@@ -7,7 +7,7 @@ Sistema completo de registro y gestión de actividades para Security Operations 
 **Producción:** Listo para deploy con Docker
 
 > Aviso: Los valores de ejemplo son placeholders. Reemplazarlos por credenciales reales desde `.env` antes de usar en producción.
-
+> Mensaje de Prueba
 ---
 
 ## Quick Start
