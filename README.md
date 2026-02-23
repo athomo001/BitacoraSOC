@@ -294,3 +294,27 @@ El estado actual de bugs conocidos y tareas pendientes se mantiene en **[ISSUES.
 
 Este proyecto se distribuye bajo la **Business Source License 1.1 (BSL 1.1)**.
 Ver archivo **[LICENSE.md](LICENSE.md)** para más detalles sobre permisos de uso comercial y no comercial.
+
+---
+
+## Troubleshooting Docker (Permisos EACCES en /app/backups/temp)
+
+Si ves este error en backend:
+`Error: EACCES: permission denied, mkdir '/app/backups/temp'`
+
+Causa:
+- Volumen bind mount (`./.data/backups`) sin permisos de escritura para el usuario `nodejs` del contenedor (uid 1001).
+
+Solución aplicada:
+- `docker-compose.yml` incluye servicio `init-permissions` que crea y corrige permisos en:
+  - `./.data/backups`
+  - `./.data/uploads`
+  - `./.data/logs`
+
+Recuperación manual (si ya está roto):
+```bash
+sudo chown -R 1001:1001 .data/backups .data/uploads .data/logs
+sudo chmod -R ug+rwX .data/backups .data/uploads .data/logs
+mkdir -p .data/backups/temp
+docker compose up -d --build
+```

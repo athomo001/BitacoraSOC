@@ -1,5 +1,4 @@
 services:
-  # MongoDB
   mongodb:
     image: mongo:7
     container_name: bitacora-mongodb
@@ -14,13 +13,34 @@ services:
     networks:
       - bitacora-network
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      test:
+        - CMD-SHELL
+        - >
+          mongosh --host localhost --port 27017
+          --username "$${MONGO_INITDB_ROOT_USERNAME}"
+          --password "$${MONGO_INITDB_ROOT_PASSWORD}"
+          --authenticationDatabase admin
+          --quiet --eval "db.runCommand({ ping: 1 }).ok" | grep 1
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 15s
 
-  # Backend (Node.js + Express)
+  init-permissions:
+    image: alpine:3.20
+    container_name: bitacora-init-permissions
+    restart: "no"
+    command: >
+      sh -c "
+      mkdir -p /work/backups/temp /work/uploads /work/logs &&
+      chown -R 1001:1001 /work/backups /work/uploads /work/logs &&
+      chmod -R ug+rwX /work/backups /work/uploads /work/logs
+      "
+    volumes:
+      - ./.data/uploads:/work/uploads
+      - ./.data/logs:/work/logs
+      - ./.data/backups:/work/backups
+
   backend:
     build:
       context: ./backend
@@ -34,6 +54,8 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
+      init-permissions:
+        condition: service_completed_successfully
     environment:
       NODE_ENV: development
       PORT: 3000
@@ -61,15 +83,7 @@ services:
       - ./.data/backups:/app/backups
     networks:
       - bitacora-network
-    # Comentado temporalmente - problemas con health check en Windows
-    # healthcheck:
-    #   test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/health"]
-    #   interval: 5s
-    #   timeout: 3s
-    #   retries: 5
-    #   start_period: 30s
 
-  # Frontend (Angular + Nginx)
   frontend:
     build:
       context: ./frontend

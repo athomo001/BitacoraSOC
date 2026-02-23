@@ -278,3 +278,20 @@ docker exec bitacora-mongodb mongosh \
     print(`✅ ${res.modifiedCount} entradas actualizadas`);
   '
 ```
+
+## Error EACCES en backend (/app/backups/temp)
+
+Síntoma:
+- Backend reinicia en bucle con:
+`EACCES: permission denied, mkdir '/app/backups/temp'`
+
+Mitigación:
+- El `docker-compose.yml` incluye `init-permissions` para preparar permisos de volúmenes bind antes de levantar backend.
+
+Comandos de recuperación:
+```bash
+sudo chown -R 1001:1001 .data/backups .data/uploads .data/logs
+sudo chmod -R ug+rwX .data/backups .data/uploads .data/logs
+mkdir -p .data/backups/temp
+docker compose up -d --build
+```
