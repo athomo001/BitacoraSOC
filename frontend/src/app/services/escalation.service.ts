@@ -20,7 +20,12 @@ import {
   ShiftOverrideFormData,
   ExternalPerson,
   RaciEntry,
-  RaciEntryFormData
+  RaciEntryFormData,
+  ClientAlertRule,
+  ClientAlertRuleFormData,
+  ClientAlertEvaluation,
+  ClientAlertAckPayload,
+  ClientAlertContext
 } from '../models/escalation.model';
 
 @Injectable({
@@ -98,6 +103,38 @@ export class EscalationService {
       params = params.set('serviceId', serviceId);
     }
     return this.http.get<RaciEntry[]>(`${this.apiUrl}/raci`, { params });
+  }
+
+  /**
+   * Evaluar alerta especial por cliente para el contexto actual del analista
+   */
+  evaluateClientAlert(
+    clientId: string,
+    context: ClientAlertContext = 'report'
+  ): Observable<ClientAlertEvaluation> {
+    const params = new HttpParams()
+      .set('clientId', clientId)
+      .set('context', context);
+    return this.http.get<ClientAlertEvaluation>(`${this.apiUrl}/client-alert`, { params });
+  }
+
+  /**
+   * Confirmar lectura de alerta especial (acknowledgement)
+   */
+  acknowledgeClientAlert(payload: ClientAlertAckPayload): Observable<{
+    acknowledged: boolean;
+    ruleId: string;
+    clientId: string;
+    context: ClientAlertContext;
+    acknowledgedAt: string;
+  }> {
+    return this.http.post<{
+      acknowledged: boolean;
+      ruleId: string;
+      clientId: string;
+      context: ClientAlertContext;
+      acknowledgedAt: string;
+    }>(`${this.apiUrl}/client-alert/ack`, payload);
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -185,6 +222,32 @@ export class EscalationService {
 
   deleteRaci(id: string): Observable<{ message: string }> {
     return this.http.delete<{ message: string }>(`${this.apiUrl}/admin/raci/${id}`);
+  }
+
+  /**
+   * CRUD ADMIN - Reglas especiales por cliente (B22)
+   */
+  getClientAlertRules(clientId?: string, enabled?: boolean): Observable<ClientAlertRule[]> {
+    let params = new HttpParams();
+    if (clientId) {
+      params = params.set('clientId', clientId);
+    }
+    if (enabled !== undefined) {
+      params = params.set('enabled', String(enabled));
+    }
+    return this.http.get<ClientAlertRule[]>(`${this.apiUrl}/admin/client-alert-rules`, { params });
+  }
+
+  createClientAlertRule(data: ClientAlertRuleFormData): Observable<ClientAlertRule> {
+    return this.http.post<ClientAlertRule>(`${this.apiUrl}/admin/client-alert-rules`, data);
+  }
+
+  updateClientAlertRule(id: string, data: ClientAlertRuleFormData): Observable<ClientAlertRule> {
+    return this.http.put<ClientAlertRule>(`${this.apiUrl}/admin/client-alert-rules/${id}`, data);
+  }
+
+  deleteClientAlertRule(id: string): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.apiUrl}/admin/client-alert-rules/${id}`);
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

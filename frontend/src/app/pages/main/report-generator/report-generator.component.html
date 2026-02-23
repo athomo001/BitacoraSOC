@@ -87,6 +87,33 @@
           Campo obligatorio
         </div>
 
+        <div class="client-alert-banner" *ngIf="activeClientAlert?.hasAlert">
+          <div class="client-alert-header">
+            <mat-icon color="warn">warning</mat-icon>
+            <strong>Alerta especial de escalamiento para {{ activeClientAlert?.client?.name }}</strong>
+          </div>
+          <p class="client-alert-message">
+            {{ activeClientAlert?.rule?.alertMessage }}
+          </p>
+          <p class="client-alert-meta">
+            Contexto: {{ activeClientAlert?.context === 'copy-report' ? 'Copiar reporte' : 'Generación de reporte' }} |
+            Hora evaluada: {{ activeClientAlert?.evaluation?.localDate }} {{ activeClientAlert?.evaluation?.localTime }}
+            ({{ activeClientAlert?.evaluation?.timezone }})
+          </p>
+          <div class="client-alert-actions">
+            <button mat-stroked-button color="warn" type="button" (click)="acknowledgeCurrentAlert()">
+              <mat-icon>fact_check</mat-icon>
+              Confirmar lectura
+            </button>
+            <span class="client-alert-status pending" *ngIf="hasPendingClientAlert">
+              Pendiente de confirmación
+            </span>
+            <span class="client-alert-status ok" *ngIf="!hasPendingClientAlert">
+              Confirmada
+            </span>
+          </div>
+        </div>
+
         <!-- Destino -->
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Destino</mat-label>

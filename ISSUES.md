@@ -30,6 +30,7 @@
 | B19 | Pendiente | Integraciones | Envío automático a GLPI al cierre de turno | Automatizar creación de ticket al cierre con resumen de entradas y estado de checklist, sin bloquear operación si falla integración. |
 | B20 | Pendiente | UI/UX | Tema Cyberpunk/Neon | Nuevo tema visual opcional, cuidando contraste y sin repetir problemas del dark mode actual. |
 | B21 | Pendiente | Backup/Operación | Backups automáticos programables + destino externo + retención configurable | Permitir programar respaldo automático cada N días, enviar a destino configurable (nube/NFS/Samba) y definir expiración local de respaldos. |
+| B22 | Pendiente | Mejoras/Escalamiento | Alertas de escalamiento especiales por cliente y horario en reportes | Al seleccionar cliente o generar/copiar reporte, mostrar alerta contextual con acciones adicionales (ej. fuera de horario: avisar por WhatsApp además del correo), configurable por admin en la ficha del cliente. |
 
 ---
 
@@ -2099,6 +2100,34 @@ module.exports = { sendViaIntegration };
     - Crear un modelo/vista `metrics` en backend (aggregation pipeline) con cache por dia.
     - Reutilizar indices existentes y agregar indices en `clientId`, `createdAt`, `tags`, `severity`.
     - Exponer un endpoint de "schema" para que BI pueda descubrir campos.
+
+#### **B22** **Alerta de requerimientos especiales de escalamiento por cliente y horario**
+
+- **Contexto:** No todos los clientes usan el mismo flujo de escalamiento. Algunos requieren acciones especiales fuera de horario habil (por ejemplo, avisar por WhatsApp ademas del correo regular).
+- **Objetivo:** Al elegir un cliente y al momento de generar/copiar reporte, el sistema debe evaluar reglas especiales activas y mostrar un cuadro de alerta visible al analista con la instruccion exacta a ejecutar.
+- **Comportamiento esperado (analista):**
+    1. Selecciona cliente en flujo de reporte.
+    2. El sistema evalua reglas especiales del cliente segun fecha/hora actual y zona horaria configurada.
+    3. Si aplica una regla, muestra modal/alerta destacada con mensaje operativo (ej: "Fuera de horario: avisar por WhatsApp al +56... y luego enviar correo").
+    4. El analista confirma lectura antes de continuar (no bloquea totalmente, pero exige acknowledgement).
+    5. Si no aplica regla, sigue el flujo normal sin alerta especial.
+- **Configuracion admin (sugerida en creacion/edicion de clientes):**
+    - Habilitar/deshabilitar reglas especiales por cliente.
+    - Definir ventanas horarias (ej: fuera de horario habil, despues de las 17:00, fines de semana, feriados).
+    - Definir canal y destinatarios por regla (correo, WhatsApp, telefono, otros).
+    - Definir mensaje de alerta que vera el analista.
+    - Definir vigencia y prioridad de la regla.
+- **Alcance tecnico sugerido:**
+    - Modelo `ClientEscalationRule` (o campo embebido en cliente) con `clientId`, `enabled`, `timeWindows`, `channels`, `contacts`, `alertMessage`, `timezone`, `priority`.
+    - Endpoint de evaluacion: `GET /api/escalation/client-alert?clientId=...&context=report`.
+    - Hook UI en pantalla de reportes: disparar evaluacion al cambiar cliente y al usar accion "copiar reporte".
+    - Registrar en auditoria: regla mostrada, usuario, fecha/hora, confirmacion de lectura.
+- **Criterios de aceptacion:**
+    1. Admin puede crear/editar reglas especiales desde la configuracion del cliente sin hardcode.
+    2. Si una regla aplica por horario, el analista ve alerta antes de enviar/comunicar el reporte.
+    3. La alerta indica claramente la accion adicional al correo regular (ej. WhatsApp).
+    4. Si no hay regla aplicable, no se muestra alerta.
+    5. Cada visualizacion/confirmacion queda en logs de auditoria.
 
 ### 3. Propuestas Arquitectónicas
 

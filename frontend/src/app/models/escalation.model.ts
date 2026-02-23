@@ -12,6 +12,80 @@ export interface Client {
   updatedAt?: string;
 }
 
+export type ClientAlertContext = 'report' | 'copy-report';
+export type ClientAlertChannelType = 'email' | 'whatsapp' | 'telefono' | 'otro';
+export type ClientAlertWindowMode =
+  | 'always'
+  | 'outside_business_hours'
+  | 'between_hours'
+  | 'after_hour'
+  | 'before_hour'
+  | 'weekend_only'
+  | 'weekdays_only';
+
+export interface ClientAlertChannel {
+  type: ClientAlertChannelType;
+  target: string;
+  notes?: string;
+}
+
+export interface ClientAlertTimeWindow {
+  mode: ClientAlertWindowMode;
+  startTime?: string;
+  endTime?: string;
+  daysOfWeek?: number[];
+  holidayOnly?: boolean;
+}
+
+export interface ClientAlertRule {
+  _id: string;
+  clientId: string | {
+    _id: string;
+    name?: string;
+    parent?: string | null;
+    enabled?: boolean;
+  };
+  name?: string;
+  enabled: boolean;
+  contexts: ClientAlertContext[];
+  timezone: string;
+  priority: number;
+  validFrom?: string | null;
+  validTo?: string | null;
+  holidayDates?: string[];
+  timeWindows: ClientAlertTimeWindow[];
+  channels: ClientAlertChannel[];
+  alertMessage: string;
+  acknowledgementRequired: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ClientAlertEvaluation {
+  hasAlert: boolean;
+  context: ClientAlertContext;
+  client: {
+    _id: string;
+    name: string;
+    parent?: string | null;
+  };
+  evaluation: {
+    evaluatedAt: string;
+    timezone: string;
+    localDate: string;
+    localTime: string;
+    dayOfWeek: number;
+  };
+  rule: ClientAlertRule | null;
+}
+
+export interface ClientAlertAckPayload {
+  ruleId: string;
+  clientId?: string;
+  context?: ClientAlertContext;
+  acknowledgedAt?: string;
+}
+
 export interface Service {
   _id: string;
   clientId: string | Client;
@@ -191,6 +265,22 @@ export interface ClientFormData {
   code: string;
   description?: string;
   active: boolean;
+}
+
+export interface ClientAlertRuleFormData {
+  clientId: string;
+  name?: string;
+  enabled: boolean;
+  contexts: ClientAlertContext[];
+  timezone: string;
+  priority: number;
+  validFrom?: string | null;
+  validTo?: string | null;
+  holidayDates?: string[];
+  timeWindows: ClientAlertTimeWindow[];
+  channels: ClientAlertChannel[];
+  alertMessage: string;
+  acknowledgementRequired: boolean;
 }
 
 export interface ServiceFormData {
