@@ -164,8 +164,10 @@ docker-compose exec backend npm run seed
 
 ### Volúmenes persistentes
 - `mongodb_data`: Datos de la base de datos
+- `mongodb_config`: Configuración interna de MongoDB
 - `backend_uploads`: Logos y archivos subidos
-- `backend_logs`: Logs del sistema
+- `backend_logs`: Logs del sistema (si se habilita salida a archivo)
+- `backend_backups`: Backups JSON creados desde la API `/api/backup/*`
 
 ### Comandos útiles
 

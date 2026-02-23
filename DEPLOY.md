@@ -187,6 +187,11 @@ docker volume ls
 docker run --rm -v bitacorasoc_backend_uploads:/source \
   -v $(pwd)/backups:/backup alpine \
   tar czf /backup/uploads-$(date +%Y%m%d).tar.gz -C /source .
+
+# Backup JSON de la app (ruta /app/backups del backend)
+docker run --rm -v bitacorasoc_backend_backups:/source \
+  -v $(pwd)/backups:/backup alpine \
+  tar czf /backup/app-backups-$(date +%Y%m%d).tar.gz -C /source .
 ```
 
 ## Troubleshooting
