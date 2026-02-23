@@ -33,6 +33,7 @@ const CatalogOperationType = require('../models/CatalogOperationType');
 const ChecklistTemplate = require('../models/ChecklistTemplate');
 const Client = require('../models/Client');
 const Contact = require('../models/Contact');
+const ClientEscalationRule = require('../models/ClientEscalationRule');
 const EscalationRule = require('../models/EscalationRule');
 const ExternalPerson = require('../models/ExternalPerson');
 const LogForwardingConfig = require('../models/LogForwardingConfig');
@@ -102,6 +103,7 @@ const backupModels = {
   checklistTemplates: ChecklistTemplate,
   clients: Client,
   contacts: Contact,
+  clientEscalationRules: ClientEscalationRule,
   escalationRules: EscalationRule,
   externalPersons: ExternalPerson,
   logForwardingConfigs: LogForwardingConfig,
@@ -157,7 +159,7 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
     // Exportar todas las colecciones
     const [entries, checks, users, adminNotes, appConfigs, auditLogs,
            catalogEvents, catalogLogSources, catalogOperationTypes,
-           checklistTemplates, clients, contacts, escalationRules,
+           checklistTemplates, clients, contacts, clientEscalationRules, escalationRules,
            externalPersons, logForwardingConfigs, personalNotes,
            services, serviceCatalogs, shiftAssignments, shiftOverrides,
            shiftRoles, shiftRotationCycles, smtpConfigs] = await Promise.all([
@@ -173,6 +175,7 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
       ChecklistTemplate.find().lean(),
       Client.find().lean(),
       Contact.find().lean(),
+      ClientEscalationRule.find().lean(),
       EscalationRule.find().lean(),
       ExternalPerson.find().lean(),
       LogForwardingConfig.find().lean(),
@@ -191,12 +194,12 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
         created: new Date(),
         version: '2.0',
         createdBy: req.user._id,
-        collections: 23
+        collections: 24
       },
       data: {
         entries, checks, users, adminNotes, appConfigs, auditLogs,
         catalogEvents, catalogLogSources, catalogOperationTypes,
-        checklistTemplates, clients, contacts, escalationRules,
+        checklistTemplates, clients, contacts, clientEscalationRules, escalationRules,
         externalPersons, logForwardingConfigs, personalNotes,
         services, serviceCatalogs, shiftAssignments, shiftOverrides,
         shiftRoles, shiftRotationCycles, smtpConfigs
@@ -216,7 +219,7 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
     res.json({
       message: 'Backup creado exitosamente',
       filename,
-      collections: 23,
+      collections: 24,
       documents: totalDocs
     });
   } catch (error) {

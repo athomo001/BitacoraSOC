@@ -1,8 +1,12 @@
 import { Component } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatDialog } from '@angular/material/dialog';
+import { firstValueFrom } from 'rxjs';
 import { CatalogService } from '../../../services/catalog.service';
 import { CatalogEvent, CatalogLogSource, CatalogOperationType } from '../../../models/catalog.model';
+import { EscalationService } from '../../../services/escalation.service';
+import { ClientAlertContext, ClientAlertEvaluation } from '../../../models/escalation.model';
 import { MatCard, MatCardHeader, MatCardTitle, MatCardSubtitle, MatCardContent } from '@angular/material/card';
 import { EntityAutocompleteComponent } from '../../../components/entity-autocomplete/entity-autocomplete.component';
 import { NgIf, NgFor } from '@angular/common';
@@ -13,6 +17,7 @@ import { MatSelect } from '@angular/material/select';
 import { MatOption } from '@angular/material/core';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
+import { ClientAlertDialogComponent } from './client-alert-dialog.component';
 
 @Component({
     selector: 'app-report-generator',
@@ -30,11 +35,16 @@ export class ReportGeneratorComponent {
   uploadedImages: { name: string, dataUrl: string }[] = [];
   generatedHtml = '';
   showPreview = false;
+  activeClientAlert: ClientAlertEvaluation | null = null;
+  isEvaluatingClientAlert = false;
+  private readonly acknowledgedRuleIds = new Set<string>();
 
   constructor(
     private fb: FormBuilder,
     public catalogService: CatalogService,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private escalationService: EscalationService,
+    private dialog: MatDialog
   ) {
     this.reportForm = this.fb.group({
       tipoOperacion: ['', Validators.required],
@@ -78,12 +88,14 @@ export class ReportGeneratorComponent {
       this.reportForm.patchValue({
         logSource: source.name
       });
+      void this.refreshClientAlert('report', true);
     }
   }
 
   onLogSourceCleared(): void {
     this.selectedLogSource = null;
     this.reportForm.patchValue({ logSource: '' });
+    this.activeClientAlert = null;
   }
 
   onOperationTypeSelected(type: any): void {
@@ -225,9 +237,14 @@ export class ReportGeneratorComponent {
     this.showPreview = true;
   }
 
-  copyToClipboard(): void {
+  async copyToClipboard(): Promise<void> {
     if (!this.generatedHtml) {
       this.snackBar.open('Primero genera la tabla', 'Cerrar', { duration: 3000 });
+      return;
+    }
+
+    const canContinue = await this.ensureClientAlertAcknowledged('copy-report');
+    if (!canContinue) {
       return;
     }
 
@@ -273,9 +290,14 @@ export class ReportGeneratorComponent {
     this.snackBar.open('Error al copiar. Selecciona y copia manualmente.', 'Cerrar', { duration: 3000 });
   }
 
-  copyMarkdown(): void {
+  async copyMarkdown(): Promise<void> {
     if (!this.generatedHtml) {
       this.snackBar.open('Primero genera la tabla', 'Cerrar', { duration: 3000 });
+      return;
+    }
+
+    const canContinue = await this.ensureClientAlertAcknowledged('copy-report');
+    if (!canContinue) {
       return;
     }
 
@@ -384,6 +406,118 @@ export class ReportGeneratorComponent {
     return lines.join('\n');
   }
 
+  get hasPendingClientAlert(): boolean {
+    const ruleId = this.activeClientAlert?.rule?._id;
+    return !!(ruleId && !this.acknowledgedRuleIds.has(ruleId));
+  }
+
+  async acknowledgeCurrentAlert(): Promise<void> {
+    if (!this.activeClientAlert?.hasAlert || !this.activeClientAlert.rule) {
+      return;
+    }
+    await this.promptClientAlert(true);
+  }
+
+  private async refreshClientAlert(context: ClientAlertContext, showDialog: boolean): Promise<void> {
+    if (!this.selectedLogSource?._id) {
+      this.activeClientAlert = null;
+      return;
+    }
+
+    this.isEvaluatingClientAlert = true;
+    try {
+      const evaluation = await firstValueFrom(
+        this.escalationService.evaluateClientAlert(this.selectedLogSource._id, context)
+      );
+      this.activeClientAlert = evaluation;
+
+      if (showDialog && evaluation.hasAlert && this.hasPendingClientAlert) {
+        await this.promptClientAlert(false);
+      }
+    } catch (error) {
+      console.error('Error evaluando alerta especial por cliente:', error);
+      this.activeClientAlert = null;
+    } finally {
+      this.isEvaluatingClientAlert = false;
+    }
+  }
+
+  private async ensureClientAlertAcknowledged(context: ClientAlertContext): Promise<boolean> {
+    await this.refreshClientAlert(context, false);
+
+    if (!this.activeClientAlert?.hasAlert || !this.activeClientAlert.rule) {
+      return true;
+    }
+
+    if (!this.activeClientAlert.rule.acknowledgementRequired) {
+      return true;
+    }
+
+    if (!this.hasPendingClientAlert) {
+      return true;
+    }
+
+    const confirmed = await this.promptClientAlert(true);
+    if (!confirmed) {
+      this.snackBar.open('Debes confirmar lectura de la alerta antes de continuar', 'Cerrar', { duration: 4000 });
+    }
+
+    return confirmed;
+  }
+
+  private async promptClientAlert(requireAckForContinue: boolean): Promise<boolean> {
+    if (!this.activeClientAlert?.hasAlert || !this.activeClientAlert.rule) {
+      return true;
+    }
+
+    const evaluation = this.activeClientAlert;
+    const rule = evaluation.rule;
+    if (!rule) {
+      return true;
+    }
+
+    const dialogRef = this.dialog.open(ClientAlertDialogComponent, {
+      width: '680px',
+      maxWidth: '95vw',
+      disableClose: false,
+      data: {
+        clientName: evaluation.client.name,
+        contextLabel: this.getContextLabel(evaluation.context),
+        message: rule.alertMessage,
+        channels: rule.channels || [],
+        timezone: evaluation.evaluation.timezone,
+        localDate: evaluation.evaluation.localDate,
+        localTime: evaluation.evaluation.localTime
+      }
+    });
+
+    const acknowledged = await firstValueFrom(dialogRef.afterClosed());
+    if (!acknowledged) {
+      return !requireAckForContinue;
+    }
+
+    try {
+      await firstValueFrom(this.escalationService.acknowledgeClientAlert({
+        ruleId: rule._id,
+        clientId: evaluation.client._id,
+        context: evaluation.context,
+        acknowledgedAt: new Date().toISOString()
+      }));
+
+      this.acknowledgedRuleIds.add(rule._id);
+      this.snackBar.open('Alerta confirmada', 'Cerrar', { duration: 2000 });
+      return true;
+    } catch (error) {
+      console.error('Error registrando confirmación de alerta:', error);
+      this.snackBar.open('No se pudo registrar la confirmación de alerta', 'Cerrar', { duration: 4000 });
+      return false;
+    }
+  }
+
+  private getContextLabel(context: ClientAlertContext): string {
+    return context === 'copy-report' ? 'Copiar reporte' : 'Generación de reporte';
+  }
+
   clearForm(): void {
     this.selectedEvent = null;
     this.selectedLogSource = null;
@@ -396,5 +530,6 @@ export class ReportGeneratorComponent {
     this.uploadedImages = [];
     this.generatedHtml = '';
     this.showPreview = false;
+    this.activeClientAlert = null;
   }
 }

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticate } = require('../middleware/auth');
 const escalationController = require('../controllers/escalationController');
+const clientAlertController = require('../controllers/clientAlertController');
 
 // Middleware para verificar que el usuario es ADMIN
 const requireAdmin = (req, res, next) => {
@@ -57,6 +58,20 @@ router.get('/internal-shifts', authenticate, escalationController.getInternalShi
  */
 router.get('/raci', authenticate, escalationController.getRaciByClient);
 
+/**
+ * @route   GET /api/escalation/client-alert?clientId=...&context=report
+ * @desc    Evaluar si aplica alerta especial de escalamiento por cliente
+ * @access  Private (Analyst/Admin)
+ */
+router.get('/client-alert', authenticate, clientAlertController.evaluateClientAlert);
+
+/**
+ * @route   POST /api/escalation/client-alert/ack
+ * @desc    Confirmar lectura de alerta especial
+ * @access  Private (Analyst/Admin)
+ */
+router.post('/client-alert/ack', authenticate, clientAlertController.acknowledgeClientAlert);
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 🔧 CRUD ADMIN - Clientes
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -65,6 +80,12 @@ router.get('/admin/clients', authenticate, requireAdmin, escalationController.ge
 router.post('/admin/clients', authenticate, requireAdmin, escalationController.createClient);
 router.put('/admin/clients/:id', authenticate, requireAdmin, escalationController.updateClient);
 router.delete('/admin/clients/:id', authenticate, requireAdmin, escalationController.deleteClient);
+
+// 🔧 CRUD ADMIN - Reglas especiales por cliente (B22)
+router.get('/admin/client-alert-rules', authenticate, requireAdmin, clientAlertController.getClientAlertRules);
+router.post('/admin/client-alert-rules', authenticate, requireAdmin, clientAlertController.createClientAlertRule);
+router.put('/admin/client-alert-rules/:id', authenticate, requireAdmin, clientAlertController.updateClientAlertRule);
+router.delete('/admin/client-alert-rules/:id', authenticate, requireAdmin, clientAlertController.deleteClientAlertRule);
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 🔧 CRUD ADMIN - Servicios

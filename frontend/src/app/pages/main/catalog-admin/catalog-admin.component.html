@@ -1,11 +1,9 @@
 <div class="catalog-admin-container">
-  <h1>📚 Administración de Catálogos</h1>
-  <p class="subtitle">Gestiona eventos, log sources y tipos de operación</p>
+  <h1>Administracion de Catalogos</h1>
+  <p class="subtitle">Gestiona eventos, log sources, reglas especiales y tipos de operacion</p>
 
   <mat-tab-group [(selectedIndex)]="activeTabIndex">
-    
-    <!-- TAB 1: EVENTOS -->
-    <mat-tab label="🔥 Eventos">
+    <mat-tab label="Eventos">
       <div class="tab-content">
         <mat-card class="form-card">
           <mat-card-header>
@@ -15,23 +13,22 @@
             <form [formGroup]="eventForm" (ngSubmit)="saveEvent()">
               <mat-form-field appearance="outline" class="full-width">
                 <mat-label>Nombre *</mat-label>
-                <input matInput formControlName="name" placeholder="ej: Phishing">
+                <input matInput formControlName="name" placeholder="Ej: Phishing">
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Categoría/Parent</mat-label>
-                <input matInput formControlName="parent" placeholder="ej: Caza de Amenazas">
+                <mat-label>Categoria / Parent</mat-label>
+                <input matInput formControlName="parent" placeholder="Ej: Caza de amenazas">
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Descripción</mat-label>
+                <mat-label>Descripcion</mat-label>
                 <textarea matInput formControlName="description" rows="2"></textarea>
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Motivo por Defecto</mat-label>
-                <textarea matInput formControlName="motivoDefault" rows="3" 
-                          placeholder="Texto que se auto-completará al seleccionar este evento"></textarea>
+                <mat-label>Motivo por defecto</mat-label>
+                <textarea matInput formControlName="motivoDefault" rows="3"></textarea>
               </mat-form-field>
 
               <mat-checkbox formControlName="enabled">Habilitado</mat-checkbox>
@@ -41,7 +38,7 @@
                   <mat-icon>{{ editingEventId ? 'save' : 'add' }}</mat-icon>
                   {{ editingEventId ? 'Actualizar' : 'Crear' }}
                 </button>
-                <button mat-stroked-button type="button" (click)="cancelEventEdit()" *ngIf="editingEventId">
+                <button mat-stroked-button type="button" *ngIf="editingEventId" (click)="cancelEventEdit()">
                   <mat-icon>cancel</mat-icon>
                   Cancelar
                 </button>
@@ -52,48 +49,37 @@
 
         <mat-card class="list-card">
           <mat-card-header>
-            <mat-card-title>Lista de Eventos ({{ events.length }})</mat-card-title>
+            <mat-card-title>Eventos ({{ events.length }})</mat-card-title>
           </mat-card-header>
           <mat-card-content>
             <div class="table-container">
-              <table mat-table [dataSource]="events" class="catalog-table">
-                
-                <ng-container matColumnDef="name">
-                  <th mat-header-cell *matHeaderCellDef>Nombre</th>
-                  <td mat-cell *matCellDef="let event">
-                    <strong>{{ event.name }}</strong>
-                    <span class="parent-badge" *ngIf="event.parent">({{ event.parent }})</span>
-                  </td>
-                </ng-container>
-
-                <ng-container matColumnDef="description">
-                  <th mat-header-cell *matHeaderCellDef>Descripción</th>
-                  <td mat-cell *matCellDef="let event">{{ event.description || '-' }}</td>
-                </ng-container>
-
-                <ng-container matColumnDef="enabled">
-                  <th mat-header-cell *matHeaderCellDef>Estado</th>
-                  <td mat-cell *matCellDef="let event">
-                    <mat-icon [class.enabled]="event.enabled" [class.disabled]="!event.enabled">
-                      {{ event.enabled ? 'check_circle' : 'cancel' }}
-                    </mat-icon>
-                  </td>
-                </ng-container>
-
-                <ng-container matColumnDef="actions">
-                  <th mat-header-cell *matHeaderCellDef>Acciones</th>
-                  <td mat-cell *matCellDef="let event">
-                    <button mat-icon-button color="primary" (click)="editEvent(event)" matTooltip="Editar">
-                      <mat-icon>edit</mat-icon>
-                    </button>
-                    <button mat-icon-button color="warn" (click)="deleteEvent(event._id)" matTooltip="Deshabilitar">
-                      <mat-icon>delete</mat-icon>
-                    </button>
-                  </td>
-                </ng-container>
-
-                <tr mat-header-row *matHeaderRowDef="['name', 'description', 'enabled', 'actions']"></tr>
-                <tr mat-row *matRowDef="let row; columns: ['name', 'description', 'enabled', 'actions'];"></tr>
+              <table class="catalog-table">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Descripcion</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let event of events">
+                    <td>
+                      <strong>{{ event.name }}</strong>
+                      <span class="parent-badge" *ngIf="event.parent">({{ event.parent }})</span>
+                    </td>
+                    <td>{{ event.description || '-' }}</td>
+                    <td>{{ event.enabled ? 'Activo' : 'Inactivo' }}</td>
+                    <td>
+                      <button mat-icon-button color="primary" (click)="editEvent(event)" matTooltip="Editar">
+                        <mat-icon>edit</mat-icon>
+                      </button>
+                      <button mat-icon-button color="warn" (click)="deleteEvent(event._id)" matTooltip="Deshabilitar">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
               </table>
             </div>
           </mat-card-content>
@@ -101,8 +87,7 @@
       </div>
     </mat-tab>
 
-    <!-- TAB 2: LOG SOURCES -->
-    <mat-tab label="🖥️ Log Sources / Clientes">
+    <mat-tab label="Log Sources / Clientes">
       <div class="tab-content">
         <mat-card class="form-card">
           <mat-card-header>
@@ -112,11 +97,11 @@
             <form [formGroup]="logSourceForm" (ngSubmit)="saveLogSource()">
               <mat-form-field appearance="outline" class="full-width">
                 <mat-label>Nombre *</mat-label>
-                <input matInput formControlName="name" placeholder="ej: Firewall Fortigate">
+                <input matInput formControlName="name" placeholder="Ej: Firewall Fortigate">
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Descripción</mat-label>
+                <mat-label>Descripcion</mat-label>
                 <textarea matInput formControlName="description" rows="2"></textarea>
               </mat-form-field>
 
@@ -127,7 +112,7 @@
                   <mat-icon>{{ editingLogSourceId ? 'save' : 'add' }}</mat-icon>
                   {{ editingLogSourceId ? 'Actualizar' : 'Crear' }}
                 </button>
-                <button mat-stroked-button type="button" (click)="cancelLogSourceEdit()" *ngIf="editingLogSourceId">
+                <button mat-stroked-button type="button" *ngIf="editingLogSourceId" (click)="cancelLogSourceEdit()">
                   <mat-icon>cancel</mat-icon>
                   Cancelar
                 </button>
@@ -138,45 +123,34 @@
 
         <mat-card class="list-card">
           <mat-card-header>
-            <mat-card-title>Lista de Log Sources ({{ logSources.length }})</mat-card-title>
+            <mat-card-title>Log Sources ({{ logSources.length }})</mat-card-title>
           </mat-card-header>
           <mat-card-content>
             <div class="table-container">
-              <table mat-table [dataSource]="logSources" class="catalog-table">
-                
-                <ng-container matColumnDef="name">
-                  <th mat-header-cell *matHeaderCellDef>Nombre</th>
-                  <td mat-cell *matCellDef="let source"><strong>{{ source.name }}</strong></td>
-                </ng-container>
-
-                <ng-container matColumnDef="description">
-                  <th mat-header-cell *matHeaderCellDef>Descripción</th>
-                  <td mat-cell *matCellDef="let source">{{ source.description || '-' }}</td>
-                </ng-container>
-
-                <ng-container matColumnDef="enabled">
-                  <th mat-header-cell *matHeaderCellDef>Estado</th>
-                  <td mat-cell *matCellDef="let source">
-                    <mat-icon [class.enabled]="source.enabled" [class.disabled]="!source.enabled">
-                      {{ source.enabled ? 'check_circle' : 'cancel' }}
-                    </mat-icon>
-                  </td>
-                </ng-container>
-
-                <ng-container matColumnDef="actions">
-                  <th mat-header-cell *matHeaderCellDef>Acciones</th>
-                  <td mat-cell *matCellDef="let source">
-                    <button mat-icon-button color="primary" (click)="editLogSource(source)">
-                      <mat-icon>edit</mat-icon>
-                    </button>
-                    <button mat-icon-button color="warn" (click)="deleteLogSource(source._id)">
-                      <mat-icon>delete</mat-icon>
-                    </button>
-                  </td>
-                </ng-container>
-
-                <tr mat-header-row *matHeaderRowDef="['name', 'description', 'enabled', 'actions']"></tr>
-                <tr mat-row *matRowDef="let row; columns: ['name', 'description', 'enabled', 'actions'];"></tr>
+              <table class="catalog-table">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Descripcion</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let source of logSources">
+                    <td><strong>{{ source.name }}</strong></td>
+                    <td>{{ source.description || '-' }}</td>
+                    <td>{{ source.enabled ? 'Activo' : 'Inactivo' }}</td>
+                    <td>
+                      <button mat-icon-button color="primary" (click)="editLogSource(source)" matTooltip="Editar">
+                        <mat-icon>edit</mat-icon>
+                      </button>
+                      <button mat-icon-button color="warn" (click)="deleteLogSource(source._id)" matTooltip="Eliminar">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
               </table>
             </div>
           </mat-card-content>
@@ -184,29 +158,185 @@
       </div>
     </mat-tab>
 
-    <!-- TAB 3: TIPOS DE OPERACIÓN -->
-    <mat-tab label="⚙️ Tipos de Operación">
+    <mat-tab label="Alertas Especiales">
       <div class="tab-content">
         <mat-card class="form-card">
           <mat-card-header>
-            <mat-card-title>{{ editingOperationTypeId ? 'Editar Tipo' : 'Nuevo Tipo de Operación' }}</mat-card-title>
+            <mat-card-title>{{ editingClientAlertRuleId ? 'Editar Regla Especial' : 'Nueva Regla Especial' }}</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <form [formGroup]="clientAlertRuleForm" (ngSubmit)="saveClientAlertRule()">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Cliente / Log Source *</mat-label>
+                <mat-select formControlName="clientId">
+                  <mat-option *ngFor="let source of logSources" [value]="source._id">
+                    {{ source.name }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Nombre de regla</mat-label>
+                <input matInput formControlName="name" placeholder="Ej: Fuera de horario cliente VIP">
+              </mat-form-field>
+
+              <div class="form-row">
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Prioridad</mat-label>
+                  <input matInput type="number" min="1" formControlName="priority">
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Zona horaria</mat-label>
+                  <input matInput formControlName="timezone" placeholder="America/Santiago">
+                </mat-form-field>
+              </div>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Contextos de aplicacion</mat-label>
+                <mat-select formControlName="contexts" multiple>
+                  <mat-option value="report">Generar reporte</mat-option>
+                  <mat-option value="copy-report">Copiar reporte</mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Modo horario</mat-label>
+                <mat-select formControlName="mode">
+                  <mat-option *ngFor="let mode of clientAlertModes" [value]="mode.value">
+                    {{ mode.label }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <div class="form-row">
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Hora inicio (HH:mm)</mat-label>
+                  <input matInput formControlName="startTime" placeholder="09:00">
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Hora fin (HH:mm)</mat-label>
+                  <input matInput formControlName="endTime" placeholder="17:00">
+                </mat-form-field>
+              </div>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Dias de semana (0=Dom..6=Sab)</mat-label>
+                <input matInput formControlName="daysOfWeekCsv" placeholder="1,2,3,4,5">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Feriados (YYYY-MM-DD, separados por coma)</mat-label>
+                <input matInput formControlName="holidayDatesCsv" placeholder="2026-01-01,2026-12-25">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Canales y destinatarios</mat-label>
+                <textarea matInput rows="3" formControlName="channelsText"
+                          placeholder="whatsapp:+56912345678&#10;email:soc@cliente.com&#10;telefono:+56223456789"></textarea>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Mensaje de alerta *</mat-label>
+                <textarea matInput rows="4" formControlName="alertMessage"
+                          placeholder="Fuera de horario: avisar por WhatsApp al contacto de guardia y luego enviar correo"></textarea>
+              </mat-form-field>
+
+              <div class="form-row">
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Vigencia desde</mat-label>
+                  <input matInput type="datetime-local" formControlName="validFrom">
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Vigencia hasta</mat-label>
+                  <input matInput type="datetime-local" formControlName="validTo">
+                </mat-form-field>
+              </div>
+
+              <mat-checkbox formControlName="enabled">Regla habilitada</mat-checkbox>
+              <mat-checkbox formControlName="holidayOnly" style="margin-left: 16px;">Solo en feriados</mat-checkbox>
+              <mat-checkbox formControlName="acknowledgementRequired" style="margin-left: 16px;">
+                Requiere confirmacion del analista
+              </mat-checkbox>
+
+              <div class="form-actions">
+                <button mat-raised-button color="primary" type="submit">
+                  <mat-icon>{{ editingClientAlertRuleId ? 'save' : 'add_alert' }}</mat-icon>
+                  {{ editingClientAlertRuleId ? 'Actualizar' : 'Crear' }}
+                </button>
+                <button mat-stroked-button type="button" (click)="cancelClientAlertRuleEdit()">
+                  <mat-icon>cancel</mat-icon>
+                  Limpiar
+                </button>
+              </div>
+            </form>
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card class="list-card">
+          <mat-card-header>
+            <mat-card-title>Reglas especiales ({{ clientAlertRules.length }})</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <div class="table-container">
+              <table class="catalog-table">
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th>Modo</th>
+                    <th>Prioridad</th>
+                    <th>Estado</th>
+                    <th>Mensaje</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let rule of clientAlertRules">
+                    <td>{{ getClientNameForRule(rule) }}</td>
+                    <td>{{ getModeLabel(rule.timeWindows?.[0]?.mode) }}</td>
+                    <td>{{ rule.priority }}</td>
+                    <td>{{ rule.enabled ? 'Activa' : 'Inactiva' }}</td>
+                    <td>{{ rule.alertMessage }}</td>
+                    <td>
+                      <button mat-icon-button color="primary" (click)="editClientAlertRule(rule)" matTooltip="Editar">
+                        <mat-icon>edit</mat-icon>
+                      </button>
+                      <button mat-icon-button color="warn" (click)="deleteClientAlertRule(rule._id)" matTooltip="Eliminar">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </mat-tab>
+
+    <mat-tab label="Tipos de Operacion">
+      <div class="tab-content">
+        <mat-card class="form-card">
+          <mat-card-header>
+            <mat-card-title>{{ editingOperationTypeId ? 'Editar Tipo' : 'Nuevo Tipo de Operacion' }}</mat-card-title>
           </mat-card-header>
           <mat-card-content>
             <form [formGroup]="operationTypeForm" (ngSubmit)="saveOperationType()">
               <mat-form-field appearance="outline" class="full-width">
                 <mat-label>Nombre *</mat-label>
-                <input matInput formControlName="name" placeholder="ej: Análisis de Malware">
+                <input matInput formControlName="name" placeholder="Ej: Analisis de malware">
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Descripción</mat-label>
+                <mat-label>Descripcion</mat-label>
                 <textarea matInput formControlName="description" rows="2"></textarea>
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Información Adicional por Defecto</mat-label>
-                <textarea matInput formControlName="infoAdicionalDefault" rows="3" 
-                          placeholder="Texto que se auto-completará al seleccionar este tipo"></textarea>
+                <mat-label>Informacion adicional por defecto</mat-label>
+                <textarea matInput formControlName="infoAdicionalDefault" rows="3"></textarea>
               </mat-form-field>
 
               <mat-checkbox formControlName="enabled">Habilitado</mat-checkbox>
@@ -216,7 +346,7 @@
                   <mat-icon>{{ editingOperationTypeId ? 'save' : 'add' }}</mat-icon>
                   {{ editingOperationTypeId ? 'Actualizar' : 'Crear' }}
                 </button>
-                <button mat-stroked-button type="button" (click)="cancelOperationTypeEdit()" *ngIf="editingOperationTypeId">
+                <button mat-stroked-button type="button" *ngIf="editingOperationTypeId" (click)="cancelOperationTypeEdit()">
                   <mat-icon>cancel</mat-icon>
                   Cancelar
                 </button>
@@ -227,51 +357,39 @@
 
         <mat-card class="list-card">
           <mat-card-header>
-            <mat-card-title>Lista de Tipos de Operación ({{ operationTypes.length }})</mat-card-title>
+            <mat-card-title>Tipos de operacion ({{ operationTypes.length }})</mat-card-title>
           </mat-card-header>
           <mat-card-content>
             <div class="table-container">
-              <table mat-table [dataSource]="operationTypes" class="catalog-table">
-                
-                <ng-container matColumnDef="name">
-                  <th mat-header-cell *matHeaderCellDef>Nombre</th>
-                  <td mat-cell *matCellDef="let type"><strong>{{ type.name }}</strong></td>
-                </ng-container>
-
-                <ng-container matColumnDef="description">
-                  <th mat-header-cell *matHeaderCellDef>Descripción</th>
-                  <td mat-cell *matCellDef="let type">{{ type.description || '-' }}</td>
-                </ng-container>
-
-                <ng-container matColumnDef="enabled">
-                  <th mat-header-cell *matHeaderCellDef>Estado</th>
-                  <td mat-cell *matCellDef="let type">
-                    <mat-icon [class.enabled]="type.enabled" [class.disabled]="!type.enabled">
-                      {{ type.enabled ? 'check_circle' : 'cancel' }}
-                    </mat-icon>
-                  </td>
-                </ng-container>
-
-                <ng-container matColumnDef="actions">
-                  <th mat-header-cell *matHeaderCellDef>Acciones</th>
-                  <td mat-cell *matCellDef="let type">
-                    <button mat-icon-button color="primary" (click)="editOperationType(type)">
-                      <mat-icon>edit</mat-icon>
-                    </button>
-                    <button mat-icon-button color="warn" (click)="deleteOperationType(type._id)">
-                      <mat-icon>delete</mat-icon>
-                    </button>
-                  </td>
-                </ng-container>
-
-                <tr mat-header-row *matHeaderRowDef="['name', 'description', 'enabled', 'actions']"></tr>
-                <tr mat-row *matRowDef="let row; columns: ['name', 'description', 'enabled', 'actions'];"></tr>
+              <table class="catalog-table">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Descripcion</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let type of operationTypes">
+                    <td><strong>{{ type.name }}</strong></td>
+                    <td>{{ type.description || '-' }}</td>
+                    <td>{{ type.enabled ? 'Activo' : 'Inactivo' }}</td>
+                    <td>
+                      <button mat-icon-button color="primary" (click)="editOperationType(type)" matTooltip="Editar">
+                        <mat-icon>edit</mat-icon>
+                      </button>
+                      <button mat-icon-button color="warn" (click)="deleteOperationType(type._id)" matTooltip="Deshabilitar">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
               </table>
             </div>
           </mat-card-content>
         </mat-card>
       </div>
     </mat-tab>
-
   </mat-tab-group>
 </div>
