@@ -30,7 +30,7 @@
 | B19 | Pendiente | Integraciones | Envío automático a GLPI al cierre de turno | Automatizar creación de ticket al cierre con resumen de entradas y estado de checklist, sin bloquear operación si falla integración. |
 | B20 | Pendiente | UI/UX | Tema Cyberpunk/Neon | Nuevo tema visual opcional, cuidando contraste y sin repetir problemas del dark mode actual. |
 | B21 | Pendiente | Backup/Operación | Backups automáticos programables + destino externo + retención configurable | Permitir programar respaldo automático cada N días, enviar a destino configurable (nube/NFS/Samba) y definir expiración local de respaldos. |
-| B22 | Pendiente | Mejoras/Escalamiento | Alertas de escalamiento especiales por cliente y horario en reportes | Al seleccionar cliente o generar/copiar reporte, mostrar alerta contextual con acciones adicionales (ej. fuera de horario: avisar por WhatsApp además del correo), configurable por admin en la ficha del cliente. |
+| B22 | Listo | Mejoras/Escalamiento | Alertas de escalamiento especiales por cliente y horario en reportes | Al seleccionar cliente o generar/copiar reporte, mostrar alerta contextual con acciones adicionales (ej. fuera de horario: avisar por WhatsApp además del correo), configurable por admin en la ficha del cliente. |
 
 ---
 
@@ -2497,3 +2497,4 @@ Los administradores necesitan poder editar entradas de otros usuarios (de forma 
 **Prioridad:** 🟠 MEDIO - Mejora operacional importante
 
 ---
+
