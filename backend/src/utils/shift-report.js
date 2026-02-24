@@ -315,8 +315,10 @@ function generateReportText({ shift, checklistEntry, checklistExit, entries, per
  * Envía reporte de turno por correo
  * @param {string} shiftId - ID del turno
  * @param {Date} shiftDate - Fecha del turno (para buscar datos)
+ * @param {Object} options - Opciones de envío
+ * @param {boolean} options.ignoreShiftEnabled - Ignora emailReportConfig.enabled del turno
  */
-async function sendShiftReport(shiftId, shiftDate = new Date()) {
+async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
   try {
     logger.info('📊 [sendShiftReport] STARTING shift report process...', { shiftId, shiftDate });
     
@@ -328,13 +330,17 @@ async function sendShiftReport(shiftId, shiftDate = new Date()) {
 
     logger.info('📊 [sendShiftReport] Shift found', { name: shift.name, id: shift._id });
 
-    // Validar configuración
-    if (!shift.emailReportConfig?.enabled) {
+    // Validar configuración de trigger
+    const ignoreShiftEnabled = options.ignoreShiftEnabled === true;
+    if (!ignoreShiftEnabled && !shift.emailReportConfig?.enabled) {
       logger.info(`📊 [sendShiftReport] Email reports DISABLED for shift ${shift.name}`);
       return { success: true, message: 'Email reports disabled for this shift' };
     }
 
-    logger.info('📊 [sendShiftReport] Email reports ENABLED', { enabled: true });
+    logger.info('📊 [sendShiftReport] Email reports ENABLED', {
+      enabled: true,
+      ignoreShiftEnabled
+    });
 
     if (!shift.emailReportConfig.recipients || shift.emailReportConfig.recipients.length === 0) {
       logger.warn(`📊 [sendShiftReport] No recipients configured for shift ${shift.name}`);

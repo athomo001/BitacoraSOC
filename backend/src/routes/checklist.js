@@ -591,12 +591,12 @@ router.post('/check',
       //   logger.error({ err: emailError, requestId: req.requestId, checkId: check._id }, 'Error sending checklist email');
       // }
 
-      // Enviar reporte de turno al registrar cierre
-      if (type === 'cierre') {
+      // Enviar reporte de turno al registrar checklist de cierre (si está habilitado en Checklist Admin)
+      if (type === 'cierre' && config?.checklistCloseEmailEnabled) {
         try {
           const currentShift = await getCurrentShift(new Date());
           if (currentShift) {
-            await sendShiftReport(currentShift._id, new Date());
+            await sendShiftReport(currentShift._id, new Date(), { ignoreShiftEnabled: true });
           } else {
             logger.warn({ requestId: req.requestId }, 'No se encontró turno actual para enviar reporte');
           }

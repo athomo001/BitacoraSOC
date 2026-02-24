@@ -269,7 +269,7 @@
         <div class="global-email-header">
           <h3>📧 Reenvío de Información (General)</h3>
           <p class="section-description">
-            Configura el envío automático de reportes para todos los turnos
+            Configura el envío automático al finalizar turno para todos los turnos
           </p>
         </div>
 
@@ -287,8 +287,11 @@
             
             <!-- Habilitar reenvío -->
             <mat-checkbox formControlName="enabled" class="section-toggle">
-              <strong>Habilitar envío automático de reporte al finalizar turno</strong>
+              <strong>Enviar correo automáticamente al finalizar turno</strong>
             </mat-checkbox>
+            <p class="section-description">
+              El envío al registrar checklist de cierre se configura en Checklist (Admin).
+            </p>
 
             <!-- Opciones cuando está habilitado -->
             <div class="report-options" *ngIf="globalEmailForm.get('enabled')?.value">

@@ -3,6 +3,7 @@ export interface AppConfig {
   guestModeEnabled: boolean;
   guestMaxDurationDays: number;
   shiftCheckCooldownHours: number;
+  checklistCloseEmailEnabled?: boolean;
   checklistAlertEnabled?: boolean;
   checklistAlertTime?: string;
   lastChecklistAlertDate?: Date;
@@ -39,6 +40,7 @@ export interface UpdateConfigRequest {
   guestModeEnabled?: boolean;
   guestMaxDurationDays?: number;
   shiftCheckCooldownHours?: number;
+  checklistCloseEmailEnabled?: boolean;
   checklistAlertEnabled?: boolean;
   checklistAlertTime?: string;
   logoUrl?: string;

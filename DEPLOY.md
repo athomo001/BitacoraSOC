@@ -98,8 +98,8 @@ Esto inyecta `APP_VERSION` al build (ej: `v1.2.3-5-gabc1234`) y lo muestra en lo
 cd /ruta/del/proyecto
 git pull origin main
 
-# Reconstruye solo lo necesario y reinicia servicios
-docker compose up -d --build
+docker compose build --no-cache
+docker compose up -d
 ```
 
 ### Rebuild forzado (sin cache y recreando contenedores)

@@ -42,7 +42,8 @@ export class ChecklistAdminComponent implements OnInit {
     });
 
     this.configForm = this.fb.group({
-      checklistCooldownHours: [240, [Validators.required, Validators.min(1)]] // minutos (default 4 horas)
+      checklistCooldownHours: [240, [Validators.required, Validators.min(1)]], // minutos (default 4 horas)
+      checklistCloseEmailEnabled: [false]
     });
   }
 
@@ -56,7 +57,8 @@ export class ChecklistAdminComponent implements OnInit {
     this.configService.getConfig().subscribe({
       next: (config) => {
         this.configForm.patchValue({
-          checklistCooldownHours: config.shiftCheckCooldownHours
+          checklistCooldownHours: config.shiftCheckCooldownHours,
+          checklistCloseEmailEnabled: config.checklistCloseEmailEnabled ?? false
         });
       },
       error: (err) => {
@@ -70,14 +72,15 @@ export class ChecklistAdminComponent implements OnInit {
     if (this.configForm.invalid) return;
     this.savingConfig = true;
     const payload = {
-      shiftCheckCooldownHours: this.configForm.value.checklistCooldownHours
+      shiftCheckCooldownHours: this.configForm.value.checklistCooldownHours,
+      checklistCloseEmailEnabled: this.configForm.value.checklistCloseEmailEnabled
     };
     this.configService.updateConfig(payload).subscribe({
       next: () => {
-        this.snackBar.open('Cooldown checklist actualizado', 'Cerrar', { duration: 2000 });
+        this.snackBar.open('Configuración de checklist actualizada', 'Cerrar', { duration: 2000 });
       },
       error: () => {
-        this.snackBar.open('Error guardando cooldown checklist', 'Cerrar', { duration: 3000 });
+        this.snackBar.open('Error guardando configuración de checklist', 'Cerrar', { duration: 3000 });
       },
       complete: () => {
         this.savingConfig = false;

@@ -42,6 +42,11 @@ const appConfigSchema = new mongoose.Schema({
     min: 1,
     max: 1440
   },
+  // Enviar correo automáticamente al registrar checklist de cierre
+  checklistCloseEmailEnabled: {
+    type: Boolean,
+    default: false
+  },
   // Alertas de checklist (B4-7)
   checklistAlertEnabled: {
     type: Boolean,

@@ -10,6 +10,9 @@
           <mat-label>Cooldown Checklist (minutos)</mat-label>
           <input matInput type="number" formControlName="checklistCooldownHours">
         </mat-form-field>
+        <mat-checkbox formControlName="checklistCloseEmailEnabled">
+          Enviar correo al registrar checklist de cierre
+        </mat-checkbox>
         <button mat-raised-button color="primary" type="submit" [disabled]="configForm.invalid || savingConfig">
           Guardar
         </button>
