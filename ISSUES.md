@@ -31,6 +31,7 @@
 | B20 | Pendiente | UI/UX | Tema Cyberpunk/Neon | Nuevo tema visual opcional, cuidando contraste y sin repetir problemas del dark mode actual. |
 | B21 | Pendiente | Backup/Operación | Backups automáticos programables + destino externo + retención configurable | Permitir programar respaldo automático cada N días, enviar a destino configurable (nube/NFS/Samba) y definir expiración local de respaldos. |
 | B22 | Listo | Mejoras/Escalamiento | Alertas de escalamiento especiales por cliente y horario en reportes | Al seleccionar cliente o generar/copiar reporte, mostrar alerta contextual con acciones adicionales (ej. fuera de horario: avisar por WhatsApp además del correo), configurable por admin en la ficha del cliente. |
+| B23 | Pendiente | UI/UX | Eliminar checkbox duplicado envío correo | Centralizar control en Configuración Global (Opción A) eliminando el checkbox redundante en la vista de Turno Activo. |
 
 ---
 
@@ -2129,6 +2130,22 @@ module.exports = { sendViaIntegration };
     4. Si no hay regla aplicable, no se muestra alerta.
     5. Cada visualizacion/confirmacion queda en logs de auditoria.
 
+---
+
+## 🟢 B23 - Eliminar checkbox duplicado envío correo (Work Shifts)
+
+**Descripción:**
+Existe duplicidad en la configuración de envío de correos al cierre de turno:
+1. Checkbox en pantalla "Turno Activo" (local).
+2. Switch en "Configuración > Reenvío de Información" (global).
+
+**Decisión (Opción A):**
+Eliminar el control local en la vista de turnos y centralizar la decisión en la configuración global para evitar errores humanos y discrepancias.
+
+**Plan de acción:**
+1. Editar `work-shifts.component.html`: Eliminar `<mat-checkbox>` de envío de correo.
+2. Editar `work-shifts.component.ts`: Eliminar propiedad ligada al checkbox y limpiar lógica de envío.
+3. Backend: Asegurar que el envío dependa de `AppConfig.emailReportConfig` o `smtpConfig` global.
 ### 3. Propuestas Arquitectónicas
 
 #### **B3a** **Etiquetas de Cargo + Rol Auditor (sobre roles existentes)**
@@ -2497,4 +2514,3 @@ Los administradores necesitan poder editar entradas de otros usuarios (de forma 
 **Prioridad:** 🟠 MEDIO - Mejora operacional importante
 
 ---
-
