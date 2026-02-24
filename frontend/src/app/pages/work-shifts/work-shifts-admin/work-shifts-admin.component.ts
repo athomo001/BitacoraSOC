@@ -96,6 +96,7 @@ export class WorkShiftsAdminComponent implements OnInit {
       checklistTemplateId: [null],
       order: [0, Validators.min(0)],
       active: [true],
+      sendEmailOnShiftEnd: [false],
       color: [DEFAULT_COLORS[0]]
     });
   }
@@ -179,6 +180,7 @@ export class WorkShiftsAdminComponent implements OnInit {
       checklistTemplateId: shift.checklistTemplateId || null,
       order: shift.order,
       active: shift.active,
+      sendEmailOnShiftEnd: shift.emailReportConfig?.enabled || false,
       color: shift.color || DEFAULT_COLORS[0]
     });
     this.showForm = true;
@@ -208,9 +210,20 @@ export class WorkShiftsAdminComponent implements OnInit {
     }
 
     const formData: WorkShiftFormData = this.shiftForm.value;
+    const sendEmailOnShiftEnd = !!this.shiftForm.value.sendEmailOnShiftEnd;
     
     // Convertir código a mayúsculas
     formData.code = formData.code.toUpperCase();
+    delete (formData as any).sendEmailOnShiftEnd;
+
+    const baseEmailConfig = this.editingShift?.emailReportConfig || this.globalEmailForm.value || {};
+    formData.emailReportConfig = {
+      enabled: sendEmailOnShiftEnd,
+      includeChecklist: baseEmailConfig.includeChecklist ?? true,
+      includeEntries: baseEmailConfig.includeEntries ?? true,
+      recipients: baseEmailConfig.recipients || [],
+      subjectTemplate: baseEmailConfig.subjectTemplate || 'Reporte SOC [fecha] [turno]'
+    };
 
     const operation = this.editingShift
       ? this.workShiftService.updateShift(this.editingShift._id, formData)
