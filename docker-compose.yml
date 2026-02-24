@@ -26,21 +26,6 @@ services:
       retries: 5
       start_period: 15s
 
-  init-permissions:
-    image: alpine:3.20
-    container_name: bitacora-init-permissions
-    restart: "no"
-    command: >
-      sh -c "
-      mkdir -p /work/backups/temp /work/uploads /work/logs &&
-      chown -R 1001:1001 /work/backups /work/uploads /work/logs &&
-      chmod -R ug+rwX /work/backups /work/uploads /work/logs
-      "
-    volumes:
-      - ./.data/uploads:/work/uploads
-      - ./.data/logs:/work/logs
-      - ./.data/backups:/work/backups
-
   backend:
     build:
       context: ./backend
@@ -54,8 +39,6 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
-      init-permissions:
-        condition: service_completed_successfully
     environment:
       NODE_ENV: development
       PORT: 3000

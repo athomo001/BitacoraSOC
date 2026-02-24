@@ -305,8 +305,8 @@ Si ves este error en backend:
 Causa:
 - Volumen bind mount (`./.data/backups`) sin permisos de escritura para el usuario `nodejs` del contenedor (uid 1001).
 
-Solución aplicada:
-- `docker-compose.yml` incluye servicio `init-permissions` que crea y corrige permisos en:
+Mitigación:
+- Preparar permisos en host para los volúmenes bind usados por backend:
   - `./.data/backups`
   - `./.data/uploads`
   - `./.data/logs`

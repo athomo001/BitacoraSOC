@@ -146,15 +146,13 @@ export class ReportGeneratorComponent {
 
     const form = this.reportForm.value;
     const fechaFormateada = new Date(form.fecha).toLocaleDateString('es-CL');
-    const reportWidthPx = 860;
+    const reportWidthPx = 760;
+    const evidenceImageWidthPx = 420;
 
     const cellDetailStyle = 'border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere; vertical-align: top;';
     const cellLabelStyle = 'background-color: #8BC34A; font-weight: bold; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; width: 32%; max-width: 240px;';
 
-    let html = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse; width: 100%; font-family: Arial, sans-serif;">
-  <tr>
-    <td align="center" style="padding: 0;">
-      <table cellpadding="8" cellspacing="0" width="${reportWidthPx}" style="border-collapse: collapse; width: ${reportWidthPx}px; max-width: 100%; font-family: Arial, sans-serif; border: 1px solid #2b2b2b; table-layout: fixed;">
+    let html = `<table cellpadding="8" cellspacing="0" width="${reportWidthPx}" style="border-collapse: collapse; width: ${reportWidthPx}px; max-width: 100%; font-family: Arial, sans-serif; border: 1px solid #2b2b2b; table-layout: fixed; margin: 0 auto;">
   <tr>
     <th colspan="2" style="background-color: #4CAF50; color: white; text-align: center; font-size: 18px; border: 1px solid #2b2b2b;">Reporte de Detección</th>
   </tr>
@@ -218,7 +216,7 @@ export class ReportGeneratorComponent {
       }
       if (hasImages) {
         this.uploadedImages.forEach(img => {
-          html += `<img src="${img.dataUrl}" style="max-width: 100%; height: auto; max-height: 420px; object-fit: contain; margin: 8px auto; display: block; border: 1px solid #ddd;"><br>`;
+          html += `<img src="${img.dataUrl}" width="${evidenceImageWidthPx}" style="max-width: 100%; height: auto; object-fit: contain; margin: 8px auto; display: block; border: 1px solid #ddd;"><br>`;
         });
       }
       html += `</td>\n  </tr>`;
@@ -234,10 +232,6 @@ export class ReportGeneratorComponent {
   <tr>
     <td style="${cellLabelStyle}">Información adicional</td>
     <td style="white-space: pre-wrap; ${cellDetailStyle}">${form.informacionAdicional || '-'}</td>
-  </tr>
-</table>`;
-    html += `
-    </td>
   </tr>
 </table>`;
 

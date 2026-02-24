@@ -286,7 +286,7 @@ Síntoma:
 `EACCES: permission denied, mkdir '/app/backups/temp'`
 
 Mitigación:
-- El `docker-compose.yml` incluye `init-permissions` para preparar permisos de volúmenes bind antes de levantar backend.
+- Preparar permisos de volúmenes bind en host antes de levantar backend.
 
 Comandos de recuperación:
 ```bash
