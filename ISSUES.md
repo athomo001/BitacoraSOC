@@ -31,7 +31,7 @@
 | B20 | Pendiente | UI/UX | Tema Cyberpunk/Neon | Nuevo tema visual opcional, cuidando contraste y sin repetir problemas del dark mode actual. |
 | B21 | Pendiente | Backup/Operación | Backups automáticos programables + destino externo + retención configurable | Permitir programar respaldo automático cada N días, enviar a destino configurable (nube/NFS/Samba) y definir expiración local de respaldos. |
 | B22 | Listo | Mejoras/Escalamiento | Alertas de escalamiento especiales por cliente y horario en reportes | Al seleccionar cliente o generar/copiar reporte, mostrar alerta contextual con acciones adicionales (ej. fuera de horario: avisar por WhatsApp además del correo), configurable por admin en la ficha del cliente. |
-| B23 | Pendiente | UI/UX | Eliminar checkbox duplicado envío correo | Centralizar control en Configuración Global (Opción A) eliminando el checkbox redundante en la vista de Turno Activo. |
+| B23 | Listo | UI/UX | Eliminar checkbox duplicado envío correo | Centralizar control en Configuración Global (Opción A) eliminando el checkbox redundante en la vista de Turno Activo. |
 
 ---
 
