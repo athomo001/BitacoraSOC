@@ -146,18 +146,18 @@ export class ReportGeneratorComponent {
 
     const form = this.reportForm.value;
     const fechaFormateada = new Date(form.fecha).toLocaleDateString('es-CL');
-    const reportWidthPx = 760;
+    const reportWidthPx = 1040;
     const evidenceImageWidthPx = 420;
 
     const cellDetailStyle = 'border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere; vertical-align: top;';
-    const cellLabelStyle = 'background-color: #8BC34A; font-weight: bold; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; width: 32%; max-width: 240px;';
+    const cellLabelStyle = 'background-color: #8BC34A; font-weight: bold; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; width: 26%; max-width: 280px;';
 
     let html = `<table cellpadding="8" cellspacing="0" width="${reportWidthPx}" style="border-collapse: collapse; width: ${reportWidthPx}px; max-width: 100%; font-family: Arial, sans-serif; border: 1px solid #2b2b2b; table-layout: fixed; margin: 0 auto;">
   <tr>
     <th colspan="2" style="background-color: #4CAF50; color: white; text-align: center; font-size: 18px; border: 1px solid #2b2b2b;">Reporte de Detección</th>
   </tr>
   <tr>
-    <th style="background-color: #8BC34A; color: white; width: 32%; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere;">Campo</th>
+    <th style="background-color: #8BC34A; color: white; width: 26%; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere;">Campo</th>
     <th style="background-color: #8BC34A; color: white; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere;">Detalle</th>
   </tr>
   <tr>
