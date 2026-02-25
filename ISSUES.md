@@ -32,6 +32,7 @@
 | B21 | Pendiente | Backup/Operación | Backups automáticos programables + destino externo + retención configurable | Permitir programar respaldo automático cada N días, enviar a destino configurable (nube/NFS/Samba) y definir expiración local de respaldos. |
 | B22 | Listo | Mejoras/Escalamiento | Alertas de escalamiento especiales por cliente y horario en reportes | Al seleccionar cliente o generar/copiar reporte, mostrar alerta contextual con acciones adicionales (ej. fuera de horario: avisar por WhatsApp además del correo), configurable por admin en la ficha del cliente. |
 | B23 | Listo | UI/UX | Eliminar checkbox duplicado envío correo | Centralizar control en Configuración Global (Opción A) eliminando el checkbox redundante en la vista de Turno Activo. |
+| B24 | Pendiente | UI/UX + Rendimiento | Admin Catálogos: solo 50 eventos visibles | En `main/catalog-admin` hay ~1800 eventos, pero solo se ven 50; además en la tabla de Eventos debe mostrarse `Motivo por defecto` en lugar de `Descripción`. |
 
 ---
 
@@ -206,6 +207,41 @@ El módulo `Logs de Auditoría` no está registrando suficiente trazabilidad ope
 
 **Impacto esperado:**
 Mayor trazabilidad operativa y capacidad de investigación/auditoría ante incidentes y cambios en producción.
+
+---
+
+## 🟠 B24 - Admin Catálogos: solo 50 eventos visibles y columna incorrecta en listado
+
+**Descripción:**
+En `main/catalog-admin` existen ~1800 eventos, pero en la pestaña **Eventos** solo se visualizan 50. Esto impide encontrar y editar eventos específicos de forma operativa. Además, en la tabla no se desea ver `Descripción`; se requiere mostrar `Motivo por defecto`.
+
+**Análisis de situación actual (código):**
+
+1. `backend/src/routes/admin-catalog.js` (GET `/admin/catalog/events`) usa `limit = 50` por defecto y paginación por `page/limit`.
+2. `frontend/src/app/services/catalog.service.ts` (`getAllEvents`) llama al endpoint sin `page`, `limit` ni `search`.
+3. `frontend/src/app/pages/main/catalog-admin/catalog-admin.component.ts` (`loadEvents`) carga solo la primera página de la API.
+4. `frontend/src/app/pages/main/catalog-admin/catalog-admin.component.html` muestra columna `Descripción` en la grilla de eventos, no `Motivo por defecto`.
+
+**Cómo se debería hacer:**
+
+1. **Listado administrable con paginación real**
+  - Extender `GET /admin/catalog/events` para soportar y documentar `page`, `limit`, `search`, `enabled`.
+  - Mantener respuesta con `items`, `total`, `page`, `totalPages`.
+2. **Búsqueda server-side para catálogos grandes**
+  - Agregar filtro por texto (`name`, `parent`, opcional `motivoDefault`) en backend.
+  - En frontend, incluir input de búsqueda con debounce (ej. 250ms) y reinicio a página 1 al filtrar.
+3. **Paginador en UI de admin eventos**
+  - En `catalog-admin.component.ts`, manejar `eventPage`, `eventPageSize`, `eventTotal`, `eventSearch`.
+  - Agregar `mat-paginator` en la pestaña de eventos con opciones (10, 25, 50, 100).
+4. **Cambio de columna en la tabla**
+  - Reemplazar columna `Descripción` por `Motivo por defecto` en la tabla de eventos (`catalog-admin.component.html`).
+  - Mostrar fallback `-` cuando no exista valor.
+5. **Edición operativa sobre grandes volúmenes**
+  - Mantener acción `Editar` sobre resultados filtrados/paginados y conservar contexto de búsqueda tras guardar.
+  - Evitar recargar siempre página 1 después de editar para no perder ubicación del registro.
+
+**Impacto esperado:**
+Permite administrar catálogos masivos (1800+ eventos) sin fricción, acelera la localización/edición de eventos y alinea la tabla con el dato más útil para operación (`Motivo por defecto`).
 
 ---
 
