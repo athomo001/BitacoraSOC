@@ -36,11 +36,13 @@ export class ChecklistAdminComponent implements OnInit {
     private fb: FormBuilder,
     private checklistService: ChecklistService,
     private configService: ConfigService,
+    private workShiftService: WorkShiftService,
     private snackBar: MatSnackBar
   ) {
     this.form = this.fb.group({
       name: ['', Validators.required],
       description: [''],
+      assignedTo: this.fb.array([]),
       items: this.fb.array([])
     });
 
@@ -53,7 +55,18 @@ export class ChecklistAdminComponent implements OnInit {
   ngOnInit(): void {
     this.loadConfig();
     this.loadTemplates();
+    this.loadActiveShifts();
     this.addItem();
+  }
+
+  loadActiveShifts(): void {
+    this.workShiftService.getShifts().subscribe({
+      next: (shifts) => {
+        this.activeShifts = shifts.filter((s: WorkShift) => s.active);
+        this.initializeAssignments(this.selectedTemplate);
+      },
+      error: (err) => console.error('Error cargando turnos', err)
+    });
   }
 
   loadConfig(): void {
