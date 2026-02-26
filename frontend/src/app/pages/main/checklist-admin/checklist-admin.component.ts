@@ -108,6 +108,33 @@ export class ChecklistAdminComponent implements OnInit {
     return this.form.get('items') as FormArray;
   }
 
+  get assignedToControls() {
+    return (this.form.get('assignedTo') as FormArray).controls;
+  }
+
+  initializeAssignments(template: ChecklistTemplate | null = null): void {
+    const assignedArr = this.form.get('assignedTo') as FormArray;
+    assignedArr.clear();
+
+    const assignedMap = new Map<string, Set<string>>();
+    if (template && template.assignedTo) {
+      template.assignedTo.forEach(a => {
+        if (!assignedMap.has(a.shiftId)) assignedMap.set(a.shiftId, new Set());
+        assignedMap.get(a.shiftId)?.add(a.type);
+      });
+    }
+
+    this.activeShifts.forEach(shift => {
+      const types = assignedMap.get(shift._id!) || new Set();
+      assignedArr.push(this.fb.group({
+        shiftId: [shift._id],
+        shiftName: [shift.name],
+        inicio: [types.has('inicio')],
+        cierre: [types.has('cierre')]
+      }));
+    });
+  }
+
   private createItemGroup(item?: Partial<ChecklistItem>): FormGroup {
     return this.fb.group({
       _id: [item?._id || null],
@@ -176,6 +203,7 @@ export class ChecklistAdminComponent implements OnInit {
       name: template.name,
       description: template.description || ''
     });
+    this.initializeAssignments(template);
     this.items.clear();
     (template.items || []).forEach(item => this.addItem(item));
   }
@@ -183,6 +211,7 @@ export class ChecklistAdminComponent implements OnInit {
   resetForm(): void {
     this.selectedTemplate = null;
     this.form.reset({ name: '', description: '' });
+    this.initializeAssignments(null);
     this.items.clear();
     this.addItem();
   }
@@ -193,9 +222,18 @@ export class ChecklistAdminComponent implements OnInit {
       return;
     }
 
+    const rawAssigned = this.form.value.assignedTo || [];
+    const assignedToParsed: { shiftId: string, type: string }[] = [];
+
+    rawAssigned.forEach((assign: any) => {
+      if (assign.inicio) assignedToParsed.push({ shiftId: assign.shiftId, type: 'inicio' });
+      if (assign.cierre) assignedToParsed.push({ shiftId: assign.shiftId, type: 'cierre' });
+    });
+
     const payload = {
       name: this.form.value.name,
       description: this.form.value.description,
+      assignedTo: assignedToParsed,
       items: this.items.value.map((item: any, idx: number) => ({
         _id: item._id,
         title: item.title,

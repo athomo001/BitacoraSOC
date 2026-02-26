@@ -52,6 +52,45 @@
   }
 
   .form-card {
+    .assignments-section {
+      background: #fdfdfd;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 24px;
+
+      h3 {
+        margin: 0 0 4px 0;
+        font-size: 1.1rem;
+      }
+
+      .assignment-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .assignment-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 12px;
+        background: white;
+        border: 1px solid #eee;
+        border-radius: 6px;
+
+        .shift-name {
+          font-weight: 500;
+        }
+
+        .assignment-actions {
+          display: flex;
+          gap: 16px;
+        }
+      }
+    }
+
     .items-block {
       display: flex;
       flex-direction: column;
@@ -148,7 +187,9 @@
   }
 
   .item-row,
-  .child-row {
+  .child-row,
+  .assignments-section,
+  .assignment-row {
     border-color: var(--border-color) !important;
     background-color: var(--surface-color) !important;
   }
