@@ -114,8 +114,18 @@ const flattenItems = (items = [], parentId = null) => {
 };
 
 // Snapshot helper: returns active template or legacy catalog as fallback
-const getActiveChecklistSnapshot = async () => {
-  const activeTemplate = await ChecklistTemplate.findOne({ isActive: true });
+const getActiveChecklistSnapshot = async (shiftId = null, templateType = null) => {
+  let activeTemplate = null;
+
+  if (shiftId && templateType) {
+    activeTemplate = await ChecklistTemplate.findOne({
+      assignedTo: { $elemMatch: { shiftId: shiftId, type: templateType } }
+    });
+  }
+
+  if (!activeTemplate) {
+    activeTemplate = await ChecklistTemplate.findOne({ isActive: true });
+  }
 
   if (activeTemplate) {
     if (ensureTemplateItemIds(activeTemplate)) {
@@ -126,7 +136,7 @@ const getActiveChecklistSnapshot = async () => {
     const normalizedItems = (activeTemplate.items || [])
       .filter(item => item.isActive !== false)
       .map((item, idx) => normalizeItem(item, idx));
-    
+
     const activeItems = sortItems(normalizedItems.map(item => ({
       ...item,
       children: sortItems((item.children || []).filter(c => c.isActive !== false))
@@ -156,7 +166,11 @@ const getActiveChecklistSnapshot = async () => {
 // Active template (visible to any authenticated role)
 router.get('/templates/active', authenticate, async (req, res) => {
   try {
-    const snapshot = await getActiveChecklistSnapshot();
+    const templateType = req.query.type;
+    const currentShift = await getCurrentShift();
+    const shiftId = currentShift ? currentShift._id : null;
+
+    const snapshot = await getActiveChecklistSnapshot(shiftId, templateType);
 
     if (!snapshot.items || snapshot.items.length === 0) {
       return res.status(404).json({ message: 'No hay checklist activo configurado' });
@@ -206,12 +220,15 @@ router.post('/templates',
     body('items.*.children.*.description').optional().trim(),
     body('items.*.children.*.order').optional().isInt().toInt(),
     body('items.*.children.*.isActive').optional().isBoolean(),
+    body('assignedTo').optional().isArray(),
+    body('assignedTo.*.shiftId').optional().isMongoId(),
+    body('assignedTo.*.type').optional().isIn(['inicio', 'cierre']),
     body('isActive').optional().isBoolean()
   ],
   validate,
   async (req, res) => {
     try {
-      const { name, description, items, isActive } = req.body;
+      const { name, description, items, isActive, assignedTo } = req.body;
 
       const normalizedItems = items.map((item, idx) => normalizeItem(item, idx));
 
@@ -220,10 +237,20 @@ router.post('/templates',
         description,
         items: normalizedItems,
         isActive: !!isActive,
+        assignedTo: assignedTo || [],
         activatedAt: isActive ? new Date() : undefined,
         createdBy: req.user?._id,
         updatedBy: req.user?._id
       });
+
+      if (assignedTo && assignedTo.length > 0) {
+        for (const assign of assignedTo) {
+          await ChecklistTemplate.updateMany(
+            {},
+            { $pull: { assignedTo: { shiftId: assign.shiftId, type: assign.type } } }
+          );
+        }
+      }
 
       if (template.isActive) {
         await ChecklistTemplate.updateMany({ _id: { $ne: template._id } }, { isActive: false });
@@ -260,7 +287,10 @@ router.put('/templates/:id',
     body('items.*.children.*.title').optional().trim().notEmpty(),
     body('items.*.children.*.description').optional().trim(),
     body('items.*.children.*.order').optional().isInt().toInt(),
-    body('items.*.children.*.isActive').optional().isBoolean()
+    body('items.*.children.*.isActive').optional().isBoolean(),
+    body('assignedTo').optional().isArray(),
+    body('assignedTo.*.shiftId').optional().isMongoId(),
+    body('assignedTo.*.type').optional().isIn(['inicio', 'cierre'])
   ],
   validate,
   async (req, res) => {
@@ -269,6 +299,15 @@ router.put('/templates/:id',
 
       if (payload.items) {
         payload.items = payload.items.map((item, idx) => normalizeItem(item, idx));
+      }
+
+      if (payload.assignedTo && payload.assignedTo.length > 0) {
+        for (const assign of payload.assignedTo) {
+          await ChecklistTemplate.updateMany(
+            { _id: { $ne: req.params.id } },
+            { $pull: { assignedTo: { shiftId: assign.shiftId, type: assign.type } } }
+          );
+        }
       }
 
       payload.updatedBy = req.user?._id;
@@ -456,7 +495,10 @@ router.post('/check',
       const { type, services, checklistId } = req.body;
       const userId = req.user._id;
 
-      const snapshot = await getActiveChecklistSnapshot();
+      const currentShift = await getCurrentShift();
+      const shiftId = currentShift ? currentShift._id : null;
+
+      const snapshot = await getActiveChecklistSnapshot(shiftId, type);
       if (!snapshot.items || snapshot.items.length === 0) {
         return res.status(400).json({ message: 'No hay un checklist activo configurado' });
       }
@@ -665,7 +707,7 @@ router.delete('/check/:id', authenticate, authorize('admin'), async (req, res) =
   try {
     const { id } = req.params;
     console.log('🗑️ DELETE INICIADO para check ID:', id);
-    
+
     const check = await ShiftCheck.findById(id);
     console.log('📋 Check encontrado:', check ? `Sí (${check._id}, type: ${check.type})` : 'NO ENCONTRADO');
 

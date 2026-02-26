@@ -77,6 +77,10 @@ const checklistTemplateSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  assignedTo: [{
+    shiftId: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkShift' },
+    type: { type: String, enum: ['inicio', 'cierre'] }
+  }],
   activatedAt: Date,
   items: {
     type: [checklistItemSchema],

@@ -20,6 +20,7 @@ export interface ChecklistTemplate {
   name: string;
   description?: string;
   isActive: boolean;
+  assignedTo?: { shiftId: string, type: string }[];
   items: ChecklistItem[];
   flatItems?: ChecklistItem[];
   source?: 'template' | 'legacy';

@@ -137,10 +137,15 @@ export class ReportGeneratorComponent {
     this.uploadedImages.splice(index, 1);
   }
 
-  generateTable(): void {
+  async generateTable(): Promise<void> {
     if (this.reportForm.invalid) {
       this.reportForm.markAllAsTouched();
       this.snackBar.open('Completa todos los campos obligatorios', 'Cerrar', { duration: 3000 });
+      return;
+    }
+
+    const canContinue = await this.ensureClientAlertAcknowledged('report');
+    if (!canContinue) {
       return;
     }
 
