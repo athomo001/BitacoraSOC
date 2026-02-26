@@ -3,7 +3,9 @@ import { FormArray, FormBuilder, FormGroup, Validators, ReactiveFormsModule } fr
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ChecklistService } from '../../../services/checklist.service';
 import { ConfigService } from '../../../services/config.service';
+import { WorkShiftService } from '../../../services/work-shift.service';
 import { ChecklistTemplate, ChecklistItem } from '../../../models/checklist.model';
+import { WorkShift } from '../../../models/work-shift.model';
 import { MatCard, MatCardTitle, MatCardContent } from '@angular/material/card';
 import { NgIf, NgFor } from '@angular/common';
 import { MatProgressBar } from '@angular/material/progress-bar';
@@ -16,14 +18,15 @@ import { MatCheckbox } from '@angular/material/checkbox';
 import { MatIcon } from '@angular/material/icon';
 
 @Component({
-    selector: 'app-checklist-admin',
-    templateUrl: './checklist-admin.component.html',
-    styleUrls: ['./checklist-admin.component.scss'],
-    imports: [MatCard, MatCardTitle, NgIf, MatProgressBar, MatNavList, NgFor, MatListItem, MatChipSet, MatChip, MatButton, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatCheckbox, MatIconButton, MatIcon]
+  selector: 'app-checklist-admin',
+  templateUrl: './checklist-admin.component.html',
+  styleUrls: ['./checklist-admin.component.scss'],
+  imports: [MatCard, MatCardTitle, NgIf, MatProgressBar, MatNavList, NgFor, MatListItem, MatChipSet, MatChip, MatButton, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatCheckbox, MatIconButton, MatIcon]
 })
 export class ChecklistAdminComponent implements OnInit {
   templates: ChecklistTemplate[] = [];
   selectedTemplate: ChecklistTemplate | null = null;
+  activeShifts: WorkShift[] = [];
   isLoading = false;
   savingConfig = false;
   form: FormGroup;
