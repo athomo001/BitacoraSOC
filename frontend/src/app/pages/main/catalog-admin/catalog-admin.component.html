@@ -304,7 +304,7 @@
                 <tbody>
                   <tr *ngFor="let rule of clientAlertRules">
                     <td>{{ getClientNameForRule(rule) }}</td>
-                    <td>{{ getModeLabel(rule.timeWindows?.[0]?.mode) }}</td>
+                    <td>{{ getModeLabel(rule.timeWindows[0]?.mode) }}</td>
                     <td>{{ rule.priority }}</td>
                     <td>{{ rule.enabled ? 'Activa' : 'Inactiva' }}</td>
                     <td>{{ rule.alertMessage }}</td>
@@ -327,29 +327,24 @@
     </mat-tab>
 
     <mat-tab label="Tipos de Operacion">
-      <div class="tab-content">
+      <div class="tab-content compact-tab-content">
         <mat-card class="form-card">
           <mat-card-header>
             <mat-card-title>{{ editingOperationTypeId ? 'Editar Tipo' : 'Nuevo Tipo de Operacion' }}</mat-card-title>
           </mat-card-header>
           <mat-card-content>
-            <form [formGroup]="operationTypeForm" (ngSubmit)="saveOperationType()">
-              <mat-form-field appearance="outline" class="full-width">
+            <form [formGroup]="operationTypeForm" (ngSubmit)="saveOperationType()" class="compact-form-grid">
+              <mat-form-field appearance="outline" class="compact-field">
                 <mat-label>Nombre *</mat-label>
                 <input matInput formControlName="name" placeholder="Ej: Analisis de malware">
               </mat-form-field>
 
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Descripcion</mat-label>
-                <textarea matInput formControlName="description" rows="2"></textarea>
-              </mat-form-field>
-
-              <mat-form-field appearance="outline" class="full-width">
+              <mat-form-field appearance="outline" class="compact-field compact-field-wide">
                 <mat-label>Informacion adicional por defecto</mat-label>
-                <textarea matInput formControlName="infoAdicionalDefault" rows="3"></textarea>
+                <textarea matInput formControlName="infoAdicionalDefault" rows="2"></textarea>
               </mat-form-field>
 
-              <mat-checkbox formControlName="enabled">Habilitado</mat-checkbox>
+              <mat-checkbox formControlName="enabled" class="compact-field">Habilitado</mat-checkbox>
 
               <div class="form-actions">
                 <button mat-raised-button color="primary" type="submit">
@@ -376,7 +371,7 @@
                 <thead>
                   <tr>
                     <th>Nombre</th>
-                    <th>Descripcion</th>
+                    <th>Informacion adicional por defecto</th>
                     <th>Estado</th>
                     <th>Acciones</th>
                   </tr>
@@ -384,7 +379,7 @@
                 <tbody>
                   <tr *ngFor="let type of operationTypes">
                     <td><strong>{{ type.name }}</strong></td>
-                    <td>{{ type.description || '-' }}</td>
+                    <td>{{ type.infoAdicionalDefault || '-' }}</td>
                     <td>{{ type.enabled ? 'Activo' : 'Inactivo' }}</td>
                     <td>
                       <button mat-icon-button color="primary" (click)="editOperationType(type)" matTooltip="Editar">
@@ -398,6 +393,43 @@
                   </tr>
                 </tbody>
               </table>
+            </div>
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card class="form-card compact-color-card">
+          <mat-card-header>
+            <mat-card-title>Color del reporte copiable a correo</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <div class="report-color-config-row">
+              <mat-form-field appearance="outline" class="report-color-select">
+                <mat-label>Color</mat-label>
+                <mat-select [(value)]="reportColorMode" (selectionChange)="onReportColorModeChange()">
+                  <mat-option value="green">Verde (actual)</mat-option>
+                  <mat-option value="sky">Celeste</mat-option>
+                  <mat-option value="light-red">Rojo claro</mat-option>
+                  <mat-option value="custom">Custom</mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <button mat-raised-button color="primary" type="button" (click)="saveReportTableColorConfig()"
+                [disabled]="isSavingReportColor">
+                <mat-icon>save</mat-icon>
+                Guardar color
+              </button>
+            </div>
+
+            <div *ngIf="reportColorMode === 'custom'" class="custom-color-table" role="grid"
+              aria-label="Tabla de colores personalizados">
+              <button
+                type="button"
+                *ngFor="let color of customColorPalette"
+                class="color-swatch"
+                [class.selected]="selectedCustomReportColor.toUpperCase() === color.toUpperCase()"
+                [style.backgroundColor]="color"
+                (click)="selectCustomReportColor(color)">
+              </button>
             </div>
           </mat-card-content>
         </mat-card>

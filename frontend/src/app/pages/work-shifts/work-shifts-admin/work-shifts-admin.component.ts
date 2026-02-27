@@ -107,7 +107,8 @@ export class WorkShiftsAdminComponent implements OnInit {
       includeChecklist: [true],
       includeEntries: [true],
       recipients: [[]],
-      subjectTemplate: ['Reporte SOC [fecha] [turno]']
+      subjectTemplate: ['Reporte SOC [fecha] [turno]'],
+      reportTableColor: ['#4CAF50']
     });
   }
 
@@ -121,7 +122,8 @@ export class WorkShiftsAdminComponent implements OnInit {
             includeChecklist: config.emailReportConfig.includeChecklist ?? true,
             includeEntries: config.emailReportConfig.includeEntries ?? true,
             recipients: config.emailReportConfig.recipients || [],
-            subjectTemplate: config.emailReportConfig.subjectTemplate || 'Reporte SOC [fecha] [turno]'
+            subjectTemplate: config.emailReportConfig.subjectTemplate || 'Reporte SOC [fecha] [turno]',
+            reportTableColor: config.emailReportConfig.reportTableColor || '#4CAF50'
           });
         }
       },

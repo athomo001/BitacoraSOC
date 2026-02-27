@@ -26,6 +26,8 @@ import { MatSelect, MatOption } from '@angular/material/select';
 import { MatPaginator, PageEvent } from '@angular/material/paginator';
 import { FormControl } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
+import { ConfigService } from '../../../services/config.service';
+import { EmailReportConfig } from '../../../models/config.model';
 
 @Component({
   selector: 'app-catalog-admin',
@@ -34,6 +36,8 @@ import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
   imports: [MatTabGroup, MatTab, MatCard, MatCardHeader, MatCardTitle, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatCheckbox, MatButton, MatIcon, NgIf, NgFor, MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatIconButton, MatTooltip, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow, MatSelect, MatOption, MatPaginator]
 })
 export class CatalogAdminComponent implements OnInit {
+  private static readonly DEFAULT_REPORT_COLOR = '#4CAF50';
+
   activeTabIndex = 0;
 
   // Listas
@@ -55,6 +59,25 @@ export class CatalogAdminComponent implements OnInit {
   eventTotal = 0;
   eventSearchControl = new FormControl('');
 
+  reportColorMode: 'green' | 'sky' | 'light-red' | 'custom' = 'green';
+  selectedCustomReportColor = CatalogAdminComponent.DEFAULT_REPORT_COLOR;
+  isSavingReportColor = false;
+  readonly customColorPalette: string[] = [
+    '#4CAF50', '#2E7D32', '#8BC34A', '#2196F3', '#29B6F6', '#03A9F4',
+    '#26A69A', '#009688', '#00BCD4', '#FF9800', '#FFC107', '#FFEB3B',
+    '#F06292', '#E57373', '#EF5350', '#BA68C8', '#9C27B0', '#7E57C2',
+    '#607D8B', '#78909C', '#795548', '#9E9E9E', '#546E7A', '#3F51B5'
+  ];
+
+  private currentEmailReportConfig: EmailReportConfig = {
+    enabled: false,
+    recipients: [],
+    includeChecklist: true,
+    includeEntries: true,
+    subjectTemplate: 'Reporte SOC [fecha] [turno]',
+    reportTableColor: CatalogAdminComponent.DEFAULT_REPORT_COLOR
+  };
+
   // Formularios
   eventForm: FormGroup;
   logSourceForm: FormGroup;
@@ -74,6 +97,7 @@ export class CatalogAdminComponent implements OnInit {
   constructor(
     private catalogService: CatalogService,
     private escalationService: EscalationService,
+    private configService: ConfigService,
     private snackBar: MatSnackBar,
     private dialog: MatDialog,
     private fb: FormBuilder
@@ -137,6 +161,85 @@ export class CatalogAdminComponent implements OnInit {
     this.loadLogSources();
     this.loadOperationTypes();
     this.loadClientAlertRules();
+    this.loadReportTableColorConfig();
+  }
+
+  loadReportTableColorConfig(): void {
+    this.configService.getConfig().subscribe({
+      next: (config) => {
+        this.currentEmailReportConfig = {
+          ...this.currentEmailReportConfig,
+          ...(config.emailReportConfig || {})
+        };
+
+        const reportColor = this.normalizeHexColor(this.currentEmailReportConfig.reportTableColor)
+          || CatalogAdminComponent.DEFAULT_REPORT_COLOR;
+        this.selectedCustomReportColor = reportColor;
+        this.reportColorMode = this.resolveReportColorMode(reportColor);
+      },
+      error: () => {
+        this.reportColorMode = 'green';
+        this.selectedCustomReportColor = CatalogAdminComponent.DEFAULT_REPORT_COLOR;
+      }
+    });
+  }
+
+  onReportColorModeChange(): void {
+    if (this.reportColorMode === 'custom') {
+      return;
+    }
+    this.selectedCustomReportColor = this.getColorForMode(this.reportColorMode);
+  }
+
+  selectCustomReportColor(color: string): void {
+    this.selectedCustomReportColor = color;
+    this.reportColorMode = 'custom';
+  }
+
+  saveReportTableColorConfig(): void {
+    const resolvedColor = this.reportColorMode === 'custom'
+      ? (this.normalizeHexColor(this.selectedCustomReportColor) || CatalogAdminComponent.DEFAULT_REPORT_COLOR)
+      : this.getColorForMode(this.reportColorMode);
+
+    const emailReportConfig: EmailReportConfig = {
+      ...this.currentEmailReportConfig,
+      reportTableColor: resolvedColor
+    };
+
+    this.isSavingReportColor = true;
+    this.configService.updateConfig({ emailReportConfig }).subscribe({
+      next: () => {
+        this.currentEmailReportConfig = emailReportConfig;
+        this.selectedCustomReportColor = resolvedColor;
+        this.snackBar.open('✅ Color del reporte guardado', 'Cerrar', { duration: 2500 });
+        this.isSavingReportColor = false;
+      },
+      error: () => {
+        this.snackBar.open('Error guardando color del reporte', 'Cerrar', { duration: 3000 });
+        this.isSavingReportColor = false;
+      }
+    });
+  }
+
+  private resolveReportColorMode(color: string): 'green' | 'sky' | 'light-red' | 'custom' {
+    const normalized = this.normalizeHexColor(color);
+    if (!normalized) return 'green';
+    if (normalized === this.getColorForMode('green')) return 'green';
+    if (normalized === this.getColorForMode('sky')) return 'sky';
+    if (normalized === this.getColorForMode('light-red')) return 'light-red';
+    return 'custom';
+  }
+
+  private getColorForMode(mode: 'green' | 'sky' | 'light-red' | 'custom'): string {
+    if (mode === 'sky') return '#29B6F6';
+    if (mode === 'light-red') return '#E57373';
+    return CatalogAdminComponent.DEFAULT_REPORT_COLOR;
+  }
+
+  private normalizeHexColor(color: string | undefined | null): string | null {
+    if (!color) return null;
+    const normalized = color.trim().toUpperCase();
+    return /^#([A-F0-9]{6})$/.test(normalized) ? normalized : null;
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

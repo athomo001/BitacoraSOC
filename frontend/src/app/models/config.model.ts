@@ -25,6 +25,7 @@ export interface EmailReportConfig {
   includeChecklist: boolean;
   includeEntries: boolean;
   subjectTemplate: string;
+  reportTableColor?: string;
 }
 
 export interface SmtpConfig {

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
@@ -7,6 +7,7 @@ import { CatalogService } from '../../../services/catalog.service';
 import { CatalogEvent, CatalogLogSource, CatalogOperationType } from '../../../models/catalog.model';
 import { EscalationService } from '../../../services/escalation.service';
 import { ClientAlertContext, ClientAlertEvaluation } from '../../../models/escalation.model';
+import { ConfigService } from '../../../services/config.service';
 import { MatCard, MatCardHeader, MatCardTitle, MatCardSubtitle, MatCardContent } from '@angular/material/card';
 import { EntityAutocompleteComponent } from '../../../components/entity-autocomplete/entity-autocomplete.component';
 import { NgIf, NgFor } from '@angular/common';
@@ -25,7 +26,7 @@ import { ClientAlertDialogComponent } from './client-alert-dialog.component';
     styleUrls: ['./report-generator.component.scss'],
     imports: [MatCard, MatCardHeader, MatCardTitle, MatCardSubtitle, MatCardContent, ReactiveFormsModule, EntityAutocompleteComponent, NgIf, MatFormField, MatLabel, MatInput, MatError, MatDatepickerInput, MatDatepickerToggle, MatSuffix, MatDatepicker, MatSelect, MatOption, MatButton, MatIcon, NgFor, MatIconButton]
 })
-export class ReportGeneratorComponent {
+export class ReportGeneratorComponent implements OnInit {
   reportForm: FormGroup;
   
   selectedEvent: CatalogEvent | null = null;
@@ -37,11 +38,13 @@ export class ReportGeneratorComponent {
   showPreview = false;
   activeClientAlert: ClientAlertEvaluation | null = null;
   isEvaluatingClientAlert = false;
+  reportTableHeaderColor = '#4CAF50';
   private readonly acknowledgedRuleIds = new Set<string>();
 
   constructor(
     private fb: FormBuilder,
     public catalogService: CatalogService,
+    private configService: ConfigService,
     private snackBar: MatSnackBar,
     private escalationService: EscalationService,
     private dialog: MatDialog
@@ -62,6 +65,10 @@ export class ReportGeneratorComponent {
       recomendacion: [''],
       informacionAdicional: ['']
     });
+  }
+
+  ngOnInit(): void {
+    this.loadReportTableColorConfig();
   }
 
   onEventSelected(event: any): void {
@@ -153,17 +160,19 @@ export class ReportGeneratorComponent {
     const fechaFormateada = new Date(form.fecha).toLocaleDateString('es-CL');
     const reportWidthPx = 1040;
     const evidenceImageWidthPx = 420;
+    const headerColor = this.reportTableHeaderColor;
+    const labelColor = this.getSecondaryColor(headerColor);
 
     const cellDetailStyle = 'border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere; vertical-align: top;';
-    const cellLabelStyle = 'background-color: #8BC34A; font-weight: bold; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; width: 26%; max-width: 280px;';
+    const cellLabelStyle = `background-color: ${labelColor}; font-weight: bold; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; width: 26%; max-width: 280px;`;
 
     let html = `<table align="left" cellpadding="8" cellspacing="0" width="${reportWidthPx}" style="border-collapse: collapse; width: ${reportWidthPx}px; max-width: 100%; font-family: Arial, sans-serif; border: 1px solid #2b2b2b; table-layout: fixed; margin: 0; margin-left: 0; mso-table-lspace: 0pt; mso-table-rspace: 0pt;">
   <tr>
-    <th colspan="2" style="background-color: #4CAF50; color: white; text-align: center; font-size: 18px; border: 1px solid #2b2b2b;">Reporte de Detección</th>
+    <th colspan="2" style="background-color: ${headerColor}; color: white; text-align: center; font-size: 18px; border: 1px solid #2b2b2b;">Reporte de Detección</th>
   </tr>
   <tr>
-    <th style="background-color: #8BC34A; color: white; width: 26%; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere;">Campo</th>
-    <th style="background-color: #8BC34A; color: white; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere;">Detalle</th>
+    <th style="background-color: ${labelColor}; color: white; width: 26%; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere;">Campo</th>
+    <th style="background-color: ${labelColor}; color: white; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere;">Detalle</th>
   </tr>
   <tr>
     <td style="${cellLabelStyle}">Tipo de operación</td>
@@ -523,6 +532,36 @@ export class ReportGeneratorComponent {
 
   private getContextLabel(context: ClientAlertContext): string {
     return context === 'copy-report' ? 'Copiar reporte' : 'Generación de reporte';
+  }
+
+  private loadReportTableColorConfig(): void {
+    this.configService.getConfig().subscribe({
+      next: (config) => {
+        const color = this.normalizeHexColor(config.emailReportConfig?.reportTableColor);
+        this.reportTableHeaderColor = color || '#4CAF50';
+      },
+      error: () => {
+        this.reportTableHeaderColor = '#4CAF50';
+      }
+    });
+  }
+
+  private normalizeHexColor(value: string | undefined): string | null {
+    if (!value) return null;
+    const normalized = value.trim().toUpperCase();
+    return /^#([A-F0-9]{6})$/.test(normalized) ? normalized : null;
+  }
+
+  private getSecondaryColor(baseHex: string): string {
+    const hex = this.normalizeHexColor(baseHex) || '#4CAF50';
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+
+    const mixWithWhite = (channel: number) => Math.round(channel + (255 - channel) * 0.35);
+    const toHex = (channel: number) => channel.toString(16).padStart(2, '0').toUpperCase();
+
+    return `#${toHex(mixWithWhite(r))}${toHex(mixWithWhite(g))}${toHex(mixWithWhite(b))}`;
   }
 
   clearForm(): void {

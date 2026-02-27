@@ -108,6 +108,12 @@ const appConfigSchema = new mongoose.Schema({
     subjectTemplate: {
       type: String,
       default: 'Reporte SOC [fecha] [turno]'
+    },
+    reportTableColor: {
+      type: String,
+      default: '#4CAF50',
+      trim: true,
+      match: /^#([A-Fa-f0-9]{6})$/
     }
   },
   // Configuración SMTP para envío de emails
