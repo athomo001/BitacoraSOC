@@ -30,9 +30,6 @@
 | B19 | Pendiente | Integraciones | Envío automático a GLPI al cierre de turno | Automatizar creación de ticket al cierre con resumen de entradas y estado de checklist, sin bloquear operación si falla integración. |
 | B20 | Pendiente | UI/UX | Tema Cyberpunk/Neon | Nuevo tema visual opcional, cuidando contraste y sin repetir problemas del dark mode actual. |
 | B21 | Pendiente | Backup/Operación | Backups automáticos programables + destino externo + retención configurable | Permitir programar respaldo automático cada N días, enviar a destino configurable (nube/NFS/Samba) y definir expiración local de respaldos. |
-| B22 | Listo | Mejoras/Escalamiento | Alertas de escalamiento especiales por cliente y horario en reportes | Al seleccionar cliente o generar/copiar reporte, mostrar alerta contextual con acciones adicionales (ej. fuera de horario: avisar por WhatsApp además del correo), configurable por admin en la ficha del cliente. |
-| B23 | Listo | UI/UX | Eliminar checkbox duplicado envío correo | Centralizar control en Configuración Global (Opción A) eliminando el checkbox redundante en la vista de Turno Activo. |
-| B24 | Listo | UI/UX + Rendimiento | Admin Catálogos: solo 50 eventos visibles | En `main/catalog-admin` hay ~1800 eventos, pero solo se ven 50; además en la tabla de Eventos debe mostrarse `Motivo por defecto` en lugar de `Descripción`. |
 | B25 | Pendiente | UI/UX + Operación | Log Sources/Clientes: separar activos e inactivos en `catalog-admin` | Hoy se puede marcar `enabled` al editar, pero la UI mezcla todos en una sola tabla; al inactivar, debe salir de Activos y mostrarse abajo en Inactivos para ordenar operación. |
 | B26 | Pendiente | UI/UX | Checklist Admin compacto + guardado rápido + acordeones | En `main/checklist-admin` la edición de plantillas largas obliga a bajar hasta el final para guardar; se requiere vista más compacta con acordeones y eliminación de campos `Descripción` que no se usan. |
 | B27 | Pendiente | UI/UX + Arquitectura Frontend | Consola Admin unificada (Users, Checklist, Turnos, Catálogos, Escalación) | Unificar módulos administrativos en una sola experiencia coherente, evitando duplicidad de menús y diseño “copiar/pegar”; debe seguir reglas UI/UX consistentes y optimizar navegación operativa. |
@@ -95,6 +92,9 @@
 | B4-11 | UI/UX | Mejora visibilidad texto login/recovery CRT theme | Todos los elementos forzados a #ffffff con !important + text-shadow green glow |
 | B2j | Mejoras | Tabla RACI por cliente (vista + admin Escalamiento) | Backend: RaciEntry con contactos {name, email, phone}. Frontend: form admin + vista analista con iconos |
 | B2f | Mejoras | Reportes: graficos | NGX-Charts: line chart (tendencia), pie chart (tipos), bar charts (usuarios/tags/servicios/log-sources), multi-line (comparación tags), heatmap (día vs hora). Backend: endpoints /tags-trend, /entries-by-logsource y /heatmap |
+| B22 | Mejoras/Escalamiento | Alertas de escalamiento especiales por cliente y horario en reportes | Implementado: alerta contextual al seleccionar cliente y al generar/copiar reporte, configurable por admin. |
+| B23 | UI/UX | Eliminar checkbox duplicado envío correo | Implementado: control centralizado en Configuración Global, sin checkbox redundante en Turno Activo. |
+| B24 | UI/UX + Rendimiento | Admin Catálogos: solo 50 eventos visibles | Implementado: paginación/búsqueda para eventos masivos y tabla de Eventos mostrando `Motivo por defecto`. |
 | C5 | Cambios | Token de recuperación: reducir a 5 min | Reducido de 1h a 5 minutos en auth.js. Email y frontend actualizados con aviso temporal |
 | C6 | Cambios | Sesión JWT reducida a 4h | JWT reducido de 24h a 4h para admin/user, guest mantiene 2h. Aviso en login sobre duración |
 
