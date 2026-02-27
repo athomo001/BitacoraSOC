@@ -19,11 +19,11 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '@env/environment';
-import { 
-  CatalogEvent, 
-  CatalogLogSource, 
+import {
+  CatalogEvent,
+  CatalogLogSource,
   CatalogOperationType,
-  CatalogSearchResponse 
+  CatalogSearchResponse
 } from '../models/catalog.model';
 
 @Injectable({
@@ -32,7 +32,7 @@ import {
 export class CatalogService {
   private readonly API_URL = environment.apiUrl;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
   /**
    * Buscar eventos en catálogo (typeahead)
@@ -42,8 +42,8 @@ export class CatalogService {
    * @param limit Máximo de resultados (default 20)
    */
   searchEvents(
-    query: string, 
-    cursor?: string, 
+    query: string,
+    cursor?: string,
     limit: number = 20
   ): Observable<CatalogSearchResponse<CatalogEvent>> {
     let params = new HttpParams()
@@ -69,8 +69,8 @@ export class CatalogService {
    * @param limit Máximo de resultados (default 20)
    */
   searchLogSources(
-    query: string, 
-    cursor?: string, 
+    query: string,
+    cursor?: string,
     limit: number = 20
   ): Observable<CatalogSearchResponse<CatalogLogSource>> {
     let params = new HttpParams()
@@ -96,8 +96,8 @@ export class CatalogService {
    * @param limit Máximo de resultados (default 20)
    */
   searchOperationTypes(
-    query: string, 
-    cursor?: string, 
+    query: string,
+    cursor?: string,
     limit: number = 20
   ): Observable<CatalogSearchResponse<CatalogOperationType>> {
     let params = new HttpParams()
@@ -120,8 +120,16 @@ export class CatalogService {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   // EVENTOS
-  getAllEvents(): Observable<any> {
-    return this.http.get(`${this.API_URL}/admin/catalog/events`);
+  getAllEvents(page: number = 1, limit: number = 50, search: string = ''): Observable<any> {
+    let params = new HttpParams()
+      .set('page', page.toString())
+      .set('limit', limit.toString());
+
+    if (search) {
+      params = params.set('search', search.trim());
+    }
+
+    return this.http.get(`${this.API_URL}/admin/catalog/events`, { params });
   }
 
   createEvent(data: Partial<CatalogEvent>): Observable<CatalogEvent> {

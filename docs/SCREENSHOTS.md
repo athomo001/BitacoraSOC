@@ -29,7 +29,7 @@ Documentación visual de las principales funcionalidades del sistema.
   - ⏰ Mis Entradas
   - 🌐 Ver todas
   - 👤 Mi Perfil
-  - ✅ Checklist (Admin)
+  - ✅ Administracion Checklist
   - 📈 Reportes
   - ⚙️ Configuración (Admin)
 
@@ -212,7 +212,7 @@ Ver documentación completa en [backend/scripts/README.md](../backend/scripts/RE
 | ⏰ | **Mis Entradas** | Admin/User | Entradas propias del usuario |
 | 🌐 | **Ver todas** | Todos | Búsqueda y filtrado de todas las entradas |
 | 👤 | **Mi Perfil** | Todos | Editar información personal |
-| ✅ | **Checklist (Admin)** | Admin | Gestionar plantillas de checklist |
+| ✅ | **Administracion Checklist** | Admin | Gestionar plantillas de checklist |
 | 📈 | **Reportes** | Admin/User | Dashboard y estadísticas |
 
 ### Configuración (Admin) ▼

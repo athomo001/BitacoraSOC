@@ -702,7 +702,7 @@ router.get('/check/history', authenticate, async (req, res) => {
   }
 });
 
-// DELETE /api/checklist/check/:id - Eliminar checklist (admin)
+// DELETE /api/checklist/check/:id - Eliminar checklist admin
 router.delete('/check/:id', authenticate, authorize('admin'), async (req, res) => {
   try {
     const { id } = req.params;

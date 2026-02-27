@@ -23,12 +23,15 @@ import { NgFor, NgIf } from '@angular/common';
 import { MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow } from '@angular/material/table';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MatSelect, MatOption } from '@angular/material/select';
+import { MatPaginator, PageEvent } from '@angular/material/paginator';
+import { FormControl } from '@angular/forms';
+import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 @Component({
-    selector: 'app-catalog-admin',
-    templateUrl: './catalog-admin.component.html',
-    styleUrls: ['./catalog-admin.component.scss'],
-    imports: [MatTabGroup, MatTab, MatCard, MatCardHeader, MatCardTitle, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatCheckbox, MatButton, MatIcon, NgIf, NgFor, MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatIconButton, MatTooltip, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow, MatSelect, MatOption]
+  selector: 'app-catalog-admin',
+  templateUrl: './catalog-admin.component.html',
+  styleUrls: ['./catalog-admin.component.scss'],
+  imports: [MatTabGroup, MatTab, MatCard, MatCardHeader, MatCardTitle, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatCheckbox, MatButton, MatIcon, NgIf, NgFor, MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatIconButton, MatTooltip, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow, MatSelect, MatOption, MatPaginator]
 })
 export class CatalogAdminComponent implements OnInit {
   activeTabIndex = 0;
@@ -45,6 +48,12 @@ export class CatalogAdminComponent implements OnInit {
   editingLogSourceId: string | null = null;
   editingOperationTypeId: string | null = null;
   editingClientAlertRuleId: string | null = null;
+
+  // Paginación y Búsqueda Eventos
+  eventPage = 1;
+  eventPageSize = 50;
+  eventTotal = 0;
+  eventSearchControl = new FormControl('');
 
   // Formularios
   eventForm: FormGroup;
@@ -112,6 +121,14 @@ export class CatalogAdminComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.eventSearchControl.valueChanges.pipe(
+      debounceTime(300),
+      distinctUntilChanged()
+    ).subscribe(() => {
+      this.eventPage = 1;
+      this.loadEvents();
+    });
+
     this.loadAll();
   }
 
@@ -128,9 +145,11 @@ export class CatalogAdminComponent implements OnInit {
 
   loadEvents(): void {
     this.isLoading = true;
-    this.catalogService.getAllEvents().subscribe({
+    const search = this.eventSearchControl.value || '';
+    this.catalogService.getAllEvents(this.eventPage, this.eventPageSize, search).subscribe({
       next: (response: any) => {
         this.events = response.items || response;
+        this.eventTotal = response.total || (response.items ? response.items.length : response.length);
         this.isLoading = false;
       },
       error: () => {
@@ -138,6 +157,12 @@ export class CatalogAdminComponent implements OnInit {
         this.isLoading = false;
       }
     });
+  }
+
+  onEventPageChange(event: PageEvent): void {
+    this.eventPage = event.pageIndex + 1;
+    this.eventPageSize = event.pageSize;
+    this.loadEvents();
   }
 
   saveEvent(): void {

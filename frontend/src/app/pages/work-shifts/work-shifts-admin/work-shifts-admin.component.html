@@ -132,7 +132,8 @@
         <!-- Descripción (ancho completo) -->
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Descripción</mat-label>
-          <textarea matInput formControlName="description" rows="3" placeholder="Descripción opcional del turno"></textarea>
+          <textarea matInput formControlName="description" rows="3"
+            placeholder="Descripción opcional del turno"></textarea>
           <mat-icon matPrefix>description</mat-icon>
         </mat-form-field>
 
@@ -276,10 +277,7 @@
           </p>
         </div>
 
-        <button mat-raised-button 
-                color="primary" 
-                (click)="toggleGlobalEmailConfig()"
-                class="toggle-config-btn">
+        <button mat-raised-button color="primary" (click)="toggleGlobalEmailConfig()" class="toggle-config-btn">
           <mat-icon>{{ showGlobalEmailConfig ? 'expand_less' : 'expand_more' }}</mat-icon>
           {{ showGlobalEmailConfig ? 'Ocultar configuración' : 'Configurar reenvío' }}
         </button>
@@ -287,18 +285,18 @@
         <!-- Formulario GLOBAL cuando está expandido -->
         <div *ngIf="showGlobalEmailConfig" class="global-config-form">
           <form [formGroup]="globalEmailForm">
-            
+
             <!-- Habilitar reenvío -->
             <mat-checkbox formControlName="enabled" class="section-toggle">
               <strong>Enviar correo automáticamente al finalizar turno</strong>
             </mat-checkbox>
             <p class="section-description">
-              El envío al registrar checklist de cierre se configura en Checklist (Admin).
+              El envío al registrar checklist de cierre se configura en Administracion Checklist.
             </p>
 
             <!-- Opciones cuando está habilitado -->
             <div class="report-options" *ngIf="globalEmailForm.get('enabled')?.value">
-              
+
               <!-- Qué incluir -->
               <div class="include-options">
                 <h4>Contenido del reporte:</h4>
@@ -313,8 +311,7 @@
               <!-- Asunto del correo -->
               <mat-form-field appearance="outline" class="full-width">
                 <mat-label>Asunto del correo</mat-label>
-                <input matInput formControlName="subjectTemplate" 
-                       placeholder="Reporte SOC [fecha] [turno]">
+                <input matInput formControlName="subjectTemplate" placeholder="Reporte SOC [fecha] [turno]">
                 <mat-icon matPrefix>subject</mat-icon>
                 <mat-hint>Variables disponibles: [fecha], [turno], [hora]</mat-hint>
               </mat-form-field>
@@ -323,32 +320,23 @@
               <div class="recipients-field">
                 <label class="recipients-label">Destinatarios</label>
                 <mat-chip-set class="email-chips">
-                  <mat-chip *ngFor="let email of recipients.value"
-                            [removable]="true"
-                            (removed)="removeEmail(email)">
+                  <mat-chip *ngFor="let email of recipients.value" [removable]="true" (removed)="removeEmail(email)">
                     {{ email }}
                     <button matChipRemove>
                       <mat-icon>cancel</mat-icon>
                     </button>
                   </mat-chip>
                 </mat-chip-set>
-                
+
                 <div class="email-input-row">
                   <mat-form-field appearance="outline" class="email-input">
                     <mat-label>Agregar email</mat-label>
-                    <input matInput 
-                           type="email" 
-                           [(ngModel)]="emailInput"
-                           [ngModelOptions]="{standalone: true}"
-                           (keydown)="onEmailKeydown($event)"
-                           placeholder="ejemplo@dominio.com">
+                    <input matInput type="email" [(ngModel)]="emailInput" [ngModelOptions]="{standalone: true}"
+                      (keydown)="onEmailKeydown($event)" placeholder="ejemplo@dominio.com">
                     <mat-icon matPrefix>email</mat-icon>
                   </mat-form-field>
-                  <button mat-raised-button 
-                          type="button"
-                          color="accent"
-                          (click)="addEmail($event)"
-                          [disabled]="!emailInput.trim()">
+                  <button mat-raised-button type="button" color="accent" (click)="addEmail($event)"
+                    [disabled]="!emailInput.trim()">
                     <mat-icon>add</mat-icon>
                     Agregar
                   </button>

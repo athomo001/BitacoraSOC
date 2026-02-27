@@ -32,10 +32,10 @@ type MenuItem = {
 };
 
 @Component({
-    selector: 'app-main-layout',
-    templateUrl: './main-layout.component.html',
-    styleUrls: ['./main-layout.component.scss'],
-    imports: [MatSidenavContainer, MatSidenav, MatToolbar, NgIf, MatIcon, MatNavList, NgFor, MatListItem, RouterLinkActive, RouterLink, MatListItemIcon, MatListItemTitle, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatDivider, MatFormField, MatLabel, MatInput, ReactiveFormsModule, FormsModule, MatHint, MatSidenavContent, MatIconButton, MatMenuTrigger, MatMenu, MatMenuItem, RouterOutlet]
+  selector: 'app-main-layout',
+  templateUrl: './main-layout.component.html',
+  styleUrls: ['./main-layout.component.scss'],
+  imports: [MatSidenavContainer, MatSidenav, MatToolbar, NgIf, MatIcon, MatNavList, NgFor, MatListItem, RouterLinkActive, RouterLink, MatListItemIcon, MatListItemTitle, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatDivider, MatFormField, MatLabel, MatInput, ReactiveFormsModule, FormsModule, MatHint, MatSidenavContent, MatIconButton, MatMenuTrigger, MatMenu, MatMenuItem, RouterOutlet]
 })
 export class MainLayoutComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
@@ -83,15 +83,15 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
 
   configItems: MenuItem[] = [
-    { icon: 'fact_check', label: 'Checklist (Admin)', route: '/main/checklist-admin', roles: ['admin'] },
     { icon: 'people', label: 'Admin Usuarios', route: '/main/users', roles: ['admin'] },
+    { icon: 'fact_check', label: 'Administracion Checklist', route: '/main/checklist-admin', roles: ['admin'] },
     { icon: 'schedule', label: 'Turnos de Trabajo', route: '/main/work-shifts', roles: ['admin'] },
     { icon: 'category', label: 'Admin Catálogos', route: '/main/catalog-admin', roles: ['admin'] },
     { icon: 'admin_panel_settings', label: 'Admin Escalación', route: '/main/escalation/admin', roles: ['admin'] },
-    { icon: 'local_offer', label: 'Tags', route: '/main/tags', roles: ['admin'] },
     { icon: 'image', label: 'Branding', route: '/main/logo', roles: ['admin'] },
     { icon: 'history', label: 'Logs de Auditoría', route: '/main/audit-logs', roles: ['admin', 'auditor'] },
     { icon: 'settings', label: 'SMTP / Config', route: '/main/settings', roles: ['admin'] },
+    { icon: 'local_offer', label: 'Tags', route: '/main/tags', roles: ['admin'] },
     { icon: 'backup', label: 'Backup', route: '/main/backup', roles: ['admin'] }
   ];
 
@@ -107,7 +107,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     private checklistService: ChecklistService,
     private configService: ConfigService,
     private themeService: ThemeService
-  ) {}
+  ) { }
 
   getAssetUrl(url: string): string {
     if (!url) return '';

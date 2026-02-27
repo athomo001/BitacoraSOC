@@ -72,14 +72,25 @@ router.delete('/events/:id', async (req, res) => {
 // Listar todos (incluyendo deshabilitados)
 router.get('/events', async (req, res) => {
   try {
-    const { page = 1, limit = 50 } = req.query;
-    const events = await CatalogEvent.find()
+    const { page = 1, limit = 50, search = '' } = req.query;
+
+    const query = {};
+    if (search) {
+      const searchRegex = new RegExp(search, 'i');
+      query.$or = [
+        { name: searchRegex },
+        { parent: searchRegex },
+        { motivoDefault: searchRegex }
+      ];
+    }
+
+    const events = await CatalogEvent.find(query)
       .sort({ parent: 1, name: 1 })
       .limit(parseInt(limit))
       .skip((parseInt(page) - 1) * parseInt(limit));
-    
-    const total = await CatalogEvent.countDocuments();
-    
+
+    const total = await CatalogEvent.countDocuments(query);
+
     res.json({
       items: events,
       total,
@@ -164,9 +175,9 @@ router.get('/log-sources', async (req, res) => {
       .sort({ name: 1 })
       .limit(parseInt(limit))
       .skip((parseInt(page) - 1) * parseInt(limit));
-    
+
     const total = await CatalogLogSource.countDocuments();
-    
+
     res.json({
       items: sources,
       total,
@@ -231,9 +242,9 @@ router.get('/operation-types', async (req, res) => {
       .sort({ name: 1 })
       .limit(parseInt(limit))
       .skip((parseInt(page) - 1) * parseInt(limit));
-    
+
     const total = await CatalogOperationType.countDocuments();
-    
+
     res.json({
       items: types,
       total,
