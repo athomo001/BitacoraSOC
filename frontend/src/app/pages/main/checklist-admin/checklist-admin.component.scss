@@ -52,12 +52,26 @@
   }
 
   .form-card {
+    .quick-actions {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: var(--surface-color);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 12px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
     .assignments-section {
       background: #fdfdfd;
       border: 1px solid #e0e0e0;
       border-radius: 8px;
-      padding: 16px;
-      margin-bottom: 24px;
+      padding: 12px;
+      margin-bottom: 12px;
 
       h3 {
         margin: 0 0 4px 0;
@@ -94,14 +108,23 @@
     .items-block {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 8px;
       margin-bottom: 12px;
     }
 
-    .item-row {
+    mat-accordion {
+      display: block;
+    }
+
+    mat-expansion-panel {
+      margin-bottom: 8px;
       border: 1px solid #e0e0e0;
       border-radius: 8px;
-      padding: 12px;
+      box-shadow: none;
+    }
+
+    .item-row {
+      padding: 8px 0;
       display: flex;
       flex-direction: column;
       gap: 8px;
@@ -130,10 +153,10 @@
       background: #fafafa;
       border: 1px dashed #d0d0d0;
       border-radius: 8px;
-      padding: 8px;
+      padding: 6px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
     }
 
     .children-header {
@@ -149,10 +172,6 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
-    }
-
-    .description-field {
-      margin: 0;
     }
 
     .full-width {
@@ -171,7 +190,8 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-top: 16px;
+      margin-top: 12px;
+      flex-wrap: wrap;
     }
 
     .spacer {
@@ -189,7 +209,9 @@
   .item-row,
   .child-row,
   .assignments-section,
-  .assignment-row {
+  .assignment-row,
+  .quick-actions,
+  mat-expansion-panel {
     border-color: var(--border-color) !important;
     background-color: var(--surface-color) !important;
   }

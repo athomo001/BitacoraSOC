@@ -16,12 +16,13 @@ import { MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { MatIcon } from '@angular/material/icon';
+import { MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle } from '@angular/material/expansion';
 
 @Component({
   selector: 'app-checklist-admin',
   templateUrl: './checklist-admin.component.html',
   styleUrls: ['./checklist-admin.component.scss'],
-  imports: [MatCard, MatCardTitle, NgIf, MatProgressBar, MatNavList, NgFor, MatListItem, MatChipSet, MatChip, MatButton, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatCheckbox, MatIconButton, MatIcon]
+  imports: [MatCard, MatCardTitle, NgIf, MatProgressBar, MatNavList, NgFor, MatListItem, MatChipSet, MatChip, MatButton, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatCheckbox, MatIconButton, MatIcon, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle]
 })
 export class ChecklistAdminComponent implements OnInit {
   templates: ChecklistTemplate[] = [];
@@ -41,7 +42,6 @@ export class ChecklistAdminComponent implements OnInit {
   ) {
     this.form = this.fb.group({
       name: ['', Validators.required],
-      description: [''],
       assignedTo: this.fb.array([]),
       items: this.fb.array([])
     });
@@ -139,7 +139,6 @@ export class ChecklistAdminComponent implements OnInit {
     return this.fb.group({
       _id: [item?._id || null],
       title: [item?.title || '', Validators.required],
-      description: [item?.description || ''],
       order: [item?.order ?? this.items.length],
       isActive: [item?.isActive !== false],
       children: this.fb.array(
@@ -152,7 +151,6 @@ export class ChecklistAdminComponent implements OnInit {
     return this.fb.group({
       _id: [child?._id || null],
       title: [child?.title || '', Validators.required],
-      description: [child?.description || ''],
       order: [child?.order ?? idx],
       isActive: [child?.isActive !== false]
     });
@@ -200,8 +198,7 @@ export class ChecklistAdminComponent implements OnInit {
   selectTemplate(template: ChecklistTemplate): void {
     this.selectedTemplate = template;
     this.form.patchValue({
-      name: template.name,
-      description: template.description || ''
+      name: template.name
     });
     this.initializeAssignments(template);
     this.items.clear();
@@ -210,7 +207,7 @@ export class ChecklistAdminComponent implements OnInit {
 
   resetForm(): void {
     this.selectedTemplate = null;
-    this.form.reset({ name: '', description: '' });
+    this.form.reset({ name: '' });
     this.initializeAssignments(null);
     this.items.clear();
     this.addItem();
@@ -232,18 +229,15 @@ export class ChecklistAdminComponent implements OnInit {
 
     const payload = {
       name: this.form.value.name,
-      description: this.form.value.description,
       assignedTo: assignedToParsed,
       items: this.items.value.map((item: any, idx: number) => ({
         _id: item._id,
         title: item.title,
-        description: item.description,
         order: typeof item.order === 'number' ? item.order : idx,
         isActive: item.isActive !== false,
         children: (item.children || []).map((child: any, cIdx: number) => ({
           _id: child._id,
           title: child.title,
-          description: child.description,
           order: typeof child.order === 'number' ? child.order : cIdx,
           isActive: child.isActive !== false
         }))

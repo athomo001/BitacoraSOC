@@ -34,6 +34,7 @@
 | B23 | Listo | UI/UX | Eliminar checkbox duplicado envío correo | Centralizar control en Configuración Global (Opción A) eliminando el checkbox redundante en la vista de Turno Activo. |
 | B24 | Listo | UI/UX + Rendimiento | Admin Catálogos: solo 50 eventos visibles | En `main/catalog-admin` hay ~1800 eventos, pero solo se ven 50; además en la tabla de Eventos debe mostrarse `Motivo por defecto` en lugar de `Descripción`. |
 | B25 | Pendiente | UI/UX + Operación | Log Sources/Clientes: separar activos e inactivos en `catalog-admin` | Hoy se puede marcar `enabled` al editar, pero la UI mezcla todos en una sola tabla; al inactivar, debe salir de Activos y mostrarse abajo en Inactivos para ordenar operación. |
+| B26 | Pendiente | UI/UX | Checklist Admin compacto + guardado rápido + acordeones | En `main/checklist-admin` la edición de plantillas largas obliga a bajar hasta el final para guardar; se requiere vista más compacta con acordeones y eliminación de campos `Descripción` que no se usan. |
 
 ---
 

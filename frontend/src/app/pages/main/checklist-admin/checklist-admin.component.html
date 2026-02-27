@@ -44,15 +44,17 @@
       <mat-card-title>{{ selectedTemplate ? 'Editar plantilla' : 'Nueva plantilla' }}</mat-card-title>
       <mat-card-content>
         <form [formGroup]="form" (ngSubmit)="saveTemplate()">
+          <div class="quick-actions">
+            <button mat-raised-button color="primary" type="submit">Guardar cambios</button>
+            <button mat-stroked-button color="primary" type="button" (click)="addItem()">
+              <mat-icon>add</mat-icon>
+              Agregar item
+            </button>
+          </div>
+
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Nombre</mat-label>
             <input matInput formControlName="name" placeholder="Checklist diario SOC">
-          </mat-form-field>
-
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Descripcion</mat-label>
-            <textarea matInput formControlName="description" rows="2"
-              placeholder="Ej: Checklist para turnos 24x7"></textarea>
           </mat-form-field>
 
           <div class="assignments-section" *ngIf="activeShifts.length > 0">
@@ -70,72 +72,71 @@
           </div>
 
           <div formArrayName="items" class="items-block">
-            <div *ngFor="let item of items.controls; let i = index" [formGroupName]="i" class="item-row">
-              <div class="item-header">
-                <h3>Item {{ i + 1 }}</h3>
-                <div class="item-actions">
-                  <mat-checkbox formControlName="isActive">Activo</mat-checkbox>
-                  <button mat-icon-button color="warn" (click)="removeItem(i)" [disabled]="items.length === 1">
-                    <mat-icon>delete</mat-icon>
-                  </button>
+            <mat-accordion multi>
+              <mat-expansion-panel *ngFor="let item of items.controls; let i = index" [formGroupName]="i">
+                <mat-expansion-panel-header>
+                  <mat-panel-title>
+                    {{ item.get('title')?.value || ('Item ' + (i + 1)) }}
+                  </mat-panel-title>
+                </mat-expansion-panel-header>
+
+                <div class="item-row">
+                  <div class="item-header">
+                    <h3>Item {{ i + 1 }}</h3>
+                    <div class="item-actions">
+                      <mat-checkbox formControlName="isActive">Activo</mat-checkbox>
+                      <button mat-icon-button color="warn" type="button" (click)="$event.stopPropagation(); removeItem(i)"
+                        [disabled]="items.length === 1">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="item-grid">
+                    <mat-form-field appearance="outline" class="flex">
+                      <mat-label>Nombre del servicio</mat-label>
+                      <input matInput formControlName="title" placeholder="Firewall, EDR, VPN...">
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="order-field">
+                      <mat-label>Orden</mat-label>
+                      <input matInput type="number" formControlName="order">
+                    </mat-form-field>
+                  </div>
+
+                  <div class="children-block" formArrayName="children">
+                    <div class="children-header">
+                      <h4>Sub-items</h4>
+                      <button mat-stroked-button color="primary" type="button" (click)="addChild(i)">
+                        <mat-icon>add</mat-icon>
+                        Agregar sub-item
+                      </button>
+                    </div>
+
+                    <div class="child-row" *ngFor="let child of getChildrenArray(i).controls; let j = index"
+                      [formGroupName]="j">
+                      <mat-form-field appearance="outline" class="flex">
+                        <mat-label>Sub-item {{ i + 1 }}.{{ j + 1 }}</mat-label>
+                        <input matInput formControlName="title" placeholder="Subservicio o paso">
+                      </mat-form-field>
+
+                      <mat-form-field appearance="outline" class="order-field">
+                        <mat-label>Orden</mat-label>
+                        <input matInput type="number" formControlName="order">
+                      </mat-form-field>
+
+                      <mat-checkbox formControlName="isActive">Activo</mat-checkbox>
+                      <button mat-icon-button color="warn" type="button" (click)="removeChild(i, j)">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    </div>
+
+                    <p class="hint" *ngIf="getChildrenArray(i).length === 0">Sin sub-items. Puedes agregarlos si necesitas
+                      checklist anidado.</p>
+                  </div>
                 </div>
-              </div>
-
-              <div class="item-grid">
-                <mat-form-field appearance="outline" class="flex">
-                  <mat-label>Nombre del servicio</mat-label>
-                  <input matInput formControlName="title" placeholder="Firewall, EDR, VPN...">
-                </mat-form-field>
-
-                <mat-form-field appearance="outline" class="order-field">
-                  <mat-label>Orden</mat-label>
-                  <input matInput type="number" formControlName="order">
-                </mat-form-field>
-              </div>
-
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Descripcion</mat-label>
-                <textarea matInput formControlName="description" rows="2"
-                  placeholder="Detalle breve del servicio"></textarea>
-              </mat-form-field>
-
-              <div class="children-block" formArrayName="children">
-                <div class="children-header">
-                  <h4>Sub-items</h4>
-                  <button mat-stroked-button color="primary" type="button" (click)="addChild(i)">
-                    <mat-icon>add</mat-icon>
-                    Agregar sub-item
-                  </button>
-                </div>
-
-                <div class="child-row" *ngFor="let child of getChildrenArray(i).controls; let j = index"
-                  [formGroupName]="j">
-                  <mat-form-field appearance="outline" class="flex">
-                    <mat-label>Sub-item {{ i + 1 }}.{{ j + 1 }}</mat-label>
-                    <input matInput formControlName="title" placeholder="Subservicio o paso">
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" class="order-field">
-                    <mat-label>Orden</mat-label>
-                    <input matInput type="number" formControlName="order">
-                  </mat-form-field>
-
-                  <mat-checkbox formControlName="isActive">Activo</mat-checkbox>
-                  <button mat-icon-button color="warn" type="button" (click)="removeChild(i, j)">
-                    <mat-icon>delete</mat-icon>
-                  </button>
-
-                  <mat-form-field appearance="outline" class="full-width description-field">
-                    <mat-label>Descripcion</mat-label>
-                    <textarea matInput formControlName="description" rows="2"
-                      placeholder="Detalle del sub-item"></textarea>
-                  </mat-form-field>
-                </div>
-
-                <p class="hint" *ngIf="getChildrenArray(i).length === 0">Sin sub-items. Puedes agregarlos si necesitas
-                  checklist anidado.</p>
-              </div>
-            </div>
+              </mat-expansion-panel>
+            </mat-accordion>
           </div>
 
           <button mat-stroked-button color="primary" type="button" (click)="addItem()">
