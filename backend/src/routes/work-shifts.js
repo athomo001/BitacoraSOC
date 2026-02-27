@@ -33,6 +33,8 @@ router.get('/current', authenticate, async (req, res) => {
     const shifts = await WorkShift.find({ active: true })
       .populate('assignedUserId', 'fullName email phone')
       .populate('checklistTemplateId', 'name')
+        .populate('checklistTemplateStartId', 'name')
+        .populate('checklistTemplateEndId', 'name')
       .sort({ order: 1 });
     
     if (shifts.length === 0) {
@@ -88,6 +90,8 @@ router.get('/',
       const shifts = await WorkShift.find(filter)
         .populate('assignedUserId', 'fullName email')
         .populate('checklistTemplateId', 'name')
+        .populate('checklistTemplateStartId', 'name')
+        .populate('checklistTemplateEndId', 'name')
         .sort({ order: 1, startTime: 1 });
       
       res.json(shifts);
@@ -109,7 +113,9 @@ router.get('/:id',
     try {
       const shift = await WorkShift.findById(req.params.id)
         .populate('assignedUserId', 'fullName email phone')
-        .populate('checklistTemplateId', 'name');
+        .populate('checklistTemplateId', 'name')
+        .populate('checklistTemplateStartId', 'name')
+        .populate('checklistTemplateEndId', 'name');
       
       if (!shift) {
         return res.status(404).json({ error: 'Turno no encontrado' });
@@ -171,6 +177,8 @@ router.post('/',
     body('description').optional().trim(),
     body('assignedUserId').optional({ checkFalsy: true }).isMongoId().withMessage('assignedUserId inválido'),
     body('checklistTemplateId').optional({ checkFalsy: true }).isMongoId().withMessage('checklistTemplateId inválido'),
+    body('checklistTemplateStartId').optional({ checkFalsy: true }).isMongoId().withMessage('checklistTemplateStartId inválido'),
+    body('checklistTemplateEndId').optional({ checkFalsy: true }).isMongoId().withMessage('checklistTemplateEndId inválido'),
     body('emailReportConfig').optional().isObject(),
     body('emailReportConfig.enabled').optional().isBoolean().toBoolean(),
     body('emailReportConfig.includeChecklist').optional().isBoolean().toBoolean(),
@@ -194,7 +202,9 @@ router.post('/',
       await shift.save();
       
       await shift.populate('assignedUserId', 'fullName email');
-      await shift.populate('checklistTemplateId', 'name');
+      await shift.populate('checklistTemplateId', 'name')
+        .populate('checklistTemplateStartId', 'name')
+        .populate('checklistTemplateEndId', 'name');
       
       logger.info('Work shift created:', { shiftId: shift._id, code: shift.code, type: shift.type });
       res.status(201).json(shift);
@@ -220,6 +230,8 @@ router.put('/:id',
     body('description').optional().trim(),
     body('assignedUserId').optional({ checkFalsy: true }).isMongoId(),
     body('checklistTemplateId').optional({ checkFalsy: true }).isMongoId(),
+    body('checklistTemplateStartId').optional({ checkFalsy: true }).isMongoId(),
+    body('checklistTemplateEndId').optional({ checkFalsy: true }).isMongoId(),
     body('emailReportConfig').optional().isObject(),
     body('emailReportConfig.enabled').optional().isBoolean().toBoolean(),
     body('emailReportConfig.includeChecklist').optional().isBoolean().toBoolean(),
@@ -250,7 +262,9 @@ router.put('/:id',
         { new: true, runValidators: true }
       )
         .populate('assignedUserId', 'fullName email')
-        .populate('checklistTemplateId', 'name');
+        .populate('checklistTemplateId', 'name')
+        .populate('checklistTemplateStartId', 'name')
+        .populate('checklistTemplateEndId', 'name');
       
       if (!shift) {
         return res.status(404).json({ error: 'Turno no encontrado' });

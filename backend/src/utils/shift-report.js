@@ -389,6 +389,30 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
       createdAt: { $gte: periodStart, $lte: periodEnd }
     }).sort({ createdAt: 1 });
 
+    // B14: Guardas anti-vacío y validación de checklist de cierre
+    const isManualTrigger = options.ignoreShiftEnabled === true;
+    if (!isManualTrigger) {
+      if (!checklistExit) {
+        logger.warn('📊 [sendShiftReport] Aborted: No closure checklist found for shift', { shiftId: shift._id });
+        return { success: false, message: 'No closure checklist found' };
+      }
+      
+      if (!checklistExit && entries.length === 0) {
+        logger.warn('📊 [sendShiftReport] Aborted: Report is completely empty', { shiftId: shift._id });
+        return { success: false, message: 'Empty report aborted' };
+      }
+      
+      // B14: Anti duplicados comprobando lastReportSentAt
+      if (shift.lastReportSentAt) {
+        const lastSentDate = new Date(shift.lastReportSentAt);
+        const today = new Date();
+        if (lastSentDate.toDateString() === today.toDateString()) {
+          logger.warn('📊 [sendShiftReport] Aborted: Report already sent today', { shiftId: shift._id });
+          return { success: false, message: 'Report already sent today' };
+        }
+      }
+    }
+
     // 5. Generar asunto del correo
     const date = (periodEnd || shiftDate).toLocaleDateString('es-CL', { 
       year: 'numeric', 
@@ -433,6 +457,10 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
       html,
       text
     });
+
+    // Registrar envío para evitar duplicados
+    shift.lastReportSentAt = new Date();
+    await shift.save({ validateModifiedOnly: true });
 
     logger.info('✅ [sendShiftReport] SHIFT REPORT SENT SUCCESSFULLY!', { shiftId, recipients: shift.emailReportConfig.recipients });
 

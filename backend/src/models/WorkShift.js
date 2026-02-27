@@ -72,12 +72,28 @@ const workShiftSchema = new mongoose.Schema({
     default: null
     // null = sin asignar, puede ser asignado por admin
   },
-  // Checklist template asociado (opcional)
+    // Checklist template asociado (opcional, legacy)
   checklistTemplateId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'ChecklistTemplate',
     default: null
-    // Permite tener checklists diferentes por turno
+  },
+  // Checklist template de Inicio
+  checklistTemplateStartId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ChecklistTemplate',
+    default: null
+  },
+  // Checklist template de Cierre
+  checklistTemplateEndId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ChecklistTemplate',
+    default: null
+  },
+  // Fecha último reporte automático
+  lastReportSentAt: {
+    type: Date,
+    default: null
   },
   // Configuración de reenvío de información por correo
   emailReportConfig: {

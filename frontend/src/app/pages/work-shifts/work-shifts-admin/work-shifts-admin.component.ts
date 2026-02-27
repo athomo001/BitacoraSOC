@@ -18,6 +18,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { WorkShiftService } from '../../../services/work-shift.service';
 import { AuthService } from '../../../services/auth.service';
 import { ConfigService } from '../../../services/config.service';
+import { ChecklistService } from '../../../services/checklist.service';
 import { WorkShift, WorkShiftFormData, SHIFT_TYPE_OPTIONS, DEFAULT_COLORS } from '../../../models/work-shift.model';
 
 @Component({
@@ -68,6 +69,7 @@ export class WorkShiftsAdminComponent implements OnInit {
   constructor(
     private workShiftService: WorkShiftService,
     private configService: ConfigService,
+    private checklistService: ChecklistService,
     private fb: FormBuilder,
     private snackBar: MatSnackBar,
     private dialog: MatDialog
@@ -94,6 +96,8 @@ export class WorkShiftsAdminComponent implements OnInit {
       timezone: ['America/Santiago', Validators.required],
       assignedUserId: [null],
       checklistTemplateId: [null],
+      checklistTemplateStartId: [null],
+      checklistTemplateEndId: [null],
       order: [0, Validators.min(0)],
       active: [true],
       color: [DEFAULT_COLORS[0]]
@@ -179,6 +183,8 @@ export class WorkShiftsAdminComponent implements OnInit {
       timezone: shift.timezone,
       assignedUserId: shift.assignedUserId || null,
       checklistTemplateId: shift.checklistTemplateId || null,
+      checklistTemplateStartId: shift.checklistTemplateStartId || null,
+      checklistTemplateEndId: shift.checklistTemplateEndId || null,
       order: shift.order,
       active: shift.active,
       color: shift.color || DEFAULT_COLORS[0]

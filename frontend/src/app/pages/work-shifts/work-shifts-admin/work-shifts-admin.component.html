@@ -120,6 +120,32 @@
             <mat-hint>Deja en blanco si no quieres asignar a nadie</mat-hint>
           </mat-form-field>
 
+          <!-- Checklist Inicio (opcional) -->
+          <mat-form-field appearance="outline">
+            <mat-label>Checklist de Inicio (opcional)</mat-label>
+            <mat-select formControlName="checklistTemplateStartId">
+              <mat-option [value]="null">Ninguno</mat-option>
+              <mat-option *ngFor="let tpl of checklistTemplates" [value]="tpl._id">
+                {{ tpl.name }}
+              </mat-option>
+            </mat-select>
+            <mat-icon matPrefix>playlist_add_check</mat-icon>
+            <mat-hint>Plantilla solicitada al iniciar el turno</mat-hint>
+          </mat-form-field>
+
+          <!-- Checklist Cierre (opcional) -->
+          <mat-form-field appearance="outline">
+            <mat-label>Checklist de Cierre (opcional)</mat-label>
+            <mat-select formControlName="checklistTemplateEndId">
+              <mat-option [value]="null">Ninguno</mat-option>
+              <mat-option *ngFor="let tpl of checklistTemplates" [value]="tpl._id">
+                {{ tpl.name }}
+              </mat-option>
+            </mat-select>
+            <mat-icon matPrefix>playlist_add_check</mat-icon>
+            <mat-hint>Plantilla solicitada al finalizar el turno</mat-hint>
+          </mat-form-field>
+
           <!-- Orden -->
           <mat-form-field appearance="outline">
             <mat-label>Orden</mat-label>

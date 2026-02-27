@@ -25,6 +25,10 @@ export interface WorkShift {
   assignedUserEmail?: string; // Populated field
   checklistTemplateId?: string | null; // Template de checklist asociado (opcional)
   checklistTemplateName?: string; // Populated field
+  checklistTemplateStartId?: string | null; // Template de checklist de inicio (opcional)
+  checklistTemplateStartName?: string; // Populated field
+  checklistTemplateEndId?: string | null; // Template de checklist de cierre (opcional)
+  checklistTemplateEndName?: string; // Populated field
   emailReportConfig?: {
     enabled: boolean; // Habilitar reenvío automático al finalizar turno
     includeChecklist: boolean; // Incluir checklist entrada/salida
@@ -48,7 +52,12 @@ export interface WorkShiftFormData {
   endTime: string;
   timezone: string;
   assignedUserId?: string | null;
-  checklistTemplateId?: string | null;
+  checklistTemplateId?: string | null; // Template de checklist asociado (opcional, legacy)
+  checklistTemplateName?: string; // Populated field
+  checklistTemplateStartId?: string | null; // Template de checklist Inicio (opcional)
+  checklistTemplateStartName?: string; // Populated field
+  checklistTemplateEndId?: string | null; // Template de checklist Cierre (opcional)
+  checklistTemplateEndName?: string; // Populated field
   emailReportConfig?: {
     enabled?: boolean;
     includeChecklist?: boolean;
