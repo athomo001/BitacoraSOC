@@ -35,6 +35,7 @@
 | B24 | Listo | UI/UX + Rendimiento | Admin Catálogos: solo 50 eventos visibles | En `main/catalog-admin` hay ~1800 eventos, pero solo se ven 50; además en la tabla de Eventos debe mostrarse `Motivo por defecto` en lugar de `Descripción`. |
 | B25 | Pendiente | UI/UX + Operación | Log Sources/Clientes: separar activos e inactivos en `catalog-admin` | Hoy se puede marcar `enabled` al editar, pero la UI mezcla todos en una sola tabla; al inactivar, debe salir de Activos y mostrarse abajo en Inactivos para ordenar operación. |
 | B26 | Pendiente | UI/UX | Checklist Admin compacto + guardado rápido + acordeones | En `main/checklist-admin` la edición de plantillas largas obliga a bajar hasta el final para guardar; se requiere vista más compacta con acordeones y eliminación de campos `Descripción` que no se usan. |
+| B27 | Pendiente | UI/UX + Arquitectura Frontend | Consola Admin unificada (Users, Checklist, Turnos, Catálogos, Escalación) | Unificar módulos administrativos en una sola experiencia coherente, evitando duplicidad de menús y diseño “copiar/pegar”; debe seguir reglas UI/UX consistentes y optimizar navegación operativa. |
 
 ---
 
@@ -284,6 +285,62 @@ En `Log Sources / Clientes` se necesita ordenar la operación diaria separando c
 
 **Impacto esperado:**
 Mejor orden operativo en administración de clientes/log sources, menos ruido visual y menor riesgo de trabajar con clientes inactivos por error.
+
+---
+
+## 🟠 B27 - Consola Admin unificada (Users, Checklist, Turnos, Catálogos, Escalación)
+
+**Descripción:**
+Actualmente la administración está repartida en múltiples pantallas y menús, lo que aumenta fricción operativa y genera inconsistencias visuales/funcionales. Se requiere una **consola administrativa unificada**, armonizada y diseñada con criterios sólidos de UI/UX.
+
+**Objetivo:**
+Centralizar en una sola experiencia los módulos de:
+
+1. Administración de usuarios.
+2. Administración de checklist.
+3. Administración de turnos.
+4. Administración de catálogos.
+5. Administración de escalación.
+
+sin multiplicar entradas de menú ni replicar patrones “copiar/pegar”.
+
+**Problemas actuales a resolver:**
+
+1. Demasiados accesos administrativos en el menú lateral.
+2. Flujos y layouts no homogéneos entre módulos.
+3. Curva de aprendizaje alta para tareas administrativas frecuentes.
+4. Baja eficiencia al pasar entre configuración relacionada (ej. turnos + checklist + escalación).
+
+**Cómo se debería hacer (a nivel de issue, sin implementación):**
+
+1. Definir una ruta única de administración (ej. `/main/admin`) con navegación interna por secciones/tab/contexto.
+2. Establecer un layout base común para todos los submódulos (header, acciones primarias, filtros, tabla/form, estado).
+3. Unificar patrones de interacción:
+  - ubicación de botones primarios,
+  - mensajes de validación/error,
+  - confirmaciones de acciones críticas,
+  - comportamiento de guardado/edición/cancelación.
+4. Reducir el menú lateral a una entrada administrativa principal con subnavegación contextual interna.
+5. Incorporar reglas de UX operativa:
+  - menor cantidad de clics para tareas frecuentes,
+  - consistencia visual y semántica,
+  - jerarquía de información clara,
+  - diseño responsive y accesible.
+6. Definir lineamientos de arquitectura frontend para evitar duplicación:
+  - componentes reutilizables (tabla admin, formulario admin, toolbar admin),
+  - contratos tipados compartidos,
+  - estructura modular mantenible.
+
+**Criterios de aceptación propuestos:**
+
+1. Existe una sola entrada de menú para administración.
+2. Users/Checklist/Turnos/Catálogos/Escalación son accesibles desde consola unificada.
+3. UI consistente entre módulos (misma estructura visual y patrón de acciones).
+4. Reducción de pasos para tareas administrativas críticas.
+5. Sin duplicación evidente de código UI entre secciones.
+
+**Impacto esperado:**
+Mejor usabilidad y mantenibilidad, menor saturación de menús, y operación administrativa más rápida y consistente.
 
 ---
 
