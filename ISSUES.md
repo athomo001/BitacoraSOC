@@ -32,7 +32,8 @@
 | B21 | Pendiente | Backup/Operación | Backups automáticos programables + destino externo + retención configurable | Permitir programar respaldo automático cada N días, enviar a destino configurable (nube/NFS/Samba) y definir expiración local de respaldos. |
 | B22 | Listo | Mejoras/Escalamiento | Alertas de escalamiento especiales por cliente y horario en reportes | Al seleccionar cliente o generar/copiar reporte, mostrar alerta contextual con acciones adicionales (ej. fuera de horario: avisar por WhatsApp además del correo), configurable por admin en la ficha del cliente. |
 | B23 | Listo | UI/UX | Eliminar checkbox duplicado envío correo | Centralizar control en Configuración Global (Opción A) eliminando el checkbox redundante en la vista de Turno Activo. |
-| B24 | Pendiente | UI/UX + Rendimiento | Admin Catálogos: solo 50 eventos visibles | En `main/catalog-admin` hay ~1800 eventos, pero solo se ven 50; además en la tabla de Eventos debe mostrarse `Motivo por defecto` en lugar de `Descripción`. |
+| B24 | Listo | UI/UX + Rendimiento | Admin Catálogos: solo 50 eventos visibles | En `main/catalog-admin` hay ~1800 eventos, pero solo se ven 50; además en la tabla de Eventos debe mostrarse `Motivo por defecto` en lugar de `Descripción`. |
+| B25 | Pendiente | UI/UX + Operación | Log Sources/Clientes: separar activos e inactivos en `catalog-admin` | Hoy se puede marcar `enabled` al editar, pero la UI mezcla todos en una sola tabla; al inactivar, debe salir de Activos y mostrarse abajo en Inactivos para ordenar operación. |
 
 ---
 
@@ -242,6 +243,46 @@ En `main/catalog-admin` existen ~1800 eventos, pero en la pestaña **Eventos** s
 
 **Impacto esperado:**
 Permite administrar catálogos masivos (1800+ eventos) sin fricción, acelera la localización/edición de eventos y alinea la tabla con el dato más útil para operación (`Motivo por defecto`).
+
+---
+
+## 🟠 B25 - Log Sources / Clientes: separar activos e inactivos en `main/catalog-admin`
+
+**Descripción:**
+En `Log Sources / Clientes` se necesita ordenar la operación diaria separando claramente los clientes activos de los inactivos. Al marcar un cliente como inactivo, debe desaparecer de la tabla de activos y aparecer en una tabla de inactivos ubicada debajo.
+
+**Análisis de situación actual (código):**
+
+1. `backend/src/models/CatalogLogSource.js` ya tiene campo `enabled` (boolean, default `true`), por lo que el concepto de activo/inactivo ya existe.
+2. `backend/src/routes/admin-catalog.js`:
+   - `PUT /admin/catalog/log-sources/:id` permite actualizar `enabled`.
+   - `GET /admin/catalog/log-sources` devuelve todos mezclados, sin filtro por `enabled`.
+   - `DELETE /admin/catalog/log-sources/:id` elimina permanente (no soft delete).
+3. `frontend/src/app/pages/main/catalog-admin/catalog-admin.component.ts` carga una sola lista `logSources`.
+4. `frontend/src/app/pages/main/catalog-admin/catalog-admin.component.html` renderiza una única tabla con `*ngFor="let source of logSources"`, mostrando estado, pero sin separación por bloques.
+5. En la pestaña `Alertas Especiales`, el selector de cliente usa la misma lista `logSources`, por lo que hoy también puede incluir inactivos.
+
+**Cómo se debería hacer:**
+
+1. Backend admin (`GET /admin/catalog/log-sources`):
+   - Agregar filtros `enabled`, `search`, `page`, `limit`.
+   - Mantener respuesta paginada (`items`, `total`, `page`, `totalPages`).
+2. Frontend `catalog-admin`:
+   - Mantener dos colecciones para UI (`activeLogSources` e `inactiveLogSources`) o cargar por filtro.
+   - Mostrar dos tablas en la pestaña:
+     - Tabla superior: Activos.
+     - Tabla inferior: Inactivos.
+3. Acción operativa:
+   - Para activos: botón `Inactivar` (`enabled=false`).
+   - Para inactivos: botón `Reactivar` (`enabled=true`).
+   - Evitar borrar permanentemente como acción principal.
+4. Coherencia en otras pantallas:
+   - En formularios operativos/selectores (ej. `Alertas Especiales`), ofrecer por defecto solo clientes activos.
+5. UX:
+   - Al inactivar/reactivar, refrescar ambas tablas y mover el registro de una a otra sin ambigüedad.
+
+**Impacto esperado:**
+Mejor orden operativo en administración de clientes/log sources, menos ruido visual y menor riesgo de trabajar con clientes inactivos por error.
 
 ---
 
