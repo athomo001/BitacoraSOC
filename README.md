@@ -263,6 +263,7 @@ Para detalles técnicos completos, consulta:
 - **[SETUP.md](docs/SETUP.md)**: Instalación y configuración avanzada
 - **[API.md](docs/API.md)**: Referencia completa de endpoints
 - **[ARCHITECTURE.md](docs/ARCHITECTURE.md)**: Mapas conceptuales y flujos
+- **[CHANGELOG.md](docs/CHANGELOG.md)**: Registro cronológico de cambios
 - **[WORK-SHIFTS.md](docs/WORK-SHIFTS.md)**: Turnos y reportes por correo
 - **[BACKUP.md](docs/BACKUP.md)**: Backups JSON, export e import
 - **[SECURITY.md](docs/SECURITY.md)**: Seguridad, hardening y checklist
