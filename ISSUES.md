@@ -9,8 +9,6 @@
 | --- | --- | --- | --- | --- |
 | SEC-STD-009 | Pendiente | Seguridad/Compliance | Alineación OWASP ASVS L2 + Secure Coding + Angular/Node | En progreso: cookie `HttpOnly`, CSP activa, CORS prod sin wildcard, sanitización anti-inyección (`$`/`.`), RBAC crítico reforzado. Pendiente para cierre total: matriz RBAC documentada + pruebas de seguridad mínimas automatizadas. |
 | B11 | Pendiente | Mejoras | Auditoría incompleta de correos y acciones de usuarios/admin | En Logs de Auditoría no aparece claramente envío de correos (estado + destinatarios) ni cambios de administradores ni acciones relevantes de usuario normal (ej. generar reporte). |
-| B12 | Pendiente | Mejoras | Huevo de pascua en login por combinaciones específicas | Si ingresan combinaciones definidas (ej. `admin/admin`, `1234/1234`, etc.), activar pantalla negra + imagen. Triggers deben configurarse en BD para no hardcodear, imagen de bender  esta dentro de la carpeta scripts  y se llama  Bender.png|
-| B13 | Pendiente | Mejoras | Huevo de pascua en entradas por hashtag `#bender` | Si en entrada aparece `#Bender` o `#bender`, mostrar overlay fullscreen con imagen de Bender, imagen de bender  esta dentro de la carpeta scripts  y se llama  Bender.png |
 | B14 | Listo | Bugs | Envío automático de correo de turno fuera de contexto (vacío/duplicado) | En no laborales y a las 00:00 o a la hora que se  configuro  como termino de turno se envían correos vacíos. Debe enviarse solo al registrar checklist de cierre real. |
 | B16 | Pendiente | Seguridad/Arquitectura | Auditoría automática avanzada (usuario + dispositivo + red + VPN) | Diseñar e implementar trazabilidad inmutable con fingerprint de dispositivo, metadata de red, detección de cambio de IP en sesión y notificación en tiempo real. |
 | B17 | Pendiente | Seguridad/Integraciones | Envío de eventos de auditoría a SIEM/SOAR/NDR (Syslog/API) | Exportar todos los eventos de auditoría a destinos externos (Elastic, Wazuh, QRadar, XSOAR, Fortinet, etc.) por UDP/TCP/TLS con puertos `514`, `6514` o puerto personalizado. |
@@ -42,6 +40,8 @@
 | B8 | Mejoras | Edición masiva/individual de entradas (Admin) | Listo: endpoint admin con whitelist + campos inmutables bloqueados + auditoría con `before/after` por entrada. |
 | B9 | Mejoras | Checklists distintos por tipo de check y por turno | Listo: soporte `checklistTemplateStartId`/`checklistTemplateEndId` en backend y asignación/visualización clara en UI de turnos. |
 | B10 | Mejoras | Branding: favicon configurable | Implementado: favicon separado del logo, con endpoints dedicados y administración en Branding. |
+| B12 | Mejoras | Huevo de pascua en login por combinaciones específicas | Implementado: reglas configurables en BD; se activa solo en intento inválido con combos tipo default (`admin/admin`, etc.); no afecta login normal. |
+| B13 | Mejoras | Huevo de pascua en entradas por hashtag `#bender` | Implementado: overlay fullscreen por regla `scope=entry`/hashtag `#bender`; comportamiento lúdico sin romper guardado. |
 | B15 | Bugs | Compatibilidad visual de correo HTML (modo oscuro vs claro) | Implementado: badges de estado reforzados con color + texto explícito para clientes claros/oscuros. |
 | P1 | Actualizacion Angular 20 | Plan general de actualizacion | Actualización completa Angular 17→20 |
 | F4-3 | Fase 4 (Post-actualizacion) | Merge rama | Listo para merge |
@@ -544,7 +544,9 @@ Centralización real de telemetría de seguridad y auditoría, habilitando corre
 
 ---
 
-## 🟠 B12 - Huevo de pascua en login por combinaciones específicas
+## ✅ B12 - Huevo de pascua en login por combinaciones específicas
+
+**Estado:** Listo
 
 **Descripción:**
 Si alguien intenta login con combinaciones concretas, debe dispararse un efecto visual (pantalla negra + imagen).
@@ -582,7 +584,9 @@ Feature lúdica configurable sin exposición evidente en código fuente.
 
 ---
 
-## 🟠 B13 - Huevo de pascua en entradas por hashtag `#bender`
+## ✅ B13 - Huevo de pascua en entradas por hashtag `#bender`
+
+**Estado:** Listo
 
 **Descripción:**
 Si el usuario escribe `#Bender` o `#bender` en el campo de entrada, mostrar imagen fullscreen de Bender.

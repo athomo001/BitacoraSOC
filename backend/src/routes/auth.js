@@ -74,6 +74,59 @@ const getAuthCookieOptions = (req) => ({
   path: '/'
 });
 
+const normalizeValue = (value) => String(value || '').trim().toLowerCase();
+
+const resolveLoginEasterEgg = (rules, username, password) => {
+  if (!Array.isArray(rules) || !rules.length) {
+    return null;
+  }
+
+  const normalizedUsername = normalizeValue(username);
+  const normalizedPassword = normalizeValue(password);
+  const normalizedPair = `${normalizedUsername}/${normalizedPassword}`;
+
+  const rule = rules.find((candidate) => {
+    if (!candidate?.enabled || candidate?.scope !== 'login' || candidate?.triggerType !== 'credentials') {
+      return false;
+    }
+
+    const hasUserPass = candidate.username || candidate.password;
+    if (hasUserPass) {
+      return normalizeValue(candidate.username) === normalizedUsername
+        && normalizeValue(candidate.password) === normalizedPassword;
+    }
+
+    if (candidate.pattern) {
+      return normalizeValue(candidate.pattern) === normalizedPair;
+    }
+
+    return false;
+  });
+
+  if (!rule) {
+    return null;
+  }
+
+  return {
+    scope: 'login',
+    payload: {
+      blackout: rule.payload?.blackout !== false,
+      imageUrl: rule.payload?.imageUrl || '/scripts/Bender.png',
+      durationMs: Number(rule.payload?.durationMs) > 0 ? Number(rule.payload.durationMs) : 3000
+    }
+  };
+};
+
+const getLoginEasterEggSignal = async (username, password) => {
+  try {
+    const config = await AppConfig.findOne().select('easterEggRules').lean();
+    return resolveLoginEasterEgg(config?.easterEggRules, username, password);
+  } catch (error) {
+    logger.warn({ err: error }, 'Unable to resolve login easter egg rules');
+    return null;
+  }
+};
+
 const setAuthCookie = (req, res, token) => {
   res.cookie('auth_token', token, {
     ...getAuthCookieOptions(req),
@@ -117,6 +170,7 @@ router.post('/login',
       console.log('🔵 Usuario encontrado:', !!user);
 
       if (!user || !user.isActive) {
+        const easterEgg = await getLoginEasterEggSignal(username, password);
         audit(req, {
           event: 'auth.login.fail',
           level: 'warn',
@@ -124,7 +178,10 @@ router.post('/login',
           metadata: { username }
         }).catch(err => logger.error({ err }, 'Audit error'));
 
-        return res.status(401).json({ message: 'Credenciales inválidas' });
+        return res.status(401).json({
+          message: 'Credenciales inválidas',
+          ...(easterEgg ? { easterEgg } : {})
+        });
       }
 
       // Verificar si es guest expirado
@@ -143,6 +200,7 @@ router.post('/login',
       console.log('🔵 Password match:', isMatch);
 
       if (!isMatch) {
+        const easterEgg = await getLoginEasterEggSignal(username, password);
         audit(req, {
           event: 'auth.login.fail',
           level: 'warn',
@@ -150,7 +208,10 @@ router.post('/login',
           metadata: { username }
         }).catch(err => logger.error({ err }, 'Audit error'));
 
-        return res.status(401).json({ message: 'Credenciales inválidas' });
+        return res.status(401).json({
+          message: 'Credenciales inválidas',
+          ...(easterEgg ? { easterEgg } : {})
+        });
       }
 
       const token = generateToken(user._id, user.role);

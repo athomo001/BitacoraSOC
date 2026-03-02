@@ -94,4 +94,12 @@
       </form>
     </mat-card-content>
   </mat-card>
+
+  <div
+    class="easter-egg-overlay"
+    *ngIf="showEasterEggOverlay"
+    (click)="closeEasterEggOverlay()"
+  >
+    <img [src]="easterEggImageUrl" alt="Bender" class="easter-egg-image" />
+  </div>
 </div>

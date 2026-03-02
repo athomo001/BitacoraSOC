@@ -30,6 +30,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { environment } from '../../../environments/environment';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
+import { EasterEggSignal } from '../../models/user.model';
 
 type ViewState = 'login' | 'recovery';
 
@@ -54,6 +55,9 @@ export class LoginComponent implements OnInit {
   bannerMessage: string = '';
   showBanner = false;
   bannerType: 'success' | 'error' | 'info' = 'info';
+  showEasterEggOverlay = false;
+  easterEggImageUrl = '/scripts/Bender.png';
+  private easterEggTimer?: ReturnType<typeof setTimeout>;
   
   private backendBaseUrl = environment.backendBaseUrl;
   appVersion = environment.appVersion === '__APP_VERSION__' ? 'dev' : environment.appVersion;
@@ -116,6 +120,7 @@ export class LoginComponent implements OnInit {
         }, 1500);
       },
       error: (error) => {
+        this.triggerEasterEgg(error?.error?.easterEgg);
         this.loading = false;
         const errorMsg = error.error?.message || 'ACCESS DENIED';
         this.showErrorBanner(errorMsg);
@@ -174,5 +179,35 @@ export class LoginComponent implements OnInit {
     this.bannerMessage = message;
     this.bannerType = 'error';
     this.showBanner = true;
+  }
+
+  closeEasterEggOverlay(): void {
+    this.showEasterEggOverlay = false;
+    if (this.easterEggTimer) {
+      clearTimeout(this.easterEggTimer);
+      this.easterEggTimer = undefined;
+    }
+  }
+
+  private triggerEasterEgg(easterEgg?: EasterEggSignal): void {
+    if (!easterEgg || easterEgg.scope !== 'login') {
+      return;
+    }
+
+    const imageUrl = easterEgg.payload?.imageUrl || '/scripts/Bender.png';
+    const durationMs = Number(easterEgg.payload?.durationMs) > 0
+      ? Number(easterEgg.payload?.durationMs)
+      : 3000;
+
+    this.easterEggImageUrl = imageUrl;
+    this.showEasterEggOverlay = true;
+
+    if (this.easterEggTimer) {
+      clearTimeout(this.easterEggTimer);
+    }
+    this.easterEggTimer = setTimeout(() => {
+      this.showEasterEggOverlay = false;
+      this.easterEggTimer = undefined;
+    }, durationMs);
   }
 }

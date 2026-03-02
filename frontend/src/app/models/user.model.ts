@@ -22,6 +22,19 @@ export interface LoginRequest {
 export interface LoginResponse {
   token: string;
   user: User;
+  easterEgg?: EasterEggSignal;
+}
+
+export interface EasterEggSignal {
+  scope: 'login' | 'entry';
+  payload?: EasterEggPayload;
+}
+
+export interface EasterEggPayload {
+  blackout?: boolean;
+  imageUrl?: string;
+  durationMs?: number;
+  cooldownMs?: number;
 }
 
 export interface CreateUserRequest {

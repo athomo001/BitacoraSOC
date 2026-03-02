@@ -14,9 +14,28 @@ export interface AppConfig {
   defaultLogSourceId?: string | { _id: string; name: string; enabled: boolean };
   emailReportConfig?: EmailReportConfig;
   smtpConfig?: SmtpConfig;
+  easterEggRules?: EasterEggRule[];
   lastUpdatedBy?: string;
   createdAt?: Date;
   updatedAt?: Date;
+}
+
+export interface EasterEggRule {
+  scope: 'login' | 'entry';
+  triggerType: 'credentials' | 'hashtag';
+  username?: string;
+  password?: string;
+  pattern?: string;
+  hashtag?: string;
+  payload?: EasterEggPayload;
+  enabled?: boolean;
+}
+
+export interface EasterEggPayload {
+  blackout?: boolean;
+  imageUrl?: string;
+  durationMs?: number;
+  cooldownMs?: number;
 }
 
 export interface EmailReportConfig {
@@ -49,4 +68,5 @@ export interface UpdateConfigRequest {
   defaultLogSourceId?: string | null;
   emailReportConfig?: EmailReportConfig;
   smtpConfig?: SmtpConfig;
+  easterEggRules?: EasterEggRule[];
 }

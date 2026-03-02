@@ -10,6 +10,8 @@ import { CatalogService } from '../../../services/catalog.service';
 import { CatalogLogSource } from '../../../models/catalog.model';
 import { CreateEntryRequest } from '../../../models/entry.model';
 import { AuthService } from '../../../services/auth.service';
+import { ConfigService } from '../../../services/config.service';
+import { EasterEggRule } from '../../../models/config.model';
 import { MatCard, MatCardContent } from '@angular/material/card';
 import { MatFormField, MatLabel, MatHint } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
@@ -32,11 +34,18 @@ export class EntriesComponent implements OnInit {
   nowTime = '';
   isSubmitting = false;
   logSources: CatalogLogSource[] = [];
+  showEasterEggOverlay = false;
+  easterEggImageUrl = '/scripts/Bender.png';
+
+  private entryEasterEggRules: EasterEggRule[] = [];
+  private easterEggTimer?: ReturnType<typeof setTimeout>;
+  private lastEasterEggTriggerAt = 0;
 
   constructor(
     private fb: FormBuilder,
     private entryService: EntryService,
     private catalogService: CatalogService,
+    private configService: ConfigService,
     private snackBar: MatSnackBar,
     private authService: AuthService
   ) {
@@ -52,6 +61,20 @@ export class EntriesComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.configService.getConfig().subscribe({
+      next: (config) => {
+        this.entryEasterEggRules = (config.easterEggRules || [])
+          .filter((rule) => rule.enabled !== false && rule.scope === 'entry' && rule.triggerType === 'hashtag');
+      },
+      error: () => {
+        this.entryEasterEggRules = [];
+      }
+    });
+
+    this.entryForm.get('content')?.valueChanges.subscribe((value: string) => {
+      this.triggerEntryEasterEggIfNeeded(value || '');
+    });
+
     // Cargar clientes disponibles
     this.catalogService.searchLogSources('').subscribe(
       (result) => {
@@ -106,6 +129,64 @@ export class EntriesComponent implements OnInit {
     if (!matches) return [];
     
     return matches.map(tag => tag.substring(1).toLowerCase());
+  }
+
+  closeEasterEggOverlay(): void {
+    this.showEasterEggOverlay = false;
+    if (this.easterEggTimer) {
+      clearTimeout(this.easterEggTimer);
+      this.easterEggTimer = undefined;
+    }
+  }
+
+  private triggerEntryEasterEggIfNeeded(content: string): void {
+    if (!this.entryEasterEggRules.length || this.showEasterEggOverlay) {
+      return;
+    }
+
+    const tags = this.extractTagsFromContent(content);
+    if (!tags.length) {
+      return;
+    }
+
+    const now = Date.now();
+    const matchedRule = this.entryEasterEggRules.find((rule) => {
+      const normalizedHashtag = String(rule.hashtag || '').replace(/^#/, '').toLowerCase();
+      if (!normalizedHashtag || !tags.includes(normalizedHashtag)) {
+        return false;
+      }
+
+      const cooldownMs = Number(rule.payload?.cooldownMs) > 0
+        ? Number(rule.payload?.cooldownMs)
+        : 0;
+
+      if (cooldownMs <= 0) {
+        return true;
+      }
+
+      return (now - this.lastEasterEggTriggerAt) >= cooldownMs;
+    });
+
+    if (!matchedRule) {
+      return;
+    }
+
+    this.lastEasterEggTriggerAt = now;
+    this.easterEggImageUrl = matchedRule.payload?.imageUrl || '/scripts/Bender.png';
+    this.showEasterEggOverlay = true;
+
+    const durationMs = Number(matchedRule.payload?.durationMs) > 0
+      ? Number(matchedRule.payload?.durationMs)
+      : 3000;
+
+    if (this.easterEggTimer) {
+      clearTimeout(this.easterEggTimer);
+    }
+
+    this.easterEggTimer = setTimeout(() => {
+      this.showEasterEggOverlay = false;
+      this.easterEggTimer = undefined;
+    }, durationMs);
   }
 
   private getLocalDateString(date: Date): string {

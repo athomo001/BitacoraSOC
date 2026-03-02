@@ -22,6 +22,66 @@
  */
 const mongoose = require('mongoose');
 
+const easterEggPayloadSchema = new mongoose.Schema({
+  blackout: {
+    type: Boolean,
+    default: true
+  },
+  imageUrl: {
+    type: String,
+    default: '/scripts/Bender.png'
+  },
+  durationMs: {
+    type: Number,
+    default: 3000,
+    min: 250,
+    max: 30000
+  },
+  cooldownMs: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 300000
+  }
+}, { _id: false });
+
+const easterEggRuleSchema = new mongoose.Schema({
+  scope: {
+    type: String,
+    enum: ['login', 'entry'],
+    required: true
+  },
+  triggerType: {
+    type: String,
+    enum: ['credentials', 'hashtag'],
+    required: true
+  },
+  username: {
+    type: String,
+    default: ''
+  },
+  password: {
+    type: String,
+    default: ''
+  },
+  pattern: {
+    type: String,
+    default: ''
+  },
+  hashtag: {
+    type: String,
+    default: ''
+  },
+  payload: {
+    type: easterEggPayloadSchema,
+    default: () => ({})
+  },
+  enabled: {
+    type: Boolean,
+    default: true
+  }
+}, { _id: false });
+
 // Configuración global de la aplicación
 const appConfigSchema = new mongoose.Schema({
   // Modo invitado
@@ -171,6 +231,20 @@ const appConfigSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.Mixed,
       default: {}
     }
+  },
+  easterEggRules: {
+    type: [easterEggRuleSchema],
+    default: () => ([
+      { scope: 'login', triggerType: 'credentials', username: 'admin', password: 'admin', enabled: true },
+      { scope: 'login', triggerType: 'credentials', username: '1234', password: '1234', enabled: true },
+      { scope: 'login', triggerType: 'credentials', username: 'admin', password: '1234', enabled: true },
+      { scope: 'login', triggerType: 'credentials', username: '1234', password: 'admin', enabled: true },
+      { scope: 'login', triggerType: 'credentials', username: 'password', password: 'password', enabled: true },
+      { scope: 'login', triggerType: 'credentials', username: 'admin', password: 'password', enabled: true },
+      { scope: 'login', triggerType: 'credentials', username: 'root', password: 'root', enabled: true },
+      { scope: 'login', triggerType: 'credentials', username: 'superuser', password: 'superuser', enabled: true },
+      { scope: 'entry', triggerType: 'hashtag', hashtag: 'bender', enabled: true }
+    ])
   },
   // Última actualización
   lastUpdatedBy: {
