@@ -130,6 +130,10 @@ docker compose up -d
 # Puerto publico del frontend
 FRONTEND_PORT=80
 
+# CORS (OBLIGATORIO en producción)
+# Incluye la URL exacta desde donde abres el frontend
+ALLOWED_ORIGINS=http://10.0.100.13:4200
+
 # MongoDB
 MONGO_ROOT_PASSWORD=tu_password_seguro
 MONGO_DATABASE=bitacora_soc

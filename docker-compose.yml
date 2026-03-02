@@ -44,7 +44,7 @@ services:
       PORT: 3000
       HOST: 0.0.0.0
       HOST_DOMAIN: ${HOST_DOMAIN:-0.0.0.0}
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost,http://localhost:4200}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
       MONGODB_URI: mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${MONGO_DATABASE:-bitacora_soc}?authSource=admin
       ADMIN_USERNAME: ${ADMIN_USERNAME}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
