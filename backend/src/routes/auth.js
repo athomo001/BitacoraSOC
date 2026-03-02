@@ -119,7 +119,7 @@ const resolveLoginEasterEgg = (rules, username, password) => {
 
 const getLoginEasterEggSignal = async (username, password) => {
   try {
-    const config = await AppConfig.findOne().select('easterEggRules').lean();
+    const config = await AppConfig.findOne().select('easterEggRules');
     return resolveLoginEasterEgg(config?.easterEggRules, username, password);
   } catch (error) {
     logger.warn({ err: error }, 'Unable to resolve login easter egg rules');
