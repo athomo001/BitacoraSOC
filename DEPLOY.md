@@ -134,6 +134,11 @@ FRONTEND_PORT=80
 # Incluye la URL exacta desde donde abres el frontend
 ALLOWED_ORIGINS=http://10.0.100.13:4200
 
+# Cookie de sesión
+# - Si usas HTTPS real: true
+# - Si usas HTTP en red local: false
+COOKIE_SECURE=false
+
 # MongoDB
 MONGO_ROOT_PASSWORD=tu_password_seguro
 MONGO_DATABASE=bitacora_soc

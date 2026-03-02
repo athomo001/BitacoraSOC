@@ -50,16 +50,33 @@ const getTokenFromCookie = (req) => {
   return tokenValue ? decodeURIComponent(tokenValue) : null;
 };
 
-const getAuthCookieOptions = () => ({
+const resolveCookieSecure = (req) => {
+  if (process.env.COOKIE_SECURE === 'true') {
+    return true;
+  }
+
+  if (process.env.COOKIE_SECURE === 'false') {
+    return false;
+  }
+
+  const forwardedProto = req?.headers?.['x-forwarded-proto'];
+  if (forwardedProto) {
+    return forwardedProto.split(',')[0].trim() === 'https';
+  }
+
+  return process.env.NODE_ENV === 'production';
+};
+
+const getAuthCookieOptions = (req) => ({
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
+  secure: resolveCookieSecure(req),
   sameSite: 'strict',
   path: '/'
 });
 
-const setAuthCookie = (res, token) => {
+const setAuthCookie = (req, res, token) => {
   res.cookie('auth_token', token, {
-    ...getAuthCookieOptions(),
+    ...getAuthCookieOptions(req),
     maxAge: 4 * 60 * 60 * 1000
   });
 };
@@ -138,7 +155,7 @@ router.post('/login',
 
       const token = generateToken(user._id, user.role);
       console.log('🔵 Token generado, enviando respuesta...');
-      setAuthCookie(res, token);
+      setAuthCookie(req, res, token);
 
       // ⚠️ TEMPORAL: Audit deshabilitado para debugging
       /*
@@ -214,7 +231,7 @@ router.post('/refresh', async (req, res) => {
     }
 
     const newToken = generateToken(user._id, user.role);
-    setAuthCookie(res, newToken);
+    setAuthCookie(req, res, newToken);
 
     res.json({ token: newToken });
   } catch (error) {
@@ -223,7 +240,7 @@ router.post('/refresh', async (req, res) => {
 });
 
 router.post('/logout', (req, res) => {
-  res.clearCookie('auth_token', getAuthCookieOptions());
+  res.clearCookie('auth_token', getAuthCookieOptions(req));
   return res.json({ message: 'Sesión cerrada' });
 });
 
