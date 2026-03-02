@@ -1,0 +1,68 @@
+.integrations-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+
+  h1 {
+    margin-bottom: 8px;
+    color: var(--text-primary);
+  }
+
+  .subtitle {
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+  }
+}
+
+.integration-card {
+  margin-bottom: 24px;
+  background: var(--surface-color);
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.connector-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+
+  mat-form-field {
+    min-width: 300px;
+    flex: 1;
+  }
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  align-items: center;
+}
+
+.full {
+  grid-column: 1 / -1;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.future-card ul {
+  margin: 10px 0 0 18px;
+}

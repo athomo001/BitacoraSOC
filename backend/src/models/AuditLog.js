@@ -62,7 +62,16 @@ const auditLogSchema = new mongoose.Schema({
     ip: String,
     userAgent: String,
     method: String,
-    path: String
+    path: String,
+    deviceFingerprint: String,
+    devicePlatform: String,
+    deviceLanguage: String,
+    forwardedFor: String,
+    isLikelyVpnOrProxy: Boolean,
+    vpnSignals: [String],
+    sessionKey: String,
+    ipChanged: Boolean,
+    previousIp: String
   },
   
   // Resultado

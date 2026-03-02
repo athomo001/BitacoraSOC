@@ -1,0 +1,41 @@
+.admin-console {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-console-header h1 {
+  margin: 0;
+}
+
+.admin-console-header p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+}
+
+.admin-console-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.admin-link {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--text-primary);
+  background: var(--surface-color);
+}
+
+.admin-link.active {
+  background: var(--primary-color);
+  color: var(--on-primary-color);
+  border-color: var(--primary-color);
+}
+
+.admin-console-content {
+  min-height: 240px;
+}

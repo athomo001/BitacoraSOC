@@ -22,13 +22,15 @@ const Entry = require('../models/Entry');
 const ShiftCheck = require('../models/ShiftCheck');
 const User = require('../models/User');
 const { authenticate, authorize } = require('../middleware/auth');
+const { audit } = require('../utils/audit');
 
 // GET /api/reports/overview - Vista general de KPIs
 router.get('/overview', authenticate, async (req, res) => {
   try {
     const { days = 30 } = req.query;
+    const parsedDays = parseInt(days, 10) || 30;
     const startDate = new Date();
-    startDate.setDate(startDate.getDate() - parseInt(days));
+    startDate.setDate(startDate.getDate() - parsedDays);
 
     // 1. Total de entradas por tipo
     const entriesByType = await Entry.aggregate([
@@ -82,6 +84,13 @@ router.get('/overview', authenticate, async (req, res) => {
     // 7. Total checks de turno
     const totalChecks = await ShiftCheck.countDocuments({ createdAt: { $gte: startDate } });
 
+    await audit(req, {
+      event: 'user.reports.overview.view',
+      level: 'info',
+      result: { success: true },
+      metadata: { days: parsedDays }
+    });
+
     res.json({
       period: `${days} días`,
       entriesByType: entriesByType.reduce((acc, item) => {
@@ -132,6 +141,17 @@ router.get('/export-entries', authenticate, authorize('admin'), async (req, res)
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="entradas_${Date.now()}.csv"`);
     res.send('\ufeff' + csv); // BOM para UTF-8
+
+    await audit(req, {
+      event: 'user.reports.export.entries',
+      level: 'info',
+      result: { success: true },
+      metadata: {
+        startDate: startDate || null,
+        endDate: endDate || null,
+        exportedCount: entries.length
+      }
+    });
   } catch (error) {
     console.error('Error al exportar:', error);
     res.status(500).json({ message: 'Error al exportar datos' });
@@ -142,8 +162,9 @@ router.get('/export-entries', authenticate, authorize('admin'), async (req, res)
 router.get('/tags-trend', authenticate, async (req, res) => {
   try {
     const { days = 30, tags } = req.query;
+    const parsedDays = parseInt(days, 10) || 30;
     const startDate = new Date();
-    startDate.setDate(startDate.getDate() - parseInt(days));
+    startDate.setDate(startDate.getDate() - parsedDays);
     
     const tagsList = tags ? tags.split(',') : [];
     
@@ -178,6 +199,17 @@ router.get('/tags-trend', authenticate, async (req, res) => {
     });
     
     const results = await Promise.all(trendsPromises);
+
+    await audit(req, {
+      event: 'user.reports.tags_trend.view',
+      level: 'info',
+      result: { success: true },
+      metadata: {
+        days: parsedDays,
+        tagsCount: tagsList.length
+      }
+    });
+
     res.json(results);
   } catch (error) {
     console.error('Error al obtener tendencias de tags:', error);
@@ -189,8 +221,9 @@ router.get('/tags-trend', authenticate, async (req, res) => {
 router.get('/heatmap', authenticate, async (req, res) => {
   try {
     const { days = 30 } = req.query;
+    const parsedDays = parseInt(days, 10) || 30;
     const startDate = new Date();
-    startDate.setDate(startDate.getDate() - parseInt(days));
+    startDate.setDate(startDate.getDate() - parsedDays);
     
     const heatmapData = await Entry.aggregate([
       {
@@ -232,6 +265,16 @@ router.get('/heatmap', authenticate, async (req, res) => {
       },
       { $sort: { dayOfWeek: 1, hour: 1 } }
     ]);
+
+    await audit(req, {
+      event: 'user.reports.heatmap.view',
+      level: 'info',
+      result: { success: true },
+      metadata: {
+        days: parsedDays,
+        buckets: heatmapData.length
+      }
+    });
     
     res.json(heatmapData);
   } catch (error) {
@@ -244,8 +287,9 @@ router.get('/heatmap', authenticate, async (req, res) => {
 router.get('/entries-by-logsource', authenticate, async (req, res) => {
   try {
     const { days = 30 } = req.query;
+    const parsedDays = parseInt(days, 10) || 30;
     const startDate = new Date();
-    startDate.setDate(startDate.getDate() - parseInt(days));
+    startDate.setDate(startDate.getDate() - parsedDays);
     
     const entriesBySource = await Entry.aggregate([
       { $match: { createdAt: { $gte: startDate } } },
@@ -264,6 +308,16 @@ router.get('/entries-by-logsource', authenticate, async (req, res) => {
       name: item._id || 'Sin asignar',
       value: item.count
     }));
+
+    await audit(req, {
+      event: 'user.reports.entries_by_logsource.view',
+      level: 'info',
+      result: { success: true },
+      metadata: {
+        days: parsedDays,
+        items: data.length
+      }
+    });
     
     res.json(data);
   } catch (error) {

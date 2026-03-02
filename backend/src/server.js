@@ -24,9 +24,11 @@ const fs = require('fs');
 const connectDB = require('./config/database');
 const { apiLimiter } = require('./middleware/rate-limiter');
 const requestIdMiddleware = require('./middleware/request-id');
+const captureMetadata = require('./middleware/metadata');
 const inputSanitizer = require('./middleware/input-sanitizer');
 const { logger } = require('./utils/logger');
 const { startChecklistAlertScheduler } = require('./utils/checklistAlertScheduler');
+const { startBackupScheduler, stopBackupScheduler } = require('./utils/backup-scheduler');
 
 const app = express();
 const HOST = process.env.HOST || '0.0.0.0';
@@ -113,6 +115,7 @@ const corsOptions = {
 
 // Rate limiting
 app.use('/api/', cors(corsOptions), apiLimiter);
+app.use('/api/', captureMetadata);
 app.use('/api/', inputSanitizer);
 
 // Servir archivos estáticos (logos) - CORS permisivo para imágenes
@@ -145,6 +148,7 @@ app.use('/api/checklist', require('./routes/checklist'));
 app.use('/api/tags', require('./routes/tags'));
 app.use('/api/smtp', require('./routes/smtp'));
 app.use('/api/logging', require('./routes/logging'));
+app.use('/api/glpi', require('./routes/glpi'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/config', require('./routes/config'));
 app.use('/api/backup', require('./routes/backup'));
@@ -226,6 +230,7 @@ const server = app.listen(PORT, HOST, () => {
 
   // Iniciar schedulers
   startChecklistAlertScheduler();
+  startBackupScheduler();
 
   const { startScheduler: startShiftReportScheduler } = require('./utils/shift-scheduler');
   startShiftReportScheduler();
@@ -246,6 +251,7 @@ server.on('error', (error) => {
 
 const gracefulShutdown = (signal) => {
   logger.info({ event: 'server.shutdown', signal }, 'Shutting down server');
+  stopBackupScheduler();
   server.close(() => {
     logger.info({ event: 'server.shutdown.completed' }, 'Servidor detenido');
     process.exit(0);

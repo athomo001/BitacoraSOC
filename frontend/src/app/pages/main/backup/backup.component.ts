@@ -8,17 +8,18 @@ import { MatButton, MatIconButton } from '@angular/material/button';
 import { NgIf } from '@angular/common';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatCheckbox } from '@angular/material/checkbox';
-import { ReactiveFormsModule, FormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, FormsModule, Validators } from '@angular/forms';
 import { MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow } from '@angular/material/table';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MatFormField, MatLabel, MatHint } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
+import { MatOption, MatSelect } from '@angular/material/select';
 
 @Component({
     selector: 'app-backup',
     templateUrl: './backup.component.html',
     styleUrls: ['./backup.component.scss'],
-    imports: [MatCard, MatCardHeader, MatCardTitle, MatIcon, MatCardContent, MatButton, NgIf, MatProgressSpinner, MatCheckbox, ReactiveFormsModule, FormsModule, MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatIconButton, MatTooltip, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow, MatFormField, MatLabel, MatHint, MatInput]
+    imports: [MatCard, MatCardHeader, MatCardTitle, MatIcon, MatCardContent, MatButton, NgIf, MatProgressSpinner, MatCheckbox, ReactiveFormsModule, FormsModule, MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatIconButton, MatTooltip, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow, MatFormField, MatLabel, MatHint, MatInput, MatOption, MatSelect]
 })
 export class BackupComponent implements OnInit {
   isExporting = false;
@@ -28,14 +29,86 @@ export class BackupComponent implements OnInit {
   clearBeforeRestore = false;
   purgeConfirmText = '';
   readonly purgeConfirmRequired = 'PURGAR TODO';
+  backupConfigForm: FormGroup;
 
   constructor(
+    private fb: FormBuilder,
     private http: HttpClient,
     private snackBar: MatSnackBar
-  ) {}
+  ) {
+    this.backupConfigForm = this.fb.group({
+      enabled: [false],
+      intervalDays: [7, [Validators.required, Validators.min(1), Validators.max(365)]],
+      destinationType: ['local', Validators.required],
+      localRetentionDays: [30, [Validators.required, Validators.min(1), Validators.max(365)]],
+      destinationPath: ['']
+    });
+
+    this.backupConfigForm.get('destinationType')?.valueChanges.subscribe((destinationType) => {
+      this.applyDestinationPathValidation(destinationType);
+    });
+  }
 
   ngOnInit(): void {
+    this.loadBackupConfig();
     this.loadBackupHistory();
+  }
+
+  loadBackupConfig(): void {
+    this.http.get<any>(`${environment.apiUrl}/backup/config`).subscribe({
+      next: (config) => {
+        this.backupConfigForm.patchValue({
+          enabled: config.enabled || false,
+          intervalDays: config.intervalDays || 7,
+          destinationType: config.destinationType || 'local',
+          localRetentionDays: config.localRetentionDays || 30,
+          destinationPath: config.destinationConfig?.basePath || ''
+        });
+        this.applyDestinationPathValidation(config.destinationType || 'local');
+      },
+      error: (err) => console.error('Error cargando Backup Config:', err)
+    });
+  }
+
+  saveBackupConfig(): void {
+    if (this.backupConfigForm.valid) {
+      const payload = {
+        enabled: this.backupConfigForm.value.enabled,
+        intervalDays: Number(this.backupConfigForm.value.intervalDays),
+        destinationType: this.backupConfigForm.value.destinationType,
+        localRetentionDays: Number(this.backupConfigForm.value.localRetentionDays),
+        destinationConfig: {
+          basePath: (this.backupConfigForm.value.destinationPath || '').trim()
+        }
+      };
+
+      this.http.put<any>(`${environment.apiUrl}/backup/config`, payload).subscribe({
+        next: () => this.snackBar.open('Configuración de Backup guardada', 'Cerrar', { duration: 2000 }),
+        error: () => this.snackBar.open('Error guardando configuración de Backup', 'Cerrar', { duration: 3000 })
+      });
+    }
+  }
+
+  private applyDestinationPathValidation(destinationType: string): void {
+    const destinationPathControl = this.backupConfigForm.get('destinationPath');
+    if (!destinationPathControl) {
+      return;
+    }
+
+    if (destinationType === 'smb' || destinationType === 'nfs') {
+      destinationPathControl.setValidators([Validators.required]);
+    } else {
+      destinationPathControl.clearValidators();
+    }
+
+    destinationPathControl.updateValueAndValidity({ emitEvent: false });
+  }
+
+  testAutoBackup(): void {
+    this.http.post<any>(`${environment.apiUrl}/backup/test-auto`, {}).subscribe({
+      next: (res) => this.snackBar.open(res.message, 'Cerrar', { duration: 3000 }),
+      error: () => this.snackBar.open('Error iniciando backup manual', 'Cerrar', { duration: 3000 })
+    });
   }
 
   loadBackupHistory(): void {

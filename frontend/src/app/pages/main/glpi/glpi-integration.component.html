@@ -1,0 +1,99 @@
+<div class="glpi-container">
+  <h1>GLPI</h1>
+  <p class="subtitle">Configuración separada para integración GLPI por API REST o correo collector.</p>
+
+  <mat-card class="glpi-card">
+    <mat-card-header>
+      <mat-card-title>Configuración</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <form [formGroup]="form" class="glpi-form">
+        <div class="grid two">
+          <mat-checkbox formControlName="enabled">Habilitar GLPI</mat-checkbox>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Modo de integración</mat-label>
+            <mat-select formControlName="mode">
+              <mat-option *ngFor="let option of modeOptions" [value]="option.value">{{ option.label }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Estrategia de envío</mat-label>
+            <mat-select formControlName="dispatchMode">
+              <mat-option *ngFor="let option of dispatchOptions" [value]="option.value">{{ option.label }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+
+        <div *ngIf="isApiMode" class="mode-section">
+          <h3>API REST GLPI</h3>
+          <div class="grid two">
+            <mat-form-field appearance="outline">
+              <mat-label>Base URL GLPI</mat-label>
+              <input matInput formControlName="apiBaseUrl" placeholder="https://glpi.midominio.cl/apirest.php" />
+              <mat-hint>Se usa para initSession y killSession</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Timeout (ms)</mat-label>
+              <input matInput type="number" formControlName="apiTimeoutMs" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>App-Token</mat-label>
+              <input matInput type="password" formControlName="apiAppToken" autocomplete="new-password" />
+              <mat-hint>{{ apiTokensConfigured ? 'Ya existe token guardado. Completa solo para reemplazar.' : 'Se guarda cifrado en backend.' }}</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>User Token</mat-label>
+              <input matInput type="password" formControlName="apiUserToken" autocomplete="new-password" />
+              <mat-hint>{{ apiTokensConfigured ? 'Completa solo para reemplazar token actual.' : 'Se guarda cifrado en backend.' }}</mat-hint>
+            </mat-form-field>
+
+            <mat-checkbox formControlName="apiVerifyTls">Validar certificado TLS</mat-checkbox>
+          </div>
+        </div>
+
+        <div *ngIf="!isApiMode" class="mode-section">
+          <h3>Correo collector</h3>
+          <div class="grid two">
+            <mat-form-field appearance="outline">
+              <mat-label>Correo collector GLPI</mat-label>
+              <input matInput formControlName="emailCollectorAddress" placeholder="collector@midominio.cl" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Template asunto</mat-label>
+              <input matInput formControlName="emailSubjectTemplate" placeholder="[SOC] Cierre de turno {date}" />
+              <mat-hint>Disponible: {{'{{date}}'}}</mat-hint>
+            </mat-form-field>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button mat-raised-button color="primary" (click)="saveConfig()" [disabled]="saving || loading">
+            {{ saving ? 'Guardando...' : 'Guardar Configuración' }}
+          </button>
+          <button mat-stroked-button color="primary" (click)="testConnection()" [disabled]="testing || loading">
+            {{ testing ? 'Probando...' : 'Probar Conexión' }}
+          </button>
+        </div>
+      </form>
+    </mat-card-content>
+  </mat-card>
+
+  <mat-card class="glpi-card">
+    <mat-card-header>
+      <mat-card-title>Última prueba</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <p *ngIf="lastTestDate"><strong>Fecha:</strong> {{ lastTestDate | date:'medium' }}</p>
+      <p *ngIf="lastTestSuccess === true" class="ok"><strong>Estado:</strong> Correcto</p>
+      <p *ngIf="lastTestSuccess === false" class="error"><strong>Estado:</strong> Fallido</p>
+      <p *ngIf="lastTestMessage"><strong>Detalle:</strong> {{ lastTestMessage }}</p>
+      <p *ngIf="!lastTestDate" class="muted">Aún no hay pruebas registradas.</p>
+    </mat-card-content>
+  </mat-card>
+</div>

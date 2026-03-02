@@ -1,21 +1,35 @@
 export interface AuditLog {
   _id: string;
-  userId: string;
-  username: string;
-  action: string;
-  entityType: string;
-  entityId?: string;
-  changes?: Record<string, any>;
-  ipAddress: string;
-  userAgent: string;
+  event: string;
+  level: 'info' | 'warn' | 'error';
   timestamp: string;
-  status: 'success' | 'failure';
-  errorMessage?: string;
+  actor?: {
+    userId?: string;
+    username?: string;
+    role?: string;
+    isGuest?: boolean;
+  };
+  request?: {
+    ip?: string;
+    path?: string;
+    method?: string;
+    userAgent?: string;
+    isLikelyVpnOrProxy?: boolean;
+    ipChanged?: boolean;
+    previousIp?: string;
+  };
+  result?: {
+    success?: boolean;
+    reason?: string;
+    statusCode?: number;
+  };
+  metadata?: Record<string, any>;
 }
 
 export interface AuditLogFilters {
   page?: number;
   limit?: number;
+  category?: string;
   userId?: string;
   event?: string;
   level?: string;

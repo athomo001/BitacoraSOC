@@ -55,7 +55,16 @@ async function audit(req, data) {
       ip: req.clientIp || req.ip,
       userAgent: req.clientUserAgent || req.get('user-agent'),
       method: req.method,
-      path: req.path
+      path: req.path,
+      deviceFingerprint: req.clientMetadata?.device?.fingerprint,
+      devicePlatform: req.clientMetadata?.device?.platform,
+      deviceLanguage: req.clientMetadata?.device?.language,
+      forwardedFor: req.clientMetadata?.network?.forwardedFor,
+      isLikelyVpnOrProxy: req.clientMetadata?.network?.isLikelyVpnOrProxy,
+      vpnSignals: req.clientMetadata?.network?.vpnSignals || [],
+      sessionKey: req.authSessionKey,
+      ipChanged: req.securitySignals?.ipChanged === true,
+      previousIp: req.securitySignals?.previousIp || null
     };
     
     // Sanitizar metadata (sin secrets, max 10KB)

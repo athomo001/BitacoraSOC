@@ -20,6 +20,7 @@ const { authenticate, authorize } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const { encrypt, decrypt } = require('../utils/encryption');
 const { invalidateCache } = require('../utils/email');
+const { audit } = require('../utils/audit');
 
 const smtpTestLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
@@ -176,6 +177,20 @@ router.post('/',
       await config.save();
       invalidateCache();
 
+      await audit(req, {
+        event: 'admin.smtp.config.update',
+        level: 'info',
+        result: { success: true, reason: 'SMTP config saved' },
+        metadata: {
+          provider: data.provider,
+          host: data.host,
+          port: data.port,
+          useTLS: data.useTLS,
+          recipientsCount: Array.isArray(data.recipients) ? data.recipients.length : 0,
+          sendOnlyIfRed: data.sendOnlyIfRed
+        }
+      });
+
       const configObj = config.toObject();
       delete configObj.password;
 
@@ -184,6 +199,17 @@ router.post('/',
         config: configObj
       });
     } catch (error) {
+      await audit(req, {
+        event: 'admin.smtp.config.update',
+        level: 'warn',
+        result: { success: false, reason: error.message },
+        metadata: {
+          host: req.body?.host,
+          port: req.body?.port,
+          provider: req.body?.provider
+        }
+      });
+
       console.error('Error al guardar config SMTP:', error);
       return res.status(500).json({ message: 'Error al guardar configuracion SMTP', error: error.message });
     }
@@ -244,12 +270,36 @@ router.post('/test',
         ? 'Correo de prueba enviado exitosamente'
         : 'Conexión SMTP verificada exitosamente (sin envío de email)';
 
+      await audit(req, {
+        event: sendMail ? 'smtp.test.send.success' : 'smtp.test.connection.success',
+        level: 'info',
+        result: { success: true, reason: message },
+        metadata: {
+          usingStoredConfig,
+          host: configData.host,
+          port: configData.port,
+          recipient: recipient || null,
+          recipientsCount: Array.isArray(configData.recipients) ? configData.recipients.length : 0
+        }
+      });
+
       return res.json({
         message,
         recipient: recipient || 'N/A (solo verificación de conexión)',
         connectionOnly: !sendMail
       });
     } catch (error) {
+      await audit(req, {
+        event: 'smtp.test.fail',
+        level: 'warn',
+        result: { success: false, reason: error.message },
+        metadata: {
+          usingStoredConfig,
+          host: req.body?.host,
+          port: req.body?.port
+        }
+      });
+
       console.error('Error al probar SMTP:', error);
 
       if (usingStoredConfig) {

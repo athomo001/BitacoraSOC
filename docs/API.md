@@ -3,6 +3,7 @@
 Guía para consumir la API REST del sistema.
 
 > Aviso: Todos los valores de ejemplo son placeholders. Reemplazarlos por credenciales reales desde `.env` antes de usar en producción.
+> Estado: El proyecto se encuentra en **beta**; algunos endpoints y flujos pueden evolucionar.
 
 ---
 
@@ -159,11 +160,16 @@ El servidor acepta tokens con diferencia de ±60 segundos (previene errores por 
 
 | Método | Endpoint | Descripción | Rol |
 |--------|----------|-------------|-----|
+| GET | `/api/backup/config` | Obtener config de backups automáticos | Admin |
+| PUT | `/api/backup/config` | Guardar config de backups automáticos | Admin |
+| POST | `/api/backup/test-auto` | Ejecutar prueba de backup automático | Admin |
 | GET | `/api/backup/history` | Historial de backups | Admin |
 | POST | `/api/backup/create` | Crear backup JSON | Admin |
 | POST | `/api/backup/restore` | Restaurar backup | Admin |
+| GET | `/api/backup/download/:filename` | Descargar backup JSON | Admin |
 | GET | `/api/backup/export/:type` | Exportar CSV | Admin |
 | POST | `/api/backup/import` | Importar CSV/JSON | Admin |
+| POST | `/api/backup/purge` | Purgar datos (con confirmación) | Admin |
 | DELETE | `/api/backup/:id` | Eliminar backup | Admin |
 
 ### Logging (SIEM)
@@ -173,6 +179,19 @@ El servidor acepta tokens con diferencia de ±60 segundos (previene errores por 
 | GET | `/api/logging/config` | Config forwarding | Admin |
 | PUT | `/api/logging/config` | Actualizar config | Admin |
 | POST | `/api/logging/test` | Probar conexión SIEM | Admin |
+| GET | `/api/logging/configs` | Listar integraciones SIEM/SOAR/NDR | Admin |
+| POST | `/api/logging/configs` | Crear integración | Admin |
+| PUT | `/api/logging/configs/:id` | Actualizar integración | Admin |
+| DELETE | `/api/logging/configs/:id` | Eliminar integración | Admin |
+| POST | `/api/logging/configs/:id/test` | Probar integración específica | Admin |
+
+### GLPI
+
+| Método | Endpoint | Descripción | Rol |
+|--------|----------|-------------|-----|
+| GET | `/api/glpi/config` | Obtener configuración GLPI | Admin |
+| PUT | `/api/glpi/config` | Guardar configuración GLPI | Admin |
+| POST | `/api/glpi/test` | Probar conexión GLPI (API/correo) | Admin |
 
 ### Audit Logs
 

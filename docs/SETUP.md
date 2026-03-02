@@ -3,6 +3,7 @@
 Guía detallada para instalar y configurar el sistema desde cero.
 
 > Aviso: Los valores de ejemplo son placeholders. Reemplazarlos por credenciales reales desde `.env` antes de usar en producción.
+> Estado: Proyecto en **beta**. Validar los flujos críticos en entorno de pruebas antes de pasar a operación.
 
 ---
 
@@ -63,6 +64,24 @@ Si no está instalado:
 - **Windows:** [Descargar MongoDB Community](https://www.mongodb.com/try/download/community)
 - **Instalación:** Incluir MongoDB Compass (GUI opcional)
 - **Servicio:** Configurar como servicio Windows (auto-start)
+
+---
+
+## Verificación rápida post-instalación
+
+1. Backend arriba: `http://localhost:3000/health`
+2. Frontend arriba: `http://localhost:4200`
+3. Login admin exitoso y acceso a consola unificada: `/main/admin`
+4. Revisar módulos admin clave:
+  - `/main/admin/integrations` (SIEM/SOAR/NDR)
+  - `/main/admin/glpi` (GLPI separado)
+  - `/main/admin/smtp` y `/main/backup`
+5. Validar API docs: `http://localhost:3000/api-docs`
+
+### Nota de GLPI (modo API)
+
+- Para guardar configuración GLPI en modo API se requieren `App-Token` y `User Token` configurados.
+- El backend valida esos campos al guardar (`PUT /api/glpi/config`).
 
 ---
 

@@ -1,0 +1,20 @@
+<div class="admin-console">
+  <header class="admin-console-header">
+    <h1>Consola Administrativa</h1>
+    <p>Gestión unificada de usuarios, checklist, turnos, catálogos y escalación.</p>
+  </header>
+
+  <nav class="admin-console-nav" aria-label="Secciones de administración">
+    <a
+      *ngFor="let section of sections"
+      [routerLink]="section.route"
+      routerLinkActive="active"
+      class="admin-link">
+      {{ section.label }}
+    </a>
+  </nav>
+
+  <section class="admin-console-content">
+    <router-outlet></router-outlet>
+  </section>
+</div>

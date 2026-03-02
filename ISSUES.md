@@ -7,17 +7,7 @@
 
 | ID | Estado | Seccion | Tarea | Notas |
 | --- | --- | --- | --- | --- |
-| SEC-STD-009 | Pendiente | Seguridad/Compliance | Alineación OWASP ASVS L2 + Secure Coding + Angular/Node | En progreso: cookie `HttpOnly`, CSP activa, CORS prod sin wildcard, sanitización anti-inyección (`$`/`.`), RBAC crítico reforzado. Pendiente para cierre total: matriz RBAC documentada + pruebas de seguridad mínimas automatizadas. |
-| B11 | Pendiente | Mejoras | Auditoría incompleta de correos y acciones de usuarios/admin | En Logs de Auditoría no aparece claramente envío de correos (estado + destinatarios) ni cambios de administradores ni acciones relevantes de usuario normal (ej. generar reporte). |
-| B14 | Listo | Bugs | Envío automático de correo de turno fuera de contexto (vacío/duplicado) | En no laborales y a las 00:00 o a la hora que se  configuro  como termino de turno se envían correos vacíos. Debe enviarse solo al registrar checklist de cierre real. |
-| B16 | Pendiente | Seguridad/Arquitectura | Auditoría automática avanzada (usuario + dispositivo + red + VPN) | Diseñar e implementar trazabilidad inmutable con fingerprint de dispositivo, metadata de red, detección de cambio de IP en sesión y notificación en tiempo real. |
-| B17 | Pendiente | Seguridad/Integraciones | Envío de eventos de auditoría a SIEM/SOAR/NDR (Syslog/API) | Exportar todos los eventos de auditoría a destinos externos (Elastic, Wazuh, QRadar, XSOAR, Fortinet, etc.) por UDP/TCP/TLS con puertos `514`, `6514` o puerto personalizado. |
-| B18 | Pendiente | Integraciones | Módulo General de Integraciones | Crear sección "Integraciones" global en el panel de administrador para configurar y habilitar conectores salientes (GLPI, Elastic, SIEM, Webhooks) y futuras conexiones (SSO, LDAP). |
-| B19 | Pendiente | Integraciones | Creación de tickets en GLPI (Correo / API) | Automatizar creación de ticket GLPI al cierre del turno. Soportar dos métodos configurables: vía correo electrónico (asunto como nombre del ticket) o de manera oficial mediante la API REST de GLPI. Insertarlo en el nuevo menú de Integraciones. |
-
-| B21 | Pendiente | Backup/Operación | Backups automáticos programables + destino externo + retención configurable | Permitir programar respaldo automático cada N días, enviar a destino configurable (nube/NFS/Samba) y definir expiración local de respaldos. |
-| B25 | Pendiente | UI/UX + Operación | Log Sources/Clientes: separar activos e inactivos en `catalog-admin` | Hoy se puede marcar `enabled` al editar, pero la UI mezcla todos en una sola tabla; al inactivar, debe salir de Activos y mostrarse abajo en Inactivos para ordenar operación. |
-| B27 | Pendiente | UI/UX + Arquitectura Frontend | Consola Admin unificada (Users, Checklist, Turnos, Catálogos, Escalación) | Unificar módulos administrativos en una sola experiencia coherente, evitando duplicidad de menús y diseño “copiar/pegar”; debe seguir reglas UI/UX consistentes y optimizar navegación operativa. |
+| B19 | Pendiente | Integraciones | Creación de tickets en GLPI (Correo / API) | Separado en módulo propio `Admin > GLPI` por complejidad. Definir flujo final (resumen diario vs evento inmediato), destino de correo collector, y/o API REST oficial (`apirest.php`) con `App-Token` + `Authorization user_token`/Basic para `initSession`, uso de `Session-Token`, payload de `Ticket` y manejo de errores/reintentos. |
 
 
 ---
@@ -98,8 +88,15 @@
 | B22 | Mejoras/Escalamiento | Alertas de escalamiento especiales por cliente y horario en reportes | Al seleccionar cliente o generar/copiar reporte, mostrar alerta contextual con acciones adicionales (ej. fuera de horario: avisar por WhatsApp además del correo), configurable por admin en la ficha del cliente. |
 | B23 | UI/UX | Eliminar checkbox duplicado envío correo | Centralizar control en Configuración Global (Opción A) eliminando el checkbox redundante en la vista de Turno Activo. |
 | B24 | UI/UX + Rendimiento | Admin Catálogos: solo 50 eventos visibles | En `main/catalog-admin` hay ~1800 eventos, pero solo se ven 50; además en la tabla de Eventos debe mostrarse `Motivo por defecto` en lugar de `Descripción`. |
-| B26 | Listo | UI/UX | Checklist Admin compacto + guardado rápido + acordeones | En `main/checklist-admin` la edición de plantillas largas obliga a bajar hasta el final para guardar; se requiere vista más compacta con acordeones y eliminación de campos `Descripción` que no se usan. |
-| B20 | Listo | UI/UX | Tema Cyberpunk/Neon | Nuevo tema visual opcional, cuidando contraste y sin repetir problemas del dark mode actual. |
+| B25 | UI/UX + Operación | Log Sources/Clientes: separar activos e inactivos en `catalog-admin` | Implementado: separación en dos bloques (Activos/Inactivos) con orden operativo y transición visible al inactivar (`enabled=false`). |
+| B11 | Mejoras | Auditoría incompleta de correos y acciones de usuarios/admin | Implementado: eventos de correo (`mail.send.success/fail`), acciones admin/user clave y mejora de UI de auditoría con filtros por categoría (`mail/admin/user/security`). |
+| B16 | Seguridad/Arquitectura | Auditoría automática avanzada (usuario + dispositivo + red + VPN) | Implementado: metadata de dispositivo/red (fingerprint + señales proxy/VPN), auditoría global y detección de cambio de IP por sesión (`auth.session.ip_change`). |
+| B18 | Integraciones | Módulo General de Integraciones | Implementado: módulo UI centralizado en Consola Admin (`/main/admin/integrations`) para gestión de múltiples conectores salientes en paralelo y base extensible para próximos conectores. |
+| B21 | Backup/Operación | Backups automáticos programables + destino externo + retención configurable | Implementado: backup periódico por `intervalDays`, retención local por `localRetentionDays` y destino externo configurable vía ruta montada para `smb`/`nfs`. |
+| B27 | UI/UX + Arquitectura Frontend | Consola Admin unificada (Users, Checklist, Turnos, Catálogos, Escalación) | Implementado: consola administrativa centralizada en `/main/admin` con secciones internas y rutas legacy redirigidas para compatibilidad. |
+| B26 | UI/UX | Checklist Admin compacto + guardado rápido + acordeones | En `main/checklist-admin` la edición de plantillas largas obliga a bajar hasta el final para guardar; se requiere vista más compacta con acordeones y eliminación de campos `Descripción` que no se usan. |
+| B20 | UI/UX | Tema Cyberpunk/Neon | Nuevo tema visual opcional, cuidando contraste y sin repetir problemas del dark mode actual. |
+
 ---
 
 ## 🟠 B9 - Checklists distintos por tipo y por turno

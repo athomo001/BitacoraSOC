@@ -2,9 +2,22 @@
 
 Sistema completo de registro y gestión de actividades para Security Operations Center (SOC).
 
+> ⚠️ **ESTADO DEL PROYECTO: BETA (OBLIGATORIO/IMPORTANTE)**
+> Este proyecto está en fase **beta**. Puede tener cambios, ajustes y comportamientos no finales.
+
 **Stack:** Angular 20 + Express + MongoDB  
 **Despliegue:** Docker Compose (Frontend + Backend + MongoDB)  
-**Producción:** Listo para deploy con Docker
+**Producción:** Uso recomendado con validación previa en entorno de pruebas (beta)
+
+**Versiones declaradas (`package.json`)**
+- Angular (`@angular/core`): `^20.3.17`
+- Express: `^4.18.2`
+- Mongo (Mongoose): `^8.0.3`
+
+**Versiones exactas instaladas (`package-lock.json`)**
+- Angular (`@angular/core`): `20.3.17`
+- Express: `4.22.1`
+- Mongo (Mongoose): `8.22.0`
 
 > Aviso: Los valores de ejemplo son placeholders. Reemplazarlos por credenciales reales desde `.env` antes de usar en producción.
 
@@ -28,6 +41,14 @@ cd frontend && npm install && npm start
 ---
 
 ## Funcionalidades principales
+
+### Estado actual (cambios recientes)
+- Proyecto en fase **beta** (features y flujos aún en ajuste)
+- **Consola Admin unificada** en `/main/admin` (Users, Checklist, Turnos, Catálogos, Escalación, SMTP, Integraciones, GLPI)
+- **Integraciones SIEM/SOAR/NDR** con múltiples conectores simultáneos (`udp/tcp/tls/http`)
+- **GLPI separado** en menú propio (`Admin > GLPI`) con modo API y modo correo
+- **Backups automáticos** con `intervalDays`, `localRetentionDays` y destino `local/smb/nfs`
+- **Auditoría reforzada** (mail/admin/user/security, metadata de red/dispositivo y cambio de IP de sesión)
 
 ### Gestión de usuarios
 - **4 roles:** Admin, User, Auditor, Guest
@@ -66,6 +87,8 @@ cd frontend && npm install && npm start
 - **Catálogos:** Eventos, fuentes de logs, tipos de operación
 - **Plantillas de Checklist:** Editor visual con preview
 - **Configuración SMTP:** Email para notificaciones
+- **Integraciones SIEM/SOAR/NDR:** Múltiples conectores en paralelo
+- **GLPI:** Módulo independiente para configuración y pruebas
 - **Backup/Restore:** Exportar e importar datos
 - **Branding:** Logo y favicon
 - **Tags:** Etiquetas personalizadas
@@ -245,7 +268,6 @@ Para detalles técnicos completos, consulta:
 - **[SECURITY.md](docs/SECURITY.md)**: Seguridad, hardening y checklist
 - **[CATALOGS.md](docs/CATALOGS.md)**: Sistema de catálogos y autocompletado
 - **[ESCALATION.md](docs/ESCALATION.md)**: Módulo de escalaciones
-- **[SECURITY.md](docs/SECURITY.md)**: Seguridad y autenticación
 - **[SCREENSHOTS.md](docs/SCREENSHOTS.md)**: Capturas de pantalla del sistema
 - **[backend/scripts/README.md](backend/scripts/README.md)**: Importación masiva de datos
 

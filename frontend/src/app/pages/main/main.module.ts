@@ -49,6 +49,8 @@ import { ChecklistHistoryComponent } from './checklist-history/checklist-history
 import { ReportGeneratorComponent } from './report-generator/report-generator.component';
 import { CatalogAdminComponent } from './catalog-admin/catalog-admin.component';
 import { AuditLogsComponent } from './audit-logs/audit-logs.component';
+import { AdminConsoleComponent } from './admin-console/admin-console.component';
+import { EscalationAdminSimpleComponent } from '../escalation/escalation-admin-simple/escalation-admin-simple.component';
 
 // Shared Components
 
@@ -69,23 +71,48 @@ const routes: Routes = [
       { path: 'all-entries', component: AllEntriesComponent },
       { path: 'profile', component: ProfileComponent },
       { path: 'reports', component: ReportsComponent },
-      { path: 'users', component: UsersComponent },
+      { path: 'users', redirectTo: 'admin/users', pathMatch: 'full' },
       { path: 'tags', component: TagsComponent },
       { path: 'logo', component: LogoComponent },
       { path: 'backup', component: BackupComponent },
-      { path: 'checklist-admin', component: ChecklistAdminComponent, canActivate: [AdminGuard] },
-      { path: 'catalog-admin', component: CatalogAdminComponent, canActivate: [AdminGuard] },
+      { path: 'checklist-admin', redirectTo: 'admin/checklist', pathMatch: 'full' },
+      { path: 'catalog-admin', redirectTo: 'admin/catalogs', pathMatch: 'full' },
       { path: 'audit-logs', component: AuditLogsComponent, canActivate: [AdminGuard] },
       { path: 'report-generator', component: ReportGeneratorComponent },
-      { path: 'settings', component: SettingsComponent },
+      { path: 'settings', redirectTo: 'admin/smtp', pathMatch: 'full' },
+      {
+        path: 'admin',
+        component: AdminConsoleComponent,
+        canActivate: [AdminGuard],
+        children: [
+          { path: '', redirectTo: 'users', pathMatch: 'full' },
+          { path: 'users', component: UsersComponent },
+          { path: 'checklist', component: ChecklistAdminComponent },
+          {
+            path: 'work-shifts',
+            loadComponent: () => import('../work-shifts/work-shifts-admin/work-shifts-admin.component').then(m => m.WorkShiftsAdminComponent)
+          },
+          { path: 'catalogs', component: CatalogAdminComponent },
+          { path: 'escalation', component: EscalationAdminSimpleComponent },
+          { path: 'smtp', component: SettingsComponent },
+          {
+            path: 'integrations',
+            loadComponent: () => import('./integrations/integrations.component').then(m => m.IntegrationsComponent)
+          },
+          {
+            path: 'glpi',
+            loadComponent: () => import('./glpi/glpi-integration.component').then(m => m.GlpiIntegrationComponent)
+          }
+        ]
+      },
       { 
         path: 'escalation', 
         loadChildren: () => import('../escalation/escalation.module').then(m => m.EscalationModule)
       },
       {
         path: 'work-shifts',
-        loadComponent: () => import('../work-shifts/work-shifts-admin/work-shifts-admin.component').then(m => m.WorkShiftsAdminComponent),
-        canActivate: [AdminGuard]
+        redirectTo: 'admin/work-shifts',
+        pathMatch: 'full'
       }
     ]
   }
@@ -138,6 +165,7 @@ const routes: Routes = [
     ChecklistAdminComponent,
     ChecklistHistoryComponent,
     CatalogAdminComponent,
+    AdminConsoleComponent,
     AuditLogsComponent,
     ReportGeneratorComponent
 ]

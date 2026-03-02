@@ -19,6 +19,37 @@
   padding: 24px 0;
 }
 
+:host ::ng-deep .catalog-tabs {
+  --mat-tab-header-active-label-text-color: var(--text-primary);
+  --mat-tab-header-inactive-label-text-color: #e6e6e6;
+  --mat-tab-header-active-ripple-color: var(--accent-color);
+  --mat-tab-header-inactive-ripple-color: var(--accent-color);
+  --mat-tab-header-active-focus-label-text-color: var(--text-primary);
+  --mat-tab-header-active-hover-label-text-color: var(--text-primary);
+  --mat-tab-header-inactive-focus-label-text-color: #ffffff;
+  --mat-tab-header-inactive-hover-label-text-color: #ffffff;
+  --mat-tab-header-active-focus-indicator-color: var(--accent-color);
+  --mat-tab-header-active-hover-indicator-color: var(--accent-color);
+  --mat-tab-header-active-indicator-color: var(--accent-color);
+}
+
+:host ::ng-deep .catalog-tabs .mat-mdc-tab {
+  opacity: 1 !important;
+}
+
+:host ::ng-deep .catalog-tabs .mat-mdc-tab .mdc-tab__text-label {
+  color: #e6e6e6 !important;
+  opacity: 1 !important;
+  text-shadow: 0 0 8px rgba(0, 224, 255, 0.35);
+}
+
+:host ::ng-deep .catalog-tabs .mat-mdc-tab.mdc-tab--active .mdc-tab__text-label {
+  color: #ffffff !important;
+  text-shadow:
+    0 0 10px rgba(255, 0, 140, 0.45),
+    0 0 14px rgba(0, 224, 255, 0.55);
+}
+
 .compact-tab-content {
   padding: 12px 0;
 }

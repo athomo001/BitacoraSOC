@@ -57,6 +57,39 @@ const backupModels = {
 const backupsDir = path.join(__dirname, '../../backups');
 let schedulerHandle = null;
 
+const pushBackupToExternalDestination = async ({ filePath, fileName, backupConfig }) => {
+  const destinationType = backupConfig?.destinationType || 'local';
+  if (destinationType === 'local') {
+    return;
+  }
+
+  if (destinationType === 's3') {
+    logger.warn({ event: 'backup.scheduler.destination.s3.pending' }, 'S3 destination is not implemented yet');
+    return;
+  }
+
+  if (destinationType !== 'smb' && destinationType !== 'nfs') {
+    logger.warn({ event: 'backup.scheduler.destination.unsupported', destinationType }, 'Unsupported backup destination type');
+    return;
+  }
+
+  const basePath = String(backupConfig?.destinationConfig?.basePath || '').trim();
+  if (!basePath) {
+    logger.warn({ event: 'backup.scheduler.destination.missing.path', destinationType }, 'External backup destination path not configured');
+    return;
+  }
+
+  const destinationDir = path.resolve(basePath);
+  const destinationFilePath = path.join(destinationDir, fileName);
+  await fs.mkdir(destinationDir, { recursive: true });
+  await fs.copyFile(filePath, destinationFilePath);
+
+  logger.info(
+    { event: 'backup.scheduler.destination.copy.success', destinationType, destinationFilePath },
+    'Backup copied to external destination'
+  );
+};
+
 const ensureBackupDir = async () => {
   await fs.mkdir(backupsDir, { recursive: true });
 };
@@ -101,6 +134,12 @@ const runBackup = async () => {
     await fs.writeFile(filePath, JSON.stringify(backupData, null, 2), 'utf8');
 
     const appConfig = await AppConfig.findOne();
+    await pushBackupToExternalDestination({
+      filePath,
+      fileName,
+      backupConfig: appConfig?.backupConfig
+    });
+
     const retentionDays = appConfig?.backupConfig?.localRetentionDays || 30;
     await cleanupOldLocalBackups(retentionDays);
 

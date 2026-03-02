@@ -10,7 +10,10 @@
  *   - Guest expiration: Desactiva cuenta si guestExpiresAt < now
  */
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const User = require('../models/User');
+
+const sessionIpTracker = new Map();
 
 const getTokenFromCookie = (req) => {
   const cookieHeader = req.headers.cookie;
@@ -51,6 +54,12 @@ const authenticate = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET, {
       clockTolerance: 60
     });
+
+    const authSessionKey = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex')
+      .slice(0, 24);
     
     // Buscar usuario
     const user = await User.findById(decoded.userId);
@@ -68,6 +77,49 @@ const authenticate = async (req, res, next) => {
       await User.findByIdAndUpdate(user._id, { isActive: false });
       return res.status(401).json({ message: 'Sesión de invitado expirada' });
     }
+
+    const currentIp = req.clientIp || req.headers['x-forwarded-for'] || req.ip;
+    const trackerKey = `${decoded.userId}:${authSessionKey}`;
+    const previousSession = sessionIpTracker.get(trackerKey);
+
+    req.authSessionKey = authSessionKey;
+    req.securitySignals = {
+      ipChanged: false,
+      previousIp: null,
+      previousSeenAt: null
+    };
+
+    if (previousSession && previousSession.ip && previousSession.ip !== currentIp) {
+      req.securitySignals = {
+        ipChanged: true,
+        previousIp: previousSession.ip,
+        previousSeenAt: previousSession.seenAt
+      };
+
+      const { audit } = require('../utils/audit');
+      audit(req, {
+        event: 'auth.session.ip_change',
+        level: 'warn',
+        result: { success: false, reason: 'IP change detected in active session' },
+        metadata: {
+          userId: user._id,
+          username: user.username,
+          sessionKey: authSessionKey,
+          previousIp: previousSession.ip,
+          currentIp,
+          previousSeenAt: previousSession.seenAt,
+          detectedAt: new Date().toISOString(),
+          deviceFingerprint: req.clientMetadata?.device?.fingerprint,
+          isLikelyVpnOrProxy: req.clientMetadata?.network?.isLikelyVpnOrProxy,
+          vpnSignals: req.clientMetadata?.network?.vpnSignals || []
+        }
+      });
+    }
+
+    sessionIpTracker.set(trackerKey, {
+      ip: currentIp,
+      seenAt: new Date().toISOString()
+    });
 
     req.user = user;
     next();

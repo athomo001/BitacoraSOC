@@ -20,7 +20,6 @@ import { MatCheckbox } from '@angular/material/checkbox';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { NgFor, NgIf } from '@angular/common';
-import { MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow } from '@angular/material/table';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MatSelect, MatOption } from '@angular/material/select';
 import { MatPaginator, PageEvent } from '@angular/material/paginator';
@@ -33,7 +32,7 @@ import { EmailReportConfig } from '../../../models/config.model';
   selector: 'app-catalog-admin',
   templateUrl: './catalog-admin.component.html',
   styleUrls: ['./catalog-admin.component.scss'],
-  imports: [MatTabGroup, MatTab, MatCard, MatCardHeader, MatCardTitle, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatCheckbox, MatButton, MatIcon, NgIf, NgFor, MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatIconButton, MatTooltip, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow, MatSelect, MatOption, MatPaginator]
+  imports: [MatTabGroup, MatTab, MatCard, MatCardHeader, MatCardTitle, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatCheckbox, MatButton, MatIcon, NgIf, NgFor, MatIconButton, MatTooltip, MatSelect, MatOption, MatPaginator]
 })
 export class CatalogAdminComponent implements OnInit {
   private static readonly DEFAULT_REPORT_COLOR = '#4CAF50';

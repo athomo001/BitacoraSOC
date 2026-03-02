@@ -218,8 +218,6 @@ router.post('/login',
       console.log('🔵 Token generado, enviando respuesta...');
       setAuthCookie(req, res, token);
 
-      // ⚠️ TEMPORAL: Audit deshabilitado para debugging
-      /*
       audit(req, {
         event: 'auth.login.success',
         level: 'info',
@@ -231,7 +229,6 @@ router.post('/login',
           isGuest: user.role === 'guest'
         }
       }).catch(err => logger.error({ err }, 'Audit error'));
-      */
 
       res.json({
         token,

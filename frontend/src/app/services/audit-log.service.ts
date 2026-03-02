@@ -17,6 +17,7 @@ export class AuditLogService {
 
     if (filters.page) params = params.set('page', filters.page.toString());
     if (filters.limit) params = params.set('limit', filters.limit.toString());
+    if (filters.category) params = params.set('category', filters.category);
     if (filters.userId) params = params.set('userId', filters.userId);
     if (filters.event) params = params.set('event', filters.event);
     if (filters.level) params = params.set('level', filters.level);
