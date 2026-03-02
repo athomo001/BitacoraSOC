@@ -12,6 +12,23 @@
   }
 }
 
+.auto-backup-card {
+  margin-bottom: 24px;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.config-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+
 .backup-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -59,6 +76,10 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.backup-actions {
+  margin-top: 8px;
 }
 
 .backup-table {

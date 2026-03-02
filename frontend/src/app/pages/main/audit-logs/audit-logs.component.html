@@ -13,6 +13,15 @@
           </mat-form-field>
 
           <mat-form-field appearance="outline">
+            <mat-label>Categoría</mat-label>
+            <mat-select formControlName="category">
+              <mat-option *ngFor="let opt of categoryOptions" [value]="opt.value">
+                {{ opt.label }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
             <mat-label>Evento</mat-label>
             <mat-select formControlName="event">
               <mat-option value="">Todos</mat-option>
@@ -112,7 +121,7 @@
               </span>
               <!-- Mostrar razón si no hay tipo específico -->
               <span *ngIf="!log.metadata?.entryType && !getEventType(log.event)" class="reason-text" [matTooltip]="log.result?.reason || ''">
-                {{ log.result?.reason || '-' }}
+                {{ getReasonText(log) }}
               </span>
             </div>
           </td>

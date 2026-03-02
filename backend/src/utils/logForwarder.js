@@ -17,19 +17,17 @@
  */
 const net = require('net');
 const tls = require('tls');
+const dgram = require('dgram');
+const http = require('http');
+const https = require('https');
 const fs = require('fs');
+const { URL } = require('url');
 const LogForwardingConfig = require('../models/LogForwardingConfig');
 const { logger, sanitize } = require('./logger');
 
 class LogForwarder {
   constructor() {
-    this.socket = null;
-    this.queue = []; // Cola en memoria
-    this.maxQueueSize = 1000;
-    this.isConnected = false;
-    this.isConnecting = false;
-    this.retryCount = 0;
-    this.config = null;
+    this.configs = [];
     
     // Cargar config al iniciar
     this.loadConfig();
@@ -40,21 +38,15 @@ class LogForwarder {
    */
   async loadConfig() {
     try {
-      this.config = await LogForwardingConfig.findOne();
-      
-      if (this.config && this.config.enabled) {
-        logger.info({
-          event: 'logforward.config.loaded',
-          host: this.config.host,
-          port: this.config.port,
-          mode: this.config.mode
-        }, 'Log forwarding enabled');
-        
-        // Conectar inmediatamente si está habilitado
-        this.connect();
-      }
+      this.configs = await LogForwardingConfig.find({ enabled: true }).sort({ createdAt: 1 }).lean();
+
+      logger.info({
+        event: 'logforward.config.loaded',
+        enabledCount: this.configs.length
+      }, 'Log forwarding configs loaded');
     } catch (error) {
       logger.error({ err: error }, 'Error loading log forwarding config');
+      this.configs = [];
     }
   }
   
@@ -63,212 +55,31 @@ class LogForwarder {
    */
   async reloadConfig() {
     logger.info({ event: 'logforward.config.reload' }, 'Reloading log forwarding config');
-    
-    // Cerrar conexión existente
-    this.disconnect();
-    
-    // Cargar nueva config
     await this.loadConfig();
-  }
-  
-  /**
-   * Conectar a colector externo
-   */
-  async connect() {
-    if (!this.config || !this.config.enabled) {
-      return;
-    }
-    
-    if (this.isConnected || this.isConnecting) {
-      return;
-    }
-    
-    this.isConnecting = true;
-    
-    try {
-      const { host, port, mode, tls: tlsConfig } = this.config;
-      
-      if (mode === 'plain') {
-        // TCP sin cifrado
-        this.socket = net.connect({ host, port }, () => {
-          this.onConnect();
-        });
-      } else {
-        // TLS (cifrado)
-        const tlsOptions = {
-          host,
-          port,
-          rejectUnauthorized: tlsConfig.rejectUnauthorized
-        };
-        
-        // CA cert (custom)
-        if (tlsConfig.caCert) {
-          tlsOptions.ca = [this.readCert(tlsConfig.caCert)];
-        }
-        
-        // Client cert (mTLS)
-        if (tlsConfig.clientCert) {
-          tlsOptions.cert = this.readCert(tlsConfig.clientCert);
-        }
-        
-        // Client key (desde env, NO DB)
-        const clientKey = process.env.LOG_FORWARD_CLIENT_KEY;
-        if (clientKey) {
-          tlsOptions.key = this.readCert(clientKey);
-        }
-        
-        this.socket = tls.connect(tlsOptions, () => {
-          this.onConnect();
-        });
-      }
-      
-      // Event handlers
-      this.socket.on('error', (err) => this.onError(err));
-      this.socket.on('close', () => this.onClose());
-      
-    } catch (error) {
-      logger.error({ err: error }, 'Error creating socket');
-      this.isConnecting = false;
-      this.scheduleReconnect();
-    }
-  }
-  
-  /**
-   * Callback: conexión exitosa
-   */
-  onConnect() {
-    this.isConnected = true;
-    this.isConnecting = false;
-    this.retryCount = 0;
-    
-    logger.info({
-      event: 'logforward.connected',
-      host: this.config.host,
-      port: this.config.port,
-      mode: this.config.mode
-    }, 'Connected to log collector');
-    
-    // Flush queue
-    this.flushQueue();
-  }
-  
-  /**
-   * Callback: error de socket
-   */
-  onError(err) {
-    logger.warn({
-      event: 'logforward.error',
-      err,
-      host: this.config?.host,
-      port: this.config?.port
-    }, 'Log forwarder socket error');
-    
-    this.disconnect();
-  }
-  
-  /**
-   * Callback: conexión cerrada
-   */
-  onClose() {
-    this.isConnected = false;
-    this.isConnecting = false;
-    
-    logger.info({ event: 'logforward.disconnected' }, 'Disconnected from log collector');
-    
-    // Reconectar si enabled
-    if (this.config && this.config.enabled) {
-      this.scheduleReconnect();
-    }
-  }
-  
-  /**
-   * Desconectar socket
-   */
-  disconnect() {
-    if (this.socket) {
-      this.socket.destroy();
-      this.socket = null;
-    }
-    this.isConnected = false;
-    this.isConnecting = false;
-  }
-  
-  /**
-   * Programar reconexión con backoff exponencial
-   */
-  scheduleReconnect() {
-    if (!this.config || !this.config.enabled || !this.config.retry.enabled) {
-      return;
-    }
-    
-    if (this.retryCount >= this.config.retry.maxRetries) {
-      logger.error({
-        event: 'logforward.retry.exhausted',
-        retryCount: this.retryCount
-      }, 'Max retries reached, giving up');
-      return;
-    }
-    
-    // Backoff exponencial
-    const delay = this.config.retry.backoffMs * Math.pow(2, this.retryCount);
-    this.retryCount++;
-    
-    logger.info({
-      event: 'logforward.retry.scheduled',
-      retryCount: this.retryCount,
-      delayMs: delay
-    }, `Reconnecting in ${delay}ms`);
-    
-    setTimeout(() => {
-      this.connect();
-    }, delay);
   }
   
   /**
    * Enviar log a colector (llamado desde audit.js)
    */
   async forward(auditRecord) {
-    if (!this.config || !this.config.enabled) {
+    if (!this.configs || this.configs.length === 0) {
       return;
     }
-    
-    // Filtrar por nivel (audit-only, info, warn, error)
-    const shouldForward = this.shouldForwardLevel(auditRecord.level);
-    if (!shouldForward) {
+
+    const targets = this.configs.filter(config => this.shouldForwardLevel(config, auditRecord.level));
+    if (targets.length === 0) {
       return;
     }
-    
-    // Sanitizar payload
-    const payload = this.preparePayload(auditRecord);
-    
-    // Si está conectado, enviar inmediatamente
-    if (this.isConnected && this.socket) {
-      this.send(payload);
-    } else {
-      // Encolar (máximo maxQueueSize)
-      if (this.queue.length < this.maxQueueSize) {
-        this.queue.push(payload);
-      } else {
-        logger.warn({
-          event: 'logforward.queue.full',
-          queueSize: this.queue.length
-        }, 'Log queue full, dropping oldest logs');
-        this.queue.shift(); // Drop oldest
-        this.queue.push(payload);
-      }
-      
-      // Intentar conectar si no está conectando
-      if (!this.isConnecting) {
-        this.connect();
-      }
-    }
+
+    const sendTasks = targets.map(config => this.sendWithRetry(config, auditRecord));
+    await Promise.allSettled(sendTasks);
   }
   
   /**
    * Determinar si el log debe forwardearse según nivel configurado
    */
-  shouldForwardLevel(logLevel) {
-    const { forwardLevel } = this.config;
+  shouldForwardLevel(config, logLevel) {
+    const { forwardLevel } = config;
     
     // audit-only: solo eventos de AuditLog (todos tienen level info/warn/error)
     if (forwardLevel === 'audit-only') {
@@ -286,7 +97,7 @@ class LogForwarder {
   /**
    * Preparar payload NDJSON
    */
-  preparePayload(auditRecord) {
+  preparePayload(auditRecord, config) {
     const payload = {
       timestamp: auditRecord.timestamp.toISOString(),
       event: auditRecord.event,
@@ -296,47 +107,152 @@ class LogForwarder {
       result: auditRecord.result,
       metadata: sanitize(auditRecord.metadata)
     };
-    
-    // NDJSON: una línea por evento
+
+    if (this.getFormat(config) === 'rfc5424') {
+      const appName = 'BitacoraSOC';
+      const host = config.host || '-';
+      const msg = JSON.stringify(payload);
+      return `<134>1 ${payload.timestamp} ${host} ${appName} - - - ${msg}`;
+    }
+
+    // JSON/NDJSON
     return JSON.stringify(payload) + '\n';
   }
   
-  /**
-   * Enviar payload por socket
-   */
-  send(payload) {
-    try {
-      this.socket.write(payload, 'utf8', (err) => {
+  sendUdp(config, payload) {
+    return new Promise((resolve, reject) => {
+      const socket = dgram.createSocket('udp4');
+      const message = Buffer.from(payload, 'utf8');
+
+      socket.send(message, config.port, config.host, (err) => {
+        socket.close();
         if (err) {
-          logger.error({ err }, 'Error writing to log collector');
-          // Encolar para reintento
-          if (this.queue.length < this.maxQueueSize) {
-            this.queue.push(payload);
-          }
+          logger.error({ err }, 'Error sending UDP log payload');
+          return reject(err);
         }
+        resolve();
       });
-    } catch (error) {
-      logger.error({ err: error }, 'Exception writing to log collector');
-    }
+    });
   }
-  
-  /**
-   * Flush queue (enviar todos los logs encolados)
-   */
-  flushQueue() {
-    if (!this.isConnected || this.queue.length === 0) {
-      return;
+
+  sendHttp(config, payload) {
+    return new Promise((resolve, reject) => {
+      try {
+        const endpoint = config.http?.url;
+        if (!endpoint) {
+          return reject(new Error('HTTP url no configurada para log forwarding'));
+        }
+
+        const url = new URL(endpoint);
+        const client = url.protocol === 'https:' ? https : http;
+        const body = payload.endsWith('\n') ? payload.trimEnd() : payload;
+        const method = config.http?.method || 'POST';
+        const timeoutMs = config.http?.timeoutMs || 5000;
+        const customHeaders = config.http?.headers || {};
+
+        const req = client.request({
+          method,
+          hostname: url.hostname,
+          port: url.port || (url.protocol === 'https:' ? 443 : 80),
+          path: `${url.pathname || '/'}${url.search || ''}`,
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(body),
+            ...customHeaders
+          },
+          timeout: timeoutMs
+        }, (res) => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve();
+          } else {
+            reject(new Error(`HTTP ${res.statusCode} al enviar log`));
+          }
+        });
+
+        req.on('error', reject);
+        req.on('timeout', () => {
+          req.destroy(new Error('Timeout enviando log via HTTP'));
+        });
+        req.write(body);
+        req.end();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  sendTcp(config, payload) {
+    return new Promise((resolve, reject) => {
+      const socket = net.connect({ host: config.host, port: config.port }, () => {
+        socket.write(payload, 'utf8', (err) => {
+          socket.destroy();
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      socket.setTimeout(5000, () => {
+        socket.destroy(new Error('Connection timeout (5s)'));
+      });
+
+      socket.on('error', reject);
+    });
+  }
+
+  sendTls(config, payload) {
+    return new Promise((resolve, reject) => {
+      const tlsConfig = config.tls || {};
+      const tlsOptions = {
+        host: config.host,
+        port: config.port,
+        rejectUnauthorized: tlsConfig.rejectUnauthorized !== false
+      };
+
+      if (tlsConfig.caCert) {
+        tlsOptions.ca = [this.readCert(tlsConfig.caCert)];
+      }
+
+      if (tlsConfig.clientCert) {
+        tlsOptions.cert = this.readCert(tlsConfig.clientCert);
+      }
+
+      const clientKey = process.env.LOG_FORWARD_CLIENT_KEY;
+      if (clientKey) {
+        tlsOptions.key = this.readCert(clientKey);
+      }
+
+      const socket = tls.connect(tlsOptions, () => {
+        socket.write(payload, 'utf8', (err) => {
+          socket.destroy();
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      socket.setTimeout(5000, () => {
+        socket.destroy(new Error('Connection timeout (5s)'));
+      });
+
+      socket.on('error', reject);
+    });
+  }
+
+  getTransport(config) {
+    if (config.transport) {
+      return config.transport;
     }
-    
-    logger.info({
-      event: 'logforward.queue.flush',
-      queueSize: this.queue.length
-    }, 'Flushing log queue');
-    
-    while (this.queue.length > 0) {
-      const payload = this.queue.shift();
-      this.send(payload);
-    }
+
+    return config.mode === 'plain' ? 'tcp' : 'tls';
+  }
+
+  getFormat(config) {
+    return config.format || 'json';
   }
   
   /**
@@ -360,81 +276,97 @@ class LogForwarder {
   /**
    * Test de conexión (llamado desde API /test)
    */
-  async testConnection() {
-    if (!this.config) {
+  async testConnection(configId = null) {
+    let config = null;
+
+    if (configId) {
+      config = await LogForwardingConfig.findById(configId).lean();
+    }
+
+    if (!config) {
+      config = await LogForwardingConfig.findOne({ enabled: true }).sort({ updatedAt: -1 }).lean();
+    }
+
+    if (!config) {
+      config = await LogForwardingConfig.findOne().sort({ updatedAt: -1 }).lean();
+    }
+
+    if (!config) {
       throw new Error('No log forwarding configuration found');
     }
-    
-    return new Promise((resolve, reject) => {
-      const { host, port, mode, tls: tlsConfig } = this.config;
-      
-      let testSocket;
-      const timeout = setTimeout(() => {
-        if (testSocket) testSocket.destroy();
-        reject(new Error('Connection timeout (5s)'));
-      }, 5000);
-      
-      const onConnect = () => {
-        clearTimeout(timeout);
-        
-        // Enviar log de prueba
-        const testPayload = JSON.stringify({
-          timestamp: new Date().toISOString(),
-          event: 'logforward.test',
-          level: 'info',
-          message: 'Test connection from BitacoraSOC',
-          source: 'test'
-        }) + '\n';
-        
-        testSocket.write(testPayload, 'utf8', (err) => {
-          testSocket.destroy();
-          if (err) {
-            reject(err);
-          } else {
-            resolve({ success: true, message: 'Connection successful' });
-          }
-        });
-      };
-      
-      const onError = (err) => {
-        clearTimeout(timeout);
-        testSocket.destroy();
-        reject(err);
-      };
-      
-      try {
-        if (mode === 'plain') {
-          testSocket = net.connect({ host, port }, onConnect);
-        } else {
-          const tlsOptions = {
-            host,
-            port,
-            rejectUnauthorized: tlsConfig.rejectUnauthorized
-          };
-          
-          if (tlsConfig.caCert) {
-            tlsOptions.ca = [this.readCert(tlsConfig.caCert)];
-          }
-          
-          if (tlsConfig.clientCert) {
-            tlsOptions.cert = this.readCert(tlsConfig.clientCert);
-          }
-          
-          const clientKey = process.env.LOG_FORWARD_CLIENT_KEY;
-          if (clientKey) {
-            tlsOptions.key = this.readCert(clientKey);
-          }
-          
-          testSocket = tls.connect(tlsOptions, onConnect);
-        }
-        
-        testSocket.on('error', onError);
-        
-      } catch (error) {
-        clearTimeout(timeout);
-        reject(error);
+
+    const testRecord = {
+      timestamp: new Date(),
+      event: 'logforward.test',
+      level: 'info',
+      actor: null,
+      request: { requestId: 'test' },
+      result: { success: true },
+      metadata: {
+        message: 'Test connection from BitacoraSOC',
+        source: 'test'
       }
-    });
+    };
+
+    await this.sendToConfig(config, testRecord);
+    return { success: true, message: 'Conexión exitosa' };
+  }
+
+  async sendWithRetry(config, auditRecord) {
+    const retryConfig = config.retry || {};
+    const retryEnabled = retryConfig.enabled !== false;
+    const maxRetries = retryEnabled ? (retryConfig.maxRetries || 0) : 0;
+    const baseBackoff = retryConfig.backoffMs || 1000;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        await this.sendToConfig(config, auditRecord);
+        return;
+      } catch (error) {
+        const isLastAttempt = attempt >= maxRetries;
+        logger.warn({
+          event: 'logforward.delivery.failed',
+          configId: config._id,
+          name: config.name,
+          attempt: attempt + 1,
+          maxAttempts: maxRetries + 1,
+          err: error
+        }, 'Log forwarding delivery failed');
+
+        if (isLastAttempt) {
+          return;
+        }
+
+        const delayMs = baseBackoff * Math.pow(2, attempt);
+        await this.delay(delayMs);
+      }
+    }
+  }
+
+  async sendToConfig(config, auditRecord) {
+    const payload = this.preparePayload(auditRecord, config);
+    const transport = this.getTransport(config);
+
+    if (transport === 'udp') {
+      await this.sendUdp(config, payload);
+      return;
+    }
+
+    if (transport === 'http') {
+      await this.sendHttp(config, payload);
+      return;
+    }
+
+    if (transport === 'tcp') {
+      await this.sendTcp(config, payload);
+      return;
+    }
+
+    await this.sendTls(config, payload);
+  }
+
+  delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
 

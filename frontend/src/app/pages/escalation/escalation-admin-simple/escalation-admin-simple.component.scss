@@ -21,13 +21,33 @@
   h1 {
     margin: 0;
     font-size: 24px;
+    color: var(--on-primary-color) !important;
   }
 
   p {
     margin: 4px 0 0 0;
     opacity: 0.9;
     font-size: 14px;
+    color: var(--on-primary-color) !important;
   }
+}
+
+:host ::ng-deep .mat-mdc-tab-group {
+  --mat-tab-header-active-label-text-color: var(--text-primary);
+  --mat-tab-header-inactive-label-text-color: var(--text-secondary);
+  --mat-tab-header-active-ripple-color: var(--primary-color);
+  --mat-tab-header-inactive-ripple-color: var(--primary-color);
+  --mat-tab-header-active-focus-label-text-color: var(--text-primary);
+  --mat-tab-header-active-hover-label-text-color: var(--text-primary);
+  --mat-tab-header-inactive-focus-label-text-color: var(--text-primary);
+  --mat-tab-header-inactive-hover-label-text-color: var(--text-primary);
+  --mat-tab-header-active-focus-indicator-color: var(--primary-color);
+  --mat-tab-header-active-hover-indicator-color: var(--primary-color);
+  --mat-tab-header-active-indicator-color: var(--primary-color);
+}
+
+:host ::ng-deep .mat-mdc-tab-group .mat-mdc-tab .mdc-tab__text-label {
+  color: inherit !important;
 }
 
 .tab-content {

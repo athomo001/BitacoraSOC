@@ -56,12 +56,21 @@ export class AuditLogsComponent implements OnInit {
   ) {
     this.filterForm = this.fb.group({
       search: [''],
+      category: [''],
       event: [''],
       level: [''],
       startDate: [''],
       endDate: ['']
     });
   }
+
+  categoryOptions = [
+    { value: '', label: 'Todas' },
+    { value: 'mail', label: 'Mail / SMTP' },
+    { value: 'admin', label: 'Admin' },
+    { value: 'user', label: 'Usuario' },
+    { value: 'security', label: 'Seguridad' }
+  ];
 
   ngOnInit(): void {
     this.loadLogs();
@@ -192,6 +201,23 @@ export class AuditLogsComponent implements OnInit {
       'reporte': 'reporte'
     };
     return classes[entryType.toLowerCase()] || 'default';
+  }
+
+  getReasonText(log: AuditLog): string {
+    if (log.event?.startsWith('mail.') || log.event?.startsWith('smtp.')) {
+      const masked = (log.metadata?.['toMasked'] as string[] | undefined) || [];
+      const recipients = masked.length ? masked.join(', ') : 'sin destinatarios';
+      const subject = log.metadata?.['subject'] ? ` | Asunto: ${log.metadata['subject']}` : '';
+      return `${log.result?.success ? 'OK' : 'FALLÓ'} | Para: ${recipients}${subject}`;
+    }
+
+    if (log.event === 'auth.session.ip_change') {
+      const prev = log.request?.previousIp || log.metadata?.['previousIp'] || '-';
+      const curr = log.request?.ip || log.metadata?.['currentIp'] || '-';
+      return `Cambio de IP en sesión: ${prev} → ${curr}`;
+    }
+
+    return log.result?.reason || '-';
   }
 
   formatDate(date: string): string {

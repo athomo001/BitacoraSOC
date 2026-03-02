@@ -3,6 +3,7 @@ const { logger } = require('./logger');
 const AppConfig = require('../models/AppConfig');
 const SmtpConfig = require('../models/SmtpConfig');
 const { decrypt } = require('./encryption');
+const { auditSystem } = require('./audit');
 
 /**
  * Servicio centralizado de envío de emails
@@ -12,6 +13,22 @@ const { decrypt } = require('./encryption');
 let smtpConfigCache = null;
 let cacheTime = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
+
+const maskEmail = (email = '') => {
+  if (!email || !email.includes('@')) return email;
+  const [local, domain] = email.split('@');
+  if (!local) return `***@${domain}`;
+  if (local.length <= 2) return `${local[0] || '*'}***@${domain}`;
+  return `${local.slice(0, 2)}***@${domain}`;
+};
+
+const normalizeRecipients = (to) => {
+  if (Array.isArray(to)) return to.filter(Boolean);
+  if (typeof to === 'string') {
+    return to.split(',').map((item) => item.trim()).filter(Boolean);
+  }
+  return [];
+};
 
 /**
  * Obtiene configuración SMTP desde BD (AppConfig.smtpConfig) o variables de entorno
@@ -163,6 +180,20 @@ async function sendEmail({ to, subject, text, html, from }) {
     });
 
     const info = await transporter.sendMail(mailOptions);
+
+    const recipients = normalizeRecipients(to);
+    auditSystem({
+      event: 'mail.send.success',
+      level: 'info',
+      result: { success: true, reason: 'Email sent successfully' },
+      metadata: {
+        toMasked: recipients.map(maskEmail),
+        recipientsCount: recipients.length,
+        subject,
+        template: html ? 'html' : 'text',
+        messageId: info.messageId
+      }
+    }).catch((err) => logger.error({ err }, 'Audit mail.send.success failed'));
     
     logger.info('✅ [sendEmail] EMAIL SENT SUCCESSFULLY!', {
       messageId: info.messageId,
@@ -182,6 +213,21 @@ async function sendEmail({ to, subject, text, html, from }) {
       to,
       subject
     });
+
+    const recipients = normalizeRecipients(to);
+    auditSystem({
+      event: 'mail.send.fail',
+      level: 'warn',
+      result: { success: false, reason: error.message },
+      metadata: {
+        toMasked: recipients.map(maskEmail),
+        recipientsCount: recipients.length,
+        subject,
+        template: html ? 'html' : 'text',
+        error: error.message
+      }
+    }).catch((err) => logger.error({ err }, 'Audit mail.send.fail failed'));
+
     throw error;
   }
 }

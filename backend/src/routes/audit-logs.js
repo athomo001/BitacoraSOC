@@ -33,6 +33,7 @@ router.get('/', authenticate, authorize('admin', 'auditor'), async (req, res) =>
       page = 1,
       limit = 20,
       userId,
+      category,
       event,
       level,
       startDate,
@@ -48,6 +49,23 @@ router.get('/', authenticate, authorize('admin', 'auditor'), async (req, res) =>
 
     if (event) {
       filters.event = event;
+    } else if (category) {
+      switch (category) {
+        case 'mail':
+          filters.event = /^(mail\.|smtp\.)/;
+          break;
+        case 'admin':
+          filters.event = /^admin\./;
+          break;
+        case 'user':
+          filters.event = /^(user\.|entry\.|shiftcheck\.|checklist\.)/;
+          break;
+        case 'security':
+          filters.event = /^(auth\.|security\.)/;
+          break;
+        default:
+          break;
+      }
     }
 
     if (level) {

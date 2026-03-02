@@ -140,7 +140,14 @@ router.get('/config', authenticate, authorize('admin'), async (req, res) => {
     if (!config) {
       config = await AppConfig.create({});
     }
-    res.json(config.backupConfig || { enabled: false, intervalDays: 7, destinationType: 'local', localRetentionDays: 30 });
+    const backupConfig = config.backupConfig || { enabled: false, intervalDays: 7, destinationType: 'local', localRetentionDays: 30 };
+    res.json({
+      ...backupConfig,
+      destinationConfig: {
+        ...(backupConfig.destinationConfig || {}),
+        basePath: backupConfig.destinationConfig?.basePath || ''
+      }
+    });
   } catch (err) {
     logger.error(`Error get backup config: ${err.message}`);
     res.status(500).json({ message: 'Error al obtener configuración de backups automáticos' });
@@ -156,17 +163,43 @@ router.put('/config', authenticate, authorize('admin'), async (req, res) => {
   try {
     const { enabled, intervalDays, destinationType, localRetentionDays, destinationConfig } = req.body;
 
+    const parsedIntervalDays = Number(intervalDays);
+    const parsedRetentionDays = Number(localRetentionDays);
+    const normalizedDestinationType = destinationType || 'local';
+    const allowedDestinationTypes = ['local', 's3', 'smb', 'nfs'];
+
+    if (!allowedDestinationTypes.includes(normalizedDestinationType)) {
+      return res.status(400).json({ message: 'destinationType inválido' });
+    }
+
+    if (!Number.isFinite(parsedIntervalDays) || parsedIntervalDays < 1 || parsedIntervalDays > 365) {
+      return res.status(400).json({ message: 'intervalDays debe estar entre 1 y 365' });
+    }
+
+    if (!Number.isFinite(parsedRetentionDays) || parsedRetentionDays < 1 || parsedRetentionDays > 365) {
+      return res.status(400).json({ message: 'localRetentionDays debe estar entre 1 y 365' });
+    }
+
+    const normalizedDestinationConfig = {
+      ...(destinationConfig || {}),
+      basePath: String(destinationConfig?.basePath || '').trim()
+    };
+
+    if ((normalizedDestinationType === 'smb' || normalizedDestinationType === 'nfs') && !normalizedDestinationConfig.basePath) {
+      return res.status(400).json({ message: 'Debes indicar destinationConfig.basePath para destino SMB/NFS' });
+    }
+
     let config = await AppConfig.findOne();
     if (!config) {
       config = await AppConfig.create({});
     }
 
     config.backupConfig = {
-      enabled: enabled !== undefined ? enabled : config.backupConfig?.enabled,
-      intervalDays: intervalDays || config.backupConfig?.intervalDays,
-      destinationType: destinationType || config.backupConfig?.destinationType,
-      localRetentionDays: localRetentionDays || config.backupConfig?.localRetentionDays,
-      destinationConfig: destinationConfig || config.backupConfig?.destinationConfig
+      enabled: enabled !== undefined ? !!enabled : config.backupConfig?.enabled,
+      intervalDays: parsedIntervalDays,
+      destinationType: normalizedDestinationType,
+      localRetentionDays: parsedRetentionDays,
+      destinationConfig: normalizedDestinationConfig
     };
 
     config.lastUpdatedBy = req.user.id;

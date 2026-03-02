@@ -21,6 +21,13 @@
 const mongoose = require('mongoose');
 
 const logForwardingConfigSchema = new mongoose.Schema({
+  // Nombre visible de la integración
+  name: {
+    type: String,
+    trim: true,
+    default: 'Integración SIEM/SOAR/NDR'
+  },
+
   // Activar/desactivar forwarding
   enabled: {
     type: Boolean,
@@ -30,10 +37,15 @@ const logForwardingConfigSchema = new mongoose.Schema({
   // Destino del colector
   host: {
     type: String,
-    required: function() { return this.enabled; },
+    required: function() {
+      return this.enabled && this.transport !== 'http';
+    },
     trim: true,
     validate: {
       validator: function(v) {
+        if (!v && this.transport === 'http') {
+          return true;
+        }
         // Validar IP o hostname válido
         const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
         const hostnameRegex = /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$/;
@@ -45,9 +57,19 @@ const logForwardingConfigSchema = new mongoose.Schema({
   
   port: {
     type: Number,
-    required: function() { return this.enabled; },
+    required: function() {
+      return this.enabled && this.transport !== 'http';
+    },
     min: 1,
     max: 65535
+  },
+
+  // Transporte de salida
+  transport: {
+    type: String,
+    enum: ['udp', 'tcp', 'tls', 'http'],
+    default: 'tls',
+    required: true
   },
   
   // Modo de conexión
@@ -56,6 +78,37 @@ const logForwardingConfigSchema = new mongoose.Schema({
     enum: ['plain', 'tls'],
     default: 'tls',
     required: true
+  },
+
+  // Formato de salida
+  format: {
+    type: String,
+    enum: ['json', 'rfc5424'],
+    default: 'json',
+    required: true
+  },
+
+  // Configuración para webhook/API (transport=http)
+  http: {
+    url: {
+      type: String,
+      default: ''
+    },
+    method: {
+      type: String,
+      enum: ['POST', 'PUT'],
+      default: 'POST'
+    },
+    timeoutMs: {
+      type: Number,
+      min: 500,
+      max: 30000,
+      default: 5000
+    },
+    headers: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {}
+    }
   },
   
   // Opciones TLS (solo si mode=tls)

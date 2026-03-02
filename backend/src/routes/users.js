@@ -77,6 +77,13 @@ router.put('/me',
         return res.status(404).json({ message: 'Usuario no encontrado' });
       }
 
+      const before = {
+        email: user.email,
+        fullName: user.fullName,
+        theme: user.theme,
+        phone: user.phone
+      };
+
       if (email) user.email = email;
       if (fullName) user.fullName = fullName;
       if (theme) user.theme = theme;
@@ -95,6 +102,22 @@ router.put('/me',
       }
 
       await user.save();
+
+      await audit(req, {
+        event: 'user.profile.update',
+        level: 'info',
+        result: { success: true },
+        metadata: {
+          before,
+          after: {
+            email: user.email,
+            fullName: user.fullName,
+            theme: user.theme,
+            phone: user.phone,
+            passwordChanged: !!newPassword
+          }
+        }
+      });
 
       res.json({ message: 'Perfil actualizado', user: user.toJSON() });
     } catch (error) {
@@ -203,11 +226,38 @@ router.put('/:id',
       delete updates.password;
       delete updates.username;
 
+      const beforeUser = await User.findById(id).select('-password').lean();
       const user = await User.findByIdAndUpdate(id, updates, { new: true }).select('-password');
 
       if (!user) {
         return res.status(404).json({ message: 'Usuario no encontrado' });
       }
+
+      await audit(req, {
+        event: 'admin.users.update',
+        level: 'info',
+        result: { success: true },
+        metadata: {
+          targetUserId: user._id,
+          targetUsername: user.username,
+          before: beforeUser ? {
+            email: beforeUser.email,
+            fullName: beforeUser.fullName,
+            role: beforeUser.role,
+            isActive: beforeUser.isActive,
+            phone: beforeUser.phone,
+            theme: beforeUser.theme
+          } : null,
+          after: {
+            email: user.email,
+            fullName: user.fullName,
+            role: user.role,
+            isActive: user.isActive,
+            phone: user.phone,
+            theme: user.theme
+          }
+        }
+      });
 
       res.json({ message: 'Usuario actualizado', user });
     } catch (error) {
@@ -231,6 +281,18 @@ router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'Usuario no encontrado' });
     }
+
+    await audit(req, {
+      event: 'admin.users.delete',
+      level: 'warn',
+      result: { success: true, reason: 'User deleted by admin' },
+      metadata: {
+        targetUserId: user._id,
+        targetUsername: user.username,
+        targetRole: user.role,
+        targetEmail: user.email
+      }
+    });
 
     res.json({ message: 'Usuario eliminado exitosamente' });
   } catch (error) {
