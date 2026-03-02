@@ -651,7 +651,9 @@ p, span, label {
 
 [data-theme="cyberpunk"] h1,
 [data-theme="cyberpunk"] h2,
-[data-theme="cyberpunk"] .mat-toolbar,
+[data-theme="cyberpunk"] .top-toolbar,
+[data-theme="cyberpunk"] .left-sidebar mat-toolbar span,
+[data-theme="cyberpunk"] .right-sidebar mat-toolbar span,
 [data-theme="cyberpunk"] .mat-expansion-panel-header-title {
   font-family: 'Eurostile Extended', 'Bank Gothic', 'Segoe UI', 'Roboto', sans-serif;
   letter-spacing: 0.06em;
@@ -661,7 +663,6 @@ p, span, label {
 
 [data-theme="cyberpunk"] .mat-mdc-menu-item,
 [data-theme="cyberpunk"] .mat-mdc-tab,
-[data-theme="cyberpunk"] .mat-mdc-button-base,
 [data-theme="cyberpunk"] .mat-mdc-list-item-title,
 [data-theme="cyberpunk"] .mat-mdc-chip {
   font-family: 'Consolas', 'Lucida Console', 'Segoe UI', sans-serif;
