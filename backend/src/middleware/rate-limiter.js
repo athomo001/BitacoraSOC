@@ -24,12 +24,11 @@ const isProduction = process.env.NODE_ENV === 'production';
 // Rate limiter para login
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: isProduction ? 5 : 1000, // 5 en producción, 1000 en desarrollo
+  max: 5, // 5 intentos permitidos para evitar fuerza bruta (SEC-CRIT-005)
   message: 'Demasiados intentos de inicio de sesión. Intenta de nuevo en 15 minutos.',
   standardHeaders: true,
   legacyHeaders: false,
-  skipSuccessfulRequests: false,
-  skip: () => !isProduction // Deshabilitado en desarrollo
+  skipSuccessfulRequests: false
 });
 
 // Rate limiter general para API
@@ -42,7 +41,27 @@ const apiLimiter = rateLimit({
   skip: () => !isProduction
 });
 
+// Rate limiter para recuperación de contraseña (máx 3/15min)
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 3,
+  message: 'Demasiados intentos de recuperación. Intenta de nuevo en 15 minutos.',
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+// Rate limiter para reseteo de contraseña (máx 5/15min)
+const resetPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: 'Demasiados intentos de reseteo. Solicita un nuevo enlace.',
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
 module.exports = {
   loginLimiter,
-  apiLimiter
+  apiLimiter,
+  forgotPasswordLimiter,
+  resetPasswordLimiter
 };

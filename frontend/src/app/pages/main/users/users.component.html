@@ -47,8 +47,8 @@
           {{ editingUserId ? 'Guardar Cambios' : 'Crear Usuario' }}
         </button>
         
-        <button mat-raised-button type="button" *ngIf="editingUserId" 
-                (click)="cancelEdit()" style="margin-left: 10px;">
+        <button mat-raised-button type="button" *ngIf="editingUserId"
+          (click)="cancelEdit()" class="cancel-edit-btn">
           Cancelar
         </button>
       </form>

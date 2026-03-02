@@ -11,6 +11,10 @@
   width: 100%;
 }
 
+.cancel-edit-btn {
+  margin-left: 10px;
+}
+
 .role-badge {
   padding: 4px 12px;
   border-radius: 12px;
@@ -19,18 +23,18 @@
   text-transform: uppercase;
   
   &.admin {
-    background-color: #fce4ec;
-    color: #c2185b;
+    background-color: var(--state-error-bg);
+    color: var(--state-error);
   }
   
   &.user {
-    background-color: #e3f2fd;
-    color: #1976d2;
+    background-color: var(--state-info-bg);
+    color: var(--state-info);
   }
   
   &.guest {
-    background-color: #fff3e0;
-    color: #f57c00;
+    background-color: var(--state-warning-bg);
+    color: var(--state-warning);
   }
 }
 
@@ -41,12 +45,12 @@
   font-weight: 500;
   
   &.active {
-    background-color: #e8f5e9;
-    color: #2e7d32;
+    background-color: var(--state-success-bg);
+    color: var(--state-success);
   }
   
   &.inactive {
-    background-color: #ffebee;
-    color: #c62828;
+    background-color: var(--state-error-bg);
+    color: var(--state-error);
   }
 }

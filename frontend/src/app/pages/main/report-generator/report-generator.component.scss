@@ -11,38 +11,38 @@
 
 .field-error {
   margin: -10px 0 16px;
-  color: #f44336;
+  color: var(--state-error);
   font-size: 12px;
 }
 
 .client-alert-banner {
   margin: 0 0 20px;
   padding: 12px;
-  border: 1px solid #f4b2b2;
-  border-left: 4px solid #d32f2f;
+  border: 1px solid var(--state-error);
+  border-left: 4px solid var(--state-error);
   border-radius: 6px;
-  background: #fff5f5;
+  background: var(--state-error-bg);
 }
 
 .client-alert-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #8b1f1f;
+  color: var(--state-error);
   margin-bottom: 8px;
 }
 
 .client-alert-message {
   margin: 0 0 8px;
   white-space: pre-wrap;
-  color: #5a1414;
+  color: var(--state-error);
   font-weight: 600;
 }
 
 .client-alert-meta {
   margin: 0 0 10px;
   font-size: 12px;
-  color: #7f3030;
+  color: var(--state-error);
 }
 
 .client-alert-actions {
@@ -58,11 +58,11 @@
 }
 
 .client-alert-status.pending {
-  color: #b3261e;
+  color: var(--state-error);
 }
 
 .client-alert-status.ok {
-  color: #2e7d32;
+  color: var(--state-success);
 }
 
 .upload-section {
@@ -70,7 +70,7 @@
 
   h4 {
     margin-bottom: 12px;
-    color: rgba(0, 0, 0, 0.87);
+    color: var(--text-primary);
   }
 
   button {
@@ -88,7 +88,7 @@
     position: relative;
     width: 150px;
     height: 150px;
-    border: 2px solid #ddd;
+    border: 2px solid var(--border-color);
     border-radius: 4px;
     overflow: hidden;
 
@@ -102,7 +102,7 @@
       position: absolute;
       top: 4px;
       right: 4px;
-      background: rgba(255, 255, 255, 0.9);
+      background: var(--surface-raised);
     }
   }
 }
@@ -112,13 +112,13 @@
   gap: 12px;
   margin-top: 24px;
   padding-top: 16px;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--border-color);
 }
 
 .preview-section {
   margin-top: 32px;
   padding-top: 24px;
-  border-top: 2px solid #e0e0e0;
+  border-top: 2px solid var(--border-color);
 
   .preview-header {
     display: flex;
@@ -139,9 +139,9 @@
 
   .html-preview {
     padding: 16px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
-    background: #f9f9f9;
+    background: var(--surface-muted);
     overflow: auto;
     max-height: 70vh;
 
@@ -176,4 +176,8 @@ mat-card {
 
 mat-card-header {
   margin-bottom: 24px;
+}
+
+.hidden-file-input {
+  display: none;
 }

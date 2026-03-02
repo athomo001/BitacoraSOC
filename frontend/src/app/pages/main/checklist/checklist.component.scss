@@ -75,10 +75,10 @@
 
       mat-icon {
         &.status-verde {
-          color: #4caf50;
+          color: var(--state-success);
         }
         &.status-rojo {
-          color: #f44336;
+          color: var(--state-error);
         }
         &.status-pending {
           color: var(--text-secondary);
@@ -131,11 +131,11 @@
         height: 20px;
 
         &.verde {
-          color: #4caf50;
+          color: var(--state-success);
         }
 
         &.rojo {
-          color: #f44336;
+          color: var(--state-error);
         }
       }
     }
@@ -173,15 +173,25 @@
 }
 
 .status-verde {
-  color: #4caf50;
+  color: var(--state-success);
 }
 
 .status-rojo {
-  color: #f44336;
+  color: var(--state-error);
 }
 
 .status-pending {
   color: var(--text-secondary);
+}
+
+.status-header-actions {
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.status-header-group {
+  display: flex;
+  gap: 8px;
 }
 
 .form-actions {

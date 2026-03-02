@@ -1,15 +1,18 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
+const path = require('path');
 const User = require('../models/User');
-require('dotenv').config();
+
+// Cargar variables desde backend/.env y también desde raíz del repo (sin sobreescribir existentes)
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
 
 // FIXED: Use MONGODB_URI to match .env file
 const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/bitacora_soc';
 
 const adminUser = {
-  username: process.env.ADMIN_USERNAME || 'admin',
-  password: process.env.ADMIN_PASSWORD || 'Admin123!',
-  email: process.env.ADMIN_EMAIL || 'admin@bitacora.local',
+  username: process.env.ADMIN_USERNAME,
+  password: process.env.ADMIN_PASSWORD,
+  email: process.env.ADMIN_EMAIL,
   fullName: 'Administrador',
   role: 'admin',
   theme: 'dark'
@@ -20,10 +23,25 @@ async function seedAdmin() {
     await mongoose.connect(MONGO_URI);
     console.log('✅ Conectado a MongoDB');
 
-    // Verificar si ya existe un admin
-    const existingAdmin = await User.findOne({ username: 'admin' });
+    if (!adminUser.username || !adminUser.password) {
+      console.log('⚠️  Variables ADMIN_USERNAME y ADMIN_PASSWORD requeridas. Omitiendo creación de admin por defecto.');
+      process.exit(0);
+    }
+
+    // Verificar si ya existe el admin configurado
+    const existingAdmin = await User.findOne({ username: adminUser.username });
     if (existingAdmin) {
-      console.log('⚠️  El usuario admin ya existe. No se requiere seed.');
+      existingAdmin.password = adminUser.password;
+      existingAdmin.email = adminUser.email || existingAdmin.email;
+      existingAdmin.fullName = adminUser.fullName;
+      existingAdmin.role = 'admin';
+      existingAdmin.theme = adminUser.theme || existingAdmin.theme;
+      existingAdmin.isActive = true;
+
+      await existingAdmin.save();
+
+      console.log('✅ Usuario admin ya existía: contraseña actualizada según .env');
+      console.log(`   Usuario: ${existingAdmin.username}`);
       process.exit(0);
     }
 
@@ -33,8 +51,8 @@ async function seedAdmin() {
 
     await newAdmin.save();
     console.log('✅ Usuario admin creado exitosamente');
-    console.log('   Usuario: admin');
-    console.log('   Contraseña: Admin123!');
+    console.log(`   Usuario: ${adminUser.username}`);
+    console.log(`   Contraseña: ${adminUser.password}`);
     console.log('   ⚠️  CAMBIA ESTA CONTRASEÑA INMEDIATAMENTE');
 
     process.exit(0);

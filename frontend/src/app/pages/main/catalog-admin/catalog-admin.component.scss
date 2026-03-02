@@ -124,11 +124,36 @@
 
   mat-icon {
     &.enabled {
-      color: #4caf50;
+      color: var(--state-success);
     }
 
     &.disabled {
-      color: #f44336;
+      color: var(--state-error);
     }
   }
+}
+
+.table-empty {
+  text-align: center;
+  color: var(--text-secondary);
+  padding: 20px;
+}
+
+.events-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.events-search-field {
+  margin-bottom: -1.25em;
+  width: 300px;
+}
+
+.inactive-list-card {
+  margin-top: 24px;
+}
+
+.ml-checkbox {
+  margin-left: 16px;
 }

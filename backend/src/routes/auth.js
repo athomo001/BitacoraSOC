@@ -25,10 +25,44 @@ const { body } = require('express-validator');
 const User = require('../models/User');
 const AppConfig = require('../models/AppConfig');
 const validate = require('../middleware/validate');
+const { loginLimiter, forgotPasswordLimiter, resetPasswordLimiter } = require('../middleware/rate-limiter');
 const { audit } = require('../utils/audit');
 const { logger } = require('../utils/logger');
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const getTokenFromCookie = (req) => {
+  const cookieHeader = req.headers.cookie;
+  if (!cookieHeader) {
+    return null;
+  }
+
+  const authCookie = cookieHeader
+    .split(';')
+    .map((value) => value.trim())
+    .find((value) => value.startsWith('auth_token='));
+
+  if (!authCookie) {
+    return null;
+  }
+
+  const tokenValue = authCookie.substring('auth_token='.length);
+  return tokenValue ? decodeURIComponent(tokenValue) : null;
+};
+
+const getAuthCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'strict',
+  path: '/'
+});
+
+const setAuthCookie = (res, token) => {
+  res.cookie('auth_token', token, {
+    ...getAuthCookieOptions(),
+    maxAge: 4 * 60 * 60 * 1000
+  });
+};
 
 // 🎫 Generar token JWT con expiración diferenciada por rol
 // Guest: 2h (sesión corta), Admin/User: 4h (reducido de 24h por seguridad)
@@ -44,7 +78,8 @@ const generateToken = (userId, role) => {
 };
 
 // POST /api/auth/login
-router.post('/login', 
+router.post('/login',
+  loginLimiter,
   [
     body('username').trim().notEmpty().withMessage('El usuario o email es requerido'),
     body('password').notEmpty().withMessage('La contraseña es requerida')
@@ -59,7 +94,7 @@ router.post('/login',
       const normalized = (username || '').trim();
       const exactMatch = new RegExp(`^${escapeRegex(normalized)}$`, 'i');
 
-      const user = await User.findOne({ 
+      const user = await User.findOne({
         $or: [{ username: exactMatch }, { email: exactMatch }]
       });
       console.log('🔵 Usuario encontrado:', !!user);
@@ -71,7 +106,7 @@ router.post('/login',
           result: { success: false, reason: 'Invalid credentials' },
           metadata: { username }
         }).catch(err => logger.error({ err }, 'Audit error'));
-        
+
         return res.status(401).json({ message: 'Credenciales inválidas' });
       }
 
@@ -83,7 +118,7 @@ router.post('/login',
           result: { success: false, reason: 'Guest expired' },
           metadata: { username, guestExpiresAt: user.guestExpiresAt }
         }).catch(err => logger.error({ err }, 'Audit error'));
-        
+
         return res.status(401).json({ message: 'Cuenta de invitado expirada' });
       }
 
@@ -97,13 +132,14 @@ router.post('/login',
           result: { success: false, reason: 'Invalid password' },
           metadata: { username }
         }).catch(err => logger.error({ err }, 'Audit error'));
-        
+
         return res.status(401).json({ message: 'Credenciales inválidas' });
       }
 
       const token = generateToken(user._id, user.role);
       console.log('🔵 Token generado, enviando respuesta...');
-      
+      setAuthCookie(res, token);
+
       // ⚠️ TEMPORAL: Audit deshabilitado para debugging
       /*
       audit(req, {
@@ -139,7 +175,7 @@ router.post('/login',
         method: req.method,
         path: req.path
       }, 'Error in login');
-      
+
       res.status(500).json({ message: 'Error al iniciar sesión' });
     }
   }
@@ -153,16 +189,22 @@ router.post('/login',
 // a las últimas X horas antes de expiración.
 router.post('/refresh', async (req, res) => {
   try {
-    const { token } = req.body;
-    
+    const authHeader = req.headers.authorization;
+    const headerToken = authHeader && authHeader.startsWith('Bearer ')
+      ? authHeader.substring(7)
+      : null;
+    const bodyToken = req.body?.token;
+    const cookieToken = getTokenFromCookie(req);
+    const token = bodyToken || cookieToken || headerToken;
+
     if (!token) {
       return res.status(401).json({ message: 'Token requerido' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET, { ignoreExpiration: true });
-    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
     const user = await User.findById(decoded.userId);
-    
+
     if (!user || !user.isActive) {
       return res.status(401).json({ message: 'Usuario no válido' });
     }
@@ -172,6 +214,7 @@ router.post('/refresh', async (req, res) => {
     }
 
     const newToken = generateToken(user._id, user.role);
+    setAuthCookie(res, newToken);
 
     res.json({ token: newToken });
   } catch (error) {
@@ -179,8 +222,14 @@ router.post('/refresh', async (req, res) => {
   }
 });
 
+router.post('/logout', (req, res) => {
+  res.clearCookie('auth_token', getAuthCookieOptions());
+  return res.json({ message: 'Sesión cerrada' });
+});
+
 // POST /api/auth/forgot-password - Solicitar reseteo de contraseña
 router.post('/forgot-password',
+  forgotPasswordLimiter,
   [
     body('email').isEmail().withMessage('Email inválido').normalizeEmail()
   ],
@@ -206,26 +255,18 @@ router.post('/forgot-password',
       user.resetPasswordExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutos
       await user.save();
 
-      // Construir URL del frontend dinámicamente:
-      // 1. Intenta obtener el host del header de la request (X-Forwarded-Host o Host)
-      // 2. Si no existe, usa HOST_DOMAIN (del .env) o localhost
-      const requestHost = req.headers['x-forwarded-host'] || req.headers.host || process.env.HOST_DOMAIN || 'localhost';
-      const frontendPort = process.env.FRONTEND_PORT || '4200';
-      
-      // Si el host ya incluye puerto (ej: 10.0.100.13:3000), extraer solo el host
-      const hostWithoutPort = requestHost.split(':')[0];
-      const frontendUrl = `http://${hostWithoutPort}:${frontendPort}`;
-      
+      // Requerir FRONTEND_URL desde variable de entorno por seguridad (SEC-CRIT-002)
+      const frontendUrl = process.env.FRONTEND_URL || 'https://localhost:4200';
       const resetUrl = `${frontendUrl}/auth/reset-password?token=${resetToken}`;
 
       // Intentar enviar email si SMTP está configurado
       const SmtpConfig = require('../models/SmtpConfig');
       const nodemailer = require('nodemailer');
       const { decrypt } = require('../utils/encryption');
-      
+
       let emailSent = false;
       const smtpConfig = await SmtpConfig.findOne({ isActive: true });
-      
+
       if (smtpConfig) {
         try {
           const secure = smtpConfig.port === 465;
@@ -271,19 +312,18 @@ router.post('/forgot-password',
         }
       }
 
-      // Si está en desarrollo Y el email no se envió, retornar el token
+      // Si está en desarrollo Y el email no se envió, solo hacemos log
       if (process.env.NODE_ENV === 'development' && !emailSent) {
+        console.log(`[DEV ONLY] Link de reseteo generado pero no enviado (SMTP sin configurar): ${resetUrl}`);
         return res.json({
-          message: 'Token de reseteo generado (solo desarrollo - SMTP no configurado)',
-          resetToken,
-          resetUrl
+          message: 'Si el email existe, recibirás instrucciones para resetear tu contraseña'
         });
       }
 
       // Si se envió el email o estamos en producción
-      res.json({ 
-        message: emailSent 
-          ? 'Email de recuperación enviado. Revisa tu bandeja de entrada.' 
+      res.json({
+        message: emailSent
+          ? 'Email de recuperación enviado. Revisa tu bandeja de entrada.'
           : 'Si el email existe, recibirás instrucciones para resetear tu contraseña'
       });
     } catch (error) {
@@ -295,6 +335,7 @@ router.post('/forgot-password',
 
 // POST /api/auth/reset-password - Resetear contraseña con token
 router.post('/reset-password',
+  resetPasswordLimiter,
   [
     body('token').notEmpty().withMessage('Token requerido'),
     body('newPassword').isLength({ min: 6 }).withMessage('Contraseña debe tener al menos 6 caracteres')

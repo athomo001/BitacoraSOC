@@ -61,10 +61,9 @@
                       'Pendiente' }}
                     </mat-panel-description>
                     <!-- Si NO tiene hijos, mostrar botones en el header -->
-                    <mat-panel-description *ngIf="!service.children?.length"
-                      style="justify-content: flex-end; gap: 8px;">
+                    <mat-panel-description *ngIf="!service.children?.length" class="status-header-actions">
                       <mat-radio-group [(ngModel)]="service.status" [name]="'status_' + i" required
-                        style="display: flex; gap: 8px;" (click)="$event.stopPropagation()"
+                        class="status-header-group" (click)="$event.stopPropagation()"
                         (change)="onStatusChange(service, $event.value)">
                         <mat-radio-button value="verde" color="primary" (click)="$event.stopPropagation()">
                           <mat-icon class="status-icon verde">check_circle</mat-icon>

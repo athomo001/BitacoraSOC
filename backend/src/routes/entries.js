@@ -5,7 +5,7 @@ const { body, query } = require('express-validator');
 const Entry = require('../models/Entry');
 const CatalogLogSource = require('../models/CatalogLogSource');
 const AppConfig = require('../models/AppConfig');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, notGuest } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const captureMetadata = require('../middleware/metadata');
 const { audit } = require('../utils/audit');
@@ -14,25 +14,26 @@ const { logger } = require('../utils/logger');
 // Helper: extraer hashtags (con protección ReDoS)
 const extractHashtags = (text) => {
   if (!text || text.length > 100000) return []; // Límite de seguridad
-  
+
   const regex = /#(\w+)/g;
   const tags = [];
   let match;
   let iterations = 0;
   const MAX_ITERATIONS = 500; // Prevenir ReDoS
-  
+
   while ((match = regex.exec(text)) !== null && iterations++ < MAX_ITERATIONS) {
     if (match[1].length <= 50) { // Tags max 50 chars
       tags.push(match[1].toLowerCase());
     }
   }
-  
+
   return [...new Set(tags)].slice(0, 100); // Max 100 tags únicos
 };
 
 // POST /api/entries - Crear entrada
 router.post('/',
   authenticate,
+  notGuest,
   captureMetadata,
   [
     body('content').trim().notEmpty().withMessage('El contenido es requerido'),
@@ -61,16 +62,16 @@ router.post('/',
       // Si no hay clientId, usar LogSource por defecto de configuración
       let finalClientId = clientId;
       let clientName = null;
-      
+
       if (!clientId) {
         // Obtener configuración de la app
         const appConfig = await AppConfig.findOne();
-        
+
         if (appConfig && appConfig.defaultLogSourceId) {
           // Usar LogSource configurado como predeterminado
           const defaultSource = await CatalogLogSource.findById(appConfig.defaultLogSourceId)
             .select('_id name enabled');
-          
+
           if (defaultSource && defaultSource.enabled) {
             finalClientId = defaultSource._id;
             clientName = defaultSource.name;
@@ -104,7 +105,7 @@ router.post('/',
       });
 
       await entry.save();
-      
+
       // Auditar creación de entrada
       await audit(req, {
         event: 'entry.create',
@@ -129,7 +130,7 @@ router.post('/',
         requestId: req.requestId,
         userId: req.user._id
       }, 'Error creating entry');
-      
+
       res.status(500).json({ message: 'Error al crear entrada' });
     }
   }
@@ -256,6 +257,7 @@ router.get('/:id', authenticate, async (req, res) => {
 // PUT /api/entries/:id - Actualizar entrada
 router.put('/:id',
   authenticate,
+  notGuest,
   [
     body('content').optional().trim().notEmpty(),
     body('entryType').optional().isIn(['operativa', 'incidente', 'ofensa']),
@@ -286,13 +288,13 @@ router.put('/:id',
       if (entryType) entry.entryType = entryType;
       if (entryDate) entry.entryDate = entryDate;
       if (entryTime) entry.entryTime = entryTime;
-      
+
       // Manejar cambio de clientId
       if (clientId !== undefined) {
         if (clientId === null) {
           // Si es null, usar LogSource por defecto de configuración
           const appConfig = await AppConfig.findOne();
-          
+
           if (appConfig && appConfig.defaultLogSourceId) {
             const defaultSource = await CatalogLogSource.findById(appConfig.defaultLogSourceId);
             if (defaultSource && defaultSource.enabled) {
@@ -329,7 +331,7 @@ router.put('/:id',
 );
 
 // DELETE /api/entries/:id - Eliminar entrada
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id', authenticate, notGuest, async (req, res) => {
   try {
     const entry = await Entry.findById(req.params.id);
 
@@ -416,7 +418,7 @@ router.put('/admin/edit',
           if (field === 'entryType' && !['operativa', 'incidente', 'ofensa'].includes(updates[field])) {
             return res.status(400).json({ message: 'entryType debe ser "operativa", "incidente" o "ofensa"' });
           }
-          
+
           sanitizedUpdates[field] = updates[field];
         }
       }
@@ -458,6 +460,22 @@ router.put('/admin/edit',
         return res.status(404).json({ message: 'Una o más entradas no encontradas' });
       }
 
+      const trackedFields = ['tags', 'clientId', 'clientName', 'entryType'];
+      const beforeById = new Map(
+        entries.map((entry) => {
+          const id = String(entry._id);
+          return [
+            id,
+            {
+              tags: entry.tags || [],
+              clientId: entry.clientId ? String(entry.clientId) : null,
+              clientName: entry.clientName || null,
+              entryType: entry.entryType || null
+            }
+          ];
+        })
+      );
+
       // Actualizar entradas
       console.log('🔵 [Admin Edit] Executing updateMany with:', { sanitizedUpdates });
       const result = await Entry.updateMany(
@@ -465,6 +483,37 @@ router.put('/admin/edit',
         { $set: sanitizedUpdates }
       );
       console.log('🟢 [Admin Edit] UpdateMany result:', result);
+
+      const updatedEntries = await Entry.find({ _id: { $in: entryIds } })
+        .select('tags clientId clientName entryType')
+        .lean();
+
+      const beforeAfter = updatedEntries.map((entry) => {
+        const id = String(entry._id);
+        const before = beforeById.get(id) || {};
+        const after = {
+          tags: entry.tags || [],
+          clientId: entry.clientId ? String(entry.clientId) : null,
+          clientName: entry.clientName || null,
+          entryType: entry.entryType || null
+        };
+
+        const changedFields = trackedFields.filter((field) => {
+          const beforeValue = before[field];
+          const afterValue = after[field];
+          return JSON.stringify(beforeValue) !== JSON.stringify(afterValue);
+        });
+
+        return {
+          entryId: id,
+          changedFields,
+          before,
+          after
+        };
+      });
+
+      const changedEntries = beforeAfter.filter((item) => item.changedFields.length > 0);
+      const beforeAfterSample = changedEntries.slice(0, 50);
 
       // Auditar la acción
       console.log('🔵 [Admin Edit] Logging audit event...');
@@ -476,7 +525,10 @@ router.put('/admin/edit',
           entryCount: entryIds.length,
           entryIds: entryIds.slice(0, 10), // Solo primeros 10 IDs
           updatedFields: Object.keys(sanitizedUpdates),
-          adminUsername: req.user.username
+          adminUsername: req.user.username,
+          changedEntriesCount: changedEntries.length,
+          beforeAfter: beforeAfterSample,
+          beforeAfterTruncated: changedEntries.length > beforeAfterSample.length
         }
       });
       console.log('🟢 [Admin Edit] Audit logged successfully');
@@ -497,7 +549,7 @@ router.put('/admin/edit',
 
       console.error('❌ [Admin Edit] Error:', error);
 
-      res.status(500).json({ 
+      res.status(500).json({
         message: 'Error al editar entradas',
         error: error.message,
         requestId: req.requestId

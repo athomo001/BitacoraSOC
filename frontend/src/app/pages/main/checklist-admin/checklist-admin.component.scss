@@ -40,8 +40,12 @@
       overflow-y: auto;
     }
 
+    .template-list-item {
+      padding: 2rem;
+    }
+
     a.active {
-      background: #f0f4ff;
+      background: var(--surface-muted);
     }
 
     .list-actions {
@@ -67,8 +71,8 @@
     }
 
     .assignments-section {
-      background: #fdfdfd;
-      border: 1px solid #e0e0e0;
+      background: var(--surface-raised);
+      border: 1px solid var(--border-color);
       border-radius: 8px;
       padding: 12px;
       margin-bottom: 12px;
@@ -90,8 +94,8 @@
         align-items: center;
         justify-content: space-between;
         padding: 8px 12px;
-        background: white;
-        border: 1px solid #eee;
+        background: var(--surface-color);
+        border: 1px solid var(--border-color);
         border-radius: 6px;
 
         .shift-name {
@@ -118,7 +122,7 @@
 
     mat-expansion-panel {
       margin-bottom: 8px;
-      border: 1px solid #e0e0e0;
+      border: 1px solid var(--border-color);
       border-radius: 8px;
       box-shadow: none;
     }
@@ -150,8 +154,8 @@
     }
 
     .children-block {
-      background: #fafafa;
-      border: 1px dashed #d0d0d0;
+      background: var(--surface-muted);
+      border: 1px dashed var(--border-color);
       border-radius: 8px;
       padding: 6px;
       display: flex;
@@ -166,7 +170,7 @@
     }
 
     .child-row {
-      border: 1px solid #e0e0e0;
+      border: 1px solid var(--border-color);
       border-radius: 6px;
       padding: 8px;
       display: flex;

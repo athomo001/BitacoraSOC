@@ -46,6 +46,14 @@ export class CatalogAdminComponent implements OnInit {
   operationTypes: CatalogOperationType[] = [];
   clientAlertRules: ClientAlertRule[] = [];
 
+  get activeLogSources(): CatalogLogSource[] {
+    return this.logSources.filter(s => s.enabled);
+  }
+
+  get inactiveLogSources(): CatalogLogSource[] {
+    return this.logSources.filter(s => !s.enabled);
+  }
+
   // Estados
   isLoading = false;
   editingEventId: string | null = null;

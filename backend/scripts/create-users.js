@@ -12,24 +12,30 @@ const User = mongoose.model('User');
 async function createUsers() {
   try {
     console.log('📡 Conectando a MongoDB...');
-    
-    const mongoUri = process.env.MONGODB_URI || 'mongodb://bitacora:bitacora123@localhost:27017/bitacora?authSource=admin';
+
+    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/bitacora_soc';
     await mongoose.connect(mongoUri);
-    
+
     console.log('✅ Conectado a MongoDB');
+
+    const defaultPassword = process.env.INITIAL_USERS_PASSWORD;
+    if (!defaultPassword) {
+      console.error('❌ Error: Requerida variable de entorno INITIAL_USERS_PASSWORD');
+      process.exit(1);
+    }
 
     const users = [
       {
         username: 'pveloso',
         email: 'pveloso@netics.cl',
-        password: 'bitacora123',
+        password: defaultPassword,
         fullName: 'Pablo Veloso',
         role: 'analyst'
       },
       {
         username: 'mfuentes',
         email: 'mfuentes@netics.cl',
-        password: 'bitacora123',
+        password: defaultPassword,
         fullName: 'Matías Fuentes',
         role: 'analyst'
       }
@@ -38,7 +44,7 @@ async function createUsers() {
     for (const userData of users) {
       // Verificar si ya existe
       const existing = await User.findOne({ username: userData.username });
-      
+
       if (existing) {
         console.log(`⚠️  Usuario ${userData.username} ya existe`);
         continue;

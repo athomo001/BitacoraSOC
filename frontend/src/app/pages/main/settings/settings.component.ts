@@ -5,6 +5,8 @@ import { ConfigService } from '../../../services/config.service';
 import { SmtpService } from '../../../services/smtp.service';
 import { UpdateConfigRequest } from '../../../models/config.model';
 import { SmtpConfigRequest, SmtpConfig } from '../../../models/smtp.model';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../../environments/environment';
 import { MatCard, MatCardHeader, MatCardTitle, MatCardContent } from '@angular/material/card';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { MatFormField, MatLabel, MatHint } from '@angular/material/form-field';
@@ -15,32 +17,33 @@ import { MatSelect, MatOption } from '@angular/material/select';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 
 @Component({
-    selector: 'app-settings',
-    templateUrl: './settings.component.html',
-    styleUrls: ['./settings.component.scss'],
-    imports: [
-        MatCard,
-        MatCardHeader,
-        MatCardTitle,
-        MatCardContent,
-        ReactiveFormsModule,
-        MatCheckbox,
-        MatFormField,
-        MatLabel,
-        MatHint,
-        MatInput,
-        MatButton,
-        NgClass,
-        MatSelect,
-        NgFor,
-        MatOption,
-        NgIf,
-        MatProgressSpinner,
-    ]
+  selector: 'app-settings',
+  templateUrl: './settings.component.html',
+  styleUrls: ['./settings.component.scss'],
+  imports: [
+    MatCard,
+    MatCardHeader,
+    MatCardTitle,
+    MatCardContent,
+    ReactiveFormsModule,
+    MatCheckbox,
+    MatFormField,
+    MatLabel,
+    MatHint,
+    MatInput,
+    MatButton,
+    NgClass,
+    MatSelect,
+    NgFor,
+    MatOption,
+    NgIf,
+    MatProgressSpinner,
+  ]
 })
 export class SettingsComponent implements OnInit {
   appConfigForm: FormGroup;
   smtpForm: FormGroup;
+  backupConfigForm: FormGroup;
   smtpTestPassed = false;
   connectionStatus: 'conectado' | 'desconectado' | 'sin-config' = 'sin-config';
   testing = false;
@@ -60,7 +63,8 @@ export class SettingsComponent implements OnInit {
     private fb: FormBuilder,
     private configService: ConfigService,
     private smtpService: SmtpService,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private http: HttpClient
   ) {
     this.appConfigForm = this.fb.group({
       guestEnabled: [false],
@@ -85,11 +89,19 @@ export class SettingsComponent implements OnInit {
     this.smtpForm.valueChanges.subscribe(() => {
       this.smtpTestPassed = false;
     });
+
+    this.backupConfigForm = this.fb.group({
+      enabled: [false],
+      intervalDays: [7, [Validators.required, Validators.min(1), Validators.max(365)]],
+      destinationType: ['local', Validators.required],
+      localRetentionDays: [30, [Validators.required, Validators.min(1), Validators.max(365)]]
+    });
   }
 
   ngOnInit(): void {
     this.loadConfig();
     this.loadSmtpConfig();
+    this.loadBackupConfig();
   }
 
   loadConfig(): void {
@@ -134,6 +146,36 @@ export class SettingsComponent implements OnInit {
 
     this.smtpTestPassed = !!config.lastTestSuccess;
     this.connectionStatus = config.lastTestSuccess ? 'conectado' : 'desconectado';
+  }
+
+  loadBackupConfig(): void {
+    this.http.get<any>(`${environment.apiUrl}/backup/config`).subscribe({
+      next: (config) => {
+        this.backupConfigForm.patchValue({
+          enabled: config.enabled || false,
+          intervalDays: config.intervalDays || 7,
+          destinationType: config.destinationType || 'local',
+          localRetentionDays: config.localRetentionDays || 30
+        });
+      },
+      error: (err) => console.error('Error cargando Backup Config:', err)
+    });
+  }
+
+  saveBackupConfig(): void {
+    if (this.backupConfigForm.valid) {
+      this.http.put<any>(`${environment.apiUrl}/backup/config`, this.backupConfigForm.value).subscribe({
+        next: () => this.snackBar.open('Configuración de Backup guardada', 'Cerrar', { duration: 2000 }),
+        error: () => this.snackBar.open('Error guardando configuración de Backup', 'Cerrar', { duration: 3000 })
+      });
+    }
+  }
+
+  testAutoBackup(): void {
+    this.http.post<any>(`${environment.apiUrl}/backup/test-auto`, {}).subscribe({
+      next: (res) => this.snackBar.open(res.message, 'Cerrar', { duration: 3000 }),
+      error: () => this.snackBar.open('Error iniciando backup manual', 'Cerrar', { duration: 3000 })
+    });
   }
 
   saveAppConfig(): void {

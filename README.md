@@ -95,6 +95,42 @@ npm start       # Puerto 4200
 
 > **Importante:** Cambiar la contraseña del administrador después del primer login.
 
+### Cuando no se reflejan cambios en local
+
+En desarrollo local, no siempre necesitas `npm install`.
+
+- `npm install`: úsalo solo si cambiaste dependencias (`package.json` o `package-lock.json`).
+- `npm run build -- --configuration development`: fuerza compilación completa para validar que todo compile.
+- `npm start`: levanta el servidor de desarrollo (watch mode) y toma cambios de código automáticamente.
+
+Si hiciste cambios y no aparecen en pantalla:
+
+```bash
+# 1) Detener el servidor actual (Ctrl + C)
+
+# 2) Verificar compilación limpia
+cd frontend
+npm run build -- --configuration development
+
+# 3) Levantar nuevamente el frontend
+npm start
+```
+
+Nota sobre backend:
+
+- El backend no requiere compilación TypeScript/transpilación para correr.
+- `cd backend && npm start` inicia directamente `node src/server.js`.
+- `cd backend && npm run build` solo valida flujo (no genera artefactos).
+
+Si aún persiste comportamiento extraño (cache/dependencias):
+
+```bash
+cd frontend
+rm -rf node_modules package-lock.json
+npm install
+npm start
+```
+
 ---
 
 ## Estructura del proyecto

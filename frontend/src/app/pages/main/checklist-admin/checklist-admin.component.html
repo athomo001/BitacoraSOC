@@ -25,7 +25,7 @@
       <mat-card-title>Plantillas</mat-card-title>
       <mat-progress-bar *ngIf="isLoading" mode="indeterminate"></mat-progress-bar>
       <mat-nav-list>
-        <a mat-list-item style="padding: 2rem;" *ngFor="let template of templates" (click)="selectTemplate(template)"
+        <a mat-list-item class="template-list-item" *ngFor="let template of templates" (click)="selectTemplate(template)"
           [class.active]="template._id === selectedTemplate?._id">
           <span>{{ template.name }}</span>
           <span class="spacer"></span>

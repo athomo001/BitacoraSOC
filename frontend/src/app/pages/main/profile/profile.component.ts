@@ -27,7 +27,7 @@ export class ProfileComponent implements OnInit {
   currentUser: any;
   isSavingProfile = false;
   isChangingPassword = false;
-  themes: Theme[] = ['light', 'dark', 'sepia', 'pastel'];
+  themes: Theme[] = ['light', 'dark', 'sepia', 'pastel', 'cyberpunk'];
 
   constructor(
     private fb: FormBuilder,

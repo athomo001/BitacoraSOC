@@ -12,16 +12,39 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
+const getTokenFromCookie = (req) => {
+  const cookieHeader = req.headers.cookie;
+  if (!cookieHeader) {
+    return null;
+  }
+
+  const authCookie = cookieHeader
+    .split(';')
+    .map((value) => value.trim())
+    .find((value) => value.startsWith('auth_token='));
+
+  if (!authCookie) {
+    return null;
+  }
+
+  const tokenValue = authCookie.substring('auth_token='.length);
+  return tokenValue ? decodeURIComponent(tokenValue) : null;
+};
+
 // 🔐 Middleware para verificar JWT y cargar usuario
 const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+
+    const headerToken = authHeader && authHeader.startsWith('Bearer ')
+      ? authHeader.substring(7)
+      : null;
+    const cookieToken = getTokenFromCookie(req);
+    const token = headerToken || cookieToken;
+
+    if (!token) {
       return res.status(401).json({ message: 'No se proporcionó token de autenticación' });
     }
-
-    const token = authHeader.substring(7);
     
     // 🔒 Clock skew tolerance: acepta tokens con diferencia ±60s
     // Previene errores por desincronización de relojes entre servidor/cliente

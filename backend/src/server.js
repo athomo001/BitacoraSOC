@@ -24,6 +24,7 @@ const fs = require('fs');
 const connectDB = require('./config/database');
 const { apiLimiter } = require('./middleware/rate-limiter');
 const requestIdMiddleware = require('./middleware/request-id');
+const inputSanitizer = require('./middleware/input-sanitizer');
 const { logger } = require('./utils/logger');
 const { startChecklistAlertScheduler } = require('./utils/checklistAlertScheduler');
 
@@ -53,7 +54,19 @@ connectDB();
 
 // Middlewares de seguridad
 app.use(helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"], // En Angular 17+ se podría requerir 'unsafe-eval' en dev, pero ajustamos a prod
+      styleSrc: ["'self'", "'unsafe-inline'"], // Angular Material requiere unsafe-inline
+      imgSrc: ["'self'", "data:", "blob:"], // Permitimos imagenes locales, dataURIs y blobs
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'", "data:"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
   hsts: {
     maxAge: 31536000,
     includeSubDomains: true,
@@ -73,18 +86,23 @@ app.use(requestIdMiddleware);
 
 // 🔒 CORS - En desarrollo permite todo, en producción restringe
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
+  origin: process.env.NODE_ENV === 'production'
     ? (origin, callback) => {
-        const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
-        // Si ALLOWED_ORIGINS es '*', permite todo
-        if (allowedOrigins.includes('*')) {
-          callback(null, true);
-        } else if (!origin || allowedOrigins.includes(origin)) {
-          callback(null, true);
-        } else {
-          callback(new Error('No permitido por CORS'));
-        }
+      const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      if (allowedOrigins.length === 0) {
+        callback(new Error('ALLOWED_ORIGINS no está configurado correctamente'));
+      } else if (!origin) {
+        callback(null, true);
+      } else if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('No permitido por CORS'));
       }
+    }
     : true, // En desarrollo permite cualquier origen
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -95,6 +113,7 @@ const corsOptions = {
 
 // Rate limiting
 app.use('/api/', cors(corsOptions), apiLimiter);
+app.use('/api/', inputSanitizer);
 
 // Servir archivos estáticos (logos) - CORS permisivo para imágenes
 app.use('/uploads', (req, res, next) => {
@@ -142,16 +161,23 @@ app.get('/health', (req, res) => {
 
 // Servir frontend compilado (SPA) si existe dist
 const clientDistPath = path.join(__dirname, '../../frontend/dist/bitacora-soc');
-if (fs.existsSync(clientDistPath)) {
+const clientIndexPath = path.join(clientDistPath, 'index.html');
+if (fs.existsSync(clientDistPath) && fs.existsSync(clientIndexPath)) {
   app.use(express.static(clientDistPath));
-  
+
   // SPA Fallback - DEBE estar al final, después de todas las rutas API
   app.get('*', (req, res) => {
     // No servir index.html para rutas de API
     if (req.path.startsWith('/api/') || req.path.startsWith('/api-docs') || req.path.startsWith('/uploads/')) {
       return res.status(404).json({ message: 'API endpoint not found' });
     }
-    res.sendFile(path.join(clientDistPath, 'index.html'));
+
+    // Solo fallback SPA para navegación HTML, no para assets (ej: /favicon.ico)
+    if (!req.accepts('html')) {
+      return res.status(404).json({ message: 'Not found' });
+    }
+
+    res.sendFile(clientIndexPath);
   });
 }
 
@@ -174,7 +200,7 @@ app.use((err, req, res, next) => {
     path: req.path,
     ip: req.ip
   }, 'Global error handler');
-  
+
   if (err.message === 'No permitido por CORS') {
     return res.status(403).json({ message: 'Origen no permitido' });
   }
@@ -200,7 +226,7 @@ const server = app.listen(PORT, HOST, () => {
 
   // Iniciar schedulers
   startChecklistAlertScheduler();
-  
+
   const { startScheduler: startShiftReportScheduler } = require('./utils/shift-scheduler');
   startShiftReportScheduler();
 });

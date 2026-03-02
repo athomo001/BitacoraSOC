@@ -136,7 +136,7 @@
         </div>
 
         <!-- Sección: Personas Externas -->
-        <div class="section" style="margin-top: 40px;">
+        <div class="section section-spacing-top">
           <h3>👤 Personas Externas (No usuarios del sistema)</h3>
           <p class="subtitle">Agrega personas que pueden estar de turno pero no tienen cuenta en el sistema</p>
           
@@ -171,7 +171,7 @@
             </form>
           </mat-card>
 
-          <div class="simple-table" *ngIf="externalPeople.length > 0" style="margin-top: 16px;">
+          <div class="simple-table table-spacing-top" *ngIf="externalPeople.length > 0">
             <table>
               <thead>
                 <tr>
@@ -444,7 +444,7 @@
             </div>
 
             <!-- RESPONSABLE (R) -->
-            <h4 style="margin-top: 16px; margin-bottom: 8px; color: #666;">👤 Responsable (R)</h4>
+            <h4 class="raci-section-title">👤 Responsable (R)</h4>
             <div formGroupName="responsible" class="form-row">
               <mat-form-field appearance="outline">
                 <mat-label>Nombre *</mat-label>
@@ -463,7 +463,7 @@
             </div>
 
             <!-- APROBADOR (A) -->
-            <h4 style="margin-top: 16px; margin-bottom: 8px; color: #666;">✅ Aprobador (A)</h4>
+            <h4 class="raci-section-title">✅ Aprobador (A)</h4>
             <div formGroupName="accountable" class="form-row">
               <mat-form-field appearance="outline">
                 <mat-label>Nombre *</mat-label>
@@ -482,7 +482,7 @@
             </div>
 
             <!-- CONSULTADO (C) -->
-            <h4 style="margin-top: 16px; margin-bottom: 8px; color: #666;">💬 Consultado (C)</h4>
+            <h4 class="raci-section-title">💬 Consultado (C)</h4>
             <div formGroupName="consulted" class="form-row">
               <mat-form-field appearance="outline">
                 <mat-label>Nombre</mat-label>
@@ -501,7 +501,7 @@
             </div>
 
             <!-- INFORMADO (I) -->
-            <h4 style="margin-top: 16px; margin-bottom: 8px; color: #666;">📢 Informado (I)</h4>
+            <h4 class="raci-section-title">📢 Informado (I)</h4>
             <div formGroupName="informed" class="form-row">
               <mat-form-field appearance="outline">
                 <mat-label>Nombre</mat-label>

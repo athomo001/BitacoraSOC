@@ -149,7 +149,7 @@
             <textarea matInput formControlName="evidenciaTexto" rows="3"
                       placeholder="Pega evidencia en texto, código o comentarios"></textarea>
           </mat-form-field>
-          <input type="file" accept="image/*" multiple (change)="onImageUpload($event)" #fileInput style="display: none;">
+          <input type="file" accept="image/*" multiple (change)="onImageUpload($event)" #fileInput class="hidden-file-input">
           <button mat-raised-button color="accent" type="button" (click)="fileInput.click()">
             <mat-icon>upload</mat-icon>
             Subir imágenes

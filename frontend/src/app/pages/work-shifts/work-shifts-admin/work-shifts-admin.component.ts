@@ -64,7 +64,7 @@ export class WorkShiftsAdminComponent implements OnInit {
   emailInput = '';
   showGlobalEmailConfig = false;
   
-  displayedColumns: string[] = ['order', 'name', 'code', 'type', 'timeRange', 'assignedUser', 'active', 'actions'];
+  displayedColumns: string[] = ['order', 'name', 'code', 'type', 'timeRange', 'checklists', 'assignedUser', 'active', 'actions'];
 
   constructor(
     private workShiftService: WorkShiftService,
@@ -160,9 +160,54 @@ export class WorkShiftsAdminComponent implements OnInit {
   }
 
   loadChecklistTemplates(): void {
-    // TODO: Implementar cuando exista endpoint de templates
-    // Por ahora dejamos vacío
-    this.checklistTemplates = [];
+    this.checklistService.getTemplates().subscribe({
+      next: (templates: any[]) => {
+        this.checklistTemplates = templates || [];
+      },
+      error: (error: any) => {
+        console.error('Error loading checklist templates:', error);
+        this.checklistTemplates = [];
+        this.snackBar.open('No se pudieron cargar plantillas de checklist', 'Cerrar', { duration: 3000 });
+      }
+    });
+  }
+
+  private getObjectId(value: any): string | null {
+    if (!value) {
+      return null;
+    }
+    if (typeof value === 'string') {
+      return value;
+    }
+    if (typeof value === 'object' && value._id) {
+      return String(value._id);
+    }
+    return null;
+  }
+
+  private getTemplateName(value: any, fallbackName?: string): string | null {
+    if (fallbackName) {
+      return fallbackName;
+    }
+
+    if (value && typeof value === 'object' && value.name) {
+      return String(value.name);
+    }
+
+    const id = this.getObjectId(value);
+    if (!id) {
+      return null;
+    }
+
+    const found = this.checklistTemplates.find((tpl: any) => String(tpl._id) === id);
+    return found?.name || null;
+  }
+
+  getChecklistSummary(shift: WorkShift): string {
+    const startName = this.getTemplateName((shift as any).checklistTemplateStartId, (shift as any).checklistTemplateStartName);
+    const endName = this.getTemplateName((shift as any).checklistTemplateEndId, (shift as any).checklistTemplateEndName);
+
+    return `Inicio: ${startName || 'Ninguno'} | Cierre: ${endName || 'Ninguno'}`;
   }
 
   addShift(): void {
@@ -181,10 +226,10 @@ export class WorkShiftsAdminComponent implements OnInit {
       startTime: shift.startTime,
       endTime: shift.endTime,
       timezone: shift.timezone,
-      assignedUserId: shift.assignedUserId || null,
-      checklistTemplateId: shift.checklistTemplateId || null,
-      checklistTemplateStartId: shift.checklistTemplateStartId || null,
-      checklistTemplateEndId: shift.checklistTemplateEndId || null,
+      assignedUserId: this.getObjectId((shift as any).assignedUserId),
+      checklistTemplateId: this.getObjectId((shift as any).checklistTemplateId),
+      checklistTemplateStartId: this.getObjectId((shift as any).checklistTemplateStartId),
+      checklistTemplateEndId: this.getObjectId((shift as any).checklistTemplateEndId),
       order: shift.order,
       active: shift.active,
       color: shift.color || DEFAULT_COLORS[0]

@@ -351,7 +351,7 @@
               <th mat-header-cell *matHeaderCellDef>Para</th>
               <td mat-cell *matCellDef="let row"
                   (click)="copyToClipboard(getRecipientEmails(row.recipientsTo))"
-                  style="cursor: pointer; font-weight: 600;">
+                  class="copyable-cell">
                 {{ getRecipientEmails(row.recipientsTo) }}
               </td>
             </ng-container>
@@ -360,14 +360,14 @@
               <th mat-header-cell *matHeaderCellDef>CC</th>
               <td mat-cell *matCellDef="let row"
                   (click)="copyToClipboard(getRecipientEmails(row.recipientsCC))"
-                  style="cursor: pointer; font-weight: 600;">
+                  class="copyable-cell">
                 {{ getRecipientEmails(row.recipientsCC) }}
               </td>
             </ng-container>
 
             <ng-container matColumnDef="emergencyPhone">
               <th mat-header-cell *matHeaderCellDef>Teléfono</th>
-              <td mat-cell *matCellDef="let row" style="color: #c0392b; font-weight: 700;">
+              <td mat-cell *matCellDef="let row" class="emergency-phone-cell">
                 {{ row.emergencyPhone || '-' }}
               </td>
             </ng-container>
@@ -458,7 +458,7 @@
           <p>No hay asignaciones registradas</p>
         </div>
 
-        <mat-divider style="margin: 32px 0;"></mat-divider>
+        <mat-divider class="section-divider"></mat-divider>
 
         <!-- Overrides -->
         <h2>Reemplazos Temporales (Overrides)</h2>
@@ -501,7 +501,7 @@
             </div>
 
             <div class="form-row">
-              <mat-form-field appearance="outline" style="flex: 1; margin-right: 16px;">
+              <mat-form-field appearance="outline" class="form-field-inline form-field-inline-right">
                 <mat-label>Fecha y Hora Inicio</mat-label>
                 <input matInput type="datetime-local" formControlName="startDate" required>
                 <mat-error *ngIf="overrideForm.get('startDate')?.hasError('required')">
@@ -509,7 +509,7 @@
                 </mat-error>
               </mat-form-field>
 
-              <mat-form-field appearance="outline" style="flex: 1;">
+              <mat-form-field appearance="outline" class="form-field-inline">
                 <mat-label>Fecha y Hora Fin</mat-label>
                 <input matInput type="datetime-local" formControlName="endDate" required>
                 <mat-error *ngIf="overrideForm.get('endDate')?.hasError('required')">

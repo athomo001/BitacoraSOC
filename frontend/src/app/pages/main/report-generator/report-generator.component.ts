@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, SecurityContext } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
@@ -19,16 +19,17 @@ import { MatOption } from '@angular/material/core';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { ClientAlertDialogComponent } from './client-alert-dialog.component';
+import { DomSanitizer } from '@angular/platform-browser';
 
 @Component({
-    selector: 'app-report-generator',
-    templateUrl: './report-generator.component.html',
-    styleUrls: ['./report-generator.component.scss'],
-    imports: [MatCard, MatCardHeader, MatCardTitle, MatCardSubtitle, MatCardContent, ReactiveFormsModule, EntityAutocompleteComponent, NgIf, MatFormField, MatLabel, MatInput, MatError, MatDatepickerInput, MatDatepickerToggle, MatSuffix, MatDatepicker, MatSelect, MatOption, MatButton, MatIcon, NgFor, MatIconButton]
+  selector: 'app-report-generator',
+  templateUrl: './report-generator.component.html',
+  styleUrls: ['./report-generator.component.scss'],
+  imports: [MatCard, MatCardHeader, MatCardTitle, MatCardSubtitle, MatCardContent, ReactiveFormsModule, EntityAutocompleteComponent, NgIf, MatFormField, MatLabel, MatInput, MatError, MatDatepickerInput, MatDatepickerToggle, MatSuffix, MatDatepicker, MatSelect, MatOption, MatButton, MatIcon, NgFor, MatIconButton]
 })
 export class ReportGeneratorComponent implements OnInit {
   reportForm: FormGroup;
-  
+
   selectedEvent: CatalogEvent | null = null;
   selectedLogSource: CatalogLogSource | null = null;
   selectedOperationType: CatalogOperationType | null = null;
@@ -47,7 +48,8 @@ export class ReportGeneratorComponent implements OnInit {
     private configService: ConfigService,
     private snackBar: MatSnackBar,
     private escalationService: EscalationService,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private sanitizer: DomSanitizer
   ) {
     this.reportForm = this.fb.group({
       tipoOperacion: ['', Validators.required],
@@ -337,7 +339,8 @@ export class ReportGeneratorComponent implements OnInit {
 
   private copyHtmlWithExecCommand(html: string): boolean {
     const container = document.createElement('div');
-    container.innerHTML = html;
+    const sanitizedHtml = this.sanitizer.sanitize(SecurityContext.HTML, html) || '';
+    container.innerHTML = sanitizedHtml;
     container.style.position = 'fixed';
     container.style.left = '-9999px';
     container.style.top = '0';

@@ -2,13 +2,13 @@
  * Interceptor de Autenticación HTTP
  * 
  * Funcionalidad:
- *   - Inyectar JWT en header Authorization de todas las requests
+ *   - Enviar cookies de sesión (`withCredentials`) en todas las requests
  *   - Manejar errores 401 (token inválido/expirado) con logout automático
  *   - Detectar backend offline (error 0) con mensaje descriptivo
  * 
  * Flujo:
  *   1. Intercepta TODA request HTTP saliente
- *   2. Si existe token JWT: agrega header "Authorization: Bearer {token}"
+ *   2. Clona request con `withCredentials: true`
  *   3. Si backend responde 401: ejecuta logout() + redirect a /login
  *   4. Si backend offline (status 0): muestra error de conectividad
  * 
@@ -36,15 +36,7 @@ export class AuthInterceptor implements HttpInterceptor {
   ) {}
 
   intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-    const token = this.authService.getToken();
-
-    if (token) {
-      req = req.clone({
-        setHeaders: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-    }
+    req = req.clone({ withCredentials: true });
 
     return next.handle(req).pipe(
       catchError((error: HttpErrorResponse) => {

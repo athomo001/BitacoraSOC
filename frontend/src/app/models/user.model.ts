@@ -41,4 +41,4 @@ export interface UpdateProfileRequest {
   newPassword?: string;
 }
 
-export type Theme = 'light' | 'dark' | 'sepia' | 'pastel';
+export type Theme = 'light' | 'dark' | 'sepia' | 'pastel' | 'cyberpunk';

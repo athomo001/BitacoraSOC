@@ -23,10 +23,58 @@
           </mat-form-field>
         </div>
 
-        <button mat-raised-button color="primary" type="submit"
-                [disabled]="!appConfigForm.valid">
+        <button mat-raised-button color="primary" type="submit" [disabled]="!appConfigForm.valid">
           Guardar
         </button>
+      </form>
+    </mat-card-content>
+  </mat-card>
+
+  <mat-card class="config-card" id="backup-config">
+    <mat-card-header>
+      <mat-card-title>Configuración de Backups Automáticos (B21)</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <form [formGroup]="backupConfigForm" (ngSubmit)="saveBackupConfig()">
+        <div class="config-row">
+          <mat-checkbox formControlName="enabled">
+            Habilitar Backups Automáticos
+          </mat-checkbox>
+        </div>
+
+        <div class="config-row">
+          <mat-form-field appearance="outline">
+            <mat-label>Intervalo (Días)</mat-label>
+            <input matInput type="number" formControlName="intervalDays" min="1" max="365">
+            <mat-hint>Cada cuántos días ejecutar</mat-hint>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Retención Local (Días)</mat-label>
+            <input matInput type="number" formControlName="localRetentionDays" min="1" max="365">
+            <mat-hint>Eliminar backups locales antiguos</mat-hint>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Destino</mat-label>
+            <mat-select formControlName="destinationType">
+              <mat-option value="local">Local</mat-option>
+              <mat-option value="s3" disabled>S3 Compatible (Próximamente)</mat-option>
+              <mat-option value="smb" disabled>SMB/Samba (Próximamente)</mat-option>
+              <mat-option value="nfs" disabled>NFS (Próximamente)</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+
+        <div class="button-group backup-actions">
+          <button mat-raised-button color="primary" type="submit" [disabled]="!backupConfigForm.valid">
+            Guardar Configuración
+          </button>
+
+          <button mat-stroked-button color="accent" type="button" (click)="testAutoBackup()">
+            Ejecutar Prueba de Backup Ahora
+          </button>
+        </div>
       </form>
     </mat-card-content>
   </mat-card>
@@ -35,7 +83,8 @@
     <mat-card-header>
       <mat-card-title>Configuracion SMTP</mat-card-title>
       <span class="status-chip" [ngClass]="connectionStatus">
-        {{ connectionStatus === 'conectado' ? 'Conectado' : connectionStatus === 'desconectado' ? 'Desconectado' : 'Sin configurar' }}
+        {{ connectionStatus === 'conectado' ? 'Conectado' : connectionStatus === 'desconectado' ? 'Desconectado' : 'Sin
+        configurar' }}
       </span>
     </mat-card-header>
     <mat-card-content>
@@ -84,9 +133,10 @@
 
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Destinatarios (separados por coma) - Opcional</mat-label>
-            <textarea matInput rows="2" formControlName="recipientsText" 
-                      placeholder="Solo necesarios si deseas enviar emails de prueba o notificaciones"></textarea>
-            <mat-hint>La conexión SMTP funciona sin destinatarios. Los emails se enviarán cuando haya incidentes críticos.</mat-hint>
+            <textarea matInput rows="2" formControlName="recipientsText"
+              placeholder="Solo necesarios si deseas enviar emails de prueba o notificaciones"></textarea>
+            <mat-hint>La conexión SMTP funciona sin destinatarios. Los emails se enviarán cuando haya incidentes
+              críticos.</mat-hint>
           </mat-form-field>
         </div>
 
@@ -95,14 +145,12 @@
         </mat-checkbox>
 
         <div class="button-group">
-          <button mat-raised-button color="accent" type="button"
-                  (click)="testSmtp()" [disabled]="testing">
+          <button mat-raised-button color="accent" type="button" (click)="testSmtp()" [disabled]="testing">
             <mat-spinner *ngIf="testing" diameter="18"></mat-spinner>
             <span *ngIf="!testing">Probar conexion</span>
           </button>
 
-          <button mat-raised-button color="primary" type="submit"
-                  [disabled]="!smtpTestPassed || savingSmtp">
+          <button mat-raised-button color="primary" type="submit" [disabled]="!smtpTestPassed || savingSmtp">
             <mat-spinner *ngIf="savingSmtp" diameter="18"></mat-spinner>
             <span *ngIf="!savingSmtp">Guardar SMTP</span>
           </button>

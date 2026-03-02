@@ -7,28 +7,16 @@
 
 | ID | Estado | Seccion | Tarea | Notas |
 | --- | --- | --- | --- | --- |
-| SEC-CRIT-001 | ⚠️ BLOQUEANTE | Seguridad CRÍTICA | Exposición de credenciales SMTP en `/api/config` | `GET /api/config` devuelve `smtpConfig.pass` a cualquier usuario autenticado. Riesgo de exfiltración de correo corporativo. |
-| SEC-CRIT-002 | ⚠️ BLOQUEANTE | Seguridad CRÍTICA | Recuperación de contraseña vulnerable | Host header poisoning + URL `http` + fuga de `resetToken` en desarrollo. Riesgo de toma de cuenta. |
-| SEC-CRIT-003 | ⚠️ BLOQUEANTE | Seguridad CRÍTICA | Refresh indefinido de JWT expirados | `/auth/refresh` usa `ignoreExpiration: true`. Token robado puede persistir indefinidamente. |
-| SEC-CRIT-004 | ⚠️ BLOQUEANTE | Seguridad CRÍTICA | RBAC incompleto para rol `guest` | Guests pueden ejecutar endpoints de escritura (`entries`, `checklist`). Rompe política de solo lectura. |
-| SEC-CRIT-005 | ⚠️ BLOQUEANTE | Seguridad CRÍTICA | Anti brute-force desactivado en despliegue actual | `NODE_ENV=development` + rate-limit deshabilitado + `loginLimiter` sin aplicar en `/auth/login`. |
-| SEC-HIGH-006 | Pendiente | Seguridad ALTA | Credenciales por defecto débiles en bootstrap/scripts | `Admin123!` y `bitacora123` en fallbacks/scripts. Facilita compromiso inicial. |
-| SEC-HIGH-007 | Pendiente | Seguridad ALTA | Riesgo de robo de JWT por cadena XSS | Sin CSP efectiva + JWT en `localStorage` + uso de `innerHTML` dinámico. |
-| SEC-HIGH-008 | Pendiente | Seguridad ALTA | Posible Path Traversal en backups | Uso de `path.join` con input no sanitizado en download/delete/restore de backups. |
-| SEC-STD-009 | Pendiente | Seguridad/Compliance | Alineación OWASP ASVS L2 + Secure Coding + Angular/Node | Revisar backend/frontend, endurecer controles y asegurar auditoría de acciones sensibles. |
-| B5 | Pendiente | Bugs CRÍTICO | Acceso a rutas sin autenticación | Vulnerabilidad: posible acceso y modificación sin login |
-| B6 | Pendiente | UI/UX | Dark mode: contraste y legibilidad deficientes | Problemas de contraste en inputs/botones/tablas; requiere ajuste WCAG y revisión completa de estilos tema oscuro. |
-| B8 | Pendiente | Mejoras | Edición masiva/individual de entradas (Admin) | Habilitar reclasificación controlada por admin sin alterar campos inmutables, con auditoría de before/after. |
-| B9 | Listo | Mejoras | Checklists distintos por tipo de check y por turno | El módulo de turnos ya existe: al crear/editar turno (ej. noche) debe permitir asignar fácil checklist de `inicio` y `cierre` en la misma pantalla y también poder asignar distinto checklist  en el  turno (entrada/salida), si se realiza el de inicio al inicio de turno este ya desaparece de la pantalla  y  lo mismo  con el de termino al cerrar el turno , osea  al inciar el turno  solo se vera  el check list de inicio de turno y al cerrar el turno se vera el check list de cierre de turno. |
+| SEC-STD-009 | Pendiente | Seguridad/Compliance | Alineación OWASP ASVS L2 + Secure Coding + Angular/Node | En progreso: cookie `HttpOnly`, CSP activa, CORS prod sin wildcard, sanitización anti-inyección (`$`/`.`), RBAC crítico reforzado. Pendiente para cierre total: matriz RBAC documentada + pruebas de seguridad mínimas automatizadas. |
 | B11 | Pendiente | Mejoras | Auditoría incompleta de correos y acciones de usuarios/admin | En Logs de Auditoría no aparece claramente envío de correos (estado + destinatarios) ni cambios de administradores ni acciones relevantes de usuario normal (ej. generar reporte). |
-| B12 | Pendiente | Mejoras | Huevo de pascua en login por combinaciones específicas | Si ingresan combinaciones definidas (ej. `admin/admin`, `1234/1234`, etc.), activar pantalla negra + imagen. Triggers deben configurarse en BD para no hardcodear. |
-| B13 | Pendiente | Mejoras | Huevo de pascua en entradas por hashtag `#bender` | Si en entrada aparece `#Bender` o `#bender`, mostrar overlay fullscreen con imagen de Bender. |
+| B12 | Pendiente | Mejoras | Huevo de pascua en login por combinaciones específicas | Si ingresan combinaciones definidas (ej. `admin/admin`, `1234/1234`, etc.), activar pantalla negra + imagen. Triggers deben configurarse en BD para no hardcodear, imagen de bender  esta dentro de la carpeta scripts  y se llama  Bender.png|
+| B13 | Pendiente | Mejoras | Huevo de pascua en entradas por hashtag `#bender` | Si en entrada aparece `#Bender` o `#bender`, mostrar overlay fullscreen con imagen de Bender, imagen de bender  esta dentro de la carpeta scripts  y se llama  Bender.png |
 | B14 | Listo | Bugs | Envío automático de correo de turno fuera de contexto (vacío/duplicado) | En no laborales y a las 00:00 o a la hora que se  configuro  como termino de turno se envían correos vacíos. Debe enviarse solo al registrar checklist de cierre real. |
 | B16 | Pendiente | Seguridad/Arquitectura | Auditoría automática avanzada (usuario + dispositivo + red + VPN) | Diseñar e implementar trazabilidad inmutable con fingerprint de dispositivo, metadata de red, detección de cambio de IP en sesión y notificación en tiempo real. |
 | B17 | Pendiente | Seguridad/Integraciones | Envío de eventos de auditoría a SIEM/SOAR/NDR (Syslog/API) | Exportar todos los eventos de auditoría a destinos externos (Elastic, Wazuh, QRadar, XSOAR, Fortinet, etc.) por UDP/TCP/TLS con puertos `514`, `6514` o puerto personalizado. |
 | B18 | Pendiente | Integraciones | Módulo General de Integraciones | Crear sección "Integraciones" global en el panel de administrador para configurar y habilitar conectores salientes (GLPI, Elastic, SIEM, Webhooks) y futuras conexiones (SSO, LDAP). |
 | B19 | Pendiente | Integraciones | Creación de tickets en GLPI (Correo / API) | Automatizar creación de ticket GLPI al cierre del turno. Soportar dos métodos configurables: vía correo electrónico (asunto como nombre del ticket) o de manera oficial mediante la API REST de GLPI. Insertarlo en el nuevo menú de Integraciones. |
-| B20 | Pendiente | UI/UX | Tema Cyberpunk/Neon | Nuevo tema visual opcional, cuidando contraste y sin repetir problemas del dark mode actual. |
+
 | B21 | Pendiente | Backup/Operación | Backups automáticos programables + destino externo + retención configurable | Permitir programar respaldo automático cada N días, enviar a destino configurable (nube/NFS/Samba) y definir expiración local de respaldos. |
 | B25 | Pendiente | UI/UX + Operación | Log Sources/Clientes: separar activos e inactivos en `catalog-admin` | Hoy se puede marcar `enabled` al editar, pero la UI mezcla todos en una sola tabla; al inactivar, debe salir de Activos y mostrarse abajo en Inactivos para ordenar operación. |
 | B27 | Pendiente | UI/UX + Arquitectura Frontend | Consola Admin unificada (Users, Checklist, Turnos, Catálogos, Escalación) | Unificar módulos administrativos en una sola experiencia coherente, evitando duplicidad de menús y diseño “copiar/pegar”; debe seguir reglas UI/UX consistentes y optimizar navegación operativa. |
@@ -41,6 +29,18 @@
 | ID | Seccion | Tarea | Notas |
 | --- | --- | --- | --- |
 | B-CRÍTICO-001 | Bugs CRÍTICO | Emails no llegan cuando se registra cierre checklist | Corregido y marcado como listo. |
+| SEC-CRIT-001 | Seguridad CRÍTICA | Exposición de credenciales SMTP en `/api/config` | Listo: respuesta de configuración sanitizada (sin `smtpConfig.pass`) y endpoints sensibles restringidos a admin. |
+| SEC-CRIT-002 | Seguridad CRÍTICA | Recuperación de contraseña vulnerable | Listo: uso de `FRONTEND_URL`, enlace seguro y eliminación de devolución de `resetToken`/`resetUrl` en respuestas. |
+| SEC-CRIT-003 | Seguridad CRÍTICA | Refresh indefinido de JWT expirados | Listo: eliminado `ignoreExpiration: true` en `/auth/refresh`. |
+| SEC-CRIT-004 | Seguridad CRÍTICA | RBAC incompleto para rol `guest` | Listo: aplicado `notGuest` en rutas críticas de escritura (`entries` y `checklist`). |
+| SEC-CRIT-005 | Seguridad CRÍTICA | Anti brute-force en auth/login | Listo: `loginLimiter` y rate-limiters de recuperación/reset aplicados en rutas de autenticación. |
+| SEC-HIGH-006 | Seguridad ALTA | Credenciales por defecto débiles en bootstrap/scripts | Listo: eliminados fallbacks inseguros en compose/seed/scripts; credenciales ahora requieren variables de entorno. |
+| SEC-HIGH-007 | Seguridad ALTA | Riesgo de robo de JWT por cadena XSS | Listo: sesión migrada a cookie `HttpOnly` (`auth_token`), middleware acepta cookie segura y frontend ya no guarda JWT en `localStorage`. |
+| SEC-HIGH-008 | Seguridad ALTA | Posible Path Traversal en backups | Listo: validación estricta de filename (`isValidBackupFilename`) en restore/download/delete de backups. |
+| B5 | Bugs CRÍTICO | Acceso a rutas sin autenticación | Listo: rutas críticas de escritura protegidas con `authenticate`/`authorize`; única exposición intencional sin login es branding público (`/config/logo`, `/config/favicon`). |
+| B6 | UI/UX | Dark mode: contraste y legibilidad deficientes | Listo: refactor de estilos a tokens de tema y mejoras de contraste en inputs/botones/tablas/componentes críticos. |
+| B8 | Mejoras | Edición masiva/individual de entradas (Admin) | Listo: endpoint admin con whitelist + campos inmutables bloqueados + auditoría con `before/after` por entrada. |
+| B9 | Mejoras | Checklists distintos por tipo de check y por turno | Listo: soporte `checklistTemplateStartId`/`checklistTemplateEndId` en backend y asignación/visualización clara en UI de turnos. |
 | B10 | Mejoras | Branding: favicon configurable | Implementado: favicon separado del logo, con endpoints dedicados y administración en Branding. |
 | B15 | Bugs | Compatibilidad visual de correo HTML (modo oscuro vs claro) | Implementado: badges de estado reforzados con color + texto explícito para clientes claros/oscuros. |
 | P1 | Actualizacion Angular 20 | Plan general de actualizacion | Actualización completa Angular 17→20 |
@@ -65,6 +65,7 @@
 | F3-5 | Fase 3 (Angular 20) | Commit upgrade 20 | Commits c102e7d + fa45c38 |
 | F4-1 | Fase 4 (Post-actualizacion) | Revision de dependencias externas | animejs@3.2.2 funcionando OK |
 | F4-2 | Fase 4 (Post-actualizacion) | Limpieza de codigo | Código limpio, solo 1 warning menor |
+| SEC-DEP-2026-03 | Seguridad Dependencias | npm audit frontend (21 vulnerabilities) | Resuelto: actualización de dependencias y parches; resultado final `npm audit` sin vulnerabilidades en frontend. |
 | B1a | Bugs | Visibilidad en tema oscuro | Commit d3112bd: Agregados estilos mat-menu-item y options en dark mode |
 | B1b | Bugs | Notas no se guardan | Verificado: autosave con debounce 3s funciona correctamente |
 | B2a | Mejoras | Reordenar y clarificar menu lateral | Checklist (Admin) movido a Configuración (Admin); texto Escalación ok |
@@ -98,6 +99,7 @@
 | B23 | UI/UX | Eliminar checkbox duplicado envío correo | Centralizar control en Configuración Global (Opción A) eliminando el checkbox redundante en la vista de Turno Activo. |
 | B24 | UI/UX + Rendimiento | Admin Catálogos: solo 50 eventos visibles | En `main/catalog-admin` hay ~1800 eventos, pero solo se ven 50; además en la tabla de Eventos debe mostrarse `Motivo por defecto` en lugar de `Descripción`. |
 | B26 | Listo | UI/UX | Checklist Admin compacto + guardado rápido + acordeones | En `main/checklist-admin` la edición de plantillas largas obliga a bajar hasta el final para guardar; se requiere vista más compacta con acordeones y eliminación de campos `Descripción` que no se usan. |
+| B20 | Listo | UI/UX | Tema Cyberpunk/Neon | Nuevo tema visual opcional, cuidando contraste y sin repetir problemas del dark mode actual. |
 ---
 
 ## 🟠 B9 - Checklists distintos por tipo y por turno

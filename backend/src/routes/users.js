@@ -63,7 +63,7 @@ router.put('/me',
   [
     body('email').optional().isEmail().normalizeEmail(),
     body('fullName').optional().trim().notEmpty(),
-    body('theme').optional().isIn(['light', 'dark', 'sepia', 'pastel']),
+    body('theme').optional().isIn(['light', 'dark', 'sepia', 'pastel', 'cyberpunk']),
     body('currentPassword').optional().notEmpty(),
     body('newPassword').optional().isLength({ min: 6 })
   ],

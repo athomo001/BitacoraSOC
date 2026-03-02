@@ -26,6 +26,10 @@ form {
   gap: 12px;
 }
 
+.backup-actions {
+  margin-top: 15px;
+}
+
 .grid {
   display: grid;
   gap: 12px;
@@ -41,19 +45,22 @@ form {
   border-radius: 12px;
   font-size: 12px;
   text-transform: uppercase;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .status-chip.conectado {
-  background: #4caf50;
+  background: var(--state-success-bg);
+  color: var(--state-success);
 }
 
 .status-chip.desconectado {
-  background: #f44336;
+  background: var(--state-error-bg);
+  color: var(--state-error);
 }
 
 .status-chip.sin-config {
-  background: #9e9e9e;
+  background: var(--state-neutral-bg);
+  color: var(--state-neutral);
 }
 
 .full-width {

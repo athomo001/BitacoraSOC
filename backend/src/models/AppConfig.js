@@ -143,6 +143,35 @@ const appConfigSchema = new mongoose.Schema({
       default: ''
     }
   },
+  // Configuración de Backups Automáticos
+  backupConfig: {
+    enabled: {
+      type: Boolean,
+      default: false
+    },
+    intervalDays: {
+      type: Number,
+      default: 7,
+      min: 1,
+      max: 365
+    },
+    destinationType: {
+      type: String,
+      enum: ['local', 's3', 'smb', 'nfs'],
+      default: 'local'
+    },
+    localRetentionDays: {
+      type: Number,
+      default: 30,
+      min: 1,
+      max: 365
+    },
+    // Configuración para destinos externos (encriptados/seguros)
+    destinationConfig: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {}
+    }
+  },
   // Última actualización
   lastUpdatedBy: {
     type: mongoose.Schema.Types.ObjectId,

@@ -43,13 +43,13 @@
 }
 
 .error-card {
-  background-color: #ffebee;
+  background-color: var(--state-error-bg);
   
   mat-card-content {
     display: flex;
     align-items: center;
     gap: 12px;
-    color: #c62828;
+    color: var(--state-error);
   }
 }
 
@@ -61,17 +61,18 @@
 
 .info-card {
   grid-column: 1 / -1;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
+  color: var(--on-primary-color);
   
   mat-card-header {
     mat-card-title {
-      color: white;
+      color: var(--on-primary-color);
       font-size: 20px;
     }
     
     mat-card-subtitle {
-      color: rgba(255, 255, 255, 0.9);
+      color: var(--on-primary-color);
+      opacity: 0.9;
     }
   }
   
@@ -120,11 +121,11 @@
   align-items: flex-start;
   gap: 12px;
   padding: 12px;
-  background-color: #f5f5f5;
+  background-color: var(--surface-muted);
   border-radius: 8px;
   
   mat-icon {
-    color: #666;
+    color: var(--text-secondary);
   }
   
   .contact-info {
@@ -138,7 +139,7 @@
     
     span {
       font-size: 13px;
-      color: #666;
+      color: var(--text-secondary);
     }
   }
 }
@@ -148,12 +149,12 @@
   align-items: center;
   gap: 12px;
   padding: 16px;
-  background-color: #fff3e0;
+  background-color: var(--state-warning-bg);
   border-radius: 8px;
-  border-left: 4px solid #ff9800;
+  border-left: 4px solid var(--state-warning);
   
   mat-icon {
-    color: #ff9800;
+    color: var(--state-warning);
     font-size: 32px;
     width: 32px;
     height: 32px;
@@ -166,12 +167,12 @@
     
     strong {
       font-size: 18px;
-      color: #e65100;
+      color: var(--state-warning);
     }
     
     span {
       font-size: 13px;
-      color: #666;
+      color: var(--text-secondary);
     }
   }
 }
@@ -184,9 +185,9 @@
 
 .shift-item {
   padding: 16px;
-  background-color: #f5f5f5;
+  background-color: var(--surface-muted);
   border-radius: 8px;
-  border-left: 4px solid #2196f3;
+  border-left: 4px solid var(--state-info);
   
   .shift-header {
     display: flex;
@@ -202,7 +203,7 @@
     margin-bottom: 8px;
     
     mat-icon {
-      color: #666;
+      color: var(--text-secondary);
     }
     
     .user-info {
@@ -216,7 +217,7 @@
       
       span {
         font-size: 13px;
-        color: #666;
+        color: var(--text-secondary);
       }
     }
   }
@@ -225,7 +226,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    color: #d32f2f;
+    color: var(--state-error);
     margin-bottom: 8px;
   }
   
@@ -234,7 +235,7 @@
     align-items: center;
     gap: 8px;
     font-size: 13px;
-    color: #666;
+    color: var(--text-secondary);
     margin-top: 8px;
     
     mat-icon {
@@ -250,7 +251,7 @@
     gap: 8px;
     margin-top: 8px;
     padding: 8px;
-    background-color: #fff3e0;
+    background-color: var(--state-warning-bg);
     border-radius: 4px;
     font-size: 13px;
     
@@ -258,21 +259,21 @@
       font-size: 18px;
       width: 18px;
       height: 18px;
-      color: #ff9800;
+      color: var(--state-warning);
     }
   }
 }
 
 .role-n2 {
-  background-color: #1976d2 !important;
+  background-color: var(--chart-2) !important;
 }
 
 .role-ti {
-  background-color: #388e3c !important;
+  background-color: var(--chart-3) !important;
 }
 
 .role-n1 {
-  background-color: #f57c00 !important;
+  background-color: var(--chart-5) !important;
 }
 
 .override-badge {
@@ -290,7 +291,7 @@
   justify-content: center;
   gap: 12px;
   padding: 48px;
-  color: #999;
+  color: var(--text-secondary);
   
   mat-icon {
     font-size: 48px;

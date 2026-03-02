@@ -53,7 +53,7 @@
                #fileInput 
                (change)="onFileSelected($event)" 
                accept="image/png,image/jpeg,image/svg+xml"
-               style="display: none">
+           class="hidden-file-input">
         
         <div class="upload-zone" (click)="fileInput.click()">
           <img *ngIf="previewUrl" [src]="previewUrl" alt="Preview">
@@ -100,7 +100,7 @@
                #faviconInput
                (change)="onFaviconFileSelected($event)"
                accept="image/png,image/x-icon,.ico"
-               style="display: none">
+           class="hidden-file-input">
 
         <div class="upload-zone favicon-preview" (click)="faviconInput.click()">
           <img *ngIf="faviconPreviewUrl" [src]="faviconPreviewUrl" alt="Preview favicon">

@@ -99,7 +99,13 @@ router.get('/', authenticate, async (req, res) => {
       });
     }
 
-    res.json(config);
+    // Sanitize config by removing sensitive info
+    const configData = config.toObject();
+    if (configData.smtpConfig && configData.smtpConfig.pass) {
+      delete configData.smtpConfig.pass;
+    }
+
+    res.json(configData);
   } catch (error) {
     console.error('Error al obtener config:', error);
     res.status(500).json({ message: 'Error al obtener configuración' });
@@ -141,7 +147,15 @@ router.put('/',
       if (!config) {
         config = new AppConfig(req.body);
       } else {
+        const oldPass = config.smtpConfig ? config.smtpConfig.pass : null;
         Object.assign(config, req.body);
+
+        // Preserve password if it wasn't provided or was sent as empty string (masked)
+        if (req.body.smtpConfig) {
+          if (!req.body.smtpConfig.pass && oldPass) {
+            config.smtpConfig.pass = oldPass;
+          }
+        }
       }
 
       config.lastUpdatedBy = req.user._id;
@@ -167,7 +181,7 @@ router.put('/',
 router.get('/logo', async (req, res) => {
   try {
     const config = await AppConfig.findOne();
-    
+
     if (!config || !config.logoUrl) {
       return res.json({ logoUrl: '' });
     }
@@ -203,7 +217,7 @@ router.post('/logo',
   async (req, res) => {
     // Middleware dinámico para manejar multipart o JSON
     const contentType = req.headers['content-type'] || '';
-    
+
     if (contentType.includes('multipart/form-data')) {
       // Manejar subida de archivo
       uploadLogo.single('logo')(req, res, async (err) => {
@@ -305,7 +319,7 @@ router.delete('/logo',
   async (req, res) => {
     try {
       const config = await AppConfig.findOne();
-      
+
       if (!config || !config.logoUrl) {
         return res.json({ message: 'No hay logo configurado' });
       }
@@ -472,7 +486,7 @@ router.delete('/favicon',
 router.get('/debug/check', authenticate, authorize('admin'), async (req, res) => {
   try {
     const config = await AppConfig.findOne().select('emailReportConfig smtpConfig').lean();
-    
+
     res.json({
       configExists: !!config,
       emailReportConfig: config?.emailReportConfig || null,

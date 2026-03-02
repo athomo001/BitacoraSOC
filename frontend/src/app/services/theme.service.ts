@@ -2,7 +2,7 @@
  * Servicio de Temas (Theming)
  * 
  * Funcionalidad:
- *   - Gestionar tema visual de la aplicación (light, dark, sepia, pastel)
+ *   - Gestionar tema visual de la aplicación (light, dark, sepia, pastel, cyberpunk)
  *   - Persistir preferencia en localStorage
  *   - Observable para cambios reactivos en UI
  * 
@@ -11,6 +11,7 @@
  *   - dark: Tema oscuro (reducir fatiga visual en turnos nocturnos)
  *   - sepia: Tono cálido (reduce luz azul)
  *   - pastel: Colores suaves (alternativa visual)
+ *   - cyberpunk: Alto contraste neon para uso opcional
  * 
  * Implementación:
  *   - setTheme(): cambia tema + guarda en localStorage + aplica CSS
@@ -31,6 +32,7 @@ import { Theme } from '../models/user.model';
 })
 export class ThemeService {
   private readonly THEME_KEY = 'bitacora_theme';
+  private readonly SUPPORTED_THEMES: Theme[] = ['light', 'dark', 'sepia', 'pastel', 'cyberpunk'];
   private currentThemeSubject = new BehaviorSubject<Theme>(this.getStoredTheme());
   public currentTheme$ = this.currentThemeSubject.asObservable();
 
@@ -50,7 +52,10 @@ export class ThemeService {
 
   private getStoredTheme(): Theme {
     const stored = localStorage.getItem(this.THEME_KEY);
-    return (stored as Theme) || 'light';
+    if (stored && this.SUPPORTED_THEMES.includes(stored as Theme)) {
+      return stored as Theme;
+    }
+    return 'light';
   }
 
   private applyTheme(theme: Theme): void {

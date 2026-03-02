@@ -44,17 +44,17 @@
 .table-container {
   overflow-x: auto;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow);
 }
 
 .data-table {
   width: 100%;
-  background-color: white;
+  background-color: var(--surface-color);
   
   th {
-    background-color: #f5f5f5;
+    background-color: var(--surface-muted);
     font-weight: 600;
-    color: #333;
+    color: var(--text-primary);
   }
   
   td, th {
@@ -62,7 +62,7 @@
   }
   
   tr:hover {
-    background-color: #fafafa;
+    background-color: var(--hover-bg);
   }
 }
 
@@ -73,7 +73,7 @@
   flex-direction: column;
   gap: 12px;
   padding: 48px;
-  color: #999;
+  color: var(--text-secondary);
   
   mat-icon {
     font-size: 48px;
@@ -94,7 +94,17 @@ mat-chip {
 /* Formularios inline */
 .form-card {
   margin-bottom: 24px;
-  background-color: #f9f9f9;
+  background-color: var(--surface-muted);
+}
+
+.copyable-cell {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.emergency-phone-cell {
+  color: var(--state-error);
+  font-weight: 700;
 }
 
 .form-row {
@@ -118,6 +128,18 @@ mat-chip {
   display: flex;
   gap: 12px;
   margin-top: 16px;
+}
+
+.section-divider {
+  margin: 32px 0;
+}
+
+.form-field-inline {
+  flex: 1;
+}
+
+.form-field-inline-right {
+  margin-right: 16px;
 }
 
 /* Responsive */

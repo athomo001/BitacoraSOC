@@ -80,7 +80,7 @@ export class ReportsComponent implements OnInit {
     name: 'soc',
     selectable: true,
     group: ScaleType.Ordinal,
-    domain: ['#00ff99', '#00ccff', '#ff6b6b', '#ffd700', '#9b59b6', '#3498db', '#e74c3c', '#2ecc71']
+    domain: []
   };
   
   // Esquema de colores para heatmap (gradiente: verde=bajo, rojo=alto)
@@ -88,7 +88,7 @@ export class ReportsComponent implements OnInit {
     name: 'heatmap',
     selectable: true,
     group: ScaleType.Linear,
-    domain: ['#d7f5b8', '#8bd35f', '#1f9d55', '#f6c343', '#e53935']
+    domain: []
   };
   
   // Selección de tags para comparación
@@ -103,7 +103,41 @@ export class ReportsComponent implements OnInit {
   constructor(private reportService: ReportService) {}
 
   ngOnInit(): void {
+    this.applyThemeColorSchemes();
     this.loadOverview();
+  }
+
+  private applyThemeColorSchemes(): void {
+    this.colorScheme = {
+      ...this.colorScheme,
+      domain: [
+        this.getThemeColor('--chart-1'),
+        this.getThemeColor('--chart-2'),
+        this.getThemeColor('--chart-3'),
+        this.getThemeColor('--chart-4'),
+        this.getThemeColor('--chart-5'),
+        this.getThemeColor('--chart-6'),
+        this.getThemeColor('--chart-7'),
+        this.getThemeColor('--chart-8')
+      ]
+    };
+
+    this.heatmapColorScheme = {
+      ...this.heatmapColorScheme,
+      domain: [
+        this.getThemeColor('--heatmap-low'),
+        this.getThemeColor('--heatmap-low-mid'),
+        this.getThemeColor('--heatmap-mid'),
+        this.getThemeColor('--heatmap-high'),
+        this.getThemeColor('--heatmap-very-high')
+      ]
+    };
+  }
+
+  private getThemeColor(variableName: string): string {
+    return getComputedStyle(document.documentElement)
+      .getPropertyValue(variableName)
+      .trim();
   }
 
   loadOverview(): void {

@@ -59,7 +59,7 @@
       </mat-card-header>
       <mat-card-content>
         <p>Importa un archivo de backup JSON para restaurar datos.</p>
-        <input type="file" #fileInput accept=".json" style="display: none" (change)="importBackup($event)">
+        <input type="file" #fileInput accept=".json" class="hidden-file-input" (change)="importBackup($event)">
         <button mat-raised-button color="primary" (click)="fileInput.click()" [disabled]="isImporting">
           <mat-spinner *ngIf="isImporting" diameter="20"></mat-spinner>
           <mat-icon *ngIf="!isImporting">cloud_upload</mat-icon>

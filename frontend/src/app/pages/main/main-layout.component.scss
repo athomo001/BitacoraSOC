@@ -53,13 +53,13 @@
       font-weight: 600;
 
       &.badge-ok {
-        background-color: #4caf50;
-        color: white;
+        background-color: var(--state-success-bg);
+        color: var(--state-success);
       }
 
       &.badge-warning {
-        background-color: #ff9800;
-        color: white;
+        background-color: var(--state-warning-bg);
+        color: var(--state-warning);
       }
 
       &.badge-none {
@@ -225,27 +225,27 @@
   gap: 8px;
   padding: 12px;
   margin-bottom: 16px;
-  background-color: #ffebee;
-  border-left: 4px solid #f44336;
-  color: #c62828;
+  background-color: var(--state-error-bg);
+  border-left: 4px solid var(--state-error);
+  color: var(--state-error);
   border-radius: 4px;
 
   mat-icon {
-    color: #f44336;
+    color: var(--state-error);
   }
 }
 
 .service-check-item {
   margin: 16px 0;
   padding: 16px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.02);
+  background: var(--surface-muted);
 
   h4 {
     margin: 0 0 12px 0;
     font-size: 1em;
-    color: rgba(0, 0, 0, 0.87);
+    color: var(--text-primary);
   }
 
   mat-radio-group {
@@ -267,11 +267,11 @@
     height: 20px;
 
     &.verde {
-      color: #4caf50;
+      color: var(--state-success);
     }
 
     &.rojo {
-      color: #f44336;
+      color: var(--state-error);
     }
   }
 }
@@ -281,7 +281,7 @@
   align-items: center;
   gap: 8px;
   padding: 16px;
-  background: rgba(255, 193, 7, 0.1);
-  border-left: 4px solid #ffc107;
-  color: rgba(0, 0, 0, 0.7);
+  background: var(--state-warning-bg);
+  border-left: 4px solid var(--state-warning);
+  color: var(--state-warning);
 }

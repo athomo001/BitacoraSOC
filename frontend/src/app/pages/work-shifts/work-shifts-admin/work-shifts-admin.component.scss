@@ -10,8 +10,8 @@
   gap: 16px;
   padding: 20px;
   margin-bottom: 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
+  color: var(--on-primary-color);
 
   mat-icon {
     font-size: 48px;
@@ -63,10 +63,14 @@
   margin-bottom: 16px;
 }
 
+.uppercase-input {
+  text-transform: uppercase;
+}
+
 .notifications-section {
   margin: 16px 0;
   padding: 16px;
-  background-color: #f5f5f5;
+  background-color: var(--surface-muted);
   border-radius: 4px;
 
   h3 {
@@ -83,20 +87,20 @@
 .report-section {
   margin: 24px 0;
   padding: 20px;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: var(--surface-muted);
   border-radius: 8px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border-color);
 
   h3 {
     margin: 0 0 8px 0;
     font-size: 18px;
     font-weight: 600;
-    color: #333;
+    color: var(--text-primary);
   }
 
   .section-description {
     margin: 0 0 16px 0;
-    color: #666;
+    color: var(--text-secondary);
     font-size: 14px;
   }
 
@@ -108,7 +112,7 @@
 
   .report-options {
     padding: 16px;
-    background-color: white;
+    background-color: var(--surface-raised);
     border-radius: 6px;
     margin-top: 16px;
   }
@@ -120,7 +124,7 @@
       margin: 0 0 12px 0;
       font-size: 14px;
       font-weight: 600;
-      color: #555;
+      color: var(--text-primary);
     }
 
     mat-checkbox {
@@ -136,7 +140,7 @@
       display: block;
       font-size: 14px;
       font-weight: 500;
-      color: #666;
+      color: var(--text-secondary);
       margin-bottom: 8px;
     }
 
@@ -147,16 +151,16 @@
       margin-bottom: 12px;
       min-height: 40px;
       padding: 8px;
-      background-color: #f9f9f9;
+      background-color: var(--surface-raised);
       border-radius: 4px;
-      border: 1px solid #ddd;
+      border: 1px solid var(--border-color);
 
       mat-chip {
-        background-color: #667eea !important;
-        color: white !important;
+        background-color: var(--primary-color) !important;
+        color: var(--on-primary-color) !important;
         
         button[matChipRemove] {
-          color: white;
+          color: var(--on-primary-color);
           opacity: 0.8;
 
           &:hover {
@@ -188,7 +192,7 @@
       gap: 8px;
       margin-top: 12px;
       font-size: 13px;
-      color: #666;
+      color: var(--text-secondary);
 
       mat-icon {
         font-size: 18px;
@@ -218,12 +222,12 @@
       margin: 0 0 8px 0;
       font-size: 18px;
       font-weight: 600;
-      color: #333;
+      color: var(--text-primary);
     }
 
     .section-description {
       margin: 0;
-      color: #666;
+      color: var(--text-secondary);
       font-size: 14px;
     }
   }
@@ -234,9 +238,9 @@
 
   .global-config-form {
     padding: 24px;
-    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    background: var(--surface-muted);
     border-radius: 8px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border-color);
     margin-top: 16px;
 
     .section-toggle {
@@ -247,7 +251,7 @@
 
     .report-options {
       padding: 16px;
-      background-color: white;
+      background-color: var(--surface-raised);
       border-radius: 6px;
       margin-top: 16px;
     }
@@ -259,7 +263,7 @@
         margin: 0 0 12px 0;
         font-size: 14px;
         font-weight: 600;
-        color: #555;
+        color: var(--text-primary);
       }
 
       mat-checkbox {
@@ -275,7 +279,7 @@
         display: block;
         font-size: 14px;
         font-weight: 500;
-        color: #666;
+        color: var(--text-secondary);
         margin-bottom: 8px;
       }
 
@@ -286,16 +290,16 @@
         margin-bottom: 12px;
         min-height: 40px;
         padding: 8px;
-        background-color: #f9f9f9;
+        background-color: var(--surface-raised);
         border-radius: 4px;
-        border: 1px solid #ddd;
+        border: 1px solid var(--border-color);
 
         mat-chip {
-          background-color: #667eea !important;
-          color: white !important;
+          background-color: var(--primary-color) !important;
+          color: var(--on-primary-color) !important;
           
           button[matChipRemove] {
-            color: white;
+            color: var(--on-primary-color);
             opacity: 0.8;
 
             &:hover {
@@ -327,7 +331,7 @@
         gap: 8px;
         margin-top: 12px;
         font-size: 13px;
-        color: #666;
+        color: var(--text-secondary);
 
         mat-icon {
           font-size: 18px;
@@ -362,7 +366,7 @@
 .empty-state {
   text-align: center;
   padding: 60px 20px;
-  color: #666;
+  color: var(--text-secondary);
 
   mat-icon {
     font-size: 64px;
@@ -383,7 +387,7 @@
 
   th {
     font-weight: 600;
-    background-color: #f5f5f5;
+    background-color: var(--surface-muted);
   }
 
   td {
@@ -401,7 +405,7 @@
   }
 
   code {
-    background-color: #f5f5f5;
+    background-color: var(--surface-muted);
     padding: 4px 8px;
     border-radius: 4px;
     font-family: 'Courier New', monospace;
@@ -421,7 +425,7 @@
   }
 
   .user-unassigned {
-    color: #999;
+    color: var(--text-secondary);
     font-style: italic;
   }
 }
@@ -429,23 +433,23 @@
 // Badges
 mat-chip {
   &.badge-regular {
-    background-color: #4caf50 !important;
-    color: white !important;
+    background-color: var(--state-success-bg) !important;
+    color: var(--state-success) !important;
   }
 
   &.badge-emergency {
-    background-color: #f44336 !important;
-    color: white !important;
+    background-color: var(--state-error-bg) !important;
+    color: var(--state-error) !important;
   }
 
   &.badge-active {
-    background-color: #4caf50 !important;
-    color: white !important;
+    background-color: var(--state-success-bg) !important;
+    color: var(--state-success) !important;
   }
 
   &.badge-inactive {
-    background-color: #9e9e9e !important;
-    color: white !important;
+    background-color: var(--state-neutral-bg) !important;
+    color: var(--state-neutral) !important;
   }
 }
 

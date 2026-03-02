@@ -82,7 +82,7 @@ const userSchema = new mongoose.Schema({
   // Preferencias
   theme: {
     type: String,
-    enum: ['light', 'dark', 'sepia', 'pastel'],
+    enum: ['light', 'dark', 'sepia', 'pastel', 'cyberpunk'],
     default: 'light'
   },
   avatar: {

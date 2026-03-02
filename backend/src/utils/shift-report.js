@@ -213,9 +213,9 @@ function generateReportHTML({ shift, checklistEntry, checklistExit, entries, per
       entries.forEach(entry => {
         const time = entry.entryTime
           ? entry.entryTime
-          : new Date(entry.createdAt).toLocaleTimeString('es-CL', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
+          : new Date(entry.createdAt).toLocaleTimeString('es-CL', {
+            hour: '2-digit',
+            minute: '2-digit'
           });
         const date = entry.entryDate ? formatDate(entry.entryDate) : formatDate(entry.createdAt);
         const typeLabel = entry.entryType ? entry.entryType.toUpperCase() : 'ENTRADA';
@@ -321,7 +321,7 @@ function generateReportText({ shift, checklistEntry, checklistExit, entries, per
 async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
   try {
     logger.info('📊 [sendShiftReport] STARTING shift report process...', { shiftId, shiftDate });
-    
+
     // 1. Obtener turno
     const shift = await WorkShift.findById(shiftId);
     if (!shift) {
@@ -352,10 +352,10 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
     // 2. Calcular rango horario del turno
     const [startHour, startMinute] = shift.startTime.split(':').map(Number);
     const [endHour, endMinute] = shift.endTime.split(':').map(Number);
-    
+
     const shiftStart = new Date(shiftDate);
     shiftStart.setHours(startHour, startMinute, 0, 0);
-    
+
     let shiftEnd = new Date(shiftDate);
     shiftEnd.setHours(endHour, endMinute, 0, 0);
 
@@ -396,28 +396,31 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
         logger.warn('📊 [sendShiftReport] Aborted: No closure checklist found for shift', { shiftId: shift._id });
         return { success: false, message: 'No closure checklist found' };
       }
-      
+
       if (!checklistExit && entries.length === 0) {
         logger.warn('📊 [sendShiftReport] Aborted: Report is completely empty', { shiftId: shift._id });
         return { success: false, message: 'Empty report aborted' };
       }
-      
-      // B14: Anti duplicados comprobando lastReportSentAt
+
+      // B14: Anti duplicados comprobando lastReportSentAt dentro del periodo de turno
       if (shift.lastReportSentAt) {
         const lastSentDate = new Date(shift.lastReportSentAt);
-        const today = new Date();
-        if (lastSentDate.toDateString() === today.toDateString()) {
-          logger.warn('📊 [sendShiftReport] Aborted: Report already sent today', { shiftId: shift._id });
-          return { success: false, message: 'Report already sent today' };
+        // Si el último reporte se envió DENTRO del segmento de este turno o DESPUÉS de su inicio
+        // significa que ya fue despachado para la "sesión" de este turno.
+        // Damos un margen de 15 minutos antes de `shiftStart` para evitar problemas de cron clock.
+        const effectiveShiftStart = new Date(shiftStart.getTime() - 15 * 60000);
+        if (lastSentDate >= effectiveShiftStart) {
+          logger.warn('📊 [sendShiftReport] Aborted: Report already sent for this shift period', { shiftId: shift._id, lastSentDate, shiftStart });
+          return { success: false, message: 'Report already sent for this shift period' };
         }
       }
     }
 
     // 5. Generar asunto del correo
-    const date = (periodEnd || shiftDate).toLocaleDateString('es-CL', { 
-      year: 'numeric', 
-      month: '2-digit', 
-      day: '2-digit' 
+    const date = (periodEnd || shiftDate).toLocaleDateString('es-CL', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
     });
     const time = shift.endTime;
     const subject = replaceSubjectVariables(shift.emailReportConfig.subjectTemplate, {
@@ -445,12 +448,12 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
     });
 
     // 7. Enviar correo
-    logger.info('📊 [sendShiftReport] About to send email...', { 
+    logger.info('📊 [sendShiftReport] About to send email...', {
       recipients: shift.emailReportConfig.recipients,
       subject,
       htmlSize: html.length
     });
-    
+
     await sendEmail({
       to: shift.emailReportConfig.recipients,
       subject,
@@ -480,7 +483,7 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
     };
 
   } catch (error) {
-    logger.error('❌ [sendShiftReport] ERROR!', { 
+    logger.error('❌ [sendShiftReport] ERROR!', {
       error: error.message,
       stack: error.stack,
       shiftId

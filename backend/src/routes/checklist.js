@@ -10,7 +10,7 @@ const ShiftClosure = require('../models/ShiftClosure');
 const Entry = require('../models/Entry');
 const AppConfig = require('../models/AppConfig');
 const WorkShift = require('../models/WorkShift');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticate, authorize, notGuest } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const captureMetadata = require('../middleware/metadata');
 const { audit } = require('../utils/audit');
@@ -480,6 +480,7 @@ router.delete('/services/:id', authenticate, authorize('admin'), async (req, res
 
 router.post('/check',
   authenticate,
+  notGuest,
   captureMetadata,
   [
     body('type').isIn(['inicio', 'cierre']).withMessage('Tipo invalido'),
@@ -742,6 +743,7 @@ router.delete('/check/:id', authenticate, authorize('admin'), async (req, res) =
 // POST /api/checklist/closure - Registrar cierre de turno (B2m)
 router.post('/closure',
   authenticate,
+  notGuest,
   [
     body('checkId').isMongoId().withMessage('checkId requerido'),
     body('observaciones').optional().trim(),

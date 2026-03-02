@@ -32,7 +32,7 @@
   }
 
   .incident {
-    color: #f44336;
+    color: var(--state-error);
     font-weight: 500;
   }
 }
