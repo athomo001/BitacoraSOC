@@ -211,11 +211,16 @@ router.put('/config', authenticate, authorize('admin'), async (req, res) => {
       startBackupScheduler();
     }
 
-    await audit({
-      action: 'backup.config.update',
-      user: req.user.id,
-      details: `Configuración de backups actualizada. Enabled: ${config.backupConfig.enabled}`,
-      ipAddress: req.ip || req.connection.remoteAddress
+    await audit(req, {
+      event: 'admin.backup.config.update',
+      level: 'info',
+      result: { success: true },
+      metadata: {
+        enabled: config.backupConfig.enabled,
+        intervalDays: config.backupConfig.intervalDays,
+        destinationType: config.backupConfig.destinationType,
+        localRetentionDays: config.backupConfig.localRetentionDays
+      }
     });
 
     res.json({ message: 'Configuración actualizada', backupConfig: config.backupConfig });
@@ -235,11 +240,13 @@ router.post('/test-auto', authenticate, authorize('admin'), async (req, res) => 
     // Forzamos la ejecución para debugging o pruebas
     runBackup().catch(e => logger.error(`Manual runBackup error: ${e.message}`));
 
-    await audit({
-      action: 'backup.auto.trigger_manual',
-      user: req.user.id,
-      details: 'Ejecución manual del proceso de backup scheduler',
-      ipAddress: req.ip || req.connection.remoteAddress
+    await audit(req, {
+      event: 'admin.backup.auto.trigger_manual',
+      level: 'info',
+      result: { success: true },
+      metadata: {
+        triggeredFrom: 'api/backup/test-auto'
+      }
     });
 
     res.json({ message: 'Proceso de backup automático iniciado en background pormodo manual' });
