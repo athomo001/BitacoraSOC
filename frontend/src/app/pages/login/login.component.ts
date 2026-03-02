@@ -122,7 +122,10 @@ export class LoginComponent implements OnInit {
       error: (error) => {
         this.triggerEasterEgg(error?.error?.easterEgg);
         this.loading = false;
-        const errorMsg = error.error?.message || 'ACCESS DENIED';
+        const backendMessage = typeof error?.error === 'string'
+          ? error.error
+          : error?.error?.message;
+        const errorMsg = backendMessage || 'ACCESS DENIED';
         this.showErrorBanner(errorMsg);
       }
     });

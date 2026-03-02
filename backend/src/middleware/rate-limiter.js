@@ -25,7 +25,9 @@ const isProduction = process.env.NODE_ENV === 'production';
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
   max: 5, // 5 intentos permitidos para evitar fuerza bruta (SEC-CRIT-005)
-  message: 'Demasiados intentos de inicio de sesión. Intenta de nuevo en 15 minutos.',
+  message: {
+    message: 'Demasiados intentos de inicio de sesión. Intenta de nuevo en 15 minutos.'
+  },
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: false
