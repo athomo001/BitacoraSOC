@@ -4,6 +4,46 @@ Registro de cambios relevantes del proyecto.
 
 ## 2026-03-03
 
+### Registro (16:42 - UTC 0  )
+- Se consolidaron los cambios funcionales B29/B30/B31/B32/B33 en backend, frontend y documentación operativa.
+
+### Operación / Turnos (B29-B30)
+- Se agregó módulo de asignación operativa en Admin de Turnos para vincular analista ↔ turno bajo la tabla principal.
+- Se implementó estado operativo en vivo (`EN TURNO` / `FUERA DE TURNO`) con evaluación de horario y soporte de cruce de medianoche.
+- Se incorporó resumen por períodos en Escalación Interna: mes actual, mes anterior en acordeón e histórico bajo demanda con filtros (`fromDate`, `toDate`, `limit`) en backend/frontend.
+
+### Escalación / Datos (B31)
+- Se consolidó Escalación sobre `CatalogLogSource` como fuente única de clientes habilitados.
+- Se agregó limpieza en cascada al eliminar Log Sources (servicios, contactos, reglas de escalación y entradas RACI asociadas).
+- Se incluyó script de migración `migrate-escalation-clients-to-log-sources` y script npm en backend para ejecutar la migración.
+
+### Usuarios / Segmentación (B32)
+- Se extendió modelo y CRUD de usuarios con campo `cargoLabel`, validaciones, índice y soporte de cargos base + cargo personalizado.
+- Se agregó rol `auditor` en validaciones y formularios administrativos.
+- Se incorporó columna de cargo en listado de usuarios y exposición de cargo en `/api/users/list` para consumo en módulos operativos.
+
+### Recordatorio Escalación Interna (B33)
+- Se reemplazó el enfoque semanal complejo por recordatorio simple diario por cargos configurados.
+- Se movió la configuración B33 desde Checklist Admin hacia Escalación Interna (activar recordatorio + selección múltiple de cargos).
+- Se implementó envío automático por scheduler a usuarios activos con email y `cargoLabel` coincidente.
+- Se agregó endpoint de prueba `POST /api/escalation/admin/reminder/test` y botón UI **Probar recordatorio** con feedback de destinatarios.
+- Se aseguró visibilidad de catálogo base de cargos (N1/N2/N3, QA, Pentester, Arquitecto SIEM, CSM, Jefatura/Gerencia) aunque no existan usuarios aún en todos los cargos.
+
+### Checklist / Configuración
+- Se mantuvo Checklist Admin enfocado en parámetros de checklist (cooldown + alerta/hora) y se retiró de ahí la configuración operativa de B33.
+- Se agregaron/normalizaron campos de `AppConfig` para alertas y recordatorios (`escalationReminderEnabled`, `escalationReminderCargoLabels`, `lastEscalationReminderDate`).
+
+### Runtime Frontend / Estabilidad Dev
+- Se simplificó `main.ts` para bootstrap standalone limpio y evitar cargas duplicadas de módulos en desarrollo.
+- Se ajustó entorno de desarrollo a `apiUrl: '/api'` y se agregó `proxy.conf.json` para `/api` y `/uploads`.
+- Se deshabilitó HMR y prebundle en `serve` para mitigar colisiones `NG0912` de IDs de componentes en runtime dev.
+- Se agregó script `frontend/scripts/restart-clean.js` para reinicio limpio del puerto `4200` y se reforzó `restart-clean` en backend (validación estricta de puertos).
+
+### Documentación / Control
+- Se actualizó `ISSUES.md` marcando B30/B31/B32/B33 como listos y registrando pendientes/alcances de asignación operativa.
+- Se actualizaron capturas y referencias visuales en `docs/SCREENSHOTS.md`.
+- Se validó compilación de frontend posterior a los cambios de configuración y runtime.
+
 ### Registro (realizado por usuario)
 - Se consolidó este bloque como cambios ejecutados por el usuario con fecha **03/03**.
 

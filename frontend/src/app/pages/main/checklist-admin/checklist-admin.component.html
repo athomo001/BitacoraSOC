@@ -6,13 +6,30 @@
     <mat-card-title>Configuración de Checklist</mat-card-title>
     <mat-card-content>
       <form [formGroup]="configForm" (ngSubmit)="saveConfig()" class="config-form">
-        <mat-form-field appearance="outline">
-          <mat-label>Cooldown Checklist (minutos)</mat-label>
-          <input matInput type="number" formControlName="checklistCooldownHours">
-        </mat-form-field>
-        <mat-checkbox formControlName="checklistCloseEmailEnabled">
-          Enviar correo al registrar checklist de cierre
-        </mat-checkbox>
+        <div class="config-columns">
+          <div class="config-column">
+            <mat-form-field appearance="outline">
+              <mat-label>Cooldown Checklist (minutos)</mat-label>
+              <input matInput type="number" formControlName="checklistCooldownHours">
+            </mat-form-field>
+            <mat-checkbox formControlName="checklistCloseEmailEnabled">
+              Enviar correo al registrar checklist de cierre
+            </mat-checkbox>
+          </div>
+
+          <div class="config-column">
+            <mat-checkbox formControlName="checklistAlertEnabled">
+              Avisar checklist no realizado
+            </mat-checkbox>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Hora límite</mat-label>
+              <input matInput type="time" formControlName="checklistAlertTime">
+              <mat-hint>Solo admins pueden cambiar este horario</mat-hint>
+            </mat-form-field>
+          </div>
+        </div>
+
         <button mat-raised-button color="primary" type="submit" [disabled]="configForm.invalid || savingConfig">
           Guardar
         </button>
@@ -31,7 +48,7 @@
           <span class="spacer"></span>
           <mat-chip-set>
             <mat-chip color="primary" *ngIf="template.isActive" selected>Activa</mat-chip>
-            <mat-chip *ngIf="template.items?.length" disableRipple>{{ template.items.length }} items</mat-chip>
+            <mat-chip *ngIf="template.items.length" disableRipple>{{ template.items.length }} items</mat-chip>
           </mat-chip-set>
         </a>
       </mat-nav-list>

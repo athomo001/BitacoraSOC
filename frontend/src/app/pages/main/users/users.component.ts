@@ -34,7 +34,7 @@ import { User, CreateUserRequest } from '../../../models/user.model';
 import { MatCard, MatCardHeader, MatCardTitle, MatCardContent } from '@angular/material/card';
 import { MatFormField, MatLabel, MatHint } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
-import { NgIf } from '@angular/common';
+import { NgFor, NgIf } from '@angular/common';
 import { MatSelect } from '@angular/material/select';
 import { MatOption } from '@angular/material/core';
 import { MatButton, MatIconButton } from '@angular/material/button';
@@ -46,12 +46,27 @@ import { MatIcon } from '@angular/material/icon';
     selector: 'app-users',
     templateUrl: './users.component.html',
     styleUrls: ['./users.component.scss'],
-    imports: [MatCard, MatCardHeader, MatCardTitle, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatInput, NgIf, MatHint, MatSelect, MatOption, MatButton, MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatIconButton, MatTooltip, MatIcon, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow]
+    imports: [MatCard, MatCardHeader, MatCardTitle, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatInput, NgIf, NgFor, MatHint, MatSelect, MatOption, MatButton, MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatIconButton, MatTooltip, MatIcon, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow]
 })
 export class UsersComponent implements OnInit {
+  readonly baseCargos: string[] = [
+    'N1',
+    'N2',
+    'N3',
+    'QA Nivel 1',
+    'QA Nivel 2',
+    'Pentester N1',
+    'Pentester N2',
+    'Arquitecto SIEM',
+    'Customer Success Manager (CSM)',
+    'Jefe Área',
+    'Gerente Área'
+  ];
+
+  readonly customCargoOption = '__custom__';
   users: User[] = [];
   userForm: FormGroup;
-  displayedColumns: string[] = ['username', 'fullName', 'email', 'phone', 'role', 'isActive', 'actions'];
+  displayedColumns: string[] = ['username', 'fullName', 'email', 'phone', 'cargoLabel', 'role', 'isActive', 'actions'];
   editingUserId: string | null = null;
 
   constructor(
@@ -65,12 +80,72 @@ export class UsersComponent implements OnInit {
       fullName: ['', Validators.required],
       email: ['', [Validators.required, Validators.email]],
       phone: [''],
-      role: ['user', Validators.required]
+      role: ['user', Validators.required],
+      cargoOption: [this.baseCargos[0], Validators.required],
+      cargoCustom: ['']
     });
   }
 
   ngOnInit(): void {
     this.loadUsers();
+    this.configureCargoValidators();
+  }
+
+  private configureCargoValidators(): void {
+    this.userForm.get('role')?.valueChanges.subscribe(() => this.applyCargoValidators());
+    this.userForm.get('cargoOption')?.valueChanges.subscribe(() => this.applyCargoValidators());
+    this.applyCargoValidators();
+  }
+
+  private applyCargoValidators(): void {
+    const role = this.userForm.get('role')?.value;
+    const cargoOptionControl = this.userForm.get('cargoOption');
+    const cargoCustomControl = this.userForm.get('cargoCustom');
+    const isGuest = role === 'guest';
+    const isCustom = cargoOptionControl?.value === this.customCargoOption;
+
+    if (isGuest) {
+      cargoOptionControl?.clearValidators();
+      cargoCustomControl?.clearValidators();
+      cargoOptionControl?.setValue('', { emitEvent: false });
+      cargoCustomControl?.setValue('', { emitEvent: false });
+    } else {
+      cargoOptionControl?.setValidators([Validators.required]);
+
+      if (!cargoOptionControl?.value) {
+        cargoOptionControl?.setValue(this.baseCargos[0], { emitEvent: false });
+      }
+
+      if (isCustom) {
+        cargoCustomControl?.setValidators([Validators.required, Validators.maxLength(120)]);
+      } else {
+        cargoCustomControl?.clearValidators();
+        cargoCustomControl?.setValue('', { emitEvent: false });
+      }
+    }
+
+    cargoOptionControl?.updateValueAndValidity({ emitEvent: false });
+    cargoCustomControl?.updateValueAndValidity({ emitEvent: false });
+  }
+
+  isCustomCargoSelected(): boolean {
+    return this.userForm.get('cargoOption')?.value === this.customCargoOption;
+  }
+
+  isGuestRoleSelected(): boolean {
+    return this.userForm.get('role')?.value === 'guest';
+  }
+
+  private resolveCargoLabelFromForm(): string | null {
+    if (this.isGuestRoleSelected()) {
+      return null;
+    }
+    const cargoOption = (this.userForm.get('cargoOption')?.value || '').trim();
+    if (cargoOption === this.customCargoOption) {
+      const customValue = (this.userForm.get('cargoCustom')?.value || '').trim();
+      return customValue || null;
+    }
+    return cargoOption || null;
   }
 
   loadUsers(): void {
@@ -88,7 +163,8 @@ export class UsersComponent implements OnInit {
           fullName: this.userForm.value.fullName,
           email: this.userForm.value.email,
           phone: this.userForm.value.phone || undefined,
-          role: this.userForm.value.role
+          role: this.userForm.value.role,
+          cargoLabel: this.resolveCargoLabelFromForm()
         };
         this.userService.updateUser(this.editingUserId, data).subscribe({
           next: () => {
@@ -103,14 +179,23 @@ export class UsersComponent implements OnInit {
         });
       } else {
         // Modo creación
-        const data: CreateUserRequest = this.userForm.value;
+        const data: CreateUserRequest = {
+          username: this.userForm.value.username,
+          password: this.userForm.value.password,
+          fullName: this.userForm.value.fullName,
+          email: this.userForm.value.email,
+          phone: this.userForm.value.phone,
+          role: this.userForm.value.role,
+          cargoLabel: this.resolveCargoLabelFromForm()
+        };
         if (data.phone === '') {
           delete data.phone;
         }
         this.userService.createUser(data).subscribe({
           next: () => {
             this.snackBar.open('Usuario creado', 'Cerrar', { duration: 2000 });
-            this.userForm.reset({ role: 'user' });
+            this.userForm.reset({ role: 'user', cargoOption: this.baseCargos[0], cargoCustom: '' });
+            this.applyCargoValidators();
             this.loadUsers();
           },
           error: (err) => {
@@ -129,8 +214,22 @@ export class UsersComponent implements OnInit {
       fullName: user.fullName,
       email: user.email,
       phone: user.phone || '',
-      role: user.role
+      role: user.role,
+      cargoOption: '',
+      cargoCustom: ''
     });
+
+    if (user.role !== 'guest') {
+      const existingCargo = (user.cargoLabel || '').trim();
+      if (existingCargo && this.baseCargos.includes(existingCargo)) {
+        this.userForm.patchValue({ cargoOption: existingCargo, cargoCustom: '' }, { emitEvent: false });
+      } else if (existingCargo) {
+        this.userForm.patchValue({ cargoOption: this.customCargoOption, cargoCustom: existingCargo }, { emitEvent: false });
+      }
+    }
+
+    this.applyCargoValidators();
+
     // Deshabilitar username y password en modo edición
     this.userForm.get('username')?.disable();
     this.userForm.get('password')?.clearValidators();
@@ -139,10 +238,11 @@ export class UsersComponent implements OnInit {
 
   cancelEdit(): void {
     this.editingUserId = null;
-    this.userForm.reset({ role: 'user' });
+    this.userForm.reset({ role: 'user', cargoOption: this.baseCargos[0], cargoCustom: '' });
     this.userForm.get('username')?.enable();
     this.userForm.get('password')?.setValidators([Validators.required, Validators.minLength(6)]);
     this.userForm.get('password')?.updateValueAndValidity();
+    this.applyCargoValidators();
   }
 
   toggleActive(user: User): void {

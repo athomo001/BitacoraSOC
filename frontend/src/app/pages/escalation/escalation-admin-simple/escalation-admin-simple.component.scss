@@ -177,6 +177,42 @@
   }
 }
 
+.month-accordion {
+  margin-top: 12px;
+}
+
+.historical-section {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.compact-table {
+  table {
+    th,
+    td {
+      padding-top: 8px !important;
+      padding-bottom: 8px !important;
+    }
+  }
+}
+
+.loading-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+}
+
+.compact-no-data {
+  padding: 12px;
+
+  p {
+    font-size: 14px;
+  }
+}
+
 .chips-list {
   display: flex;
   flex-wrap: wrap;

@@ -28,6 +28,17 @@
 | SEC-HTTPS-017 | Pendiente | Frontend/UX MEDIA | Inputs de archivo sin `accept` ni validación temprana | Reducir errores tardíos con filtros de selección y validación cliente básica. |
 | SEC-HTTPS-018 | Pendiente | Frontend/Seguridad MEDIA | Acción destructiva de reset demasiado expuesta | Mover a sección avanzada y usar confirmación fuerte (frase). |
 | SEC-HTTPS-019 | Pendiente | Backend/Robustez ALTA | Sin pre-check de puerto antes de persistir configuración HTTPS | Validar disponibilidad/alcance del puerto antes de confirmar guardado. |
+| B29 | Pendiente | Turnos/Operación | Módulo de Asignación Operativa (usuario ↔ turno) debajo de tabla de turnos | Implementar sección de vinculación operativa con herencia de horario y estado en vivo. |
+| OPS-ASSIGN-001 | Pendiente | Frontend/Integración ALTA | Selector de usuarios no funcional en Admin Turnos | `loadUsers()` está en TODO y deja `users=[]`; integrar `/api/users/list`. |
+| OPS-ASSIGN-002 | Pendiente | Backend/API ALTA | No existe API dedicada para asignaciones operativas de turnos | Crear CRUD `work-shifts/assignments` con `userId + workShiftId + weekdays`. |
+| OPS-ASSIGN-003 | Pendiente | Modelo de Datos ALTA | Modelo actual no soporta recurrencia por días ni múltiples asignaciones por turno | `WorkShift` solo tiene `assignedUserId`; crear entidad `WorkShiftAssignment`. |
+| OPS-ASSIGN-004 | Pendiente | Lógica Operativa ALTA | Falta cálculo de estado `EN TURNO / FUERA DE TURNO` por asignación y cruce de medianoche | Implementar evaluación por minuto considerando overnight y día efectivo. |
+| OPS-ASSIGN-005 | Pendiente | Frontend/Arquitectura MEDIA | Actualización en vivo no implementada con patrón observable | Usar `interval(60000)` + `takeUntil` para refresco limpio y sin fugas. |
+| OPS-ASSIGN-006 | Pendiente | Frontend/Calidad MEDIA | Falta pipe/utilidad central para parseo/comparación de horarios | Crear utility/pipe `HH:mm` para evitar lógica duplicada. |
+| OPS-ASSIGN-007 | Pendiente | Backend/Validaciones ALTA | Sin reglas anti-solapamiento de asignaciones por analista | Rechazar asignaciones activas superpuestas para mismo usuario. |
+| OPS-ASSIGN-008 | Pendiente | Backend/Timezone ALTA | Cálculo de turno actual ignora timezone del turno | `/work-shifts/current` usa hora local del servidor y no evalúa `shift.timezone`. |
+| OPS-ASSIGN-009 | Pendiente | QA/Pruebas MEDIA | Faltan pruebas para turnos nocturnos y cambio de día | Cubrir 20:00-06:00, 23:59→00:01, días asignados y refresco automático. |
+| OPS-ASSIGN-010 | Pendiente | UI/UX + Datos MEDIA | Columna "Asignado a" no refleja múltiples usuarios por turno | Al usar el nuevo módulo de asignaciones, la grilla de turnos debe mostrar resumen real (cantidad/listado) por turno para evitar duplicidad y confusión. |
 
 ### ✅ Listas
 
@@ -56,6 +67,10 @@
 | B21 | Listo | Backup/Operación | Backups automáticos + retención | Implementado. |
 | B25 | Listo | UI/UX + Operación | Log Sources/Clientes activos vs inactivos | Implementado. |
 | B27 | Listo | UI/UX + Arquitectura | Consola Admin unificada | Implementado. |
+| B30 | Listo | UI/UX Escalación | `/main/admin/escalation` compacta por meses | Mes actual visible, mes anterior en acordeón e histórico on-demand con filtro backend (`fromDate/toDate/limit`). |
+| B31 | Listo | Arquitectura/Datos Escalación | Fuente única de clientes con `CatalogLogSource` | Escalación unificada a Log Sources habilitados + cascada de limpieza al borrar log source + script de migración. |
+| B32 | Listo | Usuarios/Notificaciones | Campo `cargo` en CRUD de usuarios (base + custom) | Backend/frontend end-to-end con validación, persistencia, edición y columna de cargo en listado. Cargos base: N1, N2, N3, QA Nivel 1/2, Pentester N1/N2, Arquitecto SIEM, CSM, Jefe Área, Gerente Área. |
+| B33 | Listo | Operación/Alertas | Recordatorio simple de escalación interna por cargo | Configuración desde Escalación Interna para seleccionar cargos (ej. N2/N3) y envío diario simple a usuarios activos con esos cargos. |
 | P1 | Listo | Angular 20 | Plan general actualización | Completo. |
 
 ---
@@ -229,6 +244,110 @@ const isPortFree = (port, host = '0.0.0.0') => new Promise((resolve) => {
 });
 ```
 
+### B29 - Módulo de Asignación Operativa (usuario ↔ turno)
+
+1. Agregar una sección nueva debajo de la tabla de turnos para vincular analista + turno.
+2. El horario debe heredarse desde `WorkShift` (no duplicarse manualmente).
+3. La tabla resultante debe mostrar `Analista`, `Turno`, `Horario`, `Días`, `Estado Operativo`.
+
+### OPS-ASSIGN-001 - Selector de usuarios no funcional
+
+1. `work-shifts-admin.component.ts` tiene `loadUsers()` en TODO y deja lista vacía.
+2. Conectar `UserService.getUsersList()` y manejar errores de carga.
+3. No permitir guardar asignación si no hay usuario seleccionado.
+
+### OPS-ASSIGN-002 - API de asignaciones operativas
+
+1. Backend de turnos no tiene endpoints `/work-shifts/assignments`.
+2. Crear CRUD admin para asignaciones:
+   - `GET /api/work-shifts/assignments`
+   - `POST /api/work-shifts/assignments`
+   - `PUT /api/work-shifts/assignments/:id`
+   - `DELETE /api/work-shifts/assignments/:id`
+3. Responder datos populados (`user`, `shift`) para render inmediato.
+
+### OPS-ASSIGN-003 - Modelo de datos insuficiente para recurrencia
+
+1. `WorkShift` solo soporta `assignedUserId` único y opcional.
+2. Agregar modelo `WorkShiftAssignment`:
+   - `userId`
+   - `workShiftId`
+   - `weekdays` (0-6)
+   - `active`
+   - `validFrom`/`validTo` (opcionales)
+3. Mantener herencia de horario desde el turno vinculado.
+
+### OPS-ASSIGN-004 - Estado operativo con cruce de medianoche
+
+1. Implementar cálculo `EN TURNO/FUERA DE TURNO` usando `HH:mm -> minutos`.
+2. Si el turno cruza medianoche (`end < start`), usar lógica `now >= start || now < end`.
+3. Ajustar día efectivo: si `now < end` en turno overnight, evaluar el día anterior para `weekdays`.
+
+Reparación propuesta:
+
+```ts
+const inRange = end > start
+  ? nowMin >= start && nowMin < end
+  : (nowMin >= start || nowMin < end);
+
+const effectiveWeekday = end < start && nowMin < end
+  ? (today + 6) % 7
+  : today;
+```
+
+### OPS-ASSIGN-005 - Refresco en vivo con Observable
+
+1. Reemplazar patrones `setInterval` por `interval(60000).pipe(startWith(0))`.
+2. Usar `takeUntil(this.destroy$)` para evitar fugas al destruir componente.
+3. Recalcular estado operativo local cada minuto sin recarga de página.
+
+### OPS-ASSIGN-006 - Pipe/utilidad de horario
+
+1. Crear `shift-time` pipe o utility compartida:
+   - `toMinutes('HH:mm')`
+   - `isOvernight(start,end)`
+   - `isActiveNow(start,end,now)`
+2. Reutilizarla en tabla, validaciones y estado operativo.
+
+### OPS-ASSIGN-007 - Validación anti-solapamiento
+
+1. Impedir que un mismo usuario quede asignado a dos turnos activos solapados en mismo día.
+2. Validar colisión en backend antes de `POST/PUT`.
+3. Devolver `409 Conflict` con detalle de asignación que choca.
+
+### OPS-ASSIGN-008 - Timezone operativa consistente
+
+1. `GET /work-shifts/current` usa hora local del servidor.
+2. Debe calcularse en la timezone del turno o en una timezone operativa global definida.
+3. Estandarizar con `Intl`/`luxon` para evitar drift entre servidor y operación SOC.
+
+### OPS-ASSIGN-009 - Pruebas mínimas obligatorias
+
+1. Caso diurno: 09:00-18:00.
+2. Caso nocturno: 20:00-06:00 a las 02:00.
+3. Cambio de día: 23:59 a 00:01.
+4. Rechazo de solapamiento.
+5. Refresco por minuto sin recarga.
+
+### OPS-ASSIGN-010 - Consolidado visual en columna "Asignado a"
+
+1. Hoy la columna `Asignado a` está modelada para un solo `assignedUserId` en `WorkShift`.
+2. Con asignaciones múltiples por turno, debe mostrar:
+   - `Sin asignar` cuando no hay personas vigentes.
+   - `N asignados` y tooltip/expand con nombres cuando hay más de uno.
+3. La tabla principal de turnos debe ser resumen; el detalle editable queda en la sección de asignaciones para no redundar UI.
+
+Reparación propuesta:
+
+```ts
+// Ejemplo de view-model para tabla de turnos
+shift.assignedSummary = assignedUsers.length === 0
+  ? 'Sin asignar'
+  : assignedUsers.length === 1
+    ? assignedUsers[0].fullName
+    : `${assignedUsers.length} asignados`;
+```
+
 ---
 
 ## Orden sugerido de ejecución
@@ -239,3 +358,12 @@ const isPortFree = (port, host = '0.0.0.0') => new Promise((resolve) => {
 4. `SEC-HTTPS-016` + `SEC-HTTPS-002` + `SEC-HTTPS-010` + `SEC-HTTPS-017` (flujo simple de habilitación por UI).
 5. `SEC-HTTPS-014` + `SEC-HTTPS-018` + `SEC-HTTPS-019` (operación segura y robusta).
 6. `SEC-HTTPS-003` + `SEC-HTTPS-005` + `SEC-HTTPS-006` + `SEC-HTTPS-011` + `SEC-HTTPS-004` + `SEC-HTTPS-007` (cierre arquitectura/red/hardening).
+
+## Orden sugerido de ejecución (Asignación Operativa)
+
+1. `OPS-ASSIGN-001` + `OPS-ASSIGN-002` + `OPS-ASSIGN-003` (habilitar base funcional: usuarios + API + modelo).
+2. `B29` + `OPS-ASSIGN-006` (construir UI de vinculación y tabla heredando horario).
+3. `OPS-ASSIGN-004` + `OPS-ASSIGN-008` (estado operativo correcto con overnight y timezone).
+4. `OPS-ASSIGN-010` + `OPS-ASSIGN-005` (consolidado UI correcto + refresco por minuto robusto).
+5. `OPS-ASSIGN-007` + `OPS-ASSIGN-009` (consistencia de negocio y pruebas operativas).
+

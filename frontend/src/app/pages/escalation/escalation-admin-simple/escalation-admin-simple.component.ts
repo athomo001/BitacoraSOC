@@ -13,9 +13,12 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule, DateAdapter, NativeDateAdapter, MAT_DATE_LOCALE } from '@angular/material/core';
 import { MatTabsModule } from '@angular/material/tabs';
+import { MatExpansionModule } from '@angular/material/expansion';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { EscalationService } from '../../../services/escalation.service';
 import { UserService } from '../../../services/user.service';
 import { CatalogService } from '../../../services/catalog.service';
+import { ConfigService } from '../../../services/config.service';
 import { CatalogLogSource } from '../../../models/catalog.model';
 
 @Injectable()
@@ -43,7 +46,9 @@ class MondayFirstNativeDateAdapter extends NativeDateAdapter {
         MatSnackBarModule,
         MatDatepickerModule,
         MatNativeDateModule,
-        MatTabsModule
+        MatTabsModule,
+        MatExpansionModule,
+        MatCheckboxModule
     ],
     providers: [
         { provide: MAT_DATE_LOCALE, useValue: 'es-CL' },
@@ -58,12 +63,36 @@ class MondayFirstNativeDateAdapter extends NativeDateAdapter {
 export class EscalationAdminSimpleComponent implements OnInit {
   // Turnos internos
   assignments: any[] = [];
+  currentMonthAssignments: any[] = [];
+  previousMonthAssignments: any[] = [];
+  historicalAssignments: any[] = [];
   loadingAssignments = false;
+  loadingHistoricalAssignments = false;
   savingAssignment = false;
+  historicalLoaded = false;
+  showHistorical = false;
   showAssignmentForm = false;
   assignmentForm!: FormGroup;
   users: any[] = [];
   roles = ['N2', 'TI', 'N1_NO_HABIL'];
+  escalationReminderForm!: FormGroup;
+  availableCargoLabels: string[] = [];
+  readonly defaultReminderCargoLabels: string[] = [
+    'N1',
+    'N2',
+    'N3',
+    'QA Nivel 1',
+    'QA Nivel 2',
+    'Pentester N1',
+    'Pentester N2',
+    'Arquitecto SIEM',
+    'Customer Success Manager (CSM)',
+    'Jefe Área',
+    'Gerente Área'
+  ];
+  loadingEscalationReminderConfig = false;
+  savingEscalationReminderConfig = false;
+  testingEscalationReminder = false;
 
   // Personas externas (no usuarios del sistema)
   externalPeople: any[] = [];
@@ -108,6 +137,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
     private escalationService: EscalationService,
     private userService: UserService,
     private catalogService: CatalogService,
+    private configService: ConfigService,
     private snackBar: MatSnackBar,
     private cdr: ChangeDetectorRef,
     private ngZone: NgZone
@@ -183,6 +213,17 @@ export class EscalationAdminSimpleComponent implements OnInit {
       position: [''],
       active: [true]
     });
+
+    this.escalationReminderForm = this.fb.group({
+      escalationReminderEnabled: [false],
+      escalationReminderCargoLabels: [['N2']]
+    });
+
+    this.escalationReminderForm.get('escalationReminderEnabled')?.valueChanges.subscribe(() => {
+      this.updateEscalationReminderValidators();
+    });
+
+    this.updateEscalationReminderValidators();
   }
 
   loadAllData(): void {
@@ -193,6 +234,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
     this.loadServices();
     this.loadContacts();
     this.loadRaciClients();
+    this.loadEscalationReminderConfig();
   }
 
   // ============ TURNOS INTERNOS ============
@@ -200,6 +242,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
     this.escalationService.getUsers().subscribe({
       next: (data) => {
         this.users = [...data];
+        this.refreshAvailableCargoLabels();
         console.log('✅ Users loaded from escalation service:', this.users.length, 'users');
         if (this.users.length > 0) {
           console.log('First user:', this.users[0]);
@@ -212,6 +255,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
         this.userService.getUsersList().subscribe({
           next: (data) => {
             this.users = [...data];
+            this.refreshAvailableCargoLabels();
             console.log('✅ Users loaded from user service:', this.users.length, 'users');
             if (this.users.length > 0) {
               console.log('First user:', this.users[0]);
@@ -222,6 +266,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
             console.error('❌ Error loading users from user service:', err2);
             this.showError('Error al cargar usuarios');
             this.users = [];
+            this.refreshAvailableCargoLabels();
             setTimeout(() => this.cdr.detectChanges(), 0);
           }
         });
@@ -231,11 +276,16 @@ export class EscalationAdminSimpleComponent implements OnInit {
 
   loadAssignments(): void {
     this.loadingAssignments = true;
-    this.escalationService.getAssignments().subscribe({
+    const currentDate = new Date();
+    const fromDate = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() - 1).toISOString();
+    const toDate = this.getEndOfMonth(currentDate.getFullYear(), currentDate.getMonth()).toISOString();
+
+    this.escalationService.getAssignments(undefined, fromDate, toDate).subscribe({
       next: (data) => {
         this.assignments = [...data].sort((a: any, b: any) => 
           new Date(b.weekStartDate).getTime() - new Date(a.weekStartDate).getTime()
         );
+        this.partitionAssignmentsByMonth(this.assignments);
         this.loadingAssignments = false;
         this.cdr.detectChanges();
       },
@@ -244,6 +294,73 @@ export class EscalationAdminSimpleComponent implements OnInit {
         this.loadingAssignments = false;
       }
     });
+  }
+
+  loadHistoricalAssignments(): void {
+    if (this.historicalLoaded || this.loadingHistoricalAssignments) {
+      return;
+    }
+
+    this.loadingHistoricalAssignments = true;
+    const currentDate = new Date();
+    const previousMonthEnd = this.getEndOfMonth(currentDate.getFullYear(), currentDate.getMonth() - 1).toISOString();
+
+    this.escalationService.getAssignments(undefined, undefined, previousMonthEnd, 200).subscribe({
+      next: (data) => {
+        const currentMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth());
+        const previousMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() - 1);
+
+        this.historicalAssignments = [...data]
+          .filter((assignment: any) => {
+            const weekStart = new Date(assignment.weekStartDate);
+            return weekStart < previousMonthStart && weekStart < currentMonthStart;
+          })
+          .sort((a: any, b: any) => new Date(b.weekStartDate).getTime() - new Date(a.weekStartDate).getTime());
+
+        this.historicalLoaded = true;
+        this.showHistorical = true;
+        this.loadingHistoricalAssignments = false;
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Error loading historical assignments:', err);
+        this.loadingHistoricalAssignments = false;
+        this.showError('Error al cargar histórico de asignaciones');
+      }
+    });
+  }
+
+  toggleHistorical(): void {
+    if (!this.historicalLoaded) {
+      this.loadHistoricalAssignments();
+      return;
+    }
+    this.showHistorical = !this.showHistorical;
+  }
+
+  private partitionAssignmentsByMonth(assignments: any[]): void {
+    const currentDate = new Date();
+    const currentMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth());
+    const nextMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() + 1);
+    const previousMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() - 1);
+
+    this.currentMonthAssignments = assignments.filter((assignment: any) => {
+      const weekStart = new Date(assignment.weekStartDate);
+      return weekStart >= currentMonthStart && weekStart < nextMonthStart;
+    });
+
+    this.previousMonthAssignments = assignments.filter((assignment: any) => {
+      const weekStart = new Date(assignment.weekStartDate);
+      return weekStart >= previousMonthStart && weekStart < currentMonthStart;
+    });
+  }
+
+  private getStartOfMonth(year: number, month: number): Date {
+    return new Date(year, month, 1, 0, 0, 0, 0);
+  }
+
+  private getEndOfMonth(year: number, month: number): Date {
+    return new Date(year, month + 1, 0, 23, 59, 59, 999);
   }
 
   addAssignment(): void {
@@ -320,9 +437,10 @@ export class EscalationAdminSimpleComponent implements OnInit {
   // ============ CLIENTES ============
   loadClients(): void {
     this.loadingClients = true;
-    this.escalationService.getAllClients().subscribe({
-      next: (data) => {
-        this.clients = [...data];
+    this.catalogService.getAllLogSources().subscribe({
+      next: (response) => {
+        const items = response?.items || response || [];
+        this.clients = [...items].filter((client: any) => client.enabled !== false);
         this.loadingClients = false;
         this.cdr.detectChanges();
       },
@@ -334,40 +452,15 @@ export class EscalationAdminSimpleComponent implements OnInit {
   }
 
   addClient(): void {
-    this.showClientForm = true;
-    this.editingClientId = null;
-    this.clientForm.reset({ name: '', active: true });
+    this.showError('Los clientes se administran desde Catálogos > Log Sources');
   }
 
   saveClient(): void {
-    if (this.clientForm.invalid) return;
-
-    const data = this.clientForm.value;
-    this.escalationService.createClient(data).subscribe({
-      next: () => {
-        this.ngZone.run(() => {
-          this.showSuccess('Cliente creado');
-          this.showClientForm = false;
-          this.loadClients();
-        });
-      },
-      error: (err) => {
-        console.error('Error:', err);
-        this.showError('Error al crear cliente');
-      }
-    });
+    this.showError('Los clientes se administran desde Catálogos > Log Sources');
   }
 
-  deleteClient(id: string): void {
-    if (confirm('¿Eliminar cliente?')) {
-      this.escalationService.deleteClient(id).subscribe({
-        next: () => {
-          this.showSuccess('Cliente eliminado');
-          this.loadClients();
-        },
-        error: (err) => this.showError('Error al eliminar')
-      });
-    }
+  deleteClient(): void {
+    this.showError('Los clientes se administran desde Catálogos > Log Sources');
   }
 
   // ============ SERVICIOS ============
@@ -705,6 +798,128 @@ export class EscalationAdminSimpleComponent implements OnInit {
         }
       });
     }
+  }
+
+  loadEscalationReminderConfig(): void {
+    this.loadingEscalationReminderConfig = true;
+    this.configService.getConfig().subscribe({
+      next: (config) => {
+        const selectedCargoLabels = Array.isArray(config.escalationReminderCargoLabels)
+          ? config.escalationReminderCargoLabels.filter((cargo) => String(cargo || '').trim().length > 0)
+          : [];
+
+        this.escalationReminderForm.patchValue({
+          escalationReminderEnabled: config.escalationReminderEnabled ?? false,
+          escalationReminderCargoLabels: selectedCargoLabels.length > 0 ? selectedCargoLabels : ['N2']
+        }, { emitEvent: false });
+
+        this.updateEscalationReminderValidators();
+        this.loadingEscalationReminderConfig = false;
+      },
+      error: (err) => {
+        console.error('Error loading escalation reminder config:', err);
+        this.loadingEscalationReminderConfig = false;
+      }
+    });
+  }
+
+  saveEscalationReminderConfig(): void {
+    this.updateEscalationReminderValidators();
+    if (this.escalationReminderForm.invalid || this.savingEscalationReminderConfig) {
+      this.showError('Configura al menos un cargo para el recordatorio');
+      return;
+    }
+
+    this.savingEscalationReminderConfig = true;
+    const value = this.escalationReminderForm.value;
+    const selectedCargoLabels = Array.isArray(value.escalationReminderCargoLabels)
+      ? value.escalationReminderCargoLabels.filter((cargo: string) => String(cargo || '').trim().length > 0)
+      : [];
+
+    this.configService.updateConfig({
+      escalationReminderEnabled: !!value.escalationReminderEnabled,
+      escalationReminderCargoLabels: selectedCargoLabels
+    }).subscribe({
+      next: () => {
+        this.showSuccess('Recordatorio de escalación interna actualizado');
+      },
+      error: (err) => {
+        console.error('Error saving escalation reminder config:', err);
+        this.showError('Error guardando recordatorio de escalación interna');
+      },
+      complete: () => {
+        this.savingEscalationReminderConfig = false;
+      }
+    });
+  }
+
+  testEscalationReminder(): void {
+    if (this.testingEscalationReminder) {
+      return;
+    }
+
+    this.testingEscalationReminder = true;
+    this.escalationService.testEscalationReminder().subscribe({
+      next: (response) => {
+        const total = Number(response?.totalRecipients || 0);
+        this.showSuccess(`${response?.message || 'Prueba ejecutada'} (${total} destinatarios)`);
+      },
+      error: (err) => {
+        const backendMessage = err?.error?.message;
+        this.showError(backendMessage || 'Error en prueba de recordatorio de escalación interna');
+      },
+      complete: () => {
+        this.testingEscalationReminder = false;
+      }
+    });
+  }
+
+  private refreshAvailableCargoLabels(): void {
+    const unique = new Set<string>();
+
+    this.defaultReminderCargoLabels.forEach((cargo) => unique.add(cargo));
+
+    this.users.forEach((user) => {
+      const value = String(user?.cargoLabel || '').trim();
+      if (value) {
+        unique.add(value);
+      }
+    });
+
+    this.availableCargoLabels = Array.from(unique).sort((a, b) => a.localeCompare(b));
+    this.ensureEscalationReminderSelection();
+  }
+
+  private ensureEscalationReminderSelection(): void {
+    const currentSelection = this.escalationReminderForm?.get('escalationReminderCargoLabels')?.value;
+    const selected = Array.isArray(currentSelection)
+      ? currentSelection.filter((cargo: string) => this.availableCargoLabels.includes(cargo))
+      : [];
+
+    const fallback = selected.length > 0
+      ? selected
+      : (this.availableCargoLabels.includes('N2') ? ['N2'] : this.availableCargoLabels.slice(0, 1));
+
+    this.escalationReminderForm?.patchValue({ escalationReminderCargoLabels: fallback }, { emitEvent: false });
+    this.updateEscalationReminderValidators();
+  }
+
+  private updateEscalationReminderValidators(): void {
+    const enabled = !!this.escalationReminderForm?.get('escalationReminderEnabled')?.value;
+    const cargoControl = this.escalationReminderForm?.get('escalationReminderCargoLabels');
+
+    if (!cargoControl) return;
+
+    if (enabled) {
+      cargoControl.setValidators([
+        Validators.required,
+        (control) => Array.isArray(control.value) && control.value.length > 0 ? null : { required: true }
+      ]);
+    } else {
+      cargoControl.clearValidators();
+    }
+
+    cargoControl.updateValueAndValidity({ emitEvent: false });
   }
 
   // ============ UTILIDADES ============

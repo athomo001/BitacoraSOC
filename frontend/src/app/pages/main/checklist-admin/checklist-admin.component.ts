@@ -12,7 +12,7 @@ import { MatProgressBar } from '@angular/material/progress-bar';
 import { MatNavList, MatListItem } from '@angular/material/list';
 import { MatChipSet, MatChip } from '@angular/material/chips';
 import { MatButton, MatIconButton } from '@angular/material/button';
-import { MatFormField, MatLabel } from '@angular/material/form-field';
+import { MatFormField, MatLabel, MatHint } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { MatIcon } from '@angular/material/icon';
@@ -22,7 +22,7 @@ import { MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionP
   selector: 'app-checklist-admin',
   templateUrl: './checklist-admin.component.html',
   styleUrls: ['./checklist-admin.component.scss'],
-  imports: [MatCard, MatCardTitle, NgIf, MatProgressBar, MatNavList, NgFor, MatListItem, MatChipSet, MatChip, MatButton, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatCheckbox, MatIconButton, MatIcon, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle]
+  imports: [MatCard, MatCardTitle, NgIf, MatProgressBar, MatNavList, NgFor, MatListItem, MatChipSet, MatChip, MatButton, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatHint, MatInput, MatCheckbox, MatIconButton, MatIcon, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle]
 })
 export class ChecklistAdminComponent implements OnInit {
   templates: ChecklistTemplate[] = [];
@@ -48,7 +48,9 @@ export class ChecklistAdminComponent implements OnInit {
 
     this.configForm = this.fb.group({
       checklistCooldownHours: [240, [Validators.required, Validators.min(1)]], // minutos (default 4 horas)
-      checklistCloseEmailEnabled: [false]
+      checklistCloseEmailEnabled: [false],
+      checklistAlertEnabled: [true],
+      checklistAlertTime: ['09:30', [Validators.required]]
     });
   }
 
@@ -74,7 +76,9 @@ export class ChecklistAdminComponent implements OnInit {
       next: (config) => {
         this.configForm.patchValue({
           checklistCooldownHours: config.shiftCheckCooldownHours,
-          checklistCloseEmailEnabled: config.checklistCloseEmailEnabled ?? false
+          checklistCloseEmailEnabled: config.checklistCloseEmailEnabled ?? false,
+          checklistAlertEnabled: config.checklistAlertEnabled ?? true,
+          checklistAlertTime: config.checklistAlertTime || '09:30'
         });
       },
       error: (err) => {
@@ -89,7 +93,9 @@ export class ChecklistAdminComponent implements OnInit {
     this.savingConfig = true;
     const payload = {
       shiftCheckCooldownHours: this.configForm.value.checklistCooldownHours,
-      checklistCloseEmailEnabled: this.configForm.value.checklistCloseEmailEnabled
+      checklistCloseEmailEnabled: this.configForm.value.checklistCloseEmailEnabled,
+      checklistAlertEnabled: this.configForm.value.checklistAlertEnabled,
+      checklistAlertTime: this.configForm.value.checklistAlertTime
     };
     this.configService.updateConfig(payload).subscribe({
       next: () => {

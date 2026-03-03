@@ -2,12 +2,12 @@ const AppConfig = require('../models/AppConfig');
 const ShiftCheck = require('../models/ShiftCheck');
 const ShiftAssignment = require('../models/ShiftAssignment');
 const ShiftOverride = require('../models/ShiftOverride');
-const ExternalPerson = require('../models/ExternalPerson');
 const User = require('../models/User');
 const { logger } = require('./logger');
-const { sendChecklistAlertEmail } = require('../routes/smtp');
+const { sendChecklistAlertEmail, sendEscalationInternalReminderEmail } = require('../routes/smtp');
 
 const DEFAULT_ALERT_TIME = '09:30';
+const DEFAULT_ESCALATION_REMINDER_HOUR = 9;
 
 const isSameDay = (a, b) => a && b && a.toDateString() === b.toDateString();
 
@@ -127,10 +127,72 @@ const runChecklistAlert = async () => {
   }
 };
 
+const normalizeCargoLabel = (value) => String(value || '').trim().toUpperCase();
+
+const getEscalationReminderRecipients = async (cargoLabels) => {
+  const normalized = (cargoLabels || [])
+    .map(normalizeCargoLabel)
+    .filter(Boolean);
+
+  if (normalized.length === 0) {
+    return [];
+  }
+
+  const users = await User.find({
+    isActive: true,
+    email: { $exists: true, $ne: '' },
+    cargoLabel: { $exists: true, $ne: '' }
+  }).select('email cargoLabel fullName username');
+
+  return users
+    .filter((user) => normalized.includes(normalizeCargoLabel(user.cargoLabel)))
+    .map((user) => user.email);
+};
+
+const shouldSendEscalationReminder = (now, config) => {
+  if (!config?.escalationReminderEnabled) return false;
+
+  if (config.lastEscalationReminderDate && isSameDay(config.lastEscalationReminderDate, now)) {
+    return false;
+  }
+
+  return now.getHours() >= DEFAULT_ESCALATION_REMINDER_HOUR;
+};
+
+const runEscalationInternalReminder = async () => {
+  try {
+    const config = await AppConfig.findOne();
+    const now = new Date();
+    if (!config || !shouldSendEscalationReminder(now, config)) return;
+
+    const cargoLabels = Array.isArray(config.escalationReminderCargoLabels)
+      ? config.escalationReminderCargoLabels
+      : ['N2'];
+
+    const recipients = await getEscalationReminderRecipients(cargoLabels);
+    if (recipients.length === 0) return;
+
+    await sendEscalationInternalReminderEmail({
+      recipients,
+      cargoLabels,
+      dateLabel: now.toLocaleDateString('es-CL')
+    });
+
+    config.lastEscalationReminderDate = now;
+    await config.save();
+  } catch (error) {
+    logger.error({ err: error }, 'Error ejecutando recordatorio de escalación interna');
+  }
+};
+
 const startChecklistAlertScheduler = () => {
   const intervalMs = 5 * 60 * 1000;
   runChecklistAlert();
-  setInterval(runChecklistAlert, intervalMs);
+  runEscalationInternalReminder();
+  setInterval(() => {
+    runChecklistAlert();
+    runEscalationInternalReminder();
+  }, intervalMs);
 };
 
 module.exports = {

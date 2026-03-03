@@ -10,6 +10,7 @@ const ShiftClosure = require('../models/ShiftClosure');
 const Entry = require('../models/Entry');
 const AppConfig = require('../models/AppConfig');
 const WorkShift = require('../models/WorkShift');
+const ChecklistNotificationLog = require('../models/ChecklistNotificationLog');
 const { authenticate, authorize, notGuest } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const captureMetadata = require('../middleware/metadata');
@@ -700,6 +701,24 @@ router.get('/check/history', authenticate, async (req, res) => {
   } catch (error) {
     logger.error({ err: error }, 'Error al obtener historial');
     res.status(500).json({ message: 'Error al obtener historial' });
+  }
+});
+
+router.get('/alerts/weekly-log', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
+    const logs = await ChecklistNotificationLog.find({})
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .populate('userId', 'username fullName email cargoLabel');
+
+    res.json({
+      items: logs,
+      total: logs.length
+    });
+  } catch (error) {
+    logger.error({ err: error }, 'Error obteniendo logs semanales de checklist');
+    res.status(500).json({ message: 'Error obteniendo logs semanales de checklist' });
   }
 });
 

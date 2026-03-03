@@ -116,6 +116,41 @@ const appConfigSchema = new mongoose.Schema({
     type: String,
     default: '09:30'
   },
+  checklistWeeklyAlertEnabled: {
+    type: Boolean,
+    default: false
+  },
+  checklistWeeklyReminderDay: {
+    type: Number,
+    default: 1,
+    min: 0,
+    max: 6
+  },
+  checklistWeeklyReminderTime: {
+    type: String,
+    default: '16:00'
+  },
+  checklistWeeklyCutoffTime: {
+    type: String,
+    default: '18:00'
+  },
+  checklistWeeklyTimezone: {
+    type: String,
+    default: 'America/Santiago',
+    trim: true
+  },
+  escalationReminderEnabled: {
+    type: Boolean,
+    default: false
+  },
+  escalationReminderCargoLabels: {
+    type: [String],
+    default: ['N2']
+  },
+  lastEscalationReminderDate: {
+    type: Date,
+    default: null
+  },
   lastChecklistAlertDate: {
     type: Date,
     default: null

@@ -298,13 +298,19 @@ export class EscalationService {
   // 🔧 CRUD ADMIN - Asignaciones de Turno
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  getAssignments(roleCode?: string, fromDate?: string): Observable<ShiftAssignment[]> {
+  getAssignments(roleCode?: string, fromDate?: string, toDate?: string, limit?: number): Observable<ShiftAssignment[]> {
     let params = new HttpParams();
     if (roleCode) {
       params = params.set('roleCode', roleCode);
     }
     if (fromDate) {
       params = params.set('fromDate', fromDate);
+    }
+    if (toDate) {
+      params = params.set('toDate', toDate);
+    }
+    if (limit && limit > 0) {
+      params = params.set('limit', String(limit));
     }
     return this.http.get<ShiftAssignment[]>(`${this.apiUrl}/admin/assignments`, { params });
   }
@@ -365,6 +371,20 @@ export class EscalationService {
 
   deleteExternalPerson(id: string): Observable<{ message: string }> {
     return this.http.delete<{ message: string }>(`${this.apiUrl}/admin/external-people/${id}`);
+  }
+
+  testEscalationReminder(): Observable<{
+    message: string;
+    cargoLabels: string[];
+    totalRecipients: number;
+    recipients: string[];
+  }> {
+    return this.http.post<{
+      message: string;
+      cargoLabels: string[];
+      totalRecipients: number;
+      recipients: string[];
+    }>(`${this.apiUrl}/admin/reminder/test`, {});
   }
 
   // 👥 USUARIOS

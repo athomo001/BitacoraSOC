@@ -450,6 +450,63 @@ const sendChecklistAlertEmail = async ({ recipients, alertTime, dateLabel }) => 
   }
 };
 
+const sendEscalationInternalReminderEmail = async ({
+  recipients,
+  cargoLabels,
+  dateLabel
+}) => {
+  try {
+    if (!recipients || recipients.length === 0) {
+      return;
+    }
+
+    const config = await SmtpConfig.findOne({ isActive: true });
+    if (!config) {
+      console.log('No hay configuracion SMTP activa');
+      return;
+    }
+
+    const decryptedPassword = decrypt(config.password);
+    const transporter = nodemailer.createTransport({
+      host: config.host,
+      port: config.port,
+      secure: config.useTLS,
+      auth: {
+        user: config.username,
+        pass: decryptedPassword
+      }
+    });
+
+    const cargosText = Array.isArray(cargoLabels) && cargoLabels.length > 0
+      ? cargoLabels.join(', ')
+      : 'N2';
+    const subject = '[Bitácora SOC] Recordatorio de escalación interna';
+
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto;">
+        <h2 style="color: #1565c0;">🔔 Recordatorio de escalación interna</h2>
+        <p>Recuerda completar las tablas de escalación interna correspondientes al día <strong>${dateLabel}</strong>.</p>
+        <p><strong>Cargos objetivo:</strong> ${cargosText}</p>
+        <hr style="margin-top: 20px;">
+        <small style="color: #666;">Bitácora SOC - ${new Date().toLocaleString()}</small>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: `"${config.senderName}" <${config.senderEmail}>`,
+      to: recipients.join(', '),
+      subject,
+      html: emailHtml
+    });
+
+    console.log('Correo de recordatorio de escalación interna enviado');
+  } catch (error) {
+    console.error('Error al enviar correo de recordatorio de escalación interna:', error);
+    throw error;
+  }
+};
+
 module.exports = router;
 module.exports.sendChecklistEmail = sendChecklistEmail;
 module.exports.sendChecklistAlertEmail = sendChecklistAlertEmail;
+module.exports.sendEscalationInternalReminderEmail = sendEscalationInternalReminderEmail;

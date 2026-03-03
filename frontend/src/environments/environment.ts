@@ -8,7 +8,7 @@
  */
 export const environment = {
   production: false,
-  apiUrl: `${window.location.protocol === 'https:' ? 'https' : 'http'}://${window.location.hostname}:${window.location.protocol === 'https:' ? '3443' : '3000'}/api`,
+  apiUrl: '/api',
   backendBaseUrl: `${window.location.protocol === 'https:' ? 'https' : 'http'}://${window.location.hostname}:${window.location.protocol === 'https:' ? '3443' : '3000'}`,
   appVersion: 'dev'
 };

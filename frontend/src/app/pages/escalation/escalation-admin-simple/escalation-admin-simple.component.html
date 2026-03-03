@@ -98,8 +98,9 @@
           </form>
         </mat-card>
 
-        <!-- Tabla de asignaciones -->
-        <div *ngIf="!loadingAssignments && assignments.length > 0" class="simple-table">
+        <!-- Tabla de asignaciones del mes actual -->
+        <div *ngIf="!loadingAssignments && currentMonthAssignments.length > 0" class="simple-table">
+          <h3>Mes actual</h3>
           <table>
             <thead>
               <tr>
@@ -110,7 +111,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let assignment of assignments">
+              <tr *ngFor="let assignment of currentMonthAssignments">
                 <td>{{ formatDate(assignment.weekStartDate) }} - {{ formatDate(assignment.weekEndDate) }}</td>
                 <td><strong>{{ assignment.roleCode }}</strong></td>
                 <td>
@@ -126,13 +127,115 @@
           </table>
         </div>
 
+        <mat-accordion *ngIf="!loadingAssignments && previousMonthAssignments.length > 0" class="month-accordion">
+          <mat-expansion-panel>
+            <mat-expansion-panel-header>
+              <mat-panel-title>Mes anterior</mat-panel-title>
+              <mat-panel-description>{{ previousMonthAssignments.length }} asignaciones</mat-panel-description>
+            </mat-expansion-panel-header>
+
+            <div class="simple-table compact-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Semana</th>
+                    <th>Rol</th>
+                    <th>Persona</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let assignment of previousMonthAssignments">
+                    <td>{{ formatDate(assignment.weekStartDate) }} - {{ formatDate(assignment.weekEndDate) }}</td>
+                    <td><strong>{{ assignment.roleCode }}</strong></td>
+                    <td>
+                      {{ assignment.userId?.fullName || assignment.userId?.name || assignment.externalPersonId?.name || 'N/A' }}
+                    </td>
+                    <td>
+                      <button mat-icon-button color="warn" (click)="deleteAssignment(assignment._id)">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </mat-expansion-panel>
+        </mat-accordion>
+
+        <div class="historical-section" *ngIf="!loadingAssignments">
+          <button mat-stroked-button color="primary" (click)="toggleHistorical()" [disabled]="loadingHistoricalAssignments">
+            <mat-icon>{{ showHistorical ? 'expand_less' : 'history' }}</mat-icon>
+            {{ showHistorical ? 'Ocultar histórico' : 'Ver histórico' }}
+          </button>
+
+          <div *ngIf="loadingHistoricalAssignments" class="loading-inline">
+            <mat-spinner diameter="24"></mat-spinner>
+            <span>Cargando histórico...</span>
+          </div>
+
+          <div *ngIf="showHistorical && historicalAssignments.length > 0" class="simple-table compact-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Semana</th>
+                  <th>Rol</th>
+                  <th>Persona</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let assignment of historicalAssignments">
+                  <td>{{ formatDate(assignment.weekStartDate) }} - {{ formatDate(assignment.weekEndDate) }}</td>
+                  <td><strong>{{ assignment.roleCode }}</strong></td>
+                  <td>{{ assignment.userId?.fullName || assignment.userId?.name || assignment.externalPersonId?.name || 'N/A' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div *ngIf="showHistorical && !loadingHistoricalAssignments && historicalAssignments.length === 0" class="no-data compact-no-data">
+            <p>No hay histórico previo a los últimos 2 meses</p>
+          </div>
+        </div>
+
         <div *ngIf="loadingAssignments" class="loading">
           <mat-spinner diameter="40"></mat-spinner>
         </div>
 
-        <div *ngIf="!loadingAssignments && assignments.length === 0" class="no-data">
+        <div *ngIf="!loadingAssignments && currentMonthAssignments.length === 0 && previousMonthAssignments.length === 0" class="no-data">
           <mat-icon>event_busy</mat-icon>
           <p>No hay turnos asignados</p>
+        </div>
+
+        <div class="section section-spacing-top">
+          <h3>🔔 Recordatorio Escalación Interna</h3>
+          <p class="subtitle">Envía un recordatorio diario para completar tablas de escalación interna a usuarios por cargo.</p>
+
+          <mat-card class="inline-form">
+            <form [formGroup]="escalationReminderForm" (ngSubmit)="saveEscalationReminderConfig()">
+              <mat-checkbox formControlName="escalationReminderEnabled" color="primary">
+                Activar recordatorio diario
+              </mat-checkbox>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Cargos destinatarios</mat-label>
+                <mat-select formControlName="escalationReminderCargoLabels" multiple>
+                  <mat-option *ngFor="let cargo of availableCargoLabels" [value]="cargo">
+                    {{ cargo }}
+                  </mat-option>
+                </mat-select>
+                <mat-hint>Puedes seleccionar varios cargos a la vez (ej: N2 y N3).</mat-hint>
+              </mat-form-field>
+
+              <button mat-raised-button color="primary" type="submit" [disabled]="loadingEscalationReminderConfig || savingEscalationReminderConfig">
+                Guardar recordatorio
+              </button>
+
+              <button mat-stroked-button color="accent" type="button" (click)="testEscalationReminder()" [disabled]="loadingEscalationReminderConfig || savingEscalationReminderConfig || testingEscalationReminder">
+                Probar recordatorio
+              </button>
+            </form>
+          </mat-card>
         </div>
 
         <!-- Sección: Personas Externas -->
@@ -213,40 +316,19 @@
         <h2>Gestión de Contactos de Escalamiento</h2>
         <p class="subtitle">Administra clientes, servicios y sus contactos</p>
 
-        <!-- Sección: Clientes -->
         <div class="section">
-          <h3>1. Clientes</h3>
-          <button mat-raised-button color="accent" (click)="addClient()">
-            <mat-icon>add</mat-icon>
-            Agregar Cliente
-          </button>
-
-          <mat-card *ngIf="showClientForm" class="inline-form">
-            <form [formGroup]="clientForm" (ngSubmit)="saveClient()">
-              <mat-form-field appearance="outline">
-                <mat-label>Nombre del Cliente</mat-label>
-                <input matInput formControlName="name" placeholder="Ej: ACME, Global Tech">
-              </mat-form-field>
-              <button mat-raised-button color="primary" type="submit" [disabled]="clientForm.invalid">
-                Guardar
-              </button>
-              <button mat-button type="button" (click)="showClientForm = false">Cancelar</button>
-            </form>
-          </mat-card>
-
+          <h3>Clientes (fuente única)</h3>
+          <p class="subtitle">Los clientes de Escalación se administran desde Catálogos > Log Sources. Aquí solo se muestran habilitados.</p>
           <div class="chips-list" *ngIf="!loadingClients">
             <div class="chip" *ngFor="let client of clients">
               {{ client.name }}
-              <button mat-icon-button (click)="deleteClient(client._id)">
-                <mat-icon>close</mat-icon>
-              </button>
             </div>
           </div>
         </div>
 
         <!-- Sección: Servicios -->
         <div class="section">
-          <h3>2. Servicios</h3>
+          <h3>1. Servicios</h3>
           <button mat-raised-button color="accent" (click)="addService()">
             <mat-icon>add</mat-icon>
             Agregar Servicio
@@ -299,7 +381,7 @@
 
         <!-- Sección: Contactos -->
         <div class="section">
-          <h3>3. Contactos de Escalamiento</h3>
+          <h3>2. Contactos de Escalamiento</h3>
           <button mat-raised-button color="accent" (click)="addContact()">
             <mat-icon>add</mat-icon>
             Agregar Contacto

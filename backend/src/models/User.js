@@ -59,6 +59,7 @@ const userSchema = new mongoose.Schema({
   cargoLabel: {
     type: String,
     trim: true,
+    maxlength: 120,
     default: null
   },
   isActive: {
@@ -96,6 +97,7 @@ const userSchema = new mongoose.Schema({
 // Índices adicionales (username y email ya tienen índice por unique: true)
 // Solo definimos índices NO-UNIQUE adicionales para optimizar queries
 userSchema.index({ role: 1 }); // Query: buscar usuarios por rol
+userSchema.index({ cargoLabel: 1 }); // Query: segmentación operativa por cargo
 userSchema.index({ guestExpiresAt: 1 }); // Query: limpiar guests expirados
 userSchema.index({ resetPasswordToken: 1 }); // Query: validar token de reseteo
 
