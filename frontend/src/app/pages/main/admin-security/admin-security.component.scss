@@ -1,0 +1,69 @@
+.security-admin {
+  max-width: 920px;
+}
+
+.full-width {
+  width: 100%;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.notes {
+  border-left: 4px solid var(--state-warning);
+  background: var(--state-warning-bg);
+  color: var(--state-warning);
+  padding: 10px 12px;
+  border-radius: 4px;
+
+  p {
+    margin: 0;
+  }
+
+  p + p {
+    margin-top: 6px;
+  }
+}
+
+button mat-spinner {
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.tls-files {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tls-label {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.hidden-input {
+  display: none;
+}
+
+small {
+  color: var(--text-secondary);
+}

@@ -17,11 +17,14 @@
  */
 require('dotenv').config();
 const express = require('express');
+const http = require('http');
+const https = require('https');
 const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
 const fs = require('fs');
 const connectDB = require('./config/database');
+const AppConfig = require('./models/AppConfig');
 const { apiLimiter } = require('./middleware/rate-limiter');
 const requestIdMiddleware = require('./middleware/request-id');
 const captureMetadata = require('./middleware/metadata');
@@ -34,6 +37,85 @@ const app = express();
 const HOST = process.env.HOST || '0.0.0.0';
 const PORT = process.env.PORT || 3000;
 const APP_VERSION = process.env.APP_VERSION || 'dev';
+const DEFAULT_HTTPS_PORT = Number(process.env.HTTPS_PORT) || 3443;
+
+const DEFAULT_RUNTIME_SECURITY_CONFIG = {
+  httpsEnabled: false,
+  forceHttps: false,
+  httpsPort: DEFAULT_HTTPS_PORT,
+  tlsCertPath: '',
+  tlsKeyPath: '',
+  tlsCaPath: ''
+};
+
+const normalizeRuntimeSecurityConfig = (value) => ({
+  ...DEFAULT_RUNTIME_SECURITY_CONFIG,
+  ...(value || {})
+});
+
+const isSecureRequest = (req) => {
+  if (req.secure) {
+    return true;
+  }
+
+  const forwardedProto = req.headers['x-forwarded-proto'];
+  if (!forwardedProto) {
+    return false;
+  }
+
+  return forwardedProto.split(',')[0].trim() === 'https';
+};
+
+const getSafeHostname = (hostHeader) => {
+  if (!hostHeader) return 'localhost';
+  try {
+    return new URL(`http://${hostHeader}`).hostname;
+  } catch {
+    return hostHeader;
+  }
+};
+
+const resolveTlsPath = (rawPath) => {
+  if (!rawPath || typeof rawPath !== 'string') {
+    return '';
+  }
+
+  const trimmedPath = rawPath.trim();
+  if (!trimmedPath) {
+    return '';
+  }
+
+  if (path.isAbsolute(trimmedPath)) {
+    return trimmedPath;
+  }
+
+  return path.resolve(__dirname, '..', trimmedPath);
+};
+
+const getAllowedOriginsSet = (rawOrigins) => {
+  const origins = (rawOrigins || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const normalized = new Set();
+  origins.forEach((origin) => {
+    try {
+      const parsed = new URL(origin);
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        normalized.add(origin);
+        return;
+      }
+
+      normalized.add(`http://${parsed.host}`);
+      normalized.add(`https://${parsed.host}`);
+    } catch {
+      normalized.add(origin);
+    }
+  });
+
+  return normalized;
+};
 
 // Validación básica de variables de entorno requeridas
 const validateEnv = () => {
@@ -51,8 +133,17 @@ const validateEnv = () => {
 
 validateEnv();
 
-// Conectar a MongoDB
-connectDB();
+app.locals.runtimeSecurityConfig = { ...DEFAULT_RUNTIME_SECURITY_CONFIG };
+app.locals.httpsReady = false;
+
+const trustProxyEnv = process.env.TRUST_PROXY;
+if (trustProxyEnv === 'true') {
+  app.set('trust proxy', true);
+} else if (trustProxyEnv === 'false') {
+  app.set('trust proxy', false);
+} else {
+  app.set('trust proxy', process.env.NODE_ENV === 'production');
+}
 
 // Middlewares de seguridad
 app.use(helmet({
@@ -86,20 +177,46 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Correlation ID (X-Request-Id)
 app.use(requestIdMiddleware);
 
+app.use((req, res, next) => {
+  const securityConfig = normalizeRuntimeSecurityConfig(req.app.locals.runtimeSecurityConfig);
+  if (!securityConfig.forceHttps || !req.app.locals.httpsReady) {
+    return next();
+  }
+
+  if (req.path === '/health' || req.path.startsWith('/uploads/')) {
+    return next();
+  }
+
+  if (isSecureRequest(req)) {
+    return next();
+  }
+
+  const httpsPort = Number(securityConfig.httpsPort) || DEFAULT_HTTPS_PORT;
+  const hostname = getSafeHostname(req.headers.host);
+  const hostWithPort = httpsPort === 443 ? hostname : `${hostname}:${httpsPort}`;
+  const targetUrl = `https://${hostWithPort}${req.originalUrl}`;
+
+  if (req.method === 'GET' || req.method === 'HEAD') {
+    return res.redirect(308, targetUrl);
+  }
+
+  return res.status(426).json({
+    message: 'HTTPS requerido para esta operación',
+    targetUrl
+  });
+});
+
 // 🔒 CORS - En desarrollo permite todo, en producción restringe
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production'
     ? (origin, callback) => {
-      const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean);
+      const allowedOrigins = getAllowedOriginsSet(process.env.ALLOWED_ORIGINS || '');
 
-      if (allowedOrigins.length === 0) {
+      if (allowedOrigins.size === 0) {
         callback(new Error('ALLOWED_ORIGINS no está configurado correctamente'));
       } else if (!origin) {
         callback(null, true);
-      } else if (allowedOrigins.includes(origin)) {
+      } else if (allowedOrigins.has(origin)) {
         callback(null, true);
       } else {
         callback(new Error('No permitido por CORS'));
@@ -215,9 +332,85 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Iniciar servidor
-const server = app.listen(PORT, HOST, () => {
-  console.log(`
+let httpServer = null;
+let httpsServer = null;
+
+const attachServerErrorHandler = (serverInstance, label, listenPort) => {
+  serverInstance.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      logger.error({ event: 'server.port.in.use', protocol: label, host: HOST, port: listenPort }, 'Puerto en uso, no se pudo iniciar');
+      console.error(`❌ Puerto ${listenPort} en uso para ${label.toUpperCase()}.`);
+      return process.exit(1);
+    }
+
+    logger.error({ event: 'server.listen.error', protocol: label, error: error.message }, 'Error al iniciar servidor');
+    console.error(`❌ Error al iniciar servidor ${label.toUpperCase()}:`, error.message);
+    process.exit(1);
+  });
+};
+
+const loadRuntimeSecurityConfigFromDb = async () => {
+  try {
+    const config = await AppConfig.findOne().select('security').lean();
+    app.locals.runtimeSecurityConfig = normalizeRuntimeSecurityConfig(config?.security);
+  } catch (error) {
+    logger.warn({ event: 'server.security.load.failed', error: error.message }, 'No se pudo cargar configuración HTTPS desde DB; se usarán defaults');
+    app.locals.runtimeSecurityConfig = { ...DEFAULT_RUNTIME_SECURITY_CONFIG };
+  }
+};
+
+const startHttpsServerIfEnabled = () => {
+  app.locals.httpsReady = false;
+  const securityConfig = normalizeRuntimeSecurityConfig(app.locals.runtimeSecurityConfig);
+  if (!securityConfig.httpsEnabled) {
+    return;
+  }
+
+  const certPath = resolveTlsPath(securityConfig.tlsCertPath);
+  const keyPath = resolveTlsPath(securityConfig.tlsKeyPath);
+  const caPath = resolveTlsPath(securityConfig.tlsCaPath);
+  const httpsPort = Number(securityConfig.httpsPort) || DEFAULT_HTTPS_PORT;
+
+  if (!certPath || !keyPath) {
+    logger.warn({ event: 'server.https.disabled.missing.paths' }, 'HTTPS habilitado en config pero faltan rutas de certificado/llave');
+    return;
+  }
+
+  if (!fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
+    logger.warn({ event: 'server.https.disabled.invalid.paths', certPath, keyPath }, 'HTTPS no iniciado: archivo de certificado o llave no existe');
+    return;
+  }
+
+  try {
+    const tlsOptions = {
+      cert: fs.readFileSync(certPath),
+      key: fs.readFileSync(keyPath)
+    };
+
+    if (caPath && fs.existsSync(caPath)) {
+      tlsOptions.ca = fs.readFileSync(caPath);
+    }
+
+    httpsServer = https.createServer(tlsOptions, app);
+    attachServerErrorHandler(httpsServer, 'https', httpsPort);
+    httpsServer.listen(httpsPort, HOST, () => {
+      app.locals.httpsReady = true;
+      logger.info({ event: 'server.https.started', host: HOST, port: httpsPort }, 'Servidor HTTPS iniciado');
+      console.log(`🔒 HTTPS activo en https://${HOST}:${httpsPort}`);
+    });
+  } catch (error) {
+    logger.error({ event: 'server.https.start.failed', error: error.message }, 'No se pudo iniciar servidor HTTPS');
+  }
+};
+
+const startServers = async () => {
+  await connectDB();
+  await loadRuntimeSecurityConfigFromDb();
+
+  httpServer = http.createServer(app);
+  attachServerErrorHandler(httpServer, 'http', PORT);
+  httpServer.listen(PORT, HOST, () => {
+    console.log(`
 ╔════════════════════════════════════════╗
 ║     🛡️  BITÁCORA SOC - BACKEND       ║
 ╠════════════════════════════════════════╣
@@ -226,46 +419,53 @@ const server = app.listen(PORT, HOST, () => {
 ║  Timezone: ${(process.env.TZ || 'America/Santiago').padEnd(26)} ║
 ║  API Docs: http://${HOST}:${PORT}/api-docs ${' '.repeat(3)}║
 ╚════════════════════════════════════════╝
-  `);
+    `);
 
-  // Iniciar schedulers
-  startChecklistAlertScheduler();
-  startBackupScheduler();
+    startChecklistAlertScheduler();
+    startBackupScheduler();
 
-  const { startScheduler: startShiftReportScheduler } = require('./utils/shift-scheduler');
-  startShiftReportScheduler();
-});
+    const { startScheduler: startShiftReportScheduler } = require('./utils/shift-scheduler');
+    startShiftReportScheduler();
+  });
 
-// Manejo de errores de escucha y apagado ordenado
-server.on('error', (error) => {
-  if (error.code === 'EADDRINUSE') {
-    logger.error({ event: 'server.port.in.use', host: HOST, port: PORT }, 'Puerto en uso, no se pudo iniciar');
-    console.error(`❌ Puerto ${PORT} en uso. Cierra procesos node que estén bloqueando el puerto y vuelve a iniciar.`);
-    return process.exit(1);
-  }
-
-  logger.error({ event: 'server.listen.error', error: error.message }, 'Error al iniciar servidor');
-  console.error('❌ Error al iniciar servidor:', error.message);
-  process.exit(1);
-});
+  startHttpsServerIfEnabled();
+};
 
 const gracefulShutdown = (signal) => {
   logger.info({ event: 'server.shutdown', signal }, 'Shutting down server');
   stopBackupScheduler();
-  server.close(() => {
-    logger.info({ event: 'server.shutdown.completed' }, 'Servidor detenido');
-    process.exit(0);
+
+  const closeTargets = [httpServer, httpsServer].filter(Boolean);
+  if (!closeTargets.length) {
+    return process.exit(0);
+  }
+
+  let pending = closeTargets.length;
+  const onClosed = () => {
+    pending -= 1;
+    if (pending <= 0) {
+      logger.info({ event: 'server.shutdown.completed' }, 'Servidor detenido');
+      process.exit(0);
+    }
+  };
+
+  closeTargets.forEach((serverInstance) => {
+    serverInstance.close(onClosed);
   });
 
-  // Forzar cierre si demora más de 5s
   setTimeout(() => process.exit(1), 5000).unref();
 };
+
+startServers().catch((error) => {
+  logger.error({ event: 'server.start.failed', error: error.message }, 'Error fatal al iniciar backend');
+  console.error('❌ Error fatal al iniciar backend:', error.message);
+  process.exit(1);
+});
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('unhandledRejection', (reason) => {
   logger.error({ event: 'server.unhandled.rejection', reason }, 'Unhandled promise rejection');
-  // No cerramos el servidor, solo logueamos el error para debug
   console.error('❌ Unhandled Rejection:', reason);
 });
 process.on('uncaughtException', (error) => {

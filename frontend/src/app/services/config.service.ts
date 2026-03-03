@@ -56,4 +56,19 @@ export class ConfigService {
   getFavicon(): Observable<{ faviconUrl: string }> {
     return this.http.get<{ faviconUrl: string }>(`${this.API_URL}/favicon`);
   }
+
+  uploadTlsCertificates(files: { cert?: File; key?: File; ca?: File }): Observable<{ message: string; security: AppConfig['security'] }> {
+    const formData = new FormData();
+    if (files.cert) {
+      formData.append('tlsCert', files.cert);
+    }
+    if (files.key) {
+      formData.append('tlsKey', files.key);
+    }
+    if (files.ca) {
+      formData.append('tlsCa', files.ca);
+    }
+
+    return this.http.post<{ message: string; security: AppConfig['security'] }>(`${this.API_URL}/security/certificates`, formData);
+  }
 }

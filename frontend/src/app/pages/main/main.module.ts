@@ -96,6 +96,10 @@ const routes: Routes = [
           { path: 'escalation', component: EscalationAdminSimpleComponent },
           { path: 'smtp', component: SettingsComponent },
           {
+            path: 'security',
+            loadComponent: () => import('./admin-security/admin-security.component').then(m => m.AdminSecurityComponent)
+          },
+          {
             path: 'integrations',
             loadComponent: () => import('./integrations/integrations.component').then(m => m.IntegrationsComponent)
           },

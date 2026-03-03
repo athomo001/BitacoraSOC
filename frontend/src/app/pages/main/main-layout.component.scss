@@ -28,6 +28,11 @@
       width: 32px;
       height: 32px;
     }
+
+    .sidebar-logo,
+    .sidebar-icon {
+      margin-right: auto;
+    }
   }
 
   mat-nav-list {
@@ -198,6 +203,31 @@
   position: sticky;
   top: 0;
   z-index: 10;
+  position: relative;
+  min-height: 72px;
+  padding: 0 12px;
+
+  ::ng-deep .mat-toolbar-row,
+  ::ng-deep .mat-mdc-toolbar-row {
+    min-height: 72px;
+    height: 72px;
+  }
+}
+
+.toolbar-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 180px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--app-title-font);
+  font-weight: 400;
+  font-size: clamp(1.8rem, 3.8vw, 2.9rem);
+  letter-spacing: 0.04em;
+  line-height: 1.08;
+  pointer-events: none;
 }
 
 .spacer {

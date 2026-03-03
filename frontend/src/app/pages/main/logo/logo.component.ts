@@ -41,9 +41,11 @@ export class LogoComponent implements OnInit {
   logSources: any[] = [];
   brandingForm: FormGroup;
   savingBranding = false;
+  savingAppTitle = false;
 
   constructor() {
     this.brandingForm = this.fb.group({
+      appTitle: [''],
       defaultLogSourceId: [null]
     });
   }
@@ -70,6 +72,10 @@ export class LogoComponent implements OnInit {
   loadBrandingConfig(): void {
     this.configService.getConfig().subscribe({
       next: (config: any) => {
+        this.brandingForm.patchValue({
+          appTitle: config.appTitle || ''
+        });
+
         if (config.defaultLogSourceId) {
           const sourceId = typeof config.defaultLogSourceId === 'object' 
             ? config.defaultLogSourceId._id 
@@ -85,6 +91,24 @@ export class LogoComponent implements OnInit {
     });
   }
 
+  saveAppTitle(): void {
+    this.savingAppTitle = true;
+    const data = {
+      appTitle: (this.brandingForm.value.appTitle || '').trim()
+    };
+
+    this.configService.updateConfig(data).subscribe({
+      next: () => {
+        this.savingAppTitle = false;
+        this.snackBar.open('Título superior guardado', 'Cerrar', { duration: 3000 });
+      },
+      error: (err: any) => {
+        this.savingAppTitle = false;
+        this.snackBar.open(err.error?.message || 'Error guardando título', 'Cerrar', { duration: 3000 });
+      }
+    });
+  }
+
   saveBrandingConfig(): void {
     if (!this.brandingForm.valid) return;
 
@@ -96,7 +120,7 @@ export class LogoComponent implements OnInit {
     this.configService.updateConfig(data).subscribe({
       next: () => {
         this.savingBranding = false;
-        this.snackBar.open('Configuración de branding guardada', 'Cerrar', { duration: 3000 });
+        this.snackBar.open('Configuración por defecto guardada', 'Cerrar', { duration: 3000 });
       },
       error: (err: any) => {
         this.savingBranding = false;

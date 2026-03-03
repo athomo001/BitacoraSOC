@@ -129,6 +129,28 @@
       </mat-card-content>
     </mat-card>
 
+    <!-- Título barra superior -->
+    <mat-card class="logo-card">
+      <mat-card-header>
+        <mat-card-title>Título barra superior</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div [formGroup]="brandingForm">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Título en barra superior</mat-label>
+            <input matInput formControlName="appTitle" maxlength="80" placeholder="Ej: Checklist Diario Analistas N1">
+            <mat-hint>Texto centrado en la barra superior (vacío = sin título)</mat-hint>
+          </mat-form-field>
+        </div>
+
+        <button mat-raised-button color="primary" type="button" (click)="saveAppTitle()"
+                [disabled]="savingAppTitle">
+          <mat-spinner *ngIf="savingAppTitle" diameter="18"></mat-spinner>
+          <span *ngIf="!savingAppTitle">Guardar Título</span>
+        </button>
+      </mat-card-content>
+    </mat-card>
+
     <!-- LogSource por Defecto -->
     <mat-card class="logo-card">
       <mat-card-header>

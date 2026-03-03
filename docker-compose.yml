@@ -36,12 +36,14 @@ services:
     restart: unless-stopped
     ports:
       - "${BACKEND_PORT:-3000}:3000"
+      - "${BACKEND_HTTPS_PORT:-3443}:${HTTPS_PORT:-3443}"
     depends_on:
       mongodb:
         condition: service_healthy
     environment:
       NODE_ENV: production
       PORT: 3000
+      HTTPS_PORT: ${HTTPS_PORT:-3443}
       HOST: 0.0.0.0
       HOST_DOMAIN: ${HOST_DOMAIN:-0.0.0.0}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}

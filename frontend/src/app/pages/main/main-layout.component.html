@@ -9,7 +9,6 @@
     <mat-toolbar color="primary">
       <img *ngIf="logoUrl" [src]="getAssetUrl(logoUrl)" alt="Logo" class="sidebar-logo">
       <mat-icon *ngIf="!logoUrl" class="sidebar-icon">shield</mat-icon>
-      <span>Bitácora SOC</span>
     </mat-toolbar>
 
     <!-- Menú de navegación -->
@@ -123,6 +122,8 @@
       <button mat-icon-button (click)="toggleLeftSidebar()">
         <mat-icon>menu</mat-icon>
       </button>
+
+      <span class="toolbar-title" *ngIf="appTitle">{{ appTitle }}</span>
 
       <span class="spacer"></span>
 
