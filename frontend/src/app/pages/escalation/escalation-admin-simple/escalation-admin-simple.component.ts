@@ -131,6 +131,8 @@ export class EscalationAdminSimpleComponent implements OnInit {
   editingRaciId: string | null = null;
   selectedRaciClientId: string | null = null;
   selectedRaciTopic: string = '';
+  reusableRaciTemplates: any[] = [];
+  reusableRaciPeople: Array<{ name: string; email: string; phone: string }> = [];
 
   constructor(
     private fb: FormBuilder,
@@ -204,6 +206,13 @@ export class EscalationAdminSimpleComponent implements OnInit {
       }),
       notes: [''],
       active: [true]
+    });
+
+    this.raciForm.get('clientId')?.valueChanges.subscribe((clientId) => {
+      if (!this.showRaciForm) {
+        return;
+      }
+      this.loadReusableRaciData(clientId || undefined);
     });
 
     this.externalPersonForm = this.fb.group({
@@ -599,6 +608,8 @@ export class EscalationAdminSimpleComponent implements OnInit {
       notes: '',
       active: true
     });
+    const clientId = this.raciForm.get('clientId')?.value;
+    this.loadReusableRaciData(clientId || undefined);
   }
 
   editRaciEntry(entry: any): void {
@@ -631,6 +642,134 @@ export class EscalationAdminSimpleComponent implements OnInit {
       notes: entry.notes || '',
       active: entry.active !== false
     });
+    const clientId = entry.clientId?._id || entry.clientId;
+    this.loadReusableRaciData(clientId || undefined, entry._id);
+  }
+
+  loadReusableRaciData(clientId?: string, excludeEntryId?: string): void {
+    if (!clientId) {
+      this.reusableRaciTemplates = [];
+      this.reusableRaciPeople = [];
+      return;
+    }
+
+    this.escalationService.getRaciAdmin(clientId).subscribe({
+      next: (entries) => {
+        const filteredEntries = (entries || []).filter((entry: any) => entry?._id !== excludeEntryId);
+        this.reusableRaciTemplates = filteredEntries;
+        this.reusableRaciPeople = this.extractReusablePeople(filteredEntries);
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Error loading reusable RACI data:', err);
+        this.reusableRaciTemplates = [];
+        this.reusableRaciPeople = [];
+      }
+    });
+  }
+
+  applyRaciTemplate(templateId: string): void {
+    if (!templateId) {
+      return;
+    }
+
+    const template = this.reusableRaciTemplates.find((entry: any) => entry._id === templateId);
+    if (!template) {
+      return;
+    }
+
+    this.raciForm.patchValue({
+      topic: template.topic || template.serviceId?.name || '',
+      activity: template.activity || '',
+      responsible: {
+        name: template.responsible?.name || '',
+        email: template.responsible?.email || '',
+        phone: template.responsible?.phone || ''
+      },
+      accountable: {
+        name: template.accountable?.name || '',
+        email: template.accountable?.email || '',
+        phone: template.accountable?.phone || ''
+      },
+      consulted: {
+        name: template.consulted?.name || '',
+        email: template.consulted?.email || '',
+        phone: template.consulted?.phone || ''
+      },
+      informed: {
+        name: template.informed?.name || '',
+        email: template.informed?.email || '',
+        phone: template.informed?.phone || ''
+      },
+      notes: template.notes || ''
+    });
+  }
+
+  applyReusablePerson(role: 'responsible' | 'accountable' | 'consulted' | 'informed', person: any): void {
+    if (!person) {
+      return;
+    }
+
+    this.raciForm.get(role)?.patchValue({
+      name: person.name || '',
+      email: person.email || '',
+      phone: person.phone || ''
+    });
+  }
+
+  formatReusablePerson(person: { name: string; email: string; phone: string }): string {
+    if (!person) {
+      return '';
+    }
+
+    const segments = [person.name || 'Sin nombre'];
+    if (person.email) {
+      segments.push(person.email);
+    }
+    if (person.phone) {
+      segments.push(person.phone);
+    }
+    return segments.join(' · ');
+  }
+
+  formatRaciTemplateLabel(template: any): string {
+    if (!template) {
+      return '';
+    }
+
+    const topic = template.topic || template.serviceId?.name || 'Sin tópico';
+    const activity = template.activity || 'Sin actividad';
+    return `${topic} — ${activity}`;
+  }
+
+  private extractReusablePeople(entries: any[]): Array<{ name: string; email: string; phone: string }> {
+    const roles: Array<'responsible' | 'accountable' | 'consulted' | 'informed'> = [
+      'responsible',
+      'accountable',
+      'consulted',
+      'informed'
+    ];
+    const unique = new Map<string, { name: string; email: string; phone: string }>();
+
+    for (const entry of entries || []) {
+      for (const role of roles) {
+        const person = entry?.[role] || {};
+        const name = String(person.name || '').trim();
+        const email = String(person.email || '').trim();
+        const phone = String(person.phone || '').trim();
+
+        if (!name && !email && !phone) {
+          continue;
+        }
+
+        const key = `${name.toLowerCase()}|${email.toLowerCase()}|${phone.toLowerCase()}`;
+        if (!unique.has(key)) {
+          unique.set(key, { name, email, phone });
+        }
+      }
+    }
+
+    return Array.from(unique.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }
 
   saveRaciEntry(): void {

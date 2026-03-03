@@ -281,15 +281,12 @@ exports.getContactsPublic = async (req, res) => {
 
 exports.getRaciByClient = async (req, res) => {
   try {
-    const { clientId, serviceId } = req.query;
+    const { clientId } = req.query;
     if (!clientId) {
       return res.status(400).json({ error: 'clientId es requerido' });
     }
 
     const filter = { clientId, active: true };
-    if (serviceId) {
-      filter.serviceId = serviceId;
-    }
 
     const raciEntries = await RaciEntry.find(filter)
       .populate({
@@ -297,8 +294,7 @@ exports.getRaciByClient = async (req, res) => {
         select: 'name parent enabled',
         match: ENABLED_LOG_SOURCE_MATCH
       })
-      .populate('serviceId', 'name')
-      .sort({ activity: 1 });
+      .sort({ topic: 1, activity: 1 });
     const visibleEntries = raciEntries.filter((entry) => Boolean(entry.clientId));
 
     res.json(visibleEntries);
@@ -594,9 +590,7 @@ exports.createRaci = async (req, res) => {
   try {
     const data = { ...req.body };
     data.topic = String(data.topic || '').trim();
-    if (data.topic) {
-      data.serviceId = null;
-    }
+    data.serviceId = null;
     const raciEntry = await RaciEntry.create(data);
     const populated = await RaciEntry.findById(raciEntry._id)
       .populate('clientId', 'name')
@@ -614,9 +608,7 @@ exports.updateRaci = async (req, res) => {
     const { id } = req.params;
     const data = { ...req.body };
     data.topic = String(data.topic || '').trim();
-    if (data.topic) {
-      data.serviceId = null;
-    }
+    data.serviceId = null;
 
     const updated = await RaciEntry.findByIdAndUpdate(id, data, { new: true })
       .populate('clientId', 'name')

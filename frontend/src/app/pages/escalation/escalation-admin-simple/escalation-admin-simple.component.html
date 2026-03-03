@@ -498,6 +498,19 @@
         <mat-card *ngIf="showRaciForm" class="form-card">
           <h3>{{ editingRaciId ? 'Editar' : 'Nuevo' }} RACI</h3>
           <form class="raci-form" [formGroup]="raciForm" (ngSubmit)="saveRaciEntry()">
+            <div class="form-row" *ngIf="reusableRaciTemplates.length > 0">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Reutilizar desde RACI existente</mat-label>
+                <mat-select (selectionChange)="applyRaciTemplate($event.value)">
+                  <mat-option value="">No reutilizar</mat-option>
+                  <mat-option *ngFor="let template of reusableRaciTemplates" [value]="template._id">
+                    {{ formatRaciTemplateLabel(template) }}
+                  </mat-option>
+                </mat-select>
+                <mat-hint>Copia datos base y luego solo ajustas los responsables que cambian.</mat-hint>
+              </mat-form-field>
+            </div>
+
             <div class="form-row">
               <mat-form-field appearance="outline">
                 <mat-label>Cliente</mat-label>
@@ -523,6 +536,17 @@
 
             <!-- RESPONSABLE (R) -->
             <h4 class="raci-section-title">👤 Responsable (R)</h4>
+            <div class="form-row" *ngIf="reusableRaciPeople.length > 0">
+              <mat-form-field appearance="outline">
+                <mat-label>Usar contacto guardado</mat-label>
+                <mat-select (selectionChange)="applyReusablePerson('responsible', $event.value)">
+                  <mat-option [value]="null">Seleccionar</mat-option>
+                  <mat-option *ngFor="let person of reusableRaciPeople" [value]="person">
+                    {{ formatReusablePerson(person) }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
             <div formGroupName="responsible" class="form-row">
               <mat-form-field appearance="outline">
                 <mat-label>Nombre *</mat-label>
@@ -542,6 +566,17 @@
 
             <!-- APROBADOR (A) -->
             <h4 class="raci-section-title">✅ Aprobador (A)</h4>
+            <div class="form-row" *ngIf="reusableRaciPeople.length > 0">
+              <mat-form-field appearance="outline">
+                <mat-label>Usar contacto guardado</mat-label>
+                <mat-select (selectionChange)="applyReusablePerson('accountable', $event.value)">
+                  <mat-option [value]="null">Seleccionar</mat-option>
+                  <mat-option *ngFor="let person of reusableRaciPeople" [value]="person">
+                    {{ formatReusablePerson(person) }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
             <div formGroupName="accountable" class="form-row">
               <mat-form-field appearance="outline">
                 <mat-label>Nombre *</mat-label>
@@ -561,6 +596,17 @@
 
             <!-- CONSULTADO (C) -->
             <h4 class="raci-section-title">💬 Consultado (C)</h4>
+            <div class="form-row" *ngIf="reusableRaciPeople.length > 0">
+              <mat-form-field appearance="outline">
+                <mat-label>Usar contacto guardado</mat-label>
+                <mat-select (selectionChange)="applyReusablePerson('consulted', $event.value)">
+                  <mat-option [value]="null">Seleccionar</mat-option>
+                  <mat-option *ngFor="let person of reusableRaciPeople" [value]="person">
+                    {{ formatReusablePerson(person) }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
             <div formGroupName="consulted" class="form-row">
               <mat-form-field appearance="outline">
                 <mat-label>Nombre</mat-label>
@@ -580,6 +626,17 @@
 
             <!-- INFORMADO (I) -->
             <h4 class="raci-section-title">📢 Informado (I)</h4>
+            <div class="form-row" *ngIf="reusableRaciPeople.length > 0">
+              <mat-form-field appearance="outline">
+                <mat-label>Usar contacto guardado</mat-label>
+                <mat-select (selectionChange)="applyReusablePerson('informed', $event.value)">
+                  <mat-option [value]="null">Seleccionar</mat-option>
+                  <mat-option *ngFor="let person of reusableRaciPeople" [value]="person">
+                    {{ formatReusablePerson(person) }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
             <div formGroupName="informed" class="form-row">
               <mat-form-field appearance="outline">
                 <mat-label>Nombre</mat-label>
