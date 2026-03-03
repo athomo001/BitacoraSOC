@@ -216,7 +216,8 @@ export class EscalationAdminSimpleComponent implements OnInit {
 
     this.escalationReminderForm = this.fb.group({
       escalationReminderEnabled: [false],
-      escalationReminderCargoLabels: [['N2']]
+      escalationReminderCargoLabels: [['N2']],
+      escalationReminderDaysAhead: [7, [Validators.required, Validators.min(1), Validators.max(60)]]
     });
 
     this.escalationReminderForm.get('escalationReminderEnabled')?.valueChanges.subscribe(() => {
@@ -810,7 +811,8 @@ export class EscalationAdminSimpleComponent implements OnInit {
 
         this.escalationReminderForm.patchValue({
           escalationReminderEnabled: config.escalationReminderEnabled ?? false,
-          escalationReminderCargoLabels: selectedCargoLabels.length > 0 ? selectedCargoLabels : ['N2']
+          escalationReminderCargoLabels: selectedCargoLabels.length > 0 ? selectedCargoLabels : ['N2'],
+          escalationReminderDaysAhead: config.escalationReminderDaysAhead || 7
         }, { emitEvent: false });
 
         this.updateEscalationReminderValidators();
@@ -835,10 +837,12 @@ export class EscalationAdminSimpleComponent implements OnInit {
     const selectedCargoLabels = Array.isArray(value.escalationReminderCargoLabels)
       ? value.escalationReminderCargoLabels.filter((cargo: string) => String(cargo || '').trim().length > 0)
       : [];
+    const daysAhead = Number(value.escalationReminderDaysAhead || 7);
 
     this.configService.updateConfig({
       escalationReminderEnabled: !!value.escalationReminderEnabled,
-      escalationReminderCargoLabels: selectedCargoLabels
+      escalationReminderCargoLabels: selectedCargoLabels,
+      escalationReminderDaysAhead: Number.isFinite(daysAhead) ? Math.min(Math.max(daysAhead, 1), 60) : 7
     }).subscribe({
       next: () => {
         this.showSuccess('Recordatorio de escalación interna actualizado');
@@ -858,14 +862,24 @@ export class EscalationAdminSimpleComponent implements OnInit {
       return;
     }
 
+    const selectedCargoLabelsRaw = this.escalationReminderForm?.get('escalationReminderCargoLabels')?.value;
+    const selectedCargoLabels = Array.isArray(selectedCargoLabelsRaw)
+      ? selectedCargoLabelsRaw.map((value: string) => String(value || '').trim()).filter((value: string) => value.length > 0)
+      : [];
+
+    if (selectedCargoLabels.length === 0) {
+      this.showError('Selecciona al menos un cargo para probar el recordatorio');
+      return;
+    }
+
     this.testingEscalationReminder = true;
-    this.escalationService.testEscalationReminder().subscribe({
+    this.escalationService.testEscalationReminder(selectedCargoLabels).subscribe({
       next: (response) => {
         const total = Number(response?.totalRecipients || 0);
         this.showSuccess(`${response?.message || 'Prueba ejecutada'} (${total} destinatarios)`);
       },
       error: (err) => {
-        const backendMessage = err?.error?.message;
+        const backendMessage = err?.error?.message || err?.error?.error;
         this.showError(backendMessage || 'Error en prueba de recordatorio de escalación interna');
       },
       complete: () => {
@@ -907,8 +921,9 @@ export class EscalationAdminSimpleComponent implements OnInit {
   private updateEscalationReminderValidators(): void {
     const enabled = !!this.escalationReminderForm?.get('escalationReminderEnabled')?.value;
     const cargoControl = this.escalationReminderForm?.get('escalationReminderCargoLabels');
+    const daysAheadControl = this.escalationReminderForm?.get('escalationReminderDaysAhead');
 
-    if (!cargoControl) return;
+    if (!cargoControl || !daysAheadControl) return;
 
     if (enabled) {
       cargoControl.setValidators([
@@ -920,6 +935,14 @@ export class EscalationAdminSimpleComponent implements OnInit {
     }
 
     cargoControl.updateValueAndValidity({ emitEvent: false });
+
+    if (enabled) {
+      daysAheadControl.setValidators([Validators.required, Validators.min(1), Validators.max(60)]);
+    } else {
+      daysAheadControl.clearValidators();
+    }
+
+    daysAheadControl.updateValueAndValidity({ emitEvent: false });
   }
 
   // ============ UTILIDADES ============

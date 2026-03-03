@@ -373,7 +373,7 @@ export class EscalationService {
     return this.http.delete<{ message: string }>(`${this.apiUrl}/admin/external-people/${id}`);
   }
 
-  testEscalationReminder(): Observable<{
+  testEscalationReminder(cargoLabels: string[] = []): Observable<{
     message: string;
     cargoLabels: string[];
     totalRecipients: number;
@@ -384,7 +384,7 @@ export class EscalationService {
       cargoLabels: string[];
       totalRecipients: number;
       recipients: string[];
-    }>(`${this.apiUrl}/admin/reminder/test`, {});
+    }>(`${this.apiUrl}/admin/reminder/test`, { cargoLabels });
   }
 
   // 👥 USUARIOS

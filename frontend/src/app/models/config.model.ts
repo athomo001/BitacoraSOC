@@ -13,7 +13,9 @@ export interface AppConfig {
   checklistWeeklyTimezone?: string;
   escalationReminderEnabled?: boolean;
   escalationReminderCargoLabels?: string[];
+  escalationReminderDaysAhead?: number;
   lastEscalationReminderDate?: Date;
+  lastEscalationReminderWeekStartDate?: Date;
   lastChecklistAlertDate?: Date;
   appTitle?: string;
   security?: SecurityConfig;
@@ -95,6 +97,7 @@ export interface UpdateConfigRequest {
   checklistWeeklyTimezone?: string;
   escalationReminderEnabled?: boolean;
   escalationReminderCargoLabels?: string[];
+  escalationReminderDaysAhead?: number;
   appTitle?: string;
   security?: Partial<SecurityConfig>;
   logoUrl?: string;

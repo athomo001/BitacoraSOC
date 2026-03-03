@@ -209,12 +209,12 @@
 
         <div class="section section-spacing-top">
           <h3>🔔 Recordatorio Escalación Interna</h3>
-          <p class="subtitle">Envía un recordatorio diario para completar tablas de escalación interna a usuarios por cargo.</p>
+          <p class="subtitle">Avisa solo cuando detecta una semana futura sin escalación interna cargada.</p>
 
           <mat-card class="inline-form">
             <form [formGroup]="escalationReminderForm" (ngSubmit)="saveEscalationReminderConfig()">
               <mat-checkbox formControlName="escalationReminderEnabled" color="primary">
-                Activar recordatorio diario
+                Activar alerta de semana futura vacía
               </mat-checkbox>
 
               <mat-form-field appearance="outline">
@@ -225,6 +225,12 @@
                   </mat-option>
                 </mat-select>
                 <mat-hint>Puedes seleccionar varios cargos a la vez (ej: N2 y N3).</mat-hint>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Días de antelación</mat-label>
+                <input matInput type="number" min="1" max="60" formControlName="escalationReminderDaysAhead">
+                <mat-hint>Ejemplo: 7 = revisa semana objetivo a una semana de anticipación.</mat-hint>
               </mat-form-field>
 
               <button mat-raised-button color="primary" type="submit" [disabled]="loadingEscalationReminderConfig || savingEscalationReminderConfig">

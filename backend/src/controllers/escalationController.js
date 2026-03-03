@@ -10,6 +10,7 @@ const User = require('../models/User');
 const ExternalPerson = require('../models/ExternalPerson');
 const RaciEntry = require('../models/RaciEntry');
 const AppConfig = require('../models/AppConfig');
+const SmtpConfig = require('../models/SmtpConfig');
 const { sendEscalationInternalReminderEmail } = require('../routes/smtp');
 const { logger } = require('../utils/logger');
 
@@ -1005,10 +1006,25 @@ exports.deleteExternalPerson = async (req, res) => {
 
 exports.testEscalationReminder = async (req, res) => {
   try {
+    const payloadCargoLabels = Array.isArray(req.body?.cargoLabels)
+      ? req.body.cargoLabels.map((value) => String(value || '').trim()).filter(Boolean)
+      : [];
+
     const config = await AppConfig.findOne().select('escalationReminderCargoLabels');
-    const cargoLabels = Array.isArray(config?.escalationReminderCargoLabels)
+    const configuredCargoLabels = Array.isArray(config?.escalationReminderCargoLabels)
       ? config.escalationReminderCargoLabels.map((value) => String(value || '').trim()).filter(Boolean)
       : [];
+
+    const cargoLabels = payloadCargoLabels.length > 0
+      ? payloadCargoLabels
+      : (configuredCargoLabels.length > 0 ? configuredCargoLabels : ['N2']);
+
+    const smtpActive = await SmtpConfig.exists({ isActive: true });
+    if (!smtpActive) {
+      return res.status(400).json({
+        message: 'No hay configuración SMTP activa. Configura SMTP antes de probar el recordatorio.'
+      });
+    }
 
     if (cargoLabels.length === 0) {
       return res.status(400).json({
