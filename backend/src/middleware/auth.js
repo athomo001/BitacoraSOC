@@ -13,6 +13,24 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../models/User');
 
+const READ_ONLY_ROLES = new Set(['guest', 'auditor']);
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+const canEditOwnProfile = (req) => {
+  if (!req) {
+    return false;
+  }
+
+  const method = (req.method || '').toUpperCase();
+  if (method !== 'PUT' && method !== 'PATCH') {
+    return false;
+  }
+
+  const baseUrl = req.baseUrl || '';
+  const path = req.path || '';
+  return baseUrl.endsWith('/users') && path === '/me';
+};
+
 const sessionIpTracker = new Map();
 
 const getTokenFromCookie = (req) => {
@@ -122,6 +140,11 @@ const authenticate = async (req, res, next) => {
     });
 
     req.user = user;
+
+    if (READ_ONLY_ROLES.has(user.role) && !SAFE_METHODS.has(req.method) && !canEditOwnProfile(req)) {
+      return res.status(403).json({ message: 'Este rol es de solo lectura y no puede modificar información' });
+    }
+
     next();
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
@@ -141,7 +164,13 @@ const authorize = (...roles) => {
       return res.status(401).json({ message: 'No autenticado' });
     }
 
-    if (!roles.includes(req.user.role)) {
+    const hasRole = roles.includes(req.user.role);
+    const auditorReadOnlyAdmin =
+      req.user.role === 'auditor' &&
+      roles.includes('admin') &&
+      SAFE_METHODS.has(req.method);
+
+    if (!hasRole && !auditorReadOnlyAdmin) {
       return res.status(403).json({ message: 'No tienes permisos para realizar esta acción' });
     }
 
@@ -149,10 +178,10 @@ const authorize = (...roles) => {
   };
 };
 
-// Middleware para verificar que NO sea guest
+// Middleware para verificar que NO sea rol de solo lectura (guest/auditor)
 const notGuest = (req, res, next) => {
-  if (req.user.role === 'guest') {
-    return res.status(403).json({ message: 'Los invitados no tienen acceso a esta funcionalidad' });
+  if (req.user.role === 'guest' || req.user.role === 'auditor') {
+    return res.status(403).json({ message: 'Este rol es de solo lectura y no puede modificar información' });
   }
   next();
 };

@@ -72,23 +72,23 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   checklistErrorMessage = '';
 
   primaryMenuItems: MenuItem[] = [
-    { icon: 'edit', label: 'Escribir', route: '/main/checklist', roles: ['admin', 'user', 'guest'] },
-    { icon: 'playlist_add_check', label: 'Historial Checklists', route: '/main/checklist-history', roles: ['admin', 'user', 'guest'] },
-    { icon: 'contact_phone', label: 'Escalación', route: '/main/escalation/view', roles: ['admin', 'user', 'guest'] },
-    { icon: 'table_chart', label: 'Generar Reporte', route: '/main/report-generator', roles: ['admin', 'user'] },
-    { icon: 'history', label: 'Mis Entradas', route: '/main/my-entries', roles: ['admin', 'user'] },
-    { icon: 'public', label: 'Ver todas', route: '/main/all-entries', roles: ['admin', 'user', 'guest'] },
-    { icon: 'assessment', label: 'Reportes', route: '/main/reports', roles: ['admin', 'user'] },
-    { icon: 'person', label: 'Mi Perfil', route: '/main/profile', roles: ['admin', 'user'] }
+    { icon: 'edit', label: 'Escribir', route: '/main/checklist', roles: ['admin', 'user', 'guest', 'auditor'] },
+    { icon: 'playlist_add_check', label: 'Historial Checklists', route: '/main/checklist-history', roles: ['admin', 'user', 'guest', 'auditor'] },
+    { icon: 'contact_phone', label: 'Escalación', route: '/main/escalation/view', roles: ['admin', 'user', 'guest', 'auditor'] },
+    { icon: 'table_chart', label: 'Generar Reporte', route: '/main/report-generator', roles: ['admin', 'user', 'guest', 'auditor'] },
+    { icon: 'history', label: 'Mis Entradas', route: '/main/my-entries', roles: ['admin', 'user', 'guest', 'auditor'] },
+    { icon: 'public', label: 'Ver todas', route: '/main/all-entries', roles: ['admin', 'user', 'guest', 'auditor'] },
+    { icon: 'assessment', label: 'Reportes', route: '/main/reports', roles: ['admin', 'user', 'guest', 'auditor'] },
+    { icon: 'person', label: 'Mi Perfil', route: '/main/profile', roles: ['admin', 'user', 'guest', 'auditor'] }
   ];
 
 
   configItems: MenuItem[] = [
-    { icon: 'admin_panel_settings', label: 'Consola Admin', route: '/main/admin', roles: ['admin'] },
-    { icon: 'image', label: 'Branding', route: '/main/logo', roles: ['admin'] },
+    { icon: 'admin_panel_settings', label: 'Consola Admin', route: '/main/admin', roles: ['admin', 'auditor'] },
+    { icon: 'image', label: 'Branding', route: '/main/logo', roles: ['admin', 'auditor'] },
     { icon: 'history', label: 'Logs de Auditoría', route: '/main/audit-logs', roles: ['admin', 'auditor'] },
-    { icon: 'local_offer', label: 'Tags', route: '/main/tags', roles: ['admin'] },
-    { icon: 'backup', label: 'Backup', route: '/main/backup', roles: ['admin'] }
+    { icon: 'local_offer', label: 'Tags', route: '/main/tags', roles: ['admin', 'auditor'] },
+    { icon: 'backup', label: 'Backup', route: '/main/backup', roles: ['admin', 'auditor'] }
   ];
 
   visiblePrimaryMenu: MenuItem[] = [];
@@ -285,7 +285,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     const role = this.currentUser?.role || '';
     this.visiblePrimaryMenu = this.primaryMenuItems.filter(item => item.roles.includes(role));
     this.visibleConfigItems = this.configItems.filter(item => item.roles.includes(role));
-    this.hasConfigAccess = role === 'admin';
+    this.hasConfigAccess = this.visibleConfigItems.length > 0;
   }
 
   trackByMenu = (_: number, item: MenuItem) => item.route + (item.fragment || '');

@@ -46,16 +46,22 @@ const getApiLimiterKey = (req) => {
   return req.ip;
 };
 
+const getLoginLimiterKey = (req) => {
+  const username = String(req.body?.username || '').trim().toLowerCase();
+  return username ? `${req.ip}:${username}` : req.ip;
+};
+
 // Rate limiter para login
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
   max: 5, // 5 intentos permitidos para evitar fuerza bruta (SEC-CRIT-005)
+  keyGenerator: getLoginLimiterKey,
   message: {
     message: 'Demasiados intentos de inicio de sesión. Intenta de nuevo en 15 minutos.'
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skipSuccessfulRequests: false
+  skipSuccessfulRequests: true
 });
 
 // Rate limiter general para API

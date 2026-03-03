@@ -29,6 +29,12 @@ export class AdminGuard implements CanActivate {
   ) {}
 
   canActivate(): boolean {
+    const user = this.authService.getCurrentUser();
+    const allowed = user?.role === 'admin' || user?.role === 'auditor';
+    if (!allowed) {
+      this.router.navigate(['/main/checklist']);
+      return false;
+    }
     return true;
   }
 }
