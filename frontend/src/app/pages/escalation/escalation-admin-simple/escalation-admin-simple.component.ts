@@ -130,7 +130,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
   raciForm!: FormGroup;
   editingRaciId: string | null = null;
   selectedRaciClientId: string | null = null;
-  selectedRaciServiceId: string | null = null;
+  selectedRaciTopic: string = '';
 
   constructor(
     private fb: FormBuilder,
@@ -180,7 +180,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
 
     this.raciForm = this.fb.group({
       clientId: ['', Validators.required],
-      serviceId: [''],
+      topic: [''],
       activity: ['', Validators.required],
       responsible: this.fb.group({
         name: ['', Validators.required],
@@ -556,18 +556,21 @@ export class EscalationAdminSimpleComponent implements OnInit {
 
   loadRaciEntries(): void {
     this.loadingRaci = true;
-    this.escalationService.getRaciAdmin(this.selectedRaciClientId || undefined, this.selectedRaciServiceId || undefined)
-      .subscribe({
-        next: (data) => {
-          this.raciEntries = [...data];
-          this.loadingRaci = false;
-          this.cdr.detectChanges();
-        },
-        error: (err) => {
-          console.error('Error loading RACI:', err);
-          this.loadingRaci = false;
-        }
-      });
+    this.escalationService.getRaciAdmin(
+      this.selectedRaciClientId || undefined,
+      undefined,
+      this.selectedRaciTopic || undefined
+    ).subscribe({
+      next: (data) => {
+        this.raciEntries = [...data];
+        this.loadingRaci = false;
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Error loading RACI:', err);
+        this.loadingRaci = false;
+      }
+    });
   }
 
   onRaciFilterChange(): void {
@@ -587,7 +590,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
     this.editingRaciId = null;
     this.raciForm.reset({
       clientId: this.selectedRaciClientId || '',
-      serviceId: this.selectedRaciServiceId || '',
+      topic: this.selectedRaciTopic || '',
       activity: '',
       responsible: { name: '', email: '', phone: '' },
       accountable: { name: '', email: '', phone: '' },
@@ -603,7 +606,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
     this.editingRaciId = entry._id;
     this.raciForm.reset({
       clientId: entry.clientId?._id || entry.clientId,
-      serviceId: entry.serviceId?._id || entry.serviceId || '',
+      topic: entry.topic || entry.serviceId?.name || '',
       activity: entry.activity,
       responsible: {
         name: entry.responsible?.name || '',
@@ -637,9 +640,8 @@ export class EscalationAdminSimpleComponent implements OnInit {
     }
 
     const payload = this.raciForm.value;
-    if (!payload.serviceId) {
-      payload.serviceId = null;
-    }
+    payload.topic = String(payload.topic || '').trim();
+    payload.serviceId = null;
 
     const request$ = this.editingRaciId
       ? this.escalationService.updateRaci(this.editingRaciId, payload)

@@ -72,6 +72,11 @@ const workShiftSchema = new mongoose.Schema({
     default: null
     // null = sin asignar, puede ser asignado por admin
   },
+  assignedUserIds: {
+    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    default: []
+    // Soporte de múltiples analistas por turno
+  },
     // Checklist template asociado (opcional, legacy)
   checklistTemplateId: {
     type: mongoose.Schema.Types.ObjectId,

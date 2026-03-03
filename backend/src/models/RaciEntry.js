@@ -14,6 +14,12 @@ const raciEntrySchema = new mongoose.Schema({
     ref: 'Service',
     default: null
   },
+  topic: {
+    type: String,
+    default: '',
+    trim: true,
+    maxlength: 180
+  },
   activity: {
     type: String,
     required: true,
@@ -52,6 +58,6 @@ const raciEntrySchema = new mongoose.Schema({
   timestamps: true
 });
 
-raciEntrySchema.index({ clientId: 1, serviceId: 1, activity: 1 });
+raciEntrySchema.index({ clientId: 1, serviceId: 1, topic: 1, activity: 1 });
 
 module.exports = mongoose.model('RaciEntry', raciEntrySchema);
