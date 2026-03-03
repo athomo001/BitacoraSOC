@@ -395,14 +395,18 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
     // B14: Guardas anti-vacío y validación de checklist de cierre
     const isManualTrigger = options.ignoreShiftEnabled === true;
     if (!isManualTrigger) {
-      if (!checklistExit) {
-        logger.warn('📊 [sendShiftReport] Aborted: No closure checklist found for shift', { shiftId: shift._id });
-        return { success: false, message: 'No closure checklist found' };
-      }
-
-      if (!checklistExit && entries.length === 0) {
+      const hasContentToSend = (checklistEntry || checklistExit || (entries && entries.length > 0));
+      if (!hasContentToSend) {
         logger.warn('📊 [sendShiftReport] Aborted: Report is completely empty', { shiftId: shift._id });
         return { success: false, message: 'Empty report aborted' };
+      }
+
+      if (!checklistExit) {
+        logger.warn('📊 [sendShiftReport] No closure checklist found; sending report with available shift data', {
+          shiftId: shift._id,
+          entriesCount: entries.length,
+          hasChecklistEntry: !!checklistEntry
+        });
       }
 
       // B14: Anti duplicados comprobando lastReportSentAt dentro del periodo de turno
