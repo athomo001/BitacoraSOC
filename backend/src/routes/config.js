@@ -83,6 +83,59 @@ const parseBase64Image = (dataUrl) => {
   };
 };
 
+const tlsStorage = multer.diskStorage({
+  destination: async (_req, _file, cb) => {
+    const uploadDir = path.join(__dirname, '../../uploads/tls');
+    try {
+      await fs.mkdir(uploadDir, { recursive: true });
+      cb(null, uploadDir);
+    } catch (error) {
+      cb(error);
+    }
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.pem';
+    const baseName = path.basename(file.originalname, path.extname(file.originalname)).replace(/[^a-zA-Z0-9-_]/g, '');
+    cb(null, `${baseName || 'tls'}-${Date.now()}${ext}`);
+  }
+});
+
+const uploadTls = multer({
+  storage: tlsStorage,
+  limits: { fileSize: 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowedExt = /\.(pem|crt|cer|key)$/i;
+    const extname = allowedExt.test(path.extname(file.originalname).toLowerCase());
+    if (extname) {
+      return cb(null, true);
+    }
+    cb(new Error('Archivo inválido. Tipos permitidos: .pem, .crt, .cer, .key'));
+  }
+});
+
+const DEFAULT_SECURITY_CONFIG = {
+  httpsEnabled: false,
+  forceHttps: false,
+  httpsPort: 3443,
+  tlsCertPath: '',
+  tlsKeyPath: '',
+  tlsCaPath: ''
+};
+
+const extractSecurityConfig = (config) => ({
+  ...DEFAULT_SECURITY_CONFIG,
+  ...(config?.security || {})
+});
+
+const getTlsFileInfo = (security) => ({
+  certUploaded: !!security?.tlsCertPath,
+  keyUploaded: !!security?.tlsKeyPath,
+  caUploaded: !!security?.tlsCaPath,
+  certFileName: security?.tlsCertPath ? path.basename(security.tlsCertPath) : '',
+  keyFileName: security?.tlsKeyPath ? path.basename(security.tlsKeyPath) : '',
+  caFileName: security?.tlsCaPath ? path.basename(security.tlsCaPath) : ''
+});
+
 // GET /api/config - Obtener configuración
 router.get('/', authenticate, async (req, res) => {
   try {
@@ -95,7 +148,8 @@ router.get('/', authenticate, async (req, res) => {
         shiftCheckCooldownHours: 240,
         checklistCloseEmailEnabled: false,
         checklistAlertEnabled: true,
-        checklistAlertTime: '09:30'
+        checklistAlertTime: '09:30',
+        security: DEFAULT_SECURITY_CONFIG
       });
     }
 
@@ -104,6 +158,11 @@ router.get('/', authenticate, async (req, res) => {
     if (configData.smtpConfig && configData.smtpConfig.pass) {
       delete configData.smtpConfig.pass;
     }
+
+    configData.security = {
+      ...extractSecurityConfig(configData),
+      ...getTlsFileInfo(configData?.security)
+    };
 
     res.json(configData);
   } catch (error) {
@@ -123,6 +182,20 @@ router.put('/',
     body('checklistCloseEmailEnabled').optional().isBoolean(),
     body('checklistAlertEnabled').optional().isBoolean(),
     body('checklistAlertTime').optional().matches(/^\d{2}:\d{2}$/).withMessage('Formato de hora inválido (HH:mm)'),
+    body('appTitle').optional().isString().trim().isLength({ max: 80 }).withMessage('El título no puede superar 80 caracteres'),
+    body('security.httpsEnabled').optional().isBoolean(),
+    body('security.forceHttps').optional().isBoolean(),
+    body('security.httpsPort').optional({ nullable: true }).custom((value) => {
+      if (value === null || value === undefined || value === '') return true;
+      const numeric = Number(value);
+      if (!Number.isInteger(numeric) || numeric < 1 || numeric > 65535) {
+        throw new Error('Puerto HTTPS inválido');
+      }
+      return true;
+    }).toInt(),
+    body('security.tlsCertPath').optional().isString().trim().isLength({ max: 500 }),
+    body('security.tlsKeyPath').optional().isString().trim().isLength({ max: 500 }),
+    body('security.tlsCaPath').optional().isString().trim().isLength({ max: 500 }),
     body('logoUrl').optional().trim(),
     body('faviconUrl').optional().trim(),
     body('defaultLogSourceId').optional({ checkFalsy: true }).isMongoId().withMessage('ID de LogSource inválido'),
@@ -161,6 +234,8 @@ router.put('/',
       config.lastUpdatedBy = req.user._id;
       await config.save();
 
+      req.app.locals.runtimeSecurityConfig = extractSecurityConfig(config);
+
       // Invalidar cache de SMTP si se actualizó
       if (req.body.smtpConfig) {
         invalidateCache();
@@ -169,11 +244,80 @@ router.put('/',
       // Populate defaultLogSourceId para retornar nombre
       await config.populate('defaultLogSourceId', 'name enabled');
 
-      res.json({ message: 'Configuración actualizada', config });
+      const responseConfig = config.toObject();
+      responseConfig.security = {
+        ...extractSecurityConfig(responseConfig),
+        ...getTlsFileInfo(responseConfig?.security)
+      };
+
+      res.json({ message: 'Configuración actualizada', config: responseConfig });
     } catch (error) {
       console.error('Error al actualizar config:', error);
       res.status(500).json({ message: 'Error al actualizar configuración' });
     }
+  }
+);
+
+// POST /api/config/security/certificates - Subir certificados TLS (admin)
+router.post('/security/certificates',
+  authenticate,
+  authorize('admin'),
+  (req, res) => {
+    uploadTls.fields([
+      { name: 'tlsCert', maxCount: 1 },
+      { name: 'tlsKey', maxCount: 1 },
+      { name: 'tlsCa', maxCount: 1 }
+    ])(req, res, async (err) => {
+      if (err) {
+        return res.status(400).json({ message: err.message || 'Error al subir certificados TLS' });
+      }
+
+      try {
+        const files = req.files || {};
+        const certFile = files.tlsCert?.[0];
+        const keyFile = files.tlsKey?.[0];
+        const caFile = files.tlsCa?.[0];
+
+        if (!certFile && !keyFile && !caFile) {
+          return res.status(400).json({ message: 'Debes seleccionar al menos un archivo TLS' });
+        }
+
+        let config = await AppConfig.findOne();
+        if (!config) {
+          config = new AppConfig();
+        }
+
+        const currentSecurity = extractSecurityConfig(config);
+
+        if (certFile) {
+          currentSecurity.tlsCertPath = `uploads/tls/${certFile.filename}`;
+        }
+
+        if (keyFile) {
+          currentSecurity.tlsKeyPath = `uploads/tls/${keyFile.filename}`;
+        }
+
+        if (caFile) {
+          currentSecurity.tlsCaPath = `uploads/tls/${caFile.filename}`;
+        }
+
+        config.security = currentSecurity;
+        config.lastUpdatedBy = req.user._id;
+        await config.save();
+
+        req.app.locals.runtimeSecurityConfig = extractSecurityConfig(config);
+
+        return res.json({
+          message: 'Certificados TLS actualizados',
+          security: {
+            ...extractSecurityConfig(config),
+            ...getTlsFileInfo(config.security)
+          }
+        });
+      } catch (error) {
+        return res.status(500).json({ message: 'Error al guardar certificados TLS' });
+      }
+    });
   }
 );
 

@@ -8,6 +8,7 @@
 | ID | Estado | Seccion | Tarea | Notas |
 | --- | --- | --- | --- | --- |
 | B19 | Pendiente | Integraciones | Creación de tickets en GLPI (Correo / API) | Separado en módulo propio `Admin > GLPI` por complejidad. Definir flujo final (resumen diario vs evento inmediato), destino de correo collector, y/o API REST oficial (`apirest.php`) con `App-Token` + `Authorization user_token`/Basic para `initSession`, uso de `Session-Token`, payload de `Ticket` y manejo de errores/reintentos. |
+| B28 | Pendiente | Infraestructura/Seguridad | Configuración HTTPS simplificada (certificados + checkbox “Forzar HTTPS”) | Revisión de código: hoy backend inicia solo HTTP en `backend/src/server.js` (`app.listen`), frontend apunta a `http://...:3000` incluso en prod (`frontend/src/environments/environment*.ts`) y Nginx escucha solo `80` (`frontend/nginx.conf`). Se requiere flujo simple para dejar HTTPS operativo sin “tanto show”: cargar/definir certificado y llave en una sola configuración, validación básica previa, y checkbox admin `Forzar HTTPS` (ON: redirección HTTP→HTTPS + cookies seguras; OFF: permite HTTP sin forzar). |
 
 
 ---

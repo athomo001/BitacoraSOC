@@ -94,6 +94,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   visibleConfigItems: MenuItem[] = [];
   hasConfigAccess = false;
   logoUrl: string = '';
+  appTitle: string = '';
   private backendBaseUrl = environment.backendBaseUrl;
 
   constructor(
@@ -117,6 +118,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     this.loadNotes();
     this.loadChecklist();
     this.loadLogo();
+    this.loadBrandingTitle();
     this.setupAutosave();
   }
 
@@ -145,6 +147,19 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
         },
         error: () => {
           this.logoUrl = '';
+        }
+      });
+  }
+
+  loadBrandingTitle(): void {
+    this.configService.getConfig()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (config: any) => {
+          this.appTitle = (config?.appTitle || '').trim();
+        },
+        error: () => {
+          this.appTitle = '';
         }
       });
   }

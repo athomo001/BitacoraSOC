@@ -125,6 +125,45 @@ const appConfigSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  // Título de la aplicación (toolbar principal)
+  appTitle: {
+    type: String,
+    default: '',
+    trim: true,
+    maxlength: 80
+  },
+  // Seguridad HTTPS
+  security: {
+    httpsEnabled: {
+      type: Boolean,
+      default: false
+    },
+    forceHttps: {
+      type: Boolean,
+      default: false
+    },
+    httpsPort: {
+      type: Number,
+      default: undefined,
+      min: 1,
+      max: 65535
+    },
+    tlsCertPath: {
+      type: String,
+      default: '',
+      trim: true
+    },
+    tlsKeyPath: {
+      type: String,
+      default: '',
+      trim: true
+    },
+    tlsCaPath: {
+      type: String,
+      default: '',
+      trim: true
+    }
+  },
   logoType: {
     type: String,
     enum: ['url', 'upload', 'external'],

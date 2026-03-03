@@ -16,6 +16,7 @@ export class AdminConsoleComponent {
     { label: 'Catálogos', route: '/main/admin/catalogs' },
     { label: 'Escalación', route: '/main/admin/escalation' },
     { label: 'SMTP / Config', route: '/main/admin/smtp' },
+    { label: 'HTTPS / Seguridad', route: '/main/admin/security' },
     { label: 'Integraciones', route: '/main/admin/integrations' },
     { label: 'GLPI', route: '/main/admin/glpi' }
   ];

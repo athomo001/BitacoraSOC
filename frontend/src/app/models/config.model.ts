@@ -7,6 +7,8 @@ export interface AppConfig {
   checklistAlertEnabled?: boolean;
   checklistAlertTime?: string;
   lastChecklistAlertDate?: Date;
+  appTitle?: string;
+  security?: SecurityConfig;
   logoUrl?: string;
   logoType?: 'url' | 'upload' | 'external';
   faviconUrl?: string;
@@ -56,6 +58,21 @@ export interface SmtpConfig {
   from: string;
 }
 
+export interface SecurityConfig {
+  httpsEnabled: boolean;
+  forceHttps: boolean;
+  httpsPort?: number;
+  tlsCertPath?: string;
+  tlsKeyPath?: string;
+  tlsCaPath?: string;
+  certUploaded?: boolean;
+  keyUploaded?: boolean;
+  caUploaded?: boolean;
+  certFileName?: string;
+  keyFileName?: string;
+  caFileName?: string;
+}
+
 export interface UpdateConfigRequest {
   guestModeEnabled?: boolean;
   guestMaxDurationDays?: number;
@@ -63,6 +80,8 @@ export interface UpdateConfigRequest {
   checklistCloseEmailEnabled?: boolean;
   checklistAlertEnabled?: boolean;
   checklistAlertTime?: string;
+  appTitle?: string;
+  security?: Partial<SecurityConfig>;
   logoUrl?: string;
   faviconUrl?: string;
   defaultLogSourceId?: string | null;

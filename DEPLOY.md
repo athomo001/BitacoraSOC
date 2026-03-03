@@ -130,14 +130,19 @@ docker compose up -d
 # Puerto publico del frontend
 FRONTEND_PORT=80
 
+# Backend HTTP/HTTPS
+BACKEND_PORT=3000
+BACKEND_HTTPS_PORT=3443
+HTTPS_PORT=3443
+
 # CORS (OBLIGATORIO en producción)
 # Incluye la URL exacta desde donde abres el frontend
-ALLOWED_ORIGINS=http://10.0.100.13:4200
+ALLOWED_ORIGINS=https://soc.midominio.cl
 
 # Cookie de sesión
 # - Si usas HTTPS real: true
 # - Si usas HTTP en red local: false
-COOKIE_SECURE=false
+COOKIE_SECURE=true
 
 # MongoDB
 MONGO_ROOT_PASSWORD=tu_password_seguro
@@ -155,6 +160,21 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD=CHANGE_ME
 ADMIN_EMAIL=admin@example.com
 ```
+
+## HTTPS en Docker (automático)
+
+La configuración HTTPS se guarda en base de datos desde `Consola Admin > HTTPS / Seguridad` y se aplica al reiniciar el backend.
+
+Pasos recomendados en producción:
+1. Subir `SSL/TLS certificate` y `SSL/TLS private key` en la consola admin.
+2. Guardar y activar `Habilitar listener HTTPS del backend`.
+3. Reiniciar backend: `docker compose restart backend`.
+4. Verificar `https://TU_HOST:${BACKEND_HTTPS_PORT}`.
+5. Activar `Forzar HTTPS` solo cuando HTTPS ya responda correctamente.
+
+Notas:
+- Los archivos TLS quedan persistidos en `./.data/uploads` (ruta interna `/app/uploads/tls`).
+- Si cambias dominio/puerto HTTPS, actualiza `ALLOWED_ORIGINS` con la URL real del frontend para evitar bloqueo CORS.
 
 ## Health checks (importante)
 - Backend y frontend tienen health checks en sus Dockerfile.
