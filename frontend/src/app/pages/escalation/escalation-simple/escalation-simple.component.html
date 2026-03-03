@@ -194,17 +194,18 @@
       <table class="excel-table simple-table">
         <thead>
           <tr>
+            <th>Tópico</th>
             <th>Actividad/Proceso</th>
             <th>Responsable (R)</th>
             <th>Aprobador (A)</th>
             <th>Consultado (C)</th>
             <th>Informado (I)</th>
-            <th>Servicio</th>
             <th>Notas</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let raci of raciEntries" class="data-row">
+            <td class="cell-name">{{ raci.topic || '-' }}</td>
             <td class="cell-name">{{ raci.activity }}</td>
             <td>
               <div *ngIf="raci.responsible?.name">
@@ -246,7 +247,6 @@
               </div>
               <span *ngIf="!raci.informed?.name">-</span>
             </td>
-            <td>{{ raci.serviceId?.name || '-' }}</td>
             <td>{{ raci.notes || '-' }}</td>
           </tr>
           <tr *ngIf="!raciEntries || raciEntries.length === 0" class="no-data-row">
