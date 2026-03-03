@@ -174,7 +174,7 @@ export class AllEntriesComponent implements OnInit {
 
   viewEntry(entry: Entry): void {
     const author = entry.createdByUsername || 'N/A';
-    const date = entry.entryDate;
+    const date = this.formatEntryDate(entry.entryDate);
     const time = entry.entryTime;
     const type = entry.entryType === 'incidente'
       ? 'INCIDENTE'
@@ -196,6 +196,20 @@ Tags: ${tags}`;
       width: '900px',
       maxWidth: '95vw',
       maxHeight: '85vh'
+    });
+  }
+
+  private formatEntryDate(value: string): string {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+
+    return parsed.toLocaleDateString('es-CL', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      timeZone: 'UTC'
     });
   }
 
