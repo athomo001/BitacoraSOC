@@ -21,6 +21,7 @@ export interface WorkShift {
   endTime: string; // HH:MM formato 24h (puede ser < startTime si cruza medianoche)
   timezone: string; // Ej: "America/Santiago"
   assignedUserId?: string | null; // Usuario asignado (opcional)
+  assignedUserIds?: Array<string | { _id: string; fullName?: string; email?: string }>;
   assignedUserName?: string; // Populated field
   assignedUserEmail?: string; // Populated field
   checklistTemplateId?: string | null; // Template de checklist asociado (opcional)
@@ -52,6 +53,7 @@ export interface WorkShiftFormData {
   endTime: string;
   timezone: string;
   assignedUserId?: string | null;
+  assignedUserIds?: string[];
   checklistTemplateId?: string | null; // Template de checklist asociado (opcional, legacy)
   checklistTemplateName?: string; // Populated field
   checklistTemplateStartId?: string | null; // Template de checklist Inicio (opcional)

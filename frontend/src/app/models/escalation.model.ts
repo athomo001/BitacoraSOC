@@ -131,6 +131,7 @@ export interface RaciEntry {
   _id: string;
   clientId: string | Client;
   serviceId?: string | Service | null;
+  topic?: string;
   activity: string;
   responsible: RaciContact;
   accountable: RaciContact;
@@ -341,6 +342,7 @@ export interface ShiftOverrideFormData {
 export interface RaciEntryFormData {
   clientId: string;
   serviceId?: string | null;
+  topic?: string;
   activity: string;
   responsible: string;
   accountable: string;

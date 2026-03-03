@@ -6,6 +6,27 @@ const validate = require('../middleware/validate');
 const WorkShift = require('../models/WorkShift');
 const { logger } = require('../utils/logger');
 
+const normalizeAssignedUsersPayload = (payload = {}) => {
+  const nextPayload = { ...payload };
+
+  const hasAssignedUserIds = Object.prototype.hasOwnProperty.call(nextPayload, 'assignedUserIds');
+  const hasAssignedUserId = Object.prototype.hasOwnProperty.call(nextPayload, 'assignedUserId');
+
+  if (hasAssignedUserIds) {
+    const raw = Array.isArray(nextPayload.assignedUserIds) ? nextPayload.assignedUserIds : [];
+    const normalized = Array.from(new Set(raw.filter(Boolean).map((value) => String(value))));
+    nextPayload.assignedUserIds = normalized;
+    nextPayload.assignedUserId = normalized.length > 0 ? normalized[0] : null;
+    return nextPayload;
+  }
+
+  if (hasAssignedUserId) {
+    nextPayload.assignedUserIds = nextPayload.assignedUserId ? [nextPayload.assignedUserId] : [];
+  }
+
+  return nextPayload;
+};
+
 /**
  * Rutas de Turnos de Trabajo
  * 
@@ -32,6 +53,7 @@ router.get('/current', authenticate, async (req, res) => {
     // Buscar turnos activos
     const shifts = await WorkShift.find({ active: true })
       .populate('assignedUserId', 'fullName email phone')
+      .populate('assignedUserIds', 'fullName email phone')
       .populate('checklistTemplateId', 'name')
         .populate('checklistTemplateStartId', 'name')
         .populate('checklistTemplateEndId', 'name')
@@ -89,6 +111,7 @@ router.get('/',
       
       const shifts = await WorkShift.find(filter)
         .populate('assignedUserId', 'fullName email')
+        .populate('assignedUserIds', 'fullName email')
         .populate('checklistTemplateId', 'name')
         .populate('checklistTemplateStartId', 'name')
         .populate('checklistTemplateEndId', 'name')
@@ -113,6 +136,7 @@ router.get('/:id',
     try {
       const shift = await WorkShift.findById(req.params.id)
         .populate('assignedUserId', 'fullName email phone')
+        .populate('assignedUserIds', 'fullName email phone')
         .populate('checklistTemplateId', 'name')
         .populate('checklistTemplateStartId', 'name')
         .populate('checklistTemplateEndId', 'name');
@@ -176,6 +200,8 @@ router.post('/',
     body('timezone').optional().trim(),
     body('description').optional().trim(),
     body('assignedUserId').optional({ checkFalsy: true }).isMongoId().withMessage('assignedUserId inválido'),
+    body('assignedUserIds').optional().isArray().withMessage('assignedUserIds debe ser un array'),
+    body('assignedUserIds.*').optional({ checkFalsy: true }).isMongoId().withMessage('assignedUserIds contiene IDs inválidos'),
     body('checklistTemplateId').optional({ checkFalsy: true }).isMongoId().withMessage('checklistTemplateId inválido'),
     body('checklistTemplateStartId').optional({ checkFalsy: true }).isMongoId().withMessage('checklistTemplateStartId inválido'),
     body('checklistTemplateEndId').optional({ checkFalsy: true }).isMongoId().withMessage('checklistTemplateEndId inválido'),
@@ -198,10 +224,12 @@ router.post('/',
         return res.status(400).json({ error: 'El código ya existe' });
       }
       
-      const shift = new WorkShift(req.body);
+      const payload = normalizeAssignedUsersPayload(req.body);
+      const shift = new WorkShift(payload);
       await shift.save();
       
       await shift.populate('assignedUserId', 'fullName email');
+      await shift.populate('assignedUserIds', 'fullName email');
       await shift.populate('checklistTemplateId', 'name')
         .populate('checklistTemplateStartId', 'name')
         .populate('checklistTemplateEndId', 'name');
@@ -229,6 +257,8 @@ router.put('/:id',
     body('timezone').optional().trim(),
     body('description').optional().trim(),
     body('assignedUserId').optional({ checkFalsy: true }).isMongoId(),
+    body('assignedUserIds').optional().isArray(),
+    body('assignedUserIds.*').optional({ checkFalsy: true }).isMongoId(),
     body('checklistTemplateId').optional({ checkFalsy: true }).isMongoId(),
     body('checklistTemplateStartId').optional({ checkFalsy: true }).isMongoId(),
     body('checklistTemplateEndId').optional({ checkFalsy: true }).isMongoId(),
@@ -256,12 +286,15 @@ router.put('/:id',
         }
       }
       
+      const payload = normalizeAssignedUsersPayload(req.body);
+
       const shift = await WorkShift.findByIdAndUpdate(
         req.params.id,
-        req.body,
+        payload,
         { new: true, runValidators: true }
       )
         .populate('assignedUserId', 'fullName email')
+        .populate('assignedUserIds', 'fullName email')
         .populate('checklistTemplateId', 'name')
         .populate('checklistTemplateStartId', 'name')
         .populate('checklistTemplateEndId', 'name');

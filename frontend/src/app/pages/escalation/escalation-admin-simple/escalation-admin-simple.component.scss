@@ -78,6 +78,32 @@
   color: var(--text-secondary);
 }
 
+.raci-form {
+  display: block !important;
+
+  .form-row {
+    width: 100%;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .raci-section-title {
+    margin-top: 10px;
+    margin-bottom: 6px;
+    font-size: 14px;
+    line-height: 1.2;
+  }
+
+  .form-actions {
+    margin-top: 10px;
+  }
+
+  mat-form-field {
+    margin: 0;
+  }
+}
+
 .section {
   margin-bottom: 40px;
 }

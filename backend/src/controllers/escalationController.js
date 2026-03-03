@@ -565,10 +565,13 @@ exports.deleteContact = async (req, res) => {
 
 exports.getRaciAdmin = async (req, res) => {
   try {
-    const { clientId, serviceId } = req.query;
+    const { clientId, serviceId, topic } = req.query;
     const filter = {};
     if (clientId) filter.clientId = clientId;
     if (serviceId) filter.serviceId = serviceId;
+    if (topic) {
+      filter.topic = { $regex: String(topic).trim(), $options: 'i' };
+    }
 
     const raciEntries = await RaciEntry.find(filter)
       .populate({
@@ -590,6 +593,10 @@ exports.getRaciAdmin = async (req, res) => {
 exports.createRaci = async (req, res) => {
   try {
     const data = { ...req.body };
+    data.topic = String(data.topic || '').trim();
+    if (data.topic) {
+      data.serviceId = null;
+    }
     const raciEntry = await RaciEntry.create(data);
     const populated = await RaciEntry.findById(raciEntry._id)
       .populate('clientId', 'name')
@@ -606,6 +613,10 @@ exports.updateRaci = async (req, res) => {
   try {
     const { id } = req.params;
     const data = { ...req.body };
+    data.topic = String(data.topic || '').trim();
+    if (data.topic) {
+      data.serviceId = null;
+    }
 
     const updated = await RaciEntry.findByIdAndUpdate(id, data, { new: true })
       .populate('clientId', 'name')

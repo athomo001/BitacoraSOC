@@ -201,13 +201,16 @@ export class EscalationService {
   // 🔧 CRUD ADMIN - RACI
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  getRaciAdmin(clientId?: string, serviceId?: string): Observable<RaciEntry[]> {
+  getRaciAdmin(clientId?: string, serviceId?: string, topic?: string): Observable<RaciEntry[]> {
     let params = new HttpParams();
     if (clientId) {
       params = params.set('clientId', clientId);
     }
     if (serviceId) {
       params = params.set('serviceId', serviceId);
+    }
+    if (topic) {
+      params = params.set('topic', topic);
     }
     return this.http.get<RaciEntry[]>(`${this.apiUrl}/admin/raci`, { params });
   }

@@ -52,6 +52,7 @@ export class WorkShiftsAdminComponent implements OnInit {
   users: any[] = [];
   operationalRows: Array<{
     shiftId: string;
+    userId: string;
     analystName: string;
     shiftName: string;
     schedule: string;
@@ -189,25 +190,54 @@ export class WorkShiftsAdminComponent implements OnInit {
   }
 
   private rebuildOperationalRows(): void {
-    this.operationalRows = this.shifts
-      .filter((shift: WorkShift) => Boolean(shift.assignedUserId))
-      .map((shift: WorkShift) => ({
+    this.operationalRows = this.shifts.flatMap((shift: WorkShift) => {
+      const assignedIds = this.getAssignedUserIds(shift);
+      return assignedIds.map((userId) => ({
         shiftId: shift._id,
-        analystName: this.getAssignedAnalystName(shift),
+        userId,
+        analystName: this.getAssignedAnalystName(shift, userId),
         shiftName: shift.name,
         schedule: this.formatTimeRange(shift),
-        weekdaysLabel: 'Lun-Dom',
+        weekdaysLabel: this.getWeekdaysLabel(shift),
         status: this.isShiftActiveNow(shift) ? 'EN_TURNO' : 'FUERA_DE_TURNO'
       }));
+    });
   }
 
-  private getAssignedAnalystName(shift: WorkShift): string {
-    const assigned = this.getObjectId((shift as any).assignedUserId);
-    if (!assigned) {
-      return 'Sin asignar';
+  private getAssignedUserIds(shift: WorkShift): string[] {
+    const fromArray = Array.isArray((shift as any).assignedUserIds)
+      ? (shift as any).assignedUserIds
+          .map((value: any) => this.getObjectId(value))
+          .filter((value: string | null): value is string => Boolean(value))
+      : [];
+
+    if (fromArray.length > 0) {
+      return Array.from(new Set(fromArray));
     }
-    const fromLoadedUsers = this.users.find((u: any) => String(u._id) === assigned);
-    return fromLoadedUsers?.fullName || shift.assignedUserName || 'Usuario asignado';
+
+    const single = this.getObjectId((shift as any).assignedUserId);
+    return single ? [single] : [];
+  }
+
+  private getAssignedAnalystName(shift: WorkShift, userId: string): string {
+    const fromShiftArray = Array.isArray((shift as any).assignedUserIds)
+      ? (shift as any).assignedUserIds.find((value: any) => this.getObjectId(value) === userId)
+      : null;
+
+    if (fromShiftArray && typeof fromShiftArray === 'object' && (fromShiftArray.fullName || fromShiftArray.email)) {
+      return fromShiftArray.fullName || fromShiftArray.email;
+    }
+
+    const fromLoadedUsers = this.users.find((u: any) => String(u._id) === userId);
+    if (fromLoadedUsers?.fullName) {
+      return fromLoadedUsers.fullName;
+    }
+
+    return 'Usuario asignado';
+  }
+
+  private getWeekdaysLabel(shift: WorkShift): string {
+    return shift.type === 'regular' ? 'Lun-Vie' : 'Lun-Dom';
   }
 
   private hhmmToMinutes(value: string): number {
@@ -219,6 +249,13 @@ export class WorkShiftsAdminComponent implements OnInit {
     if (!shift?.active) {
       return false;
     }
+
+    const day = new Date().getDay();
+    const isWeekend = day === 0 || day === 6;
+    if (shift.type === 'regular' && isWeekend) {
+      return false;
+    }
+
     const now = new Date();
     const nowMinutes = (now.getHours() * 60) + now.getMinutes();
     const startMinutes = this.hhmmToMinutes(shift.startTime);
@@ -256,7 +293,24 @@ export class WorkShiftsAdminComponent implements OnInit {
     const shiftId = this.operationalAssignmentForm.value.shiftId;
     const userId = this.operationalAssignmentForm.value.userId;
 
-    this.workShiftService.updateShift(shiftId, { assignedUserId: userId }).subscribe({
+    const targetShift = this.shifts.find((shift) => shift._id === shiftId);
+    if (!targetShift) {
+      this.snackBar.open('No se encontró el turno seleccionado', 'Cerrar', { duration: 3000 });
+      return;
+    }
+
+    const currentAssigned = this.getAssignedUserIds(targetShift);
+    if (currentAssigned.includes(String(userId))) {
+      this.snackBar.open('Ese analista ya está vinculado a este turno', 'Cerrar', { duration: 2500 });
+      return;
+    }
+
+    const updatedAssigned = [...currentAssigned, String(userId)];
+
+    this.workShiftService.updateShift(shiftId, {
+      assignedUserIds: updatedAssigned,
+      assignedUserId: updatedAssigned[0] || null
+    }).subscribe({
       next: () => {
         this.snackBar.open('Asignación operativa guardada', 'Cerrar', { duration: 2500 });
         this.operationalAssignmentForm.reset({ shiftId: null, userId: null });
@@ -265,6 +319,31 @@ export class WorkShiftsAdminComponent implements OnInit {
       error: (error: any) => {
         console.error('Error saving operational assignment:', error);
         this.snackBar.open(error?.error?.error || 'Error al guardar asignación operativa', 'Cerrar', { duration: 3000 });
+      }
+    });
+  }
+
+  unlinkOperationalAssignment(row: { shiftId: string; userId: string; analystName: string }): void {
+    const targetShift = this.shifts.find((shift) => shift._id === row.shiftId);
+    if (!targetShift) {
+      this.snackBar.open('No se encontró el turno seleccionado', 'Cerrar', { duration: 3000 });
+      return;
+    }
+
+    const currentAssigned = this.getAssignedUserIds(targetShift);
+    const updatedAssigned = currentAssigned.filter((id) => id !== row.userId);
+
+    this.workShiftService.updateShift(row.shiftId, {
+      assignedUserIds: updatedAssigned,
+      assignedUserId: updatedAssigned[0] || null
+    }).subscribe({
+      next: () => {
+        this.snackBar.open(`Analista desvinculado: ${row.analystName}`, 'Cerrar', { duration: 2500 });
+        this.loadShifts();
+      },
+      error: (error: any) => {
+        console.error('Error unlinking operational assignment:', error);
+        this.snackBar.open(error?.error?.error || 'Error al desvincular analista', 'Cerrar', { duration: 3000 });
       }
     });
   }
@@ -422,7 +501,16 @@ export class WorkShiftsAdminComponent implements OnInit {
   }
 
   getUserName(shift: WorkShift): string {
-    return shift.assignedUserName || 'Sin asignar';
+    const assignedIds = this.getAssignedUserIds(shift);
+    if (assignedIds.length === 0) {
+      return 'Sin asignar';
+    }
+
+    if (assignedIds.length === 1) {
+      return this.getAssignedAnalystName(shift, assignedIds[0]);
+    }
+
+    return `${assignedIds.length} asignados`;
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -496,7 +584,9 @@ export class WorkShiftsAdminComponent implements OnInit {
 
           // Guardar cada turno con la nueva configuración
           const updatePromises = this.shifts.map(shift =>
-            this.workShiftService.updateShift(shift._id, shift).toPromise()
+            this.workShiftService.updateShift(shift._id, {
+              emailReportConfig: shift.emailReportConfig
+            }).toPromise()
           );
 
           Promise.all(updatePromises).then(() => {

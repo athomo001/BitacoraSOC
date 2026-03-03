@@ -484,13 +484,8 @@
           </mat-form-field>
 
           <mat-form-field appearance="outline">
-            <mat-label>Servicio (opcional)</mat-label>
-            <mat-select [(ngModel)]="selectedRaciServiceId" (selectionChange)="onRaciFilterChange()">
-              <mat-option value="">Todos</mat-option>
-              <mat-option *ngFor="let service of services" [value]="service._id">
-                {{ service.name }}
-              </mat-option>
-            </mat-select>
+            <mat-label>Tópico (opcional)</mat-label>
+            <input matInput [(ngModel)]="selectedRaciTopic" (ngModelChange)="onRaciFilterChange()" placeholder="Ej: Ciber Vigilancia">
           </mat-form-field>
 
           <button mat-raised-button color="primary" (click)="addRaciEntry()">
@@ -502,7 +497,7 @@
         <!-- Formulario RACI -->
         <mat-card *ngIf="showRaciForm" class="form-card">
           <h3>{{ editingRaciId ? 'Editar' : 'Nuevo' }} RACI</h3>
-          <form [formGroup]="raciForm" (ngSubmit)="saveRaciEntry()">
+          <form class="raci-form" [formGroup]="raciForm" (ngSubmit)="saveRaciEntry()">
             <div class="form-row">
               <mat-form-field appearance="outline">
                 <mat-label>Cliente</mat-label>
@@ -514,13 +509,8 @@
               </mat-form-field>
 
               <mat-form-field appearance="outline">
-                <mat-label>Servicio (opcional)</mat-label>
-                <mat-select formControlName="serviceId">
-                  <mat-option value="">Sin servicio</mat-option>
-                  <mat-option *ngFor="let service of services" [value]="service._id">
-                    {{ service.name }}
-                  </mat-option>
-                </mat-select>
+                <mat-label>Tópico (opcional)</mat-label>
+                <input matInput formControlName="topic" placeholder="Ej: Qradar">
               </mat-form-field>
             </div>
 
@@ -630,18 +620,19 @@
           <table>
             <thead>
               <tr>
+                <th>Tópico</th>
                 <th>Actividad</th>
                 <th>R - Responsable</th>
                 <th>A - Aprobador</th>
                 <th>C - Consultado</th>
                 <th>I - Informado</th>
                 <th>Cliente</th>
-                <th>Servicio</th>
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
               <tr *ngFor="let raci of raciEntries">
+                <td>{{ raci.topic || raci.serviceId?.name || '-' }}</td>
                 <td>{{ raci.activity }}</td>
                 <td>
                   <div *ngIf="raci.responsible?.name">
@@ -676,7 +667,6 @@
                   <span *ngIf="!raci.informed?.name">-</span>
                 </td>
                 <td>{{ getRaciClientName(raci) }}</td>
-                <td>{{ raci.serviceId?.name || '-' }}</td>
                 <td>
                   <button mat-icon-button (click)="editRaciEntry(raci)">
                     <mat-icon>edit</mat-icon>

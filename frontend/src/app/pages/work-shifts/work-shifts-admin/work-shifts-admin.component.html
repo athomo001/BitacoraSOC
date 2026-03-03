@@ -348,6 +348,7 @@
                 <th>Horario</th>
                 <th>Días</th>
                 <th>Estado Operativo</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -360,6 +361,11 @@
                   <mat-chip [class]="getOperationalStatusClass(row.status)">
                     {{ getOperationalStatusLabel(row.status) }}
                   </mat-chip>
+                </td>
+                <td>
+                  <button mat-icon-button color="warn" (click)="unlinkOperationalAssignment(row)" matTooltip="Desvincular analista">
+                    <mat-icon>link_off</mat-icon>
+                  </button>
                 </td>
               </tr>
             </tbody>
