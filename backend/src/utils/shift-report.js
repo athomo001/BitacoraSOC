@@ -2,6 +2,7 @@ const { sendEmail } = require('./email');
 const WorkShift = require('../models/WorkShift');
 const Entry = require('../models/Entry');
 const ShiftCheck = require('../models/ShiftCheck');
+const AppConfig = require('../models/AppConfig');
 const { logger } = require('./logger');
 
 /**
@@ -91,7 +92,7 @@ const buildServiceRows = (checklistEntry, checklistExit) => {
 
 const renderStatusCell = (service) => {
   if (!service) {
-    return '<span style="color:#000000 !important;font-size:12px;">No registrado</span>';
+    return '<span style="color:#000000 !important;font-size:11px;line-height:1.25;">No registrado</span>';
   }
 
   const isOk = service.status === 'verde';
@@ -101,22 +102,20 @@ const renderStatusCell = (service) => {
   const observation = service.observation ? escapeHtml(service.observation) : '-';
 
   return `
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;border-spacing:0;">
-      <tr>
-        <td bgcolor="${color}" style="background-color:${color};padding:4px 10px;border-radius:4px;border:1px solid ${color};">
-          <span style="color:#ffffff !important;-webkit-text-fill-color:#ffffff !important;font-weight:700;font-size:12px;letter-spacing:0.3px;">${label}</span>
-        </td>
-      </tr>
-    </table>
-    <div style="margin-top:4px;color:#000000 !important;-webkit-text-fill-color:#000000 !important;font-size:11px;font-weight:600;">${labelWithText}</div>
-    <div style="margin-top:4px;color:#000000 !important;-webkit-text-fill-color:#000000 !important;font-size:12px;">${observation}</div>
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;line-height:1.2;">
+      <span style="display:inline-block;background-color:${color};padding:2px 8px;border-radius:4px;border:1px solid ${color};color:#ffffff !important;-webkit-text-fill-color:#ffffff !important;font-weight:700;font-size:11px;letter-spacing:0.2px;">${label}</span>
+      <span style="color:#000000 !important;-webkit-text-fill-color:#000000 !important;font-size:11px;font-weight:600;">${labelWithText}</span>
+    </div>
+    <div style="margin-top:2px;color:#000000 !important;-webkit-text-fill-color:#000000 !important;font-size:11px;line-height:1.25;"><strong>Obs:</strong> ${observation}</div>
   `;
 };
 
 /**
  * Genera HTML del reporte de turno
  */
-function generateReportHTML({ shift, checklistEntry, checklistExit, entries, periodStart, periodEnd }) {
+function generateReportHTML({ shift, checklistEntry, checklistExit, entries, periodStart, periodEnd, appTitle = 'Bitácora SOC' }) {
+  const brandedAppTitle = String(appTitle || '').trim() || 'Bitácora SOC';
+  const brandedAppTitleHtml = escapeHtml(brandedAppTitle);
   const dateLabel = formatDate(periodEnd || new Date());
   const periodLabel = periodStart && periodEnd
     ? `${formatDate(periodStart)} ${formatTime(periodStart)} - ${formatDate(periodEnd)} ${formatTime(periodEnd)}`
@@ -126,7 +125,7 @@ function generateReportHTML({ shift, checklistEntry, checklistExit, entries, per
   const hardBlack = 'color:#000000 !important;-webkit-text-fill-color:#000000 !important;mso-color-alt:#000000;mso-style-textfill-fill-color:#000000;';
   const baseColor = hardBlack;
   const tableBorder = 'border:1px solid #e0e0e0;';
-  const cellPadding = 'padding:10px 12px;';
+  const cellPadding = 'padding:6px 8px;';
 
   let html = `
 <!DOCTYPE html>
@@ -151,7 +150,7 @@ function generateReportHTML({ shift, checklistEntry, checklistExit, entries, per
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td style="background-color:#ffffff;color:#000000;padding:20px;border-bottom:2px solid #e0e0e0;border-radius:8px 8px 0 0;${hardBlack}" bgcolor="#ffffff">
-                    <h1 style="margin:0;font-size:24px;${hardBlack}">🛡️ Reporte de Turno - Bitácora SOC</h1>
+                    <h1 style="margin:0;font-size:24px;${hardBlack}">🛡️ Reporte de Turno - ${brandedAppTitleHtml}</h1>
                     <div style="margin:5px 0 0 0;font-size:14px;${hardBlack}">
                       ${escapeHtml(shift.name)} (${shift.startTime} - ${shift.endTime}) • ${dateLabel}
                     </div>
@@ -170,9 +169,9 @@ function generateReportHTML({ shift, checklistEntry, checklistExit, entries, per
     const serviceRows = buildServiceRows(checklistEntry, checklistExit);
 
     html += `
-    <div style="margin:30px 0;">
+    <div style="margin:20px 0;">
       <div style="font-size:18px;font-weight:700;${hardBlack}margin-bottom:15px;padding-bottom:8px;border-bottom:2px solid #e0e0e0;">📋 Checklist de Entrada y Salida</div>
-      <table role="presentation" style="width:100%;border-collapse:collapse;margin-top:15px;${baseColor}background-color:#ffffff !important;" cellpadding="0" cellspacing="0" bgcolor="#ffffff">
+      <table role="presentation" style="width:100%;border-collapse:collapse;margin-top:10px;${baseColor}background-color:#ffffff !important;" cellpadding="0" cellspacing="0" bgcolor="#ffffff">
         <thead>
           <tr>
             <th style="width:40%;background-color:#f8f9fa !important;${cellPadding}${tableBorder}${hardBlack}text-align:left;" bgcolor="#f8f9fa">Servicio</th>
@@ -187,7 +186,7 @@ function generateReportHTML({ shift, checklistEntry, checklistExit, entries, per
       const title = escapeHtml(row.entry?.serviceTitle || row.exit?.serviceTitle || 'Servicio');
       html += `
         <tr>
-          <td style="${cellPadding}${tableBorder}${hardBlack}vertical-align:top;background-color:#ffffff !important;" bgcolor="#ffffff"><strong style="${hardBlack}">${title}</strong></td>
+          <td style="${cellPadding}${tableBorder}${hardBlack}vertical-align:top;background-color:#ffffff !important;line-height:1.25;" bgcolor="#ffffff"><strong style="${hardBlack};font-size:12px;">${title}</strong></td>
           <td style="${cellPadding}${tableBorder}${hardBlack}vertical-align:top;background-color:#ffffff !important;" bgcolor="#ffffff">${renderStatusCell(row.entry)}</td>
           <td style="${cellPadding}${tableBorder}${hardBlack}vertical-align:top;background-color:#ffffff !important;" bgcolor="#ffffff">${renderStatusCell(row.exit)}</td>
         </tr>
@@ -237,7 +236,7 @@ function generateReportHTML({ shift, checklistEntry, checklistExit, entries, per
 
   html += `
     <div style="margin-top:40px;padding-top:20px;border-top:1px solid #e0e0e0;text-align:center;${hardBlack}font-size:12px;">
-      Este correo fue generado automáticamente por Bitácora SOC<br>
+      Este correo fue generado automáticamente por ${brandedAppTitleHtml}<br>
       No responder a este mensaje
     </div>
                     </font>
@@ -257,14 +256,15 @@ function generateReportHTML({ shift, checklistEntry, checklistExit, entries, per
   return html;
 }
 
-function generateReportText({ shift, checklistEntry, checklistExit, entries, periodStart, periodEnd }) {
+function generateReportText({ shift, checklistEntry, checklistExit, entries, periodStart, periodEnd, appTitle = 'Bitácora SOC' }) {
+  const brandedAppTitle = String(appTitle || '').trim() || 'Bitácora SOC';
   const lines = [];
   const dateLabel = formatDate(periodEnd || new Date());
   const periodLabel = periodStart && periodEnd
     ? `${formatDate(periodStart)} ${formatTime(periodStart)} - ${formatDate(periodEnd)} ${formatTime(periodEnd)}`
     : '';
 
-  lines.push('Reporte de Turno - Bitacora SOC');
+  lines.push(`Reporte de Turno - ${brandedAppTitle}`);
   lines.push(`${shift.name} (${shift.startTime} - ${shift.endTime}) • ${dateLabel}`);
   if (periodLabel) lines.push(`Periodo: ${periodLabel}`);
   lines.push('');
@@ -305,7 +305,7 @@ function generateReportText({ shift, checklistEntry, checklistExit, entries, per
     }
   }
 
-  lines.push('Este correo fue generado automaticamente por Bitacora SOC');
+  lines.push(`Este correo fue generado automaticamente por ${brandedAppTitle}`);
   lines.push('No responder a este mensaje');
 
   return lines.join('\n');
@@ -348,6 +348,9 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
     }
 
     logger.info('📊 [sendShiftReport] Recipients found', { count: shift.emailReportConfig.recipients.length, recipients: shift.emailReportConfig.recipients });
+
+    const appConfig = await AppConfig.findOne().select('appTitle').lean();
+    const appTitle = String(appConfig?.appTitle || '').trim() || 'Bitácora SOC';
 
     // 2. Calcular rango horario del turno
     const [startHour, startMinute] = shift.startTime.split(':').map(Number);
@@ -436,7 +439,8 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
       checklistExit,
       entries,
       periodStart,
-      periodEnd
+      periodEnd,
+      appTitle
     });
     const text = generateReportText({
       shift,
@@ -444,7 +448,8 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
       checklistExit,
       entries,
       periodStart,
-      periodEnd
+      periodEnd,
+      appTitle
     });
 
     // 7. Enviar correo
