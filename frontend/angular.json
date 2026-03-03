@@ -26,6 +26,7 @@
             "inlineStyleLanguage": "scss",
             "assets": ["src/favicon.ico", "src/assets", "src/scripts"],
             "styles": [
+              "node_modules/material-icons/iconfont/material-icons.css",
               "@angular/material/prebuilt-themes/indigo-pink.css",
               "src/styles.scss"
             ],
