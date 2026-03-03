@@ -71,4 +71,8 @@ export class ConfigService {
 
     return this.http.post<{ message: string; security: AppConfig['security'] }>(`${this.API_URL}/security/certificates`, formData);
   }
+
+  resetTlsCertificates(): Observable<{ message: string; security: AppConfig['security'] }> {
+    return this.http.delete<{ message: string; security: AppConfig['security'] }>(`${this.API_URL}/security/certificates`);
+  }
 }

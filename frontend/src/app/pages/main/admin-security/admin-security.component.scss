@@ -64,6 +64,10 @@ button mat-spinner {
   display: none;
 }
 
+.danger-action {
+  align-self: flex-start;
+}
+
 small {
   color: var(--text-secondary);
 }

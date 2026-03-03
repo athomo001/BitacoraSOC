@@ -7,7 +7,9 @@
     "build": "node -e \"console.log('Backend: no build step required (Node.js runtime)')\"",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
+    "restart:clean": "node scripts/restart-clean.js",
     "seed": "node src/scripts/seed.js",
+    "migrate:escalation-clients": "node src/scripts/migrate-escalation-clients-to-log-sources.js",
     "test": "jest"
   },
   "keywords": [

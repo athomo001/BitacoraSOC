@@ -63,9 +63,7 @@ export class SettingsComponent implements OnInit {
     private snackBar: MatSnackBar
   ) {
     this.appConfigForm = this.fb.group({
-      guestEnabled: [false],
-      checklistAlertEnabled: [true],
-      checklistAlertTime: ['09:30', [Validators.required]]
+      guestEnabled: [false]
     });
 
     this.smtpForm = this.fb.group({
@@ -96,9 +94,7 @@ export class SettingsComponent implements OnInit {
     this.configService.getConfig().subscribe({
       next: (config) => {
         this.appConfigForm.patchValue({
-          guestEnabled: config.guestModeEnabled,
-          checklistAlertEnabled: config.checklistAlertEnabled ?? true,
-          checklistAlertTime: config.checklistAlertTime || '09:30'
+          guestEnabled: config.guestModeEnabled
         });
       },
       error: (err) => console.error('Error cargando config:', err)
@@ -139,9 +135,7 @@ export class SettingsComponent implements OnInit {
   saveAppConfig(): void {
     if (this.appConfigForm.valid) {
       const data: UpdateConfigRequest = {
-        guestModeEnabled: this.appConfigForm.value.guestEnabled,
-        checklistAlertEnabled: this.appConfigForm.value.checklistAlertEnabled,
-        checklistAlertTime: this.appConfigForm.value.checklistAlertTime
+        guestModeEnabled: this.appConfigForm.value.guestEnabled
       };
       this.configService.updateConfig(data).subscribe({
         next: () => this.snackBar.open('Configuracion guardada', 'Cerrar', { duration: 2000 }),

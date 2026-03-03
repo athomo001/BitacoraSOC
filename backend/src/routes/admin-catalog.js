@@ -7,6 +7,11 @@ const router = express.Router();
 const CatalogEvent = require('../models/CatalogEvent');
 const CatalogLogSource = require('../models/CatalogLogSource');
 const CatalogOperationType = require('../models/CatalogOperationType');
+const Service = require('../models/Service');
+const Contact = require('../models/Contact');
+const EscalationRule = require('../models/EscalationRule');
+const RaciEntry = require('../models/RaciEntry');
+const ClientEscalationRule = require('../models/ClientEscalationRule');
 const { authenticate } = require('../middleware/auth');
 
 // Middleware para verificar role=admin
@@ -158,11 +163,40 @@ router.put('/log-sources/:id', async (req, res) => {
 
 router.delete('/log-sources/:id', async (req, res) => {
   try {
-    const source = await CatalogLogSource.findByIdAndDelete(req.params.id);
+    const sourceId = req.params.id;
+    const source = await CatalogLogSource.findById(sourceId);
     if (!source) {
       return res.status(404).json({ message: 'Log Source no encontrado' });
     }
-    res.json({ message: 'Log Source eliminado permanentemente', source });
+
+    const services = await Service.find({ clientId: sourceId }).select('_id').lean();
+    const serviceIds = services.map((service) => service._id);
+
+    const [deletedEscalationRules, deletedContacts, deletedServices, deletedRaciEntries, deletedClientAlertRules] = await Promise.all([
+      serviceIds.length > 0
+        ? EscalationRule.deleteMany({ serviceId: { $in: serviceIds } })
+        : Promise.resolve({ deletedCount: 0 }),
+      serviceIds.length > 0
+        ? Contact.deleteMany({ serviceId: { $in: serviceIds } })
+        : Promise.resolve({ deletedCount: 0 }),
+      Service.deleteMany({ clientId: sourceId }),
+      RaciEntry.deleteMany({ clientId: sourceId }),
+      ClientEscalationRule.deleteMany({ clientId: sourceId })
+    ]);
+
+    await CatalogLogSource.findByIdAndDelete(sourceId);
+
+    res.json({
+      message: 'Log Source eliminado permanentemente con limpieza de escalación',
+      source,
+      cascade: {
+        services: deletedServices.deletedCount || 0,
+        contacts: deletedContacts.deletedCount || 0,
+        escalationRules: deletedEscalationRules.deletedCount || 0,
+        raciEntries: deletedRaciEntries.deletedCount || 0,
+        clientAlertRules: deletedClientAlertRules.deletedCount || 0
+      }
+    });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

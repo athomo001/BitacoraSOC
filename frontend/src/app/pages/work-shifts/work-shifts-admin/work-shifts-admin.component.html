@@ -300,6 +300,77 @@
         <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
       </table>
 
+      <div *ngIf="!loading && shifts.length > 0" class="operational-assignment-section">
+        <mat-divider></mat-divider>
+
+        <div class="operational-header">
+          <h3>Asignación Operativa</h3>
+          <p class="section-description">Vincula analista y turno. El horario se hereda desde la configuración del turno.</p>
+        </div>
+
+        <form [formGroup]="operationalAssignmentForm" (ngSubmit)="saveOperationalAssignment()" class="operational-form">
+          <mat-form-field appearance="outline">
+            <mat-label>Analista</mat-label>
+            <mat-select formControlName="userId">
+              <mat-option *ngFor="let user of users" [value]="user._id">
+                {{ user.fullName }} ({{ user.email }})
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Turno</mat-label>
+            <mat-select formControlName="shiftId">
+              <mat-option *ngFor="let shift of shifts" [value]="shift._id">
+                {{ shift.name }} ({{ formatTimeRange(shift) }})
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <div class="operational-actions">
+            <button mat-raised-button color="primary" type="submit" [disabled]="operationalAssignmentForm.invalid">
+              <mat-icon>link</mat-icon>
+              Vincular
+            </button>
+            <button mat-stroked-button type="button" (click)="refreshOperationalStatus()">
+              <mat-icon>refresh</mat-icon>
+              Actualizar estado
+            </button>
+          </div>
+        </form>
+
+        <div class="operational-table-wrapper" *ngIf="operationalRows.length > 0">
+          <table class="operational-table">
+            <thead>
+              <tr>
+                <th>Analista</th>
+                <th>Turno</th>
+                <th>Horario</th>
+                <th>Días</th>
+                <th>Estado Operativo</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of operationalRows">
+                <td>{{ row.analystName }}</td>
+                <td>{{ row.shiftName }}</td>
+                <td>{{ row.schedule }}</td>
+                <td>{{ row.weekdaysLabel }}</td>
+                <td>
+                  <mat-chip [class]="getOperationalStatusClass(row.status)">
+                    {{ getOperationalStatusLabel(row.status) }}
+                  </mat-chip>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div *ngIf="operationalRows.length === 0" class="empty-operational">
+          <p>No hay asignaciones operativas activas.</p>
+        </div>
+      </div>
+
       <!-- Sección GLOBAL: Reenvío de Información (siempre visible) -->
       <div *ngIf="!showForm" class="global-email-section">
         <mat-divider></mat-divider>

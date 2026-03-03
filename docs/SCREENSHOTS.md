@@ -7,18 +7,20 @@ Documentación visual de las principales funcionalidades del sistema.
 ## 📑 Índice de Capturas
 
 1. [Pantalla Principal - Nueva Entrada](#-pantalla-principal---nueva-entrada)
-2. [Escalación y Turnos](#-escalación-y-turnos)
-3. [Buscar Entradas](#-buscar-entradas)
-4. [Generador de Reportes SOC](#-generador-de-reportes-soc)
-5. [Configuración de Administrador](#-configuración-de-administrador)
-6. [Menú Admin - Backup](#-menú-admin---backup)
-7. [Sidebar - Menú de Navegación](#-sidebar---menú-de-navegación)
+2. [Temas Visuales](#-temas-visuales)
+3. [Escalación y Turnos](#-escalación-y-turnos)
+4. [Buscar Entradas](#-buscar-entradas)
+5. [Generador de Reportes SOC](#-generador-de-reportes-soc)
+6. [Configuración de Administrador](#-configuración-de-administrador)
+7. [Menú Admin - Backup](#-menú-admin---backup)
+8. [Sidebar - Menú de Navegación](#-sidebar---menú-de-navegación)
 
 ---
 
 ## 🏠 Pantalla Principal - Nueva Entrada
 
 ![Pantalla Principal](images/screenshots/01-main-nueva-entrada.png)
+![Pantalla Principal](images/screenshots/01.1-main-nueva-entrada.png)
 
 **Funcionalidades visibles:**
 - **Menú Lateral Izquierdo:**
@@ -51,6 +53,23 @@ Documentación visual de las principales funcionalidades del sistema.
   - Mensaje si no hay checklist activo asignado
 
 ---
+## ✅ Temas Visuales
+![Temas Visuales](images/screenshots/08-style-menu.png)
+
+| Icono | Opción |
+|-------|--------|
+| 👥 | **Ligth** |
+| 📚 | **Dark** |
+| 📞 | **Sepia** |
+| 🏷️ | **Pastel** |
+| ☁️ | **Cyberpunk** |
+
+![Ligth](images/screenshots/01.1-main-nueva-entrada.png)
+![Dark](images/screenshots/08.2-style-menu.png)
+![Sepia](images/screenshots/08.3-style-menu.png)
+![Pastel](images/screenshots/08.4-style-menu.png)
+![Cyberpunk](images/screenshots/08.5-style-menu.png)
+
 
 ## 📞 Escalación y Turnos
 
@@ -211,21 +230,20 @@ Ver documentación completa en [backend/scripts/README.md](../backend/scripts/RE
 | 📊 | **Generar Reporte** | Admin/User | Crear reportes HTML estructurados |
 | ⏰ | **Mis Entradas** | Admin/User | Entradas propias del usuario |
 | 🌐 | **Ver todas** | Todos | Búsqueda y filtrado de todas las entradas |
-| 👤 | **Mi Perfil** | Todos | Editar información personal |
-| ✅ | **Administracion Checklist** | Admin | Gestionar plantillas de checklist |
 | 📈 | **Reportes** | Admin/User | Dashboard y estadísticas |
+| 👤 | **Mi Perfil** | Todos | Editar información personal |
+
 
 ### Configuración (Admin) ▼
 
 | Icono | Opción | Descripción |
 |-------|--------|-------------|
-| 👥 | **Admin Usuarios** | CRUD de usuarios |
-| 📚 | **Admin Catálogos** | Eventos y taxonomías |
-| 📞 | **Admin Escalaci...** | Contactos y turnos |
+|👥|**Consola admin**| Toda la configuraciond e un admin|
+| 📞 | **Log auditoria** | informacion de uso de  log en la Herramienta |
 | 🏷️ | **Tags** | Etiquetas globales |
-| 🖼️ | **Logo** | Personalización |
+| 🖼️ | **Branding** | Personalización |
 | ☁️ | **Backup** | Respaldos |
-| 📧 | **SMTP / Config** | Configuración email |
+
 
 **Interacción:**
 - Sección colapsable con indicador de expansión (▼/►)
@@ -275,26 +293,6 @@ Ver documentación completa en [backend/scripts/README.md](../backend/scripts/RE
 
 ---
 
-## 🚀 Próximas Capturas Recomendadas
-
-Si deseas expandir la documentación visual, considera agregar:
-
-- [ ] Pantalla de login con autenticación
-- [ ] Mi Perfil (edición de usuario con campos completos)
-- [ ] Historial de Checklists completados (tabla con filtros)
-- [ ] Admin Usuarios (tabla CRUD con activación/desactivación)
-- [ ] Admin Catálogos (gestión de eventos con jerarquía padre/hijo)
-- [ ] Admin Escalaciones (matriz de contactos y horarios)
-- [ ] Página de Backup (historial, crear, restaurar)
-- [ ] SMTP Config (formulario de configuración de email)
-- [ ] Vista móvil / responsive (drawer menu)
-- [ ] Notificaciones en tiempo real (toasts/snackbars)
-- [ ] Reportes generados (ejemplo HTML exportado)
-- [ ] Dashboard de estadísticas con gráficos
-- [ ] Sistema de tags con autocomplete
-- [ ] Logo personalizado funcionando
-
----
 
 ## 📊 Estadísticas del Sistema
 
@@ -310,12 +308,6 @@ Si deseas expandir la documentación visual, considera agregar:
 - ✅ Generación de reportes
 - ✅ Configuración administrativa
 - ✅ Sistema de backup
-
-**Áreas pendientes:**
-- ⏳ Login y autenticación
-- ⏳ Gestión de usuarios (CRUD)
-- ⏳ Catálogos avanzados
-- ⏳ Dashboard de métricas
 
 ---
 
@@ -338,4 +330,4 @@ Si deseas expandir la documentación visual, considera agregar:
 
 ---
 
-*Última actualización: 16 de enero de 2026*
+*Última actualización: 30 de febrero de 2123  XD*

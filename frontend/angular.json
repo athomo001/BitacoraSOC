@@ -67,13 +67,19 @@
               "buildTarget": "bitacora-soc:build:production"
             },
             "development": {
-              "buildTarget": "bitacora-soc:build:development"
+              "buildTarget": "bitacora-soc:build:development",
+              "proxyConfig": "proxy.conf.json",
+              "hmr": false,
+              "prebundle": false
             }
           },
           "defaultConfiguration": "development",
           "options": {
             "host": "0.0.0.0",
-            "port": 4200
+            "port": 4200,
+            "proxyConfig": "proxy.conf.json",
+            "hmr": false,
+            "prebundle": false
           }
         }
       }

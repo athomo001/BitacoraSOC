@@ -1,5 +1,5 @@
 const Service = require('../models/Service');
-const Client = require('../models/Client');
+const CatalogLogSource = require('../models/CatalogLogSource');
 const Contact = require('../models/Contact');
 const EscalationRule = require('../models/EscalationRule');
 const ShiftRole = require('../models/ShiftRole');
@@ -9,7 +9,26 @@ const ShiftOverride = require('../models/ShiftOverride');
 const User = require('../models/User');
 const ExternalPerson = require('../models/ExternalPerson');
 const RaciEntry = require('../models/RaciEntry');
+const AppConfig = require('../models/AppConfig');
+const { sendEscalationInternalReminderEmail } = require('../routes/smtp');
 const { logger } = require('../utils/logger');
+
+const ENABLED_LOG_SOURCE_MATCH = {
+  $or: [
+    { enabled: true },
+    { enabled: { $exists: false } }
+  ]
+};
+
+const parsePositiveInt = (value, fallback, max = 500) => {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return Math.min(parsed, max);
+};
+
+const normalizeCargoLabel = (value) => String(value || '').trim().toUpperCase();
 
 /**
  * Resuelve quién está de turno AHORA para un servicio específico
@@ -19,8 +38,12 @@ const { logger } = require('../utils/logger');
 async function getEscalationNow(serviceId, now = new Date()) {
   try {
     // 1. Obtener servicio y cliente
-    const service = await Service.findById(serviceId).populate('clientId');
-    if (!service) {
+    const service = await Service.findById(serviceId).populate({
+      path: 'clientId',
+      select: 'name parent enabled',
+      match: ENABLED_LOG_SOURCE_MATCH
+    });
+    if (!service || !service.clientId) {
       throw new Error('Service not found');
     }
 
@@ -186,7 +209,10 @@ exports.getInternalShiftsNow = async (req, res) => {
 
 exports.getClients = async (req, res) => {
   try {
-    const clients = await Client.find({ active: true }).sort({ name: 1 });
+    const clients = await CatalogLogSource
+      .find(ENABLED_LOG_SOURCE_MATCH)
+      .select('_id name parent description enabled')
+      .sort({ name: 1 });
     res.json(clients);
   } catch (error) {
     logger.error('Error in getClients:', error);
@@ -202,10 +228,15 @@ exports.getServices = async (req, res) => {
       filter.clientId = clientId;
     }
     const services = await Service.find(filter)
-      .populate('clientId', 'name')
+      .populate({
+        path: 'clientId',
+        select: 'name parent enabled',
+        match: ENABLED_LOG_SOURCE_MATCH
+      })
       .sort({ name: 1 });
+    const visibleServices = services.filter((service) => Boolean(service.clientId));
     
-    const result = services.map(s => ({
+    const result = visibleServices.map(s => ({
       _id: s._id,
       name: s.name,
       code: s.code,
@@ -228,10 +259,15 @@ exports.getContactsPublic = async (req, res) => {
       .populate({
         path: 'serviceId',
         select: 'name clientId',
-        populate: { path: 'clientId', select: 'name' }
+        populate: {
+          path: 'clientId',
+          select: 'name parent enabled',
+          match: ENABLED_LOG_SOURCE_MATCH
+        }
       })
       .sort({ name: 1 });
-    res.json(contacts);
+    const visibleContacts = contacts.filter((contact) => Boolean(contact.serviceId?.clientId));
+    res.json(visibleContacts);
   } catch (error) {
     logger.error('Error in getContactsPublic:', error);
     res.status(500).json({ error: error.message });
@@ -255,11 +291,16 @@ exports.getRaciByClient = async (req, res) => {
     }
 
     const raciEntries = await RaciEntry.find(filter)
-      .populate('clientId', 'name')
+      .populate({
+        path: 'clientId',
+        select: 'name parent enabled',
+        match: ENABLED_LOG_SOURCE_MATCH
+      })
       .populate('serviceId', 'name')
       .sort({ activity: 1 });
+    const visibleEntries = raciEntries.filter((entry) => Boolean(entry.clientId));
 
-    res.json(raciEntries);
+    res.json(visibleEntries);
   } catch (error) {
     logger.error('Error in getRaciByClient:', error);
     res.status(500).json({ error: error.message });
@@ -272,7 +313,10 @@ exports.getRaciByClient = async (req, res) => {
 
 exports.getAllClients = async (req, res) => {
   try {
-    const clients = await Client.find().sort({ name: 1 });
+    const clients = await CatalogLogSource
+      .find(ENABLED_LOG_SOURCE_MATCH)
+      .select('_id name parent description enabled')
+      .sort({ name: 1 });
     res.json(clients);
   } catch (error) {
     logger.error('Error in getAllClients:', error);
@@ -282,19 +326,9 @@ exports.getAllClients = async (req, res) => {
 
 exports.createClient = async (req, res) => {
   try {
-    const data = { ...req.body };
-    if (!data.code && data.name) {
-      data.code = data.name
-        .toString()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-zA-Z0-9]+/g, '_')
-        .replace(/^_+|_+$/g, '')
-        .toLowerCase();
-    }
-    const client = new Client(data);
-    await client.save();
-    logger.info('Client created:', { clientId: client._id, name: client.name });
-    res.status(201).json(client);
+    return res.status(410).json({
+      error: 'La gestión de clientes de escalación se realiza desde Catálogos > Log Sources'
+    });
   } catch (error) {
     logger.error('Error in createClient:', error);
     res.status(400).json({ error: error.message });
@@ -303,13 +337,9 @@ exports.createClient = async (req, res) => {
 
 exports.updateClient = async (req, res) => {
   try {
-    const { id } = req.params;
-    const client = await Client.findByIdAndUpdate(id, req.body, { new: true, runValidators: true });
-    if (!client) {
-      return res.status(404).json({ error: 'Client not found' });
-    }
-    logger.info('Client updated:', { clientId: client._id, name: client.name });
-    res.json(client);
+    return res.status(410).json({
+      error: 'La gestión de clientes de escalación se realiza desde Catálogos > Log Sources'
+    });
   } catch (error) {
     logger.error('Error in updateClient:', error);
     res.status(400).json({ error: error.message });
@@ -318,13 +348,9 @@ exports.updateClient = async (req, res) => {
 
 exports.deleteClient = async (req, res) => {
   try {
-    const { id } = req.params;
-    const client = await Client.findByIdAndDelete(id);
-    if (!client) {
-      return res.status(404).json({ error: 'Client not found' });
-    }
-    logger.info('Client deleted:', { clientId: client._id, code: client.code });
-    res.json({ message: 'Client deleted successfully' });
+    return res.status(410).json({
+      error: 'La gestión de clientes de escalación se realiza desde Catálogos > Log Sources'
+    });
   } catch (error) {
     logger.error('Error in deleteClient:', error);
     res.status(500).json({ error: error.message });
@@ -337,8 +363,15 @@ exports.deleteClient = async (req, res) => {
 
 exports.getAllServices = async (req, res) => {
   try {
-    const services = await Service.find().populate('clientId', 'name').sort({ name: 1 });
-    res.json(services);
+    const services = await Service.find({ active: true })
+      .populate({
+        path: 'clientId',
+        select: 'name parent enabled',
+        match: ENABLED_LOG_SOURCE_MATCH
+      })
+      .sort({ name: 1 });
+    const visibleServices = services.filter((service) => Boolean(service.clientId));
+    res.json(visibleServices);
   } catch (error) {
     logger.error('Error in getAllServices:', error);
     res.status(500).json({ error: error.message });
@@ -348,6 +381,13 @@ exports.getAllServices = async (req, res) => {
 exports.createService = async (req, res) => {
   try {
     const data = { ...req.body };
+    const client = await CatalogLogSource.findOne({
+      _id: data.clientId,
+      ...ENABLED_LOG_SOURCE_MATCH
+    }).select('_id');
+    if (!client) {
+      return res.status(400).json({ error: 'Cliente/Log Source inválido o deshabilitado' });
+    }
     if (!data.code && data.name) {
       const slug = data.name
         .toString()
@@ -371,10 +411,26 @@ exports.createService = async (req, res) => {
 exports.updateService = async (req, res) => {
   try {
     const { id } = req.params;
+    if (req.body?.clientId) {
+      const client = await CatalogLogSource.findOne({
+        _id: req.body.clientId,
+        ...ENABLED_LOG_SOURCE_MATCH
+      }).select('_id');
+      if (!client) {
+        return res.status(400).json({ error: 'Cliente/Log Source inválido o deshabilitado' });
+      }
+    }
     const service = await Service.findByIdAndUpdate(id, req.body, { new: true, runValidators: true })
-      .populate('clientId', 'name');
+      .populate({
+        path: 'clientId',
+        select: 'name parent enabled',
+        match: ENABLED_LOG_SOURCE_MATCH
+      });
     if (!service) {
       return res.status(404).json({ error: 'Service not found' });
+    }
+    if (!service.clientId) {
+      return res.status(400).json({ error: 'Servicio asociado a cliente deshabilitado' });
     }
     logger.info('Service updated:', { serviceId: service._id, name: service.name });
     res.json(service);
@@ -409,10 +465,15 @@ exports.getAllContacts = async (req, res) => {
       .populate({
         path: 'serviceId',
         select: 'name clientId',
-        populate: { path: 'clientId', select: 'name' }
+        populate: {
+          path: 'clientId',
+          select: 'name parent enabled',
+          match: ENABLED_LOG_SOURCE_MATCH
+        }
       })
       .sort({ name: 1 });
-    res.json(contacts);
+    const visibleContacts = contacts.filter((contact) => Boolean(contact.serviceId?.clientId));
+    res.json(visibleContacts);
   } catch (error) {
     logger.error('Error in getAllContacts:', error);
     res.status(500).json({ error: error.message });
@@ -421,6 +482,17 @@ exports.getAllContacts = async (req, res) => {
 
 exports.createContact = async (req, res) => {
   try {
+    if (req.body?.serviceId) {
+      const service = await Service.findById(req.body.serviceId)
+        .populate({
+          path: 'clientId',
+          select: 'enabled',
+          match: ENABLED_LOG_SOURCE_MATCH
+        });
+      if (!service || !service.clientId) {
+        return res.status(400).json({ error: 'Servicio inválido o asociado a cliente deshabilitado' });
+      }
+    }
     const contact = new Contact(req.body);
     await contact.save();
     await contact.populate({
@@ -439,11 +511,26 @@ exports.createContact = async (req, res) => {
 exports.updateContact = async (req, res) => {
   try {
     const { id } = req.params;
+    if (req.body?.serviceId) {
+      const service = await Service.findById(req.body.serviceId)
+        .populate({
+          path: 'clientId',
+          select: 'enabled',
+          match: ENABLED_LOG_SOURCE_MATCH
+        });
+      if (!service || !service.clientId) {
+        return res.status(400).json({ error: 'Servicio inválido o asociado a cliente deshabilitado' });
+      }
+    }
     const contact = await Contact.findByIdAndUpdate(id, req.body, { new: true, runValidators: true })
       .populate({
         path: 'serviceId',
         select: 'name clientId',
-        populate: { path: 'clientId', select: 'name' }
+        populate: {
+          path: 'clientId',
+          select: 'name parent enabled',
+          match: ENABLED_LOG_SOURCE_MATCH
+        }
       });
     if (!contact) {
       return res.status(404).json({ error: 'Contact not found' });
@@ -483,11 +570,16 @@ exports.getRaciAdmin = async (req, res) => {
     if (serviceId) filter.serviceId = serviceId;
 
     const raciEntries = await RaciEntry.find(filter)
-      .populate('clientId', 'name')
+      .populate({
+        path: 'clientId',
+        select: 'name parent enabled',
+        match: ENABLED_LOG_SOURCE_MATCH
+      })
       .populate('serviceId', 'name')
       .sort({ createdAt: -1 });
+    const visibleEntries = raciEntries.filter((entry) => Boolean(entry.clientId));
 
-    res.json(raciEntries);
+    res.json(visibleEntries);
   } catch (error) {
     logger.error('Error in getRaciAdmin:', error);
     res.status(500).json({ error: error.message });
@@ -555,12 +647,21 @@ exports.getRules = async (req, res) => {
       filter.serviceId = serviceId;
     }
     const rules = await EscalationRule.find(filter)
-      .populate('serviceId', 'name code')
+      .populate({
+        path: 'serviceId',
+        select: 'name code clientId',
+        populate: {
+          path: 'clientId',
+          select: 'name parent enabled',
+          match: ENABLED_LOG_SOURCE_MATCH
+        }
+      })
       .populate('recipientsTo', 'name email')
       .populate('recipientsCC', 'name email')
       .populate('emergencyContactId', 'name phone')
       .sort({ createdAt: -1 });
-    res.json(rules);
+    const visibleRules = rules.filter((rule) => Boolean(rule.serviceId?.clientId));
+    res.json(visibleRules);
   } catch (error) {
     logger.error('Error in getRules:', error);
     res.status(500).json({ error: error.message });
@@ -569,6 +670,15 @@ exports.getRules = async (req, res) => {
 
 exports.createRule = async (req, res) => {
   try {
+    const service = await Service.findById(req.body?.serviceId)
+      .populate({
+        path: 'clientId',
+        select: 'enabled',
+        match: ENABLED_LOG_SOURCE_MATCH
+      });
+    if (!service || !service.clientId) {
+      return res.status(400).json({ error: 'Servicio inválido o asociado a cliente deshabilitado' });
+    }
     const rule = new EscalationRule(req.body);
     await rule.save();
     await rule.populate('serviceId recipientsTo recipientsCC emergencyContactId');
@@ -583,8 +693,28 @@ exports.createRule = async (req, res) => {
 exports.updateRule = async (req, res) => {
   try {
     const { id } = req.params;
+    if (req.body?.serviceId) {
+      const service = await Service.findById(req.body.serviceId)
+        .populate({
+          path: 'clientId',
+          select: 'enabled',
+          match: ENABLED_LOG_SOURCE_MATCH
+        });
+      if (!service || !service.clientId) {
+        return res.status(400).json({ error: 'Servicio inválido o asociado a cliente deshabilitado' });
+      }
+    }
     const rule = await EscalationRule.findByIdAndUpdate(id, req.body, { new: true, runValidators: true })
-      .populate('serviceId recipientsTo recipientsCC emergencyContactId');
+      .populate({
+        path: 'serviceId',
+        select: 'name code clientId',
+        populate: {
+          path: 'clientId',
+          select: 'name parent enabled',
+          match: ENABLED_LOG_SOURCE_MATCH
+        }
+      })
+      .populate('recipientsTo recipientsCC emergencyContactId');
     if (!rule) {
       return res.status(404).json({ error: 'Escalation rule not found' });
     }
@@ -673,18 +803,29 @@ exports.deleteCycle = async (req, res) => {
 
 exports.getAssignments = async (req, res) => {
   try {
-    const { roleCode, fromDate } = req.query;
+    const { roleCode, fromDate, toDate, limit } = req.query;
     const filter = {};
     if (roleCode) {
       filter.roleCode = roleCode;
     }
-    if (fromDate) {
-      filter.weekStartDate = { $gte: new Date(fromDate) };
+    if (fromDate || toDate) {
+      filter.weekStartDate = {};
+      if (fromDate) {
+        filter.weekStartDate.$gte = new Date(fromDate);
+      }
+      if (toDate) {
+        filter.weekStartDate.$lte = new Date(toDate);
+      }
     }
-    const assignments = await ShiftAssignment.find(filter)
+    const parsedLimit = parsePositiveInt(limit, 0, 1000);
+    let query = ShiftAssignment.find(filter)
       .populate('userId', 'fullName email')
       .populate('externalPersonId', 'name email')
       .sort({ weekStartDate: -1 });
+    if (parsedLimit > 0) {
+      query = query.limit(parsedLimit);
+    }
+    const assignments = await query;
     res.json(assignments);
   } catch (error) {
     logger.error('Error in getAssignments:', error);
@@ -859,5 +1000,62 @@ exports.deleteExternalPerson = async (req, res) => {
   } catch (error) {
     logger.error('Error in deleteExternalPerson:', error);
     res.status(500).json({ error: error.message });
+  }
+};
+
+exports.testEscalationReminder = async (req, res) => {
+  try {
+    const config = await AppConfig.findOne().select('escalationReminderCargoLabels');
+    const cargoLabels = Array.isArray(config?.escalationReminderCargoLabels)
+      ? config.escalationReminderCargoLabels.map((value) => String(value || '').trim()).filter(Boolean)
+      : [];
+
+    if (cargoLabels.length === 0) {
+      return res.status(400).json({
+        message: 'No hay cargos configurados para el recordatorio de escalación interna'
+      });
+    }
+
+    const normalized = cargoLabels.map(normalizeCargoLabel);
+
+    const users = await User.find({
+      isActive: true,
+      email: { $exists: true, $ne: '' },
+      cargoLabel: { $exists: true, $ne: '' }
+    }).select('email cargoLabel');
+
+    const recipients = Array.from(new Set(
+      users
+        .filter((user) => normalized.includes(normalizeCargoLabel(user.cargoLabel)))
+        .map((user) => user.email)
+    ));
+
+    if (recipients.length === 0) {
+      return res.json({
+        message: 'No hay usuarios activos con email para los cargos configurados',
+        cargoLabels,
+        totalRecipients: 0,
+        recipients: []
+      });
+    }
+
+    await sendEscalationInternalReminderEmail({
+      recipients,
+      cargoLabels,
+      dateLabel: new Date().toLocaleDateString('es-CL')
+    });
+
+    return res.json({
+      message: 'Correo de prueba de recordatorio enviado',
+      cargoLabels,
+      totalRecipients: recipients.length,
+      recipients
+    });
+  } catch (error) {
+    logger.error('Error in testEscalationReminder:', error);
+    return res.status(500).json({
+      message: 'Error enviando correo de prueba de recordatorio',
+      error: error.message
+    });
   }
 };

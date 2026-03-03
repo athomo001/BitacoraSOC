@@ -28,6 +28,13 @@ const WEEKDAY_MAP = {
   Sat: 6
 };
 
+const ENABLED_LOG_SOURCE_MATCH = {
+  $or: [
+    { enabled: true },
+    { enabled: { $exists: false } }
+  ]
+};
+
 const isObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
 
 const normalizeContext = (value) => {
@@ -285,10 +292,14 @@ exports.getClientAlertRules = async (req, res) => {
     }
 
     const rules = await ClientEscalationRule.find(filter)
-      .populate('clientId', 'name parent enabled')
+      .populate({
+        path: 'clientId',
+        select: 'name parent enabled',
+        match: ENABLED_LOG_SOURCE_MATCH
+      })
       .sort({ priority: 1, createdAt: -1 });
 
-    return res.json(rules);
+    return res.json(rules.filter((rule) => Boolean(rule.clientId)));
   } catch (error) {
     logger.error('Error in getClientAlertRules:', error);
     return res.status(500).json({ error: error.message });
@@ -301,7 +312,10 @@ exports.createClientAlertRule = async (req, res) => {
       return res.status(400).json({ error: 'clientId inválido' });
     }
 
-    const clientExists = await CatalogLogSource.exists({ _id: req.body.clientId });
+    const clientExists = await CatalogLogSource.exists({
+      _id: req.body.clientId,
+      ...ENABLED_LOG_SOURCE_MATCH
+    });
     if (!clientExists) {
       return res.status(404).json({ error: 'Cliente/Log Source no encontrado' });
     }
@@ -310,7 +324,11 @@ exports.createClientAlertRule = async (req, res) => {
     payload.lastUpdatedBy = req.user?._id || null;
 
     const rule = await ClientEscalationRule.create(payload);
-    const populated = await ClientEscalationRule.findById(rule._id).populate('clientId', 'name parent enabled');
+    const populated = await ClientEscalationRule.findById(rule._id).populate({
+      path: 'clientId',
+      select: 'name parent enabled',
+      match: ENABLED_LOG_SOURCE_MATCH
+    });
 
     await audit(req, {
       event: 'escalation.client_alert_rule.create',
@@ -343,7 +361,10 @@ exports.updateClientAlertRule = async (req, res) => {
     }
 
     if (req.body?.clientId) {
-      const clientExists = await CatalogLogSource.exists({ _id: req.body.clientId });
+      const clientExists = await CatalogLogSource.exists({
+        _id: req.body.clientId,
+        ...ENABLED_LOG_SOURCE_MATCH
+      });
       if (!clientExists) {
         return res.status(404).json({ error: 'Cliente/Log Source no encontrado' });
       }
@@ -358,7 +379,11 @@ exports.updateClientAlertRule = async (req, res) => {
     const updated = await ClientEscalationRule.findByIdAndUpdate(id, payload, {
       new: true,
       runValidators: true
-    }).populate('clientId', 'name parent enabled');
+    }).populate({
+      path: 'clientId',
+      select: 'name parent enabled',
+      match: ENABLED_LOG_SOURCE_MATCH
+    });
 
     if (!updated) {
       return res.status(404).json({ error: 'Regla no encontrada' });
@@ -424,7 +449,10 @@ exports.evaluateClientAlert = async (req, res) => {
     const requestedNow = now ? new Date(now) : new Date();
     const evaluationNow = Number.isNaN(requestedNow.getTime()) ? new Date() : requestedNow;
 
-    const client = await CatalogLogSource.findById(clientId).select('_id name parent enabled').lean();
+    const client = await CatalogLogSource.findOne({
+      _id: clientId,
+      ...ENABLED_LOG_SOURCE_MATCH
+    }).select('_id name parent enabled').lean();
     if (!client) {
       return res.status(404).json({ error: 'Cliente/Log Source no encontrado' });
     }

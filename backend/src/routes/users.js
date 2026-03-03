@@ -11,12 +11,22 @@ const validate = require('../middleware/validate');
 const { audit } = require('../utils/audit');
 const { logger } = require('../utils/logger');
 
+const MAX_CARGO_LENGTH = 120;
+
+const normalizeCargoLabel = (value) => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const normalized = String(value).replace(/\s+/g, ' ').trim();
+  return normalized || null;
+};
+
 // GET /api/users/list - Listar usuarios básicos (cualquier usuario autenticado)
 // Para uso en dropdowns y asignaciones
 router.get('/list', authenticate, async (req, res) => {
   try {
     const users = await User.find({ isActive: true })
-      .select('_id username email fullName role phone')
+      .select('_id username email fullName role phone cargoLabel')
       .sort({ fullName: 1 });
 
     // Mapear a formato simple con "name" para compatibilidad
@@ -26,7 +36,8 @@ router.get('/list', authenticate, async (req, res) => {
       username: u.username,
       email: u.email,
       role: u.role,
-      phone: u.phone
+      phone: u.phone,
+      cargoLabel: u.cargoLabel || null
     }));
 
     res.json(usersSimple);
@@ -136,17 +147,24 @@ router.post('/',
     body('email').isEmail().normalizeEmail().withMessage('Email invalido'),
     body('password').isLength({ min: 6 }).withMessage('La contrasena debe tener al menos 6 caracteres'),
     body('fullName').trim().notEmpty().withMessage('El nombre completo es requerido'),
-    body('role').isIn(['admin', 'user', 'guest']).withMessage('Rol inválido'),
-    body('phone').optional().trim().isLength({ min: 6, max: 20 }).withMessage('Teléfono inválido')
+    body('role').isIn(['admin', 'user', 'auditor', 'guest']).withMessage('Rol inválido'),
+    body('phone').optional().trim().isLength({ min: 6, max: 20 }).withMessage('Teléfono inválido'),
+    body('cargoLabel').optional({ nullable: true }).isString().trim().isLength({ max: MAX_CARGO_LENGTH })
+      .withMessage(`Cargo inválido (máx ${MAX_CARGO_LENGTH} caracteres)`)
   ],
   validate,
   async (req, res) => {
     try {
       const { username, email, password, fullName, role, phone } = req.body;
+      const cargoLabel = normalizeCargoLabel(req.body?.cargoLabel);
 
       const existingUser = await User.findOne({ $or: [{ username }, { email }] });
       if (existingUser) {
         return res.status(400).json({ message: 'El usuario o email ya existe' });
+      }
+
+      if (role !== 'guest' && !cargoLabel) {
+        return res.status(400).json({ message: 'El cargo es requerido para usuarios operativos' });
       }
 
       let guestExpiresAt = null;
@@ -164,6 +182,7 @@ router.post('/',
         fullName,
         phone,
         role,
+        cargoLabel: role === 'guest' ? null : cargoLabel,
         guestExpiresAt
       });
 
@@ -177,6 +196,7 @@ router.post('/',
           targetUserId: user._id,
           targetUsername: user.username,
           targetRole: user.role,
+          cargoLabel: user.cargoLabel,
           isGuest: user.role === 'guest',
           guestExpiresAt: user.guestExpiresAt
         }
@@ -191,6 +211,7 @@ router.post('/',
           phone: user.phone,
           fullName: user.fullName,
           role: user.role,
+          cargoLabel: user.cargoLabel,
           guestExpiresAt: user.guestExpiresAt
         }
       });
@@ -213,9 +234,11 @@ router.put('/:id',
   [
     body('email').optional().isEmail().normalizeEmail(),
     body('fullName').optional().trim().notEmpty(),
-    body('role').optional().isIn(['admin', 'user', 'guest']),
+    body('role').optional().isIn(['admin', 'user', 'auditor', 'guest']),
     body('isActive').optional().isBoolean(),
-    body('phone').optional().trim().isLength({ min: 6, max: 20 })
+    body('phone').optional().trim().isLength({ min: 6, max: 20 }),
+    body('cargoLabel').optional({ nullable: true }).isString().trim().isLength({ max: MAX_CARGO_LENGTH })
+      .withMessage(`Cargo inválido (máx ${MAX_CARGO_LENGTH} caracteres)`)
   ],
   validate,
   async (req, res) => {
@@ -225,6 +248,25 @@ router.put('/:id',
 
       delete updates.password;
       delete updates.username;
+
+      if (Object.prototype.hasOwnProperty.call(updates, 'cargoLabel')) {
+        updates.cargoLabel = normalizeCargoLabel(updates.cargoLabel);
+      }
+
+      const targetRole = updates.role;
+      if (targetRole === 'guest') {
+        updates.cargoLabel = null;
+      }
+
+      const beforeUserForValidation = await User.findById(id).select('role cargoLabel').lean();
+      const effectiveRole = targetRole || beforeUserForValidation?.role;
+      const effectiveCargoLabel = Object.prototype.hasOwnProperty.call(updates, 'cargoLabel')
+        ? updates.cargoLabel
+        : beforeUserForValidation?.cargoLabel;
+
+      if (effectiveRole !== 'guest' && !effectiveCargoLabel) {
+        return res.status(400).json({ message: 'El cargo es requerido para usuarios operativos' });
+      }
 
       const beforeUser = await User.findById(id).select('-password').lean();
       const user = await User.findByIdAndUpdate(id, updates, { new: true }).select('-password');
@@ -244,6 +286,7 @@ router.put('/:id',
             email: beforeUser.email,
             fullName: beforeUser.fullName,
             role: beforeUser.role,
+            cargoLabel: beforeUser.cargoLabel,
             isActive: beforeUser.isActive,
             phone: beforeUser.phone,
             theme: beforeUser.theme
@@ -252,6 +295,7 @@ router.put('/:id',
             email: user.email,
             fullName: user.fullName,
             role: user.role,
+            cargoLabel: user.cargoLabel,
             isActive: user.isActive,
             phone: user.phone,
             theme: user.theme

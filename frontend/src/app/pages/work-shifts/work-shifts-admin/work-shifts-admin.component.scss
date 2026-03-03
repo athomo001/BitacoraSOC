@@ -255,6 +255,70 @@
   }
 }
 
+.operational-assignment-section {
+  margin-top: 24px;
+  padding-top: 20px;
+
+  mat-divider {
+    margin-bottom: 20px;
+  }
+
+  .operational-header {
+    margin-bottom: 12px;
+
+    h3 {
+      margin: 0 0 6px 0;
+      color: var(--text-primary);
+    }
+
+    .section-description {
+      margin: 0;
+      color: var(--text-secondary);
+    }
+  }
+
+  .operational-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 14px;
+  }
+
+  .operational-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .operational-table-wrapper {
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+  }
+
+  .operational-table {
+    width: 100%;
+    border-collapse: collapse;
+
+    th,
+    td {
+      padding: 10px;
+      border-bottom: 1px solid var(--border-color);
+      text-align: left;
+    }
+
+    th {
+      background: var(--surface-muted);
+    }
+  }
+
+  .empty-operational {
+    padding: 12px;
+    color: var(--text-secondary);
+  }
+}
+
 .form-actions {
   display: flex;
   gap: 12px;
@@ -355,6 +419,16 @@ mat-chip {
   &.badge-inactive {
     background-color: var(--state-neutral-bg) !important;
     color: var(--state-neutral) !important;
+  }
+
+  &.badge-operational-on {
+    background-color: var(--state-success-bg) !important;
+    color: var(--state-success) !important;
+  }
+
+  &.badge-operational-off {
+    background-color: var(--state-warning-bg) !important;
+    color: var(--state-warning) !important;
   }
 }
 

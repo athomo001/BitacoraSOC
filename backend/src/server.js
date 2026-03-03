@@ -38,6 +38,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 const PORT = process.env.PORT || 3000;
 const APP_VERSION = process.env.APP_VERSION || 'dev';
 const DEFAULT_HTTPS_PORT = Number(process.env.HTTPS_PORT) || 3443;
+const FRONTEND_PORT = Number(process.env.FRONTEND_PORT) || 4200;
 
 const DEFAULT_RUNTIME_SECURITY_CONFIG = {
   httpsEnabled: false,
@@ -117,12 +118,67 @@ const getAllowedOriginsSet = (rawOrigins) => {
   return normalized;
 };
 
+const isWildcardAddress = (value) => {
+  if (!value) return true;
+  const normalized = value.trim().toLowerCase();
+  return normalized === '0.0.0.0' || normalized === '::' || normalized === '[::]';
+};
+
+const getTrustedHosts = (req) => {
+  const hosts = new Set();
+  const requestHost = getSafeHostname(req.headers.host);
+  const hostDomain = process.env.HOST_DOMAIN;
+
+  if (requestHost) hosts.add(requestHost);
+  if (hostDomain && !isWildcardAddress(hostDomain)) hosts.add(hostDomain);
+  hosts.add('localhost');
+  hosts.add('127.0.0.1');
+
+  return hosts;
+};
+
+const isSameTrustedHostOrigin = (req, origin) => {
+  try {
+    const parsed = new URL(origin);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return false;
+    }
+
+    return getTrustedHosts(req).has(parsed.hostname);
+  } catch {
+    return false;
+  }
+};
+
+const buildAutoAllowedOriginsSet = (req) => {
+  const hosts = getTrustedHosts(req);
+
+  const runtimeSecurityConfig = normalizeRuntimeSecurityConfig(req.app.locals.runtimeSecurityConfig);
+  const ports = new Set([
+    Number(process.env.BACKEND_PORT) || Number(PORT) || 3000,
+    Number(process.env.HTTPS_PORT) || Number(runtimeSecurityConfig.httpsPort) || DEFAULT_HTTPS_PORT,
+    Number(process.env.BACKEND_HTTPS_PORT) || Number(process.env.HTTPS_PORT) || Number(runtimeSecurityConfig.httpsPort) || DEFAULT_HTTPS_PORT,
+    FRONTEND_PORT,
+    80,
+    443
+  ].filter((value) => Number.isFinite(value) && value > 0));
+
+  const normalized = new Set();
+  hosts.forEach((host) => {
+    ports.forEach((port) => {
+      const httpOrigin = port === 80 ? `http://${host}` : `http://${host}:${port}`;
+      const httpsOrigin = port === 443 ? `https://${host}` : `https://${host}:${port}`;
+      normalized.add(httpOrigin);
+      normalized.add(httpsOrigin);
+    });
+  });
+
+  return normalized;
+};
+
 // Validación básica de variables de entorno requeridas
 const validateEnv = () => {
   const required = ['MONGODB_URI', 'JWT_SECRET'];
-  if (process.env.NODE_ENV === 'production') {
-    required.push('ALLOWED_ORIGINS');
-  }
 
   const missing = required.filter((key) => !process.env[key]);
   if (missing.length) {
@@ -210,17 +266,18 @@ app.use((req, res, next) => {
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production'
     ? (origin, callback) => {
-      const allowedOrigins = getAllowedOriginsSet(process.env.ALLOWED_ORIGINS || '');
-
-      if (allowedOrigins.size === 0) {
-        callback(new Error('ALLOWED_ORIGINS no está configurado correctamente'));
-      } else if (!origin) {
+      if (!origin) {
         callback(null, true);
-      } else if (allowedOrigins.has(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('No permitido por CORS'));
+        return;
       }
+
+      const configuredOrigins = getAllowedOriginsSet(process.env.ALLOWED_ORIGINS || '');
+      if (configuredOrigins.has(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error('No permitido por CORS'));
     }
     : true, // En desarrollo permite cualquier origen
   credentials: true,
@@ -230,8 +287,35 @@ const corsOptions = {
   maxAge: 600
 };
 
+const apiCorsMiddleware = (req, res, next) => {
+  if (process.env.NODE_ENV !== 'production') {
+    return cors(corsOptions)(req, res, next);
+  }
+
+  const dynamicCorsOptions = {
+    ...corsOptions,
+    origin: (origin, callback) => {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      const configuredOrigins = getAllowedOriginsSet(process.env.ALLOWED_ORIGINS || '');
+      const autoOrigins = buildAutoAllowedOriginsSet(req);
+      if (configuredOrigins.has(origin) || autoOrigins.has(origin) || isSameTrustedHostOrigin(req, origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error('No permitido por CORS'));
+    }
+  };
+
+  return cors(dynamicCorsOptions)(req, res, next);
+};
+
 // Rate limiting
-app.use('/api/', cors(corsOptions), apiLimiter);
+app.use('/api/', apiCorsMiddleware, apiLimiter);
 app.use('/api/', captureMetadata);
 app.use('/api/', inputSanitizer);
 
@@ -300,6 +384,14 @@ if (fs.existsSync(clientDistPath) && fs.existsSync(clientIndexPath)) {
 
     res.sendFile(clientIndexPath);
   });
+} else {
+  app.get('/', (_req, res) => {
+    res.status(200).json({
+      message: 'Backend Bitácora SOC activo',
+      health: '/health',
+      apiDocs: '/api-docs'
+    });
+  });
 }
 
 // Swagger documentation (próximo paso)
@@ -335,16 +427,73 @@ app.use((err, req, res, next) => {
 let httpServer = null;
 let httpsServer = null;
 
+const isBackendAlreadyRunningOnPort = (listenPort) => new Promise((resolve) => {
+  const request = http.get({
+    host: '127.0.0.1',
+    port: Number(listenPort),
+    path: '/health',
+    timeout: 1200
+  }, (response) => {
+    let body = '';
+    response.setEncoding('utf8');
+    response.on('data', (chunk) => {
+      body += chunk;
+    });
+    response.on('end', () => {
+      if (response.statusCode !== 200) {
+        resolve(false);
+        return;
+      }
+
+      try {
+        const payload = JSON.parse(body || '{}');
+        resolve(payload?.status === 'ok');
+      } catch {
+        resolve(false);
+      }
+    });
+  });
+
+  request.on('error', () => resolve(false));
+  request.on('timeout', () => {
+    request.destroy();
+    resolve(false);
+  });
+});
+
 const attachServerErrorHandler = (serverInstance, label, listenPort) => {
-  serverInstance.on('error', (error) => {
+  serverInstance.on('error', async (error) => {
     if (error.code === 'EADDRINUSE') {
+      if (label === 'http') {
+        const alreadyRunning = await isBackendAlreadyRunningOnPort(listenPort);
+        if (alreadyRunning) {
+          logger.info({ event: 'server.http.already.running', host: HOST, port: listenPort }, 'Otra instancia del backend ya está ejecutándose en el puerto HTTP');
+          console.log(`ℹ️ Backend ya está corriendo en http://${HOST}:${listenPort}.`);
+          return process.exit(0);
+        }
+      }
+
       logger.error({ event: 'server.port.in.use', protocol: label, host: HOST, port: listenPort }, 'Puerto en uso, no se pudo iniciar');
       console.error(`❌ Puerto ${listenPort} en uso para ${label.toUpperCase()}.`);
+
+      if (label === 'https') {
+        app.locals.httpsReady = false;
+        logger.warn({ event: 'server.https.disabled.port.in.use', host: HOST, port: listenPort }, 'HTTPS deshabilitado por puerto en uso; backend seguirá en HTTP');
+        return;
+      }
+
       return process.exit(1);
     }
 
     logger.error({ event: 'server.listen.error', protocol: label, error: error.message }, 'Error al iniciar servidor');
     console.error(`❌ Error al iniciar servidor ${label.toUpperCase()}:`, error.message);
+
+    if (label === 'https') {
+      app.locals.httpsReady = false;
+      logger.warn({ event: 'server.https.disabled.listen.error', error: error.message }, 'HTTPS deshabilitado por error de listener; backend seguirá en HTTP');
+      return;
+    }
+
     process.exit(1);
   });
 };
@@ -362,14 +511,16 @@ const loadRuntimeSecurityConfigFromDb = async () => {
 const startHttpsServerIfEnabled = () => {
   app.locals.httpsReady = false;
   const securityConfig = normalizeRuntimeSecurityConfig(app.locals.runtimeSecurityConfig);
-  if (!securityConfig.httpsEnabled) {
-    return;
-  }
 
   const certPath = resolveTlsPath(securityConfig.tlsCertPath);
   const keyPath = resolveTlsPath(securityConfig.tlsKeyPath);
   const caPath = resolveTlsPath(securityConfig.tlsCaPath);
   const httpsPort = Number(securityConfig.httpsPort) || DEFAULT_HTTPS_PORT;
+  const shouldStartHttps = !!securityConfig.httpsEnabled;
+
+  if (!shouldStartHttps) {
+    return;
+  }
 
   if (!certPath || !keyPath) {
     logger.warn({ event: 'server.https.disabled.missing.paths' }, 'HTTPS habilitado en config pero faltan rutas de certificado/llave');
@@ -426,9 +577,12 @@ const startServers = async () => {
 
     const { startScheduler: startShiftReportScheduler } = require('./utils/shift-scheduler');
     startShiftReportScheduler();
-  });
 
-  startHttpsServerIfEnabled();
+    // Iniciar HTTPS solo cuando HTTP ya está confirmado.
+    // Evita ruido de "puerto HTTPS en uso" cuando se ejecuta una segunda instancia
+    // y el puerto HTTP ya estaba ocupado por una instancia previa.
+    startHttpsServerIfEnabled();
+  });
 };
 
 const gracefulShutdown = (signal) => {

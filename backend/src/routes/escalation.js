@@ -159,5 +159,8 @@ router.post('/admin/external-people', authenticate, requireAdmin, escalationCont
 router.put('/admin/external-people/:id', authenticate, requireAdmin, escalationController.updateExternalPerson);
 router.delete('/admin/external-people/:id', authenticate, requireAdmin, escalationController.deleteExternalPerson);
 
+// 🧪 Probar envío de recordatorio de escalación interna con cargos configurados
+router.post('/admin/reminder/test', authenticate, requireAdmin, escalationController.testEscalationReminder);
+
 module.exports = router;
 

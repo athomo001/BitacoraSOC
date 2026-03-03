@@ -30,6 +30,8 @@ import { Router } from '@angular/router';
 
 @Injectable()
 export class AuthInterceptor implements HttpInterceptor {
+  private readonly httpsRetryHeader = 'X-Https-Retry';
+
   constructor(
     private authService: AuthService,
     private router: Router
@@ -40,6 +42,22 @@ export class AuthInterceptor implements HttpInterceptor {
 
     return next.handle(req).pipe(
       catchError((error: HttpErrorResponse) => {
+        // Backend exige HTTPS y entrega URL objetivo
+        if (error.status === 426) {
+          const targetUrl = error?.error?.targetUrl;
+          const alreadyRetried = req.headers.has(this.httpsRetryHeader);
+
+          if (targetUrl && !alreadyRetried) {
+            const httpsRequest = req.clone({
+              url: targetUrl,
+              withCredentials: true,
+              headers: req.headers.set(this.httpsRetryHeader, '1')
+            });
+
+            return next.handle(httpsRequest);
+          }
+        }
+
         // Network error (backend unavailable)
         if (error.status === 0) {
           console.error('Backend no disponible. Verifica que el servidor esté corriendo.');

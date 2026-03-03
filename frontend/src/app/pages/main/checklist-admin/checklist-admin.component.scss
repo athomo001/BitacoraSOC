@@ -14,8 +14,46 @@
     .config-form {
       display: flex;
       gap: 12px;
-      align-items: center;
+      align-items: flex-end;
       flex-wrap: wrap;
+    }
+
+    .config-columns {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(280px, 1fr));
+      gap: 16px;
+      width: 100%;
+    }
+
+    .config-column {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .weekly-log-section {
+      margin-top: 16px;
+
+      h3 {
+        margin: 0 0 8px 0;
+      }
+
+      .weekly-log-table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid var(--border-color);
+
+        th,
+        td {
+          padding: 8px;
+          border-bottom: 1px solid var(--border-color);
+          text-align: left;
+        }
+
+        thead {
+          background: var(--surface-muted);
+        }
+      }
     }
   }
 
@@ -23,6 +61,14 @@
     display: grid;
     grid-template-columns: 320px 1fr;
     gap: 16px;
+  }
+
+  @media (max-width: 960px) {
+    .config-card {
+      .config-columns {
+        grid-template-columns: 1fr;
+      }
+    }
   }
 
   .list-card {

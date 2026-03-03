@@ -19,6 +19,7 @@ import { WorkShiftService } from '../../../services/work-shift.service';
 import { AuthService } from '../../../services/auth.service';
 import { ConfigService } from '../../../services/config.service';
 import { ChecklistService } from '../../../services/checklist.service';
+import { UserService } from '../../../services/user.service';
 import { WorkShift, WorkShiftFormData, SHIFT_TYPE_OPTIONS, DEFAULT_COLORS } from '../../../models/work-shift.model';
 
 @Component({
@@ -49,6 +50,14 @@ import { WorkShift, WorkShiftFormData, SHIFT_TYPE_OPTIONS, DEFAULT_COLORS } from
 export class WorkShiftsAdminComponent implements OnInit {
   shifts: WorkShift[] = [];
   users: any[] = [];
+  operationalRows: Array<{
+    shiftId: string;
+    analystName: string;
+    shiftName: string;
+    schedule: string;
+    weekdaysLabel: string;
+    status: 'EN_TURNO' | 'FUERA_DE_TURNO';
+  }> = [];
   checklistTemplates: any[] = [];
   
   loading = false;
@@ -56,6 +65,7 @@ export class WorkShiftsAdminComponent implements OnInit {
   editingShift: WorkShift | null = null;
   
   shiftForm!: FormGroup;
+  operationalAssignmentForm!: FormGroup;
   globalEmailForm!: FormGroup;  // Formulario GLOBAL para Reenvío
   shiftTypeOptions = SHIFT_TYPE_OPTIONS;
   colorOptions = DEFAULT_COLORS;
@@ -70,11 +80,13 @@ export class WorkShiftsAdminComponent implements OnInit {
     private workShiftService: WorkShiftService,
     private configService: ConfigService,
     private checklistService: ChecklistService,
+    private userService: UserService,
     private fb: FormBuilder,
     private snackBar: MatSnackBar,
     private dialog: MatDialog
   ) {
     this.initForm();
+    this.initOperationalAssignmentForm();
     this.initGlobalEmailForm();  // Inicializar una sola vez aquí
   }
 
@@ -116,6 +128,13 @@ export class WorkShiftsAdminComponent implements OnInit {
     });
   }
 
+  initOperationalAssignmentForm(): void {
+    this.operationalAssignmentForm = this.fb.group({
+      shiftId: [null, Validators.required],
+      userId: [null, Validators.required]
+    });
+  }
+
   loadGlobalEmailConfig(): void {
     // Cargar configuración global de email desde BD
     this.configService.getConfig().subscribe({
@@ -143,6 +162,7 @@ export class WorkShiftsAdminComponent implements OnInit {
     this.workShiftService.getShifts().subscribe({
       next: (shifts) => {
         this.shifts = shifts;
+        this.rebuildOperationalRows();
         this.loading = false;
       },
       error: (error: any) => {
@@ -154,9 +174,99 @@ export class WorkShiftsAdminComponent implements OnInit {
   }
 
   loadUsers(): void {
-    // TODO: Implementar endpoint para obtener usuarios
-    // Por ahora dejamos vacío
-    this.users = [];
+    this.userService.getUsersList().subscribe({
+      next: (users) => {
+        this.users = (users || []).filter((user: any) => user?.isActive !== false && user?.role !== 'guest');
+        this.rebuildOperationalRows();
+      },
+      error: (error: any) => {
+        console.error('Error loading users:', error);
+        this.users = [];
+        this.rebuildOperationalRows();
+        this.snackBar.open('No se pudieron cargar usuarios para asignación operativa', 'Cerrar', { duration: 3000 });
+      }
+    });
+  }
+
+  private rebuildOperationalRows(): void {
+    this.operationalRows = this.shifts
+      .filter((shift: WorkShift) => Boolean(shift.assignedUserId))
+      .map((shift: WorkShift) => ({
+        shiftId: shift._id,
+        analystName: this.getAssignedAnalystName(shift),
+        shiftName: shift.name,
+        schedule: this.formatTimeRange(shift),
+        weekdaysLabel: 'Lun-Dom',
+        status: this.isShiftActiveNow(shift) ? 'EN_TURNO' : 'FUERA_DE_TURNO'
+      }));
+  }
+
+  private getAssignedAnalystName(shift: WorkShift): string {
+    const assigned = this.getObjectId((shift as any).assignedUserId);
+    if (!assigned) {
+      return 'Sin asignar';
+    }
+    const fromLoadedUsers = this.users.find((u: any) => String(u._id) === assigned);
+    return fromLoadedUsers?.fullName || shift.assignedUserName || 'Usuario asignado';
+  }
+
+  private hhmmToMinutes(value: string): number {
+    const [hours, minutes] = String(value || '00:00').split(':').map(Number);
+    return ((Number.isFinite(hours) ? hours : 0) * 60) + (Number.isFinite(minutes) ? minutes : 0);
+  }
+
+  private isShiftActiveNow(shift: WorkShift): boolean {
+    if (!shift?.active) {
+      return false;
+    }
+    const now = new Date();
+    const nowMinutes = (now.getHours() * 60) + now.getMinutes();
+    const startMinutes = this.hhmmToMinutes(shift.startTime);
+    const endMinutes = this.hhmmToMinutes(shift.endTime);
+
+    if (startMinutes === endMinutes) {
+      return true;
+    }
+
+    if (endMinutes > startMinutes) {
+      return nowMinutes >= startMinutes && nowMinutes < endMinutes;
+    }
+
+    return nowMinutes >= startMinutes || nowMinutes < endMinutes;
+  }
+
+  getOperationalStatusClass(status: 'EN_TURNO' | 'FUERA_DE_TURNO'): string {
+    return status === 'EN_TURNO' ? 'badge-operational-on' : 'badge-operational-off';
+  }
+
+  getOperationalStatusLabel(status: 'EN_TURNO' | 'FUERA_DE_TURNO'): string {
+    return status === 'EN_TURNO' ? 'EN TURNO' : 'FUERA DE TURNO';
+  }
+
+  refreshOperationalStatus(): void {
+    this.rebuildOperationalRows();
+  }
+
+  saveOperationalAssignment(): void {
+    if (this.operationalAssignmentForm.invalid) {
+      this.operationalAssignmentForm.markAllAsTouched();
+      return;
+    }
+
+    const shiftId = this.operationalAssignmentForm.value.shiftId;
+    const userId = this.operationalAssignmentForm.value.userId;
+
+    this.workShiftService.updateShift(shiftId, { assignedUserId: userId }).subscribe({
+      next: () => {
+        this.snackBar.open('Asignación operativa guardada', 'Cerrar', { duration: 2500 });
+        this.operationalAssignmentForm.reset({ shiftId: null, userId: null });
+        this.loadShifts();
+      },
+      error: (error: any) => {
+        console.error('Error saving operational assignment:', error);
+        this.snackBar.open(error?.error?.error || 'Error al guardar asignación operativa', 'Cerrar', { duration: 3000 });
+      }
+    });
   }
 
   loadChecklistTemplates(): void {

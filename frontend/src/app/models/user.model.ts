@@ -43,7 +43,8 @@ export interface CreateUserRequest {
   password: string;
   fullName: string;
   phone?: string;
-  role: 'admin' | 'user' | 'guest';
+  role: 'admin' | 'user' | 'auditor' | 'guest';
+  cargoLabel?: string | null;
 }
 
 export interface UpdateProfileRequest {

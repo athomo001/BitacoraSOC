@@ -38,8 +38,23 @@
           <mat-select formControlName="role">
             <mat-option value="admin">Administrador</mat-option>
             <mat-option value="user">Usuario</mat-option>
+            <mat-option value="auditor">Auditor</mat-option>
             <mat-option value="guest">Invitado</mat-option>
           </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" *ngIf="!isGuestRoleSelected()">
+          <mat-label>Cargo</mat-label>
+          <mat-select formControlName="cargoOption">
+            <mat-option *ngFor="let cargo of baseCargos" [value]="cargo">{{ cargo }}</mat-option>
+            <mat-option [value]="customCargoOption">Otro (custom)</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" *ngIf="!isGuestRoleSelected() && isCustomCargoSelected()">
+          <mat-label>Cargo personalizado</mat-label>
+          <input matInput formControlName="cargoCustom" maxlength="120" placeholder="Ej: Líder SOC nocturno">
+          <mat-hint>Máximo 120 caracteres</mat-hint>
         </mat-form-field>
 
         <button mat-raised-button color="primary" type="submit" 
@@ -83,6 +98,11 @@
           <td mat-cell *matCellDef="let user">
             <span class="role-badge" [class]="user.role">{{ user.role.toUpperCase() }}</span>
           </td>
+        </ng-container>
+
+        <ng-container matColumnDef="cargoLabel">
+          <th mat-header-cell *matHeaderCellDef>Cargo</th>
+          <td mat-cell *matCellDef="let user">{{ user.cargoLabel || '—' }}</td>
         </ng-container>
 
         <ng-container matColumnDef="isActive">

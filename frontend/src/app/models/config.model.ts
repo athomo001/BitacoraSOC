@@ -6,6 +6,14 @@ export interface AppConfig {
   checklistCloseEmailEnabled?: boolean;
   checklistAlertEnabled?: boolean;
   checklistAlertTime?: string;
+  checklistWeeklyAlertEnabled?: boolean;
+  checklistWeeklyReminderDay?: number;
+  checklistWeeklyReminderTime?: string;
+  checklistWeeklyCutoffTime?: string;
+  checklistWeeklyTimezone?: string;
+  escalationReminderEnabled?: boolean;
+  escalationReminderCargoLabels?: string[];
+  lastEscalationReminderDate?: Date;
   lastChecklistAlertDate?: Date;
   appTitle?: string;
   security?: SecurityConfig;
@@ -80,6 +88,13 @@ export interface UpdateConfigRequest {
   checklistCloseEmailEnabled?: boolean;
   checklistAlertEnabled?: boolean;
   checklistAlertTime?: string;
+  checklistWeeklyAlertEnabled?: boolean;
+  checklistWeeklyReminderDay?: number;
+  checklistWeeklyReminderTime?: string;
+  checklistWeeklyCutoffTime?: string;
+  checklistWeeklyTimezone?: string;
+  escalationReminderEnabled?: boolean;
+  escalationReminderCargoLabels?: string[];
   appTitle?: string;
   security?: Partial<SecurityConfig>;
   logoUrl?: string;
@@ -89,3 +104,4 @@ export interface UpdateConfigRequest {
   smtpConfig?: SmtpConfig;
   easterEggRules?: EasterEggRule[];
 }
+

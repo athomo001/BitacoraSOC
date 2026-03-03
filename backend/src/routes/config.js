@@ -104,12 +104,14 @@ const uploadTls = multer({
   storage: tlsStorage,
   limits: { fileSize: 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const hasNoExtension = !ext;
     const allowedExt = /\.(pem|crt|cer|key)$/i;
-    const extname = allowedExt.test(path.extname(file.originalname).toLowerCase());
-    if (extname) {
+    const hasAllowedExtension = allowedExt.test(ext);
+    if (hasNoExtension || hasAllowedExtension) {
       return cb(null, true);
     }
-    cb(new Error('Archivo inválido. Tipos permitidos: .pem, .crt, .cer, .key'));
+    cb(new Error('Archivo inválido. Tipos permitidos: .pem, .crt, .cer, .key (también se acepta archivo sin extensión)'));
   }
 });
 
@@ -136,6 +138,77 @@ const getTlsFileInfo = (security) => ({
   caFileName: security?.tlsCaPath ? path.basename(security.tlsCaPath) : ''
 });
 
+const fileHasPemToken = async (filePath, tokenCandidates) => {
+  const content = await fs.readFile(filePath, 'utf8');
+  const normalized = String(content || '').toUpperCase();
+  return tokenCandidates.some((token) => normalized.includes(token));
+};
+
+const removeUploadedFileSilently = async (filePath) => {
+  if (!filePath) return;
+  try {
+    await fs.unlink(filePath);
+  } catch {
+    // ignore cleanup errors
+  }
+};
+
+const resolveStoredTlsPath = (storedPath) => {
+  if (!storedPath || typeof storedPath !== 'string') {
+    return '';
+  }
+
+  const normalized = storedPath.replace(/\\/g, '/').trim();
+  if (!normalized) {
+    return '';
+  }
+
+  if (!normalized.startsWith('uploads/tls/')) {
+    return '';
+  }
+
+  return path.join(__dirname, '../..', normalized);
+};
+
+const removeStoredTlsFileSilently = async (storedPath) => {
+  const filePath = resolveStoredTlsPath(storedPath);
+  if (!filePath) return;
+
+  try {
+    await fs.unlink(filePath);
+  } catch {
+    // ignore cleanup errors
+  }
+};
+
+const validateTlsFilesByContent = async ({ certFile, keyFile, caFile }) => {
+  if (certFile) {
+    const certOk = await fileHasPemToken(certFile.path, ['-----BEGIN CERTIFICATE-----']);
+    if (!certOk) {
+      throw new Error('El archivo de certificado no contiene un PEM de certificado válido');
+    }
+  }
+
+  if (keyFile) {
+    const keyOk = await fileHasPemToken(keyFile.path, [
+      '-----BEGIN PRIVATE KEY-----',
+      '-----BEGIN RSA PRIVATE KEY-----',
+      '-----BEGIN EC PRIVATE KEY-----',
+      '-----BEGIN ENCRYPTED PRIVATE KEY-----'
+    ]);
+    if (!keyOk) {
+      throw new Error('El archivo de llave no contiene una llave privada PEM válida');
+    }
+  }
+
+  if (caFile) {
+    const caOk = await fileHasPemToken(caFile.path, ['-----BEGIN CERTIFICATE-----']);
+    if (!caOk) {
+      throw new Error('El archivo CA no contiene un certificado PEM válido');
+    }
+  }
+};
+
 // GET /api/config - Obtener configuración
 router.get('/', authenticate, async (req, res) => {
   try {
@@ -149,6 +222,13 @@ router.get('/', authenticate, async (req, res) => {
         checklistCloseEmailEnabled: false,
         checklistAlertEnabled: true,
         checklistAlertTime: '09:30',
+        checklistWeeklyAlertEnabled: false,
+        checklistWeeklyReminderDay: 1,
+        checklistWeeklyReminderTime: '16:00',
+        checklistWeeklyCutoffTime: '18:00',
+        checklistWeeklyTimezone: 'America/Santiago',
+        escalationReminderEnabled: false,
+        escalationReminderCargoLabels: ['N2'],
         security: DEFAULT_SECURITY_CONFIG
       });
     }
@@ -182,6 +262,14 @@ router.put('/',
     body('checklistCloseEmailEnabled').optional().isBoolean(),
     body('checklistAlertEnabled').optional().isBoolean(),
     body('checklistAlertTime').optional().matches(/^\d{2}:\d{2}$/).withMessage('Formato de hora inválido (HH:mm)'),
+    body('checklistWeeklyAlertEnabled').optional().isBoolean(),
+    body('checklistWeeklyReminderDay').optional().isInt({ min: 0, max: 6 }).toInt(),
+    body('checklistWeeklyReminderTime').optional().matches(/^\d{2}:\d{2}$/).withMessage('Formato de hora de recordatorio inválido (HH:mm)'),
+    body('checklistWeeklyCutoffTime').optional().matches(/^\d{2}:\d{2}$/).withMessage('Formato de hora de corte inválido (HH:mm)'),
+    body('checklistWeeklyTimezone').optional().isString().trim().isLength({ min: 3, max: 80 }),
+    body('escalationReminderEnabled').optional().isBoolean(),
+    body('escalationReminderCargoLabels').optional().isArray({ min: 1, max: 20 }).withMessage('Debes seleccionar al menos un cargo'),
+    body('escalationReminderCargoLabels.*').optional().isString().trim().isLength({ min: 1, max: 80 }).withMessage('Cargo inválido'),
     body('appTitle').optional().isString().trim().isLength({ max: 80 }).withMessage('El título no puede superar 80 caracteres'),
     body('security.httpsEnabled').optional().isBoolean(),
     body('security.forceHttps').optional().isBoolean(),
@@ -216,18 +304,44 @@ router.put('/',
   async (req, res) => {
     try {
       let config = await AppConfig.findOne();
+      const incomingSecurity = req.body.security;
 
       if (!config) {
         config = new AppConfig(req.body);
       } else {
         const oldPass = config.smtpConfig ? config.smtpConfig.pass : null;
+        const previousSecurity = extractSecurityConfig(config);
         Object.assign(config, req.body);
+
+        if (incomingSecurity) {
+          config.security = {
+            ...previousSecurity,
+            ...incomingSecurity
+          };
+        }
 
         // Preserve password if it wasn't provided or was sent as empty string (masked)
         if (req.body.smtpConfig) {
           if (!req.body.smtpConfig.pass && oldPass) {
             config.smtpConfig.pass = oldPass;
           }
+        }
+      }
+
+      const effectiveSecurity = extractSecurityConfig(config);
+      if (effectiveSecurity.httpsEnabled) {
+        if (!effectiveSecurity.tlsCertPath || !effectiveSecurity.tlsKeyPath) {
+          return res.status(400).json({ message: 'Para habilitar HTTPS debes cargar certificado y llave TLS' });
+        }
+      }
+
+      if (effectiveSecurity.forceHttps) {
+        if (!effectiveSecurity.httpsEnabled) {
+          return res.status(400).json({ message: 'No puedes forzar HTTPS si el listener HTTPS está deshabilitado' });
+        }
+
+        if (!effectiveSecurity.tlsCertPath || !effectiveSecurity.tlsKeyPath) {
+          return res.status(400).json({ message: 'Para forzar HTTPS debes tener certificado y llave TLS cargados' });
         }
       }
 
@@ -282,6 +396,8 @@ router.post('/security/certificates',
           return res.status(400).json({ message: 'Debes seleccionar al menos un archivo TLS' });
         }
 
+        await validateTlsFilesByContent({ certFile, keyFile, caFile });
+
         let config = await AppConfig.findOne();
         if (!config) {
           config = new AppConfig();
@@ -315,9 +431,52 @@ router.post('/security/certificates',
           }
         });
       } catch (error) {
-        return res.status(500).json({ message: 'Error al guardar certificados TLS' });
+        const files = req.files || {};
+        await removeUploadedFileSilently(files.tlsCert?.[0]?.path);
+        await removeUploadedFileSilently(files.tlsKey?.[0]?.path);
+        await removeUploadedFileSilently(files.tlsCa?.[0]?.path);
+        return res.status(400).json({ message: error.message || 'Error al guardar certificados TLS' });
       }
     });
+  }
+);
+
+// DELETE /api/config/security/certificates - Borrar certs y resetear HTTPS/TLS (admin)
+router.delete('/security/certificates',
+  authenticate,
+  authorize('admin'),
+  async (req, res) => {
+    try {
+      let config = await AppConfig.findOne();
+      if (!config) {
+        config = new AppConfig();
+      }
+
+      const currentSecurity = extractSecurityConfig(config);
+      await Promise.all([
+        removeStoredTlsFileSilently(currentSecurity.tlsCertPath),
+        removeStoredTlsFileSilently(currentSecurity.tlsKeyPath),
+        removeStoredTlsFileSilently(currentSecurity.tlsCaPath)
+      ]);
+
+      config.security = {
+        ...DEFAULT_SECURITY_CONFIG
+      };
+      config.lastUpdatedBy = req.user._id;
+      await config.save();
+
+      req.app.locals.runtimeSecurityConfig = extractSecurityConfig(config);
+
+      return res.json({
+        message: 'Configuración HTTPS/TLS restablecida a valores por defecto',
+        security: {
+          ...extractSecurityConfig(config),
+          ...getTlsFileInfo(config.security)
+        }
+      });
+    } catch (error) {
+      return res.status(500).json({ message: 'Error al restablecer configuración HTTPS/TLS' });
+    }
   }
 );
 
