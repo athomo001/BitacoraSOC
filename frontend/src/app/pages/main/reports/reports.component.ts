@@ -27,7 +27,7 @@
  *   - Solo admin (AdminGuard)
  *   - Guests NO acceden (NotGuestGuard)
  */
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, HostListener } from '@angular/core';
 import { ReportService } from '../../../services/report.service';
 import { ReportOverview } from '../../../models/report.model';
 import { Color, ScaleType } from '@swimlane/ngx-charts';
@@ -76,6 +76,7 @@ export class ReportsComponent implements OnInit {
   
   // Configuración de gráficos
   view: [number, number] = [700, 300];
+  trendView: [number, number] = [1200, 320];
   colorScheme: Color = {
     name: 'soc',
     selectable: true,
@@ -103,8 +104,21 @@ export class ReportsComponent implements OnInit {
   constructor(private reportService: ReportService) {}
 
   ngOnInit(): void {
+    this.updateTrendView();
     this.applyThemeColorSchemes();
     this.loadOverview();
+  }
+
+  @HostListener('window:resize')
+  onWindowResize(): void {
+    this.updateTrendView();
+  }
+
+  private updateTrendView(): void {
+    const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 1400;
+    const horizontalPadding = 220;
+    const responsiveWidth = Math.max(900, Math.min(screenWidth - horizontalPadding, 1500));
+    this.trendView = [responsiveWidth, 320];
   }
 
   private applyThemeColorSchemes(): void {

@@ -453,7 +453,10 @@ const sendChecklistAlertEmail = async ({ recipients, alertTime, dateLabel }) => 
 const sendEscalationInternalReminderEmail = async ({
   recipients,
   cargoLabels,
-  dateLabel
+  dateLabel,
+  targetWeekStartLabel,
+  targetWeekEndLabel,
+  daysAhead
 }) => {
   try {
     if (!recipients || recipients.length === 0) {
@@ -480,12 +483,23 @@ const sendEscalationInternalReminderEmail = async ({
     const cargosText = Array.isArray(cargoLabels) && cargoLabels.length > 0
       ? cargoLabels.join(', ')
       : 'N2';
+
+    const targetWeekText = targetWeekStartLabel && targetWeekEndLabel
+      ? `${targetWeekStartLabel} al ${targetWeekEndLabel}`
+      : 'semana futura';
+
+    const leadText = Number.isFinite(Number(daysAhead))
+      ? `${Number(daysAhead)} día(s)`
+      : 'los próximos días';
+
     const subject = '[Bitácora SOC] Recordatorio de escalación interna';
 
     const emailHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto;">
         <h2 style="color: #1565c0;">🔔 Recordatorio de escalación interna</h2>
-        <p>Recuerda completar las tablas de escalación interna correspondientes al día <strong>${dateLabel}</strong>.</p>
+        <p>Se detectó una semana futura sin escalación interna cargada en la ventana de anticipación (<strong>${leadText}</strong>).</p>
+        <p><strong>Semana objetivo:</strong> ${targetWeekText}</p>
+        <p>Fecha de evaluación: <strong>${dateLabel}</strong>.</p>
         <p><strong>Cargos objetivo:</strong> ${cargosText}</p>
         <hr style="margin-top: 20px;">
         <small style="color: #666;">Bitácora SOC - ${new Date().toLocaleString()}</small>

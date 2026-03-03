@@ -229,6 +229,7 @@ router.get('/', authenticate, async (req, res) => {
         checklistWeeklyTimezone: 'America/Santiago',
         escalationReminderEnabled: false,
         escalationReminderCargoLabels: ['N2'],
+        escalationReminderDaysAhead: 7,
         security: DEFAULT_SECURITY_CONFIG
       });
     }
@@ -270,6 +271,7 @@ router.put('/',
     body('escalationReminderEnabled').optional().isBoolean(),
     body('escalationReminderCargoLabels').optional().isArray({ min: 1, max: 20 }).withMessage('Debes seleccionar al menos un cargo'),
     body('escalationReminderCargoLabels.*').optional().isString().trim().isLength({ min: 1, max: 80 }).withMessage('Cargo inválido'),
+    body('escalationReminderDaysAhead').optional().isInt({ min: 1, max: 60 }).toInt().withMessage('Días de antelación inválidos (1-60)'),
     body('appTitle').optional().isString().trim().isLength({ max: 80 }).withMessage('El título no puede superar 80 caracteres'),
     body('security.httpsEnabled').optional().isBoolean(),
     body('security.forceHttps').optional().isBoolean(),

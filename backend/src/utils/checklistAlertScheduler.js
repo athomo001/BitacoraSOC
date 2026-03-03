@@ -8,6 +8,7 @@ const { sendChecklistAlertEmail, sendEscalationInternalReminderEmail } = require
 
 const DEFAULT_ALERT_TIME = '09:30';
 const DEFAULT_ESCALATION_REMINDER_HOUR = 9;
+const DEFAULT_ESCALATION_REMINDER_DAYS_AHEAD = 7;
 
 const isSameDay = (a, b) => a && b && a.toDateString() === b.toDateString();
 
@@ -129,6 +130,34 @@ const runChecklistAlert = async () => {
 
 const normalizeCargoLabel = (value) => String(value || '').trim().toUpperCase();
 
+const toStartOfDay = (value) => {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+const getStartOfWeekMonday = (value) => {
+  const date = toStartOfDay(value);
+  const day = (date.getDay() + 6) % 7;
+  date.setDate(date.getDate() - day);
+  return date;
+};
+
+const getEndOfWeekSunday = (weekStart) => {
+  const end = new Date(weekStart);
+  end.setDate(end.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+  return end;
+};
+
+const getEscalationReminderDaysAhead = (config) => {
+  const parsed = Number.parseInt(config?.escalationReminderDaysAhead, 10);
+  if (Number.isNaN(parsed) || parsed < 1) {
+    return DEFAULT_ESCALATION_REMINDER_DAYS_AHEAD;
+  }
+  return Math.min(parsed, 60);
+};
+
 const getEscalationReminderRecipients = async (cargoLabels) => {
   const normalized = (cargoLabels || [])
     .map(normalizeCargoLabel)
@@ -149,11 +178,50 @@ const getEscalationReminderRecipients = async (cargoLabels) => {
     .map((user) => user.email);
 };
 
-const shouldSendEscalationReminder = (now, config) => {
+const resolveFutureWeekGap = async (now, config) => {
+  const daysAhead = getEscalationReminderDaysAhead(config);
+  const currentWeekStart = getStartOfWeekMonday(now);
+
+  const anchorDate = new Date(now);
+  anchorDate.setDate(anchorDate.getDate() + daysAhead);
+
+  let targetWeekStart = getStartOfWeekMonday(anchorDate);
+  if (targetWeekStart <= currentWeekStart) {
+    targetWeekStart = new Date(currentWeekStart);
+    targetWeekStart.setDate(targetWeekStart.getDate() + 7);
+  }
+
+  const targetWeekEnd = getEndOfWeekSunday(targetWeekStart);
+  const hasAnyAssignment = await ShiftAssignment.exists({
+    weekStartDate: { $lte: targetWeekEnd },
+    weekEndDate: { $gte: targetWeekStart }
+  });
+
+  if (hasAnyAssignment) {
+    return null;
+  }
+
+  return {
+    daysAhead,
+    weekStart: targetWeekStart,
+    weekEnd: targetWeekEnd
+  };
+};
+
+const shouldSendEscalationReminder = (now, config, futureWeekGap) => {
   if (!config?.escalationReminderEnabled) return false;
+  if (!futureWeekGap) return false;
 
   if (config.lastEscalationReminderDate && isSameDay(config.lastEscalationReminderDate, now)) {
     return false;
+  }
+
+  if (config.lastEscalationReminderWeekStartDate) {
+    const lastWeekStart = toStartOfDay(config.lastEscalationReminderWeekStartDate);
+    const targetWeekStart = toStartOfDay(futureWeekGap.weekStart);
+    if (lastWeekStart.getTime() === targetWeekStart.getTime()) {
+      return false;
+    }
   }
 
   return now.getHours() >= DEFAULT_ESCALATION_REMINDER_HOUR;
@@ -163,7 +231,10 @@ const runEscalationInternalReminder = async () => {
   try {
     const config = await AppConfig.findOne();
     const now = new Date();
-    if (!config || !shouldSendEscalationReminder(now, config)) return;
+    if (!config) return;
+
+    const futureWeekGap = await resolveFutureWeekGap(now, config);
+    if (!shouldSendEscalationReminder(now, config, futureWeekGap)) return;
 
     const cargoLabels = Array.isArray(config.escalationReminderCargoLabels)
       ? config.escalationReminderCargoLabels
@@ -175,10 +246,14 @@ const runEscalationInternalReminder = async () => {
     await sendEscalationInternalReminderEmail({
       recipients,
       cargoLabels,
-      dateLabel: now.toLocaleDateString('es-CL')
+      dateLabel: now.toLocaleDateString('es-CL'),
+      targetWeekStartLabel: futureWeekGap.weekStart.toLocaleDateString('es-CL'),
+      targetWeekEndLabel: futureWeekGap.weekEnd.toLocaleDateString('es-CL'),
+      daysAhead: futureWeekGap.daysAhead
     });
 
     config.lastEscalationReminderDate = now;
+    config.lastEscalationReminderWeekStartDate = futureWeekGap.weekStart;
     await config.save();
   } catch (error) {
     logger.error({ err: error }, 'Error ejecutando recordatorio de escalación interna');

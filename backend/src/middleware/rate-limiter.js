@@ -21,6 +21,31 @@
 const rateLimit = require('express-rate-limit');
 const isProduction = process.env.NODE_ENV === 'production';
 
+const parseEnvInt = (value, fallback) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const defaultWindowMs = 15 * 60 * 1000;
+const defaultPublicMax = 300;
+const defaultAuthenticatedMax = 1200;
+
+const apiWindowMs = parseEnvInt(process.env.RATE_LIMIT_WINDOW_MS, defaultWindowMs);
+const apiPublicMax = parseEnvInt(process.env.RATE_LIMIT_MAX_REQUESTS, defaultPublicMax);
+const apiAuthenticatedMax = parseEnvInt(process.env.RATE_LIMIT_MAX_AUTH_REQUESTS, defaultAuthenticatedMax);
+
+const hasBearerToken = (req) => {
+  const authorization = req.headers?.authorization;
+  return typeof authorization === 'string' && authorization.startsWith('Bearer ') && authorization.length > 16;
+};
+
+const getApiLimiterKey = (req) => {
+  if (hasBearerToken(req)) {
+    return `auth:${req.headers.authorization.slice(7)}`;
+  }
+  return req.ip;
+};
+
 // Rate limiter para login
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
@@ -35,12 +60,13 @@ const loginLimiter = rateLimit({
 
 // Rate limiter general para API
 const apiLimiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+  windowMs: apiWindowMs,
+  max: (req) => (hasBearerToken(req) ? apiAuthenticatedMax : apiPublicMax),
+  keyGenerator: getApiLimiterKey,
   message: 'Demasiadas peticiones desde esta IP, intenta de nuevo más tarde',
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => !isProduction
+  skip: (req) => !isProduction || req.method === 'OPTIONS' || hasBearerToken(req)
 });
 
 // Rate limiter para recuperación de contraseña (máx 3/15min)

@@ -147,7 +147,17 @@ const appConfigSchema = new mongoose.Schema({
     type: [String],
     default: ['N2']
   },
+  escalationReminderDaysAhead: {
+    type: Number,
+    default: 7,
+    min: 1,
+    max: 60
+  },
   lastEscalationReminderDate: {
+    type: Date,
+    default: null
+  },
+  lastEscalationReminderWeekStartDate: {
     type: Date,
     default: null
   },
