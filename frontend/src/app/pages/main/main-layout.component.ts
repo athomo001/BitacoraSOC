@@ -41,6 +41,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
   private adminNoteChange$ = new Subject<string>();
   private personalNoteChange$ = new Subject<string>();
+  private checklistRefreshIntervalId: ReturnType<typeof setInterval> | null = null;
 
   currentUser: any = null;
   isAdmin = false;
@@ -123,6 +124,10 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.checklistRefreshIntervalId) {
+      clearInterval(this.checklistRefreshIntervalId);
+      this.checklistRefreshIntervalId = null;
+    }
     this.destroy$.next();
     this.destroy$.complete();
   }
@@ -244,7 +249,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
         error: (err) => console.error('Error cargando ultimo check:', err)
       });
 
-    setInterval(() => {
+    this.checklistRefreshIntervalId = setInterval(() => {
       this.refreshChecklistServices();
     }, 120000);
   }
@@ -268,7 +273,11 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
             }));
           }
         },
-        error: (err) => console.error('Error refrescando checklist:', err)
+        error: (err) => {
+          if (err.status !== 404) {
+            console.error('Error refrescando checklist:', err);
+          }
+        }
       });
   }
 

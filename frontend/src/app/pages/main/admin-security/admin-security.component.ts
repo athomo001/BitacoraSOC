@@ -40,6 +40,8 @@ export class AdminSecurityComponent implements OnInit {
   certStatus = '';
   keyStatus = '';
   caStatus = '';
+  private certUploaded = false;
+  private keyUploaded = false;
 
   constructor(
     private fb: FormBuilder,
@@ -73,6 +75,8 @@ export class AdminSecurityComponent implements OnInit {
         this.certStatus = config.security?.certFileName ? `Certificado cargado: ${config.security.certFileName}` : 'Sin certificado cargado';
         this.keyStatus = config.security?.keyFileName ? `Llave cargada: ${config.security.keyFileName}` : 'Sin llave cargada';
         this.caStatus = config.security?.caFileName ? `CA cargada: ${config.security.caFileName}` : 'Sin CA cargada';
+        this.certUploaded = !!config.security?.certUploaded;
+        this.keyUploaded = !!config.security?.keyUploaded;
       },
       error: () => {
         this.snackBar.open('Error cargando configuración HTTPS', 'Cerrar', { duration: 3000 });
@@ -83,6 +87,16 @@ export class AdminSecurityComponent implements OnInit {
   save(): void {
     if (this.securityForm.invalid) {
       this.securityForm.markAllAsTouched();
+      return;
+    }
+
+    const enableHttps = !!this.securityForm.value.httpsEnabled;
+    if (enableHttps && (!this.certUploaded || !this.keyUploaded)) {
+      const hasPendingFiles = !!this.certFile || !!this.keyFile;
+      const message = hasPendingFiles
+        ? 'Primero presiona "Guardar certificados SSL" para subir cert + key, luego guarda HTTPS'
+        : 'Para habilitar HTTPS primero debes cargar certificado y llave privada';
+      this.snackBar.open(message, 'Cerrar', { duration: 5000 });
       return;
     }
 
@@ -142,11 +156,56 @@ export class AdminSecurityComponent implements OnInit {
         this.certStatus = response.security?.certFileName ? `Certificado cargado: ${response.security.certFileName}` : this.certStatus;
         this.keyStatus = response.security?.keyFileName ? `Llave cargada: ${response.security.keyFileName}` : this.keyStatus;
         this.caStatus = response.security?.caFileName ? `CA cargada: ${response.security.caFileName}` : this.caStatus;
+        this.certUploaded = !!response.security?.certUploaded;
+        this.keyUploaded = !!response.security?.keyUploaded;
+        if (this.certUploaded && this.keyUploaded) {
+          this.securityForm.patchValue({ httpsEnabled: true });
+        }
         this.snackBar.open('Certificados TLS actualizados', 'Cerrar', { duration: 3000 });
       },
       error: (err) => {
         this.isSaving = false;
-        this.snackBar.open(err?.error?.message || 'Error subiendo certificados TLS', 'Cerrar', { duration: 4000 });
+        const errorMessage = err?.status === 404
+          ? 'Endpoint TLS no disponible en backend (verifica que esté corriendo la versión actual)'
+          : (err?.error?.message || 'Error subiendo certificados TLS');
+        this.snackBar.open(errorMessage, 'Cerrar', { duration: 5000 });
+      }
+    });
+  }
+
+  resetHttpsConfiguration(): void {
+    const confirmed = window.confirm('Esto deshabilitará HTTPS/Forzar HTTPS, restaurará el puerto por defecto y eliminará certificados TLS del servidor. ¿Continuar?');
+    if (!confirmed) {
+      return;
+    }
+
+    this.isSaving = true;
+    this.configService.resetTlsCertificates().subscribe({
+      next: (response) => {
+        this.isSaving = false;
+        this.certFile = null;
+        this.keyFile = null;
+        this.caFile = null;
+        this.certUploaded = false;
+        this.keyUploaded = false;
+        this.certStatus = 'Sin certificado cargado';
+        this.keyStatus = 'Sin llave cargada';
+        this.caStatus = 'Sin CA cargada';
+
+        this.securityForm.patchValue({
+          httpsEnabled: false,
+          forceHttps: false,
+          httpsPort: response.security?.httpsPort ?? 3443,
+          tlsCertPath: '',
+          tlsKeyPath: '',
+          tlsCaPath: ''
+        });
+
+        this.snackBar.open(response.message || 'HTTPS/TLS restablecido', 'Cerrar', { duration: 4000 });
+      },
+      error: (err) => {
+        this.isSaving = false;
+        this.snackBar.open(err?.error?.message || 'Error al restablecer HTTPS/TLS', 'Cerrar', { duration: 5000 });
       }
     });
   }

@@ -11,32 +11,33 @@
         </div>
 
         <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Puerto HTTPS</mat-label>
+          <mat-label>Puerto HTTPS backend</mat-label>
           <input matInput type="number" formControlName="httpsPort" min="1" max="65535">
-          <mat-hint>Si lo dejas vacío, usa el puerto HTTPS por defecto del servidor</mat-hint>
+          <mat-hint>Corresponde al listener HTTPS del backend (API), no al puerto del frontend</mat-hint>
         </mat-form-field>
 
         <div class="tls-files">
           <div class="tls-row">
             <span class="tls-label">SSL/TLS certificate</span>
-            <input #certInput type="file" accept=".pem,.crt,.cer" class="hidden-input" (change)="onCertSelected($event)">
+            <input #certInput type="file" class="hidden-input" (change)="onCertSelected($event)">
             <button mat-stroked-button type="button" (click)="certInput.click()">Seleccionar archivo</button>
           </div>
           <small>{{ certFile?.name || certStatus }}</small>
 
           <div class="tls-row">
             <span class="tls-label">SSL/TLS private key</span>
-            <input #keyInput type="file" accept=".pem,.key" class="hidden-input" (change)="onKeySelected($event)">
+            <input #keyInput type="file" class="hidden-input" (change)="onKeySelected($event)">
             <button mat-stroked-button type="button" (click)="keyInput.click()">Seleccionar archivo</button>
           </div>
           <small>{{ keyFile?.name || keyStatus }}</small>
 
           <div class="tls-row">
             <span class="tls-label">CA bundle (opcional)</span>
-            <input #caInput type="file" accept=".pem,.crt,.cer" class="hidden-input" (change)="onCaSelected($event)">
+            <input #caInput type="file" class="hidden-input" (change)="onCaSelected($event)">
             <button mat-stroked-button type="button" (click)="caInput.click()">Seleccionar archivo</button>
           </div>
           <small>{{ caFile?.name || caStatus }}</small>
+          <small>Se aceptan archivos con o sin extensión (ej: 10.0.100.13, .crt, .key, .pem).</small>
 
           <button mat-raised-button color="accent" type="button" (click)="uploadCertificates()" [disabled]="isSaving">
             <mat-spinner *ngIf="isSaving" diameter="18"></mat-spinner>
@@ -47,7 +48,12 @@
         <div class="notes">
           <p>Si cambias certificados, puerto o habilitación HTTPS, reinicia el backend para aplicar el listener TLS.</p>
           <p>Al activar Forzar HTTPS, confirma antes que el frontend use URL HTTPS permitida en CORS.</p>
+          <p>La CA es opcional; para habilitar HTTPS necesitas certificado + llave privada y activar el checkbox de listener HTTPS.</p>
         </div>
+
+        <button mat-stroked-button color="warn" type="button" class="danger-action" (click)="resetHttpsConfiguration()" [disabled]="isSaving">
+          Borrar configuración HTTPS/TLS y restaurar por defecto
+        </button>
 
         <button mat-raised-button color="primary" type="submit" [disabled]="isSaving">
           <mat-spinner *ngIf="isSaving" diameter="18"></mat-spinner>
