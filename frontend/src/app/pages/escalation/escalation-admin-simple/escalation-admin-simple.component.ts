@@ -74,6 +74,8 @@ export class EscalationAdminSimpleComponent implements OnInit {
   showAssignmentForm = false;
   assignmentForm!: FormGroup;
   users: any[] = [];
+  filteredUsersForAssignment: any[] = [];
+  showExternalPeopleForAssignment = true;
   roles = ['N2', 'TI', 'N1_NO_HABIL'];
   escalationReminderForm!: FormGroup;
   availableCargoLabels: string[] = [];
@@ -158,6 +160,10 @@ export class EscalationAdminSimpleComponent implements OnInit {
       weekEndDate: ['', Validators.required],
       startTime: ['08:00', Validators.required],
       endTime: ['18:00', Validators.required]
+    });
+
+    this.assignmentForm.get('roleCode')?.valueChanges.subscribe(() => {
+      this.updateAssignmentPeopleOptions();
     });
 
     this.clientForm = this.fb.group({
@@ -253,6 +259,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
       next: (data) => {
         this.users = [...data];
         this.refreshAvailableCargoLabels();
+        this.updateAssignmentPeopleOptions();
         console.log('✅ Users loaded from escalation service:', this.users.length, 'users');
         if (this.users.length > 0) {
           console.log('First user:', this.users[0]);
@@ -266,6 +273,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
           next: (data) => {
             this.users = [...data];
             this.refreshAvailableCargoLabels();
+            this.updateAssignmentPeopleOptions();
             console.log('✅ Users loaded from user service:', this.users.length, 'users');
             if (this.users.length > 0) {
               console.log('First user:', this.users[0]);
@@ -277,6 +285,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
             this.showError('Error al cargar usuarios');
             this.users = [];
             this.refreshAvailableCargoLabels();
+            this.updateAssignmentPeopleOptions();
             setTimeout(() => this.cdr.detectChanges(), 0);
           }
         });
@@ -383,6 +392,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
       startTime: '08:00',
       endTime: '18:00'
     });
+    this.updateAssignmentPeopleOptions();
   }
 
   saveAssignment(): void {
@@ -885,6 +895,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
     this.escalationService.getExternalPeople().subscribe({
       next: (data) => {
         this.externalPeople = [...data];
+        this.updateAssignmentPeopleOptions();
         this.loadingExternalPeople = false;
         this.cdr.detectChanges();
       },
@@ -893,6 +904,50 @@ export class EscalationAdminSimpleComponent implements OnInit {
         this.loadingExternalPeople = false;
       }
     });
+  }
+
+  private updateAssignmentPeopleOptions(): void {
+    const roleCode = String(this.assignmentForm?.get('roleCode')?.value || '').trim();
+
+    if (roleCode === 'N2') {
+      this.filteredUsersForAssignment = this.users.filter((user) => this.matchesCargoLabel(user, 'N2'));
+      this.showExternalPeopleForAssignment = false;
+    } else if (roleCode === 'N1_NO_HABIL') {
+      this.filteredUsersForAssignment = this.users.filter((user) => this.matchesCargoLabel(user, 'N1'));
+      this.showExternalPeopleForAssignment = false;
+    } else {
+      this.filteredUsersForAssignment = [...this.users];
+      this.showExternalPeopleForAssignment = true;
+    }
+
+    const selectedAssignee = this.assignmentForm?.get('assignedUserId')?.value;
+    if (!selectedAssignee) {
+      return;
+    }
+
+    const selectedAsString = String(selectedAssignee);
+    const selectedIsExternal = selectedAsString.startsWith('ext_');
+
+    const isValidExternal = selectedIsExternal
+      && this.showExternalPeopleForAssignment
+      && this.externalPeople.some((person) => `ext_${person._id}` === selectedAsString);
+
+    const isValidUser = !selectedIsExternal
+      && this.filteredUsersForAssignment.some((user) => String(user._id) === selectedAsString);
+
+    if (!isValidExternal && !isValidUser) {
+      this.assignmentForm.patchValue({ assignedUserId: '' }, { emitEvent: false });
+    }
+  }
+
+  private matchesCargoLabel(user: any, shiftLevel: 'N1' | 'N2'): boolean {
+    const cargoLabel = String(user?.cargoLabel || '').trim();
+    if (!cargoLabel) {
+      return false;
+    }
+
+    const regex = shiftLevel === 'N1' ? /\bN1\b/i : /\bN2\b/i;
+    return regex.test(cargoLabel);
   }
 
   addExternalPerson(): void {

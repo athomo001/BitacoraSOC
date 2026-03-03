@@ -10,6 +10,24 @@
   display: flex;
   flex-direction: column;
 
+  .mat-mdc-list-item {
+    width: 100%;
+  }
+
+  .mdc-list-item__content {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: visible;
+  }
+
+  .mdc-list-item__primary-text {
+    display: block;
+    max-width: none !important;
+    white-space: nowrap;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+
   mat-toolbar {
     flex-shrink: 0;
     display: flex;
@@ -314,4 +332,11 @@
   background: var(--state-warning-bg);
   border-left: 4px solid var(--state-warning);
   color: var(--state-warning);
+}
+
+::ng-deep .mat-mdc-menu-panel .mat-mdc-menu-item .mdc-list-item__primary-text {
+  max-width: none !important;
+  white-space: nowrap;
+  overflow: visible !important;
+  text-overflow: clip !important;
 }

@@ -12,6 +12,23 @@
   font-display: swap;
 }
 
+.mat-icon,
+.material-icons,
+.mat-ligature-font {
+  font-family: 'Material Icons' !important;
+  font-weight: normal;
+  font-style: normal;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-feature-settings: 'liga';
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+}
+
 :root {
   --transition-speed: 0.3s;
   --app-title-font: 'Monarchia Momentum', 'Roboto', 'Segoe UI', sans-serif;

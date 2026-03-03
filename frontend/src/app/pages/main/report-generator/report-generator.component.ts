@@ -1,4 +1,4 @@
-import { Component, OnInit, SecurityContext } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
@@ -19,7 +19,6 @@ import { MatOption } from '@angular/material/core';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { ClientAlertDialogComponent } from './client-alert-dialog.component';
-import { DomSanitizer } from '@angular/platform-browser';
 
 @Component({
   selector: 'app-report-generator',
@@ -48,8 +47,7 @@ export class ReportGeneratorComponent implements OnInit {
     private configService: ConfigService,
     private snackBar: MatSnackBar,
     private escalationService: EscalationService,
-    private dialog: MatDialog,
-    private sanitizer: DomSanitizer
+    private dialog: MatDialog
   ) {
     this.reportForm = this.fb.group({
       tipoOperacion: ['', Validators.required],
@@ -159,95 +157,114 @@ export class ReportGeneratorComponent implements OnInit {
     }
 
     const form = this.reportForm.value;
-    const fechaFormateada = new Date(form.fecha).toLocaleDateString('es-CL');
-    const reportWidthPx = 1040;
+    const fechaFormateada = this.escapeHtml(new Date(form.fecha).toLocaleDateString('es-CL'));
+    const reportWidthPx = 980;
     const evidenceImageWidthPx = 420;
     const headerColor = this.reportTableHeaderColor;
     const labelColor = this.getSecondaryColor(headerColor);
 
-    const cellDetailStyle = 'border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere; vertical-align: top;';
-    const cellLabelStyle = `background-color: ${labelColor}; font-weight: bold; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; width: 26%; max-width: 280px;`;
+    const tipoOperacion = this.escapeHtml(form.tipoOperacion);
+    const codigoInterno = this.escapeHtml(form.codigoInterno || '-');
+    const nombreEvento = this.escapeHtml(form.nombreEvento);
+    const motivoEvento = this.escapeHtml(form.motivoEvento);
+    const criticidad = this.escapeHtml(form.criticidad);
+    const origenConexion = this.escapeHtml(form.origenConexion || '-');
+    const logSource = this.escapeHtml(form.logSource);
+    const destino = this.escapeHtml(form.destino || '-');
+    const reputacionOrigen = this.escapeHtml(form.reputacionOrigen);
+    const observaciones = this.escapeHtml(form.observaciones);
+    const recomendacion = this.escapeHtml(form.recomendacion || '-');
+    const informacionAdicional = this.escapeHtml(form.informacionAdicional || '-');
 
-    let html = `<table align="left" cellpadding="8" cellspacing="0" width="${reportWidthPx}" style="border-collapse: collapse; width: ${reportWidthPx}px; max-width: 100%; font-family: Arial, sans-serif; border: 1px solid #2b2b2b; table-layout: fixed; margin: 0; margin-left: 0; mso-table-lspace: 0pt; mso-table-rspace: 0pt;">
+    const firstColumnWidthPx = 185;
+    const secondColumnWidthPx = reportWidthPx - firstColumnWidthPx;
+    const cellDetailStyle = `border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; width: ${secondColumnWidthPx}px;`;
+    const cellLabelStyle = `background-color: ${labelColor}; font-weight: bold; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; width: ${firstColumnWidthPx}px;`;
+
+    let html = `<table cellpadding="6" cellspacing="0" width="${reportWidthPx}" style="border-collapse: collapse; width: ${reportWidthPx}px; max-width: 100%; font-family: Arial, sans-serif; border: 1px solid #2b2b2b; table-layout: fixed; margin: 0; mso-table-lspace: 0pt; mso-table-rspace: 0pt; clear: both;">
+  <colgroup>
+    <col width="${firstColumnWidthPx}" style="width: ${firstColumnWidthPx}px;">
+    <col width="${secondColumnWidthPx}" style="width: ${secondColumnWidthPx}px;">
+  </colgroup>
   <tr>
     <th colspan="2" style="background-color: ${headerColor}; color: white; text-align: center; font-size: 18px; border: 1px solid #2b2b2b;">Reporte de Detección</th>
   </tr>
   <tr>
-    <th style="background-color: ${labelColor}; color: white; width: 26%; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere;">Campo</th>
-    <th style="background-color: ${labelColor}; color: white; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere;">Detalle</th>
+    <th width="${firstColumnWidthPx}" style="background-color: ${labelColor}; color: white; width: ${firstColumnWidthPx}px; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere;">Campo</th>
+    <th width="${secondColumnWidthPx}" style="background-color: ${labelColor}; color: white; width: ${secondColumnWidthPx}px; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere;">Detalle</th>
   </tr>
   <tr>
-    <td style="${cellLabelStyle}">Tipo de operación</td>
-    <td style="${cellDetailStyle}">${form.tipoOperacion}</td>
+    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Tipo de operación</td>
+    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">${tipoOperacion}</td>
   </tr>
   <tr>
-    <td style="${cellLabelStyle}">Ofensa/Código interno</td>
-    <td style="${cellDetailStyle}">${form.codigoInterno || '-'}</td>
+    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Ofensa/Código interno</td>
+    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">${codigoInterno}</td>
   </tr>
   <tr>
-    <td style="${cellLabelStyle}">Nombre de Ofensa/Evento</td>
-    <td style="${cellDetailStyle}">${form.nombreEvento}</td>
+    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Nombre de Ofensa/Evento</td>
+    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">${nombreEvento}</td>
   </tr>
   <tr>
-    <td style="${cellLabelStyle}">Motivo de la Ofensa/Evento</td>
-    <td style="${cellDetailStyle}">${form.motivoEvento}</td>
+    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Motivo de la Ofensa/Evento</td>
+    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">${motivoEvento}</td>
   </tr>
   <tr>
-    <td style="${cellLabelStyle}">Fecha</td>
-    <td style="${cellDetailStyle}">${fechaFormateada}</td>
+    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Fecha</td>
+    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">${fechaFormateada}</td>
   </tr>
   <tr>
-    <td style="${cellLabelStyle}">MRSC (Criticidad)</td>
-    <td style="${cellDetailStyle}">${form.criticidad}</td>
+    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">MRSC (Criticidad)</td>
+    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">${criticidad}</td>
   </tr>
   <tr>
-    <td style="${cellLabelStyle}">Origen de conexión</td>
-    <td style="${cellDetailStyle}">${form.origenConexion || '-'}</td>
+    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Origen de conexión</td>
+    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">${origenConexion}</td>
   </tr>
   <tr>
-    <td style="${cellLabelStyle}">Fuente / Log Source</td>
-    <td style="${cellDetailStyle}">${form.logSource}</td>
+    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Fuente / Log Source</td>
+    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">${logSource}</td>
   </tr>
   <tr>
-    <td style="${cellLabelStyle}">Destino</td>
-    <td style="${cellDetailStyle}">${form.destino || '-'}</td>
+    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Destino</td>
+    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">${destino}</td>
   </tr>
   <tr>
-    <td style="${cellLabelStyle}">Reputación de origen</td>
-    <td style="${cellDetailStyle}">${form.reputacionOrigen}</td>
+    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Reputación de origen</td>
+    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">${reputacionOrigen}</td>
   </tr>
   <tr>
-    <td style="${cellLabelStyle}">Observaciones</td>
-    <td style="white-space: pre-wrap; ${cellDetailStyle}">${form.observaciones}</td>
+    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Observaciones</td>
+    <td width="${secondColumnWidthPx}" style="white-space: pre-wrap; ${cellDetailStyle}">${observaciones}</td>
   </tr>`;
 
-    const evidenciaTexto = (form.evidenciaTexto || '').trim();
+    const evidenciaTexto = this.escapeHtml((form.evidenciaTexto || '').trim());
     const hasImages = this.uploadedImages.length > 0;
     const hasTextEvidence = evidenciaTexto.length > 0;
 
     if (hasImages || hasTextEvidence) {
-      html += `\n  <tr>\n    <td style="${cellLabelStyle}">Evidencia</td>\n    <td style="${cellDetailStyle}">`;
+      html += `\n  <tr>\n    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Evidencia</td>\n    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">`;
       if (hasTextEvidence) {
         html += `<div style="white-space: pre-wrap; margin-bottom: ${hasImages ? '10px' : '0'};">${evidenciaTexto}</div>`;
       }
       if (hasImages) {
         this.uploadedImages.forEach(img => {
-          html += `<img src="${img.dataUrl}" width="${evidenceImageWidthPx}" style="max-width: 100%; height: auto; object-fit: contain; margin: 8px auto; display: block; border: 1px solid #ddd;"><br>`;
+          html += `<img src="${img.dataUrl}" width="${evidenceImageWidthPx}" style="max-width: 100%; height: auto; object-fit: contain; margin: 4px auto; display: block; border: 1px solid #ddd;"><br>`;
         });
       }
       html += `</td>\n  </tr>`;
     } else {
-      html += `\n  <tr>\n    <td style="${cellLabelStyle}">Evidencia</td>\n    <td style="${cellDetailStyle}">Se adjunta en el correo</td>\n  </tr>`;
+      html += `\n  <tr>\n    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Evidencia</td>\n    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">Se adjunta en el correo</td>\n  </tr>`;
     }
 
     html += `
   <tr>
-    <td style="${cellLabelStyle}">Recomendación</td>
-    <td style="white-space: pre-wrap; ${cellDetailStyle}">${form.recomendacion || '-'}</td>
+    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Recomendación</td>
+    <td width="${secondColumnWidthPx}" style="white-space: pre-wrap; ${cellDetailStyle}">${recomendacion}</td>
   </tr>
   <tr>
-    <td style="${cellLabelStyle}">Información adicional</td>
-    <td style="white-space: pre-wrap; ${cellDetailStyle}">${form.informacionAdicional || '-'}</td>
+    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Información adicional</td>
+    <td width="${secondColumnWidthPx}" style="white-space: pre-wrap; ${cellDetailStyle}">${informacionAdicional}</td>
   </tr>
 </table>`;
 
@@ -278,12 +295,13 @@ export class ReportGeneratorComponent implements OnInit {
         'text/plain': textBlob
       });
 
-      navigator.clipboard.write([item]).then(() => {
+      try {
+        await navigator.clipboard.write([item]);
         this.snackBar.open('✅ Tabla copiada con formato', 'Cerrar', { duration: 2000 });
-      }).catch(() => {
-        this.snackBar.open('Error al copiar con formato. Prueba copiar HTML.', 'Cerrar', { duration: 3000 });
-      });
-      return;
+        return;
+      } catch {
+        // Fallback a execCommand o texto plano
+      }
     }
 
     if (this.copyHtmlWithExecCommand(html)) {
@@ -339,8 +357,7 @@ export class ReportGeneratorComponent implements OnInit {
 
   private copyHtmlWithExecCommand(html: string): boolean {
     const container = document.createElement('div');
-    const sanitizedHtml = this.sanitizer.sanitize(SecurityContext.HTML, html) || '';
-    container.innerHTML = sanitizedHtml;
+    container.innerHTML = html;
     container.style.position = 'fixed';
     container.style.left = '-9999px';
     container.style.top = '0';
@@ -369,6 +386,15 @@ export class ReportGeneratorComponent implements OnInit {
     selection.removeAllRanges();
     document.body.removeChild(container);
     return copied;
+  }
+
+  private escapeHtml(value: unknown): string {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   private copyTextWithExecCommand(text: string): boolean {

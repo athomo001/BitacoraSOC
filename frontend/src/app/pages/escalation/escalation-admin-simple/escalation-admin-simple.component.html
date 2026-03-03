@@ -37,21 +37,21 @@
                 <mat-label>Persona</mat-label>
                 <mat-select formControlName="assignedUserId" required>
                   <!-- Usuarios del sistema -->
-                  <mat-optgroup label="Usuarios del Sistema" *ngIf="users.length > 0">
-                    <mat-option *ngFor="let user of users" [value]="user._id">
+                  <mat-optgroup label="Usuarios del Sistema" *ngIf="filteredUsersForAssignment.length > 0">
+                    <mat-option *ngFor="let user of filteredUsersForAssignment" [value]="user._id">
                       {{ user.name || user.username || 'Usuario sin nombre' }}
                     </mat-option>
                   </mat-optgroup>
                   
                   <!-- Personas externas -->
-                  <mat-optgroup label="Personas Externas" *ngIf="externalPeople.length > 0">
+                  <mat-optgroup label="Personas Externas" *ngIf="showExternalPeopleForAssignment && externalPeople.length > 0">
                     <mat-option *ngFor="let person of externalPeople" [value]="'ext_' + person._id">
                       {{ person.name }} ({{ person.position || 'Sin cargo' }})
                     </mat-option>
                   </mat-optgroup>
                   
                   <!-- Sin datos -->
-                  <mat-option *ngIf="users.length === 0 && externalPeople.length === 0" disabled>
+                  <mat-option *ngIf="filteredUsersForAssignment.length === 0 && (!showExternalPeopleForAssignment || externalPeople.length === 0)" disabled>
                     No hay personas disponibles
                   </mat-option>
                 </mat-select>
