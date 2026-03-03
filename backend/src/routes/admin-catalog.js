@@ -16,7 +16,8 @@ const { authenticate } = require('../middleware/auth');
 
 // Middleware para verificar role=admin
 const requireAdmin = (req, res, next) => {
-  if (req.user.role !== 'admin') {
+  const isAuditorReadOnly = req.user.role === 'auditor' && ['GET', 'HEAD', 'OPTIONS'].includes(req.method);
+  if (req.user.role !== 'admin' && !isAuditorReadOnly) {
     return res.status(403).json({ message: 'Acceso denegado. Solo administradores.' });
   }
   next();

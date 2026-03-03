@@ -6,7 +6,8 @@ const clientAlertController = require('../controllers/clientAlertController');
 
 // Middleware para verificar que el usuario es ADMIN
 const requireAdmin = (req, res, next) => {
-  if (req.user.role !== 'admin') {
+  const isAuditorReadOnly = req.user.role === 'auditor' && ['GET', 'HEAD', 'OPTIONS'].includes(req.method);
+  if (req.user.role !== 'admin' && !isAuditorReadOnly) {
     return res.status(403).json({ error: 'Admin access required' });
   }
   next();
