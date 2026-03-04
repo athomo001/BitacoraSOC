@@ -39,6 +39,7 @@
 | OPS-ASSIGN-008 | Pendiente | Backend/Timezone ALTA | Cálculo de turno actual ignora timezone del turno | `/work-shifts/current` usa hora local del servidor y no evalúa `shift.timezone`. |
 | OPS-ASSIGN-009 | Pendiente | QA/Pruebas MEDIA | Faltan pruebas para turnos nocturnos y cambio de día | Cubrir 20:00-06:00, 23:59→00:01, días asignados y refresco automático. |
 | OPS-ASSIGN-010 | Pendiente | UI/UX + Datos MEDIA | Columna "Asignado a" no refleja múltiples usuarios por turno | Al usar el nuevo módulo de asignaciones, la grilla de turnos debe mostrar resumen real (cantidad/listado) por turno para evitar duplicidad y confusión. |
+| AI-SUMMARY-001 | Pendiente | IA/Operación ALTA | Módulo de Resumen Ejecutivo Efímero (IA On-Demand) | Integrar Ollama+llama3.2:3b en modo efímero `docker start -> healthcheck -> generate -> docker stop` con `try/finally`, salida editable en campo "Resumen Sugerido por IA" y botón "Generar con IA". |
 
 ### ✅ Listas
 
@@ -348,6 +349,27 @@ shift.assignedSummary = assignedUsers.length === 0
     : `${assignedUsers.length} asignados`;
 ```
 
+### AI-SUMMARY-001 - Resumen Ejecutivo Efímero (IA On-Demand)
+
+1. Backend: implementar método de orquestación efímera para Ollama:
+   - `docker start ollama`
+   - healthcheck en `http://localhost:11434`
+   - consulta a `/api/generate` con modelo `llama3.2:3b`
+   - `docker stop ollama` en bloque `finally` (siempre).
+2. Prompt del sistema: forzar estructura de salida con:
+   - tabla de tickets
+   - incidentes críticos
+   - tareas en curso.
+3. Payload: incluir todas las entradas de bitácora del turno actual.
+4. Frontend:
+   - agregar campo de texto editable `Resumen Sugerido por IA`
+   - agregar botón `✨ Generar con IA`
+   - completar el campo al terminar la respuesta sin bloquear edición manual.
+5. Recursos/operación del contenedor:
+   - memoria limitada a `--memory=\"2g\"`
+   - volumen persistente `-v ollama_data:/root/.ollama`
+   - contenedor apagado fuera de uso (superficie mínima y ahorro de RAM).
+
 ---
 
 ## Orden sugerido de ejecución
@@ -366,4 +388,3 @@ shift.assignedSummary = assignedUsers.length === 0
 3. `OPS-ASSIGN-004` + `OPS-ASSIGN-008` (estado operativo correcto con overnight y timezone).
 4. `OPS-ASSIGN-010` + `OPS-ASSIGN-005` (consolidado UI correcto + refresco por minuto robusto).
 5. `OPS-ASSIGN-007` + `OPS-ASSIGN-009` (consistencia de negocio y pruebas operativas).
-
