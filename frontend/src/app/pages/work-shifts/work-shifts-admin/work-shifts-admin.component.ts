@@ -15,12 +15,16 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatDividerModule } from '@angular/material/divider';
+import { Observable, Subscription, interval } from 'rxjs';
+import { startWith, takeUntil } from 'rxjs/operators';
+import { Subject } from 'rxjs';
 import { WorkShiftService } from '../../../services/work-shift.service';
 import { AuthService } from '../../../services/auth.service';
 import { ConfigService } from '../../../services/config.service';
 import { ChecklistService } from '../../../services/checklist.service';
 import { UserService } from '../../../services/user.service';
 import { WorkShift, WorkShiftFormData, SHIFT_TYPE_OPTIONS, DEFAULT_COLORS } from '../../../models/work-shift.model';
+import { isShiftActiveNow } from '../../../utils/shift-time.util';
 
 @Component({
   selector: 'app-work-shifts-admin',
@@ -28,7 +32,7 @@ import { WorkShift, WorkShiftFormData, SHIFT_TYPE_OPTIONS, DEFAULT_COLORS } from
   imports: [
     CommonModule,
     ReactiveFormsModule,
-      FormsModule,
+    FormsModule,
     MatCardModule,
     MatButtonModule,
     MatIconModule,
@@ -50,7 +54,10 @@ import { WorkShift, WorkShiftFormData, SHIFT_TYPE_OPTIONS, DEFAULT_COLORS } from
 export class WorkShiftsAdminComponent implements OnInit {
   shifts: WorkShift[] = [];
   users: any[] = [];
+  assignments: any[] = [];
+
   operationalRows: Array<{
+    assignmentId: string;
     shiftId: string;
     userId: string;
     analystName: string;
@@ -58,23 +65,27 @@ export class WorkShiftsAdminComponent implements OnInit {
     schedule: string;
     weekdaysLabel: string;
     status: 'EN_TURNO' | 'FUERA_DE_TURNO';
+    weekdays: number[];
+    shiftRef: any;
   }> = [];
   checklistTemplates: any[] = [];
-  
+
+  private destroy$ = new Subject<void>();
+
   loading = false;
   showForm = false;
   editingShift: WorkShift | null = null;
-  
+
   shiftForm!: FormGroup;
   operationalAssignmentForm!: FormGroup;
   globalEmailForm!: FormGroup;  // Formulario GLOBAL para Reenvío
   shiftTypeOptions = SHIFT_TYPE_OPTIONS;
   colorOptions = DEFAULT_COLORS;
-  
+
   // Manejo de chips de emails (GLOBAL)
   emailInput = '';
   showGlobalEmailConfig = false;
-  
+
   displayedColumns: string[] = ['order', 'name', 'code', 'type', 'timeRange', 'checklists', 'assignedUser', 'active', 'actions'];
 
   constructor(
@@ -92,10 +103,21 @@ export class WorkShiftsAdminComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.loadShifts();
-    this.loadUsers();
+    this.loadData();
     this.loadChecklistTemplates();
     this.loadGlobalEmailConfig();
+
+    // Refresco en vivo con Observable temporal (OPS-ASSIGN-005)
+    interval(60000)
+      .pipe(startWith(0), takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.recalculateLiveStatus();
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   initForm(): void {
@@ -132,7 +154,8 @@ export class WorkShiftsAdminComponent implements OnInit {
   initOperationalAssignmentForm(): void {
     this.operationalAssignmentForm = this.fb.group({
       shiftId: [null, Validators.required],
-      userId: [null, Validators.required]
+      userId: [null, Validators.required],
+      weekdays: [[]] // Array of numbers 0-6
     });
   }
 
@@ -158,118 +181,101 @@ export class WorkShiftsAdminComponent implements OnInit {
     });
   }
 
-  loadShifts(): void {
+  loadData(): void {
     this.loading = true;
+
+    // Cargar en paralelo turnos, usuarios y asignaciones operativas
+    Promise.all([
+      this.workShiftService.getShifts().toPromise(),
+      this.userService.getUsersList().toPromise(),
+      this.workShiftService.getAssignments().toPromise()
+    ]).then(([shifts, users, assignments]) => {
+      this.shifts = shifts || [];
+      this.users = (users || []).filter((user: any) => user?.isActive !== false && user?.role !== 'guest');
+      this.assignments = assignments || [];
+
+      this.rebuildOperationalRows();
+      this.loading = false;
+    }).catch(error => {
+      console.error('Error loading data:', error);
+      this.snackBar.open('Error al cargar datos operativos', 'Cerrar', { duration: 3000 });
+      this.loading = false;
+    });
+  }
+
+  loadShifts(): void {
     this.workShiftService.getShifts().subscribe({
       next: (shifts) => {
         this.shifts = shifts;
         this.rebuildOperationalRows();
-        this.loading = false;
-      },
-      error: (error: any) => {
-        console.error('Error loading shifts:', error);
-        this.snackBar.open('Error al cargar turnos', 'Cerrar', { duration: 3000 });
-        this.loading = false;
       }
     });
   }
 
-  loadUsers(): void {
-    this.userService.getUsersList().subscribe({
-      next: (users) => {
-        this.users = (users || []).filter((user: any) => user?.isActive !== false && user?.role !== 'guest');
+  loadAssignments(): void {
+    this.workShiftService.getAssignments().subscribe({
+      next: (assignments) => {
+        this.assignments = assignments;
         this.rebuildOperationalRows();
-      },
-      error: (error: any) => {
-        console.error('Error loading users:', error);
-        this.users = [];
-        this.rebuildOperationalRows();
-        this.snackBar.open('No se pudieron cargar usuarios para asignación operativa', 'Cerrar', { duration: 3000 });
       }
     });
   }
 
   private rebuildOperationalRows(): void {
-    this.operationalRows = this.shifts.flatMap((shift: WorkShift) => {
-      const assignedIds = this.getAssignedUserIds(shift);
-      return assignedIds.map((userId) => ({
-        shiftId: shift._id,
-        userId,
-        analystName: this.getAssignedAnalystName(shift, userId),
-        shiftName: shift.name,
-        schedule: this.formatTimeRange(shift),
-        weekdaysLabel: this.getWeekdaysLabel(shift),
-        status: this.isShiftActiveNow(shift) ? 'EN_TURNO' : 'FUERA_DE_TURNO'
-      }));
+    this.operationalRows = this.assignments
+      .filter(asg => asg.active !== false && asg.workShiftId)
+      .map(asg => {
+        const shiftId = typeof asg.workShiftId === 'object' ? asg.workShiftId._id : asg.workShiftId;
+        const userId = typeof asg.userId === 'object' ? asg.userId._id : asg.userId;
+        const analystName = typeof asg.userId === 'object' ? asg.userId.fullName : this.getLoadedUserName(userId);
+
+        const shiftData = typeof asg.workShiftId === 'object' ? asg.workShiftId : this.shifts.find(s => s._id === shiftId);
+
+        return {
+          assignmentId: asg._id,
+          shiftId: shiftId,
+          userId: userId,
+          analystName: analystName,
+          shiftName: shiftData?.name || 'Turno desconocido',
+          schedule: shiftData ? this.formatTimeRange(shiftData as any) : '-',
+          weekdaysLabel: this.getWeekdaysLabel(asg.weekdays),
+          weekdays: asg.weekdays || [],
+          shiftRef: shiftData,
+          status: 'FUERA_DE_TURNO'
+        };
+      });
+
+    this.recalculateLiveStatus();
+  }
+
+  private recalculateLiveStatus(): void {
+    this.operationalRows.forEach(row => {
+      if (row.shiftRef) {
+        const isActive = isShiftActiveNow(row.shiftRef.startTime, row.shiftRef.endTime, row.weekdays);
+        row.status = isActive ? 'EN_TURNO' : 'FUERA_DE_TURNO';
+      }
     });
   }
 
-  private getAssignedUserIds(shift: WorkShift): string[] {
-    const fromArray = Array.isArray((shift as any).assignedUserIds)
-      ? (shift as any).assignedUserIds
-          .map((value: any) => this.getObjectId(value))
-          .filter((value: string | null): value is string => Boolean(value))
-      : [];
-
-    if (fromArray.length > 0) {
-      return Array.from(new Set(fromArray));
-    }
-
-    const single = this.getObjectId((shift as any).assignedUserId);
-    return single ? [single] : [];
-  }
-
-  private getAssignedAnalystName(shift: WorkShift, userId: string): string {
-    const fromShiftArray = Array.isArray((shift as any).assignedUserIds)
-      ? (shift as any).assignedUserIds.find((value: any) => this.getObjectId(value) === userId)
-      : null;
-
-    if (fromShiftArray && typeof fromShiftArray === 'object' && (fromShiftArray.fullName || fromShiftArray.email)) {
-      return fromShiftArray.fullName || fromShiftArray.email;
-    }
-
+  private getLoadedUserName(userId: string): string {
     const fromLoadedUsers = this.users.find((u: any) => String(u._id) === userId);
     if (fromLoadedUsers?.fullName) {
       return fromLoadedUsers.fullName;
     }
-
     return 'Usuario asignado';
   }
 
-  private getWeekdaysLabel(shift: WorkShift): string {
-    return shift.type === 'regular' ? 'Lun-Vie' : 'Lun-Dom';
-  }
+  private getWeekdaysLabel(weekdays: number[]): string {
+    if (!weekdays || weekdays.length === 0) return 'Sin días';
+    if (weekdays.length === 7) return 'Lun-Dom (Todos)';
 
-  private hhmmToMinutes(value: string): number {
-    const [hours, minutes] = String(value || '00:00').split(':').map(Number);
-    return ((Number.isFinite(hours) ? hours : 0) * 60) + (Number.isFinite(minutes) ? minutes : 0);
-  }
+    // Si son de Lunes (1) a Viernes (5) exactamente
+    const isMonToFri = weekdays.length === 5 &&
+      [1, 2, 3, 4, 5].every(d => weekdays.includes(d));
+    if (isMonToFri) return 'Lun-Vie';
 
-  private isShiftActiveNow(shift: WorkShift): boolean {
-    if (!shift?.active) {
-      return false;
-    }
-
-    const day = new Date().getDay();
-    const isWeekend = day === 0 || day === 6;
-    if (shift.type === 'regular' && isWeekend) {
-      return false;
-    }
-
-    const now = new Date();
-    const nowMinutes = (now.getHours() * 60) + now.getMinutes();
-    const startMinutes = this.hhmmToMinutes(shift.startTime);
-    const endMinutes = this.hhmmToMinutes(shift.endTime);
-
-    if (startMinutes === endMinutes) {
-      return true;
-    }
-
-    if (endMinutes > startMinutes) {
-      return nowMinutes >= startMinutes && nowMinutes < endMinutes;
-    }
-
-    return nowMinutes >= startMinutes || nowMinutes < endMinutes;
+    const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    return weekdays.sort((a, b) => a - b).map(d => dayNames[d]).join(', ');
   }
 
   getOperationalStatusClass(status: 'EN_TURNO' | 'FUERA_DE_TURNO'): string {
@@ -290,56 +296,40 @@ export class WorkShiftsAdminComponent implements OnInit {
       return;
     }
 
-    const shiftId = this.operationalAssignmentForm.value.shiftId;
-    const userId = this.operationalAssignmentForm.value.userId;
+    const payload = {
+      shiftId: this.operationalAssignmentForm.value.shiftId,
+      userId: this.operationalAssignmentForm.value.userId,
+      workShiftId: this.operationalAssignmentForm.value.shiftId, // Para compatibilidad
+      weekdays: this.operationalAssignmentForm.value.weekdays
+    };
 
-    const targetShift = this.shifts.find((shift) => shift._id === shiftId);
-    if (!targetShift) {
-      this.snackBar.open('No se encontró el turno seleccionado', 'Cerrar', { duration: 3000 });
-      return;
+    // Si no eligen días por defecto asignar Lun a Vie (1,2,3,4,5)
+    if (!payload.weekdays || payload.weekdays.length === 0) {
+      payload.weekdays = [1, 2, 3, 4, 5];
     }
 
-    const currentAssigned = this.getAssignedUserIds(targetShift);
-    if (currentAssigned.includes(String(userId))) {
-      this.snackBar.open('Ese analista ya está vinculado a este turno', 'Cerrar', { duration: 2500 });
-      return;
-    }
-
-    const updatedAssigned = [...currentAssigned, String(userId)];
-
-    this.workShiftService.updateShift(shiftId, {
-      assignedUserIds: updatedAssigned,
-      assignedUserId: updatedAssigned[0] || null
-    }).subscribe({
+    this.workShiftService.createAssignment(payload).subscribe({
       next: () => {
         this.snackBar.open('Asignación operativa guardada', 'Cerrar', { duration: 2500 });
-        this.operationalAssignmentForm.reset({ shiftId: null, userId: null });
-        this.loadShifts();
+        this.operationalAssignmentForm.reset({ shiftId: null, userId: null, weekdays: [] });
+        this.loadAssignments();
       },
       error: (error: any) => {
         console.error('Error saving operational assignment:', error);
-        this.snackBar.open(error?.error?.error || 'Error al guardar asignación operativa', 'Cerrar', { duration: 3000 });
+        this.snackBar.open(error?.error?.error || 'Error al guardar asignación', 'Cerrar', { duration: 5000 });
       }
     });
   }
 
-  unlinkOperationalAssignment(row: { shiftId: string; userId: string; analystName: string }): void {
-    const targetShift = this.shifts.find((shift) => shift._id === row.shiftId);
-    if (!targetShift) {
-      this.snackBar.open('No se encontró el turno seleccionado', 'Cerrar', { duration: 3000 });
+  unlinkOperationalAssignment(row: any): void {
+    if (!confirm(`¿Desvincular a ${row.analystName} de este turno?`)) {
       return;
     }
 
-    const currentAssigned = this.getAssignedUserIds(targetShift);
-    const updatedAssigned = currentAssigned.filter((id) => id !== row.userId);
-
-    this.workShiftService.updateShift(row.shiftId, {
-      assignedUserIds: updatedAssigned,
-      assignedUserId: updatedAssigned[0] || null
-    }).subscribe({
+    this.workShiftService.deleteAssignment(row.assignmentId).subscribe({
       next: () => {
         this.snackBar.open(`Analista desvinculado: ${row.analystName}`, 'Cerrar', { duration: 2500 });
-        this.loadShifts();
+        this.loadAssignments();
       },
       error: (error: any) => {
         console.error('Error unlinking operational assignment:', error);
@@ -450,7 +440,7 @@ export class WorkShiftsAdminComponent implements OnInit {
     }
 
     const formData: WorkShiftFormData = this.shiftForm.value;
-    
+
     // Convertir código a mayúsculas
     formData.code = formData.code.toUpperCase();
 
@@ -501,13 +491,16 @@ export class WorkShiftsAdminComponent implements OnInit {
   }
 
   getUserName(shift: WorkShift): string {
-    const assignedIds = this.getAssignedUserIds(shift);
+    const assignedIds = this.assignments
+      .filter(a => a.active !== false && (typeof a.workShiftId === 'object' ? a.workShiftId._id === shift._id : a.workShiftId === shift._id))
+      .map(a => typeof a.userId === 'object' ? a.userId._id : a.userId);
+
     if (assignedIds.length === 0) {
       return 'Sin asignar';
     }
 
     if (assignedIds.length === 1) {
-      return this.getAssignedAnalystName(shift, assignedIds[0]);
+      return this.getLoadedUserName(assignedIds[0]);
     }
 
     return `${assignedIds.length} asignados`;
@@ -528,7 +521,7 @@ export class WorkShiftsAdminComponent implements OnInit {
   addEmail(event: Event): void {
     event.preventDefault();
     const input = this.emailInput.trim().toLowerCase();
-    
+
     if (!input) return;
 
     // Validar formato email básico
@@ -539,7 +532,7 @@ export class WorkShiftsAdminComponent implements OnInit {
     }
 
     const currentEmails = this.recipients.value || [];
-    
+
     if (currentEmails.includes(input)) {
       this.snackBar.open('Email ya agregado', 'Cerrar', { duration: 2000 });
       return;
@@ -569,7 +562,7 @@ export class WorkShiftsAdminComponent implements OnInit {
 
     // Obtener configuración global
     const globalConfig = this.globalEmailForm.value;
-    
+
     // 1. Guardar en BD (AppConfig)
     this.configService.updateConfig({ emailReportConfig: globalConfig }).subscribe({
       next: () => {

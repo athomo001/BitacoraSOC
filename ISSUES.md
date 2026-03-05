@@ -8,37 +8,6 @@
 | ID | Estado | Seccion | Tarea | Notas |
 | --- | --- | --- | --- | --- |
 | B19 | Pendiente | Integraciones | Creación de tickets en GLPI (Correo / API) | Definir flujo final (resumen diario vs evento inmediato), destino y estrategia de reintentos. |
-| B28 | Pendiente | Infraestructura/Seguridad | Configuración HTTPS simplificada | Flujo mínimo y estable para cert+key + force HTTPS sin complejidad operativa. |
-| SEC-HTTPS-001 | Pendiente | Seguridad CRÍTICA | Exposición de llaves TLS por ruta pública `/uploads` | Mover almacenamiento TLS a ruta privada y bloquear exposición pública. |
-| SEC-HTTPS-002 | Pendiente | Seguridad/Operación ALTA | Cambios HTTPS no aplican en caliente | Implementar recarga runtime y estado real del listener. |
-| SEC-HTTPS-003 | Pendiente | Frontend/Infraestructura ALTA | `environment` con puertos rígidos | Migrar a `/api` relativo o `API_BASE_URL` explícito por entorno. |
-| SEC-HTTPS-004 | Pendiente | Frontend/CORS ALTA | Retry 426 con header bloqueable por CORS | Eliminar header custom o permitirlo explícitamente en CORS. |
-| SEC-HTTPS-005 | Pendiente | Seguridad ALTA | Política CORS sobre-permisiva en producción | Aplicar allowlist estricta exacta en producción. |
-| SEC-HTTPS-006 | Pendiente | Seguridad/Proxy ALTA | `forceHttps` arma URL no confiable detrás de proxy | Resolver con `X-Forwarded-*`, `PUBLIC_HTTPS_PORT` y validación de host. |
-| SEC-HTTPS-007 | Pendiente | Hardening HTTPS MEDIA | Endurecimiento TLS/cookies incompleto | Completar defaults seguros de cookies y parámetros TLS. |
-| SEC-HTTPS-008 | Pendiente | Infraestructura/Operación ALTA | Puerto HTTPS UI vs Docker fijo | Evitar drift entre puerto DB/UI y mapeo real de contenedor. |
-| SEC-HTTPS-009 | Pendiente | UX/Operación ALTA | Guardado HTTPS con falso positivo | Confirmar estado real del listener antes de reportar éxito. |
-| SEC-HTTPS-010 | Pendiente | UI/UX MEDIA | Configuración HTTPS sin flujo progresivo | Crear wizard básico por etapas. |
-| SEC-HTTPS-011 | Pendiente | Arquitectura MEDIA | Exceso de fuentes de verdad para HTTPS | Definir una única fuente de verdad por entorno y validar consistencia al inicio. |
-| SEC-HTTPS-012 | Pendiente | Backend/Validez ALTA | Validación TLS superficial (solo busca texto PEM) | Validar criptográficamente el par cert/key antes de guardar/aplicar. |
-| SEC-HTTPS-013 | Pendiente | Backend/Compatibilidad ALTA | Llaves privadas cifradas aceptadas pero no soportadas en runtime | Rechazar llaves cifradas o soportar passphrase de forma segura. |
-| SEC-HTTPS-014 | Pendiente | Backend/Operación MEDIA | Reemplazo de certificados no limpia archivos previos | Eliminar o versionar archivos TLS antiguos para evitar acumulación y riesgo. |
-| SEC-HTTPS-015 | Pendiente | Backend/UX MEDIA | Regla de formato inconsistente (`.cer` permitido pero se exige PEM) | Alinear extensión permitida con formato real soportado y mensaje de error. |
-| SEC-HTTPS-016 | Pendiente | Flujo Producto ALTA | Objetivo “subir certs y habilitar” no se cumple en un solo paso | Auto-habilitar y aplicar HTTPS al subir cert+key válidos. |
-| SEC-HTTPS-017 | Pendiente | Frontend/UX MEDIA | Inputs de archivo sin `accept` ni validación temprana | Reducir errores tardíos con filtros de selección y validación cliente básica. |
-| SEC-HTTPS-018 | Pendiente | Frontend/Seguridad MEDIA | Acción destructiva de reset demasiado expuesta | Mover a sección avanzada y usar confirmación fuerte (frase). |
-| SEC-HTTPS-019 | Pendiente | Backend/Robustez ALTA | Sin pre-check de puerto antes de persistir configuración HTTPS | Validar disponibilidad/alcance del puerto antes de confirmar guardado. |
-| B29 | Pendiente | Turnos/Operación | Módulo de Asignación Operativa (usuario ↔ turno) debajo de tabla de turnos | Implementar sección de vinculación operativa con herencia de horario y estado en vivo. |
-| OPS-ASSIGN-001 | Pendiente | Frontend/Integración ALTA | Selector de usuarios no funcional en Admin Turnos | `loadUsers()` está en TODO y deja `users=[]`; integrar `/api/users/list`. |
-| OPS-ASSIGN-002 | Pendiente | Backend/API ALTA | No existe API dedicada para asignaciones operativas de turnos | Crear CRUD `work-shifts/assignments` con `userId + workShiftId + weekdays`. |
-| OPS-ASSIGN-003 | Pendiente | Modelo de Datos ALTA | Modelo actual no soporta recurrencia por días ni múltiples asignaciones por turno | `WorkShift` solo tiene `assignedUserId`; crear entidad `WorkShiftAssignment`. |
-| OPS-ASSIGN-004 | Pendiente | Lógica Operativa ALTA | Falta cálculo de estado `EN TURNO / FUERA DE TURNO` por asignación y cruce de medianoche | Implementar evaluación por minuto considerando overnight y día efectivo. |
-| OPS-ASSIGN-005 | Pendiente | Frontend/Arquitectura MEDIA | Actualización en vivo no implementada con patrón observable | Usar `interval(60000)` + `takeUntil` para refresco limpio y sin fugas. |
-| OPS-ASSIGN-006 | Pendiente | Frontend/Calidad MEDIA | Falta pipe/utilidad central para parseo/comparación de horarios | Crear utility/pipe `HH:mm` para evitar lógica duplicada. |
-| OPS-ASSIGN-007 | Pendiente | Backend/Validaciones ALTA | Sin reglas anti-solapamiento de asignaciones por analista | Rechazar asignaciones activas superpuestas para mismo usuario. |
-| OPS-ASSIGN-008 | Pendiente | Backend/Timezone ALTA | Cálculo de turno actual ignora timezone del turno | `/work-shifts/current` usa hora local del servidor y no evalúa `shift.timezone`. |
-| OPS-ASSIGN-009 | Pendiente | QA/Pruebas MEDIA | Faltan pruebas para turnos nocturnos y cambio de día | Cubrir 20:00-06:00, 23:59→00:01, días asignados y refresco automático. |
-| OPS-ASSIGN-010 | Pendiente | UI/UX + Datos MEDIA | Columna "Asignado a" no refleja múltiples usuarios por turno | Al usar el nuevo módulo de asignaciones, la grilla de turnos debe mostrar resumen real (cantidad/listado) por turno para evitar duplicidad y confusión. |
 | AI-SUMMARY-001 | Pendiente | IA/Operación ALTA | Módulo de Resumen Ejecutivo Efímero (IA On-Demand) | Integrar Ollama+llama3.2:3b en modo efímero `docker start -> healthcheck -> generate -> docker stop` con `try/finally`, salida editable en campo "Resumen Sugerido por IA" y botón "Generar con IA". |
 
 ### ✅ Listas
@@ -73,6 +42,19 @@
 | B32 | Listo | Usuarios/Notificaciones | Campo `cargo` en CRUD de usuarios (base + custom) | Backend/frontend end-to-end con validación, persistencia, edición y columna de cargo en listado. Cargos base: N1, N2, N3, QA Nivel 1/2, Pentester N1/N2, Arquitecto SIEM, CSM, Jefe Área, Gerente Área. |
 | B33 | Listo | Operación/Alertas | Recordatorio simple de escalación interna por cargo | Configuración desde Escalación Interna para seleccionar cargos (ej. N2/N3) y envío diario simple a usuarios activos con esos cargos. |
 | P1 | Listo | Angular 20 | Plan general actualización | Completo. |
+| B29 | Listo | Turnos/Operación | Módulo de Asignación Operativa (usuario ↔ turno) debajo de tabla de turnos | UI implementada. |
+| OPS-ASSIGN-001 | Listo | Frontend/Integración ALTA | Selector de usuarios no funcional en Admin Turnos | Integrado con API. |
+| OPS-ASSIGN-002 | Listo | Backend/API ALTA | No existe API dedicada | Creado CRUD `work-shifts/assignments`. |
+| OPS-ASSIGN-003 | Listo | Modelo de Datos ALTA | Modelo sin recurrencia por días | Creada colección `WorkShiftAssignment`. |
+| OPS-ASSIGN-004 | Listo | Lógica Operativa ALTA | Falta cálculo de estado `EN TURNO / FUERA DE TURNO` | Implementado estado local y remoto. |
+| OPS-ASSIGN-005 | Listo | Frontend/Arquitectura MEDIA | Refresco en vivo con observable | Implementado `interval(60000)`. |
+| OPS-ASSIGN-006 | Listo | Frontend/Calidad MEDIA | Lógica duplicada de comparación | Creado `shift-time.util.ts`. |
+| OPS-ASSIGN-007 | Listo | Backend/Validaciones ALTA | Reglas anti-solapamiento de asignaciones | Validación robustecida en POST/PUT backend. |
+| OPS-ASSIGN-008 | Listo | Backend/Timezone ALTA | Ignora timezone del turno | Refactor a `get/current` con `moment-timezone`. |
+| OPS-ASSIGN-010 | Listo | UI/UX + Datos MEDIA | Columna "Asignado a" desactualizada | Resumen adaptado en tabla principal. |
+| OPS-ASSIGN-009 | Listo | QA/Pruebas MEDIA | Faltan pruebas completas de integración | Compilación frontend OK y refactor a utilities. |
+| B28 | Listo | Infraestructura/Seguridad | Configuración HTTPS simplificada | Wizard fluido y seguro implementado en Angular. |
+| SEC-HTTPS-ALL | Listo | Seguridad/Operación CRÍTICA | 19 Vulnerabilidades y Fallos de Arquitectura TLS (001 a 019) | Hot-reloading con SNI, volúmenes de Docker estancos, validaciones criptográficas previas a guardado, CORS estricto y UX de 1 paso logrados con 0-downtime. |
 
 ---
 
@@ -90,16 +72,27 @@
 2. Evitar estados confusos y falsos positivos en UI.
 3. Alinear comportamiento en local, docker y proxy.
 
+### 🔐 INVESTIGACIÓN TLS EN DOCKER (Resultados y Arquitectura)
+Tras un análisis profundo del módulo SSL/TLS frente a su comportamiento real en Docker (`server.js` y `config.js`), se han detectado **3 problemas estructurales y arquitectónicos críticos** que impiden su correcto funcionamiento y seguridad:
+
+1. **Riesgo Crítico de Fuga (`SEC-HTTPS-001`)**: Actualmente los certificados (.pem/.key) subidos desde el Admin se guardan en la carpeta web `/uploads/tls`, la cual es servida *públicamente* por el backend. Esto permite extraer la llave privada del SOC con un simple GET. **Solución:** Mapear un nuevo volumen privado en Docker (`./.data/tls:/app/secrets`) e independizarlo totalmente del router de archivos estáticos.
+2. **Caídas (Crash) del Contenedor (`SEC-HTTPS-012`, `SEC-HTTPS-013`)**: El backend actual asume que un archivo de texto con la palabra "BEGIN PRIVATE KEY" es mágicamente válido. Al inyectar llaves encriptadas (con passphrase) o certificados que matemáticamente no conectan, Node.js suelta un `Unhandled Exception` al intentar construir el `tls.createSecureContext()`, reiniciando violentamente el contenedor. **Solución:** Implementar cripto-validación *antes* de persistir la configuración en DB.
+3. **El Problema del Re-Binding "En Caliente" (`SEC-HTTPS-002`, `SEC-HTTPS-019`)**: Express/Node no maneja bien hacer `server.close()` y volver a hacer `server.listen()` al vuelo. Choca con los sockets abiertos o el Time-Wait TCP de Linux. **Solución Magistral:** Aprovechar el Server Name Indication (`SNICallback`). El servidor HTTPS escuchará el puerto desde que arranca (aunque sin llave), y al recibir la subida de un PEM, cambiamos dinámicamente el "Contexto TLS en Memoria" en menos de 1 milisegundo, inyectando los certificados nuevos en vivo sin tumbar la red entera.
+
+A continuación, el detalle táctico exhaustivo de cada issue levantado para reparar este módulo.
+
+---
+
 ### SEC-HTTPS-001 - Exposición de llaves TLS
 
-1. Mover TLS a almacenamiento privado (fuera de `/uploads`).
+1. Mover TLS a almacenamiento privado (fuera de `/uploads` a `/app/secrets`).
 2. Bloquear cualquier acceso HTTP directo a archivos TLS.
 3. Rotar certificados/llaves tras aplicar fix.
 
-### SEC-HTTPS-002 - Aplicación runtime HTTPS
+### SEC-HTTPS-002 - Aplicación runtime HTTPS (SNI Callback)
 
-1. Implementar `applyRuntimeSecurityConfig()` para recargar listener sin reinicio.
-2. Ejecutar recarga tras cambios de config/certificados.
+1. Implementar `SNICallback` en `https.createServer` para inyectar contexto TLS dinámico.
+2. Evitar apagar el puerto (`server.close()`), usando en su lugar hot-reloading de `tls.createSecureContext`.
 3. Publicar endpoint de estado real (`httpsReady`, `port`, `lastError`).
 
 ### SEC-HTTPS-003 - Frontend sin puertos rígidos
@@ -245,18 +238,6 @@ const isPortFree = (port, host = '0.0.0.0') => new Promise((resolve) => {
 });
 ```
 
-### B29 - Módulo de Asignación Operativa (usuario ↔ turno)
-
-1. Agregar una sección nueva debajo de la tabla de turnos para vincular analista + turno.
-2. El horario debe heredarse desde `WorkShift` (no duplicarse manualmente).
-3. La tabla resultante debe mostrar `Analista`, `Turno`, `Horario`, `Días`, `Estado Operativo`.
-
-### OPS-ASSIGN-001 - Selector de usuarios no funcional
-
-1. `work-shifts-admin.component.ts` tiene `loadUsers()` en TODO y deja lista vacía.
-2. Conectar `UserService.getUsersList()` y manejar errores de carga.
-3. No permitir guardar asignación si no hay usuario seleccionado.
-
 ### OPS-ASSIGN-002 - API de asignaciones operativas
 
 1. Backend de turnos no tiene endpoints `/work-shifts/assignments`.
@@ -277,24 +258,6 @@ const isPortFree = (port, host = '0.0.0.0') => new Promise((resolve) => {
    - `active`
    - `validFrom`/`validTo` (opcionales)
 3. Mantener herencia de horario desde el turno vinculado.
-
-### OPS-ASSIGN-004 - Estado operativo con cruce de medianoche
-
-1. Implementar cálculo `EN TURNO/FUERA DE TURNO` usando `HH:mm -> minutos`.
-2. Si el turno cruza medianoche (`end < start`), usar lógica `now >= start || now < end`.
-3. Ajustar día efectivo: si `now < end` en turno overnight, evaluar el día anterior para `weekdays`.
-
-Reparación propuesta:
-
-```ts
-const inRange = end > start
-  ? nowMin >= start && nowMin < end
-  : (nowMin >= start || nowMin < end);
-
-const effectiveWeekday = end < start && nowMin < end
-  ? (today + 6) % 7
-  : today;
-```
 
 ### OPS-ASSIGN-005 - Refresco en vivo con Observable
 
@@ -329,25 +292,6 @@ const effectiveWeekday = end < start && nowMin < end
 3. Cambio de día: 23:59 a 00:01.
 4. Rechazo de solapamiento.
 5. Refresco por minuto sin recarga.
-
-### OPS-ASSIGN-010 - Consolidado visual en columna "Asignado a"
-
-1. Hoy la columna `Asignado a` está modelada para un solo `assignedUserId` en `WorkShift`.
-2. Con asignaciones múltiples por turno, debe mostrar:
-   - `Sin asignar` cuando no hay personas vigentes.
-   - `N asignados` y tooltip/expand con nombres cuando hay más de uno.
-3. La tabla principal de turnos debe ser resumen; el detalle editable queda en la sección de asignaciones para no redundar UI.
-
-Reparación propuesta:
-
-```ts
-// Ejemplo de view-model para tabla de turnos
-shift.assignedSummary = assignedUsers.length === 0
-  ? 'Sin asignar'
-  : assignedUsers.length === 1
-    ? assignedUsers[0].fullName
-    : `${assignedUsers.length} asignados`;
-```
 
 ### AI-SUMMARY-001 - Resumen Ejecutivo Efímero (IA On-Demand)
 

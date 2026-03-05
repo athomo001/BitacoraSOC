@@ -35,7 +35,7 @@ import {
 export class WorkShiftService {
   private apiUrl = `${environment.apiUrl}/work-shifts`;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // 🔍 CONSULTAS (todos los usuarios)
@@ -48,15 +48,15 @@ export class WorkShiftService {
    */
   getShifts(type?: ShiftType, active?: boolean): Observable<WorkShift[]> {
     let params = new HttpParams();
-    
+
     if (type) {
       params = params.set('type', type);
     }
-    
+
     if (active !== undefined) {
       params = params.set('active', active.toString());
     }
-    
+
     return this.http.get<WorkShift[]>(this.apiUrl, { params });
   }
 
@@ -104,6 +104,25 @@ export class WorkShiftService {
    */
   reorderShifts(request: ReorderRequest): Observable<{ message: string }> {
     return this.http.put<{ message: string }>(`${this.apiUrl}/reorder`, request);
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 🏢 ASIGNACIONES OPERATIVAS (OPS-ASSIGN)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  getAssignments(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/assignments`);
+  }
+
+  createAssignment(data: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/assignments`, data);
+  }
+
+  updateAssignment(id: string, data: any): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}/assignments/${id}`, data);
+  }
+
+  deleteAssignment(id: string): Observable<any> {
+    return this.http.delete<any>(`${this.apiUrl}/assignments/${id}`);
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

@@ -34,6 +34,7 @@ import { SecurityConfig, UpdateConfigRequest } from '../../../models/config.mode
 export class AdminSecurityComponent implements OnInit {
   securityForm: FormGroup;
   isSaving = false;
+  countdownMessage = '';
   certFile: File | null = null;
   keyFile: File | null = null;
   caFile: File | null = null;
@@ -111,8 +112,10 @@ export class AdminSecurityComponent implements OnInit {
     this.isSaving = true;
     this.configService.updateConfig(payload).subscribe({
       next: () => {
-        this.isSaving = false;
-        this.snackBar.open('Configuración HTTPS guardada', 'Cerrar', { duration: 3000 });
+        this.snackBar.open('Configuración guardada. Reiniciando frontend...', 'Espere', { duration: 15000 });
+
+        const isHttps = this.securityForm.value.httpsEnabled && this.certUploaded && this.keyUploaded;
+        this.startCountdownAndRedirect(`http${isHttps ? 's' : ''}://${window.location.hostname}:4200/main/admin/security`);
       },
       error: (err) => {
         this.isSaving = false;
@@ -149,7 +152,6 @@ export class AdminSecurityComponent implements OnInit {
       ca: this.caFile || undefined
     }).subscribe({
       next: (response) => {
-        this.isSaving = false;
         this.certFile = null;
         this.keyFile = null;
         this.caFile = null;
@@ -161,7 +163,14 @@ export class AdminSecurityComponent implements OnInit {
         if (this.certUploaded && this.keyUploaded) {
           this.securityForm.patchValue({ httpsEnabled: true });
         }
-        this.snackBar.open('Certificados TLS actualizados', 'Cerrar', { duration: 3000 });
+
+        if (response.security?.httpsEnabled) {
+          this.snackBar.open('Certificados TLS activados. Reiniciando frontend...', 'Espere', { duration: 15000 });
+          this.startCountdownAndRedirect(`https://${window.location.hostname}:4200/main/admin/security`);
+        } else {
+          this.isSaving = false;
+          this.snackBar.open('Certificados cargados parcialmente. Falta llave o certificado.', 'Cerrar', { duration: 4000 });
+        }
       },
       error: (err) => {
         this.isSaving = false;
@@ -174,15 +183,14 @@ export class AdminSecurityComponent implements OnInit {
   }
 
   resetHttpsConfiguration(): void {
-    const confirmed = window.confirm('Esto deshabilitará HTTPS/Forzar HTTPS, restaurará el puerto por defecto y eliminará certificados TLS del servidor. ¿Continuar?');
-    if (!confirmed) {
+    const word = window.prompt('Escribe RESET en mayúsculas para confirmar que deseas eliminar toda la configuración TLS y volver a HTTP inseguro:');
+    if (word !== 'RESET') {
       return;
     }
 
     this.isSaving = true;
     this.configService.resetTlsCertificates().subscribe({
       next: (response) => {
-        this.isSaving = false;
         this.certFile = null;
         this.keyFile = null;
         this.caFile = null;
@@ -201,12 +209,30 @@ export class AdminSecurityComponent implements OnInit {
           tlsCaPath: ''
         });
 
-        this.snackBar.open(response.message || 'HTTPS/TLS restablecido', 'Cerrar', { duration: 4000 });
+        this.snackBar.open('Certificados borrados. Reiniciando frontend...', 'Espere', { duration: 15000 });
+        this.startCountdownAndRedirect(`http://${window.location.hostname}:4200/main/admin/security`);
       },
       error: (err) => {
         this.isSaving = false;
         this.snackBar.open(err?.error?.message || 'Error al restablecer HTTPS/TLS', 'Cerrar', { duration: 5000 });
       }
     });
+  }
+
+  private startCountdownAndRedirect(targetUrl: string, seconds: number = 15): void {
+    this.isSaving = true;
+    let remaining = seconds;
+    this.countdownMessage = `(espere ${remaining}s)`;
+
+    const interval = setInterval(() => {
+      remaining--;
+      if (remaining > 0) {
+        this.countdownMessage = `(espere ${remaining}s)`;
+      } else {
+        this.countdownMessage = `(Recargando...)`;
+        clearInterval(interval);
+        window.location.href = targetUrl;
+      }
+    }, 1000);
   }
 }

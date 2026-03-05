@@ -327,6 +327,20 @@
             </mat-select>
           </mat-form-field>
 
+          <mat-form-field appearance="outline">
+            <mat-label>Días asignados</mat-label>
+            <mat-select formControlName="weekdays" multiple>
+              <mat-option [value]="1">Lunes</mat-option>
+              <mat-option [value]="2">Martes</mat-option>
+              <mat-option [value]="3">Miércoles</mat-option>
+              <mat-option [value]="4">Jueves</mat-option>
+              <mat-option [value]="5">Viernes</mat-option>
+              <mat-option [value]="6">Sábado</mat-option>
+              <mat-option [value]="0">Domingo</mat-option>
+            </mat-select>
+            <mat-hint>Por defecto será Lun-Vie</mat-hint>
+          </mat-form-field>
+
           <div class="operational-actions">
             <button mat-raised-button color="primary" type="submit" [disabled]="operationalAssignmentForm.invalid">
               <mat-icon>link</mat-icon>

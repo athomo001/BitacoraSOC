@@ -18,6 +18,9 @@ RUN npm run build -- --configuration production
 # Stage 2: Servir con Nginx
 FROM nginx:alpine
 
+# Instalar OpenSSL para poder auto-generar certificados dummy en el arranque
+RUN apk add --no-cache openssl
+
 # Copiar configuración de Nginx
 COPY nginx.conf /etc/nginx/nginx.conf
 

@@ -59,3 +59,6 @@ eventos-*.json
 docs/images/screenshots/*.png
 docs/images/screenshots/*.jpg
 !docs/images/screenshots/README.md
+
+#archivos de prueba
+/ssl-prueba/*

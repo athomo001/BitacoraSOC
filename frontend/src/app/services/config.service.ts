@@ -33,7 +33,7 @@ import { AppConfig, UpdateConfigRequest } from '../models/config.model';
 export class ConfigService {
   private readonly API_URL = `${environment.apiUrl}/config`;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
   getConfig(): Observable<AppConfig> {
     return this.http.get<AppConfig>(this.API_URL);

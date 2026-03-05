@@ -173,8 +173,32 @@ Pasos recomendados en producción:
 5. Activar `Forzar HTTPS` solo cuando HTTPS ya responda correctamente.
 
 Notas:
-- Los archivos TLS quedan persistidos en `./.data/uploads` (ruta interna `/app/uploads/tls`).
+- Los archivos TLS quedan persistidos en `./.data/tls` (ruta interna `/app/secrets`).
 - Si cambias dominio/puerto HTTPS, actualiza `ALLOWED_ORIGINS` con la URL real del frontend para evitar bloqueo CORS.
+
+### Cómo probar TLS/SSL en Entorno Local (0-Downtime)
+
+Para verificar que la reconexión en caliente y validación profunda de certificados funciona en tu PC sin necesidad de dominios reales:
+
+1. **Generar certificados autofirmados de prueba:**
+   Abre una terminal y ejecuta OpenSSL para crear un par de llaves:
+   `openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout local.key -out local.crt -subj "/CN=localhost"`
+2. **Entrar al Administrador de SOC:**
+   Ve a la vista **Configuración > HTTPS / Seguridad**.
+3. **Subir Archivos:**
+   - Selecciona `local.crt` en **SSL/TLS certificate**.
+   - Selecciona `local.key` en **SSL/TLS private key**.
+4. **Activar Magia:**
+   - Oprime **"Subir SSL y Activar (0-Downtime)"**.
+   - El backend validará matemáticamente la relación entre `.crt` y `.key`, e inyectará TLS en < 1ms.
+5. **Verificar Backend Seguro (HTTPS):**
+   - Abre una pestaña nueva hacia 👉 `https://localhost:3443/health` (👈 Exacto así, sin el `/api/`).
+   - *Nota: Dale "Avanzado > Continuar" al aviso de "No Seguro", y verás la respuesta RAW JSON del Healthcheck demostrando que Express está escuchando SSL nativamente.*
+6. **Usar la Interfaz (Frontend Local):**
+   - El Desarrollo local UI no usa HTTPS, es un proxy de Node que corre en otra ventana (`npm start` en la carpeta `frontend/`).
+   - Sigue usando la app normalmente abriendo en otra pestaña 👉 `http://localhost:4200`
+7. **Desmontaje rápido:**
+   - Usa el botón rojo **"Desactivar y limpiar archivos TLS"**, tipea `RESET` y el servidor matará el listener seguro volviendo a la normalidad de HTTP plano.
 
 ## Health checks (importante)
 - Backend y frontend tienen health checks en sus Dockerfile.

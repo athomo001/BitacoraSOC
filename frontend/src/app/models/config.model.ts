@@ -81,6 +81,7 @@ export interface SecurityConfig {
   certFileName?: string;
   keyFileName?: string;
   caFileName?: string;
+  httpsReady?: boolean;
 }
 
 export interface UpdateConfigRequest {

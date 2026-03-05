@@ -19,6 +19,7 @@ require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const https = require('https');
+const tls = require('tls');
 const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
@@ -247,13 +248,36 @@ app.use((req, res, next) => {
     return next();
   }
 
-  const httpsPort = Number(securityConfig.httpsPort) || DEFAULT_HTTPS_PORT;
-  const hostname = getSafeHostname(req.headers.host);
-  const hostWithPort = httpsPort === 443 ? hostname : `${hostname}:${httpsPort}`;
-  const targetUrl = `https://${hostWithPort}${req.originalUrl}`;
+  const forwardedHost = req.headers['x-forwarded-host'];
+  const baseHost = forwardedHost || req.headers.host;
+  const secureHost = baseHost ? getSafeHostname(baseHost) : 'localhost';
+
+  const publicPort = process.env.PUBLIC_HTTPS_PORT;
+  let targetHost = secureHost;
+
+  if (publicPort) {
+    targetHost = publicPort === '443' ? secureHost : `${secureHost}:${publicPort}`;
+  } else if (!forwardedHost) {
+    const httpsPort = Number(securityConfig.httpsPort) || DEFAULT_HTTPS_PORT;
+    targetHost = httpsPort === 443 ? secureHost : `${secureHost}:${httpsPort}`;
+  } else {
+    targetHost = baseHost;
+  }
+
+  const targetUrl = `https://${targetHost}${req.originalUrl}`;
+
+  // Fundamental: Para API requests (que usa el Frontend), siempre devolver 426 en lugar de redirección 307.
+  // Esto previene que el navegador siga un redireccionamiento CORS automático que destruye la cookie de sesión (causando 401).
+  // En su lugar, el Interceptor de Angular atrapa el 426 y rehace el request manualmente con { withCredentials: true }.
+  if (req.path.startsWith('/api') || req.xhr || (req.headers.accept && req.headers.accept.includes('application/json'))) {
+    return res.status(426).json({
+      message: 'HTTPS requerido para esta operación',
+      targetUrl
+    });
+  }
 
   if (req.method === 'GET' || req.method === 'HEAD') {
-    return res.redirect(308, targetUrl);
+    return res.redirect(307, targetUrl);
   }
 
   return res.status(426).json({
@@ -282,8 +306,8 @@ const corsOptions = {
     : true, // En desarrollo permite cualquier origen
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  exposedHeaders: ['Content-Length', 'X-Request-Id'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-https-retry'],
+  exposedHeaders: ['Content-Length', 'X-Request-Id', 'x-https-retry'],
   maxAge: 600
 };
 
@@ -328,16 +352,18 @@ app.use('/uploads', (req, res, next) => {
   next();
 }, express.static(path.join(__dirname, '../uploads')));
 
-const getHealthPayload = () => ({
+const getHealthPayload = (req) => ({
   status: 'ok',
   version: APP_VERSION,
   timestamp: new Date().toISOString(),
-  timezone: process.env.TZ || 'America/Santiago'
+  timezone: process.env.TZ || 'America/Santiago',
+  httpsReady: req ? req.app.locals.httpsReady : false,
+  forceHttps: req && req.app.locals.runtimeSecurityConfig ? req.app.locals.runtimeSecurityConfig.forceHttps : false
 });
 
-// Health check para Docker
+// Health check para Docker y Frontend Dev Script
 app.get('/health', (req, res) => {
-  res.status(200).json(getHealthPayload());
+  res.status(200).json(getHealthPayload(req));
 });
 
 // Rutas de API
@@ -357,6 +383,7 @@ app.use('/api/catalog', require('./routes/catalog'));
 app.use('/api/admin/catalog', require('./routes/admin-catalog')); // CRUD admin
 app.use('/api/escalation', require('./routes/escalation')); // Módulo de escalaciones
 app.use('/api/work-shifts', require('./routes/work-shifts')); // Turnos de trabajo
+app.use('/api/work-shifts/assignments', require('./routes/work-shift-assignments')); // Asignaciones operativas
 app.use('/api/audit-logs', require('./routes/audit-logs')); // Logs de auditoría
 
 // Health check (ANTES del fallback SPA)
@@ -508,50 +535,81 @@ const loadRuntimeSecurityConfigFromDb = async () => {
   }
 };
 
-const startHttpsServerIfEnabled = () => {
-  app.locals.httpsReady = false;
+let currentSecureContext = null;
+
+const buildSecureContext = () => {
   const securityConfig = normalizeRuntimeSecurityConfig(app.locals.runtimeSecurityConfig);
+  if (!securityConfig.httpsEnabled) return null;
 
   const certPath = resolveTlsPath(securityConfig.tlsCertPath);
   const keyPath = resolveTlsPath(securityConfig.tlsKeyPath);
   const caPath = resolveTlsPath(securityConfig.tlsCaPath);
-  const httpsPort = Number(securityConfig.httpsPort) || DEFAULT_HTTPS_PORT;
-  const shouldStartHttps = !!securityConfig.httpsEnabled;
 
-  if (!shouldStartHttps) {
-    return;
-  }
-
-  if (!certPath || !keyPath) {
-    logger.warn({ event: 'server.https.disabled.missing.paths' }, 'HTTPS habilitado en config pero faltan rutas de certificado/llave');
-    return;
-  }
-
-  if (!fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
-    logger.warn({ event: 'server.https.disabled.invalid.paths', certPath, keyPath }, 'HTTPS no iniciado: archivo de certificado o llave no existe');
-    return;
+  if (!certPath || !keyPath || !fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
+    return null;
   }
 
   try {
-    const tlsOptions = {
+    const options = {
       cert: fs.readFileSync(certPath),
       key: fs.readFileSync(keyPath)
     };
 
     if (caPath && fs.existsSync(caPath)) {
-      tlsOptions.ca = fs.readFileSync(caPath);
+      options.ca = fs.readFileSync(caPath);
     }
 
-    httpsServer = https.createServer(tlsOptions, app);
-    attachServerErrorHandler(httpsServer, 'https', httpsPort);
-    httpsServer.listen(httpsPort, HOST, () => {
-      app.locals.httpsReady = true;
-      logger.info({ event: 'server.https.started', host: HOST, port: httpsPort }, 'Servidor HTTPS iniciado');
-      console.log(`🔒 HTTPS activo en https://${HOST}:${httpsPort}`);
-    });
+    return tls.createSecureContext(options);
   } catch (error) {
-    logger.error({ event: 'server.https.start.failed', error: error.message }, 'No se pudo iniciar servidor HTTPS');
+    logger.error({ event: 'server.https.context.failed', error: error.message }, 'No se pudo crear el contexto TLS en memoria');
+    return null;
   }
+};
+
+app.locals.applyRuntimeSecurityConfig = () => {
+  const securityConfig = normalizeRuntimeSecurityConfig(app.locals.runtimeSecurityConfig);
+  const httpsPort = Number(securityConfig.httpsPort) || DEFAULT_HTTPS_PORT;
+  const shouldStartHttps = !!securityConfig.httpsEnabled;
+
+  currentSecureContext = buildSecureContext();
+
+  if (shouldStartHttps) {
+    if (!httpsServer) {
+      httpsServer = https.createServer({
+        SNICallback: (domain, cb) => {
+          if (currentSecureContext) {
+            cb(null, currentSecureContext);
+          } else {
+            cb(new Error('Contexto TLS no disponible'));
+          }
+        }
+      }, app);
+
+      attachServerErrorHandler(httpsServer, 'https', httpsPort);
+      httpsServer.listen(httpsPort, HOST, () => {
+        app.locals.httpsReady = !!currentSecureContext;
+        logger.info({ event: 'server.https.started', host: HOST, port: httpsPort }, 'Servidor HTTPS iniciado con SNI estricto');
+        console.log(`🔒 HTTPS activo en https://${HOST}:${httpsPort}`);
+      });
+    } else {
+      app.locals.httpsReady = !!currentSecureContext;
+      console.log(`🔒 HTTPS contexto criptográfico recargado exitosamente en caliente.`);
+    }
+  } else {
+    app.locals.httpsReady = false;
+    currentSecureContext = null;
+    if (httpsServer) {
+      httpsServer.close(() => {
+        logger.info({ event: 'server.https.stopped' }, 'Servidor HTTPS detenido por usuario');
+        console.log(`🔓 Listener HTTPS apagado correctamente.`);
+      });
+      httpsServer = null;
+    }
+  }
+};
+
+const startHttpsServerIfEnabled = () => {
+  app.locals.applyRuntimeSecurityConfig();
 };
 
 const startServers = async () => {

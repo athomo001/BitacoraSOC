@@ -19,45 +19,56 @@
         <div class="tls-files">
           <div class="tls-row">
             <span class="tls-label">SSL/TLS certificate</span>
-            <input #certInput type="file" class="hidden-input" (change)="onCertSelected($event)">
+            <input #certInput type="file" accept=".pem,.crt,.cer,.key" class="hidden-input"
+              (change)="onCertSelected($event)">
             <button mat-stroked-button type="button" (click)="certInput.click()">Seleccionar archivo</button>
           </div>
           <small>{{ certFile?.name || certStatus }}</small>
 
           <div class="tls-row">
             <span class="tls-label">SSL/TLS private key</span>
-            <input #keyInput type="file" class="hidden-input" (change)="onKeySelected($event)">
+            <input #keyInput type="file" accept=".pem,.crt,.cer,.key" class="hidden-input"
+              (change)="onKeySelected($event)">
             <button mat-stroked-button type="button" (click)="keyInput.click()">Seleccionar archivo</button>
           </div>
           <small>{{ keyFile?.name || keyStatus }}</small>
 
           <div class="tls-row">
             <span class="tls-label">CA bundle (opcional)</span>
-            <input #caInput type="file" class="hidden-input" (change)="onCaSelected($event)">
+            <input #caInput type="file" accept=".pem,.crt,.cer,.key" class="hidden-input"
+              (change)="onCaSelected($event)">
             <button mat-stroked-button type="button" (click)="caInput.click()">Seleccionar archivo</button>
           </div>
           <small>{{ caFile?.name || caStatus }}</small>
-          <small>Se aceptan archivos con o sin extensión (ej: 10.0.100.13, .crt, .key, .pem).</small>
+          <small>Se aceptan archivos formato PEM (.crt, .key, .pem). No soportamos llaves encriptadas con
+            contraseña.</small>
 
           <button mat-raised-button color="accent" type="button" (click)="uploadCertificates()" [disabled]="isSaving">
             <mat-spinner *ngIf="isSaving" diameter="18"></mat-spinner>
-            <span *ngIf="!isSaving">Guardar certificados SSL</span>
+            <span *ngIf="!isSaving">Subir SSL y Activar (0-Downtime)</span>
+            <span *ngIf="isSaving && countdownMessage">Activando TLS... {{ countdownMessage }}</span>
+            <span *ngIf="isSaving && !countdownMessage">Subiendo...</span>
           </button>
         </div>
 
         <div class="notes">
-          <p>Si cambias certificados, puerto o habilitación HTTPS, reinicia el backend para aplicar el listener TLS.</p>
-          <p>Al activar Forzar HTTPS, confirma antes que el frontend use URL HTTPS permitida en CORS.</p>
-          <p>La CA es opcional; para habilitar HTTPS necesitas certificado + llave privada y activar el checkbox de listener HTTPS.</p>
+          <p>Los cambios de certificados se aplican instantáneamente en caliente sin reiniciar la red (SNI Hot-Reload).
+          </p>
+          <p><strong>Nota Local:</strong> Si estás usando "npm start" (localhost), "Forzar HTTPS" se ignorará de forma
+            segura para no romper tu sesión HTTP. Funcionará en Producción o Docker.</p>
         </div>
 
-        <button mat-stroked-button color="warn" type="button" class="danger-action" (click)="resetHttpsConfiguration()" [disabled]="isSaving">
-          Borrar configuración HTTPS/TLS y restaurar por defecto
+        <button mat-stroked-button color="warn" type="button" class="danger-action" (click)="resetHttpsConfiguration()"
+          [disabled]="isSaving">
+          <span *ngIf="!isSaving">Restaurar a HTTP inseguro por defecto</span>
+          <span *ngIf="isSaving && countdownMessage">Restableciendo... {{ countdownMessage }}</span>
+          <span *ngIf="isSaving && !countdownMessage">Cargando...</span>
         </button>
 
         <button mat-raised-button color="primary" type="submit" [disabled]="isSaving">
           <mat-spinner *ngIf="isSaving" diameter="18"></mat-spinner>
-          <span *ngIf="!isSaving">Guardar HTTPS</span>
+          <span *ngIf="!isSaving">Aplicar Configuración Red (Puerto/Redirección)</span>
+          <span *ngIf="isSaving && countdownMessage">Reiniciando nodo... {{ countdownMessage }}</span>
         </button>
       </form>
     </mat-card-content>
