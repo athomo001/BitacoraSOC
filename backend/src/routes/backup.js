@@ -18,6 +18,9 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const fs = require('fs').promises;
+const fsSync = require('fs');
+const archiver = require('archiver');
+const unzipper = require('unzipper');
 const { authenticate, authorize } = require('../middleware/auth');
 const { audit } = require('../utils/audit');
 const { logger } = require('../utils/logger');
@@ -49,10 +52,15 @@ const multer = require('multer');
 
 const PURGE_CONFIRM_PHRASE = 'PURGAR TODO';
 
-// Configurar multer para importación
+// Directorios de volúmenes físicos del backend
+const UPLOADS_DIR = path.join(__dirname, '../../uploads');
+const SECRETS_DIR = path.join(__dirname, '../../secrets');
+const BACKUPS_DIR = path.join(__dirname, '../../backups');
+
+// Configurar multer para importación — acepta ZIP y JSON hasta 200MB
 const upload = multer({
-  dest: path.join(__dirname, '../../backups/temp'),
-  limits: { fileSize: 50 * 1024 * 1024 } // 50MB
+  dest: path.join(BACKUPS_DIR, 'temp'),
+  limits: { fileSize: 200 * 1024 * 1024 } // 200MB
 });
 
 // Importar el scheduler de backups para reiniciar si cambia la config
@@ -60,7 +68,7 @@ const { startBackupScheduler, stopBackupScheduler, runBackup } = require('../uti
 
 // Helper de validación de filename para evitar Path Traversal
 const isValidBackupFilename = (filename) => {
-  return typeof filename === 'string' && /^backup-[a-zA-Z0-9.\-_]+\.json$/.test(filename);
+  return typeof filename === 'string' && /^backup-[a-zA-Z0-9.\-_]+\.(json|zip)$/.test(filename);
 };
 
 // Helper: convertir array de objetos a CSV
@@ -258,24 +266,23 @@ router.post('/test-auto', authenticate, authorize('admin'), async (req, res) => 
 
 // -----------------------------------------------------
 
-// GET /api/backup/history - Historial de backups (admin)
+// GET /api/backup/history - Historial de backups (admin) — lista .zip y .json legacy
 router.get('/history', authenticate, authorize('admin'), async (req, res) => {
   try {
-    const backupDir = path.join(__dirname, '../../backups');
-    await fs.mkdir(backupDir, { recursive: true });
-
-    const files = await fs.readdir(backupDir);
+    await fs.mkdir(BACKUPS_DIR, { recursive: true });
+    const files = await fs.readdir(BACKUPS_DIR);
     const backups = [];
 
     for (const file of files) {
-      if (file.endsWith('.json')) {
-        const filePath = path.join(backupDir, file);
+      if (file.endsWith('.zip') || file.endsWith('.json')) {
+        const filePath = path.join(BACKUPS_DIR, file);
         const stats = await fs.stat(filePath);
         backups.push({
           _id: file,
           filename: file,
           createdAt: stats.birthtime,
-          size: stats.size
+          size: stats.size,
+          type: file.endsWith('.zip') ? 'full' : 'legacy'
         });
       }
     }
@@ -287,17 +294,19 @@ router.get('/history', authenticate, authorize('admin'), async (req, res) => {
   }
 });
 
-// POST /api/backup/create - Crear backup JSON (admin)
+// POST /api/backup/create — Backup completo ZIP (MongoDB + archivos físicos)
 router.post('/create', authenticate, authorize('admin'), async (req, res) => {
+  const tempJson = path.join(BACKUPS_DIR, `_tmp_data_${Date.now()}.json`);
   try {
-    const backupDir = path.join(__dirname, '../../backups');
-    await fs.mkdir(backupDir, { recursive: true });
+    await fs.mkdir(BACKUPS_DIR, { recursive: true });
+    await fs.mkdir(UPLOADS_DIR, { recursive: true });
+    await fs.mkdir(SECRETS_DIR, { recursive: true });
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `backup-${timestamp}.json`;
-    const filePath = path.join(backupDir, filename);
+    const filename = `backup-${timestamp}.zip`;
+    const filePath = path.join(BACKUPS_DIR, filename);
 
-    // Exportar todas las colecciones
+    // 1. Volcar todas las colecciones MongoDB a JSON
     const [entries, checks, users, adminNotes, appConfigs, auditLogs,
       catalogEvents, catalogLogSources, catalogOperationTypes,
       checklistTemplates, clients, contacts, clientEscalationRules, escalationRules,
@@ -306,7 +315,7 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
       shiftRoles, shiftRotationCycles, smtpConfigs] = await Promise.all([
         Entry.find().lean(),
         ShiftCheck.find().lean(),
-        User.find().lean(), // Incluir passwords (están hasheadas con bcrypt)
+        User.find().lean(),
         AdminNote.find().lean(),
         AppConfig.find().lean(),
         AuditLog.find().lean(),
@@ -330,10 +339,11 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
         SmtpConfig.find().lean()
       ]);
 
-    const backup = {
+    const backupData = {
       metadata: {
         created: new Date(),
-        version: '2.0',
+        version: '3.0',
+        type: 'full-zip',
         createdBy: req.user._id,
         collections: 24
       },
@@ -347,7 +357,57 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
       }
     };
 
-    await fs.writeFile(filePath, JSON.stringify(backup, null, 2));
+    await fs.writeFile(tempJson, JSON.stringify(backupData, null, 2));
+
+    // Pre-scan secrets legibles ANTES de entrar en el Promise (await no puede usarse dentro de callback sync)
+    const readableSecrets = [];
+    if (fsSync.existsSync(SECRETS_DIR)) {
+      try {
+        const secretFiles = await fs.readdir(SECRETS_DIR);
+        for (const sFile of secretFiles) {
+          const sPath = path.join(SECRETS_DIR, sFile);
+          try {
+            await fs.access(sPath, fsSync.constants.R_OK);
+            readableSecrets.push({ name: sFile, path: sPath });
+          } catch {
+            logger.warn({ path: sPath }, 'Archivo secret no legible, omitido del backup');
+          }
+        }
+      } catch (e) {
+        logger.warn({ err: e }, 'No se pudo leer directorio secrets, omitido del backup');
+      }
+    }
+
+    // 2. Crear ZIP con el JSON + archivos físicos
+    await new Promise((resolve, reject) => {
+      const output = fsSync.createWriteStream(filePath);
+      const archive = archiver('zip', { zlib: { level: 9 } });
+
+      output.on('close', resolve);
+      archive.on('error', reject);
+      archive.pipe(output);
+
+      // JSON de la base de datos
+      archive.file(tempJson, { name: 'data.json' });
+
+      // Archivos físicos de uploads (logos, imágenes)
+      if (fsSync.existsSync(UPLOADS_DIR)) {
+        archive.directory(UPLOADS_DIR, 'uploads');
+      }
+
+      // Certificados SSL (solo los legibles pre-escaneados)
+      for (const s of readableSecrets) {
+        archive.file(s.path, { name: `secrets/${s.name}` });
+      }
+
+      archive.finalize();
+    });
+
+    // Limpiar JSON temporal
+    await fs.unlink(tempJson).catch(() => {});
+
+    const stat = await fs.stat(filePath);
+    const totalDocs = Object.values(backupData.data).reduce((sum, arr) => sum + arr.length, 0);
 
     await audit(req, {
       event: 'admin.backup.create',
@@ -355,21 +415,21 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
       result: { success: true, filename }
     });
 
-    const totalDocs = Object.values(backup.data).reduce((sum, arr) => sum + arr.length, 0);
-
     res.json({
-      message: 'Backup creado exitosamente',
+      message: 'Backup completo creado exitosamente',
       filename,
       collections: 24,
-      documents: totalDocs
+      documents: totalDocs,
+      sizeBytes: stat.size
     });
   } catch (error) {
-    logger.error({ err: error }, 'Error creando backup');
+    await fs.unlink(tempJson).catch(() => {});
+    logger.error({ err: error }, 'Error creando backup ZIP');
     res.status(500).json({ message: 'Error creando backup' });
   }
 });
 
-// POST /api/backup/restore - Restaurar backup (admin)
+// POST /api/backup/restore — Restauración completa desde ZIP o JSON legacy
 router.post('/restore', authenticate, authorize('admin'), async (req, res) => {
   try {
     const { filename, clearBeforeRestore } = req.body;
@@ -378,27 +438,79 @@ router.post('/restore', authenticate, authorize('admin'), async (req, res) => {
       return res.status(400).json({ message: 'Filename inválido o requerido' });
     }
 
-    const backupDir = path.join(__dirname, '../../backups');
-    const filePath = path.join(backupDir, filename);
+    const filePath = path.join(BACKUPS_DIR, filename);
 
-    // Verificar que el archivo existe
-    try {
-      await fs.access(filePath);
-    } catch {
-      return res.status(404).json({ message: 'Backup no encontrado' });
+    try { await fs.access(filePath); }
+    catch { return res.status(404).json({ message: 'Backup no encontrado' }); }
+
+    const isZip = filename.endsWith('.zip');
+    let backupJson;
+
+    if (isZip) {
+      // --- Restauración ZIP completa ---
+      const extractDir = path.join(BACKUPS_DIR, `temp_extract_${Date.now()}`);
+      await fs.mkdir(extractDir, { recursive: true });
+
+      try {
+        // Descomprimir el ZIP
+        await new Promise((resolve, reject) => {
+          fsSync.createReadStream(filePath)
+            .pipe(unzipper.Extract({ path: extractDir }))
+            .on('close', resolve)
+            .on('error', reject);
+        });
+
+        // Leer el JSON de base de datos
+        const dataJsonPath = path.join(extractDir, 'data.json');
+        const content = await fs.readFile(dataJsonPath, 'utf8');
+        backupJson = JSON.parse(content);
+
+        // Restaurar archivos físicos: uploads
+        const extractedUploads = path.join(extractDir, 'uploads');
+        if (fsSync.existsSync(extractedUploads)) {
+          await fs.mkdir(UPLOADS_DIR, { recursive: true });
+          // Copiar todos los archivos del zip al volumen
+          const uploadFiles = await fs.readdir(extractedUploads);
+          for (const f of uploadFiles) {
+            await fs.copyFile(
+              path.join(extractedUploads, f),
+              path.join(UPLOADS_DIR, f)
+            );
+          }
+          logger.info(`Archivos de /uploads restaurados: ${uploadFiles.length}`);
+        }
+
+        // Restaurar archivos físicos: secrets (SSL certs)
+        const extractedSecrets = path.join(extractDir, 'secrets');
+        if (fsSync.existsSync(extractedSecrets)) {
+          await fs.mkdir(SECRETS_DIR, { recursive: true });
+          const secretFiles = await fs.readdir(extractedSecrets);
+          for (const f of secretFiles) {
+            await fs.copyFile(
+              path.join(extractedSecrets, f),
+              path.join(SECRETS_DIR, f)
+            );
+          }
+          logger.info(`Certificados SSL restaurados: ${secretFiles.length}`);
+        }
+
+      } finally {
+        // Limpiar directorio temporal de extracción
+        await fs.rm(extractDir, { recursive: true, force: true }).catch(() => {});
+      }
+
+    } else {
+      // --- Restauración JSON legacy ---
+      const content = await fs.readFile(filePath, 'utf8');
+      backupJson = JSON.parse(content);
     }
 
-    const content = await fs.readFile(filePath, 'utf8');
-    const backup = JSON.parse(content);
-
-    if (!backup.data) {
+    if (!backupJson.data) {
       return res.status(400).json({ message: 'Formato de backup inválido' });
     }
 
-    // Definir modelos
     const models = backupModels;
 
-    // Si clearBeforeRestore=true, borrar TODAS las colecciones primero
     if (clearBeforeRestore === true) {
       logger.info('Borrando todas las colecciones antes de restaurar...');
       for (const Model of Object.values(models)) {
@@ -408,12 +520,11 @@ router.post('/restore', authenticate, authorize('admin'), async (req, res) => {
 
     let imported = 0;
     for (const [key, Model] of Object.entries(models)) {
-      if (backup.data[key]?.length) {
+      if (backupJson.data[key]?.length) {
         try {
-          await Model.insertMany(backup.data[key], { ordered: false });
-          imported += backup.data[key].length;
+          await Model.insertMany(backupJson.data[key], { ordered: false });
+          imported += backupJson.data[key].length;
         } catch (err) {
-          // Ignorar duplicados, continuar con otras colecciones
           logger.warn({ collection: key, err }, 'Algunos documentos no pudieron ser importados');
         }
       }
@@ -422,11 +533,13 @@ router.post('/restore', authenticate, authorize('admin'), async (req, res) => {
     await audit(req, {
       event: 'admin.backup.restore',
       level: 'warning',
-      result: { success: true, filename, imported }
+      result: { success: true, filename, imported, isZip }
     });
 
     res.json({
-      message: 'Backup restaurado exitosamente',
+      message: isZip
+        ? 'Backup completo restaurado (base de datos + archivos físicos)'
+        : 'Backup legacy restaurado (solo base de datos)',
       imported
     });
   } catch (error) {

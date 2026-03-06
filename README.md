@@ -11,7 +11,7 @@ Sistema completo de registro y gestión de actividades para Security Operations 
 
 **Versiones declaradas (`package.json`)**
 - Angular (`@angular/core`): `^20.3.17`
-- Express: `^4.18.2`
+- backend (Node/Express): `Node 24 LTS`
 - Mongo (Mongoose): `^8.0.3`
 
 **Versiones exactas instaladas (`package-lock.json`)**

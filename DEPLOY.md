@@ -147,7 +147,7 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout local.key -out local
 
 ## 6. Entorno de Desarrollo Local (Sin Docker)
 
-> **Requisitos:** Node.js 18+, MongoDB 6+.
+> **Requisitos:** Node.js 24+ LTS, MongoDB 7+.
 
 ### 6.1 Backend
 ```bash
