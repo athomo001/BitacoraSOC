@@ -39,6 +39,8 @@ backups/
 docker-compose.override.yml
 .dockerignore
 backups/
+.data/
+*/.data/
 
 # Angular
 .angular/
