@@ -45,13 +45,14 @@ import {
 export class ChecklistService {
   private readonly API_URL = `${environment.apiUrl}/checklist`;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
   // ========== SERVICIOS ==========
-  
-  getActiveChecklist(): Observable<ChecklistTemplate | null> {
+
+  getActiveChecklist(type?: 'inicio' | 'cierre'): Observable<ChecklistTemplate | null> {
+    const params = type ? new HttpParams().set('type', type) : undefined;
     return this.http
-      .get<{ template: ChecklistTemplate; source: 'template' | 'legacy' }>(`${this.API_URL}/templates/active`)
+      .get<{ template: ChecklistTemplate; source: 'template' | 'legacy' }>(`${this.API_URL}/templates/active`, { params })
       .pipe(map(res => res?.template ? { ...res.template, source: res.source } : null));
   }
 
@@ -104,7 +105,7 @@ export class ChecklistService {
   }
 
   // ========== CHECKS ==========
-  
+
   createCheck(data: CreateCheckRequest): Observable<{ message: string; check: ShiftCheck }> {
     return this.http.post<{ message: string; check: ShiftCheck }>(`${this.API_URL}/check`, data);
   }

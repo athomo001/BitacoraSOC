@@ -569,6 +569,27 @@ router.post('/import',
   }
 );
 
+// Función helper para vaciar directorios de volúmenes de Docker sin borrar la carpeta base
+const emptyDirectory = async (dirPath) => {
+  try {
+    const files = await fs.readdir(dirPath);
+    for (const file of files) {
+      if (file === '.gitkeep') continue;
+      const filePath = path.join(dirPath, file);
+      const stat = await fs.stat(filePath);
+      if (stat.isDirectory()) {
+        await fs.rm(filePath, { recursive: true, force: true });
+      } else {
+        await fs.unlink(filePath);
+      }
+    }
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      logger.error({ err: error, dirPath }, 'Error vaciando directorio de volumen');
+    }
+  }
+};
+
 // POST /api/backup/purge - Purgar todos los datos (admin)
 router.post('/purge', authenticate, authorize('admin'), async (req, res) => {
   try {
@@ -585,19 +606,31 @@ router.post('/purge', authenticate, authorize('admin'), async (req, res) => {
       deletedCollections += 1;
     }
 
+    // Purgar volúmenes físicos montados en Docker
+    const dirsToPurge = [
+      path.join(__dirname, '../../uploads'),
+      path.join(__dirname, '../../logs'),
+      path.join(__dirname, '../../backups'),
+      path.join(__dirname, '../../secrets')
+    ];
+
+    for (const dir of dirsToPurge) {
+      await emptyDirectory(dir);
+    }
+
     await audit(req, {
       event: 'admin.backup.purge',
       level: 'warning',
-      result: { success: true, deletedCollections }
+      result: { success: true, deletedCollections, volumesPurged: true }
     });
 
     res.json({
-      message: 'Datos purgados exitosamente',
+      message: 'Base de datos y volúmenes físicos purgados exitosamente (Factory Reset)',
       deletedCollections
     });
   } catch (error) {
-    logger.error({ err: error }, 'Error purgando datos');
-    res.status(500).json({ message: 'Error purgando datos' });
+    logger.error({ err: error }, 'Error purgando datos y volúmenes');
+    res.status(500).json({ message: 'Error purgando datos y volúmenes' });
   }
 });
 
