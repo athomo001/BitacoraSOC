@@ -114,8 +114,9 @@ export class AdminSecurityComponent implements OnInit {
       next: () => {
         this.snackBar.open('Configuración guardada. Reiniciando frontend...', 'Espere', { duration: 15000 });
 
-        const isHttps = this.securityForm.value.httpsEnabled && this.certUploaded && this.keyUploaded;
-        this.startCountdownAndRedirect(`http${isHttps ? 's' : ''}://${window.location.hostname}:4200/main/admin/security`);
+        const protocol = isHttps ? 'https' : 'http';
+        const port = window.location.port ? `:${window.location.port}` : '';
+        this.startCountdownAndRedirect(`${protocol}://${window.location.hostname}${port}/main/admin/security`);
       },
       error: (err) => {
         this.isSaving = false;
@@ -165,8 +166,8 @@ export class AdminSecurityComponent implements OnInit {
         }
 
         if (response.security?.httpsEnabled) {
-          this.snackBar.open('Certificados TLS activados. Reiniciando frontend...', 'Espere', { duration: 15000 });
-          this.startCountdownAndRedirect(`https://${window.location.hostname}:4200/main/admin/security`);
+          const port = window.location.port ? `:${window.location.port}` : '';
+          this.startCountdownAndRedirect(`https://${window.location.hostname}${port}/main/admin/security`);
         } else {
           this.isSaving = false;
           this.snackBar.open('Certificados cargados parcialmente. Falta llave o certificado.', 'Cerrar', { duration: 4000 });
@@ -210,7 +211,8 @@ export class AdminSecurityComponent implements OnInit {
         });
 
         this.snackBar.open('Certificados borrados. Reiniciando frontend...', 'Espere', { duration: 15000 });
-        this.startCountdownAndRedirect(`http://${window.location.hostname}:4200/main/admin/security`);
+        const port = window.location.port ? `:${window.location.port}` : '';
+        this.startCountdownAndRedirect(`http://${window.location.hostname}${port}/main/admin/security`);
       },
       error: (err) => {
         this.isSaving = false;
