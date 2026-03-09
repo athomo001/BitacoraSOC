@@ -52,7 +52,7 @@
         <input type="file" 
                #fileInput 
                (change)="onFileSelected($event)" 
-               accept="image/png,image/jpeg,image/svg+xml"
+               accept="image/png,image/jpeg,image/webp,image/svg+xml"
            class="hidden-file-input">
         
         <div class="upload-zone" (click)="fileInput.click()">
@@ -60,7 +60,7 @@
           <div *ngIf="!previewUrl" class="upload-placeholder">
             <mat-icon>cloud_upload</mat-icon>
             <p>Click para seleccionar imagen</p>
-            <small>PNG, JPG o SVG (máx 2MB)</small>
+            <small>PNG, JPG, WEBP o SVG (máx 2MB)</small>
           </div>
         </div>
         
