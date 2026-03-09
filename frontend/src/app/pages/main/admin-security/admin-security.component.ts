@@ -114,6 +114,7 @@ export class AdminSecurityComponent implements OnInit {
       next: () => {
         this.snackBar.open('Configuración guardada. Reiniciando frontend...', 'Espere', { duration: 15000 });
 
+        const isHttps = this.securityForm.value.httpsEnabled && this.certUploaded && this.keyUploaded;
         const protocol = isHttps ? 'https' : 'http';
         const port = window.location.port ? `:${window.location.port}` : '';
         this.startCountdownAndRedirect(`${protocol}://${window.location.hostname}${port}/main/admin/security`);
