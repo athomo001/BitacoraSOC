@@ -515,9 +515,11 @@ Links:
 
 ## Referencias
 
+- **Despliegue:** [DEPLOY.md](./DEPLOY.md)
 - **Instalación:** [SETUP.md](./SETUP.md)
 - **API:** [API.md](./API.md)
 - **Logging:** [LOGGING.md](./LOGGING.md)
 - **Backup:** [BACKUP.md](./BACKUP.md)
 - **Seguridad:** [SECURITY.md](./SECURITY.md)
 - **Troubleshooting:** [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
+- **Backlog y roadmap:** [ISSUES.md](./ISSUES.md)

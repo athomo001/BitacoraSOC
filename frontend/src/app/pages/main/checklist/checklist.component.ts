@@ -29,10 +29,10 @@ type ChecklistNode = {
 };
 
 @Component({
-    selector: 'app-checklist',
-    templateUrl: './checklist.component.html',
-    styleUrls: ['./checklist.component.scss'],
-    imports: [NgIf, MatCard, MatCardContent, MatIcon, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, ReactiveFormsModule, FormsModule, MatFormField, MatLabel, MatSelect, MatOption, NgFor, MatExpansionPanelDescription, MatRadioGroup, MatRadioButton, MatInput, MatHint, MatButton, MatProgressSpinner, EntriesComponent, DatePipe]
+  selector: 'app-checklist',
+  templateUrl: './checklist.component.html',
+  styleUrls: ['./checklist.component.scss'],
+  imports: [NgIf, MatCard, MatCardContent, MatIcon, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, ReactiveFormsModule, FormsModule, MatFormField, MatLabel, MatSelect, MatOption, NgFor, MatExpansionPanelDescription, MatRadioGroup, MatRadioButton, MatInput, MatHint, MatButton, MatProgressSpinner, EntriesComponent, DatePipe]
 })
 export class ChecklistComponent implements OnInit {
   activeChecklist: ChecklistTemplate | null = null;
@@ -47,7 +47,7 @@ export class ChecklistComponent implements OnInit {
     private snackBar: MatSnackBar,
     private authService: AuthService,
     private expansionModule: MatExpansionModule
-  ) {}
+  ) { }
 
   ngOnInit(): void {
     this.loadActiveChecklist();
@@ -110,9 +110,13 @@ export class ChecklistComponent implements OnInit {
     );
   }
 
+  onCheckTypeChange(): void {
+    this.loadActiveChecklist();
+  }
+
   loadActiveChecklist(): void {
     this.isLoading = true;
-    this.checklistService.getActiveChecklist().subscribe({
+    this.checklistService.getActiveChecklist(this.checkType).subscribe({
       next: (template) => {
         console.log('[CHECKLIST] Template recibido del backend:', template);
         console.log('[CHECKLIST] Items del template:', template?.items);
@@ -173,7 +177,7 @@ export class ChecklistComponent implements OnInit {
     }
 
     this.isSubmitting = true;
-    
+
     // Validar que todos los servicios tengan IDs válidos
     const invalidServices = flat.filter(s => !s.serviceId || s.serviceId === 'undefined');
     if (invalidServices.length > 0) {
@@ -187,7 +191,7 @@ export class ChecklistComponent implements OnInit {
       this.isSubmitting = false;
       return;
     }
-    
+
     const payload = {
       checklistId: this.activeChecklist?._id || undefined,
       type: this.checkType,
@@ -199,7 +203,7 @@ export class ChecklistComponent implements OnInit {
         observation: s.observation
       }))
     };
-    
+
     console.log('[CHECKLIST] Enviando payload:', payload);
 
     this.checklistService.createCheck(payload).subscribe({

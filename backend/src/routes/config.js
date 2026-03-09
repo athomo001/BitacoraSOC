@@ -8,6 +8,7 @@ const AppConfig = require('../models/AppConfig');
 const { authenticate, authorize } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const { invalidateCache } = require('../utils/email');
+const { validateCryptoPair, isPortFree } = require('../utils/tls-validator');
 
 // Configurar multer para logo
 const logoStorage = multer.diskStorage({
@@ -85,7 +86,7 @@ const parseBase64Image = (dataUrl) => {
 
 const tlsStorage = multer.diskStorage({
   destination: async (_req, _file, cb) => {
-    const uploadDir = path.join(__dirname, '../../uploads/tls');
+    const uploadDir = path.join(__dirname, '../../secrets');
     try {
       await fs.mkdir(uploadDir, { recursive: true });
       cb(null, uploadDir);
@@ -163,7 +164,7 @@ const resolveStoredTlsPath = (storedPath) => {
     return '';
   }
 
-  if (!normalized.startsWith('uploads/tls/')) {
+  if (!normalized.startsWith('uploads/tls/') && !normalized.startsWith('secrets/')) {
     return '';
   }
 
@@ -182,30 +183,20 @@ const removeStoredTlsFileSilently = async (storedPath) => {
 };
 
 const validateTlsFilesByContent = async ({ certFile, keyFile, caFile }) => {
-  if (certFile) {
-    const certOk = await fileHasPemToken(certFile.path, ['-----BEGIN CERTIFICATE-----']);
-    if (!certOk) {
-      throw new Error('El archivo de certificado no contiene un PEM de certificado válido');
-    }
-  }
+  let certPem = null;
+  let keyPem = null;
+  let caPem = null;
 
-  if (keyFile) {
-    const keyOk = await fileHasPemToken(keyFile.path, [
-      '-----BEGIN PRIVATE KEY-----',
-      '-----BEGIN RSA PRIVATE KEY-----',
-      '-----BEGIN EC PRIVATE KEY-----',
-      '-----BEGIN ENCRYPTED PRIVATE KEY-----'
-    ]);
-    if (!keyOk) {
-      throw new Error('El archivo de llave no contiene una llave privada PEM válida');
-    }
-  }
+  try {
+    if (certFile) certPem = await fs.readFile(certFile.path, 'utf8');
+    if (keyFile) keyPem = await fs.readFile(keyFile.path, 'utf8');
+    if (caFile) caPem = await fs.readFile(caFile.path, 'utf8');
 
-  if (caFile) {
-    const caOk = await fileHasPemToken(caFile.path, ['-----BEGIN CERTIFICATE-----']);
-    if (!caOk) {
-      throw new Error('El archivo CA no contiene un certificado PEM válido');
+    if (certPem || keyPem) {
+      validateCryptoPair({ certPem: certPem || '', keyPem: keyPem || '', caPem });
     }
+  } catch (error) {
+    throw error;
   }
 };
 
@@ -331,9 +322,24 @@ router.put('/',
       }
 
       const effectiveSecurity = extractSecurityConfig(config);
+
+      // PRECHECK de PUERTO (SEC-HTTPS-019) si https está activo o se va a forzar
       if (effectiveSecurity.httpsEnabled) {
         if (!effectiveSecurity.tlsCertPath || !effectiveSecurity.tlsKeyPath) {
           return res.status(400).json({ message: 'Para habilitar HTTPS debes cargar certificado y llave TLS' });
+        }
+
+        // Solo verificamos puertos si cambió o si estamos prendiéndolo
+        const httpsPort = Number(effectiveSecurity.httpsPort) || 3443;
+        const portCheck = await isPortFree(httpsPort);
+
+        // Si no está libre y no es el mismo que ya tenemos levantado...
+        // Nota: Si ya estaba levantado localmente por nosotros, no fallará de inmediato porque node lo tiene,
+        // pero evitamos falsos check por ahora, asumiendo que el server.js se recargará vía SNI.
+        // Si el puerto cambia respecto a lo que tenemos en memory
+        const currentInMemoryConfig = req.app.locals.runtimeSecurityConfig || {};
+        if (Number(currentInMemoryConfig.httpsPort) !== httpsPort && !portCheck.free) {
+          return res.status(400).json({ message: `El puerto HTTPS ${httpsPort} está ocupado por otro proceso.` });
         }
       }
 
@@ -352,6 +358,11 @@ router.put('/',
 
       req.app.locals.runtimeSecurityConfig = extractSecurityConfig(config);
 
+      // Emit config reload event for SNICallback (SEC-HTTPS-002)
+      if (req.app.locals.applyRuntimeSecurityConfig) {
+        req.app.locals.applyRuntimeSecurityConfig();
+      }
+
       // Invalidar cache de SMTP si se actualizó
       if (req.body.smtpConfig) {
         invalidateCache();
@@ -369,7 +380,7 @@ router.put('/',
       res.json({ message: 'Configuración actualizada', config: responseConfig });
     } catch (error) {
       console.error('Error al actualizar config:', error);
-      res.status(500).json({ message: 'Error al actualizar configuración' });
+      res.status(500).json({ message: `Error al actualizar configuración: ${error.message}` });
     }
   }
 );
@@ -407,16 +418,28 @@ router.post('/security/certificates',
 
         const currentSecurity = extractSecurityConfig(config);
 
+        // Capturar paths antiguos (SEC-HTTPS-014)
+        const oldCerts = {
+          cert: currentSecurity.tlsCertPath,
+          key: currentSecurity.tlsKeyPath,
+          ca: currentSecurity.tlsCaPath
+        };
+
         if (certFile) {
-          currentSecurity.tlsCertPath = `uploads/tls/${certFile.filename}`;
+          currentSecurity.tlsCertPath = `secrets/${certFile.filename}`;
         }
 
         if (keyFile) {
-          currentSecurity.tlsKeyPath = `uploads/tls/${keyFile.filename}`;
+          currentSecurity.tlsKeyPath = `secrets/${keyFile.filename}`;
         }
 
         if (caFile) {
-          currentSecurity.tlsCaPath = `uploads/tls/${caFile.filename}`;
+          currentSecurity.tlsCaPath = `secrets/${caFile.filename}`;
+        }
+
+        // Habilitador automático: si sube cert+key nuevos o se complementan, activa HTTPS (SEC-HTTPS-016)
+        if (currentSecurity.tlsCertPath && currentSecurity.tlsKeyPath) {
+          currentSecurity.httpsEnabled = true;
         }
 
         config.security = currentSecurity;
@@ -425,11 +448,22 @@ router.post('/security/certificates',
 
         req.app.locals.runtimeSecurityConfig = extractSecurityConfig(config);
 
+        // Emitir recarga estricta por SNI en runtime
+        if (req.app.locals.applyRuntimeSecurityConfig) {
+          req.app.locals.applyRuntimeSecurityConfig();
+        }
+
+        // Limpieza de certificados viejos si todo salió bien (SEC-HTTPS-014)
+        if (certFile && oldCerts.cert) await removeStoredTlsFileSilently(oldCerts.cert);
+        if (keyFile && oldCerts.key) await removeStoredTlsFileSilently(oldCerts.key);
+        if (caFile && oldCerts.ca) await removeStoredTlsFileSilently(oldCerts.ca);
+
         return res.json({
-          message: 'Certificados TLS actualizados',
+          message: 'Certificados TLS actualizados y aplicados.',
           security: {
             ...extractSecurityConfig(config),
-            ...getTlsFileInfo(config.security)
+            ...getTlsFileInfo(config.security),
+            httpsReady: req.app.locals.httpsReady || false
           }
         });
       } catch (error) {
@@ -468,6 +502,11 @@ router.delete('/security/certificates',
       await config.save();
 
       req.app.locals.runtimeSecurityConfig = extractSecurityConfig(config);
+
+      // Emitir recarga estricta por SNI en runtime para desactivar HTTPS y liberar memoria
+      if (req.app.locals.applyRuntimeSecurityConfig) {
+        req.app.locals.applyRuntimeSecurityConfig();
+      }
 
       return res.json({
         message: 'Configuración HTTPS/TLS restablecida a valores por defecto',

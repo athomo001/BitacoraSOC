@@ -27,7 +27,7 @@
           <form (ngSubmit)="onSubmit()" #checkForm="ngForm">
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Tipo de Check</mat-label>
-              <mat-select [(ngModel)]="checkType" name="checkType" required>
+              <mat-select [(ngModel)]="checkType" name="checkType" required (selectionChange)="onCheckTypeChange()">
                 <mat-option value="inicio">
                   <mat-icon>wb_sunny</mat-icon>
                   Inicio de Turno

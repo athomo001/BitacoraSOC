@@ -39,6 +39,8 @@ backups/
 docker-compose.override.yml
 .dockerignore
 backups/
+.data/
+*/.data/
 
 # Angular
 .angular/
@@ -59,3 +61,6 @@ eventos-*.json
 docs/images/screenshots/*.png
 docs/images/screenshots/*.jpg
 !docs/images/screenshots/README.md
+
+# Seed data (backups de ejemplo grandes, no subir al repo)
+backend/scripts/seed/*.json

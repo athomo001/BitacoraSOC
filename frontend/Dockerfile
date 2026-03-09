@@ -1,5 +1,5 @@
 # Stage 1: Build Angular app
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
@@ -17,6 +17,9 @@ RUN npm run build -- --configuration production
 
 # Stage 2: Servir con Nginx
 FROM nginx:alpine
+
+# Instalar OpenSSL para poder auto-generar certificados dummy en el arranque
+RUN apk add --no-cache openssl
 
 # Copiar configuración de Nginx
 COPY nginx.conf /etc/nginx/nginx.conf

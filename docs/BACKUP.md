@@ -4,7 +4,7 @@ Procedimientos de respaldo, restauracion e importacion/exportacion.
 
 ---
 
-## ✅ Respaldo JSON (backup completo)
+## ✅ Respaldo Multicolección (ZIP)
 
 ### Crear backup
 
@@ -13,10 +13,11 @@ Procedimientos de respaldo, restauracion e importacion/exportacion.
 **Respuesta:**
 ```json
 {
-  "message": "Backup creado exitosamente",
-  "filename": "backup-2026-02-08T18-22-10-123Z.json",
-  "collections": 23,
-  "documents": 4120
+  "message": "Backup completo creado exitosamente",
+  "filename": "backup-2026-03-06T18-54-19-392Z.zip",
+  "collections": 24,
+  "documents": 10,
+  "sizeBytes": 3489
 }
 ```
 
@@ -45,14 +46,14 @@ Procedimientos de respaldo, restauracion e importacion/exportacion.
 **Body:**
 ```json
 {
-  "filename": "backup-2026-02-08T18-22-10-123Z.json",
+  "filename": "backup-2026-03-06T18-54-19-392Z.zip",
   "clearBeforeRestore": true
 }
 ```
 
 **Notas:**
 - `clearBeforeRestore=true` borra todas las colecciones antes de restaurar.
-- El restore valida estructura del JSON antes de aplicar.
+- El restore descomprime el archivo `.zip` en memoria y valida la estructura de cada `.json` internamente antes de aplicar.
 
 ### Eliminar backup
 
@@ -92,10 +93,9 @@ curl -X GET http://localhost:3000/api/backup/export/entries \
 
 ## 🗂️ Ubicacion de archivos
 
-Los backups JSON se guardan en:
-```
-backend/backups/
-```
+Los backups comprimidos `.zip` se guardan en:
+- **Local:** `backend/backups/`
+- **Docker:** Volumen mapeado a `./.data/backups/` en el host, montado en `/app/backups/` dentro del contenedor.
 
 ---
 

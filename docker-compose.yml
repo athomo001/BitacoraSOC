@@ -16,11 +16,7 @@ services:
       test:
         - CMD-SHELL
         - >
-          mongosh --host localhost --port 27017
-          --username "$${MONGO_INITDB_ROOT_USERNAME}"
-          --password "$${MONGO_INITDB_ROOT_PASSWORD}"
-          --authenticationDatabase admin
-          --quiet --eval "db.runCommand({ ping: 1 }).ok" | grep 1
+          mongosh --host localhost --port 27017 --username "$${MONGO_INITDB_ROOT_USERNAME}" --password "$${MONGO_INITDB_ROOT_PASSWORD}" --authenticationDatabase admin --quiet --eval "db.runCommand({ ping: 1 }).ok" | grep 1
       interval: 10s
       timeout: 5s
       retries: 5
@@ -67,6 +63,7 @@ services:
       - ./.data/uploads:/app/uploads
       - ./.data/logs:/app/logs
       - ./.data/backups:/app/backups
+      - ./.data/tls:/app/secrets
     networks:
       - bitacora-network
 
@@ -82,10 +79,18 @@ services:
       - backend
     ports:
       - "${FRONTEND_PORT:-80}:80"
+      - "${FRONTEND_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./.data/tls:/etc/nginx/certs
     networks:
       - bitacora-network
+    command: >
+      sh -c ' if [ ! -f /etc/nginx/certs/cert.pem ]; then
+        echo "Generando certificados autofirmados dummy para arranque inicial de Nginx...";
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/nginx/certs/key.pem -out /etc/nginx/certs/cert.pem -subj "/CN=localhost";
+      fi; nginx -g "daemon off;" '
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/health"]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "--no-check-certificate", "https://127.0.0.1/health" ]
       interval: 30s
       timeout: 3s
       retries: 3

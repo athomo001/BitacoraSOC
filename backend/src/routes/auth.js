@@ -67,12 +67,21 @@ const resolveCookieSecure = (req) => {
   return process.env.NODE_ENV === 'production';
 };
 
-const getAuthCookieOptions = (req) => ({
-  httpOnly: true,
-  secure: resolveCookieSecure(req),
-  sameSite: 'strict',
-  path: '/'
-});
+const getAuthCookieOptions = (req) => {
+  const isDev = process.env.NODE_ENV !== 'production';
+  const isLocalhost = req.hostname === 'localhost' || req.hostname === '127.0.0.1' || req.hostname === '::1';
+
+  // En desarrollo local (localhost), Chrome corta las cookies (401) si hay redirección cruzada HTTP -> HTTPS por SameSite=strict.
+  // Permitiendo SameSite=None (con Secure=true) arregla el traspaso de credenciales por redirección 308/307 en caché local.
+  const bypassSameSite = isDev && isLocalhost;
+
+  return {
+    httpOnly: true,
+    secure: bypassSameSite ? true : resolveCookieSecure(req),
+    sameSite: bypassSameSite ? 'none' : 'strict',
+    path: '/'
+  };
+};
 
 const normalizeValue = (value) => String(value || '').trim().toLowerCase();
 
