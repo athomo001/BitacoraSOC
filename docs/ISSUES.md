@@ -10,6 +10,7 @@
 | INFRA-MONGO-001 | Pendiente | Infraestructura / Datos CRÍTICA | Upgrade MongoDB (7 → 8) | El motor base de `mongo:7` en el docker-compose termina su soporte LTS oficial en Agosto de 2026. Se debe planificar un salto a `mongo:8`. Dado que los archivos de base de datos `.wt` no siempre son retrocompatibles entre versiones mayores, el protocolo a documentar e investigar requerirá: 1) `mongodump` completo; 2) Borrar el contenedor y limpiar el volumen físico `.data/mongodb_data`; 3) Levantar el nuevo `mongo:8` vacío; 4) Inyectar los datos de vuelta con `mongorestore`. |
 | B19 | Pendiente | Integraciones | Creación de tickets en GLPI (Correo / API) | Definir flujo final (resumen diario vs evento inmediato), destino y estrategia de reintentos. |
 | AI-SUMMARY-001 | Pendiente | IA/Operación ALTA | Módulo de Resumen Ejecutivo Efímero (IA On-Demand) | Integrar Ollama+llama3.2:3b en modo efímero `docker start -> healthcheck -> generate -> docker stop` con `try/finally`, salida editable en campo "Resumen Sugerido por IA" y botón "Generar con IA". |
+| B34 | Pendiente | Operación/Alertas | Alerta por ítems NOK (Rojo) en Checklist | Añadir switch en config global para activar/desactivar alerta por ítems en rojo. Agregar selector de cargo (ej. N2) a notificar. Al guardar el checklist, si el analista marca ítems NOK (rojo), enviar email automático a todos los usuarios del cargo seleccionado incluyendo el detalle/observación ingresada por el analista. |
 
 ### ✅ Listas
 
@@ -60,7 +61,7 @@
 
 ---
 
-## Información de Pendientes (solo pendientes)
+## Información de como solucionar los Pendientes 
 
 ### B19 - GLPI (Correo/API)
 
@@ -68,232 +69,6 @@
 2. Cerrar contrato técnico de integración (`apirest.php`, tokens, sesión, payload y reintentos).
 3. Agregar trazabilidad de entrega/fracaso por cada intento de ticket.
 
-### B28 - HTTPS simplificado
-
-1. Mantener flujo mínimo: cargar cert+key, habilitar HTTPS, opcional forzar HTTPS.
-2. Evitar estados confusos y falsos positivos en UI.
-3. Alinear comportamiento en local, docker y proxy.
-
-### 🔐 INVESTIGACIÓN TLS EN DOCKER (Resultados y Arquitectura)
-Tras un análisis profundo del módulo SSL/TLS frente a su comportamiento real en Docker (`server.js` y `config.js`), se han detectado **3 problemas estructurales y arquitectónicos críticos** que impiden su correcto funcionamiento y seguridad:
-
-1. **Riesgo Crítico de Fuga (`SEC-HTTPS-001`)**: Actualmente los certificados (.pem/.key) subidos desde el Admin se guardan en la carpeta web `/uploads/tls`, la cual es servida *públicamente* por el backend. Esto permite extraer la llave privada del SOC con un simple GET. **Solución:** Mapear un nuevo volumen privado en Docker (`./.data/tls:/app/secrets`) e independizarlo totalmente del router de archivos estáticos.
-2. **Caídas (Crash) del Contenedor (`SEC-HTTPS-012`, `SEC-HTTPS-013`)**: El backend actual asume que un archivo de texto con la palabra "BEGIN PRIVATE KEY" es mágicamente válido. Al inyectar llaves encriptadas (con passphrase) o certificados que matemáticamente no conectan, Node.js suelta un `Unhandled Exception` al intentar construir el `tls.createSecureContext()`, reiniciando violentamente el contenedor. **Solución:** Implementar cripto-validación *antes* de persistir la configuración en DB.
-3. **El Problema del Re-Binding "En Caliente" (`SEC-HTTPS-002`, `SEC-HTTPS-019`)**: Express/Node no maneja bien hacer `server.close()` y volver a hacer `server.listen()` al vuelo. Choca con los sockets abiertos o el Time-Wait TCP de Linux. **Solución Magistral:** Aprovechar el Server Name Indication (`SNICallback`). El servidor HTTPS escuchará el puerto desde que arranca (aunque sin llave), y al recibir la subida de un PEM, cambiamos dinámicamente el "Contexto TLS en Memoria" en menos de 1 milisegundo, inyectando los certificados nuevos en vivo sin tumbar la red entera.
-
-A continuación, el detalle táctico exhaustivo de cada issue levantado para reparar este módulo.
-
----
-
-### SEC-HTTPS-001 - Exposición de llaves TLS
-
-1. Mover TLS a almacenamiento privado (fuera de `/uploads` a `/app/secrets`).
-2. Bloquear cualquier acceso HTTP directo a archivos TLS.
-3. Rotar certificados/llaves tras aplicar fix.
-
-### SEC-HTTPS-002 - Aplicación runtime HTTPS (SNI Callback)
-
-1. Implementar `SNICallback` en `https.createServer` para inyectar contexto TLS dinámico.
-2. Evitar apagar el puerto (`server.close()`), usando en su lugar hot-reloading de `tls.createSecureContext`.
-3. Publicar endpoint de estado real (`httpsReady`, `port`, `lastError`).
-
-### SEC-HTTPS-003 - Frontend sin puertos rígidos
-
-1. Usar `/api` relativo por defecto.
-2. Permitir `apiBaseUrl` por `window.__APP_CONFIG__` o build-time env.
-3. Documentar despliegue recomendado detrás de reverse proxy.
-
-### SEC-HTTPS-004 - Retry 426 y CORS
-
-1. Quitar header custom de retry y usar `HttpContextToken`.
-2. Si se mantiene header, permitirlo explícitamente en `allowedHeaders`.
-3. Cubrir con pruebas de flujos `forceHttps=true` en métodos no GET.
-
-### SEC-HTTPS-005 - CORS estricto en producción
-
-1. Aplicar allowlist exacta de orígenes configurados.
-2. Eliminar inferencias automáticas por host/protocolo/puertos en producción.
-3. Mantener modo flexible solo en desarrollo.
-
-### SEC-HTTPS-006 - Redirección `forceHttps` segura en proxy
-
-1. Construir destino con `X-Forwarded-Host`/`X-Forwarded-Proto` en proxy confiable.
-2. Soportar `PUBLIC_HTTPS_PORT` para topologías no estándar.
-3. Validar host de destino contra lista permitida.
-
-### SEC-HTTPS-007 - Hardening TLS/cookies
-
-1. Asegurar `COOKIE_SECURE=true` en producción.
-2. Endurecer nombre/parámetros de cookie de sesión.
-3. Configurar `minVersion` TLS y validar handshake/headers.
-
-### SEC-HTTPS-008 - Puerto HTTPS vs Docker
-
-1. Definir modo oficial: puerto fijo contenedor o realmente configurable.
-2. Bloquear en UI cambios incompatibles con despliegue Docker fijo.
-3. Mostrar advertencia operativa cuando puerto elegido no sea publicable.
-
-### SEC-HTTPS-009 - Evitar falso positivo al guardar HTTPS
-
-1. Tras guardar, aplicar config y validar bind real del listener.
-2. Si falla, devolver error al frontend con causa útil.
-3. En frontend, confirmar estado real antes de mostrar éxito.
-
-### SEC-HTTPS-010 - UX progresiva en configuración HTTPS
-
-1. Paso 1: activar HTTPS y subir cert+key.
-2. Paso 2: configurar puerto y aplicar.
-3. Paso 3: habilitar `forceHttps` solo cuando `httpsReady=true`.
-
-### SEC-HTTPS-011 - Fuente única de verdad HTTPS
-
-1. Definir matriz por entorno (`local`, `docker`, `prod/proxy`).
-2. Eliminar hardcodes restantes de puertos en frontend.
-3. Añadir validación de drift DB/env al iniciar backend.
-
-### SEC-HTTPS-012 - Validación TLS real (cert/key)
-
-1. Reemplazar validación por texto (`BEGIN ...`) con validación criptográfica real.
-2. Al subir o guardar, construir contexto TLS con cert+key y fallar si no son par válido.
-3. Reportar error claro al usuario con causa precisa.
-
-Reparación propuesta:
-
-```js
-const tls = require('tls');
-const validateTlsPair = ({ certPem, keyPem, caPem }) => {
-  try {
-    tls.createSecureContext({ cert: certPem, key: keyPem, ca: caPem || undefined });
-    return null;
-  } catch (err) {
-    return err.message;
-  }
-};
-```
-
-### SEC-HTTPS-013 - Llaves cifradas (`ENCRYPTED PRIVATE KEY`)
-
-1. Hoy se aceptan en validación pero runtime no envía `passphrase`, por lo que puede fallar con error tipo `cannot`.
-2. Definir una política: rechazar llaves cifradas (más simple) o agregar campo passphrase cifrado.
-3. Si se rechazan, devolver guía concreta para convertir la llave a formato soportado.
-
-Reparación propuesta (modo simple/estable):
-
-```js
-if (pem.includes('-----BEGIN ENCRYPTED PRIVATE KEY-----')) {
-  throw new Error('Llave privada cifrada no soportada. Sube una llave PEM sin passphrase.');
-}
-```
-
-### SEC-HTTPS-014 - Limpieza de certificados antiguos
-
-1. Al subir nuevo cert/key/ca, capturar rutas previas.
-2. Guardar nueva configuración.
-3. Si guarda OK, borrar archivos antiguos reemplazados.
-4. Si falla guardado, borrar solo archivos recién subidos.
-
-### SEC-HTTPS-015 - Consistencia de formato TLS
-
-1. Actualmente se permite `.cer` pero la validación exige contenido PEM.
-2. Elegir una sola regla: soportar PEM únicamente (`.pem/.crt/.key`) o convertir DER→PEM.
-3. Ajustar mensajes de UI/backend para evitar confusión operativa.
-
-### SEC-HTTPS-016 - Habilitación automática con cert+key
-
-1. En upload exitoso de cert+key, marcar `httpsEnabled=true` automáticamente.
-2. Aplicar runtime inmediatamente (sin paso manual adicional).
-3. Responder con estado real del listener (`httpsReady`, `port`, `lastError`).
-
-### SEC-HTTPS-017 - Validación temprana en UI (archivos)
-
-1. Agregar `accept` a inputs: `.pem,.crt,.key,.cer`.
-2. Validar tamaño y extensión en frontend antes de subir.
-3. Mostrar errores por campo (cert/key/ca) con mensaje específico.
-
-Reparación propuesta:
-
-```html
-<input type="file" accept=".pem,.crt,.key,.cer" />
-```
-
-### SEC-HTTPS-018 - Hardening de acción “reset HTTPS/TLS”
-
-1. Mover botón de reset a bloque avanzado colapsable.
-2. Reemplazar `window.confirm` por diálogo con confirmación de frase.
-3. Auditar explícitamente la operación de reset (actor, timestamp, motivo).
-
-### SEC-HTTPS-019 - Pre-check de puerto antes de persistir
-
-1. Antes de confirmar `PUT /api/config`, validar que el puerto HTTPS objetivo es usable.
-2. En Docker/proxy, validar también que el puerto sea publicable/compatible con el modo.
-3. Si falla pre-check, no persistir y devolver error accionable.
-
-Reparación propuesta:
-
-```js
-const net = require('net');
-const isPortFree = (port, host = '0.0.0.0') => new Promise((resolve) => {
-  const srv = net.createServer();
-  srv.once('error', () => resolve(false));
-  srv.once('listening', () => srv.close(() => resolve(true)));
-  srv.listen(port, host);
-});
-```
-
-### OPS-ASSIGN-002 - API de asignaciones operativas
-
-1. Backend de turnos no tiene endpoints `/work-shifts/assignments`.
-2. Crear CRUD admin para asignaciones:
-   - `GET /api/work-shifts/assignments`
-   - `POST /api/work-shifts/assignments`
-   - `PUT /api/work-shifts/assignments/:id`
-   - `DELETE /api/work-shifts/assignments/:id`
-3. Responder datos populados (`user`, `shift`) para render inmediato.
-
-### OPS-ASSIGN-003 - Modelo de datos insuficiente para recurrencia
-
-1. `WorkShift` solo soporta `assignedUserId` único y opcional.
-2. Agregar modelo `WorkShiftAssignment`:
-   - `userId`
-   - `workShiftId`
-   - `weekdays` (0-6)
-   - `active`
-   - `validFrom`/`validTo` (opcionales)
-3. Mantener herencia de horario desde el turno vinculado.
-
-### OPS-ASSIGN-005 - Refresco en vivo con Observable
-
-1. Reemplazar patrones `setInterval` por `interval(60000).pipe(startWith(0))`.
-2. Usar `takeUntil(this.destroy$)` para evitar fugas al destruir componente.
-3. Recalcular estado operativo local cada minuto sin recarga de página.
-
-### OPS-ASSIGN-006 - Pipe/utilidad de horario
-
-1. Crear `shift-time` pipe o utility compartida:
-   - `toMinutes('HH:mm')`
-   - `isOvernight(start,end)`
-   - `isActiveNow(start,end,now)`
-2. Reutilizarla en tabla, validaciones y estado operativo.
-
-### OPS-ASSIGN-007 - Validación anti-solapamiento
-
-1. Impedir que un mismo usuario quede asignado a dos turnos activos solapados en mismo día.
-2. Validar colisión en backend antes de `POST/PUT`.
-3. Devolver `409 Conflict` con detalle de asignación que choca.
-
-### OPS-ASSIGN-008 - Timezone operativa consistente
-
-1. `GET /work-shifts/current` usa hora local del servidor.
-2. Debe calcularse en la timezone del turno o en una timezone operativa global definida.
-3. Estandarizar con `Intl`/`luxon` para evitar drift entre servidor y operación SOC.
-
-### OPS-ASSIGN-009 - Pruebas mínimas obligatorias
-
-1. Caso diurno: 09:00-18:00.
-2. Caso nocturno: 20:00-06:00 a las 02:00.
-3. Cambio de día: 23:59 a 00:01.
-4. Rechazo de solapamiento.
-5. Refresco por minuto sin recarga.
 
 ### AI-SUMMARY-001 - Resumen Ejecutivo Efímero (IA On-Demand)
 
@@ -316,21 +91,28 @@ const isPortFree = (port, host = '0.0.0.0') => new Promise((resolve) => {
    - volumen persistente `-v ollama_data:/root/.ollama`
    - contenedor apagado fuera de uso (superficie mínima y ahorro de RAM).
 
+### INFRA-MONGO-001 - Upgrade MongoDB (7 → 8)
+
+1. **Respaldar Datos:** Crear un script bash temporal que entre al contenedor `mongo:7` actual y ejecute `mongodump` completo hacia `/data/db/dump`. Mover este dump al host.
+2. **Destrucción Segura:** Bajar el stack completo (`docker-compose down`). Renombrar o hacer backup físico de la carpeta host `./.data/mongodb_data` por precaución.
+3. **Actualización de Imágen:** Modificar `docker-compose.yml` apuntando el tag a `mongo:8`.
+4. **Levantamiento y Restauración:** Arrancar el nuevo servicio `mongo:8`. Las bases estarán limpias porque se generará un nuevo volumen o carpeta de datos. Entrar al contenedor y ejecutar `mongorestore` apuntando al dump generado en el paso 1. Validar integridad visual de la Bitácora.
+5. **Documentación:** Registrar la ventana de mantenimiento y las versiones finales en `README.md` o documentación operativa.
+
+### B34 - Alerta por ítems NOK (Rojo) en Checklist
+
+1. **Modelo y Base de Datos:**
+   - En `AppConfig` (o `ChecklistTemplate` dependiendo de la granularidad requerida), agregar propiedades: `alertNokEnabled: Boolean`, `alertNokRoleTarget: [String]` (array referenciando los roles, ej: `['N2', 'N3']`).
+2. **Lógica de Backend (Guardado de Checklist):**
+   - Interceptar la ruta `POST/PUT` o el servicio de cierre/guardado del `Checklist`.
+   - Después de validar, iterar el array de ítems buscando `status === 'NOK'`.
+   - Si existen y la config local `alertNokEnabled` está en true, extraer la lista de `alertNokRoleTarget`.
+3. **Motor de Envíos y Usuarios:**
+   - Hacer un query de la colección `Users` buscando a las personas que tengan esos cargos activos (`Usuarios.find({ cargo: { $in: alertNokRoleTarget } })`).
+   - Construir el cuerpo HTML del correo donde se Listen iterativamente los ítems fallidos incluyendo las propiedades (Texto del check y el "Detalle u Observación" llenado por el analista).
+4. **Experiencia de Usuario (Frontend):**
+   - En `Global Configuration` o en Configuración de Checklists, agregar el toggle switch "Habilitar alertas NOK".
+   - Al lado, un Mat-Select con selección múltiple (checkboxes) que cargue el diccionario de cargos permitidos.
+   - Guardar estas variables de vuelta al modelo usando el servicio existente de `ConfigService`.
+
 ---
-
-## Orden sugerido de ejecución
-
-1. `SEC-HTTPS-001` (contención y rotación de llaves).
-2. `SEC-HTTPS-008` + `SEC-HTTPS-009` (evitar caídas y falsos positivos).
-3. `SEC-HTTPS-012` + `SEC-HTTPS-013` + `SEC-HTTPS-015` (validez real de certificados y errores tipo `cannot`).
-4. `SEC-HTTPS-016` + `SEC-HTTPS-002` + `SEC-HTTPS-010` + `SEC-HTTPS-017` (flujo simple de habilitación por UI).
-5. `SEC-HTTPS-014` + `SEC-HTTPS-018` + `SEC-HTTPS-019` (operación segura y robusta).
-6. `SEC-HTTPS-003` + `SEC-HTTPS-005` + `SEC-HTTPS-006` + `SEC-HTTPS-011` + `SEC-HTTPS-004` + `SEC-HTTPS-007` (cierre arquitectura/red/hardening).
-
-## Orden sugerido de ejecución (Asignación Operativa)
-
-1. `OPS-ASSIGN-001` + `OPS-ASSIGN-002` + `OPS-ASSIGN-003` (habilitar base funcional: usuarios + API + modelo).
-2. `B29` + `OPS-ASSIGN-006` (construir UI de vinculación y tabla heredando horario).
-3. `OPS-ASSIGN-004` + `OPS-ASSIGN-008` (estado operativo correcto con overnight y timezone).
-4. `OPS-ASSIGN-010` + `OPS-ASSIGN-005` (consolidado UI correcto + refresco por minuto robusto).
-5. `OPS-ASSIGN-007` + `OPS-ASSIGN-009` (consistencia de negocio y pruebas operativas).
