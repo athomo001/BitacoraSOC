@@ -31,14 +31,14 @@ const uploadLogo = multer({
   storage: logoStorage,
   limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|svg\+xml/;
+    const allowedTypes = /jpeg|jpg|png|webp|svg\+xml/;
     const mimeType = allowedTypes.test(file.mimetype);
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
 
     if (mimeType && extname) {
       return cb(null, true);
     }
-    cb(new Error('Solo se permiten imágenes (jpg, png, svg)'));
+    cb(new Error('Solo se permiten imágenes (jpg, png, webp, svg)'));
   }
 });
 
