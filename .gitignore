@@ -42,6 +42,9 @@ backups/
 .data/
 */.data/
 
+# SSL/TLS
+ssl-cdc-server/
+
 # Angular
 .angular/
 frontend/.angular/
