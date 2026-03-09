@@ -95,9 +95,17 @@ const tlsStorage = multer.diskStorage({
     }
   },
   filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase() || '.pem';
-    const baseName = path.basename(file.originalname, path.extname(file.originalname)).replace(/[^a-zA-Z0-9-_]/g, '');
-    cb(null, `${baseName || 'tls'}-${Date.now()}${ext}`);
+    if (file.fieldname === 'tlsCert') {
+      cb(null, 'cert.pem');
+    } else if (file.fieldname === 'tlsKey') {
+      cb(null, 'key.pem');
+    } else if (file.fieldname === 'tlsCa') {
+      cb(null, 'ca.pem');
+    } else {
+      const ext = path.extname(file.originalname).toLowerCase() || '.pem';
+      const baseName = path.basename(file.originalname, path.extname(file.originalname)).replace(/[^a-zA-Z0-9-_]/g, '');
+      cb(null, `${baseName || 'tls'}-${Date.now()}${ext}`);
+    }
   }
 });
 
@@ -453,10 +461,10 @@ router.post('/security/certificates',
           req.app.locals.applyRuntimeSecurityConfig();
         }
 
-        // Limpieza de certificados viejos si todo salió bien (SEC-HTTPS-014)
-        if (certFile && oldCerts.cert) await removeStoredTlsFileSilently(oldCerts.cert);
-        if (keyFile && oldCerts.key) await removeStoredTlsFileSilently(oldCerts.key);
-        if (caFile && oldCerts.ca) await removeStoredTlsFileSilently(oldCerts.ca);
+        // Limpieza de certificados viejos si todo salió bien y si no se llaman igual (SEC-HTTPS-014)
+        if (certFile && oldCerts.cert && oldCerts.cert !== currentSecurity.tlsCertPath) await removeStoredTlsFileSilently(oldCerts.cert);
+        if (keyFile && oldCerts.key && oldCerts.key !== currentSecurity.tlsKeyPath) await removeStoredTlsFileSilently(oldCerts.key);
+        if (caFile && oldCerts.ca && oldCerts.ca !== currentSecurity.tlsCaPath) await removeStoredTlsFileSilently(oldCerts.ca);
 
         return res.json({
           message: 'Certificados TLS actualizados y aplicados.',
