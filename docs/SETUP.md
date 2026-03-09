@@ -10,6 +10,7 @@ Guía detallada para instalar y configurar el sistema desde cero.
 ## Requisitos
 
 - **Node.js** 24+ LTS y npm
+- **Express** 5.1+
 - **MongoDB** 7+ (local o remoto)
 - **mongodump/mongorestore** (para backups)
 - **Angular CLI** 20+ `npm install -g @angular/cli`

@@ -16,7 +16,7 @@ Sistema completo de registro y gestión de actividades para Security Operations 
 
 **Versiones exactas instaladas (`package-lock.json`)**
 - Angular (`@angular/core`): `20.3.17`
-- Express: `4.22.1`
+- Express: `5.1.0`
 - Mongo (Mongoose): `8.22.0`
 
 > Aviso: Los valores de ejemplo son placeholders. Reemplazarlos por credenciales reales desde `.env` antes de usar en producción.
@@ -260,7 +260,9 @@ docker-compose down -v
 
 Para detalles técnicos completos, consulta:
 
+- **[DEPLOY.md](docs/DEPLOY.md)**: Despliegue, HTTPS, entorno local y backups (sysadmin)
 - **[SETUP.md](docs/SETUP.md)**: Instalación y configuración avanzada
+- **[RUNBOOK.md](docs/RUNBOOK.md)**: Operación diaria para analistas
 - **[API.md](docs/API.md)**: Referencia completa de endpoints
 - **[ARCHITECTURE.md](docs/ARCHITECTURE.md)**: Mapas conceptuales y flujos
 - **[CHANGELOG.md](docs/CHANGELOG.md)**: Registro cronológico de cambios
@@ -270,6 +272,7 @@ Para detalles técnicos completos, consulta:
 - **[CATALOGS.md](docs/CATALOGS.md)**: Sistema de catálogos y autocompletado
 - **[ESCALATION.md](docs/ESCALATION.md)**: Módulo de escalaciones
 - **[SCREENSHOTS.md](docs/SCREENSHOTS.md)**: Capturas de pantalla del sistema
+- **[ISSUES.md](docs/ISSUES.md)**: Backlog, bugs y roadmap
 - **[backend/scripts/README.md](backend/scripts/README.md)**: Importación masiva de datos
 
 ## Plantillas de correo (dónde están y cómo modificarlas)
@@ -347,7 +350,7 @@ Ver más capturas en **[docs/SCREENSHOTS.md](docs/SCREENSHOTS.md)**:
 
 ## Issues y roadmap
 
-El estado actual de bugs conocidos y tareas pendientes se mantiene en **[ISSUES.md](ISSUES.md)**.
+El estado actual de bugs conocidos y tareas pendientes se mantiene en **[ISSUES.md](docs/ISSUES.md)**.
 
 ## Licencia
 

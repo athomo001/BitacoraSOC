@@ -2,7 +2,7 @@
  * 🛡️ BITÁCORA SOC - Backend Express
  * 
  * Arquitectura:
- *   - Express 4.18 + MongoDB + Mongoose
+ *   - Express 5.1 + MongoDB + Mongoose
  *   - JWT authentication con RBAC (admin/user/guest)
  *   - Rate limiting diferenciado
  *   - CORS por IP (no wildcard '*')
@@ -398,7 +398,7 @@ if (fs.existsSync(clientDistPath) && fs.existsSync(clientIndexPath)) {
   app.use(express.static(clientDistPath));
 
   // SPA Fallback - DEBE estar al final, después de todas las rutas API
-  app.get('*', (req, res) => {
+  app.get('(.*)', (req, res) => {
     // No servir index.html para rutas de API
     if (req.path.startsWith('/api/') || req.path.startsWith('/api-docs') || req.path.startsWith('/uploads/')) {
       return res.status(404).json({ message: 'API endpoint not found' });
