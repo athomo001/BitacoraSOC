@@ -27,6 +27,7 @@ export interface AppConfig {
   emailReportConfig?: EmailReportConfig;
   smtpConfig?: SmtpConfig;
   easterEggRules?: EasterEggRule[];
+  loginTheme?: 'crt' | 'infoflow';
   lastUpdatedBy?: string;
   createdAt?: Date;
   updatedAt?: Date;
@@ -107,5 +108,6 @@ export interface UpdateConfigRequest {
   emailReportConfig?: EmailReportConfig;
   smtpConfig?: SmtpConfig;
   easterEggRules?: EasterEggRule[];
+  loginTheme?: 'crt' | 'infoflow';
 }
 

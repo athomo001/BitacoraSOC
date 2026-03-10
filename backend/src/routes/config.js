@@ -272,6 +272,7 @@ router.put('/',
     body('escalationReminderCargoLabels.*').optional().isString().trim().isLength({ min: 1, max: 80 }).withMessage('Cargo inválido'),
     body('escalationReminderDaysAhead').optional().isInt({ min: 1, max: 60 }).toInt().withMessage('Días de antelación inválidos (1-60)'),
     body('appTitle').optional().isString().trim().isLength({ max: 80 }).withMessage('El título no puede superar 80 caracteres'),
+    body('loginTheme').optional().isIn(['crt', 'infoflow']).withMessage('Tema inválido'),
     body('security.httpsEnabled').optional().isBoolean(),
     body('security.forceHttps').optional().isBoolean(),
     body('security.httpsPort').optional({ nullable: true }).custom((value) => {
@@ -534,12 +535,12 @@ router.get('/logo', async (req, res) => {
   try {
     const config = await AppConfig.findOne();
 
-    if (!config || !config.logoUrl) {
-      return res.json({ logoUrl: '' });
+    if (!config) {
+      return res.json({ logoUrl: '', loginTheme: 'crt', appTitle: '' });
     }
 
     // Devolver ruta relativa - el navegador la resolverá automáticamente
-    res.json({ logoUrl: config.logoUrl });
+    res.json({ logoUrl: config.logoUrl || '', loginTheme: config.loginTheme || 'crt', appTitle: config.appTitle || '' });
   } catch (error) {
     console.error('Error al obtener logo:', error);
     res.status(500).json({ message: 'Error al obtener logo' });

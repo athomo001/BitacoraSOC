@@ -1,0 +1,48 @@
+<mat-card>
+  <mat-card-header>
+    <mat-card-title>Apariencia — Tema de Login</mat-card-title>
+  </mat-card-header>
+  <mat-card-content>
+
+    <p class="description">
+      Selecciona el estilo visual que se mostrará en la pantalla de inicio de sesión.
+      El cambio se aplica de inmediato, sin reiniciar el servidor.
+    </p>
+
+    <mat-radio-group [(ngModel)]="loginTheme" class="theme-radio-group">
+      <div class="theme-option" [class.selected]="loginTheme === 'crt'">
+        <mat-radio-button value="crt">
+          <span class="theme-name">🖥 CRT Retro</span>
+        </mat-radio-button>
+        <p class="theme-desc">
+          Estilo terminal retro con grid de fondo, scanlines, texto monoespaciado con glow verde.
+          El diseño original del sistema.
+        </p>
+      </div>
+
+      <div class="theme-option" [class.selected]="loginTheme === 'infoflow'">
+        <mat-radio-button value="infoflow">
+          <span class="theme-name">💻 Matrix / Infoflow</span>
+        </mat-radio-button>
+        <p class="theme-desc">
+          Estilo cyberpunk con lluvia tipo Matrix animada, card glassmorphism con borde neon,
+          título con efecto glitch, botones con flecha animada y modal de recuperación
+          con reloj digital en tiempo real.
+        </p>
+      </div>
+    </mat-radio-group>
+
+    <div class="actions">
+      <button
+        mat-raised-button
+        color="primary"
+        (click)="save()"
+        [disabled]="isSaving"
+      >
+        <mat-spinner *ngIf="isSaving" diameter="18" class="inline-spinner"></mat-spinner>
+        {{ isSaving ? 'Guardando...' : 'Guardar tema' }}
+      </button>
+    </div>
+
+  </mat-card-content>
+</mat-card>

@@ -106,6 +106,10 @@ const routes: Routes = [
           {
             path: 'glpi',
             loadComponent: () => import('./glpi/glpi-integration.component').then(m => m.GlpiIntegrationComponent)
+          },
+          {
+            path: 'appearance',
+            loadComponent: () => import('./admin-appearance/admin-appearance.component').then(m => m.AdminAppearanceComponent)
           }
         ]
       },

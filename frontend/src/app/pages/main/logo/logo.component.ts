@@ -42,6 +42,8 @@ export class LogoComponent implements OnInit {
   brandingForm: FormGroup;
   savingBranding = false;
   savingAppTitle = false;
+  loginTheme: 'crt' | 'infoflow' = 'crt';
+  savingLoginTheme = false;
 
   constructor() {
     this.brandingForm = this.fb.group({
@@ -75,6 +77,8 @@ export class LogoComponent implements OnInit {
         this.brandingForm.patchValue({
           appTitle: config.appTitle || ''
         });
+
+        this.loginTheme = config.loginTheme || 'crt';
 
         if (config.defaultLogSourceId) {
           const sourceId = typeof config.defaultLogSourceId === 'object' 
@@ -125,6 +129,20 @@ export class LogoComponent implements OnInit {
       error: (err: any) => {
         this.savingBranding = false;
         this.snackBar.open(err.error?.message || 'Error guardando configuración', 'Cerrar', { duration: 3000 });
+      }
+    });
+  }
+
+  saveLoginTheme(): void {
+    this.savingLoginTheme = true;
+    this.configService.updateConfig({ loginTheme: this.loginTheme }).subscribe({
+      next: () => {
+        this.savingLoginTheme = false;
+        this.snackBar.open('Tema de login actualizado', 'Cerrar', { duration: 3000 });
+      },
+      error: (err: any) => {
+        this.savingLoginTheme = false;
+        this.snackBar.open(err.error?.message || 'Error guardando tema', 'Cerrar', { duration: 3000 });
       }
     });
   }
