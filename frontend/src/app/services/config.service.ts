@@ -49,8 +49,8 @@ export class ConfigService {
     return this.http.post<{ message: string; logoUrl: string }>(`${this.API_URL}/logo`, formData);
   }
 
-  getLogo(): Observable<{ logoUrl: string }> {
-    return this.http.get<{ logoUrl: string }>(`${this.API_URL}/logo`);
+  getLogo(): Observable<{ logoUrl: string; loginTheme?: string; appTitle?: string }> {
+    return this.http.get<{ logoUrl: string; loginTheme?: string; appTitle?: string }>(`${this.API_URL}/logo`);
   }
 
   getFavicon(): Observable<{ faviconUrl: string }> {

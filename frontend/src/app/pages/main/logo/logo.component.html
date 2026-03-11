@@ -151,6 +151,29 @@
       </mat-card-content>
     </mat-card>
 
+    <!-- Tema de Login -->
+    <mat-card class="logo-card">
+      <mat-card-header>
+        <mat-card-title>Tema de Login</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Estilo visual del login</mat-label>
+          <mat-select [(ngModel)]="loginTheme">
+            <mat-option value="crt">🖥 CRT Retro (terminal clásico)</mat-option>
+            <mat-option value="infoflow">💻 Matrix / Infoflow (cyberpunk)</mat-option>
+          </mat-select>
+          <mat-hint>Cambia el estilo de la pantalla de inicio de sesión</mat-hint>
+        </mat-form-field>
+
+        <button mat-raised-button color="primary" type="button" (click)="saveLoginTheme()"
+                [disabled]="savingLoginTheme">
+          <mat-spinner *ngIf="savingLoginTheme" diameter="18"></mat-spinner>
+          <span *ngIf="!savingLoginTheme">Guardar Tema</span>
+        </button>
+      </mat-card-content>
+    </mat-card>
+
     <!-- LogSource por Defecto -->
     <mat-card class="logo-card">
       <mat-card-header>

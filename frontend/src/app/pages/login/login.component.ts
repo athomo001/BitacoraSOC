@@ -1,27 +1,25 @@
 /**
- * Componente de Login - Estilo CRT Retro
- * 
+ * Componente de Login - Dual Theme (CRT Retro + Infoflow Matrix)
+ *
+ * Temas disponibles:
+ *   - 'crt'      → Estilo retro terminal (default)
+ *   - 'infoflow' → Estilo Matrix/cyberpunk con canvas animado
+ *
+ * El tema activo se carga desde GET /api/config/logo (loginTheme).
+ * El admin puede cambiar el tema desde /main/admin/appearance.
+ *
  * Funcionalidad:
  *   - Formulario de autenticación (username + password)
- *   - Validación reactive forms (min 3 chars user, min 6 chars pass)
+ *   - Validación reactive forms (min 3 chars user, min 4 chars pass)
  *   - Vista switcheable entre login y recovery
- *   - Animaciones CRT y glow effects
- *   - Loading state con pulse animation
- * 
- * Flujo:
- *   1. Usuario ingresa credenciales
- *   2. POST /api/auth/login (rate limited 5 intentos/15min)
- *   3. Backend retorna JWT + user
- *   4. AuthService guarda en localStorage
- *   5. Redirect a /main/checklist
- * 
- * Errores manejados:
- *   - Credenciales inválidas (401)
- *   - Usuario inactivo (401)
- *   - Guest expirado (401)
- *   - Rate limit superado (429)
+ *   - Loading state con animación
+ *   - Matrix canvas animation (sólo tema infoflow)
+ *   - Reloj digital en tiempo real para modal recovery
  */
-import { Component, OnInit, ViewEncapsulation } from '@angular/core';
+import {
+  Component, OnInit, OnDestroy, AfterViewInit,
+  ViewEncapsulation, NgZone, ChangeDetectorRef
+} from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
@@ -33,6 +31,7 @@ import { RouterModule } from '@angular/router';
 import { EasterEggSignal } from '../../models/user.model';
 
 type ViewState = 'login' | 'recovery';
+type LoginTheme = 'crt' | 'infoflow';
 
 @Component({
     selector: 'app-login',
@@ -45,7 +44,7 @@ type ViewState = 'login' | 'recovery';
       ReactiveFormsModule
     ]
 })
-export class LoginComponent implements OnInit {
+export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
   loginForm!: FormGroup;
   recoveryForm!: FormGroup;
   loading = false;
@@ -58,7 +57,26 @@ export class LoginComponent implements OnInit {
   showEasterEggOverlay = false;
   easterEggImageUrl = '/scripts/Bender.png';
   private easterEggTimer?: ReturnType<typeof setTimeout>;
-  
+
+  // Tema activo cargado desde config
+  activeTheme: LoginTheme = 'crt';
+
+  // Reloj digital para modal recovery (tema infoflow)
+  currentTime: string = '';
+  private clockInterval?: ReturnType<typeof setInterval>;
+
+  // Matrix canvas
+  private matrixAnimFrame?: number;
+  private matrixCtx?: CanvasRenderingContext2D | null;
+  private matrixDrops: number[] = [];
+
+  // No renderizar hasta que sepamos el tema
+  themeLoaded = false;
+  appTitle = 'BITÁCORA SOC';
+  typingTitle = ''; // Animación de tecleado para el subtítulo Matrix
+  private fullSubtitle = 'SISTEMA DE OPERACIONES > AUTENTICACIÓN SEGURA';
+  private typingTimer?: ReturnType<typeof setTimeout>;
+
   private backendBaseUrl = environment.backendBaseUrl;
   appVersion = environment.appVersion === '__APP_VERSION__' ? 'dev' : environment.appVersion;
 
@@ -67,7 +85,9 @@ export class LoginComponent implements OnInit {
     private authService: AuthService,
     private configService: ConfigService,
     private router: Router,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private ngZone: NgZone,
+    private cdr: ChangeDetectorRef
   ) {}
 
   getAssetUrl(url: string): string {
@@ -84,13 +104,26 @@ export class LoginComponent implements OnInit {
       this.router.navigate(['/']);
     }
 
-    // Cargar logo
+    // Cargar logo y tema de login
     this.configService.getLogo().subscribe({
       next: (response) => {
         this.logoUrl = response.logoUrl;
+        this.activeTheme = response.loginTheme === 'infoflow' ? 'infoflow' : 'crt';
+        this.appTitle = response.appTitle || 'BITÁCORA SOC';
+        console.log('[Login] Tema cargado:', this.activeTheme, '| Título:', this.appTitle);
+        this.themeLoaded = true;
+        this.cdr.detectChanges();
+        if (this.activeTheme === 'infoflow') {
+          this.startClock();
+          this.startTyping();
+          setTimeout(() => this.initMatrixCanvas(), 100);
+        }
       },
       error: () => {
         this.logoUrl = '';
+        this.activeTheme = 'crt';
+        this.themeLoaded = true;
+        this.cdr.detectChanges();
       }
     });
 
@@ -104,17 +137,127 @@ export class LoginComponent implements OnInit {
     });
   }
 
-  onLoginSubmit(): void {
-    if (this.loginForm.invalid) {
-      return;
+  ngAfterViewInit(): void {
+    // Si el tema ya era infoflow al init (raro, pero seguro)
+    if (this.activeTheme === 'infoflow') {
+      setTimeout(() => this.initMatrixCanvas(), 100);
     }
+  }
 
+  ngOnDestroy(): void {
+    this.stopMatrixCanvas();
+    this.stopClock();
+    if (this.typingTimer) clearTimeout(this.typingTimer);
+    if (this.easterEggTimer) clearTimeout(this.easterEggTimer);
+  }
+
+  // ── Reloj digital ──────────────────────────────────────────
+  private startClock(): void {
+    const tick = () => {
+      const now = new Date();
+      const h = now.getHours().toString().padStart(2, '0');
+      const m = now.getMinutes().toString().padStart(2, '0');
+      const s = now.getSeconds().toString().padStart(2, '0');
+      this.currentTime = `${h}:${m}:${s}`;
+    };
+    tick();
+    this.clockInterval = setInterval(tick, 1000);
+  }
+
+  private stopClock(): void {
+    if (this.clockInterval) {
+      clearInterval(this.clockInterval);
+      this.clockInterval = undefined;
+    }
+  }
+
+  // ── Efecto Typing ──────────────────────────────────────────
+  private startTyping(): void {
+    this.typingTitle = '';
+    let i = 0;
+    const type = () => {
+      if (i < this.fullSubtitle.length) {
+        this.typingTitle += this.fullSubtitle.charAt(i);
+        i++;
+        this.typingTimer = setTimeout(type, 50);
+        this.cdr.detectChanges();
+      }
+    };
+    type();
+  }
+
+  // ── Matrix Canvas ──────────────────────────────────────────
+  private initMatrixCanvas(): void {
+    const canvas = document.getElementById('matrix-canvas') as HTMLCanvasElement | null;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    this.matrixCtx = ctx;
+
+    const resize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const cols = Math.floor(canvas.width / 16);
+      this.matrixDrops = Array(cols).fill(1);
+    };
+
+    resize();
+    window.addEventListener('resize', resize);
+
+    const chars = 'アカサタナハマヤラワABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()';
+
+    const draw = () => {
+      if (!this.matrixCtx || !canvas.isConnected) return;
+
+      this.matrixCtx.fillStyle = 'rgba(4, 10, 4, 0.05)';
+      this.matrixCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+      this.matrixCtx.font = '14px "Courier New", monospace';
+
+      for (let i = 0; i < this.matrixDrops.length; i++) {
+        const char = chars[Math.floor(Math.random() * chars.length)];
+        const brightness = Math.random();
+        if (brightness > 0.96) {
+          this.matrixCtx.fillStyle = '#ffffff';
+        } else if (brightness > 0.8) {
+          this.matrixCtx.fillStyle = '#00ff41';
+        } else {
+          this.matrixCtx.fillStyle = '#00aa22';
+        }
+        this.matrixCtx.fillText(char, i * 16, this.matrixDrops[i] * 16);
+
+        if (this.matrixDrops[i] * 16 > canvas.height && Math.random() > 0.975) {
+          this.matrixDrops[i] = 0;
+        }
+        this.matrixDrops[i]++;
+      }
+
+      this.matrixAnimFrame = requestAnimationFrame(draw);
+    };
+
+    // Ejecutar fuera de Angular para no triggear change detection
+    this.ngZone.runOutsideAngular(() => {
+      this.matrixAnimFrame = requestAnimationFrame(draw);
+    });
+  }
+
+  private stopMatrixCanvas(): void {
+    if (this.matrixAnimFrame) {
+      cancelAnimationFrame(this.matrixAnimFrame);
+      this.matrixAnimFrame = undefined;
+    }
+  }
+
+  // ── Formularios ────────────────────────────────────────────
+  onLoginSubmit(): void {
+    if (this.loginForm.invalid) return;
     this.loading = true;
 
     this.authService.login(this.loginForm.value).subscribe({
       next: (response) => {
         this.loading = false;
-        this.showSuccessBanner(`ACCESS GRANTED - WELCOME ${response.user.fullName?.toUpperCase()}`);
+        this.showSuccessBanner(`ACCESO CONCEDIDO - BIENVENIDO ${response.user.fullName?.toUpperCase()}`);
         setTimeout(() => {
           this.router.navigate(['/main/checklist']);
         }, 1500);
@@ -125,33 +268,30 @@ export class LoginComponent implements OnInit {
         const backendMessage = typeof error?.error === 'string'
           ? error.error
           : error?.error?.message;
-        const errorMsg = backendMessage || 'ACCESS DENIED';
+        const errorMsg = backendMessage || 'ACCESO DENEGADO';
         this.showErrorBanner(errorMsg);
       }
     });
   }
 
   onRecoverySubmit(): void {
-    if (this.recoveryForm.invalid) {
-      return;
-    }
-
+    if (this.recoveryForm.invalid) return;
     this.loading = true;
     const email = this.recoveryForm.get('email')?.value;
 
     this.authService.forgotPassword(email).subscribe({
-      next: (response) => {
+      next: () => {
         this.loading = false;
-        this.showSuccessBanner('REQUEST RECEIVED');
+        this.showSuccessBanner('SOLICITUD RECIBIDA');
         setTimeout(() => {
           this.showBanner = false;
           this.recoveryForm.reset();
         }, 2500);
       },
-      error: (error) => {
+      error: () => {
         this.loading = false;
-        // Proteger contra enumeración de cuentas - mostrar el mismo mensaje
-        this.showSuccessBanner('REQUEST RECEIVED');
+        // Proteger contra enumeración de cuentas - siempre mostrar el mismo mensaje
+        this.showSuccessBanner('SOLICITUD RECIBIDA');
         setTimeout(() => {
           this.showBanner = false;
           this.recoveryForm.reset();
@@ -170,6 +310,14 @@ export class LoginComponent implements OnInit {
     this.currentView = 'login';
     this.showBanner = false;
     this.recoveryForm.reset();
+  }
+
+  closeRecoveryOnBackdrop(event: MouseEvent): void {
+    // Solo cierra si se hizo clic en el backdrop (no en el modal)
+    const modal = document.getElementById('if-recovery-modal');
+    if (modal && !modal.contains(event.target as Node)) {
+      this.switchToLogin();
+    }
   }
 
   private showSuccessBanner(message: string): void {
@@ -193,9 +341,7 @@ export class LoginComponent implements OnInit {
   }
 
   private triggerEasterEgg(easterEgg?: EasterEggSignal): void {
-    if (!easterEgg || easterEgg.scope !== 'login') {
-      return;
-    }
+    if (!easterEgg || easterEgg.scope !== 'login') return;
 
     const imageUrl = easterEgg.payload?.imageUrl || '/scripts/Bender.png';
     const durationMs = Number(easterEgg.payload?.durationMs) > 0
@@ -205,9 +351,7 @@ export class LoginComponent implements OnInit {
     this.easterEggImageUrl = imageUrl;
     this.showEasterEggOverlay = true;
 
-    if (this.easterEggTimer) {
-      clearTimeout(this.easterEggTimer);
-    }
+    if (this.easterEggTimer) clearTimeout(this.easterEggTimer);
     this.easterEggTimer = setTimeout(() => {
       this.showEasterEggOverlay = false;
       this.easterEggTimer = undefined;

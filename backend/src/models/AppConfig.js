@@ -316,6 +316,12 @@ const appConfigSchema = new mongoose.Schema({
       default: {}
     }
   },
+  // Tema visual del login
+  loginTheme: {
+    type: String,
+    enum: ['crt', 'infoflow'],
+    default: 'crt'
+  },
   easterEggRules: {
     type: [easterEggRuleSchema],
     default: () => ([

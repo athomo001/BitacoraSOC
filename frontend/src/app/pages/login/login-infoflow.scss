@@ -1,0 +1,448 @@
+// ════════════════════════════════════════════════════════════
+// Tema CYBER (v3) - Login Matrix/Cyberpunk
+// REPARACIÓN DE VISIBILIDAD DE TEXTO - CORRECCIÓN DE CACHÉ
+// ════════════════════════════════════════════════════════════
+
+// ── Variables ───────────────────────────────────────────────
+$neon: #00ff41;
+$neon-dim: #00cc33;
+$neon-glow: rgba(0, 255, 65, 0.6);
+$neon-subtle: rgba(0, 255, 65, 0.15);
+$bg-deep: #000000;
+$card-bg: rgba(0, 8, 0, 0.95);
+$font-mono: 'Courier New', 'Lucida Console', monospace;
+
+// ── Container ───────────────────────────────────────────────
+.theme-cyber {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: $bg-deep;
+  overflow: hidden;
+  font-family: $font-mono;
+
+  // Matrix canvas de fondo
+  #matrix-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    opacity: 0.8;
+    pointer-events: none;
+  }
+
+  // ── Card central ─────────────────────────────────────────
+  .cy-card {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    max-width: 480px;
+    margin: 20px;
+    padding: 36px 32px 28px;
+    background: $card-bg;
+    border: 2px solid $neon;
+    border-radius: 4px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow:
+      0 0 20px $neon-glow,
+      inset 0 0 40px rgba(0, 255, 65, 0.05);
+    animation: cyCardIn 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+
+    @media (max-width: 520px) {
+      margin: 12px;
+      padding: 24px 18px 20px;
+    }
+  }
+
+  @keyframes cyCardIn {
+    from { opacity: 0; transform: translateY(28px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  // ── Header / Título ──────────────────────────────────────
+  .cy-header {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+
+  // MÁXIMA ESPECIFICIDAD PARA EL TÍTULO
+  body & .cy-title {
+    font-size: 26px;
+    font-weight: 900;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: #ffffff !important;
+    text-shadow: 0 0 15px $neon, 0 0 3px #ffffff;
+    margin: 0 0 10px;
+    animation: cyGlitch 4s infinite;
+    position: relative;
+
+    @media (max-width: 420px) { font-size: 20px; }
+  }
+
+  @keyframes cyGlitch {
+    0%, 88%, 100% { transform: translate(0); }
+    90%  { transform: translate(-2px, 1px); }
+    92%  { transform: translate(2px, -1px); }
+    94%  { transform: translate(0); }
+  }
+
+  // MÁXIMA ESPECIFICIDAD PARA EL SUBTÍTULO
+  body & .cy-subtitle {
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: #00ff41 !important;
+    font-weight: 900;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+
+    span { color: #00ff41 !important; }
+
+    &::after {
+      content: '|';
+      display: inline-block;
+      animation: cyBlink 0.75s step-end infinite;
+      margin-left: 2px;
+      color: #00ff41;
+    }
+  }
+
+  @keyframes cyBlink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0; }
+  }
+
+  .cy-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 20px 0;
+
+    &::before,
+    &::after {
+      content: '';
+      flex: 1;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, $neon, transparent);
+    }
+
+    .cy-shield {
+      color: $neon;
+      font-size: 22px;
+      text-shadow: 0 0 12px $neon-glow;
+      line-height: 1;
+    }
+  }
+
+  // ── Formulario ────────────────────────────────────────────
+  .cy-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  body & .cy-field-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 0.18em;
+    color: #00ff41 !important;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+
+    .cy-field-icon {
+      font-size: 18px;
+      line-height: 1;
+    }
+  }
+
+  .cy-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  body & .cy-input {
+    width: 100%;
+    padding: 13px 42px 13px 14px;
+    background: #000000 !important;
+    border: 2px solid #00ff41 !important;
+    border-radius: 3px;
+    color: #ffffff !important;
+    font-family: $font-mono;
+    font-size: 16px;
+    font-weight: 900 !important;
+    letter-spacing: 0.04em;
+    outline: none;
+    box-sizing: border-box;
+
+    &::placeholder { color: #00ff41 !important; opacity: 0.8 !important; }
+    &::selection   { background: #ffffff !important; color: #000000 !important; }
+
+    &:focus {
+      border-color: #ffffff !important;
+      box-shadow: 0 0 15px rgba(0, 255, 65, 0.6);
+    }
+
+    &:disabled { opacity: 0.5; cursor: not-allowed; }
+  }
+
+  .cy-toggle-btn {
+    position: absolute;
+    right: 12px;
+    background: none;
+    border: none;
+    color: #00ff41;
+    cursor: pointer;
+    font-size: 20px;
+    padding: 0;
+
+    &:hover { color: #ffffff; }
+  }
+
+  // Error messages
+  .cy-errors {
+    min-height: 18px;
+    margin-top: 4px;
+  }
+
+  body & .cy-error-text {
+    font-size: 11px;
+    color: #ff3366 !important;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-shadow: 0 0 10px rgba(255, 51, 102, 0.6);
+  }
+
+  // ── Botón principal ───────────────────────────────────────
+  .cy-submit-btn {
+    padding: 14px 20px;
+    background: #00ff41;
+    border: none;
+    border-radius: 3px;
+    color: #000 !important;
+    font-family: $font-mono;
+    font-size: 14px;
+    font-weight: 900;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.5);
+    width: 100%;
+    margin-top: 6px;
+    text-align: center;
+
+    &:hover:not(:disabled) {
+      background: #ffffff;
+      box-shadow: 0 0 30px rgba(255, 255, 255, 0.6);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  // ── Info de sesión ───────────────────────────────────────
+  body & .cy-session-info {
+    margin-top: 12px;
+    padding: 12px;
+    font-size: 13px;
+    font-weight: 900;
+    color: #ffffff !important;
+    text-align: center;
+    border: 2px solid #00ff41;
+    background: #000000 !important;
+    
+    &, span { color: #ffffff !important; }
+  }
+
+  // ── Enlace recuperar contraseña ──────────────────────────
+  body & .cy-recover-btn {
+    display: block;
+    width: 100%;
+    margin-top: 16px;
+    background: #000000 !important;
+    border: 2px solid #00ff41 !important;
+    padding: 12px;
+    color: #00ff41 !important;
+    font-family: $font-mono;
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      color: #000000 !important;
+      background: #00ff41 !important;
+    }
+  }
+
+  // ── Footer ────────────────────────────────────────────────
+  body & .cy-footer {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 2px solid #00ff41;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 900;
+    color: #ffffff !important;
+    text-transform: uppercase;
+
+    &, span, p, div { color: #ffffff !important; }
+  }
+
+  // ── Banner ────────────────────────────────────────────────
+  body & .cy-banner {
+    margin-bottom: 24px;
+    padding: 16px;
+    border: 3px solid #00ff41 !important;
+    background: #000000 !important;
+    color: #ffffff !important;
+    font-weight: 900 !important;
+    text-align: center;
+    text-transform: uppercase;
+
+    &, div, span, p {
+      color: #ffffff !important;
+      -webkit-text-fill-color: #ffffff !important;
+    }
+
+    &.cy-banner-error {
+      border-color: #ff3366 !important;
+      background: rgba(40, 0, 0, 0.9) !important;
+      
+      &, div, span, p {
+        color: #ffffff !important;
+      }
+    }
+  }
+
+  // ── Modal Recuperación ──────────────────────────────────
+  .cy-recovery-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .cy-recovery-modal {
+    background: #000000;
+    border: 3px solid #00ff41;
+    border-radius: 4px;
+    width: 100%;
+    max-width: 460px;
+    box-shadow: 0 0 60px rgba(0, 255, 65, 0.5);
+    overflow: hidden;
+  }
+
+  .cy-modal-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    background: #00ff41;
+    color: #000;
+  }
+
+  .cy-modal-topbar-left {
+    font-weight: 900;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .cy-modal-clock {
+    font-size: 18px;
+    font-weight: 900;
+  }
+
+  .cy-modal-close {
+    background: #000;
+    border: 2px solid #fff;
+    color: #fff;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    font-weight: 900;
+  }
+
+  .cy-modal-body {
+    padding: 28px;
+  }
+
+  body & .cy-modal-title {
+    font-size: 18px;
+    font-weight: 900;
+    color: #ffffff !important;
+    text-shadow: 0 0 15px #00ff41;
+    margin-bottom: 24px;
+    border-left: 5px solid #00ff41;
+    padding-left: 14px;
+    text-transform: uppercase;
+  }
+
+  // REPARACIÓN DEFINITIVA DEL INFO BOX
+  body & .cy-info-box {
+    padding: 20px;
+    background: #000000 !important; 
+    border: 3px solid #00ff41 !important;
+    margin-bottom: 24px;
+    font-size: 15px;
+    color: #ffffff !important;
+    font-weight: 900 !important;
+    line-height: 1.6;
+    display: flex;
+    gap: 14px;
+    box-shadow: inset 0 0 30px rgba(0, 255, 65, 0.2);
+
+    &, span, p, div, b, strong, i, em {
+      color: #ffffff !important;
+      -webkit-text-fill-color: #ffffff !important;
+      text-shadow: none !important;
+    }
+
+    span:first-child {
+       color: #00ff41 !important;
+       font-size: 24px;
+    }
+  }
+
+  body & .cy-secondary-btn {
+    padding: 14px;
+    border: 2px solid #00ff41;
+    background: transparent;
+    color: #00ff41 !important;
+    font-weight: 900;
+    text-transform: uppercase;
+    cursor: pointer;
+    width: 100%;
+
+    &:hover {
+      background: #00ff41;
+      color: #000 !important;
+    }
+  }
+
+  // Selección global forzada para el tema (Nuclear)
+  & ::selection {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+}

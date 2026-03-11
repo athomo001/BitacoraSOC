@@ -1,7 +1,10 @@
-<div class="crt-container">
+<!-- ══════════════════════════════════════════════════════════
+     TEMA CRT (default)
+     ══════════════════════════════════════════════════════════ -->
+<div *ngIf="activeTheme === 'crt' && themeLoaded" class="crt-container">
   <!-- Background grid -->
   <div class="crt-grid"></div>
-  
+
   <!-- Scanlines overlay -->
   <div class="crt-scanlines"></div>
 
@@ -26,24 +29,19 @@
       <form [formGroup]="loginForm" (ngSubmit)="onLoginSubmit()" class="crt-form">
         <!-- Username field -->
         <div class="form-group">
-          <label for="username" class="form-label">USERNAME:</label>
+          <label for="username-crt" class="form-label">USERNAME:</label>
           <div class="input-wrapper">
-            <input
-              id="username"
-              type="text"
-              formControlName="username"
-              class="crt-input"
-              autocomplete="username"
-              [disabled]="loading"
-              placeholder="Enter username"
-            />
+            <input id="username-crt" type="text" formControlName="username" class="crt-input" autocomplete="username"
+              [disabled]="loading" placeholder="Enter username" />
             <span class="input-glow"></span>
           </div>
           <div class="error-messages">
-            <div *ngIf="loginForm.get('username')?.hasError('required') && loginForm.get('username')?.touched" class="error-text">
+            <div *ngIf="loginForm.get('username')?.hasError('required') && loginForm.get('username')?.touched"
+              class="error-text">
               USERNAME REQUIRED
             </div>
-            <div *ngIf="loginForm.get('username')?.hasError('minlength') && loginForm.get('username')?.touched" class="error-text">
+            <div *ngIf="loginForm.get('username')?.hasError('minlength') && loginForm.get('username')?.touched"
+              class="error-text">
               MINIMUM 3 CHARACTERS
             </div>
           </div>
@@ -51,49 +49,34 @@
 
         <!-- Password field -->
         <div class="form-group">
-          <label for="password" class="form-label">PASSWORD:</label>
+          <label for="password-crt" class="form-label">PASSWORD:</label>
           <div class="input-wrapper">
-            <input
-              id="password"
-              [type]="hidePassword ? 'password' : 'text'"
-              formControlName="password"
-              class="crt-input"
-              autocomplete="current-password"
-              [disabled]="loading"
-              placeholder="Enter password"
-            />
-            <button
-              type="button"
-              class="visibility-toggle"
-              (click)="hidePassword = !hidePassword"
-              [disabled]="loading"
-              tabindex="-1"
-            >
+            <input id="password-crt" [type]="hidePassword ? 'password' : 'text'" formControlName="password"
+              class="crt-input" autocomplete="current-password" [disabled]="loading" placeholder="Enter password" />
+            <button type="button" class="visibility-toggle" (click)="hidePassword = !hidePassword" [disabled]="loading"
+              tabindex="-1">
               {{ hidePassword ? '[SHOW]' : '[HIDE]' }}
             </button>
             <span class="input-glow"></span>
           </div>
           <div class="error-messages">
-            <div *ngIf="loginForm.get('password')?.hasError('required') && loginForm.get('password')?.touched" class="error-text">
+            <div *ngIf="loginForm.get('password')?.hasError('required') && loginForm.get('password')?.touched"
+              class="error-text">
               PASSWORD REQUIRED
             </div>
-            <div *ngIf="loginForm.get('password')?.hasError('minlength') && loginForm.get('password')?.touched" class="error-text">
+            <div *ngIf="loginForm.get('password')?.hasError('minlength') && loginForm.get('password')?.touched"
+              class="error-text">
               MINIMUM 4 CHARACTERS
             </div>
           </div>
         </div>
 
         <!-- Submit button -->
-        <button
-          type="submit"
-          class="crt-button"
-          [disabled]="loading || loginForm.invalid"
-          [class.loading]="loading"
-        >
+        <button type="submit" class="crt-button" [disabled]="loading || loginForm.invalid" [class.loading]="loading">
           <span *ngIf="!loading">[ LOGIN ]</span>
           <span *ngIf="loading" class="pulse">[ AUTHENTICATING... ]</span>
         </button>
-        
+
         <!-- Session info -->
         <div class="session-info">
           ⏰ SESSION EXPIRES: ADMIN/USER 4H | GUEST 2H
@@ -101,12 +84,7 @@
       </form>
 
       <!-- Recovery link -->
-      <button
-        type="button"
-        class="recover-link"
-        (click)="switchToRecovery()"
-        [disabled]="loading"
-      >
+      <button type="button" class="recover-link" (click)="switchToRecovery()" [disabled]="loading">
         RECOVER PASSWORD
       </button>
 
@@ -127,47 +105,33 @@
       <form [formGroup]="recoveryForm" (ngSubmit)="onRecoverySubmit()" class="crt-form">
         <!-- Email field -->
         <div class="form-group">
-          <label for="email" class="form-label">EMAIL:</label>
+          <label for="email-crt" class="form-label">EMAIL:</label>
           <div class="input-wrapper">
-            <input
-              id="email"
-              type="email"
-              formControlName="email"
-              class="crt-input"
-              [disabled]="loading"
-              placeholder="Enter your email"
-            />
+            <input id="email-crt" type="email" formControlName="email" class="crt-input" [disabled]="loading"
+              placeholder="Enter your email" />
             <span class="input-glow"></span>
           </div>
           <div class="error-messages">
-            <div *ngIf="recoveryForm.get('email')?.hasError('required') && recoveryForm.get('email')?.touched" class="error-text">
+            <div *ngIf="recoveryForm.get('email')?.hasError('required') && recoveryForm.get('email')?.touched"
+              class="error-text">
               EMAIL REQUIRED
             </div>
-            <div *ngIf="recoveryForm.get('email')?.hasError('email') && recoveryForm.get('email')?.touched" class="error-text">
+            <div *ngIf="recoveryForm.get('email')?.hasError('email') && recoveryForm.get('email')?.touched"
+              class="error-text">
               INVALID FORMAT
             </div>
           </div>
         </div>
 
         <!-- Submit button -->
-        <button
-          type="submit"
-          class="crt-button"
-          [disabled]="loading || recoveryForm.invalid"
-          [class.loading]="loading"
-        >
+        <button type="submit" class="crt-button" [disabled]="loading || recoveryForm.invalid" [class.loading]="loading">
           <span *ngIf="!loading">[ SEND RECOVERY LINK ]</span>
           <span *ngIf="loading" class="pulse">[ SENDING REQUEST... ]</span>
         </button>
       </form>
 
       <!-- Back to login link -->
-      <button
-        type="button"
-        class="recover-link"
-        (click)="switchToLogin()"
-        [disabled]="loading"
-      >
+      <button type="button" class="recover-link" (click)="switchToLogin()" [disabled]="loading">
         BACK TO LOGIN
       </button>
 
@@ -179,11 +143,155 @@
     </div>
   </div>
 
-  <div
-    class="easter-egg-overlay"
-    *ngIf="showEasterEggOverlay"
-    (click)="closeEasterEggOverlay()"
-  >
+  <div class="easter-egg-overlay" *ngIf="showEasterEggOverlay" (click)="closeEasterEggOverlay()">
+    <img [src]="easterEggImageUrl" alt="Bender" class="easter-egg-image" />
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════
+     TEMA CYBER (Matrix / Cyberpunk)
+     ══════════════════════════════════════════════════════════ -->
+<div *ngIf="activeTheme === 'infoflow' && themeLoaded" class="theme-cyber">
+  <canvas id="matrix-canvas"></canvas>
+
+  <div class="cy-card">
+    <!-- Mensajes de Banner -->
+    <div *ngIf="bannerMessage" class="cy-banner">
+      <div class="cy-banner-text">{{ bannerMessage }}</div>
+    </div>
+
+    <header class="cy-header">
+      <h1 class="cy-title">{{ appTitle }}</h1>
+      <div class="cy-subtitle">{{ typingTitle }}</div>
+    </header>
+
+    <div class="cy-divider">
+      <span class="cy-shield">🛡️</span>
+    </div>
+
+    <!-- Panel de Login -->
+    <div *ngIf="currentView === 'login'" class="cy-login-panel">
+      <form [formGroup]="loginForm" (ngSubmit)="onLoginSubmit()" class="cy-form">
+        <!-- Usuario -->
+        <div class="cy-field">
+          <label class="cy-field-label">
+            <!--  <span class="cy-field-icon">👤</span> --> USUARIO
+          </label>
+          <div class="cy-input-wrap">
+            <input type="text" formControlName="username" class="cy-input" placeholder="Ingresa tu usuario"
+              autocomplete="username">
+          </div>
+          <div class="cy-errors">
+            <span *ngIf="loginForm.get('username')?.touched && loginForm.get('username')?.errors?.['required']"
+              class="cy-error-text">
+              EL USUARIO ES REQUERIDO
+            </span>
+          </div>
+        </div>
+
+        <!-- Contraseña -->
+        <div class="cy-field">
+          <label class="cy-field-label">
+            <!-- <span class="cy-field-icon">🔒</span> --> CONTRASEÑA
+          </label>
+          <div class="cy-input-wrap">
+            <input [type]="hidePassword ? 'password' : 'text'" formControlName="password" class="cy-input"
+              placeholder="Ingresa tu contraseña" autocomplete="current-password">
+            <button type="button" class="cy-toggle-btn" (click)="hidePassword = !hidePassword"
+              [title]="hidePassword ? 'Mostrar' : 'Ocultar'">
+              <span>{{ hidePassword ? '[VER]' : '[OCULTAR]' }}</span>
+            </button>
+          </div>
+          <div class="cy-errors">
+            <span *ngIf="loginForm.get('password')?.touched && loginForm.get('password')?.errors?.['required']"
+              class="cy-error-text">
+              LA CONTRASEÑA ES REQUERIDA
+            </span>
+          </div>
+        </div>
+
+        <!-- Botón Entrar -->
+        <button type="submit" class="cy-submit-btn" [disabled]="loginForm.invalid || loading">
+          <span *ngIf="!loading">INICIAR SESIÓN</span>
+          <span *ngIf="loading">ACCEDIENDO...</span>
+        </button>
+      </form>
+
+      <div class="cy-session-info">
+        ⏰ SESIÓN: ADMIN/USER 4H | GUEST 2H
+      </div>
+
+      <button type="button" class="cy-recover-btn" (click)="switchToRecovery()">
+        <span class="cy-recover-icon">🔑</span> RECUPERAR CONTRASEÑA
+      </button>
+    </div>
+
+    <!-- Footer -->
+    <footer class="cy-footer">
+      {{ appTitle }} vDEV
+    </footer>
+  </div>
+
+  <!-- Modal de Recuperación -->
+  <div *ngIf="currentView === 'recovery'" class="cy-recovery-overlay" (click)="switchToLogin()">
+    <div class="cy-recovery-modal" (click)="$event.stopPropagation()">
+      <div class="cy-modal-topbar">
+        <div class="cy-modal-topbar-left">
+          🛡️ RECUPERACIÓN SEGURA
+        </div>
+        <div class="cy-modal-clock">{{ currentTime }}</div>
+        <button class="cy-modal-close" (click)="switchToLogin()">×</button>
+      </div>
+
+      <div class="cy-modal-body">
+        <h2 class="cy-modal-title">RECUPERACIÓN DE CONTRASEÑA</h2>
+
+        <div class="cy-info-box">
+          <span>ℹ️</span>
+          <span>Ingresa tu email registrado. Si existe una cuenta, recibirás un link de recuperación. Por seguridad no
+            se reconoce el estado de la cuenta.</span>
+        </div>
+
+        <form [formGroup]="recoveryForm" (ngSubmit)="onRecoverySubmit()" class="cy-form">
+          <div class="cy-field">
+            <label class="cy-field-label">
+              <span class="cy-field-icon">📧</span> EMAIL
+            </label>
+            <div class="cy-input-wrap">
+              <input type="email" formControlName="email" class="cy-input" placeholder="ejemplo@correo.com">
+            </div>
+            <div class="cy-errors">
+              <span *ngIf="recoveryForm.get('email')?.touched && recoveryForm.get('email')?.errors?.['required']"
+                class="cy-error-text">
+                EL EMAIL ES REQUERIDO
+              </span>
+              <span *ngIf="recoveryForm.get('email')?.touched && recoveryForm.get('email')?.errors?.['email']"
+                class="cy-error-text">
+                FORMATO DE EMAIL INVÁLIDO
+              </span>
+            </div>
+          </div>
+
+          <button type="submit" class="cy-submit-btn" [disabled]="recoveryForm.invalid || loading">
+            <span *ngIf="!loading">ENVIAR ENLACE</span>
+            <span *ngIf="loading">ENVIANDO...</span>
+          </button>
+
+          <button type="button" class="cy-secondary-btn" (click)="switchToLogin()">
+            VOLVER AL LOGIN
+          </button>
+        </form>
+      </div>
+
+      <footer class="cy-footer">
+        {{ appTitle }} SECURITY PORTAL
+      </footer>
+    </div>
+  </div>
+
+  <!-- Easter egg -->
+  <div class="easter-egg-overlay" *ngIf="showEasterEggOverlay" (click)="closeEasterEggOverlay()">
     <img [src]="easterEggImageUrl" alt="Bender" class="easter-egg-image" />
   </div>
 </div>
