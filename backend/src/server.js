@@ -382,7 +382,7 @@ app.use('/api/backup', require('./routes/backup'));
 app.use('/api/catalog', require('./routes/catalog'));
 app.use('/api/admin/catalog', require('./routes/admin-catalog')); // CRUD admin
 app.use('/api/escalation', require('./routes/escalation')); // Módulo de escalaciones
-app.use('/api/work-shifts/assignments', require('./routes/work-shift-assignments')); // Asignaciones operativas (DEBE IR ANTES DE /api/work-shifts)
+app.use('/api/work-shift-assignments', require('./routes/work-shift-assignments')); // Asignaciones operativas
 app.use('/api/work-shifts', require('./routes/work-shifts')); // Turnos de trabajo
 app.use('/api/audit-logs', require('./routes/audit-logs')); // Logs de auditoría
 
