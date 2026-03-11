@@ -4,6 +4,10 @@ Registro de cambios relevantes del proyecto.
 
 ## [v1.5.19-beta] - 2026-03-11
 
+### Reparaciones Críticas (Post-Reinicio Docker)
+- **Fix SSL (B37):** Implementación de "Hot Reload" en `SNICallback`. El servidor ahora intenta recargar certificados en caliente tras un reinicio de Docker si detecta que el contexto criptográfico se ha perdido.
+- **Fix API assignments (B38):** Se corrigió un conflicto de rutas que causaba un error 400 al cargar turnos. Se reordenaron las rutas en el backend y se ajustó el frontend para usar un endpoint específico `/api/work-shift-assignments`.
+
 ### Automático
 - Sincronización de versión basada en iteraciones de Git (199 commits totales).
 

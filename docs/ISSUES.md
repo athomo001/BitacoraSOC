@@ -11,6 +11,12 @@
 | B19 | Pendiente | Integraciones | Creación de tickets en GLPI (Correo / API) | Definir flujo final (resumen diario vs evento inmediato), destino y estrategia de reintentos. |
 | AI-SUMMARY-001 | Pendiente | IA/Operación ALTA | Módulo de Resumen Ejecutivo Efímero (IA On-Demand) | Integrar Ollama+llama3.2:3b en modo efímero `docker start -> healthcheck -> generate -> docker stop` con `try/finally`, salida editable en campo "Resumen Sugerido por IA" y botón "Generar con IA". |
 | B34 | Pendiente | Operación/Alertas | Alerta por ítems NOK (Rojo) en Checklist | Añadir switch en config global para activar/desactivar alerta por ítems en rojo. Agregar selector de cargo (ej. N2) a notificar. Al guardar el checklist, si el analista marca ítems NOK (rojo), enviar email automático a todos los usuarios del cargo seleccionado incluyendo el detalle/observación ingresada por el analista. |
+| B35 | Pendiente | UI/UX + Bug | Ajuste Header Checklist y Fix "Último Check" | Cambiar título "Checklist Diario Analistas N1" a "Checklist del turno" en `/main/checklist`. Corregir error en "Estado del ultimo check" que muestra datos antiguos (fecha/usuario) en lugar del último registro real. |
+| B36 | Pendiente | UI/UX | Aprovechamiento de ancho de pantalla | Hacer el menú/contenido principal más ancho para aprovechar pantallas grandes. El contenido solo debe achicarse cuando el cajón de notas esté desplegado. |
+| B37 | Listo | Seguridad / Infra BLOQUEANTE | Error SSL tras reinicio (ERR_SSL_PROTOCOL_ERROR) | Se añadió lógica de auto-recuperación en SNICallback para recargar certificados en caliente si se pierde el contexto tras un reinicio. |
+| B38 | Listo | Backend / Bug | Error 400 en `/api/work-shifts/assignments` | Se corrigió el orden de rutas en el servidor y se actualizó el frontend a una ruta más específica para evitar conflicto con el validador de IDs. |
+
+
 
 ### ✅ Listas
 
@@ -114,5 +120,25 @@
    - En `Global Configuration` o en Configuración de Checklists, agregar el toggle switch "Habilitar alertas NOK".
    - Al lado, un Mat-Select con selección múltiple (checkboxes) que cargue el diccionario de cargos permitidos.
    - Guardar estas variables de vuelta al modelo usando el servicio existente de `ConfigService`.
+
+### B35 - Header Checklist y Fix "Último Check"
+
+1. **Frontend (Header):**
+   - Localizar el componente en `frontend/src/app/pages/main/checklist` (o similar).
+   - Cambiar el texto estático `Checklist Diario Analistas N1` por `Checklist del turno`.
+2. **Frontend/Backend (Dato de Último Check):**
+   - Revisar la suscripción o el servicio que trae el `lastCheck`. Asegurar que se invalide la caché o que el backend devuelva el documento más reciente por `createdAt` sin filtros que excluyan al usuario actual o a otros.
+   - Si es un problema de visualización, asegurar que el `DatePipe` sea correcto y el binding del `username` venga del registro real de la DB.
+
+### B36 - Aprovechamiento de ancho de pantalla
+
+1. **Estructura Layout (CSS):**
+    - En `main-layout.component.scss`, identificar el contenedor principal (`.main-container` o `.content`).
+    - Ajustar el `max-width` o los márgenes laterales.
+2. **Interactividad con Cajón de Notas:**
+    - Usar una clase dinámica (ej: `.with-notes-open`) en el contenedor principal.
+    - Cuando `showNotes` sea `false`, aplicar `width: 100%` o un ancho mayor.
+    - Cuando `showNotes` sea `true`, aplicar el padding/margen necesario para no solapar el cajón de notas.
+
 
 ---
