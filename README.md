@@ -326,7 +326,7 @@ Ver más capturas en **[docs/SCREENSHOTS.md](docs/SCREENSHOTS.md)**:
 
 ---
 
-## Changelog v1.1.0 (15-01-2026)
+## Changelog v1.5.19-beta (15-01-2026)
 
 ### Nuevas funcionalidades
 - **Historial de Checklists:** Vista completa de todos los checklists del equipo (entrada/salida de turno)
