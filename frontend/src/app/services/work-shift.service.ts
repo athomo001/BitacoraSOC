@@ -110,19 +110,19 @@ export class WorkShiftService {
   // 🏢 ASIGNACIONES OPERATIVAS (OPS-ASSIGN)
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   getAssignments(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/assignments`);
+    return this.http.get<any[]>(`${environment.apiUrl}/work-shift-assignments`);
   }
 
   createAssignment(data: any): Observable<any> {
-    return this.http.post<any>(`${this.apiUrl}/assignments`, data);
+    return this.http.post<any>(`${environment.apiUrl}/work-shift-assignments`, data);
   }
-
+  
   updateAssignment(id: string, data: any): Observable<any> {
-    return this.http.put<any>(`${this.apiUrl}/assignments/${id}`, data);
+    return this.http.put<any>(`${environment.apiUrl}/work-shift-assignments/${id}`, data);
   }
-
+  
   deleteAssignment(id: string): Observable<any> {
-    return this.http.delete<any>(`${this.apiUrl}/assignments/${id}`);
+    return this.http.delete<any>(`${environment.apiUrl}/work-shift-assignments/${id}`);
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

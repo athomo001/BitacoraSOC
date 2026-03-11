@@ -1,6 +1,6 @@
 {
   "name": "bitacora-soc-frontend",
-  "version": "1.1.0",
+  "version": "1.5.19-beta",
   "scripts": {
     "ng": "ng",
     "start": "node start-dev.js",
@@ -8,6 +8,7 @@
     "restart:clean": "node scripts/restart-clean.js",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
+    "version:sync": "node ../scripts/sync-version.js",
     "test": "ng test"
   },
   "private": true,

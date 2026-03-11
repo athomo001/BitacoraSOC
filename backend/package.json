@@ -1,6 +1,6 @@
 {
   "name": "bitacora-soc-backend",
-  "version": "1.1.0",
+  "version": "1.5.19-beta",
   "description": "Bitácora SOC - Backend Express + MongoDB",
   "main": "src/server.js",
   "scripts": {
@@ -10,6 +10,7 @@
     "restart:clean": "node scripts/restart-clean.js",
     "seed": "node src/scripts/seed.js",
     "migrate:escalation-clients": "node src/scripts/migrate-escalation-clients-to-log-sources.js",
+    "version:sync": "node ../scripts/sync-version.js",
     "test": "jest"
   },
   "keywords": [
