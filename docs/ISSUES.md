@@ -11,6 +11,9 @@
 | B19 | Pendiente | Integraciones | Creación de tickets en GLPI (Correo / API) | Definir flujo final (resumen diario vs evento inmediato), destino y estrategia de reintentos. |
 | AI-SUMMARY-001 | Pendiente | IA/Operación ALTA | Módulo de Resumen Ejecutivo Efímero (IA On-Demand) | Integrar Ollama+llama3.2:3b en modo efímero `docker start -> healthcheck -> generate -> docker stop` con `try/finally`, salida editable en campo "Resumen Sugerido por IA" y botón "Generar con IA". |
 | B34 | Pendiente | Operación/Alertas | Alerta por ítems NOK (Rojo) en Checklist | Añadir switch en config global para activar/desactivar alerta por ítems en rojo. Agregar selector de cargo (ej. N2) a notificar. Al guardar el checklist, si el analista marca ítems NOK (rojo), enviar email automático a todos los usuarios del cargo seleccionado incluyendo el detalle/observación ingresada por el analista. |
+| B42 | Pendiente | UI/UX + Bug | Report Generator: imágenes de evidencia pierden nitidez al enviarse por correo | El formato técnico del reporte debe mantenerse exactamente dentro de los límites actuales; la imagen NO debe salirse ni mover la estructura de la tabla. Sin embargo, en `frontend/src/app/pages/main/report-generator/report-generator.component.ts` la evidencia se inserta inline como `dataUrl` con ancho fijo `width="420"`, y al copiar la tabla y enviarla por correo algunos clientes reprocesan o reescalan esa imagen embebida. El resultado es que, aun respetando el ancho del formato técnico, al hacer clic sobre la imagen esta puede verse borrosa o de baja calidad. La corrección debe preservar el layout fijo del reporte y mejorar la nitidez/render de la evidencia dentro de ese mismo marco, sin romper el formato técnico. |
+| B43 | Pendiente | Email / UX / Mantenibilidad | Email de turno: refactorizar a MJML y rediseñar como dashboard escaneable | El correo de turno generado por `backend/src/utils/shift-report.js` (`generateReportHTML`) es HTML puro construido por concatenación de strings. Problemas identificados: (1) `renderStatusCell()` muestra texto redundante "OK (Verde)" / "ERROR (Rojo)" — viola legibilidad; (2) No existe sección de Resumen Ejecutivo (conteo de OK / ERROR / entradas); (3) El Checklist se renderiza como tabla plana de 3 columnas — difícil de escanear; (4) Las entradas de Bitácora son un `<ul>` con borde izquierdo — sin jerarquía visual clara; (5) Observación siempre visible aunque sea vacía (`Obs: -`); (6) Sin framework de email, el HTML es frágil frente a dark-mode, Outlook y Gmail. La variable de branding es `appTitle`, leída desde `AppConfig.appTitle` en DB y accesible en `generateReportHTML()` como `brandedAppTitle`. Se debe usar **MJML** como framework base. |
+| B44 | Pendiente | Email / UX | Reporte de turno: mostrar estado "REPARADO" (amarillo) cuando entrada fue ERROR y salida fue OK | **Aplica SOLO al correo de reporte de turno** (`backend/src/utils/shift-report.js`). Ningún otro correo ni módulo debe tocarse. La comparación para marcar `REPARADO` solo corre cuando inicio y cierre corresponden a la misma plantilla/checklist (misma identidad por `checklistId/templateId`; como fallback, mismo nombre). Si son checklists distintos, se tratan como entes separados: cada fila conserva su estado propio (`rojo`/`verde`) con su observación, sin conversión a `REPARADO`. Regla base: si salida es rojo, siempre queda `ERROR` sin importar entrada. |
 
 
 
@@ -180,6 +183,81 @@
 4. **UX:**
    - Mostrar mensaje "Sin coincidencias" cuando no haya resultados reales.
    - Opcional: mostrar el término buscado y un botón "Refrescar" si el dataset está desactualizado.
+
+### B43 - Email de turno: refactorización a MJML y rediseño como dashboard
+
+**Contexto del código actual:**
+- Archivo principal: `backend/src/utils/shift-report.js`
+- Función que genera el HTML: `generateReportHTML({ shift, checklistEntry, checklistExit, entries, periodStart, periodEnd, appTitle })`
+- Función de texto plano (fallback): `generateReportText(...)` — NO debe modificarse
+- Función de envío: `sendShiftReport(shiftId, shiftDate, options)` — su interfaz NO debe cambiar
+- Variable de branding: `appTitle` → viene de `AppConfig.appTitle` (DB) con fallback `'Bitácora SOC'`; dentro de `generateReportHTML` se llama `brandedAppTitle`
+- Problema de texto redundante: `renderStatusCell()` usa `labelWithText = isOk ? 'OK (Verde)' : 'ERROR (Rojo)'` — debe eliminarse, solo usar ícono + etiqueta corta
+- Las observaciones vacías se muestran siempre como `Obs: -` — solo mostrar si `service.observation` no es vacía
+
+**Dependencia nueva:**
+- Añadir `mjml` a `backend/package.json` (`npm install mjml`)
+- El paquete compila plantillas MJML a HTML compatible con Outlook/Gmail en tiempo de ejecución (Node)
+- Uso: `const mjml2html = require('mjml'); const { html } = mjml2html(mjmlTemplate);`
+
+**Estructura de la nueva plantilla MJML (`generateReportHTML`):**
+
+1. **Header** (`<mj-section>` fondo oscuro o primario)
+   - Título: `🛡️ Reporte de Turno — ${brandedAppTitle}` (el guión largo separa el subtítulo)
+   - Subtítulo: `${shift.name} • ${shift.startTime}–${shift.endTime} • ${dateLabel}`
+   - Si `periodLabel` existe, mostrarlo en una tercera línea más pequeña
+
+2. **Resumen Ejecutivo** (`<mj-section>` con 3 columnas `<mj-column>`)
+   - Calcular antes de la plantilla:
+     - `totalOk` = servicios con `status === 'verde'` en entry + exit (sin duplicados)
+     - `totalError` = servicios con `status` distinto de `'verde'`
+     - `totalEntries` = `entries.length`
+   - Cada bloque muestra: número grande + etiqueta debajo (p.ej. `OK`, `ERROR`, `Entradas`)
+
+3. **Checklist — tarjetas por servicio** (`<mj-section>` por cada servicio)
+   - Iterar `buildServiceRows(checklistEntry, checklistExit)` (función ya existe)
+   - Cada fila = 1 sección con nombre del servicio en header y columnas Entrada / Salida
+   - Estado: usar solo `🟢 OK` o `🔴 ERROR` (sin "(Verde)"/"(Rojo)")
+   - Observación: solo si `service.observation` no está vacía, mostrarla como `Obs: ...`
+   - Si el servicio no fue registrado en un turno, mostrar `—` en gris
+
+4. **Bitácora — bloques independientes** (`<mj-section>` por cada entrada)
+   - Iterar `entries` (igual que antes)
+   - Cada bloque: hora + fecha en header, tipo + cliente en subtítulo, `content` completo sin resumir
+   - Si `content` tiene saltos de línea, respetar el wrap (MJML convierte `\n` con `<br>`)
+
+5. **Footer** (`<mj-section>`)
+   - `Este correo fue generado automáticamente por ${brandedAppTitle}`
+   - `No responder a este mensaje`
+
+**Reglas de implementación:**
+- Solo reemplazar la función `generateReportHTML()` — no tocar `generateReportText()`, `renderStatusCell()` (si se mantiene hay que limpiar el texto redundante), `sendShiftReport()` ni los modelos
+- `renderStatusCell()` puede eliminarse del scope de MJML porque la plantilla maneja el estado directamente dentro del string MJML
+- Toda la lógica de datos (buildServiceRows, formatTime, formatDate, etc.) se mantiene tal cual; solo cambia la capa de renderizado final
+- El MJML se construye como un template literal (`const mjmlTemplate = \`<mjml>...\``) y al final se llama `mjml2html(mjmlTemplate).html`
+- Si `mjml2html` lanza un error de compilación, capturarlo y lanzar error descriptivo (no silenciar)
+- El fondo del email debe ser `#ffffff` (claro), tipografía simple, sin CSS moderno ni JS
+
+### B44 - Reporte de turno: estado REPARADO (amarillo) en celda de salida
+
+**Alcance estricto:** Solo aplica a `backend/src/utils/shift-report.js`, función `generateReportHTML()`. Ningún otro correo, controlador ni módulo debe modificarse.
+
+**Lógica de negocio:**
+- La comparación se hace por servicio, usando `buildServiceRows()` que ya empareja `row.entry` y `row.exit` por `serviceId`
+- Antes de comparar estados, validar si checklist de inicio y cierre son la misma plantilla/checklist (prioridad: mismo `checklistId/templateId`; fallback: mismo nombre normalizado)
+- Condición REPARADO: `row.exit.status === 'verde'` **y** `row.entry.status === 'rojo'`
+- Condición ERROR: `row.exit.status === 'rojo'` (sin importar el estado de entrada)
+- El estado REPARADO solo puede aparecer en la columna **Salida**, nunca en Entrada
+- Si solo existe checklist de salida (sin entrada), NO aplica REPARADO — mostrar el estado normal de salida
+- Si inicio y cierre pertenecen a plantillas/checklists distintos, NO aplica REPARADO: se muestran como registros separados (ejemplo: servicio X rojo en inicio se mantiene rojo con su observación; servicio Y verde en cierre se mantiene verde)
+
+**Implementación sugerida:**
+1. Crear función `renderExitCell(exitService, entryService)` en el mismo archivo, a continuación de `renderStatusCell()`
+2. La función evalúa la condición y retorna:
+   - REPARADO: badge amarillo (`#f57f17`) con texto `REPARADO` + nota `⚠ Fue ERROR en entrada`; observación de salida solo si existe
+   - Cualquier otro caso: delegar a `renderStatusCell(exitService)` sin cambios
+3. En el `forEach` de `serviceRows`, usar `renderExitCell(row.exit, row.entry)` para la columna de Salida y mantener `renderStatusCell(row.entry)` para la de Entrada
+4. No modificar `renderStatusCell()` ni ninguna otra función existente
 
 
 ---
