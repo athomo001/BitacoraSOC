@@ -11,10 +11,7 @@
 | B19 | Pendiente | Integraciones | Creación de tickets en GLPI (Correo / API) | Definir flujo final (resumen diario vs evento inmediato), destino y estrategia de reintentos. |
 | AI-SUMMARY-001 | Pendiente | IA/Operación ALTA | Módulo de Resumen Ejecutivo Efímero (IA On-Demand) | Integrar Ollama+llama3.2:3b en modo efímero `docker start -> healthcheck -> generate -> docker stop` con `try/finally`, salida editable en campo "Resumen Sugerido por IA" y botón "Generar con IA". |
 | B34 | Pendiente | Operación/Alertas | Alerta por ítems NOK (Rojo) en Checklist | Añadir switch en config global para activar/desactivar alerta por ítems en rojo. Agregar selector de cargo (ej. N2) a notificar. Al guardar el checklist, si el analista marca ítems NOK (rojo), enviar email automático a todos los usuarios del cargo seleccionado incluyendo el detalle/observación ingresada por el analista. |
-| B35 | Pendiente | UI/UX + Bug | Ajuste Header Checklist y Fix "Último Check" | Cambiar título "Checklist Diario Analistas N1" a "Checklist del turno" en `/main/checklist`. Corregir error en "Estado del ultimo check" que muestra datos antiguos (fecha/usuario) en lugar del último registro real. |
-| B36 | Pendiente | UI/UX | Aprovechamiento de ancho de pantalla | Hacer el menú/contenido principal más ancho para aprovechar pantallas grandes. El contenido solo debe achicarse cuando el cajón de notas esté desplegado. |
-| B37 | Listo | Seguridad / Infra BLOQUEANTE | Error SSL tras reinicio (ERR_SSL_PROTOCOL_ERROR) | Se añadió lógica de auto-recuperación en SNICallback para recargar certificados en caliente si se pierde el contexto tras un reinicio. |
-| B38 | Listo | Backend / Bug | Error 400 en `/api/work-shifts/assignments` | Se corrigió el orden de rutas en el servidor y se actualizó el frontend a una ruta más específica para evitar conflicto con el validador de IDs. |
+
 
 
 
@@ -64,6 +61,12 @@
 | OPS-ASSIGN-009 | Listo | QA/Pruebas MEDIA | Faltan pruebas completas de integración | Compilación frontend OK y refactor a utilities. |
 | B28 | Listo | Infraestructura/Seguridad | Configuración HTTPS simplificada | Wizard fluido y seguro implementado en Angular. |
 | SEC-HTTPS-ALL | Listo | Seguridad/Operación CRÍTICA | 19 Vulnerabilidades y Fallos de Arquitectura TLS (001 a 019) | Hot-reloading con SNI, volúmenes de Docker estancos, validaciones criptográficas previas a guardado, CORS estricto y UX de 1 paso logrados con 0-downtime. |
+| B37 | Listo | Seguridad / Infra BLOQUEANTE | Error SSL tras reinicio (ERR_SSL_PROTOCOL_ERROR) | Se añadió lógica de auto-recuperación en SNICallback para recargar certificados en caliente si se pierde el contexto tras un reinicio. |
+| B38 | Listo | Backend / Bug | Error 400 en `/api/work-shifts/assignments` | Se corrigió el orden de rutas en el servidor y se actualizó el frontend a una ruta más específica para evitar conflicto con el validador de IDs. |
+| B39 | Listo | UI/UX + Lógica | Checklist: ocultar estado de item padre con sub-items | Frontend y backend ajustados: el padre ya no pide estado/observación manual, su estado se deriva desde los hijos y la API solo exige observación para nodos hoja en rojo. Validado end-to-end con plantilla temporal padre/hijo y envío real del checklist. |
+| B40 | Listo | UI/UX + Bug | Report Generator: búsqueda de ofensas no encuentra nuevas ni coincide por texto | Se cerró el ajuste completo backend+frontend: búsqueda rankeada para términos cortos, refresh del autocomplete sin cache stale y validación viva por API confirmando que `TOR` aparece correctamente como coincidencia principal. |
+| B35 | Listo | UI/UX + Bug | Ajuste Header Checklist y Fix "Último Check" | H1 cambiado a título fijo "Checklist del Turno"; nombre de plantilla se muestra como subtítulo. Accordion usa el nombre de la plantilla. Backend `GET /check/last` corregido para retornar el último check del equipo (sin filtro por usuario), garantizando que siempre se muestre el registro más reciente real. |
+| B36 | Listo | UI/UX | Aprovechamiento de ancho de pantalla | Cajón de notas (right sidebar) cambiado a `mode="over"` (overlay sobre el contenido, sin empujar). Cuando las notas se abren, el contenido recibe `margin-right: 350px` vía clase `.with-notes-open` para evitar solapamiento. El contenido principal usa `transition` suave y ocupa el ancho completo disponible en pantallas grandes. Eliminado `max-width: 900px` del contenedor del Checklist. |
 
 ---
 
@@ -139,6 +142,44 @@
     - Usar una clase dinámica (ej: `.with-notes-open`) en el contenedor principal.
     - Cuando `showNotes` sea `false`, aplicar `width: 100%` o un ancho mayor.
     - Cuando `showNotes` sea `true`, aplicar el padding/margen necesario para no solapar el cajón de notas.
+
+### B39 - Checklist: ocultar estado de item padre con sub-items
+
+1. **UI (Checklist):**
+   - En `frontend/src/app/pages/main/checklist/checklist.component.html`, ocultar el `mat-radio-group` del item padre cuando `service.children?.length` es true (hoy aparece dentro del panel).
+   - Mantener solo el icono/estado en el header para indicar el estado agregado.
+2. **Cálculo de estado agregado (TS):**
+   - En `checklist.component.ts`, al cambiar un sub-item, recalcular el estado del padre: `rojo` si algún hijo rojo, `verde` si todos verdes, `null` si hay pendientes.
+   - Propagar el cálculo hacia arriba (ancestros) usando un helper (ej. `getAggregateStatus(node)`).
+3. **Validación y observaciones:**
+   - Ajustar la validación `allHaveStatus` para exigir estado solo a hojas (items sin hijos).
+   - La observación obligatoria debe aplicar solo al item rojo hoja, no al padre derivado.
+4. **Payload:**
+   - Antes de enviar, asegurar que el estado del padre ya esté calculado; enviar ese estado derivado (o, si el backend lo permite, excluir nodos padre del payload).
+
+### B40 - Report Generator: búsqueda de ofensas no encuentra nuevas ni coincide por texto
+
+**Hecho (backend):**
+- Se reemplazó el filtro simple por regex con un ranking por relevancia en `/api/catalog/*` para priorizar exact/prefix y reducir ruido en términos cortos.
+
+**Falta validar / completar:**
+- Probar en `/main/report-generator` que “TOR” aparece correctamente y por encima de resultados no relacionados.
+- Verificar si el selector mantiene cache local y forzar refresh tras crear nuevas ofensas.
+- Ejecutar pruebas o smoke test de búsqueda en catálogo.
+
+1. **Reproducción y datos:**
+   - Crear ofensa nueva (ej. "TOR") y abrir `/main/report-generator`.
+   - Confirmar si el selector usa cache local o datos remotos paginados.
+2. **Backend/API:**
+   - Revisar endpoint de búsqueda/listado de ofensas: normalizar `q` (lowercase, trim, quitar tildes) y usar `contains` o `startsWith` en `name/title`.
+   - Verificar si hay ranking por relevancia que esté priorizando resultados no relacionados.
+   - Asegurar índice en campo `name/title` para búsquedas parciales (si usa Mongo, `text` o regex con collation).
+3. **Frontend:**
+   - Revisar lógica de filtro en el selector/autocomplete (case-insensitive).
+   - Forzar refresco del dataset luego de crear una nueva ofensa (re-fetch o invalidar cache).
+4. **UX:**
+   - Mostrar mensaje "Sin coincidencias" cuando no haya resultados reales.
+   - Opcional: mostrar el término buscado y un botón "Refrescar" si el dataset está desactualizado.
 
 
 ---

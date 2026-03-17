@@ -24,6 +24,79 @@ const CatalogLogSource = require('../models/CatalogLogSource');
 const CatalogOperationType = require('../models/CatalogOperationType');
 
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const buildEnabledQuery = (enabledBool) => (
+  enabledBool
+    ? {
+        $or: [
+          { enabled: true },
+          { enabled: { $exists: false } },
+          { enabled: 'true' },
+          { enabled: 1 }
+        ]
+      }
+    : {
+        $or: [
+          { enabled: false },
+          { enabled: 'false' },
+          { enabled: 0 }
+        ]
+      }
+);
+
+const buildSearchPipeline = ({
+  searchTerm,
+  enabledBool,
+  cursor,
+  limitNum,
+  projectFields,
+  includeMotivoDefault = false
+}) => {
+  const query = buildEnabledQuery(enabledBool);
+  if (cursor) {
+    query._id = { $gt: cursor };
+  }
+
+  const pipeline = [{ $match: query }];
+
+  if (searchTerm.length > 0) {
+    const safeTerm = escapeRegExp(searchTerm);
+    const exact = new RegExp(`^${safeTerm}$`, 'i');
+    const prefix = new RegExp(`^${safeTerm}`, 'i');
+    const contains = new RegExp(safeTerm, 'i');
+    const isShort = searchTerm.length <= 3;
+
+    const scoreParts = [
+      { $cond: [{ $regexMatch: { input: '$name', regex: exact } }, 100, 0] },
+      { $cond: [{ $regexMatch: { input: '$name', regex: prefix } }, 80, 0] },
+      { $cond: [{ $regexMatch: { input: '$name', regex: isShort ? prefix : contains } }, 50, 0] },
+      { $cond: [{ $regexMatch: { input: '$parent', regex: isShort ? prefix : contains } }, 20, 0] }
+    ];
+
+    if (!isShort) {
+      scoreParts.push({ $cond: [{ $regexMatch: { input: '$description', regex: contains } }, 10, 0] });
+    }
+
+    if (includeMotivoDefault && !isShort) {
+      scoreParts.push({ $cond: [{ $regexMatch: { input: '$motivoDefault', regex: contains } }, 8, 0] });
+    }
+
+    pipeline.push({
+      $addFields: {
+        _score: { $add: scoreParts }
+      }
+    });
+
+    pipeline.push({ $match: { _score: { $gt: 0 } } });
+    pipeline.push({ $sort: { _score: -1, name: 1 } });
+  } else {
+    pipeline.push({ $sort: { name: 1 } });
+  }
+
+  pipeline.push({ $limit: limitNum + 1 });
+  pipeline.push({ $project: projectFields });
+
+  return pipeline;
+};
 
 /**
  * GET /api/catalog/events
@@ -55,40 +128,16 @@ router.get('/events', authenticate, async (req, res) => {
     const limitNum = Math.min(parseInt(limit) || 20, 50);
     const enabledBool = enabled === 'true';
 
-    // Construir query
-    let query = enabledBool
-      ? { $or: [
-          { enabled: true },
-          { enabled: { $exists: false } },
-          { enabled: 'true' },
-          { enabled: 1 }
-        ] }
-      : { $or: [
-          { enabled: false },
-          { enabled: 'false' },
-          { enabled: 0 }
-        ] };
+    const pipeline = buildSearchPipeline({
+      searchTerm,
+      enabledBool,
+      cursor,
+      limitNum,
+      includeMotivoDefault: true,
+      projectFields: { _id: 1, name: 1, parent: 1, description: 1, motivoDefault: 1 }
+    });
 
-    // Agregar cursor para pagination
-    if (cursor) {
-      query._id = { $gt: cursor };
-    }
-
-    if (searchTerm.length > 0) {
-      const regex = new RegExp(escapeRegExp(searchTerm), 'i');
-      query.$or = [
-        { name: regex },
-        { parent: regex },
-        { description: regex }
-      ];
-    }
-
-    const items = await CatalogEvent
-      .find(query)
-      .sort({ name: 1 })
-      .limit(limitNum + 1) // +1 para detectar si hay más
-      .select('_id name parent description motivoDefault')
-      .lean();
+    const items = await CatalogEvent.aggregate(pipeline);
 
     // Detectar si hay más resultados
     const hasMore = items.length > limitNum;
@@ -123,38 +172,15 @@ router.get('/log-sources', authenticate, async (req, res) => {
     const limitNum = Math.min(parseInt(limit) || 20, 50);
     const enabledBool = enabled === 'true';
 
-    let query = enabledBool
-      ? { $or: [
-          { enabled: true },
-          { enabled: { $exists: false } },
-          { enabled: 'true' },
-          { enabled: 1 }
-        ] }
-      : { $or: [
-          { enabled: false },
-          { enabled: 'false' },
-          { enabled: 0 }
-        ] };
+    const pipeline = buildSearchPipeline({
+      searchTerm,
+      enabledBool,
+      cursor,
+      limitNum,
+      projectFields: { _id: 1, name: 1, parent: 1, description: 1 }
+    });
 
-    if (cursor) {
-      query._id = { $gt: cursor };
-    }
-
-    if (searchTerm.length > 0) {
-      const regex = new RegExp(escapeRegExp(searchTerm), 'i');
-      query.$or = [
-        { name: regex },
-        { parent: regex },
-        { description: regex }
-      ];
-    }
-
-    const items = await CatalogLogSource
-      .find(query)
-      .sort({ name: 1 })
-      .limit(limitNum + 1)
-      .select('_id name parent description')
-      .lean();
+    const items = await CatalogLogSource.aggregate(pipeline);
 
     const hasMore = items.length > limitNum;
     const results = hasMore ? items.slice(0, limitNum) : items;
@@ -188,38 +214,15 @@ router.get('/operation-types', authenticate, async (req, res) => {
     const limitNum = Math.min(parseInt(limit) || 20, 50);
     const enabledBool = enabled === 'true';
 
-    let query = enabledBool
-      ? { $or: [
-          { enabled: true },
-          { enabled: { $exists: false } },
-          { enabled: 'true' },
-          { enabled: 1 }
-        ] }
-      : { $or: [
-          { enabled: false },
-          { enabled: 'false' },
-          { enabled: 0 }
-        ] };
+    const pipeline = buildSearchPipeline({
+      searchTerm,
+      enabledBool,
+      cursor,
+      limitNum,
+      projectFields: { _id: 1, name: 1, parent: 1, description: 1, infoAdicionalDefault: 1 }
+    });
 
-    if (cursor) {
-      query._id = { $gt: cursor };
-    }
-
-    if (searchTerm.length > 0) {
-      const regex = new RegExp(escapeRegExp(searchTerm), 'i');
-      query.$or = [
-        { name: regex },
-        { parent: regex },
-        { description: regex }
-      ];
-    }
-
-    const items = await CatalogOperationType
-      .find(query)
-      .sort({ name: 1 })
-      .limit(limitNum + 1)
-      .select('_id name parent description infoAdicionalDefault')
-      .lean();
+    const items = await CatalogOperationType.aggregate(pipeline);
 
     const hasMore = items.length > limitNum;
     const results = hasMore ? items.slice(0, limitNum) : items;

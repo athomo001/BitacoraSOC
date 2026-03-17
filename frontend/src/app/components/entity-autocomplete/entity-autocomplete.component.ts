@@ -42,7 +42,7 @@ import {
   ElementRef
 } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { Observable, of } from 'rxjs';
+import { Observable, Subject, merge, of } from 'rxjs';
 import { 
   map, 
   debounceTime, 
@@ -104,9 +104,11 @@ export class EntityAutocompleteComponent implements OnInit {
   // Observables
   filteredItems$!: Observable<AutocompleteItem[]>;
   isLoading = false;
+  lastQuery = '';
 
   // Item seleccionado actual
   selectedItem: AutocompleteItem | null = null;
+  private readonly refreshRequests$ = new Subject<void>();
 
   ngOnInit(): void {
     if (!this.apiFn && this.searchFn) {
@@ -119,11 +121,21 @@ export class EntityAutocompleteComponent implements OnInit {
 
     const apiFn = this.apiFn;
 
-    this.filteredItems$ = this.searchControl.valueChanges.pipe(
+    const queryChanges$ = this.searchControl.valueChanges.pipe(
       startWith(''),
       map(value => typeof value === 'string' ? value.trim() : ''),
       distinctUntilChanged(),
-      debounceTime(250),
+      debounceTime(250)
+    );
+
+    const manualRefresh$ = this.refreshRequests$.pipe(
+      map(() => typeof this.searchControl.value === 'string' ? this.searchControl.value.trim() : '')
+    );
+
+    this.filteredItems$ = merge(queryChanges$, manualRefresh$).pipe(
+      tap(query => {
+        this.lastQuery = query;
+      }),
       switchMap(query => {
         if (query.length < this.minChars) {
           this.isLoading = false;
@@ -162,7 +174,7 @@ export class EntityAutocompleteComponent implements OnInit {
    */
   clearSelection(): void {
     this.selectedItem = null;
-    this.searchControl.setValue('', { emitEvent: false });
+    this.searchControl.setValue('', { emitEvent: true });
     this.cleared.emit();
     
     // Focus en el input después de limpiar
@@ -171,8 +183,7 @@ export class EntityAutocompleteComponent implements OnInit {
 
   openPanel(): void {
     if (this.disabled) return;
-    const value = this.searchControl.value ?? '';
-    this.searchControl.setValue(value as string, { emitEvent: true });
+    this.refreshRequests$.next();
     setTimeout(() => this.autocompleteTrigger?.openPanel(), 0);
   }
 
