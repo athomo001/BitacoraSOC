@@ -1,4 +1,5 @@
 const { sendEmail } = require('./email');
+const mjml2html = require('mjml');
 const WorkShift = require('../models/WorkShift');
 const Entry = require('../models/Entry');
 const ShiftCheck = require('../models/ShiftCheck');
@@ -110,150 +111,298 @@ const renderStatusCell = (service) => {
   `;
 };
 
+const normalizeName = (value) => {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+};
+
+const isSameChecklistContext = (checklistEntry, checklistExit) => {
+  if (!checklistEntry || !checklistExit) {
+    return false;
+  }
+
+  const entryChecklistId = checklistEntry.checklistId ? checklistEntry.checklistId.toString() : '';
+  const exitChecklistId = checklistExit.checklistId ? checklistExit.checklistId.toString() : '';
+  if (entryChecklistId && exitChecklistId) {
+    return entryChecklistId === exitChecklistId;
+  }
+
+  const entryChecklistName = normalizeName(checklistEntry.checklistName);
+  const exitChecklistName = normalizeName(checklistExit.checklistName);
+  if (entryChecklistName && exitChecklistName) {
+    return entryChecklistName === exitChecklistName;
+  }
+
+  return false;
+};
+
+const buildStatusPill = (label, color) => {
+  return `<span style="display:inline-block;background:${color};color:#ffffff;font-size:11px;font-weight:700;line-height:1;padding:6px 10px;border-radius:999px;letter-spacing:0.2px;">${label}</span>`;
+};
+
+const renderServiceStatusBlock = ({ service, entryService = null, isExit = false, allowRepaired = false }) => {
+  if (!service) {
+    return `
+      <div style="font-size:12px;color:#90a4ae;line-height:1.3;">—</div>
+    `;
+  }
+
+  const isError = service.status === 'rojo';
+  const isRepaired = Boolean(
+    isExit
+    && allowRepaired
+    && service.status === 'verde'
+    && entryService
+    && entryService.status === 'rojo'
+  );
+
+  let pill = '';
+  if (isRepaired) {
+    pill = buildStatusPill('REPARADO', '#f57f17');
+  } else if (isError) {
+    pill = buildStatusPill('ERROR', '#c62828');
+  } else {
+    pill = buildStatusPill('OK', '#2e7d32');
+  }
+
+  const observation = String(service.observation || '').trim();
+  const repairedHint = isRepaired
+    ? '<div style="margin-top:6px;font-size:11px;color:#8d6e63;line-height:1.25;">Fue ERROR en entrada</div>'
+    : '';
+  const observationHtml = observation
+    ? `<div style="margin-top:6px;font-size:12px;color:#37474f;line-height:1.35;"><strong>Obs:</strong> ${escapeHtml(observation)}</div>`
+    : '';
+
+  return `
+    <div>${pill}</div>
+    ${repairedHint}
+    ${observationHtml}
+  `;
+};
+
+const renderSummaryCard = (label, value, styles) => {
+  return `
+    <mj-column width="33.33%" background-color="${styles.bg}" border="1px solid ${styles.border}" border-radius="8px" padding="14px 10px 12px 10px">
+      <mj-text align="center" color="${styles.valueColor}" font-size="30px" font-weight="700" padding="0">${value}</mj-text>
+      <mj-text align="center" color="${styles.labelColor}" font-size="12px" font-weight="600" padding="4px 0 0 0" letter-spacing="0.4px">${label}</mj-text>
+    </mj-column>
+  `;
+};
+
 /**
  * Genera HTML del reporte de turno
  */
-function generateReportHTML({ shift, checklistEntry, checklistExit, entries, periodStart, periodEnd, appTitle = 'Bitácora SOC' }) {
+function generateReportHTML({ shift, checklistEntry, checklistExit, entries, periodStart, periodEnd, appTitle = 'Bitácora SOC', faviconUrl = '' }) {
   const brandedAppTitle = String(appTitle || '').trim() || 'Bitácora SOC';
   const brandedAppTitleHtml = escapeHtml(brandedAppTitle);
+  const favicon = String(faviconUrl || '').trim();
+  const hasFavicon = favicon.length > 0;
   const dateLabel = formatDate(periodEnd || new Date());
   const periodLabel = periodStart && periodEnd
     ? `${formatDate(periodStart)} ${formatTime(periodStart)} - ${formatDate(periodEnd)} ${formatTime(periodEnd)}`
     : '';
+  const includeChecklist = shift.emailReportConfig?.includeChecklist;
+  const includeEntries = shift.emailReportConfig?.includeEntries;
+  const serviceRows = includeChecklist ? buildServiceRows(checklistEntry, checklistExit) : [];
+  const canCompareForRepair = isSameChecklistContext(checklistEntry, checklistExit);
+  const entryTime = formatTime(checklistEntry?.createdAt || checklistEntry?.checkDate);
+  const exitTime = formatTime(checklistExit?.createdAt || checklistExit?.checkDate);
 
-  const baseFont = "font-family:'Segoe UI', Arial, sans-serif;";
-  const hardBlack = 'color:#000000 !important;-webkit-text-fill-color:#000000 !important;mso-color-alt:#000000;mso-style-textfill-fill-color:#000000;';
-  const baseColor = hardBlack;
-  const tableBorder = 'border:1px solid #e0e0e0;';
-  const cellPadding = 'padding:6px 8px;';
+  let totalOk = 0;
+  let totalError = 0;
+  serviceRows.forEach((row) => {
+    const hasError = row.entry?.status === 'rojo' || row.exit?.status === 'rojo';
+    const hasOk = row.entry?.status === 'verde' || row.exit?.status === 'verde';
+    if (hasError) {
+      totalError += 1;
+    } else if (hasOk) {
+      totalOk += 1;
+    }
+  });
+  const totalEntries = Array.isArray(entries) ? entries.length : 0;
 
-  let html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="color-scheme" content="light">
-  <meta name="supported-color-schemes" content="light">
-  <!--[if mso]>
-  <style>
-    body, table, td, p, span, div, a, h1, h2, h3, h4, h5, h6, li { color:#000000 !important; }
-  </style>
-  <![endif]-->
-</head>
-<body style="${baseFont}line-height:1.6;${baseColor}background-color:#f5f5f5;margin:0;padding:0;" bgcolor="#f5f5f5">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f5f5f5" style="background-color:#f5f5f5;">
-    <tr>
-      <td align="center" style="padding:16px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:1100px;">
-          <tr>
-            <td style="background-color:#ffffff;border-radius:8px;padding:28px;box-shadow:0 2px 4px rgba(0,0,0,0.1);${baseColor}" bgcolor="#ffffff">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  const summarySection = `
+    <mj-section padding="0 24px 8px 24px">
+      <mj-column>
+        <mj-text font-size="18px" font-weight="700" color="#263238" padding="0 0 12px 0">Resumen Ejecutivo</mj-text>
+      </mj-column>
+    </mj-section>
+    <mj-section padding="0 24px 12px 24px">
+      ${renderSummaryCard('OK', totalOk, {
+    bg: '#e8f5e9',
+    border: '#c8e6c9',
+    valueColor: '#1b5e20',
+    labelColor: '#2e7d32'
+  })}
+      ${renderSummaryCard('NO OK', totalError, {
+    bg: '#ffebee',
+    border: '#ffcdd2',
+    valueColor: '#b71c1c',
+    labelColor: '#c62828'
+  })}
+      ${renderSummaryCard('Entradas', totalEntries, {
+    bg: '#e3f2fd',
+    border: '#bbdefb',
+    valueColor: '#0d47a1',
+    labelColor: '#1565c0'
+  })}
+    </mj-section>
+  `;
+
+  const checklistCards = includeChecklist && serviceRows.length > 0
+    ? serviceRows.map((row) => {
+      const title = escapeHtml(row.entry?.serviceTitle || row.exit?.serviceTitle || 'Servicio');
+      const entryBlock = renderServiceStatusBlock({ service: row.entry });
+      const exitBlock = renderServiceStatusBlock({
+        service: row.exit,
+        entryService: row.entry,
+        isExit: true,
+        allowRepaired: canCompareForRepair
+      });
+      return `
+        <mj-section padding="0 24px 10px 24px">
+          <mj-column>
+            <mj-text padding="0">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e3e7ea;border-radius:8px;background:#ffffff;overflow:hidden;">
                 <tr>
-                  <td style="background-color:#ffffff;color:#000000;padding:20px;border-bottom:2px solid #e0e0e0;border-radius:8px 8px 0 0;${hardBlack}" bgcolor="#ffffff">
-                    <h1 style="margin:0;font-size:24px;${hardBlack}">🛡️ Reporte de Turno - ${brandedAppTitleHtml}</h1>
-                    <div style="margin:5px 0 0 0;font-size:14px;${hardBlack}">
-                      ${escapeHtml(shift.name)} (${shift.startTime} - ${shift.endTime}) • ${dateLabel}
-                    </div>
-                    ${periodLabel ? `<div style="margin:10px 0 0 0;font-size:13px;${hardBlack}">Periodo: ${periodLabel}</div>` : ''}
-                  </td>
+                  <td style="background:#f7f9fb;padding:12px 14px;font-size:14px;font-weight:700;color:#263238;">${title}</td>
                 </tr>
                 <tr>
-                  <td style="padding-top:20px;${baseColor}">
-                    <font color="#000000">
-`;
-
-  // Sección de Checklist
-  if (shift.emailReportConfig.includeChecklist && (checklistEntry || checklistExit)) {
-    const entryTime = formatTime(checklistEntry?.createdAt || checklistEntry?.checkDate);
-    const exitTime = formatTime(checklistExit?.createdAt || checklistExit?.checkDate);
-    const serviceRows = buildServiceRows(checklistEntry, checklistExit);
-
-    html += `
-    <div style="margin:20px 0;">
-      <div style="font-size:18px;font-weight:700;${hardBlack}margin-bottom:15px;padding-bottom:8px;border-bottom:2px solid #e0e0e0;">📋 Checklist de Entrada y Salida</div>
-      <table role="presentation" style="width:100%;border-collapse:collapse;margin-top:10px;${baseColor}background-color:#ffffff !important;" cellpadding="0" cellspacing="0" bgcolor="#ffffff">
-        <thead>
-          <tr>
-            <th style="width:40%;background-color:#f8f9fa !important;${cellPadding}${tableBorder}${hardBlack}text-align:left;" bgcolor="#f8f9fa">Servicio</th>
-            <th style="width:30%;background-color:#f8f9fa !important;${cellPadding}${tableBorder}${hardBlack}text-align:left;" bgcolor="#f8f9fa">Entrada (${entryTime})</th>
-            <th style="width:30%;background-color:#f8f9fa !important;${cellPadding}${tableBorder}${hardBlack}text-align:left;" bgcolor="#f8f9fa">Salida (${exitTime})</th>
-          </tr>
-        </thead>
-        <tbody>
-`;
-
-    serviceRows.forEach((row) => {
-      const title = escapeHtml(row.entry?.serviceTitle || row.exit?.serviceTitle || 'Servicio');
-      html += `
-        <tr>
-          <td style="${cellPadding}${tableBorder}${hardBlack}vertical-align:top;background-color:#ffffff !important;line-height:1.25;" bgcolor="#ffffff"><strong style="${hardBlack};font-size:12px;">${title}</strong></td>
-          <td style="${cellPadding}${tableBorder}${hardBlack}vertical-align:top;background-color:#ffffff !important;" bgcolor="#ffffff">${renderStatusCell(row.entry)}</td>
-          <td style="${cellPadding}${tableBorder}${hardBlack}vertical-align:top;background-color:#ffffff !important;" bgcolor="#ffffff">${renderStatusCell(row.exit)}</td>
-        </tr>
-      `;
-    });
-
-    html += `
-        </tbody>
-      </table>
-    </div>
-`;
-  }
-
-  // Sección de Entradas
-  if (shift.emailReportConfig.includeEntries) {
-    html += `
-    <div style="margin:30px 0;">
-      <div style="font-size:18px;font-weight:700;${hardBlack}margin-bottom:15px;padding-bottom:8px;border-bottom:2px solid #e0e0e0;">📝 Entradas de Bitácora</div>
-`;
-
-    if (entries && entries.length > 0) {
-      html += '<ul style="list-style:none;padding:0;margin:0;">';
-      entries.forEach(entry => {
-        const time = entry.entryTime
-          ? entry.entryTime
-          : new Date(entry.createdAt).toLocaleTimeString('es-CL', {
-            hour: '2-digit',
-            minute: '2-digit'
-          });
-        const date = entry.entryDate ? formatDate(entry.entryDate) : formatDate(entry.createdAt);
-        const typeLabel = entry.entryType ? entry.entryType.toUpperCase() : 'ENTRADA';
-        html += `
-        <li style="background-color:#ffffff !important;border:1px solid #e0e0e0;border-left:4px solid #667eea;padding:15px;margin:10px 0;border-radius:4px;${hardBlack}" bgcolor="#ffffff">
-          <div style="font-weight:700;${hardBlack}margin-bottom:5px;">${escapeHtml(time)}${date ? ` • ${escapeHtml(date)}` : ''}</div>
-          <div style="${hardBlack}font-size:12px;margin-bottom:6px;">Tipo: ${escapeHtml(typeLabel)}${entry.clientName ? ` • Cliente: ${escapeHtml(entry.clientName)}` : ''}</div>
-          <div style="${hardBlack}font-size:14px;white-space:pre-wrap;word-break:break-word;">${formatEntryContent(entry.content || '')}</div>
-        </li>
-`;
-      });
-      html += '</ul>';
-    } else {
-      html += '<div style="text-align:center;padding:30px;color:#999 !important;font-style:italic;">No se registraron entradas durante este turno</div>';
-    }
-
-    html += '</div>';
-  }
-
-  html += `
-    <div style="margin-top:40px;padding-top:20px;border-top:1px solid #e0e0e0;text-align:center;${hardBlack}font-size:12px;">
-      Este correo fue generado automáticamente por ${brandedAppTitleHtml}<br>
-      No responder a este mensaje
-    </div>
-                    </font>
+                  <td style="padding:10px 14px 12px 14px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="width:50%;vertical-align:top;padding-right:8px;">
+                          <div style="font-size:12px;color:#546e7a;font-weight:600;margin-bottom:6px;">Entrada (${escapeHtml(entryTime)})</div>
+                          ${entryBlock}
+                        </td>
+                        <td style="width:50%;vertical-align:top;padding-left:8px;">
+                          <div style="font-size:12px;color:#546e7a;font-weight:600;margin-bottom:6px;">Salida (${escapeHtml(exitTime)})</div>
+                          ${exitBlock}
+                        </td>
+                      </tr>
+                    </table>
                   </td>
                 </tr>
               </table>
-            </td>
+            </mj-text>
+          </mj-column>
+        </mj-section>
+      `;
+    }).join('')
+    : `
+      <mj-section padding="0 24px 12px 24px">
+        <mj-column>
+          <mj-text font-size="13px" color="#78909c" padding="0">No se registraron datos de checklist para este turno.</mj-text>
+        </mj-column>
+      </mj-section>
+    `;
+
+  const checklistSection = includeChecklist
+    ? `
+      <mj-section padding="8px 24px 8px 24px">
+        <mj-column>
+          <mj-text font-size="18px" font-weight="700" color="#263238" padding="0 0 10px 0">Checklist</mj-text>
+        </mj-column>
+      </mj-section>
+      ${checklistCards}
+    `
+    : '';
+
+  const entriesSection = includeEntries
+    ? `
+      <mj-section padding="10px 24px 8px 24px">
+        <mj-column>
+          <mj-text font-size="18px" font-weight="700" color="#263238" padding="0 0 10px 0">Bitácora</mj-text>
+        </mj-column>
+      </mj-section>
+      ${totalEntries > 0
+    ? entries.map((entry) => {
+      const time = entry.entryTime || formatTime(entry.createdAt);
+      const date = entry.entryDate ? formatDate(entry.entryDate) : formatDate(entry.createdAt);
+      const typeLabel = entry.entryType ? entry.entryType.toUpperCase() : 'ENTRADA';
+      const header = `${escapeHtml(time)}${date ? ` • ${escapeHtml(date)}` : ''}`;
+      const subtitle = `Tipo: ${escapeHtml(typeLabel)}${entry.clientName ? ` • Cliente: ${escapeHtml(entry.clientName)}` : ''}`;
+      const content = formatEntryContent(entry.content || '');
+      return `
+              <mj-section padding="0 24px 10px 24px">
+                <mj-column>
+                  <mj-text padding="0">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e3e7ea;border-radius:8px;background:#ffffff;overflow:hidden;">
+                      <tr>
+                        <td style="padding:10px 14px 6px 14px;font-size:13px;font-weight:700;color:#263238;">${header}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:0 14px 8px 14px;font-size:12px;color:#607d8b;">${subtitle}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:0 14px 12px 14px;font-size:13px;line-height:1.45;color:#263238;">${content}</td>
+                      </tr>
+                    </table>
+                  </mj-text>
+                </mj-column>
+              </mj-section>
+            `;
+    }).join('')
+    : `
+            <mj-section padding="0 24px 12px 24px">
+              <mj-column>
+                <mj-text font-size="13px" color="#78909c" padding="0">No se registraron entradas durante este turno.</mj-text>
+              </mj-column>
+            </mj-section>
+          `}
+    `
+    : '';
+
+  const mjmlTemplate = `
+<mjml>
+  <mj-head>
+    <mj-attributes>
+      <mj-all font-family="Segoe UI, Arial, sans-serif" />
+      <mj-text color="#263238" />
+    </mj-attributes>
+  </mj-head>
+  <mj-body background-color="#eef2f5" width="960px">
+    <mj-section padding="16px 24px 0 24px">
+      <mj-column background-color="#1f2d3a" border="1px solid #dde3e8" border-bottom="0" border-radius="10px 10px 0 0" padding="20px 18px 14px 18px">
+        <mj-table padding="0">
+          <tr>
+            ${hasFavicon ? `<td style="width:44px;vertical-align:middle;padding-right:8px;"><img src="${escapeHtml(favicon)}" width="36" height="36" style="display:block;width:36px;height:36px;border:0;outline:none;text-decoration:none;" alt="Logo"></td>` : ''}
+            <td style="vertical-align:middle;"><div style="font-size:24px;font-weight:700;line-height:1.2;color:#ffffff;">🛡️ Reporte de Turno - ${brandedAppTitleHtml}</div></td>
           </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
+        </mj-table>
+        <mj-text font-size="13px" color="#d6e2ea" padding="8px 0 0 0">${escapeHtml(shift.name)} • ${escapeHtml(shift.startTime)}-${escapeHtml(shift.endTime)} • ${escapeHtml(dateLabel)}</mj-text>
+        ${periodLabel ? `<mj-text font-size="12px" color="#b6c9d6" padding="6px 0 0 0">Periodo: ${escapeHtml(periodLabel)}</mj-text>` : ''}
+      </mj-column>
+    </mj-section>
+    ${summarySection}
+    ${checklistSection}
+    ${entriesSection}
+    <mj-section padding="8px 24px 20px 24px">
+      <mj-column background-color="#ffffff" border="1px solid #dde3e8" border-top="0" border-radius="0 0 10px 10px" padding="0 18px 10px 18px">
+        <mj-divider border-width="1px" border-color="#e1e7eb" padding="0 0 10px 0" />
+        <mj-text font-size="12px" color="#78909c" align="center" padding="0">Este correo fue generado automáticamente por ${brandedAppTitleHtml}</mj-text>
+        <mj-text font-size="12px" color="#90a4ae" align="center" padding="4px 0 0 0">No responder a este mensaje</mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>
 `;
 
-  return html;
+  const compilation = mjml2html(mjmlTemplate, {
+    validationLevel: 'strict',
+    minify: false,
+    keepComments: false
+  });
+
+  if (Array.isArray(compilation.errors) && compilation.errors.length > 0) {
+    const message = compilation.errors.map((item) => item.formattedMessage || item.message).join(' | ');
+    throw new Error(`MJML compilation failed: ${message}`);
+  }
+
+  return compilation.html;
 }
 
 function generateReportText({ shift, checklistEntry, checklistExit, entries, periodStart, periodEnd, appTitle = 'Bitácora SOC' }) {
@@ -349,8 +498,9 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
 
     logger.info('📊 [sendShiftReport] Recipients found', { count: shift.emailReportConfig.recipients.length, recipients: shift.emailReportConfig.recipients });
 
-    const appConfig = await AppConfig.findOne().select('appTitle').lean();
+    const appConfig = await AppConfig.findOne().select('appTitle faviconUrl').lean();
     const appTitle = String(appConfig?.appTitle || '').trim() || 'Bitácora SOC';
+    const faviconUrl = String(appConfig?.faviconUrl || '').trim();
 
     // 2. Calcular rango horario del turno
     const [startHour, startMinute] = shift.startTime.split(':').map(Number);
@@ -373,9 +523,11 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
     }
 
     // 3. Buscar checklists de entrada y salida dentro del rango real del turno
+    const isManualTrigger = options.ignoreShiftEnabled === true;
+    const checklistExitRangeEnd = isManualTrigger ? shiftDate : shiftEnd;
     const checklistExit = await ShiftCheck.findOne({
       type: 'cierre',
-      createdAt: { $gte: shiftStart, $lte: shiftEnd }
+      createdAt: { $gte: shiftStart, $lte: checklistExitRangeEnd }
     }).sort({ createdAt: -1 });
 
     const entryRangeEnd = checklistExit?.createdAt || shiftEnd;
@@ -393,7 +545,6 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
     }).sort({ createdAt: 1 });
 
     // B14: Guardas anti-vacío y validación de checklist de cierre
-    const isManualTrigger = options.ignoreShiftEnabled === true;
     if (!isManualTrigger) {
       const hasContentToSend = (checklistEntry || checklistExit || (entries && entries.length > 0));
       if (!hasContentToSend) {
@@ -402,11 +553,16 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
       }
 
       if (!checklistExit) {
-        logger.warn('📊 [sendShiftReport] No closure checklist found; sending report with available shift data', {
+        logger.info('📊 [sendShiftReport] PENDIENTE_POR_CIERRE: no closure checklist yet, report deferred', {
           shiftId: shift._id,
           entriesCount: entries.length,
           hasChecklistEntry: !!checklistEntry
         });
+        return {
+          success: false,
+          deferredByClosure: true,
+          message: 'Pending closure checklist. Report deferred.'
+        };
       }
 
       // B14: Anti duplicados comprobando lastReportSentAt dentro del periodo de turno
@@ -444,7 +600,8 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
       entries,
       periodStart,
       periodEnd,
-      appTitle
+      appTitle,
+      faviconUrl
     });
     const text = generateReportText({
       shift,
@@ -484,6 +641,7 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
 
     return {
       success: true,
+      deferredByClosure: false,
       message: 'Report sent successfully',
       recipients: shift.emailReportConfig.recipients.length,
       includeChecklist: shift.emailReportConfig.includeChecklist,

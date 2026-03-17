@@ -33,7 +33,7 @@ export class ReportGeneratorComponent implements OnInit {
   selectedLogSource: CatalogLogSource | null = null;
   selectedOperationType: CatalogOperationType | null = null;
 
-  uploadedImages: { name: string, dataUrl: string }[] = [];
+  uploadedImages: { name: string, dataUrl: string, width: number, height: number }[] = [];
   generatedHtml = '';
   showPreview = false;
   activeClientAlert: ClientAlertEvaluation | null = null;
@@ -131,10 +131,29 @@ export class ReportGeneratorComponent implements OnInit {
       const file = files[i];
       const reader = new FileReader();
       reader.onload = (e: any) => {
-        this.uploadedImages.push({
-          name: file.name,
-          dataUrl: e.target.result
-        });
+        const dataUrl = String(e?.target?.result || '');
+        if (!dataUrl) {
+          return;
+        }
+
+        const imageProbe = new Image();
+        imageProbe.onload = () => {
+          this.uploadedImages.push({
+            name: file.name,
+            dataUrl,
+            width: imageProbe.naturalWidth || 0,
+            height: imageProbe.naturalHeight || 0
+          });
+        };
+        imageProbe.onerror = () => {
+          this.uploadedImages.push({
+            name: file.name,
+            dataUrl,
+            width: 0,
+            height: 0
+          });
+        };
+        imageProbe.src = dataUrl;
       };
       reader.readAsDataURL(file);
     }
@@ -249,7 +268,13 @@ export class ReportGeneratorComponent implements OnInit {
       }
       if (hasImages) {
         this.uploadedImages.forEach(img => {
-          html += `<img src="${img.dataUrl}" width="${evidenceImageWidthPx}" style="max-width: 100%; height: auto; object-fit: contain; margin: 4px auto; display: block; border: 1px solid #ddd;"><br>`;
+          const renderWidth = img.width > 0 ? Math.min(evidenceImageWidthPx, img.width) : evidenceImageWidthPx;
+          const renderHeight = img.width > 0 && img.height > 0
+            ? Math.max(1, Math.round((img.height * renderWidth) / img.width))
+            : 0;
+          const heightAttribute = renderHeight > 0 ? ` height="${renderHeight}"` : '';
+
+          html += `<a href="${img.dataUrl}" style="display: block; text-align: center; text-decoration: none;"><img src="${img.dataUrl}" width="${renderWidth}"${heightAttribute} style="width: ${renderWidth}px; max-width: 100%; height: auto; object-fit: contain; margin: 4px auto; display: block; border: 1px solid #ddd; image-rendering: auto;" alt="${this.escapeHtml(img.name || 'Evidencia')}"></a><br>`;
         });
       }
       html += `</td>\n  </tr>`;

@@ -642,7 +642,29 @@ router.post('/check',
         try {
           const currentShift = await getCurrentShift(new Date());
           if (currentShift) {
-            await sendShiftReport(currentShift._id, new Date(), { ignoreShiftEnabled: true });
+            const reportResult = await sendShiftReport(currentShift._id, new Date(), { ignoreShiftEnabled: true });
+
+            if (reportResult?.success) {
+              logger.info({
+                requestId: req.requestId,
+                shiftId: currentShift._id,
+                checkId: check._id
+              }, 'ENVIADO_DIFERIDO: shift report sent after closure checklist');
+            } else if (reportResult?.deferredByClosure) {
+              logger.info({
+                requestId: req.requestId,
+                shiftId: currentShift._id,
+                checkId: check._id,
+                message: reportResult.message
+              }, 'PENDIENTE_POR_CIERRE: shift report still deferred after closure trigger');
+            } else {
+              logger.warn({
+                requestId: req.requestId,
+                shiftId: currentShift._id,
+                checkId: check._id,
+                message: reportResult?.message || 'Unknown reason'
+              }, 'Shift report trigger completed without email delivery');
+            }
           } else {
             logger.warn({ requestId: req.requestId }, 'No se encontró turno actual para enviar reporte');
           }
