@@ -192,8 +192,16 @@
 - Función de texto plano (fallback): `generateReportText(...)` — NO debe modificarse
 - Función de envío: `sendShiftReport(shiftId, shiftDate, options)` — su interfaz NO debe cambiar
 - Variable de branding: `appTitle` → viene de `AppConfig.appTitle` (DB) con fallback `'Bitácora SOC'`; dentro de `generateReportHTML` se llama `brandedAppTitle`
-- Problema de texto redundante: `renderStatusCell()` usa `labelWithText = isOk ? 'OK (Verde)' : 'ERROR (Rojo)'` — debe eliminarse, solo usar ícono + etiqueta corta
-- Las observaciones vacías se muestran siempre como `Obs: -` — solo mostrar si `service.observation` no es vacía
+- Problema de texto redundante: `renderStatusCell()` muestra `'OK (Verde)'` / `'ERROR (Rojo)'` — eliminar redundancia
+- Las observaciones vacías se muestran como `Obs: -` — solo mostrar si `service.observation` existe
+
+**Problemas a solucionar en esta refactorización:**
+1. Texto redundante en estados (OK Verde / ERROR Rojo)
+2. No existe sección de Resumen Ejecutivo (conteos visuales)
+3. Checklist es tabla plana de 3 columnas — difícil de escanear
+4. Entradas de Bitácora sin jerarquía visual clara
+5. Observaciones siempre visibles aunque vacías
+6. HTML frágil sin framework — incompatible con dark-mode, Outlook, Gmail
 
 **Dependencia nueva:**
 - Añadir `mjml` a `backend/package.json` (`npm install mjml`)
@@ -206,38 +214,49 @@
    - **Favicon/Logo:** Si `AppConfig.faviconUrl` existe, mostrarlo como imagen pequeña (max-width: 32px o 48px) en la esquina izquierda del header, alineado verticalmente con el título
    - Título: `🛡️ Reporte de Turno — ${brandedAppTitle}` (el guión largo separa el subtítulo); posicionar al lado del favicon si existe
    - Subtítulo: `${shift.name} • ${shift.startTime}–${shift.endTime} • ${dateLabel}`
-   - Si `periodLabel` existe, mostrarlo en una tercera línea más pequeña
+   - Si `periodLabel` existe, mostrarlo en una tercera línea más pequeña (Periodo: [rango completo])
 
 2. **Resumen Ejecutivo** (`<mj-section>` con 3 columnas `<mj-column>`)
-   - Calcular antes de la plantilla:
-     - `totalOk` = servicios con `status === 'verde'` en entry + exit (sin duplicados)
-     - `totalError` = servicios con `status` distinto de `'verde'`
+   - Calcular antes de renderizar:
+     - `totalOk` = servicios con `status === 'verde'` en entry + exit (contar sin duplicados por `serviceId`)
+     - `totalError` = servicios con `status === 'rojo'` en entry o exit
      - `totalEntries` = `entries.length`
-   - Cada bloque muestra: número grande + etiqueta debajo (p.ej. `OK`, `ERROR`, `Entradas`)
+   - Cada columna: número grande (tipografía gruesa) + etiqueta debajo (`OK`, `NO OK`, `Entradas`); fondos sutiles para claridad
 
-3. **Checklist — tarjetas por servicio** (`<mj-section>` por cada servicio)
-   - Iterar `buildServiceRows(checklistEntry, checklistExit)` (función ya existe)
-   - Cada fila = 1 sección con nombre del servicio en header y columnas Entrada / Salida
-   - Estado: usar solo `🟢 OK` o `🔴 ERROR` (sin "(Verde)"/"(Rojo)")
-   - Observación: solo si `service.observation` no está vacía, mostrarla como `Obs: ...`
-   - Si el servicio no fue registrado en un turno, mostrar `—` en gris
+3. **Checklist — tarjetas por servicio** (`<mj-section>` por servicio, NO tabla)
+   - Iterar `buildServiceRows(checklistEntry, checklistExit)` y renderizar cada servicio como una tarjeta visual
+   - Nombre del servicio en header destacado
+   - Columnas visuales Entrada / Salida lado a lado (no filas de tabla, sino bloques)
+   - **Estados columna Entrada:**
+     - `🟢 OK` → si `row.entry.status === 'verde'`
+     - `🔴 ERROR` → si `row.entry.status === 'rojo'`
+     - `—` gris → si sin registro
+   - **Estados columna Salida:** (Por ahora OK / ERROR; B44 añadirá REPARADO)
+     - `🟢 OK` → si `row.exit.status === 'verde'`
+     - `🔴 ERROR` → si `row.exit.status === 'rojo'`
+     - `—` gris → si sin registro
+   - Observación: mostrar **solo si existe** (`service.observation`), con formato `Obs: [texto]`; no mostrar si está vacía
 
-4. **Bitácora — bloques independientes** (`<mj-section>` por cada entrada)
+4. **Bitácora — bloques independientes** (`<mj-section>` por cada entrada, con jerarquía visual)
    - Iterar `entries` (igual que antes)
-   - Cada bloque: hora + fecha en header, tipo + cliente en subtítulo, `content` completo sin resumir
-   - Si `content` tiene saltos de línea, respetar el wrap (MJML convierte `\n` con `<br>`)
+   - Cada entrada como bloque independiente con:
+     - Header: hora + fecha (tipografía media/bold)
+     - Subtítulo: tipo + cliente (tipografía pequeña, gris)
+     - Cuerpo: `content` completo sin resumir, respetando saltos de línea (`\n` → `<br>`)
+   - Separación visual clara entre bloques (espaciado, bordes sutiles)
 
 5. **Footer** (`<mj-section>`)
    - `Este correo fue generado automáticamente por ${brandedAppTitle}`
    - `No responder a este mensaje`
 
 **Reglas de implementación:**
-- Solo reemplazar la función `generateReportHTML()` — no tocar `generateReportText()`, `renderStatusCell()` (si se mantiene hay que limpiar el texto redundante), `sendShiftReport()` ni los modelos
-- `renderStatusCell()` puede eliminarse del scope de MJML porque la plantilla maneja el estado directamente dentro del string MJML
-- Toda la lógica de datos (buildServiceRows, formatTime, formatDate, etc.) se mantiene tal cual; solo cambia la capa de renderizado final
-- El MJML se construye como un template literal (`const mjmlTemplate = \`<mjml>...\``) y al final se llama `mjml2html(mjmlTemplate).html`
-- Si `mjml2html` lanza un error de compilación, capturarlo y lanzar error descriptivo (no silenciar)
-- El fondo del email debe ser `#ffffff` (claro), tipografía simple, sin CSS moderno ni JS
+- **SOLO** reemplazar la función `generateReportHTML()` — no tocar `generateReportText()`, `sendShiftReport()` ni los modelos
+- No modificar `renderStatusCell()` en esta fase (B44 lo hará)
+- La lógica de datos (buildServiceRows, formatTime, formatDate, escapeHtml, etc.) se mantiene sin cambios
+- El MJML se construye como template literal: `const mjmlTemplate = \`<mjml>...\`; const { html } = mjml2html(mjmlTemplate).html;`
+- Si `mjml2html` lanza error de compilación, capturarlo y lanzar error descriptivo (no silenciar)
+- Fondo: `#ffffff` (claro), tipografía simple, sin CSS moderno ni JavaScript
+- Compatibilidad: probar viewport móvil y outlook desktop antes de mergear
 
 ### B44 - Reporte de turno: estado REPARADO (amarillo) en celda de salida
 
