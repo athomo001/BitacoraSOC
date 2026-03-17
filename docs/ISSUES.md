@@ -203,7 +203,8 @@
 **Estructura de la nueva plantilla MJML (`generateReportHTML`):**
 
 1. **Header** (`<mj-section>` fondo oscuro o primario)
-   - Título: `🛡️ Reporte de Turno — ${brandedAppTitle}` (el guión largo separa el subtítulo)
+   - **Favicon/Logo:** Si `AppConfig.faviconUrl` existe, mostrarlo como imagen pequeña (max-width: 32px o 48px) en la esquina izquierda del header, alineado verticalmente con el título
+   - Título: `🛡️ Reporte de Turno — ${brandedAppTitle}` (el guión largo separa el subtítulo); posicionar al lado del favicon si existe
    - Subtítulo: `${shift.name} • ${shift.startTime}–${shift.endTime} • ${dateLabel}`
    - Si `periodLabel` existe, mostrarlo en una tercera línea más pequeña
 
