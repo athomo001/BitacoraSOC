@@ -523,9 +523,11 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
     }
 
     // 3. Buscar checklists de entrada y salida dentro del rango real del turno
+    const isManualTrigger = options.ignoreShiftEnabled === true;
+    const checklistExitRangeEnd = isManualTrigger ? shiftDate : shiftEnd;
     const checklistExit = await ShiftCheck.findOne({
       type: 'cierre',
-      createdAt: { $gte: shiftStart, $lte: shiftEnd }
+      createdAt: { $gte: shiftStart, $lte: checklistExitRangeEnd }
     }).sort({ createdAt: -1 });
 
     const entryRangeEnd = checklistExit?.createdAt || shiftEnd;
@@ -543,7 +545,6 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
     }).sort({ createdAt: 1 });
 
     // B14: Guardas anti-vacío y validación de checklist de cierre
-    const isManualTrigger = options.ignoreShiftEnabled === true;
     if (!isManualTrigger) {
       const hasContentToSend = (checklistEntry || checklistExit || (entries && entries.length > 0));
       if (!hasContentToSend) {
@@ -552,11 +553,16 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
       }
 
       if (!checklistExit) {
-        logger.warn('📊 [sendShiftReport] No closure checklist found; sending report with available shift data', {
+        logger.info('📊 [sendShiftReport] PENDIENTE_POR_CIERRE: no closure checklist yet, report deferred', {
           shiftId: shift._id,
           entriesCount: entries.length,
           hasChecklistEntry: !!checklistEntry
         });
+        return {
+          success: false,
+          deferredByClosure: true,
+          message: 'Pending closure checklist. Report deferred.'
+        };
       }
 
       // B14: Anti duplicados comprobando lastReportSentAt dentro del periodo de turno
@@ -635,6 +641,7 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
 
     return {
       success: true,
+      deferredByClosure: false,
       message: 'Report sent successfully',
       recipients: shift.emailReportConfig.recipients.length,
       includeChecklist: shift.emailReportConfig.includeChecklist,

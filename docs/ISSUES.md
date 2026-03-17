@@ -11,6 +11,9 @@
 | B19 | Pendiente | Integraciones | Creación de tickets en GLPI (Correo / API) | Definir flujo final (resumen diario vs evento inmediato), destino y estrategia de reintentos. |
 | AI-SUMMARY-001 | Pendiente | IA/Operación ALTA | Módulo de Resumen Ejecutivo Efímero (IA On-Demand) | Integrar Ollama+llama3.2:3b en modo efímero `docker start -> healthcheck -> generate -> docker stop` con `try/finally`, salida editable en campo "Resumen Sugerido por IA" y botón "Generar con IA". |
 | B34 | Pendiente | Operación/Alertas | Alerta por ítems NOK (Rojo) en Checklist | Añadir switch en config global para activar/desactivar alerta por ítems en rojo. Agregar selector de cargo (ej. N2) a notificar. Al guardar el checklist, si el analista marca ítems NOK (rojo), enviar email automático a todos los usuarios del cargo seleccionado incluyendo el detalle/observación ingresada por el analista. |
+| SEC-HIGH-009 | Pendiente | Seguridad ALTA | Riesgo de Regex Injection / ReDoS en búsquedas de catálogo y tags (NoSQL) | Hallazgo QA: existen regex construidas directo desde input sin escape (`new RegExp(search, 'i')`, `new RegExp('^' + q, 'i')`, `$regex` con `topic` sin escapar) en rutas autenticadas/admin. Un patrón malicioso puede disparar backtracking costoso y degradar el backend (DoS lógico). Archivos detectados: `backend/src/routes/admin-catalog.js`, `backend/src/routes/tags.js`, `backend/src/routes/entries.js`, `backend/src/controllers/escalationController.js`. |
+| SEC-HIGH-010 | Pendiente | Seguridad ALTA | OWASP A10 SSRF: URLs salientes configurables sin allowlist en integraciones | Hallazgo QA: endpoints de integración permiten destinos salientes controlados por configuración (`GLPI api.baseUrl` y `logging http.url`) sin validación estricta de red interna/loopback/protocolos. Riesgo: Server-Side Request Forgery desde backend hacia servicios internos/metadatos si una cuenta admin se compromete. Archivos detectados: `backend/src/routes/glpi.js`, `backend/src/routes/logging.js`, `backend/src/utils/logForwarder.js`. |
+| SEC-MED-011 | Pendiente | Seguridad MEDIA | OWASP A09/A02: Logging sensible en autenticación (username + estado de password) | Hallazgo QA: en login se registran por consola datos sensibles de autenticación (`LOGIN REQUEST`, `Usuario encontrado`, `Password match`) sin condicionamiento por entorno. Riesgo: exposición de telemetría de credenciales/intentos en logs operativos. Archivo detectado: `backend/src/routes/auth.js`. |
 
 ### ✅ Listas
 
@@ -65,6 +68,7 @@
 | B42 | Listo | UI/UX + Bug | Report Generator: imágenes de evidencia pierden nitidez al enviarse por correo | Se mantuvo el layout técnico fijo y se mejoró la nitidez al evitar upscaling de evidencia (usa dimensiones reales de la imagen), preservando proporción y permitiendo abrir la evidencia original al hacer clic. |
 | B43 | Listo | Email / UX / Mantenibilidad | Email de turno: refactorizar a MJML y rediseñar como dashboard escaneable | `generateReportHTML` migrado a MJML con compatibilidad robusta para clientes de correo, nuevo header con branding y favicon opcional (`AppConfig.faviconUrl`), resumen ejecutivo (OK/NO OK/Entradas), checklist en tarjetas escaneables, bitácora en bloques jerárquicos y observaciones mostradas solo cuando existen. |
 | B44 | Listo | Email / UX | Reporte de turno: mostrar estado "REPARADO" (amarillo) cuando entrada fue ERROR y salida fue OK | Implementado en el correo de turno: `REPARADO` aparece solo en salida cuando entrada fue rojo y salida verde, únicamente si inicio/cierre corresponden a la misma checklist (ID o fallback por nombre). Si salida es rojo, siempre queda `ERROR`. |
+| B45 | Listo | Operación/Turnos + Email | Correo de fin de turno debe posponerse hasta checklist de cierre real (si analista se atrasa) | Implementado en backend: el trigger automático de fin de turno ya no envía si no existe checklist de cierre (`PENDIENTE_POR_CIERRE`), el envío se ejecuta al registrar cierre incluso fuera de la hora fin (ventana extendida en trigger manual), y se mantiene control anti-duplicado con `lastReportSentAt` más trazabilidad `ENVIADO_DIFERIDO`/`PENDIENTE_POR_CIERRE`. |
 | B35 | Listo | UI/UX + Bug | Ajuste Header Checklist y Fix "Último Check" | H1 cambiado a título fijo "Checklist del Turno"; nombre de plantilla se muestra como subtítulo. Accordion usa el nombre de la plantilla. Backend `GET /check/last` corregido para retornar el último check del equipo (sin filtro por usuario), garantizando que siempre se muestre el registro más reciente real. |
 | B36 | Listo | UI/UX | Aprovechamiento de ancho de pantalla | Cajón de notas (right sidebar) cambiado a `mode="over"` (overlay sobre el contenido, sin empujar). Cuando las notas se abren, el contenido recibe `margin-right: 350px` vía clase `.with-notes-open` para evitar solapamiento. El contenido principal usa `transition` suave y ocupa el ancho completo disponible en pantallas grandes. Eliminado `max-width: 900px` del contenedor del Checklist. |
 
@@ -123,6 +127,61 @@
    - En `Global Configuration` o en Configuración de Checklists, agregar el toggle switch "Habilitar alertas NOK".
    - Al lado, un Mat-Select con selección múltiple (checkboxes) que cargue el diccionario de cargos permitidos.
    - Guardar estas variables de vuelta al modelo usando el servicio existente de `ConfigService`.
+
+### B45 - Correo de fin de turno pospuesto hasta checklist de cierre real
+
+1. **Regla operativa (backend):**
+   - En el trigger automático de fin de turno, si no existe checklist de cierre (`type: 'cierre'`) para ese turno/sesión, no enviar correo y marcar envío como pendiente.
+2. **Disparador diferido:**
+   - Al registrar checklist de cierre (ruta de guardado de checklist), evaluar si existe reporte pendiente para ese turno y ejecutar `sendShiftReport(...)` inmediatamente.
+3. **Antiduplicado:**
+   - Reusar/fortalecer la lógica de `lastReportSentAt` para impedir doble envío cuando coincidan cron + envío diferido.
+4. **Ventana y correlación:**
+   - Correlacionar checklist inicio/cierre y entradas usando la sesión real del turno (incluyendo casos de cruce de medianoche y checklist de cierre tardío).
+5. **Trazabilidad:**
+   - Registrar en logs/auditoría estados `PENDIENTE_POR_CIERRE`, `ENVIADO_DIFERIDO` y motivo de no envío en trigger horario.
+
+### SEC-HIGH-009 - Regex Injection / ReDoS en búsquedas (NoSQL)
+
+1. **Corrección de construcción regex (obligatoria):**
+   - Nunca construir regex con input crudo. Crear helper común `escapeRegex()` y usarlo en:
+   - `backend/src/routes/admin-catalog.js` (campo `search`)
+   - `backend/src/routes/tags.js` (endpoint `/suggest`)
+   - `backend/src/routes/entries.js` (endpoint `/tags/suggest`)
+2. **Límites de entrada y paginación:**
+   - Restringir longitud de `search/q` (ej. max 64) y rechazar vacío/whitespace puro.
+   - Aplicar `limit` máximo estricto con clamp en todos los listados (`Math.min(..., 50)` o menor según endpoint).
+3. **Defensa adicional anti-ReDoS:**
+   - Rechazar patrones con metacaracteres no esperados si el caso de uso es búsqueda literal.
+   - Mantener búsquedas por prefijo seguro (`^textoEscapado`) para autocomplete.
+4. **Pruebas de seguridad QA:**
+   - Agregar test de regresión con payloads tipo `(a+)+$`, `(.+)+`, `(?:a|aa)+` verificando respuesta controlada y sin degradación.
+5. **Nota de clasificación:**
+   - No se encontraron vectores de SQL injection clásico (el proyecto usa MongoDB/Mongoose), pero este hallazgo califica como riesgo de inyección/DoS en capa NoSQL por regex no saneada.
+
+### SEC-HIGH-010 - OWASP A10 SSRF en integraciones salientes
+
+1. **Validación estricta de destino URL:**
+   - Restringir `api.baseUrl` (GLPI) y `http.url` (log forwarding) a `https://` por defecto y rechazar esquemas no permitidos.
+2. **Bloqueo de redes internas y loopback:**
+   - Resolver DNS y bloquear destinos privados/reservados (`127.0.0.0/8`, `::1`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, link-local/ULA IPv6).
+3. **Allowlist operativa opcional/obligatoria en producción:**
+   - Introducir `OUTBOUND_ALLOWLIST` y validar host destino contra dominios/IPs aprobados por seguridad.
+4. **Controles de transporte:**
+   - Forzar `verifyTls=true` por defecto en GLPI, timeout bajo, y denegar redirecciones automáticas.
+5. **Auditoría y alertas:**
+   - Registrar cambios de destino (host/URL) y generar evento de seguridad cuando apunten a redes no corporativas.
+
+### SEC-MED-011 - OWASP A09/A02 logging sensible en login
+
+1. **Eliminar logs sensibles de autenticación:**
+   - Quitar `console.log` de `username`, `Usuario encontrado` y `Password match` en `auth.js`.
+2. **Logging seguro por niveles:**
+   - Reemplazar por `logger` estructurado, sin PII/secretos, usando `requestId` y resultado genérico (`success/fail`).
+3. **Política por entorno:**
+   - Si se requiere diagnóstico en desarrollo, habilitar solo detrás de flag explícito (`AUTH_DEBUG_LOGS=false` por defecto).
+4. **Revisión histórica:**
+   - Verificar pipelines de logs existentes y limpiar retención de registros que hayan capturado esta telemetría.
 
 ### B35 - Header Checklist y Fix "Último Check"
 

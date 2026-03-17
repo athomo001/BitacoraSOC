@@ -51,12 +51,25 @@ function startScheduler() {
 
           try {
             const result = await sendShiftReport(shift._id, now);
-            
-            logger.info(`Automatic report sent for ${shift.name}`, {
-              shiftId: shift._id,
-              recipients: result.recipients,
-              success: result.success
-            });
+
+            if (result?.success) {
+              logger.info(`Automatic report sent for ${shift.name}`, {
+                shiftId: shift._id,
+                recipients: result.recipients,
+                success: result.success
+              });
+            } else if (result?.deferredByClosure) {
+              logger.info(`Automatic report deferred for ${shift.name}`, {
+                shiftId: shift._id,
+                reason: 'PENDIENTE_POR_CIERRE',
+                message: result.message
+              });
+            } else {
+              logger.warn(`Automatic report not sent for ${shift.name}`, {
+                shiftId: shift._id,
+                message: result?.message || 'Unknown reason'
+              });
+            }
           } catch (error) {
             logger.error(`Error sending automatic report for ${shift.name}:`, {
               shiftId: shift._id,
