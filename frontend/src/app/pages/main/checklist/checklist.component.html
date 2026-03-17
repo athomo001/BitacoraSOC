@@ -1,6 +1,7 @@
 <div class="checklist-container">
-  <h1>{{ activeChecklist?.name || 'Checklist de Turno' }}</h1>
-  <p *ngIf="activeChecklist?.description" class="subtle">{{ activeChecklist?.description }}</p>
+  <h1>Checklist del Turno</h1>
+  <p *ngIf="activeChecklist?.name" class="subtle">{{ activeChecklist?.name }}<span *ngIf="activeChecklist?.description"> — {{ activeChecklist?.description }}</span></p>
+  <p *ngIf="!activeChecklist?.name && activeChecklist?.description" class="subtle">{{ activeChecklist?.description }}</p>
 
   <mat-card class="status-card">
     <mat-card-content>
@@ -20,7 +21,7 @@
     <mat-accordion>
       <mat-expansion-panel hideToggle>
         <mat-expansion-panel-header>
-          <mat-panel-title> Checklist Diario </mat-panel-title>
+          <mat-panel-title>{{ activeChecklist?.name || 'Evaluación del Turno' }}</mat-panel-title>
         </mat-expansion-panel-header>
 
         <mat-card-content>
@@ -41,8 +42,7 @@
 
             <div class="services-accordion">
               <h3>Evaluacion de Servicios</h3>
-              <p class="hint">Todos los servicios y sub-items deben tener estado. Los servicios en rojo requieren
-                observacion obligatoria.</p>
+              <p class="hint">Los items hoja deben tener estado. Los items con sub-items calculan su estado automaticamente y solo los items hoja en rojo requieren observacion.</p>
 
               <mat-accordion multi>
                 <mat-expansion-panel *ngFor="let service of checklistTree; let i = index"
@@ -57,8 +57,7 @@
                       {{ service.serviceTitle }}
                     </mat-panel-title>
                     <mat-panel-description *ngIf="service.children?.length">
-                      {{ service.status === 'verde' ? 'Operativo' : service.status === 'rojo' ? 'Con problema' :
-                      'Pendiente' }}
+                      {{ getStatusLabel(service) }}
                     </mat-panel-description>
                     <!-- Si NO tiene hijos, mostrar botones en el header -->
                     <mat-panel-description *ngIf="!service.children?.length" class="status-header-actions">
@@ -79,22 +78,11 @@
 
                   <p class="service-description" *ngIf="service.description">{{ service.description }}</p>
 
-                  <!-- Solo mostrar dentro del panel si tiene hijos o si está rojo (para observación) -->
-                  <ng-container *ngIf="service.children?.length">
-                    <mat-radio-group [(ngModel)]="service.status" [name]="'status_' + i" required
-                      class="status-selector" (change)="onStatusChange(service, $event.value)">
-                      <mat-radio-button value="verde" color="primary">
-                        <mat-icon class="status-icon verde">check_circle</mat-icon>
-                        Verde (Operativo)
-                      </mat-radio-button>
-                      <mat-radio-button value="rojo" color="warn">
-                        <mat-icon class="status-icon rojo">cancel</mat-icon>
-                        Rojo (Problema)
-                      </mat-radio-button>
-                    </mat-radio-group>
-                  </ng-container>
+                  <p class="hint derived-status-note" *ngIf="service.children?.length">
+                    El estado de este item se calcula automaticamente segun sus sub-items.
+                  </p>
 
-                  <mat-form-field appearance="outline" class="full-width" *ngIf="service.status === 'rojo'">
+                  <mat-form-field appearance="outline" class="full-width" *ngIf="requiresObservation(service)">
                     <mat-label>Observacion (obligatoria)</mat-label>
                     <textarea matInput [(ngModel)]="service.observation" [name]="'obs_' + i" rows="3" maxlength="1000"
                       required placeholder="Describe el problema detectado..."></textarea>
@@ -103,38 +91,7 @@
 
                   <div class="child-services" *ngIf="service.children?.length">
                     <h4>Sub-items</h4>
-                    <div class="child-card" *ngFor="let child of service.children; let j = index">
-                      <div class="child-header">
-                        <div>
-                          <strong>{{ child.serviceTitle }}</strong>
-                          <p class="service-description" *ngIf="child.description">{{ child.description }}</p>
-                        </div>
-                        <mat-icon [class.status-verde]="child.status === 'verde'"
-                          [class.status-rojo]="child.status === 'rojo'" [class.status-pending]="!child.status">
-                          {{ child.status === 'verde' ? 'check_circle' : child.status === 'rojo' ? 'cancel' :
-                          'radio_button_unchecked' }}
-                        </mat-icon>
-                      </div>
-
-                      <mat-radio-group [(ngModel)]="child.status" [name]="'status_' + i + '_' + j" required
-                        class="status-selector child-selector" (change)="onStatusChange(child, $event.value)">
-                        <mat-radio-button value="verde" color="primary">
-                          <mat-icon class="status-icon verde">check_circle</mat-icon>
-                          Verde
-                        </mat-radio-button>
-                        <mat-radio-button value="rojo" color="warn">
-                          <mat-icon class="status-icon rojo">cancel</mat-icon>
-                          Rojo
-                        </mat-radio-button>
-                      </mat-radio-group>
-
-                      <mat-form-field appearance="outline" class="full-width" *ngIf="child.status === 'rojo'">
-                        <mat-label>Observacion (obligatoria)</mat-label>
-                        <textarea matInput [(ngModel)]="child.observation" [name]="'obs_' + i + '_' + j" rows="3"
-                          maxlength="1000" required placeholder="Describe el problema detectado..."></textarea>
-                        <mat-hint align="end">{{ (child.observation || '').length }}/1000</mat-hint>
-                      </mat-form-field>
-                    </div>
+                    <ng-container *ngTemplateOutlet="checklistNodeList; context: { $implicit: service.children, path: i.toString() }"></ng-container>
                   </div>
                 </mat-expansion-panel>
               </mat-accordion>
@@ -155,6 +112,51 @@
     </mat-accordion>
   </ng-container>
 </div>
+
+<ng-template #checklistNodeList let-nodes let-path="path">
+  <div class="child-card" *ngFor="let child of nodes; let childIndex = index">
+    <div class="child-header">
+      <div>
+        <strong>{{ child.serviceTitle }}</strong>
+        <p class="service-description" *ngIf="child.description">{{ child.description }}</p>
+        <p class="hint derived-status-note" *ngIf="child.children?.length">
+          Estado calculado automaticamente segun sus sub-items.
+        </p>
+      </div>
+      <mat-icon [class.status-verde]="child.status === 'verde'"
+        [class.status-rojo]="child.status === 'rojo'" [class.status-pending]="!child.status">
+        {{ child.status === 'verde' ? 'check_circle' : child.status === 'rojo' ? 'cancel' :
+        'radio_button_unchecked' }}
+      </mat-icon>
+    </div>
+
+    <ng-container *ngIf="!child.children?.length">
+      <mat-radio-group [(ngModel)]="child.status" [name]="'status_' + path + '_' + childIndex" required
+        class="status-selector child-selector" (change)="onStatusChange(child, $event.value)">
+        <mat-radio-button value="verde" color="primary">
+          <mat-icon class="status-icon verde">check_circle</mat-icon>
+          Verde
+        </mat-radio-button>
+        <mat-radio-button value="rojo" color="warn">
+          <mat-icon class="status-icon rojo">cancel</mat-icon>
+          Rojo
+        </mat-radio-button>
+      </mat-radio-group>
+
+      <mat-form-field appearance="outline" class="full-width" *ngIf="requiresObservation(child)">
+        <mat-label>Observacion (obligatoria)</mat-label>
+        <textarea matInput [(ngModel)]="child.observation" [name]="'obs_' + path + '_' + childIndex" rows="3"
+          maxlength="1000" required placeholder="Describe el problema detectado..."></textarea>
+        <mat-hint align="end">{{ (child.observation || '').length }}/1000</mat-hint>
+      </mat-form-field>
+    </ng-container>
+
+    <div class="child-services nested" *ngIf="child.children?.length">
+      <h4>Sub-items</h4>
+      <ng-container *ngTemplateOutlet="checklistNodeList; context: { $implicit: child.children, path: path + '_' + childIndex }"></ng-container>
+    </div>
+  </div>
+</ng-template>
 
 <ng-template #checklistPlaceholder>
   <mat-card class="checklist-form-card">

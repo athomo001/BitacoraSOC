@@ -528,8 +528,10 @@ router.post('/check',
       }
 
       for (const service of services) {
-        if (service.status === 'rojo' && (!service.observation || service.observation.trim() === '')) {
-          return res.status(400).json({ message: `El servicio "${servicesMap.get(String(service.serviceId))?.title || service.serviceId}" esta en rojo y requiere observacion` });
+        const serviceDefinition = servicesMap.get(String(service.serviceId));
+        const hasChildren = Array.isArray(serviceDefinition?.children) && serviceDefinition.children.length > 0;
+        if (!hasChildren && service.status === 'rojo' && (!service.observation || service.observation.trim() === '')) {
+          return res.status(400).json({ message: `El servicio "${serviceDefinition?.title || service.serviceId}" esta en rojo y requiere observacion` });
         }
       }
 
@@ -659,15 +661,16 @@ router.post('/check',
 
 router.get('/check/last', authenticate, async (req, res) => {
   try {
-    const lastCheck = await ShiftCheck.findOne({ userId: req.user._id })
-      .sort({ createdAt: -1 })
-      .populate('services.serviceId');
+    // Retorna el último check del equipo (sin filtro por usuario) para
+    // mostrar el estado real más reciente de la infraestructura SOC.
+    const lastCheck = await ShiftCheck.findOne({})
+      .sort({ createdAt: -1 });
 
     if (!lastCheck) {
       return res.json({ message: 'Sin registro previo', check: null });
     }
 
-    res.json(lastCheck);
+    res.json({ check: lastCheck });
   } catch (error) {
     logger.error({ err: error }, 'Error al obtener ultimo check');
     res.status(500).json({ message: 'Error al obtener ultimo check' });

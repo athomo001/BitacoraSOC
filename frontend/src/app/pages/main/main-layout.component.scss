@@ -257,6 +257,11 @@
   padding: 24px;
   overflow-y: auto;
   background-color: var(--background-color);
+  transition: margin-right 0.3s ease;
+
+  &.with-notes-open {
+    margin-right: 350px;
+  }
 }
 
 .active-link {

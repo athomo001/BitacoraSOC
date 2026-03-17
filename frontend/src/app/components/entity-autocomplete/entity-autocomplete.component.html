@@ -41,10 +41,10 @@
     matSuffix
     mat-icon-button
     type="button"
-    aria-label="Mostrar opciones"
+    aria-label="Actualizar opciones"
     (click)="openPanel()"
   >
-    <mat-icon>arrow_drop_down</mat-icon>
+    <mat-icon>refresh</mat-icon>
   </button>
 
   <!-- Spinner mientras busca -->
@@ -98,6 +98,6 @@
     class="no-results-option"
   >
     <mat-icon>search_off</mat-icon>
-    <span>Sin resultados</span>
+    <span>Sin coincidencias para "{{ lastQuery }}"</span>
   </mat-option>
 </mat-autocomplete>

@@ -4,7 +4,7 @@ import { MatExpansionModule, MatAccordion, MatExpansionPanel, MatExpansionPanelH
 import { ChecklistService } from '../../../services/checklist.service';
 import { ChecklistTemplate, ChecklistItem, ShiftCheck } from '../../../models/checklist.model';
 import { AuthService } from '../../../services/auth.service';
-import { NgIf, NgFor, DatePipe } from '@angular/common';
+import { NgIf, NgFor, DatePipe, NgTemplateOutlet } from '@angular/common';
 import { MatCard, MatCardContent } from '@angular/material/card';
 import { MatIcon } from '@angular/material/icon';
 import { ReactiveFormsModule, FormsModule } from '@angular/forms';
@@ -32,7 +32,7 @@ type ChecklistNode = {
   selector: 'app-checklist',
   templateUrl: './checklist.component.html',
   styleUrls: ['./checklist.component.scss'],
-  imports: [NgIf, MatCard, MatCardContent, MatIcon, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, ReactiveFormsModule, FormsModule, MatFormField, MatLabel, MatSelect, MatOption, NgFor, MatExpansionPanelDescription, MatRadioGroup, MatRadioButton, MatInput, MatHint, MatButton, MatProgressSpinner, EntriesComponent, DatePipe]
+  imports: [NgIf, MatCard, MatCardContent, MatIcon, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, ReactiveFormsModule, FormsModule, MatFormField, MatLabel, MatSelect, MatOption, NgFor, MatExpansionPanelDescription, MatRadioGroup, MatRadioButton, MatInput, MatHint, MatButton, MatProgressSpinner, EntriesComponent, DatePipe, NgTemplateOutlet]
 })
 export class ChecklistComponent implements OnInit {
   activeChecklist: ChecklistTemplate | null = null;
@@ -70,6 +70,9 @@ export class ChecklistComponent implements OnInit {
         children: []
       };
       node.children = this.buildNodes(item.children || [], node);
+      if (node.children.length > 0) {
+        node.status = this.getAggregateStatus(node);
+      }
       return node;
     });
   }
@@ -85,6 +88,11 @@ export class ChecklistComponent implements OnInit {
   }
 
   onStatusChange(node: ChecklistNode, status: 'verde' | 'rojo'): void {
+    if (!this.isLeafNode(node)) {
+      this.syncAncestors(node);
+      return;
+    }
+
     node.status = status;
     if (status !== 'rojo') {
       node.observation = '';
@@ -93,21 +101,55 @@ export class ChecklistComponent implements OnInit {
   }
 
   private syncAncestors(node: ChecklistNode): void {
-    let current = node.parent;
+    let current: ChecklistNode | undefined = node;
     while (current) {
-      if (this.hasDescendantInRed(current)) {
-        current.status = 'rojo';
-      } else if (current.status === 'rojo' && !current.observation) {
-        current.status = null;
+      if (!this.isLeafNode(current)) {
+        current.status = this.getAggregateStatus(current);
+        current.observation = '';
       }
       current = current.parent;
     }
   }
 
-  private hasDescendantInRed(node: ChecklistNode): boolean {
-    return (node.children || []).some(child =>
-      child.status === 'rojo' || this.hasDescendantInRed(child)
-    );
+  isLeafNode(node: ChecklistNode): boolean {
+    return !node.children || node.children.length === 0;
+  }
+
+  getAggregateStatus(node: ChecklistNode): 'verde' | 'rojo' | null {
+    if (this.isLeafNode(node)) {
+      return node.status;
+    }
+
+    const childStatuses = (node.children || []).map(child => this.getAggregateStatus(child));
+
+    if (childStatuses.some(status => status === null)) {
+      return null;
+    }
+
+    if (childStatuses.some(status => status === 'rojo')) {
+      return 'rojo';
+    }
+
+    return childStatuses.length > 0 ? 'verde' : null;
+  }
+
+  getStatusLabel(node: ChecklistNode): string {
+    const status = this.isLeafNode(node) ? node.status : this.getAggregateStatus(node);
+    if (status === 'verde') {
+      return 'Operativo';
+    }
+    if (status === 'rojo') {
+      return 'Con problema';
+    }
+    return 'Pendiente';
+  }
+
+  requiresObservation(node: ChecklistNode): boolean {
+    return this.isLeafNode(node) && node.status === 'rojo';
+  }
+
+  private recalculateTreeStatuses(): void {
+    this.checklistTree.forEach(node => this.syncAncestors(node));
   }
 
   onCheckTypeChange(): void {
@@ -159,17 +201,19 @@ export class ChecklistComponent implements OnInit {
       return;
     }
 
+    this.recalculateTreeStatuses();
+
     const flat = this.flattenNodes(this.checklistTree);
-    const allHaveStatus = flat.every(s => s.status !== null);
+    const leafNodes = flat.filter(node => this.isLeafNode(node));
+    const allHaveStatus = leafNodes.every(node => node.status !== null);
     if (!allHaveStatus) {
-      this.snackBar.open('Todos los servicios y sub-items deben tener estado', 'Cerrar', { duration: 3000 });
+      this.snackBar.open('Todos los sub-items deben tener estado antes de enviar el checklist', 'Cerrar', { duration: 3000 });
       return;
     }
 
-    const invalidRed = flat.find(s =>
-      s.status === 'rojo' &&
-      !this.hasDescendantInRed(s) &&
-      (!s.observation || s.observation.trim() === '')
+    const invalidRed = leafNodes.find(node =>
+      node.status === 'rojo' &&
+      (!node.observation || node.observation.trim() === '')
     );
     if (invalidRed) {
       this.snackBar.open(`El servicio "${invalidRed.serviceTitle}" esta en rojo y requiere observacion`, 'Cerrar', { duration: 4000 });
@@ -199,8 +243,8 @@ export class ChecklistComponent implements OnInit {
         serviceId: s.serviceId,
         parentServiceId: s.parentId || null,
         serviceTitle: s.serviceTitle,
-        status: s.status!,
-        observation: s.observation
+        status: (this.isLeafNode(s) ? s.status : this.getAggregateStatus(s))!,
+        observation: this.isLeafNode(s) ? s.observation : ''
       }))
     };
 
@@ -247,5 +291,8 @@ export class ChecklistComponent implements OnInit {
     node.status = null;
     node.observation = '';
     node.children?.forEach(child => this.resetNode(child));
+    if (!this.isLeafNode(node)) {
+      node.status = this.getAggregateStatus(node);
+    }
   }
 }

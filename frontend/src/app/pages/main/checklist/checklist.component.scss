@@ -1,6 +1,4 @@
 .checklist-container {
-  max-width: 900px;
-  margin: 0 auto;
   padding: 24px;
 
   h1 {
@@ -147,6 +145,10 @@
   border-top: 1px solid var(--border-color);
   padding-top: 12px;
 
+  &.nested {
+    margin-left: 16px;
+  }
+
   h4 {
     margin: 0 0 8px 0;
     color: var(--text-primary);
@@ -170,6 +172,10 @@
   .child-selector {
     margin: 4px 0 8px 0;
   }
+}
+
+.derived-status-note {
+  margin: 4px 0 12px;
 }
 
 .status-verde {

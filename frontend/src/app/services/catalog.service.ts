@@ -49,7 +49,8 @@ export class CatalogService {
     let params = new HttpParams()
       .set('search', query.trim())
       .set('enabled', 'true')
-      .set('limit', limit.toString());
+      .set('limit', limit.toString())
+      .set('t', Date.now().toString());
 
     if (cursor) {
       params = params.set('cursor', cursor);
@@ -76,7 +77,8 @@ export class CatalogService {
     let params = new HttpParams()
       .set('search', query.trim())
       .set('enabled', 'true')
-      .set('limit', limit.toString());
+      .set('limit', limit.toString())
+      .set('t', Date.now().toString());
 
     if (cursor) {
       params = params.set('cursor', cursor);
@@ -103,7 +105,8 @@ export class CatalogService {
     let params = new HttpParams()
       .set('search', query.trim())
       .set('enabled', 'true')
-      .set('limit', limit.toString());
+      .set('limit', limit.toString())
+      .set('t', Date.now().toString());
 
     if (cursor) {
       params = params.set('cursor', cursor);

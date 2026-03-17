@@ -27,6 +27,7 @@ const AppConfig = require('../models/AppConfig');
 const validate = require('../middleware/validate');
 const { loginLimiter, forgotPasswordLimiter, resetPasswordLimiter } = require('../middleware/rate-limiter');
 const { audit } = require('../utils/audit');
+const { buildFrontendResetUrl } = require('../utils/frontend-url');
 const { logger } = require('../utils/logger');
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -339,9 +340,7 @@ router.post('/forgot-password',
       user.resetPasswordExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutos
       await user.save();
 
-      // Requerir FRONTEND_URL desde variable de entorno por seguridad (SEC-CRIT-002)
-      const frontendUrl = process.env.FRONTEND_URL || 'https://localhost:4200';
-      const resetUrl = `${frontendUrl}/auth/reset-password?token=${resetToken}`;
+      const resetUrl = buildFrontendResetUrl(req, resetToken);
 
       // Intentar enviar email si SMTP está configurado
       const SmtpConfig = require('../models/SmtpConfig');
