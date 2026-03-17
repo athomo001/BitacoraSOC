@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatExpansionModule, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatExpansionPanelDescription } from '@angular/material/expansion';
 import { ChecklistService } from '../../../services/checklist.service';
@@ -41,6 +41,11 @@ export class ChecklistComponent implements OnInit {
   isSubmitting = false;
   isLoading = false;
   checklistTree: ChecklistNode[] = [];
+  
+  // Control del acordeón para evitar que se colapse al cambiar tipo
+  mainPanelExpanded = true;
+  
+  @ViewChild('mainPanel') mainPanel!: MatExpansionPanel;
 
   constructor(
     private checklistService: ChecklistService,
@@ -170,6 +175,13 @@ export class ChecklistComponent implements OnInit {
         console.log('[CHECKLIST] IDs de servicios:', flatNodes.map(n => ({ title: n.serviceTitle, id: n.serviceId })));
         this.logAction('checklist.template.load', 'ok', { count: flatNodes.length });
         this.isLoading = false;
+        
+        // Forzar expansión del panel después de que Angular actualiza la vista
+        setTimeout(() => {
+          if (this.mainPanel) {
+            this.mainPanel.open();
+          }
+        }, 0);
       },
       error: (err) => {
         this.logAction('checklist.template.load', 'error', { message: err?.message });
