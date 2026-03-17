@@ -2,6 +2,34 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.21-beta] - 2026-03-17
+
+### Correcciones de Bugs (B42 / B43 / B44)
+
+#### Report Generator — nitidez de evidencia en correo (B42)
+- **Fix frontend:** Se mejoró el render de imágenes de evidencia en `frontend/src/app/pages/main/report-generator/report-generator.component.ts` manteniendo intacto el formato técnico de la tabla (ancho fijo y estructura).
+- Las imágenes ahora guardan dimensiones reales al cargarse y se renderizan evitando upscaling innecesario (se usa el mínimo entre ancho técnico y ancho nativo), preservando proporción.
+- Cada evidencia queda enlazada a su fuente inline para permitir apertura en mayor detalle sin romper el layout del reporte copiado.
+
+#### Reporte de turno — refactor a MJML y dashboard escaneable (B43)
+- **Fix backend:** `generateReportHTML()` en `backend/src/utils/shift-report.js` fue migrado de HTML concatenado manual a plantilla MJML compilada en runtime con validación estricta.
+- Se incorporó header rediseñado con branding dinámico (`appTitle`) y favicon opcional (`AppConfig.faviconUrl`).
+- Se añadió sección de **Resumen Ejecutivo** con conteos visuales de `OK`, `NO OK` y `Entradas`.
+- El checklist pasó de tabla plana a bloques/tarjetas por servicio con columnas visuales de Entrada/Salida para lectura rápida.
+- La bitácora pasó de lista simple a bloques independientes con jerarquía visual (cabecera temporal, metadatos y contenido).
+- Observaciones en checklist se muestran solo cuando existe contenido (se elimina ruido visual por campos vacíos).
+
+#### Reporte de turno — estado REPARADO en salida (B44)
+- **Fix backend (mismo módulo):** Se implementó estado `REPARADO` (amarillo) solo en columna de salida cuando se cumple: entrada `rojo` y salida `verde`.
+- La comparación se limita a casos donde checklist de inicio/cierre corresponde al mismo contexto (prioridad por `checklistId`; fallback por nombre normalizado).
+- Regla preservada: si salida es `rojo`, siempre se muestra `ERROR` independientemente del estado de entrada.
+
+### Dependencias / Compatibilidad
+- **Backend:** Se agregó dependencia `mjml` en `backend/package.json` para compilación de correos compatible con clientes como Outlook/Gmail.
+
+### Validación Técnica
+- Se ejecutó validación de runtime de `generateReportHTML()` con compilación MJML exitosa (`OK_MJML`).
+
 ## [v1.5.20-beta] - 2026-03-17
 
 ### Correcciones de Bugs (B35 / B36 / B39 / B40 / B41)
