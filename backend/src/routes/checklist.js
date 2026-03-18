@@ -17,6 +17,7 @@ const captureMetadata = require('../middleware/metadata');
 const { audit } = require('../utils/audit');
 const { logger } = require('../utils/logger');
 const { sendShiftReport } = require('../utils/shift-report');
+const moment = require('moment-timezone');
 
 const isSameDay = (a, b) => a && b && a.toDateString() === b.toDateString();
 
@@ -28,12 +29,14 @@ const isTimeInRange = (time, start, end) => {
 };
 
 const getCurrentShift = async (date = new Date()) => {
-  const currentTime = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  const referenceMoment = moment(date);
   const shifts = await WorkShift.find({ active: true }).sort({ order: 1, startTime: 1 });
   if (!shifts.length) return null;
 
   let currentShift = null;
   for (const shift of shifts) {
+    const shiftTz = shift.timezone || 'America/Santiago';
+    const currentTime = referenceMoment.clone().tz(shiftTz).format('HH:mm');
     if (isTimeInRange(currentTime, shift.startTime, shift.endTime)) {
       currentShift = shift;
       break;
@@ -640,9 +643,10 @@ router.post('/check',
       // Enviar reporte de turno al registrar checklist de cierre (si está habilitado en Checklist Admin)
       if (type === 'cierre' && config?.checklistCloseEmailEnabled) {
         try {
-          const currentShift = await getCurrentShift(new Date());
+          const triggerDate = check.createdAt || new Date();
+          const currentShift = await getCurrentShift(triggerDate);
           if (currentShift) {
-            const reportResult = await sendShiftReport(currentShift._id, check.createdAt || new Date(), { ignoreShiftEnabled: true });
+            const reportResult = await sendShiftReport(currentShift._id, triggerDate, { ignoreShiftEnabled: true });
 
             if (reportResult?.success) {
               logger.info({
@@ -666,11 +670,21 @@ router.post('/check',
               }, 'Shift report trigger completed without email delivery');
             }
           } else {
-            logger.warn({ requestId: req.requestId }, 'No se encontró turno actual para enviar reporte');
+            logger.warn({
+              requestId: req.requestId,
+              checkId: check._id,
+              triggerDate
+            }, 'No se encontró turno actual para enviar reporte');
           }
         } catch (reportError) {
           logger.error({ err: reportError, requestId: req.requestId, checkId: check._id }, 'Error sending shift report');
         }
+      } else if (type === 'cierre') {
+        logger.warn({
+          requestId: req.requestId,
+          checkId: check._id,
+          checklistCloseEmailEnabled: Boolean(config?.checklistCloseEmailEnabled)
+        }, 'Checklist de cierre registrado sin envío de reporte: trigger global deshabilitado');
       }
 
       res.status(201).json({ message: 'Checklist registrado exitosamente', check });

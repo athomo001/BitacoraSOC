@@ -453,8 +453,8 @@ function generateReportHTML({ shift, checklistEntry, checklistExit, entries, per
       </mj-column>
     </mj-section>
     ${summarySection}
-    ${checklistSection}
     ${entryTypeSummarySection}
+    ${checklistSection}
     ${entriesSection}
     <mj-section padding="8px 24px 20px 24px">
       <mj-column background-color="#ffffff" border="1px solid #dde3e8" border-top="0" border-radius="0 0 10px 10px" padding="0 18px 10px 18px">
