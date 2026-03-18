@@ -1,4 +1,4 @@
-<mat-sidenav-container class="main-container" [hasBackdrop]="false">
+<mat-sidenav-container class="main-container" [hasBackdrop]="false" autosize>
   <!-- LEFT SIDEBAR - Solo Menú -->
   <mat-sidenav
     mode="side"
@@ -57,15 +57,18 @@
 
   <!-- RIGHT SIDEBAR - Notes (modo overlay: no empuja el contenido) -->
   <mat-sidenav
-    mode="over"
+    mode="side"
     [opened]="rightSidebarOpened"
     position="end"
     class="right-sidebar"
-    autoFocus="false"
     (closedStart)="rightSidebarOpened = false">
     
     <mat-toolbar color="primary">
       <span>Notas</span>
+      <span class="spacer"></span>
+      <button mat-icon-button aria-label="Cerrar notas" (click)="rightSidebarOpened = false">
+        <mat-icon>close</mat-icon>
+      </button>
     </mat-toolbar>
 
     <div class="notes-container" *ngIf="!isGuest">
@@ -160,7 +163,7 @@
       </button>
     </mat-toolbar>
 
-    <div class="content-wrapper" [class.with-notes-open]="rightSidebarOpened">
+    <div class="content-wrapper">
       <router-outlet></router-outlet>
     </div>
   </mat-sidenav-content>
