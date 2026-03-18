@@ -24,6 +24,14 @@ Registro de cambios relevantes del proyecto.
 - La comparación se limita a casos donde checklist de inicio/cierre corresponde al mismo contexto (prioridad por `checklistId`; fallback por nombre normalizado).
 - Regla preservada: si salida es `rojo`, siempre se muestra `ERROR` independientemente del estado de entrada.
 
+#### Reporte de turno — ajustes de legibilidad y consistencia operativa
+- **Fix backend:** Se eliminó el símbolo `🛡️` del título del correo para evitar ruido visual en clientes de correo.
+- **Fix backend:** Header del reporte ajustado a paleta clara para mejorar visibilidad del favicon/logo corporativo.
+- **Fix backend:** Se aumentó spacing/padding del bloque **Resumen Ejecutivo** para evitar que quede pegado a márgenes.
+- **Fix backend:** El checklist del correo ahora respeta el orden operativo original de los servicios en lugar de ordenarlos alfabéticamente.
+- **Fix backend:** Se excluyen ítems padre (agrupadores) del render y del cálculo de `NO OK`, evitando conteos inflados cuando el estado rojo proviene de hijos.
+- **Fix backend:** La misma exclusión de ítems padre se aplicó al fallback de texto plano para mantener consistencia con HTML.
+
 ### Operación de Turnos (B45)
 
 #### Correo de fin de turno diferido hasta checklist de cierre real (B45)
@@ -42,6 +50,7 @@ Registro de cambios relevantes del proyecto.
 - **Fix frontend:** El panel derecho de notas se mantiene visible sin bloquear interacción del contenido principal (checklist, entradas, formularios) al remover el backdrop de bloqueo en el contenedor principal.
 - **Fix frontend:** Se desactivó el auto-focus agresivo del panel de notas para evitar pérdida de foco al usuario durante la edición operativa.
 - **Fix frontend (escritorio):** Se ajustó el desplazamiento del contenido con notas abiertas para priorizar uso en PC y conservar mejor área útil de trabajo.
+- **Fix frontend (escritorio final):** El panel de notas quedó en modo lateral `side` (comportamiento equivalente al menú izquierdo), con botón de cierre interno y recalculo automático de ancho del contenido (`autosize`) al abrir/cerrar.
 
 #### Alerta especial de escalamiento — contraste de color
 - **Fix frontend:** El diálogo de alerta especial migró de colores hardcodeados a variables del sistema de temas (`--text-primary`, `--text-secondary`, `--state-warning`, `--state-warning-bg`) para corregir contraste en modo oscuro y mantener consistencia visual en todos los temas.
