@@ -134,6 +134,22 @@ const normalizeName = (value) => {
     .toLowerCase();
 };
 
+const normalizeEntryType = (value) => normalizeName(value).replace(/\s+/g, '');
+
+const toCanonicalEntryType = (value) => {
+  const normalized = normalizeEntryType(value);
+  if (['operativa', 'operativas'].includes(normalized)) {
+    return 'operativa';
+  }
+  if (['ofensa', 'ofensas'].includes(normalized)) {
+    return 'ofensa';
+  }
+  if (['incidente', 'incidentes'].includes(normalized)) {
+    return 'incidente';
+  }
+  return null;
+};
+
 const isSameChecklistContext = (checklistEntry, checklistExit) => {
   if (!checklistEntry || !checklistExit) {
     return false;
@@ -240,6 +256,17 @@ function generateReportHTML({ shift, checklistEntry, checklistExit, entries, per
     }
   });
   const totalEntries = Array.isArray(entries) ? entries.length : 0;
+  const entryTypeCounts = { operativa: 0, ofensa: 0, incidente: 0 };
+  (entries || []).forEach((entry) => {
+    const canonicalType = toCanonicalEntryType(entry?.entryType);
+    if (canonicalType === 'operativa') {
+      entryTypeCounts.operativa += 1;
+    } else if (canonicalType === 'ofensa') {
+      entryTypeCounts.ofensa += 1;
+    } else if (canonicalType === 'incidente') {
+      entryTypeCounts.incidente += 1;
+    }
+  });
 
   const summarySection = `
     <mj-section padding="14px 32px 10px 32px">
@@ -328,6 +355,37 @@ function generateReportHTML({ shift, checklistEntry, checklistExit, entries, per
     `
     : '';
 
+  const entryTypeSummarySection = includeEntries
+    ? `
+      <mj-section padding="4px 32px 8px 32px">
+        <mj-column>
+          <mj-text font-size="16px" font-weight="700" color="#263238" padding="0 0 10px 0">Entradas por tipo</mj-text>
+          <mj-text font-size="12px" color="#607d8b" padding="0 0 10px 0">Resumen rápido de entradas registradas en el periodo.</mj-text>
+        </mj-column>
+      </mj-section>
+      <mj-section padding="0 32px 14px 32px">
+        ${renderSummaryCard('Operativa', entryTypeCounts.operativa, {
+    bg: '#e8f5e9',
+    border: '#c8e6c9',
+    valueColor: '#1b5e20',
+    labelColor: '#2e7d32'
+  })}
+        ${renderSummaryCard('Ofensa', entryTypeCounts.ofensa, {
+    bg: '#fff8e1',
+    border: '#ffecb3',
+    valueColor: '#ef6c00',
+    labelColor: '#f57c00'
+  })}
+        ${renderSummaryCard('Incidente', entryTypeCounts.incidente, {
+    bg: '#ffebee',
+    border: '#ffcdd2',
+    valueColor: '#b71c1c',
+    labelColor: '#c62828'
+  })}
+      </mj-section>
+    `
+    : '';
+
   const entriesSection = includeEntries
     ? `
       <mj-section padding="10px 24px 8px 24px">
@@ -396,6 +454,7 @@ function generateReportHTML({ shift, checklistEntry, checklistExit, entries, per
     </mj-section>
     ${summarySection}
     ${checklistSection}
+    ${entryTypeSummarySection}
     ${entriesSection}
     <mj-section padding="8px 24px 20px 24px">
       <mj-column background-color="#ffffff" border="1px solid #dde3e8" border-top="0" border-radius="0 0 10px 10px" padding="0 18px 10px 18px">
