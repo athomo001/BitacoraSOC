@@ -4,6 +4,7 @@ const { body, param, query } = require('express-validator');
 const { authenticate, authorize } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const WorkShift = require('../models/WorkShift');
+const WorkShiftAssignment = require('../models/WorkShiftAssignment');
 const moment = require('moment-timezone');
 const { logger } = require('../utils/logger');
 
@@ -26,6 +27,72 @@ const normalizeAssignedUsersPayload = (payload = {}) => {
   }
 
   return nextPayload;
+};
+
+const resolveEffectiveWeekday = (currentTimeStr, startTime, endTime, weekday) => {
+  if (endTime < startTime && currentTimeStr < endTime) {
+    return (weekday + 6) % 7;
+  }
+  return weekday;
+};
+
+const isAssignmentActiveForMoment = (assignment, currentTimeStr, shift, nowInTz) => {
+  if (!assignment || assignment.active === false) {
+    return false;
+  }
+
+  const effectiveWeekday = resolveEffectiveWeekday(currentTimeStr, shift.startTime, shift.endTime, nowInTz.day());
+  const weekdays = Array.isArray(assignment.weekdays) ? assignment.weekdays : [];
+  if (weekdays.length > 0 && !weekdays.includes(effectiveWeekday)) {
+    return false;
+  }
+
+  if (assignment.validFrom && moment(assignment.validFrom).tz(shift.timezone || 'America/Santiago').isAfter(nowInTz, 'minute')) {
+    return false;
+  }
+
+  if (assignment.validTo && moment(assignment.validTo).tz(shift.timezone || 'America/Santiago').isBefore(nowInTz, 'minute')) {
+    return false;
+  }
+
+  return true;
+};
+
+const attachResolvedAssignments = async (shift, currentTimeStr, nowInTz) => {
+  if (!shift) {
+    return null;
+  }
+
+  const assignments = await WorkShiftAssignment.find({
+    workShiftId: shift._id,
+    active: true
+  }).populate('userId', 'fullName email phone isActive');
+
+  const activeAssignments = assignments.filter((assignment) => {
+    if (!assignment.userId || assignment.userId.isActive === false) {
+      return false;
+    }
+    return isAssignmentActiveForMoment(assignment, currentTimeStr, shift, nowInTz);
+  });
+
+  const activeUsers = activeAssignments
+    .map((assignment) => assignment.userId)
+    .filter(Boolean);
+
+  const shiftObject = shift.toObject ? shift.toObject() : shift;
+  shiftObject.assignedUserIds = activeUsers.map((user) => user._id);
+  shiftObject.assignedUsers = activeUsers.map((user) => ({
+    _id: user._id,
+    fullName: user.fullName,
+    email: user.email,
+    phone: user.phone || ''
+  }));
+  shiftObject.assignedUserId = activeUsers.length > 0 ? activeUsers[0]._id : null;
+  shiftObject.assignedUserName = activeUsers.length > 0 ? activeUsers[0].fullName : '';
+  shiftObject.assignedUserEmail = activeUsers.length > 0 ? activeUsers[0].email : '';
+  shiftObject.assignedUsersCount = activeUsers.length;
+
+  return shiftObject;
 };
 
 /**
@@ -86,8 +153,16 @@ router.get('/current', authenticate, async (req, res) => {
       }
     }
 
+    const currentShiftWithAssignments = currentShift
+      ? await attachResolvedAssignments(
+        currentShift,
+        shiftCurrentTime || moment().format('HH:mm'),
+        moment().tz(currentShift.timezone || 'America/Santiago')
+      )
+      : null;
+
     res.json({
-      shift: currentShift,
+      shift: currentShiftWithAssignments,
       currentTime: shiftCurrentTime || moment().format('HH:mm'),
       timezone: currentShift?.timezone || 'America/Santiago'
     });

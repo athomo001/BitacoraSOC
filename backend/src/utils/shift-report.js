@@ -271,7 +271,7 @@ function generateReportHTML({ shift, checklistEntry, checklistExit, entries, per
   const summarySection = `
     <mj-section padding="14px 32px 10px 32px">
       <mj-column>
-        <mj-text font-size="18px" font-weight="700" color="#263238" padding="0 0 12px 0">Resumen Ejecutivo</mj-text>
+        <mj-text font-size="18px" font-weight="700" color="#263238" padding="0 0 12px 0">Resumen Checklist</mj-text>
       </mj-column>
     </mj-section>
     <mj-section padding="0 32px 18px 32px">
