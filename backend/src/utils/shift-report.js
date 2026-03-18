@@ -75,20 +75,35 @@ const buildServiceRows = (checklistEntry, checklistExit) => {
     exitMap.set(key, service);
   });
 
-  const keys = new Set([...entryMap.keys(), ...exitMap.keys()]);
-  const rows = Array.from(keys)
+  // Mantener orden operativo real: primero entrada y luego elementos nuevos de salida.
+  const orderedKeys = [];
+  const seen = new Set();
+  [...entryMap.keys(), ...exitMap.keys()].forEach((key) => {
+    if (!seen.has(key)) {
+      seen.add(key);
+      orderedKeys.push(key);
+    }
+  });
+
+  const rows = orderedKeys
     .map((key) => ({
       key,
+      serviceId: (entryMap.get(key)?.serviceId || exitMap.get(key)?.serviceId || '').toString(),
       entry: entryMap.get(key) || null,
       exit: exitMap.get(key) || null
-    }))
-    .sort((a, b) => {
-      const aTitle = a.entry?.serviceTitle || a.exit?.serviceTitle || '';
-      const bTitle = b.entry?.serviceTitle || b.exit?.serviceTitle || '';
-      return aTitle.localeCompare(bTitle, 'es');
-    });
+    }));
 
   return rows;
+};
+
+const buildParentServiceIdSet = (checklistEntry, checklistExit) => {
+  const parentIds = new Set();
+  [...(checklistEntry?.services || []), ...(checklistExit?.services || [])].forEach((service) => {
+    if (service?.parentServiceId) {
+      parentIds.add(service.parentServiceId.toString());
+    }
+  });
+  return parentIds;
 };
 
 const renderStatusCell = (service) => {
@@ -207,13 +222,15 @@ function generateReportHTML({ shift, checklistEntry, checklistExit, entries, per
   const includeChecklist = shift.emailReportConfig?.includeChecklist;
   const includeEntries = shift.emailReportConfig?.includeEntries;
   const serviceRows = includeChecklist ? buildServiceRows(checklistEntry, checklistExit) : [];
+  const parentServiceIds = includeChecklist ? buildParentServiceIdSet(checklistEntry, checklistExit) : new Set();
+  const leafServiceRows = serviceRows.filter((row) => !parentServiceIds.has(row.serviceId));
   const canCompareForRepair = isSameChecklistContext(checklistEntry, checklistExit);
   const entryTime = formatTime(checklistEntry?.createdAt || checklistEntry?.checkDate);
   const exitTime = formatTime(checklistExit?.createdAt || checklistExit?.checkDate);
 
   let totalOk = 0;
   let totalError = 0;
-  serviceRows.forEach((row) => {
+  leafServiceRows.forEach((row) => {
     const hasError = row.entry?.status === 'rojo' || row.exit?.status === 'rojo';
     const hasOk = row.entry?.status === 'verde' || row.exit?.status === 'verde';
     if (hasError) {
@@ -225,12 +242,12 @@ function generateReportHTML({ shift, checklistEntry, checklistExit, entries, per
   const totalEntries = Array.isArray(entries) ? entries.length : 0;
 
   const summarySection = `
-    <mj-section padding="0 24px 8px 24px">
+    <mj-section padding="14px 32px 10px 32px">
       <mj-column>
         <mj-text font-size="18px" font-weight="700" color="#263238" padding="0 0 12px 0">Resumen Ejecutivo</mj-text>
       </mj-column>
     </mj-section>
-    <mj-section padding="0 24px 12px 24px">
+    <mj-section padding="0 32px 18px 32px">
       ${renderSummaryCard('OK', totalOk, {
     bg: '#e8f5e9',
     border: '#c8e6c9',
@@ -252,8 +269,8 @@ function generateReportHTML({ shift, checklistEntry, checklistExit, entries, per
     </mj-section>
   `;
 
-  const checklistCards = includeChecklist && serviceRows.length > 0
-    ? serviceRows.map((row) => {
+  const checklistCards = includeChecklist && leafServiceRows.length > 0
+    ? leafServiceRows.map((row) => {
       const title = escapeHtml(row.entry?.serviceTitle || row.exit?.serviceTitle || 'Servicio');
       const entryBlock = renderServiceStatusBlock({ service: row.entry });
       const exitBlock = renderServiceStatusBlock({
@@ -293,7 +310,7 @@ function generateReportHTML({ shift, checklistEntry, checklistExit, entries, per
       `;
     }).join('')
     : `
-      <mj-section padding="0 24px 12px 24px">
+      <mj-section padding="0 32px 14px 32px">
         <mj-column>
           <mj-text font-size="13px" color="#78909c" padding="0">No se registraron datos de checklist para este turno.</mj-text>
         </mj-column>
@@ -366,15 +383,15 @@ function generateReportHTML({ shift, checklistEntry, checklistExit, entries, per
   </mj-head>
   <mj-body background-color="#eef2f5" width="960px">
     <mj-section padding="16px 24px 0 24px">
-      <mj-column background-color="#1f2d3a" border="1px solid #dde3e8" border-bottom="0" border-radius="10px 10px 0 0" padding="20px 18px 14px 18px">
+      <mj-column background-color="#edf4fb" border="1px solid #d7e3ef" border-bottom="0" border-radius="10px 10px 0 0" padding="20px 18px 14px 18px">
         <mj-table padding="0">
           <tr>
             ${hasFavicon ? `<td style="width:44px;vertical-align:middle;padding-right:8px;"><img src="${escapeHtml(favicon)}" width="36" height="36" style="display:block;width:36px;height:36px;border:0;outline:none;text-decoration:none;" alt="Logo"></td>` : ''}
-            <td style="vertical-align:middle;"><div style="font-size:24px;font-weight:700;line-height:1.2;color:#ffffff;">🛡️ Reporte de Turno - ${brandedAppTitleHtml}</div></td>
+            <td style="vertical-align:middle;"><div style="font-size:24px;font-weight:700;line-height:1.2;color:#1f2d3a;">Reporte de Turno - ${brandedAppTitleHtml}</div></td>
           </tr>
         </mj-table>
-        <mj-text font-size="13px" color="#d6e2ea" padding="8px 0 0 0">${escapeHtml(shift.name)} • ${escapeHtml(shift.startTime)}-${escapeHtml(shift.endTime)} • ${escapeHtml(dateLabel)}</mj-text>
-        ${periodLabel ? `<mj-text font-size="12px" color="#b6c9d6" padding="6px 0 0 0">Periodo: ${escapeHtml(periodLabel)}</mj-text>` : ''}
+        <mj-text font-size="13px" color="#355066" padding="8px 0 0 0">${escapeHtml(shift.name)} • ${escapeHtml(shift.startTime)}-${escapeHtml(shift.endTime)} • ${escapeHtml(dateLabel)}</mj-text>
+        ${periodLabel ? `<mj-text font-size="12px" color="#4f6b81" padding="6px 0 0 0">Periodo: ${escapeHtml(periodLabel)}</mj-text>` : ''}
       </mj-column>
     </mj-section>
     ${summarySection}
@@ -422,10 +439,12 @@ function generateReportText({ shift, checklistEntry, checklistExit, entries, per
     const entryTime = formatTime(checklistEntry?.createdAt || checklistEntry?.checkDate);
     const exitTime = formatTime(checklistExit?.createdAt || checklistExit?.checkDate);
     const serviceRows = buildServiceRows(checklistEntry, checklistExit);
+    const parentServiceIds = buildParentServiceIdSet(checklistEntry, checklistExit);
+    const leafServiceRows = serviceRows.filter((row) => !parentServiceIds.has(row.serviceId));
 
     lines.push('Checklist de Entrada y Salida');
     lines.push(`Entrada: ${entryTime} | Salida: ${exitTime}`);
-    serviceRows.forEach((row) => {
+    leafServiceRows.forEach((row) => {
       const title = row.entry?.serviceTitle || row.exit?.serviceTitle || 'Servicio';
       const entryStatus = row.entry ? `${row.entry.status.toUpperCase()}${row.entry.observation ? ` - ${row.entry.observation}` : ''}` : 'No registrado';
       const exitStatus = row.exit ? `${row.exit.status.toUpperCase()}${row.exit.observation ? ` - ${row.exit.observation}` : ''}` : 'No registrado';
