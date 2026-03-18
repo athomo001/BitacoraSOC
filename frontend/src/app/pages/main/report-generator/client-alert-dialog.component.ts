@@ -68,28 +68,48 @@ export interface ClientAlertDialogData {
     </mat-dialog-actions>
   `,
   styles: [`
+    :host {
+      display: block;
+      color: var(--text-primary);
+    }
+
+    [mat-dialog-title] {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-primary);
+    }
+
+    mat-dialog-content {
+      color: var(--text-primary);
+    }
+
     .meta {
       margin: 4px 0;
-      color: rgba(0, 0, 0, 0.77);
+      color: var(--text-secondary);
     }
 
     .alert-box {
       margin-top: 12px;
       padding: 12px;
-      border-left: 4px solid #d32f2f;
-      background: #fff3f3;
+      border: 1px solid var(--state-warning);
+      border-left: 4px solid var(--state-warning);
+      border-radius: 6px;
+      background: var(--state-warning-bg);
       white-space: pre-wrap;
       font-weight: 600;
-      color: #8b1f1f;
+      color: var(--state-warning);
     }
 
     .channels {
       margin-top: 16px;
+      color: var(--text-primary);
     }
 
     .channels h3 {
       margin: 0 0 8px;
       font-size: 14px;
+      color: var(--text-primary);
     }
 
     .channels ul {
@@ -99,6 +119,7 @@ export interface ClientAlertDialogData {
 
     .channels li {
       margin-bottom: 4px;
+      color: var(--text-secondary);
     }
   `]
 })
