@@ -216,10 +216,16 @@ const renderServiceStatusBlock = ({ service, entryService = null, isExit = false
 
 const renderSummaryCard = (label, value, styles) => {
   return `
-    <mj-column width="33.33%" background-color="${styles.bg}" border="1px solid ${styles.border}" border-radius="8px" padding="14px 10px 12px 10px">
-      <mj-text align="center" color="${styles.valueColor}" font-size="30px" font-weight="700" padding="0">${value}</mj-text>
-      <mj-text align="center" color="${styles.labelColor}" font-size="12px" font-weight="600" padding="4px 0 0 0" letter-spacing="0.4px">${label}</mj-text>
-    </mj-column>
+    <td style="width:33%;vertical-align:top;padding:0 5px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${styles.bg};border:1px solid ${styles.border};border-radius:8px;">
+        <tr>
+          <td style="padding:16px 10px 14px 10px;text-align:center;">
+            <p style="margin:0 0 6px 0;font-size:30px;font-weight:700;color:${styles.valueColor};line-height:1;">${value}</p>
+            <p style="margin:0;font-size:12px;font-weight:600;color:${styles.labelColor};letter-spacing:0.4px;">${label}</p>
+          </td>
+        </tr>
+      </table>
+    </td>
   `;
 };
 
@@ -274,25 +280,18 @@ function generateReportHTML({ shift, checklistEntry, checklistExit, entries, per
         <mj-text font-size="18px" font-weight="700" color="#263238" padding="0 0 12px 0">Resumen Checklist</mj-text>
       </mj-column>
     </mj-section>
-    <mj-section padding="0 32px 18px 32px">
-      ${renderSummaryCard('OK', totalOk, {
-    bg: '#e8f5e9',
-    border: '#c8e6c9',
-    valueColor: '#1b5e20',
-    labelColor: '#2e7d32'
-  })}
-      ${renderSummaryCard('NO OK', totalError, {
-    bg: '#ffebee',
-    border: '#ffcdd2',
-    valueColor: '#b71c1c',
-    labelColor: '#c62828'
-  })}
-      ${renderSummaryCard('Entradas', totalEntries, {
-    bg: '#e3f2fd',
-    border: '#bbdefb',
-    valueColor: '#0d47a1',
-    labelColor: '#1565c0'
-  })}
+    <mj-section padding="0 26px 18px 26px">
+      <mj-column>
+        <mj-text padding="0">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed;">
+            <tr>
+              ${renderSummaryCard('OK', totalOk, { bg: '#e8f5e9', border: '#c8e6c9', valueColor: '#1b5e20', labelColor: '#2e7d32' })}
+              ${renderSummaryCard('NO OK', totalError, { bg: '#ffebee', border: '#ffcdd2', valueColor: '#b71c1c', labelColor: '#c62828' })}
+              ${renderSummaryCard('Entradas', totalEntries, { bg: '#e3f2fd', border: '#bbdefb', valueColor: '#0d47a1', labelColor: '#1565c0' })}
+            </tr>
+          </table>
+        </mj-text>
+      </mj-column>
     </mj-section>
   `;
 
@@ -359,29 +358,22 @@ function generateReportHTML({ shift, checklistEntry, checklistExit, entries, per
     ? `
       <mj-section padding="4px 32px 8px 32px">
         <mj-column>
-          <mj-text font-size="16px" font-weight="700" color="#263238" padding="0 0 10px 0">Entradas por tipo</mj-text>
+          <mj-text font-size="16px" font-weight="700" color="#263238" padding="0 0 4px 0">Entradas por tipo</mj-text>
           <mj-text font-size="12px" color="#607d8b" padding="0 0 10px 0">Resumen rápido de entradas registradas en el periodo.</mj-text>
         </mj-column>
       </mj-section>
-      <mj-section padding="0 32px 14px 32px">
-        ${renderSummaryCard('Operativa', entryTypeCounts.operativa, {
-    bg: '#e8f5e9',
-    border: '#c8e6c9',
-    valueColor: '#1b5e20',
-    labelColor: '#2e7d32'
-  })}
-        ${renderSummaryCard('Ofensa', entryTypeCounts.ofensa, {
-    bg: '#fff8e1',
-    border: '#ffecb3',
-    valueColor: '#ef6c00',
-    labelColor: '#f57c00'
-  })}
-        ${renderSummaryCard('Incidente', entryTypeCounts.incidente, {
-    bg: '#ffebee',
-    border: '#ffcdd2',
-    valueColor: '#b71c1c',
-    labelColor: '#c62828'
-  })}
+      <mj-section padding="0 26px 18px 26px">
+        <mj-column>
+          <mj-text padding="0">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed;">
+              <tr>
+                ${renderSummaryCard('Operativa', entryTypeCounts.operativa, { bg: '#e8f5e9', border: '#c8e6c9', valueColor: '#1b5e20', labelColor: '#2e7d32' })}
+                ${renderSummaryCard('Ofensa', entryTypeCounts.ofensa, { bg: '#fff8e1', border: '#ffecb3', valueColor: '#ef6c00', labelColor: '#f57c00' })}
+                ${renderSummaryCard('Incidente', entryTypeCounts.incidente, { bg: '#ffebee', border: '#ffcdd2', valueColor: '#b71c1c', labelColor: '#c62828' })}
+              </tr>
+            </table>
+          </mj-text>
+        </mj-column>
       </mj-section>
     `
     : '';
