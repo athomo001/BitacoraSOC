@@ -11,6 +11,7 @@
 | B19 | Pendiente | Integraciones | Creación de tickets en GLPI (Correo / API) | Definir flujo final (resumen diario vs evento inmediato), destino y estrategia de reintentos. |
 | AI-SUMMARY-001 | Pendiente | IA/Operación ALTA | Módulo de Resumen Ejecutivo Efímero (IA On-Demand) | Integrar Ollama+llama3.2:3b en modo efímero `docker start -> healthcheck -> generate -> docker stop` con `try/finally`, salida editable en campo "Resumen Sugerido por IA" y botón "Generar con IA". |
 | B34 | Pendiente | Operación/Alertas | Alerta por ítems NOK (Rojo) en Checklist | Añadir switch en config global para activar/desactivar alerta por ítems en rojo. Agregar selector de cargo (ej. N2) a notificar. Al guardar el checklist, si el analista marca ítems NOK (rojo), enviar email automático a todos los usuarios del cargo seleccionado incluyendo el detalle/observación ingresada por el analista. |
+| OPS-ASSIGN-011 | Pendiente | Operación/Turnos ALTA | Asignaciones de turno se pierden después de deploy | Hallazgo operativo: tras deploy/reinicio de stack, la columna `Asignado a` vuelve a "Sin asignar" y las asignaciones manuales dejan de reflejarse. Se debe asegurar persistencia real de `WorkShiftAssignment` y restauración correcta al iniciar servicios. |
 | SEC-HIGH-009 | Pendiente | Seguridad ALTA | Riesgo de Regex Injection / ReDoS en búsquedas de catálogo y tags (NoSQL) | Hallazgo QA: existen regex construidas directo desde input sin escape (`new RegExp(search, 'i')`, `new RegExp('^' + q, 'i')`, `$regex` con `topic` sin escapar) en rutas autenticadas/admin. Un patrón malicioso puede disparar backtracking costoso y degradar el backend (DoS lógico). Archivos detectados: `backend/src/routes/admin-catalog.js`, `backend/src/routes/tags.js`, `backend/src/routes/entries.js`, `backend/src/controllers/escalationController.js`. |
 | SEC-HIGH-010 | Pendiente | Seguridad ALTA | OWASP A10 SSRF: URLs salientes configurables sin allowlist en integraciones | Hallazgo QA: endpoints de integración permiten destinos salientes controlados por configuración (`GLPI api.baseUrl` y `logging http.url`) sin validación estricta de red interna/loopback/protocolos. Riesgo: Server-Side Request Forgery desde backend hacia servicios internos/metadatos si una cuenta admin se compromete. Archivos detectados: `backend/src/routes/glpi.js`, `backend/src/routes/logging.js`, `backend/src/utils/logForwarder.js`. |
 | SEC-MED-011 | Pendiente | Seguridad MEDIA | OWASP A09/A02: Logging sensible en autenticación (username + estado de password) | Hallazgo QA: en login se registran por consola datos sensibles de autenticación (`LOGIN REQUEST`, `Usuario encontrado`, `Password match`) sin condicionamiento por entorno. Riesgo: exposición de telemetría de credenciales/intentos en logs operativos. Archivo detectado: `backend/src/routes/auth.js`. |
@@ -82,7 +83,6 @@
 2. Cerrar contrato técnico de integración (`apirest.php`, tokens, sesión, payload y reintentos).
 3. Agregar trazabilidad de entrega/fracaso por cada intento de ticket.
 
-
 ### AI-SUMMARY-001 - Resumen Ejecutivo Efímero (IA On-Demand)
 
 1. Backend: implementar método de orquestación efímera para Ollama:
@@ -127,6 +127,22 @@
    - En `Global Configuration` o en Configuración de Checklists, agregar el toggle switch "Habilitar alertas NOK".
    - Al lado, un Mat-Select con selección múltiple (checkboxes) que cargue el diccionario de cargos permitidos.
    - Guardar estas variables de vuelta al modelo usando el servicio existente de `ConfigService`.
+
+### OPS-ASSIGN-011 - Asignaciones de turno se pierden después de deploy
+
+1. **Persistencia de datos (infra):**
+   - Verificar que Mongo use volumen persistente estable en deploy y que no se ejecute ningún flujo de purge/seed que limpie `WorkShiftAssignment`.
+   - Confirmar que `docker-compose down` no se ejecute con `-v` en rutina estándar de despliegue.
+2. **Inicialización backend (arranque):**
+   - Auditar scripts de inicio para asegurar que no sobrescriban/reinicialicen turnos o asignaciones al boot.
+   - Validar que migraciones sean idempotentes y no borren relaciones existentes.
+3. **Integridad API:**
+   - Revisar endpoints de lectura de asignaciones (`/work-shifts/assignments`, `/work-shifts/current`) y fallback de columna `Asignado a` para no degradar a "Sin asignar" por error de join/poblado.
+4. **Monitoreo y trazabilidad:**
+   - Agregar log/auditoría en deploy/startup con conteo de `WorkShiftAssignment` antes y después del arranque.
+   - Registrar alerta si el conteo cae abruptamente tras deploy.
+5. **Prueba de regresión obligatoria:**
+   - Crear asignaciones de prueba, ejecutar deploy completo y validar post-deploy que persisten en DB y UI sin intervención manual.
 
 ### B45 - Correo de fin de turno pospuesto hasta checklist de cierre real
 
@@ -334,6 +350,5 @@
    - Cualquier otro caso: delegar a `renderStatusCell(exitService)` sin cambios
 3. En el `forEach` de `serviceRows`, usar `renderExitCell(row.exit, row.entry)` para la columna de Salida y mantener `renderStatusCell(row.entry)` para la de Entrada
 4. No modificar `renderStatusCell()` ni ninguna otra función existente
-
 
 ---

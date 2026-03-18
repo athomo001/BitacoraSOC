@@ -12,6 +12,29 @@ const { logger } = require('./logger');
 
 let schedulerTask = null;
 let lastCheckedMinute = '';
+const SHIFT_REPORT_TOLERANCE_MINUTES = Number(process.env.SHIFT_REPORT_TOLERANCE_MINUTES || 10);
+
+function resolveShiftEndForReferenceDate(shift, referenceDate) {
+  const [startHour, startMinute] = shift.startTime.split(':').map(Number);
+  const [endHour, endMinute] = shift.endTime.split(':').map(Number);
+
+  const shiftStart = new Date(referenceDate);
+  shiftStart.setHours(startHour, startMinute, 0, 0);
+
+  const shiftEnd = new Date(referenceDate);
+  shiftEnd.setHours(endHour, endMinute, 0, 0);
+
+  const crossesMidnight = endHour < startHour || (endHour === startHour && endMinute < startMinute);
+  if (crossesMidnight) {
+    if (referenceDate < shiftEnd) {
+      shiftStart.setDate(shiftStart.getDate() - 1);
+    } else {
+      shiftEnd.setDate(shiftEnd.getDate() + 1);
+    }
+  }
+
+  return { shiftStart, shiftEnd };
+}
 
 /**
  * Inicia el scheduler
@@ -42,11 +65,18 @@ function startScheduler() {
       });
 
       for (const shift of shifts) {
-        // Verificar si el turno acaba de terminar (hora actual == hora de fin)
-        if (shift.endTime === currentTime) {
+        // Ventana de tolerancia: evita perder el envío si el turno se editó/guardó
+        // cerca del minuto de corte o si el proceso se retrasó brevemente.
+        const { shiftEnd } = resolveShiftEndForReferenceDate(shift, now);
+        const minutesSinceShiftEnd = (now.getTime() - shiftEnd.getTime()) / (1000 * 60);
+        const shouldTriggerNow = minutesSinceShiftEnd >= 0 && minutesSinceShiftEnd < SHIFT_REPORT_TOLERANCE_MINUTES;
+
+        if (shouldTriggerNow) {
           logger.info(`Shift ${shift.name} ended, sending report...`, {
             shiftId: shift._id,
-            endTime: shift.endTime
+            endTime: shift.endTime,
+            currentTime,
+            minutesSinceShiftEnd: Number(minutesSinceShiftEnd.toFixed(2))
           });
 
           try {

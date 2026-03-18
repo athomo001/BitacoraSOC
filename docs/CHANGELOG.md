@@ -40,6 +40,15 @@ Registro de cambios relevantes del proyecto.
 - **Fix backend:** Se reforzó la trazabilidad operativa en scheduler y ruta de checklist con estados explícitos `PENDIENTE_POR_CIERRE` y `ENVIADO_DIFERIDO`.
 - **Control de duplicados:** Se mantiene protección por `lastReportSentAt` para evitar doble despacho cuando conviven trigger automático y diferido.
 
+#### Correo de turno — resumen por tipo de entrada (Operativa / Ofensa / Incidente)
+- **Fix backend:** Se agregó bloque visual **"Entradas por tipo"** bajo la sección de checklist en el correo de turno, con 3 contadores fijos: `Operativa`, `Ofensa` e `Incidente`.
+- **Regla funcional:** No se agrega categoría "Otros"; el resumen está acotado explícitamente a los 3 tipos operativos soportados por el modelo de entradas.
+- **Robustez de conteo:** Se incorporó normalización/canonización de `entryType` (case/acento/plural) para mantener conteo correcto en escenarios históricos o importados (`operativa/operativas`, `ofensa/ofensas`, `incidente/incidentes`).
+
+#### Correo de turno — robustez de disparo en cierre y scheduler
+- **Fix backend (scheduler):** El envío automático dejó de depender del minuto exacto de `endTime` y ahora utiliza una ventana de tolerancia configurable (`SHIFT_REPORT_TOLERANCE_MINUTES`, default 10 min) para evitar pérdidas de disparo por desfases operativos.
+- **Fix backend (trigger por cierre):** Al guardar checklist de `cierre`, el disparo manual usa `check.createdAt` como referencia temporal del reporte (en lugar de `new Date()`), mejorando correlación con el evento real registrado.
+
 ### Ajustes UI Operativos (Checklist / Notas / Alertas)
 
 #### Checklist — comportamiento del acordeón principal

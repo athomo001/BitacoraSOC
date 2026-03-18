@@ -642,7 +642,7 @@ router.post('/check',
         try {
           const currentShift = await getCurrentShift(new Date());
           if (currentShift) {
-            const reportResult = await sendShiftReport(currentShift._id, new Date(), { ignoreShiftEnabled: true });
+            const reportResult = await sendShiftReport(currentShift._id, check.createdAt || new Date(), { ignoreShiftEnabled: true });
 
             if (reportResult?.success) {
               logger.info({
