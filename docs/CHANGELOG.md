@@ -42,12 +42,22 @@ Registro de cambios relevantes del proyecto.
 
 #### Correo de turno — resumen por tipo de entrada (Operativa / Ofensa / Incidente)
 - **Fix backend:** Se agregó bloque visual **"Entradas por tipo"** bajo la sección de checklist en el correo de turno, con 3 contadores fijos: `Operativa`, `Ofensa` e `Incidente`.
+- **Ajuste visual final:** El bloque superior del correo quedó consolidado como **"Resumen Checklist"** y ambos resúmenes (`Resumen Checklist` + `Entradas por tipo`) usan layout de cajones con número grande y título inferior para lectura operativa rápida.
 - **Regla funcional:** No se agrega categoría "Otros"; el resumen está acotado explícitamente a los 3 tipos operativos soportados por el modelo de entradas.
 - **Robustez de conteo:** Se incorporó normalización/canonización de `entryType` (case/acento/plural) para mantener conteo correcto en escenarios históricos o importados (`operativa/operativas`, `ofensa/ofensas`, `incidente/incidentes`).
 
 #### Correo de turno — robustez de disparo en cierre y scheduler
 - **Fix backend (scheduler):** El envío automático dejó de depender del minuto exacto de `endTime` y ahora utiliza una ventana de tolerancia configurable (`SHIFT_REPORT_TOLERANCE_MINUTES`, default 10 min) para evitar pérdidas de disparo por desfases operativos.
 - **Fix backend (trigger por cierre):** Al guardar checklist de `cierre`, el disparo manual usa `check.createdAt` como referencia temporal del reporte (en lugar de `new Date()`), mejorando correlación con el evento real registrado.
+
+### Operación de Turnos (OPS-ASSIGN-011)
+
+#### Asignaciones de turno aparentaban perderse tras deploy/reinicio
+- **Fix backend:** `GET /api/work-shifts/current` ahora resuelve el analista activo desde la colección real `WorkShiftAssignment` considerando turno, día efectivo, vigencia (`validFrom`/`validTo`) y zona horaria, en lugar de depender del campo legacy `assignedUserId` embebido en `WorkShift`.
+- **Fix backend:** El cálculo de asignaciones activas contempla correctamente turnos que cruzan medianoche, resolviendo el weekday operativo efectivo antes de filtrar recurrencia por días.
+- **Fix backend:** El payload del turno actual vuelve enriquecido con `assignedUserIds`, `assignedUsers`, `assignedUserId`, `assignedUserName`, `assignedUserEmail` y `assignedUsersCount` ya reconstruidos desde la fuente real.
+- **Fix frontend:** La columna `Asignado a` en Admin Turnos dejó de ocultarse según `shift.assignedUserId` y pasó a renderizarse desde el resumen real construido con las asignaciones operativas cargadas por API.
+- **Diagnóstico validado:** Se comprobó contra la base real que las asignaciones seguían persistidas tras reinicio; el problema era de lectura/resolución post-deploy, no de borrado físico de `WorkShiftAssignment`.
 
 ### Ajustes UI Operativos (Checklist / Notas / Alertas)
 

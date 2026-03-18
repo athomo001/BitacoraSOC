@@ -263,11 +263,11 @@
         <ng-container matColumnDef="assignedUser">
           <th mat-header-cell *matHeaderCellDef>Asignado a</th>
           <td mat-cell *matCellDef="let shift">
-            <span *ngIf="shift.assignedUserId" class="user-assigned">
+            <span *ngIf="getUserName(shift) !== 'Sin asignar'" class="user-assigned">
               <mat-icon>person</mat-icon>
               {{ getUserName(shift) }}
             </span>
-            <span *ngIf="!shift.assignedUserId" class="user-unassigned">
+            <span *ngIf="getUserName(shift) === 'Sin asignar'" class="user-unassigned">
               Sin asignar
             </span>
           </td>
