@@ -1,4 +1,4 @@
-<mat-sidenav-container class="main-container">
+<mat-sidenav-container class="main-container" [hasBackdrop]="false">
   <!-- LEFT SIDEBAR - Solo Menú -->
   <mat-sidenav
     mode="side"
@@ -61,6 +61,7 @@
     [opened]="rightSidebarOpened"
     position="end"
     class="right-sidebar"
+    autoFocus="false"
     (closedStart)="rightSidebarOpened = false">
     
     <mat-toolbar color="primary">

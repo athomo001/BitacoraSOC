@@ -19,7 +19,8 @@
 
   <ng-container *ngIf="!isLoading && checklistTree.length > 0; else checklistPlaceholder">
     <mat-accordion>
-      <mat-expansion-panel hideToggle [expanded]="mainPanelExpanded" #mainPanel>
+      <mat-expansion-panel hideToggle [expanded]="mainPanelExpanded" (opened)="mainPanelExpanded = true"
+        (closed)="mainPanelExpanded = false">
         <mat-expansion-panel-header>
           <mat-panel-title>{{ activeChecklist?.name || 'Evaluación del Turno' }}</mat-panel-title>
         </mat-expansion-panel-header>
