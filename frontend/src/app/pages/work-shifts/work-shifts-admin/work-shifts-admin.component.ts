@@ -85,6 +85,8 @@ export class WorkShiftsAdminComponent implements OnInit {
   // Manejo de chips de emails (GLOBAL)
   emailInput = '';
   showGlobalEmailConfig = false;
+  selectedPocShiftId: string | null = null;
+  sendingPoc = false;
 
   displayedColumns: string[] = ['order', 'name', 'code', 'type', 'timeRange', 'checklists', 'assignedUser', 'active', 'actions'];
 
@@ -194,6 +196,7 @@ export class WorkShiftsAdminComponent implements OnInit {
       this.users = (users || []).filter((user: any) => user?.isActive !== false && user?.role !== 'guest');
       this.assignments = assignments || [];
 
+      this.ensurePocShiftSelection();
       this.rebuildOperationalRows();
       this.loading = false;
     }).catch(error => {
@@ -207,6 +210,7 @@ export class WorkShiftsAdminComponent implements OnInit {
     this.workShiftService.getShifts().subscribe({
       next: (shifts) => {
         this.shifts = shifts;
+        this.ensurePocShiftSelection();
         this.rebuildOperationalRows();
       }
     });
@@ -516,6 +520,51 @@ export class WorkShiftsAdminComponent implements OnInit {
 
   toggleGlobalEmailConfig(): void {
     this.showGlobalEmailConfig = !this.showGlobalEmailConfig;
+  }
+
+  private ensurePocShiftSelection(): void {
+    if (!this.shifts || this.shifts.length === 0) {
+      this.selectedPocShiftId = null;
+      return;
+    }
+
+    const selectedStillExists = this.selectedPocShiftId
+      && this.shifts.some((shift) => shift._id === this.selectedPocShiftId);
+
+    if (selectedStillExists) {
+      return;
+    }
+
+    const preferred = this.shifts.find((shift) => shift.active && shift.type === 'regular')
+      || this.shifts.find((shift) => shift.active)
+      || this.shifts[0];
+
+    this.selectedPocShiftId = preferred?._id || null;
+  }
+
+  sendPocReport(): void {
+    if (!this.selectedPocShiftId) {
+      this.snackBar.open('Selecciona un turno para enviar prueba PoC', 'Cerrar', { duration: 3000 });
+      return;
+    }
+
+    this.sendingPoc = true;
+    this.workShiftService.sendShiftReportPoc(this.selectedPocShiftId).subscribe({
+      next: (result: any) => {
+        this.sendingPoc = false;
+        if (result?.success) {
+          this.snackBar.open('Correo PoC enviado y auditado como prueba', 'Cerrar', { duration: 3500 });
+          return;
+        }
+
+        this.snackBar.open(result?.message || 'No se pudo enviar correo PoC', 'Cerrar', { duration: 3500 });
+      },
+      error: (error: any) => {
+        this.sendingPoc = false;
+        console.error('Error sending PoC shift report:', error);
+        this.snackBar.open(error?.error?.error || 'Error al enviar correo PoC', 'Cerrar', { duration: 3500 });
+      }
+    });
   }
 
   addEmail(event: Event): void {

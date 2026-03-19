@@ -454,6 +454,41 @@ router.post('/:id/send-report',
   }
 );
 
+// POST /api/work-shifts/:id/send-report-poc - Enviar reporte PoC (sin contenido operativo real)
+router.post('/:id/send-report-poc',
+  authenticate,
+  authorize('admin'),
+  [
+    param('id').isMongoId().withMessage('ID inválido'),
+    body('date').optional().isISO8601().toDate().withMessage('date debe ser una fecha válida')
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const { sendShiftReportPoc } = require('../utils/shift-report');
+      const date = req.body.date ? new Date(req.body.date) : new Date();
+
+      const result = await sendShiftReportPoc(req.params.id, { date });
+
+      logger.info('Shift report PoC sent:', {
+        shiftId: req.params.id,
+        date: date.toISOString(),
+        recipients: result.recipients,
+        isPoc: true
+      });
+
+      res.json(result);
+    } catch (error) {
+      logger.error('Error sending shift report PoC:', error);
+      res.status(500).json({
+        error: error.message,
+        success: false,
+        isPoc: true
+      });
+    }
+  }
+);
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 🛠️ FUNCIONES AUXILIARES
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

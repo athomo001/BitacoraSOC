@@ -106,6 +106,15 @@ export class WorkShiftService {
     return this.http.put<{ message: string }>(`${this.apiUrl}/reorder`, request);
   }
 
+  /**
+   * Enviar correo PoC de cierre de turno (sin contenido operativo real).
+   */
+  sendShiftReportPoc(shiftId: string, date?: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/${shiftId}/send-report-poc`, {
+      ...(date ? { date } : {})
+    });
+  }
+
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // 🏢 ASIGNACIONES OPERATIVAS (OPS-ASSIGN)
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
