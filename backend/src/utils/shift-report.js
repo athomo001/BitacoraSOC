@@ -69,14 +69,12 @@ const buildServiceRows = (checklistEntry, checklistExit) => {
     const key = service.serviceId?.toString() || service.serviceTitle;
     entryMap.set(key, service);
   });
-
   const exitMap = new Map();
   (checklistExit?.services || []).forEach((service) => {
     const key = service.serviceId?.toString() || service.serviceTitle;
     exitMap.set(key, service);
   });
 
-  // Mantener orden operativo real: primero entrada y luego elementos nuevos de salida.
   const orderedKeys = [];
   const seen = new Set();
   [...entryMap.keys(), ...exitMap.keys()].forEach((key) => {
@@ -86,13 +84,12 @@ const buildServiceRows = (checklistEntry, checklistExit) => {
     }
   });
 
-  const rows = orderedKeys
-    .map((key) => ({
-      key,
-      serviceId: (entryMap.get(key)?.serviceId || exitMap.get(key)?.serviceId || '').toString(),
-      entry: entryMap.get(key) || null,
-      exit: exitMap.get(key) || null
-    }));
+  const rows = orderedKeys.map((key) => ({
+    key,
+    serviceId: (entryMap.get(key)?.serviceId || exitMap.get(key)?.serviceId || '').toString(),
+    entry: entryMap.get(key) || null,
+    exit: exitMap.get(key) || null
+  }));
 
   return rows;
 };
@@ -170,6 +167,75 @@ const isSameChecklistContext = (checklistEntry, checklistExit) => {
 
   return false;
 };
+
+const resolveShiftWindow = (shift, shiftDate) => {
+  const [startHour, startMinute] = shift.startTime.split(':').map(Number);
+  const [endHour, endMinute] = shift.endTime.split(':').map(Number);
+
+  const shiftStart = new Date(shiftDate);
+  shiftStart.setHours(startHour, startMinute, 0, 0);
+
+  const shiftEnd = new Date(shiftDate);
+  shiftEnd.setHours(endHour, endMinute, 0, 0);
+
+  const crossesMidnight = endHour < startHour || (endHour === startHour && endMinute < startMinute);
+  if (crossesMidnight) {
+    if (shiftDate < shiftEnd) {
+      shiftStart.setDate(shiftStart.getDate() - 1);
+    } else {
+      shiftEnd.setDate(shiftEnd.getDate() + 1);
+    }
+  }
+
+  return { shiftStart, shiftEnd };
+};
+
+const clampDateToRange = (date, minDate, maxDate) => {
+  if (date <= minDate) {
+    return new Date(minDate);
+  }
+  if (date >= maxDate) {
+    return new Date(maxDate);
+  }
+  return new Date(date);
+};
+
+async function loadShiftReportData(shift, shiftDate, options = {}) {
+  const { previewAt = null } = options;
+  const { shiftStart, shiftEnd } = resolveShiftWindow(shift, shiftDate);
+
+  const cutoffSource = previewAt ? new Date(previewAt) : shiftEnd;
+  const reportCutoff = clampDateToRange(cutoffSource, shiftStart, shiftEnd);
+
+  const checklistExit = await ShiftCheck.findOne({
+    type: 'cierre',
+    createdAt: { $gte: shiftStart, $lte: reportCutoff }
+  }).sort({ createdAt: -1 });
+
+  const entryRangeEnd = checklistExit?.createdAt || reportCutoff;
+  const checklistEntry = await ShiftCheck.findOne({
+    type: 'inicio',
+    createdAt: { $gte: shiftStart, $lte: entryRangeEnd }
+  }).sort({ createdAt: -1 });
+
+  const periodStart = checklistEntry?.createdAt || shiftStart;
+  const periodEnd = checklistExit?.createdAt || reportCutoff;
+
+  const entries = await Entry.find({
+    createdAt: { $gte: periodStart, $lte: periodEnd }
+  }).sort({ createdAt: 1 });
+
+  return {
+    shiftStart,
+    shiftEnd,
+    reportCutoff,
+    checklistEntry,
+    checklistExit,
+    periodStart,
+    periodEnd,
+    entries
+  };
+}
 
 const buildStatusPill = (label, color) => {
   return `<span style="display:inline-block;background:${color};color:#ffffff;font-size:11px;font-weight:700;line-height:1;padding:6px 10px;border-radius:999px;letter-spacing:0.2px;">${label}</span>`;
@@ -610,46 +676,16 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
     const appTitle = String(appConfig?.appTitle || '').trim() || 'Bitácora SOC';
     const faviconUrl = String(appConfig?.faviconUrl || '').trim();
 
-    // 2. Calcular rango horario del turno
-    const [startHour, startMinute] = shift.startTime.split(':').map(Number);
-    const [endHour, endMinute] = shift.endTime.split(':').map(Number);
-
-    const shiftStart = new Date(shiftDate);
-    shiftStart.setHours(startHour, startMinute, 0, 0);
-
-    let shiftEnd = new Date(shiftDate);
-    shiftEnd.setHours(endHour, endMinute, 0, 0);
-
-    const crossesMidnight = endHour < startHour || (endHour === startHour && endMinute < startMinute);
-    if (crossesMidnight) {
-      // Si es madrugada (antes del fin del turno), el turno empezó el día anterior
-      if (shiftDate < shiftEnd) {
-        shiftStart.setDate(shiftStart.getDate() - 1);
-      } else {
-        shiftEnd.setDate(shiftEnd.getDate() + 1);
-      }
-    }
-
-    // 3. Buscar checklists de entrada y salida dentro del rango real del turno
-    const checklistExitRangeEnd = isManualTrigger ? shiftDate : shiftEnd;
-    const checklistExit = await ShiftCheck.findOne({
-      type: 'cierre',
-      createdAt: { $gte: shiftStart, $lte: checklistExitRangeEnd }
-    }).sort({ createdAt: -1 });
-
-    const entryRangeEnd = checklistExit?.createdAt || shiftEnd;
-    const checklistEntry = await ShiftCheck.findOne({
-      type: 'inicio',
-      createdAt: { $gte: shiftStart, $lte: entryRangeEnd }
-    }).sort({ createdAt: -1 });
-
-    // 4. Buscar entradas entre inicio y cierre de checklist (fallback al rango del turno)
-    const periodStart = checklistEntry?.createdAt || shiftStart;
-    const periodEnd = checklistExit?.createdAt || shiftEnd;
-
-    const entries = await Entry.find({
-      createdAt: { $gte: periodStart, $lte: periodEnd }
-    }).sort({ createdAt: 1 });
+    const {
+      shiftStart,
+      checklistEntry,
+      checklistExit,
+      periodStart,
+      periodEnd,
+      entries
+    } = await loadShiftReportData(shift, shiftDate, {
+      previewAt: isManualTrigger ? shiftDate : null
+    });
 
     // B14: Guardas anti-vacío y validación de checklist de cierre
     if (!isManualTrigger) {
@@ -817,8 +853,8 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
 }
 
 /**
- * Envía un correo de prueba PoC del reporte de turno sin contenido operativo real.
- * Se usa para validar formato y canal SMTP sin contabilizarlo como envío productivo.
+ * Envía una vista previa PoC del reporte de turno usando datos reales del turno
+ * para la fecha/hora de referencia, sin contabilizarlo como envío productivo.
  */
 async function sendShiftReportPoc(shiftId, options = {}) {
   const referenceDate = options.date ? new Date(options.date) : new Date();
@@ -877,43 +913,56 @@ async function sendShiftReportPoc(shiftId, options = {}) {
       time: shift.endTime
     });
 
+    const {
+      checklistEntry,
+      checklistExit,
+      periodStart,
+      periodEnd,
+      entries,
+      shiftStart,
+      shiftEnd,
+      reportCutoff
+    } = await loadShiftReportData(shift, referenceDate, {
+      previewAt: referenceDate
+    });
+
     const shiftForPoc = {
       ...shift.toObject(),
       emailReportConfig: {
         ...(shift.emailReportConfig || {}),
-        includeChecklist: false,
-        includeEntries: false
+        includeChecklist: shift.emailReportConfig?.includeChecklist !== false,
+        includeEntries: shift.emailReportConfig?.includeEntries !== false
       }
     };
 
     const htmlBody = generateReportHTML({
       shift: shiftForPoc,
-      checklistEntry: null,
-      checklistExit: null,
-      entries: [],
-      periodStart: referenceDate,
-      periodEnd: referenceDate,
+      checklistEntry,
+      checklistExit,
+      entries,
+      periodStart,
+      periodEnd,
       appTitle,
       faviconUrl
     });
 
     const html = `
       <div style="font-family:Segoe UI,Arial,sans-serif;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:10px 12px;margin:0 0 12px 0;color:#8d6e63;font-size:12px;">
-        PRUEBA POC: Este correo valida canal y formato de envío. No incluye contenido operativo real del turno.
+        PRUEBA POC: Vista previa del correo de fin de turno con datos reales acumulados dentro del rango ${formatDate(shiftStart)} ${formatTime(shiftStart)} - ${formatDate(reportCutoff)} ${formatTime(reportCutoff)}. No registra envío productivo ni marca el turno como reportado.
       </div>
       ${htmlBody}
     `;
 
     const text = [
-      'PRUEBA POC: Este correo valida canal y formato de envío. No incluye contenido operativo real del turno.',
+      `PRUEBA POC: Vista previa del correo de fin de turno con datos reales acumulados dentro del rango ${formatDate(shiftStart)} ${formatTime(shiftStart)} - ${formatDate(reportCutoff)} ${formatTime(reportCutoff)}. No registra envío productivo ni marca el turno como reportado.`,
       '',
       generateReportText({
         shift: shiftForPoc,
-        checklistEntry: null,
-        checklistExit: null,
-        entries: [],
-        periodStart: referenceDate,
-        periodEnd: referenceDate,
+        checklistEntry,
+        checklistExit,
+        entries,
+        periodStart,
+        periodEnd,
         appTitle
       })
     ].join('\n');
@@ -934,6 +983,16 @@ async function sendShiftReportPoc(shiftId, options = {}) {
       metadata: {
         shiftName: shift.name,
         recipientsCount: recipients.length,
+        includeChecklist: shiftForPoc.emailReportConfig.includeChecklist,
+        includeEntries: shiftForPoc.emailReportConfig.includeEntries,
+        entriesCount: entries.length,
+        hasChecklistEntry: !!checklistEntry,
+        hasChecklistExit: !!checklistExit,
+        shiftStart,
+        shiftEnd,
+        reportCutoff,
+        periodStart,
+        periodEnd,
         date: referenceDate
       }
     });
@@ -941,8 +1000,11 @@ async function sendShiftReportPoc(shiftId, options = {}) {
     return {
       success: true,
       isPoc: true,
-      message: 'POC report sent successfully',
-      recipients: recipients.length
+      message: 'Vista previa del reporte de turno enviada correctamente',
+      recipients: recipients.length,
+      entriesCount: entries.length,
+      hasChecklistEntry: !!checklistEntry,
+      hasChecklistExit: !!checklistExit
     };
   } catch (error) {
     await registerPocAudit({

@@ -107,7 +107,7 @@ export class WorkShiftService {
   }
 
   /**
-   * Enviar correo PoC de cierre de turno (sin contenido operativo real).
+   * Enviar vista previa PoC del correo de cierre usando datos reales del turno.
    */
   sendShiftReportPoc(shiftId: string, date?: string): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/${shiftId}/send-report-poc`, {

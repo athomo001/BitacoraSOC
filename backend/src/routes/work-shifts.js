@@ -454,7 +454,7 @@ router.post('/:id/send-report',
   }
 );
 
-// POST /api/work-shifts/:id/send-report-poc - Enviar reporte PoC (sin contenido operativo real)
+// POST /api/work-shifts/:id/send-report-poc - Enviar vista previa PoC con datos reales del turno para la fecha de referencia
 router.post('/:id/send-report-poc',
   authenticate,
   authorize('admin'),

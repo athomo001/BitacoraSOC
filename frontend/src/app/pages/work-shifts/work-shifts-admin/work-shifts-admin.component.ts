@@ -553,7 +553,7 @@ export class WorkShiftsAdminComponent implements OnInit {
       next: (result: any) => {
         this.sendingPoc = false;
         if (result?.success) {
-          this.snackBar.open('Correo PoC enviado y auditado como prueba', 'Cerrar', { duration: 3500 });
+          this.snackBar.open(result?.message || 'Vista previa PoC enviada y auditada como prueba', 'Cerrar', { duration: 3500 });
           return;
         }
 

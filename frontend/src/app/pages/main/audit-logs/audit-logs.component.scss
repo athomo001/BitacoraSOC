@@ -107,18 +107,20 @@
   // ===== COLUMNA REASON (LA MÁS IMPORTANTE) =====
   .mat-column-reason {
     flex: 1;
-    min-width: 400px;
+    min-width: 500px;
     padding: 8px;
 
     .reason-cell {
       max-width: 100%;
+      cursor: help;
     }
 
     .reason-container {
       display: flex;
       gap: 12px;
       align-items: flex-start;
-      flex-wrap: nowrap;
+      flex-wrap: wrap;
+      word-break: break-word;
 
       .action-category {
         display: inline-block;
@@ -182,10 +184,15 @@
 
       .reason-text {
         font-size: 0.83rem;
-        line-height: 1.4;
+        line-height: 1.5;
         word-break: break-word;
+        word-wrap: break-word;
         flex: 1;
+        min-width: 200px;
+        max-width: 100%;
         color: var(--text-primary);
+        white-space: normal;
+        overflow-wrap: break-word;
 
         // Emojis se ven mejor sin "inherit"
         & {

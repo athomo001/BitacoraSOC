@@ -60,6 +60,31 @@ Registro de cambios relevantes del proyecto.
 - Se verificó que el método `getActionCategoryLabel()` retorna etiquetas legibles en español.
 - Se testing visual de los badges de categoría con contraste correcto en temas claro/oscuro.
 
+### Auditoría — ajuste final de legibilidad operativa (B46+)
+
+#### Tabla de auditoría — razón visible sin cortar y tooltip útil
+- **Fix frontend:** La columna **"Tipo / Razón / Detalles"** fue ajustada para priorizar lectura operativa continua, aumentando ancho mínimo, permitiendo wrap real del texto y mejorando el espaciado vertical de la descripción.
+- **Fix frontend:** El tooltip dejó de depender del `json` crudo del log y ahora se alinea con el texto procesado mostrado en pantalla, evitando exponer payloads técnicos poco útiles al operador.
+- **Fix frontend:** El contenedor de razón quedó preparado para mostrar textos largos sin colapsar el badge de categoría, mejorando lectura de eventos extensos como correo, escalación y entradas.
+
+#### Tabla de auditoría — limpieza de metadata y detalle expandido
+- **Fix frontend:** Se incorporó limpieza de metadata para descartar estructuras serializadas no legibles como buffers de `ObjectId` provenientes de MongoDB, manteniendo solo contexto útil para operación.
+- **Fix frontend:** Se añadió vista expandible por fila para revisar el detalle completo del evento sin truncamiento, incluyendo razón completa, metadata filtrada y datos de request/actor cuando existen.
+- **Resultado operativo:** El módulo de auditoría ahora permite validar con claridad si el contenido mostrado es completo o resumido, sin depender de tooltips con binarios o JSON irrelevante.
+
+### Reporte de turno — PoC como vista previa real del turno (B47)
+
+#### Correo PoC — vista previa con datos reales del turno seleccionado
+- **Fix backend:** `sendShiftReportPoc()` dejó de enviar un correo vacío y ahora genera una **vista previa real** del correo de fin de turno usando checklist y entradas del turno correspondiente a la fecha/hora de referencia.
+- **Fix backend:** La PoC reutiliza la misma lógica de cálculo de ventana temporal del envío productivo, incluyendo turnos que cruzan medianoche, búsqueda de checklist de inicio/cierre y recorte de entradas dentro del período efectivo.
+- **Regla funcional:** Si el turno sigue en curso, la vista previa muestra lo acumulado hasta el momento de ejecución; si ya terminó, muestra lo registrado dentro de ese turno para la fecha evaluada.
+- **Fix backend:** El bloque **"Entradas por tipo"** se mantiene visible en la PoC y se alimenta con los datos reales del período; si no hubo entradas, se muestra igualmente con contadores en cero.
+- **Seguridad operativa:** La PoC no registra envío productivo ni actualiza `lastReportSentAt`, por lo que puede usarse repetidamente para validar formato, contenido y canal SMTP sin alterar el flujo real de fin de turno.
+
+#### UI de administración de turnos — semántica corregida del botón PoC
+- **Fix frontend:** Los textos del panel de administración de turnos fueron actualizados para reflejar que el botón envía una **vista previa auditada** con datos reales del turno, no una prueba vacía.
+- **Fix frontend:** El mensaje de confirmación posterior al envío también fue ajustado para comunicar explícitamente que se trató de una vista previa PoC del reporte.
+
 ## [v1.5.21-beta] - 2026-03-17
 
 ### Correcciones de Bugs (B42 / B43 / B44)
