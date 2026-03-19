@@ -78,49 +78,40 @@
           <td mat-cell *matCellDef="let log">{{ formatDate(log.timestamp) }}</td>
         </ng-container>
 
-        <ng-container matColumnDef="level">
-          <th mat-header-cell *matHeaderCellDef>Nivel</th>
-          <td mat-cell *matCellDef="let log">
-            <mat-chip [color]="getLevelColor(log.level)">{{ log.level }}</mat-chip>
+        <ng-container matColumnDef="actor">
+          <th mat-header-cell *matHeaderCellDef>Acción</th>
+          <td mat-cell *matCellDef="let log" [matTooltip]="getActorIndicator(log).label">
+            <span [ngClass]="'actor-badge ' + getActorIndicator(log).class">
+              {{ getActorIndicator(log).icon }}
+            </span>
           </td>
         </ng-container>
 
-        <ng-container matColumnDef="event">
-          <th mat-header-cell *matHeaderCellDef>Evento</th>
-          <td mat-cell *matCellDef="let log">{{ log.event }}</td>
+        <ng-container matColumnDef="level">
+          <th mat-header-cell *matHeaderCellDef>Nivel</th>
+          <td mat-cell *matCellDef="let log">
+            <mat-chip [color]="getLevelColor(log.level)" class="level-chip">{{ log.level }}</mat-chip>
+          </td>
         </ng-container>
 
         <ng-container matColumnDef="username">
-          <th mat-header-cell *matHeaderCellDef>Usuario</th>
-          <td mat-cell *matCellDef="let log">
-            {{ log.actor?.username || '-' }}
+          <th mat-header-cell *matHeaderCellDef>Actor</th>
+          <td mat-cell *matCellDef="let log" class="username-cell">
+            <span class="username">{{ log.actor?.username || 'Sistema' }}</span>
             <span *ngIf="log.actor?.isGuest" class="guest-badge">(Invitado)</span>
           </td>
         </ng-container>
 
-        <ng-container matColumnDef="ip">
-          <th mat-header-cell *matHeaderCellDef>IP</th>
-          <td mat-cell *matCellDef="let log">{{ log.request?.ip || '-' }}</td>
-        </ng-container>
-
         <ng-container matColumnDef="reason">
-          <th mat-header-cell *matHeaderCellDef>Razón / Tipo</th>
+          <th mat-header-cell *matHeaderCellDef>Tipo / Razón / Detalles</th>
           <td mat-cell *matCellDef="let log" class="reason-cell">
             <div class="reason-container">
-              <!-- Mostrar tipo de entrada si existe (para entry.* events) -->
-              <span *ngIf="log.metadata?.entryType" [ngClass]="'badge badge-' + getEntryTypeBadgeClass(log.metadata.entryType)">
-                {{ getEntryTypeBadge(log.metadata.entryType) }}
+              <!-- Categoría de acción -->
+              <span class="action-category" [ngClass]="'category-' + getActionType(log)">
+                {{ getActionCategoryLabel(log) }}
               </span>
-              <!-- Mostrar categoría operativa si no tiene entryType específico -->
-              <span *ngIf="!log.metadata?.entryType && getEventType(log.event) === 'operativa'" class="badge badge-operativa">
-                🔧 Operativa
-              </span>
-              <!-- Mostrar categoría checklist si no tiene entryType específico -->
-              <span *ngIf="!log.metadata?.entryType && getEventType(log.event) === 'checklist'" class="badge badge-checklist">
-                ✓ Checklist
-              </span>
-              <!-- Mostrar razón si no hay tipo específico -->
-              <span *ngIf="!log.metadata?.entryType && !getEventType(log.event)" class="reason-text" [matTooltip]="log.result?.reason || ''">
+              <!-- Razón detallada -->
+              <span class="reason-text" [matTooltip]="log.result?.reason || log.metadata | json">
                 {{ getReasonText(log) }}
               </span>
             </div>

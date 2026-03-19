@@ -2,6 +2,64 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.22-beta] - 2026-03-19
+
+### Auditoría — Mejora de visibilidad y categorización (B46+)
+
+#### Tabla de auditoría — Redesign compacto y categorización de acciones
+- **Fix frontend:** La tabla de auditoría en `/main/audit-logs` fue rediseñada para maximizar el espacio disponible en la columna **"Razón / Tipo"** y mejorar la identificación de acciones críticas.
+- **Columnas optimizadas:** Se eliminaron columnas redundantes (`event`, `ip`) y se compactaron (`timestamp`, `actor`, `level`, `username`) para liberar espacio horizontal.
+- **Nueva columna "Acción":** Indicador visual 👤 (usuario) vs ⚙️ (sistema) en columna separada, permitiendo identificar al instante si fue acción manual del operador o disparada automáticamente por scheduler/integración.
+
+#### Detección de acciones del usuario vs sistema (B46+)
+- **Fix frontend:** Implementado método `isSystemAction()` que detecta automáticamente si una acción fue dispuesta por un usuario o por el sistema basándose en:
+  - Presencia/ausencia del actor en el log
+  - Patrón del evento (`scheduler.*`, `cron.*`, `automation.*`, etc)
+- **Lógica de display:** El indicador se renderiza con icono claro y tooltip descriptivo al pasar el mouse.
+
+#### Categorización contextual de acciones (B46+)
+- **Fix frontend:** Se incorporó método `getActionType()` que clasifica cada evento en una de 8 categorías visuales:
+  - 🔗 **Integración** → GLPI, Log Forwarding, etc
+  - 📧 **Correo** → SMTP, envíos de email
+  - 🔐 **Autenticación** → Login, logout, reset de contraseña, cambios de IP
+  - 📝 **Entrada** → Crear/editar/borrar entradas en la bitácora
+  - ✓ **Checklist** → Completar/modificar checklists de turno
+  - 🚨 **Escalación** → Triggers de escalación de alertas
+  - ⚙️ **Configuración** → Cambios en settings de administración
+  - 📋 **Evento** → Otras acciones genéricas
+- **Rendering:** Cada categoría se muestra como un badge coloreado independientemente en la columna "Razón", haciéndola fácil de escanear.
+
+#### Contexto detallado por tipo de acción (B46+)
+- **Fix frontend:** El método `getReasonText()` fue expandido para extraer y mostrar información contextual específica de cada tipo de evento:
+  - **Correo:** `✅ [CORREO] Para: usuario@mail.com | Asunto: Reporte`
+  - **Login:** `✅ [LOGIN] vía LOCAL` o `❌ [LOGIN] intento fallido`
+  - **Entrada:** `✅ [ENTRADA CREAR] [INCIDENTE] | Descripción/nota`
+  - **Checklist:** `✅ [CHECKLIST COMPLETADO] Checklist del Turno`
+  - **Cambio de IP:** `⚠️ [CAMBIO IP] 192.168.1.1 → 200.1.1.1 (probable VPN/Proxy)`
+  - **Escalación:** `✅ [ESCALACIÓN TRIGGER] Rueda N2 | Detalles adicionales`
+  - **Integración:** `✅ [INTEGRACIÓN] → glpi.example.com | OK`
+- **Fallback robusto:** Todos los eventos muestran un estado visual (✅ = éxito, ❌ = error, ⚠️ = alerta) seguido de la categoría en mayúsculas y detalles específicos.
+
+#### Estilos y UX optimizados (B46+)
+- **Fix frontend (SCSS):** Las columnas ahora tienen anchos explícitos y flexibles:
+  - `timestamp`: 130px (compacto)
+  - `actor`: 40px (solo ícono)
+  - `level`: 80px (chip)
+  - `username`: 140px (nombre de operador)
+  - `reason`: flex 1 (ocupa todo el espacio disponible)
+- **Fix frontend:** Los badges de categoría (`action-category`) son inline-block con flex-shrink: 0 para no comprimir, dejando la máxima área para el texto de razón.
+- **Fix frontend:** Se agregó `line-height: 1.4` en `.reason-text` para mejorar legibilidad del contexto multilínea.
+- **Fix frontend:** Los emojis se renderizan con fuente del sistema para garantizar compatibilidad en todos los navegadores.
+- **Fix frontend:** Se aumentó el `max-width` del contenedor a 1600px (era 1400px) para aprovechar pantallas modernas sin comprimir información.
+
+#### Filtros de auditoría — categorías mejoradas
+- **Fix frontend:** Las opciones de filtro por categoría ahora incluyen todas las categorías nuevas (`integración`, `correo`, `autenticación`, `entrada`, `checklist`, `escalación`, `configuración`) en el selector de categoría del formulario de búsqueda.
+
+### Validación Técnica
+- Se validó correctamente la compilación de TypeScript sin errores de tipado.
+- Se verificó que el método `getActionCategoryLabel()` retorna etiquetas legibles en español.
+- Se testing visual de los badges de categoría con contraste correcto en temas claro/oscuro.
+
 ## [v1.5.21-beta] - 2026-03-17
 
 ### Correcciones de Bugs (B42 / B43 / B44)

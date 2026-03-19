@@ -1,6 +1,6 @@
 .audit-logs-container {
   padding: 20px;
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
 }
 
@@ -34,70 +34,246 @@
 .audit-table {
   width: 100%;
   overflow-x: auto;
+  border-collapse: collapse;
 
   .mat-mdc-header-cell {
     font-weight: 600;
+    font-size: 0.85rem;
   }
 
-  .reason-cell {
-    max-width: 250px;
+  // ===== COLUMNA TIMESTAMP =====
+  .mat-column-timestamp {
+    flex: 0 0 130px;
+    padding: 8px 4px;
+    font-size: 0.80rem;
   }
 
-  .reason-container {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    flex-wrap: wrap;
+  // ===== COLUMNA ACTOR (Usuario/Sistema) =====
+  .mat-column-actor {
+    flex: 0 0 40px;
+    padding: 8px 2px;
+    text-align: center;
+
+    .actor-badge {
+      display: inline-block;
+      font-size: 1.2rem;
+      cursor: help;
+
+      &.actor-user {
+        filter: hue-rotate(0deg);
+      }
+
+      &.actor-system {
+        filter: hue-rotate(45deg) saturate(1.2);
+      }
+    }
   }
 
-  .badge {
-    display: inline-block;
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    white-space: nowrap;
+  // ===== COLUMNA LEVEL =====
+  .mat-column-level {
+    flex: 0 0 80px;
+    padding: 8px 4px;
 
-    &.badge-operativa {
-      background-color: var(--state-info-bg);
-      color: var(--state-info);
-      border-left: 3px solid var(--state-info);
+    .level-chip {
+      font-size: 0.70rem;
+      padding: 2px 8px !important;
+      height: 24px !important;
+      line-height: 24px !important;
+    }
+  }
+
+  // ===== COLUMNA USERNAME =====
+  .mat-column-username {
+    flex: 0 0 140px;
+    padding: 8px 4px;
+    font-size: 0.85rem;
+
+    .username-cell {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+
+      .username {
+        font-weight: 500;
+      }
+
+      .guest-badge {
+        font-size: 0.70rem;
+        color: var(--text-secondary);
+      }
+    }
+  }
+
+  // ===== COLUMNA REASON (LA MÁS IMPORTANTE) =====
+  .mat-column-reason {
+    flex: 1;
+    min-width: 400px;
+    padding: 8px;
+
+    .reason-cell {
+      max-width: 100%;
     }
 
-    &.badge-checklist {
-      background-color: var(--state-success-bg);
-      color: var(--state-success);
-      border-left: 3px solid var(--state-success);
+    .reason-container {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      flex-wrap: nowrap;
+
+      .action-category {
+        display: inline-block;
+        min-width: fit-content;
+        padding: 4px 10px;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        white-space: nowrap;
+        flex-shrink: 0;
+
+        // Estilos por categoría
+        &.category-integration {
+          background-color: rgba(33, 150, 243, 0.15);
+          color: #1976d2;
+          border-left: 3px solid #1976d2;
+        }
+
+        &.category-email {
+          background-color: rgba(76, 175, 80, 0.15);
+          color: #388e3c;
+          border-left: 3px solid #388e3c;
+        }
+
+        &.category-auth {
+          background-color: rgba(244, 67, 54, 0.15);
+          color: #d32f2f;
+          border-left: 3px solid #d32f2f;
+        }
+
+        &.category-entry {
+          background-color: rgba(255, 193, 7, 0.15);
+          color: #f57f17;
+          border-left: 3px solid #f57f17;
+        }
+
+        &.category-checklist {
+          background-color: rgba(63, 81, 181, 0.15);
+          color: #3f51b5;
+          border-left: 3px solid #3f51b5;
+        }
+
+        &.category-escalation {
+          background-color: rgba(233, 30, 99, 0.15);
+          color: #c2185b;
+          border-left: 3px solid #c2185b;
+        }
+
+        &.category-config {
+          background-color: rgba(156, 39, 176, 0.15);
+          color: #7b1fa2;
+          border-left: 3px solid #7b1fa2;
+        }
+
+        &.category-other {
+          background-color: rgba(158, 158, 158, 0.15);
+          color: #616161;
+          border-left: 3px solid #616161;
+        }
+      }
+
+      .reason-text {
+        font-size: 0.83rem;
+        line-height: 1.4;
+        word-break: break-word;
+        flex: 1;
+        color: var(--text-primary);
+
+        // Emojis se ven mejor sin "inherit"
+        & {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+      }
+    }
+  }
+
+  // ===== FILAS =====
+  tr {
+    &.mat-mdc-header-row {
+      background-color: var(--surface-variant);
     }
 
-    &.badge-incidente {
-      background-color: var(--state-error-bg);
-      color: var(--state-error);
-      border-left: 3px solid var(--state-error);
-    }
+    &.mat-mdc-row {
+      border-bottom: 1px solid var(--outline-variant);
+      height: auto;
+      min-height: 48px;
 
-    &.badge-urgente {
-      background-color: var(--state-warning-bg);
-      color: var(--state-warning);
-      border-left: 3px solid var(--state-warning);
+      // Hover effect
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.03);
+      }
     }
+  }
+}
 
-    &.badge-nota {
-      background-color: var(--surface-muted);
-      color: var(--text-primary);
-      border-left: 3px solid var(--text-secondary);
-    }
+// ===== ANTIGUOS ESTILOS (PARA COMPATIBILIDAD) =====
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
 
-    &.badge-reporte {
-      background-color: var(--surface-muted);
-      color: var(--state-info);
-      border-left: 3px solid var(--state-info);
-    }
+  &.badge-operativa {
+    background-color: var(--state-info-bg);
+    color: var(--state-info);
+    border-left: 3px solid var(--state-info);
+  }
 
-    &.badge-default {
-      background-color: var(--state-neutral-bg);
-      color: var(--state-neutral);
-      border-left: 3px solid var(--state-neutral);
+  &.badge-checklist {
+    background-color: var(--state-success-bg);
+    color: var(--state-success);
+    border-left: 3px solid var(--state-success);
+  }
+
+  &.badge-incidente {
+    background-color: var(--state-error-bg);
+    color: var(--state-error);
+    border-left: 3px solid var(--state-error);
+  }
+
+  &.badge-urgente {
+    background-color: var(--state-warning-bg);
+    color: var(--state-warning);
+    border-left: 3px solid var(--state-warning);
+  }
+
+  &.badge-nota {
+    background-color: var(--surface-muted);
+    color: var(--text-primary);
+    border-left: 3px solid var(--text-secondary);
+  }
+
+  &.badge-reporte {
+    background-color: var(--surface-muted);
+    color: var(--state-info);
+    border-left: 3px solid var(--state-info);
+  }
+
+  &.badge-default {
+    background-color: var(--state-neutral-bg);
+    color: var(--state-neutral);
+    border-left: 3px solid var(--state-neutral);
+  }
+}
+
+.reason-text {
+  font-size: 0.85rem;
+}
+
+.guest-badge {
+  font-size: 0.70rem;
+  color: var(--text-secondary);
+}
     }
   }
 

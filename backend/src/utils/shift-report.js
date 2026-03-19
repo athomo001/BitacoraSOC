@@ -5,6 +5,7 @@ const Entry = require('../models/Entry');
 const ShiftCheck = require('../models/ShiftCheck');
 const AppConfig = require('../models/AppConfig');
 const { logger } = require('./logger');
+const { auditSystem } = require('./audit');
 
 /**
  * Genera y envía reporte de turno por correo
@@ -216,7 +217,7 @@ const renderServiceStatusBlock = ({ service, entryService = null, isExit = false
 
 const renderSummaryCard = (label, value, styles) => {
   return `
-    <td style="width:33%;vertical-align:top;padding:0 5px;">
+    <td style="display:table-cell !important;width:33.3333% !important;vertical-align:top;padding:0 5px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${styles.bg};border:1px solid ${styles.border};border-radius:8px;">
         <tr>
           <td style="padding:16px 10px 14px 10px;text-align:center;">
@@ -283,7 +284,7 @@ function generateReportHTML({ shift, checklistEntry, checklistExit, entries, per
     <mj-section padding="0 26px 18px 26px">
       <mj-column>
         <mj-text padding="0">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed;border-collapse:separate;border-spacing:0;">
             <tr>
               ${renderSummaryCard('OK', totalOk, { bg: '#e8f5e9', border: '#c8e6c9', valueColor: '#1b5e20', labelColor: '#2e7d32' })}
               ${renderSummaryCard('NO OK', totalError, { bg: '#ffebee', border: '#ffcdd2', valueColor: '#b71c1c', labelColor: '#c62828' })}
@@ -365,7 +366,7 @@ function generateReportHTML({ shift, checklistEntry, checklistExit, entries, per
       <mj-section padding="0 26px 18px 26px">
         <mj-column>
           <mj-text padding="0">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed;border-collapse:separate;border-spacing:0;">
               <tr>
                 ${renderSummaryCard('Operativa', entryTypeCounts.operativa, { bg: '#e8f5e9', border: '#c8e6c9', valueColor: '#1b5e20', labelColor: '#2e7d32' })}
                 ${renderSummaryCard('Ofensa', entryTypeCounts.ofensa, { bg: '#fff8e1', border: '#ffecb3', valueColor: '#ef6c00', labelColor: '#f57c00' })}
@@ -538,6 +539,25 @@ function generateReportText({ shift, checklistEntry, checklistExit, entries, per
  * @param {boolean} options.ignoreShiftEnabled - Ignora emailReportConfig.enabled del turno
  */
 async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
+  const isManualTrigger = options.ignoreShiftEnabled === true;
+  const triggerSource = isManualTrigger ? 'closure-checklist' : 'scheduler';
+
+  const registerShiftReportAudit = async ({ event, success, reason, level, metadata = {} }) => {
+    await auditSystem({
+      event,
+      level: level || (success ? 'info' : 'warn'),
+      result: {
+        success,
+        reason
+      },
+      metadata: {
+        shiftId,
+        triggerSource,
+        ...metadata
+      }
+    });
+  };
+
   try {
     logger.info('📊 [sendShiftReport] STARTING shift report process...', { shiftId, shiftDate });
 
@@ -553,6 +573,15 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
     const ignoreShiftEnabled = options.ignoreShiftEnabled === true;
     if (!ignoreShiftEnabled && !shift.emailReportConfig?.enabled) {
       logger.info(`📊 [sendShiftReport] Email reports DISABLED for shift ${shift.name}`);
+      await registerShiftReportAudit({
+        event: 'smtp.shift-report.skipped',
+        success: true,
+        reason: 'Email reports disabled for this shift',
+        metadata: {
+          shiftName: shift.name,
+          enabled: false
+        }
+      });
       return { success: true, message: 'Email reports disabled for this shift' };
     }
 
@@ -563,6 +592,15 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
 
     if (!shift.emailReportConfig.recipients || shift.emailReportConfig.recipients.length === 0) {
       logger.warn(`📊 [sendShiftReport] No recipients configured for shift ${shift.name}`);
+      await registerShiftReportAudit({
+        event: 'smtp.shift-report.skipped',
+        success: false,
+        reason: 'No recipients configured',
+        metadata: {
+          shiftName: shift.name,
+          recipientsCount: 0
+        }
+      });
       return { success: false, message: 'No recipients configured' };
     }
 
@@ -593,7 +631,6 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
     }
 
     // 3. Buscar checklists de entrada y salida dentro del rango real del turno
-    const isManualTrigger = options.ignoreShiftEnabled === true;
     const checklistExitRangeEnd = isManualTrigger ? shiftDate : shiftEnd;
     const checklistExit = await ShiftCheck.findOne({
       type: 'cierre',
@@ -619,6 +656,14 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
       const hasContentToSend = (checklistEntry || checklistExit || (entries && entries.length > 0));
       if (!hasContentToSend) {
         logger.warn('📊 [sendShiftReport] Aborted: Report is completely empty', { shiftId: shift._id });
+        await registerShiftReportAudit({
+          event: 'smtp.shift-report.skipped',
+          success: false,
+          reason: 'Empty report aborted',
+          metadata: {
+            shiftName: shift.name
+          }
+        });
         return { success: false, message: 'Empty report aborted' };
       }
 
@@ -627,6 +672,16 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
           shiftId: shift._id,
           entriesCount: entries.length,
           hasChecklistEntry: !!checklistEntry
+        });
+        await registerShiftReportAudit({
+          event: 'smtp.shift-report.deferred',
+          success: false,
+          reason: 'Pending closure checklist. Report deferred.',
+          metadata: {
+            shiftName: shift.name,
+            entriesCount: entries.length,
+            hasChecklistEntry: !!checklistEntry
+          }
         });
         return {
           success: false,
@@ -644,6 +699,16 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
         const effectiveShiftStart = new Date(shiftStart.getTime() - 15 * 60000);
         if (lastSentDate >= effectiveShiftStart) {
           logger.warn('📊 [sendShiftReport] Aborted: Report already sent for this shift period', { shiftId: shift._id, lastSentDate, shiftStart });
+          await registerShiftReportAudit({
+            event: 'smtp.shift-report.skipped',
+            success: false,
+            reason: 'Report already sent for this shift period',
+            metadata: {
+              shiftName: shift.name,
+              lastSentDate,
+              shiftStart
+            }
+          });
           return { success: false, message: 'Report already sent for this shift period' };
         }
       }
@@ -709,6 +774,21 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
       date: shiftDate
     });
 
+    await registerShiftReportAudit({
+      event: 'smtp.shift-report.sent',
+      success: true,
+      reason: 'Report sent successfully',
+      metadata: {
+        shiftName: shift.name,
+        recipientsCount: shift.emailReportConfig.recipients.length,
+        includeChecklist: shift.emailReportConfig.includeChecklist,
+        includeEntries: shift.emailReportConfig.includeEntries,
+        entriesCount: entries.length,
+        periodStart,
+        periodEnd
+      }
+    });
+
     return {
       success: true,
       deferredByClosure: false,
@@ -720,6 +800,13 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
     };
 
   } catch (error) {
+    await registerShiftReportAudit({
+      event: 'smtp.shift-report.error',
+      success: false,
+      reason: error.message,
+      level: 'error'
+    });
+
     logger.error('❌ [sendShiftReport] ERROR!', {
       error: error.message,
       stack: error.stack,
@@ -729,8 +816,149 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
   }
 }
 
+/**
+ * Envía un correo de prueba PoC del reporte de turno sin contenido operativo real.
+ * Se usa para validar formato y canal SMTP sin contabilizarlo como envío productivo.
+ */
+async function sendShiftReportPoc(shiftId, options = {}) {
+  const referenceDate = options.date ? new Date(options.date) : new Date();
+
+  const registerPocAudit = async ({ event, success, reason, level, metadata = {} }) => {
+    await auditSystem({
+      event,
+      level: level || (success ? 'info' : 'warn'),
+      result: { success, reason },
+      metadata: {
+        shiftId,
+        isPoc: true,
+        ...metadata
+      }
+    });
+  };
+
+  try {
+    const shift = await WorkShift.findById(shiftId);
+    if (!shift) {
+      throw new Error(`Shift ${shiftId} not found`);
+    }
+
+    const recipients = Array.isArray(shift.emailReportConfig?.recipients)
+      ? shift.emailReportConfig.recipients.filter(Boolean)
+      : [];
+
+    if (recipients.length === 0) {
+      await registerPocAudit({
+        event: 'smtp.shift-report.poc.skipped',
+        success: false,
+        reason: 'No recipients configured',
+        metadata: {
+          shiftName: shift.name,
+          recipientsCount: 0
+        }
+      });
+
+      return { success: false, isPoc: true, message: 'No recipients configured' };
+    }
+
+    const appConfig = await AppConfig.findOne().select('appTitle faviconUrl').lean();
+    const appTitle = String(appConfig?.appTitle || '').trim() || 'Bitácora SOC';
+    const faviconUrl = String(appConfig?.faviconUrl || '').trim();
+
+    const dateLabel = referenceDate.toLocaleDateString('es-CL', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+
+    const subjectTemplate = shift.emailReportConfig?.subjectTemplate || 'Reporte SOC [fecha] [turno]';
+    const baseSubject = replaceSubjectVariables(subjectTemplate, {
+      date: dateLabel,
+      shiftName: shift.name,
+      time: shift.endTime
+    });
+
+    const shiftForPoc = {
+      ...shift.toObject(),
+      emailReportConfig: {
+        ...(shift.emailReportConfig || {}),
+        includeChecklist: false,
+        includeEntries: false
+      }
+    };
+
+    const htmlBody = generateReportHTML({
+      shift: shiftForPoc,
+      checklistEntry: null,
+      checklistExit: null,
+      entries: [],
+      periodStart: referenceDate,
+      periodEnd: referenceDate,
+      appTitle,
+      faviconUrl
+    });
+
+    const html = `
+      <div style="font-family:Segoe UI,Arial,sans-serif;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:10px 12px;margin:0 0 12px 0;color:#8d6e63;font-size:12px;">
+        PRUEBA POC: Este correo valida canal y formato de envío. No incluye contenido operativo real del turno.
+      </div>
+      ${htmlBody}
+    `;
+
+    const text = [
+      'PRUEBA POC: Este correo valida canal y formato de envío. No incluye contenido operativo real del turno.',
+      '',
+      generateReportText({
+        shift: shiftForPoc,
+        checklistEntry: null,
+        checklistExit: null,
+        entries: [],
+        periodStart: referenceDate,
+        periodEnd: referenceDate,
+        appTitle
+      })
+    ].join('\n');
+
+    const subject = `[POC] ${baseSubject}`;
+
+    await sendEmail({
+      to: recipients,
+      subject,
+      html,
+      text
+    });
+
+    await registerPocAudit({
+      event: 'smtp.shift-report.poc.sent',
+      success: true,
+      reason: 'POC report sent successfully',
+      metadata: {
+        shiftName: shift.name,
+        recipientsCount: recipients.length,
+        date: referenceDate
+      }
+    });
+
+    return {
+      success: true,
+      isPoc: true,
+      message: 'POC report sent successfully',
+      recipients: recipients.length
+    };
+  } catch (error) {
+    await registerPocAudit({
+      event: 'smtp.shift-report.poc.error',
+      success: false,
+      reason: error.message,
+      level: 'error'
+    });
+
+    throw error;
+  }
+}
+
 module.exports = {
   sendShiftReport,
+  sendShiftReportPoc,
   generateReportHTML,
   replaceSubjectVariables
 };

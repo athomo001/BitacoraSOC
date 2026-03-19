@@ -475,6 +475,40 @@
 
             </div>
 
+            <mat-divider></mat-divider>
+
+            <div class="report-options">
+              <div class="include-options">
+                <h4>Prueba PoC de correo de fin de turno</h4>
+                <p class="section-description">
+                  Envía un correo de prueba y se audita como PoC, sin contenido operativo real del turno.
+                </p>
+              </div>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Turno para prueba PoC</mat-label>
+                <mat-select [(ngModel)]="selectedPocShiftId" [ngModelOptions]="{standalone: true}">
+                  <mat-option *ngFor="let shift of shifts" [value]="shift._id">
+                    {{ shift.name }} ({{ formatTimeRange(shift) }})
+                  </mat-option>
+                </mat-select>
+                <mat-icon matPrefix>schedule</mat-icon>
+              </mat-form-field>
+
+              <div class="form-actions">
+                <button
+                  mat-stroked-button
+                  color="accent"
+                  type="button"
+                  (click)="sendPocReport()"
+                  [disabled]="sendingPoc || !selectedPocShiftId"
+                >
+                  <mat-icon>{{ sendingPoc ? 'hourglass_top' : 'science' }}</mat-icon>
+                  {{ sendingPoc ? 'Enviando PoC...' : 'Enviar correo PoC' }}
+                </button>
+              </div>
+            </div>
+
             <!-- Acciones -->
             <div class="form-actions">
               <button mat-raised-button type="button" (click)="toggleGlobalEmailConfig()">
