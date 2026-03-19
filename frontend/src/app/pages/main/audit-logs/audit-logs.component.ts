@@ -304,24 +304,24 @@ export class AuditLogsComponent implements OnInit {
     // ====== CORREO / SMTP ======
     if (event.includes('mail') || event.includes('smtp')) {
       const status = result.success ? '✅' : '❌';
-      const recipients = (meta.toMasked as string[] | undefined)?.length ? (meta.toMasked as string[]).join(', ') : 'sin destinatarios';
-      const subject = meta.subject ? ` | ${meta.subject}` : '';
-      const category = meta.category || 'correo';
+      const recipients = (meta['toMasked'] as string[] | undefined)?.length ? (meta['toMasked'] as string[]).join(', ') : 'sin destinatarios';
+      const subject = meta['subject'] ? ` | ${meta['subject']}` : '';
+      const category = meta['category'] || 'correo';
       return `${status} [${category.toUpperCase()}] Para: ${recipients}${subject}`;
     }
 
     // ====== INTEGRACIÓN (GLPI, LOG FORWARDING) ======
     if (event.includes('glpi') || event.includes('integration') || event.includes('log-forward')) {
       const status = result.success ? '✅' : '❌';
-      const target = meta.target || meta.endpoint || 'servicio externo';
-      const detail = meta.detail || meta.message || result.reason || '';
+      const target = meta['target'] || meta['endpoint'] || 'servicio externo';
+      const detail = meta['detail'] || meta['message'] || result.reason || '';
       return `${status} [INTEGRACIÓN] → ${target} ${detail ? '| ' + detail : ''}`;
     }
 
     // ====== AUTENTICACIÓN - LOGIN ======
     if (event === 'auth.login' || event === 'user.login') {
       const status = result.success ? '✅' : '❌';
-      const method = meta.method || 'local';
+      const method = meta['method'] || 'local';
       const reason = !result.success ? `| ${result.reason || 'intento fallido'}` : '';
       return `${status} [LOGIN] vía ${method.toUpperCase()} ${reason}`;
     }
@@ -341,8 +341,8 @@ export class AuditLogsComponent implements OnInit {
 
     // ====== CAMBIO DE IP / SESIÓN SOSPECHOSA ======
     if (event === 'auth.session.ip_change') {
-      const prev = meta.previousIp || meta.prev || '-';
-      const curr = log.request?.ip || meta.currentIp || '-';
+      const prev = meta['previousIp'] || meta['prev'] || '-';
+      const curr = log.request?.ip || meta['currentIp'] || '-';
       const vpn = log.request?.isLikelyVpnOrProxy ? '(probable VPN/Proxy)' : '';
       return `⚠️ [CAMBIO IP] ${prev} → ${curr} ${vpn}`;
     }
@@ -351,7 +351,7 @@ export class AuditLogsComponent implements OnInit {
     if (event.includes('entry.')) {
       const status = result.success ? '✅' : '❌';
       const action = event.replace('entry.', '').toUpperCase();
-      const type = meta.entryType || '';
+      const type = meta['entryType'] || '';
       const typeLabel = type ? `[${type.toUpperCase()}]` : '';
       const reason = result.reason ? `| ${result.reason}` : '';
       return `${status} [ENTRADA ${action}] ${typeLabel} ${reason}`;
@@ -361,7 +361,7 @@ export class AuditLogsComponent implements OnInit {
     if (event.includes('checklist') || event.includes('shiftcheck')) {
       const status = result.success ? '✅' : '❌';
       const action = event.includes('complete') ? 'COMPLETADO' : event.replace(/checklist\.|shiftcheck\./, '').toUpperCase();
-      const template = meta.templateName || meta.checklistName || 'checklist';
+      const template = meta['templateName'] || meta['checklistName'] || 'checklist';
       const reason = result.reason ? `| ${result.reason}` : '';
       return `${status} [CHECKLIST ${action}] ${template} ${reason}`;
     }
@@ -370,16 +370,16 @@ export class AuditLogsComponent implements OnInit {
     if (event.includes('escalation')) {
       const status = result.success ? '✅' : '❌';
       const action = event.replace('escalation.', '').toUpperCase();
-      const rule = meta.ruleName || 'escala';
-      const detail = meta.detail || result.reason || '';
+      const rule = meta['ruleName'] || 'escala';
+      const detail = meta['detail'] || result.reason || '';
       return `${status} [ESCALACIÓN ${action}] ${rule} ${detail ? '| ' + detail : ''}`;
     }
 
     // ====== CONFIGURACIÓN / ADMIN ======
     if (event.includes('config') || event.includes('admin')) {
       const status = result.success ? '✅' : '❌';
-      const section = meta.section || meta.config || 'configuración';
-      const detail = meta.detail || result.reason || '';
+      const section = meta['section'] || meta['config'] || 'configuración';
+      const detail = meta['detail'] || result.reason || '';
       return `${status} [CONFIG] ${section} ${detail ? '| ' + detail : ''}`;
     }
 
