@@ -274,23 +274,14 @@
   font-size: 0.70rem;
   color: var(--text-secondary);
 }
-    }
-  }
 
-  .reason-text {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 200px;
-  }
-
-  .guest-badge {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    font-style: italic;
-  }
+.reason-text {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
 }
 
 mat-chip {
