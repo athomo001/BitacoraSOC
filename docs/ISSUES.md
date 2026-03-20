@@ -12,6 +12,9 @@
 | AI-SUMMARY-001 | Pendiente | IA/Operación ALTA | Módulo de Resumen Ejecutivo Efímero (IA On-Demand) | Integrar Ollama+llama3.2:3b en modo efímero `docker start -> healthcheck -> generate -> docker stop` con `try/finally`, salida editable en campo "Resumen Sugerido por IA" y botón "Generar con IA". |
 | DEP-NPM-012 | Pendiente | Deuda Técnica / Backend MEDIA | Dependencias npm deprecadas en build Docker (`glob`/`inflight`) | Durante `npm install --omit=dev` en backend aparecen warnings por paquetes deprecados (`glob@7.2.3`, `glob@10.5.0`, `inflight@1.0.6`). Se requiere trazar árbol de dependencias, actualizar paquetes raíz y regenerar lockfile para eliminar dependencias sin soporte y riesgo de seguridad/memoria. |
 | FE-SASS-013 | Pendiente | Deuda Técnica / Frontend MEDIA | Migrar `@import` Sass a `@use/@forward` en login | Build Angular reporta deprecación en `src/app/pages/login/login.component.scss` por `@import 'login-infoflow';`. Sass eliminará `@import` en Dart Sass 3.0.0; se debe migrar a módulos `@use/@forward` para compatibilidad futura. |
+| AUDIT-014 | Pendiente | Auditoría / Backend+Frontend ALTA | Login exitoso no muestra actor real en Auditoría | Hallazgo operativo: al autenticarse un usuario, el registro aparece como `Sistema` en columna Actor y sin contexto suficiente del usuario autenticado. Se debe corregir la atribución para que `auth.login.success` persista/renderice `actorId/username` reales (sin exponer secretos) y permita trazabilidad forense confiable. |
+| MAIL-AUDIT-015 | Pendiente | Email / Observabilidad ALTA | Error `❌ [CORREO] Para: sin destinatarios` sin contexto diagnóstico | Hallazgo operativo: en auditoría se observan múltiples WARN/ERROR de correo con texto genérico `Para: sin destinatarios`, sin identificar origen exacto (módulo, turno/checklist, trigger, destinatarios calculados, config SMTP). Se requiere enriquecer metadata y razón visible para identificar por qué falla y desde qué flujo se dispara. |
+| BACKUP-AUTO-016 | Pendiente | Backup / Operación ALTA | Backup automático no se ejecuta según intervalo configurado | Hallazgo operativo: con backups automáticos habilitados (`cada 7 días`) no aparecen ejecuciones automáticas en historial aun habiendo transcurrido más de 9 días; solo se observan backups manuales. Se debe validar scheduler, persistencia de última ejecución y timezone/frecuencia real del job. |
 | B34 | Pendiente | Operación/Alertas | Alerta por ítems NOK (Rojo) en Checklist | Añadir switch en config global para activar/desactivar alerta por ítems en rojo. Agregar selector de cargo (ej. N2) a notificar. Al guardar el checklist, si el analista marca ítems NOK (rojo), enviar email automático a todos los usuarios del cargo seleccionado incluyendo el detalle/observación ingresada por el analista. |
 | SEC-HIGH-009 | Pendiente | Seguridad ALTA | Riesgo de Regex Injection / ReDoS en búsquedas de catálogo y tags (NoSQL) | Hallazgo QA: existen regex construidas directo desde input sin escape (`new RegExp(search, 'i')`, `new RegExp('^' + q, 'i')`, `$regex` con `topic` sin escapar) en rutas autenticadas/admin. Un patrón malicioso puede disparar backtracking costoso y degradar el backend (DoS lógico). Archivos detectados: `backend/src/routes/admin-catalog.js`, `backend/src/routes/tags.js`, `backend/src/routes/entries.js`, `backend/src/controllers/escalationController.js`. |
 | SEC-HIGH-010 | Pendiente | Seguridad ALTA | OWASP A10 SSRF: URLs salientes configurables sin allowlist en integraciones | Hallazgo QA: endpoints de integración permiten destinos salientes controlados por configuración (`GLPI api.baseUrl` y `logging http.url`) sin validación estricta de red interna/loopback/protocolos. Riesgo: Server-Side Request Forgery desde backend hacia servicios internos/metadatos si una cuenta admin se compromete. Archivos detectados: `backend/src/routes/glpi.js`, `backend/src/routes/logging.js`, `backend/src/utils/logForwarder.js`. |
@@ -456,6 +459,16 @@ export class EntriesComponent implements OnInit {
 4. **Levantamiento y Restauración:** Arrancar el nuevo servicio `mongo:8`. Las bases estarán limpias porque se generará un nuevo volumen o carpeta de datos. Entrar al contenedor y ejecutar `mongorestore` apuntando al dump generado en el paso 1. Validar integridad visual de la Bitácora.
 5. **Documentación:** Registrar la ventana de mantenimiento y las versiones finales en `README.md` o documentación operativa.
 
+### BACKUP-AUTO-016 - Backup automático no se ejecuta según intervalo configurado
+
+1. **Reproducir con evidencia:** Confirmar en UI que `Habilitar Backups Automáticos` está activo, intervalo `7`, retención y destino guardados; capturar timestamp de última ejecución real en historial.
+2. **Validar persistencia de configuración:** Revisar en DB (colección de configuración) que el flag de backup automático y el intervalo quedaron almacenados correctamente tras `Guardar Configuración`.
+3. **Inspeccionar scheduler backend:** Verificar que el job de backup automático se inicializa al arrancar backend y no depende de ruta manual. Confirmar frecuencia efectiva del cron/timer.
+4. **Corregir cálculo temporal:** Auditar lógica de próximo disparo (`lastRunAt + intervalDays`) con timezone del sistema para evitar desfases UTC/local que bloqueen ejecución.
+5. **Trazabilidad obligatoria:** Registrar en auditoría eventos `BACKUP_AUTO_SCHEDULED`, `BACKUP_AUTO_TRIGGERED`, `BACKUP_AUTO_SKIPPED` y motivo de skip para diagnóstico operativo.
+6. **Prueba controlada:** Bajar temporalmente intervalo a 1 día (o modo test en minutos), validar creación automática y luego restaurar 7 días.
+7. **Criterio de cierre:** Sin interacción manual, el sistema debe crear backup automático cuando vence el intervalo y mostrarlo en historial con etiqueta de origen `automático`.
+
 ### DEP-NPM-012 - Dependencias npm deprecadas en build Docker (`glob`/`inflight`)
 
 1. **Trazar el origen real:** Ejecutar en `backend` comandos como `npm ls glob inflight` para identificar qué dependencias raíz introducen cada versión deprecada.
@@ -471,6 +484,23 @@ export class EntriesComponent implements OnInit {
 3. **Compatibilidad Angular build:** Compilar frontend (`ng build` o build Docker) y confirmar desaparición de warning `Deprecation [plugin angular-sass]`.
 4. **Validación visual login:** Revisar que el tema login (incluido infoflow/cyber) conserve estilos exactos tras la migración.
 5. **Prevención futura:** Buscar otros `@import` en `frontend/src/**/*.scss` para cerrar la deuda técnica antes de Dart Sass 3.0.0.
+
+### AUDIT-014 - Login exitoso no muestra actor real en Auditoría
+
+1. **Reproducir y capturar evidencia:** Iniciar sesión con usuario real y verificar en `/main/audit-logs` si el evento de login queda con `Actor=Sistema` en vez de usuario autenticado.
+2. **Backend (emisión de evento):** Revisar punto exacto donde se registra `auth.login.success` para asegurar que incluya `actorId`, `username` y `requestId` desde contexto autenticado.
+3. **Persistencia de metadata:** Validar que el modelo/DAO de `AuditLog` no esté sobrescribiendo actor con fallback `system` cuando sí hay usuario.
+4. **Frontend (render):** Ajustar `isSystemAction()` y resolución de columnas `Actor/Username` para priorizar actor humano cuando exista en payload.
+5. **Criterio de cierre:** Login exitoso debe mostrar usuario real en la fila y conservar clasificación de autenticación sin exponer credenciales/tokens.
+
+### MAIL-AUDIT-015 - Error `❌ [CORREO] Para: sin destinatarios` sin contexto diagnóstico
+
+1. **Normalizar razón de error:** Cambiar el texto genérico por mensaje estructurado con causa explícita (`destinatarios vacíos por filtro`, `rol sin usuarios activos`, `config SMTP incompleta`, etc.).
+2. **Enriquecer metadata de auditoría:** Incluir en evento de correo campos mínimos: `sourceModule`, `triggerType`, `shiftId`, `checklistId`, `entryType`, `resolvedRecipientsCount`, `resolvedRecipientsPreview` (sanitizado) y `smtpConfigId`.
+3. **Trazar origen de disparo:** Registrar si proviene de cierre de checklist, scheduler, escalación, PoC o envío manual para evitar confusión cuando solo se esperaba 1 correo.
+4. **Frontend (razón visible):** Mejorar `Tipo / Razón / Detalles` para mostrar resumen útil en una línea y detalle expandible con contexto operativo.
+5. **Control de ruido:** Aplicar deduplicación/ratelimit de logs repetidos para el mismo fallo en ventana corta (ej. 5-10 min) y mantener contador de repeticiones.
+6. **Criterio de cierre:** Ante fallo de correo, auditoría debe permitir responder en menos de 1 minuto: qué intentó enviar, desde dónde, a quién, por qué falló y qué configuración estaba activa.
 
 ### B34 - Alerta por ítems NOK (Rojo) en Checklist
 
