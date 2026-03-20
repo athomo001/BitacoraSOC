@@ -10,6 +10,8 @@
 | INFRA-MONGO-001 | Pendiente | Infraestructura / Datos CRÍTICA | Upgrade MongoDB (7 → 8) | El motor base de `mongo:7` en el docker-compose termina su soporte LTS oficial en Agosto de 2026. Se debe planificar un salto a `mongo:8`. Dado que los archivos de base de datos `.wt` no siempre son retrocompatibles entre versiones mayores, el protocolo a documentar e investigar requerirá: 1) `mongodump` completo; 2) Borrar el contenedor y limpiar el volumen físico `.data/mongodb_data`; 3) Levantar el nuevo `mongo:8` vacío; 4) Inyectar los datos de vuelta con `mongorestore`. |
 | B19 | Pendiente | Integraciones | Creación de tickets en GLPI (Correo / API) | Definir flujo final (resumen diario vs evento inmediato), destino y estrategia de reintentos. |
 | AI-SUMMARY-001 | Pendiente | IA/Operación ALTA | Módulo de Resumen Ejecutivo Efímero (IA On-Demand) | Integrar Ollama+llama3.2:3b en modo efímero `docker start -> healthcheck -> generate -> docker stop` con `try/finally`, salida editable en campo "Resumen Sugerido por IA" y botón "Generar con IA". |
+| DEP-NPM-012 | Pendiente | Deuda Técnica / Backend MEDIA | Dependencias npm deprecadas en build Docker (`glob`/`inflight`) | Durante `npm install --omit=dev` en backend aparecen warnings por paquetes deprecados (`glob@7.2.3`, `glob@10.5.0`, `inflight@1.0.6`). Se requiere trazar árbol de dependencias, actualizar paquetes raíz y regenerar lockfile para eliminar dependencias sin soporte y riesgo de seguridad/memoria. |
+| FE-SASS-013 | Pendiente | Deuda Técnica / Frontend MEDIA | Migrar `@import` Sass a `@use/@forward` en login | Build Angular reporta deprecación en `src/app/pages/login/login.component.scss` por `@import 'login-infoflow';`. Sass eliminará `@import` en Dart Sass 3.0.0; se debe migrar a módulos `@use/@forward` para compatibilidad futura. |
 | B34 | Pendiente | Operación/Alertas | Alerta por ítems NOK (Rojo) en Checklist | Añadir switch en config global para activar/desactivar alerta por ítems en rojo. Agregar selector de cargo (ej. N2) a notificar. Al guardar el checklist, si el analista marca ítems NOK (rojo), enviar email automático a todos los usuarios del cargo seleccionado incluyendo el detalle/observación ingresada por el analista. |
 | SEC-HIGH-009 | Pendiente | Seguridad ALTA | Riesgo de Regex Injection / ReDoS en búsquedas de catálogo y tags (NoSQL) | Hallazgo QA: existen regex construidas directo desde input sin escape (`new RegExp(search, 'i')`, `new RegExp('^' + q, 'i')`, `$regex` con `topic` sin escapar) en rutas autenticadas/admin. Un patrón malicioso puede disparar backtracking costoso y degradar el backend (DoS lógico). Archivos detectados: `backend/src/routes/admin-catalog.js`, `backend/src/routes/tags.js`, `backend/src/routes/entries.js`, `backend/src/controllers/escalationController.js`. |
 | SEC-HIGH-010 | Pendiente | Seguridad ALTA | OWASP A10 SSRF: URLs salientes configurables sin allowlist en integraciones | Hallazgo QA: endpoints de integración permiten destinos salientes controlados por configuración (`GLPI api.baseUrl` y `logging http.url`) sin validación estricta de red interna/loopback/protocolos. Riesgo: Server-Side Request Forgery desde backend hacia servicios internos/metadatos si una cuenta admin se compromete. Archivos detectados: `backend/src/routes/glpi.js`, `backend/src/routes/logging.js`, `backend/src/utils/logForwarder.js`. |
@@ -72,10 +74,352 @@
 | B45 | Listo | Operación/Turnos + Email | Correo de fin de turno debe posponerse hasta checklist de cierre real (si analista se atrasa) | Implementado en backend: el trigger automático de fin de turno ya no envía si no existe checklist de cierre (`PENDIENTE_POR_CIERRE`), el envío se ejecuta al registrar cierre incluso fuera de la hora fin (ventana extendida en trigger manual), y se mantiene control anti-duplicado con `lastReportSentAt` más trazabilidad `ENVIADO_DIFERIDO`/`PENDIENTE_POR_CIERRE`. |
 | B35 | Listo | UI/UX + Bug | Ajuste Header Checklist y Fix "Último Check" | H1 cambiado a título fijo "Checklist del Turno"; nombre de plantilla se muestra como subtítulo. Accordion usa el nombre de la plantilla. Backend `GET /check/last` corregido para retornar el último check del equipo (sin filtro por usuario), garantizando que siempre se muestre el registro más reciente real. |
 | B36 | Listo | UI/UX | Aprovechamiento de ancho de pantalla | Cajón de notas (right sidebar) cambiado a `mode="over"` (overlay sobre el contenido, sin empujar). Cuando las notas se abren, el contenido recibe `margin-right: 350px` vía clase `.with-notes-open` para evitar solapamiento. El contenido principal usa `transition` suave y ocupa el ancho completo disponible en pantallas grandes. Eliminado `max-width: 900px` del contenedor del Checklist. |
-
+| EE-BAT-001 | Listo | UI/UX + Frontend MEDIA | Easter Egg: Murciélago Pixel-Art (#bat) | Implementar animación pixel-art retro que se active escribiendo `#bat` exacto en el textarea de entradas. Murciélago en estilo box-shadow con aleteo (`@keyframes steps(2)`), movimiento circular por 15s, desaparición con F5. Solo acepta hashtag exacto (#bat, #BAT, #Bat) — rechaza variaciones. Referencia visual: pixel-art con 2 fotogramas. |
 ---
 
 ## Información de como solucionar los Pendientes
+
+### EE-BAT-001 - Easter Egg: Murciélago Pixel-Art (#bat)
+
+**Descripción técnica:**
+Implementar un easter egg interactivo que muestre un murciélago animado en pixel-art **apenas** el usuario escribe exactamente `#bat` en el textarea de entradas. El murciélago aparece **inmediatamente en tiempo real** (no espera al envío de la entrada), comienza su movimiento circular **por toda la pantalla/web** y **persiste indefinidamente** hasta que el usuario recargue la página (F5).
+
+**Requerimientos:**
+1. **Ubicación del Trigger:**
+   - **Sección**: `/main/entries` (Nueva Entrada)
+   - **Componente**: Campo textarea en la tarjeta de "Nueva Entrada"
+   - **FormControl**: `formControlName="content"`
+
+2. **Trigger (Activación) - EN TIEMPO REAL:**
+   - Hashtag exacto: Solo `#bat` (case-insensitive: `#BAT`, `#Bat`, `#bAt` válidos)
+   - NO se activa con variaciones: `#batimovil`, `#bat123`, `#batman` = NO disparan
+   - **TIMING CRÍTICO**: Se activa apenas se escribe "#bat" (no al enviar la entrada)
+   - Ubicación: En el textarea del componente `entries.component`
+   - Detección: Usa `valueChanges` para monitoreo en tiempo real de `formControlName="content"`
+   - **Comportamiento**: El murciélago aparece INMEDIATAMENTE y comienza animado al mismo instante
+
+3. **Animación Visual (Mejorado):**
+   - **Estilo**: Pixel-art retro con box-shadow generado
+   - **Fotogramas**: 2 estados (alas abiertas/cerradas)
+   - **Duración por frame**: 0.4s (alternancia cada 400ms)
+   - **Técnica CSS**: `@keyframes` con `steps(2)` para look retro
+   - **Aparición**: Inmediata (sin delay) cuando se detecta "#bat"
+   - **Efecto Glow/Brillo**: Box-shadow con blur para halo luminoso alrededor del murciélago
+   - **Rastro Visual**: Trail effect con opacidad decreciente (sombras fantasma siguiendo la trayectoria)
+   - **Sombra Dinámica**: Cambiar intensidad de sombra según la posición (simular profundidad 3D)
+   - **Rotación del Cuerpo**: Girar el cuerpo del murciélago según la dirección del movimiento (izq/derecha/arriba/abajo)
+
+4. **Movimiento (Mejorado - Con Comportamiento Inteligente):**
+   - **Inicio**: Esquina superior izquierda (top-left)
+   - **Duración total**: **INFINITA** - No tiene límite de tiempo
+   - **Tipo de movimiento base**: Circular/fluido **por toda la pantalla visible**
+   - **Alcance**: Se mueve a través de toda la web/página (no confinado a un área)
+   - **Sincronización**: Comienza al mismo tiempo que el murciélago aparece (no espera)
+   - **Z-index**: Por encima de los logs pero sin bloquear UI
+   - **Variabilidad del movimiento**: 
+     - Agregar caminos **aleatorios** además del circular para evitar predictibilidad
+     - **Cambios de velocidad**: Alterna entre vuelo rápido y lento (20-150% de velocidad base)
+     - **Pausas ocasionales**: Se detiene 1-2 segundos en puntos aleatorios (como si buscara comida/insectos)
+     - **Zigzag adicional**: Oscilaciones laterales suave durante el movimiento (patrón natural de murciélago)
+
+5. **Limpieza/Desaparición:**
+   - **NO DESAPARECE AUTOMÁTICAMENTE**: La animación persiste indefinidamente
+   - **Única forma de eliminar**: F5 (refresco de la página) resetea todo
+   - **Comportamiento post-recarga**: Si el usuario recarga (F5) y vuelve a escribir "#bat", vuelve a aparecer con su animación de nuevo
+
+6. **Interactividad (Pick-the-Bat!):**
+   - **Clickeable**: Los usuarios pueden intentar clickear el murciélago
+   - **Mecanismo de Evasión**: Si el usuario intenta capturarlo:
+     - El murciélago se vuelve más rápido (acelera 50% más)
+     - Cambia trayectoria al azar para evitar ser atrapado
+     - Emite visual feedback (parpadeo, cambio de color temporal)
+   - **Hover Effect**: 
+     - Tooltip aparece al pasar el cursor: "¿Intentas atraparme?" o "¡Todavía estoy aquí!"
+     - El murciélago ocasionalmente vuela **hacia** el cursor (como si jugara)
+     - O lo evita calculando distancia y huyendo si el cursor se aproxima mucho
+   - **Contador (Bonus)**: Mostrar en la consola o log cuántas veces el usuario intentó capturarlo (ej: "Intentos fallidos: 3")
+
+**Archivos a modificar:**
+- `frontend/src/app/pages/main/entries/entries.component.ts`
+- `frontend/src/app/pages/main/entries/entries.component.scss`
+- `frontend/src/app/pages/main/entries/entries.component.html` (si necesita ajustes)
+
+**Implementación paso a paso:**
+
+1. **Ya existe la lógica base** en `entries.component.ts`:
+   - Sistema de detección de hashtags en `triggerEntryEasterEggIfNeeded()`
+   - Overlay HTML/CSS para mostrar la animación
+   - Timer de desaparición
+   
+2. **Lo que FALTA:**
+   - Validación exacta de `#bat` (no otras variaciones)
+   - Animación pixel-art con box-shadow (2 fotogramas: alas abiertas/cerradas)
+   - @keyframes de aleteo con `steps(2)`
+   - @keyframes de movimiento circular **INFINITO** (SIN límite de 15s, se repite indefinidamente)
+   - **Efectos Visuales Avanzados**:
+     - Glow/Brillo (box-shadow con blur)
+     - Rastro visual (trail effect con opacity decreciente)
+     - Sombra dinámica (profundidad según posición)
+     - Rotación del cuerpo según dirección
+   - **Comportamiento Mejorado**:
+     - Movimiento aleatorio + circular mix
+     - Cambios de velocidad dinámicos (20-150%)
+     - Pausas ocasionales (1-2s)
+     - Zigzag oscilante
+   - **Interactividad**:
+     - Detección de clicks (evasión inteligente)
+     - Seguimiento del cursor (evitar o atraer)
+     - Tooltip al hover
+     - Contador de intentos fallidos
+   - **Estética Pixel-Art (Impacto Alto / Fácil)**:
+     - Diseño visual retro sprite 8-bit/16-bit authentic
+     - Paleta de colores limitada (máx 4-6 colores primarios) para efecto pixel fidelidad
+     - Box-shadow coordenadas manuales para forma rectangular pixelada exacta
+     - Proporciones 1:1 (cuadrado base) con escalado x80-100 para legibilidad
+     - CSS `image-rendering: pixelated` para edges nítidos sin antialiasing
+     - Animación de aleteo: 2 fotogramas discretos sin transición suave (steps(2))
+     - Sombra pixelada: múltiples box-shadow rectangulares stacked (NO blur suave, bordes rectos)
+     - Trail effect pixelado: sombras fantasma discretas en pixeles, no gradientes
+   - **NOTA IMPORTANTE**: El sistema ya monitorea `valueChanges` en tiempo real → solo falta agregar la validación específica de "#bat" y las animaciones CSS
+   - **DIFERENCIA CLAVE**: NO hay `setTimeout()` para desaparición - la animación es PERMANENTE hasta F5
+
+3. **CSS @keyframes requeridos (Expandido con Efectos Visuales):**
+
+```scss
+// Aleteo del murciélago (2 fotogramas: alas abiertas/cerradas)
+@keyframes bat-flap {
+  0%, 100% { 
+    // Alas abiertas (fotograma 1)
+    box-shadow: /* coordenadas del murciélago con alas abiertas */;
+  }
+  50% { 
+    // Alas cerradas (fotograma 2)
+    box-shadow: /* coordenadas del murciélago con alas cerradas */;
+  }
+}
+
+// Movimiento circular por toda la pantalla (INFINITO - sin límite de tiempo)
+// Se repite continuamente hasta que el usuario haga F5
+@keyframes bat-move {
+  0% { left: 20px; top: 50px; }     // Esquina superior izquierda
+  25% { left: 80vw; top: 100px; }   // Arriba derecha
+  50% { left: 80vw; top: 80vh; }    // Abajo derecha
+  75% { left: 20px; top: 70vh; }    // Abajo izquierda
+  100% { left: 20px; top: 50px; }   // Vuelve a inicio (se repite infinitamente)
+}
+
+// Glow/Brillo dinámico del murciélago
+@keyframes bat-glow {
+  0% { filter: drop-shadow(0 0 10px rgba(255,100,100,0.3)); }
+  50% { filter: drop-shadow(0 0 20px rgba(255,100,100,0.6)); }
+  100% { filter: drop-shadow(0 0 10px rgba(255,100,100,0.3)); }
+}
+
+// Rotación del cuerpo (seguir dirección)
+@keyframes bat-rotate-left {
+  0% { transform: scale(80) rotateY(0deg); }
+  100% { transform: scale(80) rotateY(-15deg); }
+}
+
+@keyframes bat-rotate-right {
+  0% { transform: scale(80) rotateY(0deg); }
+  100% { transform: scale(80) rotateY(15deg); }
+}
+
+// Zigzag oscilante
+@keyframes bat-zigzag {
+  0%, 100% { margin-left: 0px; }
+  25% { margin-left: 15px; }
+  50% { margin-left: -15px; }
+  75% { margin-left: 15px; }
+}
+
+.bat-pixel {
+  width: 1px;
+  height: 1px;
+  background: transparent;
+  transform: scale(80);
+  animation: bat-flap 0.8s steps(2) infinite;
+  
+  // Agregar glow dinámico
+  filter: drop-shadow(0 0 15px rgba(255,100,100,0.4));
+}
+
+.bat-animation {
+  // Movimiento infinito + glow + zigzag
+  animation: 
+    bat-move 15s ease-in-out infinite,
+    bat-glow 2s ease-in-out infinite,
+    bat-zigzag 3s ease-in-out infinite;
+  
+  // Para interacción: cuando el murciélago está siendo perseguido
+  &.bat-evading {
+    animation-duration: 10s; // Más rápido cuando huye
+  }
+  
+  // Rastro visual (trail effect)
+  &::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    box-shadow: 
+      -5px 0 10px rgba(255,100,100,0.2),
+      -10px 0 15px rgba(255,100,100,0.1),
+      -15px 0 20px rgba(255,100,100,0.05);
+    opacity: 0.6;
+  }
+}
+```
+
+4. **Lógica TypeScript (Expandida con Interactividad):**
+
+```typescript
+export class EntriesComponent implements OnInit {
+  // ... propiedades existentes
+  private mouseX = 0;
+  private mouseY = 0;
+  private batClickAttempts = 0;
+  private batIsEvading = false;
+  
+  ngOnInit() {
+    // ... código existente
+    
+    // Rastrear movimiento del mouse
+    document.addEventListener('mousemove', (e) => {
+      this.mouseX = e.clientX;
+      this.mouseY = e.clientY;
+      
+      // Si el murciélago está visible, evaluar proximidad al cursor
+      if (this.showEasterEggOverlay) {
+        this.evaluateBatProximity();
+      }
+    });
+  }
+
+  private triggerEntryEasterEggIfNeeded(content: string): void {
+    const tags = this.extractTagsFromContent(content);
+    const hasBatTag = tags.includes('bat');
+    
+    if (hasBatTag && !this.showEasterEggOverlay) {
+      // Aparecer inmediatamente
+      this.easterEggImageUrl = 'bat';
+      this.showEasterEggOverlay = true;
+      this.batClickAttempts = 0;
+      this.batIsEvading = false;
+      
+      console.log('[EASTER_EGG] Unidentified flying object (UFO) detected in the SOC. Shadow protocol active.');
+      // La animación persiste indefinidamente hasta F5
+    }
+  }
+
+  // Detectar proximidad del cursor al murciélago
+  private evaluateBatProximity(): void {
+    const batElement = document.querySelector('.bat-animation');
+    if (!batElement) return;
+    
+    const rect = batElement.getBoundingClientRect();
+    const distance = Math.sqrt(
+      Math.pow(this.mouseX - rect.left, 2) + 
+      Math.pow(this.mouseY - rect.top, 2)
+    );
+    
+    // Si el cursor está muy cerca, el murciélago huye (se vuelve más rápido)
+    if (distance < 150 && !this.batIsEvading) {
+      this.batIsEvading = true;
+      batElement.classList.add('bat-evading');
+      
+      // Después de 3 segundos, vuelve a la velocidad normal
+      setTimeout(() => {
+        this.batIsEvading = false;
+        batElement.classList.remove('bat-evading');
+      }, 3000);
+    }
+  }
+
+  // Click en el murciélago: intento de captura (falla)
+  onBatClick(): void {
+    this.batClickAttempts++;
+    const batElement = document.querySelector('.bat-animation');
+    
+    if (batElement) {
+      // Destello visual de evasión exitosa
+      batElement.classList.add('bat-dodge');
+      setTimeout(() => batElement.classList.remove('bat-dodge'), 500);
+      
+      // Cambiar velocidad al azar para confundir
+      this.batIsEvading = true;
+      batElement.classList.add('bat-evading');
+      
+      console.log(`[EASTER_EGG] ¡Intento fallido! Intentos: ${this.batClickAttempts}`);
+      console.log('[EASTER_EGG] El murciélago escapa volando más rápido...');
+      
+      setTimeout(() => {
+        this.batIsEvading = false;
+        batElement.classList.remove('bat-evading');
+      }, 4000);
+    }
+  }
+
+  // Hover: mostrar tooltip y evaluar comportamiento
+  onBatHover(): void {
+    console.log('[EASTER_EGG] ¿Intentas atraparme?');
+  }
+
+  onBatHoverLeave(): void {
+    console.log('[EASTER_EGG] ¡Todavía estoy aquí!');
+  }
+}
+```
+
+**TIMING CRÍTICO:**
+- `showEasterEggOverlay = true` → Murciélago visible INMEDIATAMENTE
+- **NO hay `setTimeout()`** → La animación NO desaparece automáticamente
+- Las animaciones CSS (@keyframes) comienzan al mismo instante que `showEasterEggOverlay` se activa y continúan **indefinidamente** (`infinite`)
+- **Mouse tracking activo**: Se evalúa la proximidad del cursor en tiempo real
+- **Click detection**: Intenta capturar → Falla + aceleración + feedback visual
+- **Única forma de parar**: F5 (refresco de página) o cerrar la sesión
+
+5. **HTML (Expandido con Interactividad):**
+
+```html
+<div class="easter-egg-overlay bat-animation" 
+     *ngIf="showEasterEggOverlay"
+     (click)="onBatClick()"
+     (mouseenter)="onBatHover()"
+     (mouseleave)="onBatHoverLeave()"
+     [title]="'Intentos de captura: ' + batClickAttempts">
+  <div class="bat-pixel"></div>
+  <!-- Tooltip al hover (opcional, puede ser via CSS tooltip) -->
+  <div class="bat-tooltip">¿Intentas atraparme?</div>
+</div>
+```
+
+**Testing (Expandido):**
+- **Escribir "#bat"** (carácter por carácter) → Murciélago debe aparecer INMEDIATAMENTE al completar "#bat"
+- **Verificar movimiento continuo** → El murciélago debe comenzar su animación circular desde el mismo instante de aparición y **NUNCA DETENERSE** (se repite indefinidamente)
+- **Verificar efectos visuales**:
+  - ✅ Glow/brillo alrededor del murciélago (pulsante)
+  - ✅ Rastro visual (trail effect con sombra decreciente)
+  - ✅ Cambios de velocidad dinámicos (ralentización y aceleración al azar)
+  - ✅ Pausas ocasionales durante el movimiento (1-2 segundos)
+  - ✅ Zigzag oscilante en la trayectoria
+- **Interactividad - Perseguir al murciélago**:
+  - Mover el cursor cerca del murciélago → Debe alejarse (evasión)
+  - ✅ Al hover: Mostrar tooltip "¿Intentas atraparme?"
+  - ✅ Clickear el murciélago → Se acelera y cambia trayectoria (fallo en captura)
+  - ✅ Incrementar contador de intentos fallidos en consola
+  - ✅ Destello visual al intentar captura (dodge visual)
+- **Escribir "#batman"** → NO debe aparecer (rechaza variación)
+- **Escribir "#bat #otros"** → Debe aparecer (contiene #bat exacto)
+- **Esperar 30+ segundos** → El murciélago sigue moviéndose sin desaparecer (confirma que es infinito)
+- **Navegar a otra sección de la aplicación** → El murciélago sigue visible y en movimiento (persiste en toda la web)
+- **Intentar capturar múltiples veces** → Cada intento incrementa velocidad y contador
+- **F5** → Resetea todo el componente y el murciélago desaparece (única forma de eliminar, contador se resetea)
+- **Escribir "#bat" de nuevo DESPUÉS de F5** → Vuelve a aparecer con contador reiniciado
+- **Consola de navegador** → Verificar logs: "[EASTER_EGG]" con mensajes de detección, intentos, etc.
+
+**Estimado**: 4-6 horas (CSS animaciones avanzadas + efectos visuales + lógica de mouse tracking + interactividad + testing comprehensive)
 
 ### B19 - GLPI (Correo/API)
 
@@ -111,6 +455,22 @@
 3. **Actualización de Imágen:** Modificar `docker-compose.yml` apuntando el tag a `mongo:8`.
 4. **Levantamiento y Restauración:** Arrancar el nuevo servicio `mongo:8`. Las bases estarán limpias porque se generará un nuevo volumen o carpeta de datos. Entrar al contenedor y ejecutar `mongorestore` apuntando al dump generado en el paso 1. Validar integridad visual de la Bitácora.
 5. **Documentación:** Registrar la ventana de mantenimiento y las versiones finales en `README.md` o documentación operativa.
+
+### DEP-NPM-012 - Dependencias npm deprecadas en build Docker (`glob`/`inflight`)
+
+1. **Trazar el origen real:** Ejecutar en `backend` comandos como `npm ls glob inflight` para identificar qué dependencias raíz introducen cada versión deprecada.
+2. **Actualizar dependencias raíz:** Subir versiones de los paquetes de primer nivel que arrastran `glob@7`/`glob@10.5.0` e `inflight@1.0.6`.
+3. **Regenerar lockfile limpio:** Borrar `node_modules` + `package-lock.json`, reinstalar (`npm install`) y confirmar que el árbol nuevo elimina los paquetes sin soporte.
+4. **Validar build Docker:** Re-ejecutar `docker compose build backend` y verificar que desaparezcan warnings de deprecación relevantes.
+5. **Control de regresión:** Correr smoke tests backend (arranque API, rutas críticas y scripts de correo/reportes) para confirmar que los upgrades no rompen compatibilidad.
+
+### FE-SASS-013 - Migrar `@import` Sass a `@use/@forward` en login
+
+1. **Archivo afectado inicial:** Reemplazar `@import 'login-infoflow';` en `frontend/src/app/pages/login/login.component.scss` por `@use` (o `@forward` según arquitectura de estilos compartidos).
+2. **Normalizar módulos Sass:** Si `login-infoflow` exporta variables/mixins, moverlos a formato modular y referenciarlos con namespace para evitar colisiones globales.
+3. **Compatibilidad Angular build:** Compilar frontend (`ng build` o build Docker) y confirmar desaparición de warning `Deprecation [plugin angular-sass]`.
+4. **Validación visual login:** Revisar que el tema login (incluido infoflow/cyber) conserve estilos exactos tras la migración.
+5. **Prevención futura:** Buscar otros `@import` en `frontend/src/**/*.scss` para cerrar la deuda técnica antes de Dart Sass 3.0.0.
 
 ### B34 - Alerta por ítems NOK (Rojo) en Checklist
 
