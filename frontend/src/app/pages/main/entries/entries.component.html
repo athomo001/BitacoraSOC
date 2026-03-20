@@ -111,13 +111,11 @@
       *ngFor="let bat of batInstances; trackBy: trackByBatId"
       [attr.data-bat-id]="bat.id"
       [style]="getBatInlineStyle(bat)"
-      [class]="'bat-wrapper ' + getBatPathClass(bat)"
-      [class.bat-reverse]="bat.reverseDirection"
       [class.bat-evading]="bat.isEvading"
       (click)="onBatClick(bat.id)"
       (mouseenter)="onBatHover()"
       (mouseleave)="onBatHoverLeave()"
-      [title]="'🦇 Bat #' + bat.id + ' | Intentos de captura: ' + batClickAttempts + ' | Total activos: ' + batInstances.length + '/50'">
+      [title]="'🦇 Bat #' + bat.id + ' | Intentos de captura: ' + batClickAttempts + ' | Total activos: ' + batInstances.length + '/100'">
       <div class="bat-pixel"></div>
     </div>
   </div>

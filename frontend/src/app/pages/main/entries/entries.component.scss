@@ -186,52 +186,52 @@
 
 // Sprite GIF provisto por usuario (referencia visual exacta)
 
-// Trayectoria suave y continua (sin saltos bruscos)
-@keyframes bat-move-1 {
-  0%   { left: clamp(250px, calc(6vw + var(--bat-path-offset-x)), calc(100vw - 110px));  top: clamp(28px, calc(12vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  10%  { left: clamp(250px, calc(20vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(9vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  20%  { left: clamp(250px, calc(42vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(11vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  30%  { left: clamp(250px, calc(68vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(16vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  40%  { left: clamp(250px, calc(82vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(34vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  50%  { left: clamp(250px, calc(80vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(58vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  60%  { left: clamp(250px, calc(62vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(78vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  70%  { left: clamp(250px, calc(36vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(84vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  80%  { left: clamp(250px, calc(14vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(72vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  90%  { left: clamp(250px, calc(7vw + var(--bat-path-offset-x)), calc(100vw - 110px));  top: clamp(28px, calc(42vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  100% { left: clamp(250px, calc(6vw + var(--bat-path-offset-x)), calc(100vw - 110px));  top: clamp(28px, calc(12vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-}
-
-@keyframes bat-move-2 {
-  0%   { left: clamp(250px, calc(10vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(24vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  12%  { left: clamp(250px, calc(30vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(8vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  24%  { left: clamp(250px, calc(56vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(14vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  36%  { left: clamp(250px, calc(84vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(26vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  52%  { left: clamp(250px, calc(66vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(58vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  68%  { left: clamp(250px, calc(44vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(84vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  84%  { left: clamp(250px, calc(18vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(66vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  100% { left: clamp(250px, calc(10vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(24vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-}
-
-@keyframes bat-move-3 {
-  0%   { left: clamp(250px, calc(14vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(68vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  15%  { left: clamp(250px, calc(28vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(36vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  30%  { left: clamp(250px, calc(52vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(10vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  45%  { left: clamp(250px, calc(78vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(30vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  60%  { left: clamp(250px, calc(86vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(64vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  75%  { left: clamp(250px, calc(62vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(80vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  90%  { left: clamp(250px, calc(34vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(76vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  100% { left: clamp(250px, calc(14vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(68vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-}
-
-@keyframes bat-move-4 {
-  0%   { left: clamp(250px, calc(24vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(16vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  14%  { left: clamp(250px, calc(12vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(44vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  28%  { left: clamp(250px, calc(20vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(74vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  42%  { left: clamp(250px, calc(48vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(86vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  56%  { left: clamp(250px, calc(76vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(68vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  70%  { left: clamp(250px, calc(88vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(34vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  84%  { left: clamp(250px, calc(62vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(14vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
-  100% { left: clamp(250px, calc(24vw + var(--bat-path-offset-x)), calc(100vw - 110px)); top: clamp(28px, calc(16vh + var(--bat-path-offset-y)), calc(100vh - 80px)); }
+// Trayectoria por waypoints aleatorios por instancia
+@keyframes bat-move-random {
+  0% {
+    left: clamp(250px, calc(var(--bat-p0) * 1vw), calc(100vw - 110px));
+    top: clamp(28px, calc(var(--bat-p1) * 1vh), calc(100vh - 80px));
+  }
+  10% {
+    left: clamp(250px, calc(var(--bat-p2) * 1vw), calc(100vw - 110px));
+    top: clamp(28px, calc(var(--bat-p3) * 1vh), calc(100vh - 80px));
+  }
+  20% {
+    left: clamp(250px, calc(var(--bat-p4) * 1vw), calc(100vw - 110px));
+    top: clamp(28px, calc(var(--bat-p5) * 1vh), calc(100vh - 80px));
+  }
+  30% {
+    left: clamp(250px, calc(var(--bat-p6) * 1vw), calc(100vw - 110px));
+    top: clamp(28px, calc(var(--bat-p7) * 1vh), calc(100vh - 80px));
+  }
+  40% {
+    left: clamp(250px, calc(var(--bat-p8) * 1vw), calc(100vw - 110px));
+    top: clamp(28px, calc(var(--bat-p9) * 1vh), calc(100vh - 80px));
+  }
+  50% {
+    left: clamp(250px, calc(var(--bat-p10) * 1vw), calc(100vw - 110px));
+    top: clamp(28px, calc(var(--bat-p11) * 1vh), calc(100vh - 80px));
+  }
+  60% {
+    left: clamp(250px, calc(var(--bat-p12) * 1vw), calc(100vw - 110px));
+    top: clamp(28px, calc(var(--bat-p13) * 1vh), calc(100vh - 80px));
+  }
+  70% {
+    left: clamp(250px, calc(var(--bat-p14) * 1vw), calc(100vw - 110px));
+    top: clamp(28px, calc(var(--bat-p15) * 1vh), calc(100vh - 80px));
+  }
+  80% {
+    left: clamp(250px, calc(var(--bat-p16) * 1vw), calc(100vw - 110px));
+    top: clamp(28px, calc(var(--bat-p17) * 1vh), calc(100vh - 80px));
+  }
+  90% {
+    left: clamp(250px, calc(var(--bat-p18) * 1vw), calc(100vw - 110px));
+    top: clamp(28px, calc(var(--bat-p19) * 1vh), calc(100vh - 80px));
+  }
+  100% {
+    left: clamp(250px, calc(var(--bat-p0) * 1vw), calc(100vw - 110px));
+    top: clamp(28px, calc(var(--bat-p1) * 1vh), calc(100vh - 80px));
+  }
 }
 
 @keyframes bat-wobble {
@@ -275,8 +275,26 @@
   --bat-move-delay: 0s;
   --bat-wobble-duration: 3.1s;
   --bat-wobble-delay: 0s;
-  --bat-path-offset-x: 0vw;
-  --bat-path-offset-y: 0vh;
+  --bat-p0: 8;
+  --bat-p1: 12;
+  --bat-p2: 24;
+  --bat-p3: 20;
+  --bat-p4: 50;
+  --bat-p5: 28;
+  --bat-p6: 84;
+  --bat-p7: 24;
+  --bat-p8: 88;
+  --bat-p9: 52;
+  --bat-p10: 52;
+  --bat-p11: 58;
+  --bat-p12: 34;
+  --bat-p13: 76;
+  --bat-p14: 46;
+  --bat-p15: 82;
+  --bat-p16: 14;
+  --bat-p17: 56;
+  --bat-p18: 52;
+  --bat-p19: 40;
   pointer-events: auto; // el murciélago SI es interactivo
   cursor: crosshair;
   overflow: visible;
@@ -290,7 +308,7 @@
 
   // Movimiento + glow en estado normal
   animation:
-    bat-move-1 var(--bat-move-duration) linear infinite,
+    bat-move-random var(--bat-move-duration) linear infinite,
     bat-glow 3.2s ease-in-out infinite,
     bat-wobble var(--bat-wobble-duration) ease-in-out infinite;
   animation-delay:
@@ -302,7 +320,7 @@
   &.bat-evading {
     transition-duration: 140ms;
     animation:
-      bat-move-1 var(--bat-move-duration) linear infinite,
+      bat-move-random var(--bat-move-duration) linear infinite,
       bat-glow-evading 1.1s ease-in-out infinite,
       bat-wobble var(--bat-wobble-duration) ease-in-out infinite;
     animation-delay:
@@ -311,41 +329,6 @@
       var(--bat-wobble-delay);
   }
 
-  &.bat-path-1 {
-    animation-name: bat-move-1, bat-glow, bat-wobble;
-  }
-
-  &.bat-path-2 {
-    animation-name: bat-move-2, bat-glow, bat-wobble;
-  }
-
-  &.bat-path-3 {
-    animation-name: bat-move-3, bat-glow, bat-wobble;
-  }
-
-  &.bat-path-4 {
-    animation-name: bat-move-4, bat-glow, bat-wobble;
-  }
-
-  &.bat-reverse {
-    animation-direction: reverse, normal, normal;
-  }
-
-  &.bat-evading.bat-path-1 {
-    animation-name: bat-move-1, bat-glow-evading, bat-wobble;
-  }
-
-  &.bat-evading.bat-path-2 {
-    animation-name: bat-move-2, bat-glow-evading, bat-wobble;
-  }
-
-  &.bat-evading.bat-path-3 {
-    animation-name: bat-move-3, bat-glow-evading, bat-wobble;
-  }
-
-  &.bat-evading.bat-path-4 {
-    animation-name: bat-move-4, bat-glow-evading, bat-wobble;
-  }
 }
 
 // El sprite pixel-art del murciélago (CSS box-shadow = 2 fotogramas)
