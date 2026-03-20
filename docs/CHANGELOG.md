@@ -2,6 +2,21 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.23-beta] - 2026-03-20
+
+### UI/UX + Frontend (EE-BAT-001)
+
+#### Easter Egg #bat - comportamiento multi-murcielago y suavizado de trayectoria
+- **Fix frontend:** El trigger en `Nueva Entrada` mantiene deteccion exacta de `#bat` (case-insensitive) en tiempo real y ahora crea un murcielago por cada token exacto detectado en el contenido.
+- **Fix frontend:** Se elimino el patron de variacion global sincronizada que provocaba reinicios visuales grupales; cada murcielago conserva estado y variacion propios.
+- **Fix frontend:** Se introdujeron variantes reales de recorrido (`bat-move-1..4`) y direccion opcional invertida por instancia para reducir trayectorias clonadas.
+- **Fix frontend:** Se ajusto la reaccion al cursor para evitar efecto de "teletransporte": se removio la mutacion de duracion de animacion en runtime y se mantuvieron solo micro-desplazamientos acotados.
+- **Fix frontend:** Se reforzo el clamping de movimiento para evitar recortes en bordes y zona de menu lateral, manteniendo visibilidad operativa sobre la UI.
+- **Mejora funcional:** Se aumento el limite maximo de instancias de murcielago de `15` a `50` y se sincronizo el texto visible del tooltip/estado en interfaz.
+
+### Validacion Tecnica
+- Se validaron `entries.component.ts`, `entries.component.html` y `entries.component.scss` sin errores de compilacion posteriores al ajuste.
+
 ## [v1.5.22-beta] - 2026-03-19
 
 ### Auditoría — Mejora de visibilidad y categorización (B46+)

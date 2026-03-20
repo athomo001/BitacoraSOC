@@ -2,8 +2,9 @@
  * Componente de Escribir Entradas de Bitácora
  * Pantalla simple para crear nuevas entradas con clasificación Operativa/Incidente
  */
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { debounceTime } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { EntryService } from '../../../services/entry.service';
 import { CatalogService } from '../../../services/catalog.service';
@@ -26,9 +27,9 @@ import { MatSelect, MatOption } from '@angular/material/select';
     selector: 'app-entries',
     templateUrl: './entries.component.html',
     styleUrls: ['./entries.component.scss'],
-    imports: [MatCard, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatHint, MatButton, NgIf, MatIcon, MatProgressSpinner, MatRadioGroup, MatRadioButton, MatSelect, MatOption, NgFor]
+  imports: [MatCard, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatHint, MatButton, NgIf, MatIcon, MatProgressSpinner, MatRadioGroup, MatRadioButton, MatSelect, MatOption, NgFor]
 })
-export class EntriesComponent implements OnInit {
+export class EntriesComponent implements OnInit, OnDestroy {
   entryForm: FormGroup;
   today = '';
   nowTime = '';
@@ -36,6 +37,16 @@ export class EntriesComponent implements OnInit {
   logSources: CatalogLogSource[] = [];
   showEasterEggOverlay = false;
   easterEggImageUrl = '/scripts/Bender.png';
+
+  // 🦇 EE-BAT-001: Easter Egg Murciélago Pixel-Art
+  batInstances: BatInstance[] = [];
+  batClickAttempts = 0;
+  private mouseX = 0;
+  private mouseY = 0;
+  private lastProximityCheck = 0;
+  private batMouseMoveHandler?: (e: MouseEvent) => void;
+  private batEvasionTimers = new Map<number, ReturnType<typeof setTimeout>>();
+  private nextBatId = 1;
 
   private entryEasterEggRules: EasterEggRule[] = [];
   private easterEggTimer?: ReturnType<typeof setTimeout>;
@@ -61,6 +72,20 @@ export class EntriesComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    // Mouse tracking para el murciélago (EE-BAT-001)
+    this.batMouseMoveHandler = (e: MouseEvent) => {
+      this.mouseX = e.clientX;
+      this.mouseY = e.clientY;
+      if (this.batInstances.length > 0) {
+        const now = Date.now();
+        if (now - this.lastProximityCheck > 60) {
+          this.lastProximityCheck = now;
+          this.evaluateBatProximity();
+        }
+      }
+    };
+    document.addEventListener('mousemove', this.batMouseMoveHandler);
+
     this.configService.getConfig().subscribe({
       next: (config) => {
         this.entryEasterEggRules = (config.easterEggRules || [])
@@ -71,9 +96,13 @@ export class EntriesComponent implements OnInit {
       }
     });
 
-    this.entryForm.get('content')?.valueChanges.subscribe((value: string) => {
-      this.triggerEntryEasterEggIfNeeded(value || '');
-    });
+    // debounceTime(280): evita falsos triggers al escribir #batman o #batimovil.
+    // El murciélago solo aparece cuando el usuario PAUSA con #bat como palabra completa.
+    this.entryForm.get('content')?.valueChanges
+      .pipe(debounceTime(280))
+      .subscribe((value: string) => {
+        this.triggerEntryEasterEggIfNeeded(value || '');
+      });
 
     // Cargar clientes disponibles
     this.catalogService.searchLogSources('').subscribe(
@@ -84,6 +113,16 @@ export class EntriesComponent implements OnInit {
         // Error silencioso, no es crítico
       }
     );
+  }
+
+  ngOnDestroy(): void {
+    if (this.batMouseMoveHandler) {
+      document.removeEventListener('mousemove', this.batMouseMoveHandler);
+    }
+    for (const timer of this.batEvasionTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.batEvasionTimers.clear();
   }
 
   onSubmit(): void {
@@ -139,12 +178,185 @@ export class EntriesComponent implements OnInit {
     }
   }
 
+  // 🦇 EE-BAT-001 — Interactividad
+  onBatClick(batId: number): void {
+    this.batClickAttempts++;
+    console.log(`[EASTER_EGG] 🦇 ¡Intento fallido! Capturas intentadas: ${this.batClickAttempts}`);
+    this.triggerBatEvasion(batId, 420, 24);
+  }
+
+  onBatHover(): void {
+    console.log('[EASTER_EGG] 🦇 ¿Intentas atraparme?');
+  }
+
+  onBatHoverLeave(): void {
+    console.log('[EASTER_EGG] 🦇 ¡Todavía estoy aquí!');
+  }
+
+  private evaluateBatProximity(): void {
+    const batElements = document.querySelectorAll('.bat-wrapper');
+    batElements.forEach((node) => {
+      const batEl = node as HTMLElement;
+      const rawId = batEl.dataset['batId'];
+      const batId = Number(rawId);
+      if (!Number.isFinite(batId)) {
+        return;
+      }
+
+      const rect = batEl.getBoundingClientRect();
+      const batCenterX = rect.left + rect.width / 2;
+      const batCenterY = rect.top + rect.height / 2;
+      const distance = Math.sqrt(
+        Math.pow(this.mouseX - batCenterX, 2) +
+        Math.pow(this.mouseY - batCenterY, 2)
+      );
+
+      const batState = this.batInstances.find((item) => item.id === batId);
+      if (!batState) {
+        return;
+      }
+
+      const now = Date.now();
+      const burstCooldownMs = 760;
+      if (distance < 150 && (now - batState.lastBurstAt) > burstCooldownMs) {
+        this.triggerBatSprint(batId, 320);
+      }
+    });
+  }
+
+  private triggerBatEvasion(batId: number, durationMs: number, strengthPx: number): void {
+    const bat = this.batInstances.find((item) => item.id === batId);
+    if (!bat) {
+      return;
+    }
+
+    bat.isEvading = true;
+    bat.lastBurstAt = Date.now();
+
+    // Evasión por click: solo micro-desvío local para evitar saltos grandes.
+    const lateral = (Math.random() < 0.5 ? -1 : 1) * (8 + Math.random() * strengthPx);
+    const vertical = -2 - (Math.random() * (strengthPx * 0.45));
+    bat.evadeX = Number(Math.max(-32, Math.min(32, lateral)).toFixed(1));
+    bat.evadeY = Number(Math.max(-20, Math.min(12, vertical)).toFixed(1));
+
+    const existingTimer = this.batEvasionTimers.get(batId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+
+    const evasionTimer = setTimeout(() => {
+      bat.isEvading = false;
+      bat.evadeX = 0;
+      bat.evadeY = 0;
+      this.batEvasionTimers.delete(batId);
+    }, durationMs);
+
+    this.batEvasionTimers.set(batId, evasionTimer);
+  }
+
+  private triggerBatSprint(batId: number, durationMs: number): void {
+    const bat = this.batInstances.find((item) => item.id === batId);
+    if (!bat) {
+      return;
+    }
+
+    bat.isEvading = true;
+    bat.lastBurstAt = Date.now();
+
+    // Proximidad al mouse: micro-arranque local, sin alterar velocidad de keyframes.
+    const lateral = (Math.random() < 0.5 ? -1 : 1) * (6 + Math.random() * 10);
+    const vertical = -4 - (Math.random() * 6);
+    bat.evadeX = Number(Math.max(-18, Math.min(18, lateral)).toFixed(1));
+    bat.evadeY = Number(Math.max(-14, Math.min(8, vertical)).toFixed(1));
+
+    const existingTimer = this.batEvasionTimers.get(batId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+
+    const sprintTimer = setTimeout(() => {
+      bat.isEvading = false;
+      bat.evadeX = 0;
+      bat.evadeY = 0;
+      this.batEvasionTimers.delete(batId);
+    }, durationMs);
+
+    this.batEvasionTimers.set(batId, sprintTimer);
+  }
+
+  private syncBatInstances(content: string): void {
+    const batMatches = content.match(/#bat(?!\w)/gi) || [];
+    const requestedCount = Math.min(50, batMatches.length);
+    const currentCount = this.batInstances.length;
+
+    if (requestedCount <= currentCount) {
+      return;
+    }
+
+    const toAdd = requestedCount - currentCount;
+    for (let i = 0; i < toAdd; i++) {
+      this.batInstances.push(this.createRandomBatInstance());
+    }
+
+    console.log(`[EASTER_EGG] 🦇 Murciélagos activos: ${this.batInstances.length}/50`);
+  }
+
+  private createRandomBatInstance(): BatInstance {
+    const id = this.nextBatId++;
+    return {
+      id,
+      driftX: Math.round((Math.random() * 22) - 6),
+      driftY: Math.round((Math.random() * 38) - 19),
+      evadeX: 0,
+      evadeY: 0,
+      moveDuration: Number((47 + (Math.random() * 7)).toFixed(2)),
+      moveDelay: Number((Math.random() * -32).toFixed(2)),
+      wobbleDuration: Number((2.4 + (Math.random() * 2.1)).toFixed(2)),
+      wobbleDelay: Number((Math.random() * -5).toFixed(2)),
+      pathOffsetX: Number(((Math.random() * 10) - 1).toFixed(2)),
+      pathOffsetY: Number(((Math.random() * 12) - 6).toFixed(2)),
+      pathVariant: (Math.floor(Math.random() * 4) + 1) as 1 | 2 | 3 | 4,
+      reverseDirection: Math.random() < 0.5,
+      isEvading: false,
+      lastBurstAt: 0
+    };
+  }
+
+  getBatInlineStyle(bat: BatInstance): string {
+    return [
+      `--bat-evade-x:${bat.evadeX}px`,
+      `--bat-evade-y:${bat.evadeY}px`,
+      `--bat-drift-x:${bat.driftX}px`,
+      `--bat-drift-y:${bat.driftY}px`,
+      `--bat-move-duration:${bat.moveDuration}s`,
+      `--bat-move-delay:${bat.moveDelay}s`,
+      `--bat-wobble-duration:${bat.wobbleDuration}s`,
+      `--bat-wobble-delay:${bat.wobbleDelay}s`,
+      `--bat-path-offset-x:${bat.pathOffsetX}vw`,
+      `--bat-path-offset-y:${bat.pathOffsetY}vh`
+    ].join(';');
+  }
+
+  trackByBatId(_: number, bat: BatInstance): number {
+    return bat.id;
+  }
+
+  getBatPathClass(bat: BatInstance): string {
+    return `bat-path-${bat.pathVariant}`;
+  }
+
   private triggerEntryEasterEggIfNeeded(content: string): void {
+    const tags = this.extractTagsFromContent(content);
+
+    // 🦇 BAT EASTER EGG — un murciélago por cada #bat exacto, máximo 50.
+    // (?!\w): #bat no debe disparar en #batman / #bat123 / #batimovil.
+    this.syncBatInstances(content);
+
+    // Generic easter egg system (config-driven)
     if (!this.entryEasterEggRules.length || this.showEasterEggOverlay) {
       return;
     }
 
-    const tags = this.extractTagsFromContent(content);
     if (!tags.length) {
       return;
     }
@@ -217,4 +429,22 @@ export class EntriesComponent implements OnInit {
       console.error('[ENTRY]', payload);
     }
   }
+}
+
+interface BatInstance {
+  id: number;
+  driftX: number;
+  driftY: number;
+  evadeX: number;
+  evadeY: number;
+  moveDuration: number;
+  moveDelay: number;
+  wobbleDuration: number;
+  wobbleDelay: number;
+  pathOffsetX: number;
+  pathOffsetY: number;
+  pathVariant: 1 | 2 | 3 | 4;
+  reverseDirection: boolean;
+  isEvading: boolean;
+  lastBurstAt: number;
 }
