@@ -286,7 +286,7 @@ export class EntriesComponent implements OnInit, OnDestroy {
 
   private syncBatInstances(content: string): void {
     const batMatches = content.match(/#bat(?!\w)/gi) || [];
-    const requestedCount = Math.min(50, batMatches.length);
+    const requestedCount = Math.min(100, batMatches.length);
     const currentCount = this.batInstances.length;
 
     if (requestedCount <= currentCount) {
@@ -298,31 +298,74 @@ export class EntriesComponent implements OnInit, OnDestroy {
       this.batInstances.push(this.createRandomBatInstance());
     }
 
-    console.log(`[EASTER_EGG] 🦇 Murciélagos activos: ${this.batInstances.length}/50`);
+    console.log(`[EASTER_EGG] 🦇 Murciélagos activos: ${this.batInstances.length}/100`);
   }
 
   private createRandomBatInstance(): BatInstance {
     const id = this.nextBatId++;
+    const route = this.buildRandomBatRoute();
+
     return {
       id,
       driftX: Math.round((Math.random() * 22) - 6),
       driftY: Math.round((Math.random() * 38) - 19),
       evadeX: 0,
       evadeY: 0,
-      moveDuration: Number((47 + (Math.random() * 7)).toFixed(2)),
-      moveDelay: Number((Math.random() * -32).toFixed(2)),
+      moveDuration: Number((36 + (Math.random() * 32)).toFixed(2)),
+      moveDelay: Number((Math.random() * -45).toFixed(2)),
       wobbleDuration: Number((2.4 + (Math.random() * 2.1)).toFixed(2)),
       wobbleDelay: Number((Math.random() * -5).toFixed(2)),
-      pathOffsetX: Number(((Math.random() * 10) - 1).toFixed(2)),
-      pathOffsetY: Number(((Math.random() * 12) - 6).toFixed(2)),
-      pathVariant: (Math.floor(Math.random() * 4) + 1) as 1 | 2 | 3 | 4,
-      reverseDirection: Math.random() < 0.5,
+      route,
       isEvading: false,
       lastBurstAt: 0
     };
   }
 
+  private buildRandomBatRoute(): number[] {
+    const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
+    const randomBetween = (min: number, max: number): number => min + (Math.random() * (max - min));
+
+    // 10 pares x/y (20 números). Se fuerzan cruces por el centro para evitar trayectorias monotónicas.
+    const centerX = randomBetween(46, 56);
+    const centerY = randomBetween(44, 58);
+
+    const x0 = randomBetween(6, 18);
+    const y0 = randomBetween(10, 24);
+
+    const x1 = randomBetween(20, 34);
+    const y1 = randomBetween(10, 28);
+
+    const x2 = clamp(centerX + randomBetween(-8, 8), 34, 66);
+    const y2 = clamp(centerY + randomBetween(-16, -4), 16, 50);
+
+    const x3 = randomBetween(72, 90);
+    const y3 = randomBetween(12, 34);
+
+    const x4 = randomBetween(74, 92);
+    const y4 = randomBetween(42, 62);
+
+    const x5 = clamp(centerX + randomBetween(-10, 10), 32, 68);
+    const y5 = clamp(centerY + randomBetween(-6, 10), 28, 72);
+
+    const x6 = randomBetween(26, 42);
+    const y6 = randomBetween(62, 84);
+
+    const x7 = clamp(centerX + randomBetween(-12, 12), 30, 70);
+    const y7 = clamp(centerY + randomBetween(8, 20), 44, 86);
+
+    const x8 = randomBetween(8, 24);
+    const y8 = randomBetween(36, 62);
+
+    const x9 = clamp(centerX + randomBetween(-9, 9), 34, 68);
+    const y9 = clamp(centerY + randomBetween(-12, 10), 26, 76);
+
+    return [x0, y0, x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6, x7, y7, x8, y8, x9, y9]
+      .map((value) => Number(value.toFixed(2)));
+  }
+
   getBatInlineStyle(bat: BatInstance): string {
+    const routeVars = bat.route.map((value, index) => `--bat-p${index}:${value}`).join(';');
+
     return [
       `--bat-evade-x:${bat.evadeX}px`,
       `--bat-evade-y:${bat.evadeY}px`,
@@ -332,8 +375,7 @@ export class EntriesComponent implements OnInit, OnDestroy {
       `--bat-move-delay:${bat.moveDelay}s`,
       `--bat-wobble-duration:${bat.wobbleDuration}s`,
       `--bat-wobble-delay:${bat.wobbleDelay}s`,
-      `--bat-path-offset-x:${bat.pathOffsetX}vw`,
-      `--bat-path-offset-y:${bat.pathOffsetY}vh`
+      routeVars
     ].join(';');
   }
 
@@ -341,14 +383,10 @@ export class EntriesComponent implements OnInit, OnDestroy {
     return bat.id;
   }
 
-  getBatPathClass(bat: BatInstance): string {
-    return `bat-path-${bat.pathVariant}`;
-  }
-
   private triggerEntryEasterEggIfNeeded(content: string): void {
     const tags = this.extractTagsFromContent(content);
 
-    // 🦇 BAT EASTER EGG — un murciélago por cada #bat exacto, máximo 50.
+    // 🦇 BAT EASTER EGG — un murciélago por cada #bat exacto, máximo 100.
     // (?!\w): #bat no debe disparar en #batman / #bat123 / #batimovil.
     this.syncBatInstances(content);
 
@@ -441,10 +479,7 @@ interface BatInstance {
   moveDelay: number;
   wobbleDuration: number;
   wobbleDelay: number;
-  pathOffsetX: number;
-  pathOffsetY: number;
-  pathVariant: 1 | 2 | 3 | 4;
-  reverseDirection: boolean;
+  route: number[];
   isEvading: boolean;
   lastBurstAt: number;
 }
