@@ -15,10 +15,22 @@
 | AUDIT-014 | Pendiente | Auditoría / Backend+Frontend ALTA | Login exitoso no muestra actor real en Auditoría | Hallazgo operativo: al autenticarse un usuario, el registro aparece como `Sistema` en columna Actor y sin contexto suficiente del usuario autenticado. Se debe corregir la atribución para que `auth.login.success` persista/renderice `actorId/username` reales (sin exponer secretos) y permita trazabilidad forense confiable. |
 | MAIL-AUDIT-015 | Pendiente | Email / Observabilidad ALTA | Error `❌ [CORREO] Para: sin destinatarios` sin contexto diagnóstico | Hallazgo operativo: en auditoría se observan múltiples WARN/ERROR de correo con texto genérico `Para: sin destinatarios`, sin identificar origen exacto (módulo, turno/checklist, trigger, destinatarios calculados, config SMTP). Se requiere enriquecer metadata y razón visible para identificar por qué falla y desde qué flujo se dispara. |
 | BACKUP-AUTO-016 | Pendiente | Backup / Operación ALTA | Backup automático no se ejecuta según intervalo configurado | Hallazgo operativo: con backups automáticos habilitados (`cada 7 días`) no aparecen ejecuciones automáticas en historial aun habiendo transcurrido más de 9 días; solo se observan backups manuales. Se debe validar scheduler, persistencia de última ejecución y timezone/frecuencia real del job. |
+| BACKUP-RET-017 | Pendiente | Backup / Operación ALTA | Retención de backups no elimina archivos al superar 7 días | Hallazgo operativo: se configuró retención local en `7 días`, pero permanecen backups antiguos sin depuración automática. Se debe validar criterio de antigüedad, origen de fecha usada para purge, ejecución efectiva de cleanup y trazabilidad de eliminaciones/skips. |
 | B34 | Pendiente | Operación/Alertas | Alerta por ítems NOK (Rojo) en Checklist | Añadir switch en config global para activar/desactivar alerta por ítems en rojo. Agregar selector de cargo (ej. N2) a notificar. Al guardar el checklist, si el analista marca ítems NOK (rojo), enviar email automático a todos los usuarios del cargo seleccionado incluyendo el detalle/observación ingresada por el analista. |
 | SEC-HIGH-009 | Pendiente | Seguridad ALTA | Riesgo de Regex Injection / ReDoS en búsquedas de catálogo y tags (NoSQL) | Hallazgo QA: existen regex construidas directo desde input sin escape (`new RegExp(search, 'i')`, `new RegExp('^' + q, 'i')`, `$regex` con `topic` sin escapar) en rutas autenticadas/admin. Un patrón malicioso puede disparar backtracking costoso y degradar el backend (DoS lógico). Archivos detectados: `backend/src/routes/admin-catalog.js`, `backend/src/routes/tags.js`, `backend/src/routes/entries.js`, `backend/src/controllers/escalationController.js`. |
 | SEC-HIGH-010 | Pendiente | Seguridad ALTA | OWASP A10 SSRF: URLs salientes configurables sin allowlist en integraciones | Hallazgo QA: endpoints de integración permiten destinos salientes controlados por configuración (`GLPI api.baseUrl` y `logging http.url`) sin validación estricta de red interna/loopback/protocolos. Riesgo: Server-Side Request Forgery desde backend hacia servicios internos/metadatos si una cuenta admin se compromete. Archivos detectados: `backend/src/routes/glpi.js`, `backend/src/routes/logging.js`, `backend/src/utils/logForwarder.js`. |
 | SEC-MED-011 | Pendiente | Seguridad MEDIA | OWASP A09/A02: Logging sensible en autenticación (username + estado de password) | Hallazgo QA: en login se registran por consola datos sensibles de autenticación (`LOGIN REQUEST`, `Usuario encontrado`, `Password match`) sin condicionamiento por entorno. Riesgo: exposición de telemetría de credenciales/intentos en logs operativos. Archivo detectado: `backend/src/routes/auth.js`. |
+| COMP-001 | Pendiente | Arquitectura / Complementos ALTA | Persistencia Aislada, Wipe Out y Auditoría Forense | Cada complemento usa su propia DB (`bitacora_ext_*`). Al ejecutar `DELETE_COMPLEMENTO`, el orquestador dispara un Wipe Out de 4 fases (hook → dropDB → purge general → delete modelo) con trail forense completo en AuditLog. |
+| COMP-002 | Pendiente | API / Complementos ALTA | Contrato de API Interna (Microservicio-Bitácora) | Gateway seguro en `/api/internal/v1/*` con Application Token (no JWT de usuario), scopes granulares (`READ_LOGS`, `WRITE_STORAGE`, etc.) y colecciones autorizadas explícitamente por Admin. |
+| COMP-003 | Pendiente | UI / Complementos ALTA | Slot Dinámico en UI (N1 y Admin) | Iframe con `sandbox` restrictivo + `postMessage` con validación de origin. Consola Admin para gestión de Alta/Baja/Permisos. Circuit Breaker visual si el complemento falla. |
+| COMP-004 | Pendiente | Resiliencia / Complementos ALTA | Circuit Breaker para Microservicios | Si un complemento tarda >3s o devuelve 5xx, el Core lo aísla visualmente mostrando badge "Mantenimiento" sin afectar el resto de la aplicación. Estados: CLOSED → OPEN → HALF-OPEN. |
+| COMP-005 | Pendiente | Seguridad / Complementos ALTA | Application Token y Scopes Granulares | Sistema de tokens de aplicación independiente del JWT de usuario, firmado con `COMPLEMENT_TOKEN_SECRET`, con scopes verificados por middleware y revocación inmediata al eliminar complemento. |
+| COMP-006 | Pendiente | Arquitectura / Contratos ALTA | Shared Types & Contracts (Esquema JSON Compartido) | Actualmente Backend (Mongoose/JS) y Frontend (12 `.model.ts`) no comparten contratos. Sin un paquete o esquema común, los microservicios de complementos duplicarán tipos y romperán ante cambios del Core. |
+| COMP-007 | Pendiente | Frontend / Estado ALTA | Bus de Eventos para State Sync (Core ↔ Iframe) | Si el N1 cambia de turno/cliente en la Bitácora, el iframe del complemento no se entera. Se necesita un bus de eventos bidireccional vía `postMessage` con protocolo tipado y validación de origin. |
+| COMP-008 | Pendiente | DevOps / Infraestructura ALTA | Orquestación Docker y Redes Aisladas | El `docker-compose.yml` actual tiene una sola red (`bitacora-network`). Los microservicios necesitan red aislada (`bitacora-complements`) con acceso exclusivo al backend. |
+| COMP-009 | Pendiente | Observabilidad / Complementos ALTA | Logging Centralizado de Microservicios | Los logs de un complemento quedan en su propio contenedor y no son visibles desde la Bitácora. Se necesita un colector centralizado y una vista en la UI Admin para diagnosticar fallos. |
+| COMP-010 | Pendiente | API / Versionamiento MEDIA | Versionamiento de API Interna (Compatibilidad) | Si se actualiza el Core pero un complemento sigue en v1, debe seguir funcionando. Se necesita control de versiones en la API Interna (`/api/internal/v1/`, `/v2/`) con deprecation headers. |
+| COMP-011 | Pendiente | Testing / Complementos MEDIA | Mocks de Complementos para Pruebas de Integración | Crear un microservicio mock (`complement-stub`) que simule todas las interacciones de un complemento real para testing del Core sin depender de microservicios reales. |
 
 ### ✅ Listas
 
@@ -82,348 +94,6 @@
 
 ## Información de como solucionar los Pendientes
 
-### EE-BAT-001 - Easter Egg: Murciélago Pixel-Art (#bat)
-
-**Descripción técnica:**
-Implementar un easter egg interactivo que muestre un murciélago animado en pixel-art **apenas** el usuario escribe exactamente `#bat` en el textarea de entradas. El murciélago aparece **inmediatamente en tiempo real** (no espera al envío de la entrada), comienza su movimiento circular **por toda la pantalla/web** y **persiste indefinidamente** hasta que el usuario recargue la página (F5).
-
-**Requerimientos:**
-1. **Ubicación del Trigger:**
-   - **Sección**: `/main/entries` (Nueva Entrada)
-   - **Componente**: Campo textarea en la tarjeta de "Nueva Entrada"
-   - **FormControl**: `formControlName="content"`
-
-2. **Trigger (Activación) - EN TIEMPO REAL:**
-   - Hashtag exacto: Solo `#bat` (case-insensitive: `#BAT`, `#Bat`, `#bAt` válidos)
-   - NO se activa con variaciones: `#batimovil`, `#bat123`, `#batman` = NO disparan
-   - **TIMING CRÍTICO**: Se activa apenas se escribe "#bat" (no al enviar la entrada)
-   - Ubicación: En el textarea del componente `entries.component`
-   - Detección: Usa `valueChanges` para monitoreo en tiempo real de `formControlName="content"`
-   - **Comportamiento**: El murciélago aparece INMEDIATAMENTE y comienza animado al mismo instante
-
-3. **Animación Visual (Mejorado):**
-   - **Estilo**: Pixel-art retro con box-shadow generado
-   - **Fotogramas**: 2 estados (alas abiertas/cerradas)
-   - **Duración por frame**: 0.4s (alternancia cada 400ms)
-   - **Técnica CSS**: `@keyframes` con `steps(2)` para look retro
-   - **Aparición**: Inmediata (sin delay) cuando se detecta "#bat"
-   - **Efecto Glow/Brillo**: Box-shadow con blur para halo luminoso alrededor del murciélago
-   - **Rastro Visual**: Trail effect con opacidad decreciente (sombras fantasma siguiendo la trayectoria)
-   - **Sombra Dinámica**: Cambiar intensidad de sombra según la posición (simular profundidad 3D)
-   - **Rotación del Cuerpo**: Girar el cuerpo del murciélago según la dirección del movimiento (izq/derecha/arriba/abajo)
-
-4. **Movimiento (Mejorado - Con Comportamiento Inteligente):**
-   - **Inicio**: Esquina superior izquierda (top-left)
-   - **Duración total**: **INFINITA** - No tiene límite de tiempo
-   - **Tipo de movimiento base**: Circular/fluido **por toda la pantalla visible**
-   - **Alcance**: Se mueve a través de toda la web/página (no confinado a un área)
-   - **Sincronización**: Comienza al mismo tiempo que el murciélago aparece (no espera)
-   - **Z-index**: Por encima de los logs pero sin bloquear UI
-   - **Variabilidad del movimiento**: 
-     - Agregar caminos **aleatorios** además del circular para evitar predictibilidad
-     - **Cambios de velocidad**: Alterna entre vuelo rápido y lento (20-150% de velocidad base)
-     - **Pausas ocasionales**: Se detiene 1-2 segundos en puntos aleatorios (como si buscara comida/insectos)
-     - **Zigzag adicional**: Oscilaciones laterales suave durante el movimiento (patrón natural de murciélago)
-
-5. **Limpieza/Desaparición:**
-   - **NO DESAPARECE AUTOMÁTICAMENTE**: La animación persiste indefinidamente
-   - **Única forma de eliminar**: F5 (refresco de la página) resetea todo
-   - **Comportamiento post-recarga**: Si el usuario recarga (F5) y vuelve a escribir "#bat", vuelve a aparecer con su animación de nuevo
-
-6. **Interactividad (Pick-the-Bat!):**
-   - **Clickeable**: Los usuarios pueden intentar clickear el murciélago
-   - **Mecanismo de Evasión**: Si el usuario intenta capturarlo:
-     - El murciélago se vuelve más rápido (acelera 50% más)
-     - Cambia trayectoria al azar para evitar ser atrapado
-     - Emite visual feedback (parpadeo, cambio de color temporal)
-   - **Hover Effect**: 
-     - Tooltip aparece al pasar el cursor: "¿Intentas atraparme?" o "¡Todavía estoy aquí!"
-     - El murciélago ocasionalmente vuela **hacia** el cursor (como si jugara)
-     - O lo evita calculando distancia y huyendo si el cursor se aproxima mucho
-   - **Contador (Bonus)**: Mostrar en la consola o log cuántas veces el usuario intentó capturarlo (ej: "Intentos fallidos: 3")
-
-**Archivos a modificar:**
-- `frontend/src/app/pages/main/entries/entries.component.ts`
-- `frontend/src/app/pages/main/entries/entries.component.scss`
-- `frontend/src/app/pages/main/entries/entries.component.html` (si necesita ajustes)
-
-**Implementación paso a paso:**
-
-1. **Ya existe la lógica base** en `entries.component.ts`:
-   - Sistema de detección de hashtags en `triggerEntryEasterEggIfNeeded()`
-   - Overlay HTML/CSS para mostrar la animación
-   - Timer de desaparición
-   
-2. **Lo que FALTA:**
-   - Validación exacta de `#bat` (no otras variaciones)
-   - Animación pixel-art con box-shadow (2 fotogramas: alas abiertas/cerradas)
-   - @keyframes de aleteo con `steps(2)`
-   - @keyframes de movimiento circular **INFINITO** (SIN límite de 15s, se repite indefinidamente)
-   - **Efectos Visuales Avanzados**:
-     - Glow/Brillo (box-shadow con blur)
-     - Rastro visual (trail effect con opacity decreciente)
-     - Sombra dinámica (profundidad según posición)
-     - Rotación del cuerpo según dirección
-   - **Comportamiento Mejorado**:
-     - Movimiento aleatorio + circular mix
-     - Cambios de velocidad dinámicos (20-150%)
-     - Pausas ocasionales (1-2s)
-     - Zigzag oscilante
-   - **Interactividad**:
-     - Detección de clicks (evasión inteligente)
-     - Seguimiento del cursor (evitar o atraer)
-     - Tooltip al hover
-     - Contador de intentos fallidos
-   - **Estética Pixel-Art (Impacto Alto / Fácil)**:
-     - Diseño visual retro sprite 8-bit/16-bit authentic
-     - Paleta de colores limitada (máx 4-6 colores primarios) para efecto pixel fidelidad
-     - Box-shadow coordenadas manuales para forma rectangular pixelada exacta
-     - Proporciones 1:1 (cuadrado base) con escalado x80-100 para legibilidad
-     - CSS `image-rendering: pixelated` para edges nítidos sin antialiasing
-     - Animación de aleteo: 2 fotogramas discretos sin transición suave (steps(2))
-     - Sombra pixelada: múltiples box-shadow rectangulares stacked (NO blur suave, bordes rectos)
-     - Trail effect pixelado: sombras fantasma discretas en pixeles, no gradientes
-   - **NOTA IMPORTANTE**: El sistema ya monitorea `valueChanges` en tiempo real → solo falta agregar la validación específica de "#bat" y las animaciones CSS
-   - **DIFERENCIA CLAVE**: NO hay `setTimeout()` para desaparición - la animación es PERMANENTE hasta F5
-
-3. **CSS @keyframes requeridos (Expandido con Efectos Visuales):**
-
-```scss
-// Aleteo del murciélago (2 fotogramas: alas abiertas/cerradas)
-@keyframes bat-flap {
-  0%, 100% { 
-    // Alas abiertas (fotograma 1)
-    box-shadow: /* coordenadas del murciélago con alas abiertas */;
-  }
-  50% { 
-    // Alas cerradas (fotograma 2)
-    box-shadow: /* coordenadas del murciélago con alas cerradas */;
-  }
-}
-
-// Movimiento circular por toda la pantalla (INFINITO - sin límite de tiempo)
-// Se repite continuamente hasta que el usuario haga F5
-@keyframes bat-move {
-  0% { left: 20px; top: 50px; }     // Esquina superior izquierda
-  25% { left: 80vw; top: 100px; }   // Arriba derecha
-  50% { left: 80vw; top: 80vh; }    // Abajo derecha
-  75% { left: 20px; top: 70vh; }    // Abajo izquierda
-  100% { left: 20px; top: 50px; }   // Vuelve a inicio (se repite infinitamente)
-}
-
-// Glow/Brillo dinámico del murciélago
-@keyframes bat-glow {
-  0% { filter: drop-shadow(0 0 10px rgba(255,100,100,0.3)); }
-  50% { filter: drop-shadow(0 0 20px rgba(255,100,100,0.6)); }
-  100% { filter: drop-shadow(0 0 10px rgba(255,100,100,0.3)); }
-}
-
-// Rotación del cuerpo (seguir dirección)
-@keyframes bat-rotate-left {
-  0% { transform: scale(80) rotateY(0deg); }
-  100% { transform: scale(80) rotateY(-15deg); }
-}
-
-@keyframes bat-rotate-right {
-  0% { transform: scale(80) rotateY(0deg); }
-  100% { transform: scale(80) rotateY(15deg); }
-}
-
-// Zigzag oscilante
-@keyframes bat-zigzag {
-  0%, 100% { margin-left: 0px; }
-  25% { margin-left: 15px; }
-  50% { margin-left: -15px; }
-  75% { margin-left: 15px; }
-}
-
-.bat-pixel {
-  width: 1px;
-  height: 1px;
-  background: transparent;
-  transform: scale(80);
-  animation: bat-flap 0.8s steps(2) infinite;
-  
-  // Agregar glow dinámico
-  filter: drop-shadow(0 0 15px rgba(255,100,100,0.4));
-}
-
-.bat-animation {
-  // Movimiento infinito + glow + zigzag
-  animation: 
-    bat-move 15s ease-in-out infinite,
-    bat-glow 2s ease-in-out infinite,
-    bat-zigzag 3s ease-in-out infinite;
-  
-  // Para interacción: cuando el murciélago está siendo perseguido
-  &.bat-evading {
-    animation-duration: 10s; // Más rápido cuando huye
-  }
-  
-  // Rastro visual (trail effect)
-  &::before {
-    content: '';
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    box-shadow: 
-      -5px 0 10px rgba(255,100,100,0.2),
-      -10px 0 15px rgba(255,100,100,0.1),
-      -15px 0 20px rgba(255,100,100,0.05);
-    opacity: 0.6;
-  }
-}
-```
-
-4. **Lógica TypeScript (Expandida con Interactividad):**
-
-```typescript
-export class EntriesComponent implements OnInit {
-  // ... propiedades existentes
-  private mouseX = 0;
-  private mouseY = 0;
-  private batClickAttempts = 0;
-  private batIsEvading = false;
-  
-  ngOnInit() {
-    // ... código existente
-    
-    // Rastrear movimiento del mouse
-    document.addEventListener('mousemove', (e) => {
-      this.mouseX = e.clientX;
-      this.mouseY = e.clientY;
-      
-      // Si el murciélago está visible, evaluar proximidad al cursor
-      if (this.showEasterEggOverlay) {
-        this.evaluateBatProximity();
-      }
-    });
-  }
-
-  private triggerEntryEasterEggIfNeeded(content: string): void {
-    const tags = this.extractTagsFromContent(content);
-    const hasBatTag = tags.includes('bat');
-    
-    if (hasBatTag && !this.showEasterEggOverlay) {
-      // Aparecer inmediatamente
-      this.easterEggImageUrl = 'bat';
-      this.showEasterEggOverlay = true;
-      this.batClickAttempts = 0;
-      this.batIsEvading = false;
-      
-      console.log('[EASTER_EGG] Unidentified flying object (UFO) detected in the SOC. Shadow protocol active.');
-      // La animación persiste indefinidamente hasta F5
-    }
-  }
-
-  // Detectar proximidad del cursor al murciélago
-  private evaluateBatProximity(): void {
-    const batElement = document.querySelector('.bat-animation');
-    if (!batElement) return;
-    
-    const rect = batElement.getBoundingClientRect();
-    const distance = Math.sqrt(
-      Math.pow(this.mouseX - rect.left, 2) + 
-      Math.pow(this.mouseY - rect.top, 2)
-    );
-    
-    // Si el cursor está muy cerca, el murciélago huye (se vuelve más rápido)
-    if (distance < 150 && !this.batIsEvading) {
-      this.batIsEvading = true;
-      batElement.classList.add('bat-evading');
-      
-      // Después de 3 segundos, vuelve a la velocidad normal
-      setTimeout(() => {
-        this.batIsEvading = false;
-        batElement.classList.remove('bat-evading');
-      }, 3000);
-    }
-  }
-
-  // Click en el murciélago: intento de captura (falla)
-  onBatClick(): void {
-    this.batClickAttempts++;
-    const batElement = document.querySelector('.bat-animation');
-    
-    if (batElement) {
-      // Destello visual de evasión exitosa
-      batElement.classList.add('bat-dodge');
-      setTimeout(() => batElement.classList.remove('bat-dodge'), 500);
-      
-      // Cambiar velocidad al azar para confundir
-      this.batIsEvading = true;
-      batElement.classList.add('bat-evading');
-      
-      console.log(`[EASTER_EGG] ¡Intento fallido! Intentos: ${this.batClickAttempts}`);
-      console.log('[EASTER_EGG] El murciélago escapa volando más rápido...');
-      
-      setTimeout(() => {
-        this.batIsEvading = false;
-        batElement.classList.remove('bat-evading');
-      }, 4000);
-    }
-  }
-
-  // Hover: mostrar tooltip y evaluar comportamiento
-  onBatHover(): void {
-    console.log('[EASTER_EGG] ¿Intentas atraparme?');
-  }
-
-  onBatHoverLeave(): void {
-    console.log('[EASTER_EGG] ¡Todavía estoy aquí!');
-  }
-}
-```
-
-**TIMING CRÍTICO:**
-- `showEasterEggOverlay = true` → Murciélago visible INMEDIATAMENTE
-- **NO hay `setTimeout()`** → La animación NO desaparece automáticamente
-- Las animaciones CSS (@keyframes) comienzan al mismo instante que `showEasterEggOverlay` se activa y continúan **indefinidamente** (`infinite`)
-- **Mouse tracking activo**: Se evalúa la proximidad del cursor en tiempo real
-- **Click detection**: Intenta capturar → Falla + aceleración + feedback visual
-- **Única forma de parar**: F5 (refresco de página) o cerrar la sesión
-
-5. **HTML (Expandido con Interactividad):**
-
-```html
-<div class="easter-egg-overlay bat-animation" 
-     *ngIf="showEasterEggOverlay"
-     (click)="onBatClick()"
-     (mouseenter)="onBatHover()"
-     (mouseleave)="onBatHoverLeave()"
-     [title]="'Intentos de captura: ' + batClickAttempts">
-  <div class="bat-pixel"></div>
-  <!-- Tooltip al hover (opcional, puede ser via CSS tooltip) -->
-  <div class="bat-tooltip">¿Intentas atraparme?</div>
-</div>
-```
-
-**Testing (Expandido):**
-- **Escribir "#bat"** (carácter por carácter) → Murciélago debe aparecer INMEDIATAMENTE al completar "#bat"
-- **Verificar movimiento continuo** → El murciélago debe comenzar su animación circular desde el mismo instante de aparición y **NUNCA DETENERSE** (se repite indefinidamente)
-- **Verificar efectos visuales**:
-  - ✅ Glow/brillo alrededor del murciélago (pulsante)
-  - ✅ Rastro visual (trail effect con sombra decreciente)
-  - ✅ Cambios de velocidad dinámicos (ralentización y aceleración al azar)
-  - ✅ Pausas ocasionales durante el movimiento (1-2 segundos)
-  - ✅ Zigzag oscilante en la trayectoria
-- **Interactividad - Perseguir al murciélago**:
-  - Mover el cursor cerca del murciélago → Debe alejarse (evasión)
-  - ✅ Al hover: Mostrar tooltip "¿Intentas atraparme?"
-  - ✅ Clickear el murciélago → Se acelera y cambia trayectoria (fallo en captura)
-  - ✅ Incrementar contador de intentos fallidos en consola
-  - ✅ Destello visual al intentar captura (dodge visual)
-- **Escribir "#batman"** → NO debe aparecer (rechaza variación)
-- **Escribir "#bat #otros"** → Debe aparecer (contiene #bat exacto)
-- **Esperar 30+ segundos** → El murciélago sigue moviéndose sin desaparecer (confirma que es infinito)
-- **Navegar a otra sección de la aplicación** → El murciélago sigue visible y en movimiento (persiste en toda la web)
-- **Intentar capturar múltiples veces** → Cada intento incrementa velocidad y contador
-- **F5** → Resetea todo el componente y el murciélago desaparece (única forma de eliminar, contador se resetea)
-- **Escribir "#bat" de nuevo DESPUÉS de F5** → Vuelve a aparecer con contador reiniciado
-- **Consola de navegador** → Verificar logs: "[EASTER_EGG]" con mensajes de detección, intentos, etc.
-
-**Estimado**: 4-6 horas (CSS animaciones avanzadas + efectos visuales + lógica de mouse tracking + interactividad + testing comprehensive)
-
 ### B19 - GLPI (Correo/API)
 
 1. Definir modo operativo final: resumen diario o ticket inmediato.
@@ -447,7 +117,7 @@ export class EntriesComponent implements OnInit {
    - agregar botón `✨ Generar con IA`
    - completar el campo al terminar la respuesta sin bloquear edición manual.
 5. Recursos/operación del contenedor:
-   - memoria limitada a `--memory=\"2g\"`
+   - memoria limitada a `--memory="2g"`
    - volumen persistente `-v ollama_data:/root/.ollama`
    - contenedor apagado fuera de uso (superficie mínima y ahorro de RAM).
 
@@ -469,6 +139,16 @@ export class EntriesComponent implements OnInit {
 6. **Prueba controlada:** Bajar temporalmente intervalo a 1 día (o modo test en minutos), validar creación automática y luego restaurar 7 días.
 7. **Criterio de cierre:** Sin interacción manual, el sistema debe crear backup automático cuando vence el intervalo y mostrarlo en historial con etiqueta de origen `automático`.
 
+### BACKUP-RET-017 - Retención de backups no elimina archivos al superar 7 días
+
+1. **Reproducir con evidencia:** Configurar retención local en `7 días`, listar historial y respaldar evidencia de archivos con antigüedad mayor a 7 días que siguen presentes.
+2. **Validar configuración persistida:** Confirmar en DB que `localRetentionDays=7` quedó guardado y que no existe override por defecto en runtime.
+3. **Auditar lógica de purge:** Revisar en backend el cálculo de antigüedad (`mtime` vs timestamp embebido en nombre), timezone y comparación límite (`>`, `>=`) para evitar off-by-one.
+4. **Ejecutar cleanup forzado en entorno controlado:** Disparar backup automático de prueba y verificar que `cleanupOldLocalBackups(7)` realmente recorra y elimine archivos elegibles.
+5. **Agregar trazabilidad operativa:** Registrar en auditoría/logs `BACKUP_RETENTION_CLEANUP_STARTED`, `BACKUP_RETENTION_FILE_DELETED`, `BACKUP_RETENTION_FILE_SKIPPED` y motivo.
+6. **Cubrir regresión mínima:** Crear prueba automática de integración/unidad que genere archivos con fechas antiguas y valide su eliminación con retención de 7 días.
+7. **Criterio de cierre:** Todo backup con antigüedad mayor a 7 días debe eliminarse automáticamente en el siguiente ciclo de cleanup y reflejarse en trazabilidad.
+
 ### DEP-NPM-012 - Dependencias npm deprecadas en build Docker (`glob`/`inflight`)
 
 1. **Trazar el origen real:** Ejecutar en `backend` comandos como `npm ls glob inflight` para identificar qué dependencias raíz introducen cada versión deprecada.
@@ -476,6 +156,7 @@ export class EntriesComponent implements OnInit {
 3. **Regenerar lockfile limpio:** Borrar `node_modules` + `package-lock.json`, reinstalar (`npm install`) y confirmar que el árbol nuevo elimina los paquetes sin soporte.
 4. **Validar build Docker:** Re-ejecutar `docker compose build backend` y verificar que desaparezcan warnings de deprecación relevantes.
 5. **Control de regresión:** Correr smoke tests backend (arranque API, rutas críticas y scripts de correo/reportes) para confirmar que los upgrades no rompen compatibilidad.
+6. **Evidencia de revisión (2026-03-20):** En `backend/package-lock.json` los únicos deprecados detectados fueron `glob` (7.2.3 y 10.5.0 en subárboles) e `inflight@1.0.6`; en `frontend/package-lock.json` no se detectaron entradas `deprecated`.
 
 ### FE-SASS-013 - Migrar `@import` Sass a `@use/@forward` en login
 
@@ -517,19 +198,6 @@ export class EntriesComponent implements OnInit {
    - En `Global Configuration` o en Configuración de Checklists, agregar el toggle switch "Habilitar alertas NOK".
    - Al lado, un Mat-Select con selección múltiple (checkboxes) que cargue el diccionario de cargos permitidos.
    - Guardar estas variables de vuelta al modelo usando el servicio existente de `ConfigService`.
-
-### B45 - Correo de fin de turno pospuesto hasta checklist de cierre real
-
-1. **Regla operativa (backend):**
-   - En el trigger automático de fin de turno, si no existe checklist de cierre (`type: 'cierre'`) para ese turno/sesión, no enviar correo y marcar envío como pendiente.
-2. **Disparador diferido:**
-   - Al registrar checklist de cierre (ruta de guardado de checklist), evaluar si existe reporte pendiente para ese turno y ejecutar `sendShiftReport(...)` inmediatamente.
-3. **Antiduplicado:**
-   - Reusar/fortalecer la lógica de `lastReportSentAt` para impedir doble envío cuando coincidan cron + envío diferido.
-4. **Ventana y correlación:**
-   - Correlacionar checklist inicio/cierre y entradas usando la sesión real del turno (incluyendo casos de cruce de medianoche y checklist de cierre tardío).
-5. **Trazabilidad:**
-   - Registrar en logs/auditoría estados `PENDIENTE_POR_CIERRE`, `ENVIADO_DIFERIDO` y motivo de no envío en trigger horario.
 
 ### SEC-HIGH-009 - Regex Injection / ReDoS en búsquedas (NoSQL)
 
@@ -573,156 +241,683 @@ export class EntriesComponent implements OnInit {
 4. **Revisión histórica:**
    - Verificar pipelines de logs existentes y limpiar retención de registros que hayan capturado esta telemetría.
 
-### B35 - Header Checklist y Fix "Último Check"
+### COMP-001 - Persistencia Aislada, Wipe Out y Auditoría Forense
 
-1. **Frontend (Header):**
-   - Localizar el componente en `frontend/src/app/pages/main/checklist` (o similar).
-   - Cambiar el texto estático `Checklist Diario Analistas N1` por `Checklist del turno`.
-2. **Frontend/Backend (Dato de Último Check):**
-   - Revisar la suscripción o el servicio que trae el `lastCheck`. Asegurar que se invalide la caché o que el backend devuelva el documento más reciente por `createdAt` sin filtros que excluyan al usuario actual o a otros.
-   - Si es un problema de visualización, asegurar que el `DatePipe` sea correcto y el binding del `username` venga del registro real de la DB.
+**Descripción técnica:**
+Diseñar el esquema de microservicios donde cada complemento posee su propia base de datos (aislamiento total) y el núcleo de la Bitácora gestiona el ciclo de vida de forma independiente, incluyendo un protocolo de Wipe Out (borrado atómico) con trazabilidad forense completa.
 
-### B36 - Aprovechamiento de ancho de pantalla
+**Pasos a seguir:**
+1. **Modelo `Complement`**: Crear `backend/src/models/Complement.js` para registrar `slug` (alfanumérico + guion, max 32 chars), `baseUrl`, `dbName` (prefijo obligatorio `bitacora_ext_*`), `permissions`, `status` y `tokenHash`.
+2. **Protocolo Wipe Out (4 fases secuenciales)**:
+   - **Fase 1 – Notificar Microservicio**: `POST /hook/cleanup` al microservicio con timeout de 5s. Si no responde, continuar igualmente.
+   - **Fase 2 – Eliminar DB Privada**: `db.dropDatabase()` sobre la DB del complemento. Solo se ejecuta si `dbName` cumple patrón `bitacora_ext_*`.
+   - **Fase 3 – Purgar BD General**: `deleteMany({ownerComplementId: slug})` en todas las colecciones con datos del complemento.
+   - **Fase 4 – Limpiar Modelo**: `Complement.deleteOne({slug})` y revocar token activo.
+3. **Post-Wipe Verification**: Query `db.listCollections()` para confirmar eliminación total. Si quedan artefactos, registrar como `complement.wipe.orphans_detected`.
 
-1. **Estructura Layout (CSS):**
-    - En `main-layout.component.scss`, identificar el contenedor principal (`.main-container` o `.content`).
-    - Ajustar el `max-width` o los márgenes laterales.
-2. **Interactividad con Cajón de Notas:**
-    - Usar una clase dinámica (ej: `.with-notes-open`) en el contenedor principal.
-    - Cuando `showNotes` sea `false`, aplicar `width: 100%` o un ancho mayor.
-    - Cuando `showNotes` sea `true`, aplicar el padding/margen necesario para no solapar el cajón de notas.
+**Trail Forense (eventos de auditoría para LOGGING.md):**
 
-### B39 - Checklist: ocultar estado de item padre con sub-items
+| Namespace | Acción | Nivel | Metadata |
+|-----------|--------|-------|----------|
+| `complement.install` | - | info | `{slug, baseUrl, dbName, scopes}` |
+| `complement.update` | `.permissions` / `.config` | info | `{slug, changedFields}` |
+| `complement.delete` | `.initiated` / `.completed` | warn | `{slug, adminId, reason}` |
+| `complement.wipe` | `.hook_sent` | info | `{slug, hookUrl, responseStatus}` |
+| `complement.wipe` | `.hook_timeout` | warn | `{slug, hookUrl, timeoutMs}` |
+| `complement.wipe` | `.db_dropped` | warn | `{slug, dbName}` |
+| `complement.wipe` | `.general_purged` | warn | `{slug, collectionsAffected, docsRemoved}` |
+| `complement.wipe` | `.orphans_detected` | error | `{slug, orphanCollections}` |
 
-1. **UI (Checklist):**
-   - En `frontend/src/app/pages/main/checklist/checklist.component.html`, ocultar el `mat-radio-group` del item padre cuando `service.children?.length` es true (hoy aparece dentro del panel).
-   - Mantener solo el icono/estado en el header para indicar el estado agregado.
-2. **Cálculo de estado agregado (TS):**
-   - En `checklist.component.ts`, al cambiar un sub-item, recalcular el estado del padre: `rojo` si algún hijo rojo, `verde` si todos verdes, `null` si hay pendientes.
-   - Propagar el cálculo hacia arriba (ancestros) usando un helper (ej. `getAggregateStatus(node)`).
-3. **Validación y observaciones:**
-   - Ajustar la validación `allHaveStatus` para exigir estado solo a hojas (items sin hijos).
-   - La observación obligatoria debe aplicar solo al item rojo hoja, no al padre derivado.
-4. **Payload:**
-   - Antes de enviar, asegurar que el estado del padre ya esté calculado; enviar ese estado derivado (o, si el backend lo permite, excluir nodos padre del payload).
+**Restricciones de Seguridad:**
+- El microservicio **jamás** recibe credenciales de MongoDB General directamente.
+- `db.dropDatabase()` solo se ejecuta sobre DBs con prefijo `bitacora_ext_*`. Si el nombre no cumple el patrón, el Wipe Out aborta con error de seguridad.
+- Toda operación de borrado se audita con nivel `warn` y datos forenses completos.
+- El hook de cleanup al microservicio tiene timeout estricto de 5s; si el microservicio no responde, el Wipe Out continúa (no se bloquea).
 
-### B40 - Report Generator: búsqueda de ofensas no encuentra nuevas ni coincide por texto
+**Criterios de Aceptación de Arquitectura:**
+1. Modelo `Complement` creado con validación de `slug` (alfanumérico + guion, max 32 chars).
+2. `deleteComplement()` ejecuta las 4 fases del Wipe Out en secuencia con rollback parcial si falla la Fase 2.
+3. Post-wipe: query de verificación `db.listCollections()` confirma eliminación total.
+4. Trail forense: ≥ 4 eventos de auditoría registrados por cada Wipe Out completo.
+5. No queda ningún documento con `ownerComplementId` del complemento eliminado en la BD General.
 
-**Hecho (backend):**
-- Se reemplazó el filtro simple por regex con un ranking por relevancia en `/api/catalog/*` para priorizar exact/prefix y reducir ruido en términos cortos.
+### COMP-002 - Contrato de API Interna (Microservicio-Bitácora)
 
-**Falta validar / completar:**
-- Probar en `/main/report-generator` que “TOR” aparece correctamente y por encima de resultados no relacionados.
-- Verificar si el selector mantiene cache local y forzar refresh tras crear nuevas ofensas.
-- Ejecutar pruebas o smoke test de búsqueda en catálogo.
+**Descripción técnica:**
+Establecer el protocolo de comunicación para que el microservicio interactúe con el núcleo sin tener acceso directo a la infraestructura de datos. Autenticación exclusiva por Application Token (no JWT de usuario).
 
-1. **Reproducción y datos:**
-   - Crear ofensa nueva (ej. "TOR") y abrir `/main/report-generator`.
-   - Confirmar si el selector usa cache local o datos remotos paginados.
-2. **Backend/API:**
-   - Revisar endpoint de búsqueda/listado de ofensas: normalizar `q` (lowercase, trim, quitar tildes) y usar `contains` o `startsWith` en `name/title`.
-   - Verificar si hay ranking por relevancia que esté priorizando resultados no relacionados.
-   - Asegurar índice en campo `name/title` para búsquedas parciales (si usa Mongo, `text` o regex con collation).
-3. **Frontend:**
-   - Revisar lógica de filtro en el selector/autocomplete (case-insensitive).
-   - Forzar refresco del dataset luego de crear una nueva ofensa (re-fetch o invalidar cache).
-4. **UX:**
-   - Mostrar mensaje "Sin coincidencias" cuando no haya resultados reales.
-   - Opcional: mostrar el término buscado y un botón "Refrescar" si el dataset está desactualizado.
+**Endpoints Internos (Microservicio → Bitácora):**
 
-### B43 - Email de turno: refactorización a MJML y rediseño como dashboard
+| Método | Endpoint | Descripción | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/internal/v1/context` | Contexto turno/analista activo | App Token |
+| POST | `/api/internal/v1/log-entry` | Crear entrada operativa vinculada | App Token + `WRITE_ENTRIES` |
+| GET | `/api/internal/v1/query-general` | Leer logs con filtros limitados | App Token + `READ_LOGS` |
+| POST | `/api/internal/v1/storage` | Escribir en colección "Shared" | App Token + `WRITE_STORAGE` |
+| GET | `/api/internal/v1/storage` | Leer datos propios en "Shared" | App Token + `READ_STORAGE` |
 
-**Contexto del código actual:**
-- Archivo principal: `backend/src/utils/shift-report.js`
-- Función que genera el HTML: `generateReportHTML({ shift, checklistEntry, checklistExit, entries, periodStart, periodEnd, appTitle })`
-- Función de texto plano (fallback): `generateReportText(...)` — NO debe modificarse
-- Función de envío: `sendShiftReport(shiftId, shiftDate, options)` — su interfaz NO debe cambiar
-- Variable de branding: `appTitle` → viene de `AppConfig.appTitle` (DB) con fallback `'Bitácora SOC'`; dentro de `generateReportHTML` se llama `brandedAppTitle`
-- Problema de texto redundante: `renderStatusCell()` muestra `'OK (Verde)'` / `'ERROR (Rojo)'` — eliminar redundancia
-- Las observaciones vacías se muestran como `Obs: -` — solo mostrar si `service.observation` existe
+**Endpoints Admin (Gestión de Complementos):**
 
-**Problemas a solucionar en esta refactorización:**
-1. Texto redundante en estados (OK Verde / ERROR Rojo)
-2. No existe sección de Resumen Ejecutivo (conteos visuales)
-3. Checklist es tabla plana de 3 columnas — difícil de escanear
-4. Entradas de Bitácora sin jerarquía visual clara
-5. Observaciones siempre visibles aunque vacías
-6. HTML frágil sin framework — incompatible con dark-mode, Outlook, Gmail
+| Método | Endpoint | Descripción | Rol |
+|--------|----------|-------------|-----|
+| GET | `/api/complements` | Listar complementos registrados | Admin |
+| POST | `/api/complements` | Registrar/instalar complemento | Admin |
+| GET | `/api/complements/:slug` | Detalle de un complemento | Admin |
+| PUT | `/api/complements/:slug` | Actualizar configuración/permisos | Admin |
+| DELETE | `/api/complements/:slug` | Eliminar complemento (Wipe Out) | Admin |
+| POST | `/api/complements/:slug/test` | Probar conectividad | Admin |
+| GET | `/api/complements/active` | Complementos activos para sidebar | Todos |
 
-**Dependencia nueva:**
-- Añadir `mjml` a `backend/package.json` (`npm install mjml`)
-- El paquete compila plantillas MJML a HTML compatible con Outlook/Gmail en tiempo de ejecución (Node)
-- Uso: `const mjml2html = require('mjml'); const { html } = mjml2html(mjmlTemplate);`
+**Rate Limiting (por token de complemento):**
 
-**Estructura de la nueva plantilla MJML (`generateReportHTML`):**
+| Endpoint | Límite | Ventana |
+|----------|--------|---------|
+| `/api/internal/v1/*` | 200 requests | 15 min (por token) |
+| `/api/complements` (admin) | 50 requests | 15 min |
+| `DELETE /api/complements/:slug` | 3 requests | 60 min |
 
-1. **Header** (`<mj-section>` fondo oscuro o primario)
-   - **Favicon/Logo:** Si `AppConfig.faviconUrl` existe, mostrarlo como imagen pequeña (max-width: 32px o 48px) en la esquina izquierda del header, alineado verticalmente con el título
-   - Título: `🛡️ Reporte de Turno — ${brandedAppTitle}` (el guión largo separa el subtítulo); posicionar al lado del favicon si existe
-   - Subtítulo: `${shift.name} • ${shift.startTime}–${shift.endTime} • ${dateLabel}`
-   - Si `periodLabel` existe, mostrarlo en una tercera línea más pequeña (Periodo: [rango completo])
+**Restricciones de Seguridad:**
+- Autenticación exclusiva por Application Token firmado con `COMPLEMENT_TOKEN_SECRET` (diferente a `JWT_SECRET`).
+- Scopes verificados en cada endpoint; acceso denegado fuera de scope con evento `complement.api.denied`.
+- Colecciones accesibles listadas explícitamente en el token (`allowedCollections`); no se permite wildcard.
+- Rate-limiting por token: 200 req/15min (independiente del rate-limit global de usuario).
+- Sanitización de inputs aplicando las mismas reglas que `sanitizeInput.js` existente.
+- El endpoint `/context` no expone PII del analista (solo `username`, `shiftId`, `shiftName`).
 
-2. **Resumen Ejecutivo** (`<mj-section>` con 3 columnas `<mj-column>`)
-   - Calcular antes de renderizar:
-     - `totalOk` = servicios con `status === 'verde'` en entry + exit (contar sin duplicados por `serviceId`)
-     - `totalError` = servicios con `status === 'rojo'` en entry o exit
-     - `totalEntries` = `entries.length`
-   - Cada columna: número grande (tipografía gruesa) + etiqueta debajo (`OK`, `NO OK`, `Entradas`); fondos sutiles para claridad
+**Criterios de Aceptación de Arquitectura:**
+1. Middleware `complementAuth.js` creado y montado exclusivamente en `/api/internal/v1/*`.
+2. Token validado con `COMPLEMENT_TOKEN_SECRET` y verificación de `exp`.
+3. Scope check: cada ruta declara `requireScope('READ_LOGS')` y el middleware lo verifica contra el token.
+4. Correlation ID (`X-Request-Id`) propagado desde el microservicio al AuditLog.
+5. Todo acceso denegado por scope se audita como `complement.api.denied` con metadata del intento.
+6. Endpoints documentados en `API.md` bajo sección "API Interna (Complementos)" siguiendo el formato de tablas existente.
 
-3. **Checklist — tarjetas por servicio** (`<mj-section>` por servicio, NO tabla)
-   - Iterar `buildServiceRows(checklistEntry, checklistExit)` y renderizar cada servicio como una tarjeta visual
-   - Nombre del servicio en header destacado
-   - Columnas visuales Entrada / Salida lado a lado (no filas de tabla, sino bloques)
-   - **Estados columna Entrada:**
-     - `🟢 OK` → si `row.entry.status === 'verde'`
-     - `🔴 ERROR` → si `row.entry.status === 'rojo'`
-     - `—` gris → si sin registro
-   - **Estados columna Salida:** (Por ahora OK / ERROR; B44 añadirá REPARADO)
-     - `🟢 OK` → si `row.exit.status === 'verde'`
-     - `🔴 ERROR` → si `row.exit.status === 'rojo'`
-     - `—` gris → si sin registro
-   - Observación: mostrar **solo si existe** (`service.observation`), con formato `Obs: [texto]`; no mostrar si está vacía
+### COMP-003 - Slot Dinámico en UI (N1 y Admin)
 
-4. **Bitácora — bloques independientes** (`<mj-section>` por cada entrada, con jerarquía visual)
-   - Iterar `entries` (igual que antes)
-   - Cada entrada como bloque independiente con:
-     - Header: hora + fecha (tipografía media/bold)
-     - Subtítulo: tipo + cliente (tipografía pequeña, gris)
-     - Cuerpo: `content` completo sin resumir, respetando saltos de línea (`\n` → `<br>`)
-   - Separación visual clara entre bloques (espaciado, bordes sutiles)
+**Descripción técnica:**
+Inyectar el espacio de trabajo del complemento en el frontend de forma segura y no intrusiva. Si el Circuit Breaker detecta fallo, mostrar badge de mantenimiento en lugar del iframe.
 
-5. **Footer** (`<mj-section>`)
-   - `Este correo fue generado automáticamente por ${brandedAppTitle}`
-   - `No responder a este mensaje`
+**Implementación:**
+1. **Frontend N1**: Crear componente `ComplementContainerComponent` con `@Input() complement: Complement`. Cargar `baseUrl` en `<iframe>` con atributos de seguridad.
+2. **Sidebar Dinámico**: `MainLayoutComponent` consulta `GET /api/complements/active` y agrega links dinámicos al sidebar siguiendo el patrón visual existente.
+3. **PostMessage**: Bus de eventos para pasar context token (short-lived, no JWT de usuario) y contexto (turno/cliente) desde Angular hacia el microservicio. Validación de `origin` contra `complement.baseUrl` registrada.
+4. **Consola Admin**: Nueva sección en administración (siguiendo el patrón visual de `Admin > Integraciones SIEM`) para gestionar Alta/Baja/URL/Permisos.
+5. **Degradación Grácil**: Si Circuit Breaker está OPEN para un complemento, el contenedor muestra badge `🔧 Complemento en mantenimiento` en lugar del iframe.
 
-**Reglas de implementación:**
-- **SOLO** reemplazar la función `generateReportHTML()` — no tocar `generateReportText()`, `sendShiftReport()` ni los modelos
-- No modificar `renderStatusCell()` en esta fase (B44 lo hará)
-- La lógica de datos (buildServiceRows, formatTime, formatDate, escapeHtml, etc.) se mantiene sin cambios
-- El MJML se construye como template literal: `const mjmlTemplate = \`<mjml>...\`; const { html } = mjml2html(mjmlTemplate).html;`
-- Si `mjml2html` lanza error de compilación, capturarlo y lanzar error descriptivo (no silenciar)
-- Fondo: `#ffffff` (claro), tipografía simple, sin CSS moderno ni JavaScript
-- Compatibilidad: probar viewport móvil y outlook desktop antes de mergear
+**Sandbox de iframe:**
+```html
+<iframe
+  [src]="complement.baseUrl | safe"
+  sandbox="allow-scripts allow-same-origin allow-forms"
+  referrerpolicy="no-referrer"
+  loading="lazy">
+</iframe>
+```
 
-### B44 - Reporte de turno: estado REPARADO (amarillo) en celda de salida
+**Restricciones de Seguridad:**
+- iframe con `sandbox` restrictivo: NO `allow-top-navigation`, NO `allow-popups` (previene redirecciones y ventanas maliciosas).
+- `postMessage` valida `event.origin` contra `complement.baseUrl` registrada; mensajes de orígenes no registrados se descartan silenciosamente.
+- El token enviado al iframe **no** es el JWT del usuario; es un short-lived context token con TTL de 5 minutos.
+- El iframe no puede acceder al DOM padre ni a cookies de la Bitácora.
+- `baseUrl` validada al registrar el complemento: bloqueo de loopback/redes privadas y forzar `https://` en producción (mismas reglas anti-SSRF de `SECURITY.md`).
 
-**Alcance estricto:** Solo aplica a `backend/src/utils/shift-report.js`, función `generateReportHTML()`. Ningún otro correo, controlador ni módulo debe modificarse.
+**Criterios de Aceptación de Arquitectura:**
+1. Componente `ComplementContainerComponent` creado con `@Input() complement`.
+2. `MainLayoutComponent` carga links dinámicos en sidebar desde `GET /api/complements/active`.
+3. Si Circuit Breaker está OPEN, el contenedor muestra badge de mantenimiento en lugar del iframe.
+4. Admin Console de complementos sigue el mismo patrón visual de `Admin > Integraciones SIEM/SOAR/NDR`.
+5. `postMessage` handler registrado en `ngOnInit` con validación de origin y cleanup en `ngOnDestroy`.
 
-**Lógica de negocio:**
-- La comparación se hace por servicio, usando `buildServiceRows()` que ya empareja `row.entry` y `row.exit` por `serviceId`
-- Antes de comparar estados, validar si checklist de inicio y cierre son la misma plantilla/checklist (prioridad: mismo `checklistId/templateId`; fallback: mismo nombre normalizado)
-- Condición REPARADO: `row.exit.status === 'verde'` **y** `row.entry.status === 'rojo'`
-- Condición ERROR: `row.exit.status === 'rojo'` (sin importar el estado de entrada)
-- El estado REPARADO solo puede aparecer en la columna **Salida**, nunca en Entrada
-- Si solo existe checklist de salida (sin entrada), NO aplica REPARADO — mostrar el estado normal de salida
-- Si inicio y cierre pertenecen a plantillas/checklists distintos, NO aplica REPARADO: se muestran como registros separados (ejemplo: servicio X rojo en inicio se mantiene rojo con su observación; servicio Y verde en cierre se mantiene verde)
+### COMP-004 - Circuit Breaker para Microservicios
+
+**Descripción técnica:**
+Implementar patrón Circuit Breaker para aislar visualmente complementos con errores sin afectar el Core de la Bitácora. Si un microservicio tarda más de 3 segundos o devuelve errores 5xx, el sistema lo marca como "En Mantenimiento" y deja de intentar cargarlo hasta que se recupere.
+
+**Estados del Circuit Breaker:**
+
+| Estado | Condición de Entrada | Comportamiento UI | Comportamiento API |
+|--------|---------------------|-------------------|-----------|
+| **CLOSED** | Normal (< 3 fallos consecutivos) | iframe carga `baseUrl` normalmente | API Interna acepta requests del complemento |
+| **OPEN** | ≥ 3 fallos en 60s **ó** timeout > 3s | iframe reemplazado por badge: `🔧 En mantenimiento` | API Interna rechaza requests con 503 |
+| **HALF-OPEN** | 30s después de OPEN | Se intenta 1 request de health-check al microservicio | Si éxito → CLOSED. Si fallo → OPEN |
+
+**Implementación Backend:**
+```javascript
+// Estado por complemento (en memoria, no persistido)
+const circuitState = {
+  slug: 'pentesting-scanner',
+  state: 'CLOSED',      // CLOSED | OPEN | HALF_OPEN
+  failCount: 0,
+  lastFailure: null,
+  lastCheck: null
+};
+```
+
+**Configuración sugerida (variables de entorno):**
+- `COMPLEMENT_CIRCUIT_TIMEOUT_MS=3000` (timeout de request)
+- `COMPLEMENT_CIRCUIT_FAIL_THRESHOLD=3` (fallos para abrir)
+- `COMPLEMENT_CIRCUIT_RESET_MS=30000` (tiempo antes de HALF-OPEN)
+
+**Eventos de auditoría:**
+
+| Namespace | Acción | Nivel | Metadata |
+|-----------|--------|-------|----------|
+| `complement.circuit` | `.open` | warn | `{slug, reason, failCount, lastError}` |
+| `complement.circuit` | `.half_open` | info | `{slug, checkUrl}` |
+| `complement.circuit` | `.close` | info | `{slug, recoveredAfterMs}` |
+
+**Restricciones de Seguridad:**
+- El estado del circuit breaker se almacena **en memoria** (no en DB); se resetea con reinicio del backend.
+- Un complemento en estado OPEN no puede hacer requests a la API Interna (previene cascada de errores).
+- Transición a OPEN genera evento de auditoría `complement.circuit.open` con detalles del fallo.
+
+**Criterios de Aceptación de Arquitectura:**
+1. **No-Impact Design**: Si un microservicio falla, el Core **NUNCA** se degrada. Solo ese complemento se muestra como "En Mantenimiento". Sidebar, checklist, entradas y todo lo demás funcionan con normalidad.
+2. Frontend: `ComplementContainerComponent` consulta estado del circuit breaker y renderiza badge si OPEN.
+3. Backend: health-check periódico (cada 30s) intenta transición HALF-OPEN → CLOSED.
+4. Auditoría: todas las transiciones de estado registradas como eventos `complement.circuit.*`.
+5. Config externalizada: los 3 parámetros del circuit breaker son variables de entorno, no hardcodeados.
+
+### COMP-005 - Application Token y Scopes Granulares
+
+**Descripción técnica:**
+Implementar sistema de tokens de aplicación independiente del JWT de usuario, con scopes granulares y colecciones autorizadas. Cada complemento recibe su propio token firmado con un secret dedicado.
+
+**Estructura del Application Token:**
+```json
+{
+  "iss": "bitacora-core",
+  "sub": "complement:pentesting-scanner",
+  "slug": "pentesting-scanner",
+  "scopes": ["READ_LOGS", "WRITE_STORAGE"],
+  "allowedCollections": ["entries", "catalog_log_sources"],
+  "iat": 1704067200,
+  "exp": 1704153600
+}
+```
+
+**Scopes disponibles:**
+
+| Scope | Permite | Restricción |
+|-------|---------|-------------|
+| `READ_LOGS` | Leer entradas y logs filtrados | Solo colecciones autorizadas por admin |
+| `WRITE_ENTRIES` | Crear entradas vinculadas al complemento | Marcadas con `ownerComplementId` automáticamente |
+| `WRITE_STORAGE` | Escribir en colección "Shared" | Solo bajo su propio `complementId` |
+| `READ_STORAGE` | Leer datos propios en "Shared" | Filtrado por `complementId` automático |
+| `READ_CONTEXT` | Obtener turno/analista activo | Solo lectura, sin PII sensible |
+
+**Restricciones de Seguridad:**
+- `COMPLEMENT_TOKEN_SECRET` es un secret **diferente** a `JWT_SECRET` (generado con `openssl rand -base64 32`).
+- Tokens tienen TTL configurable (max 24h) y se regeneran automáticamente al vencer.
+- Revocación inmediata: al ejecutar `DELETE` de un complemento, su token se invalida al eliminarse el `tokenHash` del modelo.
+- El middleware `complementAuth.js` verifica: firma, expiración, que el `slug` existe y está activo, y que los scopes requeridos están presentes.
+- No se permiten wildcards en `allowedCollections`; cada colección debe ser autorizada explícitamente por el Admin.
+
+**Criterios de Aceptación de Arquitectura:**
+1. Modelo `Complement` incluye campo `tokenHash` (hash SHA-256 del último token emitido).
+2. Admin puede ver scopes activos y revocar/regenerar token desde la UI de gestión.
+3. Middleware `complementAuth.js` verifica: firma, expiración, slug activo, scopes requeridos.
+4. Log: todo acceso denegado por scope se audita como `complement.api.denied` con metadata completa.
+5. Secret `COMPLEMENT_TOKEN_SECRET` documentado en `DEPLOY.md` y `SECURITY.md` con instrucciones de generación.
+
+### COMP-DOC - Archivos de `/docs` que Requieren Actualización
+
+**Descripción:** Al implementar el Módulo de Complementos, los siguientes archivos de documentación deben actualizarse para que el módulo sea parte oficial del estándar de BitacoraSOC:
+
+| Archivo | Qué se agrega | Prioridad |
+|---------|---------------|-----------|
+| `ARCHITECTURE.md` | Nuevo diagrama Mermaid del Orquestador + subgrafo de Complementos integrado al mapa conceptual. Nuevo nodo `🧩 Complementos` en el mapa de módulos admin. Flujo `sequenceDiagram` para comunicación Microservicio ↔ API Interna. | **CRÍTICA** |
+| `API.md` | Nueva sección **"API Interna (Complementos)"** con tabla de endpoints `/api/internal/v1/*`, autenticación por Application Token, schemas y ejemplo cURL. Sección **"Complementos (Admin)"** con CRUD. | **CRÍTICA** |
+| `SECURITY.md` | Sección **"Aislamiento de Complementos"**: Application Tokens, Scopes, sandbox de red, iframe sandbox. Actualizar checklist pre-producción. Sección **"Respuesta a Complement Comprometido"** en Incidentes. | **CRÍTICA** |
+| `LOGGING.md` | 10 nuevos namespaces de auditoría: `complement.install`, `complement.delete`, `complement.wipe.*`, `complement.api.*`, `complement.circuit.*`. Trail forense del Wipe Out. | **ALTA** |
+| `DEPLOY.md` | Variables de entorno: `COMPLEMENT_TOKEN_SECRET`, `COMPLEMENT_CIRCUIT_TIMEOUT_MS`, `COMPLEMENT_MAX_DBS`. Docker network aislada `bitacora-complements`. | **MEDIA** |
+| `BACKUP.md` | Aclaración: backup general **NO incluye** DBs privadas de complementos. Responsabilidad del microservicio. Impacto del Wipe Out en backups. | **MEDIA** |
+| `RUNBOOK.md` | Nuevo rol Admin: gestión de complementos. Troubleshooting para estado "Mantenimiento" de un complemento. | **BAJA** |
+
+### COMP-006 - Shared Types & Contracts (Esquema JSON Compartido)
+
+**Descripción técnica:**
+BitacoraSOC no posee contratos de datos compartidos entre capas. El backend define 30 modelos Mongoose en JavaScript puro (`backend/src/models/*.js`), mientras que el frontend mantiene 12 archivos TypeScript locales (`frontend/src/app/models/*.model.ts`). No existe un paquete de tipos compartidos ni un esquema JSON unificado. Cuando se agreguen microservicios de complementos, cada uno tendría que duplicar las interfaces del Core para comunicarse, creando un riesgo alto de desincronización.
+
+**Hallazgo de Auditoría de Código:**
+
+| Capa | Archivos | Lenguaje | Tipado |
+|------|----------|----------|--------|
+| Backend | 30 modelos en `backend/src/models/` | JavaScript (ES6) | Mongoose Schema (runtime) |
+| Frontend | 12 modelos en `frontend/src/app/models/` | TypeScript | Interfaces locales |
+| Microservicios | (no existen aún) | (por definir) | (nada compartido) |
+
+**Problema concreto:**
+- Si el Core cambia el schema de `Entry` (agrega campo `ownerComplementId`), el microservicio no se entera hasta que falla en runtime.
+- Si el frontend agrega una interfaz `Complement` en `models/`, el backend no tiene equivalente validado.
+- Cero interfaces `.interface.ts` encontradas en el frontend — todo son `.model.ts` acoplados a la UI.
+
+**Solución propuesta:**
+1. **JSON Schema como fuente de verdad**: Crear carpeta `shared/schemas/` en raíz del repositorio con archivos `.schema.json` para cada entidad compartida (`complement.schema.json`, `internal-api-context.schema.json`, `complement-event.schema.json`).
+2. **Generación automática**: Usar `json-schema-to-typescript` para generar interfaces TS desde los schemas, y validación con `ajv` en backend.
+3. **Paquete npm local** (alternativa futura): Si el proyecto crece, mover a workspace npm con `shared-types` como paquete interno.
+
+**Estructura propuesta:**
+```
+BitacoraSOC/
+├── shared/
+│   └── schemas/
+│       ├── complement.schema.json        # Modelo Complement (slug, baseUrl, scopes...)
+│       ├── complement-context.schema.json # Payload de /api/internal/v1/context
+│       ├── complement-event.schema.json   # Eventos postMessage (type, payload)
+│       └── README.md                      # Documentación del contrato
+├── backend/
+│   └── src/models/Complement.js           # Mongoose schema (consume JSON Schema)
+└── frontend/
+    └── src/app/models/complement.model.ts # Generado desde JSON Schema
+```
+
+**Restricciones de Seguridad:**
+- Los schemas NO exponen campos internos del Core (`passwordHash`, `jwtSecret`, etc.)
+- Solo se comparten las interfaces de la API Interna, no los modelos completos de Mongoose.
+- Los schemas se versionan junto con la API Interna (`v1/complement.schema.json`).
+
+**Criterios de Aceptación de Arquitectura:**
+1. Carpeta `shared/schemas/` creada con al menos 3 JSON Schemas.
+2. Backend valida payloads entrantes de la API Interna contra el schema con `ajv`.
+3. Frontend tiene interfaces TypeScript generadas (o manuales) que coinciden con los schemas.
+4. Un cambio en el schema se detecta en CI/CD (validación de compatibilidad).
+5. Los microservicios de complementos pueden importar los schemas directamente.
+
+### COMP-007 - Bus de Eventos para State Sync (Core ↔ Iframe)
+
+**Descripción técnica:**
+Actualmente `MainLayoutComponent` en `frontend/src/app/pages/main/main-layout.component.ts` gestiona estado local con `Subject<void>` (destroy), `Subject<string>` (notas) y consultas HTTP directas a servicios. No existe ningún mecanismo para notificar a iframes de complementos cuando cambia el contexto operativo. Si el analista N1 cambia de turno, cierra un checklist o cambia de cliente, el complemento sigue mostrando datos antiguos.
+
+**Problema concreto con el código actual:**
+- `MainLayoutComponent` (línea 40-60) tiene `currentUser`, `isAdmin`, `activeChecklist` como propiedades locales.
+- `WorkShiftService.getCurrentShift()` se llama desde el componente, pero el resultado no se emite hacia ningún bus compartido.
+- El iframe del complemento NO tiene acceso a estos servicios Angular — está en un sandbox aislado.
+
+**Solución propuesta — Protocolo `postMessage` tipado:**
+
+```typescript
+// Protocolo de eventos Core → Complemento (outbound)
+interface BitacoraEvent {
+  type: 'CONTEXT_UPDATE' | 'SHIFT_CHANGE' | 'USER_CHANGE' | 'THEME_CHANGE' | 'CHECKLIST_SUBMITTED';
+  version: 1;
+  payload: ContextPayload | ShiftPayload | ThemePayload;
+  timestamp: number;
+}
+
+interface ContextPayload {
+  shiftId: string;
+  shiftName: string;
+  analystUsername: string;
+  clientId?: string;
+  clientName?: string;
+}
+
+// Protocolo de eventos Complemento → Core (inbound)
+interface ComplementEvent {
+  type: 'REQUEST_CONTEXT' | 'CREATE_ENTRY' | 'NOTIFY_ERROR';
+  version: 1;
+  slug: string;  // Identificador del complemento que envía
+  payload: any;
+}
+```
 
 **Implementación sugerida:**
-1. Crear función `renderExitCell(exitService, entryService)` en el mismo archivo, a continuación de `renderStatusCell()`
-2. La función evalúa la condición y retorna:
-   - REPARADO: badge amarillo (`#f57f17`) con texto `REPARADO` + nota `⚠ Fue ERROR en entrada`; observación de salida solo si existe
-   - Cualquier otro caso: delegar a `renderStatusCell(exitService)` sin cambios
-3. En el `forEach` de `serviceRows`, usar `renderExitCell(row.exit, row.entry)` para la columna de Salida y mantener `renderStatusCell(row.entry)` para la de Entrada
-4. No modificar `renderStatusCell()` ni ninguna otra función existente
+1. **Servicio Angular `ComplementBridgeService`**: Singleton que escucha `window.addEventListener('message', ...)` y despacha eventos a los iframes registrados.
+2. **Registro de iframes**: Al cargar un `ComplementContainerComponent`, registra su `contentWindow` en el bridge.
+3. **Emisión reactiva**: Cuando `WorkShiftService.getCurrentShift()` detecta cambio de turno, el bridge emite `SHIFT_CHANGE` a todos los iframes.
+4. **Validación de origin**: Solo se procesan mensajes cuyo `event.origin` coincida con el `baseUrl` registrado del complemento.
+5. **Debounce**: Eventos rápidos (ej. cambio de tema) se agrupan con `debounceTime(300ms)` antes de enviar.
+
+**Diagrama de flujo:**
+```
+┌──────────────┐    postMessage     ┌──────────────────┐
+│ Angular Core │ ───────────────→  │ Iframe Complement │
+│              │                    │                  │
+│ ShiftService │  SHIFT_CHANGE      │  onMessage()     │
+│ AuthService  │  USER_CHANGE       │  updateContext() │
+│ ThemeService │  THEME_CHANGE      │  re-render()     │
+│              │ ←───────────────── │                  │
+│              │  REQUEST_CONTEXT   │  requestData()   │
+└──────────────┘                    └──────────────────┘
+```
+
+**Restricciones de Seguridad:**
+- Validación estricta de `event.origin` contra `complement.baseUrl` registrada.
+- El Core NUNCA envía JWT ni tokens de usuario por postMessage; solo context tokens de corta vida.
+- Los eventos `ComplementEvent` inbound se validan contra el JSON Schema de `complement-event.schema.json`.
+- Si un iframe envía más de 100 mensajes en 10 segundos, se desconecta del bridge y se registra como `complement.api.flood`.
+
+**Criterios de Aceptación de Arquitectura:**
+1. `ComplementBridgeService` creado como `providedIn: 'root'` con registro/desregistro de iframes.
+2. Eventos tipados con `BitacoraEvent` interface y validación de `version` para compatibilidad futura.
+3. Cambio de turno en `WorkShiftService` dispara `SHIFT_CHANGE` a todos los iframes activos en < 500ms.
+4. Eventos inbound del complemento se validan por origin y rate-limit antes de procesarse.
+5. Si el complemento envía `REQUEST_CONTEXT`, el Core responde con el contexto actual sin re-consultar la API.
+
+### COMP-008 - Orquestación Docker y Redes Aisladas
+
+**Descripción técnica:**
+El `docker-compose.yml` actual define 3 servicios (`mongodb`, `backend`, `frontend`) en una única red `bitacora-network` tipo `bridge`. Para integrar microservicios de complementos, se necesita una red aislada que permita a los complementos comunicarse exclusivamente con el backend, sin acceso directo a MongoDB ni al frontend.
+
+**Estado actual del `docker-compose.yml`:**
+```yaml
+# Servicios actuales: mongodb, backend, frontend
+# Red actual: bitacora-network (bridge, única)
+# Puertos expuestos: 3000 (backend), 80/443 (frontend)
+# Sin network isolation para servicios externos
+```
+
+**Problema concreto:**
+- Un microservicio de complemento en la misma `bitacora-network` podría conectarse directamente a `mongodb:27017` (bypass total de la API Interna).
+- No existe `docker-compose.override.yml` ni `docker-compose.complements.yml` para separar servicios opcionales.
+- No hay variables de entorno para configurar la cantidad máxima de complementos ni límites de recursos.
+
+**Solución propuesta — docker-compose multi-network:**
+
+```yaml
+# docker-compose.complements.yml (archivo separado, se levanta con -f)
+services:
+  complement-example:
+    image: ${COMPLEMENT_EXAMPLE_IMAGE:-ghcr.io/org/complement-example:latest}
+    container_name: bitacora-complement-example
+    restart: unless-stopped
+    environment:
+      BITACORA_API_URL: http://backend:3000/api/internal/v1
+      COMPLEMENT_TOKEN: ${COMPLEMENT_EXAMPLE_TOKEN}
+      COMPLEMENT_SLUG: example-scanner
+      MONGODB_URI: mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD}@mongodb:27017/bitacora_ext_example?authSource=admin
+    networks:
+      - bitacora-complements   # Solo acceso a esta red
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+networks:
+  bitacora-complements:
+    driver: bridge
+    internal: false   # Permite salida a internet si es necesario
+```
+
+**Modificación al `docker-compose.yml` principal:**
+```yaml
+# Agregar al servicio backend:
+  backend:
+    networks:
+      - bitacora-network
+      - bitacora-complements  # Backend accesible desde ambas redes
+
+# Agregar al servicio mongodb:
+  mongodb:
+    networks:
+      - bitacora-network
+      - bitacora-complements  # Complementos con DB propia necesitan acceso
+
+# Agregar red:
+networks:
+  bitacora-network:
+    driver: bridge
+  bitacora-complements:
+    driver: bridge
+```
+
+**Variables de entorno nuevas para `.env`:**
+```bash
+# Complementos
+COMPLEMENT_TOKEN_SECRET=          # openssl rand -base64 32
+COMPLEMENT_MAX_DBS=5              # Máximo de DBs privadas permitidas
+COMPLEMENT_CIRCUIT_TIMEOUT_MS=3000
+COMPLEMENT_CIRCUIT_FAIL_THRESHOLD=3
+COMPLEMENT_CIRCUIT_RESET_MS=30000
+```
+
+**Restricciones de Seguridad:**
+- Los complementos **no** tienen acceso directo al servicio `frontend`.
+- El backend es el único puente entre ambas redes (actúa como API Gateway).
+- Cada contenedor de complemento tiene límites de recursos (`memory: 512M`, `cpus: 0.5`) para prevenir DoS.
+- MongoDB permite conexión de complementos solo a bases `bitacora_ext_*` (usuario dedicado con permisos limitados).
+
+**Criterios de Aceptación de Arquitectura:**
+1. Archivo `docker-compose.complements.yml` creado como overlay separado del principal.
+2. Comando de despliegue: `docker compose -f docker-compose.yml -f docker-compose.complements.yml up -d`.
+3. Red `bitacora-complements` creada y aislada del frontend.
+4. Backend conectado a ambas redes; complementos solo a `bitacora-complements`.
+5. Variables de entorno documentadas en `DEPLOY.md` con valores por defecto seguros.
+6. Scripts `compose-rebuild.ps1` y `compose-rebuild.sh` actualizados para incluir el overlay.
+
+### COMP-009 - Logging Centralizado de Microservicios
+
+**Descripción técnica:**
+El sistema de logging actual (documentado en `LOGGING.md`) opera en 3 capas: pino a stdout, AuditLog a MongoDB, y forwarding a SIEM. Pero las 3 capas solo cubren los logs del backend Core. Cuando un microservicio de complemento falle, su log quedará atrapado dentro de su propio contenedor Docker — invisible desde la Bitácora.
+
+**Estado actual de observabilidad:**
+
+| Capa | Alcance Actual | Limitación para Complementos |
+|------|---------------|------------------------------|
+| pino (stdout) | Solo `bitacora-backend` | Complementos escriben a su propio stdout |
+| AuditLog (MongoDB) | Colección `auditlogs` en BD General | Complementos no tienen acceso de escritura |
+| SIEM Forwarding | Solo eventos del Core | Complementos no envían a SIEM |
+
+**Solución propuesta — Logging Bridge via API Interna:**
+
+```javascript
+// Nuevo endpoint en API Interna v1
+// POST /api/internal/v1/log
+// Scope requerido: WRITE_LOGS (nuevo scope)
+{
+  "level": "error",
+  "event": "complement.scanner.scan_failed",
+  "message": "Timeout al escanear host 10.0.0.5",
+  "metadata": {
+    "targetHost": "10.0.0.5",
+    "timeoutMs": 5000,
+    "scanType": "vulnerability"
+  }
+}
+```
+
+**Flujo de logs centralizado:**
+```
+┌─────────────────┐   POST /log     ┌──────────────┐
+│ Microservicio   │ ──────────────→ │ Backend Core │
+│ (complement)    │                  │              │
+│ pino local      │                  │ ┌──────────┐ │    ┌──────┐
+│ stdout (propio) │                  │ │ AuditLog │──────→│ SIEM │
+└─────────────────┘                  │ └──────────┘ │    └──────┘
+                                     │              │
+                                     │ Admin UI:    │
+                                     │ /audit-logs  │
+                                     │ filtro: slug │
+                                     └──────────────┘
+```
+
+**Implementación en la UI Admin:**
+1. Extender la vista `/main/admin/audit-logs` con filtro por `source: 'complement:<slug>'`.
+2. Nuevo sub-tab: **"Logs de Complementos"** que muestre solo eventos con namespace `complement.*`.
+3. Badge de error en sidebar cuando haya errores recientes de un complemento.
+
+**Restricciones de Seguridad:**
+- Rate-limit específico para `/api/internal/v1/log`: 50 requests/minuto por token (previene flood de logs).
+- Metadata se trunca a 10KB (mismo límite que AuditLog existente).
+- El campo `event` del complemento se prefixa automáticamente con `complement.<slug>.` para evitar colisión con namespaces del Core.
+- Logs del complemento se marcan como `source: 'complement'` y no pueden falsificar `source: 'core'`.
+
+**Criterios de Aceptación de Arquitectura:**
+1. Endpoint `POST /api/internal/v1/log` creado con scope `WRITE_LOGS`.
+2. Logs del complemento se persisten en la colección `auditlogs` con TTL idéntico al Core (90 días).
+3. Logs se forwardean a SIEM si forwarding está habilitado, con campo `source: 'complement:<slug>'`.
+4. UI Admin permite filtrar por complemento en la vista de auditoría.
+5. Documentado en `LOGGING.md` bajo nueva sección "Logs de Complementos".
+
+### COMP-010 - Versionamiento de API Interna (Compatibilidad)
+
+**Descripción técnica:**
+Si se actualiza el Core de la Bitácora (ej. se agrega un campo obligatorio en el contexto de turno), los microservicios que usan la versión anterior de la API deben seguir funcionando. Actualmente, ninguna ruta de la Bitácora tiene prefijo de versión (`/api/entries`, no `/api/v1/entries`). La API Interna propuesta ya usa `/api/internal/v1/`, pero falta el protocolo de deprecación, negociación de versiones y headers de compatibilidad.
+
+**Estado actual del RouterMap:**
+```
+/api/auth/*        → Sin versión
+/api/entries/*     → Sin versión
+/api/checklist/*   → Sin versión
+/api/internal/v1/* → Con versión (PROPUESTO, aún no implementado)
+```
+
+**Solución propuesta — Versionamiento Semántico de API Interna:**
+
+1. **Convención de rutas**: `/api/internal/v{major}/` — solo se incrementa major si hay breaking changes.
+2. **Coexistencia**: Al crear `v2`, se mantiene `v1` operativo durante al menos 2 releases del Core.
+3. **Deprecation Headers**: Cuando un complemento hace request a `v1` y ya existe `v2`:
+   ```
+   HTTP/1.1 200 OK
+   Deprecation: true
+   Sunset: Sat, 01 Jan 2027 00:00:00 GMT
+   Link: </api/internal/v2/context>; rel="successor-version"
+   X-API-Version: v1
+   X-API-Latest: v2
+   ```
+4. **Registro de versión en modelo `Complement`**: Campo `apiVersion: 'v1'` para saber qué versión usa cada complemento.
+5. **Endpoint de discovery**: `GET /api/internal/versions` retorna las versiones disponibles y su estado.
+
+**Negociación de versión:**
+```json
+// GET /api/internal/versions
+{
+  "versions": [
+    { "version": "v1", "status": "current", "sunset": null },
+    { "version": "v2", "status": "beta", "sunset": null }
+  ],
+  "latest": "v1"
+}
+```
+
+**Restricciones de Seguridad:**
+- Un complemento no puede auto-upgradear su `apiVersion`; solo Admin lo hace desde la consola.
+- Las rutas deprecadas se auditan con `complement.api.deprecated_access` para monitorear adopción.
+- Al alcanzar la fecha `Sunset`, las rutas `v1` retornan 410 Gone en lugar de 404.
+
+**Criterios de Aceptación de Arquitectura:**
+1. Estructura de archivos: `backend/src/routes/internal/v1/*.js`, `backend/src/routes/internal/v2/*.js`.
+2. Middleware de versión inyecta headers `X-API-Version` y `Deprecation` automáticamente.
+3. Endpoint `GET /api/internal/versions` operativo y documentado en `API.md`.
+4. Modelo `Complement` incluye campo `apiVersion` con valor por defecto `'v1'`.
+5. Logs de acceso a versiones deprecadas auditados para planificar sunset.
+
+### COMP-011 - Mocks de Complementos para Pruebas de Integración
+
+**Descripción técnica:**
+Cuando se prueba la Bitácora en desarrollo o CI/CD, no se pueden tener 10 microservicios reales corriendo. Se necesita un microservicio mock (`complement-stub`) que simule las interacciones de un complemento real: responder a health-checks, consumir la API Interna, servir un iframe de prueba, y recibir hooks de cleanup del Wipe Out.
+
+**Problema concreto:**
+- Sin mocks, los desarrolladores no pueden probar: Circuit Breaker (necesita fallos simulados), State Sync (necesita un iframe receptor), Wipe Out (necesita un `/hook/cleanup` endpoint), ni la consola de Admin.
+- No existe infraestructura de test E2E que incluya un complemento.
+
+**Solución propuesta — `complement-stub` (microservicio Node.js mínimo):**
+
+```javascript
+// complement-stub/server.js
+const express = require('express');
+const app = express();
+
+// === Health Check ===
+app.get('/health', (req, res) => {
+  if (process.env.SIMULATE_FAILURE === 'true') {
+    return res.status(503).json({ status: 'down', reason: 'simulated failure' });
+  }
+  res.json({ status: 'ok', slug: 'test-complement' });
+});
+
+// === Iframe Content (UI de prueba) ===
+app.get('/', (req, res) => {
+  res.send(`
+    <html>
+    <body>
+      <h1>🧩 Complement Stub</h1>
+      <div id="context">Esperando contexto...</div>
+      <script>
+        window.addEventListener('message', (e) => {
+          if (e.data.type === 'CONTEXT_UPDATE') {
+            document.getElementById('context').textContent =
+              JSON.stringify(e.data.payload, null, 2);
+          }
+        });
+        // Solicitar contexto inicial al Core
+        window.parent.postMessage(
+          { type: 'REQUEST_CONTEXT', slug: 'test-complement', version: 1 },
+          '*'
+        );
+      </script>
+    </body>
+    </html>
+  `);
+});
+
+// === Hook de Cleanup (recibe Wipe Out) ===
+app.post('/hook/cleanup', (req, res) => {
+  console.log('[STUB] Cleanup hook received, simulating cleanup...');
+  setTimeout(() => res.json({ cleaned: true }), 500);
+});
+
+// === Test de API Interna (consume endpoints del Core) ===
+app.get('/test-api', async (req, res) => {
+  const fetch = (await import('node-fetch')).default;
+  try {
+    const response = await fetch(
+      `${process.env.BITACORA_API_URL}/context`,
+      { headers: { 'Authorization': `Bearer ${process.env.COMPLEMENT_TOKEN}` } }
+    );
+    const data = await response.json();
+    res.json({ coreContext: data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.listen(8080, () => console.log('[STUB] Complement mock running on :8080'));
+```
+
+**Modos de operación (via variables de entorno):**
+
+| Variable | Efecto | Uso |
+|----------|--------|-----|
+| `SIMULATE_FAILURE=true` | Health-check retorna 503 | Probar Circuit Breaker |
+| `SIMULATE_SLOW=true` | Respuestas con delay de 5s | Probar timeout del Circuit Breaker |
+| `SIMULATE_CLEANUP_FAIL=true` | Hook `/cleanup` retorna 500 | Probar Wipe Out con fallo de hook |
+| `COMPLEMENT_TOKEN` | Token de autenticación | Probar API Interna |
+
+**Integración con docker-compose:**
+```yaml
+# docker-compose.test.yml
+services:
+  complement-stub:
+    build: ./tools/complement-stub
+    container_name: bitacora-complement-stub
+    environment:
+      BITACORA_API_URL: http://backend:3000/api/internal/v1
+      COMPLEMENT_TOKEN: ${COMPLEMENT_STUB_TOKEN}
+      SIMULATE_FAILURE: 'false'
+    ports:
+      - "8080:8080"
+    networks:
+      - bitacora-complements
+```
+
+**Restricciones de Seguridad:**
+- El stub **nunca** se despliega en producción (solo en `docker-compose.test.yml`).
+- El token del stub tiene scopes mínimos y expiración corta (1h).
+- El stub no almacena datos persistentes (stateless).
+
+**Criterios de Aceptación de Arquitectura:**
+1. Directorio `tools/complement-stub/` creado con `server.js`, `Dockerfile` y `README.md`.
+2. El stub responde correctamente a: health-check, iframe rendering, hook cleanup, y consulta de API Interna.
+3. Configurable por variables de entorno para simular fallos (Circuit Breaker), lentitud (timeout) y errores de cleanup.
+4. Documentado en `DEPLOY.md` bajo sección "Entorno de Testing con Complementos".
+5. Integrado en `docker-compose.test.yml` como overlay para CI/CD.
 
 ---
