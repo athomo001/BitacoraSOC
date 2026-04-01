@@ -16,6 +16,8 @@
 | MAIL-AUDIT-015 | Pendiente | Email / Observabilidad ALTA | Error `❌ [CORREO] Para: sin destinatarios` sin contexto diagnóstico | Hallazgo operativo: en auditoría se observan múltiples WARN/ERROR de correo con texto genérico `Para: sin destinatarios`, sin identificar origen exacto (módulo, turno/checklist, trigger, destinatarios calculados, config SMTP). Se requiere enriquecer metadata y razón visible para identificar por qué falla y desde qué flujo se dispara. |
 | BACKUP-AUTO-016 | Pendiente | Backup / Operación ALTA | Backup automático no se ejecuta según intervalo configurado | Hallazgo operativo: con backups automáticos habilitados (`cada 7 días`) no aparecen ejecuciones automáticas en historial aun habiendo transcurrido más de 9 días; solo se observan backups manuales. Se debe validar scheduler, persistencia de última ejecución y timezone/frecuencia real del job. |
 | BACKUP-RET-017 | Pendiente | Backup / Operación ALTA | Retención de backups no elimina archivos al superar 7 días | Hallazgo operativo: se configuró retención local en `7 días`, pero permanecen backups antiguos sin depuración automática. Se debe validar criterio de antigüedad, origen de fecha usada para purge, ejecución efectiva de cleanup y trazabilidad de eliminaciones/skips. |
+| B46 | Pendiente | UI/UX + Seguridad Preventiva / Frontend MEDIA | Textarea de entradas permite escribir más de 50000 caracteres | Revisión confirmada: el formulario principal y el diálogo de edición muestran contador `x/50000` y usan `Validators.maxLength(50000)` en Angular, mientras backend (`Entry.maxlength=50000`) rechaza el exceso al guardar. Sin embargo, los `textarea` siguen aceptando escritura/pegado por encima del límite porque no tienen atributo `maxlength` ni recorte defensivo en entrada. Se debe limitar la escritura a `50000` también en UI para evitar consumo innecesario de memoria y payloads gigantes antes del submit. |
+| B47 | Pendiente | UI/UX + Accesibilidad / Frontend MEDIA | Heatmap en temas light/sepia/pastel no muestra bien el número de entradas | Hallazgo visual: en el mapa de calor de reportes, los temas claros (`light`, `sepia`, `pastel`) usan escalas con tonos bajos muy pálidos (`--heatmap-low`, `--heatmap-low-mid`) y el componente `ngx-charts-heat-map` no define una estrategia explícita de contraste para el texto dentro de cada celda. Resultado: el número de entradas se pierde o cuesta leerlo en varias celdas por similitud de color/transparencia entre fondo y etiqueta. |
 | B34 | Pendiente | Operación/Alertas | Alerta por ítems NOK (Rojo) en Checklist | Añadir switch en config global para activar/desactivar alerta por ítems en rojo. Agregar selector de cargo (ej. N2) a notificar. Al guardar el checklist, si el analista marca ítems NOK (rojo), enviar email automático a todos los usuarios del cargo seleccionado incluyendo el detalle/observación ingresada por el analista. |
 | SEC-HIGH-009 | Pendiente | Seguridad ALTA | Riesgo de Regex Injection / ReDoS en búsquedas de catálogo y tags (NoSQL) | Hallazgo QA: existen regex construidas directo desde input sin escape (`new RegExp(search, 'i')`, `new RegExp('^' + q, 'i')`, `$regex` con `topic` sin escapar) en rutas autenticadas/admin. Un patrón malicioso puede disparar backtracking costoso y degradar el backend (DoS lógico). Archivos detectados: `backend/src/routes/admin-catalog.js`, `backend/src/routes/tags.js`, `backend/src/routes/entries.js`, `backend/src/controllers/escalationController.js`. |
 | SEC-HIGH-010 | Pendiente | Seguridad ALTA | OWASP A10 SSRF: URLs salientes configurables sin allowlist en integraciones | Hallazgo QA: endpoints de integración permiten destinos salientes controlados por configuración (`GLPI api.baseUrl` y `logging http.url`) sin validación estricta de red interna/loopback/protocolos. Riesgo: Server-Side Request Forgery desde backend hacia servicios internos/metadatos si una cuenta admin se compromete. Archivos detectados: `backend/src/routes/glpi.js`, `backend/src/routes/logging.js`, `backend/src/utils/logForwarder.js`. |
@@ -36,60 +38,8 @@
 
 | ID | Estado | Seccion | Tarea | Notas |
 | --- | --- | --- | --- | --- |
-| INFRA-NODE-ALL | Listo | Infraestructura / Seguridad CRÍTICA | Upgrade Completo y Pruebas a Node 24 LTS | Se migraron las imágenes Docker a `node:24-alpine`. Mongoose 8 y Bcrypt compilaron sus bindings nativos exitosamente bajo el nuevo musl libc. Webpack de Angular funcionó perfecto. Levantamiento de contenedores estable. |
-| B-CRÍTICO-001 | Listo | Bugs CRÍTICO | Emails no llegan en cierre checklist | Corregido y validado. |
-| SEC-CRIT-001 | Listo | Seguridad CRÍTICA | Exposición de credenciales SMTP en `/api/config` | Respuesta sanitizada y endpoints sensibles restringidos. |
-| SEC-CRIT-002 | Listo | Seguridad CRÍTICA | Recuperación de contraseña vulnerable | Link seguro y sin fuga de token en respuesta. |
-| SEC-CRIT-003 | Listo | Seguridad CRÍTICA | Refresh indefinido de JWT expirados | Corregido. |
-| SEC-CRIT-004 | Listo | Seguridad CRÍTICA | RBAC incompleto para `guest` | Endpoints críticos endurecidos. |
-| SEC-CRIT-005 | Listo | Seguridad CRÍTICA | Anti brute-force login | Rate-limits aplicados en auth. |
-| SEC-HIGH-006 | Listo | Seguridad ALTA | Credenciales por defecto débiles | Eliminadas del flujo principal. |
-| SEC-HIGH-007 | Listo | Seguridad ALTA | Riesgo de robo JWT por XSS | Sesión en cookie `HttpOnly` y ajuste de flujo auth. |
-| SEC-HIGH-008 | Listo | Seguridad ALTA | Path Traversal en backups | Validación estricta de filename/ruta. |
-| B5 | Listo | Bugs CRÍTICO | Acceso a rutas sin autenticación | Rutas críticas protegidas. |
-| B6 | Listo | UI/UX | Dark mode contraste | Refactor con tokens y mejoras de legibilidad. |
-| B8 | Listo | Mejoras | Edición admin de entradas | Implementado con whitelist + auditoría. |
-| B9 | Listo | Mejoras | Checklist por tipo/turno | Implementado en backend + UI. |
-| B10 | Listo | Mejoras | Branding favicon configurable | Implementado con endpoints y UI. |
-| B11 | Listo | Mejoras | Auditoría de correo y acciones | Eventos y filtros ampliados. |
-| B12 | Listo | Mejoras | Huevo de pascua login | Implementado. |
-| B13 | Listo | Mejoras | Huevo de pascua por hashtag | Implementado. |
-| B15 | Listo | Bugs | Compatibilidad visual correo HTML | Ajustado para clientes dark/light. |
-| B16 | Listo | Seguridad/Arquitectura | Auditoría avanzada | Implementado según alcance actual. |
-| B18 | Listo | Integraciones | Módulo general de integraciones | Implementado en consola admin. |
-| B21 | Listo | Backup/Operación | Backups automáticos + retención | Implementado. |
-| B25 | Listo | UI/UX + Operación | Log Sources/Clientes activos vs inactivos | Implementado. |
-| B27 | Listo | UI/UX + Arquitectura | Consola Admin unificada | Implementado. |
-| B30 | Listo | UI/UX Escalación | `/main/admin/escalation` compacta por meses | Mes actual visible, mes anterior en acordeón e histórico on-demand con filtro backend (`fromDate/toDate/limit`). |
-| B31 | Listo | Arquitectura/Datos Escalación | Fuente única de clientes con `CatalogLogSource` | Escalación unificada a Log Sources habilitados + cascada de limpieza al borrar log source + script de migración. |
-| B32 | Listo | Usuarios/Notificaciones | Campo `cargo` en CRUD de usuarios (base + custom) | Backend/frontend end-to-end con validación, persistencia, edición y columna de cargo en listado. Cargos base: N1, N2, N3, QA Nivel 1/2, Pentester N1/N2, Arquitecto SIEM, CSM, Jefe Área, Gerente Área. |
-| B33 | Listo | Operación/Alertas | Recordatorio simple de escalación interna por cargo | Configuración desde Escalación Interna para seleccionar cargos (ej. N2/N3) y envío diario simple a usuarios activos con esos cargos. |
-| P1 | Listo | Angular 20 | Plan general actualización | Completo. |
-| B29 | Listo | Turnos/Operación | Módulo de Asignación Operativa (usuario ↔ turno) debajo de tabla de turnos | UI implementada. |
-| OPS-ASSIGN-001 | Listo | Frontend/Integración ALTA | Selector de usuarios no funcional en Admin Turnos | Integrado con API. |
-| OPS-ASSIGN-002 | Listo | Backend/API ALTA | No existe API dedicada | Creado CRUD `work-shifts/assignments`. |
-| OPS-ASSIGN-003 | Listo | Modelo de Datos ALTA | Modelo sin recurrencia por días | Creada colección `WorkShiftAssignment`. |
-| OPS-ASSIGN-004 | Listo | Lógica Operativa ALTA | Falta cálculo de estado `EN TURNO / FUERA DE TURNO` | Implementado estado local y remoto. |
-| OPS-ASSIGN-005 | Listo | Frontend/Arquitectura MEDIA | Refresco en vivo con observable | Implementado `interval(60000)`. |
-| OPS-ASSIGN-006 | Listo | Frontend/Calidad MEDIA | Lógica duplicada de comparación | Creado `shift-time.util.ts`. |
-| OPS-ASSIGN-007 | Listo | Backend/Validaciones ALTA | Reglas anti-solapamiento de asignaciones | Validación robustecida en POST/PUT backend. |
-| OPS-ASSIGN-008 | Listo | Backend/Timezone ALTA | Ignora timezone del turno | Refactor a `get/current` con `moment-timezone`. |
-| OPS-ASSIGN-010 | Listo | UI/UX + Datos MEDIA | Columna "Asignado a" desactualizada | Resumen adaptado en tabla principal. |
-| OPS-ASSIGN-011 | Listo | Operación/Turnos ALTA | Asignaciones de turno aparentan perderse después de deploy | Corregida la resolución post-reinicio: el turno actual ahora reconstruye analistas desde `WorkShiftAssignment` según día/horario/vigencia, y la columna `Asignado a` en Admin Turnos deja de depender del campo legacy `assignedUserId` del `WorkShift`. Validación real en DB confirmó que las asignaciones persistían y el problema era de lectura/UI. |
-| OPS-ASSIGN-009 | Listo | QA/Pruebas MEDIA | Faltan pruebas completas de integración | Compilación frontend OK y refactor a utilities. |
-| B28 | Listo | Infraestructura/Seguridad | Configuración HTTPS simplificada | Wizard fluido y seguro implementado en Angular. |
-| SEC-HTTPS-ALL | Listo | Seguridad/Operación CRÍTICA | 19 Vulnerabilidades y Fallos de Arquitectura TLS (001 a 019) | Hot-reloading con SNI, volúmenes de Docker estancos, validaciones criptográficas previas a guardado, CORS estricto y UX de 1 paso logrados con 0-downtime. |
-| B37 | Listo | Seguridad / Infra BLOQUEANTE | Error SSL tras reinicio (ERR_SSL_PROTOCOL_ERROR) | Se añadió lógica de auto-recuperación en SNICallback para recargar certificados en caliente si se pierde el contexto tras un reinicio. |
-| B38 | Listo | Backend / Bug | Error 400 en `/api/work-shifts/assignments` | Se corrigió el orden de rutas en el servidor y se actualizó el frontend a una ruta más específica para evitar conflicto con el validador de IDs. |
-| B39 | Listo | UI/UX + Lógica | Checklist: ocultar estado de item padre con sub-items | Frontend y backend ajustados: el padre ya no pide estado/observación manual, su estado se deriva desde los hijos y la API solo exige observación para nodos hoja en rojo. Validado end-to-end con plantilla temporal padre/hijo y envío real del checklist. |
-| B40 | Listo | UI/UX + Bug | Report Generator: búsqueda de ofensas no encuentra nuevas ni coincide por texto | Se cerró el ajuste completo backend+frontend: búsqueda rankeada para términos cortos, refresh del autocomplete sin cache stale y validación viva por API confirmando que `TOR` aparece correctamente como coincidencia principal. |
-| B42 | Listo | UI/UX + Bug | Report Generator: imágenes de evidencia pierden nitidez al enviarse por correo | Se mantuvo el layout técnico fijo y se mejoró la nitidez al evitar upscaling de evidencia (usa dimensiones reales de la imagen), preservando proporción y permitiendo abrir la evidencia original al hacer clic. |
-| B43 | Listo | Email / UX / Mantenibilidad | Email de turno: refactorizar a MJML y rediseñar como dashboard escaneable | `generateReportHTML` migrado a MJML con compatibilidad robusta para clientes de correo, nuevo header con branding y favicon opcional (`AppConfig.faviconUrl`), resumen ejecutivo (OK/NO OK/Entradas), checklist en tarjetas escaneables, bitácora en bloques jerárquicos y observaciones mostradas solo cuando existen. |
-| B44 | Listo | Email / UX | Reporte de turno: mostrar estado "REPARADO" (amarillo) cuando entrada fue ERROR y salida fue OK | Implementado en el correo de turno: `REPARADO` aparece solo en salida cuando entrada fue rojo y salida verde, únicamente si inicio/cierre corresponden a la misma checklist (ID o fallback por nombre). Si salida es rojo, siempre queda `ERROR`. |
-| B45 | Listo | Operación/Turnos + Email | Correo de fin de turno debe posponerse hasta checklist de cierre real (si analista se atrasa) | Implementado en backend: el trigger automático de fin de turno ya no envía si no existe checklist de cierre (`PENDIENTE_POR_CIERRE`), el envío se ejecuta al registrar cierre incluso fuera de la hora fin (ventana extendida en trigger manual), y se mantiene control anti-duplicado con `lastReportSentAt` más trazabilidad `ENVIADO_DIFERIDO`/`PENDIENTE_POR_CIERRE`. |
-| B35 | Listo | UI/UX + Bug | Ajuste Header Checklist y Fix "Último Check" | H1 cambiado a título fijo "Checklist del Turno"; nombre de plantilla se muestra como subtítulo. Accordion usa el nombre de la plantilla. Backend `GET /check/last` corregido para retornar el último check del equipo (sin filtro por usuario), garantizando que siempre se muestre el registro más reciente real. |
-| B36 | Listo | UI/UX | Aprovechamiento de ancho de pantalla | Cajón de notas (right sidebar) cambiado a `mode="over"` (overlay sobre el contenido, sin empujar). Cuando las notas se abren, el contenido recibe `margin-right: 350px` vía clase `.with-notes-open` para evitar solapamiento. El contenido principal usa `transition` suave y ocupa el ancho completo disponible en pantallas grandes. Eliminado `max-width: 900px` del contenedor del Checklist. |
-| EE-BAT-001 | Listo | UI/UX + Frontend MEDIA | Easter Egg: Murciélago Pixel-Art (#bat) | Implementar animación pixel-art retro que se active escribiendo `#bat` exacto en el textarea de entradas. Murciélago en estilo box-shadow con aleteo (`@keyframes steps(2)`), movimiento circular por 15s, desaparición con F5. Solo acepta hashtag exacto (#bat, #BAT, #Bat) — rechaza variaciones. Referencia visual: pixel-art con 2 fotogramas. |
+
+Los items `Listo` fueron migrados a `docs/CHANGELOG.md` como fuente de historial.
 ---
 
 ## Información de como solucionar los Pendientes
@@ -148,6 +98,53 @@
 5. **Agregar trazabilidad operativa:** Registrar en auditoría/logs `BACKUP_RETENTION_CLEANUP_STARTED`, `BACKUP_RETENTION_FILE_DELETED`, `BACKUP_RETENTION_FILE_SKIPPED` y motivo.
 6. **Cubrir regresión mínima:** Crear prueba automática de integración/unidad que genere archivos con fechas antiguas y valide su eliminación con retención de 7 días.
 7. **Criterio de cierre:** Todo backup con antigüedad mayor a 7 días debe eliminarse automáticamente en el siguiente ciclo de cleanup y reflejarse en trazabilidad.
+
+### B46 - Textarea de entradas permite escribir más de 50000 caracteres
+
+1. **Estado actual validado en código:**
+   - `frontend/src/app/pages/main/entries/entries.component.ts` usa `Validators.maxLength(50000)`.
+   - `frontend/src/app/pages/main/my-entries/entry-edit-dialog.component.ts` también usa `Validators.maxLength(50000)`.
+   - `frontend/src/app/pages/main/entries/entries.component.html` y el template inline del diálogo muestran contador `x/50000`, pero el `textarea` no define `maxlength`.
+   - `backend/src/models/Entry.js` sí impone `maxlength: 50000`, por lo que el bloqueo final existe en persistencia.
+2. **Corrección en UI (obligatoria):**
+   - Agregar `maxlength="50000"` al `textarea` de nueva entrada.
+   - Agregar `maxlength="50000"` al `textarea` del diálogo de edición.
+3. **Defensa adicional recomendada:**
+   - Interceptar `input`/pegado y truncar a `50000` en frontend para cubrir edge cases del navegador, autocompletado o pegado masivo.
+   - Mantener el contador sincronizado con el valor truncado real.
+4. **Mensajería UX:**
+   - Mostrar error claro cuando se alcance el máximo (`Máximo 50000 caracteres`) en vez de permitir seguir escribiendo con el formulario inválido sin explicar el motivo.
+5. **Prueba de cierre:**
+   - Escribir o pegar texto de más de `50000` caracteres en crear y editar.
+   - Verificar que el `textarea` no supere `50000`, que el contador se detenga en `50000/50000` y que no se generen payloads mayores desde la UI.
+6. **Criterio de cierre:**
+   - Ningún flujo de entrada/edición debe aceptar visualmente más de `50000` caracteres en memoria del navegador, manteniendo el mismo límite que frontend reactivo y backend.
+
+### B47 - Heatmap en temas light/sepia/pastel no muestra bien el número de entradas
+
+1. **Estado actual validado en código:**
+   - `frontend/src/app/pages/main/reports/reports.component.html` renderiza el heatmap con `ngx-charts-heat-map`.
+   - `frontend/src/app/pages/main/reports/reports.component.ts` solo inyecta la paleta `heatmapColorScheme` desde variables CSS del tema.
+   - `frontend/src/styles.scss` define colores muy claros para la escala baja del heatmap en varios temas de fondo claro:
+     `light` usa `--heatmap-low: #d7f5b8`,
+     `sepia` usa `--heatmap-low: #d7e5ba`,
+     `pastel` usa `--heatmap-low: #d9efc6`.
+   - `frontend/src/app/pages/main/reports/reports.component.scss` aplica estilos generales a textos de `ngx-charts`, pero no fuerza contraste específico para etiquetas internas del heatmap según color de celda.
+2. **Problema funcional/UI:**
+   - En `light`, `sepia` y `pastel`, varias celdas quedan con fondo claro y el número de entradas se vuelve difícil de leer.
+   - El mapa sigue siendo técnicamente correcto, pero pierde legibilidad operativa, especialmente al escanear rápido horas de baja/media actividad.
+3. **Corrección recomendada:**
+   - Definir color de texto contrastante para labels del heatmap según intensidad de celda.
+   - Si la librería no lo permite de forma directa, oscurecer la paleta de heatmap en los temas `light`, `sepia` y `pastel` para los niveles bajos/medios o desactivar transparencia visual en esas celdas.
+4. **Alternativas válidas de implementación:**
+   - Ajustar tokens `--heatmap-low` y `--heatmap-low-mid` en `light`, `sepia` y `pastel` a tonos con más contraste.
+   - Aplicar override CSS dirigido a labels del heatmap para usar texto oscuro o blanco según el rango.
+   - Ocultar labels dentro de celda y dejar el dato solo en tooltip si no se logra contraste consistente.
+5. **Prueba de cierre:**
+   - Revisar `/main/reports` en temas `light`, `sepia` y `pastel` con heatmap expandido.
+   - Confirmar que el número de entradas se lea claramente en celdas de bajo, medio y alto valor, sin depender del hover.
+6. **Criterio de cierre:**
+   - El heatmap en `light`, `sepia` y `pastel` debe mantener contraste suficiente entre fondo y número de entradas en todos los rangos visibles.
 
 ### DEP-NPM-012 - Dependencias npm deprecadas en build Docker (`glob`/`inflight`)
 

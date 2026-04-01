@@ -2,6 +2,65 @@
 
 Registro de cambios relevantes del proyecto.
 
+## Histórico Consolidado - 2026-04-01
+
+Migración documental de cambios cerrados que estaban marcados como `Listo` en `docs/ISSUES.md` pero aún no tenían asiento explícito en este changelog. Esta sección preserva el resultado funcional conocido sin inventar una versión histórica específica retroactiva.
+
+### Infraestructura y Seguridad Base
+
+#### Plataforma, autenticación y hardening inicial
+- **INFRA-NODE-ALL:** Upgrade completo a Node 24 LTS con imágenes `node:24-alpine`, validando compatibilidad de Mongoose 8, bcrypt, webpack Angular y arranque estable de contenedores.
+- **B-CRÍTICO-001:** Corregido el flujo por el cual los correos no llegaban al cierre de checklist.
+- **B5:** Se protegieron rutas críticas que antes podían alcanzarse sin autenticación.
+- **SEC-CRIT-001:** Se sanitizó `/api/config` para evitar exposición de credenciales SMTP y se endurecieron endpoints sensibles.
+- **SEC-CRIT-002:** Se reforzó la recuperación de contraseña para evitar fugas de token y mantener links seguros.
+- **SEC-CRIT-003:** Se corrigió el refresh indefinido de JWT expirados.
+- **SEC-CRIT-004:** Se completó el RBAC faltante para `guest` en endpoints críticos.
+- **SEC-CRIT-005:** Se aplicaron rate limits y defensas anti brute-force en autenticación.
+- **SEC-HIGH-006:** Se eliminaron credenciales por defecto débiles del flujo principal.
+- **SEC-HIGH-007:** Se redujo el riesgo de robo de JWT por XSS moviendo sesión a cookie `HttpOnly` y ajustando el flujo auth.
+- **SEC-HIGH-008:** Se añadió validación estricta de nombres/rutas para neutralizar path traversal en backups.
+
+#### HTTPS y transporte seguro
+- **B28:** Se simplificó la configuración HTTPS con un wizard Angular más fluido y seguro.
+- **SEC-HTTPS-ALL:** Se cerró un paquete amplio de fallos TLS/HTTPS: hot-reload de certificados con SNI, validaciones criptográficas previas a guardado, aislamiento de volúmenes y CORS estricto, manteniendo `0-downtime`.
+
+### Base de Producto y Administración
+
+#### Mejoras funcionales y de UX
+- **B6:** Refactor de contraste dark mode mediante tokens y mejoras de legibilidad.
+- **B8:** Implementada edición admin de entradas con whitelist y auditoría.
+- **B9:** Se incorporó soporte de checklist por tipo y turno en backend y frontend.
+- **B10:** Se habilitó branding configurable de favicon desde UI y endpoints dedicados.
+- **B11:** Se amplió la auditoría de correo y de acciones operativas.
+- **B12:** Se implementó el huevo de pascua del login.
+- **B13:** Se implementó el sistema de huevo de pascua por hashtag.
+- **B15:** Ajustes de compatibilidad visual del correo HTML en clientes dark/light.
+- **B16:** Se implementó la auditoría avanzada según el alcance definido en ese momento.
+- **B18:** Se creó el módulo general de integraciones en consola admin.
+- **B21:** Se implementaron backups automáticos y retención.
+- **B25:** Se mejoró la gestión visual y operativa de Log Sources/Clientes activos vs inactivos.
+- **B27:** Se consolidó la consola admin unificada.
+- **P1:** Se completó el plan general de actualización a Angular 20.
+
+### Turnos y Asignación Operativa
+
+#### Serie inicial `OPS-ASSIGN-*`
+- **OPS-ASSIGN-001:** Se integró con API el selector de usuarios en Admin Turnos.
+- **OPS-ASSIGN-002:** Se creó el CRUD dedicado `work-shifts/assignments`.
+- **OPS-ASSIGN-003:** Se introdujo la colección `WorkShiftAssignment` para soportar recurrencia por días.
+- **OPS-ASSIGN-004:** Se implementó el cálculo de estado `EN TURNO / FUERA DE TURNO`.
+- **OPS-ASSIGN-005:** Se añadió refresco en vivo con `interval(60000)`.
+- **OPS-ASSIGN-006:** Se extrajo lógica común a `shift-time.util.ts` para eliminar duplicación.
+- **OPS-ASSIGN-007:** Se robustecieron reglas anti-solapamiento de asignaciones en backend.
+- **OPS-ASSIGN-008:** Se corrigió manejo de timezone del turno con `moment-timezone`.
+- **OPS-ASSIGN-009:** Se validó compilación frontend y refactor a utilities como base de pruebas de integración.
+- **OPS-ASSIGN-010:** Se corrigió la columna `Asignado a` con un resumen de tabla adaptado al modelo operativo.
+
+### Validación Técnica
+- Se verificó que los items históricos migrados desde `docs/ISSUES.md` ahora quedan representados en este changelog.
+- La tabla `✅ Listas` de `docs/ISSUES.md` puede vaciarse sin perder trazabilidad documental de cambios cerrados.
+
 ## [v1.5.23-beta] - 2026-03-20
 
 ### UI/UX + Frontend (EE-BAT-001)
