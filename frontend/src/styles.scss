@@ -80,12 +80,12 @@
   --chart-7: #00897b;
   --chart-8: #6d4c41;
 
-  --heatmap-low: #b7dd8f;
-  --heatmap-low-mid: #74bb4d;
+  --heatmap-low: #8cc063;
+  --heatmap-low-mid: #5aa832;
   --heatmap-mid: #1f9d55;
-  --heatmap-high: #f6c343;
-  --heatmap-very-high: #e53935;
-  --heatmap-label-color: #1f1f1f;
+  --heatmap-high: #e8a820;
+  --heatmap-very-high: #d32f2f;
+  --heatmap-label-color: #1a1a1a;
 
   --shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
@@ -188,12 +188,12 @@
   --chart-7: #4f7a74;
   --chart-8: #6f6356;
 
-  --heatmap-low: #bfd09f;
-  --heatmap-low-mid: #839f58;
-  --heatmap-mid: #6d8f59;
-  --heatmap-high: #d8ad62;
-  --heatmap-very-high: #c17366;
-  --heatmap-label-color: #2f2a22;
+  --heatmap-low: #7da558;
+  --heatmap-low-mid: #5c8a3a;
+  --heatmap-mid: #3d7a4a;
+  --heatmap-high: #c99530;
+  --heatmap-very-high: #b54a3a;
+  --heatmap-label-color: #2a2218;
 
   --shadow: 0 2px 4px rgba(74,63,53,0.1);
 }
@@ -242,12 +242,12 @@
   --chart-7: #55a7a0;
   --chart-8: #9a7a70;
 
-  --heatmap-low: #bfdca8;
-  --heatmap-low-mid: #78bf62;
-  --heatmap-mid: #55ad73;
-  --heatmap-high: #efc46b;
-  --heatmap-very-high: #e57474;
-  --heatmap-label-color: #261f25;
+  --heatmap-low: #6ea04e;
+  --heatmap-low-mid: #4d8530;
+  --heatmap-mid: #3a9960;
+  --heatmap-high: #d4a030;
+  --heatmap-very-high: #c94545;
+  --heatmap-label-color: #1e1518;
 
   --shadow: 0 2px 6px rgba(255,111,163,0.2);
 }
@@ -423,9 +423,48 @@ a {
 
 .mat-mdc-input-element,
 .mat-mdc-button,
-.mat-mdc-raised-button,
 .mat-mdc-list-item {
   color: var(--text-primary) !important;
+}
+
+.mat-mdc-raised-button,
+.mat-mdc-unelevated-button,
+.btn-primary {
+  background-color: var(--primary-color) !important;
+  color: var(--on-primary-color) !important;
+  --mdc-filled-button-label-text-color: var(--on-primary-color);
+  --mdc-protected-button-label-text-color: var(--on-primary-color);
+  --mat-filled-button-state-layer-color: var(--on-primary-color);
+  --mat-protected-button-state-layer-color: var(--on-primary-color);
+}
+
+button[mat-raised-button][color="primary"],
+button[mat-flat-button][color="primary"],
+button[mat-raised-button].mat-primary,
+button[mat-flat-button].mat-primary,
+a[mat-raised-button][color="primary"],
+a[mat-flat-button][color="primary"] {
+  background-color: var(--primary-color) !important;
+  color: var(--on-primary-color) !important;
+}
+
+.mat-mdc-raised-button .mdc-button__label,
+.mat-mdc-unelevated-button .mdc-button__label,
+.mat-mdc-raised-button mat-icon,
+.mat-mdc-unelevated-button mat-icon,
+.btn-primary mat-icon,
+button[mat-raised-button][color="primary"] .mdc-button__label,
+button[mat-flat-button][color="primary"] .mdc-button__label,
+button[mat-raised-button][color="primary"] mat-icon,
+button[mat-flat-button][color="primary"] mat-icon {
+  color: var(--on-primary-color) !important;
+  fill: var(--on-primary-color) !important;
+}
+
+.mat-mdc-outlined-button,
+.mat-mdc-stroked-button {
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
 }
 
 .mat-mdc-list-item {
@@ -535,6 +574,37 @@ mat-sidenav {
     color: var(--text-primary) !important;
     opacity: 1 !important;
   }
+}
+
+/* Tooltips and chart overlays must not inherit sepia/pastel body text on dark surfaces */
+.mat-mdc-tooltip,
+.mat-mdc-tooltip-surface,
+.mdc-tooltip__surface,
+.ngx-charts-tooltip-content,
+.ngx-charts-tooltip-content.tooltip-content,
+.tooltip-content,
+.tooltip-content.type-tooltip,
+.tooltip-content .tooltip-caret::before,
+.tooltip-content .tooltip-caret,
+.tooltip-content .tooltip-label,
+.tooltip-content .tooltip-val,
+.ngx-charts-tooltip-content .tooltip-caret,
+.chart-tooltip {
+  background-color: rgba(24, 27, 34, 0.96) !important;
+  color: #f7f9ff !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28) !important;
+}
+
+.mat-mdc-tooltip *,
+.mat-mdc-tooltip-surface *,
+.mdc-tooltip__surface *,
+.ngx-charts-tooltip-content *,
+.tooltip-content *,
+.chart-tooltip * {
+  color: #f7f9ff !important;
+  fill: #f7f9ff !important;
+  text-shadow: none !important;
 }
 
 .mat-sort-header-content,

@@ -263,18 +263,34 @@
           </div>
         </div>
         
-        <div *ngIf="heatmapData.length > 0">
-          <ngx-charts-heat-map
-            [view]="[900, 400]"
-            [results]="heatmapData"
-            [xAxis]="true"
-            [yAxis]="true"
-            [showXAxisLabel]="true"
-            [showYAxisLabel]="true"
-            xAxisLabel="Hora del Día"
-            yAxisLabel="Día de la Semana"
-            [scheme]="heatmapColorScheme">
-          </ngx-charts-heat-map>
+        <div *ngIf="heatmapData.length > 0" class="custom-heatmap-container">
+          <!-- Y-axis label -->
+          <div class="heatmap-y-label">Día de la Semana</div>
+          
+          <div class="custom-heatmap-wrapper">
+            <div class="custom-heatmap">
+              <!-- Header row: hours -->
+              <div class="heatmap-row heatmap-header">
+                <div class="heatmap-day-label"></div>
+                <div class="heatmap-hour-label" *ngFor="let h of hoursLabels">{{ h }}</div>
+              </div>
+              <!-- Data rows -->
+              <div class="heatmap-row" *ngFor="let day of heatmapData">
+                <div class="heatmap-day-label">{{ day.name }}</div>
+                <div 
+                  class="heatmap-cell"
+                  *ngFor="let cell of day.series"
+                  [style.background-color]="getHeatmapCellColor(cell.value)"
+                  [style.color]="getHeatmapTextColor(cell.value)"
+                  [title]="day.name + ' • ' + cell.name + ': ' + cell.value + ' entradas'">
+                  {{ cell.value > 0 ? cell.value : '' }}
+                </div>
+              </div>
+            </div>
+            
+            <!-- X-axis label -->
+            <div class="heatmap-x-label">Hora del Día</div>
+          </div>
         </div>
       </mat-card-content>
     </mat-card>
