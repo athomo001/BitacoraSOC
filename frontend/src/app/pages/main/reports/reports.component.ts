@@ -100,6 +100,12 @@ export class ReportsComponent implements OnInit {
   // Configuración del mapa de calor
   heatmapData: any[] = [];
   showHeatmap = false;
+  heatmapMaxValue = 0;
+  hoursLabels: string[] = Array.from({length: 24}, (_, i) => `${i}`);
+
+  // Colores pre-cacheados para el heatmap
+  private heatmapColors: string[] = [];
+  private heatmapEmptyColor = '';
 
   constructor(private reportService: ReportService) {}
 
@@ -146,6 +152,16 @@ export class ReportsComponent implements OnInit {
         this.getThemeColor('--heatmap-very-high')
       ]
     };
+
+    // Cache heatmap colors for the custom grid
+    this.heatmapColors = [
+      this.getThemeColor('--heatmap-low'),
+      this.getThemeColor('--heatmap-low-mid'),
+      this.getThemeColor('--heatmap-mid'),
+      this.getThemeColor('--heatmap-high'),
+      this.getThemeColor('--heatmap-very-high')
+    ];
+    this.heatmapEmptyColor = this.getThemeColor('--surface-muted') || '#f5f7fb';
   }
 
   private getThemeColor(variableName: string): string {
@@ -167,6 +183,10 @@ export class ReportsComponent implements OnInit {
   onPeriodChange(days: number): void {
     this.selectedDays = days;
     this.loadOverview();
+    if (this.showHeatmap) {
+      this.heatmapData = [];
+      this.loadHeatmap();
+    }
   }
   
   prepareChartData(): void {
@@ -255,6 +275,14 @@ export class ReportsComponent implements OnInit {
         // Transformar datos para el formato de heatmap
         // data viene como [{dayOfWeek, hour, count}]
         const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+        
+        // Compute max for color scaling
+        this.heatmapMaxValue = 0;
+        for (const d of data) {
+          if (d.count > this.heatmapMaxValue) this.heatmapMaxValue = d.count;
+        }
+        if (this.heatmapMaxValue === 0) this.heatmapMaxValue = 1;
+        
         this.heatmapData = days.map((day, dayIndex) => ({
           name: day,
           series: Array.from({length: 24}, (_, hour) => {
@@ -268,6 +296,35 @@ export class ReportsComponent implements OnInit {
       },
       error: (err) => console.error('Error cargando heatmap:', err)
     });
+  }
+
+  getHeatmapCellColor(value: number): string {
+    if (value === 0) return this.heatmapEmptyColor;
+    if (this.heatmapColors.length === 0) return '#ccc';
+
+    const ratio = value / this.heatmapMaxValue;
+    if (ratio <= 0.2) return this.heatmapColors[0];
+    if (ratio <= 0.4) return this.heatmapColors[1];
+    if (ratio <= 0.6) return this.heatmapColors[2];
+    if (ratio <= 0.8) return this.heatmapColors[3];
+    return this.heatmapColors[4];
+  }
+
+  getHeatmapTextColor(value: number): string {
+    if (value === 0) return 'transparent';
+    // Parse the cell background to determine if text should be dark or light
+    const bg = this.getHeatmapCellColor(value);
+    return this.isLightColor(bg) ? '#1a1a1a' : '#ffffff';
+  }
+
+  private isLightColor(hex: string): boolean {
+    const c = hex.replace('#', '');
+    const r = parseInt(c.substring(0, 2), 16);
+    const g = parseInt(c.substring(2, 4), 16);
+    const b = parseInt(c.substring(4, 6), 16);
+    // Luminance formula
+    const lum = (0.299 * r + 0.587 * g + 0.114 * b);
+    return lum > 140;
   }
 
   exportEntries(): void {
