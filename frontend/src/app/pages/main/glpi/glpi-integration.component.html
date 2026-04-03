@@ -1,6 +1,7 @@
 <div class="glpi-container">
   <h1>GLPI</h1>
   <p class="subtitle">Configuración separada para integración GLPI por API REST o correo collector.</p>
+  <p class="subtitle">Resumen diario despacha al cierre de turno. Evento inmediato genera ticket al crear entradas de tipo incidente u ofensa.</p>
 
   <mat-card class="glpi-card">
     <mat-card-header>
@@ -94,6 +95,22 @@
       <p *ngIf="lastTestSuccess === false" class="error"><strong>Estado:</strong> Fallido</p>
       <p *ngIf="lastTestMessage"><strong>Detalle:</strong> {{ lastTestMessage }}</p>
       <p *ngIf="!lastTestDate" class="muted">Aún no hay pruebas registradas.</p>
+    </mat-card-content>
+  </mat-card>
+
+  <mat-card class="glpi-card">
+    <mat-card-header>
+      <mat-card-title>Último despacho operativo</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <p *ngIf="lastDispatchDate"><strong>Fecha:</strong> {{ lastDispatchDate | date:'medium' }}</p>
+      <p *ngIf="lastDispatchSuccess === true" class="ok"><strong>Estado:</strong> Correcto</p>
+      <p *ngIf="lastDispatchSuccess === false" class="error"><strong>Estado:</strong> Fallido</p>
+      <p *ngIf="lastDispatchMode !== 'unknown'"><strong>Modo:</strong> {{ lastDispatchMode }}</p>
+      <p *ngIf="lastDispatchChannel !== 'none'"><strong>Canal:</strong> {{ lastDispatchChannel }}</p>
+      <p *ngIf="lastDispatchEvent"><strong>Origen:</strong> {{ lastDispatchEvent }}</p>
+      <p *ngIf="lastDispatchMessage"><strong>Detalle:</strong> {{ lastDispatchMessage }}</p>
+      <p *ngIf="!lastDispatchDate" class="muted">Aún no hay despachos operativos registrados.</p>
     </mat-card-content>
   </mat-card>
 </div>

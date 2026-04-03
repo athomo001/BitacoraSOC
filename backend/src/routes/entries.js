@@ -9,7 +9,10 @@ const { authenticate, notGuest } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const captureMetadata = require('../middleware/metadata');
 const { audit } = require('../utils/audit');
+const { dispatchGlpiPayload } = require('../utils/glpi-dispatch');
 const { logger } = require('../utils/logger');
+
+const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // Helper: extraer hashtags (con protección ReDoS)
 const extractHashtags = (text) => {
@@ -119,6 +122,36 @@ router.post('/',
           isGuest: req.user.role === 'guest'
         }
       });
+
+      if (entryType === 'incidente' || entryType === 'ofensa') {
+        const ticketTitle = `[SOC][${entryType.toUpperCase()}] ${clientName || 'Sin cliente'} ${entryTime}`;
+        const ticketText = [
+          `Tipo: ${entryType}`,
+          `Fecha: ${entryDate}`,
+          `Hora: ${entryTime}`,
+          `Usuario: ${req.user.username}`,
+          `Cliente/Origen: ${clientName || 'Sin cliente'}`,
+          `Tags: ${tags.length ? tags.join(', ') : 'sin tags'}`,
+          '',
+          content
+        ].join('\n');
+
+        dispatchGlpiPayload({
+          expectedDispatchMode: 'immediate',
+          title: ticketTitle,
+          subject: ticketTitle,
+          text: ticketText,
+          sourceEvent: 'entry.create.immediate',
+          context: {
+            entryId: entry._id.toString(),
+            entryType,
+            clientName: clientName || null,
+            createdBy: req.user.username
+          }
+        }).catch((error) => {
+          logger.error({ err: error, entryId: entry._id, requestId: req.requestId }, 'Error dispatching GLPI immediate ticket');
+        });
+      }
 
       res.status(201).json({
         message: 'Entrada creada exitosamente',
@@ -356,13 +389,17 @@ router.delete('/:id', authenticate, notGuest, async (req, res) => {
 // GET /api/entries/tags/suggest - Autocompletar tags
 router.get('/tags/suggest', authenticate, async (req, res) => {
   try {
-    const { q } = req.query;
+    const q = String(req.query.q || '').trim();
 
     if (!q || q.length < 2) {
       return res.json([]);
     }
 
-    const regex = new RegExp(`^${q}`, 'i');
+    if (q.length > 64) {
+      return res.status(400).json({ message: 'q no puede superar 64 caracteres' });
+    }
+
+    const regex = new RegExp(`^${escapeRegex(q)}`, 'i');
 
     const tags = await Entry.aggregate([
       { $unwind: '$tags' },

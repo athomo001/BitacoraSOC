@@ -147,7 +147,7 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout local.key -out local
 
 ## 6. Entorno de Desarrollo Local (Sin Docker)
 
-> **Requisitos:** Node.js 24+ LTS, MongoDB 7+, Express 5.1+.
+> **Requisitos:** Node.js 24+ LTS, MongoDB 8+, Express 5.1+.
 
 ### 6.1 Backend
 ```bash
@@ -187,6 +187,16 @@ docker compose exec mongodb mongodump \
 
 docker cp bitacora-mongodb:/data/backup ./backups/
 ```
+
+### Migración Mayor MongoDB 7 a 8
+
+Antes de cambiar la imagen en `docker-compose.yml` desde `mongo:7` a `mongo:8`, no reutilices a ciegas los archivos `.wt` del volumen existente.
+
+1. Ejecuta `mongodump` completo desde el contenedor actual y copia el dump al host.
+2. Detén el stack con `docker compose down`.
+3. Respalda o renombra `./.data/mongodb_data` y `./.data/mongodb_config`.
+4. Levanta MongoDB 8 con el volumen limpio para que inicialice archivos nuevos.
+5. Restaura con `mongorestore` y valida la aplicación antes de reabrir operación.
 
 **Resguardar Subidas Estáticas (Logos, Evidencias):**
 ```bash

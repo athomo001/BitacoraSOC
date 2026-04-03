@@ -97,8 +97,8 @@
         <ng-container matColumnDef="username">
           <th mat-header-cell *matHeaderCellDef>Actor</th>
           <td mat-cell *matCellDef="let log" class="username-cell">
-            <span class="username">{{ log.actor?.username || 'Sistema' }}</span>
-            <span *ngIf="log.actor?.isGuest" class="guest-badge">(Invitado)</span>
+            <span class="username">{{ getActorUsername(log) || 'Sistema' }}</span>
+            <span *ngIf="log.actor?.isGuest || log.metadata?.['isGuest']" class="guest-badge">(Invitado)</span>
           </td>
         </ng-container>
 

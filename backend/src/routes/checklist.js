@@ -9,6 +9,7 @@ const ShiftCheck = require('../models/ShiftCheck');
 const ShiftClosure = require('../models/ShiftClosure');
 const Entry = require('../models/Entry');
 const AppConfig = require('../models/AppConfig');
+const User = require('../models/User');
 const WorkShift = require('../models/WorkShift');
 const ChecklistNotificationLog = require('../models/ChecklistNotificationLog');
 const { authenticate, authorize, notGuest } = require('../middleware/auth');
@@ -16,6 +17,7 @@ const validate = require('../middleware/validate');
 const captureMetadata = require('../middleware/metadata');
 const { audit } = require('../utils/audit');
 const { logger } = require('../utils/logger');
+const { sendEmail } = require('../utils/email');
 const { sendShiftReport } = require('../utils/shift-report');
 const moment = require('moment-timezone');
 
@@ -48,6 +50,54 @@ const getCurrentShift = async (date = new Date()) => {
   }
 
   return currentShift;
+};
+
+const escapeHtml = (value = '') => String(value)
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const normalizeCargoLabels = (labels = []) => {
+  if (!Array.isArray(labels)) return [];
+  return [...new Set(labels
+    .map((label) => String(label || '').trim())
+    .filter((label) => label.length > 0))];
+};
+
+const buildNokChecklistEmailHtml = ({ check, nokServices = [], cargoLabels = [], shiftName = 'Sin turno' }) => {
+  const items = nokServices.map((service, index) => `
+    <tr>
+      <td style="padding: 10px; border: 1px solid #ddd; vertical-align: top;">${index + 1}</td>
+      <td style="padding: 10px; border: 1px solid #ddd; vertical-align: top;"><strong>${escapeHtml(service.serviceTitle || '-')}</strong></td>
+      <td style="padding: 10px; border: 1px solid #ddd; vertical-align: top; white-space: pre-wrap;">${escapeHtml(service.observation || '-')}</td>
+    </tr>
+  `).join('');
+
+  return `
+    <div style="font-family: Arial, sans-serif; color: #1f2937;">
+      <h2 style="margin-bottom: 8px;">Alerta checklist con items NOK</h2>
+      <p style="margin: 0 0 8px 0;"><strong>Analista:</strong> ${escapeHtml(check.username || 'N/A')}</p>
+      <p style="margin: 0 0 8px 0;"><strong>Turno:</strong> ${escapeHtml(shiftName)}</p>
+      <p style="margin: 0 0 8px 0;"><strong>Tipo de checklist:</strong> ${escapeHtml((check.type || '').toUpperCase())}</p>
+      <p style="margin: 0 0 8px 0;"><strong>Cargos notificados:</strong> ${escapeHtml(cargoLabels.join(', ') || 'N/A')}</p>
+      <p style="margin: 0 0 16px 0;"><strong>Fecha:</strong> ${new Date(check.checkDate || new Date()).toLocaleString()}</p>
+
+      <table style="width: 100%; border-collapse: collapse; margin-top: 8px;">
+        <thead>
+          <tr style="background-color: #f3f4f6;">
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 48px;">#</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Servicio NOK</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Detalle / observacion</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items}
+        </tbody>
+      </table>
+    </div>
+  `;
 };
 
 const ensureObjectId = (value) => (
@@ -622,6 +672,99 @@ router.post('/check',
           }))
         }
       });
+
+      if (type && hasRedServices && config?.alertNokEnabled) {
+        const cargoTargets = normalizeCargoLabels(config?.alertNokRoleTarget || []);
+        if (cargoTargets.length > 0) {
+          const usersToNotify = await User.find({
+            isActive: true,
+            role: { $in: ['admin', 'user', 'auditor'] },
+            cargoLabel: { $in: cargoTargets }
+          }).select('email cargoLabel fullName username');
+
+          const recipients = [...new Set(
+            usersToNotify
+              .map((user) => String(user.email || '').trim().toLowerCase())
+              .filter((email) => email.length > 0)
+          )];
+
+          if (recipients.length > 0) {
+            const nokServices = normalizedServices.filter((service) => service.status === 'rojo');
+            const currentShift = await getCurrentShift(check.createdAt || new Date());
+            const shiftName = currentShift?.name || 'Sin turno';
+            const subject = `[Bitacora SOC] Alerta NOK checklist ${shiftName} (${check.type})`;
+            const html = buildNokChecklistEmailHtml({
+              check,
+              nokServices,
+              cargoLabels: cargoTargets,
+              shiftName
+            });
+
+            try {
+              await sendEmail({
+                to: recipients,
+                subject,
+                html,
+                auditContext: {
+                  sourceModule: 'checklist',
+                  triggerType: 'checklist-nok-alert',
+                  checklistId: check._id?.toString(),
+                  triggerContext: 'shiftcheck.submit',
+                  extra: {
+                    checklistType: type,
+                    cargoTargets,
+                    redCount: nokServices.length
+                  }
+                }
+              });
+
+              await audit(req, {
+                event: 'shiftcheck.nok.alert.sent',
+                level: 'info',
+                result: { success: true, reason: 'NOK alert email sent' },
+                metadata: {
+                  checkId: check._id,
+                  checklistType: type,
+                  recipientsCount: recipients.length,
+                  cargoTargets,
+                  redCount: nokServices.length
+                }
+              });
+            } catch (nokEmailError) {
+              await audit(req, {
+                event: 'shiftcheck.nok.alert.fail',
+                level: 'warn',
+                result: { success: false, reason: nokEmailError.message },
+                metadata: {
+                  checkId: check._id,
+                  checklistType: type,
+                  recipientsCount: recipients.length,
+                  cargoTargets,
+                  redCount: nokServices.length
+                }
+              });
+
+              logger.error({
+                err: nokEmailError,
+                requestId: req.requestId,
+                checkId: check._id,
+                recipientsCount: recipients.length
+              }, 'Error enviando alerta NOK de checklist');
+            }
+          } else {
+            await audit(req, {
+              event: 'shiftcheck.nok.alert.skipped',
+              level: 'warn',
+              result: { success: false, reason: 'No recipients resolved for selected cargo labels' },
+              metadata: {
+                checkId: check._id,
+                checklistType: type,
+                cargoTargets
+              }
+            });
+          }
+        }
+      }
 
       // DESACTIVADO: No enviar email individual por checklist con rojos
       // Solo se envía el reporte completo (inicio + cierre + entradas) al hacer cierre de turno

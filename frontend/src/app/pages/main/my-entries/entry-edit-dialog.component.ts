@@ -25,8 +25,11 @@ import { Entry } from '../../../models/entry.model';
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Contenido</mat-label>
             <textarea matInput formControlName="content" rows="10"
+                      maxlength="50000"
+                      (input)="enforceContentMaxLength()"
                       placeholder="Escribe el contenido de la entrada"></textarea>
             <mat-hint align="end">{{ editForm.get('content')?.value?.length || 0 }}/50000</mat-hint>
+            <mat-hint *ngIf="(editForm.get('content')?.value?.length || 0) >= 50000" class="max-length-warning">Máximo 50000 caracteres alcanzado</mat-hint>
           </mat-form-field>
 
           <!-- Tipo de Entrada -->
@@ -142,6 +145,7 @@ import { Entry } from '../../../models/entry.model';
   ]
 })
 export class EntryEditDialogComponent implements OnInit {
+  private readonly contentMaxLength = 50000;
   editForm: FormGroup;
   isSubmitting = false;
   logSources: any[] = [];
@@ -218,5 +222,19 @@ export class EntryEditDialogComponent implements OnInit {
 
   onCancel(): void {
     this.dialogRef.close(false);
+  }
+
+  enforceContentMaxLength(): void {
+    const contentControl = this.editForm.get('content');
+    if (!contentControl) {
+      return;
+    }
+
+    const currentValue = String(contentControl.value || '');
+    if (currentValue.length <= this.contentMaxLength) {
+      return;
+    }
+
+    contentControl.setValue(currentValue.slice(0, this.contentMaxLength), { emitEvent: false });
   }
 }

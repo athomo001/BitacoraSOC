@@ -64,7 +64,7 @@ const upload = multer({
 });
 
 // Importar el scheduler de backups para reiniciar si cambia la config
-const { startBackupScheduler, stopBackupScheduler, runBackup } = require('../utils/backup-scheduler');
+const { prepareBackupSchedule, startBackupScheduler, stopBackupScheduler, runBackup } = require('../utils/backup-scheduler');
 
 // Helper de validación de filename para evitar Path Traversal
 const isValidBackupFilename = (filename) => {
@@ -154,7 +154,13 @@ router.get('/config', authenticate, authorize('admin'), async (req, res) => {
       destinationConfig: {
         ...(backupConfig.destinationConfig || {}),
         basePath: backupConfig.destinationConfig?.basePath || ''
-      }
+      },
+      scheduleAnchorAt: backupConfig.scheduleAnchorAt || null,
+      lastAutoAttemptAt: backupConfig.lastAutoAttemptAt || null,
+      lastAutoRunAt: backupConfig.lastAutoRunAt || null,
+      nextAutoRunAt: backupConfig.nextAutoRunAt || null,
+      lastAutoRunStatus: backupConfig.lastAutoRunStatus || 'idle',
+      lastAutoRunMessage: backupConfig.lastAutoRunMessage || ''
     });
   } catch (err) {
     logger.error(`Error get backup config: ${err.message}`);
@@ -202,13 +208,35 @@ router.put('/config', authenticate, authorize('admin'), async (req, res) => {
       config = await AppConfig.create({});
     }
 
+    const previousBackupConfig = config.backupConfig || {};
+
     config.backupConfig = {
       enabled: enabled !== undefined ? !!enabled : config.backupConfig?.enabled,
       intervalDays: parsedIntervalDays,
       destinationType: normalizedDestinationType,
       localRetentionDays: parsedRetentionDays,
-      destinationConfig: normalizedDestinationConfig
+      destinationConfig: normalizedDestinationConfig,
+      scheduleAnchorAt: previousBackupConfig.scheduleAnchorAt || null,
+      lastAutoAttemptAt: previousBackupConfig.lastAutoAttemptAt || null,
+      lastAutoRunAt: previousBackupConfig.lastAutoRunAt || null,
+      nextAutoRunAt: previousBackupConfig.nextAutoRunAt || null,
+      lastAutoRunStatus: previousBackupConfig.lastAutoRunStatus || 'idle',
+      lastAutoRunMessage: previousBackupConfig.lastAutoRunMessage || ''
     };
+
+    const scheduleWasEnabled = Boolean(previousBackupConfig.enabled);
+    const intervalChanged = Number(previousBackupConfig.intervalDays || 7) !== parsedIntervalDays;
+    const scheduleNeedsReset = Boolean(config.backupConfig.enabled) && (!scheduleWasEnabled || intervalChanged || !previousBackupConfig.nextAutoRunAt);
+
+    prepareBackupSchedule(config, {
+      now: new Date(),
+      resetSchedule: scheduleNeedsReset
+    });
+
+    if (!config.backupConfig.enabled) {
+      config.backupConfig.lastAutoRunStatus = 'idle';
+      config.backupConfig.lastAutoRunMessage = 'Backups automáticos deshabilitados';
+    }
 
     config.lastUpdatedBy = req.user.id;
     await config.save();
@@ -216,7 +244,7 @@ router.put('/config', authenticate, authorize('admin'), async (req, res) => {
     // Si se habilita o cambia, reiniciamos el scheduler
     stopBackupScheduler();
     if (config.backupConfig.enabled) {
-      startBackupScheduler();
+      await startBackupScheduler();
     }
 
     await audit(req, {
@@ -246,7 +274,7 @@ router.put('/config', authenticate, authorize('admin'), async (req, res) => {
 router.post('/test-auto', authenticate, authorize('admin'), async (req, res) => {
   try {
     // Forzamos la ejecución para debugging o pruebas
-    runBackup().catch(e => logger.error(`Manual runBackup error: ${e.message}`));
+    runBackup({ source: 'manual', triggerContext: 'api/backup/test-auto' }).catch(e => logger.error(`Manual runBackup error: ${e.message}`));
 
     await audit(req, {
       event: 'admin.backup.auto.trigger_manual',

@@ -4,6 +4,8 @@ export interface AppConfig {
   guestMaxDurationDays: number;
   shiftCheckCooldownHours: number;
   checklistCloseEmailEnabled?: boolean;
+  alertNokEnabled?: boolean;
+  alertNokRoleTarget?: string[];
   checklistAlertEnabled?: boolean;
   checklistAlertTime?: string;
   checklistWeeklyAlertEnabled?: boolean;
@@ -90,6 +92,8 @@ export interface UpdateConfigRequest {
   guestMaxDurationDays?: number;
   shiftCheckCooldownHours?: number;
   checklistCloseEmailEnabled?: boolean;
+  alertNokEnabled?: boolean;
+  alertNokRoleTarget?: string[];
   checklistAlertEnabled?: boolean;
   checklistAlertTime?: string;
   checklistWeeklyAlertEnabled?: boolean;

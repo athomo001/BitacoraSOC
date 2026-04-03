@@ -152,6 +152,13 @@
       stroke: var(--text-secondary) !important;
       opacity: 0.8;
     }
+
+    .heat-map .cell text,
+    .heat-map .cell-label {
+      fill: var(--heatmap-label-color, var(--text-primary)) !important;
+      font-weight: 600;
+      text-shadow: 0 0 2px rgba(255, 255, 255, 0.35);
+    }
   }
 }
 

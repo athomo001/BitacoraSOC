@@ -423,9 +423,9 @@ if (fs.existsSync(clientDistPath) && fs.existsSync(clientIndexPath)) {
 
 // Swagger documentation (próximo paso)
 const swaggerUi = require('swagger-ui-express');
-const YAML = require('yamljs');
+const YAML = require('yaml');
 try {
-  const swaggerDocument = YAML.load(path.join(__dirname, './docs/swagger.yaml'));
+  const swaggerDocument = YAML.parse(fs.readFileSync(path.join(__dirname, './docs/swagger.yaml'), 'utf8'));
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 } catch (error) {
   logger.info({ event: 'server.swagger.missing' }, 'Swagger documentation not found');

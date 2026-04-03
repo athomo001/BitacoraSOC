@@ -1,6 +1,6 @@
 services:
   mongodb:
-    image: mongo:7
+    image: mongo:8
     container_name: bitacora-mongodb
     restart: unless-stopped
     environment:

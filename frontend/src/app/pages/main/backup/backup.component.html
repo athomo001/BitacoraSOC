@@ -56,6 +56,18 @@
             Ejecutar Prueba de Backup Ahora
           </button>
         </div>
+
+        <div class="config-row" *ngIf="backupConfigForm.value.enabled">
+          <mat-card class="backup-card">
+            <mat-card-content>
+              <p><strong>Estado:</strong> {{ getAutoBackupStatusLabel() }}</p>
+              <p *ngIf="lastAutoRunAt"><strong>Última ejecución automática:</strong> {{ lastAutoRunAt | date:'medium' }}</p>
+              <p *ngIf="lastAutoAttemptAt && !lastAutoRunAt"><strong>Último intento automático:</strong> {{ lastAutoAttemptAt | date:'medium' }}</p>
+              <p *ngIf="nextAutoRunAt"><strong>Próxima ejecución programada:</strong> {{ nextAutoRunAt | date:'medium' }}</p>
+              <p *ngIf="lastAutoRunMessage"><strong>Detalle:</strong> {{ lastAutoRunMessage }}</p>
+            </mat-card-content>
+          </mat-card>
+        </div>
       </form>
     </mat-card-content>
   </mat-card>

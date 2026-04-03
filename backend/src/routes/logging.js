@@ -23,6 +23,7 @@ const logForwarder = require('../utils/logForwarder');
 const { authenticate, authorize } = require('../middleware/auth');
 const { audit } = require('../utils/audit');
 const { logger } = require('../utils/logger');
+const { assertOutboundUrlSafe } = require('../utils/outbound-url-guard');
 
 const ALLOWED_TRANSPORTS = ['udp', 'tcp', 'tls', 'http'];
 const ALLOWED_MODES = ['plain', 'tls'];
@@ -214,6 +215,14 @@ router.put('/config', authenticate, authorize('admin'), async (req, res) => {
     const validationError = validatePayload(payload);
     if (validationError) {
       return res.status(400).json({ error: validationError });
+    }
+
+    if (payload.enabled && payload.transport === 'http' && payload.http?.url) {
+      try {
+        await assertOutboundUrlSafe(payload.http.url, { requireHttps: true });
+      } catch (validationError) {
+        return res.status(400).json({ error: validationError.message });
+      }
     }
     
     // Actualizar config (upsert)

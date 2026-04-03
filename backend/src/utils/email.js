@@ -13,6 +13,9 @@ const { auditSystem } = require('./audit');
 let smtpConfigCache = null;
 let cacheTime = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
+const MAIL_AUDIT_NOISE_WINDOW_MS = Math.max(60 * 1000, Number(process.env.MAIL_AUDIT_NOISE_WINDOW_MS) || (5 * 60 * 1000));
+const MAIL_AUDIT_RELOG_EVERY = Math.max(2, Number(process.env.MAIL_AUDIT_RELOG_EVERY) || 10);
+const mailFailureNoiseMap = new Map();
 
 const maskEmail = (email = '') => {
   if (!email || !email.includes('@')) return email;
@@ -23,11 +26,101 @@ const maskEmail = (email = '') => {
 };
 
 const normalizeRecipients = (to) => {
-  if (Array.isArray(to)) return to.filter(Boolean);
+  if (Array.isArray(to)) {
+    return to
+      .map((item) => String(item || '').trim().toLowerCase())
+      .filter(Boolean);
+  }
   if (typeof to === 'string') {
-    return to.split(',').map((item) => item.trim()).filter(Boolean);
+    return to
+      .split(',')
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean);
   }
   return [];
+};
+
+const classifyMailFailure = (errorMessage = '', recipientsCount = 0) => {
+  const normalized = String(errorMessage || '').toLowerCase();
+
+  if (recipientsCount === 0 || normalized.includes('no recipients')) {
+    return 'destinatarios vacios por filtro';
+  }
+  if (normalized.includes('smtp configuration missing')) {
+    return 'config smtp incompleta';
+  }
+  if (normalized.includes('eauth') || normalized.includes('invalid login') || normalized.includes('authentication')) {
+    return 'credenciales smtp invalidas';
+  }
+  if (normalized.includes('enotfound') || normalized.includes('getaddrinfo')) {
+    return 'host smtp no resoluble';
+  }
+  if (normalized.includes('timeout') || normalized.includes('etimedout')) {
+    return 'timeout smtp';
+  }
+
+  return 'error de envio smtp';
+};
+
+const normalizeAuditContext = (context = {}) => ({
+  sourceModule: String(context.sourceModule || 'unknown').trim() || 'unknown',
+  triggerType: String(context.triggerType || 'unspecified').trim() || 'unspecified',
+  triggerContext: String(context.triggerContext || '').trim() || null,
+  shiftId: context.shiftId || null,
+  checklistId: context.checklistId || null,
+  entryType: context.entryType || null,
+  smtpConfigId: context.smtpConfigId || null,
+  resolvedRecipientsCount: Number(context.resolvedRecipientsCount || 0),
+  resolvedRecipientsPreview: Array.isArray(context.resolvedRecipientsPreview)
+    ? context.resolvedRecipientsPreview.filter(Boolean)
+    : [],
+  extra: context.extra && typeof context.extra === 'object' ? context.extra : {}
+});
+
+const buildMailFailureNoiseState = (signature) => {
+  const now = Date.now();
+
+  if (mailFailureNoiseMap.size > 500) {
+    for (const [key, value] of mailFailureNoiseMap.entries()) {
+      if ((now - value.windowStart) > MAIL_AUDIT_NOISE_WINDOW_MS) {
+        mailFailureNoiseMap.delete(key);
+      }
+    }
+  }
+
+  const current = mailFailureNoiseMap.get(signature);
+  if (!current || (now - current.windowStart) > MAIL_AUDIT_NOISE_WINDOW_MS) {
+    const next = {
+      windowStart: now,
+      countInWindow: 1,
+      loggedInWindow: 1,
+      lastSeenAt: now
+    };
+    mailFailureNoiseMap.set(signature, next);
+    return {
+      shouldAudit: true,
+      countInWindow: next.countInWindow,
+      loggedInWindow: next.loggedInWindow,
+      suppressedInWindow: 0,
+      windowMs: MAIL_AUDIT_NOISE_WINDOW_MS
+    };
+  }
+
+  current.countInWindow += 1;
+  current.lastSeenAt = now;
+
+  const shouldAudit = current.countInWindow % MAIL_AUDIT_RELOG_EVERY === 0;
+  if (shouldAudit) {
+    current.loggedInWindow += 1;
+  }
+
+  return {
+    shouldAudit,
+    countInWindow: current.countInWindow,
+    loggedInWindow: current.loggedInWindow,
+    suppressedInWindow: current.countInWindow - current.loggedInWindow,
+    windowMs: MAIL_AUDIT_NOISE_WINDOW_MS
+  };
 };
 
 /**
@@ -53,6 +146,8 @@ async function getSMTPConfig() {
         secure: smtpDoc.useTLS === true || smtpDoc.port === 465,
         user: smtpDoc.username,
         pass: decrypt(smtpDoc.password),
+        smtpConfigId: smtpDoc._id?.toString?.() || String(smtpDoc._id || ''),
+        smtpConfigSource: 'SmtpConfig',
         from: smtpDoc.senderName
           ? `"${smtpDoc.senderName}" <${smtpDoc.senderEmail}>`
           : smtpDoc.senderEmail || smtpDoc.username
@@ -83,6 +178,8 @@ async function getSMTPConfig() {
         secure: smtpConfig.secure === true,
         user: smtpConfig.user,
         pass: smtpConfig.pass,
+        smtpConfigId: appConfig?._id?.toString?.() || null,
+        smtpConfigSource: 'AppConfig',
         from: smtpConfig.from || smtpConfig.user
       };
 
@@ -105,6 +202,8 @@ async function getSMTPConfig() {
     secure: process.env.SMTP_SECURE === 'true',
     user: process.env.SMTP_USER || '',
     pass: process.env.SMTP_PASS || '',
+    smtpConfigId: null,
+    smtpConfigSource: 'env',
     from: process.env.SMTP_FROM || ''
   };
 
@@ -122,8 +221,8 @@ async function getSMTPConfig() {
 /**
  * Crea transporter de nodemailer con configuración actual
  */
-async function createTransporter() {
-  const config = await getSMTPConfig();
+async function createTransporter(configOverride = null) {
+  const config = configOverride || await getSMTPConfig();
 
   if (!config || !config.user || !config.pass) {
     throw new Error('SMTP configuration missing: user and pass required');
@@ -149,9 +248,21 @@ async function createTransporter() {
  * @param {string} [options.html] - Contenido en HTML
  * @param {string} [options.from] - Remitente (opcional, usa config por defecto)
  */
-async function sendEmail({ to, subject, text, html, from }) {
+async function sendEmail({ to, subject, text, html, from, auditContext = {} }) {
+  const recipients = normalizeRecipients(to);
+  const resolvedRecipientsPreview = recipients.map(maskEmail).slice(0, 5);
+  const context = normalizeAuditContext({
+    ...auditContext,
+    resolvedRecipientsCount: recipients.length,
+    resolvedRecipientsPreview
+  });
+
   try {
     logger.info('📧 [sendEmail] Starting email send process...', { to, subject });
+
+    if (recipients.length === 0) {
+      throw new Error('No recipients resolved for email send');
+    }
     
     const config = await getSMTPConfig();
     
@@ -161,11 +272,11 @@ async function sendEmail({ to, subject, text, html, from }) {
     }
 
     logger.info('📧 [sendEmail] SMTP config loaded, creating transporter...');
-    const transporter = await createTransporter();
+    const transporter = await createTransporter(config);
     
     const mailOptions = {
       from: from || config.from || config.user,
-      to: Array.isArray(to) ? to.join(', ') : to,
+      to: recipients.join(', '),
       subject,
       text,
       html
@@ -181,17 +292,27 @@ async function sendEmail({ to, subject, text, html, from }) {
 
     const info = await transporter.sendMail(mailOptions);
 
-    const recipients = normalizeRecipients(to);
     auditSystem({
       event: 'mail.send.success',
       level: 'info',
       result: { success: true, reason: 'Email sent successfully' },
       metadata: {
+        sourceModule: context.sourceModule,
+        triggerType: context.triggerType,
+        triggerContext: context.triggerContext,
+        shiftId: context.shiftId,
+        checklistId: context.checklistId,
+        entryType: context.entryType,
+        smtpConfigId: context.smtpConfigId || config.smtpConfigId || null,
+        smtpConfigSource: config.smtpConfigSource || null,
+        resolvedRecipientsCount: recipients.length,
+        resolvedRecipientsPreview,
         toMasked: recipients.map(maskEmail),
         recipientsCount: recipients.length,
         subject,
         template: html ? 'html' : 'text',
-        messageId: info.messageId
+        messageId: info.messageId,
+        ...context.extra
       }
     }).catch((err) => logger.error({ err }, 'Audit mail.send.success failed'));
     
@@ -214,19 +335,52 @@ async function sendEmail({ to, subject, text, html, from }) {
       subject
     });
 
-    const recipients = normalizeRecipients(to);
-    auditSystem({
-      event: 'mail.send.fail',
-      level: 'warn',
-      result: { success: false, reason: error.message },
-      metadata: {
-        toMasked: recipients.map(maskEmail),
-        recipientsCount: recipients.length,
-        subject,
-        template: html ? 'html' : 'text',
-        error: error.message
-      }
-    }).catch((err) => logger.error({ err }, 'Audit mail.send.fail failed'));
+    const config = await getSMTPConfig().catch(() => null);
+    const failureCategory = classifyMailFailure(error.message, recipients.length);
+    const failureReason = `${failureCategory}: ${error.message}`;
+    const noiseSignature = [
+      context.sourceModule,
+      context.triggerType,
+      failureCategory,
+      String(subject || '').slice(0, 120),
+      recipients.length
+    ].join('|');
+    const noiseState = buildMailFailureNoiseState(noiseSignature);
+
+    if (noiseState.shouldAudit) {
+      auditSystem({
+        event: 'mail.send.fail',
+        level: 'warn',
+        result: { success: false, reason: failureReason },
+        metadata: {
+          sourceModule: context.sourceModule,
+          triggerType: context.triggerType,
+          triggerContext: context.triggerContext,
+          shiftId: context.shiftId,
+          checklistId: context.checklistId,
+          entryType: context.entryType,
+          smtpConfigId: context.smtpConfigId || config?.smtpConfigId || null,
+          smtpConfigSource: config?.smtpConfigSource || null,
+          resolvedRecipientsCount: recipients.length,
+          resolvedRecipientsPreview,
+          toMasked: recipients.map(maskEmail),
+          recipientsCount: recipients.length,
+          subject,
+          template: html ? 'html' : 'text',
+          error: error.message,
+          failureCategory,
+          noiseControl: {
+            dedupApplied: noiseState.suppressedInWindow > 0,
+            windowMs: noiseState.windowMs,
+            countInWindow: noiseState.countInWindow,
+            loggedInWindow: noiseState.loggedInWindow,
+            suppressedInWindow: noiseState.suppressedInWindow,
+            relogEvery: MAIL_AUDIT_RELOG_EVERY
+          },
+          ...context.extra
+        }
+      }).catch((err) => logger.error({ err }, 'Audit mail.send.fail failed'));
+    }
 
     throw error;
   }

@@ -67,6 +67,7 @@ export class AuditLogsComponent implements OnInit {
   categoryOptions = [
     { value: '', label: 'Todas' },
     { value: 'mail', label: 'Mail / SMTP' },
+    { value: 'backup', label: 'Backup' },
     { value: 'admin', label: 'Admin' },
     { value: 'user', label: 'Usuario' },
     { value: 'security', label: 'Seguridad' }
@@ -184,6 +185,11 @@ export class AuditLogsComponent implements OnInit {
    */
   getActionType(log: AuditLog): string {
     const event = log.event?.toLowerCase() || '';
+        // Backup
+        if (event.includes('backup') || event.startsWith('backup_')) {
+          return 'backup';
+        }
+
     
     // Integración (GLPI, Log Forwarding, etc)
     if (event.includes('glpi') || event.includes('integration') || event.includes('log-forward') || event.includes('logforward')) {
@@ -232,8 +238,8 @@ export class AuditLogsComponent implements OnInit {
     // - El actor no tiene username (sistema/proceso)
     // - El evento es del patrón scheduler.*, cron.*, sistema.*, etc
     const event = log.event?.toLowerCase() || '';
-    
-    if (!log.actor || !log.actor.username) {
+
+    if (!this.getActorUsername(log)) {
       return true;
     }
     
@@ -243,6 +249,19 @@ export class AuditLogsComponent implements OnInit {
     
     return false;
   }
+
+    getActorUsername(log: AuditLog): string {
+      const actorUsername = (log.actor?.username || '').trim();
+      if (actorUsername) {
+        return actorUsername;
+      }
+
+      const metadataUsername = typeof log.metadata?.['username'] === 'string'
+        ? log.metadata['username'].trim()
+        : '';
+
+      return metadataUsername;
+    }
 
   /**
    * Obtiene el indicador visual de acción usuario/sistema
@@ -262,6 +281,7 @@ export class AuditLogsComponent implements OnInit {
     const categoryLabels: { [key: string]: string } = {
       'integration': '🔗 Integración',
       'email': '📧 Correo',
+      'backup': '💾 Backup',
       'auth': '🔐 Autenticación',
       'entry': '📝 Entrada',
       'checklist': '✓ Checklist',
@@ -300,14 +320,85 @@ export class AuditLogsComponent implements OnInit {
     const event = log.event?.toLowerCase() || '';
     const meta = log.metadata || {};
     const result = log.result || {};
+
+    // ====== BACKUP ======
+    if (event.includes('backup') || event.startsWith('backup_')) {
+      const status = result.success ? '✅' : '❌';
+      const fileName = (meta['fileName'] as string | undefined) || (meta['filename'] as string | undefined) || '';
+      const detail = result.reason ? ` | ${result.reason}` : '';
+
+      if (event.includes('retention_file_deleted')) {
+        return `${status} [BACKUP RETENCIÓN] Archivo eliminado${fileName ? `: ${fileName}` : ''}${detail}`;
+      }
+
+      if (event.includes('retention_file_skipped')) {
+        return `${status} [BACKUP RETENCIÓN] Archivo conservado${fileName ? `: ${fileName}` : ''}${detail}`;
+      }
+
+      if (event.includes('retention_cleanup_started')) {
+        const scanned = Number(meta['scannedFiles'] || 0);
+        return `${status} [BACKUP RETENCIÓN] Inicio de limpieza | archivos revisados: ${scanned}`;
+      }
+
+      if (event.includes('run.started')) {
+        const source = (meta['source'] as string | undefined) || 'manual';
+        return `${status} [BACKUP] Inicio de ejecución (${source})${detail}`;
+      }
+
+      if (event.includes('run.completed')) {
+        const source = (meta['source'] as string | undefined) || 'manual';
+        return `${status} [BACKUP] Ejecución completada (${source})${fileName ? ` | ${fileName}` : ''}${detail}`;
+      }
+
+      if (event.includes('run.failed')) {
+        const source = (meta['source'] as string | undefined) || 'manual';
+        return `${status} [BACKUP] Ejecución fallida (${source})${detail}`;
+      }
+
+      if (event.includes('run.skipped')) {
+        const source = (meta['source'] as string | undefined) || 'manual';
+        return `${status} [BACKUP] Ejecución omitida (${source})${detail}`;
+      }
+
+      if (event.includes('auto_triggered')) {
+        return `${status} [BACKUP AUTO] Intervalo alcanzado, ejecución disparada${detail}`;
+      }
+
+      if (event.includes('auto_completed')) {
+        return `${status} [BACKUP AUTO] Ejecución automática completada${fileName ? ` | ${fileName}` : ''}${detail}`;
+      }
+
+      if (event.includes('auto_scheduled')) {
+        return `${status} [BACKUP AUTO] Scheduler inicializado${detail}`;
+      }
+
+      if (event.includes('admin.backup.delete')) {
+        return `${status} [BACKUP] Eliminación manual${fileName ? `: ${fileName}` : ''}${detail}`;
+      }
+
+      return `${status} [BACKUP] ${result.reason || 'evento de backup registrado'}`;
+    }
     
     // ====== CORREO / SMTP ======
     if (event.includes('mail') || event.includes('smtp')) {
       const status = result.success ? '✅' : '❌';
-      const recipients = (meta['toMasked'] as string[] | undefined)?.length ? (meta['toMasked'] as string[]).join(', ') : 'sin destinatarios';
+      const recipientsPreview = (meta['resolvedRecipientsPreview'] as string[] | undefined)?.length
+        ? (meta['resolvedRecipientsPreview'] as string[]).join(', ')
+        : ((meta['toMasked'] as string[] | undefined)?.length ? (meta['toMasked'] as string[]).join(', ') : 'sin destinatarios');
+      const recipientsCount = Number(meta['resolvedRecipientsCount'] ?? meta['recipientsCount'] ?? 0);
       const subject = meta['subject'] ? ` | ${meta['subject']}` : '';
       const category = meta['category'] || 'correo';
-      return `${status} [${category.toUpperCase()}] Para: ${recipients}${subject}`;
+      const sourceModule = meta['sourceModule'] ? ` | modulo:${meta['sourceModule']}` : '';
+      const triggerType = meta['triggerType'] ? ` | trigger:${meta['triggerType']}` : '';
+      const triggerContext = meta['triggerContext'] ? ` | origen:${meta['triggerContext']}` : '';
+      const smtpConfigId = meta['smtpConfigId'] ? ` | smtp:${String(meta['smtpConfigId']).slice(0, 8)}...` : '';
+      const failureCategory = meta['failureCategory'] ? ` | causa:${meta['failureCategory']}` : '';
+      const noise = (meta['noiseControl'] as any) || null;
+      const noiseText = noise && Number(noise.suppressedInWindow || 0) > 0
+        ? ` | repetidos:${noise.suppressedInWindow}`
+        : '';
+
+      return `${status} [${String(category).toUpperCase()}] Para: ${recipientsPreview} (${recipientsCount})${subject}${sourceModule}${triggerType}${triggerContext}${smtpConfigId}${failureCategory}${noiseText}`;
     }
 
     // ====== INTEGRACIÓN (GLPI, LOG FORWARDING) ======

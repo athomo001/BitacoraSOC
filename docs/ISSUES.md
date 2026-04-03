@@ -7,21 +7,7 @@
 
 | ID | Estado | Seccion | Tarea | Notas |
 | --- | --- | --- | --- | --- |
-| INFRA-MONGO-001 | Pendiente | Infraestructura / Datos CRÍTICA | Upgrade MongoDB (7 → 8) | El motor base de `mongo:7` en el docker-compose termina su soporte LTS oficial en Agosto de 2026. Se debe planificar un salto a `mongo:8`. Dado que los archivos de base de datos `.wt` no siempre son retrocompatibles entre versiones mayores, el protocolo a documentar e investigar requerirá: 1) `mongodump` completo; 2) Borrar el contenedor y limpiar el volumen físico `.data/mongodb_data`; 3) Levantar el nuevo `mongo:8` vacío; 4) Inyectar los datos de vuelta con `mongorestore`. |
-| B19 | Pendiente | Integraciones | Creación de tickets en GLPI (Correo / API) | Definir flujo final (resumen diario vs evento inmediato), destino y estrategia de reintentos. |
 | AI-SUMMARY-001 | Pendiente | IA/Operación ALTA | Módulo de Resumen Ejecutivo Efímero (IA On-Demand) | Integrar Ollama+llama3.2:3b en modo efímero `docker start -> healthcheck -> generate -> docker stop` con `try/finally`, salida editable en campo "Resumen Sugerido por IA" y botón "Generar con IA". |
-| DEP-NPM-012 | Pendiente | Deuda Técnica / Backend MEDIA | Dependencias npm deprecadas en build Docker (`glob`/`inflight`) | Durante `npm install --omit=dev` en backend aparecen warnings por paquetes deprecados (`glob@7.2.3`, `glob@10.5.0`, `inflight@1.0.6`). Se requiere trazar árbol de dependencias, actualizar paquetes raíz y regenerar lockfile para eliminar dependencias sin soporte y riesgo de seguridad/memoria. |
-| FE-SASS-013 | Pendiente | Deuda Técnica / Frontend MEDIA | Migrar `@import` Sass a `@use/@forward` en login | Build Angular reporta deprecación en `src/app/pages/login/login.component.scss` por `@import 'login-infoflow';`. Sass eliminará `@import` en Dart Sass 3.0.0; se debe migrar a módulos `@use/@forward` para compatibilidad futura. |
-| AUDIT-014 | Pendiente | Auditoría / Backend+Frontend ALTA | Login exitoso no muestra actor real en Auditoría | Hallazgo operativo: al autenticarse un usuario, el registro aparece como `Sistema` en columna Actor y sin contexto suficiente del usuario autenticado. Se debe corregir la atribución para que `auth.login.success` persista/renderice `actorId/username` reales (sin exponer secretos) y permita trazabilidad forense confiable. |
-| MAIL-AUDIT-015 | Pendiente | Email / Observabilidad ALTA | Error `❌ [CORREO] Para: sin destinatarios` sin contexto diagnóstico | Hallazgo operativo: en auditoría se observan múltiples WARN/ERROR de correo con texto genérico `Para: sin destinatarios`, sin identificar origen exacto (módulo, turno/checklist, trigger, destinatarios calculados, config SMTP). Se requiere enriquecer metadata y razón visible para identificar por qué falla y desde qué flujo se dispara. |
-| BACKUP-AUTO-016 | Pendiente | Backup / Operación ALTA | Backup automático no se ejecuta según intervalo configurado | Hallazgo operativo: con backups automáticos habilitados (`cada 7 días`) no aparecen ejecuciones automáticas en historial aun habiendo transcurrido más de 9 días; solo se observan backups manuales. Se debe validar scheduler, persistencia de última ejecución y timezone/frecuencia real del job. |
-| BACKUP-RET-017 | Pendiente | Backup / Operación ALTA | Retención de backups no elimina archivos al superar 7 días | Hallazgo operativo: se configuró retención local en `7 días`, pero permanecen backups antiguos sin depuración automática. Se debe validar criterio de antigüedad, origen de fecha usada para purge, ejecución efectiva de cleanup y trazabilidad de eliminaciones/skips. |
-| B46 | Pendiente | UI/UX + Seguridad Preventiva / Frontend MEDIA | Textarea de entradas permite escribir más de 50000 caracteres | Revisión confirmada: el formulario principal y el diálogo de edición muestran contador `x/50000` y usan `Validators.maxLength(50000)` en Angular, mientras backend (`Entry.maxlength=50000`) rechaza el exceso al guardar. Sin embargo, los `textarea` siguen aceptando escritura/pegado por encima del límite porque no tienen atributo `maxlength` ni recorte defensivo en entrada. Se debe limitar la escritura a `50000` también en UI para evitar consumo innecesario de memoria y payloads gigantes antes del submit. |
-| B47 | Pendiente | UI/UX + Accesibilidad / Frontend MEDIA | Heatmap en temas light/sepia/pastel no muestra bien el número de entradas | Hallazgo visual: en el mapa de calor de reportes, los temas claros (`light`, `sepia`, `pastel`) usan escalas con tonos bajos muy pálidos (`--heatmap-low`, `--heatmap-low-mid`) y el componente `ngx-charts-heat-map` no define una estrategia explícita de contraste para el texto dentro de cada celda. Resultado: el número de entradas se pierde o cuesta leerlo en varias celdas por similitud de color/transparencia entre fondo y etiqueta. |
-| B34 | Pendiente | Operación/Alertas | Alerta por ítems NOK (Rojo) en Checklist | Añadir switch en config global para activar/desactivar alerta por ítems en rojo. Agregar selector de cargo (ej. N2) a notificar. Al guardar el checklist, si el analista marca ítems NOK (rojo), enviar email automático a todos los usuarios del cargo seleccionado incluyendo el detalle/observación ingresada por el analista. |
-| SEC-HIGH-009 | Pendiente | Seguridad ALTA | Riesgo de Regex Injection / ReDoS en búsquedas de catálogo y tags (NoSQL) | Hallazgo QA: existen regex construidas directo desde input sin escape (`new RegExp(search, 'i')`, `new RegExp('^' + q, 'i')`, `$regex` con `topic` sin escapar) en rutas autenticadas/admin. Un patrón malicioso puede disparar backtracking costoso y degradar el backend (DoS lógico). Archivos detectados: `backend/src/routes/admin-catalog.js`, `backend/src/routes/tags.js`, `backend/src/routes/entries.js`, `backend/src/controllers/escalationController.js`. |
-| SEC-HIGH-010 | Pendiente | Seguridad ALTA | OWASP A10 SSRF: URLs salientes configurables sin allowlist en integraciones | Hallazgo QA: endpoints de integración permiten destinos salientes controlados por configuración (`GLPI api.baseUrl` y `logging http.url`) sin validación estricta de red interna/loopback/protocolos. Riesgo: Server-Side Request Forgery desde backend hacia servicios internos/metadatos si una cuenta admin se compromete. Archivos detectados: `backend/src/routes/glpi.js`, `backend/src/routes/logging.js`, `backend/src/utils/logForwarder.js`. |
-| SEC-MED-011 | Pendiente | Seguridad MEDIA | OWASP A09/A02: Logging sensible en autenticación (username + estado de password) | Hallazgo QA: en login se registran por consola datos sensibles de autenticación (`LOGIN REQUEST`, `Usuario encontrado`, `Password match`) sin condicionamiento por entorno. Riesgo: exposición de telemetría de credenciales/intentos en logs operativos. Archivo detectado: `backend/src/routes/auth.js`. |
 | COMP-001 | Pendiente | Arquitectura / Complementos ALTA | Persistencia Aislada, Wipe Out y Auditoría Forense | Cada complemento usa su propia DB (`bitacora_ext_*`). Al ejecutar `DELETE_COMPLEMENTO`, el orquestador dispara un Wipe Out de 4 fases (hook → dropDB → purge general → delete modelo) con trail forense completo en AuditLog. |
 | COMP-002 | Pendiente | API / Complementos ALTA | Contrato de API Interna (Microservicio-Bitácora) | Gateway seguro en `/api/internal/v1/*` con Application Token (no JWT de usuario), scopes granulares (`READ_LOGS`, `WRITE_STORAGE`, etc.) y colecciones autorizadas explícitamente por Admin. |
 | COMP-003 | Pendiente | UI / Complementos ALTA | Slot Dinámico en UI (N1 y Admin) | Iframe con `sandbox` restrictivo + `postMessage` con validación de origin. Consola Admin para gestión de Alta/Baja/Permisos. Circuit Breaker visual si el complemento falla. |
@@ -38,8 +24,22 @@
 
 | ID | Estado | Seccion | Tarea | Notas |
 | --- | --- | --- | --- | --- |
+| INFRA-MONGO-001 | Listo | Infraestructura / Datos CRÍTICA | Upgrade MongoDB (7 → 8) | Se actualizó `docker-compose.yml` a `mongo:8` y se documentó el procedimiento de migración mayor (dump, volumen limpio y restore) en `docs/DEPLOY.md`. |
+| B19 | Listo | Integraciones | Creación de tickets en GLPI (Correo / API) | Se implementó despacho GLPI para resumen diario e inmediato (incidente/ofensa), con reintentos, estado persistente y auditoría de éxito/fallo. |
+| DEP-NPM-012 | Listo | Deuda Técnica / Backend MEDIA | Dependencias npm deprecadas en build Docker (`glob`/`inflight`) | Se actualizó árbol raíz (`jest` 30, reemplazo `yamljs` por `yaml`) y se validó que en instalación de producción (`--omit=dev`) no aparece `inflight` ni `glob@7`; remanente deprecado queda solo en subárbol dev/transitivo. |
+| FE-SASS-013 | Listo | Deuda Técnica / Frontend MEDIA | Migrar `@import` Sass a `@use/@forward` en login | Migración aplicada en login (`@import` → `@use`) para compatibilidad con Dart Sass 3. |
+| AUDIT-014 | Listo | Auditoría / Backend+Frontend ALTA | Login exitoso no muestra actor real en Auditoría | Se corrigió la atribución de actor en `auth.login.success` (backend) y el fallback de renderizado en auditoría (frontend). |
+| BACKUP-AUTO-016 | Listo | Backup / Operación ALTA | Backup automático no se ejecuta según intervalo configurado | Scheduler rediseñado con estado persistente (`last/next run`), verificación por vencimiento al inicio/intervalo, trazabilidad de eventos automáticos y visualización de estado en UI. |
+| BACKUP-RET-017 | Listo | Backup / Operación ALTA | Retención de backups no elimina archivos al superar 7 días | Se corrigió cleanup de retención para respaldos locales `backup-*.json` y `backup-*.zip`, usando criterio robusto de antigüedad y trazabilidad explícita de inicio/eliminado/omitido por archivo. |
+| SEC-HIGH-009 | Listo | Seguridad ALTA | Riesgo de Regex Injection / ReDoS en búsquedas de catálogo y tags (NoSQL) | Se saneó construcción de regex con escape en búsquedas de catálogo/tags/RACI y se agregaron límites de tamaño de input (`search/q/topic`) y clamp de paginación para evitar patrones costosos. |
+| SEC-HIGH-010 | Listo | Seguridad ALTA | OWASP A10 SSRF: URLs salientes configurables sin allowlist en integraciones | Se implementó guard central de URLs salientes (solo HTTPS, bloqueo loopback/red privada, validación DNS y `OUTBOUND_ALLOWLIST` opcional) aplicado a GLPI y Log Forwarding en configuración y runtime. |
+| SEC-MED-011 | Listo | Seguridad MEDIA | OWASP A09/A02: Logging sensible en autenticación (username + estado de password) | Se eliminó exposición de datos sensibles en logs de autenticación y se reemplazó logging de enlace de reseteo por mensaje sanitizado sin secretos. |
+| MAIL-AUDIT-015 | Listo | Email / Observabilidad ALTA | Error `❌ [CORREO] Para: sin destinatarios` sin contexto diagnóstico | Se enriqueció la auditoría de `mail.send.success/fail` con `sourceModule`, `triggerType`, `triggerContext`, `shiftId/checklistId/entryType`, `smtpConfigId`, `resolvedRecipientsCount` y preview sanitizado; además se normalizó causa de fallo y se aplicó control de ruido (deduplicación/re-log periódico) para errores repetidos. La UI ahora muestra contexto operativo y causa explícita. |
+| B34 | Listo | Operación/Alertas | Alerta por ítems NOK (Rojo) en Checklist | Se agregó configuración global para alertas NOK (`alertNokEnabled`, `alertNokRoleTarget`) y envío automático de correo por checklist con rojos a usuarios activos del cargo seleccionado, incluyendo detalle de observación por ítem NOK. |
+| B46 | Listo | UI/UX + Seguridad Preventiva / Frontend MEDIA | Textarea de entradas permite escribir más de 50000 caracteres | Se aplicó `maxlength=50000` en creación y edición, truncado defensivo por `input` y aviso explícito al alcanzar el máximo. |
+| B47 | Listo | UI/UX + Accesibilidad / Frontend MEDIA | Heatmap en temas light/sepia/pastel no muestra bien el número de entradas | Se ajustó contraste del heatmap en temas claros (tokens `--heatmap-low` / `--heatmap-low-mid`) y se forzó color de etiqueta legible para celdas del mapa. |
 
-Los items `Listo` fueron migrados a `docs/CHANGELOG.md` como fuente de historial.
+Los items marcados como `Listo` deben quedar reflejados en `docs/CHANGELOG.md` como fuente de historial.
 ---
 
 ## Información de como solucionar los Pendientes
@@ -88,16 +88,6 @@ Los items `Listo` fueron migrados a `docs/CHANGELOG.md` como fuente de historial
 5. **Trazabilidad obligatoria:** Registrar en auditoría eventos `BACKUP_AUTO_SCHEDULED`, `BACKUP_AUTO_TRIGGERED`, `BACKUP_AUTO_SKIPPED` y motivo de skip para diagnóstico operativo.
 6. **Prueba controlada:** Bajar temporalmente intervalo a 1 día (o modo test en minutos), validar creación automática y luego restaurar 7 días.
 7. **Criterio de cierre:** Sin interacción manual, el sistema debe crear backup automático cuando vence el intervalo y mostrarlo en historial con etiqueta de origen `automático`.
-
-### BACKUP-RET-017 - Retención de backups no elimina archivos al superar 7 días
-
-1. **Reproducir con evidencia:** Configurar retención local en `7 días`, listar historial y respaldar evidencia de archivos con antigüedad mayor a 7 días que siguen presentes.
-2. **Validar configuración persistida:** Confirmar en DB que `localRetentionDays=7` quedó guardado y que no existe override por defecto en runtime.
-3. **Auditar lógica de purge:** Revisar en backend el cálculo de antigüedad (`mtime` vs timestamp embebido en nombre), timezone y comparación límite (`>`, `>=`) para evitar off-by-one.
-4. **Ejecutar cleanup forzado en entorno controlado:** Disparar backup automático de prueba y verificar que `cleanupOldLocalBackups(7)` realmente recorra y elimine archivos elegibles.
-5. **Agregar trazabilidad operativa:** Registrar en auditoría/logs `BACKUP_RETENTION_CLEANUP_STARTED`, `BACKUP_RETENTION_FILE_DELETED`, `BACKUP_RETENTION_FILE_SKIPPED` y motivo.
-6. **Cubrir regresión mínima:** Crear prueba automática de integración/unidad que genere archivos con fechas antiguas y valide su eliminación con retención de 7 días.
-7. **Criterio de cierre:** Todo backup con antigüedad mayor a 7 días debe eliminarse automáticamente en el siguiente ciclo de cleanup y reflejarse en trazabilidad.
 
 ### B46 - Textarea de entradas permite escribir más de 50000 caracteres
 
@@ -170,73 +160,6 @@ Los items `Listo` fueron migrados a `docs/CHANGELOG.md` como fuente de historial
 3. **Persistencia de metadata:** Validar que el modelo/DAO de `AuditLog` no esté sobrescribiendo actor con fallback `system` cuando sí hay usuario.
 4. **Frontend (render):** Ajustar `isSystemAction()` y resolución de columnas `Actor/Username` para priorizar actor humano cuando exista en payload.
 5. **Criterio de cierre:** Login exitoso debe mostrar usuario real en la fila y conservar clasificación de autenticación sin exponer credenciales/tokens.
-
-### MAIL-AUDIT-015 - Error `❌ [CORREO] Para: sin destinatarios` sin contexto diagnóstico
-
-1. **Normalizar razón de error:** Cambiar el texto genérico por mensaje estructurado con causa explícita (`destinatarios vacíos por filtro`, `rol sin usuarios activos`, `config SMTP incompleta`, etc.).
-2. **Enriquecer metadata de auditoría:** Incluir en evento de correo campos mínimos: `sourceModule`, `triggerType`, `shiftId`, `checklistId`, `entryType`, `resolvedRecipientsCount`, `resolvedRecipientsPreview` (sanitizado) y `smtpConfigId`.
-3. **Trazar origen de disparo:** Registrar si proviene de cierre de checklist, scheduler, escalación, PoC o envío manual para evitar confusión cuando solo se esperaba 1 correo.
-4. **Frontend (razón visible):** Mejorar `Tipo / Razón / Detalles` para mostrar resumen útil en una línea y detalle expandible con contexto operativo.
-5. **Control de ruido:** Aplicar deduplicación/ratelimit de logs repetidos para el mismo fallo en ventana corta (ej. 5-10 min) y mantener contador de repeticiones.
-6. **Criterio de cierre:** Ante fallo de correo, auditoría debe permitir responder en menos de 1 minuto: qué intentó enviar, desde dónde, a quién, por qué falló y qué configuración estaba activa.
-
-### B34 - Alerta por ítems NOK (Rojo) en Checklist
-
-1. **Modelo y Base de Datos:**
-   - En `AppConfig` (o `ChecklistTemplate` dependiendo de la granularidad requerida), agregar propiedades: `alertNokEnabled: Boolean`, `alertNokRoleTarget: [String]` (array referenciando los roles, ej: `['N2', 'N3']`).
-2. **Lógica de Backend (Guardado de Checklist):**
-   - Interceptar la ruta `POST/PUT` o el servicio de cierre/guardado del `Checklist`.
-   - Después de validar, iterar el array de ítems buscando `status === 'NOK'`.
-   - Si existen y la config local `alertNokEnabled` está en true, extraer la lista de `alertNokRoleTarget`.
-3. **Motor de Envíos y Usuarios:**
-   - Hacer un query de la colección `Users` buscando a las personas que tengan esos cargos activos (`Usuarios.find({ cargo: { $in: alertNokRoleTarget } })`).
-   - Construir el cuerpo HTML del correo donde se Listen iterativamente los ítems fallidos incluyendo las propiedades (Texto del check y el "Detalle u Observación" llenado por el analista).
-4. **Experiencia de Usuario (Frontend):**
-   - En `Global Configuration` o en Configuración de Checklists, agregar el toggle switch "Habilitar alertas NOK".
-   - Al lado, un Mat-Select con selección múltiple (checkboxes) que cargue el diccionario de cargos permitidos.
-   - Guardar estas variables de vuelta al modelo usando el servicio existente de `ConfigService`.
-
-### SEC-HIGH-009 - Regex Injection / ReDoS en búsquedas (NoSQL)
-
-1. **Corrección de construcción regex (obligatoria):**
-   - Nunca construir regex con input crudo. Crear helper común `escapeRegex()` y usarlo en:
-   - `backend/src/routes/admin-catalog.js` (campo `search`)
-   - `backend/src/routes/tags.js` (endpoint `/suggest`)
-   - `backend/src/routes/entries.js` (endpoint `/tags/suggest`)
-2. **Límites de entrada y paginación:**
-   - Restringir longitud de `search/q` (ej. max 64) y rechazar vacío/whitespace puro.
-   - Aplicar `limit` máximo estricto con clamp en todos los listados (`Math.min(..., 50)` o menor según endpoint).
-3. **Defensa adicional anti-ReDoS:**
-   - Rechazar patrones con metacaracteres no esperados si el caso de uso es búsqueda literal.
-   - Mantener búsquedas por prefijo seguro (`^textoEscapado`) para autocomplete.
-4. **Pruebas de seguridad QA:**
-   - Agregar test de regresión con payloads tipo `(a+)+$`, `(.+)+`, `(?:a|aa)+` verificando respuesta controlada y sin degradación.
-5. **Nota de clasificación:**
-   - No se encontraron vectores de SQL injection clásico (el proyecto usa MongoDB/Mongoose), pero este hallazgo califica como riesgo de inyección/DoS en capa NoSQL por regex no saneada.
-
-### SEC-HIGH-010 - OWASP A10 SSRF en integraciones salientes
-
-1. **Validación estricta de destino URL:**
-   - Restringir `api.baseUrl` (GLPI) y `http.url` (log forwarding) a `https://` por defecto y rechazar esquemas no permitidos.
-2. **Bloqueo de redes internas y loopback:**
-   - Resolver DNS y bloquear destinos privados/reservados (`127.0.0.0/8`, `::1`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, link-local/ULA IPv6).
-3. **Allowlist operativa opcional/obligatoria en producción:**
-   - Introducir `OUTBOUND_ALLOWLIST` y validar host destino contra dominios/IPs aprobados por seguridad.
-4. **Controles de transporte:**
-   - Forzar `verifyTls=true` por defecto en GLPI, timeout bajo, y denegar redirecciones automáticas.
-5. **Auditoría y alertas:**
-   - Registrar cambios de destino (host/URL) y generar evento de seguridad cuando apunten a redes no corporativas.
-
-### SEC-MED-011 - OWASP A09/A02 logging sensible en login
-
-1. **Eliminar logs sensibles de autenticación:**
-   - Quitar `console.log` de `username`, `Usuario encontrado` y `Password match` en `auth.js`.
-2. **Logging seguro por niveles:**
-   - Reemplazar por `logger` estructurado, sin PII/secretos, usando `requestId` y resultado genérico (`success/fail`).
-3. **Política por entorno:**
-   - Si se requiere diagnóstico en desarrollo, habilitar solo detrás de flag explícito (`AUTH_DEBUG_LOGS=false` por defecto).
-4. **Revisión histórica:**
-   - Verificar pipelines de logs existentes y limpiar retención de registros que hayan capturado esta telemetría.
 
 ### COMP-001 - Persistencia Aislada, Wipe Out y Auditoría Forense
 

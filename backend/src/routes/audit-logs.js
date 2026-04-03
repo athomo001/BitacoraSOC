@@ -55,7 +55,10 @@ router.get('/', authenticate, authorize('admin', 'auditor'), async (req, res) =>
           filters.event = /^(mail\.|smtp\.)/;
           break;
         case 'admin':
-          filters.event = /^admin\./;
+          filters.event = /^(admin\.|BACKUP_)/;
+          break;
+        case 'backup':
+          filters.event = /^(admin\.backup\.|BACKUP_)/;
           break;
         case 'user':
           filters.event = /^(user\.|entry\.|shiftcheck\.|checklist\.)/;

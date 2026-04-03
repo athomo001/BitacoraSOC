@@ -2,6 +2,43 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.24-beta] - 2026-04-02
+
+### Cierre de Issues Operativos
+
+#### Infraestructura y datos
+- **INFRA-MONGO-001:** Se actualizó la imagen base de MongoDB a `mongo:8` en `docker-compose.yml` y se documentó el procedimiento de migración mayor (dump, limpieza de volumen y restore) en `docs/DEPLOY.md`.
+
+#### Integraciones
+- **B19:** Se completó la integración GLPI para dos modos de operación: despacho de resumen diario y despacho inmediato para eventos críticos (`incidente` / `ofensa`).
+- Se agregó persistencia de estado de último despacho (`éxito/fallo`, canal, modo, mensaje) y trazabilidad de auditoría para intentos exitosos y fallidos.
+
+#### Auditoría y autenticación
+- **AUDIT-014:** Se corrigió la atribución de actor en `auth.login.success`, enviando actor explícito en backend para evitar que el login exitoso quede como acción de sistema.
+- Se ajustó el frontend de auditoría para resolver actor con fallback de metadata cuando corresponda, mejorando trazabilidad forense.
+- **MAIL-AUDIT-015:** Se enriqueció la auditoría de correo (`mail.send.success/fail`) con contexto operativo (`sourceModule`, `triggerType`, `triggerContext`, `shiftId/checklistId/entryType`, `smtpConfigId`, destinatarios sanitizados y conteo resuelto), se normalizó la causa de error y se agregó control de ruido para fallos repetidos; la UI ahora muestra causa y origen de disparo de forma explícita.
+
+#### Backups
+- **BACKUP-AUTO-016:** Se rediseñó el scheduler automático de backups con estado persistente de ejecución (`lastAutoRunAt`, `nextAutoRunAt`, estado y mensaje), verificación por vencimiento en arranque/intervalo y eventos de auditoría de ciclo automático.
+- Se añadió visibilidad de estado/última/próxima ejecución automática en la UI de administración de backups.
+- **BACKUP-RET-017:** Se corrigió la depuración automática de respaldos locales para incluir `backup-*.json` y `backup-*.zip`, con cálculo robusto de antigüedad y trazabilidad por archivo (`BACKUP_RETENTION_CLEANUP_STARTED`, `BACKUP_RETENTION_FILE_DELETED`, `BACKUP_RETENTION_FILE_SKIPPED`).
+
+#### Seguridad
+- **SEC-HIGH-009:** Se mitigó riesgo de Regex Injection/ReDoS en búsquedas administrativas y autocomplete, aplicando escape estricto de patrones y límites de longitud para `search/q/topic`.
+- **SEC-HIGH-010:** Se incorporó guard central de destinos salientes (solo HTTPS, bloqueo loopback/red privada, validación DNS y allowlist opcional por `OUTBOUND_ALLOWLIST`) aplicado a GLPI y Log Forwarding en guardado y ejecución.
+- **SEC-MED-011:** Se eliminó logging sensible residual de autenticación/reseteo reemplazándolo por trazas sanitizadas sin exponer secretos ni links de recuperación.
+
+#### Frontend
+- **B34:** Se incorporó en Administración de Checklist la configuración de alerta por ítems NOK (switch + selección de cargos objetivo), persistida en configuración global.
+- Se implementó en backend el envío automático de correo al registrar checklist con estados rojos, resolviendo destinatarios por cargo activo y adjuntando detalle/observación de cada ítem NOK en el mensaje.
+- **FE-SASS-013:** Se migró en login el uso de Sass de `@import` a `@use`, eliminando la ruta deprecada para compatibilidad con Dart Sass 3.
+- **B46:** Se reforzó el límite de contenido de entradas en UI con `maxlength=50000` en formulario principal y diálogo de edición, más truncado defensivo en `input` y aviso explícito al llegar al tope.
+- **B47:** Se mejoró legibilidad del heatmap en temas claros (`light`, `sepia`, `pastel`) ajustando tonos bajos/medio-bajos y forzando color de etiquetas internas con mayor contraste.
+
+#### Deuda técnica backend
+- **DEP-NPM-012:** Se actualizó el árbol raíz de dependencias (`jest` 30 y reemplazo de `yamljs` por `yaml`) y se validó instalación de producción (`npm install --omit=dev`) sin presencia de `inflight` ni `glob@7`.
+- Queda únicamente remanente de deprecación en subárbol de desarrollo/transitivo, sin impacto en runtime productivo actual.
+
 ## Histórico Consolidado - 2026-04-01
 
 Migración documental de cambios cerrados que estaban marcados como `Listo` en `docs/ISSUES.md` pero aún no tenían asiento explícito en este changelog. Esta sección preserva el resultado funcional conocido sin inventar una versión histórica específica retroactiva.

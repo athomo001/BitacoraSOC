@@ -67,6 +67,32 @@ const glpiConfigSchema = new mongoose.Schema({
   lastTestMessage: {
     type: String,
     default: ''
+  },
+  lastDispatchDate: {
+    type: Date,
+    default: null
+  },
+  lastDispatchSuccess: {
+    type: Boolean,
+    default: null
+  },
+  lastDispatchMessage: {
+    type: String,
+    default: ''
+  },
+  lastDispatchMode: {
+    type: String,
+    enum: ['daily-summary', 'immediate', 'manual-test', 'unknown'],
+    default: 'unknown'
+  },
+  lastDispatchEvent: {
+    type: String,
+    default: ''
+  },
+  lastDispatchChannel: {
+    type: String,
+    enum: ['api', 'email', 'none'],
+    default: 'none'
   }
 }, {
   timestamps: true
