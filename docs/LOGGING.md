@@ -141,6 +141,12 @@ await audit(req, {
 | `admin.users` | `.create` / `.update` / `.delete` | info | Gestión de usuarios |
 | `admin.backup` | `.create` / `.restore` | info | Backups |
 | `admin.logging` | `.view` / `.update` / `.test` | info | Config de forwarding |
+| `complement.install` | - | info | Alta de complemento |
+| `complement.update` | `.permissions` / `.config` | info | Cambios administrativos |
+| `complement.delete` | `.initiated` / `.completed` | warn | Baja y wipe-out |
+| `complement.wipe` | `.hook_sent` / `.hook_timeout` / `.db_dropped` / `.general_purged` / `.orphans_detected` | info/warn/error | Trail forense de borrado |
+| `complement.api` | `.denied` / `.log_entry` | warn/info | API interna y denegaciones |
+| `complement.circuit` | `.open` / `.half_open` / `.close` | warn/info | Estado de resiliencia |
 
 ### API de auditoría (admin/auditor)
 
@@ -151,6 +157,8 @@ GET /api/audit-logs/stats
 ```
 
 **Roles:** `admin` y `auditor`.
+
+Los eventos de complementos se registran con `source="complement"` y `sourceId="<slug>"` para facilitar filtros operativos y forwarding a SIEM.
 
 ---
 

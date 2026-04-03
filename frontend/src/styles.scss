@@ -80,11 +80,12 @@
   --chart-7: #00897b;
   --chart-8: #6d4c41;
 
-  --heatmap-low: #d7f5b8;
-  --heatmap-low-mid: #8bd35f;
+  --heatmap-low: #b7dd8f;
+  --heatmap-low-mid: #74bb4d;
   --heatmap-mid: #1f9d55;
   --heatmap-high: #f6c343;
   --heatmap-very-high: #e53935;
+  --heatmap-label-color: #1f1f1f;
 
   --shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
@@ -138,6 +139,7 @@
   --heatmap-mid: #2f9a5e;
   --heatmap-high: #d39f3a;
   --heatmap-very-high: #e07b7b;
+  --heatmap-label-color: #f7f9ff;
 
   --shadow: 0 2px 12px rgba(0,0,0,0.6);
 }
@@ -186,11 +188,12 @@
   --chart-7: #4f7a74;
   --chart-8: #6f6356;
 
-  --heatmap-low: #d7e5ba;
-  --heatmap-low-mid: #9fbc72;
+  --heatmap-low: #bfd09f;
+  --heatmap-low-mid: #839f58;
   --heatmap-mid: #6d8f59;
   --heatmap-high: #d8ad62;
   --heatmap-very-high: #c17366;
+  --heatmap-label-color: #2f2a22;
 
   --shadow: 0 2px 4px rgba(74,63,53,0.1);
 }
@@ -239,11 +242,12 @@
   --chart-7: #55a7a0;
   --chart-8: #9a7a70;
 
-  --heatmap-low: #d9efc6;
-  --heatmap-low-mid: #9ad17d;
+  --heatmap-low: #bfdca8;
+  --heatmap-low-mid: #78bf62;
   --heatmap-mid: #55ad73;
   --heatmap-high: #efc46b;
   --heatmap-very-high: #e57474;
+  --heatmap-label-color: #261f25;
 
   --shadow: 0 2px 6px rgba(255,111,163,0.2);
 }
@@ -297,6 +301,7 @@
   --heatmap-mid: #9900ff;
   --heatmap-high: #ff008c;
   --heatmap-very-high: #c71c0b;
+  --heatmap-label-color: #ffffff;
 
   --shadow: 0 6px 24px rgba(0, 0, 0, 0.8), 0 0 16px rgba(0, 224, 255, 0.25);
 }

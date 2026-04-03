@@ -24,6 +24,8 @@ const router = express.Router();
 const Entry = require('../models/Entry');
 const { authenticate, authorize } = require('../middleware/auth');
 
+const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 // Normaliza un nombre de tag: trim + lowercase y valida longitud
 const normalizeTagName = (name = '') => {
   const normalized = name.toString().trim().toLowerCase();
@@ -80,13 +82,17 @@ router.get('/list', authenticate, async (req, res) => {
 // GET /api/tags/suggest - Autocompletar (ya esta en entries.js pero tambien aqui)
 router.get('/suggest', authenticate, async (req, res) => {
   try {
-    const { q } = req.query;
+    const q = String(req.query.q || '').trim();
 
     if (!q || q.length < 2) {
       return res.json([]);
     }
 
-    const regex = new RegExp(`^${q}`, 'i');
+    if (q.length > 64) {
+      return res.status(400).json({ message: 'q no puede superar 64 caracteres' });
+    }
+
+    const regex = new RegExp(`^${escapeRegex(q)}`, 'i');
 
     const tags = await Entry.aggregate([
       { $unwind: '$tags' },

@@ -31,9 +31,14 @@
             <!-- Área de texto GRANDE -->
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Escribe aquí. Usa # para tags (ej: #Trellix #hunting)</mat-label>
-              <textarea matInput formControlName="content" rows="12" 
+              <textarea matInput formControlName="content" rows="12"
+                        maxlength="50000"
+                        (input)="enforceContentMaxLength()"
                         placeholder="Escribe aquí. Usa # para tags (ej: #Trellix #hunting)"></textarea>
               <mat-hint align="end">{{ entryForm.get('content')?.value?.length || 0 }}/50000</mat-hint>
+              <mat-hint *ngIf="(entryForm.get('content')?.value?.length || 0) >= 50000" class="max-length-warning">
+                Máximo 50000 caracteres alcanzado
+              </mat-hint>
             </mat-form-field>
 
             <!-- Botón Subir -->

@@ -166,7 +166,6 @@ router.post('/login',
   ],
   validate,
   async (req, res) => {
-    console.log('🔵 LOGIN REQUEST:', req.body.username);
     try {
       const { username, password } = req.body;
 
@@ -177,7 +176,6 @@ router.post('/login',
       const user = await User.findOne({
         $or: [{ username: exactMatch }, { email: exactMatch }]
       });
-      console.log('🔵 Usuario encontrado:', !!user);
 
       if (!user || !user.isActive) {
         const easterEgg = await getLoginEasterEggSignal(username, password);
@@ -207,7 +205,6 @@ router.post('/login',
       }
 
       const isMatch = await user.comparePassword(password);
-      console.log('🔵 Password match:', isMatch);
 
       if (!isMatch) {
         const easterEgg = await getLoginEasterEggSignal(username, password);
@@ -225,12 +222,17 @@ router.post('/login',
       }
 
       const token = generateToken(user._id, user.role);
-      console.log('🔵 Token generado, enviando respuesta...');
       setAuthCookie(req, res, token);
 
       audit(req, {
         event: 'auth.login.success',
         level: 'info',
+        actor: {
+          userId: user._id,
+          username: user.username,
+          role: user.role,
+          isGuest: user.role === 'guest'
+        },
         result: { success: true, reason: 'Login successful' },
         metadata: {
           userId: user._id,
@@ -247,6 +249,7 @@ router.post('/login',
           username: user.username,
           email: user.email,
           fullName: user.fullName,
+          cargoLabel: user.cargoLabel,
           role: user.role,
           theme: user.theme,
           avatar: user.avatar,
@@ -397,7 +400,7 @@ router.post('/forgot-password',
 
       // Si está en desarrollo Y el email no se envió, solo hacemos log
       if (process.env.NODE_ENV === 'development' && !emailSent) {
-        console.log(`[DEV ONLY] Link de reseteo generado pero no enviado (SMTP sin configurar): ${resetUrl}`);
+        logger.warn({ requestId: req.requestId }, '[DEV ONLY] Reset link generado pero no enviado (SMTP sin configurar)');
         return res.json({
           message: 'Si el email existe, recibirás instrucciones para resetear tu contraseña'
         });

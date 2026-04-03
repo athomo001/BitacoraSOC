@@ -47,11 +47,18 @@ const entrySchema = new mongoose.Schema({
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required() {
+      return !this.ownerComplementId;
+    }
   },
   createdByUsername: {
     type: String,
     required: true
+  },
+  ownerComplementId: {
+    type: String,
+    default: null,
+    index: true
   },
   isGuestEntry: {
     type: Boolean,
@@ -83,6 +90,7 @@ entrySchema.index({ createdAt: -1 });
 entrySchema.index({ entryDate: -1 });
 entrySchema.index({ createdBy: 1 });
 entrySchema.index({ isGuestEntry: 1 });
+entrySchema.index({ ownerComplementId: 1, createdAt: -1 });
 
 // Índice compuesto para filtros comunes
 entrySchema.index({ entryType: 1, createdAt: -1 });

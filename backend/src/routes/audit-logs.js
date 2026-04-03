@@ -38,7 +38,8 @@ router.get('/', authenticate, authorize('admin', 'auditor'), async (req, res) =>
       level,
       startDate,
       endDate,
-      search
+      search,
+      sourceSlug
     } = req.query;
 
     const filters = {};
@@ -55,13 +56,19 @@ router.get('/', authenticate, authorize('admin', 'auditor'), async (req, res) =>
           filters.event = /^(mail\.|smtp\.)/;
           break;
         case 'admin':
-          filters.event = /^admin\./;
+          filters.event = /^(admin\.|BACKUP_)/;
+          break;
+        case 'backup':
+          filters.event = /^(admin\.backup\.|BACKUP_)/;
           break;
         case 'user':
           filters.event = /^(user\.|entry\.|shiftcheck\.|checklist\.)/;
           break;
         case 'security':
           filters.event = /^(auth\.|security\.)/;
+          break;
+        case 'complement':
+          filters.source = 'complement';
           break;
         default:
           break;
@@ -70,6 +77,11 @@ router.get('/', authenticate, authorize('admin', 'auditor'), async (req, res) =>
 
     if (level) {
       filters.level = level;
+    }
+
+    if (sourceSlug) {
+      filters.source = 'complement';
+      filters.sourceId = sourceSlug;
     }
 
     const dateRange = buildDateRange(startDate, endDate);
@@ -84,7 +96,9 @@ router.get('/', authenticate, authorize('admin', 'auditor'), async (req, res) =>
         { 'actor.username': pattern },
         { 'request.ip': pattern },
         { 'request.path': pattern },
-        { 'result.reason': pattern }
+        { 'result.reason': pattern },
+        { sourceId: pattern },
+        { source: pattern }
       ];
     }
 

@@ -14,6 +14,13 @@ const RaciEntry = require('../models/RaciEntry');
 const ClientEscalationRule = require('../models/ClientEscalationRule');
 const { authenticate } = require('../middleware/auth');
 
+const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const clamp = (value, min, max, fallback) => {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+};
+
 // Middleware para verificar role=admin
 const requireAdmin = (req, res, next) => {
   const isAuditorReadOnly = req.user.role === 'auditor' && ['GET', 'HEAD', 'OPTIONS'].includes(req.method);
@@ -79,10 +86,17 @@ router.delete('/events/:id', async (req, res) => {
 router.get('/events', async (req, res) => {
   try {
     const { page = 1, limit = 50, search = '' } = req.query;
+    const safePage = clamp(page, 1, 100000, 1);
+    const safeLimit = clamp(limit, 1, 50, 50);
+    const normalizedSearch = String(search || '').trim();
 
     const query = {};
-    if (search) {
-      const searchRegex = new RegExp(search, 'i');
+    if (normalizedSearch) {
+      if (normalizedSearch.length > 64) {
+        return res.status(400).json({ message: 'search no puede superar 64 caracteres' });
+      }
+
+      const searchRegex = new RegExp(escapeRegex(normalizedSearch), 'i');
       query.$or = [
         { name: searchRegex },
         { parent: searchRegex },
@@ -92,16 +106,16 @@ router.get('/events', async (req, res) => {
 
     const events = await CatalogEvent.find(query)
       .sort({ parent: 1, name: 1 })
-      .limit(parseInt(limit))
-      .skip((parseInt(page) - 1) * parseInt(limit));
+      .limit(safeLimit)
+      .skip((safePage - 1) * safeLimit);
 
     const total = await CatalogEvent.countDocuments(query);
 
     res.json({
       items: events,
       total,
-      page: parseInt(page),
-      totalPages: Math.ceil(total / parseInt(limit))
+      page: safePage,
+      totalPages: Math.ceil(total / safeLimit)
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

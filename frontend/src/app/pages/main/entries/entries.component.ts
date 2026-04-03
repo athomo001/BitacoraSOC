@@ -30,6 +30,7 @@ import { MatSelect, MatOption } from '@angular/material/select';
   imports: [MatCard, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatHint, MatButton, NgIf, MatIcon, MatProgressSpinner, MatRadioGroup, MatRadioButton, MatSelect, MatOption, NgFor]
 })
 export class EntriesComponent implements OnInit, OnDestroy {
+  private readonly contentMaxLength = 50000;
   entryForm: FormGroup;
   today = '';
   nowTime = '';
@@ -160,6 +161,20 @@ export class EntriesComponent implements OnInit, OnDestroy {
         this.isSubmitting = false;
       }
     });
+  }
+
+  enforceContentMaxLength(): void {
+    const contentControl = this.entryForm.get('content');
+    if (!contentControl) {
+      return;
+    }
+
+    const currentValue = String(contentControl.value || '');
+    if (currentValue.length <= this.contentMaxLength) {
+      return;
+    }
+
+    contentControl.setValue(currentValue.slice(0, this.contentMaxLength), { emitEvent: false });
   }
 
   private extractTagsFromContent(content: string): string[] {

@@ -107,6 +107,15 @@ const appConfigSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // Alerta por items NOK (rojo) en checklist
+  alertNokEnabled: {
+    type: Boolean,
+    default: false
+  },
+  alertNokRoleTarget: {
+    type: [String],
+    default: ['N2']
+  },
   // Alertas de checklist (B4-7)
   checklistAlertEnabled: {
     type: Boolean,
@@ -314,6 +323,31 @@ const appConfigSchema = new mongoose.Schema({
     destinationConfig: {
       type: mongoose.Schema.Types.Mixed,
       default: {}
+    },
+    scheduleAnchorAt: {
+      type: Date,
+      default: null
+    },
+    lastAutoAttemptAt: {
+      type: Date,
+      default: null
+    },
+    lastAutoRunAt: {
+      type: Date,
+      default: null
+    },
+    nextAutoRunAt: {
+      type: Date,
+      default: null
+    },
+    lastAutoRunStatus: {
+      type: String,
+      enum: ['idle', 'scheduled', 'success', 'error'],
+      default: 'idle'
+    },
+    lastAutoRunMessage: {
+      type: String,
+      default: ''
     }
   },
   // Tema visual del login

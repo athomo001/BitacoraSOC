@@ -34,7 +34,15 @@ const { logger, sanitize } = require('./logger');
  */
 async function audit(req, data) {
   try {
-    const { event, level = 'info', result, metadata = {} } = data;
+    const {
+      event,
+      level = 'info',
+      result,
+      metadata = {},
+      actor: actorOverride = null,
+      source = 'core',
+      sourceId = null
+    } = data;
     
     // Validar campos requeridos
     if (!event || !result) {
@@ -42,12 +50,12 @@ async function audit(req, data) {
     }
     
     // Extraer actor de req.user (si existe)
-    const actor = req.user ? {
+    const actor = actorOverride || (req.user ? {
       userId: req.user._id,
       username: req.user.username,
       role: req.user.role,
       isGuest: req.user.role === 'guest'
-    } : null;
+    } : null);
     
     // Extraer request context
     const request = {
@@ -83,7 +91,9 @@ async function audit(req, data) {
       actor,
       request,
       result,
-      metadata: sanitizedMetadata
+      metadata: sanitizedMetadata,
+      source,
+      sourceId
     });
     
     // Log estructurado (pino)
@@ -91,6 +101,8 @@ async function audit(req, data) {
       auditId: auditRecord._id.toString(),
       event,
       requestId: request.requestId,
+      source,
+      sourceId,
       actor,
       result,
       metadata: sanitizedMetadata

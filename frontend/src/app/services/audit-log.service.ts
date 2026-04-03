@@ -24,6 +24,7 @@ export class AuditLogService {
     if (filters.startDate) params = params.set('startDate', filters.startDate);
     if (filters.endDate) params = params.set('endDate', filters.endDate);
     if (filters.search) params = params.set('search', filters.search);
+    if (filters.sourceSlug) params = params.set('sourceSlug', filters.sourceSlug);
 
     return this.http.get<AuditLogResponse>(this.apiUrl, { params });
   }

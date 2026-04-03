@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "bitacora/complement-event.schema.json",
+  "title": "Complement Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "version"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "CONTEXT_UPDATE",
+        "SHIFT_CHANGE",
+        "USER_CHANGE",
+        "THEME_CHANGE",
+        "CHECKLIST_SUBMITTED",
+        "REQUEST_CONTEXT",
+        "CREATE_ENTRY",
+        "NOTIFY_ERROR"
+      ]
+    },
+    "version": {
+      "type": "integer",
+      "enum": [1]
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]{1,32}$"
+    },
+    "payload": {
+      "type": ["object", "array", "string", "number", "boolean", "null"]
+    },
+    "timestamp": {
+      "type": "number"
+    }
+  }
+}

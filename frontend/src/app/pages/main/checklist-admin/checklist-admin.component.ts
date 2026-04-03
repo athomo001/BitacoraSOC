@@ -4,6 +4,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { ChecklistService } from '../../../services/checklist.service';
 import { ConfigService } from '../../../services/config.service';
 import { WorkShiftService } from '../../../services/work-shift.service';
+import { UserService } from '../../../services/user.service';
 import { ChecklistTemplate, ChecklistItem } from '../../../models/checklist.model';
 import { WorkShift } from '../../../models/work-shift.model';
 import { MatCard, MatCardTitle, MatCardContent } from '@angular/material/card';
@@ -17,12 +18,13 @@ import { MatInput } from '@angular/material/input';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { MatIcon } from '@angular/material/icon';
 import { MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle } from '@angular/material/expansion';
+import { MatSelect, MatOption } from '@angular/material/select';
 
 @Component({
   selector: 'app-checklist-admin',
   templateUrl: './checklist-admin.component.html',
   styleUrls: ['./checklist-admin.component.scss'],
-  imports: [MatCard, MatCardTitle, NgIf, MatProgressBar, MatNavList, NgFor, MatListItem, MatChipSet, MatChip, MatButton, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatHint, MatInput, MatCheckbox, MatIconButton, MatIcon, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle]
+  imports: [MatCard, MatCardTitle, NgIf, MatProgressBar, MatNavList, NgFor, MatListItem, MatChipSet, MatChip, MatButton, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatHint, MatInput, MatCheckbox, MatIconButton, MatIcon, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatSelect, MatOption]
 })
 export class ChecklistAdminComponent implements OnInit {
   templates: ChecklistTemplate[] = [];
@@ -30,6 +32,7 @@ export class ChecklistAdminComponent implements OnInit {
   activeShifts: WorkShift[] = [];
   isLoading = false;
   savingConfig = false;
+  cargoLabelOptions: string[] = ['N2'];
   form: FormGroup;
   configForm: FormGroup;
 
@@ -38,6 +41,7 @@ export class ChecklistAdminComponent implements OnInit {
     private checklistService: ChecklistService,
     private configService: ConfigService,
     private workShiftService: WorkShiftService,
+    private userService: UserService,
     private snackBar: MatSnackBar
   ) {
     this.form = this.fb.group({
@@ -49,16 +53,51 @@ export class ChecklistAdminComponent implements OnInit {
     this.configForm = this.fb.group({
       checklistCooldownHours: [240, [Validators.required, Validators.min(1)]], // minutos (default 4 horas)
       checklistCloseEmailEnabled: [false],
+      alertNokEnabled: [false],
+      alertNokRoleTarget: [['N2']],
       checklistAlertEnabled: [true],
       checklistAlertTime: ['09:30', [Validators.required]]
     });
   }
 
   ngOnInit(): void {
+    this.loadCargoLabelOptions();
     this.loadConfig();
     this.loadTemplates();
     this.loadActiveShifts();
     this.addItem();
+  }
+
+  loadCargoLabelOptions(): void {
+    this.userService.getUsersList().subscribe({
+      next: (users) => {
+        const labels = Array.from(new Set(
+          (users || [])
+            .map((user: any) => String(user?.cargoLabel || '').trim())
+            .filter((label: string) => label.length > 0)
+        )).sort((a, b) => a.localeCompare(b));
+
+        this.cargoLabelOptions = labels.length > 0 ? labels : ['N2'];
+        this.ensureNokRoleSelection();
+      },
+      error: (err) => {
+        console.error('Error cargando cargos para alerta NOK', err);
+        this.cargoLabelOptions = ['N2'];
+        this.ensureNokRoleSelection();
+      }
+    });
+  }
+
+  private ensureNokRoleSelection(): void {
+    const current = this.configForm.get('alertNokRoleTarget')?.value;
+    const normalized = Array.isArray(current)
+      ? current.map((value: string) => String(value || '').trim()).filter((value: string) => value.length > 0)
+      : [];
+
+    if (normalized.length === 0) {
+      const fallback = this.cargoLabelOptions.includes('N2') ? ['N2'] : [this.cargoLabelOptions[0]];
+      this.configForm.patchValue({ alertNokRoleTarget: fallback.filter(Boolean) }, { emitEvent: false });
+    }
   }
 
   loadActiveShifts(): void {
@@ -77,9 +116,15 @@ export class ChecklistAdminComponent implements OnInit {
         this.configForm.patchValue({
           checklistCooldownHours: config.shiftCheckCooldownHours,
           checklistCloseEmailEnabled: config.checklistCloseEmailEnabled ?? false,
+          alertNokEnabled: config.alertNokEnabled ?? false,
+          alertNokRoleTarget: Array.isArray(config.alertNokRoleTarget) && config.alertNokRoleTarget.length > 0
+            ? config.alertNokRoleTarget
+            : ['N2'],
           checklistAlertEnabled: config.checklistAlertEnabled ?? true,
           checklistAlertTime: config.checklistAlertTime || '09:30'
         });
+
+        this.ensureNokRoleSelection();
       },
       error: (err) => {
         console.error('Error cargando config checklist:', err);
@@ -90,10 +135,23 @@ export class ChecklistAdminComponent implements OnInit {
 
   saveConfig(): void {
     if (this.configForm.invalid) return;
+
+    const alertNokEnabled = Boolean(this.configForm.value.alertNokEnabled);
+    const selectedRoles = Array.isArray(this.configForm.value.alertNokRoleTarget)
+      ? this.configForm.value.alertNokRoleTarget.filter((label: string) => String(label || '').trim().length > 0)
+      : [];
+
+    if (alertNokEnabled && selectedRoles.length === 0) {
+      this.snackBar.open('Debes seleccionar al menos un cargo para alerta NOK', 'Cerrar', { duration: 3000 });
+      return;
+    }
+
     this.savingConfig = true;
     const payload = {
       shiftCheckCooldownHours: this.configForm.value.checklistCooldownHours,
       checklistCloseEmailEnabled: this.configForm.value.checklistCloseEmailEnabled,
+      alertNokEnabled,
+      alertNokRoleTarget: selectedRoles,
       checklistAlertEnabled: this.configForm.value.checklistAlertEnabled,
       checklistAlertTime: this.configForm.value.checklistAlertTime
     };

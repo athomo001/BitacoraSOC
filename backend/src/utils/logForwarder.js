@@ -24,6 +24,7 @@ const fs = require('fs');
 const { URL } = require('url');
 const LogForwardingConfig = require('../models/LogForwardingConfig');
 const { logger, sanitize } = require('./logger');
+const { assertOutboundUrlSafe } = require('./outbound-url-guard');
 
 class LogForwarder {
   constructor() {
@@ -137,11 +138,13 @@ class LogForwarder {
 
   sendHttp(config, payload) {
     return new Promise((resolve, reject) => {
-      try {
+      (async () => {
         const endpoint = config.http?.url;
         if (!endpoint) {
           return reject(new Error('HTTP url no configurada para log forwarding'));
         }
+
+        await assertOutboundUrlSafe(endpoint, { requireHttps: true });
 
         const url = new URL(endpoint);
         const client = url.protocol === 'https:' ? https : http;
@@ -175,9 +178,9 @@ class LogForwarder {
         });
         req.write(body);
         req.end();
-      } catch (error) {
+      })().catch((error) => {
         reject(error);
-      }
+      });
     });
   }
 

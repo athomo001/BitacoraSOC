@@ -1,3 +1,5 @@
+@use 'login-infoflow';
+
 // CRT Retro Theme Variables
 $crt-green: #00cc77;
 $crt-dark-green: #00aa55;
@@ -508,5 +510,3 @@ $crt-font: 'Courier New', monospace;
   object-fit: contain;
 }
 
-// ── Tema Infoflow (Matrix/Cyberpunk) ─────────────────────────
-@import 'login-infoflow';

@@ -6,6 +6,7 @@ const ShiftCheck = require('../models/ShiftCheck');
 const AppConfig = require('../models/AppConfig');
 const { logger } = require('./logger');
 const { auditSystem } = require('./audit');
+const { dispatchGlpiPayload } = require('./glpi-dispatch');
 
 /**
  * Genera y envía reporte de turno por correo
@@ -299,7 +300,7 @@ const renderSummaryCard = (label, value, styles) => {
 /**
  * Genera HTML del reporte de turno
  */
-function generateReportHTML({ shift, checklistEntry, checklistExit, entries, periodStart, periodEnd, appTitle = 'Bitácora SOC', faviconUrl = '' }) {
+async function generateReportHTML({ shift, checklistEntry, checklistExit, entries, periodStart, periodEnd, appTitle = 'Bitácora SOC', faviconUrl = '' }) {
   const brandedAppTitle = String(appTitle || '').trim() || 'Bitácora SOC';
   const brandedAppTitleHtml = escapeHtml(brandedAppTitle);
   const favicon = String(faviconUrl || '').trim();
@@ -526,7 +527,7 @@ function generateReportHTML({ shift, checklistEntry, checklistExit, entries, per
 </mjml>
 `;
 
-  const compilation = mjml2html(mjmlTemplate, {
+  const compilation = await mjml2html(mjmlTemplate, {
     validationLevel: 'strict',
     minify: false,
     keepComments: false
@@ -656,21 +657,14 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
       ignoreShiftEnabled
     });
 
-    if (!shift.emailReportConfig.recipients || shift.emailReportConfig.recipients.length === 0) {
-      logger.warn(`📊 [sendShiftReport] No recipients configured for shift ${shift.name}`);
-      await registerShiftReportAudit({
-        event: 'smtp.shift-report.skipped',
-        success: false,
-        reason: 'No recipients configured',
-        metadata: {
-          shiftName: shift.name,
-          recipientsCount: 0
-        }
-      });
-      return { success: false, message: 'No recipients configured' };
-    }
+    const emailRecipients = Array.isArray(shift.emailReportConfig?.recipients)
+      ? shift.emailReportConfig.recipients.filter(Boolean)
+      : [];
 
-    logger.info('📊 [sendShiftReport] Recipients found', { count: shift.emailReportConfig.recipients.length, recipients: shift.emailReportConfig.recipients });
+    logger.info('📊 [sendShiftReport] Email recipients resolved', {
+      count: emailRecipients.length,
+      recipients: emailRecipients
+    });
 
     const appConfig = await AppConfig.findOne().select('appTitle faviconUrl').lean();
     const appTitle = String(appConfig?.appTitle || '').trim() || 'Bitácora SOC';
@@ -764,7 +758,7 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
     });
 
     // 6. Generar HTML
-    const html = generateReportHTML({
+    const html = await generateReportHTML({
       shift,
       checklistEntry,
       checklistExit,
@@ -784,29 +778,96 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
       appTitle
     });
 
-    // 7. Enviar correo
-    logger.info('📊 [sendShiftReport] About to send email...', {
-      recipients: shift.emailReportConfig.recipients,
-      subject,
-      htmlSize: html.length
-    });
+    const deliveredChannels = [];
+    let lastDeliveryError = null;
 
-    await sendEmail({
-      to: shift.emailReportConfig.recipients,
+    if (emailRecipients.length > 0) {
+      logger.info('📊 [sendShiftReport] About to send email...', {
+        recipients: emailRecipients,
+        subject,
+        htmlSize: html.length
+      });
+
+      try {
+        await sendEmail({
+          to: emailRecipients,
+          subject,
+          html,
+          text,
+          auditContext: {
+            sourceModule: 'shift-report',
+            triggerType: triggerSource,
+            triggerContext: 'sendShiftReport',
+            shiftId: shift._id?.toString(),
+            extra: {
+              shiftName: shift.name,
+              entriesCount: entries.length,
+              periodStart,
+              periodEnd
+            }
+          }
+        });
+        deliveredChannels.push('email');
+      } catch (error) {
+        lastDeliveryError = error;
+        logger.error({ err: error, shiftId }, 'Error sending shift report email');
+      }
+    }
+
+    const glpiDispatchResult = await dispatchGlpiPayload({
+      expectedDispatchMode: 'daily-summary',
+      title: subject,
       subject,
+      text,
       html,
-      text
+      sourceEvent: 'shift-report.daily-summary',
+      context: {
+        shiftId: shift._id.toString(),
+        shiftName: shift.name,
+        entriesCount: entries.length,
+        periodStart,
+        periodEnd
+      }
     });
 
-    // Registrar envío para evitar duplicados
+    if (glpiDispatchResult.success) {
+      deliveredChannels.push('glpi');
+    } else if (!['disabled', 'dispatch-mode-mismatch'].includes(glpiDispatchResult.skippedReason || '')) {
+      lastDeliveryError = lastDeliveryError || glpiDispatchResult.error || new Error(glpiDispatchResult.message || 'GLPI dispatch failed');
+    }
+
+    if (!deliveredChannels.length) {
+      const reason = emailRecipients.length > 0
+        ? (lastDeliveryError?.message || 'No se logró entregar el reporte por ningún canal')
+        : 'No hay destinatarios configurados y GLPI resumen diario no está disponible';
+
+      await registerShiftReportAudit({
+        event: 'smtp.shift-report.skipped',
+        success: false,
+        reason,
+        metadata: {
+          shiftName: shift.name,
+          recipientsCount: emailRecipients.length,
+          glpiSkippedReason: glpiDispatchResult.skippedReason || null
+        }
+      });
+
+      return { success: false, message: reason };
+    }
+
     shift.lastReportSentAt = new Date();
     await shift.save({ validateModifiedOnly: true });
 
-    logger.info('✅ [sendShiftReport] SHIFT REPORT SENT SUCCESSFULLY!', { shiftId, recipients: shift.emailReportConfig.recipients });
+    logger.info('✅ [sendShiftReport] SHIFT REPORT SENT SUCCESSFULLY!', {
+      shiftId,
+      channels: deliveredChannels,
+      recipients: emailRecipients
+    });
 
     logger.info(`Shift report sent for ${shift.name}`, {
       shiftId: shift._id,
-      recipients: shift.emailReportConfig.recipients,
+      recipients: emailRecipients,
+      channels: deliveredChannels,
       date: shiftDate
     });
 
@@ -816,12 +877,13 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
       reason: 'Report sent successfully',
       metadata: {
         shiftName: shift.name,
-        recipientsCount: shift.emailReportConfig.recipients.length,
+        recipientsCount: emailRecipients.length,
         includeChecklist: shift.emailReportConfig.includeChecklist,
         includeEntries: shift.emailReportConfig.includeEntries,
         entriesCount: entries.length,
         periodStart,
-        periodEnd
+        periodEnd,
+        channels: deliveredChannels
       }
     });
 
@@ -829,10 +891,11 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
       success: true,
       deferredByClosure: false,
       message: 'Report sent successfully',
-      recipients: shift.emailReportConfig.recipients.length,
+      recipients: emailRecipients.length,
       includeChecklist: shift.emailReportConfig.includeChecklist,
       includeEntries: shift.emailReportConfig.includeEntries,
-      entriesCount: entries.length
+      entriesCount: entries.length,
+      channels: deliveredChannels
     };
 
   } catch (error) {
@@ -935,7 +998,7 @@ async function sendShiftReportPoc(shiftId, options = {}) {
       }
     };
 
-    const htmlBody = generateReportHTML({
+    const htmlBody = await generateReportHTML({
       shift: shiftForPoc,
       checklistEntry,
       checklistExit,
@@ -973,7 +1036,18 @@ async function sendShiftReportPoc(shiftId, options = {}) {
       to: recipients,
       subject,
       html,
-      text
+      text,
+      auditContext: {
+        sourceModule: 'shift-report',
+        triggerType: 'poc',
+        triggerContext: 'sendShiftReportPoc',
+        shiftId: shift._id?.toString(),
+        extra: {
+          shiftName: shift.name,
+          date: referenceDate,
+          entriesCount: entries.length
+        }
+      }
     });
 
     await registerPocAudit({

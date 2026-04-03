@@ -18,6 +18,7 @@ export class AdminConsoleComponent {
     { label: 'SMTP / Config', route: '/main/admin/smtp' },
     { label: 'HTTPS / Seguridad', route: '/main/admin/security' },
     { label: 'Integraciones', route: '/main/admin/integrations' },
-    { label: 'GLPI', route: '/main/admin/glpi' }
+    { label: 'GLPI', route: '/main/admin/glpi' },
+    { label: 'Complementos', route: '/main/admin/complements' }
   ];
 }

@@ -73,54 +73,36 @@ docker exec bitacora-backend node scripts/delete-entries.js
 
 ### 5. Restaurar un Backup
 
-Los backups se crean automáticamente en formato JSON con todas las colecciones.
+Los backups actuales son principalmente `backup-*.zip` (full backup). El sistema mantiene compatibilidad con `.json` legacy.
 
 ```bash
 # Ver backups disponibles
-ls backend/backups/
+ls .data/backups
 
-# Restaurar backup desde la API (requiere estar logueado como admin)
+# Restaurar backup desde la API (admin)
 curl -X POST http://localhost:3000/api/backup/restore \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Authorization: Bearer <token-api>" \
   -H "Content-Type: application/json" \
   -d '{
-    "filename": "backup-2026-01-15T16-34-29-624Z.json",
+    "filename": "backup-2026-03-06T18-54-19-392Z.zip",
     "clearBeforeRestore": false
   }'
 ```
 
+Nota: en uso web normal, la autenticacion principal del frontend es por cookie `auth_token` HttpOnly.
+
 **Parámetros de restauración:**
 
-- `filename`: Nombre del archivo de backup (ejemplo: `backup-2026-01-15T16-34-29-624Z.json`)
-- `clearBeforeRestore`: 
+- `filename`: Nombre del archivo de backup (ejemplo: `backup-2026-03-06T18-54-19-392Z.zip`)
+- `clearBeforeRestore`:
   - `false` (default): Inserta datos sin borrar existentes (puede generar duplicados)
   - `true`: **BORRAR TODO** antes de restaurar (restauración limpia)
 
 #### Restauración Manual desde el Servidor
 
-Si necesitas restaurar manualmente usando mongorestore:
+Para escenarios de desastre mayor, seguir `docs/DISASTER-RECOVERY.md`.
 
-```bash
-# 1. Extraer el backup JSON a MongoDB
-docker exec -i bitacora-mongodb mongorestore \
-  --uri="mongodb://bitacora:bitacora123@localhost:27017/bitacora?authSource=admin" \
-  --archive < backup.archive
-
-# 2. O restaurar colección específica desde JSON
-docker exec bitacora-backend node -e "
-const fs = require('fs');
-const mongoose = require('mongoose');
-const Entry = require('./src/models/Entry');
-
-mongoose.connect('mongodb://bitacora:bitacora123@localhost:27017/bitacora?authSource=admin')
-  .then(async () => {
-    const backup = JSON.parse(fs.readFileSync('/app/backups/backup-2026-01-15.json', 'utf8'));
-    await Entry.insertMany(backup.data.entries);
-    console.log('Restaurado:', backup.data.entries.length, 'entradas');
-    process.exit(0);
-  });
-"
-```
+La restauracion oficial del producto debe hacerse por endpoint `POST /api/backup/restore` para mantener validaciones de estructura, trazabilidad y auditoria.
 
 #### Restauración desde el Frontend
 
@@ -252,6 +234,20 @@ rm /opt/BitacoraSOC/eventos.json
 docker exec bitacora-backend rm /app/scripts/entradas.json
 docker exec bitacora-backend rm /app/scripts/eventos.json
 ```
+
+### Inicializacion de entorno (semillas)
+
+La semilla no corre automaticamente al levantar Docker.
+
+```bash
+# Solo admin (recomendado para produccion)
+docker compose exec backend node src/scripts/seed-admin.js
+
+# Datos ficticios de laboratorio/QA
+docker compose exec backend node src/scripts/seed.js
+```
+
+`seed.js` inserta datos de ejemplo y no debe usarse en produccion.
 
 ### Backup Programado
 

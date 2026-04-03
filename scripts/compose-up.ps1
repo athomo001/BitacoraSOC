@@ -2,4 +2,4 @@ $ErrorActionPreference = 'Stop'
 $version = & "$PSScriptRoot\get-version.ps1"
 $env:APP_VERSION = $version
 Write-Host "APP_VERSION=$version"
-docker compose up -d --build
+docker compose -f docker-compose.yml -f docker-compose.complements.yml up -d --build

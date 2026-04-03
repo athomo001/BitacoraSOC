@@ -1,6 +1,4 @@
 const express = require('express');
-const https = require('https');
-const http = require('http');
 const { URL } = require('url');
 const { body } = require('express-validator');
 const { authenticate, authorize } = require('../middleware/auth');
@@ -8,7 +6,15 @@ const validate = require('../middleware/validate');
 const { audit } = require('../utils/audit');
 const { encrypt, decrypt } = require('../utils/encryption');
 const { isConfigured, sendEmail } = require('../utils/email');
-const GlpiConfig = require('../models/GlpiConfig');
+const {
+  DEFAULT_EMAIL_SUBJECT,
+  ensureGlpiConfig,
+  fillTemplate,
+  glpiRequest,
+  sanitizeGlpiConfig,
+  withDefaultPath
+} = require('../utils/glpi-dispatch');
+const { assertOutboundUrlSafe } = require('../utils/outbound-url-guard');
 
 const router = express.Router();
 
@@ -25,93 +31,10 @@ const validators = [
   body('email.subjectTemplate').optional().isString()
 ];
 
-const withDefaultPath = (baseUrl) => {
-  const parsed = new URL(baseUrl);
-  const path = parsed.pathname || '/';
-  if (!path.endsWith('/apirest.php')) {
-    parsed.pathname = path.replace(/\/$/, '') + '/apirest.php';
-  }
-  parsed.search = '';
-  parsed.hash = '';
-  return parsed;
-};
-
-const glpiRequest = ({ method = 'GET', url, headers = {}, timeoutMs = 8000, verifyTls = true }) => {
-  return new Promise((resolve, reject) => {
-    const client = url.protocol === 'https:' ? https : http;
-    const req = client.request({
-      method,
-      hostname: url.hostname,
-      port: url.port || (url.protocol === 'https:' ? 443 : 80),
-      path: `${url.pathname}${url.search || ''}`,
-      headers,
-      timeout: timeoutMs,
-      rejectUnauthorized: verifyTls
-    }, (res) => {
-      let raw = '';
-      res.on('data', chunk => {
-        raw += chunk;
-      });
-      res.on('end', () => {
-        let parsed = null;
-        try {
-          parsed = raw ? JSON.parse(raw) : null;
-        } catch (_) {
-          parsed = null;
-        }
-
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve({ statusCode: res.statusCode, data: parsed || raw });
-          return;
-        }
-
-        const message = parsed?.[0] || parsed?.message || raw || `HTTP ${res.statusCode}`;
-        reject(new Error(`GLPI ${method} ${url.pathname} falló: ${message}`));
-      });
-    });
-
-    req.on('error', reject);
-    req.on('timeout', () => {
-      req.destroy(new Error('Timeout conectando a GLPI'));
-    });
-    req.end();
-  });
-};
-
-const sanitizeConfig = (doc) => ({
-  _id: doc._id,
-  enabled: doc.enabled,
-  mode: doc.mode,
-  dispatchMode: doc.dispatchMode,
-  api: {
-    baseUrl: doc.api?.baseUrl || '',
-    verifyTls: doc.api?.verifyTls ?? true,
-    timeoutMs: doc.api?.timeoutMs || 8000,
-    appTokenConfigured: Boolean(doc.api?.appToken),
-    userTokenConfigured: Boolean(doc.api?.userToken)
-  },
-  email: {
-    collectorAddress: doc.email?.collectorAddress || '',
-    subjectTemplate: doc.email?.subjectTemplate || '[SOC] Cierre de turno {{date}}'
-  },
-  lastTestDate: doc.lastTestDate,
-  lastTestSuccess: doc.lastTestSuccess,
-  lastTestMessage: doc.lastTestMessage,
-  updatedAt: doc.updatedAt
-});
-
-const getOrCreateConfig = async () => {
-  let config = await GlpiConfig.findOne();
-  if (!config) {
-    config = await GlpiConfig.create({});
-  }
-  return config;
-};
-
 router.get('/config', authenticate, authorize('admin'), async (req, res) => {
   try {
-    const config = await getOrCreateConfig();
-    res.json(sanitizeConfig(config));
+    const config = await ensureGlpiConfig();
+    res.json(sanitizeGlpiConfig(config));
   } catch (error) {
     res.status(500).json({ message: 'Error obteniendo configuración GLPI', error: error.message });
   }
@@ -119,7 +42,7 @@ router.get('/config', authenticate, authorize('admin'), async (req, res) => {
 
 router.put('/config', authenticate, authorize('admin'), validators, validate, async (req, res) => {
   try {
-    const config = await getOrCreateConfig();
+    const config = await ensureGlpiConfig();
     const payload = req.body || {};
     const incomingAppToken = String(payload.api?.appToken || '').trim();
     const incomingUserToken = String(payload.api?.userToken || '').trim();
@@ -129,7 +52,17 @@ router.put('/config', authenticate, authorize('admin'), validators, validate, as
     if (payload.dispatchMode) config.dispatchMode = payload.dispatchMode;
 
     if (payload.api) {
-      if (payload.api.baseUrl !== undefined) config.api.baseUrl = String(payload.api.baseUrl || '').trim();
+      if (payload.api.baseUrl !== undefined) {
+        const candidateBaseUrl = String(payload.api.baseUrl || '').trim();
+        if (candidateBaseUrl) {
+          try {
+            await assertOutboundUrlSafe(candidateBaseUrl, { requireHttps: true });
+          } catch (validationError) {
+            return res.status(400).json({ message: validationError.message });
+          }
+        }
+        config.api.baseUrl = candidateBaseUrl;
+      }
       if (payload.api.verifyTls !== undefined) config.api.verifyTls = !!payload.api.verifyTls;
       if (payload.api.timeoutMs !== undefined) config.api.timeoutMs = Number(payload.api.timeoutMs);
       if (incomingAppToken) config.api.appToken = encrypt(incomingAppToken);
@@ -152,7 +85,7 @@ router.put('/config', authenticate, authorize('admin'), validators, validate, as
         config.email.collectorAddress = String(payload.email.collectorAddress || '').trim().toLowerCase();
       }
       if (payload.email.subjectTemplate !== undefined) {
-        config.email.subjectTemplate = String(payload.email.subjectTemplate || '').trim() || '[SOC] Cierre de turno {{date}}';
+        config.email.subjectTemplate = String(payload.email.subjectTemplate || '').trim() || DEFAULT_EMAIL_SUBJECT;
       }
     }
 
@@ -172,7 +105,7 @@ router.put('/config', authenticate, authorize('admin'), validators, validate, as
       }
     });
 
-    res.json({ message: 'Configuración GLPI guardada', config: sanitizeConfig(config) });
+    res.json({ message: 'Configuración GLPI guardada', config: sanitizeGlpiConfig(config) });
   } catch (error) {
     await audit(req, {
       event: 'admin.glpi.config.update',
@@ -185,7 +118,7 @@ router.put('/config', authenticate, authorize('admin'), validators, validate, as
 
 router.post('/test', authenticate, authorize('admin'), async (req, res) => {
   try {
-    const config = await getOrCreateConfig();
+    const config = await ensureGlpiConfig();
 
     if (!config.enabled) {
       return res.status(400).json({ message: 'Habilita GLPI antes de probar' });
@@ -201,6 +134,7 @@ router.post('/test', authenticate, authorize('admin'), async (req, res) => {
       }
 
       const apiBase = withDefaultPath(baseUrl);
+      await assertOutboundUrlSafe(apiBase.toString(), { requireHttps: true });
       const initSessionUrl = new URL(`${apiBase.toString().replace(/\/$/, '')}/initSession`);
 
       const initResult = await glpiRequest({
@@ -258,12 +192,24 @@ router.post('/test', authenticate, authorize('admin'), async (req, res) => {
       return res.status(400).json({ message: 'SMTP no configurado para prueba por correo' });
     }
 
-    const subject = (config.email?.subjectTemplate || '[SOC] Cierre de turno {{date}}').replace('{{date}}', new Date().toISOString().slice(0, 10));
+    const subject = fillTemplate(config.email?.subjectTemplate || DEFAULT_EMAIL_SUBJECT, {
+      date: new Date().toISOString().slice(0, 10)
+    });
 
     await sendEmail({
       to: collectorAddress,
       subject,
-      text: 'Prueba de integración GLPI por correo desde Bitácora SOC.'
+      text: 'Prueba de integración GLPI por correo desde Bitácora SOC.',
+      auditContext: {
+        sourceModule: 'glpi-route',
+        triggerType: 'admin-glpi-test-email',
+        triggerContext: 'admin.glpi.test',
+        extra: {
+          collectorAddress,
+          mode: config.mode,
+          dispatchMode: config.dispatchMode
+        }
+      }
     });
 
     config.lastTestDate = new Date();
@@ -280,7 +226,7 @@ router.post('/test', authenticate, authorize('admin'), async (req, res) => {
 
     return res.json({ message: config.lastTestMessage });
   } catch (error) {
-    const config = await getOrCreateConfig();
+    const config = await ensureGlpiConfig();
     config.lastTestDate = new Date();
     config.lastTestSuccess = false;
     config.lastTestMessage = error.message;

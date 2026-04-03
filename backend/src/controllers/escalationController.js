@@ -14,6 +14,8 @@ const SmtpConfig = require('../models/SmtpConfig');
 const { sendEscalationInternalReminderEmail } = require('../routes/smtp');
 const { logger } = require('../utils/logger');
 
+const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const ENABLED_LOG_SOURCE_MATCH = {
   $or: [
     { enabled: true },
@@ -566,7 +568,11 @@ exports.getRaciAdmin = async (req, res) => {
     if (clientId) filter.clientId = clientId;
     if (serviceId) filter.serviceId = serviceId;
     if (topic) {
-      filter.topic = { $regex: String(topic).trim(), $options: 'i' };
+      const sanitizedTopic = String(topic).trim();
+      if (sanitizedTopic.length > 64) {
+        return res.status(400).json({ error: 'topic no puede superar 64 caracteres' });
+      }
+      filter.topic = { $regex: escapeRegex(sanitizedTopic), $options: 'i' };
     }
 
     const raciEntries = await RaciEntry.find(filter)

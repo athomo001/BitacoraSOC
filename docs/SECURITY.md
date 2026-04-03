@@ -8,11 +8,18 @@ Decisiones de seguridad, hardening y checklist pre-producción.
 
 ### Autenticación y Autorización
 
-**JWT Tokens:**
-- Duración: 4h (admin/user), 2h (guest)
-- Algoritmo: HS256
-- Secret: `JWT_SECRET` en `.env` (generado con `openssl rand -base64 32`)
-- Clock skew tolerance: ±60 segundos
+**Sesión Web:**
+- La web usa cookie `auth_token` HttpOnly.
+- Duración JWT interna: 4h (admin/user), 2h (guest).
+- Algoritmo: HS256.
+- Secret: `JWT_SECRET` en `.env`.
+- El frontend envía credenciales con `withCredentials: true`.
+- Al arrancar, Angular rehidrata la sesión con `GET /api/users/me`.
+
+**Application Tokens de Complementos:**
+- Se firman con `COMPLEMENT_TOKEN_SECRET`, distinto de `JWT_SECRET`.
+- Se envían en `Authorization: Bearer <application_token>` solo hacia `/api/internal/*`.
+- Se revocan efectivamente al regenerar token o eliminar el complemento.
 
 **RBAC (Role-Based Access Control):**
 - Admin: Acceso completo
@@ -21,8 +28,8 @@ Decisiones de seguridad, hardening y checklist pre-producción.
 - Guest: Acceso limitado; entradas marcadas como invitado
 
 **Validación de Roles:**
-- Middleware: `authMiddleware` + `roleMiddleware`
-- Endpoints sensibles protegidos con `role(['admin'])`
+- Middleware de autenticación para cookie/JWT y autorización por rol.
+- Endpoints sensibles protegidos con rol `admin`.
 
 ### Cifrado de Datos
 
@@ -77,14 +84,18 @@ ALLOWED_ORIGINS=http://192.168.100.50:4200,http://192.168.1.100:4200
 ### Límites Diferenciados
 
 **Login (prevención brute-force):**
-- Límite: 5 intentos (producción)
+- Límite configurable con `RATE_LIMIT_LOGIN_MAX`.
 - Ventana: 15 minutos
-- Nota: `loginLimiter` existe pero debe montarse explícitamente en la ruta de login
+- Está montado en `POST /api/auth/login`
 
 **API General:**
-- Límite: 100 requests
+- Límite configurable con `RATE_LIMIT_MAX_REQUESTS`
 - Ventana: 15 minutos
 - Endpoints: `/api/**` (solo en producción)
+
+**API autenticada:**
+- Límite configurable con `RATE_LIMIT_MAX_AUTH_REQUESTS`
+- Útil para reducir ruido en usuarios autenticados sin castigar el login
 
 **SMTP Test (prevención abuso):**
 - Límite: 3 intentos
@@ -96,8 +107,9 @@ ALLOWED_ORIGINS=http://192.168.100.50:4200,http://192.168.1.100:4200
 Variables `.env`:
 ```env
 RATE_LIMIT_WINDOW_MS=900000      # 15 min
-RATE_LIMIT_MAX_REQUESTS=100      # API general
-RATE_LIMIT_LOGIN_MAX=5           # Login
+RATE_LIMIT_MAX_REQUESTS=1000     # API general
+RATE_LIMIT_MAX_AUTH_REQUESTS=2000
+RATE_LIMIT_LOGIN_MAX=20          # Login
 RATE_LIMIT_SMTP_MAX=3            # SMTP test
 ```
 
@@ -169,6 +181,7 @@ grep -i "password.*:" backend/logs/*.log
 **X-Frame-Options:**
 - Valor: `DENY`
 - Previene clickjacking
+- Excepción controlada: los artefactos publicados bajo `/uploads/complements/*` remueven `DENY` para permitir carga en el `iframe` de la plataforma.
 
 **X-Content-Type-Options:**
 - Valor: `nosniff`
@@ -191,6 +204,25 @@ X-Frame-Options: DENY
 X-Content-Type-Options: nosniff
 X-XSS-Protection: 1; mode=block
 ```
+
+---
+
+## Aislamiento de Complementos
+
+- Los complementos usan `Application Token` firmado con `COMPLEMENT_TOKEN_SECRET`, distinto de `JWT_SECRET`.
+- La API interna valida firma, expiración, `slug` activo, hash del último token emitido y scopes requeridos.
+- El iframe de complemento corre con `sandbox="allow-scripts allow-same-origin allow-forms"`.
+- El bridge de frontend acepta `postMessage` solo desde el `origin` registrado del complemento.
+- El wipe-out solo permite `dropDatabase()` sobre nombres `bitacora_ext_*`.
+- Los artefactos publicados y previews no quedan expuestos de forma anónima: la ruta `/uploads/complements/*` exige autenticación y valida visibilidad.
+- `COMPLEMENT_ALLOW_PRIVATE_URLS` controla si se aceptan hosts privados/loopback para complementos en escenarios internos o de laboratorio.
+
+## Respuesta a Complemento Comprometido
+
+1. Poner el complemento en `maintenance` o eliminarlo desde `Admin > Complementos`.
+2. Regenerar token o completar el wipe-out.
+3. Revisar `complement.api.denied`, `complement.circuit.*` y `complement.wipe.*` en auditoría.
+4. Validar que no queden artefactos `ownerComplementId` en la BD general.
 
 ---
 

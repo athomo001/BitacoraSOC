@@ -3,6 +3,8 @@ export interface AuditLog {
   event: string;
   level: 'info' | 'warn' | 'error';
   timestamp: string;
+  source?: string;
+  sourceId?: string | null;
   actor?: {
     userId?: string;
     username?: string;
@@ -36,6 +38,7 @@ export interface AuditLogFilters {
   startDate?: string;
   endDate?: string;
   search?: string;
+  sourceSlug?: string;
 }
 
 export interface AuditLogResponse {

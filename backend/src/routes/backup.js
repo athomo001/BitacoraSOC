@@ -49,6 +49,7 @@ const ShiftRole = require('../models/ShiftRole');
 const ShiftRotationCycle = require('../models/ShiftRotationCycle');
 const SmtpConfig = require('../models/SmtpConfig');
 const multer = require('multer');
+const { backupModels, BACKUP_EXPORT_VERSION } = require('../utils/backup-manifest');
 
 const PURGE_CONFIRM_PHRASE = 'PURGAR TODO';
 
@@ -64,7 +65,7 @@ const upload = multer({
 });
 
 // Importar el scheduler de backups para reiniciar si cambia la config
-const { startBackupScheduler, stopBackupScheduler, runBackup } = require('../utils/backup-scheduler');
+const { prepareBackupSchedule, startBackupScheduler, stopBackupScheduler, runBackup } = require('../utils/backup-scheduler');
 
 // Helper de validación de filename para evitar Path Traversal
 const isValidBackupFilename = (filename) => {
@@ -106,33 +107,6 @@ const arrayToCSV = (data) => {
   return [headers.join(','), ...rows].join('\n');
 };
 
-const backupModels = {
-  entries: Entry,
-  checks: ShiftCheck,
-  users: User,
-  adminNotes: AdminNote,
-  appConfigs: AppConfig,
-  auditLogs: AuditLog,
-  catalogEvents: CatalogEvent,
-  catalogLogSources: CatalogLogSource,
-  catalogOperationTypes: CatalogOperationType,
-  checklistTemplates: ChecklistTemplate,
-  clients: Client,
-  contacts: Contact,
-  clientEscalationRules: ClientEscalationRule,
-  escalationRules: EscalationRule,
-  externalPersons: ExternalPerson,
-  logForwardingConfigs: LogForwardingConfig,
-  personalNotes: PersonalNote,
-  services: Service,
-  serviceCatalogs: ServiceCatalog,
-  shiftAssignments: ShiftAssignment,
-  shiftOverrides: ShiftOverride,
-  shiftRoles: ShiftRole,
-  shiftRotationCycles: ShiftRotationCycle,
-  smtpConfigs: SmtpConfig
-};
-
 // -----------------------------------------------------
 // Rutas de Configuración de Backups Automáticos (B21)
 // -----------------------------------------------------
@@ -154,7 +128,13 @@ router.get('/config', authenticate, authorize('admin'), async (req, res) => {
       destinationConfig: {
         ...(backupConfig.destinationConfig || {}),
         basePath: backupConfig.destinationConfig?.basePath || ''
-      }
+      },
+      scheduleAnchorAt: backupConfig.scheduleAnchorAt || null,
+      lastAutoAttemptAt: backupConfig.lastAutoAttemptAt || null,
+      lastAutoRunAt: backupConfig.lastAutoRunAt || null,
+      nextAutoRunAt: backupConfig.nextAutoRunAt || null,
+      lastAutoRunStatus: backupConfig.lastAutoRunStatus || 'idle',
+      lastAutoRunMessage: backupConfig.lastAutoRunMessage || ''
     });
   } catch (err) {
     logger.error(`Error get backup config: ${err.message}`);
@@ -202,13 +182,35 @@ router.put('/config', authenticate, authorize('admin'), async (req, res) => {
       config = await AppConfig.create({});
     }
 
+    const previousBackupConfig = config.backupConfig || {};
+
     config.backupConfig = {
       enabled: enabled !== undefined ? !!enabled : config.backupConfig?.enabled,
       intervalDays: parsedIntervalDays,
       destinationType: normalizedDestinationType,
       localRetentionDays: parsedRetentionDays,
-      destinationConfig: normalizedDestinationConfig
+      destinationConfig: normalizedDestinationConfig,
+      scheduleAnchorAt: previousBackupConfig.scheduleAnchorAt || null,
+      lastAutoAttemptAt: previousBackupConfig.lastAutoAttemptAt || null,
+      lastAutoRunAt: previousBackupConfig.lastAutoRunAt || null,
+      nextAutoRunAt: previousBackupConfig.nextAutoRunAt || null,
+      lastAutoRunStatus: previousBackupConfig.lastAutoRunStatus || 'idle',
+      lastAutoRunMessage: previousBackupConfig.lastAutoRunMessage || ''
     };
+
+    const scheduleWasEnabled = Boolean(previousBackupConfig.enabled);
+    const intervalChanged = Number(previousBackupConfig.intervalDays || 7) !== parsedIntervalDays;
+    const scheduleNeedsReset = Boolean(config.backupConfig.enabled) && (!scheduleWasEnabled || intervalChanged || !previousBackupConfig.nextAutoRunAt);
+
+    prepareBackupSchedule(config, {
+      now: new Date(),
+      resetSchedule: scheduleNeedsReset
+    });
+
+    if (!config.backupConfig.enabled) {
+      config.backupConfig.lastAutoRunStatus = 'idle';
+      config.backupConfig.lastAutoRunMessage = 'Backups automáticos deshabilitados';
+    }
 
     config.lastUpdatedBy = req.user.id;
     await config.save();
@@ -216,7 +218,7 @@ router.put('/config', authenticate, authorize('admin'), async (req, res) => {
     // Si se habilita o cambia, reiniciamos el scheduler
     stopBackupScheduler();
     if (config.backupConfig.enabled) {
-      startBackupScheduler();
+      await startBackupScheduler();
     }
 
     await audit(req, {
@@ -246,7 +248,7 @@ router.put('/config', authenticate, authorize('admin'), async (req, res) => {
 router.post('/test-auto', authenticate, authorize('admin'), async (req, res) => {
   try {
     // Forzamos la ejecución para debugging o pruebas
-    runBackup().catch(e => logger.error(`Manual runBackup error: ${e.message}`));
+    runBackup({ source: 'manual', triggerContext: 'api/backup/test-auto' }).catch(e => logger.error(`Manual runBackup error: ${e.message}`));
 
     await audit(req, {
       event: 'admin.backup.auto.trigger_manual',
@@ -306,55 +308,21 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
     const filename = `backup-${timestamp}.zip`;
     const filePath = path.join(BACKUPS_DIR, filename);
 
-    // 1. Volcar todas las colecciones MongoDB a JSON
-    const [entries, checks, users, adminNotes, appConfigs, auditLogs,
-      catalogEvents, catalogLogSources, catalogOperationTypes,
-      checklistTemplates, clients, contacts, clientEscalationRules, escalationRules,
-      externalPersons, logForwardingConfigs, personalNotes,
-      services, serviceCatalogs, shiftAssignments, shiftOverrides,
-      shiftRoles, shiftRotationCycles, smtpConfigs] = await Promise.all([
-        Entry.find().lean(),
-        ShiftCheck.find().lean(),
-        User.find().lean(),
-        AdminNote.find().lean(),
-        AppConfig.find().lean(),
-        AuditLog.find().lean(),
-        CatalogEvent.find().lean(),
-        CatalogLogSource.find().lean(),
-        CatalogOperationType.find().lean(),
-        ChecklistTemplate.find().lean(),
-        Client.find().lean(),
-        Contact.find().lean(),
-        ClientEscalationRule.find().lean(),
-        EscalationRule.find().lean(),
-        ExternalPerson.find().lean(),
-        LogForwardingConfig.find().lean(),
-        PersonalNote.find().lean(),
-        Service.find().lean(),
-        ServiceCatalog.find().lean(),
-        ShiftAssignment.find().lean(),
-        ShiftOverride.find().lean(),
-        ShiftRole.find().lean(),
-        ShiftRotationCycle.find().lean(),
-        SmtpConfig.find().lean()
-      ]);
+    const backupSnapshotEntries = await Promise.all(
+      Object.entries(backupModels).map(async ([key, Model]) => [key, await Model.find().lean()])
+    );
+    const backupSnapshot = Object.fromEntries(backupSnapshotEntries);
+    const collectionCount = Object.keys(backupModels).length;
 
     const backupData = {
       metadata: {
         created: new Date(),
-        version: '3.0',
+        version: BACKUP_EXPORT_VERSION,
         type: 'full-zip',
         createdBy: req.user._id,
-        collections: 24
+        collections: collectionCount
       },
-      data: {
-        entries, checks, users, adminNotes, appConfigs, auditLogs,
-        catalogEvents, catalogLogSources, catalogOperationTypes,
-        checklistTemplates, clients, contacts, clientEscalationRules, escalationRules,
-        externalPersons, logForwardingConfigs, personalNotes,
-        services, serviceCatalogs, shiftAssignments, shiftOverrides,
-        shiftRoles, shiftRotationCycles, smtpConfigs
-      }
+      data: backupSnapshot
     };
 
     await fs.writeFile(tempJson, JSON.stringify(backupData, null, 2));
@@ -418,7 +386,7 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
     res.json({
       message: 'Backup completo creado exitosamente',
       filename,
-      collections: 24,
+      collections: collectionCount,
       documents: totalDocs,
       sizeBytes: stat.size
     });
@@ -468,30 +436,23 @@ router.post('/restore', authenticate, authorize('admin'), async (req, res) => {
         // Restaurar archivos físicos: uploads
         const extractedUploads = path.join(extractDir, 'uploads');
         if (fsSync.existsSync(extractedUploads)) {
-          await fs.mkdir(UPLOADS_DIR, { recursive: true });
-          // Copiar todos los archivos del zip al volumen
-          const uploadFiles = await fs.readdir(extractedUploads);
-          for (const f of uploadFiles) {
-            await fs.copyFile(
-              path.join(extractedUploads, f),
-              path.join(UPLOADS_DIR, f)
-            );
+          if (clearBeforeRestore === true) {
+            await fs.rm(UPLOADS_DIR, { recursive: true, force: true }).catch(() => {});
           }
-          logger.info(`Archivos de /uploads restaurados: ${uploadFiles.length}`);
+          await fs.mkdir(UPLOADS_DIR, { recursive: true });
+          await fs.cp(extractedUploads, UPLOADS_DIR, { recursive: true, force: true });
+          logger.info({ source: extractedUploads, destination: UPLOADS_DIR }, 'Directorio /uploads restaurado recursivamente');
         }
 
         // Restaurar archivos físicos: secrets (SSL certs)
         const extractedSecrets = path.join(extractDir, 'secrets');
         if (fsSync.existsSync(extractedSecrets)) {
-          await fs.mkdir(SECRETS_DIR, { recursive: true });
-          const secretFiles = await fs.readdir(extractedSecrets);
-          for (const f of secretFiles) {
-            await fs.copyFile(
-              path.join(extractedSecrets, f),
-              path.join(SECRETS_DIR, f)
-            );
+          if (clearBeforeRestore === true) {
+            await fs.rm(SECRETS_DIR, { recursive: true, force: true }).catch(() => {});
           }
-          logger.info(`Certificados SSL restaurados: ${secretFiles.length}`);
+          await fs.mkdir(SECRETS_DIR, { recursive: true });
+          await fs.cp(extractedSecrets, SECRETS_DIR, { recursive: true, force: true });
+          logger.info({ source: extractedSecrets, destination: SECRETS_DIR }, 'Directorio /secrets restaurado recursivamente');
         }
 
       } finally {

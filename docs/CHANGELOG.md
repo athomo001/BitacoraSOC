@@ -2,6 +2,164 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.25-beta] - 2026-04-03
+
+### Plataforma de complementos
+
+#### Publicación ZIP, visibilidad y operación
+
+- Se elevó el límite de subida de paquetes ZIP a `25 MB` en validación backend, manteniéndolo fijo en código y no en variables de entorno.
+- Se incorporó flujo práctico de análisis, preview y publicación para complementos ZIP estáticos desde `Admin > Complementos`, incluyendo detección de stack permitido, configuración sugerida y publicación administrada por plataforma.
+- Se generaron paquetes de prueba para QA manual (`sin BD`, `persistencia local`, `API externa`) para validar instalación, uso y borrado end-to-end.
+- Se implementó refresco reactivo del menú lateral de complementos tras crear, actualizar, publicar o eliminar, evitando depender de `F5` para ver cambios.
+- Se reorganizó el menú lateral para escalar mejor: grupo colapsable de historial/entradas y bloque separado de complementos con tratamiento visual propio.
+
+#### Routing, iframe y acceso seguro
+
+- Se corrigió el flujo de preview/publicación de complementos estáticos normalizando URLs de iframe y rutas relativas bajo `/uploads/complements/...` para que funcionen correctamente detrás de proxy/nginx.
+- Se añadió proxy explícito para `/uploads` y `/uploads/complements` en frontend nginx, alineando acceso desde Docker, desarrollo local y despliegue HTTPS.
+- Se protegió el acceso directo a artefactos publicados y previews: ahora `/uploads/complements/*` exige autenticación y valida permisos de visibilidad; preview queda restringido a `admin`.
+- Se ajustó la política de `iframe` y cabeceras para permitir cargar complementos publicados sin dejar los artefactos expuestos públicamente por URL conocida.
+- Se simplificó la vista del contenedor de complementos para reducir el efecto de “cuadro dentro de cuadro”, quitando metadata redundante (`slug · versión`) y ampliando el área útil del iframe.
+
+#### Resiliencia y seguridad operativa
+
+- Se corrigió el circuit breaker de complementos `zip-static`: el health-check ya no intenta sondas HTTP a un servicio inexistente y ahora valida la presencia del artefacto publicado en disco.
+- Se mantuvo aislamiento visual de complementos en `OPEN`, evitando que un complemento defectuoso impacte la aplicación principal.
+- Se eliminó un `docker-compose.test.yml` residual para reducir ruido operativo y simplificar la superficie de despliegue de complementos.
+
+### Seguridad y autenticación
+
+#### Endurecimiento adicional
+
+- Se eliminó el uso activo de token stub en `.env`, dejando solo guía comentada para pruebas locales controladas.
+- Se ajustó el guard SSRF/outbound para permitir explícitamente hosts privados solo en escenarios autorizados de complementos/desarrollo interno.
+- Se añadió soporte de auditoría con `source` y `sourceId` para eventos de complementos, permitiendo filtrar por slug y enrutar mejor los eventos a observabilidad/SIEM.
+
+### Auditoría y observabilidad
+
+#### Trazabilidad de complementos
+
+- Se amplió el modelo `AuditLog` con `source` y `sourceId` y se agregaron índices para consultas operativas por complemento.
+- Se extendió el endpoint y la UI de auditoría para filtrar por categoría `Complementos` y por `slug` específico del complemento.
+- Se documentaron y centralizaron eventos de complementos (`complement.install`, `complement.update.*`, `complement.delete.*`, `complement.wipe.*`, `complement.circuit.*`, `complement.api.*`).
+
+### Dependencias y build
+
+#### Hardening de supply chain
+
+- Se actualizó `nodemailer` a `^8.0.4` para mitigar advisories de seguridad en el flujo SMTP.
+- Se migró `mjml` a `5.0.0-beta.2`, eliminando la cadena vulnerable heredada de `html-minifier` y adaptando el render de reportes a API async.
+- Se forzó `glob@^13.0.6` mediante `overrides`, eliminando de la instalación productiva los warnings y ramas transitorias deprecadas ligadas a `glob@10.5.0`.
+- Se validó generación de reportes y empaquetado con smoke tests, además de reconstrucción Docker con `npm install --omit=dev` sin vulnerabilidades productivas reportadas.
+
+### Rate limiting y operación de sesión
+
+#### Ajustes de despliegue
+
+- Se corrigió el despliegue de variables de rate limit al contenedor backend: `docker-compose.yml` ahora propaga `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX_REQUESTS`, `RATE_LIMIT_MAX_AUTH_REQUESTS` y `RATE_LIMIT_LOGIN_MAX`.
+- Se hizo configurable por entorno el límite del `loginLimiter`, evitando que quedara fijo en `5` intentos al margen de la configuración operativa.
+- Se normalizaron valores de preproducción para evitar bloqueos artificiales por recarga/prueba intensiva y separar mejor límites públicos, autenticados y de login.
+
+## [v1.5.24-beta] - 2026-04-02
+
+### Cierre de Issues Operativos
+
+#### Infraestructura y datos
+- **INFRA-MONGO-001:** Se actualizó la imagen base de MongoDB a `mongo:8` en `docker-compose.yml` y se documentó el procedimiento de migración mayor (dump, limpieza de volumen y restore) en `docs/DEPLOY.md`.
+
+#### Integraciones
+- **B19:** Se completó la integración GLPI para dos modos de operación: despacho de resumen diario y despacho inmediato para eventos críticos (`incidente` / `ofensa`).
+- Se agregó persistencia de estado de último despacho (`éxito/fallo`, canal, modo, mensaje) y trazabilidad de auditoría para intentos exitosos y fallidos.
+
+#### Auditoría y autenticación
+- **AUDIT-014:** Se corrigió la atribución de actor en `auth.login.success`, enviando actor explícito en backend para evitar que el login exitoso quede como acción de sistema.
+- Se ajustó el frontend de auditoría para resolver actor con fallback de metadata cuando corresponda, mejorando trazabilidad forense.
+- **MAIL-AUDIT-015:** Se enriqueció la auditoría de correo (`mail.send.success/fail`) con contexto operativo (`sourceModule`, `triggerType`, `triggerContext`, `shiftId/checklistId/entryType`, `smtpConfigId`, destinatarios sanitizados y conteo resuelto), se normalizó la causa de error y se agregó control de ruido para fallos repetidos; la UI ahora muestra causa y origen de disparo de forma explícita.
+
+#### Plataforma de complementos
+- **COMP-001 a COMP-011:** Se incorporó la base productiva de complementos con modelo `Complement`, API interna `/api/internal/v1`, Application Tokens con scopes, circuit breaker por complemento, shell iframe seguro, bridge `postMessage`, logging centralizado, overlays Docker y `complement-stub` para QA/integración.
+
+#### Backups
+- **BACKUP-AUTO-016:** Se rediseñó el scheduler automático de backups con estado persistente de ejecución (`lastAutoRunAt`, `nextAutoRunAt`, estado y mensaje), verificación por vencimiento en arranque/intervalo y eventos de auditoría de ciclo automático.
+- Se añadió visibilidad de estado/última/próxima ejecución automática en la UI de administración de backups.
+- **BACKUP-RET-017:** Se corrigió la depuración automática de respaldos locales para incluir `backup-*.json` y `backup-*.zip`, con cálculo robusto de antigüedad y trazabilidad por archivo (`BACKUP_RETENTION_CLEANUP_STARTED`, `BACKUP_RETENTION_FILE_DELETED`, `BACKUP_RETENTION_FILE_SKIPPED`).
+
+#### Seguridad
+- **SEC-HIGH-009:** Se mitigó riesgo de Regex Injection/ReDoS en búsquedas administrativas y autocomplete, aplicando escape estricto de patrones y límites de longitud para `search/q/topic`.
+- **SEC-HIGH-010:** Se incorporó guard central de destinos salientes (solo HTTPS, bloqueo loopback/red privada, validación DNS y allowlist opcional por `OUTBOUND_ALLOWLIST`) aplicado a GLPI y Log Forwarding en guardado y ejecución.
+- **SEC-MED-011:** Se eliminó logging sensible residual de autenticación/reseteo reemplazándolo por trazas sanitizadas sin exponer secretos ni links de recuperación.
+
+#### Frontend
+- **B34:** Se incorporó en Administración de Checklist la configuración de alerta por ítems NOK (switch + selección de cargos objetivo), persistida en configuración global.
+- Se implementó en backend el envío automático de correo al registrar checklist con estados rojos, resolviendo destinatarios por cargo activo y adjuntando detalle/observación de cada ítem NOK en el mensaje.
+- **FE-SASS-013:** Se migró en login el uso de Sass de `@import` a `@use`, eliminando la ruta deprecada para compatibilidad con Dart Sass 3.
+- **B46:** Se reforzó el límite de contenido de entradas en UI con `maxlength=50000` en formulario principal y diálogo de edición, más truncado defensivo en `input` y aviso explícito al llegar al tope.
+- **B47:** Se mejoró legibilidad del heatmap en temas claros (`light`, `sepia`, `pastel`) ajustando tonos bajos/medio-bajos y forzando color de etiquetas internas con mayor contraste.
+
+#### Deuda técnica backend
+- **DEP-NPM-012:** Se actualizó el árbol raíz de dependencias (`jest` 30 y reemplazo de `yamljs` por `yaml`) y se validó instalación de producción (`npm install --omit=dev`) sin presencia de `inflight` ni `glob@7`.
+- Queda únicamente remanente de deprecación en subárbol de desarrollo/transitivo, sin impacto en runtime productivo actual.
+
+## Histórico Consolidado - 2026-04-01
+
+Migración documental de cambios cerrados que estaban marcados como `Listo` en `docs/ISSUES.md` pero aún no tenían asiento explícito en este changelog. Esta sección preserva el resultado funcional conocido sin inventar una versión histórica específica retroactiva.
+
+### Infraestructura y Seguridad Base
+
+#### Plataforma, autenticación y hardening inicial
+- **INFRA-NODE-ALL:** Upgrade completo a Node 24 LTS con imágenes `node:24-alpine`, validando compatibilidad de Mongoose 8, bcrypt, webpack Angular y arranque estable de contenedores.
+- **B-CRÍTICO-001:** Corregido el flujo por el cual los correos no llegaban al cierre de checklist.
+- **B5:** Se protegieron rutas críticas que antes podían alcanzarse sin autenticación.
+- **SEC-CRIT-001:** Se sanitizó `/api/config` para evitar exposición de credenciales SMTP y se endurecieron endpoints sensibles.
+- **SEC-CRIT-002:** Se reforzó la recuperación de contraseña para evitar fugas de token y mantener links seguros.
+- **SEC-CRIT-003:** Se corrigió el refresh indefinido de JWT expirados.
+- **SEC-CRIT-004:** Se completó el RBAC faltante para `guest` en endpoints críticos.
+- **SEC-CRIT-005:** Se aplicaron rate limits y defensas anti brute-force en autenticación.
+- **SEC-HIGH-006:** Se eliminaron credenciales por defecto débiles del flujo principal.
+- **SEC-HIGH-007:** Se redujo el riesgo de robo de JWT por XSS moviendo sesión a cookie `HttpOnly` y ajustando el flujo auth.
+- **SEC-HIGH-008:** Se añadió validación estricta de nombres/rutas para neutralizar path traversal en backups.
+
+#### HTTPS y transporte seguro
+- **B28:** Se simplificó la configuración HTTPS con un wizard Angular más fluido y seguro.
+- **SEC-HTTPS-ALL:** Se cerró un paquete amplio de fallos TLS/HTTPS: hot-reload de certificados con SNI, validaciones criptográficas previas a guardado, aislamiento de volúmenes y CORS estricto, manteniendo `0-downtime`.
+
+### Base de Producto y Administración
+
+#### Mejoras funcionales y de UX
+- **B6:** Refactor de contraste dark mode mediante tokens y mejoras de legibilidad.
+- **B8:** Implementada edición admin de entradas con whitelist y auditoría.
+- **B9:** Se incorporó soporte de checklist por tipo y turno en backend y frontend.
+- **B10:** Se habilitó branding configurable de favicon desde UI y endpoints dedicados.
+- **B11:** Se amplió la auditoría de correo y de acciones operativas.
+- **B12:** Se implementó el huevo de pascua del login.
+- **B13:** Se implementó el sistema de huevo de pascua por hashtag.
+- **B15:** Ajustes de compatibilidad visual del correo HTML en clientes dark/light.
+- **B16:** Se implementó la auditoría avanzada según el alcance definido en ese momento.
+- **B18:** Se creó el módulo general de integraciones en consola admin.
+- **B21:** Se implementaron backups automáticos y retención.
+- **B25:** Se mejoró la gestión visual y operativa de Log Sources/Clientes activos vs inactivos.
+- **B27:** Se consolidó la consola admin unificada.
+- **P1:** Se completó el plan general de actualización a Angular 20.
+
+### Turnos y Asignación Operativa
+
+#### Serie inicial `OPS-ASSIGN-*`
+- **OPS-ASSIGN-001:** Se integró con API el selector de usuarios en Admin Turnos.
+- **OPS-ASSIGN-002:** Se creó el CRUD dedicado `work-shifts/assignments`.
+- **OPS-ASSIGN-003:** Se introdujo la colección `WorkShiftAssignment` para soportar recurrencia por días.
+- **OPS-ASSIGN-004:** Se implementó el cálculo de estado `EN TURNO / FUERA DE TURNO`.
+- **OPS-ASSIGN-005:** Se añadió refresco en vivo con `interval(60000)`.
+- **OPS-ASSIGN-006:** Se extrajo lógica común a `shift-time.util.ts` para eliminar duplicación.
+- **OPS-ASSIGN-007:** Se robustecieron reglas anti-solapamiento de asignaciones en backend.
+- **OPS-ASSIGN-008:** Se corrigió manejo de timezone del turno con `moment-timezone`.
+- **OPS-ASSIGN-009:** Se validó compilación frontend y refactor a utilities como base de pruebas de integración.
+- **OPS-ASSIGN-010:** Se corrigió la columna `Asignado a` con un resumen de tabla adaptado al modelo operativo.
+
+### Validación Técnica
+- Se verificó que los items históricos migrados desde `docs/ISSUES.md` ahora quedan representados en este changelog.
+- La tabla `✅ Listas` de `docs/ISSUES.md` puede vaciarse sin perder trazabilidad documental de cambios cerrados.
+
 ## [v1.5.23-beta] - 2026-03-20
 
 ### UI/UX + Frontend (EE-BAT-001)

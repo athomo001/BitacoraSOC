@@ -5,7 +5,7 @@ import { environment } from '../../../../environments/environment';
 import { MatCard, MatCardHeader, MatCardTitle, MatCardContent } from '@angular/material/card';
 import { MatIcon } from '@angular/material/icon';
 import { MatButton, MatIconButton } from '@angular/material/button';
-import { NgIf } from '@angular/common';
+import { DatePipe, NgIf } from '@angular/common';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { FormBuilder, FormGroup, ReactiveFormsModule, FormsModule, Validators } from '@angular/forms';
@@ -19,7 +19,7 @@ import { MatOption, MatSelect } from '@angular/material/select';
     selector: 'app-backup',
     templateUrl: './backup.component.html',
     styleUrls: ['./backup.component.scss'],
-    imports: [MatCard, MatCardHeader, MatCardTitle, MatIcon, MatCardContent, MatButton, NgIf, MatProgressSpinner, MatCheckbox, ReactiveFormsModule, FormsModule, MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatIconButton, MatTooltip, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow, MatFormField, MatLabel, MatHint, MatInput, MatOption, MatSelect]
+    imports: [MatCard, MatCardHeader, MatCardTitle, MatIcon, MatCardContent, MatButton, NgIf, DatePipe, MatProgressSpinner, MatCheckbox, ReactiveFormsModule, FormsModule, MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatIconButton, MatTooltip, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow, MatFormField, MatLabel, MatHint, MatInput, MatOption, MatSelect]
 })
 export class BackupComponent implements OnInit {
   isExporting = false;
@@ -30,6 +30,11 @@ export class BackupComponent implements OnInit {
   purgeConfirmText = '';
   readonly purgeConfirmRequired = 'PURGAR TODO';
   backupConfigForm: FormGroup;
+  lastAutoAttemptAt: string | null = null;
+  lastAutoRunAt: string | null = null;
+  nextAutoRunAt: string | null = null;
+  lastAutoRunStatus = 'idle';
+  lastAutoRunMessage = '';
 
   constructor(
     private fb: FormBuilder,
@@ -64,6 +69,11 @@ export class BackupComponent implements OnInit {
           localRetentionDays: config.localRetentionDays || 30,
           destinationPath: config.destinationConfig?.basePath || ''
         });
+        this.lastAutoAttemptAt = config.lastAutoAttemptAt || null;
+        this.lastAutoRunAt = config.lastAutoRunAt || null;
+        this.nextAutoRunAt = config.nextAutoRunAt || null;
+        this.lastAutoRunStatus = config.lastAutoRunStatus || 'idle';
+        this.lastAutoRunMessage = config.lastAutoRunMessage || '';
         this.applyDestinationPathValidation(config.destinationType || 'local');
       },
       error: (err) => console.error('Error cargando Backup Config:', err)
@@ -83,10 +93,24 @@ export class BackupComponent implements OnInit {
       };
 
       this.http.put<any>(`${environment.apiUrl}/backup/config`, payload).subscribe({
-        next: () => this.snackBar.open('Configuración de Backup guardada', 'Cerrar', { duration: 2000 }),
+        next: () => {
+          this.snackBar.open('Configuración de Backup guardada', 'Cerrar', { duration: 2000 });
+          this.loadBackupConfig();
+        },
         error: () => this.snackBar.open('Error guardando configuración de Backup', 'Cerrar', { duration: 3000 })
       });
     }
+  }
+
+  getAutoBackupStatusLabel(): string {
+    const labels: Record<string, string> = {
+      idle: 'Inactivo',
+      scheduled: 'Programado',
+      success: 'Última ejecución correcta',
+      error: 'Última ejecución con error'
+    };
+
+    return labels[this.lastAutoRunStatus] || 'Desconocido';
   }
 
   private applyDestinationPathValidation(destinationType: string): void {

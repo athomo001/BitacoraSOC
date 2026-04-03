@@ -126,6 +126,52 @@ El frontend Angular está inyectado con una URL en tiempo de build o mediante va
   ```
 - Si tu Reverse Proxy o Nginx expone HTTPS, asegúrate de que el frontend cargue los logos con el esquema correcto de HTTP/HTTPS.
 
+### La UI de complementos no refleja cambios recientes
+
+**Síntoma:** El código ya cambió, pero en navegador sigue apareciendo la vista vieja del complemento o del contenedor.
+
+**Causa común:** Estás viendo el frontend Docker en `:80/:4200` y no el `npm start` local, o el navegador quedó con caché fuerte.
+
+**Acciones:**
+```bash
+docker compose ps
+docker compose build frontend --no-cache
+docker compose up -d frontend
+```
+
+Luego forzar recarga del navegador con `Ctrl+F5`.
+
+### Abrir directo `/uploads/complements/...` devuelve 401/403
+
+**Síntoma:** Un artefacto publicado parece “caído” si se abre directo por URL.
+
+**Causa:** Es comportamiento esperado. Los artefactos publicados y previews están protegidos por autenticación y visibilidad.
+
+**Verificar:**
+- preview: solo admin
+- published: usuario autenticado con acceso al complemento
+
+### Un complemento queda en Mantenimiento
+
+**Causa posible 1:** `healthPath` incorrecto o servicio caído.
+
+**Causa posible 2:** Para `zip-static`, falta `index.html` o el artefacto publicado fue eliminado.
+
+**Acciones:**
+```bash
+docker compose logs backend
+docker compose exec backend sh
+ls -la /app/uploads/complements/published
+```
+
+Luego usar `Probar` desde `Admin > Complementos` o esperar la transición `HALF_OPEN`.
+
+### El complemento pierde datos tras cerrar sesión
+
+**Causa común:** El complemento guarda solo en `localStorage` del navegador.
+
+**Acción recomendada:** Migrar a `GET/PUT /api/complements/:slug/browser-state` o a `/api/internal/v1/storage` si el propio microservicio administra el estado.
+
 ---
 
 ## 📧 Servidor SMTP (Correos)

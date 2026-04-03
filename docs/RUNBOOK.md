@@ -2,6 +2,11 @@
 
 Guía de operación diaria para analistas y administradores del Security Operations Center.
 
+Documentos base para operación:
+
+- `OPERATIONS.md` para levantamiento e inicialización desde cero
+- `DISASTER-RECOVERY.md` para recuperación total ante desastre
+
 ---
 
 ## Roles y Responsabilidades
@@ -12,6 +17,7 @@ Guía de operación diaria para analistas y administradores del Security Operati
 - Backups y restore
 - Reportes y KPIs
 - Configuración log forwarding (SIEM)
+- Gestión de complementos
 
 ### Auditor
 - Lectura de logs de auditoría
@@ -112,6 +118,45 @@ Guía de operación diaria para analistas y administradores del Security Operati
 3. **Logout**
 
 **Nota:** El cierre de turno puede disparar el reporte por correo si el turno tiene `emailReportConfig.enabled`.
+
+---
+
+## Complementos
+
+### Alta Operativa
+
+1. Definir el modo de alta:
+   - manual, si el servicio/frontend ya está desplegado
+   - ZIP estático, si es un paquete HTML/JS simple que la plataforma publicará
+2. En `Admin > Complementos`, validar el ZIP o completar el formulario manual.
+3. Configurar solo los scopes mínimos necesarios.
+4. Restringir visibilidad por rol/cargo si no es un complemento global.
+5. Guardar el token emitido solo en el servicio correspondiente.
+6. Ejecutar `Probar` antes de habilitar uso operativo.
+7. Confirmar que aparezca en el menú lateral del usuario destino sin requerir `F5` prolongado; si el usuario usa el frontend Docker y sigue viendo UI vieja, forzar `Ctrl+F5`.
+
+### Publicación ZIP recomendada
+
+1. Subir ZIP en la pestaña de código fuente.
+2. Revisar stack detectado y configuración sugerida.
+3. Generar preview temporal.
+4. Publicar solo si el stack detectado es `HTML/JS simple`.
+5. Si el analizador detecta `Vite`, `React + Vite` o `Node.js`, desplegar fuera y registrar manualmente.
+
+### Si aparece en Mantenimiento
+
+1. Revisar el estado del circuito y el último error.
+2. Filtrar auditoría por categoría `Complementos` o por slug.
+3. Validar `healthPath`, tiempos de respuesta y reachability del microservicio.
+4. Si es `zip-static`, verificar que exista el artefacto publicado en `uploads/complements/published/<slug>/`.
+5. Esperar transición automática `HALF_OPEN` o usar `Probar` desde la consola admin.
+
+### Si el complemento pierde datos visuales tras logout/login
+
+1. Verificar si el complemento usa solo `localStorage` del navegador.
+2. Si el dato debe persistir para el equipo, usar `browser-state` o `storage` de API interna.
+3. Confirmar respuesta `200` en `GET/PUT /api/complements/:slug/browser-state`.
+4. Recordar que `browser-state` es compartido por complemento, no por usuario.
 
 ---
 

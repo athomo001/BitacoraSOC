@@ -53,6 +53,12 @@ export class GlpiIntegrationComponent implements OnInit {
   lastTestDate: string | null = null;
   lastTestMessage = '';
   lastTestSuccess: boolean | null = null;
+  lastDispatchDate: string | null = null;
+  lastDispatchMessage = '';
+  lastDispatchSuccess: boolean | null = null;
+  lastDispatchMode = 'unknown';
+  lastDispatchEvent = '';
+  lastDispatchChannel = 'none';
 
   constructor(
     private fb: FormBuilder,
@@ -126,6 +132,12 @@ export class GlpiIntegrationComponent implements OnInit {
         this.lastTestDate = config.lastTestDate || null;
         this.lastTestMessage = config.lastTestMessage || '';
         this.lastTestSuccess = config.lastTestSuccess ?? null;
+        this.lastDispatchDate = config.lastDispatchDate || null;
+        this.lastDispatchMessage = config.lastDispatchMessage || '';
+        this.lastDispatchSuccess = config.lastDispatchSuccess ?? null;
+        this.lastDispatchMode = config.lastDispatchMode || 'unknown';
+        this.lastDispatchEvent = config.lastDispatchEvent || '';
+        this.lastDispatchChannel = config.lastDispatchChannel || 'none';
         this.applyModeValidation(config.mode || 'api');
         this.loading = false;
       },

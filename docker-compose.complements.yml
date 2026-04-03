@@ -1,0 +1,28 @@
+services:
+  complement-stub:
+    build:
+      context: ./tools/complement-stub
+      dockerfile: Dockerfile
+    container_name: bitacora-complement-stub
+    restart: unless-stopped
+    environment:
+      PORT: 8080
+      COMPLEMENT_SLUG: ${COMPLEMENT_STUB_SLUG:-test-complement}
+      BITACORA_API_URL: http://backend:3000/api/internal/v1
+      COMPLEMENT_TOKEN: ${COMPLEMENT_STUB_TOKEN:-}
+      SIMULATE_FAILURE: ${COMPLEMENT_STUB_SIMULATE_FAILURE:-false}
+      SIMULATE_SLOW: ${COMPLEMENT_STUB_SIMULATE_SLOW:-false}
+      SIMULATE_CLEANUP_FAIL: ${COMPLEMENT_STUB_SIMULATE_CLEANUP_FAIL:-false}
+    ports:
+      - "${COMPLEMENT_STUB_PORT:-8080}:8080"
+    networks:
+      - bitacora-complements
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+networks:
+  bitacora-complements:
+    name: bitacora-complements

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Complemento Prueba - BD Interna Local</title>
+  <style>
+    body { font-family: Segoe UI, sans-serif; margin: 0; background: #f9fafc; color: #14233f; }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 20px; }
+    .card { background: #fff; border: 1px solid #dbe4f4; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+    input, textarea { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 10px; border: 1px solid #bcc9e4; }
+    textarea { min-height: 84px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    button { border: 0; border-radius: 10px; padding: 10px 14px; cursor: pointer; background: #2563eb; color: #fff; font-weight: 600; }
+    button.alt { background: #0f766e; }
+    button.warn { background: #b91c1c; }
+    pre { margin: 0; background: #0e172b; color: #d7f4e8; border-radius: 10px; padding: 12px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Complemento de prueba con "BD interna" local</h1>
+      <p>Simula persistencia interna usando <strong>localStorage del navegador</strong>. Sirve para probar lógica de datos sin backend externo.</p>
+      <div class="row">
+        <div>
+          <label>Título</label>
+          <input id="title" placeholder="Incidente 001" />
+        </div>
+        <div>
+          <label>Severidad</label>
+          <input id="severity" placeholder="media" />
+        </div>
+      </div>
+      <div style="margin-top: 12px;">
+        <label>Detalle</label>
+        <textarea id="detail" placeholder="Detalle de prueba"></textarea>
+      </div>
+      <div style="margin-top: 12px; display:flex; gap:10px; flex-wrap:wrap;">
+        <button id="btnSave">Guardar registro</button>
+        <button id="btnList" class="alt">Listar registros</button>
+        <button id="btnClear" class="warn">Borrar registros locales</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Salida</h2>
+      <pre id="output">Sin ejecutar.</pre>
+    </div>
+  </div>
+  <script>
+    const KEY = 'bitacora.complement.internalDbLocal.records';
+    const output = document.getElementById('output');
+    const slug = location.pathname.split('/').filter(Boolean).slice(-2, -1)[0] || 'index-html';
+    const browserStateUrl = `/api/complements/${slug}/browser-state`;
+
+    const getRecords = () => {
+      try { return JSON.parse(localStorage.getItem(KEY) || '[]'); }
+      catch { return []; }
+    };
+
+    const saveRecords = (items) => localStorage.setItem(KEY, JSON.stringify(items));
+
+    const loadRemoteRecords = async () => {
+      try {
+        const response = await fetch(browserStateUrl, { credentials: 'include' });
+        if (!response.ok) throw new Error('No se pudo cargar estado remoto');
+        const payload = await response.json();
+        const rows = Array.isArray(payload?.value?.rows) ? payload.value.rows : [];
+        saveRecords(rows);
+        return rows;
+      } catch {
+        return getRecords();
+      }
+    };
+
+    const saveRemoteRecords = async (rows) => {
+      saveRecords(rows);
+      try {
+        await fetch(browserStateUrl, {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: { rows } })
+        });
+      } catch {
+        // Fallback silencioso: al menos quedan en localStorage.
+      }
+    };
+
+    const renderRows = (rows, status = 'ok') => {
+      output.textContent = JSON.stringify({ status, count: rows.length, rows }, null, 2);
+    };
+
+    loadRemoteRecords().then((rows) => {
+      if (rows.length > 0) {
+        renderRows(rows, 'loaded');
+      }
+    });
+
+    document.getElementById('btnSave').addEventListener('click', async () => {
+      const title = document.getElementById('title').value.trim();
+      const severity = document.getElementById('severity').value.trim() || 'media';
+      const detail = document.getElementById('detail').value.trim();
+      if (!title || !detail) {
+        output.textContent = 'Debes ingresar título y detalle.';
+        return;
+      }
+      const rows = getRecords();
+      const row = { id: crypto.randomUUID(), title, severity, detail, createdAt: new Date().toISOString() };
+      rows.unshift(row);
+      await saveRemoteRecords(rows);
+      output.textContent = JSON.stringify({ status: 'saved', count: rows.length, row }, null, 2);
+    });
+
+    document.getElementById('btnList').addEventListener('click', async () => {
+      const rows = await loadRemoteRecords();
+      renderRows(rows);
+    });
+
+    document.getElementById('btnClear').addEventListener('click', async () => {
+      localStorage.removeItem(KEY);
+      await saveRemoteRecords([]);
+      output.textContent = JSON.stringify({ status: 'cleared', count: 0, timestamp: new Date().toISOString() }, null, 2);
+    });
+  </script>
+</body>
+</html>

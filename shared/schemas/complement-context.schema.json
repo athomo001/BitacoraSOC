@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "bitacora/complement-context.schema.json",
+  "title": "Complement Context",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "appVersion", "shift"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "enum": ["v1", "v2"]
+    },
+    "appVersion": {
+      "type": "string"
+    },
+    "shift": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "shiftId": { "type": "string" },
+        "shiftName": { "type": "string" },
+        "timezone": { "type": "string" },
+        "assignedUsers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "fullName"],
+            "properties": {
+              "id": { "type": "string" },
+              "fullName": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "requestId": {
+      "type": "string"
+    }
+  }
+}

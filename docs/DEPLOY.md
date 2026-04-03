@@ -7,8 +7,8 @@
 
 ## 1. Requisitos Previos
 
-*   **Docker Desktop** o **Docker Engine** (con plugin Compose).
-*   **Git** instalado.
+* **Docker Desktop** o **Docker Engine** (con plugin Compose).
+* **Git** instalado.
 
 ---
 
@@ -28,6 +28,7 @@ nano .env  # Editar TODAS las credenciales (Revisar Sección 4)
 # 3. Generar secretos criptográficos obligatorios
 echo "JWT_SECRET=$(openssl rand -base64 32)" >> .env
 echo "ENCRYPTION_KEY=$(openssl rand -hex 32)" >> .env
+echo "COMPLEMENT_TOKEN_SECRET=$(openssl rand -base64 32)" >> .env
 
 # 4. Construir y levantar los servicios en segundo plano
 docker compose up -d --build
@@ -69,8 +70,12 @@ docker compose up -d --force-recreate
 ### Automatización Integrada (Versionado Git)
 Si cuentas con Bash o PowerShell, puedes utilizar los scripts nativos adjuntos, los cuales inyectan la variable `APP_VERSION` basada en los últimos commits de Git (ej: `v1.2.3-5-gabc1234`) y la visibiliza en la plataforma.
 
-*   **Windows:** `.\scripts\compose-rebuild.ps1`
-*   **Linux/Mac:** `sh ./scripts/compose-rebuild.sh`
+Los scripts de esta carpeta ya incluyen el overlay `docker-compose.complements.yml`, pensado hoy para laboratorio/QA con `complement-stub`.
+
+* **Windows:** `.\scripts\compose-rebuild.ps1`
+* **Linux/Mac:** `sh ./scripts/compose-rebuild.sh`
+* **Windows (solo levantar):** `.\scripts\compose-up.ps1`
+* **Linux/Mac (solo levantar):** `sh ./scripts/compose-up.sh`
 
 ### Inyección de Datos Semilla (Posterior a Actualización)
 Si en las notas de la nueva versión se han agregado nuevos catálogos base, configuraciones o roles por defecto, es recomendable volver a ejecutar el comando de "siembra" para inyectar estos datos en la base de datos sin afectar tu data existente:
@@ -103,6 +108,16 @@ COOKIE_SECURE=true
 # Generar mediante 'openssl rand'
 JWT_SECRET=super_secret_aleatorio
 ENCRYPTION_KEY=clave_encriptacion_hex_32_bytes
+COMPLEMENT_TOKEN_SECRET=secret_app_tokens_complementos
+COMPLEMENT_MAX_DBS=5
+COMPLEMENT_CIRCUIT_TIMEOUT_MS=3000
+COMPLEMENT_CIRCUIT_FAIL_THRESHOLD=3
+COMPLEMENT_CIRCUIT_RESET_MS=30000
+COMPLEMENT_ALLOW_PRIVATE_URLS=true
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=1000
+RATE_LIMIT_MAX_AUTH_REQUESTS=2000
+RATE_LIMIT_LOGIN_MAX=20
 
 # ============================
 # BASE DE DATOS MONGODB
@@ -117,6 +132,26 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD=CHANGE_ME
 ADMIN_EMAIL=admin@example.com
 ```
+
+### Overlay de complementos
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.complements.yml up -d --build
+```
+
+Uso recomendado de este overlay:
+
+* laboratorio local
+* QA del `complement-stub`
+* pruebas de circuit breaker y health-check
+
+Aclaraciones:
+
+* no existe ya `docker-compose.test.yml`
+* el backend participa en `bitacora-network` y `bitacora-complements`
+* el frontend permanece solo en `bitacora-network`
+* MongoDB permanece en la red principal
+* los complementos ZIP publicados por la plataforma no necesitan este overlay
 
 ---
 
@@ -147,7 +182,7 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout local.key -out local
 
 ## 6. Entorno de Desarrollo Local (Sin Docker)
 
-> **Requisitos:** Node.js 24+ LTS, MongoDB 7+, Express 5.1+.
+> **Requisitos:** Node.js 24+ LTS, MongoDB 8+, Express 5.1+.
 
 ### 6.1 Backend
 ```bash
@@ -170,8 +205,9 @@ npm run restart:clean   # Mata limpiamente los procesos de Angular zombies en el
 npm start               # Levanta UI proxy en http://localhost:4200
 ```
 
-> **Configuración Cruzada Local:** 
+> **Configuración Cruzada Local:**
 > Asegúrate de que `backend/.env` posea `ALLOWED_ORIGINS=http://localhost:4200`.
+> **Sesión Web Actual:** El frontend usa cookie `auth_token` HttpOnly y bootstrap con `GET /api/users/me`, por lo que CORS y `withCredentials` deben quedar correctamente alineados.
 
 ---
 
@@ -188,6 +224,44 @@ docker compose exec mongodb mongodump \
 docker cp bitacora-mongodb:/data/backup ./backups/
 ```
 
+### Migración Mayor MongoDB 7 a 8
+
+Antes de cambiar la imagen en `docker-compose.yml` desde `mongo:7` a `mongo:8`, no reutilices a ciegas los archivos `.wt` del volumen existente.
+
+1. Ejecuta `mongodump` completo desde el contenedor actual y copia el dump al host.
+2. Detén el stack con `docker compose down`.
+3. Respalda o renombra `./.data/mongodb_data` y `./.data/mongodb_config`.
+4. Levanta MongoDB 8 con el volumen limpio para que inicialice archivos nuevos.
+5. Restaura con `mongorestore` y valida la aplicación antes de reabrir operación.
+
+#### Scripts de apoyo para ventana de cambio
+
+Linux/macOS:
+
+```bash
+sh ./scripts/mongo8-migration.sh backup
+sh ./scripts/mongo8-migration.sh restore ./.data/mongo8-migration/<timestamp>
+```
+
+Windows:
+
+```powershell
+.\scripts\mongo8-migration.ps1 backup
+.\scripts\mongo8-migration.ps1 restore .\.data\mongo8-migration\<timestamp>
+```
+
+Estos scripts:
+
+* crean dump lógico de todas las bases del servidor MongoDB
+* guardan copia de `.env` como respaldo separado
+* empaquetan `uploads`, `tls` y `backups`
+* renuevan `mongodb_data` y `mongodb_config` antes del restore
+* levantan el stack completo al finalizar la restauración
+
+Nota: el restore deja `.env.from-mongo8-backup` como copia de referencia y no sobreescribe `.env` automáticamente.
+Nota: al respaldar y restaurar todas las bases, este flujo también cubre bases privadas de complementos alojadas en el mismo Mongo.
+Nota: los scripts resuelven el servicio `mongodb` usando el `docker compose` de este repositorio, no un contenedor Mongo cualquiera del host.
+
 **Resguardar Subidas Estáticas (Logos, Evidencias):**
 ```bash
 docker run --rm -v bitacorasoc_backend_uploads:/source \
@@ -195,16 +269,18 @@ docker run --rm -v bitacorasoc_backend_uploads:/source \
   tar czf /backup/uploads-$(date +%Y%m%d).tar.gz -C /source .
 ```
 
-### Restauración vía API (JSON Integrado)
-Si activaste la tarea automática de Backup en el panel, se grabarán archivos consolidados JSON en `.data/backups/`. Para restaurar alguno:
+### Restauración vía API (ZIP Integrado)
+Si activaste la tarea automática de Backup en el panel, se grabarán respaldos completos `.zip` en `.data/backups/`. Para restaurar alguno:
 
 ```powershell
 # Obtén tu token Bearer logueándote como Admin, y dispara (solo desarrollo/rescate):
 curl -X POST http://TU_IP:3000/api/backup/restore \
   -H "Authorization: Bearer TU_TOKEN_JWT" \
   -H "Content-Type: application/json" \
-  -d '{"filename":"backup-ARCHIVO.json","clearBeforeRestore":true}'
+  -d '{"filename":"backup-ARCHIVO.zip","clearBeforeRestore":true}'
 ```
+
+Compatibilidad: el restore sigue aceptando `.json` legacy cuando existan respaldos antiguos.
 
 ### Herramientas de Ingesta (CSV)
 ```bash

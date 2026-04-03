@@ -14,13 +14,56 @@
     <!-- Menú de navegación -->
         <mat-nav-list>
       <a mat-list-item
-         *ngFor="let item of visiblePrimaryMenu; trackBy: trackByMenu"
+         *ngFor="let item of visiblePrimaryMenuMain; trackBy: trackByMenu"
          [routerLink]="item.route"
          routerLinkActive="active-link">
         <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
         <span matListItemTitle>{{ item.label }}</span>
       </a>
     </mat-nav-list>
+
+    <mat-accordion class="menu-accordion" *ngIf="visiblePrimaryMenuHistory.length > 0">
+      <mat-expansion-panel [expanded]="false">
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            <mat-icon>folder_open</mat-icon>
+            Historial y Entradas
+          </mat-panel-title>
+        </mat-expansion-panel-header>
+
+        <mat-nav-list>
+          <a mat-list-item
+             *ngFor="let item of visiblePrimaryMenuHistory; trackBy: trackByMenu"
+             [routerLink]="item.route"
+             routerLinkActive="active-link">
+            <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
+            <span matListItemTitle>{{ item.label }}</span>
+          </a>
+        </mat-nav-list>
+      </mat-expansion-panel>
+    </mat-accordion>
+
+    <mat-accordion class="menu-accordion complement-accordion" *ngIf="visibleComplementItems.length > 0">
+      <mat-expansion-panel [expanded]="false">
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            <mat-icon>extension</mat-icon>
+            Complementos
+          </mat-panel-title>
+          <mat-panel-description>{{ visibleComplementItems.length }}</mat-panel-description>
+        </mat-expansion-panel-header>
+
+        <mat-nav-list>
+          <a mat-list-item
+             *ngFor="let item of visibleComplementItems; trackBy: trackByMenu"
+             [routerLink]="item.route"
+             routerLinkActive="active-link">
+            <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
+            <span matListItemTitle>{{ item.label }}</span>
+          </a>
+        </mat-nav-list>
+      </mat-expansion-panel>
+    </mat-accordion>
 
     <mat-accordion class="menu-accordion" *ngIf="hasConfigAccess">
       <mat-expansion-panel [expanded]="true">

@@ -15,6 +15,20 @@
             <mat-checkbox formControlName="checklistCloseEmailEnabled">
               Enviar correo al registrar checklist de cierre
             </mat-checkbox>
+
+            <mat-checkbox formControlName="alertNokEnabled">
+              Enviar alerta por items NOK (rojo)
+            </mat-checkbox>
+
+            <mat-form-field appearance="outline" *ngIf="configForm.get('alertNokEnabled')?.value">
+              <mat-label>Cargos a notificar por NOK</mat-label>
+              <mat-select formControlName="alertNokRoleTarget" multiple>
+                <mat-option *ngFor="let cargo of cargoLabelOptions" [value]="cargo">
+                  {{ cargo }}
+                </mat-option>
+              </mat-select>
+              <mat-hint>Al registrar checklist con estado rojo, se notificará a estos cargos.</mat-hint>
+            </mat-form-field>
           </div>
 
           <div class="config-column">
