@@ -304,6 +304,11 @@ const runEscalationInternalReminder = async () => {
 
 const startChecklistAlertScheduler = () => {
   const intervalMs = 5 * 60 * 1000;
+  logger.info({
+    event: 'checklist.scheduler.start',
+    intervalMs,
+    includesEscalationReminder: true
+  }, 'Checklist/escalacion scheduler started');
   runChecklistAlert();
   runEscalationInternalReminder();
   setInterval(() => {
@@ -313,5 +318,7 @@ const startChecklistAlertScheduler = () => {
 };
 
 module.exports = {
-  startChecklistAlertScheduler
+  startChecklistAlertScheduler,
+  runChecklistAlert,
+  runEscalationInternalReminder
 };

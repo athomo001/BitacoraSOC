@@ -423,9 +423,29 @@ a {
 
 .mat-mdc-input-element,
 .mat-mdc-button,
-.mat-mdc-raised-button,
 .mat-mdc-list-item {
   color: var(--text-primary) !important;
+}
+
+.mat-mdc-raised-button,
+.mat-mdc-unelevated-button,
+.btn-primary {
+  background-color: var(--primary-color) !important;
+  color: var(--on-primary-color) !important;
+}
+
+.mat-mdc-raised-button .mdc-button__label,
+.mat-mdc-unelevated-button .mdc-button__label,
+.mat-mdc-raised-button mat-icon,
+.mat-mdc-unelevated-button mat-icon,
+.btn-primary mat-icon {
+  color: var(--on-primary-color) !important;
+}
+
+.mat-mdc-outlined-button,
+.mat-mdc-stroked-button {
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
 }
 
 .mat-mdc-list-item {
@@ -535,6 +555,29 @@ mat-sidenav {
     color: var(--text-primary) !important;
     opacity: 1 !important;
   }
+}
+
+/* Tooltips and chart overlays must not inherit sepia/pastel body text on dark surfaces */
+.mat-mdc-tooltip,
+.mat-mdc-tooltip-surface,
+.mdc-tooltip__surface,
+.ngx-charts-tooltip-content,
+.ngx-charts-tooltip-content.tooltip-content,
+.ngx-charts-tooltip-content .tooltip-caret,
+.chart-tooltip {
+  background-color: rgba(24, 27, 34, 0.96) !important;
+  color: #f7f9ff !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28) !important;
+}
+
+.mat-mdc-tooltip *,
+.mat-mdc-tooltip-surface *,
+.mdc-tooltip__surface *,
+.ngx-charts-tooltip-content *,
+.chart-tooltip * {
+  color: #f7f9ff !important;
+  fill: #f7f9ff !important;
 }
 
 .mat-sort-header-content,
