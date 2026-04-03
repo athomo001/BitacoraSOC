@@ -3,10 +3,10 @@
  * 
  * Endpoints:
  *   GET  /api/backup/history         - Historial de backups (admin)
- *   POST /api/backup/create          - Crear backup JSON (admin)
- *   POST /api/backup/restore         - Restaurar backup (admin)
+ *   POST /api/backup/create          - Crear backup ZIP (admin)
+ *   POST /api/backup/restore         - Restaurar backup ZIP o JSON (admin)
  *   GET  /api/backup/export/:type    - Exportar CSV (entries/checks/all)
- *   POST /api/backup/import          - Importar datos CSV/JSON (admin)
+ *   POST /api/backup/import          - Importar backup ZIP o JSON (admin, upload)
  *   DELETE /api/backup/:id           - Eliminar backup (admin)
  * 
  * Reglas SOC:
@@ -577,7 +577,7 @@ router.get('/export/:type', authenticate, authorize('admin'), async (req, res) =
   }
 });
 
-// POST /api/backup/import - Importar datos (admin)
+// POST /api/backup/import - Importar datos ZIP completo o JSON legacy (admin)
 router.post('/import',
   authenticate,
   authorize('admin'),
@@ -588,47 +588,97 @@ router.post('/import',
         return res.status(400).json({ message: 'No se proporcionó archivo' });
       }
 
-      const content = await fs.readFile(req.file.path, 'utf8');
-      let data;
+      const isZip = req.file.originalname.endsWith('.zip');
+      let backupJson;
 
-      // Intentar parsear como JSON
-      try {
-        data = JSON.parse(content);
-      } catch {
-        // Si falla, intentar como CSV (implementación básica)
-        return res.status(400).json({ message: 'Solo se soporta formato JSON por ahora' });
+      if (isZip) {
+        // --- Importación ZIP completa ---
+        const extractDir = path.join(BACKUPS_DIR, `temp_import_${Date.now()}`);
+        await fs.mkdir(extractDir, { recursive: true });
+
+        try {
+          // Descomprimir el ZIP
+          await new Promise((resolve, reject) => {
+            fsSync.createReadStream(req.file.path)
+              .pipe(unzipper.Extract({ path: extractDir }))
+              .on('close', resolve)
+              .on('error', reject);
+          });
+
+          // Leer el JSON de base de datos
+          const dataJsonPath = path.join(extractDir, 'data.json');
+          try {
+            const content = await fs.readFile(dataJsonPath, 'utf8');
+            backupJson = JSON.parse(content);
+          } catch {
+            return res.status(400).json({ message: 'ZIP inválido: no contiene data.json válido' });
+          }
+
+          // Restaurar archivos físicos: uploads
+          const extractedUploads = path.join(extractDir, 'uploads');
+          if (fsSync.existsSync(extractedUploads)) {
+            await fs.mkdir(UPLOADS_DIR, { recursive: true });
+            await fs.cp(extractedUploads, UPLOADS_DIR, { recursive: true, force: true });
+            logger.info({ source: extractedUploads, destination: UPLOADS_DIR }, 'Directorio /uploads importado recursivamente');
+          }
+
+          // Restaurar archivos físicos: secrets (SSL certs)
+          const extractedSecrets = path.join(extractDir, 'secrets');
+          if (fsSync.existsSync(extractedSecrets)) {
+            await fs.mkdir(SECRETS_DIR, { recursive: true });
+            await fs.cp(extractedSecrets, SECRETS_DIR, { recursive: true, force: true });
+            logger.info({ source: extractedSecrets, destination: SECRETS_DIR }, 'Directorio /secrets importado recursivamente');
+          }
+
+        } finally {
+          // Limpiar directorio temporal de extracción
+          await fs.rm(extractDir, { recursive: true, force: true }).catch(() => {});
+          // Eliminar archivo temporal del upload
+          await fs.unlink(req.file.path).catch(() => { });
+        }
+
+      } else {
+        // --- Importación JSON (legacy o nuevo formato) ---
+        try {
+          const content = await fs.readFile(req.file.path, 'utf8');
+          backupJson = JSON.parse(content);
+          await fs.unlink(req.file.path).catch(() => { });
+        } catch {
+          await fs.unlink(req.file.path).catch(() => { });
+          return res.status(400).json({ message: 'JSON inválido' });
+        }
       }
 
-      // Validar estructura
-      if (!data.data) {
-        return res.status(400).json({ message: 'Formato inválido' });
+      // Validar estructura de backup
+      if (!backupJson.data) {
+        return res.status(400).json({ message: 'Formato de backup inválido: falta sección "data"' });
       }
 
+      // Importar colecciones dinámicamente usando backupModels
+      const models = backupModels;
       let imported = 0;
 
-      // Importar entries
-      if (data.data.entries && data.data.entries.length > 0) {
-        const result = await Entry.insertMany(data.data.entries, { ordered: false }).catch(() => ({ length: 0 }));
-        imported += result.length || 0;
+      for (const [key, Model] of Object.entries(models)) {
+        if (backupJson.data[key]?.length) {
+          try {
+            await Model.insertMany(backupJson.data[key], { ordered: false });
+            imported += backupJson.data[key].length;
+          } catch (err) {
+            logger.warn({ collection: key, err }, 'Algunos documentos no pudieron ser importados');
+          }
+        }
       }
-
-      // Importar checks
-      if (data.data.checks && data.data.checks.length > 0) {
-        const result = await ShiftCheck.insertMany(data.data.checks, { ordered: false }).catch(() => ({ length: 0 }));
-        imported += result.length || 0;
-      }
-
-      // Eliminar archivo temporal
-      await fs.unlink(req.file.path).catch(() => { });
 
       await audit(req, {
         event: 'admin.backup.import',
         level: 'info',
-        result: { success: true, imported }
+        result: { success: true, imported, isZip }
       });
 
       res.json({
-        message: 'Datos importados exitosamente',
+        message: isZip 
+          ? 'Backup ZIP importado exitosamente (base de datos + archivos físicos)'
+          : 'Backup JSON importado exitosamente',
         imported
       });
     } catch (error) {
@@ -637,8 +687,8 @@ router.post('/import',
         await fs.unlink(req.file.path).catch(() => { });
       }
 
-      logger.error({ err: error }, 'Error importando datos');
-      res.status(500).json({ message: 'Error importando datos' });
+      logger.error({ err: error }, 'Error importando backup');
+      res.status(500).json({ message: 'Error importando backup' });
     }
   }
 );
