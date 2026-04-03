@@ -88,13 +88,18 @@ Nota: en uso web normal, la autenticacion principal es por cookie `auth_token` H
 
 ---
 
-## 📥 Importacion CSV/JSON
+## 📥 Importacion ZIP Completo o JSON
 
 **Endpoint:** `POST /api/backup/import` (admin)
 
 **Contenido:** `multipart/form-data`
-- `file`: archivo `.json` o `.csv`
-- `type`: `entries` | `checks` | `users` | `catalogs` (segun el formato)
+- `file`: archivo `.zip` (completo: BD + uploads + secrets) o `.json` (legacy)
+
+**ZIP:** Contiene `data.json` + directorio `/uploads` + directorio `/secrets` (certificates). Se restauran todos los archivos físicos de forma recursiva.
+
+**JSON Legacy:** Solo BD, útil para importación puntual de datos antigios.
+
+Independientemente del formato, se importan todas las 32 colecciones de base de datos de forma dinámica.
 
 ---
 

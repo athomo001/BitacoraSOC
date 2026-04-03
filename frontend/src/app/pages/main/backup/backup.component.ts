@@ -225,8 +225,8 @@ export class BackupComponent implements OnInit {
     if (!input.files?.length) return;
 
     const file = input.files[0];
-    if (!file.name.endsWith('.json')) {
-      this.snackBar.open('Solo se permiten archivos JSON', 'Cerrar', { duration: 3000 });
+    if (!file.name.endsWith('.json') && !file.name.endsWith('.zip')) {
+      this.snackBar.open('Solo se permiten archivos JSON o ZIP', 'Cerrar', { duration: 3000 });
       return;
     }
 
