@@ -174,9 +174,9 @@ El servidor acepta tokens con diferencia de ±60 segundos (previene errores por 
 | PUT | `/api/backup/config` | Guardar config de backups automáticos | Admin |
 | POST | `/api/backup/test-auto` | Ejecutar prueba de backup automático | Admin |
 | GET | `/api/backup/history` | Historial de backups | Admin |
-| POST | `/api/backup/create` | Crear backup JSON | Admin |
+| POST | `/api/backup/create` | Crear backup ZIP completo | Admin |
 | POST | `/api/backup/restore` | Restaurar backup | Admin |
-| GET | `/api/backup/download/:filename` | Descargar backup JSON | Admin |
+| GET | `/api/backup/download/:filename` | Descargar backup ZIP o JSON legacy | Admin |
 | GET | `/api/backup/export/:type` | Exportar CSV | Admin |
 | POST | `/api/backup/import` | Importar CSV/JSON | Admin |
 | POST | `/api/backup/purge` | Purgar datos (con confirmación) | Admin |

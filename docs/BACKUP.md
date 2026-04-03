@@ -17,7 +17,7 @@ Para recuperacion completa ante desastre (host perdido, volumen dañado, reconst
 {
   "message": "Backup completo creado exitosamente",
   "filename": "backup-2026-03-06T18-54-19-392Z.zip",
-  "collections": 24,
+  "collections": 32,
   "documents": 10,
   "sizeBytes": 3489
 }
@@ -32,14 +32,16 @@ Para recuperacion completa ante desastre (host perdido, volumen dañado, reconst
 {
   "backups": [
     {
-      "_id": "backup-2026-02-08T18-22-10-123Z.json",
-      "filename": "backup-2026-02-08T18-22-10-123Z.json",
+      "_id": "backup-2026-03-06T18-54-19-392Z.zip",
+      "filename": "backup-2026-03-06T18-54-19-392Z.zip",
       "createdAt": "2026-02-08T18:22:10.123Z",
       "size": 2489012
     }
   ]
 }
 ```
+
+Nota: el historial puede mostrar `.json` legacy, pero los respaldos actuales manuales y automáticos se generan como `.zip`.
 
 ### Restaurar backup
 
@@ -55,13 +57,14 @@ Para recuperacion completa ante desastre (host perdido, volumen dañado, reconst
 
 **Notas:**
 - `clearBeforeRestore=true` borra todas las colecciones antes de restaurar.
-- El restore descomprime el archivo `.zip` en memoria y valida la estructura de cada `.json` internamente antes de aplicar.
+- El restore descomprime el archivo `.zip` y restaura tanto la base de datos como `uploads/` y `secrets/`.
+- La restauración recorre subdirectorios, por lo que también repone logos, favicons y artefactos publicados bajo `uploads/complements/`.
 
 ### Eliminar backup
 
 **Endpoint:** `DELETE /api/backup/:id` (admin)
 
-Ejemplo: `DELETE /api/backup/backup-2026-02-08T18-22-10-123Z.json`
+Ejemplo: `DELETE /api/backup/backup-2026-03-06T18-54-19-392Z.zip`
 
 ---
 
@@ -116,5 +119,6 @@ Los backups comprimidos `.zip` se guardan en:
 - El wipe-out de un complemento elimina su DB privada y purga artefactos generales vinculados por `ownerComplementId`.
 - El almacenamiento compartido del complemento (`ComplementSharedRecord`) sí queda dentro del backup general del Core.
 - El estado guardado vía `/api/complements/:slug/browser-state` también queda dentro del backup general porque usa esa misma colección compartida.
+- La configuración GLPI, RACI, turnos de trabajo, cierres, notificaciones de checklist y metadatos de complementos quedan dentro del backup general del Core.
 - Los artefactos publicados `uploads/complements/published/<slug>/` deben considerarse parte del respaldo del volumen de uploads.
 - Los previews `uploads/complements/preview/<previewId>/` son temporales y hoy no tienen limpieza automática; no conviene tratarlos como artefacto permanente de respaldo.

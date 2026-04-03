@@ -1,61 +1,16 @@
 const path = require('path');
 const fs = require('fs').promises;
+const fsSync = require('fs');
+const archiver = require('archiver');
 const { logger } = require('./logger');
 const { auditSystem } = require('./audit');
+const { backupModels, BACKUP_EXPORT_VERSION } = require('./backup-manifest');
 
 const AppConfig = require('../models/AppConfig');
-const Entry = require('../models/Entry');
-const ShiftCheck = require('../models/ShiftCheck');
-const User = require('../models/User');
-const AdminNote = require('../models/AdminNote');
-const AuditLog = require('../models/AuditLog');
-const CatalogEvent = require('../models/CatalogEvent');
-const CatalogLogSource = require('../models/CatalogLogSource');
-const CatalogOperationType = require('../models/CatalogOperationType');
-const ChecklistTemplate = require('../models/ChecklistTemplate');
-const Client = require('../models/Client');
-const Contact = require('../models/Contact');
-const ClientEscalationRule = require('../models/ClientEscalationRule');
-const EscalationRule = require('../models/EscalationRule');
-const ExternalPerson = require('../models/ExternalPerson');
-const LogForwardingConfig = require('../models/LogForwardingConfig');
-const PersonalNote = require('../models/PersonalNote');
-const Service = require('../models/Service');
-const ServiceCatalog = require('../models/ServiceCatalog');
-const ShiftAssignment = require('../models/ShiftAssignment');
-const ShiftOverride = require('../models/ShiftOverride');
-const ShiftRole = require('../models/ShiftRole');
-const ShiftRotationCycle = require('../models/ShiftRotationCycle');
-const SmtpConfig = require('../models/SmtpConfig');
-
-const backupModels = {
-  entries: Entry,
-  checks: ShiftCheck,
-  users: User,
-  adminNotes: AdminNote,
-  appConfigs: AppConfig,
-  auditLogs: AuditLog,
-  catalogEvents: CatalogEvent,
-  catalogLogSources: CatalogLogSource,
-  catalogOperationTypes: CatalogOperationType,
-  checklistTemplates: ChecklistTemplate,
-  clients: Client,
-  contacts: Contact,
-  clientEscalationRules: ClientEscalationRule,
-  escalationRules: EscalationRule,
-  externalPersons: ExternalPerson,
-  logForwardingConfigs: LogForwardingConfig,
-  personalNotes: PersonalNote,
-  services: Service,
-  serviceCatalogs: ServiceCatalog,
-  shiftAssignments: ShiftAssignment,
-  shiftOverrides: ShiftOverride,
-  shiftRoles: ShiftRole,
-  shiftRotationCycles: ShiftRotationCycle,
-  smtpConfigs: SmtpConfig
-};
 
 const backupsDir = path.join(__dirname, '../../backups');
+const uploadsDir = path.join(__dirname, '../../uploads');
+const secretsDir = path.join(__dirname, '../../secrets');
 let schedulerHandle = null;
 let backupRunInProgress = false;
 
@@ -280,6 +235,7 @@ const runBackup = async (options = {}) => {
   const isAutomaticRun = source === 'auto';
   const startedAt = new Date();
   let appConfig = null;
+  let tempJsonPath = null;
 
   if (backupRunInProgress) {
     await auditBackupRunEvent('admin.backup.run.skipped', {
@@ -330,19 +286,69 @@ const runBackup = async (options = {}) => {
     const backupData = {
       metadata: {
         createdAt: new Date().toISOString(),
-        source
-      }
+        source,
+        version: BACKUP_EXPORT_VERSION,
+        collections: Object.keys(backupModels).length,
+        type: 'json-auto'
+      },
+      data: {}
     };
 
     for (const [key, model] of Object.entries(backupModels)) {
-      backupData[key] = await model.find().lean();
+      backupData.data[key] = await model.find().lean();
     }
 
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const fileName = `backup-${timestamp}.json`;
-    const filePath = path.join(backupsDir, fileName);
+    const totalDocuments = Object.values(backupData.data).reduce((sum, records) => sum + records.length, 0);
 
-    await fs.writeFile(filePath, JSON.stringify(backupData, null, 2), 'utf8');
+    backupData.metadata.documents = totalDocuments;
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `backup-${timestamp}.zip`;
+    const filePath = path.join(backupsDir, fileName);
+    tempJsonPath = path.join(backupsDir, `_tmp_auto_backup_${Date.now()}.json`);
+
+    await fs.writeFile(tempJsonPath, JSON.stringify(backupData, null, 2), 'utf8');
+
+    const readableSecrets = [];
+    if (fsSync.existsSync(secretsDir)) {
+      try {
+        const secretFiles = await fs.readdir(secretsDir);
+        for (const secretFile of secretFiles) {
+          const secretPath = path.join(secretsDir, secretFile);
+          try {
+            await fs.access(secretPath, fsSync.constants.R_OK);
+            readableSecrets.push({ name: secretFile, path: secretPath });
+          } catch {
+            logger.warn({ path: secretPath }, 'Secret file unreadable, skipped from automatic backup');
+          }
+        }
+      } catch (error) {
+        logger.warn({ err: error }, 'Unable to read secrets directory for automatic backup');
+      }
+    }
+
+    await new Promise((resolve, reject) => {
+      const output = fsSync.createWriteStream(filePath);
+      const archive = archiver('zip', { zlib: { level: 9 } });
+
+      output.on('close', resolve);
+      archive.on('error', reject);
+      archive.pipe(output);
+
+      archive.file(tempJsonPath, { name: 'data.json' });
+
+      if (fsSync.existsSync(uploadsDir)) {
+        archive.directory(uploadsDir, 'uploads');
+      }
+
+      for (const secret of readableSecrets) {
+        archive.file(secret.path, { name: `secrets/${secret.name}` });
+      }
+
+      archive.finalize();
+    });
+
+    await fs.unlink(tempJsonPath).catch(() => {});
 
     appConfig = await AppConfig.findOne();
     await pushBackupToExternalDestination({
@@ -372,12 +378,13 @@ const runBackup = async (options = {}) => {
           fileName,
           retentionCleanup: cleanupResult,
           nextAutoRunAt: backupConfig.nextAutoRunAt,
-          intervalDays
+          intervalDays,
+          documents: totalDocuments
         }
       });
     }
 
-    logger.info({ event: 'backup.scheduler.run.success', fileName }, 'Automatic backup generated');
+    logger.info({ event: 'backup.scheduler.run.success', fileName, totalDocuments }, 'Automatic backup generated');
 
     await auditBackupRunEvent('admin.backup.run.completed', {
       success: true,
@@ -387,6 +394,7 @@ const runBackup = async (options = {}) => {
       triggerContext,
       metadata: {
         fileName,
+        documents: totalDocuments,
         retentionDays,
         retentionCleanup: cleanupResult,
         durationMs: Date.now() - startedAt.getTime()
@@ -395,6 +403,9 @@ const runBackup = async (options = {}) => {
 
     return { success: true, fileName, filePath };
   } catch (error) {
+    if (tempJsonPath) {
+      await fs.unlink(tempJsonPath).catch(() => {});
+    }
     if (isAutomaticRun && appConfig) {
       const backupConfig = ensureBackupConfigState(appConfig);
       backupConfig.lastAutoAttemptAt = startedAt;

@@ -234,6 +234,34 @@ Antes de cambiar la imagen en `docker-compose.yml` desde `mongo:7` a `mongo:8`, 
 4. Levanta MongoDB 8 con el volumen limpio para que inicialice archivos nuevos.
 5. Restaura con `mongorestore` y valida la aplicación antes de reabrir operación.
 
+#### Scripts de apoyo para ventana de cambio
+
+Linux/macOS:
+
+```bash
+sh ./scripts/mongo8-migration.sh backup
+sh ./scripts/mongo8-migration.sh restore ./.data/mongo8-migration/<timestamp>
+```
+
+Windows:
+
+```powershell
+.\scripts\mongo8-migration.ps1 backup
+.\scripts\mongo8-migration.ps1 restore .\.data\mongo8-migration\<timestamp>
+```
+
+Estos scripts:
+
+* crean dump lógico de todas las bases del servidor MongoDB
+* guardan copia de `.env` como respaldo separado
+* empaquetan `uploads`, `tls` y `backups`
+* renuevan `mongodb_data` y `mongodb_config` antes del restore
+* levantan el stack completo al finalizar la restauración
+
+Nota: el restore deja `.env.from-mongo8-backup` como copia de referencia y no sobreescribe `.env` automáticamente.
+Nota: al respaldar y restaurar todas las bases, este flujo también cubre bases privadas de complementos alojadas en el mismo Mongo.
+Nota: los scripts resuelven el servicio `mongodb` usando el `docker compose` de este repositorio, no un contenedor Mongo cualquiera del host.
+
 **Resguardar Subidas Estáticas (Logos, Evidencias):**
 ```bash
 docker run --rm -v bitacorasoc_backend_uploads:/source \
@@ -241,16 +269,18 @@ docker run --rm -v bitacorasoc_backend_uploads:/source \
   tar czf /backup/uploads-$(date +%Y%m%d).tar.gz -C /source .
 ```
 
-### Restauración vía API (JSON Integrado)
-Si activaste la tarea automática de Backup en el panel, se grabarán archivos consolidados JSON en `.data/backups/`. Para restaurar alguno:
+### Restauración vía API (ZIP Integrado)
+Si activaste la tarea automática de Backup en el panel, se grabarán respaldos completos `.zip` en `.data/backups/`. Para restaurar alguno:
 
 ```powershell
 # Obtén tu token Bearer logueándote como Admin, y dispara (solo desarrollo/rescate):
 curl -X POST http://TU_IP:3000/api/backup/restore \
   -H "Authorization: Bearer TU_TOKEN_JWT" \
   -H "Content-Type: application/json" \
-  -d '{"filename":"backup-ARCHIVO.json","clearBeforeRestore":true}'
+  -d '{"filename":"backup-ARCHIVO.zip","clearBeforeRestore":true}'
 ```
+
+Compatibilidad: el restore sigue aceptando `.json` legacy cuando existan respaldos antiguos.
 
 ### Herramientas de Ingesta (CSV)
 ```bash
