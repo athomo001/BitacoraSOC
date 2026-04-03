@@ -1,0 +1,150 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bitacora/complement.schema.json",
+  "title": "Complement",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "slug",
+    "name",
+    "baseUrl",
+    "dbName",
+    "status",
+    "apiVersion",
+    "permissions"
+  ],
+  "properties": {
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]{1,32}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 80
+    },
+    "baseUrl": {
+      "type": "string",
+      "format": "uri"
+    },
+    "internalBaseUrl": {
+      "type": "string"
+    },
+    "dbName": {
+      "type": "string",
+      "pattern": "^bitacora_ext_[a-z0-9][a-z0-9_-]{0,48}$"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "disabled", "maintenance"]
+    },
+    "apiVersion": {
+      "type": "string",
+      "enum": ["v1", "v2"]
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scopes", "allowedCollections"],
+      "properties": {
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "READ_CONTEXT",
+              "READ_LOGS",
+              "WRITE_ENTRIES",
+              "READ_STORAGE",
+              "WRITE_STORAGE",
+              "WRITE_LOGS"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "allowedCollections": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["entries", "auditlogs", "shared_storage"]
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "visibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["admin", "user", "auditor", "guest"]
+          },
+          "uniqueItems": true
+        },
+        "cargoLabels": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "sourceArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sourceType": {
+          "type": "string",
+          "enum": ["manual", "zip-static"]
+        },
+        "stackKey": {
+          "type": ["string", "null"]
+        },
+        "originalFileName": {
+          "type": ["string", "null"]
+        },
+        "previewUrl": {
+          "type": ["string", "null"]
+        },
+        "previewRelativePath": {
+          "type": ["string", "null"]
+        },
+        "publishedUrl": {
+          "type": ["string", "null"]
+        },
+        "publishedRelativePath": {
+          "type": ["string", "null"]
+        },
+        "managedByPlatform": {
+          "type": "boolean"
+        },
+        "lastPreviewAt": {
+          "type": ["string", "null"]
+        },
+        "publishedAt": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "cleanupHookPath": {
+      "type": "string",
+      "default": "/hook/cleanup"
+    },
+    "healthPath": {
+      "type": "string",
+      "default": "/health"
+    },
+    "iframePath": {
+      "type": "string",
+      "default": "/"
+    }
+  }
+}

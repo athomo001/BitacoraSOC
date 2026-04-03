@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Complemento Prueba - Sin BD</title>
+  <style>
+    body { font-family: Segoe UI, sans-serif; margin: 0; background: #f5f7fb; color: #12213a; }
+    .wrap { max-width: 920px; margin: 0 auto; padding: 20px; }
+    .card { background: #fff; border: 1px solid #dce3f2; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+    button { border: 0; border-radius: 10px; padding: 10px 14px; cursor: pointer; background: #1f69ff; color: #fff; font-weight: 600; }
+    pre { margin: 0; background: #0c162a; color: #d6f4e6; border-radius: 10px; padding: 12px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Complemento de prueba sin BD</h1>
+      <p>Este complemento es solo UI. Sirve para validar carga, preview, publicación y borrado sin persistencia.</p>
+      <button id="btnPing">Ejecutar prueba visual</button>
+    </div>
+    <div class="card">
+      <h2>Salida</h2>
+      <pre id="output">Sin ejecutar.</pre>
+    </div>
+  </div>
+  <script>
+    const output = document.getElementById('output');
+    document.getElementById('btnPing').addEventListener('click', () => {
+      output.textContent = JSON.stringify({
+        status: 'ok',
+        type: 'no-db',
+        timestamp: new Date().toISOString(),
+        random: Math.floor(Math.random() * 100000)
+      }, null, 2);
+    });
+  </script>
+</body>
+</html>

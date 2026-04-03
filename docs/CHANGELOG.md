@@ -2,6 +2,65 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.25-beta] - 2026-04-03
+
+### Plataforma de complementos
+
+#### Publicación ZIP, visibilidad y operación
+
+- Se elevó el límite de subida de paquetes ZIP a `25 MB` en validación backend, manteniéndolo fijo en código y no en variables de entorno.
+- Se incorporó flujo práctico de análisis, preview y publicación para complementos ZIP estáticos desde `Admin > Complementos`, incluyendo detección de stack permitido, configuración sugerida y publicación administrada por plataforma.
+- Se generaron paquetes de prueba para QA manual (`sin BD`, `persistencia local`, `API externa`) para validar instalación, uso y borrado end-to-end.
+- Se implementó refresco reactivo del menú lateral de complementos tras crear, actualizar, publicar o eliminar, evitando depender de `F5` para ver cambios.
+- Se reorganizó el menú lateral para escalar mejor: grupo colapsable de historial/entradas y bloque separado de complementos con tratamiento visual propio.
+
+#### Routing, iframe y acceso seguro
+
+- Se corrigió el flujo de preview/publicación de complementos estáticos normalizando URLs de iframe y rutas relativas bajo `/uploads/complements/...` para que funcionen correctamente detrás de proxy/nginx.
+- Se añadió proxy explícito para `/uploads` y `/uploads/complements` en frontend nginx, alineando acceso desde Docker, desarrollo local y despliegue HTTPS.
+- Se protegió el acceso directo a artefactos publicados y previews: ahora `/uploads/complements/*` exige autenticación y valida permisos de visibilidad; preview queda restringido a `admin`.
+- Se ajustó la política de `iframe` y cabeceras para permitir cargar complementos publicados sin dejar los artefactos expuestos públicamente por URL conocida.
+- Se simplificó la vista del contenedor de complementos para reducir el efecto de “cuadro dentro de cuadro”, quitando metadata redundante (`slug · versión`) y ampliando el área útil del iframe.
+
+#### Resiliencia y seguridad operativa
+
+- Se corrigió el circuit breaker de complementos `zip-static`: el health-check ya no intenta sondas HTTP a un servicio inexistente y ahora valida la presencia del artefacto publicado en disco.
+- Se mantuvo aislamiento visual de complementos en `OPEN`, evitando que un complemento defectuoso impacte la aplicación principal.
+- Se eliminó un `docker-compose.test.yml` residual para reducir ruido operativo y simplificar la superficie de despliegue de complementos.
+
+### Seguridad y autenticación
+
+#### Endurecimiento adicional
+
+- Se eliminó el uso activo de token stub en `.env`, dejando solo guía comentada para pruebas locales controladas.
+- Se ajustó el guard SSRF/outbound para permitir explícitamente hosts privados solo en escenarios autorizados de complementos/desarrollo interno.
+- Se añadió soporte de auditoría con `source` y `sourceId` para eventos de complementos, permitiendo filtrar por slug y enrutar mejor los eventos a observabilidad/SIEM.
+
+### Auditoría y observabilidad
+
+#### Trazabilidad de complementos
+
+- Se amplió el modelo `AuditLog` con `source` y `sourceId` y se agregaron índices para consultas operativas por complemento.
+- Se extendió el endpoint y la UI de auditoría para filtrar por categoría `Complementos` y por `slug` específico del complemento.
+- Se documentaron y centralizaron eventos de complementos (`complement.install`, `complement.update.*`, `complement.delete.*`, `complement.wipe.*`, `complement.circuit.*`, `complement.api.*`).
+
+### Dependencias y build
+
+#### Hardening de supply chain
+
+- Se actualizó `nodemailer` a `^8.0.4` para mitigar advisories de seguridad en el flujo SMTP.
+- Se migró `mjml` a `5.0.0-beta.2`, eliminando la cadena vulnerable heredada de `html-minifier` y adaptando el render de reportes a API async.
+- Se forzó `glob@^13.0.6` mediante `overrides`, eliminando de la instalación productiva los warnings y ramas transitorias deprecadas ligadas a `glob@10.5.0`.
+- Se validó generación de reportes y empaquetado con smoke tests, además de reconstrucción Docker con `npm install --omit=dev` sin vulnerabilidades productivas reportadas.
+
+### Rate limiting y operación de sesión
+
+#### Ajustes de despliegue
+
+- Se corrigió el despliegue de variables de rate limit al contenedor backend: `docker-compose.yml` ahora propaga `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX_REQUESTS`, `RATE_LIMIT_MAX_AUTH_REQUESTS` y `RATE_LIMIT_LOGIN_MAX`.
+- Se hizo configurable por entorno el límite del `loginLimiter`, evitando que quedara fijo en `5` intentos al margen de la configuración operativa.
+- Se normalizaron valores de preproducción para evitar bloqueos artificiales por recarga/prueba intensiva y separar mejor límites públicos, autenticados y de login.
+
 ## [v1.5.24-beta] - 2026-04-02
 
 ### Cierre de Issues Operativos
@@ -17,6 +76,9 @@ Registro de cambios relevantes del proyecto.
 - **AUDIT-014:** Se corrigió la atribución de actor en `auth.login.success`, enviando actor explícito en backend para evitar que el login exitoso quede como acción de sistema.
 - Se ajustó el frontend de auditoría para resolver actor con fallback de metadata cuando corresponda, mejorando trazabilidad forense.
 - **MAIL-AUDIT-015:** Se enriqueció la auditoría de correo (`mail.send.success/fail`) con contexto operativo (`sourceModule`, `triggerType`, `triggerContext`, `shiftId/checklistId/entryType`, `smtpConfigId`, destinatarios sanitizados y conteo resuelto), se normalizó la causa de error y se agregó control de ruido para fallos repetidos; la UI ahora muestra causa y origen de disparo de forma explícita.
+
+#### Plataforma de complementos
+- **COMP-001 a COMP-011:** Se incorporó la base productiva de complementos con modelo `Complement`, API interna `/api/internal/v1`, Application Tokens con scopes, circuit breaker por complemento, shell iframe seguro, bridge `postMessage`, logging centralizado, overlays Docker y `complement-stub` para QA/integración.
 
 #### Backups
 - **BACKUP-AUTO-016:** Se rediseñó el scheduler automático de backups con estado persistente de ejecución (`lastAutoRunAt`, `nextAutoRunAt`, estado y mensaje), verificación por vencimiento en arranque/intervalo y eventos de auditoría de ciclo automático.

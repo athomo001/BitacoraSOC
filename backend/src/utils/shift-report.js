@@ -300,7 +300,7 @@ const renderSummaryCard = (label, value, styles) => {
 /**
  * Genera HTML del reporte de turno
  */
-function generateReportHTML({ shift, checklistEntry, checklistExit, entries, periodStart, periodEnd, appTitle = 'Bitácora SOC', faviconUrl = '' }) {
+async function generateReportHTML({ shift, checklistEntry, checklistExit, entries, periodStart, periodEnd, appTitle = 'Bitácora SOC', faviconUrl = '' }) {
   const brandedAppTitle = String(appTitle || '').trim() || 'Bitácora SOC';
   const brandedAppTitleHtml = escapeHtml(brandedAppTitle);
   const favicon = String(faviconUrl || '').trim();
@@ -527,7 +527,7 @@ function generateReportHTML({ shift, checklistEntry, checklistExit, entries, per
 </mjml>
 `;
 
-  const compilation = mjml2html(mjmlTemplate, {
+  const compilation = await mjml2html(mjmlTemplate, {
     validationLevel: 'strict',
     minify: false,
     keepComments: false
@@ -758,7 +758,7 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
     });
 
     // 6. Generar HTML
-    const html = generateReportHTML({
+    const html = await generateReportHTML({
       shift,
       checklistEntry,
       checklistExit,
@@ -998,7 +998,7 @@ async function sendShiftReportPoc(shiftId, options = {}) {
       }
     };
 
-    const htmlBody = generateReportHTML({
+    const htmlBody = await generateReportHTML({
       shift: shiftForPoc,
       checklistEntry,
       checklistExit,

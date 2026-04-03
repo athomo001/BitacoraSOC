@@ -16,6 +16,9 @@ flowchart LR
   BE --> SMTP[Servidor SMTP]
   BE --> SIEM[SIEM/SOAR Syslog/TLS]
   BE --> FS[Uploads y Backups]
+  FE -->|iframe sandbox| CUI[Complementos UI]
+  CUI -->|App Token| INT[/API Interna v1/]
+  INT --> BE
 
   subgraph Schedulers
     CRON[Shift Scheduler] --> BE
@@ -58,11 +61,15 @@ sequenceDiagram
   FE->>API: POST /api/auth/login
   API->>DB: Verifica usuario
   API->>AUD: Registra auth.login.*
-  API-->>FE: JWT
-  FE->>API: Request con Bearer token
+  API-->>FE: Cookie HttpOnly auth_token + user base
+  FE->>API: APP_INITIALIZER -> GET /api/users/me
+  FE->>API: Requests con withCredentials
   API->>AUD: Registra evento (entry.create, shiftcheck.submit, etc.)
   API-->>FE: Respuesta
 ```
+
+- La sesión web usa cookie `auth_token` HttpOnly.
+- El frontend rehidrata sesión al arrancar usando `/api/users/me`.
 
 ---
 
@@ -95,3 +102,62 @@ flowchart LR
 
 - Forwarding SIEM soporta múltiples destinos activos en paralelo.
 - GLPI tiene configuración propia y prueba de conectividad independiente.
+
+---
+
+## 🧩 Complementos
+
+```mermaid
+flowchart LR
+  ADMIN[Admin UI] --> CRUD[/api/complements]
+  ADMIN --> ZIP[/source validate preview publish/]
+  CRUD --> ORCH[Complement Manager]
+  ZIP --> ORCH
+  ORCH --> GDB[(MongoDB General)]
+  ORCH -. wipe-out seguro .-> PDB[(bitacora_ext_*)]
+  ORCH --> PRE[/uploads/complements/preview/]
+  ORCH --> PUB[/uploads/complements/published/]
+  ORCH --> AUD[AuditLog complement.*]
+  ORCH --> CIR[Circuit Breaker]
+  CIR --> SLOT[Complement Container iframe]
+  FE[Angular SPA] --> SLOT
+  SLOT --> BRIDGE[Complement Bridge]
+  BRIDGE --> INT[/API Interna v1/]
+  INT --> ORCH
+```
+
+```mermaid
+sequenceDiagram
+  participant ADMIN as Admin
+  participant UI as Admin Complementos
+  participant API as /api/complements
+  participant PUB as Publicador ZIP
+
+  ADMIN->>UI: Sube ZIP
+  UI->>API: POST /source/validate
+  API-->>UI: Stack detectado + config sugerida
+  UI->>API: POST /source/preview
+  API->>PUB: Extrae a preview/<previewId>
+  API-->>UI: previewUrl
+  UI->>API: POST /source/publish
+  API->>PUB: Publica en published/<slug>
+  API-->>UI: Complemento activo
+```
+
+```mermaid
+sequenceDiagram
+  participant I as Iframe
+  participant B as Bridge Angular
+  participant API as /api/internal/v1
+  participant DB as MongoDB
+
+  I->>B: REQUEST_CONTEXT
+  B-->>I: CONTEXT_UPDATE
+  I->>API: POST /log-entry
+  API->>DB: Insert Entry ownerComplementId
+  API-->>I: 201 Created
+```
+
+- La publicación automática hoy solo soporta ZIP `static-html`.
+- `browser-state` y `shared_storage` viven en `ComplementSharedRecord` dentro de la base general.
+- `v2` existe en discovery/modelo, pero no es aún una API interna funcional.

@@ -11,7 +11,7 @@ Guía detallada para instalar y configurar el sistema desde cero.
 
 - **Node.js** 24+ LTS y npm
 - **Express** 5.1+
-- **MongoDB** 7+ (local o remoto)
+- **MongoDB** 8+ (local o remoto)
 - **mongodump/mongorestore** (para backups)
 - **Angular CLI** 20+ `npm install -g @angular/cli`
 
@@ -58,7 +58,7 @@ mongosh --eval "db.version()"
 
 **Salida esperada:**
 ```
-6.0.x
+8.x
 ```
 
 Si no está instalado:
@@ -120,7 +120,17 @@ ALLOWED_ORIGINS=http://192.168.100.50:4200,http://localhost:4200
 
 # Rate Limiting
 RATE_LIMIT_WINDOW_MS=900000           # 15 min
-RATE_LIMIT_MAX_REQUESTS=100           # 100 requests/15min
+RATE_LIMIT_MAX_REQUESTS=1000          # API general
+RATE_LIMIT_MAX_AUTH_REQUESTS=2000     # API autenticada
+RATE_LIMIT_LOGIN_MAX=20               # Login
+
+# Complementos
+COMPLEMENT_TOKEN_SECRET=GENERAR_CON_OPENSSL
+COMPLEMENT_MAX_DBS=5
+COMPLEMENT_CIRCUIT_TIMEOUT_MS=3000
+COMPLEMENT_CIRCUIT_FAIL_THRESHOLD=3
+COMPLEMENT_CIRCUIT_RESET_MS=30000
+COMPLEMENT_ALLOW_PRIVATE_URLS=true
 
 # Timezone
 TZ=America/Santiago
@@ -157,6 +167,8 @@ JWT_SECRET=XyZ123AbC456DeF789...
 ```
 
 **⚠️ NUNCA COMMITEAR .env A GIT**
+
+**Nota de sesión web:** La UI usa cookie `auth_token` HttpOnly y rehidrata estado con `GET /api/users/me`, por lo que `ALLOWED_ORIGINS` debe incluir exactamente el origen del frontend en desarrollo.
 
 ---
 
@@ -216,67 +228,33 @@ export const environment = {
 
 ## 4. Primer Usuario Admin
 
-### Opción A: Registro Manual en MongoDB
+### Opcion recomendada: seed-admin
 
-```javascript
-// Ejecutar en mongosh
-use bitacora_soc
+Usar el script oficial para crear solo el administrador maestro:
 
-db.users.insertOne({
-  username: "admin",
-  email: "admin@example.com",
-  // Password: "CHANGE_ME" hasheado con bcrypt
-  password: "<bcrypt_hash>",
-  fullName: "Administrador",
-  role: "admin",
-  isActive: true,
-  theme: "light",
-  createdAt: new Date(),
-  updatedAt: new Date()
-})
-```
-
-**⚠️ Cambiar password inmediatamente después del primer login.**
-
-### Opción B: Script Seed (Recomendado)
-
-Crear `backend/src/scripts/seed.js`:
-
-```javascript
-require('dotenv').config();
-const mongoose = require('mongoose');
-const User = require('../models/User');
-
-async function seed() {
-  await mongoose.connect(process.env.MONGODB_URI);
-  
-  const adminExists = await User.findOne({ role: 'admin' });
-  if (adminExists) {
-    console.log('❌ Admin ya existe');
-    process.exit(0);
-  }
-  
-  const admin = new User({
-    username: 'admin',
-    email: 'admin@example.com',
-    password: 'CHANGE_ME',  // Se hashea automáticamente
-    fullName: 'Administrador',
-    role: 'admin',
-    isActive: true
-  });
-  
-  await admin.save();
-  console.log('✅ Admin creado: admin / CHANGE_ME');
-  process.exit(0);
-}
-
-seed().catch(console.error);
-```
-
-Ejecutar:
 ```powershell
-node backend\src\scripts\seed.js
+docker compose exec backend node src/scripts/seed-admin.js
 ```
+
+Este script:
+
+- toma usuario/password desde `.env` (`ADMIN_USERNAME`, `ADMIN_PASSWORD`)
+- no inserta datos ficticios adicionales
+- no sobreescribe admin existente por seguridad
+
+### Opcion de laboratorio: seed completo
+
+Para demos o QA interno, usar:
+
+```powershell
+docker compose exec backend node src/scripts/seed.js
+```
+
+`seed.js` inserta datos de prueba (usuarios, turnos, clientes, checklist, historial sanitizado). No usar en produccion.
+
+### Opcion manual en Mongo
+
+Solo para casos especiales. Se recomienda evitar inyecciones manuales directas cuando exista `seed-admin.js`.
 
 ---
 

@@ -65,8 +65,12 @@ export class AuthInterceptor implements HttpInterceptor {
         }
 
         if (error.status === 401) {
-          // Token inválido o expirado
-          this.authService.logout();
+          const isSessionBootstrapRequest = req.url.includes('/users/me');
+          const shouldSkipForcedLogout = isSessionBootstrapRequest || this.authService.isInitializingSession();
+
+          if (!shouldSkipForcedLogout && this.authService.getCurrentUser()) {
+            this.authService.logout();
+          }
         }
         return throwError(() => error);
       })

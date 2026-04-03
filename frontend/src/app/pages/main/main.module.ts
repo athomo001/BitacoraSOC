@@ -75,6 +75,10 @@ const routes: Routes = [
       { path: 'tags', component: TagsComponent },
       { path: 'logo', component: LogoComponent },
       { path: 'backup', component: BackupComponent },
+      {
+        path: 'complements/:slug',
+        loadComponent: () => import('./complement-container/complement-container.component').then(m => m.ComplementContainerComponent)
+      },
       { path: 'checklist-admin', redirectTo: 'admin/checklist', pathMatch: 'full' },
       { path: 'catalog-admin', redirectTo: 'admin/catalogs', pathMatch: 'full' },
       { path: 'audit-logs', component: AuditLogsComponent, canActivate: [AdminGuard] },
@@ -110,6 +114,10 @@ const routes: Routes = [
           {
             path: 'appearance',
             loadComponent: () => import('./admin-appearance/admin-appearance.component').then(m => m.AdminAppearanceComponent)
+          },
+          {
+            path: 'complements',
+            loadComponent: () => import('./admin-complements/admin-complements.component').then(m => m.AdminComplementsComponent)
           }
         ]
       },

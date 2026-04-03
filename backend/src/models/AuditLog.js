@@ -89,6 +89,16 @@ const auditLogSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.Mixed,
     default: {}
   },
+
+  source: {
+    type: String,
+    default: 'core'
+  },
+
+  sourceId: {
+    type: String,
+    default: null
+  },
   
   // Marca para forwarding (procesado por logForwarder)
   forwarded: {
@@ -115,6 +125,7 @@ const auditLogSchema = new mongoose.Schema({
 auditLogSchema.index({ timestamp: -1, event: 1 }); // Query: eventos recientes de tipo X
 auditLogSchema.index({ 'actor.userId': 1, timestamp: -1 }); // Query: actividad de usuario
 auditLogSchema.index({ event: 1, 'result.success': 1 }); // Query: fallos por tipo
+auditLogSchema.index({ source: 1, sourceId: 1, timestamp: -1 });
 
 /**
  * Índice TTL: Expiración Automática

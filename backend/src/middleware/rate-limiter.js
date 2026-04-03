@@ -33,6 +33,7 @@ const defaultAuthenticatedMax = 1200;
 const apiWindowMs = parseEnvInt(process.env.RATE_LIMIT_WINDOW_MS, defaultWindowMs);
 const apiPublicMax = parseEnvInt(process.env.RATE_LIMIT_MAX_REQUESTS, defaultPublicMax);
 const apiAuthenticatedMax = parseEnvInt(process.env.RATE_LIMIT_MAX_AUTH_REQUESTS, defaultAuthenticatedMax);
+const loginMax = parseEnvInt(process.env.RATE_LIMIT_LOGIN_MAX, 5);
 
 const hasBearerToken = (req) => {
   const authorization = req.headers?.authorization;
@@ -54,7 +55,7 @@ const getLoginLimiterKey = (req) => {
 // Rate limiter para login
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 5, // 5 intentos permitidos para evitar fuerza bruta (SEC-CRIT-005)
+  max: loginMax,
   keyGenerator: getLoginLimiterKey,
   message: {
     message: 'Demasiados intentos de inicio de sesión. Intenta de nuevo en 15 minutos.'

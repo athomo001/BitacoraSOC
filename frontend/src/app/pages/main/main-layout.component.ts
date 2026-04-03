@@ -5,9 +5,13 @@ import { NoteService } from '../../services/note.service';
 import { ChecklistService } from '../../services/checklist.service';
 import { ConfigService } from '../../services/config.service';
 import { ThemeService } from '../../services/theme.service';
+import { ComplementService } from '../../services/complement.service';
+import { ComplementBridgeService } from '../../services/complement-bridge.service';
+import { WorkShiftService } from '../../services/work-shift.service';
 import { AdminNote, PersonalNote } from '../../models/note.model';
 import { ChecklistTemplate, ChecklistItem, ShiftCheck } from '../../models/checklist.model';
 import { Theme } from '../../models/user.model';
+import { Complement } from '../../models/complement.model';
 import { environment } from '../../../environments/environment';
 import { MatSidenavContainer, MatSidenav, MatSidenavContent } from '@angular/material/sidenav';
 import { MatToolbar } from '@angular/material/toolbar';
@@ -15,7 +19,7 @@ import { NgIf, NgFor } from '@angular/common';
 import { MatIcon } from '@angular/material/icon';
 import { MatNavList, MatListItem, MatListItemIcon, MatListItemTitle } from '@angular/material/list';
 import { RouterLinkActive, RouterLink, RouterOutlet } from '@angular/router';
-import { MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle } from '@angular/material/expansion';
+import { MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatExpansionPanelDescription } from '@angular/material/expansion';
 import { MatDivider } from '@angular/material/divider';
 import { MatFormField, MatLabel, MatHint } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
@@ -35,13 +39,14 @@ type MenuItem = {
   selector: 'app-main-layout',
   templateUrl: './main-layout.component.html',
   styleUrls: ['./main-layout.component.scss'],
-  imports: [MatSidenavContainer, MatSidenav, MatToolbar, NgIf, MatIcon, MatNavList, NgFor, MatListItem, RouterLinkActive, RouterLink, MatListItemIcon, MatListItemTitle, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatDivider, MatFormField, MatLabel, MatInput, ReactiveFormsModule, FormsModule, MatHint, MatSidenavContent, MatIconButton, MatMenuTrigger, MatMenu, MatMenuItem, RouterOutlet]
+  imports: [MatSidenavContainer, MatSidenav, MatToolbar, NgIf, MatIcon, MatNavList, NgFor, MatListItem, RouterLinkActive, RouterLink, MatListItemIcon, MatListItemTitle, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatExpansionPanelDescription, MatDivider, MatFormField, MatLabel, MatInput, ReactiveFormsModule, FormsModule, MatHint, MatSidenavContent, MatIconButton, MatMenuTrigger, MatMenu, MatMenuItem, RouterOutlet]
 })
 export class MainLayoutComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
   private adminNoteChange$ = new Subject<string>();
   private personalNoteChange$ = new Subject<string>();
   private checklistRefreshIntervalId: ReturnType<typeof setInterval> | null = null;
+  private shiftRefreshIntervalId: ReturnType<typeof setInterval> | null = null;
 
   currentUser: any = null;
   isAdmin = false;
@@ -92,18 +97,26 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   ];
 
   visiblePrimaryMenu: MenuItem[] = [];
+  visiblePrimaryMenuMain: MenuItem[] = [];
+  visiblePrimaryMenuHistory: MenuItem[] = [];
   visibleConfigItems: MenuItem[] = [];
+  visibleComplementItems: MenuItem[] = [];
   hasConfigAccess = false;
   logoUrl: string = '';
   appTitle: string = '';
+  activeComplements: Complement[] = [];
   private backendBaseUrl = environment.backendBaseUrl;
+  private readonly historyMenuRoutes = new Set(['/main/checklist-history', '/main/my-entries', '/main/all-entries']);
 
   constructor(
     private authService: AuthService,
     private noteService: NoteService,
     private checklistService: ChecklistService,
     private configService: ConfigService,
-    private themeService: ThemeService
+    private themeService: ThemeService,
+    private complementService: ComplementService,
+    private complementBridgeService: ComplementBridgeService,
+    private workShiftService: WorkShiftService
   ) { }
 
   getAssetUrl(url: string): string {
@@ -120,13 +133,27 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     this.loadChecklist();
     this.loadLogo();
     this.loadBrandingTitle();
+    this.loadActiveComplements();
+    this.loadCurrentShiftContext();
     this.setupAutosave();
+    this.complementService.complementsChanged$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.loadActiveComplements();
+      });
+    this.complementBridgeService.updateContext({
+      theme: this.themeService.getCurrentTheme()
+    });
   }
 
   ngOnDestroy(): void {
     if (this.checklistRefreshIntervalId) {
       clearInterval(this.checklistRefreshIntervalId);
       this.checklistRefreshIntervalId = null;
+    }
+    if (this.shiftRefreshIntervalId) {
+      clearInterval(this.shiftRefreshIntervalId);
+      this.shiftRefreshIntervalId = null;
     }
     this.destroy$.next();
     this.destroy$.complete();
@@ -140,7 +167,66 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       this.isGuest = this.currentUser.role === 'guest';
     }
 
+    this.complementBridgeService.updateContext({
+      user: this.currentUser ? {
+        username: this.currentUser.username,
+        role: this.currentUser.role,
+        fullName: this.currentUser.fullName
+      } : null
+    });
+
     this.updateVisibleMenus();
+  }
+
+  loadActiveComplements(): void {
+    this.complementService.getActiveComplements()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (complements) => {
+          this.activeComplements = complements;
+          this.visibleComplementItems = complements.map((item) => ({
+            icon: item.circuit.state === 'OPEN' ? 'build' : 'extension',
+            label: item.name,
+            route: `/main/complements/${item.slug}`,
+            roles: ['admin', 'user', 'guest', 'auditor']
+          }));
+          this.updateVisibleMenus();
+        },
+        error: () => {
+          this.activeComplements = [];
+          this.visibleComplementItems = [];
+        }
+      });
+  }
+
+  loadCurrentShiftContext(): void {
+    this.workShiftService.getCurrentShift()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response) => {
+          const shift = response?.shift;
+          const assignedUsers = (shift?.assignedUserIds || [])
+            .map((user: any) => typeof user === 'string'
+              ? null
+              : ({
+                id: user._id,
+                fullName: user.fullName || ''
+              }))
+            .filter(Boolean);
+          this.complementBridgeService.updateContext({
+            shift: shift ? {
+              shiftId: shift._id,
+              shiftName: shift.name,
+              timezone: response.timezone,
+              assignedUsers
+            } : null
+          });
+        }
+      });
+
+    this.shiftRefreshIntervalId = setInterval(() => {
+      this.loadCurrentShiftContext();
+    }, 60000);
   }
 
   loadLogo(): void {
@@ -284,6 +370,8 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   private updateVisibleMenus(): void {
     const role = this.currentUser?.role || '';
     this.visiblePrimaryMenu = this.primaryMenuItems.filter(item => item.roles.includes(role));
+    this.visiblePrimaryMenuHistory = this.visiblePrimaryMenu.filter((item) => this.historyMenuRoutes.has(item.route));
+    this.visiblePrimaryMenuMain = this.visiblePrimaryMenu.filter((item) => !this.historyMenuRoutes.has(item.route));
     this.visibleConfigItems = this.configItems.filter(item => item.roles.includes(role));
     this.hasConfigAccess = this.visibleConfigItems.length > 0;
   }
@@ -379,6 +467,16 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
             s.status = null;
             s.observation = '';
           });
+          this.complementBridgeService.updateContext({
+            checklist: {
+              type: this.lastCheck?.type,
+              hasRedServices: this.lastCheck?.hasRedServices
+            }
+          });
+          this.complementBridgeService.publish('CHECKLIST_SUBMITTED', {
+            type: this.lastCheck?.type || 'inicio',
+            hasRedServices: this.lastCheck?.hasRedServices || false
+          });
           console.log('Checklist enviado exitosamente');
         },
         error: (err) => {
@@ -414,6 +512,8 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   changeTheme(theme: string): void {
     this.themeService.setTheme(theme as Theme);
+    this.complementBridgeService.updateContext({ theme: theme as Theme });
+    this.complementBridgeService.publish('THEME_CHANGE', { theme });
   }
 
   logout(): void {

@@ -8,17 +8,6 @@
 | ID | Estado | Seccion | Tarea | Notas |
 | --- | --- | --- | --- | --- |
 | AI-SUMMARY-001 | Pendiente | IA/Operación ALTA | Módulo de Resumen Ejecutivo Efímero (IA On-Demand) | Integrar Ollama+llama3.2:3b en modo efímero `docker start -> healthcheck -> generate -> docker stop` con `try/finally`, salida editable en campo "Resumen Sugerido por IA" y botón "Generar con IA". |
-| COMP-001 | Pendiente | Arquitectura / Complementos ALTA | Persistencia Aislada, Wipe Out y Auditoría Forense | Cada complemento usa su propia DB (`bitacora_ext_*`). Al ejecutar `DELETE_COMPLEMENTO`, el orquestador dispara un Wipe Out de 4 fases (hook → dropDB → purge general → delete modelo) con trail forense completo en AuditLog. |
-| COMP-002 | Pendiente | API / Complementos ALTA | Contrato de API Interna (Microservicio-Bitácora) | Gateway seguro en `/api/internal/v1/*` con Application Token (no JWT de usuario), scopes granulares (`READ_LOGS`, `WRITE_STORAGE`, etc.) y colecciones autorizadas explícitamente por Admin. |
-| COMP-003 | Pendiente | UI / Complementos ALTA | Slot Dinámico en UI (N1 y Admin) | Iframe con `sandbox` restrictivo + `postMessage` con validación de origin. Consola Admin para gestión de Alta/Baja/Permisos. Circuit Breaker visual si el complemento falla. |
-| COMP-004 | Pendiente | Resiliencia / Complementos ALTA | Circuit Breaker para Microservicios | Si un complemento tarda >3s o devuelve 5xx, el Core lo aísla visualmente mostrando badge "Mantenimiento" sin afectar el resto de la aplicación. Estados: CLOSED → OPEN → HALF-OPEN. |
-| COMP-005 | Pendiente | Seguridad / Complementos ALTA | Application Token y Scopes Granulares | Sistema de tokens de aplicación independiente del JWT de usuario, firmado con `COMPLEMENT_TOKEN_SECRET`, con scopes verificados por middleware y revocación inmediata al eliminar complemento. |
-| COMP-006 | Pendiente | Arquitectura / Contratos ALTA | Shared Types & Contracts (Esquema JSON Compartido) | Actualmente Backend (Mongoose/JS) y Frontend (12 `.model.ts`) no comparten contratos. Sin un paquete o esquema común, los microservicios de complementos duplicarán tipos y romperán ante cambios del Core. |
-| COMP-007 | Pendiente | Frontend / Estado ALTA | Bus de Eventos para State Sync (Core ↔ Iframe) | Si el N1 cambia de turno/cliente en la Bitácora, el iframe del complemento no se entera. Se necesita un bus de eventos bidireccional vía `postMessage` con protocolo tipado y validación de origin. |
-| COMP-008 | Pendiente | DevOps / Infraestructura ALTA | Orquestación Docker y Redes Aisladas | El `docker-compose.yml` actual tiene una sola red (`bitacora-network`). Los microservicios necesitan red aislada (`bitacora-complements`) con acceso exclusivo al backend. |
-| COMP-009 | Pendiente | Observabilidad / Complementos ALTA | Logging Centralizado de Microservicios | Los logs de un complemento quedan en su propio contenedor y no son visibles desde la Bitácora. Se necesita un colector centralizado y una vista en la UI Admin para diagnosticar fallos. |
-| COMP-010 | Pendiente | API / Versionamiento MEDIA | Versionamiento de API Interna (Compatibilidad) | Si se actualiza el Core pero un complemento sigue en v1, debe seguir funcionando. Se necesita control de versiones en la API Interna (`/api/internal/v1/`, `/v2/`) con deprecation headers. |
-| COMP-011 | Pendiente | Testing / Complementos MEDIA | Mocks de Complementos para Pruebas de Integración | Crear un microservicio mock (`complement-stub`) que simule todas las interacciones de un complemento real para testing del Core sin depender de microservicios reales. |
 
 ### ✅ Listas
 
@@ -35,6 +24,17 @@
 | SEC-HIGH-010 | Listo | Seguridad ALTA | OWASP A10 SSRF: URLs salientes configurables sin allowlist en integraciones | Se implementó guard central de URLs salientes (solo HTTPS, bloqueo loopback/red privada, validación DNS y `OUTBOUND_ALLOWLIST` opcional) aplicado a GLPI y Log Forwarding en configuración y runtime. |
 | SEC-MED-011 | Listo | Seguridad MEDIA | OWASP A09/A02: Logging sensible en autenticación (username + estado de password) | Se eliminó exposición de datos sensibles en logs de autenticación y se reemplazó logging de enlace de reseteo por mensaje sanitizado sin secretos. |
 | MAIL-AUDIT-015 | Listo | Email / Observabilidad ALTA | Error `❌ [CORREO] Para: sin destinatarios` sin contexto diagnóstico | Se enriqueció la auditoría de `mail.send.success/fail` con `sourceModule`, `triggerType`, `triggerContext`, `shiftId/checklistId/entryType`, `smtpConfigId`, `resolvedRecipientsCount` y preview sanitizado; además se normalizó causa de fallo y se aplicó control de ruido (deduplicación/re-log periódico) para errores repetidos. La UI ahora muestra contexto operativo y causa explícita. |
+| COMP-001 | Listo | Arquitectura / Complementos ALTA | Persistencia Aislada, Wipe Out y Auditoría Forense | Se implementó `Complement`, DB privada `bitacora_ext_*`, wipe-out de 4 fases, purge por `ownerComplementId` y eventos `complement.wipe.*`. |
+| COMP-002 | Listo | API / Complementos ALTA | Contrato de API Interna (Microservicio-Bitácora) | Se creó `/api/internal/v1/*` con Application Token, scopes, colecciones autorizadas y propagación de `X-Request-Id`. |
+| COMP-003 | Listo | UI / Complementos ALTA | Slot Dinámico en UI (N1 y Admin) | Se agregó shell iframe con `sandbox`, menú dinámico y consola admin de complementos. |
+| COMP-004 | Listo | Resiliencia / Complementos ALTA | Circuit Breaker para Microservicios | Se añadió health-check periódico y estados `CLOSED/OPEN/HALF_OPEN` con aislamiento visual y rechazo `503` en API interna. |
+| COMP-005 | Listo | Seguridad / Complementos ALTA | Application Token y Scopes Granulares | Se implementó `COMPLEMENT_TOKEN_SECRET`, hash SHA-256 del token activo, regeneración y revocación por borrado. |
+| COMP-006 | Listo | Arquitectura / Contratos ALTA | Shared Types & Contracts (Esquema JSON Compartido) | Se creó `shared/schemas/` y validación backend con `ajv`, más modelo TypeScript para frontend. |
+| COMP-007 | Listo | Frontend / Estado ALTA | Bus de Eventos para State Sync (Core ↔ Iframe) | Se implementó `ComplementBridgeService` con validación de `origin`, `REQUEST_CONTEXT` y sincronización de turno/tema/checklist. |
+| COMP-008 | Listo | DevOps / Infraestructura ALTA | Orquestación Docker y Redes Aisladas | Se agregó overlay `docker-compose.complements.yml` y red `bitacora-complements`; el antiguo `docker-compose.test.yml` quedó deprecado y fue eliminado. |
+| COMP-009 | Listo | Observabilidad / Complementos ALTA | Logging Centralizado de Microservicios | Los complementos ya publican a `/api/internal/v1/log`, centralizado en `AuditLog` con `source='complement'` y filtro por slug. |
+| COMP-010 | Listo | API / Versionamiento MEDIA | Versionamiento de API Interna (Compatibilidad) | Se estructuró la API interna en `v1` y `v2`, con discovery en `/api/internal/versions` y headers de versión. |
+| COMP-011 | Listo | Testing / Complementos MEDIA | Mocks de Complementos para Pruebas de Integración | Se creó `tools/complement-stub/` y el overlay de testing para simular health, iframe y cleanup. |
 | B34 | Listo | Operación/Alertas | Alerta por ítems NOK (Rojo) en Checklist | Se agregó configuración global para alertas NOK (`alertNokEnabled`, `alertNokRoleTarget`) y envío automático de correo por checklist con rojos a usuarios activos del cargo seleccionado, incluyendo detalle de observación por ítem NOK. |
 | B46 | Listo | UI/UX + Seguridad Preventiva / Frontend MEDIA | Textarea de entradas permite escribir más de 50000 caracteres | Se aplicó `maxlength=50000` en creación y edición, truncado defensivo por `input` y aviso explícito al alcanzar el máximo. |
 | B47 | Listo | UI/UX + Accesibilidad / Frontend MEDIA | Heatmap en temas light/sepia/pastel no muestra bien el número de entradas | Se ajustó contraste del heatmap en temas claros (tokens `--heatmap-low` / `--heatmap-low-mid`) y se forzó color de etiqueta legible para celdas del mapa. |
@@ -813,7 +813,7 @@ app.listen(8080, () => console.log('[STUB] Complement mock running on :8080'));
 
 **Integración con docker-compose:**
 ```yaml
-# docker-compose.test.yml
+# docker-compose.complements.yml
 services:
   complement-stub:
     build: ./tools/complement-stub
@@ -829,7 +829,7 @@ services:
 ```
 
 **Restricciones de Seguridad:**
-- El stub **nunca** se despliega en producción (solo en `docker-compose.test.yml`).
+- El stub **nunca** se despliega en producción (solo en `docker-compose.complements.yml` o entornos de laboratorio equivalentes).
 - El token del stub tiene scopes mínimos y expiración corta (1h).
 - El stub no almacena datos persistentes (stateless).
 
@@ -838,6 +838,6 @@ services:
 2. El stub responde correctamente a: health-check, iframe rendering, hook cleanup, y consulta de API Interna.
 3. Configurable por variables de entorno para simular fallos (Circuit Breaker), lentitud (timeout) y errores de cleanup.
 4. Documentado en `DEPLOY.md` bajo sección "Entorno de Testing con Complementos".
-5. Integrado en `docker-compose.test.yml` como overlay para CI/CD.
+5. Integrado en `docker-compose.complements.yml` como overlay de laboratorio/QA.
 
 ---

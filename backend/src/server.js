@@ -26,6 +26,10 @@ const path = require('path');
 const fs = require('fs');
 const connectDB = require('./config/database');
 const AppConfig = require('./models/AppConfig');
+const User = require('./models/User');
+const Complement = require('./models/Complement');
+const { authenticate } = require('./middleware/auth');
+const { isComplementVisibleToUser } = require('./utils/complement-manager');
 const { apiLimiter } = require('./middleware/rate-limiter');
 const requestIdMiddleware = require('./middleware/request-id');
 const captureMetadata = require('./middleware/metadata');
@@ -33,6 +37,10 @@ const inputSanitizer = require('./middleware/input-sanitizer');
 const { logger } = require('./utils/logger');
 const { startChecklistAlertScheduler } = require('./utils/checklistAlertScheduler');
 const { startBackupScheduler, stopBackupScheduler } = require('./utils/backup-scheduler');
+const {
+  startComplementCircuitHealthChecks,
+  stopComplementCircuitHealthChecks
+} = require('./utils/complement-circuit-breaker');
 
 const app = express();
 const HOST = process.env.HOST || '0.0.0.0';
@@ -214,7 +222,7 @@ app.use(helmet({
       fontSrc: ["'self'", "data:"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
-      frameSrc: ["'none'"],
+      frameSrc: ["'self'", "https:", "http:"],
     },
   },
   hsts: {
@@ -343,12 +351,53 @@ app.use('/api/', apiCorsMiddleware, apiLimiter);
 app.use('/api/', captureMetadata);
 app.use('/api/', inputSanitizer);
 
-// Servir archivos estáticos (logos) - CORS permisivo para imágenes
-app.use('/uploads', (req, res, next) => {
+// Servir archivos estáticos (logos y complementos publicados)
+app.use('/uploads', async (req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+
+  // Proteger artefactos de complementos: no deben quedar públicos por conocer la URL.
+  if (req.path.startsWith('/complements/')) {
+    await authenticate(req, res, async () => {
+      const relative = req.path.replace(/^\/+/, '');
+      const [prefix, mode, slugOrPreviewId] = relative.split('/');
+
+      if (prefix !== 'complements' || !mode || !slugOrPreviewId) {
+        return res.status(404).json({ message: 'Ruta de complemento inválida' });
+      }
+
+      if (mode === 'preview') {
+        if (req.user?.role !== 'admin') {
+          return res.status(403).json({ message: 'Solo admins pueden acceder al preview de complementos' });
+        }
+      }
+
+      if (mode === 'published') {
+        const complement = await Complement.findOne({ slug: slugOrPreviewId });
+        if (!complement) {
+          return res.status(404).json({ message: 'Complemento no encontrado' });
+        }
+
+        if (!isComplementVisibleToUser(complement, req.user)) {
+          return res.status(403).json({ message: 'No tienes acceso a este complemento' });
+        }
+      }
+
+      // Los complementos publicados se cargan como iframe: quitar DENY para esa ruta
+      res.removeHeader('X-Frame-Options');
+      res.header('Content-Security-Policy', "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; frame-ancestors 'self' http://localhost:* https://localhost:*");
+      next();
+    });
+    return;
+  }
+
+  // Los complementos publicados se cargan como iframe: quitar DENY para esa ruta
+  if (req.path.startsWith('/complements/')) {
+    res.removeHeader('X-Frame-Options');
+    res.header('Content-Security-Policy', "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; frame-ancestors 'self' http://localhost:* https://localhost:*");
+  }
   next();
 }, express.static(path.join(__dirname, '../uploads')));
 
@@ -385,6 +434,10 @@ app.use('/api/escalation', require('./routes/escalation')); // Módulo de escala
 app.use('/api/work-shift-assignments', require('./routes/work-shift-assignments')); // Asignaciones operativas
 app.use('/api/work-shifts', require('./routes/work-shifts')); // Turnos de trabajo
 app.use('/api/audit-logs', require('./routes/audit-logs')); // Logs de auditoría
+app.use('/api/complements', require('./routes/complements')); // Gestión de complementos
+app.use('/api/internal/versions', require('./routes/internal/versions'));
+app.use('/api/internal/v1', require('./routes/internal/v1'));
+app.use('/api/internal/v2', require('./routes/internal/v2'));
 
 // Health check (ANTES del fallback SPA)
 app.get('/health', (req, res) => {
@@ -535,6 +588,36 @@ const loadRuntimeSecurityConfigFromDb = async () => {
   }
 };
 
+const ensureInitialAdminUser = async () => {
+  const userCount = await User.countDocuments();
+  if (userCount > 0) {
+    return;
+  }
+
+  const adminUsername = (process.env.ADMIN_USERNAME || '').trim();
+  const adminPassword = process.env.ADMIN_PASSWORD || '';
+
+  if (!adminUsername || !adminPassword) {
+    logger.warn({ event: 'bootstrap.admin.skipped.missing.env' }, 'No se pudo crear el admin inicial porque faltan credenciales en variables de entorno');
+    return;
+  }
+
+  const adminEmail = (process.env.ADMIN_EMAIL || 'admin@bitacora.local').trim();
+
+  await User.create({
+    username: adminUsername,
+    password: adminPassword,
+    email: adminEmail,
+    fullName: 'Administrador Maestro SOC',
+    role: 'admin',
+    cargoLabel: 'Líder Técnico SOC',
+    isActive: true,
+    theme: 'dark'
+  });
+
+  logger.info({ event: 'bootstrap.admin.created', username: adminUsername, email: adminEmail }, 'Usuario administrador inicial creado');
+};
+
 let currentSecureContext = null;
 
 const buildSecureContext = () => {
@@ -622,6 +705,7 @@ const startHttpsServerIfEnabled = () => {
 
 const startServers = async () => {
   await connectDB();
+  await ensureInitialAdminUser();
   await loadRuntimeSecurityConfigFromDb();
 
   httpServer = http.createServer(app);
@@ -640,6 +724,7 @@ const startServers = async () => {
 
     startChecklistAlertScheduler();
     startBackupScheduler();
+    startComplementCircuitHealthChecks();
 
     const { startScheduler: startShiftReportScheduler } = require('./utils/shift-scheduler');
     startShiftReportScheduler();
@@ -654,6 +739,7 @@ const startServers = async () => {
 const gracefulShutdown = (signal) => {
   logger.info({ event: 'server.shutdown', signal }, 'Shutting down server');
   stopBackupScheduler();
+  stopComplementCircuitHealthChecks();
 
   const closeTargets = [httpServer, httpsServer].filter(Boolean);
   if (!closeTargets.length) {

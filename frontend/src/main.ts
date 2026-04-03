@@ -1,6 +1,6 @@
 import { HTTP_INTERCEPTORS, provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 import { AuthInterceptor } from './app/interceptors/auth.interceptor';
-import { LOCALE_ID, Injectable, importProvidersFrom } from '@angular/core';
+import { APP_INITIALIZER, LOCALE_ID, Injectable, importProvidersFrom } from '@angular/core';
 import { MAT_DATE_LOCALE, DateAdapter, NativeDateAdapter, MatNativeDateModule } from '@angular/material/core';
 import { bootstrapApplication } from '@angular/platform-browser';
 import { provideAnimations } from '@angular/platform-browser/animations';
@@ -8,6 +8,7 @@ import { registerLocaleData } from '@angular/common';
 import localeEsCL from '@angular/common/locales/es-CL';
 import { AppRoutingModule } from './app/app-routing.module';
 import { AppComponent } from './app/app.component';
+import { AuthService } from './app/services/auth.service';
 
 registerLocaleData(localeEsCL);
 
@@ -18,9 +19,17 @@ class MondayFirstDateAdapter extends NativeDateAdapter {
     }
 }
 
+const initializeSessionFactory = (authService: AuthService) => () => authService.initializeSession();
+
 bootstrapApplication(AppComponent, {
     providers: [
                 importProvidersFrom(AppRoutingModule, MatNativeDateModule),
+        {
+            provide: APP_INITIALIZER,
+            useFactory: initializeSessionFactory,
+            deps: [AuthService],
+            multi: true
+        },
         {
             provide: HTTP_INTERCEPTORS,
             useClass: AuthInterceptor,

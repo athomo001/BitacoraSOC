@@ -57,6 +57,7 @@ export class AuditLogsComponent implements OnInit {
     this.filterForm = this.fb.group({
       search: [''],
       category: [''],
+      sourceSlug: [''],
       event: [''],
       level: [''],
       startDate: [''],
@@ -68,6 +69,7 @@ export class AuditLogsComponent implements OnInit {
     { value: '', label: 'Todas' },
     { value: 'mail', label: 'Mail / SMTP' },
     { value: 'backup', label: 'Backup' },
+    { value: 'complement', label: 'Complementos' },
     { value: 'admin', label: 'Admin' },
     { value: 'user', label: 'Usuario' },
     { value: 'security', label: 'Seguridad' }
@@ -190,6 +192,10 @@ export class AuditLogsComponent implements OnInit {
           return 'backup';
         }
 
+    if (log.source === 'complement' || event.startsWith('complement.')) {
+      return 'complement';
+    }
+
     
     // Integración (GLPI, Log Forwarding, etc)
     if (event.includes('glpi') || event.includes('integration') || event.includes('log-forward') || event.includes('logforward')) {
@@ -282,6 +288,7 @@ export class AuditLogsComponent implements OnInit {
       'integration': '🔗 Integración',
       'email': '📧 Correo',
       'backup': '💾 Backup',
+      'complement': '🧩 Complemento',
       'auth': '🔐 Autenticación',
       'entry': '📝 Entrada',
       'checklist': '✓ Checklist',
@@ -320,6 +327,12 @@ export class AuditLogsComponent implements OnInit {
     const event = log.event?.toLowerCase() || '';
     const meta = log.metadata || {};
     const result = log.result || {};
+
+    if (log.source === 'complement' || event.startsWith('complement.')) {
+      const slug = log.sourceId || (typeof meta['slug'] === 'string' ? meta['slug'] : 'desconocido');
+      const message = typeof meta['message'] === 'string' ? meta['message'] : (result.reason || 'Evento de complemento');
+      return `🧩 [${slug}] ${message}`;
+    }
 
     // ====== BACKUP ======
     if (event.includes('backup') || event.startsWith('backup_')) {

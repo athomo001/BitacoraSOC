@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Complemento Prueba - BD Externa API</title>
+  <style>
+    body { font-family: Segoe UI, sans-serif; margin: 0; background: #f4f7ff; color: #12223f; }
+    .wrap { max-width: 1000px; margin: 0 auto; padding: 20px; }
+    .card { background: #fff; border: 1px solid #d7e2f3; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    input, textarea, select { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 10px; border: 1px solid #b7c8e7; }
+    textarea { min-height: 90px; }
+    button { border: 0; border-radius: 10px; padding: 10px 14px; cursor: pointer; background: #1d4ed8; color: #fff; font-weight: 600; }
+    .muted { color: #4b5f86; }
+    pre { margin: 0; background: #0f1a30; color: #d8f7e8; border-radius: 10px; padding: 12px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Complemento de prueba con "BD externa"</h1>
+      <p class="muted">Este complemento prueba integración por API externa (ejemplo: backend propio, Supabase API, servicio REST). No guarda credenciales en Bitácora por ahora; se ingresan aquí para pruebas.</p>
+      <div class="row">
+        <div>
+          <label>Base URL API externa</label>
+          <input id="baseUrl" placeholder="https://jsonplaceholder.typicode.com" value="https://jsonplaceholder.typicode.com" />
+        </div>
+        <div>
+          <label>Endpoint</label>
+          <input id="endpoint" placeholder="/posts" value="/posts" />
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px;">
+        <div>
+          <label>Método</label>
+          <select id="method">
+            <option>GET</option>
+            <option>POST</option>
+          </select>
+        </div>
+        <div>
+          <label>Header Authorization (opcional)</label>
+          <input id="auth" placeholder="Bearer ..." />
+        </div>
+      </div>
+      <div style="margin-top:12px;">
+        <label>Body JSON (para POST)</label>
+        <textarea id="body">{"title":"demo","body":"mensaje de prueba","userId":1}</textarea>
+      </div>
+      <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+        <button id="btnCall">Llamar API externa</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Salida</h2>
+      <pre id="output">Sin ejecutar.</pre>
+    </div>
+  </div>
+  <script>
+    const output = document.getElementById('output');
+
+    const normalizeUrl = (base, endpoint) => {
+      const b = String(base || '').replace(/\/+$/, '');
+      const e = String(endpoint || '').startsWith('/') ? endpoint : `/${endpoint}`;
+      return `${b}${e}`;
+    };
+
+    document.getElementById('btnCall').addEventListener('click', async () => {
+      try {
+        const baseUrl = document.getElementById('baseUrl').value.trim();
+        const endpoint = document.getElementById('endpoint').value.trim();
+        const method = document.getElementById('method').value;
+        const auth = document.getElementById('auth').value.trim();
+        const rawBody = document.getElementById('body').value.trim();
+        const url = normalizeUrl(baseUrl, endpoint);
+
+        const headers = { 'Content-Type': 'application/json' };
+        if (auth) headers['Authorization'] = auth;
+
+        const options = { method, headers };
+        if (method === 'POST') options.body = rawBody;
+
+        const resp = await fetch(url, options);
+        const text = await resp.text();
+        let body;
+        try { body = text ? JSON.parse(text) : null; } catch { body = text; }
+
+        output.textContent = JSON.stringify({
+          ok: resp.ok,
+          status: resp.status,
+          method,
+          url,
+          response: body
+        }, null, 2);
+      } catch (error) {
+        output.textContent = JSON.stringify({ ok: false, error: error.message }, null, 2);
+      }
+    });
+  </script>
+</body>
+</html>

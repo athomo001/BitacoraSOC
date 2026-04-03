@@ -61,6 +61,15 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
+      RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-300}
+      RATE_LIMIT_MAX_AUTH_REQUESTS: ${RATE_LIMIT_MAX_AUTH_REQUESTS:-1200}
+      RATE_LIMIT_LOGIN_MAX: ${RATE_LIMIT_LOGIN_MAX:-5}
+      COMPLEMENT_TOKEN_SECRET: ${COMPLEMENT_TOKEN_SECRET:-}
+      COMPLEMENT_MAX_DBS: ${COMPLEMENT_MAX_DBS:-5}
+      COMPLEMENT_CIRCUIT_TIMEOUT_MS: ${COMPLEMENT_CIRCUIT_TIMEOUT_MS:-3000}
+      COMPLEMENT_CIRCUIT_FAIL_THRESHOLD: ${COMPLEMENT_CIRCUIT_FAIL_THRESHOLD:-3}
+      COMPLEMENT_CIRCUIT_RESET_MS: ${COMPLEMENT_CIRCUIT_RESET_MS:-30000}
       TZ: America/Santiago
     volumes:
       - ./.data/uploads:/app/uploads
@@ -69,6 +78,7 @@ services:
       - ./.data/tls:/app/secrets
     networks:
       - bitacora-network
+      - bitacora-complements
 
   frontend:
     build:
@@ -103,4 +113,6 @@ services:
 
 networks:
   bitacora-network:
+    driver: bridge
+  bitacora-complements:
     driver: bridge

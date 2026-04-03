@@ -74,6 +74,7 @@ const assertOutboundUrlSafe = async (urlValue, options = {}) => {
   const {
     requireHttps = true,
     allowHttp = false,
+    allowPrivateHosts = false,
     allowlist = parseAllowlist()
   } = options;
 
@@ -110,6 +111,9 @@ const assertOutboundUrlSafe = async (urlValue, options = {}) => {
   }
 
   if (host === 'localhost') {
+    if (allowPrivateHosts) {
+      return parsed;
+    }
     throw new Error('Destino localhost no permitido');
   }
 
@@ -119,6 +123,9 @@ const assertOutboundUrlSafe = async (urlValue, options = {}) => {
 
   const isIpHost = net.isIP(host) !== 0;
   if (isIpHost) {
+    if (allowPrivateHosts) {
+      return parsed;
+    }
     if (isPrivateIp(host)) {
       throw new Error('IP privada o loopback no permitida en destino saliente');
     }
@@ -138,6 +145,9 @@ const assertOutboundUrlSafe = async (urlValue, options = {}) => {
 
   const hasPrivateResolution = resolved.some((entry) => isPrivateIp(entry.address));
   if (hasPrivateResolution) {
+    if (allowPrivateHosts) {
+      return parsed;
+    }
     throw new Error('Destino resuelve a red privada/loopback y fue bloqueado');
   }
 

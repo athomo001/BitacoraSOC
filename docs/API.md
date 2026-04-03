@@ -14,6 +14,7 @@ Guía para consumir la API REST del sistema.
 **Ejemplo:** `http://192.168.100.50:3000/api-docs`
 
 **Contenido:**
+
 - Todos los endpoints documentados
 - Schemas completos
 - Try it out interactivo
@@ -22,12 +23,18 @@ Guía para consumir la API REST del sistema.
 
 ## Autenticación
 
-### JWT Bearer Token
+### Modelo principal (Web)
 
-Todos los endpoints (excepto `/auth/login`) requieren header:
+La aplicacion web usa cookie HttpOnly `auth_token` y sesion rehidratada por `GET /api/users/me`.
 
-```
-Authorization: Bearer <tu_token_jwt>
+En frontend Angular, las llamadas se realizan con credenciales (`withCredentials`) y no requieren inyectar el token manualmente en cada request.
+
+### Modelo para clientes API (manual)
+
+Para scripts o integraciones fuera del frontend, se puede usar:
+
+```text
+Authorization: Bearer <token_jwt>
 ```
 
 ### Obtener Token
@@ -41,10 +48,12 @@ curl -X POST http://192.168.100.50:3000/api/auth/login \
     "username": "admin",
     "password": "CHANGE_ME"
   }'
-
-> Nota: `username` acepta nombre de usuario o email.
-> Nota: `CHANGE_ME` es un placeholder. Usa tu valor real desde `.env` (`ADMIN_PASSWORD`).
 ```
+
+Notas:
+
+- `username` acepta nombre de usuario o email.
+- `CHANGE_ME` es placeholder; usar credencial real de entorno.
 
 **Respuesta:**
 ```json
@@ -63,6 +72,7 @@ curl -X POST http://192.168.100.50:3000/api/auth/login \
 ```
 
 **Duración:**
+
 - Admin/User: 4h
 - Guest: 2h
 
@@ -74,7 +84,7 @@ El servidor acepta tokens con diferencia de ±60 segundos (previene errores por 
 
 ## Endpoints Principales
 
-### Autenticación
+### Endpoints de auth
 
 | Método | Endpoint | Descripción | Auth |
 |--------|----------|-------------|------|
@@ -212,6 +222,54 @@ El servidor acepta tokens con diferencia de ±60 segundos (previene errores por 
 | DELETE | `/api/work-shifts/:id` | Eliminar turno | Admin |
 | PUT | `/api/work-shifts/reorder` | Reordenar | Admin |
 | POST | `/api/work-shifts/:id/send-report` | Enviar reporte | Admin |
+
+### Complementos (Admin)
+
+| Método | Endpoint | Descripción | Rol |
+|--------|----------|-------------|-----|
+| GET | `/api/complements` | Listar complementos registrados | Admin |
+| POST | `/api/complements` | Registrar complemento | Admin |
+| GET | `/api/complements/:slug` | Ver detalle del complemento si el usuario tiene acceso | Autenticado |
+| PUT | `/api/complements/:slug` | Actualizar configuración/permisos | Admin |
+| POST | `/api/complements/:slug/test` | Ejecutar prueba de health-check | Admin |
+| POST | `/api/complements/:slug/token` | Regenerar Application Token | Admin |
+| DELETE | `/api/complements/:slug` | Ejecutar wipe-out completo | Admin |
+| GET | `/api/complements/active` | Listar complementos activos para UI | Todos |
+| GET | `/api/complements/:slug/browser-state` | Leer estado compartido de navegador del complemento | Autenticado con acceso |
+| PUT | `/api/complements/:slug/browser-state` | Guardar estado compartido de navegador del complemento | Autenticado con acceso |
+| GET | `/api/complements/source/limits` | Consultar límites del analizador ZIP | Admin |
+| POST | `/api/complements/source/validate` | Analizar ZIP y detectar stack soportado | Admin |
+| POST | `/api/complements/source/preview` | Generar preview temporal del ZIP | Admin |
+| POST | `/api/complements/source/publish` | Publicar ZIP estático y crear/actualizar complemento | Admin |
+
+### API Interna (Complementos)
+
+Autenticación: `Authorization: Bearer <application_token>`
+
+Notas operativas:
+
+- El token es independiente de la cookie `auth_token` usada por la web.
+- `v1` es la única versión funcional hoy.
+- `v2` existe como placeholder y hoy responde `501` en `/api/internal/v2/context`.
+
+| Método | Endpoint | Scope | Descripción |
+|--------|----------|-------|-------------|
+| GET | `/api/internal/versions` | - | Discovery de versiones disponibles |
+| GET | `/api/internal/v1/context` | `READ_CONTEXT` | Contexto de turno activo |
+| POST | `/api/internal/v1/log-entry` | `WRITE_ENTRIES` | Crear entrada marcada con `ownerComplementId` |
+| GET | `/api/internal/v1/query-general` | `READ_LOGS` | Consultar colección autorizada |
+| POST | `/api/internal/v1/storage` | `WRITE_STORAGE` | Guardar registro en almacenamiento compartido |
+| GET | `/api/internal/v1/storage` | `READ_STORAGE` | Leer almacenamiento propio |
+| POST | `/api/internal/v1/log` | `WRITE_LOGS` | Centralizar log del complemento en `AuditLog` |
+
+Headers de versión:
+
+```text
+X-API-Version: v1
+X-API-Latest: v1
+```
+
+La guía completa del módulo está en `docs/COMPLEMENTS.md`.
 
 ### Escalación
 

@@ -57,6 +57,42 @@
     flex-shrink: 0;
   }
 
+  .menu-accordion {
+    margin: 8px;
+
+    ::ng-deep .mat-expansion-panel {
+      background-color: var(--surface-color);
+      box-shadow: none;
+      border: 1px solid var(--border-color);
+      border-radius: 10px !important;
+      overflow: hidden;
+    }
+
+    ::ng-deep .mat-expansion-panel-header-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+    }
+  }
+
+  .complement-accordion {
+    ::ng-deep .mat-expansion-panel {
+      border-color: rgba(27, 95, 198, 0.35);
+      background: linear-gradient(180deg, rgba(27, 95, 198, 0.08), rgba(27, 95, 198, 0.03));
+    }
+
+    ::ng-deep .mat-expansion-panel-header-title mat-icon {
+      color: #1b5fc6;
+    }
+
+    ::ng-deep .mat-expansion-panel-header-description {
+      justify-content: flex-end;
+      color: #1b5fc6;
+      font-weight: 700;
+    }
+  }
+
   .checklist-accordion {
     flex: 1;
     overflow-y: auto;

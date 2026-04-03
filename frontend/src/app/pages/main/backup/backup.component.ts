@@ -5,7 +5,7 @@ import { environment } from '../../../../environments/environment';
 import { MatCard, MatCardHeader, MatCardTitle, MatCardContent } from '@angular/material/card';
 import { MatIcon } from '@angular/material/icon';
 import { MatButton, MatIconButton } from '@angular/material/button';
-import { NgIf } from '@angular/common';
+import { DatePipe, NgIf } from '@angular/common';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { FormBuilder, FormGroup, ReactiveFormsModule, FormsModule, Validators } from '@angular/forms';
@@ -19,7 +19,7 @@ import { MatOption, MatSelect } from '@angular/material/select';
     selector: 'app-backup',
     templateUrl: './backup.component.html',
     styleUrls: ['./backup.component.scss'],
-    imports: [MatCard, MatCardHeader, MatCardTitle, MatIcon, MatCardContent, MatButton, NgIf, MatProgressSpinner, MatCheckbox, ReactiveFormsModule, FormsModule, MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatIconButton, MatTooltip, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow, MatFormField, MatLabel, MatHint, MatInput, MatOption, MatSelect]
+    imports: [MatCard, MatCardHeader, MatCardTitle, MatIcon, MatCardContent, MatButton, NgIf, DatePipe, MatProgressSpinner, MatCheckbox, ReactiveFormsModule, FormsModule, MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatIconButton, MatTooltip, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow, MatFormField, MatLabel, MatHint, MatInput, MatOption, MatSelect]
 })
 export class BackupComponent implements OnInit {
   isExporting = false;

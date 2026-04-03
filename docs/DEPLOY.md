@@ -7,8 +7,8 @@
 
 ## 1. Requisitos Previos
 
-*   **Docker Desktop** o **Docker Engine** (con plugin Compose).
-*   **Git** instalado.
+* **Docker Desktop** o **Docker Engine** (con plugin Compose).
+* **Git** instalado.
 
 ---
 
@@ -28,6 +28,7 @@ nano .env  # Editar TODAS las credenciales (Revisar Sección 4)
 # 3. Generar secretos criptográficos obligatorios
 echo "JWT_SECRET=$(openssl rand -base64 32)" >> .env
 echo "ENCRYPTION_KEY=$(openssl rand -hex 32)" >> .env
+echo "COMPLEMENT_TOKEN_SECRET=$(openssl rand -base64 32)" >> .env
 
 # 4. Construir y levantar los servicios en segundo plano
 docker compose up -d --build
@@ -69,8 +70,12 @@ docker compose up -d --force-recreate
 ### Automatización Integrada (Versionado Git)
 Si cuentas con Bash o PowerShell, puedes utilizar los scripts nativos adjuntos, los cuales inyectan la variable `APP_VERSION` basada en los últimos commits de Git (ej: `v1.2.3-5-gabc1234`) y la visibiliza en la plataforma.
 
-*   **Windows:** `.\scripts\compose-rebuild.ps1`
-*   **Linux/Mac:** `sh ./scripts/compose-rebuild.sh`
+Los scripts de esta carpeta ya incluyen el overlay `docker-compose.complements.yml`, pensado hoy para laboratorio/QA con `complement-stub`.
+
+* **Windows:** `.\scripts\compose-rebuild.ps1`
+* **Linux/Mac:** `sh ./scripts/compose-rebuild.sh`
+* **Windows (solo levantar):** `.\scripts\compose-up.ps1`
+* **Linux/Mac (solo levantar):** `sh ./scripts/compose-up.sh`
 
 ### Inyección de Datos Semilla (Posterior a Actualización)
 Si en las notas de la nueva versión se han agregado nuevos catálogos base, configuraciones o roles por defecto, es recomendable volver a ejecutar el comando de "siembra" para inyectar estos datos en la base de datos sin afectar tu data existente:
@@ -103,6 +108,16 @@ COOKIE_SECURE=true
 # Generar mediante 'openssl rand'
 JWT_SECRET=super_secret_aleatorio
 ENCRYPTION_KEY=clave_encriptacion_hex_32_bytes
+COMPLEMENT_TOKEN_SECRET=secret_app_tokens_complementos
+COMPLEMENT_MAX_DBS=5
+COMPLEMENT_CIRCUIT_TIMEOUT_MS=3000
+COMPLEMENT_CIRCUIT_FAIL_THRESHOLD=3
+COMPLEMENT_CIRCUIT_RESET_MS=30000
+COMPLEMENT_ALLOW_PRIVATE_URLS=true
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=1000
+RATE_LIMIT_MAX_AUTH_REQUESTS=2000
+RATE_LIMIT_LOGIN_MAX=20
 
 # ============================
 # BASE DE DATOS MONGODB
@@ -117,6 +132,26 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD=CHANGE_ME
 ADMIN_EMAIL=admin@example.com
 ```
+
+### Overlay de complementos
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.complements.yml up -d --build
+```
+
+Uso recomendado de este overlay:
+
+* laboratorio local
+* QA del `complement-stub`
+* pruebas de circuit breaker y health-check
+
+Aclaraciones:
+
+* no existe ya `docker-compose.test.yml`
+* el backend participa en `bitacora-network` y `bitacora-complements`
+* el frontend permanece solo en `bitacora-network`
+* MongoDB permanece en la red principal
+* los complementos ZIP publicados por la plataforma no necesitan este overlay
 
 ---
 
@@ -170,8 +205,9 @@ npm run restart:clean   # Mata limpiamente los procesos de Angular zombies en el
 npm start               # Levanta UI proxy en http://localhost:4200
 ```
 
-> **Configuración Cruzada Local:** 
+> **Configuración Cruzada Local:**
 > Asegúrate de que `backend/.env` posea `ALLOWED_ORIGINS=http://localhost:4200`.
+> **Sesión Web Actual:** El frontend usa cookie `auth_token` HttpOnly y bootstrap con `GET /api/users/me`, por lo que CORS y `withCredentials` deben quedar correctamente alineados.
 
 ---
 

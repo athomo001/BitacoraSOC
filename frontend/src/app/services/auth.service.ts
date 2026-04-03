@@ -23,7 +23,7 @@
  */
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable, tap } from 'rxjs';
+import { BehaviorSubject, Observable, firstValueFrom, tap } from 'rxjs';
 import { Router } from '@angular/router';
 import { environment } from '@env/environment';
 import { User, LoginRequest, LoginResponse } from '../models/user.model';
@@ -37,11 +37,34 @@ export class AuthService {
 
   private currentUserSubject = new BehaviorSubject<User | null>(this.getUserFromStorage());
   public currentUser$ = this.currentUserSubject.asObservable();
+  private sessionInitializedSubject = new BehaviorSubject<boolean>(false);
+  public sessionInitialized$ = this.sessionInitializedSubject.asObservable();
+  private initializingSession = false;
 
   constructor(
     private http: HttpClient,
     private router: Router
   ) {}
+
+  async initializeSession(): Promise<void> {
+    if (this.sessionInitializedSubject.value || this.initializingSession) {
+      return;
+    }
+
+    this.initializingSession = true;
+
+    try {
+      const user = await firstValueFrom(this.http.get<User>(`${this.API_URL}/users/me`, { withCredentials: true }));
+      this.setUser(user);
+      this.currentUserSubject.next(user);
+    } catch {
+      localStorage.removeItem(this.USER_KEY);
+      this.currentUserSubject.next(null);
+    } finally {
+      this.initializingSession = false;
+      this.sessionInitializedSubject.next(true);
+    }
+  }
 
   login(credentials: LoginRequest): Observable<LoginResponse> {
     return this.http.post<LoginResponse>(`${this.API_URL}/auth/login`, credentials, { withCredentials: true })
@@ -69,6 +92,14 @@ export class AuthService {
 
   isAuthenticated(): boolean {
     return !!this.getCurrentUser();
+  }
+
+  isSessionInitialized(): boolean {
+    return this.sessionInitializedSubject.value;
+  }
+
+  isInitializingSession(): boolean {
+    return this.initializingSession;
   }
 
   getCurrentUser(): User | null {
