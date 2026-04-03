@@ -37,7 +37,7 @@
 | COMP-011 | Listo | Testing / Complementos MEDIA | Mocks de Complementos para Pruebas de Integración | Se creó `tools/complement-stub/` y el overlay de testing para simular health, iframe y cleanup. |
 | B34 | Listo | Operación/Alertas | Alerta por ítems NOK (Rojo) en Checklist | Se agregó configuración global para alertas NOK (`alertNokEnabled`, `alertNokRoleTarget`) y envío automático de correo por checklist con rojos a usuarios activos del cargo seleccionado, incluyendo detalle de observación por ítem NOK. |
 | B46 | Listo | UI/UX + Seguridad Preventiva / Frontend MEDIA | Textarea de entradas permite escribir más de 50000 caracteres | Se aplicó `maxlength=50000` en creación y edición, truncado defensivo por `input` y aviso explícito al alcanzar el máximo. |
-| B47 | Listo | UI/UX + Accesibilidad / Frontend MEDIA | Heatmap en temas light/sepia/pastel no muestra bien el número de entradas | Se ajustó contraste del heatmap en temas claros (tokens `--heatmap-low` / `--heatmap-low-mid`) y se forzó color de etiqueta legible para celdas del mapa. |
+| B47 | Listo | UI/UX + Accesibilidad / Frontend MEDIA | Heatmap en temas light/sepia/pastel no muestra bien el número de entradas | Se oscurecieron los colores `--heatmap-low` / `--heatmap-low-mid` en light, sepia y pastel. Se corrigió `--heatmap-label-color` de sepia (`#f5f1eb` → `#2a2218`) y pastel (`#fef9f3` → `#1e1518`) a texto oscuro legible. Se reforzó `text-shadow` y `font-weight: 700` en las labels del heatmap. |
 
 Los items marcados como `Listo` deben quedar reflejados en `docs/CHANGELOG.md` como fuente de historial.
 ---
