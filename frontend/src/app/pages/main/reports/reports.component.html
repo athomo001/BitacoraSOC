@@ -273,8 +273,13 @@
             [showYAxisLabel]="true"
             xAxisLabel="Hora del Día"
             yAxisLabel="Día de la Semana"
-            [scheme]="heatmapColorScheme"
-            [tooltipText]="heatmapTooltipText">
+            [scheme]="heatmapColorScheme">
+            <ng-template #tooltipTemplate let-model="model">
+              <div class="heatmap-tooltip">
+                <div class="heatmap-tooltip-label">{{ model.series }} • {{ model.name }}</div>
+                <div class="heatmap-tooltip-value">{{ model.value }}</div>
+              </div>
+            </ng-template>
           </ngx-charts-heat-map>
         </div>
       </mat-card-content>

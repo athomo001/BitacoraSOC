@@ -100,20 +100,6 @@ export class ReportsComponent implements OnInit {
   // Configuración del mapa de calor
   heatmapData: any[] = [];
   showHeatmap = false;
-  heatmapTooltipText = ({ label, data, series }: { label: string; data: number; series: string }): string => {
-    const safeSeries = this.escapeTooltipHtml(series);
-    const safeLabel = this.escapeTooltipHtml(label);
-    const safeValue = Number(data || 0).toLocaleString('es-CL');
-
-    return `
-      <span class="tooltip-label" style="display:block;padding:8px 6px 4px;color:#f7f9ff !important;line-height:1.2;font-size:12px;">
-        ${safeSeries} • ${safeLabel}
-      </span>
-      <span class="tooltip-val" style="display:block;padding:0 6px 8px;color:#ffffff !important;line-height:1.1;font-size:18px;font-weight:700;">
-        ${safeValue}
-      </span>
-    `;
-  };
 
   constructor(private reportService: ReportService) {}
 
@@ -304,14 +290,5 @@ export class ReportsComponent implements OnInit {
   
   formatPercentage(value: number): string {
     return `${value.toFixed(1)}%`;
-  }
-
-  private escapeTooltipHtml(value: string): string {
-    return String(value || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
   }
 }

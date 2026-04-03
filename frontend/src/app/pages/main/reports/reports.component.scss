@@ -211,6 +211,30 @@
   }
 }
 
+.heatmap-tooltip {
+  min-width: 120px;
+  padding: 8px 10px;
+  background: rgba(24, 27, 34, 0.96);
+  color: #f7f9ff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+
+  .heatmap-tooltip-label {
+    color: #dfe6f5 !important;
+    font-size: 12px;
+    line-height: 1.2;
+    margin-bottom: 4px;
+  }
+
+  .heatmap-tooltip-value {
+    color: #ffffff !important;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1;
+  }
+}
+
 .charts-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
