@@ -9,6 +9,7 @@ const { sendChecklistAlertEmail, sendEscalationInternalReminderEmail } = require
 const DEFAULT_ALERT_TIME = '09:30';
 const DEFAULT_ESCALATION_REMINDER_HOUR = 9;
 const DEFAULT_ESCALATION_REMINDER_DAYS_AHEAD = 7;
+const INTERNAL_ESCALATION_ROLE_CODES = ['N2', 'TI', 'N1_NO_HABIL'];
 
 const isSameDay = (a, b) => a && b && a.toDateString() === b.toDateString();
 
@@ -192,19 +193,29 @@ const resolveFutureWeekGap = async (now, config) => {
   }
 
   const targetWeekEnd = getEndOfWeekSunday(targetWeekStart);
-  const hasAnyAssignment = await ShiftAssignment.exists({
+  const assignments = await ShiftAssignment.find({
+    roleCode: { $in: INTERNAL_ESCALATION_ROLE_CODES },
     weekStartDate: { $lte: targetWeekEnd },
     weekEndDate: { $gte: targetWeekStart }
+  }).select('roleCode weekStartDate weekEndDate');
+
+  const missingRoleCodes = INTERNAL_ESCALATION_ROLE_CODES.filter((roleCode) => {
+    return !assignments.some((assignment) => {
+      return assignment.roleCode === roleCode
+        && assignment.weekStartDate <= targetWeekStart
+        && assignment.weekEndDate >= targetWeekEnd;
+    });
   });
 
-  if (hasAnyAssignment) {
+  if (missingRoleCodes.length === 0) {
     return null;
   }
 
   return {
     daysAhead,
     weekStart: targetWeekStart,
-    weekEnd: targetWeekEnd
+    weekEnd: targetWeekEnd,
+    missingRoleCodes
   };
 };
 
@@ -234,14 +245,35 @@ const runEscalationInternalReminder = async () => {
     if (!config) return;
 
     const futureWeekGap = await resolveFutureWeekGap(now, config);
-    if (!shouldSendEscalationReminder(now, config, futureWeekGap)) return;
+    if (!shouldSendEscalationReminder(now, config, futureWeekGap)) {
+      if (futureWeekGap?.missingRoleCodes?.length) {
+        logger.info({
+          event: 'escalation.reminder.skipped',
+          reason: 'not_due_yet_or_already_sent',
+          targetWeekStart: futureWeekGap.weekStart.toISOString(),
+          targetWeekEnd: futureWeekGap.weekEnd.toISOString(),
+          missingRoleCodes: futureWeekGap.missingRoleCodes
+        }, 'Recordatorio de escalacion interna omitido');
+      }
+      return;
+    }
 
     const cargoLabels = Array.isArray(config.escalationReminderCargoLabels)
       ? config.escalationReminderCargoLabels
       : ['N2'];
 
     const recipients = await getEscalationReminderRecipients(cargoLabels);
-    if (recipients.length === 0) return;
+    if (recipients.length === 0) {
+      logger.warn({
+        event: 'escalation.reminder.skipped',
+        reason: 'no_recipients',
+        cargoLabels,
+        missingRoleCodes: futureWeekGap.missingRoleCodes,
+        targetWeekStart: futureWeekGap.weekStart.toISOString(),
+        targetWeekEnd: futureWeekGap.weekEnd.toISOString()
+      }, 'Recordatorio de escalacion interna sin destinatarios');
+      return;
+    }
 
     await sendEscalationInternalReminderEmail({
       recipients,
@@ -255,6 +287,16 @@ const runEscalationInternalReminder = async () => {
     config.lastEscalationReminderDate = now;
     config.lastEscalationReminderWeekStartDate = futureWeekGap.weekStart;
     await config.save();
+
+    logger.info({
+      event: 'escalation.reminder.sent',
+      recipients,
+      cargoLabels,
+      missingRoleCodes: futureWeekGap.missingRoleCodes,
+      targetWeekStart: futureWeekGap.weekStart.toISOString(),
+      targetWeekEnd: futureWeekGap.weekEnd.toISOString(),
+      daysAhead: futureWeekGap.daysAhead
+    }, 'Recordatorio de escalacion interna enviado');
   } catch (error) {
     logger.error({ err: error }, 'Error ejecutando recordatorio de escalación interna');
   }
