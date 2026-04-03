@@ -432,14 +432,33 @@ a {
 .btn-primary {
   background-color: var(--primary-color) !important;
   color: var(--on-primary-color) !important;
+  --mdc-filled-button-label-text-color: var(--on-primary-color);
+  --mdc-protected-button-label-text-color: var(--on-primary-color);
+  --mat-filled-button-state-layer-color: var(--on-primary-color);
+  --mat-protected-button-state-layer-color: var(--on-primary-color);
+}
+
+button[mat-raised-button][color="primary"],
+button[mat-flat-button][color="primary"],
+button[mat-raised-button].mat-primary,
+button[mat-flat-button].mat-primary,
+a[mat-raised-button][color="primary"],
+a[mat-flat-button][color="primary"] {
+  background-color: var(--primary-color) !important;
+  color: var(--on-primary-color) !important;
 }
 
 .mat-mdc-raised-button .mdc-button__label,
 .mat-mdc-unelevated-button .mdc-button__label,
 .mat-mdc-raised-button mat-icon,
 .mat-mdc-unelevated-button mat-icon,
-.btn-primary mat-icon {
+.btn-primary mat-icon,
+button[mat-raised-button][color="primary"] .mdc-button__label,
+button[mat-flat-button][color="primary"] .mdc-button__label,
+button[mat-raised-button][color="primary"] mat-icon,
+button[mat-flat-button][color="primary"] mat-icon {
   color: var(--on-primary-color) !important;
+  fill: var(--on-primary-color) !important;
 }
 
 .mat-mdc-outlined-button,
@@ -563,6 +582,12 @@ mat-sidenav {
 .mdc-tooltip__surface,
 .ngx-charts-tooltip-content,
 .ngx-charts-tooltip-content.tooltip-content,
+.tooltip-content,
+.tooltip-content.type-tooltip,
+.tooltip-content .tooltip-caret::before,
+.tooltip-content .tooltip-caret,
+.tooltip-content .tooltip-label,
+.tooltip-content .tooltip-val,
 .ngx-charts-tooltip-content .tooltip-caret,
 .chart-tooltip {
   background-color: rgba(24, 27, 34, 0.96) !important;
@@ -575,9 +600,11 @@ mat-sidenav {
 .mat-mdc-tooltip-surface *,
 .mdc-tooltip__surface *,
 .ngx-charts-tooltip-content *,
+.tooltip-content *,
 .chart-tooltip * {
   color: #f7f9ff !important;
   fill: #f7f9ff !important;
+  text-shadow: none !important;
 }
 
 .mat-sort-header-content,
