@@ -17,9 +17,17 @@
  * Reglas SOC:
  *   - 5 intentos login: previene credential stuffing
  *   - 100 req/15min: permite operación normal pero bloquea scraping
+ *
+ * Store dedicado en memoria para `apiLimiter` (MemoryStore) permite
+ * `resetAll` / `resetKey` sin reiniciar el proceso (vía POST /api/system/rate-limit-reset + secreto).
  */
 const rateLimit = require('express-rate-limit');
+const { MemoryStore } = rateLimit;
+
 const isProduction = process.env.NODE_ENV === 'production';
+
+/** Store exclusivo del limiter global API (no compartir con otros limiters). */
+const apiRateLimitStore = new MemoryStore();
 
 const parseEnvInt = (value, fallback) => {
   const parsed = Number.parseInt(value, 10);
@@ -35,14 +43,47 @@ const apiPublicMax = parseEnvInt(process.env.RATE_LIMIT_MAX_REQUESTS, defaultPub
 const apiAuthenticatedMax = parseEnvInt(process.env.RATE_LIMIT_MAX_AUTH_REQUESTS, defaultAuthenticatedMax);
 const loginMax = parseEnvInt(process.env.RATE_LIMIT_LOGIN_MAX, 5);
 
-const hasBearerToken = (req) => {
+const hasAuthToken = (req) => {
   const authorization = req.headers?.authorization;
-  return typeof authorization === 'string' && authorization.startsWith('Bearer ') && authorization.length > 16;
+  if (typeof authorization === 'string' && authorization.startsWith('Bearer ') && authorization.length > 16) {
+    return true;
+  }
+  const cookieHeader = req.headers?.cookie;
+  if (cookieHeader) {
+    const authCookie = cookieHeader
+      .split(';')
+      .map((value) => value.trim())
+      .find((value) => value.startsWith('auth_token='));
+    if (authCookie && authCookie.length > 20) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const getAuthTokenValue = (req) => {
+  const authorization = req.headers?.authorization;
+  if (typeof authorization === 'string' && authorization.startsWith('Bearer ') && authorization.length > 16) {
+    return authorization.substring(7);
+  }
+  const cookieHeader = req.headers?.cookie;
+  if (cookieHeader) {
+    const authCookie = cookieHeader
+      .split(';')
+      .map((value) => value.trim())
+      .find((value) => value.startsWith('auth_token='));
+    if (authCookie && authCookie.length > 20) {
+      const tokenValue = authCookie.substring('auth_token='.length);
+      return decodeURIComponent(tokenValue);
+    }
+  }
+  return null;
 };
 
 const getApiLimiterKey = (req) => {
-  if (hasBearerToken(req)) {
-    return `auth:${req.headers.authorization.slice(7)}`;
+  const token = getAuthTokenValue(req);
+  if (token) {
+    return `auth:${token.substring(token.length - 24)}`;
   }
   return req.ip;
 };
@@ -68,13 +109,58 @@ const loginLimiter = rateLimit({
 // Rate limiter general para API
 const apiLimiter = rateLimit({
   windowMs: apiWindowMs,
-  max: (req) => (hasBearerToken(req) ? apiAuthenticatedMax : apiPublicMax),
+  max: (req) => (hasAuthToken(req) ? apiAuthenticatedMax : apiPublicMax),
   keyGenerator: getApiLimiterKey,
-  message: 'Demasiadas peticiones desde esta IP, intenta de nuevo más tarde',
+  message: {
+    message: 'Demasiadas peticiones desde esta IP, intenta de nuevo más tarde',
+    rate_limit_scope: 'api_global'
+  },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => !isProduction || req.method === 'OPTIONS' || hasBearerToken(req)
+  skip: (req) => {
+    if (!isProduction || req.method === 'OPTIONS') return true;
+    // Omitir límite agresivo en rutas pre-login de bajo riesgo visual
+    const path = req.path || '';
+    if (path === '/config/logo' || path.startsWith('/config/')) return true;
+    return false;
+  },
+  store: apiRateLimitStore
 });
+
+/**
+ * Vacía el bucket global del apiLimiter (todas las IPs / claves).
+ * @returns {Promise<void>}
+ */
+async function resetApiRateLimitAll() {
+  await apiRateLimitStore.resetAll();
+}
+
+/**
+ * Vacía el bucket del apiLimiter para una clave concreta (p. ej. IP pública del cliente).
+ * @param {string} key
+ * @returns {Promise<void>}
+ */
+async function resetApiRateLimitKey(key) {
+  await apiLimiter.resetKey(key);
+}
+
+/**
+ * Limpia contadores de login para una IP (y opcionalmente ip:usuario).
+ * @param {string} ip
+ * @param {string} [username]
+ * @returns {Promise<void>}
+ */
+async function resetLoginRateLimitForIp(ip, username) {
+  await loginLimiter.resetKey(ip);
+  const u = String(username || '').trim().toLowerCase();
+  if (u) {
+    await loginLimiter.resetKey(`${ip}:${u}`);
+  }
+}
+
+module.exports.resetApiRateLimitAll = resetApiRateLimitAll;
+module.exports.resetApiRateLimitKey = resetApiRateLimitKey;
+module.exports.resetLoginRateLimitForIp = resetLoginRateLimitForIp;
 
 // Rate limiter para recuperación de contraseña (máx 3/15min)
 const forgotPasswordLimiter = rateLimit({
@@ -94,9 +180,7 @@ const resetPasswordLimiter = rateLimit({
   legacyHeaders: false
 });
 
-module.exports = {
-  loginLimiter,
-  apiLimiter,
-  forgotPasswordLimiter,
-  resetPasswordLimiter
-};
+module.exports.loginLimiter = loginLimiter;
+module.exports.apiLimiter = apiLimiter;
+module.exports.forgotPasswordLimiter = forgotPasswordLimiter;
+module.exports.resetPasswordLimiter = resetPasswordLimiter;

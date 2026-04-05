@@ -1,4 +1,4 @@
-﻿import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Subject, takeUntil, debounceTime, distinctUntilChanged } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import { NoteService } from '../../services/note.service';
@@ -135,6 +135,12 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     this.loadBrandingTitle();
     this.loadActiveComplements();
     this.loadCurrentShiftContext();
+    
+    // Register shift context refresh interval here so it only sets once
+    this.shiftRefreshIntervalId = setInterval(() => {
+      this.loadCurrentShiftContext();
+    }, 60000);
+
     this.setupAutosave();
     this.complementService.complementsChanged$
       .pipe(takeUntil(this.destroy$))
@@ -223,10 +229,6 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
           });
         }
       });
-
-    this.shiftRefreshIntervalId = setInterval(() => {
-      this.loadCurrentShiftContext();
-    }, 60000);
   }
 
   loadLogo(): void {

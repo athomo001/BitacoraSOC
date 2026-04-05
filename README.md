@@ -37,6 +37,8 @@ cp .env.example .env
 #    - JWT_SECRET
 #    - ENCRYPTION_KEY
 #    - COMPLEMENT_TOKEN_SECRET
+#    - (Opcional) RATE_LIMIT_RESET_SECRET — cadena >= 24 caracteres para reinicio
+#      de contadores 429 sin reiniciar el backend; formato y uso en docs/SECURITY.md
 
 # 3. Levantar stack
 docker compose up -d --build
@@ -128,7 +130,7 @@ Documentos principales:
 - `docs/ARCHITECTURE.md`: arquitectura y flujos
 - `docs/DEPLOY.md`: despliegue, actualizacion y operacion
 - `docs/SETUP.md`: instalacion y configuracion detallada
-- `docs/SECURITY.md`: hardening, auth y seguridad operacional
+- `docs/SECURITY.md`: hardening, auth, rate limiting y secreto `RATE_LIMIT_RESET_SECRET` (reinicio operativo de 429)
 - `docs/RUNBOOK.md`: operacion diaria del SOC
 - `docs/BACKUP.md`: backup, restore e implicancias para complementos
 - `docs/TROUBLESHOOTING.md`: diagnostico de fallas comunes

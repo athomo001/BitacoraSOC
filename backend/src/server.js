@@ -31,6 +31,7 @@ const Complement = require('./models/Complement');
 const { authenticate } = require('./middleware/auth');
 const { isComplementVisibleToUser } = require('./utils/complement-manager');
 const { apiLimiter } = require('./middleware/rate-limiter');
+const rateLimitResetPublic = require('./routes/rate-limit-reset-public');
 const requestIdMiddleware = require('./middleware/request-id');
 const captureMetadata = require('./middleware/metadata');
 const inputSanitizer = require('./middleware/input-sanitizer');
@@ -345,6 +346,9 @@ const apiCorsMiddleware = (req, res, next) => {
 
   return cors(dynamicCorsOptions)(req, res, next);
 };
+
+// Reinicio de rate limits (sin pasar por apiLimiter; auth por RATE_LIMIT_RESET_SECRET)
+app.post('/api/system/rate-limit-reset', rateLimitResetPublic);
 
 // Rate limiting
 app.use('/api/', apiCorsMiddleware, apiLimiter);

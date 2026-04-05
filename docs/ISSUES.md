@@ -9,10 +9,13 @@
 | --- | --- | --- | --- | --- |
 | AI-SUMMARY-001 | Pendiente | IA/Operación ALTA | Módulo de Resumen Ejecutivo Efímero (IA On-Demand) | Integrar Ollama+llama3.2:3b en modo efímero `docker start -> healthcheck -> generate -> docker stop` con `try/finally`, salida editable en campo "Resumen Sugerido por IA" y botón "Generar con IA". |
 
+
 ### ✅ Listas
 
 | ID | Estado | Seccion | Tarea | Notas |
 | --- | --- | --- | --- | --- |
+| SEC-RL-018 | Listo | Seguridad / Autenticación ALTA | Falso positivo de rate limit en login: mensaje "DEMASIADAS PETICIONES DESDE ESTA IP" sin conducta de DoS | Se actualizó `apiLimiter` para detectar identificadores de sesión por cookie (auth_token). Ahora se aplica un rate limit separado e individual usando los últimos 24 caracteres del token para autenticados, y se agregaron exclusiones para rutas estáticas como /config/logo. |
+| AQL-LIB-001 | Listo | Complemento / Operación SOC ALTA | Biblioteca de Sentencias AQL (Complemento) | Nuevo complemento que centraliza sentencias AQL pre-validadas para QRadar, con catálogo por tipo, botón de copia rápida, campo de explicación, sección de Tips/Cheatsheet y CRUD admin para agregar/editar/eliminar sentencias y tips. |
 | INFRA-MONGO-001 | Listo | Infraestructura / Datos CRÍTICA | Upgrade MongoDB (7 → 8) | Se actualizó `docker-compose.yml` a `mongo:8` y se documentó el procedimiento de migración mayor (dump, volumen limpio y restore) en `docs/DEPLOY.md`. |
 | B19 | Listo | Integraciones | Creación de tickets en GLPI (Correo / API) | Se implementó despacho GLPI para resumen diario e inmediato (incidente/ofensa), con reintentos, estado persistente y auditoría de éxito/fallo. |
 | DEP-NPM-012 | Listo | Deuda Técnica / Backend MEDIA | Dependencias npm deprecadas en build Docker (`glob`/`inflight`) | Se actualizó árbol raíz (`jest` 30, reemplazo `yamljs` por `yaml`) y se validó que en instalación de producción (`--omit=dev`) no aparece `inflight` ni `glob@7`; remanente deprecado queda solo en subárbol dev/transitivo. |
@@ -43,6 +46,90 @@ Los items marcados como `Listo` deben quedar reflejados en `docs/CHANGELOG.md` c
 ---
 
 ## Información de como solucionar los Pendientes
+
+### SEC-RL-018 - Falso positivo de rate limit en login (429 por IP)
+
+**Resumen QA (severidad ALTA — bloqueo operativo):** En producción, usuarios válidos ven el banner de error equivalente a *"Demasiadas peticiones desde esta IP, intenta de nuevo más tarde"* sin realizar un ataque de denegación de servicio. El comportamiento es indistinguible en UI de un castigo por abuso, lo que impide iniciar sesión y eleva tickets de soporte.
+
+**Evidencia técnica (revisión de código):**
+
+| Elemento | Ubicación / detalle |
+| --- | --- |
+| Mensaje mostrado | Coincide con la cadena `message` de `apiLimiter` en `backend/src/middleware/rate-limiter.js` (límite global sobre `/api/` montado en `backend/src/server.js` antes de rutas). |
+| Mensaje que *no* aplica aquí | `loginLimiter` expone otro texto: *"Demasiados intentos de inicio de sesión..."*; si el usuario viera ese mensaje, la hipótesis sería exceso de intentos por `ip:username`. |
+| Detección de “autenticado” | `hasBearerToken()` solo mira el header `Authorization: Bearer ...`. El frontend documenta login con cookie HttpOnly (`frontend/src/app/services/auth.service.ts`); no hay interceptor que envíe Bearer. |
+| Efecto en `apiLimiter` | `skip` solo omite el limiter si hay Bearer (además de OPTIONS / no producción). Con cookies, las peticiones autenticadas **siguen** contando en el mismo bucket que las anónimas, con `max` = `RATE_LIMIT_MAX_REQUESTS` (nunca el de `RATE_LIMIT_MAX_AUTH_REQUESTS`). |
+| Agregación por IP | `keyGenerator` usa `req.ip` para tráfico sin Bearer → varios usuarios detrás del mismo NAT, proxy inverso mal configurado o IP de salida compartida comparten un único contador. |
+| Defaults | `docker-compose.yml` sugiere `RATE_LIMIT_MAX_REQUESTS` por defecto **300** en 15 min para ese bucket; valores bajos en `.env` agotan el cupo aún más rápido. |
+| Persistencia de contadores | `express-rate-limit` guarda los hits en **memoria del proceso** del backend (`MemoryStore` dedicado para `apiLimiter` en `rate-limiter.js`). No hay Redis en este flujo. |
+
+**Mitigación inmediata (falso positivo, sin reiniciar el contenedor backend):**
+
+1. **Endpoint operativo `POST /api/system/rate-limit-reset`** (registrado en `server.js` **antes** de `apiLimiter`, para que un 429 global no lo bloquee). Requiere variable de entorno `RATE_LIMIT_RESET_SECRET` con **al menos 24 caracteres**; si no está definida o es corta, el endpoint responde **404** (ruta oculta). La cabecera `X-Rate-Limit-Reset-Secret` debe coincidir con ese valor (comparación en tiempo constante).
+
+   **Si no tienes la IP del analista:** usa el cuerpo `{"all":true}` (misma cabecera de secreto). Eso vacía **todo** el store en memoria del limiter global de API; no necesitas `-d "{\"ip\":\"...\"}"`. Consecuencia: se reinician contadores de **todas** las claves de ese limiter (no solo una persona), útil con NAT o cuando nadie sabe la IP pública de salida.
+
+   **Cuerpo JSON (elegir una opción):**
+
+   - **Solo una IP** (típico: IP pública del analista bloqueado; opcional `username` si también cayó en `loginLimiter` para `ip:usuario`):
+
+     ```bash
+     curl -k -X POST "https://HOST:PUERTO_API/api/system/rate-limit-reset" \
+       -H "Content-Type: application/json" \
+       -H "X-Rate-Limit-Reset-Secret: TU_SECRETO_LARGO" \
+       -d "{\"ip\":\"203.0.113.50\",\"username\":\"correo@ejemplo.cl\"}"
+     ```
+
+     En **PowerShell** (escapado para JSON):
+
+     ```powershell
+     curl.exe -k -X POST "https://HOST:PUERTO/api/system/rate-limit-reset" `
+       -H "Content-Type: application/json" `
+       -H "X-Rate-Limit-Reset-Secret: TU_SECRETO_LARGO" `
+       -d '{\"ip\":\"203.0.113.50\"}'
+     ```
+
+   - **Todo el bucket global del apiLimiter** — también cuando **no conoces la IP** del analista (útil tras falso positivo masivo / NAT; **más sensible** porque borra contadores de todas las claves del store global API):
+
+     ```bash
+     curl -k -X POST "https://HOST:PUERTO_API/api/system/rate-limit-reset" \
+       -H "Content-Type: application/json" \
+       -H "X-Rate-Limit-Reset-Secret: TU_SECRETO_LARGO" \
+       -d "{\"all\":true}"
+     ```
+
+   **Efecto:** con `ip` se llama a `resetKey` en el store del `apiLimiter` para esa IP y se limpian entradas de `loginLimiter` para la misma IP (y `ip:username` si enviaste `username`). Con `all:true` solo se ejecuta `resetAll` del store del **apiLimiter** global (no vacía otros limiters como SMTP test).
+
+   **Auditoría:** se registra el evento `system.rate_limit.reset` (nivel `warn` u `error` si falla).
+
+   **Generar secreto:** `openssl rand -base64 32`. Configurar en `.env` y en `docker-compose` ya expone `RATE_LIMIT_RESET_SECRET` hacia el servicio `backend`.
+
+2. **Esperar la ventana** `RATE_LIMIT_WINDOW_MS` (p. ej. 15 minutos) si no puedes usar el endpoint.
+
+3. **Último recurso — reiniciar solo el backend** (`docker compose restart backend` o `docker restart bitacora-backend`): vacía toda la memoria del proceso, incluidos limiters no cubiertos por el endpoint. Breve caída de la API durante el arranque.
+
+4. **Node sin Docker:** `pm2 restart` / `systemctl restart` del servicio backend equivale al punto 3.
+
+**Cómo reproducir (casos de prueba sugeridos):**
+
+1. Producción (`NODE_ENV=production`), sin header Bearer: realizar llamadas repetidas a `/api/*` desde la misma IP (varias pestañas, refresco de login que dispara `GET /api/config/logo`, u otros endpoints previos al login) hasta recibir `429` con el mensaje de IP.
+2. Dos usuarios distintos en la misma red corporativa (misma IP pública): verificar si el primero en agotar el cupo bloquea al segundo en login.
+3. Comparar headers `X-RateLimit-*` en la respuesta `429` con la documentación en `docs/SECURITY.md` para confirmar que el límite activo es el esperado en despliegue.
+
+**Criterios de aceptación (cierre del defecto):**
+
+- Un analista con uso normal (incluida sesión con cookie) no queda bloqueado por el limiter global salvo umbral explícito y documentado de abuso.
+- El login y rutas previas al token no consumen el mismo presupuesto que un ataque de fuerza bruta sin criterio (o el mensaje distingue claramente “límite de login” vs “límite de API”).
+- Tras login, el tráfico autenticado no comparte indefinidamente el mismo bucket “público” que el tráfico anónimo, **o** el bucket por IP es coherente con el modelo de auth real (cookie) y con despliegues detrás de NAT.
+
+**Cómo lo solucionaría (propuesta de ingeniería / QA):**
+
+1. **Alinear el limiter con el modelo de autenticación real:** Tras validar cookie JWT (middleware existente), usar una clave distinta y/o un cupo mayor para sesiones válidas — equivalente funcional a lo ya previsto con `RATE_LIMIT_MAX_AUTH_REQUESTS`, pero basado en presencia de cookie o usuario resuelto, no solo en Bearer.
+2. **Excluir o ponderar rutas de bajo riesgo previas al login:** Por ejemplo `GET /api/config/logo` (y similares necesarios para pintar la pantalla de login) con limiter dedicado más laxo o fuera del contador global agresivo, para que el renderizado no “coma” el cupo de seguridad.
+3. **No depender solo de `req.ip` en entornos con NAT denso:** Opciones: confiar en `X-Forwarded-For` solo con `trust proxy` y lista de proxies conocidos; rate limit por `ip + fingerprint` débil; o límites más altos para `/api/auth/login` ya cubiertos por `loginLimiter` (evitar doble penalización si ambos aplican al mismo flujo).
+4. **Mensajería y observabilidad:** En `429`, incluir un código o subtipo (`rate_limit_scope: api_global | login | password_reset`) para diagnóstico y mensajes UX distintos; registrar en auditoría IP + ruta + bucket para incidentes.
+5. **Validación de configuración:** Revisar `.env` / `docker-compose` para que `RATE_LIMIT_MAX_REQUESTS` no quede por debajo de un mínimo operativo documentado; alinear `docs/SECURITY.md`, `.env.example` y defaults de compose.
+6. **Pruebas de regresión:** Tests de integración que simulen N peticiones con cookie válida vs anónimas y verifiquen contadores independientes o límites esperados; prueba manual detrás de IP compartida según entorno SOC.
 
 ### B19 - GLPI (Correo/API)
 
@@ -839,5 +926,320 @@ services:
 3. Configurable por variables de entorno para simular fallos (Circuit Breaker), lentitud (timeout) y errores de cleanup.
 4. Documentado en `DEPLOY.md` bajo sección "Entorno de Testing con Complementos".
 5. Integrado en `docker-compose.complements.yml` como overlay de laboratorio/QA.
+
+---
+
+### AQL-LIB-001 - Biblioteca de Sentencias AQL (Complemento)
+
+**Descripción general:**
+Crear un nuevo complemento para la Bitácora SOC que funcione como una biblioteca centralizada de sentencias AQL pre-validadas para QRadar. El objetivo es que los analistas N1/N2 puedan consultar, copiar y reutilizar queries AQL verificadas sin necesidad de memorizarlas o buscar en documentos externos. El administrador podrá mantener el catálogo (agregar, editar, eliminar) de sentencias y tips desde la UI de la Bitácora.
+
+**Justificación operativa:**
+- QRadar es muy estricto con la sintaxis AQL; queries incorrectas no devuelven resultados o fallan silenciosamente.
+- Los analistas pierden tiempo reconstruyendo queries comunes desde cero.
+- No existe un repositorio centralizado de queries validadas accesible desde la Bitácora.
+- Los tips/cheatsheet de AQL (como `protocolid = 6` → TCP) se pierden en documentos internos que nadie consulta.
+
+**Módulo 1: Catálogo de Sentencias AQL**
+
+| Campo | Tipo | Obligatorio | Descripción |
+|-------|------|-------------|-------------|
+| `title` | String (max 120) | Sí | Nombre descriptivo de la consulta (ej. "Buscar archivo", "Filtrar por nombre de muchos sucesos") |
+| `category` | String (enum) | Sí | Categoría/tipo de consulta (ej. "Búsqueda de archivos", "Análisis de tráfico", "Investigación de usuarios", "IoC", "Flujos") |
+| `aqlQuery` | String (max 5000) | Sí | Sentencia AQL completa, pre-validada en QRadar |
+| `description` | String (max 2000) | No | Explicación detallada de qué hace la sentencia, cuándo usarla y qué resultados esperar |
+| `example` | String (max 2000) | No | Ejemplo de uso o caso real donde se aplicó |
+| `tags` | Array<String> | No | Tags para facilitar búsqueda (ej. `["firewall", "fortigate", "tcp"]`) |
+| `createdBy` | String | Auto | Usuario admin que creó la sentencia |
+| `createdAt` | Date | Auto | Fecha de creación |
+| `updatedAt` | Date | Auto | Fecha de última actualización |
+| `isActive` | Boolean | Sí | Permite desactivar sentencias obsoletas sin eliminarlas |
+
+**Sentencias AQL iniciales (semilla del catálogo):**
+
+| # | Título | Sentencia AQL |
+|---|--------|---------------|
+| 1 | Buscar archivo | `SELECT DATEFORMAT(starttime, 'hh:mm:ss') AS 'Start Time', filename, sourceip, destinationip, logsourceid FROM events WHERE filename = 'PDFCIERRE.exe' LAST 1 DAYS` |
+| 2 | Clientes con más una acción específica | `SELECT username as 'Nombre de usuario', COUNT(*) as 'Número de eventos' FROM events WHERE action = 'client-rst' AND username IS NOT NULL AND username != 'N/A' GROUP BY username ORDER BY COUNT(*) DESC LIMIT 100 LAST 1 DAYS` |
+| 3 | Filtrar por nombre de muchos sucesos | `SELECT QIDNAME(qid) AS 'Event Name', LOGSOURCENAME(logsourceid) AS 'Log Source', eventcount AS 'Event Count', DATEFORMAT(starttime, 'yyyy-MM-dd hh:mm:ss') AS 'Hora de inicio', sourceip AS 'Source IP', sourceport AS 'Source Port', destinationip AS 'Destination IP', destinationport AS 'Destination Port', username AS 'Username', magnitude AS 'Magnitude', payload AS 'Raw Log' FROM events WHERE QIDNAME(qid) IN ('Xbox - This indicates an attempt to access Xbox Live Messages') LAST 1 HOURS` |
+
+**Módulo 2: Tips / Consejos / Cheatsheet**
+
+| Campo | Tipo | Obligatorio | Descripción |
+|-------|------|-------------|-------------|
+| `snippet` | String (max 500) | Sí | Fragmento AQL o expresión (ej. `protocolid = 6`) |
+| `explanation` | String (max 1000) | Sí | Explicación clara de lo que hace (ej. "TCP") |
+| `category` | String (enum) | No | Agrupación (ej. "Protocolos", "Tiempos", "Filtros", "Operadores") |
+| `order` | Number | No | Orden de visualización dentro de la categoría |
+
+**Tips iniciales (semilla):**
+
+| # | Snippet | Explicación | Categoría |
+|---|---------|-------------|----------|
+| 1 | `protocolid = 6` | TCP | Protocolos |
+| 2 | `protocolid = 17 AND dstport = 443` | QUIC | Protocolos |
+| 3 | `protocolid = 17` | UDP | Protocolos |
+| 4 | `LAST 1 HOURS` | Búsqueda en 1 hora | Tiempos |
+| 5 | `LAST 1 DAYS` | Búsqueda en 1 día | Tiempos |
+| 6 | `LAST 15 MINUTES` | Búsqueda en 15 minutos | Tiempos |
+| 7 | `LIMIT 100` | Límite de 100 eventos | Filtros |
+| 8 | `username = 'USUARIO'` | Buscar por usuario específico | Filtros |
+| 9 | `OR UTF8(payload) ILIKE '%dorijinalecza.org/jub%'` | Buscar URL sin www, dentro de `'%<WEB>.COM%'` | Operadores |
+
+**Vista del Analista (UI — iframe del complemento):**
+
+1. **Barra de búsqueda** con filtro en tiempo real por título, descripción, tags y contenido AQL.
+2. **Filtro por categoría** (dropdown o chips) para segmentar las sentencias.
+3. **Tarjetas de sentencia** que muestran:
+   - Título en negrita.
+   - Categoría como badge de color.
+   - Sentencia AQL en bloque de código con syntax highlighting.
+   - Campo de descripción/explicación expandible.
+   - **Botón "📋 Copiar AQL"** que copia la sentencia al portapapeles con feedback visual (evita Ctrl+C).
+   - Tags como chips debajo.
+4. **Sección "Tips & Cheatsheet"** (tab o panel lateral):
+   - Tabla agrupada por categoría.
+   - Cada fila muestra snippet en monospace + explicación.
+   - **Botón "📋 Copiar"** por cada snippet.
+5. **Diseño responsivo** que funcione bien embebido en el iframe de la Bitácora.
+
+**Vista del Administrador (CRUD):**
+
+1. **Gestión de Sentencias AQL:**
+   - Tabla con listado completo (título, categoría, estado activo, fecha).
+   - Botón **"+ Nueva Sentencia"** → formulario con validación.
+   - Acciones por fila: **Editar**, **Desactivar/Activar**, **Eliminar** (con confirmación).
+   - El campo AQL acepta texto multilinea con preservación de formato.
+2. **Gestión de Tips:**
+   - Tabla con listado (snippet, explicación, categoría, orden).
+   - Botón **"+ Nuevo Tip"** → formulario simple.
+   - Drag-and-drop o campo numérico para reordenar.
+   - Acciones: **Editar**, **Eliminar**.
+3. **Import/Export:** Posibilidad futura de importar sentencias desde CSV/JSON para carga masiva.
+
+**Reglas de Complementos aplicables (según `docs/COMPLEMENTS.md`):**
+
+Este complemento se rige por las reglas documentadas en `COMPLEMENTS.md`. A continuación se listan explícitamente las que aplican:
+
+**Tipo de complemento:** `zip-static` (`static-html`)
+- Es un paquete HTML + CSS + JavaScript simple empaquetado como ZIP (ref: COMPLEMENTS.md §2.2, §12.1).
+- La publicación automática del sistema **solo soporta `static-html`** (ref: §14). Este complemento cumple ese requisito.
+- No es un microservicio, no es un frontend Vite/React compilado, no requiere `node-service`.
+
+**Entregable:** Un archivo `aql-library.zip` que se genera y se publica desde Admin > Complementos.
+
+**Flujo de despliegue (ref: COMPLEMENTS.md §2.2):**
+1. **Validar**: el admin sube el ZIP a `POST /api/complements/source/validate`. El sistema analiza el contenido, detecta stack `static-html` y propone configuración.
+2. **Preview**: `POST /api/complements/source/preview` extrae el ZIP a `uploads/complements/preview/<previewId>/` para revisión en navegador.
+3. **Publicar**: `POST /api/complements/source/publish` copia el contenido a `uploads/complements/published/aql-library/` y crea o actualiza el registro del complemento con `sourceType=zip-static`.
+
+**Límites del ZIP (ref: COMPLEMENTS.md §3):**
+- Tamaño máximo comprimido: 25 MB.
+- Máximo de archivos dentro del ZIP: 200.
+- Tamaño máximo descomprimido: 20 MB.
+- El paquete NO debe contener lenguajes bloqueados (Python, Java, C#, Go, PHP, Ruby, Rust, Kotlin, Swift).
+
+**Estructura del ZIP:**
+```
+aql-library.zip
+├── index.html            ← Punto de entrada (obligatorio para static-html)
+├── styles.css            ← Estilos del complemento
+├── app.js                ← Lógica JS (búsqueda, copia, postMessage, CRUD)
+└── seed-data.json        ← Datos semilla (queries + tips iniciales)
+```
+
+**Artefactos en disco tras publicar (ref: COMPLEMENTS.md §11.4):**
+- Preview: `uploads/complements/preview/<previewId>/`
+- Publicado: `uploads/complements/published/aql-library/`
+- Los archivos publicados quedan protegidos por autenticación y visibilidad (ref: §10.2): solo usuarios autenticados con visibilidad al complemento pueden accederlos.
+
+**Modelo del complemento (ref: COMPLEMENTS.md §4):**
+
+| Campo | Valor para este complemento |
+|-------|----------------------------|
+| `slug` | `aql-library` |
+| `name` | `Biblioteca AQL` |
+| `dbName` | `bitacora_ext_aql_library` |
+| `status` | `active` |
+| `apiVersion` | `v1` |
+| `sourceArtifact.sourceType` | `zip-static` |
+| `sourceArtifact.stackKey` | `static-html` |
+| `sourceArtifact.managedByPlatform` | `true` |
+| `permissions.scopes` | `['READ_CONTEXT', 'READ_STORAGE', 'WRITE_STORAGE']` |
+| `permissions.allowedCollections` | `['shared_storage']` |
+| `visibility.roles` | `['admin', 'user']` |
+
+**Scopes utilizados (ref: COMPLEMENTS.md §4.1):**
+
+| Scope | Para qué se usa en este complemento |
+|-------|-------------------------------------|
+| `READ_CONTEXT` | Obtener turno/analista activo y rol del usuario (para mostrar/ocultar CRUD admin) |
+| `READ_STORAGE` | Leer sentencias AQL y tips almacenados |
+| `WRITE_STORAGE` | Crear, actualizar y eliminar sentencias y tips (solo admin) |
+
+**Colección autorizada (ref: COMPLEMENTS.md §4.2):** `shared_storage`
+
+**Persistencia — browser-state (ref: COMPLEMENTS.md §8.1):**
+- Usa `GET/PUT /api/complements/aql-library/browser-state` para guardar el estado del complemento.
+- `browser-state` es compartido por complemento, NO por usuario (ref: §14).
+- El último guardado sobrescribe el valor completo.
+- Queda trazado con `updatedByUserId`, `updatedByUsername` y `updatedVia`.
+- Uso en este complemento: almacenar todo el catálogo de sentencias AQL, tips, configuración y flag de seed.
+
+**Estructura del `browser-state.value`:**
+```json
+{
+  "seeded": true,
+  "queries": [
+    {
+      "id": "<uuid>",
+      "title": "Buscar archivo",
+      "category": "Búsqueda de archivos",
+      "aqlQuery": "SELECT ...",
+      "description": "Busca un archivo específico...",
+      "example": "",
+      "tags": ["archivo", "malware"],
+      "isActive": true,
+      "createdBy": "admin",
+      "createdAt": "2026-04-03T...",
+      "updatedAt": "2026-04-03T..."
+    }
+  ],
+  "tips": [
+    {
+      "id": "<uuid>",
+      "snippet": "protocolid = 6",
+      "explanation": "TCP",
+      "category": "Protocolos",
+      "order": 1
+    }
+  ],
+  "categories": ["Búsqueda de archivos", "Análisis de tráfico", "Investigación de usuarios", "IoC", "Flujos"]
+}
+```
+
+**Bridge Core ↔ iframe (ref: COMPLEMENTS.md §7):**
+
+El complemento utiliza `postMessage` para comunicarse con el Core de Angular vía `ComplementBridgeService`:
+
+- **Evento que envía el complemento:**
+  - `REQUEST_CONTEXT` (version: 1): al cargar el iframe, solicita contexto actual.
+- **Eventos que recibe del Core:**
+  - `CONTEXT_UPDATE`: recibe `shiftId`, `shiftName`, `analystUsername` y rol del usuario. Se usa para determinar si mostrar controles de admin.
+  - `THEME_CHANGE`: para adaptar estilos al tema activo de la Bitácora.
+- **Validación de origin**: el Core solo procesa mensajes cuyo `event.origin` coincida con el `baseUrl` registrado del complemento (ref: §7.3).
+- **Rate-limit del bridge**: si el iframe envía más de 100 mensajes en 10 segundos, se desconecta del bridge (ref: §7.3).
+
+Ejemplo de implementación en el iframe (ref: COMPLEMENTS.md §12.2):
+```html
+<script>
+  let currentUserRole = null;
+
+  window.addEventListener('message', (event) => {
+    if (!event.data || event.data.version !== 1) return;
+    if (event.data.type === 'CONTEXT_UPDATE') {
+      currentUserRole = event.data.payload.role || 'user';
+      toggleAdminControls(currentUserRole === 'admin');
+    }
+    if (event.data.type === 'THEME_CHANGE') {
+      applyTheme(event.data.payload);
+    }
+  });
+
+  window.parent.postMessage({
+    type: 'REQUEST_CONTEXT',
+    version: 1,
+    payload: {}
+  }, '*');
+</script>
+```
+
+**Lectura/escritura de datos — browser-state (ref: COMPLEMENTS.md §12.4):**
+
+```javascript
+const SLUG = 'aql-library';
+
+async function loadState() {
+  const res = await fetch(`/api/complements/${SLUG}/browser-state`, {
+    credentials: 'include'
+  });
+  return res.ok ? (await res.json()).value : null;
+}
+
+async function saveState(value) {
+  await fetch(`/api/complements/${SLUG}/browser-state`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value })
+  });
+}
+```
+
+**Sandbox del iframe (ref: COMPLEMENTS.md §10.4):**
+```html
+<iframe
+  [src]="complement.baseUrl | safe"
+  sandbox="allow-scripts allow-same-origin allow-forms"
+  referrerpolicy="no-referrer"
+  loading="lazy">
+</iframe>
+```
+- NO tiene `allow-top-navigation` ni `allow-popups`.
+- El iframe no puede acceder al DOM padre ni a cookies de la Bitácora.
+
+**Circuit breaker para zip-static (ref: COMPLEMENTS.md §9):**
+- Para complementos `zip-static` no se hace sonda HTTP a un microservicio; se valida que el artefacto publicado exista en disco.
+- Si el circuito está `OPEN`, la UI no carga el iframe y muestra estado de mantenimiento.
+
+**Flujo de datos completo:**
+```
+               Admin sube aql-library.zip
+                        │
+                        ▼
+        POST /api/complements/source/publish
+                        │
+                        ▼
+         uploads/complements/published/aql-library/
+                        │
+                        ▼
+    ┌───────────────────────────────────────────┐
+    │  iframe: /uploads/.../aql-library/        │
+    │  (index.html + styles.css + app.js)       │
+    │                                           │
+    │  postMessage ──→ Core: REQUEST_CONTEXT    │
+    │  ←── Core: CONTEXT_UPDATE (rol, turno)    │
+    │  ←── Core: THEME_CHANGE (tema activo)     │
+    │                                           │
+    │  fetch() ──→ GET  browser-state (leer)    │
+    │  fetch() ──→ PUT  browser-state (guardar) │
+    │  ←── ComplementSharedRecord (BD interna)  │
+    └───────────────────────────────────────────┘
+```
+
+**Restricciones de Seguridad:**
+- Solo usuarios con rol Admin pueden acceder al CRUD (crear/editar/eliminar sentencias y tips). El complemento detecta el rol via `CONTEXT_UPDATE` del bridge y oculta/muestra los controles de edición.
+- Los analistas N1/N2 solo tienen acceso de lectura y copia.
+- El campo `aqlQuery` se almacena como texto plano; NO se ejecuta contra QRadar desde la Bitácora (solo se copia al portapapeles).
+- Sanitización de inputs en título, descripción y tags.
+- La copia al portapapeles usa `navigator.clipboard.writeText()` con fallback `document.execCommand('copy')`.
+- Los archivos publicados están protegidos por autenticación; no son accesibles anónimamente (ref: §10.2).
+- Credenciales: la web usa cookie `auth_token` HttpOnly para usuarios; el complemento accede a `browser-state` con `credentials: 'include'` (ref: §10.1).
+
+**Criterios de Aceptación:**
+1. Se genera un archivo `aql-library.zip` con estructura `static-html` (`index.html` + recursos).
+2. El ZIP pasa validación de `POST /api/complements/source/validate` como stack `static-html`.
+3. El ZIP cumple los límites del analizador: < 25 MB comprimido, < 200 archivos, < 20 MB descomprimido.
+4. Se publica exitosamente desde Admin > Complementos vía flujo Validar → Preview → Publicar.
+5. El complemento aparece en el sidebar de la Bitácora como "Biblioteca AQL" para roles `admin` y `user`.
+6. Los analistas pueden buscar y filtrar sentencias AQL por título, categoría y tags.
+7. El botón "📋 Copiar AQL" copia la sentencia completa al portapapeles con feedback visual.
+8. La sección Tips muestra fragmentos agrupados por categoría con botón de copia individual.
+9. El Admin puede crear, editar, desactivar y eliminar sentencias y tips desde el iframe.
+10. Las sentencias y tips semilla se cargan automáticamente la primera vez (seed via `seed-data.json`).
+11. Los datos persisten en `browser-state` de la BD interna (`ComplementSharedRecord`), sin base de datos adicional.
+12. El complemento solicita contexto al Core via `REQUEST_CONTEXT` y adapta la UI según rol y tema.
+13. El campo de explicación/descripción es visible junto a cada sentencia.
+14. No requiere Docker propio, ni servidor adicional, ni base de datos separada.
 
 ---
