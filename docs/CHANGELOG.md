@@ -11,6 +11,9 @@ Registro de cambios relevantes del proyecto.
 - Se ajustó el middleware general (`apiLimiter`) para soportar sesiones gestionadas por cookies (`auth_token`), evitando que compartan el bucket restrictivo anónimo (`apiPublicMax`) según su IP de origen (NAT).
 - Las rutas de bajo riesgo previas al login, como `/api/config/logo` y afines, fueron exoneradas del cálculo global global limitante.
 
+#### Fuga de memoria y desbordamiento de red en Layout
+- **Fix frontend crítico:** Se resolvió una anomalía severa en `MainLayoutComponent` que generaba un desbordamiento exponencial de temporizadores (`setInterval`) por un anidamiento lógico. Esta anomalía causaba parálisis del navegador web, miles de peticiones simultáneas por minuto al backend provocando autoexpulsiones de sesión, y desencadenaba el error "Demasiadas peticiones desde esta IP" derivado en el inicio de sesión.
+
 ## [v1.5.25-beta] - 2026-04-03
 
 ### Plataforma de complementos

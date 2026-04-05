@@ -3,6 +3,8 @@ services:
     image: mongo:8
     container_name: bitacora-mongodb
     restart: unless-stopped
+    ports:
+      - "10.0.100.13:27018:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-admin}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
@@ -102,9 +104,7 @@ services:
       sh -c ' if [ ! -f /etc/nginx/certs/cert.pem ]; then
         echo "Generando certificados autofirmados dummy para arranque inicial de Nginx...";
         openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/nginx/certs/key.pem -out /etc/nginx/certs/cert.pem -subj "/CN=localhost";
-      fi; 
-      chown -R 1001:1001 /etc/nginx/certs;
-      nginx -g "daemon off;" '
+      fi;  chown -R 1001:1001 /etc/nginx/certs; nginx -g "daemon off;" '
     healthcheck:
       test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "--no-check-certificate", "https://127.0.0.1/health" ]
       interval: 30s

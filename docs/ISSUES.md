@@ -8,6 +8,8 @@
 | ID | Estado | Seccion | Tarea | Notas |
 | --- | --- | --- | --- | --- |
 | AI-SUMMARY-001 | Pendiente | IA/Operación ALTA | Módulo de Resumen Ejecutivo Efímero (IA On-Demand) | Integrar Ollama+llama3.2:3b en modo efímero `docker start -> healthcheck -> generate -> docker stop` con `try/finally`, salida editable en campo "Resumen Sugerido por IA" y botón "Generar con IA". |
+| REP-GEN-019 | Pendiente | Frontend / Comunicación Cliente ALTA | Reutilizar `/main/report-generator` para modo dual Reporte / Boletín de Seguridad | Mantener la ruta y mecánica actual del generador, agregando un selector vistoso de modo con default en `Reporte`. El modo `Boletín` debe simplificar el formulario a título/amenaza, criticidad, resumen ejecutivo, impacto, mitigación y referencias, generar salida HTML para cliente y quedar desacoplado de `Log Source` para permitir alertas transversales reutilizables con múltiples clientes por separado. |
+| REP-GEN-019A | Pendiente | Email / Comunicación Cliente MEDIA | Sub-issue de `REP-GEN-019`: envío individual por correo desde Boletín de Seguridad | Después de generar el boletín, agregar un cajón de texto para múltiples correos y acción `Enviar` que despache un correo por destinatario (1:1), nunca un único correo con todos en copia. Debe depender del SMTP existente, registrar auditoría por destinatario y mantener fallback de copia manual. |
 
 
 ### ✅ Listas
@@ -157,6 +159,114 @@ Los items marcados como `Listo` deben quedar reflejados en `docs/CHANGELOG.md` c
    - memoria limitada a `--memory="2g"`
    - volumen persistente `-v ollama_data:/root/.ollama`
    - contenedor apagado fuera de uso (superficie mínima y ahorro de RAM).
+
+### REP-GEN-019 - Reutilizar `/main/report-generator` para modo dual Reporte / Boletín de Seguridad
+
+**Objetivo funcional:** Aprovechar el módulo actual `frontend/src/app/pages/main/report-generator/` para soportar dos modos dentro de la misma pantalla:
+- `Reporte` (comportamiento actual, y debe seguir siendo el modo por defecto).
+- `Boletín de Seguridad` (newsletter/advisory para clientes, con enfoque informativo y preventivo).
+
+**Contexto técnico validado en código:**
+- La ruta actual ya existe en `/main/report-generator`.
+- El componente actual genera HTML localmente, ofrece vista previa y copia al portapapeles/Markdown.
+- El flujo actual de `Reporte` ya contempla selección de `Log Source` y alerta especial por cliente (`ClientAlertEvaluation`), por lo que conviene reutilizarlo en vez de crear un módulo nuevo.
+- La UI actual está pensada para reportes técnicos; para boletines debe reducirse la cantidad de campos y ajustar etiquetas/texto de salida.
+- El modo `Boletín` no debe depender de `Log Source`, porque una misma alerta puede ser transversal y enviarse a varios clientes distintos de forma separada.
+
+**Alcance requerido del modo `Boletín de Seguridad`:**
+
+| Campo | Tipo | Obligatorio | Observación |
+| --- | --- | --- | --- |
+| Título del Boletín / Amenaza | Texto | Sí | Ej: `Nueva vulnerabilidad crítica en Outlook` |
+| Nivel de Alerta (Criticidad) | Dropdown | Sí | `Baja`, `Media`, `Alta`, `Crítica` |
+| Resumen Ejecutivo | Textarea | Sí | Lenguaje simple, orientado a cliente |
+| Impacto | Textarea | Sí | Qué ocurre si el cliente se ve afectado |
+| Acciones Recomendadas / Mitigación | Textarea | Sí | Lista o pasos concretos |
+| Enlaces de Referencia | Textarea | No | Links oficiales, uno por línea o separados de forma clara |
+| Destinatarios | Se define en sub-issue | No en esta fase | El boletín no se amarra a un cliente único ni a `Log Source` |
+
+**Requisitos UX/UI:**
+1. Agregar un selector de modo visible y atractivo en la cabecera del módulo (segmentado, tabs o toggle estilizado), con `Reporte` activo por defecto.
+2. No duplicar ruta ni pantalla; el cambio debe ocurrir dentro del mismo `report-generator`.
+3. Al cambiar de modo, ajustar dinámicamente:
+   - título de la tarjeta,
+   - subtítulo,
+   - campos visibles,
+   - etiquetas de botones,
+   - estructura del HTML generado.
+4. En `Boletín`, ocultar por completo los campos y dependencias propias del flujo técnico (`Log Source`, datos de conexión, reputación, evidencia técnica, etc.).
+5. El modo `Reporte` no debe degradarse ni cambiar su comportamiento actual salvo lo mínimo necesario para convivir con el modo dual.
+6. El modo `Boletín` debe mantener una vista previa limpia y preparada para copiar en correo a cliente.
+7. El boletín debe conservar una línea visual consistente al copiar: colores, jerarquía visual, tablas/cajas, espaciados y tipografía compatibles con clientes de correo.
+
+**Salida esperada del boletín:**
+1. Generar HTML con formato simple y profesional, más liviano que el reporte técnico.
+2. Usar secciones legibles para cliente:
+   - título,
+   - nivel de alerta,
+   - resumen ejecutivo,
+   - impacto,
+   - acciones recomendadas,
+   - referencias.
+3. El contenido debe ser reutilizable para múltiples clientes sin depender de datos particulares de un `Log Source`.
+4. Mantener botón de copia, y si aplica, botón de copia adicional en texto/Markdown solo si el resultado sigue siendo útil para correo o documentación.
+5. El HTML del boletín debe salir con estilos inline o estructura email-safe para que Outlook y clientes similares respeten colores, bordes y jerarquía al pegar.
+6. Si existe opción `Copiar Markdown`, debe quedar claramente como secundaria; el formato principal del boletín es HTML listo para pegar/enviar.
+
+**Criterios de aceptación:**
+1. `/main/report-generator` sigue abriendo el generador actual con modo `Reporte` por defecto.
+2. Existe un selector visual para pasar a `Boletín de Seguridad` sin navegar a otra ruta.
+3. El formulario del boletín muestra solo los campos necesarios definidos arriba.
+4. El boletín se puede previsualizar y copiar conservando formato visual apto para correo.
+5. El modo `Boletín` no exige seleccionar `Log Source` ni un cliente único para poder generar el contenido.
+6. El boletín generado puede reutilizarse para enviarlo a varios clientes distintos en forma individual.
+7. El código reutiliza al máximo el componente/servicios actuales y evita crear un segundo generador paralelo.
+8. La copia desde la UI debe mantener el HTML enriquecido; si el navegador no soporta copia rica, debe informarse el fallback en texto plano de forma explícita.
+
+**Cómo lo solucionaría (propuesta de ingeniería):**
+1. Introducir un estado de modo (`report` / `newsletter`) dentro del componente y separar los formularios o subgrupos reactivos por modo.
+2. Extraer la construcción de salida a funciones distintas (`buildReportHtml`, `buildNewsletterHtml`) para evitar condicionales gigantes.
+3. Mantener shared logic para:
+   - preview,
+   - copy,
+   - clear/reset.
+4. Mantener `Log Source` y alertas especiales solo dentro del flujo `Reporte`, sin arrastrarlas al modo `Boletín`.
+5. Ajustar el template para render condicional de secciones sin romper la usabilidad actual del modo `Reporte`.
+6. Construir el HTML del boletín con estilos inline reutilizando la mecánica actual de copiado enriquecido (`text/html`) para minimizar diferencias entre preview, copiar y enviar.
+
+### REP-GEN-019A - Sub-issue de `REP-GEN-019`: envío individual por correo desde Boletín de Seguridad
+
+**Dependencia:** Este sub-issue debe ejecutarse después de `REP-GEN-019`, reutilizando el boletín ya generado en preview.
+
+**Objetivo funcional:** Tras crear un boletín, permitir ingresar múltiples destinatarios y enviar el mismo boletín como correos individuales, uno por uno, usando la configuración SMTP existente. Este flujo debe servir para campañas transversales, donde un mismo advisory se envía a varios clientes sin amarrarlo a un `Log Source` específico.
+
+**Requisitos funcionales:**
+1. Agregar bajo la vista previa del boletín un cajón de texto para pegar múltiples correos.
+2. Aceptar separación por salto de línea, coma o punto y coma.
+3. Normalizar, validar y deduplicar destinatarios antes de enviar.
+4. Al presionar `Enviar`, despachar `N` envíos independientes para `N` correos.
+5. No usar `CC` ni `BCC` para este flujo; cada destinatario debe recibir un correo separado.
+6. Mantener opción de `Copiar` aunque el envío falle o no se configure SMTP.
+7. El mismo boletín debe poder enviarse a contactos de clientes distintos sin requerir regenerar el contenido por cada cliente.
+8. El correo enviado debe usar el mismo HTML enriquecido generado en la vista previa, respetando colores, bloques y formato visual del boletín.
+
+**Requisitos técnicos sugeridos:**
+1. Reutilizar la infraestructura existente de correo (`backend/src/utils/email.js` y configuración SMTP actual).
+2. Crear endpoint específico para envío de boletines, con payload de:
+   - tipo `newsletter`,
+   - asunto,
+   - cuerpo HTML,
+   - lista de destinatarios.
+3. El `cuerpo HTML` debe ser exactamente el artefacto renderizado/validado en preview, no una reconstrucción simplificada distinta para correo.
+4. Ejecutar el envío de forma iterativa por destinatario y registrar resultado individual (`success`/`fail`) en auditoría.
+5. Mostrar en frontend resumen final de envíos exitosos y fallidos.
+
+**Criterios de aceptación:**
+1. Si el usuario ingresa 5 correos válidos, se generan 5 envíos independientes.
+2. Un fallo en un destinatario no cancela el registro del resultado de los demás.
+3. La auditoría deja trazabilidad por destinatario, sin exponer innecesariamente contenido sensible.
+4. El correo recibido conserva el mismo formato HTML del boletín generado en pantalla, incluyendo colores y jerarquía visual esenciales.
+4. El flujo queda visible solo para `Boletín de Seguridad`, no para el modo `Reporte` técnico salvo decisión posterior explícita.
 
 ### INFRA-MONGO-001 - Upgrade MongoDB (7 → 8)
 
