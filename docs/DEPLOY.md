@@ -118,6 +118,8 @@ RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX_REQUESTS=1000
 RATE_LIMIT_MAX_AUTH_REQUESTS=2000
 RATE_LIMIT_LOGIN_MAX=20
+# Opcional: cadena >= 24 chars (openssl rand -base64 32). POST /api/system/rate-limit-reset
+RATE_LIMIT_RESET_SECRET=
 
 # ============================
 # BASE DE DATOS MONGODB

@@ -2,6 +2,15 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.26-beta] - 2026-04-05
+
+### Rate limiting y operación de sesión
+
+#### Resolución de falsos positivos en login
+- **Fix backend:** Se resolvió el issue SEC-RL-018 que causaba un falso positivo de rate limit masivo (error "DEMASIADAS PETICIONES DESDE ESTA IP").
+- Se ajustó el middleware general (`apiLimiter`) para soportar sesiones gestionadas por cookies (`auth_token`), evitando que compartan el bucket restrictivo anónimo (`apiPublicMax`) según su IP de origen (NAT).
+- Las rutas de bajo riesgo previas al login, como `/api/config/logo` y afines, fueron exoneradas del cálculo global global limitante.
+
 ## [v1.5.25-beta] - 2026-04-03
 
 ### Plataforma de complementos

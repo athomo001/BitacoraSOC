@@ -549,6 +549,23 @@ X-RateLimit-Reset: 1702814400
 }
 ```
 
+### Reinicio operativo de contadores (sin reiniciar el proceso)
+
+Solo disponible si en el backend está definida la variable de entorno `RATE_LIMIT_RESET_SECRET` como **cadena de texto de al menos 24 caracteres** (no es un número: suele generarse con `openssl rand -base64 32`, resultado alfanumérico + símbolos Base64). Si no cumple, la ruta se comporta como no existente (`404`).
+
+| Método | Ruta | Autenticación |
+|--------|------|----------------|
+| `POST` | `/api/system/rate-limit-reset` | Cabecera `X-Rate-Limit-Reset-Secret` igual al valor de `RATE_LIMIT_RESET_SECRET` |
+
+**Cuerpo JSON (elige uno):**
+
+- `{"ip":"<IPv4|IPv6>"}` — Limpia el bucket del limiter global de API para esa IP. Opcional: `"username":"correo@dominio"` para limpiar también el limiter de login asociado a `ip:usuario`.
+- `{"all":true}` — Vacía **todo** el store en memoria del limiter global de API (p. ej. cuando no tienes la IP del cliente o muchas personas comparten la misma IP pública).
+
+**Respuestas frecuentes:** `200` + `{ "ok": true, "reset": [...] }`; `400` si falta `ip` válida y no enviaste `all:true`; `403` si el secreto en cabecera no coincide; `404` si el endpoint está deshabilitado (secret ausente o corto).
+
+Referencia de seguridad y buenas prácticas del secreto: `docs/SECURITY.md` (Rate limiting). Caso de uso / falsos positivos: `docs/ISSUES.md` (SEC-RL-018).
+
 ---
 
 ## Errores Estándar

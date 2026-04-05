@@ -123,6 +123,7 @@ RATE_LIMIT_WINDOW_MS=900000           # 15 min
 RATE_LIMIT_MAX_REQUESTS=1000          # API general
 RATE_LIMIT_MAX_AUTH_REQUESTS=2000     # API autenticada
 RATE_LIMIT_LOGIN_MAX=20               # Login
+RATE_LIMIT_RESET_SECRET=              # Opcional: texto >= 24 chars (openssl rand -base64 32); SECURITY.md
 
 # Complementos
 COMPLEMENT_TOKEN_SECRET=GENERAR_CON_OPENSSL

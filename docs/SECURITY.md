@@ -111,7 +111,33 @@ RATE_LIMIT_MAX_REQUESTS=1000     # API general
 RATE_LIMIT_MAX_AUTH_REQUESTS=2000
 RATE_LIMIT_LOGIN_MAX=20          # Login
 RATE_LIMIT_SMTP_MAX=3            # SMTP test
+RATE_LIMIT_RESET_SECRET=         # Opcional; ver subsección siguiente
 ```
+
+### `RATE_LIMIT_RESET_SECRET` (opcional)
+
+- **Tipo de dato:** cadena de texto (`string`). **No es un número** ni un identificador con formato obligatorio: puede contener letras, dígitos y símbolos según cómo la generes (alfanumérico, Base64, etc.).
+- **Regla en aplicación:** si la variable falta o tiene **menos de 24 caracteres**, el endpoint de reinicio de contadores **no se publica** (el servidor responde `404` en esa ruta, comportamiento “oculto”).
+- **Generación recomendada (aleatoria, alta entropía):**
+  ```bash
+  openssl rand -base64 32
+  ```
+  Eso produce típicamente **44 caracteres** en [A–Z, a–z, 0–9, `+`, `/`] y a veces `=` al final (padding Base64). Es válido pegar el resultado **completo** en `.env` sin comillas, salvo que tu shell requiera escapar `$` u otros caracteres raros.
+- **Uso en peticiones:** el valor debe enviarse **idéntico** en la cabecera HTTP `X-Rate-Limit-Reset-Secret` (texto UTF-8). Evita espacios al inicio/final al copiar desde `.env`.
+- **Riesgo:** quien conozca el secreto puede vaciar el limiter global de API; tratar como **credencial operativa** (no versionar en git, rotar si se filtra). Detalle de uso: `docs/API.md` (Rate limiting) y `docs/ISSUES.md` (SEC-RL-018).
+
+### Reinicio de contadores de rate limit (sin reiniciar el backend)
+
+Si `RATE_LIMIT_RESET_SECRET` cumple la longitud mínima, existe `POST /api/system/rate-limit-reset` (montado **antes** del middleware que aplica el límite global a `/api/`, para que un `429` no bloquee la propia llamada de rescate).
+
+| Elemento | Detalle |
+|----------|---------|
+| Método | `POST` |
+| Ruta | `/api/system/rate-limit-reset` |
+| Cabecera | `X-Rate-Limit-Reset-Secret: <mismo valor que RATE_LIMIT_RESET_SECRET>` |
+| Cuerpo JSON | `{"ip":"<IPv4 o IPv6>"}` opcionalmente con `"username":"..."` para limpiar también el limiter de login para `ip:usuario`; **o** `{"all":true}` para vaciar **todo** el store en memoria del limiter global de API (útil si **no** conoces la IP del analista o hay NAT compartido; afecta a todas las claves de ese store). |
+
+Uso típico desde el servidor o bastión: `curl` con HTTPS al puerto del API. Si el secreto no está configurado o es inválido: `404` / `403` según el caso. La operación queda auditada (`system.rate_limit.reset`).
 
 ### Respuesta 429
 

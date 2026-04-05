@@ -59,6 +59,18 @@ docker compose logs --tail=50 backend
 2. Matar el proceso host problemático.
 3. Alternativa: Cambiar el puerto en el `.env` (ej: `BACKEND_PORT=3001`) y hacer `docker compose up -d`.
 
+### HTTP 429 — demasiadas peticiones (login o API)
+
+**Síntoma:** El frontend o `curl` recibe `429` con mensaje de límite por IP o de intentos de login.
+
+**Causas típicas:** se alcanzó el umbral de `RATE_LIMIT_*`; varios analistas comparten la misma IP pública (NAT); tráfico legítimo muy alto.
+
+**Qué hacer (en orden práctico):**
+
+1. Esperar la ventana (`RATE_LIMIT_WINDOW_MS`, por defecto 15 minutos).
+2. **Sin reiniciar el contenedor:** si en `.env` existe `RATE_LIMIT_RESET_SECRET` como **texto de al menos 24 caracteres** (no es un número; suele generarse con `openssl rand -base64 32`), usar `POST /api/system/rate-limit-reset` con la cabecera `X-Rate-Limit-Reset-Secret` y cuerpo JSON `{"ip":"..."}` o `{"all":true}` si no tienes la IP. Detalle: `docs/SECURITY.md`, `docs/API.md`; caso NAT / falsos positivos: `docs/ISSUES.md` (SEC-RL-018).
+3. **Último recurso:** `docker compose restart backend` (limpia contadores en memoria de todos los limiters del proceso).
+
 ---
 
 ## 💾 MongoDB (Base de Datos)
