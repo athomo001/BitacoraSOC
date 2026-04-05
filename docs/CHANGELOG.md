@@ -4,6 +4,15 @@ Registro de cambios relevantes del proyecto.
 
 ## [v1.5.26-beta] - 2026-04-05
 
+### Generador de Reportes y Comunicación (REP-GEN-019)
+
+#### Modo de Boletín de Seguridad
+- **Feature (Frontend):** Se integró un modo dual en `/main/report-generator` mediante un selector visual que permite alternar entre "Reporte Técnico" y "Boletín de Seguridad" sin necesidad de recargar la página.
+- **Flujo Simplificado:** El formulario del modo "Boletín" fue desacoplado de la dependencia obligatoria de *Log Source* y alertas por cliente, priorizando campos orientados a la comunicación ejecutiva y generalizada (Título, Criticidad, Resumen Ejecutivo, Impacto, Mitigación y Referencias).
+- **Escala CVSS Integrada:** Se reemplazó el menú genérico de "Nivel de Alerta" incorporando métricas estándar de CVSS (0.1 - 10.0), mapeadas a insignias de color (Verde, Naranja, Rojo y Granate) al exportarse al portapapeles.
+- **Firma Automática:** El sistema ahora captura dinámicamente el nombre o identificador del usuario en sesión activa, firmando automáticamente el boletín generado (`Generado por [Usuario]`) en reemplazo del genérico "Bitácora SOC".
+
+
 ### Rate limiting y operación de sesión
 
 #### Resolución de falsos positivos en login

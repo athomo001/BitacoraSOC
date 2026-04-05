@@ -6,7 +6,21 @@
     </mat-card-header>
 
     <mat-card-content>
-      <form [formGroup]="reportForm">
+      <div class="mode-selector-container">
+        <mat-button-toggle-group [(ngModel)]="currentMode" (change)="clearForm()" class="mode-selector" aria-label="Modo de generación">
+          <mat-button-toggle value="report">
+            <mat-icon>assessment</mat-icon>
+            Reporte Técnico
+          </mat-button-toggle>
+          <mat-button-toggle value="newsletter">
+            <mat-icon>campaign</mat-icon>
+            Boletín de Seguridad
+          </mat-button-toggle>
+        </mat-button-toggle-group>
+      </div>
+
+      <!-- MODO REPORTE -->
+      <form [formGroup]="reportForm" *ngIf="currentMode === 'report'">
         <!-- Tipo de operación -->
         <app-entity-autocomplete
           label="Tipo de operación *"
@@ -182,7 +196,80 @@
         <div class="actions">
           <button mat-raised-button color="primary" type="button" (click)="generateTable()">
             <mat-icon>table_chart</mat-icon>
-            Generar Tabla HTML
+            Generar Reporte HTML
+          </button>
+          <button mat-stroked-button type="button" (click)="clearForm()">
+            <mat-icon>clear</mat-icon>
+            Limpiar
+          </button>
+        </div>
+      </form>
+
+      <!-- MODO BOLETÍN / NEWSLETTER -->
+      <form [formGroup]="newsletterForm" *ngIf="currentMode === 'newsletter'">
+        
+        <!-- Título del Boletín -->
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Título del Boletín / Amenaza *</mat-label>
+          <input matInput formControlName="tituloBoletin" placeholder="Ej: Nueva vulnerabilidad crítica en Outlook">
+          <mat-error *ngIf="newsletterForm.get('tituloBoletin')?.hasError('required')">
+            Campo obligatorio
+          </mat-error>
+        </mat-form-field>
+
+        <!-- Criticidad -->
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Nivel de Alerta (Criticidad) *</mat-label>
+          <mat-select formControlName="criticidad">
+            <mat-option value="baja">Bajo (CVSS 0.1 - 3.9)</mat-option>
+            <mat-option value="media">Medio (CVSS 4.0 - 6.9)</mat-option>
+            <mat-option value="alta">Alto (CVSS 7.0 - 8.9)</mat-option>
+            <mat-option value="crítica">Crítico (CVSS 9.0 - 10.0)</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <!-- Resumen Ejecutivo -->
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Resumen Ejecutivo *</mat-label>
+          <textarea matInput formControlName="resumenEjecutivo" rows="4" 
+                    placeholder="Describe la amenaza en lenguaje simple y directo para los clientes"></textarea>
+          <mat-error *ngIf="newsletterForm.get('resumenEjecutivo')?.hasError('required')">
+            Campo obligatorio
+          </mat-error>
+        </mat-form-field>
+
+        <!-- Impacto -->
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Impacto *</mat-label>
+          <textarea matInput formControlName="impacto" rows="3" 
+                    placeholder="¿Qué ocurre si el cliente se ve afectado?"></textarea>
+          <mat-error *ngIf="newsletterForm.get('impacto')?.hasError('required')">
+            Campo obligatorio
+          </mat-error>
+        </mat-form-field>
+
+        <!-- Acciones Recomendadas / Mitigación -->
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Acciones Recomendadas / Mitigación *</mat-label>
+          <textarea matInput formControlName="recomendacion" rows="4" 
+                    placeholder="Pasos concretos a seguir o recomendaciones de seguridad"></textarea>
+          <mat-error *ngIf="newsletterForm.get('recomendacion')?.hasError('required')">
+            Campo obligatorio
+          </mat-error>
+        </mat-form-field>
+
+        <!-- Enlaces de Referencia -->
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Enlaces de Referencia</mat-label>
+          <textarea matInput formControlName="referencias" rows="3" 
+                    placeholder="Links a documentación oficial (uno por línea recomendado)"></textarea>
+        </mat-form-field>
+
+        <!-- Botones de acción -->
+        <div class="actions">
+          <button mat-raised-button color="primary" type="button" (click)="generateTable()">
+            <mat-icon>campaign</mat-icon>
+            Generar Boletín
           </button>
           <button mat-stroked-button type="button" (click)="clearForm()">
             <mat-icon>clear</mat-icon>
@@ -198,9 +285,9 @@
           <div class="preview-actions">
             <button mat-raised-button color="accent" (click)="copyToClipboard()">
               <mat-icon>content_copy</mat-icon>
-              Copiar tabla
+              {{ currentMode === 'report' ? 'Copiar reporte' : 'Copiar boletín' }}
             </button>
-            <button mat-stroked-button color="primary" (click)="copyMarkdown()">
+            <button *ngIf="currentMode === 'report'" mat-stroked-button color="primary" (click)="copyMarkdown()">
               <mat-icon>code</mat-icon>
               Copiar Markdown
             </button>

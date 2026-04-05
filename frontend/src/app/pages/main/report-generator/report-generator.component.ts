@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
@@ -8,6 +8,7 @@ import { CatalogEvent, CatalogLogSource, CatalogOperationType } from '../../../m
 import { EscalationService } from '../../../services/escalation.service';
 import { ClientAlertContext, ClientAlertEvaluation } from '../../../models/escalation.model';
 import { ConfigService } from '../../../services/config.service';
+import { AuthService } from '../../../services/auth.service';
 import { MatCard, MatCardHeader, MatCardTitle, MatCardSubtitle, MatCardContent } from '@angular/material/card';
 import { EntityAutocompleteComponent } from '../../../components/entity-autocomplete/entity-autocomplete.component';
 import { NgIf, NgFor } from '@angular/common';
@@ -17,6 +18,7 @@ import { MatDatepickerInput, MatDatepickerToggle, MatDatepicker } from '@angular
 import { MatSelect } from '@angular/material/select';
 import { MatOption } from '@angular/material/core';
 import { MatButton, MatIconButton } from '@angular/material/button';
+import { MatButtonToggleGroup, MatButtonToggle } from '@angular/material/button-toggle';
 import { MatIcon } from '@angular/material/icon';
 import { ClientAlertDialogComponent } from './client-alert-dialog.component';
 
@@ -24,10 +26,12 @@ import { ClientAlertDialogComponent } from './client-alert-dialog.component';
   selector: 'app-report-generator',
   templateUrl: './report-generator.component.html',
   styleUrls: ['./report-generator.component.scss'],
-  imports: [MatCard, MatCardHeader, MatCardTitle, MatCardSubtitle, MatCardContent, ReactiveFormsModule, EntityAutocompleteComponent, NgIf, MatFormField, MatLabel, MatInput, MatError, MatDatepickerInput, MatDatepickerToggle, MatSuffix, MatDatepicker, MatSelect, MatOption, MatButton, MatIcon, NgFor, MatIconButton]
+  imports: [MatCard, MatCardHeader, MatCardTitle, MatCardSubtitle, MatCardContent, ReactiveFormsModule, FormsModule, EntityAutocompleteComponent, NgIf, MatFormField, MatLabel, MatInput, MatError, MatDatepickerInput, MatDatepickerToggle, MatSuffix, MatDatepicker, MatSelect, MatOption, MatButton, MatButtonToggleGroup, MatButtonToggle, MatIcon, NgFor, MatIconButton]
 })
 export class ReportGeneratorComponent implements OnInit {
+  currentMode: 'report' | 'newsletter' = 'report';
   reportForm: FormGroup;
+  newsletterForm: FormGroup;
 
   selectedEvent: CatalogEvent | null = null;
   selectedLogSource: CatalogLogSource | null = null;
@@ -47,7 +51,8 @@ export class ReportGeneratorComponent implements OnInit {
     private configService: ConfigService,
     private snackBar: MatSnackBar,
     private escalationService: EscalationService,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private authService: AuthService
   ) {
     this.reportForm = this.fb.group({
       tipoOperacion: ['', Validators.required],
@@ -64,6 +69,15 @@ export class ReportGeneratorComponent implements OnInit {
       evidenciaTexto: [''],
       recomendacion: [''],
       informacionAdicional: ['']
+    });
+
+    this.newsletterForm = this.fb.group({
+      tituloBoletin: ['', Validators.required],
+      criticidad: ['media', Validators.required],
+      resumenEjecutivo: ['', Validators.required],
+      impacto: ['', Validators.required],
+      recomendacion: ['', Validators.required],
+      referencias: ['']
     });
   }
 
@@ -164,12 +178,24 @@ export class ReportGeneratorComponent implements OnInit {
   }
 
   async generateTable(): Promise<void> {
-    if (this.reportForm.invalid) {
-      this.reportForm.markAllAsTouched();
-      this.snackBar.open('Completa todos los campos obligatorios', 'Cerrar', { duration: 3000 });
-      return;
+    if (this.currentMode === 'report') {
+      if (this.reportForm.invalid) {
+        this.reportForm.markAllAsTouched();
+        this.snackBar.open('Completa todos los campos obligatorios del reporte', 'Cerrar', { duration: 3000 });
+        return;
+      }
+      await this.buildReportHtml();
+    } else {
+      if (this.newsletterForm.invalid) {
+        this.newsletterForm.markAllAsTouched();
+        this.snackBar.open('Completa todos los campos obligatorios del boletín', 'Cerrar', { duration: 3000 });
+        return;
+      }
+      this.buildNewsletterHtml();
     }
+  }
 
+  private async buildReportHtml(): Promise<void> {
     const canContinue = await this.ensureClientAlertAcknowledged('report');
     if (!canContinue) {
       return;
@@ -290,6 +316,86 @@ export class ReportGeneratorComponent implements OnInit {
   <tr>
     <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Información adicional</td>
     <td width="${secondColumnWidthPx}" style="white-space: pre-wrap; ${cellDetailStyle}">${informacionAdicional}</td>
+  </tr>
+</table>`;
+
+    this.generatedHtml = html;
+    this.showPreview = true;
+  }
+
+  private buildNewsletterHtml(): void {
+    const form = this.newsletterForm.value;
+    const headerColor = this.reportTableHeaderColor;
+    const labelColor = this.getSecondaryColor(headerColor);
+    
+    // Ancho un poco mas estrecho y amigable para emails
+    const newsletterWidthPx = 800;
+    
+    const titulo = this.escapeHtml(form.tituloBoletin);
+    const criticidad = this.escapeHtml(form.criticidad).toUpperCase();
+    const resumen = this.escapeHtml(form.resumenEjecutivo);
+    const impacto = this.escapeHtml(form.impacto);
+    const recomendacion = this.escapeHtml(form.recomendacion);
+    const referencias = this.escapeHtml(form.referencias || '-');
+
+    let badgeColor = '#FFA500'; // Media
+    let criticidadBadgeText = `MEDIO (CVSS 4.0 - 6.9)`;
+    
+    if (criticidad.toLowerCase() === 'baja') {
+      badgeColor = '#4CAF50';
+      criticidadBadgeText = `BAJO (CVSS 0.1 - 3.9)`;
+    } else if (criticidad.toLowerCase() === 'alta') {
+      badgeColor = '#f44336';
+      criticidadBadgeText = `ALTO (CVSS 7.0 - 8.9)`;
+    } else if (criticidad.toLowerCase() === 'crítica' || criticidad.toLowerCase() === 'critica') {
+      badgeColor = '#b71c1c';
+      criticidadBadgeText = `CRÍTICO (CVSS 9.0 - 10.0)`;
+    }
+
+    const sectionTitleStyle = `color: ${headerColor}; margin-top: 20px; font-size: 16px; font-weight: bold; border-bottom: 2px solid ${labelColor}; padding-bottom: 5px;`;
+    const paragraphStyle = `color: #333; font-size: 14px; line-height: 1.6; white-space: pre-wrap;`;
+
+    let html = `<table cellpadding="0" cellspacing="0" width="${newsletterWidthPx}" style="border-collapse: collapse; width: ${newsletterWidthPx}px; max-width: 100%; font-family: Arial, sans-serif; border: 1px solid #ddd; background-color: #fcfcfc; margin: 0; mso-table-lspace: 0pt; mso-table-rspace: 0pt;">
+  <tr>
+    <td style="padding: 20px; background-color: ${headerColor}; color: white; text-align: center; border-bottom: 3px solid #2b2b2b;">
+      <h2 style="margin: 0; font-size: 24px;">Boletín de Seguridad</h2>
+      <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">Aviso importante preventivo</p>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 30px;">
+      <div style="margin-bottom: 25px;">
+        <h3 style="margin: 0 0 10px 0; font-size: 20px; color: #111;">${titulo}</h3>
+        <span style="display: inline-block; padding: 4px 10px; background-color: ${badgeColor}; color: white; border-radius: 4px; font-size: 12px; font-weight: bold;">CRITICIDAD: ${criticidadBadgeText}</span>
+      </div>
+
+      <h4 style="${sectionTitleStyle}">Resumen Ejecutivo</h4>
+      <div style="${paragraphStyle}">${resumen}</div>
+
+      <h4 style="${sectionTitleStyle}">Impacto</h4>
+      <div style="${paragraphStyle}">${impacto}</div>
+
+      <h4 style="${sectionTitleStyle}">Acciones Recomendadas / Mitigación</h4>
+      <div style="${paragraphStyle}">${recomendacion}</div>`;
+      
+    if (form.referencias && form.referencias.trim() !== '') {
+      html += `
+      <h4 style="${sectionTitleStyle}">Referencias</h4>
+      <div style="${paragraphStyle}">${referencias}</div>`;
+    }
+
+    const currentUser = this.authService.getCurrentUser();
+    const autor = this.escapeHtml(
+      currentUser?.fullName?.trim() || currentUser?.username || 'Bitácora SOC'
+    );
+
+    html += `
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 15px; text-align: center; background-color: #f1f1f1; color: #666; font-size: 12px; border-top: 1px solid #ddd;">
+      Generado por <strong>${autor}</strong>
+    </td>
   </tr>
 </table>`;
 
@@ -626,6 +732,9 @@ export class ReportGeneratorComponent implements OnInit {
       fecha: new Date(),
       criticidad: 'media',
       reputacionOrigen: 'Interna'
+    });
+    this.newsletterForm.reset({
+      criticidad: 'media'
     });
     this.uploadedImages = [];
     this.generatedHtml = '';

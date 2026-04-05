@@ -4,6 +4,29 @@
   margin: 0 auto;
 }
 
+.mode-selector-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.mode-selector {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  background-color: var(--surface-card);
+
+  ::ng-deep .mat-button-toggle-label-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 24px;
+    font-size: 14px;
+    font-weight: 500;
+  }
+}
+
 .full-width {
   width: 100%;
   margin-bottom: 16px;
