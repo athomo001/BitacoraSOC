@@ -29,7 +29,7 @@ const logoStorage = multer.diskStorage({
 
 const uploadLogo = multer({
   storage: logoStorage,
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
   fileFilter: (req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|webp|svg\+xml/;
     const mimeType = allowedTypes.test(file.mimetype);
@@ -635,9 +635,9 @@ router.post('/logo',
           const base64Data = parsed.base64Data;
           const buffer = Buffer.from(base64Data, 'base64');
 
-          // Validar tamaño (2MB máx)
-          if (buffer.length > 2 * 1024 * 1024) {
-            return res.status(400).json({ message: 'La imagen es muy grande (máx 2MB)' });
+          // Validar tamaño (5MB máx)
+          if (buffer.length > 5 * 1024 * 1024) {
+            return res.status(400).json({ message: 'La imagen es muy grande (máx 5MB)' });
           }
 
           const uploadDir = path.join(__dirname, '../../uploads/logos');

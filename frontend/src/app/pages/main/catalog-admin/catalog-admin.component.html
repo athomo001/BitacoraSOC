@@ -423,9 +423,12 @@
                       <button mat-icon-button color="primary" (click)="editOperationType(type)" matTooltip="Editar">
                         <mat-icon>edit</mat-icon>
                       </button>
+                      <button *ngIf="type.enabled" mat-icon-button color="accent" (click)="disableOperationType(type)" matTooltip="Deshabilitar">
+                        <mat-icon>block</mat-icon>
+                      </button>
                       <button mat-icon-button color="warn" (click)="deleteOperationType(type._id)"
-                        matTooltip="Deshabilitar">
-                        <mat-icon>delete</mat-icon>
+                        matTooltip="Eliminar Permanente">
+                        <mat-icon>delete_forever</mat-icon>
                       </button>
                     </td>
                   </tr>

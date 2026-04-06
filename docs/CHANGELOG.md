@@ -4,6 +4,22 @@ Registro de cambios relevantes del proyecto.
 
 ## [v1.5.26-beta] - 2026-04-05
 
+### Generador de Reportes y Comunicación (REP-GEN-019)
+
+#### Modo de Boletín de Seguridad
+- **Feature (Frontend):** Se integró un modo dual en `/main/report-generator` mediante un selector visual que permite alternar entre "Reporte Técnico" y "Boletín de Seguridad" sin necesidad de recargar la página.
+- **Flujo Simplificado:** El formulario del modo "Boletín" fue desacoplado de la dependencia obligatoria de *Log Source* y alertas por cliente, priorizando campos orientados a la comunicación ejecutiva y generalizada (Título, Criticidad, Resumen Ejecutivo, Impacto, Mitigación y Referencias).
+- **Escala CVSS Integrada:** Se reemplazó el menú genérico de "Nivel de Alerta" incorporando métricas estándar de CVSS (0.1 - 10.0), mapeadas a insignias de color (Verde, Naranja, Rojo y Granate) al exportarse al portapapeles.
+- **Firma Automática:** El sistema ahora captura dinámicamente el nombre o identificador del usuario en sesión activa, firmando automáticamente el boletín generado (`Generado por [Usuario]`) en reemplazo del genérico "Bitácora SOC".
+- **Branding Personalizado:** Se integró la extracción automática del logo corporativo configurado en el sistema para incrustarlo directamente en el Boletín de Seguridad. Al exportar el documento, la imagen se convierte dinámicamente a Base64 previniendo bloqueos de visibilidad en clientes de correo estricto (como Outlook), presentándose en un encabezado estructural que preserva el título y subtítulo centrados mientras mantiene el logo posicionado a la izquierda.
+
+### Administración y Catálogos
+
+#### Ajustes Operativos y Límites Globales (B48 / B49)
+- **Borrado Físico de Catálogos (B48):** Se ajustó la gestión de "Tipos de Operación" en `/main/admin/catalogs`. Además de la opción de desactivación lógica (baja), se habilitó un botón de eliminación física total (`findByIdAndDelete`), permitiendo a los administradores limpiar permanentemente registros configurados por error.
+- **Límites de Validación (B49):** Se incrementó la capacidad de subida de Logos de la plataforma de 2MB a 5MB (aplicado a buffers Multer y validación de strings Base64), otorgando tolerancia para imágenes institucionales de mayor tamaño o resolución desde el módulo de Branding.
+
+
 ### Rate limiting y operación de sesión
 
 #### Resolución de falsos positivos en login

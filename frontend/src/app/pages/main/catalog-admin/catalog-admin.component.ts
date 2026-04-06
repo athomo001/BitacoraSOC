@@ -641,9 +641,21 @@ export class CatalogAdminComponent implements OnInit {
   }
 
   deleteOperationType(id: string): void {
-    if (!confirm('¿Deshabilitar este tipo de operación?')) return;
+    if (!confirm('⚠️ ¿ELIMINAR PERMANENTEMENTE este tipo de operación? Esta acción no se puede deshacer.')) return;
 
     this.catalogService.deleteOperationType(id).subscribe({
+      next: () => {
+        this.snackBar.open('✅ Tipo de operación eliminado', 'Cerrar', { duration: 2000 });
+        this.loadOperationTypes();
+      },
+      error: () => this.snackBar.open('Error eliminando', 'Cerrar', { duration: 3000 })
+    });
+  }
+
+  disableOperationType(type: CatalogOperationType): void {
+    if (!confirm('¿Deshabilitar este tipo de operación?')) return;
+
+    this.catalogService.updateOperationType(type._id, { ...type, enabled: false }).subscribe({
       next: () => {
         this.snackBar.open('✅ Tipo de operación deshabilitado', 'Cerrar', { duration: 2000 });
         this.loadOperationTypes();

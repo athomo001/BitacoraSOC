@@ -270,15 +270,11 @@ router.put('/operation-types/:id', async (req, res) => {
 
 router.delete('/operation-types/:id', async (req, res) => {
   try {
-    const type = await CatalogOperationType.findByIdAndUpdate(
-      req.params.id,
-      { enabled: false },
-      { new: true }
-    );
+    const type = await CatalogOperationType.findByIdAndDelete(req.params.id);
     if (!type) {
       return res.status(404).json({ message: 'Tipo de operación no encontrado' });
     }
-    res.json({ message: 'Tipo de operación deshabilitado', type });
+    res.json({ message: 'Tipo de operación eliminado', type });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
