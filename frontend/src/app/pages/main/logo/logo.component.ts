@@ -191,8 +191,8 @@ export class LogoComponent implements OnInit {
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      this.snackBar.open('El archivo es muy grande (máx 2MB)', 'Cerrar', { duration: 3000 });
+    if (file.size > 5 * 1024 * 1024) {
+      this.snackBar.open('El archivo es muy grande (máx 5MB)', 'Cerrar', { duration: 3000 });
       return;
     }
 

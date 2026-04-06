@@ -21,6 +21,7 @@ import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatButtonToggleGroup, MatButtonToggle } from '@angular/material/button-toggle';
 import { MatIcon } from '@angular/material/icon';
 import { ClientAlertDialogComponent } from './client-alert-dialog.component';
+import { environment } from '@env/environment';
 
 @Component({
   selector: 'app-report-generator',
@@ -43,6 +44,8 @@ export class ReportGeneratorComponent implements OnInit {
   activeClientAlert: ClientAlertEvaluation | null = null;
   isEvaluatingClientAlert = false;
   reportTableHeaderColor = '#4CAF50';
+  logoBase64: string | null = null;
+  private backendBaseUrl = environment.backendBaseUrl;
   private readonly acknowledgedRuleIds = new Set<string>();
 
   constructor(
@@ -83,6 +86,43 @@ export class ReportGeneratorComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadReportTableColorConfig();
+    this.loadLogo();
+  }
+
+  private loadLogo(): void {
+    this.configService.getLogo().subscribe({
+      next: (res) => {
+        if (res.logoUrl) {
+          const url = this.getAssetUrl(res.logoUrl);
+          this.convertImageUrlToBase64(url).then(base64 => {
+             this.logoBase64 = base64;
+          }).catch(err => {
+             console.error('Error loading logo to base64', err);
+             this.logoBase64 = url;
+          });
+        }
+      },
+      error: () => {}
+    });
+  }
+
+  private getAssetUrl(url: string): string {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    return `${this.backendBaseUrl}${url}`;
+  }
+
+  private convertImageUrlToBase64(url: string): Promise<string> {
+    return fetch(url)
+      .then(response => response.blob())
+      .then(blob => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      }));
   }
 
   onEventSelected(event: any): void {
@@ -357,9 +397,19 @@ export class ReportGeneratorComponent implements OnInit {
 
     let html = `<table cellpadding="0" cellspacing="0" width="${newsletterWidthPx}" style="border-collapse: collapse; width: ${newsletterWidthPx}px; max-width: 100%; font-family: Arial, sans-serif; border: 1px solid #ddd; background-color: #fcfcfc; margin: 0; mso-table-lspace: 0pt; mso-table-rspace: 0pt;">
   <tr>
-    <td style="padding: 20px; background-color: ${headerColor}; color: white; text-align: center; border-bottom: 3px solid #2b2b2b;">
-      <h2 style="margin: 0; font-size: 24px;">Boletín de Seguridad</h2>
-      <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">Aviso importante preventivo</p>
+    <td style="padding: 20px; background-color: ${headerColor}; color: white; border-bottom: 3px solid #2b2b2b;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+          <td width="30%" valign="middle" align="left">
+            ${this.logoBase64 ? `<img src="${this.logoBase64}" height="48" style="height: 48px; max-height: 48px; width: auto; display: block;" alt="Logo">` : ''}
+          </td>
+          <td width="40%" valign="middle" align="center">
+            <h2 style="margin: 0; font-size: 24px; white-space: nowrap;">Boletín de Seguridad</h2>
+            <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9; white-space: nowrap;">Aviso importante preventivo</p>
+          </td>
+          <td width="30%"></td>
+        </tr>
+      </table>
     </td>
   </tr>
   <tr>
