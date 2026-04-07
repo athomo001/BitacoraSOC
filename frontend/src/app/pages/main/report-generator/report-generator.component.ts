@@ -354,6 +354,92 @@ export class ReportGeneratorComponent implements OnInit {
     });
   }
 
+  onNewsletterTextareaPaste(event: ClipboardEvent, controlName: 'resumenEjecutivo' | 'impacto' | 'recomendacion' | 'referencias'): void {
+    const clipboard = event.clipboardData;
+    if (!clipboard) return;
+
+    const html = clipboard.getData('text/html');
+    const plain = clipboard.getData('text/plain');
+    const normalized = this.normalizePastedNewsletterText(html, plain);
+    if (!normalized) return;
+
+    event.preventDefault();
+
+    const control = this.newsletterForm.get(controlName);
+    const target = event.target as HTMLTextAreaElement | null;
+    if (!control || !target) return;
+
+    const current = String(control.value || '');
+    const start = target.selectionStart ?? current.length;
+    const end = target.selectionEnd ?? current.length;
+    const next = `${current.slice(0, start)}${normalized}${current.slice(end)}`;
+
+    control.setValue(next);
+    control.markAsDirty();
+    control.markAsTouched();
+  }
+
+  private normalizePastedNewsletterText(html: string, plain: string): string {
+    const textFromHtml = this.extractTextFromClipboardHtml(html);
+    const base = textFromHtml || String(plain || '');
+
+    return base
+      .replace(/\u00a0/g, ' ')
+      .replace(/\r\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/[ \t]+\n/g, '\n')
+      .trim();
+  }
+
+  private extractTextFromClipboardHtml(html: string): string {
+    const raw = String(html || '').trim();
+    if (!raw) return '';
+
+    const doc = new DOMParser().parseFromString(raw, 'text/html');
+    const blocked = doc.querySelectorAll('script,style,noscript');
+    blocked.forEach(node => node.remove());
+
+    const walk = (node: Node): string => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        return node.textContent || '';
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) {
+        return '';
+      }
+
+      const element = node as HTMLElement;
+      const tag = element.tagName.toLowerCase();
+
+      if (tag === 'br') return '\n';
+
+      if (tag === 'tr') {
+        const cells = Array.from(element.querySelectorAll(':scope > th, :scope > td'))
+          .map(cell => walk(cell).replace(/\s+/g, ' ').trim())
+          .filter(Boolean);
+        return cells.length ? `${cells.join(' | ')}\n` : '';
+      }
+
+      let content = '';
+      element.childNodes.forEach(child => { content += walk(child); });
+
+      if (tag === 'li') {
+        const cleaned = content.replace(/\s+/g, ' ').trim();
+        return cleaned ? `• ${cleaned}\n` : '';
+      }
+
+      if (['p', 'div', 'section', 'article', 'blockquote', 'ul', 'ol', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tag)) {
+        const cleaned = content.trim();
+        return cleaned ? `${cleaned}\n\n` : '';
+      }
+
+      return content;
+    };
+
+    let output = '';
+    doc.body.childNodes.forEach(node => { output += walk(node); });
+    return output;
+  }
+
   private validateGeneratedNewsletterHtml(html: string): { ok: boolean; issues: string[] } {
     const raw = String(html || '');
     const issues: string[] = [];
