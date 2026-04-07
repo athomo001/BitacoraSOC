@@ -20,6 +20,7 @@ Registro de cambios relevantes del proyecto.
 #### Estilo y legibilidad del boletín
 - **Fix frontend (color):** Se reforzó color de títulos y párrafos en secciones del boletín con `#111111 !important` para evitar regresiones visuales (texto verde en clientes de correo).
 - **Branding frontend:** La carga de logo en el generador vuelve al flujo de conversión a PNG base64 controlado para email (no solo URL directa), preservando consistencia de render.
+- **Fix frontend (pegado enriquecido, `UI-NEWS-037`):** En `/main/report-generator` (modo Boletín) se intercepta el pegado `text/html` en `Resumen Ejecutivo`, `Impacto`, `Acciones Recomendadas` y `Referencias`, normalizando a texto legible con estructura (saltos, viñetas y filas tipo `col1 | col2`) para evitar contenido “achochlonado”.
 
 #### Observabilidad
 - **Logs de newsletter permanentes:** Las trazas de diagnóstico del flujo de boletín quedaron activas de forma fija en backend (`newsletterDebug`) para auditoría operativa sin depender de flag ENV.

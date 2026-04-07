@@ -1,5 +1,11 @@
 <div class="report-generator-container">
-  <mat-card #reportGuideCard *ngIf="reportGuideVisible" style="margin-bottom: 12px;">
+  <mat-card
+    #reportGuideCard
+    id="report-guide-card"
+    tabindex="-1"
+    [class.guide-card-focused]="reportGuideFocused"
+    *ngIf="reportGuideVisible"
+    style="margin-bottom: 12px;">
     <mat-card-content>
       <p><strong>Guía rápida Reportería:</strong> elige modo Reporte o Boletín, completa campos obligatorios, genera vista previa y luego copia o envía.</p>
       <div class="actions">
@@ -245,7 +251,8 @@
         <!-- Resumen Ejecutivo -->
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Resumen Ejecutivo *</mat-label>
-          <textarea matInput formControlName="resumenEjecutivo" rows="4" 
+          <textarea matInput formControlName="resumenEjecutivo" rows="4"
+                    (paste)="onNewsletterTextareaPaste($event, 'resumenEjecutivo')"
                     placeholder="Describe la amenaza en lenguaje simple y directo para los clientes"></textarea>
           <mat-error *ngIf="newsletterForm.get('resumenEjecutivo')?.hasError('required')">
             Campo obligatorio
@@ -255,7 +262,8 @@
         <!-- Impacto -->
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Impacto *</mat-label>
-          <textarea matInput formControlName="impacto" rows="3" 
+          <textarea matInput formControlName="impacto" rows="3"
+                    (paste)="onNewsletterTextareaPaste($event, 'impacto')"
                     placeholder="¿Qué ocurre si el cliente se ve afectado?"></textarea>
           <mat-error *ngIf="newsletterForm.get('impacto')?.hasError('required')">
             Campo obligatorio
@@ -265,7 +273,8 @@
         <!-- Acciones Recomendadas / Mitigación -->
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Acciones Recomendadas / Mitigación *</mat-label>
-          <textarea matInput formControlName="recomendacion" rows="4" 
+          <textarea matInput formControlName="recomendacion" rows="4"
+                    (paste)="onNewsletterTextareaPaste($event, 'recomendacion')"
                     placeholder="Pasos concretos a seguir o recomendaciones de seguridad"></textarea>
           <mat-error *ngIf="newsletterForm.get('recomendacion')?.hasError('required')">
             Campo obligatorio
@@ -275,7 +284,8 @@
         <!-- Enlaces de Referencia -->
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Enlaces de Referencia</mat-label>
-          <textarea matInput formControlName="referencias" rows="3" 
+          <textarea matInput formControlName="referencias" rows="3"
+                    (paste)="onNewsletterTextareaPaste($event, 'referencias')"
                     placeholder="Links a documentación oficial (uno por línea recomendado)"></textarea>
         </mat-form-field>
 
@@ -297,7 +307,7 @@
         <div class="preview-header">
           <h3>Vista previa</h3>
           <div class="preview-actions">
-            <button mat-button color="primary" (click)="openReportGuide()">
+            <button mat-button color="primary" type="button" (click)="openReportGuide()">
               <mat-icon>help_outline</mat-icon>
               Ver guía rápida
             </button>

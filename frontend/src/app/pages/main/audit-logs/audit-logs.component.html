@@ -1,5 +1,5 @@
 <div class="audit-logs-container">
-  <mat-card class="filter-card" *ngIf="auditGuideVisible">
+  <mat-card #auditGuideCard class="filter-card" *ngIf="auditGuideVisible">
     <mat-card-content>
       <p><strong>Guía rápida Auditoría:</strong> usa filtros para acotar eventos, luego exporta en CSV/JSON por cantidad, días, meses o todo.</p>
       <div class="filter-actions">

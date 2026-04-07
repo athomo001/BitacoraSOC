@@ -1,6 +1,6 @@
 <div class="checklist-container">
   <h1>Checklist del Turno</h1>
-  <mat-card class="status-card" *ngIf="checklistGuideVisible">
+  <mat-card #checklistGuideCard class="status-card" *ngIf="checklistGuideVisible">
     <mat-card-content>
       <p><strong>Guía rápida Checklist:</strong> selecciona tipo de check, evalúa todos los sub-items, agrega observación obligatoria en rojos y luego envía.</p>
       <div class="form-actions">

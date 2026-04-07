@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -38,6 +38,7 @@ import { AuditLog, AuditLogFilters } from '../../../models/audit-log.model';
   styleUrls: ['./audit-logs.component.scss']
 })
 export class AuditLogsComponent implements OnInit {
+  @ViewChild('auditGuideCard') auditGuideCard?: ElementRef<HTMLElement>;
   displayedColumns: string[] = ['timestamp', 'actor', 'level', 'username', 'reason'];
   logs: AuditLog[] = [];
   totalLogs = 0;
@@ -114,6 +115,10 @@ export class AuditLogsComponent implements OnInit {
 
   openAuditGuide(): void {
     this.auditGuideVisible = true;
+    setTimeout(() => {
+      const card = this.auditGuideCard?.nativeElement;
+      card?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
   }
 
   loadLogs(): void {

@@ -197,6 +197,28 @@ mat-card {
   margin-bottom: 16px;
 }
 
+#report-guide-card {
+  scroll-margin-top: 90px;
+}
+
+.guide-card-focused {
+  border: 2px solid #005fcc;
+  box-shadow: 0 0 0 4px rgba(0, 95, 204, 0.28);
+  animation: guide-pulse 1.2s ease-in-out 2;
+}
+
+@keyframes guide-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 95, 204, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(0, 95, 204, 0.18);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 95, 204, 0.06);
+  }
+}
+
 mat-card-header {
   margin-bottom: 24px;
 }
