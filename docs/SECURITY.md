@@ -264,6 +264,33 @@ exec(`mongodump -d ${dbName}`);
 // Input malicioso: "bitacora; rm -rf /"
 ```
 
+---
+
+## IA local para resumen de turno (estado: preparación)
+
+Esta sección documenta controles de seguridad acordados para `AI-SUMMARY-001` antes de activación productiva.
+
+### Alcance de seguridad
+
+- sin interacción conversacional con usuario final (no chat, no prompt libre en UI)
+- entrada limitada a eventos del turno ya existentes en backend
+- salida limitada a resumen sugerido para boletín/correo
+
+### Controles obligatorios para go-live
+
+1. **RBAC estricto:** endpoint IA solo para `admin`.
+2. **Ejecución efímera:** `start -> healthcheck -> generate -> stop` con `finally`.
+3. **Timeout duro + kill:** evitar procesos colgados.
+4. **Límite de recursos:** CPU/RAM acotados para runtime IA.
+5. **Sanitización:** tratar entradas de turno como no confiables (anti prompt-injection).
+6. **No fuga sensible:** no loguear prompt completo ni respuesta completa en texto crudo.
+7. **Auditoría técnica:** registrar `executionId`, `timingMs`, `status`, `deliveryStatus`, `errorCode`.
+
+### Política de despliegue
+
+- No habilitar endpoint IA en producción hasta cerrar sub-issues `AI-SUMMARY-001A` a `AI-SUMMARY-001G`.
+- Mantener fallback operativo manual (boletín sin IA) como camino principal de contingencia.
+
 **Solución (DESPUÉS):**
 ```javascript
 // ✅ SEGURO

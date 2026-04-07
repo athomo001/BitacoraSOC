@@ -84,6 +84,36 @@ flowchart TD
   E --> F[Envia correo SMTP]
 ```
 
+### Flujo de Boletín de Seguridad (actual)
+
+```mermaid
+sequenceDiagram
+  participant U as Usuario autenticado
+  participant FE as Report Generator (Angular)
+  participant API as /api/reports/newsletter/send
+  participant SMTP as Servidor SMTP
+
+  U->>FE: Completa formulario Boletín + Generar
+  FE->>FE: Precheck HTML (logo, color, secciones)
+  U->>FE: Enviar a destinatarios
+  FE->>API: POST newsletter/send (recipients[], subject, html)
+  API->>SMTP: Envío 1:1 por destinatario
+  API-->>FE: successCount/failCount + detalle
+```
+
+### Flujo objetivo IA local (planificado)
+
+```mermaid
+flowchart LR
+  T[Eventos del turno] --> B[Backend Orchestrator]
+  B --> O[Ollama local efímero]
+  O --> S[Resumen estructurado]
+  S --> N[Boletín/Correo]
+  B --> A[AuditLog técnico]
+```
+
+- Este flujo IA está en preparación documental (`AI-SUMMARY-001`) y aún no está habilitado en producción.
+
 ---
 
 ## 🔌 Flujo de Integraciones (SIEM + GLPI)

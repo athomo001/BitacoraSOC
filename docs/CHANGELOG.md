@@ -25,6 +25,15 @@ Registro de cambios relevantes del proyecto.
 #### Observabilidad
 - **Logs de newsletter permanentes:** Las trazas de diagnóstico del flujo de boletín quedaron activas de forma fija en backend (`newsletterDebug`) para auditoría operativa sin depender de flag ENV.
 
+#### Documentación y claridad operativa
+- **README actualizado:** Se añadió sección de novedades recientes (UX, boletines, seguridad y estado de IA local en preparación) para lectura rápida del estado real del producto.
+- **API actualizada:** Se incorporó `POST /api/reports/newsletter/send` en `docs/API.md` con notas de comportamiento 1:1 y diagnóstico de fallos parciales.
+- **Troubleshooting actualizado:** Se agregó guía específica para incidencias de pegado enriquecido en boletines (texto corrido/achochlonado), con pasos de verificación y recuperación.
+- **Runbook ampliado:** Se incorporó flujo operativo diario del Boletín de Seguridad, incluyendo checklist de uso y recomendaciones de contenido.
+- **Operations ampliado:** Se añadió validación funcional mínima del modo Boletín (preview, envío 1:1 y prueba de pegado enriquecido).
+- **Architecture ampliado:** Se agregó diagrama de flujo actual de envío de boletines y diagrama objetivo para IA local planificada (`AI-SUMMARY-001`).
+- **Security ampliado:** Se documentaron controles de seguridad requeridos para IA local en modo preparación (RBAC, ejecución efímera, timeout/kill, auditoría técnica y no fuga de datos).
+
 ### Cierre QA de issues reabiertos (2026-04-07)
 
 #### Auditoría / Exportación (`AUDIT-EXPORT-028`)

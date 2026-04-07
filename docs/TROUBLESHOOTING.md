@@ -153,6 +153,24 @@ docker compose up -d frontend
 
 Luego forzar recarga del navegador con `Ctrl+F5`.
 
+### En boletines, al pegar texto queda "achochlonado" (sin saltos/estructura)
+
+**Síntoma:** al pegar contenido desde web/PDF/Word en `Resumen Ejecutivo`, `Impacto` o `Mitigación`, aparece texto corrido o palabras pegadas.
+
+**Contexto:** el módulo de boletín ya incluye normalización de pegado enriquecido (`text/html`) para preservar estructura.
+
+**Acciones recomendadas (en orden):**
+
+1. Forzar recarga dura del frontend (`Ctrl+F5`) para asegurar el bundle más reciente.
+2. Pegar nuevamente en el campo objetivo (el parser intenta separar etiquetas y bloques semánticos).
+3. Si persiste solo con una fuente concreta, probar pegar primero en editor intermedio plano (Notepad) para aislar origen.
+4. Verificar versión desplegada en `docs/CHANGELOG.md` y reconstruir frontend si aplica:
+   ```bash
+   docker compose build frontend --no-cache
+   docker compose up -d frontend
+   ```
+5. Si el problema continúa, reportar ejemplo exacto de texto origen (sin datos sensibles) para ajustar heurísticas de parseo.
+
 ### Abrir directo `/uploads/complements/...` devuelve 401/403
 
 **Síntoma:** Un artefacto publicado parece “caído” si se abre directo por URL.
