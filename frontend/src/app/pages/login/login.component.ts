@@ -268,10 +268,27 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
         const backendMessage = typeof error?.error === 'string'
           ? error.error
           : error?.error?.message;
-        const errorMsg = backendMessage || 'ACCESO DENEGADO';
+        const errorMsg = this.buildLoginErrorGuidance(backendMessage || 'ACCESO DENEGADO');
         this.showErrorBanner(errorMsg);
       }
     });
+  }
+
+  private buildLoginErrorGuidance(message: string): string {
+    const raw = String(message || 'Acceso denegado');
+    const lowered = raw.toLowerCase();
+
+    if (lowered.includes('demasiadas peticiones') || lowered.includes('429')) {
+      return 'Acceso bloqueado temporalmente por límite de intentos. Espera unos minutos y vuelve a intentar.';
+    }
+    if (lowered.includes('invalid') || lowered.includes('credencial') || lowered.includes('usuario') || lowered.includes('password')) {
+      return 'Credenciales incorrectas. Verifica usuario/clave o solicita recuperación de contraseña.';
+    }
+    if (lowered.includes('https requerido') || lowered.includes('426')) {
+      return 'La sesión requiere HTTPS. Recarga la página con https:// y vuelve a iniciar sesión.';
+    }
+
+    return `${raw}. Siguiente paso: verifica conectividad y reintenta.`;
   }
 
   onRecoverySubmit(): void {

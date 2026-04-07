@@ -11,6 +11,9 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { AuthService } from '../../../services/auth.service';
+import { OnboardingService } from '../../../services/onboarding.service';
 import { AuditLogService } from '../../../services/audit-log.service';
 import { AuditLog, AuditLogFilters } from '../../../models/audit-log.model';
 
@@ -40,6 +43,19 @@ export class AuditLogsComponent implements OnInit {
   totalLogs = 0;
   pageSize = 20;
   currentPage = 1;
+  exporting = false;
+  exportModes = [
+    { value: 'filters', label: 'Filtros actuales (incluye fechas)' },
+    { value: 'max', label: 'Por cantidad (N registros)' },
+    { value: 'days', label: 'Últimos días (N días)' },
+    { value: 'months', label: 'Últimos meses (N meses)' },
+    { value: 'all', label: 'Todos (máximo permitido)' }
+  ];
+  exportFormats = [
+    { value: 'csv', label: 'CSV' },
+    { value: 'json', label: 'JSON' }
+  ];
+  auditGuideVisible = false;
 
   filterForm: FormGroup;
   events: string[] = [];
@@ -52,7 +68,10 @@ export class AuditLogsComponent implements OnInit {
 
   constructor(
     private auditLogService: AuditLogService,
-    private fb: FormBuilder
+    private fb: FormBuilder,
+    private snackBar: MatSnackBar,
+    private authService: AuthService,
+    private onboardingService: OnboardingService
   ) {
     this.filterForm = this.fb.group({
       search: [''],
@@ -61,7 +80,10 @@ export class AuditLogsComponent implements OnInit {
       event: [''],
       level: [''],
       startDate: [''],
-      endDate: ['']
+      endDate: [''],
+      exportMode: ['filters'],
+      exportValue: [1000],
+      exportFormat: ['csv']
     });
   }
 
@@ -76,8 +98,22 @@ export class AuditLogsComponent implements OnInit {
   ];
 
   ngOnInit(): void {
+    const username = this.authService.getCurrentUser()?.username;
+    this.auditGuideVisible = this.onboardingService.shouldShow('audit-logs', username);
     this.loadLogs();
     this.loadEvents();
+  }
+
+  closeAuditGuide(dontShowAgain = false): void {
+    const username = this.authService.getCurrentUser()?.username;
+    if (dontShowAgain) {
+      this.onboardingService.hide('audit-logs', username);
+    }
+    this.auditGuideVisible = false;
+  }
+
+  openAuditGuide(): void {
+    this.auditGuideVisible = true;
   }
 
   loadLogs(): void {
@@ -101,6 +137,7 @@ export class AuditLogsComponent implements OnInit {
       },
       error: (error) => {
         console.error('Error loading audit logs:', error);
+        this.snackBar.open('No se pudieron cargar los logs. Revisa filtros o estado de API.', 'Cerrar', { duration: 4500 });
       }
     });
   }
@@ -122,9 +159,106 @@ export class AuditLogsComponent implements OnInit {
   }
 
   onClearFilters(): void {
-    this.filterForm.reset();
+    this.filterForm.reset({
+      exportMode: 'filters',
+      exportValue: 1000,
+      exportFormat: 'csv'
+    });
     this.currentPage = 1;
     this.loadLogs();
+  }
+
+  onExport(): void {
+    if (this.exporting) return;
+
+    const raw = this.filterForm.value;
+    const exportMode = raw.exportMode || 'max';
+    const exportFormat = raw.exportFormat === 'json' ? 'json' : 'csv';
+    const exportValue = Number(raw.exportValue);
+    const needsValue = exportMode === 'max' || exportMode === 'days' || exportMode === 'months';
+
+    if (needsValue && (!Number.isFinite(exportValue) || exportValue <= 0)) {
+      console.error('Export inválido: valor numérico requerido');
+      this.snackBar.open(
+        'Valor inválido para exportación. Ingresa un número mayor a 0.',
+        'Cerrar',
+        { duration: 4000 }
+      );
+      return;
+    }
+
+    const filters: AuditLogFilters = {
+      category: raw.category || undefined,
+      sourceSlug: raw.sourceSlug || undefined,
+      event: raw.event || undefined,
+      level: raw.level || undefined,
+      startDate: raw.startDate || undefined,
+      endDate: raw.endDate || undefined,
+      search: raw.search || undefined
+    };
+
+    this.exporting = true;
+    this.auditLogService.exportAuditLogs(filters, {
+      format: exportFormat,
+      mode: exportMode,
+      exportValue: needsValue ? exportValue : undefined
+    }).subscribe({
+      next: (response) => {
+        const blob = response.body;
+        if (!blob) {
+          this.exporting = false;
+          return;
+        }
+        const disposition = response.headers.get('content-disposition') || '';
+        const match = disposition.match(/filename="?([^"]+)"?/i);
+        const fileName = match?.[1] || `audit-logs.${exportFormat}`;
+        const url = window.URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = fileName;
+        anchor.click();
+        window.URL.revokeObjectURL(url);
+        this.exporting = false;
+      },
+      error: (error) => {
+        this.exporting = false;
+        console.error('Error exportando logs de auditoría:', error);
+        const raw = String(error?.error?.message || error?.message || 'error desconocido');
+        this.snackBar.open(
+          `Error exportando logs (${raw}). Siguiente paso: ajusta filtros o reintenta.`,
+          'Cerrar',
+          { duration: 7000 }
+        );
+      }
+    });
+  }
+
+  shouldShowExportValue(): boolean {
+    const mode = this.filterForm.get('exportMode')?.value;
+    return mode === 'max' || mode === 'days' || mode === 'months';
+  }
+
+  getExportValueLabel(): string {
+    const mode = this.filterForm.get('exportMode')?.value;
+    if (mode === 'days') return 'Cantidad de días';
+    if (mode === 'months') return 'Cantidad de meses';
+    return 'Cantidad de registros';
+  }
+
+  getExportValueHint(): string {
+    const mode = this.filterForm.get('exportMode')?.value;
+    if (mode === 'days') return 'Ejemplo: 2, 7, 15, 30.';
+    if (mode === 'months') return 'Ejemplo: 1, 3, 6, 12.';
+    return 'Ejemplo: 500, 1000, 5000.';
+  }
+
+  getExportModeHint(): string {
+    const mode = this.filterForm.get('exportMode')?.value;
+    if (mode === 'months') return 'Ejemplo: 3 = últimos 3 meses desde hoy.';
+    if (mode === 'days') return 'Ejemplo: 7 = últimos 7 días desde hoy.';
+    if (mode === 'max') return 'Exporta hasta N registros recientes.';
+    if (mode === 'filters') return 'Usa los filtros actuales (buscar, categoría, evento, nivel y fechas).';
+    return 'Exporta todos los registros hasta el máximo permitido por seguridad.';
   }
 
   onPageChange(event: PageEvent): void {
@@ -406,12 +540,15 @@ export class AuditLogsComponent implements OnInit {
       const triggerContext = meta['triggerContext'] ? ` | origen:${meta['triggerContext']}` : '';
       const smtpConfigId = meta['smtpConfigId'] ? ` | smtp:${String(meta['smtpConfigId']).slice(0, 8)}...` : '';
       const failureCategory = meta['failureCategory'] ? ` | causa:${meta['failureCategory']}` : '';
+      const retryText = meta['retryAttempt']
+        ? ` | reintento:${Number(meta['retryCount'] || 1)}`
+        : '';
       const noise = (meta['noiseControl'] as any) || null;
       const noiseText = noise && Number(noise.suppressedInWindow || 0) > 0
         ? ` | repetidos:${noise.suppressedInWindow}`
         : '';
 
-      return `${status} [${String(category).toUpperCase()}] Para: ${recipientsPreview} (${recipientsCount})${subject}${sourceModule}${triggerType}${triggerContext}${smtpConfigId}${failureCategory}${noiseText}`;
+      return `${status} [${String(category).toUpperCase()}] Para: ${recipientsPreview} (${recipientsCount})${subject}${sourceModule}${triggerType}${triggerContext}${smtpConfigId}${failureCategory}${retryText}${noiseText}`;
     }
 
     // ====== INTEGRACIÓN (GLPI, LOG FORWARDING) ======
@@ -419,7 +556,10 @@ export class AuditLogsComponent implements OnInit {
       const status = result.success ? '✅' : '❌';
       const target = meta['target'] || meta['endpoint'] || 'servicio externo';
       const detail = meta['detail'] || meta['message'] || result.reason || '';
-      return `${status} [INTEGRACIÓN] → ${target} ${detail ? '| ' + detail : ''}`;
+      const retryText = meta['retryAttempt']
+        ? ` | reintento:${Number(meta['retryCount'] || 1)}`
+        : '';
+      return `${status} [INTEGRACIÓN] → ${target} ${detail ? '| ' + detail : ''}${retryText}`;
     }
 
     // ====== AUTENTICACIÓN - LOGIN ======

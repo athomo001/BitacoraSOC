@@ -247,8 +247,9 @@ async function createTransporter(configOverride = null) {
  * @param {string} [options.text] - Contenido en texto plano
  * @param {string} [options.html] - Contenido en HTML
  * @param {string} [options.from] - Remitente (opcional, usa config por defecto)
+ * @param {Array<Object>} [options.attachments] - Adjuntos nodemailer (p. ej. { filename, content, cid } para img inline)
  */
-async function sendEmail({ to, subject, text, html, from, auditContext = {} }) {
+async function sendEmail({ to, subject, text, html, from, attachments, auditContext = {} }) {
   const recipients = normalizeRecipients(to);
   const resolvedRecipientsPreview = recipients.map(maskEmail).slice(0, 5);
   const context = normalizeAuditContext({
@@ -282,12 +283,18 @@ async function sendEmail({ to, subject, text, html, from, auditContext = {} }) {
       html
     };
 
-    logger.info('📧 [sendEmail] Sending mail...', { 
-      from: mailOptions.from, 
-      to: mailOptions.to, 
+    if (Array.isArray(attachments) && attachments.length > 0) {
+      mailOptions.attachments = attachments;
+    }
+
+    logger.info('📧 [sendEmail] Sending mail...', {
+      from: mailOptions.from,
+      to: mailOptions.to,
       subject,
       hasHTML: !!html,
-      htmlLength: html?.length || 0
+      htmlLength: html?.length || 0,
+      hasText: !!text,
+      attachmentCount: Array.isArray(attachments) ? attachments.length : 0
     });
 
     const info = await transporter.sendMail(mailOptions);

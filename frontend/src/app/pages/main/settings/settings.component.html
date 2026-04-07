@@ -1,6 +1,14 @@
 <div class="settings-container">
   <h1>Configuracion</h1>
 
+  <div class="onboarding-card" *ngIf="smtpGuideVisible">
+    <p><strong>Guía rápida SMTP:</strong> 1) Completa host/puerto/usuario/remitente. 2) Prueba conexión. 3) Guarda configuración. Si ya existe clave guardada, puedes dejar contraseña vacía.</p>
+    <div class="button-group">
+      <button mat-button type="button" (click)="closeSmtpGuide(false)">Cerrar</button>
+      <button mat-stroked-button color="primary" type="button" (click)="closeSmtpGuide(true)">No volver a mostrar</button>
+    </div>
+  </div>
+
   <mat-card class="config-card" id="general-config">
     <mat-card-header>
       <mat-card-title>Configuración General</mat-card-title>
@@ -58,6 +66,7 @@
           <mat-form-field appearance="outline">
             <mat-label>Contraseña</mat-label>
             <input matInput type="password" formControlName="password">
+            <mat-hint>Si ya está configurado, puedes dejarla vacía para reutilizar la guardada.</mat-hint>
           </mat-form-field>
 
           <mat-form-field appearance="outline">
@@ -84,6 +93,7 @@
         </mat-checkbox>
 
         <div class="button-group">
+          <button mat-button type="button" (click)="openSmtpGuide()">Ver guía rápida</button>
           <button mat-raised-button color="accent" type="button" (click)="testSmtp()" [disabled]="testing">
             <mat-spinner *ngIf="testing" diameter="18"></mat-spinner>
             <span *ngIf="!testing">Probar conexion</span>
@@ -92,6 +102,16 @@
           <button mat-raised-button color="primary" type="submit" [disabled]="!smtpTestPassed || savingSmtp">
             <mat-spinner *ngIf="savingSmtp" diameter="18"></mat-spinner>
             <span *ngIf="!savingSmtp">Guardar SMTP</span>
+          </button>
+        </div>
+
+        <div class="integration-error-panel" *ngIf="smtpLastError">
+          <p><strong>Error:</strong> {{ smtpLastError.code }}</p>
+          <p><strong>Causa probable:</strong> {{ smtpLastError.probableCause }}</p>
+          <p><strong>Siguiente paso:</strong> {{ smtpLastError.suggestedAction }}</p>
+          <p class="raw-detail" *ngIf="smtpLastError.rawMessage"><strong>Detalle técnico:</strong> {{ smtpLastError.rawMessage }}</p>
+          <button mat-stroked-button color="primary" type="button" (click)="retrySmtpTest()" [disabled]="testing">
+            Reintentar prueba SMTP
           </button>
         </div>
       </form>

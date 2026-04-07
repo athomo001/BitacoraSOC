@@ -81,6 +81,16 @@
             {{ testing ? 'Probando...' : 'Probar Conexión' }}
           </button>
         </div>
+
+        <div class="integration-error-panel" *ngIf="lastGlpiError">
+          <p><strong>Error:</strong> {{ lastGlpiError.code }}</p>
+          <p><strong>Causa probable:</strong> {{ lastGlpiError.probableCause }}</p>
+          <p><strong>Siguiente paso:</strong> {{ lastGlpiError.suggestedAction }}</p>
+          <p class="muted" *ngIf="lastGlpiError.rawMessage"><strong>Detalle técnico:</strong> {{ lastGlpiError.rawMessage }}</p>
+          <button mat-stroked-button color="primary" type="button" (click)="retryGlpiTest()" [disabled]="testing || loading">
+            Reintentar conexión GLPI
+          </button>
+        </div>
       </form>
     </mat-card-content>
   </mat-card>

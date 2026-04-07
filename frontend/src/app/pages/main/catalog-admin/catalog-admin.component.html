@@ -440,17 +440,21 @@
 
         <mat-card class="form-card compact-color-card">
           <mat-card-header>
-            <mat-card-title>Color del reporte copiable a correo</mat-card-title>
+            <mat-card-title>Colores de Reportería</mat-card-title>
           </mat-card-header>
           <mat-card-content>
+            <p class="report-color-legend">
+              Esta configuración aplica a la creación de reportes y boletines de seguridad.
+            </p>
+
             <div class="report-color-config-row">
               <mat-form-field appearance="outline" class="report-color-select">
                 <mat-label>Color</mat-label>
                 <mat-select [(value)]="reportColorMode" (selectionChange)="onReportColorModeChange()">
-                  <mat-option value="green">Verde (actual)</mat-option>
-                  <mat-option value="sky">Celeste</mat-option>
-                  <mat-option value="light-red">Rojo claro</mat-option>
-                  <mat-option value="custom">Custom</mat-option>
+                  <mat-option value="green">{{ getModeOptionLabel('green') }}</mat-option>
+                  <mat-option value="sky">{{ getModeOptionLabel('sky') }}</mat-option>
+                  <mat-option value="light-red">{{ getModeOptionLabel('light-red') }}</mat-option>
+                  <mat-option value="custom">{{ getModeOptionLabel('custom') }}</mat-option>
                 </mat-select>
               </mat-form-field>
 
@@ -461,13 +465,30 @@
               </button>
             </div>
 
-            <div *ngIf="reportColorMode === 'custom'" class="custom-color-table" role="grid"
+            <div class="report-color-config-row">
+              <mat-form-field appearance="outline" class="report-color-select">
+                <mat-label>Código HEX</mat-label>
+                <input matInput [value]="customReportColorInput" (input)="onCustomColorInputChange($any($event.target).value)"
+                  placeholder="#1A1C1E">
+              </mat-form-field>
+
+              <label class="native-color-picker">
+                <span>Selector dinámico</span>
+                <input type="color" [value]="getCurrentReportColor()" (input)="selectCustomReportColor($any($event.target).value)">
+              </label>
+
+              <span class="current-color-chip">
+                Actual: <strong>{{ getCurrentReportColor() }}</strong>
+              </span>
+            </div>
+
+            <div class="custom-color-table" role="grid"
               aria-label="Tabla de colores personalizados">
               <button
                 type="button"
                 *ngFor="let color of customColorPalette"
                 class="color-swatch"
-                [class.selected]="selectedCustomReportColor.toUpperCase() === color.toUpperCase()"
+                [class.selected]="getCurrentReportColor().toUpperCase() === color.toUpperCase()"
                 [style.backgroundColor]="color"
                 (click)="selectCustomReportColor(color)">
               </button>

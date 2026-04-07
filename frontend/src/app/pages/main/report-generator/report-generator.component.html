@@ -1,4 +1,14 @@
 <div class="report-generator-container">
+  <mat-card #reportGuideCard *ngIf="reportGuideVisible" style="margin-bottom: 12px;">
+    <mat-card-content>
+      <p><strong>Guía rápida Reportería:</strong> elige modo Reporte o Boletín, completa campos obligatorios, genera vista previa y luego copia o envía.</p>
+      <div class="actions">
+        <button mat-button type="button" (click)="closeReportGuide(false)">Cerrar</button>
+        <button mat-stroked-button color="primary" type="button" (click)="closeReportGuide(true)">No volver a mostrar</button>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
   <mat-card>
     <mat-card-header>
       <mat-card-title>Generador de Reportes SOC</mat-card-title>
@@ -17,6 +27,10 @@
             Boletín de Seguridad
           </mat-button-toggle>
         </mat-button-toggle-group>
+        <button mat-button color="primary" type="button" (click)="openReportGuide()">
+          <mat-icon>help_outline</mat-icon>
+          Ver guía rápida
+        </button>
       </div>
 
       <!-- MODO REPORTE -->
@@ -283,6 +297,10 @@
         <div class="preview-header">
           <h3>Vista previa</h3>
           <div class="preview-actions">
+            <button mat-button color="primary" (click)="openReportGuide()">
+              <mat-icon>help_outline</mat-icon>
+              Ver guía rápida
+            </button>
             <button mat-raised-button color="accent" (click)="copyToClipboard()">
               <mat-icon>content_copy</mat-icon>
               {{ currentMode === 'report' ? 'Copiar reporte' : 'Copiar boletín' }}
@@ -290,6 +308,25 @@
             <button *ngIf="currentMode === 'report'" mat-stroked-button color="primary" (click)="copyMarkdown()">
               <mat-icon>code</mat-icon>
               Copiar Markdown
+            </button>
+          </div>
+        </div>
+
+        <!-- NEW: Panel para enviar correos directos -->
+        <div *ngIf="currentMode === 'newsletter'" class="newsletter-send-container" style="margin-bottom: 20px; padding: 15px; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee;">
+          <h4 style="margin-top: 0; color: #333;"><mat-icon style="vertical-align: middle; font-size: 20px; margin-right: 5px;">email</mat-icon> Enviar por Correo Electrónico</h4>
+          <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Se enviará un correo individual a cada destinatario utilizando el Servidor SMTP configurado en el sistema.</p>
+          
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Destinatarios (separados por coma)</mat-label>
+            <textarea matInput [(ngModel)]="newsletterRecipients" rows="2" placeholder="ejemplo1@cliente.com, ejemplo2@cliente.com"></textarea>
+          </mat-form-field>
+
+          <div style="text-align: right;">
+            <button mat-raised-button color="primary" [disabled]="!newsletterRecipients || isSendingNewsletter" (click)="sendNewsletter()">
+              <mat-icon *ngIf="!isSendingNewsletter">send</mat-icon>
+              <mat-icon *ngIf="isSendingNewsletter">hourglass_empty</mat-icon>
+              {{ isSendingNewsletter ? 'Enviando...' : 'Enviar Boletines (1:1)' }}
             </button>
           </div>
         </div>

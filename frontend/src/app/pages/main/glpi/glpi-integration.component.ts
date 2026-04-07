@@ -59,6 +59,8 @@ export class GlpiIntegrationComponent implements OnInit {
   lastDispatchMode = 'unknown';
   lastDispatchEvent = '';
   lastDispatchChannel = 'none';
+  lastGlpiError: { code: string; probableCause: string; suggestedAction: string; rawMessage?: string } | null = null;
+  glpiRetryCount = 0;
 
   constructor(
     private fb: FormBuilder,
@@ -201,24 +203,94 @@ export class GlpiIntegrationComponent implements OnInit {
   }
 
   testConnection(): void {
+    this.runConnectionTest(false);
+  }
+
+  private runConnectionTest(isRetry: boolean): void {
     if (!this.form.value.enabled) {
       this.snackBar.open('Habilita GLPI antes de probar conexión', 'Cerrar', { duration: 3000 });
       return;
     }
 
+    if (isRetry) {
+      this.glpiRetryCount += 1;
+    } else {
+      this.glpiRetryCount = 0;
+    }
+
+    const payload = isRetry
+      ? { retryAttempt: true, retryCount: this.glpiRetryCount }
+      : {};
+
     this.testing = true;
-    this.http.post<any>(`${environment.apiUrl}/glpi/test`, {}).subscribe({
+    this.http.post<any>(`${environment.apiUrl}/glpi/test`, payload).subscribe({
       next: (response) => {
         this.testing = false;
+        this.lastGlpiError = null;
+        this.glpiRetryCount = 0;
         this.snackBar.open(response?.message || 'Prueba GLPI OK', 'Cerrar', { duration: 3000 });
         this.loadConfig();
       },
       error: (err) => {
         this.testing = false;
+        this.lastGlpiError = this.buildGlpiDiagnostic(err);
         const message = err?.error?.error || err?.error?.message || 'Prueba GLPI fallida';
-        this.snackBar.open(message, 'Cerrar', { duration: 4500 });
+        this.snackBar.open(
+          `${message}. ${this.lastGlpiError.suggestedAction}`,
+          'Cerrar',
+          { duration: 6500 }
+        );
         this.loadConfig();
       }
     });
+  }
+
+  retryGlpiTest(): void {
+    this.runConnectionTest(true);
+  }
+
+  private buildGlpiDiagnostic(err: any): { code: string; probableCause: string; suggestedAction: string; rawMessage?: string } {
+    const rawMessage = String(err?.error?.error || err?.error?.message || err?.message || 'error desconocido');
+    const lowered = rawMessage.toLowerCase();
+
+    if (lowered.includes('401') || lowered.includes('403') || lowered.includes('token') || lowered.includes('auth')) {
+      return {
+        code: 'GLPI_AUTH',
+        probableCause: 'App-Token/User Token inválidos o sin permisos',
+        suggestedAction: 'Verifica tokens GLPI y vuelve a probar.',
+        rawMessage
+      };
+    }
+    if (lowered.includes('timeout') || lowered.includes('etimedout')) {
+      return {
+        code: 'GLPI_TIMEOUT',
+        probableCause: 'Timeout al conectar con GLPI',
+        suggestedAction: 'Revisa conectividad o incrementa timeout.',
+        rawMessage
+      };
+    }
+    if (lowered.includes('certificate') || lowered.includes('self signed') || lowered.includes('tls')) {
+      return {
+        code: 'GLPI_TLS',
+        probableCause: 'Problema TLS/certificado con GLPI',
+        suggestedAction: 'Revisa verificación TLS y certificados.',
+        rawMessage
+      };
+    }
+    if (lowered.includes('enotfound') || lowered.includes('econnrefused') || lowered.includes('invalid url')) {
+      return {
+        code: 'GLPI_ENDPOINT',
+        probableCause: 'URL base GLPI inválida o no alcanzable',
+        suggestedAction: 'Confirma la URL y acceso desde backend.',
+        rawMessage
+      };
+    }
+
+    return {
+      code: 'GLPI_UNKNOWN',
+      probableCause: 'Fallo no categorizado en integración GLPI',
+      suggestedAction: 'Reintenta y revisa auditoría de integraciones.',
+      rawMessage
+    };
   }
 }

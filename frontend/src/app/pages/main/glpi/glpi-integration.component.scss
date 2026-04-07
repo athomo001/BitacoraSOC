@@ -56,3 +56,17 @@
 .muted {
   color: var(--text-secondary);
 }
+
+.integration-error-panel {
+  border: 1px solid var(--state-warning);
+  background: var(--state-warning-bg);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.integration-error-panel p {
+  margin: 0;
+}

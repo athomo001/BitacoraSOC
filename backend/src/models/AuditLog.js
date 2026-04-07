@@ -139,7 +139,8 @@ auditLogSchema.index({ source: 1, sourceId: 1, timestamp: -1 });
  *   - Solo hay UN índice en timestamp (este TTL)
  *   - Los índices compuestos arriba NO cuentan como duplicado
  */
-const TTL_DAYS = parseInt(process.env.AUDIT_TTL_DAYS) || 90;
+const ttlEnv = Number.parseInt(process.env.AUDIT_TTL_DAYS, 10);
+const TTL_DAYS = Number.isFinite(ttlEnv) && ttlEnv > 0 ? ttlEnv : 395; // ~13 meses
 auditLogSchema.index(
   { timestamp: 1 }, // Ascendente para TTL
   { expireAfterSeconds: TTL_DAYS * 24 * 60 * 60 }

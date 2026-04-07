@@ -1,14 +1,18 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
+
 import { CatalogService } from '../../../services/catalog.service';
 import { CatalogEvent, CatalogLogSource, CatalogOperationType } from '../../../models/catalog.model';
 import { EscalationService } from '../../../services/escalation.service';
 import { ClientAlertContext, ClientAlertEvaluation } from '../../../models/escalation.model';
 import { ConfigService } from '../../../services/config.service';
 import { AuthService } from '../../../services/auth.service';
+import { OnboardingService } from '../../../services/onboarding.service';
+
 import { MatCard, MatCardHeader, MatCardTitle, MatCardSubtitle, MatCardContent } from '@angular/material/card';
 import { EntityAutocompleteComponent } from '../../../components/entity-autocomplete/entity-autocomplete.component';
 import { NgIf, NgFor } from '@angular/common';
@@ -27,35 +31,66 @@ import { environment } from '@env/environment';
   selector: 'app-report-generator',
   templateUrl: './report-generator.component.html',
   styleUrls: ['./report-generator.component.scss'],
-  imports: [MatCard, MatCardHeader, MatCardTitle, MatCardSubtitle, MatCardContent, ReactiveFormsModule, FormsModule, EntityAutocompleteComponent, NgIf, MatFormField, MatLabel, MatInput, MatError, MatDatepickerInput, MatDatepickerToggle, MatSuffix, MatDatepicker, MatSelect, MatOption, MatButton, MatButtonToggleGroup, MatButtonToggle, MatIcon, NgFor, MatIconButton]
+  imports: [
+    MatCard, MatCardHeader, MatCardTitle, MatCardSubtitle, MatCardContent,
+    ReactiveFormsModule, FormsModule,
+    EntityAutocompleteComponent,
+    NgIf, NgFor,
+    MatFormField, MatLabel, MatInput, MatError, MatSuffix,
+    MatDatepickerInput, MatDatepickerToggle, MatDatepicker,
+    MatSelect, MatOption,
+    MatButton, MatIconButton,
+    MatButtonToggleGroup, MatButtonToggle,
+    MatIcon
+  ]
 })
 export class ReportGeneratorComponent implements OnInit {
+  @ViewChild('reportGuideCard') reportGuideCard?: ElementRef<HTMLElement>;
+
+  // ─── Mode ───────────────────────────────────────────────────────────────
   currentMode: 'report' | 'newsletter' = 'report';
+
+  // ─── Forms ──────────────────────────────────────────────────────────────
   reportForm: FormGroup;
   newsletterForm: FormGroup;
 
+  // ─── Catalog selections ──────────────────────────────────────────────────
   selectedEvent: CatalogEvent | null = null;
   selectedLogSource: CatalogLogSource | null = null;
   selectedOperationType: CatalogOperationType | null = null;
 
-  uploadedImages: { name: string, dataUrl: string, width: number, height: number }[] = [];
+  // ─── Report state ────────────────────────────────────────────────────────
+  uploadedImages: { name: string; dataUrl: string; width: number; height: number }[] = [];
   generatedHtml = '';
   showPreview = false;
+  reportTableHeaderColor = '#4CAF50';
+
+  // ─── Branding ────────────────────────────────────────────────────────────
+  logoBase64: string | null = null;
+
+  // ─── Newsletter email dispatch ────────────────────────────────────────────
+  newsletterRecipients = '';
+  isSendingNewsletter = false;
+
+  // ─── Client alert ────────────────────────────────────────────────────────
   activeClientAlert: ClientAlertEvaluation | null = null;
   isEvaluatingClientAlert = false;
-  reportTableHeaderColor = '#4CAF50';
-  logoBase64: string | null = null;
-  private backendBaseUrl = environment.backendBaseUrl;
   private readonly acknowledgedRuleIds = new Set<string>();
+
+  // ─── Config ──────────────────────────────────────────────────────────────
+  private readonly backendBaseUrl = environment.backendBaseUrl;
+  reportGuideVisible = false;
 
   constructor(
     private fb: FormBuilder,
+    private http: HttpClient,
     public catalogService: CatalogService,
     private configService: ConfigService,
     private snackBar: MatSnackBar,
     private escalationService: EscalationService,
     private dialog: MatDialog,
-    private authService: AuthService
+    private authService: AuthService,
+    private onboardingService: OnboardingService
   ) {
     this.reportForm = this.fb.group({
       tipoOperacion: ['', Validators.required],
@@ -84,22 +119,43 @@ export class ReportGeneratorComponent implements OnInit {
     });
   }
 
+  // ─── Lifecycle ───────────────────────────────────────────────────────────
   ngOnInit(): void {
     this.loadReportTableColorConfig();
     this.loadLogo();
+    const username = this.authService.getCurrentUser()?.username;
+    this.reportGuideVisible = this.onboardingService.shouldShow('report-generator', username);
   }
 
+  closeReportGuide(dontShowAgain = false): void {
+    const username = this.authService.getCurrentUser()?.username;
+    if (dontShowAgain) {
+      this.onboardingService.hide('report-generator', username);
+    }
+    this.reportGuideVisible = false;
+  }
+
+  openReportGuide(): void {
+    this.reportGuideVisible = true;
+    // Si el usuario está abajo en la página, llevarlo a la guía para evitar
+    // la percepción de "botón muerto".
+    setTimeout(() => {
+      this.reportGuideCard?.nativeElement?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }, 0);
+  }
+
+  // ─── Branding: load logo ─────────────────────────────────────────────────
   private loadLogo(): void {
     this.configService.getLogo().subscribe({
       next: (res) => {
         if (res.logoUrl) {
           const url = this.getAssetUrl(res.logoUrl);
-          this.convertImageUrlToBase64(url).then(base64 => {
-             this.logoBase64 = base64;
-          }).catch(err => {
-             console.error('Error loading logo to base64', err);
-             this.logoBase64 = url;
-          });
+          this.convertImageUrlToBase64(url, 256)
+            .then(base64 => { this.logoBase64 = base64; })
+            .catch(() => { this.logoBase64 = url; });
         }
       },
       error: () => {}
@@ -108,23 +164,37 @@ export class ReportGeneratorComponent implements OnInit {
 
   private getAssetUrl(url: string): string {
     if (!url) return '';
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return url;
-    }
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
     return `${this.backendBaseUrl}${url}`;
   }
 
-  private convertImageUrlToBase64(url: string): Promise<string> {
+  private convertImageUrlToBase64(url: string, maxHeight = 120): Promise<string> {
     return fetch(url)
-      .then(response => response.blob())
-      .then(blob => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
+      .then(r => r.blob())
+      .then(blob => new Promise<string>((resolve, reject) => {
+        const img = new Image();
+        const objUrl = URL.createObjectURL(blob);
+        img.onload = () => {
+          // Redimensionar proporcionalmente para mantener el peso del email razonable
+          const scale = img.naturalHeight > maxHeight ? maxHeight / img.naturalHeight : 1;
+          const w = Math.round(img.naturalWidth * scale);
+          const h = Math.round(img.naturalHeight * scale);
+
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d')!;
+          ctx.drawImage(img, 0, 0, w, h);
+
+          URL.revokeObjectURL(objUrl);
+          resolve(canvas.toDataURL('image/png'));
+        };
+        img.onerror = () => { URL.revokeObjectURL(objUrl); reject(new Error('No se pudo cargar el logo')); };
+        img.src = objUrl;
       }));
   }
 
+  // ─── Catalog autocomplete callbacks ──────────────────────────────────────
   onEventSelected(event: any): void {
     this.selectedEvent = event as CatalogEvent;
     if (event) {
@@ -137,18 +207,13 @@ export class ReportGeneratorComponent implements OnInit {
 
   onEventCleared(): void {
     this.selectedEvent = null;
-    this.reportForm.patchValue({
-      nombreEvento: '',
-      motivoEvento: ''
-    });
+    this.reportForm.patchValue({ nombreEvento: '', motivoEvento: '' });
   }
 
   onLogSourceSelected(source: any): void {
     this.selectedLogSource = source as CatalogLogSource;
     if (source) {
-      this.reportForm.patchValue({
-        logSource: source.name
-      });
+      this.reportForm.patchValue({ logSource: source.name });
       void this.refreshClientAlert('report', true);
     }
   }
@@ -171,12 +236,10 @@ export class ReportGeneratorComponent implements OnInit {
 
   onOperationTypeCleared(): void {
     this.selectedOperationType = null;
-    this.reportForm.patchValue({
-      tipoOperacion: '',
-      informacionAdicional: ''
-    });
+    this.reportForm.patchValue({ tipoOperacion: '', informacionAdicional: '' });
   }
 
+  // ─── Image upload ─────────────────────────────────────────────────────────
   onImageUpload(event: any): void {
     const files = event.target.files;
     if (!files) return;
@@ -186,28 +249,16 @@ export class ReportGeneratorComponent implements OnInit {
       const reader = new FileReader();
       reader.onload = (e: any) => {
         const dataUrl = String(e?.target?.result || '');
-        if (!dataUrl) {
-          return;
-        }
+        if (!dataUrl) return;
 
-        const imageProbe = new Image();
-        imageProbe.onload = () => {
-          this.uploadedImages.push({
-            name: file.name,
-            dataUrl,
-            width: imageProbe.naturalWidth || 0,
-            height: imageProbe.naturalHeight || 0
-          });
+        const img = new Image();
+        img.onload = () => {
+          this.uploadedImages.push({ name: file.name, dataUrl, width: img.naturalWidth || 0, height: img.naturalHeight || 0 });
         };
-        imageProbe.onerror = () => {
-          this.uploadedImages.push({
-            name: file.name,
-            dataUrl,
-            width: 0,
-            height: 0
-          });
+        img.onerror = () => {
+          this.uploadedImages.push({ name: file.name, dataUrl, width: 0, height: 0 });
         };
-        imageProbe.src = dataUrl;
+        img.src = dataUrl;
       };
       reader.readAsDataURL(file);
     }
@@ -217,6 +268,7 @@ export class ReportGeneratorComponent implements OnInit {
     this.uploadedImages.splice(index, 1);
   }
 
+  // ─── Generate ────────────────────────────────────────────────────────────
   async generateTable(): Promise<void> {
     if (this.currentMode === 'report') {
       if (this.reportForm.invalid) {
@@ -235,224 +287,90 @@ export class ReportGeneratorComponent implements OnInit {
     }
   }
 
-  private async buildReportHtml(): Promise<void> {
-    const canContinue = await this.ensureClientAlertAcknowledged('report');
-    if (!canContinue) {
+  // ─── Newsletter: send by email (1:1) ─────────────────────────────────────
+  sendNewsletter(): void {
+    if (!this.generatedHtml) {
+      this.snackBar.open('Primero genera el boletín', 'Cerrar', { duration: 3000 });
       return;
     }
 
-    const form = this.reportForm.value;
-    const fechaFormateada = this.escapeHtml(new Date(form.fecha).toLocaleDateString('es-CL'));
-    const reportWidthPx = 980;
-    const evidenceImageWidthPx = 420;
-    const headerColor = this.reportTableHeaderColor;
-    const labelColor = this.getSecondaryColor(headerColor);
+    const newsletterValidation = this.validateGeneratedNewsletterHtml(this.generatedHtml);
+    if (!newsletterValidation.ok) {
+      console.warn('[newsletter/send][precheck] validation_failed', newsletterValidation.issues);
+      this.snackBar.open(
+        `Boletín no válido para envío: ${newsletterValidation.issues[0] || 'revisa logo/colores.'}`,
+        'Cerrar',
+        { duration: 8000 }
+      );
+      return;
+    }
 
-    const tipoOperacion = this.escapeHtml(form.tipoOperacion);
-    const codigoInterno = this.escapeHtml(form.codigoInterno || '-');
-    const nombreEvento = this.escapeHtml(form.nombreEvento);
-    const motivoEvento = this.escapeHtml(form.motivoEvento);
-    const criticidad = this.escapeHtml(form.criticidad);
-    const origenConexion = this.escapeHtml(form.origenConexion || '-');
-    const logSource = this.escapeHtml(form.logSource);
-    const destino = this.escapeHtml(form.destino || '-');
-    const reputacionOrigen = this.escapeHtml(form.reputacionOrigen);
-    const observaciones = this.escapeHtml(form.observaciones);
-    const recomendacion = this.escapeHtml(form.recomendacion || '-');
-    const informacionAdicional = this.escapeHtml(form.informacionAdicional || '-');
+    const recipients = this.newsletterRecipients
+      .split(',')
+      .map(e => e.trim())
+      .filter(e => e.includes('@'));
 
-    const firstColumnWidthPx = 185;
-    const secondColumnWidthPx = reportWidthPx - firstColumnWidthPx;
-    const cellDetailStyle = `border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; width: ${secondColumnWidthPx}px;`;
-    const cellLabelStyle = `background-color: ${labelColor}; font-weight: bold; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; width: ${firstColumnWidthPx}px;`;
+    if (recipients.length === 0) {
+      this.snackBar.open('Ingresa al menos un correo electrónico válido', 'Cerrar', { duration: 3000 });
+      return;
+    }
 
-    let html = `<table cellpadding="6" cellspacing="0" width="${reportWidthPx}" style="border-collapse: collapse; width: ${reportWidthPx}px; max-width: 100%; font-family: Arial, sans-serif; border: 1px solid #2b2b2b; table-layout: fixed; margin: 0; mso-table-lspace: 0pt; mso-table-rspace: 0pt; clear: both;">
-  <colgroup>
-    <col width="${firstColumnWidthPx}" style="width: ${firstColumnWidthPx}px;">
-    <col width="${secondColumnWidthPx}" style="width: ${secondColumnWidthPx}px;">
-  </colgroup>
-  <tr>
-    <th colspan="2" style="background-color: ${headerColor}; color: white; text-align: center; font-size: 18px; border: 1px solid #2b2b2b;">Reporte de Detección</th>
-  </tr>
-  <tr>
-    <th width="${firstColumnWidthPx}" style="background-color: ${labelColor}; color: white; width: ${firstColumnWidthPx}px; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere;">Campo</th>
-    <th width="${secondColumnWidthPx}" style="background-color: ${labelColor}; color: white; width: ${secondColumnWidthPx}px; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere;">Detalle</th>
-  </tr>
-  <tr>
-    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Tipo de operación</td>
-    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">${tipoOperacion}</td>
-  </tr>
-  <tr>
-    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Ofensa/Código interno</td>
-    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">${codigoInterno}</td>
-  </tr>
-  <tr>
-    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Nombre de Ofensa/Evento</td>
-    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">${nombreEvento}</td>
-  </tr>
-  <tr>
-    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Motivo de la Ofensa/Evento</td>
-    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">${motivoEvento}</td>
-  </tr>
-  <tr>
-    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Fecha</td>
-    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">${fechaFormateada}</td>
-  </tr>
-  <tr>
-    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">MRSC (Criticidad)</td>
-    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">${criticidad}</td>
-  </tr>
-  <tr>
-    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Origen de conexión</td>
-    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">${origenConexion}</td>
-  </tr>
-  <tr>
-    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Fuente / Log Source</td>
-    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">${logSource}</td>
-  </tr>
-  <tr>
-    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Destino</td>
-    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">${destino}</td>
-  </tr>
-  <tr>
-    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Reputación de origen</td>
-    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">${reputacionOrigen}</td>
-  </tr>
-  <tr>
-    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Observaciones</td>
-    <td width="${secondColumnWidthPx}" style="white-space: pre-wrap; ${cellDetailStyle}">${observaciones}</td>
-  </tr>`;
+    this.isSendingNewsletter = true;
+    const subject = this.newsletterForm.value.tituloBoletin || 'Boletín de Seguridad';
 
-    const evidenciaTexto = this.escapeHtml((form.evidenciaTexto || '').trim());
-    const hasImages = this.uploadedImages.length > 0;
-    const hasTextEvidence = evidenciaTexto.length > 0;
-
-    if (hasImages || hasTextEvidence) {
-      html += `\n  <tr>\n    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Evidencia</td>\n    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">`;
-      if (hasTextEvidence) {
-        html += `<div style="white-space: pre-wrap; margin-bottom: ${hasImages ? '10px' : '0'};">${evidenciaTexto}</div>`;
+    this.http.post(`${this.backendBaseUrl}/api/reports/newsletter/send`, {
+      recipients,
+      subject,
+      html: this.generatedHtml
+    }).subscribe({
+      next: (res: any) => {
+        this.isSendingNewsletter = false;
+        const msg = res.failCount > 0
+          ? `Enviado a ${res.successCount} destinatarios (${res.failCount} fallidos)`
+          : `Boletín enviado a ${res.successCount} destinatario(s)`;
+        this.snackBar.open(msg, 'Cerrar', { duration: 5000 });
+        if (res.successCount > 0) this.newsletterRecipients = '';
+      },
+      error: (err) => {
+        this.isSendingNewsletter = false;
+        const detail = err?.error?.detail || err?.error?.message || 'Revisa la configuración SMTP en Admin.';
+        this.snackBar.open(`Error al enviar: ${detail}`, 'Cerrar', { duration: 8000 });
       }
-      if (hasImages) {
-        this.uploadedImages.forEach(img => {
-          const renderWidth = img.width > 0 ? Math.min(evidenceImageWidthPx, img.width) : evidenceImageWidthPx;
-          const renderHeight = img.width > 0 && img.height > 0
-            ? Math.max(1, Math.round((img.height * renderWidth) / img.width))
-            : 0;
-          const heightAttribute = renderHeight > 0 ? ` height="${renderHeight}"` : '';
+    });
+  }
 
-          html += `<a href="${img.dataUrl}" style="display: block; text-align: center; text-decoration: none;"><img src="${img.dataUrl}" width="${renderWidth}"${heightAttribute} style="width: ${renderWidth}px; max-width: 100%; height: auto; object-fit: contain; margin: 4px auto; display: block; border: 1px solid #ddd; image-rendering: auto;" alt="${this.escapeHtml(img.name || 'Evidencia')}"></a><br>`;
-        });
-      }
-      html += `</td>\n  </tr>`;
+  private validateGeneratedNewsletterHtml(html: string): { ok: boolean; issues: string[] } {
+    const raw = String(html || '');
+    const issues: string[] = [];
+
+    // 1) Debe existir logo con src no vacío/no placeholder.
+    const imgMatch = raw.match(/<img\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/i);
+    const src = imgMatch?.[1]?.trim() || '';
+    if (!src) {
+      issues.push('Logo ausente en encabezado.');
     } else {
-      html += `\n  <tr>\n    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Evidencia</td>\n    <td width="${secondColumnWidthPx}" style="${cellDetailStyle}">Se adjunta en el correo</td>\n  </tr>`;
+      const invalidSrc = /^(x|about:blank|#)$/i.test(src);
+      if (invalidSrc) issues.push('Logo inválido (src placeholder).');
+      if (/^data:image\//i.test(src) && src.length < 200) {
+        issues.push('Logo data URI demasiado corto, posible imagen corrupta.');
+      }
     }
 
-    html += `
-  <tr>
-    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Recomendación</td>
-    <td width="${secondColumnWidthPx}" style="white-space: pre-wrap; ${cellDetailStyle}">${recomendacion}</td>
-  </tr>
-  <tr>
-    <td width="${firstColumnWidthPx}" style="${cellLabelStyle}">Información adicional</td>
-    <td width="${secondColumnWidthPx}" style="white-space: pre-wrap; ${cellDetailStyle}">${informacionAdicional}</td>
-  </tr>
-</table>`;
+    // 2) Encabezado y secciones deben ir en negro (evita regresión visual).
+    if (!/Bolet[íi]n de Seguridad/i.test(raw)) {
+      issues.push('Título principal no detectado.');
+    }
+    if (!/color:\s*#111111/i.test(raw)) {
+      issues.push('No se detecta color negro explícito (#111111) en el HTML.');
+    }
+    if (!/Resumen Ejecutivo/i.test(raw) || !/Impacto/i.test(raw)) {
+      issues.push('Secciones obligatorias del boletín incompletas.');
+    }
 
-    this.generatedHtml = html;
-    this.showPreview = true;
+    return { ok: issues.length === 0, issues };
   }
 
-  private buildNewsletterHtml(): void {
-    const form = this.newsletterForm.value;
-    const headerColor = this.reportTableHeaderColor;
-    const labelColor = this.getSecondaryColor(headerColor);
-    
-    // Ancho un poco mas estrecho y amigable para emails
-    const newsletterWidthPx = 800;
-    
-    const titulo = this.escapeHtml(form.tituloBoletin);
-    const criticidad = this.escapeHtml(form.criticidad).toUpperCase();
-    const resumen = this.escapeHtml(form.resumenEjecutivo);
-    const impacto = this.escapeHtml(form.impacto);
-    const recomendacion = this.escapeHtml(form.recomendacion);
-    const referencias = this.escapeHtml(form.referencias || '-');
-
-    let badgeColor = '#FFA500'; // Media
-    let criticidadBadgeText = `MEDIO (CVSS 4.0 - 6.9)`;
-    
-    if (criticidad.toLowerCase() === 'baja') {
-      badgeColor = '#4CAF50';
-      criticidadBadgeText = `BAJO (CVSS 0.1 - 3.9)`;
-    } else if (criticidad.toLowerCase() === 'alta') {
-      badgeColor = '#f44336';
-      criticidadBadgeText = `ALTO (CVSS 7.0 - 8.9)`;
-    } else if (criticidad.toLowerCase() === 'crítica' || criticidad.toLowerCase() === 'critica') {
-      badgeColor = '#b71c1c';
-      criticidadBadgeText = `CRÍTICO (CVSS 9.0 - 10.0)`;
-    }
-
-    const sectionTitleStyle = `color: ${headerColor}; margin-top: 20px; font-size: 16px; font-weight: bold; border-bottom: 2px solid ${labelColor}; padding-bottom: 5px;`;
-    const paragraphStyle = `color: #333; font-size: 14px; line-height: 1.6; white-space: pre-wrap;`;
-
-    let html = `<table cellpadding="0" cellspacing="0" width="${newsletterWidthPx}" style="border-collapse: collapse; width: ${newsletterWidthPx}px; max-width: 100%; font-family: Arial, sans-serif; border: 1px solid #ddd; background-color: #fcfcfc; margin: 0; mso-table-lspace: 0pt; mso-table-rspace: 0pt;">
-  <tr>
-    <td style="padding: 20px; background-color: ${headerColor}; color: white; border-bottom: 3px solid #2b2b2b;">
-      <table cellpadding="0" cellspacing="0" border="0" width="100%">
-        <tr>
-          <td width="30%" valign="middle" align="left">
-            ${this.logoBase64 ? `<img src="${this.logoBase64}" height="48" style="height: 48px; max-height: 48px; width: auto; display: block;" alt="Logo">` : ''}
-          </td>
-          <td width="40%" valign="middle" align="center">
-            <h2 style="margin: 0; font-size: 24px; white-space: nowrap;">Boletín de Seguridad</h2>
-            <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9; white-space: nowrap;">Aviso importante preventivo</p>
-          </td>
-          <td width="30%"></td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-  <tr>
-    <td style="padding: 30px;">
-      <div style="margin-bottom: 25px;">
-        <h3 style="margin: 0 0 10px 0; font-size: 20px; color: #111;">${titulo}</h3>
-        <span style="display: inline-block; padding: 4px 10px; background-color: ${badgeColor}; color: white; border-radius: 4px; font-size: 12px; font-weight: bold;">CRITICIDAD: ${criticidadBadgeText}</span>
-      </div>
-
-      <h4 style="${sectionTitleStyle}">Resumen Ejecutivo</h4>
-      <div style="${paragraphStyle}">${resumen}</div>
-
-      <h4 style="${sectionTitleStyle}">Impacto</h4>
-      <div style="${paragraphStyle}">${impacto}</div>
-
-      <h4 style="${sectionTitleStyle}">Acciones Recomendadas / Mitigación</h4>
-      <div style="${paragraphStyle}">${recomendacion}</div>`;
-      
-    if (form.referencias && form.referencias.trim() !== '') {
-      html += `
-      <h4 style="${sectionTitleStyle}">Referencias</h4>
-      <div style="${paragraphStyle}">${referencias}</div>`;
-    }
-
-    const currentUser = this.authService.getCurrentUser();
-    const autor = this.escapeHtml(
-      currentUser?.fullName?.trim() || currentUser?.username || 'Bitácora SOC'
-    );
-
-    html += `
-    </td>
-  </tr>
-  <tr>
-    <td style="padding: 15px; text-align: center; background-color: #f1f1f1; color: #666; font-size: 12px; border-top: 1px solid #ddd;">
-      Generado por <strong>${autor}</strong>
-    </td>
-  </tr>
-</table>`;
-
-    this.generatedHtml = html;
-    this.showPreview = true;
-  }
-
+  // ─── Clipboard ───────────────────────────────────────────────────────────
   async copyToClipboard(): Promise<void> {
     if (!this.generatedHtml) {
       this.snackBar.open('Primero genera la tabla', 'Cerrar', { duration: 3000 });
@@ -460,29 +378,22 @@ export class ReportGeneratorComponent implements OnInit {
     }
 
     const canContinue = await this.ensureClientAlertAcknowledged('copy-report');
-    if (!canContinue) {
-      return;
-    }
+    if (!canContinue) return;
 
     const html = this.generatedHtml;
     const plainText = this.getPlainTextFromHtml(html);
     const clipboardItem = (window as any).ClipboardItem;
 
     if (navigator?.clipboard && clipboardItem && navigator.clipboard.write) {
-      const htmlBlob = new Blob([html], { type: 'text/html' });
-      const textBlob = new Blob([plainText], { type: 'text/plain' });
       const item = new clipboardItem({
-        'text/html': htmlBlob,
-        'text/plain': textBlob
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([plainText], { type: 'text/plain' })
       });
-
       try {
         await navigator.clipboard.write([item]);
         this.snackBar.open('✅ Tabla copiada con formato', 'Cerrar', { duration: 2000 });
         return;
-      } catch {
-        // Fallback a execCommand o texto plano
-      }
+      } catch { /* fallthrough */ }
     }
 
     if (this.copyHtmlWithExecCommand(html)) {
@@ -491,11 +402,9 @@ export class ReportGeneratorComponent implements OnInit {
     }
 
     if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(plainText).then(() => {
-        this.snackBar.open('Tabla copiada como texto', 'Cerrar', { duration: 2000 });
-      }).catch(() => {
-        this.snackBar.open('Error al copiar. Selecciona y copia manualmente.', 'Cerrar', { duration: 3000 });
-      });
+      navigator.clipboard.writeText(plainText)
+        .then(() => this.snackBar.open('Tabla copiada como texto', 'Cerrar', { duration: 2000 }))
+        .catch(() => this.snackBar.open('Error al copiar. Selecciona y copia manualmente.', 'Cerrar', { duration: 3000 }));
       return;
     }
 
@@ -514,17 +423,14 @@ export class ReportGeneratorComponent implements OnInit {
     }
 
     const canContinue = await this.ensureClientAlertAcknowledged('copy-report');
-    if (!canContinue) {
-      return;
-    }
+    if (!canContinue) return;
 
     const markdown = this.getMarkdownFromHtml(this.generatedHtml);
+
     if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(markdown).then(() => {
-        this.snackBar.open('✅ Markdown copiado', 'Cerrar', { duration: 2000 });
-      }).catch(() => {
-        this.snackBar.open('Error al copiar Markdown.', 'Cerrar', { duration: 3000 });
-      });
+      navigator.clipboard.writeText(markdown)
+        .then(() => this.snackBar.open('✅ Markdown copiado', 'Cerrar', { duration: 2000 }))
+        .catch(() => this.snackBar.open('Error al copiar Markdown.', 'Cerrar', { duration: 3000 }));
       return;
     }
 
@@ -536,119 +442,180 @@ export class ReportGeneratorComponent implements OnInit {
     this.snackBar.open('Error al copiar Markdown.', 'Cerrar', { duration: 3000 });
   }
 
-  private copyHtmlWithExecCommand(html: string): boolean {
-    const container = document.createElement('div');
-    container.innerHTML = html;
-    container.style.position = 'fixed';
-    container.style.left = '-9999px';
-    container.style.top = '0';
-    container.style.opacity = '0';
-    container.setAttribute('aria-hidden', 'true');
-    document.body.appendChild(container);
-
-    const range = document.createRange();
-    range.selectNodeContents(container);
-    const selection = window.getSelection();
-    if (!selection) {
-      document.body.removeChild(container);
-      return false;
-    }
-
-    selection.removeAllRanges();
-    selection.addRange(range);
-
-    let copied = false;
-    try {
-      copied = document.execCommand('copy');
-    } catch {
-      copied = false;
-    }
-
-    selection.removeAllRanges();
-    document.body.removeChild(container);
-    return copied;
+  // ─── Clear form ───────────────────────────────────────────────────────────
+  clearForm(): void {
+    this.selectedEvent = null;
+    this.selectedLogSource = null;
+    this.selectedOperationType = null;
+    this.reportForm.reset({ fecha: new Date(), criticidad: 'media', reputacionOrigen: 'Interna' });
+    this.newsletterForm.reset({ criticidad: 'media' });
+    this.uploadedImages = [];
+    this.generatedHtml = '';
+    this.showPreview = false;
+    this.activeClientAlert = null;
+    this.newsletterRecipients = '';
   }
 
-  private escapeHtml(value: unknown): string {
-    return String(value ?? '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
+  // ─── HTML Builders ────────────────────────────────────────────────────────
+  private async buildReportHtml(): Promise<void> {
+    const canContinue = await this.ensureClientAlertAcknowledged('report');
+    if (!canContinue) return;
 
-  private copyTextWithExecCommand(text: string): boolean {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.setAttribute('readonly', '');
-    textarea.style.position = 'fixed';
-    textarea.style.left = '-9999px';
-    textarea.style.top = '0';
-    document.body.appendChild(textarea);
-    textarea.select();
-    textarea.setSelectionRange(0, text.length);
+    const form = this.reportForm.value;
+    const headerColor = this.reportTableHeaderColor;
+    const labelColor = this.getSecondaryColor(headerColor);
+    const reportWidthPx = 980;
+    const evidenceImageWidthPx = 420;
+    const firstColPx = 185;
+    const secondColPx = reportWidthPx - firstColPx;
 
-    let copied = false;
-    try {
-      copied = document.execCommand('copy');
-    } catch {
-      copied = false;
-    }
+    const cellLabel = `background-color: ${labelColor}; font-weight: bold; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; width: ${firstColPx}px;`;
+    const cellDetail = `border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; width: ${secondColPx}px;`;
 
-    document.body.removeChild(textarea);
-    return copied;
-  }
-  private getPlainTextFromHtml(html: string): string {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-    return doc.body.textContent?.trim() || '';
-  }
+    const e = (v: unknown) => this.escapeHtml(v);
 
-  private getMarkdownFromHtml(html: string): string {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-    const rows = Array.from(doc.querySelectorAll('tr'));
-    const dataRows: Array<[string, string]> = [];
+    let html = `<table cellpadding="6" cellspacing="0" width="${reportWidthPx}" style="border-collapse: collapse; width: ${reportWidthPx}px; max-width: 100%; font-family: Arial, sans-serif; border: 1px solid #2b2b2b; table-layout: fixed; margin: 0; mso-table-lspace: 0pt; mso-table-rspace: 0pt; clear: both;">
+  <colgroup>
+    <col width="${firstColPx}" style="width: ${firstColPx}px;">
+    <col width="${secondColPx}" style="width: ${secondColPx}px;">
+  </colgroup>
+  <tr>
+    <th colspan="2" style="background-color: ${headerColor}; color: white; text-align: center; font-size: 18px; border: 1px solid #2b2b2b;">Reporte de Detección</th>
+  </tr>
+  <tr>
+    <th width="${firstColPx}" style="background-color: ${labelColor}; color: white; width: ${firstColPx}px; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere;">Campo</th>
+    <th width="${secondColPx}" style="background-color: ${labelColor}; color: white; width: ${secondColPx}px; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere;">Detalle</th>
+  </tr>
+  <tr><td style="${cellLabel}">Tipo de operación</td><td style="${cellDetail}">${e(form.tipoOperacion)}</td></tr>
+  <tr><td style="${cellLabel}">Ofensa/Código interno</td><td style="${cellDetail}">${e(form.codigoInterno || '-')}</td></tr>
+  <tr><td style="${cellLabel}">Nombre de Ofensa/Evento</td><td style="${cellDetail}">${e(form.nombreEvento)}</td></tr>
+  <tr><td style="${cellLabel}">Motivo de la Ofensa/Evento</td><td style="${cellDetail}">${e(form.motivoEvento)}</td></tr>
+  <tr><td style="${cellLabel}">Fecha</td><td style="${cellDetail}">${e(new Date(form.fecha).toLocaleDateString('es-CL'))}</td></tr>
+  <tr><td style="${cellLabel}">MRSC (Criticidad)</td><td style="${cellDetail}">${e(form.criticidad)}</td></tr>
+  <tr><td style="${cellLabel}">Origen de conexión</td><td style="${cellDetail}">${e(form.origenConexion || '-')}</td></tr>
+  <tr><td style="${cellLabel}">Fuente / Log Source</td><td style="${cellDetail}">${e(form.logSource)}</td></tr>
+  <tr><td style="${cellLabel}">Destino</td><td style="${cellDetail}">${e(form.destino || '-')}</td></tr>
+  <tr><td style="${cellLabel}">Reputación de origen</td><td style="${cellDetail}">${e(form.reputacionOrigen)}</td></tr>
+  <tr><td style="${cellLabel}">Observaciones</td><td style="white-space: pre-wrap; ${cellDetail}">${e(form.observaciones)}</td></tr>`;
 
-    rows.forEach((row, index) => {
-      const cells = Array.from(row.querySelectorAll('th, td')).map(cell => {
-        const text = cell.textContent?.replace(/\s+/g, ' ').trim() || '';
-        return text.replace(/\|/g, '\\|');
-      });
-      if (index === 0 || cells.length < 2) return;
-      if (cells.length >= 2) {
-        dataRows.push([cells[0] || '-', cells[1] || '-']);
+    const evidenciaTexto = e((form.evidenciaTexto || '').trim());
+    const hasImages = this.uploadedImages.length > 0;
+    const hasTextEvidence = evidenciaTexto.length > 0;
+
+    if (hasImages || hasTextEvidence) {
+      html += `\n  <tr>\n    <td style="${cellLabel}">Evidencia</td>\n    <td style="${cellDetail}">`;
+      if (hasTextEvidence) {
+        html += `<div style="white-space: pre-wrap; margin-bottom: ${hasImages ? '10px' : '0'};">${evidenciaTexto}</div>`;
       }
-    });
+      if (hasImages) {
+        this.uploadedImages.forEach(img => {
+          const renderWidth = img.width > 0 ? Math.min(evidenceImageWidthPx, img.width) : evidenceImageWidthPx;
+          const renderHeight = img.width > 0 && img.height > 0
+            ? Math.max(1, Math.round((img.height * renderWidth) / img.width))
+            : 0;
+          const heightAttr = renderHeight > 0 ? ` height="${renderHeight}"` : '';
+          html += `<a href="${img.dataUrl}" style="display: block; text-align: center; text-decoration: none;"><img src="${img.dataUrl}" width="${renderWidth}"${heightAttr} style="width: ${renderWidth}px; max-width: 100%; height: auto; object-fit: contain; margin: 4px auto; display: block; border: 1px solid #ddd;" alt="${e(img.name || 'Evidencia')}"></a><br>`;
+        });
+      }
+      html += `</td>\n  </tr>`;
+    } else {
+      html += `\n  <tr><td style="${cellLabel}">Evidencia</td><td style="${cellDetail}">Se adjunta en el correo</td></tr>`;
+    }
 
-    const header = ['Campo', 'Detalle'];
-    const sep = ['---', '---'];
-    const lines = [
-      `| ${header[0]} | ${header[1]} |`,
-      `| ${sep[0]} | ${sep[1]} |`,
-      ...dataRows.map(row => `| ${row[0]} | ${row[1]} |`)
-    ];
-    return lines.join('\n');
+    html += `
+  <tr><td style="${cellLabel}">Recomendación</td><td style="white-space: pre-wrap; ${cellDetail}">${e(form.recomendacion || '-')}</td></tr>
+  <tr><td style="${cellLabel}">Información adicional</td><td style="white-space: pre-wrap; ${cellDetail}">${e(form.informacionAdicional || '-')}</td></tr>
+</table>`;
+
+    this.generatedHtml = html;
+    this.showPreview = true;
   }
 
+  private buildNewsletterHtml(): void {
+    const form = this.newsletterForm.value;
+    const headerColor = this.reportTableHeaderColor;
+    const width = 800;
+    const e = (v: unknown) => this.escapeHtml(v);
+
+    const criticidadLower = e(form.criticidad).toLowerCase();
+    let badgeColor = '#FFA500';
+    let badgeText = 'MEDIO (CVSS 4.0 - 6.9)';
+    if (criticidadLower === 'baja') { badgeColor = '#4CAF50'; badgeText = 'BAJO (CVSS 0.1 - 3.9)'; }
+    else if (criticidadLower === 'alta') { badgeColor = '#f44336'; badgeText = 'ALTO (CVSS 7.0 - 8.9)'; }
+    else if (criticidadLower === 'crítica' || criticidadLower === 'critica') { badgeColor = '#b71c1c'; badgeText = 'CRÍTICO (CVSS 9.0 - 10.0)'; }
+
+    const sectionTitle = `color: #111111 !important; margin-top: 20px; font-size: 16px; font-weight: bold; border-bottom: 2px solid ${headerColor}; padding-bottom: 5px;`;
+    const paragraph = `color: #111111 !important; font-size: 14px; line-height: 1.6; white-space: pre-wrap;`;
+
+    const currentUser = this.authService.getCurrentUser();
+    const autor = e(currentUser?.fullName?.trim() || currentUser?.username || 'Bitácora SOC');
+
+    let html = `<table cellpadding="0" cellspacing="0" width="${width}" style="border-collapse: collapse; width: ${width}px; max-width: 100%; font-family: Arial, sans-serif; border: 1px solid #ddd; background-color: #fcfcfc; margin: 0; mso-table-lspace: 0pt; mso-table-rspace: 0pt;">
+  <tr>
+    <td style="padding: 20px; background-color: ${headerColor}; color: white; border-bottom: 3px solid #2b2b2b;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+          <td width="30%" valign="middle" align="left">
+            ${this.logoBase64 ? `<img src="${this.logoBase64}" height="48" style="height: 48px; max-height: 48px; width: auto; display: block;" alt="Logo">` : ''}
+          </td>
+          <td width="40%" valign="middle" align="center">
+            <h2 style="margin: 0; font-size: 24px; white-space: nowrap; color: #111111;">Boletín de Seguridad</h2>
+            <p style="margin: 5px 0 0 0; font-size: 14px; white-space: nowrap; color: #111111;">Aviso importante preventivo</p>
+          </td>
+          <td width="30%"></td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 30px; color: #111111;">
+      <div style="margin-bottom: 25px;">
+        <h3 style="margin: 0 0 10px 0; font-size: 20px; color: #111111;">${e(form.tituloBoletin)}</h3>
+        <span style="display: inline-block; padding: 4px 10px; background-color: ${badgeColor}; color: white; border-radius: 4px; font-size: 12px; font-weight: bold;">CRITICIDAD: ${badgeText}</span>
+      </div>
+
+      <h4 style="${sectionTitle}">Resumen Ejecutivo</h4>
+      <div style="${paragraph}">${e(form.resumenEjecutivo)}</div>
+
+      <h4 style="${sectionTitle}">Impacto</h4>
+      <div style="${paragraph}">${e(form.impacto)}</div>
+
+      <h4 style="${sectionTitle}">Acciones Recomendadas / Mitigación</h4>
+      <div style="${paragraph}">${e(form.recomendacion)}</div>`;
+
+    if (form.referencias?.trim()) {
+      html += `
+      <h4 style="${sectionTitle}">Referencias</h4>
+      <div style="${paragraph}">${e(form.referencias)}</div>`;
+    }
+
+    html += `
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 15px; text-align: center; background-color: #f1f1f1; color: #111111; font-size: 12px; border-top: 1px solid #ddd;">
+      Generado por <strong>${autor}</strong>
+    </td>
+  </tr>
+</table>`;
+
+    this.generatedHtml = html;
+    this.showPreview = true;
+  }
+
+  // ─── Client alert helpers ─────────────────────────────────────────────────
   get hasPendingClientAlert(): boolean {
     const ruleId = this.activeClientAlert?.rule?._id;
     return !!(ruleId && !this.acknowledgedRuleIds.has(ruleId));
   }
 
   async acknowledgeCurrentAlert(): Promise<void> {
-    if (!this.activeClientAlert?.hasAlert || !this.activeClientAlert.rule) {
-      return;
-    }
+    if (!this.activeClientAlert?.hasAlert || !this.activeClientAlert.rule) return;
     await this.promptClientAlert(true);
   }
 
   private async refreshClientAlert(context: ClientAlertContext, showDialog: boolean): Promise<void> {
-    if (!this.selectedLogSource?._id) {
-      this.activeClientAlert = null;
-      return;
-    }
+    if (!this.selectedLogSource?._id) { this.activeClientAlert = null; return; }
 
     this.isEvaluatingClientAlert = true;
     try {
@@ -656,12 +623,10 @@ export class ReportGeneratorComponent implements OnInit {
         this.escalationService.evaluateClientAlert(this.selectedLogSource._id, context)
       );
       this.activeClientAlert = evaluation;
-
       if (showDialog && evaluation.hasAlert && this.hasPendingClientAlert) {
         await this.promptClientAlert(false);
       }
-    } catch (error) {
-      console.error('Error evaluando alerta especial por cliente:', error);
+    } catch {
       this.activeClientAlert = null;
     } finally {
       this.isEvaluatingClientAlert = false;
@@ -671,36 +636,23 @@ export class ReportGeneratorComponent implements OnInit {
   private async ensureClientAlertAcknowledged(context: ClientAlertContext): Promise<boolean> {
     await this.refreshClientAlert(context, false);
 
-    if (!this.activeClientAlert?.hasAlert || !this.activeClientAlert.rule) {
-      return true;
-    }
-
-    if (!this.activeClientAlert.rule.acknowledgementRequired) {
-      return true;
-    }
-
-    if (!this.hasPendingClientAlert) {
-      return true;
-    }
+    if (!this.activeClientAlert?.hasAlert || !this.activeClientAlert.rule) return true;
+    if (!this.activeClientAlert.rule.acknowledgementRequired) return true;
+    if (!this.hasPendingClientAlert) return true;
 
     const confirmed = await this.promptClientAlert(true);
     if (!confirmed) {
       this.snackBar.open('Debes confirmar lectura de la alerta antes de continuar', 'Cerrar', { duration: 4000 });
     }
-
     return confirmed;
   }
 
   private async promptClientAlert(requireAckForContinue: boolean): Promise<boolean> {
-    if (!this.activeClientAlert?.hasAlert || !this.activeClientAlert.rule) {
-      return true;
-    }
+    if (!this.activeClientAlert?.hasAlert || !this.activeClientAlert.rule) return true;
 
     const evaluation = this.activeClientAlert;
     const rule = evaluation.rule;
-    if (!rule) {
-      return true;
-    }
+    if (!rule) return true;
 
     const dialogRef = this.dialog.open(ClientAlertDialogComponent, {
       width: '680px',
@@ -708,7 +660,7 @@ export class ReportGeneratorComponent implements OnInit {
       disableClose: false,
       data: {
         clientName: evaluation.client.name,
-        contextLabel: this.getContextLabel(evaluation.context),
+        contextLabel: evaluation.context === 'copy-report' ? 'Copiar reporte' : 'Generación de reporte',
         message: rule.alertMessage,
         channels: rule.channels || [],
         timezone: evaluation.evaluation.timezone,
@@ -718,9 +670,7 @@ export class ReportGeneratorComponent implements OnInit {
     });
 
     const acknowledged = await firstValueFrom(dialogRef.afterClosed());
-    if (!acknowledged) {
-      return !requireAckForContinue;
-    }
+    if (!acknowledged) return !requireAckForContinue;
 
     try {
       await firstValueFrom(this.escalationService.acknowledgeClientAlert({
@@ -729,30 +679,23 @@ export class ReportGeneratorComponent implements OnInit {
         context: evaluation.context,
         acknowledgedAt: new Date().toISOString()
       }));
-
       this.acknowledgedRuleIds.add(rule._id);
       this.snackBar.open('Alerta confirmada', 'Cerrar', { duration: 2000 });
       return true;
-    } catch (error) {
-      console.error('Error registrando confirmación de alerta:', error);
+    } catch {
       this.snackBar.open('No se pudo registrar la confirmación de alerta', 'Cerrar', { duration: 4000 });
       return false;
     }
   }
 
-  private getContextLabel(context: ClientAlertContext): string {
-    return context === 'copy-report' ? 'Copiar reporte' : 'Generación de reporte';
-  }
-
+  // ─── Config helpers ───────────────────────────────────────────────────────
   private loadReportTableColorConfig(): void {
     this.configService.getConfig().subscribe({
       next: (config) => {
         const color = this.normalizeHexColor(config.emailReportConfig?.reportTableColor);
         this.reportTableHeaderColor = color || '#4CAF50';
       },
-      error: () => {
-        this.reportTableHeaderColor = '#4CAF50';
-      }
+      error: () => { this.reportTableHeaderColor = '#4CAF50'; }
     });
   }
 
@@ -767,28 +710,79 @@ export class ReportGeneratorComponent implements OnInit {
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
     const b = parseInt(hex.slice(5, 7), 16);
-
-    const mixWithWhite = (channel: number) => Math.round(channel + (255 - channel) * 0.35);
-    const toHex = (channel: number) => channel.toString(16).padStart(2, '0').toUpperCase();
-
-    return `#${toHex(mixWithWhite(r))}${toHex(mixWithWhite(g))}${toHex(mixWithWhite(b))}`;
+    const mix = (c: number) => Math.round(c + (255 - c) * 0.35);
+    const toHex = (c: number) => c.toString(16).padStart(2, '0').toUpperCase();
+    return `#${toHex(mix(r))}${toHex(mix(g))}${toHex(mix(b))}`;
   }
 
-  clearForm(): void {
-    this.selectedEvent = null;
-    this.selectedLogSource = null;
-    this.selectedOperationType = null;
-    this.reportForm.reset({
-      fecha: new Date(),
-      criticidad: 'media',
-      reputacionOrigen: 'Interna'
+  // ─── Clipboard helpers ────────────────────────────────────────────────────
+  private copyHtmlWithExecCommand(html: string): boolean {
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    container.style.cssText = 'position: fixed; left: -9999px; top: 0; opacity: 0;';
+    container.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(container);
+
+    const range = document.createRange();
+    range.selectNodeContents(container);
+    const selection = window.getSelection();
+    if (!selection) { document.body.removeChild(container); return false; }
+
+    selection.removeAllRanges();
+    selection.addRange(range);
+    let copied = false;
+    try { copied = document.execCommand('copy'); } catch { copied = false; }
+    selection.removeAllRanges();
+    document.body.removeChild(container);
+    return copied;
+  }
+
+  private copyTextWithExecCommand(text: string): boolean {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.cssText = 'position: fixed; left: -9999px; top: 0;';
+    document.body.appendChild(textarea);
+    textarea.select();
+    textarea.setSelectionRange(0, text.length);
+    let copied = false;
+    try { copied = document.execCommand('copy'); } catch { copied = false; }
+    document.body.removeChild(textarea);
+    return copied;
+  }
+
+  private getPlainTextFromHtml(html: string): string {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent?.trim() || '';
+  }
+
+  private getMarkdownFromHtml(html: string): string {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const rows = Array.from(doc.querySelectorAll('tr'));
+    const dataRows: [string, string][] = [];
+
+    rows.forEach((row, index) => {
+      const cells = Array.from(row.querySelectorAll('th, td')).map(c =>
+        (c.textContent?.replace(/\s+/g, ' ').trim() || '').replace(/\|/g, '\\|')
+      );
+      if (index === 0 || cells.length < 2) return;
+      dataRows.push([cells[0] || '-', cells[1] || '-']);
     });
-    this.newsletterForm.reset({
-      criticidad: 'media'
-    });
-    this.uploadedImages = [];
-    this.generatedHtml = '';
-    this.showPreview = false;
-    this.activeClientAlert = null;
+
+    return [
+      '| Campo | Detalle |',
+      '| --- | --- |',
+      ...dataRows.map(r => `| ${r[0]} | ${r[1]} |`)
+    ].join('\n');
+  }
+
+  // ─── HTML escape ──────────────────────────────────────────────────────────
+  private escapeHtml(value: unknown): string {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 }
