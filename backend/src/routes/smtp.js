@@ -77,15 +77,12 @@ const ensureRequiredFields = (data, requireRecipients = true) => {
   return null;
 };
 
-const safeDecrypt = (value) => {
+const safeDecrypt = (value, { allowPlainFallback = false } = {}) => {
   const raw = String(value || '').trim();
   if (!raw) return '';
-  try {
-    const dec = decrypt(raw);
-    return String(dec || '').trim() || raw;
-  } catch {
-    return raw;
-  }
+  const dec = String(decrypt(raw) || '').trim();
+  if (dec) return dec;
+  return allowPlainFallback ? raw : '';
 };
 
 const findStoredSmtpConfig = async () => (
@@ -98,7 +95,7 @@ const resolveLegacyPasswordFromAppConfig = async () => {
   const appConfig = await AppConfig.findOne().select('smtpConfig').lean();
   const legacy = appConfig?.smtpConfig || null;
   if (!legacy) return '';
-  return safeDecrypt(legacy.pass || legacy.password || '');
+  return safeDecrypt(legacy.pass || legacy.password || '', { allowPlainFallback: true });
 };
 
 const verifyAndTest = async (config, sendMail = true) => {
@@ -177,7 +174,12 @@ router.post('/',
 
       if (!data.password) {
         if (config?.password) {
-          data.password = safeDecrypt(config.password);
+          data.password = safeDecrypt(config.password, { allowPlainFallback: false });
+          if (!data.password) {
+            return res.status(400).json({
+              message: 'No se pudo reutilizar la contraseña SMTP guardada. Ingresa la contraseña nuevamente y guarda.'
+            });
+          }
         } else {
           const legacyPassword = await resolveLegacyPasswordFromAppConfig();
           if (!legacyPassword) {
@@ -282,8 +284,13 @@ router.post('/test',
 
         if (!bodyData.password) {
           if (stored?.password) {
-            bodyData.password = safeDecrypt(stored.password);
+            bodyData.password = safeDecrypt(stored.password, { allowPlainFallback: false });
             usingStoredPassword = true;
+            if (!bodyData.password) {
+              return res.status(400).json({
+                message: 'No se pudo reutilizar la contraseña SMTP guardada. Ingresa la contraseña nuevamente y vuelve a probar.'
+              });
+            }
           } else {
             const legacyPassword = await resolveLegacyPasswordFromAppConfig();
             if (!legacyPassword) {
@@ -308,8 +315,13 @@ router.post('/test',
         }
         configData = {
           ...stored.toObject(),
-          password: safeDecrypt(stored.password)
+          password: safeDecrypt(stored.password, { allowPlainFallback: false })
         };
+        if (!configData.password) {
+          return res.status(400).json({
+            message: 'No se pudo descifrar la contraseña SMTP guardada. Ingresa la contraseña nuevamente en configuración SMTP.'
+          });
+        }
       }
 
       // Determinar si enviar email o solo verificar conexión

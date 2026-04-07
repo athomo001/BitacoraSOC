@@ -25,15 +25,12 @@ const maskEmail = (email = '') => {
   return `${local.slice(0, 2)}***@${domain}`;
 };
 
-const safeDecrypt = (value) => {
+const safeDecrypt = (value, { allowPlainFallback = false } = {}) => {
   const raw = String(value || '').trim();
   if (!raw) return '';
-  try {
-    const dec = decrypt(raw);
-    return String(dec || '').trim() || raw;
-  } catch {
-    return raw;
-  }
+  const dec = String(decrypt(raw) || '').trim();
+  if (dec) return dec;
+  return allowPlainFallback ? raw : '';
 };
 
 const normalizeRecipients = (to) => {
@@ -160,7 +157,7 @@ async function getSMTPConfig() {
         port: smtpDoc.port,
         secure: smtpDoc.useTLS === true || smtpDoc.port === 465,
         user: smtpDoc.username,
-        pass: safeDecrypt(smtpDoc.password),
+        pass: safeDecrypt(smtpDoc.password, { allowPlainFallback: false }),
         smtpConfigId: smtpDoc._id?.toString?.() || String(smtpDoc._id || ''),
         smtpConfigSource: 'SmtpConfig',
         from: smtpDoc.senderName
@@ -186,7 +183,7 @@ async function getSMTPConfig() {
     if (appConfig && appConfig.smtpConfig) {
       const smtpConfig = appConfig.smtpConfig;
       const legacyUser = String(smtpConfig.user || smtpConfig.username || '').trim();
-      const legacyPass = safeDecrypt(smtpConfig.pass || smtpConfig.password || '');
+      const legacyPass = safeDecrypt(smtpConfig.pass || smtpConfig.password || '', { allowPlainFallback: true });
       logger.info('📧 SMTP config found in AppConfig', { user: legacyUser });
 
       const config = {
