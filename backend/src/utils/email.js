@@ -25,6 +25,17 @@ const maskEmail = (email = '') => {
   return `${local.slice(0, 2)}***@${domain}`;
 };
 
+const safeDecrypt = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const dec = decrypt(raw);
+    return String(dec || '').trim() || raw;
+  } catch {
+    return raw;
+  }
+};
+
 const normalizeRecipients = (to) => {
   if (Array.isArray(to)) {
     return to
@@ -137,7 +148,11 @@ async function getSMTPConfig() {
 
   try {
     logger.info('📧 Reading SMTP config FROM DATABASE (SmtpConfig)...');
-    const smtpDoc = await SmtpConfig.findOne({ isActive: true }).lean();
+    const smtpDoc = await SmtpConfig.findOne({
+      $or: [{ isActive: true }, { isActive: { $exists: false } }]
+    })
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .lean();
 
     if (smtpDoc) {
       const config = {
@@ -145,7 +160,7 @@ async function getSMTPConfig() {
         port: smtpDoc.port,
         secure: smtpDoc.useTLS === true || smtpDoc.port === 465,
         user: smtpDoc.username,
-        pass: decrypt(smtpDoc.password),
+        pass: safeDecrypt(smtpDoc.password),
         smtpConfigId: smtpDoc._id?.toString?.() || String(smtpDoc._id || ''),
         smtpConfigSource: 'SmtpConfig',
         from: smtpDoc.senderName
@@ -170,17 +185,19 @@ async function getSMTPConfig() {
 
     if (appConfig && appConfig.smtpConfig) {
       const smtpConfig = appConfig.smtpConfig;
-      logger.info('📧 SMTP config found in AppConfig', { user: smtpConfig.user });
+      const legacyUser = String(smtpConfig.user || smtpConfig.username || '').trim();
+      const legacyPass = safeDecrypt(smtpConfig.pass || smtpConfig.password || '');
+      logger.info('📧 SMTP config found in AppConfig', { user: legacyUser });
 
       const config = {
         host: smtpConfig.host,
         port: smtpConfig.port,
         secure: smtpConfig.secure === true,
-        user: smtpConfig.user,
-        pass: smtpConfig.pass,
+        user: legacyUser,
+        pass: legacyPass,
         smtpConfigId: appConfig?._id?.toString?.() || null,
         smtpConfigSource: 'AppConfig',
-        from: smtpConfig.from || smtpConfig.user
+        from: smtpConfig.from || legacyUser
       };
 
       smtpConfigCache = config;
