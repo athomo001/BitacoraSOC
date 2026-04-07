@@ -383,12 +383,62 @@ export class ReportGeneratorComponent implements OnInit {
     const textFromHtml = this.extractTextFromClipboardHtml(html);
     const base = textFromHtml || String(plain || '');
 
-    return base
+    const normalizedBase = base
       .replace(/\u00a0/g, ' ')
       .replace(/\r\n/g, '\n')
       .replace(/\n{3,}/g, '\n\n')
       .replace(/[ \t]+\n/g, '\n')
       .trim();
+
+    return this.applyNewsletterPasteHeuristics(normalizedBase);
+  }
+
+  private applyNewsletterPasteHeuristics(input: string): string {
+    if (!input) return '';
+
+    let text = input;
+    // Asegurar saltos antes de etiquetas semánticas aunque el origen venga "pegado".
+    const semanticLabels = [
+      'Resumen de Vulnerabilidad',
+      'ID:',
+      'Severidad (CVSS):',
+      'Impacto:',
+      'Alcance de Versiones',
+      'Producto',
+      'Rango de Versiones Vulnerables'
+    ];
+    semanticLabels.forEach((label) => {
+      const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`([^\\n])\\s*(${escaped})`, 'gi');
+      text = text.replace(regex, '$1\n$2');
+    });
+
+    // Encabezado de tabla "Producto | Rango ..."
+    text = text.replace(
+      /(Producto)\s*(Rango\s+de\s+Versiones\s+Vulnerables)/gi,
+      '$1 | $2'
+    );
+
+    // Filas: "<producto> <version-inicio - version-fin>" -> "<producto> | <rango>"
+    text = text.replace(
+      /([A-Za-zÁÉÍÓÚÑáéíóúñ0-9][A-Za-zÁÉÍÓÚÑáéíóúñ0-9 .\-()]{2,}?)\s+(\d+\.\d+(?:\.\d+){1,4}\s*[—-]\s*\d+\.\d+(?:\.\d+){1,4})/g,
+      '$1 | $2'
+    );
+
+    return text
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  private concatPreservingWordBoundaries(current: string, next: string): string {
+    if (!current) return next;
+    if (!next) return current;
+
+    const left = current[current.length - 1];
+    const right = next[0];
+    const needsSpace = /[A-Za-zÁÉÍÓÚÑáéíóúñ0-9)]/.test(left) && /[A-Za-zÁÉÍÓÚÑáéíóúñ0-9(]/.test(right);
+    return needsSpace ? `${current} ${next}` : `${current}${next}`;
   }
 
   private extractTextFromClipboardHtml(html: string): string {
@@ -420,7 +470,9 @@ export class ReportGeneratorComponent implements OnInit {
       }
 
       let content = '';
-      element.childNodes.forEach(child => { content += walk(child); });
+      element.childNodes.forEach(child => {
+        content = this.concatPreservingWordBoundaries(content, walk(child));
+      });
 
       if (tag === 'li') {
         const cleaned = content.replace(/\s+/g, ' ').trim();
