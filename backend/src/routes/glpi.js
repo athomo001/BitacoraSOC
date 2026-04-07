@@ -117,6 +117,9 @@ router.put('/config', authenticate, authorize('admin'), validators, validate, as
 });
 
 router.post('/test', authenticate, authorize('admin'), async (req, res) => {
+  const retryAttempt = req.body?.retryAttempt === true || req.body?.retryAttempt === 'true';
+  const retryCountParsed = Number.parseInt(String(req.body?.retryCount ?? ''), 10);
+  const retryCount = Number.isFinite(retryCountParsed) && retryCountParsed > 0 ? retryCountParsed : null;
   try {
     const config = await ensureGlpiConfig();
 
@@ -176,7 +179,7 @@ router.post('/test', authenticate, authorize('admin'), async (req, res) => {
         event: 'admin.glpi.test.api.success',
         level: 'info',
         result: { success: true },
-        metadata: { baseUrl: config.api.baseUrl }
+        metadata: { baseUrl: config.api.baseUrl, retryAttempt, retryCount }
       });
 
       return res.json({ message: config.lastTestMessage });
@@ -221,7 +224,7 @@ router.post('/test', authenticate, authorize('admin'), async (req, res) => {
       event: 'admin.glpi.test.email.success',
       level: 'info',
       result: { success: true },
-      metadata: { collectorAddress }
+      metadata: { collectorAddress, retryAttempt, retryCount }
     });
 
     return res.json({ message: config.lastTestMessage });
@@ -235,7 +238,8 @@ router.post('/test', authenticate, authorize('admin'), async (req, res) => {
     await audit(req, {
       event: 'admin.glpi.test.fail',
       level: 'warn',
-      result: { success: false, reason: error.message }
+      result: { success: false, reason: error.message },
+      metadata: { retryAttempt, retryCount }
     });
 
     res.status(500).json({ message: 'Prueba GLPI fallida', error: error.message });

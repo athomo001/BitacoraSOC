@@ -68,6 +68,7 @@ export class CatalogAdminComponent implements OnInit {
 
   reportColorMode: 'green' | 'sky' | 'light-red' | 'custom' = 'green';
   selectedCustomReportColor = CatalogAdminComponent.DEFAULT_REPORT_COLOR;
+  customReportColorInput = CatalogAdminComponent.DEFAULT_REPORT_COLOR;
   isSavingReportColor = false;
   readonly customColorPalette: string[] = [
     '#4CAF50', '#2E7D32', '#8BC34A', '#2196F3', '#29B6F6', '#03A9F4',
@@ -182,11 +183,13 @@ export class CatalogAdminComponent implements OnInit {
         const reportColor = this.normalizeHexColor(this.currentEmailReportConfig.reportTableColor)
           || CatalogAdminComponent.DEFAULT_REPORT_COLOR;
         this.selectedCustomReportColor = reportColor;
+        this.customReportColorInput = reportColor;
         this.reportColorMode = this.resolveReportColorMode(reportColor);
       },
       error: () => {
         this.reportColorMode = 'green';
         this.selectedCustomReportColor = CatalogAdminComponent.DEFAULT_REPORT_COLOR;
+        this.customReportColorInput = CatalogAdminComponent.DEFAULT_REPORT_COLOR;
       }
     });
   }
@@ -199,8 +202,48 @@ export class CatalogAdminComponent implements OnInit {
   }
 
   selectCustomReportColor(color: string): void {
-    this.selectedCustomReportColor = color;
+    const normalized = this.normalizeHexColor(color);
+    if (!normalized) return;
+    this.selectedCustomReportColor = normalized;
+    this.customReportColorInput = normalized;
     this.reportColorMode = 'custom';
+  }
+
+  onCustomColorInputChange(input: string): void {
+    this.customReportColorInput = (input || '').toUpperCase();
+    const normalized = this.normalizeHexColor(input);
+    if (!normalized) return;
+    this.selectedCustomReportColor = normalized;
+    this.reportColorMode = 'custom';
+  }
+
+  getCurrentReportColor(): string {
+    if (this.reportColorMode === 'custom') {
+      return this.normalizeHexColor(this.selectedCustomReportColor) || CatalogAdminComponent.DEFAULT_REPORT_COLOR;
+    }
+    return this.getColorForMode(this.reportColorMode);
+  }
+
+  getColorOptionLabel(mode: 'green' | 'sky' | 'light-red' | 'custom'): string {
+    const labels: Record<'green' | 'sky' | 'light-red' | 'custom', string> = {
+      green: 'Verde',
+      sky: 'Celeste',
+      'light-red': 'Rojo claro',
+      custom: 'Custom'
+    };
+    return labels[mode];
+  }
+
+  isReportColorModeActive(mode: 'green' | 'sky' | 'light-red' | 'custom'): boolean {
+    if (mode === 'custom') {
+      return this.reportColorMode === 'custom';
+    }
+    return this.getCurrentReportColor() === this.getColorForMode(mode);
+  }
+
+  getModeOptionLabel(mode: 'green' | 'sky' | 'light-red' | 'custom'): string {
+    const label = this.getColorOptionLabel(mode);
+    return this.isReportColorModeActive(mode) ? `${label} (actual)` : label;
   }
 
   saveReportTableColorConfig(): void {
@@ -218,6 +261,7 @@ export class CatalogAdminComponent implements OnInit {
       next: () => {
         this.currentEmailReportConfig = emailReportConfig;
         this.selectedCustomReportColor = resolvedColor;
+        this.customReportColorInput = resolvedColor;
         this.snackBar.open('✅ Color del reporte guardado', 'Cerrar', { duration: 2500 });
         this.isSavingReportColor = false;
       },

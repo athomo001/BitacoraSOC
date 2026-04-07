@@ -1,5 +1,14 @@
 <div class="checklist-container">
   <h1>Checklist del Turno</h1>
+  <mat-card class="status-card" *ngIf="checklistGuideVisible">
+    <mat-card-content>
+      <p><strong>Guía rápida Checklist:</strong> selecciona tipo de check, evalúa todos los sub-items, agrega observación obligatoria en rojos y luego envía.</p>
+      <div class="form-actions">
+        <button mat-button type="button" (click)="closeChecklistGuide(false)">Cerrar</button>
+        <button mat-stroked-button color="primary" type="button" (click)="closeChecklistGuide(true)">No volver a mostrar</button>
+      </div>
+    </mat-card-content>
+  </mat-card>
   <p *ngIf="activeChecklist?.name" class="subtle">{{ activeChecklist?.name }}<span *ngIf="activeChecklist?.description"> — {{ activeChecklist?.description }}</span></p>
   <p *ngIf="!activeChecklist?.name && activeChecklist?.description" class="subtle">{{ activeChecklist?.description }}</p>
 
@@ -99,6 +108,7 @@
             </div>
 
             <div class="form-actions">
+              <button mat-button type="button" (click)="openChecklistGuide()">Ver guía rápida</button>
               <button mat-raised-button color="primary" type="submit" [disabled]="!checkForm.valid || isSubmitting"
                 class="submit-button">
                 <mat-icon *ngIf="!isSubmitting">send</mat-icon>

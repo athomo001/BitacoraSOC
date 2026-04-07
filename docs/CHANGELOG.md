@@ -2,6 +2,49 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.27-beta] - 2026-04-07
+
+### Boletín de Seguridad (logo/correo HTML)
+
+#### Corrección integral de render de logo en Gmail/Outlook
+- **Fix backend (newsletter MIME):** Se reforzó `POST /api/reports/newsletter/send` para preparar boletines con imagen inline robusta (`multipart/related` + `cid`) y fallback de adjunto estándar.
+- **Fix backend (parser de `<img src>`):** Se reemplazó la extracción/reemplazo frágil por un escaneo seguro del primer `src` (`locateFirstImgSrcRange`, `extractFirstImgSrc`, `replaceFirstImgSrc`) para soportar `data:image` largos sin romper el HTML.
+- **Fix backend (higiene de HTML):** Se agregó saneamiento defensivo para remover `<img>` inválidos cuando corresponda (`removeFirstImgTag`, `removeLeadingDataImageTags`) evitando logos rotos.
+- **Fix backend (resolución de logo):** La resolución del buffer del logo prioriza el HTML generado del boletín (incluyendo base64 PNG generado en frontend) y usa `AppConfig.logoUrl` como fallback final.
+- **Compatibilidad de formato:** Se dejó el flujo operativo en PNG para correos (evitando problemas de render de algunos clientes con WebP inline).
+
+#### Validación pre-envío en frontend
+- **Nuevo precheck automático:** Antes de enviar boletín, el frontend valida presencia de logo (`<img src>` no vacío/placeholder), color negro explícito en textos clave (`#111111`) y secciones mínimas requeridas.
+- **Bloqueo preventivo:** Si la validación falla, el envío se detiene y se informa el motivo al usuario en UI.
+
+#### Estilo y legibilidad del boletín
+- **Fix frontend (color):** Se reforzó color de títulos y párrafos en secciones del boletín con `#111111 !important` para evitar regresiones visuales (texto verde en clientes de correo).
+- **Branding frontend:** La carga de logo en el generador vuelve al flujo de conversión a PNG base64 controlado para email (no solo URL directa), preservando consistencia de render.
+
+#### Observabilidad
+- **Logs de newsletter permanentes:** Las trazas de diagnóstico del flujo de boletín quedaron activas de forma fija en backend (`newsletterDebug`) para auditoría operativa sin depender de flag ENV.
+
+### Cierre QA de issues reabiertos (2026-04-07)
+
+#### Auditoría / Exportación (`AUDIT-EXPORT-028`)
+- **Claridad de rango temporal:** Se aclaró la UX de exportación para evitar ambigüedad en "Últimos días/meses", incorporando formato explícito por `N` (`Últimos días (N días)`, `Últimos meses (N meses)`).
+- **Ayuda contextual visible:** Se agregaron ejemplos directos en UI (`2, 7, 15, 30` días y `1, 3, 6, 12` meses) y etiquetas dinámicas del campo numérico según modo.
+- **Reutilización de filtros activos:** Se añadió modo de exportación **Filtros actuales (incluye fechas)** para descargar respetando exactamente los filtros del formulario (búsqueda, categoría, evento, nivel y rango de fecha), además de los modos por cantidad/ventana.
+
+#### Salud de servicios (`UI-HEALTH-033`)
+- **Control por rol:** La barra/chips de salud quedó restringida solo a `admin` (frontend y backend), eliminando exposición innecesaria para otros perfiles.
+- **Mejora de legibilidad:** Se separó visualmente del toolbar principal y se reforzó contraste por estado (`ok/warn/down`) con tipografía legible en todos los chips.
+
+#### Reintentos guiados (`INT-RETRY-034`)
+- **Trazabilidad de reintentos:** SMTP y GLPI ahora incluyen metadatos de reintento (`retryAttempt`, `retryCount`) tanto en llamadas de prueba como en eventos de auditoría para diferenciar intento inicial vs reintento guiado.
+
+#### Micro-onboarding contextual (`UI-ONBOARD-035`)
+- **Fix UX reportes:** Se corrigió el botón "Ver guía rápida" en `/main/report-generator` para evitar comportamiento de "botón muerto": al abrir la guía, hace scroll automático a la tarjeta de onboarding.
+
+#### Dependencias frontend / seguridad (`DEP-NPM-012` seguimiento)
+- **Remediación `npm audit`:** Se actualizaron dependencias de Angular a `20.3.18` y se aplicaron overrides de seguridad (`vite`, `picomatch`) en frontend.
+- **Validación técnica:** `npm audit` reporta `0 vulnerabilities` y `npm run build` finaliza correctamente tras la actualización.
+
 ## [v1.5.26-beta] - 2026-04-05
 
 ### Generador de Reportes y Comunicación (REP-GEN-019)

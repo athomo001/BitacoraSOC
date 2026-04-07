@@ -115,6 +115,11 @@
   flex-wrap: wrap;
 }
 
+.report-color-legend {
+  margin: 0 0 10px 0;
+  color: var(--text-secondary);
+}
+
 .report-color-select {
   min-width: 260px;
   width: 320px;
@@ -127,6 +132,34 @@
   grid-template-columns: repeat(8, minmax(24px, 1fr));
   gap: 8px;
   max-width: 480px;
+}
+
+.native-color-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.native-color-picker input[type="color"] {
+  width: 42px;
+  height: 32px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 0;
+  background: transparent;
+}
+
+.current-color-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--surface-muted);
 }
 
 .color-swatch {

@@ -3,6 +3,19 @@
   margin: 0 auto;
 }
 
+.onboarding-card {
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--accent-color);
+  background: var(--surface-muted);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.onboarding-card p {
+  margin: 0 0 8px 0;
+}
+
 .config-card,
 .smtp-card {
   margin-bottom: 24px;
@@ -61,4 +74,24 @@ form {
 
 .full-width {
   grid-column: 1 / -1;
+}
+
+.integration-error-panel {
+  border: 1px solid var(--state-warning);
+  background: var(--state-warning-bg);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.integration-error-panel p {
+  margin: 0;
+}
+
+.integration-error-panel .raw-detail {
+  color: var(--text-secondary);
+  font-size: 12px;
+  word-break: break-word;
 }

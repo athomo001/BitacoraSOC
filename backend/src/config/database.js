@@ -33,10 +33,14 @@ const connectDB = async () => {
     logger.info({ event: 'mongodb.connected' }, 'MongoDB conectado correctamente');
     console.log('✅ MongoDB conectado correctamente');
     
-    // Sincronizar índices de texto para búsqueda full-text en entradas
-    // Esto es idempotente (si ya existen, no hace nada)
+    // Sincronizar índices críticos (idempotente).
+    // Incluye Entry (búsqueda) y AuditLog (TTL de retención).
     const Entry = require('../models/Entry');
-    await Entry.syncIndexes();
+    const AuditLog = require('../models/AuditLog');
+    await Promise.all([
+      Entry.syncIndexes(),
+      AuditLog.syncIndexes()
+    ]);
     logger.info({ event: 'mongodb.indexes.synced' }, 'Índices de MongoDB sincronizados');
     
   } catch (error) {

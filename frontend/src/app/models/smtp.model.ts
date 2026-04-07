@@ -28,7 +28,7 @@ export type SmtpProvider =
   | 'custom';
 
 export interface SmtpConfigRequest extends SmtpConfig {
-  password: string;
+  password?: string;
 }
 
 export interface SmtpTestResponse {

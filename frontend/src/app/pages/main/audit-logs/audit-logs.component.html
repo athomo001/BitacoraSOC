@@ -1,4 +1,14 @@
 <div class="audit-logs-container">
+  <mat-card class="filter-card" *ngIf="auditGuideVisible">
+    <mat-card-content>
+      <p><strong>Guía rápida Auditoría:</strong> usa filtros para acotar eventos, luego exporta en CSV/JSON por cantidad, días, meses o todo.</p>
+      <div class="filter-actions">
+        <button mat-button type="button" (click)="closeAuditGuide(false)">Cerrar</button>
+        <button mat-stroked-button color="primary" type="button" (click)="closeAuditGuide(true)">No volver a mostrar</button>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
   <mat-card class="filter-card">
     <mat-card-header>
       <mat-card-title>🔍 Filtros de Auditoría</mat-card-title>
@@ -58,6 +68,7 @@
           </mat-form-field>
 
           <div class="filter-actions">
+            <button mat-button type="button" (click)="openAuditGuide()">Ver guía rápida</button>
             <button mat-raised-button color="primary" type="submit">
               <mat-icon>search</mat-icon>
               Buscar
@@ -65,6 +76,36 @@
             <button mat-button type="button" (click)="onClearFilters()">
               <mat-icon>clear</mat-icon>
               Limpiar
+            </button>
+          </div>
+        </div>
+
+        <div class="filter-row">
+          <mat-form-field appearance="outline">
+            <mat-label>Exportar modo</mat-label>
+            <mat-select formControlName="exportMode">
+              <mat-option *ngFor="let mode of exportModes" [value]="mode.value">{{ mode.label }}</mat-option>
+            </mat-select>
+            <mat-hint>{{ getExportModeHint() }}</mat-hint>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" *ngIf="shouldShowExportValue()">
+            <mat-label>{{ getExportValueLabel() }}</mat-label>
+            <input matInput type="number" min="1" formControlName="exportValue" placeholder="Ingresa un número">
+            <mat-hint>{{ getExportValueHint() }}</mat-hint>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Formato</mat-label>
+            <mat-select formControlName="exportFormat">
+              <mat-option *ngFor="let fmt of exportFormats" [value]="fmt.value">{{ fmt.label }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <div class="filter-actions">
+            <button mat-raised-button color="accent" type="button" (click)="onExport()" [disabled]="exporting">
+              <mat-icon>download</mat-icon>
+              {{ exporting ? 'Exportando...' : 'Exportar logs' }}
             </button>
           </div>
         </div>

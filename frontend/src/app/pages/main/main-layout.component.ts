@@ -8,6 +8,7 @@ import { ThemeService } from '../../services/theme.service';
 import { ComplementService } from '../../services/complement.service';
 import { ComplementBridgeService } from '../../services/complement-bridge.service';
 import { WorkShiftService } from '../../services/work-shift.service';
+import { SystemHealthService, HealthServiceState } from '../../services/system-health.service';
 import { AdminNote, PersonalNote } from '../../models/note.model';
 import { ChecklistTemplate, ChecklistItem, ShiftCheck } from '../../models/checklist.model';
 import { Theme } from '../../models/user.model';
@@ -15,7 +16,7 @@ import { Complement } from '../../models/complement.model';
 import { environment } from '../../../environments/environment';
 import { MatSidenavContainer, MatSidenav, MatSidenavContent } from '@angular/material/sidenav';
 import { MatToolbar } from '@angular/material/toolbar';
-import { NgIf, NgFor } from '@angular/common';
+import { NgIf, NgFor, NgClass } from '@angular/common';
 import { MatIcon } from '@angular/material/icon';
 import { MatNavList, MatListItem, MatListItemIcon, MatListItemTitle } from '@angular/material/list';
 import { RouterLinkActive, RouterLink, RouterOutlet } from '@angular/router';
@@ -26,6 +27,7 @@ import { MatInput } from '@angular/material/input';
 import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { MatIconButton } from '@angular/material/button';
 import { MatMenuTrigger, MatMenu, MatMenuItem } from '@angular/material/menu';
+import { MatTooltip } from '@angular/material/tooltip';
 
 type MenuItem = {
   icon: string;
@@ -39,7 +41,7 @@ type MenuItem = {
   selector: 'app-main-layout',
   templateUrl: './main-layout.component.html',
   styleUrls: ['./main-layout.component.scss'],
-  imports: [MatSidenavContainer, MatSidenav, MatToolbar, NgIf, MatIcon, MatNavList, NgFor, MatListItem, RouterLinkActive, RouterLink, MatListItemIcon, MatListItemTitle, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatExpansionPanelDescription, MatDivider, MatFormField, MatLabel, MatInput, ReactiveFormsModule, FormsModule, MatHint, MatSidenavContent, MatIconButton, MatMenuTrigger, MatMenu, MatMenuItem, RouterOutlet]
+  imports: [MatSidenavContainer, MatSidenav, MatToolbar, NgIf, MatIcon, MatNavList, NgFor, MatListItem, RouterLinkActive, RouterLink, MatListItemIcon, MatListItemTitle, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatExpansionPanelDescription, MatDivider, MatFormField, MatLabel, MatInput, ReactiveFormsModule, FormsModule, MatHint, MatSidenavContent, MatIconButton, MatMenuTrigger, MatMenu, MatMenuItem, RouterOutlet, MatTooltip, NgClass]
 })
 export class MainLayoutComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
@@ -47,6 +49,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   private personalNoteChange$ = new Subject<string>();
   private checklistRefreshIntervalId: ReturnType<typeof setInterval> | null = null;
   private shiftRefreshIntervalId: ReturnType<typeof setInterval> | null = null;
+  private healthRefreshIntervalId: ReturnType<typeof setInterval> | null = null;
 
   currentUser: any = null;
   isAdmin = false;
@@ -104,6 +107,8 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   hasConfigAccess = false;
   logoUrl: string = '';
   appTitle: string = '';
+  healthCheckedAt: string | null = null;
+  healthServices: { key: 'smtp' | 'mongo' | 'internalApi' | 'integrations'; label: string; state: HealthServiceState }[] = [];
   activeComplements: Complement[] = [];
   private backendBaseUrl = environment.backendBaseUrl;
   private readonly historyMenuRoutes = new Set(['/main/checklist-history', '/main/my-entries', '/main/all-entries']);
@@ -116,7 +121,8 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     private themeService: ThemeService,
     private complementService: ComplementService,
     private complementBridgeService: ComplementBridgeService,
-    private workShiftService: WorkShiftService
+    private workShiftService: WorkShiftService,
+    private systemHealthService: SystemHealthService
   ) { }
 
   getAssetUrl(url: string): string {
@@ -135,11 +141,22 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     this.loadBrandingTitle();
     this.loadActiveComplements();
     this.loadCurrentShiftContext();
+    if (this.canViewHealthSummary()) {
+      this.loadHealthSummary();
+    } else {
+      this.healthCheckedAt = null;
+      this.healthServices = [];
+    }
     
     // Register shift context refresh interval here so it only sets once
     this.shiftRefreshIntervalId = setInterval(() => {
       this.loadCurrentShiftContext();
     }, 60000);
+    if (this.canViewHealthSummary()) {
+      this.healthRefreshIntervalId = setInterval(() => {
+        this.loadHealthSummary();
+      }, 60000);
+    }
 
     this.setupAutosave();
     this.complementService.complementsChanged$
@@ -160,6 +177,10 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     if (this.shiftRefreshIntervalId) {
       clearInterval(this.shiftRefreshIntervalId);
       this.shiftRefreshIntervalId = null;
+    }
+    if (this.healthRefreshIntervalId) {
+      clearInterval(this.healthRefreshIntervalId);
+      this.healthRefreshIntervalId = null;
     }
     this.destroy$.next();
     this.destroy$.complete();
@@ -229,6 +250,50 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
           });
         }
       });
+  }
+
+  loadHealthSummary(): void {
+    if (!this.canViewHealthSummary()) {
+      this.healthCheckedAt = null;
+      this.healthServices = [];
+      return;
+    }
+
+    this.systemHealthService.getHealthSummary()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response) => {
+          this.healthCheckedAt = response.checkedAt;
+          this.healthServices = [
+            { key: 'smtp', label: 'SMTP', state: response.services.smtp },
+            { key: 'mongo', label: 'Mongo', state: response.services.mongo },
+            { key: 'internalApi', label: 'API interna', state: response.services.internalApi },
+            { key: 'integrations', label: 'Integraciones', state: response.services.integrations }
+          ];
+        },
+        error: () => {
+          this.healthCheckedAt = null;
+          this.healthServices = [];
+        }
+      });
+  }
+
+  private canViewHealthSummary(): boolean {
+    return this.isAdmin;
+  }
+
+  getHealthStatusClass(status: string): string {
+    if (status === 'ok') return 'chip-ok';
+    if (status === 'down') return 'chip-down';
+    return 'chip-warn';
+  }
+
+  getHealthTooltip(service: { label: string; state: HealthServiceState }): string {
+    const detail = service.state?.detail || 'Sin detalle';
+    const lastCheck = service.state?.lastCheckAt
+      ? ` | Última prueba: ${new Date(service.state.lastCheckAt).toLocaleString('es-CL')}`
+      : '';
+    return `${service.label}: ${detail}${lastCheck}`;
   }
 
   loadLogo(): void {

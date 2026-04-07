@@ -206,6 +206,21 @@
       </button>
     </mat-toolbar>
 
+    <div class="health-strip" *ngIf="isAdmin && healthServices.length > 0">
+      <div class="health-chips">
+        <button mat-icon-button class="health-refresh-btn" (click)="loadHealthSummary()" matTooltip="Refrescar estado de salud">
+          <mat-icon>refresh</mat-icon>
+        </button>
+        <span
+          *ngFor="let service of healthServices"
+          class="health-chip"
+          [ngClass]="getHealthStatusClass(service.state.status)"
+          [matTooltip]="getHealthTooltip(service)">
+          {{ service.label }}
+        </span>
+      </div>
+    </div>
+
     <div class="content-wrapper">
       <router-outlet></router-outlet>
     </div>

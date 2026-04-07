@@ -27,13 +27,18 @@ const smtpTestLimiter = rateLimit({
   max: 3,
   message: 'Demasiados intentos de prueba SMTP. Intenta en 15 minutos.',
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  // El proyecto usa trust proxy en producción; evitamos validación bloqueante
+  // de express-rate-limit para este limiter manteniendo el límite activo.
+  validate: {
+    trustProxy: false
+  }
 });
 
 const smtpValidators = [
   body('provider').isIn(['office365', 'aws-ses', 'elastic-email', 'google-mail', 'google-workspace', 'mailgun', 'custom']),
   body('username').trim().notEmpty(),
-  body('password').isLength({ min: 8 }).withMessage('Password SMTP debe tener al menos 8 caracteres'),
+  body('password').optional().isLength({ min: 8 }).withMessage('Password SMTP debe tener al menos 8 caracteres'),
   body('host').trim().notEmpty(),
   body('port').isInt({ min: 1, max: 65535 }).toInt(),
   body('useTLS').isBoolean(),
@@ -55,7 +60,9 @@ const testValidators = [
   body('senderEmail').optional().isEmail().normalizeEmail(),
   body('recipients').optional().isArray({ min: 1 }),
   body('recipients.*').optional().isEmail().normalizeEmail(),
-  body('sendOnlyIfRed').optional().isBoolean()
+  body('sendOnlyIfRed').optional().isBoolean(),
+  body('retryAttempt').optional().isBoolean(),
+  body('retryCount').optional().isInt({ min: 1, max: 20 }).toInt()
 ];
 
 const ensureRequiredFields = (data, requireRecipients = true) => {
@@ -140,7 +147,15 @@ router.post('/',
   validate,
   async (req, res) => {
     try {
-      const data = req.body;
+      const data = { ...req.body };
+      let config = await SmtpConfig.findOne();
+
+      if (!data.password) {
+        if (!config) {
+          return res.status(400).json({ message: 'Falta el campo requerido: password' });
+        }
+        data.password = decrypt(config.password);
+      }
 
       // No requerir destinatarios para guardar
       const missing = ensureRequiredFields(data, false);
@@ -157,7 +172,6 @@ router.post('/',
 
       const encryptedPassword = encrypt(data.password);
 
-      let config = await SmtpConfig.findOne();
       if (!config) {
         config = new SmtpConfig({
           ...data,
@@ -225,16 +239,31 @@ router.post('/test',
   validate,
   async (req, res) => {
     let usingStoredConfig = false;
+    let usingStoredPassword = false;
+    const retryAttempt = req.body?.retryAttempt === true || req.body?.retryAttempt === 'true';
+    const retryCountParsed = Number.parseInt(String(req.body?.retryCount ?? ''), 10);
+    const retryCount = Number.isFinite(retryCountParsed) && retryCountParsed > 0 ? retryCountParsed : null;
     try {
       let configData = null;
 
       if (Object.keys(req.body || {}).length > 0) {
+        const bodyData = { ...req.body };
+        const stored = await SmtpConfig.findOne();
+
+        if (!bodyData.password) {
+          if (!stored) {
+            return res.status(400).json({ message: 'Falta el campo requerido: password' });
+          }
+          bodyData.password = decrypt(stored.password);
+          usingStoredPassword = true;
+        }
+
         // No requerir destinatarios para prueba de conexión
-        const missing = ensureRequiredFields(req.body, false);
+        const missing = ensureRequiredFields(bodyData, false);
         if (missing) {
           return res.status(400).json({ message: missing });
         }
-        configData = req.body;
+        configData = bodyData;
       } else {
         const stored = await SmtpConfig.findOne();
         usingStoredConfig = true;
@@ -276,6 +305,9 @@ router.post('/test',
         result: { success: true, reason: message },
         metadata: {
           usingStoredConfig,
+          usingStoredPassword,
+          retryAttempt,
+          retryCount,
           host: configData.host,
           port: configData.port,
           recipient: recipient || null,
@@ -295,6 +327,9 @@ router.post('/test',
         result: { success: false, reason: error.message },
         metadata: {
           usingStoredConfig,
+          usingStoredPassword,
+          retryAttempt,
+          retryCount,
           host: req.body?.host,
           port: req.body?.port
         }

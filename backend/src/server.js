@@ -38,6 +38,7 @@ const inputSanitizer = require('./middleware/input-sanitizer');
 const { logger } = require('./utils/logger');
 const { startChecklistAlertScheduler } = require('./utils/checklistAlertScheduler');
 const { startBackupScheduler, stopBackupScheduler } = require('./utils/backup-scheduler');
+const { startAuditRetentionScheduler, stopAuditRetentionScheduler } = require('./utils/audit-retention-scheduler');
 const {
   startComplementCircuitHealthChecks,
   stopComplementCircuitHealthChecks
@@ -237,8 +238,8 @@ app.use(helmet({
 }));
 
 // Body parsers
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Correlation ID (X-Request-Id)
 app.use(requestIdMiddleware);
@@ -442,6 +443,7 @@ app.use('/api/complements', require('./routes/complements')); // Gestión de com
 app.use('/api/internal/versions', require('./routes/internal/versions'));
 app.use('/api/internal/v1', require('./routes/internal/v1'));
 app.use('/api/internal/v2', require('./routes/internal/v2'));
+app.use('/api/system', require('./routes/system'));
 
 // Health check (ANTES del fallback SPA)
 app.get('/health', (req, res) => {
@@ -728,6 +730,7 @@ const startServers = async () => {
 
     startChecklistAlertScheduler();
     startBackupScheduler();
+    startAuditRetentionScheduler();
     startComplementCircuitHealthChecks();
 
     const { startScheduler: startShiftReportScheduler } = require('./utils/shift-scheduler');
@@ -743,6 +746,7 @@ const startServers = async () => {
 const gracefulShutdown = (signal) => {
   logger.info({ event: 'server.shutdown', signal }, 'Shutting down server');
   stopBackupScheduler();
+  stopAuditRetentionScheduler();
   stopComplementCircuitHealthChecks();
 
   const closeTargets = [httpServer, httpsServer].filter(Boolean);

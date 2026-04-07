@@ -257,14 +257,13 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  position: relative;
-  min-height: 72px;
+  min-height: 64px;
   padding: 0 12px;
 
   ::ng-deep .mat-toolbar-row,
   ::ng-deep .mat-mdc-toolbar-row {
-    min-height: 72px;
-    height: 72px;
+    min-height: 64px;
+    height: 64px;
   }
 }
 
@@ -282,6 +281,54 @@
   letter-spacing: 0.04em;
   line-height: 1.08;
   pointer-events: none;
+}
+
+.health-strip {
+  padding: 8px 16px 10px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--surface-muted);
+}
+
+.health-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.health-refresh-btn {
+  width: 28px;
+  height: 28px;
+  line-height: 28px;
+}
+
+.health-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  white-space: nowrap;
+}
+
+.chip-ok {
+  background: #1f7a35;
+  border-color: #2fa04b;
+  color: #ffffff;
+}
+
+.chip-warn {
+  background: #8a6a00;
+  border-color: #b88b00;
+  color: #fff7d1;
+}
+
+.chip-down {
+  background: #b71c1c;
+  border-color: #d32f2f;
+  color: #ffffff;
 }
 
 .spacer {

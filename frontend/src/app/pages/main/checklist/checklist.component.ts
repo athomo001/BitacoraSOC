@@ -4,6 +4,7 @@ import { MatExpansionModule, MatAccordion, MatExpansionPanel, MatExpansionPanelH
 import { ChecklistService } from '../../../services/checklist.service';
 import { ChecklistTemplate, ChecklistItem, ShiftCheck } from '../../../models/checklist.model';
 import { AuthService } from '../../../services/auth.service';
+import { OnboardingService } from '../../../services/onboarding.service';
 import { NgIf, NgFor, DatePipe, NgTemplateOutlet } from '@angular/common';
 import { MatCard, MatCardContent } from '@angular/material/card';
 import { MatIcon } from '@angular/material/icon';
@@ -41,6 +42,7 @@ export class ChecklistComponent implements OnInit {
   isSubmitting = false;
   isLoading = false;
   checklistTree: ChecklistNode[] = [];
+  checklistGuideVisible = false;
   
   // Inicia cerrado por defecto y solo cambia si el usuario lo abre/cierra.
   mainPanelExpanded = false;
@@ -49,12 +51,27 @@ export class ChecklistComponent implements OnInit {
     private checklistService: ChecklistService,
     private snackBar: MatSnackBar,
     private authService: AuthService,
+    private onboardingService: OnboardingService,
     private expansionModule: MatExpansionModule
   ) { }
 
   ngOnInit(): void {
+    const username = this.authService.getCurrentUser()?.username;
+    this.checklistGuideVisible = this.onboardingService.shouldShow('checklist', username);
     this.loadActiveChecklist();
     this.loadLastCheck();
+  }
+
+  closeChecklistGuide(dontShowAgain = false): void {
+    const username = this.authService.getCurrentUser()?.username;
+    if (dontShowAgain) {
+      this.onboardingService.hide('checklist', username);
+    }
+    this.checklistGuideVisible = false;
+  }
+
+  openChecklistGuide(): void {
+    this.checklistGuideVisible = true;
   }
 
   private buildNodes(items: ChecklistItem[], parent?: ChecklistNode): ChecklistNode[] {
