@@ -397,20 +397,27 @@ export class ReportGeneratorComponent implements OnInit {
     if (!input) return '';
 
     let text = input;
-    // Asegurar saltos antes de etiquetas semánticas aunque el origen venga "pegado".
-    const semanticLabels = [
-      'Resumen de Vulnerabilidad',
-      'ID:',
-      'Severidad (CVSS):',
-      'Impacto:',
-      'Alcance de Versiones',
-      'Producto',
-      'Rango de Versiones Vulnerables'
+    // Reparar texto corrido: "VulnerabilidadID", "53770Severidad", "ProductoRango", etc.
+    text = text
+      .replace(/([a-záéíóúñ])([A-ZÁÉÍÓÚÑ])/g, '$1 $2')
+      .replace(/([0-9])([A-Za-zÁÉÍÓÚÑáéíóúñ])/g, '$1 $2')
+      .replace(/([A-Za-zÁÉÍÓÚÑáéíóúñ])([0-9])/g, '$1 $2');
+
+    // Asegurar saltos antes de etiquetas semánticas (acepta variaciones de espacios).
+    const semanticLabelRegexes = [
+      /Resumen\s*de\s*Vulnerabilidad\s*:?/gi,
+      /ID\s*:?\s*CVE-\d{4}-\d+/gi,
+      /Severidad\s*\(CVSS\)\s*:?/gi,
+      /Impacto\s*:?/gi,
+      /Alcance\s*de\s*Versiones\s*:?/gi,
+      /Producto\s*:?/gi,
+      /Rango\s*de\s*Versiones\s*Vulnerables\s*:?/gi
     ];
-    semanticLabels.forEach((label) => {
-      const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const regex = new RegExp(`([^\\n])\\s*(${escaped})`, 'gi');
-      text = text.replace(regex, '$1\n$2');
+    semanticLabelRegexes.forEach((labelRegex) => {
+      text = text.replace(labelRegex, (match, offset, whole) => {
+        const prev = offset > 0 ? whole[offset - 1] : '';
+        return prev && prev !== '\n' ? `\n${match}` : match;
+      });
     });
 
     // Encabezado de tabla "Producto | Rango ..."
@@ -426,6 +433,7 @@ export class ReportGeneratorComponent implements OnInit {
     );
 
     return text
+      .replace(/[ \t]{2,}/g, ' ')
       .replace(/[ \t]+\n/g, '\n')
       .replace(/\n{3,}/g, '\n\n')
       .trim();
