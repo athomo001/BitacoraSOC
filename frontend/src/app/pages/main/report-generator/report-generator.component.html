@@ -1,5 +1,11 @@
 <div class="report-generator-container">
-  <mat-card #reportGuideCard *ngIf="reportGuideVisible" style="margin-bottom: 12px;">
+  <mat-card
+    #reportGuideCard
+    id="report-guide-card"
+    tabindex="-1"
+    [class.guide-card-focused]="reportGuideFocused"
+    *ngIf="reportGuideVisible"
+    style="margin-bottom: 12px;">
     <mat-card-content>
       <p><strong>Guía rápida Reportería:</strong> elige modo Reporte o Boletín, completa campos obligatorios, genera vista previa y luego copia o envía.</p>
       <div class="actions">
@@ -297,7 +303,7 @@
         <div class="preview-header">
           <h3>Vista previa</h3>
           <div class="preview-actions">
-            <button mat-button color="primary" (click)="openReportGuide()">
+            <button mat-button color="primary" type="button" (click)="openReportGuide()">
               <mat-icon>help_outline</mat-icon>
               Ver guía rápida
             </button>

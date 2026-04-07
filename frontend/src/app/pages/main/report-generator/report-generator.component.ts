@@ -46,6 +46,7 @@ import { environment } from '@env/environment';
 })
 export class ReportGeneratorComponent implements OnInit {
   @ViewChild('reportGuideCard') reportGuideCard?: ElementRef<HTMLElement>;
+  reportGuideFocused = false;
 
   // ─── Mode ───────────────────────────────────────────────────────────────
   currentMode: 'report' | 'newsletter' = 'report';
@@ -137,13 +138,27 @@ export class ReportGeneratorComponent implements OnInit {
 
   openReportGuide(): void {
     this.reportGuideVisible = true;
-    // Si el usuario está abajo en la página, llevarlo a la guía para evitar
-    // la percepción de "botón muerto".
     setTimeout(() => {
-      this.reportGuideCard?.nativeElement?.scrollIntoView({
+      const card = this.reportGuideCard?.nativeElement || document.getElementById('report-guide-card');
+      if (!card) return;
+
+      card.scrollIntoView({
         behavior: 'smooth',
-        block: 'start'
+        block: 'center'
       });
+      card.focus({ preventScroll: true });
+      this.flashReportGuideCard();
+      this.snackBar.open('Guía rápida abierta y enfocada.', 'Cerrar', { duration: 2200 });
+    }, 50);
+  }
+
+  private flashReportGuideCard(): void {
+    this.reportGuideFocused = false;
+    setTimeout(() => {
+      this.reportGuideFocused = true;
+      setTimeout(() => {
+        this.reportGuideFocused = false;
+      }, 1800);
     }, 0);
   }
 

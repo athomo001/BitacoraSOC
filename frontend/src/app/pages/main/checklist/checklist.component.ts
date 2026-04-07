@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatExpansionModule, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatExpansionPanelDescription } from '@angular/material/expansion';
 import { ChecklistService } from '../../../services/checklist.service';
@@ -36,6 +36,7 @@ type ChecklistNode = {
   imports: [NgIf, MatCard, MatCardContent, MatIcon, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, ReactiveFormsModule, FormsModule, MatFormField, MatLabel, MatSelect, MatOption, NgFor, MatExpansionPanelDescription, MatRadioGroup, MatRadioButton, MatInput, MatHint, MatButton, MatProgressSpinner, EntriesComponent, DatePipe, NgTemplateOutlet]
 })
 export class ChecklistComponent implements OnInit {
+  @ViewChild('checklistGuideCard') checklistGuideCard?: ElementRef<HTMLElement>;
   activeChecklist: ChecklistTemplate | null = null;
   lastCheck: ShiftCheck | null = null;
   checkType: 'inicio' | 'cierre' = 'inicio';
@@ -72,6 +73,10 @@ export class ChecklistComponent implements OnInit {
 
   openChecklistGuide(): void {
     this.checklistGuideVisible = true;
+    setTimeout(() => {
+      const card = this.checklistGuideCard?.nativeElement;
+      card?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
   }
 
   private buildNodes(items: ChecklistItem[], parent?: ChecklistNode): ChecklistNode[] {

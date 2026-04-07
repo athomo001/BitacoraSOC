@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ConfigService } from '../../../services/config.service';
@@ -41,6 +41,7 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
   ]
 })
 export class SettingsComponent implements OnInit {
+  @ViewChild('smtpGuideCard') smtpGuideCard?: ElementRef<HTMLElement>;
   appConfigForm: FormGroup;
   smtpForm: FormGroup;
   smtpTestPassed = false;
@@ -111,6 +112,10 @@ export class SettingsComponent implements OnInit {
 
   openSmtpGuide(): void {
     this.smtpGuideVisible = true;
+    setTimeout(() => {
+      const card = this.smtpGuideCard?.nativeElement;
+      card?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
   }
 
   loadConfig(): void {

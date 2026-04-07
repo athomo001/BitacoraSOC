@@ -7,7 +7,14 @@
 
 | ID | Estado | Seccion | Tarea | Notas |
 | --- | --- | --- | --- | --- |
-| AI-SUMMARY-001 | Pendiente | IA/Operación ALTA | Módulo de Resumen Ejecutivo Efímero (IA On-Demand) | Integrar Ollama+llama3.2:3b en modo efímero `docker start -> healthcheck -> generate -> docker stop` con `try/finally`, salida editable en campo "Resumen Sugerido por IA" y botón "Generar con IA". |
+| AI-SUMMARY-001 | Pendiente | IA/Operación ALTA | Módulo de Resumen Ejecutivo Efímero (IA On-Demand) | Integrar Ollama+llama3.2:3b en modo efímero `docker start -> healthcheck -> generate -> docker stop` con `try/finally`. Alcance: IA sin interacción conversacional con usuarios; solo consume eventos del turno y genera resumen sugerido. |
+| AI-SUMMARY-001A | Pendiente | IA/Backend CRÍTICA | Endpoint seguro de generación IA on-demand (solo admin) | Crear `POST /api/reports/newsletter/ai-summary` con `authenticate + authorize('admin')`, validación fuerte de payload, timeout y respuesta estructurada. |
+| AI-SUMMARY-001B | Pendiente | IA/Infra CRÍTICA | Orquestador efímero de Ollama con kill garantizado | Implementar flujo `start -> healthcheck -> generate -> stop` en `try/finally`, con lock de concurrencia para evitar múltiples arranques simultáneos. |
+| AI-SUMMARY-001C | Pendiente | IA/Seguridad ALTA | Hardening anti prompt-injection y sanitización de contexto | Sanitizar entradas, truncar tamaño, remover instrucciones maliciosas y usar prompt de sistema inmutable con formato JSON estricto. |
+| AI-SUMMARY-001D | Pendiente | IA/Observabilidad ALTA | Auditoría técnica sin fuga de datos sensibles | Auditar duración, modelo, tokens estimados, resultado y errores; nunca persistir prompt completo ni respuesta íntegra sensible. |
+| AI-SUMMARY-001E | Pendiente | IA/Frontend ALTA | UX integrada en Boletín: `Resumen Sugerido por IA` + botón `Generar con IA` | Campo editable no bloqueante, estados loading/error/reintento, cancelación y preservación de edición manual al regenerar. |
+| AI-SUMMARY-001F | Pendiente | IA/Operación ALTA | Límite de recursos y políticas de degradación | Timeout duro, memoria/CPU límites, rate-limit por usuario, fallback manual si IA falla, sin bloquear generación de boletín. |
+| AI-SUMMARY-001G | Pendiente | QA/Testing ALTA | Suite de pruebas de seguridad, carga y regresión | Tests de éxito, timeout, lock concurrente, sanitización, RBAC, fallback UX y no-regresión en `report-generator`/newsletter. |
 | AUDIT-EXPORT-028 | Incompleto (Reabierto) | Auditoría / Operación ALTA | Descarga flexible de logs de auditoría | Ajuste UX requerido: explicar explícitamente que `N` lo define el usuario en "Últimos días (N días)" / "Últimos meses (N meses)" con ejemplos visibles (`2, 7, 15` días; `1, 3, 6` meses). Mantener también modo por **filtros actuales** (incluyendo fecha y demás filtros) y modo por cantidad. |
 | UI-HEALTH-033 | Incompleto (Reabierto) | UI/UX + Operación ALTA | Barra de salud visible de servicios críticos | Ajuste pendiente: la barra debe verla solo admin, visualmente separada del título/toolbar y con contraste legible (verde/rojo con tipografía clara según estado). |
 
@@ -19,6 +26,7 @@
 
 | ID | Estado | Seccion | Tarea | Notas |
 | --- | --- | --- | --- | --- |
+| UI-ONBOARD-036 | Listo | UI/UX + Accesibilidad ALTA | Botón "Ver guía rápida" parece enlace muerto en módulos clave | Se corrigió comportamiento en `Report Generator`, `Checklist`, `Auditoría` y `Settings SMTP`: al hacer click en "Ver guía rápida" se abre la guía y se hace scroll automático al bloque visible, eliminando percepción de enlace muerto. |
 | SMTP-030 | Listo | Configuración / SMTP ALTA | Probar conexión falla si contraseña queda vacía con estado "Conectado" | Se ajustó frontend y backend para reutilizar la contraseña cifrada guardada cuando el campo password está vacío, manteniendo validación explícita cuando no existe configuración previa. |
 | AUDIT-RET-029 | Listo | Auditoría / Retención ALTA | Retención máxima de logs de auditoría: 13 meses | Se estableció retención de 13 meses (TTL por defecto) y scheduler automático de limpieza con métricas (`deletedCount`, `cutoff`) y eventos auditables de éxito/fallo. |
 | CATALOG-COLOR-031 | Listo | Admin / Catálogos ALTA | Mejoras en "Color del reporte copiable a correo" | Se renombró a **Colores de Reportería**, se agregó leyenda de alcance (reportes y boletines), entrada manual HEX + selector dinámico y etiqueta "(actual)" ahora refleja el color realmente activo. |
@@ -154,24 +162,113 @@ Los items marcados como `Listo` deben quedar reflejados en `docs/CHANGELOG.md` c
 
 ### AI-SUMMARY-001 - Resumen Ejecutivo Efímero (IA On-Demand)
 
-1. Backend: implementar método de orquestación efímera para Ollama:
-   - `docker start ollama`
-   - healthcheck en `http://localhost:11434`
-   - consulta a `/api/generate` con modelo `llama3.2:3b`
-   - `docker stop ollama` en bloque `finally` (siempre).
-2. Prompt del sistema: forzar estructura de salida con:
-   - tabla de tickets
-   - incidentes críticos
-   - tareas en curso.
-3. Payload: incluir todas las entradas de bitácora del turno actual.
-4. Frontend:
-   - agregar campo de texto editable `Resumen Sugerido por IA`
-   - agregar botón `✨ Generar con IA`
-   - completar el campo al terminar la respuesta sin bloquear edición manual.
-5. Recursos/operación del contenedor:
-   - memoria limitada a `--memory="2g"`
-   - volumen persistente `-v ollama_data:/root/.ollama`
-   - contenedor apagado fuera de uso (superficie mínima y ahorro de RAM).
+**Resultado de revisión profunda del código actual:**
+
+1. Hoy **no existe** implementación de IA local ni endpoints de resumen IA en backend.
+2. En frontend sí existe `Resumen Ejecutivo` en `newsletterForm`, pero **sin** botón/flujo de IA.
+3. No hay orquestación de contenedor, ni lock de concurrencia, ni timeout/kill de proceso IA.
+4. El módulo de boletines funciona sin IA (envío 1:1), por lo que la integración debe ser aditiva y no romper el flujo actual.
+
+**Alcance funcional confirmado (restricción clave):**
+
+1. La IA **no** tendrá interacción con usuarios finales (sin chat, sin preguntas libres, sin prompt manual editable).
+2. La IA solo procesa contexto interno del turno (eventos/entradas/checklist) y devuelve un resumen sugerido.
+3. El usuario humano solo ve el resultado final sugerido para aceptar/editar, pero no conversa con el modelo.
+
+**Flujo operativo confirmado (end-to-end):**
+
+1. Bitácora recolecta eventos del turno (entries/checklist/contexto de cierre).
+2. Backend arma contexto sanitizado y dispara IA efímera (Ollama local).
+3. IA interpreta y devuelve resumen ejecutivo estructurado.
+4. Sistema envía el resultado por correo (destinatarios configurados).
+5. Sistema registra ejecución técnica (éxito/fallo/timeout) para auditoría operativa.
+
+**Diseño objetivo (alineado a skills IA local + seguridad + web):**
+
+1. **Modo efímero obligatorio:** `spawn -> execute -> output -> destroy` para Ollama; nada de servicio IA persistente.
+2. **Endpoint dedicado y seguro:** `POST /api/reports/newsletter/ai-summary` (solo admin), validación de input y límite de tamaño.
+3. **Prompt de sistema inmutable:** salida JSON con `summary`, `risk_level`, `indicators[]`, `recommendations[]`; luego render a texto editable.
+4. **No fuga de datos:** logs mínimos, sin prompt completo ni respuesta cruda en auditoría.
+5. **UX no bloqueante:** si IA falla, el usuario sigue generando/mandando boletín manualmente.
+
+**Contrato propuesto del endpoint (`AI-SUMMARY-001A`) — sin input libre de usuario:**
+
+Request:
+- `shiftId` o `shiftWindow` (requerido) para resolver eventos del turno desde backend.
+- `mode` opcional (`manual_trigger` o `scheduled`) para trazabilidad operativa.
+- **No se aceptan campos de prompt libre desde frontend**.
+
+Response:
+- `ok` (boolean)
+- `suggestedSummary` (string)
+- `riskLevel` (`low|medium|high`)
+- `provider` (`ollama`)
+- `model` (`llama3.2:3b`)
+- `timingMs` (number)
+- `fallbackUsed` (boolean)
+- `delivery` (`queued|sent|failed`)
+- `executionId` (string trazable en logs)
+
+**Sub-issues técnicos obligatorios:**
+
+1. `AI-SUMMARY-001A` - Endpoint seguro + validación + RBAC admin.
+2. `AI-SUMMARY-001B` - Orquestador efímero con lock de concurrencia (mutex en memoria + timeout hard + `finally` con `docker stop`).
+3. `AI-SUMMARY-001C` - Sanitización anti prompt-injection:
+   - sanitización de texto de eventos del turno,
+   - strip de instrucciones imperativas embebidas en descripciones/eventos,
+   - escapado de caracteres de control.
+4. `AI-SUMMARY-001D` - Observabilidad/auditoría:
+   - evento `admin.ai.summary.generate.success|fail`,
+   - metadata técnica (`executionId`, `timingMs`, `model`, `fallbackUsed`, `errorCode`, `deliveryStatus`),
+   - sin datos sensibles.
+5. `AI-SUMMARY-001E` - Frontend:
+   - botón `✨ Generar con IA` (solo dispara proceso backend),
+   - estado loading con disable temporal,
+   - campo `Resumen Sugerido por IA` editable y preservado,
+   - sin caja de prompt/manual input para el modelo.
+6. `AI-SUMMARY-001F` - Operación:
+   - rate-limit por usuario admin para endpoint IA,
+   - límites CPU/RAM/timeout,
+   - fallback explícito cuando Ollama no responde.
+7. `AI-SUMMARY-001G` - QA:
+   - pruebas unitarias e integración de flujo feliz + timeout + fallo de healthcheck + concurrente + RBAC.
+
+**Buenas prácticas de implementación (resumen ejecutable):**
+
+1. **Backend primero (seguridad):** route + service `ai-summary-orchestrator.js` + validadores.
+2. **Separación clara:** ruta HTTP no ejecuta docker directamente; delega a servicio con `try/finally`.
+3. **Formato estricto:** obligar respuesta IA en JSON; si parse falla, fallback seguro.
+4. **Frontend resiliente:** actualizar solo `resumenEjecutivo` sugerido, nunca bloquear edición manual del usuario.
+5. **No regresión:** no tocar el pipeline actual de `sendNewsletter()` más allá de consumir campo generado.
+6. **Anti-colgado:** watchdog de ejecución (timeout duro + kill + evento `stuck_timeout`) para detectar si la corrida quedó pegada.
+
+**Criterios de aceptación endurecidos:**
+
+1. Usuario admin puede generar sugerencia IA en <= 25s en escenario normal.
+2. Si Ollama falla o excede timeout, UI muestra error accionable y el formulario sigue usable.
+3. Contenedor queda detenido siempre tras cada intento (éxito o fallo).
+4. Auditoría registra éxito/fallo/timeout con trazabilidad técnica y sin fuga sensible.
+5. Tests automáticos cubren flujo de éxito, timeout, reintento y concurrencia.
+6. Envío por correo reporta estado final (`sent/failed`) y queda asociado a `executionId`.
+
+**Decisión pendiente (preparación, sin implementación aún):**
+
+1. **Modelo IA final**
+   - Opción base propuesta: `llama3.2:3b` (local, liviano, rápido para resumen ejecutivo).
+   - Validar si requiere upgrade por calidad (solo si QA de contenido lo justifica).
+2. **Estrategia de despliegue**
+   - Opción A: contenedor `bitacora-ollama` administrado por script de orquestación backend.
+   - Opción B: servicio `ollama` en `docker-compose` con `profile` dedicado para activación controlada.
+   - Criterio: minimizar superficie activa y consumo permanente de recursos.
+3. **Límites de recursos**
+   - Definir memoria máxima, CPU máxima y timeout duro por ejecución.
+   - Definir política de kill y recuperación ante timeout o bloqueo.
+4. **Política de operación**
+   - Confirmar frecuencia: solo trigger manual inicial o también scheduler de cierre de turno.
+   - Confirmar destinatarios del correo de resumen (lista operativa final).
+5. **Go-live / salida a producción**
+   - Checklist mínimo: pruebas de carga, seguridad, fallback sin IA, auditoría completa y rollback claro.
+   - No habilitar en productivo hasta cerrar `AI-SUMMARY-001A` a `AI-SUMMARY-001G`.
 
 ### REP-GEN-019 - Reutilizar `/main/report-generator` para modo dual Reporte / Boletín de Seguridad
 
