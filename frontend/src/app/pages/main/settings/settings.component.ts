@@ -243,7 +243,11 @@ export class SettingsComponent implements OnInit {
       },
       error: (err) => {
         this.smtpLastError = this.buildSmtpDiagnostic(err);
-        this.connectionStatus = 'desconectado';
+        const hadKnownGoodConnection = this.smtpTestPassed || this.connectionStatus === 'conectado';
+        const transientCodes = new Set(['SMTP_RATE_LIMIT', 'SMTP_THROTTLED', 'SMTP_TIMEOUT']);
+        const shouldKeepConnected = hadKnownGoodConnection && transientCodes.has(this.smtpLastError.code);
+        this.connectionStatus = shouldKeepConnected ? 'conectado' : 'desconectado';
+        this.smtpTestPassed = shouldKeepConnected ? true : false;
         this.snackBar.open(
           `Error en test SMTP: ${this.smtpLastError.probableCause}. ${this.smtpLastError.suggestedAction}`,
           'Cerrar',
@@ -261,6 +265,35 @@ export class SettingsComponent implements OnInit {
   private buildSmtpDiagnostic(err: any): { code: string; probableCause: string; suggestedAction: string; rawMessage?: string } {
     const rawMessage = String(err?.error?.error || err?.error?.message || err?.message || 'error desconocido');
     const lowered = rawMessage.toLowerCase();
+    const statusCode = Number(err?.status || err?.error?.status || 0);
+
+    if (
+      statusCode === 429 ||
+      lowered.includes('demasiados intentos') ||
+      lowered.includes('rate limit') ||
+      lowered.includes('too many requests')
+    ) {
+      return {
+        code: 'SMTP_RATE_LIMIT',
+        probableCause: 'Se alcanzó el límite temporal de pruebas SMTP',
+        suggestedAction: 'Espera unos minutos y vuelve a probar.',
+        rawMessage
+      };
+    }
+    if (
+      lowered.includes('temporarily') ||
+      lowered.includes('try again later') ||
+      lowered.includes('throttle') ||
+      lowered.includes('4.7.') ||
+      lowered.includes('5.7.139')
+    ) {
+      return {
+        code: 'SMTP_THROTTLED',
+        probableCause: 'El proveedor SMTP aplicó bloqueo temporal por seguridad',
+        suggestedAction: 'Espera unos minutos y reintenta; si persiste, revisa políticas del proveedor.',
+        rawMessage
+      };
+    }
 
     if (lowered.includes('invalid login') || lowered.includes('535') || lowered.includes('auth')) {
       return {
