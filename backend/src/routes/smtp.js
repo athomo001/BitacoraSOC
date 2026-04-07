@@ -16,6 +16,7 @@ const { body } = require('express-validator');
 const nodemailer = require('nodemailer');
 const rateLimit = require('express-rate-limit');
 const SmtpConfig = require('../models/SmtpConfig');
+const AppConfig = require('../models/AppConfig');
 const { authenticate, authorize } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const { encrypt, decrypt } = require('../utils/encryption');
@@ -76,6 +77,30 @@ const ensureRequiredFields = (data, requireRecipients = true) => {
   return null;
 };
 
+const safeDecrypt = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const dec = decrypt(raw);
+    return String(dec || '').trim() || raw;
+  } catch {
+    return raw;
+  }
+};
+
+const findStoredSmtpConfig = async () => (
+  SmtpConfig.findOne({
+    $or: [{ isActive: true }, { isActive: { $exists: false } }]
+  }).sort({ updatedAt: -1, createdAt: -1 })
+);
+
+const resolveLegacyPasswordFromAppConfig = async () => {
+  const appConfig = await AppConfig.findOne().select('smtpConfig').lean();
+  const legacy = appConfig?.smtpConfig || null;
+  if (!legacy) return '';
+  return safeDecrypt(legacy.pass || legacy.password || '');
+};
+
 const verifyAndTest = async (config, sendMail = true) => {
   // Determinar si usar SSL seguro o STARTTLS
   // Puerto 465 = SSL directo (secure: true)
@@ -127,7 +152,7 @@ const verifyAndTest = async (config, sendMail = true) => {
 // GET /api/smtp - Obtener configuracion SMTP (admin)
 router.get('/', authenticate, authorize('admin'), async (_req, res) => {
   try {
-    const config = await SmtpConfig.findOne();
+    const config = await findStoredSmtpConfig();
     if (!config) return res.json(null);
 
     const configObj = config.toObject();
@@ -148,13 +173,18 @@ router.post('/',
   async (req, res) => {
     try {
       const data = { ...req.body };
-      let config = await SmtpConfig.findOne();
+      let config = await findStoredSmtpConfig();
 
       if (!data.password) {
-        if (!config) {
-          return res.status(400).json({ message: 'Falta el campo requerido: password' });
+        if (config?.password) {
+          data.password = safeDecrypt(config.password);
+        } else {
+          const legacyPassword = await resolveLegacyPasswordFromAppConfig();
+          if (!legacyPassword) {
+            return res.status(400).json({ message: 'Falta el campo requerido: password' });
+          }
+          data.password = legacyPassword;
         }
-        data.password = decrypt(config.password);
       }
 
       // No requerir destinatarios para guardar
@@ -248,14 +278,20 @@ router.post('/test',
 
       if (Object.keys(req.body || {}).length > 0) {
         const bodyData = { ...req.body };
-        const stored = await SmtpConfig.findOne();
+        const stored = await findStoredSmtpConfig();
 
         if (!bodyData.password) {
-          if (!stored) {
-            return res.status(400).json({ message: 'Falta el campo requerido: password' });
+          if (stored?.password) {
+            bodyData.password = safeDecrypt(stored.password);
+            usingStoredPassword = true;
+          } else {
+            const legacyPassword = await resolveLegacyPasswordFromAppConfig();
+            if (!legacyPassword) {
+              return res.status(400).json({ message: 'Falta el campo requerido: password' });
+            }
+            bodyData.password = legacyPassword;
+            usingStoredPassword = true;
           }
-          bodyData.password = decrypt(stored.password);
-          usingStoredPassword = true;
         }
 
         // No requerir destinatarios para prueba de conexión
@@ -265,14 +301,14 @@ router.post('/test',
         }
         configData = bodyData;
       } else {
-        const stored = await SmtpConfig.findOne();
+        const stored = await findStoredSmtpConfig();
         usingStoredConfig = true;
         if (!stored) {
           return res.status(404).json({ message: 'No hay configuracion SMTP' });
         }
         configData = {
           ...stored.toObject(),
-          password: decrypt(stored.password)
+          password: safeDecrypt(stored.password)
         };
       }
 
@@ -286,7 +322,7 @@ router.post('/test',
       }, sendMail);
 
       if (usingStoredConfig) {
-        const stored = await SmtpConfig.findOne();
+        const stored = await findStoredSmtpConfig();
         if (stored) {
           stored.lastTestDate = new Date();
           stored.lastTestSuccess = true;
@@ -338,7 +374,7 @@ router.post('/test',
       console.error('Error al probar SMTP:', error);
 
       if (usingStoredConfig) {
-        const stored = await SmtpConfig.findOne();
+        const stored = await findStoredSmtpConfig();
         if (stored) {
           stored.lastTestDate = new Date();
           stored.lastTestSuccess = false;
