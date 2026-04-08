@@ -2,6 +2,28 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.28-beta] - 2026-04-08
+
+### Ayuda Contextual y UX (REP-GEN-039)
+
+#### Sistema de globos dinámicos "Top-Aligned"
+- **Nueva UX Avanzada:** Se reemplazó el panel de guía estático por un sistema de ayuda contextual disparado por foco (`focus/blur`).
+- **Posicionamiento Inteligente:** Se implementó una estrategia de alineación superior que coloca los globos sobre el campo, eliminando recortes en los bordes de la pantalla y la necesidad de scroll horizontal.
+- **Animaciones Premium:** Integración de `anime.js` para efectos de "pop-up" suaves con aceleración por hardware (escala y traslación vertical).
+- **Consistencia:** Limpieza de clases manuales y unificación del comportamiento de ayuda en los modos Reporte y Boletín.
+
+### Docker y DevOps (DOCKER-OPT-040)
+
+#### Optimización de Build y Concurrencia
+- **BuildKit Caching:** Se asignaron identificadores únicos a los montajes de caché de npm (`npm-cache-backend` y `npm-cache-frontend`), permitiendo que ambos servicios se compilen en paralelo sin errores de colisión de archivos (`ENOTEMPTY`).
+- **Imagen Base (Backend):** Se revirtió la imagen a `node:24-alpine` para restaurar la compatibilidad con los comandos `addgroup` y `adduser`, corrigiendo fallos de despliegue en Debian-slim.
+
+### Saneamiento y Estabilidad de Compilación
+
+#### Resolución de errores de metadatos (Build Fix)
+- **Fix Angular Compiler:** Se resolvieron errores persistentes `TS2339` (Property does not exist) mediante el renombrado de métodos (`handleFieldFocus`/`handleFieldBlur`) y propiedades (`hintActiveId`) en `ReportGeneratorComponent`, forzando al compilador a invalidar cachés de metadatos corruptos.
+- **Corrección de Validación (Bug Fix):** Eliminado el requisito erróneo de la sección "Resumen Ejecutivo" en el validador de boletines, permitiendo el envío exitoso cuando se dejan vacíos los campos opcionales (CVE y Referencias).
+
 ## [v1.5.27-beta] - 2026-04-07
 
 ### Boletín de Seguridad (logo/correo HTML)

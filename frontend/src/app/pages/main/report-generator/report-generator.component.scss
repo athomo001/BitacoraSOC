@@ -6,9 +6,14 @@
 
 .mode-selector-container {
   display: flex;
+  position: relative;
   justify-content: center;
   align-items: center;
   margin-bottom: 24px;
+}
+
+mat-card-content {
+  overflow: visible !important;
 }
 
 .mode-selector {
@@ -197,25 +202,70 @@ mat-card {
   margin-bottom: 16px;
 }
 
-#report-guide-card {
-  scroll-margin-top: 90px;
+.guide-toggle-active {
+  background-color: rgba(63, 81, 181, 0.1) !important;
+  color: #3f51b5 !important;
+  font-weight: 600;
+  border: 1px solid rgba(63, 81, 181, 0.3) !important;
 }
 
-.guide-card-focused {
-  border: 2px solid #005fcc;
-  box-shadow: 0 0 0 4px rgba(0, 95, 204, 0.28);
-  animation: guide-pulse 1.2s ease-in-out 2;
+// ─── Help Bubbles ─────────────────────────────────────────────────────────
+
+.field-with-hint {
+  position: relative;
+  width: 100%;
 }
 
-@keyframes guide-pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(0, 95, 204, 0.45);
+.help-bubble {
+  position: absolute;
+  z-index: 100;
+  bottom: calc(100% + 15px);
+  left: 0;
+  
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 16px 20px;
+  width: max-content;
+  max-width: 480px;
+  min-width: 250px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #333;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.1);
+  pointer-events: none;
+  backdrop-filter: blur(16px);
+  
+  // Down-pointing arrow (now standard)
+  &::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 20px;
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid #ffffff;
+    filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.05));
   }
-  50% {
-    box-shadow: 0 0 0 8px rgba(0, 95, 204, 0.18);
+
+  // Adjust for tablet/small desktop
+  @media (max-width: 1560px) {
+    max-width: 350px;
   }
-  100% {
-    box-shadow: 0 0 0 0 rgba(0, 95, 204, 0.06);
+
+  // Fallback for very small screens
+  @media (max-width: 600px) {
+    width: calc(100vw - 60px);
+    max-width: none;
+    left: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .help-bubble {
+    animation: none !important;
   }
 }
 
@@ -225,4 +275,51 @@ mat-card-header {
 
 .hidden-file-input {
   display: none;
+}
+
+// Optimized Newsletter Grid
+.newsletter-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 16px;
+  margin-bottom: 0px;
+
+  @media (max-width: 600px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.newsletter-grid-left {
+  display: flex;
+  flex-direction: column;
+}
+
+.newsletter-grid-right {
+  display: flex;
+  
+  .cve-field {
+    width: 100%;
+    
+    ::ng-deep .mat-mdc-text-field-wrapper {
+      height: 100%;
+    }
+    
+    ::ng-deep .mat-mdc-form-field-flex {
+      height: 100%;
+      align-items: stretch;
+    }
+
+    ::ng-deep .mat-mdc-form-field-infix {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding-top: 12px;
+      padding-bottom: 12px;
+    }
+
+    textarea {
+      flex: 1;
+      resize: none !important;
+    }
+  }
 }

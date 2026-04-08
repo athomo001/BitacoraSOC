@@ -21,6 +21,8 @@
     [disabled]="disabled"
     autocomplete="off"
     matAutocompleteTrigger
+    (focus)="focused.emit()"
+    (blur)="blurred.emit()"
   />
 
   <!-- Botón para limpiar selección -->
