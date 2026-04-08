@@ -25,6 +25,35 @@ Stack principal:
 
 ---
 
+## Novedades recientes (resumen rapido)
+
+### UX y operacion diaria
+
+- `Ver guía rápida` ahora da feedback visual claro y desplazamiento automatico en modulos principales.
+- chips de salud de servicios se muestran solo para `admin`, separados del toolbar y con mejor contraste.
+- exportacion de auditoria ahora es mas clara (`N dias`, `N meses`, modo por filtros actuales).
+
+### Report Generator / Boletines
+
+- flujo dual consolidado (`Reporte Tecnico` / `Boletin de Seguridad`) en la misma pantalla.
+- envio de boletin 1:1 por destinatario (sin CC/BCC masivo).
+- precheck previo al envio (logo valido, secciones minimas, color legible).
+- pegado enriquecido mejorado en campos de boletin (`Resumen`, `Impacto`, `Mitigacion`, `Referencias`) para evitar texto corrido sin estructura.
+
+### Seguridad y estabilidad
+
+- backend robustecido en configuracion SMTP (compatibilidad con config legacy y mensajes de error accionables).
+- trazabilidad de reintentos SMTP/GLPI en auditoria (`retryAttempt`, `retryCount`).
+- sincronizacion de indices criticos en Mongo al arranque (incluye TTL de auditoria).
+
+### IA local (estado actual)
+
+- planificacion avanzada de `AI-SUMMARY-001` documentada en `docs/ISSUES.md`.
+- alcance confirmado: IA sin chat con usuario final; analisis de eventos del turno -> resumen sugerido -> envio por correo + trazabilidad operativa.
+- estado: preparacion/documentacion, sin activacion productiva aun.
+
+---
+
 ## Quick Start con Docker
 
 ```bash

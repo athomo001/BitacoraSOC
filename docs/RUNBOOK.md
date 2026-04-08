@@ -121,6 +121,40 @@ Documentos base para operación:
 
 ---
 
+## Boletín de Seguridad (operación diaria)
+
+### Cuándo usarlo
+
+- cuando se requiere comunicar riesgo técnico en formato ejecutivo para cliente
+- cuando un mismo contenido debe enviarse a múltiples destinatarios en forma 1:1
+
+### Flujo recomendado
+
+1. Ir a `Report Generator` y cambiar a modo `Boletín de Seguridad`.
+2. Completar campos mínimos:
+   - `Título`
+   - `Criticidad`
+   - `Resumen Ejecutivo`
+   - `Impacto`
+   - `Acciones Recomendadas`
+3. Generar y revisar vista previa.
+4. Cargar destinatarios y enviar (un correo por destinatario, sin CC/BCC masivo).
+5. Confirmar resultado de envío (`successCount` / `failCount`).
+
+### Buenas prácticas de contenido
+
+- mantener texto breve y accionable para clientes no técnicos
+- usar listas en mitigación cuando existan pasos secuenciales
+- validar que no se expongan datos internos sensibles del SOC
+
+### Incidencia conocida: pegado de texto desde fuentes ricas
+
+- si pegas texto desde web/PDF/Word y notas formato extraño, aplicar `Ctrl+F5` y reintentar.
+- el formulario ya incluye normalización de pegado para preservar estructura básica (saltos, viñetas, filas).
+- si una fuente específica sigue fallando, registrar ejemplo en `docs/ISSUES.md` para ajuste dirigido.
+
+---
+
 ## Complementos
 
 ### Alta Operativa

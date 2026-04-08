@@ -154,6 +154,19 @@ El servidor acepta tokens con diferencia de ±60 segundos (previene errores por 
 | GET | `/api/reports/tags-trend?days=30&tags=a,b` | Tendencia de tags | Admin/User |
 | GET | `/api/reports/heatmap?days=30` | Mapa de calor día/hora | Admin/User |
 | GET | `/api/reports/entries-by-logsource?days=30` | Entradas por Log Source | Admin/User |
+| POST | `/api/reports/newsletter/send` | Envío de boletín 1:1 por destinatario | Admin/User autenticado |
+
+Notas operativas de boletín:
+
+- El endpoint envía un correo por destinatario (privacidad por diseño, sin envío masivo en copia).
+- Requiere `html` del boletín y arreglo `recipients`.
+- Puede responder mezcla de éxitos/fallos (`successCount`, `failCount`).
+- Si no hay éxitos y sí fallos SMTP, retorna error con `detail` para diagnóstico.
+
+Estado IA (planificado):
+
+- Aún no existe endpoint público de resumen IA para boletín en esta versión.
+- El diseño objetivo de `AI-SUMMARY-001` está detallado en `docs/ISSUES.md` (preparación).
 
 ### Configuración
 

@@ -163,6 +163,13 @@ No usar en produccion.
 - validar que se pueda crear complemento manual
 - validar flujo `validar -> preview -> publicar` para ZIP estatico
 
+## 5.5 Report Generator / Boletín
+
+- cambiar a modo `Boletín de Seguridad` y completar campos obligatorios
+- generar vista previa y validar secciones mínimas (`Resumen`, `Impacto`, `Mitigación`)
+- probar envío 1:1 con al menos 2 destinatarios y verificar `successCount/failCount`
+- validar pegado enriquecido en `Resumen Ejecutivo` y `Impacto` (que no quede texto corrido)
+
 ---
 
 ## 6. Complementos: instalacion y despliegue
