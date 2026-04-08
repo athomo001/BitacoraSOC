@@ -19,10 +19,10 @@ services:
         - CMD-SHELL
         - >
           mongosh --host localhost --port 27017 --username "$${MONGO_INITDB_ROOT_USERNAME}" --password "$${MONGO_INITDB_ROOT_PASSWORD}" --authenticationDatabase admin --quiet --eval "db.runCommand({ ping: 1 }).ok" | grep 1
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
 
   backend:
     build:
@@ -36,8 +36,7 @@ services:
       - "${BACKEND_PORT:-3000}:3000"
       - "${BACKEND_HTTPS_PORT:-3443}:${HTTPS_PORT:-3443}"
     depends_on:
-      mongodb:
-        condition: service_healthy
+      - mongodb
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -79,6 +78,12 @@ services:
       - ./.data/logs:/app/logs
       - ./.data/backups:/app/backups
       - ./.data/tls:/app/secrets
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
     networks:
       - bitacora-network
       - bitacora-complements
@@ -107,10 +112,10 @@ services:
       fi;  chown -R 1001:1001 /etc/nginx/certs; nginx -g "daemon off;" '
     healthcheck:
       test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "--no-check-certificate", "https://127.0.0.1/health" ]
-      interval: 30s
+      interval: 10s
       timeout: 3s
       retries: 3
-      start_period: 5s
+      start_period: 2s
 
 networks:
   bitacora-network:

@@ -8,7 +8,8 @@ ARG APP_VERSION=dev
 
 # Copiar dependencias
 COPY package*.json ./
-RUN npm ci && npm cache clean --force
+RUN --mount=type=cache,id=npm-cache-frontend,target=/root/.npm \
+    npm ci
 
 # Copiar código y compilar para producción
 COPY . .

@@ -10,8 +10,9 @@ ENV APP_VERSION=${APP_VERSION}
 # Copiar archivos de dependencias
 COPY package*.json ./
 
-# Instalar dependencias de producción
-RUN npm install --omit=dev && npm cache clean --force
+# Instalar dependencias de producción usando cache mount para velocidad local
+RUN --mount=type=cache,id=npm-cache-backend,target=/root/.npm \
+    npm install --omit=dev
 
 # Copiar código fuente
 COPY src ./src

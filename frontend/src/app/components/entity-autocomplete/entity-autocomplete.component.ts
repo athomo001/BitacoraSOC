@@ -97,6 +97,8 @@ export class EntityAutocompleteComponent implements OnInit {
   // Outputs
   @Output() selected = new EventEmitter<AutocompleteItem>();
   @Output() cleared = new EventEmitter<void>();
+  @Output() focused = new EventEmitter<void>();
+  @Output() blurred = new EventEmitter<void>();
 
   // Control del input
   searchControl = new FormControl('');

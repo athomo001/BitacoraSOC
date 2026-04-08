@@ -17,6 +17,9 @@
 | AI-SUMMARY-001G | Pendiente | QA/Testing ALTA | Suite de pruebas de seguridad, carga y regresión | Tests de éxito, timeout, lock concurrente, sanitización, RBAC, fallback UX y no-regresión en `report-generator`/newsletter. |
 | AUDIT-EXPORT-028 | Incompleto (Reabierto) | Auditoría / Operación ALTA | Descarga flexible de logs de auditoría | Ajuste UX requerido: explicar explícitamente que `N` lo define el usuario en "Últimos días (N días)" / "Últimos meses (N meses)" con ejemplos visibles (`2, 7, 15` días; `1, 3, 6` meses). Mantener también modo por **filtros actuales** (incluyendo fecha y demás filtros) y modo por cantidad. |
 | UI-HEALTH-033 | Incompleto (Reabierto) | UI/UX + Operación ALTA | Barra de salud visible de servicios críticos | Ajuste pendiente: la barra debe verla solo admin, visualmente separada del título/toolbar y con contraste legible (verde/rojo con tipografía clara según estado). |
+| REP-GEN-039 | Listo | UI/UX + Reportería MEDIA | Sistema de ayuda contextual dinámica con globos animados en `/main/report-generator` | Rediseñar guía rápida: eliminar panel fijo, implementar sistema dinámico "Top-Aligned" que evita recortes laterales, contenido condicional por modo y animaciones premium via anime.js. |
+| DOCKER-OPT-040 | Listo | DevOps / Infra ALTA | Optimización de tiempos de Build y Startup de Docker | Optimización completada: Implementado aislamiento de caché npm en BuildKit (`type=cache,id=...`) para evitar colisiones `ENOTEMPTY` en builds paralelos. Restaurada compatibilidad con `node:24-alpine` en backend. |
+
 
 
 
@@ -70,6 +73,166 @@ Los items marcados como `Listo` deben quedar reflejados en `docs/CHANGELOG.md` c
 ---
 
 ## Información de como solucionar los Pendientes
+
+### REP-GEN-039 - Sistema de ayuda contextual dinámica con globos animados en Report Generator
+
+**Objetivo funcional:** Reemplazar el panel estático de "Guía rápida Reportería" por un sistema de globos de texto flotantes, contextuales y animados que se activan por un botón toggle. El sistema debe adaptarse al modo activo (`Reporte de Incidente` / `Boletín de Seguridad`), mostrando contenido diferente per campo en cada caso.
+
+---
+
+**Contexto técnico validado:**
+
+| Elemento | Estado actual |
+| --- | --- |
+| `animejs@3.2.2` | ✅ Ya instalado en `frontend/package.json` |
+| `@types/animejs@3.1.12` | ✅ Instalado como devDependency |
+| Botón "Ver guía rápida" | Actualmente llama a `openReportGuide()` que hace scroll al panel estático |
+| Panel estático de guía | `mat-card` con `*ngIf="reportGuideVisible"` al inicio del template |
+| Pestaña "Reporte Técnico" | Texto literal en `mat-button-toggle` del template |
+| Métodos a eliminar o refactorizar | `openReportGuide()`, `closeReportGuide()`, `flashReportGuideCard()` |
+
+---
+
+**Sub-tareas y orden de implementación:**
+
+**Paso 1 — Cambios de nomenclatura en HTML**
+- Cambiar texto `Reporte Técnico` → `Reporte de Incidente` en `mat-button-toggle`.
+- Eliminar el bloque completo del `mat-card` con `id="report-guide-card"` (panel estático).
+- Eliminar referencia al botón "Ver guía rápida" de la sección `preview-actions`.
+
+**Paso 2 — Rediseño del botón toggle en cabecera**
+- El botón actual `(click)="openReportGuide()"` se convierte en un toggle.
+- Nuevo estado en TS: `guideActive: boolean = false`.
+- En el HTML: texto dinámico `{{ guideActive ? 'Ocultar guía' : '? Ver guía rápida' }}`.
+- Al activar: llama a `toggleGuide()` que muestra globos; al desactivar, los oculta con animación inversa.
+
+**Paso 3 — Estructura de datos de los globos (TS)**
+- Crear un mapa de ayuda `helpTips` con dos conjuntos de entradas:
+  - `report`: textos para modo "Reporte de Incidente".
+  - `newsletter`: textos para modo "Boletín de Seguridad".
+- Ejemplo de estructura:
+```typescript
+private readonly helpTips = {
+  report: [
+    { fieldId: 'field-tipo-operacion', text: 'Categoría del incidente...' },
+    { fieldId: 'field-nombre-evento',  text: 'Nombre del evento detectado...' },
+    // ...
+  ],
+  newsletter: [
+    { fieldId: 'nl-titulo',     text: 'Título claro y conciso...' },
+    { fieldId: 'nl-marca',      text: 'Proveedor o empresa responsable...' },
+    // ...
+  ]
+};
+```
+- Cada `fieldId` corresponde a un atributo `id` agregado al container del campo en el HTML.
+
+**Paso 4 — Diseño CSS del globo (SCSS)**
+- Clase `.help-bubble`:
+  - `position: absolute`, `z-index: 10`.
+  - Fondo `#FFFFFF`, borde `1px solid #E0E0E0`, `border-radius: 8px`.
+  - `box-shadow: 0 4px 12px rgba(0,0,0,0.10)`.
+  - Padding `8px 12px`, `font-size: 12px`, `color: #555`, `max-width: 280px`.
+- Cola del globo (`::after`):
+  - Triángulo CSS apuntando hacia abajo (hacia el campo).
+  - Mismo color de fondo y borde que el contenedor.
+- El campo contenedor padre debe ser `position: relative` para anclar el globo.
+- Clase `.field-with-hint`: wrapper `position: relative` que se agrega a cada campo que tiene globo.
+
+**Paso 5 — Animación con anime.js**
+- Al mostrar (`guideActive = true`):
+  ```typescript
+  anime({
+    targets: '.help-bubble',
+    opacity: [0, 1],
+    scale: [0.85, 1],
+    duration: 300,
+    easing: 'easeOutQuad',
+    delay: anime.stagger(40)
+  });
+  ```
+- Al ocultar (`guideActive = false`):
+  ```typescript
+  anime({
+    targets: '.help-bubble',
+    opacity: [1, 0],
+    scale: [1, 0.85],
+    duration: 250,
+    easing: 'easeInQuad',
+    complete: () => { this.guideActive = false; /* NgIf oculta los elementos */ }
+  });
+  ```
+- Usar `AfterViewChecked` o `setTimeout(0)` para garantizar que los elementos estén en el DOM antes de animar.
+
+**Paso 6 — Renderizado en el template HTML**
+- Cada campo de formulario se envuelve en un `div.field-with-hint`.
+- Dentro de cada wrapper, agregar:
+  ```html
+  <div class="help-bubble" *ngIf="guideActive && getHint('report', 'field-tipo-operacion')">
+    {{ getHint('report', 'field-tipo-operacion') }}
+  </div>
+  ```
+- El método `getHint(mode, fieldId)` busca en `helpTips[mode]` y retorna el string o `null`.
+
+**Paso 7 — Limpieza de métodos obsoletos en TS**
+- Eliminar: `closeReportGuide()`, `openReportGuide()`, `flashReportGuideCard()`, `reportGuideFocused`, `reportGuideVisible`, `@ViewChild('reportGuideCard')`.
+- Eliminar inyección de `OnboardingService` si ya no se usa en ningún otro lado del componente.
+- Agregar: `guideActive: boolean = false`, método `toggleGuide()`, método `getHint()`.
+
+---
+
+**Contenido de los globos por modo:**
+
+*Boletín de Seguridad:*
+
+| Campo | Texto del globo |
+| --- | --- |
+| Título | Indica un título claro y conciso para la amenaza o el parche. Es la primera impresión. |
+| Marca / Fabricante | El proveedor o empresa responsable (ej: Microsoft, Cisco, VMware). |
+| Nivel de Alerta | Gravedad de la vulnerabilidad según el estándar CVSS. |
+| CVE / Identificadores | Incluye los códigos estándar (ej: CVE-2024-XXXXX). Campo opcional. |
+| Producto(s) Afectado(s) | Software o hardware específicos y sus versiones vulnerables. |
+| Impacto | Qué puede ocurrir si se explota la vulnerabilidad (ej: Control total, robo de datos). |
+| Acciones Recomendadas | Pasos concretos a seguir o mitigaciones de seguridad. |
+| Referencias | Links oficiales al parche o análisis. Campo opcional. |
+
+*Reporte de Incidente:*
+
+| Campo | Texto del globo |
+| --- | --- |
+| Tipo de operación | Categoría del incidente para clasificación y métricas SOC. |
+| Ofensa/Código interno | Identificador único del incidente en el sistema de ticketing o SIEM. |
+| Nombre de Ofensa/Evento | Nombre del evento o alerta que originó el incidente detectado. |
+| Motivo del Evento | Descripción del comportamiento que activó la alerta. Se autocompleta. |
+| MRSC (Criticidad) | Nivel de severidad del incidente para la organización. |
+| Fuente / Log Source | Origen del evento: cliente, sistema o fuente de log afectada. |
+| Observaciones | Cronología, hechos clave y análisis técnico del incidente. |
+| Recomendación | Pasos tomados o a tomar para contención y erradicación. |
+
+---
+
+**Archivos afectados:**
+
+| Archivo | Cambio |
+| --- | --- |
+| `report-generator.component.html` | Eliminar panel estático, renombrar pestaña, agregar IDs a campos, insertar `div.help-bubble` condicionales. |
+| `report-generator.component.ts` | Eliminar métodos de guía obsoletos y `OnboardingService` (revisar), agregar `guideActive`, `toggleGuide()`, `getHint()`, `helpTips`, importar `anime` desde `animejs`. |
+| `report-generator.component.scss` | Agregar `.help-bubble`, `.field-with-hint`, cola CSS triangular. |
+
+---
+
+**Criterios de aceptación:**
+
+1. La pestaña dice "Reporte de Incidente" (no "Reporte Técnico").
+2. No existe ningún panel rectangular estático de guía.
+3. El botón "Ver guía rápida" / "Ocultar guía" funciona como toggle.
+4. Al activar en modo Boletín, aparecen globos con el contenido correcto del boletín animados.
+5. Al activar en modo Reporte, aparecen globos con el contenido de incidente.
+6. Al desactivar, los globos desaparecen con una transición suave (anime.js).
+7. Los globos no tapan los inputs y apuntan claramente a su campo (cola triangular).
+8. El build Docker compila sin errores TypeScript.
+
+---
 
 ### SEC-RL-018 - Falso positivo de rate limit en login (429 por IP)
 

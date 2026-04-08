@@ -1,9 +1,10 @@
-import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
+import anime from 'animejs';
 
 import { CatalogService } from '../../../services/catalog.service';
 import { CatalogEvent, CatalogLogSource, CatalogOperationType } from '../../../models/catalog.model';
@@ -11,7 +12,6 @@ import { EscalationService } from '../../../services/escalation.service';
 import { ClientAlertContext, ClientAlertEvaluation } from '../../../models/escalation.model';
 import { ConfigService } from '../../../services/config.service';
 import { AuthService } from '../../../services/auth.service';
-import { OnboardingService } from '../../../services/onboarding.service';
 
 import { MatCard, MatCardHeader, MatCardTitle, MatCardSubtitle, MatCardContent } from '@angular/material/card';
 import { EntityAutocompleteComponent } from '../../../components/entity-autocomplete/entity-autocomplete.component';
@@ -45,11 +45,40 @@ import { environment } from '@env/environment';
   ]
 })
 export class ReportGeneratorComponent implements OnInit {
-  @ViewChild('reportGuideCard') reportGuideCard?: ElementRef<HTMLElement>;
-  reportGuideFocused = false;
-
   // ─── Mode ───────────────────────────────────────────────────────────────
   currentMode: 'report' | 'newsletter' = 'report';
+
+  // ─── Contextual help guide ────────────────────────────────────────────────
+  guideActive = false;
+  hintActiveId: string | null = null;
+
+  /** Mapa de ayuda contextual por modo y campo. Solo transform+opacity en animaciones (skill performance). */
+  private readonly helpTips: Record<'report' | 'newsletter', Record<string, string>> = {
+    report: {
+      'hint-tipo-operacion':   'Categoría del incidente para clasificación y métricas SOC.',
+      'hint-codigo-interno':   'Identificador único del incidente en el sistema de ticketing o SIEM.',
+      'hint-nombre-evento':    'Nombre del evento o alerta que originó el incidente detectado.',
+      'hint-motivo-evento':    'Descripción del comportamiento que activó la alerta. Se autocompleta al elegir un evento.',
+      'hint-fecha':            'Fecha del incidente (por defecto hoy). Ajusta manualmente si el evento fue previo.',
+      'hint-criticidad':       'Nivel de severidad del incidente para la organización.',
+      'hint-origen':           'IP o hostname de origen del ataque/actividad sospechosa.',
+      'hint-logsource':        'Origen del evento: cliente, sistema o fuente de log afectada.',
+      'hint-destino':          'IP o hostname de destino de la actividad detectada.',
+      'hint-observaciones':    'Cronología, hechos clave y análisis técnico del incidente.',
+      'hint-recomendacion':    'Pasos tomados o a tomar para contención y erradicación.',
+      'hint-info-adicional':   'Contexto adicional del tipo de operación. Se autocompleta.',
+    },
+    newsletter: {
+      'hint-nl-titulo':        'Indica un título claro y conciso para la amenaza o el parche. Es la primera impresión.',
+      'hint-nl-marca':         'El proveedor o empresa responsable (ej: Microsoft, Cisco, VMware).',
+      'hint-nl-criticidad':    'Gravedad de la vulnerabilidad según el estándar CVSS.',
+      'hint-nl-cve':           'Incluye los códigos estándar (ej: CVE-2024-XXXXX). Campo opcional.',
+      'hint-nl-productos':     'Software o hardware específicos y sus versiones vulnerables.',
+      'hint-nl-impacto':       'Qué puede ocurrir si se explota la vulnerabilidad (ej: Control total, robo de datos).',
+      'hint-nl-recomendacion': 'Pasos concretos a seguir o mitigaciones de seguridad.',
+      'hint-nl-referencias':   'Links oficiales al parche o análisis. Campo opcional.',
+    },
+  };
 
   // ─── Forms ──────────────────────────────────────────────────────────────
   reportForm: FormGroup;
@@ -80,7 +109,6 @@ export class ReportGeneratorComponent implements OnInit {
 
   // ─── Config ──────────────────────────────────────────────────────────────
   private readonly backendBaseUrl = environment.backendBaseUrl;
-  reportGuideVisible = false;
 
   constructor(
     private fb: FormBuilder,
@@ -90,8 +118,7 @@ export class ReportGeneratorComponent implements OnInit {
     private snackBar: MatSnackBar,
     private escalationService: EscalationService,
     private dialog: MatDialog,
-    private authService: AuthService,
-    private onboardingService: OnboardingService
+    private authService: AuthService
   ) {
     this.reportForm = this.fb.group({
       tipoOperacion: ['', Validators.required],
@@ -112,8 +139,10 @@ export class ReportGeneratorComponent implements OnInit {
 
     this.newsletterForm = this.fb.group({
       tituloBoletin: ['', Validators.required],
+      marcaFabricante: ['', Validators.required],
       criticidad: ['media', Validators.required],
-      resumenEjecutivo: ['', Validators.required],
+      cveIdentificadores: [''],
+      productosAfectados: ['', Validators.required],
       impacto: ['', Validators.required],
       recomendacion: ['', Validators.required],
       referencias: ['']
@@ -124,42 +153,64 @@ export class ReportGeneratorComponent implements OnInit {
   ngOnInit(): void {
     this.loadReportTableColorConfig();
     this.loadLogo();
-    const username = this.authService.getCurrentUser()?.username;
-    this.reportGuideVisible = this.onboardingService.shouldShow('report-generator', username);
   }
 
-  closeReportGuide(dontShowAgain = false): void {
-    const username = this.authService.getCurrentUser()?.username;
-    if (dontShowAgain) {
-      this.onboardingService.hide('report-generator', username);
+  // ─── Contextual guide toggle ──────────────────────────────────────────────
+  /**
+   * Toggle de globos de ayuda contextual. Usa anime.js animando SOLO transform+opacity
+   * para garantizar hardware acceleration sin layout recalculations (skill: Frontend.md §5).
+   */
+  /**
+   * Toggle de modo de guía. Si se desactiva, se limpia el hint activo.
+   */
+  toggleGuide(): void {
+    this.guideActive = !this.guideActive;
+    if (!this.guideActive) {
+      this.hintActiveId = null;
     }
-    this.reportGuideVisible = false;
   }
 
-  openReportGuide(): void {
-    this.reportGuideVisible = true;
-    setTimeout(() => {
-      const card = this.reportGuideCard?.nativeElement || document.getElementById('report-guide-card');
-      if (!card) return;
+  /**
+   * Se dispara cuando un campo (input, select, autocomplete) recibe foco.
+   */
+  handleFieldFocus(id: string): void {
+    if (!this.guideActive) return;
+    this.hintActiveId = id;
 
-      card.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center'
-      });
-      card.focus({ preventScroll: true });
-      this.flashReportGuideCard();
-      this.snackBar.open('Guía rápida abierta y enfocada.', 'Cerrar', { duration: 2200 });
-    }, 50);
+    // Pequeño delay para asegurar que el DOM se renderizó vía *ngIf
+    setTimeout(() => {
+      this.animateHintEnter();
+    }, 10);
   }
 
-  private flashReportGuideCard(): void {
-    this.reportGuideFocused = false;
-    setTimeout(() => {
-      this.reportGuideFocused = true;
-      setTimeout(() => {
-        this.reportGuideFocused = false;
-      }, 1800);
-    }, 0);
+  /**
+   * Se dispara cuando un campo pierde el foco.
+   */
+  handleFieldBlur(): void {
+    this.hintActiveId = null;
+  }
+
+  /**
+   * Animación premium (hardware accelerated) para el globo activo.
+   * Utiliza solo transform y opacity para máximo performance.
+   */
+  private animateHintEnter(): void {
+    const bubble = document.querySelector('.help-bubble');
+    if (!bubble) return;
+
+    anime({
+      targets: bubble,
+      opacity: [0, 1],
+      translateY: [10, 0], // Sutil deslizamiento hacia arriba
+      scale: [0.95, 1],
+      duration: 400,
+      easing: 'easeOutQuint'
+    });
+  }
+
+  /** Devuelve el texto de ayuda para un campo dado el modo activo. */
+  getHint(fieldId: string): string | null {
+    return this.helpTips[this.currentMode]?.[fieldId] ?? null;
   }
 
   // ─── Branding: load logo ─────────────────────────────────────────────────
@@ -354,7 +405,7 @@ export class ReportGeneratorComponent implements OnInit {
     });
   }
 
-  onNewsletterTextareaPaste(event: ClipboardEvent, controlName: 'resumenEjecutivo' | 'impacto' | 'recomendacion' | 'referencias'): void {
+  onNewsletterTextareaPaste(event: ClipboardEvent, controlName: 'productosAfectados' | 'impacto' | 'recomendacion' | 'referencias' | 'cveIdentificadores'): void {
     const clipboard = event.clipboardData;
     if (!clipboard) return;
 
@@ -524,8 +575,16 @@ export class ReportGeneratorComponent implements OnInit {
     if (!/color:\s*#111111/i.test(raw)) {
       issues.push('No se detecta color negro explícito (#111111) en el HTML.');
     }
-    if (!/Resumen Ejecutivo/i.test(raw) || !/Impacto/i.test(raw)) {
-      issues.push('Secciones obligatorias del boletín incompletas.');
+
+    // Secciones de contenido obligatorio
+    if (!/Producto\(s\) Afectado\(s\)/i.test(raw)) {
+      issues.push('Sección "Productos Afectados" ausente.');
+    }
+    if (!/Impacto/i.test(raw)) {
+      issues.push('Sección "Impacto" ausente.');
+    }
+    if (!/Acciones Recomendadas/i.test(raw)) {
+      issues.push('Sección "Acciones Recomendadas" ausente.');
     }
 
     return { ok: issues.length === 0, issues };
@@ -603,6 +662,12 @@ export class ReportGeneratorComponent implements OnInit {
     this.snackBar.open('Error al copiar Markdown.', 'Cerrar', { duration: 3000 });
   }
 
+  // ─── Formatting helpers ──────────────────────────────────────────────────
+  private formatMultilineText(value: unknown): string {
+    const escaped = this.escapeHtml(value);
+    return escaped.replace(/\n/g, '<br>');
+  }
+
   // ─── Clear form ───────────────────────────────────────────────────────────
   clearForm(): void {
     this.selectedEvent = null;
@@ -650,23 +715,22 @@ export class ReportGeneratorComponent implements OnInit {
   <tr><td style="${cellLabel}">Tipo de operación</td><td style="${cellDetail}">${e(form.tipoOperacion)}</td></tr>
   <tr><td style="${cellLabel}">Ofensa/Código interno</td><td style="${cellDetail}">${e(form.codigoInterno || '-')}</td></tr>
   <tr><td style="${cellLabel}">Nombre de Ofensa/Evento</td><td style="${cellDetail}">${e(form.nombreEvento)}</td></tr>
-  <tr><td style="${cellLabel}">Motivo de la Ofensa/Evento</td><td style="${cellDetail}">${e(form.motivoEvento)}</td></tr>
+  <tr><td style="${cellLabel}">Motivo de la Ofensa/Evento</td><td style="${cellDetail}">${this.formatMultilineText(form.motivoEvento)}</td></tr>
   <tr><td style="${cellLabel}">Fecha</td><td style="${cellDetail}">${e(new Date(form.fecha).toLocaleDateString('es-CL'))}</td></tr>
   <tr><td style="${cellLabel}">MRSC (Criticidad)</td><td style="${cellDetail}">${e(form.criticidad)}</td></tr>
   <tr><td style="${cellLabel}">Origen de conexión</td><td style="${cellDetail}">${e(form.origenConexion || '-')}</td></tr>
   <tr><td style="${cellLabel}">Fuente / Log Source</td><td style="${cellDetail}">${e(form.logSource)}</td></tr>
   <tr><td style="${cellLabel}">Destino</td><td style="${cellDetail}">${e(form.destino || '-')}</td></tr>
   <tr><td style="${cellLabel}">Reputación de origen</td><td style="${cellDetail}">${e(form.reputacionOrigen)}</td></tr>
-  <tr><td style="${cellLabel}">Observaciones</td><td style="white-space: pre-wrap; ${cellDetail}">${e(form.observaciones)}</td></tr>`;
+  <tr><td style="${cellLabel}">Observaciones</td><td style="white-space: pre-wrap; ${cellDetail}">${this.formatMultilineText(form.observaciones)}</td></tr>`;
 
-    const evidenciaTexto = e((form.evidenciaTexto || '').trim());
     const hasImages = this.uploadedImages.length > 0;
-    const hasTextEvidence = evidenciaTexto.length > 0;
+    const hasTextEvidence = (form.evidenciaTexto || '').trim().length > 0;
 
     if (hasImages || hasTextEvidence) {
       html += `\n  <tr>\n    <td style="${cellLabel}">Evidencia</td>\n    <td style="${cellDetail}">`;
       if (hasTextEvidence) {
-        html += `<div style="white-space: pre-wrap; margin-bottom: ${hasImages ? '10px' : '0'};">${evidenciaTexto}</div>`;
+        html += `<div style="white-space: pre-wrap; margin-bottom: ${hasImages ? '10px' : '0'};">${this.formatMultilineText(form.evidenciaTexto)}</div>`;
       }
       if (hasImages) {
         this.uploadedImages.forEach(img => {
@@ -684,8 +748,8 @@ export class ReportGeneratorComponent implements OnInit {
     }
 
     html += `
-  <tr><td style="${cellLabel}">Recomendación</td><td style="white-space: pre-wrap; ${cellDetail}">${e(form.recomendacion || '-')}</td></tr>
-  <tr><td style="${cellLabel}">Información adicional</td><td style="white-space: pre-wrap; ${cellDetail}">${e(form.informacionAdicional || '-')}</td></tr>
+  <tr><td style="${cellLabel}">Recomendación</td><td style="white-space: pre-wrap; ${cellDetail}">${this.formatMultilineText(form.recomendacion || '-')}</td></tr>
+  <tr><td style="${cellLabel}">Información adicional</td><td style="white-space: pre-wrap; ${cellDetail}">${this.formatMultilineText(form.informacionAdicional || '-')}</td></tr>
 </table>`;
 
     this.generatedHtml = html;
@@ -732,22 +796,26 @@ export class ReportGeneratorComponent implements OnInit {
     <td style="padding: 30px; color: #111111;">
       <div style="margin-bottom: 25px;">
         <h3 style="margin: 0 0 10px 0; font-size: 20px; color: #111111;">${e(form.tituloBoletin)}</h3>
-        <span style="display: inline-block; padding: 4px 10px; background-color: ${badgeColor}; color: white; border-radius: 4px; font-size: 12px; font-weight: bold;">CRITICIDAD: ${badgeText}</span>
+        <div style="margin-bottom: 10px;">
+          <span style="display: inline-block; padding: 4px 10px; background-color: ${badgeColor}; color: white; border-radius: 4px; font-size: 12px; font-weight: bold; margin-right: 8px;">CRITICIDAD: ${badgeText}</span>
+          <span style="display: inline-block; padding: 4px 10px; background-color: #eee; color: #333; border-radius: 4px; font-size: 12px; font-weight: bold;">MARCA: ${e(form.marcaFabricante)}</span>
+        </div>
+        ${form.cveIdentificadores?.trim() ? `<div style="font-size: 12px; color: #666;"><strong>CVE/IDs:</strong> ${e(form.cveIdentificadores)}</div>` : ''}
       </div>
 
-      <h4 style="${sectionTitle}">Resumen Ejecutivo</h4>
-      <div style="${paragraph}">${e(form.resumenEjecutivo)}</div>
+      <h4 style="${sectionTitle}">Producto(s) Afectado(s)</h4>
+      <div style="${paragraph}">${this.formatMultilineText(form.productosAfectados)}</div>
 
       <h4 style="${sectionTitle}">Impacto</h4>
-      <div style="${paragraph}">${e(form.impacto)}</div>
+      <div style="${paragraph}">${this.formatMultilineText(form.impacto)}</div>
 
       <h4 style="${sectionTitle}">Acciones Recomendadas / Mitigación</h4>
-      <div style="${paragraph}">${e(form.recomendacion)}</div>`;
+      <div style="${paragraph}">${this.formatMultilineText(form.recomendacion)}</div>`;
 
     if (form.referencias?.trim()) {
       html += `
       <h4 style="${sectionTitle}">Referencias</h4>
-      <div style="${paragraph}">${e(form.referencias)}</div>`;
+      <div style="${paragraph}">${this.formatMultilineText(form.referencias)}</div>`;
     }
 
     html += `

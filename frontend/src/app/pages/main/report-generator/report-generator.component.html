@@ -1,20 +1,4 @@
 <div class="report-generator-container">
-  <mat-card
-    #reportGuideCard
-    id="report-guide-card"
-    tabindex="-1"
-    [class.guide-card-focused]="reportGuideFocused"
-    *ngIf="reportGuideVisible"
-    style="margin-bottom: 12px;">
-    <mat-card-content>
-      <p><strong>Guía rápida Reportería:</strong> elige modo Reporte o Boletín, completa campos obligatorios, genera vista previa y luego copia o envía.</p>
-      <div class="actions">
-        <button mat-button type="button" (click)="closeReportGuide(false)">Cerrar</button>
-        <button mat-stroked-button color="primary" type="button" (click)="closeReportGuide(true)">No volver a mostrar</button>
-      </div>
-    </mat-card-content>
-  </mat-card>
-
   <mat-card>
     <mat-card-header>
       <mat-card-title>Generador de Reportes SOC</mat-card-title>
@@ -26,99 +10,153 @@
         <mat-button-toggle-group [(ngModel)]="currentMode" (change)="clearForm()" class="mode-selector" aria-label="Modo de generación">
           <mat-button-toggle value="report">
             <mat-icon>assessment</mat-icon>
-            Reporte Técnico
+            Reporte de Incidente
           </mat-button-toggle>
           <mat-button-toggle value="newsletter">
             <mat-icon>campaign</mat-icon>
             Boletín de Seguridad
           </mat-button-toggle>
         </mat-button-toggle-group>
-        <button mat-button color="primary" type="button" (click)="openReportGuide()">
-          <mat-icon>help_outline</mat-icon>
-          Ver guía rápida
+        <button mat-button color="primary" type="button"
+                (click)="toggleGuide()"
+                [class.guide-toggle-active]="guideActive"
+                aria-label="Activar o desactivar globos de ayuda contextual">
+          <mat-icon>{{ guideActive ? 'visibility_off' : 'help_outline' }}</mat-icon>
+          {{ guideActive ? 'Ocultar guía' : '? Ver guía rápida' }}
         </button>
       </div>
 
-      <!-- MODO REPORTE -->
+      <!-- MODO REPORTE DE INCIDENTE -->
       <form [formGroup]="reportForm" *ngIf="currentMode === 'report'">
+
         <!-- Tipo de operación -->
-        <app-entity-autocomplete
-          label="Tipo de operación *"
-          placeholder="Buscar tipo de operación..."
-          [searchFn]="catalogService.searchOperationTypes.bind(catalogService)"
-          [minChars]="0"
-          (selected)="onOperationTypeSelected($event)"
-          (cleared)="onOperationTypeCleared()">
-        </app-entity-autocomplete>
-        <div class="field-error" *ngIf="reportForm.get('tipoOperacion')?.invalid && reportForm.get('tipoOperacion')?.touched">
-          Campo obligatorio
+        <div class="field-with-hint">
+          <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-tipo-operacion'">
+            {{ getHint('hint-tipo-operacion') }}
+          </div>
+          <app-entity-autocomplete
+            label="Tipo de operación *"
+            placeholder="Buscar tipo de operación..."
+            [searchFn]="catalogService.searchOperationTypes.bind(catalogService)"
+            [minChars]="0"
+            (focused)="handleFieldFocus('hint-tipo-operacion')"
+            (blurred)="handleFieldBlur()"
+            (selected)="onOperationTypeSelected($event)"
+            (cleared)="onOperationTypeCleared()">
+          </app-entity-autocomplete>
+          <div class="field-error" *ngIf="reportForm.get('tipoOperacion')?.invalid && reportForm.get('tipoOperacion')?.touched">
+            Campo obligatorio
+          </div>
         </div>
 
         <!-- Código interno -->
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Ofensa/Código interno</mat-label>
-          <input matInput formControlName="codigoInterno" placeholder="Ej: OF-2024-001">
-        </mat-form-field>
+        <div class="field-with-hint">
+          <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-codigo-interno'">
+            {{ getHint('hint-codigo-interno') }}
+          </div>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Ofensa/Código interno</mat-label>
+            <input matInput formControlName="codigoInterno" placeholder="Ej: OF-2024-001"
+                   (focus)="handleFieldFocus('hint-codigo-interno')" (blur)="handleFieldBlur()">
+          </mat-form-field>
+        </div>
 
         <!-- Nombre de evento -->
-        <app-entity-autocomplete
-          label="Nombre de Ofensa/Evento *"
-          placeholder="Buscar evento..."
-          [searchFn]="catalogService.searchEvents.bind(catalogService)"
-          [minChars]="0"
-          (selected)="onEventSelected($event)"
-          (cleared)="onEventCleared()">
-        </app-entity-autocomplete>
-        <div class="field-error" *ngIf="reportForm.get('nombreEvento')?.invalid && reportForm.get('nombreEvento')?.touched">
-          Campo obligatorio
+        <div class="field-with-hint">
+          <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-nombre-evento'">
+            {{ getHint('hint-nombre-evento') }}
+          </div>
+          <app-entity-autocomplete
+            label="Nombre de Ofensa/Evento *"
+            placeholder="Buscar evento..."
+            [searchFn]="catalogService.searchEvents.bind(catalogService)"
+            [minChars]="0"
+            (focused)="handleFieldFocus('hint-nombre-evento')"
+            (blurred)="handleFieldBlur()"
+            (selected)="onEventSelected($event)"
+            (cleared)="onEventCleared()">
+          </app-entity-autocomplete>
+          <div class="field-error" *ngIf="reportForm.get('nombreEvento')?.invalid && reportForm.get('nombreEvento')?.touched">
+            Campo obligatorio
+          </div>
         </div>
 
         <!-- Motivo (autofill) -->
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Motivo de la Ofensa/Evento *</mat-label>
-          <textarea matInput formControlName="motivoEvento" rows="3" 
-                    placeholder="Se auto-completa desde el evento seleccionado"></textarea>
-          <mat-error *ngIf="reportForm.get('motivoEvento')?.hasError('required')">
-            Campo obligatorio
-          </mat-error>
-        </mat-form-field>
+        <div class="field-with-hint">
+          <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-motivo-evento'">
+            {{ getHint('hint-motivo-evento') }}
+          </div>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Motivo de la Ofensa/Evento *</mat-label>
+            <textarea matInput formControlName="motivoEvento" rows="3"
+                      (focus)="handleFieldFocus('hint-motivo-evento')" (blur)="handleFieldBlur()"
+                      placeholder="Se auto-completa desde el evento seleccionado"></textarea>
+            <mat-error *ngIf="reportForm.get('motivoEvento')?.hasError('required')">
+              Campo obligatorio
+            </mat-error>
+          </mat-form-field>
+        </div>
 
         <!-- Fecha -->
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Fecha *</mat-label>
-          <input matInput [matDatepicker]="picker" formControlName="fecha">
-          <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
-          <mat-datepicker #picker></mat-datepicker>
-        </mat-form-field>
+        <div class="field-with-hint">
+          <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-fecha'">
+            {{ getHint('hint-fecha') }}
+          </div>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Fecha *</mat-label>
+            <input matInput [matDatepicker]="picker" formControlName="fecha"
+                   (focus)="handleFieldFocus('hint-fecha')" (blur)="handleFieldBlur()">
+            <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+            <mat-datepicker #picker></mat-datepicker>
+          </mat-form-field>
+        </div>
 
         <!-- Criticidad -->
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>MRSC (Criticidad) *</mat-label>
-          <mat-select formControlName="criticidad">
-            <mat-option value="baja">Baja</mat-option>
-            <mat-option value="media">Media</mat-option>
-            <mat-option value="alta">Alta</mat-option>
-            <mat-option value="critica">Crítica</mat-option>
-          </mat-select>
-        </mat-form-field>
+        <div class="field-with-hint">
+          <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-criticidad'">
+            {{ getHint('hint-criticidad') }}
+          </div>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>MRSC (Criticidad) *</mat-label>
+            <mat-select formControlName="criticidad" (openedChange)="$event ? handleFieldFocus('hint-criticidad') : handleFieldBlur()">
+              <mat-option value="baja">Baja</mat-option>
+              <mat-option value="media">Media</mat-option>
+              <mat-option value="alta">Alta</mat-option>
+              <mat-option value="critica">Crítica</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
 
         <!-- Origen de conexión -->
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Origen de conexión</mat-label>
-          <input matInput formControlName="origenConexion" placeholder="Ej: 192.168.1.100">
-        </mat-form-field>
+        <div class="field-with-hint">
+          <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-origen'">
+            {{ getHint('hint-origen') }}
+          </div>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Origen de conexión</mat-label>
+            <input matInput formControlName="origenConexion" placeholder="Ej: 192.168.1.100"
+                   (focus)="handleFieldFocus('hint-origen')" (blur)="handleFieldBlur()">
+          </mat-form-field>
+        </div>
 
         <!-- Log Source -->
-        <app-entity-autocomplete
-          label="Fuente / Log Source *"
-          placeholder="Buscar cliente o log source..."
-          [searchFn]="catalogService.searchLogSources.bind(catalogService)"
-          [minChars]="0"
-          (selected)="onLogSourceSelected($event)"
-          (cleared)="onLogSourceCleared()">
-        </app-entity-autocomplete>
-        <div class="field-error" *ngIf="reportForm.get('logSource')?.invalid && reportForm.get('logSource')?.touched">
-          Campo obligatorio
+        <div class="field-with-hint">
+          <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-logsource'">
+            {{ getHint('hint-logsource') }}
+          </div>
+          <app-entity-autocomplete
+            label="Fuente / Log Source *"
+            placeholder="Buscar cliente o log source..."
+            [searchFn]="catalogService.searchLogSources.bind(catalogService)"
+            [minChars]="0"
+            (focused)="handleFieldFocus('hint-logsource')"
+            (blurred)="handleFieldBlur()"
+            (selected)="onLogSourceSelected($event)"
+            (cleared)="onLogSourceCleared()">
+          </app-entity-autocomplete>
+          <div class="field-error" *ngIf="reportForm.get('logSource')?.invalid && reportForm.get('logSource')?.touched">
+            Campo obligatorio
+          </div>
         </div>
 
         <div class="client-alert-banner" *ngIf="activeClientAlert?.hasAlert">
@@ -149,10 +187,16 @@
         </div>
 
         <!-- Destino -->
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Destino</mat-label>
-          <input matInput formControlName="destino" placeholder="Ej: 10.0.0.50">
-        </mat-form-field>
+        <div class="field-with-hint">
+          <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-destino'">
+            {{ getHint('hint-destino') }}
+          </div>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Destino</mat-label>
+            <input matInput formControlName="destino" placeholder="Ej: 10.0.0.50"
+                   (focus)="handleFieldFocus('hint-destino')" (blur)="handleFieldBlur()">
+          </mat-form-field>
+        </div>
 
         <!-- Reputación de origen -->
         <mat-form-field appearance="outline" class="full-width">
@@ -166,14 +210,20 @@
         </mat-form-field>
 
         <!-- Observaciones -->
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Observaciones *</mat-label>
-          <textarea matInput formControlName="observaciones" rows="4" 
-                    placeholder="Detalla las observaciones relevantes"></textarea>
-          <mat-error *ngIf="reportForm.get('observaciones')?.hasError('required')">
-            Campo obligatorio
-          </mat-error>
-        </mat-form-field>
+        <div class="field-with-hint">
+          <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-observaciones'">
+            {{ getHint('hint-observaciones') }}
+          </div>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Observaciones *</mat-label>
+            <textarea matInput formControlName="observaciones" rows="4"
+                      (focus)="handleFieldFocus('hint-observaciones')" (blur)="handleFieldBlur()"
+                      placeholder="Detalla las observaciones relevantes"></textarea>
+            <mat-error *ngIf="reportForm.get('observaciones')?.hasError('required')">
+              Campo obligatorio
+            </mat-error>
+          </mat-form-field>
+        </div>
 
         <!-- Evidencia (upload) -->
         <div class="upload-section">
@@ -199,18 +249,30 @@
         </div>
 
         <!-- Recomendación -->
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Recomendación</mat-label>
-          <textarea matInput formControlName="recomendacion" rows="3" 
-                    placeholder="Recomendaciones técnicas"></textarea>
-        </mat-form-field>
+        <div class="field-with-hint">
+          <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-recomendacion'">
+            {{ getHint('hint-recomendacion') }}
+          </div>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Recomendación</mat-label>
+            <textarea matInput formControlName="recomendacion" rows="3"
+                      (focus)="handleFieldFocus('hint-recomendacion')" (blur)="handleFieldBlur()"
+                      placeholder="Recomendaciones técnicas"></textarea>
+          </mat-form-field>
+        </div>
 
         <!-- Información adicional (autofill) -->
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Información adicional</mat-label>
-          <textarea matInput formControlName="informacionAdicional" rows="3" 
-                    placeholder="Se auto-completa desde el tipo de operación"></textarea>
-        </mat-form-field>
+        <div class="field-with-hint">
+          <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-info-adicional'">
+            {{ getHint('hint-info-adicional') }}
+          </div>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Información adicional</mat-label>
+            <textarea matInput formControlName="informacionAdicional" rows="3"
+                      (focus)="handleFieldFocus('hint-info-adicional')" (blur)="handleFieldBlur()"
+                      placeholder="Se auto-completa desde el tipo de operación"></textarea>
+          </mat-form-field>
+        </div>
 
         <!-- Botones de acción -->
         <div class="actions">
@@ -227,67 +289,135 @@
 
       <!-- MODO BOLETÍN / NEWSLETTER -->
       <form [formGroup]="newsletterForm" *ngIf="currentMode === 'newsletter'">
-        
-        <!-- Título del Boletín -->
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Título del Boletín / Amenaza *</mat-label>
-          <input matInput formControlName="tituloBoletin" placeholder="Ej: Nueva vulnerabilidad crítica en Outlook">
-          <mat-error *ngIf="newsletterForm.get('tituloBoletin')?.hasError('required')">
-            Campo obligatorio
-          </mat-error>
-        </mat-form-field>
 
-        <!-- Criticidad -->
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Nivel de Alerta (Criticidad) *</mat-label>
-          <mat-select formControlName="criticidad">
-            <mat-option value="baja">Bajo (CVSS 0.1 - 3.9)</mat-option>
-            <mat-option value="media">Medio (CVSS 4.0 - 6.9)</mat-option>
-            <mat-option value="alta">Alto (CVSS 7.0 - 8.9)</mat-option>
-            <mat-option value="crítica">Crítico (CVSS 9.0 - 10.0)</mat-option>
-          </mat-select>
-        </mat-form-field>
+        <!-- Fila 1: Título -->
+        <div class="field-with-hint">
+          <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-nl-titulo'">
+            {{ getHint('hint-nl-titulo') }}
+          </div>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Título del Boletín / Amenaza *</mat-label>
+            <input matInput formControlName="tituloBoletin" placeholder="Ej: Nueva vulnerabilidad crítica en Outlook"
+                   (focus)="handleFieldFocus('hint-nl-titulo')" (blur)="handleFieldBlur()">
+            <mat-error *ngIf="newsletterForm.get('tituloBoletin')?.hasError('required')">
+              Campo obligatorio
+            </mat-error>
+          </mat-form-field>
+        </div>
 
-        <!-- Resumen Ejecutivo -->
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Resumen Ejecutivo *</mat-label>
-          <textarea matInput formControlName="resumenEjecutivo" rows="4"
-                    (paste)="onNewsletterTextareaPaste($event, 'resumenEjecutivo')"
-                    placeholder="Describe la amenaza en lenguaje simple y directo para los clientes"></textarea>
-          <mat-error *ngIf="newsletterForm.get('resumenEjecutivo')?.hasError('required')">
-            Campo obligatorio
-          </mat-error>
-        </mat-form-field>
+        <!-- Fila 2: Grid Marca/Criticidad y CVE -->
+        <div class="newsletter-grid">
+          <div class="newsletter-grid-left">
+            <div class="field-with-hint">
+              <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-nl-marca'">
+                {{ getHint('hint-nl-marca') }}
+              </div>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Marca / Fabricante *</mat-label>
+                <input matInput formControlName="marcaFabricante" placeholder="Ej: Microsoft"
+                       (focus)="handleFieldFocus('hint-nl-marca')" (blur)="handleFieldBlur()">
+                <mat-error *ngIf="newsletterForm.get('marcaFabricante')?.hasError('required')">
+                  Campo obligatorio
+                </mat-error>
+              </mat-form-field>
+            </div>
 
-        <!-- Impacto -->
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Impacto *</mat-label>
-          <textarea matInput formControlName="impacto" rows="3"
-                    (paste)="onNewsletterTextareaPaste($event, 'impacto')"
-                    placeholder="¿Qué ocurre si el cliente se ve afectado?"></textarea>
-          <mat-error *ngIf="newsletterForm.get('impacto')?.hasError('required')">
-            Campo obligatorio
-          </mat-error>
-        </mat-form-field>
+            <div class="field-with-hint">
+              <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-nl-criticidad'">
+                {{ getHint('hint-nl-criticidad') }}
+              </div>
+              <mat-form-field appearance="outline" class="full-width" style="margin-bottom: 20px;">
+                <mat-label>Nivel de Alerta (Criticidad) *</mat-label>
+                <mat-select formControlName="criticidad" (openedChange)="$event ? handleFieldFocus('hint-nl-criticidad') : handleFieldBlur()">
+                  <mat-option value="baja">Bajo (CVSS 0.1 - 3.9)</mat-option>
+                  <mat-option value="media">Medio (CVSS 4.0 - 6.9)</mat-option>
+                  <mat-option value="alta">Alto (CVSS 7.0 - 8.9)</mat-option>
+                  <mat-option value="crítica">Crítico (CVSS 9.0 - 10.0)</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+          </div>
 
-        <!-- Acciones Recomendadas / Mitigación -->
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Acciones Recomendadas / Mitigación *</mat-label>
-          <textarea matInput formControlName="recomendacion" rows="4"
-                    (paste)="onNewsletterTextareaPaste($event, 'recomendacion')"
-                    placeholder="Pasos concretos a seguir o recomendaciones de seguridad"></textarea>
-          <mat-error *ngIf="newsletterForm.get('recomendacion')?.hasError('required')">
-            Campo obligatorio
-          </mat-error>
-        </mat-form-field>
+          <div class="newsletter-grid-right">
+            <div class="field-with-hint" style="width: 100%;">
+              <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-nl-cve'">
+                {{ getHint('hint-nl-cve') }}
+              </div>
+              <mat-form-field appearance="outline" class="cve-field">
+                <mat-label>CVE / Identificadores</mat-label>
+                <textarea matInput formControlName="cveIdentificadores"
+                          (focus)="handleFieldFocus('hint-nl-cve')" (blur)="handleFieldBlur()"
+                          (paste)="onNewsletterTextareaPaste($event, 'cveIdentificadores')"
+                          placeholder="Ej: CVE-2024-1234, CVE-2024-5678"></textarea>
+              </mat-form-field>
+            </div>
+          </div>
+        </div>
 
-        <!-- Enlaces de Referencia -->
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Enlaces de Referencia</mat-label>
-          <textarea matInput formControlName="referencias" rows="3"
-                    (paste)="onNewsletterTextareaPaste($event, 'referencias')"
-                    placeholder="Links a documentación oficial (uno por línea recomendado)"></textarea>
-        </mat-form-field>
+        <!-- Fila 3: Productos Afectados -->
+        <div class="field-with-hint">
+          <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-nl-productos'">
+            {{ getHint('hint-nl-productos') }}
+          </div>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Producto(s) Afectado(s) *</mat-label>
+            <textarea matInput formControlName="productosAfectados" rows="3"
+                      (focus)="handleFieldFocus('hint-nl-productos')" (blur)="handleFieldBlur()"
+                      (paste)="onNewsletterTextareaPaste($event, 'productosAfectados')"
+                      placeholder="Detalla los productos y versiones vulnerables"></textarea>
+            <mat-error *ngIf="newsletterForm.get('productosAfectados')?.hasError('required')">
+              Campo obligatorio
+            </mat-error>
+          </mat-form-field>
+        </div>
+
+        <!-- Fila 4: Impacto -->
+        <div class="field-with-hint">
+          <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-nl-impacto'">
+            {{ getHint('hint-nl-impacto') }}
+          </div>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Impacto *</mat-label>
+            <textarea matInput formControlName="impacto" rows="3"
+                      (focus)="handleFieldFocus('hint-nl-impacto')" (blur)="handleFieldBlur()"
+                      (paste)="onNewsletterTextareaPaste($event, 'impacto')"
+                      placeholder="¿Qué ocurre si el cliente se ve afectado?"></textarea>
+            <mat-error *ngIf="newsletterForm.get('impacto')?.hasError('required')">
+              Campo obligatorio
+            </mat-error>
+          </mat-form-field>
+        </div>
+
+        <!-- Fila 5: Acciones Recomendadas / Mitigación -->
+        <div class="field-with-hint">
+          <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-nl-recomendacion'">
+            {{ getHint('hint-nl-recomendacion') }}
+          </div>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Acciones Recomendadas / Mitigación *</mat-label>
+            <textarea matInput formControlName="recomendacion" rows="4"
+                      (focus)="handleFieldFocus('hint-nl-recomendacion')" (blur)="handleFieldBlur()"
+                      (paste)="onNewsletterTextareaPaste($event, 'recomendacion')"
+                      placeholder="Pasos concretos a seguir o recomendaciones de seguridad"></textarea>
+            <mat-error *ngIf="newsletterForm.get('recomendacion')?.hasError('required')">
+              Campo obligatorio
+            </mat-error>
+          </mat-form-field>
+        </div>
+
+        <!-- Fila 6: Referencias -->
+        <div class="field-with-hint">
+          <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-nl-referencias'">
+            {{ getHint('hint-nl-referencias') }}
+          </div>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Enlaces de Referencia</mat-label>
+            <textarea matInput formControlName="referencias" rows="3"
+                      (focus)="handleFieldFocus('hint-nl-referencias')" (blur)="handleFieldBlur()"
+                      (paste)="onNewsletterTextareaPaste($event, 'referencias')"
+                      placeholder="Links a documentación oficial (uno por línea recomendado)"></textarea>
+          </mat-form-field>
+        </div>
 
         <!-- Botones de acción -->
         <div class="actions">
@@ -307,10 +437,6 @@
         <div class="preview-header">
           <h3>Vista previa</h3>
           <div class="preview-actions">
-            <button mat-button color="primary" type="button" (click)="openReportGuide()">
-              <mat-icon>help_outline</mat-icon>
-              Ver guía rápida
-            </button>
             <button mat-raised-button color="accent" (click)="copyToClipboard()">
               <mat-icon>content_copy</mat-icon>
               {{ currentMode === 'report' ? 'Copiar reporte' : 'Copiar boletín' }}
