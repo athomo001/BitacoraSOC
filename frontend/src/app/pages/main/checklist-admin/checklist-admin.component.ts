@@ -7,11 +7,12 @@ import { WorkShiftService } from '../../../services/work-shift.service';
 import { UserService } from '../../../services/user.service';
 import { ChecklistTemplate, ChecklistItem } from '../../../models/checklist.model';
 import { WorkShift } from '../../../models/work-shift.model';
+import { ShiftReminder } from '../../../models/config.model';
 import { MatCard, MatCardTitle, MatCardContent } from '@angular/material/card';
 import { NgIf, NgFor } from '@angular/common';
 import { MatProgressBar } from '@angular/material/progress-bar';
 import { MatNavList, MatListItem } from '@angular/material/list';
-import { MatChipSet, MatChip } from '@angular/material/chips';
+import { MatChipSet, MatChip, MatChipsModule } from '@angular/material/chips';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatFormField, MatLabel, MatHint } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
@@ -19,12 +20,14 @@ import { MatCheckbox } from '@angular/material/checkbox';
 import { MatIcon } from '@angular/material/icon';
 import { MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle } from '@angular/material/expansion';
 import { MatSelect, MatOption } from '@angular/material/select';
+import { MatRadioModule } from '@angular/material/radio';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 @Component({
   selector: 'app-checklist-admin',
   templateUrl: './checklist-admin.component.html',
   styleUrls: ['./checklist-admin.component.scss'],
-  imports: [MatCard, MatCardTitle, NgIf, MatProgressBar, MatNavList, NgFor, MatListItem, MatChipSet, MatChip, MatButton, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatHint, MatInput, MatCheckbox, MatIconButton, MatIcon, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatSelect, MatOption]
+  imports: [MatCard, MatCardTitle, NgIf, MatProgressBar, MatNavList, NgFor, MatListItem, MatChipSet, MatChip, MatChipsModule, MatButton, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatHint, MatInput, MatCheckbox, MatIconButton, MatIcon, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatSelect, MatOption, MatRadioModule, MatProgressSpinnerModule]
 })
 export class ChecklistAdminComponent implements OnInit {
   templates: ChecklistTemplate[] = [];
@@ -35,6 +38,17 @@ export class ChecklistAdminComponent implements OnInit {
   cargoLabelOptions: string[] = ['N2'];
   form: FormGroup;
   configForm: FormGroup;
+
+  // ─── MAIL-REM-043: CRUD de recordatorios ───────────────────────────────
+  shiftReminders: ShiftReminder[] = [];
+  loadingReminders = false;
+  reminderFormOpen = false;
+  editingReminder: ShiftReminder | null = null;
+  savingReminder = false;
+  reminderForm: FormGroup;
+
+  reminderFixedTimes: string[] = [];
+  fixedTimesError = false;
 
   constructor(
     private fb: FormBuilder,
@@ -51,12 +65,21 @@ export class ChecklistAdminComponent implements OnInit {
     });
 
     this.configForm = this.fb.group({
-      checklistCooldownHours: [240, [Validators.required, Validators.min(1)]], // minutos (default 4 horas)
+      checklistCooldownHours: [240, [Validators.required, Validators.min(1)]],
       checklistCloseEmailEnabled: [false],
       alertNokEnabled: [false],
       alertNokRoleTarget: [['N2']],
       checklistAlertEnabled: [true],
       checklistAlertTime: ['09:30', [Validators.required]]
+    });
+
+    this.reminderForm = this.fb.group({
+      label: ['', [Validators.required, Validators.maxLength(150)]],
+      reminderText: ['', [Validators.required, Validators.maxLength(500)]],
+      frequencyType: ['hours'],
+      intervalHours: [4, [Validators.min(1), Validators.max(24)]],
+      targetShiftIds: [[]],
+      enabled: [true]
     });
   }
 
@@ -65,6 +88,7 @@ export class ChecklistAdminComponent implements OnInit {
     this.loadConfig();
     this.loadTemplates();
     this.loadActiveShifts();
+    this.loadShiftReminders();
     this.addItem();
   }
 
@@ -147,7 +171,7 @@ export class ChecklistAdminComponent implements OnInit {
     }
 
     this.savingConfig = true;
-    const payload = {
+    const payload: any = {
       shiftCheckCooldownHours: this.configForm.value.checklistCooldownHours,
       checklistCloseEmailEnabled: this.configForm.value.checklistCloseEmailEnabled,
       alertNokEnabled,
@@ -166,6 +190,113 @@ export class ChecklistAdminComponent implements OnInit {
         this.savingConfig = false;
       }
     });
+  }
+
+  // ─── MAIL-REM-043: Gestión de recordatorios ────────────────────────────
+
+  loadShiftReminders(): void {
+    this.loadingReminders = true;
+    this.configService.getShiftReminders().subscribe({
+      next: (reminders) => {
+        this.shiftReminders = reminders;
+        this.loadingReminders = false;
+      },
+      error: () => {
+        this.loadingReminders = false;
+        this.snackBar.open('Error cargando recordatorios', 'Cerrar', { duration: 3000 });
+      }
+    });
+  }
+
+  openReminderForm(reminder?: ShiftReminder): void {
+    this.editingReminder = reminder ?? null;
+    this.reminderFixedTimes = reminder ? [...(reminder.fixedTimes ?? [])] : [];
+    this.reminderForm.reset({
+      label: reminder?.label ?? '',
+      reminderText: reminder?.reminderText ?? '',
+      frequencyType: reminder?.frequencyType ?? 'hours',
+      intervalHours: reminder?.intervalHours ?? 4,
+      targetShiftIds: reminder?.targetShiftIds ?? [],
+      enabled: reminder?.enabled !== false
+    });
+    this.reminderFormOpen = true;
+  }
+
+  cancelReminderForm(): void {
+    this.reminderFormOpen = false;
+    this.editingReminder = null;
+    this.reminderFixedTimes = [];
+    this.fixedTimesError = false;
+    this.savingReminder = false;
+  }
+
+  saveReminder(): void {
+    if (this.reminderForm.invalid) return;
+    const v = this.reminderForm.value;
+    if (v.frequencyType === 'fixed' && this.reminderFixedTimes.length === 0) {
+      this.fixedTimesError = true;
+      return;
+    }
+    this.fixedTimesError = false;
+    this.savingReminder = true;
+
+    const payload: Partial<ShiftReminder> = {
+      label: v.label.trim(),
+      reminderText: v.reminderText.trim(),
+      frequencyType: v.frequencyType,
+      intervalHours: Number(v.intervalHours) || 4,
+      fixedTimes: v.frequencyType === 'fixed' ? [...this.reminderFixedTimes] : [],
+      targetShiftIds: Array.isArray(v.targetShiftIds) ? v.targetShiftIds : [],
+      enabled: Boolean(v.enabled)
+    };
+
+    const op = this.editingReminder
+      ? this.configService.updateShiftReminder(this.editingReminder._id!, payload)
+      : this.configService.createShiftReminder(payload);
+
+    op.subscribe({
+      next: () => {
+        this.snackBar.open(this.editingReminder ? 'Recordatorio actualizado' : 'Recordatorio creado', 'Cerrar', { duration: 2000 });
+        this.cancelReminderForm();
+        this.loadShiftReminders();
+      },
+      error: (err) => {
+        this.savingReminder = false;
+        const detail = err?.error?.errors?.[0]?.msg || err?.error?.message || 'Error guardando recordatorio';
+        this.snackBar.open(detail, 'Cerrar', { duration: 4000 });
+      },
+      complete: () => {
+        this.savingReminder = false;
+      }
+    });
+  }
+
+  deleteReminder(reminder: ShiftReminder): void {
+    if (!confirm(`¿Eliminar el recordatorio "${reminder.label}"?`)) return;
+    this.configService.deleteShiftReminder(reminder._id!).subscribe({
+      next: () => {
+        this.snackBar.open('Recordatorio eliminado', 'Cerrar', { duration: 2000 });
+        this.loadShiftReminders();
+      },
+      error: () => this.snackBar.open('Error al eliminar', 'Cerrar', { duration: 3000 })
+    });
+  }
+
+  addFixedTimeFromPicker(input: HTMLInputElement): void {
+    const value = (input.value || '').trim();
+    if (/^([01]\d|2[0-3]):[0-5]\d$/.test(value) && !this.reminderFixedTimes.includes(value)) {
+      this.reminderFixedTimes = [...this.reminderFixedTimes, value].sort();
+      this.fixedTimesError = false;
+    }
+    input.value = '';
+  }
+
+  removeFixedTime(time: string): void {
+    this.reminderFixedTimes = this.reminderFixedTimes.filter(t => t !== time);
+  }
+
+  shiftNameById(id: string): string {
+    return this.activeShifts.find(s => s._id === id)?.name ?? id;
   }
 
   get items(): FormArray {

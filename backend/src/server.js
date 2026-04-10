@@ -39,6 +39,7 @@ const { logger } = require('./utils/logger');
 const { startChecklistAlertScheduler } = require('./utils/checklistAlertScheduler');
 const { startBackupScheduler, stopBackupScheduler } = require('./utils/backup-scheduler');
 const { startAuditRetentionScheduler, stopAuditRetentionScheduler } = require('./utils/audit-retention-scheduler');
+const { startShiftReminderScheduler } = require('./utils/shiftReminderScheduler');
 const {
   startComplementCircuitHealthChecks,
   stopComplementCircuitHealthChecks
@@ -732,6 +733,7 @@ const startServers = async () => {
     startBackupScheduler();
     startAuditRetentionScheduler();
     startComplementCircuitHealthChecks();
+    startShiftReminderScheduler();
 
     const { startScheduler: startShiftReportScheduler } = require('./utils/shift-scheduler');
     startShiftReportScheduler();

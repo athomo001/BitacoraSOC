@@ -309,4 +309,105 @@
       </table>
     </div>
   </mat-card>
+
+  <!-- ── ESC-MAINT-042: Gestión de Mantenimientos Programados ── -->
+  <mat-card class="section-card maintenance-section">
+    <div class="maintenance-header">
+      <h2>🔧 Mantenimientos Programados</h2>
+      <button mat-raised-button color="primary" (click)="openMaintenanceForm(null)">
+        <mat-icon>add</mat-icon> Nuevo Mantenimiento
+      </button>
+    </div>
+    <p class="subtitle">Crea y gestiona ventanas de mantenimiento para clientes.</p>
+
+    <div *ngIf="loadingMaintenances" class="loading-container">
+      <mat-spinner diameter="40"></mat-spinner>
+    </div>
+
+    <ng-container *ngIf="!loadingMaintenances">
+      <table class="catalog-table" *ngIf="maintenanceRules.length > 0">
+        <thead>
+          <tr>
+            <th>Título</th>
+            <th>Mensaje</th>
+            <th>Desde</th>
+            <th>Hasta</th>
+            <th>Bloqueante</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let rule of maintenanceRules" [class.row-disabled]="!rule.enabled">
+            <td><strong>{{ rule.maintenanceTitle || rule.name || '-' }}</strong></td>
+            <td class="cell-truncate">{{ rule.alertMessage || '-' }}</td>
+            <td>{{ rule.validFrom ? (rule.validFrom | date:'dd/MM/yyyy HH:mm') : 'Sin límite' }}</td>
+            <td>{{ rule.validTo ? (rule.validTo | date:'dd/MM/yyyy HH:mm') : 'Sin límite' }}</td>
+            <td>
+              <span class="badge" [class.badge-danger]="rule.blocking" [class.badge-neutral]="!rule.blocking">
+                {{ rule.blocking ? 'Sí' : 'No' }}
+              </span>
+            </td>
+            <td>
+              <span class="badge" [class.badge-active]="rule.enabled" [class.badge-inactive]="!rule.enabled">
+                {{ rule.enabled ? 'Activo' : 'Inactivo' }}
+              </span>
+            </td>
+            <td class="cell-actions">
+              <button mat-icon-button color="primary" (click)="openMaintenanceForm(rule)" matTooltip="Editar">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-icon-button color="warn" (click)="deleteMaintenance(rule)" matTooltip="Eliminar">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="empty-hint" *ngIf="maintenanceRules.length === 0">
+        No hay mantenimientos programados.
+      </p>
+    </ng-container>
+
+    <!-- Formulario inline de creación/edición -->
+    <div class="maintenance-form-panel" *ngIf="maintenanceFormOpen">
+      <h3>{{ editingMaintenance ? 'Editar Mantenimiento' : 'Nuevo Mantenimiento' }}</h3>
+      <form [formGroup]="maintenanceForm" (ngSubmit)="saveMaintenance()" class="maint-form">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Título del mantenimiento</mat-label>
+          <input matInput formControlName="maintenanceTitle" placeholder="Ej: Mantenimiento equipo firewall" maxlength="200">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Mensaje (descripción)</mat-label>
+          <textarea matInput formControlName="alertMessage" rows="2" maxlength="500"
+            placeholder="Ej: Equipo fuera de servicio por actualización de firmware."></textarea>
+        </mat-form-field>
+
+        <div class="maint-form-row">
+          <mat-form-field appearance="outline">
+            <mat-label>Fecha/hora inicio</mat-label>
+            <input matInput type="datetime-local" formControlName="validFrom">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Fecha/hora fin</mat-label>
+            <input matInput type="datetime-local" formControlName="validTo">
+          </mat-form-field>
+        </div>
+
+        <div class="maint-form-checks">
+          <mat-checkbox formControlName="blocking">Bloqueante (oculta Alertas Especiales)</mat-checkbox>
+          <mat-checkbox formControlName="enabled">Activo</mat-checkbox>
+        </div>
+
+        <div class="maint-form-actions">
+          <button mat-raised-button color="primary" type="submit" [disabled]="maintenanceForm.invalid || savingMaintenance">
+            {{ editingMaintenance ? 'Guardar cambios' : 'Crear mantenimiento' }}
+          </button>
+          <button mat-stroked-button type="button" (click)="cancelMaintenanceForm()">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </mat-card>
 </div>

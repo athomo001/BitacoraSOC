@@ -15,10 +15,12 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { EscalationService } from '../../../services/escalation.service';
 import { CatalogService } from '../../../services/catalog.service';
 import { CatalogLogSource } from '../../../models/catalog.model';
+import { ClientAlertRule } from '../../../models/escalation.model';
 
 @Component({
     selector: 'app-escalation-simple',
@@ -38,6 +40,7 @@ import { CatalogLogSource } from '../../../models/catalog.model';
         MatInputModule,
         MatSelectModule,
         MatTooltipModule,
+        MatCheckboxModule,
         ReactiveFormsModule
     ],
     templateUrl: './escalation-simple.component.html',
@@ -66,18 +69,37 @@ export class EscalationSimpleComponent implements OnInit {
   currentWeekStart: Date = new Date();
   currentWeekEnd: Date = new Date();
 
+  // ── ESC-MAINT-042 — Mantenimientos ──────────────────────────────────────
+  maintenanceRules: ClientAlertRule[] = [];
+  loadingMaintenances = false;
+  maintenanceFormOpen = false;
+  editingMaintenance: ClientAlertRule | null = null;
+  savingMaintenance = false;
+  maintenanceForm: FormGroup;
+
   constructor(
     private escalationService: EscalationService,
     private catalogService: CatalogService,
     private snackBar: MatSnackBar,
-    private cdr: ChangeDetectorRef
-  ) {}
+    private cdr: ChangeDetectorRef,
+    private fb: FormBuilder
+  ) {
+    this.maintenanceForm = this.fb.group({
+      maintenanceTitle: ['', [Validators.required, Validators.maxLength(200)]],
+      alertMessage: ['', Validators.maxLength(500)],
+      validFrom: [null],
+      validTo: [null],
+      blocking: [false],
+      enabled: [true]
+    });
+  }
 
   ngOnInit(): void {
     this.setCurrentWeek();
     this.loadEscalationView();
     this.loadRaciClients();
     this.loadWeekShifts();
+    this.loadMaintenanceRules();
   }
 
   async loadEscalationView(): Promise<void> {
@@ -286,5 +308,105 @@ export class EscalationSimpleComponent implements OnInit {
         this.showSuccess('Copiado al portapapeles');
       }).catch((err) => console.error('Error al copiar:', err));
     }
+  }
+
+  // ── ESC-MAINT-042 — Mantenimientos ──────────────────────────────────────
+
+  loadMaintenanceRules(): void {
+    this.loadingMaintenances = true;
+    this.escalationService.getMaintenanceRules().subscribe({
+      next: (rules) => {
+        this.maintenanceRules = rules || [];
+        this.loadingMaintenances = false;
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Error cargando mantenimientos:', err);
+        this.loadingMaintenances = false;
+      }
+    });
+  }
+
+  openMaintenanceForm(rule: ClientAlertRule | null): void {
+    this.editingMaintenance = rule;
+    this.maintenanceFormOpen = true;
+
+    if (rule) {
+      const toLocal = (iso: any) => {
+        if (!iso) return '';
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return '';
+        const pad = (n: number) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      };
+      this.maintenanceForm.patchValue({
+        maintenanceTitle: rule.maintenanceTitle || rule.name || '',
+        alertMessage: rule.alertMessage || '',
+        validFrom: toLocal(rule.validFrom),
+        validTo: toLocal(rule.validTo),
+        blocking: rule.blocking === true,
+        enabled: rule.enabled !== false
+      });
+    } else {
+      this.maintenanceForm.reset({ blocking: false, enabled: true, maintenanceTitle: '', alertMessage: '', validFrom: '', validTo: '' });
+    }
+
+    this.cdr.detectChanges();
+  }
+
+  cancelMaintenanceForm(): void {
+    this.maintenanceFormOpen = false;
+    this.editingMaintenance = null;
+    this.maintenanceForm.reset({ blocking: false, enabled: true });
+  }
+
+  saveMaintenance(): void {
+    if (this.maintenanceForm.invalid) return;
+    this.savingMaintenance = true;
+
+    const v = this.maintenanceForm.value;
+    const payload: Partial<ClientAlertRule> = {
+      maintenanceTitle: (v.maintenanceTitle || '').trim(),
+      name: (v.maintenanceTitle || '').trim(),
+      alertMessage: (v.alertMessage || '').trim(),
+      validFrom: v.validFrom ? new Date(v.validFrom) as any : null,
+      validTo: v.validTo ? new Date(v.validTo) as any : null,
+      blocking: Boolean(v.blocking),
+      enabled: Boolean(v.enabled)
+    };
+
+    const request = this.editingMaintenance
+      ? this.escalationService.updateMaintenanceRule(this.editingMaintenance._id!, payload)
+      : this.escalationService.createMaintenanceRule(payload);
+
+    request.subscribe({
+      next: () => {
+        this.showSuccess(this.editingMaintenance ? 'Mantenimiento actualizado' : 'Mantenimiento creado');
+        this.cancelMaintenanceForm();
+        this.loadMaintenanceRules();
+      },
+      error: (err) => {
+        console.error('Error guardando mantenimiento:', err);
+        this.showError('Error al guardar el mantenimiento');
+        this.savingMaintenance = false;
+      },
+      complete: () => {
+        this.savingMaintenance = false;
+      }
+    });
+  }
+
+  deleteMaintenance(rule: ClientAlertRule): void {
+    if (!confirm(`¿Eliminar el mantenimiento "${rule.maintenanceTitle || rule.name}"?`)) return;
+    this.escalationService.deleteMaintenanceRule(rule._id!).subscribe({
+      next: () => {
+        this.showSuccess('Mantenimiento eliminado');
+        this.loadMaintenanceRules();
+      },
+      error: (err) => {
+        console.error('Error eliminando mantenimiento:', err);
+        this.showError('Error al eliminar el mantenimiento');
+      }
+    });
   }
 }

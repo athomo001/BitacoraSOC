@@ -10,6 +10,10 @@ ENV APP_VERSION=${APP_VERSION}
 # Copiar archivos de dependencias
 COPY package*.json ./
 
+# Crear usuario no-root antes de instalar dependencias
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
 # Instalar dependencias de producción usando cache mount para velocidad local
 RUN --mount=type=cache,id=npm-cache-backend,target=/root/.npm \
     npm install --omit=dev
@@ -17,11 +21,9 @@ RUN --mount=type=cache,id=npm-cache-backend,target=/root/.npm \
 # Copiar código fuente
 COPY src ./src
 
-# Crear directorios necesarios y usuario no-root por seguridad
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001 && \
-    mkdir -p /app/uploads/logos /app/logs && \
-    chown -R nodejs:nodejs /app
+# Crear directorios necesarios y asignar permisos solo sobre lo necesario
+RUN mkdir -p /app/uploads/logos /app/logs && \
+    chown -R nodejs:nodejs /app/src /app/uploads /app/logs
 
 USER nodejs
 

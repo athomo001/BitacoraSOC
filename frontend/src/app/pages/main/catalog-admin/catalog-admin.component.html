@@ -204,15 +204,40 @@
       </div>
     </mat-tab>
 
-    <mat-tab label="Alertas Especiales">
+    <mat-tab label="Alertas y Mantenimientos">
       <div class="tab-content">
         <mat-card class="form-card">
           <mat-card-header>
-            <mat-card-title>{{ editingClientAlertRuleId ? 'Editar Regla Especial' : 'Nueva Regla Especial'
-              }}</mat-card-title>
+            <mat-card-title>
+              {{ editingClientAlertRuleId ? 'Editar Regla' : 'Nueva Regla' }}
+              <span class="rule-type-subtitle" *ngIf="clientAlertRuleForm.get('ruleType')?.value === 'scheduled_maintenance'"> — Mantenimiento Programado</span>
+              <span class="rule-type-subtitle" *ngIf="clientAlertRuleForm.get('ruleType')?.value !== 'scheduled_maintenance'"> — Alerta Especial</span>
+            </mat-card-title>
           </mat-card-header>
           <mat-card-content>
             <form [formGroup]="clientAlertRuleForm" (ngSubmit)="saveClientAlertRule()">
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Tipo de regla *</mat-label>
+                <mat-select formControlName="ruleType">
+                  <mat-option value="special_alert">Alerta Especial de Escalamiento</mat-option>
+                  <mat-option value="scheduled_maintenance">Mantenimiento Programado</mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width"
+                *ngIf="clientAlertRuleForm.get('ruleType')?.value === 'scheduled_maintenance'">
+                <mat-label>Título del mantenimiento</mat-label>
+                <input matInput formControlName="maintenanceTitle"
+                  placeholder="Ej: Ventana Oracle 22:00-02:00 – Producción">
+                <mat-hint>Se muestra en el banner y en el diálogo del analista</mat-hint>
+              </mat-form-field>
+
+              <mat-checkbox formControlName="blocking" class="ml-checkbox"
+                *ngIf="clientAlertRuleForm.get('ruleType')?.value === 'scheduled_maintenance'">
+                Bloqueo total (impide generar reportes hasta que el analista confirme lectura)
+              </mat-checkbox>
+
               <mat-form-field appearance="outline" class="full-width">
                 <mat-label>Cliente / Log Source *</mat-label>
                 <mat-select formControlName="clientId">
@@ -222,88 +247,115 @@
                 </mat-select>
               </mat-form-field>
 
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Nombre de regla</mat-label>
-                <input matInput formControlName="name" placeholder="Ej: Fuera de horario cliente VIP">
-              </mat-form-field>
-
-              <div class="form-row">
+              <!-- Campos exclusivos de Alerta Especial -->
+              <ng-container *ngIf="clientAlertRuleForm.get('ruleType')?.value !== 'scheduled_maintenance'">
                 <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Prioridad</mat-label>
-                  <input matInput type="number" min="1" formControlName="priority">
+                  <mat-label>Nombre de regla</mat-label>
+                  <input matInput formControlName="name" placeholder="Ej: Fuera de horario cliente VIP">
+                </mat-form-field>
+
+                <div class="form-row">
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Prioridad</mat-label>
+                    <input matInput type="number" min="1" formControlName="priority">
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Zona horaria</mat-label>
+                    <input matInput formControlName="timezone" placeholder="America/Santiago">
+                  </mat-form-field>
+                </div>
+
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Contextos de aplicacion</mat-label>
+                  <mat-select formControlName="contexts" multiple>
+                    <mat-option value="report">Generar reporte</mat-option>
+                    <mat-option value="copy-report">Copiar reporte</mat-option>
+                  </mat-select>
                 </mat-form-field>
 
                 <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Zona horaria</mat-label>
-                  <input matInput formControlName="timezone" placeholder="America/Santiago">
+                  <mat-label>Modo horario</mat-label>
+                  <mat-select formControlName="mode">
+                    <mat-option *ngFor="let mode of clientAlertModes" [value]="mode.value">
+                      {{ mode.label }}
+                    </mat-option>
+                  </mat-select>
                 </mat-form-field>
-              </div>
 
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Contextos de aplicacion</mat-label>
-                <mat-select formControlName="contexts" multiple>
-                  <mat-option value="report">Generar reporte</mat-option>
-                  <mat-option value="copy-report">Copiar reporte</mat-option>
-                </mat-select>
-              </mat-form-field>
+                <div class="form-row">
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Hora inicio (HH:mm)</mat-label>
+                    <input matInput formControlName="startTime" placeholder="09:00">
+                  </mat-form-field>
 
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Modo horario</mat-label>
-                <mat-select formControlName="mode">
-                  <mat-option *ngFor="let mode of clientAlertModes" [value]="mode.value">
-                    {{ mode.label }}
-                  </mat-option>
-                </mat-select>
-              </mat-form-field>
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Hora fin (HH:mm)</mat-label>
+                    <input matInput formControlName="endTime" placeholder="17:00">
+                  </mat-form-field>
+                </div>
 
-              <div class="form-row">
                 <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Hora inicio (HH:mm)</mat-label>
-                  <input matInput formControlName="startTime" placeholder="09:00">
+                  <mat-label>Dias de semana (0=Dom..6=Sab)</mat-label>
+                  <input matInput formControlName="daysOfWeekCsv" placeholder="1,2,3,4,5">
                 </mat-form-field>
 
                 <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Hora fin (HH:mm)</mat-label>
-                  <input matInput formControlName="endTime" placeholder="17:00">
+                  <mat-label>Feriados (YYYY-MM-DD, separados por coma)</mat-label>
+                  <input matInput formControlName="holidayDatesCsv" placeholder="2026-01-01,2026-12-25">
                 </mat-form-field>
-              </div>
+
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Canales y destinatarios</mat-label>
+                  <textarea matInput rows="3" formControlName="channelsText"
+                    placeholder="whatsapp:+56912345678&#10;email:soc@cliente.com&#10;telefono:+56223456789"></textarea>
+                </mat-form-field>
+              </ng-container>
 
               <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Dias de semana (0=Dom..6=Sab)</mat-label>
-                <input matInput formControlName="daysOfWeekCsv" placeholder="1,2,3,4,5">
-              </mat-form-field>
-
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Feriados (YYYY-MM-DD, separados por coma)</mat-label>
-                <input matInput formControlName="holidayDatesCsv" placeholder="2026-01-01,2026-12-25">
-              </mat-form-field>
-
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Canales y destinatarios</mat-label>
-                <textarea matInput rows="3" formControlName="channelsText"
-                  placeholder="whatsapp:+56912345678&#10;email:soc@cliente.com&#10;telefono:+56223456789"></textarea>
-              </mat-form-field>
-
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Mensaje de alerta *</mat-label>
+                <mat-label>{{ clientAlertRuleForm.get('ruleType')?.value === 'scheduled_maintenance' ? 'Descripción del mantenimiento *' : 'Mensaje de alerta *' }}</mat-label>
                 <textarea matInput rows="4" formControlName="alertMessage"
-                  placeholder="Fuera de horario: avisar por WhatsApp al contacto de guardia y luego enviar correo"></textarea>
+                  [placeholder]="clientAlertRuleForm.get('ruleType')?.value === 'scheduled_maintenance' ? 'Ej: Ventana de mantenimiento programada para actualización de firewall' : 'Fuera de horario: avisar por WhatsApp al contacto de guardia y luego enviar correo'"></textarea>
               </mat-form-field>
 
+              <!-- Vigencia: solo para mantenimiento es obligatoria; para alerta opcional -->
               <div class="form-row">
-                <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Vigencia desde</mat-label>
-                  <input matInput type="datetime-local" formControlName="validFrom">
-                </mat-form-field>
+                <div class="full-width date-time-group">
+                  <mat-form-field appearance="outline" class="date-field">
+                    <mat-label>Fecha inicio *</mat-label>
+                    <input matInput [matDatepicker]="pickerFrom" formControlName="validFromDate"
+                      placeholder="dd/mm/aaaa">
+                    <mat-datepicker-toggle matSuffix [for]="pickerFrom"></mat-datepicker-toggle>
+                    <mat-datepicker #pickerFrom></mat-datepicker>
+                    <mat-hint>Inicio de la ventana</mat-hint>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="time-field">
+                    <mat-label>Hora inicio *</mat-label>
+                    <input matInput type="time" formControlName="validFromTime">
+                    <mat-icon matSuffix>schedule</mat-icon>
+                  </mat-form-field>
+                </div>
 
-                <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Vigencia hasta</mat-label>
-                  <input matInput type="datetime-local" formControlName="validTo">
-                </mat-form-field>
+                <div class="full-width date-time-group">
+                  <mat-form-field appearance="outline" class="date-field">
+                    <mat-label>Fecha fin *</mat-label>
+                    <input matInput [matDatepicker]="pickerTo" formControlName="validToDate"
+                      placeholder="dd/mm/aaaa">
+                    <mat-datepicker-toggle matSuffix [for]="pickerTo"></mat-datepicker-toggle>
+                    <mat-datepicker #pickerTo></mat-datepicker>
+                    <mat-hint>Fin de la ventana</mat-hint>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="time-field">
+                    <mat-label>Hora fin *</mat-label>
+                    <input matInput type="time" formControlName="validToTime">
+                    <mat-icon matSuffix>schedule</mat-icon>
+                  </mat-form-field>
+                </div>
               </div>
 
               <mat-checkbox formControlName="enabled">Regla habilitada</mat-checkbox>
-              <mat-checkbox formControlName="holidayOnly" class="ml-checkbox">Solo en feriados</mat-checkbox>
+              <mat-checkbox formControlName="holidayOnly" class="ml-checkbox"
+                *ngIf="clientAlertRuleForm.get('ruleType')?.value !== 'scheduled_maintenance'">Solo en feriados</mat-checkbox>
               <mat-checkbox formControlName="acknowledgementRequired" class="ml-checkbox">
                 Requiere confirmacion del analista
               </mat-checkbox>
@@ -324,13 +376,14 @@
 
         <mat-card class="list-card">
           <mat-card-header>
-            <mat-card-title>Reglas especiales ({{ clientAlertRules.length }})</mat-card-title>
+            <mat-card-title>Reglas de alerta y mantenimiento ({{ clientAlertRules.length }})</mat-card-title>
           </mat-card-header>
           <mat-card-content>
             <div class="table-container">
               <table class="catalog-table">
                 <thead>
                   <tr>
+                    <th>Tipo</th>
                     <th>Cliente</th>
                     <th>Modo</th>
                     <th>Prioridad</th>
@@ -341,6 +394,13 @@
                 </thead>
                 <tbody>
                   <tr *ngFor="let rule of clientAlertRules">
+                    <td>
+                      <span class="rule-type-badge" [class.badge-maintenance]="isMaintenance(rule.ruleType)">
+                        <mat-icon class="badge-icon">{{ isMaintenance(rule.ruleType) ? 'engineering' : 'warning' }}</mat-icon>
+                        {{ getRuleTypeLabel(rule.ruleType) }}
+                        <mat-icon *ngIf="isMaintenance(rule.ruleType) && rule.blocking" class="badge-lock" matTooltip="Bloqueo total">lock</mat-icon>
+                      </span>
+                    </td>
                     <td>{{ getClientNameForRule(rule) }}</td>
                     <td>{{ getModeLabel(rule.timeWindows[0]?.mode) }}</td>
                     <td>{{ rule.priority }}</td>

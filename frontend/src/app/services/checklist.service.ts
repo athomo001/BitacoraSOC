@@ -52,7 +52,7 @@ export class ChecklistService {
   getActiveChecklist(type?: 'inicio' | 'cierre'): Observable<ChecklistTemplate | null> {
     const params = type ? new HttpParams().set('type', type) : undefined;
     return this.http
-      .get<{ template: ChecklistTemplate; source: 'template' | 'legacy' }>(`${this.API_URL}/templates/active`, { params })
+      .get<{ template: ChecklistTemplate | null; source: 'template' | 'legacy' }>(`${this.API_URL}/templates/active`, { params })
       .pipe(map(res => res?.template ? { ...res.template, source: res.source } : null));
   }
 

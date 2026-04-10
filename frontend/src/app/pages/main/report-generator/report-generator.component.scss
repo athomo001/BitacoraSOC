@@ -10,6 +10,36 @@
   justify-content: center;
   align-items: center;
   margin-bottom: 24px;
+
+  .guide-toggle-btn {
+    position: absolute;
+    right: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 4px 12px;
+    border: 1px solid rgba(63, 81, 181, 0.4);
+    border-radius: 20px;
+    color: #3f51b5;
+    background: rgba(63, 81, 181, 0.05);
+    transition: background 0.2s, border-color 0.2s;
+
+    &:hover {
+      background: rgba(63, 81, 181, 0.12);
+      border-color: #3f51b5;
+    }
+  }
+
+  @media (max-width: 680px) {
+    flex-direction: column;
+    gap: 10px;
+
+    .guide-toggle-btn {
+      position: static;
+    }
+  }
 }
 
 mat-card-content {
@@ -50,6 +80,23 @@ mat-card-content {
   border-left: 4px solid var(--state-error);
   border-radius: 6px;
   background: var(--state-error-bg);
+
+  &.maintenance-blocking {
+    border-color: #e65100;
+    background: rgba(230, 81, 0, 0.06);
+
+    .client-alert-header {
+      color: #e65100;
+    }
+
+    .client-alert-message {
+      color: #b84d00;
+    }
+
+    .client-alert-meta {
+      color: #b84d00;
+    }
+  }
 }
 
 .client-alert-header {
@@ -91,6 +138,25 @@ mat-card-content {
 
 .client-alert-status.ok {
   color: var(--state-success);
+}
+
+.maintenance-blocking-notice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0;
+  padding: 6px 10px;
+  background: rgba(230, 81, 0, 0.08);
+  border-radius: 4px;
+  font-size: 13px;
+  color: #b84d00;
+  font-weight: 600;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
 }
 
 .upload-section {

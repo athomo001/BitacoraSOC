@@ -18,11 +18,12 @@
           </mat-button-toggle>
         </mat-button-toggle-group>
         <button mat-button color="primary" type="button"
+                class="guide-toggle-btn"
                 (click)="toggleGuide()"
                 [class.guide-toggle-active]="guideActive"
                 aria-label="Activar o desactivar globos de ayuda contextual">
           <mat-icon>{{ guideActive ? 'visibility_off' : 'help_outline' }}</mat-icon>
-          {{ guideActive ? 'Ocultar guía' : '? Ver guía rápida' }}
+          {{ guideActive ? 'Ocultar guía' : 'Ver guía rápida' }}
         </button>
       </div>
 
@@ -159,10 +160,19 @@
           </div>
         </div>
 
-        <div class="client-alert-banner" *ngIf="activeClientAlert?.hasAlert">
+        <div class="client-alert-banner"
+          [class.maintenance-blocking]="activeClientAlert?.rule?.ruleType === 'scheduled_maintenance' && activeClientAlert?.rule?.blocking"
+          *ngIf="activeClientAlert?.hasAlert">
           <div class="client-alert-header">
-            <mat-icon color="warn">warning</mat-icon>
-            <strong>Alerta especial de escalamiento para {{ activeClientAlert?.client?.name }}</strong>
+            <mat-icon [color]="isMaintenanceBlocking ? '' : 'warn'">
+              {{ isMaintenanceBlocking ? 'engineering' : 'warning' }}
+            </mat-icon>
+            <strong *ngIf="isMaintenanceBlocking">
+              Mantenimiento programado: {{ activeClientAlert?.rule?.maintenanceTitle || activeClientAlert?.client?.name }}
+            </strong>
+            <strong *ngIf="!isMaintenanceBlocking">
+              Alerta especial de escalamiento para {{ activeClientAlert?.client?.name }}
+            </strong>
           </div>
           <p class="client-alert-message">
             {{ activeClientAlert?.rule?.alertMessage }}
@@ -172,9 +182,13 @@
             Hora evaluada: {{ activeClientAlert?.evaluation?.localDate }} {{ activeClientAlert?.evaluation?.localTime }}
             ({{ activeClientAlert?.evaluation?.timezone }})
           </p>
+          <p class="maintenance-blocking-notice" *ngIf="isMaintenanceBlocking && hasPendingClientAlert">
+            <mat-icon>lock</mat-icon>
+            El formulario está bloqueado hasta confirmar lectura del mantenimiento.
+          </p>
           <div class="client-alert-actions">
-            <button mat-stroked-button color="warn" type="button" (click)="acknowledgeCurrentAlert()">
-              <mat-icon>fact_check</mat-icon>
+            <button mat-stroked-button [color]="isMaintenanceBlocking ? 'primary' : 'warn'" type="button" (click)="acknowledgeCurrentAlert()">
+              <mat-icon>{{ isMaintenanceBlocking ? 'check_circle' : 'fact_check' }}</mat-icon>
               Confirmar lectura
             </button>
             <span class="client-alert-status pending" *ngIf="hasPendingClientAlert">

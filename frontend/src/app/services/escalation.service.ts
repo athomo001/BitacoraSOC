@@ -254,6 +254,28 @@ export class EscalationService {
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 🔧 ESC-MAINT-042 — Mantenimientos (Analistas y Admins)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  getMaintenanceRules(clientId?: string): Observable<ClientAlertRule[]> {
+    let params = new HttpParams();
+    if (clientId) params = params.set('clientId', clientId);
+    return this.http.get<ClientAlertRule[]>(`${this.apiUrl}/maintenance-rules`, { params });
+  }
+
+  createMaintenanceRule(data: Partial<ClientAlertRule>): Observable<ClientAlertRule> {
+    return this.http.post<ClientAlertRule>(`${this.apiUrl}/maintenance-rules`, data);
+  }
+
+  updateMaintenanceRule(id: string, data: Partial<ClientAlertRule>): Observable<ClientAlertRule> {
+    return this.http.put<ClientAlertRule>(`${this.apiUrl}/maintenance-rules/${id}`, data);
+  }
+
+  deleteMaintenanceRule(id: string): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.apiUrl}/maintenance-rules/${id}`);
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // 🔧 CRUD ADMIN - Reglas de Escalamiento
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
