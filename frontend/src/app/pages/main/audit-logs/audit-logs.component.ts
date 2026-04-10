@@ -534,9 +534,16 @@ export class AuditLogsComponent implements OnInit {
     // ====== CORREO / SMTP ======
     if (event.includes('mail') || event.includes('smtp')) {
       const status = result.success ? '✅' : '❌';
-      const recipientsPreview = (meta['resolvedRecipientsPreview'] as string[] | undefined)?.length
-        ? (meta['resolvedRecipientsPreview'] as string[]).join(', ')
-        : ((meta['toMasked'] as string[] | undefined)?.length ? (meta['toMasked'] as string[]).join(', ') : 'sin destinatarios');
+      const toRecipientArr = (val: unknown): string[] => {
+        if (!val) return [];
+        if (Array.isArray(val)) return val as string[];
+        if (typeof val === 'object') return Object.values(val as Record<string, string>);
+        return [];
+      };
+      const previewArr = toRecipientArr(meta['resolvedRecipientsPreview']).length
+        ? toRecipientArr(meta['resolvedRecipientsPreview'])
+        : toRecipientArr(meta['toMasked']);
+      const recipientsPreview = previewArr.length ? previewArr.join(', ') : 'sin destinatarios';
       const recipientsCount = Number(meta['resolvedRecipientsCount'] ?? meta['recipientsCount'] ?? 0);
       const subject = meta['subject'] ? ` | ${meta['subject']}` : '';
       const category = meta['category'] || 'correo';

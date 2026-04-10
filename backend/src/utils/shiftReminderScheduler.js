@@ -140,24 +140,7 @@ async function runShiftReminder() {
 
         const recipientSet = new Map();
 
-        if (Array.isArray(shift.assignedUserIds)) {
-          for (const user of shift.assignedUserIds) {
-            if (user?.email && user.isActive !== false) {
-              recipientSet.set(user.email.toLowerCase(), user.fullName || user.username || user.email);
-            }
-          }
-        }
-
-        if (shift.assignedUserId && recipientSet.size === 0) {
-          const legacyUser = await User.findById(shift.assignedUserId)
-            .select('email fullName username isActive')
-            .lean();
-          if (legacyUser?.email && legacyUser.isActive !== false) {
-            recipientSet.set(legacyUser.email.toLowerCase(), legacyUser.fullName || legacyUser.username || legacyUser.email);
-          }
-        }
-
-        // Fuente adicional: WorkShiftAssignment (tabla de vinculaciones operativas)
+        // Fuente principal: WorkShiftAssignment (vinculaciones operativas gestionadas desde UI)
         const currentDow = moment.tz(now, shiftTz).day(); // 0=Domingo … 6=Sábado
         const operativeAssignments = await WorkShiftAssignment.find({
           workShiftId: shift._id,
@@ -168,6 +151,24 @@ async function runShiftReminder() {
           const u = asg.userId;
           if (u?.email && u.isActive !== false) {
             recipientSet.set(u.email.toLowerCase(), u.fullName || u.username || u.email);
+          }
+        }
+
+        // Fallback legacy: solo si WorkShiftAssignment no tiene ningún destinatario
+        if (recipientSet.size === 0 && Array.isArray(shift.assignedUserIds)) {
+          for (const user of shift.assignedUserIds) {
+            if (user?.email && user.isActive !== false) {
+              recipientSet.set(user.email.toLowerCase(), user.fullName || user.username || user.email);
+            }
+          }
+        }
+
+        if (recipientSet.size === 0 && shift.assignedUserId) {
+          const legacyUser = await User.findById(shift.assignedUserId)
+            .select('email fullName username isActive')
+            .lean();
+          if (legacyUser?.email && legacyUser.isActive !== false) {
+            recipientSet.set(legacyUser.email.toLowerCase(), legacyUser.fullName || legacyUser.username || legacyUser.email);
           }
         }
 
