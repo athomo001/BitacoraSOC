@@ -32,6 +32,11 @@
 | UI-GOV-058 | Pendiente | Gobernanza UI ALTA | Guía de estilos interna y checklist obligatorio en PR | Publicar guía corta de buenas prácticas (jerarquía, contención, tema, contraste, estados, spacing) y exigir checklist de revisión UI antes de merge en módulos de interfaz. |
 | UI-QA-059 | Pendiente | QA Visual ALTA | Baseline de regresión visual por tema | Crear set de capturas base por vista crítica y tema para detectar drift visual en cambios futuros; incluir validación en pipeline de QA/manual asistido. |
 | UI-MIG-060 | Pendiente | Gestión de deuda ALTA | Plan de migración por lotes de vistas con mayor deuda visual | Ejecutar en oleadas: 1) report-generator, 2) checklist-admin, 3) catalog-admin, 4) audit-logs, 5) main-layout. Cada lote debe cerrar con métricas de reducción de nesting y hardcode. |
+| QA-UI-061 | Pendiente | QA + Frontend CRÍTICA | Rol QA obligatorio en todo trabajo UI/temas: nada se da por cerrado sin probar | Quien implemente cambios visuales o de theming debe actuar como QA: revisar legibilidad, estados de error, foco y flujos reales. No basta con “compila”; hay que validar que la interfaz sea usable en condiciones reales de operación SOC. |
+| QA-UI-062 | Pendiente | QA Visual CRÍTICA | Matriz de prueba manual: cada vista o componente tocado en los 5 temas | Tras cualquier cambio en `styles.scss`, tokens o SCSS de pantalla, probar **light, dark, sepia, pastel y cyberpunk** en esa ruta. Documentar en PR o nota de release qué se probó. Objetivo: detectar antes de merge fondos que no coinciden con texto, componentes “rotos” solo en un tema, etc. |
+| QA-UI-063 | Pendiente | QA Funcional + UI ALTA | Regresión de formularios, campos y validación tras cambios de estilo | Verificar: labels visibles, hints/errores legibles, estados `touched/invalid`, selects/autocomplete, diálogos, tablas y paginador. Un cambio de color de fondo no debe dejar texto ilegible ni campos que parezcan deshabilitados cuando no lo están (o al revés). |
+| QA-UI-064 | Pendiente | QA Contraste / Theming ALTA | Casos explícitos: fondo oscuro + texto oscuro, inputs que no siguen el tema | Checklist obligatorio: (1) texto principal/secundario vs fondo de página y de card; (2) `mat-form-field` / textarea / input nativo: fondo, borde, texto escrito y placeholder en los 5 temas; (3) hover/focus/disabled; (4) tooltips, chips y badges sobre superficies claras y oscuras. Corregir cualquier combinación ilegible antes de marcar Listo. |
+| QA-UI-065 | Pendiente | Gobernanza CRÍTICA | Buenas prácticas de QA y diseño no se omiten al escribir código | Los estándares de este bloque (tokens, contraste, prueba multi-tema, formularios) aplican **en el momento de implementar**: merge solo con evidencia de prueba o checklist firmado. No se acorta el proceso “por ir rápido” en cambios solo visuales; ahí es donde más fallan contraste y campos. |
 
 
 
@@ -120,6 +125,18 @@ En resumen: hay buena base de tema, pero falta un **sistema de layout y jerarqui
 4. Mayor costo de mantenimiento para cada tema.
 5. Mayor riesgo de errores de contraste en overrides locales.
 
+### Rol QA y pruebas obligatorias (regresión visual y funcional)
+
+Todo lo descrito en esta sección y en los issues `UI-*` / `QA-UI-*` **debe probarse** al implementarse. Los cambios de CSS, tokens o estructura de layout suelen introducir:
+
+- aspectos visuales raros o incoherentes entre módulos;
+- errores aparentes en campos (errores ilegibles, mismos colores que el fondo);
+- **fondo oscuro con letras oscuras** (o claro con texto claro) por tokens incompletos o hardcode;
+- **cajas de texto** (`input`, `textarea`, Material outline) cuyo fondo o borde **no acompaña al tema** mientras el resto de la página sí cambia;
+- regresiones solo visibles en **un** tema (p. ej. sepia o cyberpunk).
+
+**Regla:** no se marca trabajo como terminado sin pasar la matriz de temas y el checklist de formularios/contraste descritos en `QA-UI-062`, `QA-UI-063` y `QA-UI-064`. Las buenas prácticas de verificación multi-tema y accesibilidad **no se omiten** al escribir código de interfaz; ahí es donde más se concentran los fallos.
+
 ### Evidencia (muestras representativas)
 
 - Uso extensivo de contenedores visuales y overrides globales: `frontend/src/styles.scss`
@@ -200,6 +217,7 @@ En resumen: hay buena base de tema, pero falta un **sistema de layout y jerarqui
 - Checklist de contraste por tema en PR.
 - Lint de estilos para bloquear hex hardcode fuera de tokens.
 - Baseline visual por tema para detectar regresiones.
+- **QA manual obligatorio** según `QA-UI-061`–`QA-UI-065` para cada PR que toque estilos o tokens.
 
 ### Checklist de criterios de aceptacion
 
@@ -209,6 +227,9 @@ En resumen: hay buena base de tema, pero falta un **sistema de layout y jerarqui
 4. No se introducen colores hardcode en componentes funcionales nuevos.
 5. Contraste AA validado en tema light/dark/sepia/pastel/cyberpunk para texto y estados.
 6. Se reduce significativamente el uso de `!important`/`::ng-deep` en vistas priorizadas.
+7. **Prueba en los cinco temas** en las rutas afectadas; sin excepciones por “cambio pequeño”.
+8. **Formularios y mensajes de validacion** legibles en todos los temas; sin inputs “fantasma” (fondo/texto que no refleja el tema activo).
+9. Evidencia en PR (checklist marcado o nota breve) de que se cumplieron `QA-UI-062`–`QA-UI-064`.
 
 ### Sub-issues recomendados
 
@@ -220,6 +241,7 @@ En resumen: hay buena base de tema, pero falta un **sistema de layout y jerarqui
 - `UI-STATE-01` Libreria shared de badges/chips/alerts theme-aware.
 - `UI-A11Y-01` Auditoria de contraste multi-tema con correcciones.
 - `UI-CSS-01` Politica anti-hardcode y reduccion progresiva de `::ng-deep`.
+- `QA-UI-061`–`QA-UI-065` Rol QA, matriz 5 temas, regresión de formularios, checklist contraste/inputs, gobernanza al codificar.
 
 ---
 
