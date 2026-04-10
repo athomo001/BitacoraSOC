@@ -10,6 +10,7 @@ const moment = require('moment-timezone');
 const ShiftReminder = require('../models/ShiftReminder');
 const AvisoLog = require('../models/AvisoLog');
 const WorkShift = require('../models/WorkShift');
+const WorkShiftAssignment = require('../models/WorkShiftAssignment');
 const User = require('../models/User');
 const AppConfig = require('../models/AppConfig');
 const { sendEmail } = require('./email');
@@ -153,6 +154,20 @@ async function runShiftReminder() {
             .lean();
           if (legacyUser?.email && legacyUser.isActive !== false) {
             recipientSet.set(legacyUser.email.toLowerCase(), legacyUser.fullName || legacyUser.username || legacyUser.email);
+          }
+        }
+
+        // Fuente adicional: WorkShiftAssignment (tabla de vinculaciones operativas)
+        const currentDow = moment.tz(now, shiftTz).day(); // 0=Domingo … 6=Sábado
+        const operativeAssignments = await WorkShiftAssignment.find({
+          workShiftId: shift._id,
+          active: true,
+          weekdays: currentDow
+        }).populate('userId', 'email fullName username isActive').lean();
+        for (const asg of operativeAssignments) {
+          const u = asg.userId;
+          if (u?.email && u.isActive !== false) {
+            recipientSet.set(u.email.toLowerCase(), u.fullName || u.username || u.email);
           }
         }
 
