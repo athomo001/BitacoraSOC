@@ -15,10 +15,23 @@
 | AI-SUMMARY-001E | Pendiente | IA/Frontend ALTA | UX integrada en Boletín: `Resumen Sugerido por IA` + botón `Generar con IA` | Campo editable no bloqueante, estados loading/error/reintento, cancelación y preservación de edición manual al regenerar. |
 | AI-SUMMARY-001F | Pendiente | IA/Operación ALTA | Límite de recursos y políticas de degradación | Timeout duro, memoria/CPU límites, rate-limit por usuario, fallback manual si IA falla, sin bloquear generación de boletín. |
 | AI-SUMMARY-001G | Pendiente | QA/Testing ALTA | Suite de pruebas de seguridad, carga y regresión | Tests de éxito, timeout, lock concurrente, sanitización, RBAC, fallback UX y no-regresión en `report-generator`/newsletter. |
-| AUDIT-EXPORT-028 | Incompleto (Reabierto) | Auditoría / Operación ALTA | Descarga flexible de logs de auditoría | Ajuste UX requerido: explicar explícitamente que `N` lo define el usuario en "Últimos días (N días)" / "Últimos meses (N meses)" con ejemplos visibles (`2, 7, 15` días; `1, 3, 6` meses). Mantener también modo por **filtros actuales** (incluyendo fecha y demás filtros) y modo por cantidad. |
-| UI-HEALTH-033 | Incompleto (Reabierto) | UI/UX + Operación ALTA | Barra de salud visible de servicios críticos | Ajuste pendiente: la barra debe verla solo admin, visualmente separada del título/toolbar y con contraste legible (verde/rojo con tipografía clara según estado). |
-| REP-GEN-039 | Listo | UI/UX + Reportería MEDIA | Sistema de ayuda contextual dinámica con globos animados en `/main/report-generator` | Rediseñar guía rápida: eliminar panel fijo, implementar sistema dinámico "Top-Aligned" que evita recortes laterales, contenido condicional por modo y animaciones premium via anime.js. |
-| DOCKER-OPT-040 | Listo | DevOps / Infra ALTA | Optimización de tiempos de Build y Startup de Docker | Optimización completada: Implementado aislamiento de caché npm en BuildKit (`type=cache,id=...`) para evitar colisiones `ENOTEMPTY` en builds paralelos. Restaurada compatibilidad con `node:24-alpine` en backend. |
+| UI-CHK-044 | Pendiente | UI/UX + Admin Checklist ALTA | Rediseño UX de `/main/admin/checklist` para legibilidad, jerarquía visual y flujo guiado | Hallazgo QA: vista saturada (demasias acciones primarias simultaneas), densidad excesiva en tabla/formulario, baja jerarquía entre bloques (`Configuración`, `Recordatorios`, `Plantillas`) y pobre escaneabilidad en móvil. Propuesta: layout por secciones con headers sticky, acciones primarias unificadas, espaciado consistente, tabla responsive con acciones claras y formulario paso-a-paso. |
+| UI-ARCH-045 | Pendiente | UI/UX Architecture CRÍTICA | Reducir "cuadrados dentro de cuadrados" en vistas core | Definir regla global de contención: máximo 2 niveles visuales por pantalla (superficie de página + bloque funcional). Eliminar anidación redundante `card > card > card` en módulos críticos para mejorar jerarquía y escaneabilidad. |
+| UI-TOKEN-046 | Pendiente | Design System ALTA | Completar tokens semánticos faltantes de superficie y bordes | Incorporar y documentar `--surface-card`, `--surface-variant`, `--outline-variant`, `--outline-subtle`, `--outline-strong` para todos los temas (`light`, `dark`, `sepia`, `pastel`, `cyberpunk`) evitando fallback impredecible. |
+| UI-TOKEN-047 | Pendiente | Design System ALTA | Escala global de spacing/radius/typography | Definir tokens de densidad visual: `--space-*`, `--radius-*`, `--font-size-*`, `--line-height-*`, `--font-weight-*` y migrar componentes clave para consistencia transversal entre módulos. |
+| UI-COMP-048 | Pendiente | UI Componentes ALTA | Librería shared de estados visuales (badge/chip/alert/status-pill) | Unificar diseño y semántica de estados `success/warning/error/info/neutral` en un set reutilizable. Sustituir variantes locales en checklist, catálogos, auditoría y reportes. |
+| UI-COLOR-049 | Pendiente | UI/Temas ALTA | Remover hardcode de colores en vistas funcionales | Reemplazar colores hex directos por tokens semánticos en SCSS de módulos operativos (`report-generator`, `catalog-admin`, `checklist-admin`, `main-layout`, `audit-logs`, `admin-appearance`). |
+| UI-A11Y-050 | Pendiente | Accesibilidad CRÍTICA | Auditoría de contraste WCAG AA por cada tema visual | Validar contraste de texto normal/grande y estados en los 5 temas; corregir textos secundarios débiles y combinaciones de bajo contraste para garantizar legibilidad continua en turnos largos. |
+| UI-REF-051 | Pendiente | Frontend ALTA | Quitar estilos inline y moverlos a SCSS theme-aware | Eliminar estilos en línea en templates (prioridad: `report-generator`) para mejorar mantenibilidad, permitir theming uniforme y reducir deuda de parches rápidos. |
+| UI-MAT-052 | Pendiente | Frontend + Angular Material ALTA | Reducción progresiva de `!important` y `::ng-deep` | Inventariar overrides frágiles, migrar a API de theming/tokens y encapsular estilos por componente para minimizar regresiones en updates de Angular Material. |
+| UI-LAYOUT-053 | Pendiente | UI/UX ALTA | Patrón de layout estándar por página de administración | Estandarizar estructura visual: header de contexto, barra de acciones primaria, bloque de filtros opcional y contenido principal; priorizar flujo de tareas por encima de decoración de contenedores. |
+| UI-DENS-054 | Pendiente | UI/UX MEDIA | Política de densidad visual para desktop y móvil | Definir densidad por breakpoint (padding, gap, altura de controles, tablas) para reducir saturación en escritorio y mejorar escaneo en resoluciones bajas/móviles. |
+| UI-LOGIN-055 | Pendiente | UX/Branding MEDIA | Alinear experiencia visual de login con sistema multi-tema | Mantener identidad CRT como variante intencional, pero acotar efectos excesivos (glow/animación/contraste extremo) y definir fallback legible coherente con el resto del producto. |
+| UI-AUDIT-056 | Pendiente | UI/Auditoría ALTA | Normalizar colores por categoría en `audit-logs` | Reemplazar paleta por categoría hardcoded por tokens semánticos de sistema; garantizar contraste y consistencia entre tema claro/oscuro/sepia/pastel/cyberpunk. |
+| UI-HEALTH-057 | Pendiente | UI/Operación MEDIA | Unificar chips de salud de servicios críticos | Sustituir colores fijos de chips (`ok/warn/down`) por tokens de estado global y validar contraste para evitar divergencia visual respecto al resto de componentes. |
+| UI-GOV-058 | Pendiente | Gobernanza UI ALTA | Guía de estilos interna y checklist obligatorio en PR | Publicar guía corta de buenas prácticas (jerarquía, contención, tema, contraste, estados, spacing) y exigir checklist de revisión UI antes de merge en módulos de interfaz. |
+| UI-QA-059 | Pendiente | QA Visual ALTA | Baseline de regresión visual por tema | Crear set de capturas base por vista crítica y tema para detectar drift visual en cambios futuros; incluir validación en pipeline de QA/manual asistido. |
+| UI-MIG-060 | Pendiente | Gestión de deuda ALTA | Plan de migración por lotes de vistas con mayor deuda visual | Ejecutar en oleadas: 1) report-generator, 2) checklist-admin, 3) catalog-admin, 4) audit-logs, 5) main-layout. Cada lote debe cerrar con métricas de reducción de nesting y hardcode. |
 
 
 
@@ -29,6 +42,14 @@
 
 | ID | Estado | Seccion | Tarea | Notas |
 | --- | --- | --- | --- | --- |
+| REP-GEN-039 | Listo | UI/UX + Reportería MEDIA | Sistema de ayuda contextual dinámica con globos animados en `/main/report-generator` | Rediseñar guía rápida: eliminar panel fijo, implementar sistema dinámico "Top-Aligned" que evita recortes laterales, contenido condicional por modo y animaciones premium via anime.js. |
+| UI-NEWS-042 | Listo | UI/UX + Newsletter MEDIA | Formato de campos de texto en Boletín (saltos de línea, viñetas y sangría) | Se implementó `formatNewsletterText()` en `report-generator`: convierte saltos de línea, viñetas (`-`, `*`, `•`) e indentación en divs con estilos inline email-safe, eliminando dependencia de `white-space: pre-wrap` que los clientes de correo no respetan. |
+| MAIL-REM-043 | Listo | Backend / Email / Turnos / Checklist ALTA | Recordatorios por email respetando turnos laborales | Implementado: campos `shiftReminderEnabled`, `shiftReminderMinutesBefore` (5-120 min), `shiftReminderTimezone`, `shiftReminderLastSentMap` en `AppConfig`; `shiftReminderScheduler.js` con polling de 5 min, lógica de ventana con `moment-timezone`, resolución de destinatarios desde `WorkShift.assignedUserIds`, dedup por `shiftReminderLastSentMap`, email HTML con `sendEmail()`; registrado en `server.js`; UI en `/main/admin/checklist` con 3 controles condicionados al toggle. |
+| ESC-MAINT-042 | Listo | Backend / Frontend / Catálogos ALTA | Bloqueo por Mantenimientos Programados reutilizando Alertas Especiales | Implementado: `ruleType` (`special_alert`/`scheduled_maintenance`), `blocking`, `maintenanceTitle`, `readBy` (con dedup por `occurrenceKey`+usuario) en modelo y controlador; precedencia en evaluación; diálogo bloqueante sin "Más tarde"; banner con variante mantenimiento; tab renombrado "Alertas y Mantenimientos" con selector de tipo y badge en tabla. |
+| UI-NEWS-041 | Listo | UI/UX + Newsletter MEDIA | Formato de CVEs en Boletín (saltos de línea) | Se implementó `formatCveList()` en `report-generator`: divide CVE/IDs por comas, puntos y coma o saltos de línea y renderiza uno por línea con fuente monoespaciada, reemplazando el texto continuo anterior. |
+| AUDIT-EXPORT-028 | Listo | Auditoría / Operación ALTA | Descarga flexible de logs de auditoría | Verificado completo: selector de 5 modos (filtros, cantidad, días, meses, todos); `mat-hint` visible con ejemplos exactos (`2, 7, 15` días; `1, 3, 6` meses); hint contextual por modo describe la `N` al usuario. |
+| UI-HEALTH-033 | Listo | UI/UX + Operación ALTA | Barra de salud visible de servicios críticos | Verificado completo: `*ngIf="isAdmin"` restringe visibilidad solo a admins; barra con `background: var(--surface-muted)` y `border-bottom` separada visualmente del toolbar; chips con colores de alto contraste (`#1f7a35`/blanco verde, `#b71c1c`/blanco rojo) y `font-weight: 600`. |
+| DOCKER-OPT-040 | Listo | DevOps / Infra ALTA | Optimización de tiempos de Build y Startup de Docker | Optimización completada: Implementado aislamiento de caché npm en BuildKit (`type=cache,id=...`) para evitar colisiones `ENOTEMPTY` en builds paralelos. Restaurada compatibilidad con `node:24-alpine` en backend. |
 | UI-NEWS-037 | Listo | UI/UX + Boletines MEDIA | Pegado enriquecido en campos de boletín se aplana en un bloque | En `report-generator` (modo Boletín) se agregó manejo de pegado enriquecido en textareas clave. Ahora convierte `text/html` a texto legible preservando estructura (saltos, viñetas y filas), evitando el texto "achochlonado". |
 | UI-ONBOARD-036 | Listo | UI/UX + Accesibilidad ALTA | Botón "Ver guía rápida" parece enlace muerto en módulos clave | Se corrigió comportamiento en `Report Generator`, `Checklist`, `Auditoría` y `Settings SMTP`: al hacer click en "Ver guía rápida" se abre la guía y se hace scroll automático al bloque visible, eliminando percepción de enlace muerto. |
 | SMTP-030 | Listo | Configuración / SMTP ALTA | Probar conexión falla si contraseña queda vacía con estado "Conectado" | Se ajustó frontend y backend para reutilizar la contraseña cifrada guardada cuando el campo password está vacío, manteniendo validación explícita cuando no existe configuración previa. |
@@ -72,7 +93,700 @@
 Los items marcados como `Listo` deben quedar reflejados en `docs/CHANGELOG.md` como fuente de historial.
 ---
 
+## [UI/UX] Deuda visual global: "cuadrados dentro de cuadrados" y consistencia multi-tema
+
+**Prioridad:** Alta  
+**Estado:** Open  
+**Tipo:** UX/UI Architecture  
+**Scope:** Frontend completo (Angular + temas)
+
+### Problema observado
+
+La interfaz presenta un patron repetido de contencion visual excesiva:
+
+- card principal
+- cards internas
+- bloques internos con borde + fondo + sombra
+
+Esto genera una experiencia tosca y recargada. Aunque el branding y los temas funcionan, la jerarquia visual depende demasiado de cajas y poco de tipografia, espaciado y ritmo visual.
+
+En resumen: hay buena base de tema, pero falta un **sistema de layout y jerarquia** para evitar "box-in-box-in-box".
+
+### Impacto
+
+1. Fatiga visual en pantallas operativas de uso diario.
+2. Menor legibilidad y escaneo de informacion critica.
+3. Inconsistencia entre modulos (cada vista resuelve distinto).
+4. Mayor costo de mantenimiento para cada tema.
+5. Mayor riesgo de errores de contraste en overrides locales.
+
+### Evidencia (muestras representativas)
+
+- Uso extensivo de contenedores visuales y overrides globales: `frontend/src/styles.scss`
+- Estructura con multiples bloques visuales y estilos inline:  
+  `frontend/src/app/pages/main/report-generator/report-generator.component.html`  
+  `frontend/src/app/pages/main/report-generator/report-generator.component.scss`
+- Patrones de badge/estado duplicados por modulo:  
+  `frontend/src/app/pages/main/checklist-admin/checklist-admin.component.scss`  
+  `frontend/src/app/pages/main/catalog-admin/catalog-admin.component.scss`
+- Chips/estados hardcodeados no semanticos:  
+  `frontend/src/app/pages/main/main-layout.component.scss`
+- Paletas locales por categoria y tokens no definidos:  
+  `frontend/src/app/pages/main/audit-logs/audit-logs.component.scss`
+- Tema/pantalla visualmente aislada del sistema global:  
+  `frontend/src/app/pages/login/login.component.scss`
+
+### Causas raiz
+
+1. Jerarquia visual basada en bordes/fondos, no en contenido.
+2. Falta de reglas de contencion por nivel (cuantos niveles de caja permitir).
+3. Tokens semanticos incompletos (surface variants, outline variants, etc).
+4. Uso de hardcode (`#hex`) en vistas funcionales.
+5. Dependencia alta de `!important` y `::ng-deep`.
+
+### Mejores practicas a aplicar (multi-tema)
+
+1. **Maximo 2 niveles visuales por pantalla**
+   - Nivel A: superficie de pagina.
+   - Nivel B: bloque funcional.
+   - Evitar Nivel C como otra card salvo excepciones justificadas (dialogs, estados criticos).
+
+2. **Jerarquia por tipografia + espacio, no por mas cajas**
+   - Encabezados claros (`title`, `section-title`, `label`).
+   - Espaciado consistente (escala 8px).
+   - Separar secciones con ritmo vertical antes que con bordes repetidos.
+
+3. **Una sola pista visual por bloque**
+   - Usar solo una de estas por nivel: borde, fondo o sombra.
+   - Evitar combinar las 3 simultaneamente.
+
+4. **Tokens semanticos obligatorios para todos los temas**
+   - `--surface-base`, `--surface-raised`, `--surface-subtle`, `--surface-card`, `--surface-variant`
+   - `--outline-subtle`, `--outline-strong`, `--outline-variant`
+   - `--text-primary`, `--text-secondary`, `--text-muted`
+   - `--state-success|warning|error|info` + fondos asociados
+
+5. **Estados reutilizables, no por pantalla**
+   - Componente base para `badge/chip/alert/status-pill`.
+   - Misma semantica visual en checklist, catalogos, reportes, auditoria.
+
+6. **Accesibilidad de contraste por tema (WCAG AA)**
+   - Texto normal >= 4.5:1
+   - Texto grande >= 3:1
+   - Validar especialmente textos secundarios y badges.
+
+7. **Densidad y forma global**
+   - Radius fijo por escala (`sm/md/lg`).
+   - Elevacion limitada (`0/1/2`) para evitar ruido.
+   - Padding/gaps sistematizados (`space-1..space-6`).
+
+### Plan de implementacion propuesto
+
+#### Fase 1 - Estabilizacion visual (Quick wins)
+- Definir tokens faltantes usados por componentes actuales.
+- Mover estilos inline a SCSS en vistas criticas.
+- Reemplazar hardcoded de color en estados y superficies principales.
+
+#### Fase 2 - Arquitectura visual comun
+- Crear capa de design tokens de spacing/radius/typography.
+- Definir reglas de contencion (max 2 niveles visuales).
+- Estandarizar estructura de pagina: header, bloque principal, secciones internas limpias.
+
+#### Fase 3 - Componentizacion de estados
+- Crear componentes o clases utilitarias shared para badge/chip/alert/status.
+- Migrar modulos de mayor deuda: report-generator, checklist-admin, catalog-admin, audit-logs.
+
+#### Fase 4 - Calidad continua multi-tema
+- Checklist de contraste por tema en PR.
+- Lint de estilos para bloquear hex hardcode fuera de tokens.
+- Baseline visual por tema para detectar regresiones.
+
+### Checklist de criterios de aceptacion
+
+1. Ninguna pantalla critica supera 2 niveles de contencion visual.
+2. Se elimina al menos 80% de estilos inline en modulos prioritarios.
+3. Estados visuales (success/warning/error/info) son consistentes en todas las vistas auditadas.
+4. No se introducen colores hardcode en componentes funcionales nuevos.
+5. Contraste AA validado en tema light/dark/sepia/pastel/cyberpunk para texto y estados.
+6. Se reduce significativamente el uso de `!important`/`::ng-deep` en vistas priorizadas.
+
+### Sub-issues recomendados
+
+- `UI-BOX-01` Reducir nesting de contenedores en `report-generator`.
+- `UI-BOX-02` Reducir nesting de contenedores en `checklist-admin`.
+- `UI-BOX-03` Reducir nesting de contenedores en `catalog-admin`.
+- `UI-TOKEN-01` Completar tokens semanticos de superficies y bordes para todos los temas.
+- `UI-TOKEN-02` Introducir escala de spacing/radius/typography global.
+- `UI-STATE-01` Libreria shared de badges/chips/alerts theme-aware.
+- `UI-A11Y-01` Auditoria de contraste multi-tema con correcciones.
+- `UI-CSS-01` Politica anti-hardcode y reduccion progresiva de `::ng-deep`.
+
+---
+
 ## Información de como solucionar los Pendientes
+
+### ESC-MAINT-042 - Bloqueo por Mantenimientos Programados reutilizando Alertas Especiales
+
+**Objetivo funcional:** Implementar un sistema de bloqueo por mantenimientos programados sin duplicar la lógica existente de Alertas Especiales por cliente/log source. La solución debe evaluar el mantenimiento al cambiar el cliente en `report-generator`, bloquear la interacción mediante overlay, registrar confirmación de lectura por usuario autenticado y reutilizar la administración actual en `/main/admin/catalogs`.
+
+---
+
+**Auditoría técnica validada antes de implementar:**
+
+| Área | Hallazgo validado |
+| --- | --- |
+| Carpeta `/skills` | Contiene guías y lineamientos, no contratos runtime ni tipado de dominio reutilizable para este caso. |
+| Backend modelos | No existe modelo `Maintenance`, `Calendar` o `Task`. La entidad más cercana y reutilizable es `ClientEscalationRule`. |
+| Backend lógica | Ya existen evaluación temporal por cliente y confirmación de lectura en `clientAlertController`. |
+| Frontend servicios | `EscalationService` ya expone `evaluateClientAlert`, `acknowledgeClientAlert` y CRUD admin de reglas especiales. |
+| Frontend trigger | `report-generator` ya tiene el punto correcto de integración en `onLogSourceSelected()`. |
+| Catálogos | La gestión actual de cliente/log source ya está centralizada en `CatalogLogSource` y `/main/admin/catalogs`. |
+
+---
+
+**Hallazgos de código que condicionan el diseño:**
+
+1. `ClientEscalationRule` ya tiene casi todo lo necesario:
+   - `clientId`
+   - `contexts`
+   - `timezone`
+   - `priority`
+   - `validFrom`
+   - `validTo`
+   - `holidayDates`
+   - `timeWindows`
+   - `alertMessage`
+   - `acknowledgementRequired`
+   - `lastUpdatedBy`
+2. `GET /api/escalation/client-alert` ya evalúa si una regla aplica para el tiempo actual.
+3. `POST /api/escalation/client-alert/ack` ya existe, pero hoy solo audita el evento; no persiste un `readBy` asociado al usuario.
+4. En `report-generator`, el cliente/log source ya dispara evaluación cuando cambia el combo.
+5. La UX actual no es bloqueante:
+   - se muestra un banner;
+   - el diálogo actual permite cierre;
+   - la confirmación local depende de `acknowledgedRuleIds` en memoria del componente.
+6. La pestaña "Alertas Especiales" en `/main/admin/catalogs` ya tiene formulario, tabla y estilos reutilizables (`catalog-table`).
+
+---
+
+**Decisión técnica recomendada:**
+
+No crear un modelo `Maintenance` nuevo.
+
+Se debe extender `ClientEscalationRule` para soportar un nuevo tipo de regla bloqueante de mantenimiento programado.
+
+**Motivo:** crear un modelo nuevo duplicaría relación con cliente, evaluación temporal, endpoints, servicio Angular, tipado y administración en catálogos.
+
+---
+
+**Diseño recomendado - Backend**
+
+**1. Extender `ClientEscalationRule`**
+
+Agregar campos compatibles hacia atrás:
+
+- `ruleType`: `'special_alert' | 'scheduled_maintenance'`
+- `blocking`: `boolean`
+- `maintenanceTitle`: `string`
+- `readBy`: arreglo de confirmaciones por usuario y ocurrencia
+
+Estructura sugerida:
+
+```js
+readBy: [{
+  userId: ObjectId,
+  username: String,
+  context: String,
+  readAt: Date,
+  occurrenceKey: String
+}]
+```
+
+**2. Reutilizar el evaluador actual**
+
+No crear un motor paralelo.
+
+Recomendación:
+
+- mantener `evaluateClientAlert()` como evaluador central;
+- agregar soporte para `ruleType`;
+- aplicar precedencia fuerte para `scheduled_maintenance`.
+
+**Regla de precedencia:**
+
+1. Si existe mantenimiento programado activo y bloqueante, esa regla gana.
+2. Solo si no existe mantenimiento activo, evaluar la alerta especial normal.
+
+**3. Endpoint compatible con `clientName`**
+
+El requerimiento pide recibir `clientName`.
+
+Recomendación:
+
+- extender el endpoint actual para aceptar `clientId` o `clientName`;
+- resolver `clientName` contra `CatalogLogSource`;
+- usar internamente el mismo motor ya existente.
+
+**Regla de robustez:**
+
+- internamente debe seguir privilegiándose `clientId`;
+- `clientName` debe tratarse como compatibilidad;
+- si hay nombres duplicados, responder error explícito por ambigüedad.
+
+**4. Fuente de verdad temporal**
+
+La validación del mantenimiento debe usar `new Date()` del servidor.
+
+Regla:
+
+- la hora del navegador no decide el bloqueo;
+- si se conserva `now`, debe quedar solo para pruebas automatizadas.
+
+**5. Confirmación de lectura persistente**
+
+El ack debe:
+
+- persistir `readBy`;
+- vincular `req.user`;
+- guardar `context`;
+- guardar `readAt`;
+- evitar duplicados para la misma ocurrencia activa.
+
+**6. Ocurrencia de lectura**
+
+La lectura no debe quedar marcada para siempre solo por `ruleId`.
+
+Debe existir una clave de ocurrencia:
+
+- si la ventana es absoluta, usar `validFrom + validTo`;
+- si hay recurrencia, incluir la fecha local efectiva evaluada por backend.
+
+---
+
+**Diseño recomendado - Frontend (Angular)**
+
+**1. Reutilizar `EscalationService`**
+
+No crear `MaintenanceService`.
+
+Se deben extender:
+
+- `ClientAlertRule`
+- `ClientAlertEvaluation`
+- `ClientAlertAckPayload`
+
+**2. Trigger correcto**
+
+Seguir usando el evento actual:
+
+- `onLogSourceSelected()`
+
+Ese ya es el punto exacto donde cambia el cliente en `report-generator`.
+
+**3. Overlay bloqueante**
+
+Cuando la regla activa sea mantenimiento y `blocking = true`, reemplazar el flujo actual por un overlay/modal bloqueante.
+
+Requisitos:
+
+- `disableClose: true`;
+- sin botón "Más tarde";
+- impedir interacción con el formulario;
+- impedir generar reporte;
+- impedir copiar reporte o markdown mientras la lectura esté pendiente.
+
+**4. Precedencia sobre Alertas Especiales**
+
+Si el mantenimiento bloqueante está activo:
+
+- no renderizar el banner normal de alerta especial;
+- no abrir el diálogo normal de alerta especial;
+- el mantenimiento debe ser la única capa visible.
+
+**5. Fuente de verdad de la lectura**
+
+`acknowledgedRuleIds` no puede seguir siendo la verdad principal.
+
+Debe quedar como cache visual temporal, si se necesita, pero el estado real debe venir del backend vía `readBy`.
+
+---
+
+**Gestión administrativa recomendada**
+
+No crear una nueva pantalla.
+
+Se debe reutilizar `/main/admin/catalogs`.
+
+**Opción recomendada:**
+
+Convertir la pestaña actual en una administración unificada:
+
+- nuevo nombre: `Alertas y Mantenimientos`
+- agregar selector `ruleType`
+- si `ruleType = scheduled_maintenance`, mostrar campos específicos de mantenimiento y bloqueo
+- si `ruleType = special_alert`, mantener el comportamiento actual
+
+**Opción alternativa menos recomendable:**
+
+- mantener la pestaña actual y agregar una segunda sección separada para mantenimientos
+
+Esto es menos deseable porque reparte la precedencia y duplica lectura operativa en UI.
+
+---
+
+**Flujo propuesto:**
+
+```mermaid
+flowchart TD
+  A[Analista cambia cliente en report-generator] --> B[EscalationService consulta endpoint existente]
+  B --> C[Backend resuelve clientId o clientName]
+  C --> D[Evaluar ClientEscalationRule activa]
+  D --> E{Existe scheduled_maintenance activa y bloqueante?}
+  E -- Si --> F[Responder mantenimiento activo]
+  E -- No --> G{Existe special_alert activa?}
+  G -- Si --> H[Responder alerta especial]
+  G -- No --> I[Sin bloqueo]
+  F --> J[Frontend muestra overlay bloqueante]
+  J --> K[Analista confirma lectura]
+  K --> L[POST ack persiste readBy con req.user]
+  L --> M[Se habilita el resto del formulario]
+```
+
+---
+
+**Criterios de aceptación:**
+
+1. No se crea un modelo `Maintenance`, `Calendar` o `Task` nuevo si `ClientEscalationRule` puede extenderse.
+2. El backend puede evaluar mantenimiento activo usando `new Date()` del servidor.
+3. El endpoint acepta `clientName` sin duplicar el motor de evaluación existente.
+4. La lectura se persiste en `readBy` vinculada al usuario autenticado.
+5. Al cambiar el cliente en `report-generator`, la validación se ejecuta automáticamente.
+6. Si hay mantenimiento bloqueante activo, se muestra overlay bloqueante y no `alert()`.
+7. Mientras el mantenimiento siga pendiente de lectura, el formulario no puede operar normalmente.
+8. Si el mantenimiento está activo, no se debe renderizar la capa normal de Alertas Especiales.
+9. La administración reutiliza la UI y los estilos de tabla actuales en Catálogos.
+10. No se instalan librerías nuevas salvo justificación estricta.
+
+---
+
+**Archivos impactados probables cuando se implemente:**
+
+**Backend**
+- `backend/src/models/ClientEscalationRule.js`
+- `backend/src/controllers/clientAlertController.js`
+- `backend/src/routes/escalation.js`
+
+**Frontend**
+- `frontend/src/app/models/escalation.model.ts`
+- `frontend/src/app/services/escalation.service.ts`
+- `frontend/src/app/pages/main/report-generator/report-generator.component.ts`
+- `frontend/src/app/pages/main/report-generator/report-generator.component.html`
+- `frontend/src/app/pages/main/report-generator/client-alert-dialog.component.ts`
+- `frontend/src/app/pages/main/catalog-admin/catalog-admin.component.ts`
+- `frontend/src/app/pages/main/catalog-admin/catalog-admin.component.html`
+
+---
+
+**Riesgos y controles antes de implementar:**
+
+- Riesgo de ambigüedad si `clientName` no es único.
+- Riesgo funcional si la lectura se guarda solo por `ruleId` y no por ocurrencia.
+- Riesgo UX si conviven dos overlays distintos para mantenimiento y alerta especial.
+- Riesgo de regresión si la precedencia no se centraliza en backend.
+
+**Control recomendado:** la prioridad y precedencia deben resolverse del lado backend; el frontend solo debe obedecer la respuesta del evaluador.
+
+---
+
+### MAIL-REM-043 - Recordatorios por email respetando turnos laborales
+
+**Objetivo funcional:** Implementar un sistema de recordatorios por email configurable desde `/main/admin/checklist`, reutilizando la infraestructura actual de configuración, SMTP, scheduler y turnos. El envío solo debe ocurrir si la hora actual del servidor cae dentro del turno activo del analista asignado, respetando timezone y sin duplicar lógica ya validada en el proyecto.
+
+---
+
+**Auditoría técnica validada antes de implementar:**
+
+| Área | Hallazgo validado |
+| --- | --- |
+| Branding | El nombre de la Bitácora ya existe como `appTitle` en `AppConfig` y se expone por `GET /api/config/logo`. |
+| SMTP | El servicio reutilizable correcto es `backend/src/utils/email.js`, que ya resuelve SMTP desde `SmtpConfig`, `AppConfig` o variables de entorno. |
+| Worker actual | Ya existe un scheduler backend en `checklistAlertScheduler` que corre cada 5 minutos y procesa avisos automáticos. |
+| Log de envíos | Ya existe `ChecklistNotificationLog`, que hoy registra notificaciones de checklist y es la base reutilizable más cercana a `AvisoLogs`. |
+| Turnos | La resolución de turno activo y timezone ya existe en `work-shifts.js`, incluyendo asignaciones activas por usuario, rango horario y zona horaria. |
+| Admin Angular | `/main/admin/checklist` ya administra configuración global de checklist mediante `ConfigService` y es la pantalla correcta para extender. |
+| Vista operacional | `/main/admin/work-shifts` ya expone la relación analista ↔ correo ↔ turno y sirve como referencia para selección/validación de destinatarios. |
+
+---
+
+**Hallazgos de código que condicionan el diseño:**
+
+1. `AppConfig` ya centraliza configuraciones operativas de checklist y recordatorios, incluyendo:
+   - `checklistAlertEnabled`
+   - `checklistAlertTime`
+   - `checklistWeeklyTimezone`
+   - `escalationReminderEnabled`
+   - `escalationReminderCargoLabels`
+2. `checklistAlertScheduler` ya es el punto natural para agregar otro proceso programado, porque:
+   - ya se inicializa desde `server.js`;
+   - ya corre con un intervalo fijo;
+   - ya maneja deduplicación básica por fecha.
+3. El envío SMTP ya está abstraído en `sendEmail()` y además registra auditoría técnica de éxito/fallo.
+4. En `routes/smtp.js` existen helpers de correo que crean transportes propios; para este issue no se debe seguir ese patrón si `utils/email.js` ya cubre el caso.
+5. `ChecklistNotificationLog` hoy no calza perfecto con este nuevo uso porque obliga `weekId` y `userId`, pero sigue siendo la base más cercana para extender en vez de crear una tabla `AvisoLogs` paralela.
+6. La lógica de turnos que realmente respeta timezone vive hoy en backend:
+   - `isAssignmentActiveForMoment()`
+   - `attachResolvedAssignments()`
+   - uso de `moment-timezone`
+7. En frontend ya existe el patrón de configuración simple en `checklist-admin`, y el tipado global de config ya pasa por `config.model.ts`.
+
+---
+
+**Decisión técnica recomendada:**
+
+No crear un modelo `ReminderConfig`, `MailReminder` o `AvisoLogs` aislado como primera opción.
+
+La vía más segura es:
+
+1. extender `AppConfig` para guardar las configuraciones de recordatorio;
+2. extender el scheduler actual para procesarlas;
+3. extraer/reutilizar la lógica de turnos backend ya validada;
+4. extender `ChecklistNotificationLog` para registrar estos envíos.
+
+**Motivo:** así se evita duplicar configuración singleton, transporte SMTP, scheduler, lógica horaria y tabla de auditoría.
+
+---
+
+**Diseño recomendado - Backend**
+
+**1. Configuración en `AppConfig`**
+
+Agregar una colección embebida de recordatorios dentro del singleton actual.
+
+Estructura recomendada:
+
+```js
+shiftEmailReminders: [{
+  enabled: Boolean,
+  message: String,
+  scheduleType: 'interval_hours' | 'fixed_time',
+  intervalHours: Number,
+  fixedTime: String,
+  targetShiftIds: [ObjectId],
+  lastUpdatedBy: ObjectId
+}]
+```
+
+**Razón:** el usuario configurará estos avisos desde una sola pantalla admin y no hay evidencia de que se necesite una colección independiente con ciclo de vida propio.
+
+**2. Worker**
+
+No crear un proceso aparte si no es estrictamente necesario.
+
+Se debe extender `backend/src/utils/checklistAlertScheduler.js` con un tercer runner, por ejemplo:
+
+- `runShiftEmailReminders()`
+
+Ese runner debe ejecutarse dentro del mismo ciclo de 5 minutos ya existente.
+
+**3. Reutilización de lógica de turnos**
+
+La lógica actual útil está en `routes/work-shifts.js`, pero hoy no es importable porque vive dentro de la ruta.
+
+Recomendación de diseño para la futura implementación:
+
+- extraer `isAssignmentActiveForMoment()` y la resolución efectiva de asignaciones a un util compartido;
+- reutilizar `moment-timezone`;
+- no basarse en la hora del navegador ni en `shift-time.util.ts` del frontend para decidir envíos reales.
+
+**4. Regla de envío**
+
+El correo solo se envía si se cumplen todas:
+
+1. el recordatorio está `enabled`;
+2. el turno seleccionado tiene un analista asignado activo;
+3. ese analista tiene email válido;
+4. la hora actual del servidor cae dentro de la ventana efectiva de ese turno;
+5. la frecuencia configurada está vencida para esa combinación de recordatorio + turno + ventana.
+
+**5. Frecuencia**
+
+Se deben soportar dos modos:
+
+- `interval_hours`
+- `fixed_time`
+
+**Regla recomendada para `interval_hours`:**
+
+- calcular la ventana efectiva del turno activo;
+- disparar por slots relativos al inicio del turno;
+- evitar reenvío duplicado del mismo slot.
+
+**Regla recomendada para `fixed_time`:**
+
+- evaluar la hora configurada en la timezone del turno;
+- enviar una sola vez por ocurrencia efectiva del turno;
+- si la hora configurada cae fuera del turno, no enviar.
+
+**6. Idempotencia y deduplicación**
+
+No usar solo `lastSentAt` global.
+
+Debe existir una clave de ocurrencia por envío, por ejemplo:
+
+`reminderConfigId + shiftId + analystId + scheduleWindowKey`
+
+Eso evita duplicados cuando el scheduler corre cada 5 minutos.
+
+**7. Servicio de correo**
+
+Usar `sendEmail()` de `backend/src/utils/email.js`.
+
+No crear un `nodemailer.createTransport()` adicional para este caso.
+
+**8. Template HTML**
+
+Mantenerlo deliberadamente simple:
+
+- header con `appTitle`;
+- bloque principal con `RECORDATORIO` en `h1` o `h2`;
+- texto libre del recordatorio;
+- sin botones;
+- sin estilos complejos;
+- con versión texto plano mínima para fallback.
+
+**9. Bitácora de envíos**
+
+No crear una tabla `AvisoLogs` nueva sin antes extender la actual.
+
+Recomendación:
+
+- ampliar `ChecklistNotificationLog` para soportar una categoría adicional, por ejemplo `shift_reminder`;
+- volver opcionales o condicionales los campos hoy acoplados a checklist semanal;
+- guardar metadata útil:
+  - `reminderConfigId`
+  - `shiftId`
+  - `shiftName`
+  - `analystId`
+  - `analystEmail`
+  - `scheduleType`
+  - `deliveryWindowKey`
+
+---
+
+**Diseño recomendado - Frontend (Angular)**
+
+**1. Pantalla de administración**
+
+No crear una ruta nueva.
+
+Se debe extender `/main/admin/checklist`.
+
+**2. Forma de administración**
+
+Agregar una nueva sección debajo de la configuración actual, por ejemplo:
+
+- `Recordatorios por Email`
+
+La sección debe permitir:
+
+- crear uno o varios recordatorios;
+- escribir el texto del recordatorio;
+- elegir tipo de frecuencia;
+- ingresar `cada X horas` o `a las HH:mm`;
+- seleccionar uno o más turnos;
+- activar/desactivar cada recordatorio.
+
+**3. Componentización recomendada**
+
+Si el bloque crece, separar un componente hijo de administración, pero seguir colgándolo de `checklist-admin`.
+
+No moverlo a `work-shifts` porque la fuente de verdad funcional del aviso es checklist/configuración, no la definición del turno.
+
+**4. Fuentes de datos a reutilizar**
+
+- `ConfigService` para leer/guardar `AppConfig`;
+- `WorkShiftService.getShifts()` para poblar el selector de turnos;
+- `config.model.ts` para tipar la nueva configuración.
+
+**5. UX sugerida**
+
+No hace falta una UI compleja.
+
+Basta una tabla o lista simple con:
+
+- texto resumido;
+- frecuencia;
+- turnos;
+- estado;
+- acciones editar/eliminar.
+
+La edición puede ser inline o en formulario expandible, reutilizando Angular Material ya presente.
+
+---
+
+**Flujo propuesto:**
+
+```mermaid
+flowchart TD
+  A[Admin configura recordatorio en Checklist Admin] --> B[ConfigService guarda en AppConfig]
+  B --> C[Scheduler cada 5 minutos revisa shiftEmailReminders]
+  C --> D[Backend resuelve turnos seleccionados y analistas activos]
+  D --> E{Hora actual cae dentro del turno y la frecuencia esta vencida?}
+  E -- No --> F[No enviar]
+  E -- Si --> G[Construir HTML simple con appTitle]
+  G --> H[Enviar via sendEmail]
+  H --> I[Registrar envio en ChecklistNotificationLog extendido]
+```
+
+---
+
+**Criterios de aceptación:**
+
+1. El nombre de la Bitácora usado en el correo proviene de `appTitle` existente.
+2. El envío SMTP reutiliza `utils/email.js`.
+3. No se crea un scheduler aislado si `checklistAlertScheduler` puede extenderse.
+4. La validación de turno activo se hace en backend con timezone del turno.
+5. El correo no se dispara si el analista está fuera de turno, aunque el scheduler esté corriendo.
+6. Se soportan ambos modos de frecuencia:
+   - cada X horas;
+   - a las HH:mm.
+7. El HTML del correo es simple, sin botones ni diseño complejo.
+8. Cada envío exitoso genera un registro en la bitácora de avisos reutilizando/extiendo el modelo existente.
+9. La administración vive en `/main/admin/checklist`, no en una ruta nueva.
+10. No se instalan librerías nuevas salvo justificación estricta.
+
+---
+
+**Archivos impactados probables cuando se implemente:**
+
+**Backend**
+- `backend/src/models/AppConfig.js`
+- `backend/src/models/ChecklistNotificationLog.js`
+- `backend/src/utils/checklistAlertScheduler.js`
+- `backend/src/utils/email.js`
+- `backend/src/routes/config.js`
+- `backend/src/routes/work-shifts.js` o un nuevo util compartido extraído desde ahí
+
+**Frontend**
+- `frontend/src/app/models/config.model.ts`
+- `frontend/src/app/services/config.service.ts`
+- `frontend/src/app/services/work-shift.service.ts`
+- `frontend/src/app/pages/main/checklist-admin/checklist-admin.component.ts`
+- `frontend/src/app/pages/main/checklist-admin/checklist-admin.component.html`
+
+---
+
+**Riesgos y controles antes de implementar:**
+
+- Riesgo de duplicar lógica horaria si el worker reimplementa validación de turnos en vez de extraerla.
+- Riesgo de correos repetidos si no se define una clave de ocurrencia por slot/envío.
+- Riesgo de desfasaje horario si se usa hora local del proceso sin timezone del turno.
+- Riesgo de fragmentación si se crea una tabla `AvisoLogs` paralela sin necesidad real.
+- Riesgo de deuda técnica si se usa `routes/smtp.js` como referencia y no el servicio central `utils/email.js`.
+
+**Control recomendado:** primero extraer o centralizar la lógica reusable de turnos backend, luego construir el worker sobre esa base. El orden importa; si se implementa al revés, es fácil introducir falsos positivos o duplicados.
+
+---
 
 ### REP-GEN-039 - Sistema de ayuda contextual dinámica con globos animados en Report Generator
 
@@ -606,6 +1320,61 @@ Response:
    - Confirmar que el número de entradas se lea claramente en celdas de bajo, medio y alto valor, sin depender del hover.
 6. **Criterio de cierre:**
    - El heatmap en `light`, `sepia` y `pastel` debe mantener contraste suficiente entre fondo y número de entradas en todos los rangos visibles.
+
+### UI-CHK-044 - Rediseño UX de `/main/admin/checklist` (segunda revisión Arquitectura + UI/UX)
+
+**Diagnóstico de arquitectura de interfaz (estado actual):**
+
+1. La pantalla mezcla 3 dominios en una sola lectura (`Configuración`, `Recordatorios`, `Plantillas`) sin jerarquía de navegación interna ni prioridad visual.
+2. Existen acciones primarias duplicadas dentro del mismo flujo (`Guardar cambios`, `Guardar`, `Agregar item` en más de una zona), lo que aumenta riesgo de error operativo.
+3. El panel izquierdo de plantillas y el editor derecho no tienen patrón claro de “selección -> edición -> publicación”, por lo que el usuario no distingue estado borrador vs activo.
+4. Densidad alta en bloques de formulario (espaciado corto, headers débiles, demasiados controles visibles simultáneamente), reduciendo escaneabilidad.
+5. El módulo de recordatorios utiliza tabla fija con columnas compactas y acciones icon-only; en viewport medio/bajo pierde legibilidad y affordance.
+
+**Problemas UX críticos (prioridad):**
+
+1. **Jerarquía visual insuficiente:** no hay separación semántica fuerte entre configuración global, operaciones de recordatorios y edición de plantilla.
+2. **Flujo sin guía:** falta un camino explícito de uso para admins nuevos (“1. Configurar global, 2. Gestionar recordatorios, 3. Editar/activar plantilla”).
+3. **Acciones ambiguas:** botones similares con texto parecido en distintas capas generan duda sobre qué se guarda exactamente.
+4. **Escalabilidad móvil limitada:** tabla y formulario no degradan de forma óptima en breakpoints pequeños.
+
+**Propuesta de rediseño (mejores prácticas):**
+
+1. **Arquitectura por secciones (IA):**
+   - Sección A: `Configuración global de checklist` (card colapsable)
+   - Sección B: `Recordatorios por turno` (card con toolbar y tabla responsive)
+   - Sección C: `Plantillas` (layout maestro-detalle con navegación clara)
+2. **Modelo de acciones unificado:**
+   - Una sola acción primaria por contexto visible.
+   - Acciones secundarias (`Cancelar`, `Agregar item`) en línea de soporte.
+   - Acciones destructivas agrupadas y separadas visualmente.
+3. **Flujo guiado de plantillas:**
+   - Indicador de estado: `Borrador`, `Activa`, `Inactiva`.
+   - Callout de impacto al activar/desactivar (“afecta checklist visible para usuarios”).
+4. **Tabla de recordatorios usable:**
+   - En desktop: columnas limpias con truncado controlado + tooltip.
+   - En mobile: vista tipo cards (nombre, frecuencia, turnos, estado, acciones).
+5. **Legibilidad / diseño visual:**
+   - Escala de títulos consistente (`h2`, `h3`, labels).
+   - Espaciado vertical homogéneo.
+   - Chips de estado con contraste AA.
+   - Iconos siempre con texto auxiliar en acciones de riesgo.
+
+**Criterios de aceptación (UX + arquitectura):**
+
+1. Un admin nuevo debe completar tarea básica (crear plantilla, asignar turno y activarla) en <= 3 minutos sin ayuda externa.
+2. Debe existir una única acción primaria visible por bloque activo (sin duplicidad competitiva).
+3. En ancho <= 900px, la gestión de recordatorios y plantillas debe seguir siendo operable sin scroll horizontal obligatorio.
+4. Los estados `Activa/Inactiva/Borrador` deben ser visibles y consistentes en lista y editor.
+5. Las acciones destructivas (`Eliminar`, `Desactivar`) deben requerir confirmación explícita y estar visualmente separadas.
+
+**Cómo lo implementaría (plan técnico por fases):**
+
+1. **Fase 1 (estructura):** reorganizar template HTML por secciones, títulos y toolbars.
+2. **Fase 2 (interacción):** consolidar botones primarios/secundarios y mensajes de estado.
+3. **Fase 3 (responsive):** adaptar tabla de recordatorios a layout card en mobile.
+4. **Fase 4 (accesibilidad):** revisar contraste, foco de teclado, labels, tooltips y tamaños de target.
+5. **Fase 5 (QA):** prueba de tareas críticas con checklist de usabilidad y no-regresión funcional.
 
 ### DEP-NPM-012 - Dependencias npm deprecadas en build Docker (`glob`/`inflight`)
 

@@ -25,7 +25,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '@env/environment';
-import { AppConfig, UpdateConfigRequest } from '../models/config.model';
+import { AppConfig, UpdateConfigRequest, ShiftReminder } from '../models/config.model';
 
 @Injectable({
   providedIn: 'root'
@@ -74,5 +74,23 @@ export class ConfigService {
 
   resetTlsCertificates(): Observable<{ message: string; security: AppConfig['security'] }> {
     return this.http.delete<{ message: string; security: AppConfig['security'] }>(`${this.API_URL}/security/certificates`);
+  }
+
+  // ─── MAIL-REM-043: CRUD de recordatorios de turno ─────────────────────
+
+  getShiftReminders(): Observable<ShiftReminder[]> {
+    return this.http.get<ShiftReminder[]>(`${this.API_URL}/shift-reminders`);
+  }
+
+  createShiftReminder(data: Partial<ShiftReminder>): Observable<ShiftReminder> {
+    return this.http.post<ShiftReminder>(`${this.API_URL}/shift-reminders`, data);
+  }
+
+  updateShiftReminder(id: string, data: Partial<ShiftReminder>): Observable<ShiftReminder> {
+    return this.http.put<ShiftReminder>(`${this.API_URL}/shift-reminders/${id}`, data);
+  }
+
+  deleteShiftReminder(id: string): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.API_URL}/shift-reminders/${id}`);
   }
 }

@@ -13,6 +13,9 @@ export interface ClientAlertDialogData {
   timezone: string;
   localDate: string;
   localTime: string;
+  /** ESC-MAINT-042: true = mantenimiento bloqueante, oculta "Más tarde" */
+  blocking?: boolean;
+  maintenanceTitle?: string;
 }
 
 @Component({
@@ -25,14 +28,19 @@ export interface ClientAlertDialogData {
     MatIconModule
   ],
   template: `
-    <h2 mat-dialog-title>
-      <mat-icon color="warn">warning</mat-icon>
-      Alerta especial de escalamiento
+    <h2 mat-dialog-title [class.maintenance-title]="data.blocking">
+      <mat-icon [color]="data.blocking ? '' : 'warn'">
+        {{ data.blocking ? 'engineering' : 'warning' }}
+      </mat-icon>
+      {{ data.blocking ? 'Mantenimiento programado activo' : 'Alerta especial de escalamiento' }}
     </h2>
 
     <mat-dialog-content>
       <p class="meta">
         <strong>Cliente:</strong> {{ data.clientName }}
+      </p>
+      <p class="meta" *ngIf="data.maintenanceTitle">
+        <strong>Mantenimiento:</strong> {{ data.maintenanceTitle }}
       </p>
       <p class="meta">
         <strong>Contexto:</strong> {{ data.contextLabel }} |
@@ -42,9 +50,14 @@ export interface ClientAlertDialogData {
         <strong>Hora evaluada:</strong> {{ data.localDate }} {{ data.localTime }}
       </p>
 
-      <div class="alert-box">
+      <div class="alert-box" [class.maintenance-box]="data.blocking">
         {{ data.message }}
       </div>
+
+      <p class="blocking-notice" *ngIf="data.blocking">
+        <mat-icon>lock</mat-icon>
+        Debes confirmar lectura para continuar. No es posible generar reportes durante un mantenimiento bloqueante.
+      </p>
 
       <div class="channels" *ngIf="data.channels.length > 0">
         <h3>Canales / destinatarios sugeridos</h3>
@@ -59,10 +72,11 @@ export interface ClientAlertDialogData {
     </mat-dialog-content>
 
     <mat-dialog-actions align="end">
-      <button mat-stroked-button (click)="close(false)">
+      <button mat-stroked-button *ngIf="!data.blocking" (click)="close(false)">
         Más tarde
       </button>
-      <button mat-raised-button color="warn" (click)="close(true)">
+      <button mat-raised-button [color]="data.blocking ? 'primary' : 'warn'" (click)="close(true)">
+        <mat-icon>{{ data.blocking ? 'check_circle' : 'fact_check' }}</mat-icon>
         Confirmar lectura
       </button>
     </mat-dialog-actions>
@@ -78,6 +92,10 @@ export interface ClientAlertDialogData {
       align-items: center;
       gap: 10px;
       color: var(--text-primary);
+    }
+
+    [mat-dialog-title].maintenance-title mat-icon {
+      color: #e65100;
     }
 
     mat-dialog-content {
@@ -99,6 +117,30 @@ export interface ClientAlertDialogData {
       white-space: pre-wrap;
       font-weight: 600;
       color: var(--state-warning);
+    }
+
+    .alert-box.maintenance-box {
+      border-color: #e65100;
+      background: rgba(230, 81, 0, 0.07);
+      color: #e65100;
+    }
+
+    .blocking-notice {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 12px;
+      padding: 8px 12px;
+      background: rgba(230, 81, 0, 0.06);
+      border-radius: 6px;
+      font-size: 13px;
+      color: #b84d00;
+    }
+
+    .blocking-notice mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
     }
 
     .channels {

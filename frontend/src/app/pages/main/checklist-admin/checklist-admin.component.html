@@ -51,6 +51,136 @@
     </mat-card-content>
   </mat-card>
 
+  <!-- ── MAIL-REM-043: Recordatorios periódicos de turno ── -->
+  <mat-card class="config-card reminders-card">
+    <mat-card-title>
+      <span>Recordatorios periódicos de turno por email</span>
+      <button mat-raised-button color="primary" (click)="openReminderForm()" *ngIf="!reminderFormOpen">
+        <mat-icon>add</mat-icon> Nuevo recordatorio
+      </button>
+    </mat-card-title>
+    <mat-card-content>
+      <p class="hint">Crea recordatorios de acciones que se enviarán automáticamente por email a los analistas del turno activo.</p>
+
+      <mat-progress-spinner *ngIf="loadingReminders" mode="indeterminate" diameter="32"></mat-progress-spinner>
+
+      <!-- Tabla de recordatorios -->
+      <table class="reminder-table catalog-table" *ngIf="!loadingReminders && !reminderFormOpen && shiftReminders.length > 0">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Texto del recordatorio</th>
+            <th>Frecuencia</th>
+            <th>Turnos</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let r of shiftReminders">
+            <td>{{ r.label }}</td>
+            <td class="text-truncate">{{ r.reminderText }}</td>
+            <td>
+              <span *ngIf="r.frequencyType === 'hours'">Cada {{ r.intervalHours }}h</span>
+              <span *ngIf="r.frequencyType === 'fixed'">{{ r.fixedTimes.join(', ') || '–' }}</span>
+            </td>
+            <td>
+              <span *ngIf="!r.targetShiftIds.length" class="badge badge-neutral">Todos</span>
+              <span *ngFor="let sid of r.targetShiftIds" class="badge badge-shift">{{ shiftNameById(sid) }}</span>
+            </td>
+            <td>
+              <span class="badge" [class.badge-active]="r.enabled" [class.badge-inactive]="!r.enabled">
+                {{ r.enabled ? 'Activo' : 'Inactivo' }}
+              </span>
+            </td>
+            <td class="actions-cell">
+              <button mat-icon-button (click)="openReminderForm(r)" title="Editar">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-icon-button color="warn" (click)="deleteReminder(r)" title="Eliminar">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p class="empty-hint" *ngIf="!loadingReminders && !reminderFormOpen && shiftReminders.length === 0">
+        No hay recordatorios configurados. Haz clic en "Nuevo recordatorio" para crear uno.
+      </p>
+
+      <!-- Formulario de creación/edición -->
+      <div class="reminder-form-panel" *ngIf="reminderFormOpen">
+        <h3>{{ editingReminder ? 'Editar recordatorio' : 'Nuevo recordatorio' }}</h3>
+        <form [formGroup]="reminderForm" (ngSubmit)="saveReminder()" class="reminder-form">
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Nombre del recordatorio *</mat-label>
+            <input matInput formControlName="label" placeholder="Ej: Verificar sensores" maxlength="150">
+            <mat-hint>Nombre visible en la tabla. Máx. 150 caracteres.</mat-hint>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Texto del correo *</mat-label>
+            <textarea matInput formControlName="reminderText" rows="3"
+              placeholder="Ej: Recuerda revisar el estado de los sensores y registrar novedades en la bitácora."
+              maxlength="500"></textarea>
+            <mat-hint>Mensaje que recibirá el analista. Máx. 500 caracteres.</mat-hint>
+          </mat-form-field>
+
+          <div class="reminder-freq-row">
+            <label class="freq-label">Frecuencia:</label>
+            <mat-radio-group formControlName="frequencyType" class="freq-radio-group">
+              <mat-radio-button value="hours">Cada X horas</mat-radio-button>
+              <mat-radio-button value="fixed">A horas exactas (HH:MM)</mat-radio-button>
+            </mat-radio-group>
+          </div>
+
+          <mat-form-field appearance="outline" *ngIf="reminderForm.get('frequencyType')?.value === 'hours'">
+            <mat-label>Intervalo (horas)</mat-label>
+            <input matInput type="number" formControlName="intervalHours" min="1" max="24">
+            <mat-hint>Entre 1 y 24 horas</mat-hint>
+          </mat-form-field>
+
+          <div class="fixed-times-block" *ngIf="reminderForm.get('frequencyType')?.value === 'fixed'">
+            <label class="fixed-times-label">Horas de envío</label>
+            <div class="fixed-time-input-row">
+              <input type="time" #fixedTimeInput class="fixed-time-native">
+              <button mat-stroked-button type="button" (click)="addFixedTimeFromPicker(fixedTimeInput)">
+                <mat-icon>add</mat-icon> Agregar hora
+              </button>
+            </div>
+            <mat-chip-set class="fixed-times-chips">
+              <mat-chip *ngFor="let t of reminderFixedTimes" (removed)="removeFixedTime(t)">
+                {{ t }}
+                <button matChipRemove><mat-icon>cancel</mat-icon></button>
+              </mat-chip>
+            </mat-chip-set>
+            <p class="fixed-times-error" *ngIf="fixedTimesError">Agrega al menos una hora de envío antes de guardar.</p>
+          </div>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Turnos destinatarios</mat-label>
+            <mat-select formControlName="targetShiftIds" multiple>
+              <mat-option *ngFor="let shift of activeShifts" [value]="shift._id">{{ shift.name }}</mat-option>
+            </mat-select>
+            <mat-hint>Deja vacío para enviar a TODOS los turnos activos</mat-hint>
+          </mat-form-field>
+
+          <mat-checkbox formControlName="enabled">Recordatorio activo</mat-checkbox>
+
+          <div class="reminder-form-actions">
+            <button mat-raised-button color="primary" type="submit" [disabled]="reminderForm.invalid || savingReminder">
+              {{ editingReminder ? 'Actualizar' : 'Crear recordatorio' }}
+            </button>
+            <button mat-stroked-button type="button" (click)="cancelReminderForm()">Cancelar</button>
+          </div>
+        </form>
+      </div>
+
+    </mat-card-content>
+  </mat-card>
+
   <div class="layout">
     <mat-card class="list-card">
       <mat-card-title>Plantillas</mat-card-title>

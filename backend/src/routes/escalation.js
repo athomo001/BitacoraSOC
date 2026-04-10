@@ -88,6 +88,12 @@ router.post('/admin/client-alert-rules', authenticate, requireAdmin, clientAlert
 router.put('/admin/client-alert-rules/:id', authenticate, requireAdmin, clientAlertController.updateClientAlertRule);
 router.delete('/admin/client-alert-rules/:id', authenticate, requireAdmin, clientAlertController.deleteClientAlertRule);
 
+// ─── ESC-MAINT-042 — Mantenimientos (Analistas y Admins) ─────────────────
+router.get('/maintenance-rules', authenticate, clientAlertController.getMaintenanceRules);
+router.post('/maintenance-rules', authenticate, clientAlertController.createMaintenanceRule);
+router.put('/maintenance-rules/:id', authenticate, clientAlertController.updateMaintenanceRule);
+router.delete('/maintenance-rules/:id', authenticate, clientAlertController.deleteMaintenanceRule);
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 🔧 CRUD ADMIN - Servicios
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

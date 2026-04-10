@@ -87,6 +87,19 @@ export interface SecurityConfig {
   httpsReady?: boolean;
 }
 
+export interface ShiftReminder {
+  _id?: string;
+  label: string;
+  reminderText: string;
+  frequencyType: 'hours' | 'fixed';
+  intervalHours: number;
+  fixedTimes: string[];
+  targetShiftIds: string[];
+  enabled: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 export interface UpdateConfigRequest {
   guestModeEnabled?: boolean;
   guestMaxDurationDays?: number;

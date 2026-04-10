@@ -107,6 +107,12 @@ export class ReportGeneratorComponent implements OnInit {
   isEvaluatingClientAlert = false;
   private readonly acknowledgedRuleIds = new Set<string>();
 
+  /** ESC-MAINT-042: true cuando la alerta activa es un mantenimiento bloqueante */
+  get isMaintenanceBlocking(): boolean {
+    const rule = this.activeClientAlert?.rule;
+    return !!(rule && rule.ruleType === 'scheduled_maintenance' && rule.blocking);
+  }
+
   // ─── Config ──────────────────────────────────────────────────────────────
   private readonly backendBaseUrl = environment.backendBaseUrl;
 
@@ -668,6 +674,50 @@ export class ReportGeneratorComponent implements OnInit {
     return escaped.replace(/\n/g, '<br>');
   }
 
+  /** UI-NEWS-041: Renderiza CVE/IDs uno por línea, separando por comas, puntos y coma o saltos. */
+  private formatCveList(value: unknown): string {
+    const raw = String(value ?? '').trim();
+    if (!raw) return '';
+    return raw
+      .split(/[,;\n\r]+/)
+      .map(s => s.trim())
+      .filter(s => s.length > 0)
+      .map(cve => `<span style="font-family:monospace;">${this.escapeHtml(cve)}</span>`)
+      .join('<br>');
+  }
+
+  /**
+   * UI-NEWS-042: Formatea texto multilinea para email-safe HTML.
+   * Convierte saltos de línea, viñetas e indentación a divs con estilos inline
+   * porque white-space:pre-wrap no es consistente en clientes de correo.
+   */
+  private formatNewsletterText(value: unknown): string {
+    const lines = String(value ?? '').split('\n');
+    return lines.map(line => {
+      if (!line.trim()) {
+        return '<br>';
+      }
+      // Línea con viñeta: espacios opcionales + (- * • ·) + espacio + contenido
+      const bulletMatch = line.match(/^( {0,4})([-•*·])[ \t]+(.*)$/);
+      if (bulletMatch) {
+        const depth = bulletMatch[1].length;
+        const paddingLeft = 16 + depth * 8;
+        const content = this.escapeHtml(bulletMatch[3]);
+        return `<div style="padding-left:${paddingLeft}px; text-indent:-12px; margin:1px 0;">&#8226;&nbsp;${content}</div>`;
+      }
+      // Línea con indentación (sin viñeta)
+      const indentMatch = line.match(/^( {2,}|\t+)(.*)/);
+      if (indentMatch) {
+        const depth = Math.min(indentMatch[1].replace(/\t/g, '    ').length, 8);
+        const paddingLeft = depth * 6;
+        const content = this.escapeHtml(indentMatch[2]);
+        return `<div style="padding-left:${paddingLeft}px; margin:1px 0;">${content}</div>`;
+      }
+      // Línea normal
+      return `<div style="margin:1px 0;">${this.escapeHtml(line)}</div>`;
+    }).join('');
+  }
+
   // ─── Clear form ───────────────────────────────────────────────────────────
   clearForm(): void {
     this.selectedEvent = null;
@@ -770,7 +820,7 @@ export class ReportGeneratorComponent implements OnInit {
     else if (criticidadLower === 'crítica' || criticidadLower === 'critica') { badgeColor = '#b71c1c'; badgeText = 'CRÍTICO (CVSS 9.0 - 10.0)'; }
 
     const sectionTitle = `color: #111111 !important; margin-top: 20px; font-size: 16px; font-weight: bold; border-bottom: 2px solid ${headerColor}; padding-bottom: 5px;`;
-    const paragraph = `color: #111111 !important; font-size: 14px; line-height: 1.6; white-space: pre-wrap;`;
+    const paragraph = `color: #111111 !important; font-size: 14px; line-height: 1.6;`;
 
     const currentUser = this.authService.getCurrentUser();
     const autor = e(currentUser?.fullName?.trim() || currentUser?.username || 'Bitácora SOC');
@@ -800,22 +850,22 @@ export class ReportGeneratorComponent implements OnInit {
           <span style="display: inline-block; padding: 4px 10px; background-color: ${badgeColor}; color: white; border-radius: 4px; font-size: 12px; font-weight: bold; margin-right: 8px;">CRITICIDAD: ${badgeText}</span>
           <span style="display: inline-block; padding: 4px 10px; background-color: #eee; color: #333; border-radius: 4px; font-size: 12px; font-weight: bold;">MARCA: ${e(form.marcaFabricante)}</span>
         </div>
-        ${form.cveIdentificadores?.trim() ? `<div style="font-size: 12px; color: #666;"><strong>CVE/IDs:</strong> ${e(form.cveIdentificadores)}</div>` : ''}
+        ${form.cveIdentificadores?.trim() ? `<div style="font-size: 12px; color: #666; margin-top: 8px;"><strong>CVE/IDs:</strong><br>${this.formatCveList(form.cveIdentificadores)}</div>` : ''}
       </div>
 
       <h4 style="${sectionTitle}">Producto(s) Afectado(s)</h4>
-      <div style="${paragraph}">${this.formatMultilineText(form.productosAfectados)}</div>
+      <div style="${paragraph}">${this.formatNewsletterText(form.productosAfectados)}</div>
 
       <h4 style="${sectionTitle}">Impacto</h4>
-      <div style="${paragraph}">${this.formatMultilineText(form.impacto)}</div>
+      <div style="${paragraph}">${this.formatNewsletterText(form.impacto)}</div>
 
       <h4 style="${sectionTitle}">Acciones Recomendadas / Mitigación</h4>
-      <div style="${paragraph}">${this.formatMultilineText(form.recomendacion)}</div>`;
+      <div style="${paragraph}">${this.formatNewsletterText(form.recomendacion)}</div>`;
 
     if (form.referencias?.trim()) {
       html += `
       <h4 style="${sectionTitle}">Referencias</h4>
-      <div style="${paragraph}">${this.formatMultilineText(form.referencias)}</div>`;
+      <div style="${paragraph}">${this.formatNewsletterText(form.referencias)}</div>`;
     }
 
     html += `
@@ -883,10 +933,12 @@ export class ReportGeneratorComponent implements OnInit {
     const rule = evaluation.rule;
     if (!rule) return true;
 
+    const isBlocking = rule.ruleType === 'scheduled_maintenance' && rule.blocking === true;
+
     const dialogRef = this.dialog.open(ClientAlertDialogComponent, {
       width: '680px',
       maxWidth: '95vw',
-      disableClose: false,
+      disableClose: isBlocking,
       data: {
         clientName: evaluation.client.name,
         contextLabel: evaluation.context === 'copy-report' ? 'Copiar reporte' : 'Generación de reporte',
@@ -894,7 +946,9 @@ export class ReportGeneratorComponent implements OnInit {
         channels: rule.channels || [],
         timezone: evaluation.evaluation.timezone,
         localDate: evaluation.evaluation.localDate,
-        localTime: evaluation.evaluation.localTime
+        localTime: evaluation.evaluation.localTime,
+        blocking: isBlocking,
+        maintenanceTitle: rule.maintenanceTitle || ''
       }
     });
 
@@ -906,7 +960,8 @@ export class ReportGeneratorComponent implements OnInit {
         ruleId: rule._id,
         clientId: evaluation.client._id,
         context: evaluation.context,
-        acknowledgedAt: new Date().toISOString()
+        acknowledgedAt: new Date().toISOString(),
+        occurrenceKey: rule.occurrenceKey ?? undefined
       }));
       this.acknowledgedRuleIds.add(rule._id);
       this.snackBar.open('Alerta confirmada', 'Cerrar', { duration: 2000 });

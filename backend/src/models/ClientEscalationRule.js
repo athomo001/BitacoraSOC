@@ -2,6 +2,33 @@ const mongoose = require('mongoose');
 
 const HHMM_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
+// ── readBy sub-document (ESC-MAINT-042) ──────────────────────────────────────
+const readByEntrySchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  username: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  context: {
+    type: String,
+    default: 'report'
+  },
+  readAt: {
+    type: Date,
+    default: Date.now
+  },
+  occurrenceKey: {
+    type: String,
+    trim: true,
+    default: ''
+  }
+}, { _id: false });
+
 const channelSchema = new mongoose.Schema({
   type: {
     type: String,
@@ -125,6 +152,28 @@ const clientEscalationRuleSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  // ── ESC-MAINT-042: campos de mantenimiento programado ─────────────────────
+  ruleType: {
+    type: String,
+    enum: ['special_alert', 'scheduled_maintenance'],
+    default: 'special_alert',
+    index: true
+  },
+  blocking: {
+    type: Boolean,
+    default: false
+  },
+  maintenanceTitle: {
+    type: String,
+    trim: true,
+    maxlength: 500,
+    default: ''
+  },
+  readBy: {
+    type: [readByEntrySchema],
+    default: []
+  },
+  // ─────────────────────────────────────────────────────────────────────────
   lastUpdatedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

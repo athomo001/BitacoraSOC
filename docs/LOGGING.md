@@ -132,21 +132,23 @@ await audit(req, {
 
 ### Eventos auditados
 
-| Namespace | Acción | Nivel | Descripción |
-|-----------|--------|-------|-------------|
-| `auth.login` | `.success` / `.fail` | info/warn | Login de usuario |
-| `entry.create` | `.update` / `.delete` | info | CRUD de entradas |
-| `shiftcheck.submit` | - | info | Registro de check de turno |
-| `shiftcheck.block` | `.consecutive` / `.cooldown` | warn | Bloqueos de validación |
-| `admin.users` | `.create` / `.update` / `.delete` | info | Gestión de usuarios |
-| `admin.backup` | `.create` / `.restore` | info | Backups |
-| `admin.logging` | `.view` / `.update` / `.test` | info | Config de forwarding |
-| `complement.install` | - | info | Alta de complemento |
-| `complement.update` | `.permissions` / `.config` | info | Cambios administrativos |
-| `complement.delete` | `.initiated` / `.completed` | warn | Baja y wipe-out |
-| `complement.wipe` | `.hook_sent` / `.hook_timeout` / `.db_dropped` / `.general_purged` / `.orphans_detected` | info/warn/error | Trail forense de borrado |
-| `complement.api` | `.denied` / `.log_entry` | warn/info | API interna y denegaciones |
-| `complement.circuit` | `.open` / `.half_open` / `.close` | warn/info | Estado de resiliencia |
+
+| Namespace            | Acción                                                                                   | Nivel           | Descripción                |
+| -------------------- | ---------------------------------------------------------------------------------------- | --------------- | -------------------------- |
+| `auth.login`         | `.success` / `.fail`                                                                     | info/warn       | Login de usuario           |
+| `entry.create`       | `.update` / `.delete`                                                                    | info            | CRUD de entradas           |
+| `shiftcheck.submit`  | -                                                                                        | info            | Registro de check de turno |
+| `shiftcheck.block`   | `.consecutive` / `.cooldown`                                                             | warn            | Bloqueos de validación     |
+| `admin.users`        | `.create` / `.update` / `.delete`                                                        | info            | Gestión de usuarios        |
+| `admin.backup`       | `.create` / `.restore`                                                                   | info            | Backups                    |
+| `admin.logging`      | `.view` / `.update` / `.test`                                                            | info            | Config de forwarding       |
+| `complement.install` | -                                                                                        | info            | Alta de complemento        |
+| `complement.update`  | `.permissions` / `.config`                                                               | info            | Cambios administrativos    |
+| `complement.delete`  | `.initiated` / `.completed`                                                              | warn            | Baja y wipe-out            |
+| `complement.wipe`    | `.hook_sent` / `.hook_timeout` / `.db_dropped` / `.general_purged` / `.orphans_detected` | info/warn/error | Trail forense de borrado   |
+| `complement.api`     | `.denied` / `.log_entry`                                                                 | warn/info       | API interna y denegaciones |
+| `complement.circuit` | `.open` / `.half_open` / `.close`                                                        | warn/info       | Estado de resiliencia      |
+
 
 ### API de auditoría (admin/auditor)
 
@@ -169,6 +171,7 @@ Los eventos de complementos se registran con `source="complement"` y `sourceId="
 Solo **admin** puede configurar forwarding:
 
 **GET** `/api/logging/config`
+
 ```json
 {
   "enabled": false,
@@ -190,6 +193,7 @@ Solo **admin** puede configurar forwarding:
 ```
 
 **PUT** `/api/logging/config`
+
 ```json
 {
   "enabled": true,
@@ -330,24 +334,22 @@ mongo
 ### Forwarding no funciona
 
 1. Test conexión:
-   ```bash
+  ```bash
    curl -X POST http://localhost:3000/api/logging/test \
      -H "Authorization: Bearer <admin-token>"
-   ```
-
+  ```
 2. Verificar logs del forwarder:
-   ```bash
+  ```bash
    grep "logforward" logs/combined.log
-   ```
-
+  ```
 3. Test manual (netcat):
-   ```bash
+  ```bash
    # Terminal 1
    nc -l 5140
 
    # Terminal 2 (admin UI o API)
    # Habilitar forwarding → host localhost, port 5140
-   ```
+  ```
 
 ### TLS handshake fails
 
@@ -466,6 +468,7 @@ NODE_ENV=development npm run dev
 ```
 
 Output:
+
 ```
 [12:00:00.123] INFO (12345): User logged in
     event: "auth.login.success"
@@ -480,6 +483,7 @@ NODE_ENV=production npm start
 ```
 
 Output:
+
 ```json
 {"level":30,"time":1704067200123,"pid":12345,"event":"auth.login.success","userId":"507f1f77bcf86cd799439011","msg":"User logged in"}
 ```
@@ -492,3 +496,4 @@ Output:
 - [NDJSON specification](http://ndjson.org/)
 - [RFC 4122 (UUID)](https://datatracker.ietf.org/doc/html/rfc4122)
 - [OpenTelemetry context propagation](https://opentelemetry.io/docs/concepts/signals/traces/#context-propagation)
+

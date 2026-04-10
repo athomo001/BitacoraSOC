@@ -2,6 +2,102 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.32-beta] - 2026-04-10
+
+### Mejoras en Formulario de Mantenimientos Programados (ESC-MAINT-042)
+
+#### Frontend — Selector de fecha/hora con calendario (catalog-admin)
+
+- **Reemplazo de `datetime-local`:** Los campos "Ventana desde" y "Ventana hasta" pasaron de un input `datetime-local` a una combinación de `MatDatepicker` (calendario con popup) + campo de hora `type="time"`. El usuario puede elegir la fecha con el mouse desde un calendario y escribir la hora directamente.
+- **4 controles nuevos en el formulario:** `validFromDate` / `validFromTime` / `validToDate` / `validToTime` reemplazan a `validFrom` / `validTo`. La combinación a ISO se hace en `buildClientAlertRulePayload()` via `combineDateAndTime()`.
+- **Helpers nuevos:** `toDateFromIso()` (ISO → `Date` para cargar al editar), `toTimeFromIso()` (ISO → `HH:mm` para cargar al editar), `combineDateAndTime()` (fecha + hora → ISO para guardar).
+- **Validadores dinámicos actualizados:** `updateClientAlertRuleValidators()` ahora aplica `Validators.required` a los 4 nuevos controles solo cuando el tipo es `scheduled_maintenance`.
+- **Locale `es-CL`:** Calendario muestra fechas en español con semana iniciando en lunes.
+- **Imports del componente standalone:** Agregados `MatDatepickerModule`, `MatNativeDateModule`, `MatSuffix` y provider `MAT_DATE_LOCALE`.
+
+#### Frontend — Cleanup del formulario de mantenimiento
+
+- **Campos ocultos para mantenimiento:** Todos los campos exclusivos de `special_alert` (Modo horario, Hora inicio/fin, Días de la semana, Feriados, Canales y destinatarios, Solo en feriados, Prioridad, Zona horaria, Contextos, Nombre de regla) ya no se muestran cuando `ruleType === 'scheduled_maintenance'`.
+- **Validadores dinámicos:** Al cambiar entre tipos, los validators se activan/desactivan en tiempo real. El formulario nunca bloquea el submit por campos que no son visibles.
+
+#### Backend — Validación server-side (shiftReminderController)
+
+- **Validación 422 en create/update:** Si `frequencyType === 'fixed'` y `fixedTimes` está vacío o ausente, el backend responde `422 Unprocessable Entity` con mensaje explícito.
+
+#### Backend — Scheduler de recordatorios (shiftReminderScheduler)
+
+- **Polling de 5 min → 1 min:** `POLL_INTERVAL_MS` reducido de 5 a 1 minuto.
+- **Tolerancia de 5 min → 1 min:** `FIXED_TOLERANCE_MINUTES` reducido a ±1 minuto, los emails llegan en el minuto exacto configurado.
+
+---
+
+## [v1.5.31-beta] - 2026-04-10
+
+### Recordatorios por Email de Inicio de Turno (MAIL-REM-043)
+
+#### Backend — AppConfig + Scheduler
+
+- **Campos nuevos en `AppConfig`:** `shiftReminderEnabled` (toggle maestro), `shiftReminderMinutesBefore` (ventana 5-120 min, default 30), `shiftReminderTimezone` (timezone por defecto, hereda la del turno si tiene), `shiftReminderLastSentMap` (Map `shiftId→fecha`, anti-duplicado por turno y día).
+- **`shiftReminderScheduler.js`:** Nuevo scheduler con polling de 5 minutos. Para cada `WorkShift` activo de tipo `regular`, calcula minutos hasta el inicio usando `moment-timezone` en la timezone del turno; si cae dentro de la ventana de recordatorio y no se envió ya hoy (dedup vía `shiftReminderLastSentMap`), envía email HTML a los usuarios en `assignedUserIds` (con fallback a `assignedUserId` legado).
+- **Email HTML:** Plantilla inline con cabecera azul SOC, tabla con nombre de turno, código, hora de inicio y timezone. Auditoría automática via `sendEmail()` con `auditContext.sourceModule: 'shiftReminderScheduler'`.
+- **`PUT /api/config`:** Tres nuevas validaciones para `shiftReminderEnabled`, `shiftReminderMinutesBefore` (int 5-120) y `shiftReminderTimezone`.
+- **`server.js`:** `startShiftReminderScheduler()` iniciado junto a los demás schedulers al arrancar la BD.
+
+#### Frontend — Checklist Admin
+
+- **Nueva sección en `/main/admin/checklist`:** Tercera columna de configuración con checkbox "Recordatorio de inicio de turno por email", campo de anticipación (minutos) y campo de zona horaria. Los dos últimos son condicionales al toggle.
+
+---
+
+## [v1.5.30-beta] - 2026-04-10
+
+### Mantenimientos Programados Bloqueantes (ESC-MAINT-042)
+
+#### Backend — Modelo y Controller
+
+- **`ClientEscalationRule` extendido:** Nuevos campos `ruleType` (`special_alert` | `scheduled_maintenance`), `blocking` (Boolean), `maintenanceTitle` (String, max 500), `readBy` (subdocumento con `userId`, `username`, `context`, `readAt`, `occurrenceKey`).
+- **`buildOccurrenceKey()`:** Genera clave de ocurrencia estable por ventana absoluta (`validFrom+validTo`) o por fecha local recurrente (`ruleId+localDate`), previniendo re-lectura de distintas ocurrencias de la misma regla.
+- **Precedencia en evaluación:** Orden de aplicación: `scheduled_maintenance bloqueante` → `scheduled_maintenance no bloqueante` → `special_alert`.
+- **Soporte de `clientName`:** `evaluateClientAlert` acepta `?clientName=` como alternativa a `?clientId=`, con resolución unívoca (error explícito si ambiguo).
+- **`readBy` persistido en ACK:** `acknowledgeClientAlert` guarda la confirmación del analista en `readBy` con deduplicación por `userId + occurrenceKey + context`, evitando duplicados sin bloquear la respuesta.
+- **`occurrenceKey` en respuesta:** La clave de ocurrencia se incluye en la respuesta de evaluación y en los metadatos de auditoría.
+
+#### Frontend — Diálogo y Banner
+
+- **`ClientAlertDialogComponent` modo bloqueante:** Para reglas `scheduled_maintenance + blocking`, el diálogo no muestra el botón "Más tarde", muestra ícono `engineering`, título naranja "Mantenimiento programado activo", caja con borde naranja y aviso de bloqueo. `disableClose: true` impide cerrar sin confirmar.
+- **Banner `report-generator` con variante mantenimiento:** El banner de alerta activa cambia a clase `.maintenance-blocking` con fondo naranja tenue, ícono `engineering` y el título del mantenimiento. Incluye aviso de bloqueo con ícono candado.
+
+#### Frontend — Catálogo Admin
+
+- **Tab renombrado:** "Alertas Especiales" → "Alertas y Mantenimientos".
+- **Selector de tipo al inicio del formulario:** `mat-select` para `Tipo de regla` con opciones "Alerta Especial de Escalamiento" y "Mantenimiento Programado".
+- **Campos condicionales de mantenimiento:** `maintenanceTitle` y checkbox `blocking` solo visibles cuando `ruleType === 'scheduled_maintenance'`.
+- **Badge "Tipo" en tabla:** Nueva columna con íconos `engineering`/`warning`, texto tipo y candado para mantenimientos bloqueantes.
+- **`editClientAlertRule`/`cancelClientAlertRuleEdit`/`buildClientAlertRulePayload`:** Actualizados para incluir y resetear los nuevos campos.
+
+## [v1.5.29-beta] - 2026-04-09
+
+### Boletín de Seguridad — Formato HTML email-safe (UI-NEWS-041, UI-NEWS-042)
+
+#### UI-NEWS-041: CVE/IDs uno por línea
+- **Nueva función `formatCveList()`:** Los identificadores CVE/IDs del campo correspondiente se dividen ahora por comas, puntos y coma o saltos de línea y se renderizan un CVE por línea con fuente monoespaciada, eliminando la cadena continua que dificultaba la lectura técnica.
+
+#### UI-NEWS-042: Campos de texto con formato email-safe
+- **Nueva función `formatNewsletterText()`:** Los campos `Producto(s) Afectado(s)`, `Impacto`, `Acciones Recomendadas / Mitigación` y `Referencias` se procesan ahora línea a línea aplicando HTML inline:
+  - Líneas con viñeta (`-`, `*`, `•`, `·`) → `<div>` con `padding-left` y símbolo `&#8226;`, email-safe.
+  - Líneas con indentación → `<div>` con `padding-left` proporcional a la profundidad detectada.
+  - Líneas vacías → `<br>` de separación.
+  - Líneas normales → `<div>` sin dependencia de `white-space: pre-wrap`.
+- **Eliminación de `white-space: pre-wrap` en el boletín:** Esta propiedad CSS no es respetada por la mayoría de clientes de correo (Gmail, Outlook). La nueva función reemplaza el comportamiento con HTML explícito, garantizando que la estructura visible en la preview del boletín sea idéntica a la del correo enviado.
+
+### Verificación de Issues Incompletos
+
+#### AUDIT-EXPORT-028: Descarga flexible de logs de auditoría — Confirmado Listo
+- Verificado que el componente de auditoría expone 5 modos de exportación (filtros actuales, por cantidad, últimos días, últimos meses, todos) con `mat-hint` visible y ejemplos exactos (`2, 7, 15` días; `1, 3, 6` meses) tal como requería el issue.
+
+#### UI-HEALTH-033: Barra de salud de servicios críticos — Confirmado Listo
+- Verificado que la barra de salud usa `*ngIf="isAdmin"` (solo admins), tiene fondo y borde separado visualmente del toolbar, y los chips usan colores de alto contraste (`#1f7a35`/blanco, `#b71c1c`/blanco) con `font-weight: 600` para máxima legibilidad.
+
 ## [v1.5.28-beta] - 2026-04-08
 
 ### Ayuda Contextual y UX (REP-GEN-039)

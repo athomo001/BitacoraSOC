@@ -8,13 +8,14 @@ import {
   ClientAlertRuleFormData,
   ClientAlertContext,
   ClientAlertWindowMode,
-  ClientAlertChannel
+  ClientAlertChannel,
+  ClientAlertRuleType
 } from '../../../models/escalation.model';
 import { EscalationService } from '../../../services/escalation.service';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatTabGroup, MatTab } from '@angular/material/tabs';
 import { MatCard, MatCardHeader, MatCardTitle, MatCardContent } from '@angular/material/card';
-import { MatFormField, MatLabel } from '@angular/material/form-field';
+import { MatFormField, MatHint, MatLabel, MatSuffix } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { MatButton, MatIconButton } from '@angular/material/button';
@@ -27,12 +28,15 @@ import { FormControl } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { ConfigService } from '../../../services/config.service';
 import { EmailReportConfig } from '../../../models/config.model';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
 
 @Component({
   selector: 'app-catalog-admin',
   templateUrl: './catalog-admin.component.html',
   styleUrls: ['./catalog-admin.component.scss'],
-  imports: [MatTabGroup, MatTab, MatCard, MatCardHeader, MatCardTitle, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatCheckbox, MatButton, MatIcon, NgIf, NgFor, MatIconButton, MatTooltip, MatSelect, MatOption, MatPaginator]
+  imports: [MatTabGroup, MatTab, MatCard, MatCardHeader, MatCardTitle, MatCardContent, ReactiveFormsModule, MatFormField, MatHint, MatLabel, MatSuffix, MatInput, MatCheckbox, MatButton, MatIcon, NgIf, NgFor, MatIconButton, MatTooltip, MatSelect, MatOption, MatPaginator, MatDatepickerModule, MatNativeDateModule],
+  providers: [{ provide: MAT_DATE_LOCALE, useValue: 'es-CL' }]
 })
 export class CatalogAdminComponent implements OnInit {
   private static readonly DEFAULT_REPORT_COLOR = '#4CAF50';
@@ -132,23 +136,72 @@ export class CatalogAdminComponent implements OnInit {
     });
 
     this.clientAlertRuleForm = this.fb.group({
+      ruleType: ['special_alert', Validators.required],
       clientId: ['', Validators.required],
       name: [''],
       enabled: [true],
-      contexts: [['report', 'copy-report'], Validators.required],
-      timezone: ['America/Santiago', Validators.required],
-      priority: [100, [Validators.required, Validators.min(1), Validators.max(10000)]],
-      mode: ['outside_business_hours', Validators.required],
-      startTime: ['09:00', [Validators.required, Validators.pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)]],
-      endTime: ['17:00', [Validators.required, Validators.pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)]],
+      contexts: [['report', 'copy-report']],
+      timezone: ['America/Santiago'],
+      priority: [100, [Validators.min(1), Validators.max(10000)]],
+      mode: ['outside_business_hours'],
+      startTime: ['09:00', [Validators.pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)]],
+      endTime: ['17:00', [Validators.pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)]],
       daysOfWeekCsv: ['1,2,3,4,5'],
       holidayOnly: [false],
       holidayDatesCsv: [''],
       channelsText: [''],
       alertMessage: ['', [Validators.required, Validators.maxLength(4000)]],
       acknowledgementRequired: [true],
-      validFrom: [''],
-      validTo: ['']
+      validFromDate: [null as Date | null],
+      validFromTime: ['00:00', [Validators.pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)]],
+      validToDate: [null as Date | null],
+      validToTime: ['23:59', [Validators.pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)]],
+      blocking: [false],
+      maintenanceTitle: ['']
+    });
+
+    this.clientAlertRuleForm.get('ruleType')!.valueChanges.subscribe(type => {
+      this.updateClientAlertRuleValidators(type);
+    });
+  }
+
+  private updateClientAlertRuleValidators(ruleType: string): void {
+    const isMaint = ruleType === 'scheduled_maintenance';
+    const f = this.clientAlertRuleForm;
+
+    // Campos exclusivos de special_alert
+    const specialOnlyFields = ['mode', 'startTime', 'endTime', 'contexts', 'timezone', 'priority'];
+    specialOnlyFields.forEach(field => {
+      const ctrl = f.get(field);
+      if (!ctrl) return;
+      if (isMaint) {
+        ctrl.clearValidators();
+      } else {
+        if (field === 'mode' || field === 'timezone') ctrl.setValidators(Validators.required);
+        if (field === 'contexts') ctrl.setValidators(Validators.required);
+        if (field === 'priority') ctrl.setValidators([Validators.required, Validators.min(1), Validators.max(10000)]);
+        if (field === 'startTime' || field === 'endTime') ctrl.setValidators([Validators.required, Validators.pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)]);
+      }
+      ctrl.updateValueAndValidity({ emitEvent: false });
+    });
+
+    // maintenanceTitle obligatorio solo para mantenimiento
+    const titleCtrl = f.get('maintenanceTitle')!;
+    titleCtrl.setValidators(isMaint ? [Validators.required, Validators.maxLength(200)] : []);
+    titleCtrl.updateValueAndValidity({ emitEvent: false });
+
+    // validFromDate/Time y validToDate/Time obligatorios solo para mantenimiento
+    ['validFromDate', 'validToDate'].forEach(field => {
+      const ctrl = f.get(field)!;
+      ctrl.setValidators(isMaint ? Validators.required : []);
+      ctrl.updateValueAndValidity({ emitEvent: false });
+    });
+    ['validFromTime', 'validToTime'].forEach(field => {
+      const ctrl = f.get(field)!;
+      ctrl.setValidators(isMaint
+        ? [Validators.required, Validators.pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)]
+        : [Validators.pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)]);
+      ctrl.updateValueAndValidity({ emitEvent: false });
     });
   }
 
@@ -473,6 +526,7 @@ export class CatalogAdminComponent implements OnInit {
     const clientId = this.extractClientId(rule.clientId);
 
     this.clientAlertRuleForm.patchValue({
+      ruleType: rule.ruleType || 'special_alert',
       clientId,
       name: rule.name || '',
       enabled: rule.enabled,
@@ -488,8 +542,12 @@ export class CatalogAdminComponent implements OnInit {
       channelsText: this.formatChannels(rule.channels || []),
       alertMessage: rule.alertMessage || '',
       acknowledgementRequired: rule.acknowledgementRequired !== false,
-      validFrom: this.toDateTimeLocal(rule.validFrom),
-      validTo: this.toDateTimeLocal(rule.validTo)
+      validFromDate: this.toDateFromIso(rule.validFrom),
+      validFromTime: this.toTimeFromIso(rule.validFrom),
+      validToDate: this.toDateFromIso(rule.validTo),
+      validToTime: this.toTimeFromIso(rule.validTo),
+      blocking: rule.blocking === true,
+      maintenanceTitle: rule.maintenanceTitle || ''
     });
   }
 
@@ -508,6 +566,7 @@ export class CatalogAdminComponent implements OnInit {
   cancelClientAlertRuleEdit(): void {
     this.editingClientAlertRuleId = null;
     this.clientAlertRuleForm.reset({
+      ruleType: 'special_alert',
       clientId: '',
       name: '',
       enabled: true,
@@ -523,8 +582,12 @@ export class CatalogAdminComponent implements OnInit {
       channelsText: '',
       alertMessage: '',
       acknowledgementRequired: true,
-      validFrom: '',
-      validTo: ''
+      validFromDate: null,
+      validFromTime: '00:00',
+      validToDate: null,
+      validToTime: '23:59',
+      blocking: false,
+      maintenanceTitle: ''
     });
   }
 
@@ -539,16 +602,52 @@ export class CatalogAdminComponent implements OnInit {
     return found?.label || (mode || 'N/A');
   }
 
+  getRuleTypeLabel(ruleType?: string): string {
+    return ruleType === 'scheduled_maintenance' ? 'Mantenimiento' : 'Alerta Especial';
+  }
+
+  isMaintenance(ruleType?: string): boolean {
+    return ruleType === 'scheduled_maintenance';
+  }
+
   private buildClientAlertRulePayload(): ClientAlertRuleFormData {
     const value = this.clientAlertRuleForm.getRawValue();
+    const validFrom = this.combineDateAndTime(value.validFromDate, value.validFromTime);
+    const validTo = this.combineDateAndTime(value.validToDate, value.validToTime);
+
+    const ruleType: ClientAlertRuleType = value.ruleType === 'scheduled_maintenance'
+      ? 'scheduled_maintenance'
+      : 'special_alert';
+    const isMaintenance = ruleType === 'scheduled_maintenance';
+
+    if (isMaintenance) {
+      return {
+        ruleType,
+        clientId: value.clientId,
+        name: (value.maintenanceTitle || '').trim(),
+        enabled: value.enabled !== false,
+        contexts: ['report', 'copy-report'],
+        timezone: 'America/Santiago',
+        priority: 100,
+        validFrom,
+        validTo,
+        holidayDates: [],
+        timeWindows: [],
+        channels: [],
+        alertMessage: (value.alertMessage || '').trim(),
+        acknowledgementRequired: value.acknowledgementRequired !== false,
+        blocking: value.blocking === true,
+        maintenanceTitle: (value.maintenanceTitle || '').trim()
+      };
+    }
+
     const contexts = this.normalizeContexts(value.contexts);
     const daysOfWeek = this.parseDaysOfWeek(value.daysOfWeekCsv || '');
     const holidayDates = this.parseHolidayDates(value.holidayDatesCsv || '');
     const channels = this.parseChannels(value.channelsText || '');
-    const validFrom = this.toIsoOrNull(value.validFrom);
-    const validTo = this.toIsoOrNull(value.validTo);
 
     return {
+      ruleType,
       clientId: value.clientId,
       name: (value.name || '').trim(),
       enabled: value.enabled !== false,
@@ -567,7 +666,9 @@ export class CatalogAdminComponent implements OnInit {
       }],
       channels,
       alertMessage: (value.alertMessage || '').trim(),
-      acknowledgementRequired: value.acknowledgementRequired !== false
+      acknowledgementRequired: value.acknowledgementRequired !== false,
+      blocking: false,
+      maintenanceTitle: ''
     };
   }
 
@@ -632,6 +733,29 @@ export class CatalogAdminComponent implements OnInit {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '';
     return date.toISOString().slice(0, 16);
+  }
+
+  private toDateFromIso(value?: string | null): Date | null {
+    if (!value) return null;
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  private toTimeFromIso(value?: string | null): string {
+    if (!value) return '00:00';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '00:00';
+    const h = d.getHours().toString().padStart(2, '0');
+    const m = d.getMinutes().toString().padStart(2, '0');
+    return `${h}:${m}`;
+  }
+
+  private combineDateAndTime(date: Date | null, time: string): string | null {
+    if (!date) return null;
+    const [h, m] = (time || '00:00').split(':').map(Number);
+    const d = new Date(date);
+    d.setHours(h, m, 0, 0);
+    return d.toISOString();
   }
 
   private extractClientId(clientRef: unknown): string {

@@ -20,7 +20,7 @@
 
     .config-columns {
       display: grid;
-      grid-template-columns: repeat(2, minmax(280px, 1fr));
+      grid-template-columns: repeat(2, minmax(260px, 1fr));
       gap: 16px;
       width: 100%;
     }
@@ -63,7 +63,15 @@
     gap: 16px;
   }
 
-  @media (max-width: 960px) {
+  @media (max-width: 1200px) {
+    .config-card {
+      .config-columns {
+        grid-template-columns: repeat(2, minmax(260px, 1fr));
+      }
+    }
+  }
+
+  @media (max-width: 800px) {
     .config-card {
       .config-columns {
         grid-template-columns: 1fr;
@@ -246,6 +254,176 @@
 
     .spacer {
       flex: 1;
+    }
+  }
+
+  // ── Recordatorios periódicos ──────────────────────────────────────────────
+  .reminders-card {
+    margin-bottom: 16px;
+
+    mat-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .reminders-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      padding-bottom: 12px;
+    }
+  }
+
+  .catalog-table,
+  .reminder-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+
+    th,
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border-color);
+      text-align: left;
+    }
+
+    th {
+      font-weight: 600;
+      background: var(--surface-muted);
+    }
+
+    td.text-truncate {
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    td.actions-cell {
+      white-space: nowrap;
+    }
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    margin-right: 4px;
+
+    &.badge-active {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+
+    &.badge-inactive {
+      background: #fce4ec;
+      color: #c62828;
+    }
+
+    &.badge-neutral {
+      background: var(--surface-muted);
+      color: var(--text-secondary);
+    }
+
+    &.badge-shift {
+      background: #e3f2fd;
+      color: #1565c0;
+    }
+  }
+
+  .empty-hint {
+    color: var(--text-secondary);
+    font-size: 13px;
+    text-align: center;
+    padding: 24px 0;
+    margin: 0;
+  }
+
+  .reminder-form-panel {
+    margin-top: 16px;
+    border-top: 1px solid var(--border-color);
+    padding-top: 16px;
+
+    h3 {
+      margin: 0 0 16px 0;
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    .reminder-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-width: 680px;
+    }
+
+    .reminder-freq-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      flex-wrap: wrap;
+
+      .freq-label {
+        font-size: 14px;
+        color: var(--text-secondary);
+        padding-top: 10px;
+        min-width: 100px;
+      }
+
+      .freq-radio-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+    }
+
+    .fixed-times-block {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+
+      .fixed-times-label {
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+
+      .fixed-time-input-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+
+        .fixed-time-native {
+          border: 1px solid var(--border-color);
+          border-radius: 4px;
+          padding: 8px 10px;
+          font-size: 14px;
+          background: var(--surface-color);
+          color: var(--text-primary);
+          height: 36px;
+        }
+      }
+
+      .fixed-times-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+
+      .fixed-times-error {
+        margin: 0;
+        font-size: 12px;
+        color: #c62828;
+      }
+    }
+
+    .reminder-form-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 8px;
     }
   }
 }

@@ -14,6 +14,8 @@ export interface Client {
 
 export type ClientAlertContext = 'report' | 'copy-report';
 export type ClientAlertChannelType = 'email' | 'whatsapp' | 'telefono' | 'otro';
+// ESC-MAINT-042
+export type ClientAlertRuleType = 'special_alert' | 'scheduled_maintenance';
 export type ClientAlertWindowMode =
   | 'always'
   | 'outside_business_hours'
@@ -57,6 +59,11 @@ export interface ClientAlertRule {
   channels: ClientAlertChannel[];
   alertMessage: string;
   acknowledgementRequired: boolean;
+  // ESC-MAINT-042
+  ruleType?: ClientAlertRuleType;
+  blocking?: boolean;
+  maintenanceTitle?: string;
+  occurrenceKey?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -84,6 +91,7 @@ export interface ClientAlertAckPayload {
   clientId?: string;
   context?: ClientAlertContext;
   acknowledgedAt?: string;
+  occurrenceKey?: string;
 }
 
 export interface Service {
@@ -282,6 +290,10 @@ export interface ClientAlertRuleFormData {
   channels: ClientAlertChannel[];
   alertMessage: string;
   acknowledgementRequired: boolean;
+  // ESC-MAINT-042
+  ruleType?: ClientAlertRuleType;
+  blocking?: boolean;
+  maintenanceTitle?: string;
 }
 
 export interface ServiceFormData {

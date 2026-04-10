@@ -227,7 +227,13 @@ router.get('/templates/active', authenticate, async (req, res) => {
     const snapshot = await getActiveChecklistSnapshot(shiftId, templateType);
 
     if (!snapshot.items || snapshot.items.length === 0) {
-      return res.status(404).json({ message: 'No hay checklist activo configurado' });
+      // Estado válido: aún no hay plantilla/servicios activos.
+      // Responder 200 evita ruido de 404 recurrente en polling frontend.
+      return res.json({
+        template: null,
+        source: snapshot.type,
+        message: 'No hay checklist activo configurado'
+      });
     }
 
     res.json({

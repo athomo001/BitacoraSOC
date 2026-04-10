@@ -862,4 +862,31 @@ router.get('/debug/check', authenticate, authorize('admin'), async (req, res) =>
   }
 });
 
+// ─── MAIL-REM-043: CRUD de Recordatorios de Turno ─────────────────────────────
+const shiftReminderCtrl = require('../controllers/shiftReminderController');
+const { isMongoId } = require('express-validator');
+
+const shiftReminderValidators = [
+  body('label').notEmpty().trim().isLength({ max: 150 }).withMessage('Nombre obligatorio (máx 150)'),
+  body('reminderText').notEmpty().trim().isLength({ max: 500 }).withMessage('Texto obligatorio (máx 500)'),
+  body('frequencyType').optional().isIn(['hours', 'fixed']).withMessage('Tipo inválido'),
+  body('intervalHours').optional().isInt({ min: 1, max: 24 }).toInt(),
+  body('fixedTimes').optional().isArray({ max: 24 }),
+  body('fixedTimes.*').optional().isString().trim().matches(/^([01]\d|2[0-3]):[0-5]\d$/).withMessage('Formato HH:MM requerido'),
+  body('fixedTimes').custom((value, { req }) => {
+    if ((req.body.frequencyType === 'fixed') && (!Array.isArray(value) || value.length === 0)) {
+      throw new Error('Debes agregar al menos una hora cuando el tipo es \'Horas exactas\'');
+    }
+    return true;
+  }),
+  body('targetShiftIds').optional().isArray({ max: 50 }),
+  body('targetShiftIds.*').optional().isMongoId().withMessage('ID de turno inválido'),
+  body('enabled').optional().isBoolean()
+];
+
+router.get('/shift-reminders', authenticate, authorize('admin'), shiftReminderCtrl.list);
+router.post('/shift-reminders', authenticate, authorize('admin'), shiftReminderValidators, validate, shiftReminderCtrl.create);
+router.put('/shift-reminders/:id', authenticate, authorize('admin'), shiftReminderValidators, validate, shiftReminderCtrl.update);
+router.delete('/shift-reminders/:id', authenticate, authorize('admin'), shiftReminderCtrl.remove);
+
 module.exports = router;
