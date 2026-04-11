@@ -1,15 +1,19 @@
 // ════════════════════════════════════════════════════════════
-// Tema CYBER (v3) - Login Matrix/Cyberpunk
-// REPARACIÓN DE VISIBILIDAD DE TEXTO - CORRECCIÓN DE CACHÉ
+// Tema CYBER (v3) — Login Matrix / estética propia
+// Colores concentrados aquí (UI-LOGIN-055): un solo lugar para ajustar contraste
+// sin esparcir hex por el archivo. No usa el tema global de la app a propósito.
 // ════════════════════════════════════════════════════════════
 
-// ── Variables ───────────────────────────────────────────────
+// Variables de paleta Matrix
 $neon: #00ff41;
 $neon-dim: #00cc33;
 $neon-glow: rgba(0, 255, 65, 0.6);
 $neon-subtle: rgba(0, 255, 65, 0.15);
 $bg-deep: #000000;
 $card-bg: rgba(0, 8, 0, 0.95);
+$cyber-text-high: #ffffff;
+$cyber-on-neon: #000000;
+$cyber-danger: #ff3366;
 $font-mono: 'Courier New', 'Lucida Console', monospace;
 
 // ── Container ───────────────────────────────────────────────
@@ -76,8 +80,8 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
     font-weight: 900;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: #ffffff !important;
-    text-shadow: 0 0 15px $neon, 0 0 3px #ffffff;
+    color: $cyber-text-high !important;
+    text-shadow: 0 0 15px $neon, 0 0 3px $cyber-text-high;
     margin: 0 0 10px;
     animation: cyGlitch 4s infinite;
     position: relative;
@@ -96,21 +100,21 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
   body & .cy-subtitle {
     font-size: 11px;
     letter-spacing: 0.18em;
-    color: #00ff41 !important;
+    color: $neon !important;
     font-weight: 900;
     text-transform: uppercase;
     white-space: nowrap;
     overflow: hidden;
     text-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
 
-    span { color: #00ff41 !important; }
+    span { color: $neon !important; }
 
     &::after {
       content: '|';
       display: inline-block;
       animation: cyBlink 0.75s step-end infinite;
       margin-left: 2px;
-      color: #00ff41;
+      color: $neon;
     }
   }
 
@@ -155,7 +159,7 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
     font-size: 13px;
     font-weight: 900;
     letter-spacing: 0.18em;
-    color: #00ff41 !important;
+    color: $neon !important;
     text-transform: uppercase;
     margin-bottom: 8px;
 
@@ -174,10 +178,10 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
   body & .cy-input {
     width: 100%;
     padding: 13px 42px 13px 14px;
-    background: #000000 !important;
-    border: 2px solid #00ff41 !important;
+    background: $bg-deep !important;
+    border: 2px solid $neon !important;
     border-radius: 3px;
-    color: #ffffff !important;
+    color: $cyber-text-high !important;
     font-family: $font-mono;
     font-size: 16px;
     font-weight: 900 !important;
@@ -185,11 +189,11 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
     outline: none;
     box-sizing: border-box;
 
-    &::placeholder { color: #00ff41 !important; opacity: 0.8 !important; }
-    &::selection   { background: #ffffff !important; color: #000000 !important; }
+    &::placeholder { color: $neon !important; opacity: 0.8 !important; }
+    &::selection   { background: $cyber-text-high !important; color: $cyber-on-neon !important; }
 
     &:focus {
-      border-color: #ffffff !important;
+      border-color: $cyber-text-high !important;
       box-shadow: 0 0 15px rgba(0, 255, 65, 0.6);
     }
 
@@ -201,12 +205,12 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
     right: 12px;
     background: none;
     border: none;
-    color: #00ff41;
+    color: $neon;
     cursor: pointer;
     font-size: 20px;
     padding: 0;
 
-    &:hover { color: #ffffff; }
+    &:hover { color: $cyber-text-high; }
   }
 
   // Error messages
@@ -217,7 +221,7 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
 
   body & .cy-error-text {
     font-size: 11px;
-    color: #ff3366 !important;
+    color: $cyber-danger !important;
     font-weight: 900;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -227,10 +231,10 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
   // ── Botón principal ───────────────────────────────────────
   .cy-submit-btn {
     padding: 14px 20px;
-    background: #00ff41;
+    background: $neon;
     border: none;
     border-radius: 3px;
-    color: #000 !important;
+    color: $cyber-on-neon !important;
     font-family: $font-mono;
     font-size: 14px;
     font-weight: 900;
@@ -243,7 +247,7 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
     text-align: center;
 
     &:hover:not(:disabled) {
-      background: #ffffff;
+      background: $cyber-text-high;
       box-shadow: 0 0 30px rgba(255, 255, 255, 0.6);
     }
 
@@ -259,12 +263,12 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
     padding: 12px;
     font-size: 13px;
     font-weight: 900;
-    color: #ffffff !important;
+    color: $cyber-text-high !important;
     text-align: center;
-    border: 2px solid #00ff41;
-    background: #000000 !important;
+    border: 2px solid $neon;
+    background: $bg-deep !important;
     
-    &, span { color: #ffffff !important; }
+    &, span { color: $cyber-text-high !important; }
   }
 
   // ── Enlace recuperar contraseña ──────────────────────────
@@ -272,10 +276,10 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
     display: block;
     width: 100%;
     margin-top: 16px;
-    background: #000000 !important;
-    border: 2px solid #00ff41 !important;
+    background: $bg-deep !important;
+    border: 2px solid $neon !important;
     padding: 12px;
-    color: #00ff41 !important;
+    color: $neon !important;
     font-family: $font-mono;
     font-size: 13px;
     font-weight: 900;
@@ -284,8 +288,8 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
     cursor: pointer;
 
     &:hover:not(:disabled) {
-      color: #000000 !important;
-      background: #00ff41 !important;
+      color: $cyber-on-neon !important;
+      background: $neon !important;
     }
   }
 
@@ -293,38 +297,38 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
   body & .cy-footer {
     margin-top: 24px;
     padding-top: 16px;
-    border-top: 2px solid #00ff41;
+    border-top: 2px solid $neon;
     text-align: center;
     font-size: 12px;
     font-weight: 900;
-    color: #ffffff !important;
+    color: $cyber-text-high !important;
     text-transform: uppercase;
 
-    &, span, p, div { color: #ffffff !important; }
+    &, span, p, div { color: $cyber-text-high !important; }
   }
 
   // ── Banner ────────────────────────────────────────────────
   body & .cy-banner {
     margin-bottom: 24px;
     padding: 16px;
-    border: 3px solid #00ff41 !important;
-    background: #000000 !important;
-    color: #ffffff !important;
+    border: 3px solid $neon !important;
+    background: $bg-deep !important;
+    color: $cyber-text-high !important;
     font-weight: 900 !important;
     text-align: center;
     text-transform: uppercase;
 
     &, div, span, p {
-      color: #ffffff !important;
-      -webkit-text-fill-color: #ffffff !important;
+      color: $cyber-text-high !important;
+      -webkit-text-fill-color: $cyber-text-high !important;
     }
 
     &.cy-banner-error {
-      border-color: #ff3366 !important;
+      border-color: $cyber-danger !important;
       background: rgba(40, 0, 0, 0.9) !important;
       
       &, div, span, p {
-        color: #ffffff !important;
+        color: $cyber-text-high !important;
       }
     }
   }
@@ -334,7 +338,8 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
     position: fixed;
     inset: 0;
     z-index: 100;
-    background: rgba(0, 0, 0, 0.9);
+    // Alineado con --overlay-scrim global (semantic-tokens) para consistencia con otros overlays
+    background: var(--overlay-scrim);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -342,8 +347,8 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
   }
 
   .cy-recovery-modal {
-    background: #000000;
-    border: 3px solid #00ff41;
+    background: $bg-deep;
+    border: 3px solid $neon;
     border-radius: 4px;
     width: 100%;
     max-width: 460px;
@@ -356,8 +361,8 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
     align-items: center;
     justify-content: space-between;
     padding: 14px 20px;
-    background: #00ff41;
-    color: #000;
+    background: $neon;
+    color: $cyber-on-neon;
   }
 
   .cy-modal-topbar-left {
@@ -374,9 +379,9 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
   }
 
   .cy-modal-close {
-    background: #000;
-    border: 2px solid #fff;
-    color: #fff;
+    background: $bg-deep;
+    border: 2px solid $cyber-text-high;
+    color: $cyber-text-high;
     width: 28px;
     height: 28px;
     cursor: pointer;
@@ -390,10 +395,10 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
   body & .cy-modal-title {
     font-size: 18px;
     font-weight: 900;
-    color: #ffffff !important;
-    text-shadow: 0 0 15px #00ff41;
+    color: $cyber-text-high !important;
+    text-shadow: 0 0 15px $neon;
     margin-bottom: 24px;
-    border-left: 5px solid #00ff41;
+    border-left: 5px solid $neon;
     padding-left: 14px;
     text-transform: uppercase;
   }
@@ -401,11 +406,11 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
   // REPARACIÓN DEFINITIVA DEL INFO BOX
   body & .cy-info-box {
     padding: 20px;
-    background: #000000 !important; 
-    border: 3px solid #00ff41 !important;
+    background: $bg-deep !important; 
+    border: 3px solid $neon !important;
     margin-bottom: 24px;
     font-size: 15px;
-    color: #ffffff !important;
+    color: $cyber-text-high !important;
     font-weight: 900 !important;
     line-height: 1.6;
     display: flex;
@@ -413,36 +418,36 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
     box-shadow: inset 0 0 30px rgba(0, 255, 65, 0.2);
 
     &, span, p, div, b, strong, i, em {
-      color: #ffffff !important;
-      -webkit-text-fill-color: #ffffff !important;
+      color: $cyber-text-high !important;
+      -webkit-text-fill-color: $cyber-text-high !important;
       text-shadow: none !important;
     }
 
     span:first-child {
-       color: #00ff41 !important;
+       color: $neon !important;
        font-size: 24px;
     }
   }
 
   body & .cy-secondary-btn {
     padding: 14px;
-    border: 2px solid #00ff41;
+    border: 2px solid $neon;
     background: transparent;
-    color: #00ff41 !important;
+    color: $neon !important;
     font-weight: 900;
     text-transform: uppercase;
     cursor: pointer;
     width: 100%;
 
     &:hover {
-      background: #00ff41;
-      color: #000 !important;
+      background: $neon;
+      color: $cyber-on-neon !important;
     }
   }
 
   // Selección global forzada para el tema (Nuclear)
   & ::selection {
-    background: #ffffff !important;
-    color: #000000 !important;
+    background: $cyber-text-high !important;
+    color: $cyber-on-neon !important;
   }
 }

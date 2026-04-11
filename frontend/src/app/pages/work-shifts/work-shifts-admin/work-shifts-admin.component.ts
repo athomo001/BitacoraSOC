@@ -1,7 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, FormsModule, Validators } from '@angular/forms';
-import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule } from '@angular/material/table';
@@ -33,7 +32,6 @@ import { isShiftActiveNow } from '../../../utils/shift-time.util';
     CommonModule,
     ReactiveFormsModule,
     FormsModule,
-    MatCardModule,
     MatButtonModule,
     MatIconModule,
     MatTableModule,

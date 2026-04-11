@@ -5,11 +5,11 @@
   <mat-tab-group class="catalog-tabs" [(selectedIndex)]="activeTabIndex">
     <mat-tab label="Eventos">
       <div class="tab-content">
-        <mat-card class="form-card">
-          <mat-card-header>
-            <mat-card-title>{{ editingEventId ? 'Editar Evento' : 'Nuevo Evento' }}</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
+        <section class="catalog-panel form-card">
+          <header class="catalog-panel__header">
+            <h2 class="catalog-panel__title">{{ editingEventId ? 'Editar Evento' : 'Nuevo Evento' }}</h2>
+          </header>
+          <div class="catalog-panel__body">
             <form [formGroup]="eventForm" (ngSubmit)="saveEvent()">
               <mat-form-field appearance="outline" class="full-width">
                 <mat-label>Nombre *</mat-label>
@@ -44,19 +44,19 @@
                 </button>
               </div>
             </form>
-          </mat-card-content>
-        </mat-card>
+          </div>
+        </section>
 
-        <mat-card class="list-card">
-          <mat-card-header class="events-header">
-            <mat-card-title>Eventos ({{ eventTotal }})</mat-card-title>
+        <section class="catalog-panel list-card">
+          <header class="catalog-panel__header events-header">
+            <h2 class="catalog-panel__title">Eventos ({{ eventTotal }})</h2>
             <mat-form-field appearance="outline" class="events-search-field">
               <mat-label>Buscar eventos...</mat-label>
               <mat-icon matPrefix>search</mat-icon>
               <input matInput [formControl]="eventSearchControl" placeholder="Buscar por nombre, categoría o motivo">
             </mat-form-field>
-          </mat-card-header>
-          <mat-card-content>
+          </header>
+          <div class="catalog-panel__body">
             <div class="table-container">
               <table class="catalog-table">
                 <thead>
@@ -90,18 +90,18 @@
             <mat-paginator [length]="eventTotal" [pageSize]="eventPageSize" [pageIndex]="eventPage - 1"
               [pageSizeOptions]="[10, 25, 50, 100]" (page)="onEventPageChange($event)" showFirstLastButtons>
             </mat-paginator>
-          </mat-card-content>
-        </mat-card>
+          </div>
+        </section>
       </div>
     </mat-tab>
 
     <mat-tab label="Log Sources / Clientes">
       <div class="tab-content">
-        <mat-card class="form-card">
-          <mat-card-header>
-            <mat-card-title>{{ editingLogSourceId ? 'Editar Log Source' : 'Nuevo Log Source' }}</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
+        <section class="catalog-panel form-card">
+          <header class="catalog-panel__header">
+            <h2 class="catalog-panel__title">{{ editingLogSourceId ? 'Editar Log Source' : 'Nuevo Log Source' }}</h2>
+          </header>
+          <div class="catalog-panel__body">
             <form [formGroup]="logSourceForm" (ngSubmit)="saveLogSource()">
               <mat-form-field appearance="outline" class="full-width">
                 <mat-label>Nombre *</mat-label>
@@ -126,14 +126,14 @@
                 </button>
               </div>
             </form>
-          </mat-card-content>
-        </mat-card>
+          </div>
+        </section>
 
-        <mat-card class="list-card">
-          <mat-card-header>
-            <mat-card-title>Log Sources Activos ({{ activeLogSources.length }})</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
+        <section class="catalog-panel list-card">
+          <header class="catalog-panel__header">
+            <h2 class="catalog-panel__title">Log Sources Activos ({{ activeLogSources.length }})</h2>
+          </header>
+          <div class="catalog-panel__body">
             <div class="table-container">
               <table class="catalog-table">
                 <thead>
@@ -164,14 +164,14 @@
                 </tbody>
               </table>
             </div>
-          </mat-card-content>
-        </mat-card>
+          </div>
+        </section>
 
-        <mat-card class="list-card inactive-list-card" *ngIf="inactiveLogSources.length > 0">
-          <mat-card-header>
-            <mat-card-title>Log Sources Inactivos ({{ inactiveLogSources.length }})</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
+        <section class="catalog-panel list-card inactive-list-card" *ngIf="inactiveLogSources.length > 0">
+          <header class="catalog-panel__header">
+            <h2 class="catalog-panel__title">Log Sources Inactivos ({{ inactiveLogSources.length }})</h2>
+          </header>
+          <div class="catalog-panel__body">
             <div class="table-container">
               <table class="catalog-table disabled-table">
                 <thead>
@@ -199,22 +199,22 @@
                 </tbody>
               </table>
             </div>
-          </mat-card-content>
-        </mat-card>
+          </div>
+        </section>
       </div>
     </mat-tab>
 
     <mat-tab label="Alertas y Mantenimientos">
       <div class="tab-content">
-        <mat-card class="form-card">
-          <mat-card-header>
-            <mat-card-title>
+        <section class="catalog-panel form-card">
+          <header class="catalog-panel__header">
+            <h2 class="catalog-panel__title">
               {{ editingClientAlertRuleId ? 'Editar Regla' : 'Nueva Regla' }}
               <span class="rule-type-subtitle" *ngIf="clientAlertRuleForm.get('ruleType')?.value === 'scheduled_maintenance'"> — Mantenimiento Programado</span>
               <span class="rule-type-subtitle" *ngIf="clientAlertRuleForm.get('ruleType')?.value !== 'scheduled_maintenance'"> — Alerta Especial</span>
-            </mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
+            </h2>
+          </header>
+          <div class="catalog-panel__body">
             <form [formGroup]="clientAlertRuleForm" (ngSubmit)="saveClientAlertRule()">
 
               <mat-form-field appearance="outline" class="full-width">
@@ -371,14 +371,14 @@
                 </button>
               </div>
             </form>
-          </mat-card-content>
-        </mat-card>
+          </div>
+        </section>
 
-        <mat-card class="list-card">
-          <mat-card-header>
-            <mat-card-title>Reglas de alerta y mantenimiento ({{ clientAlertRules.length }})</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
+        <section class="catalog-panel list-card">
+          <header class="catalog-panel__header">
+            <h2 class="catalog-panel__title">Reglas de alerta y mantenimiento ({{ clientAlertRules.length }})</h2>
+          </header>
+          <div class="catalog-panel__body">
             <div class="table-container">
               <table class="catalog-table">
                 <thead>
@@ -419,18 +419,18 @@
                 </tbody>
               </table>
             </div>
-          </mat-card-content>
-        </mat-card>
+          </div>
+        </section>
       </div>
     </mat-tab>
 
     <mat-tab label="Tipos de Operacion">
       <div class="tab-content compact-tab-content">
-        <mat-card class="form-card">
-          <mat-card-header>
-            <mat-card-title>{{ editingOperationTypeId ? 'Editar Tipo' : 'Nuevo Tipo de Operacion' }}</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
+        <section class="catalog-panel form-card">
+          <header class="catalog-panel__header">
+            <h2 class="catalog-panel__title">{{ editingOperationTypeId ? 'Editar Tipo' : 'Nuevo Tipo de Operacion' }}</h2>
+          </header>
+          <div class="catalog-panel__body">
             <form [formGroup]="operationTypeForm" (ngSubmit)="saveOperationType()" class="compact-form-grid">
               <mat-form-field appearance="outline" class="compact-field">
                 <mat-label>Nombre *</mat-label>
@@ -456,14 +456,14 @@
                 </button>
               </div>
             </form>
-          </mat-card-content>
-        </mat-card>
+          </div>
+        </section>
 
-        <mat-card class="list-card">
-          <mat-card-header>
-            <mat-card-title>Tipos de operacion ({{ operationTypes.length }})</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
+        <section class="catalog-panel list-card">
+          <header class="catalog-panel__header">
+            <h2 class="catalog-panel__title">Tipos de operacion ({{ operationTypes.length }})</h2>
+          </header>
+          <div class="catalog-panel__body">
             <div class="table-container">
               <table class="catalog-table">
                 <thead>
@@ -495,14 +495,14 @@
                 </tbody>
               </table>
             </div>
-          </mat-card-content>
-        </mat-card>
+          </div>
+        </section>
 
-        <mat-card class="form-card compact-color-card">
-          <mat-card-header>
-            <mat-card-title>Colores de Reportería</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
+        <section class="catalog-panel form-card compact-color-card">
+          <header class="catalog-panel__header">
+            <h2 class="catalog-panel__title">Colores de Reportería</h2>
+          </header>
+          <div class="catalog-panel__body">
             <p class="report-color-legend">
               Esta configuración aplica a la creación de reportes y boletines de seguridad.
             </p>
@@ -553,8 +553,8 @@
                 (click)="selectCustomReportColor(color)">
               </button>
             </div>
-          </mat-card-content>
-        </mat-card>
+          </div>
+        </section>
       </div>
     </mat-tab>
   </mat-tab-group>

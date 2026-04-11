@@ -1,11 +1,11 @@
 <div class="container">
-  <mat-card class="page-header">
+  <header class="page-header">
     <h1>⚡ Escalación y Turnos</h1>
     <p>Vista simplificada de contactos y turnos de la semana</p>
-  </mat-card>
+  </header>
 
   <!-- SECCIÓN 1: TURNOS DE LA SEMANA (Interno) -->
-  <mat-card class="section-card">
+  <section class="section-card">
     <div class="week-header">
       <h2>👥 Turnos de esta Semana</h2>
       <div class="week-navigation">
@@ -95,10 +95,10 @@
         </div>
       </div>
     </div>
-  </mat-card>
+  </section>
 
   <!-- SECCIÓN 2: TABLA DE ESCALAMIENTO -->
-  <mat-card class="section-card">
+  <section class="section-card">
     <h2>📋 Contactos de Escalamiento</h2>
     <p class="subtitle">Lista de contactos por servicio</p>
 
@@ -168,10 +168,10 @@
       <mat-icon>warning</mat-icon>
       <p>No hay datos de escalamiento disponibles</p>
     </div>
-  </mat-card>
+  </section>
 
   <!-- SECCIÓN 3: RACI POR CLIENTE -->
-  <mat-card class="section-card" *ngIf="!loading">
+  <section class="section-card" *ngIf="!loading">
     <h2>📋 RACI</h2>
     <p class="subtitle">Matriz de responsabilidades por cliente</p>
 
@@ -265,10 +265,10 @@
       <mat-icon>info</mat-icon>
       <p>Selecciona un cliente para ver la matriz RACI</p>
     </div>
-  </mat-card>
+  </section>
 
   <!-- Contactos sin servicio asignado (global) -->
-  <mat-card class="section-card" *ngIf="!loading && unassignedContacts.length > 0">
+  <section class="section-card" *ngIf="!loading && unassignedContacts.length > 0">
     <h2>📋 Contactos sin servicio asignado</h2>
     <p class="subtitle">Asigna estos contactos a un servicio desde el administrador.</p>
     <div class="service-section">
@@ -308,10 +308,10 @@
         </tbody>
       </table>
     </div>
-  </mat-card>
+  </section>
 
   <!-- ── ESC-MAINT-042: Gestión de Mantenimientos Programados ── -->
-  <mat-card class="section-card maintenance-section">
+  <section class="section-card maintenance-section">
     <div class="maintenance-header">
       <h2>🔧 Mantenimientos Programados</h2>
       <button mat-raised-button color="primary" (click)="openMaintenanceForm(null)">
@@ -344,14 +344,12 @@
             <td>{{ rule.validFrom ? (rule.validFrom | date:'dd/MM/yyyy HH:mm') : 'Sin límite' }}</td>
             <td>{{ rule.validTo ? (rule.validTo | date:'dd/MM/yyyy HH:mm') : 'Sin límite' }}</td>
             <td>
-              <span class="badge" [class.badge-danger]="rule.blocking" [class.badge-neutral]="!rule.blocking">
-                {{ rule.blocking ? 'Sí' : 'No' }}
-              </span>
+              <span *ngIf="rule.blocking" class="badge-pill badge-surface-error">Sí</span>
+              <span *ngIf="!rule.blocking" class="badge-pill badge-surface-neutral">No</span>
             </td>
             <td>
-              <span class="badge" [class.badge-active]="rule.enabled" [class.badge-inactive]="!rule.enabled">
-                {{ rule.enabled ? 'Activo' : 'Inactivo' }}
-              </span>
+              <span *ngIf="rule.enabled" class="badge-pill badge-surface-success">Activo</span>
+              <span *ngIf="!rule.enabled" class="badge-pill badge-pill-muted">Inactivo</span>
             </td>
             <td class="cell-actions">
               <button mat-icon-button color="primary" (click)="openMaintenanceForm(rule)" matTooltip="Editar">
@@ -409,5 +407,5 @@
         </div>
       </form>
     </div>
-  </mat-card>
+  </section>
 </div>

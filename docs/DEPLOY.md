@@ -7,8 +7,8 @@
 
 ## 1. Requisitos Previos
 
-* **Docker Desktop** o **Docker Engine** (con plugin Compose).
-* **Git** instalado.
+- **Docker Desktop** o **Docker Engine** (con plugin Compose).
+- **Git** instalado.
 
 ---
 
@@ -52,7 +52,9 @@ docker compose exec backend node src/scripts/seed.js
 Para mantener la Bitácora actualizada obteniendo los últimos cambios de la rama principal (`main`).
 
 ### Actualización Normal (Recomendada)
+
 Descarga los cambios y recompila solo las capas de caché afectadas.
+
 ```bash
 git pull origin main
 docker compose build --no-cache
@@ -60,7 +62,9 @@ docker compose up -d
 ```
 
 ### Reconstrucción Forzada (Clean Recreate)
+
 Si hay cambios estructurales complejos o problemas de caché adherida.
+
 ```bash
 git pull origin main
 docker compose build --no-cache
@@ -68,16 +72,18 @@ docker compose up -d --force-recreate
 ```
 
 ### Automatización Integrada (Versionado Git)
+
 Si cuentas con Bash o PowerShell, puedes utilizar los scripts nativos adjuntos, los cuales inyectan la variable `APP_VERSION` basada en los últimos commits de Git (ej: `v1.2.3-5-gabc1234`) y la visibiliza en la plataforma.
 
 Los scripts de esta carpeta ya incluyen el overlay `docker-compose.complements.yml`, pensado hoy para laboratorio/QA con `complement-stub`.
 
-* **Windows:** `.\scripts\compose-rebuild.ps1`
-* **Linux/Mac:** `sh ./scripts/compose-rebuild.sh`
-* **Windows (solo levantar):** `.\scripts\compose-up.ps1`
-* **Linux/Mac (solo levantar):** `sh ./scripts/compose-up.sh`
+- **Windows:** `.\scripts\compose-rebuild.ps1`
+- **Linux/Mac:** `sh ./scripts/compose-rebuild.sh`
+- **Windows (solo levantar):** `.\scripts\compose-up.ps1`
+- **Linux/Mac (solo levantar):** `sh ./scripts/compose-up.sh`
 
 ### Inyección de Datos Semilla (Posterior a Actualización)
+
 Si en las notas de la nueva versión se han agregado nuevos catálogos base, configuraciones o roles por defecto, es recomendable volver a ejecutar el comando de "siembra" para inyectar estos datos en la base de datos sin afectar tu data existente:
 
 ```bash
@@ -143,17 +149,17 @@ docker compose -f docker-compose.yml -f docker-compose.complements.yml up -d --b
 
 Uso recomendado de este overlay:
 
-* laboratorio local
-* QA del `complement-stub`
-* pruebas de circuit breaker y health-check
+- laboratorio local
+- QA del `complement-stub`
+- pruebas de circuit breaker y health-check
 
 Aclaraciones:
 
-* no existe ya `docker-compose.test.yml`
-* el backend participa en `bitacora-network` y `bitacora-complements`
-* el frontend permanece solo en `bitacora-network`
-* MongoDB permanece en la red principal
-* los complementos ZIP publicados por la plataforma no necesitan este overlay
+- no existe ya `docker-compose.test.yml`
+- el backend participa en `bitacora-network` y `bitacora-complements`
+- el frontend permanece solo en `bitacora-network`
+- MongoDB permanece en la red principal
+- los complementos ZIP publicados por la plataforma no necesitan este overlay
 
 ---
 
@@ -163,6 +169,7 @@ Bitácora SOC soporta inyección dinámica TLS directamente desde la Base de Dat
 Los certificados son almacenados internamente bajo un volumen Docker estricto en `.data/tls` (montado en `/app/secrets`).
 
 ### Instalación de Certificados Reales
+
 1. Entrar a la plataforma web como Administrador.
 2. Navegar a **Configuración > HTTPS / Seguridad**.
 3. Seleccionar los archivos `.crt` (Certificado) y `.key` (Llave Privada).
@@ -170,15 +177,17 @@ Los certificados son almacenados internamente bajo un volumen Docker estricto en
 5. Apretar **"Subir SSL y Activar (0-Downtime)"**.
 6. El backend levantará HTTPS inmediatamente. Por precaución, recarga el backend: `docker compose restart backend`.
 7. Si todo opera de forma estable, puedes **Forzar HTTPS** desde la consola para redireccionar el tráfico de forma permanente.
-   > **Importante:** Actualiza el `.env` => `ALLOWED_ORIGINS=https://DOMINIO` antes de forzar, para prevenir auto-bloqueos CORS.
+  > **Importante:** Actualiza el `.env` => `ALLOWED_ORIGINS=https://DOMINIO` antes de forzar, para prevenir auto-bloqueos CORS.
 
 ### Cómo probar TLS local (Certificados Autofirmados)
+
 ```bash
 # 1. Generar llaves locales autofirmadas
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout local.key -out local.crt -subj "/CN=localhost"
 ```
-2. Sube ambos archivos en la consola local y pulsa activar.
-3. Node activará su motor criptográfico al vuelo. Verifica accediendo a `https://localhost:3443/health`.
+
+1. Sube ambos archivos en la consola local y pulsa activar.
+2. Node activará su motor criptográfico al vuelo. Verifica accediendo a `https://localhost:3443/health`.
 
 ---
 
@@ -187,6 +196,7 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout local.key -out local
 > **Requisitos:** Node.js 24+ LTS, MongoDB 8+, Express 5.1+.
 
 ### 6.1 Backend
+
 ```bash
 cd backend
 cp .env.example .env
@@ -200,6 +210,7 @@ npm run restart:clean   # Libera forzosamente puertos zombies 3000/3443 en caso 
 ```
 
 ### 6.2 Frontend
+
 ```bash
 cd frontend
 npm install
@@ -218,6 +229,7 @@ npm start               # Levanta UI proxy en http://localhost:4200
 ### Backups Funcionales (Archivos Crudos)
 
 **Resguardar Archivos de la Base de Datos (MongoDump):**
+
 ```bash
 docker compose exec mongodb mongodump \
   --uri="mongodb://admin:${MONGO_ROOT_PASSWORD}@localhost/bitacora_soc?authSource=admin" \
@@ -254,17 +266,18 @@ Windows:
 
 Estos scripts:
 
-* crean dump lógico de todas las bases del servidor MongoDB
-* guardan copia de `.env` como respaldo separado
-* empaquetan `uploads`, `tls` y `backups`
-* renuevan `mongodb_data` y `mongodb_config` antes del restore
-* levantan el stack completo al finalizar la restauración
+- crean dump lógico de todas las bases del servidor MongoDB
+- guardan copia de `.env` como respaldo separado
+- empaquetan `uploads`, `tls` y `backups`
+- renuevan `mongodb_data` y `mongodb_config` antes del restore
+- levantan el stack completo al finalizar la restauración
 
 Nota: el restore deja `.env.from-mongo8-backup` como copia de referencia y no sobreescribe `.env` automáticamente.
 Nota: al respaldar y restaurar todas las bases, este flujo también cubre bases privadas de complementos alojadas en el mismo Mongo.
 Nota: los scripts resuelven el servicio `mongodb` usando el `docker compose` de este repositorio, no un contenedor Mongo cualquiera del host.
 
 **Resguardar Subidas Estáticas (Logos, Evidencias):**
+
 ```bash
 docker run --rm -v bitacorasoc_backend_uploads:/source \
   -v $(pwd)/backups:/backup alpine \
@@ -272,6 +285,7 @@ docker run --rm -v bitacorasoc_backend_uploads:/source \
 ```
 
 ### Restauración vía API (ZIP Integrado)
+
 Si activaste la tarea automática de Backup en el panel, se grabarán respaldos completos `.zip` en `.data/backups/`. Para restaurar alguno:
 
 ```powershell
@@ -285,6 +299,7 @@ curl -X POST http://TU_IP:3000/api/backup/restore \
 Compatibilidad: el restore sigue aceptando `.json` legacy cuando existan respaldos antiguos.
 
 ### Herramientas de Ingesta (CSV)
+
 ```bash
 # Transformar CSV legacy en JSON local
 node backend/scripts/csv-to-json-entries.js ruta_origen.csv salida.json
@@ -298,8 +313,10 @@ node backend/scripts/import-entries.js salida.json <username_que_creara_las_entr
 ## 8. Troubleshooting (Solución de Conflictos)
 
 ### Error de Permisos EACCES (Carpetas de volumen)
+
 **Síntoma:** El Backend se reinicia constantemente diciendo `EACCES: permission denied, mkdir '/app/backups/temp'`
 **Solución:** Los directorios del *host* carecen de validación de permisos requerida por el usuario no-raíz del contenedor.
+
 ```bash
 sudo chown -R 1001:1001 .data/backups .data/uploads .data/logs
 sudo chmod -R ug+rwX .data/backups .data/uploads .data/logs
@@ -308,10 +325,13 @@ docker compose up -d --build
 ```
 
 ### Contenedores "Unhealthy" a pesar de Pings
+
 **Solución:** Existen topologías en Linux donde `localhost` colisiona resolviendo directamente en IPv6 (`::1`). Edita los `Dockerfile` de front y back y re-apunta los cURL de Healthcheck hacia `127.0.0.1`.
 
 ### No puedo ingresar, dejé la contraseña del Admin perdida
+
 **Solución:** Borra el usuario directamente en la base de datos en caliente y vuélvelo a inicializar:
+
 ```bash
 # Eliminar admin
 docker compose exec backend node -e "const mongoose=require('mongoose'); const User=require('./src/models/User'); mongoose.connect(process.env.MONGODB_URI).then(async()=>{ await User.deleteOne({username:'admin'}); console.log('Usuario admin borrado'); process.exit(0); })"
@@ -321,8 +341,10 @@ docker compose exec backend node src/scripts/seed.js
 ```
 
 ### Frontend en Blanco / Error NGINX
+
 **Síntoma:** Docker Compose dice que frontend está "Running", pero el puerto 80 web no muestra nada o tira 404/502.
 **Acciones:**
+
 ```bash
 docker compose logs -f frontend                                  # Analizar salidas en rojo
 docker compose exec frontend ls -la /usr/share/nginx/html      # Verificar si existe compilador
@@ -330,8 +352,10 @@ docker compose exec frontend nginx -t                            # Verificar int
 ```
 
 ### Corrección Masiva (Clientes sin asignar)
+
 **Síntoma:** Tras actualizar versiones, las entradas web viejas carecen de campo `clientId`.
 **Solución:** Asignar un "LogSource por defecto" en la interfaz de configuración del Sistema y correr paridad de rescate:
+
 ```bash
 # Logueo directo en la consola MongoDB
 docker exec -it bitacora-mongodb mongosh --username admin --authenticationDatabase admin
@@ -341,3 +365,4 @@ db = db.getSiblingDB("bitacora_soc");
 const source = db.catalog_log_sources.findOne({ _id: db.appconfigs.findOne({}).defaultLogSourceId });
 if(source) db.entries.updateMany({ clientId: null }, { $set: { clientId: source._id, clientName: source.name } });
 ```
+

@@ -1,19 +1,19 @@
 <div class="audit-logs-container">
-  <mat-card #auditGuideCard class="filter-card" *ngIf="auditGuideVisible">
-    <mat-card-content>
+  <div #auditGuideCard class="audit-panel audit-panel--guide" *ngIf="auditGuideVisible">
+    <div class="audit-panel__body">
       <p><strong>Guía rápida Auditoría:</strong> usa filtros para acotar eventos, luego exporta en CSV/JSON por cantidad, días, meses o todo.</p>
       <div class="filter-actions">
         <button mat-button type="button" (click)="closeAuditGuide(false)">Cerrar</button>
         <button mat-stroked-button color="primary" type="button" (click)="closeAuditGuide(true)">No volver a mostrar</button>
       </div>
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </div>
 
-  <mat-card class="filter-card">
-    <mat-card-header>
-      <mat-card-title>🔍 Filtros de Auditoría</mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
+  <div class="audit-panel audit-panel--filters filter-card">
+    <header class="audit-panel__header">
+      <h2 class="audit-panel__title">🔍 Filtros de Auditoría</h2>
+    </header>
+    <div class="audit-panel__body">
       <form [formGroup]="filterForm" (ngSubmit)="onSearch()" class="filter-form">
         <div class="filter-row">
           <mat-form-field appearance="outline">
@@ -110,14 +110,14 @@
           </div>
         </div>
       </form>
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </div>
 
-  <mat-card class="results-card">
-    <mat-card-header>
-      <mat-card-title>📋 Logs de Auditoría ({{ totalLogs }} registros)</mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
+  <div class="audit-panel audit-panel--results results-card">
+    <header class="audit-panel__header">
+      <h2 class="audit-panel__title">📋 Logs de Auditoría ({{ totalLogs }} registros)</h2>
+    </header>
+    <div class="audit-panel__body audit-panel__body--flush">
       <table mat-table [dataSource]="logs" class="audit-table">
         <ng-container matColumnDef="timestamp">
           <th mat-header-cell *matHeaderCellDef>Fecha/Hora</th>
@@ -175,6 +175,6 @@
         (page)="onPageChange($event)"
         showFirstLastButtons>
       </mat-paginator>
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </div>
 </div>

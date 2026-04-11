@@ -2,6 +2,197 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.43-beta] - 2026-04-10
+
+### Resumen de alcance
+
+Oleada **integral UI + gobernanza documental**: del orden de **~80 archivos** y **~2.4k líneas añadidas / ~1.5k eliminadas** en el árbol de trabajo (migración masiva de contenedores `mat-card` a paneles semánticos con tokens, refuerzo de `styles.scss`, tablas de control en `ISSUES.md` y paquete de guías QA/WCAG). Esta entrada consolida **todo** lo incluido en esa oleada, no solo un subconjunto.
+
+### Backend
+
+- **`package.json`:** `npm test` ejecuta `jest --passWithNoTests` para que el pipeline no falle mientras no existan `*.spec.js` / `__tests__` (hoy **0 tests**; el comando refleja “OK sin suites” en lugar de exit 1).
+
+### Documentación y tablas de control
+
+- **`docs/ISSUES.md`:** cierre en tabla **Listas** de **`UI-CHK-044` … `UI-MIG-060`**; sección **En progreso** reducida a **marcador** (“sin `UI-*` abiertos”) con reglas de uso; **Recurrente** con **QA-UI-061**–**065** (obligaciones por PR); leyenda de estados; nota de **alcance de seguimiento** (epic `AI-SUMMARY-*` como archivo, fuera de priorización operativa); narrativa **[UI/UX]** y bloque largo **UI-CHK-044** alineados a **Listo**; filas de **mejora continua** enlazadas a §9 y handoff WCAG.
+- **`docs/UI-GOVERNANCE.md`:** guía operativa publicada (tokens, layout, densidad, **§6** baseline visual, **§7** contraste/WCAG, **§8** checklist **QA-UI-061**–**065**, **§9** métricas `rg`); cabecera y **§2** con cierre 2026-04-10 y referencia a **Recurrente**; secciones con títulos “regla viva; antes UI-XXX”.
+- **`docs/wcag-audit-handoff.md`:** ritmo de ejecución WCAG 2.1 AA por PR/release (rutas §6, axe/Lighthouse, registro en PR); alineado con **UI-A11Y-050** y **UI-QA-059**.
+- **`docs/ui-baselines/README.md`:** convención opcional de capturas por ruta/tema y criterio de OK (coherente con **QA-UI-062** / **QA-UI-065**).
+
+### Estilos globales (`frontend`)
+
+- **`src/styles.scss`:** incorporación de **`@use 'styles/semantic-tokens'`**; ampliación de variables por tema (`[data-theme="…"]`), utilidades y overrides coherentes con la migración a paneles (incl. formularios, tablas, estados, CRT/login donde aplica).
+- **`src/styles/semantic-tokens.scss`:** archivo dedicado a **tokens semánticos** (escala `--space-*`, `--radius-*`, tipografía semántica, `--surface-card`, `--outline-subtle`, etc.) por tema, con referencias cruzadas a `ISSUES.md` y `UI-GOVERNANCE.md`.
+
+### Checklist administración (`/main/admin/checklist`)
+
+- Navegación tipo **asistente** (pasos 1–3) con **`scrollIntoView`** suave hacia `#checklist-step-config`, `#checklist-step-reminders`, `#checklist-step-templates`.
+- **Una sola** acción primaria de guardado en el editor de plantillas: barra **“Guardar plantilla”**; eliminado el segundo **`type="submit"`** duplicado en el pie; texto guía **`.form-actions__hint`**.
+- Estilos **`.checklist-wizard-nav`**, refinamiento de **`.admin-panel`** / layout responsive (incl. recordatorios en móvil).
+
+### Sustitución de `mat-card` por paneles semánticos (inventario de pantallas tocadas)
+
+Patrón recurrente: `section` / `header` / cuerpo con clases tipo **`*-panel`**, tokens `--surface-card`, `--outline-subtle`, `--radius-md`, `--space-*`, y eliminación de imports **`MatCard*`** / **`MatCardModule`** donde dejaron de usarse.
+
+| Área | Componentes / notas |
+| --- | --- |
+| **Auth** | `forgot-password`, `reset-password` (estructura alineada; CRT vía `styles.scss` / `.reset-card` donde corresponde). |
+| **Login** | `login.component.scss`, `login-infoflow.scss` (CRT / flujo info). |
+| **Principal** | `settings`, `integrations`, `users`, `entries`, `profile`, `audit-logs`, `backup`, `catalog-admin`, `all-entries`, `reports`, `report-generator`, `checklist` (operador), `glpi-integration`, `logo` (branding), `admin-appearance`, `admin-security`, `admin-complements` (TS/HTML/SCSS según ruta). |
+| **Checklist admin** | `checklist-admin` (paneles + asistente + guardado único, ver arriba). |
+| **Escalación** | `escalation-simple`, `escalation-admin-simple`, `escalation-admin`, `escalation-view`; **`escalation.module.ts`** sin `MatCardModule` si ya no se usa en plantillas activas. |
+| **Turnos** | `work-shifts-admin`. |
+| **Layout / shell** | `main-layout.component.scss` (ajustes de contenedor/superficies); **`main.module.ts`** sin import global de `MatCardModule` cuando ningún hijo lo requiere. |
+| **Widgets** | `current-shift.component.ts` (panel/tokens; menos hex sueltos en detalles). |
+
+### QA / verificación
+
+- **Manual:** cumplir **QA-UI-061**–**065** y tabla **§6** de `UI-GOVERNANCE.md` en PRs que toquen UI.
+- **Build:** validado **`npx ng build --configuration=production`** en `frontend` para esta oleada.
+- **Automatizado:** backend `npm test` → exit 0 con `passWithNoTests`; frontend **`npm test` (`ng test`)** sigue **sin target** en `angular.json` (solo `build`/`serve`) — pendiente configurar runner si se desea gate en CI.
+
+---
+
+## [v1.5.42-beta] - 2026-04-10
+
+### Oleada 11: sin `mat-card` en rutas operativas restantes — UI-ARCH-045 / UI-LAYOUT-053
+
+- **`reports`:** `.reports-panel` + cabeceras/cuerpos semánticos; KPIs y gráficos sin `MatCard*`.
+- **`all-entries`:** `.all-entries-panel` (búsqueda + resultados con toolbar).
+- **`catalog-admin`:** `.catalog-panel` (`section` / `header` / `h2` / cuerpo); imports `MatCard*` eliminados del componente.
+- **`checklist` (operador):** `.checklist-panel`; `#checklistGuideCard` sigue en `section`.
+- **`glpi-integration`:** `.glpi-panel`.
+- **`escalation-simple`:** `section.section-card` con tokens; **`escalation-admin-simple`:** `mat-card` → `section` en formularios; **`escalation.module`:** sin `MatCardModule`.
+- **`admin-complements`:** `section.complements-panel`; **`current-shift`:** panel con tokens (menos hex sueltos en detalles).
+- **Legado (no en rutas activas):** `escalation-view`, `escalation-admin` — mismos patrones por consistencia.
+- **`main.module.ts`:** eliminado `MatCardModule` (ningún template principal usa `mat-card`).
+
+Documentación: `docs/ISSUES.md`, `docs/UI-GOVERNANCE.md` §2 y §9 (oleada 11).
+
+---
+
+## [v1.5.41-beta] - 2026-04-10
+
+### Tablas de control en `ISSUES.md`: En progreso vs Recurrente vs Archivo IA
+
+- **`docs/ISSUES.md`:** leyenda de estados; backlog no-IA pasa a **En progreso** (entrega parcial en repo); `QA-UI-061`–`065` en **Recurrente**; epic `AI-SUMMARY-*` en **Archivo IA**; lista explícita del siguiente ataque (rutas con `mat-card` + MAT/COLOR/WCAG).
+- **`docs/UI-GOVERNANCE.md`:** §2 duplica **En progreso** y **Recurrente** por separado; fuentes de verdad y pie de página actualizados.
+
+---
+
+## [v1.5.40-beta] - 2026-04-10
+
+### Backup y Branding sin `mat-card` — UI-ARCH-045 / UI-LAYOUT-053
+
+- **`backup`:** paneles `.backup-panel` (config automática, estado anidado, grid CSV/BD/import/purge, historial con tabla); tokens de superficie/borde; `danger-card` mantiene borde semántico en el panel.
+- **`logo` (Branding):** ocho bloques como `.logo-panel.logo-card` con cabecera y cuerpo tokenizados.
+
+---
+
+## [v1.5.39-beta] - 2026-04-10
+
+### Más pantallas sin `mat-card` raíz (backlog no-IA) — UI-ARCH-045 / UI-LAYOUT-053
+
+Reemplazo de contenedores `mat-card` por paneles con tokens (`--surface-card`, `--outline-subtle`, `--radius-md`, `--space-*`) y cabeceras semánticas donde aplicaba:
+
+- **Configuración:** `settings` (general + SMTP), `integrations` (ambos bloques), `users` (formulario + tabla).
+- **Principal:** `entries` (formulario nueva entrada), `profile` (datos + contraseña), `audit-logs` (guía, filtros, resultados).
+- **Turnos:** `work-shifts-admin` (formulario y bloque tabla/asignación/reenvío).
+- **Auth:** `forgot-password`, `reset-password` (misma clase `.reset-card` para overrides CRT en `styles.scss`).
+
+Se eliminaron imports `MatCard*` / `MatCardModule` asociados en cada componente.
+
+**Pendiente de alcance en esta versión:** `reports`, `catalog-admin`, `checklist` (operador), `escalation-*`, `glpi-integration`, `all-entries` — siguen con `mat-card` donde aún no se migró (`backup`/`logo` cerrados en v1.5.40-beta).
+
+---
+
+## [v1.5.38-beta] - 2026-04-10
+
+### Alcance de backlog: epic IA fuera de seguimiento operativo
+
+- **`docs/ISSUES.md`:** nota **Alcance de seguimiento** bajo *Tablas de Control*: `AI-SUMMARY-001`…`001G` solo como referencia; no entran en priorización UI/QA ni en métricas por oleada (`UI-MIG-060`). Sección narrativa [UI/UX] alineada (excluye epic IA del “trabajo restante” medido).
+- **`docs/UI-GOVERNANCE.md`:** cabecera y §2 aclaran que el epic IA no se prioriza en esta guía ni en oleadas; **lo demás** del backlog §2 sí.
+
+---
+
+## [v1.5.37-beta] - 2026-04-10
+
+### Admin sin `mat-card` raíz (seguridad / apariencia) — UI-ARCH-045 / UI-LAYOUT-053
+
+- **`admin-security`:** panel `.security-panel` + cabecera y cuerpo con tokens (`--surface-card`, `--radius-md`, etc.); sin `MatCard*`.
+- **`admin-appearance`:** contenedor `.appearance-admin` + `.appearance-panel`; espaciados con `--space-*` donde aplica.
+
+### Login CRT: variables SCSS para neón / error / texto — UI-LOGIN-055 / UI-COLOR-049
+
+- **`login.component.scss`:** `$crt-neon`, `$crt-danger`; literales `#ffffff` / `#00ff99` / `#ff3366` sustituidos por variables; `.session-info` con un solo `color` (`$crt-green`).
+
+---
+
+## [v1.5.36-beta] - 2026-04-10
+
+### Report generator sin `mat-card` raíz; recordatorios móvil tipo tarjeta — UI-ARCH-045 / UI-CHK-044
+
+- **`report-generator`:** contenedor `.report-generator-panel` + cabecera semántica y cuerpo `.report-generator-body` (tokens alineados con checklist); eliminados imports `MatCard*`.
+- **`checklist-admin`:** tabla de recordatorios con `data-label`, `.reminder-table--stack-narrow` y `.reminders-table-wrap` para vista apilada en viewport ≤ 640px (sin depender solo de scroll horizontal).
+
+### Documentación — UI-QA-059, UI-MIG-060, UI-A11Y-050, §6 guía
+
+- **`docs/ui-baselines/README.md`:** convención opcional de capturas y enlace a la tabla de rutas/temas.
+- **`docs/UI-GOVERNANCE.md`:** corrección de numeración (**§6** Baseline, antes duplicado como §5); **§7** pasos sugeridos de auditoría WCAG; **§9** comandos `rg` para reconteos; oleada **7** en lista; tabla **§2** y **ISSUES** alineados.
+- **`docs/ISSUES.md`:** notas actualizadas en `UI-CHK-044`, `UI-ARCH-045`, `UI-REF-051`, `UI-A11Y-050`, `UI-QA-059`, `UI-MIG-060`.
+
+---
+
+## [v1.5.35-beta] - 2026-04-10
+
+### Guía UI: backlog en §2 y QA `QA-UI-061`–`065` en §8
+
+- **`docs/UI-GOVERNANCE.md`:** Tabla **§2** con todos los pendientes UI/QA (copia operativa de `ISSUES.md`); **§8** con tabla y checklist explícitos para `QA-UI-061`–`065`; secciones **§3–§11** renumeradas (layout §4, densidad §5, baseline §6, WCAG §7, métricas §9, badges §10, inline §11).
+- **`docs/ISSUES.md`:** Referencias `§` actualizadas a la guía nueva.
+- **`semantic-tokens.scss`:** Comentario de cabecera apuntando a §2 y §8.
+
+### Cabeceras admin sin mat-card (escalamiento / turnos) — UI-ARCH-045
+
+- **`escalation-admin-simple`**, **`escalation-simple`**, **`work-shifts-admin`:** la cabecera con gradiente pasa de `<mat-card class="page-header">` a `<header class="page-header">` con padding, `border-radius` y `box-shadow` vía tokens; texto `on-primary` donde aplica el override global de `h1`/`p`.
+- **`escalation-admin-simple`:** `.raci-form` sin `!important` en `display`.
+
+### Checklist admin: paneles sin mat-card y flujo numerado (UI-CHK-044 / UI-ARCH-045)
+
+- **`checklist-admin`:** Sustitución de `mat-card` / `mat-card-content` por `.admin-panel` + `.admin-panel__body` en configuración, recordatorios y bloque plantillas/lista+editor; títulos de sección **1. / 2. / 3.**; títulos de lista/editor con `.admin-panel__title`. Menos anidación Material y misma jerarquía visual con tokens.
+- **`docs/UI-GOVERNANCE.md`:** métricas oleadas y `!important` (ahora **§9**), clases estado **§10**, excepciones inline **§11**.
+- **`docs/ISSUES.md`:** Notas actualizadas en `UI-CHK-044`, `UI-ARCH-045`, `UI-COMP-048`, `UI-REF-051`, `UI-MAT-052`, `UI-MIG-060`.
+
+---
+
+## [v1.5.34-beta] - 2026-04-10
+
+### UI/UX: guía de gobernanza y alineación honesta del backlog (`docs/ISSUES.md`)
+
+- **`docs/UI-GOVERNANCE.md`:** Guía operativa (tokens, layout admin, densidad, plantilla baseline 5 temas, WCAG/checklist, obligaciones al cambiar CSS). Cubre el entregable **UI-GOV-058**; **no** implica que el resto del epic UI esté cerrado.
+- **`docs/ISSUES.md` — corrección de estado:** Los issues `UI-CHK-044`, `UI-ARCH-045`, `UI-COMP-048`, `UI-COLOR-049`, `UI-A11Y-050`, `UI-REF-051`, `UI-MAT-052`, `UI-LAYOUT-053`, `UI-DENS-054`, `UI-LOGIN-055`, `UI-QA-059`, `UI-MIG-060` y `QA-UI-061`–`QA-UI-065` vuelven a **Pendientes** con notas **Hecho (parcial) / Falta** para reflejar el trabajo real. Permanecen en **Listas** como **Listo:** `UI-TOKEN-046`, `UI-TOKEN-047`, `UI-AUDIT-056`, `UI-HEALTH-057`, `UI-GOV-058`.
+- **Sección narrativa [UI/UX]:** Estado actualizado a **Abierto** mientras existan filas pendientes anteriores.
+- **`frontend/src/styles/semantic-tokens.scss`:** Tokens de tipografía semántica (`--font-size-*`, `--line-height-*`, `--font-weight-*`) en `:root` (UI-TOKEN-047).
+- **`frontend/src/app/pages/login/login.component.scss`:** Scanlines CRT: animación más suave y solo si `prefers-reduced-motion: no-preference` (avance **UI-LOGIN-055**, issue sigue pendiente).
+
+---
+
+## [v1.5.33-beta] - 2026-04-10
+
+### Corrección de destinatarios en Recordatorios de Turno (MAIL-REM-043)
+
+#### Backend — Scheduler de recordatorios (`shiftReminderScheduler.js`)
+
+- **Fuente de destinatarios corregida:** `WorkShiftAssignment` (la colección que escribe el botón "Vincular" en la UI) es ahora la **fuente principal** de destinatarios. Antes se sumaba al array legacy `assignedUserIds`, causando que usuarios ya desvinculados siguieran recibiendo correos e inflando el conteo.
+- **Fallback correcto:** `assignedUserIds` y `assignedUserId` (campo singular legado) solo se usan si `WorkShiftAssignment` no retorna ningún destinatario activo para el turno y día actual.
+- **Resultado:** Si se vinculan N personas vía "Vincular", el recordatorio llega exactamente a esas N personas.
+
+#### Frontend — Auditoría (`audit-logs.component.ts`)
+
+- **Bug "Para: sin destinatarios" corregido:** `resolvedRecipientsPreview` y `toMasked` se persistían en MongoDB como objetos con claves numéricas (`{"0": "...", "1": "..."}`) en vez de arrays reales. El frontend usaba `Array.isArray()` que retorna `false` para estos objetos, cayendo al texto "sin destinatarios" incluso habiendo destinatarios.
+- **Helper `toRecipientArr()`:** Nuevo helper local que normaliza cualquier valor a array: arrays reales pasan directo, objetos con claves numéricas se convierten con `Object.values()`, null/undefined retornan `[]`. Se usa tanto para `resolvedRecipientsPreview` como para el fallback `toMasked`.
+
+---
+
 ## [v1.5.32-beta] - 2026-04-10
 
 ### Mejoras en Formulario de Mantenimientos Programados (ESC-MAINT-042)

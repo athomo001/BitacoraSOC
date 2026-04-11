@@ -6,7 +6,6 @@ import { AuthService } from '../../../services/auth.service';
 import { ThemeService } from '../../../services/theme.service';
 import { Theme } from '../../../models/user.model';
 import { UserService } from '../../../services/user.service';
-import { MatCard, MatCardHeader, MatCardTitle, MatCardContent } from '@angular/material/card';
 import { MatFormField, MatLabel, MatHint } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatSelect } from '@angular/material/select';
@@ -19,7 +18,7 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
     selector: 'app-profile',
     templateUrl: './profile.component.html',
     styleUrls: ['./profile.component.scss'],
-    imports: [MatCard, MatCardHeader, MatCardTitle, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatSelect, MatOption, MatButton, NgIf, MatProgressSpinner, MatHint]
+    imports: [ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatSelect, MatOption, MatButton, NgIf, MatProgressSpinner, MatHint]
 })
 export class ProfileComponent implements OnInit {
   profileForm!: FormGroup;

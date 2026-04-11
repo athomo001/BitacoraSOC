@@ -1,16 +1,30 @@
 @use 'login-infoflow';
 
-// CRT Retro Theme Variables
-$crt-green: #00cc77;
-$crt-dark-green: #00aa55;
-$crt-text: #ffffff;
-$crt-text-strong: #ffffff;
-$crt-bg: #0a0a0a;
-$crt-grid: rgba(0, 204, 119, 0.03);
-$crt-glow: 0 0 20px rgba(0, 204, 119, 0.6), 0 0 40px rgba(0, 204, 119, 0.3);
-$crt-font: 'Courier New', monospace;
+// =============================================================================
+// CRT RETRO LOGIN THEME
+// =============================================================================
+// IMPORTANTE: El login CRT es un tema visual FIJO e independiente de los 5
+// temas principales de la app. Sus colores son hardcodeados intencionalmente
+// para reproducir la estética de un terminal monocromático verde sobre negro.
+// NO usar tokens semánticos de la app aquí (--background-color rompe el tema).
+// =============================================================================
 
-// Container
+$crt-green:      #00cc77;
+$crt-neon:       #00ff99;
+$crt-dark-green: #00aa55;
+$crt-danger:     #ff3366;
+$crt-bg:         #050e08;       // negro con tinte verde muy oscuro
+$crt-panel-bg:   #070f09;       // fondo del panel: negro casi puro
+$crt-input-bg:   #040d06;       // fondo del input: más oscuro aún
+$crt-font:       'Courier New', monospace;
+
+// Glow / grid helpers
+$crt-glow:       0 0 12px rgba(0, 204, 119, 0.7), 0 0 28px rgba(0, 204, 119, 0.35);
+$crt-glow-text:  0 0 6px rgba(0, 204, 119, 0.9), 0 0 16px rgba(0, 204, 119, 0.5);
+$crt-glow-strong:0 0 10px rgba(0, 255, 153, 1),  0 0 30px rgba(0, 204, 119, 0.8), 0 0 60px rgba(0, 204, 119, 0.4);
+
+// ─── Container ───────────────────────────────────────────────────────────────
+
 .crt-container {
   position: relative;
   display: flex;
@@ -20,191 +34,174 @@ $crt-font: 'Courier New', monospace;
   background-color: $crt-bg;
   overflow: hidden;
   font-family: $crt-font;
-  
-  // Prefers reduced motion
+
   @media (prefers-reduced-motion: reduce) {
-    * {
-      animation: none !important;
-      transition: none !important;
-    }
+    * { animation: none; transition: none; }
   }
 }
 
-// Grid background
+// ─── Grid background ─────────────────────────────────────────────────────────
+
 .crt-grid {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
   background-image:
-    linear-gradient(0deg, transparent 24%, $crt-grid 25%, $crt-grid 26%, transparent 27%, transparent 74%, $crt-grid 75%, $crt-grid 76%, transparent 77%, transparent),
-    linear-gradient(90deg, transparent 24%, $crt-grid 25%, $crt-grid 26%, transparent 27%, transparent 74%, $crt-grid 75%, $crt-grid 76%, transparent 77%, transparent);
+    linear-gradient(0deg,   transparent 24%, rgba(0,204,119,0.04) 25%, rgba(0,204,119,0.04) 26%, transparent 27%,
+                            transparent 74%, rgba(0,204,119,0.04) 75%, rgba(0,204,119,0.04) 76%, transparent 77%),
+    linear-gradient(90deg,  transparent 24%, rgba(0,204,119,0.04) 25%, rgba(0,204,119,0.04) 26%, transparent 27%,
+                            transparent 74%, rgba(0,204,119,0.04) 75%, rgba(0,204,119,0.04) 76%, transparent 77%);
   background-size: 50px 50px;
   pointer-events: none;
   z-index: 0;
 }
 
-// Scanlines overlay
+// ─── Scanlines overlay ───────────────────────────────────────────────────────
+
 .crt-scanlines {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
   background: repeating-linear-gradient(
     0deg,
-    rgba(0, 0, 0, 0.15),
-    rgba(0, 0, 0, 0.15) 1px,
+    rgba(0, 0, 0, 0.18),
+    rgba(0, 0, 0, 0.18) 1px,
     transparent 1px,
-    transparent 2px
+    transparent 3px
   );
   pointer-events: none;
   z-index: 1;
-  animation: flicker 0.15s infinite;
-}
 
-@keyframes flicker {
-  0% {
-    opacity: 0.97;
-  }
-  50% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0.97;
+  @media (prefers-reduced-motion: no-preference) {
+    animation: crt-scanline-flicker 4s ease-in-out infinite;
   }
 }
 
-// Content wrapper
+@keyframes crt-scanline-flicker {
+  0%, 100% { opacity: 1; }
+  45%       { opacity: 0.94; }
+  50%       { opacity: 0.98; }
+}
+
+// ─── Content wrapper ─────────────────────────────────────────────────────────
+
 .crt-content {
   position: relative;
   z-index: 2;
   width: 100%;
-  max-width: 500px;
-  padding: 20px;
+  max-width: 480px;
+  padding: 24px 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
-// Banner
+// ─── Banner ──────────────────────────────────────────────────────────────────
+
 .banner {
   width: 100%;
   padding: 12px 16px;
   margin-bottom: 20px;
   text-align: center;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: bold;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  border: 2px solid $crt-green;
-  box-shadow: $crt-glow, inset 0 0 20px rgba(0, 204, 119, 0.1);
+  border: 1px solid $crt-green;
+  background-color: rgba(0, 10, 5, 0.85);
+  box-shadow: $crt-glow, inset 0 0 20px rgba(0, 204, 119, 0.06);
   animation: bannerIn 0.3s ease-out;
-  
+
   &.banner-success {
-    background-color: rgba(0, 204, 119, 0.25);
-    color: #ffffff;
+    background-color: rgba(0, 15, 8, 0.9);
+    border-color: $crt-neon;
     .banner-text {
-      color: #ffffff;
-      text-shadow: 0 0 10px rgba(0, 255, 153, 0.9), 0 0 20px rgba(0, 204, 119, 0.6), 2px 2px 4px rgba(0, 0, 0, 0.9);
+      color: $crt-neon;
+      text-shadow: $crt-glow-strong;
     }
   }
-  
+
   &.banner-error {
-    border-color: #ff3366;
-    box-shadow: 0 0 20px rgba(255, 51, 102, 0.6), 0 0 40px rgba(255, 51, 102, 0.3), inset 0 0 20px rgba(255, 51, 102, 0.1);
-    background-color: rgba(255, 51, 102, 0.2);
-    color: #ffffff;
+    border-color: $crt-danger;
+    box-shadow: 0 0 12px rgba(255, 51, 102, 0.6), 0 0 30px rgba(255, 51, 102, 0.25), inset 0 0 20px rgba(255, 51, 102, 0.06);
+    background-color: rgba(15, 0, 5, 0.92);
     .banner-text {
-      color: #ffffff;
-      text-shadow: 0 0 10px rgba(255, 51, 102, 0.9), 0 0 20px rgba(255, 51, 102, 0.6), 2px 2px 4px rgba(0, 0, 0, 0.9);
+      color: $crt-danger;
+      text-shadow: 0 0 8px rgba(255, 51, 102, 0.9), 0 0 20px rgba(255, 51, 102, 0.5);
     }
   }
 }
 
 .banner-text {
   line-height: 1.4;
-  color: #ffffff !important;
-  text-shadow: 0 0 8px rgba(0, 255, 153, 0.8), 0 0 15px rgba(0, 204, 119, 0.5), 2px 2px 4px rgba(0, 0, 0, 0.8) !important;
+  color: $crt-green;
+  text-shadow: $crt-glow-text;
   font-weight: bold;
 }
 
 .banner-secondary {
-  font-size: 12px;
-  margin-top: 8px;
-  opacity: 1;
-  color: #ffffff;
-  text-shadow: 0 0 6px rgba(0, 255, 153, 0.6), 0 0 12px rgba(0, 204, 119, 0.3), 1px 1px 3px rgba(0, 0, 0, 0.8);
+  font-size: 11px;
+  margin-top: 6px;
+  opacity: 0.8;
+  color: $crt-dark-green;
 }
 
 @keyframes bannerIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-// Panels
+// ─── Login / Recovery Panel ──────────────────────────────────────────────────
+
 .login-panel,
 .recovery-panel {
   width: 100%;
-  border: 2px solid $crt-green;
-  background-color: rgba(10, 10, 10, 0.9);
-  box-shadow: $crt-glow, inset 0 0 30px rgba(0, 204, 119, 0.05);
-  padding: 30px;
+  border: 1.5px solid $crt-green;
+  background-color: $crt-panel-bg;
+  box-shadow: $crt-glow, inset 0 0 40px rgba(0, 204, 119, 0.04);
+  padding: 32px 28px;
   animation: panelIn 0.5s ease-out;
   transition: opacity 0.3s ease-out;
-  
-  &.hidden {
-    display: none;
-  }
+
+  &.hidden { display: none; }
 }
 
 @keyframes panelIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-// Panel header
+// ─── Panel header ────────────────────────────────────────────────────────────
+
 .panel-header {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  margin-bottom: 30px;
-  
+  gap: 14px;
+  margin-bottom: 28px;
+
   .header-line {
     flex: 1;
     height: 1px;
     background: linear-gradient(90deg, transparent, $crt-green, transparent);
+    opacity: 0.7;
   }
 }
 
 .panel-title {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: bold;
-  color: #ffffff !important;
+  color: $crt-neon;
   margin: 0;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  text-shadow: 0 0 8px rgba(0, 255, 153, 0.8), 0 0 15px rgba(0, 204, 119, 0.5), 2px 2px 4px rgba(0, 0, 0, 0.8) !important;
+  text-shadow: $crt-glow-strong;
   text-rendering: geometricPrecision;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
-// Form
+// ─── Form ────────────────────────────────────────────────────────────────────
+
 .crt-form {
   display: flex;
   flex-direction: column;
@@ -215,19 +212,19 @@ $crt-font: 'Courier New', monospace;
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
 }
 
 .form-label {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: bold;
-  color: #ffffff !important;
-  letter-spacing: 0.16em;
+  color: $crt-dark-green;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  text-shadow: 0 0 6px rgba(0, 255, 153, 0.7), 0 0 12px rgba(0, 204, 119, 0.4), 1px 1px 3px rgba(0, 0, 0, 0.8) !important;
 }
 
-// Input wrapper
+// ─── Input wrapper ───────────────────────────────────────────────────────────
+
 .input-wrapper {
   position: relative;
   display: flex;
@@ -237,35 +234,35 @@ $crt-font: 'Courier New', monospace;
 
 .crt-input {
   flex: 1;
-  padding: 12px 14px;
-  border: 1px solid $crt-green;
-  background-color: rgba(0, 0, 0, 0.8);
-  color: $crt-green;
+  padding: 11px 14px;
+  border: 1px solid $crt-dark-green;
+  background-color: $crt-input-bg;
+  color: $crt-neon;
   font-family: $crt-font;
   font-size: 14px;
   letter-spacing: 0.05em;
   outline: none;
-  transition: all 0.2s ease;
-  box-shadow: inset 0 0 10px rgba(0, 204, 119, 0.1);
-  
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: inset 0 0 8px rgba(0, 204, 119, 0.08);
+
   &:focus {
-    box-shadow: inset 0 0 10px rgba(0, 204, 119, 0.2), 0 0 15px rgba(0, 204, 119, 0.4);
-    border-color: #00ff99;
+    border-color: $crt-neon;
+    box-shadow: inset 0 0 10px rgba(0, 255, 153, 0.12), 0 0 14px rgba(0, 204, 119, 0.45);
   }
-  
+
   &:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
   }
-  
+
   &::placeholder {
-    color: rgba(0, 204, 119, 0.4);
+    color: rgba(0, 170, 85, 0.45);
+    font-style: italic;
   }
-  
-  // Selection color
+
   &::selection {
-    background-color: rgba(0, 204, 119, 0.3);
-    color: $crt-green;
+    background-color: rgba(0, 204, 119, 0.25);
+    color: $crt-neon;
   }
 }
 
@@ -275,7 +272,7 @@ $crt-font: 'Courier New', monospace;
   top: 0;
   bottom: 0;
   width: 2px;
-  background: $crt-green;
+  background: $crt-neon;
   box-shadow: $crt-glow;
   opacity: 0;
   transition: opacity 0.2s ease;
@@ -285,11 +282,12 @@ $crt-font: 'Courier New', monospace;
   opacity: 1;
 }
 
-// Visibility toggle
+// ─── Visibility toggle ───────────────────────────────────────────────────────
+
 .visibility-toggle {
   background: none;
   border: none;
-  color: #ffffff !important;
+  color: $crt-dark-green;
   font-family: $crt-font;
   font-size: 11px;
   font-weight: bold;
@@ -297,91 +295,79 @@ $crt-font: 'Courier New', monospace;
   cursor: pointer;
   padding: 0;
   white-space: nowrap;
-  transition: all 0.2s ease;
-  text-shadow: 0 0 6px rgba(0, 255, 153, 0.7), 1px 1px 2px rgba(0, 0, 0, 0.8) !important;
-  
+  transition: color 0.2s ease;
+
   &:hover:not(:disabled) {
-    color: #00ff99 !important;
-    text-shadow: 0 0 10px rgba(0, 255, 153, 0.6) !important;
+    color: $crt-neon;
+    text-shadow: 0 0 8px rgba(0, 255, 153, 0.8);
   }
-  
+
   &:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
   }
 }
 
-// Error messages
+// ─── Error messages ──────────────────────────────────────────────────────────
+
 .error-messages {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-height: 20px;
+  min-height: 18px;
 }
 
 .error-text {
   font-size: 11px;
-  color: #ff3366;
+  color: $crt-danger;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   animation: errorGlow 0.3s ease-out;
 }
 
 @keyframes errorGlow {
-  from {
-    opacity: 0;
-    text-shadow: none;
-  }
-  to {
-    opacity: 1;
-    text-shadow: 0 0 10px rgba(255, 51, 102, 0.6);
-  }
+  from { opacity: 0; }
+  to   { opacity: 1; text-shadow: 0 0 8px rgba(255, 51, 102, 0.8); }
 }
 
-// Buttons
+// ─── Submit button ───────────────────────────────────────────────────────────
+
 .crt-button {
-  padding: 14px 20px;
-  border: 2px solid $crt-green;
-  background-color: transparent;
-  color: #ffffff !important;
+  width: 100%;
+  padding: 13px 20px;
+  border: 1.5px solid $crt-green;
+  background-color: rgba(0, 20, 10, 0.6);
+  color: $crt-green;
   font-family: $crt-font;
   font-size: 13px;
   font-weight: bold;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: inset 0 0 20px rgba(0, 204, 119, 0.1);
-  text-shadow: 0 0 8px rgba(0, 255, 153, 0.8), 0 0 15px rgba(0, 204, 119, 0.5), 2px 2px 4px rgba(0, 0, 0, 0.8) !important;
-  
+  text-shadow: $crt-glow-text;
+  box-shadow: inset 0 0 18px rgba(0, 204, 119, 0.07);
+
   span {
-    color: #ffffff !important;
-    text-shadow: 0 0 8px rgba(0, 255, 153, 0.8), 0 0 15px rgba(0, 204, 119, 0.5), 2px 2px 4px rgba(0, 0, 0, 0.8) !important;
+    color: inherit;
+    text-shadow: inherit;
   }
-  
+
   &:hover:not(:disabled) {
-    background-color: rgba(0, 204, 119, 0.1);
-    box-shadow: $crt-glow, inset 0 0 20px rgba(0, 204, 119, 0.15);
-    color: #00ff99 !important;
-    border-color: #00ff99;
-    
-    span {
-      color: #00ff99 !important;
-    }
+    background-color: rgba(0, 204, 119, 0.12);
+    border-color: $crt-neon;
+    color: $crt-neon;
+    box-shadow: $crt-glow, inset 0 0 20px rgba(0, 204, 119, 0.1);
   }
-  
-  &:active:not(:disabled) {
-    transform: scale(0.98);
-  }
-  
+
+  &:active:not(:disabled) { transform: scale(0.98); }
+
   &:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
   }
-  
-  &.loading {
-    animation: pulse 1s ease-in-out infinite;
-  }
+
+  &.loading { animation: crt-pulse 1s ease-in-out infinite; }
 }
 
 .pulse {
@@ -389,115 +375,92 @@ $crt-font: 'Courier New', monospace;
   animation: blink 1s ease-in-out infinite;
 }
 
-@keyframes pulse {
-  0%, 100% {
-    box-shadow: inset 0 0 20px rgba(0, 204, 119, 0.1), 0 0 20px rgba(0, 204, 119, 0.3);
-  }
-  50% {
-    box-shadow: inset 0 0 20px rgba(0, 204, 119, 0.2), 0 0 40px rgba(0, 204, 119, 0.6);
-  }
+@keyframes crt-pulse {
+  0%, 100% { box-shadow: inset 0 0 18px rgba(0,204,119,0.07), 0 0 10px rgba(0,204,119,0.3); }
+  50%       { box-shadow: inset 0 0 22px rgba(0,204,119,0.14), 0 0 24px rgba(0,204,119,0.55); }
 }
 
 @keyframes blink {
-  0%, 49%, 100% {
-    opacity: 1;
-  }
-  50%, 99% {
-    opacity: 0.7;
-  }
+  0%, 49%, 100% { opacity: 1; }
+  50%, 99%      { opacity: 0.65; }
 }
 
-// Session info
+// ─── Session info ────────────────────────────────────────────────────────────
+
 .session-info {
-  margin-top: 16px;
-  color: #ffffff !important;
-  padding: 8px 12px;
+  margin-top: 14px;
+  padding: 7px 12px;
   text-align: center;
   font-family: $crt-font;
-  font-size: 11px;
+  font-size: 10px;
   letter-spacing: 0.08em;
-  color: #00cc77;
-  background-color: rgba(0, 204, 119, 0.05);
-  border: 1px solid rgba(0, 204, 119, 0.3);
-  border-radius: 4px;
-  text-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+  color: $crt-dark-green;
+  background-color: rgba(0, 204, 119, 0.04);
+  border: 1px solid rgba(0, 204, 119, 0.2);
+  border-radius: 0;
 }
 
-// Recovery link
+// ─── Recovery link ───────────────────────────────────────────────────────────
+
 .recover-link {
   background: none;
   border: none;
-  color: #ffffff !important;
+  color: $crt-dark-green;
   font-family: $crt-font;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: bold;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   cursor: pointer;
   padding: 8px 0;
-  transition: all 0.2s ease;
-  text-shadow: 0 0 6px rgba(0, 255, 153, 0.7), 0 0 12px rgba(0, 204, 119, 0.4), 1px 1px 3px rgba(0, 0, 0, 0.8) !important;
-  
+  transition: color 0.2s ease;
+
   &:hover:not(:disabled) {
-    color: #00ff99 !important;
-    text-shadow: 0 0 10px rgba(0, 255, 153, 0.6);
+    color: $crt-neon;
+    text-shadow: 0 0 8px rgba(0, 255, 153, 0.8);
   }
-  
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
+
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
-// Panel footer
+// ─── Panel footer ────────────────────────────────────────────────────────────
+
 .panel-footer {
-  margin-top: 30px;
-  padding-top: 20px;
-  border-top: 1px solid rgba(0, 204, 119, 0.2);
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 204, 119, 0.15);
   text-align: center;
 }
 
 .footer-text {
-  font-size: 11px;
-  color: #ffffff !important;
-  letter-spacing: 0.1em;
+  font-size: 10px;
+  color: rgba(0, 170, 85, 0.6);
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   line-height: 1.6;
-  text-shadow: 0 0 6px rgba(0, 255, 153, 0.6), 0 0 12px rgba(0, 204, 119, 0.3), 1px 1px 3px rgba(0, 0, 0, 0.8) !important;
-  
+
   &.small {
-    font-size: 10px;
-    color: #ffffff !important;
-    opacity: 0.8;
+    font-size: 9px;
+    opacity: 0.7;
   }
 }
 
-// Responsive
+// ─── Responsive ──────────────────────────────────────────────────────────────
+
 @media (max-width: 600px) {
-  .crt-content {
-    max-width: 100%;
-    padding: 16px;
-  }
-  
-  .login-panel,
-  .recovery-panel {
-    padding: 20px;
-  }
-  
-  .panel-title {
-    font-size: 16px;
-  }
-  
-  .crt-form {
-    gap: 16px;
-  }
+  .crt-content { max-width: 100%; padding: 16px; }
+  .login-panel, .recovery-panel { padding: 22px 18px; }
+  .panel-title { font-size: 15px; }
+  .crt-form { gap: 16px; }
 }
+
+// ─── Easter Egg ──────────────────────────────────────────────────────────────
 
 .easter-egg-overlay {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: #000000;
+  background: rgba(0, 0, 0, 0.95);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -509,4 +472,3 @@ $crt-font: 'Courier New', monospace;
   max-height: 85vh;
   object-fit: contain;
 }
-

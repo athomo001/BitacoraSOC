@@ -1,9 +1,9 @@
 <div class="all-entries-container">
-  <mat-card class="search-card">
-    <mat-card-header>
-      <mat-card-title>🔍 Buscar Entradas</mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
+  <section class="all-entries-panel search-card">
+    <header class="all-entries-panel__header">
+      <h2 class="all-entries-panel__title">🔍 Buscar Entradas</h2>
+    </header>
+    <div class="all-entries-panel__body">
       <form [formGroup]="searchForm" (ngSubmit)="onSearch()" class="search-form">
         <div class="search-row">
           <mat-form-field appearance="outline" class="search-input">
@@ -60,12 +60,12 @@
           </button>
         </div>
       </form>
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </section>
 
-  <mat-card class="results-card">
-    <mat-card-header>
-      <mat-card-title>Resultados ({{ totalEntries }} entradas)</mat-card-title>
+  <section class="all-entries-panel results-card">
+    <header class="all-entries-panel__header all-entries-panel__header--toolbar">
+      <h2 class="all-entries-panel__title">Resultados ({{ totalEntries }} entradas)</h2>
       <div class="bulk-actions" *ngIf="isAdmin && selectedEntries.size > 0">
         <button mat-raised-button color="accent" (click)="openAdminEditDialog()">
           <mat-icon>edit</mat-icon>
@@ -76,8 +76,8 @@
           Deseleccionar
         </button>
       </div>
-    </mat-card-header>
-    <mat-card-content>
+    </header>
+    <div class="all-entries-panel__body all-entries-panel__body--flush">
       <table mat-table [dataSource]="entries" class="entries-table">
         <!-- Columna de selección (solo admin) -->
         <ng-container matColumnDef="select">
@@ -171,6 +171,6 @@
         (page)="onPageChange($event)"
         showFirstLastButtons>
       </mat-paginator>
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </section>
 </div>

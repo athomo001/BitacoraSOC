@@ -9,12 +9,17 @@
   }
 }
 
-.entry-form-card {
-  margin-bottom: 24px;
+.entry-panel {
+  margin-bottom: var(--space-6);
+  background: var(--surface-card);
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
 
-  mat-card-content {
-    padding: 24px;
-  }
+.entry-panel__body {
+  padding: var(--space-6);
 }
 
 .entry-form-layout {
@@ -36,30 +41,9 @@
     gap: 16px;
     margin-bottom: 16px;
 
+    // Outline / inputs fecha-hora: ver styles.scss (.entries-container .datetime-row mat-form-field …).
     mat-form-field {
       color: var(--text-primary);
-
-      ::ng-deep .mdc-notched-outline__leading,
-      ::ng-deep .mdc-notched-outline__trailing,
-      ::ng-deep .mdc-notched-outline__notch {
-        border-color: var(--border-color) !important;
-      }
-
-      ::ng-deep .mat-mdc-floating-label {
-        color: var(--text-secondary) !important;
-      }
-
-      ::ng-deep input {
-        color: var(--text-primary) !important;
-        background-color: var(--surface-color);
-        border-radius: 4px;
-        border: 1px solid var(--border-color);
-        padding: 6px 10px;
-      }
-
-      ::ng-deep .mdc-text-field__input::placeholder {
-        color: var(--text-secondary) !important;
-      }
     }
 
     .date-field {
@@ -112,16 +96,9 @@
     flex-direction: column;
     gap: 16px;
 
+    // Radio MDC: ver styles.scss (.entries-container .entry-type-selector mat-radio-button .mdc-radio).
     mat-radio-button {
       color: var(--text-primary);
-
-      ::ng-deep .mdc-radio {
-        margin-right: 8px;
-        --mat-radio-unselected-icon-color: var(--text-primary);
-        --mat-radio-selected-icon-color: var(--primary-color);
-        --mat-radio-disabled-unselected-icon-color: var(--border-color);
-        --mat-radio-disabled-selected-icon-color: var(--border-color);
-      }
 
       .entry-type-label {
         display: flex;
@@ -161,11 +138,12 @@
   margin-top: 20px;
 }
 
+// Overlay de easter egg: mismo scrim que login (variable global)
 .easter-egg-overlay {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: #000000;
+  background: var(--overlay-scrim);
   display: flex;
   align-items: center;
   justify-content: center;

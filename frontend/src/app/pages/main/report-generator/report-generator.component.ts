@@ -13,7 +13,6 @@ import { ClientAlertContext, ClientAlertEvaluation } from '../../../models/escal
 import { ConfigService } from '../../../services/config.service';
 import { AuthService } from '../../../services/auth.service';
 
-import { MatCard, MatCardHeader, MatCardTitle, MatCardSubtitle, MatCardContent } from '@angular/material/card';
 import { EntityAutocompleteComponent } from '../../../components/entity-autocomplete/entity-autocomplete.component';
 import { NgIf, NgFor } from '@angular/common';
 import { MatFormField, MatLabel, MatError, MatSuffix } from '@angular/material/form-field';
@@ -32,7 +31,6 @@ import { environment } from '@env/environment';
   templateUrl: './report-generator.component.html',
   styleUrls: ['./report-generator.component.scss'],
   imports: [
-    MatCard, MatCardHeader, MatCardTitle, MatCardSubtitle, MatCardContent,
     ReactiveFormsModule, FormsModule,
     EntityAutocompleteComponent,
     NgIf, NgFor,

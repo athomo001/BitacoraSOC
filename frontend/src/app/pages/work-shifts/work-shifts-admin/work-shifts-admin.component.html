@@ -1,11 +1,11 @@
 <div class="container">
-  <mat-card class="page-header">
+  <header class="page-header">
     <mat-icon>schedule</mat-icon>
     <div>
       <h1>Administración de Turnos de Trabajo</h1>
       <p>Configura los turnos con horarios personalizados</p>
     </div>
-  </mat-card>
+  </header>
 
   <!-- Botón agregar -->
   <div class="actions-bar" *ngIf="!showForm">
@@ -16,14 +16,14 @@
   </div>
 
   <!-- Formulario -->
-  <mat-card *ngIf="showForm" class="form-card">
-    <mat-card-header>
-      <mat-card-title>
+  <div *ngIf="showForm" class="shift-panel form-card">
+    <header class="shift-panel__header">
+      <h2 class="shift-panel__title">
         <mat-icon>{{ editingShift ? 'edit' : 'add' }}</mat-icon>
         {{ editingShift ? 'Editar Turno' : 'Nuevo Turno' }}
-      </mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
+      </h2>
+    </header>
+    <div class="shift-panel__body">
       <form [formGroup]="shiftForm" (ngSubmit)="saveShift()">
         <div class="form-grid">
           <!-- Nombre -->
@@ -182,18 +182,18 @@
           </button>
         </div>
       </form>
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </div>
 
   <!-- Tabla de turnos -->
-  <mat-card *ngIf="!showForm" class="table-card">
-    <mat-card-header>
-      <mat-card-title>
+  <div *ngIf="!showForm" class="shift-panel table-card">
+    <header class="shift-panel__header">
+      <h2 class="shift-panel__title">
         <mat-icon>list</mat-icon>
         Turnos Configurados
-      </mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
+      </h2>
+    </header>
+    <div class="shift-panel__body">
       <div *ngIf="loading" class="loading-container">
         <mat-spinner diameter="40"></mat-spinner>
       </div>
@@ -523,6 +523,6 @@
         </div>
       </div>
 
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </div>
 </div>

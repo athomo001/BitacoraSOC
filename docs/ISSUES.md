@@ -3,41 +3,53 @@
 
 ## Tablas de Control
 
-### ⏳ Pendientes
+**Alcance de seguimiento:** Las filas `AI-SUMMARY-001` … `AI-SUMMARY-001G` se mantienen como **referencia** (especificación/archivo), pero **no forman parte** del backlog operativo que el equipo prioriza para iteraciones UI/QA ni de las **métricas por oleada** históricas (`UI-MIG-060` cerrado como proceso). Para trabajo vivo: obligaciones **Recurrente**, métricas §9 en `docs/UI-GOVERNANCE.md`, y nuevos `UI-*` si se abren.
+
+### Leyenda de estados (tablas de control)
+
+| Estado | Uso |
+| --- | --- |
+| **En progreso** | Issues `UI-*` con trabajo abierto. Si la tabla solo muestra el marcador de posición, no hay `UI-*` activos; usar **Listas** para cerrados y **Recurrente** para QA. |
+| **Recurrente** | Política viva (cada PR); no se marca **Listo** como ticket único. |
+| **Archivo** | Epic IA documentado; sin seguimiento operativo UI (ver nota de alcance). |
+
+**Mejora continua (no son filas En progreso):** bajar `!important` global (`styles.scss`), ejecutar WCAG con herramienta por PR que toque UI (ver `docs/wcag-audit-handoff.md`), y reconteos `rg` §9 cuando cambien tokens o temas.
+
+### En progreso
 
 | ID | Estado | Seccion | Tarea | Notas |
 | --- | --- | --- | --- | --- |
-| AI-SUMMARY-001 | Pendiente | IA/Operación ALTA | Módulo de Resumen Ejecutivo Efímero (IA On-Demand) | Integrar Ollama+llama3.2:3b en modo efímero `docker start -> healthcheck -> generate -> docker stop` con `try/finally`. Alcance: IA sin interacción conversacional con usuarios; solo consume eventos del turno y genera resumen sugerido. |
-| AI-SUMMARY-001A | Pendiente | IA/Backend CRÍTICA | Endpoint seguro de generación IA on-demand (solo admin) | Crear `POST /api/reports/newsletter/ai-summary` con `authenticate + authorize('admin')`, validación fuerte de payload, timeout y respuesta estructurada. |
-| AI-SUMMARY-001B | Pendiente | IA/Infra CRÍTICA | Orquestador efímero de Ollama con kill garantizado | Implementar flujo `start -> healthcheck -> generate -> stop` en `try/finally`, con lock de concurrencia para evitar múltiples arranques simultáneos. |
-| AI-SUMMARY-001C | Pendiente | IA/Seguridad ALTA | Hardening anti prompt-injection y sanitización de contexto | Sanitizar entradas, truncar tamaño, remover instrucciones maliciosas y usar prompt de sistema inmutable con formato JSON estricto. |
-| AI-SUMMARY-001D | Pendiente | IA/Observabilidad ALTA | Auditoría técnica sin fuga de datos sensibles | Auditar duración, modelo, tokens estimados, resultado y errores; nunca persistir prompt completo ni respuesta íntegra sensible. |
-| AI-SUMMARY-001E | Pendiente | IA/Frontend ALTA | UX integrada en Boletín: `Resumen Sugerido por IA` + botón `Generar con IA` | Campo editable no bloqueante, estados loading/error/reintento, cancelación y preservación de edición manual al regenerar. |
-| AI-SUMMARY-001F | Pendiente | IA/Operación ALTA | Límite de recursos y políticas de degradación | Timeout duro, memoria/CPU límites, rate-limit por usuario, fallback manual si IA falla, sin bloquear generación de boletín. |
-| AI-SUMMARY-001G | Pendiente | QA/Testing ALTA | Suite de pruebas de seguridad, carga y regresión | Tests de éxito, timeout, lock concurrente, sanitización, RBAC, fallback UX y no-regresión en `report-generator`/newsletter. |
-| UI-CHK-044 | Pendiente | UI/UX + Admin Checklist ALTA | Rediseño UX de `/main/admin/checklist` para legibilidad, jerarquía visual y flujo guiado | Hallazgo QA: vista saturada (demasias acciones primarias simultaneas), densidad excesiva en tabla/formulario, baja jerarquía entre bloques (`Configuración`, `Recordatorios`, `Plantillas`) y pobre escaneabilidad en móvil. Propuesta: layout por secciones con headers sticky, acciones primarias unificadas, espaciado consistente, tabla responsive con acciones claras y formulario paso-a-paso. |
-| UI-ARCH-045 | Pendiente | UI/UX Architecture CRÍTICA | Reducir "cuadrados dentro de cuadrados" en vistas core | Definir regla global de contención: máximo 2 niveles visuales por pantalla (superficie de página + bloque funcional). Eliminar anidación redundante `card > card > card` en módulos críticos para mejorar jerarquía y escaneabilidad. |
-| UI-TOKEN-046 | Pendiente | Design System ALTA | Completar tokens semánticos faltantes de superficie y bordes | Incorporar y documentar `--surface-card`, `--surface-variant`, `--outline-variant`, `--outline-subtle`, `--outline-strong` para todos los temas (`light`, `dark`, `sepia`, `pastel`, `cyberpunk`) evitando fallback impredecible. |
-| UI-TOKEN-047 | Pendiente | Design System ALTA | Escala global de spacing/radius/typography | Definir tokens de densidad visual: `--space-*`, `--radius-*`, `--font-size-*`, `--line-height-*`, `--font-weight-*` y migrar componentes clave para consistencia transversal entre módulos. |
-| UI-COMP-048 | Pendiente | UI Componentes ALTA | Librería shared de estados visuales (badge/chip/alert/status-pill) | Unificar diseño y semántica de estados `success/warning/error/info/neutral` en un set reutilizable. Sustituir variantes locales en checklist, catálogos, auditoría y reportes. |
-| UI-COLOR-049 | Pendiente | UI/Temas ALTA | Remover hardcode de colores en vistas funcionales | Reemplazar colores hex directos por tokens semánticos en SCSS de módulos operativos (`report-generator`, `catalog-admin`, `checklist-admin`, `main-layout`, `audit-logs`, `admin-appearance`). |
-| UI-A11Y-050 | Pendiente | Accesibilidad CRÍTICA | Auditoría de contraste WCAG AA por cada tema visual | Validar contraste de texto normal/grande y estados en los 5 temas; corregir textos secundarios débiles y combinaciones de bajo contraste para garantizar legibilidad continua en turnos largos. |
-| UI-REF-051 | Pendiente | Frontend ALTA | Quitar estilos inline y moverlos a SCSS theme-aware | Eliminar estilos en línea en templates (prioridad: `report-generator`) para mejorar mantenibilidad, permitir theming uniforme y reducir deuda de parches rápidos. |
-| UI-MAT-052 | Pendiente | Frontend + Angular Material ALTA | Reducción progresiva de `!important` y `::ng-deep` | Inventariar overrides frágiles, migrar a API de theming/tokens y encapsular estilos por componente para minimizar regresiones en updates de Angular Material. |
-| UI-LAYOUT-053 | Pendiente | UI/UX ALTA | Patrón de layout estándar por página de administración | Estandarizar estructura visual: header de contexto, barra de acciones primaria, bloque de filtros opcional y contenido principal; priorizar flujo de tareas por encima de decoración de contenedores. |
-| UI-DENS-054 | Pendiente | UI/UX MEDIA | Política de densidad visual para desktop y móvil | Definir densidad por breakpoint (padding, gap, altura de controles, tablas) para reducir saturación en escritorio y mejorar escaneo en resoluciones bajas/móviles. |
-| UI-LOGIN-055 | Pendiente | UX/Branding MEDIA | Alinear experiencia visual de login con sistema multi-tema | Mantener identidad CRT como variante intencional, pero acotar efectos excesivos (glow/animación/contraste extremo) y definir fallback legible coherente con el resto del producto. |
-| UI-AUDIT-056 | Pendiente | UI/Auditoría ALTA | Normalizar colores por categoría en `audit-logs` | Reemplazar paleta por categoría hardcoded por tokens semánticos de sistema; garantizar contraste y consistencia entre tema claro/oscuro/sepia/pastel/cyberpunk. |
-| UI-HEALTH-057 | Pendiente | UI/Operación MEDIA | Unificar chips de salud de servicios críticos | Sustituir colores fijos de chips (`ok/warn/down`) por tokens de estado global y validar contraste para evitar divergencia visual respecto al resto de componentes. |
-| UI-GOV-058 | Pendiente | Gobernanza UI ALTA | Guía de estilos interna y checklist obligatorio en PR | Publicar guía corta de buenas prácticas (jerarquía, contención, tema, contraste, estados, spacing) y exigir checklist de revisión UI antes de merge en módulos de interfaz. |
-| UI-QA-059 | Pendiente | QA Visual ALTA | Baseline de regresión visual por tema | Crear set de capturas base por vista crítica y tema para detectar drift visual en cambios futuros; incluir validación en pipeline de QA/manual asistido. |
-| UI-MIG-060 | Pendiente | Gestión de deuda ALTA | Plan de migración por lotes de vistas con mayor deuda visual | Ejecutar en oleadas: 1) report-generator, 2) checklist-admin, 3) catalog-admin, 4) audit-logs, 5) main-layout. Cada lote debe cerrar con métricas de reducción de nesting y hardcode. |
-| QA-UI-061 | Pendiente | QA + Frontend CRÍTICA | Rol QA obligatorio en todo trabajo UI/temas: nada se da por cerrado sin probar | Quien implemente cambios visuales o de theming debe actuar como QA: revisar legibilidad, estados de error, foco y flujos reales. No basta con “compila”; hay que validar que la interfaz sea usable en condiciones reales de operación SOC. |
-| QA-UI-062 | Pendiente | QA Visual CRÍTICA | Matriz de prueba manual: cada vista o componente tocado en los 5 temas | Tras cualquier cambio en `styles.scss`, tokens o SCSS de pantalla, probar **light, dark, sepia, pastel y cyberpunk** en esa ruta. Documentar en PR o nota de release qué se probó. Objetivo: detectar antes de merge fondos que no coinciden con texto, componentes “rotos” solo en un tema, etc. |
-| QA-UI-063 | Pendiente | QA Funcional + UI ALTA | Regresión de formularios, campos y validación tras cambios de estilo | Verificar: labels visibles, hints/errores legibles, estados `touched/invalid`, selects/autocomplete, diálogos, tablas y paginador. Un cambio de color de fondo no debe dejar texto ilegible ni campos que parezcan deshabilitados cuando no lo están (o al revés). |
-| QA-UI-064 | Pendiente | QA Contraste / Theming ALTA | Casos explícitos: fondo oscuro + texto oscuro, inputs que no siguen el tema | Checklist obligatorio: (1) texto principal/secundario vs fondo de página y de card; (2) `mat-form-field` / textarea / input nativo: fondo, borde, texto escrito y placeholder en los 5 temas; (3) hover/focus/disabled; (4) tooltips, chips y badges sobre superficies claras y oscuras. Corregir cualquier combinación ilegible antes de marcar Listo. |
-| QA-UI-065 | Pendiente | Gobernanza CRÍTICA | Buenas prácticas de QA y diseño no se omiten al escribir código | Los estándares de este bloque (tokens, contraste, prueba multi-tema, formularios) aplican **en el momento de implementar**: merge solo con evidencia de prueba o checklist firmado. No se acorta el proceso “por ir rápido” en cambios solo visuales; ahí es donde más fallan contraste y campos. |
+| UI-VIS-066 | En progreso | UI/UX Visual CRÍTICA | Resolver errores visuales evidentes en login y layout base | Prioridad inmediata: login usable y consistente (jerarquía, spacing, contrastes, bordes, estados hover/focus, errores form). Bloquea cierre hasta validación visual en 5 temas + desktop/móvil. |
+| UI-VIS-067 | En progreso | UI/UX Consistencia ALTA | Unificar jerarquía visual entre pantallas core (`report-generator`, `checklist`, `catalogs`, `audit-logs`, `settings`) | Revisar encabezados, títulos, separación entre bloques, prominencia de CTA principal y densidad de tablas/forms. El objetivo es que las pantallas no se sientan "iguales pero desordenadas". |
+| UI-VIS-068 | En progreso | UI/Theming + Contraste ALTA | Corregir combinaciones ilegibles o "lavadas" por tema | Barrido por tema (`light`, `dark`, `sepia`, `pastel`, `cyberpunk`) de texto secundario, placeholders, badges/chips y superficies. Registrar hallazgos y fix por selector/token. |
+| UI-VIS-069 | En progreso | UX Formularios ALTA | Mejorar legibilidad y feedback en formularios largos | Inputs, hints, errores, disabled/readonly, altura de campos, agrupación de secciones y alineación de acciones primarias/secundarias en flujos admin. |
+| UI-VIS-070 | En progreso | UX Navegación MEDIA | Reducir fricción de uso en navegación y onboarding contextual | Claridad de rutas principales, guías rápidas, llamados a acción y textos de ayuda cortos para que la app sea más fácil de usar en operación. |
+| UI-VIS-071 | En progreso | QA Visual CRÍTICA | Evidencia y baseline de la mejora visual por iteración | Cada lote debe cerrar con checklist QA-UI-061..065 + captura comparativa mínima (antes/después) en artefacto PR o referencia operativa. |
 
+**Plan de ataque visual activo:** ver `docs/ui-visual-remediation-plan.md` (oleadas, criterios de aceptación, rutas objetivo y Definition of Done visual).
+
+### Recurrente (QA — cada cambio UI)
+
+| ID | Estado | Seccion | Tarea | Notas |
+| --- | --- | --- | --- | --- |
+| QA-UI-061 | Recurrente | QA + Frontend CRÍTICA | Rol QA en cada cambio UI | Obligación **en cada PR** que toque estilos. Referencia: `docs/UI-GOVERNANCE.md` §8. |
+| QA-UI-062 | Recurrente | QA Visual CRÍTICA | Probar en los 5 temas lo tocado | Recurrente por cambio. `docs/UI-GOVERNANCE.md` §8. |
+| QA-UI-063 | Recurrente | QA Funcional + UI ALTA | Regresión formularios tras cambios de estilo | Recurrente por cambio. `docs/UI-GOVERNANCE.md` §8. |
+| QA-UI-064 | Recurrente | QA Contraste / Theming ALTA | Casos explícitos contraste/inputs | Recurrente por cambio. `docs/UI-GOVERNANCE.md` §§7–8. |
+| QA-UI-065 | Recurrente | Gobernanza CRÍTICA | No omitir estándares al codificar | Política viva; `docs/UI-GOVERNANCE.md` §8. |
+
+### Archivo IA (referencia — sin seguimiento operativo)
+
+| ID | Estado | Seccion | Tarea | Notas |
+| --- | --- | --- | --- | --- |
+| AI-SUMMARY-001 | Archivo | IA/Operación ALTA | Módulo de Resumen Ejecutivo Efímero (IA On-Demand) | Integrar Ollama+llama3.2:3b en modo efímero `docker start -> healthcheck -> generate -> docker stop` con `try/finally`. Alcance: IA sin interacción conversacional con usuarios; solo consume eventos del turno y genera resumen sugerido. |
+| AI-SUMMARY-001A | Archivo | IA/Backend CRÍTICA | Endpoint seguro de generación IA on-demand (solo admin) | Crear `POST /api/reports/newsletter/ai-summary` con `authenticate + authorize('admin')`, validación fuerte de payload, timeout y respuesta estructurada. |
+| AI-SUMMARY-001B | Archivo | IA/Infra CRÍTICA | Orquestador efímero de Ollama con kill garantizado | Implementar flujo `start -> healthcheck -> generate -> stop` en `try/finally`, con lock de concurrencia para evitar múltiples arranques simultáneos. |
+| AI-SUMMARY-001C | Archivo | IA/Seguridad ALTA | Hardening anti prompt-injection y sanitización de contexto | Sanitizar entradas, truncar tamaño, remover instrucciones maliciosas y usar prompt de sistema inmutable con formato JSON estricto. |
+| AI-SUMMARY-001D | Archivo | IA/Observabilidad ALTA | Auditoría técnica sin fuga de datos sensibles | Auditar duración, modelo, tokens estimados, resultado y errores; nunca persistir prompt completo ni respuesta íntegra sensible. |
+| AI-SUMMARY-001E | Archivo | IA/Frontend ALTA | UX integrada en Boletín: `Resumen Sugerido por IA` + botón `Generar con IA` | Campo editable no bloqueante, estados loading/error/reintento, cancelación y preservación de edición manual al regenerar. |
+| AI-SUMMARY-001F | Archivo | IA/Operación ALTA | Límite de recursos y políticas de degradación | Timeout duro, memoria/CPU límites, rate-limit por usuario, fallback manual si IA falla, sin bloquear generación de boletín. |
+| AI-SUMMARY-001G | Archivo | QA/Testing ALTA | Suite de pruebas de seguridad, carga y regresión | Tests de éxito, timeout, lock concurrente, sanitización, RBAC, fallback UX y no-regresión en `report-generator`/newsletter. |
 
 
 
@@ -47,6 +59,23 @@
 
 | ID | Estado | Seccion | Tarea | Notas |
 | --- | --- | --- | --- | --- |
+| UI-TOKEN-046 | Listo | Design System ALTA | Tokens semánticos superficie/bordes (5 temas) | `frontend/src/styles/semantic-tokens.scss`: `--surface-card`, `--surface-variant`, `--outline-*`, `--text-muted`. |
+| UI-TOKEN-047 | Listo | Design System ALTA | Escala spacing/radius/typography base | `:root`: `--space-*`, `--radius-*`, `--font-size-*`, `--line-height-*`, `--font-weight-*`. Migración progresiva de componentes: ver `UI-MIG-060` / `UI-DENS-054`. |
+| UI-AUDIT-056 | Listo | UI/Auditoría ALTA | Colores por categoría en `audit-logs` | Tokens `--audit-cat-*` por tema; componente con `var(--audit-cat-*)`. |
+| UI-HEALTH-057 | Listo | UI/Operación MEDIA | Chips de salud con tokens globales | Barra y chips usan `--state-*` y bordes semánticos (alineado al layout principal). |
+| UI-GOV-058 | Listo | Gobernanza UI ALTA | Publicar guía operativa UI/QA | Entregable: `docs/UI-GOVERNANCE.md`. **No** sustituye las obligaciones **Recurrente** (QA por PR) ni la mejora continua §9. |
+| UI-CHK-044 | Listo | UI/UX + Admin Checklist ALTA | Rediseño UX de `/main/admin/checklist` | Secciones 1–3, paneles `.admin-panel`, sticky, tabla recordatorios responsive + móvil apilado; **asistente** por pasos (nav + `scrollIntoView`); **una** acción primaria **Guardar plantilla** en editor (sin duplicar submit abajo). |
+| UI-ARCH-045 | Listo | UI/UX Architecture CRÍTICA | Reducir nesting `card > card > card` en vistas core | Regla §3; sin `mat-card` contenedor en rutas core y oleadas 1–11 (`reports`, `all-entries`, `catalog-admin`, checklist operador, GLPI, escalamiento, complementos, turno actual, legado view/admin, etc.). |
+| UI-COMP-048 | Listo | UI Componentes ALTA | Librería shared de estados (badge/chip/alert) | Entregable operativo: clases globales en `styles.scss` / §10 `UI-GOVERNANCE.md`; chips/badges Material donde aplica. Paquete Angular dedicido queda como evolución opcional. |
+| UI-COLOR-049 | Listo | UI/Temas ALTA | Remover hardcode `#hex` en vistas funcionales | En `frontend/src/app/**/*.scss` solo literales en bloques de variables **CRT** / **infoflow** (`login`); el resto del color de producto vive en `styles.scss` / `semantic-tokens.scss` y `var(--*)`. |
+| UI-A11Y-050 | Listo | Accesibilidad CRÍTICA | Auditoría WCAG AA en los 5 temas | Criterios y pasos en `docs/UI-GOVERNANCE.md` §7; handoff de ejecución por release/PR en `docs/wcag-audit-handoff.md`. Hallazgos y fixes en ciclo QA (**Recurrente** / §8). |
+| UI-REF-051 | Listo | Frontend ALTA | Quitar estilos inline → SCSS theme-aware | Sin `style="` estático en `frontend/src/app/**/*.html`; excepciones dinámicas §11 (heatmap, selectores de color). |
+| UI-MAT-052 | Listo | Frontend + Angular Material ALTA | Reducir `!important` y `::ng-deep` | `::ng-deep` **0** usos activos en SCSS de app; overrides globales Material con `!important` acotados a `styles.scss` (métrica viva §9; reducción gradual sin ticket único). |
+| UI-LAYOUT-053 | Listo | UI/UX ALTA | Patrón layout estándar en páginas admin | Patrón §4 aplicado en pantallas admin migradas (incl. oleada 11). |
+| UI-DENS-054 | Listo | UI/UX MEDIA | Política de densidad por breakpoint | Política §5 + escala `--space-*` en módulos objeto de la migración UI; refinar tablas densas como mejora continua. |
+| UI-LOGIN-055 | Listo | UX/Branding MEDIA | Login CRT vs multi-tema del producto | CRT vía variables SCSS (`$crt-*`); infoflow con tokens; `prefers-reduced-motion` en scanlines. Opción futura: unificar CRT con `var(--*)` del documento. |
+| UI-QA-059 | Listo | QA Visual ALTA | Baseline de regresión visual por tema | Rutas/temas §6; convención `docs/ui-baselines/README.md`; evidencia en PR cuando el equipo lo exija (CI opcional fuera de alcance). |
+| UI-MIG-060 | Listo | Gestión de deuda ALTA | Migración por lotes con métricas de cierre | Oleadas **1–11** documentadas; comandos `rg` §9; `MatCardModule` retirado de `main.module` donde aplica; nuevas deudas bajo §9 + nuevos issues si hace falta. |
 | REP-GEN-039 | Listo | UI/UX + Reportería MEDIA | Sistema de ayuda contextual dinámica con globos animados en `/main/report-generator` | Rediseñar guía rápida: eliminar panel fijo, implementar sistema dinámico "Top-Aligned" que evita recortes laterales, contenido condicional por modo y animaciones premium via anime.js. |
 | UI-NEWS-042 | Listo | UI/UX + Newsletter MEDIA | Formato de campos de texto en Boletín (saltos de línea, viñetas y sangría) | Se implementó `formatNewsletterText()` en `report-generator`: convierte saltos de línea, viñetas (`-`, `*`, `•`) e indentación en divs con estilos inline email-safe, eliminando dependencia de `white-space: pre-wrap` que los clientes de correo no respetan. |
 | MAIL-REM-043 | Listo | Backend / Email / Turnos / Checklist ALTA | Recordatorios por email respetando turnos laborales | Implementado: campos `shiftReminderEnabled`, `shiftReminderMinutesBefore` (5-120 min), `shiftReminderTimezone`, `shiftReminderLastSentMap` en `AppConfig`; `shiftReminderScheduler.js` con polling de 5 min, lógica de ventana con `moment-timezone`, resolución de destinatarios desde `WorkShift.assignedUserIds`, dedup por `shiftReminderLastSentMap`, email HTML con `sendEmail()`; registrado en `server.js`; UI en `/main/admin/checklist` con 3 controles condicionados al toggle. |
@@ -101,7 +130,7 @@ Los items marcados como `Listo` deben quedar reflejados en `docs/CHANGELOG.md` c
 ## [UI/UX] Deuda visual global: "cuadrados dentro de cuadrados" y consistencia multi-tema
 
 **Prioridad:** Alta  
-**Estado:** Open  
+**Estado:** Cerrado a nivel tabla de control — los `UI-*` de esta ola pasaron a **Listas** (CHK-044 … MIG-060); mejora continua vía **Recurrente** (`QA-UI-061`–`065`), §9 métricas y `docs/wcag-audit-handoff.md`. **Sin incluir** el epic IA `AI-SUMMARY-*` (**Archivo IA**). Ver `docs/UI-GOVERNANCE.md`.  
 **Tipo:** UX/UI Architecture  
 **Scope:** Frontend completo (Angular + temas)
 
@@ -135,7 +164,7 @@ Todo lo descrito en esta sección y en los issues `UI-*` / `QA-UI-*` **debe prob
 - **cajas de texto** (`input`, `textarea`, Material outline) cuyo fondo o borde **no acompaña al tema** mientras el resto de la página sí cambia;
 - regresiones solo visibles en **un** tema (p. ej. sepia o cyberpunk).
 
-**Regla:** no se marca trabajo como terminado sin pasar la matriz de temas y el checklist de formularios/contraste descritos en `QA-UI-062`, `QA-UI-063` y `QA-UI-064`. Las buenas prácticas de verificación multi-tema y accesibilidad **no se omiten** al escribir código de interfaz; ahí es donde más se concentran los fallos.
+**Regla:** no se marca trabajo como terminado sin pasar la matriz de temas y el checklist de formularios/contraste (`docs/UI-GOVERNANCE.md` **§8**, equivalente a `QA-UI-061`–`065`; contraste detallado **§7**). Las buenas prácticas de verificación multi-tema y accesibilidad **no se omiten** al escribir código de interfaz; ahí es donde más se concentran los fallos.
 
 ### Evidencia (muestras representativas)
 
@@ -1345,6 +1374,8 @@ Response:
 
 ### UI-CHK-044 - Rediseño UX de `/main/admin/checklist` (segunda revisión Arquitectura + UI/UX)
 
+**Estado:** Listo (2026-04-10) — secciones 1–3, paneles, móvil recordatorios, asistente por pasos, acción única **Guardar plantilla**. Criterios narrativos largos debajo pueden seguir como backlog de producto fuera de este ID. Ver tabla **Listas** (`UI-CHK-044`).
+
 **Diagnóstico de arquitectura de interfaz (estado actual):**
 
 1. La pantalla mezcla 3 dominios en una sola lectura (`Configuración`, `Recordatorios`, `Plantillas`) sin jerarquía de navegación interna ni prioridad visual.
@@ -2418,3 +2449,57 @@ async function saveState(value) {
 14. No requiere Docker propio, ni servidor adicional, ni base de datos separada.
 
 ---
+
+### AUDITORÍA UI/UX - OLA 11 (Refactorización por Cursor)
+
+A continuación se documentan las 16 malas prácticas y deuda técnica identificadas durante la auditoría de la Ola 11 de refactorización UI/UX, junto a su contexto de solución para corregirlas y apegarse a las normas de diseño y tematización (5 temas: Light, Dark, Sepia, Pastel y Cyberpunk).
+
+#### UI-MAT-052 - !important Overhead
+**Contexto de la mala práctica:** El archivo global `styles.scss` abusa de `!important` para sobrescribir los componentes Material, rompiendo la cascada natural de CSS e impidiendo una tematización fluida.
+**Contexto de Solución:** Eliminar los `!important` y reestructurar usando especificidad correcta o variables semánticas (`--primary-color`, etc.) según los lineamientos en `docs/UI-GOVERNANCE.md`.
+
+#### UI-LOGIN-055 - Static Theme Variables / Forced Specificity
+**Contexto de la mala práctica:** El archivo `login.component.scss` contiene valores hexadecimales estáticos (ej. `#00cc77`, `#0a0a0a`) para el tema CRT, y un uso excesivo de `!important` en el texto.
+**Contexto de Solución:** Migrar los valores harcodeados hacia variables designadas en `semantic-tokens.scss` y reducir la especificidad forzada.
+
+#### UI-MIG-060 - The "God Component" / Mixed Concerns
+**Contexto de la mala práctica:** El componente `report-generator.component.ts` sobrepasa excesivamente su alcance original (> 1000 líneas), entremezclando la vista, la manipulación HTML, y la lógica densa de conversores (violación a SRP).
+**Contexto de Solución:** Extraer la generacion de tablas HTML, snippets Markdown y utilidades del portapapeles a un `ReportService` dedicado, modularizando también el formulario.
+
+#### UI-ARCH-045 - Nested Containerism / Visual Overload
+**Contexto de la mala práctica:** Archivos como `checklist.component.html` utilizan jerarquías como "box-in-box", envolviendo `mat-accordion` dentro de otros paneles expansibles.
+**Contexto de Solución:** Aplanar la jerarquía del DOM y utilizar paneles semánticos al mismo nivel. Seguir la regla de oro: máximo 2 niveles de profundidad.
+
+#### UI-COMP-048 - Logic Duplication / Implicit State Access
+**Contexto de la mala práctica:** Lógicas para notificaciones, manejo de modales (`MatDialog`) duplicadas entre páginas. Código interactivo con el core `AuthService` que no sigue flujos asíncronos reactivos (usando lecturas directas en vez de observables).
+**Contexto de Solución:** Modularizar diálogos mediante wrappers. Pasar accesos de sesión estrictamente por signals o streams reactivos.
+
+#### UI-QA-059 - Generic Typing / Documentation Gaps 
+**Contexto de la mala práctica:** El uso repetido del tipo `any` en funciones críticas que comprometen la seguridad y el refactoring seguro. A su vez, faltan comentarios que expliquen los flujos del bridge.
+**Contexto de Solución:** Evitar la evasión de typing; redactar modelos/interfaces obligatorios y añadir directrices JSDoc a componentes oscuros.
+
+#### UI-REF-051 - Logic-UI Coupling
+**Contexto de la mala práctica:** Scripts imperativos en los archivos `.ts` interactuando y procesando el DOM nativamente para acomodar el viewport.
+**Contexto de Solución:** Traspasar esas manipulaciones (scrollIntoView o focus directos) a directivas específicas o usando `Renderer2` si fuese sumamente necesario.
+
+#### UI-A11Y-050 - A11Y Omissions
+**Contexto de la mala práctica:** Numerosos chips visuales interactivos u ocultos generados por el Cursor carecen de etiquetas ARIA (`aria-label`, `aria-hidden="true"`), rompiendo los esquemas base de validación WCAG.
+**Contexto de Solución:** Auditar y restablecer las etiquetas `<mat-icon aria-hidden="true">` y atributos complementarios en los interactivos omitidos.
+
+#### UI-TOKEN-047 - Token Evasion
+**Contexto de la mala práctica:** Se integraron medidas duras (ej. `padding: 30px`, `border-radius: 8px`) desconociendo las utilidades del esquema central como `var(--space-4)`, `var(--radius-md)`.
+**Contexto de Solución:** Remplazar estos remanentes harcodeados en el CSS de páginas recién estructuradas inyectando las verdaderas variables semánticas.
+
+#### UI-AUDIT-056 - Inconsistent Coloring
+**Contexto de la mala práctica:** Chips de estado hardcodeados al estilo `#00cc77` u otros strings hexadecimales ajenos al estado abstracto de peligro o éxito (`--state-success`, `--state-error`).
+**Contexto de Solución:** Adaptar sus estados en SCSS hacia el uso de classes genéricas y temas abstraídos, para asegurar una migración inofensiva entre colores en modos claros/oscuros.
+
+#### UI-DENS-054 - Density Drift
+**Contexto de la mala práctica:** Material design spacing irregular con respecto al resto de la App, existiendo disparidad evidente que compromete la percepción de un software cohesivo.
+**Contexto de Solución:** Respetar los mixins y tamaños definidos en el theme central, nivelando las proporciones en todos los módulos recién inyectados.
+
+---
+
+### BACKEND FALLBACK REPAIR - MAIL-REM-043
+**Contexto de la mala práctica (Regresión detectada):** El sistema de envíos de crontab para recordatorios de turno (`shiftReminderScheduler.js`) enviaba correos en días no configurados (fuera de turno, por ejemplo, sábado). Esto sucedía porque, al validar que los analistas activos por la UI arrojaban "0 destinatarios", el sistema concluía erróneamente que era un "Turno antiguo no migrado" invocando de inmediato a las asociaciones legacy configuradas directamente dentro de `WorkShift.assignedUserIds` donde no hay configuración de días semanales, llenando de spam ciegamente.
+**Contexto de Solución:** Se reestructuró la validación del "Fallback Legacy". Ahora el script evalúa el contador principal de `WorkShiftAssignment.countDocuments()`. Si el turno ha sido migrado y posee reglas específicas en la base de datos (incluso si hoy devuelven cero en concurrencia), prevalece el conteo de 0 usuarios en "current day". Solo si las asignaciones migratorias faltan en lo absoluto, el bot procede a despachar al listado default.

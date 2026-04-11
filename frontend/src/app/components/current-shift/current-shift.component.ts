@@ -1,6 +1,5 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -16,20 +15,19 @@ import { WorkShift, CurrentShiftResponse } from '../../../models/work-shift.mode
   standalone: true,
   imports: [
     CommonModule,
-    MatCardModule,
     MatIconModule,
     MatChipsModule,
     MatProgressSpinnerModule
   ],
   template: `
-    <mat-card class="current-shift-card">
-      <mat-card-header>
-        <mat-card-title>
+    <section class="current-shift-card current-shift-panel">
+      <header class="current-shift-panel__header">
+        <h2 class="current-shift-panel__title">
           <mat-icon>schedule</mat-icon>
           Turno Actual
-        </mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
+        </h2>
+      </header>
+      <div class="current-shift-panel__body">
         <div *ngIf="loading" class="loading">
           <mat-spinner diameter="40"></mat-spinner>
         </div>
@@ -76,22 +74,40 @@ import { WorkShift, CurrentShiftResponse } from '../../../models/work-shift.mode
           <mat-icon>info</mat-icon>
           <p>{{ errorMessage || 'No hay turnos configurados' }}</p>
         </div>
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </section>
   `,
   styles: [`
     .current-shift-card {
       max-width: 600px;
       margin: 20px auto;
+    }
 
-      mat-card-header {
-        mat-card-title {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 18px;
-        }
-      }
+    .current-shift-panel {
+      background: var(--surface-card);
+      border: 1px solid var(--outline-subtle);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .current-shift-panel__header {
+      padding: var(--space-4);
+      border-bottom: 1px solid var(--outline-subtle);
+    }
+
+    .current-shift-panel__title {
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .current-shift-panel__body {
+      padding: var(--space-4);
     }
 
     .loading {
@@ -122,10 +138,10 @@ import { WorkShift, CurrentShiftResponse } from '../../../models/work-shift.mode
           align-items: center;
           gap: 12px;
           padding: 12px 0;
-          border-bottom: 1px solid #eee;
+          border-bottom: 1px solid var(--outline-subtle);
 
           mat-icon {
-            color: #666;
+            color: var(--text-secondary);
           }
 
           span {
@@ -133,7 +149,7 @@ import { WorkShift, CurrentShiftResponse } from '../../../models/work-shift.mode
           }
 
           .unassigned {
-            color: #999;
+            color: var(--text-muted, var(--text-secondary));
             font-style: italic;
           }
         }
@@ -145,12 +161,12 @@ import { WorkShift, CurrentShiftResponse } from '../../../models/work-shift.mode
         gap: 8px;
         margin-top: 24px;
         padding: 16px;
-        background-color: #f5f5f5;
-        border-radius: 8px;
+        background: var(--surface-muted);
+        border-radius: var(--radius-md);
         font-size: 15px;
 
         mat-icon {
-          color: #1976d2;
+          color: var(--primary-color);
         }
       }
     }
@@ -158,7 +174,7 @@ import { WorkShift, CurrentShiftResponse } from '../../../models/work-shift.mode
     .no-shift {
       text-align: center;
       padding: 60px 20px;
-      color: #666;
+      color: var(--text-secondary);
 
       mat-icon {
         font-size: 64px;

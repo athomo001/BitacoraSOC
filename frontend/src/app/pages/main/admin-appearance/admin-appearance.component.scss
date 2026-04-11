@@ -1,14 +1,39 @@
+// Preferencias de apariencia: todo alineado a tokens (evita grises fijos ilegibles en dark)
 :host {
   display: block;
-  padding: 16px;
+  padding: var(--space-4);
 }
 
-mat-card {
+.appearance-admin {
   max-width: 640px;
 }
 
+.appearance-panel {
+  background: var(--surface-card);
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.appearance-panel__header {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--outline-subtle);
+}
+
+.appearance-panel__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.appearance-panel__body {
+  padding: var(--space-4);
+}
+
 .description {
-  color: #888;
+  color: var(--text-muted);
   font-size: 13px;
   margin-bottom: 20px;
   line-height: 1.5;
@@ -21,20 +46,20 @@ mat-card {
 }
 
 .theme-option {
-  padding: 16px;
-  border: 1px solid #333;
-  border-radius: 8px;
+  padding: var(--space-4);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
   transition: border-color 0.2s, background-color 0.2s;
   cursor: pointer;
 
   &.selected {
-    border-color: #00cc77;
-    background-color: rgba(0, 204, 119, 0.06);
+    border-color: var(--state-success);
+    background-color: color-mix(in srgb, var(--state-success) 10%, var(--surface-color));
   }
 
   &:hover:not(.selected) {
-    border-color: #555;
-    background-color: rgba(255, 255, 255, 0.02);
+    border-color: var(--outline-strong);
+    background-color: var(--hover-bg);
   }
 }
 
@@ -46,14 +71,14 @@ mat-card {
 .theme-desc {
   margin: 8px 0 0 28px;
   font-size: 12px;
-  color: #999;
+  color: var(--text-secondary);
   line-height: 1.5;
 }
 
 .actions {
-  margin-top: 24px;
+  margin-top: var(--space-6);
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .inline-spinner {

@@ -7,9 +7,24 @@
   }
 }
 
+.checklist-panel {
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  background: var(--surface-card);
+}
+
+.checklist-panel__body {
+  padding: var(--space-4);
+
+  &--accordion {
+    padding: var(--space-4);
+  }
+}
+
 .status-card {
   margin-bottom: 24px;
-  background-color: var(--surface-color);
 
   .status-info {
     display: flex;
@@ -34,7 +49,7 @@
 }
 
 .checklist-form-card {
-  background-color: var(--surface-color);
+  margin-top: 16px;
 }
 
 .full-width {

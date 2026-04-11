@@ -1,11 +1,11 @@
 <div class="profile-container">
   <h1>Mi Perfil</h1>
 
-  <mat-card class="profile-card">
-    <mat-card-header>
-      <mat-card-title>Informacion Personal</mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
+  <div class="profile-panel">
+    <header class="profile-panel__header">
+      <h2 class="profile-panel__title">Informacion Personal</h2>
+    </header>
+    <div class="profile-panel__body">
       <form [formGroup]="profileForm" (ngSubmit)="saveProfile()">
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Nombre Completo</mat-label>
@@ -38,14 +38,14 @@
           <span *ngIf="!isSavingProfile">Guardar Cambios</span>
         </button>
       </form>
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </div>
 
-  <mat-card class="profile-card">
-    <mat-card-header>
-      <mat-card-title>Cambiar Contraseña</mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
+  <div class="profile-panel">
+    <header class="profile-panel__header">
+      <h2 class="profile-panel__title">Cambiar Contraseña</h2>
+    </header>
+    <div class="profile-panel__body">
       <form [formGroup]="passwordForm" (ngSubmit)="changePassword()">
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Contraseña Actual</mat-label>
@@ -68,6 +68,6 @@
           <span *ngIf="!isChangingPassword">Cambiar Contraseña</span>
         </button>
       </form>
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </div>
 </div>

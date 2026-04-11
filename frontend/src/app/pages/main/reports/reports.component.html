@@ -2,59 +2,62 @@
   <h1>📊 Reportes y Estadísticas</h1>
 
   <!-- Selector de período -->
-  <mat-card class="period-selector">
-    <mat-card-content>
-      <mat-button-toggle-group [(ngModel)]="selectedDays" (change)="onPeriodChange(selectedDays)">
+  <section class="period-selector reports-panel">
+    <div class="reports-panel__body reports-panel__body--center">
+      <mat-button-toggle-group
+        class="reports-period-toggle"
+        [(ngModel)]="selectedDays"
+        (change)="onPeriodChange(selectedDays)">
         <mat-button-toggle [value]="7">7 días</mat-button-toggle>
         <mat-button-toggle [value]="15">15 días</mat-button-toggle>
         <mat-button-toggle [value]="30">30 días</mat-button-toggle>
         <mat-button-toggle [value]="60">60 días</mat-button-toggle>
         <mat-button-toggle [value]="90">90 días</mat-button-toggle>
       </mat-button-toggle-group>
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </section>
 
   <div *ngIf="overview">
     <!-- KPIs Cards -->
     <div class="stats-grid">
-      <mat-card class="stat-card">
-        <mat-card-content>
+      <article class="stat-card reports-panel">
+        <div class="reports-panel__body">
           <div class="stat-value">{{ overview.entriesByType.operativa || 0 }}</div>
           <div class="stat-label">Operativa</div>
-        </mat-card-content>
-      </mat-card>
-      <mat-card class="stat-card ofensas">
-        <mat-card-content>
+        </div>
+      </article>
+      <article class="stat-card reports-panel ofensas">
+        <div class="reports-panel__body">
           <div class="stat-value">{{ overview.entriesByType.ofensa || 0 }}</div>
           <div class="stat-label">Ofensas</div>
-        </mat-card-content>
-      </mat-card>
-      <mat-card class="stat-card incidentes">
-        <mat-card-content>
+        </div>
+      </article>
+      <article class="stat-card reports-panel incidentes">
+        <div class="reports-panel__body">
           <div class="stat-value">{{ overview.entriesByType.incidente || 0 }}</div>
           <div class="stat-label">Incidentes</div>
-        </mat-card-content>
-      </mat-card>
-      <mat-card class="stat-card">
-        <mat-card-content>
+        </div>
+      </article>
+      <article class="stat-card reports-panel">
+        <div class="reports-panel__body">
           <div class="stat-value">{{ overview.totalUsers }}</div>
           <div class="stat-label">Usuarios Activos</div>
-        </mat-card-content>
-      </mat-card>
-      <mat-card class="stat-card">
-        <mat-card-content>
+        </div>
+      </article>
+      <article class="stat-card reports-panel">
+        <div class="reports-panel__body">
           <div class="stat-value">{{ overview.totalChecks }}</div>
           <div class="stat-label">Checks Realizados</div>
-        </mat-card-content>
-      </mat-card>
+        </div>
+      </article>
     </div>
 
     <!-- Gráfico de tendencia de entradas -->
-    <mat-card class="chart-card">
-      <mat-card-header>
-        <mat-card-title>📈 Tendencia de Entradas (últimos {{ selectedDays }} días)</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
+    <section class="chart-card reports-panel">
+      <header class="reports-panel__header">
+        <h2 class="reports-panel__title">📈 Tendencia de Entradas (últimos {{ selectedDays }} días)</h2>
+      </header>
+      <div class="reports-panel__body">
         <ngx-charts-line-chart
           [view]="trendView"
           [results]="entriesTrendData"
@@ -68,15 +71,15 @@
           [scheme]="colorScheme"
           [animations]="true">
         </ngx-charts-line-chart>
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </section>
 
     <!-- Entradas por tipo (Pie chart) -->
-    <mat-card class="chart-card">
-      <mat-card-header>
-        <mat-card-title>🥧 Distribución por Tipo</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
+    <section class="chart-card reports-panel">
+      <header class="reports-panel__header">
+        <h2 class="reports-panel__title">🥧 Distribución por Tipo</h2>
+      </header>
+      <div class="reports-panel__body">
         <ngx-charts-pie-chart
           [view]="view"
           [results]="entriesByTypeData"
@@ -85,15 +88,15 @@
           [doughnut]="false"
           [scheme]="colorScheme">
         </ngx-charts-pie-chart>
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </section>
 
     <!-- Incidentes por usuario -->
-    <mat-card class="chart-card" *ngIf="incidentsByUserData.length > 0">
-      <mat-card-header>
-        <mat-card-title>👤 Top 10 Analistas Más Activos</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
+    <section class="chart-card reports-panel" *ngIf="incidentsByUserData.length > 0">
+      <header class="reports-panel__header">
+        <h2 class="reports-panel__title">👤 Top 10 Analistas Más Activos</h2>
+      </header>
+      <div class="reports-panel__body">
         <ngx-charts-bar-horizontal
           [view]="view"
           [results]="incidentsByUserData"
@@ -105,15 +108,15 @@
           yAxisLabel="Analista"
           [scheme]="colorScheme">
         </ngx-charts-bar-horizontal>
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </section>
 
     <!-- Tags más usados -->
-    <mat-card class="chart-card" *ngIf="topTagsData.length > 0">
-      <mat-card-header>
-        <mat-card-title>🏷️ Top 15 Tags Más Usados</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
+    <section class="chart-card reports-panel" *ngIf="topTagsData.length > 0">
+      <header class="reports-panel__header">
+        <h2 class="reports-panel__title">🏷️ Top 15 Tags Más Usados</h2>
+      </header>
+      <div class="reports-panel__body">
         <ngx-charts-bar-horizontal
           [view]="view"
           [results]="topTagsData"
@@ -125,15 +128,15 @@
           yAxisLabel="Tag"
           [scheme]="colorScheme">
         </ngx-charts-bar-horizontal>
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </section>
 
     <!-- Servicios con rojos -->
-    <mat-card class="chart-card" *ngIf="redsByServiceData.length > 0">
-      <mat-card-header>
-        <mat-card-title>🔴 Servicios con Más Rojos</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
+    <section class="chart-card reports-panel" *ngIf="redsByServiceData.length > 0">
+      <header class="reports-panel__header">
+        <h2 class="reports-panel__title">🔴 Servicios con Más Rojos</h2>
+      </header>
+      <div class="reports-panel__body">
         <ngx-charts-bar-horizontal
           [view]="view"
           [results]="redsByServiceData"
@@ -145,15 +148,15 @@
           yAxisLabel="Servicio"
           [scheme]="colorScheme">
         </ngx-charts-bar-horizontal>
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </section>
 
     <!-- Comparación de tags -->
-    <mat-card class="chart-card">
-      <mat-card-header>
-        <mat-card-title>📊 Comparar Tendencias por Tags</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
+    <section class="chart-card reports-panel">
+      <header class="reports-panel__header">
+        <h2 class="reports-panel__title">📊 Comparar Tendencias por Tags</h2>
+      </header>
+      <div class="reports-panel__body">
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Selecciona tags para comparar (hasta 5)</mat-label>
           <mat-select [(ngModel)]="selectedTagsForComparison" multiple (selectionChange)="onTagSelectionChange()">
@@ -182,15 +185,15 @@
         <p *ngIf="tagComparisonData.length === 0" class="no-data">
           Selecciona tags para ver la comparación
         </p>
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </section>
 
     <!-- Entradas por Log Source (Cliente) -->
-    <mat-card class="chart-card" *ngIf="entriesByLogSourceData.length > 0">
-      <mat-card-header>
-        <mat-card-title>🖥️ Entradas por Log Source / Cliente</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
+    <section class="chart-card reports-panel" *ngIf="entriesByLogSourceData.length > 0">
+      <header class="reports-panel__header">
+        <h2 class="reports-panel__title">🖥️ Entradas por Log Source / Cliente</h2>
+      </header>
+      <div class="reports-panel__body">
         <div class="charts-grid">
           <!-- Gráfico de barras -->
           <div class="chart-wrapper">
@@ -207,7 +210,7 @@
               [scheme]="colorScheme">
             </ngx-charts-bar-horizontal>
           </div>
-          
+
           <!-- Gráfico de torta -->
           <div class="chart-wrapper">
             <h3 class="chart-subtitle">Distribución Porcentual</h3>
@@ -221,24 +224,24 @@
             </ngx-charts-pie-chart>
           </div>
         </div>
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </section>
 
     <!-- Mapa de calor -->
-    <mat-card class="chart-card">
-      <mat-card-header>
-        <mat-card-title>
-          🔥 Mapa de Calor: Día vs Hora
-          <button mat-icon-button (click)="toggleHeatmap()" class="toggle-btn">
+    <section class="chart-card reports-panel">
+      <header class="reports-panel__header">
+        <h2 class="reports-panel__title">
+          <span>🔥 Mapa de Calor: Día vs Hora</span>
+          <button mat-icon-button type="button" (click)="toggleHeatmap()" class="toggle-btn" aria-label="Expandir o colapsar mapa de calor">
             <mat-icon>{{ showHeatmap ? 'expand_less' : 'expand_more' }}</mat-icon>
           </button>
-        </mat-card-title>
-      </mat-card-header>
-      <mat-card-content *ngIf="showHeatmap">
+        </h2>
+      </header>
+      <div class="reports-panel__body" *ngIf="showHeatmap">
         <p class="chart-description">
           Visualiza los picos de actividad: horas y días con más entradas
         </p>
-        
+
         <!-- Leyenda de escala de colores -->
         <div class="heatmap-legend">
           <div class="legend-item">
@@ -262,11 +265,11 @@
             <span class="legend-label">Muy Alto</span>
           </div>
         </div>
-        
+
         <div *ngIf="heatmapData.length > 0" class="custom-heatmap-container">
           <!-- Y-axis label -->
           <div class="heatmap-y-label">Día de la Semana</div>
-          
+
           <div class="custom-heatmap-wrapper">
             <div class="custom-heatmap">
               <!-- Header row: hours -->
@@ -277,7 +280,7 @@
               <!-- Data rows -->
               <div class="heatmap-row" *ngFor="let day of heatmapData">
                 <div class="heatmap-day-label">{{ day.name }}</div>
-                <div 
+                <div
                   class="heatmap-cell"
                   *ngFor="let cell of day.series"
                   [style.background-color]="getHeatmapCellColor(cell.value)"
@@ -287,13 +290,13 @@
                 </div>
               </div>
             </div>
-            
+
             <!-- X-axis label -->
             <div class="heatmap-x-label">Hora del Día</div>
           </div>
         </div>
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </section>
 
     <!-- Acciones -->
     <div class="actions">

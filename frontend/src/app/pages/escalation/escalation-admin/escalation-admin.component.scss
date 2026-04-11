@@ -4,16 +4,44 @@
   margin: 0 auto;
 }
 
+.esc-admin-panel {
+  background: var(--surface-card);
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.esc-admin-panel__header {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--outline-subtle);
+}
+
+.esc-admin-panel__title {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.esc-admin-panel__subtitle {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.esc-admin-panel__body {
+  padding: var(--space-4);
+}
+
 .header-card {
   margin-bottom: 24px;
-  
-  mat-card-header {
-    mat-card-title {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-size: 24px;
-    }
+
+  .esc-admin-panel__title {
+    font-size: 24px;
   }
 }
 
@@ -94,7 +122,6 @@ mat-chip {
 /* Formularios inline */
 .form-card {
   margin-bottom: 24px;
-  background-color: var(--surface-muted);
 }
 
 .copyable-cell {

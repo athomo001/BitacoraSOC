@@ -1,7 +1,6 @@
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { MatCardModule } from '@angular/material/card';
 import { MatTableModule } from '@angular/material/table';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -23,7 +22,6 @@ import { AuditLog, AuditLogFilters } from '../../../models/audit-log.model';
   imports: [
     CommonModule,
     ReactiveFormsModule,
-    MatCardModule,
     MatTableModule,
     MatPaginatorModule,
     MatFormFieldModule,

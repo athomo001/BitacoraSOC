@@ -7,7 +7,6 @@ import { AuthService } from '../../../services/auth.service';
 import { OnboardingService } from '../../../services/onboarding.service';
 import { UpdateConfigRequest } from '../../../models/config.model';
 import { SmtpConfigRequest, SmtpConfig } from '../../../models/smtp.model';
-import { MatCard, MatCardHeader, MatCardTitle, MatCardContent } from '@angular/material/card';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { MatFormField, MatLabel, MatHint } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
@@ -21,10 +20,6 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
   templateUrl: './settings.component.html',
   styleUrls: ['./settings.component.scss'],
   imports: [
-    MatCard,
-    MatCardHeader,
-    MatCardTitle,
-    MatCardContent,
     ReactiveFormsModule,
     MatCheckbox,
     MatFormField,

@@ -9,11 +9,11 @@
     </div>
   </div>
 
-  <mat-card class="config-card" id="general-config">
-    <mat-card-header>
-      <mat-card-title>Configuración General</mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
+  <div class="settings-panel settings-panel--config" id="general-config">
+    <header class="settings-panel__header">
+      <h2 class="settings-panel__title">Configuración General</h2>
+    </header>
+    <div class="settings-panel__body">
       <form [formGroup]="appConfigForm" (ngSubmit)="saveAppConfig()">
         <mat-checkbox formControlName="guestEnabled" id="guest-mode">
           Habilitar modo invitado
@@ -23,18 +23,18 @@
           Guardar
         </button>
       </form>
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </div>
 
-  <mat-card class="smtp-card" id="smtp-config">
-    <mat-card-header>
-      <mat-card-title>Configuracion SMTP</mat-card-title>
+  <div class="settings-panel settings-panel--smtp" id="smtp-config">
+    <header class="settings-panel__header settings-panel__header--split">
+      <h2 class="settings-panel__title">Configuracion SMTP</h2>
       <span class="status-chip" [ngClass]="connectionStatus">
         {{ connectionStatus === 'conectado' ? 'Conectado' : connectionStatus === 'desconectado' ? 'Desconectado' : 'Sin
         configurar' }}
       </span>
-    </mat-card-header>
-    <mat-card-content>
+    </header>
+    <div class="settings-panel__body">
       <form [formGroup]="smtpForm" (ngSubmit)="saveSmtpConfig()">
         <div class="grid two-cols">
           <mat-form-field appearance="outline">
@@ -115,6 +115,6 @@
           </button>
         </div>
       </form>
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </div>
 </div>

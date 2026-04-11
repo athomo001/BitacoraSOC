@@ -140,35 +140,44 @@ async function runShiftReminder() {
 
         const recipientSet = new Map();
 
-        // Fuente principal: WorkShiftAssignment (vinculaciones operativas gestionadas desde UI)
-        const currentDow = moment.tz(now, shiftTz).day(); // 0=Domingo … 6=Sábado
-        const operativeAssignments = await WorkShiftAssignment.find({
+        // Revisar si el turno ha sido migrado al nuevo sistema de asignaciones
+        const totalAssignmentsCount = await WorkShiftAssignment.countDocuments({
           workShiftId: shift._id,
-          active: true,
-          weekdays: currentDow
-        }).populate('userId', 'email fullName username isActive').lean();
-        for (const asg of operativeAssignments) {
-          const u = asg.userId;
-          if (u?.email && u.isActive !== false) {
-            recipientSet.set(u.email.toLowerCase(), u.fullName || u.username || u.email);
-          }
-        }
+          active: true
+        });
 
-        // Fallback legacy: solo si WorkShiftAssignment no tiene ningún destinatario
-        if (recipientSet.size === 0 && Array.isArray(shift.assignedUserIds)) {
-          for (const user of shift.assignedUserIds) {
-            if (user?.email && user.isActive !== false) {
-              recipientSet.set(user.email.toLowerCase(), user.fullName || user.username || user.email);
+        if (totalAssignmentsCount > 0) {
+          // Fuente principal: WorkShiftAssignment (vinculaciones operativas)
+          const currentDow = moment.tz(now, shiftTz).day(); // 0=Domingo … 6=Sábado
+          const operativeAssignments = await WorkShiftAssignment.find({
+            workShiftId: shift._id,
+            active: true,
+            weekdays: currentDow
+          }).populate('userId', 'email fullName username isActive').lean();
+          
+          for (const asg of operativeAssignments) {
+            const u = asg.userId;
+            if (u?.email && u.isActive !== false) {
+              recipientSet.set(u.email.toLowerCase(), u.fullName || u.username || u.email);
             }
           }
-        }
+        } else {
+          // Fallback legacy: solo si WorkShiftAssignment no tiene asignaciones activas para este turno
+          if (Array.isArray(shift.assignedUserIds)) {
+            for (const user of shift.assignedUserIds) {
+              if (user?.email && user.isActive !== false) {
+                recipientSet.set(user.email.toLowerCase(), user.fullName || user.username || user.email);
+              }
+            }
+          }
 
-        if (recipientSet.size === 0 && shift.assignedUserId) {
-          const legacyUser = await User.findById(shift.assignedUserId)
-            .select('email fullName username isActive')
-            .lean();
-          if (legacyUser?.email && legacyUser.isActive !== false) {
-            recipientSet.set(legacyUser.email.toLowerCase(), legacyUser.fullName || legacyUser.username || legacyUser.email);
+          if (recipientSet.size === 0 && shift.assignedUserId) {
+            const legacyUser = await User.findById(shift.assignedUserId)
+              .select('email fullName username isActive')
+              .lean();
+            if (legacyUser?.email && legacyUser.isActive !== false) {
+              recipientSet.set(legacyUser.email.toLowerCase(), legacyUser.fullName || legacyUser.username || legacyUser.email);
+            }
           }
         }
 

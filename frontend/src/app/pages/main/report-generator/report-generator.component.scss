@@ -1,7 +1,44 @@
+// Estilos del generador de reportes / boletín.
+// Colores y superficies: siempre vía variables CSS del tema (styles.scss + semantic-tokens.scss).
+
 .report-generator-container {
-  padding: 20px;
+  padding: var(--space-5);
   max-width: 1200px;
   margin: 0 auto;
+}
+
+// Superficie única sin mat-card raíz (UI-ARCH-045): mismos tokens que checklist `.admin-panel`.
+.report-generator-panel {
+  background: var(--surface-card);
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  margin-bottom: var(--space-4);
+}
+
+.report-generator-header {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--outline-subtle);
+
+  h1 {
+    margin: 0 0 var(--space-2);
+    font-size: 1.35rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .report-generator-subtitle {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.45;
+  }
+}
+
+.report-generator-body {
+  padding: var(--space-4);
+  overflow: visible;
 }
 
 .mode-selector-container {
@@ -9,26 +46,26 @@
   position: relative;
   justify-content: center;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: var(--space-6);
 
   .guide-toggle-btn {
     position: absolute;
     right: 0;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
     font-size: 13px;
     font-weight: 500;
-    padding: 4px 12px;
-    border: 1px solid rgba(63, 81, 181, 0.4);
-    border-radius: 20px;
-    color: #3f51b5;
-    background: rgba(63, 81, 181, 0.05);
+    padding: var(--space-1) var(--space-3);
+    border: 1px solid color-mix(in srgb, var(--primary-color) 42%, transparent);
+    border-radius: var(--radius-pill);
+    color: var(--primary-color);
+    background: color-mix(in srgb, var(--primary-color) 8%, var(--surface-color));
     transition: background 0.2s, border-color 0.2s;
 
     &:hover {
-      background: rgba(63, 81, 181, 0.12);
-      border-color: #3f51b5;
+      background: color-mix(in srgb, var(--primary-color) 16%, var(--surface-color));
+      border-color: var(--primary-color);
     }
   }
 
@@ -42,24 +79,12 @@
   }
 }
 
-mat-card-content {
-  overflow: visible !important;
-}
-
+// Etiquetas del toggle modo: ver styles.scss (mat-button-toggle-group.mode-selector).
 .mode-selector {
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: var(--shadow);
   background-color: var(--surface-card);
-
-  ::ng-deep .mat-button-toggle-label-content {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 0 24px;
-    font-size: 14px;
-    font-weight: 500;
-  }
 }
 
 .full-width {
@@ -82,19 +107,19 @@ mat-card-content {
   background: var(--state-error-bg);
 
   &.maintenance-blocking {
-    border-color: #e65100;
-    background: rgba(230, 81, 0, 0.06);
+    border-color: var(--state-warning);
+    background: var(--state-warning-bg);
 
     .client-alert-header {
-      color: #e65100;
+      color: var(--state-warning);
     }
 
     .client-alert-message {
-      color: #b84d00;
+      color: var(--state-warning);
     }
 
     .client-alert-meta {
-      color: #b84d00;
+      color: var(--text-secondary);
     }
   }
 }
@@ -143,13 +168,13 @@ mat-card-content {
 .maintenance-blocking-notice {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin: 8px 0;
-  padding: 6px 10px;
-  background: rgba(230, 81, 0, 0.08);
-  border-radius: 4px;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+  background: color-mix(in srgb, var(--state-warning) 14%, var(--surface-color));
+  border-radius: var(--radius-sm);
   font-size: 13px;
-  color: #b84d00;
+  color: var(--state-warning);
   font-weight: 600;
 
   mat-icon {
@@ -264,15 +289,11 @@ mat-card-content {
   }
 }
 
-mat-card {
-  margin-bottom: 16px;
-}
-
 .guide-toggle-active {
-  background-color: rgba(63, 81, 181, 0.1) !important;
-  color: #3f51b5 !important;
+  background-color: color-mix(in srgb, var(--primary-color) 12%, var(--surface-color)) !important;
+  color: var(--primary-color) !important;
   font-weight: 600;
-  border: 1px solid rgba(63, 81, 181, 0.3) !important;
+  border: 1px solid color-mix(in srgb, var(--primary-color) 35%, transparent) !important;
 }
 
 // ─── Help Bubbles ─────────────────────────────────────────────────────────
@@ -287,22 +308,22 @@ mat-card {
   z-index: 100;
   bottom: calc(100% + 15px);
   left: 0;
-  
-  background: #ffffff;
-  border: 1px solid #e0e0e0;
-  border-radius: 12px;
-  padding: 16px 20px;
+
+  background: var(--surface-raised);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5);
   width: max-content;
   max-width: 480px;
   min-width: 250px;
   font-size: 13px;
   line-height: 1.6;
-  color: #333;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.1);
+  color: var(--text-primary);
+  box-shadow: var(--shadow);
   pointer-events: none;
   backdrop-filter: blur(16px);
-  
-  // Down-pointing arrow (now standard)
+
+  // Flecha inferior alineada al tema (evita “caja blanca” en dark/sepia)
   &::after {
     content: '';
     position: absolute;
@@ -312,8 +333,8 @@ mat-card {
     height: 0;
     border-left: 8px solid transparent;
     border-right: 8px solid transparent;
-    border-top: 8px solid #ffffff;
-    filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.05));
+    border-top: 8px solid var(--surface-raised);
+    filter: drop-shadow(0 2px 1px var(--outline-subtle));
   }
 
   // Adjust for tablet/small desktop
@@ -333,10 +354,6 @@ mat-card {
   .help-bubble {
     animation: none !important;
   }
-}
-
-mat-card-header {
-  margin-bottom: 24px;
 }
 
 .hidden-file-input {
@@ -363,29 +380,57 @@ mat-card-header {
 .newsletter-grid-right {
   display: flex;
   
+  // Internos MDC del campo CVE (altura en grid): ver styles.scss (.report-generator-container … .cve-field).
   .cve-field {
     width: 100%;
-    
-    ::ng-deep .mat-mdc-text-field-wrapper {
-      height: 100%;
-    }
-    
-    ::ng-deep .mat-mdc-form-field-flex {
-      height: 100%;
-      align-items: stretch;
-    }
-
-    ::ng-deep .mat-mdc-form-field-infix {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      padding-top: 12px;
-      padding-bottom: 12px;
-    }
 
     textarea {
       flex: 1;
       resize: none !important;
     }
   }
+}
+
+// Contenedor de envío 1:1 del boletín (antes con estilos inline; ahora 100 % tokens de tema)
+.newsletter-send-container {
+  margin-bottom: var(--space-5);
+  padding: var(--space-4);
+  background: var(--surface-muted);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+
+  .newsletter-send-title {
+    margin-top: 0;
+    margin-bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--text-primary);
+
+    mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+  }
+
+  .newsletter-send-hint {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: var(--space-2) 0 var(--space-4);
+  }
+
+  .newsletter-send-actions {
+    text-align: right;
+  }
+}
+
+// Mayor separación bajo un campo del grid de boletín (reemplaza margin inline)
+.newsletter-field-spaced.full-width {
+  margin-bottom: var(--space-5);
+}
+
+// Contenedor de hint + campo a ancho completo en columnas flex
+.field-with-hint--stretch {
+  width: 100%;
 }

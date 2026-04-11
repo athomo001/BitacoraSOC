@@ -1,16 +1,16 @@
 <div class="escalation-admin-container">
   <!-- Encabezado -->
-  <mat-card class="header-card">
-    <mat-card-header>
-      <mat-card-title>
+  <section class="header-card esc-admin-panel">
+    <header class="esc-admin-panel__header">
+      <h2 class="esc-admin-panel__title">
         <mat-icon>admin_panel_settings</mat-icon>
         Administración de Escalamientos
-      </mat-card-title>
-      <mat-card-subtitle>
+      </h2>
+      <p class="esc-admin-panel__subtitle">
         Gestión de clientes, servicios, contactos, reglas y turnos
-      </mat-card-subtitle>
-    </mat-card-header>
-  </mat-card>
+      </p>
+    </header>
+  </section>
 
   <!-- Tabs -->
   <mat-tab-group [(selectedIndex)]="selectedTab" animationDuration="200ms">
@@ -26,11 +26,11 @@
         </div>
 
         <!-- Formulario inline para agregar/editar cliente -->
-        <mat-card *ngIf="showClientForm" class="form-card">
-          <mat-card-header>
-            <mat-card-title>{{ editingClientId ? 'Editar' : 'Nuevo' }} Cliente</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
+        <section *ngIf="showClientForm" class="form-card esc-admin-panel">
+          <header class="esc-admin-panel__header">
+            <h2 class="esc-admin-panel__title">{{ editingClientId ? 'Editar' : 'Nuevo' }} Cliente</h2>
+          </header>
+          <div class="esc-admin-panel__body">
             <form [formGroup]="clientForm" (ngSubmit)="saveClient()">
               <div class="form-row">
                 <mat-form-field appearance="outline" class="form-field">
@@ -54,8 +54,8 @@
                 </button>
               </div>
             </form>
-          </mat-card-content>
-        </mat-card>
+          </div>
+        </section>
 
         <div *ngIf="loadingClients" class="loading-container">
           <mat-spinner></mat-spinner>
@@ -112,11 +112,11 @@
         </div>
 
         <!-- Formulario inline para agregar/editar servicio -->
-        <mat-card *ngIf="showServiceForm" class="form-card">
-          <mat-card-header>
-            <mat-card-title>{{ editingServiceId ? 'Editar' : 'Nuevo' }} Servicio</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
+        <section *ngIf="showServiceForm" class="form-card esc-admin-panel">
+          <header class="esc-admin-panel__header">
+            <h2 class="esc-admin-panel__title">{{ editingServiceId ? 'Editar' : 'Nuevo' }} Servicio</h2>
+          </header>
+          <div class="esc-admin-panel__body">
             <form [formGroup]="serviceForm" (ngSubmit)="saveService()">
               <div class="form-row">
                 <mat-form-field appearance="outline" class="form-field">
@@ -152,8 +152,8 @@
                 </button>
               </div>
             </form>
-          </mat-card-content>
-        </mat-card>
+          </div>
+        </section>
 
         <div *ngIf="loadingServices" class="loading-container">
           <mat-spinner></mat-spinner>
@@ -215,11 +215,11 @@
         </div>
 
         <!-- Formulario inline para agregar/editar contacto -->
-        <mat-card *ngIf="showContactForm" class="form-card">
-          <mat-card-header>
-            <mat-card-title>{{ editingContactId ? 'Editar' : 'Nuevo' }} Contacto</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
+        <section *ngIf="showContactForm" class="form-card esc-admin-panel">
+          <header class="esc-admin-panel__header">
+            <h2 class="esc-admin-panel__title">{{ editingContactId ? 'Editar' : 'Nuevo' }} Contacto</h2>
+          </header>
+          <div class="esc-admin-panel__body">
             <form [formGroup]="contactForm" (ngSubmit)="saveContact()">
               <div class="form-row">
                 <mat-form-field appearance="outline" class="form-field">
@@ -264,8 +264,8 @@
                 </button>
               </div>
             </form>
-          </mat-card-content>
-        </mat-card>
+          </div>
+        </section>
 
         <div *ngIf="loadingContacts" class="loading-container">
           <mat-spinner></mat-spinner>
@@ -470,7 +470,8 @@
         </div>
 
         <!-- Formulario de Override -->
-        <mat-card *ngIf="showOverrideForm" class="form-card">
+        <section *ngIf="showOverrideForm" class="form-card esc-admin-panel">
+          <div class="esc-admin-panel__body">
           <form [formGroup]="overrideForm" (ngSubmit)="saveOverride()">
             <div class="form-row">
               <mat-form-field appearance="outline" class="full-width">
@@ -543,7 +544,8 @@
               </button>
             </div>
           </form>
-        </mat-card>
+          </div>
+        </section>
 
         <div *ngIf="loadingOverrides" class="loading-container">
           <mat-spinner></mat-spinner>

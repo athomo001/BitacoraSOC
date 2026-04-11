@@ -2,7 +2,6 @@ import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
-import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule } from '@angular/material/table';
@@ -27,7 +26,6 @@ import { ClientAlertRule } from '../../../models/escalation.model';
     imports: [
         CommonModule,
         FormsModule,
-        MatCardModule,
         MatButtonModule,
         MatIconModule,
         MatTableModule,

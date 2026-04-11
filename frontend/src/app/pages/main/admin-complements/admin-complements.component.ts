@@ -3,7 +3,6 @@ import { Component, OnInit } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -29,7 +28,6 @@ import { UserService } from '../../../services/user.service';
     CommonModule,
     ReactiveFormsModule,
     MatButtonModule,
-    MatCardModule,
     MatCheckboxModule,
     MatFormFieldModule,
     MatIconModule,
@@ -40,7 +38,7 @@ import { UserService } from '../../../services/user.service';
   ],
   template: `
     <div class="complements-admin">
-      <mat-card class="complements-list">
+      <section class="complements-list complements-panel">
         <h2>Complementos Registrados</h2>
         <button mat-raised-button color="primary" (click)="startNew()">Nuevo complemento</button>
 
@@ -50,9 +48,9 @@ import { UserService } from '../../../services/user.service';
             <div>{{ item.slug }} · {{ item.status }} · {{ item.circuit.state }}</div>
           </div>
         </div>
-      </mat-card>
+      </section>
 
-      <mat-card class="complements-form">
+      <section class="complements-form complements-panel">
         <h2>{{ selectedComplement ? 'Editar complemento' : 'Alta de complemento' }}</h2>
 
         <mat-tab-group [(selectedIndex)]="selectedTabIndex">
@@ -342,7 +340,7 @@ import { UserService } from '../../../services/user.service';
           <h3>Último token emitido</h3>
           <pre>{{ lastIssuedToken }}</pre>
         </div>
-      </mat-card>
+      </section>
     </div>
   `,
   styles: [`
@@ -351,6 +349,14 @@ import { UserService } from '../../../services/user.service';
       grid-template-columns: 320px minmax(0, 1fr);
       gap: 16px;
       padding: 16px;
+    }
+
+    .complements-panel {
+      background: var(--surface-card);
+      border: 1px solid var(--outline-subtle);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow);
+      overflow: hidden;
     }
 
     .complements-list,

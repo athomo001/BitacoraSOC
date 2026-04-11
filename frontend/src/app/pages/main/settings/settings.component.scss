@@ -16,9 +16,40 @@
   margin: 0 0 8px 0;
 }
 
-.config-card,
-.smtp-card {
-  margin-bottom: 24px;
+.settings-panel {
+  background: var(--surface-card);
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  margin-bottom: var(--space-6);
+}
+
+.settings-panel__header {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--outline-subtle);
+
+  &--split {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+  }
+}
+
+.settings-panel__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.settings-panel__header--split .settings-panel__title {
+  flex: 1 1 auto;
+}
+
+.settings-panel__body {
+  padding: var(--space-4);
 }
 
 form {
@@ -49,7 +80,6 @@ form {
 }
 
 .status-chip {
-  margin-left: auto;
   padding: 6px 10px;
   border-radius: 12px;
   font-size: 12px;

@@ -2,11 +2,11 @@
   <h1>Integraciones</h1>
   <p class="subtitle">Centraliza conectores salientes para SIEM/SOAR/NDR y futuras integraciones.</p>
 
-  <mat-card class="integration-card">
-    <mat-card-header>
-      <mat-card-title>SIEM / SOAR / NDR</mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
+  <div class="integration-panel">
+    <header class="integration-panel__header">
+      <h2 class="integration-panel__title">SIEM / SOAR / NDR</h2>
+    </header>
+    <div class="integration-panel__body">
       <div class="connector-toolbar">
         <mat-form-field appearance="outline">
           <mat-label>Integración</mat-label>
@@ -113,19 +113,19 @@
           </button>
         </div>
       </form>
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </div>
 
-  <mat-card class="integration-card future-card">
-    <mat-card-header>
-      <mat-card-title>Módulo General de Integraciones</mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
+  <div class="integration-panel integration-panel--future">
+    <header class="integration-panel__header">
+      <h2 class="integration-panel__title">Módulo General de Integraciones</h2>
+    </header>
+    <div class="integration-panel__body">
       <p>Esta consola unifica integraciones salientes. Conectores próximos:</p>
       <ul>
         <li>Webhooks operativos</li>
         <li>Conectores SIEM adicionales (Elastic/Wazuh/QRadar/Fortinet)</li>
       </ul>
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </div>
 </div>
