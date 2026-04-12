@@ -1,7 +1,9 @@
 # Stage 1: Build Angular app
-FROM node:24-alpine AS builder
+ARG NODE_IMAGE=node:24-alpine
+FROM ${NODE_IMAGE} AS builder
 
 WORKDIR /app
+USER root
 
 # Version del build (inyectada desde Docker Compose/CI)
 ARG APP_VERSION=dev

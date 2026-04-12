@@ -57,3 +57,28 @@ button {
     margin-right: 8px;
   }
 }
+
+.profile-panel button[mat-raised-button] {
+  min-width: 220px;
+  min-height: 42px;
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+}
+
+.profile-panel button[mat-raised-button][color="accent"] {
+  background: var(--accent-color);
+  color: var(--on-primary-color);
+}
+
+:host ::ng-deep .profile-panel .mdc-button__label,
+:host ::ng-deep .profile-panel .mat-mdc-form-field .mdc-text-field__input,
+:host ::ng-deep .profile-panel .mat-mdc-form-field .mat-mdc-input-element,
+:host ::ng-deep .profile-panel .mat-mdc-form-field .mat-mdc-select-value-text,
+:host ::ng-deep .profile-panel .mat-mdc-form-field .mdc-floating-label,
+:host ::ng-deep .profile-panel .mat-mdc-form-field .mat-mdc-floating-label,
+:host ::ng-deep .profile-panel .mat-mdc-form-field-hint {
+  text-shadow: none !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+  font-family: 'Roboto', 'Segoe UI', sans-serif !important;
+}

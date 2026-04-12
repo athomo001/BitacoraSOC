@@ -1,7 +1,9 @@
 # Multi-stage build para optimizar tamaño
-FROM node:24-alpine AS base
+ARG NODE_IMAGE=node:24-alpine
+FROM ${NODE_IMAGE} AS base
 
 WORKDIR /app
+USER root
 
 # Version del build (inyectada desde Docker Compose/CI)
 ARG APP_VERSION=dev
@@ -10,9 +12,9 @@ ENV APP_VERSION=${APP_VERSION}
 # Copiar archivos de dependencias
 COPY package*.json ./
 
-# Crear usuario no-root antes de instalar dependencias
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+# Crear usuario no-root antes de instalar dependencias (idempotente para fallback local)
+RUN if ! grep -q '^nodejs:' /etc/group; then addgroup -g 1001 -S nodejs; fi && \
+    if ! grep -q '^nodejs:' /etc/passwd; then adduser -S nodejs -u 1001; fi
 
 # Instalar dependencias de producción usando cache mount para velocidad local
 RUN --mount=type=cache,id=npm-cache-backend,target=/root/.npm \

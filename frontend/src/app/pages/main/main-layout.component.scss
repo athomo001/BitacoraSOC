@@ -13,6 +13,12 @@
 
   .mat-mdc-list-item {
     width: 100%;
+    color: var(--sidebar-text);
+
+    .mdc-list-item__primary-text,
+    .mat-icon {
+      color: var(--sidebar-text);
+    }
   }
 
   .mdc-list-item__content {
@@ -27,6 +33,8 @@
     white-space: nowrap;
     overflow: visible !important;
     text-overflow: clip !important;
+    color: var(--sidebar-text);
+    font-weight: 600;
   }
 
   mat-toolbar {
@@ -61,6 +69,24 @@
   // Acordeones del drawer: ver styles.scss (.left-sidebar mat-accordion.menu-accordion …).
   .menu-accordion {
     margin: 8px;
+
+    .mat-expansion-panel,
+    .mat-expansion-panel-header {
+      background-color: var(--surface-color);
+      color: var(--sidebar-text);
+    }
+
+    .mat-expansion-panel-header-title,
+    .mat-expansion-panel-header-description,
+    .mat-expansion-indicator::after,
+    mat-panel-title,
+    mat-panel-description {
+      color: var(--sidebar-text);
+    }
+
+    .mat-icon {
+      color: var(--sidebar-text);
+    }
   }
 
   .checklist-accordion {
@@ -319,6 +345,7 @@
 
 .active-link {
   background-color: var(--hover-bg) !important;
+  box-shadow: inset 3px 0 0 var(--accent-color);
 }
 
 .full-width {

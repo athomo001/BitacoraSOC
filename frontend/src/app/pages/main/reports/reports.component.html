@@ -199,7 +199,7 @@
           <div class="chart-wrapper">
             <h3 class="chart-subtitle">Cantidad por Cliente</h3>
             <ngx-charts-bar-horizontal
-              [view]="[400, 300]"
+              [view]="logSourceBarView"
               [results]="entriesByLogSourceData"
               [xAxis]="true"
               [yAxis]="true"
@@ -215,9 +215,9 @@
           <div class="chart-wrapper">
             <h3 class="chart-subtitle">Distribución Porcentual</h3>
             <ngx-charts-pie-chart
-              [view]="[400, 300]"
+              [view]="logSourcePieView"
               [results]="entriesByLogSourceData"
-              [legend]="true"
+              [legend]="false"
               [labels]="true"
               [doughnut]="false"
               [scheme]="colorScheme">

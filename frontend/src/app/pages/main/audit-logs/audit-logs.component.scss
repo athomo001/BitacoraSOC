@@ -36,9 +36,11 @@
 
   &--flush {
     padding: 0;
+    overflow-x: auto;
 
     .audit-table {
       margin: 0;
+      min-width: 1080px;
     }
 
     mat-paginator {
@@ -78,6 +80,15 @@
   width: 100%;
   overflow-x: auto;
   border-collapse: collapse;
+
+  .mat-mdc-header-cell,
+  .mat-mdc-cell {
+    color: var(--text-primary) !important;
+    font-family: 'Roboto', 'Segoe UI', sans-serif;
+    text-shadow: none !important;
+    letter-spacing: normal !important;
+    text-transform: none !important;
+  }
 
   .mat-mdc-header-cell {
     font-weight: 600;
@@ -326,12 +337,11 @@
 }
 
 .reason-text {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 200px;
+  color: var(--text-primary);
+  overflow: visible;
+  text-overflow: unset;
+  white-space: normal;
+  max-width: none;
 }
 
 mat-chip {
@@ -342,4 +352,15 @@ mat-chip {
 
 mat-paginator {
   margin-top: 16px;
+}
+
+:host ::ng-deep .audit-panel__body--flush .mat-mdc-paginator {
+  background: var(--surface-color) !important;
+  color: var(--text-primary) !important;
+  border-top: 1px solid var(--outline-subtle);
+}
+
+:host ::ng-deep .audit-panel__body--flush .mat-mdc-paginator * {
+  color: var(--text-primary) !important;
+  text-shadow: none !important;
 }

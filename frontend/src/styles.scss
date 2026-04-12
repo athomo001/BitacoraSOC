@@ -421,6 +421,16 @@ a {
   color: var(--text-secondary);
 }
 
+/*
+ * Material MDC: cuando existe mat-label sin foco, Angular agrega
+ * .mat-form-field-hide-placeholder para ocultar placeholder.
+ * Si se fuerza color global, puede verse label + placeholder superpuestos.
+ */
+.mat-mdc-form-field.mat-form-field-hide-placeholder .mdc-text-field__input::placeholder,
+.mat-mdc-form-field.mat-form-field-hide-placeholder .mat-mdc-input-element::placeholder {
+  color: transparent !important;
+}
+
 .mat-mdc-text-field-wrapper {
   background-color: var(--surface-color);
 }
@@ -578,6 +588,336 @@ mat-sidenav {
     color: var(--text-primary);
     opacity: 1;
   }
+}
+
+/*
+ * Dark theme hardening (UI-VIS): corrige contraste en overlays MDC (menu/select),
+ * formularios y tablas cuando Material aplica estilos base claros por defecto.
+ */
+[data-theme='dark'] {
+  /* Material token bridge: evita defaults claros/negros de MDC */
+  --mat-sys-surface: var(--surface-color);
+  --mat-sys-surface-container: var(--surface-raised);
+  --mat-sys-on-surface: var(--text-primary);
+  --mat-sys-on-surface-variant: var(--text-secondary);
+  --mat-sys-outline: var(--border-color);
+  --mdc-outlined-text-field-input-text-color: var(--text-primary);
+  --mdc-outlined-text-field-label-text-color: var(--text-secondary);
+  --mdc-outlined-text-field-outline-color: var(--border-color);
+  --mdc-outlined-text-field-hover-outline-color: var(--text-secondary);
+  --mdc-outlined-text-field-focus-outline-color: var(--primary-color);
+  --mat-select-enabled-trigger-text-color: var(--text-primary);
+  --mat-select-enabled-arrow-color: var(--text-secondary);
+  --mat-option-label-text-color: var(--text-primary);
+  --mat-paginator-container-text-color: var(--text-primary);
+  --mat-paginator-enabled-icon-color: var(--text-primary);
+  --mat-paginator-disabled-icon-color: var(--text-secondary);
+
+  .cdk-overlay-container .mat-mdc-menu-panel,
+  .cdk-overlay-container .mat-mdc-select-panel,
+  .cdk-overlay-container .mat-mdc-autocomplete-panel {
+    background: var(--surface-raised) !important;
+    border: 1px solid var(--outline-subtle) !important;
+    box-shadow: var(--shadow);
+  }
+
+  .cdk-overlay-container .mat-mdc-menu-item,
+  .cdk-overlay-container .mat-mdc-option,
+  .cdk-overlay-container .mat-mdc-option .mdc-list-item__primary-text,
+  .cdk-overlay-container .mat-mdc-menu-item .mdc-list-item__primary-text,
+  .cdk-overlay-container .mat-mdc-menu-item mat-icon {
+    color: var(--text-primary) !important;
+    opacity: 1 !important;
+  }
+
+  .cdk-overlay-container .mat-mdc-option:hover,
+  .cdk-overlay-container .mat-mdc-option.mdc-list-item--selected:not(.mdc-list-item--disabled),
+  .cdk-overlay-container .mat-mdc-menu-item:hover {
+    background: color-mix(in srgb, var(--hover-bg) 80%, var(--surface-raised) 20%) !important;
+  }
+
+  .mat-mdc-form-field .mat-mdc-text-field-wrapper {
+    background: var(--surface-raised) !important;
+  }
+
+  .mat-mdc-form-field .mdc-notched-outline__leading,
+  .mat-mdc-form-field .mdc-notched-outline__trailing,
+  .mat-mdc-form-field .mdc-notched-outline__notch {
+    border-color: var(--outline-strong, var(--border-color)) !important;
+  }
+
+  .mat-mdc-form-field .mdc-floating-label,
+  .mat-mdc-form-field .mat-mdc-floating-label {
+    color: var(--text-secondary) !important;
+    opacity: 1 !important;
+  }
+
+  .mat-mdc-form-field .mat-mdc-input-element,
+  .mat-mdc-form-field .mdc-text-field__input,
+  .mat-mdc-form-field .mat-mdc-select-value,
+  .mat-mdc-form-field .mat-mdc-select-min-line,
+  .mat-mdc-form-field .mat-mdc-select-placeholder,
+  .mat-mdc-form-field .mat-mdc-select-value-text,
+  .mat-mdc-form-field .mat-mdc-select-arrow,
+  .mat-mdc-form-field mat-icon {
+    color: var(--text-primary) !important;
+    -webkit-text-fill-color: var(--text-primary) !important;
+    opacity: 1 !important;
+  }
+
+  .mat-mdc-form-field .mdc-text-field__input::placeholder {
+    color: var(--text-secondary) !important;
+  }
+
+  .mat-mdc-form-field.mat-form-field-hide-placeholder .mdc-text-field__input::placeholder,
+  .mat-mdc-form-field.mat-form-field-hide-placeholder .mat-mdc-input-element::placeholder {
+    color: transparent !important;
+    opacity: 0 !important;
+  }
+
+  .mat-mdc-table,
+  .mdc-data-table__table,
+  .mat-mdc-row,
+  .mat-mdc-header-row,
+  .mdc-data-table__row {
+    background: var(--surface-color) !important;
+  }
+
+  .mat-mdc-cell,
+  .mat-mdc-header-cell,
+  .mdc-data-table__cell,
+  .mdc-data-table__header-cell {
+    color: var(--text-primary) !important;
+    border-bottom-color: var(--outline-subtle) !important;
+  }
+
+  mat-button-toggle-group.mode-selector {
+    background: var(--surface-raised) !important;
+    border: 1px solid var(--outline-subtle) !important;
+  }
+
+  mat-button-toggle-group.mode-selector .mat-button-toggle {
+    background: transparent;
+    color: var(--text-primary) !important;
+  }
+
+  mat-button-toggle-group.mode-selector .mat-button-toggle .mat-button-toggle-label-content,
+  mat-button-toggle-group.mode-selector .mat-button-toggle mat-icon {
+    color: var(--text-primary) !important;
+    opacity: 1 !important;
+  }
+
+  mat-button-toggle-group.mode-selector .mat-button-toggle-checked {
+    background: color-mix(in srgb, var(--primary-color) 25%, var(--surface-raised) 75%) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .mat-mdc-outlined-button,
+  .mat-mdc-stroked-button {
+    background: var(--surface-raised) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+  }
+
+  .mat-mdc-outlined-button:hover,
+  .mat-mdc-stroked-button:hover {
+    background: color-mix(in srgb, var(--hover-bg) 78%, var(--surface-raised) 22%) !important;
+    border-color: var(--text-secondary) !important;
+  }
+
+  .mat-mdc-tab-group {
+    --mat-tab-header-active-label-text-color: var(--text-primary);
+    --mat-tab-header-inactive-label-text-color: var(--text-secondary);
+    --mat-tab-header-active-indicator-color: var(--primary-color);
+    --mat-tab-header-active-focus-indicator-color: var(--primary-color);
+    --mat-tab-header-active-hover-indicator-color: var(--primary-color);
+    --mat-tab-header-active-ripple-color: var(--primary-color);
+    --mat-tab-header-inactive-ripple-color: var(--primary-color);
+  }
+
+  .mat-mdc-tab .mdc-tab__text-label {
+    color: var(--text-secondary) !important;
+    text-shadow: none !important;
+  }
+
+  .mat-mdc-tab.mdc-tab--active .mdc-tab__text-label {
+    color: var(--text-primary) !important;
+  }
+
+  .mat-mdc-paginator,
+  .mat-mdc-paginator * {
+    color: var(--text-primary) !important;
+    fill: var(--text-primary) !important;
+  }
+}
+
+/*
+ * Cyberpunk estable: conserva paleta neon pero usa baseline legible
+ * de controles Material para evitar texto montado, negro sobre negro,
+ * recortes y ruido visual en vistas operativas.
+ */
+[data-theme='cyberpunk'] {
+  --mat-sys-surface: var(--surface-color);
+  --mat-sys-surface-container: var(--surface-raised);
+  --mat-sys-on-surface: var(--text-primary);
+  --mat-sys-on-surface-variant: var(--text-secondary);
+  --mat-sys-outline: var(--border-color);
+  --mdc-outlined-text-field-input-text-color: var(--text-primary);
+  --mdc-outlined-text-field-label-text-color: var(--text-secondary);
+  --mdc-outlined-text-field-outline-color: var(--border-color);
+  --mdc-outlined-text-field-hover-outline-color: var(--text-secondary);
+  --mdc-outlined-text-field-focus-outline-color: var(--accent-color);
+  --mat-select-enabled-trigger-text-color: var(--text-primary);
+  --mat-select-enabled-arrow-color: var(--text-secondary);
+  --mat-option-label-text-color: var(--text-primary);
+  --mat-paginator-container-text-color: var(--text-primary);
+  --mat-paginator-enabled-icon-color: var(--text-primary);
+  --mat-paginator-disabled-icon-color: var(--text-secondary);
+
+  .cdk-overlay-container .mat-mdc-menu-panel,
+  .cdk-overlay-container .mat-mdc-select-panel,
+  .cdk-overlay-container .mat-mdc-autocomplete-panel {
+    background: var(--surface-raised) !important;
+    border: 1px solid var(--outline-subtle) !important;
+    box-shadow: var(--shadow);
+  }
+
+  .cdk-overlay-container .mat-mdc-menu-item,
+  .cdk-overlay-container .mat-mdc-option,
+  .cdk-overlay-container .mat-mdc-option .mdc-list-item__primary-text,
+  .cdk-overlay-container .mat-mdc-menu-item .mdc-list-item__primary-text,
+  .cdk-overlay-container .mat-mdc-menu-item mat-icon {
+    color: var(--text-primary) !important;
+    opacity: 1 !important;
+  }
+
+  .cdk-overlay-container .mat-mdc-option:hover,
+  .cdk-overlay-container .mat-mdc-option.mdc-list-item--selected:not(.mdc-list-item--disabled),
+  .cdk-overlay-container .mat-mdc-menu-item:hover {
+    background: color-mix(in srgb, var(--hover-bg) 78%, var(--surface-raised) 22%) !important;
+  }
+
+  .mat-mdc-form-field .mat-mdc-text-field-wrapper {
+    background: var(--surface-raised) !important;
+  }
+
+  .mat-mdc-form-field .mdc-notched-outline__leading,
+  .mat-mdc-form-field .mdc-notched-outline__trailing,
+  .mat-mdc-form-field .mdc-notched-outline__notch {
+    border-color: var(--outline-strong, var(--border-color)) !important;
+  }
+
+  .mat-mdc-form-field .mdc-floating-label,
+  .mat-mdc-form-field .mat-mdc-floating-label {
+    color: var(--text-secondary) !important;
+    opacity: 1 !important;
+  }
+
+  .mat-mdc-form-field .mat-mdc-input-element,
+  .mat-mdc-form-field .mdc-text-field__input,
+  .mat-mdc-form-field .mat-mdc-select-value,
+  .mat-mdc-form-field .mat-mdc-select-min-line,
+  .mat-mdc-form-field .mat-mdc-select-placeholder,
+  .mat-mdc-form-field .mat-mdc-select-value-text,
+  .mat-mdc-form-field .mat-mdc-select-arrow,
+  .mat-mdc-form-field mat-icon {
+    color: var(--text-primary) !important;
+    -webkit-text-fill-color: var(--text-primary) !important;
+    opacity: 1 !important;
+  }
+
+  .mat-mdc-form-field .mdc-text-field__input::placeholder {
+    color: var(--text-secondary) !important;
+  }
+
+  .mat-mdc-form-field.mat-form-field-hide-placeholder .mdc-text-field__input::placeholder,
+  .mat-mdc-form-field.mat-form-field-hide-placeholder .mat-mdc-input-element::placeholder {
+    color: transparent !important;
+    opacity: 0 !important;
+  }
+
+  .mat-mdc-outlined-button,
+  .mat-mdc-stroked-button {
+    background: var(--surface-raised) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+  }
+
+  .mat-mdc-outlined-button:hover,
+  .mat-mdc-stroked-button:hover {
+    background: color-mix(in srgb, var(--hover-bg) 78%, var(--surface-raised) 22%) !important;
+    border-color: var(--text-secondary) !important;
+  }
+
+  .mat-mdc-table,
+  .mdc-data-table__table,
+  .mat-mdc-row,
+  .mat-mdc-header-row,
+  .mdc-data-table__row {
+    background: var(--surface-color) !important;
+  }
+
+  .mat-mdc-cell,
+  .mat-mdc-header-cell,
+  .mdc-data-table__cell,
+  .mdc-data-table__header-cell {
+    color: var(--text-primary) !important;
+    border-bottom-color: var(--outline-subtle) !important;
+  }
+
+  .mat-mdc-tab-group {
+    --mat-tab-header-active-label-text-color: var(--text-primary);
+    --mat-tab-header-inactive-label-text-color: var(--text-secondary);
+    --mat-tab-header-active-indicator-color: var(--accent-color);
+    --mat-tab-header-active-focus-indicator-color: var(--accent-color);
+    --mat-tab-header-active-hover-indicator-color: var(--accent-color);
+    --mat-tab-header-active-ripple-color: var(--accent-color);
+    --mat-tab-header-inactive-ripple-color: var(--accent-color);
+  }
+
+  .mat-mdc-tab .mdc-tab__text-label {
+    color: var(--text-secondary) !important;
+    text-shadow: none !important;
+  }
+
+  .mat-mdc-tab.mdc-tab--active .mdc-tab__text-label {
+    color: var(--text-primary) !important;
+  }
+
+  .mat-mdc-paginator,
+  .mat-mdc-paginator * {
+    color: var(--text-primary) !important;
+    fill: var(--text-primary) !important;
+  }
+}
+
+/*
+ * Evita "ghosting" de texto en controles MDC (doble render por sombras/spacing
+ * heredado en temas oscuros/cyberpunk). Se limita a inputs/selects/hints.
+ */
+[data-theme='dark'] .mat-mdc-form-field .mdc-text-field__input,
+[data-theme='dark'] .mat-mdc-form-field .mat-mdc-input-element,
+[data-theme='dark'] .mat-mdc-form-field .mat-mdc-select-min-line,
+[data-theme='dark'] .mat-mdc-form-field .mat-mdc-select-placeholder,
+[data-theme='dark'] .mat-mdc-form-field .mat-mdc-select-value-text,
+[data-theme='dark'] .mat-mdc-form-field .mdc-floating-label,
+[data-theme='dark'] .mat-mdc-form-field .mat-mdc-floating-label,
+[data-theme='dark'] .mat-mdc-form-field-hint,
+[data-theme='dark'] .mat-mdc-option .mdc-list-item__primary-text,
+[data-theme='cyberpunk'] .mat-mdc-form-field .mdc-text-field__input,
+[data-theme='cyberpunk'] .mat-mdc-form-field .mat-mdc-input-element,
+[data-theme='cyberpunk'] .mat-mdc-form-field .mat-mdc-select-min-line,
+[data-theme='cyberpunk'] .mat-mdc-form-field .mat-mdc-select-placeholder,
+[data-theme='cyberpunk'] .mat-mdc-form-field .mat-mdc-select-value-text,
+[data-theme='cyberpunk'] .mat-mdc-form-field .mdc-floating-label,
+[data-theme='cyberpunk'] .mat-mdc-form-field .mat-mdc-floating-label,
+[data-theme='cyberpunk'] .mat-mdc-form-field-hint,
+[data-theme='cyberpunk'] .mat-mdc-option .mdc-list-item__primary-text {
+  font-family: 'Roboto', 'Segoe UI', sans-serif !important;
+  text-shadow: none !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+  -webkit-text-fill-color: currentColor !important;
 }
 
 /* Tooltips and chart overlays must not inherit sepia/pastel body text on dark surfaces */
@@ -1131,6 +1471,39 @@ mat-button-toggle-group.mode-selector .mat-button-toggle-label-content {
 
 .mat-mdc-paginator-icon {
   fill: var(--text-primary);
+}
+
+/* Paginator hardening in dark/cyberpunk (evita franja blanca y texto invisible) */
+[data-theme='dark'] .mat-mdc-paginator,
+[data-theme='cyberpunk'] .mat-mdc-paginator,
+[data-theme='dark'] .mat-mdc-paginator-container,
+[data-theme='cyberpunk'] .mat-mdc-paginator-container {
+  background: var(--surface-color) !important;
+  color: var(--text-primary) !important;
+  border-top-color: var(--outline-subtle) !important;
+}
+
+[data-theme='dark'] .mat-mdc-paginator *,
+[data-theme='cyberpunk'] .mat-mdc-paginator * {
+  color: var(--text-primary) !important;
+  fill: var(--text-primary) !important;
+  text-shadow: none !important;
+}
+
+[data-theme='dark'] .mat-mdc-paginator .mat-mdc-select-min-line,
+[data-theme='cyberpunk'] .mat-mdc-paginator .mat-mdc-select-min-line,
+[data-theme='dark'] .mat-mdc-paginator .mat-mdc-select-placeholder,
+[data-theme='cyberpunk'] .mat-mdc-paginator .mat-mdc-select-placeholder,
+[data-theme='dark'] .mat-mdc-paginator .mat-mdc-paginator-page-size-label,
+[data-theme='cyberpunk'] .mat-mdc-paginator .mat-mdc-paginator-page-size-label,
+[data-theme='dark'] .mat-mdc-paginator .mat-mdc-paginator-range-label,
+[data-theme='cyberpunk'] .mat-mdc-paginator .mat-mdc-paginator-range-label {
+  color: var(--text-primary) !important;
+}
+
+[data-theme='dark'] .mat-mdc-paginator .mat-mdc-text-field-wrapper,
+[data-theme='cyberpunk'] .mat-mdc-paginator .mat-mdc-text-field-wrapper {
+  background: var(--surface-raised) !important;
 }
 
 /* Chips */
