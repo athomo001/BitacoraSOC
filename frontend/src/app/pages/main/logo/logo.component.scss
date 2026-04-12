@@ -18,18 +18,31 @@
   gap: 24px;
 }
 
-.logo-card {
-  background-color: var(--surface-color);
+.logo-panel.logo-card {
+  background: var(--surface-card);
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
 
-  mat-card-title {
-    color: var(--text-primary);
-  }
+.logo-panel__header {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--outline-subtle);
+}
 
-  mat-card-content {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
+.logo-panel__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.logo-panel__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: var(--space-4);
 }
 
 .logo-preview, .upload-zone {

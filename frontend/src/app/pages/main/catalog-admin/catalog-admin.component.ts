@@ -14,7 +14,6 @@ import {
 import { EscalationService } from '../../../services/escalation.service';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatTabGroup, MatTab } from '@angular/material/tabs';
-import { MatCard, MatCardHeader, MatCardTitle, MatCardContent } from '@angular/material/card';
 import { MatFormField, MatHint, MatLabel, MatSuffix } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatCheckbox } from '@angular/material/checkbox';
@@ -35,7 +34,7 @@ import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
   selector: 'app-catalog-admin',
   templateUrl: './catalog-admin.component.html',
   styleUrls: ['./catalog-admin.component.scss'],
-  imports: [MatTabGroup, MatTab, MatCard, MatCardHeader, MatCardTitle, MatCardContent, ReactiveFormsModule, MatFormField, MatHint, MatLabel, MatSuffix, MatInput, MatCheckbox, MatButton, MatIcon, NgIf, NgFor, MatIconButton, MatTooltip, MatSelect, MatOption, MatPaginator, MatDatepickerModule, MatNativeDateModule],
+  imports: [MatTabGroup, MatTab, ReactiveFormsModule, MatFormField, MatHint, MatLabel, MatSuffix, MatInput, MatCheckbox, MatButton, MatIcon, NgIf, NgFor, MatIconButton, MatTooltip, MatSelect, MatOption, MatPaginator, MatDatepickerModule, MatNativeDateModule],
   providers: [{ provide: MAT_DATE_LOCALE, useValue: 'es-CL' }]
 })
 export class CatalogAdminComponent implements OnInit {

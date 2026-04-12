@@ -3,7 +3,6 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { HttpClient } from '@angular/common/http';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { DatePipe, NgFor, NgIf } from '@angular/common';
-import { MatCard, MatCardContent, MatCardHeader, MatCardTitle } from '@angular/material/card';
 import { MatFormField, MatHint, MatLabel } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatCheckbox } from '@angular/material/checkbox';
@@ -20,10 +19,6 @@ import { environment } from '../../../../environments/environment';
     NgIf,
     NgFor,
     DatePipe,
-    MatCard,
-    MatCardHeader,
-    MatCardTitle,
-    MatCardContent,
     MatFormField,
     MatLabel,
     MatInput,

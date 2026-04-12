@@ -1,33 +1,28 @@
-// ════════════════════════════════════════════════════════════
-// Tema CYBER (v3) - Login Matrix/Cyberpunk
-// REPARACIÓN DE VISIBILIDAD DE TEXTO - CORRECCIÓN DE CACHÉ
-// ════════════════════════════════════════════════════════════
-
-// ── Variables ───────────────────────────────────────────────
+// Tema CYBER (v4) - misma identidad visual, sin hacks de especificidad.
 $neon: #00ff41;
 $neon-dim: #00cc33;
-$neon-glow: rgba(0, 255, 65, 0.6);
-$neon-subtle: rgba(0, 255, 65, 0.15);
+$neon-glow: rgba(0, 255, 65, 0.55);
 $bg-deep: #000000;
 $card-bg: rgba(0, 8, 0, 0.95);
+$text-high: #ffffff;
+$text-on-neon: #000000;
+$danger: #ff3366;
 $font-mono: 'Courier New', 'Lucida Console', monospace;
 
-// ── Container ───────────────────────────────────────────────
 .theme-cyber {
   position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background-color: $bg-deep;
+  background: $bg-deep;
   overflow: hidden;
   font-family: $font-mono;
+  color: $text-high;
 
-  // Matrix canvas de fondo
   #matrix-canvas {
     position: fixed;
-    top: 0;
-    left: 0;
+    inset: 0;
     width: 100%;
     height: 100%;
     z-index: 0;
@@ -35,134 +30,92 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
     pointer-events: none;
   }
 
-  // ── Card central ─────────────────────────────────────────
   .cy-card {
     position: relative;
     z-index: 2;
     width: 100%;
-    max-width: 480px;
+    max-width: 500px;
     margin: 20px;
     padding: 36px 32px 28px;
     background: $card-bg;
     border: 2px solid $neon;
-    border-radius: 4px;
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    box-shadow:
-      0 0 20px $neon-glow,
-      inset 0 0 40px rgba(0, 255, 65, 0.05);
-    animation: cyCardIn 0.55s cubic-bezier(0.22, 1, 0.36, 1);
-
-    @media (max-width: 520px) {
-      margin: 12px;
-      padding: 24px 18px 20px;
-    }
+    border-radius: 8px;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    box-shadow: 0 0 20px $neon-glow, inset 0 0 40px rgba(0, 255, 65, 0.05);
+    animation: cy-card-in 0.45s ease-out;
   }
 
-  @keyframes cyCardIn {
-    from { opacity: 0; transform: translateY(28px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  // ── Header / Título ──────────────────────────────────────
   .cy-header {
     text-align: center;
-    margin-bottom: 28px;
+    margin-bottom: 24px;
   }
 
-  // MÁXIMA ESPECIFICIDAD PARA EL TÍTULO
-  body & .cy-title {
-    font-size: 26px;
-    font-weight: 900;
-    letter-spacing: 0.22em;
+  .cy-title {
+    margin: 0 0 8px;
+    color: $text-high;
+    font-size: clamp(1.25rem, 4vw, 1.7rem);
+    font-weight: 800;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: #ffffff !important;
-    text-shadow: 0 0 15px $neon, 0 0 3px #ffffff;
-    margin: 0 0 10px;
-    animation: cyGlitch 4s infinite;
-    position: relative;
-
-    @media (max-width: 420px) { font-size: 20px; }
+    text-shadow: 0 0 12px rgba(0, 255, 65, 0.6);
   }
 
-  @keyframes cyGlitch {
-    0%, 88%, 100% { transform: translate(0); }
-    90%  { transform: translate(-2px, 1px); }
-    92%  { transform: translate(2px, -1px); }
-    94%  { transform: translate(0); }
-  }
-
-  // MÁXIMA ESPECIFICIDAD PARA EL SUBTÍTULO
-  body & .cy-subtitle {
-    font-size: 11px;
-    letter-spacing: 0.18em;
-    color: #00ff41 !important;
-    font-weight: 900;
+  .cy-subtitle {
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    color: $neon;
+    font-weight: 700;
     text-transform: uppercase;
     white-space: nowrap;
     overflow: hidden;
-    text-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
-
-    span { color: #00ff41 !important; }
+    text-shadow: 0 0 8px rgba(0, 255, 65, 0.45);
 
     &::after {
       content: '|';
-      display: inline-block;
-      animation: cyBlink 0.75s step-end infinite;
       margin-left: 2px;
-      color: #00ff41;
+      animation: cy-blink 0.75s step-end infinite;
     }
-  }
-
-  @keyframes cyBlink {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0; }
   }
 
   .cy-divider {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin: 20px 0;
+    margin: 18px 0 20px;
 
     &::before,
     &::after {
       content: '';
       flex: 1;
-      height: 2px;
+      height: 1px;
       background: linear-gradient(90deg, transparent, $neon, transparent);
     }
 
     .cy-shield {
       color: $neon;
-      font-size: 22px;
-      text-shadow: 0 0 12px $neon-glow;
+      font-size: 20px;
       line-height: 1;
+      text-shadow: 0 0 10px $neon-glow;
     }
   }
 
-  // ── Formulario ────────────────────────────────────────────
   .cy-form {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 16px;
   }
 
-  body & .cy-field-label {
+  .cy-field-label {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 13px;
-    font-weight: 900;
-    letter-spacing: 0.18em;
-    color: #00ff41 !important;
-    text-transform: uppercase;
     margin-bottom: 8px;
-
-    .cy-field-icon {
-      font-size: 18px;
-      line-height: 1;
-    }
+    color: $neon;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
   }
 
   .cy-input-wrap {
@@ -171,278 +124,284 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
     align-items: center;
   }
 
-  body & .cy-input {
+  .cy-input {
     width: 100%;
-    padding: 13px 42px 13px 14px;
-    background: #000000 !important;
-    border: 2px solid #00ff41 !important;
-    border-radius: 3px;
-    color: #ffffff !important;
-    font-family: $font-mono;
-    font-size: 16px;
-    font-weight: 900 !important;
-    letter-spacing: 0.04em;
-    outline: none;
     box-sizing: border-box;
+    padding: 12px 44px 12px 14px;
+    background: $bg-deep;
+    border: 1px solid $neon-dim;
+    border-radius: 6px;
+    color: $text-high;
+    font-family: $font-mono;
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 
-    &::placeholder { color: #00ff41 !important; opacity: 0.8 !important; }
-    &::selection   { background: #ffffff !important; color: #000000 !important; }
-
-    &:focus {
-      border-color: #ffffff !important;
-      box-shadow: 0 0 15px rgba(0, 255, 65, 0.6);
+    &::placeholder {
+      color: color-mix(in srgb, $neon 70%, #ffffff 30%);
+      opacity: 0.7;
     }
 
-    &:disabled { opacity: 0.5; cursor: not-allowed; }
+    &:focus {
+      border-color: $neon;
+      box-shadow: 0 0 0 2px rgba(0, 255, 65, 0.22), 0 0 14px rgba(0, 255, 65, 0.3);
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
   }
 
   .cy-toggle-btn {
     position: absolute;
-    right: 12px;
-    background: none;
+    right: 10px;
     border: none;
-    color: #00ff41;
+    background: transparent;
+    color: $neon;
     cursor: pointer;
-    font-size: 20px;
-    padding: 0;
+    font-family: $font-mono;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 4px 0;
 
-    &:hover { color: #ffffff; }
+    &:hover {
+      color: $text-high;
+    }
   }
 
-  // Error messages
   .cy-errors {
     min-height: 18px;
     margin-top: 4px;
   }
 
-  body & .cy-error-text {
-    font-size: 11px;
-    color: #ff3366 !important;
-    font-weight: 900;
-    letter-spacing: 0.1em;
+  .cy-error-text {
+    color: $danger;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    text-shadow: 0 0 10px rgba(255, 51, 102, 0.6);
   }
 
-  // ── Botón principal ───────────────────────────────────────
-  .cy-submit-btn {
-    padding: 14px 20px;
-    background: #00ff41;
-    border: none;
-    border-radius: 3px;
-    color: #000 !important;
+  .cy-submit-btn,
+  .cy-recover-btn,
+  .cy-secondary-btn {
+    width: 100%;
+    border-radius: 6px;
     font-family: $font-mono;
-    font-size: 14px;
-    font-weight: 900;
-    letter-spacing: 0.2em;
+    font-weight: 700;
+    letter-spacing: 0.13em;
     text-transform: uppercase;
     cursor: pointer;
-    box-shadow: 0 0 20px rgba(0, 255, 65, 0.5);
-    width: 100%;
+    transition: transform 0.16s ease, box-shadow 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+
+    &:focus-visible {
+      outline: 2px solid $text-high;
+      outline-offset: 2px;
+    }
+  }
+
+  .cy-submit-btn {
     margin-top: 6px;
-    text-align: center;
+    padding: 13px 16px;
+    border: 1px solid transparent;
+    background: $neon;
+    color: $text-on-neon;
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.45);
 
     &:hover:not(:disabled) {
-      background: #ffffff;
-      box-shadow: 0 0 30px rgba(255, 255, 255, 0.6);
+      transform: translateY(-1px);
+      box-shadow: 0 0 22px rgba(255, 255, 255, 0.45);
     }
 
     &:disabled {
-      opacity: 0.5;
+      opacity: 0.55;
       cursor: not-allowed;
     }
   }
 
-  // ── Info de sesión ───────────────────────────────────────
-  body & .cy-session-info {
-    margin-top: 12px;
-    padding: 12px;
-    font-size: 13px;
-    font-weight: 900;
-    color: #ffffff !important;
+  .cy-session-info {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, $neon 70%, transparent);
+    border-radius: 6px;
+    background: rgba(0, 255, 65, 0.08);
+    color: $text-high;
+    font-size: 0.75rem;
+    font-weight: 600;
     text-align: center;
-    border: 2px solid #00ff41;
-    background: #000000 !important;
-    
-    &, span { color: #ffffff !important; }
   }
 
-  // ── Enlace recuperar contraseña ──────────────────────────
-  body & .cy-recover-btn {
-    display: block;
-    width: 100%;
-    margin-top: 16px;
-    background: #000000 !important;
-    border: 2px solid #00ff41 !important;
-    padding: 12px;
-    color: #00ff41 !important;
-    font-family: $font-mono;
-    font-size: 13px;
-    font-weight: 900;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    cursor: pointer;
+  .cy-recover-btn {
+    margin-top: 14px;
+    padding: 11px 14px;
+    border: 1px solid $neon;
+    background: transparent;
+    color: $neon;
 
     &:hover:not(:disabled) {
-      color: #000000 !important;
-      background: #00ff41 !important;
+      background: rgba(0, 255, 65, 0.12);
+      color: $text-high;
     }
   }
 
-  // ── Footer ────────────────────────────────────────────────
-  body & .cy-footer {
-    margin-top: 24px;
-    padding-top: 16px;
-    border-top: 2px solid #00ff41;
+  .cy-footer {
+    margin-top: 20px;
+    padding-top: 14px;
+    border-top: 1px solid color-mix(in srgb, $neon 45%, transparent);
     text-align: center;
-    font-size: 12px;
-    font-weight: 900;
-    color: #ffffff !important;
+    color: color-mix(in srgb, $text-high 85%, $neon 15%);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-
-    &, span, p, div { color: #ffffff !important; }
   }
 
-  // ── Banner ────────────────────────────────────────────────
-  body & .cy-banner {
-    margin-bottom: 24px;
-    padding: 16px;
-    border: 3px solid #00ff41 !important;
-    background: #000000 !important;
-    color: #ffffff !important;
-    font-weight: 900 !important;
+  .cy-banner {
+    margin-bottom: 18px;
+    padding: 12px 14px;
+    border: 1px solid $neon;
+    border-radius: 6px;
+    background: rgba(0, 255, 65, 0.08);
+    color: $text-high;
     text-align: center;
     text-transform: uppercase;
-
-    &, div, span, p {
-      color: #ffffff !important;
-      -webkit-text-fill-color: #ffffff !important;
-    }
-
-    &.cy-banner-error {
-      border-color: #ff3366 !important;
-      background: rgba(40, 0, 0, 0.9) !important;
-      
-      &, div, span, p {
-        color: #ffffff !important;
-      }
-    }
+    font-size: 0.75rem;
+    line-height: 1.45;
   }
 
-  // ── Modal Recuperación ──────────────────────────────────
   .cy-recovery-overlay {
     position: fixed;
     inset: 0;
     z-index: 100;
-    background: rgba(0, 0, 0, 0.9);
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 16px;
+    background: var(--overlay-scrim);
   }
 
   .cy-recovery-modal {
-    background: #000000;
-    border: 3px solid #00ff41;
-    border-radius: 4px;
     width: 100%;
     max-width: 460px;
-    box-shadow: 0 0 60px rgba(0, 255, 65, 0.5);
     overflow: hidden;
+    border: 2px solid $neon;
+    border-radius: 10px;
+    background: $bg-deep;
+    box-shadow: 0 0 40px rgba(0, 255, 65, 0.35);
   }
 
   .cy-modal-topbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 20px;
-    background: #00ff41;
-    color: #000;
+    gap: 8px;
+    padding: 12px 16px;
+    background: $neon;
+    color: $text-on-neon;
   }
 
   .cy-modal-topbar-left {
-    font-weight: 900;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    display: flex;
-    align-items: center;
-    gap: 8px;
   }
 
   .cy-modal-clock {
-    font-size: 18px;
-    font-weight: 900;
+    font-size: 0.9rem;
+    font-weight: 700;
   }
 
   .cy-modal-close {
-    background: #000;
-    border: 2px solid #fff;
-    color: #fff;
     width: 28px;
     height: 28px;
+    border: 1px solid $text-on-neon;
+    border-radius: 4px;
+    background: transparent;
+    color: $text-on-neon;
     cursor: pointer;
-    font-weight: 900;
+    font-weight: 700;
   }
 
   .cy-modal-body {
-    padding: 28px;
+    padding: 22px;
   }
 
-  body & .cy-modal-title {
-    font-size: 18px;
-    font-weight: 900;
-    color: #ffffff !important;
-    text-shadow: 0 0 15px #00ff41;
-    margin-bottom: 24px;
-    border-left: 5px solid #00ff41;
-    padding-left: 14px;
+  .cy-modal-title {
+    margin: 0 0 16px;
+    padding-left: 10px;
+    border-left: 3px solid $neon;
+    color: $text-high;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
   }
 
-  // REPARACIÓN DEFINITIVA DEL INFO BOX
-  body & .cy-info-box {
-    padding: 20px;
-    background: #000000 !important; 
-    border: 3px solid #00ff41 !important;
-    margin-bottom: 24px;
-    font-size: 15px;
-    color: #ffffff !important;
-    font-weight: 900 !important;
-    line-height: 1.6;
+  .cy-info-box {
     display: flex;
-    gap: 14px;
-    box-shadow: inset 0 0 30px rgba(0, 255, 65, 0.2);
-
-    &, span, p, div, b, strong, i, em {
-      color: #ffffff !important;
-      -webkit-text-fill-color: #ffffff !important;
-      text-shadow: none !important;
-    }
+    gap: 10px;
+    margin-bottom: 18px;
+    padding: 14px;
+    border: 1px solid color-mix(in srgb, $neon 65%, transparent);
+    border-radius: 6px;
+    background: rgba(0, 255, 65, 0.08);
+    color: $text-high;
+    font-size: 0.85rem;
+    line-height: 1.45;
 
     span:first-child {
-       color: #00ff41 !important;
-       font-size: 24px;
+      color: $neon;
+      font-size: 1rem;
     }
   }
 
-  body & .cy-secondary-btn {
-    padding: 14px;
-    border: 2px solid #00ff41;
+  .cy-secondary-btn {
+    margin-top: 8px;
+    padding: 11px 14px;
+    border: 1px solid $neon;
     background: transparent;
-    color: #00ff41 !important;
-    font-weight: 900;
-    text-transform: uppercase;
-    cursor: pointer;
-    width: 100%;
+    color: $neon;
 
-    &:hover {
-      background: #00ff41;
-      color: #000 !important;
+    &:hover:not(:disabled) {
+      background: rgba(0, 255, 65, 0.12);
+      color: $text-high;
     }
   }
 
-  // Selección global forzada para el tema (Nuclear)
-  & ::selection {
-    background: #ffffff !important;
-    color: #000000 !important;
+  ::selection {
+    background: $text-high;
+    color: $text-on-neon;
+  }
+}
+
+@media (max-width: 520px) {
+  .theme-cyber .cy-card {
+    margin: 12px;
+    padding: 22px 18px 18px;
+  }
+}
+
+@keyframes cy-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes cy-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
   }
 }

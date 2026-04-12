@@ -1,9 +1,9 @@
 <div class="security-admin">
-  <mat-card>
-    <mat-card-header>
-      <mat-card-title>HTTPS / Seguridad</mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
+  <div class="security-panel">
+    <header class="security-panel__header">
+      <h1 class="security-panel__title">HTTPS / Seguridad</h1>
+    </header>
+    <div class="security-panel__body">
       <form [formGroup]="securityForm" (ngSubmit)="save()">
         <div class="toggles">
           <mat-checkbox formControlName="httpsEnabled">Habilitar listener HTTPS del backend</mat-checkbox>
@@ -71,6 +71,6 @@
           <span *ngIf="isSaving && countdownMessage">Reiniciando nodo... {{ countdownMessage }}</span>
         </button>
       </form>
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </div>
 </div>

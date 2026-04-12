@@ -1,7 +1,50 @@
+// Vista de auditoría: colores de categoría conservan matiz propio; hover de filas usa tokens de tema.
 .audit-logs-container {
   padding: 20px;
   max-width: 1600px;
   margin: 0 auto;
+}
+
+.audit-panel {
+  margin-bottom: 20px;
+  background: var(--surface-card);
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+
+  &--guide {
+    border-left: 4px solid var(--accent-color);
+    background: var(--surface-muted);
+  }
+}
+
+.audit-panel__header {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--outline-subtle);
+}
+
+.audit-panel__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.audit-panel__body {
+  padding: var(--space-4);
+
+  &--flush {
+    padding: 0;
+
+    .audit-table {
+      margin: 0;
+    }
+
+    mat-paginator {
+      border-top: 1px solid var(--outline-subtle);
+    }
+  }
 }
 
 .filter-card,
@@ -132,53 +175,53 @@
         white-space: nowrap;
         flex-shrink: 0;
 
-        // Estilos por categoría
+        // Categorías: colores centralizados en semantic-tokens.scss (--audit-cat-*)
         &.category-integration {
-          background-color: rgba(33, 150, 243, 0.15);
-          color: #1976d2;
-          border-left: 3px solid #1976d2;
+          background-color: var(--audit-cat-integration-bg);
+          color: var(--audit-cat-integration-fg);
+          border-left: 3px solid var(--audit-cat-integration-fg);
         }
 
         &.category-email {
-          background-color: rgba(76, 175, 80, 0.15);
-          color: #388e3c;
-          border-left: 3px solid #388e3c;
+          background-color: var(--audit-cat-email-bg);
+          color: var(--audit-cat-email-fg);
+          border-left: 3px solid var(--audit-cat-email-fg);
         }
 
         &.category-auth {
-          background-color: rgba(244, 67, 54, 0.15);
-          color: #d32f2f;
-          border-left: 3px solid #d32f2f;
+          background-color: var(--audit-cat-auth-bg);
+          color: var(--audit-cat-auth-fg);
+          border-left: 3px solid var(--audit-cat-auth-fg);
         }
 
         &.category-entry {
-          background-color: rgba(255, 193, 7, 0.15);
-          color: #f57f17;
-          border-left: 3px solid #f57f17;
+          background-color: var(--audit-cat-entry-bg);
+          color: var(--audit-cat-entry-fg);
+          border-left: 3px solid var(--audit-cat-entry-fg);
         }
 
         &.category-checklist {
-          background-color: rgba(63, 81, 181, 0.15);
-          color: #3f51b5;
-          border-left: 3px solid #3f51b5;
+          background-color: var(--audit-cat-checklist-bg);
+          color: var(--audit-cat-checklist-fg);
+          border-left: 3px solid var(--audit-cat-checklist-fg);
         }
 
         &.category-escalation {
-          background-color: rgba(233, 30, 99, 0.15);
-          color: #c2185b;
-          border-left: 3px solid #c2185b;
+          background-color: var(--audit-cat-escalation-bg);
+          color: var(--audit-cat-escalation-fg);
+          border-left: 3px solid var(--audit-cat-escalation-fg);
         }
 
         &.category-config {
-          background-color: rgba(156, 39, 176, 0.15);
-          color: #7b1fa2;
-          border-left: 3px solid #7b1fa2;
+          background-color: var(--audit-cat-config-bg);
+          color: var(--audit-cat-config-fg);
+          border-left: 3px solid var(--audit-cat-config-fg);
         }
 
         &.category-other {
-          background-color: rgba(158, 158, 158, 0.15);
-          color: #616161;
-          border-left: 3px solid #616161;
+          background-color: var(--audit-cat-other-bg);
+          color: var(--audit-cat-other-fg);
+          border-left: 3px solid var(--audit-cat-other-fg);
         }
       }
 
@@ -213,9 +256,9 @@
       height: auto;
       min-height: 48px;
 
-      // Hover effect
+      // Hover: usar token de tema (evita hover invisible en fondos claros)
       &:hover {
-        background-color: rgba(255, 255, 255, 0.03);
+        background-color: var(--hover-bg);
       }
     }
   }

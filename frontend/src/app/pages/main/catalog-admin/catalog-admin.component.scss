@@ -1,3 +1,4 @@
+// Admin de catálogos: pestañas Material respetan tokens (incl. variante cyberpunk).
 .catalog-admin-container {
   max-width: 1200px;
   margin: 0 auto;
@@ -15,58 +16,43 @@
   }
 }
 
+.catalog-panel {
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.catalog-panel__header {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--outline-subtle);
+}
+
+.catalog-panel__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.catalog-panel__body {
+  padding: var(--space-4);
+}
+
 .tab-content {
   padding: 24px 0;
 }
 
-:host ::ng-deep .catalog-tabs {
-  --mat-tab-header-active-label-text-color: var(--text-primary);
-  --mat-tab-header-inactive-label-text-color: var(--text-secondary);
-  --mat-tab-header-active-ripple-color: var(--accent-color);
-  --mat-tab-header-inactive-ripple-color: var(--accent-color);
-  --mat-tab-header-active-focus-label-text-color: var(--text-primary);
-  --mat-tab-header-active-hover-label-text-color: var(--text-primary);
-  --mat-tab-header-inactive-focus-label-text-color: var(--text-primary);
-  --mat-tab-header-inactive-hover-label-text-color: var(--text-primary);
-  --mat-tab-header-active-focus-indicator-color: var(--accent-color);
-  --mat-tab-header-active-hover-indicator-color: var(--accent-color);
-  --mat-tab-header-active-indicator-color: var(--accent-color);
-}
-
-:host ::ng-deep .catalog-tabs .mat-mdc-tab {
-  opacity: 1 !important;
-}
-
-:host ::ng-deep .catalog-tabs .mat-mdc-tab .mdc-tab__text-label {
-  color: var(--text-secondary) !important;
-  opacity: 1 !important;
-  text-shadow: none;
-}
-
-:host ::ng-deep .catalog-tabs .mat-mdc-tab.mdc-tab--active .mdc-tab__text-label {
-  color: var(--text-primary) !important;
-  text-shadow: none;
-}
-
-:host-context([data-theme="cyberpunk"]) ::ng-deep .catalog-tabs .mat-mdc-tab .mdc-tab__text-label {
-  color: #e6e6e6 !important;
-  text-shadow: 0 0 8px rgba(0, 224, 255, 0.35);
-}
-
-:host-context([data-theme="cyberpunk"]) ::ng-deep .catalog-tabs .mat-mdc-tab.mdc-tab--active .mdc-tab__text-label {
-  color: #ffffff !important;
-  text-shadow:
-    0 0 10px rgba(255, 0, 140, 0.45),
-    0 0 14px rgba(0, 224, 255, 0.55);
-}
+// Estilos de mat-tab-group.catalog-tabs: ver styles.scss (sin ::ng-deep).
 
 .compact-tab-content {
   padding: 12px 0;
 }
 
-.form-card, .list-card {
+.form-card,
+.list-card {
   margin-bottom: 24px;
-  background-color: var(--surface-color);
+  background: var(--surface-card);
 }
 
 .compact-tab-content .form-card,
@@ -207,6 +193,7 @@
   }
 }
 
+// Badges de tipo de regla: colores del tema (advertencia / alerta) para legibilidad en dark/sepia/pastel
 .rule-type-badge {
   display: inline-flex;
   align-items: center;
@@ -215,8 +202,8 @@
   border-radius: 12px;
   font-size: 12px;
   font-weight: 500;
-  background: #fff3e0;
-  color: #e65100;
+  background: var(--state-warning-bg);
+  color: var(--state-warning);
 
   .badge-icon {
     font-size: 14px;
@@ -229,12 +216,13 @@
     width: 13px;
     height: 13px;
     margin-left: 2px;
-    color: #b84d00;
+    color: var(--state-warning);
+    opacity: 0.9;
   }
 
   &:not(.badge-maintenance) {
-    background: #fffde7;
-    color: #f57f17;
+    background: var(--alert-bg);
+    color: var(--alert-text);
   }
 }
 

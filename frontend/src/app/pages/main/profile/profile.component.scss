@@ -9,17 +9,29 @@
   }
 }
 
-.profile-card {
-  margin-bottom: 24px;
-  background-color: var(--surface-color);
+.profile-panel {
+  margin-bottom: var(--space-6);
+  background: var(--surface-card);
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
 
-  mat-card-header {
-    margin-bottom: 16px;
-  }
+.profile-panel__header {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--outline-subtle);
+}
 
-  mat-card-title {
-    color: var(--text-primary);
-  }
+.profile-panel__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.profile-panel__body {
+  padding: var(--space-4);
 }
 
 .full-width {

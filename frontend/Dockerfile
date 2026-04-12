@@ -19,11 +19,14 @@ RUN npm run build -- --configuration production
 # Stage 2: Servir con Nginx
 FROM nginx:alpine
 
-# Instalar OpenSSL para poder auto-generar certificados dummy en el arranque
-RUN apk add --no-cache openssl
+# OpenSSL (certs al arranque) + wget (espera a backend antes de nginx)
+RUN apk add --no-cache openssl wget
 
 # Copiar configuración de Nginx
 COPY nginx.conf /etc/nginx/nginx.conf
+
+COPY docker-entrypoint.sh /docker-entrypoint-bitacora.sh
+RUN sed -i 's/\r$//' /docker-entrypoint-bitacora.sh && chmod +x /docker-entrypoint-bitacora.sh
 
 # Copiar build de Angular (Angular 20 genera en /browser)
 COPY --from=builder /app/dist/bitacora-soc/browser /usr/share/nginx/html
@@ -35,5 +38,4 @@ EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --quiet --tries=1 --spider http://127.0.0.1/health || exit 1
 
-# Nginx se ejecuta en foreground por defecto
-CMD ["nginx", "-g", "daemon off;"]
+ENTRYPOINT ["/docker-entrypoint-bitacora.sh"]

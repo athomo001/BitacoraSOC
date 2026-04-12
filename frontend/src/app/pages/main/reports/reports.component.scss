@@ -1,3 +1,4 @@
+// Reportes e indicadores: sombras y colores vía variables de tema.
 .reports-container {
   max-width: 1400px;
   margin: 0 auto;
@@ -9,32 +10,47 @@
   }
 }
 
-.period-selector {
-  margin-bottom: 24px;
+.reports-panel {
+  background: var(--surface-card);
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
 
-  mat-card-content {
-    padding: 16px;
+.reports-panel__header {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--outline-subtle);
+  background: var(--surface-muted);
+}
+
+.reports-panel__title {
+  margin: 0;
+  font-size: 1.2em;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+
+  .toggle-btn {
+    flex-shrink: 0;
+  }
+}
+
+.reports-panel__body {
+  padding: 24px;
+
+  &--center {
     display: flex;
     justify-content: center;
+    padding: 16px;
   }
+}
 
-  ::ng-deep .mat-button-toggle-group {
-    border-color: var(--border-color);
-  }
-
-  ::ng-deep .mat-button-toggle {
-    background: var(--surface-raised);
-    color: var(--text-secondary);
-  }
-
-  ::ng-deep .mat-button-toggle .mat-button-toggle-label-content {
-    color: inherit;
-  }
-
-  ::ng-deep .mat-button-toggle-checked {
-    background: var(--primary-color);
-    color: var(--on-primary-color);
-  }
+.period-selector {
+  margin-bottom: 24px;
 }
 
 .stats-grid {
@@ -64,10 +80,6 @@
     }
   }
 
-  mat-card-content {
-    padding: 24px !important;
-  }
-
   .stat-value {
     font-size: 2.5em;
     font-weight: bold;
@@ -87,28 +99,6 @@
 .chart-card {
   margin-bottom: 24px;
 
-  mat-card-header {
-    background: var(--surface-muted);
-    padding: 16px;
-    margin: -16px -16px 16px -16px;
-
-    mat-card-title {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 1.2em;
-      color: var(--text-primary);
-
-      .toggle-btn {
-        margin-left: auto;
-      }
-    }
-  }
-
-  mat-card-content {
-    padding: 24px;
-  }
-
   .chart-description {
     color: var(--text-secondary);
     font-style: italic;
@@ -127,38 +117,7 @@
     margin-bottom: 24px;
   }
 
-  ::ng-deep .ngx-charts {
-    text {
-      fill: var(--text-primary) !important;
-    }
-
-    .axis-label {
-      fill: var(--text-primary) !important;
-    }
-
-    .tick text,
-    .legend-label-text,
-    .timeline-label {
-      fill: var(--text-primary) !important;
-    }
-
-    .gridline-path {
-      stroke: var(--border-color) !important;
-      opacity: 0.45;
-    }
-
-    .domain,
-    .tick line {
-      stroke: var(--text-secondary) !important;
-      opacity: 0.8;
-    }
-
-    .heat-map .cell text,
-    .heat-map .cell-label {
-      fill: var(--heatmap-label-color, var(--text-primary)) !important;
-      font-weight: 700;
-    }
-  }
+  // ngx-charts: ver styles.scss (.reports-container .chart-card .ngx-charts).
 }
 
 .heatmap-legend {
@@ -285,9 +244,10 @@
   transition: transform 0.15s ease, box-shadow 0.15s ease;
   user-select: none;
 
+  // Sombra acorde al tema (evita gris fijo en dark/sepia)
   &:hover {
     transform: scale(1.15);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow);
     z-index: 2;
     position: relative;
   }
@@ -344,7 +304,7 @@
     font-size: 2em;
   }
 
-  .chart-card mat-card-content {
+  .chart-card .reports-panel__body {
     padding: 16px;
   }
 
@@ -353,7 +313,3 @@
   }
 }
 
-// Theme-safe card background
-.stat-card {
-  background: var(--surface-color);
-}

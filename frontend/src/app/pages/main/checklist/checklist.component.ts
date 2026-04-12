@@ -6,7 +6,6 @@ import { ChecklistTemplate, ChecklistItem, ShiftCheck } from '../../../models/ch
 import { AuthService } from '../../../services/auth.service';
 import { OnboardingService } from '../../../services/onboarding.service';
 import { NgIf, NgFor, DatePipe, NgTemplateOutlet } from '@angular/common';
-import { MatCard, MatCardContent } from '@angular/material/card';
 import { MatIcon } from '@angular/material/icon';
 import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { MatFormField, MatLabel, MatHint } from '@angular/material/form-field';
@@ -33,7 +32,7 @@ type ChecklistNode = {
   selector: 'app-checklist',
   templateUrl: './checklist.component.html',
   styleUrls: ['./checklist.component.scss'],
-  imports: [NgIf, MatCard, MatCardContent, MatIcon, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, ReactiveFormsModule, FormsModule, MatFormField, MatLabel, MatSelect, MatOption, NgFor, MatExpansionPanelDescription, MatRadioGroup, MatRadioButton, MatInput, MatHint, MatButton, MatProgressSpinner, EntriesComponent, DatePipe, NgTemplateOutlet]
+  imports: [NgIf, MatIcon, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, ReactiveFormsModule, FormsModule, MatFormField, MatLabel, MatSelect, MatOption, NgFor, MatExpansionPanelDescription, MatRadioGroup, MatRadioButton, MatInput, MatHint, MatButton, MatProgressSpinner, EntriesComponent, DatePipe, NgTemplateOutlet]
 })
 export class ChecklistComponent implements OnInit {
   @ViewChild('checklistGuideCard') checklistGuideCard?: ElementRef<HTMLElement>;

@@ -1,10 +1,27 @@
 <div class="checklist-admin">
-  <h1>Administracion Checklist</h1>
-  <p class="hint">Crea plantillas, activalas y define el checklist que veran todos los usuarios (incluyendo guests).</p>
+  <header class="page-header">
+    <h1>Administración de checklist</h1>
+    <p class="hint">Crea plantillas, actívalas y define el checklist que verán todos los usuarios (incluyendo invitados).</p>
+  </header>
 
-  <mat-card class="config-card">
-    <mat-card-title>Configuración de Checklist</mat-card-title>
-    <mat-card-content>
+  <nav class="checklist-wizard-nav" aria-label="Pasos de administración (asistente)">
+    <button type="button" mat-stroked-button color="primary" (click)="scrollToChecklistStep('checklist-step-config')">
+      1. Configuración
+    </button>
+    <button type="button" mat-stroked-button color="primary" (click)="scrollToChecklistStep('checklist-step-reminders')">
+      2. Recordatorios
+    </button>
+    <button type="button" mat-stroked-button color="primary" (click)="scrollToChecklistStep('checklist-step-templates')">
+      3. Plantillas
+    </button>
+  </nav>
+
+  <section class="admin-section" id="checklist-step-config" aria-labelledby="checklist-config-heading">
+    <header class="admin-section__toolbar">
+      <h2 id="checklist-config-heading" class="admin-section__title">1. Configuración de checklist</h2>
+    </header>
+    <div class="admin-panel config-card">
+      <div class="admin-panel__body">
       <form [formGroup]="configForm" (ngSubmit)="saveConfig()" class="config-form">
         <div class="config-columns">
           <div class="config-column">
@@ -48,24 +65,28 @@
           Guardar
         </button>
       </form>
-    </mat-card-content>
-  </mat-card>
+      </div>
+    </div>
+  </section>
 
   <!-- ── MAIL-REM-043: Recordatorios periódicos de turno ── -->
-  <mat-card class="config-card reminders-card">
-    <mat-card-title>
-      <span>Recordatorios periódicos de turno por email</span>
-      <button mat-raised-button color="primary" (click)="openReminderForm()" *ngIf="!reminderFormOpen">
-        <mat-icon>add</mat-icon> Nuevo recordatorio
+  <section class="admin-section" id="checklist-step-reminders" aria-labelledby="checklist-reminders-heading">
+    <header class="admin-section__toolbar admin-section__toolbar--split">
+      <h2 id="checklist-reminders-heading" class="admin-section__title">2. Recordatorios periódicos de turno por correo</h2>
+      <button mat-raised-button color="primary" type="button" (click)="openReminderForm()" *ngIf="!reminderFormOpen">
+        <mat-icon>add</mat-icon>
+        Nuevo recordatorio
       </button>
-    </mat-card-title>
-    <mat-card-content>
+    </header>
+    <div class="admin-panel config-card reminders-card">
+      <div class="admin-panel__body">
       <p class="hint">Crea recordatorios de acciones que se enviarán automáticamente por email a los analistas del turno activo.</p>
 
       <mat-progress-spinner *ngIf="loadingReminders" mode="indeterminate" diameter="32"></mat-progress-spinner>
 
-      <!-- Tabla de recordatorios -->
-      <table class="reminder-table catalog-table" *ngIf="!loadingReminders && !reminderFormOpen && shiftReminders.length > 0">
+      <!-- Tabla de recordatorios (contenedor con scroll horizontal en pantallas estrechas) -->
+      <div class="table-responsive reminders-table-wrap" *ngIf="!loadingReminders && !reminderFormOpen && shiftReminders.length > 0">
+      <table class="reminder-table catalog-table reminder-table--stack-narrow">
         <thead>
           <tr>
             <th>Nombre</th>
@@ -78,22 +99,22 @@
         </thead>
         <tbody>
           <tr *ngFor="let r of shiftReminders">
-            <td>{{ r.label }}</td>
-            <td class="text-truncate">{{ r.reminderText }}</td>
-            <td>
+            <td data-label="Nombre">{{ r.label }}</td>
+            <td data-label="Texto del recordatorio" class="text-truncate">{{ r.reminderText }}</td>
+            <td data-label="Frecuencia">
               <span *ngIf="r.frequencyType === 'hours'">Cada {{ r.intervalHours }}h</span>
               <span *ngIf="r.frequencyType === 'fixed'">{{ r.fixedTimes.join(', ') || '–' }}</span>
             </td>
-            <td>
-              <span *ngIf="!r.targetShiftIds.length" class="badge badge-neutral">Todos</span>
-              <span *ngFor="let sid of r.targetShiftIds" class="badge badge-shift">{{ shiftNameById(sid) }}</span>
+            <td data-label="Turnos" class="reminder-shifts-cell">
+              <span *ngIf="!r.targetShiftIds.length" class="badge-pill badge-surface-neutral">Todos</span>
+              <span *ngFor="let sid of r.targetShiftIds" class="badge-pill badge-surface-info">{{ shiftNameById(sid) }}</span>
             </td>
-            <td>
-              <span class="badge" [class.badge-active]="r.enabled" [class.badge-inactive]="!r.enabled">
+            <td data-label="Estado">
+              <span class="badge-pill" [class.badge-surface-success]="r.enabled" [class.badge-surface-error]="!r.enabled">
                 {{ r.enabled ? 'Activo' : 'Inactivo' }}
               </span>
             </td>
-            <td class="actions-cell">
+            <td data-label="Acciones" class="actions-cell">
               <button mat-icon-button (click)="openReminderForm(r)" title="Editar">
                 <mat-icon>edit</mat-icon>
               </button>
@@ -104,6 +125,7 @@
           </tr>
         </tbody>
       </table>
+      </div>
 
       <p class="empty-hint" *ngIf="!loadingReminders && !reminderFormOpen && shiftReminders.length === 0">
         No hay recordatorios configurados. Haz clic en "Nuevo recordatorio" para crear uno.
@@ -178,12 +200,18 @@
         </form>
       </div>
 
-    </mat-card-content>
-  </mat-card>
+      </div>
+    </div>
+  </section>
 
+  <section class="admin-section" id="checklist-step-templates" aria-labelledby="checklist-templates-heading">
+    <header class="admin-section__toolbar">
+      <h2 id="checklist-templates-heading" class="admin-section__title">3. Plantillas y editor</h2>
+      <p class="admin-section__subtitle">Selecciona una plantilla a la izquierda o crea una nueva; edita el contenido a la derecha.</p>
+    </header>
   <div class="layout">
-    <mat-card class="list-card">
-      <mat-card-title>Plantillas</mat-card-title>
+    <div class="admin-panel list-card">
+      <h3 class="admin-panel__title">Plantillas</h3>
       <mat-progress-bar *ngIf="isLoading" mode="indeterminate"></mat-progress-bar>
       <mat-nav-list>
         <a mat-list-item class="template-list-item" *ngFor="let template of templates" (click)="selectTemplate(template)"
@@ -199,14 +227,15 @@
       <div class="list-actions">
         <button mat-stroked-button color="primary" (click)="resetForm()">Nueva plantilla</button>
       </div>
-    </mat-card>
+    </div>
 
-    <mat-card class="form-card">
-      <mat-card-title>{{ selectedTemplate ? 'Editar plantilla' : 'Nueva plantilla' }}</mat-card-title>
-      <mat-card-content>
+    <div class="admin-panel form-card">
+      <h3 class="admin-panel__title">{{ selectedTemplate ? 'Editar plantilla' : 'Nueva plantilla' }}</h3>
+      <div class="admin-panel__body">
         <form [formGroup]="form" (ngSubmit)="saveTemplate()">
-          <div class="quick-actions">
-            <button mat-raised-button color="primary" type="submit">Guardar cambios</button>
+          <!-- Acciones frecuentes fijas al hacer scroll (UI-CHK-044) -->
+          <div class="quick-actions" role="toolbar" aria-label="Acciones rápidas del editor de plantilla">
+            <button mat-raised-button color="primary" type="submit">Guardar plantilla</button>
             <button mat-stroked-button color="primary" type="button" (click)="addItem()">
               <mat-icon>add</mat-icon>
               Agregar item
@@ -300,13 +329,8 @@
             </mat-accordion>
           </div>
 
-          <button mat-stroked-button color="primary" type="button" (click)="addItem()">
-            <mat-icon>add</mat-icon>
-            Agregar item
-          </button>
-
           <div class="form-actions">
-            <button mat-raised-button color="primary" type="submit">Guardar</button>
+            <p class="form-actions__hint">La plantilla se guarda con <strong>Guardar plantilla</strong> en la barra superior.</p>
             <button mat-button type="button" (click)="resetForm()">Cancelar</button>
             <span class="spacer"></span>
             <button mat-flat-button color="accent" type="button" *ngIf="selectedTemplate && !selectedTemplate.isActive"
@@ -323,7 +347,8 @@
             </button>
           </div>
         </form>
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </div>
   </div>
+  </section>
 </div>

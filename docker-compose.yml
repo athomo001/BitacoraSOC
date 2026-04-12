@@ -14,15 +14,22 @@ services:
       - ./.data/mongodb_config:/data/configdb
     networks:
       - bitacora-network
+    # CMD-SHELL para que Mongo expanda usuario/contraseña del entorno (CMD exec no expande $VAR).
     healthcheck:
       test:
         - CMD-SHELL
         - >
-          mongosh --host localhost --port 27017 --username "$${MONGO_INITDB_ROOT_USERNAME}" --password "$${MONGO_INITDB_ROOT_PASSWORD}" --authenticationDatabase admin --quiet --eval "db.runCommand({ ping: 1 }).ok" | grep 1
+          mongosh --host 127.0.0.1 --port 27017
+          --username "$$MONGO_INITDB_ROOT_USERNAME"
+          --password "$$MONGO_INITDB_ROOT_PASSWORD"
+          --authenticationDatabase admin
+          --quiet
+          --eval 'db.runCommand({ ping: 1 }).ok'
+          | grep -q 1 || exit 1
       interval: 5s
-      timeout: 3s
-      retries: 3
-      start_period: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
 
   backend:
     build:
@@ -105,13 +112,8 @@ services:
       - ./.data/tls:/etc/nginx/certs
     networks:
       - bitacora-network
-    command: >
-      sh -c ' if [ ! -f /etc/nginx/certs/cert.pem ]; then
-        echo "Generando certificados autofirmados dummy para arranque inicial de Nginx...";
-        openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/nginx/certs/key.pem -out /etc/nginx/certs/cert.pem -subj "/CN=localhost";
-      fi;  chown -R 1001:1001 /etc/nginx/certs; nginx -g "daemon off;" '
     healthcheck:
-      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "--no-check-certificate", "https://127.0.0.1/health" ]
+      test: [ "CMD", "wget", "-qO-", "http://127.0.0.1/health" ]
       interval: 10s
       timeout: 3s
       retries: 3

@@ -13,7 +13,6 @@ import { CreateEntryRequest } from '../../../models/entry.model';
 import { AuthService } from '../../../services/auth.service';
 import { ConfigService } from '../../../services/config.service';
 import { EasterEggRule } from '../../../models/config.model';
-import { MatCard, MatCardContent } from '@angular/material/card';
 import { MatFormField, MatLabel, MatHint } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatButton } from '@angular/material/button';
@@ -27,7 +26,7 @@ import { MatSelect, MatOption } from '@angular/material/select';
     selector: 'app-entries',
     templateUrl: './entries.component.html',
     styleUrls: ['./entries.component.scss'],
-  imports: [MatCard, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatHint, MatButton, NgIf, MatIcon, MatProgressSpinner, MatRadioGroup, MatRadioButton, MatSelect, MatOption, NgFor]
+  imports: [ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatHint, MatButton, NgIf, MatIcon, MatProgressSpinner, MatRadioGroup, MatRadioButton, MatSelect, MatOption, NgFor]
 })
 export class EntriesComponent implements OnInit, OnDestroy {
   private readonly contentMaxLength = 50000;

@@ -32,7 +32,6 @@ import { ReportService } from '../../../services/report.service';
 import { ReportOverview } from '../../../models/report.model';
 import { Color, ScaleType } from '@swimlane/ngx-charts';
 import { NgIf, NgFor } from '@angular/common';
-import { MatCard, MatCardHeader, MatCardTitle, MatCardContent } from '@angular/material/card';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -46,12 +45,8 @@ import { NgxChartsModule } from '@swimlane/ngx-charts';
     templateUrl: './reports.component.html',
     styleUrls: ['./reports.component.scss'],
     imports: [
-      NgIf, 
+      NgIf,
       NgFor,
-      MatCard, 
-      MatCardHeader, 
-      MatCardTitle, 
-      MatCardContent, 
       MatButton, 
       MatIconButton,
       MatIcon,

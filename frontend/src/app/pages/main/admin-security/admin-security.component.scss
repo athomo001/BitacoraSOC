@@ -2,6 +2,30 @@
   max-width: 920px;
 }
 
+.security-panel {
+  background: var(--surface-card);
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.security-panel__header {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--outline-subtle);
+}
+
+.security-panel__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.security-panel__body {
+  padding: var(--space-4);
+}
+
 .full-width {
   width: 100%;
 }

@@ -1,3 +1,4 @@
+// Layout principal (sidebars + barra de salud). Chips y acentos usan tokens del tema, no paleta fija.
 .main-container {
   height: 100vh;
   width: 100vw;
@@ -57,52 +58,15 @@
     flex-shrink: 0;
   }
 
+  // Acordeones del drawer: ver styles.scss (.left-sidebar mat-accordion.menu-accordion …).
   .menu-accordion {
     margin: 8px;
-
-    ::ng-deep .mat-expansion-panel {
-      background-color: var(--surface-color);
-      box-shadow: none;
-      border: 1px solid var(--border-color);
-      border-radius: 10px !important;
-      overflow: hidden;
-    }
-
-    ::ng-deep .mat-expansion-panel-header-title {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-weight: 600;
-    }
-  }
-
-  .complement-accordion {
-    ::ng-deep .mat-expansion-panel {
-      border-color: rgba(27, 95, 198, 0.35);
-      background: linear-gradient(180deg, rgba(27, 95, 198, 0.08), rgba(27, 95, 198, 0.03));
-    }
-
-    ::ng-deep .mat-expansion-panel-header-title mat-icon {
-      color: #1b5fc6;
-    }
-
-    ::ng-deep .mat-expansion-panel-header-description {
-      justify-content: flex-end;
-      color: #1b5fc6;
-      font-weight: 700;
-    }
   }
 
   .checklist-accordion {
     flex: 1;
     overflow-y: auto;
     margin: 8px;
-
-    ::ng-deep .mat-expansion-panel {
-      background-color: var(--surface-color);
-      box-shadow: none;
-      border: 1px solid var(--border-color);
-    }
 
     .checklist-badge {
       margin-left: auto;
@@ -251,42 +215,45 @@
   display: flex;
   flex-direction: column;
   background-color: var(--background-color);
+  min-width: 0;
 }
 
+// Filas de la barra superior: ver styles.scss (.main-container mat-toolbar.top-toolbar …).
 .top-toolbar {
   position: sticky;
   top: 0;
   z-index: 10;
-  min-height: 64px;
-  padding: 0 12px;
-
-  ::ng-deep .mat-toolbar-row,
-  ::ng-deep .mat-mdc-toolbar-row {
-    min-height: 64px;
-    height: 64px;
-  }
+  min-height: 68px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--outline-subtle);
+  backdrop-filter: blur(10px);
 }
 
 .toolbar-title {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  max-width: calc(100% - 180px);
+  max-width: calc(100% - 220px);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   font-family: var(--app-title-font);
   font-weight: 400;
-  font-size: clamp(1.8rem, 3.8vw, 2.9rem);
+  font-size: clamp(1.35rem, 2.8vw, 2.15rem);
   letter-spacing: 0.04em;
   line-height: 1.08;
   pointer-events: none;
+  color: var(--text-primary);
+  text-shadow: 0 2px 8px color-mix(in srgb, var(--text-primary) 12%, transparent);
 }
 
 .health-strip {
+  position: sticky;
+  top: 68px;
+  z-index: 9;
   padding: 8px 16px 10px;
-  border-bottom: 1px solid var(--border-color);
-  background: var(--surface-muted);
+  border-bottom: 1px solid var(--outline-subtle);
+  background: color-mix(in srgb, var(--surface-muted) 90%, transparent);
 }
 
 .health-chips {
@@ -309,26 +276,27 @@
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  border: 1px solid var(--outline-subtle);
   white-space: nowrap;
 }
 
+// Chips de salud: superficie semántica + texto del token (coherente con los 5 temas)
 .chip-ok {
-  background: #1f7a35;
-  border-color: #2fa04b;
-  color: #ffffff;
+  background: var(--state-success-bg);
+  border-color: color-mix(in srgb, var(--state-success) 45%, transparent);
+  color: var(--state-success);
 }
 
 .chip-warn {
-  background: #8a6a00;
-  border-color: #b88b00;
-  color: #fff7d1;
+  background: var(--state-warning-bg);
+  border-color: color-mix(in srgb, var(--state-warning) 45%, transparent);
+  color: var(--state-warning);
 }
 
 .chip-down {
-  background: #b71c1c;
-  border-color: #d32f2f;
-  color: #ffffff;
+  background: var(--state-error-bg);
+  border-color: color-mix(in srgb, var(--state-error) 45%, transparent);
+  color: var(--state-error);
 }
 
 .spacer {
@@ -337,10 +305,16 @@
 
 .content-wrapper {
   flex: 1;
-  padding: 24px;
+  padding: 20px 24px 28px;
   overflow-y: auto;
   background-color: var(--background-color);
-  transition: padding-right 0.3s ease;
+  transition: padding-right 0.3s ease, background-color 0.2s ease;
+}
+
+.content-wrapper > * {
+  max-width: 1320px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .active-link {
@@ -418,9 +392,24 @@
   color: var(--state-warning);
 }
 
-::ng-deep .mat-mdc-menu-panel .mat-mdc-menu-item .mdc-list-item__primary-text {
-  max-width: none !important;
-  white-space: nowrap;
-  overflow: visible !important;
-  text-overflow: clip !important;
+// Texto de ítems de menú (sin truncar): ver styles.scss (.mat-mdc-menu-panel …).
+
+@media (max-width: 960px) {
+  .top-toolbar {
+    min-height: 60px;
+    padding: 0 10px;
+  }
+
+  .toolbar-title {
+    max-width: calc(100% - 110px);
+    font-size: clamp(1.05rem, 4.3vw, 1.5rem);
+  }
+
+  .health-strip {
+    top: 60px;
+  }
+
+  .content-wrapper {
+    padding: 14px 12px 18px;
+  }
 }

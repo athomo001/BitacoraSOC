@@ -8,7 +8,6 @@ import { UserService } from '../../../services/user.service';
 import { ChecklistTemplate, ChecklistItem } from '../../../models/checklist.model';
 import { WorkShift } from '../../../models/work-shift.model';
 import { ShiftReminder } from '../../../models/config.model';
-import { MatCard, MatCardTitle, MatCardContent } from '@angular/material/card';
 import { NgIf, NgFor } from '@angular/common';
 import { MatProgressBar } from '@angular/material/progress-bar';
 import { MatNavList, MatListItem } from '@angular/material/list';
@@ -27,7 +26,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
   selector: 'app-checklist-admin',
   templateUrl: './checklist-admin.component.html',
   styleUrls: ['./checklist-admin.component.scss'],
-  imports: [MatCard, MatCardTitle, NgIf, MatProgressBar, MatNavList, NgFor, MatListItem, MatChipSet, MatChip, MatChipsModule, MatButton, MatCardContent, ReactiveFormsModule, MatFormField, MatLabel, MatHint, MatInput, MatCheckbox, MatIconButton, MatIcon, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatSelect, MatOption, MatRadioModule, MatProgressSpinnerModule]
+  imports: [NgIf, MatProgressBar, MatNavList, NgFor, MatListItem, MatChipSet, MatChip, MatChipsModule, MatButton, ReactiveFormsModule, MatFormField, MatLabel, MatHint, MatInput, MatCheckbox, MatIconButton, MatIcon, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatSelect, MatOption, MatRadioModule, MatProgressSpinnerModule]
 })
 export class ChecklistAdminComponent implements OnInit {
   templates: ChecklistTemplate[] = [];
@@ -90,6 +89,11 @@ export class ChecklistAdminComponent implements OnInit {
     this.loadActiveShifts();
     this.loadShiftReminders();
     this.addItem();
+  }
+
+  /** Asistente por pasos (UI-CHK-044): scroll a sección sin recargar. */
+  scrollToChecklistStep(elementId: string): void {
+    document.getElementById(elementId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   loadCargoLabelOptions(): void {

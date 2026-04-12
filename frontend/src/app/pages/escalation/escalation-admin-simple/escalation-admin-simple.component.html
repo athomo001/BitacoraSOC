@@ -1,13 +1,13 @@
 <div class="container">
-  <mat-card class="page-header">
+  <header class="page-header">
     <mat-icon>settings</mat-icon>
     <div>
       <h1>Administración de Escalamientos</h1>
       <p>Configura turnos internos y contactos de clientes</p>
     </div>
-  </mat-card>
+  </header>
 
-  <mat-tab-group>
+  <mat-tab-group class="escalation-admin-tabs">
     <!-- TAB 1: TURNOS INTERNOS -->
     <mat-tab label="🗓️ Turnos Internos (Mi Empresa)">
       <div class="tab-content">
@@ -20,7 +20,7 @@
         </button>
 
         <!-- Formulario de asignación -->
-        <mat-card *ngIf="showAssignmentForm" class="form-card">
+        <section *ngIf="showAssignmentForm" class="form-card">
           <h3>Nueva Asignación de Turno</h3>
           <form [formGroup]="assignmentForm" (ngSubmit)="saveAssignment()">
             <div class="form-row">
@@ -96,7 +96,7 @@
               </button>
             </div>
           </form>
-        </mat-card>
+        </section>
 
         <!-- Tabla de asignaciones del mes actual -->
         <div *ngIf="!loadingAssignments && currentMonthAssignments.length > 0" class="simple-table">
@@ -211,7 +211,7 @@
           <h3>🔔 Recordatorio Escalación Interna</h3>
           <p class="subtitle">Avisa solo cuando detecta una semana futura sin escalación interna cargada.</p>
 
-          <mat-card class="inline-form">
+          <section class="inline-form">
             <form [formGroup]="escalationReminderForm" (ngSubmit)="saveEscalationReminderConfig()">
               <mat-checkbox formControlName="escalationReminderEnabled" color="primary">
                 Activar alerta de semana futura vacía
@@ -241,7 +241,7 @@
                 Probar recordatorio
               </button>
             </form>
-          </mat-card>
+          </section>
         </div>
 
         <!-- Sección: Personas Externas -->
@@ -254,7 +254,7 @@
             Agregar Persona Externa
           </button>
 
-          <mat-card *ngIf="showExternalPersonForm" class="inline-form">
+          <section *ngIf="showExternalPersonForm" class="inline-form">
             <h4>Nueva Persona Externa</h4>
             <form [formGroup]="externalPersonForm" (ngSubmit)="saveExternalPerson()">
               <mat-form-field appearance="outline">
@@ -278,7 +278,7 @@
               </button>
               <button mat-button type="button" (click)="showExternalPersonForm = false">Cancelar</button>
             </form>
-          </mat-card>
+          </section>
 
           <div class="simple-table table-spacing-top" *ngIf="externalPeople.length > 0">
             <table>
@@ -340,7 +340,7 @@
             Agregar Servicio
           </button>
 
-          <mat-card *ngIf="showServiceForm" class="inline-form">
+          <section *ngIf="showServiceForm" class="inline-form">
             <form [formGroup]="serviceForm" (ngSubmit)="saveService()">
               <mat-form-field appearance="outline">
                 <mat-label>Cliente</mat-label>
@@ -359,7 +359,7 @@
               </button>
               <button mat-button type="button" (click)="showServiceForm = false">Cancelar</button>
             </form>
-          </mat-card>
+          </section>
 
           <div class="simple-table" *ngIf="!loadingServices && services.length > 0">
             <table>
@@ -393,7 +393,7 @@
             Agregar Contacto
           </button>
 
-          <mat-card *ngIf="showContactForm" class="inline-form">
+          <section *ngIf="showContactForm" class="inline-form">
             <form [formGroup]="contactForm" (ngSubmit)="saveContact()">
               <mat-form-field appearance="outline">
                 <mat-label>Servicio</mat-label>
@@ -427,7 +427,7 @@
               </button>
               <button mat-button type="button" (click)="showContactForm = false">Cancelar</button>
             </form>
-          </mat-card>
+          </section>
 
           <div class="simple-table" *ngIf="!loadingContacts && contacts.length > 0">
             <table>
@@ -495,7 +495,7 @@
         </div>
 
         <!-- Formulario RACI -->
-        <mat-card *ngIf="showRaciForm" class="form-card">
+        <section *ngIf="showRaciForm" class="form-card">
           <h3>{{ editingRaciId ? 'Editar' : 'Nuevo' }} RACI</h3>
           <form class="raci-form" [formGroup]="raciForm" (ngSubmit)="saveRaciEntry()">
             <div class="form-row" *ngIf="reusableRaciTemplates.length > 0">
@@ -670,7 +670,7 @@
               </button>
             </div>
           </form>
-        </mat-card>
+        </section>
 
         <!-- Tabla RACI -->
         <div *ngIf="!loadingRaci" class="simple-table">

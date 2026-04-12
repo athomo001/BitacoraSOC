@@ -4,11 +4,11 @@
 
   <div class="logo-grid">
     <!-- Logo actual -->
-    <mat-card class="logo-card">
-      <mat-card-header>
-        <mat-card-title>Logo Actual</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
+    <div class="logo-panel logo-card">
+      <header class="logo-panel__header">
+        <h2 class="logo-panel__title">Logo Actual</h2>
+      </header>
+      <div class="logo-panel__body">
         <div class="logo-preview">
           <img *ngIf="currentLogo" [src]="getAssetUrl(currentLogo)" alt="Logo actual">
           <div *ngIf="!currentLogo" class="no-logo">
@@ -20,15 +20,15 @@
           <mat-icon>delete</mat-icon>
           Eliminar Logo
         </button>
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </div>
 
     <!-- Favicon actual -->
-    <mat-card class="logo-card">
-      <mat-card-header>
-        <mat-card-title>Favicon Actual</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
+    <div class="logo-panel logo-card">
+      <header class="logo-panel__header">
+        <h2 class="logo-panel__title">Favicon Actual</h2>
+      </header>
+      <div class="logo-panel__body">
         <div class="logo-preview favicon-preview">
           <img *ngIf="currentFavicon" [src]="getAssetUrl(currentFavicon)" alt="Favicon actual">
           <div *ngIf="!currentFavicon" class="no-logo">
@@ -40,21 +40,21 @@
           <mat-icon>delete</mat-icon>
           Eliminar Favicon
         </button>
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </div>
 
     <!-- Subir archivo -->
-    <mat-card class="logo-card">
-      <mat-card-header>
-        <mat-card-title>Subir Imagen</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        <input type="file" 
-               #fileInput 
-               (change)="onFileSelected($event)" 
+    <div class="logo-panel logo-card">
+      <header class="logo-panel__header">
+        <h2 class="logo-panel__title">Subir Imagen</h2>
+      </header>
+      <div class="logo-panel__body">
+        <input type="file"
+               #fileInput
+               (change)="onFileSelected($event)"
                accept="image/png,image/jpeg,image/webp,image/svg+xml"
            class="hidden-file-input">
-        
+
         <div class="upload-zone" (click)="fileInput.click()">
           <img *ngIf="previewUrl" [src]="previewUrl" alt="Preview">
           <div *ngIf="!previewUrl" class="upload-placeholder">
@@ -63,39 +63,39 @@
             <small>PNG, JPG, WEBP o SVG (máx 2MB)</small>
           </div>
         </div>
-        
+
         <button mat-raised-button color="primary" (click)="uploadLogo()" [disabled]="!previewUrl || isLoading">
           <mat-spinner *ngIf="isLoading" diameter="20"></mat-spinner>
           <span *ngIf="!isLoading">Subir Logo</span>
         </button>
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </div>
 
     <!-- URL externa -->
-    <mat-card class="logo-card">
-      <mat-card-header>
-        <mat-card-title>URL Externa</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
+    <div class="logo-panel logo-card">
+      <header class="logo-panel__header">
+        <h2 class="logo-panel__title">URL Externa</h2>
+      </header>
+      <div class="logo-panel__body">
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>URL del Logo</mat-label>
           <input matInput [(ngModel)]="logoUrl" placeholder="https://ejemplo.com/logo.png">
           <mat-hint>Ingresa la URL directa de una imagen</mat-hint>
         </mat-form-field>
-        
+
         <button mat-raised-button color="accent" (click)="saveLogo()" [disabled]="!logoUrl || isLoading">
           <mat-spinner *ngIf="isLoading" diameter="20"></mat-spinner>
           <span *ngIf="!isLoading">Guardar URL</span>
         </button>
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </div>
 
     <!-- Favicon -->
-    <mat-card class="logo-card">
-      <mat-card-header>
-        <mat-card-title>Favicon (PNG/ICO)</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
+    <div class="logo-panel logo-card">
+      <header class="logo-panel__header">
+        <h2 class="logo-panel__title">Favicon (PNG/ICO)</h2>
+      </header>
+      <div class="logo-panel__body">
         <input type="file"
                #faviconInput
                (change)="onFaviconFileSelected($event)"
@@ -126,15 +126,15 @@
           <mat-spinner *ngIf="isLoading" diameter="20"></mat-spinner>
           <span *ngIf="!isLoading">Guardar URL Favicon</span>
         </button>
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </div>
 
     <!-- Título barra superior -->
-    <mat-card class="logo-card">
-      <mat-card-header>
-        <mat-card-title>Título barra superior</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
+    <div class="logo-panel logo-card">
+      <header class="logo-panel__header">
+        <h2 class="logo-panel__title">Título barra superior</h2>
+      </header>
+      <div class="logo-panel__body">
         <div [formGroup]="brandingForm">
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Título en barra superior</mat-label>
@@ -148,15 +148,15 @@
           <mat-spinner *ngIf="savingAppTitle" diameter="18"></mat-spinner>
           <span *ngIf="!savingAppTitle">Guardar Título</span>
         </button>
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </div>
 
     <!-- Tema de Login -->
-    <mat-card class="logo-card">
-      <mat-card-header>
-        <mat-card-title>Tema de Login</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
+    <div class="logo-panel logo-card">
+      <header class="logo-panel__header">
+        <h2 class="logo-panel__title">Tema de Login</h2>
+      </header>
+      <div class="logo-panel__body">
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Estilo visual del login</mat-label>
           <mat-select [(ngModel)]="loginTheme">
@@ -171,15 +171,15 @@
           <mat-spinner *ngIf="savingLoginTheme" diameter="18"></mat-spinner>
           <span *ngIf="!savingLoginTheme">Guardar Tema</span>
         </button>
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </div>
 
     <!-- LogSource por Defecto -->
-    <mat-card class="logo-card">
-      <mat-card-header>
-        <mat-card-title>Configuración por Defecto</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
+    <div class="logo-panel logo-card">
+      <header class="logo-panel__header">
+        <h2 class="logo-panel__title">Configuración por Defecto</h2>
+      </header>
+      <div class="logo-panel__body">
         <form [formGroup]="brandingForm" (ngSubmit)="saveBrandingConfig()">
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>LogSource por Defecto</mat-label>
@@ -198,7 +198,7 @@
             <span *ngIf="!savingBranding">Guardar Configuración</span>
           </button>
         </form>
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </div>
   </div>
 </div>

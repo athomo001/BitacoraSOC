@@ -2,7 +2,6 @@ import { Component, OnInit, inject } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
-import { MatCard, MatCardHeader, MatCardTitle, MatCardContent } from '@angular/material/card';
 import { NgIf } from '@angular/common';
 import { MatIcon } from '@angular/material/icon';
 import { MatButton } from '@angular/material/button';
@@ -19,7 +18,7 @@ import { ConfigService } from '../../../services/config.service';
     selector: 'app-logo',
     templateUrl: './logo.component.html',
     styleUrls: ['./logo.component.scss'],
-    imports: [MatCard, MatCardHeader, MatCardTitle, MatCardContent, NgIf, MatIcon, MatButton, MatProgressSpinner, MatFormField, MatLabel, MatInput, ReactiveFormsModule, FormsModule, MatHint, MatSelect, MatOption, NgFor]
+    imports: [NgIf, MatIcon, MatButton, MatProgressSpinner, MatFormField, MatLabel, MatInput, ReactiveFormsModule, FormsModule, MatHint, MatSelect, MatOption, NgFor]
 })
 export class LogoComponent implements OnInit {
   private http = inject(HttpClient);

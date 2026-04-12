@@ -1,13 +1,13 @@
 <div class="escalation-view-container">
   <!-- Encabezado -->
-  <mat-card class="header-card">
-    <mat-card-header>
-      <mat-card-title>
+  <section class="header-card escalation-view-panel">
+    <header class="escalation-view-panel__header">
+      <h2 class="escalation-view-panel__title">
         <mat-icon>contact_phone</mat-icon>
         Información de Escalamiento
-      </mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
+      </h2>
+    </header>
+    <div class="escalation-view-panel__body">
       <!-- Selectores -->
       <div class="selectors">
         <mat-form-field appearance="outline" class="selector-field">
@@ -56,8 +56,8 @@
           Actualizar
         </button>
       </div>
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </section>
 
   <!-- Loading -->
   <div *ngIf="loading" class="loading-container">
@@ -65,39 +65,39 @@
   </div>
 
   <!-- Error -->
-  <mat-card *ngIf="error && !loading" class="error-card">
-    <mat-card-content>
+  <section *ngIf="error && !loading" class="error-card escalation-view-panel">
+    <div class="escalation-view-panel__body escalation-view-panel__body--row">
       <mat-icon color="warn">error</mat-icon>
       {{ error }}
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </section>
 
   <!-- Datos de Escalamiento -->
   <div *ngIf="escalationData && !loading" class="escalation-data">
-    
+
     <!-- Info del Servicio -->
-    <mat-card class="info-card">
-      <mat-card-header>
-        <mat-card-title>{{ escalationData.service.name }}</mat-card-title>
-        <mat-card-subtitle>Cliente: {{ escalationData.service.clientName }}</mat-card-subtitle>
-      </mat-card-header>
-      <mat-card-content>
+    <section class="info-card escalation-view-panel">
+      <header class="escalation-view-panel__header">
+        <h2 class="escalation-view-panel__title">{{ escalationData.service.name }}</h2>
+        <p class="escalation-view-panel__subtitle">Cliente: {{ escalationData.service.clientName }}</p>
+      </header>
+      <div class="escalation-view-panel__body">
         <p class="timestamp">
           <mat-icon>schedule</mat-icon>
           Consultado: {{ formatDateTime(escalationData.timestamp) }}
         </p>
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </section>
 
     <!-- Contactos Externos -->
-    <mat-card class="contacts-card">
-      <mat-card-header>
-        <mat-card-title>
+    <section class="contacts-card escalation-view-panel">
+      <header class="escalation-view-panel__header">
+        <h2 class="escalation-view-panel__title">
           <mat-icon>email</mat-icon>
           Contactos Externos
-        </mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
+        </h2>
+      </header>
+      <div class="escalation-view-panel__body">
         <!-- Para -->
         <div class="contact-section" *ngIf="escalationData.externalContacts.to.length > 0">
           <h3>
@@ -151,25 +151,25 @@
         </div>
 
         <!-- Sin contactos -->
-        <div *ngIf="escalationData.externalContacts.to.length === 0 && 
-                    escalationData.externalContacts.cc.length === 0 && 
-                    !escalationData.externalContacts.emergency.phone" 
+        <div *ngIf="escalationData.externalContacts.to.length === 0 &&
+                    escalationData.externalContacts.cc.length === 0 &&
+                    !escalationData.externalContacts.emergency.phone"
              class="no-data">
           <mat-icon>info</mat-icon>
           <p>No hay contactos externos configurados para este servicio</p>
         </div>
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </section>
 
     <!-- Turnos Internos -->
-    <mat-card class="shifts-card">
-      <mat-card-header>
-        <mat-card-title>
+    <section class="shifts-card escalation-view-panel">
+      <header class="escalation-view-panel__header">
+        <h2 class="escalation-view-panel__title">
           <mat-icon>groups</mat-icon>
           Turnos Internos
-        </mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
+        </h2>
+      </header>
+      <div class="escalation-view-panel__body">
         <div *ngIf="escalationData.internalShifts.length > 0" class="shifts-list">
           <div *ngFor="let shift of escalationData.internalShifts" class="shift-item">
             <div class="shift-header">
@@ -213,8 +213,8 @@
           <mat-icon>info</mat-icon>
           <p>No hay turnos internos configurados</p>
         </div>
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </section>
 
   </div>
 </div>

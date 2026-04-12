@@ -14,9 +14,33 @@
   }
 }
 
-.integration-card {
-  margin-bottom: 24px;
-  background: var(--surface-color);
+.integration-panel {
+  margin-bottom: var(--space-6);
+  background: var(--surface-card);
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+
+  &--future {
+    opacity: 0.92;
+  }
+}
+
+.integration-panel__header {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--outline-subtle);
+}
+
+.integration-panel__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.integration-panel__body {
+  padding: var(--space-4);
 }
 
 form {
@@ -63,6 +87,6 @@ form {
   margin-top: 8px;
 }
 
-.future-card ul {
+.integration-panel--future ul {
   margin: 10px 0 0 18px;
 }

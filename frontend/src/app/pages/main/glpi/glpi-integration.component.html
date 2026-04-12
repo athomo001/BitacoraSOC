@@ -3,11 +3,11 @@
   <p class="subtitle">Configuración separada para integración GLPI por API REST o correo collector.</p>
   <p class="subtitle">Resumen diario despacha al cierre de turno. Evento inmediato genera ticket al crear entradas de tipo incidente u ofensa.</p>
 
-  <mat-card class="glpi-card">
-    <mat-card-header>
-      <mat-card-title>Configuración</mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
+  <section class="glpi-panel glpi-card">
+    <header class="glpi-panel__header">
+      <h2 class="glpi-panel__title">Configuración</h2>
+    </header>
+    <div class="glpi-panel__body">
       <form [formGroup]="form" class="glpi-form">
         <div class="grid two">
           <mat-checkbox formControlName="enabled">Habilitar GLPI</mat-checkbox>
@@ -92,27 +92,27 @@
           </button>
         </div>
       </form>
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </section>
 
-  <mat-card class="glpi-card">
-    <mat-card-header>
-      <mat-card-title>Última prueba</mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
+  <section class="glpi-panel glpi-card">
+    <header class="glpi-panel__header">
+      <h2 class="glpi-panel__title">Última prueba</h2>
+    </header>
+    <div class="glpi-panel__body">
       <p *ngIf="lastTestDate"><strong>Fecha:</strong> {{ lastTestDate | date:'medium' }}</p>
       <p *ngIf="lastTestSuccess === true" class="ok"><strong>Estado:</strong> Correcto</p>
       <p *ngIf="lastTestSuccess === false" class="error"><strong>Estado:</strong> Fallido</p>
       <p *ngIf="lastTestMessage"><strong>Detalle:</strong> {{ lastTestMessage }}</p>
       <p *ngIf="!lastTestDate" class="muted">Aún no hay pruebas registradas.</p>
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </section>
 
-  <mat-card class="glpi-card">
-    <mat-card-header>
-      <mat-card-title>Último despacho operativo</mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
+  <section class="glpi-panel glpi-card">
+    <header class="glpi-panel__header">
+      <h2 class="glpi-panel__title">Último despacho operativo</h2>
+    </header>
+    <div class="glpi-panel__body">
       <p *ngIf="lastDispatchDate"><strong>Fecha:</strong> {{ lastDispatchDate | date:'medium' }}</p>
       <p *ngIf="lastDispatchSuccess === true" class="ok"><strong>Estado:</strong> Correcto</p>
       <p *ngIf="lastDispatchSuccess === false" class="error"><strong>Estado:</strong> Fallido</p>
@@ -121,6 +121,6 @@
       <p *ngIf="lastDispatchEvent"><strong>Origen:</strong> {{ lastDispatchEvent }}</p>
       <p *ngIf="lastDispatchMessage"><strong>Detalle:</strong> {{ lastDispatchMessage }}</p>
       <p *ngIf="!lastDispatchDate" class="muted">Aún no hay despachos operativos registrados.</p>
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </section>
 </div>

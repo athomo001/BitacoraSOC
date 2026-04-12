@@ -2,8 +2,8 @@
   <h1>Nueva Entrada</h1>
 
   <!-- Formulario de Nueva Entrada (PANTALLA PRINCIPAL) -->
-  <mat-card class="entry-form-card">
-    <mat-card-content>
+  <div class="entry-panel">
+    <div class="entry-panel__body">
       <form [formGroup]="entryForm" (ngSubmit)="onSubmit()">
         <div class="entry-form-layout">
           <!-- Columna izquierda: Fecha, Hora, Contenido -->
@@ -97,8 +97,8 @@
           </div>
         </div>
       </form>
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </div>
 
   <div
     class="easter-egg-overlay"

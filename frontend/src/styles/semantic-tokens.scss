@@ -1,0 +1,193 @@
+// =============================================================================
+// Tokens semánticos globales — Bitácora SOC
+// =============================================================================
+// Propósito: un solo lugar para variables CSS que complementan el tema
+// (--surface-color, --border-color, etc.) y evitan:
+//   - variables usadas en componentes pero no definidas (--surface-card, …)
+//   - hardcode de grises (#888, #eee) que rompen dark/sepia/pastel/cyberpunk
+//
+// Convención: cada [data-theme="…"] define los MISMOS nombres con valores
+// acordes al tema. Los componentes solo consumen var(--…), sin hex locales.
+//
+// Ver también: docs/ISSUES.md (Listas / Pendientes), docs/UI-GOVERNANCE.md (§2 backlog, §8 QA por PR).
+// =============================================================================
+
+:root {
+  // Escala de espacio (no depende del tema; usar en gap/padding/margin)
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  // Radios recomendados para mantener coherencia visual entre módulos
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  // Tipografía semántica (complementa Material; UI-TOKEN-047)
+  --font-size-sm: 0.8125rem;
+  --font-size-body: 1rem;
+  --font-size-md: 1.0625rem;
+  --font-size-lg: 1.125rem;
+  --line-height-tight: 1.25;
+  --line-height-body: 1.5;
+  --line-height-relaxed: 1.6;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  // Pantalla completa sobre la app (easter eggs, overlays de imagen)
+  --overlay-scrim: rgb(0 0 0 / 0.94);
+}
+
+[data-theme='light'] {
+  // Superficie secundaria: cabeceras de tabla, zonas de énfasis suave
+  --surface-variant: #eceff3;
+  // Alias explícito para contenedores tipo “card” (puede igualar a --surface-color)
+  --surface-card: #ffffff;
+  // Líneas divisorias y bordes de baja jerarquía (estilo outline M3)
+  --outline-variant: #c5c5c5;
+  --outline-subtle: rgba(0, 0, 0, 0.08);
+  --outline-strong: #9e9e9e;
+  // Texto terciario: debe mantener contraste legible sobre --surface-color
+  --text-muted: #616161;
+}
+
+[data-theme='dark'] {
+  --surface-variant: #252a36;
+  --surface-card: #1a1d27;
+  --outline-variant: #3d4456;
+  --outline-subtle: rgba(255, 255, 255, 0.08);
+  --outline-strong: #6b7288;
+  --text-muted: #a8b0c4;
+}
+
+[data-theme='sepia'] {
+  --surface-variant: #ebe3d4;
+  --surface-card: #f9f6ed;
+  --outline-variant: #c9bcaa;
+  --outline-subtle: rgba(74, 63, 53, 0.12);
+  --outline-strong: #9a8b7a;
+  --text-muted: #6d6156;
+}
+
+[data-theme='pastel'] {
+  --surface-variant: #ffe8f0;
+  --surface-card: #fff5f9;
+  --outline-variant: #edc4d4;
+  --outline-subtle: rgba(47, 36, 48, 0.08);
+  --outline-strong: #c9a4b5;
+  --text-muted: #7a5f70;
+}
+
+[data-theme='cyberpunk'] {
+  --surface-variant: #242424;
+  --surface-card: #1b1b1b;
+  --outline-variant: color-mix(in srgb, #9900ff 55%, #00e0ff 45%);
+  --outline-subtle: rgba(0, 224, 255, 0.12);
+  --outline-strong: #00e0ff;
+  --text-muted: #9a9a9a;
+}
+
+// =============================================================================
+// Auditoría — chips de categoría en columna “motivo” (audit-logs)
+// =============================================================================
+// Fondo + texto/borde izquierdo por categoría; definidos por tema para contraste.
+// Consumo: solo var(--audit-cat-*); no repetir hex en componentes.
+
+[data-theme='light'] {
+  --audit-cat-integration-bg: rgba(33, 150, 243, 0.15);
+  --audit-cat-integration-fg: #1976d2;
+  --audit-cat-email-bg: rgba(76, 175, 80, 0.15);
+  --audit-cat-email-fg: #388e3c;
+  --audit-cat-auth-bg: rgba(244, 67, 54, 0.15);
+  --audit-cat-auth-fg: #d32f2f;
+  --audit-cat-entry-bg: rgba(255, 193, 7, 0.18);
+  --audit-cat-entry-fg: #f57f17;
+  --audit-cat-checklist-bg: rgba(63, 81, 181, 0.15);
+  --audit-cat-checklist-fg: #3f51b5;
+  --audit-cat-escalation-bg: rgba(233, 30, 99, 0.15);
+  --audit-cat-escalation-fg: #c2185b;
+  --audit-cat-config-bg: rgba(156, 39, 176, 0.15);
+  --audit-cat-config-fg: #7b1fa2;
+  --audit-cat-other-bg: rgba(158, 158, 158, 0.18);
+  --audit-cat-other-fg: #616161;
+}
+
+[data-theme='dark'] {
+  --audit-cat-integration-bg: rgba(33, 150, 243, 0.28);
+  --audit-cat-integration-fg: #90caf9;
+  --audit-cat-email-bg: rgba(76, 175, 80, 0.28);
+  --audit-cat-email-fg: #a5d6a7;
+  --audit-cat-auth-bg: rgba(244, 67, 54, 0.28);
+  --audit-cat-auth-fg: #ef9a9a;
+  --audit-cat-entry-bg: rgba(255, 193, 7, 0.22);
+  --audit-cat-entry-fg: #ffe082;
+  --audit-cat-checklist-bg: rgba(121, 134, 203, 0.28);
+  --audit-cat-checklist-fg: #9fa8da;
+  --audit-cat-escalation-bg: rgba(233, 30, 99, 0.28);
+  --audit-cat-escalation-fg: #f48fb1;
+  --audit-cat-config-bg: rgba(186, 104, 200, 0.28);
+  --audit-cat-config-fg: #ce93d8;
+  --audit-cat-other-bg: rgba(189, 189, 189, 0.2);
+  --audit-cat-other-fg: #e0e0e0;
+}
+
+[data-theme='sepia'] {
+  --audit-cat-integration-bg: rgba(61, 95, 143, 0.18);
+  --audit-cat-integration-fg: #2d4a6e;
+  --audit-cat-email-bg: rgba(63, 122, 67, 0.18);
+  --audit-cat-email-fg: #2d5c30;
+  --audit-cat-auth-bg: rgba(163, 60, 60, 0.18);
+  --audit-cat-auth-fg: #8b2e2e;
+  --audit-cat-entry-bg: rgba(154, 90, 23, 0.2);
+  --audit-cat-entry-fg: #7a4a12;
+  --audit-cat-checklist-bg: rgba(107, 90, 130, 0.18);
+  --audit-cat-checklist-fg: #4f3f63;
+  --audit-cat-escalation-bg: rgba(141, 95, 122, 0.2);
+  --audit-cat-escalation-fg: #6b3d52;
+  --audit-cat-config-bg: rgba(120, 80, 130, 0.18);
+  --audit-cat-config-fg: #5a3d62;
+  --audit-cat-other-bg: rgba(90, 81, 72, 0.15);
+  --audit-cat-other-fg: #5a5148;
+}
+
+[data-theme='pastel'] {
+  --audit-cat-integration-bg: rgba(77, 122, 179, 0.2);
+  --audit-cat-integration-fg: #3d5f8f;
+  --audit-cat-email-bg: rgba(47, 143, 101, 0.2);
+  --audit-cat-email-fg: #2f8f65;
+  --audit-cat-auth-bg: rgba(184, 63, 100, 0.2);
+  --audit-cat-auth-fg: #b83f64;
+  --audit-cat-entry-bg: rgba(212, 137, 57, 0.22);
+  --audit-cat-entry-fg: #b86f1f;
+  --audit-cat-checklist-bg: rgba(181, 122, 217, 0.2);
+  --audit-cat-checklist-fg: #8b5bb5;
+  --audit-cat-escalation-bg: rgba(255, 128, 181, 0.22);
+  --audit-cat-escalation-fg: #c94d7a;
+  --audit-cat-config-bg: rgba(157, 122, 200, 0.2);
+  --audit-cat-config-fg: #7b5fa3;
+  --audit-cat-other-bg: rgba(111, 90, 102, 0.15);
+  --audit-cat-other-fg: #6b5a66;
+}
+
+[data-theme='cyberpunk'] {
+  --audit-cat-integration-bg: rgba(0, 224, 255, 0.18);
+  --audit-cat-integration-fg: #00e0ff;
+  --audit-cat-email-bg: rgba(0, 224, 255, 0.12);
+  --audit-cat-email-fg: #7fe0d6;
+  --audit-cat-auth-bg: rgba(199, 28, 11, 0.28);
+  --audit-cat-auth-fg: #ff9b9b;
+  --audit-cat-entry-bg: rgba(255, 0, 140, 0.18);
+  --audit-cat-entry-fg: #ff008c;
+  --audit-cat-checklist-bg: rgba(153, 0, 255, 0.22);
+  --audit-cat-checklist-fg: #d4a9ff;
+  --audit-cat-escalation-bg: rgba(255, 0, 140, 0.14);
+  --audit-cat-escalation-fg: #ff4f8a;
+  --audit-cat-config-bg: rgba(153, 0, 255, 0.18);
+  --audit-cat-config-fg: #9900ff;
+  --audit-cat-other-bg: rgba(255, 255, 255, 0.1);
+  --audit-cat-other-fg: #e6e6e6;
+}

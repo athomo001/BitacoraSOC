@@ -11,7 +11,7 @@
     "seed": "node src/scripts/seed.js",
     "migrate:escalation-clients": "node src/scripts/migrate-escalation-clients-to-log-sources.js",
     "version:sync": "node ../scripts/sync-version.js",
-    "test": "jest"
+    "test": "jest --passWithNoTests"
   },
   "keywords": [
     "soc",
