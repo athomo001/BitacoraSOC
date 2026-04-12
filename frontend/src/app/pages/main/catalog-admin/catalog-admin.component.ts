@@ -98,10 +98,6 @@ export class CatalogAdminComponent implements OnInit {
   readonly clientAlertModes: Array<{ value: ClientAlertWindowMode; label: string }> = [
     { value: 'always', label: 'Siempre' },
     { value: 'outside_business_hours', label: 'Fuera de horario hábil' },
-    { value: 'between_hours', label: 'Entre horarios' },
-    { value: 'after_hour', label: 'Después de hora' },
-    { value: 'before_hour', label: 'Antes de hora' },
-    { value: 'weekend_only', label: 'Solo fin de semana' },
     { value: 'weekdays_only', label: 'Solo días hábiles' }
   ];
 
@@ -169,17 +165,15 @@ export class CatalogAdminComponent implements OnInit {
     const f = this.clientAlertRuleForm;
 
     // Campos exclusivos de special_alert
-    const specialOnlyFields = ['mode', 'startTime', 'endTime', 'contexts', 'timezone', 'priority'];
+    const specialOnlyFields = ['mode', 'contexts'];
     specialOnlyFields.forEach(field => {
       const ctrl = f.get(field);
       if (!ctrl) return;
       if (isMaint) {
         ctrl.clearValidators();
       } else {
-        if (field === 'mode' || field === 'timezone') ctrl.setValidators(Validators.required);
+        if (field === 'mode') ctrl.setValidators(Validators.required);
         if (field === 'contexts') ctrl.setValidators(Validators.required);
-        if (field === 'priority') ctrl.setValidators([Validators.required, Validators.min(1), Validators.max(10000)]);
-        if (field === 'startTime' || field === 'endTime') ctrl.setValidators([Validators.required, Validators.pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)]);
       }
       ctrl.updateValueAndValidity({ emitEvent: false });
     });
@@ -532,7 +526,7 @@ export class CatalogAdminComponent implements OnInit {
       contexts,
       timezone: rule.timezone || 'America/Santiago',
       priority: rule.priority ?? 100,
-      mode: window?.mode || 'outside_business_hours',
+      mode: this.getSpecialAlertModeFromRule(rule),
       startTime: window?.startTime || '09:00',
       endTime: window?.endTime || '17:00',
       daysOfWeekCsv: (window?.daysOfWeek || []).join(','),
@@ -601,6 +595,13 @@ export class CatalogAdminComponent implements OnInit {
     return found?.label || (mode || 'N/A');
   }
 
+  getRuleModeLabel(rule: ClientAlertRule): string {
+    if (rule.ruleType === 'scheduled_maintenance') {
+      return 'Ventana programada';
+    }
+    return this.getModeLabel(this.getSpecialAlertModeFromRule(rule));
+  }
+
   getRuleTypeLabel(ruleType?: string): string {
     return ruleType === 'scheduled_maintenance' ? 'Mantenimiento' : 'Alerta Especial';
   }
@@ -641,34 +642,97 @@ export class CatalogAdminComponent implements OnInit {
     }
 
     const contexts = this.normalizeContexts(value.contexts);
-    const daysOfWeek = this.parseDaysOfWeek(value.daysOfWeekCsv || '');
-    const holidayDates = this.parseHolidayDates(value.holidayDatesCsv || '');
-    const channels = this.parseChannels(value.channelsText || '');
+    const mode = (value.mode || 'outside_business_hours') as ClientAlertWindowMode;
+    const timeWindows = this.buildSpecialAlertWindows(mode);
 
     return {
       ruleType,
       clientId: value.clientId,
-      name: (value.name || '').trim(),
+      name: this.getSpecialAlertName(mode),
       enabled: value.enabled !== false,
       contexts,
-      timezone: (value.timezone || 'America/Santiago').trim(),
-      priority: Number(value.priority) || 100,
-      validFrom,
-      validTo,
-      holidayDates,
-      timeWindows: [{
-        mode: value.mode,
-        startTime: value.startTime,
-        endTime: value.endTime,
-        daysOfWeek,
-        holidayOnly: value.holidayOnly === true
-      }],
-      channels,
+      timezone: 'America/Santiago',
+      priority: 100,
+      validFrom: null,
+      validTo: null,
+      holidayDates: [],
+      timeWindows,
+      channels: [],
       alertMessage: (value.alertMessage || '').trim(),
       acknowledgementRequired: value.acknowledgementRequired !== false,
       blocking: false,
       maintenanceTitle: ''
     };
+  }
+
+  private getSpecialAlertModeFromRule(rule: ClientAlertRule): ClientAlertWindowMode {
+    const windows = rule.timeWindows || [];
+    if (windows.some((w) => w.mode === 'always')) return 'always';
+
+    const hasBusinessHours = windows.some((w) =>
+      w.mode === 'between_hours'
+      && w.startTime === '09:00'
+      && w.endTime === '18:00'
+      && Array.isArray(w.daysOfWeek)
+      && w.daysOfWeek.join(',') === '1,2,3,4,5'
+    );
+    if (hasBusinessHours || windows.some((w) => w.mode === 'weekdays_only')) {
+      return 'weekdays_only';
+    }
+
+    return 'outside_business_hours';
+  }
+
+  private buildSpecialAlertWindows(mode: ClientAlertWindowMode): Array<{
+    mode: ClientAlertWindowMode;
+    startTime: string;
+    endTime: string;
+    daysOfWeek: number[];
+    holidayOnly: boolean;
+  }> {
+    if (mode === 'always') {
+      return [{
+        mode: 'always',
+        startTime: '09:00',
+        endTime: '18:00',
+        daysOfWeek: [],
+        holidayOnly: false
+      }];
+    }
+
+    if (mode === 'weekdays_only') {
+      return [{
+        mode: 'between_hours',
+        startTime: '09:00',
+        endTime: '18:00',
+        daysOfWeek: [1, 2, 3, 4, 5],
+        holidayOnly: false
+      }];
+    }
+
+    // Fuera de horario hábil = L-V fuera de 09:00-18:00 + fin de semana completo.
+    return [
+      {
+        mode: 'outside_business_hours',
+        startTime: '09:00',
+        endTime: '18:00',
+        daysOfWeek: [1, 2, 3, 4, 5],
+        holidayOnly: false
+      },
+      {
+        mode: 'weekend_only',
+        startTime: '09:00',
+        endTime: '18:00',
+        daysOfWeek: [],
+        holidayOnly: false
+      }
+    ];
+  }
+
+  private getSpecialAlertName(mode: ClientAlertWindowMode): string {
+    if (mode === 'always') return 'Alerta especial - Siempre';
+    if (mode === 'weekdays_only') return 'Alerta especial - Solo días hábiles';
+    return 'Alerta especial - Fuera de horario hábil';
   }
 
   private normalizeContexts(contexts: unknown): ClientAlertContext[] {
