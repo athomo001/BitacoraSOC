@@ -886,6 +886,85 @@ mat-button-toggle-group.mode-selector .mat-button-toggle-label-content {
 }
 
 /*
+ * UI-VIS-067/068/069: baseline visual común para pantallas operativas.
+ * Refuerza jerarquía (header -> toolbar -> panel), espaciado y legibilidad sin hacks.
+ */
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-color) 88%, var(--primary-color) 12%),
+    var(--surface-color)
+  );
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.page-header h1,
+.page-header h2,
+.page-header h3 {
+  margin: 0;
+  font-size: clamp(1.12rem, 1.8vw, 1.45rem);
+  line-height: var(--line-height-tight);
+  letter-spacing: 0.01em;
+}
+
+.page-header p,
+.page-header .subtitle,
+.page-header .description {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-body);
+}
+
+.admin-section,
+.admin-panel,
+.section-card,
+.reports-panel,
+.catalog-panel,
+.all-entries-panel,
+.backup-panel,
+.logo-panel,
+.glpi-panel,
+.checklist-panel,
+.report-generator-panel {
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card, var(--surface-color));
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--text-primary) 7%, transparent);
+}
+
+.admin-section,
+.admin-panel,
+.section-card {
+  padding: var(--space-5);
+}
+
+.admin-section__toolbar,
+.form-actions,
+.panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.admin-section .mat-mdc-form-field,
+.admin-panel .mat-mdc-form-field,
+.section-card .mat-mdc-form-field {
+  margin-bottom: var(--space-2);
+}
+
+/*
  * Entradas: fila fecha/hora y radios de tipo (UI-MAT-052; heredan tokens del tema activo).
  */
 .entries-container .datetime-row mat-form-field .mdc-notched-outline__leading,

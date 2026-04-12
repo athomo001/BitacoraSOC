@@ -89,7 +89,7 @@ $crt-glow-strong:0 0 10px rgba(0, 255, 153, 1),  0 0 30px rgba(0, 204, 119, 0.8)
   position: relative;
   z-index: 2;
   width: 100%;
-  max-width: 480px;
+  max-width: 520px;
   padding: 24px 20px;
   display: flex;
   flex-direction: column;
@@ -159,6 +159,7 @@ $crt-glow-strong:0 0 10px rgba(0, 255, 153, 1),  0 0 30px rgba(0, 204, 119, 0.8)
   border: 1.5px solid $crt-green;
   background-color: $crt-panel-bg;
   box-shadow: $crt-glow, inset 0 0 40px rgba(0, 204, 119, 0.04);
+  border-radius: 8px;
   padding: 32px 28px;
   animation: panelIn 0.5s ease-out;
   transition: opacity 0.3s ease-out;
@@ -347,6 +348,7 @@ $crt-glow-strong:0 0 10px rgba(0, 255, 153, 1),  0 0 30px rgba(0, 204, 119, 0.8)
   transition: all 0.2s ease;
   text-shadow: $crt-glow-text;
   box-shadow: inset 0 0 18px rgba(0, 204, 119, 0.07);
+  border-radius: 6px;
 
   span {
     color: inherit;
@@ -403,8 +405,9 @@ $crt-glow-strong:0 0 10px rgba(0, 255, 153, 1),  0 0 30px rgba(0, 204, 119, 0.8)
 // ─── Recovery link ───────────────────────────────────────────────────────────
 
 .recover-link {
-  background: none;
-  border: none;
+  background: rgba(0, 204, 119, 0.05);
+  border: 1px solid rgba(0, 204, 119, 0.2);
+  border-radius: 6px;
   color: $crt-dark-green;
   font-family: $crt-font;
   font-size: 11px;
@@ -412,7 +415,8 @@ $crt-glow-strong:0 0 10px rgba(0, 255, 153, 1),  0 0 30px rgba(0, 204, 119, 0.8)
   letter-spacing: 0.16em;
   text-transform: uppercase;
   cursor: pointer;
-  padding: 8px 0;
+  width: 100%;
+  padding: 10px 12px;
   transition: color 0.2s ease;
 
   &:hover:not(:disabled) {

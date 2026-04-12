@@ -1,6 +1,6 @@
 # Gobernanza UI — Bitácora SOC
 
-Documento operativo asociado principalmente a **UI-GOV-058** (entregable “guía publicada”). Los issues **`UI-CHK-044` … `UI-MIG-060`** figuran como **Listos** en `docs/ISSUES.md` (cierre de tabla 2026-04-10); **no** hay filas `UI-*` activas en **En progreso** salvo que el equipo abra nuevas. Obligaciones por PR: **`QA-UI-061`–`065`** (**Recurrente**). Mejora continua: **§9** (`!important`, hex, reconteos) y **`docs/wcag-audit-handoff.md`**. El epic **`AI-SUMMARY-001` … `001G`** no se prioriza aquí: ver `ISSUES.md` → *Tablas de Control*.
+Documento operativo asociado principalmente a **UI-GOV-058** (entregable “guía publicada”). Los issues **`UI-CHK-044` … `UI-MIG-060`** y la remediación visual **`UI-VIS-066`..`071`** figuran como **Listos** en `docs/ISSUES.md` (cierre de tabla 2026-04-10 / 2026-04-11). Obligaciones por PR: **`QA-UI-061`–`065`** (**Recurrente**). Mejora continua: **§9** (`!important`, hex, reconteos) y **`docs/wcag-audit-handoff.md`**. El epic **`AI-SUMMARY-001` … `001G`** no se prioriza aquí: ver `ISSUES.md` → *Tablas de Control*.
 
 ## 1. Fuentes de verdad
 
@@ -8,11 +8,11 @@ Documento operativo asociado principalmente a **UI-GOV-058** (entregable “guí
 | --- | --- |
 | `frontend/src/styles/semantic-tokens.scss` | Tokens `--surface-*`, `--outline-*`, `--space-*`, `--radius-*`, `--audit-cat-*`, tipografía semántica |
 | `frontend/src/styles.scss` | Overrides globales Material; preferir clase contenedora + selectores acotados antes que `::ng-deep` en componentes |
-| `docs/ISSUES.md` | **Listas** = cerrados (incl. `UI-CHK-044`…`UI-MIG-060`, tokens, guía); **En progreso** = placeholder hasta nuevos `UI-*`; **Recurrente** = QA por PR; **Archivo IA** = epic IA sin priorización operativa |
+| `docs/ISSUES.md` | **Listas** = cerrados (incl. `UI-CHK-044`…`UI-MIG-060` y `UI-VIS-066`..`071`); **En progreso** = nuevos `UI-*` cuando se abran; **Recurrente** = QA por PR; **Archivo IA** = epic IA sin priorización operativa |
 
 ## 2. Backlog UI/QA (misma fuente que `ISSUES.md`)
 
-`docs/ISSUES.md` manda. El cierre **`UI-CHK-044` … `UI-MIG-060`** está en **Listas**; la tabla **En progreso** puede estar vacía (marcador) hasta nuevos tickets.
+`docs/ISSUES.md` manda. El cierre **`UI-CHK-044` … `UI-MIG-060`** y **`UI-VIS-066`..`071`** permanece en **Listas**; la tabla **En progreso** queda para nuevas olas.
 
 **Resumen de lo cerrado (2026-04-10):** checklist admin (asistente + guardado único), sin `mat-card` contenedor en rutas core (oleadas 1–11), tokens/hex en app acotados a CRT, sin `::ng-deep` en SCSS de app, baseline §6, handoff WCAG en `docs/wcag-audit-handoff.md`, `!important` remanente solo en overrides globales (métrica §9).
 

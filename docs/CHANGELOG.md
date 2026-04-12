@@ -2,6 +2,19 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.44-beta] - 2026-04-11
+
+### Estabilización Docker + remediación visual UI (`UI-VIS-066`..`071`)
+
+- **Frontend Docker estable en recreate:** fix de arranque Linux para script propio (`CRLF -> LF` en `frontend/Dockerfile`), `ENTRYPOINT` dedicado (`frontend/docker-entrypoint.sh`) y espera activa a `http://backend:3000/health` antes de iniciar Nginx.
+- **Nginx frontend simplificado y robusto:** `proxy_pass` directo a `backend:3000` (sin resolver/variables/keepalive frágiles), timeout más amplios y rutas `/api` + `/uploads` consolidadas para evitar 502 intermitente.
+- **Smoke de conectividad validado tras `docker compose build --no-cache` + `up -d --force-recreate`:** `/health`=200, `/api/config/logo`=200, `/api/users/me`=401 esperado sin sesión (ya no 502).
+- **Login visual refactor (CRT/Cyber):** limpieza de malas prácticas en `login-infoflow.scss` (eliminados `!important` y hacks de especificidad), jerarquía tipográfica más clara, foco/errores/acciones consistentes y mejor lectura móvil.
+- **Baseline visual global para pantallas core:** nuevas reglas compartidas en `styles.scss` (`page-header`, `admin-section`, `admin-panel`, `section-card`, `panel-actions`) y ajuste de shell en `main-layout.component.scss` (toolbar, health strip, densidad responsive).
+- **Documentación operativa actualizada:** `docs/ISSUES.md` y `docs/UI-GOVERNANCE.md` dejan cerrada la ola `UI-VIS-066`..`071`; plan ejecutado en `docs/ui-visual-remediation-plan.md`; QA recurrente (`QA-UI-061`..`065`) se mantiene obligatorio por PR.
+
+---
+
 ## [v1.5.43-beta] - 2026-04-10
 
 ### Resumen de alcance
@@ -18,6 +31,7 @@ Oleada **integral UI + gobernanza documental**: del orden de **~80 archivos** y 
 - **`docs/UI-GOVERNANCE.md`:** guía operativa publicada (tokens, layout, densidad, **§6** baseline visual, **§7** contraste/WCAG, **§8** checklist **QA-UI-061**–**065**, **§9** métricas `rg`); cabecera y **§2** con cierre 2026-04-10 y referencia a **Recurrente**; secciones con títulos “regla viva; antes UI-XXX”.
 - **`docs/wcag-audit-handoff.md`:** ritmo de ejecución WCAG 2.1 AA por PR/release (rutas §6, axe/Lighthouse, registro en PR); alineado con **UI-A11Y-050** y **UI-QA-059**.
 - **`docs/ui-baselines/README.md`:** convención opcional de capturas por ruta/tema y criterio de OK (coherente con **QA-UI-062** / **QA-UI-065**).
+- **Reapertura de backlog visual (2026-04):** nuevos issues **`UI-VIS-066`..`UI-VIS-071`** en **En progreso** para atacar deuda de legibilidad, consistencia y usabilidad percibida; plan operativo en `docs/ui-visual-remediation-plan.md`.
 
 ### Estilos globales (`frontend`)
 
