@@ -72,6 +72,8 @@ export class ReportsComponent implements OnInit {
   // Configuración de gráficos
   view: [number, number] = [700, 300];
   trendView: [number, number] = [1200, 320];
+  logSourceBarView: [number, number] = [520, 320];
+  logSourcePieView: [number, number] = [420, 320];
   colorScheme: Color = {
     name: 'soc',
     selectable: true,
@@ -120,6 +122,9 @@ export class ReportsComponent implements OnInit {
     const horizontalPadding = 220;
     const responsiveWidth = Math.max(900, Math.min(screenWidth - horizontalPadding, 1500));
     this.trendView = [responsiveWidth, 320];
+    const cardWidth = Math.max(320, Math.min(Math.floor((screenWidth - 180) / 2), 620));
+    this.logSourceBarView = [cardWidth, 320];
+    this.logSourcePieView = [Math.max(320, cardWidth - 40), 320];
   }
 
   private applyThemeColorSchemes(): void {

@@ -40,7 +40,7 @@
 }
 
 .reports-panel__body {
-  padding: 24px;
+  padding: 20px;
 
   &--center {
     display: flex;
@@ -269,6 +269,8 @@
   align-items: start;
 
   .chart-wrapper {
+    min-width: 0;
+
     .chart-subtitle {
       font-size: 0.95em;
       font-weight: 600;
@@ -276,6 +278,13 @@
       color: var(--text-primary);
     }
   }
+}
+
+.chart-wrapper ngx-charts-bar-horizontal,
+.chart-wrapper ngx-charts-pie-chart,
+.chart-wrapper ngx-charts-line-chart {
+  display: block;
+  max-width: 100%;
 }
 
 .actions {

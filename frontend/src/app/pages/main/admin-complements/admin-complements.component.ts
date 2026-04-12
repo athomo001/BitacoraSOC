@@ -362,19 +362,21 @@ import { UserService } from '../../../services/user.service';
     .complements-list,
     .complements-form {
       padding: 12px;
+      color: var(--text-primary);
     }
 
     .complement-item {
-      border: 1px solid rgba(0, 0, 0, 0.08);
+      border: 1px solid var(--outline-subtle);
       border-radius: 12px;
       padding: 12px;
       margin-top: 12px;
       cursor: pointer;
+      background: var(--surface-color);
     }
 
     .complement-item.selected {
-      border-color: #1b5fc6;
-      background: #eff5ff;
+      border-color: color-mix(in srgb, var(--primary-color) 56%, var(--outline-subtle));
+      background: color-mix(in srgb, var(--primary-color) 14%, var(--surface-color));
     }
 
     .grid {
@@ -388,8 +390,8 @@ import { UserService } from '../../../services/user.service';
       justify-content: space-between;
       gap: 16px;
       align-items: center;
-      border: 1px solid rgba(27, 95, 198, 0.15);
-      background: #f5f8ff;
+      border: 1px solid var(--outline-subtle);
+      background: var(--surface-muted);
       border-radius: 12px;
       padding: 16px;
       margin-bottom: 16px;
@@ -415,10 +417,10 @@ import { UserService } from '../../../services/user.service';
     .analysis-panel,
     .analysis-stack-card,
     .analysis-files {
-      border: 1px solid rgba(0, 0, 0, 0.08);
+      border: 1px solid var(--outline-subtle);
       border-radius: 12px;
       padding: 12px;
-      background: #fcfcfd;
+      background: var(--surface-color);
       margin-bottom: 10px;
     }
 
@@ -430,11 +432,11 @@ import { UserService } from '../../../services/user.service';
     }
 
     .muted {
-      color: #566173;
+      color: var(--text-secondary);
     }
 
     .analysis-error {
-      color: #b42318;
+      color: var(--state-error);
       font-weight: 600;
       margin-top: 12px;
     }
@@ -447,18 +449,18 @@ import { UserService } from '../../../services/user.service';
       border-radius: 12px;
       padding: 16px;
       margin-bottom: 16px;
-      background: #fff3f2;
-      border: 1px solid #f2b8b5;
+      background: var(--state-error-bg);
+      border: 1px solid color-mix(in srgb, var(--state-error) 55%, var(--outline-subtle));
     }
 
     .analysis-header.ok {
-      background: #eefbf3;
-      border-color: #9ed5af;
+      background: var(--state-success-bg);
+      border-color: color-mix(in srgb, var(--state-success) 55%, var(--outline-subtle));
     }
 
     .analysis-header.bad {
-      background: #fff3f2;
-      border-color: #f2b8b5;
+      background: var(--state-error-bg);
+      border-color: color-mix(in srgb, var(--state-error) 55%, var(--outline-subtle));
     }
 
     .analysis-header p {
@@ -486,7 +488,7 @@ import { UserService } from '../../../services/user.service';
     .guide-item p,
     .permissions-block p {
       margin: 4px 0 0;
-      color: #44506a;
+      color: var(--text-secondary);
     }
 
     .guide-grid {
@@ -497,21 +499,21 @@ import { UserService } from '../../../services/user.service';
     }
 
     .guide-item {
-      border: 1px solid rgba(0, 0, 0, 0.08);
+      border: 1px solid var(--outline-subtle);
       border-radius: 12px;
       padding: 10px;
-      background: #fafbfc;
+      background: var(--surface-muted);
     }
 
     .guide-subtitle {
       margin-top: 8px;
       font-weight: 600;
-      color: #1f2937;
+      color: var(--text-primary);
     }
 
     .guide-item.warning {
-      border-color: #f0c36d;
-      background: #fff8e9;
+      border-color: color-mix(in srgb, var(--state-warning) 55%, var(--outline-subtle));
+      background: var(--state-warning-bg);
     }
 
     .full-width {
@@ -519,10 +521,10 @@ import { UserService } from '../../../services/user.service';
     }
 
     .permissions-block {
-      border: 1px solid rgba(0, 0, 0, 0.08);
+      border: 1px solid var(--outline-subtle);
       border-radius: 12px;
       padding: 16px;
-      background: #fcfcfd;
+      background: var(--surface-color);
     }
 
     .permissions-block h3 {
@@ -549,7 +551,7 @@ import { UserService } from '../../../services/user.service';
     .checkbox-help {
       display: block;
       font-size: 12px;
-      color: #556070;
+      color: var(--text-secondary);
       margin-top: 2px;
       white-space: normal;
     }
@@ -566,10 +568,10 @@ import { UserService } from '../../../services/user.service';
     }
 
     .preview-panel {
-      border: 1px solid rgba(0, 0, 0, 0.08);
+      border: 1px solid var(--outline-subtle);
       border-radius: 12px;
       padding: 16px;
-      background: #f8fbff;
+      background: var(--surface-muted);
       margin-bottom: 16px;
     }
 
@@ -589,17 +591,28 @@ import { UserService } from '../../../services/user.service';
     .preview-frame {
       width: 100%;
       min-height: 420px;
-      border: 1px solid rgba(0, 0, 0, 0.1);
+      border: 1px solid var(--outline-subtle);
       border-radius: 12px;
-      background: #fff;
+      background: var(--surface-color);
     }
 
     .token-panel {
       margin-top: 16px;
-      background: #101826;
-      color: #f3f7ff;
+      background: var(--surface-muted);
+      color: var(--text-primary);
       border-radius: 12px;
       padding: 12px;
+    }
+
+    .complements-admin .mat-mdc-form-field .mdc-text-field__input,
+    .complements-admin .mat-mdc-form-field .mat-mdc-input-element,
+    .complements-admin .mat-mdc-form-field .mat-mdc-select-value-text,
+    .complements-admin .mat-mdc-form-field .mdc-floating-label,
+    .complements-admin .mat-mdc-form-field .mat-mdc-floating-label,
+    .complements-admin .mat-mdc-form-field-hint {
+      text-shadow: none !important;
+      letter-spacing: normal !important;
+      text-transform: none !important;
     }
 
     .token-panel pre {
