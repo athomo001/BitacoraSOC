@@ -250,23 +250,6 @@
               <!-- Campos exclusivos de Alerta Especial -->
               <ng-container *ngIf="clientAlertRuleForm.get('ruleType')?.value !== 'scheduled_maintenance'">
                 <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Nombre de regla</mat-label>
-                  <input matInput formControlName="name" placeholder="Ej: Fuera de horario cliente VIP">
-                </mat-form-field>
-
-                <div class="form-row">
-                  <mat-form-field appearance="outline" class="full-width">
-                    <mat-label>Prioridad</mat-label>
-                    <input matInput type="number" min="1" formControlName="priority">
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" class="full-width">
-                    <mat-label>Zona horaria</mat-label>
-                    <input matInput formControlName="timezone" placeholder="America/Santiago">
-                  </mat-form-field>
-                </div>
-
-                <mat-form-field appearance="outline" class="full-width">
                   <mat-label>Contextos de aplicacion</mat-label>
                   <mat-select formControlName="contexts" multiple>
                     <mat-option value="report">Generar reporte</mat-option>
@@ -275,40 +258,21 @@
                 </mat-form-field>
 
                 <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Modo horario</mat-label>
+                  <mat-label>Modo horario *</mat-label>
                   <mat-select formControlName="mode">
                     <mat-option *ngFor="let mode of clientAlertModes" [value]="mode.value">
                       {{ mode.label }}
                     </mat-option>
                   </mat-select>
-                </mat-form-field>
-
-                <div class="form-row">
-                  <mat-form-field appearance="outline" class="full-width">
-                    <mat-label>Hora inicio (HH:mm)</mat-label>
-                    <input matInput formControlName="startTime" placeholder="09:00">
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" class="full-width">
-                    <mat-label>Hora fin (HH:mm)</mat-label>
-                    <input matInput formControlName="endTime" placeholder="17:00">
-                  </mat-form-field>
-                </div>
-
-                <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Dias de semana (0=Dom..6=Sab)</mat-label>
-                  <input matInput formControlName="daysOfWeekCsv" placeholder="1,2,3,4,5">
-                </mat-form-field>
-
-                <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Feriados (YYYY-MM-DD, separados por coma)</mat-label>
-                  <input matInput formControlName="holidayDatesCsv" placeholder="2026-01-01,2026-12-25">
-                </mat-form-field>
-
-                <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Canales y destinatarios</mat-label>
-                  <textarea matInput rows="3" formControlName="channelsText"
-                    placeholder="whatsapp:+56912345678&#10;email:soc@cliente.com&#10;telefono:+56223456789"></textarea>
+                  <mat-hint *ngIf="clientAlertRuleForm.get('mode')?.value === 'always'">
+                    Siempre: se muestra en cualquier momento.
+                  </mat-hint>
+                  <mat-hint *ngIf="clientAlertRuleForm.get('mode')?.value === 'weekdays_only'">
+                    Solo días hábiles: Lunes a Viernes entre 09:00 y 18:00.
+                  </mat-hint>
+                  <mat-hint *ngIf="clientAlertRuleForm.get('mode')?.value === 'outside_business_hours'">
+                    Fuera de horario hábil: L-V 18:01-08:59 + Sábado y Domingo.
+                  </mat-hint>
                 </mat-form-field>
               </ng-container>
 
@@ -318,8 +282,8 @@
                   [placeholder]="clientAlertRuleForm.get('ruleType')?.value === 'scheduled_maintenance' ? 'Ej: Ventana de mantenimiento programada para actualización de firewall' : 'Fuera de horario: avisar por WhatsApp al contacto de guardia y luego enviar correo'"></textarea>
               </mat-form-field>
 
-              <!-- Vigencia: solo para mantenimiento es obligatoria; para alerta opcional -->
-              <div class="form-row">
+              <!-- Vigencia: aplica solo a mantenimiento programado -->
+              <div class="form-row" *ngIf="clientAlertRuleForm.get('ruleType')?.value === 'scheduled_maintenance'">
                 <div class="full-width date-time-group">
                   <mat-form-field appearance="outline" class="date-field">
                     <mat-label>Fecha inicio *</mat-label>
@@ -354,8 +318,9 @@
               </div>
 
               <mat-checkbox formControlName="enabled">Regla habilitada</mat-checkbox>
-              <mat-checkbox formControlName="holidayOnly" class="ml-checkbox"
-                *ngIf="clientAlertRuleForm.get('ruleType')?.value !== 'scheduled_maintenance'">Solo en feriados</mat-checkbox>
+              <div class="hint" *ngIf="clientAlertRuleForm.get('ruleType')?.value !== 'scheduled_maintenance'">
+                Nota: los feriados variables por año no se calculan automáticamente en esta versión.
+              </div>
               <mat-checkbox formControlName="acknowledgementRequired" class="ml-checkbox">
                 Requiere confirmacion del analista
               </mat-checkbox>
@@ -402,7 +367,7 @@
                       </span>
                     </td>
                     <td>{{ getClientNameForRule(rule) }}</td>
-                    <td>{{ getModeLabel(rule.timeWindows[0]?.mode) }}</td>
+                    <td>{{ getRuleModeLabel(rule) }}</td>
                     <td>{{ rule.priority }}</td>
                     <td>{{ rule.enabled ? 'Activa' : 'Inactiva' }}</td>
                     <td>{{ rule.alertMessage }}</td>
