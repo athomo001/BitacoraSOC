@@ -1,5 +1,7 @@
 # 📚 Sistema de Catálogos con Autocomplete
 
+<!-- Marca de autor en comentarios: Athan Espinoza -->
+
 Sistema de autocomplete reutilizable con Angular Material para datasets grandes (1900+ items).
 
 ## 🎯 Componentes Implementados

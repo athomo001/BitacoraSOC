@@ -19,6 +19,7 @@ const SmtpConfig = require('../models/SmtpConfig');
 const AppConfig = require('../models/AppConfig');
 const { authenticate, authorize } = require('../middleware/auth');
 const validate = require('../middleware/validate');
+const { getBrandingSnapshot, formatBrandedSubject, getAppTitleForText } = require('../utils/branding');
 const { encrypt, decrypt } = require('../utils/encryption');
 const { invalidateCache } = require('../utils/email');
 const { audit } = require('../utils/audit');
@@ -99,6 +100,9 @@ const resolveLegacyPasswordFromAppConfig = async () => {
 };
 
 const verifyAndTest = async (config, sendMail = true) => {
+  const { appTitle } = await getBrandingSnapshot();
+  const systemName = getAppTitleForText(appTitle, 'el sistema');
+
   // Determinar si usar SSL seguro o STARTTLS
   // Puerto 465 = SSL directo (secure: true)
   // Puerto 587 = STARTTLS (secure: false, luego upgrade)
@@ -130,12 +134,12 @@ const verifyAndTest = async (config, sendMail = true) => {
   await transporter.sendMail({
     from: `"${config.senderName}" <${config.senderEmail}>`,
     to: testRecipient,
-    subject: 'Prueba de Configuracion SMTP - Bitacora SOC',
+    subject: appTitle ? `Prueba de Configuracion SMTP - ${appTitle}` : 'Prueba de Configuracion SMTP',
     text: 'Este es un correo de prueba. La configuracion SMTP funciona correctamente.',
     html: `
       <div style="font-family: Arial, sans-serif; padding: 20px;">
         <h2>Prueba Exitosa</h2>
-        <p>Correo de prueba enviado desde la <strong>Bitacora SOC</strong>.</p>
+        <p>Correo de prueba enviado desde <strong>${systemName}</strong>.</p>
         <p>La configuracion SMTP esta funcionando correctamente.</p>
         <hr>
         <small>Fecha: ${new Date().toISOString()}</small>
@@ -407,6 +411,8 @@ router.post('/test',
 const sendChecklistEmail = async (check, services) => {
   try {
     const config = await SmtpConfig.findOne({ isActive: true });
+    const { appTitle } = await getBrandingSnapshot();
+    const systemName = getAppTitleForText(appTitle, 'el sistema');
     if (!config) {
       console.log('No hay configuracion SMTP activa');
       return;
@@ -468,14 +474,14 @@ const sendChecklistEmail = async (check, services) => {
         </table>
         
         <hr style="margin-top: 30px;">
-        <small style="color: #666;">Bitacora SOC - ${new Date().toLocaleString()}</small>
+        <small style="color: #666;">${systemName} - ${new Date().toLocaleString()}</small>
       </div>
     `;
 
     await transporter.sendMail({
       from: `"${config.senderName}" <${config.senderEmail}>`,
       to: config.recipients.join(', '),
-      subject: `[Bitacora SOC] Checklist de ${check.type} - ${check.username}`,
+      subject: formatBrandedSubject(appTitle, `Checklist de ${check.type} - ${check.username}`),
       html: emailHtml
     });
 
@@ -493,6 +499,8 @@ const sendChecklistAlertEmail = async ({ recipients, alertTime, dateLabel }) => 
     }
 
     const config = await SmtpConfig.findOne({ isActive: true });
+    const { appTitle } = await getBrandingSnapshot();
+    const systemName = getAppTitleForText(appTitle, 'el sistema');
     if (!config) {
       console.log('No hay configuracion SMTP activa');
       return;
@@ -516,14 +524,14 @@ const sendChecklistAlertEmail = async ({ recipients, alertTime, dateLabel }) => 
         <p>No se registró el checklist antes de las <strong>${alertTime}</strong> (${dateLabel}).</p>
         <p>Por favor revisar y completar el checklist correspondiente.</p>
         <hr style="margin-top: 20px;">
-        <small style="color: #666;">Bitácora SOC - ${new Date().toLocaleString()}</small>
+        <small style="color: #666;">${systemName} - ${new Date().toLocaleString()}</small>
       </div>
     `;
 
     await transporter.sendMail({
       from: `"${config.senderName}" <${config.senderEmail}>`,
       to: recipients.join(', '),
-      subject: '[Bitácora SOC] Checklist pendiente',
+      subject: formatBrandedSubject(appTitle, 'Checklist pendiente'),
       html: emailHtml
     });
 
@@ -547,6 +555,8 @@ const sendEscalationInternalReminderEmail = async ({
     }
 
     const config = await SmtpConfig.findOne({ isActive: true });
+    const { appTitle } = await getBrandingSnapshot();
+    const systemName = getAppTitleForText(appTitle, 'el sistema');
     if (!config) {
       console.log('No hay configuracion SMTP activa');
       return;
@@ -575,7 +585,7 @@ const sendEscalationInternalReminderEmail = async ({
       ? `${Number(daysAhead)} día(s)`
       : 'los próximos días';
 
-    const subject = '[Bitácora SOC] Recordatorio de escalación interna';
+    const subject = formatBrandedSubject(appTitle, 'Recordatorio de escalación interna');
 
     const emailHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto;">
@@ -585,7 +595,7 @@ const sendEscalationInternalReminderEmail = async ({
         <p>Fecha de evaluación: <strong>${dateLabel}</strong>.</p>
         <p><strong>Cargos objetivo:</strong> ${cargosText}</p>
         <hr style="margin-top: 20px;">
-        <small style="color: #666;">Bitácora SOC - ${new Date().toLocaleString()}</small>
+        <small style="color: #666;">${systemName} - ${new Date().toLocaleString()}</small>
       </div>
     `;
 

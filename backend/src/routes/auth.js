@@ -27,6 +27,7 @@ const AppConfig = require('../models/AppConfig');
 const validate = require('../middleware/validate');
 const { loginLimiter, forgotPasswordLimiter, resetPasswordLimiter } = require('../middleware/rate-limiter');
 const { audit } = require('../utils/audit');
+const { getBrandingSnapshot, getAppTitleForText } = require('../utils/branding');
 const { buildFrontendResetUrl } = require('../utils/frontend-url');
 const { logger } = require('../utils/logger');
 
@@ -352,6 +353,9 @@ router.post('/forgot-password',
 
       let emailSent = false;
       const smtpConfig = await SmtpConfig.findOne({ isActive: true });
+      const { appTitle } = await getBrandingSnapshot();
+      const systemName = getAppTitleForText(appTitle, 'el sistema');
+      const teamName = appTitle ? `Equipo ${appTitle}` : 'Equipo de soporte';
 
       if (smtpConfig) {
         try {
@@ -369,13 +373,13 @@ router.post('/forgot-password',
           await transporter.sendMail({
             from: `"${smtpConfig.senderName}" <${smtpConfig.senderEmail}>`,
             to: email,
-            subject: 'Recuperación de Contraseña - Bitácora SOC',
-            text: `Hola,\n\nHemos recibido una solicitud para resetear tu contraseña.\n\nHaz click en el siguiente enlace para crear una nueva contraseña:\n${resetUrl}\n\nEste enlace expirará en 5 minutos.\n\nSi no solicitaste este cambio, ignora este email.\n\nSaludos,\nEquipo Bitácora SOC`,
+            subject: appTitle ? `Recuperación de Contraseña - ${appTitle}` : 'Recuperación de Contraseña',
+            text: `Hola,\n\nHemos recibido una solicitud para resetear tu contraseña en ${systemName}.\n\nHaz click en el siguiente enlace para crear una nueva contraseña:\n${resetUrl}\n\nEste enlace expirará en 5 minutos.\n\nSi no solicitaste este cambio, ignora este email.\n\nSaludos,\n${teamName}`,
             html: `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                 <h2 style="color: #1976d2;">Recuperación de Contraseña</h2>
                 <p>Hola,</p>
-                <p>Hemos recibido una solicitud para resetear tu contraseña.</p>
+                <p>Hemos recibido una solicitud para resetear tu contraseña en ${systemName}.</p>
                 <p>Haz click en el siguiente botón para crear una nueva contraseña:</p>
                 <div style="text-align: center; margin: 30px 0;">
                   <a href="${resetUrl}" style="background-color: #1976d2; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; display: inline-block;">
@@ -386,7 +390,7 @@ router.post('/forgot-password',
                 <p style="color: #f44336;"><strong>⏰ Este enlace expirará en 5 minutos.</strong></p>
                 <p>Si no solicitaste este cambio, ignora este email.</p>
                 <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
-                <p style="color: #666; font-size: 12px;">Saludos,<br>Equipo Bitácora SOC</p>
+                <p style="color: #666; font-size: 12px;">Saludos,<br>${teamName}</p>
               </div>
             `
           });

@@ -1,5 +1,7 @@
 # Bitacora SOC
 
+<!-- Marca de autor en comentarios: Athan Espinoza -->
+
 Plataforma web para operacion SOC con bitacora operativa, checklists de turno, escalacion, auditoria, backup, integraciones y modulo de complementos embebidos.
 
 > Estado del proyecto: beta. Validar siempre los flujos criticos en un entorno controlado antes de pasar a operacion formal.

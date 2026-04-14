@@ -1,5 +1,6 @@
 /**
  * Configuración de Conexión MongoDB
+ * Marca de autor en comentarios: Athan Espinoza
  * 
  * Configuración:
  *   - MONGODB_URI: mongodb://localhost:27017/bitacora_soc (sin auth local)

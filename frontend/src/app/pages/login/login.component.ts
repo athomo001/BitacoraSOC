@@ -29,6 +29,7 @@ import { environment } from '../../../environments/environment';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { EasterEggSignal } from '../../models/user.model';
+import { Title } from '@angular/platform-browser';
 
 type ViewState = 'login' | 'recovery';
 type LoginTheme = 'crt' | 'infoflow';
@@ -72,7 +73,7 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // No renderizar hasta que sepamos el tema
   themeLoaded = false;
-  appTitle = 'BITÁCORA SOC';
+  appTitle = '';
   typingTitle = ''; // Animación de tecleado para el subtítulo Matrix
   private fullSubtitle = 'SISTEMA DE OPERACIONES > AUTENTICACIÓN SEGURA';
   private typingTimer?: ReturnType<typeof setTimeout>;
@@ -87,7 +88,8 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
     private router: Router,
     private snackBar: MatSnackBar,
     private ngZone: NgZone,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private titleService: Title
   ) {}
 
   getAssetUrl(url: string): string {
@@ -109,7 +111,8 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
       next: (response) => {
         this.logoUrl = response.logoUrl;
         this.activeTheme = response.loginTheme === 'infoflow' ? 'infoflow' : 'crt';
-        this.appTitle = response.appTitle || 'BITÁCORA SOC';
+        this.appTitle = (response.appTitle || '').trim();
+        this.titleService.setTitle(this.appTitle);
         console.log('[Login] Tema cargado:', this.activeTheme, '| Título:', this.appTitle);
         this.themeLoaded = true;
         this.cdr.detectChanges();
@@ -122,6 +125,7 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
       error: () => {
         this.logoUrl = '';
         this.activeTheme = 'crt';
+        this.titleService.setTitle('');
         this.themeLoaded = true;
         this.cdr.detectChanges();
       }

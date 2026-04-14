@@ -10,6 +10,7 @@ import { AppRoutingModule } from './app/app-routing.module';
 import { AppComponent } from './app/app.component';
 import { AuthService } from './app/services/auth.service';
 
+// Marca de autor en comentarios: Athan Espinoza.
 registerLocaleData(localeEsCL);
 
 @Injectable()

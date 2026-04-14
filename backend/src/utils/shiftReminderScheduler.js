@@ -12,7 +12,7 @@ const AvisoLog = require('../models/AvisoLog');
 const WorkShift = require('../models/WorkShift');
 const WorkShiftAssignment = require('../models/WorkShiftAssignment');
 const User = require('../models/User');
-const AppConfig = require('../models/AppConfig');
+const { getBrandingSnapshot, formatBrandedSubject, getAppTitleForText } = require('./branding');
 const { sendEmail } = require('./email');
 const { logger } = require('./logger');
 
@@ -48,7 +48,7 @@ function hoursBlockKey(reminderId, timezone, now, intervalHours) {
 // ─── Email HTML ───────────────────────────────────────────────────────────
 
 function buildReminderHtml({ appTitle, reminderText }) {
-  const safeTitle = (appTitle || 'Bitácora SOC').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const safeTitle = getAppTitleForText(appTitle).replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const safeText = (reminderText || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
 
   return `<!DOCTYPE html>
@@ -82,7 +82,7 @@ async function runShiftReminder() {
     const reminders = await ShiftReminder.find({ enabled: true }).lean();
     if (!reminders.length) return;
 
-    const config = await AppConfig.findOne().lean();
+    const config = await getBrandingSnapshot();
     const now = new Date();
 
     for (const reminder of reminders) {
@@ -188,13 +188,13 @@ async function runShiftReminder() {
 
         const recipients = [...recipientSet.keys()];
         const html = buildReminderHtml({
-          appTitle: config?.appTitle || 'Bitácora SOC',
+          appTitle: config?.appTitle,
           reminderText: reminder.reminderText
         });
 
         await sendEmail({
           to: recipients,
-          subject: `[${config?.appTitle || 'Bitácora SOC'}] ${reminder.label}`,
+          subject: formatBrandedSubject(config?.appTitle, reminder.label),
           html,
           auditContext: {
             sourceModule: 'shiftReminderScheduler',

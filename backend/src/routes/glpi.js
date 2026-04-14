@@ -14,6 +14,7 @@ const {
   sanitizeGlpiConfig,
   withDefaultPath
 } = require('../utils/glpi-dispatch');
+const { getBrandingSnapshot, getAppTitleForText } = require('../utils/branding');
 const { assertOutboundUrlSafe } = require('../utils/outbound-url-guard');
 
 const router = express.Router();
@@ -198,11 +199,13 @@ router.post('/test', authenticate, authorize('admin'), async (req, res) => {
     const subject = fillTemplate(config.email?.subjectTemplate || DEFAULT_EMAIL_SUBJECT, {
       date: new Date().toISOString().slice(0, 10)
     });
+    const { appTitle } = await getBrandingSnapshot();
+    const systemName = getAppTitleForText(appTitle, 'el sistema');
 
     await sendEmail({
       to: collectorAddress,
       subject,
-      text: 'Prueba de integración GLPI por correo desde Bitácora SOC.',
+      text: `Prueba de integración GLPI por correo desde ${systemName}.`,
       auditContext: {
         sourceModule: 'glpi-route',
         triggerType: 'admin-glpi-test-email',

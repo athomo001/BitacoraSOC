@@ -1,5 +1,6 @@
 import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
+import { Title } from '@angular/platform-browser';
 import { ThemeService } from './services/theme.service';
 import { ConfigService } from './services/config.service';
 import { environment } from '../environments/environment';
@@ -17,6 +18,7 @@ export class AppComponent implements OnInit {
   constructor(
     private themeService: ThemeService,
     private configService: ConfigService,
+    private titleService: Title,
     @Inject(PLATFORM_ID) private platformId: Object
   ) {
     // El tema se aplica automáticamente en el constructor del servicio
@@ -25,6 +27,17 @@ export class AppComponent implements OnInit {
   ngOnInit(): void {
     // Cargar y actualizar favicon dinámicamente
     if (isPlatformBrowser(this.platformId)) {
+      this.titleService.setTitle('');
+
+      this.configService.getLogo().subscribe({
+        next: (response) => {
+          this.updateDocumentTitle(response.appTitle);
+        },
+        error: () => {
+          this.updateDocumentTitle('');
+        }
+      });
+
       this.configService.getFavicon().subscribe({
         next: (response) => {
           if (response.faviconUrl) {
@@ -65,5 +78,10 @@ export class AppComponent implements OnInit {
     link.rel = 'icon';
     link.href = iconUrl;
     document.getElementsByTagName('head')[0].appendChild(link);
+  }
+
+  private updateDocumentTitle(appTitle?: string): void {
+    const resolvedTitle = (appTitle || '').trim();
+    this.titleService.setTitle(resolvedTitle);
   }
 }
