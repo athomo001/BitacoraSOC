@@ -28,6 +28,24 @@ const contactSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  contactType: {
+    type: String,
+    enum: ['escalation', 'preventive'],
+    default: 'escalation'
+  },
+  favorite: {
+    type: Boolean,
+    default: false
+  },
+  doNotSend: {
+    type: Boolean,
+    default: false
+  },
+  notes: {
+    type: String,
+    trim: true,
+    maxlength: 500
+  },
   active: {
     type: Boolean,
     default: true
@@ -40,6 +58,9 @@ const contactSchema = new mongoose.Schema({
 contactSchema.index({ email: 1 });
 contactSchema.index({ active: 1 });
 contactSchema.index({ serviceId: 1 });
+contactSchema.index({ contactType: 1, active: 1 });
+contactSchema.index({ organization: 1 });
+contactSchema.index({ favorite: 1, doNotSend: 1 });
 
 const Contact = mongoose.model('Contact', contactSchema);
 

@@ -9,7 +9,7 @@ import anime from 'animejs';
 import { CatalogService } from '../../../services/catalog.service';
 import { CatalogEvent, CatalogLogSource, CatalogOperationType } from '../../../models/catalog.model';
 import { EscalationService } from '../../../services/escalation.service';
-import { ClientAlertContext, ClientAlertEvaluation } from '../../../models/escalation.model';
+import { ClientAlertContext, ClientAlertEvaluation, Contact } from '../../../models/escalation.model';
 import { ConfigService } from '../../../services/config.service';
 import { AuthService } from '../../../services/auth.service';
 
@@ -20,6 +20,7 @@ import { MatInput } from '@angular/material/input';
 import { MatDatepickerInput, MatDatepickerToggle, MatDatepicker } from '@angular/material/datepicker';
 import { MatSelect } from '@angular/material/select';
 import { MatOption } from '@angular/material/core';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatButtonToggleGroup, MatButtonToggle } from '@angular/material/button-toggle';
 import { MatIcon } from '@angular/material/icon';
@@ -37,6 +38,7 @@ import { environment } from '@env/environment';
     MatFormField, MatLabel, MatInput, MatError, MatSuffix,
     MatDatepickerInput, MatDatepickerToggle, MatDatepicker,
     MatSelect, MatOption,
+    MatCheckboxModule,
     MatButton, MatIconButton,
     MatButtonToggleGroup, MatButtonToggle,
     MatIcon
@@ -100,6 +102,11 @@ export class ReportGeneratorComponent implements OnInit {
   // ─── Newsletter email dispatch ────────────────────────────────────────────
   newsletterRecipients = '';
   isSendingNewsletter = false;
+  newsletterContacts: Contact[] = [];
+  newsletterContactSearch = '';
+  newsletterCompanyFilter = '';
+  newsletterFavoritesOnly = false;
+  private readonly selectedNewsletterContactIds = new Set<string>();
 
   // ─── Client alert ────────────────────────────────────────────────────────
   activeClientAlert: ClientAlertEvaluation | null = null;
@@ -158,6 +165,7 @@ export class ReportGeneratorComponent implements OnInit {
   ngOnInit(): void {
     this.loadReportTableColorConfig();
     this.loadLogo();
+    this.loadNewsletterContacts();
   }
 
   // ─── Contextual guide toggle ──────────────────────────────────────────────
@@ -358,7 +366,142 @@ export class ReportGeneratorComponent implements OnInit {
     }
   }
 
-  // ─── Newsletter: send by email (1:1) ─────────────────────────────────────
+  // ─── Newsletter: saved recipients + send by email (1:1) ──────────────────
+  get newsletterCompanyOptions(): string[] {
+    const companies = new Set(
+      this.newsletterContacts
+        .map((contact) => String(contact.organization || '').trim())
+        .filter((value) => value.length > 0)
+    );
+    return Array.from(companies).sort((a, b) => a.localeCompare(b));
+  }
+
+  get filteredNewsletterContacts(): Contact[] {
+    const term = this.newsletterContactSearch.trim().toLowerCase();
+    return [...this.newsletterContacts]
+      .filter((contact) => {
+        const matchesTerm = !term || [contact.name, contact.email, contact.organization]
+          .some((value) => String(value || '').toLowerCase().includes(term));
+        const matchesCompany = !this.newsletterCompanyFilter || contact.organization === this.newsletterCompanyFilter;
+        const matchesFavorite = !this.newsletterFavoritesOnly || !!contact.favorite;
+        return matchesTerm && matchesCompany && matchesFavorite;
+      })
+      .sort((a, b) => Number(!!b.favorite) - Number(!!a.favorite) || String(a.organization || '').localeCompare(String(b.organization || '')) || String(a.name || '').localeCompare(String(b.name || '')));
+  }
+
+  get newsletterSelectedCount(): number {
+    return this.getSelectedNewsletterContacts().filter((contact) => contact.active !== false && !contact.doNotSend && this.isValidNewsletterEmail(contact.email)).length;
+  }
+
+  get newsletterRecipientSummary(): {
+    validRecipients: string[];
+    invalidRecipients: string[];
+    duplicateRecipients: string[];
+    blockedRecipients: string[];
+  } {
+    const validRecipients: string[] = [];
+    const invalidRecipients: string[] = [];
+    const duplicateRecipients: string[] = [];
+    const blockedRecipients: string[] = [];
+    const seen = new Set<string>();
+
+    this.getSelectedNewsletterContacts().forEach((contact) => {
+      const label = `${contact.name || 'Contacto'}${contact.email ? ` <${contact.email}>` : ''}`;
+      if (contact.active === false || contact.doNotSend) {
+        blockedRecipients.push(label);
+        return;
+      }
+      const email = String(contact.email || '').trim().toLowerCase();
+      if (!this.isValidNewsletterEmail(email)) {
+        invalidRecipients.push(label);
+        return;
+      }
+      if (seen.has(email)) {
+        duplicateRecipients.push(email);
+        return;
+      }
+      seen.add(email);
+      validRecipients.push(email);
+    });
+
+    this.parseManualNewsletterRecipients().forEach((entry) => {
+      const email = String(entry || '').trim().toLowerCase();
+      if (!this.isValidNewsletterEmail(email)) {
+        invalidRecipients.push(entry);
+        return;
+      }
+      if (seen.has(email)) {
+        duplicateRecipients.push(email);
+        return;
+      }
+      seen.add(email);
+      validRecipients.push(email);
+    });
+
+    return {
+      validRecipients,
+      invalidRecipients: Array.from(new Set(invalidRecipients)),
+      duplicateRecipients: Array.from(new Set(duplicateRecipients)),
+      blockedRecipients: Array.from(new Set(blockedRecipients))
+    };
+  }
+
+  private loadNewsletterContacts(): void {
+    this.escalationService.getContacts('preventive').subscribe({
+      next: (contacts) => {
+        this.newsletterContacts = [...contacts];
+        this.selectedNewsletterContactIds.clear();
+        contacts
+          .filter((contact) => !!contact.favorite && contact.active !== false && !contact.doNotSend && this.isValidNewsletterEmail(contact.email))
+          .forEach((contact) => {
+            if (contact._id) this.selectedNewsletterContactIds.add(contact._id);
+          });
+      },
+      error: () => {
+        this.newsletterContacts = [];
+        this.selectedNewsletterContactIds.clear();
+      }
+    });
+  }
+
+  isNewsletterContactSelected(contact: Contact): boolean {
+    return !!contact?._id && this.selectedNewsletterContactIds.has(contact._id);
+  }
+
+  toggleNewsletterContact(contact: Contact, checked: boolean): void {
+    if (!contact?._id) return;
+    if (checked) this.selectedNewsletterContactIds.add(contact._id);
+    else this.selectedNewsletterContactIds.delete(contact._id);
+  }
+
+  selectAllNewsletterContacts(): void {
+    this.filteredNewsletterContacts.forEach((contact) => {
+      if (contact._id && contact.active !== false && !contact.doNotSend && this.isValidNewsletterEmail(contact.email)) {
+        this.selectedNewsletterContactIds.add(contact._id);
+      }
+    });
+  }
+
+  clearNewsletterSelection(): void {
+    this.selectedNewsletterContactIds.clear();
+  }
+
+  isValidNewsletterEmail(email?: string | null): boolean {
+    const value = String(email || '').trim().toLowerCase();
+    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
+  }
+
+  private getSelectedNewsletterContacts(): Contact[] {
+    return this.newsletterContacts.filter((contact) => !!contact._id && this.selectedNewsletterContactIds.has(contact._id));
+  }
+
+  private parseManualNewsletterRecipients(): string[] {
+    return String(this.newsletterRecipients || '')
+      .split(/[;,\n]+/)
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0);
+  }
+
   sendNewsletter(): void {
     if (!this.generatedHtml) {
       this.snackBar.open('Primero genera el boletín', 'Cerrar', { duration: 3000 });
@@ -376,13 +519,9 @@ export class ReportGeneratorComponent implements OnInit {
       return;
     }
 
-    const recipients = this.newsletterRecipients
-      .split(',')
-      .map(e => e.trim())
-      .filter(e => e.includes('@'));
-
-    if (recipients.length === 0) {
-      this.snackBar.open('Ingresa al menos un correo electrónico válido', 'Cerrar', { duration: 3000 });
+    const recipientSummary = this.newsletterRecipientSummary;
+    if (recipientSummary.validRecipients.length === 0) {
+      this.snackBar.open('No hay destinatarios válidos para procesar', 'Cerrar', { duration: 4000 });
       return;
     }
 
@@ -390,17 +529,22 @@ export class ReportGeneratorComponent implements OnInit {
     const subject = this.newsletterForm.value.tituloBoletin || 'Boletín de Seguridad';
 
     this.http.post(`${this.backendBaseUrl}/api/reports/newsletter/send`, {
-      recipients,
+      recipients: recipientSummary.validRecipients,
       subject,
       html: this.generatedHtml
     }).subscribe({
       next: (res: any) => {
         this.isSendingNewsletter = false;
         const msg = res.failCount > 0
-          ? `Enviado a ${res.successCount} destinatarios (${res.failCount} fallidos)`
+          ? `Boletín enviado a ${res.successCount} destinatarios (${res.failCount} fallidos)`
           : `Boletín enviado a ${res.successCount} destinatario(s)`;
         this.snackBar.open(msg, 'Cerrar', { duration: 5000 });
-        if (res.successCount > 0) this.newsletterRecipients = '';
+
+        if (res.successCount > 0) {
+          this.newsletterRecipients = '';
+          this.clearNewsletterSelection();
+          this.loadNewsletterContacts();
+        }
       },
       error: (err) => {
         this.isSendingNewsletter = false;
@@ -729,6 +873,10 @@ export class ReportGeneratorComponent implements OnInit {
     this.showPreview = false;
     this.activeClientAlert = null;
     this.newsletterRecipients = '';
+    this.newsletterContactSearch = '';
+    this.newsletterCompanyFilter = '';
+    this.newsletterFavoritesOnly = false;
+    this.clearNewsletterSelection();
   }
 
   // ─── HTML Builders ────────────────────────────────────────────────────────

@@ -213,15 +213,14 @@
     <div class="admin-panel list-card">
       <h3 class="admin-panel__title">Plantillas</h3>
       <mat-progress-bar *ngIf="isLoading" mode="indeterminate"></mat-progress-bar>
-      <mat-nav-list>
+      <mat-nav-list class="template-nav-list">
         <a mat-list-item class="template-list-item" *ngFor="let template of templates" (click)="selectTemplate(template)"
           [class.active]="template._id === selectedTemplate?._id">
-          <span>{{ template.name }}</span>
-          <span class="spacer"></span>
-          <mat-chip-set>
-            <mat-chip color="primary" *ngIf="template.isActive" selected>Activa</mat-chip>
-            <mat-chip *ngIf="template.items.length" disableRipple>{{ template.items.length }} items</mat-chip>
-          </mat-chip-set>
+          <span matListItemTitle class="template-list-item__name">{{ template.name }}</span>
+          <span matListItemLine class="template-list-item__meta">
+            <span class="template-status-pill template-status-pill--active" *ngIf="template.isActive">Activa</span>
+            <span class="template-status-pill" *ngIf="template.items.length">{{ template.items.length }} items</span>
+          </span>
         </a>
       </mat-nav-list>
       <div class="list-actions">

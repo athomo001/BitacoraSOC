@@ -3,7 +3,7 @@
     <mat-icon>settings</mat-icon>
     <div>
       <h1>Administración de Escalamientos</h1>
-      <p>Configura turnos internos y contactos de clientes</p>
+      <p>Configura turnos internos, contactos de escalación y agenda preventiva</p>
     </div>
   </header>
 
@@ -316,15 +316,15 @@
       </div>
     </mat-tab>
 
-    <!-- TAB 2: CONTACTOS DE CLIENTES -->
-    <mat-tab label="📞 Contactos de Clientes">
+    <!-- TAB 2: CONTACTOS DE ESCALACIÓN -->
+    <mat-tab label="📞 Contactos de Escalación">
       <div class="tab-content">
-        <h2>Gestión de Contactos de Escalamiento</h2>
-        <p class="subtitle">Administra clientes, servicios y sus contactos</p>
+        <h2>Contactos de Escalación y Agenda Preventiva</h2>
+        <p class="subtitle">Este módulo corresponde al flujo operativo de escalación/turnos. La libreta preventiva de boletines vive abajo y se mantiene separada.</p>
 
         <div class="section">
           <h3>Clientes (fuente única)</h3>
-          <p class="subtitle">Los clientes de Escalación se administran desde Catálogos > Log Sources. Aquí solo se muestran habilitados.</p>
+          <p class="subtitle">Los clientes de escalación se administran desde Catálogos &gt; Log Sources. Aquí solo se muestran habilitados.</p>
           <div class="chips-list" *ngIf="!loadingClients">
             <div class="chip" *ngFor="let client of clients">
               {{ client.name }}
@@ -332,9 +332,8 @@
           </div>
         </div>
 
-        <!-- Sección: Servicios -->
         <div class="section">
-          <h3>1. Servicios</h3>
+          <h3>1. Servicios de Escalación</h3>
           <button mat-raised-button color="accent" (click)="addService()">
             <mat-icon>add</mat-icon>
             Agregar Servicio
@@ -385,15 +384,16 @@
           </div>
         </div>
 
-        <!-- Sección: Contactos -->
         <div class="section">
-          <h3>2. Contactos de Escalamiento</h3>
-          <button mat-raised-button color="accent" (click)="addContact()">
+          <h3>2. Contactos de Escalación</h3>
+          <p class="subtitle">Usa esta sección solo para contactos ligados a escalación, turnos y servicio activo. No es una agenda comercial general.</p>
+
+          <button mat-raised-button color="accent" (click)="addContact('escalation')">
             <mat-icon>add</mat-icon>
-            Agregar Contacto
+            Agregar Contacto de Escalación
           </button>
 
-          <section *ngIf="showContactForm" class="inline-form">
+          <section *ngIf="showContactForm && contactForm.get('contactType')?.value !== 'preventive'" class="inline-form">
             <form [formGroup]="contactForm" (ngSubmit)="saveContact()">
               <mat-form-field appearance="outline">
                 <mat-label>Servicio</mat-label>
@@ -422,6 +422,7 @@
                   <mat-option value="CC">CC</mat-option>
                 </mat-select>
               </mat-form-field>
+              <mat-checkbox formControlName="active" color="primary">Activo</mat-checkbox>
               <button mat-raised-button color="primary" type="submit" [disabled]="contactForm.invalid">
                 Guardar
               </button>
@@ -429,25 +430,25 @@
             </form>
           </section>
 
-          <div class="simple-table" *ngIf="!loadingContacts && contacts.length > 0">
+          <div class="simple-table" *ngIf="!loadingContacts && escalationContacts.length > 0">
             <table>
               <thead>
                 <tr>
-              <th>Cliente</th>
-              <th>Servicio</th>
-              <th>Nombre</th>
-              <th>Email</th>
-              <th>Teléfono</th>
-              <th>Tipo</th>
-              <th>Acciones</th>
+                  <th>Cliente</th>
+                  <th>Servicio</th>
+                  <th>Nombre</th>
+                  <th>Email</th>
+                  <th>Teléfono</th>
+                  <th>Tipo</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let contact of contacts">
+                <tr *ngFor="let contact of escalationContacts">
                   <td>{{ contact.serviceId?.clientId?.name || 'N/A' }}</td>
                   <td>{{ contact.serviceId?.name || 'N/A' }}</td>
                   <td><strong>{{ contact.name }}</strong></td>
-                  <td>{{ contact.email }}</td>
+                  <td>{{ contact.email || '-' }}</td>
                   <td>{{ contact.phone || '-' }}</td>
                   <td><span class="badge" [class.para]="contact.role === 'PARA'">{{ contact.role }}</span></td>
                   <td>
@@ -461,6 +462,127 @@
                 </tr>
               </tbody>
             </table>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3>3. Agenda Preventiva para Boletines</h3>
+          <p class="subtitle">Libreta simple separada de escalación para avisos preventivos, campañas repetidas y clientes sin servicio activo.</p>
+
+          <div class="toolbar-row">
+            <button mat-raised-button color="primary" (click)="addContact('preventive')">
+              <mat-icon>person_add</mat-icon>
+              Nuevo contacto preventivo
+            </button>
+            <button mat-stroked-button color="primary" type="button" (click)="downloadPreventiveTemplate()">
+              <mat-icon>description</mat-icon>
+              Plantilla CSV
+            </button>
+            <button mat-stroked-button color="accent" type="button" [disabled]="importingPreventiveCsv" (click)="preventiveCsvInput.click()">
+              <mat-icon>{{ importingPreventiveCsv ? 'hourglass_empty' : 'upload_file' }}</mat-icon>
+              {{ importingPreventiveCsv ? 'Importando...' : 'Importar CSV' }}
+            </button>
+            <button mat-stroked-button color="accent" type="button" [disabled]="exportingPreventiveCsv" (click)="exportPreventiveContacts()">
+              <mat-icon>{{ exportingPreventiveCsv ? 'hourglass_empty' : 'download' }}</mat-icon>
+              {{ exportingPreventiveCsv ? 'Exportando...' : 'Exportar CSV' }}
+            </button>
+            <input #preventiveCsvInput type="file" accept=".csv,text/csv" class="hidden-native-input" (change)="onPreventiveCsvSelected($event)">
+          </div>
+
+          <p class="subtitle compact-subtitle">Formato sugerido: name, email, organization, phone, favorite, doNotSend, notes.</p>
+
+          <div class="form-row filters-row">
+            <mat-form-field appearance="outline">
+              <mat-label>Buscar</mat-label>
+              <input matInput [(ngModel)]="preventiveSearch" placeholder="Nombre, correo o empresa">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Empresa</mat-label>
+              <mat-select [(ngModel)]="preventiveCompanyFilter">
+                <mat-option value="">Todas</mat-option>
+                <mat-option *ngFor="let company of preventiveCompanyOptions" [value]="company">
+                  {{ company }}
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-checkbox [(ngModel)]="preventiveFavoritesOnly" color="primary">Solo favoritos</mat-checkbox>
+          </div>
+
+          <section *ngIf="showContactForm && contactForm.get('contactType')?.value === 'preventive'" class="inline-form">
+            <form [formGroup]="contactForm" (ngSubmit)="saveContact()">
+              <mat-form-field appearance="outline">
+                <mat-label>Nombre completo</mat-label>
+                <input matInput formControlName="name" placeholder="Ej: Ana Pérez">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Correo</mat-label>
+                <input matInput type="email" formControlName="email" placeholder="cliente@empresa.com">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Empresa</mat-label>
+                <input matInput formControlName="organization" placeholder="Ej: Empresa Demo">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Teléfono (opcional)</mat-label>
+                <input matInput formControlName="phone" placeholder="+56 9 ...">
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Nota interna (opcional)</mat-label>
+                <textarea matInput rows="2" formControlName="notes" placeholder="Uso sugerido, observaciones o exclusiones"></textarea>
+              </mat-form-field>
+              <mat-checkbox formControlName="favorite" color="primary">Favorito</mat-checkbox>
+              <mat-checkbox formControlName="doNotSend" color="warn">No enviar</mat-checkbox>
+              <mat-checkbox formControlName="active" color="primary">Activo</mat-checkbox>
+              <button mat-raised-button color="primary" type="submit" [disabled]="contactForm.invalid">
+                Guardar
+              </button>
+              <button mat-button type="button" (click)="showContactForm = false">Cancelar</button>
+            </form>
+          </section>
+
+          <div class="simple-table" *ngIf="!loadingContacts && filteredPreventiveContacts.length > 0">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Correo</th>
+                  <th>Empresa</th>
+                  <th>Teléfono</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let contact of filteredPreventiveContacts">
+                  <td>
+                    <strong>{{ contact.name }}</strong>
+                    <div class="row-meta" *ngIf="contact.notes">{{ contact.notes }}</div>
+                  </td>
+                  <td>{{ contact.email || '-' }}</td>
+                  <td>{{ contact.organization || '-' }}</td>
+                  <td>{{ contact.phone || '-' }}</td>
+                  <td>
+                    <span class="badge para" *ngIf="contact.favorite">Favorito</span>
+                    <span class="badge warn" *ngIf="contact.doNotSend">No enviar</span>
+                    <span class="badge" [class.muted]="contact.active === false">{{ contact.active === false ? 'Inactivo' : 'Activo' }}</span>
+                  </td>
+                  <td>
+                    <button mat-icon-button color="primary" (click)="editContact(contact)" matTooltip="Editar">
+                      <mat-icon>edit</mat-icon>
+                    </button>
+                    <button mat-icon-button color="warn" (click)="deleteContact(contact._id)" matTooltip="Eliminar">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div *ngIf="!loadingContacts && filteredPreventiveContacts.length === 0" class="no-data compact-no-data">
+            <p>No hay contactos preventivos para los filtros seleccionados.</p>
           </div>
         </div>
       </div>

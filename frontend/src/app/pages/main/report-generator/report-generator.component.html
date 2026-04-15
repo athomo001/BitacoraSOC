@@ -462,24 +462,118 @@
           </div>
         </div>
 
-        <!-- NEW: Panel para enviar correos directos -->
         <div *ngIf="currentMode === 'newsletter'" class="newsletter-send-container">
-          <h4 class="newsletter-send-title">
-            <mat-icon aria-hidden="true">email</mat-icon>
-            Enviar por Correo Electrónico
-          </h4>
-          <p class="newsletter-send-hint">Se enviará un correo individual a cada destinatario utilizando el Servidor SMTP configurado en el sistema.</p>
+          <div class="newsletter-send-header">
+            <div>
+              <h4 class="newsletter-send-title">
+                <mat-icon aria-hidden="true">email</mat-icon>
+                Envío de Boletines
+              </h4>
+              <p class="newsletter-send-hint">
+                Combina correos manuales con la agenda preventiva guardada. El sistema deduplica y resume válidos, inválidos y excluidos antes del envío real.
+              </p>
+            </div>
+          </div>
 
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Destinatarios (separados por coma)</mat-label>
-            <textarea matInput [(ngModel)]="newsletterRecipients" rows="2" placeholder="ejemplo1@cliente.com, ejemplo2@cliente.com"></textarea>
-          </mat-form-field>
+          <div class="newsletter-recipient-layout">
+            <div class="newsletter-manual-block">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Destinatarios manuales</mat-label>
+                <textarea matInput [(ngModel)]="newsletterRecipients" rows="4" placeholder="correo1@cliente.com, correo2@cliente.com o uno por línea"></textarea>
+              </mat-form-field>
+              <p class="newsletter-helper-text">
+                Fallback manual preservado. Puedes mezclarlo con contactos guardados sin repetir destinatarios.
+              </p>
+            </div>
+
+            <aside class="newsletter-saved-block">
+              <div class="newsletter-saved-header">
+                <strong>Contactos guardados</strong>
+                <span>{{ newsletterSelectedCount }} seleccionados</span>
+              </div>
+
+              <div class="newsletter-filter-grid">
+                <mat-form-field appearance="outline">
+                  <mat-label>Buscar</mat-label>
+                  <input matInput [(ngModel)]="newsletterContactSearch" placeholder="Nombre, correo o empresa">
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Empresa</mat-label>
+                  <mat-select [(ngModel)]="newsletterCompanyFilter">
+                    <mat-option value="">Todas</mat-option>
+                    <mat-option *ngFor="let company of newsletterCompanyOptions" [value]="company">
+                      {{ company }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+
+              <div class="newsletter-mini-actions">
+                <mat-checkbox [(ngModel)]="newsletterFavoritesOnly" color="primary">Solo favoritos</mat-checkbox>
+                <button mat-button type="button" (click)="selectAllNewsletterContacts()">Seleccionar todo</button>
+                <button mat-button type="button" (click)="clearNewsletterSelection()">Limpiar</button>
+              </div>
+
+              <div class="newsletter-contact-list" *ngIf="filteredNewsletterContacts.length > 0; else noNewsletterContacts">
+                <label class="newsletter-contact-item"
+                       *ngFor="let contact of filteredNewsletterContacts"
+                       [class.is-disabled]="contact.active === false || contact.doNotSend || !isValidNewsletterEmail(contact.email)">
+                  <mat-checkbox
+                    [checked]="isNewsletterContactSelected(contact)"
+                    [disabled]="contact.active === false || contact.doNotSend || !isValidNewsletterEmail(contact.email)"
+                    (change)="toggleNewsletterContact(contact, $event.checked)">
+                  </mat-checkbox>
+
+                  <div class="newsletter-contact-meta">
+                    <div class="newsletter-contact-title">
+                      <strong>{{ contact.name }}</strong>
+                      <span class="newsletter-badge favorite" *ngIf="contact.favorite">Favorito</span>
+                      <span class="newsletter-badge blocked" *ngIf="contact.doNotSend">No enviar</span>
+                      <span class="newsletter-badge muted" *ngIf="contact.active === false">Inactivo</span>
+                    </div>
+                    <div class="newsletter-contact-detail">{{ contact.email || 'Sin correo válido' }}</div>
+                    <div class="newsletter-contact-detail">{{ contact.organization || 'Sin empresa' }}</div>
+                  </div>
+                </label>
+              </div>
+
+              <ng-template #noNewsletterContacts>
+                <div class="newsletter-empty-state">
+                  No hay contactos preventivos que coincidan con el filtro actual.
+                </div>
+              </ng-template>
+            </aside>
+          </div>
+
+          <div class="newsletter-validation-summary">
+            <span class="summary-pill ok">Válidos: {{ newsletterRecipientSummary.validRecipients.length }}</span>
+            <span class="summary-pill warn">Duplicados: {{ newsletterRecipientSummary.duplicateRecipients.length }}</span>
+            <span class="summary-pill danger">Inválidos: {{ newsletterRecipientSummary.invalidRecipients.length }}</span>
+            <span class="summary-pill muted">Excluidos: {{ newsletterRecipientSummary.blockedRecipients.length }}</span>
+          </div>
+
+          <div class="newsletter-summary-details"
+               *ngIf="newsletterRecipientSummary.duplicateRecipients.length || newsletterRecipientSummary.invalidRecipients.length || newsletterRecipientSummary.blockedRecipients.length">
+            <p *ngIf="newsletterRecipientSummary.duplicateRecipients.length > 0">
+              <strong>Duplicados:</strong>
+              {{ newsletterRecipientSummary.duplicateRecipients.join(', ') }}
+            </p>
+            <p *ngIf="newsletterRecipientSummary.invalidRecipients.length > 0">
+              <strong>Inválidos:</strong>
+              {{ newsletterRecipientSummary.invalidRecipients.join(', ') }}
+            </p>
+            <p *ngIf="newsletterRecipientSummary.blockedRecipients.length > 0">
+              <strong>Excluidos por estado:</strong>
+              {{ newsletterRecipientSummary.blockedRecipients.join(', ') }}
+            </p>
+          </div>
 
           <div class="newsletter-send-actions">
-            <button mat-raised-button color="primary" [disabled]="!newsletterRecipients || isSendingNewsletter" (click)="sendNewsletter()">
+            <button mat-raised-button color="primary" [disabled]="newsletterRecipientSummary.validRecipients.length === 0 || isSendingNewsletter" (click)="sendNewsletter()">
               <mat-icon *ngIf="!isSendingNewsletter">send</mat-icon>
               <mat-icon *ngIf="isSendingNewsletter">hourglass_empty</mat-icon>
-              {{ isSendingNewsletter ? 'Enviando...' : 'Enviar Boletines (1:1)' }}
+              {{ isSendingNewsletter ? 'Enviando...' : 'Enviar boletines (1:1)' }}
             </button>
           </div>
         </div>

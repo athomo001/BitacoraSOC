@@ -6,6 +6,7 @@ import {
   Client,
   Service,
   Contact,
+  ContactType,
   EscalationRule,
   ShiftRotationCycle,
   ShiftAssignment,
@@ -24,6 +25,7 @@ import {
   ClientAlertRule,
   ClientAlertRuleFormData,
   ClientAlertEvaluation,
+  NewsletterRecipientValidation,
   ClientAlertAckPayload,
   ClientAlertContext
 } from '../models/escalation.model';
@@ -90,8 +92,12 @@ export class EscalationService {
   /**
    * Obtener contactos activos (sin permisos de admin)
    */
-  getContacts(): Observable<Contact[]> {
-    return this.http.get<Contact[]>(`${this.apiUrl}/contacts`);
+  getContacts(contactType: ContactType = 'escalation', search?: string): Observable<Contact[]> {
+    let params = new HttpParams().set('contactType', contactType);
+    if (search) {
+      params = params.set('search', search);
+    }
+    return this.http.get<Contact[]>(`${this.apiUrl}/contacts`, { params });
   }
 
   /**
@@ -181,8 +187,15 @@ export class EscalationService {
   // 🔧 CRUD ADMIN - Contactos
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  getAllContacts(): Observable<Contact[]> {
-    return this.http.get<Contact[]>(`${this.apiUrl}/admin/contacts`);
+  getAllContacts(contactType?: ContactType | 'all', search?: string): Observable<Contact[]> {
+    let params = new HttpParams();
+    if (contactType) {
+      params = params.set('contactType', contactType);
+    }
+    if (search) {
+      params = params.set('search', search);
+    }
+    return this.http.get<Contact[]>(`${this.apiUrl}/admin/contacts`, { params });
   }
 
   createContact(data: ContactFormData): Observable<Contact> {
@@ -195,6 +208,39 @@ export class EscalationService {
 
   deleteContact(id: string): Observable<{ message: string }> {
     return this.http.delete<{ message: string }>(`${this.apiUrl}/admin/contacts/${id}`);
+  }
+
+  importContactsCsv(file: File, contactType: ContactType = 'preventive'): Observable<{
+    message: string;
+    created: number;
+    updated: number;
+    errorCount: number;
+    errors: Array<{ row: number | string; message: string }>;
+  }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('contactType', contactType);
+    return this.http.post<{
+      message: string;
+      created: number;
+      updated: number;
+      errorCount: number;
+      errors: Array<{ row: number | string; message: string }>;
+    }>(`${this.apiUrl}/admin/contacts/import-csv`, formData);
+  }
+
+  exportContactsCsv(contactType: ContactType | 'all' = 'preventive'): Observable<Blob> {
+    const params = new HttpParams().set('contactType', contactType);
+    return this.http.get(`${this.apiUrl}/admin/contacts/export-csv`, {
+      params,
+      responseType: 'blob'
+    });
+  }
+
+  validateNewsletterRecipients(recipients: string[]): Observable<NewsletterRecipientValidation> {
+    return this.http.post<NewsletterRecipientValidation>(`${environment.backendBaseUrl}/api/reports/newsletter/validate`, {
+      recipients
+    });
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

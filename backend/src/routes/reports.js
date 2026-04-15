@@ -25,6 +25,7 @@ const AppConfig = require('../models/AppConfig');
 const { authenticate, authorize } = require('../middleware/auth');
 const { audit } = require('../utils/audit');
 const { sendEmail } = require('../utils/email');
+const { analyzeRecipientEmails } = require('../utils/contactDirectory');
 
 /**
  * CID estable para multipart/related (imagen inline). Debe coincidir con el atributo src del HTML.
@@ -708,13 +709,39 @@ router.get('/entries-by-logsource', authenticate, async (req, res) => {
   }
 });
 
+// POST /api/reports/newsletter/validate - Validación previa de destinatarios
+router.post('/newsletter/validate', authenticate, async (req, res) => {
+  try {
+    const analysis = analyzeRecipientEmails(req.body?.recipients || []);
+    res.json({
+      validRecipients: analysis.valid,
+      invalidRecipients: analysis.invalid,
+      duplicateRecipients: analysis.duplicates,
+      validCount: analysis.valid.length,
+      invalidCount: analysis.invalid.length,
+      duplicateCount: analysis.duplicates.length,
+      totalSubmitted: analysis.totalSubmitted
+    });
+  } catch (error) {
+    res.status(400).json({
+      message: 'No se pudo validar la lista de destinatarios',
+      detail: error.message
+    });
+  }
+});
+
 // POST /api/reports/newsletter/send - Envío de boletines (1:1)
 router.post('/newsletter/send', authenticate, async (req, res) => {
   try {
-    const { recipients, subject, html, inlineAttachments } = req.body;
+    const { recipients, subject, html } = req.body;
+    const sendMode = 'real';
+    const analysis = analyzeRecipientEmails(recipients || []);
 
-    if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
-      return res.status(400).json({ message: 'Se requiere un arreglo de destinatarios' });
+    if (analysis.valid.length === 0) {
+      return res.status(400).json({
+        message: 'Se requiere al menos un destinatario válido',
+        detail: 'Corrige los correos inválidos o duplicados antes de enviar.'
+      });
     }
 
     if (!html) {
@@ -731,11 +758,7 @@ router.post('/newsletter/send', authenticate, async (req, res) => {
     let failCount = 0;
     let lastError = null;
 
-    for (const recipient of recipients) {
-      if (!recipient || typeof recipient !== 'string') continue;
-      const email = recipient.trim();
-      if (!email || !email.includes('@')) continue;
-
+    for (const email of analysis.valid) {
       try {
         await sendEmail({
           to: email,
@@ -748,7 +771,10 @@ router.post('/newsletter/send', authenticate, async (req, res) => {
             triggerType: 'manual_newsletter',
             extra: {
               type: 'newsletter',
-              newsletterAttachmentParts: newsletterAttachments.length
+              mode: sendMode,
+              newsletterAttachmentParts: newsletterAttachments.length,
+              duplicateCount: analysis.duplicates.length,
+              invalidCount: analysis.invalid.length
             }
           }
         });
@@ -769,8 +795,12 @@ router.post('/newsletter/send', authenticate, async (req, res) => {
 
     res.json({
       success: true,
+      mode: sendMode,
       successCount,
       failCount,
+      duplicateCount: analysis.duplicates.length,
+      invalidCount: analysis.invalid.length,
+      processedRecipients: analysis.valid.length,
       message: `Boletín enviado: ${successCount} correctos, ${failCount} fallidos`
     });
   } catch (error) {
