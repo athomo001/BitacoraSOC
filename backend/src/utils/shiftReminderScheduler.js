@@ -47,9 +47,38 @@ function hoursBlockKey(reminderId, timezone, now, intervalHours) {
 
 // ─── Email HTML ───────────────────────────────────────────────────────────
 
+function escapeHtml(value = '') {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatReminderTextForEmail(reminderText = '') {
+  const normalized = String(reminderText || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = normalized.split('\n');
+
+  return lines.map((line) => {
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      return '<div style="height:12px;line-height:12px;">&nbsp;</div>';
+    }
+
+    const bulletMatch = trimmed.match(/^(\*|-|•)\s+(.*)$/);
+    if (bulletMatch) {
+      return `<div style="margin:0 0 6px 0;color:#111111;font-size:15px;line-height:1.6;">&bull; ${escapeHtml(bulletMatch[2])}</div>`;
+    }
+
+    return `<div style="margin:0 0 10px 0;color:#111111;font-size:15px;line-height:1.6;">${escapeHtml(line).replace(/  /g, ' &nbsp;')}</div>`;
+  }).join('');
+}
+
 function buildReminderHtml({ appTitle, reminderText }) {
-  const safeTitle = getAppTitleForText(appTitle).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const safeText = (reminderText || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+  const safeTitle = escapeHtml(getAppTitleForText(appTitle));
+  const formattedBody = formatReminderTextForEmail(reminderText);
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -64,8 +93,8 @@ function buildReminderHtml({ appTitle, reminderText }) {
     </tr>
     <tr>
       <td style="padding:32px 24px;">
-        <p style="margin:0;font-size:22px;font-weight:bold;color:#111111;line-height:1.4;">${safeText}</p>
-        <p style="margin:24px 0 0 0;font-size:12px;color:#888888;">
+        <div style="margin:0;color:#111111;">${formattedBody}</div>
+        <p style="margin:24px 0 0 0;font-size:12px;color:#888888;line-height:1.5;">
           Este es un recordatorio automático generado por ${safeTitle}. No responder a este correo.
         </p>
       </td>
@@ -195,6 +224,7 @@ async function runShiftReminder() {
         await sendEmail({
           to: recipients,
           subject: formatBrandedSubject(config?.appTitle, reminder.label),
+          text: reminder.reminderText,
           html,
           auditContext: {
             sourceModule: 'shiftReminderScheduler',
@@ -235,4 +265,4 @@ function startShiftReminderScheduler() {
   logger.info('✅ Shift reminder scheduler started (polling cada 5 min)');
 }
 
-module.exports = { startShiftReminderScheduler };
+module.exports = { startShiftReminderScheduler, buildReminderHtml, formatReminderTextForEmail };

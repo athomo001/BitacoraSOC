@@ -144,10 +144,10 @@
 
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Texto del correo *</mat-label>
-            <textarea matInput formControlName="reminderText" rows="3"
+            <textarea matInput formControlName="reminderText" rows="10"
               placeholder="Ej: Recuerda revisar el estado de los sensores y registrar novedades en la bitácora."
-              maxlength="500"></textarea>
-            <mat-hint>Mensaje que recibirá el analista. Máx. 500 caracteres.</mat-hint>
+              maxlength="5000"></textarea>
+            <mat-hint>Mensaje que recibirá el analista. Máx. 5000 caracteres. Se respetan los saltos de línea al enviarlo.</mat-hint>
           </mat-form-field>
 
           <div class="reminder-freq-row">

@@ -2,6 +2,16 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.45-beta] - 2026-04-15
+
+### Corrección recordatorios largos por correo (`MAIL-REM-079`)
+
+- **Checklist Admin / recordatorios periódicos:** el campo `Texto del correo` ya no queda limitado a 500 caracteres; ahora acepta hasta **5000** para mensajes operativos extensos.
+- **Formato preservado en email:** el render HTML del recordatorio ahora respeta saltos de línea, separaciones y listas con viñetas, evitando que el contenido llegue como un bloque único.
+- **Validación consistente punta a punta:** frontend, API y modelo Mongo quedaron alineados con el nuevo límite para evitar rechazos silenciosos o truncamientos inesperados.
+
+---
+
 ## [v1.5.44-beta] - 2026-04-11
 
 ### Estabilización Docker + remediación visual UI (`UI-VIS-066`..`071`)

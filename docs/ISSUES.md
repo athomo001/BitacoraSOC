@@ -19,7 +19,13 @@
 
 | ID | Estado | Seccion | Tarea | Notas |
 | --- | --- | --- | --- | --- |
-| — | — | — | *Sin issues `UI-*` abiertos en esta tabla* | Nuevo trabajo UI: crear fila aquí o en **Listas** al cerrar. Seguir **Recurrente** y `docs/UI-GOVERNANCE.md` §§6–9. |
+| UI-NEWS-072 | En progreso | UI/UX + Boletines ALTA | Selector rápido de destinatarios guardados en envío de boletín | En `/main/report-generator` agregar panel lateral o bloque contiguo con checkboxes de contactos guardados mostrando **nombre + correo + empresa**. Debe convivir con el textarea manual actual separado por comas y combinar ambas fuentes sin duplicados. |
+| UI-ESC-073 | En progreso | UX/Admin + Escalación MEDIA | Renombrar "Contactos de Clientes" a "Contactos de Escalación" | Ajustar títulos, ayudas y textos de `/main/admin/escalation` para reflejar que ese módulo corresponde a escalación/turnos y no a una libreta general de contactos comerciales o preventivos. |
+| UI-DIR-074 | En progreso | Admin + Backend + Email ALTA | Agenda simple de contactos generales para avisos preventivos | Crear una base/CRUD liviano separado de escalación con **nombre, correo y empresa obligatorios** y **teléfono opcional**. Debe permitir registrar clientes sin servicio activo para notificaciones tipo zero-day y servir de fuente para boletines. |
+| UI-NEWS-075 | En progreso | UX/Boletines MEDIA | Filtros, favoritos y selección masiva de destinatarios | Sobre el panel de contactos del boletín, agregar búsqueda por nombre/correo/empresa, filtros rápidos por empresa y acciones `Seleccionar todo`, `Limpiar` y `Solo favoritos` para acelerar campañas repetitivas. |
+| UI-DIR-076 | En progreso | Admin + Datos MEDIA | Importación y exportación CSV de agenda preventiva | Permitir poblar o respaldar la agenda de contactos generales mediante CSV para cargar decenas de clientes sin digitación manual uno a uno. |
+| UI-DIR-077 | En progreso | Admin + Cumplimiento ALTA | Estado del contacto y exclusión de envíos | Agregar flags simples como `activo`, `favorito` y `no enviar` para prevenir errores operativos y respetar exclusiones explícitas antes de campañas o avisos masivos. |
+| MAIL-NEWS-078 | En progreso | Email + QA MEDIA | Validación previa y resumen de destinatarios antes del envío | Antes de enviar boletines, mostrar cuántos destinatarios válidos, duplicados o inválidos serán procesados; mantener opción de envío real y prueba PoC sin mezclar auditoría. |
 
 **Plan de ataque visual ejecutado:** `docs/ui-visual-remediation-plan.md` (oleadas, criterios de aceptación, rutas objetivo y Definition of Done visual).
 
@@ -80,6 +86,7 @@
 | REP-GEN-039 | Listo | UI/UX + Reportería MEDIA | Sistema de ayuda contextual dinámica con globos animados en `/main/report-generator` | Rediseñar guía rápida: eliminar panel fijo, implementar sistema dinámico "Top-Aligned" que evita recortes laterales, contenido condicional por modo y animaciones premium via anime.js. |
 | UI-NEWS-042 | Listo | UI/UX + Newsletter MEDIA | Formato de campos de texto en Boletín (saltos de línea, viñetas y sangría) | Se implementó `formatNewsletterText()` en `report-generator`: convierte saltos de línea, viñetas (`-`, `*`, `•`) e indentación en divs con estilos inline email-safe, eliminando dependencia de `white-space: pre-wrap` que los clientes de correo no respetan. |
 | MAIL-REM-043 | Listo | Backend / Email / Turnos / Checklist ALTA | Recordatorios por email respetando turnos laborales | Implementado: campos `shiftReminderEnabled`, `shiftReminderMinutesBefore` (5-120 min), `shiftReminderTimezone`, `shiftReminderLastSentMap` en `AppConfig`; `shiftReminderScheduler.js` con polling de 5 min, lógica de ventana con `moment-timezone`, resolución de destinatarios desde `WorkShift.assignedUserIds`, dedup por `shiftReminderLastSentMap`, email HTML con `sendEmail()`; registrado en `server.js`; UI en `/main/admin/checklist` con 3 controles condicionados al toggle. |
+| MAIL-REM-079 | Listo | Email / UX + QA ALTA | Texto largo en recordatorios de turno queda limitado a 500 y puede perder formato | Corregido: límite ampliado a **5000** caracteres en frontend + backend y el correo HTML ahora preserva saltos de línea y listas, evitando que el mensaje llegue "achoclonado". |
 | ESC-MAINT-042 | Listo | Backend / Frontend / Catálogos ALTA | Bloqueo por Mantenimientos Programados reutilizando Alertas Especiales | Implementado: `ruleType` (`special_alert`/`scheduled_maintenance`), `blocking`, `maintenanceTitle`, `readBy` (con dedup por `occurrenceKey`+usuario) en modelo y controlador; precedencia en evaluación; diálogo bloqueante sin "Más tarde"; banner con variante mantenimiento; tab renombrado "Alertas y Mantenimientos" con selector de tipo y badge en tabla. |
 | UI-NEWS-041 | Listo | UI/UX + Newsletter MEDIA | Formato de CVEs en Boletín (saltos de línea) | Se implementó `formatCveList()` en `report-generator`: divide CVE/IDs por comas, puntos y coma o saltos de línea y renderiza uno por línea con fuente monoespaciada, reemplazando el texto continuo anterior. |
 | AUDIT-EXPORT-028 | Listo | Auditoría / Operación ALTA | Descarga flexible de logs de auditoría | Verificado completo: selector de 5 modos (filtros, cantidad, días, meses, todos); `mat-hint` visible con ejemplos exactos (`2, 7, 15` días; `1, 3, 6` meses); hint contextual por modo describe la `N` al usuario. |
@@ -276,6 +283,105 @@ Todo lo descrito en esta sección y en los issues `UI-*` / `QA-UI-*` **debe prob
 ---
 
 ## Información de como solucionar los Pendientes
+
+### UI-NEWS-072 - Selector rápido de destinatarios guardados en envío de boletín
+
+**Objetivo funcional:** Mantener el textarea manual de destinatarios separados por coma en el modo **Boletín** de `/main/report-generator`, pero sumar un panel lateral o bloque contiguo con contactos guardados seleccionables por checkbox. Cada registro debe mostrar nombre, correo y empresa para acelerar el envío sin obligar a memorizar direcciones.
+
+**Criterios mínimos de aceptación:**
+
+- permitir mezclar correos escritos manualmente con contactos seleccionados desde la libreta;
+- deduplicar destinatarios repetidos antes del envío `1:1`;
+- permitir búsqueda rápida por nombre, correo o empresa;
+- mostrar cantidad de destinatarios válidos seleccionados;
+- si un contacto no tiene correo válido, omitirlo con aviso claro sin bloquear el resto.
+
+**Hallazgo técnico validado antes de implementar:**
+
+- la UI actual solo expone el campo `newsletterRecipients` como texto manual libre y luego ejecuta el envío desde la vista previa;
+- el comportamiento manual actual **debe mantenerse** como fallback obligatorio;
+- el valor agregado de este issue está en la selección rápida y la reutilización de contactos guardados.
+
+### UI-ESC-073 - Renombrar "Contactos de Clientes" a "Contactos de Escalación"
+
+**Objetivo funcional:** Corregir la nomenclatura del módulo en `/main/admin/escalation` para que no induzca a error. El tab y los textos actuales sugieren una agenda general de clientes, pero en realidad corresponden a contactos usados en escenarios de escalación operacional.
+
+**Criterios mínimos de aceptación:**
+
+- actualizar título de pestaña, subtítulo, ayudas y textos vacíos;
+- dejar explícito que esos contactos pertenecen al flujo de escalación/turnos;
+- evitar que usuarios registren ahí contactos comerciales o preventivos que no tengan servicio activo;
+- mantener compatibilidad con los registros existentes y sin migraciones destructivas.
+
+### UI-DIR-074 - Agenda simple de contactos generales para avisos preventivos
+
+**Objetivo funcional:** Crear una libreta simple y separada de escalación para almacenar contactos de clientes o terceros que deban recibir avisos preventivos, aunque no tengan servicio activo o contrato de escalación asociado.
+
+**Campos mínimos:**
+
+- nombre completo (**obligatorio**)
+- correo electrónico (**obligatorio**)
+- empresa (**obligatorio**)
+- teléfono (**opcional**)
+
+**Criterios mínimos de aceptación:**
+
+- CRUD simple tipo "gestión de usuarios", pero más liviano;
+- búsqueda y filtrado por empresa / nombre / correo;
+- fuente reutilizable para selección rápida en boletines y futuras campañas preventivas;
+- no mezclar esta libreta con los contactos de escalación ya existentes;
+- registrar auditoría básica de alta, edición y eliminación.
+
+### UI-NEWS-075 - Filtros, favoritos y selección masiva de destinatarios
+
+**Objetivo funcional:** Hacer que el panel de destinatarios guardados sea realmente rápido de usar en operación diaria, especialmente cuando existan muchos contactos cargados de distintas empresas.
+
+**Criterios mínimos de aceptación:**
+
+- buscador instantáneo por nombre, correo o empresa;
+- filtro rápido por empresa;
+- acciones `Seleccionar todo`, `Limpiar` y `Solo favoritos`;
+- contador visible de seleccionados;
+- mantener compatibilidad con el ingreso manual existente.
+
+### UI-DIR-076 - Importación y exportación CSV de agenda preventiva
+
+**Objetivo funcional:** Evitar carga manual repetitiva permitiendo importar y exportar contactos generales desde planillas CSV.
+
+**Criterios mínimos de aceptación:**
+
+- plantilla CSV simple y documentada;
+- validación por fila con reporte de errores;
+- importación parcial segura (las filas válidas se guardan y las inválidas se informan);
+- exportación filtrable para respaldo o edición externa.
+
+### UI-DIR-077 - Estado del contacto y exclusión de envíos
+
+**Objetivo funcional:** Dar control operativo sobre qué contactos sí deben recibir avisos y cuáles deben quedar excluidos temporal o permanentemente.
+
+**Campos/flags sugeridos:**
+
+- activo (sí/no)
+- favorito (sí/no)
+- no enviar (sí/no)
+- nota breve interna (opcional)
+
+**Criterios mínimos de aceptación:**
+
+- un contacto marcado `no enviar` no aparece seleccionado por defecto;
+- un contacto inactivo no participa en campañas nuevas;
+- favoritos se priorizan visualmente en el selector rápido del boletín.
+
+### MAIL-NEWS-078 - Validación previa y resumen de destinatarios antes del envío
+
+**Objetivo funcional:** Reducir errores antes de disparar el correo mostrando un pequeño resumen operativo de destinatarios válidos, inválidos y deduplicados.
+
+**Criterios mínimos de aceptación:**
+
+- previsualizar cantidad total a enviar;
+- separar correos válidos, duplicados e inválidos;
+- permitir `envío de prueba` o PoC sin mezclarlo con auditoría operacional real;
+- no bloquear el flujo manual si el usuario decide seguir corrigiendo a mano.
 
 ### ESC-MAINT-042 - Bloqueo por Mantenimientos Programados reutilizando Alertas Especiales
 

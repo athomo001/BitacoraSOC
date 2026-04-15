@@ -868,7 +868,7 @@ const { isMongoId } = require('express-validator');
 
 const shiftReminderValidators = [
   body('label').notEmpty().trim().isLength({ max: 150 }).withMessage('Nombre obligatorio (máx 150)'),
-  body('reminderText').notEmpty().trim().isLength({ max: 500 }).withMessage('Texto obligatorio (máx 500)'),
+  body('reminderText').notEmpty().trim().isLength({ max: 5000 }).withMessage('Texto obligatorio (máx 5000)'),
   body('frequencyType').optional().isIn(['hours', 'fixed']).withMessage('Tipo inválido'),
   body('intervalHours').optional().isInt({ min: 1, max: 24 }).toInt(),
   body('fixedTimes').optional().isArray({ max: 24 }),

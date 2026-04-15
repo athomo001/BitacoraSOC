@@ -74,7 +74,7 @@ export class ChecklistAdminComponent implements OnInit {
 
     this.reminderForm = this.fb.group({
       label: ['', [Validators.required, Validators.maxLength(150)]],
-      reminderText: ['', [Validators.required, Validators.maxLength(500)]],
+      reminderText: ['', [Validators.required, Validators.maxLength(5000)]],
       frequencyType: ['hours'],
       intervalHours: [4, [Validators.min(1), Validators.max(24)]],
       targetShiftIds: [[]],
