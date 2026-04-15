@@ -101,13 +101,18 @@ export class EscalationAdminSimpleComponent implements OnInit {
   externalPersonForm!: FormGroup;
   editingExternalPersonId: string | null = null;
 
-  // Contactos de clientes
+  // Contactos de escalación + agenda preventiva
   clients: any[] = [];
   services: any[] = [];
   contacts: any[] = [];
   loadingClients = false;
   loadingServices = false;
   loadingContacts = false;
+  importingPreventiveCsv = false;
+  exportingPreventiveCsv = false;
+  preventiveSearch = '';
+  preventiveCompanyFilter = '';
+  preventiveFavoritesOnly = false;
 
   showClientForm = false;
   clientForm!: FormGroup;
@@ -176,13 +181,23 @@ export class EscalationAdminSimpleComponent implements OnInit {
     });
 
     this.contactForm = this.fb.group({
-      serviceId: ['', Validators.required],
+      contactType: ['escalation', Validators.required],
+      serviceId: [''],
       name: ['', Validators.required],
       email: ['', [Validators.required, Validators.email]],
       phone: [''],
-      role: ['PARA', Validators.required],
+      organization: [''],
+      role: ['PARA'],
+      favorite: [false],
+      doNotSend: [false],
+      notes: [''],
       active: [true]
     });
+
+    this.contactForm.get('contactType')?.valueChanges.subscribe(() => {
+      this.updateContactValidators();
+    });
+    this.updateContactValidators();
 
     this.raciForm = this.fb.group({
       clientId: ['', Validators.required],
@@ -249,6 +264,40 @@ export class EscalationAdminSimpleComponent implements OnInit {
     this.loadContacts();
     this.loadRaciClients();
     this.loadEscalationReminderConfig();
+  }
+
+  private updateContactValidators(): void {
+    const contactType = this.contactForm?.get('contactType')?.value === 'preventive' ? 'preventive' : 'escalation';
+    const serviceControl = this.contactForm?.get('serviceId');
+    const organizationControl = this.contactForm?.get('organization');
+    const roleControl = this.contactForm?.get('role');
+
+    if (!serviceControl || !organizationControl || !roleControl) {
+      return;
+    }
+
+    if (contactType === 'preventive') {
+      serviceControl.clearValidators();
+      roleControl.clearValidators();
+      organizationControl.setValidators([Validators.required]);
+      if (serviceControl.value) {
+        serviceControl.setValue('', { emitEvent: false });
+      }
+      if (!roleControl.value) {
+        roleControl.setValue('PREVENTIVO', { emitEvent: false });
+      }
+    } else {
+      serviceControl.setValidators([Validators.required]);
+      roleControl.setValidators([Validators.required]);
+      organizationControl.clearValidators();
+      if (!roleControl.value || roleControl.value === 'PREVENTIVO') {
+        roleControl.setValue('PARA', { emitEvent: false });
+      }
+    }
+
+    serviceControl.updateValueAndValidity({ emitEvent: false });
+    roleControl.updateValueAndValidity({ emitEvent: false });
+    organizationControl.updateValueAndValidity({ emitEvent: false });
   }
 
   // ============ TURNOS INTERNOS ============
@@ -537,7 +586,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
   // ============ CONTACTOS ============
   loadContacts(): void {
     this.loadingContacts = true;
-    this.escalationService.getAllContacts().subscribe({
+    this.escalationService.getAllContacts('all').subscribe({
       next: (data) => {
         this.contacts = [...data];
         this.loadingContacts = false;
@@ -547,6 +596,36 @@ export class EscalationAdminSimpleComponent implements OnInit {
         console.error('Error:', err);
         this.loadingContacts = false;
       }
+    });
+  }
+
+  get escalationContacts(): any[] {
+    return (this.contacts || []).filter((contact) => (contact.contactType || 'escalation') !== 'preventive');
+  }
+
+  get preventiveContacts(): any[] {
+    return (this.contacts || [])
+      .filter((contact) => (contact.contactType || 'escalation') === 'preventive')
+      .sort((a, b) => Number(!!b.favorite) - Number(!!a.favorite) || String(a.organization || '').localeCompare(String(b.organization || '')) || String(a.name || '').localeCompare(String(b.name || '')));
+  }
+
+  get preventiveCompanyOptions(): string[] {
+    const values = new Set(
+      this.preventiveContacts
+        .map((contact) => String(contact.organization || '').trim())
+        .filter((value) => value.length > 0)
+    );
+    return Array.from(values).sort((a, b) => a.localeCompare(b));
+  }
+
+  get filteredPreventiveContacts(): any[] {
+    const term = this.preventiveSearch.trim().toLowerCase();
+    return this.preventiveContacts.filter((contact) => {
+      const matchesTerm = !term || [contact.name, contact.email, contact.organization]
+        .some((value) => String(value || '').toLowerCase().includes(term));
+      const matchesCompany = !this.preventiveCompanyFilter || contact.organization === this.preventiveCompanyFilter;
+      const matchesFavorite = !this.preventiveFavoritesOnly || !!contact.favorite;
+      return matchesTerm && matchesCompany && matchesFavorite;
     });
   }
 
@@ -822,23 +901,38 @@ export class EscalationAdminSimpleComponent implements OnInit {
     });
   }
 
-  addContact(): void {
+  addContact(contactType: 'escalation' | 'preventive' = 'escalation'): void {
     this.showContactForm = true;
     this.editingContactId = null;
-    this.contactForm.reset({ 
-      serviceId: '', 
-      name: '', 
-      email: '', 
-      phone: '', 
-      role: 'PARA',
-      active: true 
+    this.contactForm.reset({
+      contactType,
+      serviceId: '',
+      name: '',
+      email: '',
+      phone: '',
+      organization: '',
+      role: contactType === 'preventive' ? 'PREVENTIVO' : 'PARA',
+      favorite: false,
+      doNotSend: false,
+      notes: '',
+      active: true
     });
+    this.updateContactValidators();
   }
 
   saveContact(): void {
-    if (this.contactForm.invalid) return;
+    this.updateContactValidators();
+    if (this.contactForm.invalid) {
+      this.showError('Completa los campos obligatorios del contacto');
+      return;
+    }
 
-    const data = this.contactForm.value;
+    const data = { ...this.contactForm.value };
+    if (data.contactType === 'preventive') {
+      data.serviceId = null;
+      data.role = 'PREVENTIVO';
+    }
+
     const request$ = this.editingContactId
       ? this.escalationService.updateContact(this.editingContactId, data)
       : this.escalationService.createContact(data);
@@ -846,7 +940,10 @@ export class EscalationAdminSimpleComponent implements OnInit {
     request$.subscribe({
       next: () => {
         this.ngZone.run(() => {
-          this.showSuccess(this.editingContactId ? 'Contacto actualizado' : 'Contacto creado');
+          const isPreventive = data.contactType === 'preventive';
+          this.showSuccess(this.editingContactId
+            ? (isPreventive ? 'Contacto preventivo actualizado' : 'Contacto de escalación actualizado')
+            : (isPreventive ? 'Contacto preventivo creado' : 'Contacto de escalación creado'));
           this.showContactForm = false;
           this.editingContactId = null;
           this.loadContacts();
@@ -854,7 +951,8 @@ export class EscalationAdminSimpleComponent implements OnInit {
       },
       error: (err) => {
         console.error('Error:', err);
-        this.showError('Error al guardar contacto');
+        const backendMessage = err?.error?.error || err?.error?.message;
+        this.showError(backendMessage || 'Error al guardar contacto');
       }
     });
   }
@@ -866,7 +964,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
           this.showSuccess('Contacto eliminado');
           this.loadContacts();
         },
-        error: (err) => this.showError('Error al eliminar')
+        error: () => this.showError('Error al eliminar')
       });
     }
   }
@@ -878,13 +976,70 @@ export class EscalationAdminSimpleComponent implements OnInit {
       ? contact.serviceId._id
       : (contact.serviceId || '');
     this.contactForm.patchValue({
+      contactType: contact.contactType || 'escalation',
       serviceId,
       name: contact.name || '',
       email: contact.email || '',
       phone: contact.phone || '',
-      role: contact.role || 'PARA',
+      organization: contact.organization || '',
+      role: contact.role || ((contact.contactType || 'escalation') === 'preventive' ? 'PREVENTIVO' : 'PARA'),
+      favorite: !!contact.favorite,
+      doNotSend: !!contact.doNotSend,
+      notes: contact.notes || '',
       active: contact.active !== false
     });
+    this.updateContactValidators();
+  }
+
+  onPreventiveCsvSelected(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    const file = input?.files?.[0];
+    if (!file) return;
+
+    this.importingPreventiveCsv = true;
+    this.escalationService.importContactsCsv(file, 'preventive').subscribe({
+      next: (response) => {
+        const observationText = response.errorCount > 0
+          ? ` con ${response.errorCount} observación(es)`
+          : '';
+        this.showSuccess(`CSV procesado: ${response.created} nuevos, ${response.updated} actualizados${observationText}`);
+        this.loadContacts();
+      },
+      error: (err) => {
+        const backendMessage = err?.error?.error || err?.error?.message;
+        this.showError(backendMessage || 'Error importando CSV');
+      },
+      complete: () => {
+        this.importingPreventiveCsv = false;
+        if (input) input.value = '';
+      }
+    });
+  }
+
+  exportPreventiveContacts(): void {
+    if (this.exportingPreventiveCsv) return;
+    this.exportingPreventiveCsv = true;
+
+    this.escalationService.exportContactsCsv('preventive').subscribe({
+      next: (blob) => {
+        this.downloadBlob(blob, `agenda-preventiva-${new Date().toISOString().slice(0, 10)}.csv`);
+        this.showSuccess('CSV exportado correctamente');
+      },
+      error: () => {
+        this.showError('Error exportando CSV');
+      },
+      complete: () => {
+        this.exportingPreventiveCsv = false;
+      }
+    });
+  }
+
+  downloadPreventiveTemplate(): void {
+    const template = [
+      'name,email,organization,phone,favorite,doNotSend,notes',
+      'Ejemplo Cliente,cliente@example.com,Empresa Demo,+56911111111,true,false,Contacto preferente para boletines'
+    ].join('\n');
+    this.downloadBlob(new Blob([`\ufeff${template}`], { type: 'text/csv;charset=utf-8;' }), 'agenda-preventiva-template.csv');
   }
 
   // ============ PERSONAS EXTERNAS ============
@@ -1140,6 +1295,15 @@ export class EscalationAdminSimpleComponent implements OnInit {
   }
 
   // ============ UTILIDADES ============
+  private downloadBlob(blob: Blob, filename: string): void {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  }
+
   formatDate(date: string): string {
     return new Date(date).toLocaleDateString('es-CL');
   }

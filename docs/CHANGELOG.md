@@ -2,6 +2,20 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.46-beta] - 2026-04-15
+
+### Agenda preventiva + boletines guardados (`UI-NEWS-072`, `UI-ESC-073`, `UI-DIR-074`..`077`, `MAIL-NEWS-078`)
+
+- **Boletines con libreta guardada:** en `report-generator` el envío ahora mezcla correos manuales con una agenda preventiva seleccionable por checkbox, mostrando **nombre, correo y empresa** por contacto y deduplicando antes del despacho 1:1.
+- **Filtros y favoritos operativos:** búsqueda por nombre/correo/empresa, filtro por empresa, acciones `Seleccionar todo`, `Limpiar` y `Solo favoritos`, además de contador visible de seleccionados para campañas repetitivas.
+- **Agenda preventiva separada de escalación:** `/main/admin/escalation` deja explícita la diferencia entre contactos de escalación y libreta preventiva; el backend soporta `contactType='preventive'`, flags `activo`, `favorito`, `no enviar` y nota interna.
+- **CSV de agenda preventiva:** importación parcial segura con validación por fila, plantilla simple descargable y exportación CSV de respaldo desde el panel admin.
+- **Validación y auditoría de envío:** el boletín muestra resumen previo de destinatarios válidos, duplicados, inválidos y excluidos, y el despacho queda consolidado como **envío real 1:1** con trazabilidad operativa.
+- **Checklist admin legible en temas oscuros:** se corrigió la sección **Plantillas y editor** para evitar nombres encimados y textos oscuros sobre fondo dark/cyberpunk; el listado y los headers del acordeón ahora respetan los tokens de contraste del tema.
+- **Verificación técnica fresca:** backend `npm test -- --runInBand` → **2 suites OK / 5 tests OK**; frontend `npm run build` → compilación Angular exitosa y bundle generado en `frontend/dist/bitacora-soc`.
+
+---
+
 ## [v1.5.45-beta] - 2026-04-15
 
 ### Corrección recordatorios largos por correo (`MAIL-REM-079`)

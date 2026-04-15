@@ -19,13 +19,7 @@
 
 | ID | Estado | Seccion | Tarea | Notas |
 | --- | --- | --- | --- | --- |
-| UI-NEWS-072 | En progreso | UI/UX + Boletines ALTA | Selector rápido de destinatarios guardados en envío de boletín | En `/main/report-generator` agregar panel lateral o bloque contiguo con checkboxes de contactos guardados mostrando **nombre + correo + empresa**. Debe convivir con el textarea manual actual separado por comas y combinar ambas fuentes sin duplicados. |
-| UI-ESC-073 | En progreso | UX/Admin + Escalación MEDIA | Renombrar "Contactos de Clientes" a "Contactos de Escalación" | Ajustar títulos, ayudas y textos de `/main/admin/escalation` para reflejar que ese módulo corresponde a escalación/turnos y no a una libreta general de contactos comerciales o preventivos. |
-| UI-DIR-074 | En progreso | Admin + Backend + Email ALTA | Agenda simple de contactos generales para avisos preventivos | Crear una base/CRUD liviano separado de escalación con **nombre, correo y empresa obligatorios** y **teléfono opcional**. Debe permitir registrar clientes sin servicio activo para notificaciones tipo zero-day y servir de fuente para boletines. |
-| UI-NEWS-075 | En progreso | UX/Boletines MEDIA | Filtros, favoritos y selección masiva de destinatarios | Sobre el panel de contactos del boletín, agregar búsqueda por nombre/correo/empresa, filtros rápidos por empresa y acciones `Seleccionar todo`, `Limpiar` y `Solo favoritos` para acelerar campañas repetitivas. |
-| UI-DIR-076 | En progreso | Admin + Datos MEDIA | Importación y exportación CSV de agenda preventiva | Permitir poblar o respaldar la agenda de contactos generales mediante CSV para cargar decenas de clientes sin digitación manual uno a uno. |
-| UI-DIR-077 | En progreso | Admin + Cumplimiento ALTA | Estado del contacto y exclusión de envíos | Agregar flags simples como `activo`, `favorito` y `no enviar` para prevenir errores operativos y respetar exclusiones explícitas antes de campañas o avisos masivos. |
-| MAIL-NEWS-078 | En progreso | Email + QA MEDIA | Validación previa y resumen de destinatarios antes del envío | Antes de enviar boletines, mostrar cuántos destinatarios válidos, duplicados o inválidos serán procesados; mantener opción de envío real y prueba PoC sin mezclar auditoría. |
+| — | Marcador | UI/UX + Boletines | Sin issues activos en esta ola | Los pendientes de agenda preventiva, selector guardado, CSV y validación previa quedaron cerrados y movidos a **Listas**. |
 
 **Plan de ataque visual ejecutado:** `docs/ui-visual-remediation-plan.md` (oleadas, criterios de aceptación, rutas objetivo y Definition of Done visual).
 
@@ -60,6 +54,14 @@
 
 | ID | Estado | Seccion | Tarea | Notas |
 | --- | --- | --- | --- | --- |
+| UI-NEWS-072 | Listo | UI/UX + Boletines ALTA | Selector rápido de destinatarios guardados en envío de boletín | En `/main/report-generator` se agregó bloque contiguo con contactos guardados por checkbox mostrando **nombre + correo + empresa**; convive con el textarea manual y ambas fuentes se combinan sin duplicados. |
+| UI-ESC-073 | Listo | UX/Admin + Escalación MEDIA | Renombrar "Contactos de Clientes" a "Contactos de Escalación" | `/main/admin/escalation` ahora explicita que el módulo corresponde a escalación/turnos y separa la libreta preventiva del flujo operacional. |
+| UI-DIR-074 | Listo | Admin + Backend + Email ALTA | Agenda simple de contactos generales para avisos preventivos | Se implementó agenda preventiva separada usando `contactType='preventive'` con CRUD liviano, **nombre/correo/empresa obligatorios** y **teléfono opcional**, reutilizable para boletines. |
+| UI-NEWS-075 | Listo | UX/Boletines MEDIA | Filtros, favoritos y selección masiva de destinatarios | El panel del boletín ahora incluye búsqueda por nombre/correo/empresa, filtro por empresa, acciones `Seleccionar todo`, `Limpiar` y `Solo favoritos`, más contador visible de seleccionados. |
+| UI-DIR-076 | Listo | Admin + Datos MEDIA | Importación y exportación CSV de agenda preventiva | La agenda preventiva permite descargar plantilla CSV, importar en lote con validación parcial segura y exportar el respaldo actual desde el admin. |
+| UI-DIR-077 | Listo | Admin + Cumplimiento ALTA | Estado del contacto y exclusión de envíos | Se agregaron flags `activo`, `favorito` y `no enviar`, además de nota interna; los contactos excluidos o sin correo válido quedan claramente identificados y no participan por defecto. |
+| MAIL-NEWS-078 | Listo | Email + QA MEDIA | Validación previa y resumen de destinatarios antes del envío | Antes del envío se resume cuántos destinatarios serán válidos, duplicados, inválidos o excluidos; el despacho queda operativo como **envío real 1:1** con auditoría clara. |
+| UI-CHK-080 | Listo | Checklist Admin + Theming ALTA | Corregir legibilidad de plantillas/editor en dark y cyberpunk | Se reparó el layout visual de `/main/admin/checklist` en la sección **Plantillas y editor**: nombres ya no se enciman, badges usan contraste theme-aware y el acordeón/items vuelve a leerse correctamente en temas oscuros. |
 | UI-TOKEN-046 | Listo | Design System ALTA | Tokens semánticos superficie/bordes (5 temas) | `frontend/src/styles/semantic-tokens.scss`: `--surface-card`, `--surface-variant`, `--outline-*`, `--text-muted`. |
 | UI-TOKEN-047 | Listo | Design System ALTA | Escala spacing/radius/typography base | `:root`: `--space-*`, `--radius-*`, `--font-size-*`, `--line-height-*`, `--font-weight-*`. Migración progresiva de componentes: ver `UI-MIG-060` / `UI-DENS-054`. |
 | UI-AUDIT-056 | Listo | UI/Auditoría ALTA | Colores por categoría en `audit-logs` | Tokens `--audit-cat-*` por tema; componente con `var(--audit-cat-*)`. |
@@ -380,7 +382,7 @@ Todo lo descrito en esta sección y en los issues `UI-*` / `QA-UI-*` **debe prob
 
 - previsualizar cantidad total a enviar;
 - separar correos válidos, duplicados e inválidos;
-- permitir `envío de prueba` o PoC sin mezclarlo con auditoría operacional real;
+- permitir validación previa clara sin bloquear el flujo manual antes del envío real;
 - no bloquear el flujo manual si el usuario decide seguir corrigiendo a mano.
 
 ### ESC-MAINT-042 - Bloqueo por Mantenimientos Programados reutilizando Alertas Especiales

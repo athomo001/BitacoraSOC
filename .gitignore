@@ -76,3 +76,9 @@ skills/*
 
 # Watermarks locales de autor (no subir)
 docs/AUTHOR_WATERMARKS.local.md
+
+# Temporales de subida / Google Drive
+*.tmp
+.tmp/
+.tmp.*/
+.tmp.driveupload/

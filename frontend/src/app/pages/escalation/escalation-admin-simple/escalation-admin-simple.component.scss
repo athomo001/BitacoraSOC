@@ -96,6 +96,32 @@
   margin-bottom: 40px;
 }
 
+.toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.filters-row {
+  align-items: center;
+}
+
+.hidden-native-input {
+  display: none;
+}
+
+.row-meta {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.compact-subtitle {
+  margin-top: 10px !important;
+  margin-bottom: 10px !important;
+}
+
 .section-spacing-top {
   margin-top: 40px;
 }
@@ -268,10 +294,21 @@
   font-weight: bold;
   background: var(--state-neutral-bg);
   color: var(--state-neutral);
+  margin-right: 6px;
+  margin-bottom: 4px;
 
   &.para {
     background: var(--state-success-bg);
     color: var(--state-success);
+  }
+
+  &.warn {
+    background: var(--state-warning-bg);
+    color: var(--state-warning);
+  }
+
+  &.muted {
+    opacity: 0.8;
   }
 }
 

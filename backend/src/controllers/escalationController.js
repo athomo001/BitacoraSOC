@@ -12,7 +12,15 @@ const RaciEntry = require('../models/RaciEntry');
 const AppConfig = require('../models/AppConfig');
 const SmtpConfig = require('../models/SmtpConfig');
 const { sendEscalationInternalReminderEmail } = require('../routes/smtp');
+const { audit } = require('../utils/audit');
 const { logger } = require('../utils/logger');
+const {
+  normalizeContactType,
+  isValidEmail,
+  parseContactsCsv,
+  formatContactsCsv,
+  parseBooleanLike
+} = require('../utils/contactDirectory');
 
 const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -21,6 +29,16 @@ const ENABLED_LOG_SOURCE_MATCH = {
     { enabled: true },
     { enabled: { $exists: false } }
   ]
+};
+
+const CONTACT_SERVICE_POPULATE = {
+  path: 'serviceId',
+  select: 'name clientId',
+  populate: {
+    path: 'clientId',
+    select: 'name parent enabled',
+    match: ENABLED_LOG_SOURCE_MATCH
+  }
 };
 
 const parsePositiveInt = (value, fallback, max = 500) => {
@@ -32,6 +50,46 @@ const parsePositiveInt = (value, fallback, max = 500) => {
 };
 
 const normalizeCargoLabel = (value) => String(value || '').trim().toUpperCase();
+const sanitizeText = (value, maxLength = 300) => String(value ?? '').trim().slice(0, maxLength);
+
+const sanitizeContactPayload = (payload = {}, existing = {}) => {
+  const hasOwn = (key) => Object.prototype.hasOwnProperty.call(payload, key);
+  const contactType = normalizeContactType(payload.contactType || payload.type || existing.contactType);
+
+  const organizationSource = hasOwn('organization')
+    ? payload.organization
+    : (hasOwn('company') ? payload.company : existing.organization);
+
+  return {
+    name: sanitizeText(hasOwn('name') ? payload.name : existing.name, 120),
+    email: sanitizeText(hasOwn('email') ? payload.email : existing.email, 180).toLowerCase(),
+    phone: sanitizeText(hasOwn('phone') ? payload.phone : existing.phone, 80),
+    organization: sanitizeText(organizationSource, 160),
+    serviceId: contactType === 'preventive'
+      ? null
+      : ((hasOwn('serviceId') ? payload.serviceId : existing.serviceId) || null),
+    role: sanitizeText(hasOwn('role') ? payload.role : existing.role, 40)
+      || (contactType === 'preventive' ? 'PREVENTIVO' : 'PARA'),
+    active: hasOwn('active') ? parseBooleanLike(payload.active, true) : (existing.active ?? true),
+    favorite: hasOwn('favorite') ? parseBooleanLike(payload.favorite, false) : (existing.favorite ?? false),
+    doNotSend: hasOwn('doNotSend') ? parseBooleanLike(payload.doNotSend, false) : (existing.doNotSend ?? false),
+    notes: sanitizeText(hasOwn('notes') ? payload.notes : existing.notes, 500),
+    contactType
+  };
+};
+
+const validateContactPayload = (contact) => {
+  const errors = [];
+  if (!contact.name) errors.push('El nombre es obligatorio');
+  if (contact.email && !isValidEmail(contact.email)) errors.push('El correo no es válido');
+
+  if (contact.contactType === 'preventive') {
+    if (!contact.email) errors.push('El correo es obligatorio para la agenda preventiva');
+    if (!contact.organization) errors.push('La empresa es obligatoria para la agenda preventiva');
+  }
+
+  return errors;
+};
 
 /**
  * Resuelve quién está de turno AHORA para un servicio específico
@@ -258,18 +316,32 @@ exports.getServices = async (req, res) => {
 // Contactos visibles para usuarios (no admin)
 exports.getContactsPublic = async (req, res) => {
   try {
-    const contacts = await Contact.find({ active: true })
-      .populate({
-        path: 'serviceId',
-        select: 'name clientId',
-        populate: {
-          path: 'clientId',
-          select: 'name parent enabled',
-          match: ENABLED_LOG_SOURCE_MATCH
-        }
-      })
-      .sort({ name: 1 });
-    const visibleContacts = contacts.filter((contact) => Boolean(contact.serviceId?.clientId));
+    const requestedType = req.query.contactType || req.query.type || 'escalation';
+    const contactType = normalizeContactType(requestedType);
+    const search = String(req.query.search || '').trim();
+    const filter = { active: true, contactType };
+
+    if (search) {
+      if (search.length > 64) {
+        return res.status(400).json({ error: 'search no puede superar 64 caracteres' });
+      }
+      filter.$or = [
+        { name: { $regex: escapeRegex(search), $options: 'i' } },
+        { email: { $regex: escapeRegex(search), $options: 'i' } },
+        { organization: { $regex: escapeRegex(search), $options: 'i' } }
+      ];
+    }
+
+    const contacts = await Contact.find(filter)
+      .populate(CONTACT_SERVICE_POPULATE)
+      .sort({ favorite: -1, organization: 1, name: 1 });
+
+    const visibleContacts = contacts.filter((contact) => {
+      if (contact.contactType === 'preventive') return true;
+      if (!contact.serviceId) return true;
+      return Boolean(contact.serviceId?.clientId);
+    });
+
     res.json(visibleContacts);
   } catch (error) {
     logger.error('Error in getContactsPublic:', error);
@@ -460,18 +532,39 @@ exports.deleteService = async (req, res) => {
 
 exports.getAllContacts = async (req, res) => {
   try {
-    const contacts = await Contact.find()
-      .populate({
-        path: 'serviceId',
-        select: 'name clientId',
-        populate: {
-          path: 'clientId',
-          select: 'name parent enabled',
-          match: ENABLED_LOG_SOURCE_MATCH
-        }
-      })
-      .sort({ name: 1 });
-    const visibleContacts = contacts.filter((contact) => Boolean(contact.serviceId?.clientId));
+    const requestedType = String(req.query.contactType || req.query.type || '').trim().toLowerCase();
+    const search = String(req.query.search || '').trim();
+    const filter = {};
+
+    if (requestedType && requestedType !== 'all') {
+      filter.contactType = normalizeContactType(requestedType);
+    }
+
+    if (req.query.active !== undefined) {
+      filter.active = parseBooleanLike(req.query.active, true);
+    }
+
+    if (search) {
+      if (search.length > 64) {
+        return res.status(400).json({ error: 'search no puede superar 64 caracteres' });
+      }
+      filter.$or = [
+        { name: { $regex: escapeRegex(search), $options: 'i' } },
+        { email: { $regex: escapeRegex(search), $options: 'i' } },
+        { organization: { $regex: escapeRegex(search), $options: 'i' } }
+      ];
+    }
+
+    const contacts = await Contact.find(filter)
+      .populate(CONTACT_SERVICE_POPULATE)
+      .sort({ favorite: -1, organization: 1, name: 1 });
+
+    const visibleContacts = contacts.filter((contact) => {
+      if (contact.contactType === 'preventive') return true;
+      if (!contact.serviceId) return true;
+      return Boolean(contact.serviceId?.clientId);
+    });
+
     res.json(visibleContacts);
   } catch (error) {
     logger.error('Error in getAllContacts:', error);
@@ -481,8 +574,14 @@ exports.getAllContacts = async (req, res) => {
 
 exports.createContact = async (req, res) => {
   try {
-    if (req.body?.serviceId) {
-      const service = await Service.findById(req.body.serviceId)
+    const payload = sanitizeContactPayload(req.body);
+    const validationErrors = validateContactPayload(payload);
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ error: validationErrors.join('. ') });
+    }
+
+    if (payload.serviceId) {
+      const service = await Service.findById(payload.serviceId)
         .populate({
           path: 'clientId',
           select: 'enabled',
@@ -492,14 +591,26 @@ exports.createContact = async (req, res) => {
         return res.status(400).json({ error: 'Servicio inválido o asociado a cliente deshabilitado' });
       }
     }
-    const contact = new Contact(req.body);
+
+    const contact = new Contact(payload);
     await contact.save();
-    await contact.populate({
-      path: 'serviceId',
-      select: 'name clientId',
-      populate: { path: 'clientId', select: 'name' }
+    await contact.populate(CONTACT_SERVICE_POPULATE);
+
+    await audit(req, {
+      event: 'directory.contact.create',
+      result: { success: true },
+      metadata: {
+        contactId: contact._id,
+        name: contact.name,
+        email: contact.email,
+        organization: contact.organization,
+        contactType: contact.contactType,
+        favorite: contact.favorite,
+        doNotSend: contact.doNotSend
+      }
     });
-    logger.info('Contact created:', { contactId: contact._id, name: contact.name });
+
+    logger.info('Contact created:', { contactId: contact._id, name: contact.name, type: contact.contactType });
     res.status(201).json(contact);
   } catch (error) {
     logger.error('Error in createContact:', error);
@@ -510,8 +621,19 @@ exports.createContact = async (req, res) => {
 exports.updateContact = async (req, res) => {
   try {
     const { id } = req.params;
-    if (req.body?.serviceId) {
-      const service = await Service.findById(req.body.serviceId)
+    const existingContact = await Contact.findById(id);
+    if (!existingContact) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
+    const payload = sanitizeContactPayload(req.body, existingContact.toObject());
+    const validationErrors = validateContactPayload(payload);
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ error: validationErrors.join('. ') });
+    }
+
+    if (payload.serviceId) {
+      const service = await Service.findById(payload.serviceId)
         .populate({
           path: 'clientId',
           select: 'enabled',
@@ -521,21 +643,27 @@ exports.updateContact = async (req, res) => {
         return res.status(400).json({ error: 'Servicio inválido o asociado a cliente deshabilitado' });
       }
     }
-    const contact = await Contact.findByIdAndUpdate(id, req.body, { new: true, runValidators: true })
-      .populate({
-        path: 'serviceId',
-        select: 'name clientId',
-        populate: {
-          path: 'clientId',
-          select: 'name parent enabled',
-          match: ENABLED_LOG_SOURCE_MATCH
-        }
-      });
-    if (!contact) {
-      return res.status(404).json({ error: 'Contact not found' });
-    }
-    logger.info('Contact updated:', { contactId: contact._id, name: contact.name });
-    res.json(contact);
+
+    Object.assign(existingContact, payload);
+    await existingContact.save();
+    await existingContact.populate(CONTACT_SERVICE_POPULATE);
+
+    await audit(req, {
+      event: 'directory.contact.update',
+      result: { success: true },
+      metadata: {
+        contactId: existingContact._id,
+        name: existingContact.name,
+        email: existingContact.email,
+        organization: existingContact.organization,
+        contactType: existingContact.contactType,
+        favorite: existingContact.favorite,
+        doNotSend: existingContact.doNotSend
+      }
+    });
+
+    logger.info('Contact updated:', { contactId: existingContact._id, name: existingContact.name, type: existingContact.contactType });
+    res.json(existingContact);
   } catch (error) {
     logger.error('Error in updateContact:', error);
     res.status(400).json({ error: error.message });
@@ -549,10 +677,137 @@ exports.deleteContact = async (req, res) => {
     if (!contact) {
       return res.status(404).json({ error: 'Contact not found' });
     }
-    logger.info('Contact deleted:', { contactId: contact._id, name: contact.name });
+
+    await audit(req, {
+      event: 'directory.contact.delete',
+      result: { success: true },
+      metadata: {
+        contactId: contact._id,
+        name: contact.name,
+        email: contact.email,
+        contactType: contact.contactType
+      }
+    });
+
+    logger.info('Contact deleted:', { contactId: contact._id, name: contact.name, type: contact.contactType });
     res.json({ message: 'Contact deleted successfully' });
   } catch (error) {
     logger.error('Error in deleteContact:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.importContactsCsv = async (req, res) => {
+  try {
+    const defaultType = normalizeContactType(req.body?.contactType || req.query?.contactType || 'preventive');
+    const csvText = req.file?.buffer
+      ? req.file.buffer.toString('utf8')
+      : String(req.body?.csvText || '');
+
+    if (!csvText.trim()) {
+      return res.status(400).json({ error: 'Adjunta un archivo CSV o contenido csvText válido' });
+    }
+
+    const parsed = parseContactsCsv(csvText, { defaultType });
+    if (parsed.validRows.length === 0) {
+      return res.status(400).json({
+        error: 'No se encontraron filas válidas para importar',
+        errors: parsed.errors.slice(0, 200)
+      });
+    }
+
+    const importErrors = [...parsed.errors];
+    let created = 0;
+    let updated = 0;
+    const maxRows = 1000;
+    const rowsToProcess = parsed.validRows.slice(0, maxRows);
+
+    if (parsed.validRows.length > maxRows) {
+      importErrors.push({ row: maxRows + 1, message: `Se omitieron ${parsed.validRows.length - maxRows} filas por límite operativo de ${maxRows}` });
+    }
+
+    for (const row of rowsToProcess) {
+      if (row.serviceId) {
+        const service = await Service.findById(row.serviceId)
+          .populate({
+            path: 'clientId',
+            select: 'enabled',
+            match: ENABLED_LOG_SOURCE_MATCH
+          });
+        if (!service || !service.clientId) {
+          importErrors.push({ row: row.name, message: 'Servicio inválido o asociado a cliente deshabilitado' });
+          continue;
+        }
+      }
+
+      const existing = await Contact.findOne({
+        email: row.email,
+        contactType: row.contactType
+      });
+
+      if (existing) {
+        Object.assign(existing, row);
+        await existing.save();
+        updated += 1;
+      } else {
+        await Contact.create(row);
+        created += 1;
+      }
+    }
+
+    await audit(req, {
+      event: 'directory.contact.import_csv',
+      result: { success: true },
+      metadata: {
+        contactType: defaultType,
+        created,
+        updated,
+        errorCount: importErrors.length
+      }
+    });
+
+    res.json({
+      message: `Importación completada: ${created} nuevos, ${updated} actualizados, ${importErrors.length} observaciones`,
+      created,
+      updated,
+      errorCount: importErrors.length,
+      errors: importErrors.slice(0, 200)
+    });
+  } catch (error) {
+    logger.error('Error in importContactsCsv:', error);
+    res.status(400).json({ error: error.message });
+  }
+};
+
+exports.exportContactsCsv = async (req, res) => {
+  try {
+    const requestedType = String(req.query.contactType || req.query.type || 'preventive').trim().toLowerCase();
+    const filter = {};
+    if (requestedType !== 'all') {
+      filter.contactType = normalizeContactType(requestedType);
+    }
+
+    const contacts = await Contact.find(filter)
+      .sort({ organization: 1, name: 1 })
+      .lean();
+
+    const csv = formatContactsCsv(contacts);
+    const fileLabel = filter.contactType || 'all';
+
+    await audit(req, {
+      event: 'directory.contact.export_csv',
+      result: { success: true },
+      metadata: {
+        contactType: fileLabel,
+        count: contacts.length
+      }
+    });
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="contactos-${fileLabel}-${new Date().toISOString().slice(0, 10)}.csv"`);
+    return res.status(200).send(`\ufeff${csv}`);
+  } catch (error) {
+    logger.error('Error in exportContactsCsv:', error);
     res.status(500).json({ error: error.message });
   }
 };

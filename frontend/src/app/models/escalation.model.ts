@@ -106,6 +106,8 @@ export interface Service {
   clientName?: string; // Populated field
 }
 
+export type ContactType = 'escalation' | 'preventive';
+
 export interface Contact {
   _id: string;
   name: string;
@@ -113,9 +115,24 @@ export interface Contact {
   phone?: string;
   organization?: string;
   role?: string;
+  serviceId?: string | Service | null;
+  contactType?: ContactType;
+  favorite?: boolean;
+  doNotSend?: boolean;
+  notes?: string;
   active: boolean;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface NewsletterRecipientValidation {
+  validRecipients: string[];
+  invalidRecipients: string[];
+  duplicateRecipients: string[];
+  validCount: number;
+  invalidCount: number;
+  duplicateCount: number;
+  totalSubmitted: number;
 }
 
 export interface ExternalPerson {
@@ -310,6 +327,11 @@ export interface ContactFormData {
   phone?: string;
   organization?: string;
   role?: string;
+  serviceId?: string | null;
+  contactType?: ContactType;
+  favorite?: boolean;
+  doNotSend?: boolean;
+  notes?: string;
   active: boolean;
 }
 

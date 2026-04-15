@@ -1,6 +1,12 @@
 const express = require('express');
+const multer = require('multer');
 const router = express.Router();
 const { authenticate } = require('../middleware/auth');
+
+const csvUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024 }
+});
 const escalationController = require('../controllers/escalationController');
 const clientAlertController = require('../controllers/clientAlertController');
 
@@ -108,6 +114,8 @@ router.delete('/admin/services/:id', authenticate, requireAdmin, escalationContr
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 router.get('/admin/contacts', authenticate, requireAdmin, escalationController.getAllContacts);
+router.get('/admin/contacts/export-csv', authenticate, requireAdmin, escalationController.exportContactsCsv);
+router.post('/admin/contacts/import-csv', authenticate, requireAdmin, csvUpload.single('file'), escalationController.importContactsCsv);
 router.post('/admin/contacts', authenticate, requireAdmin, escalationController.createContact);
 router.put('/admin/contacts/:id', authenticate, requireAdmin, escalationController.updateContact);
 router.delete('/admin/contacts/:id', authenticate, requireAdmin, escalationController.deleteContact);
