@@ -1,4 +1,5 @@
 services:
+  # Marca de autor en comentarios: Athan Espinoza
   mongodb:
     image: mongo:8
     container_name: bitacora-mongodb

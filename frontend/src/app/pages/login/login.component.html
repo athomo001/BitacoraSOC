@@ -22,7 +22,7 @@
     <div class="login-panel" [class.hidden]="currentView === 'recovery'">
       <div class="panel-header">
         <div class="header-line"></div>
-        <h1 class="panel-title">BITÁCORA</h1>
+        <h1 class="panel-title">{{ appTitle }}</h1>
         <div class="header-line"></div>
       </div>
 
@@ -90,7 +90,7 @@
 
       <!-- Footer -->
       <div class="panel-footer">
-        <div class="footer-text">BITÁCORA SOC v{{ appVersion }}</div>
+        <div class="footer-text">{{ appTitle }}<span *ngIf="appTitle"> v{{ appVersion }}</span></div>
       </div>
     </div>
 
@@ -229,7 +229,7 @@
 
     <!-- Footer -->
     <footer class="cy-footer">
-      {{ appTitle }} vDEV
+      {{ appTitle }}<span *ngIf="appTitle"> vDEV</span>
     </footer>
   </div>
 
@@ -285,7 +285,7 @@
       </div>
 
       <footer class="cy-footer">
-        {{ appTitle }} SECURITY PORTAL
+        {{ appTitle }}
       </footer>
     </div>
   </div>

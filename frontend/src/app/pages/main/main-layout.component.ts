@@ -28,6 +28,7 @@ import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { MatIconButton } from '@angular/material/button';
 import { MatMenuTrigger, MatMenu, MatMenuItem } from '@angular/material/menu';
 import { MatTooltip } from '@angular/material/tooltip';
+import { Title } from '@angular/platform-browser';
 
 type MenuItem = {
   icon: string;
@@ -122,7 +123,8 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     private complementService: ComplementService,
     private complementBridgeService: ComplementBridgeService,
     private workShiftService: WorkShiftService,
-    private systemHealthService: SystemHealthService
+    private systemHealthService: SystemHealthService,
+    private titleService: Title
   ) { }
 
   getAssetUrl(url: string): string {
@@ -315,9 +317,11 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (config: any) => {
           this.appTitle = (config?.appTitle || '').trim();
+          this.titleService.setTitle(this.appTitle);
         },
         error: () => {
           this.appTitle = '';
+          this.titleService.setTitle('');
         }
       });
   }

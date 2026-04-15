@@ -1,5 +1,6 @@
 /**
  * 🛡️ BITÁCORA SOC - Backend Express
+ * Marca de autor en comentarios: Athan Espinoza
  * 
  * Arquitectura:
  *   - Express 5.1 + MongoDB + Mongoose
@@ -36,6 +37,7 @@ const requestIdMiddleware = require('./middleware/request-id');
 const captureMetadata = require('./middleware/metadata');
 const inputSanitizer = require('./middleware/input-sanitizer');
 const { logger } = require('./utils/logger');
+const { getBrandingSnapshot, getAppTitleForText } = require('./utils/branding');
 const { startChecklistAlertScheduler } = require('./utils/checklistAlertScheduler');
 const { startBackupScheduler, stopBackupScheduler } = require('./utils/backup-scheduler');
 const { startAuditRetentionScheduler, stopAuditRetentionScheduler } = require('./utils/audit-retention-scheduler');
@@ -472,9 +474,10 @@ if (fs.existsSync(clientDistPath) && fs.existsSync(clientIndexPath)) {
     res.sendFile(clientIndexPath);
   });
 } else {
-  app.get('/', (_req, res) => {
+  app.get('/', async (_req, res) => {
+    const { appTitle } = await getBrandingSnapshot();
     res.status(200).json({
-      message: 'Backend Bitácora SOC activo',
+      message: `Backend ${getAppTitleForText(appTitle, 'activo').trim() === 'activo' ? 'activo' : `${appTitle} activo`}`,
       health: '/health',
       apiDocs: '/api-docs'
     });
@@ -714,13 +717,15 @@ const startServers = async () => {
   await connectDB();
   await ensureInitialAdminUser();
   await loadRuntimeSecurityConfigFromDb();
+  const { appTitle } = await getBrandingSnapshot();
+  const backendBannerTitle = appTitle ? `${appTitle} - BACKEND` : 'BACKEND';
 
   httpServer = http.createServer(app);
   attachServerErrorHandler(httpServer, 'http', PORT);
   httpServer.listen(PORT, HOST, () => {
     console.log(`
 ╔════════════════════════════════════════╗
-║     🛡️  BITÁCORA SOC - BACKEND       ║
+║     🛡️  ${backendBannerTitle.padEnd(29)}║
 ╠════════════════════════════════════════╣
 ║  Host:     ${HOST.padEnd(26)} ║
 ║  Port:     ${PORT.toString().padEnd(26)} ║

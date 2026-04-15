@@ -16,6 +16,7 @@ const { authenticate, authorize, notGuest } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const captureMetadata = require('../middleware/metadata');
 const { audit } = require('../utils/audit');
+const { getBrandingSnapshot, formatBrandedSubject } = require('../utils/branding');
 const { logger } = require('../utils/logger');
 const { sendEmail } = require('../utils/email');
 const { sendShiftReport } = require('../utils/shift-report');
@@ -698,7 +699,8 @@ router.post('/check',
             const nokServices = normalizedServices.filter((service) => service.status === 'rojo');
             const currentShift = await getCurrentShift(check.createdAt || new Date());
             const shiftName = currentShift?.name || 'Sin turno';
-            const subject = `[Bitacora SOC] Alerta NOK checklist ${shiftName} (${check.type})`;
+            const { appTitle } = await getBrandingSnapshot();
+            const subject = formatBrandedSubject(appTitle, `Alerta NOK checklist ${shiftName} (${check.type})`);
             const html = buildNokChecklistEmailHtml({
               check,
               nokServices,

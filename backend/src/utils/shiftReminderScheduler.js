@@ -12,7 +12,7 @@ const AvisoLog = require('../models/AvisoLog');
 const WorkShift = require('../models/WorkShift');
 const WorkShiftAssignment = require('../models/WorkShiftAssignment');
 const User = require('../models/User');
-const AppConfig = require('../models/AppConfig');
+const { getBrandingSnapshot, formatBrandedSubject, getAppTitleForText } = require('./branding');
 const { sendEmail } = require('./email');
 const { logger } = require('./logger');
 
@@ -47,9 +47,38 @@ function hoursBlockKey(reminderId, timezone, now, intervalHours) {
 
 // ─── Email HTML ───────────────────────────────────────────────────────────
 
+function escapeHtml(value = '') {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatReminderTextForEmail(reminderText = '') {
+  const normalized = String(reminderText || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = normalized.split('\n');
+
+  return lines.map((line) => {
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      return '<div style="height:12px;line-height:12px;">&nbsp;</div>';
+    }
+
+    const bulletMatch = trimmed.match(/^(\*|-|•)\s+(.*)$/);
+    if (bulletMatch) {
+      return `<div style="margin:0 0 6px 0;color:#111111;font-size:15px;line-height:1.6;">&bull; ${escapeHtml(bulletMatch[2])}</div>`;
+    }
+
+    return `<div style="margin:0 0 10px 0;color:#111111;font-size:15px;line-height:1.6;">${escapeHtml(line).replace(/  /g, ' &nbsp;')}</div>`;
+  }).join('');
+}
+
 function buildReminderHtml({ appTitle, reminderText }) {
-  const safeTitle = (appTitle || 'Bitácora SOC').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const safeText = (reminderText || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+  const safeTitle = escapeHtml(getAppTitleForText(appTitle));
+  const formattedBody = formatReminderTextForEmail(reminderText);
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -64,8 +93,8 @@ function buildReminderHtml({ appTitle, reminderText }) {
     </tr>
     <tr>
       <td style="padding:32px 24px;">
-        <p style="margin:0;font-size:22px;font-weight:bold;color:#111111;line-height:1.4;">${safeText}</p>
-        <p style="margin:24px 0 0 0;font-size:12px;color:#888888;">
+        <div style="margin:0;color:#111111;">${formattedBody}</div>
+        <p style="margin:24px 0 0 0;font-size:12px;color:#888888;line-height:1.5;">
           Este es un recordatorio automático generado por ${safeTitle}. No responder a este correo.
         </p>
       </td>
@@ -82,7 +111,7 @@ async function runShiftReminder() {
     const reminders = await ShiftReminder.find({ enabled: true }).lean();
     if (!reminders.length) return;
 
-    const config = await AppConfig.findOne().lean();
+    const config = await getBrandingSnapshot();
     const now = new Date();
 
     for (const reminder of reminders) {
@@ -188,13 +217,14 @@ async function runShiftReminder() {
 
         const recipients = [...recipientSet.keys()];
         const html = buildReminderHtml({
-          appTitle: config?.appTitle || 'Bitácora SOC',
+          appTitle: config?.appTitle,
           reminderText: reminder.reminderText
         });
 
         await sendEmail({
           to: recipients,
-          subject: `[${config?.appTitle || 'Bitácora SOC'}] ${reminder.label}`,
+          subject: formatBrandedSubject(config?.appTitle, reminder.label),
+          text: reminder.reminderText,
           html,
           auditContext: {
             sourceModule: 'shiftReminderScheduler',
@@ -235,4 +265,4 @@ function startShiftReminderScheduler() {
   logger.info('✅ Shift reminder scheduler started (polling cada 5 min)');
 }
 
-module.exports = { startShiftReminderScheduler };
+module.exports = { startShiftReminderScheduler, buildReminderHtml, formatReminderTextForEmail };

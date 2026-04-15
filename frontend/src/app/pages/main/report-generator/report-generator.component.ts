@@ -95,6 +95,7 @@ export class ReportGeneratorComponent implements OnInit {
 
   // ─── Branding ────────────────────────────────────────────────────────────
   logoBase64: string | null = null;
+  appTitle = '';
 
   // ─── Newsletter email dispatch ────────────────────────────────────────────
   newsletterRecipients = '';
@@ -821,7 +822,7 @@ export class ReportGeneratorComponent implements OnInit {
     const paragraph = `color: #111111 !important; font-size: 14px; line-height: 1.6;`;
 
     const currentUser = this.authService.getCurrentUser();
-    const autor = e(currentUser?.fullName?.trim() || currentUser?.username || 'Bitácora SOC');
+    const autor = e(currentUser?.fullName?.trim() || currentUser?.username || this.appTitle || '');
 
     let html = `<table cellpadding="0" cellspacing="0" width="${width}" style="border-collapse: collapse; width: ${width}px; max-width: 100%; font-family: Arial, sans-serif; border: 1px solid #ddd; background-color: #fcfcfc; margin: 0; mso-table-lspace: 0pt; mso-table-rspace: 0pt;">
   <tr>
@@ -975,9 +976,13 @@ export class ReportGeneratorComponent implements OnInit {
     this.configService.getConfig().subscribe({
       next: (config) => {
         const color = this.normalizeHexColor(config.emailReportConfig?.reportTableColor);
+        this.appTitle = (config.appTitle || '').trim();
         this.reportTableHeaderColor = color || '#4CAF50';
       },
-      error: () => { this.reportTableHeaderColor = '#4CAF50'; }
+      error: () => {
+        this.appTitle = '';
+        this.reportTableHeaderColor = '#4CAF50';
+      }
     });
   }
 

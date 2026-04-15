@@ -1,4 +1,5 @@
 $ErrorActionPreference = 'Stop'
+# Marca de autor en comentarios: Athan Espinoza
 $version = & "$PSScriptRoot\get-version.ps1"
 $env:APP_VERSION = $version
 Write-Host "APP_VERSION=$version"

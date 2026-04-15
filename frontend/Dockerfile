@@ -1,4 +1,5 @@
 # Stage 1: Build Angular app
+# Marca de autor en comentarios: Athan Espinoza
 ARG NODE_IMAGE=node:24-alpine
 FROM ${NODE_IMAGE} AS builder
 

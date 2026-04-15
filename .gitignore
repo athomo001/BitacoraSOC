@@ -73,3 +73,6 @@ BITACORA_SOC_FULL_DOCUMENTATION.md
 # Complementos
 tools/
 skills/*
+
+# Watermarks locales de autor (no subir)
+docs/AUTHOR_WATERMARKS.local.md

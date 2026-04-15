@@ -22,7 +22,7 @@ const shiftReminderSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      maxlength: 500
+      maxlength: 5000
     },
     /** Modo de frecuencia: cada N horas o a horas fijas */
     frequencyType: {

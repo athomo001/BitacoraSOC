@@ -3,7 +3,7 @@ const mjml2html = require('mjml');
 const WorkShift = require('../models/WorkShift');
 const Entry = require('../models/Entry');
 const ShiftCheck = require('../models/ShiftCheck');
-const AppConfig = require('../models/AppConfig');
+const { getBrandingSnapshot, getAppTitleForText } = require('./branding');
 const { logger } = require('./logger');
 const { auditSystem } = require('./audit');
 const { dispatchGlpiPayload } = require('./glpi-dispatch');
@@ -300,8 +300,8 @@ const renderSummaryCard = (label, value, styles) => {
 /**
  * Genera HTML del reporte de turno
  */
-async function generateReportHTML({ shift, checklistEntry, checklistExit, entries, periodStart, periodEnd, appTitle = 'Bitácora SOC', faviconUrl = '' }) {
-  const brandedAppTitle = String(appTitle || '').trim() || 'Bitácora SOC';
+async function generateReportHTML({ shift, checklistEntry, checklistExit, entries, periodStart, periodEnd, appTitle = '', faviconUrl = '' }) {
+  const brandedAppTitle = String(appTitle || '').trim();
   const brandedAppTitleHtml = escapeHtml(brandedAppTitle);
   const favicon = String(faviconUrl || '').trim();
   const hasFavicon = favicon.length > 0;
@@ -505,7 +505,7 @@ async function generateReportHTML({ shift, checklistEntry, checklistExit, entrie
         <mj-table padding="0">
           <tr>
             ${hasFavicon ? `<td style="width:44px;vertical-align:middle;padding-right:8px;"><img src="${escapeHtml(favicon)}" width="36" height="36" style="display:block;width:36px;height:36px;border:0;outline:none;text-decoration:none;" alt="Logo"></td>` : ''}
-            <td style="vertical-align:middle;"><div style="font-size:24px;font-weight:700;line-height:1.2;color:#1f2d3a;">Reporte de Turno - ${brandedAppTitleHtml}</div></td>
+            <td style="vertical-align:middle;"><div style="font-size:24px;font-weight:700;line-height:1.2;color:#1f2d3a;">Reporte de Turno${brandedAppTitle ? ` - ${brandedAppTitleHtml}` : ''}</div></td>
           </tr>
         </mj-table>
         <mj-text font-size="13px" color="#355066" padding="8px 0 0 0">${escapeHtml(shift.name)} • ${escapeHtml(shift.startTime)}-${escapeHtml(shift.endTime)} • ${escapeHtml(dateLabel)}</mj-text>
@@ -519,7 +519,7 @@ async function generateReportHTML({ shift, checklistEntry, checklistExit, entrie
     <mj-section padding="8px 24px 20px 24px">
       <mj-column background-color="#ffffff" border="1px solid #dde3e8" border-top="0" border-radius="0 0 10px 10px" padding="0 18px 10px 18px">
         <mj-divider border-width="1px" border-color="#e1e7eb" padding="0 0 10px 0" />
-        <mj-text font-size="12px" color="#78909c" align="center" padding="0">Este correo fue generado automáticamente por ${brandedAppTitleHtml}</mj-text>
+        <mj-text font-size="12px" color="#78909c" align="center" padding="0">Este correo fue generado automáticamente por ${escapeHtml(getAppTitleForText(brandedAppTitle))}</mj-text>
         <mj-text font-size="12px" color="#90a4ae" align="center" padding="4px 0 0 0">No responder a este mensaje</mj-text>
       </mj-column>
     </mj-section>
@@ -541,15 +541,15 @@ async function generateReportHTML({ shift, checklistEntry, checklistExit, entrie
   return compilation.html;
 }
 
-function generateReportText({ shift, checklistEntry, checklistExit, entries, periodStart, periodEnd, appTitle = 'Bitácora SOC' }) {
-  const brandedAppTitle = String(appTitle || '').trim() || 'Bitácora SOC';
+function generateReportText({ shift, checklistEntry, checklistExit, entries, periodStart, periodEnd, appTitle = '' }) {
+  const brandedAppTitle = String(appTitle || '').trim();
   const lines = [];
   const dateLabel = formatDate(periodEnd || new Date());
   const periodLabel = periodStart && periodEnd
     ? `${formatDate(periodStart)} ${formatTime(periodStart)} - ${formatDate(periodEnd)} ${formatTime(periodEnd)}`
     : '';
 
-  lines.push(`Reporte de Turno - ${brandedAppTitle}`);
+  lines.push(`Reporte de Turno${brandedAppTitle ? ` - ${brandedAppTitle}` : ''}`);
   lines.push(`${shift.name} (${shift.startTime} - ${shift.endTime}) • ${dateLabel}`);
   if (periodLabel) lines.push(`Periodo: ${periodLabel}`);
   lines.push('');
@@ -592,7 +592,7 @@ function generateReportText({ shift, checklistEntry, checklistExit, entries, per
     }
   }
 
-  lines.push(`Este correo fue generado automaticamente por ${brandedAppTitle}`);
+  lines.push(`Este correo fue generado automaticamente por ${getAppTitleForText(brandedAppTitle)}`);
   lines.push('No responder a este mensaje');
 
   return lines.join('\n');
@@ -666,9 +666,9 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
       recipients: emailRecipients
     });
 
-    const appConfig = await AppConfig.findOne().select('appTitle faviconUrl').lean();
-    const appTitle = String(appConfig?.appTitle || '').trim() || 'Bitácora SOC';
-    const faviconUrl = String(appConfig?.faviconUrl || '').trim();
+    const appConfig = await getBrandingSnapshot();
+    const appTitle = appConfig.appTitle;
+    const faviconUrl = appConfig.faviconUrl;
 
     const {
       shiftStart,
@@ -959,9 +959,9 @@ async function sendShiftReportPoc(shiftId, options = {}) {
       return { success: false, isPoc: true, message: 'No recipients configured' };
     }
 
-    const appConfig = await AppConfig.findOne().select('appTitle faviconUrl').lean();
-    const appTitle = String(appConfig?.appTitle || '').trim() || 'Bitácora SOC';
-    const faviconUrl = String(appConfig?.faviconUrl || '').trim();
+    const appConfig = await getBrandingSnapshot();
+    const appTitle = appConfig.appTitle;
+    const faviconUrl = appConfig.faviconUrl;
 
     const dateLabel = referenceDate.toLocaleDateString('es-CL', {
       year: 'numeric',
