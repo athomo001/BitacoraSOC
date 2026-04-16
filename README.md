@@ -5,11 +5,13 @@
 Plataforma web para operacion SOC con bitacora operativa, checklists de turno, escalacion, auditoria, backup, integraciones y modulo de complementos embebidos.
 
 > Estado del proyecto: beta. Validar siempre los flujos criticos en un entorno controlado antes de pasar a operacion formal.
+>
+> Version referencial actual: 1.5.47-beta
 
 Stack principal:
 
 - frontend: Angular 20
-- backend: Express 5 + Node 24
+- backend: Express 5 + Node 22 LTS
 - base de datos: MongoDB 8
 - despliegue: Docker Compose v2
 
@@ -28,6 +30,13 @@ Stack principal:
 ---
 
 ## Novedades recientes (resumen rapido)
+
+### v1.5.47-beta
+
+- correcciones visuales en temas Dark y Cyberpunk para checklist history, sidebar y acordeones laterales.
+- tipografia cyberpunk ajustada para uso operativo real: menos ruido visual y mejor lectura.
+- pantalla de backups depurada con textos mas cortos y encabezado mas limpio.
+- stack Docker estabilizado con imagen base Node 22 Alpine para frontend y backend.
 
 ### UX y operacion diaria
 

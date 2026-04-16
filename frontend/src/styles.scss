@@ -602,6 +602,10 @@ mat-sidenav {
   --mat-sys-on-surface: var(--text-primary);
   --mat-sys-on-surface-variant: var(--text-secondary);
   --mat-sys-outline: var(--border-color);
+  --mat-expansion-container-background-color: var(--surface-color);
+  --mat-expansion-container-text-color: var(--text-primary);
+  --mat-expansion-header-text-color: var(--text-primary);
+  --mat-expansion-header-description-color: var(--text-secondary);
   --mdc-outlined-text-field-input-text-color: var(--text-primary);
   --mdc-outlined-text-field-label-text-color: var(--text-secondary);
   --mdc-outlined-text-field-outline-color: var(--border-color);
@@ -763,6 +767,10 @@ mat-sidenav {
   --mat-sys-on-surface: var(--text-primary);
   --mat-sys-on-surface-variant: var(--text-secondary);
   --mat-sys-outline: var(--border-color);
+  --mat-expansion-container-background-color: var(--surface-color);
+  --mat-expansion-container-text-color: var(--text-primary);
+  --mat-expansion-header-text-color: var(--text-primary);
+  --mat-expansion-header-description-color: var(--text-secondary);
   --mdc-outlined-text-field-input-text-color: var(--text-primary);
   --mdc-outlined-text-field-label-text-color: var(--text-secondary);
   --mdc-outlined-text-field-outline-color: var(--border-color);
@@ -1181,11 +1189,31 @@ mat-button-toggle-group.mode-selector .mat-button-toggle-label-content {
   overflow: hidden;
 }
 
+.left-sidebar mat-accordion.menu-accordion .mat-expansion-panel-header .mat-content {
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
 .left-sidebar mat-accordion.menu-accordion .mat-expansion-panel-header-title {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
   font-weight: 600;
+  overflow: hidden;
+}
+
+.left-sidebar mat-accordion.menu-accordion .mat-expansion-panel-header-title mat-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .left-sidebar mat-accordion.menu-accordion.complement-accordion .mat-expansion-panel {
@@ -1575,6 +1603,9 @@ p, span, label {
 [data-theme="cyberpunk"] body,
 [data-theme="cyberpunk"] .mat-sidenav-content {
   font-family: 'Orbitron', 'Audiowide', 'Segoe UI', sans-serif;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  letter-spacing: 0.008em;
   background-image:
     linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
@@ -1592,11 +1623,39 @@ p, span, label {
 [data-theme="cyberpunk"] .right-sidebar mat-toolbar span,
 [data-theme="cyberpunk"] .mat-expansion-panel-header-title {
   font-family: 'Orbitron', 'Audiowide', 'Segoe UI', sans-serif;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.025em;
   text-transform: uppercase;
+  line-height: 1.18;
   text-shadow:
     0 0 4px rgba(255, 0, 140, 0.8),
     0 0 10px rgba(0, 224, 255, 0.55);
+}
+
+[data-theme="cyberpunk"] h1 {
+  font-size: clamp(1.7rem, 2.6vw, 2.45rem);
+}
+
+[data-theme="cyberpunk"] h2 {
+  font-size: clamp(1.2rem, 1.9vw, 1.65rem);
+}
+
+[data-theme="cyberpunk"] .toolbar-title {
+  font-size: clamp(1.15rem, 2.1vw, 1.85rem);
+  letter-spacing: 0.025em;
+}
+
+[data-theme="dark"] .mat-expansion-panel-header,
+[data-theme="cyberpunk"] .mat-expansion-panel-header {
+  height: auto !important;
+  min-height: 72px;
+}
+
+[data-theme="dark"] .mat-expansion-panel-header-title,
+[data-theme="dark"] .mat-expansion-panel-header-description,
+[data-theme="cyberpunk"] .mat-expansion-panel-header-title,
+[data-theme="cyberpunk"] .mat-expansion-panel-header-description {
+  white-space: normal;
+  overflow: visible;
 }
 
 [data-theme="cyberpunk"] .left-sidebar mat-toolbar span {
@@ -1619,8 +1678,39 @@ p, span, label {
 [data-theme="cyberpunk"] .mat-mdc-list-item-title,
 [data-theme="cyberpunk"] .mat-mdc-chip {
   font-family: 'Orbitron', 'Audiowide', 'Segoe UI', sans-serif;
-  letter-spacing: 0.04em;
+  font-size: 0.88rem;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
+  line-height: 1.2;
+}
+
+[data-theme="cyberpunk"] .left-sidebar .mdc-list-item__primary-text,
+[data-theme="cyberpunk"] .mat-mdc-menu-panel .mdc-list-item__primary-text {
+  font-size: 0.84rem !important;
+  letter-spacing: 0.018em !important;
+  line-height: 1.2 !important;
+  white-space: normal !important;
+  word-break: break-word;
+}
+
+[data-theme="cyberpunk"] .left-sidebar .mat-expansion-panel-header-title,
+[data-theme="cyberpunk"] .left-sidebar .mat-expansion-panel-header-description,
+[data-theme="cyberpunk"] .left-sidebar .mat-expansion-panel-header-title mat-panel-title {
+  font-size: 0.8rem !important;
+  letter-spacing: 0.012em !important;
+  line-height: 1.1 !important;
+  white-space: nowrap !important;
+  word-break: normal !important;
+}
+
+[data-theme="cyberpunk"] .left-sidebar .mat-expansion-panel-header-title {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+[data-theme="cyberpunk"] .left-sidebar .mat-expansion-panel-header-description {
+  flex: 0 0 auto;
+  overflow: visible !important;
 }
 
 [data-theme="cyberpunk"] .mat-mdc-card,

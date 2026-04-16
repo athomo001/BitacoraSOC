@@ -2,6 +2,19 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.47-beta] - 2026-04-16
+
+### Correcciones visuales Cyberpunk/Dark + estabilización Docker
+
+- **Historial de checklists legible y responsivo:** se corrigieron desbordes, headers cortados y bloques montados en la vista de historial para temas **Dark** y **Cyberpunk**, mejorando wrap, alturas mínimas y espaciado en móvil.
+- **Cyberpunk más usable en operación diaria:** se redujo la tipografía global, el espaciado excesivo y la agresividad visual del tema para menús, títulos, toolbar y paneles, manteniendo la identidad neon pero con mejor lectura.
+- **Sidebar lateral reparado:** los acordeones y botones de navegación como **Historial y Entradas** y **Complementos** ya no quiebran palabras letra por letra ni muestran headers deformados; ahora usan truncado limpio y proporciones consistentes.
+- **Pantalla de Backups depurada:** el encabezado visible se simplificó a **Configuración de Backups Automáticos** y se acortaron etiquetas largas de destino como **SMB/Samba** y **NFS** para evitar cortes visuales innecesarios.
+- **Base Docker más estable:** frontend y backend pasan a usar **Node 22 Alpine** por defecto en sus builds, reduciendo fragilidad frente a cambios de imagen y mejorando compatibilidad operativa.
+- **Verificación fresca:** `frontend npm run build` OK; `docker compose build frontend backend` OK; `docker compose ps` con **backend**, **frontend** y **mongodb** en estado saludable.
+
+---
+
 ## [v1.5.46-beta] - 2026-04-15
 
 ### Agenda preventiva + boletines guardados (`UI-NEWS-072`, `UI-ESC-073`, `UI-DIR-074`..`077`, `MAIL-NEWS-078`)

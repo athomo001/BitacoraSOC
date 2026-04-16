@@ -1,6 +1,6 @@
 # Multi-stage build para optimizar tamaño
 # Marca de autor en comentarios: Athan Espinoza
-ARG NODE_IMAGE=node:24-alpine
+ARG NODE_IMAGE=node:22-alpine
 FROM ${NODE_IMAGE} AS base
 
 WORKDIR /app
