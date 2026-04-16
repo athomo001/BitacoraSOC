@@ -37,7 +37,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       args:
-        NODE_IMAGE: ${NODE_IMAGE:-node:24-alpine}
+        NODE_IMAGE: ${NODE_IMAGE:-node:22-alpine}
         APP_VERSION: ${APP_VERSION:-dev}
     container_name: bitacora-backend
     restart: unless-stopped
@@ -102,7 +102,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NODE_IMAGE: ${NODE_IMAGE:-node:24-alpine}
+        NODE_IMAGE: ${NODE_IMAGE:-node:22-alpine}
         APP_VERSION: ${APP_VERSION:-dev}
     container_name: bitacora-frontend
     restart: unless-stopped

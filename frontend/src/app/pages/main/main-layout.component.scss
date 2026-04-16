@@ -13,6 +13,8 @@
 
   .mat-mdc-list-item {
     width: 100%;
+    min-height: 48px;
+    height: auto;
     color: var(--sidebar-text);
 
     .mdc-list-item__primary-text,
@@ -30,11 +32,14 @@
   .mdc-list-item__primary-text {
     display: block;
     max-width: none !important;
-    white-space: nowrap;
+    white-space: normal;
     overflow: visible !important;
     text-overflow: clip !important;
+    overflow-wrap: anywhere;
+    line-height: 1.2;
     color: var(--sidebar-text);
     font-weight: 600;
+    font-size: 0.92rem;
   }
 
   mat-toolbar {
