@@ -29,6 +29,22 @@ Stack principal:
 
 ---
 
+## Vista rapida de la interfaz
+
+Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCREENSHOTS.md`.
+
+### Pantallas principales
+
+![Pantalla principal](docs/images/screenshots/01-main-nueva-entrada.png)
+
+![Generador de reportes](docs/images/screenshots/04-generador-reportes.png)
+
+![Configuracion administrativa](docs/images/screenshots/05-menu-configuracion.png)
+
+![Modulo de backup](docs/images/screenshots/06-menu-admin-backup.png)
+
+---
+
 ## Novedades recientes (resumen rapido)
 
 ### v1.5.47-beta
@@ -174,6 +190,7 @@ Documentos principales:
 - `docs/RUNBOOK.md`: operacion diaria del SOC
 - `docs/BACKUP.md`: backup, restore e implicancias para complementos
 - `docs/TROUBLESHOOTING.md`: diagnostico de fallas comunes
+- `docs/SCREENSHOTS.md`: galeria visual de la interfaz y modulos principales
 - `docs/CHANGELOG.md`: cambios relevantes por version
 
 Documentos funcionales complementarios:
