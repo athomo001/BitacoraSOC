@@ -3,6 +3,8 @@
 Documentacion visual del funcionamiento general del sistema.
 
 > Estado: Arquitectura en evolución (beta). Los módulos clave ya están operativos y separados por dominio funcional.
+>
+> Referencia visual de pantallas: ver `docs/SCREENSHOTS.md` para capturas reales de la interfaz.
 
 ---
 
