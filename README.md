@@ -206,3 +206,4 @@ Documentos funcionales complementarios:
 ## Licencia
 
 El proyecto se distribuye bajo Business Source License 1.1. Revisar `LICENSE.md` para el detalle formal.
+El archivo incluye el texto base en ingles y una seccion informativa en espanol para facilitar su lectura.
