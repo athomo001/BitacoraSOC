@@ -433,6 +433,25 @@
           </mat-form-field>
         </div>
 
+        <!-- Fila 7: Evidencias (imágenes opcionales) -->
+        <div class="upload-section">
+          <h4>Evidencias (Opcional)</h4>
+          <p class="upload-hint">Sube imágenes de prueba. Solo aparecen en el boletín si las cargas.</p>
+          <input type="file" accept="image/*" multiple (change)="onNewsletterImageUpload($event)" #newsletterFileInput class="hidden-file-input">
+          <button mat-raised-button color="accent" type="button" (click)="newsletterFileInput.click()">
+            <mat-icon>upload</mat-icon>
+            Subir imágenes de evidencia
+          </button>
+          <div class="image-preview" *ngIf="newsletterUploadedImages.length > 0">
+            <div *ngFor="let img of newsletterUploadedImages; let i = index" class="preview-item">
+              <img [src]="img.dataUrl" [alt]="img.name">
+              <button mat-icon-button color="warn" (click)="removeNewsletterImage(i)" type="button">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- Botones de acción -->
         <div class="actions">
           <button mat-raised-button color="primary" type="button" (click)="generateTable()">
@@ -451,9 +470,16 @@
         <div class="preview-header">
           <h3>Vista previa</h3>
           <div class="preview-actions">
-            <button mat-raised-button color="accent" (click)="copyToClipboard()">
+            <button *ngIf="currentMode === 'report'" mat-raised-button color="accent" (click)="copyToClipboard()">
               <mat-icon>content_copy</mat-icon>
-              {{ currentMode === 'report' ? 'Copiar reporte' : 'Copiar boletín' }}
+              Copiar reporte
+            </button>
+            <button *ngIf="currentMode === 'newsletter'" 
+                    mat-stroked-button 
+                    color="accent" 
+                    (click)="copyToClipboard()">
+              <mat-icon>content_copy</mat-icon>
+              Copiar boletín
             </button>
             <button *ngIf="currentMode === 'report'" mat-stroked-button color="primary" (click)="copyMarkdown()">
               <mat-icon>code</mat-icon>
