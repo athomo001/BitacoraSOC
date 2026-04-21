@@ -24,6 +24,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatButtonToggleGroup, MatButtonToggle } from '@angular/material/button-toggle';
 import { MatIcon } from '@angular/material/icon';
+import { MatTooltip } from '@angular/material/tooltip';
 import { ClientAlertDialogComponent } from './client-alert-dialog.component';
 import { environment } from '@env/environment';
 
@@ -91,6 +92,7 @@ export class ReportGeneratorComponent implements OnInit {
 
   // ─── Report state ────────────────────────────────────────────────────────
   uploadedImages: { name: string; dataUrl: string; width: number; height: number }[] = [];
+  newsletterUploadedImages: { name: string; dataUrl: string; width: number; height: number }[] = [];
   generatedHtml = '';
   showPreview = false;
   reportTableHeaderColor = '#4CAF50';
@@ -347,6 +349,82 @@ export class ReportGeneratorComponent implements OnInit {
     this.uploadedImages.splice(index, 1);
   }
 
+  onNewsletterImageUpload(event: any): void {
+    const files = Array.from(event.target.files || []) as File[];
+    if (files.length === 0) return;
+    
+    files.forEach(file => {
+      // Validar tipo de archivo
+      if (!file.type.startsWith('image/')) {
+        this.snackBar.open(`"${file.name}" no es una imagen válida`, 'Cerrar', { duration: 3000 });
+        return;
+      }
+      
+      // Validar tamaño (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        this.snackBar.open(`"${file.name}" supera el límite de 5MB`, 'Cerrar', { duration: 3000 });
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = (e: any) => {
+        const img = new Image();
+        img.onload = () => {
+          // Redimensionar y comprimir para emails (max 500px ancho)
+          const maxWidth = 500;
+          const maxHeight = 500;
+          let width = img.naturalWidth || img.width;
+          let height = img.naturalHeight || img.height;
+          
+          // Calcular nuevas dimensiones manteniendo aspect ratio
+          if (width > maxWidth || height > maxHeight) {
+            const ratio = Math.min(maxWidth / width, maxHeight / height);
+            width = Math.round(width * ratio);
+            height = Math.round(height * ratio);
+          }
+          
+          // Crear canvas y redimensionar
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            this.snackBar.open(`Error al procesar "${file.name}"`, 'Cerrar', { duration: 3000 });
+            return;
+          }
+          
+          // Dibujar imagen redimensionada
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Convertir a base64 con compresión (0.85 = 85% calidad)
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          
+          this.newsletterUploadedImages.push({ 
+            name: file.name, 
+            dataUrl, 
+            width, 
+            height 
+          });
+        };
+        img.onerror = () => {
+          this.snackBar.open(`Error al cargar "${file.name}"`, 'Cerrar', { duration: 3000 });
+        };
+        img.src = e.target.result;
+      };
+      reader.onerror = () => {
+        this.snackBar.open(`Error al leer "${file.name}"`, 'Cerrar', { duration: 3000 });
+      };
+      reader.readAsDataURL(file);
+    });
+    
+    // Limpiar el input para permitir subir el mismo archivo nuevamente
+    event.target.value = '';
+  }
+
+  removeNewsletterImage(index: number): void {
+    this.newsletterUploadedImages.splice(index, 1);
+  }
+
   // ─── Generate ────────────────────────────────────────────────────────────
   async generateTable(): Promise<void> {
     if (this.currentMode === 'report') {
@@ -541,8 +619,17 @@ export class ReportGeneratorComponent implements OnInit {
         this.snackBar.open(msg, 'Cerrar', { duration: 5000 });
 
         if (res.successCount > 0) {
+          // Limpiar destinatarios
           this.newsletterRecipients = '';
           this.clearNewsletterSelection();
+          
+          // Limpiar imágenes cargadas (liberan memoria base64)
+          this.newsletterUploadedImages = [];
+          
+          // Limpiar preview y HTML generado para forzar regeneración
+          this.generatedHtml = '';
+          this.showPreview = false;
+          
           this.loadNewsletterContacts();
         }
       },
@@ -596,7 +683,15 @@ export class ReportGeneratorComponent implements OnInit {
   private applyNewsletterPasteHeuristics(input: string): string {
     if (!input) return '';
 
-    let text = input;
+    // Extraer URLs para protegerlas de las transformaciones
+    const urlPattern = /(https?:\/\/[^\s]+)/gi;
+    const urls: string[] = [];
+    let text = input.replace(urlPattern, (match) => {
+      const placeholder = `__URL_PLACEHOLDER_${urls.length}__`;
+      urls.push(match);
+      return placeholder;
+    });
+
     // Reparar texto corrido: "VulnerabilidadID", "53770Severidad", "ProductoRango", etc.
     text = text
       .replace(/([a-záéíóúñ])([A-ZÁÉÍÓÚÑ])/g, '$1 $2')
@@ -631,6 +726,11 @@ export class ReportGeneratorComponent implements OnInit {
       /([A-Za-zÁÉÍÓÚÑáéíóúñ0-9][A-Za-zÁÉÍÓÚÑáéíóúñ0-9 .\-()]{2,}?)\s+(\d+\.\d+(?:\.\d+){1,4}\s*[—-]\s*\d+\.\d+(?:\.\d+){1,4})/g,
       '$1 | $2'
     );
+
+    // Restaurar URLs preservadas
+    text = text.replace(/__URL_PLACEHOLDER_(\d+)__/g, (match, index) => {
+      return urls[parseInt(index, 10)] || match;
+    });
 
     return text
       .replace(/[ \t]{2,}/g, ' ')
@@ -861,6 +961,36 @@ export class ReportGeneratorComponent implements OnInit {
     }).join('');
   }
 
+  private formatNewsletterReferences(value: unknown): string {
+    const text = String(value ?? '').trim();
+    if (!text) return '';
+    
+    // Unir todo el texto en una sola línea para evitar que URLs se rompan
+    const singleLine = text.replace(/\s+/g, ' ');
+    
+    // Detectar URLs y convertirlas en links clicables
+    const urlRegex = /(https?:\/\/[^\s]+)/gi;
+    const withLinks = singleLine.replace(urlRegex, (url) => {
+      const cleanUrl = this.escapeHtml(url);
+      return `<a href="${cleanUrl}" style="color: #1a73e8; text-decoration: underline; word-break: break-all;">${cleanUrl}</a>`;
+    });
+    
+    // Separar por saltos de línea originales para mantener la estructura
+    const lines = String(value ?? '').split('\n').filter(l => l.trim());
+    return lines.map(line => {
+      const trimmed = line.trim();
+      if (!trimmed) return '<br>';
+      
+      // Convertir URLs en esta línea
+      const withLineLinks = trimmed.replace(urlRegex, (url) => {
+        const cleanUrl = this.escapeHtml(url);
+        return `<a href="${cleanUrl}" style="color: #1a73e8; text-decoration: underline; word-break: break-all;">${cleanUrl}</a>`;
+      });
+      
+      return `<div style="margin: 4px 0;">${withLineLinks}</div>`;
+    }).join('');
+  }
+
   // ─── Clear form ───────────────────────────────────────────────────────────
   clearForm(): void {
     this.selectedEvent = null;
@@ -869,6 +999,7 @@ export class ReportGeneratorComponent implements OnInit {
     this.reportForm.reset({ fecha: new Date(), criticidad: 'media', reputacionOrigen: 'Interna' });
     this.newsletterForm.reset({ criticidad: 'media' });
     this.uploadedImages = [];
+    this.newsletterUploadedImages = [];
     this.generatedHtml = '';
     this.showPreview = false;
     this.activeClientAlert = null;
@@ -966,61 +1097,179 @@ export class ReportGeneratorComponent implements OnInit {
     else if (criticidadLower === 'alta') { badgeColor = '#f44336'; badgeText = 'ALTO (CVSS 7.0 - 8.9)'; }
     else if (criticidadLower === 'crítica' || criticidadLower === 'critica') { badgeColor = '#b71c1c'; badgeText = 'CRÍTICO (CVSS 9.0 - 10.0)'; }
 
-    const sectionTitle = `color: #111111 !important; margin-top: 20px; font-size: 16px; font-weight: bold; border-bottom: 2px solid ${headerColor}; padding-bottom: 5px;`;
-    const paragraph = `color: #111111 !important; font-size: 14px; line-height: 1.6;`;
-
     const currentUser = this.authService.getCurrentUser();
     const autor = e(currentUser?.fullName?.trim() || currentUser?.username || this.appTitle || '');
 
-    let html = `<table cellpadding="0" cellspacing="0" width="${width}" style="border-collapse: collapse; width: ${width}px; max-width: 100%; font-family: Arial, sans-serif; border: 1px solid #ddd; background-color: #fcfcfc; margin: 0; mso-table-lspace: 0pt; mso-table-rspace: 0pt;">
+    // HTML usando SOLO tablas para máxima compatibilidad con Outlook/Gmail
+    // NO usar divs, h1-h6, spans con display, ni border-radius
+    let html = `<table cellpadding="0" cellspacing="0" width="${width}" border="0" style="border-collapse: collapse; width: ${width}px; max-width: 100%; font-family: Arial, Helvetica, sans-serif; border: 1px solid #dddddd; background-color: #ffffff; margin: 0 auto; mso-table-lspace: 0pt; mso-table-rspace: 0pt;">
   <tr>
-    <td style="padding: 20px; background-color: ${headerColor}; color: white; border-bottom: 3px solid #2b2b2b;">
-      <table cellpadding="0" cellspacing="0" border="0" width="100%">
+    <td style="padding: 20px; background-color: ${headerColor}; border-bottom: 3px solid #2b2b2b;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
         <tr>
-          <td width="30%" valign="middle" align="left">
-            ${this.logoBase64 ? `<img src="${this.logoBase64}" height="48" style="height: 48px; max-height: 48px; width: auto; display: block;" alt="Logo">` : ''}
+          <td width="120" valign="middle" align="left" style="padding: 0;">
+            ${this.logoBase64 ? `<img src="${this.logoBase64}" height="48" width="auto" style="height: 48px; width: auto; border: 0;" alt="Logo" border="0">` : ''}
           </td>
-          <td width="40%" valign="middle" align="center">
-            <h2 style="margin: 0; font-size: 24px; white-space: nowrap; color: #111111;">Boletín de Seguridad</h2>
-            <p style="margin: 5px 0 0 0; font-size: 14px; white-space: nowrap; color: #111111;">Aviso importante preventivo</p>
+          <td valign="middle" align="center" style="padding: 0;">
+            <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
+              <tr>
+                <td style="padding: 0; margin: 0; font-size: 24px; font-weight: bold; color: #ffffff; font-family: Arial, Helvetica, sans-serif; text-align: center;">
+                  Boletín de Seguridad
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 5px 0 0 0; font-size: 14px; color: #ffffff; font-family: Arial, Helvetica, sans-serif; text-align: center;">
+                  Aviso importante preventivo
+                </td>
+              </tr>
+            </table>
           </td>
-          <td width="30%"></td>
+          <td width="120" style="padding: 0;"></td>
         </tr>
       </table>
     </td>
   </tr>
   <tr>
-    <td style="padding: 30px; color: #111111;">
-      <div style="margin-bottom: 25px;">
-        <h3 style="margin: 0 0 10px 0; font-size: 20px; color: #111111;">${e(form.tituloBoletin)}</h3>
-        <div style="margin-bottom: 10px;">
-          <span style="display: inline-block; padding: 4px 10px; background-color: ${badgeColor}; color: white; border-radius: 4px; font-size: 12px; font-weight: bold; margin-right: 8px;">CRITICIDAD: ${badgeText}</span>
-          <span style="display: inline-block; padding: 4px 10px; background-color: #eee; color: #333; border-radius: 4px; font-size: 12px; font-weight: bold;">MARCA: ${e(form.marcaFabricante)}</span>
-        </div>
-        ${form.cveIdentificadores?.trim() ? `<div style="font-size: 12px; color: #666; margin-top: 8px;"><strong>CVE/IDs:</strong><br>${this.formatCveList(form.cveIdentificadores)}</div>` : ''}
-      </div>
+    <td style="padding: 30px 30px 20px 30px; background-color: #ffffff;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
+        <tr>
+          <td style="padding: 0 0 15px 0; font-size: 20px; font-weight: bold; color: #111111; font-family: Arial, Helvetica, sans-serif;">
+            ${e(form.tituloBoletin)}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0 0 10px 0;">
+            <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
+              <tr>
+                <td style="padding: 6px 12px; background-color: ${badgeColor}; color: #ffffff; font-size: 12px; font-weight: bold; font-family: Arial, Helvetica, sans-serif;">
+                  CRITICIDAD: ${badgeText}
+                </td>
+                <td style="padding: 0 8px 0 0;"></td>
+                <td style="padding: 6px 12px; background-color: #eeeeee; color: #333333; font-size: 12px; font-weight: bold; font-family: Arial, Helvetica, sans-serif;">
+                  MARCA: ${e(form.marcaFabricante)}
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>`;
 
-      <h4 style="${sectionTitle}">Producto(s) Afectado(s)</h4>
-      <div style="${paragraph}">${this.formatNewsletterText(form.productosAfectados)}</div>
-
-      <h4 style="${sectionTitle}">Impacto</h4>
-      <div style="${paragraph}">${this.formatNewsletterText(form.impacto)}</div>
-
-      <h4 style="${sectionTitle}">Acciones Recomendadas / Mitigación</h4>
-      <div style="${paragraph}">${this.formatNewsletterText(form.recomendacion)}</div>`;
-
-    if (form.referencias?.trim()) {
+    if (form.cveIdentificadores?.trim()) {
       html += `
-      <h4 style="${sectionTitle}">Referencias</h4>
-      <div style="${paragraph}">${this.formatNewsletterText(form.referencias)}</div>`;
+        <tr>
+          <td style="padding: 8px 0 0 0; font-size: 12px; color: #666666; font-family: Arial, Helvetica, sans-serif;">
+            <strong style="font-weight: bold;">CVE/IDs:</strong><br>
+            ${this.formatCveList(form.cveIdentificadores)}
+          </td>
+        </tr>`;
     }
 
     html += `
+      </table>
     </td>
   </tr>
   <tr>
-    <td style="padding: 15px; text-align: center; background-color: #f1f1f1; color: #111111; font-size: 12px; border-top: 1px solid #ddd;">
-      Generado por <strong>${autor}</strong>
+    <td style="padding: 20px 30px 10px 30px; background-color: #ffffff;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
+        <tr>
+          <td style="padding: 0 0 8px 0; font-size: 16px; font-weight: bold; color: #111111; font-family: Arial, Helvetica, sans-serif; border-bottom: 2px solid ${headerColor};">
+            Producto(s) Afectado(s)
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 0; font-size: 14px; line-height: 1.6; color: #111111; font-family: Arial, Helvetica, sans-serif;">
+            ${this.formatNewsletterText(form.productosAfectados)}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 10px 30px; background-color: #ffffff;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
+        <tr>
+          <td style="padding: 0 0 8px 0; font-size: 16px; font-weight: bold; color: #111111; font-family: Arial, Helvetica, sans-serif; border-bottom: 2px solid ${headerColor};">
+            Impacto
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 0; font-size: 14px; line-height: 1.6; color: #111111; font-family: Arial, Helvetica, sans-serif;">
+            ${this.formatNewsletterText(form.impacto)}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 10px 30px; background-color: #ffffff;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
+        <tr>
+          <td style="padding: 0 0 8px 0; font-size: 16px; font-weight: bold; color: #111111; font-family: Arial, Helvetica, sans-serif; border-bottom: 2px solid ${headerColor};">
+            Acciones Recomendadas / Mitigación
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 0; font-size: 14px; line-height: 1.6; color: #111111; font-family: Arial, Helvetica, sans-serif;">
+            ${this.formatNewsletterText(form.recomendacion)}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>`;
+
+    if (form.referencias?.trim()) {
+      html += `
+  <tr>
+    <td style="padding: 10px 30px; background-color: #ffffff;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
+        <tr>
+          <td style="padding: 0 0 8px 0; font-size: 16px; font-weight: bold; color: #111111; font-family: Arial, Helvetica, sans-serif; border-bottom: 2px solid ${headerColor};">
+            Referencias
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 0; font-size: 14px; line-height: 1.6; color: #111111; font-family: Arial, Helvetica, sans-serif;">
+            ${this.formatNewsletterReferences(form.referencias)}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>`;
+    }
+
+    if (this.newsletterUploadedImages.length > 0) {
+      html += `
+  <tr>
+    <td style="padding: 10px 30px 20px 30px; background-color: #ffffff;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
+        <tr>
+          <td style="padding: 0 0 8px 0; font-size: 16px; font-weight: bold; color: #111111; font-family: Arial, Helvetica, sans-serif; border-bottom: 2px solid ${headerColor};">
+            Evidencias
+          </td>
+        </tr>`;
+      
+      const evidenceImageWidthPx = 500;
+      this.newsletterUploadedImages.forEach(img => {
+        const renderWidth = Math.min(img.width, evidenceImageWidthPx);
+        const renderHeight = img.height > 0 ? Math.max(1, Math.round((img.height * renderWidth) / img.width)) : 0;
+        const heightAttr = renderHeight > 0 ? ` height="${renderHeight}"` : '';
+        html += `
+        <tr>
+          <td align="center" style="padding: 15px 0;">
+            <img src="${img.dataUrl}" width="${renderWidth}"${heightAttr} style="width: ${renderWidth}px; max-width: 100%; height: auto; display: block; margin: 0 auto;" alt="${e(img.name || 'Evidencia')}" border="0">
+          </td>
+        </tr>`;
+      });
+      
+      html += `
+      </table>
+    </td>
+  </tr>`;
+    }
+
+    html += `
+  <tr>
+    <td style="padding: 15px; text-align: center; background-color: #f1f1f1; color: #111111; font-size: 12px; font-family: Arial, Helvetica, sans-serif; border-top: 1px solid #dddddd;">
+      Generado por <strong style="font-weight: bold;">${autor}</strong>
     </td>
   </tr>
 </table>`;

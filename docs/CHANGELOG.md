@@ -2,6 +2,16 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.48-beta] - 2026-04-21
+
+### Correcciones críticas de URLs en Boletín (`MAIL-NEWS-082`)
+
+- **URLs rotas en Referencias del boletín:** Se corrigió bug donde URLs largas (ej: `https://github.com/openssl/openssl/commit/61f428a2fc...`) se enviaban con espacios insertados entre caracteres alfanuméricos, rompiendo el link en el correo. Ahora `formatNewsletterReferences()` detecta URLs con regex `/(https?:\/\/[^\s]+)/gi`, las convierte en links clicables `<a>` con estilos de preservación de URL (`word-break: break-all`) y las renderiza correctamente sin espacios.
+- **URLs rotas al pegar en textareas del formulario:** Se corrigió bug en `applyNewsletterPasteHeuristics()` donde el procesamiento automático de texto pegado (reparación de "VulnerabilidadID" → "Vulnerabilidad ID") insertaba espacios en URLs, rompiendo links como `61f428a2fc` → `61 f 428 a 2 fc`. Ahora la función **extrae URLs temporalmente** con placeholders antes de aplicar transformaciones, preservándolas intactas y restaurándolas al final.
+- **Verificación técnica:** Compilación frontend OK, despliegue Docker OK (`frontend:v1.5.48`). URLs ahora se preservan completas tanto en el render del correo como en el pegado de texto en cualquier textarea del boletín (Impacto, Referencias, CVE, etc.).
+
+---
+
 ## [v1.5.47-beta] - 2026-04-16
 
 ### Correcciones visuales Cyberpunk/Dark + estabilización Docker

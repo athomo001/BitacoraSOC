@@ -378,8 +378,8 @@ async function prepareNewsletterEmailPayload(html, clientLogoAttachments) {
   const ext = extensionFromContentType(ct);
   const filename = `logo.${ext}`;
   const cid = NEWSLETTER_LOGO_CID;
-  const htmlOut = replaceFirstImgSrc(rawHtml, `cid:${cid}`);
-  const safeHtmlOut = removeLeadingDataImageTags(htmlOut);
+  let htmlOut = replaceFirstImgSrc(rawHtml, `cid:${cid}`);
+  htmlOut = removeLeadingDataImageTags(htmlOut);
   newsletterDebug('prepare_payload.use_cid', {
     cid,
     filename,
@@ -387,23 +387,89 @@ async function prepareNewsletterEmailPayload(html, clientLogoAttachments) {
     bufferLength: buf.length
   });
 
-  return {
-    html: safeHtmlOut,
-    attachments: [
-      {
-        filename,
-        content: buf,
-        cid,
-        contentType: ct,
-        contentDisposition: 'inline'
-      },
-      {
-        filename,
-        content: buf,
-        contentType: ct,
-        contentDisposition: 'attachment'
+  const attachments = [
+    {
+      filename,
+      content: buf,
+      cid,
+      contentType: ct,
+      contentDisposition: 'inline'
+    },
+    {
+      filename,
+      content: buf,
+      contentType: ct,
+      contentDisposition: 'attachment'
+    }
+  ];
+
+  // Procesar imágenes de evidencias (data: URIs) -> CID attachments para compatibilidad Gmail
+  const dataImageRegex = /<img\b[^>]*\ssrc=["']data:image\/(png|jpeg|jpg|gif|webp);base64,([A-Za-z0-9+/=\s]+)["'][^>]*>/gi;
+  let evidenceIndex = 0;
+  let finalHtml = htmlOut;
+  let match;
+  
+  while ((match = dataImageRegex.exec(htmlOut)) !== null) {
+    evidenceIndex++;
+    const imgTag = match[0];
+    const imageType = match[1];
+    const base64Data = match[2].replace(/\s/g, '');
+    
+    try {
+      const evidenceBuffer = Buffer.from(base64Data, 'base64');
+      
+      // Validar tamaño razonable (máx 5MB por imagen de evidencia)
+      if (evidenceBuffer.length > 5 * 1024 * 1024) {
+        newsletterDebug('prepare_payload.evidence_skip_too_large', {
+          index: evidenceIndex,
+          size: evidenceBuffer.length
+        });
+        continue;
       }
-    ]
+      
+      const evidenceCid = `evidence-${evidenceIndex}@bitacora-newsletter`;
+      const evidenceExt = imageType === 'jpeg' || imageType === 'jpg' ? 'jpg' : imageType;
+      const evidenceFilename = `evidence-${evidenceIndex}.${evidenceExt}`;
+      const evidenceContentType = `image/${imageType === 'jpg' ? 'jpeg' : imageType}`;
+      
+      attachments.push({
+        filename: evidenceFilename,
+        content: evidenceBuffer,
+        cid: evidenceCid,
+        contentType: evidenceContentType,
+        contentDisposition: 'inline'
+      });
+      
+      // Reemplazar data: URI con cid: en el HTML
+      const newImgTag = imgTag.replace(
+        /src=["']data:image\/[^"']+["']/i,
+        `src="cid:${evidenceCid}"`
+      );
+      finalHtml = finalHtml.replace(imgTag, newImgTag);
+      
+      newsletterDebug('prepare_payload.evidence_processed', {
+        index: evidenceIndex,
+        cid: evidenceCid,
+        filename: evidenceFilename,
+        size: evidenceBuffer.length,
+        contentType: evidenceContentType
+      });
+    } catch (err) {
+      newsletterDebug('prepare_payload.evidence_decode_failed', {
+        index: evidenceIndex,
+        error: err.message
+      });
+    }
+  }
+  
+  newsletterDebug('prepare_payload.done', {
+    totalAttachments: attachments.length,
+    evidenceImagesProcessed: evidenceIndex
+  });
+
+  return {
+    html: finalHtml,
+    attachments
   };
 }
 

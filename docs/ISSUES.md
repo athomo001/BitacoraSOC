@@ -130,6 +130,7 @@
 | COMP-009 | Listo | Observabilidad / Complementos ALTA | Logging Centralizado de Microservicios | Los complementos ya publican a `/api/internal/v1/log`, centralizado en `AuditLog` con `source='complement'` y filtro por slug. |
 | COMP-010 | Listo | API / Versionamiento MEDIA | Versionamiento de API Interna (Compatibilidad) | Se estructuró la API interna en `v1` y `v2`, con discovery en `/api/internal/versions` y headers de versión. |
 | COMP-011 | Listo | Testing / Complementos MEDIA | Mocks de Complementos para Pruebas de Integración | Se creó `tools/complement-stub/` y el overlay de testing para simular health, iframe y cleanup. |
+| MAIL-NEWS-082 | Listo | Email + UX + Compatibilidad ALTA | Boletín copiado manualmente al correo pierde layout frente al envío directo | Se reescribió completamente `buildNewsletterHtml()` usando SOLO tablas anidadas (sin divs, h1-h6, spans con display, border-radius) para máxima compatibilidad cross-client. Cada sección (header, título, badges, contenido, evidencias, footer) es ahora una fila de tabla con celdas y tablas internas. Se eliminaron propiedades problemáticas para Outlook/Gmail (margin en elementos anidados, display inline-block, border-radius). El HTML resultante funciona correctamente tanto al copiar/pegar manualmente como al enviar por SMTP. Se implementó campo opcional de evidencias con imágenes (validación tipo/tamaño max 5MB, resize automático 500px, compresión JPEG 85%), renderizadas como tablas. Sección evidencias solo aparece si hay imágenes cargadas. **Corrección URLs rotas:** Se corrigió bug donde URLs largas se enviaban con espacios entre caracteres alfanuméricos (`61f428a2fc` → `61 f 428 a 2 fc`). Implementadas funciones `formatNewsletterReferences()` para convertir URLs en links clicables preservados y protección de URLs en `applyNewsletterPasteHeuristics()` mediante extracción temporal con placeholders. |
 | B34 | Listo | Operación/Alertas | Alerta por ítems NOK (Rojo) en Checklist | Se agregó configuración global para alertas NOK (`alertNokEnabled`, `alertNokRoleTarget`) y envío automático de correo por checklist con rojos a usuarios activos del cargo seleccionado, incluyendo detalle de observación por ítem NOK. |
 | B46 | Listo | UI/UX + Seguridad Preventiva / Frontend MEDIA | Textarea de entradas permite escribir más de 50000 caracteres | Se aplicó `maxlength=50000` en creación y edición, truncado defensivo por `input` y aviso explícito al alcanzar el máximo. |
 | B47 | Listo | UI/UX + Accesibilidad / Frontend MEDIA | Heatmap en temas light/sepia/pastel no muestra bien el número de entradas | **Causa raíz**: `ngx-charts-heat-map` v23 NO renderiza texto dentro de las celdas (solo tooltip). Se reemplazó por heatmap HTML/CSS propio con grid de `div`, color por celda según escala 5-niveles desde CSS vars, y contraste de texto dinámico por luminancia (oscuro para celdas claras, blanco para oscuras). Se corrigieron también los tokens `--heatmap-label-color` de sepia/pastel que eran blancos sobre fondo claro. |
@@ -384,6 +385,64 @@ Todo lo descrito en esta sección y en los issues `UI-*` / `QA-UI-*` **debe prob
 - separar correos válidos, duplicados e inválidos;
 - permitir validación previa clara sin bloquear el flujo manual antes del envío real;
 - no bloquear el flujo manual si el usuario decide seguir corrigiendo a mano.
+
+### MAIL-NEWS-082 - Boletín copiado manualmente al correo pierde layout frente al envío directo
+
+**Objetivo funcional:** Lograr que el Boletín de Seguridad mantenga una apariencia consistente y profesional, evitando que el flujo de copia manual produzca un resultado distinto al correo enviado directamente desde la Bitácora.
+
+**Evidencia visual reportada:** Según las capturas adjuntas al requerimiento, el resultado pegado manualmente en el editor del correo pierde fidelidad visual respecto al boletín enviado por SMTP desde la Bitácora:
+
+- el logo cambia de posición o tamaño;
+- los títulos y subtítulos no conservan la misma jerarquía;
+- algunos colores, anchos y espaciados se degradan;
+- el resultado esperado es siempre equivalente al del correo enviado directamente.
+
+**Auditoría técnica validada antes de implementar:**
+
+| Área | Hallazgo validado |
+| --- | --- |
+| Frontend generación HTML | `buildNewsletterHtml()` en `frontend/src/app/pages/main/report-generator/report-generator.component.ts:956` construye el boletín con HTML inline y logo embebido en el artefacto mostrado en preview. |
+| Frontend copia manual | `copyToClipboard()` en `frontend/src/app/pages/main/report-generator/report-generator.component.ts:743` copia `text/html` al portapapeles y cae a `execCommand` o texto plano según soporte del navegador. |
+| Frontend envío | `sendNewsletter()` en `frontend/src/app/pages/main/report-generator/report-generator.component.ts:505` envía el HTML generado al backend como artefacto base del correo real. |
+| Backend preparación SMTP | `prepareNewsletterEmailPayload()` en `backend/src/routes/reports.js:333` transforma el logo a `cid:` o URL pública y sanea el HTML para tránsito MIME real. |
+| Backend despacho | `POST /api/reports/newsletter/send` en `backend/src/routes/reports.js:734` envía el boletín como correo real 1:1, no como contenido pegado en un editor intermedio. |
+
+**Diagnóstico técnico:** El problema no está en un único bloque CSS sino en que hoy existen dos transportes distintos para un mismo boletín:
+
+1. **Copiar y pegar manualmente:** el HTML sale al portapapeles y luego queda sujeto al saneamiento del editor del cliente de correo (Outlook, Outlook Web, Gmail u otro). Ese editor puede reescribir el DOM, eliminar atributos, reinterpretar anchos, mover imágenes o convertir el contenido a una variante más limitada.
+2. **Enviar desde la Bitácora:** el HTML viaja como correo MIME real, con preparación específica del logo (`cid`/URL pública) y sin pasar por un editor visual que lo reprocese.
+
+**Inferencia técnica principal:** Mientras exista el flujo "copiar HTML y pegar en editor", no hay garantía de equivalencia visual exacta entre clientes de correo. El comportamiento depende del editor destino, no solo del HTML generado por la Bitácora.
+
+**Impacto operativo:**
+
+- el analista puede creer que el boletín quedó mal generado cuando en realidad se degradó durante el pegado;
+- se rompe la consistencia visual de la comunicación preventiva;
+- el logo institucional y la jerarquía visual quedan expuestos a recortes o reflujo;
+- aumenta el riesgo de enviar campañas con formatos distintos para un mismo contenido.
+
+**Cómo lo solucionaría (propuesta recomendada):**
+
+1. **Definir el envío directo como camino canónico.** Si el requisito es "que siempre se vea como la imagen 2", la opción principal debe ser `Enviar desde la Bitácora`, no `Copiar boletín`.
+2. **Rebajar el flujo de copia a fallback explícito.** Mantenerlo solo para contingencia, con texto visible tipo: "El pegado manual puede variar según Outlook/Gmail".
+3. **Agregar exportación a `.eml` como alternativa de alta fidelidad.** Si el usuario necesita revisión manual antes de despachar, conviene generar un artefacto MIME descargable con el logo inline, en vez de depender del portapapeles.
+4. **Separar artefactos por destino.** No reutilizar exactamente el mismo HTML para `preview`, `clipboard` y `smtp` si cada transporte tiene restricciones distintas. Deben existir al menos:
+   - un artefacto `smtp-safe` para envío real;
+   - un artefacto `paste-safe` para clientes que acepten pegado enriquecido;
+   - opcionalmente un artefacto `.eml` para revisión/aprobación.
+5. **Mover la compatibilidad de logo fuera de `data:` para el flujo manual.** El pegado manual es especialmente frágil con imágenes inline/base64. Para ese caso conviene priorizar URL pública absoluta o directamente no prometer fidelidad total.
+6. **Ajustar UX para no inducir un resultado engañoso.** El botón actual `Copiar boletín` debería reflejar su naturaleza real: `Copiar boletín (compatibilidad limitada)` o quedar detrás de una ayuda contextual.
+
+**Alternativa si el negocio exige seguir pegando a mano:** Implementar un modo específico "Copiar para Outlook" con HTML más conservador, pero documentando que incluso así no se puede garantizar paridad absoluta en todos los clientes. Esto reduce el problema, pero no lo elimina.
+
+**Criterios de aceptación sugeridos:**
+
+1. El usuario entiende claramente cuál es el flujo recomendado y cuál es solo fallback.
+2. El flujo recomendado entrega siempre un boletín visualmente equivalente al envío correcto.
+3. El logo no se corta ni cambia de posición en el camino canónico.
+4. La jerarquía visual de títulos, colores y separadores se preserva en el camino canónico.
+5. Si se mantiene el copiado manual, la UI advierte explícitamente que puede variar según el cliente de correo.
+6. Si se implementa exportación `.eml`, el artefacto abre con el mismo layout del envío real y sin reconstrucciones paralelas.
 
 ### ESC-MAINT-042 - Bloqueo por Mantenimientos Programados reutilizando Alertas Especiales
 
