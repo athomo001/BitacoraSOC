@@ -370,11 +370,23 @@ export class ReportGeneratorComponent implements OnInit {
       reader.onload = (e: any) => {
         const img = new Image();
         img.onload = () => {
-          // Redimensionar y comprimir para emails (max 500px ancho)
-          const maxWidth = 500;
-          const maxHeight = 500;
+          // Redimensionar para emails - detectar imágenes panorámicas (tablas, capturas anchas)
           let width = img.naturalWidth || img.width;
           let height = img.naturalHeight || img.height;
+          const aspectRatio = width / height;
+          
+          // Para imágenes panorámicas (tablas, gráficos anchos), permitir mayor resolución
+          let maxWidth: number;
+          let maxHeight: number;
+          if (aspectRatio > 1.4) {
+            // Imagen panorámica - permitir hasta 2400px para preservar detalle horizontal
+            maxWidth = 2400;
+            maxHeight = 1600;
+          } else {
+            // Imagen cuadrada/vertical - límite estándar
+            maxWidth = 1600;
+            maxHeight = 1600;
+          }
           
           // Calcular nuevas dimensiones manteniendo aspect ratio
           if (width > maxWidth || height > maxHeight) {
@@ -396,8 +408,16 @@ export class ReportGeneratorComponent implements OnInit {
           // Dibujar imagen redimensionada
           ctx.drawImage(img, 0, 0, width, height);
           
-          // Convertir a base64 con compresión (0.85 = 85% calidad)
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          // Detectar formato original para preservar calidad
+          // PNG es mejor para capturas con texto, JPEG para fotos
+          let dataUrl: string;
+          if (file.type === 'image/png') {
+            // Mantener PNG para capturas de pantalla (mejor para texto)
+            dataUrl = canvas.toDataURL('image/png');
+          } else {
+            // JPEG con alta calidad (95%) para otros formatos
+            dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+          }
           
           this.newsletterUploadedImages.push({ 
             name: file.name, 
@@ -1247,9 +1267,19 @@ export class ReportGeneratorComponent implements OnInit {
           </td>
         </tr>`;
       
-      const evidenceImageWidthPx = 500;
+      // Renderizar imágenes adaptando ancho según aspect ratio
       this.newsletterUploadedImages.forEach(img => {
-        const renderWidth = Math.min(img.width, evidenceImageWidthPx);
+        const aspectRatio = img.width / img.height;
+        // Para imágenes panorámicas (tablas), usar más ancho del email (hasta 900px)
+        // Para imágenes cuadradas/verticales, límite menor para no desperdiciar espacio
+        let maxRenderWidth: number;
+        if (aspectRatio > 1.4) {
+          maxRenderWidth = 900; // Panorámica - aprovechar ancho disponible en email
+        } else {
+          maxRenderWidth = 700; // Cuadrada/vertical - ancho estándar
+        }
+        
+        const renderWidth = Math.min(img.width, maxRenderWidth);
         const renderHeight = img.height > 0 ? Math.max(1, Math.round((img.height * renderWidth) / img.width)) : 0;
         const heightAttr = renderHeight > 0 ? ` height="${renderHeight}"` : '';
         html += `
