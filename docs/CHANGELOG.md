@@ -10,6 +10,14 @@ Registro de cambios relevantes del proyecto.
 - **URLs rotas al pegar en textareas del formulario:** Se corrigió bug en `applyNewsletterPasteHeuristics()` donde el procesamiento automático de texto pegado (reparación de "VulnerabilidadID" → "Vulnerabilidad ID") insertaba espacios en URLs, rompiendo links como `61f428a2fc` → `61 f 428 a 2 fc`. Ahora la función **extrae URLs temporalmente** con placeholders antes de aplicar transformaciones, preservándolas intactas y restaurándolas al final.
 - **Verificación técnica:** Compilación frontend OK, despliegue Docker OK (`frontend:v1.5.48`). URLs ahora se preservan completas tanto en el render del correo como en el pegado de texto en cualquier textarea del boletín (Impacto, Referencias, CVE, etc.).
 
+### Optimización de imágenes panorámicas en evidencias del boletín
+
+- **Detección automática de tablas y capturas anchas:** El sistema ahora detecta imágenes con aspect ratio > 1.4 (panorámicas, tablas multi-columna, gráficos horizontales) y las procesa de forma diferenciada.
+- **Mayor resolución para imágenes panorámicas:** Las imágenes anchas se guardan hasta **2400x1600px** (antes 1600x1600px) para preservar legibilidad de texto en tablas densas, mientras que imágenes cuadradas/verticales mantienen límite estándar de 1600x1600px.
+- **Renderizado adaptativo en email:** Imágenes panorámicas se renderizan a **900px de ancho** (antes 1600px universal), aprovechando mejor el espacio disponible en el correo sin estiramiento vertical. Imágenes cuadradas/verticales usan **700px** para mantener proporciones adecuadas.
+- **Sin estiramiento visual:** La lógica de aspect ratio asegura que tablas con mucha información horizontal se vean proporcionadas y legibles, eliminando la distorsión que hacía texto ilegible en evidencias densas.
+- **Formato preservado:** Se mantiene PNG para capturas de pantalla (mejor para texto) y JPEG 95% para fotos, ahora con dimensiones óptimas según tipo de contenido.
+
 ---
 
 ## [v1.5.47-beta] - 2026-04-16

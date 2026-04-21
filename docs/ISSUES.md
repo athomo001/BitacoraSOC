@@ -435,6 +435,13 @@ Todo lo descrito en esta sección y en los issues `UI-*` / `QA-UI-*` **debe prob
 
 **Alternativa si el negocio exige seguir pegando a mano:** Implementar un modo específico "Copiar para Outlook" con HTML más conservador, pero documentando que incluso así no se puede garantizar paridad absoluta en todos los clientes. Esto reduce el problema, pero no lo elimina.
 
+**Correcciones implementadas (v1.5.48-beta):**
+
+1. ✅ **URLs rotas en Referencias:** Corregido `formatNewsletterReferences()` para detectar URLs con regex y preservarlas sin espacios insertados.
+2. ✅ **URLs rotas al pegar:** Corregido `applyNewsletterPasteHeuristics()` con sistema de placeholders que extrae URLs antes de transformaciones.
+3. ✅ **Imágenes panorámicas estiradas:** Implementado sistema de detección de aspect ratio (>1.4) que permite mayor resolución (hasta 2400x1600px) para tablas y capturas anchas, y renderizado adaptativo (900px para panorámicas vs 700px para cuadradas) que elimina estiramiento vertical y aprovecha mejor el espacio del email.
+4. ✅ **Calidad de texto en evidencias:** PNG preservado para capturas, JPEG 95% para fotos, dimensiones óptimas según tipo de contenido.
+
 **Criterios de aceptación sugeridos:**
 
 1. El usuario entiende claramente cuál es el flujo recomendado y cuál es solo fallback.
