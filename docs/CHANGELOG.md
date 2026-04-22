@@ -2,6 +2,38 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.49-beta] - 2026-04-22
+
+### Módulo de escalación: correcciones, UX y página 404 animada
+
+#### Scheduler de alertas de escalación (`SCHED-ESC-083`)
+- **Cálculo de semana futura corregido:** `resolveFutureWeekGap()` calculaba incorrectamente la semana usando `getStartOfWeekMonday(anchorDate)`, que devolvía la semana actual o pasada. Ahora calcula explícitamente el próximo lunes desde `anchorDate` con `daysToNextMonday`, garantizando que el recordatorio apunte siempre a la semana siguiente correcta.
+
+#### Formulario de asignación de turnos (`UI-ESC-084`)
+- **Auto-relleno de fechas:** al abrir el formulario de nueva asignación, los campos `weekStartDate` y `weekEndDate` se rellenan automáticamente con el próximo lunes a las 09:00 y el lunes siguiente a las 08:59, respectivamente.
+- **Sincronización automática de fecha fin:** al modificar `weekStartDate`, el campo `weekEndDate` se actualiza automáticamente a `startDate + 7 días`, evitando descuadres manuales.
+
+#### Visibilidad de turnos asignados (`UI-ESC-085`)
+- **Turnos de meses futuros ahora visibles:** la consulta de `loadAssignments()` eliminó el límite superior de fecha (`toDate`), permitiendo cargar asignaciones de cualquier mes futuro (junio, diciembre, etc.).
+- **Nueva sección "Próximos meses":** se agregó una sección expandida por defecto que agrupa todos los turnos desde el mes siguiente en adelante, reemplazando la anterior sección limitada a "Próximo mes".
+- **Indicador de destino en formulario:** al seleccionar fechas, el formulario muestra en tiempo real la etiqueta de la sección donde aparecerá el turno creado ("Mes actual", "Próximos meses", "Mes anterior", "Histórico").
+
+#### Validación de duplicados (`VAL-ESC-086`)
+- **Prevención de doble asignación:** se agregó validación en backend (`createAssignment` y `updateAssignment`) que rechaza asignaciones con el mismo `roleCode + weekStartDate + weekEndDate`. El error devuelto indica el nombre de la persona ya asignada y la sección donde encontrarla.
+
+#### Filtrado de candidatos por cargo (`VAL-ESC-087`)
+- **Coincidencia exacta de cargo:** `updateAssignmentPeopleOptions()` en frontend y la validación en backend ahora usan coincidencia estricta de `cargoLabel` por rol: `N1_NO_HABIL → 'N1'`, `N2 → 'N2'`, `TI → 'TI'`. Esto evitaba que usuarios con cargo "Pentester N1" aparecieran en el listado de turnos N1.
+
+#### Página 404 animada (`UI-404-088`)
+- **Nueva página de error 404:** se creó el componente standalone `NotFoundComponent` con animación Lottie embebida vía iframe, botones de navegación a `/main/checklist` y `/login`, y diseño de tarjeta limpia con fondo blanco.
+- **Fondo completamente blanco:** la animación (fondo blanco) se fusiona con la tarjeta eliminando el corte visual; se removieron gradientes, glows de color y bordes del contenedor de animación.
+- **Cuadro de animación ampliado:** el iframe de animación creció de 520×310px a 720×420px para mayor impacto visual.
+- **Routing conectado:** se registró `/404` con `loadComponent` en `app-routing.module.ts` y wildcard `**` tanto en el router principal como en el módulo `main` para capturar cualquier ruta desconocida.
+- **Assets organizados:** `404.json` y `404.lottie` movidos a `frontend/src/assets/animations/` para mantener la estructura de assets del proyecto.
+- **Verificación técnica:** `npm run build` → compilación Angular OK, bundle generado sin errores. Docker rebuild y push a `origin/Development-update`.
+
+---
+
 ## [v1.5.48-beta] - 2026-04-21
 
 ### Correcciones críticas de URLs en Boletín (`MAIL-NEWS-082`)
