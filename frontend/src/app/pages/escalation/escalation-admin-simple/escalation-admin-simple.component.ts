@@ -484,6 +484,42 @@ export class EscalationAdminSimpleComponent implements OnInit {
     return new Date(year, month + 1, 0, 23, 59, 59, 999);
   }
 
+  getSelectedAssignmentSectionLabel(): string {
+    const startDate = this.assignmentForm?.get('weekStartDate')?.value;
+    if (!startDate) {
+      return '';
+    }
+
+    return this.getAssignmentSectionLabel(startDate);
+  }
+
+  private getAssignmentSectionLabel(dateValue: string | Date): string {
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) {
+      return '';
+    }
+
+    const currentDate = new Date();
+    const currentMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth());
+    const nextMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() + 1);
+    const monthAfterNextStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() + 2);
+    const previousMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() - 1);
+
+    if (date >= currentMonthStart && date < nextMonthStart) {
+      return 'Mes actual';
+    }
+
+    if (date >= nextMonthStart && date < monthAfterNextStart) {
+      return 'Próximo mes';
+    }
+
+    if (date >= previousMonthStart && date < currentMonthStart) {
+      return 'Mes anterior';
+    }
+
+    return 'Histórico';
+  }
+
   addAssignment(): void {
     this.showAssignmentForm = true;
     const defaultDates = this.calculateDefaultWeekDates();
@@ -537,7 +573,11 @@ export class EscalationAdminSimpleComponent implements OnInit {
       error: (err) => {
         console.error('Error:', err);
         const backendMessage = err?.error?.error || err?.error?.message;
-        this.showError(backendMessage || 'Error al asignar turno');
+        const sectionLabel = this.getSelectedAssignmentSectionLabel();
+        const enhancedMessage = backendMessage?.includes('mismo período') && sectionLabel
+          ? `${backendMessage}. Revísala en "${sectionLabel}".`
+          : backendMessage;
+        this.showError(enhancedMessage || 'Error al asignar turno');
         this.savingAssignment = false;
       }
     });

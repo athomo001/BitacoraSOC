@@ -74,7 +74,7 @@
               </mat-form-field>
 
               <mat-form-field appearance="outline">
-                <mat-label>Hasta (Domingo)</mat-label>
+                <mat-label>Hasta</mat-label>
                 <input matInput [matDatepicker]="pickerEnd" formControlName="weekEndDate" required>
                 <mat-datepicker-toggle matSuffix [for]="pickerEnd"></mat-datepicker-toggle>
                 <mat-datepicker #pickerEnd></mat-datepicker>
@@ -86,6 +86,10 @@
                 <mat-hint>Hora de fin del turno</mat-hint>
               </mat-form-field>
             </div>
+
+            <p class="subtitle" *ngIf="getSelectedAssignmentSectionLabel()">
+              Este turno se verá en: <strong>{{ getSelectedAssignmentSectionLabel() }}</strong>
+            </p>
 
             <div class="form-actions">
               <button mat-raised-button color="primary" type="submit" [disabled]="assignmentForm.invalid || savingAssignment">
@@ -127,6 +131,42 @@
           </table>
         </div>
 
+        <mat-accordion *ngIf="!loadingAssignments && nextMonthAssignments.length > 0" class="month-accordion">
+          <mat-expansion-panel [expanded]="true">
+            <mat-expansion-panel-header>
+              <mat-panel-title>Próximo mes</mat-panel-title>
+              <mat-panel-description>{{ nextMonthAssignments.length }} asignaciones</mat-panel-description>
+            </mat-expansion-panel-header>
+
+            <div class="simple-table compact-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Semana</th>
+                    <th>Rol</th>
+                    <th>Persona</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let assignment of nextMonthAssignments">
+                    <td>{{ formatDate(assignment.weekStartDate) }} - {{ formatDate(assignment.weekEndDate) }}</td>
+                    <td><strong>{{ assignment.roleCode }}</strong></td>
+                    <td>
+                      {{ assignment.userId?.fullName || assignment.userId?.name || assignment.externalPersonId?.name || 'N/A' }}
+                    </td>
+                    <td>
+                      <button mat-icon-button color="warn" (click)="deleteAssignment(assignment._id)">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </mat-expansion-panel>
+        </mat-accordion>
+
         <mat-accordion *ngIf="!loadingAssignments && previousMonthAssignments.length > 0" class="month-accordion">
           <mat-expansion-panel>
             <mat-expansion-panel-header>
@@ -146,42 +186,6 @@
                 </thead>
                 <tbody>
                   <tr *ngFor="let assignment of previousMonthAssignments">
-                    <td>{{ formatDate(assignment.weekStartDate) }} - {{ formatDate(assignment.weekEndDate) }}</td>
-                    <td><strong>{{ assignment.roleCode }}</strong></td>
-                    <td>
-                      {{ assignment.userId?.fullName || assignment.userId?.name || assignment.externalPersonId?.name || 'N/A' }}
-                    </td>
-                    <td>
-                      <button mat-icon-button color="warn" (click)="deleteAssignment(assignment._id)">
-                        <mat-icon>delete</mat-icon>
-                      </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </mat-expansion-panel>
-        </mat-accordion>
-
-        <mat-accordion *ngIf="!loadingAssignments && nextMonthAssignments.length > 0" class="month-accordion">
-          <mat-expansion-panel>
-            <mat-expansion-panel-header>
-              <mat-panel-title>Próximo mes</mat-panel-title>
-              <mat-panel-description>{{ nextMonthAssignments.length }} asignaciones</mat-panel-description>
-            </mat-expansion-panel-header>
-
-            <div class="simple-table compact-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Semana</th>
-                    <th>Rol</th>
-                    <th>Persona</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr *ngFor="let assignment of nextMonthAssignments">
                     <td>{{ formatDate(assignment.weekStartDate) }} - {{ formatDate(assignment.weekEndDate) }}</td>
                     <td><strong>{{ assignment.roleCode }}</strong></td>
                     <td>
