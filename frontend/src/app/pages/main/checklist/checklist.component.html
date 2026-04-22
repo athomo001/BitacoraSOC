@@ -9,30 +9,20 @@
       </div>
     </div>
   </section>
-  <p *ngIf="activeChecklist?.name" class="subtle">{{ activeChecklist?.name }}<span *ngIf="activeChecklist?.description"> — {{ activeChecklist?.description }}</span></p>
-  <p *ngIf="!activeChecklist?.name && activeChecklist?.description" class="subtle">{{ activeChecklist?.description }}</p>
-
-  <section class="status-card checklist-panel">
-    <div class="checklist-panel__body">
-      <div class="status-info">
-        <mat-icon>info</mat-icon>
-        <div>
-          <p><strong>Estado del ultimo check:</strong></p>
-          <p>{{ getLastCheckStatus() }}</p>
-          <p *ngIf="lastCheck"><small>{{ lastCheck.createdAt | date:'dd/MM/yyyy HH:mm' }} por {{ lastCheck.username
-              }}</small></p>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <ng-container *ngIf="!isLoading && checklistTree.length > 0; else checklistPlaceholder">
-    <section class="checklist-panel">
-      <div class="checklist-panel__header">
-        <h2>{{ activeChecklist?.name || 'Evaluación del Turno' }}</h2>
-      </div>
+    <section class="checklist-panel checklist-panel--interactive">
+      <mat-accordion>
+        <mat-expansion-panel [(expanded)]="mainPanelExpanded" [hideToggle]="false">
+          <mat-expansion-panel-header>
+            <mat-panel-title>
+              Checklist
+            </mat-panel-title>
+            <mat-panel-description>
+              {{ mainPanelExpanded ? 'Ocultar checklist' : 'Abrir checklist' }}
+            </mat-panel-description>
+          </mat-expansion-panel-header>
 
-      <div class="checklist-panel__body">
+          <div class="checklist-panel__body">
           <form (ngSubmit)="onSubmit()" #checkForm="ngForm">
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Tipo de Check</mat-label>
@@ -116,7 +106,9 @@
               </button>
             </div>
           </form>
-        </div>
+          </div>
+        </mat-expansion-panel>
+      </mat-accordion>
       </section>
   </ng-container>
 </div>

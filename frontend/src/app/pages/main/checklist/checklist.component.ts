@@ -2,10 +2,10 @@ import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatExpansionModule, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatExpansionPanelDescription } from '@angular/material/expansion';
 import { ChecklistService } from '../../../services/checklist.service';
-import { ChecklistTemplate, ChecklistItem, ShiftCheck } from '../../../models/checklist.model';
+import { ChecklistTemplate, ChecklistItem } from '../../../models/checklist.model';
 import { AuthService } from '../../../services/auth.service';
 import { OnboardingService } from '../../../services/onboarding.service';
-import { NgIf, NgFor, DatePipe, NgTemplateOutlet } from '@angular/common';
+import { NgIf, NgFor, NgTemplateOutlet } from '@angular/common';
 import { MatIcon } from '@angular/material/icon';
 import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { MatFormField, MatLabel, MatHint } from '@angular/material/form-field';
@@ -32,12 +32,11 @@ type ChecklistNode = {
   selector: 'app-checklist',
   templateUrl: './checklist.component.html',
   styleUrls: ['./checklist.component.scss'],
-  imports: [NgIf, MatIcon, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, ReactiveFormsModule, FormsModule, MatFormField, MatLabel, MatSelect, MatOption, NgFor, MatExpansionPanelDescription, MatRadioGroup, MatRadioButton, MatInput, MatHint, MatButton, MatProgressSpinner, EntriesComponent, DatePipe, NgTemplateOutlet]
+  imports: [NgIf, MatIcon, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, ReactiveFormsModule, FormsModule, MatFormField, MatLabel, MatSelect, MatOption, NgFor, MatExpansionPanelDescription, MatRadioGroup, MatRadioButton, MatInput, MatHint, MatButton, MatProgressSpinner, EntriesComponent, NgTemplateOutlet]
 })
 export class ChecklistComponent implements OnInit {
   @ViewChild('checklistGuideCard') checklistGuideCard?: ElementRef<HTMLElement>;
   activeChecklist: ChecklistTemplate | null = null;
-  lastCheck: ShiftCheck | null = null;
   checkType: 'inicio' | 'cierre' = 'inicio';
   isSubmitting = false;
   isLoading = false;
@@ -59,7 +58,6 @@ export class ChecklistComponent implements OnInit {
     const username = this.authService.getCurrentUser()?.username;
     this.checklistGuideVisible = this.onboardingService.shouldShow('checklist', username);
     this.loadActiveChecklist();
-    this.loadLastCheck();
   }
 
   closeChecklistGuide(dontShowAgain = false): void {
@@ -203,23 +201,6 @@ export class ChecklistComponent implements OnInit {
     });
   }
 
-  loadLastCheck(): void {
-    this.checklistService.getLastCheck().subscribe({
-      next: (check: any) => {
-        this.lastCheck = (check as any)?.check || check || null;
-        this.logAction('checklist.last.load', 'ok', { exists: !!this.lastCheck });
-      },
-      error: (err) => this.logAction('checklist.last.load', 'error', { message: err?.message })
-    });
-  }
-
-  getLastCheckStatus(): string {
-    if (!this.lastCheck) return 'Sin registro';
-    const type = this.lastCheck.type === 'inicio' ? 'Inicio' : 'Cierre';
-    const status = this.lastCheck.hasRedServices ? 'Con problemas' : 'OK';
-    return `${type} - ${status}`;
-  }
-
   onSubmit(): void {
     if (this.isSubmitting) {
       return;
@@ -277,7 +258,6 @@ export class ChecklistComponent implements OnInit {
     this.checklistService.createCheck(payload).subscribe({
       next: () => {
         this.snackBar.open('Checklist enviado exitosamente', 'Cerrar', { duration: 3000 });
-        this.loadLastCheck();
         this.resetForm();
         this.logAction('checklist.submit', 'ok', { services: payload.services.length });
         this.isSubmitting = false;

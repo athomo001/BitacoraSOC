@@ -2,7 +2,9 @@
   padding: 24px;
 
   h1 {
-    margin-bottom: 24px;
+    margin: 4px 0 24px;
+    line-height: 1.25;
+    letter-spacing: 0.01em;
     color: var(--text-primary);
   }
 }
@@ -13,6 +15,32 @@
   box-shadow: var(--shadow);
   overflow: hidden;
   background: var(--surface-card);
+}
+
+.checklist-panel--interactive {
+  margin-bottom: 16px;
+
+  .mat-expansion-panel {
+    box-shadow: none;
+    background: transparent;
+  }
+
+  .mat-expansion-panel-header {
+    min-height: 64px;
+    padding: 0 18px;
+  }
+
+  .mat-expansion-panel-header-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--text-primary);
+  }
+
+  .mat-expansion-panel-header-description {
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
 }
 
 .checklist-panel__body {
@@ -61,13 +89,15 @@
   margin-top: 24px;
 
   h3 {
-    margin-bottom: 8px;
+    margin: 0 0 10px;
+    line-height: 1.35;
     color: var(--text-primary);
   }
 
   .hint {
     color: var(--text-secondary);
     font-size: 14px;
+    line-height: 1.5;
     margin-bottom: 24px;
   }
 
@@ -105,6 +135,7 @@
 
     .service-description {
       margin: 4px 0 8px 40px;
+      line-height: 1.5;
       color: var(--text-secondary);
     }
   }
