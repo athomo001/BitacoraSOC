@@ -49,6 +49,29 @@ const parsePositiveInt = (value, fallback, max = 500) => {
   return Math.min(parsed, max);
 };
 
+const findAssignmentConflict = async ({ roleCode, weekStartDate, weekEndDate, excludeId }) => {
+  const conflictFilter = {
+    roleCode,
+    weekStartDate: { $lt: weekEndDate },
+    weekEndDate: { $gt: weekStartDate }
+  };
+
+  if (excludeId) {
+    conflictFilter._id = { $ne: excludeId };
+  }
+
+  return ShiftAssignment.findOne(conflictFilter)
+    .populate('userId', 'fullName')
+    .populate('externalPersonId', 'name');
+};
+
+const formatConflictMessage = (conflict) => {
+  const personName = conflict?.userId?.fullName || conflict?.externalPersonId?.name || 'otra persona';
+  const startLabel = new Date(conflict.weekStartDate).toLocaleDateString('es-CL');
+  const endLabel = new Date(conflict.weekEndDate).toLocaleDateString('es-CL');
+  return `Ya existe una asignación para ${conflict.roleCode} en ese período (${startLabel} - ${endLabel}) con ${personName}`;
+};
+
 const normalizeCargoLabel = (value) => String(value || '').trim().toUpperCase();
 const sanitizeText = (value, maxLength = 300) => String(value ?? '').trim().slice(0, maxLength);
 
@@ -1100,6 +1123,23 @@ exports.getAssignments = async (req, res) => {
 
 exports.createAssignment = async (req, res) => {
   try {
+    const weekStartDate = new Date(req.body.weekStartDate);
+    const weekEndDate = new Date(req.body.weekEndDate);
+
+    if (Number.isNaN(weekStartDate.getTime()) || Number.isNaN(weekEndDate.getTime())) {
+      return res.status(400).json({ error: 'Fechas de asignación inválidas' });
+    }
+
+    const conflict = await findAssignmentConflict({
+      roleCode: req.body.roleCode,
+      weekStartDate,
+      weekEndDate
+    });
+
+    if (conflict) {
+      return res.status(409).json({ error: formatConflictMessage(conflict) });
+    }
+
     const assignment = new ShiftAssignment(req.body);
     await assignment.save();
     await assignment.populate('userId', 'fullName email');
@@ -1115,12 +1155,34 @@ exports.createAssignment = async (req, res) => {
 exports.updateAssignment = async (req, res) => {
   try {
     const { id } = req.params;
+
+    const existing = await ShiftAssignment.findById(id);
+    if (!existing) {
+      return res.status(404).json({ error: 'Shift assignment not found' });
+    }
+
+    const roleCode = req.body.roleCode || existing.roleCode;
+    const weekStartDate = req.body.weekStartDate ? new Date(req.body.weekStartDate) : new Date(existing.weekStartDate);
+    const weekEndDate = req.body.weekEndDate ? new Date(req.body.weekEndDate) : new Date(existing.weekEndDate);
+
+    if (Number.isNaN(weekStartDate.getTime()) || Number.isNaN(weekEndDate.getTime())) {
+      return res.status(400).json({ error: 'Fechas de asignación inválidas' });
+    }
+
+    const conflict = await findAssignmentConflict({
+      roleCode,
+      weekStartDate,
+      weekEndDate,
+      excludeId: id
+    });
+
+    if (conflict) {
+      return res.status(409).json({ error: formatConflictMessage(conflict) });
+    }
+
     const assignment = await ShiftAssignment.findByIdAndUpdate(id, req.body, { new: true, runValidators: true })
       .populate('userId', 'fullName email')
       .populate('externalPersonId', 'name email');
-    if (!assignment) {
-      return res.status(404).json({ error: 'Shift assignment not found' });
-    }
     logger.info('Shift assignment updated:', { assignmentId: assignment._id, roleCode: assignment.roleCode });
     res.json(assignment);
   } catch (error) {

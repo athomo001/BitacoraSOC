@@ -163,6 +163,42 @@
           </mat-expansion-panel>
         </mat-accordion>
 
+        <mat-accordion *ngIf="!loadingAssignments && nextMonthAssignments.length > 0" class="month-accordion">
+          <mat-expansion-panel>
+            <mat-expansion-panel-header>
+              <mat-panel-title>Próximo mes</mat-panel-title>
+              <mat-panel-description>{{ nextMonthAssignments.length }} asignaciones</mat-panel-description>
+            </mat-expansion-panel-header>
+
+            <div class="simple-table compact-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Semana</th>
+                    <th>Rol</th>
+                    <th>Persona</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let assignment of nextMonthAssignments">
+                    <td>{{ formatDate(assignment.weekStartDate) }} - {{ formatDate(assignment.weekEndDate) }}</td>
+                    <td><strong>{{ assignment.roleCode }}</strong></td>
+                    <td>
+                      {{ assignment.userId?.fullName || assignment.userId?.name || assignment.externalPersonId?.name || 'N/A' }}
+                    </td>
+                    <td>
+                      <button mat-icon-button color="warn" (click)="deleteAssignment(assignment._id)">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </mat-expansion-panel>
+        </mat-accordion>
+
         <div class="historical-section" *ngIf="!loadingAssignments">
           <button mat-stroked-button color="primary" (click)="toggleHistorical()" [disabled]="loadingHistoricalAssignments">
             <mat-icon>{{ showHistorical ? 'expand_less' : 'history' }}</mat-icon>
@@ -202,7 +238,7 @@
           <mat-spinner diameter="40"></mat-spinner>
         </div>
 
-        <div *ngIf="!loadingAssignments && currentMonthAssignments.length === 0 && previousMonthAssignments.length === 0" class="no-data">
+        <div *ngIf="!loadingAssignments && currentMonthAssignments.length === 0 && previousMonthAssignments.length === 0 && nextMonthAssignments.length === 0" class="no-data">
           <mat-icon>event_busy</mat-icon>
           <p>No hay turnos asignados</p>
         </div>

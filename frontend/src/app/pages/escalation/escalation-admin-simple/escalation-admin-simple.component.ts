@@ -62,6 +62,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
   // Turnos internos
   assignments: any[] = [];
   currentMonthAssignments: any[] = [];
+  nextMonthAssignments: any[] = [];
   previousMonthAssignments: any[] = [];
   historicalAssignments: any[] = [];
   loadingAssignments = false;
@@ -392,7 +393,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
     this.loadingAssignments = true;
     const currentDate = new Date();
     const fromDate = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() - 1).toISOString();
-    const toDate = this.getEndOfMonth(currentDate.getFullYear(), currentDate.getMonth()).toISOString();
+    const toDate = this.getEndOfMonth(currentDate.getFullYear(), currentDate.getMonth() + 1).toISOString();
 
     this.escalationService.getAssignments(undefined, fromDate, toDate).subscribe({
       next: (data) => {
@@ -456,11 +457,17 @@ export class EscalationAdminSimpleComponent implements OnInit {
     const currentDate = new Date();
     const currentMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth());
     const nextMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() + 1);
+    const monthAfterNextStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() + 2);
     const previousMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() - 1);
 
     this.currentMonthAssignments = assignments.filter((assignment: any) => {
       const weekStart = new Date(assignment.weekStartDate);
       return weekStart >= currentMonthStart && weekStart < nextMonthStart;
+    });
+
+    this.nextMonthAssignments = assignments.filter((assignment: any) => {
+      const weekStart = new Date(assignment.weekStartDate);
+      return weekStart >= nextMonthStart && weekStart < monthAfterNextStart;
     });
 
     this.previousMonthAssignments = assignments.filter((assignment: any) => {
@@ -529,7 +536,8 @@ export class EscalationAdminSimpleComponent implements OnInit {
       },
       error: (err) => {
         console.error('Error:', err);
-        this.showError('Error al asignar turno');
+        const backendMessage = err?.error?.error || err?.error?.message;
+        this.showError(backendMessage || 'Error al asignar turno');
         this.savingAssignment = false;
       }
     });
