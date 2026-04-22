@@ -131,11 +131,11 @@
           </table>
         </div>
 
-        <mat-accordion *ngIf="!loadingAssignments && nextMonthAssignments.length > 0" class="month-accordion">
+        <mat-accordion *ngIf="!loadingAssignments && futureAssignments.length > 0" class="month-accordion">
           <mat-expansion-panel [expanded]="true">
             <mat-expansion-panel-header>
-              <mat-panel-title>Próximo mes</mat-panel-title>
-              <mat-panel-description>{{ nextMonthAssignments.length }} asignaciones</mat-panel-description>
+              <mat-panel-title>Próximos meses</mat-panel-title>
+              <mat-panel-description>{{ futureAssignments.length }} asignaciones</mat-panel-description>
             </mat-expansion-panel-header>
 
             <div class="simple-table compact-table">
@@ -149,7 +149,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr *ngFor="let assignment of nextMonthAssignments">
+                  <tr *ngFor="let assignment of futureAssignments">
                     <td>{{ formatDate(assignment.weekStartDate) }} - {{ formatDate(assignment.weekEndDate) }}</td>
                     <td><strong>{{ assignment.roleCode }}</strong></td>
                     <td>
@@ -242,7 +242,7 @@
           <mat-spinner diameter="40"></mat-spinner>
         </div>
 
-        <div *ngIf="!loadingAssignments && currentMonthAssignments.length === 0 && previousMonthAssignments.length === 0 && nextMonthAssignments.length === 0" class="no-data">
+        <div *ngIf="!loadingAssignments && currentMonthAssignments.length === 0 && previousMonthAssignments.length === 0 && futureAssignments.length === 0" class="no-data">
           <mat-icon>event_busy</mat-icon>
           <p>No hay turnos asignados</p>
         </div>
