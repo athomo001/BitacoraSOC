@@ -52,8 +52,8 @@ const parsePositiveInt = (value, fallback, max = 500) => {
 const findAssignmentConflict = async ({ roleCode, weekStartDate, weekEndDate, excludeId }) => {
   const conflictFilter = {
     roleCode,
-    weekStartDate: { $lt: weekEndDate },
-    weekEndDate: { $gt: weekStartDate }
+    weekStartDate,
+    weekEndDate
   };
 
   if (excludeId) {
@@ -69,7 +69,7 @@ const formatConflictMessage = (conflict) => {
   const personName = conflict?.userId?.fullName || conflict?.externalPersonId?.name || 'otra persona';
   const startLabel = new Date(conflict.weekStartDate).toLocaleDateString('es-CL');
   const endLabel = new Date(conflict.weekEndDate).toLocaleDateString('es-CL');
-  return `Ya existe una asignación para ${conflict.roleCode} en ese período (${startLabel} - ${endLabel}) con ${personName}`;
+  return `Ya existe una asignación para ${conflict.roleCode} en el mismo período (${startLabel} - ${endLabel}) con ${personName}`;
 };
 
 const normalizeCargoLabel = (value) => String(value || '').trim().toUpperCase();
