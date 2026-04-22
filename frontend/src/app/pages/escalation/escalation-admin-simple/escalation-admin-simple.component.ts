@@ -1193,8 +1193,9 @@ export class EscalationAdminSimpleComponent implements OnInit {
       return false;
     }
 
-    const regex = shiftLevel === 'N1' ? /\bN1\b/i : /\bN2\b/i;
-    return regex.test(cargoLabel);
+    // Solo acepta cargos que comienzan con N1/N2; evita coincidencias ambiguas como "Pentester N1".
+    const normalized = cargoLabel.toUpperCase();
+    return normalized.startsWith(shiftLevel);
   }
 
   addExternalPerson(): void {

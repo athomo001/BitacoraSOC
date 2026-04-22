@@ -49,6 +49,21 @@ const parsePositiveInt = (value, fallback, max = 500) => {
   return Math.min(parsed, max);
 };
 
+const cargoMatchesRoleCode = (cargoLabel, roleCode) => {
+  const normalizedCargo = String(cargoLabel || '').trim().toUpperCase();
+  if (!normalizedCargo) return false;
+
+  if (roleCode === 'N1_NO_HABIL') {
+    return normalizedCargo.startsWith('N1');
+  }
+
+  if (roleCode === 'N2') {
+    return normalizedCargo.startsWith('N2');
+  }
+
+  return true;
+};
+
 const findAssignmentConflict = async ({ roleCode, weekStartDate, weekEndDate, excludeId }) => {
   const conflictFilter = {
     roleCode,
@@ -1130,6 +1145,20 @@ exports.createAssignment = async (req, res) => {
       return res.status(400).json({ error: 'Fechas de asignación inválidas' });
     }
 
+    if (req.body.userId) {
+      const user = await User.findById(req.body.userId).select('cargoLabel fullName username');
+      if (!user) {
+        return res.status(400).json({ error: 'Usuario no válido para la asignación' });
+      }
+
+      if (!cargoMatchesRoleCode(user.cargoLabel, req.body.roleCode)) {
+        const userName = user.fullName || user.username || 'usuario';
+        return res.status(400).json({
+          error: `El usuario ${userName} no tiene cargo compatible con el rol ${req.body.roleCode}`
+        });
+      }
+    }
+
     const conflict = await findAssignmentConflict({
       roleCode: req.body.roleCode,
       weekStartDate,
@@ -1164,9 +1193,24 @@ exports.updateAssignment = async (req, res) => {
     const roleCode = req.body.roleCode || existing.roleCode;
     const weekStartDate = req.body.weekStartDate ? new Date(req.body.weekStartDate) : new Date(existing.weekStartDate);
     const weekEndDate = req.body.weekEndDate ? new Date(req.body.weekEndDate) : new Date(existing.weekEndDate);
+    const userId = req.body.userId !== undefined ? req.body.userId : existing.userId;
 
     if (Number.isNaN(weekStartDate.getTime()) || Number.isNaN(weekEndDate.getTime())) {
       return res.status(400).json({ error: 'Fechas de asignación inválidas' });
+    }
+
+    if (userId) {
+      const user = await User.findById(userId).select('cargoLabel fullName username');
+      if (!user) {
+        return res.status(400).json({ error: 'Usuario no válido para la asignación' });
+      }
+
+      if (!cargoMatchesRoleCode(user.cargoLabel, roleCode)) {
+        const userName = user.fullName || user.username || 'usuario';
+        return res.status(400).json({
+          error: `El usuario ${userName} no tiene cargo compatible con el rol ${roleCode}`
+        });
+      }
     }
 
     const conflict = await findAssignmentConflict({
