@@ -9,43 +9,19 @@
   padding: 2.5rem 1.25rem;
   display: grid;
   place-items: center;
-  background:
-    radial-gradient(circle at 12% 15%, rgba(17, 86, 204, 0.2) 0%, transparent 40%),
-    radial-gradient(circle at 88% 82%, rgba(14, 196, 120, 0.17) 0%, transparent 42%),
-    linear-gradient(145deg, #f5f7fb 0%, #eef3f9 45%, #edf6f3 100%);
+  background: #ffffff;
 }
 
-.glow-shape {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(40px);
-  z-index: 0;
-}
 
-.glow-shape-left {
-  width: 220px;
-  height: 220px;
-  left: 6%;
-  top: 12%;
-  background: rgba(33, 114, 255, 0.28);
-}
-
-.glow-shape-right {
-  width: 260px;
-  height: 260px;
-  right: 5%;
-  bottom: 8%;
-  background: rgba(17, 163, 99, 0.24);
-}
 
 .not-found-card {
   position: relative;
   z-index: 1;
-  width: min(760px, 96vw);
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(20, 50, 100, 0.1);
+  width: min(820px, 96vw);
+  background: #ffffff;
+  border: 1px solid rgba(20, 50, 100, 0.08);
   border-radius: 20px;
-  box-shadow: 0 24px 60px rgba(25, 48, 84, 0.18);
+  box-shadow: 0 8px 32px rgba(25, 48, 84, 0.1);
   padding: 2rem 1.5rem;
   text-align: center;
 }
@@ -75,18 +51,19 @@ h1 {
 }
 
 .animation-shell {
-  width: min(520px, 100%);
+  width: min(720px, 100%);
   margin: 0 auto 1.6rem;
-  border-radius: 14px;
+  border-radius: 0;
   overflow: hidden;
-  border: 1px solid rgba(14, 39, 79, 0.12);
-  background: #f7fbff;
+  border: none;
+  background: #ffffff;
 }
 
 .animation-shell iframe {
   width: 100%;
-  height: 310px;
+  height: 420px;
   border: 0;
+  background: #ffffff;
 }
 
 .actions {
@@ -129,6 +106,6 @@ h1 {
   }
 
   .animation-shell iframe {
-    height: 260px;
+    height: 320px;
   }
 }
