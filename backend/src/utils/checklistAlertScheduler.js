@@ -183,10 +183,32 @@ const resolveFutureWeekGap = async (now, config) => {
   const daysAhead = getEscalationReminderDaysAhead(config);
   const currentWeekStart = getStartOfWeekMonday(now);
 
+  // Calcula el próximo lunes a partir de ahora + daysAhead
   const anchorDate = new Date(now);
   anchorDate.setDate(anchorDate.getDate() + daysAhead);
-
-  let targetWeekStart = getStartOfWeekMonday(anchorDate);
+  
+  // Normaliza a inicio del día
+  anchorDate.setHours(0, 0, 0, 0);
+  
+  // Encuentra el próximo lunes desde anchorDate
+  const dayOfWeek = anchorDate.getDay(); // 0=domingo, 1=lunes, etc
+  let daysToNextMonday = 0;
+  
+  if (dayOfWeek === 0) {
+    // Si es domingo, el próximo lunes es mañana (+1)
+    daysToNextMonday = 1;
+  } else if (dayOfWeek === 1) {
+    // Si ya es lunes, usa este lunes (mismo día)
+    daysToNextMonday = 0;
+  } else {
+    // Si es martes-sábado, calcula días hasta el próximo lunes
+    daysToNextMonday = (8 - dayOfWeek);
+  }
+  
+  let targetWeekStart = new Date(anchorDate);
+  targetWeekStart.setDate(targetWeekStart.getDate() + daysToNextMonday);
+  
+  // Asegúrate que no sea la semana actual o anterior
   if (targetWeekStart <= currentWeekStart) {
     targetWeekStart = new Date(currentWeekStart);
     targetWeekStart.setDate(targetWeekStart.getDate() + 7);
