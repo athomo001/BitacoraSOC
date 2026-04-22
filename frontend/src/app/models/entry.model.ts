@@ -27,13 +27,19 @@ export interface Entry {
   userAgent?: string;
   createdAt: Date;
   updatedAt?: Date;
+  checklistType?: 'inicio' | 'cierre';
+  checklistMetrics?: {
+    totalServices: number;
+    totalProblems: number;
+  };
 }
 
-export type EntryType = 'operativa' | 'incidente' | 'ofensa';
+export type EntryType = 'operativa' | 'incidente' | 'ofensa' | 'checklist';
+export type CreateEntryType = 'operativa' | 'incidente' | 'ofensa';
 
 export interface CreateEntryRequest {
   content: string;
-  entryType: EntryType;
+  entryType: CreateEntryType;
   entryDate: string;
   entryTime: string;
   clientId?: string; // Cliente/Log Source (B2i)

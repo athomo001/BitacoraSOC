@@ -64,46 +64,54 @@ import { ComplementBridgeService } from '../../../services/complement-bridge.ser
     </div>
   `,
   styles: [`
+    :host {
+      display: block;
+      /* Rompe el max-width: 1320px del content-wrapper > * */
+      max-width: none !important;
+      width: 100%;
+    }
+
     .complement-page {
-      padding: 20px 24px 24px;
+      /* Cancela el padding del content-wrapper (20px top, 24px sides, 28px bottom) */
+      margin: -20px -24px -28px;
     }
 
     .complement-page.is-empty {
-      min-height: calc(100vh - 160px);
+      padding: 40px 32px;
+      min-height: calc(100vh - 108px);
     }
 
     .complement-header {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 16px;
-      padding: 0 2px;
+      justify-content: flex-end;
+      gap: 12px;
+      padding: 6px 16px;
+      min-height: 40px;
+      background: var(--surface-color, #fff);
+      border-bottom: 1px solid var(--outline-subtle, rgba(0,0,0,0.07));
     }
 
     .complement-header.is-open {
-      margin-bottom: 12px;
+      background: #fffaf0;
+      border-color: rgba(196, 137, 0, 0.2);
     }
 
-    .header-copy h1 {
-      margin: 0;
-      font-size: clamp(1.7rem, 2vw, 2.2rem);
-      line-height: 1.1;
-      color: var(--text-primary, #1a2233);
+    /* Título oculto — el nombre ya está en el menú lateral */
+    .header-copy {
+      display: none;
     }
 
     .header-actions {
       display: flex;
       align-items: center;
-      justify-content: flex-end;
-      gap: 12px;
-      flex-wrap: wrap;
+      gap: 10px;
     }
 
     .state-badge {
       border-radius: 999px;
-      padding: 7px 14px;
-      font-size: 12px;
+      padding: 4px 12px;
+      font-size: 11px;
       font-weight: 700;
       background: #e7eefc;
       color: #244a9a;
@@ -121,11 +129,12 @@ import { ComplementBridgeService } from '../../../services/complement-bridge.ser
     }
 
     .status-panel {
-      padding: 22px 24px;
-      border-radius: 18px;
+      margin: 16px 20px;
+      padding: 18px 22px;
+      border-radius: 14px;
       background: var(--surface-color, #ffffff);
       border: 1px solid rgba(0, 0, 0, 0.08);
-      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+      box-shadow: 0 6px 20px rgba(15, 23, 42, 0.04);
     }
 
     .status-panel h2,
@@ -135,26 +144,24 @@ import { ComplementBridgeService } from '../../../services/complement-bridge.ser
 
     .status-panel p + p,
     .status-panel h2 + p {
-      margin-top: 10px;
+      margin-top: 8px;
     }
 
     .warning-panel {
-      margin-bottom: 16px;
       background: #fffaf0;
       border-color: rgba(196, 137, 0, 0.18);
     }
 
     .frame-stage {
-      border-radius: 20px;
+      /* Sin bordes ni padding — el iframe ocupa todo */
       overflow: hidden;
       background: var(--surface-color, #ffffff);
-      border: 1px solid rgba(0, 0, 0, 0.07);
-      box-shadow: 0 18px 48px rgba(15, 23, 42, 0.05);
     }
 
     .complement-frame {
       width: 100%;
-      min-height: calc(100vh - 180px);
+      /* 68px toolbar + 40px header banda + 40px complement-header */
+      height: calc(100vh - 148px);
       border: 0;
       background: #fff;
       display: block;
@@ -162,20 +169,11 @@ import { ComplementBridgeService } from '../../../services/complement-bridge.ser
 
     @media (max-width: 900px) {
       .complement-page {
-        padding: 16px;
-      }
-
-      .complement-header {
-        align-items: flex-start;
-        flex-direction: column;
-      }
-
-      .header-actions {
-        justify-content: flex-start;
+        margin: -16px -16px -20px;
       }
 
       .complement-frame {
-        min-height: calc(100vh - 220px);
+        height: calc(100vh - 160px);
       }
     }
   `]
