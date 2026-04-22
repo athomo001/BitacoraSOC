@@ -3,6 +3,7 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const { body, query } = require('express-validator');
 const Entry = require('../models/Entry');
+const ShiftCheck = require('../models/ShiftCheck');
 const CatalogLogSource = require('../models/CatalogLogSource');
 const AppConfig = require('../models/AppConfig');
 const { authenticate, notGuest } = require('../middleware/auth');
@@ -13,6 +14,67 @@ const { dispatchGlpiPayload } = require('../utils/glpi-dispatch');
 const { logger } = require('../utils/logger');
 
 const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const buildChecklistSummaryContent = (check) => {
+  const services = Array.isArray(check?.services) ? check.services : [];
+  const redServices = services.filter((service) => service?.status === 'rojo');
+  const kind = check?.type === 'cierre' ? 'Cierre' : 'Inicio';
+  const totalServices = services.length;
+  const totalProblems = redServices.length;
+
+  if (totalProblems === 0) {
+    return `[${kind}] Estado general: OK - Servicios Evaluados ${totalServices} - Servicios con Problemas ${totalProblems}`;
+  }
+
+  const detail = redServices
+    .map((service) => {
+      const title = String(service?.serviceTitle || '').trim() || 'Servicio sin nombre';
+      const observation = String(service?.observation || '').trim();
+      return observation ? `${title} [${observation}]` : title;
+    })
+    .join(', ');
+
+  return `[${kind}] Estado general: CON PROBLEMAS ${detail} - Servicios Evaluados ${totalServices} - Servicios con Problemas ${totalProblems}`;
+};
+
+const toSantiagoDate = (value) => new Date(value).toLocaleDateString('en-CA', {
+  timeZone: 'America/Santiago'
+});
+
+const toSantiagoTime = (value) => new Date(value).toLocaleTimeString('es-CL', {
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+  timeZone: 'America/Santiago'
+});
+
+const toChecklistEntryLikeRecord = (check, clientContext = {}) => {
+  const checkDate = new Date(check.checkDate || check.createdAt || new Date());
+  const entryDate = `${toSantiagoDate(checkDate)}T00:00:00.000Z`;
+  const entryTime = toSantiagoTime(checkDate);
+  return {
+    _id: String(check._id),
+    content: buildChecklistSummaryContent(check),
+    entryType: 'checklist',
+    entryDate,
+    entryTime,
+    tags: [],
+    clientId: clientContext.clientId || null,
+    clientName: clientContext.clientName || 'netics',
+    createdBy: check.userId || null,
+    createdByUsername: check.username || check.userId?.username || 'N/A',
+    isGuestEntry: false,
+    createdAt: checkDate,
+    updatedAt: check.updatedAt || checkDate,
+    checklistType: check.type,
+    checklistMetrics: {
+      totalServices: Array.isArray(check.services) ? check.services.length : 0,
+      totalProblems: Array.isArray(check.services)
+        ? check.services.filter((service) => service?.status === 'rojo').length
+        : 0
+    }
+  };
+};
 
 // Helper: extraer hashtags (con protección ReDoS)
 const extractHashtags = (text) => {
@@ -178,7 +240,7 @@ router.get('/',
     query('search').optional().trim(),
     query('tags').optional(),
     query('clientId').optional().isMongoId(),
-    query('entryType').optional().isIn(['operativa', 'incidente', 'ofensa']),
+    query('entryType').optional().isIn(['operativa', 'incidente', 'ofensa', 'checklist']),
     query('startDate').optional().isISO8601(),
     query('endDate').optional().isISO8601(),
     query('userId').optional().isMongoId()
@@ -243,19 +305,87 @@ router.get('/',
         }
       }
 
-      // Ejecutar consulta
-      const [entries, total] = await Promise.all([
-        Entry.find(filters)
-          .sort({ entryDate: -1, entryTime: -1, createdAt: -1 })
-          .skip(skip)
-          .limit(limit)
-          .populate('createdBy', 'username fullName role')
-          .lean(),
-        Entry.countDocuments(filters)
+      const includeChecklistByType = !entryType || entryType === 'checklist';
+      const includeNormalEntriesByType = !entryType || entryType !== 'checklist';
+      const shouldIncludeChecklist = includeChecklistByType && !tags;
+
+      let checklistClientContext = { clientId: null, clientName: 'netics' };
+      if (shouldIncludeChecklist) {
+        const appConfig = await AppConfig.findOne().select('defaultLogSourceId').lean();
+        if (appConfig?.defaultLogSourceId) {
+          const defaultSource = await CatalogLogSource.findById(appConfig.defaultLogSourceId)
+            .select('_id name')
+            .lean();
+          if (defaultSource) {
+            checklistClientContext = {
+              clientId: String(defaultSource._id),
+              clientName: defaultSource.name || 'netics'
+            };
+          }
+        }
+      }
+
+      const checklistFilters = {};
+      if (startDate || endDate) {
+        checklistFilters.checkDate = {};
+        if (startDate) checklistFilters.checkDate.$gte = new Date(startDate);
+        if (endDate) checklistFilters.checkDate.$lte = new Date(endDate);
+      }
+      if (userId) {
+        checklistFilters.userId = userId;
+      }
+      if (search) {
+        const searchRegex = new RegExp(escapeRegex(search), 'i');
+        checklistFilters.$or = [
+          { username: searchRegex },
+          { type: searchRegex },
+          { 'services.serviceTitle': searchRegex },
+          { 'services.observation': searchRegex }
+        ];
+      }
+
+      const includeChecklistForClient = !clientId
+        || String(checklistClientContext.clientId || '') === String(clientId);
+
+      // Para mezclar entradas y checklists en orden cronológico sin usar $union,
+      // traemos una ventana suficiente por fuente y luego paginamos en memoria.
+      const fetchWindow = skip + limit;
+
+      const [entriesRows, entriesTotal, checklistRows, checklistTotal] = await Promise.all([
+        includeNormalEntriesByType
+          ? Entry.find(filters)
+              .sort({ entryDate: -1, entryTime: -1, createdAt: -1 })
+              .limit(fetchWindow)
+              .populate('createdBy', 'username fullName role')
+              .lean()
+          : Promise.resolve([]),
+        includeNormalEntriesByType ? Entry.countDocuments(filters) : Promise.resolve(0),
+        (shouldIncludeChecklist && includeChecklistForClient)
+          ? ShiftCheck.find(checklistFilters)
+              .sort({ checkDate: -1, createdAt: -1 })
+              .limit(fetchWindow)
+              .populate('userId', 'username fullName role')
+              .lean()
+          : Promise.resolve([]),
+        (shouldIncludeChecklist && includeChecklistForClient)
+          ? ShiftCheck.countDocuments(checklistFilters)
+          : Promise.resolve(0)
       ]);
 
+      let checklistEntries = checklistRows.map((check) => toChecklistEntryLikeRecord(check, checklistClientContext));
+
+      const allRows = [...entriesRows, ...checklistEntries]
+        .sort((a, b) => {
+          const aTime = new Date(a.createdAt || `${a.entryDate}T${a.entryTime || '00:00'}:00`).getTime();
+          const bTime = new Date(b.createdAt || `${b.entryDate}T${b.entryTime || '00:00'}:00`).getTime();
+          return bTime - aTime;
+        });
+
+      const pageRows = allRows.slice(skip, skip + limit);
+      const total = entriesTotal + checklistTotal;
+
       res.json({
-        entries,
+        entries: pageRows,
         pagination: {
           total,
           page,

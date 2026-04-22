@@ -155,6 +155,11 @@
       background-color: var(--state-warning-bg);
       color: var(--state-warning);
     }
+
+    &.checklist {
+      background-color: color-mix(in srgb, var(--primary-color) 14%, transparent);
+      color: var(--primary-color);
+    }
   }
 
   mat-chip {

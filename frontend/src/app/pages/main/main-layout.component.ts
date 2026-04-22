@@ -85,8 +85,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     { icon: 'playlist_add_check', label: 'Historial Checklists', route: '/main/checklist-history', roles: ['admin', 'user', 'guest', 'auditor'] },
     { icon: 'contact_phone', label: 'Escalación', route: '/main/escalation/view', roles: ['admin', 'user', 'guest', 'auditor'] },
     { icon: 'table_chart', label: 'Generar Reporte', route: '/main/report-generator', roles: ['admin', 'user', 'guest', 'auditor'] },
-    { icon: 'history', label: 'Mis Entradas', route: '/main/my-entries', roles: ['admin', 'user', 'guest', 'auditor'] },
-    { icon: 'public', label: 'Ver todas', route: '/main/all-entries', roles: ['admin', 'user', 'guest', 'auditor'] },
+    { icon: 'public', label: 'Ver entradas', route: '/main/all-entries', roles: ['admin', 'user', 'guest', 'auditor'] },
     { icon: 'assessment', label: 'Reportes', route: '/main/reports', roles: ['admin', 'user', 'guest', 'auditor'] },
     { icon: 'person', label: 'Mi Perfil', route: '/main/profile', roles: ['admin', 'user', 'guest', 'auditor'] }
   ];
@@ -112,7 +111,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   healthServices: { key: 'smtp' | 'mongo' | 'internalApi' | 'integrations'; label: string; state: HealthServiceState }[] = [];
   activeComplements: Complement[] = [];
   private backendBaseUrl = environment.backendBaseUrl;
-  private readonly historyMenuRoutes = new Set(['/main/checklist-history', '/main/my-entries', '/main/all-entries']);
+  private readonly historyMenuRoutes = new Set(['/main/checklist-history', '/main/all-entries']);
 
   constructor(
     private authService: AuthService,

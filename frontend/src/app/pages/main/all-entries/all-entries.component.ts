@@ -63,7 +63,8 @@ export class AllEntriesComponent implements OnInit {
     { value: '', label: 'Todos' },
     { value: 'operativa', label: 'Operativa' },
     { value: 'ofensa', label: 'Ofensa' },
-    { value: 'incidente', label: 'Incidente' }
+    { value: 'incidente', label: 'Incidente' },
+    { value: 'checklist', label: 'Checklist' }
   ];
 
   constructor(
@@ -156,6 +157,11 @@ export class AllEntriesComponent implements OnInit {
   }
 
   onDelete(entry: Entry): void {
+    if (this.isChecklistEntry(entry)) {
+      this.snackBar.open('Los checklists se eliminan desde Historial Checklists', 'Cerrar', { duration: 2800 });
+      return;
+    }
+
     if (!confirm('¿Eliminar esta entrada?')) return;
 
     this.entryService.deleteEntry(entry._id).subscribe({
@@ -174,11 +180,7 @@ export class AllEntriesComponent implements OnInit {
     const author = entry.createdByUsername || 'N/A';
     const date = this.formatEntryDate(entry.entryDate);
     const time = entry.entryTime;
-    const type = entry.entryType === 'incidente'
-      ? 'INCIDENTE'
-      : entry.entryType === 'ofensa'
-        ? 'OFENSA'
-        : 'OPERATIVA';
+    const type = this.getEntryTypeLabel(entry).toUpperCase();
     const tags = entry.tags?.join(', ') || 'Sin tags';
 
     const details = `Fecha: ${date} ${time}
@@ -226,22 +228,30 @@ Tags: ${tags}`;
 
   // Selección masiva
   toggleSelectAll(): void {
+    const selectableEntries = this.entries.filter((entry) => !this.isChecklistEntry(entry));
+
     if (this.allSelected) {
       this.selectedEntries.clear();
       this.allSelected = false;
     } else {
-      this.entries.forEach(entry => this.selectedEntries.add(entry._id));
-      this.allSelected = true;
+      selectableEntries.forEach(entry => this.selectedEntries.add(entry._id));
+      this.allSelected = selectableEntries.length > 0;
     }
   }
 
   toggleSelectEntry(entryId: string): void {
+    const entry = this.entries.find((item) => item._id === entryId);
+    if (!entry || this.isChecklistEntry(entry)) {
+      return;
+    }
+
     if (this.selectedEntries.has(entryId)) {
       this.selectedEntries.delete(entryId);
       this.allSelected = false;
     } else {
       this.selectedEntries.add(entryId);
-      if (this.selectedEntries.size === this.entries.length) {
+      const selectableCount = this.entries.filter((item) => !this.isChecklistEntry(item)).length;
+      if (this.selectedEntries.size === selectableCount) {
         this.allSelected = true;
       }
     }
@@ -309,5 +319,16 @@ Tags: ${tags}`;
         }
       });
     });
+  }
+
+  isChecklistEntry(entry: Entry): boolean {
+    return entry.entryType === 'checklist';
+  }
+
+  getEntryTypeLabel(entry: Entry): string {
+    if (entry.entryType === 'checklist') return 'Checklist';
+    if (entry.entryType === 'incidente') return 'Incidente';
+    if (entry.entryType === 'ofensa') return 'Ofensa';
+    return 'Operativa';
   }
 }

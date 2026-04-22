@@ -158,10 +158,27 @@ router.post('/',
       const { username, email, password, fullName, role, phone } = req.body;
       const cargoLabel = normalizeCargoLabel(req.body?.cargoLabel);
 
-      const existingUser = await User.findOne({ $or: [{ username }, { email }] });
-      if (existingUser) {
+      const matchingUsers = await User.find({ $or: [{ username }, { email }] })
+        .select('_id username email isActive role guestExpiresAt');
+
+      const activeMatch = matchingUsers.find((u) => u.isActive);
+      if (activeMatch) {
         return res.status(400).json({ message: 'El usuario o email ya existe' });
       }
+
+      // Si el usuario fue desactivado previamente, reutilizamos ese registro.
+      // Esto evita bloquear la creación cuando en UI se "eliminó" pero realmente se desactivó.
+      let reusableUser = null;
+      const usernameMatch = matchingUsers.find((u) => u.username === username);
+      const emailMatch = matchingUsers.find((u) => u.email === email);
+
+      if (usernameMatch && emailMatch && String(usernameMatch._id) !== String(emailMatch._id)) {
+        return res.status(400).json({
+          message: 'Conflicto de cuentas inactivas: el usuario y email pertenecen a cuentas distintas. Revisa usuarios inactivos.'
+        });
+      }
+
+      reusableUser = usernameMatch || emailMatch || null;
 
       if (role !== 'guest' && !cargoLabel) {
         return res.status(400).json({ message: 'El cargo es requerido para usuarios operativos' });
@@ -175,21 +192,43 @@ router.post('/',
         guestExpiresAt.setDate(guestExpiresAt.getDate() + days);
       }
 
-      const user = new User({
-        username,
-        email,
-        password,
-        fullName,
-        phone,
-        role,
-        cargoLabel: role === 'guest' ? null : cargoLabel,
-        guestExpiresAt
-      });
+      let user;
+      let auditEvent = 'admin.users.create';
 
-      await user.save();
+      if (reusableUser) {
+        user = await User.findById(reusableUser._id);
+        if (!user) {
+          return res.status(404).json({ message: 'Usuario reutilizable no encontrado' });
+        }
+
+        user.username = username;
+        user.email = email;
+        user.password = password;
+        user.fullName = fullName;
+        user.phone = phone || null;
+        user.role = role;
+        user.cargoLabel = role === 'guest' ? null : cargoLabel;
+        user.guestExpiresAt = guestExpiresAt;
+        user.isActive = true;
+        await user.save();
+        auditEvent = 'admin.users.reactivate';
+      } else {
+        user = new User({
+          username,
+          email,
+          password,
+          fullName,
+          phone,
+          role,
+          cargoLabel: role === 'guest' ? null : cargoLabel,
+          guestExpiresAt
+        });
+
+        await user.save();
+      }
 
       await audit(req, {
-        event: 'admin.users.create',
+        event: auditEvent,
         level: 'info',
         result: { success: true },
         metadata: {
@@ -198,12 +237,13 @@ router.post('/',
           targetRole: user.role,
           cargoLabel: user.cargoLabel,
           isGuest: user.role === 'guest',
-          guestExpiresAt: user.guestExpiresAt
+          guestExpiresAt: user.guestExpiresAt,
+          reusedInactiveAccount: !!reusableUser
         }
       });
 
       res.status(201).json({
-        message: 'Usuario creado exitosamente',
+        message: reusableUser ? 'Usuario reactivado exitosamente' : 'Usuario creado exitosamente',
         user: {
           id: user._id,
           username: user.username,
@@ -216,6 +256,9 @@ router.post('/',
         }
       });
     } catch (error) {
+      if (error?.code === 11000) {
+        return res.status(400).json({ message: 'El usuario o email ya existe' });
+      }
       logger.error({
         err: error,
         requestId: req.requestId,
