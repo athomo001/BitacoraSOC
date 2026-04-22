@@ -207,6 +207,16 @@ export class EscalationAdminSimpleComponent implements OnInit {
       this.updateAssignmentPeopleOptions();
     });
 
+    // Cuando cambia la fecha de inicio, actualiza automáticamente la fecha de fin al siguiente lunes
+    this.assignmentForm.get('weekStartDate')?.valueChanges.subscribe((startDate) => {
+      if (startDate) {
+        const start = new Date(startDate);
+        const endDate = new Date(start);
+        endDate.setDate(endDate.getDate() + 7); // Suma 7 días para el siguiente lunes
+        this.assignmentForm.patchValue({ weekEndDate: endDate }, { emitEvent: false });
+      }
+    });
+
     this.clientForm = this.fb.group({
       name: ['', Validators.required],
       active: [true]
