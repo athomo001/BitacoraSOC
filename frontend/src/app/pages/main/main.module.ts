@@ -128,7 +128,8 @@ const routes: Routes = [
         path: 'work-shifts',
         redirectTo: 'admin/work-shifts',
         pathMatch: 'full'
-      }
+      },
+      { path: '**', redirectTo: '/404' }
     ]
   }
 ];
