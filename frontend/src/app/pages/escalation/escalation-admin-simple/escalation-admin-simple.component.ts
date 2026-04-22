@@ -62,7 +62,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
   // Turnos internos
   assignments: any[] = [];
   currentMonthAssignments: any[] = [];
-  nextMonthAssignments: any[] = [];
+  futureAssignments: any[] = [];
   previousMonthAssignments: any[] = [];
   historicalAssignments: any[] = [];
   loadingAssignments = false;
@@ -393,9 +393,8 @@ export class EscalationAdminSimpleComponent implements OnInit {
     this.loadingAssignments = true;
     const currentDate = new Date();
     const fromDate = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() - 1).toISOString();
-    const toDate = this.getEndOfMonth(currentDate.getFullYear(), currentDate.getMonth() + 1).toISOString();
 
-    this.escalationService.getAssignments(undefined, fromDate, toDate).subscribe({
+    this.escalationService.getAssignments(undefined, fromDate).subscribe({
       next: (data) => {
         this.assignments = [...data].sort((a: any, b: any) => 
           new Date(b.weekStartDate).getTime() - new Date(a.weekStartDate).getTime()
@@ -457,7 +456,6 @@ export class EscalationAdminSimpleComponent implements OnInit {
     const currentDate = new Date();
     const currentMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth());
     const nextMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() + 1);
-    const monthAfterNextStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() + 2);
     const previousMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() - 1);
 
     this.currentMonthAssignments = assignments.filter((assignment: any) => {
@@ -465,9 +463,9 @@ export class EscalationAdminSimpleComponent implements OnInit {
       return weekStart >= currentMonthStart && weekStart < nextMonthStart;
     });
 
-    this.nextMonthAssignments = assignments.filter((assignment: any) => {
+    this.futureAssignments = assignments.filter((assignment: any) => {
       const weekStart = new Date(assignment.weekStartDate);
-      return weekStart >= nextMonthStart && weekStart < monthAfterNextStart;
+      return weekStart >= nextMonthStart;
     });
 
     this.previousMonthAssignments = assignments.filter((assignment: any) => {
@@ -502,15 +500,14 @@ export class EscalationAdminSimpleComponent implements OnInit {
     const currentDate = new Date();
     const currentMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth());
     const nextMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() + 1);
-    const monthAfterNextStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() + 2);
     const previousMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() - 1);
 
     if (date >= currentMonthStart && date < nextMonthStart) {
       return 'Mes actual';
     }
 
-    if (date >= nextMonthStart && date < monthAfterNextStart) {
-      return 'Próximo mes';
+    if (date >= nextMonthStart) {
+      return 'Próximos meses';
     }
 
     if (date >= previousMonthStart && date < currentMonthStart) {
