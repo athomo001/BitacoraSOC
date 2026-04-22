@@ -1157,10 +1157,13 @@ export class EscalationAdminSimpleComponent implements OnInit {
     const roleCode = String(this.assignmentForm?.get('roleCode')?.value || '').trim();
 
     if (roleCode === 'N2') {
-      this.filteredUsersForAssignment = this.users.filter((user) => this.matchesCargoLabel(user, 'N2'));
+      this.filteredUsersForAssignment = this.users.filter((user) => this.matchesRoleCargo(user, 'N2'));
       this.showExternalPeopleForAssignment = false;
     } else if (roleCode === 'N1_NO_HABIL') {
-      this.filteredUsersForAssignment = this.users.filter((user) => this.matchesCargoLabel(user, 'N1'));
+      this.filteredUsersForAssignment = this.users.filter((user) => this.matchesRoleCargo(user, 'N1_NO_HABIL'));
+      this.showExternalPeopleForAssignment = false;
+    } else if (roleCode === 'TI') {
+      this.filteredUsersForAssignment = this.users.filter((user) => this.matchesRoleCargo(user, 'TI'));
       this.showExternalPeopleForAssignment = false;
     } else {
       this.filteredUsersForAssignment = [...this.users];
@@ -1187,15 +1190,19 @@ export class EscalationAdminSimpleComponent implements OnInit {
     }
   }
 
-  private matchesCargoLabel(user: any, shiftLevel: 'N1' | 'N2'): boolean {
-    const cargoLabel = String(user?.cargoLabel || '').trim();
+  private matchesRoleCargo(user: any, roleCode: 'N1_NO_HABIL' | 'N2' | 'TI'): boolean {
+    const cargoLabel = String(user?.cargoLabel || '').trim().toUpperCase();
     if (!cargoLabel) {
       return false;
     }
 
-    // Solo acepta cargos que comienzan con N1/N2; evita coincidencias ambiguas como "Pentester N1".
-    const normalized = cargoLabel.toUpperCase();
-    return normalized.startsWith(shiftLevel);
+    const expectedCargoByRole = {
+      N1_NO_HABIL: 'N1',
+      N2: 'N2',
+      TI: 'TI'
+    };
+
+    return cargoLabel === expectedCargoByRole[roleCode];
   }
 
   addExternalPerson(): void {

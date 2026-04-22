@@ -53,12 +53,14 @@ const cargoMatchesRoleCode = (cargoLabel, roleCode) => {
   const normalizedCargo = String(cargoLabel || '').trim().toUpperCase();
   if (!normalizedCargo) return false;
 
-  if (roleCode === 'N1_NO_HABIL') {
-    return normalizedCargo.startsWith('N1');
-  }
+  const expectedCargoByRole = {
+    N1_NO_HABIL: 'N1',
+    N2: 'N2',
+    TI: 'TI'
+  };
 
-  if (roleCode === 'N2') {
-    return normalizedCargo.startsWith('N2');
+  if (Object.prototype.hasOwnProperty.call(expectedCargoByRole, roleCode)) {
+    return normalizedCargo === expectedCargoByRole[roleCode];
   }
 
   return true;
