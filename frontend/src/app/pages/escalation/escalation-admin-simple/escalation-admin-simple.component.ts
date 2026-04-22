@@ -155,6 +155,44 @@ export class EscalationAdminSimpleComponent implements OnInit {
     this.loadAllData();
   }
 
+  /**
+   * Calcula automáticamente el próximo lunes a las 09:00 y el siguiente lunes a las 08:59
+   */
+  private calculateDefaultWeekDates() {
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0 = domingo, 1 = lunes, ..., 6 = sábado
+    
+    // Calcular cuántos días para llegar al próximo lunes
+    let daysToNextMonday = 0;
+    if (dayOfWeek === 0) {
+      // Si es domingo, el próximo lunes es mañana
+      daysToNextMonday = 1;
+    } else if (dayOfWeek === 1) {
+      // Si es lunes, el próximo lunes es en 7 días
+      daysToNextMonday = 7;
+    } else {
+      // Si es otro día (2-6), calcula días hasta el próximo lunes
+      daysToNextMonday = 8 - dayOfWeek;
+    }
+    
+    // Próximo lunes a las 09:00
+    const nextMonday = new Date(today);
+    nextMonday.setDate(nextMonday.getDate() + daysToNextMonday);
+    nextMonday.setHours(9, 0, 0, 0);
+    
+    // Próximo lunes de la siguiente semana a las 08:59
+    const followingMonday = new Date(nextMonday);
+    followingMonday.setDate(followingMonday.getDate() + 7);
+    followingMonday.setHours(8, 59, 0, 0);
+    
+    return {
+      weekStartDate: nextMonday,
+      weekEndDate: followingMonday,
+      startTime: '09:00',
+      endTime: '08:59'
+    };
+  }
+
   initForms(): void {
     this.assignmentForm = this.fb.group({
       roleCode: ['', Validators.required],
@@ -431,13 +469,14 @@ export class EscalationAdminSimpleComponent implements OnInit {
 
   addAssignment(): void {
     this.showAssignmentForm = true;
+    const defaultDates = this.calculateDefaultWeekDates();
     this.assignmentForm.reset({
       roleCode: '',
       assignedUserId: '',
-      weekStartDate: '',
-      weekEndDate: '',
-      startTime: '08:00',
-      endTime: '18:00'
+      weekStartDate: defaultDates.weekStartDate,
+      weekEndDate: defaultDates.weekEndDate,
+      startTime: defaultDates.startTime,
+      endTime: defaultDates.endTime
     });
     this.updateAssignmentPeopleOptions();
   }
