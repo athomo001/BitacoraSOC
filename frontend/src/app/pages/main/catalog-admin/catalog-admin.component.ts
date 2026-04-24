@@ -13,6 +13,7 @@ import {
 } from '../../../models/escalation.model';
 import { EscalationService } from '../../../services/escalation.service';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormsModule } from '@angular/forms';
 import { MatTabGroup, MatTab } from '@angular/material/tabs';
 import { MatFormField, MatHint, MatLabel, MatSuffix } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
@@ -34,11 +35,17 @@ import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
   selector: 'app-catalog-admin',
   templateUrl: './catalog-admin.component.html',
   styleUrls: ['./catalog-admin.component.scss'],
-  imports: [MatTabGroup, MatTab, ReactiveFormsModule, MatFormField, MatHint, MatLabel, MatSuffix, MatInput, MatCheckbox, MatButton, MatIcon, NgIf, NgFor, MatIconButton, MatTooltip, MatSelect, MatOption, MatPaginator, MatDatepickerModule, MatNativeDateModule],
+  imports: [MatTabGroup, MatTab, ReactiveFormsModule, FormsModule, MatFormField, MatHint, MatLabel, MatSuffix, MatInput, MatCheckbox, MatButton, MatIcon, NgIf, NgFor, MatIconButton, MatTooltip, MatSelect, MatOption, MatPaginator, MatDatepickerModule, MatNativeDateModule],
   providers: [{ provide: MAT_DATE_LOCALE, useValue: 'es-CL' }]
 })
 export class CatalogAdminComponent implements OnInit {
   private static readonly DEFAULT_REPORT_COLOR = '#4CAF50';
+  private static readonly REPORT_COLOR_TYPES = ['incident', 'bulletin'] as const;
+
+  reportColorSelection: Record<'incident' | 'bulletin', boolean> = {
+    incident: true,
+    bulletin: true
+  };
 
   activeTabIndex = 0;
 
@@ -86,7 +93,11 @@ export class CatalogAdminComponent implements OnInit {
     includeChecklist: true,
     includeEntries: true,
     subjectTemplate: 'Reporte SOC [fecha] [turno]',
-    reportTableColor: CatalogAdminComponent.DEFAULT_REPORT_COLOR
+    reportTableColor: CatalogAdminComponent.DEFAULT_REPORT_COLOR,
+    reportTableColorByDocumentType: {
+      incident: CatalogAdminComponent.DEFAULT_REPORT_COLOR,
+      bulletin: CatalogAdminComponent.DEFAULT_REPORT_COLOR
+    }
   };
 
   // Formularios
@@ -226,7 +237,11 @@ export class CatalogAdminComponent implements OnInit {
           ...(config.emailReportConfig || {})
         };
 
-        const reportColor = this.normalizeHexColor(this.currentEmailReportConfig.reportTableColor)
+        const incidentColor = this.normalizeHexColor(
+          this.currentEmailReportConfig.reportTableColorByDocumentType?.incident
+        );
+        const legacyColor = this.normalizeHexColor(this.currentEmailReportConfig.reportTableColor);
+        const reportColor = incidentColor || legacyColor
           || CatalogAdminComponent.DEFAULT_REPORT_COLOR;
         this.selectedCustomReportColor = reportColor;
         this.customReportColorInput = reportColor;
@@ -238,6 +253,10 @@ export class CatalogAdminComponent implements OnInit {
         this.customReportColorInput = CatalogAdminComponent.DEFAULT_REPORT_COLOR;
       }
     });
+  }
+
+  isReportColorTypeSelected(type: 'incident' | 'bulletin'): boolean {
+    return !!this.reportColorSelection[type];
   }
 
   onReportColorModeChange(): void {
@@ -293,14 +312,43 @@ export class CatalogAdminComponent implements OnInit {
   }
 
   saveReportTableColorConfig(): void {
+    const selectedTypes = CatalogAdminComponent.REPORT_COLOR_TYPES
+      .filter((type) => this.reportColorSelection[type]);
+
+    if (selectedTypes.length === 0) {
+      this.snackBar.open('Selecciona al menos un tipo de documento', 'Cerrar', { duration: 3000 });
+      return;
+    }
+
     const resolvedColor = this.reportColorMode === 'custom'
       ? (this.normalizeHexColor(this.selectedCustomReportColor) || CatalogAdminComponent.DEFAULT_REPORT_COLOR)
       : this.getColorForMode(this.reportColorMode);
 
+    const colorByType = {
+      incident: this.normalizeHexColor(this.currentEmailReportConfig.reportTableColorByDocumentType?.incident)
+        || this.normalizeHexColor(this.currentEmailReportConfig.reportTableColor)
+        || CatalogAdminComponent.DEFAULT_REPORT_COLOR,
+      bulletin: this.normalizeHexColor(this.currentEmailReportConfig.reportTableColorByDocumentType?.bulletin)
+        || this.normalizeHexColor(this.currentEmailReportConfig.reportTableColor)
+        || CatalogAdminComponent.DEFAULT_REPORT_COLOR
+    };
+
+    selectedTypes.forEach((type) => {
+      colorByType[type] = resolvedColor;
+    });
+
     const emailReportConfig: EmailReportConfig = {
       ...this.currentEmailReportConfig,
-      reportTableColor: resolvedColor
+      // Compatibilidad hacia atrás para módulos que aún usan el campo legacy.
+      reportTableColor: colorByType.incident,
+      reportTableColorByDocumentType: colorByType
     };
+
+    const selectedTypeLabels: Record<'incident' | 'bulletin', string> = {
+      incident: 'Reporte de Incidente',
+      bulletin: 'Boletín de Seguridad'
+    };
+    const targetsLabel = selectedTypes.map((type) => selectedTypeLabels[type]).join(', ');
 
     this.isSavingReportColor = true;
     this.configService.updateConfig({ emailReportConfig }).subscribe({
@@ -308,7 +356,7 @@ export class CatalogAdminComponent implements OnInit {
         this.currentEmailReportConfig = emailReportConfig;
         this.selectedCustomReportColor = resolvedColor;
         this.customReportColorInput = resolvedColor;
-        this.snackBar.open('✅ Color del reporte guardado', 'Cerrar', { duration: 2500 });
+        this.snackBar.open(`✅ Color guardado para: ${targetsLabel}`, 'Cerrar', { duration: 3000 });
         this.isSavingReportColor = false;
       },
       error: () => {

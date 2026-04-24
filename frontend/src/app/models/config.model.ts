@@ -60,6 +60,10 @@ export interface EmailReportConfig {
   includeEntries: boolean;
   subjectTemplate: string;
   reportTableColor?: string;
+  reportTableColorByDocumentType?: {
+    incident?: string;
+    bulletin?: string;
+  };
 }
 
 export interface SmtpConfig {

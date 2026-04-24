@@ -2,6 +2,42 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.50-beta] - 2026-04-24
+
+### Correcciones de escalación interna + color independiente por tipo de documento
+
+#### Scheduler de recordatorio de escalación interna (`SCHED-ESC-089`)
+- **Falso positivo corregido en cobertura semanal:** en `resolveFutureWeekGap()` se normalizó la comparación de fechas a inicio de día (`toStartOfDay`) para evitar discrepancias por hora (`00:00:00` vs `23:59:59.999`) que marcaban semanas como incompletas aunque ya tuvieran escalación cargada.
+- **Comparación robusta por día calendario:** ahora `weekStartDate` y `weekEndDate` de asignaciones se comparan por timestamp normalizado (`getTime()`), eliminando alertas de correo incorrectas cuando la semana sí está cubierta.
+- **Texto de antelación corregido:** el correo ya no usa ciegamente el valor de configuración (`daysAhead`) y ahora muestra los días reales faltantes hasta la semana objetivo (`actualDaysAhead`), evitando mensajes como “4 día(s)” cuando realmente faltaban 3.
+
+#### Catálogos: color por tipo de documento (`UI-CAT-090`)
+- **UI extendida con selección de destino:** en `/main/admin/catalogs` se agregaron checkboxes para aplicar color a:
+  - `Reporte de Incidente`
+  - `Boletín de Seguridad`
+- **Guardado selectivo en una sola acción:** si se marcan ambos tipos, guarda para ambos; si se marca uno, actualiza solo ese tipo; si no hay selección, bloquea guardado con feedback.
+- **Mensajería de confirmación mejorada:** el snackbar informa explícitamente a qué tipo(s) se aplicó el color.
+
+#### Configuración backend/frontend para color independiente (`CFG-REP-091`)
+- **Nuevo esquema en configuración global:** `emailReportConfig.reportTableColorByDocumentType` con claves `incident` y `bulletin`.
+- **Validación API agregada:** en `PUT /api/config` se validan ambos colores con formato HEX `#RRGGBB`.
+- **Compatibilidad legacy preservada:** `reportTableColor` se mantiene como fallback para módulos existentes y migración progresiva.
+- **Merge seguro en updates parciales:** al actualizar `emailReportConfig`, backend ahora fusiona (`merge`) configuración previa + nueva para no perder colores por tipo cuando otro módulo envía payload parcial.
+
+#### Generador de reportes/boletín (`UI-REP-092`)
+- **Consumo de color por modo activo:**
+  - modo `report` usa `reportTableColorByDocumentType.incident`
+  - modo `newsletter` usa `reportTableColorByDocumentType.bulletin`
+- **Sincronización al cambiar de modo:** al alternar entre Reporte/Boletín se refresca color de cabecera según tipo.
+- **Refresh defensivo antes de generar:** se fuerza lectura de configuración actual antes de `generateTable()` para evitar usar color stale en memoria tras cambios recientes en catálogos.
+
+#### QA y despliegue operativo (`QA-REL-093`)
+- **QA técnico completo ejecutado:** revisión de lógica, modelos, template SMTP, validaciones y flujo de guardado/lectura.
+- **Sin errores de compilación/lint en archivos intervenidos:** verificación con diagnóstico de errores del workspace.
+- **Despliegue requerido aplicado:** rebuild/restart de `backend` y `frontend` vía Docker Compose para activar cambios de schema + UI.
+
+---
+
 ## [v1.5.49-beta] - 2026-04-22
 
 ### Módulo de escalación: correcciones, UX y página 404 animada

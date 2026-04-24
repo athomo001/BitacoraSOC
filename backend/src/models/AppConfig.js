@@ -267,6 +267,20 @@ const appConfigSchema = new mongoose.Schema({
       default: '#4CAF50',
       trim: true,
       match: /^#([A-Fa-f0-9]{6})$/
+    },
+    reportTableColorByDocumentType: {
+      incident: {
+        type: String,
+        default: '#4CAF50',
+        trim: true,
+        match: /^#([A-Fa-f0-9]{6})$/
+      },
+      bulletin: {
+        type: String,
+        default: '#4CAF50',
+        trim: true,
+        match: /^#([A-Fa-f0-9]{6})$/
+      }
     }
   },
   // Configuración SMTP para envío de emails
