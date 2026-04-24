@@ -221,11 +221,14 @@ const resolveFutureWeekGap = async (now, config) => {
     weekEndDate: { $gte: targetWeekStart }
   }).select('roleCode weekStartDate weekEndDate');
 
+  const targetWeekStartDay = toStartOfDay(targetWeekStart).getTime();
+  const targetWeekEndDay = toStartOfDay(targetWeekEnd).getTime();
+
   const missingRoleCodes = INTERNAL_ESCALATION_ROLE_CODES.filter((roleCode) => {
     return !assignments.some((assignment) => {
       return assignment.roleCode === roleCode
-        && assignment.weekStartDate <= targetWeekStart
-        && assignment.weekEndDate >= targetWeekEnd;
+        && toStartOfDay(assignment.weekStartDate).getTime() <= targetWeekStartDay
+        && toStartOfDay(assignment.weekEndDate).getTime() >= targetWeekEndDay;
     });
   });
 
@@ -233,8 +236,11 @@ const resolveFutureWeekGap = async (now, config) => {
     return null;
   }
 
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const actualDaysAhead = Math.ceil((toStartOfDay(targetWeekStart).getTime() - toStartOfDay(now).getTime()) / msPerDay);
+
   return {
-    daysAhead,
+    daysAhead: actualDaysAhead,
     weekStart: targetWeekStart,
     weekEnd: targetWeekEnd,
     missingRoleCodes
