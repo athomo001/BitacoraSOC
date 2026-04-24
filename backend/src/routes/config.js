@@ -300,6 +300,9 @@ router.put('/',
     body('emailReportConfig.includeEntries').optional().isBoolean(),
     body('emailReportConfig.subjectTemplate').optional().trim(),
     body('emailReportConfig.reportTableColor').optional().matches(/^#([A-Fa-f0-9]{6})$/).withMessage('Color de tabla inválido. Usa formato #RRGGBB'),
+    body('emailReportConfig.reportTableColorByDocumentType').optional().isObject().withMessage('Configuración de color por tipo inválida'),
+    body('emailReportConfig.reportTableColorByDocumentType.incident').optional().matches(/^#([A-Fa-f0-9]{6})$/).withMessage('Color de incidente inválido. Usa formato #RRGGBB'),
+    body('emailReportConfig.reportTableColorByDocumentType.bulletin').optional().matches(/^#([A-Fa-f0-9]{6})$/).withMessage('Color de boletín inválido. Usa formato #RRGGBB'),
     body('smtpConfig.host').optional().trim(),
     body('smtpConfig.port').optional().isInt({ min: 1, max: 65535 }).toInt(),
     body('smtpConfig.secure').optional().isBoolean(),
@@ -318,12 +321,27 @@ router.put('/',
       } else {
         const oldPass = config.smtpConfig ? config.smtpConfig.pass : null;
         const previousSecurity = extractSecurityConfig(config);
+        const previousEmailReportConfig = config.emailReportConfig
+          ? config.emailReportConfig.toObject()
+          : {};
         Object.assign(config, req.body);
 
         if (incomingSecurity) {
           config.security = {
             ...previousSecurity,
             ...incomingSecurity
+          };
+        }
+
+        if (req.body.emailReportConfig) {
+          const incomingEmailReportConfig = req.body.emailReportConfig;
+          config.emailReportConfig = {
+            ...previousEmailReportConfig,
+            ...incomingEmailReportConfig,
+            reportTableColorByDocumentType: {
+              ...(previousEmailReportConfig.reportTableColorByDocumentType || {}),
+              ...(incomingEmailReportConfig.reportTableColorByDocumentType || {})
+            }
           };
         }
 

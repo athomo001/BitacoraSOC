@@ -7,7 +7,7 @@
 
     <div class="report-generator-body">
       <div class="mode-selector-container">
-        <mat-button-toggle-group [(ngModel)]="currentMode" (change)="clearForm()" class="mode-selector" aria-label="Modo de generación">
+        <mat-button-toggle-group [(ngModel)]="currentMode" (change)="onModeChange()" class="mode-selector" aria-label="Modo de generación">
           <mat-button-toggle value="report">
             <mat-icon>assessment</mat-icon>
             Reporte de Incidente

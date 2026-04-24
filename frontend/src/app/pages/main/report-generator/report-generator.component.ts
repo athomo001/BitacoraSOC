@@ -96,6 +96,10 @@ export class ReportGeneratorComponent implements OnInit {
   generatedHtml = '';
   showPreview = false;
   reportTableHeaderColor = '#4CAF50';
+  reportTableColorsByType: Record<'incident' | 'bulletin', string> = {
+    incident: '#4CAF50',
+    bulletin: '#4CAF50'
+  };
 
   // ─── Branding ────────────────────────────────────────────────────────────
   logoBase64: string | null = null;
@@ -447,6 +451,8 @@ export class ReportGeneratorComponent implements OnInit {
 
   // ─── Generate ────────────────────────────────────────────────────────────
   async generateTable(): Promise<void> {
+    await this.refreshReportTableColorConfig();
+
     if (this.currentMode === 'report') {
       if (this.reportForm.invalid) {
         this.reportForm.markAllAsTouched();
@@ -1030,12 +1036,18 @@ export class ReportGeneratorComponent implements OnInit {
     this.clearNewsletterSelection();
   }
 
+  onModeChange(): void {
+    this.clearForm();
+    this.syncReportHeaderColorByMode();
+  }
+
   // ─── HTML Builders ────────────────────────────────────────────────────────
   private async buildReportHtml(): Promise<void> {
     const canContinue = await this.ensureClientAlertAcknowledged('report');
     if (!canContinue) return;
 
     const form = this.reportForm.value;
+    this.reportTableHeaderColor = this.reportTableColorsByType.incident;
     const headerColor = this.reportTableHeaderColor;
     const labelColor = this.getSecondaryColor(headerColor);
     const reportWidthPx = 980;
@@ -1106,6 +1118,7 @@ export class ReportGeneratorComponent implements OnInit {
 
   private buildNewsletterHtml(): void {
     const form = this.newsletterForm.value;
+    this.reportTableHeaderColor = this.reportTableColorsByType.bulletin;
     const headerColor = this.reportTableHeaderColor;
     const width = 800;
     const e = (v: unknown) => this.escapeHtml(v);
@@ -1402,15 +1415,43 @@ export class ReportGeneratorComponent implements OnInit {
   private loadReportTableColorConfig(): void {
     this.configService.getConfig().subscribe({
       next: (config) => {
-        const color = this.normalizeHexColor(config.emailReportConfig?.reportTableColor);
-        this.appTitle = (config.appTitle || '').trim();
-        this.reportTableHeaderColor = color || '#4CAF50';
+        this.applyReportTableColorConfig(config);
       },
       error: () => {
         this.appTitle = '';
+        this.reportTableColorsByType = {
+          incident: '#4CAF50',
+          bulletin: '#4CAF50'
+        };
         this.reportTableHeaderColor = '#4CAF50';
       }
     });
+  }
+
+  private async refreshReportTableColorConfig(): Promise<void> {
+    try {
+      const config = await firstValueFrom(this.configService.getConfig());
+      this.applyReportTableColorConfig(config);
+    } catch {
+      // Silencioso: conserva colores ya cargados si falla refresh.
+    }
+  }
+
+  private applyReportTableColorConfig(config: any): void {
+    const legacyColor = this.normalizeHexColor(config?.emailReportConfig?.reportTableColor) || '#4CAF50';
+    const byType = config?.emailReportConfig?.reportTableColorByDocumentType;
+    this.reportTableColorsByType = {
+      incident: this.normalizeHexColor(byType?.incident) || legacyColor,
+      bulletin: this.normalizeHexColor(byType?.bulletin) || legacyColor
+    };
+    this.appTitle = (config?.appTitle || '').trim();
+    this.syncReportHeaderColorByMode();
+  }
+
+  private syncReportHeaderColorByMode(): void {
+    this.reportTableHeaderColor = this.currentMode === 'newsletter'
+      ? this.reportTableColorsByType.bulletin
+      : this.reportTableColorsByType.incident;
   }
 
   private normalizeHexColor(value: string | undefined): string | null {

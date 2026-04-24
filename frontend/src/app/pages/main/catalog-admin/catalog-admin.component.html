@@ -490,6 +490,12 @@
               </button>
             </div>
 
+            <div class="report-color-target-row">
+              <span class="report-color-target-label">Aplicar a:</span>
+              <mat-checkbox [(ngModel)]="reportColorSelection.incident">Reporte de Incidente</mat-checkbox>
+              <mat-checkbox [(ngModel)]="reportColorSelection.bulletin">Boletín de Seguridad</mat-checkbox>
+            </div>
+
             <div class="report-color-config-row">
               <mat-form-field appearance="outline" class="report-color-select">
                 <mat-label>Código HEX</mat-label>
