@@ -190,6 +190,53 @@ const buildAutoAllowedOriginsSet = (req) => {
   return normalized;
 };
 
+const buildComplementArtifactCsp = (complement) => {
+  const runtimePolicy = complement?.runtimePolicy || {};
+  const cspPolicy = runtimePolicy.csp || {};
+
+  const scriptSrc = ["'self'", "'unsafe-inline'", 'https:', 'http:'];
+  if (cspPolicy.allowUnsafeEval) {
+    scriptSrc.push("'unsafe-eval'");
+  }
+
+  const connectSrc = [
+    "'self'",
+    'data:',
+    'blob:',
+    'https:',
+    'http:',
+    'wss:',
+    'ws:',
+    ...((cspPolicy.extraConnectSrc || []).map((value) => String(value).trim()).filter(Boolean))
+  ];
+  const childSrc = [
+    "'self'",
+    'data:',
+    'blob:',
+    'https:',
+    'http:',
+    ...((cspPolicy.extraChildSrc || []).map((value) => String(value).trim()).filter(Boolean))
+  ];
+  const workerSrc = cspPolicy.allowBlobWorker ? ["'self'", 'blob:'] : ["'self'", 'blob:'];
+
+  const directives = [
+    `default-src 'self' data: blob: https: http:`,
+    `script-src ${Array.from(new Set(scriptSrc)).join(' ')}`,
+    `style-src 'self' 'unsafe-inline' https: http:`,
+    `img-src 'self' data: blob: https: http:`,
+    `font-src 'self' data: https: http:`,
+    `connect-src ${Array.from(new Set(connectSrc)).join(' ')}`,
+    `worker-src ${Array.from(new Set(workerSrc)).join(' ')}`,
+    `child-src ${Array.from(new Set(childSrc)).join(' ')}`,
+    `frame-src ${Array.from(new Set(childSrc)).join(' ')}`,
+    `media-src 'self' data: blob: https: http:`,
+    `object-src 'none'`,
+    `frame-ancestors 'self' http://localhost:* https://localhost:*`
+  ];
+
+  return directives.join('; ');
+};
+
 // Validación básica de variables de entorno requeridas
 const validateEnv = () => {
   const required = ['MONGODB_URI', 'JWT_SECRET'];
@@ -391,20 +438,18 @@ app.use('/uploads', async (req, res, next) => {
         if (!isComplementVisibleToUser(complement, req.user)) {
           return res.status(403).json({ message: 'No tienes acceso a este complemento' });
         }
+
+        res.removeHeader('X-Frame-Options');
+        res.header('Content-Security-Policy', buildComplementArtifactCsp(complement));
+        return next();
       }
 
-      // Los complementos publicados se cargan como iframe: quitar DENY para esa ruta
+      // Preview (admin): política más flexible para validar artefactos antes de publicar.
       res.removeHeader('X-Frame-Options');
       res.header('Content-Security-Policy', "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; frame-ancestors 'self' http://localhost:* https://localhost:*");
       next();
     });
     return;
-  }
-
-  // Los complementos publicados se cargan como iframe: quitar DENY para esa ruta
-  if (req.path.startsWith('/complements/')) {
-    res.removeHeader('X-Frame-Options');
-    res.header('Content-Security-Policy', "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; frame-ancestors 'self' http://localhost:* https://localhost:*");
   }
   next();
 }, express.static(path.join(__dirname, '../uploads')));

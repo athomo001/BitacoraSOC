@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Diccionario Interactivo de Logs - Ciberseguridad</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="layout">
+    <header class="panel">
+      <p class="eyebrow">Bitacora SOC / Complemento Operativo</p>
+      <h1>Datos para el Diccionario (Dataset)</h1>
+      <p class="subtitle">Referencia rapida de tags, significado tecnico y valores comunes.</p>
+    </header>
+
+    <section class="panel controls" aria-label="Controles del diccionario">
+      <label class="field">
+        <span>Vista</span>
+        <select id="vendorSelect" aria-label="Seleccionar vista de fabricante"></select>
+      </label>
+
+      <label class="field">
+        <span>Buscar</span>
+        <input
+          id="searchInput"
+          type="text"
+          placeholder="Ej: ipaccesslogp, arpmiss, srcip, policyid"
+          aria-label="Filtrar tags"
+        />
+      </label>
+
+      <label class="field">
+        <span>Impacto</span>
+        <select id="impactSelect" aria-label="Filtrar por impacto">
+          <option value="all">Todos</option>
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+          <option value="Info">Info</option>
+          <option value="Variable">Variable</option>
+        </select>
+      </label>
+
+      <div class="actions">
+        <button id="clearFiltersBtn" type="button" class="btn secondary">Limpiar</button>
+        <button id="expandAllBtn" type="button" class="btn">Expandir todo</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="sectionHeader">
+        <h2>Catalogo operativo</h2>
+        <p id="resultsMeta" class="meta" aria-live="polite">0 resultados</p>
+      </div>
+      <div id="tablesContainer" class="tablesContainer"></div>
+    </section>
+
+    <section id="huaweiVrpGuide" class="panel vrpGuide" aria-label="Guias rapidas de interpretacion">
+      <h2>Guias Rapidas de Interpretacion</h2>
+      <p class="guidePattern"><strong>Huawei VRP:</strong> <code>%%01[Modulo]/[Severidad]/[Evento](l): [Contenido]</code></p>
+      <div class="guideGrid">
+        <p><strong>0-2 (Rojo):</strong> riesgo alto, servicio comprometido o inestable.</p>
+        <p><strong>3-4 (Naranja):</strong> errores/ataques activos que requieren accion operativa.</p>
+        <p><strong>5-6 (Verde/Azul):</strong> cambios de estado o informacion operativa.</p>
+      </div>
+      <p class="guidePattern"><strong>Cisco IOS:</strong> <code>[Seq]: [Time]: %[Facility]-[Sev]-[Mnemonic]: [Message]</code></p>
+      <div class="guideGrid">
+        <p><strong>0-2:</strong> emergencia/critico (impacto alto).</p>
+        <p><strong>3-4:</strong> error/warning (investigar de inmediato).</p>
+        <p><strong>5-7:</strong> notificacion/info/debug (contexto operativo).</p>
+      </div>
+    </section>
+
+    <section class="panel knowledgePanel" aria-label="Correlacion cruzada">
+      <h2>Modulo de Correlacion Cruzada</h2>
+      <table class="knowledgeTable">
+        <thead>
+          <tr>
+            <th>Concepto Universal</th>
+            <th>Huawei HiSec</th>
+            <th>Fortinet</th>
+            <th>Cisco IOS</th>
+            <th>Huawei VRP</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Accion: Bloqueado</td>
+            <td>Status 4</td>
+            <td>action="deny"</td>
+            <td>denied</td>
+            <td>Drop / Filter</td>
+          </tr>
+          <tr>
+            <td>Accion: Permitido</td>
+            <td>Status 1</td>
+            <td>action="accept"</td>
+            <td>permitted</td>
+            <td>Pass</td>
+          </tr>
+          <tr>
+            <td>Identificador Fisico</td>
+            <td>SrcMac</td>
+            <td>mac</td>
+            <td>SrcMAC</td>
+            <td>Source MAC</td>
+          </tr>
+          <tr>
+            <td>Severidad Critica</td>
+            <td>Level 4</td>
+            <td>Critical</td>
+            <td>Level 0-2</td>
+            <td>Level 1-2</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel knowledgePanel" aria-label="Troubleshooting rapido WLC WAC">
+      <h2>Troubleshooting Rapido (WLC / WAC)</h2>
+      <ul class="tipsList">
+        <li><strong>212/216:</strong> Client Disassociation. Usuario se alejo o apago WiFi (bajo impacto).</li>
+        <li><strong>1 (Auth Failure):</strong> Password incorrecta. Si se repite, posible fuerza bruta (impacto medio).</li>
+        <li><strong>22 (Deauth):</strong> Cliente expulsado por admin/politica de seguridad (impacto segun contexto).</li>
+      </ul>
+    </section>
+
+    <section class="panel knowledgePanel" aria-label="Tips de mitigacion por fabricante">
+      <h2>Tips de Mitigacion Operativa</h2>
+      <ul class="tipsList">
+        <li><strong>Huawei HiSec:</strong> si `Status=1` no cambia a `4`, evaluar bloqueo manual en firewall.</li>
+        <li><strong>Fortinet:</strong> `action="accept"` con `subtype="ips"` sugiere IPS en modo monitor.</li>
+        <li><strong>Cisco:</strong> `Mnemonic=CONFIG_I` indica cambio de configuracion; auditar usuario y origen.</li>
+      </ul>
+    </section>
+
+    <section class="panel statusPanel">
+      <p id="statusText" class="statusText" role="status" aria-live="polite"></p>
+      <p class="note">Tip: tecla <kbd>/</kbd> para ir directo al buscador.</p>
+    </section>
+  </main>
+
+  <script src="app.js" defer></script>
+</body>
+</html>

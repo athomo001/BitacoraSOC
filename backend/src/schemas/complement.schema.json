@@ -131,6 +131,39 @@
         }
       }
     },
+    "runtimePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "csp": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allowUnsafeEval": { "type": "boolean" },
+            "allowBlobWorker": { "type": "boolean" },
+            "extraConnectSrc": {
+              "type": "array",
+              "items": { "type": "string", "maxLength": 255 },
+              "uniqueItems": true
+            },
+            "extraChildSrc": {
+              "type": "array",
+              "items": { "type": "string", "maxLength": 255 },
+              "uniqueItems": true
+            }
+          }
+        },
+        "iframeSandbox": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allowPointerLock": { "type": "boolean" },
+            "allowPopups": { "type": "boolean" },
+            "allowDownloads": { "type": "boolean" }
+          }
+        }
+      }
+    },
     "metadata": {
       "type": "object"
     },

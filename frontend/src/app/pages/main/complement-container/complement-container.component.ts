@@ -56,7 +56,7 @@ import { ComplementBridgeService } from '../../../services/complement-bridge.ser
         #complementFrame
         class="complement-frame"
         [src]="safeIframeUrl"
-        sandbox="allow-scripts allow-same-origin allow-forms"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock"
         referrerpolicy="no-referrer"
         loading="lazy"
         (load)="registerBridge()"></iframe>
@@ -256,4 +256,5 @@ export class ComplementContainerComponent implements OnInit, OnDestroy {
       }
     });
   }
+
 }

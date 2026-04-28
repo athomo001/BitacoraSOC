@@ -24,6 +24,7 @@ export interface Complement {
   };
   visibility?: ComplementVisibility;
   sourceArtifact?: ComplementSourceArtifact | null;
+  runtimePolicy?: ComplementRuntimePolicy;
   metadata?: Record<string, unknown>;
   lastTokenIssuedAt?: string | null;
   circuit: {
@@ -53,6 +54,20 @@ export interface ComplementSourceArtifact {
   publishedAt?: string | null;
 }
 
+export interface ComplementRuntimePolicy {
+  csp: {
+    allowUnsafeEval: boolean;
+    allowBlobWorker: boolean;
+    extraConnectSrc: string[];
+    extraChildSrc: string[];
+  };
+  iframeSandbox: {
+    allowPointerLock: boolean;
+    allowPopups: boolean;
+    allowDownloads: boolean;
+  };
+}
+
 export interface ComplementFormValue {
   slug: string;
   name: string;
@@ -68,6 +83,13 @@ export interface ComplementFormValue {
   allowedCollections: string[];
   visibleRoles: Array<'admin' | 'user' | 'auditor' | 'guest'>;
   visibleCargoLabels: string[];
+  allowUnsafeEval: boolean;
+  allowBlobWorker: boolean;
+  extraConnectSrc: string;
+  extraChildSrc: string;
+  sandboxAllowPointerLock: boolean;
+  sandboxAllowPopups: boolean;
+  sandboxAllowDownloads: boolean;
 }
 
 export interface ComplementSourceStackInfo {

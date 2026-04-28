@@ -298,6 +298,62 @@ import { UserService } from '../../../services/user.service';
             </div>
           </div>
 
+          <div class="full-width permissions-block">
+            <h3>Runtime web (CSP por complemento)</h3>
+            <p>Activa solo lo necesario para este complemento, especialmente si requiere runtime web avanzado (WASM, workers o iframes internos).</p>
+            <div class="upload-actions">
+              <button mat-stroked-button type="button" (click)="applyRuntimePresetDoom()">
+                Activar preset runtime avanzado
+              </button>
+              <button mat-stroked-button type="button" (click)="clearRuntimePreset()">
+                Limpiar preset runtime
+              </button>
+            </div>
+            <div class="checkbox-grid">
+              <mat-checkbox formControlName="allowUnsafeEval">
+                <span class="checkbox-title">Permitir script-src unsafe-eval</span>
+                <span class="checkbox-help">Necesario para runtimes que usan eval/wasm legacy.</span>
+              </mat-checkbox>
+              <mat-checkbox formControlName="allowBlobWorker">
+                <span class="checkbox-title">Permitir worker-src blob:</span>
+                <span class="checkbox-help">Habilita workers en memoria para este complemento.</span>
+              </mat-checkbox>
+            </div>
+
+            <div class="grid">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Extra connect-src (opcional)</mat-label>
+                <input matInput formControlName="extraConnectSrc" placeholder="https://api.ejemplo.com, wss://socket.ejemplo.com">
+                <mat-hint>Separado por comas. Úsalo para conexiones externas específicas.</mat-hint>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Extra child-src/frame-src (opcional)</mat-label>
+                <input matInput formControlName="extraChildSrc" placeholder="https://contenido.ejemplo.com, blob:">
+                <mat-hint>Separado por comas. Para subframes/recursos embebidos adicionales.</mat-hint>
+              </mat-form-field>
+            </div>
+          </div>
+
+          <div class="full-width permissions-block">
+            <h3>Sandbox del iframe</h3>
+            <p>Permisos extra del iframe al abrir el complemento en la ruta /main/complements/:slug.</p>
+            <div class="checkbox-grid">
+              <mat-checkbox formControlName="sandboxAllowPointerLock">
+                <span class="checkbox-title">allow-pointer-lock</span>
+                <span class="checkbox-help">Útil para juegos/emuladores con captura de mouse.</span>
+              </mat-checkbox>
+              <mat-checkbox formControlName="sandboxAllowPopups">
+                <span class="checkbox-title">allow-popups</span>
+                <span class="checkbox-help">Permite abrir ventanas/pestañas desde el complemento.</span>
+              </mat-checkbox>
+              <mat-checkbox formControlName="sandboxAllowDownloads">
+                <span class="checkbox-title">allow-downloads</span>
+                <span class="checkbox-help">Permite descargas disparadas desde el iframe.</span>
+              </mat-checkbox>
+            </div>
+          </div>
+
           <div class="full-width advanced-toggle-row">
             <button mat-stroked-button type="button" (click)="advancedOpen = !advancedOpen">
               <mat-icon>{{ advancedOpen ? 'expand_less' : 'expand_more' }}</mat-icon>
@@ -700,7 +756,14 @@ export class AdminComplementsComponent implements OnInit {
     scopes: [['READ_CONTEXT', 'WRITE_ENTRIES', 'READ_STORAGE', 'WRITE_STORAGE', 'WRITE_LOGS'] as ComplementScope[]],
     allowedCollections: [['entries', 'shared_storage', 'auditlogs']],
     visibleRoles: [[] as Array<'admin' | 'user' | 'auditor' | 'guest'>],
-    visibleCargoLabels: [[] as string[]]
+    visibleCargoLabels: [[] as string[]],
+    allowUnsafeEval: [false],
+    allowBlobWorker: [false],
+    extraConnectSrc: [''],
+    extraChildSrc: [''],
+    sandboxAllowPointerLock: [false],
+    sandboxAllowPopups: [false],
+    sandboxAllowDownloads: [false]
   });
 
   constructor(
@@ -915,7 +978,14 @@ export class AdminComplementsComponent implements OnInit {
       scopes: ['READ_CONTEXT', 'WRITE_ENTRIES', 'READ_STORAGE', 'WRITE_STORAGE', 'WRITE_LOGS'],
       allowedCollections: ['entries', 'shared_storage', 'auditlogs'],
       visibleRoles: [],
-      visibleCargoLabels: []
+      visibleCargoLabels: [],
+      allowUnsafeEval: false,
+      allowBlobWorker: false,
+      extraConnectSrc: '',
+      extraChildSrc: '',
+      sandboxAllowPointerLock: false,
+      sandboxAllowPopups: false,
+      sandboxAllowDownloads: false
     });
     this.syncDbName();
   }
@@ -939,11 +1009,18 @@ export class AdminComplementsComponent implements OnInit {
       status: complement.status,
       cleanupHookPath: complement.cleanupHookPath,
       healthPath: complement.healthPath,
-      iframePath: new URL(complement.iframeUrl).pathname || '/',
+      iframePath: this.safeIframePath(complement.iframeUrl),
       scopes: complement.permissions.scopes,
       allowedCollections: complement.permissions.allowedCollections,
       visibleRoles: complement.visibility?.roles || [],
-      visibleCargoLabels: complement.visibility?.cargoLabels || []
+      visibleCargoLabels: complement.visibility?.cargoLabels || [],
+      allowUnsafeEval: Boolean(complement.runtimePolicy?.csp?.allowUnsafeEval),
+      allowBlobWorker: Boolean(complement.runtimePolicy?.csp?.allowBlobWorker),
+      extraConnectSrc: (complement.runtimePolicy?.csp?.extraConnectSrc || []).join(', '),
+      extraChildSrc: (complement.runtimePolicy?.csp?.extraChildSrc || []).join(', '),
+      sandboxAllowPointerLock: Boolean(complement.runtimePolicy?.iframeSandbox?.allowPointerLock),
+      sandboxAllowPopups: Boolean(complement.runtimePolicy?.iframeSandbox?.allowPopups),
+      sandboxAllowDownloads: Boolean(complement.runtimePolicy?.iframeSandbox?.allowDownloads)
     });
   }
 
@@ -1077,6 +1154,19 @@ export class AdminComplementsComponent implements OnInit {
       visibility: {
         roles: value.visibleRoles,
         cargoLabels: value.visibleCargoLabels
+      },
+      runtimePolicy: {
+        csp: {
+          allowUnsafeEval: Boolean(value.allowUnsafeEval),
+          allowBlobWorker: Boolean(value.allowBlobWorker),
+          extraConnectSrc: this.parseDirectiveList(value.extraConnectSrc),
+          extraChildSrc: this.parseDirectiveList(value.extraChildSrc)
+        },
+        iframeSandbox: {
+          allowPointerLock: Boolean(value.sandboxAllowPointerLock),
+          allowPopups: Boolean(value.sandboxAllowPopups),
+          allowDownloads: Boolean(value.sandboxAllowDownloads)
+        }
       }
     };
   }
@@ -1177,6 +1267,19 @@ export class AdminComplementsComponent implements OnInit {
         roles: raw.visibleRoles || [],
         cargoLabels: raw.visibleCargoLabels || []
       },
+      runtimePolicy: {
+        csp: {
+          allowUnsafeEval: Boolean(raw.allowUnsafeEval),
+          allowBlobWorker: Boolean(raw.allowBlobWorker),
+          extraConnectSrc: this.parseDirectiveList(raw.extraConnectSrc),
+          extraChildSrc: this.parseDirectiveList(raw.extraChildSrc)
+        },
+        iframeSandbox: {
+          allowPointerLock: Boolean(raw.sandboxAllowPointerLock),
+          allowPopups: Boolean(raw.sandboxAllowPopups),
+          allowDownloads: Boolean(raw.sandboxAllowDownloads)
+        }
+      },
       sourceArtifact: {
         previewUrl: this.sourcePreviewUrl || null,
         previewRelativePath: this.sourcePreview?.previewRelativePath || null,
@@ -1205,5 +1308,52 @@ export class AdminComplementsComponent implements OnInit {
   private buildDbName(slug: string): string {
     const normalized = (slug || 'app').replace(/-/g, '_');
     return `bitacora_ext_${normalized}`;
+  }
+
+  applyRuntimePresetDoom(): void {
+    this.form.patchValue({
+      allowUnsafeEval: true,
+      allowBlobWorker: true,
+      extraConnectSrc: 'https:, http:, wss:, ws:',
+      extraChildSrc: 'blob:, data:, https:, http:',
+      sandboxAllowPointerLock: true,
+      sandboxAllowPopups: true,
+      sandboxAllowDownloads: true
+    });
+  }
+
+  clearRuntimePreset(): void {
+    this.form.patchValue({
+      allowUnsafeEval: false,
+      allowBlobWorker: false,
+      extraConnectSrc: '',
+      extraChildSrc: '',
+      sandboxAllowPointerLock: false,
+      sandboxAllowPopups: false,
+      sandboxAllowDownloads: false
+    });
+  }
+
+  private safeIframePath(iframeUrl: string): string {
+    if (!iframeUrl) {
+      return '/';
+    }
+
+    if (iframeUrl.startsWith('/')) {
+      return iframeUrl;
+    }
+
+    try {
+      return new URL(iframeUrl).pathname || '/';
+    } catch {
+      return '/';
+    }
+  }
+
+  private parseDirectiveList(value: string | null | undefined): string[] {
+    return String(value || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
   }
 }

@@ -143,6 +143,42 @@ const complementSchema = new mongoose.Schema({
       default: null
     }
   },
+  runtimePolicy: {
+    csp: {
+      allowUnsafeEval: {
+        type: Boolean,
+        default: false
+      },
+      allowBlobWorker: {
+        type: Boolean,
+        default: false
+      },
+      extraConnectSrc: [{
+        type: String,
+        trim: true,
+        maxlength: 255
+      }],
+      extraChildSrc: [{
+        type: String,
+        trim: true,
+        maxlength: 255
+      }]
+    },
+    iframeSandbox: {
+      allowPointerLock: {
+        type: Boolean,
+        default: false
+      },
+      allowPopups: {
+        type: Boolean,
+        default: false
+      },
+      allowDownloads: {
+        type: Boolean,
+        default: false
+      }
+    }
+  },
   metadata: {
     type: mongoose.Schema.Types.Mixed,
     default: {}

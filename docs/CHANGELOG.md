@@ -2,6 +2,82 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.53-beta] - 2026-04-28
+
+### Complementos en plataforma y documentación operativa
+
+- Se actualizó el texto de `Admin > Complementos` en la sección **Runtime web (CSP por complemento)** para usar una redacción genérica orientada a cualquier complemento con runtime avanzado (WASM/workers/iframe), en lugar de una referencia explícita a DOOM.
+- Se agregó en `README.md` una sección de **Complementos en Extras** con listado de artefactos de referencia y su propósito operativo.
+- Se creó `Extras/README.md` como catálogo dedicado con lista de herramientas/complementos, enlaces de descarga/acceso, capturas y reseña breve por elemento.
+- Se dejó `docs/COMPLEMENTS.md` enfocado en arquitectura/operación del módulo, con referencia breve al catálogo de `Extras/`.
+
+## [v1.5.52-beta] - 2026-04-27
+
+### Complemento `doom-browser` — estabilización final para publicación en plataforma
+
+- Se corrigió la secuencia de runtime para DOOM en navegador con assets locales consistentes (`js-dos`, `wdosbox` y binario WASM), eliminando bloqueos de arranque en 0%.
+- Se robusteció la captura de entrada para juego real en operación: foco al canvas, mitigación de interferencias del teclado virtual interno de js-dos y habilitación de `pointer lock` para entorno embebido.
+- Se incorporó visibilidad operativa en tiempo real con sello de build en UI y contador de FPS para validar rendimiento durante QA.
+- Se optimizó el perfil de ejecución del emulador ajustando parámetros de ciclos para una experiencia más fluida en equipos de escritorio.
+- Se dejó guía de publicación con preset recomendado de runtime policy (CSP/sandbox) y checklist de verificación post-publicación en `tools/doom-browser/README.md`.
+
+---
+
+## [v1.5.51-beta] - 2026-04-27
+
+### Complemento diccionario de logs ciber (`COMP-DICT-083`) — QA integral, rediseño operativo y ampliación de conocimiento
+
+#### Implementación base del complemento estático
+- Se consolidó el complemento `zip-static` `diccionario-logs-ciber` como artefacto autocontenido de consulta (`index`, estilos, lógica y guía de uso), sin backend dedicado y sin Docker adicional.
+- Se dejó listo el paquete para publicación en Admin > Complementos con flujo completo de análisis, preview y publicación.
+
+#### QA funcional y remediación UX inicial
+- Se ejecutó revisión funcional exhaustiva del flujo de consulta por fabricante, búsqueda y render de resultados.
+- Se agregaron controles operativos para mejorar uso diario: limpieza rápida de filtros, orden por criticidad y exportación por fabricante.
+- Se reforzó feedback de estado para analistas con conteos visibles, mensajes de vacío claros y navegación más directa.
+
+#### Rediseño visual orientado a operación SOC (sin look “generado”)
+- Se reemplazó la vista tipo tarjetas por tabla técnica de lectura rápida, alineada a formato documental operativo.
+- Se ajustó jerarquía visual para priorizar etiquetas, significado y valores comunes en grilla legible para turnos N1/N2.
+- Se mejoró responsividad y consistencia visual para escritorio y móvil, manteniendo un estilo sobrio y profesional.
+
+#### Dataset ampliado y normalizado por fabricante
+- Se enriqueció la base de tags para Huawei HiSec Insight y Fortinet con campos de uso frecuente en investigación operativa.
+- Se incorporaron ejemplos de logs más realistas por fabricante para comparación contextual durante triage.
+- Se actualizaron descripciones e impactos para reducir ambigüedad en interpretación de eventos.
+
+#### Separación explícita Huawei Router vs Cisco Router
+- Se eliminó la combinación anterior de dominios y se separaron fuentes en dos bloques independientes:
+  - Huawei Router (VRP / Info-Center).
+  - Cisco Router (IOS XE / ACL Syslog).
+- Se amplió específicamente Cisco Router con campos más ricos de syslog/ACL (estructura de mensaje, correlación y contexto de red), evitando equivalencias incorrectas con Huawei.
+
+#### Profundización técnica Huawei Router (VRP)
+- Se agregó semántica de severidad VRP para interpretación rápida por urgencia operativa.
+- Se incorporaron campos críticos para investigación: correlativo de evento, módulo, evento/firma, origen IP/MAC, interfaz, usuario/grupo y referencia de filtro/ACL.
+- Se añadió guía rápida en la interfaz con patrón de anatomía VRP y lectura por rangos de severidad para evitar errores de diagnóstico.
+
+#### Profundización técnica Cisco Router (IOS XE)
+- Se reforzó el bloque Cisco con anatomía completa de syslog (`facility`, severidad, mnemónico y mensaje), más campos de ACL y tráfico.
+- Se incluyeron claves de interpretación para eventos sensibles de configuración y seguridad.
+- Se añadió guía rápida Cisco en la interfaz para estandarizar lectura operativa por niveles de severidad.
+
+#### Módulos de conocimiento “senior analyst” en la UI
+- Se agregó módulo de correlación cruzada entre Huawei HiSec, Fortinet, Cisco IOS y Huawei VRP para homologar conceptos entre fabricantes.
+- Se incluyó sección de troubleshooting rápido para códigos recurrentes de entorno inalámbrico/WLC-WAC.
+- Se incorporaron tips de mitigación operativa por fabricante para acelerar respuesta y reducir falsas interpretaciones.
+
+#### Documentación del complemento (sin código)
+- Se dejó guía completa de instalación, compresión, publicación, pruebas y uso operativo del complemento.
+- Se añadieron fuentes de referencia para trazabilidad técnica del dataset y criterios de interpretación.
+- Se incorporó un “prompt maestro” documental de referencia para futuras implementaciones Angular del mismo dominio funcional.
+
+#### Verificación y empaquetado final
+- Se validó consistencia técnica del complemento tras cada iteración de cambios.
+- Se regeneró el ZIP final publicado en `tools/diccionario-logs-ciber.zip` con estructura lista para carga en plataforma.
+
+---
+
 ## [v1.5.50-beta] - 2026-04-24
 
 ### Correcciones de escalación interna + color independiente por tipo de documento
