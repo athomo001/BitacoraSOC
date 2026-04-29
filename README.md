@@ -158,6 +158,18 @@ El flujo `validar -> preview -> publicar` ya existe en la consola admin, pero la
 
 El detalle completo esta en `docs/COMPLEMENTS.md`.
 
+### Complementos en `Extras/`
+
+La carpeta `Extras/` incluye complementos y muestras listos para laboratorio, QA o publicacion como `zip-static`:
+
+- `Extras/doom-browser/`: complemento estatico para ejecutar DOOM en navegador embebido.
+- `Extras/diccionario-logs-ciber/`: complemento estatico tipo log helper/diccionario tecnico para analisis SOC.
+- `Extras/complement-stub/`: stub minimo de complemento para pruebas de integracion con Docker.
+- `Extras/complement-samples/`: ejemplos de referencia (`no-db-static`, `internal-db-local`, `external-db-api`) para acelerar nuevos desarrollos.
+- `Extras/Imagenes/`: capturas de apoyo de herramientas/complementos para documentacion operativa.
+
+El catalogo de los complementos de prueba (con imagen y descripcion breve) esta en `docs/COMPLEMENTS_CATALOG.md`.
+
 ---
 
 ## Estructura del repositorio
@@ -182,6 +194,7 @@ Documentos principales:
 - `docs/OPERATIONS.md`: como levantar desde cero, semillas y validaciones operativas
 - `docs/DISASTER-RECOVERY.md`: plan de recuperacion total ante desastre
 - `docs/COMPLEMENTS.md`: guia integral del modulo de complementos
+- `docs/COMPLEMENTS_CATALOG.md`: catalogo de complementos de prueba (doom-browser, diccionario-logs-ciber)
 - `docs/API.md`: referencia de endpoints
 - `docs/ARCHITECTURE.md`: arquitectura y flujos
 - `docs/DEPLOY.md`: despliegue, actualizacion y operacion

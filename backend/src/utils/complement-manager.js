@@ -40,6 +40,13 @@ const sanitizeCargoLabels = (cargoLabels = []) => Array.from(new Set(
     .filter(Boolean)
 ));
 
+const sanitizeDirectiveTokens = (values = []) => Array.from(new Set(
+  values
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .filter((value) => /^(https?:\/\/|wss?:\/\/|https:|http:|wss:|ws:|blob:|data:|'self')/i.test(value))
+));
+
 const normalizeSourceArtifact = (sourceArtifact = {}) => ({
   sourceType: String(sourceArtifact.sourceType || 'manual').trim() || 'manual',
   stackKey: sourceArtifact.stackKey ? String(sourceArtifact.stackKey).trim() : null,
@@ -51,6 +58,20 @@ const normalizeSourceArtifact = (sourceArtifact = {}) => ({
   managedByPlatform: Boolean(sourceArtifact.managedByPlatform),
   lastPreviewAt: sourceArtifact.lastPreviewAt ? new Date(sourceArtifact.lastPreviewAt).toISOString() : null,
   publishedAt: sourceArtifact.publishedAt ? new Date(sourceArtifact.publishedAt).toISOString() : null
+});
+
+const normalizeRuntimePolicy = (runtimePolicy = {}) => ({
+  csp: {
+    allowUnsafeEval: Boolean(runtimePolicy?.csp?.allowUnsafeEval),
+    allowBlobWorker: Boolean(runtimePolicy?.csp?.allowBlobWorker),
+    extraConnectSrc: sanitizeDirectiveTokens(runtimePolicy?.csp?.extraConnectSrc || []),
+    extraChildSrc: sanitizeDirectiveTokens(runtimePolicy?.csp?.extraChildSrc || [])
+  },
+  iframeSandbox: {
+    allowPointerLock: Boolean(runtimePolicy?.iframeSandbox?.allowPointerLock),
+    allowPopups: Boolean(runtimePolicy?.iframeSandbox?.allowPopups),
+    allowDownloads: Boolean(runtimePolicy?.iframeSandbox?.allowDownloads)
+  }
 });
 
 const assertComplementDbNameAllowed = (dbName) => {
@@ -110,6 +131,7 @@ const normalizeComplementPayload = (body = {}) => ({
     cargoLabels: sanitizeCargoLabels(body.visibility?.cargoLabels || [])
   },
   sourceArtifact: normalizeSourceArtifact(body.sourceArtifact || {}),
+  runtimePolicy: normalizeRuntimePolicy(body.runtimePolicy || {}),
   metadata: typeof body.metadata === 'object' && body.metadata !== null ? body.metadata : {}
 });
 
@@ -134,6 +156,19 @@ const getComplementSummary = (complement) => {
     permissions: complement.permissions,
     visibility: complement.visibility || { roles: [], cargoLabels: [] },
     sourceArtifact: complement.sourceArtifact || null,
+    runtimePolicy: complement.runtimePolicy || {
+      csp: {
+        allowUnsafeEval: false,
+        allowBlobWorker: false,
+        extraConnectSrc: [],
+        extraChildSrc: []
+      },
+      iframeSandbox: {
+        allowPointerLock: false,
+        allowPopups: false,
+        allowDownloads: false
+      }
+    },
     metadata: complement.metadata || {},
     lastTokenIssuedAt: complement.lastTokenIssuedAt,
     circuit: getCircuitState(complement.slug),
@@ -271,6 +306,11 @@ const updateComplement = async (req, complement, payload) => {
   if (JSON.stringify(complement.sourceArtifact || {}) !== JSON.stringify(payload.sourceArtifact || {})) {
     complement.sourceArtifact = payload.sourceArtifact;
     changedFields.push('sourceArtifact');
+  }
+
+  if (JSON.stringify(complement.runtimePolicy || {}) !== JSON.stringify(payload.runtimePolicy || {})) {
+    complement.runtimePolicy = payload.runtimePolicy;
+    changedFields.push('runtimePolicy');
   }
 
   await complement.save();

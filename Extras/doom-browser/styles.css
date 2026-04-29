@@ -1,0 +1,194 @@
+:root {
+  --bg: #090306;
+  --surface: #180c10;
+  --line: #5f232c;
+  --ink: #ffe8c7;
+  --muted: #d6b487;
+  --accent: #d8402b;
+  --accent-2: #ffbe45;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at top, #2d0f13, #090306 55%);
+  color: var(--ink);
+  font-family: "Consolas", "Courier New", monospace;
+}
+
+.layout {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: linear-gradient(180deg, #241015, #14090d);
+  box-shadow: inset 0 0 0 1px rgba(255, 190, 69, 0.08);
+  padding: 14px;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+h1 {
+  margin: 2px 0 0;
+  font-size: 2.9rem;
+  letter-spacing: 0.04em;
+  font-family: "AmazDooMLeft2", "AmazDooMLeft", "Segoe UI", Arial, sans-serif;
+  color: var(--accent-2);
+  text-shadow: 0 3px 0 #6e1f16, 0 0 16px rgba(255, 190, 69, 0.22);
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--muted);
+}
+
+.build {
+  margin: 8px 0 0;
+  color: #ffce8f;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.fileProtocolWarn {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #92400e;
+  border-radius: 8px;
+  background: #1c1410;
+  color: #fcd34d;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.fileProtocolWarn code {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #111827;
+  color: #e5e7eb;
+  font-size: 12px;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.btn {
+  border: 1px solid #7a3127;
+  border-radius: 3px;
+  height: 40px;
+  padding: 0 16px;
+  font-weight: 700;
+  font-family: "Consolas", "Courier New", monospace;
+  letter-spacing: 0.03em;
+  background: linear-gradient(180deg, #e85a3f, #b23121);
+  color: #fff5e0;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.btn.secondary {
+  background: linear-gradient(180deg, #3c2328, #241216);
+  border-color: #71414b;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.status {
+  margin: 0;
+  color: #ffd69c;
+  font-size: 13px;
+}
+
+.fpsBadge {
+  margin-left: auto;
+  padding: 7px 10px;
+  border: 1px solid #78612f;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffdd94;
+  background: linear-gradient(180deg, #2a1c0a, #1a1207);
+  letter-spacing: 0.03em;
+}
+
+.dosboxHost {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  min-height: min(72vh, 480px);
+  border: 1px solid #70422a;
+  border-radius: 3px;
+  background: #080707;
+  overflow: hidden;
+}
+
+.crtWrap {
+  position: relative;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.crtWrap::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      rgba(255, 210, 130, 0.03),
+      rgba(255, 210, 130, 0.03) 50%,
+      rgba(0, 0, 0, 0.12) 50%,
+      rgba(0, 0, 0, 0.12)
+    );
+  background-size: 100% 3px;
+  mix-blend-mode: screen;
+}
+
+.crtWrap::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, transparent 58%, rgba(0, 0, 0, 0.22) 100%);
+}
+
+.dosbox-container {
+  width: 100% !important;
+  height: min(72vh, 640px) !important;
+}
+
+.notes h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.notes ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+}

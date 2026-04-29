@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DOOM</title>
+  <link rel="stylesheet" href="https://fonts.cdnfonts.com/css/amazdoom" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="layout">
+    <header class="panel">
+      <h1>DOOM</h1>
+      <p class="build">Build <span id="buildVersion">v0.0.0</span></p>
+    </header>
+
+    <p id="fileProtocolNote" class="fileProtocolWarn" hidden>
+      Estas abriendo la pagina como <strong>archivo local (file://)</strong>. Varios navegadores
+      (Chrome, Brave, Edge) <strong>bloquean</strong> workers, WASM o lectura de recursos de forma que el
+      emulador puede fallar aunque los archivos existan. Sirve la carpeta por HTTP: doble clic en
+      <code>run-local.cmd</code> (recomendado en Windows) o en PowerShell usa
+      <code>python -m http.server 5173</code>. Si usas Node y PowerShell bloquea scripts, ejecuta
+      <code>npx.cmd --yes serve -l 5173</code> (no <code>npx.ps1</code>). Luego abre
+      <code>http://127.0.0.1:5173</code> solo con el servidor ya corriendo (si no, veras error -102).
+    </p>
+
+    <section class="panel controls">
+      <button id="startBtn" type="button" class="btn">Iniciar DOOM</button>
+      <button id="fullscreenBtn" type="button" class="btn secondary" disabled>Pantalla completa</button>
+      <p id="statusText" class="status" role="status" aria-live="polite">Listo para iniciar.</p>
+      <span id="fpsText" class="fpsBadge" aria-live="polite">FPS --</span>
+    </section>
+
+    <section class="panel">
+      <div class="crtWrap">
+        <!-- js-dos / wdosbox requieren un <canvas> (getContext); un <div> provoca "canvas.getContext is not a function". -->
+        <canvas id="dosbox" class="dosboxHost" width="640" height="400" tabindex="0" aria-label="Pantalla del emulador"></canvas>
+      </div>
+    </section>
+  </main>
+
+  <script src="vendor/js-dos.js"></script>
+  <script src="app.js" defer></script>
+</body>
+</html>

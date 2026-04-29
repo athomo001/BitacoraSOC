@@ -20,8 +20,33 @@
 | ID | Estado | Seccion | Tarea | Notas |
 | --- | --- | --- | --- | --- |
 | BACKUP-ENC-081 | En progreso | Backup / Seguridad ALTA | Cifrado opcional de backups con passphrase en crear y restaurar | Al crear un backup, el usuario podrá elegir si desea cifrarlo mediante un popup para ingresar frase secreta; no será obligatorio. Al restaurar, si el respaldo está cifrado, el sistema debe pedir la llave, validarla antes de tocar datos y continuar solo si es correcta. |
+| COMP-DICT-083 | Pendiente | Complementos / Operación SOC MEDIA | Diccionario interactivo de logs de ciberseguridad (estático, sin Docker) | Implementación detallada: 1) Se tomó como base la guía `docs/COMPLEMENTS.md` y se eligió flujo `zip-static` (sin backend ni contenedor). 2) Se creó la carpeta `tools/diccionario-logs-ciber/` con `index.html` (estructura UI), `styles.css` (diseño responsive), `app.js` (dataset + lógica), y `README.md` (uso/publicación). 3) Dataset embebido por fabricante con campos `tag`, `meaning`, `values`, `impact` para: Huawei HiSec Insight (`ThreatEventStatus`, `EventLevel`, `EventCategory`, `SrcArea`, `EventClass`), Fortinet FortiOS (`action`, `type`, `subtype`, `level`, `app`), y Huawei WAC/Cisco WLC (`ERRCODE`, `RESULT`, `MAC`, `SESSIONTIME`, `RSSI/Signal`). 4) UX implementada: combobox de fabricante, buscador por texto libre (filtra por tag/significado/valores), render de tarjetas por tag con badge de impacto (`High/Medium/Low/Info`), contador de coincidencias y bloque de ejemplo de log realista por marca para comparación visual del analista. 5) Lógica técnica en frontend: normalización de búsqueda (`toLowerCase` + `trim`), filtrado dinámico en evento `input/change`, escape básico de HTML para render seguro y construcción de tarjetas por plantilla en cliente. 6) Empaquetado realizado con `Compress-Archive` en `tools/diccionario-logs-ciber.zip`, listo para Admin > Complementos (`Analizar ZIP` -> `Preview` -> `Publicar`). 7) Criterio para pasar a Listo: validar funcionamiento del selector/buscador/cards en preview, confirmar carga del `iframe` publicado y disponibilidad del complemento para perfiles autorizados. Condiciones para IA en este issue: no usar Docker ni backend adicional, no cambiar contrato de complemento estático, no agregar dependencias innecesarias, no exponer secretos/tokens, mantener UI responsive y legible, y documentar evidencia de validación antes de mover a `Listo`. |
 
 **Plan de ataque visual ejecutado:** `docs/ui-visual-remediation-plan.md` (oleadas, criterios de aceptación, rutas objetivo y Definition of Done visual).
+
+### Guardrails para IA (evitar fallas por malas practicas)
+
+Estas reglas aplican a cualquier agente IA que tome items de este backlog:
+
+1. No inventar arquitectura ni stack: antes de codificar, leer documentación vigente del módulo impactado (`docs/COMPLEMENTS.md`, `docs/UI-GOVERNANCE.md`, `docs/API.md`, etc.).
+2. No usar Docker cuando el issue no lo requiere: para complementos simples, priorizar `zip-static` con HTML/CSS/JS y publicación por Admin > Complementos.
+3. No introducir complejidad innecesaria: si el requerimiento es de consulta visual, evitar backend nuevo, base de datos o servicios externos.
+4. No romper contratos existentes: respetar rutas, nombres de campos, scopes y estructuras ya definidas por la plataforma.
+5. No hardcodear secretos ni credenciales: prohibido tokens, passwords o endpoints sensibles en frontend/documentación.
+6. No usar datos ficticios ambiguos sin etiquetarlos: los ejemplos deben ser claramente de referencia y no simular producción real.
+7. No omitir validación funcional: todo cambio debe incluir criterio verificable (qué probar, dónde, y cuándo pasa a `Listo`).
+8. No cerrar issues sin evidencia mínima: registrar archivos tocados, resultado esperado y estado (`Pendiente`, `En progreso`, `Listo`).
+9. No degradar UX/Accesibilidad: mantener contraste legible, responsive básico y navegación clara; evitar UI recargada o inconsistente con el sistema.
+10. No editar de forma destructiva: no revertir cambios ajenos ni sobrescribir secciones históricas de este documento sin justificación explícita.
+11. No dejar decisiones implícitas: documentar supuestos clave en la nota del issue (alcance, límites y exclusiones).
+12. No saltarse seguridad básica de frontend: escapar contenido dinámico renderizado y evitar inserciones HTML inseguras.
+
+Checklist mínimo recomendado para agentes IA antes de marcar un item como `Listo`:
+
+- Implementación alineada a documentación del repo.
+- Sin sobreingeniería para el alcance solicitado.
+- Evidencia en `Notas` del issue (qué se hizo y cómo validarlo).
+- Riesgos y pendientes explícitos si aplica.
 
 ### Recurrente (QA — cada cambio UI)
 
