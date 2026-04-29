@@ -504,4 +504,4 @@ async function saveBrowserState(slug, value) {
 - `docs/LOGGING.md`
 - `docs/RUNBOOK.md`
 - `docs/BACKUP.md`
-- `Extras/README.md`: catalogo de complementos y utilidades en `Extras/` (lista, descarga, imagen y descripcion breve)
+- `docs/COMPLEMENTS_CATALOG.md`: catalogo de complementos de prueba disponibles en `Extras/` (lista, imagen y descripcion breve)

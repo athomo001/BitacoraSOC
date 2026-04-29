@@ -168,7 +168,7 @@ La carpeta `Extras/` incluye complementos y muestras listos para laboratorio, QA
 - `Extras/complement-samples/`: ejemplos de referencia (`no-db-static`, `internal-db-local`, `external-db-api`) para acelerar nuevos desarrollos.
 - `Extras/Imagenes/`: capturas de apoyo de herramientas/complementos para documentacion operativa.
 
-El catalogo de herramientas en `Extras/` (con descarga, imagen y descripcion breve) esta en `Extras/README.md`.
+El catalogo de los complementos de prueba (con imagen y descripcion breve) esta en `docs/COMPLEMENTS_CATALOG.md`.
 
 ---
 
@@ -194,6 +194,7 @@ Documentos principales:
 - `docs/OPERATIONS.md`: como levantar desde cero, semillas y validaciones operativas
 - `docs/DISASTER-RECOVERY.md`: plan de recuperacion total ante desastre
 - `docs/COMPLEMENTS.md`: guia integral del modulo de complementos
+- `docs/COMPLEMENTS_CATALOG.md`: catalogo de complementos de prueba (doom-browser, diccionario-logs-ciber)
 - `docs/API.md`: referencia de endpoints
 - `docs/ARCHITECTURE.md`: arquitectura y flujos
 - `docs/DEPLOY.md`: despliegue, actualizacion y operacion
