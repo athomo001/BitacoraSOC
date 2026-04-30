@@ -33,6 +33,10 @@ const contactSchema = new mongoose.Schema({
     enum: ['escalation', 'preventive'],
     default: 'escalation'
   },
+  isMailingList: {
+    type: Boolean,
+    default: false
+  },
   favorite: {
     type: Boolean,
     default: false

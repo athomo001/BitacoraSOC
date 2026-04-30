@@ -14,6 +14,7 @@ import { MatNativeDateModule, DateAdapter, NativeDateAdapter, MAT_DATE_LOCALE } 
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { EscalationService } from '../../../services/escalation.service';
 import { UserService } from '../../../services/user.service';
 import { CatalogService } from '../../../services/catalog.service';
@@ -46,7 +47,8 @@ class MondayFirstNativeDateAdapter extends NativeDateAdapter {
         MatNativeDateModule,
         MatTabsModule,
         MatExpansionModule,
-        MatCheckboxModule
+        MatCheckboxModule,
+        MatAutocompleteModule
     ],
     providers: [
         { provide: MAT_DATE_LOCALE, useValue: 'es-CL' },
@@ -114,6 +116,8 @@ export class EscalationAdminSimpleComponent implements OnInit {
   preventiveSearch = '';
   preventiveCompanyFilter = '';
   preventiveFavoritesOnly = false;
+  preventiveTypeFilter: '' | 'personal' | 'list' = '';
+  filteredOrgSuggestions: string[] = [];
 
   showClientForm = false;
   clientForm!: FormGroup;
@@ -238,6 +242,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
       organization: [''],
       role: ['PARA'],
       favorite: [false],
+      isMailingList: [false],
       doNotSend: [false],
       notes: [''],
       active: [true]
@@ -719,8 +724,17 @@ export class EscalationAdminSimpleComponent implements OnInit {
         .some((value) => String(value || '').toLowerCase().includes(term));
       const matchesCompany = !this.preventiveCompanyFilter || contact.organization === this.preventiveCompanyFilter;
       const matchesFavorite = !this.preventiveFavoritesOnly || !!contact.favorite;
-      return matchesTerm && matchesCompany && matchesFavorite;
+      const matchesType = !this.preventiveTypeFilter
+        || (this.preventiveTypeFilter === 'list' && !!contact.isMailingList)
+        || (this.preventiveTypeFilter === 'personal' && !contact.isMailingList);
+      return matchesTerm && matchesCompany && matchesFavorite && matchesType;
     });
+  }
+
+  filterOrgSuggestions(event: Event): void {
+    const term = (event.target as HTMLInputElement).value.trim().toLowerCase();
+    this.filteredOrgSuggestions = this.preventiveCompanyOptions
+      .filter(org => org.toLowerCase().includes(term));
   }
 
   // ============ RACI ============
@@ -998,6 +1012,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
   addContact(contactType: 'escalation' | 'preventive' = 'escalation'): void {
     this.showContactForm = true;
     this.editingContactId = null;
+    this.filteredOrgSuggestions = [...this.preventiveCompanyOptions];
     this.contactForm.reset({
       contactType,
       serviceId: '',
@@ -1007,6 +1022,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
       organization: '',
       role: contactType === 'preventive' ? 'PREVENTIVO' : 'PARA',
       favorite: false,
+      isMailingList: false,
       doNotSend: false,
       notes: '',
       active: true
@@ -1066,6 +1082,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
   editContact(contact: any): void {
     this.showContactForm = true;
     this.editingContactId = contact._id;
+    this.filteredOrgSuggestions = [...this.preventiveCompanyOptions];
     const serviceId = typeof contact.serviceId === 'object' && contact.serviceId !== null
       ? contact.serviceId._id
       : (contact.serviceId || '');
@@ -1078,6 +1095,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
       organization: contact.organization || '',
       role: contact.role || ((contact.contactType || 'escalation') === 'preventive' ? 'PREVENTIVO' : 'PARA'),
       favorite: !!contact.favorite,
+      isMailingList: !!contact.isMailingList,
       doNotSend: !!contact.doNotSend,
       notes: contact.notes || '',
       active: contact.active !== false

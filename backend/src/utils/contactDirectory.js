@@ -89,6 +89,7 @@ function parseContactsCsv(csvText, options = {}) {
       phone: sanitizeString(resolve(values, ['phone', 'telefono', 'teléfono']), 80),
       notes: sanitizeString(resolve(values, ['notes', 'nota', 'notas']), 500),
       favorite: parseBooleanLike(resolve(values, ['favorite', 'favorito']), false),
+      isMailingList: parseBooleanLike(resolve(values, ['ismailinglist', 'listadecorreo', 'lista']), false),
       doNotSend: parseBooleanLike(resolve(values, ['donotsend', 'noenviar', 'no_enviar']), false),
       active: parseBooleanLike(resolve(values, ['active', 'activo']), true),
       role: sanitizeString(resolve(values, ['role', 'rol']), 40) || (contactType === 'preventive' ? 'PREVENTIVO' : 'PARA'),
@@ -130,6 +131,7 @@ function formatContactsCsv(contacts = []) {
     'contactType',
     'active',
     'favorite',
+    'isMailingList',
     'doNotSend',
     'notes'
   ];
@@ -142,6 +144,7 @@ function formatContactsCsv(contacts = []) {
     normalizeContactType(contact.contactType),
     Boolean(contact.active),
     Boolean(contact.favorite),
+    Boolean(contact.isMailingList),
     Boolean(contact.doNotSend),
     contact.notes || ''
   ].map(escapeCsvValue).join(',')));

@@ -113,6 +113,7 @@ export class ReportGeneratorComponent implements OnInit {
   newsletterCompanyFilter = '';
   newsletterFavoritesOnly = false;
   private readonly selectedNewsletterContactIds = new Set<string>();
+  newsletterSelectedMailingLists = new Set<string>();
 
   // ─── Client alert ────────────────────────────────────────────────────────
   activeClientAlert: ClientAlertEvaluation | null = null;
@@ -483,6 +484,7 @@ export class ReportGeneratorComponent implements OnInit {
   get filteredNewsletterContacts(): Contact[] {
     const term = this.newsletterContactSearch.trim().toLowerCase();
     return [...this.newsletterContacts]
+      .filter((contact) => !contact.isMailingList)
       .filter((contact) => {
         const matchesTerm = !term || [contact.name, contact.email, contact.organization]
           .some((value) => String(value || '').toLowerCase().includes(term));
@@ -491,6 +493,39 @@ export class ReportGeneratorComponent implements OnInit {
         return matchesTerm && matchesCompany && matchesFavorite;
       })
       .sort((a, b) => Number(!!b.favorite) - Number(!!a.favorite) || String(a.organization || '').localeCompare(String(b.organization || '')) || String(a.name || '').localeCompare(String(b.name || '')));
+  }
+
+  get mailingListContacts(): Contact[] {
+    return this.newsletterContacts.filter(contact => contact.isMailingList && contact.active !== false && !contact.doNotSend);
+  }
+
+  get allMailingListsSelected(): boolean {
+    const lists = this.mailingListContacts;
+    if (lists.length === 0) return false;
+    return lists.every(contact => contact._id && this.newsletterSelectedMailingLists.has(contact._id));
+  }
+
+  get newsletterSelectedMailingListCount(): number {
+    return this.getSelectedMailingLists().length;
+  }
+
+  toggleAllMailingLists(checked: boolean): void {
+    if (checked) {
+      this.mailingListContacts.forEach(contact => {
+        if (contact._id) this.newsletterSelectedMailingLists.add(contact._id);
+      });
+    } else {
+      this.newsletterSelectedMailingLists.clear();
+    }
+  }
+
+  toggleMailingList(contact: Contact, checked: boolean): void {
+    if (!contact._id) return;
+    if (checked) {
+      this.newsletterSelectedMailingLists.add(contact._id);
+    } else {
+      this.newsletterSelectedMailingLists.delete(contact._id);
+    }
   }
 
   get newsletterSelectedCount(): number {
@@ -511,6 +546,25 @@ export class ReportGeneratorComponent implements OnInit {
 
     this.getSelectedNewsletterContacts().forEach((contact) => {
       const label = `${contact.name || 'Contacto'}${contact.email ? ` <${contact.email}>` : ''}`;
+      if (contact.active === false || contact.doNotSend) {
+        blockedRecipients.push(label);
+        return;
+      }
+      const email = String(contact.email || '').trim().toLowerCase();
+      if (!this.isValidNewsletterEmail(email)) {
+        invalidRecipients.push(label);
+        return;
+      }
+      if (seen.has(email)) {
+        duplicateRecipients.push(email);
+        return;
+      }
+      seen.add(email);
+      validRecipients.push(email);
+    });
+
+    this.getSelectedMailingLists().forEach((contact) => {
+      const label = `${contact.name || 'Lista'}${contact.email ? ` <${contact.email}>` : ''}`;
       if (contact.active === false || contact.doNotSend) {
         blockedRecipients.push(label);
         return;
@@ -588,6 +642,7 @@ export class ReportGeneratorComponent implements OnInit {
 
   clearNewsletterSelection(): void {
     this.selectedNewsletterContactIds.clear();
+    this.newsletterSelectedMailingLists.clear();
   }
 
   isValidNewsletterEmail(email?: string | null): boolean {
@@ -596,7 +651,11 @@ export class ReportGeneratorComponent implements OnInit {
   }
 
   private getSelectedNewsletterContacts(): Contact[] {
-    return this.newsletterContacts.filter((contact) => !!contact._id && this.selectedNewsletterContactIds.has(contact._id));
+    return this.newsletterContacts.filter((contact) => !contact.isMailingList && !!contact._id && this.selectedNewsletterContactIds.has(contact._id));
+  }
+
+  private getSelectedMailingLists(): Contact[] {
+    return this.newsletterContacts.filter((contact) => contact.isMailingList && !!contact._id && this.newsletterSelectedMailingLists.has(contact._id));
   }
 
   private parseManualNewsletterRecipients(): string[] {
