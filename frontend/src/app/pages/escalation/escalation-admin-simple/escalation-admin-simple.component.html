@@ -547,6 +547,15 @@
               </mat-select>
             </mat-form-field>
 
+            <mat-form-field appearance="outline">
+              <mat-label>Tipo</mat-label>
+              <mat-select [(ngModel)]="preventiveTypeFilter">
+                <mat-option value="">Todos</mat-option>
+                <mat-option value="personal">Solo personales</mat-option>
+                <mat-option value="list">Solo listas de correo</mat-option>
+              </mat-select>
+            </mat-form-field>
+
             <mat-checkbox [(ngModel)]="preventiveFavoritesOnly" color="primary">Solo favoritos</mat-checkbox>
           </div>
 
@@ -562,7 +571,12 @@
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Empresa</mat-label>
-                <input matInput formControlName="organization" placeholder="Ej: Empresa Demo">
+                <input matInput formControlName="organization" placeholder="Ej: Empresa Demo" [matAutocomplete]="orgAuto" (input)="filterOrgSuggestions($event)">
+                <mat-autocomplete #orgAuto="matAutocomplete">
+                  <mat-option *ngFor="let org of filteredOrgSuggestions" [value]="org">
+                    {{ org }}
+                  </mat-option>
+                </mat-autocomplete>
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Teléfono (opcional)</mat-label>
@@ -573,6 +587,7 @@
                 <textarea matInput rows="2" formControlName="notes" placeholder="Uso sugerido, observaciones o exclusiones"></textarea>
               </mat-form-field>
               <mat-checkbox formControlName="favorite" color="primary">Favorito</mat-checkbox>
+              <mat-checkbox formControlName="isMailingList" color="primary">Lista de correo</mat-checkbox>
               <mat-checkbox formControlName="doNotSend" color="warn">No enviar</mat-checkbox>
               <mat-checkbox formControlName="active" color="primary">Activo</mat-checkbox>
               <button mat-raised-button color="primary" type="submit" [disabled]="contactForm.invalid">
@@ -604,9 +619,12 @@
                   <td>{{ contact.organization || '-' }}</td>
                   <td>{{ contact.phone || '-' }}</td>
                   <td>
-                    <span class="badge para" *ngIf="contact.favorite">Favorito</span>
-                    <span class="badge warn" *ngIf="contact.doNotSend">No enviar</span>
-                    <span class="badge" [class.muted]="contact.active === false">{{ contact.active === false ? 'Inactivo' : 'Activo' }}</span>
+                    <span class="badge accent" *ngIf="contact.favorite">⭐ Favorito</span>
+                    <span class="badge" *ngIf="contact.doNotSend">🚫 No enviar</span>
+                    <span class="badge accent" *ngIf="contact.isMailingList">📋 Lista</span>
+                    <span class="badge muted" *ngIf="!contact.isMailingList">👤 Personal</span>
+                    <span class="badge muted" *ngIf="!contact.active">Inactivo</span>
+                    <span class="badge outline" *ngIf="contact.active && !contact.favorite && !contact.doNotSend && !contact.isMailingList">Activo</span>
                   </td>
                   <td>
                     <button mat-icon-button color="primary" (click)="editContact(contact)" matTooltip="Editar">

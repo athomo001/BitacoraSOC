@@ -112,6 +112,7 @@ const sanitizeContactPayload = (payload = {}, existing = {}) => {
       || (contactType === 'preventive' ? 'PREVENTIVO' : 'PARA'),
     active: hasOwn('active') ? parseBooleanLike(payload.active, true) : (existing.active ?? true),
     favorite: hasOwn('favorite') ? parseBooleanLike(payload.favorite, false) : (existing.favorite ?? false),
+    isMailingList: hasOwn('isMailingList') ? parseBooleanLike(payload.isMailingList, false) : (existing.isMailingList ?? false),
     doNotSend: hasOwn('doNotSend') ? parseBooleanLike(payload.doNotSend, false) : (existing.doNotSend ?? false),
     notes: sanitizeText(hasOwn('notes') ? payload.notes : existing.notes, 500),
     contactType
@@ -646,6 +647,7 @@ exports.createContact = async (req, res) => {
         organization: contact.organization,
         contactType: contact.contactType,
         favorite: contact.favorite,
+        isMailingList: contact.isMailingList,
         doNotSend: contact.doNotSend
       }
     });
@@ -698,6 +700,7 @@ exports.updateContact = async (req, res) => {
         organization: existingContact.organization,
         contactType: existingContact.contactType,
         favorite: existingContact.favorite,
+        isMailingList: existingContact.isMailingList,
         doNotSend: existingContact.doNotSend
       }
     });

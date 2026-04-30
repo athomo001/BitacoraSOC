@@ -21,6 +21,10 @@
 | --- | --- | --- | --- | --- |
 | BACKUP-ENC-081 | En progreso | Backup / Seguridad ALTA | Cifrado opcional de backups con passphrase en crear y restaurar | Al crear un backup, el usuario podrá elegir si desea cifrarlo mediante un popup para ingresar frase secreta; no será obligatorio. Al restaurar, si el respaldo está cifrado, el sistema debe pedir la llave, validarla antes de tocar datos y continuar solo si es correcta. |
 | COMP-DICT-083 | Pendiente | Complementos / Operación SOC MEDIA | Diccionario interactivo de logs de ciberseguridad (estático, sin Docker) | Implementación detallada: 1) Se tomó como base la guía `docs/COMPLEMENTS.md` y se eligió flujo `zip-static` (sin backend ni contenedor). 2) Se creó la carpeta `tools/diccionario-logs-ciber/` con `index.html` (estructura UI), `styles.css` (diseño responsive), `app.js` (dataset + lógica), y `README.md` (uso/publicación). 3) Dataset embebido por fabricante con campos `tag`, `meaning`, `values`, `impact` para: Huawei HiSec Insight (`ThreatEventStatus`, `EventLevel`, `EventCategory`, `SrcArea`, `EventClass`), Fortinet FortiOS (`action`, `type`, `subtype`, `level`, `app`), y Huawei WAC/Cisco WLC (`ERRCODE`, `RESULT`, `MAC`, `SESSIONTIME`, `RSSI/Signal`). 4) UX implementada: combobox de fabricante, buscador por texto libre (filtra por tag/significado/valores), render de tarjetas por tag con badge de impacto (`High/Medium/Low/Info`), contador de coincidencias y bloque de ejemplo de log realista por marca para comparación visual del analista. 5) Lógica técnica en frontend: normalización de búsqueda (`toLowerCase` + `trim`), filtrado dinámico en evento `input/change`, escape básico de HTML para render seguro y construcción de tarjetas por plantilla en cliente. 6) Empaquetado realizado con `Compress-Archive` en `tools/diccionario-logs-ciber.zip`, listo para Admin > Complementos (`Analizar ZIP` -> `Preview` -> `Publicar`). 7) Criterio para pasar a Listo: validar funcionamiento del selector/buscador/cards en preview, confirmar carga del `iframe` publicado y disponibilidad del complemento para perfiles autorizados. Condiciones para IA en este issue: no usar Docker ni backend adicional, no cambiar contrato de complemento estático, no agregar dependencias innecesarias, no exponer secretos/tokens, mantener UI responsive y legible, y documentar evidencia de validación antes de mover a `Listo`. |
+| ESC-PREV-084 | Listo | Admin / Escalación MEDIA | Autocomplete de empresa en formulario de contacto preventivo | En `/main/admin/escalation` (Tab "Contactos de Escalación" > sección 3 "Agenda Preventiva para Boletines"), el campo Empresa del formulario debe convertirse en un `matAutocomplete` que sugiere en tiempo real las empresas ya registradas al escribir (filtro parcial, case-insensitive), permitiendo igualmente escritura libre para empresas nuevas. |
+| ESC-PREV-085 | Listo | Admin / Escalación MEDIA | Nuevo campo "Lista de correo" en contactos preventivos | En la misma sección, agregar un checkbox `isMailingList` debajo de "Favorito" en el formulario y persistirlo en backend (modelo + endpoints + CSV import/export). Permite distinguir correos de personas (`cfsilva@scj.gob.cl`) de listas de distribución (`eventos.ciberseguridad@scj.gob.cl`). |
+| ESC-PREV-086 | Listo | Admin / Escalación MEDIA | Indicadores visuales de tipo de correo (personal vs lista) en tabla y filtros | En la tabla de contactos preventivos, mostrar badges `👤 Personal` / `📋 Lista` en la columna Estado. Agregar selector de filtro "Tipo" (Todos / Solo personales / Solo listas de correo) junto a los filtros existentes. Depende de `ESC-PREV-085`. |
+| REP-NEWS-087 | Listo | Boletines / UX MEDIA | Panel "Listas de correo" en cajón de envío de boletines | En `/main/report-generator` (sección "Envío de Boletines"), agregar un panel de "Listas de correo" debajo del textarea de destinatarios manuales. Solo muestra contactos preventivos con `isMailingList: true`. Incluye checkbox seleccionar todo, checkboxes individuales y contador de seleccionados. El cajón de envío se amplía levemente para que ambos paneles respiren bien. Depende de `ESC-PREV-085`. |
 
 **Plan de ataque visual ejecutado:** `docs/ui-visual-remediation-plan.md` (oleadas, criterios de aceptación, rutas objetivo y Definition of Done visual).
 
@@ -308,6 +312,162 @@ Todo lo descrito en esta sección y en los issues `UI-*` / `QA-UI-*` **debe prob
 - `UI-CSS-01` Politica anti-hardcode y reduccion progresiva de `::ng-deep`.
 - `QA-UI-061`–`QA-UI-065` Rol QA, matriz 5 temas, regresión de formularios, checklist contraste/inputs, gobernanza al codificar.
 
+
+## REP-NEWS-087 - Panel "Listas de correo" en cajón de envío de boletines
+
+**Estado:** Listo (depende de `ESC-PREV-085`)  
+**Prioridad:** MEDIA  
+**Tipo:** Boletines / UX  
+**Ruta:** `/main/report-generator` → sección **"Envío de Boletines"** (visible al generar un boletín en modo Newsletter)
+
+### Objetivo
+
+El cajón de envío de boletines ya tiene un panel lateral de **"Contactos guardados"** (todos los contactos preventivos). Se necesita agregar un panel equivalente de **"Listas de correo"** que muestre únicamente los contactos preventivos con `isMailingList: true` (definido en `ESC-PREV-085`). Esto permite seleccionar con un clic una lista de distribución completa (ej. `eventos.ciberseguridad@scj.gob.cl`) sin tener que buscarla entre los contactos personales.
+
+Además, el cajón de envío se amplía levemente (altura del textarea y espaciado) para que los paneles coexistan visualmente sin recargarse.
+
+### Criterios de aceptación
+
+1. En el bloque izquierdo del cajón de envío (`.newsletter-manual-block`), debajo del textarea "Destinatarios manuales" y su texto de ayuda, aparece un nuevo panel titulado **"Listas de correo"**.
+2. El panel solo muestra contactos preventivos con `isMailingList: true` y que estén activos y no tengan `doNotSend: true`.
+3. El panel incluye:
+   - **Encabezado** con título "Listas de correo" y contador `X seleccionadas`.
+   - **Checkbox "Seleccionar todas"** que marca/desmarca todas las listas visibles de una vez.
+   - **Lista con checkboxes individuales** por cada lista de correo: muestra el nombre de la lista, el correo y la empresa.
+   - **Badge visual** `📋 Lista` en cada ítem para reforzar la distinción (reusa estilos existentes de `.newsletter-badge`).
+4. Las listas seleccionadas se incluyen en los destinatarios combinados del envío, exactamente como los contactos guardados normales — deduplicadas y validadas por el mismo `newsletterRecipientSummary`.
+5. Si no hay listas de correo registradas, el panel muestra un estado vacío breve: "No hay listas de correo registradas. Créalas en la Agenda Preventiva."
+6. El textarea "Destinatarios manuales" aumenta de `rows="4"` a `rows="6"` para equilibrar el espacio visual con el nuevo panel.
+7. El layout del cajón de envío respeta la estructura de dos columnas existente (`.newsletter-recipient-layout`) — el nuevo panel queda dentro del bloque izquierdo, debajo del textarea, no como una tercera columna.
+8. Las letras del nuevo panel siguen la misma tipografía y contraste que `.newsletter-contact-item` existente (no se introducen estilos inline).
+
+### Archivos afectados
+
+- `report-generator.component.html` — agregar bloque HTML del panel "Listas de correo" dentro de `.newsletter-manual-block`, después del `<p class="newsletter-helper-text">`. Ampliar `rows` del textarea de 4 a 6.
+- `report-generator.component.ts` — agregar:
+  - Getter `mailingListContacts: any[]` que filtra `preventiveContacts` por `isMailingList === true` (sin `doNotSend`, activos).
+  - Propiedad `newsletterSelectedMailingLists: Set<string>` para trackear seleccionadas.
+  - Getter `allMailingListsSelected: boolean` y método `toggleAllMailingLists(checked: boolean)`.
+  - Método `toggleMailingList(contact, checked)` — similar a `toggleNewsletterContact()`.
+  - Getter `newsletterSelectedMailingListCount: number`.
+  - Los correos de listas seleccionadas deben incluirse en el cálculo de `newsletterRecipientSummary` junto a los contactos individuales seleccionados.
+- `report-generator.component.scss` — si es necesario, ajustes menores de padding del `.newsletter-manual-block` para el nuevo panel; reutilizar clases `.newsletter-contact-list`, `.newsletter-contact-item`, `.newsletter-contact-meta`, `.newsletter-badge` ya existentes.
+
+### Notas / Restricciones
+
+- Depende de `ESC-PREV-085`: el campo `isMailingList` debe existir en los datos del backend antes de implementar este issue.
+- No crear un tercer bloque/columna en el layout — el panel va **dentro** del bloque izquierdo (`.newsletter-manual-block`), debajo del textarea.
+- Reutilizar la misma lógica de deduplicación y validación existente en `newsletterRecipientSummary`; no duplicar lógica.
+- No introducir estilos inline; usar clases CSS existentes del componente.
+- QA obligatorio en los 5 temas según `QA-UI-061`–`QA-UI-065`, verificando legibilidad de texto en el nuevo panel.
+
+---
+
+## ESC-PREV-084 - Autocomplete de empresa en formulario de contacto preventivo
+
+**Estado:** Listo  
+**Prioridad:** MEDIA  
+**Tipo:** Admin / Escalación  
+**Ruta:** `/main/admin/escalation` → Tab "📞 Contactos de Escalación" → sección "3. Agenda Preventiva para Boletines"
+
+### Objetivo
+
+El campo **Empresa** (`formControl: organization`) en el formulario de nuevo/editar contacto preventivo es actualmente un `<input matInput>` de texto libre. Esto genera inconsistencias de nombre (ej. "GNL Quinteros" vs "GNLQuinteros") que rompen el filtro de empresa en la tabla. El campo debe comportarse como un **autocomplete con escritura libre** (`matAutocomplete`).
+
+### Criterios de aceptación
+
+1. Al hacer foco o escribir en el campo Empresa, aparece un panel con las empresas ya existentes en la agenda preventiva.
+2. El filtro es **parcial y case-insensitive**: escribir `gnl` muestra "GNL Quinteros".
+3. Al hacer clic en una sugerencia, el valor se carga en el campo.
+4. Si la empresa no existe en la lista, el usuario puede escribirla completa y guardarla sin restricción (escritura libre preservada).
+5. Las sugerencias se generan desde el getter `preventiveCompanyOptions` ya existente — no se requiere nueva lógica de carga.
+
+### Archivos afectados
+
+- `frontend/src/app/pages/escalation/escalation-admin-simple/escalation-admin-simple.component.html` — reemplazar `<mat-form-field>` de Empresa por uno con `[matAutocomplete]`.
+- `frontend/src/app/pages/escalation/escalation-admin-simple/escalation-admin-simple.component.ts` — agregar propiedad `filteredOrgSuggestions: string[]` y método `filterOrgSuggestions(event)`; inicializar sugerencias al abrir el formulario.
+- Imports del componente — agregar `MatAutocompleteModule`.
+
+### Notas / Restricciones
+
+- No se debe forzar al usuario a elegir de la lista; si escribe un nombre nuevo, debe guardarse.
+- `preventiveCompanyOptions` ya existe como getter calculado (línea ~706 del .ts); reutilizarlo directamente.
+- No introducir dependencias externas adicionales.
+
+---
+
+## ESC-PREV-085 - Nuevo campo "Lista de correo" en contactos preventivos
+
+**Estado:** Listo  
+**Prioridad:** MEDIA  
+**Tipo:** Admin / Escalación  
+**Ruta:** `/main/admin/escalation` → Tab "📞 Contactos de Escalación" → sección "3. Agenda Preventiva para Boletines"
+
+### Objetivo
+
+La agenda preventiva mezcla correos personales (ej. `cfsilva@scj.gob.cl`) con listas de distribución (ej. `eventos.ciberseguridad@scj.gob.cl`). Sin distinción, no es posible saber si un correo llega a 1 persona o a múltiples destinatarios. Agregar el flag `isMailingList` permite separarlos explícitamente.
+
+### Criterios de aceptación
+
+1. En el formulario de contacto preventivo, aparece un nuevo checkbox **"Lista de correo"** debajo del checkbox "Favorito".
+2. El campo `isMailingList: Boolean` se persiste en MongoDB (modelo Mongoose del contacto preventivo).
+3. Los endpoints `POST` y `PUT` de contactos aceptan y guardan `isMailingList`; el `GET` lo devuelve en la respuesta.
+4. La plantilla CSV de descarga incluye la columna `isMailingList`.
+5. La importación CSV procesa correctamente el valor (`true`/`false`, `1`/`0`, `si`/`no`).
+6. La exportación CSV incluye el valor actual del campo.
+7. Los contactos sin el campo (registros anteriores) se tratan como `isMailingList: false` (correo personal por defecto).
+
+### Archivos afectados
+
+- `escalation-admin-simple.component.html` — agregar `<mat-checkbox formControlName="isMailingList">Lista de correo</mat-checkbox>` después del checkbox Favorito.
+- `escalation-admin-simple.component.ts` — agregar `isMailingList: [false]` al `contactForm`.
+- Backend: modelo Mongoose de contacto (`contactType: 'preventive'`) — agregar campo `isMailingList: { type: Boolean, default: false }`.
+- Backend: controlador/rutas de contactos — aceptar `isMailingList` en create/update y devolverlo en get.
+- Backend: funciones de CSV import/export/template — incluir columna `isMailingList`.
+
+### Notas / Restricciones
+
+- Implementar antes que `ESC-PREV-086`, ya que este issue genera el campo del que depende la visualización.
+- No cambiar el modelo de contactos de escalación (`contactType !== 'preventive'`); el campo aplica solo a preventivos.
+- No requerir migración destructiva: los registros existentes siguen funcionando con valor por defecto `false`.
+
+---
+
+## ESC-PREV-086 - Indicadores visuales de tipo de correo en tabla y filtros
+
+**Estado:** Listo (depende de `ESC-PREV-085`)  
+**Prioridad:** MEDIA  
+**Tipo:** Admin / Escalación  
+**Ruta:** `/main/admin/escalation` → Tab "📞 Contactos de Escalación" → sección "3. Agenda Preventiva para Boletines"
+
+### Objetivo
+
+La tabla de contactos preventivos no indica visualmente si un contacto es un correo personal o una lista de distribución. El buscador tampoco permite filtrar por este criterio. Agregar badges diferenciadores y un filtro de tipo mejora la legibilidad operativa de la agenda.
+
+### Criterios de aceptación
+
+1. En la columna **Estado** de la tabla, se muestra un badge diferenciador:
+   - Listas de correo: badge con ícono `group` (ej. `📋 Lista`) en color accent.
+   - Correos personales: badge con ícono `person` (ej. `👤 Personal`) en color neutro/muted.
+2. Los badges de tipo se muestran junto a los badges existentes (Favorito, No enviar, Activo/Inactivo) sin reemplazarlos.
+3. En la fila de filtros, se agrega un selector **"Tipo"** con opciones: `Todos` / `Solo personales` / `Solo listas de correo`.
+4. El getter `filteredPreventiveContacts` aplica el filtro de tipo correctamente combinado con los filtros existentes (búsqueda, empresa, favoritos).
+5. El selector de filtro de tipo se restablece junto a los demás filtros si el usuario limpia la búsqueda.
+
+### Archivos afectados
+
+- `escalation-admin-simple.component.html` — agregar selector de filtro "Tipo" en la fila de filtros; agregar badges en columna Estado de la tabla.
+- `escalation-admin-simple.component.ts` — agregar propiedad `preventiveTypeFilter: '' | 'personal' | 'list' = ''`; actualizar getter `filteredPreventiveContacts` con condición `matchesType`.
+- `escalation-admin-simple.component.scss` — si se requiere, estilos para el badge nuevo (preferir clases ya existentes como `.badge`, `.badge.para`, `.badge.warn`, `.badge.muted`).
+
+### Notas / Restricciones
+
+- Depende de `ESC-PREV-085` (el campo `isMailingList` debe existir en los datos antes de implementar este issue).
+- Reutilizar las clases CSS de badge ya existentes en el componente para no crear deuda de estilos.
+- El badge "Personal" puede omitirse si el filtro activo ya es "Solo personales" (evitar redundancia visual).
+- QA obligatorio en los 5 temas según `QA-UI-061`–`QA-UI-065`.
+
+---
 
 ## BACKUP-ENC-081 - Cifrado opcional de backups con passphrase
 

@@ -2,6 +2,20 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.54-beta] - 2026-04-30
+
+### Agenda Preventiva de Boletines (`ESC-PREV-084`, `ESC-PREV-085`, `ESC-PREV-086`)
+
+- **Autocomplete de Empresas (`ESC-PREV-084`):** Se integró un selector dinámico (`matAutocomplete`) en el campo "Empresa" del formulario de contacto preventivo. Ahora sugiere en tiempo real empresas ya registradas para evitar duplicidades tipográficas, manteniendo la opción de escritura libre para empresas nuevas.
+- **Soporte para Listas de Correo (`ESC-PREV-085`):** Se introdujo el flag `isMailingList` en el modelo, backend y exportación/importación CSV de contactos. Esto permite diferenciar correos institucionales de personas naturales frente a casillas de distribución grupal.
+- **Indicadores y Filtros en Tabla (`ESC-PREV-086`):** La tabla de administración ahora cuenta con badges distintivos (`👤 Personal` y `📋 Lista`) para una lectura rápida. Además, se sumó un filtro dedicado para alternar la vista entre todos los contactos, solo personales o solo listas.
+
+### Generador de Reportes / Boletines (`REP-NEWS-087`)
+
+- **Nuevo panel de Listas de correo:** Se añadió un bloque visual exclusivo para seleccionar listas de distribución en la vista de envío de boletines, ubicado estratégicamente debajo del área de destinatarios manuales.
+- **Separación estricta de contactos:** El panel lateral derecho de "Contactos guardados" ahora filtra exclusivamente correos personales (excluyendo cualquier lista de distribución), integrando además un badge explícito de `👤 Personal` por ítem.
+- **Consolidación de envío unificada:** Al enviar el boletín, el sistema fusiona de manera transparente y sin duplicados los correos manuales, las listas seleccionadas en su panel, y los contactos individuales seleccionados a la derecha, previniendo rebotes y descartando inválidos antes de procesar el lote 1:1.
+
 ## [v1.5.53-beta] - 2026-04-28
 
 ### Complementos en plataforma y documentación operativa

@@ -118,6 +118,7 @@ export interface Contact {
   serviceId?: string | Service | null;
   contactType?: ContactType;
   favorite?: boolean;
+  isMailingList?: boolean;
   doNotSend?: boolean;
   notes?: string;
   active: boolean;
@@ -330,6 +331,7 @@ export interface ContactFormData {
   serviceId?: string | null;
   contactType?: ContactType;
   favorite?: boolean;
+  isMailingList?: boolean;
   doNotSend?: boolean;
   notes?: string;
   active: boolean;
