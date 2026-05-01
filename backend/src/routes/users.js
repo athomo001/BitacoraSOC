@@ -145,7 +145,7 @@ router.post('/',
   [
     body('username').trim().isLength({ min: 3 }).withMessage('El usuario debe tener al menos 3 caracteres'),
     body('email').isEmail().normalizeEmail().withMessage('Email invalido'),
-    body('password').isLength({ min: 6 }).withMessage('La contrasena debe tener al menos 6 caracteres'),
+    body('password').notEmpty().withMessage('La contraseña no puede estar vacía'),  // Admin: sin mínimo de caracteres
     body('fullName').trim().notEmpty().withMessage('El nombre completo es requerido'),
     body('role').isIn(['admin', 'user', 'auditor', 'guest']).withMessage('Rol inválido'),
     body('phone').optional().trim().isLength({ min: 6, max: 20 }).withMessage('Teléfono inválido'),
@@ -281,7 +281,8 @@ router.put('/:id',
     body('isActive').optional().isBoolean(),
     body('phone').optional().trim().isLength({ min: 6, max: 20 }),
     body('cargoLabel').optional({ nullable: true }).isString().trim().isLength({ max: MAX_CARGO_LENGTH })
-      .withMessage(`Cargo inválido (máx ${MAX_CARGO_LENGTH} caracteres)`)
+      .withMessage(`Cargo inválido (máx ${MAX_CARGO_LENGTH} caracteres)`),
+    body('newPassword').optional().notEmpty().withMessage('La nueva contraseña no puede estar vacía') // Admin: sin mínimo
   ],
   validate,
   async (req, res) => {
@@ -289,6 +290,11 @@ router.put('/:id',
       const { id } = req.params;
       const updates = req.body;
 
+      // Extraer newPassword antes de limpiar updates
+      const newPasswordToSet = (updates.newPassword && String(updates.newPassword).length > 0)
+        ? String(updates.newPassword)
+        : null;
+      delete updates.newPassword;
       delete updates.password;
       delete updates.username;
 
@@ -312,6 +318,17 @@ router.put('/:id',
       }
 
       const beforeUser = await User.findById(id).select('-password').lean();
+
+      // Cambio de contraseña por admin: pasa por el pre-save hook de bcrypt
+      if (newPasswordToSet) {
+        const userToSetPwd = await User.findById(id);
+        if (!userToSetPwd) {
+          return res.status(404).json({ message: 'Usuario no encontrado' });
+        }
+        userToSetPwd.password = newPasswordToSet;
+        await userToSetPwd.save();
+      }
+
       const user = await User.findByIdAndUpdate(id, updates, { new: true }).select('-password');
 
       if (!user) {
@@ -341,7 +358,8 @@ router.put('/:id',
             cargoLabel: user.cargoLabel,
             isActive: user.isActive,
             phone: user.phone,
-            theme: user.theme
+            theme: user.theme,
+            passwordChanged: !!newPasswordToSet
           }
         }
       });

@@ -75,7 +75,8 @@ export class UsersComponent implements OnInit {
   ) {
     this.userForm = this.fb.group({
       username: ['', Validators.required],
-      password: ['', [Validators.required, Validators.minLength(6)]],
+      password: ['', [Validators.required]],  // Admin: sin mínimo de caracteres
+      newPassword: [''],                        // Solo en edición, opcional
       fullName: ['', Validators.required],
       email: ['', [Validators.required, Validators.email]],
       phone: [''],
@@ -165,6 +166,11 @@ export class UsersComponent implements OnInit {
           role: this.userForm.value.role,
           cargoLabel: this.resolveCargoLabelFromForm()
         };
+        // Incluir newPassword solo si el admin escribió algo
+        const newPwd = (this.userForm.value.newPassword || '').trim();
+        if (newPwd) {
+          data.newPassword = newPwd;
+        }
         this.userService.updateUser(this.editingUserId, data).subscribe({
           next: () => {
             this.snackBar.open('Usuario actualizado', 'Cerrar', { duration: 2000 });
@@ -215,7 +221,8 @@ export class UsersComponent implements OnInit {
       phone: user.phone || '',
       role: user.role,
       cargoOption: '',
-      cargoCustom: ''
+      cargoCustom: '',
+      newPassword: ''
     });
 
     if (user.role !== 'guest') {
@@ -237,9 +244,9 @@ export class UsersComponent implements OnInit {
 
   cancelEdit(): void {
     this.editingUserId = null;
-    this.userForm.reset({ role: 'user', cargoOption: this.baseCargos[0], cargoCustom: '' });
+    this.userForm.reset({ role: 'user', cargoOption: this.baseCargos[0], cargoCustom: '', newPassword: '' });
     this.userForm.get('username')?.enable();
-    this.userForm.get('password')?.setValidators([Validators.required, Validators.minLength(6)]);
+    this.userForm.get('password')?.setValidators([Validators.required]);
     this.userForm.get('password')?.updateValueAndValidity();
     this.applyCargoValidators();
   }

@@ -6,6 +6,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import anime from 'animejs';
 
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { CatalogService } from '../../../services/catalog.service';
 import { CatalogEvent, CatalogLogSource, CatalogOperationType } from '../../../models/catalog.model';
 import { EscalationService } from '../../../services/escalation.service';
@@ -94,6 +95,7 @@ export class ReportGeneratorComponent implements OnInit {
   uploadedImages: { name: string; dataUrl: string; width: number; height: number }[] = [];
   newsletterUploadedImages: { name: string; dataUrl: string; width: number; height: number }[] = [];
   generatedHtml = '';
+  safeGeneratedHtml: SafeHtml | null = null;
   showPreview = false;
   reportTableHeaderColor = '#4CAF50';
   reportTableColorsByType: Record<'incident' | 'bulletin', string> = {
@@ -114,6 +116,25 @@ export class ReportGeneratorComponent implements OnInit {
   newsletterFavoritesOnly = false;
   private readonly selectedNewsletterContactIds = new Set<string>();
   newsletterSelectedMailingLists = new Set<string>();
+
+  // ─── Incident email dispatch ──────────────────────────────────────────────
+  incidentRecipientsTo = '';
+  incidentRecipientsCc = '';
+  incidentSubject = '';
+  isSendingIncident = false;
+  
+  incidentContactSearch = '';
+  incidentCompanyFilter = '';
+  incidentFavoritesOnly = false;
+  
+  // Modos de selección de destinatarios para incidentes ('to' o 'cc')
+  activeIncidentSelectorMode: 'to' | 'cc' = 'to';
+  
+  private readonly selectedIncidentContactIdsTo = new Set<string>();
+  incidentSelectedMailingListsTo = new Set<string>();
+
+  private readonly selectedIncidentContactIdsCc = new Set<string>();
+  incidentSelectedMailingListsCc = new Set<string>();
 
   // ─── Client alert ────────────────────────────────────────────────────────
   activeClientAlert: ClientAlertEvaluation | null = null;
@@ -137,18 +158,20 @@ export class ReportGeneratorComponent implements OnInit {
     private snackBar: MatSnackBar,
     private escalationService: EscalationService,
     private dialog: MatDialog,
-    private authService: AuthService
+    private authService: AuthService,
+    private sanitizer: DomSanitizer
   ) {
     this.reportForm = this.fb.group({
+      codigoTicket: ['', Validators.required],
+      ofensa: ['', Validators.required],
       tipoOperacion: ['', Validators.required],
-      codigoInterno: [''],
       nombreEvento: ['', Validators.required],
-      motivoEvento: ['', Validators.required],
+      motivoEvento: [''], // Ya no es obligatorio
       fecha: [new Date(), Validators.required],
-      criticidad: ['media', Validators.required],
+      criticidad: ['media'], // Ya no es obligatorio
       origenConexion: [''],
-      logSource: ['', Validators.required],
       destino: [''],
+      logSource: [''], // Ya no es obligatorio
       reputacionOrigen: ['Interna'],
       observaciones: ['', Validators.required],
       evidenciaTexto: [''],
@@ -288,6 +311,13 @@ export class ReportGeneratorComponent implements OnInit {
         nombreEvento: event.name,
         motivoEvento: event.motivoDefault || ''
       });
+    }
+  }
+
+  onEventTextChanged(text: string): void {
+    if (!this.selectedEvent || this.selectedEvent.name !== text) {
+      this.selectedEvent = null;
+      this.reportForm.patchValue({ nombreEvento: text, motivoEvento: '' });
     }
   }
 
@@ -1086,13 +1116,24 @@ export class ReportGeneratorComponent implements OnInit {
     this.uploadedImages = [];
     this.newsletterUploadedImages = [];
     this.generatedHtml = '';
+    this.safeGeneratedHtml = null;
     this.showPreview = false;
     this.activeClientAlert = null;
+    
     this.newsletterRecipients = '';
     this.newsletterContactSearch = '';
     this.newsletterCompanyFilter = '';
     this.newsletterFavoritesOnly = false;
     this.clearNewsletterSelection();
+
+    this.incidentRecipientsTo = '';
+    this.incidentRecipientsCc = '';
+    this.incidentSubject = '';
+    this.incidentContactSearch = '';
+    this.incidentCompanyFilter = '';
+    this.incidentFavoritesOnly = false;
+    this.selectedIncidentContactIdsTo.clear();
+    this.selectedIncidentContactIdsCc.clear();
   }
 
   onModeChange(): void {
@@ -1119,29 +1160,66 @@ export class ReportGeneratorComponent implements OnInit {
 
     const e = (v: unknown) => this.escapeHtml(v);
 
-    let html = `<table cellpadding="6" cellspacing="0" width="${reportWidthPx}" style="border-collapse: collapse; width: ${reportWidthPx}px; max-width: 100%; font-family: Arial, sans-serif; border: 1px solid #2b2b2b; table-layout: fixed; margin: 0; mso-table-lspace: 0pt; mso-table-rspace: 0pt; clear: both;">
-  <colgroup>
-    <col width="${firstColPx}" style="width: ${firstColPx}px;">
-    <col width="${secondColPx}" style="width: ${secondColPx}px;">
-  </colgroup>
+    const autor = this.authService.getCurrentUser()?.fullName || 'Analista SOC';
+
+    let html = `<table cellpadding="0" cellspacing="0" width="${reportWidthPx}" border="0" style="border-collapse: collapse; width: ${reportWidthPx}px; max-width: 100%; font-family: Arial, Helvetica, sans-serif; border: 1px solid #dddddd; background-color: #ffffff; margin: 0 auto; mso-table-lspace: 0pt; mso-table-rspace: 0pt;">
   <tr>
-    <th colspan="2" style="background-color: ${headerColor}; color: white; text-align: center; font-size: 18px; border: 1px solid #2b2b2b;">Reporte de Detección</th>
+    <td style="padding: 20px; background-color: ${headerColor}; border-bottom: 3px solid #2b2b2b;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
+        <tr>
+          <td width="120" valign="middle" align="left" style="padding: 0;">
+            ${this.logoBase64 ? `<img src="${this.logoBase64}" height="48" width="auto" style="height: 48px; width: auto; border: 0;" alt="Logo" border="0">` : ''}
+          </td>
+          <td valign="middle" align="center" style="padding: 0;">
+            <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
+              <tr>
+                <td style="padding: 0; margin: 0; font-size: 24px; font-weight: bold; color: #ffffff; font-family: Arial, Helvetica, sans-serif; text-align: center;">
+                  Reporte de Detección
+                </td>
+              </tr>
+            </table>
+          </td>
+          <td width="120" style="padding: 0;"></td>
+        </tr>
+      </table>
+    </td>
   </tr>
   <tr>
-    <th width="${firstColPx}" style="background-color: ${labelColor}; color: white; width: ${firstColPx}px; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere;">Campo</th>
-    <th width="${secondColPx}" style="background-color: ${labelColor}; color: white; width: ${secondColPx}px; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere;">Detalle</th>
-  </tr>
+    <td style="padding: 30px 30px 20px 30px; background-color: #ffffff;">
+      <table cellpadding="6" cellspacing="0" width="100%" style="border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; border: 1px solid #2b2b2b; table-layout: fixed; margin: 0; mso-table-lspace: 0pt; mso-table-rspace: 0pt; clear: both;">
+        <colgroup>
+          <col width="${firstColPx}" style="width: ${firstColPx}px;">
+          <col width="${secondColPx - 60}" style="width: ${secondColPx - 60}px;">
+        </colgroup>
+        <tr>
+          <th width="${firstColPx}" style="background-color: ${labelColor}; color: white; width: ${firstColPx}px; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere;">Campo</th>
+          <th width="${secondColPx - 60}" style="background-color: ${labelColor}; color: white; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere;">Detalle</th>
+        </tr>
+  <tr><td style="${cellLabel}">Código Ticket</td><td style="${cellDetail}">${e(form.codigoTicket)}</td></tr>
+  <tr><td style="${cellLabel}">Ofensa</td><td style="${cellDetail}">${e(form.ofensa)}</td></tr>
   <tr><td style="${cellLabel}">Tipo de operación</td><td style="${cellDetail}">${e(form.tipoOperacion)}</td></tr>
-  <tr><td style="${cellLabel}">Ofensa/Código interno</td><td style="${cellDetail}">${e(form.codigoInterno || '-')}</td></tr>
-  <tr><td style="${cellLabel}">Nombre de Ofensa/Evento</td><td style="${cellDetail}">${e(form.nombreEvento)}</td></tr>
-  <tr><td style="${cellLabel}">Motivo de la Ofensa/Evento</td><td style="${cellDetail}">${this.formatMultilineText(form.motivoEvento)}</td></tr>
-  <tr><td style="${cellLabel}">Fecha</td><td style="${cellDetail}">${e(new Date(form.fecha).toLocaleDateString('es-CL'))}</td></tr>
-  <tr><td style="${cellLabel}">MRSC (Criticidad)</td><td style="${cellDetail}">${e(form.criticidad)}</td></tr>
+  <tr><td style="${cellLabel}">Nombre de Ofensa/Evento</td><td style="${cellDetail}">${e(form.nombreEvento)}</td></tr>`;
+  
+    if (form.motivoEvento) {
+      html += `\n  <tr><td style="${cellLabel}">Motivo de la Ofensa/Evento</td><td style="${cellDetail}">${this.formatMultilineText(form.motivoEvento)}</td></tr>`;
+    }
+    
+    if (form.criticidad) {
+      html += `\n  <tr><td style="${cellLabel}">MRSC (Criticidad)</td><td style="${cellDetail}">${e(form.criticidad)}</td></tr>`;
+    }
+
+    html += `
   <tr><td style="${cellLabel}">Origen de conexión</td><td style="${cellDetail}">${e(form.origenConexion || '-')}</td></tr>
-  <tr><td style="${cellLabel}">Fuente / Log Source</td><td style="${cellDetail}">${e(form.logSource)}</td></tr>
-  <tr><td style="${cellLabel}">Destino</td><td style="${cellDetail}">${e(form.destino || '-')}</td></tr>
-  <tr><td style="${cellLabel}">Reputación de origen</td><td style="${cellDetail}">${e(form.reputacionOrigen)}</td></tr>
-  <tr><td style="${cellLabel}">Observaciones</td><td style="white-space: pre-wrap; ${cellDetail}">${this.formatMultilineText(form.observaciones)}</td></tr>`;
+  <tr><td style="${cellLabel}">Destino</td><td style="${cellDetail}">${e(form.destino || '-')}</td></tr>`;
+
+    if (form.logSource) {
+      html += `\n  <tr><td style="${cellLabel}">Fuente / Log Source</td><td style="${cellDetail}">${e(form.logSource)}</td></tr>`;
+    }
+
+    html += `
+  <tr><td style="${cellLabel}">Reputación de origen</td><td style="${cellDetail}">${e(form.reputacionOrigen || '-')}</td></tr>
+  <tr><td style="${cellLabel}">Observaciones</td><td style="white-space: pre-wrap; ${cellDetail}">${this.formatMultilineText(form.observaciones)}</td></tr>
+  <tr><td style="${cellLabel}">Recomendación</td><td style="white-space: pre-wrap; ${cellDetail}">${this.formatMultilineText(form.recomendacion || '-')}</td></tr>`;
 
     const hasImages = this.uploadedImages.length > 0;
     const hasTextEvidence = (form.evidenciaTexto || '').trim().length > 0;
@@ -1158,7 +1236,8 @@ export class ReportGeneratorComponent implements OnInit {
             ? Math.max(1, Math.round((img.height * renderWidth) / img.width))
             : 0;
           const heightAttr = renderHeight > 0 ? ` height="${renderHeight}"` : '';
-          html += `<a href="${img.dataUrl}" style="display: block; text-align: center; text-decoration: none;"><img src="${img.dataUrl}" width="${renderWidth}"${heightAttr} style="width: ${renderWidth}px; max-width: 100%; height: auto; object-fit: contain; margin: 4px auto; display: block; border: 1px solid #ddd;" alt="${e(img.name || 'Evidencia')}"></a><br>`;
+          // Sin <a href="data:...">, Gmail lo muestra como texto plano. Solo img con tabla para centrar.
+          html += `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 6px 0;"><tr><td align="center"><img src="${img.dataUrl}" width="${renderWidth}"${heightAttr} style="width: ${renderWidth}px; max-width: 100%; height: auto; display: block; border: 1px solid #ddd;" alt="${e(img.name || 'Evidencia')}" border="0"></td></tr></table>`;
         });
       }
       html += `</td>\n  </tr>`;
@@ -1166,13 +1245,162 @@ export class ReportGeneratorComponent implements OnInit {
       html += `\n  <tr><td style="${cellLabel}">Evidencia</td><td style="${cellDetail}">Se adjunta en el correo</td></tr>`;
     }
 
+    html += `\n  <tr><td style="${cellLabel}">Información adicional</td><td style="white-space: pre-wrap; ${cellDetail}">${this.formatMultilineText(form.informacionAdicional || '-')}</td></tr>`;
+
     html += `
-  <tr><td style="${cellLabel}">Recomendación</td><td style="white-space: pre-wrap; ${cellDetail}">${this.formatMultilineText(form.recomendacion || '-')}</td></tr>
-  <tr><td style="${cellLabel}">Información adicional</td><td style="white-space: pre-wrap; ${cellDetail}">${this.formatMultilineText(form.informacionAdicional || '-')}</td></tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 15px; text-align: center; background-color: #f1f1f1; color: #111111; font-size: 12px; font-family: Arial, Helvetica, sans-serif; border-top: 1px solid #dddddd;">
+      Generado por <strong style="font-weight: bold;">${autor}</strong>
+    </td>
+  </tr>
 </table>`;
 
     this.generatedHtml = html;
+    this.safeGeneratedHtml = this.sanitizer.bypassSecurityTrustHtml(html);
     this.showPreview = true;
+    
+    // Auto-generar asunto para el reporte de incidente
+    const clienteStr = form.logSource || 'Cliente';
+    this.incidentSubject = `${clienteStr} - ${form.nombreEvento} - ${form.codigoTicket}`;
+  }
+
+  // ─── Incident email dispatch ──────────────────────────────────────────────
+  get incidentCompanyOptionsTo(): string[] {
+    const companies = new Set(
+      this.newsletterContacts
+        .map(c => String(c.organization || '').trim())
+        .filter(v => v.length > 0)
+    );
+    return Array.from(companies).sort((a, b) => a.localeCompare(b));
+  }
+
+  get incidentFilteredContactsTo(): Contact[] {
+    let list = this.newsletterContacts.filter(c => !c.isMailingList);
+    if (this.incidentFavoritesOnly) {
+      list = list.filter(c => c.favorite);
+    }
+    if (this.incidentCompanyFilter) {
+      list = list.filter(c => c.organization === this.incidentCompanyFilter);
+    }
+    const search = this.incidentContactSearch.trim().toLowerCase();
+    if (search) {
+      list = list.filter(c =>
+        c.name.toLowerCase().includes(search) ||
+        (c.email || '').toLowerCase().includes(search)
+      );
+    }
+    return list;
+  }
+
+  get incidentMailingListsTo(): Contact[] {
+    let list = this.newsletterContacts.filter(c => c.isMailingList);
+    if (this.incidentFavoritesOnly) {
+      list = list.filter(c => c.favorite);
+    }
+    const search = this.incidentContactSearch.trim().toLowerCase();
+    if (search) {
+      list = list.filter(c =>
+        c.name.toLowerCase().includes(search) ||
+        (c.email || '').toLowerCase().includes(search)
+      );
+    }
+    return list;
+  }
+
+  toggleIncidentContact(contactId: string, mode: 'to' | 'cc'): void {
+    const set = mode === 'to' ? this.selectedIncidentContactIdsTo : this.selectedIncidentContactIdsCc;
+    if (set.has(contactId)) {
+      set.delete(contactId);
+    } else {
+      set.add(contactId);
+    }
+    this.syncIncidentRecipientsText(mode);
+  }
+
+  isIncidentContactSelected(contactId: string, mode: 'to' | 'cc'): boolean {
+    const set = mode === 'to' ? this.selectedIncidentContactIdsTo : this.selectedIncidentContactIdsCc;
+    return set.has(contactId);
+  }
+
+  private syncIncidentRecipientsText(mode: 'to' | 'cc'): void {
+    const set = mode === 'to' ? this.selectedIncidentContactIdsTo : this.selectedIncidentContactIdsCc;
+    const emails = Array.from(set)
+      .map(id => this.newsletterContacts.find(c => c._id === id)?.email)
+      .filter(e => !!e);
+    
+    if (mode === 'to') {
+      this.incidentRecipientsTo = emails.join('\n');
+    } else {
+      this.incidentRecipientsCc = emails.join('\n');
+    }
+  }
+
+  onIncidentRecipientsToChange(text: string): void {
+    this.incidentRecipientsTo = text;
+    this.updateIncidentSelectedFromText(text, 'to');
+  }
+
+  onIncidentRecipientsCcChange(text: string): void {
+    this.incidentRecipientsCc = text;
+    this.updateIncidentSelectedFromText(text, 'cc');
+  }
+
+  private updateIncidentSelectedFromText(text: string, mode: 'to' | 'cc'): void {
+    const emails = text.split(/[\n,;]+/).map(e => e.trim().toLowerCase()).filter(e => e);
+    const set = mode === 'to' ? this.selectedIncidentContactIdsTo : this.selectedIncidentContactIdsCc;
+    set.clear();
+    
+    this.newsletterContacts.forEach(contact => {
+      if (contact.email && emails.includes(contact.email.toLowerCase())) {
+        set.add(contact._id || '');
+      }
+    });
+  }
+
+  async sendIncidentReport(): Promise<void> {
+    if (!this.incidentRecipientsTo.trim()) {
+      this.snackBar.open('Debes ingresar al menos un destinatario en Para', 'Cerrar', { duration: 3000 });
+      return;
+    }
+    if (!this.incidentSubject.trim()) {
+      this.snackBar.open('Debes ingresar un asunto para el correo', 'Cerrar', { duration: 3000 });
+      return;
+    }
+
+    const canContinue = await this.ensureClientAlertAcknowledged('report');
+    if (!canContinue) return;
+
+    this.isSendingIncident = true;
+    const payload = {
+      to: this.incidentRecipientsTo.split(/[\n,;]+/).map(e => e.trim()).filter(e => e),
+      cc: this.incidentRecipientsCc.split(/[\n,;]+/).map(e => e.trim()).filter(e => e),
+      subject: this.incidentSubject,
+      html: this.generatedHtml,
+      inlineAttachments: this.uploadedImages.map(img => ({
+        filename: img.name,
+        contentType: img.dataUrl.startsWith('data:image/png') ? 'image/png' : 'image/jpeg',
+        contentBase64: img.dataUrl.split(',')[1]
+      }))
+    };
+
+    this.http.post(`${this.backendBaseUrl}/api/reports/incident/send`, payload).subscribe({
+      next: (res: any) => {
+        this.snackBar.open(`✅ Reporte enviado a ${res.toCount} destinatario(s) y ${res.ccCount} en copia`, 'Cerrar', { duration: 4000 });
+        this.isSendingIncident = false;
+        
+        // Limpiar para permitir un nuevo reporte
+        this.clearForm();
+        this.loadNewsletterContacts();
+      },
+      error: (err) => {
+        this.isSendingIncident = false;
+        const msg = err.error?.detail || err.error?.message || 'Error al enviar reporte';
+        this.snackBar.open(`Error: ${msg}`, 'Cerrar', { duration: 5000 });
+      }
+    });
   }
 
   private buildNewsletterHtml(): void {
@@ -1377,6 +1605,7 @@ export class ReportGeneratorComponent implements OnInit {
 </table>`;
 
     this.generatedHtml = html;
+    this.safeGeneratedHtml = this.sanitizer.bypassSecurityTrustHtml(html);
     this.showPreview = true;
   }
 

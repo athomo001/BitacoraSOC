@@ -99,6 +99,7 @@ export class EntityAutocompleteComponent implements OnInit {
   @Output() cleared = new EventEmitter<void>();
   @Output() focused = new EventEmitter<void>();
   @Output() blurred = new EventEmitter<void>();
+  @Output() textChanged = new EventEmitter<string>();
 
   // Control del input
   searchControl = new FormControl('');
@@ -126,6 +127,7 @@ export class EntityAutocompleteComponent implements OnInit {
     const queryChanges$ = this.searchControl.valueChanges.pipe(
       startWith(''),
       map(value => typeof value === 'string' ? value.trim() : ''),
+      tap(value => this.textChanged.emit(value)),
       distinctUntilChanged(),
       debounceTime(250)
     );

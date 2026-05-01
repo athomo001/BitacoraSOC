@@ -342,15 +342,57 @@ async function prepareNewsletterEmailPayload(html, clientLogoAttachments) {
     hasPublicBase: Boolean(publicBase)
   });
 
+  // ─── Helper: convierte data: URIs de evidencias a CID ─────────────────────
+  function processEvidenceImages(htmlIn, attachmentsArr) {
+    const dataImageRegex = /<img\b[^>]*\ssrc=["']data:image\/(png|jpeg|jpg|gif|webp);base64,([A-Za-z0-9+/=\s]+)["'][^>]*>/gi;
+    let evidenceIndex = 0;
+    let finalHtml = htmlIn;
+    let match;
+    const regexCopy = new RegExp(dataImageRegex.source, dataImageRegex.flags);
+    while ((match = regexCopy.exec(htmlIn)) !== null) {
+      evidenceIndex++;
+      const imgTag = match[0];
+      const imageType = match[1];
+      const base64Data = match[2].replace(/\s/g, '');
+      try {
+        const evidenceBuffer = Buffer.from(base64Data, 'base64');
+        if (evidenceBuffer.length > 5 * 1024 * 1024) {
+          newsletterDebug('prepare_payload.evidence_skip_too_large', { index: evidenceIndex, size: evidenceBuffer.length });
+          continue;
+        }
+        const evidenceCid = `evidence-${evidenceIndex}@bitacora-newsletter`;
+        const evidenceExt = imageType === 'jpeg' || imageType === 'jpg' ? 'jpg' : imageType;
+        const evidenceFilename = `evidence-${evidenceIndex}.${evidenceExt}`;
+        const evidenceContentType = `image/${imageType === 'jpg' ? 'jpeg' : imageType}`;
+        attachmentsArr.push({
+          filename: evidenceFilename,
+          content: evidenceBuffer,
+          cid: evidenceCid,
+          contentType: evidenceContentType,
+          contentDisposition: 'inline'
+        });
+        const newImgTag = imgTag.replace(/src=["']data:image\/[^"']+["']/i, `src="cid:${evidenceCid}"`);
+        finalHtml = finalHtml.replace(imgTag, newImgTag);
+        newsletterDebug('prepare_payload.evidence_processed', {
+          index: evidenceIndex, cid: evidenceCid, filename: evidenceFilename,
+          size: evidenceBuffer.length, contentType: evidenceContentType
+        });
+      } catch (err) {
+        newsletterDebug('prepare_payload.evidence_decode_failed', { index: evidenceIndex, error: err.message });
+      }
+    }
+    return { finalHtml, evidenceCount: evidenceIndex };
+  }
+  // ──────────────────────────────────────────────────────────────────────────
+
   if (publicBase && logoUrl && typeof logoUrl === 'string' && logoUrl.startsWith('/uploads/logos/')) {
     const absolute = `${publicBase}${logoUrl}`;
-    const htmlWithPublicLogo = /<img\b/i.test(rawHtml) ? replaceFirstImgSrc(rawHtml, absolute) : rawHtml;
-    const safePublicHtml = removeLeadingDataImageTags(htmlWithPublicLogo);
+    let htmlWithPublicLogo = /^<img\b/i.test(rawHtml) ? replaceFirstImgSrc(rawHtml, absolute) : rawHtml;
+    htmlWithPublicLogo = removeLeadingDataImageTags(htmlWithPublicLogo);
+    const attachments = [];
+    const { finalHtml } = processEvidenceImages(htmlWithPublicLogo, attachments);
     newsletterDebug('prepare_payload.use_public_url', { absolute });
-    return {
-      html: safePublicHtml,
-      attachments: []
-    };
+    return { html: finalHtml, attachments };
   }
 
   const { buffer: buf, contentType: ct } = await resolveNewsletterLogoBuffer(
@@ -358,6 +400,9 @@ async function prepareNewsletterEmailPayload(html, clientLogoAttachments) {
     clientLogoAttachments,
     logoUrl
   );
+
+  const attachments = [];
+
   if (!buf || !buf.length || !/<img\b/i.test(rawHtml)) {
     let out = rawHtml;
     const s = extractFirstImgSrc(out);
@@ -368,11 +413,14 @@ async function prepareNewsletterEmailPayload(html, clientLogoAttachments) {
         originalSrcType: /^cid:/i.test(s) ? 'cid' : 'data'
       });
     }
-    newsletterDebug('prepare_payload.return_without_attachments', {
+    newsletterDebug('prepare_payload.return_without_logo', {
       hasBuffer: Boolean(buf && buf.length),
       hasImgTag: /<img\b/i.test(rawHtml)
     });
-    return { html: out, attachments: [] };
+    // Aún así convertir evidencias en el HTML restante
+    const { finalHtml, evidenceCount } = processEvidenceImages(out, attachments);
+    newsletterDebug('prepare_payload.done', { totalAttachments: attachments.length, evidenceImagesProcessed: evidenceCount });
+    return { html: finalHtml, attachments };
   }
 
   const ext = extensionFromContentType(ct);
@@ -380,97 +428,21 @@ async function prepareNewsletterEmailPayload(html, clientLogoAttachments) {
   const cid = NEWSLETTER_LOGO_CID;
   let htmlOut = replaceFirstImgSrc(rawHtml, `cid:${cid}`);
   htmlOut = removeLeadingDataImageTags(htmlOut);
-  newsletterDebug('prepare_payload.use_cid', {
-    cid,
-    filename,
-    contentType: ct,
-    bufferLength: buf.length
-  });
+  newsletterDebug('prepare_payload.use_cid', { cid, filename, contentType: ct, bufferLength: buf.length });
 
-  const attachments = [
-    {
-      filename,
-      content: buf,
-      cid,
-      contentType: ct,
-      contentDisposition: 'inline'
-    },
-    {
-      filename,
-      content: buf,
-      contentType: ct,
-      contentDisposition: 'attachment'
-    }
-  ];
+  attachments.push(
+    { filename, content: buf, cid, contentType: ct, contentDisposition: 'inline' },
+    { filename, content: buf, contentType: ct, contentDisposition: 'attachment' }
+  );
 
-  // Procesar imágenes de evidencias (data: URIs) -> CID attachments para compatibilidad Gmail
-  const dataImageRegex = /<img\b[^>]*\ssrc=["']data:image\/(png|jpeg|jpg|gif|webp);base64,([A-Za-z0-9+/=\s]+)["'][^>]*>/gi;
-  let evidenceIndex = 0;
-  let finalHtml = htmlOut;
-  let match;
-  
-  while ((match = dataImageRegex.exec(htmlOut)) !== null) {
-    evidenceIndex++;
-    const imgTag = match[0];
-    const imageType = match[1];
-    const base64Data = match[2].replace(/\s/g, '');
-    
-    try {
-      const evidenceBuffer = Buffer.from(base64Data, 'base64');
-      
-      // Validar tamaño razonable (máx 5MB por imagen de evidencia)
-      if (evidenceBuffer.length > 5 * 1024 * 1024) {
-        newsletterDebug('prepare_payload.evidence_skip_too_large', {
-          index: evidenceIndex,
-          size: evidenceBuffer.length
-        });
-        continue;
-      }
-      
-      const evidenceCid = `evidence-${evidenceIndex}@bitacora-newsletter`;
-      const evidenceExt = imageType === 'jpeg' || imageType === 'jpg' ? 'jpg' : imageType;
-      const evidenceFilename = `evidence-${evidenceIndex}.${evidenceExt}`;
-      const evidenceContentType = `image/${imageType === 'jpg' ? 'jpeg' : imageType}`;
-      
-      attachments.push({
-        filename: evidenceFilename,
-        content: evidenceBuffer,
-        cid: evidenceCid,
-        contentType: evidenceContentType,
-        contentDisposition: 'inline'
-      });
-      
-      // Reemplazar data: URI con cid: en el HTML
-      const newImgTag = imgTag.replace(
-        /src=["']data:image\/[^"']+["']/i,
-        `src="cid:${evidenceCid}"`
-      );
-      finalHtml = finalHtml.replace(imgTag, newImgTag);
-      
-      newsletterDebug('prepare_payload.evidence_processed', {
-        index: evidenceIndex,
-        cid: evidenceCid,
-        filename: evidenceFilename,
-        size: evidenceBuffer.length,
-        contentType: evidenceContentType
-      });
-    } catch (err) {
-      newsletterDebug('prepare_payload.evidence_decode_failed', {
-        index: evidenceIndex,
-        error: err.message
-      });
-    }
-  }
-  
+  const { finalHtml, evidenceCount } = processEvidenceImages(htmlOut, attachments);
+
   newsletterDebug('prepare_payload.done', {
     totalAttachments: attachments.length,
-    evidenceImagesProcessed: evidenceIndex
+    evidenceImagesProcessed: evidenceCount
   });
 
-  return {
-    html: finalHtml,
-    attachments
-  };
+  return { html: finalHtml, attachments };
 }
 
 // GET /api/reports/overview - Vista general de KPIs
@@ -873,6 +845,79 @@ router.post('/newsletter/send', authenticate, async (req, res) => {
     console.error('[newsletter/send] Error inesperado:', error);
     res.status(500).json({
       message: 'Error interno al enviar boletines',
+      detail: error.message
+    });
+  }
+});
+// POST /api/reports/incident/send - Envío de reporte de incidente (Para y CC)
+router.post('/incident/send', authenticate, async (req, res) => {
+  try {
+    const { to, cc, subject, html } = req.body;
+    
+    // Validar destinatario principal (to)
+    const analysisTo = analyzeRecipientEmails(to || []);
+    if (analysisTo.valid.length === 0) {
+      return res.status(400).json({
+        message: 'Se requiere al menos un destinatario válido en Para',
+        detail: 'Corrige los correos inválidos antes de enviar.'
+      });
+    }
+
+    // Validar en copia (cc) (opcional)
+    const analysisCc = analyzeRecipientEmails(cc || []);
+    const validCc = analysisCc.valid;
+
+    if (!html) {
+      return res.status(400).json({ message: 'Se requiere el contenido HTML del reporte' });
+    }
+
+    // Extraemos imágenes del HTML de la misma forma que el boletín (reutilizamos la función)
+    // Limpiar href="data:..." residuales antes de procesar (evita chorizo base64 en Gmail)
+    const cleanedHtml = String(html)
+      .replace(/<a\b[^>]*\shref=["']data:[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi, '$1');
+    const prepared = await prepareNewsletterEmailPayload(cleanedHtml, req.body.inlineAttachments);
+    const emailHtml = prepared.html;
+    const emailAttachments = prepared.attachments;
+    const plainText = htmlToBasicPlainText(emailHtml);
+
+    // Envío único con múltiples destinatarios (no secuencial 1:1)
+    try {
+      await sendEmail({
+        to: analysisTo.valid,
+        cc: validCc,
+        subject: subject || 'Reporte de Incidente de Seguridad',
+        html: emailHtml,
+        text: plainText,
+        attachments: emailAttachments.length ? emailAttachments : undefined,
+        auditContext: {
+          sourceModule: 'ReportGenerator',
+          triggerType: 'manual_incident_report',
+          extra: {
+            type: 'incident',
+            attachmentParts: emailAttachments.length,
+            toCount: analysisTo.valid.length,
+            ccCount: validCc.length
+          }
+        }
+      });
+      
+      res.json({
+        success: true,
+        message: 'Reporte de incidente enviado correctamente',
+        toCount: analysisTo.valid.length,
+        ccCount: validCc.length
+      });
+    } catch (err) {
+      console.error(`[incident/send] Error al enviar reporte:`, err.message);
+      return res.status(500).json({
+        message: 'Error SMTP al enviar el reporte',
+        detail: err.message || 'Error desconocido — revisa la configuración SMTP en Admin.'
+      });
+    }
+  } catch (error) {
+    console.error('[incident/send] Error inesperado:', error);
+    res.status(500).json({
+      message: 'Error interno al enviar el reporte',
       detail: error.message
     });
   }
