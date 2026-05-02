@@ -1,3 +1,9 @@
+/**
+ * File Purpose: frontend/start-dev.js
+ * Responsibilities: Explain intent, contracts, and expected maintenance boundaries.
+ * QA Notes: Preserve deterministic behavior and document validation assumptions.
+ */
+
 const { spawn } = require('child_process');
 const http = require('http');
 

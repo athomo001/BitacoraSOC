@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/src/middleware/request-id.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Middleware de Correlation ID (Request Tracing)
  * 
  * Funcionalidad:

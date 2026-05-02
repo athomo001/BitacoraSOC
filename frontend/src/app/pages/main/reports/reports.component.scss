@@ -60,6 +60,16 @@
   margin-bottom: 24px;
 }
 
+.mail-stats-grid {
+  margin-bottom: 32px;
+}
+
+.mail-stat-card {
+  .stat-value {
+    color: var(--chart-4);
+  }
+}
+
 .stat-card {
   text-align: center;
   transition: transform 0.2s;
@@ -278,6 +288,10 @@
       color: var(--text-primary);
     }
   }
+}
+
+.analytics-grid {
+  row-gap: 32px;
 }
 
 .chart-wrapper ngx-charts-bar-horizontal,

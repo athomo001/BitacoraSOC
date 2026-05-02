@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/src/server.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * 🛡️ BITÁCORA SOC - Backend Express
  * Marca de autor en comentarios: Athan Espinoza
  * 
@@ -252,6 +258,17 @@ validateEnv();
 
 app.locals.runtimeSecurityConfig = { ...DEFAULT_RUNTIME_SECURITY_CONFIG };
 app.locals.httpsReady = false;
+
+/*
+ * QA / seguridad — orden del pipeline HTTP (no reordenar sin revisar impacto):
+ * 1) trust proxy: afecta IP real y `req.secure` detrás de balanceadores.
+ * 2) Helmet: cabeceras de mitigación (CSP, HSTS, etc.); probar front con Material/iframe.
+ * 3) Parsers JSON/urlencoded: límite 50mb; validar que uploads grandes vayan por ruta adecuada.
+ * 4) requestId: trazabilidad; correlacionar con logs y auditoría.
+ * 5) Redirección/426 HTTPS: API usa 426 para no romper cookies/CORS (ver comentario inline).
+ * 6) Bajo `/api/`: CORS + rate limit → metadata cliente → inputSanitizer (antes de rutas).
+ * Casos de prueba manuales sugeridos: login con cookie, refresh, upload complemento, health.
+ */
 
 const trustProxyEnv = process.env.TRUST_PROXY;
 if (trustProxyEnv === 'true') {

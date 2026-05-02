@@ -1,3 +1,9 @@
+/**
+ * File Purpose: frontend/src/app/pages/login/login.module.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule } from '@angular/forms';

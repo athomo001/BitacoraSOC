@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/utils/complement-publisher.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const crypto = require('crypto');
 const fs = require('fs/promises');
 const path = require('path');

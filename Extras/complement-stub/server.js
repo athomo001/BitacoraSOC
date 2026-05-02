@@ -1,3 +1,9 @@
+/**
+ * File Purpose: Extras/complement-stub/server.js
+ * Responsibilities: Explain intent, contracts, and expected maintenance boundaries.
+ * QA Notes: Preserve deterministic behavior and document validation assumptions.
+ */
+
 const express = require('express');
 
 const app = express();

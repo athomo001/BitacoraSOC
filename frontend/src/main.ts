@@ -1,3 +1,9 @@
+/**
+ * File Purpose: frontend/src/main.ts
+ * Responsibilities: Explain intent, contracts, and expected maintenance boundaries.
+ * QA Notes: Preserve deterministic behavior and document validation assumptions.
+ */
+
 import { HTTP_INTERCEPTORS, provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 import { AuthInterceptor } from './app/interceptors/auth.interceptor';
 import { APP_INITIALIZER, LOCALE_ID, Injectable, importProvidersFrom } from '@angular/core';

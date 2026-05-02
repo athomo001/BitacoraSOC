@@ -1,4 +1,10 @@
 /**
+ * File Purpose: frontend/src/app/services/report.service.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Servicio de Reportes y Análisis
  * 
  * Funcionalidad:
@@ -27,7 +33,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '@env/environment';
-import { ReportOverview, TagStats } from '../models/report.model';
+import { MailAnalytics, ReportOverview, TagStats } from '../models/report.model';
 
 @Injectable({
   providedIn: 'root'
@@ -68,5 +74,10 @@ export class ReportService {
   getEntriesByLogSource(days = 30): Observable<any[]> {
     const params = new HttpParams().set('days', days.toString());
     return this.http.get<any[]>(`${this.API_URL}/entries-by-logsource`, { params });
+  }
+
+  getMailAnalytics(days = 30): Observable<MailAnalytics> {
+    const params = new HttpParams().set('days', days.toString());
+    return this.http.get<MailAnalytics>(`${this.API_URL}/mail-analytics`, { params });
   }
 }

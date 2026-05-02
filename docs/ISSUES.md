@@ -25,6 +25,8 @@
 | ESC-PREV-085 | Listo | Admin / Escalación MEDIA | Nuevo campo "Lista de correo" en contactos preventivos | En la misma sección, agregar un checkbox `isMailingList` debajo de "Favorito" en el formulario y persistirlo en backend (modelo + endpoints + CSV import/export). Permite distinguir correos de personas (`cfsilva@scj.gob.cl`) de listas de distribución (`eventos.ciberseguridad@scj.gob.cl`). |
 | ESC-PREV-086 | Listo | Admin / Escalación MEDIA | Indicadores visuales de tipo de correo (personal vs lista) en tabla y filtros | En la tabla de contactos preventivos, mostrar badges `👤 Personal` / `📋 Lista` en la columna Estado. Agregar selector de filtro "Tipo" (Todos / Solo personales / Solo listas de correo) junto a los filtros existentes. Depende de `ESC-PREV-085`. |
 | REP-NEWS-087 | Listo | Boletines / UX MEDIA | Panel "Listas de correo" en cajón de envío de boletines | En `/main/report-generator` (sección "Envío de Boletines"), agregar un panel de "Listas de correo" debajo del textarea de destinatarios manuales. Solo muestra contactos preventivos con `isMailingList: true`. Incluye checkbox seleccionar todo, checkboxes individuales y contador de seleccionados. El cajón de envío se amplía levemente para que ambos paneles respiren bien. Depende de `ESC-PREV-085`. |
+| USR-ADM-088 | En progreso | Admin / Usuarios ALTA | Mejoras en gestión de usuarios: cambio de contraseña por admin, fix botón Cancelar, layout más ancho y creación sin mínimo de contraseña | En `/main/admin/users`: (1) Admin puede cambiar la contraseña de cualquier usuario (incluyéndose a sí mismo) desde el formulario de edición, sin límite mínimo de caracteres — privilegio exclusivo de admin. (2) El botón "Cancelar" no es visible en varios temas por falta de estilo; corregir con tokens del design system. (3) El formulario de gestión se ve apretado aunque hay espacio disponible; ampliar con flex layout. (4) Al crear un usuario nuevo, el admin no tiene mínimo de contraseña (usuarios normales conservan el mínimo de 6 al cambiar su propio perfil). |
+| REP-INC-089 | Listo | Reporte de Incidente / UX ALTA | Mejoras en formulario de Reporte de Incidente: reordenamiento de campos, envío directo por email con Para/CC, y asunto automático | En `/main/report-generator` modo Reporte: (1) Reordenar campos al orden definitivo: Código Ticket*, Ofensa*, Tipo de Operación*, Nombre Ofensa/Evento*, Motivo, MRSC, Origen, Destino, Fuente/Log Source, Reputación, Observaciones, Recomendación, Info Adicional, Evidencia. Si el usuario escribe un título custom (sin elegir del catálogo) el campo Motivo queda vacío y editable a mano. (2) Después de generar el reporte HTML aparece un cajón de envío con campo Para (con el mismo selector de contactos que boletines) y CC (mismo selector), más la opción de copiar como antes. El envío es un solo correo con Para y CC. (3) El asunto del correo se construye automáticamente: `[cliente] - [título evento] - [código ticket GLPI]`. Adicionalmente: se migró a MJML para diseño unificado y robusto en clientes de correo. |
 
 **Plan de ataque visual ejecutado:** `docs/ui-visual-remediation-plan.md` (oleadas, criterios de aceptación, rutas objetivo y Definition of Done visual).
 
@@ -466,6 +468,149 @@ La tabla de contactos preventivos no indica visualmente si un contacto es un cor
 - Reutilizar las clases CSS de badge ya existentes en el componente para no crear deuda de estilos.
 - El badge "Personal" puede omitirse si el filtro activo ya es "Solo personales" (evitar redundancia visual).
 - QA obligatorio en los 5 temas según `QA-UI-061`–`QA-UI-065`.
+
+---
+
+## REP-INC-089 — Mejoras en Formulario de Reporte de Incidente (`/main/report-generator`)
+
+**Estado:** En progreso  
+**Prioridad:** ALTA  
+**Tipo:** Reporte de Incidente / UX  
+**Ruta:** `/main/report-generator` → modo **Reporte de Incidente**
+
+### Objetivo
+
+Tres mejoras agrupadas sobre el modo Reporte de Incidente del generador de reportes. El modo Boletín **no se toca**.
+
+### Cambios incluidos
+
+#### 1. Reordenamiento de campos y comportamiento de Nombre Ofensa/Evento con título custom
+
+Orden definitivo del formulario (los `*` son obligatorios):
+
+1. **Código Ticket \*** — antes era `codigoInterno` (campo libre, renombrar etiqueta)
+2. **Ofensa \*** — número de ofensa del SIEM (campo nuevo: `ofensa`, libre, obligatorio)
+3. **Tipo de Operación \*** — ya existe como autocomplete del catálogo
+4. **Nombre de Ofensa/Evento \*** — ya existe como autocomplete del catálogo; si el usuario escribe un valor custom (sin seleccionar del catálogo), el campo **Motivo queda vacío** y el usuario lo completa a mano. Si elige del catálogo, sigue auto-completando Motivo como hoy.
+5. **Motivo de la Ofensa/Evento** — no obligatorio (quitar `Validators.required`)
+6. **MRSC (Criticidad)** — ya existe; quitar obligatoriedad (era requerido, pasa a opcional)
+7. **Origen de conexión** — ya existe
+8. **Destino** — ya existe
+9. **Fuente / Log Source** — ya existe como autocomplete; quitar obligatoriedad (pasa a opcional)
+10. **Reputación de origen** — ya existe
+11. **Observaciones** — ya existe, mantener obligatorio
+12. **Recomendación** — ya existe
+13. **Información adicional** — ya existe
+14. **Evidencia** — sección de upload ya existe; mover al final del formulario
+
+**Campos nuevos en `reportForm`:** `ofensa` (string, requerido). `codigoInterno` pasa a ser el `codigoTicket` (renombrar solo la etiqueta HTML; el `formControlName` puede quedar igual o renombrarse — se prefiere renombrar a `codigoTicket` para claridad).
+
+**Cambio de comportamiento en Nombre Ofensa/Evento:** Actualmente `onEventSelected` autocompleta siempre `motivoEvento`. Cuando el usuario escribe un título libremente sin seleccionar del catálogo (`onEventCleared` o campo directo), `motivoEvento` debe quedar vacío (`''`) — ya funciona así en `onEventCleared`. Confirmar que si el usuario borra el autocomplete el motivo se limpia correctamente — el comportamiento ya existe, solo hay que asegurarse de que el campo no tenga `required`.
+
+#### 2. Envío directo del reporte por email (Para + CC)
+
+Al generar el reporte HTML y mostrarse la vista previa, aparece debajo un cajón de envío **específico para el modo Reporte**, con las siguientes diferencias respecto al boletín (1:1):
+
+- **Un solo correo** con campo `Para` (un destinatario principal) y campo `CC` (múltiples en copia).
+- Cada campo usa **la misma UX de selección de contactos** que el boletín: se puede escribir un correo manualmente O elegirlo del panel de contactos de la agenda preventiva (con búsqueda y filtro).
+- El botón **"Copiar reporte"** ya existente se mantiene dentro de la sección preview-actions.
+- El envío llama a un endpoint existente o nuevo que envíe UN correo con `to` + `cc` + `subject` + `html`.
+- El asunto se construye automáticamente (ver punto 3); el usuario puede editarlo antes de enviar.
+
+**Endpoint de envío:** Reutilizar el backend de reportes. Crear o extender `POST /api/reports/incident/send` con body `{ to, cc, subject, html }` siguiendo el mismo patrón que `/api/reports/newsletter/send`. Respeta SMTP configurado, registra auditoría `report.incident.send`.
+
+#### 3. Asunto del correo automático
+
+El asunto se construye con la nomenclatura:
+```
+[cliente] - [nombre evento/ofensa] - [código ticket]
+```
+Ejemplo: `DPP - IRC Connections que contiene Built translation / ActiveX control bypass attempt - 4065`
+
+- **`[cliente]`** se extrae del Log Source seleccionado (`selectedLogSource.client` o similar — revisar modelo del catálogo). Si el Log Source no tiene cliente definido, usar el texto del campo tal cual.
+- **`[nombre evento/ofensa]`** es el valor del campo `nombreEvento` del formulario.
+- **`[código ticket]`** es el valor del campo `codigoTicket` del formulario.
+- El campo de asunto es editable por el usuario antes de enviar (pre-poblado automáticamente, no bloqueado).
+
+### Criterios de aceptación
+
+1. El orden de campos en el formulario modo Reporte coincide exactamente con la lista definida en el punto 1.
+2. Existe un campo "Ofensa" obligatorio nuevo (campo libre, número de ofensa del SIEM).
+3. El campo "Código Ticket" (antes "Ofensa/Código interno") es obligatorio.
+4. Motivo, Criticidad y Log Source ya no son obligatorios (sin asterisco y sin validator required).
+5. Al seleccionar un evento del catálogo, Motivo se autocompleta. Al escribir un título manualmente o borrar el autocomplete, Motivo queda vacío y editable.
+6. Después de generar el HTML, aparece el cajón de envío con campos Para y CC con el mismo selector de contactos que el boletín.
+7. El campo de asunto se pre-pobla con el formato `[cliente] - [evento] - [ticket]` y es editable.
+8. El botón "Copiar reporte" sigue existiendo junto al cajón de envío.
+9. Al enviar, se despacha UN correo con el Para, CC, asunto y HTML generado.
+10. QA obligatorio en los 5 temas (`QA-UI-062`–`QA-UI-064`).
+
+### Archivos afectados
+
+- `report-generator.component.html` — reordenar campos, agregar campo Ofensa, cajón Para/CC.
+- `report-generator.component.ts` — agregar `ofensa` y `codigoTicket` al FormGroup; ajustar validators; lógica del asunto automático; método `sendIncidentReport()`; estado `isSendingReport`, `reportTo`, `reportCc`, `reportSubject`.
+- `report-generator.component.scss` — estilos del cajón de envío de reporte (reutilizar clases `.newsletter-send-*` existentes).
+- `backend/src/routes/reports.js` — agregar `POST /api/reports/incident/send`.
+
+### Notas / Restricciones
+
+- El modo Boletín (newsletter) **no se toca** en este issue.
+- La sección de evidencia se mueve al final del formulario, no se modifica su comportamiento.
+- El campo `fecha` se mantiene en el formulario pero se puede mover a después de Código Ticket (decisión UX menor).
+- No crear una tercera columna en el cajón de envío; mantener layout de 2 columnas o uno único si se simplifica (Para + CC en columnas o en filas).
+- Guardrail 9: QA obligatorio en los 5 temas.
+- Guardrail 7: validación funcional con criterios verificables antes de marcar Listo.
+
+---
+
+## USR-ADM-088 — Mejoras en Gestión de Usuarios (`/main/admin/users`)
+
+**Estado:** En progreso  
+**Prioridad:** ALTA  
+**Tipo:** Admin / Usuarios  
+**Ruta:** `/main/admin/users`
+
+### Objetivo
+
+Cuatro mejoras agrupadas sobre la vista de administración de usuarios. No requieren cambios en modelos de datos, solo en validadores backend, lógica de formulario frontend y estilos.
+
+### Cambios incluidos
+
+1. **Cambio de contraseña por admin en edición:** El admin puede establecer una nueva contraseña para cualquier usuario (incluyéndose a sí mismo) desde el formulario de edición, sin mínimo de caracteres. Hoy `PUT /api/users/:id` borra `password` del body y no existe campo en el formulario de edición.
+2. **Fix botón "Cancelar" invisible:** El botón aparece sin color perceptible en la mayoría de temas por falta de estilos en `.cancel-edit-btn`. Se corrige usando tokens `var(--surface-variant)`, `var(--text-primary)` y `var(--outline-subtle)`.
+3. **Formulario más ancho:** El panel de gestión tiene `max-width: 1200px` pero los campos no se estiran. Se aplica flex layout con `flex-wrap: wrap` para distribuir los campos horizontalmente en pantallas anchas.
+4. **Creación de usuario sin mínimo para admin:** Al crear un nuevo usuario, el admin no tiene límite mínimo de contraseña (se quita `isLength({ min: 6 })` del `POST /api/users` en backend y `Validators.minLength(6)` en frontend). El campo sigue siendo requerido y no vacío.
+
+### Regla consolidada de contraseñas
+
+- **Admin (desde gestión de usuarios):** Sin mínimo de caracteres, tanto en creación como en edición de contraseña ajena.
+- **Usuarios normales (desde su perfil `/me`):** Mínimo 6 caracteres — regla **no modificada**.
+
+### Criterios de aceptación
+
+1. En modo edición, aparece un campo "Nueva Contraseña" (opcional — dejar vacío no modifica la contraseña).
+2. El admin puede guardar una contraseña de 1 carácter para cualquier usuario, incluyéndose a sí mismo.
+3. El admin puede crear un usuario nuevo con contraseña de 1 carácter.
+4. Intentar crear un usuario sin contraseña sigue siendo rechazado.
+5. El botón "Cancelar" es visible y legible en los 5 temas (light, dark, sepia, pastel, cyberpunk).
+6. Los campos del formulario se distribuyen horizontalmente en pantallas anchas; apilan en móvil.
+7. Editar datos de un usuario sin tocar "Nueva Contraseña" no modifica su contraseña actual.
+8. La contraseña nueva pasa por el hook bcrypt del modelo `User` (usa `user.save()`, no `findByIdAndUpdate`).
+9. La auditoría registra `passwordChanged: true` cuando se cambia contraseña; nunca registra el valor en texto plano.
+
+### Archivos afectados
+
+- `backend/src/routes/users.js` — quitar `min: 6` de `POST`; agregar soporte `newPassword` en `PUT /:id` con `user.save()`.
+- `frontend/src/app/pages/main/users/users.component.ts` — agregar `newPassword` al FormGroup, quitar `minLength(6)` de `password`.
+- `frontend/src/app/pages/main/users/users.component.html` — agregar campo "Nueva Contraseña" en modo edición; envolver botones en `.form-actions`.
+- `frontend/src/app/pages/main/users/users.component.scss` — fix `.cancel-edit-btn` con tokens del design system; flex layout del formulario.
+
+### Notas / Restricciones
+
+- No se modifica `PUT /api/users/me` — el perfil propio del usuario conserva su validación de mínimo 6 caracteres.
+- No se expone `newPassword` en auditoría; solo el flag `passwordChanged`.
+- QA obligatorio en los 5 temas según `QA-UI-061`–`QA-UI-065`, especialmente para botones y formularios.
+- No se genera lockout: si el admin cambia su propia contraseña, su sesión actual sigue activa.
 
 ---
 

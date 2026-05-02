@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/src/routes/reports.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Rutas de Reportes y Análisis SOC
  *
  * Endpoints:
@@ -17,15 +23,18 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs').promises;
+const sharp = require('sharp');
 const router = express.Router();
 const Entry = require('../models/Entry');
 const ShiftCheck = require('../models/ShiftCheck');
 const User = require('../models/User');
 const AppConfig = require('../models/AppConfig');
 const { authenticate, authorize } = require('../middleware/auth');
+const AuditLog = require('../models/AuditLog');
 const { audit } = require('../utils/audit');
 const { sendEmail } = require('../utils/email');
 const { analyzeRecipientEmails } = require('../utils/contactDirectory');
+const { buildIncidentEmail } = require('../utils/incidentEmailTemplate');
 
 /**
  * CID estable para multipart/related (imagen inline). Debe coincidir con el atributo src del HTML.
@@ -34,6 +43,90 @@ const { analyzeRecipientEmails } = require('../utils/contactDirectory');
 const NEWSLETTER_LOGO_CID = 'bitacora_newsletter_logo@bitacora';
 // Mantener trazas de newsletter siempre activas para diagnóstico continuo.
 const NEWSLETTER_DEBUG_LOGS = true;
+
+const normalizeAnalyticsLabel = (value, fallback = 'Sin dato') => {
+  const normalized = String(value || '').trim();
+  return normalized || fallback;
+};
+
+const normalizeCriticalityLabel = (value) => {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  if (!normalized) return null;
+  if (normalized === 'critica' || normalized === 'critico' || normalized === 'critical') return 'Crítico';
+  if (normalized === 'alta' || normalized === 'high') return 'Alto';
+  if (normalized === 'media' || normalized === 'medio' || normalized === 'medium') return 'Medio';
+  if (normalized === 'baja' || normalized === 'bajo' || normalized === 'low') return 'Bajo';
+  return null;
+};
+
+const incrementCounter = (map, label, amount = 1) => {
+  const key = normalizeAnalyticsLabel(label);
+  map.set(key, (map.get(key) || 0) + amount);
+};
+
+const mapToSeries = (map, limit = 10) => Array.from(map.entries())
+  .sort((left, right) => right[1] - left[1])
+  .slice(0, limit)
+  .map(([name, value]) => ({ name, value }));
+
+const getDayBucket = (dateValue) => {
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
+};
+
+const getHourBucket = (dateValue) => {
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return null;
+  return String(date.getHours()).padStart(2, '0');
+};
+
+const detectMailAnalyticsType = (log) => {
+  const metadata = log.metadata || {};
+  const triggerType = String(metadata.triggerType || '').toLowerCase();
+  if (triggerType === 'manual_newsletter') return 'newsletter';
+  if (triggerType === 'manual_incident_report') return 'incident';
+
+  const explicitType = String(metadata.type || '').toLowerCase();
+  if (explicitType.includes('newsletter') || explicitType.includes('boletin')) return 'newsletter';
+  if (explicitType.includes('incident') || explicitType.includes('incidente')) return 'incident';
+
+  if (String(log.event || '').includes('incident')) return 'incident';
+  return null;
+};
+
+const detectMailAnalyticsStatus = (eventName) => {
+  if (eventName === 'mail.send.success' || eventName === 'mail.incident.sent') return 'success';
+  if (eventName === 'mail.send.fail' || eventName === 'mail.incident.fail') return 'fail';
+  if (eventName === 'mail.incident.attempt') return 'attempt';
+  return null;
+};
+
+const resolveClientLabelFromMetadata = (metadata = {}) => {
+  const fromMetadata = [
+    metadata.clientName,
+    metadata.client,
+    metadata.clientLabel,
+    metadata.logSource,
+    metadata.ofensa,
+    metadata.customer,
+    metadata.company,
+    metadata.account
+  ]
+    .map((value) => String(value || '').trim())
+    .find(Boolean);
+
+  if (fromMetadata) {
+    return normalizeAnalyticsLabel(fromMetadata, 'Sin cliente');
+  }
+
+  return null;
+};
 
 const UPLOADS_LOGOS_DIR = path.resolve(path.join(__dirname, '../../uploads/logos'));
 
@@ -191,6 +284,84 @@ async function readUploadedLogoFromWebPath(webPath) {
   }
 }
 
+function resolveUploadedLogoWebPath(logoUrl) {
+  if (!logoUrl || typeof logoUrl !== 'string') return null;
+
+  const clean = logoUrl.trim();
+  if (!clean) return null;
+
+  if (clean.startsWith('/uploads/logos/')) {
+    return clean.split('?')[0];
+  }
+
+  if (/^https?:\/\//i.test(clean)) {
+    try {
+      const parsed = new URL(clean);
+      if (parsed.pathname && parsed.pathname.startsWith('/uploads/logos/')) {
+        return parsed.pathname.split('?')[0];
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+async function buildIncidentEmailLogoVariant(buffer, contentType) {
+  if (!buffer || !Buffer.isBuffer(buffer) || !buffer.length) return null;
+
+  const safeContentType = /^image\//.test(String(contentType || '')) ? contentType : 'image/png';
+
+  try {
+    const source = sharp(buffer, { animated: false, density: 300 });
+    const meta = await source.metadata();
+    const width = Math.max(1, Math.min(meta.width || 320, 1600));
+    const height = Math.max(1, Math.min(meta.height || 120, 1600));
+    const sourceDataUri = `data:${safeContentType};base64,${buffer.toString('base64')}`;
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${width + 4}" height="${height + 4}" viewBox="0 0 ${width + 4} ${height + 4}">
+        <defs>
+          <filter id="logo-outline" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">
+            <feMorphology in="SourceAlpha" operator="dilate" radius="2" result="outline-alpha" />
+            <feFlood flood-color="#FFFFFF" result="outline-color" />
+            <feComposite in="outline-color" in2="outline-alpha" operator="in" result="outline-fill" />
+            <feMerge>
+              <feMergeNode in="outline-fill" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        <image
+          x="2"
+          y="2"
+          width="${width}"
+          height="${height}"
+          href="${sourceDataUri}"
+          preserveAspectRatio="xMidYMid meet"
+          filter="url(#logo-outline)"
+        />
+      </svg>`;
+
+    const outlinedBuffer = await sharp(Buffer.from(svg)).png().toBuffer();
+    return {
+      buffer: outlinedBuffer,
+      contentType: 'image/png',
+      extension: 'png'
+    };
+  } catch (error) {
+    newsletterDebug('incident.logo_outline.failed', {
+      contentType: safeContentType,
+      message: error?.message || 'unknown error'
+    });
+    return {
+      buffer,
+      contentType: safeContentType,
+      extension: extensionFromContentType(safeContentType)
+    };
+  }
+}
+
 /**
  * Resuelve bytes del logo desde HTML (data:, URL interna, cid previo) o adjunto cliente (legacy).
  */
@@ -342,15 +513,57 @@ async function prepareNewsletterEmailPayload(html, clientLogoAttachments) {
     hasPublicBase: Boolean(publicBase)
   });
 
+  // ─── Helper: convierte data: URIs de evidencias a CID ─────────────────────
+  function processEvidenceImages(htmlIn, attachmentsArr) {
+    const dataImageRegex = /<img\b[^>]*\ssrc=["']data:image\/(png|jpeg|jpg|gif|webp);base64,([A-Za-z0-9+/=\s]+)["'][^>]*>/gi;
+    let evidenceIndex = 0;
+    let finalHtml = htmlIn;
+    let match;
+    const regexCopy = new RegExp(dataImageRegex.source, dataImageRegex.flags);
+    while ((match = regexCopy.exec(htmlIn)) !== null) {
+      evidenceIndex++;
+      const imgTag = match[0];
+      const imageType = match[1];
+      const base64Data = match[2].replace(/\s/g, '');
+      try {
+        const evidenceBuffer = Buffer.from(base64Data, 'base64');
+        if (evidenceBuffer.length > 5 * 1024 * 1024) {
+          newsletterDebug('prepare_payload.evidence_skip_too_large', { index: evidenceIndex, size: evidenceBuffer.length });
+          continue;
+        }
+        const evidenceCid = `evidence-${evidenceIndex}@bitacora-newsletter`;
+        const evidenceExt = imageType === 'jpeg' || imageType === 'jpg' ? 'jpg' : imageType;
+        const evidenceFilename = `evidence-${evidenceIndex}.${evidenceExt}`;
+        const evidenceContentType = `image/${imageType === 'jpg' ? 'jpeg' : imageType}`;
+        attachmentsArr.push({
+          filename: evidenceFilename,
+          content: evidenceBuffer,
+          cid: evidenceCid,
+          contentType: evidenceContentType,
+          contentDisposition: 'inline'
+        });
+        const newImgTag = imgTag.replace(/src=["']data:image\/[^"']+["']/i, `src="cid:${evidenceCid}"`);
+        finalHtml = finalHtml.replace(imgTag, newImgTag);
+        newsletterDebug('prepare_payload.evidence_processed', {
+          index: evidenceIndex, cid: evidenceCid, filename: evidenceFilename,
+          size: evidenceBuffer.length, contentType: evidenceContentType
+        });
+      } catch (err) {
+        newsletterDebug('prepare_payload.evidence_decode_failed', { index: evidenceIndex, error: err.message });
+      }
+    }
+    return { finalHtml, evidenceCount: evidenceIndex };
+  }
+  // ──────────────────────────────────────────────────────────────────────────
+
   if (publicBase && logoUrl && typeof logoUrl === 'string' && logoUrl.startsWith('/uploads/logos/')) {
     const absolute = `${publicBase}${logoUrl}`;
-    const htmlWithPublicLogo = /<img\b/i.test(rawHtml) ? replaceFirstImgSrc(rawHtml, absolute) : rawHtml;
-    const safePublicHtml = removeLeadingDataImageTags(htmlWithPublicLogo);
+    let htmlWithPublicLogo = /^<img\b/i.test(rawHtml) ? replaceFirstImgSrc(rawHtml, absolute) : rawHtml;
+    htmlWithPublicLogo = removeLeadingDataImageTags(htmlWithPublicLogo);
+    const attachments = [];
+    const { finalHtml } = processEvidenceImages(htmlWithPublicLogo, attachments);
     newsletterDebug('prepare_payload.use_public_url', { absolute });
-    return {
-      html: safePublicHtml,
-      attachments: []
-    };
+    return { html: finalHtml, attachments };
   }
 
   const { buffer: buf, contentType: ct } = await resolveNewsletterLogoBuffer(
@@ -358,6 +571,9 @@ async function prepareNewsletterEmailPayload(html, clientLogoAttachments) {
     clientLogoAttachments,
     logoUrl
   );
+
+  const attachments = [];
+
   if (!buf || !buf.length || !/<img\b/i.test(rawHtml)) {
     let out = rawHtml;
     const s = extractFirstImgSrc(out);
@@ -368,11 +584,14 @@ async function prepareNewsletterEmailPayload(html, clientLogoAttachments) {
         originalSrcType: /^cid:/i.test(s) ? 'cid' : 'data'
       });
     }
-    newsletterDebug('prepare_payload.return_without_attachments', {
+    newsletterDebug('prepare_payload.return_without_logo', {
       hasBuffer: Boolean(buf && buf.length),
       hasImgTag: /<img\b/i.test(rawHtml)
     });
-    return { html: out, attachments: [] };
+    // Aún así convertir evidencias en el HTML restante
+    const { finalHtml, evidenceCount } = processEvidenceImages(out, attachments);
+    newsletterDebug('prepare_payload.done', { totalAttachments: attachments.length, evidenceImagesProcessed: evidenceCount });
+    return { html: finalHtml, attachments };
   }
 
   const ext = extensionFromContentType(ct);
@@ -380,97 +599,21 @@ async function prepareNewsletterEmailPayload(html, clientLogoAttachments) {
   const cid = NEWSLETTER_LOGO_CID;
   let htmlOut = replaceFirstImgSrc(rawHtml, `cid:${cid}`);
   htmlOut = removeLeadingDataImageTags(htmlOut);
-  newsletterDebug('prepare_payload.use_cid', {
-    cid,
-    filename,
-    contentType: ct,
-    bufferLength: buf.length
-  });
+  newsletterDebug('prepare_payload.use_cid', { cid, filename, contentType: ct, bufferLength: buf.length });
 
-  const attachments = [
-    {
-      filename,
-      content: buf,
-      cid,
-      contentType: ct,
-      contentDisposition: 'inline'
-    },
-    {
-      filename,
-      content: buf,
-      contentType: ct,
-      contentDisposition: 'attachment'
-    }
-  ];
+  attachments.push(
+    { filename, content: buf, cid, contentType: ct, contentDisposition: 'inline' },
+    { filename, content: buf, contentType: ct, contentDisposition: 'attachment' }
+  );
 
-  // Procesar imágenes de evidencias (data: URIs) -> CID attachments para compatibilidad Gmail
-  const dataImageRegex = /<img\b[^>]*\ssrc=["']data:image\/(png|jpeg|jpg|gif|webp);base64,([A-Za-z0-9+/=\s]+)["'][^>]*>/gi;
-  let evidenceIndex = 0;
-  let finalHtml = htmlOut;
-  let match;
-  
-  while ((match = dataImageRegex.exec(htmlOut)) !== null) {
-    evidenceIndex++;
-    const imgTag = match[0];
-    const imageType = match[1];
-    const base64Data = match[2].replace(/\s/g, '');
-    
-    try {
-      const evidenceBuffer = Buffer.from(base64Data, 'base64');
-      
-      // Validar tamaño razonable (máx 5MB por imagen de evidencia)
-      if (evidenceBuffer.length > 5 * 1024 * 1024) {
-        newsletterDebug('prepare_payload.evidence_skip_too_large', {
-          index: evidenceIndex,
-          size: evidenceBuffer.length
-        });
-        continue;
-      }
-      
-      const evidenceCid = `evidence-${evidenceIndex}@bitacora-newsletter`;
-      const evidenceExt = imageType === 'jpeg' || imageType === 'jpg' ? 'jpg' : imageType;
-      const evidenceFilename = `evidence-${evidenceIndex}.${evidenceExt}`;
-      const evidenceContentType = `image/${imageType === 'jpg' ? 'jpeg' : imageType}`;
-      
-      attachments.push({
-        filename: evidenceFilename,
-        content: evidenceBuffer,
-        cid: evidenceCid,
-        contentType: evidenceContentType,
-        contentDisposition: 'inline'
-      });
-      
-      // Reemplazar data: URI con cid: en el HTML
-      const newImgTag = imgTag.replace(
-        /src=["']data:image\/[^"']+["']/i,
-        `src="cid:${evidenceCid}"`
-      );
-      finalHtml = finalHtml.replace(imgTag, newImgTag);
-      
-      newsletterDebug('prepare_payload.evidence_processed', {
-        index: evidenceIndex,
-        cid: evidenceCid,
-        filename: evidenceFilename,
-        size: evidenceBuffer.length,
-        contentType: evidenceContentType
-      });
-    } catch (err) {
-      newsletterDebug('prepare_payload.evidence_decode_failed', {
-        index: evidenceIndex,
-        error: err.message
-      });
-    }
-  }
-  
+  const { finalHtml, evidenceCount } = processEvidenceImages(htmlOut, attachments);
+
   newsletterDebug('prepare_payload.done', {
     totalAttachments: attachments.length,
-    evidenceImagesProcessed: evidenceIndex
+    evidenceImagesProcessed: evidenceCount
   });
 
-  return {
-    html: finalHtml,
-    attachments
-  };
+  return { html: finalHtml, attachments };
 }
 
 // GET /api/reports/overview - Vista general de KPIs
@@ -775,6 +918,270 @@ router.get('/entries-by-logsource', authenticate, async (req, res) => {
   }
 });
 
+// GET /api/reports/mail-analytics - Analítica de envíos de boletines y reportes
+router.get('/mail-analytics', authenticate, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days, 10) || 30;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const logs = await AuditLog.find({
+      timestamp: { $gte: startDate },
+      $or: [
+        {
+          event: { $in: ['mail.send.success', 'mail.send.fail'] },
+          $or: [
+            { 'metadata.sourceModule': 'ReportGenerator' },
+            { 'metadata.triggerType': { $in: ['manual_newsletter', 'manual_incident_report'] } },
+            { 'metadata.type': { $in: ['newsletter', 'incident_mjml'] } }
+          ]
+        },
+        { event: { $in: ['mail.incident.attempt', 'mail.incident.sent', 'mail.incident.fail'] } }
+      ]
+    })
+      .select('event timestamp metadata')
+      .sort({ timestamp: -1 })
+      .lean();
+
+    const sentMessages = { newsletter: 0, incident: 0, combined: 0 };
+    const recipientCounts = { newsletter: 0, incident: 0, combined: 0 };
+    const uniqueRecipientSet = new Set();
+    const statusSummary = { success: 0, fail: 0, attempt: 0 };
+    const statusByType = {
+      newsletter: { success: 0, fail: 0, attempt: 0 },
+      incident: { success: 0, fail: 0, attempt: 0 }
+    };
+
+    const topRecipients = {
+      newsletter: new Map(),
+      incident: new Map(),
+      combined: new Map()
+    };
+    const topDomains = {
+      newsletter: new Map(),
+      incident: new Map(),
+      combined: new Map()
+    };
+    const topClients = {
+      incident: new Map(),
+      combined: new Map()
+    };
+    const criticality = {
+      newsletter: new Map(),
+      incident: new Map(),
+      combined: new Map()
+    };
+    const generationByDay = {
+      newsletter: new Map(),
+      incident: new Map()
+    };
+    const deliveryByDay = {
+      success: new Map(),
+      fail: new Map()
+    };
+    const activityByHour = new Map();
+
+    let criticalityKnown = 0;
+    let criticalityMissing = 0;
+    let clientKnown = 0;
+    let clientMissing = 0;
+
+    for (const log of logs) {
+      const metadata = log.metadata || {};
+      const type = detectMailAnalyticsType(log);
+      if (!type) continue;
+
+      const status = detectMailAnalyticsStatus(log.event);
+      if (status) {
+        statusSummary[status] += 1;
+        statusByType[type][status] += 1;
+      }
+
+      const isCanonicalDeliveryEvent = log.event === 'mail.send.success' || log.event === 'mail.send.fail';
+      const dayBucket = getDayBucket(log.timestamp);
+      if (dayBucket) {
+        if (isCanonicalDeliveryEvent && status === 'success') {
+          incrementCounter(generationByDay[type], dayBucket);
+        }
+        if (isCanonicalDeliveryEvent && (status === 'success' || status === 'fail')) {
+          incrementCounter(deliveryByDay[status], dayBucket);
+        }
+      }
+
+      const hourBucket = getHourBucket(log.timestamp);
+      if (hourBucket !== null && isCanonicalDeliveryEvent) {
+        incrementCounter(activityByHour, `${hourBucket}:00`);
+      }
+
+      if (status !== 'success' || log.event !== 'mail.send.success') {
+        continue;
+      }
+
+      const recipients = Array.isArray(metadata.toMasked)
+        ? metadata.toMasked.filter(Boolean)
+        : Array.isArray(metadata.resolvedRecipientsPreview)
+          ? metadata.resolvedRecipientsPreview.filter(Boolean)
+          : [];
+      const recipientsCount = Number(
+        metadata.resolvedRecipientsCount
+        || metadata.recipientsCount
+        || metadata.toCount
+        || recipients.length
+        || 0
+      );
+
+      sentMessages[type] += 1;
+      sentMessages.combined += 1;
+      recipientCounts[type] += recipientsCount;
+      recipientCounts.combined += recipientsCount;
+
+      recipients.forEach((recipient) => {
+        incrementCounter(topRecipients[type], recipient);
+        incrementCounter(topRecipients.combined, recipient);
+        uniqueRecipientSet.add(recipient);
+
+        const domain = String(recipient).includes('@')
+          ? String(recipient).split('@').pop()
+          : 'Sin dominio';
+        incrementCounter(topDomains[type], domain);
+        incrementCounter(topDomains.combined, domain);
+      });
+
+      const criticalityLabel = normalizeCriticalityLabel(metadata.criticality || metadata.criticidad);
+      if (criticalityLabel) {
+        incrementCounter(criticality[type], criticalityLabel);
+        incrementCounter(criticality.combined, criticalityLabel);
+        criticalityKnown += 1;
+      } else {
+        criticalityMissing += 1;
+      }
+
+      if (type === 'incident') {
+        const clientLabel = resolveClientLabelFromMetadata(metadata);
+        if (clientLabel) {
+          incrementCounter(topClients.incident, clientLabel);
+          incrementCounter(topClients.combined, clientLabel);
+          clientKnown += 1;
+        } else {
+          clientMissing += 1;
+        }
+      }
+    }
+
+    const comparisonOrder = ['Crítico', 'Alto', 'Medio', 'Bajo'];
+    const criticalityComparison = comparisonOrder
+      .map((label) => ({
+        name: label,
+        series: [
+          { name: 'Boletines', value: criticality.newsletter.get(label) || 0 },
+          { name: 'Incidentes', value: criticality.incident.get(label) || 0 }
+        ]
+      }));
+
+    const allDays = Array.from(new Set([
+      ...Array.from(generationByDay.newsletter.keys()),
+      ...Array.from(generationByDay.incident.keys()),
+      ...Array.from(deliveryByDay.success.keys()),
+      ...Array.from(deliveryByDay.fail.keys())
+    ])).sort();
+
+    const generationTrend = [
+      {
+        name: 'Boletines',
+        series: allDays.map((day) => ({ name: day, value: generationByDay.newsletter.get(day) || 0 }))
+      },
+      {
+        name: 'Incidentes',
+        series: allDays.map((day) => ({ name: day, value: generationByDay.incident.get(day) || 0 }))
+      }
+    ];
+
+    const deliveryStatusTrend = [
+      {
+        name: 'Envíos exitosos',
+        series: allDays.map((day) => ({ name: day, value: deliveryByDay.success.get(day) || 0 }))
+      },
+      {
+        name: 'Envíos fallidos',
+        series: allDays.map((day) => ({ name: day, value: deliveryByDay.fail.get(day) || 0 }))
+      }
+    ];
+
+    const hourlyActivity = Array.from({ length: 24 }, (_, hour) => {
+      const label = `${String(hour).padStart(2, '0')}:00`;
+      return { name: label, value: activityByHour.get(label) || 0 };
+    });
+
+    const deliveryStatusSummary = [
+      { name: 'Exitosos', value: statusSummary.success },
+      { name: 'Fallidos', value: statusSummary.fail },
+      { name: 'Intentos', value: statusSummary.attempt }
+    ];
+
+    const statusByTypeSeries = [
+      {
+        name: 'Boletines',
+        series: [
+          { name: 'Exitosos', value: statusByType.newsletter.success },
+          { name: 'Fallidos', value: statusByType.newsletter.fail },
+          { name: 'Intentos', value: statusByType.newsletter.attempt }
+        ]
+      },
+      {
+        name: 'Incidentes',
+        series: [
+          { name: 'Exitosos', value: statusByType.incident.success },
+          { name: 'Fallidos', value: statusByType.incident.fail },
+          { name: 'Intentos', value: statusByType.incident.attempt }
+        ]
+      }
+    ];
+
+    return res.json({
+      period: `${days} días`,
+      sentMessages,
+      recipientCounts,
+      uniqueRecipients: uniqueRecipientSet.size,
+      statusSummary,
+      statusByType,
+      recipientBreakdown: {
+        newsletter: mapToSeries(topRecipients.newsletter, 10),
+        incident: mapToSeries(topRecipients.incident, 10),
+        combined: mapToSeries(topRecipients.combined, 10)
+      },
+      domainBreakdown: {
+        newsletter: mapToSeries(topDomains.newsletter, 10),
+        incident: mapToSeries(topDomains.incident, 10),
+        combined: mapToSeries(topDomains.combined, 10)
+      },
+      clientBreakdown: {
+        incident: mapToSeries(topClients.incident, 10),
+        combined: mapToSeries(topClients.combined, 10)
+      },
+      criticalityBreakdown: {
+        newsletter: mapToSeries(criticality.newsletter, 10),
+        incident: mapToSeries(criticality.incident, 10),
+        combined: mapToSeries(criticality.combined, 10)
+      },
+      criticalityComparison,
+      generationTrend,
+      deliveryStatusTrend,
+      hourlyActivity,
+      deliveryStatusSummary,
+      statusByTypeSeries,
+      metadataQuality: {
+        criticalityKnown,
+        criticalityMissing,
+        clientKnown,
+        clientMissing
+      }
+    });
+  } catch (error) {
+    console.error('Error generando analítica de correo:', error);
+    return res.status(500).json({ message: 'Error generando analítica de correo' });
+  }
+});
+
 // POST /api/reports/newsletter/validate - Validación previa de destinatarios
 router.post('/newsletter/validate', authenticate, async (req, res) => {
   try {
@@ -799,7 +1206,7 @@ router.post('/newsletter/validate', authenticate, async (req, res) => {
 // POST /api/reports/newsletter/send - Envío de boletines (1:1)
 router.post('/newsletter/send', authenticate, async (req, res) => {
   try {
-    const { recipients, subject, html } = req.body;
+    const { recipients, subject, html, analytics } = req.body;
     const sendMode = 'real';
     const analysis = analyzeRecipientEmails(recipients || []);
 
@@ -838,6 +1245,9 @@ router.post('/newsletter/send', authenticate, async (req, res) => {
             extra: {
               type: 'newsletter',
               mode: sendMode,
+              criticality: String(analytics?.criticality || '').trim().toLowerCase() || null,
+              bulletinTitle: String(analytics?.title || subject || '').trim() || null,
+              vendor: String(analytics?.vendor || '').trim() || null,
               newsletterAttachmentParts: newsletterAttachments.length,
               duplicateCount: analysis.duplicates.length,
               invalidCount: analysis.invalid.length
@@ -873,6 +1283,247 @@ router.post('/newsletter/send', authenticate, async (req, res) => {
     console.error('[newsletter/send] Error inesperado:', error);
     res.status(500).json({
       message: 'Error interno al enviar boletines',
+      detail: error.message
+    });
+  }
+});
+// POST /api/reports/incident/preview - Previsualización MJML del reporte (sin envío)
+router.post('/incident/preview', authenticate, async (req, res) => {
+  try {
+    const { reportData, images } = req.body;
+    if (!reportData) return res.status(400).json({ message: 'Se requiere reportData' });
+
+    const config  = await AppConfig.findOne();
+    const logoUrl = config?.logoUrl;
+    const brandName = config?.appTitle || 'Bitácora SOC';
+    let logoCid = null;
+    const attachments = [];
+
+    const logoWebPath = resolveUploadedLogoWebPath(logoUrl);
+    if (logoWebPath) {
+      const logoBuf = await readUploadedLogoFromWebPath(logoWebPath);
+      if (logoBuf && logoBuf.length) {
+        const ct = contentTypeFromLogoFilename(logoWebPath);
+        const outlinedLogo = await buildIncidentEmailLogoVariant(logoBuf, ct);
+        // Para preview: embebemos el logo como data URI en el HTML
+        logoCid = `data:${outlinedLogo.contentType};base64,${outlinedLogo.buffer.toString('base64')}`;
+        void attachments; // no se usan en preview
+      }
+    }
+
+    // Para preview: reemplazar CIDs de evidencias con data URIs reales
+    const imgList = Array.isArray(images) ? images : [];
+    // Modificamos buildIncidentEmail para que use data URIs directamente en preview
+    const previewImages = imgList.map((img, idx) => ({
+      ...img,
+      _previewSrc: img.contentBase64
+        ? `data:${/^image\//.test(img.contentType) ? img.contentType : 'image/png'};base64,${img.contentBase64}`
+        : null
+    }));
+
+    const autor = req.user?.fullName || req.user?.username || 'Analista SOC';
+
+    // Compilar MJML con data URIs para que el preview sea visible en el navegador
+    const { buildIncidentEmailPreview } = require('../utils/incidentEmailTemplate');
+    const paletteKey = config?.incidentEmailPaletteKey || 'cdc-verde';
+    const { html, errors } = buildIncidentEmailPreview({
+      reportData, images: previewImages, logoCid, autor, brandName, paletteKey
+    });
+
+    if (errors && errors.length > 0) console.warn('[incident/preview] MJML warnings:', errors);
+
+    res.json({ html: html || '' });
+  } catch (error) {
+    console.error('[incident/preview] Error:', error);
+    res.status(500).json({ message: 'Error al generar preview', detail: error.message });
+  }
+});
+
+// POST /api/reports/incident/send - Envío de reporte de incidente (MJML)
+router.post('/incident/send', authenticate, async (req, res) => {
+  const { to, cc, subject, reportData, images } = req.body;
+  try {
+
+    // Validar destinatario
+    const analysisTo = analyzeRecipientEmails(to || []);
+    if (analysisTo.valid.length === 0) {
+      return res.status(400).json({
+        message: 'Se requiere al menos un destinatario válido en Para',
+        detail: 'Corrige los correos inválidos antes de enviar.'
+      });
+    }
+    const validCc = analyzeRecipientEmails(cc || []).valid;
+
+    if (!reportData) {
+      return res.status(400).json({ message: 'Se requiere reportData con los campos del incidente' });
+    }
+
+    const reportClient = String(reportData?.logSource || reportData?.clientName || reportData?.cliente || '').trim();
+    if (!reportClient) {
+      return res.status(400).json({
+        message: 'Se requiere cliente / logSource para enviar reporte de incidente',
+        detail: 'Selecciona un cliente (Log Source) antes de enviar para mantener trazabilidad.'
+      });
+    }
+
+    // ── Registro de intento (siempre se guarda, antes de cualquier procesamiento) ──
+    await audit(req, {
+      event: 'mail.incident.attempt',
+      level: 'info',
+      result: { success: true, reason: 'Intento de envío de reporte de incidente iniciado' },
+      metadata: {
+        toCount: analysisTo.valid.length,
+        ccCount: validCc.length,
+        subject: subject || 'Reporte de Incidente de Seguridad',
+        reportFields: Object.keys(reportData || {}),
+        imageCount: Array.isArray(images) ? images.length : 0,
+        invalidToCount: analysisTo.invalid?.length || 0,
+        duplicateToCount: analysisTo.duplicates?.length || 0,
+      }
+    }).catch(err => console.error('[incident/send] audit attempt error:', err.message));
+
+    // Resolver logo desde config
+    const config = await AppConfig.findOne();
+    const logoUrl = config?.logoUrl;
+    let logoCid = null;
+    const attachments = [];
+
+    const logoWebPath = resolveUploadedLogoWebPath(logoUrl);
+    if (logoWebPath) {
+      const logoBuf = await readUploadedLogoFromWebPath(logoWebPath);
+      if (logoBuf && logoBuf.length) {
+        const logoCidStr = NEWSLETTER_LOGO_CID;
+        const logoCt = contentTypeFromLogoFilename(logoWebPath);
+        const outlinedLogo = await buildIncidentEmailLogoVariant(logoBuf, logoCt);
+        attachments.push({
+          filename: `logo-email.${outlinedLogo.extension}`,
+          content: outlinedLogo.buffer,
+          cid: logoCidStr,
+          contentType: outlinedLogo.contentType,
+          contentDisposition: 'inline'
+        });
+        logoCid = `cid:${logoCidStr}`;
+      }
+    }
+
+    // Procesar imágenes de evidencia
+    const imgList = Array.isArray(images) ? images : [];
+    imgList.forEach((img, idx) => {
+      if (!img.contentBase64) return;
+      try {
+        const buf = Buffer.from(String(img.contentBase64).replace(/\s/g, ''), 'base64');
+        if (!buf.length || buf.length > 6 * 1024 * 1024) return;
+        const ct  = /^image\//.test(img.contentType) ? img.contentType : 'image/png';
+        const ext = ct === 'image/jpeg' ? 'jpg' : 'png';
+        const cid = `evidence-${idx + 1}@bitacora-incident`;
+        attachments.push({
+          filename: img.name || `evidence-${idx + 1}.${ext}`,
+          content: buf,
+          cid,
+          contentType: ct,
+          contentDisposition: 'inline'
+        });
+      } catch { /* ignorar imágenes corruptas */ }
+    });
+
+    // Obtener nombre del analista y nombre de la bitácora
+    const autor     = req.user?.fullName || req.user?.username || 'Analista SOC';
+    const brandName = config?.appTitle || 'Bitácora SOC';
+
+    // Compilar MJML -> HTML
+    const paletteKey = config?.incidentEmailPaletteKey || 'cdc-verde';
+    const { html: emailHtml, errors: mjmlErrors } = buildIncidentEmail({
+      reportData,
+      images: imgList,
+      logoCid,
+      autor,
+      brandName,
+      paletteKey
+    });
+
+    if (mjmlErrors && mjmlErrors.length > 0) {
+      console.warn('[incident/send] MJML warnings:', mjmlErrors);
+    }
+
+    const plainText = htmlToBasicPlainText(emailHtml);
+
+    try {
+      await sendEmail({
+        to: analysisTo.valid,
+        cc: validCc,
+        subject: subject || 'Reporte de Incidente de Seguridad',
+        html: emailHtml,
+        text: plainText,
+        attachments: attachments.length ? attachments : undefined,
+        auditContext: {
+          sourceModule: 'ReportGenerator',
+          triggerType: 'manual_incident_report',
+          extra: {
+            type: 'incident_mjml',
+            criticality: String(reportData?.criticidad || '').trim().toLowerCase() || null,
+            clientName: String(reportData?.clientName || reportData?.cliente || reportData?.logSource || '').trim() || null,
+            client: String(reportData?.clientName || reportData?.cliente || reportData?.ofensa || '').trim() || null,
+            ofensa: String(reportData?.ofensa || '').trim() || null,
+            logSource: String(reportData?.logSource || '').trim() || null,
+            eventName: String(reportData?.nombreEvento || '').trim() || null,
+            attachmentParts: attachments.length,
+            toCount: analysisTo.valid.length,
+            ccCount: validCc.length
+          }
+        }
+      });
+
+      await audit(req, {
+        event: 'mail.incident.sent',
+        level: 'info',
+        result: { success: true, reason: 'Reporte de incidente enviado correctamente' },
+        metadata: {
+          toCount: analysisTo.valid.length,
+          ccCount: validCc.length,
+          subject: subject || 'Reporte de Incidente de Seguridad',
+          attachmentParts: attachments.length,
+          paletteKey,
+        }
+      }).catch(err => console.error('[incident/send] audit sent error:', err.message));
+
+      res.json({
+        success: true,
+        message: 'Reporte de incidente enviado correctamente',
+        toCount: analysisTo.valid.length,
+        ccCount: validCc.length
+      });
+    } catch (err) {
+      console.error('[incident/send] Error SMTP:', err.message);
+      await audit(req, {
+        event: 'mail.incident.fail',
+        level: 'warn',
+        result: { success: false, reason: err.message },
+        metadata: {
+          toCount: analysisTo.valid.length,
+          ccCount: validCc.length,
+          subject: subject || 'Reporte de Incidente de Seguridad',
+          error: err.message,
+        }
+      }).catch(e => console.error('[incident/send] audit fail error:', e.message));
+      return res.status(500).json({
+        message: 'Error SMTP al enviar el reporte',
+        detail: err.message || 'Error desconocido — revisa la configuración SMTP en Admin.'
+      });
+    }
+  } catch (error) {
+    console.error('[incident/send] Error inesperado:', error);
+    await audit(req, {
+      event: 'mail.incident.fail',
+      level: 'error',
+      result: { success: false, reason: error.message },
+      metadata: {
+        subject: subject || 'Reporte de Incidente de Seguridad',
+        error: error.message,
+        phase: 'pre-send',
+      }
+    }).catch(e => console.error('[incident/send] audit unexpected error:', e.message));
+    res.status(500).json({
+      message: 'Error interno al enviar el reporte',
       detail: error.message
     });
   }

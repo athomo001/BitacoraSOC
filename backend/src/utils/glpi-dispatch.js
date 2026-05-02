@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/utils/glpi-dispatch.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const http = require('http');
 const https = require('https');
 const { URL } = require('url');
@@ -11,6 +17,16 @@ const { assertOutboundUrlSafe } = require('./outbound-url-guard');
 
 const DEFAULT_EMAIL_SUBJECT = '[SOC] Cierre de turno {{date}}';
 const MAX_DISPATCH_ATTEMPTS = 2;
+
+/*
+ * QA — integración saliente GLPI:
+ * - URL API: `assertOutboundUrlSafe` exige HTTPS en API (mitiga SSRF hacia redes internas según política del guard).
+ * - Tokens: app/user token se descifran en memoria para cada request; no exponer en logs (solo errores agregados).
+ * - API: initSession → POST Ticket → killSession en `finally` (fuga de sesión = advertencia, no fallo duro).
+ * - Email: usa `sendEmail` al collector; auditar plantillas y destino en SMTP.
+ * - Reintentos: hasta MAX_DISPATCH_ATTEMPTS; fallos parciales pueden duplicar tickets si GLPI creó y la respuesta se cortó
+ *   (probar timeouts y verificar en GLPI antes de subir reintentos).
+ */
 
 const withDefaultPath = (baseUrl) => {
   const parsed = new URL(baseUrl);

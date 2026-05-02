@@ -1,3 +1,9 @@
+/**
+ * File Purpose: frontend/src/app/pages/escalation/escalation-admin-simple/escalation-admin-simple.component.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 import { Component, OnInit, ChangeDetectorRef, NgZone, Injectable } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormsModule } from '@angular/forms';
@@ -70,6 +76,8 @@ export class EscalationAdminSimpleComponent implements OnInit {
   loadingAssignments = false;
   loadingHistoricalAssignments = false;
   savingAssignment = false;
+  importingAssignmentsCsv = false;
+  downloadingAssignmentTemplate = false;
   historicalLoaded = false;
   showHistorical = false;
   showAssignmentForm = false;
@@ -1124,6 +1132,52 @@ export class EscalationAdminSimpleComponent implements OnInit {
       complete: () => {
         this.importingPreventiveCsv = false;
         if (input) input.value = '';
+      }
+    });
+  }
+
+  onAssignmentsCsvSelected(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    const file = input?.files?.[0];
+    if (!file || this.importingAssignmentsCsv) {
+      return;
+    }
+
+    this.importingAssignmentsCsv = true;
+    this.escalationService.importAssignmentsCsv(file).subscribe({
+      next: (response) => {
+        const observationText = response.errorCount > 0
+          ? ` con ${response.errorCount} observación(es)`
+          : '';
+        this.showSuccess(`Turnos procesados: ${response.created} nuevos, ${response.updated} actualizados${observationText}`);
+        this.loadAssignments();
+      },
+      error: (err) => {
+        const backendMessage = err?.error?.error || err?.error?.message;
+        this.showError(backendMessage || 'Error importando turnos desde CSV');
+      },
+      complete: () => {
+        this.importingAssignmentsCsv = false;
+        if (input) input.value = '';
+      }
+    });
+  }
+
+  downloadAssignmentTemplate(): void {
+    if (this.downloadingAssignmentTemplate) {
+      return;
+    }
+
+    this.downloadingAssignmentTemplate = true;
+    this.escalationService.downloadAssignmentsTemplateCsv().subscribe({
+      next: (blob) => {
+        this.downloadBlob(blob, 'turnos-internos-template.csv');
+      },
+      error: () => {
+        this.showError('Error descargando plantilla de turnos');
+      },
+      complete: () => {
+        this.downloadingAssignmentTemplate = false;
       }
     });
   }

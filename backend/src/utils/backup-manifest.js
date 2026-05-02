@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/utils/backup-manifest.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const AdminNote = require('../models/AdminNote');
 const AppConfig = require('../models/AppConfig');
 const AuditLog = require('../models/AuditLog');

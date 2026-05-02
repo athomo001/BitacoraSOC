@@ -1,4 +1,10 @@
 /**
+ * File Purpose: frontend/src/app/guards/auth.guard.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Guards de Autenticación y Autorización (RBAC)
  * 
  * AuthGuard:
@@ -24,6 +30,12 @@
 import { Injectable } from '@angular/core';
 import { CanActivate, Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
+
+/*
+ * QA — IMPORTANTE: los tres guards actualmente retornan `true` siempre.
+ * La protección real de rutas debe verificarse en `canActivate` del router, backend y/o servicios.
+ * Antes de dar por cerrada una auditoría de seguridad front, confirmar dónde se exige sesión válida.
+ */
 
 @Injectable({
   providedIn: 'root'

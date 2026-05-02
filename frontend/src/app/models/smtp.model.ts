@@ -1,3 +1,9 @@
+/**
+ * File Purpose: frontend/src/app/models/smtp.model.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 export interface SmtpConfig {
   _id?: string;
   provider: SmtpProvider;

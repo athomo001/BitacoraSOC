@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/routes/complements.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const express = require('express');
 const multer = require('multer');
 const rateLimit = require('express-rate-limit');

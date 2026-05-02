@@ -1,3 +1,9 @@
+/**
+ * File Purpose: frontend/src/app/services/complement-bridge.service.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 import { Injectable, OnDestroy } from '@angular/core';
 import { EntryService } from './entry.service';
 import { Theme } from '../models/user.model';

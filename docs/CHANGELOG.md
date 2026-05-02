@@ -2,6 +2,109 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.60-beta] - 2026-05-01
+
+### Correcciones y mejoras operativas en Admin + Reportes (`UI-ADMIN-094`, `REP-AN-095`)
+
+- **Usuarios / botón Cancelar:** en creación y edición de usuarios se corrigió contraste del botón cancelar para todos los temas (claro, sepia, rosa y oscuros), usando estilo de error consistente (fondo rojo + texto blanco).
+
+### SMTP funcional en `/main/admin/smtp` (`SMTP-UX-096`)
+
+- **Proveedor con presets reales:** el selector de proveedor ahora aplica configuración base útil (host, puerto y TLS) para `Office 365`, `Google Mail`, `Google Workspace`, `AWS SES`, `Mailgun`, `Elastic Email` y `Custom`.
+- **Hints contextuales:** se añadieron ayudas por proveedor y placeholder dinámico para usuario SMTP según el preset elegido.
+- **Contraseña con máscara y visibilidad:** el campo de contraseña ahora muestra máscara visual (`********`) cuando ya existe clave guardada y permite alternar mostrar/ocultar al ingresar una nueva.
+- **Compatibilidad de clave guardada:** si hay configuración previa, se puede probar/guardar sin reescribir contraseña, manteniendo la almacenada.
+
+### Catálogos y navegación administrativa (`UI-CAT-097`)
+
+- **Catálogos:** se eliminó de `/main/admin/catalogs` la sección duplicada **Colores de Reportería** para evitar configuración redundante y conflictos.
+- **Menú Tags:** se retiró la opción `/main/tags` del menú lateral principal sin eliminar la funcionalidad interna de tags ni sus datos.
+
+### Escalación interna por CSV (`ESC-CSV-098`)
+
+- **Plantilla descargable:** nuevo endpoint y acción en UI para descargar plantilla CSV de turnos internos.
+- **Importación CSV de turnos:** nuevo flujo para cargar asignaciones semanales desde archivo CSV en `/main/admin/escalation`.
+- **Validación de datos y upsert:** se valida estructura, persona/rol y ventana semanal; si ya existe una asignación del mismo rol+semana, se actualiza en vez de duplicar.
+- **Resumen de importación:** respuesta con conteo de creados, actualizados y errores por fila para trazabilidad operativa.
+
+### Reportes: expansión de analítica en `/main/reports` (`REP-AN-099`)
+
+- **Nueva analítica de correos:** se agregó endpoint de agregación para boletines e incidentes con métricas de envíos y destinatarios.
+- **Nuevas visualizaciones:** se incorporaron gráficas adicionales de generación por día, actividad horaria, destinatarios por tipo y distribución por cliente/dominio (según disponibilidad de metadata).
+- **Cliente en reportes corregido:** se mejoró la resolución de cliente para incidentes usando metadata enriquecida y se evitó representar `Sin cliente` como categoría principal de cliente cuando no corresponde.
+- **Fuente canónica para analytics:** la agregación de clientes/criticidad se alineó a eventos de envío efectivos para reducir ruido de eventos auxiliares.
+- **Criticidad normalizada:** la representación de criticidad quedó restringida a niveles SOC esperados (`Bajo`, `Medio`, `Alto`, `Crítico`) para boletines y reportes.
+- **Limpieza de UI solicitada:** se retiraron del panel de reportes los mensajes informativos de “registros sin criticidad” y “envíos sin cliente identificado”.
+
+### Trazabilidad obligatoria de cliente en incidente (`REP-AN-100`)
+
+- **Frontend:** el envío de reporte de incidente bloquea la acción si no hay cliente/log source seleccionado.
+- **Backend:** `POST /api/reports/incident/send` valida y exige cliente/log source antes de procesar el envío.
+- **Auditoría enriquecida:** se amplió metadata del envío con campos adicionales de cliente para mejorar atribución futura en analytics.
+
+### Verificación técnica
+
+- **Compilación frontend:** `npm run build` ejecutado exitosamente tras los cambios de esta versión.
+- **Diagnóstico de errores en archivos tocados:** validación de workspace sin errores relevantes en los módulos intervenidos.
+
+## [v1.5.59-beta] - 2026-05-01
+
+### Documentación en código — comentarios de propósito y QA (`DOC-QA-093`)
+
+- **Cobertura general:** Se añadieron encabezados de documentación (propósito del archivo, responsabilidades, notas QA) en el código fuente **JS/TS de primer nivel** del repositorio (backend, frontend, scripts y utilidades asociadas), excluyendo dependencias, caché de build y datos locales.
+- **Pasada focalizada (seguridad y flujos críticos):** Comentarios tipo QA senior por bloques en puntos sensibles y de integración:
+  - Backend: orden del pipeline en `server.js`, sanitización de entrada (`input-sanitizer.js`), autenticación JWT y roles (`auth.js`), complementos (`complement-auth.js`), rate limiting (`rate-limiter.js`), rutas `auth`, `entries`, `escalation`, despacho GLPI (`glpi-dispatch.js`), gestión de complementos (`complement-manager.js`), alertas por cliente (`clientAlertController.js`).
+  - Frontend: interceptor HTTP (`auth.interceptor.ts`), alineación sesión vs guards (`auth.service.ts`), constatación documentada sobre guards (`auth.guard.ts`), generador de reportes (`report-generator.component.ts`), consola admin (`admin-console.component.ts`).
+- **Alcance:** Solo comentarios; **sin cambios de lógica** ni de comportamiento de la aplicación.
+
+## [v1.5.58-beta] - 2026-05-01
+
+### Corrección: Login acepta contraseñas de cualquier longitud (`FIX-AUTH-092`)
+
+- Se eliminó la validación `minLength(4)` del campo password en el formulario de login (`login.component.ts`). El campo acepta contraseñas de cualquier largo, dado que la restricción de longitud corresponde solo a la creación/cambio de contraseña, no a la autenticación.
+- Se eliminó el mensaje de error "MINIMUM 4 CHARACTERS" del template de login (`login.component.html`) que bloqueaba el botón de submit y confundía al usuario cuando su contraseña tenía menos de 4 caracteres.
+
+## [v1.5.57-beta] - 2026-05-01
+
+### Auditoría completa del envío de reporte de incidente (`AUD-INC-091`)
+
+- Se agregaron tres eventos de auditoría explícitos en el route `POST /api/reports/incident/send`, independientes del noise suppression de `email.js`:
+  - `mail.incident.attempt` — se registra siempre al inicio del request, antes de cualquier procesamiento. Guarda quién inició el envío, cantidad de destinatarios, campos del reporte y cantidad de imágenes.
+  - `mail.incident.sent` — se registra tras envío SMTP exitoso. Incluye destinatarios, adjuntos y paleta de colores usada.
+  - `mail.incident.fail` — se registra ante cualquier error SMTP o error inesperado, con el mensaje de error y la fase donde ocurrió.
+- Estos eventos son visibles en Auditoría → filtro **Mail / SMTP** y no están sujetos a supresión por reintentos.
+- Se corrigió el alcance de la destructuración de `req.body` para que `subject` sea accesible en el bloque `catch` externo.
+
+## [v1.5.56-beta] - 2026-05-01
+
+### Selector de paleta de colores para el correo de incidente (`REP-INC-090`)
+
+- **6 paletas curadas** implementadas en `incidentEmailTemplate.js`: `cdc-verde`, `noche-azul`, `slate-pro`, `carbon`, `indigo`, `bosque`. Cada paleta define todos los colores del email (fondo, cabecera, tarjetas, textos, evidencia, info adicional).
+- **Backend — Modelo:** Se añadió el campo `incidentEmailPaletteKey` en `AppConfig` (Mongoose), con valor por defecto `cdc-verde`.
+- **Backend — Rutas de config:** Se agregó validación y guardado del campo en `config.js`. La ruta `PUT /api/config` acepta y persiste la paleta seleccionada.
+- **Backend — Template:** `buildIncidentEmail` y `buildIncidentEmailPreview` aceptan el parámetro `paletteKey`. La función `resolvePalette()` selecciona la paleta activa; si la clave no existe usa `cdc-verde` como fallback.
+- **Backend — Reports:** Ambas rutas (`/incident/preview` y `/incident/send`) leen `config.incidentEmailPaletteKey` y lo pasan al template.
+- **Frontend — Modelo:** Se añadió `incidentEmailPaletteKey?: string` a las interfaces `AppConfig` y `UpdateConfigRequest` en `config.model.ts`.
+- **Frontend — Componente:** Se implementó en `settings.component.ts` el array `INCIDENT_PALETTES` con nombre, descripción y 5 swatches por paleta, junto con `selectIncidentPalette()` y `saveIncidentPalette()`.
+- **Frontend — Template:** Panel de selección visual de paleta con grilla de tarjetas interactivas, indicador de selección activa (`check_circle`) y botón "Guardar paleta" con spinner.
+- **Frontend — Estilos:** Las tarjetas de paleta usan variables CSS del sistema de temas (`--surface-muted`, `--border-color`, `--text-primary`, `--text-secondary`, `--accent-color`), garantizando coherencia visual en los tres temas del app (oscuro, claro, sepia).
+- **Fix visual:** Se eliminó el uso de valores hardcodeados (`#1e1e2e`, `rgba(92,107,192,...)`) que rompían la apariencia en temas claro y sepia.
+- **Fix UI:** Se eliminó el checkbox "Aplicar a: Reporte de Incidente" del panel "Colores del Boletín de Seguridad", que era redundante con el nuevo selector de paleta dedicado.
+
+## [v1.5.55-beta] - 2026-05-01
+
+### Modernización y Refactorización del Reporte de Incidentes (`REP-INC-089`)
+
+- **Migración a MJML:** Se sustituyó la generación de HTML manual en el frontend por un motor de plantillas MJML en el backend (`incidentEmailTemplate.js`). Esto asegura consistencia total y diseño responsive en clientes estrictos como Outlook y Gmail, eliminando problemas de imágenes rotas o renderizado defectuoso.
+- **Previsualización Real (Preview Endpoint):** Se implementó un nuevo endpoint (`/api/reports/incident/preview`) que el frontend consume para mostrar en tiempo real la previsualización del correo, garantizando que lo que se ve en la web es exactamente lo que llegará al destinatario.
+- **Imágenes Integradas por CID:** Las evidencias ahora se envían incrustadas nativamente mediante `Content-ID` (CID) en lugar de Base64 crudo en el HTML, evitando bloqueos por parte de los filtros de spam y webmails.
+- **Alineación Visual y Branding:**
+  - Título principal ("Reporte de Detección") y metadatos ("Ticket" y "Ofensa") reubicados en la cabecera verde de alto contraste para visibilidad inmediata.
+  - Logo corporativo insertado con control estricto de tamaño (`height=44`) para evitar el estiramiento ("stretch").
+  - Ancho de diseño del reporte incrementado a `680px` para acomodar mejor el texto técnico.
+  - Pie de página dinámico con el nombre del analista emisor y la marca real configurada ("Bitácora SOC").
+- **Limpieza de Evidencias:** Bloque de evidencia unificado para agrupar texto e imágenes limpiamente, eliminando redundancia visual como nombres de archivos inútiles o textos repetidos por cada captura.
+
 ## [v1.5.54-beta] - 2026-04-30
 
 ### Agenda Preventiva de Boletines (`ESC-PREV-084`, `ESC-PREV-085`, `ESC-PREV-086`)

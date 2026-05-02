@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/scripts/add-netics.js
+ * Responsibilities: Explain intent, contracts, and expected maintenance boundaries.
+ * QA Notes: Preserve deterministic behavior and document validation assumptions.
+ */
+
+/**
  * Script para agregar "Netics" al catálogo de Log Sources
  * Ejecutar: node scripts/add-netics.js
  */

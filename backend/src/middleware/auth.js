@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/src/middleware/auth.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Middleware de Autenticación y Autorización
  * 
  * Funciones:
@@ -32,6 +38,14 @@ const canEditOwnProfile = (req) => {
 };
 
 const sessionIpTracker = new Map();
+
+/*
+ * QA — superficie de autenticación:
+ * - Token aceptado desde `Authorization: Bearer` o cookie `auth_token` (compatibilidad browser/API).
+ * - Guest expirado: se desactiva cuenta y 401 (coherente con login).
+ * - Sesión: hash del token en tracker (no almacena JWT completo); cambio de IP → auditoría warn, no bloquea.
+ * - Roles solo lectura: guest/auditor bloquean métodos mutadores salvo PATCH/PUT `/users/me`.
+ */
 
 const getTokenFromCookie = (req) => {
   const cookieHeader = req.headers.cookie;

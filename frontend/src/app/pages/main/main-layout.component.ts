@@ -1,3 +1,9 @@
+/**
+ * File Purpose: frontend/src/app/pages/main/main-layout.component.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Subject, takeUntil, debounceTime, distinctUntilChanged } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
@@ -95,7 +101,6 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     { icon: 'admin_panel_settings', label: 'Consola Admin', route: '/main/admin', roles: ['admin', 'auditor'] },
     { icon: 'image', label: 'Branding', route: '/main/logo', roles: ['admin', 'auditor'] },
     { icon: 'history', label: 'Logs de Auditoría', route: '/main/audit-logs', roles: ['admin', 'auditor'] },
-    { icon: 'local_offer', label: 'Tags', route: '/main/tags', roles: ['admin', 'auditor'] },
     { icon: 'backup', label: 'Backup', route: '/main/backup', roles: ['admin', 'auditor'] }
   ];
 

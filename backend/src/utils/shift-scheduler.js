@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/utils/shift-scheduler.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const cron = require('node-cron');
 const WorkShift = require('../models/WorkShift');
 const { sendShiftReport } = require('./shift-report');

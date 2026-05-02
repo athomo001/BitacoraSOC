@@ -1,4 +1,10 @@
 /**
+ * File Purpose: Extras/diccionario-logs-ciber/app.js
+ * Responsibilities: Explain intent, contracts, and expected maintenance boundaries.
+ * QA Notes: Preserve deterministic behavior and document validation assumptions.
+ */
+
+/**
  * @typedef {'High' | 'Medium' | 'Low' | 'Info' | 'Variable'} Impact
  */
 

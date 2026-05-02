@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/src/models/PersonalNote.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Modelo de Notas Personales
  * 
  * Cada usuario tiene UNA nota personal privada (1:1 relationship)

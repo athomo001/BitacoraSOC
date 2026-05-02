@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/scripts/import-entries.js
+ * Responsibilities: Explain intent, contracts, and expected maintenance boundaries.
+ * QA Notes: Preserve deterministic behavior and document validation assumptions.
+ */
+
+/**
  * Script para importar entradas de bitácora de forma masiva desde un archivo JSON
  * 
  * Uso:

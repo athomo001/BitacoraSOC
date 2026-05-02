@@ -1,5 +1,5 @@
 <div class="settings-container">
-  <h1>Configuracion</h1>
+  <h1>EMAIL Config</h1>
 
   <div #smtpGuideCard class="onboarding-card" *ngIf="smtpGuideVisible">
     <p><strong>Guía rápida SMTP:</strong> 1) Completa host/puerto/usuario/remitente. 2) Prueba conexión. 3) Guarda configuración. Si ya existe clave guardada, puedes dejar contraseña vacía.</p>
@@ -26,95 +26,221 @@
     </div>
   </div>
 
-  <div class="settings-panel settings-panel--smtp" id="smtp-config">
-    <header class="settings-panel__header settings-panel__header--split">
-      <h2 class="settings-panel__title">Configuracion SMTP</h2>
-      <span class="status-chip" [ngClass]="connectionStatus">
-        {{ connectionStatus === 'conectado' ? 'Conectado' : connectionStatus === 'desconectado' ? 'Desconectado' : 'Sin
-        configurar' }}
-      </span>
-    </header>
-    <div class="settings-panel__body">
-      <form [formGroup]="smtpForm" (ngSubmit)="saveSmtpConfig()">
-        <div class="grid two-cols">
-          <mat-form-field appearance="outline">
-            <mat-label>Proveedor</mat-label>
-            <mat-select formControlName="provider">
-              <mat-option *ngFor="let p of providers" [value]="p.value">{{ p.label }}</mat-option>
-            </mat-select>
-          </mat-form-field>
+  <!-- Layout lado a lado: SMTP (izquierda) + Colores (derecha) -->
+  <div class="settings-row">
 
-          <mat-form-field appearance="outline">
-            <mat-label>Host</mat-label>
-            <input matInput formControlName="host">
-          </mat-form-field>
+    <!-- ── Columna izquierda: SMTP ───────────────────────────────────────────── -->
+    <div class="settings-col settings-col--main">
+      <div class="settings-panel settings-panel--smtp" id="smtp-config">
+        <header class="settings-panel__header settings-panel__header--split">
+          <h2 class="settings-panel__title">Configuracion SMTP</h2>
+          <span class="status-chip" [ngClass]="connectionStatus">
+            {{ connectionStatus === 'conectado' ? 'Conectado' : connectionStatus === 'desconectado' ? 'Desconectado' : 'Sin configurar' }}
+          </span>
+        </header>
+        <div class="settings-panel__body">
+          <form [formGroup]="smtpForm" (ngSubmit)="saveSmtpConfig()">
+            <div class="grid two-cols">
+              <mat-form-field appearance="outline">
+                <mat-label>Proveedor</mat-label>
+                <mat-select formControlName="provider">
+                  <mat-option *ngFor="let p of providers" [value]="p.value">{{ p.label }}</mat-option>
+                </mat-select>
+                <mat-hint>{{ selectedProviderPreset.senderHint }}</mat-hint>
+              </mat-form-field>
 
-          <mat-form-field appearance="outline">
-            <mat-label>Puerto</mat-label>
-            <input matInput type="number" formControlName="port">
-          </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Host</mat-label>
+                <input matInput formControlName="host">
+              </mat-form-field>
 
-          <mat-checkbox formControlName="useTLS">
-            Conexión segura (SSL/TLS)
-          </mat-checkbox>
+              <mat-form-field appearance="outline">
+                <mat-label>Puerto</mat-label>
+                <input matInput type="number" formControlName="port">
+              </mat-form-field>
 
-          <mat-form-field appearance="outline">
-            <mat-label>Usuario</mat-label>
-            <input matInput formControlName="username">
-          </mat-form-field>
+              <mat-checkbox formControlName="useTLS">
+                Conexión segura (SSL/TLS)
+              </mat-checkbox>
 
-          <mat-form-field appearance="outline">
-            <mat-label>Contraseña</mat-label>
-            <input matInput type="password" formControlName="password">
-            <mat-hint>Si ya está configurado, puedes dejarla vacía para reutilizar la guardada.</mat-hint>
-          </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Usuario</mat-label>
+                <input matInput formControlName="username" [placeholder]="selectedProviderPreset.usernamePlaceholder">
+              </mat-form-field>
 
-          <mat-form-field appearance="outline">
-            <mat-label>Nombre Remitente</mat-label>
-            <input matInput formControlName="senderName">
-          </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Contraseña</mat-label>
+                <input matInput [type]="smtpPasswordInputType" formControlName="password" [placeholder]="smtpPasswordPlaceholder">
+                <button mat-icon-button matSuffix type="button"
+                  (click)="toggleSmtpPasswordVisibility()"
+                  [attr.aria-label]="showSmtpPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                  [attr.aria-pressed]="showSmtpPassword">
+                  <mat-icon>{{ showSmtpPassword ? 'visibility_off' : 'visibility' }}</mat-icon>
+                </button>
+                <mat-hint>Si ya está configurado, puedes dejarla vacía para reutilizar la guardada.</mat-hint>
+              </mat-form-field>
 
-          <mat-form-field appearance="outline">
-            <mat-label>Email Remitente</mat-label>
-            <input matInput type="email" formControlName="senderEmail">
-          </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Nombre Remitente</mat-label>
+                <input matInput formControlName="senderName">
+              </mat-form-field>
 
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Destinatarios (separados por coma) - Opcional</mat-label>
-            <textarea matInput rows="2" formControlName="recipientsText"
-              placeholder="Solo necesarios si deseas enviar emails de prueba o notificaciones"></textarea>
-            <mat-hint>La conexión SMTP funciona sin destinatarios. Los emails se enviarán cuando haya incidentes
-              críticos.</mat-hint>
-          </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Email Remitente</mat-label>
+                <input matInput type="email" formControlName="senderEmail">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Destinatarios (separados por coma) - Opcional</mat-label>
+                <textarea matInput rows="2" formControlName="recipientsText"
+                  placeholder="Solo necesarios si deseas enviar emails de prueba o notificaciones"></textarea>
+                <mat-hint>La conexión SMTP funciona sin destinatarios. Los emails se enviarán cuando haya incidentes
+                  críticos.</mat-hint>
+              </mat-form-field>
+            </div>
+
+            <mat-checkbox formControlName="sendOnlyIfRed">
+              Enviar correo solo si hay servicios en rojo (si no, envía siempre)
+            </mat-checkbox>
+
+            <div class="button-group">
+              <button mat-button type="button" (click)="openSmtpGuide()">Ver guía rápida</button>
+              <button mat-raised-button color="accent" type="button" (click)="testSmtp()" [disabled]="testing">
+                <mat-spinner *ngIf="testing" diameter="18"></mat-spinner>
+                <span *ngIf="!testing">Probar conexion</span>
+              </button>
+
+              <button mat-raised-button color="primary" type="submit" [disabled]="!smtpTestPassed || savingSmtp">
+                <mat-spinner *ngIf="savingSmtp" diameter="18"></mat-spinner>
+                <span *ngIf="!savingSmtp">Guardar SMTP</span>
+              </button>
+            </div>
+
+            <div class="integration-error-panel" *ngIf="smtpLastError">
+              <p><strong>Error:</strong> {{ smtpLastError.code }}</p>
+              <p><strong>Causa probable:</strong> {{ smtpLastError.probableCause }}</p>
+              <p><strong>Siguiente paso:</strong> {{ smtpLastError.suggestedAction }}</p>
+              <p class="raw-detail" *ngIf="smtpLastError.rawMessage"><strong>Detalle técnico:</strong> {{ smtpLastError.rawMessage }}</p>
+              <button mat-stroked-button color="primary" type="button" (click)="retrySmtpTest()" [disabled]="testing">
+                Reintentar prueba SMTP
+              </button>
+            </div>
+          </form>
         </div>
-
-        <mat-checkbox formControlName="sendOnlyIfRed">
-          Enviar correo solo si hay servicios en rojo (si no, envía siempre)
-        </mat-checkbox>
-
-        <div class="button-group">
-          <button mat-button type="button" (click)="openSmtpGuide()">Ver guía rápida</button>
-          <button mat-raised-button color="accent" type="button" (click)="testSmtp()" [disabled]="testing">
-            <mat-spinner *ngIf="testing" diameter="18"></mat-spinner>
-            <span *ngIf="!testing">Probar conexion</span>
-          </button>
-
-          <button mat-raised-button color="primary" type="submit" [disabled]="!smtpTestPassed || savingSmtp">
-            <mat-spinner *ngIf="savingSmtp" diameter="18"></mat-spinner>
-            <span *ngIf="!savingSmtp">Guardar SMTP</span>
-          </button>
-        </div>
-
-        <div class="integration-error-panel" *ngIf="smtpLastError">
-          <p><strong>Error:</strong> {{ smtpLastError.code }}</p>
-          <p><strong>Causa probable:</strong> {{ smtpLastError.probableCause }}</p>
-          <p><strong>Siguiente paso:</strong> {{ smtpLastError.suggestedAction }}</p>
-          <p class="raw-detail" *ngIf="smtpLastError.rawMessage"><strong>Detalle técnico:</strong> {{ smtpLastError.rawMessage }}</p>
-          <button mat-stroked-button color="primary" type="button" (click)="retrySmtpTest()" [disabled]="testing">
-            Reintentar prueba SMTP
-          </button>
-        </div>
-      </form>
+      </div>
     </div>
+
+    <!-- ── Columna derecha: Colores de Email ─────────────────────────────────── -->
+    <div class="settings-col settings-col--side">
+
+      <!-- Panel: Selector de Paleta del Correo de Incidentes -->
+      <div class="settings-panel settings-panel--colors">
+        <header class="settings-panel__header">
+          <h2 class="settings-panel__title">Paleta del Correo de Incidentes</h2>
+        </header>
+        <div class="settings-panel__body">
+          <p class="color-hint">Elige el tema de color para los correos de reporte de incidente.</p>
+
+          <div class="palette-grid">
+            <div
+              *ngFor="let p of INCIDENT_PALETTES"
+              class="palette-card"
+              [class.palette-card--active]="selectedPaletteKey === p.key"
+              (click)="selectIncidentPalette(p.key)"
+              [attr.title]="p.description">
+              <div class="palette-card__swatches">
+                <span
+                  *ngFor="let sw of p.swatches"
+                  class="palette-card__swatch"
+                  [style.background]="sw">
+                </span>
+              </div>
+              <div class="palette-card__info">
+                <span class="palette-card__name">{{ p.name }}</span>
+                <span class="palette-card__desc">{{ p.description }}</span>
+              </div>
+              <span class="palette-card__check" *ngIf="selectedPaletteKey === p.key">
+                <mat-icon>check_circle</mat-icon>
+              </span>
+            </div>
+          </div>
+
+          <div class="palette-actions">
+            <button mat-raised-button color="primary" type="button"
+              (click)="saveIncidentPalette()" [disabled]="isSavingPalette">
+              <mat-icon>save</mat-icon>
+              Guardar paleta
+            </button>
+            <mat-spinner *ngIf="isSavingPalette" diameter="20"></mat-spinner>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel: Colores configurables del Boletín de Seguridad -->
+      <div class="settings-panel settings-panel--colors" style="margin-top: 16px;">
+        <header class="settings-panel__header">
+          <h2 class="settings-panel__title">Colores del Boletín de Seguridad</h2>
+        </header>
+        <div class="settings-panel__body">
+          <p class="color-hint">
+            Esta configuración aplica al color de encabezado del boletín de seguridad.
+          </p>
+
+          <div class="color-config-row">
+            <mat-form-field appearance="outline" class="color-mode-select">
+              <mat-label>Color</mat-label>
+              <mat-select [(value)]="reportColorMode" (selectionChange)="onReportColorModeChange()">
+                <mat-option value="green">{{ getModeOptionLabel('green') }}</mat-option>
+                <mat-option value="sky">{{ getModeOptionLabel('sky') }}</mat-option>
+                <mat-option value="light-red">{{ getModeOptionLabel('light-red') }}</mat-option>
+                <mat-option value="custom">{{ getModeOptionLabel('custom') }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <button mat-raised-button color="primary" type="button"
+              (click)="saveReportTableColorConfig()" [disabled]="isSavingReportColor">
+              <mat-icon>save</mat-icon>
+              Guardar
+            </button>
+          </div>
+
+          <div class="color-target-row">
+            <span class="color-target-label">Aplicar a:</span>
+            <mat-checkbox [(ngModel)]="reportColorSelection.bulletin">Boletín de Seguridad</mat-checkbox>
+          </div>
+
+          <div class="color-config-row">
+            <mat-form-field appearance="outline" class="color-mode-select">
+              <mat-label>Código HEX</mat-label>
+              <input matInput [value]="customReportColorInput"
+                (input)="onCustomColorInputChange($any($event.target).value)"
+                placeholder="#1A1C1E">
+            </mat-form-field>
+
+            <label class="native-color-picker">
+              <span>Selector</span>
+              <input type="color" [value]="getCurrentReportColor()"
+                (input)="selectCustomReportColor($any($event.target).value)">
+            </label>
+
+            <span class="current-color-chip">
+              <span class="color-chip__dot" [style.background]="getCurrentReportColor()"></span>
+              <strong>{{ getCurrentReportColor() }}</strong>
+            </span>
+          </div>
+
+          <div class="color-swatch-grid">
+            <button type="button" *ngFor="let color of customColorPalette"
+              class="color-swatch-btn"
+              [class.selected]="getCurrentReportColor().toUpperCase() === color.toUpperCase()"
+              [style.background]="color"
+              (click)="selectCustomReportColor(color)">
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <!-- ── fin columna derecha ──────────────────────────────────────────────── -->
   </div>
 </div>

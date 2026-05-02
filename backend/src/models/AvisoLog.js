@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/src/models/AvisoLog.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * AvisoLog.js — MAIL-REM-043
  *
  * Registro de auditoría de cada envío de recordatorio periódico de turno.

@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/src/models/CatalogOperationType.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Modelo de Catálogo de Tipos de Operación
  * 
  * Catálogo de tipos de operaciones SOC (investigación, respuesta, monitoreo, etc).

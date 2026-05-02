@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/utils/audit-retention-scheduler.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const AuditLog = require('../models/AuditLog');
 const { logger } = require('./logger');
 const { auditSystem } = require('./audit');

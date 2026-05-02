@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/utils/email.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const nodemailer = require('nodemailer');
 const { logger } = require('./logger');
 const AppConfig = require('../models/AppConfig');
@@ -261,10 +267,12 @@ async function createTransporter(configOverride = null) {
  * @param {string} [options.text] - Contenido en texto plano
  * @param {string} [options.html] - Contenido en HTML
  * @param {string} [options.from] - Remitente (opcional, usa config por defecto)
+ * @param {string|string[]} [options.cc] - Destinatario(s) en copia
  * @param {Array<Object>} [options.attachments] - Adjuntos nodemailer (p. ej. { filename, content, cid } para img inline)
  */
-async function sendEmail({ to, subject, text, html, from, attachments, auditContext = {} }) {
+async function sendEmail({ to, cc, subject, text, html, from, attachments, auditContext = {} }) {
   const recipients = normalizeRecipients(to);
+  const ccRecipients = normalizeRecipients(cc);
   const resolvedRecipientsPreview = recipients.map(maskEmail).slice(0, 5);
   const context = normalizeAuditContext({
     ...auditContext,
@@ -297,6 +305,10 @@ async function sendEmail({ to, subject, text, html, from, attachments, auditCont
       html
     };
 
+    if (ccRecipients.length > 0) {
+      mailOptions.cc = ccRecipients.join(', ');
+    }
+
     if (Array.isArray(attachments) && attachments.length > 0) {
       mailOptions.attachments = attachments;
     }
@@ -304,6 +316,7 @@ async function sendEmail({ to, subject, text, html, from, attachments, auditCont
     logger.info('📧 [sendEmail] Sending mail...', {
       from: mailOptions.from,
       to: mailOptions.to,
+      cc: mailOptions.cc,
       subject,
       hasHTML: !!html,
       htmlLength: html?.length || 0,
@@ -329,7 +342,9 @@ async function sendEmail({ to, subject, text, html, from, attachments, auditCont
         resolvedRecipientsCount: recipients.length,
         resolvedRecipientsPreview,
         toMasked: recipients.map(maskEmail),
+        ccMasked: ccRecipients.map(maskEmail),
         recipientsCount: recipients.length,
+        ccCount: ccRecipients.length,
         subject,
         template: html ? 'html' : 'text',
         messageId: info.messageId,

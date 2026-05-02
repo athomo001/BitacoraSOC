@@ -1,3 +1,9 @@
+/**
+ * File Purpose: frontend/src/app/app-routing.module.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { AuthGuard, AdminGuard, NotGuestGuard } from './guards/auth.guard';

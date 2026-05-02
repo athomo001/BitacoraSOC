@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/src/utils/encryption.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Utilidad de Cifrado AES-256-GCM
  * 
  * Funcionalidad:

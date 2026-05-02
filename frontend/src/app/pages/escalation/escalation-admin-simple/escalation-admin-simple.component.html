@@ -14,10 +14,26 @@
         <h2>Asignar Turnos Semanales</h2>
         <p class="subtitle">Configura quién estará de turno cada semana del mes</p>
 
-        <button mat-raised-button color="primary" (click)="addAssignment()">
-          <mat-icon>add</mat-icon>
-          Asignar Turno
-        </button>
+        <div class="toolbar-row">
+          <button mat-raised-button color="primary" (click)="addAssignment()">
+            <mat-icon>add</mat-icon>
+            Asignar Turno
+          </button>
+          <button mat-stroked-button color="primary" type="button" [disabled]="downloadingAssignmentTemplate"
+            (click)="downloadAssignmentTemplate()">
+            <mat-icon>{{ downloadingAssignmentTemplate ? 'hourglass_empty' : 'description' }}</mat-icon>
+            {{ downloadingAssignmentTemplate ? 'Descargando...' : 'Plantilla CSV' }}
+          </button>
+          <button mat-stroked-button color="accent" type="button" [disabled]="importingAssignmentsCsv"
+            (click)="assignmentCsvInput.click()">
+            <mat-icon>{{ importingAssignmentsCsv ? 'hourglass_empty' : 'upload_file' }}</mat-icon>
+            {{ importingAssignmentsCsv ? 'Importando...' : 'Importar CSV' }}
+          </button>
+          <input #assignmentCsvInput type="file" accept=".csv,text/csv" class="hidden-native-input"
+            (change)="onAssignmentsCsvSelected($event)">
+        </div>
+
+        <p class="subtitle compact-subtitle">Formato: roleCode, userType, identifier, weekStartDate, weekStartTime, weekEndDate, weekEndTime, notes.</p>
 
         <!-- Formulario de asignación -->
         <section *ngIf="showAssignmentForm" class="form-card">

@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/src/config/database.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Configuración de Conexión MongoDB
  * Marca de autor en comentarios: Athan Espinoza
  * 

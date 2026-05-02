@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/src/models/AppConfig.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Modelo de Configuración Global de Aplicación
  * 
  * Función:
@@ -282,6 +288,12 @@ const appConfigSchema = new mongoose.Schema({
         match: /^#([A-Fa-f0-9]{6})$/
       }
     }
+  },
+  // Paleta de colores seleccionada para el correo de incidentes
+  incidentEmailPaletteKey: {
+    type: String,
+    default: 'cdc-verde',
+    trim: true
   },
   // Configuración SMTP para envío de emails
   smtpConfig: {

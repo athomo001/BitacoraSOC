@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/src/models/CatalogLogSource.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Modelo de Catálogo de Log Sources (Clientes / Fuentes de logs)
  * 
  * Catálogo de clientes y fuentes de logs monitoreadas.

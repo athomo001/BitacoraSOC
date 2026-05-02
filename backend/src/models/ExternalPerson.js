@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/models/ExternalPerson.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const mongoose = require('mongoose');
 
 const externalPersonSchema = new mongoose.Schema({

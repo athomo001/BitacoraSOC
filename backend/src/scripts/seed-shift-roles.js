@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/scripts/seed-shift-roles.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const mongoose = require('mongoose');
 const ShiftRole = require('../models/ShiftRole');
 require('dotenv').config();

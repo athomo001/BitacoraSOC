@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/routes/config.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
@@ -303,6 +309,7 @@ router.put('/',
     body('emailReportConfig.reportTableColorByDocumentType').optional().isObject().withMessage('Configuración de color por tipo inválida'),
     body('emailReportConfig.reportTableColorByDocumentType.incident').optional().matches(/^#([A-Fa-f0-9]{6})$/).withMessage('Color de incidente inválido. Usa formato #RRGGBB'),
     body('emailReportConfig.reportTableColorByDocumentType.bulletin').optional().matches(/^#([A-Fa-f0-9]{6})$/).withMessage('Color de boletín inválido. Usa formato #RRGGBB'),
+    body('incidentEmailPaletteKey').optional().trim().isString(),
     body('smtpConfig.host').optional().trim(),
     body('smtpConfig.port').optional().isInt({ min: 1, max: 65535 }).toInt(),
     body('smtpConfig.secure').optional().isBoolean(),
@@ -343,6 +350,10 @@ router.put('/',
               ...(incomingEmailReportConfig.reportTableColorByDocumentType || {})
             }
           };
+        }
+
+        if (req.body.incidentEmailPaletteKey !== undefined) {
+          config.incidentEmailPaletteKey = String(req.body.incidentEmailPaletteKey).trim() || 'cdc-verde';
         }
 
         // Preserve password if it wasn't provided or was sent as empty string (masked)

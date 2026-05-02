@@ -31,6 +31,26 @@
     padding: 0;
     overflow-x: auto;
   }
+
+  form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    align-items: flex-start;
+
+    mat-form-field {
+      flex: 1 1 200px;
+      min-width: 180px;
+    }
+  }
+}
+
+.form-actions {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-1);
 }
 
 .users-table {
@@ -38,7 +58,14 @@
 }
 
 .cancel-edit-btn {
-  margin-left: 10px;
+  background-color: var(--state-error) !important;
+  color: #ffffff !important;
+  border: 1px solid color-mix(in srgb, var(--state-error) 82%, #000000 18%) !important;
+
+  &:hover,
+  &:focus-visible {
+    background-color: color-mix(in srgb, var(--state-error) 88%, #000000 12%) !important;
+  }
 }
 
 .role-badge {

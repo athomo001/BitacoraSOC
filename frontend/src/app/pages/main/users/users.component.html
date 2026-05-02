@@ -15,6 +15,14 @@
         <mat-form-field appearance="outline" *ngIf="!editingUserId">
           <mat-label>Contraseña</mat-label>
           <input matInput type="password" formControlName="password">
+          <mat-hint>Sin mínimo de caracteres — privilegio admin</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" *ngIf="editingUserId">
+          <mat-label>Nueva Contraseña</mat-label>
+          <input matInput type="password" formControlName="newPassword"
+                 placeholder="Dejar vacío para no cambiar">
+          <mat-hint>Sin mínimo — privilegio admin</mat-hint>
         </mat-form-field>
 
         <mat-form-field appearance="outline">
@@ -57,15 +65,17 @@
           <mat-hint>Máximo 120 caracteres</mat-hint>
         </mat-form-field>
 
-        <button mat-raised-button color="primary" type="submit" 
-                [disabled]="!userForm.valid">
-          {{ editingUserId ? 'Guardar Cambios' : 'Crear Usuario' }}
-        </button>
-        
-        <button mat-raised-button type="button" *ngIf="editingUserId"
-          (click)="cancelEdit()" class="cancel-edit-btn">
-          Cancelar
-        </button>
+        <div class="form-actions">
+          <button mat-raised-button color="primary" type="submit" 
+                  [disabled]="!userForm.valid">
+            {{ editingUserId ? 'Guardar Cambios' : 'Crear Usuario' }}
+          </button>
+          
+          <button mat-raised-button type="button" *ngIf="editingUserId"
+            (click)="cancelEdit()" class="cancel-edit-btn">
+            Cancelar
+          </button>
+        </div>
       </form>
     </div>
   </div>

@@ -1,3 +1,9 @@
+/**
+ * File Purpose: frontend/src/app/pages/main/report-generator/report-generator.component.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 import { Component, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
@@ -6,6 +12,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import anime from 'animejs';
 
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { CatalogService } from '../../../services/catalog.service';
 import { CatalogEvent, CatalogLogSource, CatalogOperationType } from '../../../models/catalog.model';
 import { EscalationService } from '../../../services/escalation.service';
@@ -27,6 +34,14 @@ import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
 import { ClientAlertDialogComponent } from './client-alert-dialog.component';
 import { environment } from '@env/environment';
+
+/*
+ * QA — generador de informes / newsletter:
+ * - Dos modos (`report` | `newsletter`): validar toggles, catálogos y payload enviado al backend por modo.
+ * - HTML en vista previa: pasa por DomSanitizer donde aplique; probar XSS en campos libres y referencias URL.
+ * - Client alert: flujo con EscalationService + diálogo; comprobar contexto `report` vs `copy-report` y ACK.
+ * - Regresión visual: animaciones (anime.js) no deben bloquear submit; probar con CPU throttling.
+ */
 
 @Component({
   selector: 'app-report-generator',
@@ -94,6 +109,7 @@ export class ReportGeneratorComponent implements OnInit {
   uploadedImages: { name: string; dataUrl: string; width: number; height: number }[] = [];
   newsletterUploadedImages: { name: string; dataUrl: string; width: number; height: number }[] = [];
   generatedHtml = '';
+  safeGeneratedHtml: SafeHtml | null = null;
   showPreview = false;
   reportTableHeaderColor = '#4CAF50';
   reportTableColorsByType: Record<'incident' | 'bulletin', string> = {
@@ -114,6 +130,25 @@ export class ReportGeneratorComponent implements OnInit {
   newsletterFavoritesOnly = false;
   private readonly selectedNewsletterContactIds = new Set<string>();
   newsletterSelectedMailingLists = new Set<string>();
+
+  // ─── Incident email dispatch ──────────────────────────────────────────────
+  incidentRecipientsTo = '';
+  incidentRecipientsCc = '';
+  incidentSubject = '';
+  isSendingIncident = false;
+  
+  incidentContactSearch = '';
+  incidentCompanyFilter = '';
+  incidentFavoritesOnly = false;
+  
+  // Modos de selección de destinatarios para incidentes ('to' o 'cc')
+  activeIncidentSelectorMode: 'to' | 'cc' = 'to';
+  
+  private readonly selectedIncidentContactIdsTo = new Set<string>();
+  incidentSelectedMailingListsTo = new Set<string>();
+
+  private readonly selectedIncidentContactIdsCc = new Set<string>();
+  incidentSelectedMailingListsCc = new Set<string>();
 
   // ─── Client alert ────────────────────────────────────────────────────────
   activeClientAlert: ClientAlertEvaluation | null = null;
@@ -137,18 +172,20 @@ export class ReportGeneratorComponent implements OnInit {
     private snackBar: MatSnackBar,
     private escalationService: EscalationService,
     private dialog: MatDialog,
-    private authService: AuthService
+    private authService: AuthService,
+    private sanitizer: DomSanitizer
   ) {
     this.reportForm = this.fb.group({
+      codigoTicket: ['', Validators.required],
+      ofensa: ['', Validators.required],
       tipoOperacion: ['', Validators.required],
-      codigoInterno: [''],
       nombreEvento: ['', Validators.required],
-      motivoEvento: ['', Validators.required],
+      motivoEvento: [''], // Ya no es obligatorio
       fecha: [new Date(), Validators.required],
-      criticidad: ['media', Validators.required],
+      criticidad: ['media'], // Ya no es obligatorio
       origenConexion: [''],
-      logSource: ['', Validators.required],
       destino: [''],
+      logSource: [''], // Ya no es obligatorio
       reputacionOrigen: ['Interna'],
       observaciones: ['', Validators.required],
       evidenciaTexto: [''],
@@ -288,6 +325,13 @@ export class ReportGeneratorComponent implements OnInit {
         nombreEvento: event.name,
         motivoEvento: event.motivoDefault || ''
       });
+    }
+  }
+
+  onEventTextChanged(text: string): void {
+    if (!this.selectedEvent || this.selectedEvent.name !== text) {
+      this.selectedEvent = null;
+      this.reportForm.patchValue({ nombreEvento: text, motivoEvento: '' });
     }
   }
 
@@ -694,7 +738,12 @@ export class ReportGeneratorComponent implements OnInit {
     this.http.post(`${this.backendBaseUrl}/api/reports/newsletter/send`, {
       recipients: recipientSummary.validRecipients,
       subject,
-      html: this.generatedHtml
+      html: this.generatedHtml,
+      analytics: {
+        criticality: this.newsletterForm.value.criticidad,
+        title: this.newsletterForm.value.tituloBoletin,
+        vendor: this.newsletterForm.value.marcaFabricante
+      }
     }).subscribe({
       next: (res: any) => {
         this.isSendingNewsletter = false;
@@ -1086,13 +1135,24 @@ export class ReportGeneratorComponent implements OnInit {
     this.uploadedImages = [];
     this.newsletterUploadedImages = [];
     this.generatedHtml = '';
+    this.safeGeneratedHtml = null;
     this.showPreview = false;
     this.activeClientAlert = null;
+    
     this.newsletterRecipients = '';
     this.newsletterContactSearch = '';
     this.newsletterCompanyFilter = '';
     this.newsletterFavoritesOnly = false;
     this.clearNewsletterSelection();
+
+    this.incidentRecipientsTo = '';
+    this.incidentRecipientsCc = '';
+    this.incidentSubject = '';
+    this.incidentContactSearch = '';
+    this.incidentCompanyFilter = '';
+    this.incidentFavoritesOnly = false;
+    this.selectedIncidentContactIdsTo.clear();
+    this.selectedIncidentContactIdsCc.clear();
   }
 
   onModeChange(): void {
@@ -1106,73 +1166,210 @@ export class ReportGeneratorComponent implements OnInit {
     if (!canContinue) return;
 
     const form = this.reportForm.value;
-    this.reportTableHeaderColor = this.reportTableColorsByType.incident;
-    const headerColor = this.reportTableHeaderColor;
-    const labelColor = this.getSecondaryColor(headerColor);
-    const reportWidthPx = 980;
-    const evidenceImageWidthPx = 420;
-    const firstColPx = 185;
-    const secondColPx = reportWidthPx - firstColPx;
+    
+    const payload = {
+      reportData: {
+        codigoTicket: form.codigoTicket,
+        ofensa: form.ofensa,
+        tipoOperacion: form.tipoOperacion,
+        nombreEvento: form.nombreEvento,
+        motivoEvento: form.motivoEvento,
+        fecha: form.fecha,
+        criticidad: form.criticidad,
+        origenConexion: form.origenConexion,
+        destino: form.destino,
+        logSource: form.logSource,
+        reputacionOrigen: form.reputacionOrigen,
+        observaciones: form.observaciones,
+        evidenciaTexto: form.evidenciaTexto,
+        recomendacion: form.recomendacion,
+        informacionAdicional: form.informacionAdicional
+      },
+      images: this.uploadedImages.map(img => ({
+        name: img.name,
+        contentBase64: img.dataUrl.split(',')[1],
+        contentType: img.dataUrl.startsWith('data:image/png') ? 'image/png' : 'image/jpeg',
+        width: img.width,
+        height: img.height
+      }))
+    };
 
-    const cellLabel = `background-color: ${labelColor}; font-weight: bold; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; width: ${firstColPx}px;`;
-    const cellDetail = `border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; width: ${secondColPx}px;`;
+    // Auto-generar asunto para el reporte de incidente
+    const clienteStr = form.logSource || 'Cliente';
+    this.incidentSubject = `${clienteStr} - ${form.nombreEvento} - ${form.codigoTicket}`;
 
-    const e = (v: unknown) => this.escapeHtml(v);
-
-    let html = `<table cellpadding="6" cellspacing="0" width="${reportWidthPx}" style="border-collapse: collapse; width: ${reportWidthPx}px; max-width: 100%; font-family: Arial, sans-serif; border: 1px solid #2b2b2b; table-layout: fixed; margin: 0; mso-table-lspace: 0pt; mso-table-rspace: 0pt; clear: both;">
-  <colgroup>
-    <col width="${firstColPx}" style="width: ${firstColPx}px;">
-    <col width="${secondColPx}" style="width: ${secondColPx}px;">
-  </colgroup>
-  <tr>
-    <th colspan="2" style="background-color: ${headerColor}; color: white; text-align: center; font-size: 18px; border: 1px solid #2b2b2b;">Reporte de Detección</th>
-  </tr>
-  <tr>
-    <th width="${firstColPx}" style="background-color: ${labelColor}; color: white; width: ${firstColPx}px; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere;">Campo</th>
-    <th width="${secondColPx}" style="background-color: ${labelColor}; color: white; width: ${secondColPx}px; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere;">Detalle</th>
-  </tr>
-  <tr><td style="${cellLabel}">Tipo de operación</td><td style="${cellDetail}">${e(form.tipoOperacion)}</td></tr>
-  <tr><td style="${cellLabel}">Ofensa/Código interno</td><td style="${cellDetail}">${e(form.codigoInterno || '-')}</td></tr>
-  <tr><td style="${cellLabel}">Nombre de Ofensa/Evento</td><td style="${cellDetail}">${e(form.nombreEvento)}</td></tr>
-  <tr><td style="${cellLabel}">Motivo de la Ofensa/Evento</td><td style="${cellDetail}">${this.formatMultilineText(form.motivoEvento)}</td></tr>
-  <tr><td style="${cellLabel}">Fecha</td><td style="${cellDetail}">${e(new Date(form.fecha).toLocaleDateString('es-CL'))}</td></tr>
-  <tr><td style="${cellLabel}">MRSC (Criticidad)</td><td style="${cellDetail}">${e(form.criticidad)}</td></tr>
-  <tr><td style="${cellLabel}">Origen de conexión</td><td style="${cellDetail}">${e(form.origenConexion || '-')}</td></tr>
-  <tr><td style="${cellLabel}">Fuente / Log Source</td><td style="${cellDetail}">${e(form.logSource)}</td></tr>
-  <tr><td style="${cellLabel}">Destino</td><td style="${cellDetail}">${e(form.destino || '-')}</td></tr>
-  <tr><td style="${cellLabel}">Reputación de origen</td><td style="${cellDetail}">${e(form.reputacionOrigen)}</td></tr>
-  <tr><td style="${cellLabel}">Observaciones</td><td style="white-space: pre-wrap; ${cellDetail}">${this.formatMultilineText(form.observaciones)}</td></tr>`;
-
-    const hasImages = this.uploadedImages.length > 0;
-    const hasTextEvidence = (form.evidenciaTexto || '').trim().length > 0;
-
-    if (hasImages || hasTextEvidence) {
-      html += `\n  <tr>\n    <td style="${cellLabel}">Evidencia</td>\n    <td style="${cellDetail}">`;
-      if (hasTextEvidence) {
-        html += `<div style="white-space: pre-wrap; margin-bottom: ${hasImages ? '10px' : '0'};">${this.formatMultilineText(form.evidenciaTexto)}</div>`;
+    this.http.post<{html: string}>(`${this.backendBaseUrl}/api/reports/incident/preview`, payload).subscribe({
+      next: (res) => {
+        this.generatedHtml = res.html || '';
+        this.safeGeneratedHtml = this.sanitizer.bypassSecurityTrustHtml(this.generatedHtml);
+        this.showPreview = true;
+      },
+      error: (err) => {
+        console.error('Error al generar preview de reporte', err);
+        this.snackBar.open('Error al generar preview del reporte', 'Cerrar', { duration: 3000 });
       }
-      if (hasImages) {
-        this.uploadedImages.forEach(img => {
-          const renderWidth = img.width > 0 ? Math.min(evidenceImageWidthPx, img.width) : evidenceImageWidthPx;
-          const renderHeight = img.width > 0 && img.height > 0
-            ? Math.max(1, Math.round((img.height * renderWidth) / img.width))
-            : 0;
-          const heightAttr = renderHeight > 0 ? ` height="${renderHeight}"` : '';
-          html += `<a href="${img.dataUrl}" style="display: block; text-align: center; text-decoration: none;"><img src="${img.dataUrl}" width="${renderWidth}"${heightAttr} style="width: ${renderWidth}px; max-width: 100%; height: auto; object-fit: contain; margin: 4px auto; display: block; border: 1px solid #ddd;" alt="${e(img.name || 'Evidencia')}"></a><br>`;
-        });
-      }
-      html += `</td>\n  </tr>`;
+    });
+  }
+
+  // ─── Incident email dispatch ──────────────────────────────────────────────
+  get incidentCompanyOptionsTo(): string[] {
+    const companies = new Set(
+      this.newsletterContacts
+        .map(c => String(c.organization || '').trim())
+        .filter(v => v.length > 0)
+    );
+    return Array.from(companies).sort((a, b) => a.localeCompare(b));
+  }
+
+  get incidentFilteredContactsTo(): Contact[] {
+    let list = this.newsletterContacts.filter(c => !c.isMailingList);
+    if (this.incidentFavoritesOnly) {
+      list = list.filter(c => c.favorite);
+    }
+    if (this.incidentCompanyFilter) {
+      list = list.filter(c => c.organization === this.incidentCompanyFilter);
+    }
+    const search = this.incidentContactSearch.trim().toLowerCase();
+    if (search) {
+      list = list.filter(c =>
+        c.name.toLowerCase().includes(search) ||
+        (c.email || '').toLowerCase().includes(search)
+      );
+    }
+    return list;
+  }
+
+  get incidentMailingListsTo(): Contact[] {
+    let list = this.newsletterContacts.filter(c => c.isMailingList);
+    if (this.incidentFavoritesOnly) {
+      list = list.filter(c => c.favorite);
+    }
+    const search = this.incidentContactSearch.trim().toLowerCase();
+    if (search) {
+      list = list.filter(c =>
+        c.name.toLowerCase().includes(search) ||
+        (c.email || '').toLowerCase().includes(search)
+      );
+    }
+    return list;
+  }
+
+  toggleIncidentContact(contactId: string, mode: 'to' | 'cc'): void {
+    const set = mode === 'to' ? this.selectedIncidentContactIdsTo : this.selectedIncidentContactIdsCc;
+    if (set.has(contactId)) {
+      set.delete(contactId);
     } else {
-      html += `\n  <tr><td style="${cellLabel}">Evidencia</td><td style="${cellDetail}">Se adjunta en el correo</td></tr>`;
+      set.add(contactId);
+    }
+    this.syncIncidentRecipientsText(mode);
+  }
+
+  isIncidentContactSelected(contactId: string, mode: 'to' | 'cc'): boolean {
+    const set = mode === 'to' ? this.selectedIncidentContactIdsTo : this.selectedIncidentContactIdsCc;
+    return set.has(contactId);
+  }
+
+  private syncIncidentRecipientsText(mode: 'to' | 'cc'): void {
+    const set = mode === 'to' ? this.selectedIncidentContactIdsTo : this.selectedIncidentContactIdsCc;
+    const emails = Array.from(set)
+      .map(id => this.newsletterContacts.find(c => c._id === id)?.email)
+      .filter(e => !!e);
+    
+    if (mode === 'to') {
+      this.incidentRecipientsTo = emails.join('\n');
+    } else {
+      this.incidentRecipientsCc = emails.join('\n');
+    }
+  }
+
+  onIncidentRecipientsToChange(text: string): void {
+    this.incidentRecipientsTo = text;
+    this.updateIncidentSelectedFromText(text, 'to');
+  }
+
+  onIncidentRecipientsCcChange(text: string): void {
+    this.incidentRecipientsCc = text;
+    this.updateIncidentSelectedFromText(text, 'cc');
+  }
+
+  private updateIncidentSelectedFromText(text: string, mode: 'to' | 'cc'): void {
+    const emails = text.split(/[\n,;]+/).map(e => e.trim().toLowerCase()).filter(e => e);
+    const set = mode === 'to' ? this.selectedIncidentContactIdsTo : this.selectedIncidentContactIdsCc;
+    set.clear();
+    
+    this.newsletterContacts.forEach(contact => {
+      if (contact.email && emails.includes(contact.email.toLowerCase())) {
+        set.add(contact._id || '');
+      }
+    });
+  }
+
+  async sendIncidentReport(): Promise<void> {
+    if (!this.incidentRecipientsTo.trim()) {
+      this.snackBar.open('Debes ingresar al menos un destinatario en Para', 'Cerrar', { duration: 3000 });
+      return;
+    }
+    if (!this.incidentSubject.trim()) {
+      this.snackBar.open('Debes ingresar un asunto para el correo', 'Cerrar', { duration: 3000 });
+      return;
     }
 
-    html += `
-  <tr><td style="${cellLabel}">Recomendación</td><td style="white-space: pre-wrap; ${cellDetail}">${this.formatMultilineText(form.recomendacion || '-')}</td></tr>
-  <tr><td style="${cellLabel}">Información adicional</td><td style="white-space: pre-wrap; ${cellDetail}">${this.formatMultilineText(form.informacionAdicional || '-')}</td></tr>
-</table>`;
+    const logSourceValue = String(this.reportForm.get('logSource')?.value || '').trim();
+    if (!logSourceValue) {
+      this.snackBar.open('Debes seleccionar Cliente / Log Source para asociar el reporte', 'Cerrar', { duration: 3500 });
+      return;
+    }
 
-    this.generatedHtml = html;
-    this.showPreview = true;
+    const canContinue = await this.ensureClientAlertAcknowledged('report');
+    if (!canContinue) return;
+
+    const form = this.reportForm.value;
+    this.isSendingIncident = true;
+    const payload = {
+      to: this.incidentRecipientsTo.split(/[\n,;]+/).map(e => e.trim()).filter(e => e),
+      cc: this.incidentRecipientsCc.split(/[\n,;]+/).map(e => e.trim()).filter(e => e),
+      subject: this.incidentSubject,
+      reportData: {
+        codigoTicket: form.codigoTicket,
+        ofensa: form.ofensa,
+        tipoOperacion: form.tipoOperacion,
+        nombreEvento: form.nombreEvento,
+        motivoEvento: form.motivoEvento,
+        fecha: form.fecha,
+        criticidad: form.criticidad,
+        origenConexion: form.origenConexion,
+        destino: form.destino,
+        logSource: logSourceValue,
+        reputacionOrigen: form.reputacionOrigen,
+        observaciones: form.observaciones,
+        evidenciaTexto: form.evidenciaTexto,
+        recomendacion: form.recomendacion,
+        informacionAdicional: form.informacionAdicional
+      },
+      images: this.uploadedImages.map(img => ({
+        name: img.name,
+        contentBase64: img.dataUrl.split(',')[1],
+        contentType: img.dataUrl.startsWith('data:image/png') ? 'image/png' : 'image/jpeg',
+        width: img.width,
+        height: img.height
+      }))
+    };
+
+    this.http.post(`${this.backendBaseUrl}/api/reports/incident/send`, payload).subscribe({
+      next: (res: any) => {
+        this.snackBar.open(`✅ Reporte enviado a ${res.toCount} destinatario(s) y ${res.ccCount} en copia`, 'Cerrar', { duration: 4000 });
+        this.isSendingIncident = false;
+        
+        // Limpiar para permitir un nuevo reporte
+        this.clearForm();
+        this.loadNewsletterContacts();
+      },
+      error: (err) => {
+        this.isSendingIncident = false;
+        const msg = err.error?.detail || err.error?.message || 'Error al enviar reporte';
+        this.snackBar.open(`Error: ${msg}`, 'Cerrar', { duration: 5000 });
+      }
+    });
   }
 
   private buildNewsletterHtml(): void {
@@ -1377,6 +1574,7 @@ export class ReportGeneratorComponent implements OnInit {
 </table>`;
 
     this.generatedHtml = html;
+    this.safeGeneratedHtml = this.sanitizer.bypassSecurityTrustHtml(html);
     this.showPreview = true;
   }
 

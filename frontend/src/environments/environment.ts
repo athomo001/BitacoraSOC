@@ -1,3 +1,9 @@
+/**
+ * File Purpose: frontend/src/environments/environment.ts
+ * Responsibilities: Explain intent, contracts, and expected maintenance boundaries.
+ * QA Notes: Preserve deterministic behavior and document validation assumptions.
+ */
+
 // Cambiar según tu IP del backend
 /**
  * Environment de desarrollo

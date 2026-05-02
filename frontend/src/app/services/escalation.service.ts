@@ -1,3 +1,9 @@
+/**
+ * File Purpose: frontend/src/app/services/escalation.service.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
@@ -388,6 +394,30 @@ export class EscalationService {
 
   createAssignment(data: ShiftAssignmentFormData): Observable<ShiftAssignment> {
     return this.http.post<ShiftAssignment>(`${this.apiUrl}/admin/assignments`, data);
+  }
+
+  importAssignmentsCsv(file: File): Observable<{
+    message: string;
+    created: number;
+    updated: number;
+    errorCount: number;
+    errors: Array<{ row: number | string; message: string }>;
+  }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<{
+      message: string;
+      created: number;
+      updated: number;
+      errorCount: number;
+      errors: Array<{ row: number | string; message: string }>;
+    }>(`${this.apiUrl}/admin/assignments/import-csv`, formData);
+  }
+
+  downloadAssignmentsTemplateCsv(): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/admin/assignments/template-csv`, {
+      responseType: 'blob'
+    });
   }
 
   updateAssignment(id: string, data: ShiftAssignmentFormData): Observable<ShiftAssignment> {

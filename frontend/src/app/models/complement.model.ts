@@ -1,3 +1,9 @@
+/**
+ * File Purpose: frontend/src/app/models/complement.model.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 export type ComplementScope =
   | 'READ_CONTEXT'
   | 'READ_LOGS'

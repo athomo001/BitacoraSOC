@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/routes/internal/v1/index.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const express = require('express');
 const Entry = require('../../../models/Entry');
 const AuditLog = require('../../../models/AuditLog');

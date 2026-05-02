@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/utils/complement-schema-validator.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const fs = require('fs');
 const path = require('path');
 const Ajv = require('ajv');

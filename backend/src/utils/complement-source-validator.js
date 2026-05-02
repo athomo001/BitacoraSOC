@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/utils/complement-source-validator.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const path = require('path');
 const unzipper = require('unzipper');
 

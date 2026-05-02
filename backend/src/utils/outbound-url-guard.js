@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/utils/outbound-url-guard.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const dns = require('dns').promises;
 const net = require('net');
 const { URL } = require('url');

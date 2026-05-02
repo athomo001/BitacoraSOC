@@ -1,4 +1,10 @@
 /**
+ * File Purpose: frontend/src/app/pages/main/entries/entries.component.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Componente de Escribir Entradas de Bitácora
  * Pantalla simple para crear nuevas entradas con clasificación Operativa/Incidente
  */

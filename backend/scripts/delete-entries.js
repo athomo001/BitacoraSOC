@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/scripts/delete-entries.js
+ * Responsibilities: Explain intent, contracts, and expected maintenance boundaries.
+ * QA Notes: Preserve deterministic behavior and document validation assumptions.
+ */
+
+/**
  * Script para eliminar todas las entradas
  * Uso: node scripts/delete-entries.js
  */

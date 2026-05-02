@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/src/controllers/shiftReminderController.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * shiftReminderController.js — MAIL-REM-043 (v3)
  * CRUD para la colección ShiftReminder (solo admin).
  */

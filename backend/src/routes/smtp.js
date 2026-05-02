@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/src/routes/smtp.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Rutas de Configuracion SMTP (estilo Passbolt)
  *
  * Reglas:
