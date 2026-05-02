@@ -1,4 +1,10 @@
 /**
+ * File Purpose: frontend/src/app/guards/admin.guard.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Admin Guard - Protección de Rutas Admin
  * 
  * Funcionalidad:

@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/utils/complement-manager.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const Complement = require('../models/Complement');
@@ -13,6 +19,15 @@ const { removePublishedArtifacts } = require('./complement-publisher');
 const PURGE_MODELS = [Entry, ComplementSharedRecord];
 
 const COMPLEMENT_DB_PREFIX = 'bitacora_ext_';
+
+/*
+ * QA — ciclo de vida de complementos:
+ * - URLs externas pasan por `assertOutboundUrlSafe` / `validateComplementUrl` (HTTPS obligatorio salvo allowlist privada).
+ * - `COMPLEMENT_ALLOW_PRIVATE_URLS`: en false, endurece contra hosts internos; validar en staging antes de prod.
+ * - BD dedicada: nombre debe usar prefijo `bitacora_ext_`; wipe solo si coincide (anti borrado accidental).
+ * - Límites: `enforceComplementLimits` cuenta documentos Complement; pruebas de carga al borde del máximo.
+ * - Circuit breaker / health: ver `complement-circuit-breaker` y rutas que sirven artefactos en `server.js`.
+ */
 
 const DEFAULT_LOCAL_COMPLEMENT_URLS = process.env.COMPLEMENT_ALLOW_PRIVATE_URLS !== 'false';
 

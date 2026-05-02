@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/src/models/ShiftClosure.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Modelo de Cierre de Turno SOC
  *
  * Registra el resumen del turno y el estado de envío (email/API/webhook).

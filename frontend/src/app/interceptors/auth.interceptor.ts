@@ -1,4 +1,10 @@
 /**
+ * File Purpose: frontend/src/app/interceptors/auth.interceptor.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Interceptor de Autenticación HTTP
  * 
  * Funcionalidad:
@@ -38,6 +44,7 @@ export class AuthInterceptor implements HttpInterceptor {
   ) {}
 
   intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+    // QA: todas las llamadas envían cookies de sesión; sin esto el backend no verá `auth_token`.
     req = req.clone({ withCredentials: true });
 
     return next.handle(req).pipe(
@@ -65,6 +72,7 @@ export class AuthInterceptor implements HttpInterceptor {
         }
 
         if (error.status === 401) {
+          // QA: durante bootstrap (`/users/me`) o init de sesión no forzar logout para evitar carrera al arrancar la app.
           const isSessionBootstrapRequest = req.url.includes('/users/me');
           const shouldSkipForcedLogout = isSessionBootstrapRequest || this.authService.isInitializingSession();
 

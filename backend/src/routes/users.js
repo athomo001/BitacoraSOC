@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/src/routes/users.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Rutas de Gestion de Usuarios
  */
 const express = require('express');
@@ -366,6 +372,16 @@ router.put('/:id',
 
       res.json({ message: 'Usuario actualizado', user });
     } catch (error) {
+      if (error?.name === 'ValidationError') {
+        return res.status(400).json({
+          message: Object.values(error.errors || {})[0]?.message || 'Datos inválidos al actualizar usuario'
+        });
+      }
+
+      if (error?.code === 11000) {
+        return res.status(400).json({ message: 'El usuario o email ya existe' });
+      }
+
       console.error('Error al actualizar usuario:', error);
       res.status(500).json({ message: 'Error al actualizar usuario' });
     }

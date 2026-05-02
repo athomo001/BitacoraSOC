@@ -1,9 +1,23 @@
+/**
+ * File Purpose: backend/src/middleware/complement-auth.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const { auditSystem } = require('../utils/audit');
 const { hashComplementToken, verifyComplementToken } = require('../utils/complement-token');
 const Complement = require('../models/Complement');
 const { getCircuitState } = require('../utils/complement-circuit-breaker');
 
 const requestWindows = new Map();
+
+/*
+ * QA — complementos (apps embebidas con token propio):
+ * - Bearer verificado contra hash en BD (revocación por rotación de token).
+ * - Circuit breaker OPEN → 503 (degradación controlada).
+ * - Rate limit en memoria por slug (reinicio de proceso resetea ventanas; entorno multi-instancia: revisar).
+ * - Scopes y colecciones: probar 403 con token válido pero scope insuficiente.
+ */
 
 const recordRequestAndCheckLimit = (slug, limit = 200, windowMs = 15 * 60 * 1000) => {
   const now = Date.now();

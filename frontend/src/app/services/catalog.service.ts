@@ -1,4 +1,10 @@
 /**
+ * File Purpose: frontend/src/app/services/catalog.service.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * 📚 Servicio de Catálogos
  * 
  * Servicio centralizado para búsqueda typeahead de catálogos grandes:

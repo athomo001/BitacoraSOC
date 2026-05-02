@@ -1,3 +1,9 @@
+/**
+ * File Purpose: frontend/src/app/pages/main/catalog-admin/catalog-admin.component.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 import { Component, OnInit } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
@@ -26,8 +32,6 @@ import { MatSelect, MatOption } from '@angular/material/select';
 import { MatPaginator, PageEvent } from '@angular/material/paginator';
 import { FormControl } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
-import { ConfigService } from '../../../services/config.service';
-import { EmailReportConfig } from '../../../models/config.model';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
 
@@ -39,14 +43,6 @@ import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
   providers: [{ provide: MAT_DATE_LOCALE, useValue: 'es-CL' }]
 })
 export class CatalogAdminComponent implements OnInit {
-  private static readonly DEFAULT_REPORT_COLOR = '#4CAF50';
-  private static readonly REPORT_COLOR_TYPES = ['incident', 'bulletin'] as const;
-
-  reportColorSelection: Record<'incident' | 'bulletin', boolean> = {
-    incident: true,
-    bulletin: true
-  };
-
   activeTabIndex = 0;
 
   // Listas
@@ -76,30 +72,6 @@ export class CatalogAdminComponent implements OnInit {
   eventTotal = 0;
   eventSearchControl = new FormControl('');
 
-  reportColorMode: 'green' | 'sky' | 'light-red' | 'custom' = 'green';
-  selectedCustomReportColor = CatalogAdminComponent.DEFAULT_REPORT_COLOR;
-  customReportColorInput = CatalogAdminComponent.DEFAULT_REPORT_COLOR;
-  isSavingReportColor = false;
-  readonly customColorPalette: string[] = [
-    '#4CAF50', '#2E7D32', '#8BC34A', '#2196F3', '#29B6F6', '#03A9F4',
-    '#26A69A', '#009688', '#00BCD4', '#FF9800', '#FFC107', '#FFEB3B',
-    '#F06292', '#E57373', '#EF5350', '#BA68C8', '#9C27B0', '#7E57C2',
-    '#607D8B', '#78909C', '#795548', '#9E9E9E', '#546E7A', '#3F51B5'
-  ];
-
-  private currentEmailReportConfig: EmailReportConfig = {
-    enabled: false,
-    recipients: [],
-    includeChecklist: true,
-    includeEntries: true,
-    subjectTemplate: 'Reporte SOC [fecha] [turno]',
-    reportTableColor: CatalogAdminComponent.DEFAULT_REPORT_COLOR,
-    reportTableColorByDocumentType: {
-      incident: CatalogAdminComponent.DEFAULT_REPORT_COLOR,
-      bulletin: CatalogAdminComponent.DEFAULT_REPORT_COLOR
-    }
-  };
-
   // Formularios
   eventForm: FormGroup;
   logSourceForm: FormGroup;
@@ -115,7 +87,6 @@ export class CatalogAdminComponent implements OnInit {
   constructor(
     private catalogService: CatalogService,
     private escalationService: EscalationService,
-    private configService: ConfigService,
     private snackBar: MatSnackBar,
     private dialog: MatDialog,
     private fb: FormBuilder
@@ -171,220 +142,37 @@ export class CatalogAdminComponent implements OnInit {
     });
   }
 
-  private updateClientAlertRuleValidators(ruleType: string): void {
-    const isMaint = ruleType === 'scheduled_maintenance';
-    const f = this.clientAlertRuleForm;
-
-    // Campos exclusivos de special_alert
-    const specialOnlyFields = ['mode', 'contexts'];
-    specialOnlyFields.forEach(field => {
-      const ctrl = f.get(field);
-      if (!ctrl) return;
-      if (isMaint) {
-        ctrl.clearValidators();
-      } else {
-        if (field === 'mode') ctrl.setValidators(Validators.required);
-        if (field === 'contexts') ctrl.setValidators(Validators.required);
-      }
-      ctrl.updateValueAndValidity({ emitEvent: false });
-    });
-
-    // maintenanceTitle obligatorio solo para mantenimiento
-    const titleCtrl = f.get('maintenanceTitle')!;
-    titleCtrl.setValidators(isMaint ? [Validators.required, Validators.maxLength(200)] : []);
-    titleCtrl.updateValueAndValidity({ emitEvent: false });
-
-    // validFromDate/Time y validToDate/Time obligatorios solo para mantenimiento
-    ['validFromDate', 'validToDate'].forEach(field => {
-      const ctrl = f.get(field)!;
-      ctrl.setValidators(isMaint ? Validators.required : []);
-      ctrl.updateValueAndValidity({ emitEvent: false });
-    });
-    ['validFromTime', 'validToTime'].forEach(field => {
-      const ctrl = f.get(field)!;
-      ctrl.setValidators(isMaint
-        ? [Validators.required, Validators.pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)]
-        : [Validators.pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)]);
-      ctrl.updateValueAndValidity({ emitEvent: false });
-    });
-  }
-
   ngOnInit(): void {
-    this.eventSearchControl.valueChanges.pipe(
-      debounceTime(300),
-      distinctUntilChanged()
-    ).subscribe(() => {
-      this.eventPage = 1;
-      this.loadEvents();
-    });
-
-    this.loadAll();
-  }
-
-  loadAll(): void {
     this.loadEvents();
     this.loadLogSources();
     this.loadOperationTypes();
     this.loadClientAlertRules();
-    this.loadReportTableColorConfig();
+    this.updateClientAlertRuleValidators(this.clientAlertRuleForm.get('ruleType')?.value || 'special_alert');
+
+    this.eventSearchControl.valueChanges
+      .pipe(debounceTime(300), distinctUntilChanged())
+      .subscribe(() => {
+        this.eventPage = 1;
+        this.loadEvents();
+      });
   }
 
-  loadReportTableColorConfig(): void {
-    this.configService.getConfig().subscribe({
-      next: (config) => {
-        this.currentEmailReportConfig = {
-          ...this.currentEmailReportConfig,
-          ...(config.emailReportConfig || {})
-        };
+  private updateClientAlertRuleValidators(ruleType: string): void {
+    const isMaint = ruleType === 'scheduled_maintenance';
 
-        const incidentColor = this.normalizeHexColor(
-          this.currentEmailReportConfig.reportTableColorByDocumentType?.incident
-        );
-        const legacyColor = this.normalizeHexColor(this.currentEmailReportConfig.reportTableColor);
-        const reportColor = incidentColor || legacyColor
-          || CatalogAdminComponent.DEFAULT_REPORT_COLOR;
-        this.selectedCustomReportColor = reportColor;
-        this.customReportColorInput = reportColor;
-        this.reportColorMode = this.resolveReportColorMode(reportColor);
-      },
-      error: () => {
-        this.reportColorMode = 'green';
-        this.selectedCustomReportColor = CatalogAdminComponent.DEFAULT_REPORT_COLOR;
-        this.customReportColorInput = CatalogAdminComponent.DEFAULT_REPORT_COLOR;
-      }
-    });
-  }
+    const alertMessageControl = this.clientAlertRuleForm.get('alertMessage');
+    const maintenanceTitleControl = this.clientAlertRuleForm.get('maintenanceTitle');
 
-  isReportColorTypeSelected(type: 'incident' | 'bulletin'): boolean {
-    return !!this.reportColorSelection[type];
-  }
-
-  onReportColorModeChange(): void {
-    if (this.reportColorMode === 'custom') {
-      return;
-    }
-    this.selectedCustomReportColor = this.getColorForMode(this.reportColorMode);
-  }
-
-  selectCustomReportColor(color: string): void {
-    const normalized = this.normalizeHexColor(color);
-    if (!normalized) return;
-    this.selectedCustomReportColor = normalized;
-    this.customReportColorInput = normalized;
-    this.reportColorMode = 'custom';
-  }
-
-  onCustomColorInputChange(input: string): void {
-    this.customReportColorInput = (input || '').toUpperCase();
-    const normalized = this.normalizeHexColor(input);
-    if (!normalized) return;
-    this.selectedCustomReportColor = normalized;
-    this.reportColorMode = 'custom';
-  }
-
-  getCurrentReportColor(): string {
-    if (this.reportColorMode === 'custom') {
-      return this.normalizeHexColor(this.selectedCustomReportColor) || CatalogAdminComponent.DEFAULT_REPORT_COLOR;
-    }
-    return this.getColorForMode(this.reportColorMode);
-  }
-
-  getColorOptionLabel(mode: 'green' | 'sky' | 'light-red' | 'custom'): string {
-    const labels: Record<'green' | 'sky' | 'light-red' | 'custom', string> = {
-      green: 'Verde',
-      sky: 'Celeste',
-      'light-red': 'Rojo claro',
-      custom: 'Custom'
-    };
-    return labels[mode];
-  }
-
-  isReportColorModeActive(mode: 'green' | 'sky' | 'light-red' | 'custom'): boolean {
-    if (mode === 'custom') {
-      return this.reportColorMode === 'custom';
-    }
-    return this.getCurrentReportColor() === this.getColorForMode(mode);
-  }
-
-  getModeOptionLabel(mode: 'green' | 'sky' | 'light-red' | 'custom'): string {
-    const label = this.getColorOptionLabel(mode);
-    return this.isReportColorModeActive(mode) ? `${label} (actual)` : label;
-  }
-
-  saveReportTableColorConfig(): void {
-    const selectedTypes = CatalogAdminComponent.REPORT_COLOR_TYPES
-      .filter((type) => this.reportColorSelection[type]);
-
-    if (selectedTypes.length === 0) {
-      this.snackBar.open('Selecciona al menos un tipo de documento', 'Cerrar', { duration: 3000 });
-      return;
+    if (isMaint) {
+      alertMessageControl?.setValidators([Validators.maxLength(4000)]);
+      maintenanceTitleControl?.setValidators([Validators.required, Validators.maxLength(200)]);
+    } else {
+      alertMessageControl?.setValidators([Validators.required, Validators.maxLength(4000)]);
+      maintenanceTitleControl?.clearValidators();
     }
 
-    const resolvedColor = this.reportColorMode === 'custom'
-      ? (this.normalizeHexColor(this.selectedCustomReportColor) || CatalogAdminComponent.DEFAULT_REPORT_COLOR)
-      : this.getColorForMode(this.reportColorMode);
-
-    const colorByType = {
-      incident: this.normalizeHexColor(this.currentEmailReportConfig.reportTableColorByDocumentType?.incident)
-        || this.normalizeHexColor(this.currentEmailReportConfig.reportTableColor)
-        || CatalogAdminComponent.DEFAULT_REPORT_COLOR,
-      bulletin: this.normalizeHexColor(this.currentEmailReportConfig.reportTableColorByDocumentType?.bulletin)
-        || this.normalizeHexColor(this.currentEmailReportConfig.reportTableColor)
-        || CatalogAdminComponent.DEFAULT_REPORT_COLOR
-    };
-
-    selectedTypes.forEach((type) => {
-      colorByType[type] = resolvedColor;
-    });
-
-    const emailReportConfig: EmailReportConfig = {
-      ...this.currentEmailReportConfig,
-      // Compatibilidad hacia atrás para módulos que aún usan el campo legacy.
-      reportTableColor: colorByType.incident,
-      reportTableColorByDocumentType: colorByType
-    };
-
-    const selectedTypeLabels: Record<'incident' | 'bulletin', string> = {
-      incident: 'Reporte de Incidente',
-      bulletin: 'Boletín de Seguridad'
-    };
-    const targetsLabel = selectedTypes.map((type) => selectedTypeLabels[type]).join(', ');
-
-    this.isSavingReportColor = true;
-    this.configService.updateConfig({ emailReportConfig }).subscribe({
-      next: () => {
-        this.currentEmailReportConfig = emailReportConfig;
-        this.selectedCustomReportColor = resolvedColor;
-        this.customReportColorInput = resolvedColor;
-        this.snackBar.open(`✅ Color guardado para: ${targetsLabel}`, 'Cerrar', { duration: 3000 });
-        this.isSavingReportColor = false;
-      },
-      error: () => {
-        this.snackBar.open('Error guardando color del reporte', 'Cerrar', { duration: 3000 });
-        this.isSavingReportColor = false;
-      }
-    });
-  }
-
-  private resolveReportColorMode(color: string): 'green' | 'sky' | 'light-red' | 'custom' {
-    const normalized = this.normalizeHexColor(color);
-    if (!normalized) return 'green';
-    if (normalized === this.getColorForMode('green')) return 'green';
-    if (normalized === this.getColorForMode('sky')) return 'sky';
-    if (normalized === this.getColorForMode('light-red')) return 'light-red';
-    return 'custom';
-  }
-
-  private getColorForMode(mode: 'green' | 'sky' | 'light-red' | 'custom'): string {
-    if (mode === 'sky') return '#29B6F6';
-    if (mode === 'light-red') return '#E57373';
-    return CatalogAdminComponent.DEFAULT_REPORT_COLOR;
-  }
-
-  private normalizeHexColor(color: string | undefined | null): string | null {
-    if (!color) return null;
-    const normalized = color.trim().toUpperCase();
-    return /^#([A-F0-9]{6})$/.test(normalized) ? normalized : null;
+    alertMessageControl?.updateValueAndValidity({ emitEvent: false });
+    maintenanceTitleControl?.updateValueAndValidity({ emitEvent: false });
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/routes/checklist.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 // Checklist routes and admin template management
 const express = require('express');
 const router = express.Router();

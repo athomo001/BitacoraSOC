@@ -1,3 +1,9 @@
+/**
+ * File Purpose: frontend/src/app/pages/main/checklist-history/checklist-history.component.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 import { Component, OnInit } from '@angular/core';
 import { ChecklistService } from '../../../services/checklist.service';
 import { AuthService } from '../../../services/auth.service';

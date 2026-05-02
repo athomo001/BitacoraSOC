@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/src/models/User.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Modelo de Usuario
  * 
  * Roles SOC:
@@ -36,8 +42,7 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true,
-    minlength: 6
+    required: true
   },
   fullName: {
     type: String,

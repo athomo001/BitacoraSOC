@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/scripts/csv-to-json-entries.js
+ * Responsibilities: Explain intent, contracts, and expected maintenance boundaries.
+ * QA Notes: Preserve deterministic behavior and document validation assumptions.
+ */
+
+/**
  * Script para convertir CSV de entradas antiguas a JSON para importación
  * 
  * Formato CSV de entrada:

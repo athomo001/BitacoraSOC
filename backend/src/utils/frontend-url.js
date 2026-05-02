@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/utils/frontend-url.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const DEFAULT_FRONTEND_PORT = 4200;
 const DEFAULT_FRONTEND_HTTPS_PORT = 4300;
 

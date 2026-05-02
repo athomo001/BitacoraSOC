@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/src/scripts/seed-escalation-example.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Script de ejemplo para poblar el módulo de Escalaciones
  * con datos de prueba basados en ACME Corp
  * 

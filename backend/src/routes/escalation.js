@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/routes/escalation.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const express = require('express');
 const multer = require('multer');
 const router = express.Router();
@@ -11,6 +17,10 @@ const escalationController = require('../controllers/escalationController');
 const clientAlertController = require('../controllers/clientAlertController');
 
 // Middleware para verificar que el usuario es ADMIN
+/*
+ * QA — `requireAdmin`: excepción explícita para `auditor` solo en métodos seguros (lectura).
+ * Verificar que ningún endpoint admin mutable quede expuesto vía método que no sea GET/HEAD/OPTIONS.
+ */
 const requireAdmin = (req, res, next) => {
   const isAuditorReadOnly = req.user.role === 'auditor' && ['GET', 'HEAD', 'OPTIONS'].includes(req.method);
   if (req.user.role !== 'admin' && !isAuditorReadOnly) {
@@ -152,6 +162,8 @@ router.delete('/admin/cycles/:id', authenticate, requireAdmin, escalationControl
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 router.get('/admin/assignments', authenticate, requireAdmin, escalationController.getAssignments);
+router.get('/admin/assignments/template-csv', authenticate, requireAdmin, escalationController.downloadAssignmentTemplateCsv);
+router.post('/admin/assignments/import-csv', authenticate, requireAdmin, csvUpload.single('file'), escalationController.importAssignmentsCsv);
 router.post('/admin/assignments', authenticate, requireAdmin, escalationController.createAssignment);
 router.put('/admin/assignments/:id', authenticate, requireAdmin, escalationController.updateAssignment);
 router.delete('/admin/assignments/:id', authenticate, requireAdmin, escalationController.deleteAssignment);

@@ -58,9 +58,14 @@
 }
 
 .cancel-edit-btn {
-  background-color: var(--surface-variant) !important;
-  color: var(--text-primary) !important;
-  border: 1px solid var(--outline-subtle) !important;
+  background-color: var(--state-error) !important;
+  color: #ffffff !important;
+  border: 1px solid color-mix(in srgb, var(--state-error) 82%, #000000 18%) !important;
+
+  &:hover,
+  &:focus-visible {
+    background-color: color-mix(in srgb, var(--state-error) 88%, #000000 12%) !important;
+  }
 }
 
 .role-badge {

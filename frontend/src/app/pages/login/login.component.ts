@@ -1,4 +1,10 @@
 /**
+ * File Purpose: frontend/src/app/pages/login/login.component.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Componente de Login - Dual Theme (CRT Retro + Infoflow Matrix)
  *
  * Temas disponibles:
@@ -133,7 +139,7 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.loginForm = this.fb.group({
       username: ['', [Validators.required, Validators.minLength(3)]],
-      password: ['', [Validators.required, Validators.minLength(4)]]
+      password: ['', [Validators.required]]
     });
 
     this.recoveryForm = this.fb.group({

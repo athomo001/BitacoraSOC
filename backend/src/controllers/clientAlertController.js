@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/controllers/clientAlertController.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const mongoose = require('mongoose');
 const ClientEscalationRule = require('../models/ClientEscalationRule');
 const CatalogLogSource = require('../models/CatalogLogSource');
@@ -27,6 +33,14 @@ const WEEKDAY_MAP = {
   Fri: 5,
   Sat: 6
 };
+
+/*
+ * QA — alertas por cliente (escalamiento):
+ * - `evaluateClientAlert`: resuelve cliente por `clientId` o `clientName` (nombre duplicado → 400; no adivinar).
+ * - Ventanas horarias: `Intl` + zona por regla; probar cambio DST y medianoche (`isTimeInRange` cruza día).
+ * - Precedencia: maintenance bloqueante → maintenance informativo → resto (comentario ESC-MAINT-042 en handler).
+ * - `acknowledgeClientAlert`: deduplica por usuario + occurrenceKey + contexto; sin usuario no persiste readBy.
+ */
 
 const ENABLED_LOG_SOURCE_MATCH = {
   $or: [

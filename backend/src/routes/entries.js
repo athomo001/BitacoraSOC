@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/routes/entries.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
@@ -94,6 +100,15 @@ const extractHashtags = (text) => {
 
   return [...new Set(tags)].slice(0, 100); // Max 100 tags únicos
 };
+
+/*
+ * QA — POST /api/entries (matriz rápida):
+ * - Auth: usuario autenticado; `notGuest` impide creación como invitado.
+ * - Validación: tipo operativa|incidente|ofensa; fecha ISO; hora HH:mm; clientId opcional MongoId.
+ * - Negocio: fecha no > mañana; hashtags desde contenido (límites anti-ReDoS arriba).
+ * - Cliente: sin clientId → LogSource por defecto desde AppConfig si existe y está habilitado.
+ * - Auditoría: revisar eventos posteriores al save en handler (no duplicar expectativas aquí).
+ */
 
 // POST /api/entries - Crear entrada
 router.post('/',

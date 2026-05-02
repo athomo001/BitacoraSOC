@@ -1,4 +1,17 @@
+/**
+ * File Purpose: backend/src/middleware/input-sanitizer.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const { logger } = require('../utils/logger');
+
+/*
+ * QA — mitigación de operadores peligrosos en payloads (NoSQL / MongoDB):
+ * Se eliminan claves que empiezan por `$` o contienen `.` en body/query/params recursivamente.
+ * Comportamiento esperado: cualquier coincidencia → 400 (fallo cerrado), no solo “strip silencioso”.
+ * Probar: enviar `{"$gt": ""}` anidado y verificar 400 + log `request.blocked.suspicious_input`.
+ */
 
 const isPlainObject = (value) => (
   value !== null &&

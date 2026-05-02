@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/scripts/restart-clean.js
+ * Responsibilities: Explain intent, contracts, and expected maintenance boundaries.
+ * QA Notes: Preserve deterministic behavior and document validation assumptions.
+ */
+
 const { execSync } = require('child_process');
 
 const ports = [3000, 3443, 5000];

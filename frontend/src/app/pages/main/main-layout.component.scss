@@ -47,18 +47,25 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    /* Cabecera del drawer: deja aire para un logo horizontal sin recortarlo */
+    min-height: 72px;
+    padding-top: 10px;
+    padding-bottom: 10px;
 
     .sidebar-logo {
-      height: 32px;
+      /* object-fit: contain mantiene proporción (sin estirar); el ancho sigue el asset */
+      height: auto;
       width: auto;
-      max-width: 100px;
+      max-height: 52px;
+      max-width: min(232px, calc(100% - 8px));
       object-fit: contain;
+      object-position: left center;
     }
 
     .sidebar-icon {
-      font-size: 32px;
-      width: 32px;
-      height: 32px;
+      font-size: 48px;
+      width: 48px;
+      height: 48px;
     }
 
     .sidebar-logo,

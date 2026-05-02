@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/src/middleware/rate-limiter.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Rate Limiters de Seguridad
  * 
  * Funcionalidad:
@@ -20,6 +26,9 @@
  *
  * Store dedicado en memoria para `apiLimiter` (MemoryStore) permite
  * `resetAll` / `resetKey` sin reiniciar el proceso (vía POST /api/system/rate-limit-reset + secreto).
+ *
+ * QA adicional: contadores en memoria no se comparten entre réplicas; bajo varias instancias,
+ * el límite “efectivo” se multiplica. Validar arquitectura de despliegue antes de asumir 100% cobertura anti-abuso.
  */
 const rateLimit = require('express-rate-limit');
 const { MemoryStore } = rateLimit;

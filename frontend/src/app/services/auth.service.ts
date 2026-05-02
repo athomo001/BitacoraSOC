@@ -1,4 +1,10 @@
 /**
+ * File Purpose: frontend/src/app/services/auth.service.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Servicio de Autenticación
  * 
  * Funcionalidad:
@@ -20,6 +26,10 @@
  *   - admin: Acceso total
  *   - user: Analista SOC (sin admin functions)
  *   - guest: Solo lectura (no puede crear entradas ni checks)
+ *
+ * QA: `initializeSession()` consulta `/users/me` y es la fuente de verdad al refrescar;
+ * si devuelve error, se limpia `bitacora_user`. Contrastar con guards en `auth.guard.ts` (revisar que la
+ * protección de navegación esté alineada con backend, no solo con comentarios de documentación).
  */
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';

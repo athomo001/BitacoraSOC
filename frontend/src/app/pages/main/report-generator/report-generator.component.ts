@@ -1,3 +1,9 @@
+/**
+ * File Purpose: frontend/src/app/pages/main/report-generator/report-generator.component.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 import { Component, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
@@ -28,6 +34,14 @@ import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
 import { ClientAlertDialogComponent } from './client-alert-dialog.component';
 import { environment } from '@env/environment';
+
+/*
+ * QA — generador de informes / newsletter:
+ * - Dos modos (`report` | `newsletter`): validar toggles, catálogos y payload enviado al backend por modo.
+ * - HTML en vista previa: pasa por DomSanitizer donde aplique; probar XSS en campos libres y referencias URL.
+ * - Client alert: flujo con EscalationService + diálogo; comprobar contexto `report` vs `copy-report` y ACK.
+ * - Regresión visual: animaciones (anime.js) no deben bloquear submit; probar con CPU throttling.
+ */
 
 @Component({
   selector: 'app-report-generator',
@@ -724,7 +738,12 @@ export class ReportGeneratorComponent implements OnInit {
     this.http.post(`${this.backendBaseUrl}/api/reports/newsletter/send`, {
       recipients: recipientSummary.validRecipients,
       subject,
-      html: this.generatedHtml
+      html: this.generatedHtml,
+      analytics: {
+        criticality: this.newsletterForm.value.criticidad,
+        title: this.newsletterForm.value.tituloBoletin,
+        vendor: this.newsletterForm.value.marcaFabricante
+      }
     }).subscribe({
       next: (res: any) => {
         this.isSendingNewsletter = false;
@@ -1147,124 +1166,49 @@ export class ReportGeneratorComponent implements OnInit {
     if (!canContinue) return;
 
     const form = this.reportForm.value;
-    this.reportTableHeaderColor = this.reportTableColorsByType.incident;
-    const headerColor = this.reportTableHeaderColor;
-    const labelColor = this.getSecondaryColor(headerColor);
-    const reportWidthPx = 980;
-    const evidenceImageWidthPx = 420;
-    const firstColPx = 185;
-    const secondColPx = reportWidthPx - firstColPx;
-
-    const cellLabel = `background-color: ${labelColor}; font-weight: bold; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; width: ${firstColPx}px;`;
-    const cellDetail = `border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; width: ${secondColPx}px;`;
-
-    const e = (v: unknown) => this.escapeHtml(v);
-
-    const autor = this.authService.getCurrentUser()?.fullName || 'Analista SOC';
-
-    let html = `<table cellpadding="0" cellspacing="0" width="${reportWidthPx}" border="0" style="border-collapse: collapse; width: ${reportWidthPx}px; max-width: 100%; font-family: Arial, Helvetica, sans-serif; border: 1px solid #dddddd; background-color: #ffffff; margin: 0 auto; mso-table-lspace: 0pt; mso-table-rspace: 0pt;">
-  <tr>
-    <td style="padding: 20px; background-color: ${headerColor}; border-bottom: 3px solid #2b2b2b;">
-      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
-        <tr>
-          <td width="120" valign="middle" align="left" style="padding: 0;">
-            ${this.logoBase64 ? `<img src="${this.logoBase64}" height="48" width="auto" style="height: 48px; width: auto; border: 0;" alt="Logo" border="0">` : ''}
-          </td>
-          <td valign="middle" align="center" style="padding: 0;">
-            <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
-              <tr>
-                <td style="padding: 0; margin: 0; font-size: 24px; font-weight: bold; color: #ffffff; font-family: Arial, Helvetica, sans-serif; text-align: center;">
-                  Reporte de Detección
-                </td>
-              </tr>
-            </table>
-          </td>
-          <td width="120" style="padding: 0;"></td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-  <tr>
-    <td style="padding: 30px 30px 20px 30px; background-color: #ffffff;">
-      <table cellpadding="6" cellspacing="0" width="100%" style="border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; border: 1px solid #2b2b2b; table-layout: fixed; margin: 0; mso-table-lspace: 0pt; mso-table-rspace: 0pt; clear: both;">
-        <colgroup>
-          <col width="${firstColPx}" style="width: ${firstColPx}px;">
-          <col width="${secondColPx - 60}" style="width: ${secondColPx - 60}px;">
-        </colgroup>
-        <tr>
-          <th width="${firstColPx}" style="background-color: ${labelColor}; color: white; width: ${firstColPx}px; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere;">Campo</th>
-          <th width="${secondColPx - 60}" style="background-color: ${labelColor}; color: white; border: 1px solid #2b2b2b; word-break: break-word; overflow-wrap: anywhere;">Detalle</th>
-        </tr>
-  <tr><td style="${cellLabel}">Código Ticket</td><td style="${cellDetail}">${e(form.codigoTicket)}</td></tr>
-  <tr><td style="${cellLabel}">Ofensa</td><td style="${cellDetail}">${e(form.ofensa)}</td></tr>
-  <tr><td style="${cellLabel}">Tipo de operación</td><td style="${cellDetail}">${e(form.tipoOperacion)}</td></tr>
-  <tr><td style="${cellLabel}">Nombre de Ofensa/Evento</td><td style="${cellDetail}">${e(form.nombreEvento)}</td></tr>`;
-  
-    if (form.motivoEvento) {
-      html += `\n  <tr><td style="${cellLabel}">Motivo de la Ofensa/Evento</td><td style="${cellDetail}">${this.formatMultilineText(form.motivoEvento)}</td></tr>`;
-    }
     
-    if (form.criticidad) {
-      html += `\n  <tr><td style="${cellLabel}">MRSC (Criticidad)</td><td style="${cellDetail}">${e(form.criticidad)}</td></tr>`;
-    }
+    const payload = {
+      reportData: {
+        codigoTicket: form.codigoTicket,
+        ofensa: form.ofensa,
+        tipoOperacion: form.tipoOperacion,
+        nombreEvento: form.nombreEvento,
+        motivoEvento: form.motivoEvento,
+        fecha: form.fecha,
+        criticidad: form.criticidad,
+        origenConexion: form.origenConexion,
+        destino: form.destino,
+        logSource: form.logSource,
+        reputacionOrigen: form.reputacionOrigen,
+        observaciones: form.observaciones,
+        evidenciaTexto: form.evidenciaTexto,
+        recomendacion: form.recomendacion,
+        informacionAdicional: form.informacionAdicional
+      },
+      images: this.uploadedImages.map(img => ({
+        name: img.name,
+        contentBase64: img.dataUrl.split(',')[1],
+        contentType: img.dataUrl.startsWith('data:image/png') ? 'image/png' : 'image/jpeg',
+        width: img.width,
+        height: img.height
+      }))
+    };
 
-    html += `
-  <tr><td style="${cellLabel}">Origen de conexión</td><td style="${cellDetail}">${e(form.origenConexion || '-')}</td></tr>
-  <tr><td style="${cellLabel}">Destino</td><td style="${cellDetail}">${e(form.destino || '-')}</td></tr>`;
-
-    if (form.logSource) {
-      html += `\n  <tr><td style="${cellLabel}">Fuente / Log Source</td><td style="${cellDetail}">${e(form.logSource)}</td></tr>`;
-    }
-
-    html += `
-  <tr><td style="${cellLabel}">Reputación de origen</td><td style="${cellDetail}">${e(form.reputacionOrigen || '-')}</td></tr>
-  <tr><td style="${cellLabel}">Observaciones</td><td style="white-space: pre-wrap; ${cellDetail}">${this.formatMultilineText(form.observaciones)}</td></tr>
-  <tr><td style="${cellLabel}">Recomendación</td><td style="white-space: pre-wrap; ${cellDetail}">${this.formatMultilineText(form.recomendacion || '-')}</td></tr>`;
-
-    const hasImages = this.uploadedImages.length > 0;
-    const hasTextEvidence = (form.evidenciaTexto || '').trim().length > 0;
-
-    if (hasImages || hasTextEvidence) {
-      html += `\n  <tr>\n    <td style="${cellLabel}">Evidencia</td>\n    <td style="${cellDetail}">`;
-      if (hasTextEvidence) {
-        html += `<div style="white-space: pre-wrap; margin-bottom: ${hasImages ? '10px' : '0'};">${this.formatMultilineText(form.evidenciaTexto)}</div>`;
-      }
-      if (hasImages) {
-        this.uploadedImages.forEach(img => {
-          const renderWidth = img.width > 0 ? Math.min(evidenceImageWidthPx, img.width) : evidenceImageWidthPx;
-          const renderHeight = img.width > 0 && img.height > 0
-            ? Math.max(1, Math.round((img.height * renderWidth) / img.width))
-            : 0;
-          const heightAttr = renderHeight > 0 ? ` height="${renderHeight}"` : '';
-          // Sin <a href="data:...">, Gmail lo muestra como texto plano. Solo img con tabla para centrar.
-          html += `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 6px 0;"><tr><td align="center"><img src="${img.dataUrl}" width="${renderWidth}"${heightAttr} style="width: ${renderWidth}px; max-width: 100%; height: auto; display: block; border: 1px solid #ddd;" alt="${e(img.name || 'Evidencia')}" border="0"></td></tr></table>`;
-        });
-      }
-      html += `</td>\n  </tr>`;
-    } else {
-      html += `\n  <tr><td style="${cellLabel}">Evidencia</td><td style="${cellDetail}">Se adjunta en el correo</td></tr>`;
-    }
-
-    html += `\n  <tr><td style="${cellLabel}">Información adicional</td><td style="white-space: pre-wrap; ${cellDetail}">${this.formatMultilineText(form.informacionAdicional || '-')}</td></tr>`;
-
-    html += `
-      </table>
-    </td>
-  </tr>
-  <tr>
-    <td style="padding: 15px; text-align: center; background-color: #f1f1f1; color: #111111; font-size: 12px; font-family: Arial, Helvetica, sans-serif; border-top: 1px solid #dddddd;">
-      Generado por <strong style="font-weight: bold;">${autor}</strong>
-    </td>
-  </tr>
-</table>`;
-
-    this.generatedHtml = html;
-    this.safeGeneratedHtml = this.sanitizer.bypassSecurityTrustHtml(html);
-    this.showPreview = true;
-    
     // Auto-generar asunto para el reporte de incidente
     const clienteStr = form.logSource || 'Cliente';
     this.incidentSubject = `${clienteStr} - ${form.nombreEvento} - ${form.codigoTicket}`;
+
+    this.http.post<{html: string}>(`${this.backendBaseUrl}/api/reports/incident/preview`, payload).subscribe({
+      next: (res) => {
+        this.generatedHtml = res.html || '';
+        this.safeGeneratedHtml = this.sanitizer.bypassSecurityTrustHtml(this.generatedHtml);
+        this.showPreview = true;
+      },
+      error: (err) => {
+        console.error('Error al generar preview de reporte', err);
+        this.snackBar.open('Error al generar preview del reporte', 'Cerrar', { duration: 3000 });
+      }
+    });
   }
 
   // ─── Incident email dispatch ──────────────────────────────────────────────
@@ -1370,19 +1314,44 @@ export class ReportGeneratorComponent implements OnInit {
       return;
     }
 
+    const logSourceValue = String(this.reportForm.get('logSource')?.value || '').trim();
+    if (!logSourceValue) {
+      this.snackBar.open('Debes seleccionar Cliente / Log Source para asociar el reporte', 'Cerrar', { duration: 3500 });
+      return;
+    }
+
     const canContinue = await this.ensureClientAlertAcknowledged('report');
     if (!canContinue) return;
 
+    const form = this.reportForm.value;
     this.isSendingIncident = true;
     const payload = {
       to: this.incidentRecipientsTo.split(/[\n,;]+/).map(e => e.trim()).filter(e => e),
       cc: this.incidentRecipientsCc.split(/[\n,;]+/).map(e => e.trim()).filter(e => e),
       subject: this.incidentSubject,
-      html: this.generatedHtml,
-      inlineAttachments: this.uploadedImages.map(img => ({
-        filename: img.name,
+      reportData: {
+        codigoTicket: form.codigoTicket,
+        ofensa: form.ofensa,
+        tipoOperacion: form.tipoOperacion,
+        nombreEvento: form.nombreEvento,
+        motivoEvento: form.motivoEvento,
+        fecha: form.fecha,
+        criticidad: form.criticidad,
+        origenConexion: form.origenConexion,
+        destino: form.destino,
+        logSource: logSourceValue,
+        reputacionOrigen: form.reputacionOrigen,
+        observaciones: form.observaciones,
+        evidenciaTexto: form.evidenciaTexto,
+        recomendacion: form.recomendacion,
+        informacionAdicional: form.informacionAdicional
+      },
+      images: this.uploadedImages.map(img => ({
+        name: img.name,
+        contentBase64: img.dataUrl.split(',')[1],
         contentType: img.dataUrl.startsWith('data:image/png') ? 'image/png' : 'image/jpeg',
-        contentBase64: img.dataUrl.split(',')[1]
+        width: img.width,
+        height: img.height
       }))
     };
 

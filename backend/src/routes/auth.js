@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/src/routes/auth.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Rutas de Autenticación
  * 
  * Endpoints:
@@ -32,6 +38,14 @@ const { buildFrontendResetUrl } = require('../utils/frontend-url');
 const { logger } = require('../utils/logger');
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/*
+ * QA — rutas /api/auth:
+ * - Login: mismo mensaje genérico ante usuario inexistente / password incorrecta (reduce enumeración).
+ * - Easter egg: solo en fallo de credenciales; no filtra existencia de usuario.
+ * - Cookies: opciones dependen de entorno y localhost (SameSite); probar redirect tras login.
+ * - Refresh: guests pueden renovar JWT; documentado riesgo en comentario TODO del endpoint.
+ */
 
 const getTokenFromCookie = (req) => {
   const cookieHeader = req.headers.cookie;

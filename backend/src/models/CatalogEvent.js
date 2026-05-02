@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/src/models/CatalogEvent.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Modelo de Catálogo de Eventos
  * 
  * Catálogo centralizado de eventos SOC (1900+ registros y creciendo).

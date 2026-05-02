@@ -1,11 +1,17 @@
+/**
+ * File Purpose: frontend/src/app/pages/main/settings/settings.component.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ConfigService } from '../../../services/config.service';
 import { SmtpService } from '../../../services/smtp.service';
 import { AuthService } from '../../../services/auth.service';
 import { OnboardingService } from '../../../services/onboarding.service';
-import { UpdateConfigRequest } from '../../../models/config.model';
+import { UpdateConfigRequest, EmailReportConfig } from '../../../models/config.model';
 import { SmtpConfigRequest, SmtpConfig } from '../../../models/smtp.model';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { MatFormField, MatLabel, MatHint } from '@angular/material/form-field';
@@ -14,6 +20,7 @@ import { MatButton } from '@angular/material/button';
 import { NgClass, NgFor, NgIf } from '@angular/common';
 import { MatSelect, MatOption } from '@angular/material/select';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
+import { MatIcon } from '@angular/material/icon';
 
 @Component({
   selector: 'app-settings',
@@ -21,6 +28,7 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
   styleUrls: ['./settings.component.scss'],
   imports: [
     ReactiveFormsModule,
+    FormsModule,
     MatCheckbox,
     MatFormField,
     MatLabel,
@@ -33,9 +41,76 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
     MatOption,
     NgIf,
     MatProgressSpinner,
+    MatIcon,
   ]
 })
 export class SettingsComponent implements OnInit {
+  private readonly smtpProviderPresets: Record<string, {
+    host: string;
+    port: number;
+    useTLS: boolean;
+    authMethod: 'credentials';
+    usernamePlaceholder: string;
+    senderHint: string;
+  }> = {
+    office365: {
+      host: 'smtp.office365.com',
+      port: 587,
+      useTLS: true,
+      authMethod: 'credentials',
+      usernamePlaceholder: 'usuario@empresa.com',
+      senderHint: 'Usa la casilla corporativa completa de Microsoft 365.'
+    },
+    'google-mail': {
+      host: 'smtp.gmail.com',
+      port: 587,
+      useTLS: true,
+      authMethod: 'credentials',
+      usernamePlaceholder: 'usuario@gmail.com',
+      senderHint: 'Requiere contraseña de aplicación si usas 2FA.'
+    },
+    'google-workspace': {
+      host: 'smtp.gmail.com',
+      port: 587,
+      useTLS: true,
+      authMethod: 'credentials',
+      usernamePlaceholder: 'usuario@dominio.com',
+      senderHint: 'Usa la cuenta Workspace o relay autorizado del dominio.'
+    },
+    'aws-ses': {
+      host: 'email-smtp.us-east-1.amazonaws.com',
+      port: 587,
+      useTLS: true,
+      authMethod: 'credentials',
+      usernamePlaceholder: 'SMTP username de SES',
+      senderHint: 'Ajusta la región SES si tu cuenta no usa us-east-1.'
+    },
+    mailgun: {
+      host: 'smtp.mailgun.org',
+      port: 587,
+      useTLS: true,
+      authMethod: 'credentials',
+      usernamePlaceholder: 'postmaster@tu-dominio.mailgun.org',
+      senderHint: 'La cuenta postmaster y clave SMTP vienen desde Mailgun.'
+    },
+    'elastic-email': {
+      host: 'smtp.elasticemail.com',
+      port: 2525,
+      useTLS: true,
+      authMethod: 'credentials',
+      usernamePlaceholder: 'correo o usuario SMTP',
+      senderHint: 'Elastic Email suele operar bien en 2525 o 587.'
+    },
+    custom: {
+      host: '',
+      port: 587,
+      useTLS: true,
+      authMethod: 'credentials',
+      usernamePlaceholder: 'usuario@servidor.local',
+      senderHint: 'Configura host, puerto y seguridad según tu relay.'
+    }
+  };
+
   @ViewChild('smtpGuideCard') smtpGuideCard?: ElementRef<HTMLElement>;
   appConfigForm: FormGroup;
   smtpForm: FormGroup;
@@ -47,6 +122,85 @@ export class SettingsComponent implements OnInit {
   smtpLastError: { code: string; probableCause: string; suggestedAction: string; rawMessage?: string } | null = null;
   smtpGuideVisible = false;
   smtpRetryCount = 0;
+  showSmtpPassword = false;
+
+  // ─── Paletas predefinidas para el correo de incidentes ──────────────────────
+  readonly INCIDENT_PALETTES = [
+    {
+      key: 'cdc-verde',
+      name: 'CDC Verde',
+      description: 'Verde oscuro institucional',
+      swatches: ['#173831', '#155F50', '#F8FAE1', '#9BCB93', '#C3382B'],
+    },
+    {
+      key: 'noche-azul',
+      name: 'Noche Azul',
+      description: 'Azul naval oscuro y profesional',
+      swatches: ['#0D1B2A', '#1B3A5C', '#EFF4FB', '#7EB2E0', '#C3382B'],
+    },
+    {
+      key: 'slate-pro',
+      name: 'Slate Pro',
+      description: 'Gris azulado corporativo',
+      swatches: ['#1C2333', '#2E3D56', '#F5F6FA', '#8DA5C4', '#C3382B'],
+    },
+    {
+      key: 'carbon',
+      name: 'Carbon',
+      description: 'Carbón oscuro minimalista',
+      swatches: ['#1A1A1A', '#2D2D2D', '#F7F7F7', '#AAAAAA', '#C3382B'],
+    },
+    {
+      key: 'indigo',
+      name: 'Índigo',
+      description: 'Púrpura profundo y elegante',
+      swatches: ['#1A1240', '#2D2080', '#F4F3FF', '#9B93E0', '#C3382B'],
+    },
+    {
+      key: 'bosque',
+      name: 'Bosque',
+      description: 'Verde naturaleza suave',
+      swatches: ['#1B2A1E', '#2D4A33', '#F2F8F3', '#7DBD85', '#C3382B'],
+    },
+  ];
+
+  selectedPaletteKey = 'cdc-verde';
+  isSavingPalette = false;
+
+  readonly criticidadColors = [
+    { label: 'Crítica',     color: '#C0392B' },
+    { label: 'Alta',        color: '#E85D04' },
+    { label: 'Media',       color: '#E67E22' },
+    { label: 'Baja',        color: '#27AE60' },
+    { label: 'Informativa', color: '#2980B9' },
+  ];
+
+  // ─── Colores configurables (boletín / incidente) ──────────────────────────────
+  private static readonly DEFAULT_REPORT_COLOR = '#4CAF50';
+
+  reportColorSelection: Record<'incident' | 'bulletin', boolean> = { incident: false, bulletin: true };
+  reportColorMode: 'green' | 'sky' | 'light-red' | 'custom' = 'green';
+  selectedCustomReportColor = SettingsComponent.DEFAULT_REPORT_COLOR;
+  customReportColorInput   = SettingsComponent.DEFAULT_REPORT_COLOR;
+  isSavingReportColor = false;
+  readonly customColorPalette: string[] = [
+    '#4CAF50', '#2E7D32', '#8BC34A', '#2196F3', '#29B6F6', '#03A9F4',
+    '#26A69A', '#009688', '#00BCD4', '#FF9800', '#FFC107', '#FFEB3B',
+    '#F06292', '#E57373', '#EF5350', '#BA68C8', '#9C27B0', '#7E57C2',
+    '#607D8B', '#78909C', '#795548', '#9E9E9E', '#546E7A', '#3F51B5'
+  ];
+  private currentEmailReportConfig: EmailReportConfig = {
+    enabled: false,
+    recipients: [],
+    includeChecklist: true,
+    includeEntries: true,
+    subjectTemplate: 'Reporte SOC [fecha] [turno]',
+    reportTableColor: SettingsComponent.DEFAULT_REPORT_COLOR,
+    reportTableColorByDocumentType: {
+      incident: SettingsComponent.DEFAULT_REPORT_COLOR,
+      bulletin: SettingsComponent.DEFAULT_REPORT_COLOR
+    }
+  };
 
   providers = [
     { value: 'office365', label: 'Office 365' },
@@ -84,6 +238,10 @@ export class SettingsComponent implements OnInit {
       isActive: [true]
     });
 
+    this.smtpForm.get('provider')?.valueChanges.subscribe((provider) => {
+      this.applyProviderPreset(provider);
+    });
+
     this.smtpForm.valueChanges.subscribe(() => {
       this.smtpTestPassed = false;
       this.smtpRetryCount = 0;
@@ -93,6 +251,7 @@ export class SettingsComponent implements OnInit {
   ngOnInit(): void {
     this.loadConfig();
     this.loadSmtpConfig();
+    this.loadReportTableColorConfig();
     const username = this.authService.getCurrentUser()?.username;
     this.smtpGuideVisible = this.onboardingService.shouldShow('admin-smtp', username);
   }
@@ -153,8 +312,39 @@ export class SettingsComponent implements OnInit {
       isActive: config.isActive ?? true
     });
 
+    this.applyProviderPreset(config.provider || 'custom', true);
+
     this.smtpTestPassed = !!config.lastTestSuccess;
     this.connectionStatus = config.lastTestSuccess ? 'conectado' : 'desconectado';
+  }
+
+  get selectedProviderPreset() {
+    const provider = this.smtpForm.get('provider')?.value || 'custom';
+    return this.smtpProviderPresets[provider] || this.smtpProviderPresets['custom'];
+  }
+
+  get smtpPasswordInputType(): 'password' | 'text' {
+    return this.showSmtpPassword ? 'text' : 'password';
+  }
+
+  get smtpPasswordPlaceholder(): string {
+    const hasTypedValue = !!String(this.smtpForm.get('password')?.value || '').trim();
+    return this.hasStoredSmtpConfig && !hasTypedValue ? '********' : '';
+  }
+
+  toggleSmtpPasswordVisibility(): void {
+    this.showSmtpPassword = !this.showSmtpPassword;
+  }
+
+  private applyProviderPreset(provider: string, keepExistingHost = false): void {
+    const preset = this.smtpProviderPresets[provider] || this.smtpProviderPresets['custom'];
+    const currentHost = String(this.smtpForm.get('host')?.value || '').trim();
+
+    this.smtpForm.patchValue({
+      host: keepExistingHost && currentHost ? currentHost : preset.host,
+      port: preset.port,
+      useTLS: preset.useTLS
+    }, { emitEvent: false });
   }
 
   saveAppConfig(): void {
@@ -363,5 +553,159 @@ export class SettingsComponent implements OnInit {
     }
 
     return payload;
+  }
+
+  // ─── Métodos de paleta de colores de email ────────────────────────────────────
+
+  loadReportTableColorConfig(): void {
+    this.configService.getConfig().subscribe({
+      next: (config) => {
+        this.currentEmailReportConfig = {
+          ...this.currentEmailReportConfig,
+          ...(config.emailReportConfig || {})
+        };
+        // Cargar paleta seleccionada del correo de incidentes
+        if (config.incidentEmailPaletteKey) {
+          this.selectedPaletteKey = config.incidentEmailPaletteKey;
+        }
+        const incidentColor = this.normalizeHexColor(
+          this.currentEmailReportConfig.reportTableColorByDocumentType?.incident
+        );
+        const legacyColor = this.normalizeHexColor(this.currentEmailReportConfig.reportTableColor);
+        const reportColor = incidentColor || legacyColor || SettingsComponent.DEFAULT_REPORT_COLOR;
+        this.selectedCustomReportColor = reportColor;
+        this.customReportColorInput    = reportColor;
+        this.reportColorMode = this.resolveReportColorMode(reportColor);
+      },
+      error: () => {
+        this.reportColorMode = 'green';
+        this.selectedCustomReportColor = SettingsComponent.DEFAULT_REPORT_COLOR;
+        this.customReportColorInput    = SettingsComponent.DEFAULT_REPORT_COLOR;
+      }
+    });
+  }
+
+  selectIncidentPalette(key: string): void {
+    this.selectedPaletteKey = key;
+  }
+
+  saveIncidentPalette(): void {
+    this.isSavingPalette = true;
+    this.configService.updateConfig({ incidentEmailPaletteKey: this.selectedPaletteKey }).subscribe({
+      next: () => {
+        this.isSavingPalette = false;
+        this.snackBar.open('Paleta guardada correctamente', 'OK', { duration: 3000 });
+      },
+      error: (err) => {
+        this.isSavingPalette = false;
+        this.snackBar.open('Error al guardar la paleta', 'OK', { duration: 4000 });
+        console.error('[settings] Error guardando paleta:', err);
+      }
+    });
+  }
+
+  onReportColorModeChange(): void {
+    if (this.reportColorMode !== 'custom') {
+      this.selectedCustomReportColor = this.getColorForMode(this.reportColorMode);
+    }
+  }
+
+  selectCustomReportColor(color: string): void {
+    const normalized = this.normalizeHexColor(color);
+    if (!normalized) return;
+    this.selectedCustomReportColor = normalized;
+    this.customReportColorInput    = normalized;
+    this.reportColorMode = 'custom';
+  }
+
+  onCustomColorInputChange(input: string): void {
+    this.customReportColorInput = (input || '').toUpperCase();
+    const normalized = this.normalizeHexColor(input);
+    if (!normalized) return;
+    this.selectedCustomReportColor = normalized;
+    this.reportColorMode = 'custom';
+  }
+
+  getCurrentReportColor(): string {
+    if (this.reportColorMode === 'custom') {
+      return this.normalizeHexColor(this.selectedCustomReportColor) || SettingsComponent.DEFAULT_REPORT_COLOR;
+    }
+    return this.getColorForMode(this.reportColorMode);
+  }
+
+  getModeOptionLabel(mode: 'green' | 'sky' | 'light-red' | 'custom'): string {
+    const labels: Record<string, string> = { green: 'Verde', sky: 'Celeste', 'light-red': 'Rojo claro', custom: 'Custom' };
+    const active = this.isReportColorModeActive(mode) ? ' (actual)' : '';
+    return (labels[mode] ?? mode) + active;
+  }
+
+  isReportColorModeActive(mode: 'green' | 'sky' | 'light-red' | 'custom'): boolean {
+    if (mode === 'custom') return this.reportColorMode === 'custom';
+    return this.getCurrentReportColor() === this.getColorForMode(mode);
+  }
+
+  saveReportTableColorConfig(): void {
+    const selectedTypes = (['incident', 'bulletin'] as const).filter(t => this.reportColorSelection[t]);
+    if (selectedTypes.length === 0) {
+      this.snackBar.open('Selecciona al menos un tipo de documento', 'Cerrar', { duration: 3000 });
+      return;
+    }
+
+    const resolvedColor = this.reportColorMode === 'custom'
+      ? (this.normalizeHexColor(this.selectedCustomReportColor) || SettingsComponent.DEFAULT_REPORT_COLOR)
+      : this.getColorForMode(this.reportColorMode);
+
+    const colorByType = {
+      incident: this.normalizeHexColor(this.currentEmailReportConfig.reportTableColorByDocumentType?.incident)
+        || SettingsComponent.DEFAULT_REPORT_COLOR,
+      bulletin: this.normalizeHexColor(this.currentEmailReportConfig.reportTableColorByDocumentType?.bulletin)
+        || SettingsComponent.DEFAULT_REPORT_COLOR
+    };
+    selectedTypes.forEach(t => { colorByType[t] = resolvedColor; });
+
+    const emailReportConfig: EmailReportConfig = {
+      ...this.currentEmailReportConfig,
+      reportTableColor: colorByType.incident,
+      reportTableColorByDocumentType: colorByType
+    };
+
+    const labels: Record<string, string> = { incident: 'Reporte de Incidente', bulletin: 'Boletín de Seguridad' };
+    const targetsLabel = selectedTypes.map(t => labels[t]).join(', ');
+
+    this.isSavingReportColor = true;
+    this.configService.updateConfig({ emailReportConfig }).subscribe({
+      next: () => {
+        this.currentEmailReportConfig = emailReportConfig;
+        this.selectedCustomReportColor = resolvedColor;
+        this.customReportColorInput    = resolvedColor;
+        this.snackBar.open(`✅ Color guardado para: ${targetsLabel}`, 'Cerrar', { duration: 3000 });
+        this.isSavingReportColor = false;
+      },
+      error: () => {
+        this.snackBar.open('Error guardando color', 'Cerrar', { duration: 3000 });
+        this.isSavingReportColor = false;
+      }
+    });
+  }
+
+  private resolveReportColorMode(color: string): 'green' | 'sky' | 'light-red' | 'custom' {
+    const n = this.normalizeHexColor(color);
+    if (!n) return 'green';
+    if (n === this.getColorForMode('green'))     return 'green';
+    if (n === this.getColorForMode('sky'))        return 'sky';
+    if (n === this.getColorForMode('light-red'))  return 'light-red';
+    return 'custom';
+  }
+
+  private getColorForMode(mode: 'green' | 'sky' | 'light-red' | 'custom'): string {
+    if (mode === 'sky')       return '#29B6F6';
+    if (mode === 'light-red') return '#E57373';
+    return SettingsComponent.DEFAULT_REPORT_COLOR;
+  }
+
+  private normalizeHexColor(color: string | undefined | null): string | null {
+    if (!color) return null;
+    const n = color.trim().toUpperCase();
+    return /^#([A-F0-9]{6})$/.test(n) ? n : null;
   }
 }

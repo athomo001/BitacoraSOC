@@ -1,4 +1,10 @@
 /**
+ * File Purpose: frontend/src/environments/environment.prod.ts
+ * Responsibilities: Explain intent, contracts, and expected maintenance boundaries.
+ * QA Notes: Preserve deterministic behavior and document validation assumptions.
+ */
+
+/**
  * Environment de producción
  * 
  * apiUrl usa window.location.hostname para detectar automáticamente la IP del servidor.

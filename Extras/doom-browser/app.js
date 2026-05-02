@@ -1,3 +1,9 @@
+/**
+ * File Purpose: Extras/doom-browser/app.js
+ * Responsibilities: Explain intent, contracts, and expected maintenance boundaries.
+ * QA Notes: Preserve deterministic behavior and document validation assumptions.
+ */
+
 const startBtn = document.getElementById('startBtn');
 const fullscreenBtn = document.getElementById('fullscreenBtn');
 const statusText = document.getElementById('statusText');

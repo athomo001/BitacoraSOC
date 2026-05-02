@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/utils/email.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const nodemailer = require('nodemailer');
 const { logger } = require('./logger');
 const AppConfig = require('../models/AppConfig');

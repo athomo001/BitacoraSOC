@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/controllers/escalationController.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const Service = require('../models/Service');
 const CatalogLogSource = require('../models/CatalogLogSource');
 const Contact = require('../models/Contact');
@@ -130,6 +136,150 @@ const validateContactPayload = (contact) => {
   }
 
   return errors;
+};
+
+const splitCsvLine = (line = '') => {
+  const values = [];
+  let current = '';
+  let insideQuotes = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const nextChar = line[index + 1];
+
+    if (char === '"') {
+      if (insideQuotes && nextChar === '"') {
+        current += '"';
+        index += 1;
+      } else {
+        insideQuotes = !insideQuotes;
+      }
+      continue;
+    }
+
+    if (char === ',' && !insideQuotes) {
+      values.push(current.trim());
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  values.push(current.trim());
+  return values;
+};
+
+const formatShiftAssignmentsTemplateCsv = () => ([
+  'roleCode,userType,identifier,weekStartDate,weekStartTime,weekEndDate,weekEndTime,notes',
+  'N2,user,analista.n2@empresa.com,2026-05-04,09:00,2026-05-11,08:59,Cobertura semanal N2',
+  'TI,user,usuario.ti,2026-05-04,09:00,2026-05-11,08:59,Infraestructura primaria',
+  'N1_NO_HABIL,external,guardia.externa@partner.com,2026-05-04,09:00,2026-05-11,08:59,Guardia externa'
+].join('\n'));
+
+const parseShiftAssignmentsCsv = (csvText = '') => {
+  const text = String(csvText || '').replace(/^\uFEFF/, '').trim();
+  if (!text) {
+    return { rows: [], errors: [{ row: 0, message: 'CSV vacío' }] };
+  }
+
+  const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  if (lines.length < 2) {
+    return { rows: [], errors: [{ row: 0, message: 'El CSV debe incluir encabezado y al menos una fila' }] };
+  }
+
+  const headers = splitCsvLine(lines[0]).map((header) => header.trim().toLowerCase());
+  const requiredHeaders = ['rolecode', 'usertype', 'identifier', 'weekstartdate', 'weekstarttime', 'weekenddate', 'weekendtime'];
+  const missingHeaders = requiredHeaders.filter((header) => !headers.includes(header));
+
+  if (missingHeaders.length > 0) {
+    return {
+      rows: [],
+      errors: [{ row: 0, message: `Faltan columnas requeridas: ${missingHeaders.join(', ')}` }]
+    };
+  }
+
+  const rows = [];
+  const errors = [];
+
+  for (let index = 1; index < lines.length; index += 1) {
+    const values = splitCsvLine(lines[index]);
+    const row = { rowNumber: index + 1 };
+
+    headers.forEach((header, headerIndex) => {
+      row[header] = String(values[headerIndex] || '').trim();
+    });
+
+    if (!row.rolecode && !row.identifier) {
+      continue;
+    }
+
+    if (!row.rolecode || !row.usertype || !row.identifier || !row.weekstartdate || !row.weekstarttime || !row.weekenddate || !row.weekendtime) {
+      errors.push({ row: row.rowNumber, message: 'Fila incompleta. Revisa rol, tipo, identificador y fechas/horas.' });
+      continue;
+    }
+
+    rows.push(row);
+  }
+
+  return { rows, errors };
+};
+
+const buildAssignmentDateTime = (dateValue, timeValue) => {
+  const isoCandidate = String(dateValue || '').includes('T')
+    ? String(dateValue || '')
+    : `${String(dateValue || '').trim()}T${String(timeValue || '').trim()}:00`;
+  const parsed = new Date(isoCandidate);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const resolveAssignmentAssignee = async (row) => {
+  const userType = String(row.usertype || '').trim().toLowerCase();
+  const identifier = String(row.identifier || '').trim();
+
+  if (!identifier) {
+    throw new Error('Falta el identificador de la persona asignada');
+  }
+
+  if (userType === 'external') {
+    const externalPerson = await ExternalPerson.findOne({
+      $or: [
+        { email: identifier.toLowerCase() },
+        { name: { $regex: `^${escapeRegex(identifier)}$`, $options: 'i' } }
+      ]
+    }).select('_id name email');
+
+    if (!externalPerson) {
+      throw new Error(`Persona externa no encontrada: ${identifier}`);
+    }
+
+    return {
+      externalPersonId: externalPerson._id,
+      label: externalPerson.name || externalPerson.email || identifier
+    };
+  }
+
+  if (userType !== 'user') {
+    throw new Error(`userType inválido: ${row.usertype}. Usa user o external`);
+  }
+
+  const user = await User.findOne({
+    $or: [
+      { username: identifier },
+      { email: identifier.toLowerCase() },
+      { fullName: { $regex: `^${escapeRegex(identifier)}$`, $options: 'i' } }
+    ]
+  }).select('_id cargoLabel fullName username email');
+
+  if (!user) {
+    throw new Error(`Usuario no encontrado: ${identifier}`);
+  }
+
+  return {
+    userId: user._id,
+    user,
+    label: user.fullName || user.username || user.email || identifier
+  };
 };
 
 /**
@@ -1138,6 +1288,106 @@ exports.getAssignments = async (req, res) => {
   } catch (error) {
     logger.error('Error in getAssignments:', error);
     res.status(500).json({ error: error.message });
+  }
+};
+
+exports.downloadAssignmentTemplateCsv = async (_req, res) => {
+  const csv = formatShiftAssignmentsTemplateCsv();
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="turnos-internos-template.csv"');
+  return res.status(200).send(`\ufeff${csv}`);
+};
+
+exports.importAssignmentsCsv = async (req, res) => {
+  try {
+    const csvText = req.file?.buffer
+      ? req.file.buffer.toString('utf8')
+      : String(req.body?.csvText || '');
+
+    if (!csvText.trim()) {
+      return res.status(400).json({ error: 'Adjunta un archivo CSV válido' });
+    }
+
+    const parsed = parseShiftAssignmentsCsv(csvText);
+    if (parsed.errors.length > 0 && parsed.rows.length === 0) {
+      return res.status(400).json({ error: parsed.errors[0].message, errors: parsed.errors });
+    }
+
+    const results = {
+      created: 0,
+      updated: 0,
+      errorCount: parsed.errors.length,
+      errors: [...parsed.errors]
+    };
+
+    for (const row of parsed.rows) {
+      try {
+        const roleCode = String(row.rolecode || '').trim().toUpperCase();
+        if (!['N2', 'TI', 'N1_NO_HABIL'].includes(roleCode)) {
+          throw new Error(`roleCode inválido: ${row.rolecode}`);
+        }
+
+        const weekStartDate = buildAssignmentDateTime(row.weekstartdate, row.weekstarttime);
+        const weekEndDate = buildAssignmentDateTime(row.weekenddate, row.weekendtime);
+
+        if (!weekStartDate || !weekEndDate) {
+          throw new Error('Fechas u horas inválidas. Usa formato YYYY-MM-DD y HH:MM');
+        }
+
+        if (weekEndDate <= weekStartDate) {
+          throw new Error('La fecha/hora de término debe ser mayor a la de inicio');
+        }
+
+        const assignee = await resolveAssignmentAssignee(row);
+        if (assignee.user && !cargoMatchesRoleCode(assignee.user.cargoLabel, roleCode)) {
+          throw new Error(`El usuario ${assignee.label} no tiene cargo compatible con el rol ${roleCode}`);
+        }
+
+        const payload = {
+          roleCode,
+          weekStartDate,
+          weekEndDate,
+          notes: sanitizeText(row.notes || '', 500),
+          userId: assignee.userId,
+          externalPersonId: assignee.externalPersonId
+        };
+
+        const existing = await findAssignmentConflict({ roleCode, weekStartDate, weekEndDate });
+        if (existing) {
+          await ShiftAssignment.findByIdAndUpdate(existing._id, payload, { new: true, runValidators: true });
+          results.updated += 1;
+        } else {
+          const assignment = new ShiftAssignment(payload);
+          await assignment.save();
+          results.created += 1;
+        }
+      } catch (error) {
+        results.errorCount += 1;
+        results.errors.push({ row: row.rowNumber, message: error.message });
+      }
+    }
+
+    await audit(req, {
+      event: 'directory.assignment.import_csv',
+      level: results.errorCount > 0 ? 'warn' : 'info',
+      result: {
+        success: results.created > 0 || results.updated > 0,
+        reason: results.errorCount > 0 ? 'CSV import completed with observations' : 'CSV import completed'
+      },
+      metadata: {
+        created: results.created,
+        updated: results.updated,
+        errorCount: results.errorCount
+      }
+    });
+
+    return res.status(200).json({
+      message: 'CSV de turnos procesado',
+      ...results
+    });
+  } catch (error) {
+    logger.error('Error in importAssignmentsCsv:', error);
+    return res.status(500).json({ error: error.message });
   }
 };
 

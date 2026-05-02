@@ -1,4 +1,10 @@
 /**
+ * File Purpose: frontend/src/app/pages/main/reports/reports.component.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Componente de Reportes y Dashboard SOC
  * 
  * Funcionalidad:
@@ -29,7 +35,7 @@
  */
 import { Component, OnInit, HostListener } from '@angular/core';
 import { ReportService } from '../../../services/report.service';
-import { ReportOverview } from '../../../models/report.model';
+import { MailAnalytics, ReportOverview } from '../../../models/report.model';
 import { Color, ScaleType } from '@swimlane/ngx-charts';
 import { NgIf, NgFor } from '@angular/common';
 import { MatButton, MatIconButton } from '@angular/material/button';
@@ -59,6 +65,7 @@ import { NgxChartsModule } from '@swimlane/ngx-charts';
 })
 export class ReportsComponent implements OnInit {
   overview: ReportOverview | null = null;
+  mailAnalytics: MailAnalytics | null = null;
   selectedDays = 30;
   
   // Datos para gráficos
@@ -68,12 +75,26 @@ export class ReportsComponent implements OnInit {
   topTagsData: any[] = [];
   redsByServiceData: any[] = [];
   entriesByLogSourceData: any[] = [];
+  newsletterRecipientsData: any[] = [];
+  incidentRecipientsData: any[] = [];
+  newsletterDomainsData: any[] = [];
+  incidentClientsData: any[] = [];
+  criticalityCombinedData: any[] = [];
+  criticalityComparisonData: any[] = [];
+  generationTrendData: any[] = [];
+  deliveryTrendData: any[] = [];
+  hourlyActivityData: any[] = [];
+  deliveryStatusSummaryData: any[] = [];
+  statusByTypeSeriesData: any[] = [];
+  recipientsByTypeData: any[] = [];
   
   // Configuración de gráficos
   view: [number, number] = [700, 300];
   trendView: [number, number] = [1200, 320];
   logSourceBarView: [number, number] = [520, 320];
   logSourcePieView: [number, number] = [420, 320];
+  mailChartView: [number, number] = [520, 320];
+  mailPieView: [number, number] = [420, 320];
   colorScheme: Color = {
     name: 'soc',
     selectable: true,
@@ -125,6 +146,8 @@ export class ReportsComponent implements OnInit {
     const cardWidth = Math.max(320, Math.min(Math.floor((screenWidth - 180) / 2), 620));
     this.logSourceBarView = [cardWidth, 320];
     this.logSourcePieView = [Math.max(320, cardWidth - 40), 320];
+    this.mailChartView = [cardWidth, 320];
+    this.mailPieView = [Math.max(320, cardWidth - 40), 320];
   }
 
   private applyThemeColorSchemes(): void {
@@ -177,6 +200,14 @@ export class ReportsComponent implements OnInit {
         this.prepareChartData();
       },
       error: (err) => console.error('Error cargando reporte:', err)
+    });
+
+    this.reportService.getMailAnalytics(this.selectedDays).subscribe({
+      next: (data) => {
+        this.mailAnalytics = data;
+        this.prepareMailAnalyticsData();
+      },
+      error: (err) => console.error('Error cargando analítica de correo:', err)
     });
   }
   
@@ -239,6 +270,26 @@ export class ReportsComponent implements OnInit {
       },
       error: (err) => console.error('Error cargando entradas por log source:', err)
     });
+  }
+
+  prepareMailAnalyticsData(): void {
+    if (!this.mailAnalytics) return;
+
+    this.newsletterRecipientsData = this.mailAnalytics.recipientBreakdown.newsletter;
+    this.incidentRecipientsData = this.mailAnalytics.recipientBreakdown.incident;
+    this.newsletterDomainsData = this.mailAnalytics.domainBreakdown.newsletter;
+    this.incidentClientsData = this.mailAnalytics.clientBreakdown.incident;
+    this.criticalityCombinedData = this.mailAnalytics.criticalityBreakdown.combined;
+    this.criticalityComparisonData = this.mailAnalytics.criticalityComparison;
+    this.generationTrendData = this.mailAnalytics.generationTrend;
+    this.deliveryTrendData = this.mailAnalytics.deliveryStatusTrend;
+    this.hourlyActivityData = this.mailAnalytics.hourlyActivity;
+    this.deliveryStatusSummaryData = this.mailAnalytics.deliveryStatusSummary;
+    this.statusByTypeSeriesData = this.mailAnalytics.statusByTypeSeries;
+    this.recipientsByTypeData = [
+      { name: 'Boletines', value: this.mailAnalytics.recipientCounts.newsletter },
+      { name: 'Incidentes', value: this.mailAnalytics.recipientCounts.incident }
+    ];
   }
   
   onTagSelectionChange(): void {

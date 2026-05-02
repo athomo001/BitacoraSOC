@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/src/routes/rate-limit-reset-public.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * POST /api/system/rate-limit-reset
  *
  * Montado ANTES de apiLimiter en server.js: permite a operaciones desbloquear

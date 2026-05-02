@@ -1,4 +1,10 @@
 /**
+ * File Purpose: frontend/src/app/components/entity-autocomplete/entity-autocomplete.component.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * 🔍 ENTITY AUTOCOMPLETE - Componente Reutilizable
  * 
  * Autocomplete genérico con Angular Material para catálogos grandes (1900+ items).

@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/utils/contactDirectory.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const CONTACT_TYPE_VALUES = ['escalation', 'preventive'];
 
 function normalizeContactType(value) {

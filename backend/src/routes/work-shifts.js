@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/routes/work-shifts.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const express = require('express');
 const router = express.Router();
 const { body, param, query } = require('express-validator');

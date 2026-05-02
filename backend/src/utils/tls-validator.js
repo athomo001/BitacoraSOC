@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/utils/tls-validator.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const tls = require('tls');
 const net = require('net');
 

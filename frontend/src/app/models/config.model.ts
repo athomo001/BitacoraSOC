@@ -1,3 +1,9 @@
+/**
+ * File Purpose: frontend/src/app/models/config.model.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 export interface AppConfig {
   _id?: string;
   guestModeEnabled: boolean;
@@ -27,6 +33,7 @@ export interface AppConfig {
   faviconType?: 'url' | 'upload' | 'external';
   defaultLogSourceId?: string | { _id: string; name: string; enabled: boolean };
   emailReportConfig?: EmailReportConfig;
+  incidentEmailPaletteKey?: string;
   smtpConfig?: SmtpConfig;
   easterEggRules?: EasterEggRule[];
   loginTheme?: 'crt' | 'infoflow';
@@ -127,6 +134,7 @@ export interface UpdateConfigRequest {
   faviconUrl?: string;
   defaultLogSourceId?: string | null;
   emailReportConfig?: EmailReportConfig;
+  incidentEmailPaletteKey?: string;
   smtpConfig?: SmtpConfig;
   easterEggRules?: EasterEggRule[];
   loginTheme?: 'crt' | 'infoflow';

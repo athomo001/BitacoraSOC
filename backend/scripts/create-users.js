@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/scripts/create-users.js
+ * Responsibilities: Explain intent, contracts, and expected maintenance boundaries.
+ * QA Notes: Preserve deterministic behavior and document validation assumptions.
+ */
+
+/**
  * Script para crear usuarios pveloso y mfuentes
  * Uso: node scripts/create-users.js
  */

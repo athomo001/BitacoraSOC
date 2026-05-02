@@ -1,3 +1,9 @@
+/**
+ * File Purpose: backend/src/routes/glpi.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 const express = require('express');
 const { URL } = require('url');
 const { body } = require('express-validator');

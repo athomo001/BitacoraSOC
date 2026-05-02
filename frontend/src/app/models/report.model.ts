@@ -1,3 +1,9 @@
+/**
+ * File Purpose: frontend/src/app/models/report.model.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 export interface ReportOverview {
   period: string;
   entriesByType: {
@@ -28,4 +34,77 @@ export interface ReportOverview {
 export interface TagStats {
   tag: string;
   count: number;
+}
+
+export interface ChartDatum {
+  name: string;
+  value: number;
+}
+
+export interface MultiSeriesDatum {
+  name: string;
+  series: ChartDatum[];
+}
+
+export interface MailAnalytics {
+  period: string;
+  sentMessages: {
+    newsletter: number;
+    incident: number;
+    combined: number;
+  };
+  recipientCounts: {
+    newsletter: number;
+    incident: number;
+    combined: number;
+  };
+  uniqueRecipients: number;
+  statusSummary: {
+    success: number;
+    fail: number;
+    attempt: number;
+  };
+  statusByType: {
+    newsletter: {
+      success: number;
+      fail: number;
+      attempt: number;
+    };
+    incident: {
+      success: number;
+      fail: number;
+      attempt: number;
+    };
+  };
+  recipientBreakdown: {
+    newsletter: ChartDatum[];
+    incident: ChartDatum[];
+    combined: ChartDatum[];
+  };
+  domainBreakdown: {
+    newsletter: ChartDatum[];
+    incident: ChartDatum[];
+    combined: ChartDatum[];
+  };
+  clientBreakdown: {
+    incident: ChartDatum[];
+    combined: ChartDatum[];
+  };
+  criticalityBreakdown: {
+    newsletter: ChartDatum[];
+    incident: ChartDatum[];
+    combined: ChartDatum[];
+  };
+  criticalityComparison: MultiSeriesDatum[];
+  generationTrend: MultiSeriesDatum[];
+  deliveryStatusTrend: MultiSeriesDatum[];
+  hourlyActivity: ChartDatum[];
+  deliveryStatusSummary: ChartDatum[];
+  statusByTypeSeries: MultiSeriesDatum[];
+  metadataQuality: {
+    criticalityKnown: number;
+    criticalityMissing: number;
+    clientKnown: number;
+    clientMissing: number;
+  };
 }

@@ -1,3 +1,9 @@
+/**
+ * File Purpose: scripts/sync-version.js
+ * Responsibilities: Explain intent, contracts, and expected maintenance boundaries.
+ * QA Notes: Preserve deterministic behavior and document validation assumptions.
+ */
+
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');

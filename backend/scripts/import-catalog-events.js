@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/scripts/import-catalog-events.js
+ * Responsibilities: Explain intent, contracts, and expected maintenance boundaries.
+ * QA Notes: Preserve deterministic behavior and document validation assumptions.
+ */
+
+/**
  * Script para importar eventos del catálogo de forma masiva desde un archivo JSON
  * 
  * Uso:

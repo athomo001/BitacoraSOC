@@ -1,4 +1,10 @@
 /**
+ * File Purpose: frontend/src/app/models/entry.model.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Modelo de Entry - DEBE coincidir con backend Entry schema
  * 
  * Campos críticos SOC:

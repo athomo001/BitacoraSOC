@@ -52,6 +52,173 @@
       </article>
     </div>
 
+    <section class="chart-card reports-panel" *ngIf="mailAnalytics">
+      <header class="reports-panel__header">
+        <h2 class="reports-panel__title">✉️ Analítica de Envíos</h2>
+      </header>
+      <div class="reports-panel__body">
+        <p class="chart-description">Resumen de boletines y reportes de incidentes enviados durante {{ mailAnalytics.period }}.</p>
+
+        <div class="stats-grid mail-stats-grid">
+          <article class="stat-card reports-panel mail-stat-card">
+            <div class="reports-panel__body">
+              <div class="stat-value">{{ mailAnalytics.sentMessages.newsletter }}</div>
+              <div class="stat-label">Boletines Enviados</div>
+            </div>
+          </article>
+          <article class="stat-card reports-panel mail-stat-card incidentes">
+            <div class="reports-panel__body">
+              <div class="stat-value">{{ mailAnalytics.sentMessages.incident }}</div>
+              <div class="stat-label">Reportes de Incidente</div>
+            </div>
+          </article>
+          <article class="stat-card reports-panel mail-stat-card">
+            <div class="reports-panel__body">
+              <div class="stat-value">{{ mailAnalytics.recipientCounts.combined }}</div>
+              <div class="stat-label">Destinatarios Totales</div>
+            </div>
+          </article>
+          <article class="stat-card reports-panel mail-stat-card">
+            <div class="reports-panel__body">
+              <div class="stat-value">{{ mailAnalytics.uniqueRecipients }}</div>
+              <div class="stat-label">Destinatarios Únicos</div>
+            </div>
+          </article>
+        </div>
+
+        <div class="charts-grid analytics-grid">
+          <div class="chart-wrapper" *ngIf="generationTrendData.length > 0">
+            <h3 class="chart-subtitle">Generación de reportes y boletines por día</h3>
+            <ngx-charts-line-chart
+              [view]="mailChartView"
+              [results]="generationTrendData"
+              [xAxis]="true"
+              [yAxis]="true"
+              [legend]="true"
+              [showXAxisLabel]="true"
+              [showYAxisLabel]="true"
+              xAxisLabel="Día"
+              yAxisLabel="Generados"
+              [scheme]="colorScheme"
+              [animations]="true">
+            </ngx-charts-line-chart>
+          </div>
+
+          <div class="chart-wrapper" *ngIf="recipientsByTypeData.length > 0">
+            <h3 class="chart-subtitle">Destinatarios por tipo de envío</h3>
+            <ngx-charts-bar-vertical
+              [view]="mailChartView"
+              [results]="recipientsByTypeData"
+              [xAxis]="true"
+              [yAxis]="true"
+              [showXAxisLabel]="true"
+              [showYAxisLabel]="true"
+              xAxisLabel="Tipo"
+              yAxisLabel="Destinatarios"
+              [scheme]="colorScheme">
+            </ngx-charts-bar-vertical>
+          </div>
+
+          <div class="chart-wrapper" *ngIf="hourlyActivityData.length > 0">
+            <h3 class="chart-subtitle">Actividad de envíos por hora</h3>
+            <ngx-charts-bar-vertical
+              [view]="mailChartView"
+              [results]="hourlyActivityData"
+              [xAxis]="true"
+              [yAxis]="true"
+              [showXAxisLabel]="true"
+              [showYAxisLabel]="true"
+              xAxisLabel="Hora"
+              yAxisLabel="Actividad"
+              [scheme]="colorScheme">
+            </ngx-charts-bar-vertical>
+          </div>
+
+          <div class="chart-wrapper" *ngIf="newsletterRecipientsData.length > 0">
+            <h3 class="chart-subtitle">Top destinatarios de boletines</h3>
+            <ngx-charts-bar-horizontal
+              [view]="mailChartView"
+              [results]="newsletterRecipientsData"
+              [xAxis]="true"
+              [yAxis]="true"
+              [showXAxisLabel]="true"
+              [showYAxisLabel]="false"
+              xAxisLabel="Envíos"
+              [scheme]="colorScheme">
+            </ngx-charts-bar-horizontal>
+          </div>
+
+          <div class="chart-wrapper" *ngIf="incidentRecipientsData.length > 0">
+            <h3 class="chart-subtitle">Top destinatarios de incidentes</h3>
+            <ngx-charts-bar-horizontal
+              [view]="mailChartView"
+              [results]="incidentRecipientsData"
+              [xAxis]="true"
+              [yAxis]="true"
+              [showXAxisLabel]="true"
+              [showYAxisLabel]="false"
+              xAxisLabel="Envíos"
+              [scheme]="colorScheme">
+            </ngx-charts-bar-horizontal>
+          </div>
+
+          <div class="chart-wrapper" *ngIf="newsletterDomainsData.length > 0">
+            <h3 class="chart-subtitle">Dominios impactados por boletines</h3>
+            <ngx-charts-pie-chart
+              [view]="mailPieView"
+              [results]="newsletterDomainsData"
+              [legend]="true"
+              [labels]="true"
+              [doughnut]="true"
+              [scheme]="colorScheme">
+            </ngx-charts-pie-chart>
+          </div>
+
+          <div class="chart-wrapper" *ngIf="incidentClientsData.length > 0">
+            <h3 class="chart-subtitle">Clientes con más reportes enviados</h3>
+            <ngx-charts-bar-horizontal
+              [view]="mailChartView"
+              [results]="incidentClientsData"
+              [xAxis]="true"
+              [yAxis]="true"
+              [showXAxisLabel]="true"
+              [showYAxisLabel]="false"
+              xAxisLabel="Envíos"
+              [scheme]="colorScheme">
+            </ngx-charts-bar-horizontal>
+          </div>
+
+          <div class="chart-wrapper" *ngIf="criticalityComparisonData.length > 0">
+            <h3 class="chart-subtitle">Criticidad (Bajo/Medio/Alto/Crítico) por tipo</h3>
+            <ngx-charts-bar-vertical-2d
+              [view]="mailChartView"
+              [results]="criticalityComparisonData"
+              [xAxis]="true"
+              [yAxis]="true"
+              [legend]="true"
+              [showXAxisLabel]="true"
+              [showYAxisLabel]="true"
+              xAxisLabel="Criticidad"
+              yAxisLabel="Cantidad"
+              [scheme]="colorScheme">
+            </ngx-charts-bar-vertical-2d>
+          </div>
+
+          <div class="chart-wrapper" *ngIf="criticalityCombinedData.length > 0">
+            <h3 class="chart-subtitle">Criticidad combinada (boletines + incidentes)</h3>
+            <ngx-charts-pie-chart
+              [view]="mailPieView"
+              [results]="criticalityCombinedData"
+              [legend]="true"
+              [labels]="true"
+              [doughnut]="false"
+              [scheme]="colorScheme">
+            </ngx-charts-pie-chart>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Gráfico de tendencia de entradas -->
     <section class="chart-card reports-panel">
       <header class="reports-panel__header">

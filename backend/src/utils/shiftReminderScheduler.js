@@ -1,4 +1,10 @@
 /**
+ * File Purpose: backend/src/utils/shiftReminderScheduler.js
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * shiftReminderScheduler.js — MAIL-REM-043 (v3)
  *
  * Procesa TODOS los recordatorios habilitados en la colección ShiftReminder.

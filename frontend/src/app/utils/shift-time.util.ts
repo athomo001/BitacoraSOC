@@ -1,4 +1,10 @@
 /**
+ * File Purpose: frontend/src/app/utils/shift-time.util.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
+/**
  * Utilidades compartidas para parseo y comparación de horarios de turnos operativos.
  * Creado para OPS-ASSIGN-006.
  */

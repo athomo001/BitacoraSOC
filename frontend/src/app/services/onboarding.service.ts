@@ -1,3 +1,9 @@
+/**
+ * File Purpose: frontend/src/app/services/onboarding.service.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 import { Injectable } from '@angular/core';
 
 @Injectable({

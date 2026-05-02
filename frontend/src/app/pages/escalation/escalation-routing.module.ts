@@ -1,3 +1,9 @@
+/**
+ * File Purpose: frontend/src/app/pages/escalation/escalation-routing.module.ts
+ * Responsibilities: Define the module behavior and maintain clear contracts.
+ * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ */
+
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { EscalationSimpleComponent } from './escalation-simple/escalation-simple.component';
