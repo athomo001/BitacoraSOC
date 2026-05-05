@@ -781,6 +781,9 @@ exports.createContact = async (req, res) => {
       if (!service || !service.clientId) {
         return res.status(400).json({ error: 'Servicio inválido o asociado a cliente deshabilitado' });
       }
+      if (service.active === false) {
+        return res.status(400).json({ error: 'Servicio inactivo: activa el servicio o reasigna el contacto antes de guardar' });
+      }
     }
 
     const contact = new Contact(payload);
@@ -833,6 +836,9 @@ exports.updateContact = async (req, res) => {
         });
       if (!service || !service.clientId) {
         return res.status(400).json({ error: 'Servicio inválido o asociado a cliente deshabilitado' });
+      }
+      if (service.active === false) {
+        return res.status(400).json({ error: 'Servicio inactivo: activa el servicio o reasigna el contacto antes de guardar' });
       }
     }
 
