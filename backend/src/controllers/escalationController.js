@@ -510,20 +510,36 @@ exports.getContactsPublic = async (req, res) => {
     const requestedType = req.query.contactType || req.query.type || 'escalation';
     const contactType = normalizeContactType(requestedType);
     const search = String(req.query.search || '').trim();
-    // Use $ne: false instead of true so contacts without the active field
-    // (created before the field was added) are treated as active, matching admin display logic.
-    const filter = { active: { $ne: false }, contactType };
+    const andFilters = [{ active: { $ne: false } }];
+
+    if (contactType === 'preventive') {
+      andFilters.push({ contactType: 'preventive' });
+    } else {
+      // Compatibilidad legacy: contactos históricos sin contactType se tratan como escalación.
+      andFilters.push({
+        $or: [
+          { contactType: 'escalation' },
+          { contactType: { $exists: false } },
+          { contactType: null },
+          { contactType: '' }
+        ]
+      });
+    }
 
     if (search) {
       if (search.length > 64) {
         return res.status(400).json({ error: 'search no puede superar 64 caracteres' });
       }
-      filter.$or = [
+      andFilters.push({
+        $or: [
         { name: { $regex: escapeRegex(search), $options: 'i' } },
         { email: { $regex: escapeRegex(search), $options: 'i' } },
         { organization: { $regex: escapeRegex(search), $options: 'i' } }
-      ];
+        ]
+      });
     }
+
+    const filter = andFilters.length === 1 ? andFilters[0] : { $and: andFilters };
 
     const contacts = await Contact.find(filter)
       .populate(CONTACT_SERVICE_POPULATE)
