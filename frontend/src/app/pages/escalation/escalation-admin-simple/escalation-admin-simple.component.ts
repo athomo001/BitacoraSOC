@@ -707,7 +707,12 @@ export class EscalationAdminSimpleComponent implements OnInit {
   }
 
   get escalationContacts(): any[] {
-    return (this.contacts || []).filter((contact) => (contact.contactType || 'escalation') !== 'preventive');
+    return (this.contacts || [])
+      .filter((contact) => (contact.contactType || 'escalation') !== 'preventive')
+      .sort((a, b) => Number((b.active !== false)) - Number((a.active !== false))
+        || String(a.serviceId?.clientId?.name || '').localeCompare(String(b.serviceId?.clientId?.name || ''))
+        || String(a.serviceId?.name || '').localeCompare(String(b.serviceId?.name || ''))
+        || String(a.name || '').localeCompare(String(b.name || '')));
   }
 
   get preventiveContacts(): any[] {
