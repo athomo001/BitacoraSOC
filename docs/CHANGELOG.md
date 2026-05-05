@@ -2,6 +2,15 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.61-beta] - 2026-05-05
+
+### Corrección SMTP: error TLS "wrong version number" al enviar correos (`SMTP-TLS-101`)
+
+- **Causa raíz:** la ruta de envío real usaba `secure=true` cuando `useTLS` estaba activo, independientemente del puerto. En puertos STARTTLS (587, 2525) esto produce el error OpenSSL `tls_validate_record_header:wrong version number` porque TLS implícito y STARTTLS son protocolos distintos.
+- **Corrección:** se centralizó la lógica TLS en `backend/src/utils/email.js` mediante el helper `resolveTransportSecurityOptions`: puerto 465 usa `secure=true` (TLS implícito); cualquier otro puerto usa `secure=false` + `requireTLS` según el flag `useTLS`.
+- **Alineación test/send:** `backend/src/routes/smtp.js` (ruta de prueba SMTP) ahora reutiliza el mismo helper, eliminando la desalineación previa que ocultaba el problema durante la prueba pero lo manifestaba en el envío real.
+- **Archivos modificados:** `backend/src/utils/email.js`, `backend/src/routes/smtp.js`.
+
 ## [v1.5.60-beta] - 2026-05-01
 
 ### Correcciones y mejoras operativas en Admin + Reportes (`UI-ADMIN-094`, `REP-AN-095`)
