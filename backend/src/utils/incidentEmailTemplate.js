@@ -225,8 +225,8 @@ function buildIncidentEmail({ reportData: rd = {}, images = [], logoCid = null, 
       }
     </mj-style>
   </mj-head>
-  <mj-body background-color="${P.pageBg}" width="900px">
-    <mj-wrapper background-color="transparent" padding="0px">
+  <mj-body background-color="#FFFFFF" width="900px">
+    <mj-wrapper background-color="${P.pageBg}" padding="16px 0">
     
     <!-- CABECERA COMPACTA: Todo en una sola sección para evitar saltos -->
     <mj-section padding="10px 24px 20px 24px" background-color="${P.headerBg}" border-radius="16px 16px 16px 16px">
@@ -310,8 +310,8 @@ function buildIncidentEmail({ reportData: rd = {}, images = [], logoCid = null, 
     <!-- Footer del correo -->
     <mj-section padding="24px 0px">
       <mj-column>
-        <mj-text align="center" color="#C6DDD2" font-size="12px">
-          Generado por&nbsp;<span style="color:${P.white};font-weight:700;">${e(autor)}</span>&nbsp;·&nbsp;${e(brandName)}
+        <mj-text align="center" color="#888888" font-size="12px">
+          Generado por&nbsp;<span style="color:${P.headerBg};font-weight:700;">${e(autor)}</span>&nbsp;·&nbsp;${e(brandName)}
         </mj-text>
       </mj-column>
     </mj-section>
