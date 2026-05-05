@@ -27,7 +27,7 @@ const { authenticate, authorize } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const { getBrandingSnapshot, formatBrandedSubject, getAppTitleForText } = require('../utils/branding');
 const { encrypt, decrypt } = require('../utils/encryption');
-const { invalidateCache } = require('../utils/email');
+const { invalidateCache, resolveTransportSecurityOptions } = require('../utils/email');
 const { audit } = require('../utils/audit');
 
 const smtpTestLimiter = rateLimit({
@@ -109,16 +109,16 @@ const verifyAndTest = async (config, sendMail = true) => {
   const { appTitle } = await getBrandingSnapshot();
   const systemName = getAppTitleForText(appTitle, 'el sistema');
 
-  // Determinar si usar SSL seguro o STARTTLS
-  // Puerto 465 = SSL directo (secure: true)
-  // Puerto 587 = STARTTLS (secure: false, luego upgrade)
-  // Puerto 25 = Sin encriptación (secure: false)
-  const secure = config.port === 465;
+  const transportSecurity = resolveTransportSecurityOptions({
+    port: config.port,
+    useTLS: config.useTLS
+  });
 
   const transporter = nodemailer.createTransport({
     host: config.host,
-    port: config.port,
-    secure: secure,
+    port: transportSecurity.port,
+    secure: transportSecurity.secure,
+    requireTLS: transportSecurity.requireTLS,
     auth: {
       user: config.username,
       pass: config.password

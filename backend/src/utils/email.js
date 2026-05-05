@@ -158,10 +158,16 @@ async function getSMTPConfig() {
       .lean();
 
     if (smtpDoc) {
+      const transportSecurity = resolveTransportSecurityOptions({
+        port: smtpDoc.port,
+        useTLS: smtpDoc.useTLS
+      });
       const config = {
         host: smtpDoc.host,
-        port: smtpDoc.port,
-        secure: smtpDoc.useTLS === true || smtpDoc.port === 465,
+        port: transportSecurity.port,
+        secure: transportSecurity.secure,
+        requireTLS: transportSecurity.requireTLS,
+        useTLS: smtpDoc.useTLS === true,
         user: smtpDoc.username,
         pass: safeDecrypt(smtpDoc.password, { allowPlainFallback: false }),
         smtpConfigId: smtpDoc._id?.toString?.() || String(smtpDoc._id || ''),
@@ -190,12 +196,19 @@ async function getSMTPConfig() {
       const smtpConfig = appConfig.smtpConfig;
       const legacyUser = String(smtpConfig.user || smtpConfig.username || '').trim();
       const legacyPass = safeDecrypt(smtpConfig.pass || smtpConfig.password || '', { allowPlainFallback: true });
+      const legacyUseTLS = smtpConfig.useTLS === true || smtpConfig.secure === true;
+      const transportSecurity = resolveTransportSecurityOptions({
+        port: smtpConfig.port,
+        useTLS: legacyUseTLS
+      });
       logger.info('📧 SMTP config found in AppConfig', { user: legacyUser });
 
       const config = {
         host: smtpConfig.host,
-        port: smtpConfig.port,
-        secure: smtpConfig.secure === true,
+        port: transportSecurity.port,
+        secure: transportSecurity.secure,
+        requireTLS: transportSecurity.requireTLS,
+        useTLS: legacyUseTLS,
         user: legacyUser,
         pass: legacyPass,
         smtpConfigId: appConfig?._id?.toString?.() || null,
@@ -220,6 +233,7 @@ async function getSMTPConfig() {
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
     port: parseInt(process.env.SMTP_PORT) || 587,
     secure: process.env.SMTP_SECURE === 'true',
+    useTLS: process.env.SMTP_USE_TLS === 'true' || process.env.SMTP_SECURE === 'true',
     user: process.env.SMTP_USER || '',
     pass: process.env.SMTP_PASS || '',
     smtpConfigId: null,
@@ -248,10 +262,13 @@ async function createTransporter(configOverride = null) {
     throw new Error('SMTP configuration missing: user and pass required');
   }
 
+  const transportSecurity = resolveTransportSecurityOptions(config);
+
   return nodemailer.createTransport({
     host: config.host,
-    port: config.port,
-    secure: config.secure === true,
+    port: transportSecurity.port,
+    secure: transportSecurity.secure,
+    requireTLS: transportSecurity.requireTLS,
     auth: {
       user: config.user,
       pass: config.pass
@@ -442,10 +459,28 @@ function invalidateCache() {
   cacheTime = 0;
 }
 
+/**
+ * Reglas de transporte SMTP:
+ * - Puerto 465: TLS implícito (secure=true)
+ * - Otros puertos: conexión plana con upgrade STARTTLS opcional/obligatorio (requireTLS)
+ */
+function resolveTransportSecurityOptions(config = {}) {
+  const parsedPort = Number(config.port) || 587;
+  const useTLS = config.useTLS === true || config.secure === true || parsedPort === 465;
+  const secure = parsedPort === 465;
+
+  return {
+    port: parsedPort,
+    secure,
+    requireTLS: useTLS && !secure
+  };
+}
+
 module.exports = {
   sendEmail,
   createTransporter,
   isConfigured,
   invalidateCache,
-  getSMTPConfig
+  getSMTPConfig,
+  resolveTransportSecurityOptions
 };
