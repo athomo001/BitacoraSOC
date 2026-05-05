@@ -510,7 +510,9 @@ exports.getContactsPublic = async (req, res) => {
     const requestedType = req.query.contactType || req.query.type || 'escalation';
     const contactType = normalizeContactType(requestedType);
     const search = String(req.query.search || '').trim();
-    const filter = { active: true, contactType };
+    // Use $ne: false instead of true so contacts without the active field
+    // (created before the field was added) are treated as active, matching admin display logic.
+    const filter = { active: { $ne: false }, contactType };
 
     if (search) {
       if (search.length > 64) {
