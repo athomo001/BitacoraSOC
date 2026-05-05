@@ -106,6 +106,19 @@ export class EscalationSimpleComponent implements OnInit {
     this.loadMaintenanceRules();
   }
 
+  private normalizeId(value: any): string {
+    if (!value) return '';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object') {
+      if (typeof value._id === 'string') return value._id;
+      if (value._id != null) return String(value._id);
+      if (typeof value.toString === 'function' && value.toString !== Object.prototype.toString) {
+        return String(value.toString());
+      }
+    }
+    return String(value);
+  }
+
   async loadEscalationView(): Promise<void> {
     this.loading = true;
     
@@ -123,7 +136,7 @@ export class EscalationSimpleComponent implements OnInit {
       // Agrupar servicios por cliente
       const servicesByClient = new Map<string, any[]>();
       (services as any[]).forEach((service: any) => {
-        const clientId = service.clientId?._id || service.clientId || 'no-client';
+        const clientId = this.normalizeId(service.clientId) || 'no-client';
         if (!servicesByClient.has(clientId)) {
           servicesByClient.set(clientId, []);
         }
@@ -133,19 +146,38 @@ export class EscalationSimpleComponent implements OnInit {
       // Agrupar contactos por servicio (ordenando PARA primero, luego CC, resto al final)
       const contactsByService = new Map<string, any[]>();
       (contacts as any[]).forEach((contact: any) => {
-        const serviceId = contact.serviceId?._id || contact.serviceId || 'no-service';
+        const serviceId = this.normalizeId(contact.serviceId) || 'no-service';
         if (!contactsByService.has(serviceId)) {
           contactsByService.set(serviceId, []);
         }
         contactsByService.get(serviceId)!.push(contact);
+
+        const populatedService = typeof contact.serviceId === 'object' ? contact.serviceId : null;
+        const populatedClientId = this.normalizeId(populatedService?.clientId);
+        if (serviceId !== 'no-service' && populatedService && populatedClientId) {
+          if (!servicesByClient.has(populatedClientId)) {
+            servicesByClient.set(populatedClientId, []);
+          }
+
+          const clientServices = servicesByClient.get(populatedClientId)!;
+          const alreadyRegistered = clientServices.some((service: any) => this.normalizeId(service._id) === serviceId);
+          if (!alreadyRegistered) {
+            clientServices.push({
+              _id: serviceId,
+              name: populatedService.name || 'Servicio',
+              clientId: populatedService.clientId,
+              emergencyPhone: populatedService.emergencyPhone || null
+            });
+          }
+        }
       });
       this.unassignedContacts = contactsByService.get('no-service') || [];
 
       // Construir datos completos por cliente
       this.escalationData = this.allClients.map((client: any) => {
-        const clientServices = servicesByClient.get(client._id) || [];
+        const clientServices = servicesByClient.get(this.normalizeId(client._id)) || [];
         const servicesWithContacts = clientServices.map((service: any) => {
-          const contactsForService = contactsByService.get(service._id) || [];
+          const contactsForService = contactsByService.get(this.normalizeId(service._id)) || [];
           const ordered = [...contactsForService].sort((a, b) => {
             const order = { PARA: 0, CC: 1 } as any;
             return (order[a.role] ?? 2) - (order[b.role] ?? 2);
