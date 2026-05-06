@@ -596,10 +596,10 @@ export class EscalationAdminSimpleComponent implements OnInit {
       })
     ).subscribe({
       next: ({ rebuildResponse, mergeResponse }) => {
-        const rebuilt = Number(rebuildResponse?.created || 0);
+        const rebuilt = Number(rebuildResponse?.totalDirectoryContacts || 0);
         const merged = Number(mergeResponse?.mergedGroups || 0);
         const removed = Number(mergeResponse?.removedDuplicates || 0);
-        this.showSuccess(`Sincronizado (${rebuilt}) y consolidado (${merged} grupos, ${removed} duplicados)`);
+        this.showSuccess(`Sincronizado (total ${rebuilt}) y consolidado (${merged} grupos, ${removed} duplicados)`);
         this.loadDirectoryContacts();
         this.refreshOperationalViewsAfterDirectoryChange();
         this.mergingDirectoryDuplicates = false;
