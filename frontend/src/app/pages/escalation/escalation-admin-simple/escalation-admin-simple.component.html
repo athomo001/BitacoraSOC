@@ -968,9 +968,9 @@
             <mat-form-field appearance="outline">
               <mat-label>Filas por página</mat-label>
               <mat-select [(ngModel)]="directoryPageSize" (selectionChange)="applyDirectoryFilters()">
-                <mat-option [value]="10">10</mat-option>
-                <mat-option [value]="20">20</mat-option>
                 <mat-option [value]="50">50</mat-option>
+                <mat-option [value]="100">100</mat-option>
+                <mat-option [value]="'all'">Todos</mat-option>
               </mat-select>
             </mat-form-field>
             <button mat-raised-button color="primary" type="button" (click)="addDirectoryContact()" [disabled]="!canDirectoryWrite">
@@ -1023,6 +1023,13 @@
                   <mat-option value="List">Lista</mat-option>
                 </mat-select>
               </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Ámbito</mat-label>
+                <mat-select [(ngModel)]="directoryFormModel.scope" name="dirScope">
+                  <mat-option value="Internal">Interno</mat-option>
+                  <mat-option value="External">Externo</mat-option>
+                </mat-select>
+              </mat-form-field>
               <mat-checkbox [(ngModel)]="directoryFormModel.isFavorite" name="dirFavorite" color="primary">Favorito</mat-checkbox>
               <button mat-raised-button color="primary" type="submit" [disabled]="savingDirectoryContact">
                 {{ savingDirectoryContact ? 'Guardando...' : 'Guardar contacto' }}
@@ -1040,6 +1047,7 @@
                   <th>Correo</th>
                   <th>Empresa</th>
                   <th>Tipo</th>
+                  <th>Ámbito</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
@@ -1056,13 +1064,14 @@
                   </td>
                   <td>{{ person.company || '-' }}</td>
                   <td><span class="badge outline">{{ getDirectoryTypeLabel(person.type) }}</span></td>
+                  <td><span class="badge">{{ getDirectoryScopeLabel(person.scope) }}</span></td>
                   <td>
                     <button
                       mat-icon-button
                       color="primary"
                       (click)="editDirectoryContact(person)"
                       [disabled]="isDirectoryInternal(person) || !canDirectoryWrite"
-                      [matTooltip]="isDirectoryInternal(person) ? 'Los internos se editan en Usuarios' : 'Editar contacto del directorio'">
+                      [matTooltip]="isDirectoryInternal(person) ? 'Los contactos de usuarios se editan en Usuarios' : 'Editar contacto del directorio'">
                       <mat-icon>edit</mat-icon>
                     </button>
                     <button
@@ -1070,7 +1079,7 @@
                       color="warn"
                       (click)="deleteDirectoryContact(person._id)"
                       [disabled]="isDirectoryInternal(person) || !canDirectoryDelete"
-                      [matTooltip]="isDirectoryInternal(person) ? 'Los internos no se eliminan aquí' : 'Eliminar contacto del directorio'">
+                      [matTooltip]="isDirectoryInternal(person) ? 'Los contactos de usuarios no se eliminan aquí' : 'Eliminar contacto del directorio'">
                       <mat-icon>delete</mat-icon>
                     </button>
                   </td>
@@ -1085,9 +1094,9 @@
 
           <div class="directory-pagination" *ngIf="!loadingDirectoryContacts && filteredDirectoryContacts.length > 0">
             <span>Mostrando {{ directoryStartItem }}-{{ directoryEndItem }} de {{ filteredDirectoryContacts.length }}</span>
-            <button mat-stroked-button type="button" (click)="prevDirectoryPage()" [disabled]="directoryPageIndex === 0">Anterior</button>
+            <button mat-stroked-button type="button" (click)="prevDirectoryPage()" [disabled]="directoryPageIndex === 0 || directoryPageSize === 'all'">Anterior</button>
             <span>Página {{ directoryPageIndex + 1 }} de {{ directoryTotalPages }}</span>
-            <button mat-stroked-button type="button" (click)="nextDirectoryPage()" [disabled]="directoryPageIndex >= directoryTotalPages - 1">Siguiente</button>
+            <button mat-stroked-button type="button" (click)="nextDirectoryPage()" [disabled]="directoryPageIndex >= directoryTotalPages - 1 || directoryPageSize === 'all'">Siguiente</button>
           </div>
         </div>
       </div>

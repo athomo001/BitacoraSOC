@@ -145,7 +145,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
   directoryContacts: DirectoryContact[] = [];
   directorySearch = '';
   directoryTypeFilter: '' | 'Internal' | 'External' | 'List' = '';
-  directoryPageSize = 10;
+  directoryPageSize: 50 | 100 | 'all' = 50;
   directoryPageIndex = 0;
   loadingDirectoryContacts = false;
   rebuildingDirectory = false;
@@ -168,6 +168,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
     company: string;
     position: string;
     type: 'Internal' | 'External' | 'List';
+    scope: 'Internal' | 'External';
     isFavorite: boolean;
   } = {
     name: '',
@@ -176,6 +177,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
     company: '',
     position: '',
     type: 'External',
+    scope: 'External',
     isFavorite: false
   };
   loadingClients = false;
@@ -242,8 +244,11 @@ export class EscalationAdminSimpleComponent implements OnInit {
     return 'Externo';
   };
 
+  readonly getDirectoryScopeLabel = (scope?: string): string =>
+    String(scope || 'External') === 'Internal' ? 'Interno' : 'Externo';
+
   readonly isDirectoryInternal = (contact?: DirectoryContact | null): boolean =>
-    String(contact?.type || '') === 'Internal';
+    String(contact?.source || '') === 'User';
 
   get pageHeaderTitle(): string {
     return this.directoryOnlyAccess ? 'Directorio Global de Contactos' : 'Administración de Escalamientos';
@@ -486,12 +491,18 @@ export class EscalationAdminSimpleComponent implements OnInit {
   }
 
   get paginatedDirectoryContacts(): DirectoryContact[] {
+    if (this.directoryPageSize === 'all') {
+      return this.filteredDirectoryContacts;
+    }
     const start = this.directoryPageIndex * this.directoryPageSize;
     const end = start + this.directoryPageSize;
     return this.filteredDirectoryContacts.slice(start, end);
   }
 
   get directoryTotalPages(): number {
+    if (this.directoryPageSize === 'all') {
+      return 1;
+    }
     return Math.max(1, Math.ceil(this.filteredDirectoryContacts.length / this.directoryPageSize));
   }
 
@@ -499,10 +510,16 @@ export class EscalationAdminSimpleComponent implements OnInit {
     if (this.filteredDirectoryContacts.length === 0) {
       return 0;
     }
+    if (this.directoryPageSize === 'all') {
+      return 1;
+    }
     return this.directoryPageIndex * this.directoryPageSize + 1;
   }
 
   get directoryEndItem(): number {
+    if (this.directoryPageSize === 'all') {
+      return this.filteredDirectoryContacts.length;
+    }
     return Math.min((this.directoryPageIndex + 1) * this.directoryPageSize, this.filteredDirectoryContacts.length);
   }
 
@@ -1814,6 +1831,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
       company: '',
       position: '',
       type: 'External',
+      scope: 'External',
       isFavorite: false
     };
     this.showDirectoryForm = true;
@@ -1836,6 +1854,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
       company: String(contact.company || ''),
       position: String(contact.position || ''),
       type: (contact.type as 'Internal' | 'External' | 'List') || 'External',
+      scope: (contact.scope as 'Internal' | 'External') || (contact.type === 'Internal' ? 'Internal' : 'External'),
       isFavorite: !!contact.isFavorite
     };
     this.showDirectoryForm = true;
@@ -1858,6 +1877,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
       company: String(this.directoryFormModel.company || '').trim(),
       position: String(this.directoryFormModel.position || '').trim(),
       type: this.directoryFormModel.type,
+      scope: this.directoryFormModel.scope,
       isFavorite: !!this.directoryFormModel.isFavorite
     };
 

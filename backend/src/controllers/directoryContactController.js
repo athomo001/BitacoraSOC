@@ -10,24 +10,40 @@ const ExternalPerson = require('../models/ExternalPerson');
 const RaciEntry = require('../models/RaciEntry');
 const CatalogLogSource = require('../models/CatalogLogSource');
 const User = require('../models/User');
-const { syncManyDirectoryContacts } = require('../utils/directory-sync');
+const { syncManyDirectoryContacts, mergeDirectoryDuplicates } = require('../utils/directory-sync');
 const { logger } = require('../utils/logger');
 
 const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const sanitizeText = (value, max = 180) => String(value ?? '').trim().slice(0, max);
 
+const resolveScope = (body = {}, existing = {}, type = 'External') => {
+  if (['Internal', 'External'].includes(body.scope)) {
+    return body.scope;
+  }
+  if (['Internal', 'External'].includes(existing.scope)) {
+    return existing.scope;
+  }
+  if (type === 'Internal') {
+    return 'Internal';
+  }
+  return 'External';
+};
+
 const normalizePayload = (body = {}, existing = {}) => ({
+  ...(existing.source ? { source: existing.source } : {}),
   name: sanitizeText(body.name ?? existing.name, 120),
   email: sanitizeText(body.email ?? existing.email, 180).toLowerCase(),
   phone: sanitizeText(body.phone ?? existing.phone, 80),
   company: sanitizeText(body.company ?? existing.company, 160),
   position: sanitizeText(body.position ?? existing.position, 120),
   type: ['Internal', 'External', 'List'].includes(body.type) ? body.type : (existing.type || 'External'),
+  scope: resolveScope(body, existing, ['Internal', 'External', 'List'].includes(body.type) ? body.type : (existing.type || 'External')),
   isFavorite: body.isFavorite !== undefined ? Boolean(body.isFavorite) : Boolean(existing.isFavorite)
 });
 
 exports.listDirectoryContacts = async (req, res) => {
   try {
+    await mergeDirectoryDuplicates();
     const { type, favorite } = req.query;
     const filter = {};
     if (type && ['Internal', 'External', 'List'].includes(type)) {
@@ -82,7 +98,7 @@ exports.updateDirectoryContact = async (req, res) => {
     if (!existing) {
       return res.status(404).json({ error: 'Contacto no encontrado' });
     }
-    if (existing.type === 'Internal') {
+    if (existing.source === 'User') {
       return res.status(403).json({ error: 'Los contactos internos se administran desde Usuarios' });
     }
 
@@ -233,7 +249,7 @@ exports.deleteDirectoryContact = async (req, res) => {
     if (!deleted) {
       return res.status(404).json({ error: 'Contacto no encontrado' });
     }
-    if (deleted.type === 'Internal') {
+    if (deleted.source === 'User') {
       return res.status(403).json({ error: 'Los contactos internos no se eliminan desde el directorio' });
     }
 
@@ -376,7 +392,9 @@ exports.rebuildDirectoryFromEscalation = async (_req, res) => {
         email: user.email,
         phone: user.phone,
         position: user.cargoLabel || user.role,
-        type: 'Internal'
+        type: 'Internal',
+        scope: 'Internal',
+        source: 'User'
       });
     });
 

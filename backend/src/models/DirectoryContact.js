@@ -38,6 +38,16 @@ const directoryContactSchema = new mongoose.Schema({
     enum: ['Internal', 'External', 'List'],
     default: 'External'
   },
+  scope: {
+    type: String,
+    enum: ['Internal', 'External'],
+    default: 'External'
+  },
+  source: {
+    type: String,
+    enum: ['User', 'Manual', 'Sync'],
+    default: 'Manual'
+  },
   isFavorite: {
     type: Boolean,
     default: false
