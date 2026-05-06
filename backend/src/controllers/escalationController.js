@@ -282,6 +282,35 @@ const resolveAssignmentAssignee = async (row) => {
   };
 };
 
+const normalizeEscalationFlowPayload = (rawSteps = []) => {
+  if (!Array.isArray(rawSteps)) return [];
+
+  return rawSteps.map((rawStep, index) => {
+    const stepType = String(rawStep?.type || '').trim().toLowerCase() === 'pool' ? 'pool' : 'unique';
+    const normalizedContacts = Array.isArray(rawStep?.contacts)
+      ? rawStep.contacts
+        .map((contact) => ({
+          name: sanitizeText(contact?.name, 120),
+          tel: sanitizeText(contact?.tel, 80)
+        }))
+        .filter((contact) => contact.name || contact.tel)
+      : [];
+
+    const parsedCallAt = rawStep?.callAt ? new Date(rawStep.callAt) : null;
+    const callAt = parsedCallAt && !Number.isNaN(parsedCallAt.getTime()) ? parsedCallAt : null;
+
+    return {
+      order: index + 1,
+      title: sanitizeText(rawStep?.title || `Paso ${index + 1}`, 120) || `Paso ${index + 1}`,
+      type: stepType,
+      contactName: stepType === 'unique' ? sanitizeText(rawStep?.contactName, 120) : '',
+      contactTel: stepType === 'unique' ? sanitizeText(rawStep?.contactTel, 80) : '',
+      callAt: stepType === 'unique' ? callAt : null,
+      contacts: stepType === 'pool' ? normalizedContacts : []
+    };
+  });
+};
+
 /**
  * Resuelve quién está de turno AHORA para un servicio específico
  * @param {string} serviceId - ID del servicio
@@ -584,6 +613,64 @@ exports.getRaciByClient = async (req, res) => {
   } catch (error) {
     logger.error('Error in getRaciByClient:', error);
     res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getEscalationFlowByClient = async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const client = await CatalogLogSource.findOne({
+      _id: clientId,
+      ...ENABLED_LOG_SOURCE_MATCH
+    }).select('_id name escalationFlow escalationLegend');
+
+    if (!client) {
+      return res.status(404).json({ error: 'Cliente no encontrado o deshabilitado' });
+    }
+
+    return res.json({
+      clientId: client._id,
+      clientName: client.name,
+      flow: (client.escalationFlow || []).sort((a, b) => (a.order || 0) - (b.order || 0)),
+      legend: client.escalationLegend || ''
+    });
+  } catch (error) {
+    logger.error('Error in getEscalationFlowByClient:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+exports.upsertEscalationFlowByClient = async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const flow = normalizeEscalationFlowPayload(req.body?.flow);
+    const legend = sanitizeText(req.body?.legend, 3000);
+
+    const client = await CatalogLogSource.findOneAndUpdate(
+      { _id: clientId, ...ENABLED_LOG_SOURCE_MATCH },
+      {
+        $set: {
+          escalationFlow: flow,
+          escalationLegend: legend
+        }
+      },
+      { new: true, runValidators: true }
+    ).select('_id name escalationFlow escalationLegend');
+
+    if (!client) {
+      return res.status(404).json({ error: 'Cliente no encontrado o deshabilitado' });
+    }
+
+    return res.json({
+      message: 'Flujo de escalamiento actualizado',
+      clientId: client._id,
+      clientName: client.name,
+      flow: (client.escalationFlow || []).sort((a, b) => (a.order || 0) - (b.order || 0)),
+      legend: client.escalationLegend || ''
+    });
+  } catch (error) {
+    logger.error('Error in upsertEscalationFlowByClient:', error);
+    return res.status(400).json({ error: error.message });
   }
 };
 

@@ -336,3 +336,84 @@
     font-size: 16px;
   }
 }
+
+.flow-admin-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.flow-client-field {
+  min-width: 260px;
+}
+
+.flow-steps-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.flow-step-card {
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  padding: 12px;
+}
+
+.flow-step-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.flow-step-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.flow-step-title {
+  width: 100%;
+}
+
+.flow-step-body {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.flow-step-body--pool {
+  display: block;
+}
+
+.pool-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.pool-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.pool-contact-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.flow-legend-card {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px dashed var(--outline-subtle);
+  border-radius: var(--radius-md);
+}

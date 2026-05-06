@@ -106,6 +106,70 @@
   }
 }
 
+.dynamic-flow-view {
+  margin-bottom: 20px;
+}
+
+.loading-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.flow-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.flow-step-box {
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  background: var(--surface-muted);
+
+  h4 {
+    margin: 0 0 4px 0;
+  }
+}
+
+.flow-unique {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.flow-pool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.flow-pool-item {
+  background: var(--surface-card);
+  border: 1px solid var(--outline-subtle);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.flow-legend-view {
+  border-left: 4px solid var(--primary-color);
+  background: var(--surface-muted);
+  padding: 10px;
+
+  p {
+    margin: 6px 0 0;
+    white-space: pre-wrap;
+  }
+}
+
 // ESTILOS PARA TURNOS DE LA SEMANA
 .shifts-grid {
   display: grid;

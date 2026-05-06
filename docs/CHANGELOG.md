@@ -2,6 +2,28 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.62-beta] - 2026-05-06
+
+### Escalación: flujo dinámico por cliente en Admin y View (`ESC-FLOW-090`)
+
+- **Nuevo modelo por cliente:** se extendió `CatalogLogSource` con `escalationFlow[]` y `escalationLegend`, permitiendo persistir un flujo de llamados configurable por cliente sin crear colección adicional.
+- **Nuevos endpoints backend:** se agregaron `GET /api/escalation/flow/:clientId` y `PUT/POST /api/escalation/flow/:clientId` para lectura y actualización completa del flujo por cliente.
+- **Admin dinámico (`/main/escalation/admin`):** nuevo tab para configurar pasos de escalamiento con:
+  - alta de pasos `unique` y `pool`,
+  - edición de título/contactos/fecha-hora,
+  - eliminación de pasos,
+  - reordenamiento con `CdkDragDrop`,
+  - edición anidada de contactos dentro de pools,
+  - textarea de leyenda/recordatorio por cliente.
+- **Vista operativa responsiva (`/main/escalation/view`):** carga del flujo configurado del cliente seleccionado y render en cards responsivas; los pools usan grid adaptativo para evitar desborde horizontal en móviles.
+- **Contrato frontend tipado:** se incorporaron nuevos tipos (`EscalationFlowStep`, `EscalationFlowConfig`) y métodos en `EscalationService` para consumir/guardar la configuración.
+
+### Corrección de compilación Docker (TypeScript estricto)
+
+- **Causa:** durante `docker compose build`, Angular fallaba con `TS2345` en `escalation-admin-simple.component.ts` por inferencia de `type: string` en payload de flujo (`string` no asignable a `EscalationFlowStepType`).
+- **Fix aplicado:** tipado explícito del payload como `{ flow: EscalationFlowStep[]; legend: string }` y retorno tipado en el `map`.
+- **Resultado:** `docker compose build` completado exitosamente para `bitacorasoc-frontend` y `bitacorasoc-backend`.
+
 ## [v1.5.61-beta] - 2026-05-05
 
 ### Corrección SMTP: error TLS "wrong version number" al enviar correos (`SMTP-TLS-101`)

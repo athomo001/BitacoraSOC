@@ -9,7 +9,7 @@ import { FormControl } from '@angular/forms';
 import { Observable } from 'rxjs';
 import { map, startWith, switchMap } from 'rxjs/operators';
 import { EscalationService } from '../../../services/escalation.service';
-import { Client, Service, EscalationView } from '../../../models/escalation.model';
+import { Client, Service, EscalationView, EscalationFlowConfig } from '../../../models/escalation.model';
 
 @Component({
   selector: 'app-escalation-view',
@@ -29,6 +29,7 @@ export class EscalationViewComponent implements OnInit {
 
   // Vista de escalamiento
   escalationData: EscalationView | null = null;
+  escalationFlow: EscalationFlowConfig | null = null;
   loading = false;
   error: string | null = null;
 
@@ -72,8 +73,21 @@ export class EscalationViewComponent implements OnInit {
     if (client && client._id) {
       this.serviceControl.setValue(null);
       this.escalationData = null;
+      this.loadEscalationFlow(client._id);
       this.loadServices(client._id);
     }
+  }
+
+  loadEscalationFlow(clientId: string): void {
+    this.escalationService.getEscalationFlow(clientId).subscribe({
+      next: (flow) => {
+        this.escalationFlow = flow;
+      },
+      error: (err) => {
+        console.error('Error loading escalation flow:', err);
+        this.escalationFlow = { clientId, clientName: '', flow: [], legend: '' };
+      }
+    });
   }
 
   loadServices(clientId: string): void {
@@ -112,6 +126,10 @@ export class EscalationViewComponent implements OnInit {
   }
 
   refresh(): void {
+    const client = this.clientControl.value;
+    if (client && typeof client === 'object' && client._id) {
+      this.loadEscalationFlow(client._id);
+    }
     const service = this.serviceControl.value;
     if (service && typeof service === 'object' && service._id) {
       this.loadEscalationData(service._id);

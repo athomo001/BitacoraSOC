@@ -18,6 +18,21 @@
  */
 const mongoose = require('mongoose');
 
+const escalationFlowContactSchema = new mongoose.Schema({
+  name: { type: String, trim: true, default: '' },
+  tel: { type: String, trim: true, default: '' }
+}, { _id: true });
+
+const escalationFlowStepSchema = new mongoose.Schema({
+  order: { type: Number, required: true, min: 1 },
+  title: { type: String, trim: true, required: true, maxlength: 120 },
+  type: { type: String, enum: ['unique', 'pool'], required: true },
+  contactName: { type: String, trim: true, default: '' },
+  contactTel: { type: String, trim: true, default: '' },
+  callAt: { type: Date, default: null },
+  contacts: { type: [escalationFlowContactSchema], default: [] }
+}, { _id: true });
+
 const catalogLogSourceSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -41,6 +56,16 @@ const catalogLogSourceSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
     required: true
+  },
+  escalationFlow: {
+    type: [escalationFlowStepSchema],
+    default: []
+  },
+  escalationLegend: {
+    type: String,
+    trim: true,
+    maxlength: 3000,
+    default: ''
   }
 }, {
   timestamps: true

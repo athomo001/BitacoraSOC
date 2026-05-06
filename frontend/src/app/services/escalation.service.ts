@@ -33,7 +33,9 @@ import {
   ClientAlertEvaluation,
   NewsletterRecipientValidation,
   ClientAlertAckPayload,
-  ClientAlertContext
+  ClientAlertContext,
+  EscalationFlowConfig,
+  EscalationFlowStep
 } from '../models/escalation.model';
 
 @Injectable({
@@ -115,6 +117,14 @@ export class EscalationService {
       params = params.set('serviceId', serviceId);
     }
     return this.http.get<RaciEntry[]>(`${this.apiUrl}/raci`, { params });
+  }
+
+  getEscalationFlow(clientId: string): Observable<EscalationFlowConfig> {
+    return this.http.get<EscalationFlowConfig>(`${this.apiUrl}/flow/${clientId}`);
+  }
+
+  saveEscalationFlow(clientId: string, payload: { flow: EscalationFlowStep[]; legend: string }): Observable<EscalationFlowConfig> {
+    return this.http.put<EscalationFlowConfig>(`${this.apiUrl}/flow/${clientId}`, payload);
   }
 
   /**

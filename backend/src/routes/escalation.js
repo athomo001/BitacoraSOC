@@ -74,6 +74,9 @@ router.get('/internal-shifts', authenticate, escalationController.getInternalShi
  * @access  Private (Analyst/Admin)
  */
 router.get('/raci', authenticate, escalationController.getRaciByClient);
+router.get('/flow/:clientId', authenticate, escalationController.getEscalationFlowByClient);
+router.put('/flow/:clientId', authenticate, requireAdmin, escalationController.upsertEscalationFlowByClient);
+router.post('/flow/:clientId', authenticate, requireAdmin, escalationController.upsertEscalationFlowByClient);
 
 /**
  * @route   GET /api/escalation/client-alert?clientId=...&context=report
