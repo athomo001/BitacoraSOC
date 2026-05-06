@@ -118,6 +118,42 @@
       <mat-spinner diameter="40"></mat-spinner>
     </div>
 
+    <div *ngIf="!loading && selectedClient" class="dynamic-flow-view">
+      <h3>Flujo dinámico configurado</h3>
+      <div *ngIf="loadingClientFlow" class="loading-inline">
+        <mat-spinner diameter="24"></mat-spinner>
+      </div>
+
+      <div *ngIf="!loadingClientFlow && selectedClientFlow?.flow?.length" class="flow-grid">
+        <article class="flow-step-box" *ngFor="let step of selectedClientFlow?.flow">
+          <h4>{{ step.title }}</h4>
+          <small>Paso {{ step.order }}</small>
+
+          <div *ngIf="step.type === 'unique'" class="flow-unique">
+            <strong>{{ step.contactName || 'Sin nombre' }}</strong>
+            <span>{{ step.contactTel || 'Sin teléfono' }}</span>
+            <span *ngIf="step.callAt">{{ step.callAt | date:'dd/MM/yyyy HH:mm' }}</span>
+          </div>
+
+          <div *ngIf="step.type === 'pool'" class="flow-pool-grid">
+            <div *ngFor="let c of step.contacts || []" class="flow-pool-item">
+              <strong>{{ c.name || 'Sin nombre' }}</strong>
+              <span>{{ c.tel || 'Sin teléfono' }}</span>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <p *ngIf="!loadingClientFlow && (!selectedClientFlow?.flow || selectedClientFlow?.flow?.length === 0)" class="text-muted">
+        No hay flujo dinámico configurado para este cliente.
+      </p>
+
+      <div *ngIf="selectedClientFlow?.legend" class="flow-legend-view">
+        <strong>Leyenda / Recordatorio</strong>
+        <p>{{ selectedClientFlow?.legend }}</p>
+      </div>
+    </div>
+
     <div *ngIf="!loading && selectedClient && selectedClientData" class="excel-table-container">
       <h3 class="client-title">{{ selectedClient.name }}</h3>
       

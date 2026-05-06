@@ -331,3 +331,70 @@
 mat-divider {
   margin: 24px 0;
 }
+
+.flow-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.flow-step {
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  background: var(--surface-muted);
+
+  h3 {
+    margin: 0 0 4px 0;
+    font-size: 15px;
+  }
+}
+
+.step-meta {
+  margin: 0 0 8px 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.step-contact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pool-responsive-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.pool-contact {
+  border: 1px solid var(--outline-subtle);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--surface-card);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.flow-legend {
+  margin-top: 16px;
+  padding: 12px;
+  border-left: 4px solid var(--primary-color);
+  background: var(--surface-muted);
+
+  h3 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+  }
+
+  p {
+    margin: 0;
+    white-space: pre-wrap;
+  }
+}
+
+.compact-no-data {
+  padding: 20px;
+}

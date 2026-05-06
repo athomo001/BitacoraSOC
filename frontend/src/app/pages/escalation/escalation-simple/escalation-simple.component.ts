@@ -25,7 +25,7 @@ import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angula
 import { EscalationService } from '../../../services/escalation.service';
 import { CatalogService } from '../../../services/catalog.service';
 import { CatalogLogSource } from '../../../models/catalog.model';
-import { ClientAlertRule } from '../../../models/escalation.model';
+import { ClientAlertRule, EscalationFlowConfig } from '../../../models/escalation.model';
 
 @Component({
     selector: 'app-escalation-simple',
@@ -56,6 +56,8 @@ export class EscalationSimpleComponent implements OnInit {
   allClients: any[] = [];
   selectedClient: any = null;
   unassignedContacts: any[] = [];
+  selectedClientFlow: EscalationFlowConfig | null = null;
+  loadingClientFlow = false;
   loading = false;
   raciClients: CatalogLogSource[] = [];
   selectedRaciClient: CatalogLogSource | null = null;
@@ -199,6 +201,7 @@ export class EscalationSimpleComponent implements OnInit {
       // Seleccionar primer cliente por defecto
       if (this.allClients.length > 0 && !this.selectedClient) {
         this.selectedClient = this.allClients[0];
+        this.loadSelectedClientFlow();
       }
       
       this.loading = false;
@@ -233,7 +236,27 @@ export class EscalationSimpleComponent implements OnInit {
   }
 
   onClientChange(): void {
-    // Selector de contactos (no afecta RACI)
+    this.loadSelectedClientFlow();
+  }
+
+  loadSelectedClientFlow(): void {
+    const clientId = this.selectedClient?._id;
+    if (!clientId) {
+      this.selectedClientFlow = null;
+      return;
+    }
+
+    this.loadingClientFlow = true;
+    this.escalationService.getEscalationFlow(clientId).subscribe({
+      next: (flow) => {
+        this.selectedClientFlow = flow;
+        this.loadingClientFlow = false;
+      },
+      error: () => {
+        this.selectedClientFlow = { clientId, clientName: this.selectedClient?.name || '', flow: [], legend: '' };
+        this.loadingClientFlow = false;
+      }
+    });
   }
 
   onRaciClientChange(): void {

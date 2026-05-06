@@ -8,6 +8,109 @@
   </header>
 
   <mat-tab-group class="escalation-admin-tabs">
+    <mat-tab label="📲 Flujo de Escalamiento Dinámico">
+      <div class="tab-content">
+        <h2>Contactos de Escalamiento</h2>
+        <p class="subtitle">Configura un flujo dinámico por cliente con pasos únicos o tipo pool.</p>
+
+        <div class="flow-admin-toolbar">
+          <mat-form-field appearance="outline" class="flow-client-field">
+            <mat-label>Seleccionar Cliente</mat-label>
+            <mat-select [(ngModel)]="selectedFlowClientId" (selectionChange)="onFlowClientChange()">
+              <mat-option *ngFor="let client of clients" [value]="client._id">
+                {{ client.name }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <button mat-raised-button color="primary" (click)="addFlowStep('unique')">
+            <mat-icon>add</mat-icon>
+            Añadir Nuevo Paso de Escalación
+          </button>
+          <button mat-stroked-button color="accent" (click)="addFlowStep('pool')">
+            <mat-icon>group_add</mat-icon>
+            Añadir POOL
+          </button>
+          <button mat-raised-button color="primary" (click)="saveEscalationFlow()" [disabled]="!selectedFlowClientId || savingFlow">
+            <mat-icon>{{ savingFlow ? 'hourglass_empty' : 'save' }}</mat-icon>
+            {{ savingFlow ? 'Guardando...' : 'Guardar flujo' }}
+          </button>
+        </div>
+
+        <div *ngIf="loadingFlow" class="loading">
+          <mat-spinner diameter="36"></mat-spinner>
+        </div>
+
+        <div class="flow-steps-container" cdkDropList [cdkDropListData]="flowSteps" (cdkDropListDropped)="dropFlowStep($event)">
+          <section class="flow-step-card" *ngFor="let step of flowSteps; let stepIndex = index" cdkDrag>
+            <header class="flow-step-header">
+              <div class="flow-step-title-wrap">
+                <button mat-icon-button cdkDragHandle matTooltip="Arrastrar para reordenar">
+                  <mat-icon>drag_indicator</mat-icon>
+                </button>
+                <mat-form-field appearance="outline" class="flow-step-title">
+                  <mat-label>Título del paso</mat-label>
+                  <input matInput [(ngModel)]="step.title" placeholder="Ej: 1er Llamado">
+                </mat-form-field>
+              </div>
+              <div>
+                <button mat-icon-button color="warn" (click)="deleteFlowStep(stepIndex)" matTooltip="Eliminar paso">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+            </header>
+
+            <div *ngIf="step.type === 'unique'" class="flow-step-body">
+              <mat-form-field appearance="outline">
+                <mat-label>Nombre</mat-label>
+                <input matInput [(ngModel)]="step.contactName" placeholder="Nombre del contacto">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Tel</mat-label>
+                <input matInput [(ngModel)]="step.contactTel" placeholder="+56 9 ...">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Fecha/Hora</mat-label>
+                <input matInput type="datetime-local" [(ngModel)]="step.callAt">
+              </mat-form-field>
+            </div>
+
+            <div *ngIf="step.type === 'pool'" class="flow-step-body flow-step-body--pool">
+              <div class="pool-header">
+                <strong>Contactos del pool</strong>
+                <button mat-icon-button color="primary" (click)="addPoolContact(stepIndex)" matTooltip="Agregar contacto al pool">
+                  <mat-icon>add_circle</mat-icon>
+                </button>
+              </div>
+              <div class="pool-grid">
+                <div class="pool-contact-row" *ngFor="let contact of step.contacts; let contactIndex = index">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Nombre</mat-label>
+                    <input matInput [(ngModel)]="contact.name" placeholder="Nombre">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Tel</mat-label>
+                    <input matInput [(ngModel)]="contact.tel" placeholder="+56 9 ...">
+                  </mat-form-field>
+                  <button mat-icon-button color="warn" (click)="removePoolContact(stepIndex, contactIndex)">
+                    <mat-icon>remove_circle</mat-icon>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <section class="flow-legend-card">
+          <h3>Leyenda del Administrador / Recordatorio de Llamada</h3>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Texto para operadores</mat-label>
+            <textarea matInput rows="5" [(ngModel)]="flowLegend" placeholder="Ej: Llamar 3 veces antes de descartar el caso..."></textarea>
+          </mat-form-field>
+        </section>
+      </div>
+    </mat-tab>
+
     <!-- TAB 1: TURNOS INTERNOS -->
     <mat-tab label="🗓️ Turnos Internos (Mi Empresa)">
       <div class="tab-content">

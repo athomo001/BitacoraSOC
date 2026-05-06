@@ -89,6 +89,46 @@
       </div>
     </section>
 
+    <section *ngIf="escalationFlow" class="flow-card escalation-view-panel">
+      <header class="escalation-view-panel__header">
+        <h2 class="escalation-view-panel__title">
+          <mat-icon>call</mat-icon>
+          Flujo de Llamados de Escalamiento
+        </h2>
+      </header>
+      <div class="escalation-view-panel__body">
+        <div *ngIf="escalationFlow.flow.length > 0" class="flow-grid">
+          <article *ngFor="let step of escalationFlow.flow" class="flow-step">
+            <h3>{{ step.title }}</h3>
+            <p class="step-meta">Paso {{ step.order }}</p>
+
+            <div *ngIf="step.type === 'unique'" class="step-contact">
+              <div><strong>{{ step.contactName || 'Sin nombre' }}</strong></div>
+              <div>{{ step.contactTel || 'Sin teléfono' }}</div>
+              <div *ngIf="step.callAt">Fecha/Hora: {{ formatDateTime(step.callAt) }}</div>
+            </div>
+
+            <div *ngIf="step.type === 'pool'" class="pool-responsive-grid">
+              <div class="pool-contact" *ngFor="let contact of step.contacts || []">
+                <strong>{{ contact.name || 'Sin nombre' }}</strong>
+                <span>{{ contact.tel || 'Sin teléfono' }}</span>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <div *ngIf="escalationFlow.flow.length === 0" class="no-data compact-no-data">
+          <mat-icon>info</mat-icon>
+          <p>No hay flujo de escalamiento configurado para este cliente</p>
+        </div>
+
+        <div *ngIf="escalationFlow.legend" class="flow-legend">
+          <h3>Leyenda / Recordatorio</h3>
+          <p>{{ escalationFlow.legend }}</p>
+        </div>
+      </div>
+    </section>
+
     <!-- Contactos Externos -->
     <section class="contacts-card escalation-view-panel">
       <header class="escalation-view-panel__header">

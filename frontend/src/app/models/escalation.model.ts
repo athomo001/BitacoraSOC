@@ -289,6 +289,32 @@ export interface EscalationView {
   timestamp: string; // ISO 8601
 }
 
+export type EscalationFlowStepType = 'unique' | 'pool';
+
+export interface EscalationFlowContact {
+  _id?: string;
+  name: string;
+  tel: string;
+}
+
+export interface EscalationFlowStep {
+  _id?: string;
+  order: number;
+  title: string;
+  type: EscalationFlowStepType;
+  contactName?: string;
+  contactTel?: string;
+  callAt?: string | null;
+  contacts?: EscalationFlowContact[];
+}
+
+export interface EscalationFlowConfig {
+  clientId: string;
+  clientName: string;
+  flow: EscalationFlowStep[];
+  legend: string;
+}
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 📝 DTOs PARA FORMULARIOS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

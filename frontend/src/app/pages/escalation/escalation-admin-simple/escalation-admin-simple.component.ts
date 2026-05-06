@@ -21,11 +21,13 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { EscalationService } from '../../../services/escalation.service';
 import { UserService } from '../../../services/user.service';
 import { CatalogService } from '../../../services/catalog.service';
 import { ConfigService } from '../../../services/config.service';
 import { CatalogLogSource } from '../../../models/catalog.model';
+import { EscalationFlowStep } from '../../../models/escalation.model';
 
 @Injectable()
 class MondayFirstNativeDateAdapter extends NativeDateAdapter {
@@ -54,7 +56,8 @@ class MondayFirstNativeDateAdapter extends NativeDateAdapter {
         MatTabsModule,
         MatExpansionModule,
         MatCheckboxModule,
-        MatAutocompleteModule
+        MatAutocompleteModule,
+        DragDropModule
     ],
     providers: [
         { provide: MAT_DATE_LOCALE, useValue: 'es-CL' },
@@ -116,6 +119,11 @@ export class EscalationAdminSimpleComponent implements OnInit {
   clients: any[] = [];
   services: any[] = [];
   contacts: any[] = [];
+  selectedFlowClientId: string | null = null;
+  flowSteps: any[] = [];
+  flowLegend = '';
+  loadingFlow = false;
+  savingFlow = false;
   loadingClients = false;
   loadingServices = false;
   loadingContacts = false;
@@ -615,6 +623,10 @@ export class EscalationAdminSimpleComponent implements OnInit {
       next: (response) => {
         const items = response?.items || response || [];
         this.clients = [...items].filter((client: any) => client.enabled !== false);
+        if (!this.selectedFlowClientId && this.clients.length > 0) {
+          this.selectedFlowClientId = this.clients[0]._id;
+          this.loadEscalationFlow();
+        }
         this.loadingClients = false;
         this.cdr.detectChanges();
       },
@@ -623,6 +635,118 @@ export class EscalationAdminSimpleComponent implements OnInit {
         this.loadingClients = false;
       }
     });
+  }
+
+  onFlowClientChange(): void {
+    this.loadEscalationFlow();
+  }
+
+  loadEscalationFlow(): void {
+    if (!this.selectedFlowClientId) {
+      this.flowSteps = [];
+      this.flowLegend = '';
+      return;
+    }
+
+    this.loadingFlow = true;
+    this.escalationService.getEscalationFlow(this.selectedFlowClientId).subscribe({
+      next: (response) => {
+        this.flowSteps = (response?.flow || []).map((step: any, idx: number) => ({
+          order: idx + 1,
+          title: step?.title || `Paso ${idx + 1}`,
+          type: step?.type === 'pool' ? 'pool' : 'unique',
+          contactName: step?.contactName || '',
+          contactTel: step?.contactTel || '',
+          callAt: step?.callAt ? new Date(step.callAt).toISOString().slice(0, 16) : '',
+          contacts: Array.isArray(step?.contacts) ? step.contacts.map((c: any) => ({
+            name: c?.name || '',
+            tel: c?.tel || ''
+          })) : []
+        }));
+        this.flowLegend = response?.legend || '';
+        this.loadingFlow = false;
+      },
+      error: () => {
+        this.flowSteps = [];
+        this.flowLegend = '';
+        this.loadingFlow = false;
+      }
+    });
+  }
+
+  addFlowStep(type: 'unique' | 'pool' = 'unique'): void {
+    this.flowSteps.push({
+      order: this.flowSteps.length + 1,
+      title: type === 'pool' ? 'POOL de Llamados' : `${this.flowSteps.length + 1}er Llamado`,
+      type,
+      contactName: '',
+      contactTel: '',
+      callAt: '',
+      contacts: type === 'pool' ? [{ name: '', tel: '' }] : []
+    });
+  }
+
+  deleteFlowStep(index: number): void {
+    this.flowSteps.splice(index, 1);
+    this.reindexFlowSteps();
+  }
+
+  addPoolContact(stepIndex: number): void {
+    if (!Array.isArray(this.flowSteps[stepIndex].contacts)) {
+      this.flowSteps[stepIndex].contacts = [];
+    }
+    this.flowSteps[stepIndex].contacts.push({ name: '', tel: '' });
+  }
+
+  removePoolContact(stepIndex: number, contactIndex: number): void {
+    this.flowSteps[stepIndex].contacts.splice(contactIndex, 1);
+  }
+
+  dropFlowStep(event: CdkDragDrop<any[]>): void {
+    moveItemInArray(this.flowSteps, event.previousIndex, event.currentIndex);
+    this.reindexFlowSteps();
+  }
+
+  saveEscalationFlow(): void {
+    if (!this.selectedFlowClientId || this.savingFlow) {
+      return;
+    }
+
+    this.savingFlow = true;
+    const payload: { flow: EscalationFlowStep[]; legend: string } = {
+      flow: this.flowSteps.map((step, idx): EscalationFlowStep => ({
+        order: idx + 1,
+        title: String(step?.title || '').trim() || `Paso ${idx + 1}`,
+        type: step?.type === 'pool' ? 'pool' : 'unique',
+        contactName: step?.type === 'pool' ? '' : String(step?.contactName || '').trim(),
+        contactTel: step?.type === 'pool' ? '' : String(step?.contactTel || '').trim(),
+        callAt: step?.type === 'pool' ? null : (step?.callAt ? new Date(step.callAt).toISOString() : null),
+        contacts: step?.type === 'pool'
+          ? (Array.isArray(step?.contacts) ? step.contacts.map((c: any) => ({
+            name: String(c?.name || '').trim(),
+            tel: String(c?.tel || '').trim()
+          })) : []).filter((c: any) => c.name || c.tel)
+          : []
+      })),
+      legend: String(this.flowLegend || '').trim()
+    };
+
+    this.escalationService.saveEscalationFlow(this.selectedFlowClientId, payload).subscribe({
+      next: () => {
+        this.showSuccess('Flujo de escalamiento actualizado');
+        this.savingFlow = false;
+        this.loadEscalationFlow();
+      },
+      error: (err) => {
+        const backendMessage = err?.error?.error || err?.error?.message;
+        this.showError(backendMessage || 'Error guardando flujo de escalamiento');
+        this.savingFlow = false;
+      }
+    });
+  }
+
+  private reindexFlowSteps(): void {
+    this.flowSteps = this.flowSteps.map((step, idx) => ({ ...step, order: idx + 1 }));
   }
 
   addClient(): void {

@@ -20,6 +20,7 @@
 | ID | Estado | Seccion | Tarea | Notas |
 | --- | --- | --- | --- | --- |
 | BACKUP-ENC-081 | En progreso | Backup / Seguridad ALTA | Cifrado opcional de backups con passphrase en crear y restaurar | Al crear un backup, el usuario podrá elegir si desea cifrarlo mediante un popup para ingresar frase secreta; no será obligatorio. Al restaurar, si el respaldo está cifrado, el sistema debe pedir la llave, validarla antes de tocar datos y continuar solo si es correcta. |
+| ESC-FLOW-090 | En progreso | Escalación / Admin + View ALTA | Configuración dinámica y responsiva de flujo de llamados por cliente | Implementación investigada y documentada para `/main/escalation/admin` y `/main/escalation/view`: flujo editable por cliente (pasos únicos/pool), drag&drop, persistencia en cliente (`CatalogLogSource`), endpoints dedicados (`GET/PUT/POST /api/escalation/flow/:clientId`) y render responsivo en vista operativa. |
 | COMP-DICT-083 | Pendiente | Complementos / Operación SOC MEDIA | Diccionario interactivo de logs de ciberseguridad (estático, sin Docker) | Implementación detallada: 1) Se tomó como base la guía `docs/COMPLEMENTS.md` y se eligió flujo `zip-static` (sin backend ni contenedor). 2) Se creó la carpeta `tools/diccionario-logs-ciber/` con `index.html` (estructura UI), `styles.css` (diseño responsive), `app.js` (dataset + lógica), y `README.md` (uso/publicación). 3) Dataset embebido por fabricante con campos `tag`, `meaning`, `values`, `impact` para: Huawei HiSec Insight (`ThreatEventStatus`, `EventLevel`, `EventCategory`, `SrcArea`, `EventClass`), Fortinet FortiOS (`action`, `type`, `subtype`, `level`, `app`), y Huawei WAC/Cisco WLC (`ERRCODE`, `RESULT`, `MAC`, `SESSIONTIME`, `RSSI/Signal`). 4) UX implementada: combobox de fabricante, buscador por texto libre (filtra por tag/significado/valores), render de tarjetas por tag con badge de impacto (`High/Medium/Low/Info`), contador de coincidencias y bloque de ejemplo de log realista por marca para comparación visual del analista. 5) Lógica técnica en frontend: normalización de búsqueda (`toLowerCase` + `trim`), filtrado dinámico en evento `input/change`, escape básico de HTML para render seguro y construcción de tarjetas por plantilla en cliente. 6) Empaquetado realizado con `Compress-Archive` en `tools/diccionario-logs-ciber.zip`, listo para Admin > Complementos (`Analizar ZIP` -> `Preview` -> `Publicar`). 7) Criterio para pasar a Listo: validar funcionamiento del selector/buscador/cards en preview, confirmar carga del `iframe` publicado y disponibilidad del complemento para perfiles autorizados. Condiciones para IA en este issue: no usar Docker ni backend adicional, no cambiar contrato de complemento estático, no agregar dependencias innecesarias, no exponer secretos/tokens, mantener UI responsive y legible, y documentar evidencia de validación antes de mover a `Listo`. |
 | ESC-PREV-084 | Listo | Admin / Escalación MEDIA | Autocomplete de empresa en formulario de contacto preventivo | En `/main/admin/escalation` (Tab "Contactos de Escalación" > sección 3 "Agenda Preventiva para Boletines"), el campo Empresa del formulario debe convertirse en un `matAutocomplete` que sugiere en tiempo real las empresas ya registradas al escribir (filtro parcial, case-insensitive), permitiendo igualmente escritura libre para empresas nuevas. |
 | ESC-PREV-085 | Listo | Admin / Escalación MEDIA | Nuevo campo "Lista de correo" en contactos preventivos | En la misma sección, agregar un checkbox `isMailingList` debajo de "Favorito" en el formulario y persistirlo en backend (modelo + endpoints + CSV import/export). Permite distinguir correos de personas (`cfsilva@scj.gob.cl`) de listas de distribución (`eventos.ciberseguridad@scj.gob.cl`). |
@@ -611,6 +612,105 @@ Cuatro mejoras agrupadas sobre la vista de administración de usuarios. No requi
 - No se expone `newPassword` en auditoría; solo el flag `passwordChanged`.
 - QA obligatorio en los 5 temas según `QA-UI-061`–`QA-UI-065`, especialmente para botones y formularios.
 - No se genera lockout: si el admin cambia su propia contraseña, su sesión actual sigue activa.
+
+---
+
+## ESC-FLOW-090 — Configuración Dinámica y Responsiva de Flujos de Llamados de Escalamiento
+
+**Estado:** En progreso  
+**Prioridad:** ALTA  
+**Tipo:** Escalación / Admin + View + Backend  
+**Rutas:** `/main/escalation/admin` y `/main/escalation/view`
+
+### Objetivo
+
+Permitir que cada cliente tenga su propio flujo de escalamiento configurable por administración, reemplazando el esquema estático, y renderizar ese flujo en la vista operativa con diseño responsivo para pasos individuales y pools de contactos.
+
+### Investigación aplicada (estado actual del módulo)
+
+1. La ruta real de administración ya usa `EscalationAdminSimpleComponent` y la vista operativa usa `EscalationSimpleComponent`.
+2. Los clientes se consumen desde `CatalogLogSource` (Log Sources habilitados), por lo que la configuración por cliente debe anclarse ahí.
+3. El backend no tenía endpoints dedicados para flujo dinámico por cliente; solo contactos/reglas/turnos.
+4. La vista operativa tenía tabla por servicio y no contemplaba estructura de pasos tipo `unique/pool`.
+
+### Diseño técnico implementado
+
+#### 1) Persistencia MongoDB por cliente (sin colección nueva)
+
+Se extiende `CatalogLogSource` con:
+- `escalationFlow[]`: arreglo ordenado de pasos.
+- `escalationLegend`: leyenda/recordatorio editable por cliente.
+
+Cada paso soporta:
+- `order`, `title`, `type` (`unique` o `pool`)
+- Para `unique`: `contactName`, `contactTel`, `callAt`
+- Para `pool`: `contacts[]` con `name` y `tel`
+
+#### 2) API backend dedicada
+
+Se agregan endpoints en `/api/escalation`:
+- `GET /flow/:clientId` (lectura autenticada)
+- `PUT /flow/:clientId` (admin)
+- `POST /flow/:clientId` (admin, alias de upsert)
+
+Comportamiento:
+- normaliza y reindexa `order` en backend (fuente de verdad)
+- sanitiza textos y valida fechas
+- devuelve flujo y leyenda listos para render
+
+#### 3) Vista Admin dinámica (configuración)
+
+En `EscalationAdminSimpleComponent`:
+- Selector de cliente dedicado al flujo.
+- Botones:
+  - `Añadir Nuevo Paso de Escalación` (`unique`)
+  - `Añadir POOL`
+  - `Guardar flujo`
+- Edición por paso:
+  - título editable
+  - drag&drop con `CdkDragDrop`
+  - eliminar paso
+  - formulario por tipo (`unique` o `pool`)
+- En `pool`: lista anidada editable con agregar/quitar contactos.
+- Caja de leyenda (`textarea`) para recordatorio operativo.
+
+#### 4) Vista Operativa responsiva (`/main/escalation/view`)
+
+En `EscalationSimpleComponent`:
+- al cambiar cliente, carga `GET /flow/:clientId`
+- renderiza flujo en cards responsivas:
+  - paso `unique`: contacto + teléfono + fecha/hora
+  - paso `pool`: grilla responsiva de contactos (`auto-fit`) para evitar desborde en móvil
+- muestra leyenda al pie del bloque de flujo
+
+### Criterios de aceptación (definitivos para cierre)
+
+1. El admin puede crear, editar, eliminar y reordenar pasos por cliente.
+2. Se soportan tipos `unique` y `pool` con sus campos específicos.
+3. La configuración persiste y se recupera vía API para el cliente seleccionado.
+4. La vista operativa muestra el flujo del cliente activo sin controles de edición.
+5. Los pools no desbordan horizontalmente en mobile (grid responsivo activo).
+6. La leyenda del admin queda visible para operadores.
+
+### Archivos impactados
+
+- `backend/src/models/CatalogLogSource.js`
+- `backend/src/controllers/escalationController.js`
+- `backend/src/routes/escalation.js`
+- `frontend/src/app/models/escalation.model.ts`
+- `frontend/src/app/services/escalation.service.ts`
+- `frontend/src/app/pages/escalation/escalation-admin-simple/escalation-admin-simple.component.ts`
+- `frontend/src/app/pages/escalation/escalation-admin-simple/escalation-admin-simple.component.html`
+- `frontend/src/app/pages/escalation/escalation-admin-simple/escalation-admin-simple.component.scss`
+- `frontend/src/app/pages/escalation/escalation-simple/escalation-simple.component.ts`
+- `frontend/src/app/pages/escalation/escalation-simple/escalation-simple.component.html`
+- `frontend/src/app/pages/escalation/escalation-simple/escalation-simple.component.scss`
+
+### Riesgos / pendientes QA
+
+- Validar en los 5 temas que los nuevos bloques del flujo mantengan contraste.
+- Ejecutar smoke en mobile (ancho <= 390px) con pool de 6+ contactos.
+- Confirmar que usuarios auditor solo lectura no puedan mutar (`PUT/POST /flow/:clientId`).
 
 ---
 
