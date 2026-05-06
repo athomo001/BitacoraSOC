@@ -105,21 +105,21 @@
     <!-- Selector de Cliente -->
     <div class="client-selector" *ngIf="allClients.length > 0">
       <mat-form-field appearance="outline" class="client-field">
-        <mat-label>Buscar cliente</mat-label>
-        <input matInput [(ngModel)]="clientSearchTerm" placeholder="Escribe nombre del cliente">
+        <mat-label>Cliente</mat-label>
+        <input
+          matInput
+          [(ngModel)]="clientSearchTerm"
+          [matAutocomplete]="autoClientSimple"
+          placeholder="Buscar y seleccionar cliente">
         <mat-icon matSuffix>search</mat-icon>
-      </mat-form-field>
-
-      <mat-form-field appearance="outline" class="client-field">
-        <mat-label>Seleccionar Cliente</mat-label>
-        <mat-select [(ngModel)]="selectedClient" (selectionChange)="onClientChange()">
+        <mat-autocomplete #autoClientSimple="matAutocomplete" [displayWith]="displayClientOption" (optionSelected)="onClientAutocompleteSelected($event.option.value)">
           <mat-option *ngFor="let client of filteredClients" [value]="client">
             {{ client.name }}
           </mat-option>
           <mat-option *ngIf="filteredClients.length === 0" disabled>
             Sin resultados para "{{ clientSearchTerm }}"
           </mat-option>
-        </mat-select>
+        </mat-autocomplete>
       </mat-form-field>
 
       <button mat-stroked-button color="accent" type="button" (click)="toggleQuickClientForm(clientSearchTerm)">
@@ -247,20 +247,21 @@
 
     <div class="client-selector" *ngIf="raciClients.length > 0">
       <mat-form-field appearance="outline" class="client-field">
-        <mat-label>Buscar cliente</mat-label>
-        <input matInput [(ngModel)]="raciClientSearchTerm" placeholder="Filtrar clientes">
+        <mat-label>Cliente</mat-label>
+        <input
+          matInput
+          [(ngModel)]="raciClientSearchTerm"
+          [matAutocomplete]="autoRaciClientSimple"
+          placeholder="Buscar y seleccionar cliente">
         <mat-icon matSuffix>search</mat-icon>
-      </mat-form-field>
-      <mat-form-field appearance="outline" class="client-field">
-        <mat-label>Seleccionar Cliente</mat-label>
-        <mat-select [(ngModel)]="selectedRaciClient" (selectionChange)="onRaciClientChange()">
+        <mat-autocomplete #autoRaciClientSimple="matAutocomplete" [displayWith]="displayRaciClientOption" (optionSelected)="onRaciClientAutocompleteSelected($event.option.value)">
           <mat-option *ngFor="let client of filteredRaciClients" [value]="client">
             {{ client.name }}
           </mat-option>
           <mat-option *ngIf="filteredRaciClients.length === 0" disabled>
             Sin resultados para "{{ raciClientSearchTerm }}"
           </mat-option>
-        </mat-select>
+        </mat-autocomplete>
       </mat-form-field>
     </div>
 

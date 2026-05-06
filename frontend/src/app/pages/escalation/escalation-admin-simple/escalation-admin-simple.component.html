@@ -985,6 +985,10 @@
               <mat-icon>{{ rebuildingDirectory ? 'hourglass_empty' : 'sync' }}</mat-icon>
               {{ rebuildingDirectory ? 'Sincronizando...' : 'Sincronizar histórico' }}
             </button>
+            <button mat-stroked-button color="accent" type="button" (click)="mergeDirectoryDuplicatesNow()" [disabled]="mergingDirectoryDuplicates || !canDirectoryWrite">
+              <mat-icon>{{ mergingDirectoryDuplicates ? 'hourglass_empty' : 'auto_fix_high' }}</mat-icon>
+              {{ mergingDirectoryDuplicates ? 'Consolidando...' : 'Consolidar duplicados' }}
+            </button>
           </div>
 
           <div class="section-note" *ngIf="!canDirectoryWrite">

@@ -75,6 +75,7 @@ const requireDirectoryDelete = (req, res, next) => {
 
 router.get('/search', authenticate, controller.searchDirectoryContacts);
 router.post('/rebuild-from-escalation', authenticate, requireAdmin, controller.rebuildDirectoryFromEscalation);
+router.post('/merge-duplicates', authenticate, requireDirectoryWrite, controller.mergeDirectoryDuplicatesNow);
 router.get('/', authenticate, controller.listDirectoryContacts);
 router.get('/:id', authenticate, controller.getDirectoryContactById);
 router.post('/', authenticate, requireDirectoryWrite, controller.createDirectoryContact);
