@@ -2,6 +2,46 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.63-beta] - 2026-05-06
+
+### Directorio Centralizado como fuente de verdad operativa (`DIR-SSOT-101`)
+
+- **CRUD visible y utilizable en UI:** se habilitó alta/edición/eliminación directa del directorio en frontend (con formulario y acciones por fila).
+- **Sincronización histórica consolidada:** el proceso `rebuild-from-escalation` ahora incorpora también usuarios activos operativos (`admin`, `user`, `auditor`) al directorio con tipo `Internal`.
+- **Auto-sync de usuarios a directorio:** al crear/reactivar/actualizar usuarios desde Admin, se sincronizan automáticamente al directorio como `Internal`.
+- **Autocompletado extendido en formularios:** integración de directorio en Flujo dinámico, Contactos de escalación, Agenda preventiva, RACI y Personas externas; selección autocompleta campos relevantes.
+- **Selector común “Usar contacto existente”:** se añadió selector rápido de directorio para rellenar formularios con un click.
+
+### Propagación automática de cambios y borrados (`DIR-PROP-102`)
+
+- **Sin F5 en Admin Escalación:** al crear/editar/eliminar desde directorio se refrescan automáticamente los bloques operativos (contactos, agenda, externos, RACI y flujo dinámico).
+- **Borrado en cascada desde directorio:** eliminar un contacto del directorio también elimina equivalentes en `Contact` (incluyendo agenda preventiva) para evitar registros huérfanos.
+- **Actualización en cascada desde directorio:** editar nombre/correo/teléfono en directorio ahora propaga cambios a `Contact`, `ExternalPerson`, personas embebidas en `RaciEntry` y contactos de `CatalogLogSource.escalationFlow` (unique/pool).
+
+### Separación funcional de módulo y mejoras UX (`DIR-UX-103`)
+
+- **Directorio separado de Escalación Admin:** se removió la gestión de “fuente de verdad” desde `/main/admin/escalation` y se dejó en ruta/módulo dedicado.
+- **Nueva entrada de navegación global:** se agregó `Directorio Centralizado` bajo `Generar Reporte` en menú principal (`/main/escalation/directory`), visible para usuarios autenticados.
+- **Modo módulo independiente:** en `/main/escalation/directory` se adaptó cabecera, título/subtítulo y breadcrumb para identidad propia de “Directorio Global”.
+- **Filtro y paginación del directorio:** se añadieron filtros por tipo (`Todos/Internos/Externos/Listas`), búsqueda y paginación visual (`10/20/50`, anterior/siguiente, rango mostrado).
+- **Copia rápida al portapapeles:** nombre, correo y teléfono en la tabla del directorio son clickeables con feedback visual y snackbar de confirmación.
+- **Localización visual:** etiquetas de tipo en español (`Interno`, `Externo`, `Lista`) y ajustes visuales para una apariencia más profesional.
+
+### Reglas de gobierno y permisos del directorio (`DIR-RBAC-104`)
+
+- **Internos protegidos por diseño:** contactos `Internal` no se editan ni eliminan desde directorio; su gestión permanece en módulo `Users`.
+- **Backend con RBAC por cargo para directorio:**
+  - `admin`: crear/editar/eliminar (excepto `Internal` por regla de negocio).
+  - `qa nivel 1`, `qa nivel 2`, `customer success manager (csm)`: crear/editar, sin eliminar.
+  - `n2`, `n3`, `jefe area`, `gerente area`, `arquitecto siem`: crear/editar/eliminar.
+  - perfiles fuera de matriz: solo lectura.
+- **UI alineada a permisos reales:** botones/formularios de directorio se habilitan/deshabilitan según permiso efectivo de usuario/cargo.
+
+### Estabilidad de build y Docker (`BUILD-DOCKER-105`)
+
+- **Fix de compilación Angular:** se corrigió error `NG8002` por `matTooltip` no reconocido en `escalation-admin-simple` importando `MatTooltipModule`.
+- **Verificación técnica:** compilación frontend y `docker compose build` ejecutados con resultado exitoso tras los cambios.
+
 ## [v1.5.62-beta] - 2026-05-06
 
 ### Escalación: flujo dinámico por cliente en Admin y View (`ESC-FLOW-090`)

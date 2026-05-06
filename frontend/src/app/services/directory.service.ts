@@ -4,6 +4,8 @@ import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 export type DirectoryContactType = 'Internal' | 'External' | 'List';
+export type DirectoryContactScope = 'Internal' | 'External';
+export type DirectoryContactSource = 'User' | 'Manual' | 'Sync';
 
 export interface DirectoryContact {
   _id: string;
@@ -13,6 +15,8 @@ export interface DirectoryContact {
   company?: string;
   position?: string;
   type: DirectoryContactType;
+  scope?: DirectoryContactScope;
+  source?: DirectoryContactSource;
   isFavorite: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -25,6 +29,8 @@ export interface DirectoryContactPayload {
   company?: string;
   position?: string;
   type?: DirectoryContactType;
+  scope?: DirectoryContactScope;
+  source?: DirectoryContactSource;
   isFavorite?: boolean;
 }
 

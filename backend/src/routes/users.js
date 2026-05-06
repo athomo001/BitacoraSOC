@@ -41,7 +41,9 @@ const syncUserAsDirectoryInternal = (userDoc) => {
     email: userDoc.email,
     phone: userDoc.phone,
     position: userDoc.cargoLabel || userDoc.role,
-    type: 'Internal'
+    type: 'Internal',
+    scope: 'Internal',
+    source: 'User'
   }).then(() => undefined);
 };
 
