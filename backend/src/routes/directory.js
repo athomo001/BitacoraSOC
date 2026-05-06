@@ -41,7 +41,7 @@ const canWriteDirectory = (req) => {
     return true;
   }
   const cargo = normalizeCargo(req?.user?.cargoLabel || '');
-  return EDIT_ONLY_CARGOS.has(cargo) || FULL_DIRECTORY_CARGOS.has(cargo);
+  return !!cargo && cargo !== 'n1';
 };
 
 const canDeleteDirectory = (req) => {

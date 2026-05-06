@@ -285,7 +285,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
     const normalizedCargo = this.normalizeCargoLabel(user?.cargoLabel || '');
     const editOnlyCargos = new Set(['qa nivel 1', 'qa nivel 2', 'customer success manager (csm)', 'customer success manager', 'csm']);
     const fullAccessCargos = new Set(['n2', 'n3', 'jefe area', 'gerente area', 'arquitecto siem']);
-    this.canDirectoryWrite = this.isAdminUser || editOnlyCargos.has(normalizedCargo) || fullAccessCargos.has(normalizedCargo);
+    this.canDirectoryWrite = this.isAdminUser || (!!normalizedCargo && normalizedCargo !== 'n1');
     this.canDirectoryDelete = this.isAdminUser || fullAccessCargos.has(normalizedCargo);
     this.directoryOnlyAccess = this.router.url.includes('/main/escalation/directory');
     this.initForms();
