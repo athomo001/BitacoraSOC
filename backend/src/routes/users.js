@@ -16,6 +16,7 @@ const { authenticate, authorize } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const { audit } = require('../utils/audit');
 const { logger } = require('../utils/logger');
+const { syncDirectoryContact } = require('../utils/directory-sync');
 
 const MAX_CARGO_LENGTH = 120;
 
@@ -25,6 +26,23 @@ const normalizeCargoLabel = (value) => {
   }
   const normalized = String(value).replace(/\s+/g, ' ').trim();
   return normalized || null;
+};
+
+const syncUserAsDirectoryInternal = (userDoc) => {
+  if (!userDoc) {
+    return Promise.resolve();
+  }
+  const isOperationalRole = ['admin', 'user', 'auditor'].includes(String(userDoc.role || ''));
+  if (!isOperationalRole || userDoc.isActive === false) {
+    return Promise.resolve();
+  }
+  return syncDirectoryContact({
+    name: userDoc.fullName,
+    email: userDoc.email,
+    phone: userDoc.phone,
+    position: userDoc.cargoLabel || userDoc.role,
+    type: 'Internal'
+  }).then(() => undefined);
 };
 
 // GET /api/users/list - Listar usuarios básicos (cualquier usuario autenticado)
@@ -217,6 +235,7 @@ router.post('/',
         user.guestExpiresAt = guestExpiresAt;
         user.isActive = true;
         await user.save();
+        await syncUserAsDirectoryInternal(user);
         auditEvent = 'admin.users.reactivate';
       } else {
         user = new User({
@@ -231,6 +250,7 @@ router.post('/',
         });
 
         await user.save();
+        await syncUserAsDirectoryInternal(user);
       }
 
       await audit(req, {
@@ -340,6 +360,8 @@ router.put('/:id',
       if (!user) {
         return res.status(404).json({ message: 'Usuario no encontrado' });
       }
+
+      await syncUserAsDirectoryInternal(user);
 
       await audit(req, {
         event: 'admin.users.update',

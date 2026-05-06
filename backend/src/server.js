@@ -500,6 +500,7 @@ app.use('/api/config', require('./routes/config'));
 app.use('/api/backup', require('./routes/backup'));
 app.use('/api/catalog', require('./routes/catalog'));
 app.use('/api/admin/catalog', require('./routes/admin-catalog')); // CRUD admin
+app.use('/api/directory', require('./routes/directory')); // Directorio centralizado
 app.use('/api/escalation', require('./routes/escalation')); // Módulo de escalaciones
 app.use('/api/work-shift-assignments', require('./routes/work-shift-assignments')); // Asignaciones operativas
 app.use('/api/work-shifts', require('./routes/work-shifts')); // Turnos de trabajo

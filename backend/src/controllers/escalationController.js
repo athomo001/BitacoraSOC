@@ -27,6 +27,7 @@ const {
   formatContactsCsv,
   parseBooleanLike
 } = require('../utils/contactDirectory');
+const { syncDirectoryContact, syncManyDirectoryContacts } = require('../utils/directory-sync');
 
 const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -661,6 +662,27 @@ exports.upsertEscalationFlowByClient = async (req, res) => {
       return res.status(404).json({ error: 'Cliente no encontrado o deshabilitado' });
     }
 
+    const flowDirectoryContacts = [];
+    flow.forEach((step) => {
+      if (step.type === 'pool') {
+        (step.contacts || []).forEach((contact) => {
+          flowDirectoryContacts.push({
+            name: contact?.name,
+            phone: contact?.tel,
+            type: 'External'
+          });
+        });
+        return;
+      }
+
+      flowDirectoryContacts.push({
+        name: step.contactName,
+        phone: step.contactTel,
+        type: 'External'
+      });
+    });
+    await syncManyDirectoryContacts(flowDirectoryContacts);
+
     return res.json({
       message: 'Flujo de escalamiento actualizado',
       clientId: client._id,
@@ -894,6 +916,15 @@ exports.createContact = async (req, res) => {
     const contact = new Contact(payload);
     await contact.save();
     await contact.populate(CONTACT_SERVICE_POPULATE);
+    await syncDirectoryContact({
+      name: contact.name,
+      email: contact.email,
+      phone: contact.phone,
+      organization: contact.organization,
+      role: contact.role,
+      favorite: contact.favorite,
+      isMailingList: contact.isMailingList
+    });
 
     await audit(req, {
       event: 'directory.contact.create',
@@ -950,6 +981,15 @@ exports.updateContact = async (req, res) => {
     Object.assign(existingContact, payload);
     await existingContact.save();
     await existingContact.populate(CONTACT_SERVICE_POPULATE);
+    await syncDirectoryContact({
+      name: existingContact.name,
+      email: existingContact.email,
+      phone: existingContact.phone,
+      organization: existingContact.organization,
+      role: existingContact.role,
+      favorite: existingContact.favorite,
+      isMailingList: existingContact.isMailingList
+    });
 
     await audit(req, {
       event: 'directory.contact.update',
@@ -1052,9 +1092,27 @@ exports.importContactsCsv = async (req, res) => {
       if (existing) {
         Object.assign(existing, row);
         await existing.save();
+        await syncDirectoryContact({
+          name: existing.name,
+          email: existing.email,
+          phone: existing.phone,
+          organization: existing.organization,
+          role: existing.role,
+          favorite: existing.favorite,
+          isMailingList: existing.isMailingList
+        });
         updated += 1;
       } else {
-        await Contact.create(row);
+        const createdContact = await Contact.create(row);
+        await syncDirectoryContact({
+          name: createdContact.name,
+          email: createdContact.email,
+          phone: createdContact.phone,
+          organization: createdContact.organization,
+          role: createdContact.role,
+          favorite: createdContact.favorite,
+          isMailingList: createdContact.isMailingList
+        });
         created += 1;
       }
     }
@@ -1160,6 +1218,12 @@ exports.createRaci = async (req, res) => {
     const populated = await RaciEntry.findById(raciEntry._id)
       .populate('clientId', 'name')
       .populate('serviceId', 'name');
+    await syncManyDirectoryContacts([
+      { ...(data.responsible || {}), type: 'External' },
+      { ...(data.accountable || {}), type: 'External' },
+      { ...(data.consulted || {}), type: 'External' },
+      { ...(data.informed || {}), type: 'External' }
+    ]);
 
     res.status(201).json(populated);
   } catch (error) {
@@ -1182,6 +1246,12 @@ exports.updateRaci = async (req, res) => {
     if (!updated) {
       return res.status(404).json({ error: 'RACI no encontrado' });
     }
+    await syncManyDirectoryContacts([
+      { ...(data.responsible || {}), type: 'External' },
+      { ...(data.accountable || {}), type: 'External' },
+      { ...(data.consulted || {}), type: 'External' },
+      { ...(data.informed || {}), type: 'External' }
+    ]);
 
     res.json(updated);
   } catch (error) {
@@ -1705,6 +1775,13 @@ exports.createExternalPerson = async (req, res) => {
   try {
     const person = new ExternalPerson(req.body);
     await person.save();
+    await syncDirectoryContact({
+      name: person.name,
+      email: person.email,
+      phone: person.phone,
+      position: person.position,
+      type: 'External'
+    });
     res.status(201).json(person);
   } catch (error) {
     logger.error('Error in createExternalPerson:', error);
@@ -1719,6 +1796,13 @@ exports.updateExternalPerson = async (req, res) => {
     if (!person) {
       return res.status(404).json({ error: 'External person not found' });
     }
+    await syncDirectoryContact({
+      name: person.name,
+      email: person.email,
+      phone: person.phone,
+      position: person.position,
+      type: 'External'
+    });
     res.json(person);
   } catch (error) {
     logger.error('Error in updateExternalPerson:', error);

@@ -55,12 +55,18 @@ export class EscalationSimpleComponent implements OnInit {
   escalationData: any[] = [];
   allClients: any[] = [];
   selectedClient: any = null;
+  clientSearchTerm = '';
   unassignedContacts: any[] = [];
   selectedClientFlow: EscalationFlowConfig | null = null;
   loadingClientFlow = false;
   loading = false;
   raciClients: CatalogLogSource[] = [];
   selectedRaciClient: CatalogLogSource | null = null;
+  raciClientSearchTerm = '';
+  showQuickClientForm = false;
+  quickClientName = '';
+  quickClientDescription = '';
+  savingQuickClient = false;
   loadingRaciClients = false;
   raciEntries: any[] = [];
   loadingRaci = false;
@@ -134,6 +140,7 @@ export class EscalationSimpleComponent implements OnInit {
 
       // Guardar lista completa de clientes para el combobox
       this.allClients = (clients as any[]).filter((c: any) => c.active !== false);
+      this.raciClients = [...this.allClients];
       
       // Agrupar servicios por cliente
       const servicesByClient = new Map<string, any[]>();
@@ -214,6 +221,15 @@ export class EscalationSimpleComponent implements OnInit {
   }
 
   async loadRaciClients(): Promise<void> {
+    if (this.allClients.length > 0) {
+      this.raciClients = [...this.allClients];
+      if (this.raciClients.length > 0 && !this.selectedRaciClient) {
+        this.selectedRaciClient = this.raciClients[0];
+        this.loadRaciEntries();
+      }
+      return;
+    }
+
     this.loadingRaciClients = true;
     try {
       const response = await firstValueFrom(this.catalogService.searchLogSources('', undefined, 200));
@@ -261,6 +277,62 @@ export class EscalationSimpleComponent implements OnInit {
 
   onRaciClientChange(): void {
     this.loadRaciEntries();
+  }
+
+  get filteredClients(): any[] {
+    const term = this.clientSearchTerm.trim().toLowerCase();
+    if (!term) return this.allClients;
+    return this.allClients.filter((client) => String(client?.name || '').toLowerCase().includes(term));
+  }
+
+  get filteredRaciClients(): CatalogLogSource[] {
+    const term = this.raciClientSearchTerm.trim().toLowerCase();
+    if (!term) return this.raciClients;
+    return this.raciClients.filter((client) => String(client?.name || '').toLowerCase().includes(term));
+  }
+
+  toggleQuickClientForm(prefill?: string): void {
+    this.showQuickClientForm = !this.showQuickClientForm;
+    if (this.showQuickClientForm) {
+      this.quickClientName = String(prefill || '').trim();
+      this.quickClientDescription = '';
+    }
+  }
+
+  saveQuickClient(): void {
+    const name = this.quickClientName.trim();
+    if (!name) {
+      this.showError('Ingresa un nombre para el cliente');
+      return;
+    }
+    if (this.savingQuickClient) {
+      return;
+    }
+
+    this.savingQuickClient = true;
+    this.catalogService.createLogSource({
+      name,
+      description: this.quickClientDescription.trim(),
+      enabled: true
+    } as any).subscribe({
+      next: (created: any) => {
+        this.showSuccess('Cliente creado en el listado central');
+        this.showQuickClientForm = false;
+        this.quickClientName = '';
+        this.quickClientDescription = '';
+        this.loadEscalationView();
+        if (created?._id) {
+          this.selectedClient = created;
+          this.selectedRaciClient = created;
+        }
+        this.savingQuickClient = false;
+      },
+      error: (err) => {
+        const backendMessage = err?.error?.error || err?.error?.message;
+        this.showError(backendMessage || 'No se pudo crear el cliente');
+        this.savingQuickClient = false;
+      }
+    });
   }
 
   loadRaciEntries(): void {

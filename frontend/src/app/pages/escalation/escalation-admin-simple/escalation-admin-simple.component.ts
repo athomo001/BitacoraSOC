@@ -21,13 +21,19 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
+import { Router } from '@angular/router';
 import { EscalationService } from '../../../services/escalation.service';
 import { UserService } from '../../../services/user.service';
 import { CatalogService } from '../../../services/catalog.service';
 import { ConfigService } from '../../../services/config.service';
+import { DirectoryService, DirectoryContact } from '../../../services/directory.service';
+import { AuthService } from '../../../services/auth.service';
 import { CatalogLogSource } from '../../../models/catalog.model';
 import { EscalationFlowStep } from '../../../models/escalation.model';
+import { Observable, of, forkJoin } from 'rxjs';
+import { catchError, map, switchMap } from 'rxjs/operators';
 
 @Injectable()
 class MondayFirstNativeDateAdapter extends NativeDateAdapter {
@@ -57,6 +63,7 @@ class MondayFirstNativeDateAdapter extends NativeDateAdapter {
         MatExpansionModule,
         MatCheckboxModule,
         MatAutocompleteModule,
+        MatTooltipModule,
         DragDropModule
     ],
     providers: [
@@ -114,16 +121,63 @@ export class EscalationAdminSimpleComponent implements OnInit {
   showExternalPersonForm = false;
   externalPersonForm!: FormGroup;
   editingExternalPersonId: string | null = null;
+  externalPersonDirectorySuggestions: DirectoryContact[] = [];
+  private externalPersonNameSearchTimer?: ReturnType<typeof setTimeout>;
 
   // Contactos de escalación + agenda preventiva
   clients: any[] = [];
   services: any[] = [];
   contacts: any[] = [];
+  flowClientSearch = '';
+  serviceClientSearch = '';
+  raciClientSearch = '';
+  showQuickClientForm = false;
+  quickClientName = '';
+  quickClientDescription = '';
+  savingQuickClient = false;
   selectedFlowClientId: string | null = null;
   flowSteps: any[] = [];
   flowLegend = '';
   loadingFlow = false;
   savingFlow = false;
+  directorySuggestions: Record<string, DirectoryContact[]> = {};
+  private directorySearchTimers: Record<string, ReturnType<typeof setTimeout> | undefined> = {};
+  directoryContacts: DirectoryContact[] = [];
+  directorySearch = '';
+  directoryTypeFilter: '' | 'Internal' | 'External' | 'List' = '';
+  directoryPageSize = 10;
+  directoryPageIndex = 0;
+  loadingDirectoryContacts = false;
+  rebuildingDirectory = false;
+  showDirectoryForm = false;
+  savingDirectoryContact = false;
+  editingDirectoryContactId: string | null = null;
+  directoryQuickPickerVisible = false;
+  directoryQuickPickerQuery = '';
+  directoryQuickPickerSuggestions: DirectoryContact[] = [];
+  directoryQuickPickerTarget: 'contact' | 'external' | 'raci:responsible' | 'raci:accountable' | 'raci:consulted' | 'raci:informed' | null = null;
+  private directoryQuickPickerTimer?: ReturnType<typeof setTimeout>;
+  isAdminUser = false;
+  directoryOnlyAccess = false;
+  canDirectoryWrite = false;
+  canDirectoryDelete = false;
+  directoryFormModel: {
+    name: string;
+    email: string;
+    phone: string;
+    company: string;
+    position: string;
+    type: 'Internal' | 'External' | 'List';
+    isFavorite: boolean;
+  } = {
+    name: '',
+    email: '',
+    phone: '',
+    company: '',
+    position: '',
+    type: 'External',
+    isFavorite: false
+  };
   loadingClients = false;
   loadingServices = false;
   loadingContacts = false;
@@ -146,6 +200,9 @@ export class EscalationAdminSimpleComponent implements OnInit {
   showContactForm = false;
   contactForm!: FormGroup;
   editingContactId: string | null = null;
+  contactDirectorySuggestions: DirectoryContact[] = [];
+  private contactNameSearchTimer?: ReturnType<typeof setTimeout>;
+  private selectedContactDirectoryId = '';
 
   // RACI
   raciClients: CatalogLogSource[] = [];
@@ -159,21 +216,82 @@ export class EscalationAdminSimpleComponent implements OnInit {
   selectedRaciTopic: string = '';
   reusableRaciTemplates: any[] = [];
   reusableRaciPeople: Array<{ name: string; email: string; phone: string }> = [];
+  raciDirectorySuggestions: Record<string, DirectoryContact[]> = {};
+  private raciSearchTimers: Record<string, ReturnType<typeof setTimeout> | undefined> = {};
 
   constructor(
     private fb: FormBuilder,
     private escalationService: EscalationService,
     private userService: UserService,
     private catalogService: CatalogService,
+    private directoryService: DirectoryService,
+    private authService: AuthService,
     private configService: ConfigService,
     private snackBar: MatSnackBar,
     private cdr: ChangeDetectorRef,
-    private ngZone: NgZone
+    private ngZone: NgZone,
+    private router: Router
   ) {}
 
+  readonly displayDirectoryContact = (value: DirectoryContact | string | null): string =>
+    typeof value === 'string' ? value : (value?.name || '');
+
+  readonly getDirectoryTypeLabel = (type?: string): string => {
+    if (type === 'Internal') return 'Interno';
+    if (type === 'List') return 'Lista';
+    return 'Externo';
+  };
+
+  readonly isDirectoryInternal = (contact?: DirectoryContact | null): boolean =>
+    String(contact?.type || '') === 'Internal';
+
+  get pageHeaderTitle(): string {
+    return this.directoryOnlyAccess ? 'Directorio Global de Contactos' : 'Administración de Escalamientos';
+  }
+
+  get pageHeaderSubtitle(): string {
+    return this.directoryOnlyAccess
+      ? 'Fuente única de contactos para todos los módulos operativos'
+      : 'Configura turnos internos, contactos de escalación y agenda preventiva';
+  }
+
+  copyDirectoryValue(value: string, label: 'nombre' | 'correo' | 'telefono'): void {
+    const text = String(value || '').trim();
+    if (!text || text === '-') {
+      return;
+    }
+    navigator.clipboard.writeText(text).then(() => {
+      const labelMap = {
+        nombre: 'Nombre',
+        correo: 'Correo',
+        telefono: 'Teléfono'
+      } as const;
+      this.showSuccess(`${labelMap[label]} copiado al portapapeles`);
+    }).catch(() => {
+      this.showError('No se pudo copiar al portapapeles');
+    });
+  }
+
   ngOnInit(): void {
+    const user = this.authService.getCurrentUser();
+    this.isAdminUser = this.authService.hasRole('admin');
+    const normalizedCargo = this.normalizeCargoLabel(user?.cargoLabel || '');
+    const editOnlyCargos = new Set(['qa nivel 1', 'qa nivel 2', 'customer success manager (csm)', 'customer success manager', 'csm']);
+    const fullAccessCargos = new Set(['n2', 'n3', 'jefe area', 'gerente area', 'arquitecto siem']);
+    this.canDirectoryWrite = this.isAdminUser || editOnlyCargos.has(normalizedCargo) || fullAccessCargos.has(normalizedCargo);
+    this.canDirectoryDelete = this.isAdminUser || fullAccessCargos.has(normalizedCargo);
+    this.directoryOnlyAccess = this.router.url.includes('/main/escalation/directory');
     this.initForms();
     this.loadAllData();
+  }
+
+  private normalizeCargoLabel(value: string): string {
+    return String(value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   /**
@@ -333,7 +451,103 @@ export class EscalationAdminSimpleComponent implements OnInit {
     this.loadServices();
     this.loadContacts();
     this.loadRaciClients();
+    this.loadDirectoryContacts();
     this.loadEscalationReminderConfig();
+  }
+
+  private refreshOperationalViewsAfterDirectoryChange(): void {
+    this.loadContacts();
+    this.loadExternalPeople();
+    this.loadRaciEntries();
+    this.loadEscalationFlow();
+  }
+
+  loadDirectoryContacts(): void {
+    this.loadingDirectoryContacts = true;
+    this.directoryService.getAll().subscribe({
+      next: (contacts) => {
+        this.directoryContacts = contacts || [];
+        this.ensureDirectoryPageBounds();
+        this.loadingDirectoryContacts = false;
+      },
+      error: () => {
+        this.directoryContacts = [];
+        this.loadingDirectoryContacts = false;
+      }
+    });
+  }
+
+  get filteredDirectoryContacts(): DirectoryContact[] {
+    const term = this.directorySearch.trim().toLowerCase();
+    return this.directoryContacts
+      .filter((contact) => !this.directoryTypeFilter || contact.type === this.directoryTypeFilter)
+      .filter((contact) => !term || [contact.name, contact.email, contact.phone, contact.company]
+        .some((value) => String(value || '').toLowerCase().includes(term)));
+  }
+
+  get paginatedDirectoryContacts(): DirectoryContact[] {
+    const start = this.directoryPageIndex * this.directoryPageSize;
+    const end = start + this.directoryPageSize;
+    return this.filteredDirectoryContacts.slice(start, end);
+  }
+
+  get directoryTotalPages(): number {
+    return Math.max(1, Math.ceil(this.filteredDirectoryContacts.length / this.directoryPageSize));
+  }
+
+  get directoryStartItem(): number {
+    if (this.filteredDirectoryContacts.length === 0) {
+      return 0;
+    }
+    return this.directoryPageIndex * this.directoryPageSize + 1;
+  }
+
+  get directoryEndItem(): number {
+    return Math.min((this.directoryPageIndex + 1) * this.directoryPageSize, this.filteredDirectoryContacts.length);
+  }
+
+  applyDirectoryFilters(): void {
+    this.directoryPageIndex = 0;
+    this.ensureDirectoryPageBounds();
+  }
+
+  nextDirectoryPage(): void {
+    if (this.directoryPageIndex < this.directoryTotalPages - 1) {
+      this.directoryPageIndex += 1;
+    }
+  }
+
+  prevDirectoryPage(): void {
+    if (this.directoryPageIndex > 0) {
+      this.directoryPageIndex -= 1;
+    }
+  }
+
+  private ensureDirectoryPageBounds(): void {
+    const totalPages = this.directoryTotalPages;
+    if (this.directoryPageIndex > totalPages - 1) {
+      this.directoryPageIndex = Math.max(totalPages - 1, 0);
+    }
+  }
+
+  rebuildDirectoryFromEscalation(): void {
+    if (this.rebuildingDirectory) {
+      return;
+    }
+    this.rebuildingDirectory = true;
+    this.directoryService.rebuildFromEscalation().subscribe({
+      next: (response) => {
+        this.showSuccess(response?.message || 'Directorio sincronizado');
+        this.loadDirectoryContacts();
+        this.refreshOperationalViewsAfterDirectoryChange();
+        this.rebuildingDirectory = false;
+      },
+      error: (err) => {
+        const backendMessage = err?.error?.error || err?.error?.message;
+        this.showError(backendMessage || 'No se pudo sincronizar el directorio');
+        this.rebuildingDirectory = false;
+      }
+    });
   }
 
   private updateContactValidators(): void {
@@ -623,9 +837,14 @@ export class EscalationAdminSimpleComponent implements OnInit {
       next: (response) => {
         const items = response?.items || response || [];
         this.clients = [...items].filter((client: any) => client.enabled !== false);
+        this.raciClients = [...this.clients];
         if (!this.selectedFlowClientId && this.clients.length > 0) {
           this.selectedFlowClientId = this.clients[0]._id;
           this.loadEscalationFlow();
+        }
+        if (!this.selectedRaciClientId && this.raciClients.length > 0) {
+          this.selectedRaciClientId = this.raciClients[0]._id;
+          this.loadRaciEntries();
         }
         this.loadingClients = false;
         this.cdr.detectChanges();
@@ -684,6 +903,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
       callAt: '',
       contacts: type === 'pool' ? [{ name: '', tel: '' }] : []
     });
+    this.cleanupDirectoryState();
   }
 
   deleteFlowStep(index: number): void {
@@ -696,10 +916,12 @@ export class EscalationAdminSimpleComponent implements OnInit {
       this.flowSteps[stepIndex].contacts = [];
     }
     this.flowSteps[stepIndex].contacts.push({ name: '', tel: '' });
+    this.cleanupDirectoryState();
   }
 
   removePoolContact(stepIndex: number, contactIndex: number): void {
     this.flowSteps[stepIndex].contacts.splice(contactIndex, 1);
+    this.cleanupDirectoryState();
   }
 
   dropFlowStep(event: CdkDragDrop<any[]>): void {
@@ -731,10 +953,13 @@ export class EscalationAdminSimpleComponent implements OnInit {
       legend: String(this.flowLegend || '').trim()
     };
 
-    this.escalationService.saveEscalationFlow(this.selectedFlowClientId, payload).subscribe({
+    this.syncNewFlowContactsToDirectory(this.flowSteps as any).pipe(
+      switchMap(() => this.escalationService.saveEscalationFlow(this.selectedFlowClientId as string, payload))
+    ).subscribe({
       next: () => {
         this.showSuccess('Flujo de escalamiento actualizado');
         this.savingFlow = false;
+        this.loadDirectoryContacts();
         this.loadEscalationFlow();
       },
       error: (err) => {
@@ -747,6 +972,148 @@ export class EscalationAdminSimpleComponent implements OnInit {
 
   private reindexFlowSteps(): void {
     this.flowSteps = this.flowSteps.map((step, idx) => ({ ...step, order: idx + 1 }));
+    this.cleanupDirectoryState();
+  }
+
+  getDirectoryOptions(stepIndex: number, contactIndex?: number): DirectoryContact[] {
+    return this.directorySuggestions[this.getFlowContactKey(stepIndex, contactIndex)] || [];
+  }
+
+  onFlowNameInput(stepIndex: number, rawValue: string, contactIndex?: number): void {
+    const key = this.getFlowContactKey(stepIndex, contactIndex);
+    const value = String(rawValue || '').trim();
+    this.clearFlowContactSelection(stepIndex, contactIndex);
+
+    if (this.directorySearchTimers[key]) {
+      clearTimeout(this.directorySearchTimers[key]);
+    }
+
+    if (value.length < 2) {
+      this.directorySuggestions[key] = this.getLocalDirectoryMatches(value);
+      return;
+    }
+
+    this.directorySearchTimers[key] = setTimeout(() => {
+      this.directoryService.quickSearch(value).subscribe({
+        next: (items) => {
+          this.directorySuggestions[key] = items || [];
+        },
+        error: () => {
+          this.directorySuggestions[key] = [];
+        }
+      });
+    }, 250);
+  }
+
+  onFlowNameFocus(stepIndex: number, contactIndex?: number): void {
+    const key = this.getFlowContactKey(stepIndex, contactIndex);
+    const currentValue = contactIndex === undefined
+      ? String(this.flowSteps?.[stepIndex]?.contactName || '')
+      : String(this.flowSteps?.[stepIndex]?.contacts?.[contactIndex || 0]?.name || '');
+    this.directorySuggestions[key] = this.getLocalDirectoryMatches(currentValue);
+  }
+
+  onFlowDirectoryContactSelected(stepIndex: number, contact: DirectoryContact, contactIndex?: number): void {
+    const key = this.getFlowContactKey(stepIndex, contactIndex);
+    if (contactIndex === undefined) {
+      this.flowSteps[stepIndex].contactName = contact.name || '';
+      this.flowSteps[stepIndex].contactTel = contact.phone || '';
+      this.flowSteps[stepIndex].directoryContactId = contact._id;
+    } else if (this.flowSteps[stepIndex]?.contacts?.[contactIndex]) {
+      this.flowSteps[stepIndex].contacts[contactIndex].name = contact.name || '';
+      this.flowSteps[stepIndex].contacts[contactIndex].tel = contact.phone || '';
+      this.flowSteps[stepIndex].contacts[contactIndex].directoryContactId = contact._id;
+    }
+
+    this.directorySuggestions[key] = [];
+  }
+
+  private clearFlowContactSelection(stepIndex: number, contactIndex?: number): void {
+    if (contactIndex === undefined) {
+      if (this.flowSteps[stepIndex]) {
+        this.flowSteps[stepIndex].directoryContactId = '';
+      }
+      return;
+    }
+
+    if (this.flowSteps[stepIndex]?.contacts?.[contactIndex]) {
+      this.flowSteps[stepIndex].contacts[contactIndex].directoryContactId = '';
+    }
+  }
+
+  private getFlowContactKey(stepIndex: number, contactIndex?: number): string {
+    return contactIndex === undefined ? `step-${stepIndex}` : `step-${stepIndex}-pool-${contactIndex}`;
+  }
+
+  private cleanupDirectoryState(): void {
+    const validKeys = new Set<string>();
+    this.flowSteps.forEach((step, stepIndex) => {
+      validKeys.add(this.getFlowContactKey(stepIndex));
+      if (step.type === 'pool' && Array.isArray(step.contacts)) {
+        step.contacts.forEach((_: any, contactIndex: number) => {
+          validKeys.add(this.getFlowContactKey(stepIndex, contactIndex));
+        });
+      }
+    });
+
+    Object.keys(this.directorySuggestions).forEach((key) => {
+      if (!validKeys.has(key)) {
+        delete this.directorySuggestions[key];
+      }
+    });
+  }
+
+  private syncNewFlowContactsToDirectory(flow: EscalationFlowStep[]): Observable<void> {
+    const newContacts: Array<{ name: string; phone?: string }> = [];
+
+    flow.forEach((step: any) => {
+      if (step.type === 'pool') {
+        (step.contacts || []).forEach((contact: any) => {
+          if (contact.name && !contact.directoryContactId) {
+            newContacts.push({ name: contact.name, phone: contact.tel || '' });
+          }
+        });
+        return;
+      }
+
+      if (step.contactName && !step.directoryContactId) {
+        newContacts.push({ name: step.contactName, phone: step.contactTel || '' });
+      }
+    });
+
+    if (newContacts.length === 0) {
+      return of(void 0);
+    }
+
+    const deduped = new Map<string, { name: string; phone?: string }>();
+    newContacts.forEach((contact) => {
+      const key = `${contact.name.trim().toLowerCase()}|${String(contact.phone || '').trim().toLowerCase()}`;
+      if (!deduped.has(key)) {
+        deduped.set(key, contact);
+      }
+    });
+
+    const requests = Array.from(deduped.values()).map((contact) =>
+      this.directoryService.quickSearch(contact.name).pipe(
+        map((matches) => {
+          const match = (matches || []).find((item) => item.name?.trim().toLowerCase() === contact.name.trim().toLowerCase());
+          return { contact, exists: Boolean(match) };
+        }),
+        switchMap((result) => {
+          if (result.exists) {
+            return of(null);
+          }
+          return this.directoryService.create({
+            name: result.contact.name,
+            phone: result.contact.phone || '',
+            type: 'External'
+          });
+        }),
+        catchError(() => of(null))
+      )
+    );
+
+    return forkJoin(requests).pipe(map(() => void 0));
   }
 
   addClient(): void {
@@ -876,6 +1243,15 @@ export class EscalationAdminSimpleComponent implements OnInit {
 
   // ============ RACI ============
   loadRaciClients(): void {
+    if (this.clients.length > 0) {
+      this.raciClients = [...this.clients];
+      if (!this.selectedRaciClientId && this.raciClients.length > 0) {
+        this.selectedRaciClientId = this.raciClients[0]._id;
+      }
+      this.loadRaciEntries();
+      return;
+    }
+
     this.loadingRaciClients = true;
     this.catalogService.getAllLogSources().subscribe({
       next: (response) => {
@@ -916,6 +1292,68 @@ export class EscalationAdminSimpleComponent implements OnInit {
 
   onRaciFilterChange(): void {
     this.loadRaciEntries();
+  }
+
+  get filteredClientsForFlow(): any[] {
+    const term = this.flowClientSearch.trim().toLowerCase();
+    if (!term) return this.clients;
+    return this.clients.filter((client) => String(client?.name || '').toLowerCase().includes(term));
+  }
+
+  get filteredClientsForServiceForm(): any[] {
+    const term = this.serviceClientSearch.trim().toLowerCase();
+    if (!term) return this.clients;
+    return this.clients.filter((client) => String(client?.name || '').toLowerCase().includes(term));
+  }
+
+  get filteredClientsForRaci(): CatalogLogSource[] {
+    const term = this.raciClientSearch.trim().toLowerCase();
+    if (!term) return this.raciClients;
+    return this.raciClients.filter((client) => String(client?.name || '').toLowerCase().includes(term));
+  }
+
+  toggleQuickClientForm(nameHint?: string): void {
+    this.showQuickClientForm = !this.showQuickClientForm;
+    if (this.showQuickClientForm) {
+      this.quickClientName = String(nameHint || '').trim();
+      this.quickClientDescription = '';
+    }
+  }
+
+  saveQuickClient(): void {
+    const name = this.quickClientName.trim();
+    if (!name) {
+      this.showError('Ingresa un nombre para el cliente');
+      return;
+    }
+    if (this.savingQuickClient) {
+      return;
+    }
+
+    this.savingQuickClient = true;
+    this.catalogService.createLogSource({
+      name,
+      description: this.quickClientDescription.trim(),
+      enabled: true
+    } as any).subscribe({
+      next: (created: any) => {
+        this.showSuccess('Cliente creado en el listado central');
+        this.showQuickClientForm = false;
+        this.quickClientName = '';
+        this.quickClientDescription = '';
+        this.loadClients();
+        if (created?._id) {
+          this.selectedFlowClientId = created._id;
+          this.selectedRaciClientId = created._id;
+        }
+        this.savingQuickClient = false;
+      },
+      error: (err) => {
+        const backendMessage = err?.error?.error || err?.error?.message;
+        this.showError(backendMessage || 'No se pudo crear el cliente');
+        this.savingQuickClient = false;
+      }
+    });
   }
 
   getRaciClientName(entry: any): string {
@@ -1120,6 +1558,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
 
     request$.subscribe({
       next: () => {
+        this.syncRaciPeopleToDirectory(payload);
         this.showSuccess('RACI guardado correctamente');
         this.showRaciForm = false;
         this.editingRaciId = null;
@@ -1129,6 +1568,94 @@ export class EscalationAdminSimpleComponent implements OnInit {
         console.error('Error saving RACI:', err);
         this.showError('Error guardando RACI');
       }
+    });
+  }
+
+  onRaciPersonNameInput(role: 'responsible' | 'accountable' | 'consulted' | 'informed', rawValue: string): void {
+    const query = String(rawValue || '').trim();
+    if (this.raciSearchTimers[role]) {
+      clearTimeout(this.raciSearchTimers[role]);
+    }
+
+    if (query.length < 2) {
+      this.raciDirectorySuggestions[role] = this.getLocalDirectoryMatches(query);
+      return;
+    }
+
+    this.raciSearchTimers[role] = setTimeout(() => {
+      this.directoryService.quickSearch(query).subscribe({
+        next: (items) => {
+          this.raciDirectorySuggestions[role] = items || [];
+        },
+        error: () => {
+          this.raciDirectorySuggestions[role] = [];
+        }
+      });
+    }, 250);
+  }
+
+  onRaciPersonNameFocus(role: 'responsible' | 'accountable' | 'consulted' | 'informed'): void {
+    const currentValue = String(this.raciForm.get(`${role}.name`)?.value || '');
+    this.raciDirectorySuggestions[role] = this.getLocalDirectoryMatches(currentValue);
+  }
+
+  getRaciDirectoryOptions(role: 'responsible' | 'accountable' | 'consulted' | 'informed'): DirectoryContact[] {
+    return this.raciDirectorySuggestions[role] || [];
+  }
+
+  onRaciDirectorySelected(role: 'responsible' | 'accountable' | 'consulted' | 'informed', contact: DirectoryContact): void {
+    this.raciForm.get(role)?.patchValue({
+      name: contact.name || '',
+      email: contact.email || '',
+      phone: contact.phone || ''
+    });
+    this.raciDirectorySuggestions[role] = [];
+  }
+
+  private syncRaciPeopleToDirectory(payload: any): void {
+    const roles: Array<'responsible' | 'accountable' | 'consulted' | 'informed'> = [
+      'responsible',
+      'accountable',
+      'consulted',
+      'informed'
+    ];
+
+    const people = roles
+      .map((role) => payload?.[role])
+      .filter((person: any) => person && (person.name || person.email || person.phone))
+      .map((person: any) => ({
+        name: String(person.name || '').trim(),
+        email: String(person.email || '').trim(),
+        phone: String(person.phone || '').trim(),
+        type: 'External' as const
+      }))
+      .filter((person) => person.name.length > 0);
+
+    if (people.length === 0) {
+      return;
+    }
+
+    const dedup = new Map<string, (typeof people)[number]>();
+    people.forEach((person) => {
+      const key = `${person.name.toLowerCase()}|${person.email.toLowerCase()}|${person.phone.toLowerCase()}`;
+      dedup.set(key, person);
+    });
+
+    Array.from(dedup.values()).forEach((person) => {
+      this.directoryService.quickSearch(person.name).subscribe({
+        next: (matches) => {
+          const exists = (matches || []).some((item) => {
+            const sameName = String(item.name || '').trim().toLowerCase() === person.name.toLowerCase();
+            const sameEmail = person.email && String(item.email || '').trim().toLowerCase() === person.email.toLowerCase();
+            const samePhone = person.phone && String(item.phone || '').trim() === person.phone;
+            return sameName && (sameEmail || samePhone || (!person.email && !person.phone));
+          });
+          if (!exists) {
+            this.directoryService.create(person).subscribe({ next: () => void 0, error: () => void 0 });
+          }
+        },
+        error: () => void 0
+      });
     });
   }
 
@@ -1149,6 +1676,8 @@ export class EscalationAdminSimpleComponent implements OnInit {
   addContact(contactType: 'escalation' | 'preventive' = 'escalation'): void {
     this.showContactForm = true;
     this.editingContactId = null;
+    this.selectedContactDirectoryId = '';
+    this.contactDirectorySuggestions = [];
     this.filteredOrgSuggestions = [...this.preventiveCompanyOptions];
     this.contactForm.reset({
       contactType,
@@ -1187,6 +1716,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
     request$.subscribe({
       next: () => {
         this.ngZone.run(() => {
+          this.syncContactFormToDirectory(data);
           const isPreventive = data.contactType === 'preventive';
           this.showSuccess(this.editingContactId
             ? (isPreventive ? 'Contacto preventivo actualizado' : 'Contacto de escalación actualizado')
@@ -1219,6 +1749,8 @@ export class EscalationAdminSimpleComponent implements OnInit {
   editContact(contact: any): void {
     this.showContactForm = true;
     this.editingContactId = contact._id;
+    this.selectedContactDirectoryId = '';
+    this.contactDirectorySuggestions = [];
     this.filteredOrgSuggestions = [...this.preventiveCompanyOptions];
     const serviceId = typeof contact.serviceId === 'object' && contact.serviceId !== null
       ? contact.serviceId._id
@@ -1238,6 +1770,213 @@ export class EscalationAdminSimpleComponent implements OnInit {
       active: contact.active !== false
     });
     this.updateContactValidators();
+  }
+
+  onContactNameInput(rawValue: string): void {
+    const query = String(rawValue || '').trim();
+    this.selectedContactDirectoryId = '';
+    if (this.contactNameSearchTimer) {
+      clearTimeout(this.contactNameSearchTimer);
+    }
+
+    if (query.length < 2) {
+      this.contactDirectorySuggestions = this.getLocalDirectoryMatches(query);
+      return;
+    }
+
+    this.contactNameSearchTimer = setTimeout(() => {
+      this.directoryService.quickSearch(query).subscribe({
+        next: (items) => {
+          this.contactDirectorySuggestions = items || [];
+        },
+        error: () => {
+          this.contactDirectorySuggestions = [];
+        }
+      });
+    }, 250);
+  }
+
+  onContactNameFocus(): void {
+    const currentValue = String(this.contactForm.get('name')?.value || '');
+    this.contactDirectorySuggestions = this.getLocalDirectoryMatches(currentValue);
+  }
+
+  addDirectoryContact(): void {
+    if (!this.canDirectoryWrite) {
+      this.showError('No tienes permisos para crear contactos del directorio');
+      return;
+    }
+    this.editingDirectoryContactId = null;
+    this.directoryFormModel = {
+      name: '',
+      email: '',
+      phone: '',
+      company: '',
+      position: '',
+      type: 'External',
+      isFavorite: false
+    };
+    this.showDirectoryForm = true;
+  }
+
+  editDirectoryContact(contact: DirectoryContact): void {
+    if (!this.canDirectoryWrite) {
+      this.showError('No tienes permisos para editar el directorio');
+      return;
+    }
+    if (this.isDirectoryInternal(contact)) {
+      this.showError('Los usuarios internos se editan desde el módulo de Usuarios');
+      return;
+    }
+    this.editingDirectoryContactId = contact._id;
+    this.directoryFormModel = {
+      name: String(contact.name || ''),
+      email: String(contact.email || ''),
+      phone: String(contact.phone || ''),
+      company: String(contact.company || ''),
+      position: String(contact.position || ''),
+      type: (contact.type as 'Internal' | 'External' | 'List') || 'External',
+      isFavorite: !!contact.isFavorite
+    };
+    this.showDirectoryForm = true;
+  }
+
+  cancelDirectoryForm(): void {
+    this.showDirectoryForm = false;
+    this.editingDirectoryContactId = null;
+  }
+
+  saveDirectoryContact(): void {
+    if (!this.canDirectoryWrite) {
+      this.showError('No tienes permisos para modificar el directorio');
+      return;
+    }
+    const payload = {
+      name: String(this.directoryFormModel.name || '').trim(),
+      email: String(this.directoryFormModel.email || '').trim(),
+      phone: String(this.directoryFormModel.phone || '').trim(),
+      company: String(this.directoryFormModel.company || '').trim(),
+      position: String(this.directoryFormModel.position || '').trim(),
+      type: this.directoryFormModel.type,
+      isFavorite: !!this.directoryFormModel.isFavorite
+    };
+
+    if (!payload.name) {
+      this.showError('El nombre es obligatorio en el directorio');
+      return;
+    }
+    if (this.savingDirectoryContact) {
+      return;
+    }
+
+    this.savingDirectoryContact = true;
+    const request$ = this.editingDirectoryContactId
+      ? this.directoryService.update(this.editingDirectoryContactId, payload)
+      : this.directoryService.create(payload);
+
+    request$.subscribe({
+      next: () => {
+        this.showSuccess(this.editingDirectoryContactId ? 'Contacto del directorio actualizado' : 'Contacto agregado al directorio');
+        this.showDirectoryForm = false;
+        this.editingDirectoryContactId = null;
+        this.savingDirectoryContact = false;
+        this.loadDirectoryContacts();
+        this.refreshOperationalViewsAfterDirectoryChange();
+      },
+      error: (err) => {
+        const backendMessage = err?.error?.error || err?.error?.message;
+        this.showError(backendMessage || 'No se pudo guardar el contacto en el directorio');
+        this.savingDirectoryContact = false;
+      }
+    });
+  }
+
+  deleteDirectoryContact(contactId: string): void {
+    if (!this.canDirectoryDelete) {
+      this.showError('No tienes permisos para eliminar en el directorio');
+      return;
+    }
+    if (!contactId) {
+      return;
+    }
+    const contact = this.directoryContacts.find((item) => item._id === contactId);
+    if (this.isDirectoryInternal(contact)) {
+      this.showError('Los usuarios internos no se eliminan desde el directorio');
+      return;
+    }
+    if (!confirm('¿Eliminar este contacto del directorio centralizado?')) {
+      return;
+    }
+    this.directoryService.delete(contactId).subscribe({
+      next: () => {
+        this.showSuccess('Contacto eliminado del directorio');
+        this.loadDirectoryContacts();
+        this.refreshOperationalViewsAfterDirectoryChange();
+      },
+      error: (err) => {
+        const backendMessage = err?.error?.error || err?.error?.message;
+        this.showError(backendMessage || 'No se pudo eliminar el contacto del directorio');
+      }
+    });
+  }
+
+  private getLocalDirectoryMatches(term: string): DirectoryContact[] {
+    const normalized = String(term || '').trim().toLowerCase();
+    const source = this.directoryContacts || [];
+    if (!normalized) {
+      return source.slice(0, 8);
+    }
+    return source
+      .filter((contact) => [contact.name, contact.email, contact.phone, contact.company]
+        .some((value) => String(value || '').toLowerCase().includes(normalized)))
+      .slice(0, 8);
+  }
+
+  onContactDirectorySelected(contact: DirectoryContact): void {
+    this.selectedContactDirectoryId = contact._id;
+    this.contactForm.patchValue({
+      name: contact.name || '',
+      email: contact.email || this.contactForm.get('email')?.value || '',
+      phone: contact.phone || '',
+      organization: contact.company || this.contactForm.get('organization')?.value || ''
+    }, { emitEvent: false });
+    this.contactDirectorySuggestions = [];
+    this.closeDirectoryQuickPicker();
+  }
+
+  private syncContactFormToDirectory(data: any): void {
+    const name = String(data?.name || '').trim();
+    if (!name || this.selectedContactDirectoryId) {
+      return;
+    }
+
+    this.directoryService.quickSearch(name).subscribe({
+      next: (matches) => {
+        const email = String(data?.email || '').trim().toLowerCase();
+        const phone = String(data?.phone || '').trim();
+        const exact = (matches || []).find((item) => {
+          const sameName = String(item.name || '').trim().toLowerCase() === name.toLowerCase();
+          const sameEmail = email && String(item.email || '').trim().toLowerCase() === email;
+          const samePhone = phone && String(item.phone || '').trim() === phone;
+          return sameName && (sameEmail || samePhone || (!email && !phone));
+        });
+        if (exact) {
+          return;
+        }
+
+        this.directoryService.create({
+          name,
+          email: data?.email || '',
+          phone: data?.phone || '',
+          company: data?.organization || '',
+          type: data?.contactType === 'preventive' ? 'List' : 'External'
+        }).subscribe({
+          next: () => this.loadDirectoryContacts(),
+          error: () => void 0
+        });
+      },
+      error: () => void 0
+    });
   }
 
   onPreventiveCsvSelected(event: Event): void {
@@ -1436,6 +2175,106 @@ export class EscalationAdminSimpleComponent implements OnInit {
         this.showError('Error al agregar persona');
       }
     });
+  }
+
+  onExternalPersonNameInput(rawValue: string): void {
+    const query = String(rawValue || '').trim();
+    if (this.externalPersonNameSearchTimer) {
+      clearTimeout(this.externalPersonNameSearchTimer);
+    }
+
+    if (query.length < 2) {
+      this.externalPersonDirectorySuggestions = this.getLocalDirectoryMatches(query);
+      return;
+    }
+
+    this.externalPersonNameSearchTimer = setTimeout(() => {
+      this.directoryService.quickSearch(query).subscribe({
+        next: (items) => {
+          this.externalPersonDirectorySuggestions = items || [];
+        },
+        error: () => {
+          this.externalPersonDirectorySuggestions = [];
+        }
+      });
+    }, 250);
+  }
+
+  onExternalPersonNameFocus(): void {
+    const currentValue = String(this.externalPersonForm.get('name')?.value || '');
+    this.externalPersonDirectorySuggestions = this.getLocalDirectoryMatches(currentValue);
+  }
+
+  onExternalPersonDirectorySelected(contact: DirectoryContact): void {
+    this.externalPersonForm.patchValue({
+      name: contact.name || '',
+      email: contact.email || this.externalPersonForm.get('email')?.value || '',
+      phone: contact.phone || this.externalPersonForm.get('phone')?.value || '',
+      position: contact.position || this.externalPersonForm.get('position')?.value || ''
+    }, { emitEvent: false });
+    this.externalPersonDirectorySuggestions = [];
+    this.closeDirectoryQuickPicker();
+  }
+
+  openDirectoryQuickPicker(
+    target: 'contact' | 'external' | 'raci:responsible' | 'raci:accountable' | 'raci:consulted' | 'raci:informed',
+    queryHint = ''
+  ): void {
+    this.directoryQuickPickerTarget = target;
+    this.directoryQuickPickerVisible = true;
+    this.directoryQuickPickerQuery = String(queryHint || '').trim();
+    this.directoryQuickPickerSuggestions = this.getLocalDirectoryMatches(this.directoryQuickPickerQuery);
+  }
+
+  closeDirectoryQuickPicker(): void {
+    this.directoryQuickPickerVisible = false;
+    this.directoryQuickPickerTarget = null;
+    this.directoryQuickPickerQuery = '';
+    this.directoryQuickPickerSuggestions = [];
+  }
+
+  onDirectoryQuickPickerInput(rawValue: string): void {
+    const query = String(rawValue || '').trim();
+    this.directoryQuickPickerQuery = query;
+    if (this.directoryQuickPickerTimer) {
+      clearTimeout(this.directoryQuickPickerTimer);
+    }
+
+    if (query.length < 2) {
+      this.directoryQuickPickerSuggestions = this.getLocalDirectoryMatches(query);
+      return;
+    }
+
+    this.directoryQuickPickerTimer = setTimeout(() => {
+      this.directoryService.quickSearch(query).subscribe({
+        next: (items) => {
+          this.directoryQuickPickerSuggestions = items || [];
+        },
+        error: () => {
+          this.directoryQuickPickerSuggestions = [];
+        }
+      });
+    }, 250);
+  }
+
+  useDirectoryQuickPick(contact: DirectoryContact): void {
+    if (!contact || !this.directoryQuickPickerTarget) {
+      return;
+    }
+
+    if (this.directoryQuickPickerTarget === 'contact') {
+      this.onContactDirectorySelected(contact);
+      return;
+    }
+
+    if (this.directoryQuickPickerTarget === 'external') {
+      this.onExternalPersonDirectorySelected(contact);
+      return;
+    }
+
+    const role = this.directoryQuickPickerTarget.replace('raci:', '') as 'responsible' | 'accountable' | 'consulted' | 'informed';
+    this.onRaciDirectorySelected(role, contact);
+    this.closeDirectoryQuickPicker();
   }
 
   deleteExternalPerson(id: string): void {

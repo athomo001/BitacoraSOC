@@ -26,6 +26,11 @@ const routes: Routes = [
     path: 'admin',
     component: EscalationAdminSimpleComponent,
     canActivate: [AuthGuard, AdminGuard]
+  },
+  {
+    path: 'directory',
+    component: EscalationAdminSimpleComponent,
+    canActivate: [AuthGuard]
   }
 ];
 
