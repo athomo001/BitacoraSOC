@@ -1,24 +1,34 @@
 <div class="container">
   <header class="page-header">
-    <mat-icon>settings</mat-icon>
+    <mat-icon>{{ directoryOnlyAccess ? 'contacts' : 'settings' }}</mat-icon>
     <div>
-      <h1>Administración de Escalamientos</h1>
-      <p>Configura turnos internos, contactos de escalación y agenda preventiva</p>
+      <h1>{{ pageHeaderTitle }}</h1>
+      <p>{{ pageHeaderSubtitle }}</p>
+      <small *ngIf="directoryOnlyAccess" class="breadcrumb-lite">Inicio / Directorio Global</small>
     </div>
   </header>
 
   <mat-tab-group class="escalation-admin-tabs">
-    <mat-tab label="📲 Flujo de Escalamiento Dinámico">
+    <mat-tab *ngIf="!directoryOnlyAccess" label="📲 Flujo de Escalamiento Dinámico">
       <div class="tab-content">
         <h2>Contactos de Escalamiento</h2>
         <p class="subtitle">Configura un flujo dinámico por cliente con pasos únicos o tipo pool.</p>
 
         <div class="flow-admin-toolbar">
           <mat-form-field appearance="outline" class="flow-client-field">
+            <mat-label>Buscar cliente</mat-label>
+            <input matInput [(ngModel)]="flowClientSearch" placeholder="Escribe nombre del cliente">
+            <mat-icon matSuffix>search</mat-icon>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="flow-client-field">
             <mat-label>Seleccionar Cliente</mat-label>
             <mat-select [(ngModel)]="selectedFlowClientId" (selectionChange)="onFlowClientChange()">
-              <mat-option *ngFor="let client of clients" [value]="client._id">
+              <mat-option *ngFor="let client of filteredClientsForFlow" [value]="client._id">
                 {{ client.name }}
+              </mat-option>
+              <mat-option *ngIf="filteredClientsForFlow.length === 0" disabled>
+                Sin resultados para "{{ flowClientSearch }}"
               </mat-option>
             </mat-select>
           </mat-form-field>
@@ -35,7 +45,30 @@
             <mat-icon>{{ savingFlow ? 'hourglass_empty' : 'save' }}</mat-icon>
             {{ savingFlow ? 'Guardando...' : 'Guardar flujo' }}
           </button>
+
+          <button mat-stroked-button color="accent" (click)="toggleQuickClientForm(flowClientSearch)">
+            <mat-icon>person_add</mat-icon>
+            Cliente no está en la lista
+          </button>
         </div>
+
+        <section *ngIf="showQuickClientForm" class="inline-form inline-form--quick-client">
+          <h4>Agregar cliente nuevo al listado central</h4>
+          <form (ngSubmit)="saveQuickClient()">
+            <mat-form-field appearance="outline">
+              <mat-label>Nombre del cliente</mat-label>
+              <input matInput [(ngModel)]="quickClientName" name="quickClientName" required>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Descripción (opcional)</mat-label>
+              <input matInput [(ngModel)]="quickClientDescription" name="quickClientDescription">
+            </mat-form-field>
+            <button mat-raised-button color="primary" type="submit" [disabled]="savingQuickClient">
+              {{ savingQuickClient ? 'Guardando...' : 'Guardar cliente' }}
+            </button>
+            <button mat-button type="button" (click)="showQuickClientForm = false">Cancelar</button>
+          </form>
+        </section>
 
         <div *ngIf="loadingFlow" class="loading">
           <mat-spinner diameter="36"></mat-spinner>
@@ -63,7 +96,21 @@
             <div *ngIf="step.type === 'unique'" class="flow-step-body">
               <mat-form-field appearance="outline">
                 <mat-label>Nombre</mat-label>
-                <input matInput [(ngModel)]="step.contactName" placeholder="Nombre del contacto">
+                <input
+                  matInput
+                  [(ngModel)]="step.contactName"
+                  [matAutocomplete]="autoUniqueName"
+                  (focus)="onFlowNameFocus(stepIndex)"
+                  (input)="onFlowNameInput(stepIndex, step.contactName)"
+                  placeholder="Nombre del contacto">
+                <mat-autocomplete
+                  #autoUniqueName="matAutocomplete"
+                  [displayWith]="displayDirectoryContact"
+                  (optionSelected)="onFlowDirectoryContactSelected(stepIndex, $event.option.value)">
+                  <mat-option *ngFor="let suggestion of getDirectoryOptions(stepIndex)" [value]="suggestion">
+                    {{ suggestion.name }} <span *ngIf="suggestion.phone">- {{ suggestion.phone }}</span>
+                  </mat-option>
+                </mat-autocomplete>
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Tel</mat-label>
@@ -86,7 +133,21 @@
                 <div class="pool-contact-row" *ngFor="let contact of step.contacts; let contactIndex = index">
                   <mat-form-field appearance="outline">
                     <mat-label>Nombre</mat-label>
-                    <input matInput [(ngModel)]="contact.name" placeholder="Nombre">
+                    <input
+                      matInput
+                      [(ngModel)]="contact.name"
+                      [matAutocomplete]="autoPoolName"
+                      (focus)="onFlowNameFocus(stepIndex, contactIndex)"
+                      (input)="onFlowNameInput(stepIndex, contact.name, contactIndex)"
+                      placeholder="Nombre">
+                    <mat-autocomplete
+                      #autoPoolName="matAutocomplete"
+                      [displayWith]="displayDirectoryContact"
+                      (optionSelected)="onFlowDirectoryContactSelected(stepIndex, $event.option.value, contactIndex)">
+                      <mat-option *ngFor="let suggestion of getDirectoryOptions(stepIndex, contactIndex)" [value]="suggestion">
+                        {{ suggestion.name }} <span *ngIf="suggestion.phone">- {{ suggestion.phone }}</span>
+                      </mat-option>
+                    </mat-autocomplete>
                   </mat-form-field>
                   <mat-form-field appearance="outline">
                     <mat-label>Tel</mat-label>
@@ -112,7 +173,7 @@
     </mat-tab>
 
     <!-- TAB 1: TURNOS INTERNOS -->
-    <mat-tab label="🗓️ Turnos Internos (Mi Empresa)">
+    <mat-tab *ngIf="!directoryOnlyAccess" label="🗓️ Turnos Internos (Mi Empresa)">
       <div class="tab-content">
         <h2>Asignar Turnos Semanales</h2>
         <p class="subtitle">Configura quién estará de turno cada semana del mes</p>
@@ -415,10 +476,45 @@
 
           <section *ngIf="showExternalPersonForm" class="inline-form">
             <h4>Nueva Persona Externa</h4>
+            <div class="toolbar-row">
+              <button mat-stroked-button type="button" color="primary" (click)="openDirectoryQuickPicker('external', externalPersonForm.get('name')?.value || '')">
+                <mat-icon>manage_search</mat-icon>
+                Usar contacto existente
+              </button>
+            </div>
+            <div class="inline-picker" *ngIf="directoryQuickPickerVisible && directoryQuickPickerTarget === 'external'">
+              <mat-form-field appearance="outline">
+                <mat-label>Buscar en directorio</mat-label>
+                <input matInput [ngModel]="directoryQuickPickerQuery" (ngModelChange)="onDirectoryQuickPickerInput($event)" placeholder="Nombre, correo, teléfono o empresa">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Seleccionar contacto</mat-label>
+                <mat-select (selectionChange)="useDirectoryQuickPick($event.value)">
+                  <mat-option *ngFor="let suggestion of directoryQuickPickerSuggestions" [value]="suggestion">
+                    {{ suggestion.name }} · {{ suggestion.email || suggestion.phone || '-' }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+              <button mat-button type="button" (click)="closeDirectoryQuickPicker()">Cerrar</button>
+            </div>
             <form [formGroup]="externalPersonForm" (ngSubmit)="saveExternalPerson()">
               <mat-form-field appearance="outline">
                 <mat-label>Nombre Completo</mat-label>
-                <input matInput formControlName="name" placeholder="Ej: Juan Pérez">
+                <input
+                  matInput
+                  formControlName="name"
+                  [matAutocomplete]="autoExternalPersonName"
+                  (focus)="onExternalPersonNameFocus()"
+                  (input)="onExternalPersonNameInput($any($event.target).value)"
+                  placeholder="Ej: Juan Pérez">
+                <mat-autocomplete
+                  #autoExternalPersonName="matAutocomplete"
+                  [displayWith]="displayDirectoryContact"
+                  (optionSelected)="onExternalPersonDirectorySelected($event.option.value)">
+                  <mat-option *ngFor="let suggestion of externalPersonDirectorySuggestions" [value]="suggestion">
+                    {{ suggestion.name }} <span *ngIf="suggestion.phone">- {{ suggestion.phone }}</span>
+                  </mat-option>
+                </mat-autocomplete>
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Email</mat-label>
@@ -476,7 +572,7 @@
     </mat-tab>
 
     <!-- TAB 2: CONTACTOS DE ESCALACIÓN -->
-    <mat-tab label="📞 Contactos de Escalación">
+    <mat-tab *ngIf="!directoryOnlyAccess" label="📞 Contactos de Escalación">
       <div class="tab-content">
         <h2>Contactos de Escalación y Agenda Preventiva</h2>
         <p class="subtitle">Este módulo corresponde al flujo operativo de escalación/turnos. La libreta preventiva de boletines vive abajo y se mantiene separada.</p>
@@ -501,10 +597,18 @@
           <section *ngIf="showServiceForm" class="inline-form">
             <form [formGroup]="serviceForm" (ngSubmit)="saveService()">
               <mat-form-field appearance="outline">
+                <mat-label>Buscar cliente</mat-label>
+                <input matInput [(ngModel)]="serviceClientSearch" name="serviceClientSearch" placeholder="Filtrar clientes">
+                <mat-icon matSuffix>search</mat-icon>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
                 <mat-label>Cliente</mat-label>
                 <mat-select formControlName="clientId">
-                  <mat-option *ngFor="let client of clients" [value]="client._id">
+                  <mat-option *ngFor="let client of filteredClientsForServiceForm" [value]="client._id">
                     {{ client.name }}
+                  </mat-option>
+                  <mat-option *ngIf="filteredClientsForServiceForm.length === 0" disabled>
+                    Sin resultados para "{{ serviceClientSearch }}"
                   </mat-option>
                 </mat-select>
               </mat-form-field>
@@ -553,6 +657,27 @@
           </button>
 
           <section *ngIf="showContactForm && contactForm.get('contactType')?.value !== 'preventive'" class="inline-form">
+            <div class="toolbar-row">
+              <button mat-stroked-button type="button" color="primary" (click)="openDirectoryQuickPicker('contact', contactForm.get('name')?.value || '')">
+                <mat-icon>manage_search</mat-icon>
+                Usar contacto existente
+              </button>
+            </div>
+            <div class="inline-picker" *ngIf="directoryQuickPickerVisible && directoryQuickPickerTarget === 'contact'">
+              <mat-form-field appearance="outline">
+                <mat-label>Buscar en directorio</mat-label>
+                <input matInput [ngModel]="directoryQuickPickerQuery" (ngModelChange)="onDirectoryQuickPickerInput($event)" placeholder="Nombre, correo, teléfono o empresa">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Seleccionar contacto</mat-label>
+                <mat-select (selectionChange)="useDirectoryQuickPick($event.value)">
+                  <mat-option *ngFor="let suggestion of directoryQuickPickerSuggestions" [value]="suggestion">
+                    {{ suggestion.name }} · {{ suggestion.email || suggestion.phone || '-' }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+              <button mat-button type="button" (click)="closeDirectoryQuickPicker()">Cerrar</button>
+            </div>
             <form [formGroup]="contactForm" (ngSubmit)="saveContact()">
               <mat-form-field appearance="outline">
                 <mat-label>Servicio</mat-label>
@@ -564,7 +689,21 @@
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Nombre</mat-label>
-                <input matInput formControlName="name" placeholder="Nombre del contacto">
+                <input
+                  matInput
+                  formControlName="name"
+                  [matAutocomplete]="autoContactNameEsc"
+                  (focus)="onContactNameFocus()"
+                  (input)="onContactNameInput($any($event.target).value)"
+                  placeholder="Nombre del contacto">
+                <mat-autocomplete
+                  #autoContactNameEsc="matAutocomplete"
+                  [displayWith]="displayDirectoryContact"
+                  (optionSelected)="onContactDirectorySelected($event.option.value)">
+                  <mat-option *ngFor="let suggestion of contactDirectorySuggestions" [value]="suggestion">
+                    {{ suggestion.name }} <span *ngIf="suggestion.phone">- {{ suggestion.phone }}</span>
+                  </mat-option>
+                </mat-autocomplete>
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Email</mat-label>
@@ -684,10 +823,45 @@
           </div>
 
           <section *ngIf="showContactForm && contactForm.get('contactType')?.value === 'preventive'" class="inline-form">
+            <div class="toolbar-row">
+              <button mat-stroked-button type="button" color="primary" (click)="openDirectoryQuickPicker('contact', contactForm.get('name')?.value || '')">
+                <mat-icon>manage_search</mat-icon>
+                Usar contacto existente
+              </button>
+            </div>
+            <div class="inline-picker" *ngIf="directoryQuickPickerVisible && directoryQuickPickerTarget === 'contact'">
+              <mat-form-field appearance="outline">
+                <mat-label>Buscar en directorio</mat-label>
+                <input matInput [ngModel]="directoryQuickPickerQuery" (ngModelChange)="onDirectoryQuickPickerInput($event)" placeholder="Nombre, correo, teléfono o empresa">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Seleccionar contacto</mat-label>
+                <mat-select (selectionChange)="useDirectoryQuickPick($event.value)">
+                  <mat-option *ngFor="let suggestion of directoryQuickPickerSuggestions" [value]="suggestion">
+                    {{ suggestion.name }} · {{ suggestion.email || suggestion.phone || '-' }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+              <button mat-button type="button" (click)="closeDirectoryQuickPicker()">Cerrar</button>
+            </div>
             <form [formGroup]="contactForm" (ngSubmit)="saveContact()">
               <mat-form-field appearance="outline">
                 <mat-label>Nombre completo</mat-label>
-                <input matInput formControlName="name" placeholder="Ej: Ana Pérez">
+                <input
+                  matInput
+                  formControlName="name"
+                  [matAutocomplete]="autoContactNamePrev"
+                  (focus)="onContactNameFocus()"
+                  (input)="onContactNameInput($any($event.target).value)"
+                  placeholder="Ej: Ana Pérez">
+                <mat-autocomplete
+                  #autoContactNamePrev="matAutocomplete"
+                  [displayWith]="displayDirectoryContact"
+                  (optionSelected)="onContactDirectorySelected($event.option.value)">
+                  <mat-option *ngFor="let suggestion of contactDirectorySuggestions" [value]="suggestion">
+                    {{ suggestion.name }} <span *ngIf="suggestion.phone">- {{ suggestion.phone }}</span>
+                  </mat-option>
+                </mat-autocomplete>
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Correo</mat-label>
@@ -770,19 +944,176 @@
       </div>
     </mat-tab>
 
-    <!-- TAB 3: RACI -->
-    <mat-tab label="📋 RACI">
+    <mat-tab *ngIf="directoryOnlyAccess" label="📚 Directorio Centralizado">
+      <div class="tab-content">
+        <h2>Fuente de Verdad de Contactos</h2>
+        <p class="subtitle">Aquí se gestiona el directorio global que usan los formularios operativos. Los contactos internos se administran desde Usuarios.</p>
+
+        <div class="section directory-section">
+          <div class="toolbar-row">
+            <mat-form-field appearance="outline">
+              <mat-label>Buscar en directorio</mat-label>
+              <input matInput [(ngModel)]="directorySearch" (ngModelChange)="applyDirectoryFilters()" placeholder="Nombre, correo, teléfono o empresa">
+              <mat-icon matSuffix>search</mat-icon>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Tipo</mat-label>
+              <mat-select [(ngModel)]="directoryTypeFilter" (selectionChange)="applyDirectoryFilters()">
+                <mat-option value="">Todos</mat-option>
+                <mat-option value="Internal">Internos</mat-option>
+                <mat-option value="External">Externos</mat-option>
+                <mat-option value="List">Listas</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Filas por página</mat-label>
+              <mat-select [(ngModel)]="directoryPageSize" (selectionChange)="applyDirectoryFilters()">
+                <mat-option [value]="10">10</mat-option>
+                <mat-option [value]="20">20</mat-option>
+                <mat-option [value]="50">50</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <button mat-raised-button color="primary" type="button" (click)="addDirectoryContact()" [disabled]="!canDirectoryWrite">
+              <mat-icon>person_add</mat-icon>
+              Agregar contacto
+            </button>
+            <button mat-stroked-button color="primary" type="button" (click)="loadDirectoryContacts()" [disabled]="loadingDirectoryContacts">
+              <mat-icon>{{ loadingDirectoryContacts ? 'hourglass_empty' : 'refresh' }}</mat-icon>
+              {{ loadingDirectoryContacts ? 'Actualizando...' : 'Actualizar' }}
+            </button>
+            <button mat-stroked-button color="accent" type="button" (click)="rebuildDirectoryFromEscalation()" [disabled]="rebuildingDirectory">
+              <mat-icon>{{ rebuildingDirectory ? 'hourglass_empty' : 'sync' }}</mat-icon>
+              {{ rebuildingDirectory ? 'Sincronizando...' : 'Sincronizar histórico' }}
+            </button>
+          </div>
+
+          <div class="section-note" *ngIf="!canDirectoryWrite">
+            <mat-icon>visibility</mat-icon>
+            <p>Vista de solo lectura. Tu perfil no tiene permisos para crear o editar contactos del directorio.</p>
+          </div>
+
+          <section *ngIf="showDirectoryForm && canDirectoryWrite" class="inline-form directory-form">
+            <h4>{{ editingDirectoryContactId ? 'Editar contacto del directorio' : 'Nuevo contacto del directorio' }}</h4>
+            <form (ngSubmit)="saveDirectoryContact()">
+              <mat-form-field appearance="outline">
+                <mat-label>Nombre *</mat-label>
+                <input matInput [(ngModel)]="directoryFormModel.name" name="dirName" required>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Correo</mat-label>
+                <input matInput type="email" [(ngModel)]="directoryFormModel.email" name="dirEmail">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Teléfono</mat-label>
+                <input matInput [(ngModel)]="directoryFormModel.phone" name="dirPhone">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Empresa</mat-label>
+                <input matInput [(ngModel)]="directoryFormModel.company" name="dirCompany">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Cargo</mat-label>
+                <input matInput [(ngModel)]="directoryFormModel.position" name="dirPosition">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Tipo</mat-label>
+                <mat-select [(ngModel)]="directoryFormModel.type" name="dirType">
+                  <mat-option value="Internal">Interno</mat-option>
+                  <mat-option value="External">Externo</mat-option>
+                  <mat-option value="List">Lista</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-checkbox [(ngModel)]="directoryFormModel.isFavorite" name="dirFavorite" color="primary">Favorito</mat-checkbox>
+              <button mat-raised-button color="primary" type="submit" [disabled]="savingDirectoryContact">
+                {{ savingDirectoryContact ? 'Guardando...' : 'Guardar contacto' }}
+              </button>
+              <button mat-button type="button" (click)="cancelDirectoryForm()">Cancelar</button>
+            </form>
+          </section>
+
+          <div class="simple-table" *ngIf="!loadingDirectoryContacts && filteredDirectoryContacts.length > 0">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Teléfono</th>
+                  <th>Correo</th>
+                  <th>Empresa</th>
+                  <th>Tipo</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let person of paginatedDirectoryContacts">
+                  <td>
+                    <strong class="copyable-cell" (click)="copyDirectoryValue(person.name || '', 'nombre')">{{ person.name }}</strong>
+                  </td>
+                  <td>
+                    <span class="copyable-cell" (click)="copyDirectoryValue(person.phone || '', 'telefono')">{{ person.phone || '-' }}</span>
+                  </td>
+                  <td>
+                    <span class="copyable-cell" (click)="copyDirectoryValue(person.email || '', 'correo')">{{ person.email || '-' }}</span>
+                  </td>
+                  <td>{{ person.company || '-' }}</td>
+                  <td><span class="badge outline">{{ getDirectoryTypeLabel(person.type) }}</span></td>
+                  <td>
+                    <button
+                      mat-icon-button
+                      color="primary"
+                      (click)="editDirectoryContact(person)"
+                      [disabled]="isDirectoryInternal(person) || !canDirectoryWrite"
+                      [matTooltip]="isDirectoryInternal(person) ? 'Los internos se editan en Usuarios' : 'Editar contacto del directorio'">
+                      <mat-icon>edit</mat-icon>
+                    </button>
+                    <button
+                      mat-icon-button
+                      color="warn"
+                      (click)="deleteDirectoryContact(person._id)"
+                      [disabled]="isDirectoryInternal(person) || !canDirectoryDelete"
+                      [matTooltip]="isDirectoryInternal(person) ? 'Los internos no se eliminan aquí' : 'Eliminar contacto del directorio'">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div *ngIf="!loadingDirectoryContacts && filteredDirectoryContacts.length === 0" class="no-data compact-no-data">
+            <p>No hay personas en el directorio para ese filtro.</p>
+          </div>
+
+          <div class="directory-pagination" *ngIf="!loadingDirectoryContacts && filteredDirectoryContacts.length > 0">
+            <span>Mostrando {{ directoryStartItem }}-{{ directoryEndItem }} de {{ filteredDirectoryContacts.length }}</span>
+            <button mat-stroked-button type="button" (click)="prevDirectoryPage()" [disabled]="directoryPageIndex === 0">Anterior</button>
+            <span>Página {{ directoryPageIndex + 1 }} de {{ directoryTotalPages }}</span>
+            <button mat-stroked-button type="button" (click)="nextDirectoryPage()" [disabled]="directoryPageIndex >= directoryTotalPages - 1">Siguiente</button>
+          </div>
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- TAB 4: RACI -->
+    <mat-tab *ngIf="!directoryOnlyAccess" label="📋 RACI">
       <div class="tab-content">
         <h2>Matriz RACI por Cliente</h2>
         <p class="subtitle">Configura responsables, aprobadores y consultados por actividad</p>
 
         <div class="form-row">
           <mat-form-field appearance="outline">
+            <mat-label>Buscar cliente</mat-label>
+            <input matInput [(ngModel)]="raciClientSearch" placeholder="Filtrar clientes">
+            <mat-icon matSuffix>search</mat-icon>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
             <mat-label>Cliente</mat-label>
             <mat-select [(ngModel)]="selectedRaciClientId" (selectionChange)="onRaciFilterChange()">
               <mat-option value="">Todos</mat-option>
-              <mat-option *ngFor="let client of raciClients" [value]="client._id">
+              <mat-option *ngFor="let client of filteredClientsForRaci" [value]="client._id">
                 {{ client.name }}
+              </mat-option>
+              <mat-option *ngIf="filteredClientsForRaci.length === 0" disabled>
+                Sin resultados para "{{ raciClientSearch }}"
               </mat-option>
             </mat-select>
           </mat-form-field>
@@ -817,10 +1148,18 @@
 
             <div class="form-row">
               <mat-form-field appearance="outline">
+                <mat-label>Buscar cliente</mat-label>
+                <input matInput [(ngModel)]="raciClientSearch" [ngModelOptions]="{standalone: true}" placeholder="Filtrar clientes">
+                <mat-icon matSuffix>search</mat-icon>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
                 <mat-label>Cliente</mat-label>
                 <mat-select formControlName="clientId" required>
-                  <mat-option *ngFor="let client of raciClients" [value]="client._id">
+                  <mat-option *ngFor="let client of filteredClientsForRaci" [value]="client._id">
                     {{ client.name }}
+                  </mat-option>
+                  <mat-option *ngIf="filteredClientsForRaci.length === 0" disabled>
+                    Sin resultados para "{{ raciClientSearch }}"
                   </mat-option>
                 </mat-select>
               </mat-form-field>
@@ -840,6 +1179,27 @@
 
             <!-- RESPONSABLE (R) -->
             <h4 class="raci-section-title">👤 Responsable (R)</h4>
+            <div class="toolbar-row">
+              <button mat-stroked-button type="button" color="primary" (click)="openDirectoryQuickPicker('raci:responsible', raciForm.get('responsible.name')?.value || '')">
+                <mat-icon>manage_search</mat-icon>
+                Usar contacto existente
+              </button>
+            </div>
+            <div class="inline-picker" *ngIf="directoryQuickPickerVisible && directoryQuickPickerTarget === 'raci:responsible'">
+              <mat-form-field appearance="outline">
+                <mat-label>Buscar en directorio</mat-label>
+                <input matInput [ngModel]="directoryQuickPickerQuery" [ngModelOptions]="{standalone: true}" (ngModelChange)="onDirectoryQuickPickerInput($event)" placeholder="Nombre, correo, teléfono o empresa">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Seleccionar contacto</mat-label>
+                <mat-select (selectionChange)="useDirectoryQuickPick($event.value)">
+                  <mat-option *ngFor="let suggestion of directoryQuickPickerSuggestions" [value]="suggestion">
+                    {{ suggestion.name }} · {{ suggestion.email || suggestion.phone || '-' }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+              <button mat-button type="button" (click)="closeDirectoryQuickPicker()">Cerrar</button>
+            </div>
             <div class="form-row" *ngIf="reusableRaciPeople.length > 0">
               <mat-form-field appearance="outline">
                 <mat-label>Usar contacto guardado</mat-label>
@@ -854,7 +1214,21 @@
             <div formGroupName="responsible" class="form-row">
               <mat-form-field appearance="outline">
                 <mat-label>Nombre *</mat-label>
-                <input matInput formControlName="name" required>
+                <input
+                  matInput
+                  formControlName="name"
+                  [matAutocomplete]="autoRaciResponsible"
+                  (focus)="onRaciPersonNameFocus('responsible')"
+                  (input)="onRaciPersonNameInput('responsible', $any($event.target).value)"
+                  required>
+                <mat-autocomplete
+                  #autoRaciResponsible="matAutocomplete"
+                  [displayWith]="displayDirectoryContact"
+                  (optionSelected)="onRaciDirectorySelected('responsible', $event.option.value)">
+                  <mat-option *ngFor="let suggestion of getRaciDirectoryOptions('responsible')" [value]="suggestion">
+                    {{ suggestion.name }} <span *ngIf="suggestion.phone">- {{ suggestion.phone }}</span>
+                  </mat-option>
+                </mat-autocomplete>
               </mat-form-field>
 
               <mat-form-field appearance="outline">
@@ -884,7 +1258,21 @@
             <div formGroupName="accountable" class="form-row">
               <mat-form-field appearance="outline">
                 <mat-label>Nombre *</mat-label>
-                <input matInput formControlName="name" required>
+                <input
+                  matInput
+                  formControlName="name"
+                  [matAutocomplete]="autoRaciAccountable"
+                  (focus)="onRaciPersonNameFocus('accountable')"
+                  (input)="onRaciPersonNameInput('accountable', $any($event.target).value)"
+                  required>
+                <mat-autocomplete
+                  #autoRaciAccountable="matAutocomplete"
+                  [displayWith]="displayDirectoryContact"
+                  (optionSelected)="onRaciDirectorySelected('accountable', $event.option.value)">
+                  <mat-option *ngFor="let suggestion of getRaciDirectoryOptions('accountable')" [value]="suggestion">
+                    {{ suggestion.name }} <span *ngIf="suggestion.phone">- {{ suggestion.phone }}</span>
+                  </mat-option>
+                </mat-autocomplete>
               </mat-form-field>
 
               <mat-form-field appearance="outline">
@@ -914,7 +1302,20 @@
             <div formGroupName="consulted" class="form-row">
               <mat-form-field appearance="outline">
                 <mat-label>Nombre</mat-label>
-                <input matInput formControlName="name">
+                <input
+                  matInput
+                  formControlName="name"
+                  [matAutocomplete]="autoRaciConsulted"
+                  (focus)="onRaciPersonNameFocus('consulted')"
+                  (input)="onRaciPersonNameInput('consulted', $any($event.target).value)">
+                <mat-autocomplete
+                  #autoRaciConsulted="matAutocomplete"
+                  [displayWith]="displayDirectoryContact"
+                  (optionSelected)="onRaciDirectorySelected('consulted', $event.option.value)">
+                  <mat-option *ngFor="let suggestion of getRaciDirectoryOptions('consulted')" [value]="suggestion">
+                    {{ suggestion.name }} <span *ngIf="suggestion.phone">- {{ suggestion.phone }}</span>
+                  </mat-option>
+                </mat-autocomplete>
               </mat-form-field>
 
               <mat-form-field appearance="outline">
@@ -944,7 +1345,20 @@
             <div formGroupName="informed" class="form-row">
               <mat-form-field appearance="outline">
                 <mat-label>Nombre</mat-label>
-                <input matInput formControlName="name">
+                <input
+                  matInput
+                  formControlName="name"
+                  [matAutocomplete]="autoRaciInformed"
+                  (focus)="onRaciPersonNameFocus('informed')"
+                  (input)="onRaciPersonNameInput('informed', $any($event.target).value)">
+                <mat-autocomplete
+                  #autoRaciInformed="matAutocomplete"
+                  [displayWith]="displayDirectoryContact"
+                  (optionSelected)="onRaciDirectorySelected('informed', $event.option.value)">
+                  <mat-option *ngFor="let suggestion of getRaciDirectoryOptions('informed')" [value]="suggestion">
+                    {{ suggestion.name }} <span *ngIf="suggestion.phone">- {{ suggestion.phone }}</span>
+                  </mat-option>
+                </mat-autocomplete>
               </mat-form-field>
 
               <mat-form-field appearance="outline">

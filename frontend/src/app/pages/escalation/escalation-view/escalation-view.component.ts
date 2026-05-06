@@ -9,6 +9,7 @@ import { FormControl } from '@angular/forms';
 import { Observable } from 'rxjs';
 import { map, startWith, switchMap } from 'rxjs/operators';
 import { EscalationService } from '../../../services/escalation.service';
+import { CatalogService } from '../../../services/catalog.service';
 import { Client, Service, EscalationView, EscalationFlowConfig } from '../../../models/escalation.model';
 
 @Component({
@@ -32,8 +33,15 @@ export class EscalationViewComponent implements OnInit {
   escalationFlow: EscalationFlowConfig | null = null;
   loading = false;
   error: string | null = null;
+  showQuickClientForm = false;
+  quickClientName = '';
+  quickClientDescription = '';
+  savingQuickClient = false;
 
-  constructor(private escalationService: EscalationService) {
+  constructor(
+    private escalationService: EscalationService,
+    private catalogService: CatalogService
+  ) {
     // Filtro de clientes (autocomplete)
     this.filteredClients = this.clientControl.valueChanges.pipe(
       startWith(''),
@@ -65,6 +73,46 @@ export class EscalationViewComponent implements OnInit {
       error: (err) => {
         console.error('Error loading clients:', err);
         this.error = 'Error al cargar clientes';
+      }
+    });
+  }
+
+  toggleQuickClientForm(): void {
+    this.showQuickClientForm = !this.showQuickClientForm;
+    if (!this.showQuickClientForm) {
+      this.quickClientName = '';
+      this.quickClientDescription = '';
+    }
+  }
+
+  saveQuickClient(): void {
+    const name = this.quickClientName.trim();
+    if (!name) {
+      this.error = 'Ingresa un nombre para el cliente nuevo';
+      return;
+    }
+    if (this.savingQuickClient) {
+      return;
+    }
+
+    this.savingQuickClient = true;
+    this.catalogService.createLogSource({
+      name,
+      description: this.quickClientDescription.trim(),
+      enabled: true
+    } as any).subscribe({
+      next: () => {
+        this.showQuickClientForm = false;
+        this.quickClientName = '';
+        this.quickClientDescription = '';
+        this.loadClients();
+        this.error = null;
+        this.savingQuickClient = false;
+      },
+      error: (err) => {
+        const backendMessage = err?.error?.error || err?.error?.message;
+        this.error = backendMessage || 'No se pudo crear el cliente';
+        this.savingQuickClient = false;
       }
     });
   }

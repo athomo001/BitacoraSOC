@@ -55,7 +55,29 @@
           <mat-icon>refresh</mat-icon>
           Actualizar
         </button>
+
+        <button mat-stroked-button color="accent" type="button" (click)="toggleQuickClientForm()">
+          <mat-icon>person_add</mat-icon>
+          Cliente no está en la lista
+        </button>
       </div>
+
+      <section *ngIf="showQuickClientForm" class="flow-legend">
+        <h3>Agregar cliente nuevo al listado central</h3>
+        <div class="selectors">
+          <mat-form-field appearance="outline" class="selector-field">
+            <mat-label>Nombre del cliente</mat-label>
+            <input matInput [value]="quickClientName" (input)="quickClientName = $any($event.target).value">
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="selector-field">
+            <mat-label>Descripción (opcional)</mat-label>
+            <input matInput [value]="quickClientDescription" (input)="quickClientDescription = $any($event.target).value">
+          </mat-form-field>
+          <button mat-raised-button color="primary" type="button" [disabled]="savingQuickClient" (click)="saveQuickClient()">
+            {{ savingQuickClient ? 'Guardando...' : 'Guardar cliente' }}
+          </button>
+        </div>
+      </section>
     </div>
   </section>
 

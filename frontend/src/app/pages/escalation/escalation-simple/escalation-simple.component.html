@@ -105,14 +105,48 @@
     <!-- Selector de Cliente -->
     <div class="client-selector" *ngIf="allClients.length > 0">
       <mat-form-field appearance="outline" class="client-field">
+        <mat-label>Buscar cliente</mat-label>
+        <input matInput [(ngModel)]="clientSearchTerm" placeholder="Escribe nombre del cliente">
+        <mat-icon matSuffix>search</mat-icon>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="client-field">
         <mat-label>Seleccionar Cliente</mat-label>
         <mat-select [(ngModel)]="selectedClient" (selectionChange)="onClientChange()">
-          <mat-option *ngFor="let client of allClients" [value]="client">
+          <mat-option *ngFor="let client of filteredClients" [value]="client">
             {{ client.name }}
+          </mat-option>
+          <mat-option *ngIf="filteredClients.length === 0" disabled>
+            Sin resultados para "{{ clientSearchTerm }}"
           </mat-option>
         </mat-select>
       </mat-form-field>
+
+      <button mat-stroked-button color="accent" type="button" (click)="toggleQuickClientForm(clientSearchTerm)">
+        <mat-icon>person_add</mat-icon>
+        Cliente no está en la lista
+      </button>
     </div>
+
+    <section *ngIf="showQuickClientForm" class="quick-client-form">
+      <h4>Agregar cliente nuevo al listado central</h4>
+      <div class="quick-client-form__row">
+        <mat-form-field appearance="outline" class="client-field">
+          <mat-label>Nombre del cliente</mat-label>
+          <input matInput [(ngModel)]="quickClientName" name="quickClientName" required>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="client-field">
+          <mat-label>Descripción (opcional)</mat-label>
+          <input matInput [(ngModel)]="quickClientDescription" name="quickClientDescription">
+        </mat-form-field>
+      </div>
+      <div class="quick-client-form__actions">
+        <button mat-raised-button color="primary" type="button" [disabled]="savingQuickClient" (click)="saveQuickClient()">
+          {{ savingQuickClient ? 'Guardando...' : 'Guardar cliente' }}
+        </button>
+        <button mat-button type="button" (click)="showQuickClientForm = false">Cancelar</button>
+      </div>
+    </section>
 
     <div *ngIf="loading" class="loading-container">
       <mat-spinner diameter="40"></mat-spinner>
@@ -213,10 +247,18 @@
 
     <div class="client-selector" *ngIf="raciClients.length > 0">
       <mat-form-field appearance="outline" class="client-field">
+        <mat-label>Buscar cliente</mat-label>
+        <input matInput [(ngModel)]="raciClientSearchTerm" placeholder="Filtrar clientes">
+        <mat-icon matSuffix>search</mat-icon>
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="client-field">
         <mat-label>Seleccionar Cliente</mat-label>
         <mat-select [(ngModel)]="selectedRaciClient" (selectionChange)="onRaciClientChange()">
-          <mat-option *ngFor="let client of raciClients" [value]="client">
+          <mat-option *ngFor="let client of filteredRaciClients" [value]="client">
             {{ client.name }}
+          </mat-option>
+          <mat-option *ngIf="filteredRaciClients.length === 0" disabled>
+            Sin resultados para "{{ raciClientSearchTerm }}"
           </mat-option>
         </mat-select>
       </mat-form-field>
