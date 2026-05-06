@@ -14,7 +14,14 @@ const { syncManyDirectoryContacts, mergeDirectoryDuplicates } = require('../util
 const { logger } = require('../utils/logger');
 
 const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const sanitizeText = (value, max = 180) => String(value ?? '').trim().slice(0, max);
+const sanitizeText = (value, max = 180) => {
+  const normalized = String(value ?? '').trim().slice(0, max);
+  if (!normalized) return '';
+  const lower = normalized.toLowerCase();
+  if (/^[-–—]+$/.test(lower)) return '';
+  if (['n/a', 'na', 'null', 'undefined', 'sin dato', 'sin datos'].includes(lower)) return '';
+  return normalized;
+};
 
 const resolveScope = (body = {}, existing = {}, type = 'External') => {
   if (['Internal', 'External'].includes(body.scope)) {

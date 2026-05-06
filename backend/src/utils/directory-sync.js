@@ -6,7 +6,21 @@
 
 const DirectoryContact = require('../models/DirectoryContact');
 
-const sanitize = (value, max = 180) => String(value ?? '').trim().slice(0, max);
+const isEmptyLike = (value = '') => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) {
+    return true;
+  }
+  if (/^[-–—]+$/.test(normalized)) {
+    return true;
+  }
+  return ['n/a', 'na', 'null', 'undefined', 'sin dato', 'sin datos'].includes(normalized);
+};
+
+const sanitize = (value, max = 180) => {
+  const normalized = String(value ?? '').trim().slice(0, max);
+  return isEmptyLike(normalized) ? '' : normalized;
+};
 
 const resolveDirectoryType = (payload = {}) => {
   if (payload.type && ['Internal', 'External', 'List'].includes(payload.type)) {
@@ -102,7 +116,7 @@ const sourcePriority = {
 
 const pickBestValue = (...values) => {
   for (const value of values) {
-    const normalized = String(value || '').trim();
+    const normalized = sanitize(value);
     if (normalized) {
       return normalized;
     }
@@ -119,10 +133,10 @@ const normalizeName = (value = '') =>
 
 const buildDuplicateKeys = (contact = {}) => {
   const keys = [];
-  const email = String(contact.email || '').trim().toLowerCase();
+  const email = sanitize(contact.email, 180).toLowerCase();
   const name = normalizeName(contact.name || '');
-  const phone = String(contact.phone || '').trim();
-  const company = String(contact.company || '').trim().toLowerCase();
+  const phone = sanitize(contact.phone, 80);
+  const company = sanitize(contact.company, 160).toLowerCase();
 
   if (name) {
     keys.push(`name:${name}`);
