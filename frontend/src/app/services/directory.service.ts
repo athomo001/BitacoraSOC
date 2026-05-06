@@ -73,4 +73,18 @@ export class DirectoryService {
       {}
     );
   }
+
+  mergeDuplicates(): Observable<{
+    message: string;
+    mergedGroups: number;
+    removedDuplicates: number;
+    totalDirectoryContacts: number;
+  }> {
+    return this.http.post<{
+      message: string;
+      mergedGroups: number;
+      removedDuplicates: number;
+      totalDirectoryContacts: number;
+    }>(`${this.apiUrl}/merge-duplicates`, {});
+  }
 }

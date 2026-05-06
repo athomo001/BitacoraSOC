@@ -110,17 +110,33 @@ const pickBestValue = (...values) => {
   return '';
 };
 
-const buildDuplicateKey = (contact = {}) => {
+const normalizeName = (value = '') =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+const buildDuplicateKeys = (contact = {}) => {
+  const keys = [];
   const email = String(contact.email || '').trim().toLowerCase();
-  const name = String(contact.name || '').trim().toLowerCase();
+  const name = normalizeName(contact.name || '');
   const phone = String(contact.phone || '').trim();
+  const company = String(contact.company || '').trim().toLowerCase();
+
+  if (name) {
+    keys.push(`name:${name}`);
+  }
   if (email) {
-    return `email:${email}`;
+    keys.push(`email:${email}`);
   }
   if (name && phone) {
-    return `name_phone:${name}|${phone}`;
+    keys.push(`name_phone:${name}|${phone}`);
   }
-  return `name:${name}`;
+  if (name && company) {
+    keys.push(`name_company:${name}|${company}`);
+  }
+  return keys;
 };
 
 const mergeDirectoryDuplicates = async () => {
@@ -129,13 +145,55 @@ const mergeDirectoryDuplicates = async () => {
     return { mergedGroups: 0, removed: 0 };
   }
 
-  const groups = new Map();
-  all.forEach((contact) => {
-    const key = buildDuplicateKey(contact);
-    if (!groups.has(key)) {
-      groups.set(key, []);
+  const parent = new Map();
+  const idToContact = new Map();
+  const keyToIds = new Map();
+
+  const find = (id) => {
+    const current = parent.get(id) || id;
+    if (current !== id) {
+      const root = find(current);
+      parent.set(id, root);
+      return root;
     }
-    groups.get(key).push(contact);
+    return current;
+  };
+
+  const union = (a, b) => {
+    const rootA = find(a);
+    const rootB = find(b);
+    if (rootA !== rootB) {
+      parent.set(rootB, rootA);
+    }
+  };
+
+  all.forEach((contact) => {
+    const id = String(contact._id);
+    parent.set(id, id);
+    idToContact.set(id, contact);
+    buildDuplicateKeys(contact).forEach((key) => {
+      if (!keyToIds.has(key)) {
+        keyToIds.set(key, []);
+      }
+      keyToIds.get(key).push(id);
+    });
+  });
+
+  keyToIds.forEach((ids) => {
+    if (!ids || ids.length < 2) return;
+    const first = ids[0];
+    for (let i = 1; i < ids.length; i += 1) {
+      union(first, ids[i]);
+    }
+  });
+
+  const groups = new Map();
+  Array.from(idToContact.keys()).forEach((id) => {
+    const root = find(id);
+    if (!groups.has(root)) {
+      groups.set(root, []);
+    }
+    groups.get(root).push(idToContact.get(id));
   });
 
   let mergedGroups = 0;
@@ -147,15 +205,20 @@ const mergeDirectoryDuplicates = async () => {
     }
 
     const sorted = [...contacts].sort((a, b) => {
-      const aType = typePriority[a.type] || 0;
-      const bType = typePriority[b.type] || 0;
-      if (aType !== bType) {
-        return bType - aType;
-      }
       const aScore = Number(!!a.email) + Number(!!a.phone) + Number(!!a.company) + Number(!!a.position);
       const bScore = Number(!!b.email) + Number(!!b.phone) + Number(!!b.company) + Number(!!b.position);
       if (aScore !== bScore) {
         return bScore - aScore;
+      }
+      const aSource = sourcePriority[a.source] || 0;
+      const bSource = sourcePriority[b.source] || 0;
+      if (aSource !== bSource) {
+        return bSource - aSource;
+      }
+      const aType = typePriority[a.type] || 0;
+      const bType = typePriority[b.type] || 0;
+      if (aType !== bType) {
+        return bType - aType;
       }
       return 0;
     });

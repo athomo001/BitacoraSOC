@@ -2,6 +2,49 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.64-beta] - 2026-05-06
+
+### Directorio: permisos finos por cargo y gobierno de internos (`DIR-RBAC-106`)
+
+- **Matriz RBAC aplicada en backend para `/api/directory`:**
+  - `admin`: crear/editar/eliminar (con restricción de contactos provenientes de `Users`).
+  - `qa nivel 1`, `qa nivel 2`, `customer success manager (csm)`: crear/editar, sin eliminar.
+  - `n2`, `n3`, `jefe area`, `gerente area`, `arquitecto siem`: crear/editar/eliminar.
+  - resto de perfiles: solo lectura.
+- **UI alineada a backend:** botones/formularios de directorio se habilitan/deshabilitan según permiso efectivo del usuario (no solo visibilidad).
+- **Internos protegidos correctamente por origen:** la regla de bloqueo dejó de depender de `type=Internal` y ahora usa `source='User'` para permitir casos válidos de listas internas manuales.
+
+### Directorio: dimensión de ámbito y origen de contacto (`DIR-MODEL-107`)
+
+- **Modelo `DirectoryContact` ampliado** con:
+  - `scope`: `Internal | External` (ámbito del contacto/lista),
+  - `source`: `User | Manual | Sync` (origen del dato).
+- **Configuración editable en UI:** formulario de directorio ahora permite definir `Ámbito` para distinguir, por ejemplo, listas internas vs listas externas de cliente.
+- **Sincronización de usuarios reforzada:** usuarios sincronizados al directorio quedan marcados como `type=Internal`, `scope=Internal`, `source=User`.
+
+### Duplicados: consolidación avanzada y control manual (`DIR-DEDUP-108`)
+
+- **Lógica de deduplicación mejorada:** se reemplazó agrupación simple por una consolidación conectada (multi-clave) que une registros por `name`, `email`, `name+phone` y `name+company`.
+- **Fusión por “registro más completo”:** al consolidar, se conserva el contacto con mejor densidad de datos y se completan campos faltantes desde los duplicados.
+- **Conservación de semántica:** en merges se priorizan `type`, `scope` y `source` según jerarquía definida para no degradar calidad del dato.
+- **Nuevo endpoint manual:** `POST /api/directory/merge-duplicates` para ejecutar consolidación a demanda.
+- **Nuevo botón en UI:** `Consolidar duplicados` en `/main/escalation/directory`, con feedback de resultado (`grupos fusionados`, `registros eliminados`).
+
+### UX operativa y navegación (`DIR-UX-109`)
+
+- **Vista directorio más operativa:** paginación ajustada a `50 / 100 / Todos` con comportamiento coherente cuando se selecciona `Todos`.
+- **Copia rápida mejorada:** nombre/correo/teléfono del directorio permanecen copiables con snackbar de confirmación.
+- **Selector de cliente unificado en vista de escalación:** en `/main/escalation/view` se unificaron “buscar” y “seleccionar” en un único campo autocomplete (cliente principal y cliente de RACI).
+
+### Integridad de actualización cruzada (`DIR-PROP-110`)
+
+- **Edición en fuente de verdad con propagación extendida:** actualizar un contacto en directorio propaga cambios de nombre/correo/teléfono a:
+  - `Contact`,
+  - `ExternalPerson`,
+  - personas embebidas en `RaciEntry`,
+  - `CatalogLogSource.escalationFlow` (pasos `unique` y `pool`).
+- **Objetivo:** evitar inconsistencias como el mismo contacto con variantes de nombre/datos en distintos módulos operativos.
+
 ## [v1.5.63-beta] - 2026-05-06
 
 ### Directorio Centralizado como fuente de verdad operativa (`DIR-SSOT-101`)

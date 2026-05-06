@@ -19,6 +19,7 @@ import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
@@ -43,6 +44,7 @@ import { ClientAlertRule, EscalationFlowConfig } from '../../../models/escalatio
         MatFormFieldModule,
         MatInputModule,
         MatSelectModule,
+        MatAutocompleteModule,
         MatTooltipModule,
         MatCheckboxModule,
         ReactiveFormsModule
@@ -255,6 +257,18 @@ export class EscalationSimpleComponent implements OnInit {
     this.loadSelectedClientFlow();
   }
 
+  onClientAutocompleteSelected(client: any): void {
+    if (!client) return;
+    this.selectedClient = client;
+    this.clientSearchTerm = String(client?.name || '');
+    this.onClientChange();
+  }
+
+  displayClientOption(value: any): string {
+    if (!value) return '';
+    return typeof value === 'string' ? value : String(value?.name || '');
+  }
+
   loadSelectedClientFlow(): void {
     const clientId = this.selectedClient?._id;
     if (!clientId) {
@@ -277,6 +291,18 @@ export class EscalationSimpleComponent implements OnInit {
 
   onRaciClientChange(): void {
     this.loadRaciEntries();
+  }
+
+  onRaciClientAutocompleteSelected(client: CatalogLogSource): void {
+    if (!client) return;
+    this.selectedRaciClient = client;
+    this.raciClientSearchTerm = String(client?.name || '');
+    this.onRaciClientChange();
+  }
+
+  displayRaciClientOption(value: any): string {
+    if (!value) return '';
+    return typeof value === 'string' ? value : String(value?.name || '');
   }
 
   get filteredClients(): any[] {

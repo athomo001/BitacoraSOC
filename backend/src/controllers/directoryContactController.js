@@ -410,3 +410,19 @@ exports.rebuildDirectoryFromEscalation = async (_req, res) => {
     return res.status(500).json({ error: error.message });
   }
 };
+
+exports.mergeDirectoryDuplicatesNow = async (_req, res) => {
+  try {
+    const result = await mergeDirectoryDuplicates();
+    const total = await DirectoryContact.countDocuments();
+    return res.json({
+      message: 'Consolidación de duplicados completada',
+      mergedGroups: Number(result?.mergedGroups || 0),
+      removedDuplicates: Number(result?.removed || 0),
+      totalDirectoryContacts: total
+    });
+  } catch (error) {
+    logger.error('Error in mergeDirectoryDuplicatesNow:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};

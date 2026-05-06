@@ -149,6 +149,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
   directoryPageIndex = 0;
   loadingDirectoryContacts = false;
   rebuildingDirectory = false;
+  mergingDirectoryDuplicates = false;
   showDirectoryForm = false;
   savingDirectoryContact = false;
   editingDirectoryContactId: string | null = null;
@@ -563,6 +564,28 @@ export class EscalationAdminSimpleComponent implements OnInit {
         const backendMessage = err?.error?.error || err?.error?.message;
         this.showError(backendMessage || 'No se pudo sincronizar el directorio');
         this.rebuildingDirectory = false;
+      }
+    });
+  }
+
+  mergeDirectoryDuplicatesNow(): void {
+    if (this.mergingDirectoryDuplicates || !this.canDirectoryWrite) {
+      return;
+    }
+    this.mergingDirectoryDuplicates = true;
+    this.directoryService.mergeDuplicates().subscribe({
+      next: (response) => {
+        const merged = Number(response?.mergedGroups || 0);
+        const removed = Number(response?.removedDuplicates || 0);
+        this.showSuccess(`Duplicados consolidados: ${merged} grupos, ${removed} registros eliminados`);
+        this.loadDirectoryContacts();
+        this.refreshOperationalViewsAfterDirectoryChange();
+        this.mergingDirectoryDuplicates = false;
+      },
+      error: (err) => {
+        const backendMessage = err?.error?.error || err?.error?.message;
+        this.showError(backendMessage || 'No se pudo consolidar duplicados del directorio');
+        this.mergingDirectoryDuplicates = false;
       }
     });
   }
