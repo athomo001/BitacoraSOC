@@ -153,6 +153,27 @@
   align-items: center;
 }
 
+.directory-toolbar {
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.directory-toolbar-filters {
+  display: grid;
+  gap: 10px;
+  flex: 1 1 760px;
+  grid-template-columns: repeat(4, minmax(170px, 1fr));
+}
+
+.directory-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  flex: 0 1 auto;
+}
+
 .filters-row {
   align-items: center;
 }
@@ -408,6 +429,24 @@
 .directory-form {
   margin-top: 10px;
   border-style: dashed;
+}
+
+@media (max-width: 1200px) {
+  .directory-toolbar-filters {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .directory-toolbar-filters {
+    grid-template-columns: 1fr;
+    flex-basis: 100%;
+  }
+
+  .directory-toolbar-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 .inline-picker {

@@ -45,6 +45,14 @@ Registro de cambios relevantes del proyecto.
   - `CatalogLogSource.escalationFlow` (pasos `unique` y `pool`).
 - **Objetivo:** evitar inconsistencias como el mismo contacto con variantes de nombre/datos en distintos módulos operativos.
 
+### Calidad de consolidación, filtros, UX y auditoría (`DIR-QA-111`)
+
+- **Consolidación más confiable:** el merge de duplicados ahora ignora valores basura (`-`, `n/a`, `null`, etc.) para no degradar correo/empresa/teléfono en el registro final.
+- **Filtro por empresa en directorio:** se añadió filtro dedicado `Empresa` en `/main/escalation/directory`, combinado con búsqueda, tipo y paginación.
+- **Acción unificada operativa:** se reemplazaron acciones separadas por botón único `Sincronizar y consolidar` (rebuild + merge en secuencia), con estados de progreso y mensaje de resultado.
+- **Toolbar del directorio reordenado:** nueva distribución visual de filtros y acciones para mejorar legibilidad, alineación y comportamiento responsive.
+- **Auditoría del directorio central habilitada:** ahora se registran eventos en Audit Log para crear/editar/eliminar/sincronizar/consolidar (`directory.central.create|update|delete|rebuild|merge_duplicates`) con metadata contextual.
+
 ## [v1.5.63-beta] - 2026-05-06
 
 ### Directorio Centralizado como fuente de verdad operativa (`DIR-SSOT-101`)

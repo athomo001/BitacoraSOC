@@ -145,6 +145,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
   directoryContacts: DirectoryContact[] = [];
   directorySearch = '';
   directoryTypeFilter: '' | 'Internal' | 'External' | 'List' = '';
+  directoryCompanyFilter = '';
   directoryPageSize: 50 | 100 | 'all' = 50;
   directoryPageIndex = 0;
   loadingDirectoryContacts = false;
@@ -485,10 +486,21 @@ export class EscalationAdminSimpleComponent implements OnInit {
 
   get filteredDirectoryContacts(): DirectoryContact[] {
     const term = this.directorySearch.trim().toLowerCase();
+    const companyFilter = this.directoryCompanyFilter.trim().toLowerCase();
     return this.directoryContacts
       .filter((contact) => !this.directoryTypeFilter || contact.type === this.directoryTypeFilter)
+      .filter((contact) => !companyFilter || String(contact.company || '').trim().toLowerCase() === companyFilter)
       .filter((contact) => !term || [contact.name, contact.email, contact.phone, contact.company]
         .some((value) => String(value || '').toLowerCase().includes(term)));
+  }
+
+  get directoryCompanyOptions(): string[] {
+    const values = new Set(
+      (this.directoryContacts || [])
+        .map((contact) => String(contact.company || '').trim())
+        .filter((value) => value.length > 0)
+    );
+    return Array.from(values).sort((a, b) => a.localeCompare(b));
   }
 
   get paginatedDirectoryContacts(): DirectoryContact[] {
@@ -564,6 +576,42 @@ export class EscalationAdminSimpleComponent implements OnInit {
         const backendMessage = err?.error?.error || err?.error?.message;
         this.showError(backendMessage || 'No se pudo sincronizar el directorio');
         this.rebuildingDirectory = false;
+      }
+    });
+  }
+
+  syncAndMergeDirectoryNow(): void {
+    if (this.rebuildingDirectory || this.mergingDirectoryDuplicates || !this.canDirectoryWrite) {
+      return;
+    }
+
+    this.rebuildingDirectory = true;
+    this.directoryService.rebuildFromEscalation().pipe(
+      switchMap((rebuildResponse) => {
+        this.rebuildingDirectory = false;
+        this.mergingDirectoryDuplicates = true;
+        return this.directoryService.mergeDuplicates().pipe(
+          map((mergeResponse) => ({ rebuildResponse, mergeResponse }))
+        );
+      })
+    ).subscribe({
+      next: ({ rebuildResponse, mergeResponse }) => {
+        const rebuilt = Number(rebuildResponse?.created || 0);
+        const merged = Number(mergeResponse?.mergedGroups || 0);
+        const removed = Number(mergeResponse?.removedDuplicates || 0);
+        this.showSuccess(`Sincronizado (${rebuilt}) y consolidado (${merged} grupos, ${removed} duplicados)`);
+        this.loadDirectoryContacts();
+        this.refreshOperationalViewsAfterDirectoryChange();
+        this.mergingDirectoryDuplicates = false;
+      },
+      error: (err) => {
+        const mergePhase = this.mergingDirectoryDuplicates;
+        const backendMessage = err?.error?.error || err?.error?.message;
+        this.showError(backendMessage || (mergePhase
+          ? 'No se pudo consolidar duplicados después de sincronizar'
+          : 'No se pudo sincronizar el directorio'));
+        this.rebuildingDirectory = false;
+        this.mergingDirectoryDuplicates = false;
       }
     });
   }
