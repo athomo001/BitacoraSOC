@@ -11,6 +11,7 @@ const RaciEntry = require('../models/RaciEntry');
 const CatalogLogSource = require('../models/CatalogLogSource');
 const User = require('../models/User');
 const { syncManyDirectoryContacts, mergeDirectoryDuplicates } = require('../utils/directory-sync');
+const { audit } = require('../utils/audit');
 const { logger } = require('../utils/logger');
 
 const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -92,6 +93,20 @@ exports.createDirectoryContact = async (req, res) => {
     }
 
     const created = await DirectoryContact.create(payload);
+    await audit(req, {
+      event: 'directory.central.create',
+      result: { success: true },
+      metadata: {
+        directoryContactId: created._id,
+        name: created.name,
+        email: created.email,
+        phone: created.phone,
+        company: created.company,
+        type: created.type,
+        scope: created.scope,
+        source: created.source
+      }
+    });
     return res.status(201).json(created);
   } catch (error) {
     logger.error('Error in createDirectoryContact:', error);
@@ -123,6 +138,24 @@ exports.updateDirectoryContact = async (req, res) => {
 
     Object.assign(existing, payload);
     await existing.save();
+    await audit(req, {
+      event: 'directory.central.update',
+      result: { success: true },
+      metadata: {
+        directoryContactId: existing._id,
+        before: oldSnapshot,
+        after: {
+          name: existing.name,
+          email: existing.email,
+          phone: existing.phone,
+          company: existing.company,
+          position: existing.position,
+          type: existing.type,
+          scope: existing.scope,
+          source: existing.source
+        }
+      }
+    });
 
     const identityFilters = [];
     if (oldSnapshot.email) {
@@ -286,6 +319,18 @@ exports.deleteDirectoryContact = async (req, res) => {
     }
 
     await DirectoryContact.findByIdAndDelete(req.params.id);
+    await audit(req, {
+      event: 'directory.central.delete',
+      result: { success: true },
+      metadata: {
+        directoryContactId: deleted._id,
+        name: deleted.name,
+        email: deleted.email,
+        phone: deleted.phone,
+        company: deleted.company,
+        removedFromContacts
+      }
+    });
 
     return res.json({
       message: 'Contacto eliminado correctamente',
@@ -325,7 +370,7 @@ exports.searchDirectoryContacts = async (req, res) => {
   }
 };
 
-exports.rebuildDirectoryFromEscalation = async (_req, res) => {
+exports.rebuildDirectoryFromEscalation = async (req, res) => {
   try {
     const [contacts, externalPeople, raciEntries, clients, users] = await Promise.all([
       Contact.find({}).select('name email phone organization role favorite isMailingList').lean(),
@@ -408,6 +453,14 @@ exports.rebuildDirectoryFromEscalation = async (_req, res) => {
     await syncManyDirectoryContacts(payload);
 
     const total = await DirectoryContact.countDocuments();
+    await audit(req, {
+      event: 'directory.central.rebuild',
+      result: { success: true },
+      metadata: {
+        payloadSize: payload.length,
+        totalDirectoryContacts: total
+      }
+    });
     return res.json({
       message: 'Directorio central sincronizado desde escalaciones',
       totalDirectoryContacts: total
@@ -418,10 +471,19 @@ exports.rebuildDirectoryFromEscalation = async (_req, res) => {
   }
 };
 
-exports.mergeDirectoryDuplicatesNow = async (_req, res) => {
+exports.mergeDirectoryDuplicatesNow = async (req, res) => {
   try {
     const result = await mergeDirectoryDuplicates();
     const total = await DirectoryContact.countDocuments();
+    await audit(req, {
+      event: 'directory.central.merge_duplicates',
+      result: { success: true },
+      metadata: {
+        mergedGroups: Number(result?.mergedGroups || 0),
+        removedDuplicates: Number(result?.removed || 0),
+        totalDirectoryContacts: total
+      }
+    });
     return res.json({
       message: 'Consolidación de duplicados completada',
       mergedGroups: Number(result?.mergedGroups || 0),

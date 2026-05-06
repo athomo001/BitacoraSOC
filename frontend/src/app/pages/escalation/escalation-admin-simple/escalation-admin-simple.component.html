@@ -950,45 +950,54 @@
         <p class="subtitle">Aquí se gestiona el directorio global que usan los formularios operativos. Los contactos internos se administran desde Usuarios.</p>
 
         <div class="section directory-section">
-          <div class="toolbar-row">
-            <mat-form-field appearance="outline">
-              <mat-label>Buscar en directorio</mat-label>
-              <input matInput [(ngModel)]="directorySearch" (ngModelChange)="applyDirectoryFilters()" placeholder="Nombre, correo, teléfono o empresa">
-              <mat-icon matSuffix>search</mat-icon>
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>Tipo</mat-label>
-              <mat-select [(ngModel)]="directoryTypeFilter" (selectionChange)="applyDirectoryFilters()">
-                <mat-option value="">Todos</mat-option>
-                <mat-option value="Internal">Internos</mat-option>
-                <mat-option value="External">Externos</mat-option>
-                <mat-option value="List">Listas</mat-option>
-              </mat-select>
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>Filas por página</mat-label>
-              <mat-select [(ngModel)]="directoryPageSize" (selectionChange)="applyDirectoryFilters()">
-                <mat-option [value]="50">50</mat-option>
-                <mat-option [value]="100">100</mat-option>
-                <mat-option [value]="'all'">Todos</mat-option>
-              </mat-select>
-            </mat-form-field>
-            <button mat-raised-button color="primary" type="button" (click)="addDirectoryContact()" [disabled]="!canDirectoryWrite">
-              <mat-icon>person_add</mat-icon>
-              Agregar contacto
-            </button>
-            <button mat-stroked-button color="primary" type="button" (click)="loadDirectoryContacts()" [disabled]="loadingDirectoryContacts">
-              <mat-icon>{{ loadingDirectoryContacts ? 'hourglass_empty' : 'refresh' }}</mat-icon>
-              {{ loadingDirectoryContacts ? 'Actualizando...' : 'Actualizar' }}
-            </button>
-            <button mat-stroked-button color="accent" type="button" (click)="rebuildDirectoryFromEscalation()" [disabled]="rebuildingDirectory">
-              <mat-icon>{{ rebuildingDirectory ? 'hourglass_empty' : 'sync' }}</mat-icon>
-              {{ rebuildingDirectory ? 'Sincronizando...' : 'Sincronizar histórico' }}
-            </button>
-            <button mat-stroked-button color="accent" type="button" (click)="mergeDirectoryDuplicatesNow()" [disabled]="mergingDirectoryDuplicates || !canDirectoryWrite">
-              <mat-icon>{{ mergingDirectoryDuplicates ? 'hourglass_empty' : 'auto_fix_high' }}</mat-icon>
-              {{ mergingDirectoryDuplicates ? 'Consolidando...' : 'Consolidar duplicados' }}
-            </button>
+          <div class="toolbar-row directory-toolbar">
+            <div class="directory-toolbar-filters">
+              <mat-form-field appearance="outline">
+                <mat-label>Buscar en directorio</mat-label>
+                <input matInput [(ngModel)]="directorySearch" (ngModelChange)="applyDirectoryFilters()" placeholder="Nombre, correo, teléfono o empresa">
+                <mat-icon matSuffix>search</mat-icon>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Tipo</mat-label>
+                <mat-select [(ngModel)]="directoryTypeFilter" (selectionChange)="applyDirectoryFilters()">
+                  <mat-option value="">Todos</mat-option>
+                  <mat-option value="Internal">Internos</mat-option>
+                  <mat-option value="External">Externos</mat-option>
+                  <mat-option value="List">Listas</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Empresa</mat-label>
+                <mat-select [(ngModel)]="directoryCompanyFilter" (selectionChange)="applyDirectoryFilters()">
+                  <mat-option value="">Todas</mat-option>
+                  <mat-option *ngFor="let company of directoryCompanyOptions" [value]="company">
+                    {{ company }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Filas por página</mat-label>
+                <mat-select [(ngModel)]="directoryPageSize" (selectionChange)="applyDirectoryFilters()">
+                  <mat-option [value]="50">50</mat-option>
+                  <mat-option [value]="100">100</mat-option>
+                  <mat-option [value]="'all'">Todos</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <div class="directory-toolbar-actions">
+              <button mat-raised-button color="primary" type="button" (click)="addDirectoryContact()" [disabled]="!canDirectoryWrite">
+                <mat-icon>person_add</mat-icon>
+                Agregar contacto
+              </button>
+              <button mat-stroked-button color="primary" type="button" (click)="loadDirectoryContacts()" [disabled]="loadingDirectoryContacts || rebuildingDirectory || mergingDirectoryDuplicates">
+                <mat-icon>{{ loadingDirectoryContacts ? 'hourglass_empty' : 'refresh' }}</mat-icon>
+                {{ loadingDirectoryContacts ? 'Actualizando...' : 'Actualizar' }}
+              </button>
+              <button mat-stroked-button color="accent" type="button" (click)="syncAndMergeDirectoryNow()" [disabled]="rebuildingDirectory || mergingDirectoryDuplicates || !canDirectoryWrite">
+                <mat-icon>{{ (rebuildingDirectory || mergingDirectoryDuplicates) ? 'hourglass_empty' : 'sync_alt' }}</mat-icon>
+                {{ rebuildingDirectory ? 'Sincronizando...' : (mergingDirectoryDuplicates ? 'Consolidando...' : 'Sincronizar y consolidar') }}
+              </button>
+            </div>
           </div>
 
           <div class="section-note" *ngIf="!canDirectoryWrite">
