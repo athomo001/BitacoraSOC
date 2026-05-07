@@ -33,7 +33,7 @@
 
               <mat-accordion multi>
                 <mat-expansion-panel *ngFor="let service of checklistTree; let i = index"
-                  [expanded]="service.status === 'rojo'" [hideToggle]="!service.children?.length">
+                  [expanded]="false" [hideToggle]="!service.children?.length">
                   <mat-expansion-panel-header>
                     <mat-panel-title>
                       <mat-icon aria-hidden="true" [class.status-verde]="service.status === 'verde'"
