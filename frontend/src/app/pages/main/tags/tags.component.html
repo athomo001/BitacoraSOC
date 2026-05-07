@@ -4,7 +4,12 @@
     Los tags se crean automáticamente al usar # en las entradas. Desde aquí puedes normalizarlos o eliminarlos de todas las entradas.
   </p>
 
-  <mat-spinner *ngIf="isLoading" diameter="40"></mat-spinner>
+  <div class="skeleton-container mt-2 mb-2" *ngIf="isLoading">
+    <div class="skeleton-line title"></div>
+    <div class="skeleton-line"></div>
+    <div class="skeleton-line"></div>
+    <div class="skeleton-line short"></div>
+  </div>
 
   <div class="tags-table-container" *ngIf="!isLoading">
     <table mat-table [dataSource]="tags" class="tags-table">

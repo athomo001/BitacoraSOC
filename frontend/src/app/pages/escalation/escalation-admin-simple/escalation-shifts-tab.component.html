@@ -1,0 +1,494 @@
+<div class="tab-content">
+  <header class="tab-header">
+    <h2>Asignar Turnos Semanales</h2>
+    <p class="subtitle">Configura quién estará de turno cada semana del mes</p>
+  </header>
+
+  <section class="toolbar-row" aria-label="Acciones de turnos">
+    <button mat-raised-button color="primary" (click)="addAssignment()">
+      <mat-icon aria-hidden="true">add</mat-icon>
+      Asignar Turno
+    </button>
+    <button mat-stroked-button color="primary" type="button" [disabled]="downloadingAssignmentTemplate"
+      (click)="downloadAssignmentTemplate()">
+      <mat-icon aria-hidden="true">{{ downloadingAssignmentTemplate ? 'hourglass_empty' : 'description' }}</mat-icon>
+      {{ downloadingAssignmentTemplate ? 'Descargando...' : 'Plantilla CSV' }}
+    </button>
+    <button mat-stroked-button color="accent" type="button" [disabled]="importingAssignmentsCsv"
+      (click)="assignmentCsvInput.click()">
+      <mat-icon aria-hidden="true">{{ importingAssignmentsCsv ? 'hourglass_empty' : 'upload_file' }}</mat-icon>
+      {{ importingAssignmentsCsv ? 'Importando...' : 'Importar CSV' }}
+    </button>
+    <input #assignmentCsvInput type="file" accept=".csv,text/csv" class="hidden-native-input"
+      (change)="onAssignmentsCsvSelected($event)">
+  </section>
+
+  <p class="subtitle compact-subtitle">Formato: roleCode, userType, identifier, weekStartDate, weekStartTime, weekEndDate, weekEndTime, notes.</p>
+
+  <!-- Formulario de asignación -->
+  <section *ngIf="showAssignmentForm" class="form-card">
+    <h3>Nueva Asignación de Turno</h3>
+    <form [formGroup]="assignmentForm" (ngSubmit)="saveAssignment()">
+      <div class="form-row">
+        <mat-form-field appearance="outline">
+          <mat-label>Rol</mat-label>
+          <mat-select formControlName="roleCode" required>
+            <mat-option value="N2">N2 - Soporte Técnico</mat-option>
+            <mat-option value="TI">TI - Infraestructura</mat-option>
+            <mat-option value="N1_NO_HABIL">N1 - No Hábil</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Persona</mat-label>
+          <mat-select formControlName="assignedUserId" required>
+            <!-- Usuarios del sistema -->
+            <mat-optgroup label="Usuarios del Sistema" *ngIf="filteredUsersForAssignment.length > 0">
+              <mat-option *ngFor="let user of filteredUsersForAssignment" [value]="user._id">
+                {{ user.name || user.username || 'Usuario sin nombre' }}
+              </mat-option>
+            </mat-optgroup>
+            
+            <!-- Personas externas -->
+            <mat-optgroup label="Personas Externas" *ngIf="showExternalPeopleForAssignment && externalPeople.length > 0">
+              <mat-option *ngFor="let person of externalPeople" [value]="'ext_' + person._id">
+                {{ person.name }} ({{ person.position || 'Sin cargo' }})
+              </mat-option>
+            </mat-optgroup>
+            
+            <!-- Sin datos -->
+            <mat-option *ngIf="filteredUsersForAssignment.length === 0 && (!showExternalPeopleForAssignment || externalPeople.length === 0)" disabled>
+              No hay personas disponibles
+            </mat-option>
+          </mat-select>
+          <mat-hint>Selecciona un usuario del sistema o una persona externa</mat-hint>
+        </mat-form-field>
+      </div>
+
+      <div class="form-row">
+        <mat-form-field appearance="outline">
+          <mat-label>Desde (Lunes)</mat-label>
+          <input matInput [matDatepicker]="pickerStart" formControlName="weekStartDate" required>
+          <mat-datepicker-toggle matSuffix [for]="pickerStart"></mat-datepicker-toggle>
+          <mat-datepicker #pickerStart></mat-datepicker>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Hora Inicio</mat-label>
+          <input matInput type="time" formControlName="startTime" required>
+          <mat-hint>Hora de inicio del turno</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Hasta</mat-label>
+          <input matInput [matDatepicker]="pickerEnd" formControlName="weekEndDate" required>
+          <mat-datepicker-toggle matSuffix [for]="pickerEnd"></mat-datepicker-toggle>
+          <mat-datepicker #pickerEnd></mat-datepicker>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Hora Fin</mat-label>
+          <input matInput type="time" formControlName="endTime" required>
+          <mat-hint>Hora de fin del turno</mat-hint>
+        </mat-form-field>
+      </div>
+
+      <p class="subtitle" *ngIf="getSelectedAssignmentSectionLabel()">
+        Este turno se verá en: <strong>{{ getSelectedAssignmentSectionLabel() }}</strong>
+      </p>
+
+      <div class="form-actions">
+        <button mat-raised-button color="primary" type="submit" [disabled]="assignmentForm.invalid || savingAssignment">
+          Guardar
+        </button>
+        <button mat-button type="button" (click)="showAssignmentForm = false">
+          Cancelar
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <!-- Tabla de asignaciones del mes actual -->
+  <section *ngIf="!loadingAssignments && currentMonthAssignments.length > 0" class="simple-table">
+    <h3>Mes actual</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Semana</th>
+          <th>Rol</th>
+          <th>Persona</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let assignment of currentMonthAssignments">
+          <td>{{ formatDate(assignment.weekStartDate) }} - {{ formatDate(assignment.weekEndDate) }}</td>
+          <td><strong>{{ assignment.roleCode }}</strong></td>
+          <td>
+            {{ assignment.userId?.fullName || assignment.userId?.name || assignment.externalPersonId?.name || 'N/A' }}
+          </td>
+          <td>
+            <button mat-icon-button color="warn" (click)="deleteAssignment(assignment._id)" aria-label="Eliminar asignación">
+              <mat-icon aria-hidden="true">delete</mat-icon>
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <mat-accordion *ngIf="!loadingAssignments && futureAssignments.length > 0" class="month-accordion">
+    <mat-expansion-panel [expanded]="true">
+      <mat-expansion-panel-header>
+        <mat-panel-title>Próximos meses</mat-panel-title>
+        <mat-panel-description>{{ futureAssignments.length }} asignaciones</mat-panel-description>
+      </mat-expansion-panel-header>
+
+      <div class="simple-table compact-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Semana</th>
+              <th>Rol</th>
+              <th>Persona</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let assignment of futureAssignments">
+              <td>{{ formatDate(assignment.weekStartDate) }} - {{ formatDate(assignment.weekEndDate) }}</td>
+              <td><strong>{{ assignment.roleCode }}</strong></td>
+              <td>
+                {{ assignment.userId?.fullName || assignment.userId?.name || assignment.externalPersonId?.name || 'N/A' }}
+              </td>
+              <td>
+                <button mat-icon-button color="warn" (click)="deleteAssignment(assignment._id)" aria-label="Eliminar asignación">
+                  <mat-icon aria-hidden="true">delete</mat-icon>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </mat-expansion-panel>
+  </mat-accordion>
+
+  <mat-accordion *ngIf="!loadingAssignments && previousMonthAssignments.length > 0" class="month-accordion">
+    <mat-expansion-panel>
+      <mat-expansion-panel-header>
+        <mat-panel-title>Mes anterior</mat-panel-title>
+        <mat-panel-description>{{ previousMonthAssignments.length }} asignaciones</mat-panel-description>
+      </mat-expansion-panel-header>
+
+      <div class="simple-table compact-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Semana</th>
+              <th>Rol</th>
+              <th>Persona</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let assignment of previousMonthAssignments">
+              <td>{{ formatDate(assignment.weekStartDate) }} - {{ formatDate(assignment.weekEndDate) }}</td>
+              <td><strong>{{ assignment.roleCode }}</strong></td>
+              <td>
+                {{ assignment.userId?.fullName || assignment.userId?.name || assignment.externalPersonId?.name || 'N/A' }}
+              </td>
+              <td>
+                <button mat-icon-button color="warn" (click)="deleteAssignment(assignment._id)" aria-label="Eliminar asignación">
+                  <mat-icon aria-hidden="true">delete</mat-icon>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </mat-expansion-panel>
+  </mat-accordion>
+
+  <section class="historical-section" *ngIf="!loadingAssignments">
+    <button mat-stroked-button color="primary" (click)="toggleHistorical()" [disabled]="loadingHistoricalAssignments">
+      <mat-icon aria-hidden="true">{{ showHistorical ? 'expand_less' : 'history' }}</mat-icon>
+      {{ showHistorical ? 'Ocultar histórico' : 'Ver histórico' }}
+    </button>
+
+    <div *ngIf="loadingHistoricalAssignments" class="loading-inline" role="status" aria-live="polite">
+      <mat-spinner diameter="24"></mat-spinner>
+      <span>Cargando histórico...</span>
+    </div>
+
+    <div *ngIf="showHistorical && historicalAssignments.length > 0" class="simple-table compact-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Semana</th>
+            <th>Rol</th>
+            <th>Persona</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let assignment of historicalAssignments">
+            <td>{{ formatDate(assignment.weekStartDate) }} - {{ formatDate(assignment.weekEndDate) }}</td>
+            <td><strong>{{ assignment.roleCode }}</strong></td>
+            <td>{{ assignment.userId?.fullName || assignment.userId?.name || assignment.externalPersonId?.name || 'N/A' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div *ngIf="showHistorical && !loadingHistoricalAssignments && historicalAssignments.length === 0" class="no-data compact-no-data">
+      <p>No hay histórico previo a los últimos 2 meses</p>
+    </div>
+  </section>
+
+  <div *ngIf="loadingAssignments" class="loading" role="status" aria-live="polite">
+    <mat-spinner diameter="40"></mat-spinner>
+    <p>Cargando asignaciones...</p>
+  </div>
+
+  <div *ngIf="!loadingAssignments && currentMonthAssignments.length === 0 && previousMonthAssignments.length === 0 && futureAssignments.length === 0" class="no-data">
+    <mat-icon aria-hidden="true">event_busy</mat-icon>
+    <p>No hay turnos asignados</p>
+  </div>
+
+  <section class="section section-spacing-top">
+    <h3>🔔 Recordatorio Escalación Interna</h3>
+    <p class="subtitle">Avisa solo cuando detecta una semana futura sin escalación interna cargada.</p>
+
+    <div class="inline-form">
+      <form [formGroup]="escalationReminderForm" (ngSubmit)="saveEscalationReminderConfig()">
+        <div class="form-row--checkbox">
+          <mat-checkbox formControlName="escalationReminderEnabled" color="primary">
+            Activar alerta de semana futura vacía
+          </mat-checkbox>
+        </div>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Cargos destinatarios</mat-label>
+          <mat-select formControlName="escalationReminderCargoLabels" multiple>
+            <mat-option *ngFor="let cargo of availableCargoLabels" [value]="cargo">
+              {{ cargo }}
+            </mat-option>
+          </mat-select>
+          <mat-hint>Puedes seleccionar varios cargos a la vez (ej: N2 y N3).</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Días de antelación</mat-label>
+          <input matInput type="number" min="1" max="60" formControlName="escalationReminderDaysAhead">
+          <mat-hint>Ejemplo: 7 = revisa semana objetivo a una semana de anticipación.</mat-hint>
+        </mat-form-field>
+
+        <div class="form-actions">
+          <button mat-raised-button color="primary" type="submit" [disabled]="loadingEscalationReminderConfig || savingEscalationReminderConfig">
+            Guardar recordatorio
+          </button>
+          <button mat-stroked-button color="accent" type="button" (click)="testEscalationReminder()" [disabled]="loadingEscalationReminderConfig || savingEscalationReminderConfig || testingEscalationReminder">
+            Probar recordatorio
+          </button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- Sección: Personas Externas -->
+  <section class="section section-spacing-top">
+    <h3>👤 Personas Externas (No usuarios del sistema)</h3>
+    <p class="subtitle">Agrega personas que pueden estar de turno pero no tienen cuenta en el sistema</p>
+    
+    <button mat-raised-button color="accent" (click)="addExternalPerson()">
+      <mat-icon aria-hidden="true">person_add</mat-icon>
+      Agregar Persona Externa
+    </button>
+
+    <article *ngIf="showExternalPersonForm" class="inline-form">
+      <h4>Nueva Persona Externa</h4>
+      <div class="toolbar-row">
+        <button mat-stroked-button type="button" color="primary" (click)="openDirectoryQuickPicker('external', externalPersonForm.get('name')?.value || '')">
+          <mat-icon aria-hidden="true">manage_search</mat-icon>
+          Usar contacto existente
+        </button>
+      </div>
+      <div class="inline-picker" *ngIf="directoryQuickPickerVisible && directoryQuickPickerTarget === 'external'">
+        <mat-form-field appearance="outline">
+          <mat-label>Buscar en directorio</mat-label>
+          <input matInput [ngModel]="directoryQuickPickerQuery" (ngModelChange)="onDirectoryQuickPickerInput($event)" placeholder="Nombre, correo, teléfono o empresa">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Seleccionar contacto</mat-label>
+          <mat-select (selectionChange)="useDirectoryQuickPick($event.value)">
+            <mat-option *ngFor="let suggestion of directoryQuickPickerSuggestions" [value]="suggestion">
+              {{ suggestion.name }} · {{ suggestion.email || suggestion.phone || '-' }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        <button mat-button type="button" (click)="closeDirectoryQuickPicker()">Cerrar</button>
+      </div>
+      <form [formGroup]="externalPersonForm" (ngSubmit)="saveExternalPerson()">
+        <mat-form-field appearance="outline">
+          <mat-label>Nombre Completo</mat-label>
+          <input
+            matInput
+            formControlName="name"
+            [matAutocomplete]="autoExternalPersonName"
+            (focus)="onExternalPersonNameFocus()"
+            (input)="onExternalPersonNameInput($any($event.target).value)"
+            placeholder="Ej: Juan Pérez">
+          <mat-autocomplete
+            #autoExternalPersonName="matAutocomplete"
+            [displayWith]="displayDirectoryContact"
+            (optionSelected)="onExternalPersonDirectorySelected($event.option.value)">
+            <mat-option *ngFor="let suggestion of externalPersonDirectorySuggestions" [value]="suggestion">
+              {{ suggestion.name }} <span *ngIf="suggestion.phone">- {{ suggestion.phone }}</span>
+            </mat-option>
+          </mat-autocomplete>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Email</mat-label>
+          <input matInput type="email" formControlName="email">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Teléfono</mat-label>
+          <input matInput formControlName="phone" placeholder="+56 9 1234 5678">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Cargo (Opcional)</mat-label>
+          <input matInput formControlName="position" placeholder="Ej: Soporte N2 Externo">
+        </mat-form-field>
+        <div class="form-actions">
+          <button mat-raised-button color="primary" type="submit" [disabled]="externalPersonForm.invalid">
+            Guardar
+          </button>
+          <button mat-button type="button" (click)="showExternalPersonForm = false">Cancelar</button>
+        </div>
+      </form>
+    </article>
+
+    <div class="simple-table table-spacing-top" *ngIf="externalPeople.length > 0">
+      <table>
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Email</th>
+            <th>Teléfono</th>
+            <th>Cargo</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let person of externalPeople">
+            <td><strong>{{ person.name }}</strong></td>
+            <td>{{ person.email }}</td>
+            <td>{{ person.phone }}</td>
+            <td>{{ person.position || '-' }}</td>
+            <td>
+              <button mat-icon-button color="warn" (click)="deleteExternalPerson(person._id)" aria-label="Eliminar persona externa">
+                <mat-icon aria-hidden="true">delete</mat-icon>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div *ngIf="externalPeople.length === 0 && !showExternalPersonForm" class="no-data">
+      <mat-icon aria-hidden="true">person_off</mat-icon>
+      <p>No hay personas externas registradas</p>
+      <small>Las personas externas pueden ser asignadas a turnos sin tener cuenta en el sistema</small>
+    </div>
+  </section>
+
+  <!-- Automatización de Envío (ESC-SHIFT-111) -->
+  <section class="section section-spacing-top automation-section">
+    <div class="section-header-row">
+      <h3>📅 Automatización de Envío de Turnos</h3>
+      <span class="status-badge" [class.active]="escalationScheduleAutomationForm.get('enabled')?.value">
+        {{ escalationScheduleAutomationForm.get('enabled')?.value ? 'Activado' : 'Desactivado' }}
+      </span>
+    </div>
+    <p class="subtitle">Configura el envío automático del reporte de turnos por correo electrónico.</p>
+
+    <div class="inline-form automation-form">
+      <form [formGroup]="escalationScheduleAutomationForm" (ngSubmit)="saveAutomationConfig()">
+        <div class="form-row--checkbox">
+          <mat-checkbox formControlName="enabled" color="primary">
+            Habilitar envío automático
+          </mat-checkbox>
+        </div>
+
+        <div class="form-grid">
+          <mat-form-field appearance="outline">
+            <mat-label>Frecuencia</mat-label>
+            <mat-select formControlName="frequency">
+              <mat-option value="weekly">Semanal (Próximos 7 días)</mat-option>
+              <mat-option value="monthly">Mensual (Mes en curso)</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" *ngIf="escalationScheduleAutomationForm.get('frequency')?.value === 'weekly'">
+            <mat-label>Día de envío</mat-label>
+            <mat-select formControlName="dayOfWeek">
+              <mat-option *ngFor="let day of daysOfWeek" [value]="day.value">
+                {{ day.label }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Hora de envío</mat-label>
+            <input matInput type="time" formControlName="time">
+            <mat-hint>Hora local (HH:mm)</mat-hint>
+          </mat-form-field>
+        </div>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Destinatarios (Separados por coma)</mat-label>
+          <input
+            matInput
+            formControlName="recipients"
+            [matAutocomplete]="autoRecipients"
+            (input)="onAutomationRecipientsInput($any($event.target).value)"
+            placeholder="ejemplo1@empresa.com, ejemplo2@empresa.com">
+          <mat-icon matSuffix>email</mat-icon>
+          <mat-autocomplete #autoRecipients="matAutocomplete" (optionSelected)="useAutomationRecipientEmail($event.option.value)">
+            <mat-option *ngFor="let suggestion of automationRecipientSuggestions" [value]="suggestion.email">
+              {{ suggestion.name || 'Sin nombre' }} · {{ suggestion.email }}
+            </mat-option>
+          </mat-autocomplete>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>CC (Separados por coma)</mat-label>
+          <input
+            matInput
+            formControlName="ccRecipients"
+            [matAutocomplete]="autoCcRecipients"
+            (input)="onAutomationCcInput($any($event.target).value)"
+            placeholder="copia@empresa.com">
+          <mat-icon matSuffix>content_copy</mat-icon>
+          <mat-autocomplete #autoCcRecipients="matAutocomplete" (optionSelected)="useAutomationCcEmail($event.option.value)">
+            <mat-option *ngFor="let suggestion of automationCcSuggestions" [value]="suggestion.email">
+              {{ suggestion.name || 'Sin nombre' }} · {{ suggestion.email }}
+            </mat-option>
+          </mat-autocomplete>
+        </mat-form-field>
+
+        <div class="form-actions">
+          <button mat-raised-button color="primary" type="submit" [disabled]="loadingAutomationConfig || savingAutomationConfig">
+            <mat-icon aria-hidden="true">save</mat-icon>
+            Guardar Configuración
+          </button>
+          
+          <button mat-stroked-button color="accent" type="button" (click)="triggerManualSend()" 
+                  [disabled]="loadingAutomationConfig || savingAutomationConfig || triggeringManualSend">
+            <mat-icon aria-hidden="true">{{ triggeringManualSend ? 'hourglass_empty' : 'send' }}</mat-icon>
+            {{ triggeringManualSend ? 'Enviando...' : 'Enviar Ahora (Manual)' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>

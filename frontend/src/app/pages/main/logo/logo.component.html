@@ -55,14 +55,14 @@
                accept="image/png,image/jpeg,image/webp,image/svg+xml"
            class="hidden-file-input">
 
-        <div class="upload-zone" (click)="fileInput.click()">
+        <button type="button" class="upload-zone" (click)="fileInput.click()">
           <img *ngIf="previewUrl" [src]="previewUrl" alt="Preview">
           <div *ngIf="!previewUrl" class="upload-placeholder">
             <mat-icon>cloud_upload</mat-icon>
             <p>Click para seleccionar imagen</p>
             <small>PNG, JPG, WEBP o SVG (máx 2MB)</small>
           </div>
-        </div>
+        </button>
 
         <button mat-raised-button color="primary" (click)="uploadLogo()" [disabled]="!previewUrl || isLoading">
           <mat-spinner *ngIf="isLoading" diameter="20"></mat-spinner>
@@ -102,14 +102,14 @@
                accept="image/png,image/x-icon,.ico"
            class="hidden-file-input">
 
-        <div class="upload-zone favicon-preview" (click)="faviconInput.click()">
+        <button type="button" class="upload-zone favicon-preview" (click)="faviconInput.click()">
           <img *ngIf="faviconPreviewUrl" [src]="faviconPreviewUrl" alt="Preview favicon">
           <div *ngIf="!faviconPreviewUrl" class="upload-placeholder">
             <mat-icon>insert_photo</mat-icon>
             <p>Click para seleccionar favicon</p>
             <small>PNG o ICO (máx 256KB, ideal 32x32)</small>
           </div>
-        </div>
+        </button>
 
         <button mat-raised-button color="primary" (click)="uploadFavicon()" [disabled]="!faviconPreviewUrl || isLoading">
           <mat-spinner *ngIf="isLoading" diameter="20"></mat-spinner>

@@ -2,6 +2,37 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.66-beta] - 2026-05-07
+
+### Fix: autocomplete de destinatarios múltiples en Automatización de Turnos (`ESC-SHIFT-112`)
+
+- **Bug corregido:** al seleccionar un segundo o tercer correo desde el directorio en los campos _Destinatarios_ y _CC_ de la sección "Automatización de Envío de Turnos", el valor seleccionado sobreescribía los correos ya ingresados en lugar de agregarlos a la lista.
+- **Causa raíz:** `mat-autocomplete` reemplaza el valor del `formControl` con la opción elegida **antes** de ejecutar el callback `(optionSelected)`, dejando sin contexto a `applyEmailToControl` para reconstruir la lista acumulada.
+- **Solución:** se introdujeron los campos `_recipientsRaw` y `_ccRaw` que cachean el valor raw del input en cada evento `(input)`. Al seleccionar una opción, `applyEmailToControl` usa el caché en vez del valor del control (ya sobreescrito por Material), elimina el token parcial de búsqueda, agrega el email completo sin duplicar, y actualiza el caché para que selecciones subsiguientes también funcionen correctamente.
+- **Archivos modificados:** `frontend/src/app/pages/escalation/escalation-admin-simple/escalation-shifts-tab.component.ts`.
+
+## [v1.5.65-beta] - 2026-05-07
+
+### Programación de envío automático de turnos (`ESC-SHIFT-111`)
+
+- **Backend: Programador de reportes integrado:**
+  - Implementación de `escalationScheduleScheduler.js` con `node-cron` para monitorear y disparar envíos automáticos según la configuración de cada cliente.
+  - Nuevo motor de plantillas en backend usando **MJML** para asegurar reportes responsivos y profesionales.
+  - Integración en `server.js` para inicialización automática al arranque.
+- **Frontend: Panel de automatización completo:**
+  - Nueva sección "Automatización de Envío de Turnos" en el administrador de turnos semanales.
+  - Formulario reactivo con validaciones para frecuencia (semanal/mensual), día, hora y gestión de múltiples destinatarios (manual + directorio).
+  - Acción **"Enviar Ahora"** para disparar manualmente el reporte y validar la configuración al instante.
+  - Extensión de `AppConfig` para soportar `escalationScheduleAutomation` con seguimiento de `lastSentAt`.
+  - Actualización de interfaces TypeScript en `config.model.ts`.
+
+- **Excelencia Visual y UX (Polished Interface):**
+  - **Diseño Premium**: Panel de automatización con jerarquía visual clara, usando bordes de acento (`border-left`) y fondos suavizados (`var(--surface-muted)`) para destacar la sección.
+  - **Badges Inteligentes**: Indicadores de estado dinámicos (Activo/Inactivo) con colores semánticos (`cdc-verde`) y tipografía de alto contraste.
+  - **Layout Responsivo**: Grilla adaptativa (`grid-template-columns`) que asegura una visualización perfecta tanto en pantallas de escritorio como en dispositivos móviles.
+  - **Micro-interacciones**: Estados de carga integrados en botones y feedback visual inmediato tras el envío manual o guardado de configuración.
+  - **Tipografía y Espaciado**: Alineación estricta con el *design system* del SOC, usando tokens de espaciado y radios de borde consistentes.
+
 ## [v1.5.64-beta] - 2026-05-06
 
 ### Directorio: permisos finos por cargo y gobierno de internos (`DIR-RBAC-106`)

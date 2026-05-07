@@ -35,6 +35,8 @@
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatDialog } from '@angular/material/dialog';
+import { ConfirmDialogComponent } from '../../../components/confirm-dialog/confirm-dialog.component';
 import { UserService } from '../../../services/user.service';
 import { User, CreateUserRequest } from '../../../models/user.model';
 import { MatFormField, MatLabel, MatHint } from '@angular/material/form-field';
@@ -77,7 +79,8 @@ export class UsersComponent implements OnInit {
   constructor(
     private fb: FormBuilder,
     private userService: UserService,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private dialog: MatDialog
   ) {
     this.userForm = this.fb.group({
       username: ['', Validators.required],
@@ -259,26 +262,48 @@ export class UsersComponent implements OnInit {
 
   toggleActive(user: User): void {
     const action = user.isActive ? 'desactivar' : 'activar';
-    if (confirm(`¿Estás seguro de ${action} a ${user.username}?`)) {
-      this.userService.updateUser(user._id, { isActive: !user.isActive }).subscribe({
-        next: () => {
-          this.snackBar.open(`Usuario ${action}do`, 'Cerrar', { duration: 2000 });
-          this.loadUsers();
-        },
-        error: (err) => this.snackBar.open(`Error al ${action} usuario`, 'Cerrar', { duration: 3000 })
-      });
-    }
+    const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+      data: {
+        title: `${user.isActive ? 'Desactivar' : 'Activar'} Usuario`,
+        message: `¿Estás seguro de ${action} a <strong>${user.username}</strong>?`,
+        confirmText: user.isActive ? 'Desactivar' : 'Activar',
+        isDestructive: user.isActive
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.userService.updateUser(user._id, { isActive: !user.isActive }).subscribe({
+          next: () => {
+            this.snackBar.open(`Usuario ${action}do`, 'Cerrar', { duration: 2000 });
+            this.loadUsers();
+          },
+          error: (err) => this.snackBar.open(`Error al ${action} usuario`, 'Cerrar', { duration: 3000 })
+        });
+      }
+    });
   }
 
   deleteUser(id: string): void {
-    if (confirm('¿Eliminar este usuario? Esta acción no se puede deshacer.')) {
-      this.userService.deleteUser(id).subscribe({
-        next: () => {
-          this.snackBar.open('Usuario eliminado', 'Cerrar', { duration: 2000 });
-          this.loadUsers();
-        },
-        error: (err) => this.snackBar.open('Error eliminando usuario', 'Cerrar', { duration: 3000 })
-      });
-    }
+    const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+      data: {
+        title: 'Eliminar Usuario',
+        message: '¿Estás seguro de eliminar este usuario? Esta acción no se puede deshacer.',
+        confirmText: 'Eliminar',
+        isDestructive: true
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.userService.deleteUser(id).subscribe({
+          next: () => {
+            this.snackBar.open('Usuario eliminado', 'Cerrar', { duration: 2000 });
+            this.loadUsers();
+          },
+          error: (err) => this.snackBar.open('Error eliminando usuario', 'Cerrar', { duration: 3000 })
+        });
+      }
+    });
   }
 }

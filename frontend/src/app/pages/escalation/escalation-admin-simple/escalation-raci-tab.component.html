@@ -1,0 +1,370 @@
+<div class="tab-content">
+  <header class="tab-header">
+    <h2>Matriz RACI por Cliente</h2>
+    <p class="subtitle">Configura responsables, aprobadores y consultados por actividad</p>
+  </header>
+
+  <section class="toolbar-row" aria-label="Filtros y acciones de RACI">
+    <mat-form-field appearance="outline">
+      <mat-label>Buscar cliente</mat-label>
+      <input matInput [(ngModel)]="raciClientSearch" placeholder="Filtrar clientes">
+      <mat-icon matSuffix aria-hidden="true">search</mat-icon>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Cliente</mat-label>
+      <mat-select [(ngModel)]="selectedRaciClientId" (selectionChange)="onRaciFilterChange()">
+        <mat-option value="">Todos</mat-option>
+        <mat-option *ngFor="let client of filteredClientsForRaci" [value]="client._id">
+          {{ client.name }}
+        </mat-option>
+        <mat-option *ngIf="filteredClientsForRaci.length === 0" disabled>
+          Sin resultados para "{{ raciClientSearch }}"
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Tópico (opcional)</mat-label>
+      <input matInput [(ngModel)]="selectedRaciTopic" (ngModelChange)="onRaciFilterChange()" placeholder="Ej: Ciber Vigilancia">
+    </mat-form-field>
+
+    <button mat-raised-button color="primary" (click)="addRaciEntry()">
+      <mat-icon aria-hidden="true">add</mat-icon>
+      Nuevo RACI
+    </button>
+  </section>
+
+  <!-- Formulario RACI -->
+  <section *ngIf="showRaciForm" class="form-card">
+    <h3>{{ editingRaciId ? 'Editar' : 'Nuevo' }} RACI</h3>
+    <form class="raci-form" [formGroup]="raciForm" (ngSubmit)="saveRaciEntry()">
+      <div class="form-row" *ngIf="reusableRaciTemplates.length > 0">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Reutilizar desde RACI existente</mat-label>
+          <mat-select (selectionChange)="applyRaciTemplate($event.value)">
+            <mat-option value="">No reutilizar</mat-option>
+            <mat-option *ngFor="let template of reusableRaciTemplates" [value]="template._id">
+              {{ formatRaciTemplateLabel(template) }}
+            </mat-option>
+          </mat-select>
+          <mat-hint>Copia datos base y luego solo ajustas los responsables que cambian.</mat-hint>
+        </mat-form-field>
+      </div>
+
+      <div class="form-row">
+        <mat-form-field appearance="outline">
+          <mat-label>Buscar cliente</mat-label>
+          <input matInput [(ngModel)]="raciClientSearch" [ngModelOptions]="{standalone: true}" placeholder="Filtrar clientes">
+          <mat-icon matSuffix aria-hidden="true">search</mat-icon>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Cliente</mat-label>
+          <mat-select formControlName="clientId" required>
+            <mat-option *ngFor="let client of filteredClientsForRaci" [value]="client._id">
+              {{ client.name }}
+            </mat-option>
+            <mat-option *ngIf="filteredClientsForRaci.length === 0" disabled>
+              Sin resultados para "{{ raciClientSearch }}"
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Tópico (opcional)</mat-label>
+          <input matInput formControlName="topic" placeholder="Ej: Qradar">
+        </mat-form-field>
+      </div>
+
+      <div class="form-row">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Actividad / Proceso</mat-label>
+          <input matInput formControlName="activity" required>
+        </mat-form-field>
+      </div>
+
+      <!-- RESPONSABLE (R) -->
+      <h4 class="raci-section-title">👤 Responsable (R)</h4>
+      <div class="toolbar-row">
+        <button mat-stroked-button type="button" color="primary" (click)="openDirectoryQuickPicker('raci:responsible', raciForm.get('responsible.name')?.value || '')">
+          <mat-icon aria-hidden="true">manage_search</mat-icon>
+          Usar contacto existente
+        </button>
+      </div>
+      <div class="inline-picker" *ngIf="directoryQuickPickerVisible && directoryQuickPickerTarget === 'raci:responsible'">
+        <mat-form-field appearance="outline">
+          <mat-label>Buscar en directorio</mat-label>
+          <input matInput [ngModel]="directoryQuickPickerQuery" [ngModelOptions]="{standalone: true}" (ngModelChange)="onDirectoryQuickPickerInput($event)" placeholder="Nombre, correo, teléfono o empresa">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Seleccionar contacto</mat-label>
+          <mat-select (selectionChange)="useDirectoryQuickPick($event.value)">
+            <mat-option *ngFor="let suggestion of directoryQuickPickerSuggestions" [value]="suggestion">
+              {{ suggestion.name }} · {{ suggestion.email || suggestion.phone || '-' }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        <button mat-button type="button" (click)="closeDirectoryQuickPicker()">Cerrar</button>
+      </div>
+      <div class="form-row" *ngIf="reusableRaciPeople.length > 0">
+        <mat-form-field appearance="outline">
+          <mat-label>Usar contacto guardado</mat-label>
+          <mat-select (selectionChange)="applyReusablePerson('responsible', $event.value)">
+            <mat-option [value]="null">Seleccionar</mat-option>
+            <mat-option *ngFor="let person of reusableRaciPeople" [value]="person">
+              {{ formatReusablePerson(person) }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+      <div formGroupName="responsible" class="form-row">
+        <mat-form-field appearance="outline">
+          <mat-label>Nombre *</mat-label>
+          <input
+            matInput
+            formControlName="name"
+            [matAutocomplete]="autoRaciResponsible"
+            (focus)="onRaciPersonNameFocus('responsible')"
+            (input)="onRaciPersonNameInput('responsible', $any($event.target).value)"
+            required>
+          <mat-autocomplete
+            #autoRaciResponsible="matAutocomplete"
+            [displayWith]="displayDirectoryContact"
+            (optionSelected)="onRaciDirectorySelected('responsible', $event.option.value)">
+            <mat-option *ngFor="let suggestion of getRaciDirectoryOptions('responsible')" [value]="suggestion">
+              {{ suggestion.name }} <span *ngIf="suggestion.phone">- {{ suggestion.phone }}</span>
+            </mat-option>
+          </mat-autocomplete>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Email</mat-label>
+          <input matInput type="email" formControlName="email">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Teléfono</mat-label>
+          <input matInput formControlName="phone">
+        </mat-form-field>
+      </div>
+
+      <!-- APROBADOR (A) -->
+      <h4 class="raci-section-title">✅ Aprobador (A)</h4>
+      <div class="form-row" *ngIf="reusableRaciPeople.length > 0">
+        <mat-form-field appearance="outline">
+          <mat-label>Usar contacto guardado</mat-label>
+          <mat-select (selectionChange)="applyReusablePerson('accountable', $event.value)">
+            <mat-option [value]="null">Seleccionar</mat-option>
+            <mat-option *ngFor="let person of reusableRaciPeople" [value]="person">
+              {{ formatReusablePerson(person) }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+      <div formGroupName="accountable" class="form-row">
+        <mat-form-field appearance="outline">
+          <mat-label>Nombre *</mat-label>
+          <input
+            matInput
+            formControlName="name"
+            [matAutocomplete]="autoRaciAccountable"
+            (focus)="onRaciPersonNameFocus('accountable')"
+            (input)="onRaciPersonNameInput('accountable', $any($event.target).value)"
+            required>
+          <mat-autocomplete
+            #autoRaciAccountable="matAutocomplete"
+            [displayWith]="displayDirectoryContact"
+            (optionSelected)="onRaciDirectorySelected('accountable', $event.option.value)">
+            <mat-option *ngFor="let suggestion of getRaciDirectoryOptions('accountable')" [value]="suggestion">
+              {{ suggestion.name }} <span *ngIf="suggestion.phone">- {{ suggestion.phone }}</span>
+            </mat-option>
+          </mat-autocomplete>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Email</mat-label>
+          <input matInput type="email" formControlName="email">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Teléfono</mat-label>
+          <input matInput formControlName="phone">
+        </mat-form-field>
+      </div>
+
+      <!-- CONSULTADO (C) -->
+      <h4 class="raci-section-title">💬 Consultado (C)</h4>
+      <div class="form-row" *ngIf="reusableRaciPeople.length > 0">
+        <mat-form-field appearance="outline">
+          <mat-label>Usar contacto guardado</mat-label>
+          <mat-select (selectionChange)="applyReusablePerson('consulted', $event.value)">
+            <mat-option [value]="null">Seleccionar</mat-option>
+            <mat-option *ngFor="let person of reusableRaciPeople" [value]="person">
+              {{ formatReusablePerson(person) }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+      <div formGroupName="consulted" class="form-row">
+        <mat-form-field appearance="outline">
+          <mat-label>Nombre</mat-label>
+          <input
+            matInput
+            formControlName="name"
+            [matAutocomplete]="autoRaciConsulted"
+            (focus)="onRaciPersonNameFocus('consulted')"
+            (input)="onRaciPersonNameInput('consulted', $any($event.target).value)">
+          <mat-autocomplete
+            #autoRaciConsulted="matAutocomplete"
+            [displayWith]="displayDirectoryContact"
+            (optionSelected)="onRaciDirectorySelected('consulted', $event.option.value)">
+            <mat-option *ngFor="let suggestion of getRaciDirectoryOptions('consulted')" [value]="suggestion">
+              {{ suggestion.name }} <span *ngIf="suggestion.phone">- {{ suggestion.phone }}</span>
+            </mat-option>
+          </mat-autocomplete>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Email</mat-label>
+          <input matInput type="email" formControlName="email">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Teléfono</mat-label>
+          <input matInput formControlName="phone">
+        </mat-form-field>
+      </div>
+
+      <!-- INFORMADO (I) -->
+      <h4 class="raci-section-title">📢 Informado (I)</h4>
+      <div class="form-row" *ngIf="reusableRaciPeople.length > 0">
+        <mat-form-field appearance="outline">
+          <mat-label>Usar contacto guardado</mat-label>
+          <mat-select (selectionChange)="applyReusablePerson('informed', $event.value)">
+            <mat-option [value]="null">Seleccionar</mat-option>
+            <mat-option *ngFor="let person of reusableRaciPeople" [value]="person">
+              {{ formatReusablePerson(person) }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+      <div formGroupName="informed" class="form-row">
+        <mat-form-field appearance="outline">
+          <mat-label>Nombre</mat-label>
+          <input
+            matInput
+            formControlName="name"
+            [matAutocomplete]="autoRaciInformed"
+            (focus)="onRaciPersonNameFocus('informed')"
+            (input)="onRaciPersonNameInput('informed', $any($event.target).value)">
+          <mat-autocomplete
+            #autoRaciInformed="matAutocomplete"
+            [displayWith]="displayDirectoryContact"
+            (optionSelected)="onRaciDirectorySelected('informed', $event.option.value)">
+            <mat-option *ngFor="let suggestion of getRaciDirectoryOptions('informed')" [value]="suggestion">
+              {{ suggestion.name }} <span *ngIf="suggestion.phone">- {{ suggestion.phone }}</span>
+            </mat-option>
+          </mat-autocomplete>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Email</mat-label>
+          <input matInput type="email" formControlName="email">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Teléfono</mat-label>
+          <input matInput formControlName="phone">
+        </mat-form-field>
+      </div>
+
+      <div class="form-row">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Notas</mat-label>
+          <textarea matInput rows="2" formControlName="notes"></textarea>
+        </mat-form-field>
+      </div>
+
+      <div class="form-actions">
+        <button mat-raised-button color="primary" type="submit" [disabled]="raciForm.invalid">
+          Guardar
+        </button>
+        <button mat-button type="button" (click)="showRaciForm = false">
+          Cancelar
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <!-- Tabla RACI -->
+  <section *ngIf="!loadingRaci" class="simple-table">
+    <table>
+      <thead>
+        <tr>
+          <th>Tópico</th>
+          <th>Actividad</th>
+          <th>R - Responsable</th>
+          <th>A - Aprobador</th>
+          <th>C - Consultado</th>
+          <th>I - Informado</th>
+          <th>Cliente</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let raci of raciEntries">
+          <td>{{ raci.topic || raci.serviceId?.name || '-' }}</td>
+          <td>{{ raci.activity }}</td>
+          <td>
+            <div *ngIf="raci.responsible?.name">
+              <strong>{{ raci.responsible.name }}</strong><br>
+              <small *ngIf="raci.responsible.email">📧 {{ raci.responsible.email }}</small><br *ngIf="raci.responsible.email">
+              <small *ngIf="raci.responsible.phone">📱 {{ raci.responsible.phone }}</small>
+            </div>
+            <span *ngIf="!raci.responsible?.name">-</span>
+          </td>
+          <td>
+            <div *ngIf="raci.accountable?.name">
+              <strong>{{ raci.accountable.name }}</strong><br>
+              <small *ngIf="raci.accountable.email">📧 {{ raci.accountable.email }}</small><br *ngIf="raci.accountable.email">
+              <small *ngIf="raci.accountable.phone">📱 {{ raci.accountable.phone }}</small>
+            </div>
+            <span *ngIf="!raci.accountable?.name">-</span>
+          </td>
+          <td>
+            <div *ngIf="raci.consulted?.name">
+              <strong>{{ raci.consulted.name }}</strong><br>
+              <small *ngIf="raci.consulted.email">📧 {{ raci.consulted.email }}</small><br *ngIf="raci.consulted.email">
+              <small *ngIf="raci.consulted.phone">📱 {{ raci.consulted.phone }}</small>
+            </div>
+            <span *ngIf="!raci.consulted?.name">-</span>
+          </td>
+          <td>
+            <div *ngIf="raci.informed?.name">
+              <strong>{{ raci.informed.name }}</strong><br>
+              <small *ngIf="raci.informed.email">📧 {{ raci.informed.email }}</small><br *ngIf="raci.informed.email">
+              <small *ngIf="raci.informed.phone">📱 {{ raci.informed.phone }}</small>
+            </div>
+            <span *ngIf="!raci.informed?.name">-</span>
+          </td>
+          <td>{{ getRaciClientName(raci) }}</td>
+          <td>
+            <button mat-icon-button (click)="editRaciEntry(raci)" aria-label="Editar RACI">
+              <mat-icon aria-hidden="true">edit</mat-icon>
+            </button>
+            <button mat-icon-button color="warn" (click)="deleteRaciEntry(raci._id)" aria-label="Eliminar RACI">
+              <mat-icon aria-hidden="true">delete</mat-icon>
+            </button>
+          </td>
+        </tr>
+        <tr *ngIf="raciEntries.length === 0">
+          <td colspan="8" class="text-center text-muted">No hay registros RACI</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <div *ngIf="loadingRaci" class="loading" role="status" aria-live="polite">
+    <mat-spinner diameter="40"></mat-spinner>
+    <p>Cargando matriz RACI...</p>
+  </div>
+</div>

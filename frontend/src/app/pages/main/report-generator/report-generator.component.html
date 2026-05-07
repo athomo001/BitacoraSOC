@@ -1,10 +1,13 @@
 <div class="report-generator-container">
-  <div class="report-generator-panel">
-    <header class="report-generator-header">
+  <header class="page-header">
+    <mat-icon>assessment</mat-icon>
+    <div>
       <h1>Generador de Reportes SOC</h1>
-      <p class="report-generator-subtitle">Completa la información para generar tabla HTML</p>
-    </header>
+      <p class="subtitle">Completa la información para generar tabla HTML</p>
+    </div>
+  </header>
 
+  <div class="report-generator-panel">
     <div class="report-generator-body">
       <div class="mode-selector-container">
         <mat-button-toggle-group [(ngModel)]="currentMode" (change)="onModeChange()" class="mode-selector" aria-label="Modo de generación">
@@ -281,7 +284,7 @@
                       placeholder="Pega evidencia en texto, código o comentarios"></textarea>
           </mat-form-field>
           <input type="file" accept="image/*" multiple (change)="onImageUpload($event)" #fileInput class="hidden-file-input">
-          <button mat-raised-button color="accent" type="button" (click)="fileInput.click()">
+          <button mat-stroked-button color="accent" type="button" (click)="fileInput.click()">
             <mat-icon>upload</mat-icon>
             Subir imágenes
           </button>
@@ -296,7 +299,7 @@
         </div>
 
         <!-- Botones de acción -->
-        <div class="actions">
+        <div class="form-actions">
           <button mat-raised-button color="primary" type="button" (click)="generateTable()">
             <mat-icon>table_chart</mat-icon>
             Generar Reporte HTML
@@ -445,9 +448,9 @@
           <h4>Evidencias (Opcional)</h4>
           <p class="upload-hint">Sube imágenes de prueba. Solo aparecen en el boletín si las cargas.</p>
           <input type="file" accept="image/*" multiple (change)="onNewsletterImageUpload($event)" #newsletterFileInput class="hidden-file-input">
-          <button mat-raised-button color="accent" type="button" (click)="newsletterFileInput.click()">
+          <button mat-stroked-button color="accent" type="button" (click)="newsletterFileInput.click()">
             <mat-icon>upload</mat-icon>
-            Subir imágenes de evidencia
+            Subir imágenes
           </button>
           <div class="image-preview" *ngIf="newsletterUploadedImages.length > 0">
             <div *ngFor="let img of newsletterUploadedImages; let i = index" class="preview-item">
@@ -460,7 +463,7 @@
         </div>
 
         <!-- Botones de acción -->
-        <div class="actions">
+        <div class="form-actions">
           <button mat-raised-button color="primary" type="button" (click)="generateTable()">
             <mat-icon>campaign</mat-icon>
             Generar Boletín
@@ -476,7 +479,7 @@
       <div *ngIf="showPreview" class="preview-section">
         <div class="preview-header">
           <h3>Vista previa</h3>
-          <div class="preview-actions">
+          <div class="form-actions">
             <button *ngIf="currentMode === 'report'" mat-raised-button color="accent" (click)="copyToClipboard()">
               <mat-icon>content_copy</mat-icon>
               Copiar reporte
@@ -509,13 +512,13 @@
           </div>
 
           <div class="newsletter-recipient-layout">
-            <div class="newsletter-left-column" style="display: flex; flex-direction: column; gap: var(--space-4);">
+            <div class="newsletter-left-column">
               <div class="newsletter-manual-block">
                 <mat-form-field appearance="outline" class="full-width">
                   <mat-label>Destinatarios manuales</mat-label>
                   <textarea matInput [(ngModel)]="newsletterRecipients" rows="6" placeholder="correo1@cliente.com, correo2@cliente.com o uno por línea"></textarea>
                 </mat-form-field>
-                <p class="newsletter-helper-text" style="margin-bottom: 0;">
+                <p class="newsletter-helper-text newsletter-helper-text--no-margin">
                   Fallback manual preservado. Puedes mezclarlo con contactos guardados sin repetir destinatarios.
                 </p>
               </div>
@@ -645,7 +648,7 @@
             </p>
           </div>
 
-          <div class="newsletter-send-actions">
+          <div class="form-actions">
             <button mat-raised-button color="primary" [disabled]="newsletterRecipientSummary.validRecipients.length === 0 || isSendingNewsletter" (click)="sendNewsletter()">
               <mat-icon *ngIf="!isSendingNewsletter">send</mat-icon>
               <mat-icon *ngIf="isSendingNewsletter">hourglass_empty</mat-icon>
@@ -667,7 +670,7 @@
           </div>
 
           <div class="newsletter-recipient-layout">
-            <div class="newsletter-left-column" style="display: flex; flex-direction: column; gap: var(--space-4);">
+            <div class="newsletter-left-column">
               <mat-form-field appearance="outline" class="full-width">
                 <mat-label>Asunto del correo</mat-label>
                 <input matInput [(ngModel)]="incidentSubject" placeholder="[Cliente] - [Evento] - [Ticket]">
@@ -712,7 +715,7 @@
 
               <div class="newsletter-contact-list" *ngIf="incidentFilteredContactsTo.length > 0 || incidentMailingListsTo.length > 0; else noIncidentContacts">
                 <ng-container *ngIf="incidentMailingListsTo.length > 0">
-                  <div class="newsletter-contact-list-divider" style="padding: 4px 12px; background: var(--surface-variant); font-size: 12px; font-weight: bold; text-transform: uppercase;">Listas de correo</div>
+                  <div class="newsletter-contact-list-divider">Listas de correo</div>
                   <label class="newsletter-contact-item"
                          *ngFor="let contact of incidentMailingListsTo"
                          [class.is-disabled]="contact.active === false || contact.doNotSend || !isValidNewsletterEmail(contact.email)">
@@ -735,7 +738,7 @@
                 </ng-container>
 
                 <ng-container *ngIf="incidentFilteredContactsTo.length > 0">
-                  <div class="newsletter-contact-list-divider" style="padding: 4px 12px; background: var(--surface-variant); font-size: 12px; font-weight: bold; text-transform: uppercase; margin-top: 8px;">Contactos personales</div>
+                  <div class="newsletter-contact-list-divider newsletter-contact-list-divider--spaced">Contactos personales</div>
                   <label class="newsletter-contact-item"
                          *ngFor="let contact of incidentFilteredContactsTo"
                          [class.is-disabled]="contact.active === false || contact.doNotSend || !isValidNewsletterEmail(contact.email)">
@@ -767,7 +770,7 @@
             </aside>
           </div>
 
-          <div class="newsletter-send-actions">
+          <div class="form-actions">
             <button mat-raised-button color="primary" [disabled]="!incidentRecipientsTo.trim() || !incidentSubject.trim() || isSendingIncident" (click)="sendIncidentReport()">
               <mat-icon *ngIf="!isSendingIncident">send</mat-icon>
               <mat-icon *ngIf="isSendingIncident">hourglass_empty</mat-icon>

@@ -27,6 +27,7 @@ import { Entry } from '../../../models/entry.model';
 import { AuthService } from '../../../services/auth.service';
 import { EntryDetailDialogComponent } from './entry-detail-dialog.component';
 import { AdminEditDialogComponent } from './admin-edit-dialog.component';
+import { ConfirmDialogComponent } from '../../../components/confirm-dialog/confirm-dialog.component';
 
 @Component({
     selector: 'app-all-entries',
@@ -168,16 +169,27 @@ export class AllEntriesComponent implements OnInit {
       return;
     }
 
-    if (!confirm('¿Eliminar esta entrada?')) return;
+    const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+      data: {
+        title: 'Eliminar Entrada',
+        message: '¿Estás seguro de eliminar esta entrada? Esta acción no se puede deshacer.',
+        confirmText: 'Eliminar',
+        isDestructive: true
+      }
+    });
 
-    this.entryService.deleteEntry(entry._id).subscribe({
-      next: () => {
-        this.snackBar.open('✅ Entrada eliminada', 'Cerrar', { duration: 2000 });
-        this.loadEntries();
-      },
-      error: (err) => {
-        const msg = err.error?.message || 'Error eliminando entrada';
-        this.snackBar.open(msg, 'Cerrar', { duration: 3000 });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.entryService.deleteEntry(entry._id).subscribe({
+          next: () => {
+            this.snackBar.open('✅ Entrada eliminada', 'Cerrar', { duration: 2000 });
+            this.loadEntries();
+          },
+          error: (err) => {
+            const msg = err.error?.message || 'Error eliminando entrada';
+            this.snackBar.open(msg, 'Cerrar', { duration: 3000 });
+          }
+        });
       }
     });
   }

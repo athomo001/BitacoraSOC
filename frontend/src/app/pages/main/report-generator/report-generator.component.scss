@@ -232,13 +232,6 @@
   }
 }
 
-.actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-color);
-}
 
 .preview-section {
   margin-top: 32px;
@@ -254,12 +247,6 @@
     h3 {
       margin: 0;
     }
-  }
-
-  .preview-actions {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
   }
 
   .html-preview {
@@ -610,9 +597,6 @@
     }
   }
 
-  .newsletter-send-actions {
-    text-align: right;
-  }
 }
 
 // Mayor separación bajo un campo del grid de boletín (reemplaza margin inline)
@@ -623,4 +607,26 @@
 // Contenedor de hint + campo a ancho completo en columnas flex
 .field-with-hint--stretch {
   width: 100%;
+}
+
+.newsletter-left-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.newsletter-helper-text--no-margin {
+  margin-bottom: 0;
+}
+
+.newsletter-contact-list-divider {
+  padding: 4px 12px;
+  background: var(--surface-variant);
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+
+  &--spaced {
+    margin-top: 8px;
+  }
 }

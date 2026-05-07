@@ -192,5 +192,8 @@ router.delete('/admin/external-people/:id', authenticate, requireAdmin, escalati
 // 🧪 Probar envío de recordatorio de escalación interna con cargos configurados
 router.post('/admin/reminder/test', authenticate, requireAdmin, escalationController.testEscalationReminder);
 
+// 📅 Automatización de Turnos (ESC-SHIFT-111)
+router.post('/admin/automation/trigger-send', authenticate, requireAdmin, escalationController.triggerEscalationScheduleSend);
+
 module.exports = router;
 

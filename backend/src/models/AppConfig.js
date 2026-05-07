@@ -376,6 +376,42 @@ const appConfigSchema = new mongoose.Schema({
       default: ''
     }
   },
+  // Automatización de envío de turnos de escalación
+  escalationScheduleAutomation: {
+    enabled: {
+      type: Boolean,
+      default: false
+    },
+    frequency: {
+      type: String,
+      enum: ['weekly', 'monthly'],
+      default: 'weekly'
+    },
+    dayOfWeek: {
+      type: Number,
+      default: 1, // Lunes (0=Domingo, 1=Lunes...)
+      min: 0,
+      max: 6
+    },
+    time: {
+      type: String,
+      default: '09:00'
+    },
+    recipients: [{
+      type: String,
+      trim: true,
+      lowercase: true
+    }],
+    ccRecipients: [{
+      type: String,
+      trim: true,
+      lowercase: true
+    }],
+    lastSentAt: {
+      type: Date,
+      default: null
+    }
+  },
   // Tema visual del login
   loginTheme: {
     type: String,

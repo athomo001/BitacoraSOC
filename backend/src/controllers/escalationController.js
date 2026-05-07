@@ -28,6 +28,8 @@ const {
   parseBooleanLike
 } = require('../utils/contactDirectory');
 const { syncDirectoryContact, syncManyDirectoryContacts } = require('../utils/directory-sync');
+const { buildEscalationScheduleEmail } = require('../utils/escalationScheduleEmailTemplate');
+const { sendEmail } = require('../utils/email');
 
 const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -1893,5 +1895,123 @@ exports.testEscalationReminder = async (req, res) => {
       message: 'Error enviando correo de prueba de recordatorio',
       error: error.message
     });
+  }
+};
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 📅 AUTOMATIZACIÓN DE TURNOS (ESC-SHIFT-111)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/**
+ * Endpoint manual para disparar el envío de turnos
+ */
+exports.triggerEscalationScheduleSend = async (req, res) => {
+  try {
+    const config = await AppConfig.findOne();
+    if (!config) {
+      return res.status(404).json({ error: 'Configuración no encontrada' });
+    }
+
+    const automation = config.escalationScheduleAutomation || {};
+    const recipients = automation.recipients || [];
+    const ccRecipients = automation.ccRecipients || [];
+
+    if (recipients.length === 0) {
+      return res.status(400).json({ error: 'No hay destinatarios configurados para el envío automático.' });
+    }
+
+    const result = await exports.sendEscalationScheduleInternal({
+      recipients,
+      ccRecipients,
+      frequency: automation.frequency || 'weekly'
+    });
+
+    if (result.success) {
+      // Actualizar última fecha de envío
+      await AppConfig.updateOne({}, { 
+        $set: { 'escalationScheduleAutomation.lastSentAt': new Date() } 
+      });
+      
+      return res.json({ message: 'Envío de turnos procesado correctamente', messageId: result.messageId });
+    } else {
+      return res.status(500).json({ error: 'Error al enviar el correo de turnos', details: result.error });
+    }
+  } catch (error) {
+    logger.error('Error in triggerEscalationScheduleSend:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Lógica compartida para generar y enviar el reporte de turnos
+ */
+exports.sendEscalationScheduleInternal = async ({ recipients, ccRecipients, frequency = 'weekly' }) => {
+  try {
+    const now = new Date();
+    let startDate = new Date(now);
+    let endDate = new Date(now);
+
+    if (frequency === 'monthly') {
+      // Siguiente mes calendario
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    } else {
+      // Siguientes 7 días (semana)
+      endDate.setDate(now.getDate() + 7);
+    }
+
+    const periodLabel = frequency === 'monthly'
+      ? `Periodo Mensual: ${startDate.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })}`
+      : `Periodo Semanal: ${startDate.toLocaleDateString('es-CL')} - ${endDate.toLocaleDateString('es-CL')}`;
+
+    // Obtener asignaciones en el rango
+    const assignments = await ShiftAssignment.find({
+      $or: [
+        { weekStartDate: { $gte: startDate, $lte: endDate } },
+        { weekEndDate: { $gte: startDate, $lte: endDate } },
+        { weekStartDate: { $lte: startDate }, weekEndDate: { $gte: endDate } }
+      ]
+    })
+    .populate('userId', 'fullName cargoLabel')
+    .populate('externalPersonId', 'name email')
+    .sort({ weekStartDate: 1 });
+
+    // Mapear a formato de template
+    const scheduleData = assignments.map(a => {
+      const isCurrent = a.weekStartDate <= now && a.weekEndDate >= now;
+      return {
+        analystName: a.userId?.fullName || a.externalPersonId?.name || 'Pendiente',
+        startDate: a.weekStartDate,
+        endDate: a.weekEndDate,
+        cargoLabel: a.userId?.cargoLabel || (a.externalPersonId ? 'EXTERNO' : '-'),
+        isCurrent
+      };
+    });
+
+    if (scheduleData.length === 0) {
+      logger.info('No hay turnos programados para el periodo', { periodLabel });
+      // Podríamos optar por no enviar nada o enviar un aviso de "Sin turnos"
+    }
+
+    const { html } = buildEscalationScheduleEmail({
+      schedule: scheduleData,
+      periodLabel,
+      brandName: 'Bitácora SOC'
+    });
+
+    const emailResult = await sendEmail({
+      to: recipients,
+      cc: ccRecipients,
+      subject: `[Bitácora SOC] Turnos de Escalación - ${periodLabel}`,
+      html,
+      auditContext: {
+        sourceModule: 'escalation-automation',
+        triggerType: 'schedule'
+      }
+    });
+
+    return { success: true, messageId: emailResult.messageId };
+  } catch (error) {
+    logger.error('Error in sendEscalationScheduleInternal:', error);
+    return { success: false, error: error.message };
   }
 };

@@ -52,6 +52,7 @@ const {
   startComplementCircuitHealthChecks,
   stopComplementCircuitHealthChecks
 } = require('./utils/complement-circuit-breaker');
+const { initEscalationScheduleScheduler } = require('./utils/escalationScheduleScheduler');
 
 const app = express();
 const HOST = process.env.HOST || '0.0.0.0';
@@ -802,6 +803,7 @@ const startServers = async () => {
     startAuditRetentionScheduler();
     startComplementCircuitHealthChecks();
     startShiftReminderScheduler();
+    initEscalationScheduleScheduler();
 
     const { startScheduler: startShiftReportScheduler } = require('./utils/shift-scheduler');
     startShiftReportScheduler();

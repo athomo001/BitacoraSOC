@@ -37,6 +37,15 @@ export interface AppConfig {
   smtpConfig?: SmtpConfig;
   easterEggRules?: EasterEggRule[];
   loginTheme?: 'crt' | 'infoflow';
+  escalationScheduleAutomation?: {
+    enabled: boolean;
+    frequency: 'weekly' | 'monthly';
+    dayOfWeek: number;
+    time: string;
+    recipients: string[];
+    ccRecipients: string[];
+    lastSentAt?: Date;
+  };
   lastUpdatedBy?: string;
   createdAt?: Date;
   updatedAt?: Date;
@@ -138,5 +147,12 @@ export interface UpdateConfigRequest {
   smtpConfig?: SmtpConfig;
   easterEggRules?: EasterEggRule[];
   loginTheme?: 'crt' | 'infoflow';
+  escalationScheduleAutomation?: {
+    enabled: boolean;
+    frequency: 'weekly' | 'monthly';
+    dayOfWeek: number;
+    time: string;
+    recipients: string[];
+    ccRecipients: string[];
+  };
 }
-

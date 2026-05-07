@@ -48,12 +48,12 @@ import { UserService } from '../../../services/user.service';
         <h2>Complementos Registrados</h2>
         <button mat-raised-button color="primary" (click)="startNew()">Nuevo complemento</button>
 
-        <div class="complement-item" *ngFor="let item of complements" (click)="select(item)" [class.selected]="selectedComplement?._id === item._id">
+        <button type="button" class="complement-item" *ngFor="let item of complements" (click)="select(item)" [class.selected]="selectedComplement?._id === item._id">
           <div>
             <strong>{{ item.name }}</strong>
             <div>{{ item.slug }} · {{ item.status }} · {{ item.circuit.state }}</div>
           </div>
-        </div>
+        </button>
       </section>
 
       <section class="complements-form complements-panel">

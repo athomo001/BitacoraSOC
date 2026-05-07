@@ -1,5 +1,4 @@
 <div class="checklist-container">
-  <h1>Checklist del Turno</h1>
   <section #checklistGuideCard class="status-card checklist-panel" *ngIf="checklistGuideVisible">
     <div class="checklist-panel__body">
       <p><strong>Guía rápida Checklist:</strong> selecciona tipo de check, evalúa todos los sub-items, agrega observación obligatoria en rojos y luego envía.</p>
@@ -11,35 +10,25 @@
   </section>
   <ng-container *ngIf="!isLoading && checklistTree.length > 0; else checklistPlaceholder">
     <section class="checklist-panel checklist-panel--interactive">
-      <mat-accordion>
-        <mat-expansion-panel [(expanded)]="mainPanelExpanded" [hideToggle]="false">
-          <mat-expansion-panel-header>
-            <mat-panel-title>
-              Checklist
-            </mat-panel-title>
-            <mat-panel-description>
-              {{ mainPanelExpanded ? 'Ocultar checklist' : 'Abrir checklist' }}
-            </mat-panel-description>
-          </mat-expansion-panel-header>
-
-          <div class="checklist-panel__body">
-          <form (ngSubmit)="onSubmit()" #checkForm="ngForm">
+      <div class="checklist-panel__body">
+        <h2 class="checklist-form-title">Formulario de Checklist</h2>
+        <form (ngSubmit)="onSubmit()" #checkForm="ngForm">
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Tipo de Check</mat-label>
               <mat-select [(ngModel)]="checkType" name="checkType" required (selectionChange)="onCheckTypeChange()">
                 <mat-option value="inicio">
-                  <mat-icon>wb_sunny</mat-icon>
+                  <mat-icon aria-hidden="true">wb_sunny</mat-icon>
                   Inicio de Turno
                 </mat-option>
                 <mat-option value="cierre">
-                  <mat-icon>nightlight</mat-icon>
+                  <mat-icon aria-hidden="true">nightlight</mat-icon>
                   Cierre de Turno
                 </mat-option>
               </mat-select>
             </mat-form-field>
 
             <div class="services-accordion">
-              <h3>Evaluacion de Servicios</h3>
+              <h2>Evaluación de Servicios</h2>
               <p class="hint">Los items hoja deben tener estado. Los items con sub-items calculan su estado automaticamente y solo los items hoja en rojo requieren observacion.</p>
 
               <mat-accordion multi>
@@ -47,7 +36,7 @@
                   [expanded]="service.status === 'rojo'" [hideToggle]="!service.children?.length">
                   <mat-expansion-panel-header>
                     <mat-panel-title>
-                      <mat-icon [class.status-verde]="service.status === 'verde'"
+                      <mat-icon aria-hidden="true" [class.status-verde]="service.status === 'verde'"
                         [class.status-rojo]="service.status === 'rojo'" [class.status-pending]="!service.status">
                         {{ service.status === 'verde' ? 'check_circle' : service.status === 'rojo' ? 'cancel' :
                         'radio_button_unchecked' }}
@@ -63,11 +52,11 @@
                         class="status-header-group" (click)="$event.stopPropagation()"
                         (change)="onStatusChange(service, $event.value)">
                         <mat-radio-button value="verde" color="primary" (click)="$event.stopPropagation()">
-                          <mat-icon class="status-icon verde">check_circle</mat-icon>
+                          <mat-icon aria-hidden="true" class="status-icon verde">check_circle</mat-icon>
                           Verde (Operativo)
                         </mat-radio-button>
                         <mat-radio-button value="rojo" color="warn" (click)="$event.stopPropagation()">
-                          <mat-icon class="status-icon rojo">cancel</mat-icon>
+                          <mat-icon aria-hidden="true" class="status-icon rojo">cancel</mat-icon>
                           Rojo (Problema)
                         </mat-radio-button>
                       </mat-radio-group>
@@ -99,17 +88,15 @@
               <button mat-button type="button" (click)="openChecklistGuide()">Ver guía rápida</button>
               <button mat-raised-button color="primary" type="submit" [disabled]="!checkForm.valid || isSubmitting"
                 class="submit-button">
-                <mat-icon *ngIf="!isSubmitting">send</mat-icon>
+                <mat-icon aria-hidden="true" *ngIf="!isSubmitting">send</mat-icon>
                 <mat-progress-spinner *ngIf="isSubmitting" mode="indeterminate" diameter="20" strokeWidth="3"
                   class="loading-spinner"></mat-progress-spinner>
                 <span>{{ isSubmitting ? 'Enviando...' : 'Enviar Checklist' }}</span>
               </button>
             </div>
           </form>
-          </div>
-        </mat-expansion-panel>
-      </mat-accordion>
-      </section>
+      </div>
+    </section>
   </ng-container>
 </div>
 
@@ -123,7 +110,7 @@
           Estado calculado automaticamente segun sus sub-items.
         </p>
       </div>
-      <mat-icon [class.status-verde]="child.status === 'verde'"
+      <mat-icon aria-hidden="true" [class.status-verde]="child.status === 'verde'"
         [class.status-rojo]="child.status === 'rojo'" [class.status-pending]="!child.status">
         {{ child.status === 'verde' ? 'check_circle' : child.status === 'rojo' ? 'cancel' :
         'radio_button_unchecked' }}
@@ -134,11 +121,11 @@
       <mat-radio-group [(ngModel)]="child.status" [name]="'status_' + path + '_' + childIndex" required
         class="status-selector child-selector" (change)="onStatusChange(child, $event.value)">
         <mat-radio-button value="verde" color="primary">
-          <mat-icon class="status-icon verde">check_circle</mat-icon>
+          <mat-icon aria-hidden="true" class="status-icon verde">check_circle</mat-icon>
           Verde
         </mat-radio-button>
         <mat-radio-button value="rojo" color="warn">
-          <mat-icon class="status-icon rojo">cancel</mat-icon>
+          <mat-icon aria-hidden="true" class="status-icon rojo">cancel</mat-icon>
           Rojo
         </mat-radio-button>
       </mat-radio-group>
@@ -161,12 +148,13 @@
 <ng-template #checklistPlaceholder>
   <section class="checklist-form-card checklist-panel">
     <div class="checklist-panel__body">
-      <div class="placeholder" *ngIf="isLoading">
-        <mat-progress-spinner mode="indeterminate" diameter="30"></mat-progress-spinner>
-        <p>Cargando checklist activo...</p>
+      <div class="placeholder skeleton-placeholder" *ngIf="isLoading">
+        <div class="skeleton-line title"></div>
+        <div class="skeleton-line"></div>
+        <div class="skeleton-line short"></div>
       </div>
       <div class="placeholder" *ngIf="!isLoading">
-        <mat-icon>info</mat-icon>
+        <mat-icon aria-hidden="true">info</mat-icon>
         <p>💡 No hay checklist activo configurado.</p>
         <p><small>Puedes crear entradas normales en la sección de abajo.</small></p>
       </div>

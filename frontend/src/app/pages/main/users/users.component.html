@@ -1,5 +1,11 @@
 <div class="users-container">
-  <h1>Gestión de Usuarios</h1>
+  <header class="page-header">
+    <mat-icon>manage_accounts</mat-icon>
+    <div>
+      <h1>Gestión de Usuarios</h1>
+      <p class="subtitle">Administra los accesos y perfiles del equipo SOC</p>
+    </div>
+  </header>
 
   <div class="users-panel users-panel--form">
     <header class="users-panel__header">
@@ -71,7 +77,7 @@
             {{ editingUserId ? 'Guardar Cambios' : 'Crear Usuario' }}
           </button>
           
-          <button mat-raised-button type="button" *ngIf="editingUserId"
+          <button mat-stroked-button type="button" *ngIf="editingUserId"
             (click)="cancelEdit()" class="cancel-edit-btn">
             Cancelar
           </button>
