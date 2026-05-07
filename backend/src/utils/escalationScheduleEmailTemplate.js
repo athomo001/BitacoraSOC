@@ -25,7 +25,7 @@ function formatTime(fecha) {
   try {
     const d = new Date(fecha);
     if (isNaN(d.getTime())) return '';
-    return d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false });
   } catch { return ''; }
 }
 
@@ -56,19 +56,21 @@ async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', l
     const isLast = i === schedule.length - 1;
     const border = isLast ? 'none' : `1px solid ${PALETTE.softLine}`;
     const badge = s.isCurrent 
-      ? `<span style="background-color:${PALETTE.accent}; color:${PALETTE.white}; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">EN TURNO</span>`
-      : `<span style="background-color:${PALETTE.mutedText}; color:${PALETTE.white}; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">PRÓXIMO</span>`;
+      ? `<span style="display:inline-block; white-space:nowrap; background-color:${PALETTE.accent}; color:${PALETTE.white}; padding:4px 8px; border-radius:4px; font-size:11px; line-height:1; font-weight:700;">EN&nbsp;TURNO</span>`
+      : `<span style="display:inline-block; white-space:nowrap; background-color:${PALETTE.mutedText}; color:${PALETTE.white}; padding:4px 8px; border-radius:4px; font-size:11px; line-height:1; font-weight:700;">PRÓXIMO</span>`;
 
     return `
       <tr>
-        <td style="padding:12px 8px; border-bottom:${border}; color:${PALETTE.bodyText}; font-weight:700;">${e(s.analystName)}</td>
+        <td style="padding:12px 8px; border-bottom:${border}; color:${PALETTE.bodyText}; font-weight:700; line-height:1.35;">${e(s.analystName)}</td>
         <td style="padding:12px 8px; border-bottom:${border}; color:${PALETTE.bodyText}; font-size:13px;">
-          ${formatDate(s.startDate)} ${formatTime(s.startDate)}
+          <span style="white-space:nowrap;">${formatDate(s.startDate)}</span><br/>
+          <span style="white-space:nowrap;">${formatTime(s.startDate)}</span>
         </td>
         <td style="padding:12px 8px; border-bottom:${border}; color:${PALETTE.bodyText}; font-size:13px;">
-          ${formatDate(s.endDate)} ${formatTime(s.endDate)}
+          <span style="white-space:nowrap;">${formatDate(s.endDate)}</span><br/>
+          <span style="white-space:nowrap;">${formatTime(s.endDate)}</span>
         </td>
-        <td style="padding:12px 8px; border-bottom:${border}; color:${PALETTE.mutedText}; font-size:12px;">${e(s.cargoLabel || '-')}</td>
+        <td style="padding:12px 8px; border-bottom:${border}; color:${PALETTE.mutedText}; font-size:12px; white-space:nowrap;">${e(s.cargoLabel || '-')}</td>
         <td style="padding:12px 8px; border-bottom:${border}; text-align:right;">${badge}</td>
       </tr>
     `;
@@ -88,7 +90,7 @@ async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', l
       }
     </mj-style>
   </mj-head>
-  <mj-body background-color="#FFFFFF" width="800px">
+  <mj-body background-color="#FFFFFF" width="700px">
     <mj-wrapper background-color="${PALETTE.pageBg}" padding="20px 0">
       
       <!-- Cabecera -->
@@ -124,11 +126,11 @@ async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', l
           </mj-text>
           <mj-table css-class="schedule-table">
             <tr style="border-bottom: 2px solid ${PALETTE.softLine};">
-              <th style="text-align:left; padding:10px 8px; color:${PALETTE.mutedText}; font-size:12px;">ANALISTA</th>
-              <th style="text-align:left; padding:10px 8px; color:${PALETTE.mutedText}; font-size:12px;">INICIO</th>
-              <th style="text-align:left; padding:10px 8px; color:${PALETTE.mutedText}; font-size:12px;">FIN</th>
-              <th style="text-align:left; padding:10px 8px; color:${PALETTE.mutedText}; font-size:12px;">CARGO</th>
-              <th style="text-align:right; padding:10px 8px; color:${PALETTE.mutedText}; font-size:12px;">ESTADO</th>
+              <th style="text-align:left; padding:10px 8px; color:${PALETTE.mutedText}; font-size:12px; white-space:nowrap; width:28%;">ANALISTA</th>
+              <th style="text-align:left; padding:10px 8px; color:${PALETTE.mutedText}; font-size:12px; white-space:nowrap; width:22%;">INICIO</th>
+              <th style="text-align:left; padding:10px 8px; color:${PALETTE.mutedText}; font-size:12px; white-space:nowrap; width:22%;">FIN</th>
+              <th style="text-align:left; padding:10px 8px; color:${PALETTE.mutedText}; font-size:12px; white-space:nowrap; width:10%;">CARGO</th>
+              <th style="text-align:right; padding:10px 8px; color:${PALETTE.mutedText}; font-size:12px; white-space:nowrap; width:18%;">ESTADO</th>
             </tr>
             ${scheduleRows}
           </mj-table>
