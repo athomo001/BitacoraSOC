@@ -5,6 +5,8 @@
  */
 
 const Service = require('../models/Service');
+const path = require('path');
+const fs = require('fs').promises;
 const CatalogLogSource = require('../models/CatalogLogSource');
 const Contact = require('../models/Contact');
 const EscalationRule = require('../models/EscalationRule');
@@ -30,6 +32,63 @@ const {
 const { syncDirectoryContact, syncManyDirectoryContacts } = require('../utils/directory-sync');
 const { buildEscalationScheduleEmail } = require('../utils/escalationScheduleEmailTemplate');
 const { sendEmail } = require('../utils/email');
+
+const INTERNAL_SHIFT_ROLE_CODES = ['N1_NO_HABIL', 'N2', 'TI'];
+const SHIFT_ROLE_ORDER = {
+  N1_NO_HABIL: 1,
+  N2: 2,
+  TI: 3
+};
+const UPLOADS_LOGOS_DIR = path.resolve(path.join(__dirname, '../../uploads/logos'));
+
+const contentTypeFromLogoFilename = (filename) => {
+  const extension = path.extname(filename || '').toLowerCase();
+  if (extension === '.jpg' || extension === '.jpeg') return 'image/jpeg';
+  if (extension === '.png') return 'image/png';
+  if (extension === '.gif') return 'image/gif';
+  if (extension === '.webp') return 'image/webp';
+  if (extension === '.svg') return 'image/svg+xml';
+  return 'image/png';
+};
+
+const resolveUploadedLogoWebPath = (logoUrl) => {
+  if (!logoUrl || typeof logoUrl !== 'string') return null;
+
+  const clean = logoUrl.trim();
+  if (!clean) return null;
+
+  if (clean.startsWith('/uploads/logos/')) {
+    return clean.split('?')[0];
+  }
+
+  if (/^https?:\/\//i.test(clean)) {
+    try {
+      const parsed = new URL(clean);
+      if (parsed.pathname && parsed.pathname.startsWith('/uploads/logos/')) {
+        return parsed.pathname.split('?')[0];
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+};
+
+const readUploadedLogoFromWebPath = async (webPath) => {
+  if (!webPath || typeof webPath !== 'string') return null;
+  const clean = webPath.split('?')[0].trim();
+  if (!clean.startsWith('/uploads/logos/')) return null;
+  const base = path.basename(clean);
+  if (!base || base === '.' || base === '..' || base.includes('..')) return null;
+  const full = path.resolve(path.join(UPLOADS_LOGOS_DIR, base));
+  if (!full.startsWith(UPLOADS_LOGOS_DIR)) return null;
+  try {
+    return await fs.readFile(full);
+  } catch {
+    return null;
+  }
+};
 
 const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -1983,6 +2042,37 @@ exports.sendEscalationScheduleInternal = async ({ recipients, ccRecipients, freq
       ? `Periodo Mensual: ${startDate.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })}`
       : `Periodo Semanal: ${startDate.toLocaleDateString('es-CL')} - ${endDate.toLocaleDateString('es-CL')}`;
 
+    const appConfig = await AppConfig.findOne().select('logoUrl appTitle').lean();
+    const brandName = String(appConfig?.appTitle || 'Bitácora SOC').trim() || 'Bitácora SOC';
+    const logoWebPath = resolveUploadedLogoWebPath(appConfig?.logoUrl);
+    const attachments = [];
+    let logoCid = null;
+
+    if (logoWebPath) {
+      const logoBuffer = await readUploadedLogoFromWebPath(logoWebPath);
+      if (logoBuffer && logoBuffer.length) {
+        const logoContentType = contentTypeFromLogoFilename(logoWebPath);
+        const logoExtension = logoContentType === 'image/jpeg'
+          ? 'jpg'
+          : logoContentType === 'image/webp'
+            ? 'webp'
+            : logoContentType === 'image/gif'
+              ? 'gif'
+              : logoContentType === 'image/svg+xml'
+                ? 'svg'
+                : 'png';
+        const logoContentId = 'bitacora_escalation_logo@bitacora';
+        attachments.push({
+          filename: `logo-escalation.${logoExtension}`,
+          content: logoBuffer,
+          cid: logoContentId,
+          contentType: logoContentType,
+          contentDisposition: 'inline'
+        });
+        logoCid = `cid:${logoContentId}`;
+      }
+    }
+
     // Obtener asignaciones en el rango
     const assignments = await ShiftAssignment.find({
       $or: [
@@ -1996,20 +2086,61 @@ exports.sendEscalationScheduleInternal = async ({ recipients, ccRecipients, freq
     .sort({ weekStartDate: 1 });
 
     // Mapear a formato de template
-    const scheduleData = assignments.map(a => {
-      const isCurrent = a.weekStartDate <= now && a.weekEndDate >= now;
+    // Regla semanal: incluir cualquier turno que se cruce con la semana objetivo,
+    // para que turnos largos (ej. 2 semanas) aparezcan en ambas semanas.
+    const overlappingInternalAssignments = assignments.filter((assignment) => {
+      const overlapsRequestedPeriod = assignment.weekStartDate <= endDate && assignment.weekEndDate >= startDate;
+      const isInternalRole = INTERNAL_SHIFT_ROLE_CODES.includes(String(assignment.roleCode || '').toUpperCase());
+      const isInternalPerson = !!assignment.userId && !assignment.externalPersonId;
+      return overlapsRequestedPeriod && isInternalRole && isInternalPerson;
+    });
+
+    let selectedAssignments = [];
+    if (frequency === 'weekly') {
+      const latestAssignmentByRole = new Map();
+      for (const assignment of overlappingInternalAssignments) {
+        const roleCode = String(assignment.roleCode || '').toUpperCase();
+        const current = latestAssignmentByRole.get(roleCode);
+        if (!current) {
+          latestAssignmentByRole.set(roleCode, assignment);
+          continue;
+        }
+
+        const startsLater = new Date(assignment.weekStartDate).getTime() > new Date(current.weekStartDate).getTime();
+        const updatedLater = new Date(assignment.updatedAt || assignment.createdAt || 0).getTime() > new Date(current.updatedAt || current.createdAt || 0).getTime();
+        if (startsLater || (!startsLater && updatedLater)) {
+          latestAssignmentByRole.set(roleCode, assignment);
+        }
+      }
+
+      selectedAssignments = Array.from(latestAssignmentByRole.values());
+    } else {
+      selectedAssignments = [...overlappingInternalAssignments];
+    }
+
+    selectedAssignments.sort((left, right) => {
+      const leftOrder = SHIFT_ROLE_ORDER[String(left.roleCode || '').toUpperCase()] || 99;
+      const rightOrder = SHIFT_ROLE_ORDER[String(right.roleCode || '').toUpperCase()] || 99;
+      if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+      return new Date(left.weekStartDate).getTime() - new Date(right.weekStartDate).getTime();
+    });
+
+    const scheduleData = selectedAssignments.map((assignment) => {
+      const isCurrent = assignment.weekStartDate <= now && assignment.weekEndDate >= now;
       return {
-        analystName: a.userId?.fullName || a.externalPersonId?.name || 'Pendiente',
-        startDate: a.weekStartDate,
-        endDate: a.weekEndDate,
-        cargoLabel: a.userId?.cargoLabel || (a.externalPersonId ? 'EXTERNO' : '-'),
-        isCurrent
-      };
+      analystName: assignment.userId?.fullName || 'Pendiente',
+      startDate: assignment.weekStartDate,
+      endDate: assignment.weekEndDate,
+      cargoLabel: assignment.userId?.cargoLabel || assignment.roleCode || '-',
+      isCurrent
+    };
     });
 
     logger.info('Escalation schedule email generation', {
       periodLabel,
       assignmentsFound: assignments.length,
+      overlappingInternalAssignments: overlappingInternalAssignments.length,
+      selectedAssignments: selectedAssignments.length,
       scheduleDataMapped: scheduleData.length,
       startDate: startDate.toISOString(),
       endDate: endDate.toISOString()
@@ -2029,7 +2160,8 @@ exports.sendEscalationScheduleInternal = async ({ recipients, ccRecipients, freq
       const emptyScheduleEmailBuild = await buildEscalationScheduleEmail({
         schedule: emptyScheduleData,
         periodLabel,
-        brandName: 'Bitácora SOC'
+        logoCid,
+        brandName
       });
 
       const emailResult = await sendEmail({
@@ -2037,6 +2169,7 @@ exports.sendEscalationScheduleInternal = async ({ recipients, ccRecipients, freq
         cc: ccRecipients,
         subject: `[Bitácora SOC] Turnos de Escalación - ${periodLabel}`,
         html: emptyScheduleEmailBuild.html,
+        attachments: attachments.length ? attachments : undefined,
         auditContext: {
           sourceModule: 'escalation-automation',
           triggerType: 'schedule',
@@ -2050,7 +2183,8 @@ exports.sendEscalationScheduleInternal = async ({ recipients, ccRecipients, freq
     const emailBuild = await buildEscalationScheduleEmail({
       schedule: scheduleData,
       periodLabel,
-      brandName: 'Bitácora SOC'
+      logoCid,
+      brandName
     });
 
     if (emailBuild.errors && emailBuild.errors.length > 0) {
@@ -2067,6 +2201,7 @@ exports.sendEscalationScheduleInternal = async ({ recipients, ccRecipients, freq
       cc: ccRecipients,
       subject: `[Bitácora SOC] Turnos de Escalación - ${periodLabel}`,
       html,
+      attachments: attachments.length ? attachments : undefined,
       auditContext: {
         sourceModule: 'escalation-automation',
         triggerType: 'schedule'
