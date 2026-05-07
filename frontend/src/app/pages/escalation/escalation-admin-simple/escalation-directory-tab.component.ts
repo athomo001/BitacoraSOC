@@ -214,9 +214,19 @@ export class EscalationDirectoryTabComponent implements OnInit {
     this.mergingDirectoryDuplicates = true;
     this.directoryService.mergeDuplicates().subscribe({
       next: () => {
-        this.mergingDirectoryDuplicates = false;
-        this.showSuccess('Duplicados consolidados (cambios manuales preservados)');
-        this.directoryRefresh.emit();
+        this.directoryService.syncUsersFromDirectory().subscribe({
+          next: (syncResult: any) => {
+            this.mergingDirectoryDuplicates = false;
+            const updated = Number(syncResult?.updatedUsers || 0);
+            this.showSuccess(`Duplicados consolidados y usuarios sincronizados (${updated} actualizados)`);
+            this.directoryRefresh.emit();
+          },
+          error: () => {
+            this.mergingDirectoryDuplicates = false;
+            this.showError('Consolidado OK, pero falló la sincronización retroactiva de usuarios');
+            this.directoryRefresh.emit();
+          }
+        });
       },
       error: (err: any) => {
         this.mergingDirectoryDuplicates = false;
