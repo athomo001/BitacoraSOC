@@ -424,7 +424,7 @@ exports.rebuildDirectoryFromEscalation = async (req, res) => {
           (step.contacts || []).forEach((contact) => {
             payload.push({
               name: contact?.name,
-              phone: contact?.tel,
+              phone: contact?.phone || contact?.tel,
               type: 'External'
             });
           });
@@ -432,7 +432,7 @@ exports.rebuildDirectoryFromEscalation = async (req, res) => {
         }
         payload.push({
           name: step?.contactName,
-          phone: step?.contactTel,
+          phone: step?.contactPhone || step?.contactTel,
           type: 'External'
         });
       });
