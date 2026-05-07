@@ -9,9 +9,15 @@
     </div>
   </section>
   <ng-container *ngIf="!isLoading && checklistTree.length > 0; else checklistPlaceholder">
-    <section class="checklist-panel checklist-panel--interactive">
+    <mat-expansion-panel class="checklist-panel checklist-panel--interactive" [expanded]="false">
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          <mat-icon aria-hidden="true">checklist</mat-icon>
+          Formulario de Checklist
+        </mat-panel-title>
+        <mat-panel-description>Inicio / Cierre de Turno</mat-panel-description>
+      </mat-expansion-panel-header>
       <div class="checklist-panel__body">
-        <h2 class="checklist-form-title">Formulario de Checklist</h2>
         <form (ngSubmit)="onSubmit()" #checkForm="ngForm">
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Tipo de Check</mat-label>
@@ -96,7 +102,7 @@
             </div>
           </form>
       </div>
-    </section>
+    </mat-expansion-panel>
   </ng-container>
 </div>
 
