@@ -144,6 +144,23 @@ exports.updateDirectoryContact = async (req, res) => {
 
     Object.assign(existing, payload);
     await existing.save();
+
+    // Keep internal user records in sync when directory entry comes from User source.
+    if (isUserSourceContact) {
+      const userFilter = oldSnapshot.email
+        ? { email: oldSnapshot.email }
+        : { fullName: oldSnapshot.name };
+
+      const userSet = {};
+      if (payload.phone !== undefined) {
+        userSet.phone = payload.phone || null;
+      }
+
+      if (Object.keys(userSet).length > 0) {
+        await User.updateOne(userFilter, { $set: userSet });
+      }
+    }
+
     await audit(req, {
       event: 'directory.central.update',
       result: { success: true },
