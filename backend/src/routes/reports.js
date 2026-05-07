@@ -1326,7 +1326,7 @@ router.post('/incident/preview', authenticate, async (req, res) => {
     // Compilar MJML con data URIs para que el preview sea visible en el navegador
     const { buildIncidentEmailPreview } = require('../utils/incidentEmailTemplate');
     const paletteKey = config?.incidentEmailPaletteKey || 'cdc-verde';
-    const { html, errors } = buildIncidentEmailPreview({
+    const { html, errors } = await buildIncidentEmailPreview({
       reportData, images: previewImages, logoCid, autor, brandName, paletteKey
     });
 
@@ -1432,7 +1432,7 @@ router.post('/incident/send', authenticate, async (req, res) => {
 
     // Compilar MJML -> HTML
     const paletteKey = config?.incidentEmailPaletteKey || 'cdc-verde';
-    const { html: emailHtml, errors: mjmlErrors } = buildIncidentEmail({
+    const { html: emailHtml, errors: mjmlErrors } = await buildIncidentEmail({
       reportData,
       images: imgList,
       logoCid,

@@ -50,7 +50,7 @@ const PALETTE = {
  * @param {string} data.logoCid - CID del logo para adjuntar
  * @param {string} data.brandName - Nombre de la marca (Bitácora SOC)
  */
-function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', logoCid = null, brandName = 'Bitácora SOC' }) {
+async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', logoCid = null, brandName = 'Bitácora SOC' }) {
   
   const scheduleRows = schedule.map((s, i) => {
     const isLast = i === schedule.length - 1;
@@ -161,8 +161,21 @@ function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', logoCid
 </mjml>
   `;
 
-  const result = mjml(template, { validationLevel: 'soft' });
-  return { html: result.html || '', errors: result.errors || [] };
+  const result = await mjml(template, { validationLevel: 'soft' });
+  
+  // Validar que se generó HTML correctamente
+  const html = result?.html || '';
+  if (!html || html.trim().length === 0) {
+    console.error('[escalationScheduleEmailTemplate] MJML compilation produced empty HTML', {
+      hasResult: !!result,
+      hasHtml: !!result?.html,
+      htmlLength: result?.html?.length || 0,
+      errors: result?.errors || [],
+      template: template.substring(0, 200) // primeros 200 caracteres para debugging
+    });
+  }
+  
+  return { html, errors: result?.errors || [] };
 }
 
 module.exports = { buildEscalationScheduleEmail };

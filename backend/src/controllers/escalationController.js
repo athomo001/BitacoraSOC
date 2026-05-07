@@ -2007,16 +2007,60 @@ exports.sendEscalationScheduleInternal = async ({ recipients, ccRecipients, freq
       };
     });
 
+    logger.info('Escalation schedule email generation', {
+      periodLabel,
+      assignmentsFound: assignments.length,
+      scheduleDataMapped: scheduleData.length,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString()
+    });
+
     if (scheduleData.length === 0) {
-      logger.info('No hay turnos programados para el periodo', { periodLabel });
-      // Podríamos optar por no enviar nada o enviar un aviso de "Sin turnos"
+      logger.warn('No hay turnos programados para el periodo', { periodLabel });
+      // Crear email con mensaje de "Sin turnos"
+      const emptyScheduleData = [{
+        analystName: 'Sin asignaciones',
+        startDate: startDate,
+        endDate: endDate,
+        cargoLabel: '-',
+        isCurrent: false
+      }];
+      
+      const emptyScheduleEmailBuild = await buildEscalationScheduleEmail({
+        schedule: emptyScheduleData,
+        periodLabel,
+        brandName: 'Bitácora SOC'
+      });
+
+      const emailResult = await sendEmail({
+        to: recipients,
+        cc: ccRecipients,
+        subject: `[Bitácora SOC] Turnos de Escalación - ${periodLabel}`,
+        html: emptyScheduleEmailBuild.html,
+        auditContext: {
+          sourceModule: 'escalation-automation',
+          triggerType: 'schedule',
+          status: 'empty_schedule'
+        }
+      });
+      
+      return { success: true, messageId: emailResult.messageId, warning: 'No hay turnos para este periodo' };
     }
 
-    const { html } = buildEscalationScheduleEmail({
+    const emailBuild = await buildEscalationScheduleEmail({
       schedule: scheduleData,
       periodLabel,
       brandName: 'Bitácora SOC'
     });
+
+    if (emailBuild.errors && emailBuild.errors.length > 0) {
+      logger.warn('MJML compilation warnings for escalation schedule email', {
+        errors: emailBuild.errors,
+        scheduleDataCount: scheduleData.length
+      });
+    }
+
+    const { html } = emailBuild;
 
     const emailResult = await sendEmail({
       to: recipients,
