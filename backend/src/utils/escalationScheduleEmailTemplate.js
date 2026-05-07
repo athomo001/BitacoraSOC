@@ -50,7 +50,7 @@ const PALETTE = {
  * @param {string} data.logoCid - CID del logo para adjuntar
  * @param {string} data.brandName - Nombre de la marca (Bitácora SOC)
  */
-async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', logoCid = null, brandName = 'Bitácora SOC' }) {
+async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', logoCid = null, brandName = 'Bitácora CDC' }) {
   
   const scheduleRows = schedule.map((s, i) => {
     const isLast = i === schedule.length - 1;
@@ -140,8 +140,7 @@ async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', l
           <mj-spacer height="20px" />
           
           <mj-text font-size="13px" line-height="20px" color="${PALETTE.mutedText}" align="center">
-            Este es un correo automático generado por el sistema Bitácora SOC.<br/>
-            Por favor, asegúrese de que su disponibilidad coincida con los turnos asignados.
+            Este es un correo automático generado por el sistema ${e(brandName)}.
           </mj-text>
         </mj-column>
       </mj-section>
