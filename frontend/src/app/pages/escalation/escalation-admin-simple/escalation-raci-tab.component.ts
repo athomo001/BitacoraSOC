@@ -411,6 +411,10 @@ export class EscalationRaciTabComponent implements OnInit {
   }
 
   private belongsToSelectedClient(contact: DirectoryContact): boolean {
+    if (contact?.source === 'User' || contact?.type === 'Internal') {
+      return false;
+    }
+
     const clientName = this.getActiveRaciClientName();
     if (!clientName) return true;
 
