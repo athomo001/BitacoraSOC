@@ -403,22 +403,45 @@ export class EscalationRaciTabComponent implements OnInit {
     return this.raciDirectorySuggestions[role] || [];
   }
 
-  private getActiveRaciClientName(): string {
+  private getActiveRaciClient(): CatalogLogSource | null {
     const selectedClientId = String(this.raciForm?.get('clientId')?.value || this.selectedRaciClientId || '').trim();
-    if (!selectedClientId) return '';
-    const client = this.raciClients.find((item) => String(item?._id || '') === selectedClientId);
-    return String(client?.name || '').trim();
+    if (!selectedClientId) return null;
+    return this.raciClients.find((item) => String(item?._id || '') === selectedClientId) || null;
+  }
+
+  private looksLikeInternalContact(contact: DirectoryContact): boolean {
+    const source = String(contact?.source || '').toLowerCase();
+    const type = String(contact?.type || '').toLowerCase();
+    const scope = String(contact?.scope || '').toLowerCase();
+
+    if (source === 'user' || type === 'internal' || scope === 'internal') {
+      return true;
+    }
+
+    const markerText = [contact?.name, contact?.position]
+      .map((value) => String(value || '').toLowerCase())
+      .join(' ');
+
+    return /\b(n1|n2|ti|interno|interna)\b/.test(markerText);
   }
 
   private belongsToSelectedClient(contact: DirectoryContact): boolean {
-    if (contact?.source === 'User' || contact?.type === 'Internal') {
+    const selectedClient = this.getActiveRaciClient();
+    const selectedClientName = String(selectedClient?.name || '').trim();
+    const selectedClientIsInternal = selectedClient?.isInternal === true;
+    const contactLooksInternal = this.looksLikeInternalContact(contact);
+
+    if (!selectedClientIsInternal && contactLooksInternal) {
       return false;
     }
 
-    const clientName = this.getActiveRaciClientName();
-    if (!clientName) return true;
+    if (selectedClientIsInternal) {
+      return contactLooksInternal;
+    }
 
-    const normalizedClient = clientName.toLowerCase();
+    if (!selectedClientName) return true;
+
+    const normalizedClient = selectedClientName.toLowerCase();
     const normalizedCompany = String(contact?.company || '').trim().toLowerCase();
     if (!normalizedCompany) return false;
 

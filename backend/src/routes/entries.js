@@ -54,6 +54,45 @@ const toSantiagoTime = (value) => new Date(value).toLocaleTimeString('es-CL', {
   timeZone: 'America/Santiago'
 });
 
+const DEFAULT_INTERNAL_CLIENT_NAME = 'Cliente interno';
+
+const resolveDefaultClientContext = async () => {
+  const appConfig = await AppConfig.findOne().select('defaultLogSourceId').lean();
+
+  if (appConfig?.defaultLogSourceId) {
+    const defaultSource = await CatalogLogSource.findById(appConfig.defaultLogSourceId)
+      .select('_id name enabled isInternal')
+      .lean();
+
+    if (defaultSource && defaultSource.enabled !== false) {
+      return {
+        clientId: String(defaultSource._id),
+        clientName: String(defaultSource.name || '').trim() || DEFAULT_INTERNAL_CLIENT_NAME,
+        isInternal: defaultSource.isInternal === true
+      };
+    }
+  }
+
+  const internalClient = await CatalogLogSource.findOne({ enabled: true, isInternal: true })
+    .select('_id name')
+    .sort({ updatedAt: -1, createdAt: -1, _id: -1 })
+    .lean();
+
+  if (internalClient) {
+    return {
+      clientId: String(internalClient._id),
+      clientName: String(internalClient.name || '').trim() || DEFAULT_INTERNAL_CLIENT_NAME,
+      isInternal: true
+    };
+  }
+
+  return {
+    clientId: null,
+    clientName: DEFAULT_INTERNAL_CLIENT_NAME,
+    isInternal: true
+  };
+};
+
 const toChecklistEntryLikeRecord = (check, clientContext = {}) => {
   const checkDate = new Date(check.checkDate || check.createdAt || new Date());
   const entryDate = `${toSantiagoDate(checkDate)}T00:00:00.000Z`;
@@ -66,7 +105,7 @@ const toChecklistEntryLikeRecord = (check, clientContext = {}) => {
     entryTime,
     tags: [],
     clientId: clientContext.clientId || null,
-    clientName: clientContext.clientName || 'netics',
+    clientName: clientContext.clientName || DEFAULT_INTERNAL_CLIENT_NAME,
     createdBy: check.userId || null,
     createdByUsername: check.username || check.userId?.username || 'N/A',
     isGuestEntry: false,
@@ -139,25 +178,14 @@ router.post('/',
       // Extraer tags del contenido
       const tags = extractHashtags(content);
 
-      // Si no hay clientId, usar LogSource por defecto de configuración
+      // Si no hay clientId, usar cliente interno centralizado (AppConfig o LogSource marcado como interno)
       let finalClientId = clientId;
       let clientName = null;
 
       if (!clientId) {
-        // Obtener configuración de la app
-        const appConfig = await AppConfig.findOne();
-
-        if (appConfig && appConfig.defaultLogSourceId) {
-          // Usar LogSource configurado como predeterminado
-          const defaultSource = await CatalogLogSource.findById(appConfig.defaultLogSourceId)
-            .select('_id name enabled');
-
-          if (defaultSource && defaultSource.enabled) {
-            finalClientId = defaultSource._id;
-            clientName = defaultSource.name;
-          }
-        }
-        // Si no hay LogSource configurado, el entry se crea sin cliente (null)
+        const defaultClientContext = await resolveDefaultClientContext();
+        finalClientId = defaultClientContext.clientId || null;
+        clientName = defaultClientContext.clientName || DEFAULT_INTERNAL_CLIENT_NAME;
       } else {
         // Si se proporciona clientId, obtener su nombre
         const logSource = await CatalogLogSource.findById(clientId).select('name enabled');
@@ -324,20 +352,13 @@ router.get('/',
       const includeNormalEntriesByType = !entryType || entryType !== 'checklist';
       const shouldIncludeChecklist = includeChecklistByType && !tags;
 
-      let checklistClientContext = { clientId: null, clientName: 'netics' };
+      let checklistClientContext = { clientId: null, clientName: DEFAULT_INTERNAL_CLIENT_NAME };
       if (shouldIncludeChecklist) {
-        const appConfig = await AppConfig.findOne().select('defaultLogSourceId').lean();
-        if (appConfig?.defaultLogSourceId) {
-          const defaultSource = await CatalogLogSource.findById(appConfig.defaultLogSourceId)
-            .select('_id name')
-            .lean();
-          if (defaultSource) {
-            checklistClientContext = {
-              clientId: String(defaultSource._id),
-              clientName: defaultSource.name || 'netics'
-            };
-          }
-        }
+        const defaultClientContext = await resolveDefaultClientContext();
+        checklistClientContext = {
+          clientId: defaultClientContext.clientId,
+          clientName: defaultClientContext.clientName
+        };
       }
 
       const checklistFilters = {};

@@ -584,13 +584,27 @@ export class EscalationShiftsTabComponent implements OnInit {
 
   triggerManualSend(): void {
     if (this.triggeringManualSend) return;
-    
-    if (!confirm('┬┐Desea enviar los turnos ahora a los destinatarios configurados?')) return;
+
+    // Parse current form values so unsaved recipients are also used
+    const val = this.escalationScheduleAutomationForm.value;
+    const parseEmails = (raw: string): string[] =>
+      String(raw || '').split(',').map((s) => s.trim().toLowerCase()).filter((s) => s.includes('@'));
+
+    const formRecipients = parseEmails(val.recipients || '');
+    const formCc = parseEmails(val.ccRecipients || '');
+
+    if (formRecipients.length === 0) {
+      this.showError('No hay destinatarios válidos. Agrega al menos un correo en el campo "Destinatarios".');
+      return;
+    }
+
+    if (!confirm('¿Desea enviar los turnos ahora a los destinatarios configurados?')) return;
 
     this.triggeringManualSend = true;
-    this.escalationService.triggerAutomationSend().subscribe({
-      next: (res: any) => this.showSuccess(res.message || 'Env├¡o procesado correctamente'),
-      error: (err: any) => this.showError(err?.error?.error || 'Error al disparar el env├¡o'),
+    const payload = { recipients: formRecipients, ccRecipients: formCc };
+    this.escalationService.triggerAutomationSend(payload).subscribe({
+      next: (res: any) => this.showSuccess(res.message || 'Envío procesado correctamente'),
+      error: (err: any) => this.showError(err?.error?.error || 'Error al disparar el envío'),
       complete: () => this.triggeringManualSend = false
     });
   }

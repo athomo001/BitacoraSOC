@@ -57,6 +57,11 @@ const catalogLogSourceSchema = new mongoose.Schema({
     default: true,
     required: true
   },
+  isInternal: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
   escalationFlow: {
     type: [escalationFlowStepSchema],
     default: []

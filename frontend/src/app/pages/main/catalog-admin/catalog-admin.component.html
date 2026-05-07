@@ -113,6 +113,7 @@
                 <textarea matInput formControlName="description" rows="2"></textarea>
               </mat-form-field>
 
+              <mat-checkbox formControlName="isInternal">Cliente interno (nuestra empresa)</mat-checkbox>
               <mat-checkbox formControlName="enabled">Habilitado</mat-checkbox>
 
               <div class="form-actions">
@@ -139,6 +140,7 @@
                 <thead>
                   <tr>
                     <th>Nombre</th>
+                    <th>Tipo</th>
                     <th>Descripcion</th>
                     <th>Estado</th>
                     <th>Acciones</th>
@@ -147,6 +149,7 @@
                 <tbody>
                   <tr *ngFor="let source of activeLogSources">
                     <td><strong>{{ source.name }}</strong></td>
+                    <td>{{ source.isInternal ? 'Interno' : 'Cliente' }}</td>
                     <td>{{ source.description || '-' }}</td>
                     <td>Activo</td>
                     <td>
@@ -159,7 +162,7 @@
                     </td>
                   </tr>
                   <tr *ngIf="activeLogSources.length === 0">
-                    <td colspan="4" class="table-empty">No hay Log Sources activos</td>
+                    <td colspan="5" class="table-empty">No hay Log Sources activos</td>
                   </tr>
                 </tbody>
               </table>
@@ -177,6 +180,7 @@
                 <thead>
                   <tr>
                     <th>Nombre</th>
+                    <th>Tipo</th>
                     <th>Descripcion</th>
                     <th>Estado</th>
                     <th>Acciones</th>
@@ -185,6 +189,7 @@
                 <tbody>
                   <tr *ngFor="let source of inactiveLogSources">
                     <td><strong>{{ source.name }}</strong></td>
+                    <td>{{ source.isInternal ? 'Interno' : 'Cliente' }}</td>
                     <td>{{ source.description || '-' }}</td>
                     <td>Inactivo</td>
                     <td>

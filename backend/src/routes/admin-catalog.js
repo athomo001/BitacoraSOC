@@ -27,6 +27,16 @@ const clamp = (value, min, max, fallback) => {
   return Math.min(max, Math.max(min, parsed));
 };
 
+const coerceBoolean = (value, fallback = false) => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true') return true;
+    if (normalized === 'false') return false;
+  }
+  return fallback;
+};
+
 // Middleware para verificar role=admin
 const requireAdmin = (req, res, next) => {
   const isAuditorReadOnly = req.user.role === 'auditor' && ['GET', 'HEAD', 'OPTIONS'].includes(req.method);
@@ -158,7 +168,16 @@ router.post('/events/import', async (req, res) => {
 
 router.post('/log-sources', async (req, res) => {
   try {
-    const source = new CatalogLogSource(req.body);
+    const payload = {
+      ...req.body,
+      isInternal: coerceBoolean(req.body?.isInternal, false)
+    };
+
+    if (payload.isInternal) {
+      await CatalogLogSource.updateMany({ isInternal: true }, { $set: { isInternal: false } });
+    }
+
+    const source = new CatalogLogSource(payload);
     await source.save();
     res.status(201).json(source);
   } catch (error) {
@@ -168,9 +187,23 @@ router.post('/log-sources', async (req, res) => {
 
 router.put('/log-sources/:id', async (req, res) => {
   try {
+    const updatePayload = {
+      ...req.body
+    };
+
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'isInternal')) {
+      updatePayload.isInternal = coerceBoolean(req.body?.isInternal, false);
+      if (updatePayload.isInternal) {
+        await CatalogLogSource.updateMany(
+          { _id: { $ne: req.params.id }, isInternal: true },
+          { $set: { isInternal: false } }
+        );
+      }
+    }
+
     const source = await CatalogLogSource.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updatePayload,
       { new: true, runValidators: true }
     );
     if (!source) {
