@@ -2043,7 +2043,7 @@ exports.sendEscalationScheduleInternal = async ({ recipients, ccRecipients, freq
       : `Periodo Semanal: ${startDate.toLocaleDateString('es-CL')} - ${endDate.toLocaleDateString('es-CL')}`;
 
     const appConfig = await AppConfig.findOne().select('logoUrl appTitle').lean();
-    const brandName = String(appConfig?.appTitle || 'Bitácora SOC').trim() || 'Bitácora SOC';
+    const brandName = String(appConfig?.appTitle || 'Bitácora CDC').trim() || 'Bitácora CDC';
     const logoWebPath = resolveUploadedLogoWebPath(appConfig?.logoUrl);
     const attachments = [];
     let logoCid = null;
@@ -2167,7 +2167,7 @@ exports.sendEscalationScheduleInternal = async ({ recipients, ccRecipients, freq
       const emailResult = await sendEmail({
         to: recipients,
         cc: ccRecipients,
-        subject: `[Bitácora SOC] Turnos de Escalación - ${periodLabel}`,
+        subject: `[${brandName}] Turnos de Escalación - ${periodLabel}`,
         html: emptyScheduleEmailBuild.html,
         attachments: attachments.length ? attachments : undefined,
         auditContext: {
@@ -2199,7 +2199,7 @@ exports.sendEscalationScheduleInternal = async ({ recipients, ccRecipients, freq
     const emailResult = await sendEmail({
       to: recipients,
       cc: ccRecipients,
-      subject: `[Bitácora SOC] Turnos de Escalación - ${periodLabel}`,
+      subject: `[${brandName}] Turnos de Escalación - ${periodLabel}`,
       html,
       attachments: attachments.length ? attachments : undefined,
       auditContext: {
