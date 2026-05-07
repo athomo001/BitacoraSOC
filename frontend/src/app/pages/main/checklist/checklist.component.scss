@@ -20,6 +20,31 @@
 .checklist-panel--interactive {
   margin-bottom: 16px;
 
+  // Outer panel itself: clear default Material box-shadow (we use our own border/shadow)
+  &.mat-expansion-panel {
+    box-shadow: none;
+  }
+
+  // Header of the outer collapsible panel
+  > .mat-expansion-panel-header {
+    min-height: 56px;
+    padding: 0 18px;
+    background: var(--surface-card);
+
+    .mat-expansion-panel-header-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      gap: 8px;
+      color: var(--text-primary);
+    }
+
+    .mat-expansion-panel-header-description {
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+  }
+
+  // Inner accordion items (items del checklist)
   .mat-expansion-panel {
     box-shadow: none;
     background: transparent;
