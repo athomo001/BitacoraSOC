@@ -1906,9 +1906,9 @@ exports.testEscalationReminder = async (req, res) => {
  */
 exports.triggerEscalationScheduleSend = async (req, res) => {
   try {
-    let config = await AppConfig.findOne();
+    const config = await AppConfig.findOne();
     if (!config) {
-      config = await AppConfig.create({});
+      return res.status(400).json({ error: 'La aplicación no ha sido configurada aún. Contacta a un administrador.' });
     }
 
     const automation = config.escalationScheduleAutomation || {};
@@ -1963,12 +1963,20 @@ exports.sendEscalationScheduleInternal = async ({ recipients, ccRecipients, freq
     let endDate = new Date(now);
 
     if (frequency === 'monthly') {
-      // Siguiente mes calendario
+      // Mes calendario actual
       startDate = new Date(now.getFullYear(), now.getMonth(), 1);
       endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
     } else {
-      // Siguientes 7 días (semana)
-      endDate.setDate(now.getDate() + 7);
+      // Semana actual: lunes actual a domingo actual
+      const dayOfWeek = now.getDay(); // 0 = Domingo, 1 = Lunes, ..., 6 = Sábado
+      const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Restar días para llegar a lunes
+      const daysToSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek; // Sumar días para llegar a domingo
+      
+      startDate.setDate(now.getDate() + daysToMonday);
+      startDate.setHours(0, 0, 0, 0);
+      
+      endDate.setDate(now.getDate() + daysToSunday);
+      endDate.setHours(23, 59, 59, 999);
     }
 
     const periodLabel = frequency === 'monthly'
