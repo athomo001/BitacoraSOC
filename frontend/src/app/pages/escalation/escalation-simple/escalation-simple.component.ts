@@ -305,6 +305,15 @@ export class EscalationSimpleComponent implements OnInit {
     return typeof value === 'string' ? value : String(value?.name || '');
   }
 
+  onClientSearchChange(): void {
+    const term = this.clientSearchTerm.trim();
+    // If search is cleared, also clear the selected client
+    if (!term && this.selectedClient) {
+      this.selectedClient = null;
+      this.selectedClientFlow = null;
+    }
+  }
+
   get filteredClients(): any[] {
     const term = this.clientSearchTerm.trim().toLowerCase();
     if (!term) return this.allClients;

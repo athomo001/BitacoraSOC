@@ -62,14 +62,19 @@
 
     <article *ngIf="showDirectoryForm && canDirectoryWrite" class="inline-form directory-form">
       <h3>{{ editingDirectoryContactId ? 'Editar contacto del directorio' : 'Nuevo contacto del directorio' }}</h3>
+      <div *ngIf="isEditingInternalContact" class="warning-banner" style="background-color:#fff3cd; border-left:4px solid #ffc107; padding:12px; margin-bottom:16px; border-radius:4px;">
+        <p style="margin:0; color:#856404; font-size:14px;"><strong>⚠️ Contacto de usuario interno:</strong> Solo puedes editar Teléfono, Empresa, Tipo y Ámbito. Para cambiar otros datos, usa la sección de Usuarios.</p>
+      </div>
       <form (ngSubmit)="saveDirectoryContact()">
         <mat-form-field appearance="outline">
           <mat-label>Nombre *</mat-label>
-          <input matInput [(ngModel)]="directoryFormModel.name" name="dirName" required>
+          <input matInput [(ngModel)]="directoryFormModel.name" name="dirName" required [disabled]="isEditingInternalContact">
+          <mat-hint *ngIf="isEditingInternalContact">Editable solo en Usuarios</mat-hint>
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Correo</mat-label>
-          <input matInput type="email" [(ngModel)]="directoryFormModel.email" name="dirEmail">
+          <input matInput type="email" [(ngModel)]="directoryFormModel.email" name="dirEmail" [disabled]="isEditingInternalContact">
+          <mat-hint *ngIf="isEditingInternalContact">Editable solo en Usuarios</mat-hint>
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Teléfono</mat-label>
@@ -81,7 +86,8 @@
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Cargo</mat-label>
-          <input matInput [(ngModel)]="directoryFormModel.position" name="dirPosition">
+          <input matInput [(ngModel)]="directoryFormModel.position" name="dirPosition" [disabled]="isEditingInternalContact">
+          <mat-hint *ngIf="isEditingInternalContact">Editable solo en Usuarios</mat-hint>
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Tipo</mat-label>
@@ -144,8 +150,8 @@
                 mat-icon-button
                 color="primary"
                 (click)="editDirectoryContact(person)"
-                [disabled]="isDirectoryInternal(person) || !canDirectoryWrite"
-                [matTooltip]="isDirectoryInternal(person) ? 'Los contactos de usuarios se editan en Usuarios' : 'Editar contacto del directorio'"
+                [disabled]="!canDirectoryWrite"
+                [matTooltip]="isDirectoryInternal(person) ? 'Editar campos permitidos: Teléfono, Empresa, Tipo, Ámbito' : 'Editar contacto del directorio'"
                 aria-label="Editar contacto">
                 <mat-icon aria-hidden="true">edit</mat-icon>
               </button>
@@ -154,7 +160,7 @@
                 color="warn"
                 (click)="deleteDirectoryContact(person._id)"
                 [disabled]="isDirectoryInternal(person) || !canDirectoryDelete"
-                [matTooltip]="isDirectoryInternal(person) ? 'Los contactos de usuarios no se eliminan aquí' : 'Eliminar contacto del directorio'"
+                [matTooltip]="isDirectoryInternal(person) ? 'No se pueden eliminar contactos de usuarios internos desde aquí' : 'Eliminar contacto del directorio'"
                 aria-label="Eliminar contacto">
                 <mat-icon aria-hidden="true">delete</mat-icon>
               </button>

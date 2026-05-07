@@ -217,6 +217,35 @@
   }
 }
 
+// Style disabled form fields
+::ng-deep mat-form-field.mat-form-field-disabled {
+  .mat-form-field-flex {
+    opacity: 0.7;
+  }
+}
+
+::ng-deep .mat-form-field-disabled {
+  .mat-form-field-label {
+    color: var(--text-secondary) !important;
+    opacity: 0.7;
+  }
+  
+  .mat-input-element:disabled {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: var(--text-secondary);
+  }
+}
+
+.warning-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  
+  p {
+    flex: 1;
+  }
+}
+
 @keyframes slideDown {
   from { opacity: 0; transform: translateY(-20px); }
   to { opacity: 1; transform: translateY(0); }
