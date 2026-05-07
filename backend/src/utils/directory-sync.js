@@ -154,6 +154,82 @@ const normalizeName = (value = '') =>
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '');
 
+const levenshteinDistance = (a = '', b = '') => {
+  const left = String(a || '');
+  const right = String(b || '');
+  if (left === right) return 0;
+  if (!left.length) return right.length;
+  if (!right.length) return left.length;
+
+  const matrix = Array.from({ length: left.length + 1 }, () => new Array(right.length + 1).fill(0));
+  for (let i = 0; i <= left.length; i += 1) matrix[i][0] = i;
+  for (let j = 0; j <= right.length; j += 1) matrix[0][j] = j;
+
+  for (let i = 1; i <= left.length; i += 1) {
+    for (let j = 1; j <= right.length; j += 1) {
+      const cost = left[i - 1] === right[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+    }
+  }
+
+  return matrix[left.length][right.length];
+};
+
+const splitNameTokens = (value = '') =>
+  normalizeName(value)
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length > 0);
+
+const companiesCompatible = (a = '', b = '') => {
+  const left = sanitize(a, 160).toLowerCase();
+  const right = sanitize(b, 160).toLowerCase();
+  if (!left || !right) return true;
+  return left === right;
+};
+
+const hasConflictingIdentity = (a = {}, b = {}) => {
+  const aEmail = sanitize(a.email, 180).toLowerCase();
+  const bEmail = sanitize(b.email, 180).toLowerCase();
+  if (aEmail && bEmail && aEmail !== bEmail) return true;
+
+  const aPhone = sanitize(a.phone, 80);
+  const bPhone = sanitize(b.phone, 80);
+  if (aPhone && bPhone && aPhone !== bPhone) return true;
+
+  return false;
+};
+
+const areLikelySamePerson = (a = {}, b = {}) => {
+  if (hasConflictingIdentity(a, b)) return false;
+
+  const aName = normalizeName(a.name || '');
+  const bName = normalizeName(b.name || '');
+  if (!aName || !bName) return false;
+  if (aName === bName) return true;
+
+  if (!companiesCompatible(a.company, b.company)) return false;
+
+  const aTokens = splitNameTokens(a.name || '');
+  const bTokens = splitNameTokens(b.name || '');
+  if (aTokens.length === 0 || bTokens.length === 0) return false;
+
+  const firstA = aTokens[0];
+  const firstB = bTokens[0];
+  if (firstA !== firstB) return false;
+
+  const lastA = aTokens[aTokens.length - 1] || '';
+  const lastB = bTokens[bTokens.length - 1] || '';
+  if (!lastA || !lastB) return false;
+
+  const distance = levenshteinDistance(lastA, lastB);
+  return distance <= 1 || lastA.includes(lastB) || lastB.includes(lastA);
+};
+
 const buildDuplicateKeys = (contact = {}) => {
   const keys = [];
   const email = sanitize(contact.email, 180).toLowerCase();
@@ -223,6 +299,18 @@ const mergeDirectoryDuplicates = async () => {
       union(first, ids[i]);
     }
   });
+
+  // Conservative fuzzy pass: merge same-first-name records with tiny last-name variations
+  // when there is no email/phone conflict (e.g., "Simpson" vs "Simson").
+  for (let i = 0; i < all.length; i += 1) {
+    const left = all[i];
+    for (let j = i + 1; j < all.length; j += 1) {
+      const right = all[j];
+      if (areLikelySamePerson(left, right)) {
+        union(String(left._id), String(right._id));
+      }
+    }
+  }
 
   const groups = new Map();
   Array.from(idToContact.keys()).forEach((id) => {
