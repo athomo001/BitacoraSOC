@@ -39,9 +39,9 @@ import { Entry } from '../../../models/entry.model';
           </mat-form-field>
 
           <!-- Tipo de Entrada -->
-          <div class="entry-type-section">
-            <label>Tipo de Entrada</label>
-            <mat-radio-group formControlName="entryType" class="entry-type-group">
+          <div class="entry-type-section" role="group" aria-labelledby="entry-type-label">
+            <label id="entry-type-label">Tipo de Entrada</label>
+            <mat-radio-group formControlName="entryType" class="entry-type-group" aria-labelledby="entry-type-label">
               <mat-radio-button value="operativa" color="primary">
                 ✅ Operativa
               </mat-radio-button>

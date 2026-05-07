@@ -47,6 +47,10 @@
   box-shadow: var(--shadow);
   overflow: hidden;
   margin-bottom: var(--space-6);
+
+  &--colors {
+    margin-top: var(--space-4);
+  }
 }
 
 .settings-panel__header {
@@ -89,10 +93,7 @@ form {
   align-items: center;
 }
 
-.button-group {
-  display: flex;
-  gap: 12px;
-}
+
 
 .grid {
   display: grid;
@@ -358,9 +359,4 @@ form {
   }
 }
 
-.palette-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 4px;
-}
+

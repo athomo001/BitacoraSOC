@@ -1964,3 +1964,35 @@ select:disabled {
 .gap-1 { gap: 8px; }
 .gap-2 { gap: 16px; }
 .gap-3 { gap: 24px; }
+
+/* ========== SKELETON LOADING ========== */
+@keyframes skeletonPulse {
+  0% { opacity: 0.7; }
+  50% { opacity: 0.3; }
+  100% { opacity: 0.7; }
+}
+
+.skeleton-line {
+  height: 16px;
+  width: 100%;
+  background-color: var(--border-color);
+  border-radius: 4px;
+  animation: skeletonPulse 1.5s infinite ease-in-out;
+  margin-bottom: 12px;
+}
+.skeleton-line.short {
+  width: 60%;
+}
+.skeleton-line.title {
+  height: 24px;
+  width: 40%;
+  margin-bottom: 16px;
+}
+.skeleton-box {
+  height: 100px;
+  width: 100%;
+  background-color: var(--border-color);
+  border-radius: 8px;
+  animation: skeletonPulse 1.5s infinite ease-in-out;
+  margin-bottom: 16px;
+}

@@ -2,7 +2,12 @@
   <h1>📝 Mis Entradas</h1>
   <p class="subtitle">Entradas creadas por {{ currentUser?.fullName || currentUser?.username }}</p>
 
-  <mat-spinner *ngIf="isLoading" diameter="40"></mat-spinner>
+  <div class="skeleton-container mt-2 mb-2" *ngIf="isLoading">
+    <div class="skeleton-line title"></div>
+    <div class="skeleton-line"></div>
+    <div class="skeleton-line"></div>
+    <div class="skeleton-line short"></div>
+  </div>
 
   <div class="table-container" *ngIf="!isLoading">
     <table mat-table [dataSource]="dataSource" class="entries-table">

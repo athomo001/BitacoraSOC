@@ -1,9 +1,15 @@
 <div class="settings-container">
-  <h1>EMAIL Config</h1>
+  <header class="page-header">
+    <mat-icon>settings</mat-icon>
+    <div>
+      <h1>Configuración del Sistema</h1>
+      <p class="subtitle">Administración de correo, reportes y apariencia global</p>
+    </div>
+  </header>
 
   <div #smtpGuideCard class="onboarding-card" *ngIf="smtpGuideVisible">
     <p><strong>Guía rápida SMTP:</strong> 1) Completa host/puerto/usuario/remitente. 2) Prueba conexión. 3) Guarda configuración. Si ya existe clave guardada, puedes dejar contraseña vacía.</p>
-    <div class="button-group">
+    <div class="form-actions">
       <button mat-button type="button" (click)="closeSmtpGuide(false)">Cerrar</button>
       <button mat-stroked-button color="primary" type="button" (click)="closeSmtpGuide(true)">No volver a mostrar</button>
     </div>
@@ -75,7 +81,7 @@
                   (click)="toggleSmtpPasswordVisibility()"
                   [attr.aria-label]="showSmtpPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
                   [attr.aria-pressed]="showSmtpPassword">
-                  <mat-icon>{{ showSmtpPassword ? 'visibility_off' : 'visibility' }}</mat-icon>
+                  <mat-icon aria-hidden="true">{{ showSmtpPassword ? 'visibility_off' : 'visibility' }}</mat-icon>
                 </button>
                 <mat-hint>Si ya está configurado, puedes dejarla vacía para reutilizar la guardada.</mat-hint>
               </mat-form-field>
@@ -103,9 +109,9 @@
               Enviar correo solo si hay servicios en rojo (si no, envía siempre)
             </mat-checkbox>
 
-            <div class="button-group">
+            <div class="form-actions">
               <button mat-button type="button" (click)="openSmtpGuide()">Ver guía rápida</button>
-              <button mat-raised-button color="accent" type="button" (click)="testSmtp()" [disabled]="testing">
+              <button mat-stroked-button color="accent" type="button" (click)="testSmtp()" [disabled]="testing">
                 <mat-spinner *ngIf="testing" diameter="18"></mat-spinner>
                 <span *ngIf="!testing">Probar conexion</span>
               </button>
@@ -142,33 +148,35 @@
           <p class="color-hint">Elige el tema de color para los correos de reporte de incidente.</p>
 
           <div class="palette-grid">
-            <div
+            <button type="button"
               *ngFor="let p of INCIDENT_PALETTES"
               class="palette-card"
+              [attr.aria-label]="'Paleta ' + p.name + ': ' + p.description"
+              [attr.aria-pressed]="selectedPaletteKey === p.key"
               [class.palette-card--active]="selectedPaletteKey === p.key"
               (click)="selectIncidentPalette(p.key)"
               [attr.title]="p.description">
-              <div class="palette-card__swatches">
+              <div class="palette-card__swatches" aria-hidden="true">
                 <span
                   *ngFor="let sw of p.swatches"
                   class="palette-card__swatch"
                   [style.background]="sw">
                 </span>
               </div>
-              <div class="palette-card__info">
+              <div class="palette-card__info" aria-hidden="true">
                 <span class="palette-card__name">{{ p.name }}</span>
                 <span class="palette-card__desc">{{ p.description }}</span>
               </div>
               <span class="palette-card__check" *ngIf="selectedPaletteKey === p.key">
-                <mat-icon>check_circle</mat-icon>
+                <mat-icon aria-hidden="true">check_circle</mat-icon>
               </span>
-            </div>
+            </button>
           </div>
 
-          <div class="palette-actions">
+          <div class="form-actions">
             <button mat-raised-button color="primary" type="button"
               (click)="saveIncidentPalette()" [disabled]="isSavingPalette">
-              <mat-icon>save</mat-icon>
+              <mat-icon aria-hidden="true">save</mat-icon>
               Guardar paleta
             </button>
             <mat-spinner *ngIf="isSavingPalette" diameter="20"></mat-spinner>
@@ -177,7 +185,7 @@
       </div>
 
       <!-- Panel: Colores configurables del Boletín de Seguridad -->
-      <div class="settings-panel settings-panel--colors" style="margin-top: 16px;">
+      <div class="settings-panel settings-panel--colors">
         <header class="settings-panel__header">
           <h2 class="settings-panel__title">Colores del Boletín de Seguridad</h2>
         </header>
@@ -199,7 +207,7 @@
 
             <button mat-raised-button color="primary" type="button"
               (click)="saveReportTableColorConfig()" [disabled]="isSavingReportColor">
-              <mat-icon>save</mat-icon>
+              <mat-icon aria-hidden="true">save</mat-icon>
               Guardar
             </button>
           </div>
@@ -217,9 +225,9 @@
                 placeholder="#1A1C1E">
             </mat-form-field>
 
-            <label class="native-color-picker">
+            <label class="native-color-picker" for="report-color-picker">
               <span>Selector</span>
-              <input type="color" [value]="getCurrentReportColor()"
+              <input id="report-color-picker" type="color" [value]="getCurrentReportColor()"
                 (input)="selectCustomReportColor($any($event.target).value)">
             </label>
 

@@ -1,4 +1,5 @@
 <!-- markdownlint-disable MD013 MD007 MD030 MD031 MD034 MD036 MD050 MD032 -->
+
 # Plan de Trabajo: Bitácora SOC
 
 ## Tablas de Control
@@ -8,7 +9,7 @@
 ### Leyenda de estados (tablas de control)
 
 | Estado | Uso |
-| --- | --- |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **En progreso** | Issues `UI-*` con trabajo abierto. Si la tabla solo muestra el marcador de posición, no hay `UI-*` activos; usar **Listas** para cerrados y **Recurrente** para QA. |
 | **Recurrente** | Política viva (cada PR); no se marca **Listo** como ticket único. |
 | **Archivo** | Epic IA documentado; sin seguimiento operativo UI (ver nota de alcance). |
@@ -18,16 +19,23 @@
 ### En progreso
 
 | ID | Estado | Seccion | Tarea | Notas |
-| --- | --- | --- | --- | --- |
-| BACKUP-ENC-081 | En progreso | Backup / Seguridad ALTA | Cifrado opcional de backups con passphrase en crear y restaurar | Al crear un backup, el usuario podrá elegir si desea cifrarlo mediante un popup para ingresar frase secreta; no será obligatorio. Al restaurar, si el respaldo está cifrado, el sistema debe pedir la llave, validarla antes de tocar datos y continuar solo si es correcta. |
-| ESC-FLOW-090 | En progreso | Escalación / Admin + View ALTA | Configuración dinámica y responsiva de flujo de llamados por cliente | Implementación investigada y documentada para `/main/escalation/admin` y `/main/escalation/view`: flujo editable por cliente (pasos únicos/pool), drag&drop, persistencia en cliente (`CatalogLogSource`), endpoints dedicados (`GET/PUT/POST /api/escalation/flow/:clientId`) y render responsivo en vista operativa. |
-| COMP-DICT-083 | Pendiente | Complementos / Operación SOC MEDIA | Diccionario interactivo de logs de ciberseguridad (estático, sin Docker) | Implementación detallada: 1) Se tomó como base la guía `docs/COMPLEMENTS.md` y se eligió flujo `zip-static` (sin backend ni contenedor). 2) Se creó la carpeta `tools/diccionario-logs-ciber/` con `index.html` (estructura UI), `styles.css` (diseño responsive), `app.js` (dataset + lógica), y `README.md` (uso/publicación). 3) Dataset embebido por fabricante con campos `tag`, `meaning`, `values`, `impact` para: Huawei HiSec Insight (`ThreatEventStatus`, `EventLevel`, `EventCategory`, `SrcArea`, `EventClass`), Fortinet FortiOS (`action`, `type`, `subtype`, `level`, `app`), y Huawei WAC/Cisco WLC (`ERRCODE`, `RESULT`, `MAC`, `SESSIONTIME`, `RSSI/Signal`). 4) UX implementada: combobox de fabricante, buscador por texto libre (filtra por tag/significado/valores), render de tarjetas por tag con badge de impacto (`High/Medium/Low/Info`), contador de coincidencias y bloque de ejemplo de log realista por marca para comparación visual del analista. 5) Lógica técnica en frontend: normalización de búsqueda (`toLowerCase` + `trim`), filtrado dinámico en evento `input/change`, escape básico de HTML para render seguro y construcción de tarjetas por plantilla en cliente. 6) Empaquetado realizado con `Compress-Archive` en `tools/diccionario-logs-ciber.zip`, listo para Admin > Complementos (`Analizar ZIP` -> `Preview` -> `Publicar`). 7) Criterio para pasar a Listo: validar funcionamiento del selector/buscador/cards en preview, confirmar carga del `iframe` publicado y disponibilidad del complemento para perfiles autorizados. Condiciones para IA en este issue: no usar Docker ni backend adicional, no cambiar contrato de complemento estático, no agregar dependencias innecesarias, no exponer secretos/tokens, mantener UI responsive y legible, y documentar evidencia de validación antes de mover a `Listo`. |
-| ESC-PREV-084 | Listo | Admin / Escalación MEDIA | Autocomplete de empresa en formulario de contacto preventivo | En `/main/admin/escalation` (Tab "Contactos de Escalación" > sección 3 "Agenda Preventiva para Boletines"), el campo Empresa del formulario debe convertirse en un `matAutocomplete` que sugiere en tiempo real las empresas ya registradas al escribir (filtro parcial, case-insensitive), permitiendo igualmente escritura libre para empresas nuevas. |
-| ESC-PREV-085 | Listo | Admin / Escalación MEDIA | Nuevo campo "Lista de correo" en contactos preventivos | En la misma sección, agregar un checkbox `isMailingList` debajo de "Favorito" en el formulario y persistirlo en backend (modelo + endpoints + CSV import/export). Permite distinguir correos de personas (`cfsilva@scj.gob.cl`) de listas de distribución (`eventos.ciberseguridad@scj.gob.cl`). |
-| ESC-PREV-086 | Listo | Admin / Escalación MEDIA | Indicadores visuales de tipo de correo (personal vs lista) en tabla y filtros | En la tabla de contactos preventivos, mostrar badges `👤 Personal` / `📋 Lista` en la columna Estado. Agregar selector de filtro "Tipo" (Todos / Solo personales / Solo listas de correo) junto a los filtros existentes. Depende de `ESC-PREV-085`. |
-| REP-NEWS-087 | Listo | Boletines / UX MEDIA | Panel "Listas de correo" en cajón de envío de boletines | En `/main/report-generator` (sección "Envío de Boletines"), agregar un panel de "Listas de correo" debajo del textarea de destinatarios manuales. Solo muestra contactos preventivos con `isMailingList: true`. Incluye checkbox seleccionar todo, checkboxes individuales y contador de seleccionados. El cajón de envío se amplía levemente para que ambos paneles respiren bien. Depende de `ESC-PREV-085`. |
-| USR-ADM-088 | En progreso | Admin / Usuarios ALTA | Mejoras en gestión de usuarios: cambio de contraseña por admin, fix botón Cancelar, layout más ancho y creación sin mínimo de contraseña | En `/main/admin/users`: (1) Admin puede cambiar la contraseña de cualquier usuario (incluyéndose a sí mismo) desde el formulario de edición, sin límite mínimo de caracteres — privilegio exclusivo de admin. (2) El botón "Cancelar" no es visible en varios temas por falta de estilo; corregir con tokens del design system. (3) El formulario de gestión se ve apretado aunque hay espacio disponible; ampliar con flex layout. (4) Al crear un usuario nuevo, el admin no tiene mínimo de contraseña (usuarios normales conservan el mínimo de 6 al cambiar su propio perfil). |
-| REP-INC-089 | Listo | Reporte de Incidente / UX ALTA | Mejoras en formulario de Reporte de Incidente: reordenamiento de campos, envío directo por email con Para/CC, y asunto automático | En `/main/report-generator` modo Reporte: (1) Reordenar campos al orden definitivo: Código Ticket*, Ofensa*, Tipo de Operación*, Nombre Ofensa/Evento*, Motivo, MRSC, Origen, Destino, Fuente/Log Source, Reputación, Observaciones, Recomendación, Info Adicional, Evidencia. Si el usuario escribe un título custom (sin elegir del catálogo) el campo Motivo queda vacío y editable a mano. (2) Después de generar el reporte HTML aparece un cajón de envío con campo Para (con el mismo selector de contactos que boletines) y CC (mismo selector), más la opción de copiar como antes. El envío es un solo correo con Para y CC. (3) El asunto del correo se construye automáticamente: `[cliente] - [título evento] - [código ticket GLPI]`. Adicionalmente: se migró a MJML para diseño unificado y robusto en clientes de correo. |
+| :--- | :--- | :--- | :--- | :--- |
+| BACKUP-ENC-081 | En progreso | Backup / Seguridad ALTA | Cifrado opcional de backups con passphrase | Al crear un backup, el usuario podrá elegir si desea cifrarlo mediante un popup para ingresar frase secreta; no será obligatorio. Al restaurar, si el respaldo está cifrado, el sistema debe pedir la llave. |
+| ESC-FLOW-090 | En progreso | Escalación / Admin + View ALTA | Configuración dinámica de flujo por cliente | Implementación investigada para `/main/escalation/admin` y `/main/escalation/view`: flujo editable por cliente (pasos únicos/pool), drag&drop, persistencia en cliente y endpoints dedicados. |
+| UI-SEM-091 | En progreso | UX/UI + Frontend ALTA | Limpieza de Div-soup y semántica HTML | [PARCIAL] Limpieza completada en el módulo de Escalación (Tablas RACI, Turnos, Contactos, Directorio). Pendiente en Reportes y Usuarios. |
+| UI-INLINE-092 | Pendiente | UX/UI + Frontend MEDIA | Mover estilos inline style="" a SCSS | Se encontraron estilos hardcodeados en `report-generator.component.html` y `settings.component.html`. Deben migrarse a clases semánticas en SCSS siguiendo UI-GOVERNANCE.md. |
+| UI-CHART-A11Y-100 | Pendiente | UX/UI + Accesibilidad ALTA | Gráficos ngx-charts sin texto alternativo | Los gráficos en `reports.component.html` carecen de `aria-label` o `role="img"`. Deben incluir descripciones para lectores de pantalla según WCAG 1.1.1. |
+| UI-CARD-SEM-099 | Pendiente | UX/UI + Semántica MEDIA | Contenido interno de KPI cards sin semántica | Las stat-cards en `reports.component.html` usan `<div>` internos. Migrar a `<dl><dt><dd>` o elementos semánticos según Web Coder.md. |
+| UI-LOAD-INCON-101 | Pendiente | UX/UI + Interacción MEDIA | Inconsistencia en estados de carga | Auditado en audit-logs, report-generator y reports. Implementar `<mat-progress-bar>` o indicadores consistentes durante cargas asíncronas. |
+| UI-H1-CHECK-102 | Pendiente | UX/UI + Accesibilidad MEDIA | Jerarquía de headings en checklist.component | Falta `<header>` para el `<h1>` y hay saltos en la jerarquía h1->h3. Corregir según UX-UI-Senior-Standards.md §5. |
+| UI-DIV-AUDIT-103 | Pendiente | UX/UI + Semántica MEDIA | Uso de <div> en audit-logs.component | Los paneles de guía, filtros y resultados deben ser `<section>` o `<aside>` con headings adecuados. |
+| UI-H1-SET-104 | Pendiente | UX/UI + Semántica BAJA | Título técnico <h1>EMAIL Config</h1> | Renombrar a "Configuración de Correo" y envolver en `<header>` con clase `.page-header`. |
+| UI-DIV-ACTIONS-105 | Pendiente | UX/UI + Semántica BAJA | Uso de clase .actions en reports | Migrar `<div class="actions">` a `<div class="form-actions">` o `<footer>` para consistencia con el design system. |
+| UI-SKEL-106 | Pendiente | UX/UI + Performance BAJA | Ausencia de skeleton loading | Implementar patrón de skeleton loading (shimmer) en tablas largas para mejorar CLS según UX-Angular-Material-Patterns.md. |
+| UI-BTN-GROUP-107 | Pendiente | UX/UI + Consistencia BAJA | Clase ad-hoc .button-group en settings | Consolidar con `.form-actions` para heredar estilos globales de spacing y alineación. |
+| UI-CONFIRM-DEL-108 | Pendiente | UX/UI + Interacción ALTA | Uso de window.confirm() nativo | Migrar a `MatDialog` para confirmaciones de borrado en usuarios y entradas, asegurando consistencia visual. |
+| UI-LABEL-ONLY-109 | Pendiente | UX/UI + Accesibilidad MEDIA | Label nativo sin for en selector de color | Corregir asociación de label o usar `aria-label` descriptivo para cumplir con WCAG 1.3.1. |
+| UI-HARDWIDTH-110 | Pendiente | UX/UI + Responsividad MEDIA | Dimensiones de gráficos hardcodeadas | Remover `[view]` fijos en `reports.component.ts` para que los gráficos sean 100% responsivos. |
 
 **Plan de ataque visual ejecutado:** `docs/ui-visual-remediation-plan.md` (oleadas, criterios de aceptación, rutas objetivo y Definition of Done visual).
 
@@ -58,7 +66,7 @@ Checklist mínimo recomendado para agentes IA antes de marcar un item como `List
 ### Recurrente (QA — cada cambio UI)
 
 | ID | Estado | Seccion | Tarea | Notas |
-| --- | --- | --- | --- | --- |
+| --------- | ---------- | --------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------ |
 | QA-UI-061 | Recurrente | QA + Frontend CRÍTICA | Rol QA en cada cambio UI | Obligación **en cada PR** que toque estilos. Referencia: `docs/UI-GOVERNANCE.md` §8. |
 | QA-UI-062 | Recurrente | QA Visual CRÍTICA | Probar en los 5 temas lo tocado | Recurrente por cambio. `docs/UI-GOVERNANCE.md` §8. |
 | QA-UI-063 | Recurrente | QA Funcional + UI ALTA | Regresión formularios tras cambios de estilo | Recurrente por cambio. `docs/UI-GOVERNANCE.md` §8. |
@@ -68,7 +76,7 @@ Checklist mínimo recomendado para agentes IA antes de marcar un item como `List
 ### Archivo IA (referencia — sin seguimiento operativo)
 
 | ID | Estado | Seccion | Tarea | Notas |
-| --- | --- | --- | --- | --- |
+| --------------- | ------- | ---------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | AI-SUMMARY-001 | Archivo | IA/Operación ALTA | Módulo de Resumen Ejecutivo Efímero (IA On-Demand) | Integrar Ollama+llama3.2:3b en modo efímero `docker start -> healthcheck -> generate -> docker stop` con `try/finally`. Alcance: IA sin interacción conversacional con usuarios; solo consume eventos del turno y genera resumen sugerido. |
 | AI-SUMMARY-001A | Archivo | IA/Backend CRÍTICA | Endpoint seguro de generación IA on-demand (solo admin) | Crear `POST /api/reports/newsletter/ai-summary` con `authenticate + authorize('admin')`, validación fuerte de payload, timeout y respuesta estructurada. |
 | AI-SUMMARY-001B | Archivo | IA/Infra CRÍTICA | Orquestador efímero de Ollama con kill garantizado | Implementar flujo `start -> healthcheck -> generate -> stop` en `try/finally`, con lock de concurrencia para evitar múltiples arranques simultáneos. |
@@ -76,16 +84,26 @@ Checklist mínimo recomendado para agentes IA antes de marcar un item como `List
 | AI-SUMMARY-001D | Archivo | IA/Observabilidad ALTA | Auditoría técnica sin fuga de datos sensibles | Auditar duración, modelo, tokens estimados, resultado y errores; nunca persistir prompt completo ni respuesta íntegra sensible. |
 | AI-SUMMARY-001E | Archivo | IA/Frontend ALTA | UX integrada en Boletín: `Resumen Sugerido por IA` + botón `Generar con IA` | Campo editable no bloqueante, estados loading/error/reintento, cancelación y preservación de edición manual al regenerar. |
 | AI-SUMMARY-001F | Archivo | IA/Operación ALTA | Límite de recursos y políticas de degradación | Timeout duro, memoria/CPU límites, rate-limit por usuario, fallback manual si IA falla, sin bloquear generación de boletín. |
-| AI-SUMMARY-001G | Archivo | QA/Testing ALTA | Suite de pruebas de seguridad, carga y regresión | Tests de éxito, timeout, lock concurrente, sanitización, RBAC, fallback UX y no-regresión en `report-generator`/newsletter. |
-
-
-
-
+| AI-SUMMARY-001G | Archivo | QA/Testing ALTA | Suite de pruebas de seguridad, carga y regresión | Tests de éxito, timeout, lock concurrente, sanitización, RBAC, fallback UX y no-regresión en report-generator/newsletter. |
 
 ### ✅ Listas
 
 | ID | Estado | Seccion | Tarea | Notas |
-| --- | --- | --- | --- | --- |
+| :--- | :--- | :--- | :--- | :--- |
+| ESC-SHIFT-111 | Listo | Escalación / Admin / Correos ALTA | Programación de envío automático de turnos | [ESC-SHIFT-111] Implementación completa: Backend (AppConfig, Scheduler, MJML Template) y Frontend (Panel de configuración en Turnos Semanales con trigger manual). |
+| UI-TABLA-093 | Listo | UX/UI + Frontend ALTA | Migrar tabla de turnos a MatTable con sorting | Se migró la tabla de turnos manuales a MatTable, implementando sorting por analista/fecha y alineando con el design system global. |
+| UI-ESC-GIANT-094 | Listo | Arquitectura + Frontend ALTA | Dividir componente gigante de Escalación | Se refactorizó `escalation-admin-simple.component` en múltiples sub-componentes (Tablas, Contactos, RACI) para mejorar mantenibilidad. |
+| UI-TABLA-095 | Listo | UX/UI + Frontend MEDIA | Fix sorting en tabla de contactos | Corregido el sorting de MatTable en el componente de contactos de escalación que fallaba con campos anidados. |
+| UI-TABLA-096 | Listo | UX/UI + Frontend MEDIA | Fix filter en tabla de directorio | Implementado predicado de filtro personalizado para buscar por múltiples campos en el Directorio Global. |
+| UI-TABLA-097 | Listo | UX/UI + Frontend MEDIA | Fix layout en tabla RACI | Ajustada la densidad y el responsive de la tabla RACI para evitar desbordamiento en pantallas pequeñas. |
+| UI-TABLA-098 | Listo | UX/UI + Frontend MEDIA | Fix padding en celdas de tablas | Unificado el padding de todas las celdas de MatTable usando variables CSS del design system para consistencia visual. |
+| USR-ADM-088 | Listo | Admin / Usuarios ALTA | Mejoras en gestión de usuarios | Implementado cambio de contraseña por admin (sin mínimo), fix de botón Cancelar con estilos de tema, y diálogos de confirmación MatDialog. |
+| COMP-DICT-083 | Listo | Complementos / Operación SOC MEDIA | Diccionario interactivo de logs de ciberseguridad | Implementación estática (zip-static) con dataset de Huawei HiSec, Fortinet y WLC. Publicado en Admin > Complementos. |
+| ESC-PREV-084 | Listo | Admin / Escalación MEDIA | Autocomplete de empresa en contacto preventivo | Implementado `matAutocomplete` en el formulario de contactos preventivos para sugerir empresas existentes. |
+| ESC-PREV-085 | Listo | Admin / Escalación MEDIA | Nuevo campo "Lista de correo" en contactos | Agregado flag `isMailingList` para distinguir correos individuales de listas de distribución. |
+| ESC-PREV-086 | Listo | Admin / Escalación MEDIA | Indicadores visuales de tipo de correo | Badges `👤 Personal` / `📋 Lista` en tablas y filtros de contactos preventivos. |
+| REP-NEWS-087 | Listo | Boletines / UX MEDIA | Panel "Listas de correo" en envío de boletines | Nuevo panel en el generador de reportes para selección rápida de listas de distribución filtradas. |
+| REP-INC-089 | Listo | Reporte de Incidente / UX ALTA | Mejoras en formulario de Reporte de Incidente | Reordenamiento de campos, envío MJML con Para/CC, y generación automática de asunto con datos del ticket. |
 | UI-NEWS-072 | Listo | UI/UX + Boletines ALTA | Selector rápido de destinatarios guardados en envío de boletín | En `/main/report-generator` se agregó bloque contiguo con contactos guardados por checkbox mostrando **nombre + correo + empresa**; convive con el textarea manual y ambas fuentes se combinan sin duplicados. |
 | UI-ESC-073 | Listo | UX/Admin + Escalación MEDIA | Renombrar "Contactos de Clientes" a "Contactos de Escalación" | `/main/admin/escalation` ahora explicita que el módulo corresponde a escalación/turnos y separa la libreta preventiva del flujo operacional. |
 | UI-DIR-074 | Listo | Admin + Backend + Email ALTA | Agenda simple de contactos generales para avisos preventivos | Se implementó agenda preventiva separada usando `contactType='preventive'` con CRUD liviano, **nombre/correo/empresa obligatorios** y **teléfono opcional**, reutilizable para boletines. |
@@ -167,8 +185,7 @@ Checklist mínimo recomendado para agentes IA antes de marcar un item como `List
 | B46 | Listo | UI/UX + Seguridad Preventiva / Frontend MEDIA | Textarea de entradas permite escribir más de 50000 caracteres | Se aplicó `maxlength=50000` en creación y edición, truncado defensivo por `input` y aviso explícito al alcanzar el máximo. |
 | B47 | Listo | UI/UX + Accesibilidad / Frontend MEDIA | Heatmap en temas light/sepia/pastel no muestra bien el número de entradas | **Causa raíz**: `ngx-charts-heat-map` v23 NO renderiza texto dentro de las celdas (solo tooltip). Se reemplazó por heatmap HTML/CSS propio con grid de `div`, color por celda según escala 5-niveles desde CSS vars, y contraste de texto dinámico por luminancia (oscuro para celdas claras, blanco para oscuras). Se corrigieron también los tokens `--heatmap-label-color` de sepia/pastel que eran blancos sobre fondo claro. |
 
-Los items marcados como `Listo` deben quedar reflejados en `docs/CHANGELOG.md` como fuente de historial.
----
+## Los items marcados como `Listo` deben quedar reflejados en `docs/CHANGELOG.md` como fuente de historial.
 
 ## [UI/UX] Deuda visual global: "cuadrados dentro de cuadrados" y consistencia multi-tema
 
@@ -272,20 +289,24 @@ Todo lo descrito en esta sección y en los issues `UI-*` / `QA-UI-*` **debe prob
 ### Plan de implementacion propuesto
 
 #### Fase 1 - Estabilizacion visual (Quick wins)
+
 - Definir tokens faltantes usados por componentes actuales.
 - Mover estilos inline a SCSS en vistas criticas.
 - Reemplazar hardcoded de color en estados y superficies principales.
 
 #### Fase 2 - Arquitectura visual comun
+
 - Crear capa de design tokens de spacing/radius/typography.
 - Definir reglas de contencion (max 2 niveles visuales).
 - Estandarizar estructura de pagina: header, bloque principal, secciones internas limpias.
 
 #### Fase 3 - Componentizacion de estados
+
 - Crear componentes o clases utilitarias shared para badge/chip/alert/status.
 - Migrar modulos de mayor deuda: report-generator, checklist-admin, catalog-admin, audit-logs.
 
 #### Fase 4 - Calidad continua multi-tema
+
 - Checklist de contraste por tema en PR.
 - Lint de estilos para bloquear hex hardcode fuera de tokens.
 - Baseline visual por tema para detectar regresiones.
@@ -314,7 +335,6 @@ Todo lo descrito en esta sección y en los issues `UI-*` / `QA-UI-*` **debe prob
 - `UI-A11Y-01` Auditoria de contraste multi-tema con correcciones.
 - `UI-CSS-01` Politica anti-hardcode y reduccion progresiva de `::ng-deep`.
 - `QA-UI-061`–`QA-UI-065` Rol QA, matriz 5 temas, regresión de formularios, checklist contraste/inputs, gobernanza al codificar.
-
 
 ## REP-NEWS-087 - Panel "Listas de correo" en cajón de envío de boletines
 
@@ -523,9 +543,11 @@ Al generar el reporte HTML y mostrarse la vista previa, aparece debajo un cajón
 #### 3. Asunto del correo automático
 
 El asunto se construye con la nomenclatura:
+
 ```
 [cliente] - [nombre evento/ofensa] - [código ticket]
 ```
+
 Ejemplo: `DPP - IRC Connections que contiene Built translation / ActiveX control bypass attempt - 4065`
 
 - **`[cliente]`** se extrae del Log Source seleccionado (`selectedLogSource.client` o similar — revisar modelo del catálogo). Si el Log Source no tiene cliente definido, usar el texto del campo tal cual.
@@ -638,10 +660,12 @@ Permitir que cada cliente tenga su propio flujo de escalamiento configurable por
 #### 1) Persistencia MongoDB por cliente (sin colección nueva)
 
 Se extiende `CatalogLogSource` con:
+
 - `escalationFlow[]`: arreglo ordenado de pasos.
 - `escalationLegend`: leyenda/recordatorio editable por cliente.
 
 Cada paso soporta:
+
 - `order`, `title`, `type` (`unique` o `pool`)
 - Para `unique`: `contactName`, `contactTel`, `callAt`
 - Para `pool`: `contacts[]` con `name` y `tel`
@@ -649,11 +673,13 @@ Cada paso soporta:
 #### 2) API backend dedicada
 
 Se agregan endpoints en `/api/escalation`:
+
 - `GET /flow/:clientId` (lectura autenticada)
 - `PUT /flow/:clientId` (admin)
 - `POST /flow/:clientId` (admin, alias de upsert)
 
 Comportamiento:
+
 - normaliza y reindexa `order` en backend (fuente de verdad)
 - sanitiza textos y valida fechas
 - devuelve flujo y leyenda listos para render
@@ -661,6 +687,7 @@ Comportamiento:
 #### 3) Vista Admin dinámica (configuración)
 
 En `EscalationAdminSimpleComponent`:
+
 - Selector de cliente dedicado al flujo.
 - Botones:
   - `Añadir Nuevo Paso de Escalación` (`unique`)
@@ -677,6 +704,7 @@ En `EscalationAdminSimpleComponent`:
 #### 4) Vista Operativa responsiva (`/main/escalation/view`)
 
 En `EscalationSimpleComponent`:
+
 - al cambiar cliente, carga `GET /flow/:clientId`
 - renderiza flujo en cards responsivas:
   - paso `unique`: contacto + teléfono + fecha/hora
@@ -749,3 +777,789 @@ Integrar Ollama+llama3.2:3b en modo efímero `docker start -> healthcheck -> gen
 ### Sub-issues
 
 Consultar tabla **Archivo IA** en la sección de **Tablas de Control** para ver todos los sub-issues de este epic (AI-SUMMARY-001A hasta AI-SUMMARY-001G).
+
+---
+
+## UI-SEM-091 — Div-soup generalizado: reemplazar wrappers `<div>` sin semántica
+
+**Estado:** Pendiente  
+**Prioridad:** ALTA  
+**Tipo:** UX/UI + Semántica HTML  
+**Rutas afectadas:** Toda la app — prioridad en `escalation-admin-simple`, `report-generator`, `users`, `entries`
+
+### Problema
+
+El código generado por IA tiende a usar `<div>` como elemento universal para cualquier agrupación. En BitacoraSOC esto se observa de forma sistemática en todos los templates: secciones con título propio (`<div class="section">`), barras laterales de contenido (`<div class="newsletter-saved-block">`), encabezados de página (`<div>` genérico), y listas de chips (`<div class="chip">` en bucle sin `<ul>`/`<li>`).
+
+Los impactos son:
+
+- **Accesibilidad**: los lectores de pantalla no pueden inferir la estructura del documento
+- **Mantenibilidad**: no se puede razonar sobre la jerarquía del contenido sin leer el CSS
+- **SEO interno** (navegación con anclas): los headings y landmarks no están expuestos correctamente
+
+### Inventario de casos prioritarios
+
+| Archivo | Patrón problemático | Reemplazo correcto |
+| ---------------------------------------- | ------------------------------------------- | -------------------------------------------------------------------------------- |
+| `escalation-admin-simple.component.html` | `<div class="section">` × 6+ | `<section>` |
+| `escalation-admin-simple.component.html` | `<div class="section section-spacing-top">` | `<section class="...">` |
+| `report-generator.component.html` | `<div class="newsletter-saved-block">` | `<aside>` (ya en línea 564 hay `<aside>`, pero no consistente) |
+| `report-generator.component.html` | `<div class="upload-section">` | `<section>` |
+| `report-generator.component.html` | `<div class="actions">` | `<footer class="form-actions">` o `<div class="form-actions">` con rol explícito |
+| `report-generator.component.html` | `<div class="preview-header">` | `<header>` |
+| `users.component.html` | `<div class="users-container">` raíz | Puede mantenerse como wrapper, pero el `<h1>` debe estar dentro de un `<header>` |
+| `entries.component.html` | `<div class="entry-panel">` sin semántica | `<article>` o `<section>` (es el formulario principal de la vista) |
+
+### Criterios de aceptación
+
+1. Cada `<div class="section">` con un `<h3>` o `<h2>` propio se convierte en `<section>`.
+2. Los bloques laterales de contenido informativo (directorio, contactos guardados) usan `<aside>` de forma consistente.
+3. Los encabezados de componentes con título + acciones usan `<header>`.
+4. Las listas de chips/tags generadas con `*ngFor` sobre divs iguales usan `<ul>` + `<li>`.
+5. Ningún cambio rompe el CSS existente (las clases se mantienen, solo cambia el elemento host).
+6. QA obligatorio en 5 temas: `QA-UI-061`–`QA-UI-065`.
+
+### Notas para IA
+
+- Cambiar el elemento host (`<div>` → `<section>`) es un cambio de una sola línea por ocurrencia y no afecta la lógica Angular.
+- Las directivas `*ngIf`, `*ngFor`, `[class]`, `(click)` se transfieren sin modificación al nuevo elemento.
+- Antes de cambiar, verificar que el SCSS del componente no tenga selectores de elemento (`div.section {}`) que rompan con el cambio; si los hay, actualizar el selector en el mismo commit.
+
+---
+
+## UI-INLINE-092 — Estilos inline `style=""` hardcodeados en templates HTML
+
+**Estado:** Pendiente  
+**Prioridad:** MEDIA  
+**Tipo:** UX/UI + Frontend — Deuda técnica visual  
+**Rutas afectadas:** `/main/report-generator`, `/main/admin/settings`
+
+### Problema
+
+Violación directa de `UI-REF-051` (cerrado) que ya estableció la regla de cero `style=""` estáticos en templates. Los estilos inline que se encontraron son el residuo de iteraciones de IA que agregaron layout sin respetar el SCSS del componente.
+
+### Inventario exacto
+
+| Archivo | Línea | Estilo inline | Reemplazo |
+| --------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `report-generator.component.html` | 512 | `style="display: flex; flex-direction: column; gap: var(--space-4);"` | Clase `.newsletter-left-column` ya existe → agregarle el flex en su SCSS |
+| `report-generator.component.html` | 518 | `style="margin-bottom: 0;"` | Clase modificadora `.newsletter-helper-text--flush` o ajuste en SCSS de `.newsletter-helper-text` |
+| `report-generator.component.html` | 670 | `style="display: flex; flex-direction: column; gap: var(--space-4);"` | Igual que línea 512, misma clase |
+| `report-generator.component.html` | 715 | `style="padding: 4px 12px; background: var(--surface-variant); font-size: 12px; font-weight: bold; text-transform: uppercase;"` | Clase `.newsletter-contact-list-divider` ya existe en HTML → definirla completamente en SCSS |
+| `report-generator.component.html` | 738 | `style="padding: 4px 12px; ...; margin-top: 8px;"` | Misma clase que arriba, el `margin-top` va en modificador o en el segundo `.newsletter-contact-list-divider` |
+| `settings.component.html` | 180 | `style="margin-top: 16px;"` | Modificar el SCSS de `.settings-panel--colors` para incluir el margen |
+
+### Criterios de aceptación
+
+1. Cero ocurrencias de `style="..."` con valores estáticos en los archivos afectados.
+2. Cada estilo tiene su clase CSS correspondiente en el SCSS del componente.
+3. Los nombres de clase expresan función, no estilo (`newsletter-contact-list-divider`, no `bold-divider`).
+4. La UI es visualmente idéntica antes y después del cambio.
+
+---
+
+## UI-TABLA-093 — Tabla de asignaciones de turnos triplicada
+
+**Estado:** Pendiente  
+**Prioridad:** MEDIA  
+**Tipo:** UX/UI + Arquitectura Frontend — DRY  
+**Ruta:** `/main/escalation/admin` → Tab Turnos Internos
+
+### Problema
+
+En `escalation-admin-simple.component.html`, la misma estructura de tabla `<table>` con columnas (Semana / Rol / Persona / Acciones) aparece tres veces para los conjuntos de datos: `currentMonthAssignments` (línea ~288), `futureAssignments` (línea ~322) y `historicalAssignments` (línea ~397). La cuarta aparición (`previousMonthAssignments`, línea ~357) repite exactamente la misma estructura.
+
+Cualquier cambio de columnas (agregar cargo, mostrar hora) requiere editar 3–4 bloques en lugar de uno. Las diferencias reales entre los bloques son:
+
+- El array de datos que itera `*ngFor`
+- Si se muestra o no el botón de eliminar (histórico lo omite)
+- El mensaje de vacío (si aplica)
+
+### Recomendación
+
+Dos opciones ordenadas por esfuerzo:
+
+**Opción A — `ng-template` reutilizable (menor esfuerzo, mismo componente):**
+
+```html
+<ng-template #assignmentTable let-rows="rows" let-showDelete="showDelete">
+  <div class="simple-table">
+    <table>
+      ...
+    </table>
+    <!-- único bloque -->
+  </div>
+</ng-template>
+
+<ng-container
+  *ngTemplateOutlet="assignmentTable; context: { rows: currentMonthAssignments, showDelete: true }"
+>
+</ng-container>
+```
+
+**Opción B — Componente hijo `<app-assignment-table>` (más escalable):**
+Se justifica cuando la tabla necesite sorting, filtros o exportación. Evaluar si hay plans para esas funciones antes de optar por B.
+
+### Criterios de aceptación
+
+1. La estructura de la tabla existe una sola vez en el HTML.
+2. Pasar de 3–4 duplicaciones a 1 definición + 3–4 instancias con contexto diferente.
+3. El botón de eliminar se muestra u oculta según el contexto (histórico no lo muestra).
+4. El resultado visual es idéntico al actual.
+
+---
+
+## UI-ESC-GIANT-094 — Componente `escalation-admin-simple` supera 4000 líneas combinadas
+
+**Estado:** Pendiente  
+**Prioridad:** ALTA  
+**Tipo:** UX/UI + Arquitectura Frontend  
+**Ruta:** `/main/escalation/admin` y `/main/escalation/directory`
+
+### Problema
+
+`escalation-admin-simple.component.ts` tiene **2552 líneas de TypeScript** y `escalation-admin-simple.component.html` tiene **1490 líneas de HTML**. El componente resuelve 6 dominios funcionales completamente independientes bajo el mismo archivo: flujo de escalamiento, turnos internos, personas externas, contactos de escalación, agenda preventiva, directorio global y RACI.
+
+Las consecuencias prácticas observadas:
+
+- La IA comete errores de contexto cruzado al editar (modifica variables del Tab A pensando que están en el Tab B)
+- Los tiempos de compilación incremental son mayores
+- Un bug en el directorio puede romper accidentalmente los turnos si se toca el estado compartido
+- Revisar código requiere desplazarse cientos de líneas para encontrar una función
+
+### Plan de división propuesto
+
+El shell (`EscalationAdminSimpleComponent`) mantiene el router-outlet o el `mat-tab-group` y los servicios compartidos. Los tabs se extraen a componentes hijos:
+
+| Componente nuevo | Tab actual | Líneas estimadas HTML | Líneas estimadas TS |
+| --------------------------------- | ---------------------------------------- | --------------------- | ------------------- |
+| `EscalationFlowTabComponent` | Flujo de Escalamiento | ~170 | ~300 |
+| `EscalationShiftsTabComponent` | Turnos Internos + Personas Externas | ~400 | ~600 |
+| `EscalationContactsTabComponent` | Contactos Escalación + Agenda Preventiva | ~450 | ~500 |
+| `EscalationDirectoryTabComponent` | Directorio Global | ~350 | ~400 |
+| `EscalationRaciTabComponent` | RACI | ~180 | ~350 |
+
+### Criterios de aceptación
+
+1. Ningún componente resultante supera 500 líneas de HTML ni 700 de TypeScript.
+2. El comportamiento de los 5 temas es idéntico antes y después.
+3. La ruta `/main/escalation/directory` sigue funcionando (acceso directo al tab Directorio).
+4. Los permisos (`canDirectoryWrite`, `canDirectoryDelete`, `isAdminUser`) se pasan por `@Input` o `service` al componente hijo correspondiente.
+
+### Notas para IA
+
+- Esta refactorización **no debe cambiar la lógica de negocio**, solo reorganizar la estructura de componentes.
+- Extraer primero el tab más independiente (Directorio o RACI) para validar el patrón antes de dividir los más acoplados.
+- Los `FormGroup` del componente padre que pertenecen a un solo tab deben moverse al componente hijo; los compartidos entre tabs permanecen en el padre o pasan a un servicio.
+
+---
+
+## UI-FORM-095 — Jerarquía de botones incorrecta: múltiples `mat-raised-button` compitiendo
+
+**Estado:** Pendiente  
+**Prioridad:** MEDIA  
+**Tipo:** UX/UI + Diseño de Interacción  
+**Rutas afectadas:** `/main/escalation/admin` (varios tabs), `/main/escalation/directory`
+
+### Problema
+
+En el tab Flujo de Escalamiento de `escalation-admin-simple.component.html`, el `div.flow-admin-toolbar` contiene 3 botones `mat-raised-button` del mismo nivel visual (líneas 36–47):
+
+```html
+<button mat-raised-button color="primary">Añadir Nuevo Paso</button>
+<button mat-stroked-button color="accent">Añadir POOL</button>
+<!-- correcto -->
+<button mat-raised-button color="primary">Guardar flujo</button>
+<!-- compite con el primero -->
+```
+
+El usuario no sabe cuál es la acción principal. En términos de UX, dos botones raised del mismo color dicen que ambas son igualmente importantes, lo que genera indecisión.
+
+### Inventario de casos
+
+| Sección | Botones raised actuales | Acción principal real |
+| ---------------------------------- | -------------------------------------------------------------- | --------------------------------------------------- |
+| Tab Flujo — toolbar | "Añadir Nuevo Paso" + "Guardar flujo" | **Guardar flujo** (las adiciones son preparatorias) |
+| Tab Turnos — toolbar | "Asignar Turno" es el único raised | ✓ Correcto ya |
+| Tab Contactos Escalación — toolbar | "Agregar Servicio" + "Agregar Contacto" en distintas secciones | ✓ Correcto (son secciones distintas) |
+| Tab Directorio — toolbar | "+ Nuevo Contacto" raised + "Sincronizar" stroked | ✓ Correcto |
+
+### Corrección en Tab Flujo
+
+```
+Guardar flujo          → mat-raised-button color="primary"  (acción principal)
+Añadir Nuevo Paso      → mat-stroked-button color="primary" (acción secundaria)
+Añadir POOL            → mat-button (acción terciaria / contexto)
+Cliente no está...     → mat-button o mat-stroked-button color="accent"
+```
+
+### Criterios de aceptación
+
+1. Máximo un `mat-raised-button` por barra de acciones en el componente.
+2. La jerarquía raised → stroked → button se aplica en todos los toolbars del componente.
+3. El cambio es puramente de atributo de componente Material; sin cambios de lógica.
+4. QA visual en 5 temas: verificar que el botón secundario tenga suficiente contraste de borde en `cyberpunk`.
+
+---
+
+## UI-H1-096 — Jerarquía de headings incorrecta o incompleta en vistas clave
+
+**Estado:** Pendiente  
+**Prioridad:** MEDIA  
+**Tipo:** UX/UI + Accesibilidad — WCAG 1.3.1  
+**Rutas afectadas:** `/main/escalation/admin`, `/main/report-generator`, `/main/admin/users`, `/main/entries`
+
+### Problema
+
+La jerarquía de encabezados HTML define la estructura navegable del documento para lectores de pantalla y herramientas de accesibilidad. En varios componentes esta jerarquía tiene saltos o inconsistencias:
+
+### Inventario por componente
+
+**`escalation-admin-simple.component.html`**
+
+- `<h1>` correcto en el `<header class="page-header">`
+- Tab Flujo: `<h2>Contactos de Escalamiento</h2>` → pero `<section class="flow-legend-card">` usa `<h3>Leyenda del Administrador</h3>` sin que haya un `<h2>` que lo contenga dentro del tab (el `<h2>` del tab está en el bloque superior, no como padre semántico de la sección legend)
+- Tab Turnos: `<h2>Asignar Turnos Semanales</h2>` correcto → luego `<h3>Nueva Asignación</h3>` correcto → luego `<h3>🔔 Recordatorio</h3>` y `<h3>👤 Personas Externas</h3>` correctos
+- **Problema real**: las secciones dentro de cada tab deberían tener `<h3>` solo si hay un `<h2>` claro que las preceda en el flujo de lectura del DOM
+
+**`report-generator.component.html`**
+
+- `<h1>Generador de Reportes SOC</h1>` existe pero está enterrado en `<div class="report-generator-container"> > <div class="report-generator-panel"> > <header class="report-generator-header">`
+- Ningún `<h2>` visible divide los dos modos (Reporte / Boletín); el selector de modo es un `mat-button-toggle-group`, no un heading → los lectores de pantalla no saben que cambiaron de contexto
+- Los `<h4>Evidencia</h4>` y `<h4>Evidencias (Opcional)</h4>` aparecen sin `<h2>` o `<h3>` padres visibles en el template
+
+**`users.component.html`**
+
+- `<h1>Gestión de Usuarios</h1>` suelto sin `<header>` contenedor
+- `<h2>` del formulario viene de `users-panel__title` → correcto
+- Sin `<h2>` para la tabla de usuarios (el panel de lista no tiene título de sección)
+
+**`entries.component.html`**
+
+- `<h1>Nueva Entrada</h1>` correcto
+- `<h3>Clasificación de la Entrada</h3>` dentro del formulario: falta un `<h2>` intermedio o debería ser `<fieldset><legend>` ya que es un grupo de controles de formulario
+
+### Criterios de aceptación
+
+1. Ninguna vista tiene saltos de nivel (de `<h1>` directo a `<h3>` sin `<h2>`).
+2. Los modos o tabs con contexto distinto tienen al menos un `<h2>` que los identifique, ya sea visible o con `class="sr-only"` si el diseño no requiere un encabezado visible.
+3. Los grupos de controles de formulario con título propio usan `<fieldset>` + `<legend>` en lugar de `<h4>` cuando corresponde.
+4. Ninguna vista tiene saltos de nivel (de `<h1>` directo a `<h3>` sin `<h2>`).
+5. Los modos o tabs con contexto distinto tienen al menos un `<h2>` que los identifique, ya sea visible o con `class="sr-only"` si el diseño no requiere un encabezado visible.
+6. Los grupos de controles de formulario con título propio usan `<fieldset>` + `<legend>` en lugar de `<h4>` cuando corresponde.
+7. Herramienta axe DevTools reporta cero errores de estructura de headings en las rutas afectadas.
+
+---
+
+## UI-ARIA-097 — `<mat-icon>` decorativos sin `aria-hidden="true"`
+
+**Estado:** Pendiente  
+**Prioridad:** ALTA  
+**Tipo:** UX/UI + Accesibilidad — WCAG 1.1.1 y 4.1.2  
+**Rutas afectadas:** `/main/checklist`, `/main/audit-logs`, `/main/admin/settings`, `/main/reports`
+
+### Problema
+
+Un `<mat-icon>` sin `aria-hidden="true"` hace que el lector de pantalla anuncie el nombre del icono como texto adicional. Cuando ese icono acompaña texto visible, produce lectura doble o confusa: el usuario escucha `"check_circle Servicio DNS check circle"` en lugar de simplemente `"Servicio DNS"`.
+
+### Inventario por componente
+
+| Archivo | Línea aprox. | Icono | Problema | Corrección |
+| --------------------------- | ------------ | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `checklist.component.html` | 50-53 | `check_circle`/`cancel`/`radio_button_unchecked` en `mat-panel-title` | Anunciado junto al texto del servicio | Agregar `aria-hidden="true"` |
+| `checklist.component.html` | 66-71 | `check_circle`/`cancel` en `mat-radio-button` | El radio button ya comunica el estado | Agregar `aria-hidden="true"` |
+| `audit-logs.component.html` | 130-133 | Emoji en `actor-badge` via `getActorIndicator(log).icon` | Si el emoji es el único indicador visual del actor, necesita `role="img"` + `aria-label` | Evaluar si hay texto alternativo ya disponible en el `matTooltip` |
+| `settings.component.html` | 163 | `check_circle` en `.palette-card__check` | El estado activo ya se comunica por clase CSS | Agregar `aria-hidden="true"` |
+| `reports.component.html` | 403 | `expand_more`/`expand_less` en `<h2>` | El botón tiene `aria-label` correcto; el ícono es decorativo | Agregar `aria-hidden="true"` al `<mat-icon>` dentro del botón |
+
+### Criterios de aceptación
+
+1. Todo `<mat-icon>` que acompañe texto visible lleva `aria-hidden="true"`.
+2. Los íconos que comunican información sin texto alternativo visible llevan `role="img"` + `aria-label` descriptivo.
+3. axe DevTools no reporta violaciones WCAG 1.1.1 ni 4.1.2 relacionadas con íconos en los componentes listados.
+4. QA en 5 temas: verificar que `aria-hidden` no rompe el estilo visual de ningún tema.
+
+---
+
+## UI-ACCORD-098 — `mat-accordion` como wrapper del formulario principal en `checklist`
+
+**Estado:** Pendiente  
+**Prioridad:** MEDIA  
+**Tipo:** UX/UI + Diseño de Interacción  
+**Ruta:** `/main/checklist`
+
+### Problema
+
+El formulario del checklist de turno — que es la **acción principal** de la vista, no contenido opcional — está envuelto en un `mat-expansion-panel` que puede colapsar. Según `skills/UX-Angular-Material-Patterns.md` §9.1, los acordeones son para contenido opcional o de consulta.
+
+Consecuencias operativas:
+
+- Un analista puede colapsar el formulario por error sin entender que ahí estaba su tarea
+- El estado `mainPanelExpanded = false` inicial (si aplica) significa que el formulario llega oculto
+- Los lectores de pantalla pueden no anunciar correctamente el rol del `mat-expansion-panel` como formulario principal
+
+### Solución recomendada
+
+Eliminar el `mat-accordion`/`mat-expansion-panel` externo. El formulario debe ser visible directamente dentro de un `<section>`:
+
+```html
+<section class="checklist-panel checklist-panel--interactive">
+  <header class="checklist-panel__header">
+    <h2>Formulario de Checklist</h2>
+  </header>
+  <div class="checklist-panel__body">
+    <form ...>
+      <!-- contenido directo sin accordion wrapper -->
+    </form>
+  </div>
+</section>
+```
+
+El acordeón interno (`mat-accordion multi` para los servicios individuales) sí es apropiado y debe mantenerse.
+
+### Criterios de aceptación
+
+1. El formulario del checklist es visible directamente al entrar a la vista, sin interacción previa.
+2. Los servicios individuales siguen usando `mat-expansion-panel` (es correcto para ítems opcionales).
+3. La guía rápida puede seguir siendo colapsable.
+4. QA: verificar que la eliminación del panel externo no rompe el SCSS del componente.
+
+---
+
+## UI-CARD-SEM-099 — KPI cards y leyenda del heatmap con `<div>` en lugar de semántica correcta
+
+**Estado:** Pendiente  
+**Prioridad:** MEDIA  
+**Tipo:** UX/UI + Semántica HTML  
+**Ruta:** `/main/reports`
+
+### Problema
+
+**KPI cards (líneas 22-52):** Cada tarjeta estadística tiene `<article>` (correcto) pero internamente usa `<div class="stat-value">` y `<div class="stat-label">`. Para datos estructurados como "47 Incidentes", la semántica correcta es una lista de definiciones:
+
+```html
+<!-- ✅ Correcto para datos estadísticos -->
+<article class="stat-card reports-panel">
+  <dl class="stat-data">
+    <dd class="stat-value">47</dd>
+    <dt class="stat-label">Incidentes</dt>
+  </dl>
+</article>
+```
+
+**Leyenda del heatmap (líneas 413-434):** Los 5 ítems de leyenda son una lista semántica:
+
+```html
+<!-- ✅ Correcto -->
+<ul class="heatmap-legend" aria-label="Escala de intensidad">
+  <li class="legend-item">
+    <span class="legend-color legend-low" aria-hidden="true"></span>
+    <span class="legend-label">Bajo</span>
+  </li>
+  ...
+</ul>
+```
+
+### Criterios de aceptación
+
+1. Los datos KPI usan `<dl>/<dt>/<dd>` o equivalente semántico.
+2. La leyenda del heatmap usa `<ul>/<li>` con `aria-label` en el `<ul>`.
+3. El cambio es solo HTML; el SCSS existente se adapta con selectores de clase (no de elemento).
+
+---
+
+## UI-CHART-A11Y-100 — Gráficos `ngx-charts` sin texto alternativo accesible
+
+**Estado:** Pendiente  
+**Prioridad:** ALTA  
+**Tipo:** UX/UI + Accesibilidad — WCAG 1.1.1  
+**Ruta:** `/main/reports`
+
+### Problema
+
+12+ instancias de `ngx-charts-*` en `reports.component.html` (líneas 92-477) renderizan SVG sin que el contenedor tenga `role="img"` ni `aria-label`. Un lector de pantalla navega por el SVG interno de ngx-charts y puede anunciar elementos internos sin contexto, o ignorarlo por completo.
+
+### Corrección por cada bloque de gráfico
+
+```html
+<!-- Antes -->
+<div class="chart-wrapper" *ngIf="generationTrendData.length > 0">
+  <h3 class="chart-subtitle">Generación de reportes por día</h3>
+  <ngx-charts-line-chart ...></ngx-charts-line-chart>
+</div>
+
+<!-- Después -->
+<div
+  class="chart-wrapper"
+  *ngIf="generationTrendData.length > 0"
+  role="img"
+  aria-label="Gráfico de línea: Generación de reportes y boletines por día durante el período seleccionado"
+>
+  <h3 class="chart-subtitle" aria-hidden="true">
+    Generación de reportes por día
+  </h3>
+  <ngx-charts-line-chart ...></ngx-charts-line-chart>
+</div>
+```
+
+### Criterios de aceptación
+
+1. Cada `<div class="chart-wrapper">` tiene `role="img"` + `aria-label` que describe el tipo y contenido del gráfico.
+2. El `<h3>` del subtítulo lleva `aria-hidden="true"` para evitar lectura doble (el `aria-label` ya incluye esa info).
+3. axe DevTools no reporta errores WCAG 1.1.1 en la ruta `/main/reports`.
+
+---
+
+## UI-LOAD-INCON-101 — Inconsistencia en estados de carga entre componentes
+
+**Estado:** Pendiente  
+**Prioridad:** MEDIA  
+**Tipo:** UX/UI + Interacción — Consistencia de patrón  
+**Rutas afectadas:** `/main/audit-logs`, `/main/report-generator`, `/main/reports`
+
+### Inventario de ausencias de loading state
+
+| Componente | Dato que carga | Estado actual | Estado correcto |
+| --------------------------------- | ------------------------------ | ----------------------------------------- | --------------------------------------------------------------------- |
+| `audit-logs.component.html` | Tabla de logs | Aparece vacía hasta cargar | `<mat-progress-bar>` encima de la tabla mientras `isLoading` |
+| `report-generator.component.html` | Lista de contactos preventivos | Panel vacío sin indicador | `<mat-progress-bar>` en el panel de contactos |
+| `report-generator.component.html` | Lista de listas de correo | Panel vacío sin indicador | Misma solución |
+| `reports.component.html` | Gráficos de analítica | No se muestra nada hasta que datos llegan | `<mat-progress-bar>` en cada sección de gráficos mientras `!overview` |
+
+### Patrón a aplicar
+
+```html
+<!-- Patrón consistente para secciones con carga asíncrona -->
+<section class="...">
+  <mat-progress-bar
+    mode="indeterminate"
+    *ngIf="isLoading"
+    class="section-loader"
+  ></mat-progress-bar>
+  <div class="..." *ngIf="!isLoading && data.length > 0">
+    <!-- contenido -->
+  </div>
+  <div class="no-data" *ngIf="!isLoading && data.length === 0">
+    <!-- estado vacío -->
+  </div>
+</section>
+```
+
+---
+
+## UI-H1-CHECK-102 — `checklist.component.html`: heading suelto y jerarquía rota
+
+**Estado:** Pendiente  
+**Prioridad:** MEDIA  
+**Tipo:** UX/UI + Accesibilidad  
+**Ruta:** `/main/checklist`
+
+### Problema exacto
+
+```
+h1 "Checklist del Turno" (línea 2) — suelto sin <header>
+  → sin h2 visible
+    → h3 "Evaluacion de Servicios" (línea 42) — SALTO de h1 a h3
+      → h4 "Sub-items" (líneas 91, 155) — dentro de ng-template, posición imprevisible
+```
+
+### Corrección
+
+```html
+<div class="checklist-container">
+  <header class="page-header">
+    <h1>Checklist del Turno</h1>
+  </header>
+
+  <!-- Guía (puede quedar como está) -->
+  <section ...>...</section>
+
+  <ng-container *ngIf="...">
+    <section class="checklist-panel">
+      <header class="checklist-panel__header">
+        <h2>Formulario de Evaluación</h2>
+        <!-- h2 nuevo -->
+      </header>
+      <div class="checklist-panel__body">
+        <form>
+          ...
+          <div class="services-accordion">
+            <h3>Evaluación de Servicios</h3>
+            <!-- correcto: h1→h2→h3 -->
+          </div>
+        </form>
+      </div>
+    </section></ng-container
+  >
+</div>
+```
+
+---
+
+## UI-DIV-AUDIT-103 — `audit-logs.component.html`: contenedores `<div>` sin semántica de sección
+
+**Estado:** Pendiente  
+**Prioridad:** MEDIA  
+**Tipo:** UX/UI + Semántica HTML  
+**Ruta:** `/main/audit-logs`
+
+### Inventario de cambios
+
+| Línea | HTML actual | HTML correcto | Razón |
+| ---------- | -------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------ |
+| 2 | `<div #auditGuideCard class="audit-panel audit-panel--guide">` | `<aside #auditGuideCard class="audit-panel audit-panel--guide">` | Contenido auxiliar/informativo |
+| 12 | `<div class="audit-panel audit-panel--filters filter-card">` | `<section class="audit-panel audit-panel--filters filter-card">` | Sección con `<h2>` propio |
+| 116 | `<div class="audit-panel audit-panel--results results-card">` | `<section class="audit-panel audit-panel--results results-card">` | Sección con `<h2>` propio |
+| 5, 70, 105 | `<div class="filter-actions">` | `<div class="form-actions">` | Clase del design system |
+| (ausente) | Sin `<h1>` de página | Agregar `<header><h1>Logs de Auditoría</h1></header>` | Cada vista necesita un `<h1>` |
+
+---
+
+## UI-H1-SET-104 — `settings.component.html`: título `<h1>EMAIL Config</h1>` incorrecto
+
+**Estado:** Pendiente  
+**Prioridad:** BAJA  
+**Tipo:** UX/UI + Consistencia de contenido  
+**Ruta:** `/main/admin/settings`
+
+### Correcciones
+
+1. Cambiar `<h1>EMAIL Config</h1>` por `<h1>Configuración del Sistema</h1>` (español, descriptivo)
+2. Envolver en `<header class="page-header">` para heredad estilos del design system
+3. Auditar los demás `<h1>` de vistas admin para verificar consistencia de tono y estilo:
+   - `/main/admin/users` → `<h1>Gestión de Usuarios</h1>` ✓
+   - `/main/admin/checklist` → verificar
+   - `/main/admin/appearance` → verificar
+   - `/main/admin/backup` → verificar
+
+---
+
+## UI-DIV-ACTIONS-105 — Clase `<div class="actions">` no es parte del design system
+
+**Estado:** Pendiente  
+**Prioridad:** BAJA  
+**Tipo:** UX/UI + Consistencia de Design System  
+**Rutas afectadas:** `reports.component.html`, `report-generator.component.html`
+
+### Inventario
+
+| Archivo | Línea | Clase actual | Clase correcta |
+| --------------------------------- | ----- | ----------------- | ---------------------- |
+| `reports.component.html` | 469 | `class="actions"` | `class="form-actions"` |
+| `report-generator.component.html` | 299 | `class="actions"` | `class="form-actions"` |
+| `report-generator.component.html` | 463 | `class="actions"` | `class="form-actions"` |
+
+El SCSS local de cada componente puede tener reglas `.actions {}` que deberán renombrarse a `.form-actions {}` (o eliminar si el design system ya las cubre).
+
+---
+
+## UI-SKEL-106 — Skeleton loading ausente en tablas principales
+
+**Estado:** Pendiente  
+**Prioridad:** BAJA  
+**Tipo:** UX/UI + Performance — CLS  
+**Rutas afectadas:** `/main/all-entries`, `/main/audit-logs`, `/main/admin/users`
+
+### Patrón de implementación (sin librería externa)
+
+```scss
+// En styles.scss — disponible globalmente
+.skeleton-row {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--outline-subtle);
+}
+
+.skeleton-line {
+  height: 16px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--surface-variant) 25%,
+    var(--surface-muted) 50%,
+    var(--surface-variant) 75%
+  );
+  background-size: 200% 100%;
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: skeleton-shimmer 1.5s infinite;
+  }
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+```
+
+```html
+<!-- Template de skeleton para tablas -->
+<div class="skeleton-row" *ngFor="let i of [1,2,3,4,5]" aria-hidden="true">
+  <div class="skeleton-line" style="width: 80px;"></div>
+  <div class="skeleton-line" style="flex: 1;"></div>
+  <div class="skeleton-line" style="width: 60px;"></div>
+</div>
+```
+
+---
+
+## UI-BTN-GROUP-107 — Clase `button-group` ad-hoc en `settings.component.html`
+
+**Estado:** Pendiente  
+**Prioridad:** BAJA  
+**Tipo:** UX/UI + Consistencia de Design System  
+**Ruta:** `/main/admin/settings`
+
+### Corrección
+
+Reemplazar `<div class="button-group">` por `<div class="form-actions">` en líneas 6 y 106 del componente. Si el SCSS de `settings.component.scss` define `.button-group`, eliminar esa regla y verificar que `.form-actions` del sistema global cubre el mismo espaciado.
+
+---
+
+## UI-CONFIRM-DEL-108 — Botones de eliminar sin diálogo de confirmación
+
+**Estado:** Pendiente  
+**Prioridad:** ALTA  
+**Tipo:** UX/UI + Interacción — Prevención de errores (WCAG 3.3.4)  
+**Rutas afectadas:** `/main/admin/users`, `/main/all-entries`, `/main/escalation/admin`
+
+### Patrón correcto
+
+```typescript
+// En el componente
+deleteUser(userId: string): void {
+  const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+    data: {
+      title: 'Eliminar usuario',
+      message: '¿Estás seguro? Esta acción no se puede deshacer.',
+      confirmLabel: 'Eliminar',
+      confirmColor: 'warn'
+    }
+  });
+
+  dialogRef.afterClosed().subscribe(confirmed => {
+    if (confirmed) {
+      this.userService.delete(userId).subscribe(...);
+    }
+  });
+}
+```
+
+### Criterios de aceptación
+
+1. Todo `deleteUser()`, `onDelete()`, o equivalente abre `MatDialog` antes de ejecutar.
+2. El diálogo muestra el nombre del ítem a eliminar para que el usuario confirme que es el correcto.
+3. El botón de confirmación usa `color="warn"` para reforzar la severidad.
+4. No se aplica a acciones "desactivar" que son reversibles — solo a eliminaciones permanentes.
+
+---
+
+## UI-LABEL-ONLY-109 — `<label>` y `<button>` sin texto accesible en selector de color
+
+**Estado:** Pendiente  
+**Prioridad:** MEDIA  
+**Tipo:** UX/UI + Accesibilidad — WCAG 1.3.1 y 2.4.6  
+**Ruta:** `/main/admin/settings` — sección Colores del Boletín
+
+### Correcciones puntuales
+
+```html
+<!-- Antes (línea 220-224) -->
+<label class="native-color-picker">
+  <span>Selector</span>
+  <input type="color" [value]="getCurrentReportColor()" ... />
+</label>
+
+<!-- Después -->
+<label class="native-color-picker">
+  <span>Selector de color</span>
+  <input
+    type="color"
+    [value]="getCurrentReportColor()"
+    aria-label="Selector de color personalizado para el boletín"
+    ...
+  />
+</label>
+
+<!-- Antes (línea 233-238) — botón de swatch sin label -->
+<button
+  type="button"
+  *ngFor="let color of customColorPalette"
+  class="color-swatch-btn"
+  [style.background]="color"
+  (click)="selectCustomReportColor(color)"
+></button>
+
+<!-- Después -->
+<button
+  type="button"
+  *ngFor="let color of customColorPalette"
+  class="color-swatch-btn"
+  [style.background]="color"
+  [attr.aria-label]="'Seleccionar color ' + color"
+  [class.selected]="getCurrentReportColor().toUpperCase() === color.toUpperCase()"
+  (click)="selectCustomReportColor(color)"
+></button>
+```
+
+---
+
+## UI-HARDWIDTH-110 — Gráficos `ngx-charts` con `[view]` hardcodeado en TypeScript
+
+**Estado:** Pendiente  
+**Prioridad:** MEDIA  
+**Tipo:** UX/UI + Responsividad  
+**Ruta:** `/main/reports`
+
+### Problema
+
+En `reports.component.ts` los tamaños están fijos:
+
+```typescript
+view: [number, number] = [700, 400];
+trendView: [number, number] = [900, 400];
+mailChartView: [number, number] = [500, 300];
+```
+
+En tablets (1024px) y cualquier pantalla menor a los valores fijos, los gráficos desbordan.
+
+### Solución A — Sin `[view]` (más simple)
+
+Eliminar el binding `[view]="..."` de cada gráfico en el template. ngx-charts usará el 100% del contenedor si el contenedor tiene `width` definido en CSS:
+
+```scss
+.chart-wrapper {
+  width: 100%;
+
+  ngx-charts-line-chart,
+  ngx-charts-bar-horizontal,
+  ngx-charts-pie-chart {
+    width: 100% !important;
+  }
+}
+```
+
+### Solución B — `ResizeObserver` reactivo (más robusto)
+
+```typescript
+private resizeObserver = new ResizeObserver(entries => {
+  const width = entries[0].contentRect.width;
+  this.chartWidth = Math.max(300, width - 32);
+  this.view = [this.chartWidth, 350];
+});
+
+ngAfterViewInit(): void {
+  this.resizeObserver.observe(this.chartContainer.nativeElement);
+}
+```
+
+### Criterios de aceptación
+
+1. En viewport de 1024px (tablet), ningún gráfico crea scroll horizontal.
+2. Los gráficos se adaptan al ancho del contenedor sin valores fijos hardcodeados.
+3. QA en los 5 temas verificando que los gráficos no se "comprimen" visualmente en breakpoints menores.

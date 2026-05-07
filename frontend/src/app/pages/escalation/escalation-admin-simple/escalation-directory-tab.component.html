@@ -1,0 +1,190 @@
+<div class="tab-content">
+  <header class="tab-header">
+    <h2>Fuente de Verdad de Contactos</h2>
+    <p class="subtitle">Aquí se gestiona el directorio global que usan los formularios operativos. Los contactos internos se administran desde Usuarios.</p>
+  </header>
+
+  <section class="section directory-section">
+    <header class="toolbar-row directory-toolbar" aria-label="Filtros y acciones del directorio">
+      <div class="directory-toolbar-filters">
+        <mat-form-field appearance="outline">
+          <mat-label>Buscar en directorio</mat-label>
+          <input matInput [(ngModel)]="directorySearch" (ngModelChange)="applyDirectoryFilters()" placeholder="Nombre, correo, teléfono o empresa">
+          <mat-icon matSuffix aria-hidden="true">search</mat-icon>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Tipo</mat-label>
+          <mat-select [(ngModel)]="directoryTypeFilter" (selectionChange)="applyDirectoryFilters()">
+            <mat-option value="">Todos</mat-option>
+            <mat-option value="Internal">Internos</mat-option>
+            <mat-option value="External">Externos</mat-option>
+            <mat-option value="List">Listas</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Empresa</mat-label>
+          <mat-select [(ngModel)]="directoryCompanyFilter" (selectionChange)="applyDirectoryFilters()">
+            <mat-option value="">Todas</mat-option>
+            <mat-option *ngFor="let company of directoryCompanyOptions" [value]="company">
+              {{ company }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Filas por página</mat-label>
+          <mat-select [(ngModel)]="directoryPageSize" (selectionChange)="applyDirectoryFilters()">
+            <mat-option [value]="50">50</mat-option>
+            <mat-option [value]="100">100</mat-option>
+            <mat-option value="all">Todos</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+      <div class="directory-toolbar-actions">
+        <button mat-raised-button color="primary" type="button" (click)="addDirectoryContact()" [disabled]="!canDirectoryWrite">
+          <mat-icon aria-hidden="true">person_add</mat-icon>
+          Agregar contacto
+        </button>
+        <button mat-stroked-button color="primary" type="button" (click)="directoryRefresh.emit()" [disabled]="loadingDirectoryContacts || rebuildingDirectory || mergingDirectoryDuplicates">
+          <mat-icon aria-hidden="true">{{ loadingDirectoryContacts ? 'hourglass_empty' : 'refresh' }}</mat-icon>
+          {{ loadingDirectoryContacts ? 'Actualizando...' : 'Actualizar' }}
+        </button>
+        <button mat-stroked-button color="accent" type="button" (click)="syncAndMergeDirectoryNow()" [disabled]="rebuildingDirectory || mergingDirectoryDuplicates || !canDirectoryWrite">
+          <mat-icon aria-hidden="true">{{ (rebuildingDirectory || mergingDirectoryDuplicates) ? 'hourglass_empty' : 'sync_alt' }}</mat-icon>
+          {{ rebuildingDirectory ? 'Sincronizando...' : (mergingDirectoryDuplicates ? 'Consolidando...' : 'Sincronizar y consolidar') }}
+        </button>
+      </div>
+    </header>
+
+    <div class="section-note" *ngIf="!canDirectoryWrite" role="alert">
+      <mat-icon aria-hidden="true">visibility</mat-icon>
+      <p>Vista de solo lectura. Tu perfil no tiene permisos para crear o editar contactos del directorio.</p>
+    </div>
+
+    <article *ngIf="showDirectoryForm && canDirectoryWrite" class="inline-form directory-form">
+      <h3>{{ editingDirectoryContactId ? 'Editar contacto del directorio' : 'Nuevo contacto del directorio' }}</h3>
+      <form (ngSubmit)="saveDirectoryContact()">
+        <mat-form-field appearance="outline">
+          <mat-label>Nombre *</mat-label>
+          <input matInput [(ngModel)]="directoryFormModel.name" name="dirName" required>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Correo</mat-label>
+          <input matInput type="email" [(ngModel)]="directoryFormModel.email" name="dirEmail">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Teléfono</mat-label>
+          <input matInput [(ngModel)]="directoryFormModel.phone" name="dirPhone">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Empresa</mat-label>
+          <input matInput [(ngModel)]="directoryFormModel.company" name="dirCompany">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Cargo</mat-label>
+          <input matInput [(ngModel)]="directoryFormModel.position" name="dirPosition">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Tipo</mat-label>
+          <mat-select [(ngModel)]="directoryFormModel.type" name="dirType">
+            <mat-option value="Internal">Interno</mat-option>
+            <mat-option value="External">Externo</mat-option>
+            <mat-option value="List">Lista</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Ámbito</mat-label>
+          <mat-select [(ngModel)]="directoryFormModel.scope" name="dirScope">
+            <mat-option value="Internal">Interno</mat-option>
+            <mat-option value="External">Externo</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <div class="form-row--checkbox">
+          <mat-checkbox [(ngModel)]="directoryFormModel.isFavorite" name="dirFavorite" color="primary">Favorito</mat-checkbox>
+        </div>
+        <div class="form-actions">
+          <button mat-raised-button color="primary" type="submit" [disabled]="savingDirectoryContact">
+            {{ savingDirectoryContact ? 'Guardando...' : 'Guardar' }}
+          </button>
+          <button mat-button type="button" (click)="cancelDirectoryForm()">Cancelar</button>
+        </div>
+      </form>
+    </article>
+
+    <div class="simple-table" *ngIf="!loadingDirectoryContacts && filteredDirectoryContacts.length > 0">
+      <table>
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Teléfono</th>
+            <th>Correo</th>
+            <th>Empresa</th>
+            <th>Tipo</th>
+            <th>Ámbito</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let person of paginatedDirectoryContacts">
+            <td>
+              <strong class="copyable-cell" (click)="copyDirectoryValue(person.name || '', 'nombre')">{{ person.name }}</strong>
+            </td>
+            <td>
+              <span class="copyable-cell" (click)="copyDirectoryValue(person.phone || '', 'telefono')">{{ person.phone || '-' }}</span>
+            </td>
+            <td>
+              <span class="copyable-cell" (click)="copyDirectoryValue(person.email || '', 'correo')">{{ person.email || '-' }}</span>
+            </td>
+            <td>{{ person.company || '-' }}</td>
+            <td><span class="badge outline">{{ getDirectoryTypeLabel(person.type) }}</span></td>
+            <td><span class="badge" [class.accent]="person.scope === 'Internal'">{{ getDirectoryScopeLabel(person.scope) }}</span></td>
+            <td>
+              <button
+                mat-icon-button
+                color="primary"
+                (click)="editDirectoryContact(person)"
+                [disabled]="isDirectoryInternal(person) || !canDirectoryWrite"
+                [matTooltip]="isDirectoryInternal(person) ? 'Los contactos de usuarios se editan en Usuarios' : 'Editar contacto del directorio'"
+                aria-label="Editar contacto">
+                <mat-icon aria-hidden="true">edit</mat-icon>
+              </button>
+              <button
+                mat-icon-button
+                color="warn"
+                (click)="deleteDirectoryContact(person._id)"
+                [disabled]="isDirectoryInternal(person) || !canDirectoryDelete"
+                [matTooltip]="isDirectoryInternal(person) ? 'Los contactos de usuarios no se eliminan aquí' : 'Eliminar contacto del directorio'"
+                aria-label="Eliminar contacto">
+                <mat-icon aria-hidden="true">delete</mat-icon>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div *ngIf="loadingDirectoryContacts" class="loading-center" role="status" aria-live="polite">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>Cargando directorio...</p>
+    </div>
+
+    <div *ngIf="!loadingDirectoryContacts && filteredDirectoryContacts.length === 0" class="no-data">
+      <mat-icon aria-hidden="true">contact_page</mat-icon>
+      <p>No hay personas en el directorio para ese filtro.</p>
+    </div>
+
+    <nav class="directory-pagination" *ngIf="!loadingDirectoryContacts && filteredDirectoryContacts.length > 0 && directoryPageSize !== 'all'" aria-label="Paginación del directorio">
+      <div class="page-info">
+        Mostrando {{ directoryStartItem }}-{{ directoryEndItem }} de {{ filteredDirectoryContacts.length }}
+      </div>
+      <div class="page-controls">
+        <button mat-stroked-button type="button" (click)="prevDirectoryPage()" [disabled]="directoryPageIndex === 0">
+          <mat-icon aria-hidden="true">chevron_left</mat-icon> Anterior
+        </button>
+        <span class="page-number">Página {{ directoryPageIndex + 1 }} de {{ directoryTotalPages }}</span>
+        <button mat-stroked-button type="button" (click)="nextDirectoryPage()" [disabled]="directoryPageIndex >= directoryTotalPages - 1">
+          Siguiente <mat-icon aria-hidden="true">chevron_right</mat-icon>
+        </button>
+      </div>
+    </nav>
+  </section>
+</div>

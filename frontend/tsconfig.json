@@ -2,8 +2,7 @@
   "compileOnSave": false,
   "compilerOptions": {
     // Configuración de paths para imports limpios (@app, @env)
-    // baseUrl requerido para paths (Angular 17+ necesita esta base)
-    "baseUrl": "./",
+    "rootDir": "./src",
     "outDir": "./dist/out-tsc",
     "forceConsistentCasingInFileNames": true,
     "esModuleInterop": true,
@@ -26,8 +25,8 @@
       "dom"
     ],
     "paths": {
-      "@app/*": ["src/app/*"],
-      "@env/*": ["src/environments/*"]
+      "@app/*": ["./src/app/*"],
+      "@env/*": ["./src/environments/*"]
     }
   },
   "angularCompilerOptions": {

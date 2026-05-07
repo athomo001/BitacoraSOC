@@ -10,7 +10,7 @@ import { Router } from '@angular/router';
 import { TagService } from '../../../services/tag.service';
 import { TagStats } from '../../../models/report.model';
 import { NgIf } from '@angular/common';
-import { MatProgressSpinner } from '@angular/material/progress-spinner';
+
 import { MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow } from '@angular/material/table';
 import { MatChip } from '@angular/material/chips';
 import { MatIconButton } from '@angular/material/button';
@@ -21,7 +21,7 @@ import { MatIcon } from '@angular/material/icon';
     selector: 'app-tags',
     templateUrl: './tags.component.html',
     styleUrls: ['./tags.component.scss'],
-    imports: [NgIf, MatProgressSpinner, MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatChip, MatIconButton, MatTooltip, MatIcon, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow]
+    imports: [NgIf, MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatChip, MatIconButton, MatTooltip, MatIcon, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow]
 })
 export class TagsComponent implements OnInit {
   tags: Array<TagStats & { name?: string }> = [];

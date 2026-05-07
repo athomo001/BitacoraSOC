@@ -1,0 +1,103 @@
+.tab-content {
+  padding: 1.25rem 1rem 1.5rem;
+}
+
+.tab-header {
+  margin-bottom: 1rem;
+}
+
+.tab-header h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1.8rem;
+}
+
+.tab-header .subtitle {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.toolbar-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 0.75rem;
+  align-items: end;
+  margin: 0 0 1rem;
+}
+
+.form-card {
+  border: 1px solid var(--outline-subtle);
+  border-radius: 12px;
+  padding: 1rem;
+  background: var(--surface-card);
+  margin-bottom: 1rem;
+}
+
+.raci-form .form-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.raci-form .full-width {
+  grid-column: 1 / -1;
+}
+
+.raci-section-title {
+  margin: 0.6rem 0;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 0.75rem;
+}
+
+.simple-table {
+  border: 1px solid var(--outline-subtle);
+  border-radius: 12px;
+  overflow-x: auto;
+  background: var(--surface-card);
+}
+
+.simple-table table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 980px;
+}
+
+.simple-table th,
+.simple-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--outline-subtle);
+  vertical-align: top;
+  text-align: left;
+}
+
+.simple-table th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  background: var(--surface-muted);
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 0;
+}
+
+@media (max-width: 960px) {
+  .toolbar-row {
+    grid-template-columns: 1fr;
+  }
+
+  .raci-form .form-row {
+    grid-template-columns: 1fr;
+  }
+}

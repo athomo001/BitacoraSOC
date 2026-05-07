@@ -49,8 +49,6 @@ export class ChecklistComponent implements OnInit {
   checklistTree: ChecklistNode[] = [];
   checklistGuideVisible = false;
   
-  // Inicia cerrado por defecto y solo cambia si el usuario lo abre/cierra.
-  mainPanelExpanded = false;
 
   constructor(
     private checklistService: ChecklistService,

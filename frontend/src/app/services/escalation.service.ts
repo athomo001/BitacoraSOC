@@ -505,4 +505,11 @@ export class EscalationService {
     // Endpoint público que no requiere permisos de admin
     return this.http.get<any[]>(`${environment.apiUrl}/users/list`);
   }
+
+  /**
+   * Disparar manualmente el envío de turnos automatizado (ESC-SHIFT-111)
+   */
+  triggerAutomationSend(): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/admin/automation/trigger-send`, {});
+  }
 }
