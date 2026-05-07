@@ -183,7 +183,7 @@ router.get('/log-sources', authenticate, async (req, res) => {
       enabledBool,
       cursor,
       limitNum,
-      projectFields: { _id: 1, name: 1, parent: 1, description: 1 }
+      projectFields: { _id: 1, name: 1, parent: 1, description: 1, isInternal: 1 }
     });
 
     const items = await CatalogLogSource.aggregate(pipeline);

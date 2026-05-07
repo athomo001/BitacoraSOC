@@ -89,7 +89,8 @@ const sampleLogSources = [
     name: 'Netics',
     parent: 'Sistema Interno',
     description: 'Log source por defecto del sistema',
-    enabled: true
+    enabled: true,
+    isInternal: true
   },
   {
     name: 'Firewall Cisco ASA',

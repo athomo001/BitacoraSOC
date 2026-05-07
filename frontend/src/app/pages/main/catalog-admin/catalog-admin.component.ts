@@ -102,6 +102,7 @@ export class CatalogAdminComponent implements OnInit {
     this.logSourceForm = this.fb.group({
       name: ['', Validators.required],
       description: [''],
+      isInternal: [false],
       enabled: [true]
     });
 
@@ -279,7 +280,7 @@ export class CatalogAdminComponent implements OnInit {
         next: () => {
           this.snackBar.open('✅ Log Source creado', 'Cerrar', { duration: 2000 });
           this.loadLogSources();
-          this.logSourceForm.reset({ enabled: true });
+          this.logSourceForm.reset({ enabled: true, isInternal: false });
         },
         error: () => this.snackBar.open('Error creando', 'Cerrar', { duration: 3000 })
       });
@@ -738,7 +739,7 @@ export class CatalogAdminComponent implements OnInit {
 
   cancelLogSourceEdit(): void {
     this.editingLogSourceId = null;
-    this.logSourceForm.reset({ enabled: true });
+    this.logSourceForm.reset({ enabled: true, isInternal: false });
   }
 
   cancelOperationTypeEdit(): void {

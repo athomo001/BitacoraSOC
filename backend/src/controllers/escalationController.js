@@ -1906,9 +1906,9 @@ exports.testEscalationReminder = async (req, res) => {
  */
 exports.triggerEscalationScheduleSend = async (req, res) => {
   try {
-    const config = await AppConfig.findOne();
+    let config = await AppConfig.findOne();
     if (!config) {
-      return res.status(404).json({ error: 'Configuración no encontrada' });
+      config = await AppConfig.create({});
     }
 
     const automation = config.escalationScheduleAutomation || {};
