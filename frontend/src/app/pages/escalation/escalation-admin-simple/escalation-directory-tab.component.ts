@@ -244,7 +244,7 @@ export class EscalationDirectoryTabComponent implements OnInit {
   getDirectoryTypeLabel(type?: string): string {
     switch (type) {
       case 'Internal': return 'Interno';
-      case 'External': return 'Externo';
+      case 'External': return 'Personal';
       case 'List': return 'Lista';
       default: return type || 'N/A';
     }

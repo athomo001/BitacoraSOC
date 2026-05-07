@@ -509,7 +509,7 @@ export class EscalationService {
   /**
    * Disparar manualmente el envío de turnos automatizado (ESC-SHIFT-111)
    */
-  triggerAutomationSend(): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.apiUrl}/admin/automation/trigger-send`, {});
+  triggerAutomationSend(payload?: { recipients?: string[]; ccRecipients?: string[] }): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/admin/automation/trigger-send`, payload || {});
   }
 }

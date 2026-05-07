@@ -386,7 +386,9 @@ export class EscalationRaciTabComponent implements OnInit {
 
     this.raciSearchTimers[role] = setTimeout(() => {
       this.directoryService.quickSearch(query).subscribe({
-        next: (items) => { this.raciDirectorySuggestions[role] = items || []; },
+        next: (items) => {
+          this.raciDirectorySuggestions[role] = (items || []).filter((item) => this.belongsToSelectedClient(item));
+        },
         error: () => { this.raciDirectorySuggestions[role] = []; }
       });
     }, 250);
@@ -399,6 +401,24 @@ export class EscalationRaciTabComponent implements OnInit {
 
   getRaciDirectoryOptions(role: 'responsible' | 'accountable' | 'consulted' | 'informed'): DirectoryContact[] {
     return this.raciDirectorySuggestions[role] || [];
+  }
+
+  private getActiveRaciClientName(): string {
+    const selectedClientId = String(this.raciForm?.get('clientId')?.value || this.selectedRaciClientId || '').trim();
+    if (!selectedClientId) return '';
+    const client = this.raciClients.find((item) => String(item?._id || '') === selectedClientId);
+    return String(client?.name || '').trim();
+  }
+
+  private belongsToSelectedClient(contact: DirectoryContact): boolean {
+    const clientName = this.getActiveRaciClientName();
+    if (!clientName) return true;
+
+    const normalizedClient = clientName.toLowerCase();
+    const normalizedCompany = String(contact?.company || '').trim().toLowerCase();
+    if (!normalizedCompany) return false;
+
+    return normalizedCompany.includes(normalizedClient) || normalizedClient.includes(normalizedCompany);
   }
 
   onRaciDirectorySelected(role: 'responsible' | 'accountable' | 'consulted' | 'informed', contact: DirectoryContact): void {
@@ -442,7 +462,9 @@ export class EscalationRaciTabComponent implements OnInit {
 
     this.directoryQuickPickerTimer = setTimeout(() => {
       this.directoryService.quickSearch(query).subscribe({
-        next: (items) => { this.directoryQuickPickerSuggestions = items || []; },
+        next: (items) => {
+          this.directoryQuickPickerSuggestions = (items || []).filter((item) => this.belongsToSelectedClient(item));
+        },
         error: () => { this.directoryQuickPickerSuggestions = []; }
       });
     }, 250);
@@ -457,7 +479,7 @@ export class EscalationRaciTabComponent implements OnInit {
 
   private getLocalDirectoryMatches(term: string): DirectoryContact[] {
     const normalized = String(term || '').trim().toLowerCase();
-    const source = this.directoryContacts || [];
+    const source = (this.directoryContacts || []).filter((contact) => this.belongsToSelectedClient(contact));
     if (!normalized) return source.slice(0, 8);
     return source
       .filter((contact) => [contact.name, contact.email, contact.phone, contact.company]

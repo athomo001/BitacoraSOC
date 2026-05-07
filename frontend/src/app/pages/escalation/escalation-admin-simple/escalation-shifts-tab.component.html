@@ -50,14 +50,20 @@
             </mat-optgroup>
             
             <!-- Personas externas -->
-            <mat-optgroup label="Personas Externas" *ngIf="showExternalPeopleForAssignment && externalPeople.length > 0">
-              <mat-option *ngFor="let person of externalPeople" [value]="'ext_' + person._id">
+            <mat-optgroup label="Personas Externas" *ngIf="showExternalPeopleForAssignment && filteredExternalPeopleForAssignment.length > 0">
+              <mat-option *ngFor="let person of filteredExternalPeopleForAssignment" [value]="'ext_' + person._id">
+                {{ person.name }} ({{ person.position || 'Sin cargo' }})
+              </mat-option>
+            </mat-optgroup>
+
+            <mat-optgroup label="Directorio General" *ngIf="showExternalPeopleForAssignment && filteredDirectoryContactsForAssignment.length > 0">
+              <mat-option *ngFor="let person of filteredDirectoryContactsForAssignment" [value]="'dir_' + person._id">
                 {{ person.name }} ({{ person.position || 'Sin cargo' }})
               </mat-option>
             </mat-optgroup>
             
             <!-- Sin datos -->
-            <mat-option *ngIf="filteredUsersForAssignment.length === 0 && (!showExternalPeopleForAssignment || externalPeople.length === 0)" disabled>
+            <mat-option *ngIf="filteredUsersForAssignment.length === 0 && (!showExternalPeopleForAssignment || (filteredExternalPeopleForAssignment.length === 0 && filteredDirectoryContactsForAssignment.length === 0))" disabled>
               No hay personas disponibles
             </mat-option>
           </mat-select>

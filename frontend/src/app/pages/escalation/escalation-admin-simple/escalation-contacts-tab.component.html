@@ -93,6 +93,14 @@
       Agregar Contacto de Escalación
     </button>
 
+    <div class="form-row filters-row">
+      <mat-form-field appearance="outline">
+        <mat-label>Buscar por cliente</mat-label>
+        <input matInput [(ngModel)]="escalationClientSearch" placeholder="Ej: PJUD, ACME, Cliente X">
+        <mat-icon matSuffix aria-hidden="true">search</mat-icon>
+      </mat-form-field>
+    </div>
+
     <article *ngIf="showContactForm && contactForm.get('contactType')?.value !== 'preventive'" class="inline-form">
       <div class="toolbar-row">
         <button mat-stroked-button type="button" color="primary" (click)="openDirectoryQuickPicker('contact', contactForm.get('name')?.value || '')">
@@ -117,10 +125,30 @@
       </div>
       <form [formGroup]="contactForm" (ngSubmit)="saveContact()">
         <mat-form-field appearance="outline">
+          <mat-label>Cliente</mat-label>
+          <mat-select [(ngModel)]="escalationServiceClientFilter" [ngModelOptions]="{standalone: true}" (selectionChange)="onEscalationServiceClientFilterChange()">
+            <mat-option value="">Todos</mat-option>
+            <mat-option *ngFor="let client of clients" [value]="client._id">
+              {{ client.name }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
           <mat-label>Servicio</mat-label>
           <mat-select formControlName="serviceId">
-            <mat-option *ngFor="let service of services" [value]="service._id">
+            <mat-option disabled class="service-search-option">
+              <input
+                matInput
+                [(ngModel)]="escalationServiceSearch"
+                [ngModelOptions]="{standalone: true}"
+                (keydown)="$event.stopPropagation()"
+                placeholder="Buscar servicio...">
+            </mat-option>
+            <mat-option *ngFor="let service of filteredServicesForContactForm" [value]="service._id">
               {{ service.clientId?.name }} - {{ service.name }}
+            </mat-option>
+            <mat-option *ngIf="filteredServicesForContactForm.length === 0" disabled>
+              No hay servicios para el filtro actual
             </mat-option>
           </mat-select>
         </mat-form-field>
@@ -211,183 +239,9 @@
       <mat-spinner diameter="30"></mat-spinner>
       <p>Cargando contactos...</p>
     </div>
-  </section>
-
-  <section class="section">
-    <h3>3. Agenda Preventiva para Boletines</h3>
-    <p class="subtitle">Libreta simple separada de escalación para avisos preventivos, campañas repetidas y clientes sin servicio activo.</p>
-
-    <div class="toolbar-row" aria-label="Acciones de agenda">
-      <button mat-raised-button color="primary" (click)="addContact('preventive')">
-        <mat-icon aria-hidden="true">person_add</mat-icon>
-        Nuevo contacto preventivo
-      </button>
-      <button mat-stroked-button color="primary" type="button" (click)="downloadPreventiveTemplate()">
-        <mat-icon aria-hidden="true">description</mat-icon>
-        Plantilla CSV
-      </button>
-      <button mat-stroked-button color="accent" type="button" [disabled]="importingPreventiveCsv" (click)="preventiveCsvInput.click()">
-        <mat-icon aria-hidden="true">{{ importingPreventiveCsv ? 'hourglass_empty' : 'upload_file' }}</mat-icon>
-        {{ importingPreventiveCsv ? 'Importando...' : 'Importar CSV' }}
-      </button>
-      <button mat-stroked-button color="accent" type="button" [disabled]="exportingPreventiveCsv" (click)="exportPreventiveContacts()">
-        <mat-icon aria-hidden="true">{{ exportingPreventiveCsv ? 'hourglass_empty' : 'download' }}</mat-icon>
-        {{ exportingPreventiveCsv ? 'Exportando...' : 'Exportar CSV' }}
-      </button>
-      <input #preventiveCsvInput type="file" accept=".csv,text/csv" class="hidden-native-input" (change)="onPreventiveCsvSelected($event)">
-    </div>
-
-    <p class="subtitle compact-subtitle">Formato sugerido: name, email, organization, phone, favorite, doNotSend, notes.</p>
-
-    <div class="form-row filters-row">
-      <mat-form-field appearance="outline">
-        <mat-label>Buscar</mat-label>
-        <input matInput [(ngModel)]="preventiveSearch" placeholder="Nombre, correo o empresa">
-      </mat-form-field>
-
-      <mat-form-field appearance="outline">
-        <mat-label>Empresa</mat-label>
-        <mat-select [(ngModel)]="preventiveCompanyFilter">
-          <mat-option value="">Todas</mat-option>
-          <mat-option *ngFor="let company of preventiveCompanyOptions" [value]="company">
-            {{ company }}
-          </mat-option>
-        </mat-select>
-      </mat-form-field>
-
-      <mat-form-field appearance="outline">
-        <mat-label>Tipo</mat-label>
-        <mat-select [(ngModel)]="preventiveTypeFilter">
-          <mat-option value="">Todos</mat-option>
-          <mat-option value="personal">Solo personales</mat-option>
-          <mat-option value="list">Solo listas de correo</mat-option>
-        </mat-select>
-      </mat-form-field>
-
-      <mat-checkbox [(ngModel)]="preventiveFavoritesOnly" color="primary">Solo favoritos</mat-checkbox>
-    </div>
-
-    <article *ngIf="showContactForm && contactForm.get('contactType')?.value === 'preventive'" class="inline-form">
-      <div class="toolbar-row">
-        <button mat-stroked-button type="button" color="primary" (click)="openDirectoryQuickPicker('contact', contactForm.get('name')?.value || '')">
-          <mat-icon aria-hidden="true">manage_search</mat-icon>
-          Usar contacto existente
-        </button>
-      </div>
-      <div class="inline-picker" *ngIf="directoryQuickPickerVisible && directoryQuickPickerTarget === 'contact'">
-        <mat-form-field appearance="outline">
-          <mat-label>Buscar en directorio</mat-label>
-          <input matInput [ngModel]="directoryQuickPickerQuery" [ngModelOptions]="{standalone: true}" (ngModelChange)="onDirectoryQuickPickerInput($event)" placeholder="Nombre, correo, teléfono o empresa">
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Seleccionar contacto</mat-label>
-          <mat-select (selectionChange)="useDirectoryQuickPick($event.value)">
-            <mat-option *ngFor="let suggestion of directoryQuickPickerSuggestions" [value]="suggestion">
-              {{ suggestion.name }} · {{ suggestion.email || suggestion.phone || '-' }}
-            </mat-option>
-          </mat-select>
-        </mat-form-field>
-        <button mat-button type="button" (click)="closeDirectoryQuickPicker()">Cerrar</button>
-      </div>
-      <form [formGroup]="contactForm" (ngSubmit)="saveContact()">
-        <mat-form-field appearance="outline">
-          <mat-label>Nombre completo</mat-label>
-          <input
-            matInput
-            formControlName="name"
-            [matAutocomplete]="autoContactNamePrev"
-            (focus)="onContactNameFocus()"
-            (input)="onContactNameInput($any($event.target).value)"
-            placeholder="Ej: Ana Pérez">
-          <mat-autocomplete
-            #autoContactNamePrev="matAutocomplete"
-            [displayWith]="displayDirectoryContact"
-            (optionSelected)="onContactDirectorySelected($event.option.value)">
-            <mat-option *ngFor="let suggestion of contactDirectorySuggestions" [value]="suggestion">
-              {{ suggestion.name }} <span *ngIf="suggestion.phone">- {{ suggestion.phone }}</span>
-            </mat-option>
-          </mat-autocomplete>
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Correo</mat-label>
-          <input matInput type="email" formControlName="email" placeholder="cliente@empresa.com">
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Empresa</mat-label>
-          <input matInput formControlName="organization" placeholder="Ej: Empresa Demo" [matAutocomplete]="orgAuto" (input)="filterOrgSuggestions($event)">
-          <mat-autocomplete #orgAuto="matAutocomplete">
-            <mat-option *ngFor="let org of filteredOrgSuggestions" [value]="org">
-              {{ org }}
-            </mat-option>
-          </mat-autocomplete>
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Teléfono (opcional)</mat-label>
-          <input matInput formControlName="phone" placeholder="+56 9 ...">
-        </mat-form-field>
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Nota interna (opcional)</mat-label>
-          <textarea matInput rows="2" formControlName="notes" placeholder="Uso sugerido, observaciones o exclusiones"></textarea>
-        </mat-form-field>
-        <div class="form-grid--checkboxes">
-          <mat-checkbox formControlName="favorite" color="primary">Favorito</mat-checkbox>
-          <mat-checkbox formControlName="isMailingList" color="primary">Lista de correo</mat-checkbox>
-          <mat-checkbox formControlName="doNotSend" color="warn">No enviar</mat-checkbox>
-          <mat-checkbox formControlName="active" color="primary">Activo</mat-checkbox>
-        </div>
-        <div class="form-actions">
-          <button mat-raised-button color="primary" type="submit" [disabled]="contactForm.invalid">
-            Guardar
-          </button>
-          <button mat-button type="button" (click)="showContactForm = false">Cancelar</button>
-        </div>
-      </form>
-    </article>
-
-    <div class="simple-table" *ngIf="!loadingContacts && filteredPreventiveContacts.length > 0">
-      <table>
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>Correo</th>
-            <th>Empresa</th>
-            <th>Teléfono</th>
-            <th>Estado</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let contact of filteredPreventiveContacts">
-            <td>
-              <strong>{{ contact.name }}</strong>
-              <div class="row-meta" *ngIf="contact.notes">{{ contact.notes }}</div>
-            </td>
-            <td>{{ contact.email || '-' }}</td>
-            <td>{{ contact.organization || '-' }}</td>
-            <td>{{ contact.phone || '-' }}</td>
-            <td>
-              <span class="badge accent" *ngIf="contact.favorite">⭐ Favorito</span>
-              <span class="badge" *ngIf="contact.doNotSend">🚫 No enviar</span>
-              <span class="badge accent" *ngIf="contact.isMailingList">📋 Lista</span>
-              <span class="badge muted" *ngIf="!contact.isMailingList">👤 Personal</span>
-              <span class="badge muted" *ngIf="!contact.active">Inactivo</span>
-              <span class="badge outline" *ngIf="contact.active && !contact.favorite && !contact.doNotSend && !contact.isMailingList">Activo</span>
-            </td>
-            <td>
-              <button mat-icon-button color="primary" (click)="editContact(contact)" matTooltip="Editar" aria-label="Editar contacto">
-                <mat-icon aria-hidden="true">edit</mat-icon>
-              </button>
-              <button mat-icon-button color="warn" (click)="deleteContact(contact._id)" matTooltip="Eliminar" aria-label="Eliminar contacto">
-                <mat-icon aria-hidden="true">delete</mat-icon>
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div *ngIf="!loadingContacts && filteredPreventiveContacts.length === 0" class="no-data compact-no-data">
-      <p>No hay contactos preventivos para los filtros seleccionados.</p>
+    <div *ngIf="!loadingContacts && escalationContacts.length === 0" class="no-data compact-no-data">
+      <p>No hay contactos de escalación para el cliente buscado.</p>
     </div>
   </section>
+
 </div>

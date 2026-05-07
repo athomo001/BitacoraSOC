@@ -1912,11 +1912,23 @@ exports.triggerEscalationScheduleSend = async (req, res) => {
     }
 
     const automation = config.escalationScheduleAutomation || {};
-    const recipients = automation.recipients || [];
-    const ccRecipients = automation.ccRecipients || [];
+
+    // Allow frontend to pass recipients override (e.g. from unsaved form state)
+    const parseEmailList = (raw) => {
+      if (Array.isArray(raw)) return raw.map((s) => String(s || '').trim().toLowerCase()).filter((s) => s.includes('@'));
+      if (typeof raw === 'string') return raw.split(',').map((s) => s.trim().toLowerCase()).filter((s) => s.includes('@'));
+      return [];
+    };
+
+    const recipients = req.body?.recipients
+      ? parseEmailList(req.body.recipients)
+      : parseEmailList(automation.recipients);
+    const ccRecipients = req.body?.ccRecipients
+      ? parseEmailList(req.body.ccRecipients)
+      : parseEmailList(automation.ccRecipients);
 
     if (recipients.length === 0) {
-      return res.status(400).json({ error: 'No hay destinatarios configurados para el envío automático.' });
+      return res.status(400).json({ error: 'No hay destinatarios válidos configurados para el envío automático.' });
     }
 
     const result = await exports.sendEscalationScheduleInternal({
