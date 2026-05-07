@@ -16,7 +16,8 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { CatalogService } from '../../../services/catalog.service';
 import { CatalogEvent, CatalogLogSource, CatalogOperationType } from '../../../models/catalog.model';
 import { EscalationService } from '../../../services/escalation.service';
-import { ClientAlertContext, ClientAlertEvaluation, Contact } from '../../../models/escalation.model';
+import { ClientAlertContext, ClientAlertEvaluation } from '../../../models/escalation.model';
+import { DirectoryService, DirectoryContact } from '../../../services/directory.service';
 import { ConfigService } from '../../../services/config.service';
 import { AuthService } from '../../../services/auth.service';
 
@@ -124,7 +125,7 @@ export class ReportGeneratorComponent implements OnInit {
   // ─── Newsletter email dispatch ────────────────────────────────────────────
   newsletterRecipients = '';
   isSendingNewsletter = false;
-  newsletterContacts: Contact[] = [];
+  newsletterContacts: DirectoryContact[] = [];
   newsletterContactSearch = '';
   newsletterCompanyFilter = '';
   newsletterFavoritesOnly = false;
@@ -171,6 +172,7 @@ export class ReportGeneratorComponent implements OnInit {
     private configService: ConfigService,
     private snackBar: MatSnackBar,
     private escalationService: EscalationService,
+    private directoryService: DirectoryService,
     private dialog: MatDialog,
     private authService: AuthService,
     private sanitizer: DomSanitizer
@@ -519,28 +521,28 @@ export class ReportGeneratorComponent implements OnInit {
   get newsletterCompanyOptions(): string[] {
     const companies = new Set(
       this.newsletterContacts
-        .map((contact) => String(contact.organization || '').trim())
+        .map((contact) => String(contact.company || '').trim())
         .filter((value) => value.length > 0)
     );
     return Array.from(companies).sort((a, b) => a.localeCompare(b));
   }
 
-  get filteredNewsletterContacts(): Contact[] {
+  get filteredNewsletterContacts(): DirectoryContact[] {
     const term = this.newsletterContactSearch.trim().toLowerCase();
     return [...this.newsletterContacts]
-      .filter((contact) => !contact.isMailingList)
+      .filter((contact) => contact.type !== 'List')
       .filter((contact) => {
-        const matchesTerm = !term || [contact.name, contact.email, contact.organization]
+        const matchesTerm = !term || [contact.name, contact.email, contact.company]
           .some((value) => String(value || '').toLowerCase().includes(term));
-        const matchesCompany = !this.newsletterCompanyFilter || contact.organization === this.newsletterCompanyFilter;
-        const matchesFavorite = !this.newsletterFavoritesOnly || !!contact.favorite;
+        const matchesCompany = !this.newsletterCompanyFilter || contact.company === this.newsletterCompanyFilter;
+        const matchesFavorite = !this.newsletterFavoritesOnly || !!contact.isFavorite;
         return matchesTerm && matchesCompany && matchesFavorite;
       })
-      .sort((a, b) => Number(!!b.favorite) - Number(!!a.favorite) || String(a.organization || '').localeCompare(String(b.organization || '')) || String(a.name || '').localeCompare(String(b.name || '')));
+      .sort((a, b) => Number(!!b.isFavorite) - Number(!!a.isFavorite) || String(a.company || '').localeCompare(String(b.company || '')) || String(a.name || '').localeCompare(String(b.name || '')));
   }
 
-  get mailingListContacts(): Contact[] {
-    return this.newsletterContacts.filter(contact => contact.isMailingList && contact.active !== false && !contact.doNotSend);
+  get mailingListContacts(): DirectoryContact[] {
+    return this.newsletterContacts.filter(contact => contact.type === 'List');
   }
 
   get allMailingListsSelected(): boolean {
@@ -563,7 +565,7 @@ export class ReportGeneratorComponent implements OnInit {
     }
   }
 
-  toggleMailingList(contact: Contact, checked: boolean): void {
+  toggleMailingList(contact: DirectoryContact, checked: boolean): void {
     if (!contact._id) return;
     if (checked) {
       this.newsletterSelectedMailingLists.add(contact._id);
@@ -573,7 +575,7 @@ export class ReportGeneratorComponent implements OnInit {
   }
 
   get newsletterSelectedCount(): number {
-    return this.getSelectedNewsletterContacts().filter((contact) => contact.active !== false && !contact.doNotSend && this.isValidNewsletterEmail(contact.email)).length;
+    return this.getSelectedNewsletterContacts().filter((contact) => this.isValidNewsletterEmail(contact.email)).length;
   }
 
   get newsletterRecipientSummary(): {
@@ -590,10 +592,6 @@ export class ReportGeneratorComponent implements OnInit {
 
     this.getSelectedNewsletterContacts().forEach((contact) => {
       const label = `${contact.name || 'Contacto'}${contact.email ? ` <${contact.email}>` : ''}`;
-      if (contact.active === false || contact.doNotSend) {
-        blockedRecipients.push(label);
-        return;
-      }
       const email = String(contact.email || '').trim().toLowerCase();
       if (!this.isValidNewsletterEmail(email)) {
         invalidRecipients.push(label);
@@ -609,10 +607,6 @@ export class ReportGeneratorComponent implements OnInit {
 
     this.getSelectedMailingLists().forEach((contact) => {
       const label = `${contact.name || 'Lista'}${contact.email ? ` <${contact.email}>` : ''}`;
-      if (contact.active === false || contact.doNotSend) {
-        blockedRecipients.push(label);
-        return;
-      }
       const email = String(contact.email || '').trim().toLowerCase();
       if (!this.isValidNewsletterEmail(email)) {
         invalidRecipients.push(label);
@@ -649,12 +643,12 @@ export class ReportGeneratorComponent implements OnInit {
   }
 
   private loadNewsletterContacts(): void {
-    this.escalationService.getContacts('preventive').subscribe({
+    this.directoryService.getAll().subscribe({
       next: (contacts) => {
         this.newsletterContacts = [...contacts];
         this.selectedNewsletterContactIds.clear();
         contacts
-          .filter((contact) => !!contact.favorite && contact.active !== false && !contact.doNotSend && this.isValidNewsletterEmail(contact.email))
+          .filter((contact) => !!contact.isFavorite && this.isValidNewsletterEmail(contact.email))
           .forEach((contact) => {
             if (contact._id) this.selectedNewsletterContactIds.add(contact._id);
           });
@@ -666,11 +660,11 @@ export class ReportGeneratorComponent implements OnInit {
     });
   }
 
-  isNewsletterContactSelected(contact: Contact): boolean {
+  isNewsletterContactSelected(contact: DirectoryContact): boolean {
     return !!contact?._id && this.selectedNewsletterContactIds.has(contact._id);
   }
 
-  toggleNewsletterContact(contact: Contact, checked: boolean): void {
+  toggleNewsletterContact(contact: DirectoryContact, checked: boolean): void {
     if (!contact?._id) return;
     if (checked) this.selectedNewsletterContactIds.add(contact._id);
     else this.selectedNewsletterContactIds.delete(contact._id);
@@ -678,7 +672,7 @@ export class ReportGeneratorComponent implements OnInit {
 
   selectAllNewsletterContacts(): void {
     this.filteredNewsletterContacts.forEach((contact) => {
-      if (contact._id && contact.active !== false && !contact.doNotSend && this.isValidNewsletterEmail(contact.email)) {
+      if (contact._id && this.isValidNewsletterEmail(contact.email)) {
         this.selectedNewsletterContactIds.add(contact._id);
       }
     });
@@ -694,12 +688,12 @@ export class ReportGeneratorComponent implements OnInit {
     return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
   }
 
-  private getSelectedNewsletterContacts(): Contact[] {
-    return this.newsletterContacts.filter((contact) => !contact.isMailingList && !!contact._id && this.selectedNewsletterContactIds.has(contact._id));
+  private getSelectedNewsletterContacts(): DirectoryContact[] {
+    return this.newsletterContacts.filter((contact) => contact.type !== 'List' && !!contact._id && this.selectedNewsletterContactIds.has(contact._id));
   }
 
-  private getSelectedMailingLists(): Contact[] {
-    return this.newsletterContacts.filter((contact) => contact.isMailingList && !!contact._id && this.newsletterSelectedMailingLists.has(contact._id));
+  private getSelectedMailingLists(): DirectoryContact[] {
+    return this.newsletterContacts.filter((contact) => contact.type === 'List' && !!contact._id && this.newsletterSelectedMailingLists.has(contact._id));
   }
 
   private parseManualNewsletterRecipients(): string[] {
@@ -1215,19 +1209,19 @@ export class ReportGeneratorComponent implements OnInit {
   get incidentCompanyOptionsTo(): string[] {
     const companies = new Set(
       this.newsletterContacts
-        .map(c => String(c.organization || '').trim())
+        .map(c => String(c.company || '').trim())
         .filter(v => v.length > 0)
     );
     return Array.from(companies).sort((a, b) => a.localeCompare(b));
   }
 
-  get incidentFilteredContactsTo(): Contact[] {
-    let list = this.newsletterContacts.filter(c => !c.isMailingList);
+  get incidentFilteredContactsTo(): DirectoryContact[] {
+    let list = this.newsletterContacts.filter(c => c.type !== 'List');
     if (this.incidentFavoritesOnly) {
-      list = list.filter(c => c.favorite);
+      list = list.filter(c => c.isFavorite);
     }
     if (this.incidentCompanyFilter) {
-      list = list.filter(c => c.organization === this.incidentCompanyFilter);
+      list = list.filter(c => c.company === this.incidentCompanyFilter);
     }
     const search = this.incidentContactSearch.trim().toLowerCase();
     if (search) {
@@ -1239,10 +1233,10 @@ export class ReportGeneratorComponent implements OnInit {
     return list;
   }
 
-  get incidentMailingListsTo(): Contact[] {
-    let list = this.newsletterContacts.filter(c => c.isMailingList);
+  get incidentMailingListsTo(): DirectoryContact[] {
+    let list = this.newsletterContacts.filter(c => c.type === 'List');
     if (this.incidentFavoritesOnly) {
-      list = list.filter(c => c.favorite);
+      list = list.filter(c => c.isFavorite);
     }
     const search = this.incidentContactSearch.trim().toLowerCase();
     if (search) {

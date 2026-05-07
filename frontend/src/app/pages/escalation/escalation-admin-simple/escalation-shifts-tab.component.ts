@@ -66,6 +66,8 @@ export class EscalationShiftsTabComponent implements OnInit {
   assignmentForm!: FormGroup;
   users: any[] = [];
   filteredUsersForAssignment: any[] = [];
+  filteredExternalPeopleForAssignment: any[] = [];
+  filteredDirectoryContactsForAssignment: DirectoryContact[] = [];
   showExternalPeopleForAssignment = true;
   roles = ['N2', 'TI', 'N1_NO_HABIL'];
 
@@ -74,13 +76,13 @@ export class EscalationShiftsTabComponent implements OnInit {
   availableCargoLabels: string[] = [];
   readonly defaultReminderCargoLabels: string[] = [
     'N1', 'N2', 'N3', 'QA Nivel 1', 'QA Nivel 2', 'Pentester N1', 'Pentester N2',
-    'Arquitecto SIEM', 'Customer Success Manager (CSM)', 'Jefe Área', 'Gerente Área'
+    'Arquitecto SIEM', 'Customer Success Manager (CSM)', 'Jefe ├ürea', 'Gerente ├ürea'
   ];
   loadingEscalationReminderConfig = false;
   savingEscalationReminderConfig = false;
   testingEscalationReminder = false;
   
-  // Automatización de Envío (ESC-SHIFT-111)
+  // Automatizaci├│n de Env├¡o (ESC-SHIFT-111)
   escalationScheduleAutomationForm!: FormGroup;
   loadingAutomationConfig = false;
   savingAutomationConfig = false;
@@ -88,10 +90,10 @@ export class EscalationShiftsTabComponent implements OnInit {
   daysOfWeek = [
     { value: 1, label: 'Lunes' },
     { value: 2, label: 'Martes' },
-    { value: 3, label: 'Miércoles' },
+    { value: 3, label: 'Mi├®rcoles' },
     { value: 4, label: 'Jueves' },
     { value: 5, label: 'Viernes' },
-    { value: 6, label: 'Sábado' },
+    { value: 6, label: 'S├íbado' },
     { value: 0, label: 'Domingo' }
   ];
   automationRecipientSuggestions: DirectoryContact[] = [];
@@ -189,6 +191,7 @@ export class EscalationShiftsTabComponent implements OnInit {
   }
 
   loadAllData(): void {
+    this.loadUsers();
     this.loadExternalPeople();
     this.loadAssignments();
     this.loadEscalationReminderConfig();
@@ -266,7 +269,7 @@ export class EscalationShiftsTabComponent implements OnInit {
       },
       error: () => {
         this.loadingHistoricalAssignments = false;
-        this.showError('Error al cargar histórico de asignaciones');
+        this.showError('Error al cargar hist├│rico de asignaciones');
       }
     });
   }
@@ -322,9 +325,9 @@ export class EscalationShiftsTabComponent implements OnInit {
     const previousMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() - 1);
 
     if (date >= currentMonthStart && date < nextMonthStart) return 'Mes actual';
-    if (date >= nextMonthStart) return 'Próximos meses';
+    if (date >= nextMonthStart) return 'Pr├│ximos meses';
     if (date >= previousMonthStart && date < currentMonthStart) return 'Mes anterior';
-    return 'Histórico';
+    return 'Hist├│rico';
   }
 
   addAssignment(): void {
@@ -371,8 +374,7 @@ export class EscalationShiftsTabComponent implements OnInit {
 
     this.savingAssignment = true;
     const formData = this.assignmentForm.value;
-    const isExternal = typeof formData.assignedUserId === 'string' && formData.assignedUserId.startsWith('ext_');
-    const externalPersonId = isExternal ? formData.assignedUserId.replace('ext_', '') : undefined;
+    const assignedUserIdRaw = String(formData.assignedUserId || '');
     
     const startDateTime = new Date(formData.weekStartDate);
     const [startHour, startMin] = formData.startTime.split(':');
@@ -382,40 +384,108 @@ export class EscalationShiftsTabComponent implements OnInit {
     const [endHour, endMin] = formData.endTime.split(':');
     endDateTime.setHours(parseInt(endHour), parseInt(endMin), 0);
 
-    const data = {
-      roleCode: formData.roleCode,
-      userId: isExternal ? undefined : formData.assignedUserId,
-      externalPersonId: isExternal ? externalPersonId : undefined,
-      weekStartDate: startDateTime.toISOString(),
-      weekEndDate: endDateTime.toISOString()
+    const submitAssignment = (resolvedUserId?: string, resolvedExternalPersonId?: string): void => {
+      const data = {
+        roleCode: formData.roleCode,
+        userId: resolvedExternalPersonId ? undefined : resolvedUserId,
+        externalPersonId: resolvedExternalPersonId,
+        weekStartDate: startDateTime.toISOString(),
+        weekEndDate: endDateTime.toISOString()
+      };
+
+      this.escalationService.createAssignment(data).subscribe({
+        next: () => {
+          this.ngZone.run(() => {
+            this.showSuccess('Turno asignado correctamente');
+            this.showAssignmentForm = false;
+            this.loadAssignments();
+            this.savingAssignment = false;
+          });
+        },
+        error: (err: any) => {
+          const backendMessage = err?.error?.error || err?.error?.message;
+          const sectionLabel = this.getSelectedAssignmentSectionLabel();
+          const enhancedMessage = backendMessage?.includes('mismo per├¡odo') && sectionLabel
+            ? `${backendMessage}. Rev├¡sala en "${sectionLabel}".`
+            : backendMessage;
+          this.showError(enhancedMessage || 'Error al asignar turno');
+          this.savingAssignment = false;
+        }
+      });
     };
 
-    this.escalationService.createAssignment(data).subscribe({
-      next: () => {
-        this.ngZone.run(() => {
-          this.showSuccess('Turno asignado correctamente');
-          this.showAssignmentForm = false;
-          this.loadAssignments();
+    if (assignedUserIdRaw.startsWith('dir_')) {
+      const directoryId = assignedUserIdRaw.replace('dir_', '');
+      this.ensureExternalPersonFromDirectory(directoryId).subscribe({
+        next: (externalPersonId) => {
+          if (!externalPersonId) {
+            this.showError('No se pudo resolver la persona del directorio para asignar el turno.');
+            this.savingAssignment = false;
+            return;
+          }
+          submitAssignment(undefined, externalPersonId);
+        },
+        error: () => {
+          this.showError('No se pudo preparar la persona desde el directorio.');
           this.savingAssignment = false;
-        });
-      },
-      error: (err: any) => {
-        const backendMessage = err?.error?.error || err?.error?.message;
-        const sectionLabel = this.getSelectedAssignmentSectionLabel();
-        const enhancedMessage = backendMessage?.includes('mismo período') && sectionLabel
-          ? `${backendMessage}. Revísala en "${sectionLabel}".`
-          : backendMessage;
-        this.showError(enhancedMessage || 'Error al asignar turno');
-        this.savingAssignment = false;
-      }
+        }
+      });
+      return;
+    }
+
+    if (assignedUserIdRaw.startsWith('ext_')) {
+      submitAssignment(undefined, assignedUserIdRaw.replace('ext_', ''));
+      return;
+    }
+
+    submitAssignment(assignedUserIdRaw, undefined);
+  }
+
+  private ensureExternalPersonFromDirectory(directoryId: string): Observable<string> {
+    const match = (this.directoryContacts || []).find((item) => String(item?._id || '') === String(directoryId));
+    if (!match) {
+      return of('');
+    }
+
+    const normalizedName = String(match.name || '').trim().toLowerCase();
+    const normalizedEmail = String(match.email || '').trim().toLowerCase();
+    const normalizedPhone = String(match.phone || '').trim();
+
+    const existing = (this.externalPeople || []).find((person) => {
+      const sameName = String(person?.name || '').trim().toLowerCase() === normalizedName;
+      const sameEmail = normalizedEmail && String(person?.email || '').trim().toLowerCase() === normalizedEmail;
+      const samePhone = normalizedPhone && String(person?.phone || '').trim() === normalizedPhone;
+      return sameName && (sameEmail || samePhone || (!normalizedEmail && !normalizedPhone));
     });
+
+    if (existing?._id) {
+      return of(String(existing._id));
+    }
+
+    return this.escalationService.createExternalPerson({
+      name: match.name,
+      email: match.email || 'sin-correo@directorio.local',
+      phone: match.phone || '000000000',
+      position: match.position || '',
+      active: true
+    }).pipe(
+      map((created: any) => {
+        const createdId = String(created?._id || '');
+        if (createdId) {
+          this.externalPeople = [...this.externalPeople, created];
+          this.updateAssignmentPeopleOptions();
+        }
+        return createdId;
+      }),
+      catchError(() => of(''))
+    );
   }
 
   deleteAssignment(id: string): void {
-    if (confirm('¿Eliminar esta asignación?')) {
+    if (confirm('┬┐Eliminar esta asignaci├│n?')) {
       this.escalationService.deleteAssignment(id).subscribe({
         next: () => {
-          this.showSuccess('Asignación eliminada');
+          this.showSuccess('Asignaci├│n eliminada');
           this.loadAssignments();
         },
         error: () => this.showError('Error al eliminar')
@@ -463,13 +533,13 @@ export class EscalationShiftsTabComponent implements OnInit {
       escalationReminderCargoLabels: selectedCargoLabels,
       escalationReminderDaysAhead: Number.isFinite(daysAhead) ? Math.min(Math.max(daysAhead, 1), 60) : 7
     }).subscribe({
-      next: () => this.showSuccess('Recordatorio de escalación interna actualizado'),
+      next: () => this.showSuccess('Recordatorio de escalaci├│n interna actualizado'),
       error: () => this.showError('Error guardando recordatorio'),
       complete: () => this.savingEscalationReminderConfig = false
     });
   }
 
-  // ============ AUTOMATIZACIÓN DE TURNOS (ESC-SHIFT-111) ============
+  // ============ AUTOMATIZACI├ôN DE TURNOS (ESC-SHIFT-111) ============
   loadAutomationConfig(): void {
     this.loadingAutomationConfig = true;
     this.configService.getConfig().subscribe({
@@ -506,8 +576,8 @@ export class EscalationShiftsTabComponent implements OnInit {
     };
 
     this.configService.updateConfig(payload).subscribe({
-      next: () => this.showSuccess('Configuración de automatización guardada'),
-      error: () => this.showError('Error al guardar configuración'),
+      next: () => this.showSuccess('Configuraci├│n de automatizaci├│n guardada'),
+      error: () => this.showError('Error al guardar configuraci├│n'),
       complete: () => this.savingAutomationConfig = false
     });
   }
@@ -515,12 +585,12 @@ export class EscalationShiftsTabComponent implements OnInit {
   triggerManualSend(): void {
     if (this.triggeringManualSend) return;
     
-    if (!confirm('¿Desea enviar los turnos ahora a los destinatarios configurados?')) return;
+    if (!confirm('┬┐Desea enviar los turnos ahora a los destinatarios configurados?')) return;
 
     this.triggeringManualSend = true;
     this.escalationService.triggerAutomationSend().subscribe({
-      next: (res: any) => this.showSuccess(res.message || 'Envío procesado correctamente'),
-      error: (err: any) => this.showError(err?.error?.error || 'Error al disparar el envío'),
+      next: (res: any) => this.showSuccess(res.message || 'Env├¡o procesado correctamente'),
+      error: (err: any) => this.showError(err?.error?.error || 'Error al disparar el env├¡o'),
       complete: () => this.triggeringManualSend = false
     });
   }
@@ -696,7 +766,7 @@ export class EscalationShiftsTabComponent implements OnInit {
   }
 
   deleteExternalPerson(id: string): void {
-    if (confirm('¿Eliminar esta persona?')) {
+    if (confirm('┬┐Eliminar esta persona?')) {
       this.escalationService.deleteExternalPerson(id).subscribe({
         next: () => {
           this.showSuccess('Persona eliminada');
@@ -715,7 +785,7 @@ export class EscalationShiftsTabComponent implements OnInit {
     this.importingAssignmentsCsv = true;
     this.escalationService.importAssignmentsCsv(file).subscribe({
       next: (response: any) => {
-        const obs = response.errorCount > 0 ? ` con ${response.errorCount} observación(es)` : '';
+        const obs = response.errorCount > 0 ? ` con ${response.errorCount} observaci├│n(es)` : '';
         this.showSuccess(`Turnos procesados: ${response.created} nuevos, ${response.updated} actualizados${obs}`);
         this.loadAssignments();
       },
@@ -751,31 +821,51 @@ export class EscalationShiftsTabComponent implements OnInit {
     const roleCode = String(this.assignmentForm?.get('roleCode')?.value || '').trim();
     if (roleCode === 'N2') {
       this.filteredUsersForAssignment = this.users.filter((u) => this.matchesRoleCargo(u, 'N2'));
-      this.showExternalPeopleForAssignment = false;
+      this.filteredExternalPeopleForAssignment = this.externalPeople.filter((p) => this.matchesRoleCargo(p, 'N2'));
+      this.filteredDirectoryContactsForAssignment = (this.directoryContacts || []).filter((c) => this.matchesRoleCargo(c, 'N2'));
+      this.showExternalPeopleForAssignment = this.filteredExternalPeopleForAssignment.length > 0 || this.filteredDirectoryContactsForAssignment.length > 0;
     } else if (roleCode === 'N1_NO_HABIL') {
       this.filteredUsersForAssignment = this.users.filter((u) => this.matchesRoleCargo(u, 'N1_NO_HABIL'));
-      this.showExternalPeopleForAssignment = false;
+      this.filteredExternalPeopleForAssignment = this.externalPeople.filter((p) => this.matchesRoleCargo(p, 'N1_NO_HABIL'));
+      this.filteredDirectoryContactsForAssignment = (this.directoryContacts || []).filter((c) => this.matchesRoleCargo(c, 'N1_NO_HABIL'));
+      this.showExternalPeopleForAssignment = this.filteredExternalPeopleForAssignment.length > 0 || this.filteredDirectoryContactsForAssignment.length > 0;
     } else if (roleCode === 'TI') {
       this.filteredUsersForAssignment = this.users.filter((u) => this.matchesRoleCargo(u, 'TI'));
-      this.showExternalPeopleForAssignment = false;
+      this.filteredExternalPeopleForAssignment = this.externalPeople.filter((p) => this.matchesRoleCargo(p, 'TI'));
+      this.filteredDirectoryContactsForAssignment = (this.directoryContacts || []).filter((c) => this.matchesRoleCargo(c, 'TI'));
+      this.showExternalPeopleForAssignment = this.filteredExternalPeopleForAssignment.length > 0 || this.filteredDirectoryContactsForAssignment.length > 0;
     } else {
       this.filteredUsersForAssignment = [...this.users];
+      this.filteredExternalPeopleForAssignment = [...this.externalPeople];
+      this.filteredDirectoryContactsForAssignment = [...(this.directoryContacts || [])];
       this.showExternalPeopleForAssignment = true;
     }
     const selected = this.assignmentForm?.get('assignedUserId')?.value;
     if (selected) {
       const s = String(selected);
       const isExt = s.startsWith('ext_');
-      const validExt = isExt && this.showExternalPeopleForAssignment && this.externalPeople.some(p => `ext_${p._id}` === s);
+      const isDir = s.startsWith('dir_');
+      const validExt = isExt && this.showExternalPeopleForAssignment && this.filteredExternalPeopleForAssignment.some(p => `ext_${p._id}` === s);
+      const validDir = isDir && this.showExternalPeopleForAssignment && this.filteredDirectoryContactsForAssignment.some(c => `dir_${c._id}` === s);
       const validUsr = !isExt && this.filteredUsersForAssignment.some(u => String(u._id) === s);
-      if (!validExt && !validUsr) this.assignmentForm.patchValue({ assignedUserId: '' }, { emitEvent: false });
+      if (!validExt && !validDir && !validUsr) this.assignmentForm.patchValue({ assignedUserId: '' }, { emitEvent: false });
     }
   }
 
-  private matchesRoleCargo(user: any, roleCode: 'N1_NO_HABIL' | 'N2' | 'TI'): boolean {
-    const cargo = String(user?.cargoLabel || '').trim().toUpperCase();
-    const map = { N1_NO_HABIL: 'N1', N2: 'N2', TI: 'TI' };
-    return cargo === map[roleCode];
+  private matchesRoleCargo(entity: any, roleCode: 'N1_NO_HABIL' | 'N2' | 'TI'): boolean {
+    const roleToken = roleCode === 'N1_NO_HABIL' ? 'N1' : roleCode;
+    const candidates = [
+      String(entity?.cargoLabel || ''),
+      String(entity?.position || ''),
+      String(entity?.role || '')
+    ].map((value) => value.trim().toUpperCase()).filter((value) => value.length > 0);
+
+    return candidates.some((value) => {
+      if (value === roleToken) return true;
+      if (value.startsWith(`${roleToken} `)) return true;
+      if (value.includes(` ${roleToken} `)) return true;
+      return value.includes(roleToken);
+    });
   }
 
   formatDate(date: string): string {

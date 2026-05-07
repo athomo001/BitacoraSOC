@@ -536,10 +536,10 @@
                 <div class="newsletter-contact-list" *ngIf="mailingListContacts.length > 0; else noMailingLists">
                   <label class="newsletter-contact-item"
                          *ngFor="let contact of mailingListContacts"
-                         [class.is-disabled]="contact.active === false || contact.doNotSend || !isValidNewsletterEmail(contact.email)">
+                         [class.is-disabled]="!isValidNewsletterEmail(contact.email)">
                     <mat-checkbox
                       [checked]="newsletterSelectedMailingLists.has(contact._id || '')"
-                      [disabled]="contact.active === false || contact.doNotSend || !isValidNewsletterEmail(contact.email)"
+                      [disabled]="!isValidNewsletterEmail(contact.email)"
                       (change)="toggleMailingList(contact, $event.checked)">
                     </mat-checkbox>
 
@@ -547,18 +547,16 @@
                       <div class="newsletter-contact-title">
                         <strong>{{ contact.name }}</strong>
                         <span class="newsletter-badge accent">📋 Lista</span>
-                        <span class="newsletter-badge blocked" *ngIf="contact.doNotSend">No enviar</span>
-                        <span class="newsletter-badge muted" *ngIf="contact.active === false">Inactivo</span>
                       </div>
                       <div class="newsletter-contact-detail">{{ contact.email || 'Sin correo válido' }}</div>
-                      <div class="newsletter-contact-detail">{{ contact.organization || 'Sin empresa' }}</div>
+                      <div class="newsletter-contact-detail">{{ contact.company || 'Sin empresa' }}</div>
                     </div>
                   </label>
                 </div>
 
                 <ng-template #noMailingLists>
                   <div class="newsletter-empty-state">
-                    No hay listas de correo registradas. Créalas en la Agenda Preventiva.
+                    No hay listas de correo registradas. Créalas en el Directorio General.
                   </div>
                 </ng-template>
               </div>
@@ -596,10 +594,10 @@
               <div class="newsletter-contact-list" *ngIf="filteredNewsletterContacts.length > 0; else noNewsletterContacts">
                 <label class="newsletter-contact-item"
                        *ngFor="let contact of filteredNewsletterContacts"
-                       [class.is-disabled]="contact.active === false || contact.doNotSend || !isValidNewsletterEmail(contact.email)">
+                       [class.is-disabled]="!isValidNewsletterEmail(contact.email)">
                   <mat-checkbox
                     [checked]="isNewsletterContactSelected(contact)"
-                    [disabled]="contact.active === false || contact.doNotSend || !isValidNewsletterEmail(contact.email)"
+                    [disabled]="!isValidNewsletterEmail(contact.email)"
                     (change)="toggleNewsletterContact(contact, $event.checked)">
                   </mat-checkbox>
 
@@ -607,19 +605,17 @@
                     <div class="newsletter-contact-title">
                       <strong>{{ contact.name }}</strong>
                       <span class="newsletter-badge muted">👤 Personal</span>
-                      <span class="newsletter-badge favorite" *ngIf="contact.favorite">Favorito</span>
-                      <span class="newsletter-badge blocked" *ngIf="contact.doNotSend">No enviar</span>
-                      <span class="newsletter-badge muted" *ngIf="contact.active === false">Inactivo</span>
+                      <span class="newsletter-badge favorite" *ngIf="contact.isFavorite">Favorito</span>
                     </div>
                     <div class="newsletter-contact-detail">{{ contact.email || 'Sin correo válido' }}</div>
-                    <div class="newsletter-contact-detail">{{ contact.organization || 'Sin empresa' }}</div>
+                    <div class="newsletter-contact-detail">{{ contact.company || 'Sin empresa' }}</div>
                   </div>
                 </label>
               </div>
 
               <ng-template #noNewsletterContacts>
                 <div class="newsletter-empty-state">
-                  No hay contactos preventivos que coincidan con el filtro actual.
+                  No hay contactos en el directorio que coincidan con el filtro actual.
                 </div>
               </ng-template>
             </aside>
@@ -718,21 +714,19 @@
                   <div class="newsletter-contact-list-divider">Listas de correo</div>
                   <label class="newsletter-contact-item"
                          *ngFor="let contact of incidentMailingListsTo"
-                         [class.is-disabled]="contact.active === false || contact.doNotSend || !isValidNewsletterEmail(contact.email)">
+                         [class.is-disabled]="!isValidNewsletterEmail(contact.email)">
                     <mat-checkbox
                       [checked]="isIncidentContactSelected(contact._id || '', activeIncidentSelectorMode)"
-                      [disabled]="contact.active === false || contact.doNotSend || !isValidNewsletterEmail(contact.email)"
+                      [disabled]="!isValidNewsletterEmail(contact.email)"
                       (change)="toggleIncidentContact(contact._id || '', activeIncidentSelectorMode)">
                     </mat-checkbox>
                     <div class="newsletter-contact-meta">
                       <div class="newsletter-contact-title">
                         <strong>{{ contact.name }}</strong>
                         <span class="newsletter-badge accent">📋 Lista</span>
-                        <span class="newsletter-badge blocked" *ngIf="contact.doNotSend">No enviar</span>
-                        <span class="newsletter-badge muted" *ngIf="contact.active === false">Inactivo</span>
                       </div>
                       <div class="newsletter-contact-detail">{{ contact.email || 'Sin correo válido' }}</div>
-                      <div class="newsletter-contact-detail">{{ contact.organization || 'Sin empresa' }}</div>
+                      <div class="newsletter-contact-detail">{{ contact.company || 'Sin empresa' }}</div>
                     </div>
                   </label>
                 </ng-container>
@@ -741,22 +735,20 @@
                   <div class="newsletter-contact-list-divider newsletter-contact-list-divider--spaced">Contactos personales</div>
                   <label class="newsletter-contact-item"
                          *ngFor="let contact of incidentFilteredContactsTo"
-                         [class.is-disabled]="contact.active === false || contact.doNotSend || !isValidNewsletterEmail(contact.email)">
+                         [class.is-disabled]="!isValidNewsletterEmail(contact.email)">
                     <mat-checkbox
                       [checked]="isIncidentContactSelected(contact._id || '', activeIncidentSelectorMode)"
-                      [disabled]="contact.active === false || contact.doNotSend || !isValidNewsletterEmail(contact.email)"
+                      [disabled]="!isValidNewsletterEmail(contact.email)"
                       (change)="toggleIncidentContact(contact._id || '', activeIncidentSelectorMode)">
                     </mat-checkbox>
                     <div class="newsletter-contact-meta">
                       <div class="newsletter-contact-title">
                         <strong>{{ contact.name }}</strong>
                         <span class="newsletter-badge muted">👤 Personal</span>
-                        <span class="newsletter-badge favorite" *ngIf="contact.favorite">Favorito</span>
-                        <span class="newsletter-badge blocked" *ngIf="contact.doNotSend">No enviar</span>
-                        <span class="newsletter-badge muted" *ngIf="contact.active === false">Inactivo</span>
+                        <span class="newsletter-badge favorite" *ngIf="contact.isFavorite">Favorito</span>
                       </div>
                       <div class="newsletter-contact-detail">{{ contact.email || 'Sin correo válido' }}</div>
-                      <div class="newsletter-contact-detail">{{ contact.organization || 'Sin empresa' }}</div>
+                      <div class="newsletter-contact-detail">{{ contact.company || 'Sin empresa' }}</div>
                     </div>
                   </label>
                 </ng-container>
@@ -764,7 +756,7 @@
 
               <ng-template #noIncidentContacts>
                 <div class="newsletter-empty-state">
-                  No hay contactos preventivos que coincidan con el filtro actual.
+                  No hay contactos en el directorio que coincidan con el filtro actual.
                 </div>
               </ng-template>
             </aside>

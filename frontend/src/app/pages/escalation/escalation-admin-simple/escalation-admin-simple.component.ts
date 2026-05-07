@@ -152,7 +152,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
   get pageHeaderSubtitle(): string {
     return this.directoryOnlyAccess
       ? 'Fuente única de contactos para todos los módulos operativos'
-      : 'Configura turnos internos, contactos de escalación y agenda preventiva';
+      : 'Configura turnos internos y contactos de escalación';
   }
 
   showError(message: string): void {
