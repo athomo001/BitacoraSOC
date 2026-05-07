@@ -120,11 +120,17 @@ exports.updateDirectoryContact = async (req, res) => {
     if (!existing) {
       return res.status(404).json({ error: 'Contacto no encontrado' });
     }
-    if (existing.source === 'User') {
-      return res.status(403).json({ error: 'Los contactos internos se administran desde Usuarios' });
+
+    // For internal/User-source contacts, only allow updating specific fields
+    const isUserSourceContact = existing.source === 'User';
+    let bodyForPayload = req.body;
+    if (isUserSourceContact) {
+      // Restrict to only editable fields for internal contacts
+      const { phone, company, type, scope, isFavorite } = req.body;
+      bodyForPayload = { phone, company, type, scope, isFavorite };
     }
 
-    const payload = normalizePayload(req.body, existing.toObject());
+    const payload = normalizePayload(bodyForPayload, existing.toObject());
     if (!payload.name) {
       return res.status(400).json({ error: 'name es obligatorio' });
     }
