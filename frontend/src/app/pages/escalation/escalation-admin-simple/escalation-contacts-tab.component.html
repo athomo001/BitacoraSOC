@@ -88,7 +88,7 @@
     <h3>2. Contactos de Escalación</h3>
     <p class="subtitle">Usa esta sección solo para contactos ligados a escalación, turnos y servicio activo. No es una agenda comercial general.</p>
 
-    <button mat-raised-button color="accent" (click)="addContact('escalation')">
+    <button mat-raised-button color="accent" (click)="addContact('escalation')" style="margin-top: 1rem;">
       <mat-icon aria-hidden="true">add</mat-icon>
       Agregar Contacto de Escalación
     </button>
@@ -96,7 +96,7 @@
     <div class="form-row filters-row">
       <mat-form-field appearance="outline">
         <mat-label>Buscar por cliente</mat-label>
-        <input matInput [(ngModel)]="escalationClientSearch" placeholder="Ej: PJUD, ACME, Cliente X">
+        <input matInput [(ngModel)]="escalationClientSearch" placeholder="Ej: ACME, Cliente X">
         <mat-icon matSuffix aria-hidden="true">search</mat-icon>
       </mat-form-field>
     </div>

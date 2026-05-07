@@ -109,6 +109,7 @@
         <input
           matInput
           [(ngModel)]="clientSearchTerm"
+          (ngModelChange)="onClientSearchChange()"
           [matAutocomplete]="autoClientSimple"
           placeholder="Buscar y seleccionar cliente">
         <mat-icon matSuffix>search</mat-icon>

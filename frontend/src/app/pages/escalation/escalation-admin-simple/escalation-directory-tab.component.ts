@@ -52,6 +52,7 @@ export class EscalationDirectoryTabComponent implements OnInit {
   showDirectoryForm = false;
   savingDirectoryContact = false;
   editingDirectoryContactId: string | null = null;
+  isEditingInternalContact = false;
 
   directoryFormModel = {
     name: '',
@@ -139,6 +140,7 @@ export class EscalationDirectoryTabComponent implements OnInit {
       return;
     }
     this.editingDirectoryContactId = null;
+    this.isEditingInternalContact = false;
     this.directoryFormModel = {
       name: '', email: '', phone: '', company: '', position: '',
       type: 'External', scope: 'External', isFavorite: false
@@ -151,10 +153,7 @@ export class EscalationDirectoryTabComponent implements OnInit {
       this.showError('No tienes permisos para editar');
       return;
     }
-    if (this.isDirectoryInternal(contact)) {
-      this.showError('Los usuarios internos se editan en el módulo de Usuarios');
-      return;
-    }
+    this.isEditingInternalContact = this.isDirectoryInternal(contact);
     this.editingDirectoryContactId = contact._id;
     this.directoryFormModel = {
       name: String(contact.name || ''),
@@ -211,25 +210,17 @@ export class EscalationDirectoryTabComponent implements OnInit {
 
   syncAndMergeDirectoryNow(): void {
     if (!this.canDirectoryWrite) return;
-    this.rebuildingDirectory = true;
-    this.directoryService.rebuildFromEscalation().subscribe({
+    // Only merge duplicates WITHOUT rebuilding - preserves all manual edits
+    this.mergingDirectoryDuplicates = true;
+    this.directoryService.mergeDuplicates().subscribe({
       next: () => {
-        this.rebuildingDirectory = false;
-        this.mergingDirectoryDuplicates = true;
-        this.directoryService.mergeDuplicates().subscribe({
-          next: () => {
-            this.mergingDirectoryDuplicates = false;
-            this.showSuccess('Directorio sincronizado y consolidado');
-            this.directoryRefresh.emit();
-          },
-          error: () => {
-            this.mergingDirectoryDuplicates = false;
-            this.directoryRefresh.emit();
-          }
-        });
+        this.mergingDirectoryDuplicates = false;
+        this.showSuccess('Duplicados consolidados (cambios manuales preservados)');
+        this.directoryRefresh.emit();
       },
-      error: () => {
-        this.rebuildingDirectory = false;
+      error: (err: any) => {
+        this.mergingDirectoryDuplicates = false;
+        this.showError(err?.error?.message || 'Error al consolidar');
         this.directoryRefresh.emit();
       }
     });
@@ -238,6 +229,7 @@ export class EscalationDirectoryTabComponent implements OnInit {
   cancelDirectoryForm(): void {
     this.showDirectoryForm = false;
     this.editingDirectoryContactId = null;
+    this.isEditingInternalContact = false;
   }
 
   // Helpers
