@@ -52,18 +52,27 @@ const resolveDirectorySource = (payload = {}) => {
 };
 
 const buildUpsertFilter = (normalized) => {
+  const filters = [];
+
   if (normalized.email) {
-    return { email: normalized.email };
+    filters.push({ email: normalized.email });
   }
 
   if (normalized.phone && normalized.name) {
-    return { phone: normalized.phone, name: normalized.name };
+    filters.push({ phone: normalized.phone, name: normalized.name });
   }
 
-  return {
-    name: normalized.name,
-    company: normalized.company || ''
-  };
+  if (normalized.name && normalized.company) {
+    filters.push({ name: normalized.name, company: normalized.company });
+  }
+
+  if (normalized.name) {
+    filters.push({ name: normalized.name });
+  }
+
+  if (filters.length === 0) return { name: '' };
+  if (filters.length === 1) return filters[0];
+  return { $or: filters };
 };
 
 const syncDirectoryContact = async (payload = {}) => {
@@ -83,11 +92,25 @@ const syncDirectoryContact = async (payload = {}) => {
   };
 
   const filter = buildUpsertFilter(normalized);
-  return DirectoryContact.findOneAndUpdate(
+  const result = await DirectoryContact.findOneAndUpdate(
     filter,
     { $set: normalized },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
+
+  // Merge duplicates: if OR filter matched multiple contacts, consolidate to primary
+  if (result && filter.$or && filter.$or.length > 1) {
+    const otherMatches = await DirectoryContact.find({
+      _id: { $ne: result._id },
+      $or: filter.$or
+    });
+    if (otherMatches.length > 0) {
+      const idsToRemove = otherMatches.map((m) => m._id);
+      await DirectoryContact.deleteMany({ _id: { $in: idsToRemove } });
+    }
+  }
+
+  return result;
 };
 
 const syncManyDirectoryContacts = async (contacts = []) => {
