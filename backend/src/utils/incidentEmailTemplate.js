@@ -116,7 +116,7 @@ const EMBEDDED_INTER_CSS = [buildEmbeddedInterFont(400), buildEmbeddedInterFont(
   .filter(Boolean)
   .join('\n');
 
-function buildIncidentEmail({ reportData: rd = {}, images = [], logoCid = null, autor = 'Analista SOC', brandName = 'Bitácora SOC', paletteKey = 'cdc-verde' }) {
+async function buildIncidentEmail({ reportData: rd = {}, images = [], logoCid = null, autor = 'Analista SOC', brandName = 'Bitácora SOC', paletteKey = 'cdc-verde' }) {
   // Resolvemos la paleta de colores según la clave seleccionada
   const P = resolvePalette(paletteKey);
   // Color dinámico de criticidad (alta, media, baja, etc.)
@@ -319,15 +319,15 @@ function buildIncidentEmail({ reportData: rd = {}, images = [], logoCid = null, 
   </mj-body>
 </mjml>`;
 
-  const result = mjml(template, { validationLevel: 'soft' });
-  return { html: result.html || '', errors: result.errors || [] };
+  const result = await mjml(template, { validationLevel: 'soft' });
+  return { html: result?.html || '', errors: result?.errors || [] };
 }
 
 /**
  * Versión para preview (navegador): usa data URIs en lugar de CIDs
  * para que las imágenes sean visibles sin adjuntos MIME.
  */
-function buildIncidentEmailPreview(opts) {
+async function buildIncidentEmailPreview(opts) {
   const { images = [], ...rest } = opts;
   const previewImages = images.map((img) => ({
     ...img,
