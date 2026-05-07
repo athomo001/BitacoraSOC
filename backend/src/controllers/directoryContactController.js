@@ -518,3 +518,59 @@ exports.mergeDirectoryDuplicatesNow = async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 };
+
+exports.syncUsersFromDirectoryNow = async (req, res) => {
+  try {
+    const internalContacts = await DirectoryContact.find({
+      $and: [
+        { email: { $exists: true, $ne: '' } },
+        {
+          $or: [
+            { type: 'Internal' },
+            { scope: 'Internal' },
+            { source: 'User' }
+          ]
+        }
+      ]
+    })
+      .select('email name phone')
+      .lean();
+
+    let matchedUsers = 0;
+    let updatedUsers = 0;
+
+    for (const contact of internalContacts) {
+      const email = String(contact.email || '').trim().toLowerCase();
+      if (!email) {
+        continue;
+      }
+      const phone = String(contact.phone || '').trim();
+      const updateResult = await User.updateMany(
+        { email },
+        { $set: { phone: phone || null } }
+      );
+      matchedUsers += Number(updateResult?.matchedCount || 0);
+      updatedUsers += Number(updateResult?.modifiedCount || 0);
+    }
+
+    await audit(req, {
+      event: 'directory.central.sync_users_from_directory',
+      result: { success: true },
+      metadata: {
+        scannedInternalContacts: internalContacts.length,
+        matchedUsers,
+        updatedUsers
+      }
+    });
+
+    return res.json({
+      message: 'Sincronización retroactiva de usuarios completada',
+      scannedInternalContacts: internalContacts.length,
+      matchedUsers,
+      updatedUsers
+    });
+  } catch (error) {
+    logger.error('Error in syncUsersFromDirectoryNow:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};

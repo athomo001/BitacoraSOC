@@ -87,4 +87,18 @@ export class DirectoryService {
       totalDirectoryContacts: number;
     }>(`${this.apiUrl}/merge-duplicates`, {});
   }
+
+  syncUsersFromDirectory(): Observable<{
+    message: string;
+    scannedInternalContacts: number;
+    matchedUsers: number;
+    updatedUsers: number;
+  }> {
+    return this.http.post<{
+      message: string;
+      scannedInternalContacts: number;
+      matchedUsers: number;
+      updatedUsers: number;
+    }>(`${this.apiUrl}/sync-users-from-directory`, {});
+  }
 }
