@@ -282,7 +282,7 @@ export class EscalationDirectoryTabComponent implements OnInit {
   }
 
   isDirectoryInternal(contact: DirectoryContact): boolean {
-    return contact?.type === 'Internal' || contact?.scope === 'Internal';
+    return contact?.source === 'User';
   }
 
   copyDirectoryValue(value: string, label: string): void {
