@@ -2,6 +2,16 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.70-beta] - 2026-05-11
+
+### Hotfix SMTP post-restore: 400 al desactivar y diagnóstico incompleto
+
+- **Restore completo de credenciales cifradas entre entornos:** se implementó `encryption-keyring.json` persistente en `/secrets` y fallback de descifrado multi-llave en `utils/encryption.js`. Con esto, al restaurar un backup completo (incluyendo `/secrets`) se pueden recuperar contraseñas SMTP e integraciones aunque cambie `ENCRYPTION_KEY` del entorno destino.
+- **400 en `POST /api/smtp` al desactivar:** se corrigió validación interna que seguía exigiendo `password` aun con `isActive=false`.
+- **Desactivación resiliente tras restore:** ahora el guardado en modo desactivado no bloquea por ausencia de contraseña descifrada y conserva la contraseña cifrada existente para una futura reactivación.
+- **Auditoría detallada del guardado SMTP:** se añadieron eventos `smtp.config.save.attempt`, `smtp.config.save.rejected`, `smtp.config.save.success` y `smtp.config.save.error` para trazar intento, rechazo funcional (400), éxito y excepción con metadata de contexto.
+- **Diagnóstico frontend más útil:** cuando backend responde `Errores de validación`, la UI muestra el campo/motivo concreto en lugar de solo `SMTP_UNKNOWN`.
+
 ## [v1.5.69-beta] - 2026-05-11
 
 ### Hotfix backup/restore: Directorio Global y borrado previo real

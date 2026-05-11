@@ -60,6 +60,7 @@ Nota: el historial puede mostrar `.json` legacy, pero los respaldos actuales man
 - El restore descomprime el archivo `.zip` y restaura tanto la base de datos como `uploads/`, `secrets/` y el directorio opcional `global/` cuando existe en el respaldo.
 - La restauración recorre subdirectorios, por lo que también repone logos, favicons y artefactos publicados bajo `uploads/complements/`.
 - Los certificados TLS guardados por la plataforma via `secrets/` quedan cubiertos dentro del mismo restore.
+- `secrets/` también incluye `encryption-keyring.json`, usado para descifrar credenciales históricas (SMTP e integraciones) al restaurar en otro entorno.
 
 ### Eliminar backup
 
@@ -97,7 +98,7 @@ Nota: en uso web normal, la autenticacion principal es por cookie `auth_token` H
 - `file`: archivo `.zip` (completo: BD + uploads + secrets) o `.json` (legacy)
 - `clearBeforeRestore`: opcional; si llega en `true`, limpia primero las colecciones antes de importar.
 
-**ZIP:** Contiene `data.json` + directorio `/uploads` + directorio `/secrets` (certificates) + directorio opcional `/global`. Se restauran todos los archivos fisicos de forma recursiva.
+**ZIP:** Contiene `data.json` + directorio `/uploads` + directorio `/secrets` (certificados + keyring de cifrado) + directorio opcional `/global`. Se restauran todos los archivos fisicos de forma recursiva.
 
 **JSON Legacy:** Solo BD, útil para importación puntual de datos antigios.
 

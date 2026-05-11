@@ -52,7 +52,7 @@ const smtpValidators = [
   body('useTLS').isBoolean(),
   body('senderName').trim().notEmpty(),
   body('senderEmail').isEmail().normalizeEmail(),
-  body('recipients').optional().isArray({ min: 1 }),
+  body('recipients').optional().isArray(),
   body('recipients.*').optional().isEmail().normalizeEmail(),
   body('sendOnlyIfRed').isBoolean(),
   body('isActive').optional().isBoolean()
@@ -67,7 +67,7 @@ const testValidators = [
   body('useTLS').optional().isBoolean(),
   body('senderName').optional().trim().notEmpty(),
   body('senderEmail').optional().isEmail().normalizeEmail(),
-  body('recipients').optional().isArray({ min: 1 }),
+  body('recipients').optional().isArray(),
   body('recipients.*').optional().isEmail().normalizeEmail(),
   body('sendOnlyIfRed').optional().isBoolean(),
   body('isActive').optional().isBoolean(),
@@ -75,8 +75,11 @@ const testValidators = [
   body('retryCount').optional().isInt({ min: 1, max: 20 }).toInt()
 ];
 
-const ensureRequiredFields = (data, requireRecipients = true) => {
-  const required = ['host', 'port', 'username', 'password', 'senderName', 'senderEmail'];
+const ensureRequiredFields = (data, requireRecipients = true, requirePassword = true) => {
+  const required = ['host', 'port', 'username', 'senderName', 'senderEmail'];
+  if (requirePassword) {
+    required.push('password');
+  }
   for (const field of required) {
     if (!data[field]) return `Falta el campo requerido: ${field}`;
   }
@@ -185,34 +188,78 @@ router.post('/',
     try {
       const data = { ...req.body };
       let config = await findStoredSmtpConfig();
+      const isActive = data.isActive !== false;
+      const previousIsActive = config ? (config.isActive !== false) : null;
+
+      await audit(req, {
+        event: 'smtp.config.save.attempt',
+        level: 'info',
+        result: { success: true, reason: 'SMTP save requested' },
+        metadata: {
+          provider: data.provider,
+          host: data.host,
+          port: data.port,
+          requestedIsActive: isActive,
+          previousIsActive,
+          hasPasswordInput: Boolean(String(data.password || '').trim())
+        }
+      });
+
+      const audit400 = async (message, metadata = {}) => {
+        await audit(req, {
+          event: 'smtp.config.save.rejected',
+          level: 'warn',
+          result: { success: false, reason: message },
+          metadata: {
+            provider: data.provider,
+            host: data.host,
+            port: data.port,
+            isActive,
+            previousIsActive,
+            hasPasswordInput: Boolean(String(data.password || '').trim()),
+            ...metadata
+          }
+        });
+      };
 
       if (!data.password) {
-        if (config?.password) {
+        if (!isActive && config?.password) {
+          // Para desactivar SMTP no exigimos descifrar/reingresar la contraseña.
+          // Conservamos la contraseña cifrada existente para permitir reactivación futura.
+          data.password = '';
+        } else if (config?.password) {
           data.password = safeDecrypt(config.password, { allowPlainFallback: false });
           if (!data.password) {
+            await audit400('No se pudo reutilizar la contraseña SMTP guardada. Ingresa la contraseña nuevamente y guarda.', {
+              source: 'stored-config',
+              hadStoredPassword: true
+            });
             return res.status(400).json({
               message: 'No se pudo reutilizar la contraseña SMTP guardada. Ingresa la contraseña nuevamente y guarda.'
             });
           }
         } else {
           const legacyPassword = await resolveLegacyPasswordFromAppConfig();
-          if (!legacyPassword) {
+          if (!legacyPassword && isActive) {
+            await audit400('Falta el campo requerido: password', {
+              source: 'request',
+              hadStoredPassword: false
+            });
             return res.status(400).json({ message: 'Falta el campo requerido: password' });
           }
           data.password = legacyPassword;
         }
       }
 
-      // No requerir destinatarios para guardar
-      const missing = ensureRequiredFields(data, false);
+      // No requerir destinatarios para guardar. Password solo obligatorio si SMTP activo.
+      const missing = ensureRequiredFields(data, false, isActive);
       if (missing) {
+        await audit400(missing, { source: 'required-fields' });
         return res.status(400).json({ message: missing });
       }
 
       // Verificar conexión sin enviar email (ya que puede no haber destinatarios)
       const hasRecipients = Array.isArray(data.recipients) && data.recipients.length > 0;
-      const isActive = data.isActive !== false;
-
       if (isActive) {
         await verifyAndTest({
           ...data,
@@ -220,7 +267,9 @@ router.post('/',
         }, hasRecipients);
       }
 
-      const encryptedPassword = encrypt(data.password);
+      const encryptedPassword = data.password
+        ? encrypt(data.password)
+        : (config?.password || '');
 
       if (!config) {
         config = new SmtpConfig({
@@ -242,7 +291,7 @@ router.post('/',
       invalidateCache();
 
       await audit(req, {
-        event: 'admin.smtp.config.update',
+        event: 'smtp.config.save.success',
         level: 'info',
         result: { success: true, reason: isActive ? 'SMTP config saved' : 'SMTP sending disabled' },
         metadata: {
@@ -252,7 +301,9 @@ router.post('/',
           useTLS: data.useTLS,
           recipientsCount: Array.isArray(data.recipients) ? data.recipients.length : 0,
           sendOnlyIfRed: data.sendOnlyIfRed,
-          isActive: data.isActive !== false
+          isActive: data.isActive !== false,
+          previousIsActive,
+          hasPasswordInput: Boolean(String(req.body?.password || '').trim())
         }
       });
 
@@ -265,13 +316,15 @@ router.post('/',
       });
     } catch (error) {
       await audit(req, {
-        event: 'admin.smtp.config.update',
+        event: 'smtp.config.save.error',
         level: 'warn',
         result: { success: false, reason: error.message },
         metadata: {
           host: req.body?.host,
           port: req.body?.port,
-          provider: req.body?.provider
+          provider: req.body?.provider,
+          requestedIsActive: req.body?.isActive !== false,
+          hasPasswordInput: Boolean(String(req.body?.password || '').trim())
         }
       });
 
