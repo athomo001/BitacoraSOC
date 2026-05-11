@@ -17,6 +17,7 @@ const ClientEscalationRule = require('../models/ClientEscalationRule');
 const Complement = require('../models/Complement');
 const ComplementSharedRecord = require('../models/ComplementSharedRecord');
 const Contact = require('../models/Contact');
+const DirectoryContact = require('../models/DirectoryContact');
 const Entry = require('../models/Entry');
 const EscalationRule = require('../models/EscalationRule');
 const ExternalPerson = require('../models/ExternalPerson');
@@ -54,6 +55,7 @@ const backupModels = {
   complements: Complement,
   complementSharedRecords: ComplementSharedRecord,
   contacts: Contact,
+  directoryContacts: DirectoryContact,
   escalationRules: EscalationRule,
   externalPersons: ExternalPerson,
   glpiConfigs: GlpiConfig,
