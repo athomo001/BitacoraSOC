@@ -536,7 +536,7 @@ export class AuditLogsComponent implements OnInit {
     }
     
     // ====== CORREO / SMTP ======
-    if (event.includes('mail') || event.includes('smtp')) {
+    if (event.includes('mail') || event.includes('smtp') || event.includes('email')) {
       const status = result.success ? '✅' : '❌';
       const toRecipientArr = (val: unknown): string[] => {
         if (!val) return [];
@@ -551,11 +551,15 @@ export class AuditLogsComponent implements OnInit {
       const recipientsCount = Number(meta['resolvedRecipientsCount'] ?? meta['recipientsCount'] ?? 0);
       const subject = meta['subject'] ? ` | ${meta['subject']}` : '';
       const category = meta['category'] || 'correo';
+      const eventLabel = event.startsWith('smtp.test.')
+        ? 'SMTP TEST'
+        : String(category).toUpperCase();
       const sourceModule = meta['sourceModule'] ? ` | modulo:${meta['sourceModule']}` : '';
       const triggerType = meta['triggerType'] ? ` | trigger:${meta['triggerType']}` : '';
       const triggerContext = meta['triggerContext'] ? ` | origen:${meta['triggerContext']}` : '';
       const smtpConfigId = meta['smtpConfigId'] ? ` | smtp:${String(meta['smtpConfigId']).slice(0, 8)}...` : '';
       const failureCategory = meta['failureCategory'] ? ` | causa:${meta['failureCategory']}` : '';
+      const reasonText = !result.success && result.reason ? ` | motivo:${result.reason}` : '';
       const retryText = meta['retryAttempt']
         ? ` | reintento:${Number(meta['retryCount'] || 1)}`
         : '';
@@ -564,7 +568,7 @@ export class AuditLogsComponent implements OnInit {
         ? ` | repetidos:${noise.suppressedInWindow}`
         : '';
 
-      return `${status} [${String(category).toUpperCase()}] Para: ${recipientsPreview} (${recipientsCount})${subject}${sourceModule}${triggerType}${triggerContext}${smtpConfigId}${failureCategory}${retryText}${noiseText}`;
+      return `${status} [${eventLabel}] Para: ${recipientsPreview} (${recipientsCount})${subject}${sourceModule}${triggerType}${triggerContext}${smtpConfigId}${failureCategory}${reasonText}${retryText}${noiseText}`;
     }
 
     // ====== INTEGRACIÓN (GLPI, LOG FORWARDING) ======

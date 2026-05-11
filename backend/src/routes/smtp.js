@@ -99,6 +99,52 @@ const safeDecrypt = (value, { allowPlainFallback = false } = {}) => {
   return allowPlainFallback ? raw : '';
 };
 
+const maskEmail = (value) => {
+  const raw = String(value || '').trim().toLowerCase();
+  const atIndex = raw.indexOf('@');
+  if (!raw || atIndex <= 1) return raw || '';
+  return `${raw.slice(0, 2)}***${raw.slice(atIndex)}`;
+};
+
+const normalizeRecipients = (input) => {
+  if (Array.isArray(input)) {
+    return input
+      .map((item) => String(item || '').trim())
+      .filter(Boolean);
+  }
+  if (typeof input === 'string') {
+    return input
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+};
+
+const classifySmtpTestFailure = (message = '') => {
+  const text = String(message || '').toLowerCase();
+
+  if (text.includes('5.7.139') || text.includes('did not meet the criteria') || text.includes('conditional access')) {
+    return 'smtp_auth_policy';
+  }
+  if (text.includes('535') || text.includes('eauth') || text.includes('invalid login') || text.includes('authentication')) {
+    return 'smtp_auth';
+  }
+  if (text.includes('etimedout') || text.includes('timeout')) {
+    return 'smtp_timeout';
+  }
+  if (text.includes('enotfound') || text.includes('eai_again') || text.includes('getaddrinfo')) {
+    return 'smtp_host';
+  }
+  if (text.includes('ssl') || text.includes('tls') || text.includes('certificate') || text.includes('wrong version number')) {
+    return 'smtp_tls';
+  }
+  if (text.includes('too many') || text.includes('rate limit') || text.includes('throttle')) {
+    return 'smtp_throttled';
+  }
+  return 'smtp_unknown';
+};
+
 const findStoredSmtpConfig = async ({ activeOnly = false } = {}) => {
   const query = activeOnly
     ? { $or: [{ isActive: true }, { isActive: { $exists: false } }] }
@@ -177,6 +223,64 @@ router.get('/', authenticate, authorize('admin'), async (_req, res) => {
   } catch (error) {
     console.error('Error al obtener config SMTP:', error);
     return res.status(500).json({ message: 'Error al obtener configuracion' });
+  }
+});
+
+// GET /api/smtp/password - Obtener contraseña SMTP descifrada (solo admin)
+router.get('/password', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const config = await findStoredSmtpConfig();
+    if (!config || !config.password) {
+      await audit(req, {
+        event: 'smtp.password.reveal.rejected',
+        level: 'warn',
+        result: { success: false, reason: 'No hay contraseña SMTP guardada' },
+        metadata: {
+          hasConfig: Boolean(config),
+          hasEncryptedPassword: Boolean(config?.password)
+        }
+      });
+      return res.status(404).json({ message: 'No hay contraseña SMTP guardada' });
+    }
+
+    const decryptedPassword = safeDecrypt(config.password, { allowPlainFallback: false });
+    if (!decryptedPassword) {
+      await audit(req, {
+        event: 'smtp.password.reveal.rejected',
+        level: 'warn',
+        result: { success: false, reason: 'No se pudo descifrar contraseña SMTP guardada' },
+        metadata: {
+          hasConfig: true,
+          hasEncryptedPassword: true
+        }
+      });
+      return res.status(400).json({ message: 'No se pudo descifrar contraseña SMTP guardada' });
+    }
+
+    await audit(req, {
+      event: 'smtp.password.reveal.success',
+      level: 'warn',
+      result: { success: true, reason: 'Contraseña SMTP revelada en UI por administrador' },
+      metadata: {
+        host: config.host,
+        port: config.port,
+        username: config.username,
+        passwordLength: decryptedPassword.length
+      }
+    });
+
+    return res.json({ password: decryptedPassword });
+  } catch (error) {
+    await audit(req, {
+      event: 'smtp.password.reveal.error',
+      level: 'error',
+      result: { success: false, reason: error.message },
+      metadata: {
+        sourceModule: 'smtp-settings'
+      }
+    });
+
+    return res.status(500).json({ message: 'Error al revelar contraseña SMTP' });
   }
 });
 
@@ -346,12 +450,11 @@ router.post('/test',
   async (req, res) => {
     let usingStoredConfig = false;
     let usingStoredPassword = false;
+    let configData = null;
     const retryAttempt = req.body?.retryAttempt === true || req.body?.retryAttempt === 'true';
     const retryCountParsed = Number.parseInt(String(req.body?.retryCount ?? ''), 10);
     const retryCount = Number.isFinite(retryCountParsed) && retryCountParsed > 0 ? retryCountParsed : null;
     try {
-      let configData = null;
-
       if (Object.keys(req.body || {}).length > 0) {
         const bodyData = { ...req.body };
         const stored = await findStoredSmtpConfig();
@@ -426,6 +529,10 @@ router.post('/test',
         level: 'info',
         result: { success: true, reason: message },
         metadata: {
+          category: 'smtp_test',
+          sourceModule: 'smtp-settings',
+          triggerType: 'manual',
+          triggerContext: 'smtp-test',
           usingStoredConfig,
           usingStoredPassword,
           retryAttempt,
@@ -433,7 +540,8 @@ router.post('/test',
           host: configData.host,
           port: configData.port,
           recipient: recipient || null,
-          recipientsCount: Array.isArray(configData.recipients) ? configData.recipients.length : 0
+          recipientsCount: normalizeRecipients(configData.recipients).length,
+          toMasked: normalizeRecipients(configData.recipients).map(maskEmail)
         }
       });
 
@@ -443,17 +551,31 @@ router.post('/test',
         connectionOnly: !sendMail
       });
     } catch (error) {
+      const resolvedRecipients = normalizeRecipients(configData?.recipients ?? req.body?.recipients);
+      const failureCategory = classifySmtpTestFailure(error.message);
+
       await audit(req, {
         event: 'smtp.test.fail',
         level: 'warn',
         result: { success: false, reason: error.message },
         metadata: {
+          category: 'smtp_test',
+          sourceModule: 'smtp-settings',
+          triggerType: 'manual',
+          triggerContext: 'smtp-test',
           usingStoredConfig,
           usingStoredPassword,
           retryAttempt,
           retryCount,
-          host: req.body?.host,
-          port: req.body?.port
+          host: configData?.host || req.body?.host,
+          port: configData?.port || req.body?.port,
+          recipientsCount: resolvedRecipients.length,
+          resolvedRecipientsCount: resolvedRecipients.length,
+          toMasked: resolvedRecipients.map(maskEmail),
+          resolvedRecipientsPreview: resolvedRecipients.map(maskEmail),
+          failureCategory,
+          smtpErrorCode: error.code || null,
+          smtpErrorCommand: error.command || null
         }
       });
 

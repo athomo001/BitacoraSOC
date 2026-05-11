@@ -14,9 +14,9 @@ import { OnboardingService } from '../../../services/onboarding.service';
 import { UpdateConfigRequest, EmailReportConfig } from '../../../models/config.model';
 import { SmtpConfigRequest, SmtpConfig } from '../../../models/smtp.model';
 import { MatCheckbox } from '@angular/material/checkbox';
-import { MatFormField, MatLabel, MatHint } from '@angular/material/form-field';
+import { MatFormField, MatLabel, MatHint, MatSuffix } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
-import { MatButton } from '@angular/material/button';
+import { MatButton, MatIconButton } from '@angular/material/button';
 import { NgClass, NgFor, NgIf } from '@angular/common';
 import { MatSelect, MatOption } from '@angular/material/select';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
@@ -33,8 +33,10 @@ import { MatIcon } from '@angular/material/icon';
     MatFormField,
     MatLabel,
     MatHint,
+    MatSuffix,
     MatInput,
     MatButton,
+    MatIconButton,
     NgClass,
     MatSelect,
     NgFor,
@@ -232,14 +234,27 @@ export class SettingsComponent implements OnInit {
       username: ['', Validators.required],
       password: ['', [Validators.minLength(8)]],
       senderName: ['', Validators.required],
+      useUsernameAsSenderEmail: [true],
       senderEmail: ['', [Validators.required, Validators.email]],
       recipientsText: [''], // Opcional para pruebas, obligatorio para guardar
       sendOnlyIfRed: [false],
       isActive: [true]
     });
 
+    this.setSenderEmailLinkState(true);
+
     this.smtpForm.get('provider')?.valueChanges.subscribe((provider) => {
       this.applyProviderPreset(provider);
+    });
+
+    this.smtpForm.get('username')?.valueChanges.subscribe((username) => {
+      if (this.smtpForm.get('useUsernameAsSenderEmail')?.value === true) {
+        this.smtpForm.patchValue({ senderEmail: String(username || '').trim() }, { emitEvent: false });
+      }
+    });
+
+    this.smtpForm.get('useUsernameAsSenderEmail')?.valueChanges.subscribe((useLinkedEmail) => {
+      this.setSenderEmailLinkState(useLinkedEmail === true);
     });
 
     this.smtpForm.valueChanges.subscribe(() => {
@@ -306,11 +321,14 @@ export class SettingsComponent implements OnInit {
       username: config.username,
       password: '',
       senderName: config.senderName,
+      useUsernameAsSenderEmail: String(config.senderEmail || '').trim().toLowerCase() === String(config.username || '').trim().toLowerCase(),
       senderEmail: config.senderEmail,
       recipientsText: (config.recipients || []).join(', '),
       sendOnlyIfRed: config.sendOnlyIfRed ?? false,
       isActive: config.isActive ?? true
     });
+
+    this.setSenderEmailLinkState(this.smtpForm.get('useUsernameAsSenderEmail')?.value === true);
 
     this.applyProviderPreset(config.provider || 'custom', true);
 
@@ -331,7 +349,7 @@ export class SettingsComponent implements OnInit {
 
   get smtpPasswordPlaceholder(): string {
     const hasTypedValue = !!String(this.smtpForm.get('password')?.value || '').trim();
-    return this.hasStoredSmtpConfig && !hasTypedValue ? '********' : '';
+    return this.hasStoredSmtpConfig && !hasTypedValue ? '******' : '';
   }
 
   get canSaveSmtpConfig(): boolean {
@@ -339,7 +357,31 @@ export class SettingsComponent implements OnInit {
   }
 
   toggleSmtpPasswordVisibility(): void {
-    this.showSmtpPassword = !this.showSmtpPassword;
+    const shouldShow = !this.showSmtpPassword;
+
+    if (shouldShow) {
+      const hasTypedValue = !!String(this.smtpForm.get('password')?.value || '').trim();
+      if (!hasTypedValue && this.hasStoredSmtpConfig) {
+        this.smtpService.getStoredPassword().subscribe({
+          next: (resp) => {
+            const password = String(resp?.password || '');
+            this.smtpForm.patchValue({ password }, { emitEvent: false });
+            this.showSmtpPassword = true;
+          },
+          error: (err) => {
+            this.smtpLastError = this.buildSmtpDiagnostic(err);
+            this.snackBar.open(
+              'No se pudo revelar la contraseña SMTP guardada. Revisa Logs de Auditoría.',
+              'Cerrar',
+              { duration: 5000 }
+            );
+          }
+        });
+        return;
+      }
+    }
+
+    this.showSmtpPassword = shouldShow;
   }
 
   private applyProviderPreset(provider: string, keepExistingHost = false): void {
@@ -351,6 +393,20 @@ export class SettingsComponent implements OnInit {
       port: preset.port,
       useTLS: preset.useTLS
     }, { emitEvent: false });
+  }
+
+  private setSenderEmailLinkState(useLinkedEmail: boolean): void {
+    const senderEmailControl = this.smtpForm.get('senderEmail');
+    if (!senderEmailControl) return;
+
+    if (useLinkedEmail) {
+      const username = String(this.smtpForm.get('username')?.value || '').trim();
+      senderEmailControl.setValue(username, { emitEvent: false });
+      senderEmailControl.disable({ emitEvent: false });
+      return;
+    }
+
+    senderEmailControl.enable({ emitEvent: false });
   }
 
   onSmtpActiveChange(enabled: boolean): void {
@@ -526,6 +582,19 @@ export class SettingsComponent implements OnInit {
       lowered.includes('authentication unsuccessful') ||
       lowered.includes('auth')
     ) {
+      if (
+        lowered.includes('5.7.139') ||
+        lowered.includes('did not meet the criteria') ||
+        lowered.includes('contact your administrator')
+      ) {
+        return {
+          code: 'SMTP_AUTH_POLICY',
+          probableCause: 'Bloqueo de política de Microsoft 365 (Conditional Access o SMTP AUTH restringido)',
+          suggestedAction: 'No es solo clave: valida política SMTP AUTH del usuario, MFA/App Password y restricciones por IP/origen.',
+          rawMessage: detailedMessage
+        };
+      }
+
       return {
         code: 'SMTP_AUTH',
         probableCause: 'Credenciales SMTP inválidas o bloqueadas',
@@ -581,21 +650,26 @@ export class SettingsComponent implements OnInit {
   }
 
   private buildSmtpPayload(): SmtpConfigRequest {
-    const value = this.smtpForm.value;
+    const value = this.smtpForm.getRawValue();
     const recipients = (value.recipientsText as string || '')
       .split(',')
       .map(r => r.trim())
       .filter(r => r.length > 0);
 
+    const username = String(value.username || '').trim();
+    const senderEmail = value.useUsernameAsSenderEmail === true
+      ? username
+      : String(value.senderEmail || '').trim();
+
     const payload: SmtpConfigRequest = {
       provider: value.provider,
       authMethod: 'credentials',
-      username: value.username,
+      username,
       host: value.host,
       port: Number(value.port),
       useTLS: value.useTLS,
       senderName: value.senderName,
-      senderEmail: value.senderEmail,
+      senderEmail,
       recipients,
       sendOnlyIfRed: value.sendOnlyIfRed,
       isActive: value.isActive

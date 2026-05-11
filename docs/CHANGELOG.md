@@ -2,6 +2,23 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.71-beta] - 2026-05-11
+
+### SMTP: observabilidad real, diagnóstico útil y UX operativa
+
+- **Clasificación explícita de bloqueo de autenticación por política (M365):** en pruebas SMTP se agregó categorización específica `smtp_auth_policy` para errores tipo `535 5.7.139`, separándolos de credenciales inválidas y evitando diagnósticos ambiguos.
+- **Metadatos de auditoría SMTP más completos:** los eventos de prueba SMTP registran categoría de falla, código SMTP, resultado y contexto de destinatarios para facilitar análisis post-incidente.
+- **Visibilidad del motivo técnico en UI de auditoría:** la vista de auditoría ahora muestra el motivo detallado (`reason`) en eventos de correo/SMTP y etiqueta explícitamente resultados de `SMTP TEST`.
+- **Filtro de categoría `mail` ampliado:** el backend incluyó también eventos `.email.` en consultas de auditoría para no ocultar fallas reales de envío/prueba.
+- **Revelado seguro de contraseña SMTP para administradores:** nuevo endpoint `GET /api/smtp/password` (solo admin) para ver la contraseña almacenada bajo demanda; se agregó trazabilidad de acceso en auditoría.
+- **Diagnóstico frontend alineado al backend:** la pantalla de configuración SMTP reconoce y muestra `SMTP_AUTH_POLICY` con recomendación operativa específica.
+- **Menos fricción en formulario SMTP:** se agregó opción para usar automáticamente el correo de `Usuario SMTP` como `Email Remitente`, evitando doble ingreso del mismo correo. Si está activa, el remitente se autocompleta y queda bloqueado para mantener consistencia; puede desactivarse para casos avanzados.
+
+### Backup/Restore: evidencia explícita de restauración de secretos
+
+- **Respuesta y auditoría de restore/import enriquecidas:** se añadieron campos `restoredUploads`, `restoredGlobal`, `restoredSecrets` y `keyringPresentAfterRestore` para verificar de forma explícita qué se repuso tras una recuperación.
+- **Trazabilidad de restauración de keyring:** se dejó evidencia operativa de presencia de `encryption-keyring.json` después de restore/import, reduciendo falsos diagnósticos sobre pérdida de credenciales cifradas.
+
 ## [v1.5.70-beta] - 2026-05-11
 
 ### Hotfix SMTP post-restore: 400 al desactivar y diagnóstico incompleto

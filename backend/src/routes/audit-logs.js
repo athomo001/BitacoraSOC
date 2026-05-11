@@ -68,7 +68,7 @@ const buildFiltersFromQuery = (query) => {
   } else if (category) {
     switch (category) {
       case 'mail':
-        filters.event = /^(mail\.|smtp\.)/;
+        filters.event = /^(mail\.|smtp\.)|\.email\./;
         break;
       case 'admin':
         filters.event = /^(admin\.|BACKUP_)/;
