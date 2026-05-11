@@ -16,9 +16,16 @@
           <mat-label>Tipo</mat-label>
           <mat-select [(ngModel)]="directoryTypeFilter" (selectionChange)="applyDirectoryFilters()">
             <mat-option value="">Todos</mat-option>
-            <mat-option value="Internal">Internos</mat-option>
-            <mat-option value="External">Externos</mat-option>
+            <mat-option value="External">Personales</mat-option>
             <mat-option value="List">Listas</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Ámbito</mat-label>
+          <mat-select [(ngModel)]="directoryScopeFilter" (selectionChange)="applyDirectoryFilters()">
+            <mat-option value="">Todos</mat-option>
+            <mat-option value="Internal">Interno</mat-option>
+            <mat-option value="External">Externo</mat-option>
           </mat-select>
         </mat-form-field>
         <mat-form-field appearance="outline">
@@ -62,7 +69,7 @@
 
     <ng-template #directoryContactForm>
       <div *ngIf="isEditingInternalContact" class="warning-banner" style="background-color:#fff3cd; border-left:4px solid #ffc107; padding:12px; margin-bottom:16px; border-radius:4px;">
-        <p style="margin:0; color:#856404; font-size:14px;"><strong>⚠️ Contacto de usuario interno:</strong> Solo puedes editar Teléfono, Empresa, Tipo y Ámbito. Para cambiar otros datos, usa la sección de Usuarios.</p>
+          <p style="margin:0; color:#856404; font-size:14px;"><strong>⚠️ Contacto sincronizado desde Usuarios:</strong> Solo puedes editar Teléfono, Empresa, Tipo y Ámbito. Para cambiar otros datos, usa la sección de Usuarios.</p>
       </div>
       <form (ngSubmit)="saveDirectoryContact()">
         <mat-form-field appearance="outline">
@@ -91,7 +98,6 @@
         <mat-form-field appearance="outline">
           <mat-label>Tipo</mat-label>
           <mat-select [(ngModel)]="directoryFormModel.type" name="dirType">
-            <mat-option value="Internal">Interno</mat-option>
             <mat-option value="External">Personal</mat-option>
             <mat-option value="List">Lista</mat-option>
           </mat-select>
@@ -156,7 +162,7 @@
                 color="primary"
                 (click)="editDirectoryContact(person)"
                 [disabled]="!canDirectoryWrite"
-                [matTooltip]="isDirectoryInternal(person) ? 'Editar campos permitidos: Teléfono, Empresa, Tipo, Ámbito' : 'Editar contacto del directorio'"
+                [matTooltip]="isDirectoryInternal(person) ? 'Editar campos permitidos: Teléfono, Empresa, Tipo, Ámbito (origen: Usuarios)' : 'Editar contacto del directorio'"
                 aria-label="Editar contacto">
                 <mat-icon aria-hidden="true">edit</mat-icon>
               </button>
@@ -165,7 +171,7 @@
                 color="warn"
                 (click)="deleteDirectoryContact(person._id)"
                 [disabled]="isDirectoryInternal(person) || !canDirectoryDelete"
-                [matTooltip]="isDirectoryInternal(person) ? 'No se pueden eliminar contactos de usuarios internos desde aquí' : 'Eliminar contacto del directorio'"
+                [matTooltip]="isDirectoryInternal(person) ? 'No se pueden eliminar contactos sincronizados desde Usuarios desde aquí' : 'Eliminar contacto del directorio'"
                 aria-label="Eliminar contacto">
                 <mat-icon aria-hidden="true">delete</mat-icon>
               </button>

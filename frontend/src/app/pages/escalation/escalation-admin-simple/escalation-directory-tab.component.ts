@@ -42,7 +42,8 @@ export class EscalationDirectoryTabComponent implements OnInit {
   @Output() directoryRefresh = new EventEmitter<void>();
 
   directorySearch = '';
-  directoryTypeFilter: '' | 'Internal' | 'External' | 'List' = '';
+  directoryTypeFilter: '' | 'External' | 'List' = '';
+  directoryScopeFilter: '' | 'Internal' | 'External' = '';
   directoryCompanyFilter = '';
   directoryPageSize: 50 | 100 | 'all' = 50;
   directoryPageIndex = 0;
@@ -60,7 +61,7 @@ export class EscalationDirectoryTabComponent implements OnInit {
     phone: '',
     company: '',
     position: '',
-    type: 'External' as 'Internal' | 'External' | 'List',
+    type: 'External' as 'External' | 'List',
     scope: 'External' as 'Internal' | 'External',
     isFavorite: false
   };
@@ -88,8 +89,9 @@ export class EscalationDirectoryTabComponent implements OnInit {
       const matchesTerm = !term || [c.name, c.email, c.phone, c.company, c.position]
         .some((v) => String(v || '').toLowerCase().includes(term));
       const matchesType = !this.directoryTypeFilter || c.type === this.directoryTypeFilter;
+      const matchesScope = !this.directoryScopeFilter || c.scope === this.directoryScopeFilter;
       const matchesCompany = !this.directoryCompanyFilter || c.company === this.directoryCompanyFilter;
-      return matchesTerm && matchesType && matchesCompany;
+      return matchesTerm && matchesType && matchesScope && matchesCompany;
     });
   }
 
@@ -167,7 +169,7 @@ export class EscalationDirectoryTabComponent implements OnInit {
       phone: String(contact.phone || ''),
       company: String(contact.company || ''),
       position: String(contact.position || ''),
-      type: (contact.type as any) || 'External',
+      type: this.normalizeDirectoryType(contact.type),
       scope: (contact.scope as any) || (contact.type === 'Internal' ? 'Internal' : 'External'),
       isFavorite: !!contact.isFavorite
     };
@@ -270,11 +272,15 @@ export class EscalationDirectoryTabComponent implements OnInit {
   // Helpers
   getDirectoryTypeLabel(type?: string): string {
     switch (type) {
-      case 'Internal': return 'Interno';
+      case 'Internal': return 'Personal';
       case 'External': return 'Personal';
       case 'List': return 'Lista';
       default: return type || 'N/A';
     }
+  }
+
+  private normalizeDirectoryType(type?: string): 'External' | 'List' {
+    return type === 'List' ? 'List' : 'External';
   }
 
   getDirectoryScopeLabel(scope?: string): string {
@@ -282,7 +288,7 @@ export class EscalationDirectoryTabComponent implements OnInit {
   }
 
   isDirectoryInternal(contact: DirectoryContact): boolean {
-    return contact?.type === 'Internal' || contact?.scope === 'Internal';
+    return contact?.source === 'User';
   }
 
   copyDirectoryValue(value: string, label: string): void {

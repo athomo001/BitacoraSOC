@@ -313,7 +313,7 @@ exports.deleteDirectoryContact = async (req, res) => {
       return res.status(404).json({ error: 'Contacto no encontrado' });
     }
     if (deleted.source === 'User') {
-      return res.status(403).json({ error: 'Los contactos internos no se eliminan desde el directorio' });
+      return res.status(403).json({ error: 'Los contactos sincronizados desde Usuarios no se eliminan desde el directorio' });
     }
 
     const email = String(deleted.email || '').trim().toLowerCase();
