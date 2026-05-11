@@ -153,6 +153,12 @@ export class EscalationDirectoryTabComponent implements OnInit {
       this.showError('No tienes permisos para editar');
       return;
     }
+
+    if (this.editingDirectoryContactId === contact._id && this.showDirectoryForm) {
+      this.cancelDirectoryForm();
+      return;
+    }
+
     this.isEditingInternalContact = this.isDirectoryInternal(contact);
     this.editingDirectoryContactId = contact._id;
     this.directoryFormModel = {
@@ -166,6 +172,10 @@ export class EscalationDirectoryTabComponent implements OnInit {
       isFavorite: !!contact.isFavorite
     };
     this.showDirectoryForm = true;
+  }
+
+  isEditingDirectoryContact(contact: DirectoryContact): boolean {
+    return this.showDirectoryForm && !!contact?._id && this.editingDirectoryContactId === contact._id;
   }
 
   saveDirectoryContact(): void {

@@ -127,6 +127,11 @@ form {
   color: var(--state-neutral);
 }
 
+.status-chip.desactivado {
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+}
+
 .full-width {
   grid-column: 1 / -1;
 }

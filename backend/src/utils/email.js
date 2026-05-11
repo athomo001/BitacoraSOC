@@ -183,6 +183,29 @@ async function getSMTPConfig() {
       return config;
     }
 
+    const disabledDoc = await SmtpConfig.findOne({ isActive: false })
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .lean();
+
+    if (disabledDoc) {
+      logger.warn('📧 SMTP config found but disabled in SmtpConfig');
+      return {
+        disabled: true,
+        host: disabledDoc.host,
+        port: disabledDoc.port,
+        secure: disabledDoc.useTLS === true,
+        requireTLS: disabledDoc.useTLS === true,
+        useTLS: disabledDoc.useTLS === true,
+        user: disabledDoc.username,
+        pass: safeDecrypt(disabledDoc.password, { allowPlainFallback: false }),
+        smtpConfigId: disabledDoc._id?.toString?.() || String(disabledDoc._id || ''),
+        smtpConfigSource: 'SmtpConfig',
+        from: disabledDoc.senderName
+          ? `"${disabledDoc.senderName}" <${disabledDoc.senderEmail}>`
+          : disabledDoc.senderEmail || disabledDoc.username
+      };
+    }
+
     logger.warn('📧 No SMTP config found in SmtpConfig (isActive: true)');
   } catch (error) {
     logger.error('📧 ERROR reading SMTP from SmtpConfig:', error.message, error.stack);
@@ -305,6 +328,10 @@ async function sendEmail({ to, cc, subject, text, html, from, attachments, audit
     }
     
     const config = await getSMTPConfig();
+
+    if (config?.disabled) {
+      throw new Error('SMTP sending is disabled by admin');
+    }
     
     if (!config || !config.user || !config.pass) {
       logger.error('❌ [sendEmail] SMTP config is missing!', { user: config?.user, pass: !!config?.pass });

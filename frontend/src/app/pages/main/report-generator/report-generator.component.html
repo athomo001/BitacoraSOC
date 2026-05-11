@@ -514,58 +514,50 @@
           <div class="newsletter-recipient-layout">
             <div class="newsletter-left-column">
               <div class="newsletter-manual-block">
-                <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Destinatarios manuales</mat-label>
-                  <textarea matInput [(ngModel)]="newsletterRecipients" rows="6" placeholder="correo1@cliente.com, correo2@cliente.com o uno por línea"></textarea>
-                </mat-form-field>
-                <p class="newsletter-helper-text newsletter-helper-text--no-margin">
-                  Fallback manual preservado. Puedes mezclarlo con contactos guardados sin repetir destinatarios.
-                </p>
-              </div>
-
-              <div class="newsletter-mailing-list-block">
-                <div class="newsletter-saved-header">
-                  <strong>Listas de correo</strong>
-                  <span>{{ newsletterSelectedMailingListCount }} seleccionadas</span>
-                </div>
-
-                <div class="newsletter-mini-actions" *ngIf="mailingListContacts.length > 0">
-                  <mat-checkbox [checked]="allMailingListsSelected" (change)="toggleAllMailingLists($event.checked)" color="primary">Seleccionar todas</mat-checkbox>
-                </div>
-
-                <div class="newsletter-contact-list" *ngIf="mailingListContacts.length > 0; else noMailingLists">
-                  <label class="newsletter-contact-item"
-                         *ngFor="let contact of mailingListContacts"
-                         [class.is-disabled]="!isValidNewsletterEmail(contact.email)">
-                    <mat-checkbox
-                      [checked]="newsletterSelectedMailingLists.has(contact._id || '')"
-                      [disabled]="!isValidNewsletterEmail(contact.email)"
-                      (change)="toggleMailingList(contact, $event.checked)">
-                    </mat-checkbox>
-
-                    <div class="newsletter-contact-meta">
-                      <div class="newsletter-contact-title">
-                        <strong>{{ contact.name }}</strong>
-                        <span class="newsletter-badge accent">📋 Lista</span>
-                      </div>
-                      <div class="newsletter-contact-detail">{{ contact.email || 'Sin correo válido' }}</div>
-                      <div class="newsletter-contact-detail">{{ contact.company || 'Sin empresa' }}</div>
-                    </div>
-                  </label>
-                </div>
-
-                <ng-template #noMailingLists>
-                  <div class="newsletter-empty-state">
-                    No hay listas de correo registradas. Créalas en el Directorio General.
+                <div class="field-with-hint"
+                     (mouseenter)="guideActive ? handleFieldFocus('hint-nl-send-para') : null"
+                     (mouseleave)="guideActive ? handleFieldBlur() : null">
+                  <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-nl-send-para'">
+                    {{ getHint('hint-nl-send-para') }}
                   </div>
-                </ng-template>
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Destinatarios (Para)</mat-label>
+                    <textarea matInput [(ngModel)]="newsletterRecipients" rows="6" placeholder="correo1@cliente.com, correo2@cliente.com o uno por línea"></textarea>
+                  </mat-form-field>
+                </div>
+                <p class="newsletter-helper-text newsletter-helper-text--no-margin">
+                  Puedes mezclarlo con contactos guardados sin repetir destinatarios.
+                </p>
+
+                <div class="field-with-hint"
+                     (mouseenter)="guideActive ? handleFieldFocus('hint-nl-send-cc') : null"
+                     (mouseleave)="guideActive ? handleFieldBlur() : null">
+                  <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-nl-send-cc'">
+                    {{ getHint('hint-nl-send-cc') }}
+                  </div>
+                  <mat-form-field appearance="outline" class="full-width" style="margin-top: 12px;">
+                    <mat-label>CC interno (copia a control)</mat-label>
+                    <textarea matInput [(ngModel)]="newsletterCcRecipients" rows="3" placeholder="operaciones@empresa.cl, control@empresa.cl o uno por línea"></textarea>
+                  </mat-form-field>
+                </div>
+                <p class="newsletter-helper-text newsletter-helper-text--no-margin">
+                  Cada correo individual enviado incluirá estos CC. Separados por coma, punto y coma o salto de línea.
+                  <span *ngIf="newsletterCcSummary.invalid.length > 0" class="newsletter-cc-invalid-hint">
+                    ⚠ CC inválidos: {{ newsletterCcSummary.invalid.join(', ') }}
+                  </span>
+                </p>
               </div>
             </div>
 
-            <aside class="newsletter-saved-block">
+            <aside class="newsletter-saved-block"
+                   (mouseenter)="guideActive ? handleFieldFocus('hint-nl-saved-contacts') : null"
+                   (mouseleave)="guideActive ? handleFieldBlur() : null">
+              <div class="help-bubble help-bubble--side" *ngIf="guideActive && hintActiveId === 'hint-nl-saved-contacts'">
+                {{ getHint('hint-nl-saved-contacts') }}
+              </div>
               <div class="newsletter-saved-header">
                 <strong>Contactos guardados</strong>
-                <span>{{ newsletterSelectedCount }} seleccionados</span>
+                <span>Para: {{ newsletterRecipientSummary.validRecipients.length }} &middot; CC: {{ newsletterCcSummary.valid.length }}</span>
               </div>
 
               <div class="newsletter-filter-grid">
@@ -587,30 +579,40 @@
 
               <div class="newsletter-mini-actions">
                 <mat-checkbox [(ngModel)]="newsletterFavoritesOnly" color="primary">Solo favoritos</mat-checkbox>
-                <button mat-button type="button" (click)="selectAllNewsletterContacts()">Seleccionar todo</button>
-                <button mat-button type="button" (click)="clearNewsletterSelection()">Limpiar</button>
+                <button mat-button type="button" (click)="selectAllNewsletterContacts()">+ Todos al Para</button>
+                <button mat-button type="button" (click)="clearNewsletterSelection()">Limpiar Para</button>
               </div>
 
               <div class="newsletter-contact-list" *ngIf="filteredNewsletterContacts.length > 0; else noNewsletterContacts">
-                <label class="newsletter-contact-item"
-                       *ngFor="let contact of filteredNewsletterContacts"
-                       [class.is-disabled]="!isValidNewsletterEmail(contact.email)">
-                  <mat-checkbox
-                    [checked]="isNewsletterContactSelected(contact)"
-                    [disabled]="!isValidNewsletterEmail(contact.email)"
-                    (change)="toggleNewsletterContact(contact, $event.checked)">
-                  </mat-checkbox>
-
+                <div class="newsletter-contact-item"
+                     *ngFor="let contact of filteredNewsletterContacts"
+                     [class.is-disabled]="!isValidNewsletterEmail(contact.email)">
                   <div class="newsletter-contact-meta">
                     <div class="newsletter-contact-title">
                       <strong>{{ contact.name }}</strong>
                       <span class="newsletter-badge muted">👤 Personal</span>
-                      <span class="newsletter-badge favorite" *ngIf="contact.isFavorite">Favorito</span>
+                      <span class="newsletter-badge favorite" *ngIf="contact.isFavorite">★</span>
                     </div>
                     <div class="newsletter-contact-detail">{{ contact.email || 'Sin correo válido' }}</div>
-                    <div class="newsletter-contact-detail">{{ contact.company || 'Sin empresa' }}</div>
+                    <div class="newsletter-contact-detail">{{ contact.company || '' }}</div>
                   </div>
-                </label>
+                  <div class="newsletter-contact-actions" *ngIf="isValidNewsletterEmail(contact.email)">
+                    <button type="button" class="field-btn"
+                            [class.field-btn--active-to]="isEmailInField(contact.email, 'to')"
+                            (click)="toggleEmailInField(contact.email, 'to')"
+                            matTooltip="Para: destinatario principal. Recibe el boletín directamente."
+                            matTooltipPosition="above">
+                      {{ isEmailInField(contact.email, 'to') ? '✓' : '+' }} Para
+                    </button>
+                    <button type="button" class="field-btn"
+                            [class.field-btn--active-cc]="isEmailInField(contact.email, 'cc')"
+                            (click)="toggleEmailInField(contact.email, 'cc')"
+                            matTooltip="CC: copia interna o seguimiento. Se envía como copia del boletín."
+                            matTooltipPosition="above">
+                      {{ isEmailInField(contact.email, 'cc') ? '✓' : '+' }} CC
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <ng-template #noNewsletterContacts>
@@ -618,11 +620,57 @@
                   No hay contactos en el directorio que coincidan con el filtro actual.
                 </div>
               </ng-template>
+
+              <!-- Listas de correo -->
+              <div class="newsletter-mailing-list-block">
+                <div class="newsletter-saved-header" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--outline-subtle);">
+                  <strong>Listas de correo</strong>
+                  <button mat-button type="button" (click)="selectAllMailingLists()" *ngIf="mailingListContacts.length > 0" style="font-size:12px; padding: 0 8px; min-width: 0;">+ Todas al Para</button>
+                </div>
+
+                <div class="newsletter-contact-list" *ngIf="mailingListContacts.length > 0; else noMailingLists">
+                  <div class="newsletter-contact-item"
+                       *ngFor="let contact of mailingListContacts"
+                       [class.is-disabled]="!isValidNewsletterEmail(contact.email)">
+                    <div class="newsletter-contact-meta">
+                      <div class="newsletter-contact-title">
+                        <strong>{{ contact.name }}</strong>
+                        <span class="newsletter-badge accent">📋 Lista</span>
+                      </div>
+                      <div class="newsletter-contact-detail">{{ contact.email || 'Sin correo válido' }}</div>
+                      <div class="newsletter-contact-detail">{{ contact.company || '' }}</div>
+                    </div>
+                    <div class="newsletter-contact-actions" *ngIf="isValidNewsletterEmail(contact.email)">
+                      <button type="button" class="field-btn"
+                              [class.field-btn--active-to]="isEmailInField(contact.email, 'to')"
+                              (click)="toggleEmailInField(contact.email, 'to')"
+                              matTooltip="Para: destinatario principal. Recibe el boletín directamente."
+                              matTooltipPosition="above">
+                        {{ isEmailInField(contact.email, 'to') ? '✓' : '+' }} Para
+                      </button>
+                      <button type="button" class="field-btn"
+                              [class.field-btn--active-cc]="isEmailInField(contact.email, 'cc')"
+                              (click)="toggleEmailInField(contact.email, 'cc')"
+                              matTooltip="CC: copia interna o seguimiento. Se envía como copia del boletín."
+                              matTooltipPosition="above">
+                        {{ isEmailInField(contact.email, 'cc') ? '✓' : '+' }} CC
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <ng-template #noMailingLists>
+                  <div class="newsletter-empty-state">
+                    No hay listas de correo registradas. Créalas en el Directorio General.
+                  </div>
+                </ng-template>
+              </div>
             </aside>
           </div>
 
           <div class="newsletter-validation-summary">
-            <span class="summary-pill ok">Válidos: {{ newsletterRecipientSummary.validRecipients.length }}</span>
+            <span class="summary-pill ok">Válidos (Para): {{ newsletterRecipientSummary.validRecipients.length }}</span>
+            <span class="summary-pill ok" *ngIf="newsletterCcSummary.valid.length > 0">CC: {{ newsletterCcSummary.valid.length }}</span>
             <span class="summary-pill warn">Duplicados: {{ newsletterRecipientSummary.duplicateRecipients.length }}</span>
             <span class="summary-pill danger">Inválidos: {{ newsletterRecipientSummary.invalidRecipients.length }}</span>
             <span class="summary-pill muted">Excluidos: {{ newsletterRecipientSummary.blockedRecipients.length }}</span>
@@ -644,8 +692,14 @@
             </p>
           </div>
 
-          <div class="form-actions">
-            <button mat-raised-button color="primary" [disabled]="newsletterRecipientSummary.validRecipients.length === 0 || isSendingNewsletter" (click)="sendNewsletter()">
+          <div class="form-actions field-with-hint"
+               (mouseenter)="guideActive ? handleFieldFocus('hint-nl-send-action') : null"
+               (mouseleave)="guideActive ? handleFieldBlur() : null">
+            <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-nl-send-action'">
+              {{ getHint('hint-nl-send-action') }}
+            </div>
+            <button mat-raised-button color="primary" [disabled]="newsletterRecipientSummary.validRecipients.length === 0 || isSendingNewsletter" (click)="sendNewsletter()"
+                    (focus)="handleFieldFocus('hint-nl-send-action')" (blur)="handleFieldBlur()">
               <mat-icon *ngIf="!isSendingNewsletter">send</mat-icon>
               <mat-icon *ngIf="isSendingNewsletter">hourglass_empty</mat-icon>
               {{ isSendingNewsletter ? 'Enviando...' : 'Enviar boletines (1:1)' }}

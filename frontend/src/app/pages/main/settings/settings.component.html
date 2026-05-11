@@ -41,7 +41,7 @@
         <header class="settings-panel__header settings-panel__header--split">
           <h2 class="settings-panel__title">Configuracion SMTP</h2>
           <span class="status-chip" [ngClass]="connectionStatus">
-            {{ connectionStatus === 'conectado' ? 'Conectado' : connectionStatus === 'desconectado' ? 'Desconectado' : 'Sin configurar' }}
+            {{ connectionStatus === 'conectado' ? 'Conectado' : connectionStatus === 'desconectado' ? 'Desconectado' : connectionStatus === 'desactivado' ? 'Desactivado' : 'Sin configurar' }}
           </span>
         </header>
         <div class="settings-panel__body">
@@ -109,6 +109,10 @@
               Enviar correo solo si hay servicios en rojo (si no, envía siempre)
             </mat-checkbox>
 
+            <mat-checkbox formControlName="isActive" (change)="onSmtpActiveChange($event.checked)">
+              Activar envío de correos
+            </mat-checkbox>
+
             <div class="form-actions">
               <button mat-button type="button" (click)="openSmtpGuide()">Ver guía rápida</button>
               <button mat-stroked-button color="accent" type="button" (click)="testSmtp()" [disabled]="testing">
@@ -116,7 +120,7 @@
                 <span *ngIf="!testing">Probar conexion</span>
               </button>
 
-              <button mat-raised-button color="primary" type="submit" [disabled]="!smtpTestPassed || savingSmtp">
+              <button mat-raised-button color="primary" type="submit" [disabled]="!canSaveSmtpConfig">
                 <mat-spinner *ngIf="savingSmtp" diameter="18"></mat-spinner>
                 <span *ngIf="!savingSmtp">Guardar SMTP</span>
               </button>

@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: beta. Validar siempre los flujos criticos en un entorno controlado antes de pasar a operacion formal.
 >
-> Version referencial actual: 1.5.47-beta
+> Version referencial actual: 1.5.68-beta
 
 Stack principal:
 
@@ -47,6 +47,13 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 
 ## Novedades recientes (resumen rapido)
 
+### v1.5.68-beta
+
+- backup ZIP endurecido para operacion real: importacion por archivo hasta `100M`, soporte correcto de `clearBeforeRestore`, historial de fechas robusto y restauracion fisica de `uploads`, `secrets` y `global`.
+- purge total mas seguro: al limpiar la plataforma se recrea automaticamente la cuenta admin por defecto definida en `.env`.
+- SMTP puede quedar desactivado sin borrar host/usuario/credenciales; al reactivar se reutiliza la password cifrada almacenada cuando corresponde.
+- el Directorio Global ahora edita contactos existentes inline en la misma fila, evitando volver al inicio de la pagina en listas largas.
+
 ### v1.5.47-beta
 
 - correcciones visuales en temas Dark y Cyberpunk para checklist history, sidebar y acordeones laterales.
@@ -63,13 +70,14 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 ### Report Generator / Boletines
 
 - flujo dual consolidado (`Reporte Tecnico` / `Boletin de Seguridad`) en la misma pantalla.
-- envio de boletin 1:1 por destinatario (sin CC/BCC masivo).
+- envio de boletin 1:1 por destinatario, con `CC` interno opcional compartido por cada correo individual.
+- selector rapido de destinatarios desde agenda preventiva y panel dedicado de listas de correo para casillas grupales.
 - precheck previo al envio (logo valido, secciones minimas, color legible).
 - pegado enriquecido mejorado en campos de boletin (`Resumen`, `Impacto`, `Mitigacion`, `Referencias`) para evitar texto corrido sin estructura.
 
 ### Seguridad y estabilidad
 
-- backend robustecido en configuracion SMTP (compatibilidad con config legacy y mensajes de error accionables).
+- backend robustecido en configuracion SMTP (compatibilidad con config legacy, switch activo/inactivo y mensajes de error accionables).
 - trazabilidad de reintentos SMTP/GLPI en auditoria (`retryAttempt`, `retryCount`).
 - sincronizacion de indices criticos en Mongo al arranque (incluye TTL de auditoria).
 
@@ -209,7 +217,7 @@ Documentos principales:
 Documentos funcionales complementarios:
 
 - `docs/WORK-SHIFTS.md`
-- `docs/ESCALATION.md`
+- `docs/ESCALATION.md`: escalacion, directorio global, agenda preventiva y turnos
 - `docs/CATALOGS.md`
 - `docs/LOGGING.md`
 - `backend/scripts/README.md`

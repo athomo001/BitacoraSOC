@@ -22,6 +22,7 @@ Sistema centralizado para gestionar información de escalación: contactos exter
 - **CRUD de Clientes**: Organizaciones (ACME Corp, Global Tech, etc.)
 - **CRUD de Servicios**: Servicios por cliente (ACME - Service A, etc.)
 - **CRUD de Contactos**: Base de datos de personas con email/teléfono
+- **Directorio Global**: Fuente de verdad centralizada para contactos internos, externos y listas, con filtros operativos, copia rápida y edición contextual en fila.
 - **Reglas de Escalación**: Configurar Para/CC/Emergencia por servicio
 - **Asignaciones de Turno**: Planificar turnos semanales por rol
 - **Overrides Manuales**: Reemplazos temporales con vigencia y motivo
@@ -45,6 +46,7 @@ Esto crea los 3 roles predefinidos: N2, TI, N1_NO_HABIL.
 **Frontend:**
 - Vista Analista: `http://localhost:4200/main/escalation/view`
 - Vista Admin: `http://localhost:4200/main/escalation/admin`
+- Directorio Global: `http://localhost:4200/main/escalation/directory`
 
 **Backend API:**
 - Base: `/api/escalation`
@@ -150,6 +152,13 @@ Esto crea los 3 roles predefinidos: N2, TI, N1_NO_HABIL.
    - **Contactos Externos**: Para/CC/Emergencia
    - **Turnos Internos**: Quién está de turno AHORA con badges de override
 
+### Directorio Global (`/main/escalation/directory`)
+
+1. Usa el formulario superior solo para crear un contacto nuevo.
+2. Para modificar un contacto existente, pulsa **Editar** en su fila: el formulario se abre inline justo debajo del registro seleccionado.
+3. Si vuelves a pulsar **Editar** sobre la misma fila, el editor contextual se cierra sin sacarte del lugar actual de la tabla.
+4. El modulo sigue ofreciendo filtros operativos por busqueda, tipo y empresa, ademas de acciones de sincronizacion/consolidacion para mantener el directorio como fuente de verdad.
+
 ---
 
 ## 🔒 Seguridad
@@ -157,6 +166,7 @@ Esto crea los 3 roles predefinidos: N2, TI, N1_NO_HABIL.
 - **Vista de consulta**: Requiere autenticación (cualquier usuario)
 - **Vista admin**: Requiere rol `admin`
 - **Backend**: Middleware `requireAdmin` valida permisos en todas las rutas `/admin/*`
+- **Directorio Global**: Requiere autenticacion; la escritura y eliminacion se gobiernan por RBAC segun cargo/rol operativo, por lo que algunos perfiles quedan en solo lectura y otros pueden crear/editar sin ser `admin` global.
 
 ---
 

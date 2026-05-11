@@ -60,8 +60,7 @@
       <p>Vista de solo lectura. Tu perfil no tiene permisos para crear o editar contactos del directorio.</p>
     </div>
 
-    <article *ngIf="showDirectoryForm && canDirectoryWrite" class="inline-form directory-form">
-      <h3>{{ editingDirectoryContactId ? 'Editar contacto del directorio' : 'Nuevo contacto del directorio' }}</h3>
+    <ng-template #directoryContactForm>
       <div *ngIf="isEditingInternalContact" class="warning-banner" style="background-color:#fff3cd; border-left:4px solid #ffc107; padding:12px; margin-bottom:16px; border-radius:4px;">
         <p style="margin:0; color:#856404; font-size:14px;"><strong>⚠️ Contacto de usuario interno:</strong> Solo puedes editar Teléfono, Empresa, Tipo y Ámbito. Para cambiar otros datos, usa la sección de Usuarios.</p>
       </div>
@@ -114,6 +113,11 @@
           <button mat-button type="button" (click)="cancelDirectoryForm()">Cancelar</button>
         </div>
       </form>
+    </ng-template>
+
+    <article *ngIf="showDirectoryForm && canDirectoryWrite && !editingDirectoryContactId" class="inline-form directory-form">
+      <h3>{{ editingDirectoryContactId ? 'Editar contacto del directorio' : 'Nuevo contacto del directorio' }}</h3>
+      <ng-container *ngTemplateOutlet="directoryContactForm"></ng-container>
     </article>
 
     <div class="simple-table" *ngIf="!loadingDirectoryContacts && filteredDirectoryContacts.length > 0">
@@ -131,7 +135,8 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let person of paginatedDirectoryContacts">
+          <ng-container *ngFor="let person of paginatedDirectoryContacts">
+          <tr [class.directory-row--editing]="isEditingDirectoryContact(person)">
             <td>
               <strong class="copyable-cell" (click)="copyDirectoryValue(person.name || '', 'nombre')">{{ person.name }}</strong>
             </td>
@@ -166,6 +171,15 @@
               </button>
             </td>
           </tr>
+          <tr *ngIf="isEditingDirectoryContact(person)" class="directory-inline-edit-row">
+            <td colspan="8">
+              <article class="inline-form directory-form directory-form--embedded">
+                <h3>Editar contacto del directorio</h3>
+                <ng-container *ngTemplateOutlet="directoryContactForm"></ng-container>
+              </article>
+            </td>
+          </tr>
+          </ng-container>
         </tbody>
       </table>
     </div>

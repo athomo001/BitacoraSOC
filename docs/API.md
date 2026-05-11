@@ -145,6 +145,13 @@ El servidor acepta tokens con diferencia de ±60 segundos (previene errores por 
 | POST | `/api/smtp` | Guardar config | Admin |
 | POST | `/api/smtp/test` | Probar (rate-limited 3/15min) | Admin |
 
+Notas operativas SMTP:
+
+- `GET /api/smtp` devuelve la ultima configuracion guardada aunque este desactivada.
+- `POST /api/smtp` acepta `isActive`; cuando se guarda en `false`, la configuracion queda persistida pero sin habilitar envios.
+- Si el campo password se deja vacio y ya existe una configuracion previa, el backend reutiliza la contraseña cifrada almacenada.
+- Una configuracion SMTP desactivada bloquea el envio real de correos hasta reactivarse.
+
 ### Reportes
 
 | Método | Endpoint | Descripción | Rol |
@@ -160,6 +167,7 @@ Notas operativas de boletín:
 
 - El endpoint envía un correo por destinatario (privacidad por diseño, sin envío masivo en copia).
 - Requiere `html` del boletín y arreglo `recipients`.
+- Acepta opcionalmente `cc[]` para copias internas compartidas; cada correo 1:1 hereda ese `CC` filtrando auto-copias del destinatario principal.
 - Puede responder mezcla de éxitos/fallos (`successCount`, `failCount`).
 - Si no hay éxitos y sí fallos SMTP, retorna error con `detail` para diagnóstico.
 
@@ -194,6 +202,12 @@ Estado IA (planificado):
 | POST | `/api/backup/import` | Importar backup ZIP o JSON | Admin |
 | POST | `/api/backup/purge` | Purgar datos (con confirmación) | Admin |
 | DELETE | `/api/backup/:id` | Eliminar backup | Admin |
+
+Notas operativas de backup:
+
+- Los ZIP completos cubren base de datos + `uploads/` + `secrets/` + `global/` si existe en la instancia.
+- `POST /api/backup/import` acepta `multipart/form-data` y puede recibir `clearBeforeRestore=true` junto al archivo.
+- `POST /api/backup/purge` limpia tambien el filesystem restaurable del Core y recrea la cuenta admin por defecto desde `.env`.
 
 ### Logging (SIEM)
 

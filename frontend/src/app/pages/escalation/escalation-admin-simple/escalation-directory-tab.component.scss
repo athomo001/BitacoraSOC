@@ -142,7 +142,28 @@
     tr:hover {
       background: rgba(255, 255, 255, 0.02);
     }
+
+    tr.directory-row--editing {
+      background: rgba(var(--primary-rgb), 0.06);
+    }
+
+    tr.directory-inline-edit-row:hover {
+      background: transparent;
+    }
+
+    tr.directory-inline-edit-row td {
+      padding: 0;
+      background: transparent;
+    }
   }
+}
+
+.directory-form--embedded {
+  margin: 0;
+  border: none;
+  border-left: 4px solid var(--primary-color);
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .copyable-cell {

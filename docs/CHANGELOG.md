@@ -2,6 +2,59 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.68-beta] - 2026-05-11
+
+### Backup y recuperacion operativa reforzada
+
+- **Importacion ZIP estable para respaldos grandes:** se corrigio el `413 Request Entity Too Large` en importacion por archivo elevando el limite de `nginx` a `100M` y ampliando timeouts de proxy a `300s`.
+- **`clearBeforeRestore` ya funciona tambien al importar archivo:** el checkbox de borrado previo ahora viaja en `multipart/form-data` y el backend limpia las colecciones antes de reinsertar cuando corresponde.
+- **Historial de backups consistente en Docker/Windows:** `GET /api/backup/history` ahora usa `birthtime` valido con fallback a `mtime`, evitando fechas erroneas tipo `31-12-1969`.
+- **Cobertura ampliada del backup completo:** los ZIP manuales y automaticos incluyen base de datos, `uploads/`, `secrets/` y tambien el directorio opcional `global/` cuando existe en despliegues productivos.
+- **Restore/import fisico mas fiel:** al restaurar o importar un ZIP, el sistema repone recursivamente `uploads/`, `secrets/` y `global/`, manteniendo logos, certificados TLS, artefactos publicados y recursos compartidos del despliegue.
+- **Purge seguro para continuidad operativa:** la purga total ahora limpia tambien `global/` y recrea la cuenta administrativa por defecto usando las variables de `.env`, evitando quedar sin acceso tras un wipe controlado.
+
+### SMTP con interruptor operacional real
+
+- **Desactivacion sin borrar configuracion:** la configuracion SMTP ahora puede guardarse con `isActive=false`, quedando visible en UI/API pero sin habilitar envios reales.
+- **Sin prueba forzada al desactivar:** guardar una configuracion desactivada ya no obliga a pasar un test SMTP en vivo.
+- **Reactivacion sin perder credenciales:** si ya existe configuracion almacenada, el backend reutiliza la contraseña cifrada previa cuando el campo password se deja vacio al volver a guardar.
+- **Respeto centralizado del estado inactivo:** el flujo comun de envio de correo dejo de tratar una config desactivada como si pudiera hacer fallback implicito a otra fuente SMTP habilitada.
+
+### Directorio global con edicion contextual en fila
+
+- **Nuevo contacto arriba, edicion donde corresponde:** el formulario superior queda reservado para altas; al editar un contacto existente en `/main/escalation/directory`, el editor aparece inline justo debajo de la fila seleccionada.
+- **Menos friccion en listas largas:** se evita el salto al inicio de pagina al modificar contactos ubicados al final del directorio.
+- **Cierre rapido del editor contextual:** pulsar nuevamente editar sobre la misma fila permite abrir/cerrar el formulario inline sin perder el contexto visual.
+
+### Documentacion operativa sincronizada con boletines
+
+- **README y docs tecnicos alineados:** se actualizaron las guias para reflejar el estado actual del Boletin de Seguridad, incluyendo `CC` interno opcional, seleccion rapida desde agenda preventiva/listas de correo y el flujo 1:1 por destinatario.
+- **Arquitectura y API consistentes:** `docs/API.md` y `docs/ARCHITECTURE.md` ahora describen el payload real de `newsletter/send`, el uso opcional de `cc[]` y el comportamiento operativo del envio.
+
+## [v1.5.67-beta] - 2026-05-07
+
+### Directorio → Usuarios: sincronización retroactiva de teléfonos (`DIR-SYNC-113`)
+
+- **Bug corregido:** los teléfonos editados en el Directorio Global de Contactos para contactos de origen `User` nunca se propagaban hacia el modelo `User` en la colección de Gestión de Usuarios, quedando el campo `phone` en `null` indefinidamente.
+- **Causa raíz:** el controlador `updateDirectoryContact` retornaba `403 Forbidden` para cualquier intento de edición sobre contactos con `source='User'`, impidiendo tanto la actualización directa como la propagación en cascada.
+- **Solución implementada:**
+  - Se levantó la restricción absoluta: contactos `source='User'` ahora permiten edición de los campos `phone`, `company`, `type`, `scope` e `isFavorite` desde el directorio.
+  - Después de guardar el `DirectoryContact`, si el origen es `User`, se ejecuta `User.updateMany({ email }, { $set: { phone } })` para mantener consistencia entre ambas colecciones.
+  - Se agregó endpoint `POST /api/directory/sync-users-from-directory` (con `requireDirectoryWrite`) que realiza backfill retroactivo: recorre todos los contactos internos con email y propaga su teléfono al usuario correspondiente, sobrescribiendo `null`.
+  - Se encadenó el backfill en el flujo `syncAndMergeDirectoryNow()` del frontend: al pulsar **"Sincronizar y consolidar"**, primero se fusionan duplicados y luego se ejecuta la sincronización retroactiva de teléfonos.
+- **Archivos modificados:**
+  - `backend/src/controllers/directoryContactController.js` — lógica de update parcial + función `syncUsersFromDirectoryNow`.
+  - `backend/src/routes/directory.js` — ruta `POST /sync-users-from-directory`.
+  - `frontend/src/app/services/directory.service.ts` — método `syncUsersFromDirectory()`.
+  - `frontend/src/app/pages/escalation/escalation-admin-simple/escalation-directory-tab.component.ts` — encadenamiento del backfill en consolidación.
+
+### UX y correcciones menores (`UX-FIX-114`)
+
+- **Placeholder corregido en Contactos:** se reemplazó `"Ej: PJUD"` por `"Ej: ACME, Cliente X"` en el campo _Empresa_ del formulario de contactos de escalación.
+- **Espaciado en leyenda de directorio:** se agregó `margin-bottom` al subtítulo de la sección para separarlo visualmente del primer botón de acción.
+- **Visibilidad condicional de AFPmodelo:** el selector de cliente derivado (`AFPmodelo`) ya no se muestra si no hay cliente principal seleccionado; se agregó `onClientSearchChange()` que limpia `selectedClient` al borrar el campo de búsqueda.
+- **Botón "Sincronizar y consolidar" no destructivo:** se desacopló del proceso de rebuild completo; ahora solo ejecuta `mergeDuplicates()` para no sobreescribir datos manuales vigentes.
+
 ## [v1.5.66-beta] - 2026-05-07
 
 ### Fix: autocomplete de destinatarios múltiples en Automatización de Turnos (`ESC-SHIFT-112`)
