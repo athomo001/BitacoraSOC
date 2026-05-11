@@ -170,7 +170,16 @@ const getEscalationReminderRecipients = async (cargoLabels) => {
     .map(normalizeCargoLabel)
     .filter(Boolean);
 
+  logger.debug('[getEscalationReminderRecipients] Normalizando cargos', {
+    inputCargos: cargoLabels,
+    normalizedCargos: normalized,
+    cargoCount: normalized.length
+  });
+
   if (normalized.length === 0) {
+    logger.warn('[getEscalationReminderRecipients] No hay cargos normalizados', {
+      inputCargos: cargoLabels
+    });
     return [];
   }
 
@@ -180,9 +189,20 @@ const getEscalationReminderRecipients = async (cargoLabels) => {
     cargoLabel: { $exists: true, $ne: '' }
   }).select('email cargoLabel fullName username');
 
-  return users
-    .filter((user) => normalized.includes(normalizeCargoLabel(user.cargoLabel)))
-    .map((user) => user.email);
+  const matched = users
+    .filter((user) => normalized.includes(normalizeCargoLabel(user.cargoLabel)));
+
+  const recipients = matched.map((user) => user.email);
+
+  logger.debug('[getEscalationReminderRecipients] Búsqueda completada', {
+    searchedCargos: normalized,
+    totalActiveUsersWithEmail: users.length,
+    usersWithMatchingCargos: matched.length,
+    matchedCargos: Array.from(new Set(matched.map(u => u.cargoLabel))),
+    recipients: recipients.map(r => r.substring(0, 3) + '***')
+  });
+
+  return recipients;
 };
 
 const resolveFutureWeekGap = async (now, config) => {
@@ -297,6 +317,14 @@ const runEscalationInternalReminder = async () => {
       : ['N2'];
 
     const recipients = await getEscalationReminderRecipients(cargoLabels);
+    
+    logger.debug('[runEscalationInternalReminder] Resolviendo destinatarios', {
+      cargoLabels,
+      recipientsFound: recipients.length,
+      recipients: recipients.map(r => r.substring(0, 3) + '***'),
+      missingRoleCodes: futureWeekGap.missingRoleCodes
+    });
+    
     if (recipients.length === 0) {
       logger.warn({
         event: 'escalation.reminder.skipped',
@@ -304,8 +332,10 @@ const runEscalationInternalReminder = async () => {
         cargoLabels,
         missingRoleCodes: futureWeekGap.missingRoleCodes,
         targetWeekStart: futureWeekGap.weekStart.toISOString(),
-        targetWeekEnd: futureWeekGap.weekEnd.toISOString()
-      }, 'Recordatorio de escalacion interna sin destinatarios');
+        targetWeekEnd: futureWeekGap.weekEnd.toISOString(),
+        escalationReminderEnabled: config.escalationReminderEnabled,
+        hasConfiguredCargos: cargoLabels.length > 0
+      }, 'Recordatorio de escalacion interna sin destinatarios - verifica: ¿hay usuarios activos con esos cargos?');
       return;
     }
 

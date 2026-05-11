@@ -165,25 +165,51 @@ const decrypt = (ciphertext) => {
     
     // Legacy fallback: si no tiene formato nuevo, intentar crypto-js
     if (parts.length !== 3) {
+      console.log(`[DECRYPT] Formato legacy detectado (${parts.length} partes), intentando crypto-js...`);
       const CryptoJS = require('crypto-js');
       const candidateKeys = getAvailableHexKeys();
+      console.log(`[DECRYPT] Intentando ${candidateKeys.length} llaves candidatas`);
 
-      for (const candidate of candidateKeys) {
-        const bytes = CryptoJS.AES.decrypt(ciphertext, candidate);
-        const decoded = bytes.toString(CryptoJS.enc.Utf8);
-        if (decoded) return decoded;
+      for (let i = 0; i < candidateKeys.length; i++) {
+        const candidate = candidateKeys[i];
+        try {
+          const bytes = CryptoJS.AES.decrypt(ciphertext, candidate);
+          const decoded = bytes.toString(CryptoJS.enc.Utf8);
+          // Validar que el descifrado sea realmente válido UTF-8 (no basura)
+          if (decoded && /^[\x20-\x7E\t\n\r]*$/.test(decoded)) {
+            console.log(`[DECRYPT] ✓ Llave ${i} funcionó (crypto-js legacy)`);
+            return decoded;
+          }
+          console.log(`[DECRYPT] ✗ Llave ${i} descifró basura (${decoded.substring(0, 20)}...)`);
+        } catch (e) {
+          console.log(`[DECRYPT] ✗ Llave ${i} error: ${e.message}`);
+        }
       }
 
-      const bytes = CryptoJS.AES.decrypt(ciphertext, process.env.ENCRYPTION_KEY || 'default-key-change-me!!!!!!!!');
-      return bytes.toString(CryptoJS.enc.Utf8);
+      try {
+        console.log(`[DECRYPT] Intentando ENCRYPTION_KEY de env...`);
+        const bytes = CryptoJS.AES.decrypt(ciphertext, process.env.ENCRYPTION_KEY || 'default-key-change-me!!!!!!!!');
+        const decoded = bytes.toString(CryptoJS.enc.Utf8);
+        if (decoded && /^[\x20-\x7E\t\n\r]*$/.test(decoded)) {
+          console.log(`[DECRYPT] ✓ ENCRYPTION_KEY funcionó`);
+          return decoded;
+        }
+        console.log(`[DECRYPT] ✗ ENCRYPTION_KEY descifró basura`);
+        return '';
+      } catch (e) {
+        console.log(`[DECRYPT] ✗ ENCRYPTION_KEY error: ${e.message}`);
+        return '';
+      }
     }
     
+    console.log(`[DECRYPT] Formato AES-256-GCM detectado, intentando ${getAvailableHexKeys().length} llaves...`);
     const iv = Buffer.from(parts[0], 'hex');
     const authTag = Buffer.from(parts[1], 'hex');
     const encrypted = parts[2];
     
     const candidateKeys = getAvailableBufferKeys();
-    for (const key of candidateKeys) {
+    for (let i = 0; i < candidateKeys.length; i++) {
+      const key = candidateKeys[i];
       try {
         const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
         decipher.setAuthTag(authTag);
@@ -191,14 +217,18 @@ const decrypt = (ciphertext) => {
         let decrypted = decipher.update(encrypted, 'hex', 'utf8');
         decrypted += decipher.final('utf8');
 
-        if (decrypted) {
+        if (decrypted && /^[\x20-\x7E\t\n\r]*$/.test(decrypted)) {
+          console.log(`[DECRYPT] ✓ Llave ${i} funcionó (AES-256-GCM)`);
           return decrypted;
         }
-      } catch {
-        // Probar la siguiente llave disponible del keyring
+        console.log(`[DECRYPT] ✗ Llave ${i} descifró basura`);
+      } catch (authTagError) {
+        // AuthTag mismatch o llave incorrecta, probar siguiente
+        console.log(`[DECRYPT] ✗ Llave ${i} error: ${authTagError.message}`);
       }
     }
 
+    console.error(`[DECRYPT] ✗ No se encontró llave válida para descifrar`);
     return '';
   } catch (error) {
     console.error('Error al descifrar:', error.message);

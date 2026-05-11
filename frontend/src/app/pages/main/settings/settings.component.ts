@@ -521,25 +521,29 @@ export class SettingsComponent implements OnInit {
       };
     }
     if (
+      lowered.includes('invalid login') ||
+      lowered.includes('535') ||
+      lowered.includes('authentication unsuccessful') ||
+      lowered.includes('auth')
+    ) {
+      return {
+        code: 'SMTP_AUTH',
+        probableCause: 'Credenciales SMTP inválidas o bloqueadas',
+        suggestedAction: 'Verifica usuario/clave y vuelve a probar.',
+        rawMessage: detailedMessage
+      };
+    }
+
+    if (
       lowered.includes('temporarily') ||
       lowered.includes('try again later') ||
       lowered.includes('throttle') ||
-      lowered.includes('4.7.') ||
-      lowered.includes('5.7.139')
+      lowered.includes('4.7.')
     ) {
       return {
         code: 'SMTP_THROTTLED',
         probableCause: 'El proveedor SMTP aplicó bloqueo temporal por seguridad',
         suggestedAction: 'Espera unos minutos y reintenta; si persiste, revisa políticas del proveedor.',
-        rawMessage: detailedMessage
-      };
-    }
-
-    if (lowered.includes('invalid login') || lowered.includes('535') || lowered.includes('auth')) {
-      return {
-        code: 'SMTP_AUTH',
-        probableCause: 'Credenciales SMTP inválidas o bloqueadas',
-        suggestedAction: 'Verifica usuario/clave y vuelve a probar.',
         rawMessage: detailedMessage
       };
     }
