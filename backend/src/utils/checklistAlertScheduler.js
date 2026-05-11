@@ -10,6 +10,7 @@ const ShiftAssignment = require('../models/ShiftAssignment');
 const ShiftOverride = require('../models/ShiftOverride');
 const User = require('../models/User');
 const { logger } = require('./logger');
+const { auditSystem } = require('./audit');
 const { sendChecklistAlertEmail, sendEscalationInternalReminderEmail } = require('../routes/smtp');
 
 const DEFAULT_ALERT_TIME = '09:30';
@@ -170,7 +171,16 @@ const getEscalationReminderRecipients = async (cargoLabels) => {
     .map(normalizeCargoLabel)
     .filter(Boolean);
 
+  logger.debug('[getEscalationReminderRecipients] Normalizando cargos', {
+    inputCargos: cargoLabels,
+    normalizedCargos: normalized,
+    cargoCount: normalized.length
+  });
+
   if (normalized.length === 0) {
+    logger.warn('[getEscalationReminderRecipients] No hay cargos normalizados', {
+      inputCargos: cargoLabels
+    });
     return [];
   }
 
@@ -180,9 +190,20 @@ const getEscalationReminderRecipients = async (cargoLabels) => {
     cargoLabel: { $exists: true, $ne: '' }
   }).select('email cargoLabel fullName username');
 
-  return users
-    .filter((user) => normalized.includes(normalizeCargoLabel(user.cargoLabel)))
-    .map((user) => user.email);
+  const matched = users
+    .filter((user) => normalized.includes(normalizeCargoLabel(user.cargoLabel)));
+
+  const recipients = matched.map((user) => user.email);
+
+  logger.debug('[getEscalationReminderRecipients] Búsqueda completada', {
+    searchedCargos: normalized,
+    totalActiveUsersWithEmail: users.length,
+    usersWithMatchingCargos: matched.length,
+    matchedCargos: Array.from(new Set(matched.map(u => u.cargoLabel))),
+    recipients: recipients.map(r => r.substring(0, 3) + '***')
+  });
+
+  return recipients;
 };
 
 const resolveFutureWeekGap = async (now, config) => {
@@ -297,6 +318,14 @@ const runEscalationInternalReminder = async () => {
       : ['N2'];
 
     const recipients = await getEscalationReminderRecipients(cargoLabels);
+    
+    logger.debug('[runEscalationInternalReminder] Resolviendo destinatarios', {
+      cargoLabels,
+      recipientsFound: recipients.length,
+      recipients: recipients.map(r => r.substring(0, 3) + '***'),
+      missingRoleCodes: futureWeekGap.missingRoleCodes
+    });
+    
     if (recipients.length === 0) {
       logger.warn({
         event: 'escalation.reminder.skipped',
@@ -304,8 +333,28 @@ const runEscalationInternalReminder = async () => {
         cargoLabels,
         missingRoleCodes: futureWeekGap.missingRoleCodes,
         targetWeekStart: futureWeekGap.weekStart.toISOString(),
-        targetWeekEnd: futureWeekGap.weekEnd.toISOString()
-      }, 'Recordatorio de escalacion interna sin destinatarios');
+        targetWeekEnd: futureWeekGap.weekEnd.toISOString(),
+        escalationReminderEnabled: config.escalationReminderEnabled,
+        hasConfiguredCargos: cargoLabels.length > 0
+      }, 'Recordatorio de escalacion interna sin destinatarios - verifica: ¿hay usuarios activos con esos cargos?');
+
+            auditSystem({
+              event: 'escalation.reminder.attempt.failed',
+              level: 'warn',
+              result: { success: false, reason: 'No recipients found' },
+              metadata: {
+                sourceModule: 'escalation-scheduler',
+                triggerType: 'scheduled',
+                cargoLabels,
+                missingRoleCodes: futureWeekGap.missingRoleCodes,
+                targetWeek: `${futureWeekGap.weekStart.toLocaleDateString('es-CL')} al ${futureWeekGap.weekEnd.toLocaleDateString('es-CL')}`,
+                daysAhead: futureWeekGap.daysAhead,
+                escalationReminderEnabled: config.escalationReminderEnabled,
+                hasConfiguredCargos: cargoLabels.length > 0,
+                diagnosticMessage: 'No hay usuarios activos con los cargos configurados o sus emails están vacíos'
+              }
+            }).catch((err) => logger.error({ err }, 'Audit escalation.reminder.attempt.failed failed'));
+
       return;
     }
 
@@ -331,8 +380,36 @@ const runEscalationInternalReminder = async () => {
       targetWeekEnd: futureWeekGap.weekEnd.toISOString(),
       daysAhead: futureWeekGap.daysAhead
     }, 'Recordatorio de escalacion interna enviado');
+
+      auditSystem({
+        event: 'escalation.reminder.sent',
+        level: 'info',
+        result: { success: true, reason: 'Escalation reminder email sent' },
+        metadata: {
+          sourceModule: 'escalation-scheduler',
+          triggerType: 'scheduled',
+          cargoLabels,
+          missingRoleCodes: futureWeekGap.missingRoleCodes,
+          targetWeek: `${futureWeekGap.weekStart.toLocaleDateString('es-CL')} al ${futureWeekGap.weekEnd.toLocaleDateString('es-CL')}`,
+          recipientsCount: recipients.length,
+          recipientsMasked: recipients.map(r => r.substring(0, 3) + '***'),
+          daysAhead: futureWeekGap.daysAhead
+        }
+      }).catch((err) => logger.error({ err }, 'Audit escalation.reminder.sent failed'));
+
   } catch (error) {
     logger.error({ err: error }, 'Error ejecutando recordatorio de escalación interna');
+      auditSystem({
+        event: 'escalation.reminder.error',
+        level: 'error',
+        result: { success: false, reason: error.message },
+        metadata: {
+          sourceModule: 'escalation-scheduler',
+          triggerType: 'scheduled',
+          error: error.message,
+          errorStack: error.stack?.split('\n').slice(0, 3).join('\n')
+        }
+      }).catch((err) => logger.error({ err }, 'Audit escalation.reminder.error failed'));
   }
 };
 

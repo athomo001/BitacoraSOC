@@ -11,6 +11,7 @@ Registro de cambios relevantes del proyecto.
 - **Desactivación resiliente tras restore:** ahora el guardado en modo desactivado no bloquea por ausencia de contraseña descifrada y conserva la contraseña cifrada existente para una futura reactivación.
 - **Auditoría detallada del guardado SMTP:** se añadieron eventos `smtp.config.save.attempt`, `smtp.config.save.rejected`, `smtp.config.save.success` y `smtp.config.save.error` para trazar intento, rechazo funcional (400), éxito y excepción con metadata de contexto.
 - **Diagnóstico frontend más útil:** cuando backend responde `Errores de validación`, la UI muestra el campo/motivo concreto en lugar de solo `SMTP_UNKNOWN`.
+- **Corrección de clasificación SMTP en UI:** errores de autenticación de proveedor (ej. `535 5.7.139 Authentication unsuccessful` de Outlook) ahora se clasifican como `SMTP_AUTH` en vez de `SMTP_THROTTLED`, evitando recomendaciones operativas incorrectas.
 
 ## [v1.5.69-beta] - 2026-05-11
 

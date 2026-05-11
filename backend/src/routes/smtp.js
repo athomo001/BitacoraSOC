@@ -28,11 +28,13 @@ const validate = require('../middleware/validate');
 const { getBrandingSnapshot, formatBrandedSubject, getAppTitleForText } = require('../utils/branding');
 const { encrypt, decrypt } = require('../utils/encryption');
 const { invalidateCache, resolveTransportSecurityOptions } = require('../utils/email');
+const logger = require('../utils/logger');
+const { auditSystem } = require('../utils/audit');
 const { audit } = require('../utils/audit');
 
 const smtpTestLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 3,
+  max: 15,
   message: 'Demasiados intentos de prueba SMTP. Intenta en 15 minutos.',
   standardHeaders: true,
   legacyHeaders: false,
@@ -667,16 +669,84 @@ const sendEscalationInternalReminderEmail = async ({
       </div>
     `;
 
-    await transporter.sendMail({
+    logger.info('[sendEscalationInternalReminderEmail] Enviando correo...', {
+      recipients: recipients.map(r => ({ email: r.substring(0, 3) + '***' })),
+      recipientCount: recipients.length,
+      cargoLabels,
+      subject,
+      targetWeek: `${targetWeekStartLabel} al ${targetWeekEndLabel}`,
+      daysAhead,
+      host: config.host,
+      port: config.port,
+      sender: config.senderEmail
+    });
+
+    const info = await transporter.sendMail({
       from: `"${config.senderName}" <${config.senderEmail}>`,
       to: recipients.join(', '),
       subject,
       html: emailHtml
     });
 
-    console.log('Correo de recordatorio de escalación interna enviado');
+    logger.info('✅ [sendEscalationInternalReminderEmail] CORREO ENVIADO EXITOSAMENTE', {
+      messageId: info.messageId,
+      recipients: recipients.length,
+      cargoLabels,
+      subject,
+      response: info.response
+    });
+
+    auditSystem({
+      event: 'escalation.email.sent',
+      level: 'info',
+      result: { success: true, reason: 'Email sent successfully' },
+      metadata: {
+        sourceModule: 'smtp-scheduler',
+        triggerType: 'scheduled',
+        triggerContext: 'escalation-reminder',
+        cargoLabels,
+        recipientsCount: recipients.length,
+        recipientsMasked: recipients.map((r) => r.substring(0, 3) + '***'),
+        subject,
+        messageId: info.messageId,
+        smtpResponse: info.response,
+        host: config.host,
+        port: config.port
+      }
+    }).catch((err) => logger.error({ err }, 'Audit escalation.email.sent failed'));
   } catch (error) {
-    console.error('Error al enviar correo de recordatorio de escalación interna:', error);
+    logger.error('❌ [sendEscalationInternalReminderEmail] ERROR AL ENVIAR CORREO', {
+      error: error.message,
+      errorCode: error.code,
+      errorCommand: error.command,
+      recipients: recipients.map((r) => r.substring(0, 3) + '***'),
+      recipientCount: recipients.length,
+      cargoLabels,
+      subject,
+      stack: error.stack
+    });
+
+    auditSystem({
+      event: 'escalation.email.failed',
+      level: 'error',
+      result: { success: false, reason: error.message },
+      metadata: {
+        sourceModule: 'smtp-scheduler',
+        triggerType: 'scheduled',
+        triggerContext: 'escalation-reminder',
+        cargoLabels,
+        recipientsCount: recipients.length,
+        recipientsMasked: recipients.map((r) => r.substring(0, 3) + '***'),
+        subject,
+        error: error.message,
+        errorCode: error.code,
+        errorCommand: error.command,
+        host: config.host,
+        port: config.port,
+        diagnosticHint: 'Revisa credenciales SMTP, conexión de red, o logs del backend para más detalles'
+      }
+    }).catch((err) => logger.error({ err }, 'Audit escalation.email.failed failed'));
+
     throw error;
   }
 };
