@@ -427,6 +427,10 @@ router.post('/restore', authenticate, authorize('admin'), async (req, res) => {
   try {
     const { filename, clearBeforeRestore } = req.body;
     const shouldClearBeforeRestore = parseBooleanFlag(clearBeforeRestore);
+    let restoredUploads = false;
+    let restoredGlobal = false;
+    let restoredSecrets = false;
+    let keyringPresentAfterRestore = false;
 
     if (!filename || !isValidBackupFilename(filename)) {
       return res.status(400).json({ message: 'Filename inválido o requerido' });
@@ -467,6 +471,7 @@ router.post('/restore', authenticate, authorize('admin'), async (req, res) => {
           }
           await fs.mkdir(UPLOADS_DIR, { recursive: true });
           await fs.cp(extractedUploads, UPLOADS_DIR, { recursive: true, force: true });
+          restoredUploads = true;
           logger.info({ source: extractedUploads, destination: UPLOADS_DIR }, 'Directorio /uploads restaurado recursivamente');
         }
 
@@ -478,6 +483,7 @@ router.post('/restore', authenticate, authorize('admin'), async (req, res) => {
           }
           await fs.mkdir(GLOBAL_DIR, { recursive: true });
           await fs.cp(extractedGlobal, GLOBAL_DIR, { recursive: true, force: true });
+          restoredGlobal = true;
           logger.info({ source: extractedGlobal, destination: GLOBAL_DIR }, 'Directorio /global restaurado recursivamente');
         }
 
@@ -489,6 +495,8 @@ router.post('/restore', authenticate, authorize('admin'), async (req, res) => {
           }
           await fs.mkdir(SECRETS_DIR, { recursive: true });
           await fs.cp(extractedSecrets, SECRETS_DIR, { recursive: true, force: true });
+          restoredSecrets = true;
+          keyringPresentAfterRestore = fsSync.existsSync(path.join(SECRETS_DIR, 'encryption-keyring.json'));
           logger.info({ source: extractedSecrets, destination: SECRETS_DIR }, 'Directorio /secrets restaurado recursivamente');
         }
 
@@ -531,14 +539,25 @@ router.post('/restore', authenticate, authorize('admin'), async (req, res) => {
     await audit(req, {
       event: 'admin.backup.restore',
       level: 'warning',
-      result: { success: true, filename, imported, isZip }
+      result: { success: true, filename, imported, isZip },
+      metadata: {
+        restoredUploads,
+        restoredGlobal,
+        restoredSecrets,
+        keyringPresentAfterRestore,
+        clearBeforeRestore: shouldClearBeforeRestore
+      }
     });
 
     res.json({
       message: isZip
         ? 'Backup completo restaurado (base de datos + archivos físicos)'
         : 'Backup legacy restaurado (solo base de datos)',
-      imported
+      imported,
+      restoredUploads,
+      restoredGlobal,
+      restoredSecrets,
+      keyringPresentAfterRestore
     });
   } catch (error) {
     logger.error({ err: error }, 'Error restaurando backup');
@@ -629,6 +648,10 @@ router.post('/import',
       const isZip = req.file.originalname.endsWith('.zip');
       const clearBeforeRestore = parseBooleanFlag(req.body?.clearBeforeRestore);
       let backupJson;
+      let restoredUploads = false;
+      let restoredGlobal = false;
+      let restoredSecrets = false;
+      let keyringPresentAfterRestore = false;
 
       if (isZip) {
         // --- Importación ZIP completa ---
@@ -661,6 +684,7 @@ router.post('/import',
             }
             await fs.mkdir(UPLOADS_DIR, { recursive: true });
             await fs.cp(extractedUploads, UPLOADS_DIR, { recursive: true, force: true });
+            restoredUploads = true;
             logger.info({ source: extractedUploads, destination: UPLOADS_DIR }, 'Directorio /uploads importado recursivamente');
           }
 
@@ -672,6 +696,7 @@ router.post('/import',
               }
               await fs.mkdir(GLOBAL_DIR, { recursive: true });
               await fs.cp(extractedGlobal, GLOBAL_DIR, { recursive: true, force: true });
+              restoredGlobal = true;
               logger.info({ source: extractedGlobal, destination: GLOBAL_DIR }, 'Directorio /global importado recursivamente');
             }
 
@@ -683,6 +708,8 @@ router.post('/import',
             }
             await fs.mkdir(SECRETS_DIR, { recursive: true });
             await fs.cp(extractedSecrets, SECRETS_DIR, { recursive: true, force: true });
+            restoredSecrets = true;
+            keyringPresentAfterRestore = fsSync.existsSync(path.join(SECRETS_DIR, 'encryption-keyring.json'));
             logger.info({ source: extractedSecrets, destination: SECRETS_DIR }, 'Directorio /secrets importado recursivamente');
           }
 
@@ -735,14 +762,25 @@ router.post('/import',
       await audit(req, {
         event: 'admin.backup.import',
         level: 'info',
-        result: { success: true, imported, isZip }
+        result: { success: true, imported, isZip },
+        metadata: {
+          clearBeforeRestore,
+          restoredUploads,
+          restoredGlobal,
+          restoredSecrets,
+          keyringPresentAfterRestore
+        }
       });
 
       res.json({
         message: isZip 
           ? 'Backup ZIP importado exitosamente (base de datos + archivos físicos)'
           : 'Backup JSON importado exitosamente',
-        imported
+        imported,
+        restoredUploads,
+        restoredGlobal,
+        restoredSecrets,
+        keyringPresentAfterRestore
       });
     } catch (error) {
       // Limpiar archivo temporal
