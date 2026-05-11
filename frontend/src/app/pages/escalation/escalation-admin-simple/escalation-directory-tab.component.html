@@ -16,9 +16,16 @@
           <mat-label>Tipo</mat-label>
           <mat-select [(ngModel)]="directoryTypeFilter" (selectionChange)="applyDirectoryFilters()">
             <mat-option value="">Todos</mat-option>
-            <mat-option value="Internal">Internos</mat-option>
-            <mat-option value="External">Externos</mat-option>
+            <mat-option value="External">Personales</mat-option>
             <mat-option value="List">Listas</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Ámbito</mat-label>
+          <mat-select [(ngModel)]="directoryScopeFilter" (selectionChange)="applyDirectoryFilters()">
+            <mat-option value="">Todos</mat-option>
+            <mat-option value="Internal">Interno</mat-option>
+            <mat-option value="External">Externo</mat-option>
           </mat-select>
         </mat-form-field>
         <mat-form-field appearance="outline">
@@ -91,7 +98,6 @@
         <mat-form-field appearance="outline">
           <mat-label>Tipo</mat-label>
           <mat-select [(ngModel)]="directoryFormModel.type" name="dirType">
-            <mat-option value="Internal">Interno</mat-option>
             <mat-option value="External">Personal</mat-option>
             <mat-option value="List">Lista</mat-option>
           </mat-select>
