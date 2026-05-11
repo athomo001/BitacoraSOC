@@ -21,21 +21,18 @@
 | ID | Estado | Seccion | Tarea | Notas |
 | :--- | :--- | :--- | :--- | :--- |
 | BACKUP-ENC-081 | En progreso | Backup / Seguridad ALTA | Cifrado opcional de backups con passphrase | Al crear un backup, el usuario podrá elegir si desea cifrarlo mediante un popup para ingresar frase secreta; no será obligatorio. Al restaurar, si el respaldo está cifrado, el sistema debe pedir la llave. |
-| ESC-FLOW-090 | En progreso | Escalación / Admin + View ALTA | Configuración dinámica de flujo por cliente | Implementación investigada para `/main/escalation/admin` y `/main/escalation/view`: flujo editable por cliente (pasos únicos/pool), drag&drop, persistencia en cliente y endpoints dedicados. |
+| correo-001 | Listo | Boletines / Envío de correo ALTA | Agregar campo CC en envío de boletines para registro interno | Envío **1:1 con CC compartido**: por cada destinatario del campo Para se genera un correo individual; todos reciben la misma lista completa de CC. N destinatarios → N correos, cada uno con los M CC adjuntos. |
 | UI-SEM-091 | En progreso | UX/UI + Frontend ALTA | Limpieza de Div-soup y semántica HTML | [PARCIAL] Limpieza completada en el módulo de Escalación (Tablas RACI, Turnos, Contactos, Directorio). Pendiente en Reportes y Usuarios. |
-| UI-INLINE-092 | Pendiente | UX/UI + Frontend MEDIA | Mover estilos inline style="" a SCSS | Se encontraron estilos hardcodeados en `report-generator.component.html` y `settings.component.html`. Deben migrarse a clases semánticas en SCSS siguiendo UI-GOVERNANCE.md. |
-| UI-CHART-A11Y-100 | Pendiente | UX/UI + Accesibilidad ALTA | Gráficos ngx-charts sin texto alternativo | Los gráficos en `reports.component.html` carecen de `aria-label` o `role="img"`. Deben incluir descripciones para lectores de pantalla según WCAG 1.1.1. |
 | UI-CARD-SEM-099 | Pendiente | UX/UI + Semántica MEDIA | Contenido interno de KPI cards sin semántica | Las stat-cards en `reports.component.html` usan `<div>` internos. Migrar a `<dl><dt><dd>` o elementos semánticos según Web Coder.md. |
 | UI-LOAD-INCON-101 | Pendiente | UX/UI + Interacción MEDIA | Inconsistencia en estados de carga | Auditado en audit-logs, report-generator y reports. Implementar `<mat-progress-bar>` o indicadores consistentes durante cargas asíncronas. |
 | UI-H1-CHECK-102 | Pendiente | UX/UI + Accesibilidad MEDIA | Jerarquía de headings en checklist.component | Falta `<header>` para el `<h1>` y hay saltos en la jerarquía h1->h3. Corregir según UX-UI-Senior-Standards.md §5. |
 | UI-DIV-AUDIT-103 | Pendiente | UX/UI + Semántica MEDIA | Uso de <div> en audit-logs.component | Los paneles de guía, filtros y resultados deben ser `<section>` o `<aside>` con headings adecuados. |
-| UI-H1-SET-104 | Pendiente | UX/UI + Semántica BAJA | Título técnico <h1>EMAIL Config</h1> | Renombrar a "Configuración de Correo" y envolver en `<header>` con clase `.page-header`. |
 | UI-DIV-ACTIONS-105 | Pendiente | UX/UI + Semántica BAJA | Uso de clase .actions en reports | Migrar `<div class="actions">` a `<div class="form-actions">` o `<footer>` para consistencia con el design system. |
 | UI-SKEL-106 | Pendiente | UX/UI + Performance BAJA | Ausencia de skeleton loading | Implementar patrón de skeleton loading (shimmer) en tablas largas para mejorar CLS según UX-Angular-Material-Patterns.md. |
-| UI-BTN-GROUP-107 | Pendiente | UX/UI + Consistencia BAJA | Clase ad-hoc .button-group en settings | Consolidar con `.form-actions` para heredar estilos globales de spacing y alineación. |
 | UI-CONFIRM-DEL-108 | Pendiente | UX/UI + Interacción ALTA | Uso de window.confirm() nativo | Migrar a `MatDialog` para confirmaciones de borrado en usuarios y entradas, asegurando consistencia visual. |
-| UI-LABEL-ONLY-109 | Pendiente | UX/UI + Accesibilidad MEDIA | Label nativo sin for en selector de color | Corregir asociación de label o usar `aria-label` descriptivo para cumplir con WCAG 1.3.1. |
-| UI-HARDWIDTH-110 | Pendiente | UX/UI + Responsividad MEDIA | Dimensiones de gráficos hardcodeadas | Remover `[view]` fijos en `reports.component.ts` para que los gráficos sean 100% responsivos. |
+| BACKUP-IMP-112 | Listo | Backup / Operación ALTA | 413 Request Entity Too Large al importar backup ZIP por archivo | **Fix aplicado**: `client_max_body_size 100M;` agregado en `location /api/` de ambos server blocks (`:80` y `:443`) en `frontend/nginx.conf`; timeouts de proxy subidos a 300s para archivos grandes. |
+| BACKUP-FLAG-113 | Listo | Backup / Operación ALTA | Checkbox "borrar antes de restaurar" no tiene efecto en importación por archivo | **Fix aplicado**: (a) Frontend: `formData.append('clearBeforeRestore', String(this.clearBeforeRestore))` en `importBackup()` — `frontend/src/app/pages/main/backup/backup.component.ts`; (b) Backend: lee `req.body.clearBeforeRestore` y ejecuta `Model.deleteMany({})` por colección si es `true` antes del `insertMany` — `backend/src/routes/backup.js`. |
+| BACKUP-DATE-114 | Listo | Backup / Operación MEDIA | Historial de backups muestra fecha 31-12-1969 en entorno Docker/Windows | **Fix aplicado**: en el handler `GET /history`, `createdAt` ahora usa `stats.birthtime` si es `> epoch0`, con fallback a `stats.mtime`; si ambos son epoch-0 usa `new Date()` como último recurso — `backend/src/routes/backup.js`. |
 
 **Plan de ataque visual ejecutado:** `docs/ui-visual-remediation-plan.md` (oleadas, criterios de aceptación, rutas objetivo y Definition of Done visual).
 
@@ -90,7 +87,15 @@ Checklist mínimo recomendado para agentes IA antes de marcar un item como `List
 
 | ID | Estado | Seccion | Tarea | Notas |
 | :--- | :--- | :--- | :--- | :--- |
+| correo-001 | Listo | Boletines / Email / Operación ALTA | CC interno en envío de boletines | Implementado: campo CC en UI, parseo/validación en TS, payload `cc[]` al backend. Loop 1:1 aplica CC completo a cada correo individual (excluyendo auto-copia). Respuesta con `ccCount`. Sin cambios en `email.js`. |
+| ESC-FLOW-090 | Listo | Escalación / Admin + View ALTA | Configuración dinámica de flujo por cliente | Implementación completa en `/main/escalation/admin` y `/main/escalation/view` con persistencia por cliente, drag&drop, tipos `unique/pool`, endpoints dedicados y render operativo responsivo. |
 | ESC-SHIFT-111 | Listo | Escalación / Admin / Correos ALTA | Programación de envío automático de turnos | [ESC-SHIFT-111] Implementación completa: Backend (AppConfig, Scheduler, MJML Template) y Frontend (Panel de configuración en Turnos Semanales con trigger manual). |
+| UI-INLINE-092 | Listo | UX/UI + Frontend MEDIA | Mover estilos inline style="" a SCSS | Verificado en código: sin `style=""` estático en `report-generator.component.html` ni `settings.component.html`; estilos migrados a clases SCSS. |
+| UI-CHART-A11Y-100 | Listo | UX/UI + Accesibilidad ALTA | Gráficos ngx-charts sin texto alternativo | Verificado en código: wrappers de gráficos en `reports.component.html` incluyen `role="img"` + `aria-label` descriptivo. |
+| UI-H1-SET-104 | Listo | UX/UI + Semántica BAJA | Título técnico <h1>EMAIL Config</h1> | Verificado en código: header semántico con `<header class="page-header">` y `<h1>Configuración del Sistema</h1>` en settings. |
+| UI-BTN-GROUP-107 | Listo | UX/UI + Consistencia BAJA | Clase ad-hoc .button-group en settings | Verificado en código: en settings se usa `.form-actions`; no hay `.button-group` en plantilla/SCSS de settings. |
+| UI-LABEL-ONLY-109 | Listo | UX/UI + Accesibilidad MEDIA | Label nativo sin for en selector de color | Verificado en código: selector nativo usa `for` en label e `aria-label` descriptivo en controles de color. |
+| UI-HARDWIDTH-110 | Listo | UX/UI + Responsividad MEDIA | Dimensiones de gráficos hardcodeadas | Verificado en código: no hay bindings `[view]` en `reports.component.html`; render responsive por contenedor. |
 | UI-TABLA-093 | Listo | UX/UI + Frontend ALTA | Migrar tabla de turnos a MatTable con sorting | Se migró la tabla de turnos manuales a MatTable, implementando sorting por analista/fecha y alineando con el design system global. |
 | UI-ESC-GIANT-094 | Listo | Arquitectura + Frontend ALTA | Dividir componente gigante de Escalación | Se refactorizó `escalation-admin-simple.component` en múltiples sub-componentes (Tablas, Contactos, RACI) para mejorar mantenibilidad. |
 | UI-TABLA-095 | Listo | UX/UI + Frontend MEDIA | Fix sorting en tabla de contactos | Corregido el sorting de MatTable en el componente de contactos de escalación que fallaba con campos anidados. |
@@ -639,7 +644,7 @@ Cuatro mejoras agrupadas sobre la vista de administración de usuarios. No requi
 
 ## ESC-FLOW-090 — Configuración Dinámica y Responsiva de Flujos de Llamados de Escalamiento
 
-**Estado:** En progreso  
+**Estado:** Listo  
 **Prioridad:** ALTA  
 **Tipo:** Escalación / Admin + View + Backend  
 **Rutas:** `/main/escalation/admin` y `/main/escalation/view`
@@ -764,6 +769,71 @@ Permitir cifrado opcional de backups mediante passphrase, sin volverlo obligator
 
 ---
 
+## correo-001 - CC interno en envío de boletines
+
+**Estado:** Listo  
+**Prioridad:** ALTA  
+**Tipo:** Boletines / Email / Operación  
+**Ruta:** `/main/report-generator` (modo Boletín) + `POST /api/reports/newsletter/send`
+
+### Objetivo
+
+Permitir que el envío de boletines incluya campo **CC** para dejar registro en una o más listas de correo internas (CDC/operaciones), sin afectar el envío principal a clientes.
+
+El modelo de envío es **1:1 con CC compartido**: por cada destinatario del campo **Para**, se genera un correo individual que incluye la lista completa de CC. Todos los destinatarios CC reciben copia de cada envío.
+
+#### Ejemplo de comportamiento
+
+| Para | CC configurado | Correos generados |
+|------|---------------|-------------------|
+| `pepe@algo.cl`, `xe@algo.cl`, `fge@algo.cl` | `operaciones@algo.cl` | 3 correos: cada uno con `to` individual y `cc: operaciones@algo.cl` |
+| `pepe@algo.cl`, `xe@algo.cl`, `fge@algo.cl` | `operaciones@algo.cl`, `cumbia@algo.cl` | 3 correos: cada uno con `to` individual y `cc: operaciones@algo.cl, cumbia@algo.cl` |
+
+Concretamente para el segundo caso:
+```
+Correo 1 → Para: pepe@algo.cl   | CC: operaciones@algo.cl, cumbia@algo.cl
+Correo 2 → Para: xe@algo.cl     | CC: operaciones@algo.cl, cumbia@algo.cl
+Correo 3 → Para: fge@algo.cl    | CC: operaciones@algo.cl, cumbia@algo.cl
+```
+
+El campo **Para** puede tener N destinatarios; el campo **CC** puede tener M correos internos. El total de correos despachados es siempre N (uno por destinatario principal), cada uno con los M CC adjuntos.
+
+### Criterios de aceptación
+
+1. En el cajón de envío de boletines existe campo **CC** editable (múltiples correos separados por coma, punto y coma o salto de línea).
+2. El campo CC permite ingresar uno o más correos internos de control.
+3. Por cada destinatario del campo **Para** se genera un correo individual (patrón 1:1 ya existente) al que se adjunta la lista completa del campo **CC**.
+4. La lista interna de control puede quedar precompletada por defecto (configurable) y ser editable antes de enviar.
+5. Si el usuario no modifica CC, el sistema envía igualmente con el CC por defecto aplicado a cada correo individual.
+6. Si un correo aparece duplicado entre `to` (destinatario actual del loop) y `cc`, se elimina del CC para ese envío específico (el receptor no se ve a sí mismo en copia).
+7. La validación de correos (válidos/inválidos/duplicados) considera también el campo CC y lo refleja en el resumen previo al envío.
+8. El resumen previo al envío muestra: N destinatarios principales y M correos en CC, con indicación de cuántos correos totales se despacharán (= N).
+9. La auditoría registra por cada correo enviado: el `to` individual, la cantidad de CC (`ccCount`) y el resultado, sin exponer las direcciones completas innecesariamente.
+10. Compatibilidad preservada: si `cc` viene vacío, el flujo actual de boletín 1:1 sigue funcionando sin regresión.
+
+### Archivos afectados
+
+- `frontend/src/app/pages/main/report-generator/report-generator.component.html` — agregar UI de campo CC en bloque de envío de boletín.
+- `frontend/src/app/pages/main/report-generator/report-generator.component.ts` — estado del CC, validación/deduplicación y construcción del payload con `cc[]` al backend.
+- `backend/src/routes/reports.js` — aceptar array `cc` en endpoint de envío de boletín y propagarlo al loop de despacho.
+- `backend/src/utils/email.js` — asegurar soporte del campo `cc` en `sendEmail()` para envío SMTP (ya compatible con Nodemailer; confirmar que se pasa correctamente).
+
+### Notas / Restricciones
+
+- El CC **no reemplaza** destinatarios principales: es complemento para trazabilidad interna.
+- El patrón de despacho sigue siendo **1:1** (un correo por destinatario To). El CC se adjunta a cada uno de esos correos individuales, no como un único correo masivo.
+- Mantener UX consistente con envío de incidentes (patrón `to` + `cc`) y sin romper el modo actual.
+- QA obligatorio en los 5 temas (`QA-UI-061`–`QA-UI-065`) y smoke funcional de envío real con SMTP configurado.
+
+### Evidencia de implementación
+
+- **`backend/src/routes/reports.js`**: endpoint `POST /api/reports/newsletter/send` acepta campo `cc[]`; en el loop 1:1 se filtra el To actual del CC para evitar auto-copia; respuesta incluye `ccCount`. Sin cambios en `email.js` (ya soportaba `cc`).
+- **`report-generator.component.ts`**: nueva propiedad `newsletterCcRecipients`, getter `newsletterCcSummary` (válidos/inválidos), método `parseCcNewsletterRecipients()`. El payload de envío incluye `cc: ccValid`. Snackbar muestra "N destinatario(s) + M en CC". Limpieza al enviar y al `clearForm()`.
+- **`report-generator.component.html`**: nuevo campo CC (`textarea rows=3`) debajo del campo Para, con hint de inválidos inline. Resumen de validación muestra píldora "CC: M" cuando hay CC válidos.
+- **`report-generator.component.scss`**: clase `.newsletter-cc-invalid-hint` con color `var(--state-error)`.
+
+---
+
 ## AI-SUMMARY-001 - Resumen Ejecutivo Efímero (IA On-Demand)
 
 **Estado:** Archivo IA (referencia — sin seguimiento operativo)  
@@ -829,7 +899,7 @@ Los impactos son:
 
 ## UI-INLINE-092 — Estilos inline `style=""` hardcodeados en templates HTML
 
-**Estado:** Pendiente  
+**Estado:** Listo  
 **Prioridad:** MEDIA  
 **Tipo:** UX/UI + Frontend — Deuda técnica visual  
 **Rutas afectadas:** `/main/report-generator`, `/main/admin/settings`
@@ -1170,7 +1240,7 @@ El acordeón interno (`mat-accordion multi` para los servicios individuales) sí
 
 ## UI-CHART-A11Y-100 — Gráficos `ngx-charts` sin texto alternativo accesible
 
-**Estado:** Pendiente  
+**Estado:** Listo  
 **Prioridad:** ALTA  
 **Tipo:** UX/UI + Accesibilidad — WCAG 1.1.1  
 **Ruta:** `/main/reports`
@@ -1317,7 +1387,7 @@ h1 "Checklist del Turno" (línea 2) — suelto sin <header>
 
 ## UI-H1-SET-104 — `settings.component.html`: título `<h1>EMAIL Config</h1>` incorrecto
 
-**Estado:** Pendiente  
+**Estado:** Listo  
 **Prioridad:** BAJA  
 **Tipo:** UX/UI + Consistencia de contenido  
 **Ruta:** `/main/admin/settings`
@@ -1410,7 +1480,7 @@ El SCSS local de cada componente puede tener reglas `.actions {}` que deberán r
 
 ## UI-BTN-GROUP-107 — Clase `button-group` ad-hoc en `settings.component.html`
 
-**Estado:** Pendiente  
+**Estado:** Listo  
 **Prioridad:** BAJA  
 **Tipo:** UX/UI + Consistencia de Design System  
 **Ruta:** `/main/admin/settings`
@@ -1461,7 +1531,7 @@ deleteUser(userId: string): void {
 
 ## UI-LABEL-ONLY-109 — `<label>` y `<button>` sin texto accesible en selector de color
 
-**Estado:** Pendiente  
+**Estado:** Listo  
 **Prioridad:** MEDIA  
 **Tipo:** UX/UI + Accesibilidad — WCAG 1.3.1 y 2.4.6  
 **Ruta:** `/main/admin/settings` — sección Colores del Boletín
@@ -1511,7 +1581,7 @@ deleteUser(userId: string): void {
 
 ## UI-HARDWIDTH-110 — Gráficos `ngx-charts` con `[view]` hardcodeado en TypeScript
 
-**Estado:** Pendiente  
+**Estado:** Listo  
 **Prioridad:** MEDIA  
 **Tipo:** UX/UI + Responsividad  
 **Ruta:** `/main/reports`

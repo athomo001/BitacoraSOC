@@ -1203,10 +1203,10 @@ router.post('/newsletter/validate', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/reports/newsletter/send - Envío de boletines (1:1)
+// POST /api/reports/newsletter/send - Envío de boletines (1:1 con CC compartido)
 router.post('/newsletter/send', authenticate, async (req, res) => {
   try {
-    const { recipients, subject, html, analytics } = req.body;
+    const { recipients, cc, subject, html, analytics } = req.body;
     const sendMode = 'real';
     const analysis = analyzeRecipientEmails(recipients || []);
 
@@ -1221,20 +1221,28 @@ router.post('/newsletter/send', authenticate, async (req, res) => {
       return res.status(400).json({ message: 'Se requiere el contenido HTML del boletín' });
     }
 
+    // Validar y deduplicar lista de CC
+    const ccAnalysis = analyzeRecipientEmails(Array.isArray(cc) ? cc : []);
+    const validCcBase = ccAnalysis.valid; // lista CC sin filtrar por destinatario
+
     const prepared = await prepareNewsletterEmailPayload(html, req.body.inlineAttachments);
     const emailHtml = prepared.html;
     const newsletterAttachments = prepared.attachments;
     const plainText = htmlToBasicPlainText(emailHtml);
 
-    // Envío secuencial 1:1 — nunca en copia masiva
+    // Envío secuencial 1:1 — cada destinatario To recibe su correo individual
+    // con la lista completa de CC adjunta (excepto su propia dirección si coincide).
     let successCount = 0;
     let failCount = 0;
     let lastError = null;
 
     for (const email of analysis.valid) {
+      // Excluir del CC el correo que ya es el destinatario principal de este envío
+      const ccForThis = validCcBase.filter(c => c.toLowerCase() !== email.toLowerCase());
       try {
         await sendEmail({
           to: email,
+          cc: ccForThis.length ? ccForThis : undefined,
           subject: subject || 'Boletín de Seguridad',
           html: emailHtml,
           text: plainText,
@@ -1250,7 +1258,8 @@ router.post('/newsletter/send', authenticate, async (req, res) => {
               vendor: String(analytics?.vendor || '').trim() || null,
               newsletterAttachmentParts: newsletterAttachments.length,
               duplicateCount: analysis.duplicates.length,
-              invalidCount: analysis.invalid.length
+              invalidCount: analysis.invalid.length,
+              ccCount: ccForThis.length
             }
           }
         });
@@ -1274,6 +1283,7 @@ router.post('/newsletter/send', authenticate, async (req, res) => {
       mode: sendMode,
       successCount,
       failCount,
+      ccCount: validCcBase.length,
       duplicateCount: analysis.duplicates.length,
       invalidCount: analysis.invalid.length,
       processedRecipients: analysis.valid.length,

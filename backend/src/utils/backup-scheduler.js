@@ -16,6 +16,7 @@ const AppConfig = require('../models/AppConfig');
 
 const backupsDir = path.join(__dirname, '../../backups');
 const uploadsDir = path.join(__dirname, '../../uploads');
+const globalDir = path.join(__dirname, '../../global');
 const secretsDir = path.join(__dirname, '../../secrets');
 let schedulerHandle = null;
 let backupRunInProgress = false;
@@ -345,6 +346,10 @@ const runBackup = async (options = {}) => {
 
       if (fsSync.existsSync(uploadsDir)) {
         archive.directory(uploadsDir, 'uploads');
+      }
+
+      if (fsSync.existsSync(globalDir)) {
+        archive.directory(globalDir, 'global');
       }
 
       for (const secret of readableSecrets) {

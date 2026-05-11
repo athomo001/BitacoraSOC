@@ -57,8 +57,9 @@ Nota: el historial puede mostrar `.json` legacy, pero los respaldos actuales man
 
 **Notas:**
 - `clearBeforeRestore=true` borra todas las colecciones antes de restaurar.
-- El restore descomprime el archivo `.zip` y restaura tanto la base de datos como `uploads/` y `secrets/`.
+- El restore descomprime el archivo `.zip` y restaura tanto la base de datos como `uploads/`, `secrets/` y el directorio opcional `global/` cuando existe en el respaldo.
 - La restauración recorre subdirectorios, por lo que también repone logos, favicons y artefactos publicados bajo `uploads/complements/`.
+- Los certificados TLS guardados por la plataforma via `secrets/` quedan cubiertos dentro del mismo restore.
 
 ### Eliminar backup
 
@@ -94,12 +95,26 @@ Nota: en uso web normal, la autenticacion principal es por cookie `auth_token` H
 
 **Contenido:** `multipart/form-data`
 - `file`: archivo `.zip` (completo: BD + uploads + secrets) o `.json` (legacy)
+- `clearBeforeRestore`: opcional; si llega en `true`, limpia primero las colecciones antes de importar.
 
-**ZIP:** Contiene `data.json` + directorio `/uploads` + directorio `/secrets` (certificates). Se restauran todos los archivos físicos de forma recursiva.
+**ZIP:** Contiene `data.json` + directorio `/uploads` + directorio `/secrets` (certificates) + directorio opcional `/global`. Se restauran todos los archivos fisicos de forma recursiva.
 
 **JSON Legacy:** Solo BD, útil para importación puntual de datos antigios.
 
 Independientemente del formato, se importan todas las 32 colecciones de base de datos de forma dinámica.
+
+Nota operativa: el proxy web del frontend acepta importaciones de backup de hasta `100M` y extiende timeouts a `300s` para evitar rechazos `413` en respaldos grandes.
+
+---
+
+## 🧹 Purga controlada
+
+**Endpoint:** `POST /api/backup/purge` (admin)
+
+**Notas:**
+- La purga elimina el contenido operativo de base de datos y limpia los directorios fisicos restaurables del Core (`uploads/`, `secrets/` y `global/` si existe).
+- Tras la purga, el sistema recrea automaticamente la cuenta administrativa por defecto tomando `ADMIN_USERNAME`, `ADMIN_PASSWORD` y `ADMIN_EMAIL` desde `.env`.
+- Este flujo sirve para rearmar una instancia desde cero sin perder el acceso inicial de administracion.
 
 ---
 

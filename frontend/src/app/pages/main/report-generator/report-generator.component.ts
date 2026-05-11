@@ -58,7 +58,8 @@ import { environment } from '@env/environment';
     MatCheckboxModule,
     MatButton, MatIconButton,
     MatButtonToggleGroup, MatButtonToggle,
-    MatIcon
+    MatIcon,
+    MatTooltip
   ]
 })
 export class ReportGeneratorComponent implements OnInit {
@@ -86,14 +87,18 @@ export class ReportGeneratorComponent implements OnInit {
       'hint-info-adicional':   'Contexto adicional del tipo de operación. Se autocompleta.',
     },
     newsletter: {
-      'hint-nl-titulo':        'Indica un título claro y conciso para la amenaza o el parche. Es la primera impresión.',
+      'hint-nl-titulo':        'Indica un título claro y conciso para la amenaza o el parche. Si el boletín todavía puede cambiar, aún no envíes el correo.',
       'hint-nl-marca':         'El proveedor o empresa responsable (ej: Microsoft, Cisco, VMware).',
-      'hint-nl-criticidad':    'Gravedad de la vulnerabilidad según el estándar CVSS.',
+      'hint-nl-criticidad':    'Gravedad de la vulnerabilidad según el estándar CVSS. Úsala cuando el contenido ya esté confirmado.',
       'hint-nl-cve':           'Incluye los códigos estándar (ej: CVE-2024-XXXXX). Campo opcional.',
       'hint-nl-productos':     'Software o hardware específicos y sus versiones vulnerables.',
-      'hint-nl-impacto':       'Qué puede ocurrir si se explota la vulnerabilidad (ej: Control total, robo de datos).',
-      'hint-nl-recomendacion': 'Pasos concretos a seguir o mitigaciones de seguridad.',
-      'hint-nl-referencias':   'Links oficiales al parche o análisis. Campo opcional.',
+      'hint-nl-impacto':       'Qué puede ocurrir si se explota la vulnerabilidad (ej: Control total, robo de datos). Esto ayuda a decidir cuándo cerrar el envío.',
+      'hint-nl-recomendacion': 'Pasos concretos a seguir o mitigaciones de seguridad. Cuando esto esté completo, el boletín ya puede enviarse.',
+      'hint-nl-referencias':   'Links oficiales al parche o análisis. Campo opcional. Revíselos antes de enviar el correo.',
+      'hint-nl-send-para':     'Aquí van los destinatarios finales. Úsalo cuando el boletín ya esté revisado y listo para salir.',
+      'hint-nl-send-cc':       'Aquí agrega copias internas de control o seguimiento. No reemplaza el campo Para.',
+      'hint-nl-saved-contacts':'En este panel agregas destinatarios rápido: + Para envía el boletín al contacto y + CC lo agrega como copia interna. Usa Buscar/Empresa y + Todos al Para para armar la lista.',
+      'hint-nl-send-action':   'Envía solo cuando contenido y destinatarios estén confirmados: el sistema despacha 1 correo por cada destinatario del Para.',
     },
   };
 
@@ -124,13 +129,12 @@ export class ReportGeneratorComponent implements OnInit {
 
   // ─── Newsletter email dispatch ────────────────────────────────────────────
   newsletterRecipients = '';
+  newsletterCcRecipients = '';
   isSendingNewsletter = false;
   newsletterContacts: DirectoryContact[] = [];
   newsletterContactSearch = '';
   newsletterCompanyFilter = '';
   newsletterFavoritesOnly = false;
-  private readonly selectedNewsletterContactIds = new Set<string>();
-  newsletterSelectedMailingLists = new Set<string>();
 
   // ─── Incident email dispatch ──────────────────────────────────────────────
   incidentRecipientsTo = '';
@@ -545,37 +549,51 @@ export class ReportGeneratorComponent implements OnInit {
     return this.newsletterContacts.filter(contact => contact.type === 'List');
   }
 
-  get allMailingListsSelected(): boolean {
-    const lists = this.mailingListContacts;
-    if (lists.length === 0) return false;
-    return lists.every(contact => contact._id && this.newsletterSelectedMailingLists.has(contact._id));
+  isEmailInField(email: string | null | undefined, field: 'to' | 'cc'): boolean {
+    if (!email) return false;
+    const lower = email.trim().toLowerCase();
+    const list = field === 'to' ? this.parseManualNewsletterRecipients() : this.parseCcNewsletterRecipients();
+    return list.some(e => e.toLowerCase() === lower);
   }
 
-  get newsletterSelectedMailingListCount(): number {
-    return this.getSelectedMailingLists().length;
-  }
-
-  toggleAllMailingLists(checked: boolean): void {
-    if (checked) {
-      this.mailingListContacts.forEach(contact => {
-        if (contact._id) this.newsletterSelectedMailingLists.add(contact._id);
-      });
+  private addEmailToField(email: string, field: 'to' | 'cc'): void {
+    if (!email || !this.isValidNewsletterEmail(email)) return;
+    if (this.isEmailInField(email, field)) return;
+    const trimmed = email.trim();
+    if (field === 'to') {
+      this.newsletterRecipients = this.newsletterRecipients
+        ? this.newsletterRecipients.trimEnd() + '\n' + trimmed
+        : trimmed;
     } else {
-      this.newsletterSelectedMailingLists.clear();
+      this.newsletterCcRecipients = this.newsletterCcRecipients
+        ? this.newsletterCcRecipients.trimEnd() + '\n' + trimmed
+        : trimmed;
     }
   }
 
-  toggleMailingList(contact: DirectoryContact, checked: boolean): void {
-    if (!contact._id) return;
-    if (checked) {
-      this.newsletterSelectedMailingLists.add(contact._id);
+  private removeEmailFromField(email: string, field: 'to' | 'cc'): void {
+    if (!email) return;
+    const lower = email.trim().toLowerCase();
+    if (field === 'to') {
+      this.newsletterRecipients = this.parseManualNewsletterRecipients()
+        .filter(e => e.toLowerCase() !== lower).join('\n');
     } else {
-      this.newsletterSelectedMailingLists.delete(contact._id);
+      this.newsletterCcRecipients = this.parseCcNewsletterRecipients()
+        .filter(e => e.toLowerCase() !== lower).join('\n');
+    }
+  }
+
+  toggleEmailInField(email: string | null | undefined, field: 'to' | 'cc'): void {
+    if (!email || !this.isValidNewsletterEmail(email)) return;
+    if (this.isEmailInField(email, field)) {
+      this.removeEmailFromField(email, field);
+    } else {
+      this.addEmailToField(email, field);
     }
   }
 
   get newsletterSelectedCount(): number {
-    return this.getSelectedNewsletterContacts().filter((contact) => this.isValidNewsletterEmail(contact.email)).length;
+    return this.newsletterRecipientSummary.validRecipients.length;
   }
 
   get newsletterRecipientSummary(): {
@@ -587,38 +605,7 @@ export class ReportGeneratorComponent implements OnInit {
     const validRecipients: string[] = [];
     const invalidRecipients: string[] = [];
     const duplicateRecipients: string[] = [];
-    const blockedRecipients: string[] = [];
     const seen = new Set<string>();
-
-    this.getSelectedNewsletterContacts().forEach((contact) => {
-      const label = `${contact.name || 'Contacto'}${contact.email ? ` <${contact.email}>` : ''}`;
-      const email = String(contact.email || '').trim().toLowerCase();
-      if (!this.isValidNewsletterEmail(email)) {
-        invalidRecipients.push(label);
-        return;
-      }
-      if (seen.has(email)) {
-        duplicateRecipients.push(email);
-        return;
-      }
-      seen.add(email);
-      validRecipients.push(email);
-    });
-
-    this.getSelectedMailingLists().forEach((contact) => {
-      const label = `${contact.name || 'Lista'}${contact.email ? ` <${contact.email}>` : ''}`;
-      const email = String(contact.email || '').trim().toLowerCase();
-      if (!this.isValidNewsletterEmail(email)) {
-        invalidRecipients.push(label);
-        return;
-      }
-      if (seen.has(email)) {
-        duplicateRecipients.push(email);
-        return;
-      }
-      seen.add(email);
-      validRecipients.push(email);
-    });
 
     this.parseManualNewsletterRecipients().forEach((entry) => {
       const email = String(entry || '').trim().toLowerCase();
@@ -638,49 +625,35 @@ export class ReportGeneratorComponent implements OnInit {
       validRecipients,
       invalidRecipients: Array.from(new Set(invalidRecipients)),
       duplicateRecipients: Array.from(new Set(duplicateRecipients)),
-      blockedRecipients: Array.from(new Set(blockedRecipients))
+      blockedRecipients: []
     };
   }
 
   private loadNewsletterContacts(): void {
     this.directoryService.getAll().subscribe({
-      next: (contacts) => {
-        this.newsletterContacts = [...contacts];
-        this.selectedNewsletterContactIds.clear();
-        contacts
-          .filter((contact) => !!contact.isFavorite && this.isValidNewsletterEmail(contact.email))
-          .forEach((contact) => {
-            if (contact._id) this.selectedNewsletterContactIds.add(contact._id);
-          });
-      },
-      error: () => {
-        this.newsletterContacts = [];
-        this.selectedNewsletterContactIds.clear();
-      }
+      next: (contacts) => { this.newsletterContacts = [...contacts]; },
+      error: () => { this.newsletterContacts = []; }
     });
-  }
-
-  isNewsletterContactSelected(contact: DirectoryContact): boolean {
-    return !!contact?._id && this.selectedNewsletterContactIds.has(contact._id);
-  }
-
-  toggleNewsletterContact(contact: DirectoryContact, checked: boolean): void {
-    if (!contact?._id) return;
-    if (checked) this.selectedNewsletterContactIds.add(contact._id);
-    else this.selectedNewsletterContactIds.delete(contact._id);
   }
 
   selectAllNewsletterContacts(): void {
     this.filteredNewsletterContacts.forEach((contact) => {
-      if (contact._id && this.isValidNewsletterEmail(contact.email)) {
-        this.selectedNewsletterContactIds.add(contact._id);
+      if (contact.email && this.isValidNewsletterEmail(contact.email)) {
+        this.addEmailToField(contact.email, 'to');
+      }
+    });
+  }
+
+  selectAllMailingLists(): void {
+    this.mailingListContacts.forEach((contact) => {
+      if (contact.email && this.isValidNewsletterEmail(contact.email)) {
+        this.addEmailToField(contact.email, 'to');
       }
     });
   }
 
   clearNewsletterSelection(): void {
-    this.selectedNewsletterContactIds.clear();
-    this.newsletterSelectedMailingLists.clear();
+    this.newsletterRecipients = '';
   }
 
   isValidNewsletterEmail(email?: string | null): boolean {
@@ -688,19 +661,34 @@ export class ReportGeneratorComponent implements OnInit {
     return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
   }
 
-  private getSelectedNewsletterContacts(): DirectoryContact[] {
-    return this.newsletterContacts.filter((contact) => contact.type !== 'List' && !!contact._id && this.selectedNewsletterContactIds.has(contact._id));
-  }
-
-  private getSelectedMailingLists(): DirectoryContact[] {
-    return this.newsletterContacts.filter((contact) => contact.type === 'List' && !!contact._id && this.newsletterSelectedMailingLists.has(contact._id));
-  }
-
   private parseManualNewsletterRecipients(): string[] {
     return String(this.newsletterRecipients || '')
       .split(/[;,\n]+/)
       .map((value) => value.trim())
       .filter((value) => value.length > 0);
+  }
+
+  private parseCcNewsletterRecipients(): string[] {
+    return String(this.newsletterCcRecipients || '')
+      .split(/[;,\n]+/)
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0);
+  }
+
+  get newsletterCcSummary(): { valid: string[]; invalid: string[] } {
+    const valid: string[] = [];
+    const invalid: string[] = [];
+    const seen = new Set<string>();
+    this.parseCcNewsletterRecipients().forEach((entry) => {
+      const email = entry.trim().toLowerCase();
+      if (!this.isValidNewsletterEmail(email)) {
+        invalid.push(entry);
+      } else if (!seen.has(email)) {
+        seen.add(email);
+        valid.push(email);
+      }
+    });
+    return { valid, invalid };
   }
 
   sendNewsletter(): void {
@@ -728,9 +716,11 @@ export class ReportGeneratorComponent implements OnInit {
 
     this.isSendingNewsletter = true;
     const subject = this.newsletterForm.value.tituloBoletin || 'Boletín de Seguridad';
+    const ccValid = this.newsletterCcSummary.valid;
 
     this.http.post(`${this.backendBaseUrl}/api/reports/newsletter/send`, {
       recipients: recipientSummary.validRecipients,
+      cc: ccValid,
       subject,
       html: this.generatedHtml,
       analytics: {
@@ -741,14 +731,16 @@ export class ReportGeneratorComponent implements OnInit {
     }).subscribe({
       next: (res: any) => {
         this.isSendingNewsletter = false;
+        const ccPart = res.ccCount > 0 ? ` + ${res.ccCount} en CC` : '';
         const msg = res.failCount > 0
-          ? `Boletín enviado a ${res.successCount} destinatarios (${res.failCount} fallidos)`
-          : `Boletín enviado a ${res.successCount} destinatario(s)`;
+          ? `Boletín enviado a ${res.successCount} destinatarios${ccPart} (${res.failCount} fallidos)`
+          : `Boletín enviado a ${res.successCount} destinatario(s)${ccPart}`;
         this.snackBar.open(msg, 'Cerrar', { duration: 5000 });
 
         if (res.successCount > 0) {
           // Limpiar destinatarios
           this.newsletterRecipients = '';
+          this.newsletterCcRecipients = '';
           this.clearNewsletterSelection();
           
           // Limpiar imágenes cargadas (liberan memoria base64)
@@ -1134,6 +1126,7 @@ export class ReportGeneratorComponent implements OnInit {
     this.activeClientAlert = null;
     
     this.newsletterRecipients = '';
+    this.newsletterCcRecipients = '';
     this.newsletterContactSearch = '';
     this.newsletterCompanyFilter = '';
     this.newsletterFavoritesOnly = false;

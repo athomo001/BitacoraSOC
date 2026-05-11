@@ -54,7 +54,8 @@ const smtpValidators = [
   body('senderEmail').isEmail().normalizeEmail(),
   body('recipients').optional().isArray({ min: 1 }),
   body('recipients.*').optional().isEmail().normalizeEmail(),
-  body('sendOnlyIfRed').isBoolean()
+  body('sendOnlyIfRed').isBoolean(),
+  body('isActive').optional().isBoolean()
 ];
 
 const testValidators = [
@@ -69,6 +70,7 @@ const testValidators = [
   body('recipients').optional().isArray({ min: 1 }),
   body('recipients.*').optional().isEmail().normalizeEmail(),
   body('sendOnlyIfRed').optional().isBoolean(),
+  body('isActive').optional().isBoolean(),
   body('retryAttempt').optional().isBoolean(),
   body('retryCount').optional().isInt({ min: 1, max: 20 }).toInt()
 ];
@@ -92,11 +94,13 @@ const safeDecrypt = (value, { allowPlainFallback = false } = {}) => {
   return allowPlainFallback ? raw : '';
 };
 
-const findStoredSmtpConfig = async () => (
-  SmtpConfig.findOne({
-    $or: [{ isActive: true }, { isActive: { $exists: false } }]
-  }).sort({ updatedAt: -1, createdAt: -1 })
-);
+const findStoredSmtpConfig = async ({ activeOnly = false } = {}) => {
+  const query = activeOnly
+    ? { $or: [{ isActive: true }, { isActive: { $exists: false } }] }
+    : {};
+
+  return SmtpConfig.findOne(query).sort({ updatedAt: -1, createdAt: -1 });
+};
 
 const resolveLegacyPasswordFromAppConfig = async () => {
   const appConfig = await AppConfig.findOne().select('smtpConfig').lean();
@@ -207,10 +211,14 @@ router.post('/',
 
       // Verificar conexión sin enviar email (ya que puede no haber destinatarios)
       const hasRecipients = Array.isArray(data.recipients) && data.recipients.length > 0;
-      await verifyAndTest({
-        ...data,
-        password: data.password
-      }, hasRecipients);
+      const isActive = data.isActive !== false;
+
+      if (isActive) {
+        await verifyAndTest({
+          ...data,
+          password: data.password
+        }, hasRecipients);
+      }
 
       const encryptedPassword = encrypt(data.password);
 
@@ -219,14 +227,14 @@ router.post('/',
           ...data,
           password: encryptedPassword,
           lastTestDate: new Date(),
-          lastTestSuccess: true
+          lastTestSuccess: isActive
         });
       } else {
         Object.assign(config, {
           ...data,
           password: encryptedPassword,
           lastTestDate: new Date(),
-          lastTestSuccess: true
+          lastTestSuccess: isActive ? true : config.lastTestSuccess
         });
       }
 
@@ -236,14 +244,15 @@ router.post('/',
       await audit(req, {
         event: 'admin.smtp.config.update',
         level: 'info',
-        result: { success: true, reason: 'SMTP config saved' },
+        result: { success: true, reason: isActive ? 'SMTP config saved' : 'SMTP sending disabled' },
         metadata: {
           provider: data.provider,
           host: data.host,
           port: data.port,
           useTLS: data.useTLS,
           recipientsCount: Array.isArray(data.recipients) ? data.recipients.length : 0,
-          sendOnlyIfRed: data.sendOnlyIfRed
+          sendOnlyIfRed: data.sendOnlyIfRed,
+          isActive: data.isActive !== false
         }
       });
 
@@ -251,7 +260,7 @@ router.post('/',
       delete configObj.password;
 
       return res.json({
-        message: 'Configuracion SMTP guardada y probada exitosamente',
+        message: isActive ? 'Configuracion SMTP guardada y probada exitosamente' : 'Configuracion SMTP desactivada',
         config: configObj
       });
     } catch (error) {

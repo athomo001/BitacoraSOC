@@ -116,7 +116,7 @@ export class SettingsComponent implements OnInit {
   smtpForm: FormGroup;
   smtpTestPassed = false;
   hasStoredSmtpConfig = false;
-  connectionStatus: 'conectado' | 'desconectado' | 'sin-config' = 'sin-config';
+  connectionStatus: 'conectado' | 'desconectado' | 'desactivado' | 'sin-config' = 'sin-config';
   testing = false;
   savingSmtp = false;
   smtpLastError: { code: string; probableCause: string; suggestedAction: string; rawMessage?: string } | null = null;
@@ -315,7 +315,9 @@ export class SettingsComponent implements OnInit {
     this.applyProviderPreset(config.provider || 'custom', true);
 
     this.smtpTestPassed = !!config.lastTestSuccess;
-    this.connectionStatus = config.lastTestSuccess ? 'conectado' : 'desconectado';
+    this.connectionStatus = config.isActive === false
+      ? 'desactivado'
+      : (config.lastTestSuccess ? 'conectado' : 'desconectado');
   }
 
   get selectedProviderPreset() {
@@ -330,6 +332,10 @@ export class SettingsComponent implements OnInit {
   get smtpPasswordPlaceholder(): string {
     const hasTypedValue = !!String(this.smtpForm.get('password')?.value || '').trim();
     return this.hasStoredSmtpConfig && !hasTypedValue ? '********' : '';
+  }
+
+  get canSaveSmtpConfig(): boolean {
+    return this.savingSmtp ? false : (this.smtpTestPassed || this.hasStoredSmtpConfig || this.smtpForm.value.isActive === false);
   }
 
   toggleSmtpPasswordVisibility(): void {
@@ -347,6 +353,14 @@ export class SettingsComponent implements OnInit {
     }, { emitEvent: false });
   }
 
+  onSmtpActiveChange(enabled: boolean): void {
+    this.smtpForm.patchValue({ isActive: enabled }, { emitEvent: false });
+
+    if (!enabled && this.hasStoredSmtpConfig) {
+      this.saveSmtpConfig(true);
+    }
+  }
+
   saveAppConfig(): void {
     if (this.appConfigForm.valid) {
       const data: UpdateConfigRequest = {
@@ -359,8 +373,9 @@ export class SettingsComponent implements OnInit {
     }
   }
 
-  saveSmtpConfig(): void {
-    if (!this.smtpTestPassed) {
+  saveSmtpConfig(allowInactiveSave = false): void {
+    const isActive = this.smtpForm.value.isActive !== false;
+    if (!this.smtpTestPassed && !this.hasStoredSmtpConfig && !(allowInactiveSave && !isActive)) {
       this.snackBar.open('Primero realiza una prueba SMTP exitosa', 'Cerrar', { duration: 3000 });
       return;
     }

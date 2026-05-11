@@ -61,6 +61,7 @@ const PURGE_CONFIRM_PHRASE = 'PURGAR TODO';
 
 // Directorios de volúmenes físicos del backend
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
+const GLOBAL_DIR = path.join(__dirname, '../../global');
 const SECRETS_DIR = path.join(__dirname, '../../secrets');
 const BACKUPS_DIR = path.join(__dirname, '../../backups');
 
@@ -285,10 +286,13 @@ router.get('/history', authenticate, authorize('admin'), async (req, res) => {
       if (file.endsWith('.zip') || file.endsWith('.json')) {
         const filePath = path.join(BACKUPS_DIR, file);
         const stats = await fs.stat(filePath);
+        const epoch0 = new Date(0);
+        const birthtime = stats.birthtime > epoch0 ? stats.birthtime : null;
+        const createdAt = birthtime || (stats.mtime > epoch0 ? stats.mtime : new Date());
         backups.push({
           _id: file,
           filename: file,
-          createdAt: stats.birthtime,
+          createdAt,
           size: stats.size,
           type: file.endsWith('.zip') ? 'full' : 'legacy'
         });
@@ -308,6 +312,7 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
   try {
     await fs.mkdir(BACKUPS_DIR, { recursive: true });
     await fs.mkdir(UPLOADS_DIR, { recursive: true });
+    await fs.mkdir(GLOBAL_DIR, { recursive: true }).catch(() => {});
     await fs.mkdir(SECRETS_DIR, { recursive: true });
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -367,6 +372,11 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
       // Archivos físicos de uploads (logos, imágenes)
       if (fsSync.existsSync(UPLOADS_DIR)) {
         archive.directory(UPLOADS_DIR, 'uploads');
+      }
+
+      // Directorio global opcional del servidor
+      if (fsSync.existsSync(GLOBAL_DIR)) {
+        archive.directory(GLOBAL_DIR, 'global');
       }
 
       // Certificados SSL (solo los legibles pre-escaneados)
@@ -448,6 +458,17 @@ router.post('/restore', authenticate, authorize('admin'), async (req, res) => {
           await fs.mkdir(UPLOADS_DIR, { recursive: true });
           await fs.cp(extractedUploads, UPLOADS_DIR, { recursive: true, force: true });
           logger.info({ source: extractedUploads, destination: UPLOADS_DIR }, 'Directorio /uploads restaurado recursivamente');
+        }
+
+        // Restaurar directorio global opcional
+        const extractedGlobal = path.join(extractDir, 'global');
+        if (fsSync.existsSync(extractedGlobal)) {
+          if (clearBeforeRestore === true) {
+            await fs.rm(GLOBAL_DIR, { recursive: true, force: true }).catch(() => {});
+          }
+          await fs.mkdir(GLOBAL_DIR, { recursive: true });
+          await fs.cp(extractedGlobal, GLOBAL_DIR, { recursive: true, force: true });
+          logger.info({ source: extractedGlobal, destination: GLOBAL_DIR }, 'Directorio /global restaurado recursivamente');
         }
 
         // Restaurar archivos físicos: secrets (SSL certs)
@@ -628,6 +649,14 @@ router.post('/import',
             logger.info({ source: extractedUploads, destination: UPLOADS_DIR }, 'Directorio /uploads importado recursivamente');
           }
 
+            // Directorio global opcional
+            const extractedGlobal = path.join(extractDir, 'global');
+            if (fsSync.existsSync(extractedGlobal)) {
+              await fs.mkdir(GLOBAL_DIR, { recursive: true });
+              await fs.cp(extractedGlobal, GLOBAL_DIR, { recursive: true, force: true });
+              logger.info({ source: extractedGlobal, destination: GLOBAL_DIR }, 'Directorio /global importado recursivamente');
+            }
+
           // Restaurar archivos físicos: secrets (SSL certs)
           const extractedSecrets = path.join(extractDir, 'secrets');
           if (fsSync.existsSync(extractedSecrets)) {
@@ -662,7 +691,15 @@ router.post('/import',
 
       // Importar colecciones dinámicamente usando backupModels
       const models = backupModels;
+      const clearBeforeRestore = req.body.clearBeforeRestore === 'true' || req.body.clearBeforeRestore === true;
       let imported = 0;
+
+      if (clearBeforeRestore) {
+        logger.info('Borrando todas las colecciones antes de importar...');
+        for (const Model of Object.values(models)) {
+          await Model.deleteMany({});
+        }
+      }
 
       for (const [key, Model] of Object.entries(models)) {
         if (backupJson.data[key]?.length) {
@@ -720,6 +757,31 @@ const emptyDirectory = async (dirPath) => {
   }
 };
 
+const ensureDefaultAdminUser = async () => {
+  const adminUsername = (process.env.ADMIN_USERNAME || '').trim();
+  const adminPassword = process.env.ADMIN_PASSWORD || '';
+
+  if (!adminUsername || !adminPassword) {
+    logger.warn({ event: 'backup.purge.admin.skipped' }, 'No se pudo recrear el usuario admin por falta de variables de entorno');
+    return false;
+  }
+
+  const adminEmail = (process.env.ADMIN_EMAIL || 'admin@bitacora.local').trim();
+  await User.deleteMany({ role: 'admin' });
+  await User.create({
+    username: adminUsername,
+    password: adminPassword,
+    email: adminEmail,
+    fullName: 'Administrador Maestro SOC',
+    role: 'admin',
+    cargoLabel: 'Líder Técnico SOC',
+    isActive: true,
+    theme: 'dark'
+  });
+
+  return true;
+};
+
 // POST /api/backup/purge - Purgar todos los datos (admin)
 router.post('/purge', authenticate, authorize('admin'), async (req, res) => {
   try {
@@ -739,6 +801,7 @@ router.post('/purge', authenticate, authorize('admin'), async (req, res) => {
     // Purgar volúmenes físicos montados en Docker
     const dirsToPurge = [
       path.join(__dirname, '../../uploads'),
+      path.join(__dirname, '../../global'),
       path.join(__dirname, '../../logs'),
       path.join(__dirname, '../../backups'),
       path.join(__dirname, '../../secrets')
@@ -748,15 +811,20 @@ router.post('/purge', authenticate, authorize('admin'), async (req, res) => {
       await emptyDirectory(dir);
     }
 
+    const adminRecreated = await ensureDefaultAdminUser();
+
     await audit(req, {
       event: 'admin.backup.purge',
       level: 'warning',
-      result: { success: true, deletedCollections, volumesPurged: true }
+      result: { success: true, deletedCollections, volumesPurged: true, adminRecreated }
     });
 
     res.json({
-      message: 'Base de datos y volúmenes físicos purgados exitosamente (Factory Reset)',
-      deletedCollections
+      message: adminRecreated
+        ? 'Base de datos y volúmenes físicos purgados exitosamente (Factory Reset). Usuario admin recreado desde .env'
+        : 'Base de datos y volúmenes físicos purgados exitosamente (Factory Reset). No se pudo recrear el usuario admin porque faltan variables de entorno',
+      deletedCollections,
+      adminRecreated
     });
   } catch (error) {
     logger.error({ err: error }, 'Error purgando datos y volúmenes');

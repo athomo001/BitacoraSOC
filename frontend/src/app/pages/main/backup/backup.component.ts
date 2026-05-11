@@ -239,6 +239,7 @@ export class BackupComponent implements OnInit {
 
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('clearBeforeRestore', String(this.clearBeforeRestore));
 
     this.isImporting = true;
     this.http.post<any>(`${environment.apiUrl}/backup/import`, formData).subscribe({
