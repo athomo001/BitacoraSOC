@@ -29,6 +29,7 @@ const { getBrandingSnapshot, formatBrandedSubject, getAppTitleForText } = requir
 const { encrypt, decrypt } = require('../utils/encryption');
 const { invalidateCache, resolveTransportSecurityOptions } = require('../utils/email');
 const logger = require('../utils/logger');
+const { auditSystem } = require('../utils/audit');
 const { audit } = require('../utils/audit');
 
 const smtpTestLimiter = rateLimit({
@@ -694,17 +695,58 @@ const sendEscalationInternalReminderEmail = async ({
       subject,
       response: info.response
     });
+
+    auditSystem({
+      event: 'escalation.email.sent',
+      level: 'info',
+      result: { success: true, reason: 'Email sent successfully' },
+      metadata: {
+        sourceModule: 'smtp-scheduler',
+        triggerType: 'scheduled',
+        triggerContext: 'escalation-reminder',
+        cargoLabels,
+        recipientsCount: recipients.length,
+        recipientsMasked: recipients.map((r) => r.substring(0, 3) + '***'),
+        subject,
+        messageId: info.messageId,
+        smtpResponse: info.response,
+        host: config.host,
+        port: config.port
+      }
+    }).catch((err) => logger.error({ err }, 'Audit escalation.email.sent failed'));
   } catch (error) {
     logger.error('❌ [sendEscalationInternalReminderEmail] ERROR AL ENVIAR CORREO', {
       error: error.message,
       errorCode: error.code,
       errorCommand: error.command,
-      recipients: recipients.map(r => r.substring(0, 3) + '***'),
+      recipients: recipients.map((r) => r.substring(0, 3) + '***'),
       recipientCount: recipients.length,
       cargoLabels,
       subject,
       stack: error.stack
     });
+
+    auditSystem({
+      event: 'escalation.email.failed',
+      level: 'error',
+      result: { success: false, reason: error.message },
+      metadata: {
+        sourceModule: 'smtp-scheduler',
+        triggerType: 'scheduled',
+        triggerContext: 'escalation-reminder',
+        cargoLabels,
+        recipientsCount: recipients.length,
+        recipientsMasked: recipients.map((r) => r.substring(0, 3) + '***'),
+        subject,
+        error: error.message,
+        errorCode: error.code,
+        errorCommand: error.command,
+        host: config.host,
+        port: config.port,
+        diagnosticHint: 'Revisa credenciales SMTP, conexión de red, o logs del backend para más detalles'
+      }
+    }).catch((err) => logger.error({ err }, 'Audit escalation.email.failed failed'));
+
     throw error;
   }
 };
