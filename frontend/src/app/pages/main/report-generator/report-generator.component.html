@@ -623,9 +623,9 @@
 
               <!-- Listas de correo -->
               <div class="newsletter-mailing-list-block">
-                <div class="newsletter-saved-header" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--outline-subtle);">
+                <div class="newsletter-saved-header newsletter-saved-header--section-separator">
                   <strong>Listas de correo</strong>
-                  <button mat-button type="button" (click)="selectAllMailingLists()" *ngIf="mailingListContacts.length > 0" style="font-size:12px; padding: 0 8px; min-width: 0;">+ Todas al Para</button>
+                  <button mat-button type="button" (click)="selectAllMailingLists()" *ngIf="mailingListContacts.length > 0" class="newsletter-header-action">+ Todas al Para</button>
                 </div>
 
                 <div class="newsletter-contact-list" *ngIf="mailingListContacts.length > 0; else noMailingLists">
