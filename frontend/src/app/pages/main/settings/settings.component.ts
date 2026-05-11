@@ -375,6 +375,17 @@ export class SettingsComponent implements OnInit {
 
   saveSmtpConfig(allowInactiveSave = false): void {
     const isActive = this.smtpForm.value.isActive !== false;
+    const passwordInput = String(this.smtpForm.get('password')?.value || '').trim();
+
+    if (isActive && this.hasStoredSmtpConfig && !this.smtpTestPassed && !passwordInput) {
+      this.snackBar.open(
+        'Para reactivar SMTP después de una restauración, ingresa nuevamente la contraseña SMTP y guarda.',
+        'Cerrar',
+        { duration: 5000 }
+      );
+      return;
+    }
+
     if (!this.smtpTestPassed && !this.hasStoredSmtpConfig && !(allowInactiveSave && !isActive)) {
       this.snackBar.open('Primero realiza una prueba SMTP exitosa', 'Cerrar', { duration: 3000 });
       return;
@@ -468,9 +479,33 @@ export class SettingsComponent implements OnInit {
   }
 
   private buildSmtpDiagnostic(err: any): { code: string; probableCause: string; suggestedAction: string; rawMessage?: string } {
+    const firstValidationError = err?.error?.errors?.[0];
+    const validationMsg = firstValidationError
+      ? `${firstValidationError.field || 'campo'}: ${firstValidationError.msg || 'valor inválido'}`
+      : '';
+
     const rawMessage = String(err?.error?.error || err?.error?.message || err?.message || 'error desconocido');
+    const detailedMessage = validationMsg ? `${rawMessage} | ${validationMsg}` : rawMessage;
     const lowered = rawMessage.toLowerCase();
     const statusCode = Number(err?.status || err?.error?.status || 0);
+
+    if (statusCode === 400 && (rawMessage.includes('Errores de validación') || !!firstValidationError)) {
+      return {
+        code: 'SMTP_VALIDATION',
+        probableCause: validationMsg || 'Payload inválido para guardar/probar configuración SMTP',
+        suggestedAction: 'Revisa el campo indicado y vuelve a guardar.',
+        rawMessage: detailedMessage
+      };
+    }
+
+    if (rawMessage.includes('No se pudo reutilizar la contraseña SMTP guardada')) {
+      return {
+        code: 'SMTP_PASSWORD_REENTRY',
+        probableCause: 'La contraseña SMTP guardada no pudo reutilizarse en este entorno',
+        suggestedAction: 'Ingresa nuevamente la contraseña SMTP, prueba conexión y guarda.',
+        rawMessage: detailedMessage
+      };
+    }
 
     if (
       statusCode === 429 ||
@@ -482,7 +517,7 @@ export class SettingsComponent implements OnInit {
         code: 'SMTP_RATE_LIMIT',
         probableCause: 'Se alcanzó el límite temporal de pruebas SMTP',
         suggestedAction: 'Espera unos minutos y vuelve a probar.',
-        rawMessage
+        rawMessage: detailedMessage
       };
     }
     if (
@@ -496,7 +531,7 @@ export class SettingsComponent implements OnInit {
         code: 'SMTP_THROTTLED',
         probableCause: 'El proveedor SMTP aplicó bloqueo temporal por seguridad',
         suggestedAction: 'Espera unos minutos y reintenta; si persiste, revisa políticas del proveedor.',
-        rawMessage
+        rawMessage: detailedMessage
       };
     }
 
@@ -505,7 +540,7 @@ export class SettingsComponent implements OnInit {
         code: 'SMTP_AUTH',
         probableCause: 'Credenciales SMTP inválidas o bloqueadas',
         suggestedAction: 'Verifica usuario/clave y vuelve a probar.',
-        rawMessage
+        rawMessage: detailedMessage
       };
     }
     if (lowered.includes('etimedout') || lowered.includes('timeout')) {
@@ -513,7 +548,7 @@ export class SettingsComponent implements OnInit {
         code: 'SMTP_TIMEOUT',
         probableCause: 'Tiempo de espera agotado hacia el servidor SMTP',
         suggestedAction: 'Revisa conectividad de red/firewall y reintenta.',
-        rawMessage
+        rawMessage: detailedMessage
       };
     }
     if (lowered.includes('econnrefused') || lowered.includes('enotfound')) {
@@ -521,7 +556,7 @@ export class SettingsComponent implements OnInit {
         code: 'SMTP_HOST',
         probableCause: 'Host o puerto SMTP no alcanzable',
         suggestedAction: 'Confirma host/puerto y DNS interno.',
-        rawMessage
+        rawMessage: detailedMessage
       };
     }
     if (lowered.includes('self signed') || lowered.includes('certificate') || lowered.includes('tls')) {
@@ -529,7 +564,7 @@ export class SettingsComponent implements OnInit {
         code: 'SMTP_TLS',
         probableCause: 'Problema de certificado o negociación TLS',
         suggestedAction: 'Revisa opción SSL/TLS y política de certificados.',
-        rawMessage
+        rawMessage: detailedMessage
       };
     }
 
@@ -537,7 +572,7 @@ export class SettingsComponent implements OnInit {
       code: 'SMTP_UNKNOWN',
       probableCause: 'Fallo no categorizado en la prueba SMTP',
       suggestedAction: 'Reintenta y revisa logs de auditoría para detalle técnico.',
-      rawMessage
+      rawMessage: detailedMessage
     };
   }
 

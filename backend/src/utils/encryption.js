@@ -23,16 +23,85 @@
  *   - Si no tiene formato nuevo, intenta descifrar con crypto-js (compatibilidad)
  */
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 
-// 🔒 CRÍTICO: Validar que ENCRYPTION_KEY esté configurada (no usar default)
-// Genera con: openssl rand -hex 32
-if (!process.env.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY.length < 32) {
-  console.error('⚠️ ENCRYPTION_KEY no configurada o muy corta. Usa: openssl rand -hex 32');
-  process.exit(1);
-}
-
-const ENCRYPTION_KEY = Buffer.from(process.env.ENCRYPTION_KEY, 'hex');
 const ALGORITHM = 'aes-256-gcm';
+const SECRETS_DIR = path.join(__dirname, '../../secrets');
+const KEYRING_PATH = path.join(SECRETS_DIR, 'encryption-keyring.json');
+
+const normalizeHexKey = (value) => {
+  const raw = String(value || '').trim().toLowerCase();
+  return /^[a-f0-9]{64}$/.test(raw) ? raw : '';
+};
+
+const readKeyringHexKeys = () => {
+  try {
+    if (!fs.existsSync(KEYRING_PATH)) {
+      return [];
+    }
+
+    const parsed = JSON.parse(fs.readFileSync(KEYRING_PATH, 'utf8'));
+    const keys = Array.isArray(parsed?.keys) ? parsed.keys : [];
+    const normalized = keys.map(normalizeHexKey).filter(Boolean);
+    return Array.from(new Set(normalized));
+  } catch (error) {
+    console.error('Error leyendo keyring de cifrado:', error.message);
+    return [];
+  }
+};
+
+const writeKeyringHexKeys = (keys) => {
+  try {
+    fs.mkdirSync(SECRETS_DIR, { recursive: true });
+    fs.writeFileSync(
+      KEYRING_PATH,
+      JSON.stringify({
+        version: 1,
+        updatedAt: new Date().toISOString(),
+        keys
+      }, null, 2),
+      'utf8'
+    );
+    return true;
+  } catch (error) {
+    console.error('Error escribiendo keyring de cifrado:', error.message);
+    return false;
+  }
+};
+
+const getAvailableHexKeys = () => {
+  const envKey = normalizeHexKey(process.env.ENCRYPTION_KEY);
+  const keyringKeys = readKeyringHexKeys();
+  const ordered = [];
+
+  if (envKey) ordered.push(envKey);
+  for (const key of keyringKeys) {
+    if (!ordered.includes(key)) {
+      ordered.push(key);
+    }
+  }
+
+  return ordered;
+};
+
+const getAvailableBufferKeys = () => getAvailableHexKeys().map((hex) => Buffer.from(hex, 'hex'));
+
+const bootstrapKeyring = () => {
+  const envKey = normalizeHexKey(process.env.ENCRYPTION_KEY);
+  const keyringKeys = readKeyringHexKeys();
+
+  if (!envKey && keyringKeys.length === 0) {
+    console.error('⚠️ ENCRYPTION_KEY inválida o ausente y sin keyring persistente. Usa: openssl rand -hex 32');
+    process.exit(1);
+  }
+
+  if (envKey && !keyringKeys.includes(envKey)) {
+    writeKeyringHexKeys([envKey, ...keyringKeys]);
+  }
+};
+
+bootstrapKeyring();
 
 /**
  * Cifrar texto con AES-256-GCM
@@ -53,9 +122,14 @@ const ALGORITHM = 'aes-256-gcm';
  */
 const encrypt = (text) => {
   if (!text) return '';
+
+  const keys = getAvailableBufferKeys();
+  if (keys.length === 0) {
+    throw new Error('No hay llaves válidas para cifrar');
+  }
   
   const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
+  const cipher = crypto.createCipheriv(ALGORITHM, keys[0], iv);
   
   let encrypted = cipher.update(text, 'utf8', 'hex');
   encrypted += cipher.final('hex');
@@ -92,6 +166,14 @@ const decrypt = (ciphertext) => {
     // Legacy fallback: si no tiene formato nuevo, intentar crypto-js
     if (parts.length !== 3) {
       const CryptoJS = require('crypto-js');
+      const candidateKeys = getAvailableHexKeys();
+
+      for (const candidate of candidateKeys) {
+        const bytes = CryptoJS.AES.decrypt(ciphertext, candidate);
+        const decoded = bytes.toString(CryptoJS.enc.Utf8);
+        if (decoded) return decoded;
+      }
+
       const bytes = CryptoJS.AES.decrypt(ciphertext, process.env.ENCRYPTION_KEY || 'default-key-change-me!!!!!!!!');
       return bytes.toString(CryptoJS.enc.Utf8);
     }
@@ -100,13 +182,24 @@ const decrypt = (ciphertext) => {
     const authTag = Buffer.from(parts[1], 'hex');
     const encrypted = parts[2];
     
-    const decipher = crypto.createDecipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
-    decipher.setAuthTag(authTag);
-    
-    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    
-    return decrypted;
+    const candidateKeys = getAvailableBufferKeys();
+    for (const key of candidateKeys) {
+      try {
+        const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+        decipher.setAuthTag(authTag);
+
+        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+
+        if (decrypted) {
+          return decrypted;
+        }
+      } catch {
+        // Probar la siguiente llave disponible del keyring
+      }
+    }
+
+    return '';
   } catch (error) {
     console.error('Error al descifrar:', error.message);
     return '';
