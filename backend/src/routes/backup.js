@@ -79,6 +79,15 @@ const isValidBackupFilename = (filename) => {
   return typeof filename === 'string' && /^backup-[a-zA-Z0-9.\-_]+\.(json|zip)$/.test(filename);
 };
 
+const parseBooleanFlag = (value) => {
+  if (value === true || value === 1) return true;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on';
+  }
+  return false;
+};
+
 // Helper: convertir array de objetos a CSV
 const arrayToCSV = (data) => {
   if (!data || data.length === 0) return '';
@@ -417,6 +426,7 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
 router.post('/restore', authenticate, authorize('admin'), async (req, res) => {
   try {
     const { filename, clearBeforeRestore } = req.body;
+    const shouldClearBeforeRestore = parseBooleanFlag(clearBeforeRestore);
 
     if (!filename || !isValidBackupFilename(filename)) {
       return res.status(400).json({ message: 'Filename inválido o requerido' });
@@ -452,7 +462,7 @@ router.post('/restore', authenticate, authorize('admin'), async (req, res) => {
         // Restaurar archivos físicos: uploads
         const extractedUploads = path.join(extractDir, 'uploads');
         if (fsSync.existsSync(extractedUploads)) {
-          if (clearBeforeRestore === true) {
+          if (shouldClearBeforeRestore) {
             await fs.rm(UPLOADS_DIR, { recursive: true, force: true }).catch(() => {});
           }
           await fs.mkdir(UPLOADS_DIR, { recursive: true });
@@ -463,7 +473,7 @@ router.post('/restore', authenticate, authorize('admin'), async (req, res) => {
         // Restaurar directorio global opcional
         const extractedGlobal = path.join(extractDir, 'global');
         if (fsSync.existsSync(extractedGlobal)) {
-          if (clearBeforeRestore === true) {
+          if (shouldClearBeforeRestore) {
             await fs.rm(GLOBAL_DIR, { recursive: true, force: true }).catch(() => {});
           }
           await fs.mkdir(GLOBAL_DIR, { recursive: true });
@@ -474,7 +484,7 @@ router.post('/restore', authenticate, authorize('admin'), async (req, res) => {
         // Restaurar archivos físicos: secrets (SSL certs)
         const extractedSecrets = path.join(extractDir, 'secrets');
         if (fsSync.existsSync(extractedSecrets)) {
-          if (clearBeforeRestore === true) {
+          if (shouldClearBeforeRestore) {
             await fs.rm(SECRETS_DIR, { recursive: true, force: true }).catch(() => {});
           }
           await fs.mkdir(SECRETS_DIR, { recursive: true });
@@ -499,7 +509,7 @@ router.post('/restore', authenticate, authorize('admin'), async (req, res) => {
 
     const models = backupModels;
 
-    if (clearBeforeRestore === true) {
+    if (shouldClearBeforeRestore) {
       logger.info('Borrando todas las colecciones antes de restaurar...');
       for (const Model of Object.values(models)) {
         await Model.deleteMany({});
@@ -536,7 +546,7 @@ router.post('/restore', authenticate, authorize('admin'), async (req, res) => {
   }
 });
 
-// GET /api/backup/download/:filename - Descargar backup JSON (admin)
+// GET /api/backup/download/:filename - Descargar backup ZIP o JSON (admin)
 router.get('/download/:filename', authenticate, authorize('admin'), async (req, res) => {
   try {
     const { filename } = req.params;
@@ -553,7 +563,8 @@ router.get('/download/:filename', authenticate, authorize('admin'), async (req, 
       return res.status(404).json({ message: 'Backup no encontrado' });
     }
 
-    res.setHeader('Content-Type', 'application/json');
+    const contentType = filename.endsWith('.zip') ? 'application/zip' : 'application/json';
+    res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.download(filePath);
   } catch (error) {
@@ -616,6 +627,7 @@ router.post('/import',
       }
 
       const isZip = req.file.originalname.endsWith('.zip');
+      const clearBeforeRestore = parseBooleanFlag(req.body?.clearBeforeRestore);
       let backupJson;
 
       if (isZip) {
@@ -644,6 +656,9 @@ router.post('/import',
           // Restaurar archivos físicos: uploads
           const extractedUploads = path.join(extractDir, 'uploads');
           if (fsSync.existsSync(extractedUploads)) {
+            if (clearBeforeRestore) {
+              await fs.rm(UPLOADS_DIR, { recursive: true, force: true }).catch(() => {});
+            }
             await fs.mkdir(UPLOADS_DIR, { recursive: true });
             await fs.cp(extractedUploads, UPLOADS_DIR, { recursive: true, force: true });
             logger.info({ source: extractedUploads, destination: UPLOADS_DIR }, 'Directorio /uploads importado recursivamente');
@@ -652,6 +667,9 @@ router.post('/import',
             // Directorio global opcional
             const extractedGlobal = path.join(extractDir, 'global');
             if (fsSync.existsSync(extractedGlobal)) {
+              if (clearBeforeRestore) {
+                await fs.rm(GLOBAL_DIR, { recursive: true, force: true }).catch(() => {});
+              }
               await fs.mkdir(GLOBAL_DIR, { recursive: true });
               await fs.cp(extractedGlobal, GLOBAL_DIR, { recursive: true, force: true });
               logger.info({ source: extractedGlobal, destination: GLOBAL_DIR }, 'Directorio /global importado recursivamente');
@@ -660,6 +678,9 @@ router.post('/import',
           // Restaurar archivos físicos: secrets (SSL certs)
           const extractedSecrets = path.join(extractDir, 'secrets');
           if (fsSync.existsSync(extractedSecrets)) {
+            if (clearBeforeRestore) {
+              await fs.rm(SECRETS_DIR, { recursive: true, force: true }).catch(() => {});
+            }
             await fs.mkdir(SECRETS_DIR, { recursive: true });
             await fs.cp(extractedSecrets, SECRETS_DIR, { recursive: true, force: true });
             logger.info({ source: extractedSecrets, destination: SECRETS_DIR }, 'Directorio /secrets importado recursivamente');
@@ -691,7 +712,6 @@ router.post('/import',
 
       // Importar colecciones dinámicamente usando backupModels
       const models = backupModels;
-      const clearBeforeRestore = req.body.clearBeforeRestore === 'true' || req.body.clearBeforeRestore === true;
       let imported = 0;
 
       if (clearBeforeRestore) {

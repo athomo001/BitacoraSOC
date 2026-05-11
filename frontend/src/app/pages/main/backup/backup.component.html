@@ -201,8 +201,8 @@
         <ng-container matColumnDef="actions">
           <th mat-header-cell *matHeaderCellDef>Acciones</th>
           <td mat-cell *matCellDef="let backup">
-            <button mat-icon-button color="accent" (click)="downloadBackup(backup)"
-                    matTooltip="Descargar JSON">
+                <button mat-icon-button color="accent" (click)="downloadBackup(backup)"
+                  matTooltip="Descargar backup">
               <mat-icon>download</mat-icon>
             </button>
             <button mat-icon-button color="primary" (click)="restoreBackup(backup)"

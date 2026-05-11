@@ -220,9 +220,10 @@ export class EscalationDirectoryTabComponent implements OnInit {
 
   syncAndMergeDirectoryNow(): void {
     if (!this.canDirectoryWrite) return;
-    // Only merge duplicates WITHOUT rebuilding - preserves all manual edits
+
     this.mergingDirectoryDuplicates = true;
-    this.directoryService.mergeDuplicates().subscribe({
+
+    const runMergeAndUserSync = () => this.directoryService.mergeDuplicates().subscribe({
       next: () => {
         this.directoryService.syncUsersFromDirectory().subscribe({
           next: (syncResult: any) => {
@@ -244,6 +245,20 @@ export class EscalationDirectoryTabComponent implements OnInit {
         this.directoryRefresh.emit();
       }
     });
+
+    // If directory is empty, allow admin to rebuild first to avoid no-op sync/merge.
+    if ((this.directoryContacts || []).length === 0 && this.isAdminUser) {
+      this.directoryService.rebuildFromEscalation().subscribe({
+        next: () => runMergeAndUserSync(),
+        error: (err: any) => {
+          this.mergingDirectoryDuplicates = false;
+          this.showError(err?.error?.message || 'Error al reconstruir directorio desde escalación');
+        }
+      });
+      return;
+    }
+
+    runMergeAndUserSync();
   }
 
   cancelDirectoryForm(): void {

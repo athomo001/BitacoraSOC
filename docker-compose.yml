@@ -84,6 +84,7 @@ services:
       TZ: America/Santiago
     volumes:
       - ./.data/uploads:/app/uploads
+      - ./.data/global:/app/global
       - ./.data/logs:/app/logs
       - ./.data/backups:/app/backups
       - ./.data/tls:/app/secrets

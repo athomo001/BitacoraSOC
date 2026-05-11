@@ -2,6 +2,20 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.69-beta] - 2026-05-11
+
+### Hotfix backup/restore: Directorio Global y borrado previo real
+
+- **Causa raíz identificada:** la colección `DirectoryContact` (fuente de `/main/escalation/directory`) no estaba incluida en `backup-manifest`, por lo que:
+  - no se exportaba al crear backup,
+  - no se restauraba al recuperar backup,
+  - y tampoco se purgaba en `clearBeforeRestore`/factory reset.
+- **Fix aplicado:** se agregó `directoryContacts` al manifiesto central de backup, unificando create/import/restore/purge sobre esa colección.
+- **`clearBeforeRestore` robustecido:** la ruta de restore/import ahora normaliza flags booleanos (`true`, `"true"`, `1`, `"1"`, etc.) para evitar falsos negativos de limpieza previa.
+- **Limpieza física alineada en import ZIP:** al importar con `clearBeforeRestore=true`, además de DB se limpia también el filesystem restaurable (`uploads`, `global`, `secrets`) antes de copiar.
+- **Persistencia de carpeta global en Docker:** se agregó volumen `./.data/global:/app/global` para evitar pérdida del contenido físico de `global/` al recrear contenedores.
+- **UX de recuperación mejorada en Directorio:** la acción `Sincronizar y consolidar`, cuando el directorio está vacío y el usuario es admin, reconstruye desde escalación antes de consolidar/sincronizar usuarios.
+
 ## [v1.5.68-beta] - 2026-05-11
 
 ### Backup y recuperacion operativa reforzada
