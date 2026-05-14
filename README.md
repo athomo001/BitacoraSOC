@@ -134,17 +134,23 @@ Notas rapidas:
 ```bash
 cd backend
 cp .env.example .env
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
 ### Frontend
 
 ```bash
 cd frontend
-npm install
-npm start
+pnpm install
+pnpm start
 ```
+
+Politica de gestor de paquetes:
+
+- Este repositorio usa exclusivamente `pnpm@11`.
+- No usar `npm` para instalar o ejecutar scripts.
+- Ver detalles en `docs/PNPM_POLICY.md`.
 
 Acceso local:
 

@@ -142,7 +142,7 @@ El frontend Angular está inyectado con una URL en tiempo de build o mediante va
 
 **Síntoma:** El código ya cambió, pero en navegador sigue apareciendo la vista vieja del complemento o del contenedor.
 
-**Causa común:** Estás viendo el frontend Docker en `:80/:4200` y no el `npm start` local, o el navegador quedó con caché fuerte.
+**Causa común:** Estás viendo el frontend Docker en `:80/:4200` y no el `pnpm start` local, o el navegador quedó con caché fuerte.
 
 **Acciones:**
 ```bash
@@ -241,7 +241,7 @@ docker compose logs backend | grep smtp
 
 ## 🧹 Limpiar y Reempezar (Modo Nuclear)
 
-Si alguna actualización grande corrompió la estructura, NPM se bloqueó en caché docker, o simplemente todo se rompió irremediablemente (excepto la BD):
+Si alguna actualización grande corrompió la estructura, el gestor de paquetes se bloqueó en caché docker, o simplemente todo se rompió irremediablemente (excepto la BD):
 
 ```bash
 # Bajar todos los contenedores

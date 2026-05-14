@@ -86,7 +86,7 @@ const freePorts = () => {
 
 const startServer = () => {
   console.log('🚀 Iniciando backend...');
-  run('npm start');
+  run('pnpm start');
 };
 
 try {

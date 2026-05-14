@@ -436,7 +436,7 @@ source = bitacora-soc
 ```bash
 # Terminal 1: Start backend
 cd backend
-npm run dev
+pnpm run dev
 
 # Terminal 2: Start netcat collector
 nc -l 5140
@@ -464,7 +464,7 @@ curl -X POST http://localhost:3000/api/auth/login \
 ### Pretty logs en dev
 
 ```bash
-NODE_ENV=development npm run dev
+NODE_ENV=development pnpm run dev
 ```
 
 Output:
@@ -479,7 +479,7 @@ Output:
 ### Modo JSON puro
 
 ```bash
-NODE_ENV=production npm start
+NODE_ENV=production pnpm start
 ```
 
 Output:

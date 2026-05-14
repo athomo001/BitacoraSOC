@@ -9,17 +9,22 @@ USER root
 # Version del build (inyectada desde Docker Compose/CI)
 ARG APP_VERSION=dev
 ENV APP_VERSION=${APP_VERSION}
+ENV PNPM_HOME=/pnpm
+ENV PATH=${PNPM_HOME}:${PATH}
+
+RUN corepack enable && corepack prepare pnpm@11.0.0 --activate
 
 # Copiar archivos de dependencias
-COPY package*.json ./
+COPY package.json pnpm-lock.yaml ./
 
 # Crear usuario no-root antes de instalar dependencias (idempotente para fallback local)
 RUN if ! grep -q '^nodejs:' /etc/group; then addgroup -g 1001 -S nodejs; fi && \
     if ! grep -q '^nodejs:' /etc/passwd; then adduser -S nodejs -u 1001; fi
 
 # Instalar dependencias de producción usando cache mount para velocidad local
-RUN --mount=type=cache,id=npm-cache-backend,target=/root/.npm \
-    npm install --omit=dev
+RUN --mount=type=cache,id=pnpm-store-backend,target=/pnpm/store \
+    pnpm config set store-dir /pnpm/store && \
+    NPM_CONFIG_USER_AGENT=pnpm/11.0.0 pnpm install --prod --frozen-lockfile --ignore-scripts
 
 # Copiar código fuente
 COPY src ./src

@@ -9,11 +9,12 @@ Guía detallada para instalar y configurar el sistema desde cero.
 
 ## Requisitos
 
-- **Node.js** 24+ LTS y npm
+- **Node.js** 24+ LTS
+- **pnpm** 11.x (via Corepack: `corepack enable && corepack prepare pnpm@11.0.0 --activate`)
 - **Express** 5.1+
 - **MongoDB** 8+ (local o remoto)
 - **mongodump/mongorestore** (para backups)
-- **Angular CLI** 20+ `npm install -g @angular/cli`
+- **Angular CLI** 20+ (ejecutado via scripts o `pnpm exec ng`)
 
 ---
 
@@ -29,7 +30,7 @@ cd C:\ruta\a\BitacoraSOC
 
 ```powershell
 cd backend
-npm install
+pnpm install
 ```
 
 **Paquetes principales instalados:**
@@ -41,7 +42,7 @@ npm install
 
 ```powershell
 cd ..\frontend
-npm install
+pnpm install
 ```
 
 **Paquetes principales:**
@@ -265,7 +266,7 @@ Solo para casos especiales. Se recomienda evitar inyecciones manuales directas c
 
 ```powershell
 cd backend
-npm run dev
+pnpm run dev
 ```
 
 **Salida esperada:**
@@ -299,7 +300,7 @@ curl http://localhost:3000/health
 
 ```powershell
 cd frontend
-npm start
+pnpm start
 ```
 
 **Salida esperada:**

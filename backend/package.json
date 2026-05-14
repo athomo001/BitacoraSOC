@@ -3,7 +3,12 @@
   "version": "1.5.19-beta",
   "description": "Bitácora SOC - Backend Express + MongoDB",
   "main": "src/server.js",
+  "packageManager": "pnpm@11.0.0",
+  "engines": {
+    "pnpm": "11.x"
+  },
   "scripts": {
+    "preinstall": "node -e \"const ua=(process.env.npm_config_user_agent||'').toLowerCase(); const pm=(process.env.npm_config_package_manager||'').toLowerCase(); const exec=(process.env.npm_execpath||'').toLowerCase().split(String.fromCharCode(92)).join('/'); const ok=/\\bpnpm\\/11\\./.test(ua)||/^pnpm@11\\./.test(pm)||/pnpm\\/11\\./.test(exec); if(!ok){console.error('ERROR: Use pnpm@11.x only in this repository.'); process.exit(1)}\"",
     "build": "node -e \"console.log('Backend: no build step required (Node.js runtime)')\"",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
@@ -54,5 +59,11 @@
   },
   "overrides": {
     "glob": "^13.0.6"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@scarf/scarf",
+      "sharp"
+    ]
   }
 }
