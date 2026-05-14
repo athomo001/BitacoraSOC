@@ -2,6 +2,17 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.72-beta] - 2026-05-14
+
+### Migracion completa a pnpm 11 por seguridad y consistencia operativa
+
+- **Estandar de gestor de paquetes unificado:** se migro el proyecto para operar con `pnpm` como gestor unico, eliminando el uso operativo de `npm`/`npx` en flujos de instalacion y ejecucion.
+- **Version fijada y controlada:** se dejo `pnpm@11.0.0` como version objetivo para asegurar reproducibilidad entre entornos locales, CI y contenedores.
+- **Guard de instalacion en `preinstall`:** se incorporo validacion del `user agent` para bloquear instalaciones fuera de `pnpm 11`, reduciendo riesgo de drift de dependencias.
+- **Docker alineado a la politica de paquetes:** los `Dockerfile` pasan a preparar/usar `pnpm 11` via `corepack` y ejecutar `pnpm install --frozen-lockfile`.
+- **Lockfiles por contexto de build:** se mantiene lockfile por paquete (`backend`, `frontend`, `Extras/complement-stub`) para preservar builds independientes y deterministas.
+- **Documentacion y operacion actualizadas:** se ajustaron guias y convenciones internas para reflejar que la operacion oficial del repo es sobre `pnpm`.
+
 ## [v1.5.71-beta] - 2026-05-11
 
 ### SMTP: observabilidad real, diagnóstico útil y UX operativa
