@@ -4,7 +4,7 @@
  * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
  */
 
-import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatExpansionModule, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatExpansionPanelDescription } from '@angular/material/expansion';
 import { ChecklistService } from '../../../services/checklist.service';
@@ -40,7 +40,7 @@ type ChecklistNode = {
   styleUrls: ['./checklist.component.scss'],
   imports: [NgIf, MatIcon, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, ReactiveFormsModule, FormsModule, MatFormField, MatLabel, MatSelect, MatOption, NgFor, MatExpansionPanelDescription, MatRadioGroup, MatRadioButton, MatInput, MatHint, MatButton, MatProgressSpinner, EntriesComponent, NgTemplateOutlet]
 })
-export class ChecklistComponent implements OnInit {
+export class ChecklistComponent implements OnInit, OnDestroy {
   @ViewChild('checklistGuideCard') checklistGuideCard?: ElementRef<HTMLElement>;
   activeChecklist: ChecklistTemplate | null = null;
   checkType: 'inicio' | 'cierre' = 'inicio';
@@ -48,6 +48,9 @@ export class ChecklistComponent implements OnInit {
   isLoading = false;
   checklistTree: ChecklistNode[] = [];
   checklistGuideVisible = false;
+
+  private checklistOpened = false;
+  private checklistSubmitted = false;
   
 
   constructor(
@@ -178,7 +181,17 @@ export class ChecklistComponent implements OnInit {
     this.checklistTree.forEach(node => this.syncAncestors(node));
   }
 
+  ngOnDestroy(): void {
+    if (this.checklistOpened && !this.checklistSubmitted) {
+      this.checklistService.postAuditEvent('checklist.abandoned', {
+        checkType: this.checkType,
+        templateName: this.activeChecklist?.name
+      }).subscribe({ error: () => {} });
+    }
+  }
+
   onCheckTypeChange(): void {
+    this.checklistOpened = false;
     this.loadActiveChecklist();
   }
 
@@ -195,6 +208,15 @@ export class ChecklistComponent implements OnInit {
         console.log('[CHECKLIST] Nodos aplanados:', flatNodes);
         console.log('[CHECKLIST] IDs de servicios:', flatNodes.map(n => ({ title: n.serviceTitle, id: n.serviceId })));
         this.logAction('checklist.template.load', 'ok', { count: flatNodes.length });
+        if (!this.checklistOpened) {
+          this.checklistOpened = true;
+          this.checklistSubmitted = false;
+          this.checklistService.postAuditEvent('checklist.opened', {
+            checkType: this.checkType,
+            templateName: template?.name,
+            itemCount: flatNodes.length
+          }).subscribe({ error: () => {} });
+        }
         this.isLoading = false;
       },
       error: (err) => {
@@ -261,8 +283,10 @@ export class ChecklistComponent implements OnInit {
 
     this.checklistService.createCheck(payload).subscribe({
       next: () => {
+        this.checklistSubmitted = true;
         this.snackBar.open('Checklist enviado exitosamente', 'Cerrar', { duration: 3000 });
         this.resetForm();
+        this.checklistOpened = false;
         this.logAction('checklist.submit', 'ok', { services: payload.services.length });
         this.isSubmitting = false;
       },
