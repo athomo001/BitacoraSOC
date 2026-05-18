@@ -9,7 +9,7 @@ Guía detallada para instalar y configurar el sistema desde cero.
 
 ## Requisitos
 
-- **Node.js** 24+ LTS
+- **Node.js** 22 LTS o superior
 - **pnpm** 11.x (via Corepack: `corepack enable && corepack prepare pnpm@11.0.0 --activate`)
 - **Express** 5.1+
 - **MongoDB** 8+ (local o remoto)
@@ -46,7 +46,7 @@ pnpm install
 ```
 
 **Paquetes principales:**
-- @angular/core 20.3.16, @angular/material 20.2.14
+- @angular/core 20.3.18, @angular/material 20.2.14
 - anime.js (animaciones)
 
 ### 1.4 MongoDB

@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: beta. Validar siempre los flujos criticos en un entorno controlado antes de pasar a operacion formal.
 >
-> Version referencial actual: 1.5.68-beta
+> Version referencial actual (segun `docs/CHANGELOG.md`): v1.5.73-beta
 
 Stack principal:
 
@@ -47,19 +47,23 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 
 ## Novedades recientes (resumen rapido)
 
-### v1.5.68-beta
+### v1.5.73-beta
 
-- backup ZIP endurecido para operacion real: importacion por archivo hasta `100M`, soporte correcto de `clearBeforeRestore`, historial de fechas robusto y restauracion fisica de `uploads`, `secrets` y `global`.
-- purge total mas seguro: al limpiar la plataforma se recrea automaticamente la cuenta admin por defecto definida en `.env`.
-- SMTP puede quedar desactivado sin borrar host/usuario/credenciales; al reactivar se reutiliza la password cifrada almacenada cuando corresponde.
-- el Directorio Global ahora edita contactos existentes inline en la misma fila, evitando volver al inicio de la pagina en listas largas.
+- hotfix UX en `/main/report-generator`: los tooltips de `Para` y `CC` en envio de boletines ya no aparecen cuando `Ver guia rapida` esta desactivado.
 
-### v1.5.47-beta
+### v1.5.72-beta
 
-- correcciones visuales en temas Dark y Cyberpunk para checklist history, sidebar y acordeones laterales.
-- tipografia cyberpunk ajustada para uso operativo real: menos ruido visual y mejor lectura.
-- pantalla de backups depurada con textos mas cortos y encabezado mas limpio.
-- stack Docker estabilizado con imagen base Node 22 Alpine para frontend y backend.
+- migracion operativa a `pnpm@11`: estandar unico de paquetes en frontend/backend, guard en `preinstall` y alineacion de Docker para instalaciones reproducibles.
+
+### v1.5.71-beta
+
+- SMTP con diagnostico mas accionable: clasificacion explicita de errores de autenticacion por politica (`smtp_auth_policy`), mejor metadata de auditoria y lectura de motivo tecnico en UI.
+- configuracion SMTP admin con menor friccion: opcion para reutilizar el correo del usuario SMTP como remitente.
+- restore/import con evidencia explicita de secretos restaurados (`restoredSecrets`, `keyringPresentAfterRestore`).
+
+### v1.5.70-beta y v1.5.69-beta
+
+- robustecimiento de backup/restore: recuperacion de credenciales cifradas entre entornos, correccion de `clearBeforeRestore`, inclusion completa de `DirectoryContact` y persistencia de `global/` en Docker.
 
 ### UX y operacion diaria
 
@@ -111,6 +115,19 @@ docker compose up -d --build
 docker compose exec backend node src/scripts/seed-admin.js
 # o, si necesitas ambiente de prueba:
 docker compose exec backend node src/scripts/seed.js
+```
+
+## Inicio rapido
+
+si ya esta descargado y solo resta levantar
+```bash
+docker compose build --no-cache && docker compose up -d
+```
+
+Para actualizar
+
+```bash
+git pull origin main && docker compose build --no-cache && docker compose up -d
 ```
 
 Acceso por defecto:
@@ -222,10 +239,11 @@ Documentos principales:
 
 Documentos funcionales complementarios:
 
-- `docs/WORK-SHIFTS.md`
 - `docs/ESCALATION.md`: escalacion, directorio global, agenda preventiva y turnos
 - `docs/CATALOGS.md`
 - `docs/LOGGING.md`
+- `docs/TLS_SSL_ARCHITECTURE.md`
+- `docs/UI-GOVERNANCE.md`
 - `backend/scripts/README.md`
 
 ---

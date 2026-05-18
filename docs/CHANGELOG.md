@@ -8,6 +8,13 @@ Registro de cambios relevantes del proyecto.
 
 - **Tooltip de destinatarios alineado a la guía rápida:** en `/main/report-generator` (modo Boletín), los tooltips de los botones `Para` y `CC` dentro de `Contactos guardados` y `Listas de correo` ahora respetan el estado de `Ver guía rápida`. Antes podían mostrarse aunque la ayuda contextual estuviera deshabilitada; ahora solo aparecen cuando la guía está activa.
 
+### Documentación operativa sincronizada
+
+- **README y screenshots actualizados:** se alinearon novedades recientes, referencias documentales y metadatos visuales de `docs/SCREENSHOTS.md` con el estado actual del producto.
+- **Guías técnicas ajustadas a baseline real:** `docs/SETUP.md` y `docs/DEPLOY.md` se actualizaron para reflejar `Node.js 22 LTS+`, dependencia frontend Angular `20.3.18` y notas de migración Mongo aplicables a instalaciones históricas.
+- **Runbook y troubleshooting corregidos:** se normalizaron referencias de acceso por puerto para entorno Docker y desarrollo local en `docs/RUNBOOK.md` y `docs/TROUBLESHOOTING.md`.
+- **API y gobernanza al día:** se documentaron endpoints operativos vigentes (`GET /api/smtp/password`, `POST /api/system/rate-limit-reset`) y se actualizó la marca de vigencia en `docs/UI-GOVERNANCE.md`.
+
 ## [v1.5.72-beta] - 2026-05-14
 
 ### Migracion completa a pnpm 11 por seguridad y consistencia operativa

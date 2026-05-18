@@ -2,7 +2,7 @@
 
 Documentación visual de las principales funcionalidades del sistema.
 
-> Nota: Las capturas son referenciales y pueden variar respecto a la versión actual.
+> Nota: Las capturas son referenciales y pueden variar respecto a la versión actual. Para comportamiento exacto de cada módulo, priorizar `docs/OPERATIONS.md`, `docs/RUNBOOK.md` y `docs/CHANGELOG.md`.
 
 ## 📑 Índice de Capturas
 
@@ -58,7 +58,7 @@ Documentación visual de las principales funcionalidades del sistema.
 
 | Icono | Opción |
 |-------|--------|
-| 👥 | **Ligth** |
+| 👥 | **Light** |
 | 📚 | **Dark** |
 | 📞 | **Sepia** |
 | 🏷️ | **Pastel** |
@@ -172,10 +172,11 @@ Sección expandida con opciones administrativas:
 | 👥 | **Admin Usuarios** | Gestión de usuarios, roles y permisos |
 | 📚 | **Admin Catálogos** | Configuración de catálogos de eventos, fuentes de logs, tipos de operación |
 | 📞 | **Admin Escalaci...** | Configuración de reglas de escalación y contactos |
-| 🏷️ | **Tags** | Gestión de etiquetas del sistema |
 | 🖼️ | **Logo** | Personalización del logo de la aplicación |
 | ☁️ | **Backup** | Creación y restauración de backups (seleccionado) |
 | 📧 | **SMTP / Config** | Configuración de servidor SMTP para notificaciones por email |
+
+> La consola admin puede incluir más entradas según versión/rol (por ejemplo: Integraciones, Seguridad, Apariencia y Complementos).
 
 **Acceso:** Solo usuarios con rol `admin` pueden ver y acceder a esta sección.
 
@@ -197,7 +198,6 @@ Opciones visibles en la sección de configuración:
 - **Admin Usuarios** - Gestión completa de cuentas
 - **Admin Catálogos** - Taxonomías y diccionarios
 - **Admin Escalaci...** - Matriz de contactos
-- **Tags** - Sistema de etiquetado
 - **Logo** - Branding corporativo
 - **Backup** ← **(seleccionado)** - Sistema de respaldo
 - **SMTP / Config** - Notificaciones email
@@ -240,9 +240,10 @@ Ver documentación completa en [backend/scripts/README.md](../backend/scripts/RE
 |-------|--------|-------------|
 |👥|**Consola admin**| Toda la configuraciond e un admin|
 | 📞 | **Log auditoria** | informacion de uso de  log en la Herramienta |
-| 🏷️ | **Tags** | Etiquetas globales |
 | 🖼️ | **Branding** | Personalización |
 | ☁️ | **Backup** | Respaldos |
+
+> La navegación de configuración es dinámica y puede variar por versión, rol y módulos habilitados.
 
 
 **Interacción:**
@@ -282,13 +283,13 @@ Ver documentación completa en [backend/scripts/README.md](../backend/scripts/RE
 
 **Características del diseño:**
 - 🎨 Material Design con Angular Material
-- 🌈 Esquema de colores: Azul primario, Rosa/Fucsia secundario
+- 🌈 Sistema multi-tema: light, dark, sepia, pastel y cyberpunk
 - 📱 Diseño responsive (desktop, tablet, mobile)
-- 🌙 Modo oscuro disponible
+- 🌙 Tematización operativa para distintos contextos de uso
 - ♿ Accesibilidad: ARIA labels, navegación por teclado
 - ⚡ Autosave para prevenir pérdida de datos
 - 🔔 Notificaciones en tiempo real
-- 📊 Visualización clara de tipos (operativa = verde, incidente = rojo)
+- 📊 Visualización clara de tipos (operativa/incidente)
 - 🏷️ Tags visuales como chips de colores
 
 ---
@@ -296,9 +297,9 @@ Ver documentación completa en [backend/scripts/README.md](../backend/scripts/RE
 
 ## 📊 Estadísticas del Sistema
 
-**Capturas documentadas:** 7  
-**Última actualización:** 16 de enero de 2026  
-**Funcionalidades cubiertas:** ~85%  
+**Capturas documentadas:** 13  
+**Última actualización:** 18 de mayo de 2026  
+**Cobertura visual:** módulos principales (vista referencial, no exhaustiva)  
 
 **Áreas documentadas:**
 - ✅ Navegación y menús
@@ -314,7 +315,7 @@ Ver documentación completa en [backend/scripts/README.md](../backend/scripts/RE
 ## 📝 Notas Técnicas
 
 **Stack tecnológico visible:**
-- Frontend: Angular 17+ con Material Design
+- Frontend: Angular 20 + Angular Material
 - Componentes standalone
 - Diseño modular y escalable
 - Sistema de rutas protegidas por roles
@@ -330,4 +331,4 @@ Ver documentación completa en [backend/scripts/README.md](../backend/scripts/RE
 
 ---
 
-*Última actualización: 30 de febrero de 2123  XD*
+*Última actualización: 2026-05-18*

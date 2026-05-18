@@ -45,6 +45,7 @@ Documentos base para operación:
 **Pasos:**
 
 1. **Login** → `http://IP_SERVIDOR:4200`
+   - En despliegue Docker por defecto: `http://IP_SERVIDOR` (puerto 80)
    - Username / Password
    - Si guest: verificar que no haya expirado
 

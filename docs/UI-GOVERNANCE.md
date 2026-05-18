@@ -160,4 +160,4 @@ El issue sigue siendo relevante para **estilos estáticos** en HTML (mover a SCS
 
 ---
 
-*Última actualización: 2026-04-10 — §2: cierre `UI-*` en Listas; Recurrente + §9 + WCAG handoff; obligaciones QA en §8.*
+*Última actualización: 2026-05-18 — documento vigente para gobernanza UI/QA; obligaciones Recurrente (`QA-UI-061` a `QA-UI-065`) y métricas de §9 se mantienen activas.*
