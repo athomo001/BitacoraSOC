@@ -142,6 +142,7 @@ El servidor acepta tokens con diferencia de ±60 segundos (previene errores por 
 | Método | Endpoint | Descripción | Rol |
 |--------|----------|-------------|-----|
 | GET | `/api/smtp` | Obtener config | Admin |
+| GET | `/api/smtp/password` | Obtener password SMTP descifrada bajo demanda | Admin |
 | POST | `/api/smtp` | Guardar config | Admin |
 | POST | `/api/smtp/test` | Probar (rate-limited 3/15min) | Admin |
 
@@ -151,6 +152,17 @@ Notas operativas SMTP:
 - `POST /api/smtp` acepta `isActive`; cuando se guarda en `false`, la configuracion queda persistida pero sin habilitar envios.
 - Si el campo password se deja vacio y ya existe una configuracion previa, el backend reutiliza la contraseña cifrada almacenada.
 - Una configuracion SMTP desactivada bloquea el envio real de correos hasta reactivarse.
+
+### Sistema
+
+| Método | Endpoint | Descripción | Rol |
+|--------|----------|-------------|-----|
+| POST | `/api/system/rate-limit-reset` | Reiniciar contadores de rate limit (requiere secreto en header) | Operación protegida por secreto |
+
+Notas operativas:
+
+- Requiere header `X-Rate-Limit-Reset-Secret` con el valor de `RATE_LIMIT_RESET_SECRET`.
+- Si `RATE_LIMIT_RESET_SECRET` no está definido o es inválido, la ruta no queda operativa.
 
 ### Reportes
 
