@@ -2,6 +2,12 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.73-beta] - 2026-05-18
+
+### Hotfix UX en ayuda contextual del generador de reportes
+
+- **Tooltip de destinatarios alineado a la guía rápida:** en `/main/report-generator` (modo Boletín), los tooltips de los botones `Para` y `CC` dentro de `Contactos guardados` y `Listas de correo` ahora respetan el estado de `Ver guía rápida`. Antes podían mostrarse aunque la ayuda contextual estuviera deshabilitada; ahora solo aparecen cuando la guía está activa.
+
 ## [v1.5.72-beta] - 2026-05-14
 
 ### Migracion completa a pnpm 11 por seguridad y consistencia operativa
