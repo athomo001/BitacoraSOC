@@ -224,8 +224,8 @@ No se borran registros, solo se marcan como `enabled: false`
 ## 🧪 Testing
 
 ### Test Manual:
-1. Iniciar backend: `cd backend && npm start`
-2. Iniciar frontend: `cd frontend && npm start`
+1. Iniciar backend: `cd backend && pnpm start`
+2. Iniciar frontend: `cd frontend && pnpm start`
 3. Login en `/login`
 4. Navegar a `/main/report-generator`
 5. Probar los 3 autocompletes

@@ -203,19 +203,19 @@ cp .env.example .env
 
 # Asegúrate de ajustar MONGODB_URI a localhost en tu .env
 
-npm install
-npm run dev             # Levanta API en http://localhost:3000
-npm run seed            # Crea admin root
-npm run restart:clean   # Libera forzosamente puertos zombies 3000/3443 en caso de crasheos
+pnpm install
+pnpm run dev             # Levanta API en http://localhost:3000
+pnpm run seed            # Crea admin root
+pnpm run restart:clean   # Libera forzosamente puertos zombies 3000/3443 en caso de crasheos
 ```
 
 ### 6.2 Frontend
 
 ```bash
 cd frontend
-npm install
-npm run restart:clean   # Mata limpiamente los procesos de Angular zombies en el 4200 (EADDRINUSE)
-npm start               # Levanta UI proxy en http://localhost:4200
+pnpm install
+pnpm run restart:clean   # Mata limpiamente los procesos de Angular zombies en el 4200 (EADDRINUSE)
+pnpm start               # Levanta UI proxy en http://localhost:4200
 ```
 
 > **Configuración Cruzada Local:**

@@ -79,7 +79,7 @@ const freePorts = () => {
 
 const startFrontend = () => {
   console.log('🚀 Iniciando frontend...');
-  run('npm start');
+  run('pnpm start');
 };
 
 try {

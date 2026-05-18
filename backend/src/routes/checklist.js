@@ -545,6 +545,36 @@ router.delete('/services/:id', authenticate, authorize('admin'), async (req, res
 
 // ========== Checklist records ==========
 
+// POST /api/checklist/audit-event — Registrar eventos de auditoría desde el cliente
+// Permite rastrear cuando un usuario abre el checklist pero nunca lo envía
+router.post('/audit-event',
+  authenticate,
+  notGuest,
+  body('event').isIn(['checklist.opened', 'checklist.abandoned']).withMessage('Evento no permitido'),
+  body('metadata').optional().isObject(),
+  validate,
+  async (req, res) => {
+    try {
+      const { event, metadata = {} } = req.body;
+      const reason = event === 'checklist.abandoned'
+        ? 'Checklist abierto pero no enviado (posible abandono)'
+        : 'Checklist abierto para llenado';
+
+      await audit(req, {
+        event,
+        level: event === 'checklist.abandoned' ? 'warn' : 'info',
+        result: { success: true, reason },
+        metadata: { ...metadata, source: 'client' }
+      });
+
+      res.json({ ok: true });
+    } catch (error) {
+      logger.error({ err: error }, 'Error registrando audit-event de checklist');
+      res.status(500).json({ message: 'Error registrando evento' });
+    }
+  }
+);
+
 router.post('/check',
   authenticate,
   notGuest,

@@ -16,8 +16,8 @@ if %ERRORLEVEL%==0 (
 
 where node >nul 2>nul
 if %ERRORLEVEL%==0 (
-  REM En CMD, "npx" usa npx.cmd y no choca con ExecutionPolicy de PowerShell
-  call npx --yes serve -l %PORT%
+  REM En CMD, "pnpm" usa pnpm.cmd y no choca con ExecutionPolicy de PowerShell
+  call pnpm dlx serve -l %PORT%
   exit /b %ERRORLEVEL%
 )
 

@@ -315,6 +315,8 @@ export class AuditLogsComponent implements OnInit {
       'checklist.update',
       'checklist.complete',
       'checklist.delete',
+      'checklist.opened',
+      'checklist.abandoned',
       'shiftcheck.create',
       'shiftcheck.update',
       'shiftcheck.complete'
@@ -624,9 +626,19 @@ export class AuditLogsComponent implements OnInit {
     // ====== CHECKLIST / SHIFTCHECK ======
     if (event.includes('checklist') || event.includes('shiftcheck')) {
       const status = result.success ? '✅' : '❌';
-      const action = event.includes('complete') ? 'COMPLETADO' : event.replace(/checklist\.|shiftcheck\./, '').toUpperCase();
       const template = meta['templateName'] || meta['checklistName'] || 'checklist';
+      const checkType = meta['checkType'] ? ` (${meta['checkType']})` : '';
       const reason = result.reason ? `| ${result.reason}` : '';
+
+      if (event === 'checklist.opened') {
+        const items = meta['itemCount'] ? ` | ${meta['itemCount']} ítems` : '';
+        return `👁️ [CHECKLIST ABIERTO] ${template}${checkType}${items} — sin enviar aún`;
+      }
+      if (event === 'checklist.abandoned') {
+        return `⚠️ [CHECKLIST ABANDONADO] ${template}${checkType} — abierto y cerrado sin enviar`;
+      }
+
+      const action = event.includes('complete') ? 'COMPLETADO' : event.replace(/checklist\.|shiftcheck\./, '').toUpperCase();
       return `${status} [CHECKLIST ${action}] ${template} ${reason}`;
     }
 

@@ -10,7 +10,7 @@ Complemento `zip-static` para ejecutar DOOM clasico en navegador dentro de Bitac
 
 ## Uso local rapido
 
-1. **Recomendado (HTTP local, Windows):** doble clic en **`run-local.cmd`** (usa Python o `npx` via CMD; evita el bloqueo de PowerShell a `npx.ps1`). Alternativa: `python -m http.server 5173` en esta carpeta. Si insistes en PowerShell y `npx` falla por *ExecutionPolicy*, usa **`npx.cmd --yes serve -l 5173`**. Luego abre `http://127.0.0.1:5173/` **solo con la ventana del servidor abierta** (error -102 = nada escuchando en ese puerto).
+1. **Recomendado (HTTP local, Windows):** doble clic en **`run-local.cmd`** (usa Python o `pnpm dlx` via CMD; evita bloqueos de ExecutionPolicy en PowerShell). Alternativa: `python -m http.server 5173` en esta carpeta. Si usas PowerShell, ejecuta **`pnpm dlx serve -l 5173`**. Luego abre `http://127.0.0.1:5173/` **solo con la ventana del servidor abierta** (error -102 = nada escuchando en ese puerto).
 2. Presionar `Iniciar DOOM`.
 3. Usar `Pantalla completa` si se desea.
 
@@ -55,7 +55,7 @@ Para este complemento (emulador WASM/js-dos), usar este preset minimo:
 
 ## Notas operativas
 
-- Runtime alineado **npm `js-dos@6.22.60`**: `vendor/js-dos.js`, `vendor/wdosbox.js`, **`vendor/wdosbox.wasm.js`** (sin este archivo el progreso queda ~0% y en el servidor HTTP se ve **404**), mas `vendor/DOOM-@evilution.zip`.
+- Runtime alineado con `js-dos@6.22.60`: `vendor/js-dos.js`, `vendor/wdosbox.js`, **`vendor/wdosbox.wasm.js`** (sin este archivo el progreso queda ~0% y en el servidor HTTP se ve **404**), mas `vendor/DOOM-@evilution.zip`.
 - El contenedor raiz de `Dos(...)` debe ser un **`<canvas>`** (no un `div`): de lo contrario aparece `canvas.getContext is not a function`.
 - **Teclado:** js-dos monta un teclado virtual (`.qwerty-input`, `tabIndex=1`) que hace `stopPropagation` de teclas; si el foco cae ahi tras deshabilitar el boton Iniciar, el juego no recibe teclas. En `app.js` se fuerza `blur`/`tabIndex=-1` y foco al canvas; en iframe hace falta `allow-pointer-lock` si usas `autolock`.
 - El UI muestra `Build vX.Y.Z` para validar el ZIP publicado.

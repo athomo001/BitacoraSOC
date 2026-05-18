@@ -626,7 +626,7 @@ db.auditlogs.find({ action: "login", result: "success" })
 2. Reiniciar backend:
    ```powershell
    # Task Manager → Terminar proceso Node.js
-   # Iniciar nuevamente: npm run dev
+  # Iniciar nuevamente: pnpm run dev
    ```
 
 3. Forzar re-login de todos los usuarios

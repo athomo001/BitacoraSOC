@@ -601,6 +601,7 @@
                             [class.field-btn--active-to]="isEmailInField(contact.email, 'to')"
                             (click)="toggleEmailInField(contact.email, 'to')"
                             matTooltip="Para: destinatario principal. Recibe el boletín directamente."
+                            [matTooltipDisabled]="!guideActive"
                             matTooltipPosition="above">
                       {{ isEmailInField(contact.email, 'to') ? '✓' : '+' }} Para
                     </button>
@@ -608,6 +609,7 @@
                             [class.field-btn--active-cc]="isEmailInField(contact.email, 'cc')"
                             (click)="toggleEmailInField(contact.email, 'cc')"
                             matTooltip="CC: copia interna o seguimiento. Se envía como copia del boletín."
+                            [matTooltipDisabled]="!guideActive"
                             matTooltipPosition="above">
                       {{ isEmailInField(contact.email, 'cc') ? '✓' : '+' }} CC
                     </button>
@@ -645,6 +647,7 @@
                               [class.field-btn--active-to]="isEmailInField(contact.email, 'to')"
                               (click)="toggleEmailInField(contact.email, 'to')"
                               matTooltip="Para: destinatario principal. Recibe el boletín directamente."
+                              [matTooltipDisabled]="!guideActive"
                               matTooltipPosition="above">
                         {{ isEmailInField(contact.email, 'to') ? '✓' : '+' }} Para
                       </button>
@@ -652,6 +655,7 @@
                               [class.field-btn--active-cc]="isEmailInField(contact.email, 'cc')"
                               (click)="toggleEmailInField(contact.email, 'cc')"
                               matTooltip="CC: copia interna o seguimiento. Se envía como copia del boletín."
+                              [matTooltipDisabled]="!guideActive"
                               matTooltipPosition="above">
                         {{ isEmailInField(contact.email, 'cc') ? '✓' : '+' }} CC
                       </button>

@@ -42,7 +42,7 @@ function checkBackendState() {
         });
     }).on('error', (err) => {
         if (currentSslState === null) {
-            console.log(`\n⚠️  Backend inalcanzable. Asegúrate de correr 'npm start' en /backend primero.`);
+            console.log(`\n⚠️  Backend inalcanzable. Asegúrate de correr 'pnpm start' en /backend primero.`);
             currentSslState = false;
             startFallback();
         }
@@ -73,7 +73,7 @@ function startFallback() {
 }
 
 function spawnNg(args) {
-    activeNgProcess = spawn('npx', ['ng', ...args], { stdio: 'inherit', shell: true });
+    activeNgProcess = spawn('pnpm', ['exec', 'ng', ...args], { stdio: 'inherit', shell: true });
 
     activeNgProcess.on('close', (code) => {
         if (!isRestarting) {

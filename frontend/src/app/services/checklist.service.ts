@@ -116,6 +116,13 @@ export class ChecklistService {
     return this.http.post<{ message: string; check: ShiftCheck }>(`${this.API_URL}/check`, data);
   }
 
+  postAuditEvent(
+    event: 'checklist.opened' | 'checklist.abandoned',
+    metadata: Record<string, unknown> = {}
+  ): Observable<{ ok: boolean }> {
+    return this.http.post<{ ok: boolean }>(`${this.API_URL}/audit-event`, { event, metadata });
+  }
+
   getLastCheck(): Observable<ShiftCheck | { message: string; check: null }> {
     return this.http.get<ShiftCheck | { message: string; check: null }>(`${this.API_URL}/check/last`);
   }

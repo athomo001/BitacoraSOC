@@ -5,19 +5,24 @@ FROM ${NODE_IMAGE} AS builder
 
 WORKDIR /app
 USER root
+ENV PNPM_HOME=/pnpm
+ENV PATH=${PNPM_HOME}:${PATH}
+
+RUN corepack enable && corepack prepare pnpm@11.0.0 --activate
 
 # Version del build (inyectada desde Docker Compose/CI)
 ARG APP_VERSION=dev
 
 # Copiar dependencias
-COPY package*.json ./
-RUN --mount=type=cache,id=npm-cache-frontend,target=/root/.npm \
-    npm ci
+COPY package.json pnpm-lock.yaml ./
+RUN --mount=type=cache,id=pnpm-store-frontend,target=/pnpm/store \
+  pnpm config set store-dir /pnpm/store && \
+  NPM_CONFIG_USER_AGENT=pnpm/11.0.0 pnpm install --frozen-lockfile --ignore-scripts
 
 # Copiar código y compilar para producción
 COPY . .
 RUN sed -i "s|__APP_VERSION__|${APP_VERSION}|g" src/environments/environment*.ts
-RUN npm run build -- --configuration production
+RUN pnpm run build --configuration production
 
 # Stage 2: Servir con Nginx
 FROM nginx:alpine
