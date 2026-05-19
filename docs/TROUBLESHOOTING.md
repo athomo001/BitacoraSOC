@@ -171,6 +171,50 @@ Luego forzar recarga del navegador con `Ctrl+F5`.
    ```
 5. Si el problema continúa, reportar ejemplo exacto de texto origen (sin datos sensibles) para ajustar heurísticas de parseo.
 
+### Boletín no envía: conflicto entre `Para` y `CC` (error 400)
+
+**Síntoma:** al enviar boletín aparece error indicando que hay correos repetidos entre `Para` y `CC`.
+
+**Causa:** el sistema bloquea por diseño cualquier correo duplicado entre ambos campos para evitar ambigüedad de entrega.
+
+**Acciones:**
+
+1. Revisar lista de correos reportados en el mensaje de error.
+2. Dejar cada correo en un solo campo (`Para` o `CC`).
+3. Reintentar envío.
+
+**Nota operativa:** no se usa `CCO`; el flujo de boletines opera solo con `Para` y `CC`.
+
+### Boletín envía más/menos correos de los esperados
+
+**Síntoma:** el operador esperaba un envío 1:1, pero ve menos correos; o esperaba agrupación y se envían más.
+
+**Causa típica:** estado del selector `Unir destinatarios por dominio` en `/main/report-generator`.
+
+- activado (default): 1 envío por dominio exacto en `Para`
+- desactivado: envío 1:1 por destinatario
+
+**Acciones:**
+
+1. Confirmar estado del selector antes de enviar.
+2. Verificar dominios de los destinatarios en `Para`.
+3. Validar resultado con `processedGroups`, `successCount` y `failCount`.
+
+### Boletín con éxito parcial SMTP
+
+**Síntoma:** la UI muestra enviados y fallidos en el mismo intento.
+
+**Contexto:** el backend contabiliza éxito/fallo por destinatario real en `Para`; con algunos servidores SMTP puede haber aceptación parcial.
+
+**Acciones:**
+
+1. Revisar métricas de respuesta (`successCount`, `failCount`, `processedGroups`).
+2. Consultar logs backend para causa técnica:
+   ```bash
+   docker compose logs --tail=200 backend | grep newsletter/send
+   ```
+3. Corregir direcciones inválidas/rechazadas y reintentar solo los faltantes.
+
 ### Abrir directo `/uploads/complements/...` devuelve 401/403
 
 **Síntoma:** Un artefacto publicado parece “caído” si se abre directo por URL.

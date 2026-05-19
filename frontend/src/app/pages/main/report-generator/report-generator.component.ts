@@ -130,6 +130,7 @@ export class ReportGeneratorComponent implements OnInit {
   // ─── Newsletter email dispatch ────────────────────────────────────────────
   newsletterRecipients = '';
   newsletterCcRecipients = '';
+  newsletterGroupByDomain = true;
   isSendingNewsletter = false;
   newsletterContacts: DirectoryContact[] = [];
   newsletterContactSearch = '';
@@ -691,6 +692,16 @@ export class ReportGeneratorComponent implements OnInit {
     return { valid, invalid };
   }
 
+  get newsletterToCcOverlap(): string[] {
+    const toSet = new Set(this.newsletterRecipientSummary.validRecipients.map((email) => email.toLowerCase()));
+    const overlap = this.newsletterCcSummary.valid.filter((email) => toSet.has(email.toLowerCase()));
+    return Array.from(new Set(overlap));
+  }
+
+  get hasNewsletterRecipientConflicts(): boolean {
+    return this.newsletterToCcOverlap.length > 0;
+  }
+
   sendNewsletter(): void {
     if (!this.generatedHtml) {
       this.snackBar.open('Primero genera el boletín', 'Cerrar', { duration: 3000 });
@@ -714,6 +725,16 @@ export class ReportGeneratorComponent implements OnInit {
       return;
     }
 
+    const overlap = this.newsletterToCcOverlap;
+    if (overlap.length > 0) {
+      this.snackBar.open(
+        `Error: no se permite el mismo correo en Para y CC (${overlap.join(', ')})`,
+        'Cerrar',
+        { duration: 9000 }
+      );
+      return;
+    }
+
     this.isSendingNewsletter = true;
     const subject = this.newsletterForm.value.tituloBoletin || 'Boletín de Seguridad';
     const ccValid = this.newsletterCcSummary.valid;
@@ -721,6 +742,7 @@ export class ReportGeneratorComponent implements OnInit {
     this.http.post(`${this.backendBaseUrl}/api/reports/newsletter/send`, {
       recipients: recipientSummary.validRecipients,
       cc: ccValid,
+      groupByDomain: this.newsletterGroupByDomain,
       subject,
       html: this.generatedHtml,
       analytics: {
@@ -732,9 +754,12 @@ export class ReportGeneratorComponent implements OnInit {
       next: (res: any) => {
         this.isSendingNewsletter = false;
         const ccPart = res.ccCount > 0 ? ` + ${res.ccCount} en CC` : '';
+        const modePart = res.groupByDomain
+          ? ` en ${res.processedGroups || res.successCount} grupo(s) de dominio`
+          : '';
         const msg = res.failCount > 0
-          ? `Boletín enviado a ${res.successCount} destinatarios${ccPart} (${res.failCount} fallidos)`
-          : `Boletín enviado a ${res.successCount} destinatario(s)${ccPart}`;
+          ? `Boletín enviado a ${res.successCount} destinatarios${ccPart}${modePart} (${res.failCount} fallidos)`
+          : `Boletín enviado a ${res.successCount} destinatario(s)${ccPart}${modePart}`;
         this.snackBar.open(msg, 'Cerrar', { duration: 5000 });
 
         if (res.successCount > 0) {

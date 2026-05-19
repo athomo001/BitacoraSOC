@@ -167,7 +167,9 @@ No usar en produccion.
 
 - cambiar a modo `Boletín de Seguridad` y completar campos obligatorios
 - generar vista previa y validar secciones mínimas (`Resumen`, `Impacto`, `Mitigación`)
-- probar envío 1:1 con al menos 2 destinatarios y verificar `successCount/failCount`
+- probar envío con `Unir destinatarios por dominio` activado y verificar `processedGroups` + `successCount/failCount`
+- desactivar `Unir destinatarios por dominio` y validar retorno a modo 1:1
+- validar bloqueo de error cuando exista el mismo correo en `Para` y `CC`
 - validar pegado enriquecido en `Resumen Ejecutivo` y `Impacto` (que no quede texto corrido)
 
 ---

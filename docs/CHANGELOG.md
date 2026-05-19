@@ -2,6 +2,26 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.74-beta] - 2026-05-18
+
+### Boletines: agrupacion por dominio con control operativo en UI
+
+- **Nuevo modo de envio agrupado por dominio en `/main/report-generator`:** se incorporo opcion **"Unir destinatarios por dominio"** para boletines. Cuando esta activa, el backend agrupa destinatarios `Para` por dominio exacto y envia un correo por grupo; cuando se desactiva, el flujo vuelve a modo **1:1**.
+- **Comportamiento por defecto seguro para reducir ruido de copia:** el selector queda habilitado por defecto (ON), minimizando copias repetidas en `CC` cuando existen multiples destinatarios del mismo dominio.
+- **Sin `CCO` por diseno:** el flujo mantiene solo `Para` y `CC`, respetando el comportamiento operacional definido para el modulo.
+
+### Validaciones de destinatarios reforzadas (Para vs CC)
+
+- **Bloqueo explicito de correos repetidos entre `Para` y `CC`:** se agrego validacion en frontend y backend para impedir enviar si el mismo correo aparece en ambos campos.
+- **Feedback inmediato al operador:** la UI muestra mensaje de error claro con la lista de correos en conflicto y deshabilita el boton de envio mientras exista inconsistencia.
+
+### UX de envio y trazabilidad mas precisas
+
+- **Etiqueta del boton dinamica por modo:** en Boletin, el CTA cambia entre **"Enviar boletines (por dominio)"** y **"Enviar boletines (1:1)"** segun el estado del selector.
+- **Mensajeria de ayuda alineada al modo real:** se ajusto el texto de apoyo de `CC` para que sea correcto tanto en envios agrupados como en 1:1.
+- **Conteo de resultados corregido en backend:** el resumen de envio ahora contabiliza exitos/fallos por destinatario real en `Para` usando metadatos `accepted/rejected` del transporte SMTP, evitando sobrecontar lotes agrupados como exito total cuando hay rechazos parciales.
+- **Comentarios tecnicos actualizados:** se normalizaron descripciones del endpoint `POST /api/reports/newsletter/send` para reflejar comportamiento dual (1:1 o agrupado por dominio).
+
 ## [v1.5.73-beta] - 2026-05-18
 
 ### Hotfix UX en ayuda contextual del generador de reportes

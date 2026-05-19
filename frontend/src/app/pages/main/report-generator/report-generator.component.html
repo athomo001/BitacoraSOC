@@ -541,10 +541,23 @@
                   </mat-form-field>
                 </div>
                 <p class="newsletter-helper-text newsletter-helper-text--no-margin">
-                  Cada correo individual enviado incluirá estos CC. Separados por coma, punto y coma o salto de línea.
+                  Cada envío incluirá estos CC (ya sea por dominio o 1:1). Separados por coma, punto y coma o salto de línea.
                   <span *ngIf="newsletterCcSummary.invalid.length > 0" class="newsletter-cc-invalid-hint">
                     ⚠ CC inválidos: {{ newsletterCcSummary.invalid.join(', ') }}
                   </span>
+                </p>
+
+                <div class="newsletter-send-options">
+                  <mat-checkbox [(ngModel)]="newsletterGroupByDomain" color="primary">
+                    Unir destinatarios por dominio
+                  </mat-checkbox>
+                  <p class="newsletter-helper-text newsletter-helper-text--no-margin">
+                    Activado: se envía 1 correo por dominio (manteniendo Para y CC). Desactivado: vuelve a envío 1:1.
+                  </p>
+                </div>
+
+                <p *ngIf="newsletterToCcOverlap.length > 0" class="newsletter-overlap-error">
+                  Error: estos correos están repetidos en Para y CC: {{ newsletterToCcOverlap.join(', ') }}
                 </p>
               </div>
             </div>
@@ -702,11 +715,11 @@
             <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-nl-send-action'">
               {{ getHint('hint-nl-send-action') }}
             </div>
-            <button mat-raised-button color="primary" [disabled]="newsletterRecipientSummary.validRecipients.length === 0 || isSendingNewsletter" (click)="sendNewsletter()"
+            <button mat-raised-button color="primary" [disabled]="newsletterRecipientSummary.validRecipients.length === 0 || isSendingNewsletter || hasNewsletterRecipientConflicts" (click)="sendNewsletter()"
                     (focus)="handleFieldFocus('hint-nl-send-action')" (blur)="handleFieldBlur()">
               <mat-icon *ngIf="!isSendingNewsletter">send</mat-icon>
               <mat-icon *ngIf="isSendingNewsletter">hourglass_empty</mat-icon>
-              {{ isSendingNewsletter ? 'Enviando...' : 'Enviar boletines (1:1)' }}
+              {{ isSendingNewsletter ? 'Enviando...' : (newsletterGroupByDomain ? 'Enviar boletines (por dominio)' : 'Enviar boletines (1:1)') }}
             </button>
           </div>
         </div>

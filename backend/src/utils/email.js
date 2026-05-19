@@ -54,6 +54,22 @@ const normalizeRecipients = (to) => {
   return [];
 };
 
+const normalizeSmtpRecipientValue = (value) => {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw) return '';
+  const bracketMatch = raw.match(/<\s*([^>]+)\s*>/);
+  const candidate = (bracketMatch?.[1] || raw).trim();
+  return candidate;
+};
+
+const normalizeSmtpRecipientList = (list = []) => {
+  if (!Array.isArray(list)) return [];
+  const normalized = list
+    .map((value) => normalizeSmtpRecipientValue(value))
+    .filter(Boolean);
+  return Array.from(new Set(normalized));
+};
+
 const classifyMailFailure = (errorMessage = '', recipientsCount = 0) => {
   const normalized = String(errorMessage || '').toLowerCase();
 
@@ -405,7 +421,20 @@ async function sendEmail({ to, cc, subject, text, html, from, attachments, audit
 
     return {
       success: true,
-      messageId: info.messageId
+      messageId: info.messageId,
+      attemptedTo: recipients,
+      acceptedTo: (() => {
+        const accepted = normalizeSmtpRecipientList(info?.accepted);
+        if (accepted.length === 0) return [...recipients];
+        const toSet = new Set(recipients);
+        return accepted.filter((recipient) => toSet.has(recipient));
+      })(),
+      rejectedTo: (() => {
+        const rejected = normalizeSmtpRecipientList(info?.rejected);
+        if (rejected.length === 0) return [];
+        const toSet = new Set(recipients);
+        return rejected.filter((recipient) => toSet.has(recipient));
+      })()
     };
   } catch (error) {
     logger.error('❌ [sendEmail] EMAIL SEND FAILED!', {

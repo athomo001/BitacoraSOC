@@ -214,6 +214,18 @@
   }
 }
 
+.newsletter-send-options {
+  margin-top: 10px;
+  margin-bottom: 8px;
+}
+
+.newsletter-overlap-error {
+  margin: 8px 0 0;
+  color: var(--state-error);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .image-preview {
   display: flex;
   flex-wrap: wrap;

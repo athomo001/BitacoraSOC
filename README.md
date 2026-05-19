@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: beta. Validar siempre los flujos criticos en un entorno controlado antes de pasar a operacion formal.
 >
-> Version referencial actual (segun `docs/CHANGELOG.md`): v1.5.73-beta
+> Version referencial actual (segun `docs/CHANGELOG.md`): v1.5.74-beta
 
 Stack principal:
 
@@ -47,6 +47,12 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 
 ## Novedades recientes (resumen rapido)
 
+### v1.5.74-beta
+
+- boletines con modo de envio dual: agrupado por dominio (default) o 1:1 segun selector en UI.
+- validacion reforzada: no se permite repetir el mismo correo en `Para` y `CC`.
+- resumen de envio mas preciso: conteo de exitos/fallos por destinatario real en `Para`, incluyendo escenarios con rechazos parciales SMTP.
+
 ### v1.5.73-beta
 
 - hotfix UX en `/main/report-generator`: los tooltips de `Para` y `CC` en envio de boletines ya no aparecen cuando `Ver guia rapida` esta desactivado.
@@ -74,7 +80,11 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 ### Report Generator / Boletines
 
 - flujo dual consolidado (`Reporte Tecnico` / `Boletin de Seguridad`) en la misma pantalla.
-- envio de boletin 1:1 por destinatario, con `CC` interno opcional compartido por cada correo individual.
+- envio de boletin con selector **"Unir destinatarios por dominio"** (activo por defecto):
+	- activo: un envio por dominio exacto en `Para`.
+	- inactivo: envio 1:1 por destinatario.
+- `CC` interno opcional compartido por envio (sin `CCO`) y exclusion automatica de auto-copias.
+- validacion bloqueante para evitar correos repetidos entre `Para` y `CC`.
 - selector rapido de destinatarios desde agenda preventiva y panel dedicado de listas de correo para casillas grupales.
 - precheck previo al envio (logo valido, secciones minimas, color legible).
 - pegado enriquecido mejorado en campos de boletin (`Resumen`, `Impacto`, `Mitigacion`, `Referencias`) para evitar texto corrido sin estructura.
