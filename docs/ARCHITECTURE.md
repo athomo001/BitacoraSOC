@@ -98,9 +98,10 @@ sequenceDiagram
   U->>FE: Completa formulario Boletín + Generar
   FE->>FE: Precheck HTML (logo, color, secciones)
   U->>FE: Enviar a destinatarios
-  FE->>API: POST newsletter/send (recipients[], cc[], subject, html)
-  API->>SMTP: Envío 1:1 por destinatario + CC interno opcional
-  API-->>FE: successCount/failCount + detalle
+  FE->>API: POST newsletter/send (recipients[], cc[], groupByDomain, subject, html)
+  API->>API: Valida conflicto Para/CC (si repite correo => 400)
+  API->>SMTP: Envío por dominio (default) o 1:1 + CC interno opcional
+  API-->>FE: successCount/failCount + processedGroups + detalle
 ```
 
 ### Flujo objetivo IA local (planificado)

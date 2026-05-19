@@ -13,7 +13,7 @@
  *   GET  /api/reports/tags-trend              - Tendencia de tags
  *   GET  /api/reports/heatmap                 - Mapa de calor día/hora
  *   GET  /api/reports/entries-by-logsource    - Entradas por Log Source
- *   POST /api/reports/newsletter/send         - Envío 1:1 de Boletín de Seguridad (REP-GEN-019A)
+ *   POST /api/reports/newsletter/send         - Envío de Boletín de Seguridad (1:1 o agrupado por dominio)
  *
  * Reglas SOC:
  *   - Todos los endpoints requieren autenticación.
@@ -47,6 +47,46 @@ const NEWSLETTER_DEBUG_LOGS = true;
 const normalizeAnalyticsLabel = (value, fallback = 'Sin dato') => {
   const normalized = String(value || '').trim();
   return normalized || fallback;
+};
+
+const parseBooleanFlag = (value, defaultValue = false) => {
+  if (typeof value === 'boolean') return value;
+  if (value === null || value === undefined || value === '') return defaultValue;
+  const normalized = String(value).trim().toLowerCase();
+  if (['true', '1', 'yes', 'y', 'si', 'sí', 'on'].includes(normalized)) return true;
+  if (['false', '0', 'no', 'n', 'off'].includes(normalized)) return false;
+  return defaultValue;
+};
+
+const extractEmailDomain = (email) => {
+  const value = String(email || '').trim().toLowerCase();
+  const at = value.lastIndexOf('@');
+  if (at <= 0 || at >= value.length - 1) return '';
+  return value.slice(at + 1);
+};
+
+const buildRecipientBatches = (recipients = [], groupByDomain = true) => {
+  const list = Array.isArray(recipients) ? recipients : [];
+  if (!groupByDomain) {
+    return list.map((email) => ({
+      key: email,
+      domain: extractEmailDomain(email) || null,
+      to: [email]
+    }));
+  }
+
+  const buckets = new Map();
+  list.forEach((email) => {
+    const domain = extractEmailDomain(email) || '__sin_dominio__';
+    if (!buckets.has(domain)) buckets.set(domain, []);
+    buckets.get(domain).push(email);
+  });
+
+  return Array.from(buckets.entries()).map(([domain, to]) => ({
+    key: domain,
+    domain: domain === '__sin_dominio__' ? null : domain,
+    to
+  }));
 };
 
 const normalizeCriticalityLabel = (value) => {
@@ -1203,10 +1243,11 @@ router.post('/newsletter/validate', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/reports/newsletter/send - Envío de boletines (1:1 con CC compartido)
+// POST /api/reports/newsletter/send - Envío de boletines (1:1 o agrupado por dominio con CC compartido)
 router.post('/newsletter/send', authenticate, async (req, res) => {
   try {
     const { recipients, cc, subject, html, analytics } = req.body;
+    const groupByDomain = parseBooleanFlag(req.body?.groupByDomain, true);
     const sendMode = 'real';
     const analysis = analyzeRecipientEmails(recipients || []);
 
@@ -1225,23 +1266,38 @@ router.post('/newsletter/send', authenticate, async (req, res) => {
     const ccAnalysis = analyzeRecipientEmails(Array.isArray(cc) ? cc : []);
     const validCcBase = ccAnalysis.valid; // lista CC sin filtrar por destinatario
 
+    const toSet = new Set(analysis.valid.map((email) => email.toLowerCase()));
+    const overlapRecipients = validCcBase.filter((email) => toSet.has(email.toLowerCase()));
+    if (overlapRecipients.length > 0) {
+      return res.status(400).json({
+        message: 'No se permite repetir correos entre Para y CC',
+        detail: `Corrige estos correos repetidos: ${overlapRecipients.join(', ')}`,
+        overlapRecipients
+      });
+    }
+
+    const recipientBatches = buildRecipientBatches(analysis.valid, groupByDomain);
+
     const prepared = await prepareNewsletterEmailPayload(html, req.body.inlineAttachments);
     const emailHtml = prepared.html;
     const newsletterAttachments = prepared.attachments;
     const plainText = htmlToBasicPlainText(emailHtml);
 
-    // Envío secuencial 1:1 — cada destinatario To recibe su correo individual
-    // con la lista completa de CC adjunta (excepto su propia dirección si coincide).
+    // Envío secuencial por lote: por dominio cuando groupByDomain=true,
+    // o 1:1 cuando groupByDomain=false.
     let successCount = 0;
     let failCount = 0;
     let lastError = null;
+    let successGroups = 0;
+    let failGroups = 0;
 
-    for (const email of analysis.valid) {
-      // Excluir del CC el correo que ya es el destinatario principal de este envío
-      const ccForThis = validCcBase.filter(c => c.toLowerCase() !== email.toLowerCase());
+    for (const batch of recipientBatches) {
+      // Excluir del CC cualquier correo que ya esté en Para dentro del lote actual.
+      const toSetBatch = new Set(batch.to.map((email) => email.toLowerCase()));
+      const ccForThis = validCcBase.filter(c => !toSetBatch.has(c.toLowerCase()));
       try {
-        await sendEmail({
-          to: email,
+        const sendResult = await sendEmail({
+          to: batch.to,
           cc: ccForThis.length ? ccForThis : undefined,
           subject: subject || 'Boletín de Seguridad',
           html: emailHtml,
@@ -1259,15 +1315,40 @@ router.post('/newsletter/send', authenticate, async (req, res) => {
               newsletterAttachmentParts: newsletterAttachments.length,
               duplicateCount: analysis.duplicates.length,
               invalidCount: analysis.invalid.length,
-              ccCount: ccForThis.length
+              ccCount: ccForThis.length,
+              groupedByDomain: groupByDomain,
+              recipientBatchDomain: batch.domain,
+              recipientBatchSize: batch.to.length
             }
           }
         });
-        successCount++;
+
+        const attemptedSet = new Set(batch.to.map((email) => email.toLowerCase()));
+        const acceptedSet = new Set(
+          (Array.isArray(sendResult?.acceptedTo) ? sendResult.acceptedTo : [])
+            .map((email) => String(email || '').toLowerCase())
+            .filter((email) => attemptedSet.has(email))
+        );
+        const rejectedSet = new Set(
+          (Array.isArray(sendResult?.rejectedTo) ? sendResult.rejectedTo : [])
+            .map((email) => String(email || '').toLowerCase())
+            .filter((email) => attemptedSet.has(email))
+        );
+
+        // Si el transport no informa accepted/rejected por destinatario, asumimos éxito total del lote.
+        const acceptedCount = acceptedSet.size > 0 ? acceptedSet.size : batch.to.length;
+        const unresolvedCount = Math.max(0, batch.to.length - acceptedCount - rejectedSet.size);
+        const failCountForBatch = rejectedSet.size + unresolvedCount;
+
+        successCount += acceptedCount;
+        failCount += failCountForBatch;
+        if (acceptedCount > 0) successGroups += 1;
+        if (failCountForBatch > 0) failGroups += 1;
       } catch (err) {
-        console.error(`[newsletter/send] Error al enviar a ${email}:`, err.message);
+        console.error(`[newsletter/send] Error al enviar lote ${batch.key}:`, err.message);
         lastError = err.message;
-        failCount++;
+        failCount += batch.to.length;
+        failGroups += 1;
       }
     }
 
@@ -1281,8 +1362,12 @@ router.post('/newsletter/send', authenticate, async (req, res) => {
     res.json({
       success: true,
       mode: sendMode,
+      groupByDomain,
       successCount,
       failCount,
+      successGroups,
+      failGroups,
+      processedGroups: recipientBatches.length,
       ccCount: validCcBase.length,
       duplicateCount: analysis.duplicates.length,
       invalidCount: analysis.invalid.length,

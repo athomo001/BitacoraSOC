@@ -173,14 +173,17 @@ Notas operativas:
 | GET | `/api/reports/tags-trend?days=30&tags=a,b` | Tendencia de tags | Admin/User |
 | GET | `/api/reports/heatmap?days=30` | Mapa de calor día/hora | Admin/User |
 | GET | `/api/reports/entries-by-logsource?days=30` | Entradas por Log Source | Admin/User |
-| POST | `/api/reports/newsletter/send` | Envío de boletín 1:1 por destinatario | Admin/User autenticado |
+| POST | `/api/reports/newsletter/send` | Envío de boletín (agrupado por dominio o 1:1) | Admin/User autenticado |
 
 Notas operativas de boletín:
 
-- El endpoint envía un correo por destinatario (privacidad por diseño, sin envío masivo en copia).
 - Requiere `html` del boletín y arreglo `recipients`.
-- Acepta opcionalmente `cc[]` para copias internas compartidas; cada correo 1:1 hereda ese `CC` filtrando auto-copias del destinatario principal.
-- Puede responder mezcla de éxitos/fallos (`successCount`, `failCount`).
+- Acepta opcionalmente `cc[]` para copias internas compartidas y `groupByDomain` (default: `true`).
+- `groupByDomain=true`: agrupa destinatarios `Para` por dominio exacto y envía 1 correo por grupo.
+- `groupByDomain=false`: mantiene envío 1:1 por destinatario.
+- No usa `CCO`: el flujo opera solo con `Para` y `CC`.
+- Si existe el mismo correo en `Para` y `CC`, responde `400` con detalle de correos en conflicto.
+- Puede responder mezcla de éxitos/fallos (`successCount`, `failCount`) y métricas por lotes (`processedGroups`, `successGroups`, `failGroups`).
 - Si no hay éxitos y sí fallos SMTP, retorna error con `detail` para diagnóstico.
 
 Estado IA (planificado):

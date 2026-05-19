@@ -127,7 +127,7 @@ Documentos base para operación:
 ### Cuándo usarlo
 
 - cuando se requiere comunicar riesgo técnico en formato ejecutivo para cliente
-- cuando un mismo contenido debe enviarse a múltiples destinatarios en forma 1:1
+- cuando un mismo contenido debe enviarse a múltiples destinatarios, priorizando agrupación por dominio
 
 ### Flujo recomendado
 
@@ -139,8 +139,19 @@ Documentos base para operación:
    - `Impacto`
    - `Acciones Recomendadas`
 3. Generar y revisar vista previa.
-4. Cargar destinatarios y enviar (un correo por destinatario, sin CC/BCC masivo).
-5. Confirmar resultado de envío (`successCount` / `failCount`).
+4. Cargar destinatarios en `Para` y, si aplica, copias internas en `CC`.
+5. Revisar el selector `Unir destinatarios por dominio`:
+   - activado (default): 1 envio por dominio exacto en `Para`
+   - desactivado: envio 1:1 por destinatario
+6. Validar que no existan correos repetidos entre `Para` y `CC`.
+7. Enviar y confirmar resultado (`successCount` / `failCount` y `processedGroups` cuando aplique).
+
+### Reglas operativas de envío
+
+- no se usa `CCO`; el flujo opera solo con `Para` y `CC`
+- si un correo aparece en `Para` y `CC`, el sistema bloquea el envío hasta corregir
+- en modo agrupado por dominio, un destinatario con dominio único genera su propio envío
+- ante fallos SMTP parciales, el backend devuelve conteo por destinatario real para facilitar diagnóstico
 
 ### Buenas prácticas de contenido
 
