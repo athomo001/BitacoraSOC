@@ -518,6 +518,20 @@ exports.getEscalationView = async (req, res) => {
     const parsedNow = now ? new Date(now) : null;
     const effectiveNow = parsedNow && !isNaN(parsedNow.getTime()) ? parsedNow : new Date();
     const result = await getEscalationNow(serviceId, effectiveNow);
+
+    await audit(req, {
+      event: 'escalation.view.service.read',
+      result: { success: true },
+      metadata: {
+        serviceId,
+        hasNowOverride: Boolean(now),
+        internalShifts: Array.isArray(result?.internalShifts) ? result.internalShifts.length : 0,
+        contacts: Array.isArray(result?.contacts) ? result.contacts.length : 0
+      }
+    }).catch((auditError) => {
+      logger.warn({ err: auditError }, 'No se pudo registrar auditoría de vista de escalación');
+    });
+
     res.json(result);
   } catch (error) {
     logger.error('Error in getEscalationView:', error);
@@ -539,6 +553,17 @@ exports.getInternalShiftsNow = async (req, res) => {
         internalShifts.push(shift);
       }
     }
+
+    await audit(req, {
+      event: 'escalation.view.internal_shifts.read',
+      result: { success: true },
+      metadata: {
+        hasNowOverride: Boolean(now),
+        internalShiftsCount: internalShifts.length
+      }
+    }).catch((auditError) => {
+      logger.warn({ err: auditError }, 'No se pudo registrar auditoría de turnos internos');
+    });
 
     res.json({
       internalShifts,
@@ -642,6 +667,18 @@ exports.getContactsPublic = async (req, res) => {
       return Boolean(contact.serviceId?.clientId);
     });
 
+    await audit(req, {
+      event: 'escalation.view.contacts.read',
+      result: { success: true },
+      metadata: {
+        contactType,
+        search: search || null,
+        count: visibleContacts.length
+      }
+    }).catch((auditError) => {
+      logger.warn({ err: auditError }, 'No se pudo registrar auditoría de contactos públicos de escalación');
+    });
+
     res.json(visibleContacts);
   } catch (error) {
     logger.error('Error in getContactsPublic:', error);
@@ -671,6 +708,17 @@ exports.getRaciByClient = async (req, res) => {
       .sort({ topic: 1, activity: 1 });
     const visibleEntries = raciEntries.filter((entry) => Boolean(entry.clientId));
 
+    await audit(req, {
+      event: 'escalation.view.raci.read',
+      result: { success: true },
+      metadata: {
+        clientId,
+        count: visibleEntries.length
+      }
+    }).catch((auditError) => {
+      logger.warn({ err: auditError }, 'No se pudo registrar auditoría de vista RACI');
+    });
+
     res.json(visibleEntries);
   } catch (error) {
     logger.error('Error in getRaciByClient:', error);
@@ -690,12 +738,26 @@ exports.getEscalationFlowByClient = async (req, res) => {
       return res.status(404).json({ error: 'Cliente no encontrado o deshabilitado' });
     }
 
-    return res.json({
+    const payload = {
       clientId: client._id,
       clientName: client.name,
       flow: (client.escalationFlow || []).sort((a, b) => (a.order || 0) - (b.order || 0)),
       legend: client.escalationLegend || ''
+    };
+
+    await audit(req, {
+      event: 'escalation.view.flow.read',
+      result: { success: true },
+      metadata: {
+        clientId,
+        flowSteps: Array.isArray(payload.flow) ? payload.flow.length : 0,
+        hasLegend: Boolean(payload.legend)
+      }
+    }).catch((auditError) => {
+      logger.warn({ err: auditError }, 'No se pudo registrar auditoría de flujo de escalación');
     });
+
+    return res.json(payload);
   } catch (error) {
     logger.error('Error in getEscalationFlowByClient:', error);
     return res.status(500).json({ error: error.message });
@@ -1263,6 +1325,19 @@ exports.getRaciAdmin = async (req, res) => {
       .sort({ createdAt: -1 });
     const visibleEntries = raciEntries.filter((entry) => Boolean(entry.clientId));
 
+    await audit(req, {
+      event: 'escalation.admin.raci.read',
+      result: { success: true },
+      metadata: {
+        clientId: clientId || null,
+        serviceId: serviceId || null,
+        topic: topic || null,
+        count: visibleEntries.length
+      }
+    }).catch((auditError) => {
+      logger.warn({ err: auditError }, 'No se pudo registrar auditoría de RACI admin');
+    });
+
     res.json(visibleEntries);
   } catch (error) {
     logger.error('Error in getRaciAdmin:', error);
@@ -1361,6 +1436,18 @@ exports.getRules = async (req, res) => {
       .populate('emergencyContactId', 'name phone')
       .sort({ createdAt: -1 });
     const visibleRules = rules.filter((rule) => Boolean(rule.serviceId?.clientId));
+
+    await audit(req, {
+      event: 'escalation.admin.rules.read',
+      result: { success: true },
+      metadata: {
+        serviceId: serviceId || null,
+        count: visibleRules.length
+      }
+    }).catch((auditError) => {
+      logger.warn({ err: auditError }, 'No se pudo registrar auditoría de reglas de escalación');
+    });
+
     res.json(visibleRules);
   } catch (error) {
     logger.error('Error in getRules:', error);
@@ -1526,6 +1613,21 @@ exports.getAssignments = async (req, res) => {
       query = query.limit(parsedLimit);
     }
     const assignments = await query;
+
+    await audit(req, {
+      event: 'escalation.admin.assignments.read',
+      result: { success: true },
+      metadata: {
+        roleCode: roleCode || null,
+        fromDate: fromDate || null,
+        toDate: toDate || null,
+        limit: parsedLimit || null,
+        count: assignments.length
+      }
+    }).catch((auditError) => {
+      logger.warn({ err: auditError }, 'No se pudo registrar auditoría de asignaciones de turno');
+    });
+
     res.json(assignments);
   } catch (error) {
     logger.error('Error in getAssignments:', error);
