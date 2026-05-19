@@ -2,6 +2,25 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.75-beta] - 2026-05-19
+
+### Auditoria: clasificacion correcta para Escalacion y mayor cobertura de eventos
+
+- **Correccion de clasificacion visual en `/main/audit-logs`:** acciones realizadas en Escalacion/RACI/turnos/flujo ya no aparecen como checklist por arrastre de eventos no representativos; ahora se muestran bajo categoria **Escalacion** con textos legibles.
+- **Nuevos eventos de lectura auditables en Escalacion (backend):** se agrego trazabilidad explicita para vistas clave: `escalation.view.service.read`, `escalation.view.internal_shifts.read`, `escalation.view.contacts.read`, `escalation.view.raci.read`, `escalation.view.flow.read`, `escalation.admin.raci.read`, `escalation.admin.rules.read`, `escalation.admin.assignments.read`.
+- **Etiquetas humanas para eventos de Escalacion (frontend):** la columna `Tipo / Razon / Detalles` ahora traduce esos eventos a descripciones operativas claras (por ejemplo, *Consulta de matriz RACI* o *Consulta de reglas de escalacion*).
+
+### Checklist y fallback de auditoria: legibilidad y semantica real
+
+- **Checklist realizado visible como tal:** los eventos de envio/completitud (`shiftcheck.submit`, `shiftcheck.complete`, `checklist.complete`) ahora se presentan como **CHECKLIST REALIZADO** con metrica verde/rojo cuando existe.
+- **Metadata enriquecida para checklist enviado:** se agrega `checklistName` en auditoria de `shiftcheck.submit` para identificar claramente que checklist se completo.
+- **Fallback generico mejorado:** cuando un evento no tiene plantilla especifica, se humaniza el nombre del evento y se muestran detalles utiles de metadata, evitando mensajes ambiguos como "accion completada" sin contexto.
+
+### Cobertura adicional de auditoria en Directorio y Complementos
+
+- **Directorio centralizado:** se registran consultas de listado y detalle (`directory.central.list.view`, `directory.central.detail.view`) para dejar evidencia de acceso operativo.
+- **Complementos:** se registran consulta de listado activo y detalle por slug (`complement.list.view`, `complement.detail.view`) para mejorar trazabilidad de uso.
+
 ## [v1.5.74-beta] - 2026-05-18
 
 ### Boletines: agrupacion por dominio con control operativo en UI

@@ -29,6 +29,8 @@ const {
   testComplement,
   updateComplement
 } = require('../utils/complement-manager');
+const { audit } = require('../utils/audit');
+const { logger } = require('../utils/logger');
 
 const router = express.Router();
 
@@ -65,6 +67,18 @@ const complementSourceUpload = multer({
 router.get('/active', authenticate, async (req, res) => {
   const complements = await Complement.find({ status: { $in: ['active', 'maintenance'] } }).sort({ name: 1 });
   const visibleComplements = complements.filter((complement) => isComplementVisibleToUser(complement, req.user));
+
+  await audit(req, {
+    event: 'complement.list.view',
+    result: { success: true },
+    metadata: {
+      visibleCount: visibleComplements.length,
+      role: req.user?.role || 'unknown'
+    }
+  }).catch((auditError) => {
+    logger.warn({ err: auditError }, 'No se pudo registrar auditoría de listado de complementos');
+  });
+
   res.json(visibleComplements.map(getComplementSummary));
 });
 
@@ -256,6 +270,20 @@ router.get('/:slug', authenticate, async (req, res) => {
   if (!isComplementVisibleToUser(complement, req.user)) {
     return res.status(403).json({ message: 'No tienes acceso a este complemento' });
   }
+
+  await audit(req, {
+    event: 'complement.detail.view',
+    result: { success: true },
+    source: 'complement',
+    sourceId: complement.slug,
+    metadata: {
+      slug: complement.slug,
+      status: complement.status,
+      role: req.user?.role || 'unknown'
+    }
+  }).catch((auditError) => {
+    logger.warn({ err: auditError }, 'No se pudo registrar auditoría de detalle de complemento');
+  });
 
   res.json(getComplementSummary(complement));
 });

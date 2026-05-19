@@ -65,6 +65,18 @@ exports.listDirectoryContacts = async (req, res) => {
       .sort({ isFavorite: -1, name: 1 })
       .limit(500);
 
+    await audit(req, {
+      event: 'directory.central.list.view',
+      result: { success: true },
+      metadata: {
+        count: contacts.length,
+        type: filter.type || 'all',
+        favorite: favorite !== undefined ? String(favorite === 'true') : 'all'
+      }
+    }).catch((auditError) => {
+      logger.warn({ err: auditError }, 'No se pudo registrar auditoría de listado de directorio');
+    });
+
     return res.json(contacts);
   } catch (error) {
     logger.error('Error in listDirectoryContacts:', error);
@@ -78,6 +90,21 @@ exports.getDirectoryContactById = async (req, res) => {
     if (!contact) {
       return res.status(404).json({ error: 'Contacto no encontrado' });
     }
+
+    await audit(req, {
+      event: 'directory.central.detail.view',
+      result: { success: true },
+      metadata: {
+        directoryContactId: contact._id,
+        type: contact.type,
+        scope: contact.scope,
+        source: contact.source,
+        name: contact.name
+      }
+    }).catch((auditError) => {
+      logger.warn({ err: auditError }, 'No se pudo registrar auditoría de detalle de directorio');
+    });
+
     return res.json(contact);
   } catch (error) {
     logger.error('Error in getDirectoryContactById:', error);

@@ -706,6 +706,7 @@ router.post('/check',
         metadata: {
           type,
           checklistId: snapshot.checklistId,
+          checklistName: snapshot.checklistName,
           redCount: normalizedServices.filter(s => s.status === 'rojo').length,
           greenCount: normalizedServices.filter(s => s.status === 'verde').length,
           services: normalizedServices.map(s => ({

@@ -468,6 +468,24 @@ export class AuditLogsComponent implements OnInit {
     return classes[entryType.toLowerCase()] || 'default';
   }
 
+  private humanizeEventLabel(event: string): string {
+    return event
+      .split('.')
+      .filter(Boolean)
+      .map((part) => part.replace(/[_-]+/g, ' '))
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' > ');
+  }
+
+  private getSimpleMetadataText(metadata: Record<string, any>): string {
+    const preferredKeys = ['days', 'items', 'count', 'section', 'detail', 'type', 'scope', 'name'];
+    const chunks = preferredKeys
+      .filter((key) => metadata[key] !== undefined && metadata[key] !== null && metadata[key] !== '')
+      .slice(0, 3)
+      .map((key) => `${key}: ${String(metadata[key])}`);
+    return chunks.join(' | ');
+  }
+
   getReasonText(log: AuditLog): string {
     const event = log.event?.toLowerCase() || '';
     const meta = log.metadata || {};
@@ -623,11 +641,47 @@ export class AuditLogsComponent implements OnInit {
       return `${status} [ENTRADA ${action}] ${typeLabel} ${reason}`;
     }
 
+    // ====== REPORTES ======
+    if (event.startsWith('user.reports.')) {
+      const status = result.success ? '✅' : '❌';
+      const reportLabels: Record<string, string> = {
+        'user.reports.overview.view': 'Resumen general',
+        'user.reports.tags_trend.view': 'Tendencia de tags',
+        'user.reports.heatmap.view': 'Mapa de calor',
+        'user.reports.entries_by_logsource.view': 'Entradas por Log Source',
+        'user.reports.export.entries': 'Exportar entradas'
+      };
+      const label = reportLabels[event] || this.humanizeEventLabel(event);
+      const details = this.getSimpleMetadataText(meta);
+      return `${status} [REPORTES] ${label}${details ? ` | ${details}` : ''}`;
+    }
+
+    // ====== DIRECTORIO DE CONTACTOS ======
+    if (event.startsWith('directory.')) {
+      const status = result.success ? '✅' : '❌';
+      const op = event.includes('.list.')
+        ? 'Listado consultado'
+        : event.includes('.detail.')
+          ? 'Detalle consultado'
+          : this.humanizeEventLabel(event);
+      const details = this.getSimpleMetadataText(meta);
+      return `${status} [DIRECTORIO] ${op}${details ? ` | ${details}` : ''}`;
+    }
+
+    // ====== COMPLEMENTOS ======
+    if (event.startsWith('complement.')) {
+      const status = result.success ? '✅' : '❌';
+      const slug = typeof meta['slug'] === 'string' ? meta['slug'] : log.sourceId || '';
+      const label = this.humanizeEventLabel(event.replace('complement.', ''));
+      return `${status} [COMPLEMENTO] ${label}${slug ? ` | slug: ${slug}` : ''}`;
+    }
+
     // ====== CHECKLIST / SHIFTCHECK ======
     if (event.includes('checklist') || event.includes('shiftcheck')) {
       const status = result.success ? '✅' : '❌';
       const template = meta['templateName'] || meta['checklistName'] || 'checklist';
-      const checkType = meta['checkType'] ? ` (${meta['checkType']})` : '';
+      const rawType = meta['checkType'] || meta['type'];
+      const checkType = rawType ? ` (${rawType})` : '';
       const reason = result.reason ? `| ${result.reason}` : '';
 
       if (event === 'checklist.opened') {
@@ -638,11 +692,37 @@ export class AuditLogsComponent implements OnInit {
         return `⚠️ [CHECKLIST ABANDONADO] ${template}${checkType} — abierto y cerrado sin enviar`;
       }
 
+      if (event === 'shiftcheck.submit' || event === 'shiftcheck.complete' || event === 'checklist.complete') {
+        const greenCount = Number(meta['greenCount'] || 0);
+        const redCount = Number(meta['redCount'] || 0);
+        const totals = (greenCount || redCount)
+          ? ` | verdes:${greenCount} rojos:${redCount}`
+          : '';
+        return `✅ [CHECKLIST REALIZADO] ${template}${checkType}${totals}`;
+      }
+
       const action = event.includes('complete') ? 'COMPLETADO' : event.replace(/checklist\.|shiftcheck\./, '').toUpperCase();
       return `${status} [CHECKLIST ${action}] ${template} ${reason}`;
     }
 
     // ====== ESCALACIÓN ======
+    if (event.startsWith('escalation.view.') || event.startsWith('escalation.admin.')) {
+      const status = result.success ? '✅' : '❌';
+      const escalationLabels: Record<string, string> = {
+        'escalation.view.service.read': 'Vista de escalación por servicio',
+        'escalation.view.internal_shifts.read': 'Consulta de turnos internos',
+        'escalation.view.contacts.read': 'Consulta de contactos de escalación',
+        'escalation.view.raci.read': 'Consulta de matriz RACI',
+        'escalation.view.flow.read': 'Consulta de flujo de escalación',
+        'escalation.admin.raci.read': 'Consulta RACI (admin)',
+        'escalation.admin.rules.read': 'Consulta de reglas de escalación (admin)',
+        'escalation.admin.assignments.read': 'Consulta de asignaciones de turno (admin)'
+      };
+      const label = escalationLabels[event] || this.humanizeEventLabel(event);
+      const details = this.getSimpleMetadataText(meta);
+      return `${status} [ESCALACIÓN] ${label}${details ? ` | ${details}` : ''}`;
+    }
+
     if (event.includes('escalation')) {
       const status = result.success ? '✅' : '❌';
       const action = event.replace('escalation.', '').toUpperCase();
@@ -661,8 +741,10 @@ export class AuditLogsComponent implements OnInit {
 
     // ====== FALLBACK ======
     const status = result.success ? '✅' : '❌';
-    const reason = result.reason || 'acción completada';
-    return `${status} [${event.toUpperCase()}] ${reason}`;
+    const label = this.humanizeEventLabel(event || 'evento') || 'Evento';
+    const details = this.getSimpleMetadataText(meta);
+    const reason = result.reason || details || 'evento registrado';
+    return `${status} [${label}] ${reason}`;
   }
 
   formatDate(date: string): string {
