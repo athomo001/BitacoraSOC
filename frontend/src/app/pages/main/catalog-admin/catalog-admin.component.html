@@ -1,6 +1,6 @@
 <div class="catalog-admin-container">
   <h1>Administracion de Catalogos</h1>
-  <p class="subtitle">Gestiona eventos, log sources, reglas especiales y tipos de operacion</p>
+  <p class="subtitle">Gestiona eventos, clientes, reglas especiales y tipos de operacion</p>
 
   <mat-tab-group class="catalog-tabs" [(selectedIndex)]="activeTabIndex">
     <mat-tab label="Eventos">
@@ -95,11 +95,11 @@
       </div>
     </mat-tab>
 
-    <mat-tab label="Log Sources / Clientes">
+    <mat-tab label="Clientes">
       <div class="tab-content">
         <section class="catalog-panel form-card">
           <header class="catalog-panel__header">
-            <h2 class="catalog-panel__title">{{ editingLogSourceId ? 'Editar Log Source' : 'Nuevo Log Source' }}</h2>
+            <h2 class="catalog-panel__title">{{ editingLogSourceId ? 'Editar Cliente' : 'Nuevo Cliente' }}</h2>
           </header>
           <div class="catalog-panel__body">
             <form [formGroup]="logSourceForm" (ngSubmit)="saveLogSource()">
@@ -114,7 +114,22 @@
               </mat-form-field>
 
               <mat-checkbox formControlName="isInternal">Cliente interno (nuestra empresa)</mat-checkbox>
-              <mat-checkbox formControlName="enabled">Habilitado</mat-checkbox>
+
+              <mat-form-field appearance="outline" class="full-width" style="margin-top: 12px;" *ngIf="logSourceForm.get('isInternal')?.value">
+                <mat-label>Correo de Copia Global (CC) *</mat-label>
+                <textarea matInput formControlName="internalEmail" placeholder="ejemplo1@empresa.com, ejemplo2@empresa.com" rows="2"></textarea>
+                <mat-hint>Separa múltiples correos con comas o saltos de línea</mat-hint>
+                 <mat-error *ngIf="internalEmailRequiredError">
+                   El correo de copia global es obligatorio para el cliente interno.
+                 </mat-error>
+                 <mat-error *ngIf="internalEmailInvalidError">
+                   Formato de correo(s) inválido.
+                 </mat-error>
+              </mat-form-field>
+
+              <div style="margin-top: 8px;">
+                <mat-checkbox formControlName="enabled">Habilitado</mat-checkbox>
+              </div>
 
               <div class="form-actions">
                 <button mat-raised-button color="primary" type="submit">
@@ -132,7 +147,7 @@
 
         <section class="catalog-panel list-card">
           <header class="catalog-panel__header">
-            <h2 class="catalog-panel__title">Log Sources Activos ({{ activeLogSources.length }})</h2>
+            <h2 class="catalog-panel__title">Clientes Activos ({{ activeLogSources.length }})</h2>
           </header>
           <div class="catalog-panel__body">
             <div class="table-container">
@@ -147,8 +162,16 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr *ngFor="let source of activeLogSources">
-                    <td><strong>{{ source.name }}</strong></td>
+                  <tr *ngFor="let source of activeLogSources" [class.internal-client-row]="source.isInternal">
+                    <td>
+                      <div class="client-name-cell">
+                        <mat-icon *ngIf="source.isInternal" class="internal-client-icon" matTooltip="Cliente Interno">star</mat-icon>
+                        <strong>{{ source.name }}</strong>
+                      </div>
+                      <div *ngIf="source.isInternal && source.internalEmail" class="client-cc-email">
+                        <small class="muted">CC: {{ source.internalEmail }}</small>
+                      </div>
+                    </td>
                     <td>{{ source.isInternal ? 'Interno' : 'Cliente' }}</td>
                     <td>{{ source.description || '-' }}</td>
                     <td>Activo</td>
@@ -162,7 +185,7 @@
                     </td>
                   </tr>
                   <tr *ngIf="activeLogSources.length === 0">
-                    <td colspan="5" class="table-empty">No hay Log Sources activos</td>
+                    <td colspan="5" class="table-empty">No hay clientes activos</td>
                   </tr>
                 </tbody>
               </table>
@@ -172,7 +195,7 @@
 
         <section class="catalog-panel list-card inactive-list-card" *ngIf="inactiveLogSources.length > 0">
           <header class="catalog-panel__header">
-            <h2 class="catalog-panel__title">Log Sources Inactivos ({{ inactiveLogSources.length }})</h2>
+            <h2 class="catalog-panel__title">Clientes Inactivos ({{ inactiveLogSources.length }})</h2>
           </header>
           <div class="catalog-panel__body">
             <div class="table-container">
@@ -187,8 +210,16 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr *ngFor="let source of inactiveLogSources">
-                    <td><strong>{{ source.name }}</strong></td>
+                  <tr *ngFor="let source of inactiveLogSources" [class.internal-client-row]="source.isInternal">
+                    <td>
+                      <div class="client-name-cell">
+                        <mat-icon *ngIf="source.isInternal" class="internal-client-icon" matTooltip="Cliente Interno">star</mat-icon>
+                        <strong>{{ source.name }}</strong>
+                      </div>
+                      <div *ngIf="source.isInternal && source.internalEmail" class="client-cc-email">
+                        <small class="muted">CC: {{ source.internalEmail }}</small>
+                      </div>
+                    </td>
                     <td>{{ source.isInternal ? 'Interno' : 'Cliente' }}</td>
                     <td>{{ source.description || '-' }}</td>
                     <td>Inactivo</td>

@@ -6,21 +6,20 @@
 
   <section class="flow-admin-toolbar" aria-label="Controles de flujo">
     <mat-form-field appearance="outline" class="flow-client-field">
-      <mat-label>Buscar cliente</mat-label>
-      <input matInput [(ngModel)]="flowClientSearch" placeholder="Escribe nombre del cliente">
-      <mat-icon matSuffix aria-hidden="true">search</mat-icon>
-    </mat-form-field>
-
-    <mat-form-field appearance="outline" class="flow-client-field">
-      <mat-label>Seleccionar Cliente</mat-label>
-      <mat-select [(ngModel)]="selectedFlowClientId" (selectionChange)="onFlowClientChange()">
-        <mat-option *ngFor="let client of filteredClientsForFlow" [value]="client._id">
+      <mat-label>Cliente</mat-label>
+      <input
+        matInput
+        placeholder="Escriba para buscar cliente..."
+        [value]="flowClientSearch"
+        (input)="onFlowClientSearchInput($any($event.target).value)"
+        [matAutocomplete]="autoFlowClient">
+      <mat-autocomplete
+        #autoFlowClient="matAutocomplete"
+        (optionSelected)="onFlowClientSelected($event.option.value)">
+        <mat-option *ngFor="let client of filteredClientsForFlow" [value]="client">
           {{ client.name }}
         </mat-option>
-        <mat-option *ngIf="filteredClientsForFlow.length === 0" disabled>
-          Sin resultados para "{{ flowClientSearch }}"
-        </mat-option>
-      </mat-select>
+      </mat-autocomplete>
     </mat-form-field>
 
     <div class="toolbar-actions">
@@ -86,11 +85,16 @@
           <button mat-icon-button cdkDragHandle matTooltip="Arrastrar para reordenar" aria-label="Reordenar paso">
             <mat-icon aria-hidden="true">drag_indicator</mat-icon>
           </button>
+          <span class="step-number-badge">Paso {{ stepIndex + 1 }}</span>
           <mat-form-field appearance="outline" class="flow-step-title">
             <mat-label>Título del paso</mat-label>
             <input matInput [(ngModel)]="step.title" placeholder="Ej: 1er Llamado">
           </mat-form-field>
           <span class="step-type-badge">{{ step.type === 'pool' ? 'POOL' : 'ÚNICO' }}</span>
+          <span class="step-status-badge" [class.complete]="isStepConfigured(step)" [class.incomplete]="!isStepConfigured(step)">
+            <mat-icon aria-hidden="true">{{ isStepConfigured(step) ? 'check_circle' : 'pending' }}</mat-icon>
+            {{ isStepConfigured(step) ? 'Configurado' : 'Incompleto' }}
+          </span>
         </div>
         <div>
           <button mat-icon-button color="warn" (click)="deleteFlowStep(stepIndex)" matTooltip="Eliminar paso" aria-label="Eliminar paso">

@@ -204,3 +204,26 @@
 .time-field {
   width: 100%;
 }
+
+.internal-client-row {
+  background-color: rgba(var(--accent-rgb, 26, 115, 232), 0.05);
+  border-left: 4px solid var(--accent, #1a73e8);
+}
+
+.client-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.internal-client-icon {
+  color: var(--accent, #1a73e8);
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+
+.client-cc-email {
+  margin-top: 4px;
+  font-size: 11px;
+}

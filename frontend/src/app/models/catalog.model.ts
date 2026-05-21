@@ -35,6 +35,7 @@ export interface CatalogLogSource {
   description?: string;
   enabled: boolean;
   isInternal?: boolean;
+  internalEmail?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }

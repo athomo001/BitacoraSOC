@@ -62,6 +62,11 @@ const catalogLogSourceSchema = new mongoose.Schema({
     default: false,
     index: true
   },
+  internalEmail: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   escalationFlow: {
     type: [escalationFlowStepSchema],
     default: []

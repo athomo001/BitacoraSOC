@@ -21,7 +21,7 @@ import { EscalationService } from '../../../services/escalation.service';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { FormsModule } from '@angular/forms';
 import { MatTabGroup, MatTab } from '@angular/material/tabs';
-import { MatFormField, MatHint, MatLabel, MatSuffix } from '@angular/material/form-field';
+import { MatFormField, MatHint, MatLabel, MatSuffix, MatError } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { MatButton, MatIconButton } from '@angular/material/button';
@@ -39,7 +39,7 @@ import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
   selector: 'app-catalog-admin',
   templateUrl: './catalog-admin.component.html',
   styleUrls: ['./catalog-admin.component.scss'],
-  imports: [MatTabGroup, MatTab, ReactiveFormsModule, FormsModule, MatFormField, MatHint, MatLabel, MatSuffix, MatInput, MatCheckbox, MatButton, MatIcon, NgIf, NgFor, MatIconButton, MatTooltip, MatSelect, MatOption, MatPaginator, MatDatepickerModule, MatNativeDateModule],
+  imports: [MatTabGroup, MatTab, ReactiveFormsModule, FormsModule, MatFormField, MatHint, MatLabel, MatSuffix, MatError, MatInput, MatCheckbox, MatButton, MatIcon, NgIf, NgFor, MatIconButton, MatTooltip, MatSelect, MatOption, MatPaginator, MatDatepickerModule, MatNativeDateModule],
   providers: [{ provide: MAT_DATE_LOCALE, useValue: 'es-CL' }]
 })
 export class CatalogAdminComponent implements OnInit {
@@ -78,6 +78,16 @@ export class CatalogAdminComponent implements OnInit {
   operationTypeForm: FormGroup;
   clientAlertRuleForm: FormGroup;
 
+  get internalEmailRequiredError(): boolean {
+    const ctrl = this.logSourceForm.get('internalEmail');
+    return !!(ctrl && ctrl.hasError('required'));
+  }
+
+  get internalEmailInvalidError(): boolean {
+    const ctrl = this.logSourceForm.get('internalEmail');
+    return !!(ctrl && ctrl.hasError('emailInvalid'));
+  }
+
   readonly clientAlertModes: Array<{ value: ClientAlertWindowMode; label: string }> = [
     { value: 'always', label: 'Siempre' },
     { value: 'outside_business_hours', label: 'Fuera de horario hábil' },
@@ -103,7 +113,28 @@ export class CatalogAdminComponent implements OnInit {
       name: ['', Validators.required],
       description: [''],
       isInternal: [false],
+      internalEmail: [''],
       enabled: [true]
+    });
+
+    this.logSourceForm.get('isInternal')!.valueChanges.subscribe(isInternal => {
+      const emailControl = this.logSourceForm.get('internalEmail')!;
+      if (isInternal) {
+        emailControl.setValidators([Validators.required, (control) => {
+          if (!control.value) return null;
+          const emails = control.value.split(/[,;\n\r]+/).map((e: string) => e.trim()).filter((e: string) => e);
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+          for (const email of emails) {
+            if (!emailRegex.test(email)) {
+              return { emailInvalid: { value: email } };
+            }
+          }
+          return null;
+        }]);
+      } else {
+        emailControl.clearValidators();
+      }
+      emailControl.updateValueAndValidity();
     });
 
     this.operationTypeForm = this.fb.group({
@@ -257,7 +288,7 @@ export class CatalogAdminComponent implements OnInit {
       next: (response: any) => {
         this.logSources = response.items || response;
       },
-      error: () => this.snackBar.open('Error cargando log sources', 'Cerrar', { duration: 3000 })
+      error: () => this.snackBar.open('Error cargando clientes', 'Cerrar', { duration: 3000 })
     });
   }
 
@@ -269,20 +300,20 @@ export class CatalogAdminComponent implements OnInit {
     if (this.editingLogSourceId) {
       this.catalogService.updateLogSource(this.editingLogSourceId, data).subscribe({
         next: () => {
-          this.snackBar.open('✅ Log Source actualizado', 'Cerrar', { duration: 2000 });
+          this.snackBar.open('✅ Cliente actualizado', 'Cerrar', { duration: 2000 });
           this.loadLogSources();
           this.cancelLogSourceEdit();
         },
-        error: () => this.snackBar.open('Error actualizando', 'Cerrar', { duration: 3000 })
+        error: () => this.snackBar.open('Error actualizando cliente', 'Cerrar', { duration: 3000 })
       });
     } else {
       this.catalogService.createLogSource(data).subscribe({
         next: () => {
-          this.snackBar.open('✅ Log Source creado', 'Cerrar', { duration: 2000 });
+          this.snackBar.open('✅ Cliente creado', 'Cerrar', { duration: 2000 });
           this.loadLogSources();
           this.logSourceForm.reset({ enabled: true, isInternal: false });
         },
-        error: () => this.snackBar.open('Error creando', 'Cerrar', { duration: 3000 })
+        error: () => this.snackBar.open('Error creando cliente', 'Cerrar', { duration: 3000 })
       });
     }
   }
@@ -293,14 +324,14 @@ export class CatalogAdminComponent implements OnInit {
   }
 
   deleteLogSource(id: string): void {
-    if (!confirm('⚠️ ¿ELIMINAR PERMANENTEMENTE este log source? Esta acción no se puede deshacer.')) return;
+    if (!confirm('⚠️ ¿ELIMINAR PERMANENTEMENTE este cliente? Esta acción no se puede deshacer.')) return;
 
     this.catalogService.deleteLogSource(id).subscribe({
       next: () => {
-        this.snackBar.open('✅ Log Source eliminado', 'Cerrar', { duration: 2000 });
+        this.snackBar.open('✅ Cliente eliminado', 'Cerrar', { duration: 2000 });
         this.loadLogSources();
       },
-      error: () => this.snackBar.open('Error eliminando', 'Cerrar', { duration: 3000 })
+      error: () => this.snackBar.open('Error eliminando cliente', 'Cerrar', { duration: 3000 })
     });
   }
 

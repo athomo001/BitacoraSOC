@@ -521,6 +521,15 @@
                     {{ getHint('hint-nl-send-para') }}
                   </div>
                   <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Autocompletar destinatarios (Para)</mat-label>
+                    <input matInput placeholder="Escriba nombre o correo..." [matAutocomplete]="autoNlTo" #nlToInput>
+                    <mat-autocomplete #autoNlTo="matAutocomplete" (optionSelected)="addEmailToTextarea($event.option.value, 'nlTo'); nlToInput.value = ''">
+                      <mat-option *ngFor="let contact of getAutocompleteContacts(nlToInput.value)" [value]="contact.email">
+                        {{ contact.name }} &lt;{{ contact.email }}&gt;
+                      </mat-option>
+                    </mat-autocomplete>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="full-width">
                     <mat-label>Destinatarios (Para)</mat-label>
                     <textarea matInput [(ngModel)]="newsletterRecipients" rows="6" placeholder="correo1@cliente.com, correo2@cliente.com o uno por línea"></textarea>
                   </mat-form-field>
@@ -535,6 +544,15 @@
                   <div class="help-bubble" *ngIf="guideActive && hintActiveId === 'hint-nl-send-cc'">
                     {{ getHint('hint-nl-send-cc') }}
                   </div>
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Autocompletar CC</mat-label>
+                    <input matInput placeholder="Escriba nombre o correo..." [matAutocomplete]="autoNlCc" #nlCcInput>
+                    <mat-autocomplete #autoNlCc="matAutocomplete" (optionSelected)="addEmailToTextarea($event.option.value, 'nlCc'); nlCcInput.value = ''">
+                      <mat-option *ngFor="let contact of getAutocompleteContacts(nlCcInput.value)" [value]="contact.email">
+                        {{ contact.name }} &lt;{{ contact.email }}&gt;
+                      </mat-option>
+                    </mat-autocomplete>
+                  </mat-form-field>
                   <mat-form-field appearance="outline" class="full-width" style="margin-top: 12px;">
                     <mat-label>CC interno (copia a control)</mat-label>
                     <textarea matInput [(ngModel)]="newsletterCcRecipients" rows="3" placeholder="operaciones@empresa.cl, control@empresa.cl o uno por línea"></textarea>
@@ -744,10 +762,28 @@
               </mat-form-field>
               
               <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Autocompletar destinatarios (Para)</mat-label>
+                <input matInput placeholder="Escriba nombre o correo..." [matAutocomplete]="autoIncTo" #incToInput>
+                <mat-autocomplete #autoIncTo="matAutocomplete" (optionSelected)="addEmailToTextarea($event.option.value, 'incTo'); incToInput.value = ''">
+                  <mat-option *ngFor="let contact of getAutocompleteContacts(incToInput.value)" [value]="contact.email">
+                    {{ contact.name }} &lt;{{ contact.email }}&gt;
+                  </mat-option>
+                </mat-autocomplete>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
                 <mat-label>Para</mat-label>
                 <textarea matInput [ngModel]="incidentRecipientsTo" (ngModelChange)="onIncidentRecipientsToChange($event)" rows="3" placeholder="correo1@cliente.com, correo2@cliente.com"></textarea>
               </mat-form-field>
 
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Autocompletar CC</mat-label>
+                <input matInput placeholder="Escriba nombre o correo..." [matAutocomplete]="autoIncCc" #incCcInput>
+                <mat-autocomplete #autoIncCc="matAutocomplete" (optionSelected)="addEmailToTextarea($event.option.value, 'incCc'); incCcInput.value = ''">
+                  <mat-option *ngFor="let contact of getAutocompleteContacts(incCcInput.value)" [value]="contact.email">
+                    {{ contact.name }} &lt;{{ contact.email }}&gt;
+                  </mat-option>
+                </mat-autocomplete>
+              </mat-form-field>
               <mat-form-field appearance="outline" class="full-width">
                 <mat-label>CC (En copia)</mat-label>
                 <textarea matInput [ngModel]="incidentRecipientsCc" (ngModelChange)="onIncidentRecipientsCcChange($event)" rows="3" placeholder="copia1@cliente.com"></textarea>

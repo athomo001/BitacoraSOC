@@ -2,6 +2,55 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.78-beta] - 2026-05-20
+
+### Mejoras en Selector de Asignación para Especialista TI (SHIFT-TI-SEL-136)
+
+- **Fuente correcta del directorio centralizado:** Se corrigió el selector de rol Especialista TI (`TI`) para cargar contactos internos desde el **directorio centralizado** en lugar de limitarse a 3 usuarios del sistema. Ahora muestra 20+ personas reales con datos completos.
+- **Visualización de nombre completo + teléfono:** Las opciones del dropdown ahora muestran formato `Nombre Completo • Teléfono` (ej: "Oscar Ortiz • +56976783378"), facilitando la identificación correcta de personas. Se agregó clase CSS `.option-phone` para estilos legibles en gris secundario.
+- **Asignación directa desde directorio para TI:** Se modificó la lógica de validación en `saveWeeklyAssignment()` para permitir que TI asigne contactos internos del directorio sin buscar coincidencia en tabla de usuarios del sistema, evitando error "Asígnalo desde Analistas Internos (Usuarios)".
+- **Organización visual mejorada:** Se separó visualmente "Personas Externas" de "Directorio Interno" en secciones distintas del selector cuando aplica, mejorando la experiencia de selección.
+
+### Corrección de Barras de Progreso en Turnos Próximos a Iniciar (SHIFT-PROX-137)
+
+- **Barras funcionales:** Se implementó cálculo de progreso para la sección "Próximos Turnos a Iniciar" utilizando la fórmula `progress = (tiempo restante hasta inicio) / (duración total) × 100`. Anteriormente estaban hardcodeadas a 0% y no se llenaban.
+- **Consistencia visual:** Ambas secciones (Próximos a Terminar y Próximos a Iniciar) ahora aplican el mismo sistema de colores dinámicos: verde para >80%, amarillo para 50-80%, rojo para <50%.
+- **Cálculo preciso:** El progreso refleja qué tan cercano está el turno a su inicio en relación a su duración total, proporcionando feedback temporal correcto al operador.
+
+## [v1.5.77-beta] - 2026-05-21
+
+### Migración y mejoras UX de Gestión de Turnos Semanales (SHIFT-MOVE-124 a SHIFT-NAV-135)
+
+- **Migración de Turnos Semanales (SHIFT-MOVE-124):** Se migró la funcionalidad de turnos semanales desde Escalación hacia `/main/admin/work-shifts`, eliminando dependencias obsoletas y manteniendo total compatibilidad de datos.
+- **Layout Dashboard en 2 Columnas (SHIFT-UX-125):** Rediseñado `/main/admin/work-shifts` con una estructura visual moderna de 2 columnas (panel central y editor lateral) adaptativa y con micro-animaciones premium.
+- **Vista Resumen Semanal en Gantt (SHIFT-GANTT-126):** Implementado un timeline tipo Gantt para el resumen semanal, con visualización por rol/analista, colores según estado (En Curso, Próximo, Pasado) y una línea roja vertical destacada para el Día Actual con su fecha legible.
+- **Tarjetas de Turnos por Proximidad (SHIFT-PROX-127):** Agregadas tarjetas de "Turnos Próximos a Terminar" y "Próximos Turnos a Iniciar" ordenadas cronológicamente, con barras de progreso y temporizador de cuenta regresiva/inicio.
+- **Formato de Datos de Asignación (SHIFT-FORMAT-128):** Incorporado un bloque de ayuda contextual detallada que describe el formato esperado de datos de turnos para minimizar errores.
+- **Editor de Asignación Lateral (SHIFT-EDITOR-129):** Creado un panel lateral para agregar y editar turnos, integrando validación estricta de solapes de horario, rangos de fecha inválidos, autocomplete desde el directorio y disponibilidad de analistas.
+- **Acciones y Feedback de Persistencia (SHIFT-SAVE-130):** Añadido botón primario con estado de carga (loading) y notificaciones emergentes de éxito/error al guardar cambios, forzando la actualización instantánea de la interfaz.
+- **Filtros Rápidos (SHIFT-FILTER-131):** Implementado un buscador y filtros interactivos por Persona y Rol para depurar la lista de asignaciones rápidamente sin recargas de página.
+- **Tabla Detallada de Asignaciones (SHIFT-TABLE-132):** Diseñada una MatTable completa con columnas de Estado (con pills de color), Semana, Rol, Persona, Comentarios y Acciones (editar, eliminar).
+- **Consistencia de Datos (SHIFT-DATA-133):** Garantizado que el timeline de Gantt, las tarjetas de proximidad y la tabla detallada se alimenten de la misma fuente de datos de asignación sincronizada.
+- **Texto y Labels en Español (SHIFT-I18N-134):** Normalizados todos los textos, ayudas, estados y mensajes de validación de turnos a español neutro.
+- **Integración con Navegación Global (SHIFT-NAV-135):** Pulida la integración visual de la vista de turnos con el shell, el menú lateral y la barra superior del sistema.
+- **Optimización de Ancho de Pantalla y Legibilidad:** Ampliado el ancho máximo de la consola administrativa a 1750px y optimizado el tamaño de la tipografía del diagrama Gantt (incrementando las etiquetas y textos a 13px/14px) para aprovechar al máximo las pantallas de escritorio sin comprimir textos.
+- **Compilación e Integración Docker exitosa:** Se validó la compilación del frontend dentro del contenedor Docker sin advertencias ni errores.
+
+## [v1.5.76-beta] - 2026-05-20
+
+### Consolidación y mejoras UX de Clientes, Escalación y Reportes (CAT-INT-115 a ESC-FLOW-123)
+
+- **Cliente Interno Único (CAT-INT-115):** Implementada validación en base de datos, API de backend y formularios reactivos en frontend para impedir la activación de más de un Cliente Interno de forma concurrente.
+- **Correo CC Global Obligatorio (CAT-INT-116):** Agregada configuración y validación estricta de múltiples correos electrónicos en formato CC global para el Cliente Interno. Se importó `MatError` y se definieron getters booleanos específicos en el componente `CatalogAdminComponent` para solucionar fallos en compilación estricta en producción.
+- **Unificación de Nomenclatura a "Cliente" (CAT-UX-117):** Eliminada la terminología técnica "Log Source" / "Fuente de Logs" de la interfaz de administración de catálogos, sustituyéndola por la palabra funcional "Cliente".
+- **Visualización Destacada (CAT-UX-118):** Se integró un badge con colores distintivos en la tabla de clientes para resaltar al Cliente Interno junto con sus correos de copia global configurados.
+- **Selector Simplificado de Clientes (ESC-UX-119):** Removidos los campos redundantes (buscador de texto + combo) en Escalación Simple y reemplazados por un único campo autocomplete responsivo para seleccionar el cliente.
+- **Carga de CC y Autocompletado de Contactos (ESC-DATA-120):** Automatizado el pre-llenado de los campos CC con los correos del Cliente Interno en el generador de reportes. Se integró `MatAutocompleteModule` para autocompletar rápidamente direcciones desde el Directorio Central en los campos destinatarios del Boletín y Reporte de Incidentes.
+- **Optimización de Layout (ESC-LAYOUT-121):** Retirado el bloque obsoleto "Clientes (fuente única)" para maximizar el espacio vertical disponible y se ajustaron las tablas de servicios de escalación a un tamaño máximo contenido (`max-height: 250px`) con barras de desplazamiento y cabeceras fijas.
+- **Reorganización y Limpieza de Pestañas (ESC-TABS-122):** Reordenadas y renombradas las pestañas a "Flujo de Correos" y "Flujo de llamadas". Se eliminó completamente la pestaña de "Turnos Internos" (migrada previamente a `/main/admin/work-shifts`), limpiando todas sus importaciones y referencias para mantener un empaquetado optimizado.
+- **Secuencia y Estado de Configuración del Flujo (ESC-FLOW-123):** Añadida numeración de secuencia secuencial (`Paso 1`, `Paso 2`...) en cada elemento de la lista y se programaron badges de validación dinámica (`Configurado` / `Incompleto`) basados en si la tarjeta tiene los datos de contacto mínimos obligatorios para operar.
+- **Estabilidad de Docker en Producción:** Verificado el empaquetado de producción de toda la aplicación ejecutando `docker compose build --no-cache && docker compose up -d` de forma exitosa.
+
 ## [v1.5.75-beta] - 2026-05-19
 
 ### Auditoria: clasificacion correcta para Escalacion y mayor cobertura de eventos

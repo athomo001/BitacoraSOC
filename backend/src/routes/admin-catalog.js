@@ -174,6 +174,19 @@ router.post('/log-sources', async (req, res) => {
     };
 
     if (payload.isInternal) {
+      if (!payload.internalEmail || !payload.internalEmail.trim()) {
+        return res.status(400).json({ message: 'El correo electrónico es obligatorio para el cliente interno.' });
+      }
+      const emails = payload.internalEmail.split(/[,;\n\r]+/).map(e => e.trim()).filter(e => e);
+      if (emails.length === 0) {
+        return res.status(400).json({ message: 'Debe proporcionar al menos un correo electrónico válido.' });
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+      for (const email of emails) {
+        if (!emailRegex.test(email)) {
+          return res.status(400).json({ message: `El correo "${email}" no tiene un formato de correo electrónico válido.` });
+        }
+      }
       await CatalogLogSource.updateMany({ isInternal: true }, { $set: { isInternal: false } });
     }
 
@@ -191,6 +204,35 @@ router.put('/log-sources/:id', async (req, res) => {
       ...req.body
     };
 
+    const existingDoc = await CatalogLogSource.findById(req.params.id);
+    if (!existingDoc) {
+      return res.status(404).json({ message: 'Log Source no encontrado' });
+    }
+
+    const finalIsInternal = Object.prototype.hasOwnProperty.call(updatePayload, 'isInternal')
+      ? coerceBoolean(updatePayload.isInternal, false)
+      : existingDoc.isInternal === true;
+
+    const finalEmail = Object.prototype.hasOwnProperty.call(updatePayload, 'internalEmail')
+      ? updatePayload.internalEmail
+      : existingDoc.internalEmail || '';
+
+    if (finalIsInternal) {
+      if (!finalEmail || !finalEmail.trim()) {
+        return res.status(400).json({ message: 'El correo electrónico es obligatorio para el cliente interno.' });
+      }
+      const emails = finalEmail.split(/[,;\n\r]+/).map(e => e.trim()).filter(e => e);
+      if (emails.length === 0) {
+        return res.status(400).json({ message: 'Debe proporcionar al menos un correo electrónico válido.' });
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+      for (const mail of emails) {
+        if (!emailRegex.test(mail)) {
+          return res.status(400).json({ message: `El correo "${mail}" no tiene un formato de correo electrónico válido.` });
+        }
+      }
+    }
+
     if (Object.prototype.hasOwnProperty.call(req.body || {}, 'isInternal')) {
       updatePayload.isInternal = coerceBoolean(req.body?.isInternal, false);
       if (updatePayload.isInternal) {
@@ -206,9 +248,6 @@ router.put('/log-sources/:id', async (req, res) => {
       updatePayload,
       { new: true, runValidators: true }
     );
-    if (!source) {
-      return res.status(404).json({ message: 'Log Source no encontrado' });
-    }
     res.json(source);
   } catch (error) {
     res.status(400).json({ message: error.message });

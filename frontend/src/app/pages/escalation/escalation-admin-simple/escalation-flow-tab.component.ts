@@ -105,6 +105,27 @@ export class EscalationFlowTabComponent implements OnInit {
     }
   }
 
+  onFlowClientSearchInput(value: string): void {
+    this.flowClientSearch = value;
+    const match = this.clients.find(c => c.name.toLowerCase() === value.toLowerCase());
+    if (match) {
+      this.selectedFlowClientId = match._id;
+      this.onFlowClientChange();
+    } else {
+      this.selectedFlowClientId = null;
+      this.flowSteps = [];
+      this.flowLegend = '';
+    }
+  }
+
+  onFlowClientSelected(client: any): void {
+    if (client) {
+      this.selectedFlowClientId = client._id;
+      this.flowClientSearch = client.name;
+      this.onFlowClientChange();
+    }
+  }
+
   loadEscalationFlow(): void {
     if (!this.selectedFlowClientId) return;
     this.loadingFlow = true;
@@ -202,6 +223,7 @@ export class EscalationFlowTabComponent implements OnInit {
         this.clientsRefresh.emit(); // Notify parent or other tabs
         if (created?._id) {
           this.selectedFlowClientId = created._id;
+          this.flowClientSearch = created.name;
           this.onFlowClientChange();
         }
         this.savingQuickClient = false;
@@ -277,6 +299,21 @@ export class EscalationFlowTabComponent implements OnInit {
 
   displayDirectoryContact(value: DirectoryContact | string | null): string {
     return typeof value === 'string' ? value : (value?.name || '');
+  }
+
+  isStepConfigured(step: EscalationFlowStep): boolean {
+    if (!step.title || !step.title.trim()) {
+      return false;
+    }
+    if (step.type === 'unique') {
+      return !!(step.contactName && step.contactName.trim() && step.contactTel && step.contactTel.trim());
+    } else if (step.type === 'pool') {
+      if (!step.contacts || step.contacts.length === 0) {
+        return false;
+      }
+      return step.contacts.every(c => c.name && c.name.trim() && c.tel && c.tel.trim());
+    }
+    return false;
   }
 
   showError(message: string): void {

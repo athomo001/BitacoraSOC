@@ -33,6 +33,7 @@ import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatButtonToggleGroup, MatButtonToggle } from '@angular/material/button-toggle';
 import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { ClientAlertDialogComponent } from './client-alert-dialog.component';
 import { environment } from '@env/environment';
 
@@ -59,7 +60,8 @@ import { environment } from '@env/environment';
     MatButton, MatIconButton,
     MatButtonToggleGroup, MatButtonToggle,
     MatIcon,
-    MatTooltip
+    MatTooltip,
+    MatAutocompleteModule
   ]
 })
 export class ReportGeneratorComponent implements OnInit {
@@ -126,6 +128,7 @@ export class ReportGeneratorComponent implements OnInit {
   // ─── Branding ────────────────────────────────────────────────────────────
   logoBase64: string | null = null;
   appTitle = '';
+  internalClientEmail = '';
 
   // ─── Newsletter email dispatch ────────────────────────────────────────────
   newsletterRecipients = '';
@@ -212,11 +215,70 @@ export class ReportGeneratorComponent implements OnInit {
     });
   }
 
-  // ─── Lifecycle ───────────────────────────────────────────────────────────
   ngOnInit(): void {
     this.loadReportTableColorConfig();
     this.loadLogo();
     this.loadNewsletterContacts();
+    this.loadInternalClientEmail();
+  }
+
+  loadInternalClientEmail(): void {
+    this.catalogService.getAllLogSources().subscribe({
+      next: (res) => {
+        const sources = Array.isArray(res) ? res : (res?.data || []);
+        const internalClient = sources.find((s: any) => s.isInternal === true);
+        if (internalClient && internalClient.internalEmail) {
+          this.internalClientEmail = internalClient.internalEmail;
+          // Set initially
+          this.newsletterCcRecipients = this.internalClientEmail;
+          this.incidentRecipientsCc = this.internalClientEmail;
+          this.updateIncidentSelectedFromText(this.internalClientEmail, 'cc');
+        }
+      },
+      error: () => {}
+    });
+  }
+
+  getAutocompleteContacts(query: string): DirectoryContact[] {
+    const term = String(query || '').trim().toLowerCase();
+    if (!term) return [];
+    return this.newsletterContacts.filter(c =>
+      c.email && (
+        c.name.toLowerCase().includes(term) ||
+        c.email.toLowerCase().includes(term) ||
+        (c.company || '').toLowerCase().includes(term)
+      )
+    );
+  }
+
+  addEmailToTextarea(email: string, target: 'nlTo' | 'nlCc' | 'incTo' | 'incCc'): void {
+    if (!email) return;
+    const trimmed = email.trim();
+    if (target === 'nlTo') {
+      if (!this.isEmailInField(trimmed, 'to')) {
+        this.addEmailToField(trimmed, 'to');
+      }
+    } else if (target === 'nlCc') {
+      if (!this.isEmailInField(trimmed, 'cc')) {
+        this.addEmailToField(trimmed, 'cc');
+      }
+    } else if (target === 'incTo') {
+      const current = this.incidentRecipientsTo.split(/[\n,;]+/).map(e => e.trim().toLowerCase());
+      if (!current.includes(trimmed.toLowerCase())) {
+        this.incidentRecipientsTo = this.incidentRecipientsTo
+          ? this.incidentRecipientsTo.trimEnd() + '\n' + trimmed
+          : trimmed;
+        this.updateIncidentSelectedFromText(this.incidentRecipientsTo, 'to');
+      }
+    } else if (target === 'incCc') {
+      const current = this.incidentRecipientsCc.split(/[\n,;]+/).map(e => e.trim().toLowerCase());
+      if (!current.includes(trimmed.toLowerCase())) {
+        this.incidentRecipientsCc = this.incidentRecipientsCc
+          ? this.incidentRecipientsCc.trimEnd() + '\n' + trimmed
+          : trimmed;
+        this.updateIncidentSelectedFromText(this.incidentRecipientsCc, 'cc');
+      }
+    }
   }
 
   // ─── Contextual guide toggle ──────────────────────────────────────────────
@@ -352,6 +414,12 @@ export class ReportGeneratorComponent implements OnInit {
     if (source) {
       this.reportForm.patchValue({ logSource: source.name });
       void this.refreshClientAlert('report', true);
+      
+      const ccEmail = source.internalEmail || this.internalClientEmail || '';
+      if (ccEmail) {
+        this.incidentRecipientsCc = ccEmail;
+        this.updateIncidentSelectedFromText(ccEmail, 'cc');
+      }
     }
   }
 

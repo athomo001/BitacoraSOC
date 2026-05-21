@@ -18,7 +18,7 @@
 
   <mat-tab-group *ngIf="!directoryOnlyAccess" class="escalation-admin-tabs" animationDuration="0ms">
     <!-- TAB 0: FLUJO DINÁMICO -->
-    <mat-tab *ngIf="!directoryOnlyAccess" label="📲 Flujo de Escalamiento">
+    <mat-tab *ngIf="!directoryOnlyAccess" label="📲 Flujo de llamadas">
       <app-escalation-flow-tab
         [isAdminUser]="isAdminUser"
         [directoryContacts]="directoryContacts"
@@ -27,15 +27,8 @@
       </app-escalation-flow-tab>
     </mat-tab>
 
-    <!-- TAB 1: TURNOS INTERNOS -->
-    <mat-tab *ngIf="!directoryOnlyAccess" label="🗓️ Turnos Internos">
-      <app-escalation-shifts-tab 
-        [directoryContacts]="directoryContacts">
-      </app-escalation-shifts-tab>
-    </mat-tab>
-
-    <!-- TAB 2: CONTACTOS Y AGENDA -->
-    <mat-tab *ngIf="!directoryOnlyAccess" label="📇 Contactos y Agenda">
+    <!-- TAB 1: CONTACTOS Y AGENDA -->
+    <mat-tab *ngIf="!directoryOnlyAccess" label="📇 Flujo de Correos">
       <app-escalation-contacts-tab
         [isAdminUser]="isAdminUser"
         [directoryContacts]="directoryContacts"
@@ -43,7 +36,7 @@
       </app-escalation-contacts-tab>
     </mat-tab>
 
-    <!-- TAB 3: RACI -->
+    <!-- TAB 2: RACI -->
     <mat-tab label="📋 Matriz RACI">
       <app-escalation-raci-tab 
         [directoryContacts]="directoryContacts">
