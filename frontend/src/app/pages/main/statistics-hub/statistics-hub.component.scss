@@ -1,0 +1,48 @@
+.statistics-hub-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.statistics-hub-header {
+  h1 {
+    margin: 0;
+    color: var(--text-primary);
+  }
+
+  p {
+    margin: 0.25rem 0 0;
+    color: var(--text-secondary);
+  }
+}
+
+.statistics-hub-toggle-wrap {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.statistics-hub-toggle {
+  width: fit-content;
+}
+
+.statistics-hub-content {
+  min-height: 240px;
+}
+
+@media (max-width: 768px) {
+  .statistics-hub-container {
+    padding: 0.75rem;
+  }
+
+  .statistics-hub-toggle-wrap {
+    width: 100%;
+  }
+
+  .statistics-hub-toggle {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.4rem;
+  }
+}

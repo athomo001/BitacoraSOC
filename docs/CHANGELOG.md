@@ -11,6 +11,13 @@ Registro de cambios relevantes del proyecto.
 - **Limpieza de campos duplicados:** Se eliminaron las entradas duplicadas de *Código Ticket*, *Tipo de operación* y *Fecha* en la sección inferior de detalles adicionales, dejando únicamente los campos de origen, destino, reputación y carga de evidencia.
 - **Estilos responsivos:** Se incorporó la clase `.row-four-cols` en el SCSS para adaptar la nueva fila de 4 columnas de forma fluida a todo tipo de pantallas (desktop, tableta y móviles).
 
+### Nomenclatura y reorden de Catálogos en Admin (CAT-NOMEN-REORG-144)
+
+- **Título principal actualizado:** en `/main/admin/catalogs` se cambió el encabezado a **"Administración de Clientes y Catálogos"** para reflejar el alcance real del módulo.
+- **Etiqueta de navegación renombrada:** en la consola administrativa, el acceso lateral se actualizó de **"Catálogos"** a **"Clientes y Catálogos"**.
+- **Pestañas reorganizadas en orden operativo:** el `mat-tab-group` quedó en el orden **Clientes**, **Tipos de Operación**, **Alertas y Mantenimientos**, **Tipo de Eventos**.
+- **Renombre funcional de Eventos:** la pestaña **"Eventos"** se renombró a **"Tipo de Eventos"** y su encabezado interno también fue actualizado para mantener consistencia visual y semántica.
+
 ## [v1.5.79-beta] - 2026-05-21
 
 ### Ampliación de Timeline en Vista Resumen Semanal (SHIFT-GANTT-TIMELINE)

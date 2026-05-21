@@ -4,7 +4,7 @@
  * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
  */
 
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
@@ -15,6 +15,10 @@ import { MatCheckbox } from '@angular/material/checkbox';
 import { MatOption, MatSelect } from '@angular/material/select';
 import { MatButton } from '@angular/material/button';
 import { NgFor, NgIf } from '@angular/common';
+import { MatTabsModule } from '@angular/material/tabs';
+import { ActivatedRoute, Router } from '@angular/router';
+import { Subscription } from 'rxjs';
+import { GlpiIntegrationComponent } from '../glpi/glpi-integration.component';
 
 @Component({
   selector: 'app-integrations',
@@ -31,10 +35,12 @@ import { NgFor, NgIf } from '@angular/common';
     MatOption,
     MatButton,
     NgIf,
-    NgFor
+    NgFor,
+    MatTabsModule,
+    GlpiIntegrationComponent
   ]
 })
-export class IntegrationsComponent implements OnInit {
+export class IntegrationsComponent implements OnInit, OnDestroy {
   readonly transportOptions = [
     { value: 'udp', label: 'Syslog UDP' },
     { value: 'tcp', label: 'Syslog TCP' },
@@ -62,11 +68,15 @@ export class IntegrationsComponent implements OnInit {
   testing = false;
   saving = false;
   deleting = false;
+  selectedTabIndex = 0;
+  private _querySub?: Subscription;
 
   constructor(
     private fb: FormBuilder,
     private http: HttpClient,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private route: ActivatedRoute,
+    private router: Router
   ) {
     this.integrationForm = this.fb.group({
       name: ['Integración SIEM/SOAR/NDR', Validators.required],
@@ -92,6 +102,22 @@ export class IntegrationsComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadConfigs();
+    this._querySub = this.route.queryParams.subscribe((params) => {
+      this.selectedTabIndex = params['type'] === 'glpi' ? 1 : 0;
+    });
+  }
+
+  ngOnDestroy(): void {
+    this._querySub?.unsubscribe();
+  }
+
+  onTabChange(index: number): void {
+    const type = index === 1 ? 'glpi' : null;
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: type ? { type } : {},
+      replaceUrl: true
+    });
   }
 
   get isHttp(): boolean {

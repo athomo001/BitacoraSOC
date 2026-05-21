@@ -75,7 +75,7 @@ const routes: Routes = [
       { path: 'checklist-history', component: ChecklistHistoryComponent },
       { path: 'all-entries', component: AllEntriesComponent },
       { path: 'profile', component: ProfileComponent },
-      { path: 'reports', component: ReportsComponent },
+      { path: 'reports', component: ReportGeneratorComponent },
       { path: 'users', redirectTo: 'admin/users', pathMatch: 'full' },
       { path: 'tags', component: TagsComponent },
       { path: 'logo', component: LogoComponent },
@@ -87,7 +87,8 @@ const routes: Routes = [
       { path: 'checklist-admin', redirectTo: 'admin/checklist', pathMatch: 'full' },
       { path: 'catalog-admin', redirectTo: 'admin/catalogs', pathMatch: 'full' },
       { path: 'audit-logs', component: AuditLogsComponent, canActivate: [AdminGuard] },
-      { path: 'report-generator', component: ReportGeneratorComponent },
+      { path: 'report-generator', redirectTo: 'reports', pathMatch: 'full' },
+      { path: 'statistics', component: ReportsComponent },
       { path: 'settings', redirectTo: 'admin/smtp', pathMatch: 'full' },
       {
         path: 'admin',
@@ -114,7 +115,8 @@ const routes: Routes = [
           },
           {
             path: 'glpi',
-            loadComponent: () => import('./glpi/glpi-integration.component').then(m => m.GlpiIntegrationComponent)
+            redirectTo: 'integrations',
+            pathMatch: 'full'
           },
           {
             path: 'appearance',

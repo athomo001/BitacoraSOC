@@ -255,4 +255,90 @@ router.post('/test', authenticate, authorize('admin'), async (req, res) => {
   }
 });
 
+// Aliases para rutas raíz (cuando el router se monta en /api/integrations/glpi)
+router.get('/', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const config = await ensureGlpiConfig();
+    res.json(sanitizeGlpiConfig(config));
+  } catch (error) {
+    res.status(500).json({ message: 'Error obteniendo configuración GLPI', error: error.message });
+  }
+});
+
+router.put('/', authenticate, authorize('admin'), validators, validate, async (req, res) => {
+  try {
+    const config = await ensureGlpiConfig();
+    const payload = req.body || {};
+    const incomingAppToken = String(payload.api?.appToken || '').trim();
+    const incomingUserToken = String(payload.api?.userToken || '').trim();
+
+    if (payload.enabled !== undefined) config.enabled = !!payload.enabled;
+    if (payload.mode) config.mode = payload.mode;
+    if (payload.dispatchMode) config.dispatchMode = payload.dispatchMode;
+
+    if (payload.api) {
+      if (payload.api.baseUrl !== undefined) {
+        const candidateBaseUrl = String(payload.api.baseUrl || '').trim();
+        if (candidateBaseUrl) {
+          try {
+            await assertOutboundUrlSafe(candidateBaseUrl, { requireHttps: true });
+          } catch (validationError) {
+            return res.status(400).json({ message: validationError.message });
+          }
+        }
+        config.api.baseUrl = candidateBaseUrl;
+      }
+      if (payload.api.verifyTls !== undefined) config.api.verifyTls = !!payload.api.verifyTls;
+      if (payload.api.timeoutMs !== undefined) config.api.timeoutMs = Number(payload.api.timeoutMs);
+      if (incomingAppToken) config.api.appToken = encrypt(incomingAppToken);
+      if (incomingUserToken) config.api.userToken = encrypt(incomingUserToken);
+    }
+
+    const apiMode = config.mode === 'api';
+    if (apiMode) {
+      const hasAppToken = Boolean(incomingAppToken) || Boolean(config.api?.appToken);
+      const hasUserToken = Boolean(incomingUserToken) || Boolean(config.api?.userToken);
+      if (!hasAppToken || !hasUserToken) {
+        return res.status(400).json({
+          message: 'Para guardar en modo API debes tener App-Token y User Token configurados'
+        });
+      }
+    }
+
+    if (payload.email) {
+      if (payload.email.collectorAddress !== undefined) {
+        config.email.collectorAddress = String(payload.email.collectorAddress || '').trim().toLowerCase();
+      }
+      if (payload.email.subjectTemplate !== undefined) {
+        config.email.subjectTemplate = String(payload.email.subjectTemplate || '').trim() || DEFAULT_EMAIL_SUBJECT;
+      }
+    }
+
+    config.lastUpdatedBy = req.user._id;
+    await config.save();
+
+    await audit(req, {
+      event: 'admin.glpi.config.update',
+      level: 'info',
+      result: { success: true },
+      metadata: {
+        enabled: config.enabled,
+        mode: config.mode,
+        dispatchMode: config.dispatchMode,
+        hasApiTokens: Boolean(config.api?.appToken) && Boolean(config.api?.userToken),
+        hasCollectorAddress: Boolean(config.email?.collectorAddress)
+      }
+    });
+
+    res.json({ message: 'Configuración GLPI guardada', config: sanitizeGlpiConfig(config) });
+  } catch (error) {
+    await audit(req, {
+      event: 'admin.glpi.config.update',
+      level: 'warn',
+      result: { success: false, reason: error.message }
+    });
+    res.status(500).json({ message: 'Error guardando configuración GLPI', error: error.message });
+  }
+});
+
 module.exports = router;

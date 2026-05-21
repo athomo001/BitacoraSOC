@@ -496,6 +496,7 @@ app.use('/api/tags', require('./routes/tags'));
 app.use('/api/smtp', require('./routes/smtp'));
 app.use('/api/logging', require('./routes/logging'));
 app.use('/api/glpi', require('./routes/glpi'));
+app.use('/api/integrations/glpi', require('./routes/glpi')); // alias unificado
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/config', require('./routes/config'));
 app.use('/api/backup', require('./routes/backup'));

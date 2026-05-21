@@ -1,100 +1,8 @@
 <div class="catalog-admin-container">
-  <h1>Administracion de Catalogos</h1>
-  <p class="subtitle">Gestiona eventos, clientes, reglas especiales y tipos de operacion</p>
+  <h1>Administración de Clientes y Catálogos</h1>
+  <p class="subtitle">Gestiona clientes, tipos de operación, alertas y tipos de eventos</p>
 
   <mat-tab-group class="catalog-tabs" [(selectedIndex)]="activeTabIndex">
-    <mat-tab label="Eventos">
-      <div class="tab-content">
-        <section class="catalog-panel form-card">
-          <header class="catalog-panel__header">
-            <h2 class="catalog-panel__title">{{ editingEventId ? 'Editar Evento' : 'Nuevo Evento' }}</h2>
-          </header>
-          <div class="catalog-panel__body">
-            <form [formGroup]="eventForm" (ngSubmit)="saveEvent()">
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Nombre *</mat-label>
-                <input matInput formControlName="name" placeholder="Ej: Phishing">
-              </mat-form-field>
-
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Categoria / Parent</mat-label>
-                <input matInput formControlName="parent" placeholder="Ej: Caza de amenazas">
-              </mat-form-field>
-
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Descripcion</mat-label>
-                <textarea matInput formControlName="description" rows="2"></textarea>
-              </mat-form-field>
-
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Motivo por defecto</mat-label>
-                <textarea matInput formControlName="motivoDefault" rows="3"></textarea>
-              </mat-form-field>
-
-              <mat-checkbox formControlName="enabled">Habilitado</mat-checkbox>
-
-              <div class="form-actions">
-                <button mat-raised-button color="primary" type="submit">
-                  <mat-icon>{{ editingEventId ? 'save' : 'add' }}</mat-icon>
-                  {{ editingEventId ? 'Actualizar' : 'Crear' }}
-                </button>
-                <button mat-stroked-button type="button" *ngIf="editingEventId" (click)="cancelEventEdit()">
-                  <mat-icon>cancel</mat-icon>
-                  Cancelar
-                </button>
-              </div>
-            </form>
-          </div>
-        </section>
-
-        <section class="catalog-panel list-card">
-          <header class="catalog-panel__header events-header">
-            <h2 class="catalog-panel__title">Eventos ({{ eventTotal }})</h2>
-            <mat-form-field appearance="outline" class="events-search-field">
-              <mat-label>Buscar eventos...</mat-label>
-              <mat-icon matPrefix>search</mat-icon>
-              <input matInput [formControl]="eventSearchControl" placeholder="Buscar por nombre, categoría o motivo">
-            </mat-form-field>
-          </header>
-          <div class="catalog-panel__body">
-            <div class="table-container">
-              <table class="catalog-table">
-                <thead>
-                  <tr>
-                    <th>Nombre</th>
-                    <th>Motivo por defecto</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr *ngFor="let event of events">
-                    <td>
-                      <strong>{{ event.name }}</strong>
-                      <span class="parent-badge" *ngIf="event.parent">({{ event.parent }})</span>
-                    </td>
-                    <td>{{ event.motivoDefault || '-' }}</td>
-                    <td>{{ event.enabled ? 'Activo' : 'Inactivo' }}</td>
-                    <td>
-                      <button mat-icon-button color="primary" (click)="editEvent(event)" matTooltip="Editar">
-                        <mat-icon>edit</mat-icon>
-                      </button>
-                      <button mat-icon-button color="warn" (click)="deleteEvent(event._id)" matTooltip="Deshabilitar">
-                        <mat-icon>delete</mat-icon>
-                      </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <mat-paginator [length]="eventTotal" [pageSize]="eventPageSize" [pageIndex]="eventPage - 1"
-              [pageSizeOptions]="[10, 25, 50, 100]" (page)="onEventPageChange($event)" showFirstLastButtons>
-            </mat-paginator>
-          </div>
-        </section>
-      </div>
-    </mat-tab>
-
     <mat-tab label="Clientes">
       <div class="tab-content">
         <section class="catalog-panel form-card">
@@ -240,7 +148,83 @@
       </div>
     </mat-tab>
 
-    <mat-tab label="Alertas y Mantenimientos">
+<mat-tab label="Tipos de Operación">
+      <div class="tab-content compact-tab-content">
+        <section class="catalog-panel form-card">
+          <header class="catalog-panel__header">
+            <h2 class="catalog-panel__title">{{ editingOperationTypeId ? 'Editar Tipo' : 'Nuevo Tipo de Operacion' }}</h2>
+          </header>
+          <div class="catalog-panel__body">
+            <form [formGroup]="operationTypeForm" (ngSubmit)="saveOperationType()" class="compact-form-grid">
+              <mat-form-field appearance="outline" class="compact-field">
+                <mat-label>Nombre *</mat-label>
+                <input matInput formControlName="name" placeholder="Ej: Analisis de malware">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="compact-field compact-field-wide">
+                <mat-label>Informacion adicional por defecto</mat-label>
+                <textarea matInput formControlName="infoAdicionalDefault" rows="2"></textarea>
+              </mat-form-field>
+
+              <mat-checkbox formControlName="enabled" class="compact-field">Habilitado</mat-checkbox>
+
+              <div class="form-actions">
+                <button mat-raised-button color="primary" type="submit">
+                  <mat-icon>{{ editingOperationTypeId ? 'save' : 'add' }}</mat-icon>
+                  {{ editingOperationTypeId ? 'Actualizar' : 'Crear' }}
+                </button>
+                <button mat-stroked-button type="button" *ngIf="editingOperationTypeId"
+                  (click)="cancelOperationTypeEdit()">
+                  <mat-icon>cancel</mat-icon>
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <section class="catalog-panel list-card">
+          <header class="catalog-panel__header">
+            <h2 class="catalog-panel__title">Tipos de operacion ({{ operationTypes.length }})</h2>
+          </header>
+          <div class="catalog-panel__body">
+            <div class="table-container">
+              <table class="catalog-table">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Informacion adicional por defecto</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let type of operationTypes">
+                    <td><strong>{{ type.name }}</strong></td>
+                    <td>{{ type.infoAdicionalDefault || '-' }}</td>
+                    <td>{{ type.enabled ? 'Activo' : 'Inactivo' }}</td>
+                    <td>
+                      <button mat-icon-button color="primary" (click)="editOperationType(type)" matTooltip="Editar">
+                        <mat-icon>edit</mat-icon>
+                      </button>
+                      <button *ngIf="type.enabled" mat-icon-button color="accent" (click)="disableOperationType(type)" matTooltip="Deshabilitar">
+                        <mat-icon>block</mat-icon>
+                      </button>
+                      <button mat-icon-button color="warn" (click)="deleteOperationType(type._id)"
+                        matTooltip="Eliminar Permanente">
+                        <mat-icon>delete_forever</mat-icon>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </div>
+    </mat-tab>
+
+<mat-tab label="Alertas y Mantenimientos">
       <div class="tab-content">
         <section class="catalog-panel form-card">
           <header class="catalog-panel__header">
@@ -425,33 +409,42 @@
       </div>
     </mat-tab>
 
-    <mat-tab label="Tipos de Operacion">
-      <div class="tab-content compact-tab-content">
+<mat-tab label="Tipo de Eventos">
+      <div class="tab-content">
         <section class="catalog-panel form-card">
           <header class="catalog-panel__header">
-            <h2 class="catalog-panel__title">{{ editingOperationTypeId ? 'Editar Tipo' : 'Nuevo Tipo de Operacion' }}</h2>
+            <h2 class="catalog-panel__title">{{ editingEventId ? 'Editar Evento' : 'Nuevo Evento' }}</h2>
           </header>
           <div class="catalog-panel__body">
-            <form [formGroup]="operationTypeForm" (ngSubmit)="saveOperationType()" class="compact-form-grid">
-              <mat-form-field appearance="outline" class="compact-field">
+            <form [formGroup]="eventForm" (ngSubmit)="saveEvent()">
+              <mat-form-field appearance="outline" class="full-width">
                 <mat-label>Nombre *</mat-label>
-                <input matInput formControlName="name" placeholder="Ej: Analisis de malware">
+                <input matInput formControlName="name" placeholder="Ej: Phishing">
               </mat-form-field>
 
-              <mat-form-field appearance="outline" class="compact-field compact-field-wide">
-                <mat-label>Informacion adicional por defecto</mat-label>
-                <textarea matInput formControlName="infoAdicionalDefault" rows="2"></textarea>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Categoria / Parent</mat-label>
+                <input matInput formControlName="parent" placeholder="Ej: Caza de amenazas">
               </mat-form-field>
 
-              <mat-checkbox formControlName="enabled" class="compact-field">Habilitado</mat-checkbox>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Descripcion</mat-label>
+                <textarea matInput formControlName="description" rows="2"></textarea>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Motivo por defecto</mat-label>
+                <textarea matInput formControlName="motivoDefault" rows="3"></textarea>
+              </mat-form-field>
+
+              <mat-checkbox formControlName="enabled">Habilitado</mat-checkbox>
 
               <div class="form-actions">
                 <button mat-raised-button color="primary" type="submit">
-                  <mat-icon>{{ editingOperationTypeId ? 'save' : 'add' }}</mat-icon>
-                  {{ editingOperationTypeId ? 'Actualizar' : 'Crear' }}
+                  <mat-icon>{{ editingEventId ? 'save' : 'add' }}</mat-icon>
+                  {{ editingEventId ? 'Actualizar' : 'Crear' }}
                 </button>
-                <button mat-stroked-button type="button" *ngIf="editingOperationTypeId"
-                  (click)="cancelOperationTypeEdit()">
+                <button mat-stroked-button type="button" *ngIf="editingEventId" (click)="cancelEventEdit()">
                   <mat-icon>cancel</mat-icon>
                   Cancelar
                 </button>
@@ -461,8 +454,13 @@
         </section>
 
         <section class="catalog-panel list-card">
-          <header class="catalog-panel__header">
-            <h2 class="catalog-panel__title">Tipos de operacion ({{ operationTypes.length }})</h2>
+          <header class="catalog-panel__header events-header">
+            <h2 class="catalog-panel__title">Tipos de Eventos ({{ eventTotal }})</h2>
+            <mat-form-field appearance="outline" class="events-search-field">
+              <mat-label>Buscar eventos...</mat-label>
+              <mat-icon matPrefix>search</mat-icon>
+              <input matInput [formControl]="eventSearchControl" placeholder="Buscar por nombre, categoría o motivo">
+            </mat-form-field>
           </header>
           <div class="catalog-panel__body">
             <div class="table-container">
@@ -470,32 +468,34 @@
                 <thead>
                   <tr>
                     <th>Nombre</th>
-                    <th>Informacion adicional por defecto</th>
+                    <th>Motivo por defecto</th>
                     <th>Estado</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr *ngFor="let type of operationTypes">
-                    <td><strong>{{ type.name }}</strong></td>
-                    <td>{{ type.infoAdicionalDefault || '-' }}</td>
-                    <td>{{ type.enabled ? 'Activo' : 'Inactivo' }}</td>
+                  <tr *ngFor="let event of events">
                     <td>
-                      <button mat-icon-button color="primary" (click)="editOperationType(type)" matTooltip="Editar">
+                      <strong>{{ event.name }}</strong>
+                      <span class="parent-badge" *ngIf="event.parent">({{ event.parent }})</span>
+                    </td>
+                    <td>{{ event.motivoDefault || '-' }}</td>
+                    <td>{{ event.enabled ? 'Activo' : 'Inactivo' }}</td>
+                    <td>
+                      <button mat-icon-button color="primary" (click)="editEvent(event)" matTooltip="Editar">
                         <mat-icon>edit</mat-icon>
                       </button>
-                      <button *ngIf="type.enabled" mat-icon-button color="accent" (click)="disableOperationType(type)" matTooltip="Deshabilitar">
-                        <mat-icon>block</mat-icon>
-                      </button>
-                      <button mat-icon-button color="warn" (click)="deleteOperationType(type._id)"
-                        matTooltip="Eliminar Permanente">
-                        <mat-icon>delete_forever</mat-icon>
+                      <button mat-icon-button color="warn" (click)="deleteEvent(event._id)" matTooltip="Deshabilitar">
+                        <mat-icon>delete</mat-icon>
                       </button>
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
+            <mat-paginator [length]="eventTotal" [pageSize]="eventPageSize" [pageIndex]="eventPage - 1"
+              [pageSizeOptions]="[10, 25, 50, 100]" (page)="onEventPageChange($event)" showFirstLastButtons>
+            </mat-paginator>
           </div>
         </section>
       </div>
