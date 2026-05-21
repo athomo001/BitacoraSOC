@@ -848,26 +848,28 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     currentMonday.setDate(diff);
     currentMonday.setHours(0, 0, 0, 0);
 
-    const nextMonday = new Date(currentMonday);
-    nextMonday.setDate(nextMonday.getDate() + 7);
-    nextMonday.setHours(0, 0, 0, 0);
+    // Mostrar 10 días (1 semana + 3 días de la próxima semana)
+    const endDate = new Date(currentMonday);
+    endDate.setDate(endDate.getDate() + 10);
+    endDate.setHours(0, 0, 0, 0);
 
     this.ganttWeekStart = currentMonday;
-    this.ganttWeekEnd = nextMonday;
+    this.ganttWeekEnd = endDate;
 
-    const totalMs = nextMonday.getTime() - currentMonday.getTime();
+    const totalMs = endDate.getTime() - currentMonday.getTime();
     const nowMs = now.getTime() - currentMonday.getTime();
     this.ganttTodayPosition = Math.min(Math.max((nowMs / totalMs) * 100, 0), 100);
 
     const ticks = [];
     const dayNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 10; i++) {
       const d = new Date(currentMonday);
       d.setDate(d.getDate() + i);
       const isToday = d.toDateString() === now.toDateString();
+      const dayName = dayNames[i % 7];
       ticks.push({
-        label: `${dayNames[i]} ${d.getDate()}/${d.getMonth() + 1}`,
-        position: (i / 7) * 100,
+        label: `${dayName} ${d.getDate()}/${d.getMonth() + 1}`,
+        position: (i / 10) * 100,
         isToday
       });
     }
@@ -879,7 +881,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
         if (asg.roleCode !== roleCode) return false;
         const start = new Date(asg.weekStartDate);
         const end = new Date(asg.weekEndDate);
-        return start < nextMonday && end > currentMonday;
+        return start < endDate && end > currentMonday;
       });
 
       const bars = matches.map(asg => {
@@ -887,7 +889,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
         const end = new Date(asg.weekEndDate);
 
         const startMs = Math.max(start.getTime(), currentMonday.getTime()) - currentMonday.getTime();
-        const endMs = Math.min(end.getTime(), nextMonday.getTime()) - currentMonday.getTime();
+        const endMs = Math.min(end.getTime(), endDate.getTime()) - currentMonday.getTime();
 
         const left = (startMs / totalMs) * 100;
         const width = ((endMs - startMs) / totalMs) * 100;
@@ -998,9 +1000,10 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
           timeUntilText = `Inicia en ${mins} min${mins > 1 ? 's' : ''}`;
         }
 
-        // Calcular progress: cuánto tiempo falta hasta inicio relativo a la duración total del turno
+        // Calcular progress: cuánto tiempo ya ha "pasado" (proximidad al inicio)
+        // Invertido: 0% = falta mucho (verde), 100% = falta poco (rojo)
         const durationTotal = end.getTime() - start.getTime();
-        let progress = durationTotal > 0 ? (diffMs / durationTotal) * 100 : 0;
+        let progress = durationTotal > 0 ? 100 - ((diffMs / durationTotal) * 100) : 0;
         progress = Math.min(Math.max(progress, 0), 100);
 
         return {

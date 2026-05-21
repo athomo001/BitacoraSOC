@@ -21,34 +21,34 @@
     <!-- KPIs Cards -->
     <div class="stats-grid">
       <article class="stat-card reports-panel">
-        <div class="reports-panel__body">
-          <p class="stat-value"><strong>{{ overview.entriesByType.operativa || 0 }}</strong></p>
-          <p class="stat-label">Operativa</p>
-        </div>
+        <dl class="reports-panel__body">
+          <dt class="stat-label">Operativa</dt>
+          <dd class="stat-value"><strong>{{ overview.entriesByType.operativa || 0 }}</strong></dd>
+        </dl>
       </article>
       <article class="stat-card reports-panel ofensas">
-        <div class="reports-panel__body">
-          <p class="stat-value"><strong>{{ overview.entriesByType.ofensa || 0 }}</strong></p>
-          <p class="stat-label">Ofensas</p>
-        </div>
+        <dl class="reports-panel__body">
+          <dt class="stat-label">Ofensas</dt>
+          <dd class="stat-value"><strong>{{ overview.entriesByType.ofensa || 0 }}</strong></dd>
+        </dl>
       </article>
       <article class="stat-card reports-panel incidentes">
-        <div class="reports-panel__body">
-          <p class="stat-value"><strong>{{ overview.entriesByType.incidente || 0 }}</strong></p>
-          <p class="stat-label">Incidentes</p>
-        </div>
+        <dl class="reports-panel__body">
+          <dt class="stat-label">Incidentes</dt>
+          <dd class="stat-value"><strong>{{ overview.entriesByType.incidente || 0 }}</strong></dd>
+        </dl>
       </article>
       <article class="stat-card reports-panel">
-        <div class="reports-panel__body">
-          <p class="stat-value"><strong>{{ overview.totalUsers }}</strong></p>
-          <p class="stat-label">Usuarios Activos</p>
-        </div>
+        <dl class="reports-panel__body">
+          <dt class="stat-label">Usuarios Activos</dt>
+          <dd class="stat-value"><strong>{{ overview.totalUsers }}</strong></dd>
+        </dl>
       </article>
       <article class="stat-card reports-panel">
-        <div class="reports-panel__body">
-          <p class="stat-value"><strong>{{ overview.totalChecks }}</strong></p>
-          <p class="stat-label">Checks Realizados</p>
-        </div>
+        <dl class="reports-panel__body">
+          <dt class="stat-label">Checks Realizados</dt>
+          <dd class="stat-value"><strong>{{ overview.totalChecks }}</strong></dd>
+        </dl>
       </article>
     </div>
 
@@ -476,7 +476,7 @@
     </section>
 
     <!-- Acciones -->
-    <div class="actions">
+    <div class="form-actions">
       <button mat-raised-button color="primary" (click)="exportEntries()">
         <mat-icon aria-hidden="true">download</mat-icon>
         Exportar Entradas a CSV

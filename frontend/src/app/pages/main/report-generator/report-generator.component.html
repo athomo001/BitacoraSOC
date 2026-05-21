@@ -878,6 +878,7 @@
           </div>
         </div>
 
+        <mat-progress-bar *ngIf="isGenerating" mode="indeterminate" class="loading-bar"></mat-progress-bar>
         <div class="html-preview" [innerHTML]="safeGeneratedHtml || generatedHtml"></div>
       </div>
     </div>

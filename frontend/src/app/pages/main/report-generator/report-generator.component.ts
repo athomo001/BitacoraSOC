@@ -34,6 +34,7 @@ import { MatButtonToggleGroup, MatButtonToggle } from '@angular/material/button-
 import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { ClientAlertDialogComponent } from './client-alert-dialog.component';
 import { environment } from '@env/environment';
 
@@ -61,7 +62,8 @@ import { environment } from '@env/environment';
     MatButtonToggleGroup, MatButtonToggle,
     MatIcon,
     MatTooltip,
-    MatAutocompleteModule
+    MatAutocompleteModule,
+    MatProgressBarModule
   ]
 })
 export class ReportGeneratorComponent implements OnInit {
@@ -114,6 +116,7 @@ export class ReportGeneratorComponent implements OnInit {
   selectedOperationType: CatalogOperationType | null = null;
 
   // ─── Report state ────────────────────────────────────────────────────────
+  isGenerating = false;
   uploadedImages: { name: string; dataUrl: string; width: number; height: number }[] = [];
   newsletterUploadedImages: { name: string; dataUrl: string; width: number; height: number }[] = [];
   generatedHtml = '';
@@ -571,22 +574,27 @@ export class ReportGeneratorComponent implements OnInit {
 
   // ─── Generate ────────────────────────────────────────────────────────────
   async generateTable(): Promise<void> {
-    await this.refreshReportTableColorConfig();
+    this.isGenerating = true;
+    try {
+      await this.refreshReportTableColorConfig();
 
-    if (this.currentMode === 'report') {
-      if (this.reportForm.invalid) {
-        this.reportForm.markAllAsTouched();
-        this.snackBar.open('Completa todos los campos obligatorios del reporte', 'Cerrar', { duration: 3000 });
-        return;
+      if (this.currentMode === 'report') {
+        if (this.reportForm.invalid) {
+          this.reportForm.markAllAsTouched();
+          this.snackBar.open('Completa todos los campos obligatorios del reporte', 'Cerrar', { duration: 3000 });
+          return;
+        }
+        await this.buildReportHtml();
+      } else {
+        if (this.newsletterForm.invalid) {
+          this.newsletterForm.markAllAsTouched();
+          this.snackBar.open('Completa todos los campos obligatorios del boletín', 'Cerrar', { duration: 3000 });
+          return;
+        }
+        this.buildNewsletterHtml();
       }
-      await this.buildReportHtml();
-    } else {
-      if (this.newsletterForm.invalid) {
-        this.newsletterForm.markAllAsTouched();
-        this.snackBar.open('Completa todos los campos obligatorios del boletín', 'Cerrar', { duration: 3000 });
-        return;
-      }
-      this.buildNewsletterHtml();
+    } finally {
+      this.isGenerating = false;
     }
   }
 

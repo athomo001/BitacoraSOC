@@ -2,6 +2,14 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.79-beta] - 2026-05-21
+
+### Ampliación de Timeline en Vista Resumen Semanal (SHIFT-GANTT-TIMELINE)
+
+- **Timeline extendido de 7 a 10 días:** Se modificó la vista de resumen semanal (Gantt) para mostrar la semana actual completa + 3 días de la próxima semana, proporcionando mayor visibilidad anticipada de asignaciones próximas.
+- **Mejor distribución visual:** La semana próxima ahora ocupa ~30% del espacio timeline en lugar de ~14%, permitiendo una mejor visualización de turnos y asignaciones en el corto plazo.
+- **Mantención de funcionalidad:** Se preservó toda la lógica de cálculo de posiciones, colores de estado y línea del día actual, escalando proporcionalmente los 10 días en lugar de 7.
+
 ## [v1.5.78-beta] - 2026-05-20
 
 ### Mejoras en Selector de Asignación para Especialista TI (SHIFT-TI-SEL-136)

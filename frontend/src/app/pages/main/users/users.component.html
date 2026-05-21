@@ -7,7 +7,7 @@
     </div>
   </header>
 
-  <div class="users-panel users-panel--form">
+  <section class="users-panel users-panel--form">
     <header class="users-panel__header">
       <h2 class="users-panel__title">{{ editingUserId ? 'Editar Usuario' : 'Crear Nuevo Usuario' }}</h2>
     </header>
@@ -84,9 +84,12 @@
         </div>
       </form>
     </div>
-  </div>
+  </section>
 
-  <div class="users-panel users-panel--list">
+  <section class="users-panel users-panel--list">
+    <header class="users-panel__header">
+      <h2 class="users-panel__title">Usuarios Registrados</h2>
+    </header>
     <div class="users-panel__body users-panel__body--flush">
       <table mat-table [dataSource]="users" class="users-table">
         <ng-container matColumnDef="username">
@@ -153,5 +156,5 @@
         <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
       </table>
     </div>
-  </div>
+  </section>
 </div>

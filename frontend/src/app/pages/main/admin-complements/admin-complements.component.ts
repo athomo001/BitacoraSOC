@@ -5,7 +5,7 @@
  */
 
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, Inject, OnInit } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { MatButtonModule } from '@angular/material/button';
@@ -16,6 +16,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import {
   Complement,
   ComplementFormValue,
@@ -40,7 +41,8 @@ import { UserService } from '../../../services/user.service';
     MatInputModule,
     MatSelectModule,
     MatSnackBarModule,
-    MatTabsModule
+    MatTabsModule,
+    MatDialogModule
   ],
   template: `
     <div class="complements-admin">
@@ -777,7 +779,8 @@ export class AdminComplementsComponent implements OnInit {
     private complementService: ComplementService,
     private userService: UserService,
     private sanitizer: DomSanitizer,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private dialog: MatDialog
   ) {}
 
   ngOnInit(): void {
@@ -1109,20 +1112,28 @@ export class AdminComplementsComponent implements OnInit {
       return;
     }
 
-    const confirmed = window.confirm(`Eliminar ${this.selectedComplement.slug} con wipe-out completo?`);
-    if (!confirmed) {
-      return;
-    }
+    const selectedSlug = this.selectedComplement.slug;
 
-    this.complementService.deleteComplement(this.selectedComplement.slug, 'DELETE_COMPLEMENTO').subscribe({
-      next: () => {
-        this.snackBar.open('Complemento eliminado', 'Cerrar', { duration: 2500 });
-        this.startNew();
-        this.reload();
-      },
-      error: (error: any) => {
-        this.snackBar.open(error?.error?.message || 'No se pudo eliminar', 'Cerrar', { duration: 3500 });
+    const dialogRef = this.dialog.open(ConfirmDeleteComponent, {
+      width: '400px',
+      data: { slug: selectedSlug }
+    });
+
+    dialogRef.afterClosed().subscribe((confirmed) => {
+      if (!confirmed) {
+        return;
       }
+
+      this.complementService.deleteComplement(selectedSlug, 'DELETE_COMPLEMENTO').subscribe({
+        next: () => {
+          this.snackBar.open('Complemento eliminado', 'Cerrar', { duration: 2500 });
+          this.startNew();
+          this.reload();
+        },
+        error: (error: any) => {
+          this.snackBar.open(error?.error?.message || 'No se pudo eliminar', 'Cerrar', { duration: 3500 });
+        }
+      });
     });
   }
 
@@ -1361,5 +1372,52 @@ export class AdminComplementsComponent implements OnInit {
       .split(',')
       .map((item) => item.trim())
       .filter(Boolean);
+  }
+}
+
+// Componente de diálogo para confirmar eliminación
+import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+
+@Component({
+  selector: 'app-confirm-delete',
+  standalone: true,
+  imports: [CommonModule, MatButtonModule, MatDialogModule],
+  template: `
+    <div class="confirm-delete-dialog">
+      <h2 mat-dialog-title>Confirmar eliminación</h2>
+      <mat-dialog-content>
+        <p>¿Está seguro de que desea eliminar <strong>{{ data.slug }}</strong> con wipe-out completo?</p>
+        <p style="color: var(--state-error); font-size: 12px; margin-top: 12px;">
+          Esta acción no se puede deshacer.
+        </p>
+      </mat-dialog-content>
+      <mat-dialog-actions align="end">
+        <button mat-button (click)="onCancel()">Cancelar</button>
+        <button mat-raised-button color="warn" (click)="onConfirm()">Eliminar</button>
+      </mat-dialog-actions>
+    </div>
+  `,
+  styles: [`
+    .confirm-delete-dialog {
+      min-width: 300px;
+    }
+    p {
+      margin: 12px 0;
+      line-height: 1.5;
+    }
+  `]
+})
+export class ConfirmDeleteComponent {
+  constructor(
+    public dialogRef: MatDialogRef<ConfirmDeleteComponent>,
+    @Inject(MAT_DIALOG_DATA) public data: { slug: string }
+  ) {}
+
+  onCancel(): void {
+    this.dialogRef.close(false);
+  }
+
+  onConfirm(): void {
+    this.dialogRef.close(true);
   }
 }
