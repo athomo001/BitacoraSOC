@@ -4,13 +4,15 @@
  * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
  */
 
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Subscription } from 'rxjs';
+import { debounceTime, filter } from 'rxjs/operators';
 import anime from 'animejs';
+import html2canvas from 'html2canvas';
 
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { CatalogService } from '../../../services/catalog.service';
@@ -22,7 +24,7 @@ import { ConfigService } from '../../../services/config.service';
 import { AuthService } from '../../../services/auth.service';
 
 import { EntityAutocompleteComponent } from '../../../components/entity-autocomplete/entity-autocomplete.component';
-import { NgIf, NgFor } from '@angular/common';
+import { NgIf, NgFor, DatePipe } from '@angular/common';
 import { MatFormField, MatLabel, MatError, MatSuffix } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatDatepickerInput, MatDatepickerToggle, MatDatepicker } from '@angular/material/datepicker';
@@ -35,8 +37,18 @@ import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatCardModule } from '@angular/material/card';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ClientAlertDialogComponent } from './client-alert-dialog.component';
 import { environment } from '@env/environment';
+
+export interface ReportHistoryItem {
+  id: string;
+  type: 'report' | 'newsletter';
+  title: string;
+  timestamp: string;
+  html: string;
+}
 
 /*
  * QA — generador de informes / newsletter:
@@ -53,7 +65,7 @@ import { environment } from '@env/environment';
   imports: [
     ReactiveFormsModule, FormsModule,
     EntityAutocompleteComponent,
-    NgIf, NgFor,
+    NgIf, NgFor, DatePipe,
     MatFormField, MatLabel, MatInput, MatError, MatSuffix,
     MatDatepickerInput, MatDatepickerToggle, MatDatepicker,
     MatSelect, MatOption,
@@ -63,10 +75,16 @@ import { environment } from '@env/environment';
     MatIcon,
     MatTooltip,
     MatAutocompleteModule,
-    MatProgressBarModule
+    MatProgressBarModule,
+    MatCardModule,
+    MatProgressSpinnerModule
   ]
 })
-export class ReportGeneratorComponent implements OnInit {
+export class ReportGeneratorComponent implements OnInit, OnDestroy {
+  // ─── History & Subscriptions ───────────────────────────────────────────
+  historyItems: ReportHistoryItem[] = [];
+  private formSub = new Subscription();
+
   // ─── Mode ───────────────────────────────────────────────────────────────
   currentMode: 'report' | 'newsletter' = 'report';
 
@@ -223,6 +241,46 @@ export class ReportGeneratorComponent implements OnInit {
     this.loadLogo();
     this.loadNewsletterContacts();
     this.loadInternalClientEmail();
+    this.loadHistory();
+
+    // Debounced live previews (disabled to prevent auto-generation/preview while typing, as requested by user)
+    /*
+    this.formSub.add(
+      this.reportForm.valueChanges
+        .pipe(
+          debounceTime(300),
+          filter(() => this.currentMode === 'report')
+        )
+        .subscribe(() => {
+          if (this.reportForm.valid) {
+            void this.buildReportHtml(true);
+          } else {
+            this.generatedHtml = '';
+            this.safeGeneratedHtml = null;
+          }
+        })
+    );
+
+    this.formSub.add(
+      this.newsletterForm.valueChanges
+        .pipe(
+          debounceTime(100),
+          filter(() => this.currentMode === 'newsletter')
+        )
+        .subscribe(() => {
+          if (this.newsletterForm.valid) {
+            this.buildNewsletterHtml();
+          } else {
+            this.generatedHtml = '';
+            this.safeGeneratedHtml = null;
+          }
+        })
+    );
+    */
+  }
+
+  ngOnDestroy(): void {
+    this.formSub.unsubscribe();
   }
 
   loadInternalClientEmail(): void {
@@ -573,7 +631,7 @@ export class ReportGeneratorComponent implements OnInit {
   }
 
   // ─── Generate ────────────────────────────────────────────────────────────
-  async generateTable(): Promise<void> {
+  async generateTable(addToHistoryFlag = false): Promise<void> {
     this.isGenerating = true;
     try {
       await this.refreshReportTableColorConfig();
@@ -584,14 +642,14 @@ export class ReportGeneratorComponent implements OnInit {
           this.snackBar.open('Completa todos los campos obligatorios del reporte', 'Cerrar', { duration: 3000 });
           return;
         }
-        await this.buildReportHtml();
+        await this.buildReportHtml(false, addToHistoryFlag);
       } else {
         if (this.newsletterForm.invalid) {
           this.newsletterForm.markAllAsTouched();
           this.snackBar.open('Completa todos los campos obligatorios del boletín', 'Cerrar', { duration: 3000 });
           return;
         }
-        this.buildNewsletterHtml();
+        this.buildNewsletterHtml(addToHistoryFlag);
       }
     } finally {
       this.isGenerating = false;
@@ -839,6 +897,9 @@ export class ReportGeneratorComponent implements OnInit {
         this.snackBar.open(msg, 'Cerrar', { duration: 5000 });
 
         if (res.successCount > 0) {
+          // Add to history on success before clearing
+          this.addToHistory('newsletter', subject, this.generatedHtml);
+
           // Limpiar destinatarios
           this.newsletterRecipients = '';
           this.newsletterCcRecipients = '';
@@ -1249,9 +1310,11 @@ export class ReportGeneratorComponent implements OnInit {
   }
 
   // ─── HTML Builders ────────────────────────────────────────────────────────
-  private async buildReportHtml(): Promise<void> {
-    const canContinue = await this.ensureClientAlertAcknowledged('report');
-    if (!canContinue) return;
+  private async buildReportHtml(silent = false, addToHistoryFlag = false): Promise<void> {
+    if (!silent) {
+      const canContinue = await this.ensureClientAlertAcknowledged('report');
+      if (!canContinue) return;
+    }
 
     const form = this.reportForm.value;
     
@@ -1291,10 +1354,18 @@ export class ReportGeneratorComponent implements OnInit {
         this.generatedHtml = res.html || '';
         this.safeGeneratedHtml = this.sanitizer.bypassSecurityTrustHtml(this.generatedHtml);
         this.showPreview = true;
+        
+        if (addToHistoryFlag) {
+          // Add to history
+          const title = `${form.codigoTicket} - ${form.nombreEvento}`;
+          this.addToHistory('report', title, this.generatedHtml);
+        }
       },
       error: (err) => {
         console.error('Error al generar preview de reporte', err);
-        this.snackBar.open('Error al generar preview del reporte', 'Cerrar', { duration: 3000 });
+        if (!silent) {
+          this.snackBar.open('Error al generar preview del reporte', 'Cerrar', { duration: 3000 });
+        }
       }
     });
   }
@@ -1445,8 +1516,20 @@ export class ReportGeneratorComponent implements OnInit {
 
     this.http.post(`${this.backendBaseUrl}/api/reports/incident/send`, payload).subscribe({
       next: (res: any) => {
-        this.snackBar.open(`✅ Reporte enviado a ${res.toCount} destinatario(s) y ${res.ccCount} en copia`, 'Cerrar', { duration: 4000 });
+        this.snackBar.open(
+          'Reporte creado. Imágenes PNG de respaldo generadas y reporte enviado por correo.',
+          'Cerrar',
+          {
+            duration: 4000,
+            horizontalPosition: 'right',
+            verticalPosition: 'top'
+          }
+        );
         this.isSendingIncident = false;
+        
+        // Add to history on success
+        const title = `${form.codigoTicket} - ${form.nombreEvento}`;
+        this.addToHistory('report', title, this.generatedHtml);
         
         // Limpiar para permitir un nuevo reporte
         this.clearForm();
@@ -1460,7 +1543,7 @@ export class ReportGeneratorComponent implements OnInit {
     });
   }
 
-  private buildNewsletterHtml(): void {
+  private buildNewsletterHtml(addToHistoryFlag = false): void {
     const form = this.newsletterForm.value;
     this.reportTableHeaderColor = this.reportTableColorsByType.bulletin;
     const headerColor = this.reportTableHeaderColor;
@@ -1664,6 +1747,11 @@ export class ReportGeneratorComponent implements OnInit {
     this.generatedHtml = html;
     this.safeGeneratedHtml = this.sanitizer.bypassSecurityTrustHtml(html);
     this.showPreview = true;
+    
+    if (addToHistoryFlag) {
+      // Add to history
+      this.addToHistory('newsletter', form.tituloBoletin, html);
+    }
   }
 
   // ─── Client alert helpers ─────────────────────────────────────────────────
@@ -1884,5 +1972,251 @@ export class ReportGeneratorComponent implements OnInit {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  }
+
+  // ─── History Methods ──────────────────────────────────────────────────────
+  loadHistory(): void {
+    try {
+      const stored = localStorage.getItem('soc_report_history');
+      if (stored) {
+        this.historyItems = JSON.parse(stored);
+      }
+    } catch (e) {
+      console.error('Error loading history', e);
+      this.historyItems = [];
+    }
+  }
+
+  saveHistory(): void {
+    try {
+      localStorage.setItem('soc_report_history', JSON.stringify(this.historyItems));
+    } catch (e) {
+      console.error('Error saving history', e);
+    }
+  }
+
+  addToHistory(type: 'report' | 'newsletter', title: string, html: string): void {
+    // Check if an item with the same title and HTML already exists to prevent duplicate entries
+    const duplicate = this.historyItems.find(item => item.title === title && item.html === html);
+    if (duplicate) {
+      // Just update the timestamp to now and move it to the top
+      this.historyItems = this.historyItems.filter(item => item !== duplicate);
+      duplicate.timestamp = new Date().toISOString();
+      this.historyItems.unshift(duplicate);
+      this.saveHistory();
+      return;
+    }
+
+    const newItem: ReportHistoryItem = {
+      id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
+      type,
+      title,
+      timestamp: new Date().toISOString(),
+      html
+    };
+    this.historyItems.unshift(newItem);
+    if (this.historyItems.length > 10) {
+      this.historyItems = this.historyItems.slice(0, 10);
+    }
+    this.saveHistory();
+  }
+
+  openInNewTab(item: ReportHistoryItem): void {
+    const win = window.open();
+    if (win) {
+      win.document.write(item.html);
+      win.document.close();
+    } else {
+      this.snackBar.open('No se pudo abrir la pestaña. Habilite las ventanas emergentes.', 'Cerrar', { duration: 3000 });
+    }
+  }
+
+  get isAdmin(): boolean {
+    return this.authService.isAdmin();
+  }
+
+  deleteHistoryItem(item: ReportHistoryItem): void {
+    this.historyItems = this.historyItems.filter(h => h.id !== item.id);
+    this.saveHistory();
+    this.snackBar.open('Reporte eliminado del historial', 'Cerrar', { duration: 2000 });
+  }
+
+  clearAllHistory(): void {
+    if (confirm('¿Está seguro de que desea borrar todo el historial de reportes?')) {
+      this.historyItems = [];
+      this.saveHistory();
+      this.snackBar.open('Historial vacío', 'Cerrar', { duration: 2000 });
+    }
+  }
+
+  private cleanElementForXml(element: Element): void {
+    // 1. Remove attributes containing colons (namespaces, MS Outlook stuff)
+    const attrs = Array.from(element.attributes);
+    for (const attr of attrs) {
+      if (attr.name.includes(':')) {
+        element.removeAttribute(attr.name);
+      }
+    }
+
+    // 2. Process child nodes
+    const children = Array.from(element.childNodes);
+    for (const child of children) {
+      if (child.nodeType === Node.COMMENT_NODE) {
+        element.removeChild(child);
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const childEl = child as Element;
+        if (childEl.tagName.includes(':')) {
+          element.removeChild(childEl);
+        } else {
+          this.cleanElementForXml(childEl);
+        }
+      }
+    }
+  }
+
+  private convertToXhtml(html: string): string {
+    try {
+      const parser = new DOMParser();
+      // Remove XML-invalid sequences like doctype declarations and XML-style comment content
+      let cleanHtml = html
+        .replace(/<!DOCTYPE[^>]*>/gi, '')
+        .replace(/<!--[\s\S]*?-->/g, ''); // Strip comments at string level first
+      
+      const doc = parser.parseFromString(cleanHtml, 'text/html');
+      
+      // Create a clean XHTML container div
+      const wrapper = doc.createElement('div');
+      wrapper.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+      wrapper.style.backgroundColor = '#ffffff';
+      wrapper.style.fontFamily = 'Arial, sans-serif';
+      wrapper.style.margin = '0';
+      wrapper.style.padding = '20px';
+      wrapper.style.width = '100%';
+      wrapper.style.boxSizing = 'border-box';
+
+      // Import CSS style blocks and replace with placeholders to avoid escaping issues
+      const styles = Array.from(doc.getElementsByTagName('style'));
+      const cssContents: string[] = [];
+      for (let i = 0; i < styles.length; i++) {
+        const style = styles[i];
+        cssContents.push(style.textContent || '');
+        style.textContent = `__STYLE_PLACEHOLDER_${i}__`;
+        
+        // Append a clone to the top of wrapper
+        wrapper.appendChild(style.cloneNode(true));
+        
+        // Remove from its original parent so it's not duplicated
+        if (style.parentNode) {
+          style.parentNode.removeChild(style);
+        }
+      }
+
+      // Import the actual HTML body elements
+      const body = doc.body;
+      if (body) {
+        const children = Array.from(body.childNodes);
+        for (const child of children) {
+          wrapper.appendChild(child.cloneNode(true));
+        }
+      }
+
+      // Recursively clean elements (remove comments, colon-namespaced tags/attributes)
+      this.cleanElementForXml(wrapper);
+
+      const serializer = new XMLSerializer();
+      let serialized = serializer.serializeToString(wrapper);
+
+      // Restore raw CSS content inside CDATA block
+      for (let i = 0; i < cssContents.length; i++) {
+        const placeholder = `__STYLE_PLACEHOLDER_${i}__`;
+        const rawCss = cssContents[i];
+        serialized = serialized.replace(placeholder, `/* <![CDATA[ */\n${rawCss}\n/* ]]> */`);
+      }
+
+      return serialized;
+    } catch (e) {
+      console.error('Error converting HTML to XHTML', e);
+      return html;
+    }
+  }
+
+  async downloadPng(item: ReportHistoryItem): Promise<void> {
+    const html = item.html;
+    const width = 800;
+
+    // Create a temporary container in the DOM
+    const temp = document.createElement('div');
+    temp.style.position = 'fixed';
+    temp.style.left = '-9999px';
+    temp.style.top = '-9999px';
+    temp.style.width = `${width}px`;
+    temp.style.backgroundColor = '#ffffff';
+    temp.style.fontFamily = 'Arial, sans-serif';
+    temp.innerHTML = html;
+    document.body.appendChild(temp);
+
+    try {
+      // Wait for any images in the HTML to fully load before rendering
+      const images = Array.from(temp.querySelectorAll('img'));
+      await Promise.all(images.map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise<void>((resolve) => {
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+        });
+      }));
+
+      // Render the element directly using html2canvas with scale: 2 for high definition
+      const canvas = await html2canvas(temp, {
+        useCORS: true,
+        allowTaint: true,
+        scale: 2,
+        backgroundColor: '#ffffff',
+        logging: false
+      });
+
+      const pngUrl = canvas.toDataURL('image/png');
+      const downloadLink = document.createElement('a');
+      downloadLink.href = pngUrl;
+      downloadLink.download = `${item.title.replace(/[^a-zA-Z0-9-_]/g, '_')}.png`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+    } catch (err) {
+      console.error('html2canvas PNG generation failed, falling back to SVG download', err);
+      this.downloadSvgFallback(item);
+    } finally {
+      if (temp.parentNode) {
+        temp.parentNode.removeChild(temp);
+      }
+    }
+  }
+
+  private downloadSvgFallback(item: ReportHistoryItem): void {
+    const html = item.html;
+    const height = Math.max(1000, Math.min(3000, Math.floor(html.length / 5)));
+    const width = 800;
+
+    const xhtml = this.convertToXhtml(html);
+
+    const svgString = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+        <foreignObject width="100%" height="100%">
+          ${xhtml}
+        </foreignObject>
+      </svg>
+    `;
+
+    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const URL = window.URL || window.webkitURL || window;
+    const blobURL = URL.createObjectURL(svgBlob);
+
+    const downloadLink = document.createElement('a');
+    downloadLink.href = blobURL;
+    downloadLink.download = `${item.title.replace(/[^a-zA-Z0-9-_]/g, '_')}.svg`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+    URL.revokeObjectURL(blobURL);
   }
 }

@@ -2,6 +2,15 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.80-beta] - 2026-05-21
+
+### Reordenamiento de campos en Generador de Reportes de Incidentes (UI-REPORT-GEN-140)
+
+- **Fila superior de 4 columnas al inicio:** Se ubicaron al comienzo del formulario de reporte los campos **Código Ticket**, **Ofensa**, **Tipo de operación** y **Fecha**, facilitando el flujo rápido de ingreso de datos clave.
+- **Búsqueda de eventos reubicada:** Se movió la búsqueda de **Nombre de Ofensa/Evento** desde la fila completa del principio a la columna central de la segunda fila (junto a *Fuente / Log Source* y *MRSC (Criticidad)*), sustituyendo la posición del campo *Ofensa*.
+- **Limpieza de campos duplicados:** Se eliminaron las entradas duplicadas de *Código Ticket*, *Tipo de operación* y *Fecha* en la sección inferior de detalles adicionales, dejando únicamente los campos de origen, destino, reputación y carga de evidencia.
+- **Estilos responsivos:** Se incorporó la clase `.row-four-cols` en el SCSS para adaptar la nueva fila de 4 columnas de forma fluida a todo tipo de pantallas (desktop, tableta y móviles).
+
 ## [v1.5.79-beta] - 2026-05-21
 
 ### Ampliación de Timeline en Vista Resumen Semanal (SHIFT-GANTT-TIMELINE)
