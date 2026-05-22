@@ -2,6 +2,19 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.83-beta] - 2026-05-22
+
+### Auditoría Exhaustiva de Documentación y Limpieza de Repositorio
+
+- **Sincronización de Documentación API:** Se implementó un script automatizado para extraer endpoints directamente del router de Express, reconstruyendo la documentación maestra (`docs/04_DESARROLLO_Y_API.md`) con más de 100 rutas operativas validadas.
+- **Consolidación Operativa UI:** Se estandarizó la nomenclatura en la documentación general (`03_OPERACIONES.md` y `SCREENSHOTS.md`) para coincidir de manera estricta con las etiquetas actuales de la UI.
+- **Unificación de Entornos (`.env`):** Se eliminó la duplicidad de configuración entre la raíz y el backend. `backend/src/server.js` fue refactorizado para resolver automáticamente el archivo `.env` de la raíz del proyecto, permitiendo que un único archivo actúe como fuente de verdad absoluta tanto para la orquestación Docker como para la ejecución local de Node.js.
+- **Depuración de Scripts Heredados (Clean-up):**
+  - Se eliminaron fragmentos obsoletos de inicialización de BD (`seed-escalation-example.js`, `seed-services.js`, `seed-shift-roles.js`, `seed-work-shifts.js`) para consolidar la estrategia en el sembrado oficial (`seed.js` y `seed-admin.js`).
+  - Se borraron scripts manuales de único uso que generaban ruido operativo (`add-netics.js`, `create-users.js`, `shift-dates.js`, `import-sanitized.js`).
+  - Se removieron los scripts de migración `mongo8-migration` (y su documentación en `02_DESPLIEGUE_Y_CONFIG.md`), al considerarse un procedimiento puntual ya ejecutado y superado por la arquitectura nativa en Mongo 8.
+- **Resiliencia de Easter Eggs:** Se restituyó y validó la dependencia funcional de `scripts/Bender.png` para los triggers de UI basados en el hashtag `#bender`.
+
 ## [v1.5.82-beta] - 2026-05-22
 
 ### Cierre de Auditoría de Seguridad: Mitigación de Hallazgos MEDIA (SEC-PENTEST-AUDIT-145)

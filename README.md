@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: beta. Validar siempre los flujos criticos en un entorno controlado antes de pasar a operacion formal.
 >
-> Version referencial actual (segun `docs/CHANGELOG.md`): v1.5.74-beta
+> Version referencial actual (segun `docs/CHANGELOG.md`): v1.5.82-beta
 
 Stack principal:
 
@@ -47,59 +47,34 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 
 ## Novedades recientes (resumen rapido)
 
-### v1.5.74-beta
+### v1.5.82-beta (seguridad y hardening)
 
-- boletines con modo de envio dual: agrupado por dominio (default) o 1:1 segun selector en UI.
-- validacion reforzada: no se permite repetir el mismo correo en `Para` y `CC`.
-- resumen de envio mas preciso: conteo de exitos/fallos por destinatario real en `Para`, incluyendo escenarios con rechazos parciales SMTP.
+- cierre de auditoria de seguridad con mitigaciones de severidad media.
+- invalidacion de JWT en logout via denylist persistente en MongoDB.
+- eventos forenses de autorizacion denegada (`auth.authorize.fail`) en auditoria.
+- rate-limit centralizado en Mongo para escenarios multi-contenedor/multi-replica.
+- CORS mas estricto y reducción de superficie para payloads grandes.
+- validacion de archivos reforzada para logos/favicons (MIME + estructura interna).
 
-### v1.5.73-beta
+### v1.5.81-beta y v1.5.80-beta (UX reportes y catalogos)
 
-- hotfix UX en `/main/report-generator`: los tooltips de `Para` y `CC` en envio de boletines ya no aparecen cuando `Ver guia rapida` esta desactivado.
+- simplificacion del flujo de destinatarios en boletines/incidentes desde el panel lateral.
+- bloqueo de conflictos entre `Para` y `CC` con validacion y feedback inmediato en UI.
+- reordenamiento del formulario de reporte de incidentes para captura mas rapida.
+- actualizacion de nomenclatura en admin a **Clientes y Catalogos** y reorden operativo de pestanas.
 
-### v1.5.72-beta
+### v1.5.79-beta a v1.5.77-beta (turnos semanales)
 
-- migracion operativa a `pnpm@11`: estandar unico de paquetes en frontend/backend, guard en `preinstall` y alineacion de Docker para instalaciones reproducibles.
+- migracion de gestion de turnos semanales hacia `/main/admin/work-shifts`.
+- dashboard de turnos con resumen tipo Gantt, proximos turnos y editor lateral.
+- timeline extendido para dar visibilidad anticipada de la proxima semana.
+- mejoras de selector TI y barras de progreso de turnos proximos.
 
-### v1.5.71-beta
+### Estado IA local
 
-- SMTP con diagnostico mas accionable: clasificacion explicita de errores de autenticacion por politica (`smtp_auth_policy`), mejor metadata de auditoria y lectura de motivo tecnico en UI.
-- configuracion SMTP admin con menor friccion: opcion para reutilizar el correo del usuario SMTP como remitente.
-- restore/import con evidencia explicita de secretos restaurados (`restoredSecrets`, `keyringPresentAfterRestore`).
-
-### v1.5.70-beta y v1.5.69-beta
-
-- robustecimiento de backup/restore: recuperacion de credenciales cifradas entre entornos, correccion de `clearBeforeRestore`, inclusion completa de `DirectoryContact` y persistencia de `global/` en Docker.
-
-### UX y operacion diaria
-
-- `Ver guía rápida` ahora da feedback visual claro y desplazamiento automatico en modulos principales.
-- chips de salud de servicios se muestran solo para `admin`, separados del toolbar y con mejor contraste.
-- exportacion de auditoria ahora es mas clara (`N dias`, `N meses`, modo por filtros actuales).
-
-### Report Generator / Boletines
-
-- flujo dual consolidado (`Reporte Tecnico` / `Boletin de Seguridad`) en la misma pantalla.
-- envio de boletin con selector **"Unir destinatarios por dominio"** (activo por defecto):
-	- activo: un envio por dominio exacto en `Para`.
-	- inactivo: envio 1:1 por destinatario.
-- `CC` interno opcional compartido por envio (sin `CCO`) y exclusion automatica de auto-copias.
-- validacion bloqueante para evitar correos repetidos entre `Para` y `CC`.
-- selector rapido de destinatarios desde agenda preventiva y panel dedicado de listas de correo para casillas grupales.
-- precheck previo al envio (logo valido, secciones minimas, color legible).
-- pegado enriquecido mejorado en campos de boletin (`Resumen`, `Impacto`, `Mitigacion`, `Referencias`) para evitar texto corrido sin estructura.
-
-### Seguridad y estabilidad
-
-- backend robustecido en configuracion SMTP (compatibilidad con config legacy, switch activo/inactivo y mensajes de error accionables).
-- trazabilidad de reintentos SMTP/GLPI en auditoria (`retryAttempt`, `retryCount`).
-- sincronizacion de indices criticos en Mongo al arranque (incluye TTL de auditoria).
-
-### IA local (estado actual)
-
-- planificacion avanzada de `AI-SUMMARY-001` documentada en `docs/ISSUES.md`.
-- alcance confirmado: IA sin chat con usuario final; analisis de eventos del turno -> resumen sugerido -> envio por correo + trazabilidad operativa.
-- estado: preparacion/documentacion, sin activacion productiva aun.
+- alcance definido en `docs/ISSUES.md` (epic `AI-SUMMARY-001` y subitems).
+- IA planteada como asistencia operativa efimera y controlada (sin chat de usuario final).
+- estado actual: planificado/documentado, no activado en produccion.
 
 ---
 
@@ -130,6 +105,7 @@ docker compose exec backend node src/scripts/seed.js
 ## Inicio rapido
 
 si ya esta descargado y solo resta levantar
+
 ```bash
 docker compose build --no-cache && docker compose up -d
 ```
@@ -151,6 +127,22 @@ Notas rapidas:
 - el proyecto usa `docker compose`, no `docker-compose`
 - el overlay `docker-compose.complements.yml` es opcional y hoy sirve principalmente para el `complement-stub` de laboratorio
 - los scripts `scripts/compose-up.*` y `scripts/compose-rebuild.*` ya incluyen ese overlay
+
+Diagnostico rapido si backend no levanta:
+
+```bash
+# Estado general
+docker compose ps
+
+# Logs del backend y Mongo
+docker compose logs backend --tail=200
+docker compose logs mongodb --tail=120
+
+# Rebuild completo cuando cambian dependencias
+docker compose up -d --build
+```
+
+Si ves errores de modulo faltante en backend durante arranque, ejecuta rebuild para forzar reinstalacion de dependencias de la imagen.
 
 ---
 

@@ -22,14 +22,19 @@
  * Timezone: America/Santiago (configurable vía TZ env)
  * Puerto: 3000 (configurable vía PORT env)
  */
+const path = require('path');
+// Intentar cargar .env desde la raíz del proyecto (para desarrollo local sin duplicar archivos)
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+// Fallback por si acaso se ejecuta en un contexto diferente
 require('dotenv').config();
+
 const express = require('express');
 const http = require('http');
 const https = require('https');
 const tls = require('tls');
 const cors = require('cors');
 const helmet = require('helmet');
-const path = require('path');
+
 const fs = require('fs');
 const connectDB = require('./config/database');
 const AppConfig = require('./models/AppConfig');

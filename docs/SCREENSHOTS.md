@@ -224,24 +224,24 @@ Ver documentación completa en [backend/scripts/README.md](../backend/scripts/RE
 
 | Icono | Opción | Rol | Descripción |
 |-------|--------|-----|-------------|
-| ✏️ | **Escribir** | Todos | Crear nueva entrada (operativa/incidente) |
+| ✏️ | **Escribir** | Todos | Crear nueva entrada y registrar checks |
 | 📋 | **Historial Checklists** | Todos | Ver todos los checklists completados del equipo |
-| 📞 | **Escalaciones** | Todos | Vista de turnos y contactos de escalación |
-| 📊 | **Generar Reporte** | Admin/User | Crear reportes HTML estructurados |
-| ⏰ | **Mis Entradas** | Admin/User | Entradas propias del usuario |
-| 🌐 | **Ver todas** | Todos | Búsqueda y filtrado de todas las entradas |
-| 📈 | **Reportes** | Admin/User | Dashboard y estadísticas |
-| 👤 | **Mi Perfil** | Todos | Editar información personal |
+| 📞 | **Escalación** | Todos | Vista de turnos y contactos de escalación |
+| 📄 | **Reportes** | Todos | Dashboard de reportes KPIs y exportación |
+| 👥 | **Directorio Centralizado** | Todos | Búsqueda centralizada de contactos |
+| 🌐 | **Ver entradas** | Todos | Búsqueda y filtrado de todas las entradas operativas |
+| 👤 | **Mi Perfil** | Todos | Editar información personal e interfaz |
+| 📈 | **Estadísticas** | Todos | Estadísticas de uso y carga laboral |
 
 
 ### Configuración (Admin) ▼
 
 | Icono | Opción | Descripción |
 |-------|--------|-------------|
-|👥|**Consola admin**| Toda la configuraciond e un admin|
-| 📞 | **Log auditoria** | informacion de uso de  log en la Herramienta |
-| 🖼️ | **Branding** | Personalización |
-| ☁️ | **Backup** | Respaldos |
+| ⚙️ | **Consola Admin** | Toda la configuración general (Integraciones, Turnos, SMTP, Usuarios) |
+| 🖼️ | **Branding** | Personalización visual |
+| 📜 | **Logs de Auditoría** | Información de uso y trazabilidad de eventos |
+| ☁️ | **Backup** | Respaldos automáticos y manuales |
 
 > La navegación de configuración es dinámica y puede variar por versión, rol y módulos habilitados.
 
