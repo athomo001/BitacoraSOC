@@ -2,6 +2,18 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.81-beta] - 2026-05-22
+
+### Ajustes en Destinatarios y Alineación del Panel de Contactos (UI-REPORT-REC-141)
+
+- **Eliminación de campos de autocompletar redundantes:** Se removieron los inputs de autocompletar individuales ("Autocompletar destinatarios (Para)" y "Autocompletar CC") en Boletines e Incidentes dentro del generador de reportes, dejando la gestión completa de envíos rápidos a través de la barra lateral de contactos guardados.
+- **Alineación del Directorio de Contactos en el Sidebar:** Se añadió estilo a `.newsletter-contact-meta` con `flex-grow: 1; text-align: left; min-width: 0;` para que la información del contacto se mantenga ordenada y unificada junto al checkbox y no se desplace forzadamente a la derecha.
+- **Validación y Bloqueo de Solapamientos (Para vs CC):**
+  - Se modificó `toggleIncidentContact` en el controlador para remover proactivamente a un contacto de la lista opuesta (Para <-> CC) al ser seleccionado.
+  - Se implementó validación en `sendIncidentReport` que detiene el flujo de envío del reporte e informa el conflicto mediante `snackBar` si hay correos duplicados entre los destinatarios y las copias.
+  - Se integró la advertencia dinámica en la UI y se bloqueó la interacción del botón "Enviar reporte por correo" en caso de conflicto.
+- **Compilación del sistema:** Verificado el empaquetado de producción de toda la aplicación ejecutando `docker compose build --no-cache && docker compose up -d` de forma exitosa.
+
 ## [v1.5.80-beta] - 2026-05-21
 
 ### Reordenamiento de campos en Generador de Reportes de Incidentes (UI-REPORT-GEN-140)

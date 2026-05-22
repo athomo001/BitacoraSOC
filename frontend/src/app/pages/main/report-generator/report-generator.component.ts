@@ -836,6 +836,33 @@ export class ReportGeneratorComponent implements OnInit, OnDestroy {
     return this.newsletterToCcOverlap.length > 0;
   }
 
+  /**
+   * Identifica correos duplicados entre los campos Para y CC en el reporte de incidente.
+   * Utilizado para prevenir que un mismo destinatario reciba copias duplicadas.
+   */
+  get incidentToCcOverlap(): string[] {
+    const toEmails = String(this.incidentRecipientsTo || '')
+      .split(/[\n,;]+/)
+      .map(e => e.trim().toLowerCase())
+      .filter(e => this.isValidNewsletterEmail(e));
+    
+    const ccEmails = String(this.incidentRecipientsCc || '')
+      .split(/[\n,;]+/)
+      .map(e => e.trim().toLowerCase())
+      .filter(e => this.isValidNewsletterEmail(e));
+      
+    const toSet = new Set(toEmails);
+    const overlap = ccEmails.filter(email => toSet.has(email));
+    return Array.from(new Set(overlap));
+  }
+
+  /**
+   * Indica si existen conflictos de destinatarios duplicados en el reporte de incidente.
+   */
+  get hasIncidentRecipientConflicts(): boolean {
+    return this.incidentToCcOverlap.length > 0;
+  }
+
   sendNewsletter(): void {
     if (!this.generatedHtml) {
       this.snackBar.open('Primero genera el boletín', 'Cerrar', { duration: 3000 });
@@ -1132,23 +1159,29 @@ export class ReportGeneratorComponent implements OnInit, OnDestroy {
     if (!canContinue) return;
 
     const html = this.generatedHtml;
-    const plainText = this.getPlainTextFromHtml(html);
+    const htmlForClipboard = this.currentMode === 'report'
+      ? this.buildSimpleTableHtmlForClipboard()
+      : html;
+    const plainText = this.getPlainTextFromHtml(htmlForClipboard);
     const clipboardItem = (window as any).ClipboardItem;
+    const reportCopyNote = this.currentMode === 'report'
+      ? ' Nota: Se copió una estructura de tabla uniforme optimizada para Outlook/Gmail.'
+      : '';
 
     if (navigator?.clipboard && clipboardItem && navigator.clipboard.write) {
       const item = new clipboardItem({
-        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/html': new Blob([htmlForClipboard], { type: 'text/html' }),
         'text/plain': new Blob([plainText], { type: 'text/plain' })
       });
       try {
         await navigator.clipboard.write([item]);
-        this.snackBar.open('✅ Tabla copiada con formato', 'Cerrar', { duration: 2000 });
+        this.snackBar.open(`✅ Tabla copiada con formato.${reportCopyNote}`, 'Cerrar', { duration: 5000 });
         return;
       } catch { /* fallthrough */ }
     }
 
-    if (this.copyHtmlWithExecCommand(html)) {
-      this.snackBar.open('Tabla copiada con formato', 'Cerrar', { duration: 2000 });
+    if (this.copyHtmlWithExecCommand(htmlForClipboard)) {
+      this.snackBar.open(`Tabla copiada con formato.${reportCopyNote}`, 'Cerrar', { duration: 5000 });
       return;
     }
 
@@ -1415,12 +1448,17 @@ export class ReportGeneratorComponent implements OnInit, OnDestroy {
 
   toggleIncidentContact(contactId: string, mode: 'to' | 'cc'): void {
     const set = mode === 'to' ? this.selectedIncidentContactIdsTo : this.selectedIncidentContactIdsCc;
+    const alternateSet = mode === 'to' ? this.selectedIncidentContactIdsCc : this.selectedIncidentContactIdsTo;
+
     if (set.has(contactId)) {
       set.delete(contactId);
     } else {
       set.add(contactId);
+      // Evitar que el mismo contacto esté en Para y CC al mismo tiempo
+      alternateSet.delete(contactId);
     }
-    this.syncIncidentRecipientsText(mode);
+    this.syncIncidentRecipientsText('to');
+    this.syncIncidentRecipientsText('cc');
   }
 
   isIncidentContactSelected(contactId: string, mode: 'to' | 'cc'): boolean {
@@ -1468,6 +1506,18 @@ export class ReportGeneratorComponent implements OnInit, OnDestroy {
       this.snackBar.open('Debes ingresar al menos un destinatario en Para', 'Cerrar', { duration: 3000 });
       return;
     }
+    
+    // Validar que no existan destinatarios duplicados entre los campos Para y CC
+    const overlap = this.incidentToCcOverlap;
+    if (overlap.length > 0) {
+      this.snackBar.open(
+        `Error: no se permite el mismo correo en Para y CC (${overlap.join(', ')})`,
+        'Cerrar',
+        { duration: 9000 }
+      );
+      return;
+    }
+
     if (!this.incidentSubject.trim()) {
       this.snackBar.open('Debes ingresar un asunto para el correo', 'Cerrar', { duration: 3000 });
       return;
@@ -1942,6 +1992,250 @@ export class ReportGeneratorComponent implements OnInit, OnDestroy {
   private getPlainTextFromHtml(html: string): string {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     return doc.body.textContent?.trim() || '';
+  }
+
+  private buildSimpleTableHtmlForClipboard(): string {
+    const form = this.reportForm.value;
+    const e = (v: unknown) => this.escapeHtml(v);
+    
+    // Formatear Fecha
+    let formattedDate = '';
+    if (form.fecha) {
+      const d = new Date(form.fecha);
+      if (!isNaN(d.getTime())) {
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        formattedDate = `${day}-${month}-${year}`;
+      }
+    }
+
+    // Color criticidad
+    const crit = String(form.criticidad || 'media').toLowerCase();
+    let badgeColor = '#FFA500';
+    if (crit === 'baja') {
+      badgeColor = '#4CAF50';
+    } else if (crit === 'alta') {
+      badgeColor = '#f44336';
+    } else if (crit === 'crítica' || crit === 'critica') {
+      badgeColor = '#b71c1c';
+    }
+
+    const headerColor = this.reportTableHeaderColor || '#155F50';
+
+    let html = `<table cellpadding="0" cellspacing="0" width="600" border="0" style="border-collapse: collapse; width: 600px; max-width: 100%; font-family: Arial, Helvetica, sans-serif; border: 1px solid #dddddd; background-color: #ffffff; margin: 0 auto;">
+  <tr>
+    <td style="padding: 15px; background-color: ${headerColor}; border-bottom: 3px solid #2b2b2b;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
+        <tr>
+          <td width="100" valign="middle" align="left" style="padding: 0;">
+            ${this.logoBase64 ? `<img src="${this.logoBase64}" height="40" width="auto" style="height: 40px; width: auto; border: 0; display: block;" alt="Logo">` : ''}
+          </td>
+          <td valign="middle" align="center" style="padding: 0; font-family: Arial, Helvetica, sans-serif; color: #ffffff; text-align: center;">
+            <div style="font-size: 20px; font-weight: bold; margin: 0;">Reporte de Detección</div>
+            <div style="font-size: 12px; margin: 5px 0 0 0; opacity: 0.9;">Monitoreo de Seguridad SOC</div>
+          </td>
+          <td width="100" style="padding: 0;"></td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 25px 25px 15px 25px; background-color: #ffffff;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
+        <tr>
+          <td style="padding: 0 0 15px 0; font-size: 20px; font-weight: bold; color: #111111; font-family: Arial, Helvetica, sans-serif;">
+            ${e(form.nombreEvento)}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0 0 15px 0;">
+            <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
+              <tr>
+                <td style="padding: 5px 10px; background-color: ${badgeColor}; color: #ffffff; font-size: 11px; font-weight: bold; font-family: Arial, Helvetica, sans-serif; text-transform: uppercase;">
+                  CRITICIDAD: ${e(form.criticidad)}
+                </td>
+                <td width="8"></td>
+                <td style="padding: 5px 10px; background-color: #eeeeee; color: #333333; font-size: 11px; font-weight: bold; font-family: Arial, Helvetica, sans-serif;">
+                  TICKET: ${e(form.codigoTicket)}
+                </td>
+                <td width="8"></td>
+                <td style="padding: 5px 10px; background-color: #eeeeee; color: #333333; font-size: 11px; font-weight: bold; font-family: Arial, Helvetica, sans-serif;">
+                  OFENSA: ${e(form.ofensa)}
+                </td>
+                <td width="8"></td>
+                <td style="padding: 5px 10px; background-color: #eeeeee; color: #333333; font-size: 11px; font-weight: bold; font-family: Arial, Helvetica, sans-serif;">
+                  FECHA: ${formattedDate}
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 10px 25px; background-color: #ffffff;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
+        <tr>
+          <td style="padding: 0 0 8px 0; font-size: 15px; font-weight: bold; color: #111111; font-family: Arial, Helvetica, sans-serif; border-bottom: 2px solid ${headerColor}; text-transform: uppercase;">
+            Información del Evento
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 0;">
+            <table cellpadding="6" cellspacing="0" border="0" width="100%" style="border-collapse: collapse; font-size: 13px; font-family: Arial, Helvetica, sans-serif; color: #333333;">
+              <tr style="border-bottom: 1px solid #eeeeee;">
+                <td width="30%" style="font-weight: bold; padding: 6px 0; vertical-align: top;">Ofensa</td>
+                <td width="70%" style="padding: 6px 0; vertical-align: top;">${e(form.ofensa)}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #eeeeee;">
+                <td style="font-weight: bold; padding: 6px 0; vertical-align: top;">Tipo de operación</td>
+                <td style="padding: 6px 0; vertical-align: top;">${e(form.tipoOperacion)}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #eeeeee;">
+                <td style="font-weight: bold; padding: 6px 0; vertical-align: top;">Nombre de Ofensa/Evento</td>
+                <td style="padding: 6px 0; vertical-align: top;">${e(form.nombreEvento)}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #eeeeee;">
+                <td style="font-weight: bold; padding: 6px 0; vertical-align: top;">Motivo</td>
+                <td style="padding: 6px 0; vertical-align: top;">${e(form.motivoEvento)}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #eeeeee;">
+                <td style="font-weight: bold; padding: 6px 0; vertical-align: top;">MRSC (Criticidad)</td>
+                <td style="padding: 6px 0; vertical-align: top;">${e(form.criticidad)}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #eeeeee;">
+                <td style="font-weight: bold; padding: 6px 0; vertical-align: top;">Fuente / Log Source</td>
+                <td style="padding: 6px 0; vertical-align: top;">${e(form.logSource)}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #eeeeee;">
+                <td style="font-weight: bold; padding: 6px 0; vertical-align: top;">Reputación de origen</td>
+                <td style="padding: 6px 0; vertical-align: top;">${e(form.reputacionOrigen)}</td>
+              </tr>
+  `;
+
+    if (form.origenConexion?.trim()) {
+      html += `
+              <tr style="border-bottom: 1px solid #eeeeee;">
+                <td style="font-weight: bold; padding: 6px 0; vertical-align: top;">Origen</td>
+                <td style="padding: 6px 0; vertical-align: top;">${e(form.origenConexion)}</td>
+              </tr>`;
+    }
+
+    if (form.destino?.trim()) {
+      html += `
+              <tr style="border-bottom: 1px solid #eeeeee;">
+                <td style="font-weight: bold; padding: 6px 0; vertical-align: top;">Destino</td>
+                <td style="padding: 6px 0; vertical-align: top;">${e(form.destino)}</td>
+              </tr>`;
+    }
+
+    if (form.informacionAdicional?.trim()) {
+      html += `
+              <tr style="border-bottom: 1px solid #eeeeee;">
+                <td style="font-weight: bold; padding: 6px 0; vertical-align: top;">Información Adicional</td>
+                <td style="padding: 6px 0; vertical-align: top;">${e(form.informacionAdicional)}</td>
+              </tr>`;
+    }
+
+    html += `
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 10px 25px; background-color: #ffffff;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
+        <tr>
+          <td style="padding: 0 0 8px 0; font-size: 15px; font-weight: bold; color: #111111; font-family: Arial, Helvetica, sans-serif; border-bottom: 2px solid ${headerColor}; text-transform: uppercase;">
+            Observaciones
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 0; font-size: 13px; line-height: 1.6; color: #333333; font-family: Arial, Helvetica, sans-serif;">
+            ${this.formatMultilineText(form.observaciones)}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  `;
+
+    if (form.recomendacion?.trim()) {
+      html += `
+  <tr>
+    <td style="padding: 10px 25px; background-color: #ffffff;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
+        <tr>
+          <td style="padding: 0 0 8px 0; font-size: 15px; font-weight: bold; color: #111111; font-family: Arial, Helvetica, sans-serif; border-bottom: 2px solid ${headerColor}; text-transform: uppercase;">
+            Acciones Recomendadas
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 0; font-size: 13px; line-height: 1.6; color: #333333; font-family: Arial, Helvetica, sans-serif;">
+            ${this.formatMultilineText(form.recomendacion)}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>`;
+    }
+
+    if (form.evidenciaTexto?.trim() || this.uploadedImages.length > 0) {
+      html += `
+  <tr>
+    <td style="padding: 10px 25px 20px 25px; background-color: #ffffff;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
+        <tr>
+          <td style="padding: 0 0 8px 0; font-size: 15px; font-weight: bold; color: #111111; font-family: Arial, Helvetica, sans-serif; border-bottom: 2px solid ${headerColor}; text-transform: uppercase;">
+            Evidencias
+          </td>
+        </tr>`;
+
+      if (form.evidenciaTexto?.trim()) {
+        html += `
+        <tr>
+          <td style="padding: 10px 0; font-size: 13px; line-height: 1.6; color: #333333; font-family: Arial, Helvetica, sans-serif;">
+            ${this.formatMultilineText(form.evidenciaTexto)}
+          </td>
+        </tr>`;
+      }
+
+      if (this.uploadedImages.length > 0) {
+        html += `
+        <tr>
+          <td style="padding: 10px 0;">
+            <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
+        `;
+        this.uploadedImages.forEach(img => {
+          html += `
+              <tr>
+                <td align="center" style="padding: 10px 0;">
+                  <img src="${img.dataUrl}" style="max-width: 100%; height: auto; border: 1px solid #dddddd; display: block;" alt="${e(img.name)}">
+                  <div style="font-size: 11px; color: #666666; margin-top: 4px; text-align: center;">${e(img.name)}</div>
+                </td>
+              </tr>
+          `;
+        });
+        html += `
+            </table>
+          </td>
+        </tr>`;
+      }
+
+      html += `
+      </table>
+    </td>
+  </tr>`;
+    }
+
+    html += `
+</table>`;
+
+    return html;
   }
 
   private getMarkdownFromHtml(html: string): string {

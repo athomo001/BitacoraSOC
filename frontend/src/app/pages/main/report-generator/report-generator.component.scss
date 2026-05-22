@@ -481,10 +481,20 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 16px;
     margin-bottom: 16px;
 
     h3 {
       margin: 0;
+    }
+
+    .copy-compat-note {
+      flex: 0 0 100%;
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.4;
+      color: var(--text-secondary);
     }
   }
 
@@ -992,6 +1002,13 @@
     &.is-disabled {
       opacity: 0.72;
     }
+  }
+
+  .newsletter-contact-meta {
+    flex-grow: 1;
+    text-align: left;
+    min-width: 0;
+    margin-left: var(--space-2);
   }
 
   .newsletter-contact-actions {
