@@ -45,7 +45,8 @@ services:
       - "${BACKEND_PORT:-3000}:3000"
       - "${BACKEND_HTTPS_PORT:-3443}:${HTTPS_PORT:-3443}"
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
     environment:
       NODE_ENV: production
       PORT: 3000

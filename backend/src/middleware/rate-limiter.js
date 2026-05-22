@@ -31,17 +31,30 @@
  * el límite “efectivo” se multiplica. Validar arquitectura de despliegue antes de asumir 100% cobertura anti-abuso.
  */
 const rateLimit = require('express-rate-limit');
-const MongoStore = require('rate-limit-mongo');
+let MongoStore = null;
+try {
+  MongoStore = require('rate-limit-mongo');
+} catch (error) {
+  console.warn('⚠️ rate-limit-mongo no está disponible. Se usará MemoryStore temporal.');
+}
 
 const isProduction = process.env.NODE_ENV === 'production';
 
+const createMongoStore = (collectionName) => {
+  if (!MongoStore || !process.env.MONGODB_URI) {
+    return undefined;
+  }
+
+  return new MongoStore({
+    uri: process.env.MONGODB_URI,
+    collectionName,
+    expireTimeMs: 15 * 60 * 1000,
+    errorHandler: console.error.bind(null, 'rate-limit-mongo')
+  });
+};
+
 /** Store exclusivo del limiter global API (no compartir con otros limiters). */
-const apiRateLimitStore = new MongoStore({
-  uri: process.env.MONGODB_URI,
-  collectionName: 'rate_limits_api',
-  expireTimeMs: 15 * 60 * 1000,
-  errorHandler: console.error.bind(null, 'rate-limit-mongo')
-});
+const apiRateLimitStore = createMongoStore('rate_limits_api');
 
 const parseEnvInt = (value, fallback) => {
   const parsed = Number.parseInt(value, 10);
@@ -118,12 +131,7 @@ const loginLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true,
-  store: new MongoStore({
-    uri: process.env.MONGODB_URI,
-    collectionName: 'rate_limits_login',
-    expireTimeMs: 15 * 60 * 1000,
-    errorHandler: console.error.bind(null, 'rate-limit-mongo')
-  })
+  store: createMongoStore('rate_limits_login')
 });
 
 // Rate limiter general para API
@@ -153,6 +161,10 @@ const apiLimiter = rateLimit({
  */
 async function resetApiRateLimitAll() {
   try {
+    if (!apiRateLimitStore) {
+      return;
+    }
+
     if (typeof apiRateLimitStore.resetAll === 'function') {
       await apiRateLimitStore.resetAll();
     } else if (apiRateLimitStore.collection) {
@@ -205,12 +217,7 @@ const forgotPasswordLimiter = rateLimit({
   message: 'Demasiados intentos de recuperación. Intenta de nuevo en 15 minutos.',
   standardHeaders: true,
   legacyHeaders: false,
-  store: new MongoStore({
-    uri: process.env.MONGODB_URI,
-    collectionName: 'rate_limits_forgot_pw',
-    expireTimeMs: 15 * 60 * 1000,
-    errorHandler: console.error.bind(null, 'rate-limit-mongo')
-  })
+  store: createMongoStore('rate_limits_forgot_pw')
 });
 
 // Rate limiter para reseteo de contraseña (máx 5/15min)
@@ -220,12 +227,7 @@ const resetPasswordLimiter = rateLimit({
   message: 'Demasiados intentos de reseteo. Solicita un nuevo enlace.',
   standardHeaders: true,
   legacyHeaders: false,
-  store: new MongoStore({
-    uri: process.env.MONGODB_URI,
-    collectionName: 'rate_limits_reset_pw',
-    expireTimeMs: 15 * 60 * 1000,
-    errorHandler: console.error.bind(null, 'rate-limit-mongo')
-  })
+  store: createMongoStore('rate_limits_reset_pw')
 });
 
 module.exports.loginLimiter = loginLimiter;
