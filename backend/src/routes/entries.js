@@ -446,6 +446,12 @@ router.get('/:id', authenticate, async (req, res) => {
       return res.status(404).json({ message: 'Entrada no encontrada' });
     }
 
+    // Validación de permisos (IDOR fix)
+    const creatorId = entry.createdBy && entry.createdBy._id ? entry.createdBy._id.toString() : null;
+    if (req.user.role !== 'admin' && creatorId !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'No tienes permiso para ver esta entrada' });
+    }
+
     res.json(entry);
   } catch (error) {
     console.error('Error al obtener entrada:', error);

@@ -15,6 +15,23 @@ const { authenticate, authorize } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const { invalidateCache } = require('../utils/email');
 const { validateCryptoPair, isPortFree } = require('../utils/tls-validator');
+const sharp = require('sharp');
+
+const verifyImageFile = async (filePath, mimetype, isFavicon = false) => {
+  try {
+    if (isFavicon && (mimetype.includes('icon') || filePath.toLowerCase().endsWith('.ico'))) {
+      const buffer = await fs.readFile(filePath);
+      if (buffer.length >= 4 && buffer[0] === 0x00 && buffer[1] === 0x00 && buffer[2] === 0x01 && buffer[3] === 0x00) {
+        return true;
+      }
+      return false;
+    }
+    const metadata = await sharp(filePath).metadata();
+    return ['jpeg', 'jpg', 'png', 'webp', 'svg'].includes(metadata.format);
+  } catch (err) {
+    return false;
+  }
+};
 
 // Configurar multer para logo
 const logoStorage = multer.diskStorage({
@@ -618,6 +635,12 @@ router.post('/logo',
             return res.status(400).json({ message: 'No se proporcionó archivo' });
           }
 
+          const isValidImg = await verifyImageFile(req.file.path, req.file.mimetype, false);
+          if (!isValidImg) {
+            await require('fs').promises.unlink(req.file.path);
+            return res.status(400).json({ message: 'El archivo no es una imagen válida o está corrompido' });
+          }
+
           const logoUrl = `/uploads/logos/${req.file.filename}`;
 
           let config = await AppConfig.findOne();
@@ -751,6 +774,12 @@ router.post('/favicon',
         try {
           if (!req.file) {
             return res.status(400).json({ message: 'No se proporcionó archivo favicon' });
+          }
+
+          const isValidImg = await verifyImageFile(req.file.path, req.file.mimetype, true);
+          if (!isValidImg) {
+            await require('fs').promises.unlink(req.file.path);
+            return res.status(400).json({ message: 'El archivo no es un favicon válido o está corrompido' });
           }
 
           const faviconUrl = `/uploads/favicons/${req.file.filename}`;

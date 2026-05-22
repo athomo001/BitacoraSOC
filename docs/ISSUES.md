@@ -19,142 +19,6 @@
 ### En progreso
 
 | ID | Estado | Seccion | Tarea | Notas |
-| SEC-PENTEST-AUDIT-145 | En progreso | Seguridad / Pentesting CRÍTICA | Auditoría de seguridad ofensiva (pentesting): hallazgos sin reparación inmediata — solo documentar | **OBJETIVO:** Ejecutar revisión de seguridad ofensiva sobre el sistema completo (frontend Angular, backend Express/Node, MongoDB, Docker). **REGLA FUNDAMENTAL:** Este issue es SOLO de HALLAZGOS. Cada vulnerabilidad encontrada se documenta aquí con severidad, descripción, vector de ataque y evidencia. Las reparaciones se planifican por separado en issues SEC-FIX-* para evitar cambios no controlados que rompan el sistema. **SUPERFICIES A AUDITAR:** (1) **Autenticación y Sesiones:** Fuerza bruta sin rate-limit en `/api/auth/login`, ausencia o debilidad de bloqueo por intentos fallidos, tokens JWT con algoritmo débil (HS256 con secret corto, ausencia de rotación), expiración excesiva de JWT/refresh tokens, fijación de sesión tras login, logout sin invalidación de token en backend. (2) **Autorización / IDOR:** Acceso a recursos ajenos por manipulación de IDs en URL/body (ej: `GET /api/entries/:id` sin verificar ownership), escalada horizontal entre usuarios, escalada vertical (acceso admin desde rol usuario), endpoints admin sin verificación de rol, exposición de datos de otros tenants. (3) **Inyección / Input Handling:** Inyección NoSQL en queries MongoDB (operadores `$where`, `$regex`, `$gt` sin sanitizar), inyección de headers HTTP, Path Traversal en uploads de archivos (logos, TLS, complements), HTML/Script injection en campos de entrada renderizados, contaminación de prototipos JS en backend. (4) **Seguridad de API:** Endpoints sin autenticación que deberían estar protegidos, CORS mal configurado (allow-all origins), métodos HTTP innecesarios habilitados, respuestas con stack traces o info interna expuesta en errores, ausencia de HTTPS forzado, endpoints de debug activos en producción. (5) **Tokens y Secretos:** Secretos hardcodeados en código fuente o variables de entorno accesibles, JWT secret débil o predecible, API keys expuestas en frontend bundle, tokens sin scope limitado. (6) **Ataques de Denegación de Servicio (DoS/DDoS):** Ausencia de rate limiting global por IP en rutas críticas, endpoint costoso sin throttle (ej: generación de reportes HTML, búsquedas masivas), payload bombing (JSON enorme sin límite de tamaño), regex DoS (ReDoS) en validaciones de strings, Slowloris / conexiones lentas sin timeout. (7) **Archivos y Uploads:** Extensiones permitidas sin validar MIME real (bypass de filtro subiendo PHP como PNG), tamaño máximo sin límite, path traversal en nombre de archivo, archivos servidos sin Content-Disposition header (ejecución en browser). (8) **Dependencias y CVEs:** Dependencias npm con CVEs conocidos (frontend y backend), imágenes Docker base con vulnerabilidades publicadas, MongoDB versión con CVEs activos, librerías sin actualizar con severidad alta/crítica. (9) **Docker / Infraestructura:** Contenedores corriendo como root, variables de entorno sensibles en `docker inspect`, puertos innecesarios expuestos al host, falta de read-only filesystem, secrets de Docker sin uso de Docker Secrets o vault. (10) **Logging y Evidencia Forense:** Logging de credenciales en texto claro en logs de audit, ausencia de logs para eventos críticos (login fallido, acceso denegado, delete masivo), logs accesibles sin autenticación desde endpoint. **FORMATO DE HALLAZGOS (agregar como subitems bajo este issue):** `SEC-PENTEST-AUDIT-145-[N]`: Superficie, Severidad (CRÍTICA/ALTA/MEDIA/BAJA), Vector de ataque, Descripción técnica, Endpoint/Archivo afectado, PoC o evidencia mínima, Impacto potencial. **REGLA DE REPARACIÓN:** Cada hallazgo documentado genera un issue separado SEC-FIX-[N] con análisis de impacto, propuesta de fix, tests de regresión requeridos y aprobación antes de implementar. Ningún fix puede alterar contratos de API existentes, campos de base de datos ni flujos de usuario sin análisis previo. **CRITERIOS CIERRE AUDIT:** Issue se cierra cuando se completen las 10 superficies auditadas y cada hallazgo tenga su issue SEC-FIX-* creado. Los SEC-FIX-* se priorizan por severidad: CRÍTICA (inmediato), ALTA (próximo sprint), MEDIA/BAJA (backlog). |
-
-#### Hallazgos SEC-PENTEST-AUDIT-145 (solo documentación)
-
-- `SEC-PENTEST-AUDIT-145-01`
-  Superficie: Autenticación y Sesiones
-  Severidad: ALTA
-  Vector: Fuerza bruta distribuida por IP/usuario sin bloqueo persistente de cuenta.
-  Descripción técnica: Existe `loginLimiter` por ventana, pero no hay contador persistente de bloqueo por usuario en modelo ni inhabilitación temporal de cuenta al superar umbral.
-  Endpoint/Archivo afectado: `POST /api/auth/login`, `backend/src/middleware/rate-limiter.js`, `backend/src/models/User.js`
-  PoC/Evidencia mínima: `skipSuccessfulRequests: true` (`backend/src/middleware/rate-limiter.js`) y ausencia de campos tipo `failedAttempts`/`lockedUntil` en `User`.
-  Impacto potencial: Incrementa riesgo de credential stuffing y guessing con rotación de IP.
-  Issue de reparación propuesto: `SEC-FIX-145-01`
-
-- `SEC-PENTEST-AUDIT-145-02`
-  Superficie: Autenticación y Sesiones
-  Severidad: ALTA
-  Vector: Renovación continua de JWT en cuentas guest antes de expirar cuenta.
-  Descripción técnica: El endpoint de refresh permite renovar token guest y el propio código advierte extensión indefinida de sesión si se renueva periódicamente.
-  Endpoint/Archivo afectado: `POST /api/auth/refresh`, `backend/src/routes/auth.js`
-  PoC/Evidencia mínima: comentario explícito de riesgo en `backend/src/routes/auth.js` (línea con "Guests pueden renovar tokens...") y `router.post('/refresh', ...)`.
-  Impacto potencial: Persistencia de sesión guest más allá de la intención operativa.
-  Issue de reparación propuesto: `SEC-FIX-145-02`
-
-- `SEC-PENTEST-AUDIT-145-03`
-  Superficie: Autenticación y Sesiones
-  Severidad: MEDIA
-  Vector: Reuso de JWT tras logout (si token fue extraído previamente).
-  Descripción técnica: Logout limpia cookie, pero no existe invalidación server-side (denylist/session store) del JWT ya emitido.
-  Endpoint/Archivo afectado: `POST /api/auth/logout`, `backend/src/routes/auth.js`
-  PoC/Evidencia mínima: `res.clearCookie('auth_token', ...)` sin revocación de token.
-  Impacto potencial: Ventana de uso del token robado hasta expiración natural.
-  Issue de reparación propuesto: `SEC-FIX-145-03`
-
-- `SEC-PENTEST-AUDIT-145-04`
-  Superficie: Autorización / IDOR
-  Severidad: ALTA
-  Vector: IDOR por lectura directa de entradas con ID conocido.
-  Descripción técnica: `GET /api/entries/:id` no valida ownership/tenant; en cambio PUT/DELETE sí validan creador o admin.
-  Endpoint/Archivo afectado: `GET /api/entries/:id`, `backend/src/routes/entries.js`
-  PoC/Evidencia mínima: ruta GET sin condición de ownership y validación de ownership presente recién en PUT/DELETE.
-  Impacto potencial: Exposición de entradas de otros usuarios autenticados.
-  Issue de reparación propuesto: `SEC-FIX-145-04`
-
-- `SEC-PENTEST-AUDIT-145-05`
-  Superficie: Autorización
-  Severidad: MEDIA
-  Vector: Bypass de control de navegación en frontend (client-side guard bypass).
-  Descripción técnica: `AuthGuard`, `AdminGuard` y `NotGuestGuard` retornan `true` de forma incondicional.
-  Endpoint/Archivo afectado: `frontend/src/app/guards/auth.guard.ts`
-  PoC/Evidencia mínima: `canActivate(): boolean { return true; }` en los tres guards.
-  Impacto potencial: Acceso UI a pantallas restringidas antes del rechazo backend; posible fuga de metadatos de interfaz.
-  Issue de reparación propuesto: `SEC-FIX-145-05`
-
-- `SEC-PENTEST-AUDIT-145-06`
-  Superficie: Seguridad de API
-  Severidad: MEDIA
-  Vector: CORS permisivo fuera de producción con credenciales habilitadas.
-  Descripción técnica: En `NODE_ENV != production`, `origin: true` permite cualquier origen y `credentials: true` habilita cookies/autorización cross-origin.
-  Endpoint/Archivo afectado: `backend/src/server.js`
-  PoC/Evidencia mínima: bloque `corsOptions` con `origin ... : true` y `credentials: true`.
-  Impacto potencial: Riesgo de abuso cross-origin si ambientes no productivos quedan expuestos.
-  Issue de reparación propuesto: `SEC-FIX-145-06`
-
-- `SEC-PENTEST-AUDIT-145-07`
-  Superficie: DoS / Anti-abuso
-  Severidad: MEDIA
-  Vector: Protección inefectiva en despliegues multi-réplica.
-  Descripción técnica: El rate limit global usa `MemoryStore` local por proceso; no existe backend compartido de contadores.
-  Endpoint/Archivo afectado: `backend/src/middleware/rate-limiter.js`
-  PoC/Evidencia mínima: `const apiRateLimitStore = new MemoryStore();`.
-  Impacto potencial: El límite efectivo se multiplica por número de instancias.
-  Issue de reparación propuesto: `SEC-FIX-145-07`
-
-- `SEC-PENTEST-AUDIT-145-08`
-  Superficie: DoS / API hardening
-  Severidad: MEDIA
-  Vector: Payload bombing en endpoints JSON generales.
-  Descripción técnica: El parser global acepta JSON/urlencoded de hasta 50MB para toda la API.
-  Endpoint/Archivo afectado: `backend/src/server.js`
-  PoC/Evidencia mínima: `app.use(express.json({ limit: '50mb' }))` y `app.use(express.urlencoded({ extended: true, limit: '50mb' }))`.
-  Impacto potencial: Mayor consumo de memoria/CPU por requests voluminosas.
-  Issue de reparación propuesto: `SEC-FIX-145-08`
-
-- `SEC-PENTEST-AUDIT-145-09`
-  Superficie: Archivos y Uploads
-  Severidad: MEDIA
-  Vector: Bypass por spoofing MIME/extensión en carga de logo/favicon.
-  Descripción técnica: `multer` filtra por `file.mimetype` y extensión declarada por cliente; no se valida magic bytes del binario para logo/favicon.
-  Endpoint/Archivo afectado: `POST /api/config/logo`, `POST /api/config/favicon`, `backend/src/routes/config.js`
-  PoC/Evidencia mínima: validación basada en regex de `file.mimetype` + `path.extname(...)`.
-  Impacto potencial: Carga de contenido no-imagen disfrazado.
-  Issue de reparación propuesto: `SEC-FIX-145-09`
-
-- `SEC-PENTEST-AUDIT-145-10`
-  Superficie: Tokens y Secretos
-  Severidad: ALTA
-  Vector: Debilidad criptográfica por secreto JWT insuficiente y gestión de secretos por env plana.
-  Descripción técnica: Se exige presencia de `JWT_SECRET` pero no mínimo de entropía/longitud; JWT se firma/verifica directo con `process.env.JWT_SECRET`.
-  Endpoint/Archivo afectado: `backend/src/server.js`, `backend/src/routes/auth.js`, `backend/src/middleware/auth.js`, `docker-compose.yml`
-  PoC/Evidencia mínima: `required = ['MONGODB_URI', 'JWT_SECRET']` + uso directo en `jwt.sign/jwt.verify`.
-  Impacto potencial: Riesgo de forja/reutilización de tokens si el secreto operacional es débil o filtrado.
-  Issue de reparación propuesto: `SEC-FIX-145-10`
-
-- `SEC-PENTEST-AUDIT-145-11`
-  Superficie: Dependencias y CVEs
-  Severidad: ALTA
-  Vector: Dependencias vulnerables en backend productivo.
-  Descripción técnica: `pnpm audit --prod` reporta 1 vulnerabilidad HIGH y 1 MODERATE en árbol backend.
-  Endpoint/Archivo afectado: `backend/package.json` (transitivas)
-  PoC/Evidencia mínima: HIGH `js-cookie <=3.0.5` (`GHSA-qjx8-664m-686j`) vía `mjml`; MODERATE `uuid <11.1.1` (`GHSA-w5hq-g745-h8pq`).
-  Impacto potencial: Exposición a fallos de librerías transitivas en runtime/herramientas de render.
-  Issue de reparación propuesto: `SEC-FIX-145-11`
-
-- `SEC-PENTEST-AUDIT-145-12`
-  Superficie: Docker / Infraestructura
-  Severidad: MEDIA
-  Vector: Contenedor frontend ejecutando como root en runtime.
-  Descripción técnica: El stage final `nginx:alpine` no define `USER` no-root.
-  Endpoint/Archivo afectado: `frontend/Dockerfile`
-  PoC/Evidencia mínima: `FROM nginx:alpine` sin instrucción `USER` posterior.
-  Impacto potencial: Mayor blast radius ante RCE en Nginx/entrypoint.
-  Issue de reparación propuesto: `SEC-FIX-145-12`
-
-- `SEC-PENTEST-AUDIT-145-13`
-  Superficie: Logging y Evidencia Forense
-  Severidad: MEDIA
-  Vector: Accesos denegados sin auditoría explícita de autorización.
-  Descripción técnica: `authorize(...)` devuelve 403 pero no registra evento de denegación en audit log.
-  Endpoint/Archivo afectado: `backend/src/middleware/auth.js`
-  PoC/Evidencia mínima: `return res.status(403).json({ message: 'No tienes permisos para realizar esta acción' });` sin llamada a `audit(...)`.
-  Impacto potencial: Menor trazabilidad forense en intentos de escalada de privilegios.
-  Issue de reparación propuesto: `SEC-FIX-145-13`
-
-- Estado de cobertura de superficies auditadas: 10/10 revisadas con evidencia en código y/o auditoría de dependencias.
-- Pendiente para cierre definitivo del issue: crear y priorizar `SEC-FIX-145-01` … `SEC-FIX-145-13`.
 
 
 **Plan de ataque visual ejecutado:** `docs/ui-visual-remediation-plan.md` (oleadas, criterios de aceptación, rutas objetivo y Definition of Done visual).
@@ -211,6 +75,13 @@ Checklist mínimo recomendado para agentes IA antes de marcar un item como `List
 
 | ID | Estado | Seccion | Tarea | Notas |
 | :--- | :--- | :--- | :--- | :--- |
+| SEC-PENTEST-AUDIT-145 | Listo | Seguridad / Pentesting CRÍTICA | Auditoría de seguridad ofensiva (pentesting): hallazgos sin reparación inmediata — solo documentar | **OBJETIVO:** Ejecutar revisión de seguridad ofensiva sobre el sistema completo (frontend Angular, backend Express/Node, MongoDB, Docker). **REGLA FUNDAMENTAL:** Este issue es SOLO de HALLAZGOS. Cada vulnerabilidad encontrada se documenta aquí con severidad, descripción, vector de ataque y evidencia. Las reparaciones se planifican por separado en issues SEC-FIX-* para evitar cambios no controlados que rompan el sistema. **SUPERFICIES A AUDITAR:** (1) **Autenticación y Sesiones:** Fuerza bruta sin rate-limit en `/api/auth/login`, ausencia o debilidad de bloqueo por intentos fallidos, tokens JWT con algoritmo débil (HS256 con secret corto, ausencia de rotación), expiración excesiva de JWT/refresh tokens, fijación de sesión tras login, logout sin invalidación de token en backend. (2) **Autorización / IDOR:** Acceso a recursos ajenos por manipulación de IDs en URL/body (ej: `GET /api/entries/:id` sin verificar ownership), escalada horizontal entre usuarios, escalada vertical (acceso admin desde rol usuario), endpoints admin sin verificación de rol, exposición de datos de otros tenants. (3) **Inyección / Input Handling:** Inyección NoSQL en queries MongoDB (operadores `$where`, `$regex`, `$gt` sin sanitizar), inyección de headers HTTP, Path Traversal en uploads de archivos (logos, TLS, complements), HTML/Script injection en campos de entrada renderizados, contaminación de prototipos JS en backend. (4) **Seguridad de API:** Endpoints sin autenticación que deberían estar protegidos, CORS mal configurado (allow-all origins), métodos HTTP innecesarios habilitados, respuestas con stack traces o info interna expuesta en errores, ausencia de HTTPS forzado, endpoints de debug activos en producción. (5) **Tokens y Secretos:** Secretos hardcodeados en código fuente o variables de entorno accesibles, JWT secret débil o predecible, API keys expuestas en frontend bundle, tokens sin scope limitado. (6) **Ataques de Denegación de Servicio (DoS/DDoS):** Ausencia de rate limiting global por IP en rutas críticas, endpoint costoso sin throttle (ej: generación de reportes HTML, búsquedas masivas), payload bombing (JSON enorme sin límite de tamaño), regex DoS (ReDoS) en validaciones de strings, Slowloris / conexiones lentas sin timeout. (7) **Archivos y Uploads:** Extensiones permitidas sin validar MIME real (bypass de filtro subiendo PHP como PNG), tamaño máximo sin límite, path traversal en nombre de archivo, archivos servidos sin Content-Disposition header (ejecución en browser). (8) **Dependencias y CVEs:** Dependencias npm con CVEs conocidos (frontend y backend), imágenes Docker base con vulnerabilidades publicadas, MongoDB versión con CVEs activos, librerías sin actualizar con severidad alta/crítica. (9) **Docker / Infraestructura:** Contenedores corriendo como root, variables de entorno sensibles en `docker inspect`, puertos innecesarios expuestos al host, falta de read-only filesystem, secrets de Docker sin uso de Docker Secrets o vault. (10) **Logging y Evidencia Forense:** Logging de credenciales en texto claro en logs de audit, ausencia de logs para eventos críticos (login fallido, acceso denegado, delete masivo), logs accesibles sin autenticación desde endpoint. **FORMATO DE HALLAZGOS (agregar como subitems bajo este issue):** `SEC-PENTEST-AUDIT-145-[N]`: Superficie, Severidad (CRÍTICA/ALTA/MEDIA/BAJA), Vector de ataque, Descripción técnica, Endpoint/Archivo afectado, PoC o evidencia mínima, Impacto potencial. **REGLA DE REPARACIÓN:** Cada hallazgo documentado genera un issue separado SEC-FIX-[N] con análisis de impacto, propuesta de fix, tests de regresión requeridos y aprobación antes de implementar. Ningún fix puede alterar contratos de API existentes, campos de base de datos ni flujos de usuario sin análisis previo. **CRITERIOS CIERRE AUDIT:** Issue se cierra cuando se completen las 10 superficies auditadas y cada hallazgo tenga su issue SEC-FIX-* creado. Los SEC-FIX-* se priorizan por severidad: CRÍTICA (inmediato), ALTA (próximo sprint), MEDIA/BAJA (backlog). |
+
+| SEC-FIX-145-01 | Listo | Seguridad / Pentesting ALTA | Prevención de fuerza bruta en login | Añadidos `failedAttempts` y `lockedUntil` en `User.js`; bloqueo persistente en `/login` (`auth.js`). |
+| SEC-FIX-145-02 | Listo | Seguridad / Pentesting ALTA | Bloqueo de refresh para invitados | Se deniega la renovación en `POST /refresh` (`auth.js`) para usuarios con rol `guest`. |
+| SEC-FIX-145-04 | Listo | Seguridad / Pentesting ALTA | Mitigación de IDOR en entradas | Validación de propiedad implementada en `GET /api/entries/:id` (`entries.js`). |
+| SEC-FIX-145-10 | Listo | Seguridad / Pentesting ALTA | Validación fuerte de JWT_SECRET | Exigida longitud mínima de 32 caracteres en `server.js` (`validateEnv()`). |
+| SEC-FIX-145-11 | Listo | Seguridad / Pentesting ALTA | Actualización de dependencias vulnerables | Actualizado `uuid` a ^11.1.1 y forzado `js-cookie` en `overrides` de `package.json`. |
 | ADMIN-MENU-NAV-142 | Listo | Admin / Navegación MEDIA | Consolidar "Reportes" y "Estadísticas" en un solo item del menú | **OBJETIVO:** Eliminar item "Reportes" del menú principal y unificar bajo "Estadísticas" para ahorrar 1 slot de menú. GLPI ya consolidado bajo integraciones (issue ADMIN-INTEG-NAV-141), mismo patrón aquí. **CAMBIOS ESTRUCTURA:** (1) **Frontend Routing:** Verificar si existen rutas separadas `/main/reports` y `/main/statistics`. Si aplica, consolidar bajo una sola ruta (ej: `/main/statistics` o `/main/reports`) con tabs/toggle interno para cambiar entre vistas "Reportes" y "Estadísticas". (2) **Menú Navegación:** Remover item de menú "Reportes" del sidebar/menú principal. Mantener solo "Estadísticas" como item visible. Al clickear "Estadísticas", abre `/main/statistics` (o ruta única) con selector interno (tabs o toggle) que muestre opciones: "Reportes", "Estadísticas". (3) **Componentes:** Si `reports.component` y `statistics.component` son independientes, integrar ambas bajo un contenedor wrapper (ej: `reports-statistics.component`) con tabs o selector de estado. Mantener lógica separada internamente pero UI unificada. (4) **Navegación Directa:** URL bookmarkable (ej: `/main/statistics?view=reports` o `/main/statistics/reports`) para acceso directo a cada sección. **ARCHIVOS A MODIFICAR:** `src/app/pages/main/main-routing.module.ts` (consolidar/eliminar ruta reports), `src/app/pages/main/statistics/statistics.component.ts` (agregar tab/state controller), `src/app/pages/main/statistics/statistics.component.html` (agregar tabs/toggle selector), `src/app/pages/main/reports/reports.component.ts` (integrar o deprecate según arquitectura), menú/sidebar component (remover link reports), service de routing si aplica. **CRITERIOS VALIDACIÓN:** (1) Menú principal muestra **solo** "Estadísticas", item "Reportes" separado **desaparece**. (2) Ruta `/main/reports` **no responde** (404 o redirect a statistics). (3) `/main/statistics` (o ruta única) carga con tabs/toggle: "Reportes" y "Estadísticas". (4) Clicking cada tab carga contenido correspondiente sin cambio de URL (o con param query si implementa estado). (5) Navegación directa vía URL con param/query (ej: `?view=reports`) funciona y carga vista correcta. (6) Todas las funcionalidades de ambas vistas (generar reportes, ver gráficos, descargar datos) **íntegra** sin regresión. (7) Sin errores compilación frontend tras consolidación. (8) Responsive: tabs stacked mobile, horizontal desktop. |
 | ESC-FLOW-PREVIEW-143 | Listo | Admin / Escalación ALTA | Live Preview de "Contactos de Escalamiento" en editor "Flujo de Escalamiento Dinámico" | **OBJETIVO:** Agregar vista previa en vivo (live preview) dentro de `/main/admin/escalation` en la pestaña "Flujo de Escalamiento Dinámico", mostrando exactamente cómo se verá el flujo configurado cuando el operador lo consulte en `/main/escalation/view` de "Contactos de Escalamiento". Esto evita tener que abrir 2 pestañas para validar cambios. **ARQUITECTURA:** (1) **Layout 2-Panel en Flujo:** Mantener editor actual a la izquierda (form inputs, tabla servicios, configuración pasos). Agregar panel derecho (40-50% ancho, scrollable) con preview vivo que replica exactamente el layout de `/escalation/view`. (2) **Preview Panel Contenido:** Mostrar encabezado "Contactos de Escalamiento", subtítulo "Lista de contactos por servicio", selector cliente (read-only dropdown) con cliente actual seleccionado, mensaje de estado si aplica (rojo: "Cliente no está en la lista", verde: "Cliente Configurado"), sección "Flujo dinámico configurado" con tarjetas por paso: **Paso 1, 2, 3, etc.** - nombre del paso, nombres + teléfonos formateados (uno por línea, si es POOL de Mundo mostrar múltiples personas en tabla compacta). (3) **Actualización Automática:** Cada vez que usuario edita campos (nombre paso, agrega/quita persona, cambia teléfono), preview se actualiza instantáneamente sin delay perceptible (debounce 300ms máximo). Usar `valueChanges` en FormGroup para triggerear actualización. (4) **Estilos Preview:** Aplicar estilos exactos de `/escalation/view` (mismo tema, colores, tipografía, espaciado) para que sea 1:1 visual. Usar componente compartido o réplica de `escalation-view.component.html` para garantizar consistencia. (5) **Responsive:** Desktop: editor + preview lado a lado (1:1 o 60/40 split). Tablet <1024px: stacked vertical, preview debajo editor (toggle collapse si espacio). Mobile <768px: solo editor, preview en modal/drawer colapsable. **ARCHIVOS A MODIFICAR:** `src/app/pages/main/admin/escalation/escalation.component.ts` (agregar FormGroup valueChanges listener, bindear preview data). `src/app/pages/main/admin/escalation/escalation.component.html` (layout 2-panel desktop, preview template mirror). `src/app/pages/main/admin/escalation/escalation.component.scss` (media queries responsive, panel split, scrollable). `src/app/pages/escalation/contacts/contacts.component.html` (extraer template preview logic a componente compartido, ej: `escalation-flow-preview.component.html`). **CRITERIOS VALIDACIÓN:** (1) Preview panel **visible** en desktop `/main/admin/escalation` "Flujo de Escalamiento Dinámico" tab. (2) Al editar nombre paso → preview actualiza texto instantáneamente. (3) Al agregar persona y teléfono → preview muestra con formato "Nombre Teléfono" íntegro. (4) Al cambiar cliente selector → preview valida cliente y muestra estado (rojo "no está en lista" o verde "configurado"). (5) POOL de Mundo: múltiples personas se listan en tabla compacta en preview. (6) Estilos preview **identical** a `/main/escalation/view` (mismos colores, fonts, espaciado). (7) Cambios se propagan sin page reload, smooth UX. (8) Responsive: desktop 2-panel, tablet stacked, mobile drawer. (9) Sin errores compilación, sin regresión funcionalidad editor. |
 | UI-CARD-SEM-099 | Listo | UX/UI + Semántica MEDIA | Contenido interno de KPI cards sin semántica | `reports.component.html` líneas 23-47: stat-cards usan `<article class="stat-card">` con `<div class="reports-panel__body">`. Migrar internos a `<dl><dt><dd>` según Web Coder.md. |

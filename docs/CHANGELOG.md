@@ -2,6 +2,19 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.82-beta] - 2026-05-22
+
+### Cierre de Auditoría de Seguridad: Mitigación de Hallazgos MEDIA (SEC-PENTEST-AUDIT-145)
+
+- **Control de Sesiones (SEC-FIX-145-03):** Implementada lista negra de tokens (`TokenDenylist`) respaldada en MongoDB para invalidar de manera inmediata y centralizada los JWT tras el cierre de sesión, bloqueando accesos posteriores con tokens capturados.
+- **Auditoría 403 (SEC-FIX-145-13):** Agregada trazabilidad forense explícita (`auth.authorize.fail`) cuando un usuario intenta acceder a endpoints para los que no tiene rol autorizado.
+- **Rate Limit Multi-Réplica (SEC-FIX-145-07):** Reemplazado `MemoryStore` local por `rate-limit-mongo`, centralizando la prevención de abusos por fuerza bruta (login y API) en todos los nodos/contenedores del sistema.
+- **CORS Estricto (SEC-FIX-145-06):** Eliminada la configuración permisiva global; el backend ahora valida el origen explícitamente (`ALLOWED_ORIGINS` y trusted hosts) independientemente del entorno.
+- **Límite de Payload Global (SEC-FIX-145-08):** Reducido el límite del parser de cuerpos JSON/URL-encoded de 50MB a un valor razonable (2MB) globalmente para mitigar payload bombing, manteniendo 10MB dedicados para cargas de imágenes seguras.
+- **Validación de Magic Bytes (SEC-FIX-145-09):** `multer` ahora es complementado por `sharp` y revisión de cabeceras binarias (para `.ico`) para validar la estructura interna de los archivos subidos, evitando bypass por spoofing de extensiones en logos y favicons.
+- **Frontend Guards Robustecidos (SEC-FIX-145-05):** Eliminados los retornos estáticos incondicionales en los guards (`AuthGuard`, `AdminGuard`, `NotGuestGuard`), implementando validaciones front-end reales apoyadas en el estado de autenticación y RBAC del sistema.
+- **Contenedor Nginx No-Root (SEC-FIX-145-12):** Modificado el `Dockerfile` del frontend para delegar los permisos al usuario nativo `nginx`, operando el demonio sin privilegios de sistema (`USER nginx`).
+
 ## [v1.5.81-beta] - 2026-05-22
 
 ### Ajustes en Destinatarios y Alineación del Panel de Contactos (UI-REPORT-REC-141)

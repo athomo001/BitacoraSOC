@@ -253,6 +253,15 @@ const validateEnv = () => {
     console.error(`❌ Faltan variables de entorno requeridas: ${missing.join(', ')}`);
     process.exit(1);
   }
+
+  if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
+    console.error(`❌ JWT_SECRET es demasiado corto. Debe tener al menos 32 caracteres por seguridad.`);
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
+    } else {
+      console.warn(`⚠️ [ADVERTENCIA] JWT_SECRET es débil. En producción el servidor no arrancará.`);
+    }
+  }
 };
 
 validateEnv();
@@ -305,9 +314,17 @@ app.use(helmet({
   xssFilter: true
 }));
 
-// Body parsers
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// Body parsers con límites dinámicos por ruta
+app.use((req, res, next) => {
+  const isLogoRoute = req.path === '/api/config/logo' || req.path === '/api/config/favicon';
+  const limit = isLogoRoute ? '10mb' : '2mb';
+  express.json({ limit })(req, res, next);
+});
+app.use((req, res, next) => {
+  const isLogoRoute = req.path === '/api/config/logo' || req.path === '/api/config/favicon';
+  const limit = isLogoRoute ? '10mb' : '2mb';
+  express.urlencoded({ extended: true, limit })(req, res, next);
+});
 
 // Correlation ID (X-Request-Id)
 app.use(requestIdMiddleware);
@@ -364,24 +381,22 @@ app.use((req, res, next) => {
   });
 });
 
-// 🔒 CORS - En desarrollo permite todo, en producción restringe
+// 🔒 CORS - Restringido en todos los ambientes
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production'
-    ? (origin, callback) => {
-      if (!origin) {
-        callback(null, true);
-        return;
-      }
-
-      const configuredOrigins = getAllowedOriginsSet(process.env.ALLOWED_ORIGINS || '');
-      if (configuredOrigins.has(origin)) {
-        callback(null, true);
-        return;
-      }
-
-      callback(new Error('No permitido por CORS'));
+  origin: (origin, callback) => {
+    if (!origin) {
+      callback(null, true);
+      return;
     }
-    : true, // En desarrollo permite cualquier origen
+
+    const configuredOrigins = getAllowedOriginsSet(process.env.ALLOWED_ORIGINS || '');
+    if (configuredOrigins.has(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error('No permitido por CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-https-retry'],
@@ -390,9 +405,6 @@ const corsOptions = {
 };
 
 const apiCorsMiddleware = (req, res, next) => {
-  if (process.env.NODE_ENV !== 'production') {
-    return cors(corsOptions)(req, res, next);
-  }
 
   const dynamicCorsOptions = {
     ...corsOptions,

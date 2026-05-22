@@ -94,6 +94,15 @@ const userSchema = new mongoose.Schema({
   avatar: {
     type: String,
     default: null
+  },
+  // Seguridad y Bloqueo de Cuenta
+  failedAttempts: {
+    type: Number,
+    default: 0
+  },
+  lockedUntil: {
+    type: Date,
+    default: null
   }
 }, {
   timestamps: true // Añade createdAt y updatedAt automáticamente

@@ -18,6 +18,7 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../models/User');
+const TokenDenylist = require('../models/TokenDenylist');
 
 const READ_ONLY_ROLES = new Set(['guest', 'auditor']);
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -79,6 +80,12 @@ const authenticate = async (req, res, next) => {
 
     if (!token) {
       return res.status(401).json({ message: 'No se proporcionó token de autenticación' });
+    }
+    
+    // Validar en Denylist
+    const isDenylisted = await TokenDenylist.exists({ token });
+    if (isDenylisted) {
+      return res.status(401).json({ message: 'Sesión terminada. Token inválido o revocado.' });
     }
     
     // 🔒 Clock skew tolerance: acepta tokens con diferencia ±60s
@@ -185,6 +192,19 @@ const authorize = (...roles) => {
       SAFE_METHODS.has(req.method);
 
     if (!hasRole && !auditorReadOnlyAdmin) {
+      const { audit } = require('../utils/audit');
+      audit(req, {
+        event: 'auth.authorize.fail',
+        level: 'warn',
+        result: { success: false, reason: 'Forbidden: Insufficient privileges' },
+        metadata: {
+          requiredRoles: roles,
+          userRole: req.user.role,
+          method: req.method,
+          path: req.originalUrl || req.path
+        }
+      }).catch(err => console.error('Audit error:', err));
+      
       return res.status(403).json({ message: 'No tienes permisos para realizar esta acción' });
     }
 
