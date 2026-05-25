@@ -2,6 +2,16 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.87-beta] - 2026-05-25
+
+### Historial compartido en /main/reports y borrado solo admin
+
+- **Historial global para todos los usuarios autenticados:** Se reemplazó el historial local por navegador (`localStorage`) por persistencia centralizada en backend, permitiendo que todos vean los reportes/boletines enviados por el equipo.
+- **API de historial de reportes:** Se incorporaron endpoints `GET /api/reports/history` y `POST /api/reports/history` para listar y registrar elementos del historial compartido.
+- **Borrado restringido a administradores:** Se agregaron `DELETE /api/reports/history/:id` y `DELETE /api/reports/history` protegidos con `authorize('admin')`, manteniendo la política de que solo admin puede eliminar historial.
+- **Frontend alineado al backend:** El módulo de `Report Generator` ahora consume la API compartida para cargar, agregar y paginar historial (`Cargar Más`), en vez de usar almacenamiento local por usuario.
+- **Validación técnica y despliegue:** Se verificó compilación y levantamiento de `backend` y `frontend` en Docker Compose tras los cambios.
+
 ## [v1.5.86-beta] - 2026-05-25
 
 ### Hora oficial del servidor en Gantt de Turnos (SHIFT-DASH-146)

@@ -38,7 +38,12 @@
     </div>
     
     <div class="sidebar-footer">
-      <button mat-stroked-button class="btn-load-more" [disabled]="historyItems.length >= 10" [matTooltip]="historyItems.length >= 10 ? 'Límite de historial alcanzado' : 'Cargar más reportes'">
+      <button
+        mat-stroked-button
+        class="btn-load-more"
+        (click)="loadMoreHistory()"
+        [disabled]="isHistoryLoading || historyItems.length >= historyTotal"
+        [matTooltip]="historyItems.length >= historyTotal ? 'No hay más reportes por cargar' : 'Cargar más reportes'">
         Cargar Más
       </button>
     </div>

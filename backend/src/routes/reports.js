@@ -29,6 +29,7 @@ const Entry = require('../models/Entry');
 const ShiftCheck = require('../models/ShiftCheck');
 const User = require('../models/User');
 const AppConfig = require('../models/AppConfig');
+const ReportHistory = require('../models/ReportHistory');
 const { authenticate, authorize } = require('../middleware/auth');
 const AuditLog = require('../models/AuditLog');
 const { audit } = require('../utils/audit');
@@ -124,6 +125,12 @@ const getHourBucket = (dateValue) => {
   const date = new Date(dateValue);
   if (Number.isNaN(date.getTime())) return null;
   return String(date.getHours()).padStart(2, '0');
+};
+
+const parseHistoryLimit = (rawLimit) => {
+  const parsed = Number.parseInt(rawLimit, 10);
+  if (!Number.isFinite(parsed)) return 10;
+  return Math.min(Math.max(parsed, 1), 100);
 };
 
 const detectMailAnalyticsType = (log) => {
@@ -655,6 +662,110 @@ async function prepareNewsletterEmailPayload(html, clientLogoAttachments) {
 
   return { html: finalHtml, attachments };
 }
+
+// GET /api/reports/history - Historial compartido de reportes/boletines
+router.get('/history', authenticate, async (req, res) => {
+  try {
+    const limit = parseHistoryLimit(req.query.limit);
+
+    const [items, total] = await Promise.all([
+      ReportHistory.find({})
+        .sort({ timestamp: -1 })
+        .limit(limit)
+        .lean(),
+      ReportHistory.countDocuments({})
+    ]);
+
+    res.json({
+      items: items.map((item) => ({
+        id: String(item._id),
+        type: item.type,
+        title: item.title,
+        timestamp: item.timestamp,
+        html: item.html,
+        createdBy: item.createdBy || null,
+        createdByUsername: item.createdByUsername || ''
+      })),
+      total
+    });
+  } catch (error) {
+    console.error('Error loading reports history:', error);
+    res.status(500).json({ message: 'Error al obtener historial de reportes' });
+  }
+});
+
+// POST /api/reports/history - Registrar item en historial compartido
+router.post('/history', authenticate, async (req, res) => {
+  try {
+    const type = String(req.body?.type || '').trim();
+    const title = String(req.body?.title || '').trim();
+    const html = String(req.body?.html || '').trim();
+    const timestamp = req.body?.timestamp ? new Date(req.body.timestamp) : new Date();
+
+    if (!['report', 'newsletter'].includes(type)) {
+      return res.status(400).json({ message: 'Tipo de historial inválido' });
+    }
+
+    if (!title) {
+      return res.status(400).json({ message: 'El título del historial es obligatorio' });
+    }
+
+    if (!html) {
+      return res.status(400).json({ message: 'El contenido del historial es obligatorio' });
+    }
+
+    if (Number.isNaN(timestamp.getTime())) {
+      return res.status(400).json({ message: 'Timestamp inválido' });
+    }
+
+    const item = await ReportHistory.create({
+      type,
+      title,
+      html,
+      timestamp,
+      createdBy: req.user._id,
+      createdByUsername: req.user.username || ''
+    });
+
+    res.status(201).json({
+      id: String(item._id),
+      type: item.type,
+      title: item.title,
+      timestamp: item.timestamp,
+      html: item.html,
+      createdBy: item.createdBy,
+      createdByUsername: item.createdByUsername
+    });
+  } catch (error) {
+    console.error('Error saving reports history:', error);
+    res.status(500).json({ message: 'Error al guardar historial de reportes' });
+  }
+});
+
+// DELETE /api/reports/history/:id - Eliminar item de historial (solo admin)
+router.delete('/history/:id', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const removed = await ReportHistory.findByIdAndDelete(req.params.id);
+    if (!removed) {
+      return res.status(404).json({ message: 'Registro de historial no encontrado' });
+    }
+    res.json({ message: 'Registro eliminado del historial' });
+  } catch (error) {
+    console.error('Error deleting history item:', error);
+    res.status(500).json({ message: 'Error al eliminar registro del historial' });
+  }
+});
+
+// DELETE /api/reports/history - Limpiar historial completo (solo admin)
+router.delete('/history', authenticate, authorize('admin'), async (_req, res) => {
+  try {
+    const result = await ReportHistory.deleteMany({});
+    res.json({ message: 'Historial limpiado', deletedCount: result.deletedCount || 0 });
+  } catch (error) {
+    console.error('Error clearing reports history:', error);
+    res.status(500).json({ message: 'Error al limpiar historial de reportes' });
+  }
+});
 
 // GET /api/reports/overview - Vista general de KPIs
 router.get('/overview', authenticate, async (req, res) => {

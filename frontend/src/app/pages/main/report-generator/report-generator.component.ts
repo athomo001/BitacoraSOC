@@ -48,6 +48,7 @@ export interface ReportHistoryItem {
   title: string;
   timestamp: string;
   html: string;
+  createdByUsername?: string;
 }
 
 /*
@@ -83,6 +84,9 @@ export interface ReportHistoryItem {
 export class ReportGeneratorComponent implements OnInit, OnDestroy {
   // ─── History & Subscriptions ───────────────────────────────────────────
   historyItems: ReportHistoryItem[] = [];
+  historyTotal = 0;
+  historyLimit = 10;
+  isHistoryLoading = false;
   private formSub = new Subscription();
 
   // ─── Mode ───────────────────────────────────────────────────────────────
@@ -2270,49 +2274,48 @@ export class ReportGeneratorComponent implements OnInit, OnDestroy {
 
   // ─── History Methods ──────────────────────────────────────────────────────
   loadHistory(): void {
-    try {
-      const stored = localStorage.getItem('soc_report_history');
-      if (stored) {
-        this.historyItems = JSON.parse(stored);
+    this.isHistoryLoading = true;
+    this.http.get<{ items: ReportHistoryItem[]; total: number }>(`${this.backendBaseUrl}/api/reports/history`, {
+      params: { limit: String(this.historyLimit) }
+    }).subscribe({
+      next: (response) => {
+        this.historyItems = Array.isArray(response?.items) ? response.items : [];
+        this.historyTotal = Number.isFinite(response?.total) ? Number(response.total) : this.historyItems.length;
+        this.isHistoryLoading = false;
+      },
+      error: (error) => {
+        console.error('Error loading history', error);
+        this.historyItems = [];
+        this.historyTotal = 0;
+        this.isHistoryLoading = false;
       }
-    } catch (e) {
-      console.error('Error loading history', e);
-      this.historyItems = [];
-    }
-  }
-
-  saveHistory(): void {
-    try {
-      localStorage.setItem('soc_report_history', JSON.stringify(this.historyItems));
-    } catch (e) {
-      console.error('Error saving history', e);
-    }
+    });
   }
 
   addToHistory(type: 'report' | 'newsletter', title: string, html: string): void {
-    // Check if an item with the same title and HTML already exists to prevent duplicate entries
-    const duplicate = this.historyItems.find(item => item.title === title && item.html === html);
-    if (duplicate) {
-      // Just update the timestamp to now and move it to the top
-      this.historyItems = this.historyItems.filter(item => item !== duplicate);
-      duplicate.timestamp = new Date().toISOString();
-      this.historyItems.unshift(duplicate);
-      this.saveHistory();
-      return;
-    }
-
-    const newItem: ReportHistoryItem = {
-      id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
+    const payload: Omit<ReportHistoryItem, 'id'> = {
       type,
       title,
       timestamp: new Date().toISOString(),
       html
     };
-    this.historyItems.unshift(newItem);
-    if (this.historyItems.length > 10) {
-      this.historyItems = this.historyItems.slice(0, 10);
+
+    this.http.post(`${this.backendBaseUrl}/api/reports/history`, payload).subscribe({
+      next: () => {
+        this.loadHistory();
+      },
+      error: (error) => {
+        console.error('Error saving history', error);
+      }
+    });
+  }
+
+  loadMoreHistory(): void {
+    if (this.historyItems.length >= this.historyTotal) {
+      return;
     }
-    this.saveHistory();
+    this.historyLimit += 10;
+    this.loadHistory();
   }
 
   openInNewTab(item: ReportHistoryItem): void {
@@ -2330,16 +2333,31 @@ export class ReportGeneratorComponent implements OnInit, OnDestroy {
   }
 
   deleteHistoryItem(item: ReportHistoryItem): void {
-    this.historyItems = this.historyItems.filter(h => h.id !== item.id);
-    this.saveHistory();
-    this.snackBar.open('Reporte eliminado del historial', 'Cerrar', { duration: 2000 });
+    this.http.delete(`${this.backendBaseUrl}/api/reports/history/${item.id}`).subscribe({
+      next: () => {
+        this.snackBar.open('Reporte eliminado del historial', 'Cerrar', { duration: 2000 });
+        this.loadHistory();
+      },
+      error: (error) => {
+        console.error('Error deleting history item', error);
+        this.snackBar.open('No fue posible eliminar el reporte del historial', 'Cerrar', { duration: 3000 });
+      }
+    });
   }
 
   clearAllHistory(): void {
     if (confirm('¿Está seguro de que desea borrar todo el historial de reportes?')) {
-      this.historyItems = [];
-      this.saveHistory();
-      this.snackBar.open('Historial vacío', 'Cerrar', { duration: 2000 });
+      this.http.delete(`${this.backendBaseUrl}/api/reports/history`).subscribe({
+        next: () => {
+          this.snackBar.open('Historial vacío', 'Cerrar', { duration: 2000 });
+          this.historyLimit = 10;
+          this.loadHistory();
+        },
+        error: (error) => {
+          console.error('Error clearing history', error);
+          this.snackBar.open('No fue posible limpiar el historial', 'Cerrar', { duration: 3000 });
+        }
+      });
     }
   }
 
