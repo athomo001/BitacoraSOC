@@ -355,6 +355,10 @@
   margin-right: auto;
 }
 
+.content-wrapper > app-admin-console {
+  max-width: 2000px;
+}
+
 .active-link {
   background-color: var(--hover-bg) !important;
   box-shadow: inset 3px 0 0 var(--accent-color);

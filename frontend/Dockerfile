@@ -39,8 +39,17 @@ RUN sed -i 's/\r$//' /docker-entrypoint-bitacora.sh && chmod +x /docker-entrypoi
 # Copiar build de Angular (Angular 20 genera en /browser)
 COPY --from=builder /app/dist/bitacora-soc/browser /usr/share/nginx/html
 
+# Permisos para Nginx no-root
+RUN mkdir -p /var/cache/nginx /var/log/nginx /etc/nginx/conf.d && \
+    chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /var/log/nginx /etc/nginx /docker-entrypoint-bitacora.sh && \
+    touch /var/run/nginx.pid && \
+    chown -R nginx:nginx /var/run/nginx.pid
+
 # Exponer puerto
 EXPOSE 80
+
+# Cambiar a usuario no root
+USER nginx
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

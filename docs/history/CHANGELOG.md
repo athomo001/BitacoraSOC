@@ -2,6 +2,126 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.84-beta] - 2026-05-25
+
+### Simplificación del CSV de Asignación de Turnos (SHIFT-CSV-146)
+
+- **Formato reducido del CSV:** La importación de turnos ahora usa únicamente `rol, usuario, fechaInicio, horaInicio, fechaFin, horaFin`, eliminando columnas técnicas innecesarias como `userType` y `notes`.
+- **Resolución automática de usuario:** El campo `usuario` se resuelve internamente por `username` como primera opción; también acepta correo o nombre completo si coincide con un usuario interno o una persona externa.
+- **Mapeo funcional de roles:** El rol visible `N1` se traduce automáticamente a `N1_NO_HABIL` en backend, manteniendo la semántica operativa sin obligar al usuario a conocer la nomenclatura interna.
+- **Ejemplos y ayuda alineados a UX:** Se actualizaron las ayudas del panel y la plantilla descargable para mostrar usernames como ejemplo recomendado, evitando confusión con correos electrónicos.
+
+## [v1.5.83-beta] - 2026-05-22
+
+### Auditoría Exhaustiva de Documentación y Limpieza de Repositorio
+
+- **Sincronización de Documentación API:** Se implementó un script automatizado para extraer endpoints directamente del router de Express, reconstruyendo la documentación maestra (`docs/04_DESARROLLO_Y_API.md`) con más de 100 rutas operativas validadas.
+- **Consolidación Operativa UI:** Se estandarizó la nomenclatura en la documentación general (`03_OPERACIONES.md` y `SCREENSHOTS.md`) para coincidir de manera estricta con las etiquetas actuales de la UI.
+- **Unificación de Entornos (`.env`):** Se eliminó la duplicidad de configuración entre la raíz y el backend. `backend/src/server.js` fue refactorizado para resolver automáticamente el archivo `.env` de la raíz del proyecto, permitiendo que un único archivo actúe como fuente de verdad absoluta tanto para la orquestación Docker como para la ejecución local de Node.js.
+- **Depuración de Scripts Heredados (Clean-up):**
+  - Se eliminaron fragmentos obsoletos de inicialización de BD (`seed-escalation-example.js`, `seed-services.js`, `seed-shift-roles.js`, `seed-work-shifts.js`) para consolidar la estrategia en el sembrado oficial (`seed.js` y `seed-admin.js`).
+  - Se borraron scripts manuales de único uso que generaban ruido operativo (`add-netics.js`, `create-users.js`, `shift-dates.js`, `import-sanitized.js`).
+  - Se removieron los scripts de migración `mongo8-migration` (y su documentación en `02_DESPLIEGUE_Y_CONFIG.md`), al considerarse un procedimiento puntual ya ejecutado y superado por la arquitectura nativa en Mongo 8.
+- **Resiliencia de Easter Eggs:** Se restituyó y validó la dependencia funcional de `scripts/Bender.png` para los triggers de UI basados en el hashtag `#bender`.
+
+## [v1.5.82-beta] - 2026-05-22
+
+### Cierre de Auditoría de Seguridad: Mitigación de Hallazgos MEDIA (SEC-PENTEST-AUDIT-145)
+
+- **Control de Sesiones (SEC-FIX-145-03):** Implementada lista negra de tokens (`TokenDenylist`) respaldada en MongoDB para invalidar de manera inmediata y centralizada los JWT tras el cierre de sesión, bloqueando accesos posteriores con tokens capturados.
+- **Auditoría 403 (SEC-FIX-145-13):** Agregada trazabilidad forense explícita (`auth.authorize.fail`) cuando un usuario intenta acceder a endpoints para los que no tiene rol autorizado.
+- **Rate Limit Multi-Réplica (SEC-FIX-145-07):** Reemplazado `MemoryStore` local por `rate-limit-mongo`, centralizando la prevención de abusos por fuerza bruta (login y API) en todos los nodos/contenedores del sistema.
+- **CORS Estricto (SEC-FIX-145-06):** Eliminada la configuración permisiva global; el backend ahora valida el origen explícitamente (`ALLOWED_ORIGINS` y trusted hosts) independientemente del entorno.
+- **Límite de Payload Global (SEC-FIX-145-08):** Reducido el límite del parser de cuerpos JSON/URL-encoded de 50MB a un valor razonable (2MB) globalmente para mitigar payload bombing, manteniendo 10MB dedicados para cargas de imágenes seguras.
+- **Validación de Magic Bytes (SEC-FIX-145-09):** `multer` ahora es complementado por `sharp` y revisión de cabeceras binarias (para `.ico`) para validar la estructura interna de los archivos subidos, evitando bypass por spoofing de extensiones en logos y favicons.
+- **Frontend Guards Robustecidos (SEC-FIX-145-05):** Eliminados los retornos estáticos incondicionales en los guards (`AuthGuard`, `AdminGuard`, `NotGuestGuard`), implementando validaciones front-end reales apoyadas en el estado de autenticación y RBAC del sistema.
+- **Contenedor Nginx No-Root (SEC-FIX-145-12):** Modificado el `Dockerfile` del frontend para delegar los permisos al usuario nativo `nginx`, operando el demonio sin privilegios de sistema (`USER nginx`).
+
+## [v1.5.81-beta] - 2026-05-22
+
+### Ajustes en Destinatarios y Alineación del Panel de Contactos (UI-REPORT-REC-141)
+
+- **Eliminación de campos de autocompletar redundantes:** Se removieron los inputs de autocompletar individuales ("Autocompletar destinatarios (Para)" y "Autocompletar CC") en Boletines e Incidentes dentro del generador de reportes, dejando la gestión completa de envíos rápidos a través de la barra lateral de contactos guardados.
+- **Alineación del Directorio de Contactos en el Sidebar:** Se añadió estilo a `.newsletter-contact-meta` con `flex-grow: 1; text-align: left; min-width: 0;` para que la información del contacto se mantenga ordenada y unificada junto al checkbox y no se desplace forzadamente a la derecha.
+- **Validación y Bloqueo de Solapamientos (Para vs CC):**
+  - Se modificó `toggleIncidentContact` en el controlador para remover proactivamente a un contacto de la lista opuesta (Para <-> CC) al ser seleccionado.
+  - Se implementó validación en `sendIncidentReport` que detiene el flujo de envío del reporte e informa el conflicto mediante `snackBar` si hay correos duplicados entre los destinatarios y las copias.
+  - Se integró la advertencia dinámica en la UI y se bloqueó la interacción del botón "Enviar reporte por correo" en caso de conflicto.
+- **Compilación del sistema:** Verificado el empaquetado de producción de toda la aplicación ejecutando `docker compose build --no-cache && docker compose up -d` de forma exitosa.
+
+## [v1.5.80-beta] - 2026-05-21
+
+### Reordenamiento de campos en Generador de Reportes de Incidentes (UI-REPORT-GEN-140)
+
+- **Fila superior de 4 columnas al inicio:** Se ubicaron al comienzo del formulario de reporte los campos **Código Ticket**, **Ofensa**, **Tipo de operación** y **Fecha**, facilitando el flujo rápido de ingreso de datos clave.
+- **Búsqueda de eventos reubicada:** Se movió la búsqueda de **Nombre de Ofensa/Evento** desde la fila completa del principio a la columna central de la segunda fila (junto a *Fuente / Log Source* y *MRSC (Criticidad)*), sustituyendo la posición del campo *Ofensa*.
+- **Limpieza de campos duplicados:** Se eliminaron las entradas duplicadas de *Código Ticket*, *Tipo de operación* y *Fecha* en la sección inferior de detalles adicionales, dejando únicamente los campos de origen, destino, reputación y carga de evidencia.
+- **Estilos responsivos:** Se incorporó la clase `.row-four-cols` en el SCSS para adaptar la nueva fila de 4 columnas de forma fluida a todo tipo de pantallas (desktop, tableta y móviles).
+
+### Nomenclatura y reorden de Catálogos en Admin (CAT-NOMEN-REORG-144)
+
+- **Título principal actualizado:** en `/main/admin/catalogs` se cambió el encabezado a **"Administración de Clientes y Catálogos"** para reflejar el alcance real del módulo.
+- **Etiqueta de navegación renombrada:** en la consola administrativa, el acceso lateral se actualizó de **"Catálogos"** a **"Clientes y Catálogos"**.
+- **Pestañas reorganizadas en orden operativo:** el `mat-tab-group` quedó en el orden **Clientes**, **Tipos de Operación**, **Alertas y Mantenimientos**, **Tipo de Eventos**.
+- **Renombre funcional de Eventos:** la pestaña **"Eventos"** se renombró a **"Tipo de Eventos"** y su encabezado interno también fue actualizado para mantener consistencia visual y semántica.
+
+## [v1.5.79-beta] - 2026-05-21
+
+### Ampliación de Timeline en Vista Resumen Semanal (SHIFT-GANTT-TIMELINE)
+
+- **Timeline extendido de 7 a 10 días:** Se modificó la vista de resumen semanal (Gantt) para mostrar la semana actual completa + 3 días de la próxima semana, proporcionando mayor visibilidad anticipada de asignaciones próximas.
+- **Mejor distribución visual:** La semana próxima ahora ocupa ~30% del espacio timeline en lugar de ~14%, permitiendo una mejor visualización de turnos y asignaciones en el corto plazo.
+- **Mantención de funcionalidad:** Se preservó toda la lógica de cálculo de posiciones, colores de estado y línea del día actual, escalando proporcionalmente los 10 días en lugar de 7.
+
+## [v1.5.78-beta] - 2026-05-20
+
+### Mejoras en Selector de Asignación para Especialista TI (SHIFT-TI-SEL-136)
+
+- **Fuente correcta del directorio centralizado:** Se corrigió el selector de rol Especialista TI (`TI`) para cargar contactos internos desde el **directorio centralizado** en lugar de limitarse a 3 usuarios del sistema. Ahora muestra 20+ personas reales con datos completos.
+- **Visualización de nombre completo + teléfono:** Las opciones del dropdown ahora muestran formato `Nombre Completo • Teléfono` (ej: "Oscar Ortiz • +56976783378"), facilitando la identificación correcta de personas. Se agregó clase CSS `.option-phone` para estilos legibles en gris secundario.
+- **Asignación directa desde directorio para TI:** Se modificó la lógica de validación en `saveWeeklyAssignment()` para permitir que TI asigne contactos internos del directorio sin buscar coincidencia en tabla de usuarios del sistema, evitando error "Asígnalo desde Analistas Internos (Usuarios)".
+- **Organización visual mejorada:** Se separó visualmente "Personas Externas" de "Directorio Interno" en secciones distintas del selector cuando aplica, mejorando la experiencia de selección.
+
+### Corrección de Barras de Progreso en Turnos Próximos a Iniciar (SHIFT-PROX-137)
+
+- **Barras funcionales:** Se implementó cálculo de progreso para la sección "Próximos Turnos a Iniciar" utilizando la fórmula `progress = (tiempo restante hasta inicio) / (duración total) × 100`. Anteriormente estaban hardcodeadas a 0% y no se llenaban.
+- **Consistencia visual:** Ambas secciones (Próximos a Terminar y Próximos a Iniciar) ahora aplican el mismo sistema de colores dinámicos: verde para >80%, amarillo para 50-80%, rojo para <50%.
+- **Cálculo preciso:** El progreso refleja qué tan cercano está el turno a su inicio en relación a su duración total, proporcionando feedback temporal correcto al operador.
+
+## [v1.5.77-beta] - 2026-05-21
+
+### Migración y mejoras UX de Gestión de Turnos Semanales (SHIFT-MOVE-124 a SHIFT-NAV-135)
+
+- **Migración de Turnos Semanales (SHIFT-MOVE-124):** Se migró la funcionalidad de turnos semanales desde Escalación hacia `/main/admin/work-shifts`, eliminando dependencias obsoletas y manteniendo total compatibilidad de datos.
+- **Layout Dashboard en 2 Columnas (SHIFT-UX-125):** Rediseñado `/main/admin/work-shifts` con una estructura visual moderna de 2 columnas (panel central y editor lateral) adaptativa y con micro-animaciones premium.
+- **Vista Resumen Semanal en Gantt (SHIFT-GANTT-126):** Implementado un timeline tipo Gantt para el resumen semanal, con visualización por rol/analista, colores según estado (En Curso, Próximo, Pasado) y una línea roja vertical destacada para el Día Actual con su fecha legible.
+- **Tarjetas de Turnos por Proximidad (SHIFT-PROX-127):** Agregadas tarjetas de "Turnos Próximos a Terminar" y "Próximos Turnos a Iniciar" ordenadas cronológicamente, con barras de progreso y temporizador de cuenta regresiva/inicio.
+- **Formato de Datos de Asignación (SHIFT-FORMAT-128):** Incorporado un bloque de ayuda contextual detallada que describe el formato esperado de datos de turnos para minimizar errores.
+- **Editor de Asignación Lateral (SHIFT-EDITOR-129):** Creado un panel lateral para agregar y editar turnos, integrando validación estricta de solapes de horario, rangos de fecha inválidos, autocomplete desde el directorio y disponibilidad de analistas.
+- **Acciones y Feedback de Persistencia (SHIFT-SAVE-130):** Añadido botón primario con estado de carga (loading) y notificaciones emergentes de éxito/error al guardar cambios, forzando la actualización instantánea de la interfaz.
+- **Filtros Rápidos (SHIFT-FILTER-131):** Implementado un buscador y filtros interactivos por Persona y Rol para depurar la lista de asignaciones rápidamente sin recargas de página.
+- **Tabla Detallada de Asignaciones (SHIFT-TABLE-132):** Diseñada una MatTable completa con columnas de Estado (con pills de color), Semana, Rol, Persona, Comentarios y Acciones (editar, eliminar).
+- **Consistencia de Datos (SHIFT-DATA-133):** Garantizado que el timeline de Gantt, las tarjetas de proximidad y la tabla detallada se alimenten de la misma fuente de datos de asignación sincronizada.
+- **Texto y Labels en Español (SHIFT-I18N-134):** Normalizados todos los textos, ayudas, estados y mensajes de validación de turnos a español neutro.
+- **Integración con Navegación Global (SHIFT-NAV-135):** Pulida la integración visual de la vista de turnos con el shell, el menú lateral y la barra superior del sistema.
+- **Optimización de Ancho de Pantalla y Legibilidad:** Ampliado el ancho máximo de la consola administrativa a 1750px y optimizado el tamaño de la tipografía del diagrama Gantt (incrementando las etiquetas y textos a 13px/14px) para aprovechar al máximo las pantallas de escritorio sin comprimir textos.
+- **Compilación e Integración Docker exitosa:** Se validó la compilación del frontend dentro del contenedor Docker sin advertencias ni errores.
+
+## [v1.5.76-beta] - 2026-05-20
+
+### Consolidación y mejoras UX de Clientes, Escalación y Reportes (CAT-INT-115 a ESC-FLOW-123)
+
+- **Cliente Interno Único (CAT-INT-115):** Implementada validación en base de datos, API de backend y formularios reactivos en frontend para impedir la activación de más de un Cliente Interno de forma concurrente.
+- **Correo CC Global Obligatorio (CAT-INT-116):** Agregada configuración y validación estricta de múltiples correos electrónicos en formato CC global para el Cliente Interno. Se importó `MatError` y se definieron getters booleanos específicos en el componente `CatalogAdminComponent` para solucionar fallos en compilación estricta en producción.
+- **Unificación de Nomenclatura a "Cliente" (CAT-UX-117):** Eliminada la terminología técnica "Log Source" / "Fuente de Logs" de la interfaz de administración de catálogos, sustituyéndola por la palabra funcional "Cliente".
+- **Visualización Destacada (CAT-UX-118):** Se integró un badge con colores distintivos en la tabla de clientes para resaltar al Cliente Interno junto con sus correos de copia global configurados.
+- **Selector Simplificado de Clientes (ESC-UX-119):** Removidos los campos redundantes (buscador de texto + combo) en Escalación Simple y reemplazados por un único campo autocomplete responsivo para seleccionar el cliente.
+- **Carga de CC y Autocompletado de Contactos (ESC-DATA-120):** Automatizado el pre-llenado de los campos CC con los correos del Cliente Interno en el generador de reportes. Se integró `MatAutocompleteModule` para autocompletar rápidamente direcciones desde el Directorio Central en los campos destinatarios del Boletín y Reporte de Incidentes.
+- **Optimización de Layout (ESC-LAYOUT-121):** Retirado el bloque obsoleto "Clientes (fuente única)" para maximizar el espacio vertical disponible y se ajustaron las tablas de servicios de escalación a un tamaño máximo contenido (`max-height: 250px`) con barras de desplazamiento y cabeceras fijas.
+- **Reorganización y Limpieza de Pestañas (ESC-TABS-122):** Reordenadas y renombradas las pestañas a "Flujo de Correos" y "Flujo de llamadas". Se eliminó completamente la pestaña de "Turnos Internos" (migrada previamente a `/main/admin/work-shifts`), limpiando todas sus importaciones y referencias para mantener un empaquetado optimizado.
+- **Secuencia y Estado de Configuración del Flujo (ESC-FLOW-123):** Añadida numeración de secuencia secuencial (`Paso 1`, `Paso 2`...) en cada elemento de la lista y se programaron badges de validación dinámica (`Configurado` / `Incompleto`) basados en si la tarjeta tiene los datos de contacto mínimos obligatorios para operar.
+- **Estabilidad de Docker en Producción:** Verificado el empaquetado de producción de toda la aplicación ejecutando `docker compose build --no-cache && docker compose up -d` de forma exitosa.
+
 ## [v1.5.75-beta] - 2026-05-19
 
 ### Auditoria: clasificacion correcta para Escalacion y mayor cobertura de eventos

@@ -10,7 +10,6 @@ Este directorio contiene scripts para importar datos masivamente a la BitacoraSO
 - **`import-entries.js`** - Importa entradas de bitácora con asignación de usuarios
 - **`csv-to-json-entries.js`** - Convierte CSV a formato JSON para importación
 - **`delete-entries.js`** - Elimina todas las entradas (usar con precaución)
-- **`create-users.js`** - Crea usuarios en el sistema
 
 ### Archivos de Ejemplo
 
@@ -325,7 +324,8 @@ docker logs bitacora-backend --tail 100
 Asegúrate de crear el usuario primero:
 
 ```bash
-docker exec -it bitacora-backend node scripts/create-users.js
+# Usa los scripts oficiales de seed:
+docker compose exec backend node src/scripts/seed-admin.js
 ```
 
 ### Error: Cannot find module

@@ -47,6 +47,10 @@ export class AuthGuard implements CanActivate {
   ) {}
 
   canActivate(): boolean {
+    if (!this.authService.isAuthenticated()) {
+      this.router.navigate(['/login']);
+      return false;
+    }
     return true;
   }
 }
@@ -61,6 +65,10 @@ export class AdminGuard implements CanActivate {
   ) {}
 
   canActivate(): boolean {
+    if (!this.authService.isAdmin() && !this.authService.hasRole('auditor')) {
+      this.router.navigate(['/main/entries']);
+      return false;
+    }
     return true;
   }
 }
@@ -75,6 +83,10 @@ export class NotGuestGuard implements CanActivate {
   ) {}
 
   canActivate(): boolean {
+    if (this.authService.isGuest()) {
+      this.router.navigate(['/main/entries']);
+      return false;
+    }
     return true;
   }
 }

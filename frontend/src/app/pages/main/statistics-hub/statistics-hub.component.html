@@ -1,0 +1,25 @@
+<section class="statistics-hub-container">
+  <header class="statistics-hub-header">
+    <h1>Estadísticas</h1>
+    <p>Vista unificada para analítica operativa y generación de reportes.</p>
+  </header>
+
+  <div class="statistics-hub-toggle-wrap">
+    <mat-button-toggle-group
+      class="statistics-hub-toggle"
+      [value]="viewMode"
+      (change)="onViewModeChange($event)"
+      aria-label="Selector de vista de estadísticas y reportes">
+      <mat-button-toggle value="statistics">Estadísticas</mat-button-toggle>
+      <mat-button-toggle value="reports">Reportes</mat-button-toggle>
+    </mat-button-toggle-group>
+  </div>
+
+  <section *ngIf="viewMode === 'statistics'" class="statistics-hub-content" aria-label="Vista de estadísticas">
+    <app-reports></app-reports>
+  </section>
+
+  <section *ngIf="viewMode === 'reports'" class="statistics-hub-content" aria-label="Vista de reportes">
+    <app-report-generator></app-report-generator>
+  </section>
+</section>

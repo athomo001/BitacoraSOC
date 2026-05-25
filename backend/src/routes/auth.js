@@ -30,6 +30,7 @@ const jwt = require('jsonwebtoken');
 const { body } = require('express-validator');
 const User = require('../models/User');
 const AppConfig = require('../models/AppConfig');
+const TokenDenylist = require('../models/TokenDenylist');
 const validate = require('../middleware/validate');
 const { loginLimiter, forgotPasswordLimiter, resetPasswordLimiter } = require('../middleware/rate-limiter');
 const { audit } = require('../utils/audit');
@@ -192,6 +193,16 @@ router.post('/login',
         $or: [{ username: exactMatch }, { email: exactMatch }]
       });
 
+      if (user && user.lockedUntil && user.lockedUntil > Date.now()) {
+        audit(req, {
+          event: 'auth.login.fail',
+          level: 'warn',
+          result: { success: false, reason: 'Account locked due to brute force' },
+          metadata: { username }
+        }).catch(err => logger.error({ err }, 'Audit error'));
+        return res.status(401).json({ message: 'Cuenta bloqueada temporalmente por múltiples intentos fallidos. Intente en 15 minutos.' });
+      }
+
       if (!user || !user.isActive) {
         const easterEgg = await getLoginEasterEggSignal(username, password);
         audit(req, {
@@ -222,18 +233,31 @@ router.post('/login',
       const isMatch = await user.comparePassword(password);
 
       if (!isMatch) {
+        user.failedAttempts = (user.failedAttempts || 0) + 1;
+        if (user.failedAttempts >= 5) {
+          user.lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
+        }
+        await user.save();
+
         const easterEgg = await getLoginEasterEggSignal(username, password);
         audit(req, {
           event: 'auth.login.fail',
           level: 'warn',
           result: { success: false, reason: 'Invalid password' },
-          metadata: { username }
+          metadata: { username, failedAttempts: user.failedAttempts }
         }).catch(err => logger.error({ err }, 'Audit error'));
 
         return res.status(401).json({
           message: 'Credenciales inválidas',
           ...(easterEgg ? { easterEgg } : {})
         });
+      }
+
+      // Resetear contadores de intentos fallidos si el login es exitoso
+      if (user.failedAttempts > 0 || user.lockedUntil) {
+        user.failedAttempts = 0;
+        user.lockedUntil = null;
+        await user.save();
       }
 
       const token = generateToken(user._id, user.role);
@@ -312,8 +336,8 @@ router.post('/refresh', async (req, res) => {
       return res.status(401).json({ message: 'Usuario no válido' });
     }
 
-    if (user.role === 'guest' && user.isGuestExpired()) {
-      return res.status(401).json({ message: 'Sesión de invitado expirada' });
+    if (user.role === 'guest') {
+      return res.status(403).json({ message: 'Los invitados no pueden renovar su sesión' });
     }
 
     const newToken = generateToken(user._id, user.role);
@@ -325,7 +349,30 @@ router.post('/refresh', async (req, res) => {
   }
 });
 
-router.post('/logout', (req, res) => {
+router.post('/logout', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const headerToken = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    const cookieToken = getTokenFromCookie(req);
+    const token = headerToken || cookieToken;
+
+    if (token) {
+      const decoded = jwt.decode(token);
+      if (decoded && decoded.exp) {
+        await TokenDenylist.create({
+          token,
+          expiresAt: new Date(decoded.exp * 1000)
+        }).catch(err => {
+          if (err.code !== 11000) {
+            logger.error({ err }, 'Error guardando token en denylist');
+          }
+        });
+      }
+    }
+  } catch (err) {
+    logger.error({ err }, 'Error procesando token en logout');
+  }
+
   res.clearCookie('auth_token', getAuthCookieOptions(req));
   return res.json({ message: 'Sesión cerrada' });
 });

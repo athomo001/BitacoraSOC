@@ -2,6 +2,11 @@
   <h1>Integraciones</h1>
   <p class="subtitle">Centraliza conectores salientes para SIEM/SOAR/NDR y futuras integraciones.</p>
 
+  <mat-tab-group [selectedIndex]="selectedTabIndex" (selectedIndexChange)="onTabChange($event)" animationDuration="200ms">
+
+    <mat-tab label="SIEM / SOAR / NDR">
+      <div class="tab-content">
+
   <div class="integration-panel">
     <header class="integration-panel__header">
       <h2 class="integration-panel__title">SIEM / SOAR / NDR</h2>
@@ -128,4 +133,15 @@
       </ul>
     </div>
   </div>
+
+      </div><!-- /tab-content SIEM -->
+    </mat-tab>
+
+    <mat-tab label="GLPI">
+      <div class="tab-content">
+        <app-glpi-integration></app-glpi-integration>
+      </div>
+    </mat-tab>
+
+  </mat-tab-group>
 </div>

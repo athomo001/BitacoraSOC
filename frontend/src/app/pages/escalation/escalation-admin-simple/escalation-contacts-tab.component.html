@@ -5,20 +5,6 @@
   </header>
 
   <section class="section">
-    <h3>Clientes (fuente única)</h3>
-    <p class="subtitle">Los clientes de escalación se administran desde Catálogos &gt; Log Sources. Aquí solo se muestran habilitados.</p>
-    <div class="chips-list" *ngIf="!loadingClients">
-      <div class="chip" *ngFor="let client of clients">
-        {{ client.name }}
-      </div>
-    </div>
-    <div *ngIf="loadingClients" class="loading-inline" role="status" aria-live="polite">
-      <mat-spinner diameter="20"></mat-spinner>
-      <span>Cargando clientes...</span>
-    </div>
-  </section>
-
-  <section class="section">
     <h3>1. Servicios de Escalación</h3>
     <button mat-raised-button color="accent" (click)="addService()">
       <mat-icon aria-hidden="true">add</mat-icon>
@@ -28,20 +14,21 @@
     <article *ngIf="showServiceForm" class="inline-form">
       <form [formGroup]="serviceForm" (ngSubmit)="saveService()">
         <mat-form-field appearance="outline">
-          <mat-label>Buscar cliente</mat-label>
-          <input matInput [(ngModel)]="serviceClientSearch" [ngModelOptions]="{standalone: true}" placeholder="Filtrar clientes">
-          <mat-icon matSuffix aria-hidden="true">search</mat-icon>
-        </mat-form-field>
-        <mat-form-field appearance="outline">
           <mat-label>Cliente</mat-label>
-          <mat-select formControlName="clientId">
-            <mat-option *ngFor="let client of filteredClientsForServiceForm" [value]="client._id">
+          <input
+            matInput
+            placeholder="Escriba para buscar cliente..."
+            [value]="serviceClientSearch"
+            (input)="onServiceClientSearchInput($any($event.target).value)"
+            [matAutocomplete]="autoServiceClient">
+          <mat-autocomplete
+            #autoServiceClient="matAutocomplete"
+            (optionSelected)="onServiceClientSelected($event.option.value)">
+            <mat-option *ngFor="let client of filteredClientsForServiceForm" [value]="client">
               {{ client.name }}
             </mat-option>
-            <mat-option *ngIf="filteredClientsForServiceForm.length === 0" disabled>
-              Sin resultados para "{{ serviceClientSearch }}"
-            </mat-option>
-          </mat-select>
+          </mat-autocomplete>
+          <mat-error *ngIf="serviceForm.get('clientId')?.invalid">El cliente es obligatorio</mat-error>
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Nombre del Servicio</mat-label>
@@ -56,7 +43,7 @@
       </form>
     </article>
 
-    <div class="simple-table" *ngIf="!loadingServices && services.length > 0">
+    <div class="simple-table services-table-container" *ngIf="!loadingServices && services.length > 0">
       <table>
         <thead>
           <tr>
@@ -125,13 +112,21 @@
       </div>
       <form [formGroup]="contactForm" (ngSubmit)="saveContact()">
         <mat-form-field appearance="outline">
-          <mat-label>Cliente</mat-label>
-          <mat-select [(ngModel)]="escalationServiceClientFilter" [ngModelOptions]="{standalone: true}" (selectionChange)="onEscalationServiceClientFilterChange()">
-            <mat-option value="">Todos</mat-option>
-            <mat-option *ngFor="let client of clients" [value]="client._id">
+          <mat-label>Filtrar por Cliente</mat-label>
+          <input
+            matInput
+            placeholder="Escriba para buscar cliente..."
+            [value]="contactClientSearch"
+            (input)="onContactClientSearchInput($any($event.target).value)"
+            [matAutocomplete]="autoContactClient">
+          <mat-autocomplete
+            #autoContactClient="matAutocomplete"
+            (optionSelected)="onContactClientSelected($event.option.value)">
+            <mat-option [value]="null">Todos</mat-option>
+            <mat-option *ngFor="let client of filteredClientsForContactForm" [value]="client">
               {{ client.name }}
             </mat-option>
-          </mat-select>
+          </mat-autocomplete>
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Servicio</mat-label>

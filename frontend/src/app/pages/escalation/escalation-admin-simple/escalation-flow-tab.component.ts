@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, ChangeDetectorRef, NgZone, Output, EventEmitter } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit, ChangeDetectorRef, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -11,10 +11,12 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
+import { Subject, debounceTime, takeUntil } from 'rxjs';
 import { EscalationService } from '../../../services/escalation.service';
 import { CatalogService } from '../../../services/catalog.service';
 import { DirectoryService, DirectoryContact } from '../../../services/directory.service';
 import { EscalationFlowStep } from '../../../models/escalation.model';
+import { EscalationFlowPreviewComponent } from '../shared/escalation-flow-preview.component';
 
 @Component({
   selector: 'app-escalation-flow-tab',
@@ -32,12 +34,13 @@ import { EscalationFlowStep } from '../../../models/escalation.model';
     MatSnackBarModule,
     MatAutocompleteModule,
     MatTooltipModule,
-    DragDropModule
+    DragDropModule,
+    EscalationFlowPreviewComponent
   ],
   templateUrl: './escalation-flow-tab.component.html',
   styleUrls: ['./escalation-flow-tab.component.scss']
 })
-export class EscalationFlowTabComponent implements OnInit {
+export class EscalationFlowTabComponent implements OnInit, OnDestroy {
   @Input() isAdminUser = false;
   @Input() directoryContacts: DirectoryContact[] = [];
   
@@ -49,6 +52,8 @@ export class EscalationFlowTabComponent implements OnInit {
   selectedFlowClientId: string | null = null;
   flowSteps: any[] = [];
   flowLegend = '';
+  previewFlowSteps: EscalationFlowStep[] = [];
+  previewLegend = '';
   
   loadingFlow = false;
   savingFlow = false;
@@ -63,18 +68,31 @@ export class EscalationFlowTabComponent implements OnInit {
   // Search/Autocomplete helpers
   directorySuggestions: Record<string, DirectoryContact[]> = {};
   private directorySearchTimers: Record<string, any> = {};
+  isTabletPreviewCollapsed = false;
+  showMobilePreview = false;
+
+  private readonly destroy$ = new Subject<void>();
+  private readonly previewRefresh$ = new Subject<void>();
 
   constructor(
     private escalationService: EscalationService,
     private catalogService: CatalogService,
     private directoryService: DirectoryService,
     private snackBar: MatSnackBar,
-    private cdr: ChangeDetectorRef,
-    private ngZone: NgZone
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
+    this.previewRefresh$
+      .pipe(debounceTime(150), takeUntil(this.destroy$))
+      .subscribe(() => this.syncPreviewFromEditor());
+
     this.loadClients();
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   loadClients(): void {
@@ -102,6 +120,29 @@ export class EscalationFlowTabComponent implements OnInit {
     } else {
       this.flowSteps = [];
       this.flowLegend = '';
+      this.queuePreviewUpdate();
+    }
+  }
+
+  onFlowClientSearchInput(value: string): void {
+    this.flowClientSearch = value;
+    const match = this.clients.find(c => c.name.toLowerCase() === value.toLowerCase());
+    if (match) {
+      this.selectedFlowClientId = match._id;
+      this.onFlowClientChange();
+    } else {
+      this.selectedFlowClientId = null;
+      this.flowSteps = [];
+      this.flowLegend = '';
+      this.queuePreviewUpdate();
+    }
+  }
+
+  onFlowClientSelected(client: any): void {
+    if (client) {
+      this.selectedFlowClientId = client._id;
+      this.flowClientSearch = client.name;
+      this.onFlowClientChange();
     }
   }
 
@@ -113,12 +154,14 @@ export class EscalationFlowTabComponent implements OnInit {
         this.flowSteps = config?.flow || [];
         this.flowLegend = config?.legend || '';
         this.loadingFlow = false;
+        this.syncPreviewFromEditor();
         this.cdr.detectChanges();
       },
       error: () => {
         this.flowSteps = [];
         this.flowLegend = '';
         this.loadingFlow = false;
+        this.syncPreviewFromEditor();
       }
     });
   }
@@ -151,14 +194,17 @@ export class EscalationFlowTabComponent implements OnInit {
       contacts: type === 'pool' ? [] : undefined
     };
     this.flowSteps.push(newStep);
+    this.queuePreviewUpdate();
   }
 
   deleteFlowStep(index: number): void {
     this.flowSteps.splice(index, 1);
+    this.queuePreviewUpdate();
   }
 
   dropFlowStep(event: CdkDragDrop<any[]>): void {
     moveItemInArray(this.flowSteps, event.previousIndex, event.currentIndex);
+    this.queuePreviewUpdate();
   }
 
   addPoolContact(stepIndex: number): void {
@@ -166,10 +212,12 @@ export class EscalationFlowTabComponent implements OnInit {
       this.flowSteps[stepIndex].contacts = [];
     }
     this.flowSteps[stepIndex].contacts.push({ name: '', tel: '' });
+    this.queuePreviewUpdate();
   }
 
   removePoolContact(stepIndex: number, contactIndex: number): void {
     this.flowSteps[stepIndex].contacts.splice(contactIndex, 1);
+    this.queuePreviewUpdate();
   }
 
   // Quick Client Logic
@@ -202,6 +250,7 @@ export class EscalationFlowTabComponent implements OnInit {
         this.clientsRefresh.emit(); // Notify parent or other tabs
         if (created?._id) {
           this.selectedFlowClientId = created._id;
+          this.flowClientSearch = created.name;
           this.onFlowClientChange();
         }
         this.savingQuickClient = false;
@@ -226,6 +275,7 @@ export class EscalationFlowTabComponent implements OnInit {
   onFlowNameInput(stepIndex: number, value: any, contactIndex?: number): void {
     const query = typeof value === 'string' ? value.trim() : (value?.name || '');
     const key = this.getStepKey(stepIndex, contactIndex);
+    this.queuePreviewUpdate();
 
     if (this.directorySearchTimers[key]) clearTimeout(this.directorySearchTimers[key]);
 
@@ -255,6 +305,7 @@ export class EscalationFlowTabComponent implements OnInit {
     }
     const key = this.getStepKey(stepIndex, contactIndex);
     this.directorySuggestions[key] = [];
+    this.queuePreviewUpdate();
   }
 
   getDirectoryOptions(stepIndex: number, contactIndex?: number): DirectoryContact[] {
@@ -277,6 +328,55 @@ export class EscalationFlowTabComponent implements OnInit {
 
   displayDirectoryContact(value: DirectoryContact | string | null): string {
     return typeof value === 'string' ? value : (value?.name || '');
+  }
+
+  isStepConfigured(step: EscalationFlowStep): boolean {
+    if (!step.title || !step.title.trim()) {
+      return false;
+    }
+    if (step.type === 'unique') {
+      return !!(step.contactName && step.contactName.trim() && step.contactTel && step.contactTel.trim());
+    } else if (step.type === 'pool') {
+      if (!step.contacts || step.contacts.length === 0) {
+        return false;
+      }
+      return step.contacts.every(c => c.name && c.name.trim() && c.tel && c.tel.trim());
+    }
+    return false;
+  }
+
+  queuePreviewUpdate(): void {
+    this.previewRefresh$.next();
+  }
+
+  syncPreviewFromEditor(): void {
+    this.previewFlowSteps = (this.flowSteps || []).map((step: EscalationFlowStep, index: number) => ({
+      ...step,
+      order: step.order || index + 1,
+      contacts: step.contacts ? step.contacts.map((contact) => ({ ...contact })) : []
+    }));
+    this.previewLegend = this.flowLegend || '';
+  }
+
+  getSelectedClientNameForPreview(): string {
+    const selectedClient = this.clients.find((client) => client._id === this.selectedFlowClientId);
+    return selectedClient?.name || this.flowClientSearch || '';
+  }
+
+  hasClientConfiguredForPreview(): boolean {
+    return !!this.selectedFlowClientId;
+  }
+
+  toggleTabletPreview(): void {
+    this.isTabletPreviewCollapsed = !this.isTabletPreviewCollapsed;
+  }
+
+  toggleMobilePreview(): void {
+    this.showMobilePreview = !this.showMobilePreview;
+  }
+
+  closeMobilePreview(): void {
+    this.showMobilePreview = false;
   }
 
   showError(message: string): void {

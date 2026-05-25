@@ -1,5 +1,8 @@
 <div class="audit-logs-container">
-  <div #auditGuideCard class="audit-panel audit-panel--guide" *ngIf="auditGuideVisible">
+  <section #auditGuideCard class="audit-panel audit-panel--guide" *ngIf="auditGuideVisible">
+    <header class="audit-panel__header">
+      <h2 class="audit-panel__title">ℹ️ Guía de Auditoría</h2>
+    </header>
     <div class="audit-panel__body">
       <p><strong>Guía rápida Auditoría:</strong> usa filtros para acotar eventos, luego exporta en CSV/JSON por cantidad, días, meses o todo.</p>
       <div class="filter-actions">
@@ -7,9 +10,9 @@
         <button mat-stroked-button color="primary" type="button" (click)="closeAuditGuide(true)">No volver a mostrar</button>
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="audit-panel audit-panel--filters filter-card">
+  <section class="audit-panel audit-panel--filters filter-card">
     <header class="audit-panel__header">
       <h2 class="audit-panel__title">🔍 Filtros de Auditoría</h2>
     </header>
@@ -111,12 +114,13 @@
         </div>
       </form>
     </div>
-  </div>
+  </section>
 
-  <div class="audit-panel audit-panel--results results-card">
+  <section class="audit-panel audit-panel--results results-card">
     <header class="audit-panel__header">
       <h2 class="audit-panel__title">📋 Logs de Auditoría ({{ totalLogs }} registros)</h2>
     </header>
+    <mat-progress-bar *ngIf="isLoading" mode="indeterminate" class="loading-bar"></mat-progress-bar>
     <div class="audit-panel__body audit-panel__body--flush">
       <table mat-table [dataSource]="logs" class="audit-table">
         <ng-container matColumnDef="timestamp">
@@ -176,5 +180,5 @@
         showFirstLastButtons>
       </mat-paginator>
     </div>
-  </div>
+  </section>
 </div>

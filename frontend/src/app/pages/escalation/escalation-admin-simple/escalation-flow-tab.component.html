@@ -6,21 +6,20 @@
 
   <section class="flow-admin-toolbar" aria-label="Controles de flujo">
     <mat-form-field appearance="outline" class="flow-client-field">
-      <mat-label>Buscar cliente</mat-label>
-      <input matInput [(ngModel)]="flowClientSearch" placeholder="Escribe nombre del cliente">
-      <mat-icon matSuffix aria-hidden="true">search</mat-icon>
-    </mat-form-field>
-
-    <mat-form-field appearance="outline" class="flow-client-field">
-      <mat-label>Seleccionar Cliente</mat-label>
-      <mat-select [(ngModel)]="selectedFlowClientId" (selectionChange)="onFlowClientChange()">
-        <mat-option *ngFor="let client of filteredClientsForFlow" [value]="client._id">
+      <mat-label>Cliente</mat-label>
+      <input
+        matInput
+        placeholder="Escriba para buscar cliente..."
+        [value]="flowClientSearch"
+        (input)="onFlowClientSearchInput($any($event.target).value)"
+        [matAutocomplete]="autoFlowClient">
+      <mat-autocomplete
+        #autoFlowClient="matAutocomplete"
+        (optionSelected)="onFlowClientSelected($event.option.value)">
+        <mat-option *ngFor="let client of filteredClientsForFlow" [value]="client">
           {{ client.name }}
         </mat-option>
-        <mat-option *ngIf="filteredClientsForFlow.length === 0" disabled>
-          Sin resultados para "{{ flowClientSearch }}"
-        </mat-option>
-      </mat-select>
+      </mat-autocomplete>
     </mat-form-field>
 
     <div class="toolbar-actions">
@@ -64,116 +63,163 @@
     </form>
   </section>
 
-  <div *ngIf="loadingFlow" class="loading-center" role="status" aria-live="polite">
-    <mat-spinner diameter="36"></mat-spinner>
-    <p>Cargando flujo...</p>
+  <div class="preview-toolbar" *ngIf="selectedFlowClientId || flowClientSearch">
+    <button mat-stroked-button type="button" class="tablet-preview-btn" (click)="toggleTabletPreview()">
+      <mat-icon aria-hidden="true">preview</mat-icon>
+      {{ isTabletPreviewCollapsed ? 'Mostrar vista previa' : 'Ocultar vista previa' }}
+    </button>
+    <button mat-stroked-button type="button" class="mobile-preview-btn" (click)="toggleMobilePreview()">
+      <mat-icon aria-hidden="true">open_in_new</mat-icon>
+      Abrir vista previa
+    </button>
   </div>
 
-  <div *ngIf="!loadingFlow && selectedFlowClientId && flowSteps.length === 0" class="no-data">
-    <mat-icon aria-hidden="true">schema</mat-icon>
-    <p>No hay pasos configurados para este cliente. Agregue uno para comenzar.</p>
-  </div>
-
-  <div *ngIf="!selectedFlowClientId" class="no-data">
-    <mat-icon aria-hidden="true">person_search</mat-icon>
-    <p>Seleccione un cliente para ver o editar su flujo de escalamiento.</p>
-  </div>
-
-  <div class="flow-steps-container" cdkDropList [cdkDropListData]="flowSteps" (cdkDropListDropped)="dropFlowStep($event)">
-    <article class="flow-step-card" *ngFor="let step of flowSteps; let stepIndex = index" cdkDrag>
-      <header class="flow-step-header">
-        <div class="flow-step-title-wrap">
-          <button mat-icon-button cdkDragHandle matTooltip="Arrastrar para reordenar" aria-label="Reordenar paso">
-            <mat-icon aria-hidden="true">drag_indicator</mat-icon>
-          </button>
-          <mat-form-field appearance="outline" class="flow-step-title">
-            <mat-label>Título del paso</mat-label>
-            <input matInput [(ngModel)]="step.title" placeholder="Ej: 1er Llamado">
-          </mat-form-field>
-          <span class="step-type-badge">{{ step.type === 'pool' ? 'POOL' : 'ÚNICO' }}</span>
-        </div>
-        <div>
-          <button mat-icon-button color="warn" (click)="deleteFlowStep(stepIndex)" matTooltip="Eliminar paso" aria-label="Eliminar paso">
-            <mat-icon aria-hidden="true">delete</mat-icon>
-          </button>
-        </div>
-      </header>
-
-      <div *ngIf="step.type === 'unique'" class="flow-step-body">
-        <mat-form-field appearance="outline">
-          <mat-label>Nombre</mat-label>
-          <input
-            matInput
-            [(ngModel)]="step.contactName"
-            [matAutocomplete]="autoUniqueName"
-            (focus)="onFlowNameFocus(stepIndex)"
-            (input)="onFlowNameInput(stepIndex, step.contactName)"
-            placeholder="Nombre del contacto">
-          <mat-autocomplete
-            #autoUniqueName="matAutocomplete"
-            [displayWith]="displayDirectoryContact"
-            (optionSelected)="onFlowDirectoryContactSelected(stepIndex, $event.option.value)">
-            <mat-option *ngFor="let suggestion of getDirectoryOptions(stepIndex)" [value]="suggestion">
-              {{ suggestion.name }} <span *ngIf="suggestion.phone">- {{ suggestion.phone }}</span>
-            </mat-option>
-          </mat-autocomplete>
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Tel</mat-label>
-          <input matInput [(ngModel)]="step.contactTel" placeholder="+56 9 ...">
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Fecha/Hora (Referencia)</mat-label>
-          <input matInput type="datetime-local" [(ngModel)]="step.callAt">
-        </mat-form-field>
+  <div class="flow-workbench" [class.preview-collapsed]="isTabletPreviewCollapsed">
+    <section class="flow-editor-pane">
+      <div *ngIf="loadingFlow" class="loading-center" role="status" aria-live="polite">
+        <mat-spinner diameter="36"></mat-spinner>
+        <p>Cargando flujo...</p>
       </div>
 
-      <div *ngIf="step.type === 'pool'" class="flow-step-body flow-step-body--pool">
-        <header class="pool-header">
-          <strong>Miembros del Pool</strong>
-          <button mat-stroked-button color="primary" size="small" (click)="addPoolContact(stepIndex)">
-            <mat-icon aria-hidden="true">add_circle</mat-icon>
-            Agregar Miembro
-          </button>
-        </header>
-        <div class="pool-grid">
-          <div class="pool-contact-row" *ngFor="let contact of step.contacts; let contactIndex = index">
+      <div *ngIf="!loadingFlow && selectedFlowClientId && flowSteps.length === 0" class="no-data">
+        <mat-icon aria-hidden="true">schema</mat-icon>
+        <p>No hay pasos configurados para este cliente. Agregue uno para comenzar.</p>
+      </div>
+
+      <div *ngIf="!selectedFlowClientId" class="no-data">
+        <mat-icon aria-hidden="true">person_search</mat-icon>
+        <p>Seleccione un cliente para ver o editar su flujo de escalamiento.</p>
+      </div>
+
+      <div class="flow-steps-container" cdkDropList [cdkDropListData]="flowSteps" (cdkDropListDropped)="dropFlowStep($event)">
+        <article class="flow-step-card" *ngFor="let step of flowSteps; let stepIndex = index" cdkDrag>
+          <header class="flow-step-header">
+            <div class="flow-step-title-wrap">
+              <button mat-icon-button cdkDragHandle matTooltip="Arrastrar para reordenar" aria-label="Reordenar paso">
+                <mat-icon aria-hidden="true">drag_indicator</mat-icon>
+              </button>
+              <span class="step-number-badge">Paso {{ stepIndex + 1 }}</span>
+              <mat-form-field appearance="outline" class="flow-step-title">
+                <mat-label>Título del paso</mat-label>
+                <input matInput [(ngModel)]="step.title" (ngModelChange)="queuePreviewUpdate()" placeholder="Ej: 1er Llamado">
+              </mat-form-field>
+              <span class="step-type-badge">{{ step.type === 'pool' ? 'POOL' : 'ÚNICO' }}</span>
+              <span class="step-status-badge" [class.complete]="isStepConfigured(step)" [class.incomplete]="!isStepConfigured(step)">
+                <mat-icon aria-hidden="true">{{ isStepConfigured(step) ? 'check_circle' : 'pending' }}</mat-icon>
+                {{ isStepConfigured(step) ? 'Configurado' : 'Incompleto' }}
+              </span>
+            </div>
+            <div>
+              <button mat-icon-button color="warn" (click)="deleteFlowStep(stepIndex)" matTooltip="Eliminar paso" aria-label="Eliminar paso">
+                <mat-icon aria-hidden="true">delete</mat-icon>
+              </button>
+            </div>
+          </header>
+
+          <div *ngIf="step.type === 'unique'" class="flow-step-body">
             <mat-form-field appearance="outline">
               <mat-label>Nombre</mat-label>
               <input
                 matInput
-                [(ngModel)]="contact.name"
-                [matAutocomplete]="autoPoolName"
-                (focus)="onFlowNameFocus(stepIndex, contactIndex)"
-                (input)="onFlowNameInput(stepIndex, contact.name, contactIndex)"
-                placeholder="Nombre">
+                [(ngModel)]="step.contactName"
+                (ngModelChange)="queuePreviewUpdate()"
+                [matAutocomplete]="autoUniqueName"
+                (focus)="onFlowNameFocus(stepIndex)"
+                (input)="onFlowNameInput(stepIndex, step.contactName)"
+                placeholder="Nombre del contacto">
               <mat-autocomplete
-                #autoPoolName="matAutocomplete"
+                #autoUniqueName="matAutocomplete"
                 [displayWith]="displayDirectoryContact"
-                (optionSelected)="onFlowDirectoryContactSelected(stepIndex, $event.option.value, contactIndex)">
-                <mat-option *ngFor="let suggestion of getDirectoryOptions(stepIndex, contactIndex)" [value]="suggestion">
+                (optionSelected)="onFlowDirectoryContactSelected(stepIndex, $event.option.value)">
+                <mat-option *ngFor="let suggestion of getDirectoryOptions(stepIndex)" [value]="suggestion">
                   {{ suggestion.name }} <span *ngIf="suggestion.phone">- {{ suggestion.phone }}</span>
                 </mat-option>
               </mat-autocomplete>
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Tel</mat-label>
-              <input matInput [(ngModel)]="contact.tel" placeholder="+56 9 ...">
+              <input matInput [(ngModel)]="step.contactTel" (ngModelChange)="queuePreviewUpdate()" placeholder="+56 9 ...">
             </mat-form-field>
-            <button mat-icon-button color="warn" (click)="removePoolContact(stepIndex, contactIndex)" aria-label="Quitar miembro">
-              <mat-icon aria-hidden="true">remove_circle</mat-icon>
-            </button>
+            <mat-form-field appearance="outline">
+              <mat-label>Fecha/Hora (Referencia)</mat-label>
+              <input matInput type="datetime-local" [(ngModel)]="step.callAt" (ngModelChange)="queuePreviewUpdate()">
+            </mat-form-field>
           </div>
-        </div>
+
+          <div *ngIf="step.type === 'pool'" class="flow-step-body flow-step-body--pool">
+            <header class="pool-header">
+              <strong>Miembros del Pool</strong>
+              <button mat-stroked-button color="primary" size="small" (click)="addPoolContact(stepIndex)">
+                <mat-icon aria-hidden="true">add_circle</mat-icon>
+                Agregar Miembro
+              </button>
+            </header>
+            <div class="pool-grid">
+              <div class="pool-contact-row" *ngFor="let contact of step.contacts; let contactIndex = index">
+                <mat-form-field appearance="outline">
+                  <mat-label>Nombre</mat-label>
+                  <input
+                    matInput
+                    [(ngModel)]="contact.name"
+                    (ngModelChange)="queuePreviewUpdate()"
+                    [matAutocomplete]="autoPoolName"
+                    (focus)="onFlowNameFocus(stepIndex, contactIndex)"
+                    (input)="onFlowNameInput(stepIndex, contact.name, contactIndex)"
+                    placeholder="Nombre">
+                  <mat-autocomplete
+                    #autoPoolName="matAutocomplete"
+                    [displayWith]="displayDirectoryContact"
+                    (optionSelected)="onFlowDirectoryContactSelected(stepIndex, $event.option.value, contactIndex)">
+                    <mat-option *ngFor="let suggestion of getDirectoryOptions(stepIndex, contactIndex)" [value]="suggestion">
+                      {{ suggestion.name }} <span *ngIf="suggestion.phone">- {{ suggestion.phone }}</span>
+                    </mat-option>
+                  </mat-autocomplete>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Tel</mat-label>
+                  <input matInput [(ngModel)]="contact.tel" (ngModelChange)="queuePreviewUpdate()" placeholder="+56 9 ...">
+                </mat-form-field>
+                <button mat-icon-button color="warn" (click)="removePoolContact(stepIndex, contactIndex)" aria-label="Quitar miembro">
+                  <mat-icon aria-hidden="true">remove_circle</mat-icon>
+                </button>
+              </div>
+            </div>
+          </div>
+        </article>
       </div>
-    </article>
+
+      <section class="flow-legend-card" *ngIf="selectedFlowClientId">
+        <h3>Leyenda / Guía para el Operador</h3>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Texto de apoyo</mat-label>
+          <textarea matInput rows="4" [(ngModel)]="flowLegend" (ngModelChange)="queuePreviewUpdate()" placeholder="Ej: Llamar 3 veces antes de descartar el caso..."></textarea>
+        </mat-form-field>
+      </section>
+    </section>
+
+    <aside class="flow-preview-pane" *ngIf="selectedFlowClientId || flowClientSearch">
+      <app-escalation-flow-preview
+        [clientName]="getSelectedClientNameForPreview()"
+        [clientSelected]="hasClientConfiguredForPreview()"
+        [flowSteps]="previewFlowSteps"
+        [legend]="previewLegend">
+      </app-escalation-flow-preview>
+    </aside>
   </div>
 
-  <section class="flow-legend-card" *ngIf="selectedFlowClientId">
-    <h3>Leyenda / Guía para el Operador</h3>
-    <mat-form-field appearance="outline" class="full-width">
-      <mat-label>Texto de apoyo</mat-label>
-      <textarea matInput rows="4" [(ngModel)]="flowLegend" placeholder="Ej: Llamar 3 veces antes de descartar el caso..."></textarea>
-    </mat-form-field>
-  </section>
+  <div class="mobile-preview-overlay" *ngIf="showMobilePreview" (click)="closeMobilePreview()"></div>
+  <aside class="mobile-preview-drawer" [class.open]="showMobilePreview" *ngIf="selectedFlowClientId || flowClientSearch">
+    <header class="mobile-preview-drawer__header">
+      <strong>Vista previa en vivo</strong>
+      <button mat-icon-button type="button" (click)="closeMobilePreview()" aria-label="Cerrar vista previa">
+        <mat-icon aria-hidden="true">close</mat-icon>
+      </button>
+    </header>
+    <app-escalation-flow-preview
+      [clientName]="getSelectedClientNameForPreview()"
+      [clientSelected]="hasClientConfiguredForPreview()"
+      [flowSteps]="previewFlowSteps"
+      [legend]="previewLegend">
+    </app-escalation-flow-preview>
+  </aside>
 </div>

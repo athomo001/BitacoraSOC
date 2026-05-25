@@ -22,14 +22,19 @@
  * Timezone: America/Santiago (configurable vía TZ env)
  * Puerto: 3000 (configurable vía PORT env)
  */
+const path = require('path');
+// Intentar cargar .env desde la raíz del proyecto (para desarrollo local sin duplicar archivos)
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+// Fallback por si acaso se ejecuta en un contexto diferente
 require('dotenv').config();
+
 const express = require('express');
 const http = require('http');
 const https = require('https');
 const tls = require('tls');
 const cors = require('cors');
 const helmet = require('helmet');
-const path = require('path');
+
 const fs = require('fs');
 const connectDB = require('./config/database');
 const AppConfig = require('./models/AppConfig');
@@ -253,6 +258,15 @@ const validateEnv = () => {
     console.error(`❌ Faltan variables de entorno requeridas: ${missing.join(', ')}`);
     process.exit(1);
   }
+
+  if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
+    console.error(`❌ JWT_SECRET es demasiado corto. Debe tener al menos 32 caracteres por seguridad.`);
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
+    } else {
+      console.warn(`⚠️ [ADVERTENCIA] JWT_SECRET es débil. En producción el servidor no arrancará.`);
+    }
+  }
 };
 
 validateEnv();
@@ -305,9 +319,17 @@ app.use(helmet({
   xssFilter: true
 }));
 
-// Body parsers
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// Body parsers con límites dinámicos por ruta
+app.use((req, res, next) => {
+  const isLogoRoute = req.path === '/api/config/logo' || req.path === '/api/config/favicon';
+  const limit = isLogoRoute ? '10mb' : '2mb';
+  express.json({ limit })(req, res, next);
+});
+app.use((req, res, next) => {
+  const isLogoRoute = req.path === '/api/config/logo' || req.path === '/api/config/favicon';
+  const limit = isLogoRoute ? '10mb' : '2mb';
+  express.urlencoded({ extended: true, limit })(req, res, next);
+});
 
 // Correlation ID (X-Request-Id)
 app.use(requestIdMiddleware);
@@ -364,24 +386,22 @@ app.use((req, res, next) => {
   });
 });
 
-// 🔒 CORS - En desarrollo permite todo, en producción restringe
+// 🔒 CORS - Restringido en todos los ambientes
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production'
-    ? (origin, callback) => {
-      if (!origin) {
-        callback(null, true);
-        return;
-      }
-
-      const configuredOrigins = getAllowedOriginsSet(process.env.ALLOWED_ORIGINS || '');
-      if (configuredOrigins.has(origin)) {
-        callback(null, true);
-        return;
-      }
-
-      callback(new Error('No permitido por CORS'));
+  origin: (origin, callback) => {
+    if (!origin) {
+      callback(null, true);
+      return;
     }
-    : true, // En desarrollo permite cualquier origen
+
+    const configuredOrigins = getAllowedOriginsSet(process.env.ALLOWED_ORIGINS || '');
+    if (configuredOrigins.has(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error('No permitido por CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-https-retry'],
@@ -390,9 +410,6 @@ const corsOptions = {
 };
 
 const apiCorsMiddleware = (req, res, next) => {
-  if (process.env.NODE_ENV !== 'production') {
-    return cors(corsOptions)(req, res, next);
-  }
 
   const dynamicCorsOptions = {
     ...corsOptions,
@@ -496,6 +513,7 @@ app.use('/api/tags', require('./routes/tags'));
 app.use('/api/smtp', require('./routes/smtp'));
 app.use('/api/logging', require('./routes/logging'));
 app.use('/api/glpi', require('./routes/glpi'));
+app.use('/api/integrations/glpi', require('./routes/glpi')); // alias unificado
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/config', require('./routes/config'));
 app.use('/api/backup', require('./routes/backup'));

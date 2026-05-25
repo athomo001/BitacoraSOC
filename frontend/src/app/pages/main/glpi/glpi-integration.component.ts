@@ -116,7 +116,7 @@ export class GlpiIntegrationComponent implements OnInit {
 
   loadConfig(): void {
     this.loading = true;
-    this.http.get<any>(`${environment.apiUrl}/glpi/config`).subscribe({
+    this.http.get<any>(`${environment.apiUrl}/integrations/glpi`).subscribe({
       next: (config) => {
         this.form.patchValue({
           enabled: config.enabled ?? false,
@@ -189,7 +189,7 @@ export class GlpiIntegrationComponent implements OnInit {
     }
 
     this.saving = true;
-    this.http.put<any>(`${environment.apiUrl}/glpi/config`, payload).subscribe({
+    this.http.put<any>(`${environment.apiUrl}/integrations/glpi`, payload).subscribe({
       next: () => {
         this.saving = false;
         this.snackBar.open('Configuración GLPI guardada', 'Cerrar', { duration: 2500 });
@@ -224,7 +224,7 @@ export class GlpiIntegrationComponent implements OnInit {
       : {};
 
     this.testing = true;
-    this.http.post<any>(`${environment.apiUrl}/glpi/test`, payload).subscribe({
+    this.http.post<any>(`${environment.apiUrl}/integrations/glpi/test`, payload).subscribe({
       next: (response) => {
         this.testing = false;
         this.lastGlpiError = null;

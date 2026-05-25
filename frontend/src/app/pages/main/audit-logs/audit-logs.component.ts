@@ -16,6 +16,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { AuthService } from '../../../services/auth.service';
 import { OnboardingService } from '../../../services/onboarding.service';
@@ -36,7 +37,8 @@ import { AuditLog, AuditLogFilters } from '../../../models/audit-log.model';
     MatButtonModule,
     MatIconModule,
     MatChipsModule,
-    MatTooltipModule
+    MatTooltipModule,
+    MatProgressBarModule
   ],
   templateUrl: './audit-logs.component.html',
   styleUrls: ['./audit-logs.component.scss']
@@ -48,6 +50,7 @@ export class AuditLogsComponent implements OnInit {
   totalLogs = 0;
   pageSize = 20;
   currentPage = 1;
+  isLoading = false;
   exporting = false;
   exportModes = [
     { value: 'filters', label: 'Filtros actuales (incluye fechas)' },
@@ -139,14 +142,17 @@ export class AuditLogsComponent implements OnInit {
       }
     });
 
+    this.isLoading = true;
     this.auditLogService.getAuditLogs(filters).subscribe({
       next: (response) => {
         this.logs = response.logs;
         this.totalLogs = response.pagination.totalItems;
+        this.isLoading = false;
       },
       error: (error) => {
         console.error('Error loading audit logs:', error);
         this.snackBar.open('No se pudieron cargar los logs. Revisa filtros o estado de API.', 'Cerrar', { duration: 4500 });
+        this.isLoading = false;
       }
     });
   }

@@ -24,7 +24,6 @@ import { DirectoryService, DirectoryContact } from '../../../services/directory.
 import { AuthService } from '../../../services/auth.service';
 
 import { EscalationRaciTabComponent } from './escalation-raci-tab.component';
-import { EscalationShiftsTabComponent } from './escalation-shifts-tab.component';
 import { EscalationContactsTabComponent } from './escalation-contacts-tab.component';
 import { EscalationFlowTabComponent } from './escalation-flow-tab.component';
 import { EscalationDirectoryTabComponent } from './escalation-directory-tab.component';
@@ -53,7 +52,6 @@ class MondayFirstNativeDateAdapter extends NativeDateAdapter {
     MatTabsModule,
     MatTooltipModule,
     EscalationRaciTabComponent,
-    EscalationShiftsTabComponent,
     EscalationContactsTabComponent,
     EscalationFlowTabComponent,
     EscalationDirectoryTabComponent
@@ -152,7 +150,7 @@ export class EscalationAdminSimpleComponent implements OnInit {
   get pageHeaderSubtitle(): string {
     return this.directoryOnlyAccess
       ? 'Fuente única de contactos para todos los módulos operativos'
-      : 'Configura turnos internos y contactos de escalación';
+      : 'Configura flujos de llamadas, correos y RACI';
   }
 
   showError(message: string): void {

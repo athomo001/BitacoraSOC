@@ -25,12 +25,11 @@ export class AdminConsoleComponent {
     { label: 'Usuarios', route: '/main/admin/users' },
     { label: 'Checklist', route: '/main/admin/checklist' },
     { label: 'Turnos', route: '/main/admin/work-shifts' },
-    { label: 'Catálogos', route: '/main/admin/catalogs' },
+    { label: 'Clientes y Catálogos', route: '/main/admin/catalogs' },
     { label: 'Escalación', route: '/main/admin/escalation' },
     { label: 'EMAIL Config', route: '/main/admin/smtp' },
     { label: 'HTTPS / Seguridad', route: '/main/admin/security' },
     { label: 'Integraciones', route: '/main/admin/integrations' },
-    { label: 'GLPI', route: '/main/admin/glpi' },
     { label: 'Complementos', route: '/main/admin/complements' }
   ];
 }

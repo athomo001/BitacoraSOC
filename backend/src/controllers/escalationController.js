@@ -233,10 +233,10 @@ const splitCsvLine = (line = '') => {
 };
 
 const formatShiftAssignmentsTemplateCsv = () => ([
-  'roleCode,userType,identifier,weekStartDate,weekStartTime,weekEndDate,weekEndTime,notes',
-  'N2,user,analista.n2@empresa.com,2026-05-04,09:00,2026-05-11,08:59,Cobertura semanal N2',
-  'TI,user,usuario.ti,2026-05-04,09:00,2026-05-11,08:59,Infraestructura primaria',
-  'N1_NO_HABIL,external,guardia.externa@partner.com,2026-05-04,09:00,2026-05-11,08:59,Guardia externa'
+  'rol,usuario,fechaInicio,horaInicio,fechaFin,horaFin',
+  'N2,usuario.n2,2026-05-04,09:00,2026-05-11,08:59',
+  'TI,usuario.ti,2026-05-04,09:00,2026-05-11,08:59',
+  'N1,guardia.externa,2026-05-04,09:00,2026-05-11,08:59'
 ].join('\n'));
 
 const parseShiftAssignmentsCsv = (csvText = '') => {
@@ -251,7 +251,7 @@ const parseShiftAssignmentsCsv = (csvText = '') => {
   }
 
   const headers = splitCsvLine(lines[0]).map((header) => header.trim().toLowerCase());
-  const requiredHeaders = ['rolecode', 'usertype', 'identifier', 'weekstartdate', 'weekstarttime', 'weekenddate', 'weekendtime'];
+  const requiredHeaders = ['rol', 'usuario', 'fechainicio', 'horainicio', 'fechafin', 'horafin'];
   const missingHeaders = requiredHeaders.filter((header) => !headers.includes(header));
 
   if (missingHeaders.length > 0) {
@@ -272,12 +272,12 @@ const parseShiftAssignmentsCsv = (csvText = '') => {
       row[header] = String(values[headerIndex] || '').trim();
     });
 
-    if (!row.rolecode && !row.identifier) {
+    if (!row.rol && !row.usuario) {
       continue;
     }
 
-    if (!row.rolecode || !row.usertype || !row.identifier || !row.weekstartdate || !row.weekstarttime || !row.weekenddate || !row.weekendtime) {
-      errors.push({ row: row.rowNumber, message: 'Fila incompleta. Revisa rol, tipo, identificador y fechas/horas.' });
+    if (!row.rol || !row.usuario || !row.fechainicio || !row.horainicio || !row.fechafin || !row.horafin) {
+      errors.push({ row: row.rowNumber, message: 'Fila incompleta. Revisa rol, usuario y fechas/horas.' });
       continue;
     }
 
@@ -296,35 +296,13 @@ const buildAssignmentDateTime = (dateValue, timeValue) => {
 };
 
 const resolveAssignmentAssignee = async (row) => {
-  const userType = String(row.usertype || '').trim().toLowerCase();
-  const identifier = String(row.identifier || '').trim();
+  const identifier = String(row.usuario || row.identifier || '').trim();
 
   if (!identifier) {
     throw new Error('Falta el identificador de la persona asignada');
   }
 
-  if (userType === 'external') {
-    const externalPerson = await ExternalPerson.findOne({
-      $or: [
-        { email: identifier.toLowerCase() },
-        { name: { $regex: `^${escapeRegex(identifier)}$`, $options: 'i' } }
-      ]
-    }).select('_id name email');
-
-    if (!externalPerson) {
-      throw new Error(`Persona externa no encontrada: ${identifier}`);
-    }
-
-    return {
-      externalPersonId: externalPerson._id,
-      label: externalPerson.name || externalPerson.email || identifier
-    };
-  }
-
-  if (userType !== 'user') {
-    throw new Error(`userType inválido: ${row.usertype}. Usa user o external`);
-  }
-
+  // Primero buscar usuario interno
   const user = await User.findOne({
     $or: [
       { username: identifier },
@@ -333,15 +311,30 @@ const resolveAssignmentAssignee = async (row) => {
     ]
   }).select('_id cargoLabel fullName username email');
 
-  if (!user) {
-    throw new Error(`Usuario no encontrado: ${identifier}`);
+  if (user) {
+    return {
+      userId: user._id,
+      user,
+      label: user.fullName || user.username || user.email || identifier
+    };
   }
 
-  return {
-    userId: user._id,
-    user,
-    label: user.fullName || user.username || user.email || identifier
-  };
+  // Si no se encontró internamente, buscar en personas externas
+  const externalPerson = await ExternalPerson.findOne({
+    $or: [
+      { email: identifier.toLowerCase() },
+      { name: { $regex: `^${escapeRegex(identifier)}$`, $options: 'i' } }
+    ]
+  }).select('_id name email');
+
+  if (externalPerson) {
+    return {
+      externalPersonId: externalPerson._id,
+      label: externalPerson.name || externalPerson.email || identifier
+    };
+  }
+
+  throw new Error(`Persona no encontrada: ${identifier}`);
 };
 
 const normalizeEscalationFlowPayload = (rawSteps = []) => {
@@ -1666,13 +1659,14 @@ exports.importAssignmentsCsv = async (req, res) => {
 
     for (const row of parsed.rows) {
       try {
-        const roleCode = String(row.rolecode || '').trim().toUpperCase();
+        const rawRol = String(row.rol || row.rolecode || '').trim().toUpperCase();
+        const roleCode = rawRol === 'N1' ? 'N1_NO_HABIL' : rawRol;
         if (!['N2', 'TI', 'N1_NO_HABIL'].includes(roleCode)) {
-          throw new Error(`roleCode inválido: ${row.rolecode}`);
+          throw new Error(`Rol inválido: ${rawRol}. Usa N1, N2 o TI`);
         }
 
-        const weekStartDate = buildAssignmentDateTime(row.weekstartdate, row.weekstarttime);
-        const weekEndDate = buildAssignmentDateTime(row.weekenddate, row.weekendtime);
+        const weekStartDate = buildAssignmentDateTime(row.fechainicio || row.weekstartdate, row.horainicio || row.weekstarttime);
+        const weekEndDate = buildAssignmentDateTime(row.fechafin || row.weekenddate, row.horafin || row.weekendtime);
 
         if (!weekStartDate || !weekEndDate) {
           throw new Error('Fechas u horas inválidas. Usa formato YYYY-MM-DD y HH:MM');
@@ -1691,7 +1685,6 @@ exports.importAssignmentsCsv = async (req, res) => {
           roleCode,
           weekStartDate,
           weekEndDate,
-          notes: sanitizeText(row.notes || '', 500),
           userId: assignee.userId,
           externalPersonId: assignee.externalPersonId
         };

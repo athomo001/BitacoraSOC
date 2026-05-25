@@ -27,6 +27,7 @@ import { EscalationService } from '../../../services/escalation.service';
 import { CatalogService } from '../../../services/catalog.service';
 import { CatalogLogSource } from '../../../models/catalog.model';
 import { ClientAlertRule, EscalationFlowConfig } from '../../../models/escalation.model';
+import { EscalationFlowPreviewComponent } from '../shared/escalation-flow-preview.component';
 
 @Component({
     selector: 'app-escalation-simple',
@@ -47,7 +48,8 @@ import { ClientAlertRule, EscalationFlowConfig } from '../../../models/escalatio
         MatAutocompleteModule,
         MatTooltipModule,
         MatCheckboxModule,
-        ReactiveFormsModule
+        ReactiveFormsModule,
+        EscalationFlowPreviewComponent
     ],
     templateUrl: './escalation-simple.component.html',
     styleUrls: ['./escalation-simple.component.scss']

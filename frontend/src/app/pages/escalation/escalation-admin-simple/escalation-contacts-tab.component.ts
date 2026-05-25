@@ -67,6 +67,7 @@ export class EscalationContactsTabComponent implements OnInit {
   escalationClientSearch = '';
   escalationServiceClientFilter = '';
   escalationServiceSearch = '';
+  contactClientSearch = '';
   contactDirectorySuggestions: DirectoryContact[] = [];
   private contactNameSearchTimer?: any;
   private selectedContactDirectoryId = '';
@@ -225,6 +226,55 @@ export class EscalationContactsTabComponent implements OnInit {
     return this.clients.filter((client) => String(client?.name || '').toLowerCase().includes(term));
   }
 
+  onServiceClientSearchInput(value: string): void {
+    this.serviceClientSearch = value;
+    const match = this.clients.find(c => c.name.toLowerCase() === value.toLowerCase());
+    if (match) {
+      this.serviceForm.patchValue({ clientId: match._id });
+    } else {
+      this.serviceForm.patchValue({ clientId: '' });
+    }
+  }
+
+  onServiceClientSelected(client: any): void {
+    if (client) {
+      this.serviceForm.patchValue({ clientId: client._id });
+      this.serviceClientSearch = client.name;
+    } else {
+      this.serviceForm.patchValue({ clientId: '' });
+      this.serviceClientSearch = '';
+    }
+  }
+
+  get filteredClientsForContactForm(): any[] {
+    const term = this.contactClientSearch.trim().toLowerCase();
+    if (!term) return this.clients;
+    return this.clients.filter((client) => String(client?.name || '').toLowerCase().includes(term));
+  }
+
+  onContactClientSearchInput(value: string): void {
+    this.contactClientSearch = value;
+    const match = this.clients.find(c => c.name.toLowerCase() === value.toLowerCase());
+    if (match) {
+      this.escalationServiceClientFilter = match._id;
+      this.onEscalationServiceClientFilterChange();
+    } else {
+      this.escalationServiceClientFilter = '';
+      this.onEscalationServiceClientFilterChange();
+    }
+  }
+
+  onContactClientSelected(client: any): void {
+    if (client) {
+      this.escalationServiceClientFilter = client._id;
+      this.contactClientSearch = client.name;
+    } else {
+      this.escalationServiceClientFilter = '';
+      this.contactClientSearch = '';
+    }
+    this.onEscalationServiceClientFilterChange();
+  }
+
   get filteredServicesForContactForm(): any[] {
     const selectedClientId = String(this.escalationServiceClientFilter || '').trim();
     const search = String(this.escalationServiceSearch || '').trim().toLowerCase();
@@ -250,6 +300,7 @@ export class EscalationContactsTabComponent implements OnInit {
   addService(): void {
     this.showServiceForm = true;
     this.editingServiceId = null;
+    this.serviceClientSearch = '';
     this.serviceForm.reset({ clientId: '', name: '', active: true });
   }
 
@@ -285,6 +336,7 @@ export class EscalationContactsTabComponent implements OnInit {
     this.showContactForm = true;
     this.editingContactId = null;
     this.escalationServiceClientFilter = '';
+    this.contactClientSearch = '';
     this.escalationServiceSearch = '';
     this.selectedContactDirectoryId = '';
     this.contactDirectorySuggestions = [];
@@ -350,6 +402,10 @@ export class EscalationContactsTabComponent implements OnInit {
       ? String(contact?.serviceId?.clientId?._id || '')
       : '';
     this.escalationServiceClientFilter = serviceClientId;
+    const serviceClientName = typeof contact?.serviceId === 'object' && contact?.serviceId !== null
+      ? String(contact?.serviceId?.clientId?.name || '')
+      : '';
+    this.contactClientSearch = serviceClientName;
     this.escalationServiceSearch = '';
     this.selectedContactDirectoryId = '';
     this.contactDirectorySuggestions = [];

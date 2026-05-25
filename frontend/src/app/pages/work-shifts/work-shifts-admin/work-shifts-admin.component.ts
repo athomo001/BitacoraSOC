@@ -4,7 +4,7 @@
  * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
  */
 
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, FormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -20,14 +20,21 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatDividerModule } from '@angular/material/divider';
-import { Observable, Subscription, interval } from 'rxjs';
-import { startWith, takeUntil } from 'rxjs/operators';
-import { Subject } from 'rxjs';
+import { MatTabsModule } from '@angular/material/tabs';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatNativeDateModule } from '@angular/material/core';
+import { MatExpansionModule } from '@angular/material/expansion';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { Observable, Subscription, interval, Subject, forkJoin, of } from 'rxjs';
+import { startWith, takeUntil, map, catchError } from 'rxjs/operators';
 import { WorkShiftService } from '../../../services/work-shift.service';
 import { AuthService } from '../../../services/auth.service';
 import { ConfigService } from '../../../services/config.service';
 import { ChecklistService } from '../../../services/checklist.service';
 import { UserService } from '../../../services/user.service';
+import { CatalogService } from '../../../services/catalog.service';
+import { EscalationService } from '../../../services/escalation.service';
+import { DirectoryService, DirectoryContact } from '../../../services/directory.service';
 import { WorkShift, WorkShiftFormData, SHIFT_TYPE_OPTIONS, DEFAULT_COLORS } from '../../../models/work-shift.model';
 import { isShiftActiveNow } from '../../../utils/shift-time.util';
 
@@ -50,16 +57,21 @@ import { isShiftActiveNow } from '../../../utils/shift-time.util';
     MatSnackBarModule,
     MatProgressSpinnerModule,
     MatDialogModule,
-    MatDividerModule
+    MatDividerModule,
+    MatTabsModule,
+    MatDatepickerModule,
+    MatNativeDateModule,
+    MatExpansionModule,
+    MatAutocompleteModule
   ],
   templateUrl: './work-shifts-admin.component.html',
   styleUrls: ['./work-shifts-admin.component.scss']
 })
-export class WorkShiftsAdminComponent implements OnInit {
+export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
+  // Turnos Operativos Diarios
   shifts: WorkShift[] = [];
   users: any[] = [];
   assignments: any[] = [];
-
   operationalRows: Array<{
     assignmentId: string;
     shiftId: string;
@@ -73,57 +85,151 @@ export class WorkShiftsAdminComponent implements OnInit {
     shiftRef: any;
   }> = [];
   checklistTemplates: any[] = [];
-
-  private destroy$ = new Subject<void>();
-
   loading = false;
   showForm = false;
   editingShift: WorkShift | null = null;
-
   shiftForm!: FormGroup;
   operationalAssignmentForm!: FormGroup;
-  globalEmailForm!: FormGroup;  // Formulario GLOBAL para Reenvío
+  globalEmailForm!: FormGroup;
   shiftTypeOptions = SHIFT_TYPE_OPTIONS;
   colorOptions = DEFAULT_COLORS;
-
-  // Manejo de chips de emails (GLOBAL)
   emailInput = '';
   showGlobalEmailConfig = false;
   selectedPocShiftId: string | null = null;
   sendingPoc = false;
-
   displayedColumns: string[] = ['order', 'name', 'code', 'type', 'timeRange', 'checklists', 'assignedUser', 'active', 'actions'];
+
+  // Turnos Semanales (Asignación)
+  weeklyAssignments: any[] = [];
+  currentMonthAssignments: any[] = [];
+  futureAssignments: any[] = [];
+  previousMonthAssignments: any[] = [];
+  historicalAssignments: any[] = [];
+  loadingWeeklyAssignments = false;
+  loadingHistoricalAssignments = false;
+  savingWeeklyAssignment = false;
+  importingAssignmentsCsv = false;
+  downloadingAssignmentTemplate = false;
+  historicalLoaded = false;
+  showHistorical = false;
+  showAssignmentForm = false;
+  assignmentForm!: FormGroup;
+  filteredUsersForAssignment: any[] = [];
+  filteredExternalPeopleForAssignment: any[] = [];
+  filteredDirectoryContactsForAssignment: DirectoryContact[] = [];
+  showExternalPeopleForAssignment = true;
+  roles = ['N2', 'TI', 'N1_NO_HABIL'];
+  editingWeeklyAssignmentId: string | null = null;
+
+  // Filtros de asignación semanal
+  filterAnalyst = '';
+  filterRole = '';
+
+  // Eje de Tiempo Gantt Semanal
+  ganttWeekStart!: Date;
+  ganttWeekEnd!: Date;
+  ganttTodayPosition = 0;
+  ganttRoles: any[] = [];
+  ganttTicks: { label: string; position: number; isToday: boolean }[] = [];
+
+  // Tarjetas de Proximidad Semanales
+  upcomingEndAssignments: any[] = [];
+  upcomingStartAssignments: any[] = [];
+
+  // Recordatorios Escalamiento Semanal
+  escalationReminderForm!: FormGroup;
+  availableCargoLabels: string[] = [];
+  readonly defaultReminderCargoLabels: string[] = [
+    'N1', 'N2', 'N3', 'QA Nivel 1', 'QA Nivel 2', 'Pentester N1', 'Pentester N2',
+    'Arquitecto SIEM', 'Customer Success Manager (CSM)', 'Jefe Área', 'Gerente Área'
+  ];
+  loadingEscalationReminderConfig = false;
+  savingEscalationReminderConfig = false;
+  testingEscalationReminder = false;
+  
+  // Automatización Semanal de Envío
+  escalationScheduleAutomationForm!: FormGroup;
+  loadingAutomationConfig = false;
+  savingAutomationConfig = false;
+  triggeringManualSend = false;
+  daysOfWeek = [
+    { value: 1, label: 'Lunes' },
+    { value: 2, label: 'Martes' },
+    { value: 3, label: 'Miércoles' },
+    { value: 4, label: 'Jueves' },
+    { value: 5, label: 'Viernes' },
+    { value: 6, label: 'Sábado' },
+    { value: 0, label: 'Domingo' }
+  ];
+  automationRecipientSuggestions: DirectoryContact[] = [];
+  automationCcSuggestions: DirectoryContact[] = [];
+  private _recipientsRaw = '';
+  private _ccRaw = '';
+
+  // Personas externas
+  externalPeople: any[] = [];
+  loadingExternalPeople = false;
+  showExternalPersonForm = false;
+  externalPersonForm!: FormGroup;
+  editingExternalPersonId: string | null = null;
+  externalPersonDirectorySuggestions: DirectoryContact[] = [];
+  private externalPersonNameSearchTimer?: any;
+
+  // Directory Quick Picker
+  directoryQuickPickerVisible = false;
+  directoryQuickPickerQuery = '';
+  directoryQuickPickerSuggestions: DirectoryContact[] = [];
+  directoryQuickPickerTarget: 'external' | null = null;
+  private directoryQuickPickerTimer?: any;
+  directoryContacts: DirectoryContact[] = [];
+  private internalClientCompanyKeys = new Set<string>();
+
+  // Alertas de conflicto en el Editor Lateral
+  roleConflictMsg: string | null = null;
+  personConflictMsg: string | null = null;
+  rangeErrorMsg: string | null = null;
+
+  private destroy$ = new Subject<void>();
 
   constructor(
     private workShiftService: WorkShiftService,
     private configService: ConfigService,
     private checklistService: ChecklistService,
     private userService: UserService,
+    private catalogService: CatalogService,
+    private escalationService: EscalationService,
+    private directoryService: DirectoryService,
     private fb: FormBuilder,
     private snackBar: MatSnackBar,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private cdr: ChangeDetectorRef,
+    private ngZone: NgZone
   ) {
     this.initForm();
     this.initOperationalAssignmentForm();
-    this.initGlobalEmailForm();  // Inicializar una sola vez aquí
+    this.initGlobalEmailForm();
+    this.initWeeklyForms();
   }
 
   ngOnInit(): void {
     this.loadData();
     this.loadChecklistTemplates();
-    this.loadGlobalEmailConfig();
 
-    // Refresco en vivo con Observable temporal (OPS-ASSIGN-005)
+    // Refresco en vivo cada minuto para el estado de turnos operativos
     interval(60000)
       .pipe(startWith(0), takeUntil(this.destroy$))
       .subscribe(() => {
         this.recalculateLiveStatus();
+        this.calculateGantt();
+        this.calculateProximityCards();
       });
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    if (this.externalPersonNameSearchTimer) clearTimeout(this.externalPersonNameSearchTimer);
+    if (this.directoryQuickPickerTimer) clearTimeout(this.directoryQuickPickerTimer);
   }
 
   initForm(): void {
@@ -146,7 +252,6 @@ export class WorkShiftsAdminComponent implements OnInit {
   }
 
   initGlobalEmailForm(): void {
-    // Formulario GLOBAL para Reenvío de Información - NUNCA se reinicia
     this.globalEmailForm = this.fb.group({
       enabled: [false],
       includeChecklist: [true],
@@ -161,52 +266,116 @@ export class WorkShiftsAdminComponent implements OnInit {
     this.operationalAssignmentForm = this.fb.group({
       shiftId: [null, Validators.required],
       userId: [null, Validators.required],
-      weekdays: [[]] // Array of numbers 0-6
+      weekdays: [[]]
     });
   }
 
-  loadGlobalEmailConfig(): void {
-    // Cargar configuración global de email desde BD
-    this.configService.getConfig().subscribe({
-      next: (config: any) => {
-        if (config && config.emailReportConfig) {
-          this.globalEmailForm.patchValue({
-            enabled: config.emailReportConfig.enabled || false,
-            includeChecklist: config.emailReportConfig.includeChecklist ?? true,
-            includeEntries: config.emailReportConfig.includeEntries ?? true,
-            recipients: config.emailReportConfig.recipients || [],
-            subjectTemplate: config.emailReportConfig.subjectTemplate || 'Reporte SOC [fecha] [turno]',
-            reportTableColor: config.emailReportConfig.reportTableColor || '#4CAF50'
-          });
-        }
-      },
-      error: (error: any) => {
-        console.error('Error loading global email config:', error);
-        // No mostrar error al usuario, solo usar valores por defecto
+  initWeeklyForms(): void {
+    this.assignmentForm = this.fb.group({
+      roleCode: ['', Validators.required],
+      assignedUserId: ['', Validators.required],
+      weekStartDate: ['', Validators.required],
+      weekEndDate: ['', Validators.required],
+      startTime: ['09:00', Validators.required],
+      endTime: ['08:59', Validators.required]
+    });
+
+    this.assignmentForm.get('roleCode')?.valueChanges.subscribe(() => {
+      this.updateAssignmentPeopleOptions();
+      this.checkAssignmentConflicts();
+    });
+
+    this.assignmentForm.get('assignedUserId')?.valueChanges.subscribe(() => {
+      this.checkAssignmentConflicts();
+    });
+
+    this.assignmentForm.get('weekStartDate')?.valueChanges.subscribe((startDate) => {
+      if (startDate) {
+        const start = new Date(startDate);
+        const endDate = new Date(start);
+        endDate.setDate(endDate.getDate() + 7);
+        this.assignmentForm.patchValue({ weekEndDate: endDate }, { emitEvent: false });
       }
+      this.checkAssignmentConflicts();
+    });
+
+    this.assignmentForm.get('weekEndDate')?.valueChanges.subscribe(() => {
+      this.checkAssignmentConflicts();
+    });
+
+    this.assignmentForm.get('startTime')?.valueChanges.subscribe(() => {
+      this.checkAssignmentConflicts();
+    });
+
+    this.assignmentForm.get('endTime')?.valueChanges.subscribe(() => {
+      this.checkAssignmentConflicts();
+    });
+
+    this.externalPersonForm = this.fb.group({
+      name: ['', Validators.required],
+      email: ['', [Validators.required, Validators.email]],
+      phone: ['', Validators.required],
+      position: [''],
+      active: [true]
+    });
+
+    this.escalationReminderForm = this.fb.group({
+      escalationReminderEnabled: [false],
+      escalationReminderCargoLabels: [['N2']],
+      escalationReminderDaysAhead: [7, [Validators.required, Validators.min(1), Validators.max(60)]]
+    });
+
+    this.escalationReminderForm.get('escalationReminderEnabled')?.valueChanges.subscribe(() => {
+      this.updateEscalationReminderValidators();
+    });
+    this.updateEscalationReminderValidators();
+
+    this.escalationScheduleAutomationForm = this.fb.group({
+      enabled: [false],
+      frequency: ['weekly'],
+      dayOfWeek: [1],
+      time: ['09:00', [Validators.required, Validators.pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)]],
+      recipients: [''],
+      ccRecipients: ['']
     });
   }
 
   loadData(): void {
     this.loading = true;
 
-    // Cargar en paralelo turnos, usuarios y asignaciones operativas
     Promise.all([
       this.workShiftService.getShifts().toPromise(),
       this.userService.getUsersList().toPromise(),
-      this.workShiftService.getAssignments().toPromise()
-    ]).then(([shifts, users, assignments]) => {
+      this.workShiftService.getAssignments().toPromise(),
+      this.escalationService.getExternalPeople().toPromise(),
+      this.directoryService.getAll().toPromise(),
+      this.catalogService.getAllLogSources().toPromise()
+    ]).then(([shifts, users, assignments, externalPeople, directoryContacts, logSourcesResponse]) => {
       this.shifts = shifts || [];
       this.users = (users || []).filter((user: any) => user?.isActive !== false && user?.role !== 'guest');
       this.assignments = assignments || [];
+      this.externalPeople = externalPeople || [];
+      this.directoryContacts = directoryContacts || [];
+      this.internalClientCompanyKeys = this.buildInternalClientCompanyKeys(logSourcesResponse);
 
       this.ensurePocShiftSelection();
       this.rebuildOperationalRows();
+      this.loadGlobalEmailConfig();
+
+      this.refreshAvailableCargoLabels();
+      this.updateAssignmentPeopleOptions();
+      
+      this.loadWeeklyAssignments();
+      this.loadEscalationReminderConfig();
+      this.loadAutomationConfig();
+
       this.loading = false;
+      this.cdr.detectChanges();
     }).catch(error => {
       console.error('Error loading data:', error);
       this.snackBar.open('Error al cargar datos operativos', 'Cerrar', { duration: 3000 });
       this.loading = false;
+      this.cdr.detectChanges();
     });
   }
 
@@ -229,6 +398,24 @@ export class WorkShiftsAdminComponent implements OnInit {
     });
   }
 
+  loadGlobalEmailConfig(): void {
+    this.configService.getConfig().subscribe({
+      next: (config: any) => {
+        if (config && config.emailReportConfig) {
+          this.globalEmailForm.patchValue({
+            enabled: config.emailReportConfig.enabled || false,
+            includeChecklist: config.emailReportConfig.includeChecklist ?? true,
+            includeEntries: config.emailReportConfig.includeEntries ?? true,
+            recipients: config.emailReportConfig.recipients || [],
+            subjectTemplate: config.emailReportConfig.subjectTemplate || 'Reporte SOC [fecha] [turno]',
+            reportTableColor: config.emailReportConfig.reportTableColor || '#4CAF50'
+          });
+        }
+      }
+    });
+  }
+
+  // ============ TURNOS OPERATIVOS DIARIOS ============
   private rebuildOperationalRows(): void {
     this.operationalRows = this.assignments
       .filter(asg => asg.active !== false && asg.workShiftId)
@@ -236,7 +423,6 @@ export class WorkShiftsAdminComponent implements OnInit {
         const shiftId = typeof asg.workShiftId === 'object' ? asg.workShiftId._id : asg.workShiftId;
         const userId = typeof asg.userId === 'object' ? asg.userId._id : asg.userId;
         const analystName = typeof asg.userId === 'object' ? asg.userId.fullName : this.getLoadedUserName(userId);
-
         const shiftData = typeof asg.workShiftId === 'object' ? asg.workShiftId : this.shifts.find(s => s._id === shiftId);
 
         return {
@@ -277,7 +463,6 @@ export class WorkShiftsAdminComponent implements OnInit {
     if (!weekdays || weekdays.length === 0) return 'Sin días';
     if (weekdays.length === 7) return 'Lun-Dom (Todos)';
 
-    // Si son de Lunes (1) a Viernes (5) exactamente
     const isMonToFri = weekdays.length === 5 &&
       [1, 2, 3, 4, 5].every(d => weekdays.includes(d));
     if (isMonToFri) return 'Lun-Vie';
@@ -307,11 +492,10 @@ export class WorkShiftsAdminComponent implements OnInit {
     const payload = {
       shiftId: this.operationalAssignmentForm.value.shiftId,
       userId: this.operationalAssignmentForm.value.userId,
-      workShiftId: this.operationalAssignmentForm.value.shiftId, // Para compatibilidad
+      workShiftId: this.operationalAssignmentForm.value.shiftId,
       weekdays: this.operationalAssignmentForm.value.weekdays
     };
 
-    // Si no eligen días por defecto asignar Lun a Vie (1,2,3,4,5)
     if (!payload.weekdays || payload.weekdays.length === 0) {
       payload.weekdays = [1, 2, 3, 4, 5];
     }
@@ -346,6 +530,1312 @@ export class WorkShiftsAdminComponent implements OnInit {
     });
   }
 
+  // ============ TURNOS SEMANALES ============
+  loadWeeklyAssignments(): void {
+    this.loadingWeeklyAssignments = true;
+    const currentDate = new Date();
+    const fromDate = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() - 1).toISOString();
+
+    this.escalationService.getAssignments(undefined, fromDate).subscribe({
+      next: (data: any[]) => {
+        this.weeklyAssignments = [...data].sort((a: any, b: any) => 
+          new Date(b.weekStartDate).getTime() - new Date(a.weekStartDate).getTime()
+        );
+        this.partitionAssignmentsByMonth(this.weeklyAssignments);
+        this.calculateGantt();
+        this.calculateProximityCards();
+        this.loadingWeeklyAssignments = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.loadingWeeklyAssignments = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  loadHistoricalAssignments(): void {
+    if (this.historicalLoaded || this.loadingHistoricalAssignments) return;
+    this.loadingHistoricalAssignments = true;
+    const currentDate = new Date();
+    const previousMonthEnd = this.getEndOfMonth(currentDate.getFullYear(), currentDate.getMonth() - 1).toISOString();
+
+    this.escalationService.getAssignments(undefined, undefined, previousMonthEnd, 200).subscribe({
+      next: (data: any[]) => {
+        const currentMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth());
+        const previousMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() - 1);
+        this.historicalAssignments = [...data]
+          .filter((assignment: any) => {
+            const weekStart = new Date(assignment.weekStartDate);
+            return weekStart < previousMonthStart && weekStart < currentMonthStart;
+          })
+          .sort((a: any, b: any) => new Date(b.weekStartDate).getTime() - new Date(a.weekStartDate).getTime());
+        this.historicalLoaded = true;
+        this.showHistorical = true;
+        this.loadingHistoricalAssignments = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.loadingHistoricalAssignments = false;
+        this.showError('Error al cargar histórico de asignaciones');
+      }
+    });
+  }
+
+  toggleHistorical(): void {
+    if (!this.historicalLoaded) {
+      this.loadHistoricalAssignments();
+      return;
+    }
+    this.showHistorical = !this.showHistorical;
+  }
+
+  private partitionAssignmentsByMonth(assignments: any[]): void {
+    const currentDate = new Date();
+    const currentMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth());
+    const nextMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() + 1);
+    const previousMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() - 1);
+
+    this.currentMonthAssignments = assignments.filter((assignment: any) => {
+      const weekStart = new Date(assignment.weekStartDate);
+      return weekStart >= currentMonthStart && weekStart < nextMonthStart;
+    });
+    this.futureAssignments = assignments.filter((assignment: any) => {
+      const weekStart = new Date(assignment.weekStartDate);
+      return weekStart >= nextMonthStart;
+    });
+    this.previousMonthAssignments = assignments.filter((assignment: any) => {
+      const weekStart = new Date(assignment.weekStartDate);
+      return weekStart >= previousMonthStart && weekStart < currentMonthStart;
+    });
+  }
+
+  private getStartOfMonth(year: number, month: number): Date {
+    return new Date(year, month, 1, 0, 0, 0, 0);
+  }
+
+  private getEndOfMonth(year: number, month: number): Date {
+    return new Date(year, month + 1, 0, 23, 59, 59, 999);
+  }
+
+  getSelectedAssignmentSectionLabel(): string {
+    const startDate = this.assignmentForm?.get('weekStartDate')?.value;
+    if (!startDate) return '';
+    return this.getAssignmentSectionLabel(startDate);
+  }
+
+  private getAssignmentSectionLabel(dateValue: string | Date): string {
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) return '';
+    const currentDate = new Date();
+    const currentMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth());
+    const nextMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() + 1);
+    const previousMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() - 1);
+
+    if (date >= currentMonthStart && date < nextMonthStart) return 'Mes actual';
+    if (date >= nextMonthStart) return 'Próximos meses';
+    if (date >= previousMonthStart && date < currentMonthStart) return 'Mes anterior';
+    return 'Histórico';
+  }
+
+  addWeeklyAssignment(): void {
+    this.showAssignmentForm = true;
+    this.editingWeeklyAssignmentId = null;
+    const defaultDates = this.calculateDefaultWeekDates();
+    this.assignmentForm.reset({
+      roleCode: '',
+      assignedUserId: '',
+      weekStartDate: defaultDates.weekStartDate,
+      weekEndDate: defaultDates.weekEndDate,
+      startTime: defaultDates.startTime,
+      endTime: defaultDates.endTime
+    });
+    this.updateAssignmentPeopleOptions();
+    this.roleConflictMsg = null;
+    this.personConflictMsg = null;
+    this.rangeErrorMsg = null;
+  }
+
+  private calculateDefaultWeekDates() {
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    let daysToNextMonday = 1 - dayOfWeek;
+    if (daysToNextMonday <= 0) daysToNextMonday += 7;
+    
+    const nextMonday = new Date(today);
+    nextMonday.setDate(nextMonday.getDate() + daysToNextMonday);
+    nextMonday.setHours(9, 0, 0, 0);
+    
+    const followingMonday = new Date(nextMonday);
+    followingMonday.setDate(followingMonday.getDate() + 7);
+    followingMonday.setHours(8, 59, 0, 0);
+    
+    return {
+      weekStartDate: nextMonday,
+      weekEndDate: followingMonday,
+      startTime: '09:00',
+      endTime: '08:59'
+    };
+  }
+
+  saveWeeklyAssignment(): void {
+    if (this.assignmentForm.invalid || this.savingWeeklyAssignment) {
+      this.showError('Complete todos los campos obligatorios');
+      return;
+    }
+
+    this.savingWeeklyAssignment = true;
+    const formData = this.assignmentForm.value;
+    const assignedUserIdRaw = String(formData.assignedUserId || '');
+    
+    const startDateTime = new Date(formData.weekStartDate);
+    const [startHour, startMin] = formData.startTime.split(':');
+    startDateTime.setHours(parseInt(startHour), parseInt(startMin), 0);
+    
+    const endDateTime = new Date(formData.weekEndDate);
+    const [endHour, endMin] = formData.endTime.split(':');
+    endDateTime.setHours(parseInt(endHour), parseInt(endMin), 0);
+
+    const submitAssignment = (resolvedUserId?: string, resolvedExternalPersonId?: string): void => {
+      const data = {
+        roleCode: formData.roleCode,
+        userId: resolvedExternalPersonId ? undefined : resolvedUserId,
+        externalPersonId: resolvedExternalPersonId,
+        weekStartDate: startDateTime.toISOString(),
+        weekEndDate: endDateTime.toISOString()
+      };
+
+      const obs$ = this.editingWeeklyAssignmentId
+        ? this.escalationService.updateAssignment(this.editingWeeklyAssignmentId, data)
+        : this.escalationService.createAssignment(data);
+
+      obs$.subscribe({
+        next: () => {
+          this.ngZone.run(() => {
+            this.showSuccess(this.editingWeeklyAssignmentId ? 'Turno actualizado correctamente' : 'Turno asignado correctamente');
+            this.cancelWeeklyAssignmentEdit();
+            this.loadWeeklyAssignments();
+            this.savingWeeklyAssignment = false;
+          });
+        },
+        error: (err: any) => {
+          const backendMessage = err?.error?.error || err?.error?.message;
+          const sectionLabel = this.getSelectedAssignmentSectionLabel();
+          const enhancedMessage = backendMessage?.includes('mismo período') && sectionLabel
+            ? `${backendMessage}. Revísala en "${sectionLabel}".`
+            : backendMessage;
+          this.showError(enhancedMessage || 'Error al guardar turno');
+          this.savingWeeklyAssignment = false;
+        }
+      });
+    };
+
+    if (assignedUserIdRaw.startsWith('dir_')) {
+      const directoryId = assignedUserIdRaw.replace('dir_', '');
+      const selectedDirectoryContact = (this.directoryContacts || []).find((item) => String(item?._id || '') === directoryId);
+      const roleCode = String(formData.roleCode || '');
+
+      if (selectedDirectoryContact && this.isDirectoryContactInternal(selectedDirectoryContact)) {
+        // Para TI role, permitir asignar directamente desde directorio interno sin buscar usuario sistema
+        if (roleCode === 'TI') {
+          this.ensureExternalPersonFromDirectory(directoryId).subscribe({
+            next: (externalPersonId) => {
+              submitAssignment(undefined, externalPersonId);
+            },
+            error: () => {
+              this.showError('No se pudo preparar el contacto del directorio para TI.');
+              this.savingWeeklyAssignment = false;
+            }
+          });
+          return;
+        }
+
+        // Para otros roles, buscar usuario interno coincidente
+        const resolvedInternalUserId = this.findInternalUserIdFromDirectoryContact(selectedDirectoryContact);
+        if (!resolvedInternalUserId) {
+          this.showError('El contacto del directorio es interno. Asígnalo desde Analistas Internos (Usuarios).');
+          this.savingWeeklyAssignment = false;
+          return;
+        }
+        submitAssignment(resolvedInternalUserId, undefined);
+        return;
+      }
+
+      this.ensureExternalPersonFromDirectory(directoryId).subscribe({
+        next: (externalPersonId) => {
+          if (!externalPersonId) {
+            this.showError('No se pudo resolver la persona del directorio para asignar el turno.');
+            this.savingWeeklyAssignment = false;
+            return;
+          }
+          submitAssignment(undefined, externalPersonId);
+        },
+        error: () => {
+          this.showError('No se pudo preparar la persona desde el directorio.');
+          this.savingWeeklyAssignment = false;
+        }
+      });
+      return;
+    }
+
+    if (assignedUserIdRaw.startsWith('ext_')) {
+      submitAssignment(undefined, assignedUserIdRaw.replace('ext_', ''));
+      return;
+    }
+
+    submitAssignment(assignedUserIdRaw, undefined);
+  }
+
+  private ensureExternalPersonFromDirectory(directoryId: string): Observable<string> {
+    const match = (this.directoryContacts || []).find((item) => String(item?._id || '') === String(directoryId));
+    if (!match) {
+      return of('');
+    }
+
+    const normalizedName = String(match.name || '').trim().toLowerCase();
+    const normalizedEmail = String(match.email || '').trim().toLowerCase();
+    const normalizedPhone = String(match.phone || '').trim();
+
+    const existing = (this.externalPeople || []).find((person) => {
+      const sameName = String(person?.name || '').trim().toLowerCase() === normalizedName;
+      const sameEmail = normalizedEmail && String(person?.email || '').trim().toLowerCase() === normalizedEmail;
+      const samePhone = normalizedPhone && String(person?.phone || '').trim() === normalizedPhone;
+      return sameName && (sameEmail || samePhone || (!normalizedEmail && !normalizedPhone));
+    });
+
+    if (existing?._id) {
+      return of(String(existing._id));
+    }
+
+    return this.escalationService.createExternalPerson({
+      name: match.name,
+      email: match.email || 'sin-correo@directorio.local',
+      phone: match.phone || '000000000',
+      position: match.position || '',
+      active: true
+    }).pipe(
+      map((created: any) => {
+        const createdId = String(created?._id || '');
+        if (createdId) {
+          this.externalPeople = [...this.externalPeople, created];
+          this.updateAssignmentPeopleOptions();
+        }
+        return createdId;
+      }),
+      catchError(() => of(''))
+    );
+  }
+
+  deleteWeeklyAssignment(id: string): void {
+    if (confirm('¿Eliminar esta asignación?')) {
+      this.escalationService.deleteAssignment(id).subscribe({
+        next: () => {
+          this.showSuccess('Asignación eliminada');
+          this.loadWeeklyAssignments();
+        },
+        error: () => this.showError('Error al eliminar')
+      });
+    }
+  }
+
+  // ============ GANTT VISUAL SEMANAL ============
+  calculateGantt(): void {
+    const now = new Date();
+    
+    const currentMonday = new Date(now);
+    const day = currentMonday.getDay();
+    const diff = currentMonday.getDate() - day + (day === 0 ? -6 : 1);
+    currentMonday.setDate(diff);
+    currentMonday.setHours(0, 0, 0, 0);
+
+    // Mostrar 10 días (1 semana + 3 días de la próxima semana)
+    const endDate = new Date(currentMonday);
+    endDate.setDate(endDate.getDate() + 10);
+    endDate.setHours(0, 0, 0, 0);
+
+    this.ganttWeekStart = currentMonday;
+    this.ganttWeekEnd = endDate;
+
+    const totalMs = endDate.getTime() - currentMonday.getTime();
+    const nowMs = now.getTime() - currentMonday.getTime();
+    this.ganttTodayPosition = Math.min(Math.max((nowMs / totalMs) * 100, 0), 100);
+
+    const ticks = [];
+    const dayNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+    for (let i = 0; i < 10; i++) {
+      const d = new Date(currentMonday);
+      d.setDate(d.getDate() + i);
+      const isToday = d.toDateString() === now.toDateString();
+      const dayName = dayNames[i % 7];
+      ticks.push({
+        label: `${dayName} ${d.getDate()}/${d.getMonth() + 1}`,
+        position: (i / 10) * 100,
+        isToday
+      });
+    }
+    this.ganttTicks = ticks;
+
+    const roles = ['N2', 'TI', 'N1_NO_HABIL'];
+    this.ganttRoles = roles.map(roleCode => {
+      const matches = this.weeklyAssignments.filter(asg => {
+        if (asg.roleCode !== roleCode) return false;
+        const start = new Date(asg.weekStartDate);
+        const end = new Date(asg.weekEndDate);
+        return start < endDate && end > currentMonday;
+      });
+
+      const bars = matches.map(asg => {
+        const start = new Date(asg.weekStartDate);
+        const end = new Date(asg.weekEndDate);
+
+        const startMs = Math.max(start.getTime(), currentMonday.getTime()) - currentMonday.getTime();
+        const endMs = Math.min(end.getTime(), endDate.getTime()) - currentMonday.getTime();
+
+        const left = (startMs / totalMs) * 100;
+        const width = ((endMs - startMs) / totalMs) * 100;
+
+        const personName = asg.userId?.fullName || asg.externalPersonId?.name || 'Sin asignar';
+        const status = this.getAssignmentStatus(asg);
+
+        return {
+          left,
+          width: Math.max(width, 4),
+          label: personName,
+          status,
+          statusClass: this.getWeeklyStatusClass(status),
+          asg
+        };
+      });
+
+      return {
+        roleCode,
+        roleLabel: this.getRoleLabel(roleCode),
+        bars
+      };
+    });
+  }
+
+  getRoleLabel(roleCode: string): string {
+    if (roleCode === 'N1_NO_HABIL') return 'N1_NO_HABIL';
+    if (roleCode === 'N2') return 'N2';
+    if (roleCode === 'TI') return 'TI';
+    return roleCode;
+  }
+
+  getAssignmentStatus(asg: any): 'Pasado' | 'En Curso' | 'Próximo' {
+    const now = new Date();
+    const start = new Date(asg.weekStartDate);
+    const end = new Date(asg.weekEndDate);
+    if (end < now) return 'Pasado';
+    if (start <= now && end >= now) return 'En Curso';
+    return 'Próximo';
+  }
+
+  getWeeklyStatusClass(status: string): string {
+    if (status === 'En Curso') return 'status-active';
+    if (status === 'Próximo') return 'status-upcoming';
+    return 'status-past';
+  }
+
+  // ============ TARJETAS DE PROXIMIDAD ============
+  calculateProximityCards(): void {
+    const now = new Date();
+
+    const activeAssignments = this.weeklyAssignments.filter(asg => this.getAssignmentStatus(asg) === 'En Curso');
+    const futureAssignments = this.weeklyAssignments.filter(asg => this.getAssignmentStatus(asg) === 'Próximo');
+
+    // Turnos Próximos a Terminar (En Curso)
+    this.upcomingEndAssignments = activeAssignments
+      .map(asg => {
+        const start = new Date(asg.weekStartDate);
+        const end = new Date(asg.weekEndDate);
+        const total = end.getTime() - start.getTime();
+        const elapsed = now.getTime() - start.getTime();
+        
+        let progress = total > 0 ? (elapsed / total) * 100 : 0;
+        progress = Math.min(Math.max(progress, 0), 100);
+
+        const personName = asg.userId?.fullName || asg.externalPersonId?.name || 'Sin asignar';
+        
+        const diffMs = end.getTime() - now.getTime();
+        const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        let remainingText = '';
+        if (days > 0) {
+          remainingText = `Termina en ${days} día${days > 1 ? 's' : ''}`;
+        } else if (hours > 0) {
+          remainingText = `Termina en ${hours} hora${hours > 1 ? 's' : ''}`;
+        } else {
+          const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+          remainingText = `Termina en ${mins} min${mins > 1 ? 's' : ''}`;
+        }
+
+        return {
+          personName,
+          roleCode: asg.roleCode,
+          remainingText,
+          progress,
+          asg
+        };
+      })
+      .sort((a, b) => new Date(a.asg.weekEndDate).getTime() - new Date(b.asg.weekEndDate).getTime());
+
+    // Próximos Turnos a Iniciar (Próximo)
+    this.upcomingStartAssignments = futureAssignments
+      .map(asg => {
+        const start = new Date(asg.weekStartDate);
+        const end = new Date(asg.weekEndDate);
+        const personName = asg.userId?.fullName || asg.externalPersonId?.name || 'Sin asignar';
+
+        const diffMs = start.getTime() - now.getTime();
+        const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        let timeUntilText = '';
+        if (days > 0) {
+          timeUntilText = `Inicia en ${days} día${days > 1 ? 's' : ''}`;
+        } else if (hours > 0) {
+          timeUntilText = `Inicia en ${hours} hora${hours > 1 ? 's' : ''}`;
+        } else {
+          const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+          timeUntilText = `Inicia en ${mins} min${mins > 1 ? 's' : ''}`;
+        }
+
+        // Calcular progress: cuánto tiempo ya ha "pasado" (proximidad al inicio)
+        // Invertido: 0% = falta mucho (verde), 100% = falta poco (rojo)
+        const durationTotal = end.getTime() - start.getTime();
+        let progress = durationTotal > 0 ? 100 - ((diffMs / durationTotal) * 100) : 0;
+        progress = Math.min(Math.max(progress, 0), 100);
+
+        return {
+          personName,
+          roleCode: asg.roleCode,
+          timeUntilText,
+          progress,
+          asg
+        };
+      })
+      .sort((a, b) => new Date(a.asg.weekStartDate).getTime() - new Date(b.asg.weekStartDate).getTime());
+  }
+
+  // ============ VALIDACIONES DE SOLAPE EN EL EDITOR ============
+  checkAssignmentConflicts(): void {
+    this.roleConflictMsg = null;
+    this.personConflictMsg = null;
+    this.rangeErrorMsg = null;
+
+    const roleCode = this.assignmentForm.get('roleCode')?.value;
+    const assignedUserId = this.assignmentForm.get('assignedUserId')?.value;
+    const weekStartDate = this.assignmentForm.get('weekStartDate')?.value;
+    const weekEndDate = this.assignmentForm.get('weekEndDate')?.value;
+    const startTime = this.assignmentForm.get('startTime')?.value || '09:00';
+    const endTime = this.assignmentForm.get('endTime')?.value || '08:59';
+
+    if (!roleCode || !assignedUserId || !weekStartDate || !weekEndDate) {
+      return;
+    }
+
+    const start = new Date(weekStartDate);
+    const [startHour, startMin] = startTime.split(':');
+    start.setHours(parseInt(startHour || '0'), parseInt(startMin || '0'), 0, 0);
+
+    const end = new Date(weekEndDate);
+    const [endHour, endMin] = endTime.split(':');
+    end.setHours(parseInt(endHour || '23'), parseInt(endMin || '59'), 59, 999);
+
+    if (end <= start) {
+      this.rangeErrorMsg = '⚠️ Rango Inválido: La fecha de fin debe ser posterior a la fecha de inicio.';
+      return;
+    }
+
+    let targetUserId: string | undefined;
+    let targetExtId: string | undefined;
+    let targetPersonName = '';
+
+    const idStr = String(assignedUserId);
+    if (idStr.startsWith('ext_')) {
+      targetExtId = idStr.replace('ext_', '');
+      const match = this.externalPeople.find(p => p._id === targetExtId);
+      targetPersonName = match?.name || 'Persona Externa';
+    } else if (idStr.startsWith('dir_')) {
+      const dirId = idStr.replace('dir_', '');
+      const match = this.directoryContacts.find(c => c._id === dirId);
+      targetPersonName = match?.name || 'Contacto de Directorio';
+    } else {
+      targetUserId = idStr;
+      const match = this.users.find(u => u._id === targetUserId);
+      targetPersonName = match?.fullName || match?.username || 'Usuario';
+    }
+
+    for (const asg of this.weeklyAssignments) {
+      if (this.editingWeeklyAssignmentId && asg._id === this.editingWeeklyAssignmentId) {
+        continue;
+      }
+
+      const asgStart = new Date(asg.weekStartDate);
+      const asgEnd = new Date(asg.weekEndDate);
+
+      const overlap = start < asgEnd && end > asgStart;
+      if (!overlap) {
+        continue;
+      }
+
+      // 1. Conflicto de Rol
+      if (asg.roleCode === roleCode) {
+        const assignedName = asg.userId?.fullName || asg.externalPersonId?.name || 'otra persona';
+        const startStr = asgStart.toLocaleDateString('es-CL');
+        const endStr = asgEnd.toLocaleDateString('es-CL');
+        this.roleConflictMsg = `⚠️ Conflicto de Rol: Ya existe un turno asignado para el rol ${this.getRoleLabel(roleCode)} en este período (${startStr} - ${endStr}) por ${assignedName}.`;
+      }
+
+      // 2. Conflicto de Persona
+      const matchesUser = targetUserId && asg.userId && String(asg.userId._id || asg.userId) === String(targetUserId);
+      const matchesExt = targetExtId && asg.externalPersonId && String(asg.externalPersonId._id || asg.externalPersonId) === String(targetExtId);
+      
+      if (matchesUser || matchesExt) {
+        const otherRole = this.getRoleLabel(asg.roleCode);
+        const startStr = asgStart.toLocaleDateString('es-CL');
+        const endStr = asgEnd.toLocaleDateString('es-CL');
+        this.personConflictMsg = `⚠️ Conflicto de Disponibilidad: ${targetPersonName} ya tiene asignado otro turno (${otherRole}) en este período (${startStr} - ${endStr}).`;
+      }
+    }
+  }
+
+  hasRowConflict(asg: any): boolean {
+    const start = new Date(asg.weekStartDate);
+    const end = new Date(asg.weekEndDate);
+    const roleCode = asg.roleCode;
+    const userId = asg.userId?._id || asg.userId;
+    const extId = asg.externalPersonId?._id || asg.externalPersonId;
+
+    for (const other of this.weeklyAssignments) {
+      if (other._id === asg._id) continue;
+      
+      const otherStart = new Date(other.weekStartDate);
+      const otherEnd = new Date(other.weekEndDate);
+      const overlap = start < otherEnd && end > otherStart;
+      if (!overlap) continue;
+
+      if (other.roleCode === roleCode) return true;
+
+      const matchesUser = userId && other.userId && String(other.userId._id || other.userId) === String(userId);
+      const matchesExt = extId && other.externalPersonId && String(other.externalPersonId._id || other.externalPersonId) === String(extId);
+      if (matchesUser || matchesExt) return true;
+    }
+    return false;
+  }
+
+  getRowConflictTooltip(asg: any): string {
+    const start = new Date(asg.weekStartDate);
+    const end = new Date(asg.weekEndDate);
+    const roleCode = asg.roleCode;
+    const userId = asg.userId?._id || asg.userId;
+    const extId = asg.externalPersonId?._id || asg.externalPersonId;
+
+    for (const other of this.weeklyAssignments) {
+      if (other._id === asg._id) continue;
+      
+      const otherStart = new Date(other.weekStartDate);
+      const otherEnd = new Date(other.weekEndDate);
+      const overlap = start < otherEnd && end > otherStart;
+      if (!overlap) continue;
+
+      if (other.roleCode === roleCode) {
+        const name = other.userId?.fullName || other.externalPersonId?.name || 'otra persona';
+        return `Conflicto de Rol: ${this.getRoleLabel(roleCode)} ya está asignado a ${name} en este período.`;
+      }
+
+      const matchesUser = userId && other.userId && String(other.userId._id || other.userId) === String(userId);
+      const matchesExt = extId && other.externalPersonId && String(other.externalPersonId._id || other.externalPersonId) === String(extId);
+      if (matchesUser || matchesExt) {
+        return `Conflicto de Disponibilidad: Esta persona tiene otro turno (${this.getRoleLabel(other.roleCode)}) en este período.`;
+      }
+    }
+    return '';
+  }
+
+  // ============ FILTRADO Y AGRUPAMIENTO EN TABLA DE ASIGNACIONES ============
+  getFilteredWeeklyAssignments(): any[] {
+    let result = [...this.weeklyAssignments];
+
+    if (this.filterAnalyst) {
+      const q = this.filterAnalyst.toLowerCase().trim();
+      result = result.filter(asg => {
+        const name = (asg.userId?.fullName || asg.externalPersonId?.name || '').toLowerCase();
+        const email = (asg.userId?.email || asg.externalPersonId?.email || '').toLowerCase();
+        return name.includes(q) || email.includes(q);
+      });
+    }
+
+    if (this.filterRole) {
+      result = result.filter(asg => asg.roleCode === this.filterRole);
+    }
+
+    // Orden: Próximos primero → En Curso → Pasado; luego por fecha inicio ascendente
+    const statusOrder: { [key: string]: number } = {
+      'Próximo': 1,
+      'En Curso': 2,
+      'Pasado': 3
+    };
+
+    result.sort((a, b) => {
+      const statusA = statusOrder[this.getAssignmentStatus(a)] ?? 99;
+      const statusB = statusOrder[this.getAssignmentStatus(b)] ?? 99;
+      if (statusA !== statusB) {
+        return statusA - statusB;
+      }
+      return new Date(a.weekStartDate).getTime() - new Date(b.weekStartDate).getTime();
+    });
+
+    // Limitar a 50 registros visuales máximo
+    return result.slice(0, 50);
+  }
+
+  editWeeklyAssignment(asg: any): void {
+    this.editingWeeklyAssignmentId = asg._id;
+    this.showAssignmentForm = true;
+
+    let assignedVal = '';
+    if (asg.externalPersonId) {
+      assignedVal = `ext_${asg.externalPersonId._id || asg.externalPersonId}`;
+    } else if (asg.userId) {
+      assignedVal = asg.userId._id || asg.userId;
+    }
+
+    const start = new Date(asg.weekStartDate);
+    const end = new Date(asg.weekEndDate);
+
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const startTime = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
+    const endTime = `${pad(end.getHours())}:${pad(end.getMinutes())}`;
+
+    // 1. Primero cargar las opciones basadas en el rol (sin filtrar el valor actual)
+    this.updateAssignmentPeopleOptionsForRole(asg.roleCode, assignedVal);
+
+    // 2. Ahora setear el formulario — la persona ya está disponible en las opciones
+    this.assignmentForm.setValue({
+      roleCode: asg.roleCode,
+      assignedUserId: assignedVal,
+      weekStartDate: start,
+      weekEndDate: end,
+      startTime: startTime,
+      endTime: endTime
+    });
+
+    this.checkAssignmentConflicts();
+    this.cdr.detectChanges();
+  }
+
+  cancelWeeklyAssignmentEdit(): void {
+    this.editingWeeklyAssignmentId = null;
+    this.showAssignmentForm = false;
+    const defaultDates = this.calculateDefaultWeekDates();
+    this.assignmentForm.reset({
+      roleCode: '',
+      assignedUserId: '',
+      weekStartDate: defaultDates.weekStartDate,
+      weekEndDate: defaultDates.weekEndDate,
+      startTime: defaultDates.startTime,
+      endTime: defaultDates.endTime
+    });
+    this.updateAssignmentPeopleOptions();
+    this.roleConflictMsg = null;
+    this.personConflictMsg = null;
+    this.rangeErrorMsg = null;
+  }
+
+  // ============ RECORDATORIOS ============
+  loadEscalationReminderConfig(): void {
+    this.loadingEscalationReminderConfig = true;
+    this.configService.getConfig().subscribe({
+      next: (config: any) => {
+        const selectedCargoLabels = Array.isArray(config.escalationReminderCargoLabels)
+          ? config.escalationReminderCargoLabels.filter((cargo: string) => String(cargo || '').trim().length > 0)
+          : [];
+        this.escalationReminderForm.patchValue({
+          escalationReminderEnabled: config.escalationReminderEnabled ?? false,
+          escalationReminderCargoLabels: selectedCargoLabels.length > 0 ? selectedCargoLabels : ['N2'],
+          escalationReminderDaysAhead: config.escalationReminderDaysAhead || 7
+        }, { emitEvent: false });
+        this.updateEscalationReminderValidators();
+        this.loadingEscalationReminderConfig = false;
+      },
+      error: () => {
+        this.loadingEscalationReminderConfig = false;
+      }
+    });
+  }
+
+  saveEscalationReminderConfig(): void {
+    this.updateEscalationReminderValidators();
+    if (this.escalationReminderForm.invalid || this.savingEscalationReminderConfig) {
+      this.showError('Configura al menos un cargo para el recordatorio');
+      return;
+    }
+    this.savingEscalationReminderConfig = true;
+    const value = this.escalationReminderForm.value;
+    const selectedCargoLabels = Array.isArray(value.escalationReminderCargoLabels)
+      ? value.escalationReminderCargoLabels.filter((cargo: string) => String(cargo || '').trim().length > 0)
+      : [];
+    const daysAhead = Number(value.escalationReminderDaysAhead || 7);
+
+    this.configService.updateConfig({
+      escalationReminderEnabled: !!value.escalationReminderEnabled,
+      escalationReminderCargoLabels: selectedCargoLabels,
+      escalationReminderDaysAhead: Number.isFinite(daysAhead) ? Math.min(Math.max(daysAhead, 1), 60) : 7
+    }).subscribe({
+      next: () => this.showSuccess('Recordatorio de escalación interna actualizado'),
+      error: () => this.showError('Error guardando recordatorio'),
+      complete: () => this.savingEscalationReminderConfig = false
+    });
+  }
+
+  testEscalationReminder(): void {
+    if (this.testingEscalationReminder) return;
+    const selectedCargoLabelsRaw = this.escalationReminderForm?.get('escalationReminderCargoLabels')?.value;
+    const selectedCargoLabels = Array.isArray(selectedCargoLabelsRaw)
+      ? selectedCargoLabelsRaw.map((v: string) => String(v || '').trim()).filter((v: string) => v.length > 0)
+      : [];
+    if (selectedCargoLabels.length === 0) {
+      this.showError('Selecciona al menos un cargo para probar el recordatorio');
+      return;
+    }
+    this.testingEscalationReminder = true;
+    this.escalationService.testEscalationReminder(selectedCargoLabels).subscribe({
+      next: (response: any) => {
+        const total = Number(response?.totalRecipients || 0);
+        this.showSuccess(`${response?.message || 'Prueba ejecutada'} (${total} destinatarios)`);
+      },
+      error: (err: any) => this.showError(err?.error?.message || 'Error en prueba'),
+      complete: () => this.testingEscalationReminder = false
+    });
+  }
+
+  private refreshAvailableCargoLabels(): void {
+    const unique = new Set<string>();
+    this.defaultReminderCargoLabels.forEach((cargo) => unique.add(cargo));
+    this.users.forEach((user) => {
+      const value = String(user?.cargoLabel || '').trim();
+      if (value) unique.add(value);
+    });
+    this.availableCargoLabels = Array.from(unique).sort((a, b) => a.localeCompare(b));
+    this.ensureEscalationReminderSelection();
+  }
+
+  private ensureEscalationReminderSelection(): void {
+    const currentSelection = this.escalationReminderForm?.get('escalationReminderCargoLabels')?.value;
+    const selected = Array.isArray(currentSelection)
+      ? currentSelection.filter((cargo: string) => this.availableCargoLabels.includes(cargo))
+      : [];
+    const fallback = selected.length > 0 ? selected : (this.availableCargoLabels.includes('N2') ? ['N2'] : this.availableCargoLabels.slice(0, 1));
+    this.escalationReminderForm?.patchValue({ escalationReminderCargoLabels: fallback }, { emitEvent: false });
+    this.updateEscalationReminderValidators();
+  }
+
+  private updateEscalationReminderValidators(): void {
+    const enabled = !!this.escalationReminderForm?.get('escalationReminderEnabled')?.value;
+    const cargoControl = this.escalationReminderForm?.get('escalationReminderCargoLabels');
+    const daysAheadControl = this.escalationReminderForm?.get('escalationReminderDaysAhead');
+    if (!cargoControl || !daysAheadControl) return;
+    if (enabled) {
+      cargoControl.setValidators([Validators.required, (control) => Array.isArray(control.value) && control.value.length > 0 ? null : { required: true }]);
+      daysAheadControl.setValidators([Validators.required, Validators.min(1), Validators.max(60)]);
+    } else {
+      cargoControl.clearValidators();
+      daysAheadControl.clearValidators();
+    }
+    cargoControl.updateValueAndValidity({ emitEvent: false });
+    daysAheadControl.updateValueAndValidity({ emitEvent: false });
+  }
+
+  // ============ AUTOMATIZACIÓN DE TURNOS ============
+  loadAutomationConfig(): void {
+    this.loadingAutomationConfig = true;
+    this.configService.getConfig().subscribe({
+      next: (config: any) => {
+        const auto = config.escalationScheduleAutomation || {};
+        this.escalationScheduleAutomationForm.patchValue({
+          enabled: auto.enabled ?? false,
+          frequency: auto.frequency || 'weekly',
+          dayOfWeek: auto.dayOfWeek ?? 1,
+          time: auto.time || '09:00',
+          recipients: Array.isArray(auto.recipients) ? auto.recipients.join(', ') : '',
+          ccRecipients: Array.isArray(auto.ccRecipients) ? auto.ccRecipients.join(', ') : ''
+        });
+        this.loadingAutomationConfig = false;
+      },
+      error: () => this.loadingAutomationConfig = false
+    });
+  }
+
+  saveAutomationConfig(): void {
+    if (this.escalationScheduleAutomationForm.invalid || this.savingAutomationConfig) return;
+    this.savingAutomationConfig = true;
+    
+    const val = this.escalationScheduleAutomationForm.value;
+    const payload = {
+      escalationScheduleAutomation: {
+        enabled: val.enabled,
+        frequency: val.frequency,
+        dayOfWeek: val.dayOfWeek,
+        time: val.time,
+        recipients: val.recipients.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean),
+        ccRecipients: val.ccRecipients.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean)
+      }
+    };
+
+    this.configService.updateConfig(payload).subscribe({
+      next: () => this.showSuccess('Configuración de automatización guardada'),
+      error: () => this.showError('Error al guardar configuración'),
+      complete: () => this.savingAutomationConfig = false
+    });
+  }
+
+  triggerManualSend(): void {
+    if (this.triggeringManualSend) return;
+
+    const val = this.escalationScheduleAutomationForm.value;
+    const parseEmails = (raw: string): string[] =>
+      String(raw || '').split(',').map((s) => s.trim().toLowerCase()).filter((s) => s.includes('@'));
+
+    const formRecipients = parseEmails(val.recipients || '');
+    const formCc = parseEmails(val.ccRecipients || '');
+
+    if (formRecipients.length === 0) {
+      this.showError('No hay destinatarios válidos. Agrega al menos un correo en el campo "Destinatarios".');
+      return;
+    }
+
+    if (!confirm('¿Desea enviar los turnos ahora a los destinatarios configurados?')) return;
+
+    this.triggeringManualSend = true;
+    const payload = { recipients: formRecipients, ccRecipients: formCc };
+    this.escalationService.triggerAutomationSend(payload).subscribe({
+      next: (res: any) => this.showSuccess(res.message || 'Envío procesado correctamente'),
+      error: (err: any) => this.showError(err?.error?.error || 'Error al disparar el envío'),
+      complete: () => this.triggeringManualSend = false
+    });
+  }
+
+  onAutomationRecipientsInput(rawValue: string): void {
+    this._recipientsRaw = rawValue;
+    this.automationRecipientSuggestions = this.findDirectoryEmails(rawValue);
+  }
+
+  onAutomationCcInput(rawValue: string): void {
+    this._ccRaw = rawValue;
+    this.automationCcSuggestions = this.findDirectoryEmails(rawValue);
+  }
+
+  useAutomationRecipientEmail(email: string): void {
+    this.applyEmailToControl('recipients', email || '');
+    this.automationRecipientSuggestions = [];
+  }
+
+  useAutomationCcEmail(email: string): void {
+    this.applyEmailToControl('ccRecipients', email || '');
+    this.automationCcSuggestions = [];
+  }
+
+  private applyEmailToControl(controlName: 'recipients' | 'ccRecipients', email: string): void {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    if (!normalizedEmail) return;
+
+    const cached = controlName === 'recipients' ? this._recipientsRaw : this._ccRaw;
+    const parts = cached
+      .split(',')
+      .map((s) => String(s || '').trim())
+      .filter((s) => s.length > 0);
+
+    const lastToken = String(parts[parts.length - 1] || '').toLowerCase();
+    if (lastToken && normalizedEmail.startsWith(lastToken) && lastToken !== normalizedEmail) {
+      parts.pop();
+    }
+
+    const existing = parts.map((s) => s.toLowerCase());
+    if (!existing.includes(normalizedEmail)) {
+      existing.push(normalizedEmail);
+    }
+
+    const newValue = existing.join(', ');
+    const control = this.escalationScheduleAutomationForm.get(controlName);
+    control?.setValue(newValue);
+
+    if (controlName === 'recipients') {
+      this._recipientsRaw = newValue;
+    } else {
+      this._ccRaw = newValue;
+    }
+  }
+
+  private findDirectoryEmails(rawValue: string): DirectoryContact[] {
+    const query = this.getLastCsvToken(rawValue).toLowerCase();
+    const source = this.directoryContacts || [];
+
+    return source
+      .filter((contact) => {
+        const email = String(contact.email || '').trim().toLowerCase();
+        if (!email || !email.includes('@')) return false;
+        if (!query) return true;
+        const name = String(contact.name || '').toLowerCase();
+        const company = String(contact.company || '').toLowerCase();
+        return email.includes(query) || name.includes(query) || company.includes(query);
+      })
+      .slice(0, 8);
+  }
+
+  private getLastCsvToken(rawValue: string): string {
+    const value = String(rawValue || '');
+    const parts = value.split(',');
+    return String(parts[parts.length - 1] || '').trim();
+  }
+
+  // ============ PERSONAS EXTERNAS ============
+  loadExternalPeople(): void {
+    this.loadingExternalPeople = true;
+    this.escalationService.getExternalPeople().subscribe({
+      next: (data: any[]) => {
+        this.externalPeople = [...data];
+        this.updateAssignmentPeopleOptions();
+        this.loadingExternalPeople = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.loadingExternalPeople = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  addExternalPerson(): void {
+    this.showExternalPersonForm = true;
+    this.editingExternalPersonId = null;
+    this.externalPersonForm.reset({ name: '', email: '', phone: '', position: '', active: true });
+  }
+
+  saveExternalPerson(): void {
+    if (this.externalPersonForm.invalid) {
+      this.showError('Complete todos los campos obligatorios');
+      return;
+    }
+    const data = this.externalPersonForm.value;
+    this.escalationService.createExternalPerson(data).subscribe({
+      next: () => {
+        this.showSuccess('Persona agregada');
+        this.showExternalPersonForm = false;
+        this.loadExternalPeople();
+      },
+      error: () => this.showError('Error al agregar persona')
+    });
+  }
+
+  deleteExternalPerson(id: string): void {
+    if (confirm('¿Eliminar esta persona?')) {
+      this.escalationService.deleteExternalPerson(id).subscribe({
+        next: () => {
+          this.showSuccess('Persona eliminada');
+          this.loadExternalPeople();
+        },
+        error: () => this.showError('Error al eliminar persona')
+      });
+    }
+  }
+
+  // ============ CSV ============
+  onAssignmentsCsvSelected(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    const file = input?.files?.[0];
+    if (!file || this.importingAssignmentsCsv) return;
+    this.importingAssignmentsCsv = true;
+    this.escalationService.importAssignmentsCsv(file).subscribe({
+      next: (response: any) => {
+        const obs = response.errorCount > 0 ? ` con ${response.errorCount} observación(es)` : '';
+        this.showSuccess(`Turnos procesados: ${response.created} nuevos, ${response.updated} actualizados${obs}`);
+        this.loadWeeklyAssignments();
+      },
+      error: (err: any) => this.showError(err?.error?.message || 'Error importando CSV'),
+      complete: () => {
+        this.importingAssignmentsCsv = false;
+        if (input) input.value = '';
+      }
+    });
+  }
+
+  downloadAssignmentTemplate(): void {
+    if (this.downloadingAssignmentTemplate) return;
+    this.downloadingAssignmentTemplate = true;
+    this.escalationService.downloadAssignmentsTemplateCsv().subscribe({
+      next: (blob: Blob) => this.downloadBlob(blob, 'turnos-internos-template.csv'),
+      error: () => this.showError('Error descargando plantilla'),
+      complete: () => this.downloadingAssignmentTemplate = false
+    });
+  }
+
+  private downloadBlob(blob: Blob, filename: string): void {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  }
+
+  // ============ HELPERS Y AUTOPLAY ============
+  private updateAssignmentPeopleOptions(): void {
+    const roleCode = String(this.assignmentForm?.get('roleCode')?.value || '').trim();
+    const currentVal = String(this.assignmentForm?.get('assignedUserId')?.value || '');
+    this.updateAssignmentPeopleOptionsForRole(roleCode, currentVal);
+  }
+
+  /**
+   * Carga las listas filtradas según el rol y garantiza que la persona
+   * actualmente asignada (currentAssignedVal) siempre esté en las opciones,
+   * incluso si no coincide con el filtro de cargo.
+   */
+  private updateAssignmentPeopleOptionsForRole(roleCode: string, currentAssignedVal: string): void {
+    const hasDisplay = (u: any) => !!(u?.fullName || u?.username || u?.email);
+    const externalDirectoryContacts = (this.directoryContacts || [])
+      .filter((c) => this.isDirectoryContactExternal(c) && this.isDirectoryPersonContact(c));
+    const internalDirectoryContacts = (this.directoryContacts || [])
+      .filter((c) => this.isDirectoryContactInternal(c) && this.isDirectoryPersonContact(c));
+
+    if (roleCode === 'N2') {
+      this.filteredUsersForAssignment = this.users.filter((u) => hasDisplay(u) && this.matchesRoleCargo(u, 'N2'));
+      this.filteredExternalPeopleForAssignment = this.externalPeople.filter((p) => this.matchesRoleCargo(p, 'N2'));
+      this.filteredDirectoryContactsForAssignment = externalDirectoryContacts.filter((c) => this.matchesRoleCargo(c, 'N2'));
+      this.showExternalPeopleForAssignment = this.filteredExternalPeopleForAssignment.length > 0 || this.filteredDirectoryContactsForAssignment.length > 0;
+    } else if (roleCode === 'N1_NO_HABIL') {
+      this.filteredUsersForAssignment = this.users.filter((u) => hasDisplay(u) && this.matchesRoleCargo(u, 'N1_NO_HABIL'));
+      this.filteredExternalPeopleForAssignment = this.externalPeople.filter((p) => this.matchesRoleCargo(p, 'N1_NO_HABIL'));
+      this.filteredDirectoryContactsForAssignment = externalDirectoryContacts.filter((c) => this.matchesRoleCargo(c, 'N1_NO_HABIL'));
+      this.showExternalPeopleForAssignment = this.filteredExternalPeopleForAssignment.length > 0 || this.filteredDirectoryContactsForAssignment.length > 0;
+    } else if (roleCode === 'TI') {
+      this.filteredUsersForAssignment = this.users.filter((u) => {
+        if (!hasDisplay(u)) return false;
+        const isN2 = this.matchesRoleCargo(u, 'N2');
+        const isN1 = this.matchesRoleCargo(u, 'N1_NO_HABIL');
+        return !isN2 && !isN1;
+      });
+      this.filteredExternalPeopleForAssignment = [];
+      this.filteredDirectoryContactsForAssignment = internalDirectoryContacts;
+      this.showExternalPeopleForAssignment = this.filteredDirectoryContactsForAssignment.length > 0;
+    } else {
+      this.filteredUsersForAssignment = this.users.filter((u) => hasDisplay(u));
+      this.filteredExternalPeopleForAssignment = [...this.externalPeople];
+      this.filteredDirectoryContactsForAssignment = [...externalDirectoryContacts];
+      this.showExternalPeopleForAssignment = true;
+    }
+
+    // Garantizar que la persona asignada siempre esté en la lista
+    if (currentAssignedVal) {
+      const s = currentAssignedVal;
+      if (s.startsWith('ext_')) {
+        const extId = s.replace('ext_', '');
+        const alreadyInList = this.filteredExternalPeopleForAssignment.some((p: any) => String(p._id) === extId);
+        if (!alreadyInList) {
+          const match = this.externalPeople.find((p: any) => String(p._id) === extId);
+          if (match) {
+            this.filteredExternalPeopleForAssignment = [match, ...this.filteredExternalPeopleForAssignment];
+            this.showExternalPeopleForAssignment = true;
+          }
+        }
+      } else if (s.startsWith('dir_')) {
+        const dirId = s.replace('dir_', '');
+        const alreadyInList = this.filteredDirectoryContactsForAssignment.some((c: any) => String(c._id) === dirId);
+        if (!alreadyInList) {
+          const match = (this.directoryContacts || []).find((c: any) => String(c._id) === dirId);
+          if (match) {
+            this.filteredDirectoryContactsForAssignment = [match, ...this.filteredDirectoryContactsForAssignment];
+            this.showExternalPeopleForAssignment = true;
+          }
+        }
+      } else {
+        const alreadyInList = this.filteredUsersForAssignment.some((u: any) => String(u._id) === s);
+        if (!alreadyInList) {
+          const match = this.users.find((u: any) => String(u._id) === s);
+          if (match) {
+            this.filteredUsersForAssignment = [match, ...this.filteredUsersForAssignment];
+          }
+        }
+      }
+    }
+  }
+
+  private matchesRoleCargo(entity: any, roleCode: 'N1_NO_HABIL' | 'N2' | 'TI'): boolean {
+    const roleToken = roleCode === 'N1_NO_HABIL' ? 'N1' : roleCode;
+    const candidates = [
+      String(entity?.cargoLabel || ''),
+      String(entity?.position || ''),
+      String(entity?.role || '')
+    ].map((value) => value.trim().toUpperCase()).filter((value) => value.length > 0);
+
+    return candidates.some((value) => {
+      if (value === roleToken) return true;
+      if (value.startsWith(`${roleToken} `)) return true;
+      if (value.includes(` ${roleToken} `)) return true;
+      return value.includes(roleToken);
+    });
+  }
+
+  private buildInternalClientCompanyKeys(logSourcesResponse: any): Set<string> {
+    const items = Array.isArray(logSourcesResponse?.items)
+      ? logSourcesResponse.items
+      : (Array.isArray(logSourcesResponse) ? logSourcesResponse : []);
+
+    const keys = new Set<string>();
+    items
+      .filter((item: any) => item?.enabled !== false && item?.isInternal === true)
+      .forEach((item: any) => {
+        const key = this.normalizeCompanyKey(item?.name);
+        if (key) {
+          keys.add(key);
+        }
+      });
+    return keys;
+  }
+
+  private normalizeCompanyKey(value: unknown): string {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+  }
+
+  private isDirectoryContactInternal(contact: DirectoryContact): boolean {
+    const type = String(contact?.type || '').trim();
+    const scope = String(contact?.scope || '').trim();
+    const source = String(contact?.source || '').trim();
+    if (type === 'Internal' || scope === 'Internal' || source === 'User') {
+      return true;
+    }
+
+    const companyKey = this.normalizeCompanyKey(contact?.company);
+    return !!companyKey && this.internalClientCompanyKeys.has(companyKey);
+  }
+
+  private isDirectoryContactExternal(contact: DirectoryContact): boolean {
+    return !this.isDirectoryContactInternal(contact);
+  }
+
+  private isDirectoryPersonContact(contact: DirectoryContact): boolean {
+    return String(contact?.type || '').trim() !== 'List';
+  }
+
+  private findInternalUserIdFromDirectoryContact(contact: DirectoryContact): string {
+    const email = String(contact?.email || '').trim().toLowerCase();
+    if (email) {
+      const emailMatch = (this.users || []).find((user: any) => String(user?.email || '').trim().toLowerCase() === email);
+      if (emailMatch?._id) {
+        return String(emailMatch._id);
+      }
+    }
+
+    const contactName = this.normalizeCompanyKey(contact?.name);
+    if (!contactName) {
+      return '';
+    }
+
+    const nameMatch = (this.users || []).find((user: any) => this.normalizeCompanyKey(user?.fullName) === contactName);
+    return nameMatch?._id ? String(nameMatch._id) : '';
+  }
+
+  formatDate(date: string): string {
+    return new Date(date).toLocaleDateString('es-CL');
+  }
+
+  showError(message: string): void {
+    this.snackBar.open(message, 'Cerrar', { duration: 4000 });
+  }
+
+  showSuccess(message: string): void {
+    this.snackBar.open(message, 'Cerrar', { duration: 3000 });
+  }
+
+  // ============ DIRECTORY QUICK PICKER ============
+  openDirectoryQuickPicker(target: 'external', queryHint = ''): void {
+    this.directoryQuickPickerTarget = target;
+    this.directoryQuickPickerVisible = true;
+    this.directoryQuickPickerQuery = String(queryHint || '').trim();
+    this.directoryQuickPickerSuggestions = this.getLocalDirectoryMatches(this.directoryQuickPickerQuery);
+  }
+
+  closeDirectoryQuickPicker(): void {
+    this.directoryQuickPickerVisible = false;
+    this.directoryQuickPickerTarget = null;
+    this.directoryQuickPickerQuery = '';
+    this.directoryQuickPickerSuggestions = [];
+  }
+
+  onDirectoryQuickPickerInput(rawValue: string): void {
+    const query = String(rawValue || '').trim();
+    this.directoryQuickPickerQuery = query;
+    if (this.directoryQuickPickerTimer) clearTimeout(this.directoryQuickPickerTimer);
+    if (query.length < 2) {
+      this.directoryQuickPickerSuggestions = this.getLocalDirectoryMatches(query);
+      return;
+    }
+    this.directoryQuickPickerTimer = setTimeout(() => {
+      this.directoryService.quickSearch(query).subscribe({
+        next: (items: DirectoryContact[]) => this.directoryQuickPickerSuggestions = items || [],
+        error: () => this.directoryQuickPickerSuggestions = []
+      });
+    }, 250);
+  }
+
+  useDirectoryQuickPick(contact: DirectoryContact): void {
+    if (!contact || this.directoryQuickPickerTarget !== 'external') return;
+    this.externalPersonForm.patchValue({
+      name: contact.name || '',
+      email: contact.email || this.externalPersonForm.get('email')?.value || '',
+      phone: contact.phone || this.externalPersonForm.get('phone')?.value || '',
+      position: contact.position || this.externalPersonForm.get('position')?.value || ''
+    }, { emitEvent: false });
+    this.closeDirectoryQuickPicker();
+  }
+
+  private getLocalDirectoryMatches(term: string): DirectoryContact[] {
+    const normalized = String(term || '').trim().toLowerCase();
+    const source = (this.directoryContacts || []).filter((c) => this.isDirectoryContactExternal(c) && this.isDirectoryPersonContact(c));
+    if (!normalized) return source.slice(0, 8);
+    return source.filter((c) => [c.name, c.email, c.phone, c.company].some(v => String(v || '').toLowerCase().includes(normalized))).slice(0, 8);
+  }
+
+  onExternalPersonNameInput(rawValue: string): void {
+    const query = String(rawValue || '').trim();
+    if (this.externalPersonNameSearchTimer) clearTimeout(this.externalPersonNameSearchTimer);
+    if (query.length < 2) {
+      this.externalPersonDirectorySuggestions = this.getLocalDirectoryMatches(query);
+      return;
+    }
+    this.externalPersonNameSearchTimer = setTimeout(() => {
+      this.directoryService.quickSearch(query).subscribe({
+        next: (items: DirectoryContact[]) => this.externalPersonDirectorySuggestions = items || [],
+        error: () => this.externalPersonDirectorySuggestions = []
+      });
+    }, 250);
+  }
+
+  onExternalPersonNameFocus(): void {
+    const currentValue = String(this.externalPersonForm.get('name')?.value || '');
+    this.externalPersonDirectorySuggestions = this.getLocalDirectoryMatches(currentValue);
+  }
+
+  onExternalPersonDirectorySelected(contact: DirectoryContact): void {
+    this.externalPersonForm.patchValue({
+      name: contact.name || '',
+      email: contact.email || this.externalPersonForm.get('email')?.value || '',
+      phone: contact.phone || this.externalPersonForm.get('phone')?.value || '',
+      position: contact.position || this.externalPersonForm.get('position')?.value || ''
+    }, { emitEvent: false });
+    this.externalPersonDirectorySuggestions = [];
+    this.closeDirectoryQuickPicker();
+  }
+
+  displayDirectoryContact(value: DirectoryContact | string | null): string {
+    return typeof value === 'string' ? value : (value?.name || '');
+  }
+
+  // ============ TURNOS DIARIOS / CONFIGURACION ============
   loadChecklistTemplates(): void {
     this.checklistService.getTemplates().subscribe({
       next: (templates: any[]) => {
@@ -448,11 +1938,7 @@ export class WorkShiftsAdminComponent implements OnInit {
     }
 
     const formData: WorkShiftFormData = this.shiftForm.value;
-
-    // Convertir código a mayúsculas
     formData.code = formData.code.toUpperCase();
-
-    // Email config is now global. Inherit from global settings.
     formData.emailReportConfig = this.globalEmailForm.value;
 
     const operation = this.editingShift
@@ -483,7 +1969,7 @@ export class WorkShiftsAdminComponent implements OnInit {
   cancelForm(): void {
     this.showForm = false;
     this.editingShift = null;
-    this.initForm();  // Solo reiniciar el formulario de turnos, NO el global
+    this.initForm();
   }
 
   getTypeLabel(type: string): string {
@@ -513,10 +1999,6 @@ export class WorkShiftsAdminComponent implements OnInit {
 
     return `${assignedIds.length} asignados`;
   }
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // Manejo de Reenvío de Información GLOBAL
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   get recipients() {
     return this.globalEmailForm.get('recipients') as any;
@@ -560,7 +2042,6 @@ export class WorkShiftsAdminComponent implements OnInit {
           this.snackBar.open(result?.message || 'Vista previa PoC enviada y auditada como prueba', 'Cerrar', { duration: 3500 });
           return;
         }
-
         this.snackBar.open(result?.message || 'No se pudo enviar correo PoC', 'Cerrar', { duration: 3500 });
       },
       error: (error: any) => {
@@ -577,7 +2058,6 @@ export class WorkShiftsAdminComponent implements OnInit {
 
     if (!input) return;
 
-    // Validar formato email básico
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(input)) {
       this.snackBar.open('Email inválido', 'Cerrar', { duration: 2000 });
@@ -613,13 +2093,10 @@ export class WorkShiftsAdminComponent implements OnInit {
       return;
     }
 
-    // Obtener configuración global
     const globalConfig = this.globalEmailForm.value;
 
-    // 1. Guardar en BD (AppConfig)
     this.configService.updateConfig({ emailReportConfig: globalConfig }).subscribe({
       next: () => {
-        // 2. Aplicar a todos los turnos existentes
         if (this.shifts.length > 0) {
           this.shifts.forEach(shift => {
             shift.emailReportConfig = {
@@ -628,7 +2105,6 @@ export class WorkShiftsAdminComponent implements OnInit {
             };
           });
 
-          // Guardar cada turno con la nueva configuración
           const updatePromises = this.shifts.map(shift =>
             this.workShiftService.updateShift(shift._id, {
               emailReportConfig: shift.emailReportConfig

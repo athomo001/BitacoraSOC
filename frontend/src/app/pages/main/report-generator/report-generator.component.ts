@@ -4,13 +4,15 @@
  * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
  */
 
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Subscription } from 'rxjs';
+import { debounceTime, filter } from 'rxjs/operators';
 import anime from 'animejs';
+import html2canvas from 'html2canvas';
 
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { CatalogService } from '../../../services/catalog.service';
@@ -22,7 +24,7 @@ import { ConfigService } from '../../../services/config.service';
 import { AuthService } from '../../../services/auth.service';
 
 import { EntityAutocompleteComponent } from '../../../components/entity-autocomplete/entity-autocomplete.component';
-import { NgIf, NgFor } from '@angular/common';
+import { NgIf, NgFor, DatePipe } from '@angular/common';
 import { MatFormField, MatLabel, MatError, MatSuffix } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatDatepickerInput, MatDatepickerToggle, MatDatepicker } from '@angular/material/datepicker';
@@ -33,8 +35,20 @@ import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatButtonToggleGroup, MatButtonToggle } from '@angular/material/button-toggle';
 import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatCardModule } from '@angular/material/card';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ClientAlertDialogComponent } from './client-alert-dialog.component';
 import { environment } from '@env/environment';
+
+export interface ReportHistoryItem {
+  id: string;
+  type: 'report' | 'newsletter';
+  title: string;
+  timestamp: string;
+  html: string;
+}
 
 /*
  * QA — generador de informes / newsletter:
@@ -51,7 +65,7 @@ import { environment } from '@env/environment';
   imports: [
     ReactiveFormsModule, FormsModule,
     EntityAutocompleteComponent,
-    NgIf, NgFor,
+    NgIf, NgFor, DatePipe,
     MatFormField, MatLabel, MatInput, MatError, MatSuffix,
     MatDatepickerInput, MatDatepickerToggle, MatDatepicker,
     MatSelect, MatOption,
@@ -59,10 +73,18 @@ import { environment } from '@env/environment';
     MatButton, MatIconButton,
     MatButtonToggleGroup, MatButtonToggle,
     MatIcon,
-    MatTooltip
+    MatTooltip,
+    MatAutocompleteModule,
+    MatProgressBarModule,
+    MatCardModule,
+    MatProgressSpinnerModule
   ]
 })
-export class ReportGeneratorComponent implements OnInit {
+export class ReportGeneratorComponent implements OnInit, OnDestroy {
+  // ─── History & Subscriptions ───────────────────────────────────────────
+  historyItems: ReportHistoryItem[] = [];
+  private formSub = new Subscription();
+
   // ─── Mode ───────────────────────────────────────────────────────────────
   currentMode: 'report' | 'newsletter' = 'report';
 
@@ -112,6 +134,7 @@ export class ReportGeneratorComponent implements OnInit {
   selectedOperationType: CatalogOperationType | null = null;
 
   // ─── Report state ────────────────────────────────────────────────────────
+  isGenerating = false;
   uploadedImages: { name: string; dataUrl: string; width: number; height: number }[] = [];
   newsletterUploadedImages: { name: string; dataUrl: string; width: number; height: number }[] = [];
   generatedHtml = '';
@@ -126,6 +149,7 @@ export class ReportGeneratorComponent implements OnInit {
   // ─── Branding ────────────────────────────────────────────────────────────
   logoBase64: string | null = null;
   appTitle = '';
+  internalClientEmail = '';
 
   // ─── Newsletter email dispatch ────────────────────────────────────────────
   newsletterRecipients = '';
@@ -212,11 +236,110 @@ export class ReportGeneratorComponent implements OnInit {
     });
   }
 
-  // ─── Lifecycle ───────────────────────────────────────────────────────────
   ngOnInit(): void {
     this.loadReportTableColorConfig();
     this.loadLogo();
     this.loadNewsletterContacts();
+    this.loadInternalClientEmail();
+    this.loadHistory();
+
+    // Debounced live previews (disabled to prevent auto-generation/preview while typing, as requested by user)
+    /*
+    this.formSub.add(
+      this.reportForm.valueChanges
+        .pipe(
+          debounceTime(300),
+          filter(() => this.currentMode === 'report')
+        )
+        .subscribe(() => {
+          if (this.reportForm.valid) {
+            void this.buildReportHtml(true);
+          } else {
+            this.generatedHtml = '';
+            this.safeGeneratedHtml = null;
+          }
+        })
+    );
+
+    this.formSub.add(
+      this.newsletterForm.valueChanges
+        .pipe(
+          debounceTime(100),
+          filter(() => this.currentMode === 'newsletter')
+        )
+        .subscribe(() => {
+          if (this.newsletterForm.valid) {
+            this.buildNewsletterHtml();
+          } else {
+            this.generatedHtml = '';
+            this.safeGeneratedHtml = null;
+          }
+        })
+    );
+    */
+  }
+
+  ngOnDestroy(): void {
+    this.formSub.unsubscribe();
+  }
+
+  loadInternalClientEmail(): void {
+    this.catalogService.getAllLogSources().subscribe({
+      next: (res) => {
+        const sources = Array.isArray(res) ? res : (res?.data || []);
+        const internalClient = sources.find((s: any) => s.isInternal === true);
+        if (internalClient && internalClient.internalEmail) {
+          this.internalClientEmail = internalClient.internalEmail;
+          // Set initially
+          this.newsletterCcRecipients = this.internalClientEmail;
+          this.incidentRecipientsCc = this.internalClientEmail;
+          this.updateIncidentSelectedFromText(this.internalClientEmail, 'cc');
+        }
+      },
+      error: () => {}
+    });
+  }
+
+  getAutocompleteContacts(query: string): DirectoryContact[] {
+    const term = String(query || '').trim().toLowerCase();
+    if (!term) return [];
+    return this.newsletterContacts.filter(c =>
+      c.email && (
+        c.name.toLowerCase().includes(term) ||
+        c.email.toLowerCase().includes(term) ||
+        (c.company || '').toLowerCase().includes(term)
+      )
+    );
+  }
+
+  addEmailToTextarea(email: string, target: 'nlTo' | 'nlCc' | 'incTo' | 'incCc'): void {
+    if (!email) return;
+    const trimmed = email.trim();
+    if (target === 'nlTo') {
+      if (!this.isEmailInField(trimmed, 'to')) {
+        this.addEmailToField(trimmed, 'to');
+      }
+    } else if (target === 'nlCc') {
+      if (!this.isEmailInField(trimmed, 'cc')) {
+        this.addEmailToField(trimmed, 'cc');
+      }
+    } else if (target === 'incTo') {
+      const current = this.incidentRecipientsTo.split(/[\n,;]+/).map(e => e.trim().toLowerCase());
+      if (!current.includes(trimmed.toLowerCase())) {
+        this.incidentRecipientsTo = this.incidentRecipientsTo
+          ? this.incidentRecipientsTo.trimEnd() + '\n' + trimmed
+          : trimmed;
+        this.updateIncidentSelectedFromText(this.incidentRecipientsTo, 'to');
+      }
+    } else if (target === 'incCc') {
+      const current = this.incidentRecipientsCc.split(/[\n,;]+/).map(e => e.trim().toLowerCase());
+      if (!current.includes(trimmed.toLowerCase())) {
+        this.incidentRecipientsCc = this.incidentRecipientsCc
+          ? this.incidentRecipientsCc.trimEnd() + '\n' + trimmed
+          : trimmed;
+        this.updateIncidentSelectedFromText(this.incidentRecipientsCc, 'cc');
+      }
+    }
   }
 
   // ─── Contextual guide toggle ──────────────────────────────────────────────
@@ -352,6 +475,12 @@ export class ReportGeneratorComponent implements OnInit {
     if (source) {
       this.reportForm.patchValue({ logSource: source.name });
       void this.refreshClientAlert('report', true);
+      
+      const ccEmail = source.internalEmail || this.internalClientEmail || '';
+      if (ccEmail) {
+        this.incidentRecipientsCc = ccEmail;
+        this.updateIncidentSelectedFromText(ccEmail, 'cc');
+      }
     }
   }
 
@@ -502,23 +631,28 @@ export class ReportGeneratorComponent implements OnInit {
   }
 
   // ─── Generate ────────────────────────────────────────────────────────────
-  async generateTable(): Promise<void> {
-    await this.refreshReportTableColorConfig();
+  async generateTable(addToHistoryFlag = false): Promise<void> {
+    this.isGenerating = true;
+    try {
+      await this.refreshReportTableColorConfig();
 
-    if (this.currentMode === 'report') {
-      if (this.reportForm.invalid) {
-        this.reportForm.markAllAsTouched();
-        this.snackBar.open('Completa todos los campos obligatorios del reporte', 'Cerrar', { duration: 3000 });
-        return;
+      if (this.currentMode === 'report') {
+        if (this.reportForm.invalid) {
+          this.reportForm.markAllAsTouched();
+          this.snackBar.open('Completa todos los campos obligatorios del reporte', 'Cerrar', { duration: 3000 });
+          return;
+        }
+        await this.buildReportHtml(false, addToHistoryFlag);
+      } else {
+        if (this.newsletterForm.invalid) {
+          this.newsletterForm.markAllAsTouched();
+          this.snackBar.open('Completa todos los campos obligatorios del boletín', 'Cerrar', { duration: 3000 });
+          return;
+        }
+        this.buildNewsletterHtml(addToHistoryFlag);
       }
-      await this.buildReportHtml();
-    } else {
-      if (this.newsletterForm.invalid) {
-        this.newsletterForm.markAllAsTouched();
-        this.snackBar.open('Completa todos los campos obligatorios del boletín', 'Cerrar', { duration: 3000 });
-        return;
-      }
-      this.buildNewsletterHtml();
+    } finally {
+      this.isGenerating = false;
     }
   }
 
@@ -702,6 +836,33 @@ export class ReportGeneratorComponent implements OnInit {
     return this.newsletterToCcOverlap.length > 0;
   }
 
+  /**
+   * Identifica correos duplicados entre los campos Para y CC en el reporte de incidente.
+   * Utilizado para prevenir que un mismo destinatario reciba copias duplicadas.
+   */
+  get incidentToCcOverlap(): string[] {
+    const toEmails = String(this.incidentRecipientsTo || '')
+      .split(/[\n,;]+/)
+      .map(e => e.trim().toLowerCase())
+      .filter(e => this.isValidNewsletterEmail(e));
+    
+    const ccEmails = String(this.incidentRecipientsCc || '')
+      .split(/[\n,;]+/)
+      .map(e => e.trim().toLowerCase())
+      .filter(e => this.isValidNewsletterEmail(e));
+      
+    const toSet = new Set(toEmails);
+    const overlap = ccEmails.filter(email => toSet.has(email));
+    return Array.from(new Set(overlap));
+  }
+
+  /**
+   * Indica si existen conflictos de destinatarios duplicados en el reporte de incidente.
+   */
+  get hasIncidentRecipientConflicts(): boolean {
+    return this.incidentToCcOverlap.length > 0;
+  }
+
   sendNewsletter(): void {
     if (!this.generatedHtml) {
       this.snackBar.open('Primero genera el boletín', 'Cerrar', { duration: 3000 });
@@ -763,6 +924,9 @@ export class ReportGeneratorComponent implements OnInit {
         this.snackBar.open(msg, 'Cerrar', { duration: 5000 });
 
         if (res.successCount > 0) {
+          // Add to history on success before clearing
+          this.addToHistory('newsletter', subject, this.generatedHtml);
+
           // Limpiar destinatarios
           this.newsletterRecipients = '';
           this.newsletterCcRecipients = '';
@@ -995,23 +1159,29 @@ export class ReportGeneratorComponent implements OnInit {
     if (!canContinue) return;
 
     const html = this.generatedHtml;
-    const plainText = this.getPlainTextFromHtml(html);
+    const htmlForClipboard = this.currentMode === 'report'
+      ? this.buildSimpleTableHtmlForClipboard()
+      : html;
+    const plainText = this.getPlainTextFromHtml(htmlForClipboard);
     const clipboardItem = (window as any).ClipboardItem;
+    const reportCopyNote = this.currentMode === 'report'
+      ? ' Nota: Se copió una estructura de tabla uniforme optimizada para Outlook/Gmail.'
+      : '';
 
     if (navigator?.clipboard && clipboardItem && navigator.clipboard.write) {
       const item = new clipboardItem({
-        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/html': new Blob([htmlForClipboard], { type: 'text/html' }),
         'text/plain': new Blob([plainText], { type: 'text/plain' })
       });
       try {
         await navigator.clipboard.write([item]);
-        this.snackBar.open('✅ Tabla copiada con formato', 'Cerrar', { duration: 2000 });
+        this.snackBar.open(`✅ Tabla copiada con formato.${reportCopyNote}`, 'Cerrar', { duration: 5000 });
         return;
       } catch { /* fallthrough */ }
     }
 
-    if (this.copyHtmlWithExecCommand(html)) {
-      this.snackBar.open('Tabla copiada con formato', 'Cerrar', { duration: 2000 });
+    if (this.copyHtmlWithExecCommand(htmlForClipboard)) {
+      this.snackBar.open(`Tabla copiada con formato.${reportCopyNote}`, 'Cerrar', { duration: 5000 });
       return;
     }
 
@@ -1173,9 +1343,11 @@ export class ReportGeneratorComponent implements OnInit {
   }
 
   // ─── HTML Builders ────────────────────────────────────────────────────────
-  private async buildReportHtml(): Promise<void> {
-    const canContinue = await this.ensureClientAlertAcknowledged('report');
-    if (!canContinue) return;
+  private async buildReportHtml(silent = false, addToHistoryFlag = false): Promise<void> {
+    if (!silent) {
+      const canContinue = await this.ensureClientAlertAcknowledged('report');
+      if (!canContinue) return;
+    }
 
     const form = this.reportForm.value;
     
@@ -1215,10 +1387,18 @@ export class ReportGeneratorComponent implements OnInit {
         this.generatedHtml = res.html || '';
         this.safeGeneratedHtml = this.sanitizer.bypassSecurityTrustHtml(this.generatedHtml);
         this.showPreview = true;
+        
+        if (addToHistoryFlag) {
+          // Add to history
+          const title = `${form.codigoTicket} - ${form.nombreEvento}`;
+          this.addToHistory('report', title, this.generatedHtml);
+        }
       },
       error: (err) => {
         console.error('Error al generar preview de reporte', err);
-        this.snackBar.open('Error al generar preview del reporte', 'Cerrar', { duration: 3000 });
+        if (!silent) {
+          this.snackBar.open('Error al generar preview del reporte', 'Cerrar', { duration: 3000 });
+        }
       }
     });
   }
@@ -1268,12 +1448,17 @@ export class ReportGeneratorComponent implements OnInit {
 
   toggleIncidentContact(contactId: string, mode: 'to' | 'cc'): void {
     const set = mode === 'to' ? this.selectedIncidentContactIdsTo : this.selectedIncidentContactIdsCc;
+    const alternateSet = mode === 'to' ? this.selectedIncidentContactIdsCc : this.selectedIncidentContactIdsTo;
+
     if (set.has(contactId)) {
       set.delete(contactId);
     } else {
       set.add(contactId);
+      // Evitar que el mismo contacto esté en Para y CC al mismo tiempo
+      alternateSet.delete(contactId);
     }
-    this.syncIncidentRecipientsText(mode);
+    this.syncIncidentRecipientsText('to');
+    this.syncIncidentRecipientsText('cc');
   }
 
   isIncidentContactSelected(contactId: string, mode: 'to' | 'cc'): boolean {
@@ -1321,6 +1506,18 @@ export class ReportGeneratorComponent implements OnInit {
       this.snackBar.open('Debes ingresar al menos un destinatario en Para', 'Cerrar', { duration: 3000 });
       return;
     }
+    
+    // Validar que no existan destinatarios duplicados entre los campos Para y CC
+    const overlap = this.incidentToCcOverlap;
+    if (overlap.length > 0) {
+      this.snackBar.open(
+        `Error: no se permite el mismo correo en Para y CC (${overlap.join(', ')})`,
+        'Cerrar',
+        { duration: 9000 }
+      );
+      return;
+    }
+
     if (!this.incidentSubject.trim()) {
       this.snackBar.open('Debes ingresar un asunto para el correo', 'Cerrar', { duration: 3000 });
       return;
@@ -1369,8 +1566,20 @@ export class ReportGeneratorComponent implements OnInit {
 
     this.http.post(`${this.backendBaseUrl}/api/reports/incident/send`, payload).subscribe({
       next: (res: any) => {
-        this.snackBar.open(`✅ Reporte enviado a ${res.toCount} destinatario(s) y ${res.ccCount} en copia`, 'Cerrar', { duration: 4000 });
+        this.snackBar.open(
+          'Reporte creado. Imágenes PNG de respaldo generadas y reporte enviado por correo.',
+          'Cerrar',
+          {
+            duration: 4000,
+            horizontalPosition: 'right',
+            verticalPosition: 'top'
+          }
+        );
         this.isSendingIncident = false;
+        
+        // Add to history on success
+        const title = `${form.codigoTicket} - ${form.nombreEvento}`;
+        this.addToHistory('report', title, this.generatedHtml);
         
         // Limpiar para permitir un nuevo reporte
         this.clearForm();
@@ -1384,7 +1593,7 @@ export class ReportGeneratorComponent implements OnInit {
     });
   }
 
-  private buildNewsletterHtml(): void {
+  private buildNewsletterHtml(addToHistoryFlag = false): void {
     const form = this.newsletterForm.value;
     this.reportTableHeaderColor = this.reportTableColorsByType.bulletin;
     const headerColor = this.reportTableHeaderColor;
@@ -1588,6 +1797,11 @@ export class ReportGeneratorComponent implements OnInit {
     this.generatedHtml = html;
     this.safeGeneratedHtml = this.sanitizer.bypassSecurityTrustHtml(html);
     this.showPreview = true;
+    
+    if (addToHistoryFlag) {
+      // Add to history
+      this.addToHistory('newsletter', form.tituloBoletin, html);
+    }
   }
 
   // ─── Client alert helpers ─────────────────────────────────────────────────
@@ -1780,6 +1994,250 @@ export class ReportGeneratorComponent implements OnInit {
     return doc.body.textContent?.trim() || '';
   }
 
+  private buildSimpleTableHtmlForClipboard(): string {
+    const form = this.reportForm.value;
+    const e = (v: unknown) => this.escapeHtml(v);
+    
+    // Formatear Fecha
+    let formattedDate = '';
+    if (form.fecha) {
+      const d = new Date(form.fecha);
+      if (!isNaN(d.getTime())) {
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        formattedDate = `${day}-${month}-${year}`;
+      }
+    }
+
+    // Color criticidad
+    const crit = String(form.criticidad || 'media').toLowerCase();
+    let badgeColor = '#FFA500';
+    if (crit === 'baja') {
+      badgeColor = '#4CAF50';
+    } else if (crit === 'alta') {
+      badgeColor = '#f44336';
+    } else if (crit === 'crítica' || crit === 'critica') {
+      badgeColor = '#b71c1c';
+    }
+
+    const headerColor = this.reportTableHeaderColor || '#155F50';
+
+    let html = `<table cellpadding="0" cellspacing="0" width="600" border="0" style="border-collapse: collapse; width: 600px; max-width: 100%; font-family: Arial, Helvetica, sans-serif; border: 1px solid #dddddd; background-color: #ffffff; margin: 0 auto;">
+  <tr>
+    <td style="padding: 15px; background-color: ${headerColor}; border-bottom: 3px solid #2b2b2b;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
+        <tr>
+          <td width="100" valign="middle" align="left" style="padding: 0;">
+            ${this.logoBase64 ? `<img src="${this.logoBase64}" height="40" width="auto" style="height: 40px; width: auto; border: 0; display: block;" alt="Logo">` : ''}
+          </td>
+          <td valign="middle" align="center" style="padding: 0; font-family: Arial, Helvetica, sans-serif; color: #ffffff; text-align: center;">
+            <div style="font-size: 20px; font-weight: bold; margin: 0;">Reporte de Detección</div>
+            <div style="font-size: 12px; margin: 5px 0 0 0; opacity: 0.9;">Monitoreo de Seguridad SOC</div>
+          </td>
+          <td width="100" style="padding: 0;"></td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 25px 25px 15px 25px; background-color: #ffffff;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
+        <tr>
+          <td style="padding: 0 0 15px 0; font-size: 20px; font-weight: bold; color: #111111; font-family: Arial, Helvetica, sans-serif;">
+            ${e(form.nombreEvento)}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0 0 15px 0;">
+            <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
+              <tr>
+                <td style="padding: 5px 10px; background-color: ${badgeColor}; color: #ffffff; font-size: 11px; font-weight: bold; font-family: Arial, Helvetica, sans-serif; text-transform: uppercase;">
+                  CRITICIDAD: ${e(form.criticidad)}
+                </td>
+                <td width="8"></td>
+                <td style="padding: 5px 10px; background-color: #eeeeee; color: #333333; font-size: 11px; font-weight: bold; font-family: Arial, Helvetica, sans-serif;">
+                  TICKET: ${e(form.codigoTicket)}
+                </td>
+                <td width="8"></td>
+                <td style="padding: 5px 10px; background-color: #eeeeee; color: #333333; font-size: 11px; font-weight: bold; font-family: Arial, Helvetica, sans-serif;">
+                  OFENSA: ${e(form.ofensa)}
+                </td>
+                <td width="8"></td>
+                <td style="padding: 5px 10px; background-color: #eeeeee; color: #333333; font-size: 11px; font-weight: bold; font-family: Arial, Helvetica, sans-serif;">
+                  FECHA: ${formattedDate}
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 10px 25px; background-color: #ffffff;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
+        <tr>
+          <td style="padding: 0 0 8px 0; font-size: 15px; font-weight: bold; color: #111111; font-family: Arial, Helvetica, sans-serif; border-bottom: 2px solid ${headerColor}; text-transform: uppercase;">
+            Información del Evento
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 0;">
+            <table cellpadding="6" cellspacing="0" border="0" width="100%" style="border-collapse: collapse; font-size: 13px; font-family: Arial, Helvetica, sans-serif; color: #333333;">
+              <tr style="border-bottom: 1px solid #eeeeee;">
+                <td width="30%" style="font-weight: bold; padding: 6px 0; vertical-align: top;">Ofensa</td>
+                <td width="70%" style="padding: 6px 0; vertical-align: top;">${e(form.ofensa)}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #eeeeee;">
+                <td style="font-weight: bold; padding: 6px 0; vertical-align: top;">Tipo de operación</td>
+                <td style="padding: 6px 0; vertical-align: top;">${e(form.tipoOperacion)}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #eeeeee;">
+                <td style="font-weight: bold; padding: 6px 0; vertical-align: top;">Nombre de Ofensa/Evento</td>
+                <td style="padding: 6px 0; vertical-align: top;">${e(form.nombreEvento)}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #eeeeee;">
+                <td style="font-weight: bold; padding: 6px 0; vertical-align: top;">Motivo</td>
+                <td style="padding: 6px 0; vertical-align: top;">${e(form.motivoEvento)}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #eeeeee;">
+                <td style="font-weight: bold; padding: 6px 0; vertical-align: top;">MRSC (Criticidad)</td>
+                <td style="padding: 6px 0; vertical-align: top;">${e(form.criticidad)}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #eeeeee;">
+                <td style="font-weight: bold; padding: 6px 0; vertical-align: top;">Fuente / Log Source</td>
+                <td style="padding: 6px 0; vertical-align: top;">${e(form.logSource)}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #eeeeee;">
+                <td style="font-weight: bold; padding: 6px 0; vertical-align: top;">Reputación de origen</td>
+                <td style="padding: 6px 0; vertical-align: top;">${e(form.reputacionOrigen)}</td>
+              </tr>
+  `;
+
+    if (form.origenConexion?.trim()) {
+      html += `
+              <tr style="border-bottom: 1px solid #eeeeee;">
+                <td style="font-weight: bold; padding: 6px 0; vertical-align: top;">Origen</td>
+                <td style="padding: 6px 0; vertical-align: top;">${e(form.origenConexion)}</td>
+              </tr>`;
+    }
+
+    if (form.destino?.trim()) {
+      html += `
+              <tr style="border-bottom: 1px solid #eeeeee;">
+                <td style="font-weight: bold; padding: 6px 0; vertical-align: top;">Destino</td>
+                <td style="padding: 6px 0; vertical-align: top;">${e(form.destino)}</td>
+              </tr>`;
+    }
+
+    if (form.informacionAdicional?.trim()) {
+      html += `
+              <tr style="border-bottom: 1px solid #eeeeee;">
+                <td style="font-weight: bold; padding: 6px 0; vertical-align: top;">Información Adicional</td>
+                <td style="padding: 6px 0; vertical-align: top;">${e(form.informacionAdicional)}</td>
+              </tr>`;
+    }
+
+    html += `
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 10px 25px; background-color: #ffffff;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
+        <tr>
+          <td style="padding: 0 0 8px 0; font-size: 15px; font-weight: bold; color: #111111; font-family: Arial, Helvetica, sans-serif; border-bottom: 2px solid ${headerColor}; text-transform: uppercase;">
+            Observaciones
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 0; font-size: 13px; line-height: 1.6; color: #333333; font-family: Arial, Helvetica, sans-serif;">
+            ${this.formatMultilineText(form.observaciones)}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  `;
+
+    if (form.recomendacion?.trim()) {
+      html += `
+  <tr>
+    <td style="padding: 10px 25px; background-color: #ffffff;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
+        <tr>
+          <td style="padding: 0 0 8px 0; font-size: 15px; font-weight: bold; color: #111111; font-family: Arial, Helvetica, sans-serif; border-bottom: 2px solid ${headerColor}; text-transform: uppercase;">
+            Acciones Recomendadas
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 0; font-size: 13px; line-height: 1.6; color: #333333; font-family: Arial, Helvetica, sans-serif;">
+            ${this.formatMultilineText(form.recomendacion)}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>`;
+    }
+
+    if (form.evidenciaTexto?.trim() || this.uploadedImages.length > 0) {
+      html += `
+  <tr>
+    <td style="padding: 10px 25px 20px 25px; background-color: #ffffff;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
+        <tr>
+          <td style="padding: 0 0 8px 0; font-size: 15px; font-weight: bold; color: #111111; font-family: Arial, Helvetica, sans-serif; border-bottom: 2px solid ${headerColor}; text-transform: uppercase;">
+            Evidencias
+          </td>
+        </tr>`;
+
+      if (form.evidenciaTexto?.trim()) {
+        html += `
+        <tr>
+          <td style="padding: 10px 0; font-size: 13px; line-height: 1.6; color: #333333; font-family: Arial, Helvetica, sans-serif;">
+            ${this.formatMultilineText(form.evidenciaTexto)}
+          </td>
+        </tr>`;
+      }
+
+      if (this.uploadedImages.length > 0) {
+        html += `
+        <tr>
+          <td style="padding: 10px 0;">
+            <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
+        `;
+        this.uploadedImages.forEach(img => {
+          html += `
+              <tr>
+                <td align="center" style="padding: 10px 0;">
+                  <img src="${img.dataUrl}" style="max-width: 100%; height: auto; border: 1px solid #dddddd; display: block;" alt="${e(img.name)}">
+                  <div style="font-size: 11px; color: #666666; margin-top: 4px; text-align: center;">${e(img.name)}</div>
+                </td>
+              </tr>
+          `;
+        });
+        html += `
+            </table>
+          </td>
+        </tr>`;
+      }
+
+      html += `
+      </table>
+    </td>
+  </tr>`;
+    }
+
+    html += `
+</table>`;
+
+    return html;
+  }
+
   private getMarkdownFromHtml(html: string): string {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const rows = Array.from(doc.querySelectorAll('tr'));
@@ -1808,5 +2266,251 @@ export class ReportGeneratorComponent implements OnInit {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  }
+
+  // ─── History Methods ──────────────────────────────────────────────────────
+  loadHistory(): void {
+    try {
+      const stored = localStorage.getItem('soc_report_history');
+      if (stored) {
+        this.historyItems = JSON.parse(stored);
+      }
+    } catch (e) {
+      console.error('Error loading history', e);
+      this.historyItems = [];
+    }
+  }
+
+  saveHistory(): void {
+    try {
+      localStorage.setItem('soc_report_history', JSON.stringify(this.historyItems));
+    } catch (e) {
+      console.error('Error saving history', e);
+    }
+  }
+
+  addToHistory(type: 'report' | 'newsletter', title: string, html: string): void {
+    // Check if an item with the same title and HTML already exists to prevent duplicate entries
+    const duplicate = this.historyItems.find(item => item.title === title && item.html === html);
+    if (duplicate) {
+      // Just update the timestamp to now and move it to the top
+      this.historyItems = this.historyItems.filter(item => item !== duplicate);
+      duplicate.timestamp = new Date().toISOString();
+      this.historyItems.unshift(duplicate);
+      this.saveHistory();
+      return;
+    }
+
+    const newItem: ReportHistoryItem = {
+      id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
+      type,
+      title,
+      timestamp: new Date().toISOString(),
+      html
+    };
+    this.historyItems.unshift(newItem);
+    if (this.historyItems.length > 10) {
+      this.historyItems = this.historyItems.slice(0, 10);
+    }
+    this.saveHistory();
+  }
+
+  openInNewTab(item: ReportHistoryItem): void {
+    const win = window.open();
+    if (win) {
+      win.document.write(item.html);
+      win.document.close();
+    } else {
+      this.snackBar.open('No se pudo abrir la pestaña. Habilite las ventanas emergentes.', 'Cerrar', { duration: 3000 });
+    }
+  }
+
+  get isAdmin(): boolean {
+    return this.authService.isAdmin();
+  }
+
+  deleteHistoryItem(item: ReportHistoryItem): void {
+    this.historyItems = this.historyItems.filter(h => h.id !== item.id);
+    this.saveHistory();
+    this.snackBar.open('Reporte eliminado del historial', 'Cerrar', { duration: 2000 });
+  }
+
+  clearAllHistory(): void {
+    if (confirm('¿Está seguro de que desea borrar todo el historial de reportes?')) {
+      this.historyItems = [];
+      this.saveHistory();
+      this.snackBar.open('Historial vacío', 'Cerrar', { duration: 2000 });
+    }
+  }
+
+  private cleanElementForXml(element: Element): void {
+    // 1. Remove attributes containing colons (namespaces, MS Outlook stuff)
+    const attrs = Array.from(element.attributes);
+    for (const attr of attrs) {
+      if (attr.name.includes(':')) {
+        element.removeAttribute(attr.name);
+      }
+    }
+
+    // 2. Process child nodes
+    const children = Array.from(element.childNodes);
+    for (const child of children) {
+      if (child.nodeType === Node.COMMENT_NODE) {
+        element.removeChild(child);
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const childEl = child as Element;
+        if (childEl.tagName.includes(':')) {
+          element.removeChild(childEl);
+        } else {
+          this.cleanElementForXml(childEl);
+        }
+      }
+    }
+  }
+
+  private convertToXhtml(html: string): string {
+    try {
+      const parser = new DOMParser();
+      // Remove XML-invalid sequences like doctype declarations and XML-style comment content
+      let cleanHtml = html
+        .replace(/<!DOCTYPE[^>]*>/gi, '')
+        .replace(/<!--[\s\S]*?-->/g, ''); // Strip comments at string level first
+      
+      const doc = parser.parseFromString(cleanHtml, 'text/html');
+      
+      // Create a clean XHTML container div
+      const wrapper = doc.createElement('div');
+      wrapper.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+      wrapper.style.backgroundColor = '#ffffff';
+      wrapper.style.fontFamily = 'Arial, sans-serif';
+      wrapper.style.margin = '0';
+      wrapper.style.padding = '20px';
+      wrapper.style.width = '100%';
+      wrapper.style.boxSizing = 'border-box';
+
+      // Import CSS style blocks and replace with placeholders to avoid escaping issues
+      const styles = Array.from(doc.getElementsByTagName('style'));
+      const cssContents: string[] = [];
+      for (let i = 0; i < styles.length; i++) {
+        const style = styles[i];
+        cssContents.push(style.textContent || '');
+        style.textContent = `__STYLE_PLACEHOLDER_${i}__`;
+        
+        // Append a clone to the top of wrapper
+        wrapper.appendChild(style.cloneNode(true));
+        
+        // Remove from its original parent so it's not duplicated
+        if (style.parentNode) {
+          style.parentNode.removeChild(style);
+        }
+      }
+
+      // Import the actual HTML body elements
+      const body = doc.body;
+      if (body) {
+        const children = Array.from(body.childNodes);
+        for (const child of children) {
+          wrapper.appendChild(child.cloneNode(true));
+        }
+      }
+
+      // Recursively clean elements (remove comments, colon-namespaced tags/attributes)
+      this.cleanElementForXml(wrapper);
+
+      const serializer = new XMLSerializer();
+      let serialized = serializer.serializeToString(wrapper);
+
+      // Restore raw CSS content inside CDATA block
+      for (let i = 0; i < cssContents.length; i++) {
+        const placeholder = `__STYLE_PLACEHOLDER_${i}__`;
+        const rawCss = cssContents[i];
+        serialized = serialized.replace(placeholder, `/* <![CDATA[ */\n${rawCss}\n/* ]]> */`);
+      }
+
+      return serialized;
+    } catch (e) {
+      console.error('Error converting HTML to XHTML', e);
+      return html;
+    }
+  }
+
+  async downloadPng(item: ReportHistoryItem): Promise<void> {
+    const html = item.html;
+    const width = 800;
+
+    // Create a temporary container in the DOM
+    const temp = document.createElement('div');
+    temp.style.position = 'fixed';
+    temp.style.left = '-9999px';
+    temp.style.top = '-9999px';
+    temp.style.width = `${width}px`;
+    temp.style.backgroundColor = '#ffffff';
+    temp.style.fontFamily = 'Arial, sans-serif';
+    temp.innerHTML = html;
+    document.body.appendChild(temp);
+
+    try {
+      // Wait for any images in the HTML to fully load before rendering
+      const images = Array.from(temp.querySelectorAll('img'));
+      await Promise.all(images.map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise<void>((resolve) => {
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+        });
+      }));
+
+      // Render the element directly using html2canvas with scale: 2 for high definition
+      const canvas = await html2canvas(temp, {
+        useCORS: true,
+        allowTaint: true,
+        scale: 2,
+        backgroundColor: '#ffffff',
+        logging: false
+      });
+
+      const pngUrl = canvas.toDataURL('image/png');
+      const downloadLink = document.createElement('a');
+      downloadLink.href = pngUrl;
+      downloadLink.download = `${item.title.replace(/[^a-zA-Z0-9-_]/g, '_')}.png`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+    } catch (err) {
+      console.error('html2canvas PNG generation failed, falling back to SVG download', err);
+      this.downloadSvgFallback(item);
+    } finally {
+      if (temp.parentNode) {
+        temp.parentNode.removeChild(temp);
+      }
+    }
+  }
+
+  private downloadSvgFallback(item: ReportHistoryItem): void {
+    const html = item.html;
+    const height = Math.max(1000, Math.min(3000, Math.floor(html.length / 5)));
+    const width = 800;
+
+    const xhtml = this.convertToXhtml(html);
+
+    const svgString = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+        <foreignObject width="100%" height="100%">
+          ${xhtml}
+        </foreignObject>
+      </svg>
+    `;
+
+    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const URL = window.URL || window.webkitURL || window;
+    const blobURL = URL.createObjectURL(svgBlob);
+
+    const downloadLink = document.createElement('a');
+    downloadLink.href = blobURL;
+    downloadLink.download = `${item.title.replace(/[^a-zA-Z0-9-_]/g, '_')}.svg`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+    URL.revokeObjectURL(blobURL);
   }
 }

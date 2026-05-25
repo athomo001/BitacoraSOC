@@ -3,526 +3,959 @@
     <mat-icon>schedule</mat-icon>
     <div>
       <h1>Administración de Turnos de Trabajo</h1>
-      <p>Configura los turnos con horarios personalizados</p>
+      <p>Configura los turnos con horarios personalizados y asignaciones semanales</p>
     </div>
   </header>
 
-  <!-- Botón agregar -->
-  <div class="actions-bar" *ngIf="!showForm">
-    <button mat-raised-button color="primary" (click)="addShift()">
-      <mat-icon>add</mat-icon>
-      Crear Turno
-    </button>
-  </div>
-
-  <!-- Formulario -->
-  <div *ngIf="showForm" class="shift-panel form-card">
-    <header class="shift-panel__header">
-      <h2 class="shift-panel__title">
-        <mat-icon>{{ editingShift ? 'edit' : 'add' }}</mat-icon>
-        {{ editingShift ? 'Editar Turno' : 'Nuevo Turno' }}
-      </h2>
-    </header>
-    <div class="shift-panel__body">
-      <form [formGroup]="shiftForm" (ngSubmit)="saveShift()">
-        <div class="form-grid">
-          <!-- Nombre -->
-          <mat-form-field appearance="outline">
-            <mat-label>Nombre del turno</mat-label>
-            <input matInput formControlName="name" placeholder="Ej: Turno Mañana">
-            <mat-icon matPrefix>label</mat-icon>
-            <mat-error *ngIf="shiftForm.get('name')?.hasError('required')">
-              Nombre requerido
-            </mat-error>
-          </mat-form-field>
-
-          <!-- Código -->
-          <mat-form-field appearance="outline">
-            <mat-label>Código</mat-label>
-            <input matInput formControlName="code" placeholder="Ej: MORNING" class="uppercase-input">
-            <mat-icon matPrefix>code</mat-icon>
-            <mat-hint>Solo letras mayúsculas, números y guión bajo</mat-hint>
-            <mat-error *ngIf="shiftForm.get('code')?.hasError('required')">
-              Código requerido
-            </mat-error>
-            <mat-error *ngIf="shiftForm.get('code')?.hasError('pattern')">
-              Solo letras mayúsculas, números y _
-            </mat-error>
-          </mat-form-field>
-
-          <!-- Tipo -->
-          <mat-form-field appearance="outline">
-            <mat-label>Tipo de turno</mat-label>
-            <mat-select formControlName="type">
-              <mat-option *ngFor="let option of shiftTypeOptions" [value]="option.value">
-                {{ option.label }} - {{ option.description }}
-              </mat-option>
-            </mat-select>
-            <mat-icon matPrefix>category</mat-icon>
-          </mat-form-field>
-
-          <!-- Color -->
-          <mat-form-field appearance="outline">
-            <mat-label>Color</mat-label>
-            <mat-select formControlName="color">
-              <mat-option *ngFor="let color of colorOptions" [value]="color">
-                <span [style.color]="color">⬤</span> {{ color }}
-              </mat-option>
-            </mat-select>
-            <mat-icon matPrefix>palette</mat-icon>
-          </mat-form-field>
-
-          <!-- Hora inicio -->
-          <mat-form-field appearance="outline">
-            <mat-label>Hora inicio</mat-label>
-            <input matInput type="time" formControlName="startTime">
-            <mat-icon matPrefix>access_time</mat-icon>
-            <mat-error *ngIf="shiftForm.get('startTime')?.hasError('required')">
-              Hora inicio requerida
-            </mat-error>
-          </mat-form-field>
-
-          <!-- Hora fin -->
-          <mat-form-field appearance="outline">
-            <mat-label>Hora fin</mat-label>
-            <input matInput type="time" formControlName="endTime">
-            <mat-icon matPrefix>access_time</mat-icon>
-            <mat-hint>Puede ser menor que inicio si cruza medianoche</mat-hint>
-            <mat-error *ngIf="shiftForm.get('endTime')?.hasError('required')">
-              Hora fin requerida
-            </mat-error>
-          </mat-form-field>
-
-          <!-- Zona horaria -->
-          <mat-form-field appearance="outline">
-            <mat-label>Zona horaria</mat-label>
-            <mat-select formControlName="timezone">
-              <mat-option value="America/Santiago">America/Santiago (Chile)</mat-option>
-              <mat-option value="America/Argentina/Buenos_Aires">America/Argentina/Buenos_Aires</mat-option>
-              <mat-option value="America/New_York">America/New_York</mat-option>
-              <mat-option value="America/Los_Angeles">America/Los_Angeles</mat-option>
-              <mat-option value="Europe/Madrid">Europe/Madrid</mat-option>
-              <mat-option value="UTC">UTC</mat-option>
-            </mat-select>
-            <mat-icon matPrefix>public</mat-icon>
-          </mat-form-field>
-
-          <!-- Usuario asignado -->
-          <mat-form-field appearance="outline">
-            <mat-label>Usuario asignado (opcional)</mat-label>
-            <mat-select formControlName="assignedUserId">
-              <mat-option [value]="null">Sin asignar</mat-option>
-              <mat-option *ngFor="let user of users" [value]="user._id">
-                {{ user.fullName }} ({{ user.email }})
-              </mat-option>
-            </mat-select>
-            <mat-icon matPrefix>person</mat-icon>
-            <mat-hint>Deja en blanco si no quieres asignar a nadie</mat-hint>
-          </mat-form-field>
-
-          <!-- Checklist Inicio (opcional) -->
-          <mat-form-field appearance="outline">
-            <mat-label>Checklist de Inicio (opcional)</mat-label>
-            <mat-select formControlName="checklistTemplateStartId">
-              <mat-option [value]="null">Ninguno</mat-option>
-              <mat-option *ngFor="let tpl of checklistTemplates" [value]="tpl._id">
-                {{ tpl.name }}
-              </mat-option>
-            </mat-select>
-            <mat-icon matPrefix>playlist_add_check</mat-icon>
-            <mat-hint>Plantilla solicitada al iniciar el turno</mat-hint>
-          </mat-form-field>
-
-          <!-- Checklist Cierre (opcional) -->
-          <mat-form-field appearance="outline">
-            <mat-label>Checklist de Cierre (opcional)</mat-label>
-            <mat-select formControlName="checklistTemplateEndId">
-              <mat-option [value]="null">Ninguno</mat-option>
-              <mat-option *ngFor="let tpl of checklistTemplates" [value]="tpl._id">
-                {{ tpl.name }}
-              </mat-option>
-            </mat-select>
-            <mat-icon matPrefix>playlist_add_check</mat-icon>
-            <mat-hint>Plantilla solicitada al finalizar el turno</mat-hint>
-          </mat-form-field>
-
-          <!-- Orden -->
-          <mat-form-field appearance="outline">
-            <mat-label>Orden</mat-label>
-            <input matInput type="number" formControlName="order" min="0">
-            <mat-icon matPrefix>sort</mat-icon>
-            <mat-hint>Para ordenar en la lista</mat-hint>
-          </mat-form-field>
-        </div>
-
-        <!-- Descripción (ancho completo) -->
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Descripción</mat-label>
-          <textarea matInput formControlName="description" rows="3"
-            placeholder="Descripción opcional del turno"></textarea>
-          <mat-icon matPrefix>description</mat-icon>
-        </mat-form-field>
-
-        <!-- Estado -->
-        <mat-checkbox formControlName="active">
-          Turno activo
-        </mat-checkbox>
-        <p class="section-description">
-          El envío de correo se gestiona en la sección "Reenvío de Información (General)".
-        </p>
-
-        <!-- Acciones -->
-        <div class="form-actions">
-          <button mat-raised-button type="button" (click)="cancelForm()">
-            Cancelar
-          </button>
-          <button mat-raised-button color="primary" type="submit" [disabled]="shiftForm.invalid">
-            <mat-icon>save</mat-icon>
-            {{ editingShift ? 'Actualizar' : 'Crear' }}
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Tabla de turnos -->
-  <div *ngIf="!showForm" class="shift-panel table-card">
-    <header class="shift-panel__header">
-      <h2 class="shift-panel__title">
-        <mat-icon>list</mat-icon>
-        Turnos Configurados
-      </h2>
-    </header>
-    <div class="shift-panel__body">
-      <div *ngIf="loading" class="loading-container">
-        <mat-spinner diameter="40"></mat-spinner>
-      </div>
-
-      <div *ngIf="!loading && shifts.length === 0" class="empty-state">
-        <mat-icon>schedule</mat-icon>
-        <p>No hay turnos configurados</p>
-        <button mat-raised-button color="primary" (click)="addShift()">
-          <mat-icon>add</mat-icon>
-          Crear primer turno
-        </button>
-      </div>
-
-      <table mat-table [dataSource]="shifts" *ngIf="!loading && shifts.length > 0" class="shifts-table">
-        <!-- Orden -->
-        <ng-container matColumnDef="order">
-          <th mat-header-cell *matHeaderCellDef>#</th>
-          <td mat-cell *matCellDef="let shift">{{ shift.order }}</td>
-        </ng-container>
-
-        <!-- Nombre -->
-        <ng-container matColumnDef="name">
-          <th mat-header-cell *matHeaderCellDef>Nombre</th>
-          <td mat-cell *matCellDef="let shift">
-            <div class="shift-name">
-              <span [style.color]="shift.color" class="color-indicator">⬤</span>
-              <strong>{{ shift.name }}</strong>
+  <mat-tab-group class="dashboard-tabs">
+    <!-- PESTAÑA 1: ASIGNACIÓN DE TURNOS SEMANALES -->
+    <mat-tab label="Asignación de Turnos Semanales">
+      <div class="weekly-shifts-dashboard">
+        <!-- Columna Principal -->
+        <div class="main-column">
+          
+          <!-- Vista Resumen Semanal (Gantt) -->
+          <div class="dashboard-card gantt-card-wrapper">
+            <div class="card-header">
+              <div class="title-with-subtitle">
+                <h3>Vista Resumen Semanal</h3>
+                <span class="week-label">
+                  Periodo: {{ ganttWeekStart | date:'dd/MM/yyyy' }} al {{ ganttWeekEnd | date:'dd/MM/yyyy' }}
+                </span>
+              </div>
             </div>
-          </td>
-        </ng-container>
-
-        <!-- Código -->
-        <ng-container matColumnDef="code">
-          <th mat-header-cell *matHeaderCellDef>Código</th>
-          <td mat-cell *matCellDef="let shift">
-            <code>{{ shift.code }}</code>
-          </td>
-        </ng-container>
-
-        <!-- Tipo -->
-        <ng-container matColumnDef="type">
-          <th mat-header-cell *matHeaderCellDef>Tipo</th>
-          <td mat-cell *matCellDef="let shift">
-            <mat-chip [class]="getTypeBadgeClass(shift.type)">
-              {{ getTypeLabel(shift.type) }}
-            </mat-chip>
-          </td>
-        </ng-container>
-
-        <!-- Horario -->
-        <ng-container matColumnDef="timeRange">
-          <th mat-header-cell *matHeaderCellDef>Horario</th>
-          <td mat-cell *matCellDef="let shift">
-            {{ formatTimeRange(shift) }}
-          </td>
-        </ng-container>
-
-        <!-- Checklists por tipo -->
-        <ng-container matColumnDef="checklists">
-          <th mat-header-cell *matHeaderCellDef>Checklist Inicio/Cierre</th>
-          <td mat-cell *matCellDef="let shift">
-            {{ getChecklistSummary(shift) }}
-          </td>
-        </ng-container>
-
-        <!-- Usuario asignado -->
-        <ng-container matColumnDef="assignedUser">
-          <th mat-header-cell *matHeaderCellDef>Asignado a</th>
-          <td mat-cell *matCellDef="let shift">
-            <span *ngIf="getUserName(shift) !== 'Sin asignar'" class="user-assigned">
-              <mat-icon>person</mat-icon>
-              {{ getUserName(shift) }}
-            </span>
-            <span *ngIf="getUserName(shift) === 'Sin asignar'" class="user-unassigned">
-              Sin asignar
-            </span>
-          </td>
-        </ng-container>
-
-        <!-- Estado -->
-        <ng-container matColumnDef="active">
-          <th mat-header-cell *matHeaderCellDef>Estado</th>
-          <td mat-cell *matCellDef="let shift">
-            <mat-chip [class]="shift.active ? 'badge-active' : 'badge-inactive'">
-              {{ shift.active ? 'Activo' : 'Inactivo' }}
-            </mat-chip>
-          </td>
-        </ng-container>
-
-        <!-- Acciones -->
-        <ng-container matColumnDef="actions">
-          <th mat-header-cell *matHeaderCellDef>Acciones</th>
-          <td mat-cell *matCellDef="let shift">
-            <button mat-icon-button color="primary" (click)="editShift(shift)" matTooltip="Editar">
-              <mat-icon>edit</mat-icon>
-            </button>
-            <button mat-icon-button color="warn" (click)="deleteShift(shift)" matTooltip="Eliminar">
-              <mat-icon>delete</mat-icon>
-            </button>
-          </td>
-        </ng-container>
-
-        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-      </table>
-
-      <div *ngIf="!loading && shifts.length > 0" class="operational-assignment-section">
-        <mat-divider></mat-divider>
-
-        <div class="operational-header">
-          <h3>Asignación Operativa</h3>
-          <p class="section-description">Vincula analista y turno. El horario se hereda desde la configuración del turno.</p>
-        </div>
-
-        <form [formGroup]="operationalAssignmentForm" (ngSubmit)="saveOperationalAssignment()" class="operational-form">
-          <mat-form-field appearance="outline">
-            <mat-label>Analista</mat-label>
-            <mat-select formControlName="userId">
-              <mat-option *ngFor="let user of users" [value]="user._id">
-                {{ user.fullName }} ({{ user.email }})
-              </mat-option>
-            </mat-select>
-          </mat-form-field>
-
-          <mat-form-field appearance="outline">
-            <mat-label>Turno</mat-label>
-            <mat-select formControlName="shiftId">
-              <mat-option *ngFor="let shift of shifts" [value]="shift._id">
-                {{ shift.name }} ({{ formatTimeRange(shift) }})
-              </mat-option>
-            </mat-select>
-          </mat-form-field>
-
-          <mat-form-field appearance="outline">
-            <mat-label>Días asignados</mat-label>
-            <mat-select formControlName="weekdays" multiple>
-              <mat-option [value]="1">Lunes</mat-option>
-              <mat-option [value]="2">Martes</mat-option>
-              <mat-option [value]="3">Miércoles</mat-option>
-              <mat-option [value]="4">Jueves</mat-option>
-              <mat-option [value]="5">Viernes</mat-option>
-              <mat-option [value]="6">Sábado</mat-option>
-              <mat-option [value]="0">Domingo</mat-option>
-            </mat-select>
-            <mat-hint>Por defecto será Lun-Vie</mat-hint>
-          </mat-form-field>
-
-          <div class="operational-actions">
-            <button mat-raised-button color="primary" type="submit" [disabled]="operationalAssignmentForm.invalid">
-              <mat-icon>link</mat-icon>
-              Vincular
-            </button>
-            <button mat-stroked-button type="button" (click)="refreshOperationalStatus()">
-              <mat-icon>refresh</mat-icon>
-              Actualizar estado
-            </button>
-          </div>
-        </form>
-
-        <div class="operational-table-wrapper" *ngIf="operationalRows.length > 0">
-          <table class="operational-table">
-            <thead>
-              <tr>
-                <th>Analista</th>
-                <th>Turno</th>
-                <th>Horario</th>
-                <th>Días</th>
-                <th>Estado Operativo</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let row of operationalRows">
-                <td>{{ row.analystName }}</td>
-                <td>{{ row.shiftName }}</td>
-                <td>{{ row.schedule }}</td>
-                <td>{{ row.weekdaysLabel }}</td>
-                <td>
-                  <mat-chip [class]="getOperationalStatusClass(row.status)">
-                    {{ getOperationalStatusLabel(row.status) }}
-                  </mat-chip>
-                </td>
-                <td>
-                  <button mat-icon-button color="warn" (click)="unlinkOperationalAssignment(row)" matTooltip="Desvincular analista">
-                    <mat-icon>link_off</mat-icon>
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div *ngIf="operationalRows.length === 0" class="empty-operational">
-          <p>No hay asignaciones operativas activas.</p>
-        </div>
-      </div>
-
-      <!-- Sección GLOBAL: Reenvío de Información (siempre visible) -->
-      <div *ngIf="!showForm" class="global-email-section">
-        <mat-divider></mat-divider>
-
-        <div class="global-email-header">
-          <h3>📧 Reenvío de Información (General)</h3>
-          <p class="section-description">
-            Configura el envío automático al finalizar turno para todos los turnos
-          </p>
-        </div>
-
-        <button mat-raised-button color="primary" (click)="toggleGlobalEmailConfig()" class="toggle-config-btn">
-          <mat-icon>{{ showGlobalEmailConfig ? 'expand_less' : 'expand_more' }}</mat-icon>
-          {{ showGlobalEmailConfig ? 'Ocultar configuración' : 'Configurar reenvío' }}
-        </button>
-
-        <!-- Formulario GLOBAL cuando está expandido -->
-        <div *ngIf="showGlobalEmailConfig" class="global-config-form">
-          <form [formGroup]="globalEmailForm">
-
-            <!-- Habilitar reenvío -->
-            <mat-checkbox formControlName="enabled" class="section-toggle">
-              <strong>Enviar correo automáticamente al finalizar turno</strong>
-            </mat-checkbox>
-            <p class="section-description">
-              El envío al registrar checklist de cierre se configura en Administracion Checklist.
-            </p>
-
-            <!-- Opciones cuando está habilitado -->
-            <div class="report-options" *ngIf="globalEmailForm.get('enabled')?.value">
-
-              <!-- Qué incluir -->
-              <div class="include-options">
-                <h4>Contenido del reporte:</h4>
-                <mat-checkbox formControlName="includeChecklist">
-                  📋 Incluir checklist de entrada y salida
-                </mat-checkbox>
-                <mat-checkbox formControlName="includeEntries">
-                  📝 Incluir entradas de bitácora del turno
-                </mat-checkbox>
+            
+            <div class="gantt-chart">
+              <!-- Grid de fondo -->
+              <div class="gantt-grid">
+                <div class="gantt-grid-line" *ngFor="let tick of ganttTicks" [style.left.%]="tick.position"></div>
               </div>
 
-              <!-- Asunto del correo -->
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Asunto del correo</mat-label>
-                <input matInput formControlName="subjectTemplate" placeholder="Reporte SOC [fecha] [turno]">
-                <mat-icon matPrefix>subject</mat-icon>
-                <mat-hint>Variables disponibles: [fecha], [turno], [hora]</mat-hint>
-              </mat-form-field>
+              <!-- Línea del día actual -->
+              <div class="gantt-today-line" [style.left.%]="ganttTodayPosition">
+                <div class="gantt-today-badge">Día Actual</div>
+              </div>
 
-              <!-- Destinatarios (chips) -->
-              <div class="recipients-field">
-                <label class="recipients-label">Destinatarios</label>
-                <mat-chip-set class="email-chips">
-                  <mat-chip *ngFor="let email of recipients.value" [removable]="true" (removed)="removeEmail(email)">
-                    {{ email }}
-                    <button matChipRemove>
-                      <mat-icon>cancel</mat-icon>
-                    </button>
-                  </mat-chip>
-                </mat-chip-set>
+              <!-- Cabecera Gantt -->
+              <div class="gantt-header-row">
+                <div class="gantt-label-col">Rol</div>
+                <div class="gantt-timeline-col"></div>
+              </div>
 
-                <div class="email-input-row">
-                  <mat-form-field appearance="outline" class="email-input">
-                    <mat-label>Agregar email</mat-label>
-                    <input matInput type="email" [(ngModel)]="emailInput" [ngModelOptions]="{standalone: true}"
-                      (keydown)="onEmailKeydown($event)" placeholder="ejemplo@dominio.com">
-                    <mat-icon matPrefix>email</mat-icon>
-                  </mat-form-field>
-                  <button mat-raised-button type="button" color="accent" (click)="addEmail($event)"
-                    [disabled]="!emailInput.trim()">
-                    <mat-icon>add</mat-icon>
-                    Agregar
-                  </button>
+              <!-- Filas Gantt -->
+              <div class="gantt-row" *ngFor="let role of ganttRoles">
+                <div class="gantt-label-col">
+                  <strong>{{ role.roleCode }}</strong>
                 </div>
-
-                <mat-hint class="recipients-hint">
-                  <mat-icon>info</mat-icon>
-                  El reporte se enviará automáticamente a estos correos al finalizar cada turno
-                </mat-hint>
+                <div class="gantt-timeline-col">
+                  <!-- Barras de Asignación -->
+                  <div class="gantt-bar" 
+                       *ngFor="let bar of role.bars"
+                       [style.left.%]="bar.left"
+                       [style.width.%]="bar.width"
+                       [class]="bar.statusClass"
+                       [matTooltip]="bar.label + ' - de ' + (bar.asg.weekStartDate | date:'dd/MM/yyyy HH:mm') + ' a ' + (bar.asg.weekEndDate | date:'dd/MM/yyyy HH:mm')">
+                    {{ bar.label }}
+                  </div>
+                </div>
               </div>
 
+              <!-- Ticks / Días -->
+              <div class="gantt-ticks">
+                <div class="gantt-tick" 
+                     *ngFor="let tick of ganttTicks" 
+                     [style.left.%]="tick.position"
+                     [class.is-today]="tick.isToday">
+                  {{ tick.label }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tarjetas de Proximidad -->
+          <div class="proximity-cards-container">
+            <!-- Turnos Próximos a Terminar -->
+            <div class="proximity-card-section">
+              <h3>
+                <mat-icon color="warn">hourglass_bottom</mat-icon>
+                Turnos Próximos a Terminar (En Curso)
+              </h3>
+              
+              <div *ngIf="upcomingEndAssignments.length === 0" class="empty-proximity">
+                No hay turnos activos terminando próximamente.
+              </div>
+              
+              <div class="proximity-row" *ngFor="let item of upcomingEndAssignments">
+                <div class="proximity-info">
+                  <span class="proximity-text">
+                    <strong>{{ item.personName }}</strong> - {{ item.roleCode }}
+                  </span>
+                  <span class="proximity-time">{{ item.remainingText }}</span>
+                </div>
+                <div class="proximity-progress-bar">
+                  <div class="proximity-progress-fill" 
+                       [style.width.%]="item.progress"
+                       [class.active-high]="item.progress > 80"
+                       [class.active-medium]="item.progress > 50 && item.progress <= 80"
+                       [class.active-low]="item.progress <= 50">
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <mat-divider></mat-divider>
+            <!-- Próximos Turnos a Iniciar -->
+            <div class="proximity-card-section">
+              <h3>
+                <mat-icon color="primary">play_circle_outline</mat-icon>
+                Próximos Turnos a Iniciar
+              </h3>
+              
+              <div *ngIf="upcomingStartAssignments.length === 0" class="empty-proximity">
+                No hay turnos futuros programados.
+              </div>
+              
+              <div class="proximity-row" *ngFor="let item of upcomingStartAssignments">
+                <div class="proximity-info">
+                  <span class="proximity-text">
+                    <strong>{{ item.personName }}</strong> - {{ item.roleCode }}
+                  </span>
+                  <span class="proximity-time upcoming">{{ item.timeUntilText }}</span>
+                </div>
+                <div class="proximity-progress-bar">
+                  <div class="proximity-progress-fill" 
+                       [style.width.%]="item.progress"
+                       [class.active-high]="item.progress > 80"
+                       [class.active-medium]="item.progress > 50 && item.progress <= 80"
+                       [class.active-low]="item.progress <= 50">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
-            <div class="report-options">
-              <div class="include-options">
-                <h4>Prueba PoC de correo de fin de turno</h4>
-                <p class="section-description">
-                  Envía una vista previa auditada como PoC usando los datos reales acumulados del turno seleccionado para validar el correo de fin de turno sin marcarlo como envío productivo.
-                </p>
+          <!-- Gestión de Asignaciones -->
+          <div class="dashboard-card detailed-table-card">
+            <div class="card-header">
+              <div class="title-with-subtitle">
+                <h3>Gestión de Asignaciones</h3>
+                <p class="subtitle">Orden: Próximos → En Curso → Pasado. Máximo 50 registros.</p>
+              </div>
+            </div>
+
+            <!-- Filtros rápidos -->
+            <div class="filters-actions-bar">
+              <div class="search-filters">
+                <mat-form-field appearance="outline">
+                  <mat-label>Persona</mat-label>
+                  <input matInput [(ngModel)]="filterAnalyst" placeholder="Buscar por persona...">
+                  <mat-icon matPrefix>search</mat-icon>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Rol</mat-label>
+                  <mat-select [(ngModel)]="filterRole">
+                    <mat-option value="">Todos los Roles</mat-option>
+                    <mat-option value="N2">Operador N2</mat-option>
+                    <mat-option value="TI">Especialista TI</mat-option>
+                    <mat-option value="N1_NO_HABIL">Guardia N1 No Hábil</mat-option>
+                  </mat-select>
+                  <mat-icon matPrefix>filter_list</mat-icon>
+                </mat-form-field>
+                
+                <button mat-mini-fab color="primary" matTooltip="Limpiar filtros" (click)="filterAnalyst=''; filterRole=''">
+                  <mat-icon>refresh</mat-icon>
+                </button>
               </div>
 
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Turno para prueba PoC</mat-label>
-                <mat-select [(ngModel)]="selectedPocShiftId" [ngModelOptions]="{standalone: true}">
-                  <mat-option *ngFor="let shift of shifts" [value]="shift._id">
-                    {{ shift.name }} ({{ formatTimeRange(shift) }})
-                  </mat-option>
-                </mat-select>
-                <mat-icon matPrefix>schedule</mat-icon>
-              </mat-form-field>
-
-              <div class="form-actions">
-                <button
-                  mat-stroked-button
-                  color="accent"
-                  type="button"
-                  (click)="sendPocReport()"
-                  [disabled]="sendingPoc || !selectedPocShiftId"
-                >
-                  <mat-icon>{{ sendingPoc ? 'hourglass_top' : 'science' }}</mat-icon>
-                  {{ sendingPoc ? 'Enviando PoC...' : 'Enviar correo PoC' }}
+              <div class="csv-actions">
+                <input type="file" #csvFileInput style="display:none" (change)="onAssignmentsCsvSelected($event)" accept=".csv">
+                <button mat-stroked-button (click)="csvFileInput.click()" [disabled]="importingAssignmentsCsv">
+                  <mat-icon>upload_file</mat-icon>
+                  {{ importingAssignmentsCsv ? 'Importando...' : 'Importar CSV' }}
+                </button>
+                <button mat-stroked-button (click)="downloadAssignmentTemplate()" [disabled]="downloadingAssignmentTemplate">
+                  <mat-icon>download</mat-icon>
+                  Plantilla CSV
+                </button>
+                <button mat-raised-button color="primary" (click)="addWeeklyAssignment()">
+                  <mat-icon>add</mat-icon>
+                  Asignar Turno
                 </button>
               </div>
             </div>
 
-            <!-- Acciones -->
-            <div class="form-actions">
-              <button mat-raised-button type="button" (click)="toggleGlobalEmailConfig()">
-                Cancelar
-              </button>
-              <button mat-raised-button color="primary" type="button" (click)="saveGlobalEmailConfig()">
-                <mat-icon>save</mat-icon>
-                Guardar Configuración
-              </button>
+            <!-- Ayuda de Formato de Datos -->
+            <div class="format-help-block">
+              <h4>📋 Formato de Datos de Asignación</h4>
+              <p>Campos esperados para el registro o importación CSV de turnos:</p>
+              <ul>
+                <li><strong>rol:</strong> N1, N2 o TI.</li>
+                <li><strong>usuario:</strong> Username recomendado; también acepta email o nombre completo. El sistema detecta si es usuario interno o persona externa.</li>
+                <li><strong>fechaInicio / horaInicio:</strong> Formato YYYY-MM-DD y HH:MM (ej: 2026-05-26, 09:00).</li>
+                <li><strong>fechaFin / horaFin:</strong> Formato YYYY-MM-DD y HH:MM (ej: 2026-06-02, 08:59).</li>
+              </ul>
             </div>
-          </form>
+
+            <!-- Split: tabla + editor inline al lado -->
+            <div class="table-editor-split" [class.has-editor]="showAssignmentForm">
+
+              <!-- Tabla -->
+              <div class="detailed-table-container">
+                <table class="detailed-table">
+                  <thead>
+                    <tr>
+                      <th>Estado</th>
+                      <th>Semana / Periodo</th>
+                      <th>Rol</th>
+                      <th>Asignado A</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let asg of getFilteredWeeklyAssignments()"
+                        [class.row-conflict]="hasRowConflict(asg)"
+                        [class.row-editing]="editingWeeklyAssignmentId === asg._id">
+                      <td>
+                        <span class="status-pill" [class]="getWeeklyStatusClass(getAssignmentStatus(asg))">
+                          {{ getAssignmentStatus(asg) }}
+                        </span>
+                      </td>
+                      <td>
+                        <div class="period-text">
+                          <strong>{{ asg.weekStartDate | date:'dd/MM/yyyy HH:mm' }}</strong>
+                          <span class="arrow">➔</span>
+                          <strong>{{ asg.weekEndDate | date:'dd/MM/yyyy HH:mm' }}</strong>
+                        </div>
+                      </td>
+                      <td><span class="role-badge">{{ asg.roleCode }}</span></td>
+                      <td>
+                        <div class="person-cell">
+                          <mat-icon class="warning-icon" color="warn" *ngIf="hasRowConflict(asg)" [matTooltip]="getRowConflictTooltip(asg)">warning</mat-icon>
+                          <span>{{ asg.userId?.fullName || asg.externalPersonId?.name || 'Sin asignar' }}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="actions-cell">
+                          <button mat-icon-button color="primary" (click)="editWeeklyAssignment(asg)" matTooltip="Editar">
+                            <mat-icon>edit</mat-icon>
+                          </button>
+                          <button mat-icon-button color="warn" (click)="deleteWeeklyAssignment(asg._id)" matTooltip="Eliminar">
+                            <mat-icon>delete</mat-icon>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr *ngIf="getFilteredWeeklyAssignments().length === 0">
+                      <td colspan="5" class="empty-table-cell">No se encontraron asignaciones semanales.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Editor inline (al lado de la tabla) -->
+              <div class="inline-editor" *ngIf="showAssignmentForm">
+                <div class="inline-editor-header">
+                  <h3>{{ editingWeeklyAssignmentId ? 'Editar Asignación' : 'Nueva Asignación' }}</h3>
+                  <button mat-icon-button (click)="cancelWeeklyAssignmentEdit()">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+                <div class="inline-editor-body">
+                  <form [formGroup]="assignmentForm" (ngSubmit)="saveWeeklyAssignment()">
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Rol</mat-label>
+                      <mat-select formControlName="roleCode">
+                        <mat-option value="N2">Operador N2</mat-option>
+                        <mat-option value="TI">Especialista TI</mat-option>
+                        <mat-option value="N1_NO_HABIL">Guardia N1 No Hábil</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Persona</mat-label>
+                      <mat-select formControlName="assignedUserId">
+                        <mat-option value="" disabled>Seleccione Persona</mat-option>
+                        <mat-optgroup label="Analistas Internos" *ngIf="filteredUsersForAssignment.length > 0">
+                          <mat-option *ngFor="let user of filteredUsersForAssignment" [value]="user._id">
+                            {{ user.fullName || user.username || user.email || '(sin nombre)' }}
+                          </mat-option>
+                        </mat-optgroup>
+                        <mat-optgroup label="Personas Externas" *ngIf="showExternalPeopleForAssignment && filteredExternalPeopleForAssignment.length > 0">
+                          <mat-option *ngFor="let p of filteredExternalPeopleForAssignment" [value]="'ext_' + p._id">
+                            {{ p.name || p.email || '(sin nombre)' }}
+                          </mat-option>
+                        </mat-optgroup>
+                        <mat-optgroup label="Directorio Interno" *ngIf="showExternalPeopleForAssignment && filteredDirectoryContactsForAssignment.length > 0">
+                          <mat-option *ngFor="let c of filteredDirectoryContactsForAssignment" [value]="'dir_' + c._id">
+                            {{ c.name || c.email || '(sin nombre)' }}<span *ngIf="c.phone" class="option-phone"> • {{ c.phone }}</span>
+                          </mat-option>
+                        </mat-optgroup>
+                      </mat-select>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Fecha Inicio</mat-label>
+                      <input matInput [matDatepicker]="startPicker2" formControlName="weekStartDate">
+                      <mat-datepicker-toggle matSuffix [for]="startPicker2"></mat-datepicker-toggle>
+                      <mat-datepicker #startPicker2></mat-datepicker>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Fecha Término</mat-label>
+                      <input matInput [matDatepicker]="endPicker2" formControlName="weekEndDate">
+                      <mat-datepicker-toggle matSuffix [for]="endPicker2"></mat-datepicker-toggle>
+                      <mat-datepicker #endPicker2></mat-datepicker>
+                    </mat-form-field>
+
+                    <div class="time-inputs">
+                      <mat-form-field appearance="outline">
+                        <mat-label>Hora Inicio</mat-label>
+                        <input matInput type="time" formControlName="startTime">
+                      </mat-form-field>
+                      <mat-form-field appearance="outline">
+                        <mat-label>Hora Fin</mat-label>
+                        <input matInput type="time" formControlName="endTime">
+                      </mat-form-field>
+                    </div>
+
+                    <div class="editor-alerts" *ngIf="rangeErrorMsg || roleConflictMsg || personConflictMsg">
+                      <div class="alert-card alert-error" *ngIf="rangeErrorMsg">{{ rangeErrorMsg }}</div>
+                      <div class="alert-card alert-warning" *ngIf="roleConflictMsg">{{ roleConflictMsg }}</div>
+                      <div class="alert-card alert-warning" *ngIf="personConflictMsg">{{ personConflictMsg }}</div>
+                    </div>
+
+                    <div class="editor-actions">
+                      <button mat-stroked-button type="button" (click)="cancelWeeklyAssignmentEdit()">Cancelar</button>
+                      <button mat-raised-button color="primary" type="submit" [disabled]="assignmentForm.invalid || savingWeeklyAssignment">
+                        {{ savingWeeklyAssignment ? 'Guardando...' : 'Guardar' }}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Barra Lateral Derecha -->
+        <div class="sidebar-column">
+
+
+
+          <!-- Recordatorios -->
+          <div class="dashboard-card config-sidebar-card">
+            <div class="card-header">
+              <h3>Recordatorios automáticos</h3>
+            </div>
+            <div class="card-body">
+              <form [formGroup]="escalationReminderForm" (ngSubmit)="saveEscalationReminderConfig()">
+                <mat-checkbox formControlName="escalationReminderEnabled">
+                  Enviar recordatorio
+                </mat-checkbox>
+
+                <div class="reminder-fields" *ngIf="escalationReminderForm.get('escalationReminderEnabled')?.value">
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Días antes del turno</mat-label>
+                    <input matInput type="number" formControlName="escalationReminderDaysAhead" min="1" max="60">
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Cargos a notificar</mat-label>
+                    <mat-select formControlName="escalationReminderCargoLabels" multiple>
+                      <mat-option *ngFor="let cargo of availableCargoLabels" [value]="cargo">
+                        {{ cargo }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+
+                <div class="reminder-actions">
+                  <button mat-stroked-button type="button" (click)="testEscalationReminder()" [disabled]="testingEscalationReminder">
+                    Probar
+                  </button>
+                  <button mat-raised-button color="primary" type="submit" [disabled]="savingEscalationReminderConfig">
+                    Guardar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Automatización de Envío -->
+          <div class="dashboard-card config-sidebar-card">
+            <div class="card-header">
+              <h3>Envío automatizado semanal</h3>
+            </div>
+            <div class="card-body">
+              <form [formGroup]="escalationScheduleAutomationForm" (ngSubmit)="saveAutomationConfig()">
+                <mat-checkbox formControlName="enabled">
+                  Activar envío automático
+                </mat-checkbox>
+
+                <div class="automation-fields" *ngIf="escalationScheduleAutomationForm.get('enabled')?.value">
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Día de envío</mat-label>
+                    <mat-select formControlName="dayOfWeek">
+                      <mat-option *ngFor="let d of daysOfWeek" [value]="d.value">{{ d.label }}</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Hora de envío</mat-label>
+                    <input matInput type="time" formControlName="time">
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Destinatarios (emails separados por coma)</mat-label>
+                    <input matInput formControlName="recipients" (input)="onAutomationRecipientsInput(autoRec.value)" #autoRec>
+                  </mat-form-field>
+                  <div class="autocomplete-suggestions" *ngIf="automationRecipientSuggestions.length > 0">
+                    <div class="suggestion-item" *ngFor="let c of automationRecipientSuggestions" (click)="useAutomationRecipientEmail(c.email || '')">
+                      {{ c.name }} &lt;{{ c.email }}&gt;
+                    </div>
+                  </div>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>CC (emails separados por coma)</mat-label>
+                    <input matInput formControlName="ccRecipients" (input)="onAutomationCcInput(autoCc.value)" #autoCc>
+                  </mat-form-field>
+                  <div class="autocomplete-suggestions" *ngIf="automationCcSuggestions.length > 0">
+                    <div class="suggestion-item" *ngFor="let c of automationCcSuggestions" (click)="useAutomationCcEmail(c.email || '')">
+                      {{ c.name }} &lt;{{ c.email }}&gt;
+                    </div>
+                  </div>
+                </div>
+
+                <div class="automation-actions">
+                  <button mat-stroked-button type="button" (click)="triggerManualSend()" [disabled]="triggeringManualSend">
+                    Enviar ahora
+                  </button>
+                  <button mat-raised-button color="primary" type="submit" [disabled]="savingAutomationConfig">
+                    Guardar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
         </div>
       </div>
+    </mat-tab>
 
-    </div>
-  </div>
+    <!-- PESTAÑA 2: TURNOS DIARIOS Y OPERATIVOS -->
+    <mat-tab label="Turnos Diarios y Operativos">
+      <div class="tab-content-wrapper">
+        <!-- Botón agregar -->
+        <div class="actions-bar" *ngIf="!showForm">
+          <button mat-raised-button color="primary" (click)="addShift()">
+            <mat-icon>add</mat-icon>
+            Crear Turno
+          </button>
+        </div>
+
+        <!-- Formulario -->
+        <div *ngIf="showForm" class="shift-panel form-card">
+          <header class="shift-panel__header">
+            <h2 class="shift-panel__title">
+              <mat-icon>{{ editingShift ? 'edit' : 'add' }}</mat-icon>
+              {{ editingShift ? 'Editar Turno' : 'Nuevo Turno' }}
+            </h2>
+          </header>
+          <div class="shift-panel__body">
+            <form [formGroup]="shiftForm" (ngSubmit)="saveShift()">
+              <div class="form-grid">
+                <!-- Nombre -->
+                <mat-form-field appearance="outline">
+                  <mat-label>Nombre del turno</mat-label>
+                  <input matInput formControlName="name" placeholder="Ej: Turno Mañana">
+                  <mat-icon matPrefix>label</mat-icon>
+                  <mat-error *ngIf="shiftForm.get('name')?.hasError('required')">
+                    Nombre requerido
+                  </mat-error>
+                </mat-form-field>
+
+                <!-- Código -->
+                <mat-form-field appearance="outline">
+                  <mat-label>Código</mat-label>
+                  <input matInput formControlName="code" placeholder="Ej: MORNING" class="uppercase-input">
+                  <mat-icon matPrefix>code</mat-icon>
+                  <mat-hint>Solo letras mayúsculas, números y guión bajo</mat-hint>
+                  <mat-error *ngIf="shiftForm.get('code')?.hasError('required')">
+                    Código requerido
+                  </mat-error>
+                  <mat-error *ngIf="shiftForm.get('code')?.hasError('pattern')">
+                    Solo letras mayúsculas, números y _
+                  </mat-error>
+                </mat-form-field>
+
+                <!-- Tipo -->
+                <mat-form-field appearance="outline">
+                  <mat-label>Tipo de turno</mat-label>
+                  <mat-select formControlName="type">
+                    <mat-option *ngFor="let option of shiftTypeOptions" [value]="option.value">
+                      {{ option.label }} - {{ option.description }}
+                    </mat-option>
+                  </mat-select>
+                  <mat-icon matPrefix>category</mat-icon>
+                </mat-form-field>
+
+                <!-- Color -->
+                <mat-form-field appearance="outline">
+                  <mat-label>Color</mat-label>
+                  <mat-select formControlName="color">
+                    <mat-option *ngFor="let color of colorOptions" [value]="color">
+                      <span [style.color]="color">⬤</span> {{ color }}
+                    </mat-option>
+                  </mat-select>
+                  <mat-icon matPrefix>palette</mat-icon>
+                </mat-form-field>
+
+                <!-- Hora inicio -->
+                <mat-form-field appearance="outline">
+                  <mat-label>Hora inicio</mat-label>
+                  <input matInput type="time" formControlName="startTime">
+                  <mat-icon matPrefix>access_time</mat-icon>
+                  <mat-error *ngIf="shiftForm.get('startTime')?.hasError('required')">
+                    Hora inicio requerida
+                  </mat-error>
+                </mat-form-field>
+
+                <!-- Hora fin -->
+                <mat-form-field appearance="outline">
+                  <mat-label>Hora fin</mat-label>
+                  <input matInput type="time" formControlName="endTime">
+                  <mat-icon matPrefix>access_time</mat-icon>
+                  <mat-hint>Puede ser menor que inicio si cruza medianoche</mat-hint>
+                  <mat-error *ngIf="shiftForm.get('endTime')?.hasError('required')">
+                    Hora fin requerida
+                  </mat-error>
+                </mat-form-field>
+
+                <!-- Zona horaria -->
+                <mat-form-field appearance="outline">
+                  <mat-label>Zona horaria</mat-label>
+                  <mat-select formControlName="timezone">
+                    <mat-option value="America/Santiago">America/Santiago (Chile)</mat-option>
+                    <mat-option value="America/Argentina/Buenos_Aires">America/Argentina/Buenos_Aires</mat-option>
+                    <mat-option value="America/New_York">America/New_York</mat-option>
+                    <mat-option value="America/Los_Angeles">America/Los_Angeles</mat-option>
+                    <mat-option value="Europe/Madrid">Europe/Madrid</mat-option>
+                    <mat-option value="UTC">UTC</mat-option>
+                  </mat-select>
+                  <mat-icon matPrefix>public</mat-icon>
+                </mat-form-field>
+
+                <!-- Usuario asignado -->
+                <mat-form-field appearance="outline">
+                  <mat-label>Usuario asignado (opcional)</mat-label>
+                  <mat-select formControlName="assignedUserId">
+                    <mat-option [value]="null">Sin asignar</mat-option>
+                    <mat-option *ngFor="let user of users" [value]="user._id">
+                      {{ user.fullName }} ({{ user.email }})
+                    </mat-option>
+                  </mat-select>
+                  <mat-icon matPrefix>person</mat-icon>
+                  <mat-hint>Deja en blanco si no quieres asignar a nadie</mat-hint>
+                </mat-form-field>
+
+                <!-- Checklist Inicio (opcional) -->
+                <mat-form-field appearance="outline">
+                  <mat-label>Checklist de Inicio (opcional)</mat-label>
+                  <mat-select formControlName="checklistTemplateStartId">
+                    <mat-option [value]="null">Ninguno</mat-option>
+                    <mat-option *ngFor="let tpl of checklistTemplates" [value]="tpl._id">
+                      {{ tpl.name }}
+                    </mat-option>
+                  </mat-select>
+                  <mat-icon matPrefix>playlist_add_check</mat-icon>
+                  <mat-hint>Plantilla solicitada al iniciar el turno</mat-hint>
+                </mat-form-field>
+
+                <!-- Checklist Cierre (opcional) -->
+                <mat-form-field appearance="outline">
+                  <mat-label>Checklist de Cierre (opcional)</mat-label>
+                  <mat-select formControlName="checklistTemplateEndId">
+                    <mat-option [value]="null">Ninguno</mat-option>
+                    <mat-option *ngFor="let tpl of checklistTemplates" [value]="tpl._id">
+                      {{ tpl.name }}
+                    </mat-option>
+                  </mat-select>
+                  <mat-icon matPrefix>playlist_add_check</mat-icon>
+                  <mat-hint>Plantilla solicitada al finalizar el turno</mat-hint>
+                </mat-form-field>
+
+                <!-- Orden -->
+                <mat-form-field appearance="outline">
+                  <mat-label>Orden</mat-label>
+                  <input matInput type="number" formControlName="order" min="0">
+                  <mat-icon matPrefix>sort</mat-icon>
+                  <mat-hint>Para ordenar en la lista</mat-hint>
+                </mat-form-field>
+              </div>
+
+              <!-- Descripción (ancho completo) -->
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Descripción</mat-label>
+                <textarea matInput formControlName="description" rows="3"
+                  placeholder="Descripción opcional del turno"></textarea>
+                <mat-icon matPrefix>description</mat-icon>
+              </mat-form-field>
+
+              <!-- Estado -->
+              <mat-checkbox formControlName="active">
+                Turno activo
+              </mat-checkbox>
+              <p class="section-description">
+                El envío de correo se gestiona en la sección "Reenvío de Información (General)".
+              </p>
+
+              <!-- Acciones -->
+              <div class="form-actions">
+                <button mat-raised-button type="button" (click)="cancelForm()">
+                  Cancelar
+                </button>
+                <button mat-raised-button color="primary" type="submit" [disabled]="shiftForm.invalid">
+                  <mat-icon>save</mat-icon>
+                  {{ editingShift ? 'Actualizar' : 'Crear' }}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Tabla de turnos -->
+        <div *ngIf="!showForm" class="shift-panel table-card">
+          <header class="shift-panel__header">
+            <h2 class="shift-panel__title">
+              <mat-icon>list</mat-icon>
+              Turnos Configurados
+            </h2>
+          </header>
+          <div class="shift-panel__body">
+            <div *ngIf="loading" class="loading-container">
+              <mat-spinner diameter="40"></mat-spinner>
+            </div>
+
+            <div *ngIf="!loading && shifts.length === 0" class="empty-state">
+              <mat-icon>schedule</mat-icon>
+              <p>No hay turnos configurados</p>
+              <button mat-raised-button color="primary" (click)="addShift()">
+                <mat-icon>add</mat-icon>
+                Crear primer turno
+              </button>
+            </div>
+
+            <table mat-table [dataSource]="shifts" *ngIf="!loading && shifts.length > 0" class="shifts-table">
+              <!-- Orden -->
+              <ng-container matColumnDef="order">
+                <th mat-header-cell *matHeaderCellDef>#</th>
+                <td mat-cell *matCellDef="let shift">{{ shift.order }}</td>
+              </ng-container>
+
+              <!-- Nombre -->
+              <ng-container matColumnDef="name">
+                <th mat-header-cell *matHeaderCellDef>Nombre</th>
+                <td mat-cell *matCellDef="let shift">
+                  <div class="shift-name">
+                    <span [style.color]="shift.color" class="color-indicator">⬤</span>
+                    <strong>{{ shift.name }}</strong>
+                  </div>
+                </td>
+              </ng-container>
+
+              <!-- Código -->
+              <ng-container matColumnDef="code">
+                <th mat-header-cell *matHeaderCellDef>Código</th>
+                <td mat-cell *matCellDef="let shift">
+                  <code>{{ shift.code }}</code>
+                </td>
+              </ng-container>
+
+              <!-- Tipo -->
+              <ng-container matColumnDef="type">
+                <th mat-header-cell *matHeaderCellDef>Tipo</th>
+                <td mat-cell *matCellDef="let shift">
+                  <mat-chip [class]="getTypeBadgeClass(shift.type)">
+                    {{ getTypeLabel(shift.type) }}
+                  </mat-chip>
+                </td>
+              </ng-container>
+
+              <!-- Horario -->
+              <ng-container matColumnDef="timeRange">
+                <th mat-header-cell *matHeaderCellDef>Horario</th>
+                <td mat-cell *matCellDef="let shift">
+                  {{ formatTimeRange(shift) }}
+                </td>
+              </ng-container>
+
+              <!-- Checklists por tipo -->
+              <ng-container matColumnDef="checklists">
+                <th mat-header-cell *matHeaderCellDef>Checklist Inicio/Cierre</th>
+                <td mat-cell *matCellDef="let shift">
+                  {{ getChecklistSummary(shift) }}
+                </td>
+              </ng-container>
+
+              <!-- Usuario asignado -->
+              <ng-container matColumnDef="assignedUser">
+                <th mat-header-cell *matHeaderCellDef>Asignado a</th>
+                <td mat-cell *matCellDef="let shift">
+                  <span *ngIf="getUserName(shift) !== 'Sin asignar'" class="user-assigned">
+                    <mat-icon>person</mat-icon>
+                    {{ getUserName(shift) }}
+                  </span>
+                  <span *ngIf="getUserName(shift) === 'Sin asignar'" class="user-unassigned">
+                    Sin asignar
+                  </span>
+                </td>
+              </ng-container>
+
+              <!-- Estado -->
+              <ng-container matColumnDef="active">
+                <th mat-header-cell *matHeaderCellDef>Estado</th>
+                <td mat-cell *matCellDef="let shift">
+                  <mat-chip [class]="shift.active ? 'badge-active' : 'badge-inactive'">
+                    {{ shift.active ? 'Activo' : 'Inactivo' }}
+                  </mat-chip>
+                </td>
+              </ng-container>
+
+              <!-- Acciones -->
+              <ng-container matColumnDef="actions">
+                <th mat-header-cell *matHeaderCellDef>Acciones</th>
+                <td mat-cell *matCellDef="let shift">
+                  <button mat-icon-button color="primary" (click)="editShift(shift)" matTooltip="Editar">
+                    <mat-icon>edit</mat-icon>
+                  </button>
+                  <button mat-icon-button color="warn" (click)="deleteShift(shift)" matTooltip="Eliminar">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+            </table>
+
+            <div *ngIf="!loading && shifts.length > 0" class="operational-assignment-section">
+              <mat-divider></mat-divider>
+
+              <div class="operational-header">
+                <h3>Asignación Operativa</h3>
+                <p class="section-description">Vincula analista y turno. El horario se hereda desde la configuración del turno.</p>
+              </div>
+
+              <form [formGroup]="operationalAssignmentForm" (ngSubmit)="saveOperationalAssignment()" class="operational-form">
+                <mat-form-field appearance="outline">
+                  <mat-label>Analista</mat-label>
+                  <mat-select formControlName="userId">
+                    <mat-option *ngFor="let user of users" [value]="user._id">
+                      {{ user.fullName }} ({{ user.email }})
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Turno</mat-label>
+                  <mat-select formControlName="shiftId">
+                    <mat-option *ngFor="let shift of shifts" [value]="shift._id">
+                      {{ shift.name }} ({{ formatTimeRange(shift) }})
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Días asignados</mat-label>
+                  <mat-select formControlName="weekdays" multiple>
+                    <mat-option [value]="1">Lunes</mat-option>
+                    <mat-option [value]="2">Martes</mat-option>
+                    <mat-option [value]="3">Miércoles</mat-option>
+                    <mat-option [value]="4">Jueves</mat-option>
+                    <mat-option [value]="5">Viernes</mat-option>
+                    <mat-option [value]="6">Sábado</mat-option>
+                    <mat-option [value]="0">Domingo</mat-option>
+                  </mat-select>
+                  <mat-hint>Por defecto será Lun-Vie</mat-hint>
+                </mat-form-field>
+
+                <div class="operational-actions">
+                  <button mat-raised-button color="primary" type="submit" [disabled]="operationalAssignmentForm.invalid">
+                    <mat-icon>link</mat-icon>
+                    Vincular
+                  </button>
+                  <button mat-stroked-button type="button" (click)="refreshOperationalStatus()">
+                    <mat-icon>refresh</mat-icon>
+                    Actualizar estado
+                  </button>
+                </div>
+              </form>
+
+              <div class="operational-table-wrapper" *ngIf="operationalRows.length > 0">
+                <table class="operational-table">
+                  <thead>
+                    <tr>
+                      <th>Analista</th>
+                      <th>Turno</th>
+                      <th>Horario</th>
+                      <th>Días</th>
+                      <th>Estado Operativo</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let row of operationalRows">
+                      <td>{{ row.analystName }}</td>
+                      <td>{{ row.shiftName }}</td>
+                      <td>{{ row.schedule }}</td>
+                      <td>{{ row.weekdaysLabel }}</td>
+                      <td>
+                        <mat-chip [class]="getOperationalStatusClass(row.status)">
+                          {{ getOperationalStatusLabel(row.status) }}
+                        </mat-chip>
+                      </td>
+                      <td>
+                        <button mat-icon-button color="warn" (click)="unlinkOperationalAssignment(row)" matTooltip="Desvincular analista">
+                          <mat-icon>link_off</mat-icon>
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div *ngIf="operationalRows.length === 0" class="empty-operational">
+                <p>No hay asignaciones operativas activas.</p>
+              </div>
+            </div>
+
+            <!-- Sección GLOBAL: Reenvío de Información -->
+            <div *ngIf="!showForm" class="global-email-section">
+              <mat-divider></mat-divider>
+
+              <div class="global-email-header">
+                <h3>📧 Reenvío de Información (General)</h3>
+                <p class="section-description">
+                  Configura el envío automático al finalizar turno para todos los turnos
+                </p>
+              </div>
+
+              <button mat-raised-button color="primary" (click)="toggleGlobalEmailConfig()" class="toggle-config-btn">
+                <mat-icon>{{ showGlobalEmailConfig ? 'expand_less' : 'expand_more' }}</mat-icon>
+                {{ showGlobalEmailConfig ? 'Ocultar configuración' : 'Configurar reenvío' }}
+              </button>
+
+              <div *ngIf="showGlobalEmailConfig" class="global-config-form">
+                <form [formGroup]="globalEmailForm">
+                  <mat-checkbox formControlName="enabled" class="section-toggle">
+                    <strong>Enviar correo automáticamente al finalizar turno</strong>
+                  </mat-checkbox>
+                  <p class="section-description">
+                    El envío al registrar checklist de cierre se configura en Administracion Checklist.
+                  </p>
+
+                  <div class="report-options" *ngIf="globalEmailForm.get('enabled')?.value">
+                    <div class="include-options">
+                      <h4>Contenido del reporte:</h4>
+                      <mat-checkbox formControlName="includeChecklist">
+                        📋 Incluir checklist de entrada y salida
+                      </mat-checkbox>
+                      <mat-checkbox formControlName="includeEntries">
+                        📝 Incluir entradas de bitácora del turno
+                      </mat-checkbox>
+                    </div>
+
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Asunto del correo</mat-label>
+                      <input matInput formControlName="subjectTemplate" placeholder="Reporte SOC [fecha] [turno]">
+                      <mat-icon matPrefix>subject</mat-icon>
+                      <mat-hint>Variables disponibles: [fecha], [turno], [hora]</mat-hint>
+                    </mat-form-field>
+
+                    <div class="recipients-field">
+                      <label class="recipients-label">Destinatarios</label>
+                      <mat-chip-set class="email-chips">
+                        <mat-chip *ngFor="let email of recipients.value" [removable]="true" (removed)="removeEmail(email)">
+                          {{ email }}
+                          <button matChipRemove>
+                            <mat-icon>cancel</mat-icon>
+                          </button>
+                        </mat-chip>
+                      </mat-chip-set>
+
+                      <div class="email-input-row">
+                        <mat-form-field appearance="outline" class="email-input">
+                          <mat-label>Agregar email</mat-label>
+                          <input matInput type="email" [(ngModel)]="emailInput" [ngModelOptions]="{standalone: true}"
+                            (keydown)="onEmailKeydown($event)" placeholder="ejemplo@dominio.com">
+                          <mat-icon matPrefix>email</mat-icon>
+                        </mat-form-field>
+                        <button mat-raised-button type="button" color="accent" (click)="addEmail($event)"
+                          [disabled]="!emailInput.trim()">
+                          <mat-icon>add</mat-icon>
+                          Agregar
+                        </button>
+                      </div>
+
+                      <mat-hint class="recipients-hint">
+                        <mat-icon>info</mat-icon>
+                        El reporte se enviará automáticamente a estos correos al finalizar cada turno
+                      </mat-hint>
+                    </div>
+                  </div>
+
+                  <mat-divider></mat-divider>
+
+                  <div class="report-options">
+                    <div class="include-options">
+                      <h4>Prueba PoC de correo de fin de turno</h4>
+                      <p class="section-description">
+                        Envía una vista previa auditada como PoC usando los datos reales acumulados del turno seleccionado para validar el correo de fin de turno.
+                      </p>
+                    </div>
+
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Turno para prueba PoC</mat-label>
+                      <mat-select [(ngModel)]="selectedPocShiftId" [ngModelOptions]="{standalone: true}">
+                        <mat-option *ngFor="let shift of shifts" [value]="shift._id">
+                          {{ shift.name }} ({{ formatTimeRange(shift) }})
+                        </mat-option>
+                      </mat-select>
+                      <mat-icon matPrefix>schedule</mat-icon>
+                    </mat-form-field>
+
+                    <div class="form-actions">
+                      <button
+                        mat-stroked-button
+                        color="accent"
+                        type="button"
+                        (click)="sendPocReport()"
+                        [disabled]="sendingPoc || !selectedPocShiftId"
+                      >
+                        <mat-icon>{{ sendingPoc ? 'hourglass_top' : 'science' }}</mat-icon>
+                        {{ sendingPoc ? 'Enviando PoC...' : 'Enviar correo PoC' }}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="form-actions">
+                    <button mat-raised-button type="button" (click)="toggleGlobalEmailConfig()">
+                      Cancelar
+                    </button>
+                    <button mat-raised-button color="primary" type="button" (click)="saveGlobalEmailConfig()">
+                      <mat-icon>save</mat-icon>
+                      Guardar Configuración
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
 </div>
