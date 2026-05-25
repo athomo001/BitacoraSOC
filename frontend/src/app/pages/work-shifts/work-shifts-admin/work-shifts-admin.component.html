@@ -28,12 +28,12 @@
             <div class="gantt-chart">
               <!-- Grid de fondo -->
               <div class="gantt-grid">
-                <div class="gantt-grid-line" *ngFor="let tick of ganttTicks" [style.left.%]="tick.position"></div>
-              </div>
+                <div class="gantt-grid-line" *ngFor="let line of ganttGridLines" [style.left.%]="line"></div>
 
-              <!-- Línea del día actual -->
-              <div class="gantt-today-line" [style.left.%]="ganttTodayPosition">
-                <div class="gantt-today-badge">Día Actual</div>
+                <!-- Línea del día actual (anclada al mismo plano temporal de las barras) -->
+                <div class="gantt-today-line" [style.left.%]="ganttTodayPosition">
+                  <div class="gantt-today-badge">{{ ganttTodayLabel }}</div>
+                </div>
               </div>
 
               <!-- Cabecera Gantt -->

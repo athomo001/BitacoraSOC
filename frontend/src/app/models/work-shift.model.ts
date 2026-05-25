@@ -82,6 +82,8 @@ export interface CurrentShiftResponse {
   shift: WorkShift | null;
   currentTime: string; // HH:MM
   timezone: string;
+  currentDateTime?: string;
+  currentTimestamp?: number;
   message?: string;
 }
 

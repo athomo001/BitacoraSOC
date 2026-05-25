@@ -2,6 +2,16 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.86-beta] - 2026-05-25
+
+### Hora oficial del servidor en Gantt de Turnos (SHIFT-DASH-146)
+
+- **Fuente de tiempo oficial (backend/NTP):** Se reforzó `GET /api/work-shifts/current` para entregar referencia temporal completa del servidor (`currentDateTime` y `currentTimestamp`) además de `currentTime` y `timezone`, evitando depender del reloj del navegador para la vista operativa.
+- **Timeline semanal anclado al servidor:** El panel de administración de turnos semanales ahora calcula la línea de "Día Actual" y los estados (`Pasado`, `En Curso`, `Próximo`) usando hora oficial sincronizada desde backend.
+- **Endurecimiento anti-manipulación local:** El frontend dejó de proyectar la hora con `Date.now()` del cliente y pasó a usar base oficial de servidor + reloj monotónico (`performance.now()`), reduciendo impacto de cambios manuales de hora en el equipo del operador.
+- **Contrato tipado actualizado:** Se extendió `CurrentShiftResponse` en frontend para soportar los nuevos campos temporales oficiales sin romper compatibilidad con consumidores existentes.
+- **Validación de despliegue:** Se verificó compilación y levantamiento de contenedores con `docker compose build backend frontend && docker compose up -d backend frontend` y rebuild posterior de frontend exitoso.
+
 ## [v1.5.84-beta] - 2026-05-25
 
 ### Simplificación del CSV de Asignación de Turnos (SHIFT-CSV-146)

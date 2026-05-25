@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: beta. Validar siempre los flujos criticos en un entorno controlado antes de pasar a operacion formal.
 >
-> Version referencial actual (segun `docs/CHANGELOG.md`): v1.5.82-beta
+> Version referencial actual (segun `docs/history/CHANGELOG.md`): v1.5.86-beta
 
 Stack principal:
 
@@ -47,7 +47,14 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 
 ## Novedades recientes (resumen rapido)
 
-### v1.5.82-beta (seguridad y hardening)
+### v1.5.86-beta (hora oficial de servidor en turnos)
+
+- la vista de turnos semanales ahora usa hora oficial del backend como fuente de verdad.
+- el endpoint `GET /api/work-shifts/current` entrega `currentDateTime` y `currentTimestamp` para sincronizacion temporal robusta.
+- el Gantt calcula linea de dia actual y estados (`Pasado`, `En Curso`, `Proximo`) con tiempo de servidor.
+- se endurecio el frontend contra manipulacion de hora local usando referencia oficial + reloj monotono (`performance.now()`).
+
+### v1.5.85-beta y v1.5.84-beta (seguridad y CSV de turnos)
 
 - cierre de auditoria de seguridad con mitigaciones de severidad media.
 - invalidacion de JWT en logout via denylist persistente en MongoDB.
@@ -55,6 +62,7 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 - rate-limit centralizado en Mongo para escenarios multi-contenedor/multi-replica.
 - CORS mas estricto y reducción de superficie para payloads grandes.
 - validacion de archivos reforzada para logos/favicons (MIME + estructura interna).
+- simplificacion del CSV de asignacion de turnos con formato operativo reducido y mapeo funcional de roles.
 
 ### v1.5.81-beta y v1.5.80-beta (UX reportes y catalogos)
 
