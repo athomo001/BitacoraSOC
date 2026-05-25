@@ -42,8 +42,7 @@ COPY --from=builder /app/dist/bitacora-soc/browser /usr/share/nginx/html
 # Permisos para Nginx no-root
 RUN mkdir -p /var/cache/nginx /var/log/nginx /etc/nginx/conf.d && \
     chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /var/log/nginx /etc/nginx /docker-entrypoint-bitacora.sh && \
-    touch /var/run/nginx.pid && \
-    chown -R nginx:nginx /var/run/nginx.pid
+  true
 
 # Exponer puerto
 EXPOSE 80

@@ -200,7 +200,7 @@
   position: absolute;
   top: 0;
   left: 140px;
-  right: 16px;
+  right: 0;
   bottom: 30px;
   pointer-events: none;
 }
@@ -217,11 +217,10 @@
 .gantt-today-line {
   position: absolute;
   top: 0;
-  bottom: 30px;
+  bottom: 0;
   width: 2px;
   background-color: var(--state-error, #d32f2f);
   z-index: 10;
-  left: calc(140px + (100% - 156px) * var(--left-percent, 0));
   pointer-events: none;
 
   .gantt-today-badge {
@@ -320,9 +319,10 @@
 }
 
 .gantt-ticks {
-  display: flex;
   margin-top: 12px;
-  padding-left: 140px;
+  margin-left: 140px;
+  width: calc(100% - 140px);
+  padding-left: 0;
   position: relative;
   font-size: 13px;
   color: var(--text-secondary);

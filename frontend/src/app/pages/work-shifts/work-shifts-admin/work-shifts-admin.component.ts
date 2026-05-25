@@ -129,8 +129,13 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
   ganttWeekStart!: Date;
   ganttWeekEnd!: Date;
   ganttTodayPosition = 0;
+  ganttTodayLabel = 'Día Actual';
   ganttRoles: any[] = [];
+  ganttGridLines: number[] = [];
   ganttTicks: { label: string; position: number; isToday: boolean }[] = [];
+  private serverReferenceMs = 0;
+  private monotonicAtSyncMs = 0;
+  private hasServerClock = false;
 
   // Tarjetas de Proximidad Semanales
   upcomingEndAssignments: any[] = [];
@@ -214,11 +219,13 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.loadData();
     this.loadChecklistTemplates();
+    this.syncServerClock();
 
     // Refresco en vivo cada minuto para el estado de turnos operativos
     interval(60000)
       .pipe(startWith(0), takeUntil(this.destroy$))
       .subscribe(() => {
+        this.syncServerClock();
         this.recalculateLiveStatus();
         this.calculateGantt();
         this.calculateProximityCards();
@@ -840,7 +847,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
 
   // ============ GANTT VISUAL SEMANAL ============
   calculateGantt(): void {
-    const now = new Date();
+    const now = this.getOfficialNow();
     
     const currentMonday = new Date(now);
     const day = currentMonday.getDay();
@@ -848,28 +855,49 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     currentMonday.setDate(diff);
     currentMonday.setHours(0, 0, 0, 0);
 
-    // Mostrar 10 días (1 semana + 3 días de la próxima semana)
-    const endDate = new Date(currentMonday);
-    endDate.setDate(endDate.getDate() + 10);
-    endDate.setHours(0, 0, 0, 0);
+    // Ventana visual: 3 días previos + semana actual (7) + 3 días posteriores = 13 días.
+    const previousHalfDays = 3;
+    const nextHalfDays = 3;
+    const currentWeekDays = 7;
+    const totalDays = previousHalfDays + currentWeekDays + nextHalfDays;
 
-    this.ganttWeekStart = currentMonday;
-    this.ganttWeekEnd = endDate;
+    const windowStart = new Date(currentMonday);
+    windowStart.setDate(windowStart.getDate() - previousHalfDays);
+    windowStart.setHours(0, 0, 0, 0);
 
-    const totalMs = endDate.getTime() - currentMonday.getTime();
-    const nowMs = now.getTime() - currentMonday.getTime();
+    // Fin exclusivo para cálculos temporales.
+    const windowEndExclusive = new Date(windowStart);
+    windowEndExclusive.setDate(windowEndExclusive.getDate() + totalDays);
+    windowEndExclusive.setHours(0, 0, 0, 0);
+
+    // Fin inclusivo para etiqueta visual de período.
+    const windowEndInclusive = new Date(windowEndExclusive);
+    windowEndInclusive.setDate(windowEndInclusive.getDate() - 1);
+
+    this.ganttWeekStart = windowStart;
+    this.ganttWeekEnd = windowEndInclusive;
+
+    const totalMs = windowEndExclusive.getTime() - windowStart.getTime();
+    const dayMs = 24 * 60 * 60 * 1000;
+
+    // Grid: limites reales de cada día (0..totalDays).
+    this.ganttGridLines = Array.from({ length: totalDays + 1 }, (_, i) => (i / totalDays) * 100);
+
+    // Dia actual: marcador dinamico por hora/minuto real dentro de la ventana.
+    const nowMs = now.getTime() - windowStart.getTime();
     this.ganttTodayPosition = Math.min(Math.max((nowMs / totalMs) * 100, 0), 100);
+    this.ganttTodayLabel = `Día Actual servidor (${this.formatShortDateTime(now)})`;
 
     const ticks = [];
-    const dayNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-    for (let i = 0; i < 10; i++) {
-      const d = new Date(currentMonday);
+    const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    for (let i = 0; i < totalDays; i++) {
+      const d = new Date(windowStart);
       d.setDate(d.getDate() + i);
-      const isToday = d.toDateString() === now.toDateString();
-      const dayName = dayNames[i % 7];
+      const isToday = this.isSameLocalDay(d, now);
+      const dayName = dayNames[d.getDay()];
       ticks.push({
         label: `${dayName} ${d.getDate()}/${d.getMonth() + 1}`,
-        position: (i / 10) * 100,
+        position: ((i + 0.5) / totalDays) * 100,
         isToday
       });
     }
@@ -881,15 +909,20 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
         if (asg.roleCode !== roleCode) return false;
         const start = new Date(asg.weekStartDate);
         const end = new Date(asg.weekEndDate);
-        return start < endDate && end > currentMonday;
+        return start < windowEndExclusive && end > windowStart;
       });
 
       const bars = matches.map(asg => {
         const start = new Date(asg.weekStartDate);
         const end = new Date(asg.weekEndDate);
 
-        const startMs = Math.max(start.getTime(), currentMonday.getTime()) - currentMonday.getTime();
-        const endMs = Math.min(end.getTime(), endDate.getTime()) - currentMonday.getTime();
+        const startMs = Math.max(start.getTime(), windowStart.getTime()) - windowStart.getTime();
+        const endMs = Math.min(end.getTime(), windowEndExclusive.getTime()) - windowStart.getTime();
+
+        // Si el tramo visible no tiene duracion, no dibujar barra para evitar artefactos.
+        if (endMs <= startMs) {
+          return null;
+        }
 
         const left = (startMs / totalMs) * 100;
         const width = ((endMs - startMs) / totalMs) * 100;
@@ -899,13 +932,15 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
 
         return {
           left,
-          width: Math.max(width, 4),
+          width: Math.max(width, 0.8),
           label: personName,
           status,
           statusClass: this.getWeeklyStatusClass(status),
           asg
         };
-      });
+      })
+      .filter((bar): bar is NonNullable<typeof bar> => bar !== null)
+      .sort((a, b) => a.left - b.left);
 
       return {
         roleCode,
@@ -923,12 +958,68 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
   }
 
   getAssignmentStatus(asg: any): 'Pasado' | 'En Curso' | 'Próximo' {
-    const now = new Date();
+    const now = this.getOfficialNow();
     const start = new Date(asg.weekStartDate);
     const end = new Date(asg.weekEndDate);
     if (end < now) return 'Pasado';
     if (start <= now && end >= now) return 'En Curso';
     return 'Próximo';
+  }
+
+  private syncServerClock(): void {
+    const requestStartedMonotonicMs = performance.now();
+    this.workShiftService.getCurrentShift()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response) => {
+          const requestEndedMonotonicMs = performance.now();
+
+          let serverMs: number | null = null;
+          if (typeof response?.currentTimestamp === 'number' && Number.isFinite(response.currentTimestamp)) {
+            serverMs = response.currentTimestamp;
+          } else if (response?.currentDateTime) {
+            const parsed = Date.parse(response.currentDateTime);
+            if (Number.isFinite(parsed)) {
+              serverMs = parsed;
+            }
+          }
+
+          if (serverMs === null) return;
+
+          // Aproximación NTP simple: corregimos por mitad del RTT para minimizar sesgo.
+          const midpointMonotonicMs = requestStartedMonotonicMs + ((requestEndedMonotonicMs - requestStartedMonotonicMs) / 2);
+          this.serverReferenceMs = serverMs;
+          this.monotonicAtSyncMs = midpointMonotonicMs;
+          this.hasServerClock = true;
+        },
+        error: () => {
+          // Si falla la lectura oficial, conservar la última referencia válida y fallback implícito a reloj local.
+        }
+      });
+  }
+
+  private getOfficialNow(): Date {
+    if (!this.hasServerClock) {
+      return new Date();
+    }
+    const elapsedMonotonicMs = performance.now() - this.monotonicAtSyncMs;
+    return new Date(this.serverReferenceMs + elapsedMonotonicMs);
+  }
+
+  private isSameLocalDay(a: Date, b: Date): boolean {
+    return (
+      a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth() &&
+      a.getDate() === b.getDate()
+    );
+  }
+
+  private formatShortDateTime(date: Date): string {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${day}/${month} ${hours}:${minutes}`;
   }
 
   getWeeklyStatusClass(status: string): string {
@@ -939,7 +1030,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
 
   // ============ TARJETAS DE PROXIMIDAD ============
   calculateProximityCards(): void {
-    const now = new Date();
+    const now = this.getOfficialNow();
 
     const activeAssignments = this.weeklyAssignments.filter(asg => this.getAssignmentStatus(asg) === 'En Curso');
     const futureAssignments = this.weeklyAssignments.filter(asg => this.getAssignmentStatus(asg) === 'Próximo');

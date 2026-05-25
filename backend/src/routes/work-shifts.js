@@ -167,10 +167,15 @@ router.get('/current', authenticate, async (req, res) => {
       )
       : null;
 
+    const effectiveTimezone = currentShift?.timezone || 'America/Santiago';
+    const nowInEffectiveTimezone = moment().tz(effectiveTimezone);
+
     res.json({
       shift: currentShiftWithAssignments,
       currentTime: shiftCurrentTime || moment().format('HH:mm'),
-      timezone: currentShift?.timezone || 'America/Santiago'
+      timezone: effectiveTimezone,
+      currentDateTime: nowInEffectiveTimezone.toISOString(),
+      currentTimestamp: nowInEffectiveTimezone.valueOf()
     });
   } catch (error) {
     logger.error('Error getting current work shift:', error);
