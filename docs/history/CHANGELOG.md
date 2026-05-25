@@ -2,6 +2,15 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.84-beta] - 2026-05-25
+
+### Simplificación del CSV de Asignación de Turnos (SHIFT-CSV-146)
+
+- **Formato reducido del CSV:** La importación de turnos ahora usa únicamente `rol, usuario, fechaInicio, horaInicio, fechaFin, horaFin`, eliminando columnas técnicas innecesarias como `userType` y `notes`.
+- **Resolución automática de usuario:** El campo `usuario` se resuelve internamente por `username` como primera opción; también acepta correo o nombre completo si coincide con un usuario interno o una persona externa.
+- **Mapeo funcional de roles:** El rol visible `N1` se traduce automáticamente a `N1_NO_HABIL` en backend, manteniendo la semántica operativa sin obligar al usuario a conocer la nomenclatura interna.
+- **Ejemplos y ayuda alineados a UX:** Se actualizaron las ayudas del panel y la plantilla descargable para mostrar usernames como ejemplo recomendado, evitando confusión con correos electrónicos.
+
 ## [v1.5.83-beta] - 2026-05-22
 
 ### Auditoría Exhaustiva de Documentación y Limpieza de Repositorio
