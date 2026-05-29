@@ -703,28 +703,9 @@ async function sendShiftReport(shiftId, shiftDate = new Date(), options = {}) {
         return { success: false, message: 'Empty report aborted' };
       }
 
-      if (!checklistExit) {
-        logger.info('📊 [sendShiftReport] PENDIENTE_POR_CIERRE: no closure checklist yet, report deferred', {
-          shiftId: shift._id,
-          entriesCount: entries.length,
-          hasChecklistEntry: !!checklistEntry
-        });
-        await registerShiftReportAudit({
-          event: 'smtp.shift-report.deferred',
-          success: false,
-          reason: 'Pending closure checklist. Report deferred.',
-          metadata: {
-            shiftName: shift.name,
-            entriesCount: entries.length,
-            hasChecklistEntry: !!checklistEntry
-          }
-        });
-        return {
-          success: false,
-          deferredByClosure: true,
-          message: 'Pending closure checklist. Report deferred.'
-        };
-      }
+      // Se eliminó la validación que difería el envío del reporte por la ausencia del checklist de cierre.
+      // Ahora el reporte de turno se despacha de manera directa al finalizar el turno, garantizando el envío
+      // oportuno sin bloquear la operación de los analistas por tareas pendientes.
 
       // B14: Anti duplicados comprobando lastReportSentAt dentro del periodo de turno
       if (shift.lastReportSentAt) {
