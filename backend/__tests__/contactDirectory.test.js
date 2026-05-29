@@ -33,6 +33,8 @@ describe('contactDirectory utils', () => {
   });
 
   test('formatContactsCsv exporta encabezados y mantiene flags operativos', () => {
+    // Se corrigen las expectativas para incluir el campo isMailingList en el CSV,
+    // garantizando la consistencia del test con la estructura real del directorio de contactos.
     const csv = formatContactsCsv([
       {
         name: 'Bea',
@@ -41,14 +43,15 @@ describe('contactDirectory utils', () => {
         phone: '123',
         contactType: 'preventive',
         favorite: true,
+        isMailingList: false,
         doNotSend: false,
         active: true,
         notes: 'Cliente preferente'
       }
     ]);
 
-    expect(csv).toContain('name,email,organization,phone,contactType,active,favorite,doNotSend,notes');
-    expect(csv).toContain('Bea,bea@example.com,Contoso,123,preventive,true,true,false,Cliente preferente');
+    expect(csv).toContain('name,email,organization,phone,contactType,active,favorite,isMailingList,doNotSend,notes');
+    expect(csv).toContain('Bea,bea@example.com,Contoso,123,preventive,true,true,false,false,Cliente preferente');
   });
 
   test('helpers de normalización y email son consistentes', () => {
