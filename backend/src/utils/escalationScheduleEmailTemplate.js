@@ -43,7 +43,7 @@ const PALETTE = {
 };
 
 /**
- * Genera el HTML del correo de turnos de escalación
+ * Genera el HTML del correo de turnos de escalamiento
  * @param {Object} data - Datos del turno
  * @param {Array} data.schedule - Lista de turnos [{ analystName, startDate, endDate, cargoLabel, isCurrent }]
  * @param {string} data.periodLabel - Texto del periodo (ej: "Semana del 07 al 13 de Mayo")
@@ -105,12 +105,14 @@ async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', l
                 }
               </td>
               <td style="width:50%; text-align:right; vertical-align:middle;">
-                <span style="font-size:12px; font-weight:700; color:${PALETTE.headerText}; letter-spacing:1px;">CALENDARIO DE ESCALACIÓN</span>
+                <!-- Cambiado de Escalación a Escalamiento para corregir la redacción en la cabecera del correo enviado a otras áreas -->
+                <span style="font-size:12px; font-weight:700; color:${PALETTE.headerText}; letter-spacing:1px;">CALENDARIO DE ESCALAMIENTO</span>
               </td>
             </tr>
           </mj-table>
           <mj-text align="center" color="${PALETTE.headerText}" font-size="28px" font-weight="700" padding="10px 0">
-            Turnos de Escalación SOC
+            <!-- Corrección de texto en el título del cuerpo del correo -->
+            Turnos de Escalamiento SOC
           </mj-text>
           <mj-text align="center" color="${PALETTE.cardAccent}" font-size="16px" font-weight="400" padding="0">
             ${e(periodLabel)}

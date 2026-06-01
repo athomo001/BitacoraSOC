@@ -39,7 +39,8 @@
     <div class="settings-col settings-col--main">
       <div class="settings-panel settings-panel--smtp" id="smtp-config">
         <header class="settings-panel__header settings-panel__header--split">
-          <h2 class="settings-panel__title">Configuracion SMTP</h2>
+          <!-- Corrección ortográfica: agregada tilde en Configuración -->
+          <h2 class="settings-panel__title">Configuración SMTP</h2>
           <span class="status-chip" [ngClass]="connectionStatus">
             {{ connectionStatus === 'conectado' ? 'Conectado' : connectionStatus === 'desconectado' ? 'Desconectado' : connectionStatus === 'desactivado' ? 'Desactivado' : 'Sin configurar' }}
           </span>

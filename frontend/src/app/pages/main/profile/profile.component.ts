@@ -118,7 +118,8 @@ export class ProfileComponent implements OnInit {
 
     const { currentPassword, newPassword, confirmPassword } = this.passwordForm.value;
     if (newPassword !== confirmPassword) {
-      this.snackBar.open('Las contrasenas no coinciden', 'Cerrar', { duration: 3000 });
+      // Corrección ortográfica: ñ agregada a contraseñas
+      this.snackBar.open('Las contraseñas no coinciden', 'Cerrar', { duration: 3000 });
       return;
     }
 
@@ -130,11 +131,13 @@ export class ProfileComponent implements OnInit {
       .subscribe({
         next: () => {
           this.passwordForm.reset();
-          this.snackBar.open('Contrasena actualizada', 'Cerrar', { duration: 3000 });
+          // Corrección ortográfica: ñ y tilde agregadas en contraseña
+          this.snackBar.open('Contraseña actualizada', 'Cerrar', { duration: 3000 });
         },
         error: (err) => {
           console.error('Error changing password:', err);
-          this.snackBar.open(err.error?.message || 'No se pudo cambiar la contrasena', 'Cerrar', { duration: 3000 });
+          // Corrección ortográfica: ñ y tilde agregadas en contraseña
+          this.snackBar.open(err.error?.message || 'No se pudo cambiar la contraseña', 'Cerrar', { duration: 3000 });
         }
       });
   }
