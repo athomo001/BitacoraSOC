@@ -2,6 +2,14 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.88-beta] - 2026-06-01
+
+### Correcciones ortográficas y de redacción en correos y UI (UI-ORTHO-FIX)
+
+- **Corrección de redacción de turnos de escalamiento:** Se reemplazó el término "Escalación" por "Escalamiento" en el asunto y cuerpo de las plantillas de correo (`Turnos de Escalamiento SOC`), normalizando su redacción y eliminando el término erróneo.
+- **Correcciones ortográficas masivas en la UI:** Se corrigieron etiquetas de texto, placeholders, labels de formulario y snackbars en el frontend para agregar tildes y caracteres correctos (por ejemplo: `Configuracion` -> `Configuración`, `contrasenas` -> `contraseñas`, `telefono` -> `teléfono`, `informacion` -> `información`, `operacion` -> `operación`, `sesion` -> `sesión`, `categoria` -> `categoría`, `analisis` -> `análisis`, `minimo` -> `mínimo`).
+- **Validación de empaquetado:** Se validó la compilación del frontend (`pnpm run build`) asegurando que los templates de Angular no tengan errores sintácticos tras los cambios.
+
 ## [v1.5.87-beta] - 2026-05-25
 
 ### Historial compartido en /main/reports y borrado solo admin

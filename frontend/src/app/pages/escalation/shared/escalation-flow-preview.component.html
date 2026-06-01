@@ -12,12 +12,14 @@
       <span class="preview-client-label">Cliente</span>
       <div class="preview-client-readonly">{{ clientName || 'Sin cliente seleccionado' }}</div>
       <span class="preview-client-status" [class.ok]="clientSelected" [class.error]="!clientSelected">
-        {{ clientSelected ? 'Cliente configurado' : 'Cliente no esta en la lista' }}
+        <!-- Corrección ortográfica: tilde agregada en está -->
+        {{ clientSelected ? 'Cliente configurado' : 'Cliente no está en la lista' }}
       </span>
     </div>
 
     <section class="preview-flow-section">
-      <h4>Flujo dinamico configurado</h4>
+      <!-- Corrección ortográfica: tilde agregada en dinámico -->
+      <h4>Flujo dinámico configurado</h4>
 
       <div *ngIf="flowSteps.length > 0" class="preview-flow-grid">
         <article *ngFor="let step of flowSteps; let index = index" class="preview-step-card">
@@ -28,7 +30,8 @@
 
           <div *ngIf="step.type === 'unique'" class="preview-unique-row">
             <div><strong>{{ step.contactName || 'Sin nombre' }}</strong></div>
-            <div>{{ step.contactTel || 'Sin telefono' }}</div>
+            <!-- Corrección ortográfica: tilde agregada en teléfono -->
+            <div>{{ step.contactTel || 'Sin teléfono' }}</div>
             <div *ngIf="step.callAt">{{ formatDateTime(step.callAt) }}</div>
           </div>
 
@@ -37,13 +40,15 @@
               <thead>
                 <tr>
                   <th>Nombre</th>
-                  <th>Telefono</th>
+                  <!-- Corrección ortográfica: tilde agregada en Teléfono -->
+                  <th>Teléfono</th>
                 </tr>
               </thead>
               <tbody>
                 <tr *ngFor="let person of step.contacts || []">
                   <td>{{ person.name || 'Sin nombre' }}</td>
-                  <td>{{ person.tel || 'Sin telefono' }}</td>
+                  <!-- Corrección ortográfica: tilde agregada en teléfono -->
+                  <td>{{ person.tel || 'Sin teléfono' }}</td>
                 </tr>
               </tbody>
             </table>
@@ -51,7 +56,8 @@
         </article>
       </div>
 
-      <p *ngIf="flowSteps.length === 0" class="preview-empty">No hay flujo dinamico configurado para este cliente.</p>
+      <!-- Corrección ortográfica: tilde agregada en dinámico -->
+      <p *ngIf="flowSteps.length === 0" class="preview-empty">No hay flujo dinámico configurado para este cliente.</p>
     </section>
 
     <section *ngIf="legend" class="preview-legend">

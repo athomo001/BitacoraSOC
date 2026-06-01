@@ -3,7 +3,8 @@
 
   <div class="profile-panel">
     <header class="profile-panel__header">
-      <h2 class="profile-panel__title">Informacion Personal</h2>
+      <!-- Corrección ortográfica: tilde agregada en Información -->
+      <h2 class="profile-panel__title">Información Personal</h2>
     </header>
     <div class="profile-panel__body">
       <form [formGroup]="profileForm" (ngSubmit)="saveProfile()">
@@ -13,12 +14,14 @@
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Correo Electronico</mat-label>
+          <!-- Corrección ortográfica: tilde agregada en Electrónico -->
+          <mat-label>Correo Electrónico</mat-label>
           <input matInput formControlName="email" type="email" placeholder="tu@email.com">
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Tema de la Aplicacion</mat-label>
+          <!-- Corrección ortográfica: tilde agregada en Aplicación -->
+          <mat-label>Tema de la Aplicación</mat-label>
           <mat-select formControlName="theme" (selectionChange)="onThemeChange($event.value)">
             <mat-option value="light">Claro</mat-option>
             <mat-option value="dark">Oscuro</mat-option>
@@ -55,7 +58,8 @@
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Nueva Contraseña</mat-label>
           <input matInput formControlName="newPassword" type="password">
-          <mat-hint>Minimo 6 caracteres</mat-hint>
+          <!-- Corrección ortográfica: tilde agregada en Mínimo -->
+          <mat-hint>Mínimo 6 caracteres</mat-hint>
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="full-width">

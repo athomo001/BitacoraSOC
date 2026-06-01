@@ -66,9 +66,10 @@
     </mat-accordion>
 
     <mat-accordion class="menu-accordion" *ngIf="hasConfigAccess">
-      <mat-expansion-panel [expanded]="true">
+        <mat-expansion-panel [expanded]="true">
         <mat-expansion-panel-header>
-          <mat-panel-title>Configuracion (Admin)</mat-panel-title>
+          <!-- Corrección ortográfica: tilde agregada en Configuración -->
+          <mat-panel-title>Configuración (Admin)</mat-panel-title>
         </mat-expansion-panel-header>
 
         <mat-nav-list>
@@ -88,7 +89,8 @@
 
     <a mat-list-item (click)="logout()">
       <mat-icon matListItemIcon>exit_to_app</mat-icon>
-      <span matListItemTitle>Cerrar Sesion</span>
+      <!-- Corrección ortográfica: tilde agregada en Cerrar Sesión -->
+      <span matListItemTitle>Cerrar Sesión</span>
     </a>
 
     <!-- Info usuario -->

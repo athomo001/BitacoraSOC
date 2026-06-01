@@ -2259,10 +2259,11 @@ exports.sendEscalationScheduleInternal = async ({ recipients, ccRecipients, freq
         brandName
       });
 
+      // Envío de correo electrónico para notificar la ausencia de turnos programados en el periodo evaluado
       const emailResult = await sendEmail({
         to: recipients,
         cc: ccRecipients,
-        subject: `[${brandName}] Turnos de Escalación - ${periodLabel}`,
+        subject: `[${brandName}] Turnos de Escalamiento - ${periodLabel}`,
         html: emptyScheduleEmailBuild.html,
         attachments: attachments.length ? attachments : undefined,
         auditContext: {
@@ -2291,10 +2292,11 @@ exports.sendEscalationScheduleInternal = async ({ recipients, ccRecipients, freq
 
     const { html } = emailBuild;
 
+    // Envío del correo electrónico que contiene la tabla de turnos de escalamiento programados
     const emailResult = await sendEmail({
       to: recipients,
       cc: ccRecipients,
-      subject: `[${brandName}] Turnos de Escalación - ${periodLabel}`,
+      subject: `[${brandName}] Turnos de Escalamiento - ${periodLabel}`,
       html,
       attachments: attachments.length ? attachments : undefined,
       auditContext: {

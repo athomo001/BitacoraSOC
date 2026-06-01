@@ -423,8 +423,10 @@ export class SettingsComponent implements OnInit {
         guestModeEnabled: this.appConfigForm.value.guestEnabled
       };
       this.configService.updateConfig(data).subscribe({
-        next: () => this.snackBar.open('Configuracion guardada', 'Cerrar', { duration: 2000 }),
-        error: () => this.snackBar.open('Error guardando configuracion', 'Cerrar', { duration: 3000 })
+        // Corrección ortográfica: tilde agregada en Configuración
+        next: () => this.snackBar.open('Configuración guardada', 'Cerrar', { duration: 2000 }),
+        // Corrección ortográfica y de redacción para el mensaje de error
+        error: () => this.snackBar.open('Error al guardar configuración', 'Cerrar', { duration: 3000 })
       });
     }
   }
