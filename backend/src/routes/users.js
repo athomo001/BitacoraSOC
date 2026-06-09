@@ -55,14 +55,17 @@ router.get('/list', authenticate, async (req, res) => {
       .select('_id username email fullName role phone cargoLabel')
       .sort({ fullName: 1 });
 
+    // Restricción de seguridad: invitados y auditores no deben ver datos de contacto sensibles
+    const isRestrictedRole = req.user && (req.user.role === 'guest' || req.user.role === 'auditor');
+
     // Mapear a formato simple con "name" para compatibilidad
     const usersSimple = users.map(u => ({
       _id: u._id,
       name: u.fullName,
       username: u.username,
-      email: u.email,
+      email: isRestrictedRole ? undefined : u.email,
       role: u.role,
-      phone: u.phone,
+      phone: isRestrictedRole ? undefined : u.phone,
       cargoLabel: u.cargoLabel || null
     }));
 
@@ -171,7 +174,7 @@ router.post('/',
   [
     body('username').trim().isLength({ min: 3 }).withMessage('El usuario debe tener al menos 3 caracteres'),
     body('email').isEmail().normalizeEmail().withMessage('Email invalido'),
-    body('password').notEmpty().withMessage('La contraseña no puede estar vacía'),  // Admin: sin mínimo de caracteres
+    body('password').isLength({ min: 6 }).withMessage('La contraseña debe tener al menos 6 caracteres'), // Validación unificada a mínimo 6 caracteres
     body('fullName').trim().notEmpty().withMessage('El nombre completo es requerido'),
     body('role').isIn(['admin', 'user', 'auditor', 'guest']).withMessage('Rol inválido'),
     body('phone').optional().trim().isLength({ min: 6, max: 20 }).withMessage('Teléfono inválido'),
@@ -310,7 +313,7 @@ router.put('/:id',
     body('phone').optional().trim().isLength({ min: 6, max: 20 }),
     body('cargoLabel').optional({ nullable: true }).isString().trim().isLength({ max: MAX_CARGO_LENGTH })
       .withMessage(`Cargo inválido (máx ${MAX_CARGO_LENGTH} caracteres)`),
-    body('newPassword').optional().notEmpty().withMessage('La nueva contraseña no puede estar vacía') // Admin: sin mínimo
+    body('newPassword').optional().isLength({ min: 6 }).withMessage('La nueva contraseña debe tener al menos 6 caracteres') // Validación unificada a mínimo 6 caracteres
   ],
   validate,
   async (req, res) => {

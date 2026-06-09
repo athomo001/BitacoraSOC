@@ -108,6 +108,24 @@
     <img [src]="easterEggImageUrl" alt="Bender" class="easter-egg-image" />
   </div>
 
+  <!-- HUD superior central para el minijuego de cacería de murciélagos (#bat) -->
+  <div class="bat-hud" *ngIf="batInstances.length > 0 || batsCaught > 0">
+    <div class="hud-item">
+      <span>🦇 ACTIVOS:</span>
+      <span class="hud-value">{{ batInstances.length }}</span>
+    </div>
+    <div class="hud-divider"></div>
+    <div class="hud-item">
+      <span>🎯 INTENTOS:</span>
+      <span class="hud-value">{{ batClickAttempts }}</span>
+    </div>
+    <div class="hud-divider"></div>
+    <div class="hud-item">
+      <span>🏆 CAZADOS:</span>
+      <span class="hud-value">{{ batsCaught }}</span>
+    </div>
+  </div>
+
   <!-- 🦇 EE-BAT-001: Murciélago Pixel-Art | Activado por #bat en tiempo real -->
   <!-- Persiste indefinidamente hasta F5 — NO cierra al hacer clic en pestaña/UI -->
   <div class="bat-container" *ngIf="batInstances.length > 0">

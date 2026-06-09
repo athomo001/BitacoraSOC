@@ -1,227 +1,274 @@
+<!--
+     Componente de Backup y Exportación
+     Identidad Visual: CDC/SOC Premium (diseño asimétrico)
+     Comentarios: Español profesional.
+-->
 <div class="backup-container">
-  <h1>💾 Backup y Exportación</h1>
-  <p class="subtitle">Gestiona las copias de seguridad del sistema</p>
+  <header class="page-header">
+    <h1 class="page-title">
+      <mat-icon class="title-icon">settings_backup_restore</mat-icon>
+      Backup y Exportación
+    </h1>
+    <p class="subtitle">Gestiona la integridad de los datos, programaciones de respaldo local/red e historial de copias de seguridad.</p>
+  </header>
 
-  <div class="backup-panel backup-card auto-backup-card" id="backup-config">
-    <header class="backup-panel__header">
-      <h2 class="backup-panel__title">
-        <mat-icon>schedule</mat-icon>
-        Configuración de Backups Automáticos
-      </h2>
-    </header>
-    <div class="backup-panel__body">
-      <form [formGroup]="backupConfigForm" (ngSubmit)="saveBackupConfig()">
-        <div class="config-row">
-          <mat-checkbox formControlName="enabled">
-            Habilitar Backups Automáticos
-          </mat-checkbox>
-        </div>
+  <!-- Layout de doble columna asimétrico para evitar cuadrículas repetitivas de IA -->
+  <div class="backup-layout">
+    
+    <!-- Columna Principal (Izquierda): Configuración y Datos Dinámicos -->
+    <div class="backup-main-col">
+      
+      <!-- Panel de Configuración de Backups Automáticos -->
+      <div class="elegant-card" id="backup-config">
+        <header class="card-header">
+          <h2 class="card-title">
+            <mat-icon>schedule</mat-icon>
+            Backups Automáticos
+          </h2>
+          <!-- Reemplazo de checkbox clásico por Slide Toggle para una UX premium -->
+          <mat-slide-toggle [formControl]="$any(backupConfigForm.get('enabled'))" color="primary">
+            {{ backupConfigForm.value.enabled ? 'Habilitado' : 'Deshabilitado' }}
+          </mat-slide-toggle>
+        </header>
 
-        <div class="config-row">
-          <mat-form-field appearance="outline">
-            <mat-label>Intervalo (Días)</mat-label>
-            <input matInput type="number" formControlName="intervalDays" min="1" max="365">
-            <mat-hint>Cada cuántos días ejecutar</mat-hint>
-          </mat-form-field>
+        <div class="card-body">
+          <form [formGroup]="backupConfigForm" (ngSubmit)="saveBackupConfig()">
+            <!-- Grid de parámetros - visible solo si la automatización está activa -->
+            <div class="config-grid animate-fade-in" *ngIf="backupConfigForm.value.enabled">
+              <mat-form-field appearance="outline">
+                <mat-label>Frecuencia de Ejecución (Días)</mat-label>
+                <input matInput type="number" formControlName="intervalDays" min="1" max="365">
+                <mat-icon matSuffix>calendar_today</mat-icon>
+                <mat-hint>Período entre cada respaldo</mat-hint>
+              </mat-form-field>
 
-          <mat-form-field appearance="outline">
-            <mat-label>Retención Local (Días)</mat-label>
-            <input matInput type="number" formControlName="localRetentionDays" min="1" max="365">
-            <mat-hint>Eliminar backups locales antiguos</mat-hint>
-          </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Retención Histórica (Días)</mat-label>
+                <input matInput type="number" formControlName="localRetentionDays" min="1" max="365">
+                <mat-icon matSuffix>restore</mat-icon>
+                <mat-hint>Vencimiento de copias locales</mat-hint>
+              </mat-form-field>
 
-          <mat-form-field appearance="outline">
-            <mat-label>Destino</mat-label>
-            <mat-select formControlName="destinationType">
-              <mat-option value="local">Local</mat-option>
-              <mat-option value="s3" disabled>S3 Compatible (Próximamente)</mat-option>
-              <mat-option value="smb">SMB/Samba</mat-option>
-              <mat-option value="nfs">NFS</mat-option>
-            </mat-select>
-          </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Destino de Copias</mat-label>
+                <mat-select formControlName="destinationType">
+                  <mat-option value="local">Almacenamiento Local</mat-option>
+                  <mat-option value="s3" disabled>Nube S3 (Próximamente)</mat-option>
+                  <mat-option value="smb">SMB / Samba Share</mat-option>
+                  <mat-option value="nfs">NFS Mount</mat-option>
+                </mat-select>
+              </mat-form-field>
 
-          <mat-form-field appearance="outline" *ngIf="backupConfigForm.value.destinationType === 'smb' || backupConfigForm.value.destinationType === 'nfs'">
-            <mat-label>Ruta destino montada</mat-label>
-            <input matInput type="text" formControlName="destinationPath" placeholder="Ej: /mnt/backups-soc o \\server\share">
-            <mat-hint>El contenedor/backend debe tener acceso a esta ruta</mat-hint>
-          </mat-form-field>
-        </div>
-
-        <div class="button-group backup-actions">
-          <button mat-raised-button color="primary" type="submit" [disabled]="!backupConfigForm.valid">
-            Guardar Configuración
-          </button>
-
-          <button mat-stroked-button color="accent" type="button" (click)="testAutoBackup()">
-            Ejecutar Prueba de Backup Ahora
-          </button>
-        </div>
-
-        <div class="config-row" *ngIf="backupConfigForm.value.enabled">
-          <div class="backup-panel backup-panel--nested backup-card">
-            <div class="backup-panel__body backup-panel__body--nested">
-              <p><strong>Estado:</strong> {{ getAutoBackupStatusLabel() }}</p>
-              <p *ngIf="lastAutoRunAt"><strong>Última ejecución automática:</strong> {{ lastAutoRunAt | date:'medium' }}</p>
-              <p *ngIf="lastAutoAttemptAt && !lastAutoRunAt"><strong>Último intento automático:</strong> {{ lastAutoAttemptAt | date:'medium' }}</p>
-              <p *ngIf="nextAutoRunAt"><strong>Próxima ejecución programada:</strong> {{ nextAutoRunAt | date:'medium' }}</p>
-              <p *ngIf="lastAutoRunMessage"><strong>Detalle:</strong> {{ lastAutoRunMessage }}</p>
+              <mat-form-field appearance="outline" class="full-width" *ngIf="backupConfigForm.value.destinationType === 'smb' || backupConfigForm.value.destinationType === 'nfs'">
+                <mat-label>Ruta de Red Montada</mat-label>
+                <input matInput type="text" formControlName="destinationPath" placeholder="Ej: /mnt/backups-soc o \\server\share">
+                <mat-icon matSuffix>dns</mat-icon>
+                <mat-hint>Ruta accesible del sistema de archivos</mat-hint>
+              </mat-form-field>
             </div>
+
+            <!-- Resumen de estado del planificador -->
+            <div class="status-summary" *ngIf="backupConfigForm.value.enabled">
+              <div class="status-indicator">
+                <span class="status-dot" [class.active]="lastAutoRunStatus === 'success' || lastAutoRunStatus === 'scheduled'"></span>
+                <span class="status-label"><strong>Estado del Scheduler:</strong> {{ getAutoBackupStatusLabel() }}</span>
+              </div>
+              
+              <div class="status-meta-grid">
+                <div class="meta-item" *ngIf="lastAutoRunAt">
+                  <mat-icon>check_circle</mat-icon>
+                  <div>
+                    <span class="meta-label">Último éxito</span>
+                    <span class="meta-val">{{ lastAutoRunAt | date:'medium' }}</span>
+                  </div>
+                </div>
+                <div class="meta-item" *ngIf="nextAutoRunAt">
+                  <mat-icon>update</mat-icon>
+                  <div>
+                    <span class="meta-label">Próxima ejecución</span>
+                    <span class="meta-val">{{ nextAutoRunAt | date:'medium' }}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <p class="status-message-box" *ngIf="lastAutoRunMessage">
+                <strong>Detalle de ejecución:</strong> {{ lastAutoRunMessage }}
+              </p>
+            </div>
+
+            <div class="card-actions">
+              <button mat-flat-button color="primary" type="submit" [disabled]="!backupConfigForm.valid">
+                <mat-icon>save</mat-icon> Guardar Cambios
+              </button>
+              <button mat-stroked-button type="button" (click)="testAutoBackup()">
+                <mat-icon>play_circle_filled</mat-icon> Ejecutar Prueba Ahora
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Tabla de Historial de Respaldos (Elemento central) -->
+      <div class="elegant-card history-card">
+        <header class="card-header">
+          <h2 class="card-title">
+            <mat-icon>history</mat-icon>
+            Historial de Copias de Seguridad
+          </h2>
+          <span class="badge" *ngIf="backupHistory.length > 0">{{ backupHistory.length }} Copias Registradas</span>
+        </header>
+
+        <div class="card-body">
+          <!-- Advertencia de restauración con opción de sobreescritura -->
+          <div class="restore-warning-box">
+            <mat-checkbox [(ngModel)]="clearBeforeRestore" color="warn">
+              <span class="warning-title">Sobreescribir base de datos existente al restaurar</span>
+              <p class="warning-desc">⚠️ Si se activa: eliminará toda la base de datos actual antes de aplicar el respaldo. Si se desactiva, solo unirá registros omitiendo duplicados.</p>
+            </mat-checkbox>
+          </div>
+
+          <!-- Tabla de historial -->
+          <div class="table-responsive" *ngIf="backupHistory.length > 0">
+            <table mat-table [dataSource]="backupHistory" class="elegant-table">
+              
+              <!-- Columna Archivo -->
+              <ng-container matColumnDef="filename">
+                <th mat-header-cell *matHeaderCellDef>Archivo de Respaldos</th>
+                <td mat-cell *matCellDef="let backup">
+                  <span class="filename-text" [matTooltip]="backup.filename">{{ backup.filename }}</span>
+                </td>
+              </ng-container>
+
+              <!-- Columna Fecha -->
+              <ng-container matColumnDef="date">
+                <th mat-header-cell *matHeaderCellDef>Fecha de Creación</th>
+                <td mat-cell *matCellDef="let backup">{{ formatDate(backup.createdAt) }}</td>
+              </ng-container>
+
+              <!-- Columna Tamaño -->
+              <ng-container matColumnDef="size">
+                <th mat-header-cell *matHeaderCellDef>Tamaño</th>
+                <td mat-cell *matCellDef="let backup" class="size-col">{{ formatSize(backup.size) }}</td>
+              </ng-container>
+
+              <!-- Columna Acciones -->
+              <ng-container matColumnDef="actions">
+                <th mat-header-cell *matHeaderCellDef class="actions-header">Acciones</th>
+                <td mat-cell *matCellDef="let backup" class="actions-col">
+                  <button mat-icon-button color="accent" (click)="downloadBackup(backup)" matTooltip="Descargar Archivo">
+                    <mat-icon>download</mat-icon>
+                  </button>
+                  <button mat-icon-button color="primary" (click)="restoreBackup(backup)" matTooltip="Restaurar Copia" [disabled]="isImporting">
+                    <mat-icon>settings_backup_restore</mat-icon>
+                  </button>
+                  <button mat-icon-button color="warn" (click)="deleteBackup(backup)" matTooltip="Eliminar del Registro">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="['filename', 'date', 'size', 'actions']"></tr>
+              <tr mat-row *matRowDef="let row; columns: ['filename', 'date', 'size', 'actions'];"></tr>
+            </table>
+          </div>
+
+          <!-- Estado Vacío -->
+          <div class="empty-state" *ngIf="backupHistory.length === 0">
+            <mat-icon class="empty-icon">folder_open</mat-icon>
+            <h3>No hay respaldos disponibles</h3>
+            <p>Genera un respaldo de base de datos desde el panel lateral derecho para inicializar el registro histórico.</p>
           </div>
         </div>
-      </form>
-    </div>
-  </div>
+      </div>
 
-  <div class="backup-grid">
-    <!-- Exportar CSV -->
-    <div class="backup-panel backup-card">
-      <header class="backup-panel__header">
-        <h2 class="backup-panel__title">
-          <mat-icon>download</mat-icon>
-          Exportar a CSV
-        </h2>
-      </header>
-      <div class="backup-panel__body">
-        <p>Descarga los datos en formato CSV para análisis externo.</p>
-        <div class="button-group">
-          <button mat-stroked-button (click)="exportCSV('entries')" [disabled]="isExporting">
-            <mat-icon>article</mat-icon>
-            Entradas
-          </button>
-          <button mat-stroked-button (click)="exportCSV('checks')" [disabled]="isExporting">
-            <mat-icon>checklist</mat-icon>
-            Checklists
-          </button>
-          <button mat-raised-button color="primary" (click)="exportCSV('all')" [disabled]="isExporting">
-            <mat-spinner *ngIf="isExporting" diameter="20"></mat-spinner>
-            <mat-icon *ngIf="!isExporting">archive</mat-icon>
-            <span *ngIf="!isExporting">Todo</span>
-          </button>
+    </div>
+
+    <!-- Columna Lateral (Derecha): Acciones Rápidas y Zona de Peligro -->
+    <div class="backup-sidebar-col">
+      
+      <!-- Tarjeta de Acciones Rápidas -->
+      <div class="elegant-card actions-sidebar-card">
+        <header class="card-header">
+          <h2 class="card-title">
+            <mat-icon>extension</mat-icon>
+            Acciones de Datos
+          </h2>
+        </header>
+
+        <div class="card-body sidebar-actions-list">
+          
+          <!-- Bloque de Respaldos Manuales -->
+          <div class="action-block">
+            <h3 class="block-title">Respaldo Manual de BD</h3>
+            <p class="block-desc">Crea un clon de base de datos listo para descargar o restaurar en caliente.</p>
+            <button mat-flat-button color="accent" class="w-100" (click)="createBackup()" [disabled]="isExporting">
+              <mat-spinner *ngIf="isExporting" diameter="18" class="button-spinner"></mat-spinner>
+              <mat-icon *ngIf="!isExporting">cloud_download</mat-icon>
+              {{ isExporting ? 'Generando...' : 'Crear Respaldo Ahora' }}
+            </button>
+            
+            <div class="sidebar-divider">o importa una copia</div>
+
+            <input type="file" #fileInput accept=".json,.zip" class="hidden-file-input" (change)="importBackup($event)">
+            <button mat-stroked-button class="w-100" (click)="fileInput.click()" [disabled]="isImporting">
+              <mat-spinner *ngIf="isImporting" diameter="18" class="button-spinner"></mat-spinner>
+              <mat-icon *ngIf="!isImporting">file_upload</mat-icon>
+              {{ isImporting ? 'Importando...' : 'Subir Archivo (.zip/.json)' }}
+            </button>
+          </div>
+
+          <!-- Bloque de Exportación CSV -->
+          <div class="action-block">
+            <h3 class="block-title">Exportación de Tablas (CSV)</h3>
+            <p class="block-desc">Descarga los registros en formato universal plano para su lectura en hojas de cálculo.</p>
+            
+            <div class="csv-grid">
+              <button mat-stroked-button (click)="exportCSV('entries')" [disabled]="isExporting">
+                <mat-icon>view_list</mat-icon>
+                Bitácoras
+              </button>
+              <button mat-stroked-button (click)="exportCSV('checks')" [disabled]="isExporting">
+                <mat-icon>done_all</mat-icon>
+                Checklists
+              </button>
+            </div>
+            
+            <button mat-flat-button color="primary" class="w-100 mt-2" (click)="exportCSV('all')" [disabled]="isExporting">
+              <mat-icon>archive</mat-icon> Exportar Todo (ZIP)
+            </button>
+          </div>
+
         </div>
       </div>
-    </div>
 
-    <!-- Backup completo -->
-    <div class="backup-panel backup-card">
-      <header class="backup-panel__header">
-        <h2 class="backup-panel__title">
-          <mat-icon>backup</mat-icon>
-          Backup Base de Datos
-        </h2>
-      </header>
-      <div class="backup-panel__body">
-        <p>Crea una copia de seguridad completa de todas las colecciones de la base de datos.</p>
-        <button mat-raised-button color="accent" (click)="createBackup()" [disabled]="isExporting">
-          <mat-spinner *ngIf="isExporting" diameter="20"></mat-spinner>
-          <mat-icon *ngIf="!isExporting">save</mat-icon>
-          <span *ngIf="!isExporting">Crear Backup</span>
-        </button>
-      </div>
-    </div>
+      <!-- Tarjeta de Zona de Peligro -->
+      <div class="elegant-card danger-zone-card">
+        <header class="card-header danger-header">
+          <h2 class="card-title danger-title">
+            <mat-icon>report_problem</mat-icon>
+            Zona de Peligro
+          </h2>
+        </header>
 
-    <!-- Importar Backup -->
-    <div class="backup-panel backup-card">
-      <header class="backup-panel__header">
-        <h2 class="backup-panel__title">
-          <mat-icon>upload</mat-icon>
-          Importar Backup
-        </h2>
-      </header>
-      <div class="backup-panel__body">
-        <p>Importa un archivo de backup ZIP o JSON para restaurar datos completos (BD + archivos).</p>
-        <input type="file" #fileInput accept=".json,.zip" class="hidden-file-input" (change)="importBackup($event)">
-        <button mat-raised-button color="primary" (click)="fileInput.click()" [disabled]="isImporting">
-          <mat-spinner *ngIf="isImporting" diameter="20"></mat-spinner>
-          <mat-icon *ngIf="!isImporting">cloud_upload</mat-icon>
-          <span *ngIf="!isImporting">Seleccionar Archivo</span>
-        </button>
-      </div>
-    </div>
+        <div class="card-body">
+          <p class="danger-desc">
+            La purga borrará permanentemente todas las entradas de bitácora, checklists, reportes y configuraciones. <strong>Esta acción es irreversible.</strong>
+          </p>
 
-    <!-- Purgar datos -->
-    <div class="backup-panel backup-card danger-card">
-      <header class="backup-panel__header">
-        <h2 class="backup-panel__title">
-          <mat-icon>warning</mat-icon>
-          Purgar Todos los Datos
-        </h2>
-      </header>
-      <div class="backup-panel__body">
-        <p>Elimina TODA la información del sistema. Esta acción es irreversible.</p>
-        <mat-form-field appearance="outline" class="purge-field">
-          <mat-label>Confirmación</mat-label>
-          <input matInput [(ngModel)]="purgeConfirmText" placeholder="Escribe: {{ purgeConfirmRequired }}">
-          <mat-hint>Debes escribir exactamente: {{ purgeConfirmRequired }}</mat-hint>
-        </mat-form-field>
-        <div class="purge-actions">
-          <button mat-raised-button color="warn" (click)="purgeAllData()" [disabled]="isPurging">
-            <mat-spinner *ngIf="isPurging" diameter="20"></mat-spinner>
+          <mat-form-field appearance="outline" class="w-100 compact-field">
+            <mat-label>Escribe "{{ purgeConfirmRequired }}"</mat-label>
+            <input matInput [(ngModel)]="purgeConfirmText">
+          </mat-form-field>
+
+          <button mat-flat-button color="warn" class="w-100 danger-btn" (click)="purgeAllData()" [disabled]="isPurging || purgeConfirmText !== purgeConfirmRequired">
+            <mat-spinner *ngIf="isPurging" diameter="18" class="button-spinner"></mat-spinner>
             <mat-icon *ngIf="!isPurging">delete_forever</mat-icon>
-            <span *ngIf="!isPurging">Purgar Datos</span>
+            {{ isPurging ? 'Purgando...' : 'Purgar Base de Datos' }}
           </button>
         </div>
       </div>
+
     </div>
-  </div>
 
-  <!-- Historial de backups -->
-  <div class="backup-panel history-card">
-    <header class="backup-panel__header">
-      <h2 class="backup-panel__title">
-        <mat-icon>history</mat-icon>
-        Historial de Backups
-      </h2>
-    </header>
-    <div class="backup-panel__body backup-panel__body--flush">
-      <div class="warning-box">
-        <mat-checkbox [(ngModel)]="clearBeforeRestore" color="warn">
-          <strong>Borrar todos los datos existentes antes de restaurar</strong>
-          <div class="warning-text">
-            ⚠️ Si está marcado: Elimina TODA la base de datos y carga solo el backup.<br>
-            Si NO está marcado: Mantiene los datos actuales y agrega los del backup (ignora duplicados).
-          </div>
-        </mat-checkbox>
-      </div>
-      <table mat-table [dataSource]="backupHistory" class="backup-table" *ngIf="backupHistory.length > 0">
-        <ng-container matColumnDef="filename">
-          <th mat-header-cell *matHeaderCellDef>Archivo</th>
-          <td mat-cell *matCellDef="let backup">{{ backup.filename }}</td>
-        </ng-container>
-
-        <ng-container matColumnDef="date">
-          <th mat-header-cell *matHeaderCellDef>Fecha</th>
-          <td mat-cell *matCellDef="let backup">{{ formatDate(backup.createdAt) }}</td>
-        </ng-container>
-
-        <ng-container matColumnDef="size">
-          <th mat-header-cell *matHeaderCellDef>Tamaño</th>
-          <td mat-cell *matCellDef="let backup">{{ formatSize(backup.size) }}</td>
-        </ng-container>
-
-        <ng-container matColumnDef="actions">
-          <th mat-header-cell *matHeaderCellDef>Acciones</th>
-          <td mat-cell *matCellDef="let backup">
-                <button mat-icon-button color="accent" (click)="downloadBackup(backup)"
-                  matTooltip="Descargar backup">
-              <mat-icon>download</mat-icon>
-            </button>
-            <button mat-icon-button color="primary" (click)="restoreBackup(backup)"
-                    matTooltip="Restaurar" [disabled]="isImporting">
-              <mat-icon>restore</mat-icon>
-            </button>
-            <button mat-icon-button color="warn" (click)="deleteBackup(backup)" matTooltip="Eliminar">
-              <mat-icon>delete</mat-icon>
-            </button>
-          </td>
-        </ng-container>
-
-        <tr mat-header-row *matHeaderRowDef="['filename', 'date', 'size', 'actions']"></tr>
-        <tr mat-row *matRowDef="let row; columns: ['filename', 'date', 'size', 'actions'];"></tr>
-      </table>
-
-      <p *ngIf="backupHistory.length === 0" class="no-data">
-        No hay backups registrados. Crea tu primer backup ahora.
-      </p>
-    </div>
   </div>
 </div>

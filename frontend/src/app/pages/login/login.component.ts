@@ -67,6 +67,7 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // Tema activo cargado desde config
   activeTheme: LoginTheme = 'crt';
+  showPrivacyConsent = true;
 
   // Reloj digital para modal recovery (tema infoflow)
   currentTime: string = '';
@@ -137,9 +138,13 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     });
 
+    const hasAccepted = localStorage.getItem('privacyConsentAccepted') === 'true';
+    this.showPrivacyConsent = !hasAccepted;
+
     this.loginForm = this.fb.group({
       username: ['', [Validators.required, Validators.minLength(3)]],
-      password: ['', [Validators.required]]
+      password: ['', [Validators.required]],
+      privacyConsent: [hasAccepted, [Validators.requiredTrue]] // Requerido para compliance (QA-COMPLIANCE-PRIVACY-NOTICE)
     });
 
     this.recoveryForm = this.fb.group({
@@ -267,6 +272,7 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
     this.authService.login(this.loginForm.value).subscribe({
       next: (response) => {
         this.loading = false;
+        localStorage.setItem('privacyConsentAccepted', 'true');
         this.showSuccessBanner(`ACCESO CONCEDIDO - BIENVENIDO ${response.user.fullName?.toUpperCase()}`);
         setTimeout(() => {
           this.router.navigate(['/main/checklist']);

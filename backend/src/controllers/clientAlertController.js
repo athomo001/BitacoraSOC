@@ -9,8 +9,7 @@ const ClientEscalationRule = require('../models/ClientEscalationRule');
 const CatalogLogSource = require('../models/CatalogLogSource');
 const { audit } = require('../utils/audit');
 const { logger } = require('../utils/logger');
-
-const DEFAULT_TIMEZONE = 'America/Santiago';
+const { DEFAULT_TIMEZONE } = require('../utils/date-utils');
 const HHMM_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const ALLOWED_CONTEXTS = new Set(['report', 'copy-report']);

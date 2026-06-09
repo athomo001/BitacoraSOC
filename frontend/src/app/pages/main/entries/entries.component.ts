@@ -47,6 +47,7 @@ export class EntriesComponent implements OnInit, OnDestroy {
   // 🦇 EE-BAT-001: Easter Egg Murciélago Pixel-Art
   batInstances: BatInstance[] = [];
   batClickAttempts = 0;
+  batsCaught = 0;
   private mouseX = 0;
   private mouseY = 0;
   private lastProximityCheck = 0;
@@ -200,9 +201,20 @@ export class EntriesComponent implements OnInit, OnDestroy {
 
   // 🦇 EE-BAT-001 — Interactividad
   onBatClick(batId: number): void {
-    this.batClickAttempts++;
-    console.log(`[EASTER_EGG] 🦇 ¡Intento fallido! Capturas intentadas: ${this.batClickAttempts}`);
-    this.triggerBatEvasion(batId, 420, 24);
+    // 35% de probabilidad de cazar el murciélago con éxito
+    const isSuccess = Math.random() < 0.35;
+    if (isSuccess) {
+      this.batsCaught++;
+      // Remueve la instancia cazada del listado de murciélagos activos
+      this.batInstances = this.batInstances.filter(bat => bat.id !== batId);
+      this.snackBar.open('🦇 ¡Murciélago cazado con éxito! (+1)', 'Cerrar', { duration: 2000 });
+      console.log(`[EASTER_EGG] 🦇 ¡Murciélago cazado! Total cazados: ${this.batsCaught}`);
+    } else {
+      // Incrementar intentos fallidos y forzar la evasión del murciélago
+      this.batClickAttempts++;
+      console.log(`[EASTER_EGG] 🦇 ¡Intento fallido! Capturas intentadas: ${this.batClickAttempts}`);
+      this.triggerBatEvasion(batId, 420, 24);
+    }
   }
 
   onBatHover(): void {

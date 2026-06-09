@@ -349,12 +349,16 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
     border: 1px solid color-mix(in srgb, $neon 65%, transparent);
     border-radius: 6px;
     background: rgba(0, 255, 65, 0.08);
-    color: $text-high;
+    color: #ffffff !important;
     font-size: 0.85rem;
     line-height: 1.45;
 
+    span {
+      color: #ffffff !important;
+    }
+
     span:first-child {
-      color: $neon;
+      color: $neon !important;
       font-size: 1rem;
     }
   }
@@ -375,6 +379,59 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
   ::selection {
     background: $text-high;
     color: $text-on-neon;
+  }
+
+  .cy-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: $text-high;
+    font-family: $font-mono;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    text-transform: uppercase;
+  }
+
+  .cy-checkbox {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid $neon;
+    background-color: rgba(4, 10, 4, 0.6);
+    border-radius: 3px;
+    cursor: pointer;
+    position: relative;
+    display: inline-block;
+    outline: none;
+
+    &:checked::after {
+      content: '✔';
+      font-size: 10px;
+      font-weight: 700;
+      color: #ffffff;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    &:hover {
+      border-color: #ffffff;
+      box-shadow: 0 0 8px rgba(0, 255, 65, 0.65);
+    }
+  }
+
+  .cy-privacy-link {
+    color: $neon;
+    text-decoration: underline;
+    font-weight: 700;
+
+    &:hover {
+      color: #ffffff;
+      text-shadow: 0 0 8px rgba(0, 255, 65, 0.85);
+    }
   }
 }
 

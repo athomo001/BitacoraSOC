@@ -26,9 +26,9 @@ const {
   normalizeContactType,
   isValidEmail,
   parseContactsCsv,
-  formatContactsCsv,
-  parseBooleanLike
+  formatContactsCsv
 } = require('../utils/contactDirectory');
+const { parseBooleanLike } = require('../utils/boolean-helper');
 const { syncDirectoryContact, syncManyDirectoryContacts } = require('../utils/directory-sync');
 const { buildEscalationScheduleEmail } = require('../utils/escalationScheduleEmailTemplate');
 const { sendEmail } = require('../utils/email');

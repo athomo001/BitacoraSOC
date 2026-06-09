@@ -8,123 +8,119 @@
 
 ### Leyenda de estados (tablas de control)
 
-| Estado | Uso |
-| :--- | :--- |
-| **Pendiente** | Issue abierto aun no iniciado. |
-| **En progreso** | Issue abierto con trabajo en curso. |
-| **Recurrente** | Politica viva (cada PR), no se cierra como ticket unico. |
-| **Archivo** | Epic/documentacion de referencia sin seguimiento operativo activo. |
-| **Listo** | Issue cerrado con resultado aplicado o documentado. |
+| Estado          | Uso                                                                |
+| :-------------- | :----------------------------------------------------------------- |
+| **Pendiente**   | Issue abierto aun no iniciado.                                     |
+| **En progreso** | Issue abierto con trabajo en curso.                                |
+| **Recurrente**  | Politica viva (cada PR), no se cierra como ticket unico.           |
+| **Archivo**     | Epic/documentacion de referencia sin seguimiento operativo activo. |
+| **Listo**       | Issue cerrado con resultado aplicado o documentado.                |
 
 ### En progreso (backlog activo)
 
 | ID | Estado | Seccion | Tarea | Notas |
 | :--- | :--- | :--- | :--- | :--- |
-| SHIFT-DASH-146 | Pendiente | Admin / Turnos + UX/UI CRITICA | Diseno de Dashboard de Turnos Integrado (Operacion + Administracion) | **OBJETIVO:** Definir el rediseno integral de la vista de turnos en formato "Command Center" con alta densidad de informacion y enfoque operativo + administrativo en una sola pantalla. **IMPORTANTE:** este issue es solo de diseno/especificacion; no contempla implementacion en esta etapa. **SECCION SUPERIOR (OPERACION):** mantener encabezado "Turnos de esta Semana" + subtitulo "Personal de turno en nuestra empresa"; selector de fecha con navegacion anterior/siguiente y rango visible (`25/5 al 31-05-2026`) en cajas limpias; reemplazar cajones por grilla/tabla unificada compacta con filas por area y micro-barra lateral de color. Colores minimos requeridos: `N2 - Soporte Tecnico` magenta, `TI - Infraestructura` granate, `N1 - No Habil` azul. Por fila: columnas ordenadas para nombre, email y telefono con iconografia compacta (correo/telefono). Debe soportar multiples personas por area (ej. 2 filas en N2) y escalar verticalmente a 10+ areas sin romper layout. **SECCION INFERIOR (ADMIN):** titulo "Administracion de Turnos y Personal" con icono engranaje/usuario; formulario para nueva area (nombre, color desde paleta predefinida, icono); accion de "Anadir Personal" por area; formulario de alta/edicion de persona (Nombre Completo, Rol, Email Corporativo, Telefono); acciones de editar/eliminar (lapiz/papelera) por area y persona; zona visual drag-and-drop con bloque "Personal Disponible" para asignacion por arrastre; pie con metricas "Total de Personal Asignado: 6 | Areas Activas: 3" y CTA principal "Guardar Cambios Operativos". **LINEAMIENTOS VISUALES:** estetica moderna de command center TI, base blanca limpia, acentos vibrantes, composicion tipo Bento Grid, tipografia monospace para datos y sans-serif para interfaz, diseno compacto y legible con enfasis en operacion. **CRITERIOS DE ACEPTACION (DISENO):** (1) mockup/wireframe contempla ambas secciones completas en una sola vista; (2) jerarquia visual permite lectura rapida de areas criticas y contactos; (3) la grilla operativa soporta multi-persona por area y crecimiento vertical; (4) el panel admin muestra claramente CRUD minimo de areas/personas; (5) queda definida interaccion drag-and-drop (origen, destino, estado visual); (6) responsive definido para desktop y mobile sin perdida funcional del flujo principal; (7) especificacion documenta estados vacios, carga y error a nivel de diseno; (8) se deja trazabilidad explicita de que la implementacion tecnica se abordara en issue(s) posterior(es). |
+| SHIFT-DASH-146 | listo | Admin / Turnos + UX/UI CRITICA | Diseno de Dashboard de Turnos Integrado (Operacion + Administracion) | **OBJETIVO:** Definir el rediseno integral de la vista de turnos en formato "Command Center" con alta densidad de informacion... |
 | BACKUP-ENC-081 | En progreso | Backup / Seguridad ALTA | Cifrado opcional de backups con passphrase | Al crear un backup, el usuario podra elegir si desea cifrarlo mediante un popup para ingresar frase secreta; no sera obligatorio. Al restaurar, si el respaldo esta cifrado, el sistema debe pedir la llave. |
-
-#### Recomendacion de soluciones - SHIFT-DASH-146
-
-1. Dividir la implementacion en 2 entregables: `vista operativa` y `panel administrativo`, con feature flag para habilitacion progresiva.
-2. Definir un esquema de datos unico para area/persona/asignacion antes del UI final, evitando doble fuente entre tabla de turnos y drag-and-drop.
-3. Implementar la grilla operativa con layout de filas densas y altura fija por celda, permitiendo expansion vertical controlada para 10+ areas.
-4. Estandarizar paleta de barras laterales por area (tokens por categoria) para mantener consistencia en todos los temas.
-5. Reutilizar formularios de alta/edicion con validaciones compartidas (nombre, rol, email corporativo, telefono) y mensajes de error uniformes.
-6. Para drag-and-drop, definir estados visuales minimos: disponible, arrastrando, destino valido, destino invalido y asignado.
-7. Incorporar resumen operativo en footer con conteos en tiempo real (`total asignado`, `areas activas`) y boton principal de guardado con estado loading/success/error.
-8. Validar responsive por breakpoints (desktop/tablet/mobile) con criterio explicito: sin scroll horizontal en tabla principal y acciones admin accesibles en movil.
-
-**Plan de ataque visual ejecutado:** `docs/ui-visual-remediation-plan.md` (oleadas, criterios de aceptacion, rutas objetivo y Definition of Done visual).
-
-### Guardrails para IA (evitar fallas por malas practicas)
-
-Estas reglas aplican a cualquier agente IA que tome items de este backlog:
-
-1. No inventar arquitectura ni stack: antes de codificar, leer documentacion vigente del modulo impactado (`docs/COMPLEMENTS.md`, `docs/UI-GOVERNANCE.md`, `docs/API.md`, etc.).
-2. No usar Docker cuando el issue no lo requiere: para complementos simples, priorizar `zip-static` con HTML/CSS/JS y publicacion por Admin > Complementos.
-3. No introducir complejidad innecesaria: si el requerimiento es de consulta visual, evitar backend nuevo, base de datos o servicios externos.
-4. No romper contratos existentes: respetar rutas, nombres de campos, scopes y estructuras ya definidas por la plataforma.
-5. No hardcodear secretos ni credenciales: prohibido tokens, passwords o endpoints sensibles en frontend/documentacion.
-6. No usar datos ficticios ambiguos sin etiquetarlos: los ejemplos deben ser claramente de referencia y no simular produccion real.
-7. No omitir validacion funcional: todo cambio debe incluir criterio verificable (que probar, donde, y cuando pasa a `Listo`).
-8. No cerrar issues sin evidencia minima: registrar archivos tocados, resultado esperado y estado (`Pendiente`, `En progreso`, `Listo`).
-9. No degradar UX/Accesibilidad: mantener contraste legible, responsive basico y navegacion clara; evitar UI recargada o inconsistente con el sistema.
-10. No editar de forma destructiva: no revertir cambios ajenos ni sobrescribir secciones historicas de este documento sin justificacion explicita.
-11. No dejar decisiones implicitas: documentar supuestos clave en la nota del issue (alcance, limites y exclusiones).
-12. No saltarse seguridad basica de frontend: escapar contenido dinamico renderizado y evitar inserciones HTML inseguras.
-
-Checklist minimo recomendado para agentes IA antes de marcar un item como `Listo`:
-
-- Implementacion alineada a documentacion del repo.
-- Sin sobreingenieria para el alcance solicitado.
-- Evidencia en `Notas` del issue (que se hizo y como validarlo).
-- Riesgos y pendientes explicitos si aplica.
+| QA-SMTP-SEC-001 | Pendiente | Admin / Seguridad CRITICA | Credenciales SMTP expuestas en texto claro en frontend | **HALLAZGO:** El método `toggleSmtpPasswordVisibility` en `SettingsComponent` llama a `getStoredPassword` y carga el password descifrado en el cliente. **REMEDIACIÓN:** Eliminar endpoint del backend que expone password y cambiar input a write-only. |
+| QA-SHIFTS-PERF-001 | Pendiente | Turnos / Rendimiento ALTA | Fuga de memoria en suscripciones del reloj y Gantt síncrono | **HALLAZGO:** El refresco cada 60s acumula suscripciones anidadas sin terminar en `syncServerClock`. **REMEDIACIÓN:** Asegurar cancelación explícita en cada llamada con `switchMap` o `take(1)` y optimizar Gantt. |
+| QA-SHIFTS-UX-001 | Pendiente | Turnos / UX-UI ALTA | Div Soup y falta de semántica HTML en administración de turnos | **HALLAZGO:** Uso excesivo de `div` anidados en lugar de `<section>`, `<header>`, `<article>` y `<aside>`. **REMEDIACIÓN:** Reestructurar plantillas HTML del módulo. |
+| QA-REPORTS-PERF-001 | Pendiente | Reportes / Rendimiento ALTA | Bloqueo de loop de eventos por envíos SMTP secuenciales | **HALLAZGO:** El envío de boletines a múltiples lotes se hace secuencialmente con `await` en un bucle blocking. **REMEDIACIÓN:** Migrar a ejecución asíncrona o batch concurrente controlado. |
+| QA-SERVER-DOS-001 | listo | Backend / Seguridad MEDIA | Body limit excesivo sin validación de tipo en subida de logos | **HALLAZGO:** Body size de `10mb` expuesto en `/api/config/logo` sin validar estructura. **REMEDIACIÓN:** Integrar validación temprana de cabeceras de contenido y limitar a 2MB. |
+| QA-COMP-REFRESH-001 | Pendiente | Complementos / UX-UI CRITICA | Navegación de complementos requiere F5 para actualizar | **HALLAZGO:** El componente `ComplementContainer` usa el snapshot de la ruta en lugar de suscribirse a los parámetros activos. **REMEDIACIÓN:** Migrar de `route.snapshot.paramMap` a la suscripción reactiva de `route.paramMap`. |
+| QA-CRON-LEAK-001 | Pendiente | Backend / Infraestructura ALTA | Acumulación de tareas cron y leaks de memoria en scheduler | **HALLAZGO:** `escalationScheduleScheduler` y `shiftReminderScheduler` registran tareas de fondo sin métodos para detenerlas o limpiarlas al reiniciar módulos. **REMEDIACIÓN:** Implementar persistencia de handlers de cron/interval y exponer métodos `stop...()` en el backend. |
+| QA-ANIM-ROUTE-001 | listo | UX-UI / Apariencia MEDIA | Transición suave en el cambio de páginas (Router-Outlet) | **HALLAZGO:** La navegación entre vistas principales es abrupta y causa parpadeos visuales en `.content-wrapper`. **REMEDIACIÓN:** Integrar animación de fade-in y slide-up (`translateY(10px)`) en `router-outlet + *` con aceleración por hardware (`will-change`). |
+| QA-ANIM-OVERLAYS-002 | listo | UX-UI / Apariencia MEDIA | Animación de entrada para selectores desplegables y menús contextuales | **HALLAZGO:** Desplegables y autocompletados Material aparecen instantáneamente sin transición. **REMEDIACIÓN:** Agregar animación `@keyframes menuFadeIn` con escala y desvanecimiento (`scaleY(0.95)` a `scaleY(1)`) en los paneles de overlay. |
+| QA-ANIM-DIALOG-003 | listo | UX-UI / Apariencia MEDIA | Entrada con rebote elástico para cuadros de diálogo y modales | **HALLAZGO:** La aparición de diálogos de confirmación y configuración carece de dinamismo premium. **REMEDIACIÓN:** Aplicar animación de escala con curva de rebote sutil (`cubic-bezier(0.34, 1.56, 0.64, 1)`) en `.mat-mdc-dialog-container`. |
+| QA-SSO-CONFIG-001 | Pendiente | Seguridad / Integraciones CRITICA | Soporte SSO Google/Microsoft con logs de auditoría estrictos | **HALLAZGO:** No hay integración SSO. **REMEDIACIÓN:** Crear backend OAuth/MSAL y panel admin para activar SSO Google/Microsoft. Requiere auditoría estricta de todos los flujos de autenticación e intentos fallidos en `AuditLog`. |
+| QA-BACKUP-ZIPSLIP-001 | Pendiente | Backup / Seguridad CRITICA | Vulnerabilidad de Zip Slip en restauración de backups | **HALLAZGO:** En `POST /api/backup/restore` se extraen archivos ZIP sin validar que las rutas no contengan `..`. **REMEDIACIÓN:** Validar que los nombres de archivo de cada entrada no escapen del directorio de extracción base. |
+| QA-USERLIST-INFO-001 | listo | Usuarios / Seguridad MEDIA | Exposición de información de directorio de usuarios a invitados | **HALLAZGO:** El endpoint `/api/users/list` expone datos sensibles (teléfono, email) a cualquier rol, incluyendo `guest` y `auditor`. **REMEDIACIÓN:** Restringir el retorno de campos sensibles o limitar el acceso al endpoint según el rol. |
+| QA-AUTH-REFRESH-001 | Pendiente | Auth / Seguridad ALTA | Mecanismo débil de renovación de sesión (Refresh) sin rotación | **HALLAZGO:** El endpoint `/api/auth/refresh` permite renovar el token JWT sin invalidar el token anterior ni aplicar rotación. **REMEDIACIÓN:** Implementar rotación de tokens o blacklist temporal para tokens antiguos usados para refresco. |
+| QA-ENCRYPT-LOG-001 | Pendiente | Criptografía / Seguridad ALTA | Fuga de secretos en logs de consola en caso de descifrado fallido | **HALLAZGO:** En `encryption.js` se imprime en consola un fragmento del texto descifrado (`decoded.substring(0, 20)`) si la verificación falla. **REMEDIACIÓN:** Eliminar la impresión de fragmentos del secreto en los logs. |
+| QA-ENCRYPT-KEY-001 | Pendiente | Criptografía / Seguridad CRITICA | Fallback de clave de cifrado estática en utilidad de encriptación | **HALLAZGO:** En `encryption.js` se utiliza la clave hardcodeada `'default-key-change-me!!!!!!!!'` si no hay clave de entorno o keyring. **REMEDIACIÓN:** Eliminar el fallback e impedir el arranque del servidor si no hay llave configurada. |
+| QA-CODE-REDUNDANCY-001 | listo | Refactor / Código Limpio BAJA | Duplicación de lógica auxiliar en autenticación y cookies | **HALLAZGO:** La función helper `getTokenFromCookie` se encuentra duplicada textualmente en `auth.js` (rutas) y `auth.js` (middleware). **REMEDIACIÓN:** Centralizar la función en un utilitario común (`cookie-helper.js` en `utils/`) y exportarla. |
+| QA-CODE-SPAGHETTI-002 | listo | Refactor / Arquitectura MEDIA | Acoplamiento de lógica de negocio y controladores en `reports.js` | **HALLAZGO:** El archivo `reports.js` posee más de 1700 líneas que mezclan definición de rutas, validaciones, lógica de negocio y plantillas de correo. **REMEDIACIÓN:** Modularizar separando los controladores en `controllers/` y la generación de HTML en `utils/email-templates-helper.js`. |
+| QA-CODE-CONFIG-003 | listo | Refactor / Código Limpio BAJA | Inconsistencia y duplicación en la configuración de zona horaria | **HALLAZGO:** La zona horaria `'America/Santiago'` y su lógica de formateo están duplicadas en múltiples rutas, modelos y schedulers. **REMEDIACIÓN:** Crear un módulo de utilidades de fecha unificado (`date-utils.js`) en `utils/` y consumirlo de forma centralizada. |
+| QA-CONFIG-LOGO-001 | Pendiente | Config / Seguridad CRITICA | Subida de logos base64 y URLs sin validar contenido | **HALLAZGO:** En `/api/config/logo` (flujo JSON) no se valida la integridad de la imagen decodificada ni el formato de la URL externa. **REMEDIACIÓN:** Aplicar `sharp` para verificar el buffer y añadir Regex estricta sobre la URL. |
+| QA-REPORTS-ACCESS-001 | listo | Reportes / Seguridad MEDIA | Envío de reportes e incidentes permite uso a invitados | **HALLAZGO:** El endpoint `/api/reports/incident/send` carece de restricción de roles, permitiendo que invitados o auditores envíen correos arbitrarios. **REMEDIACIÓN:** Añadir middleware de autorización para restringir a roles operativos. |
+| QA-CODE-SMTP-001 | listo | Refactor / Código Limpio BAJA | Duplicación de lógica de transporte SMTP en forgot-password | **HALLAZGO:** `/api/auth/forgot-password` recrea localmente el transporte SMTP y el descifrado en vez de usar `utils/email.js`. **REMEDIACIÓN:** Refactorizar el endpoint utilizando `sendEmail` centralizado. |
+| QA-CODE-DUPLICATION-BOOLEAN-001 | listo | Refactor / Código Limpio BAJA | Duplicación de lógica de parseo de booleanos | **HALLAZGO:** Helpers idénticos (`parseBooleanLike` y `parseBooleanFlag`) se encuentran dispersos en 4 archivos distintos del backend. **REMEDIACIÓN:** Unificar en un módulo utilitario común. |
+| QA-FRONTEND-REDUNDANT-REQUESTS-001 | listo | Frontend / Arquitectura BAJA | Peticiones redundantes de branding en Angular | **HALLAZGO:** Múltiples componentes llaman al endpoint de logo localmente sin caché o BehaviorSubject. **REMEDIACIÓN:** Migrar a un store de branding reactivo en `ConfigService`. |
+| QA-INFRA-DOCKER-LOGS-001 | Pendiente | Infraestructura / Producción ALTA | Logs ilimitados en Docker causan fuga de disco | **HALLAZGO:** `docker-compose.yml` carece de directivas de rotación de logs, arriesgando el llenado del disco del host. **REMEDIACIÓN:** Aplicar política de rotación de logs json-file de 10MB en compose. |
+| QA-INFRA-DOCKER-LIMITS-001 | listo | Infraestructura / Producción MEDIA | Ausencia de límites de recursos en contenedores | **HALLAZGO:** Los contenedores en docker-compose no limitan CPU/RAM, pudiendo colgar la máquina virtual host en fugas. **REMEDIACIÓN:** Configurar deploy limits en Compose. |
+| QA-DB-INDEX-OPTIMIZATION-001 | Pendiente | Base de Datos / Rendimiento ALTA | COLLSCANs severos en AuditLog y Entry por falta de índices | **HALLAZGO:** Colecciones de auditoría y bitácoras no tienen índices por fecha/evento, ralentizando las agregaciones del dashboard. **REMEDIACIÓN:** Crear índices en campos clave de búsqueda. |
+| QA-CHECKLIST-SEQUENCE-001 | Pendiente | Checklist / Lógica CRITICA | Bloqueo lógico y carrera de estados en múltiples turnos | **HALLAZGO:** El control de checklist secuencial busca el último checklist globalmente sin filtrar por `shiftId`, bloqueando el inicio de turnos paralelos. **REMEDIACIÓN:** Segregar secuencia de checklists por turno en Mongoose. |
+| QA-ENTRIES-PAGINATION-001 | Pendiente | Entries / Rendimiento ALTA | Ordenamiento y paginación en memoria heap ineficiente | **HALLAZGO:** Mezclar `Entry` y `ShiftCheck` mediante `.limit(skip + limit)` y ordenar con `.sort` en JS consume CPU y memoria heap de Node masivamente. **REMEDIACIÓN:** Migrar a agregación nativa `$unionWith` en MongoDB. |
+| QA-ENTRIES-NULL-CREATOR-001 | listo | Entries / Confiabilidad MEDIA | Crash de backend en actualización si createdBy es nulo | **HALLAZGO:** Validar pertenencia con `entry.createdBy.toString()` colapsará con TypeError 500 si la entrada es huérfana de creador. **REMEDIACIÓN:** Proteger validación contra nulos. |
+| QA-CODE-TIME-RANGE-001 | listo | Refactor / Código Limpio BAJA | Helper de rango horario duplicado y redefinido dos veces | **HALLAZGO:** `isTimeInRange` está duplicado en rutas de turnos y checklists, y se declara dos veces en `work-shifts.js`. **REMEDIACIÓN:** Unificar en utilitarios comunes. |
+| QA-BACKUP-PURGE-KEYRING-LOSS | Pendiente | Backup / Confiabilidad CRITICA | Pérdida del keyring persistente de claves criptográficas en flujo purge | **HALLAZGO:** La acción `/purge` limpia el directorio `secrets/`, borrando la clave de encriptación y dejando inaccesibles backups antiguos que contengan datos cifrados. **REMEDIACIÓN:** Excluir `encryption-keyring.json` del vaciado de directorios. |
+| QA-CONFIG-BASE64-VALIDATION | Pendiente | Config / Seguridad ALTA | Carga de logos y favicons base64 evade validaciones de tipo de imagen | **HALLAZGO:** El flujo base64 de `/logo` y `/favicon` almacena el buffer en disco sin pasar por `verifyImageFile`, permitiendo archivos binarios arbitrarios. **REMEDIACIÓN:** Validar buffer de base64 con `sharp` antes de escribir en disco. |
+| QA-REPORTS-HISTORY-AUTH | listo | Reportes / Seguridad MEDIA | Creación de historial de reportes no valida roles | **HALLAZGO:** El endpoint `POST /api/reports/history` solo requiere autenticación simple, permitiendo a invitados y auditores escribir reportes falsos. **REMEDIACIÓN:** Agregar middleware de validación de rol `authorize('admin', 'user')`. |
+| QA-REPORTS-CSV-INJECTION | listo | Reportes / Seguridad MEDIA | Inyección de fórmulas CSV al exportar entradas de bitácora | **HALLAZGO:** Al exportar a CSV no se escapan caracteres iniciales (`=`, `+`, `-`, `@`), posibilitando que analistas o invitados inyecten comandos en hojas de cálculo. **REMEDIACIÓN:** Sanitizar celdas en el CSV agregando comilla simple de escape. |
+| QA-REPORTS-SMTP-RELAY-ABUSE | Pendiente | Reportes / Seguridad ALTA | Abuso de SMTP Relay para envío de correos arbitrarios desde el SOC | **HALLAZGO:** `POST /newsletter/send` y `/incident/send` carecen de validación de roles y de dominios de destino, permitiendo a invitados enviar spam o phishing. **REMEDIACIÓN:** Limitar endpoints a roles operativos y restringir dominios a destinatarios válidos del SOC. |
+| QA-AUTH-AUDITOR-PRIVILEGE | Pendiente | Seguridad / Autorización CRITICA | Rol Auditor posee escalación de privilegios implícita a GET administrativos | **HALLAZGO:** El middleware `authorize` permite a auditores acceder a cualquier ruta `GET` de admin, incluyendo descarga de backups completos del sistema. **REMEDIACIÓN:** Restringir el bypass del auditor a una lista blanca específica de endpoints. |
+| QA-NOTES-GUEST-WRITE-BLOCKED | listo | Notas / Lógica BAJA | Bloqueo de escritura en notas personales para roles de solo lectura | **HALLAZGO:** El middleware `authenticate` impide que invitados y auditores actualicen su propia nota personal (`PUT /personal`) al bloquear globalmente métodos mutadores. **REMEDIACIÓN:** Excluir `PUT /personal` del bloqueo general de solo lectura. |
+| QA-USERS-PASSWORD-POLICY | listo | Usuarios / Seguridad BAJA | Inconsistencia de longitud mínima en políticas de contraseña creadas por admin | **HALLAZGO:** Mientras que `/users/me` exige mínimo 6 caracteres para nuevas contraseñas, los endpoints administrativos `/users` y `/users/:id` permiten contraseñas de cualquier longitud. **REMEDIACIÓN:** Unificar el validator de contraseña para requerir 6 caracteres mínimos globalmente. |
+| QA-ENTRIES-TAGS-SUGGEST-PERF | listo | Entries / Rendimiento MEDIA | Ineficiencia de agregación en autocompletado de tags | **HALLAZGO:** `/tags/suggest` hace `$unwind` de toda la colección `Entry` antes de aplicar `$match` con regex, resultando en COLLSCANs severos en bitácoras grandes. **REMEDIACIÓN:** Filtrar con `$match` antes del `$unwind` para usar el índice multikey de `tags`. |
+| QA-ENTRIES-DATE-FORMAT-CRASH | listo | Entries / Confiabilidad MEDIA | Crash de backend (HTTP 500) en listado de bitácoras por fechas inválidas | **HALLAZGO:** Si un checklist tiene fecha corrupta o nula, `toChecklistEntryLikeRecord` colapsará al llamar a `toLocaleDateString` sobre una fecha inválida. **REMEDIACIÓN:** Añadir comprobación de fecha válida con fallback seguro. |
+| QA-FRONTEND-SESSION-EXPIRATION | Pendiente | Frontend / UX ALTA | Cierre abrupto de sesión por expiración de token sin silent-refresh | **HALLAZGO:** El frontend no implementa llamadas a `/refresh`, por lo que al expirar el JWT tras 4 horas, el analista es expulsado perdiendo su trabajo en curso. **REMEDIACIÓN:** Integrar interceptor de refresco transparente en Angular mediante `/auth/refresh`. |
+| QA-COMPLIANCE-MFA | Pendiente | Compliance / Seguridad ALTA | Ausencia de autenticación multifactor (MFA) por TOTP | **HALLAZGO:** El acceso al sistema no requiere MFA. Se requiere implementar un mecanismo de un solo uso sin costes de SMS ni dependencias de email. **REMEDIACIÓN:** Integrar autenticación MFA por software (TOTP - RFC 6238) con códigos QR. |
+| QA-COMPLIANCE-PII-ENCRYPTION | Pendiente | Compliance / Privacidad ALTA | Almacenamiento de datos de contacto (PII) en texto claro con descifrado transparente | **HALLAZGO:** Correos y teléfonos se guardan en texto plano en la DB. Para protegerlos, deben guardarse encriptados en MongoDB y descifrarse transparentemente en la API antes de enviarlos a la UI. **REMEDIACIÓN:** Cifrar campos sensibles de contacto en base de datos con AES-256-GCM y descifrar en endpoints. |
+| QA-COMPLIANCE-PRIVACY-NOTICE | listo | Compliance / UI-UX BAJA | Portal de acceso sin aviso de privacidad ni consentimiento de uso | **HALLAZGO:** La interfaz de inicio de sesión no cuenta con cláusulas de términos de uso ni aviso de privacidad. **REMEDIACIÓN:** Incluir casilla de consentimiento y link a políticas en el Login. |
 
 ### Recurrente (QA - cada cambio UI)
 
-| ID | Estado | Seccion | Tarea | Notas |
-| :--- | :--- | :--- | :--- | :--- |
-| QA-UI-061 | Recurrente | QA + Frontend CRITICA | Rol QA en cada cambio UI | Obligacion en cada PR que toque estilos. Referencia: `docs/UI-GOVERNANCE.md`. |
-| QA-UI-062 | Recurrente | QA Visual CRITICA | Probar en los 5 temas lo tocado | Recurrente por cambio. Ver `docs/UI-GOVERNANCE.md`. |
-| QA-UI-063 | Recurrente | QA Funcional + UI ALTA | Regresion de formularios tras cambios de estilo | Recurrente por cambio. Ver `docs/UI-GOVERNANCE.md`. |
-| QA-UI-064 | Recurrente | QA Contraste / Theming ALTA | Casos explicitos de contraste/inputs | Recurrente por cambio. Ver `docs/UI-GOVERNANCE.md`. |
-| QA-UI-065 | Recurrente | Gobernanza CRITICA | No omitir estandares al codificar | Politica viva de desarrollo. |
+| ID        | Estado     | Seccion                     | Tarea                                           | Notas                                                                         |
+| :-------- | :--------- | :-------------------------- | :---------------------------------------------- | :---------------------------------------------------------------------------- |
+| QA-UI-061 | Recurrente | QA + Frontend CRITICA       | Rol QA en cada cambio UI                        | Obligacion en cada PR que toque estilos. Referencia: `docs/UI-GOVERNANCE.md`. |
+| QA-UI-062 | Recurrente | QA Visual CRITICA           | Probar en los 5 temas lo tocado                 | Recurrente por cambio. Ver `docs/UI-GOVERNANCE.md`.                           |
+| QA-UI-063 | Recurrente | QA Funcional + UI ALTA      | Regresion de formularios tras cambios de estilo | Recurrente por cambio. Ver `docs/UI-GOVERNANCE.md`.                           |
+| QA-UI-064 | Recurrente | QA Contraste / Theming ALTA | Casos explicitos de contraste/inputs            | Recurrente por cambio. Ver `docs/UI-GOVERNANCE.md`.                           |
+| QA-UI-065 | Recurrente | Gobernanza CRITICA          | No omitir estandares al codificar               | Politica viva de desarrollo.                                                  |
 
 ### Archivo (referencia, sin seguimiento operativo)
 
-| ID | Estado | Seccion | Tarea | Notas |
-| :--- | :--- | :--- | :--- | :--- |
-| AI-SUMMARY-001 | Archivo | IA/Operacion ALTA | Modulo de Resumen Ejecutivo Efimero (IA On-Demand) | Integrar Ollama+llama3.2:3b en modo efimero `docker start -> healthcheck -> generate -> docker stop` con `try/finally`. Alcance: IA sin interaccion conversacional con usuarios; solo consume eventos del turno y genera resumen sugerido. |
-| AI-SUMMARY-001A | Archivo | IA/Backend CRITICA | Endpoint seguro de generacion IA on-demand (solo admin) | Crear `POST /api/reports/newsletter/ai-summary` con `authenticate + authorize('admin')`, validacion fuerte de payload, timeout y respuesta estructurada. |
-| AI-SUMMARY-001B | Archivo | IA/Infra CRITICA | Orquestador efimero de Ollama con kill garantizado | Implementar flujo `start -> healthcheck -> generate -> stop` en `try/finally`, con lock de concurrencia para evitar multiples arranques simultaneos. |
-| AI-SUMMARY-001C | Archivo | IA/Seguridad ALTA | Hardening anti prompt-injection y sanitizacion de contexto | Sanitizar entradas, truncar tamano, remover instrucciones maliciosas y usar prompt de sistema inmutable con formato JSON estricto. |
-| AI-SUMMARY-001D | Archivo | IA/Observabilidad ALTA | Auditoria tecnica sin fuga de datos sensibles | Auditar duracion, modelo, tokens estimados, resultado y errores; nunca persistir prompt completo ni respuesta integra sensible. |
-| AI-SUMMARY-001E | Archivo | IA/Frontend ALTA | UX integrada en Boletin: `Resumen Sugerido por IA` + boton `Generar con IA` | Campo editable no bloqueante, estados loading/error/reintento, cancelacion y preservacion de edicion manual al regenerar. |
-| AI-SUMMARY-001F | Archivo | IA/Operacion ALTA | Limite de recursos y politicas de degradacion | Timeout duro, memoria/CPU limites, rate-limit por usuario, fallback manual si IA falla, sin bloquear generacion de boletin. |
-| AI-SUMMARY-001G | Archivo | QA/Testing ALTA | Suite de pruebas de seguridad, carga y regresion | Tests de exito, timeout, lock concurrente, sanitizacion, RBAC, fallback UX y no-regresion en report-generator/newsletter. |
+| ID              | Estado  | Seccion                | Tarea                                                                       | Notas                                                                                                                                                                                                                                      |
+| :-------------- | :------ | :--------------------- | :-------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AI-SUMMARY-001  | Archivo | IA/Operacion ALTA      | Modulo de Resumen Ejecutivo Efimero (IA On-Demand)                          | Integrar Ollama+llama3.2:3b en modo efimero `docker start -> healthcheck -> generate -> docker stop` con `try/finally`. Alcance: IA sin interaccion conversacional con usuarios; solo consume eventos del turno y genera resumen sugerido. |
+| AI-SUMMARY-001A | Archivo | IA/Backend CRITICA     | Endpoint seguro de generacion IA on-demand (solo admin)                     | Crear `POST /api/reports/newsletter/ai-summary` con `authenticate + authorize('admin')`, validacion fuerte de payload, timeout y respuesta estructurada.                                                                                   |
+| AI-SUMMARY-001B | Archivo | IA/Infra CRITICA       | Orquestador efimero de Ollama con kill garantizado                          | Implementar flujo `start -> healthcheck -> generate -> stop` in `try/finally`, con lock de concurrencia para evitar multiples arranques simultaneos.                                                                                       |
+| AI-SUMMARY-001C | Archivo | IA/Seguridad ALTA      | Hardening anti prompt-injection y sanitizacion de contexto                  | Sanitizar entradas, truncar tamano, remover instrucciones maliciosas y usar prompt de sistema inmutable con formato JSON estricto.                                                                                                         |
+| AI-SUMMARY-001D | Archivo | IA/Observabilidad ALTA | Auditoria tecnica sin fuga de datos sensibles                               | Auditar duracion, modelo, tokens estimados, resultado y errores; nunca persistir prompt completo ni respuesta integra sensible.                                                                                                            |
+| AI-SUMMARY-001E | Archivo | IA/Frontend ALTA       | UX integrada en Boletin: `Resumen Sugerido por IA` + boton `Generar con IA` | Campo editable no bloqueante, estados loading/error/reintento, cancelacion y preservacion de edicion manual al regenerar.                                                                                                                  |
+| AI-SUMMARY-001F | Archivo | IA/Operacion ALTA      | Limite de recursos y politicas de degradacion                               | Con timeout duro, memoria/CPU limites, rate-limit por usuario, fallback manual si IA falla, sin bloquear generacion de boletin.                                                                                                            |
+| AI-SUMMARY-001G | Archivo | QA/Testing ALTA        | Suite de pruebas de seguridad, carga y regresion                            | Tests de exito, timeout, lock concurrente, sanitizacion, RBAC, fallback UX y no-regresion en report-generator/newsletter. |
 
 ### Listas (cerrados)
 
-| ID | Estado | Seccion | Tarea | Notas |
-| :--- | :--- | :--- | :--- | :--- |
-| - | - | - | Sin items cargados en esta version del archivo | Pendiente de restaurar o reimportar historial cerrado. |
+| ID  | Estado | Seccion | Tarea | Notas |
+| :-- | :----- | :------ | :---- | :---- |
+| -   | -      | -       | Sin items cargados en esta version del archivo | Pendiente de restaurar o reimportar historial cerrado. |
 
 ## Anexo temporal: Recomendacion de soluciones
 
-### SHIFT-DASH-146
-Este bloque queda asociado al diseno de referencia de SHIFT-DASH-146.
+### SHIFT-DASH-146 (Diseño de Dashboard de Turnos)
+
+Este bloque queda asociado al diseño de referencia de SHIFT-DASH-146.
 
 #### Propuesta visual basada en referencia (imagen ejemplo)
-
-1. Mantener un encabezado operativo compacto con titulo y subtitulo en 2 lineas maximo para priorizar la tabla.
+1. Mantener un encabezado operativo compacto con título y subtítulo en 2 líneas máximo para priorizar la tabla.
 2. Ubicar el selector de semana en la esquina superior derecha con botones anterior/siguiente y rango visible en formato corto.
-3. Reemplazar tarjetas separadas por una sola grilla/taba unificada de alta densidad.
-4. Mostrar cada area como fila con micro-barra lateral de color para lectura rapida de criticidad y tipo de equipo.
-5. Mantener 3 columnas operativas fijas: `Categoria y turno`, `Personal de turno`, `Contacto`.
-6. En `Personal de turno`, permitir 1..N personas por area usando filas internas compactas sin romper la altura general.
-7. En `Contacto`, mostrar email y telefono alineados con iconos pequenos para escaneo rapido (correo/telefono).
+3. Reemplazar tarjetas separadas por una sola grilla/tabla unificada de alta densidad.
+4. Mostrar cada área como fila con micro-barra lateral de color para lectura rápida de criticidad y tipo de equipo.
+5. Mantener 3 columnas operativas fijas: `Categoría y turno`, `Personal de turno`, `Contacto`.
+6. En `Personal de turno`, permitir 1..N personas por área usando filas internas compactas sin romper la altura general.
+7. En `Contacto`, mostrar email y teléfono alineados con iconos pequeños para escaneo rápido (correo/teléfono).
 8. Asegurar separadores suaves, bordes sutiles y fondos limpios para evitar ruido visual (estilo command center sobre base clara).
-9. Permitir crecimiento vertical a 10+ areas con scroll del contenedor, manteniendo header de columnas sticky.
-10. Mantener coherencia cromatica por area en toda la vista (misma barra en tabla, admin y drag-and-drop).
+9. Permitir crecimiento vertical a 10+ áreas con scroll del contenedor, manteniendo header de columnas sticky.
+10. Mantener coherencia cromática por área en toda la vista (misma barra en tabla, admin y drag-and-drop).
 
-#### Recomendacion de implementacion UX para la seccion Admin
-
-1. Distribuir la parte administrativa en panel inferior con 3 bloques: `Areas`, `Personal`, `Asignacion visual`.
-2. Bloque `Areas`: alta rapida con nombre, color predefinido e icono, mas acciones editar/eliminar por fila.
-3. Bloque `Personal`: formulario reutilizable (alta/edicion) con validacion de email corporativo y telefono.
-4. Bloque `Asignacion visual`: lista `Personal disponible` a la izquierda y destinos por area a la derecha para drag-and-drop.
-5. Definir estados visuales de arrastre: disponible, arrastrando, destino valido, destino invalido, asignado.
-6. Agregar pie operativo con metricas en vivo: `Total de Personal Asignado` y `Areas Activas`.
-7. El boton principal `Guardar Cambios Operativos` debe mostrar estado loading/success/error y confirmacion clara.
-8. En mobile, convertir drag-and-drop a flujo alternativo por selector y boton `Asignar` para no perder usabilidad tactil.
-
-## Criterios de aceptacion
-
-1. En viewport desktop, la tabla de turnos muestra areas, personal y contacto sin desbordes ni cortes de texto critico.
-2. En viewport de 1024px (tablet), la grilla principal no crea scroll horizontal y conserva legibilidad.
-3. En mobile, se mantiene acceso completo a acciones administrativas mediante layout apilado o drawer.
-4. La vista soporta multiples personas por area sin romper alineaciones de filas ni columnas.
-5. Los colores de barras laterales por area permanecen consistentes en tabla operativa y panel admin.
-6. Drag-and-drop (o flujo alternativo mobile) permite asignar y desasignar personal con feedback inmediato.
-7. Las metricas de pie (`total asignado`, `areas activas`) se actualizan en tiempo real tras cada cambio.
-8. QA visual valida contraste y legibilidad en los temas activos definidos por la plataforma.
+#### Recomendación de implementación UX para la sección Admin
+1. Distribuir la parte administrativa en panel inferior con 3 bloques: `Áreas`, `Personal`, `Asignación visual`.
+2. Bloque `Áreas`: alta rápida con nombre, color predefinido e icono, más acciones editar/eliminar por fila.
+3. Bloque `Personal`: formulario reutilizable (alta/edición) con validación de email corporativo y teléfono.
+4. Bloque `Asignación visual`: lista `Personal disponible` a la izquierda y destinos por área a la derecha para drag-and-drop.
+5. Definir estados visuales de arrastre: disponible, arrastrando, destino válido, destino inválido, asignado.
+6. Agregar pie operativo con métricas en vivo: `Total de Personal Asignado` y `Áreas Activas`.
+7. El botón principal `Guardar Cambios Operativos` debe mostrar estado loading/success/error y confirmación clara.
+8. En mobile, convertir drag-and-drop a flujo alternativo por selector y botón `Asignar` para no perder usabilidad táctil.

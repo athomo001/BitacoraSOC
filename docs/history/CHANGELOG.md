@@ -2,6 +2,41 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.89-beta] - 2026-06-09
+
+### Auditoría de QA y UX/UI: Contraste, Aviso de Privacidad Dinámico, Rediseño Premium de Backups y Resolución de Backlog de QA
+
+- **Contraste de Recuperación en Tema Matrix (QA-UI-064):** Ajustado el contraste del texto descriptivo del flujo de recuperación de contraseña bajo el tema `infoflow` a un color blanco puro (`#ffffff !important`) para asegurar una correcta lectura en pantallas oscuras.
+- **Branding Dinámico en Aviso de Privacidad (QA-COMPLIANCE-PRIVACY-NOTICE):** Implementada la inyección en caliente del nombre del branding (`appTitle`) configurado en la base de datos en `/uploads/aviso-privacidad.html`, eliminando cualquier referencia estática a "Bitácora SOC".
+- **Persistencia de Consentimiento de Privacidad:** El consentimiento aceptado ahora se almacena en `localStorage`, evitando que la casilla y link de aceptación aparezcan recurrentemente a los analistas después del primer login exitoso.
+- **Rediseño Asimétrico Premium de Backups:** Rediseñada la vista de `/main/backup` bajo un layout asimétrico de dos columnas (65% principal / 35% lateral), eliminando la distribución simétrica repetitiva de IA. Se reemplazó el control de automatización clásico por `mat-slide-toggle` y se estilizó la zona de peligro y las tarjetas con sombreados y transiciones modernas.
+- **Mejora del Huevo de Pascua (#bat):** Implementación de una mecánica de cacería interactiva para el Easter Egg de murciélagos en `EntriesComponent`. Ahora, hacer clic sobre un murciélago otorga una probabilidad del 35% de capturarlo con éxito (lo que remueve la instancia de la pantalla). Se integró un HUD Cyberpunk persistente en la parte superior central de la pantalla que se activa junto al minijuego para mostrar de forma nítida la cantidad de murciélagos activos, los intentos realizados y el total de capturas exitosas.
+- **Solución a Texto Borroso (HD Text):** Se corrigió la borrosidad del texto del panel central causada por la aceleración 3D del navegador. Se removió la directiva `will-change: transform` de la transición de rutas (`router-outlet + *`) y se cambió el destino de `pageTransition` a `transform: none`, permitiendo el suavizado de fuentes subpíxel (ClearType). Se removió la animación redundante en `backup.component.scss`.
+- **Límites de Recursos en Infraestructura (QA-INFRA-DOCKER-LIMITS-001):** Incorporación de límites estrictos de CPU y memoria RAM en `docker-compose.yml` para los contenedores de frontend, backend y base de datos, resguardando la estabilidad del servidor host.
+- **Refactorización y Eliminación de Código Redundante:**
+  - **Centralización de Cookies (QA-CODE-REDUNDANCY-001):** Creada la utilidad común `cookie-helper.js` para extraer tokens JWT desde cookies y cabeceras de autorización de forma centralizada.
+  - **Helper de Parseo de Booleanos (QA-CODE-DUPLICATION-BOOLEAN-001):** Unificada la lógica de parsing de flags en `boolean-helper.js`.
+  - **Helper de Rango Horario (QA-CODE-TIME-RANGE-001):** Centralizada la lógica de validación de horas que cruzan la medianoche en `time-helper.js`.
+  - **Configuración de Zona Horaria (QA-CODE-CONFIG-003):** Centralizada la constante y formateador de la zona horaria `America/Santiago` en `date-utils.js`.
+  - **Desacoplamiento de Lógica de Reportes (QA-CODE-SPAGHETTI-002):** Separadas las funciones auxiliares de limpieza de HTML y procesamiento de imágenes a `email-templates-helper.js`.
+  - **SMTP Centralizado en Forgot-Password (QA-CODE-SMTP-001):** Refactorizado el flujo de olvido de contraseña para invocar al transporte centralizado de `utils/email.js`.
+- **Seguridad y Trazabilidad (Backend):**
+  - **Restricción de Directorio (QA-USERLIST-INFO-001):** Ocultos los campos sensibles de correo y teléfono en `GET /api/users/list` si el rol es de solo lectura (`guest` o `auditor`).
+  - **Políticas de Contraseña Unificadas (QA-USERS-PASSWORD-POLICY):** Establecida una longitud mínima obligatoria de 6 caracteres para contraseñas de usuarios creados por administradores.
+  - **Escritura de Notas Personales (QA-NOTES-GUEST-WRITE-BLOCKED):** Permitidas peticiones mutadoras de tipo `PUT /api/notes/personal` para invitados y auditores en su propia nota personal.
+  - **Autorización en Historial y Envíos (QA-REPORTS-ACCESS-001, QA-REPORTS-HISTORY-AUTH):** Implementado el middleware de validación de rol `authorize('admin', 'user')` en creación de historial de reportes e incidentes.
+  - **Prevención de Inyección de Fórmulas CSV (QA-REPORTS-CSV-INJECTION):** Sanitizadas las celdas en la exportación de bitácoras forzando una comilla simple inicial en valores que comiencen con `=`, `+`, `-` o `@`.
+  - **DoS Payload Limits en Logos (QA-SERVER-DOS-001):** Limitado el parse de Express a 2MB con validación temprana de cabeceras en rutas de carga de logos y favicons.
+- **Confiabilidad y Rendimiento (Backend & Frontend):**
+  - **Manejo de Creadores Nulos (QA-ENTRIES-NULL-CREATOR-001):** Protegido el borrado y edición de entradas contra errores de pertenencia de creador nulo/huérfano en base de datos.
+  - **Optimización de Autocompletado de Tags (QA-ENTRIES-TAGS-SUGGEST-PERF):** Reordenados los pipelines de agregación colocando `$match` antes del `$unwind` para evitar escaneos de colección completos (COLLSCANs).
+  - **Resiliencia ante Fechas Corruptas (QA-ENTRIES-DATE-FORMAT-CRASH):** Añadido fallback robusto contra fechas nulas o corruptas durante la transformación local en `toChecklistEntryLikeRecord`.
+  - **Caché Reactiva de Configuración (QA-FRONTEND-REDUNDANT-REQUESTS-001):** Implementado `shareReplay(1)` en `ConfigService` del frontend para evitar múltiples peticiones HTTP redundantes a `/api/config/logo`.
+- **Animaciones Premium Globales (Frontend):**
+  - **Transición de Rutas (QA-ANIM-ROUTE-001):** Agregada transición fluida fade-in y slide-up en el cambio de páginas en `router-outlet + *`.
+  - **Transiciones de Selectores y Menús (QA-ANIM-OVERLAYS-002):** Implementada animación `@keyframes menuFadeIn` con escala vertical y opacidad en overlays de Material.
+  - **Modales y Diálogos Elásticos (QA-ANIM-DIALOG-003):** Aplicada animación con curva de rebote sutil (`cubic-bezier(0.34, 1.56, 0.64, 1)`) en la apertura de modales.
+
 ## [v1.5.88-beta] - 2026-06-01
 
 ### Correcciones ortográficas y de redacción en correos y UI (UI-ORTHO-FIX)
