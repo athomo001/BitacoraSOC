@@ -20,7 +20,7 @@ Documentación visual de las principales funcionalidades del sistema.
 ## 🏠 Pantalla Principal - Nueva Entrada
 
 ![Pantalla Principal](images/screenshots/01-main-nueva-entrada.png)
-![Pantalla Principal](images/screenshots/01.1-main-nueva-entrada.png)
+![Pantalla Principal](images/screenshots/01.1-main-nueva-entrada.png?v=1)
 
 **Funcionalidades visibles:**
 - **Menú Lateral Izquierdo:**
@@ -54,7 +54,7 @@ Documentación visual de las principales funcionalidades del sistema.
 
 ---
 ## ✅ Temas Visuales
-![Temas Visuales](images/screenshots/08-style-menu.png)
+![Temas Visuales](images/screenshots/08-style-menu.png?v=1)
 
 | Icono | Opción |
 |-------|--------|
@@ -64,11 +64,11 @@ Documentación visual de las principales funcionalidades del sistema.
 | 🏷️ | **Pastel** |
 | ☁️ | **Cyberpunk** |
 
-![Ligth](images/screenshots/01.1-main-nueva-entrada.png)
-![Dark](images/screenshots/08.2-style-menu.png)
-![Sepia](images/screenshots/08.3-style-menu.png)
-![Pastel](images/screenshots/08.4-style-menu.png)
-![Cyberpunk](images/screenshots/08.5-style-menu.png)
+![Ligth](images/screenshots/01.1-main-nueva-entrada.png?v=1)
+![Dark](images/screenshots/08.2-style-menu.png?v=1)
+![Sepia](images/screenshots/08.3-style-menu.png?v=1)
+![Pastel](images/screenshots/08.4-style-menu.png?v=1)
+![Cyberpunk](images/screenshots/08.5-style-menu.png?v=1)
 
 
 ## 📞 Escalación y Turnos
