@@ -23,6 +23,7 @@ Documentación visual de las principales funcionalidades del sistema.
 ![Pantalla Principal](images/screenshots/01.1-main-nueva-entrada.png?v=1)
 
 **Funcionalidades visibles:**
+
 - **Menú Lateral Izquierdo:**
   - ✍️ Escribir (página actual)
   - 📋 Historial Checklists
@@ -53,23 +54,24 @@ Documentación visual de las principales funcionalidades del sistema.
   - Mensaje si no hay checklist activo asignado
 
 ---
+
 ## ✅ Temas Visuales
+
 ![Temas Visuales](images/screenshots/08-style-menu.png?v=1)
 
-| Icono | Opción |
-|-------|--------|
-| 👥 | **Light** |
-| 📚 | **Dark** |
-| 📞 | **Sepia** |
-| 🏷️ | **Pastel** |
-| ☁️ | **Cyberpunk** |
+| Icono | Opción        |
+| ----- | ------------- |
+| 👥    | **Light**     |
+| 📚    | **Dark**      |
+| 📞    | **Sepia**     |
+| 🏷️    | **Pastel**    |
+| ☁️    | **Cyberpunk** |
 
 ![Ligth](images/screenshots/01.1-main-nueva-entrada.png?v=1)
 ![Dark](images/screenshots/08.2-style-menu.png?v=1)
 ![Sepia](images/screenshots/08.3-style-menu.png?v=1)
 ![Pastel](images/screenshots/08.4-style-menu.png?v=1)
 ![Cyberpunk](images/screenshots/08.5-style-menu.png?v=1)
-
 
 ## 📞 Escalación y Turnos
 
@@ -98,8 +100,9 @@ Documentación visual de las principales funcionalidades del sistema.
 ## 🔍 Buscar Entradas
 
 ![Buscar Entradas](images/screenshots/03-buscar-entradas.png)
-
+![Configuración Admin](images/screenshots/05-menu-configuracion.png)
 **Filtros de Búsqueda:**
+
 - 🔍 **Buscar texto**: Búsqueda en el contenido
 - 📑 **Tipo**: Dropdown (Todos/Operativa/Incidente)
 - 📅 **Fecha desde**: dd-mm-aaaa
@@ -110,16 +113,17 @@ Documentación visual de las principales funcionalidades del sistema.
 
 **Tabla de Resultados (78 entradas):**
 
-| Columna | Descripción |
-|---------|-------------|
-| **Fecha** | dd/mm/aaaa |
-| **Hora** | HH:mm |
-| **Tipo** | 🟢 operativa / 🔴 incidente |
-| **Contenido** | Texto truncado de la entrada |
-| **Tags** | Hashtags en chips (qradar, dpp, 0002296, 2214, etc.) |
-| **Autor** | Usuario que creó la entrada |
+| Columna       | Descripción                                          |
+| ------------- | ---------------------------------------------------- |
+| **Fecha**     | dd/mm/aaaa                                           |
+| **Hora**      | HH:mm                                                |
+| **Tipo**      | 🟢 operativa / 🔴 incidente                          |
+| **Contenido** | Texto truncado de la entrada                         |
+| **Tags**      | Hashtags en chips (qradar, dpp, 0002296, 2214, etc.) |
+| **Autor**     | Usuario que creó la entrada                          |
 
 **Ejemplo visible:**
+
 - 14/01/2026 18:28 - Operativa - "#Qradar #dpp [[QRADAR] #0002296] Nuevo incidente D..."
 - Tags: qradar, dpp, 0002296, 2214
 - Autor: mfuentes
@@ -135,7 +139,8 @@ Documentación visual de las principales funcionalidades del sistema.
 **Formulario para Reportes HTML:**
 
 **Campos del formulario:**
-1. **Tipo de operación** *
+
+1. **Tipo de operación** \*
    - Dropdown con autocomplete
    - Validación: "Escribe al menos 0 caracteres para buscar"
 
@@ -143,15 +148,16 @@ Documentación visual de las principales funcionalidades del sistema.
    - Campo de texto libre
    - Ejemplo: Número de offense o ticket
 
-3. **Nombre de Ofensa/Evento** *
+3. **Nombre de Ofensa/Evento** \*
    - Dropdown con autocomplete
    - Validación: "Escribe al menos 0 caracteres para buscar"
 
-4. **Motivo de la Ofensa/Evento** **
+4. **Motivo de la Ofensa/Evento** \*\*
    - Textarea multilínea
    - Descripción detallada del evento
 
-**Funcionalidad:** 
+**Funcionalidad:**
+
 - Genera reportes en formato HTML estructurados
 - Utiliza catálogos predefinidos (Tipos de operación, Eventos)
 - Facilita la documentación estandarizada de incidentes
@@ -161,26 +167,30 @@ Documentación visual de las principales funcionalidades del sistema.
 
 ## ⚙️ Configuración de Administrador
 
-![Configuración Admin](images/screenshots/05-menu-configuracion.png)
-
 **Menú de Configuración (Admin):**
+
+![Configuración Admin](images/screenshots/05.1-menu-configuracion.png?v=1)
 
 Sección expandida con opciones administrativas:
 
 | Icono | Opción | Descripción |
-|-------|--------|-------------|
-| 👥 | **Admin Usuarios** | Gestión de usuarios, roles y permisos |
-| 📚 | **Admin Catálogos** | Configuración de catálogos de eventos, fuentes de logs, tipos de operación |
-| 📞 | **Admin Escalaci...** | Configuración de reglas de escalación y contactos |
-| 🖼️ | **Logo** | Personalización del logo de la aplicación |
-| ☁️ | **Backup** | Creación y restauración de backups (seleccionado) |
-| 📧 | **SMTP / Config** | Configuración de servidor SMTP para notificaciones por email |
+| ----- | ------ | ----------- |
+| 👥 | **Usuarios** | Gestión de usuarios, roles y permisos |
+| 📋 | **Checklist** | Configuración y asignación de checklists operativos de turno |
+| ⏰ | **Turnos** | Administración de turnos rotativos semanales (soporte para Teletrabajo y Vacaciones) |
+| 📚 | **Clientes y Catálogos** | Configuración de clientes, servicios, tipos de operación y catálogo de eventos |
+| 📞 | **Escalación** | Configuración de contactos externos y turnos internos de escalación |
+| 📧 | **EMAIL Config** | Configuración del servidor SMTP y parámetros de correo |
+| 🔒 | **HTTPS / Seguridad** | Administración de certificados SSL/TLS y directivas de seguridad |
+| 🔌 | **Integraciones** | Administración de webhooks y conectores externos |
+| 🧩 | **Complementos** | Gestión de complementos modulares adicionales |
 
 > La consola admin puede incluir más entradas según versión/rol (por ejemplo: Integraciones, Seguridad, Apariencia y Complementos).
 
-**Acceso:** Solo usuarios con rol `admin` pueden ver y acceder a esta sección.
+**Acceso:** Solo usuarios con rol `admin` o `auditor` pueden ver y acceder a esta sección.
 
-**Seguridad:** 
+**Seguridad:**
+
 - Requiere autenticación previa
 - Operaciones sensibles registradas en audit logs
 - Backups protegidos con control de acceso
@@ -189,20 +199,24 @@ Sección expandida con opciones administrativas:
 
 ## 💾 Menú Admin - Backup
 
-![Menú Admin Backup](images/screenshots/06-menu-admin-backup.png)
+![Menú Admin Backup](images/screenshots/06-menu-admin-backup.png?v=1)
 
 **Detalle del menú administrativo:**
 
 Opciones visibles en la sección de configuración:
 
-- **Admin Usuarios** - Gestión completa de cuentas
-- **Admin Catálogos** - Taxonomías y diccionarios
-- **Admin Escalaci...** - Matriz de contactos
-- **Logo** - Branding corporativo
-- **Backup** ← **(seleccionado)** - Sistema de respaldo
-- **SMTP / Config** - Notificaciones email
+- **Usuarios** - Gestión de cuentas y roles
+- **Checklist** - Configuración de tareas de control
+- **Turnos** - Planificación de rotaciones (Teletrabajo/Vacaciones)
+- **Clientes y Catálogos** - Configuración del SOC
+- **Escalación** - Matriz de contactos telefónicos
+- **EMAIL Config** - Parámetros SMTP
+- **HTTPS / Seguridad** - Certificados y seguridad SSL
+- **Integraciones** - Webhooks y APIs externas
+- **Complementos** - Módulos adicionales y backups (seleccionado)
 
 **Funcionalidad de Backup:**
+
 - Crear backup completo de todas las colecciones (23 colecciones)
 - Descargar backups en formato JSON
 - Restaurar desde backup existente
@@ -216,37 +230,36 @@ Ver documentación completa en [backend/scripts/README.md](../backend/scripts/RE
 
 ## 📂 Sidebar - Menú de Navegación
 
-![Sidebar Menu](images/screenshots/07-sidebar-menu.png)
+![Sidebar Menu](images/screenshots/07-sidebar-menu.png?v=1)
 
 **Menú lateral izquierdo completo:**
 
 ### Secciones Principales
 
-| Icono | Opción | Rol | Descripción |
-|-------|--------|-----|-------------|
-| ✏️ | **Escribir** | Todos | Crear nueva entrada y registrar checks |
-| 📋 | **Historial Checklists** | Todos | Ver todos los checklists completados del equipo |
-| 📞 | **Escalación** | Todos | Vista de turnos y contactos de escalación |
-| 📄 | **Reportes** | Todos | Dashboard de reportes KPIs y exportación |
-| 👥 | **Directorio Centralizado** | Todos | Búsqueda centralizada de contactos |
-| 🌐 | **Ver entradas** | Todos | Búsqueda y filtrado de todas las entradas operativas |
-| 👤 | **Mi Perfil** | Todos | Editar información personal e interfaz |
-| 📈 | **Estadísticas** | Todos | Estadísticas de uso y carga laboral |
-
+| Icono | Opción                      | Rol   | Descripción                                          |
+| ----- | --------------------------- | ----- | ---------------------------------------------------- |
+| ✏️    | **Escribir**                | Todos | Crear nueva entrada y registrar checks               |
+| 📋    | **Historial Checklists**    | Todos | Ver todos los checklists completados del equipo      |
+| 📞    | **Escalación**              | Todos | Vista de turnos y contactos de escalación            |
+| 📄    | **Reportes**                | Todos | Dashboard de reportes KPIs y exportación             |
+| 👥    | **Directorio Centralizado** | Todos | Búsqueda centralizada de contactos                   |
+| 🌐    | **Ver entradas**            | Todos | Búsqueda y filtrado de todas las entradas operativas |
+| 👤    | **Mi Perfil**               | Todos | Editar información personal e interfaz               |
+| 📈    | **Estadísticas**            | Todos | Estadísticas de uso y carga laboral                  |
 
 ### Configuración (Admin) ▼
 
-| Icono | Opción | Descripción |
-|-------|--------|-------------|
-| ⚙️ | **Consola Admin** | Toda la configuración general (Integraciones, Turnos, SMTP, Usuarios) |
-| 🖼️ | **Branding** | Personalización visual |
-| 📜 | **Logs de Auditoría** | Información de uso y trazabilidad de eventos |
-| ☁️ | **Backup** | Respaldos automáticos y manuales |
+| Icono | Opción                | Descripción                                                           |
+| ----- | --------------------- | --------------------------------------------------------------------- |
+| ⚙️    | **Consola Admin**     | Toda la configuración general (Integraciones, Turnos, SMTP, Usuarios) |
+| 🖼️    | **Branding**          | Personalización visual                                                |
+| 📜    | **Logs de Auditoría** | Información de uso y trazabilidad de eventos                          |
+| ☁️    | **Backup**            | Respaldos automáticos y manuales                                      |
 
 > La navegación de configuración es dinámica y puede variar por versión, rol y módulos habilitados.
 
-
 **Interacción:**
+
 - Sección colapsable con indicador de expansión (▼/►)
 - Items activos resaltados
 - Íconos intuitivos con Material Icons
@@ -257,6 +270,7 @@ Ver documentación completa en [backend/scripts/README.md](../backend/scripts/RE
 ## 📋 Resumen de Funcionalidades
 
 ### Usuario Operador
+
 ✅ Crear entradas operativas e incidentes  
 ✅ Usar hashtags para categorización  
 ✅ Ver todas las entradas del equipo  
@@ -264,9 +278,10 @@ Ver documentación completa en [backend/scripts/README.md](../backend/scripts/RE
 ✅ Ver turnos y escalaciones  
 ✅ Completar checklists de turno  
 ✅ Generar reportes HTML  
-✅ Notas personales privadas  
+✅ Notas personales privadas
 
 ### Usuario Administrador
+
 ✅ Todas las funciones de operador  
 ✅ Gestionar usuarios y permisos  
 ✅ Configurar catálogos y taxonomías  
@@ -275,13 +290,14 @@ Ver documentación completa en [backend/scripts/README.md](../backend/scripts/RE
 ✅ Crear y restaurar backups  
 ✅ Configurar SMTP y notificaciones  
 ✅ Ver auditorías del sistema  
-✅ Personalizar logo corporativo  
+✅ Personalizar logo corporativo
 
 ---
 
 ## 🎨 Diseño y UX
 
 **Características del diseño:**
+
 - 🎨 Material Design con Angular Material
 - 🌈 Sistema multi-tema: light, dark, sepia, pastel y cyberpunk
 - 📱 Diseño responsive (desktop, tablet, mobile)
@@ -294,14 +310,14 @@ Ver documentación completa en [backend/scripts/README.md](../backend/scripts/RE
 
 ---
 
-
 ## 📊 Estadísticas del Sistema
 
 **Capturas documentadas:** 13  
 **Última actualización:** 18 de mayo de 2026  
-**Cobertura visual:** módulos principales (vista referencial, no exhaustiva)  
+**Cobertura visual:** módulos principales (vista referencial, no exhaustiva)
 
 **Áreas documentadas:**
+
 - ✅ Navegación y menús
 - ✅ Formulario de entradas
 - ✅ Sistema de búsqueda
@@ -315,6 +331,7 @@ Ver documentación completa en [backend/scripts/README.md](../backend/scripts/RE
 ## 📝 Notas Técnicas
 
 **Stack tecnológico visible:**
+
 - Frontend: Angular 20 + Angular Material
 - Componentes standalone
 - Diseño modular y escalable
@@ -322,6 +339,7 @@ Ver documentación completa en [backend/scripts/README.md](../backend/scripts/RE
 - Formularios reactivos con validación
 
 **Patrones de diseño:**
+
 - Sidebar navigation con secciones colapsables
 - Floating action buttons para acciones principales
 - Cards para agrupación de contenido
@@ -331,4 +349,4 @@ Ver documentación completa en [backend/scripts/README.md](../backend/scripts/RE
 
 ---
 
-*Última actualización: 2026-05-18*
+_Última actualización: 2026-05-18_
