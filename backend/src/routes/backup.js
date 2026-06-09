@@ -80,6 +80,62 @@ const isValidBackupFilename = (filename) => {
   return typeof filename === 'string' && /^backup-[a-zA-Z0-9.\-_]+\.(json|zip)$/.test(filename);
 };
 
+const crypto = require('crypto');
+
+/**
+ * Cifra un texto usando una passphrase
+ * @param {string} text - Contenido a cifrar
+ * @param {string} passphrase - Frase secreta de cifrado
+ * @returns {string} JSON stringificado con la metadata de cifrado
+ */
+function encryptWithPassphrase(text, passphrase) {
+  const salt = crypto.randomBytes(16);
+  // Derivar clave de 32 bytes usando PBKDF2
+  const key = crypto.pbkdf2Sync(passphrase, salt, 10000, 32, 'sha256');
+  const iv = crypto.randomBytes(12); // GCM recomienda 12 bytes
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  
+  let encrypted = cipher.update(text, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  const authTag = cipher.getAuthTag();
+  
+  return JSON.stringify({
+    encrypted: true,
+    salt: salt.toString('hex'),
+    iv: iv.toString('hex'),
+    authTag: authTag.toString('hex'),
+    ciphertext: encrypted
+  });
+}
+
+/**
+ * Descifra un objeto JSON stringificado cifrado
+ * @param {string} encryptedJsonStr - Objeto cifrado stringificado
+ * @param {string} passphrase - Frase secreta para descifrar
+ * @returns {string} Texto descifrado
+ */
+function decryptWithPassphrase(encryptedJsonStr, passphrase) {
+  try {
+    const parsed = JSON.parse(encryptedJsonStr);
+    if (!parsed.encrypted || !parsed.salt || !parsed.iv || !parsed.authTag || !parsed.ciphertext) {
+      throw new Error('Formato cifrado inválido');
+    }
+    const salt = Buffer.from(parsed.salt, 'hex');
+    const iv = Buffer.from(parsed.iv, 'hex');
+    const authTag = Buffer.from(parsed.authTag, 'hex');
+    const key = crypto.pbkdf2Sync(passphrase, salt, 10000, 32, 'sha256');
+    
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(authTag);
+    
+    let decrypted = decipher.update(parsed.ciphertext, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+  } catch (err) {
+    throw new Error('Frase secreta incorrecta o datos dañados: ' + err.message);
+  }
+}
+
 // Helper: convertir array de objetos a CSV
 const arrayToCSV = (data) => {
   if (!data || data.length === 0) return '';
@@ -337,7 +393,16 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
       data: backupSnapshot
     };
 
-    await fs.writeFile(tempJson, JSON.stringify(backupData, null, 2));
+    const { passphrase } = req.body;
+    let finalJsonData = JSON.stringify(backupData, null, 2);
+    let isEncrypted = false;
+    
+    if (passphrase && String(passphrase).trim()) {
+      finalJsonData = encryptWithPassphrase(finalJsonData, String(passphrase).trim());
+      isEncrypted = true;
+    }
+
+    await fs.writeFile(tempJson, finalJsonData);
 
     // Pre-scan secrets legibles ANTES de entrar en el Promise (await no puede usarse dentro de callback sync)
     const readableSecrets = [];
@@ -397,7 +462,8 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
     await audit(req, {
       event: 'admin.backup.create',
       level: 'info',
-      result: { success: true, filename }
+      result: { success: true, filename },
+      metadata: { encrypted: isEncrypted }
     });
 
     res.json({
@@ -453,7 +519,34 @@ router.post('/restore', authenticate, authorize('admin'), async (req, res) => {
         // Leer el JSON de base de datos
         const dataJsonPath = path.join(extractDir, 'data.json');
         const content = await fs.readFile(dataJsonPath, 'utf8');
-        backupJson = JSON.parse(content);
+        
+        let parsedJson;
+        try {
+          parsedJson = JSON.parse(content);
+        } catch (err) {
+          return res.status(400).json({ message: 'Formato de backup inválido: data.json corrupto' });
+        }
+
+        if (parsedJson.encrypted) {
+          const { passphrase } = req.body;
+          if (!passphrase) {
+            return res.status(400).json({
+              requiresPassphrase: true,
+              message: 'El backup está cifrado. Ingrese la frase secreta para restaurarlo:'
+            });
+          }
+          try {
+            const decryptedStr = decryptWithPassphrase(content, passphrase);
+            backupJson = JSON.parse(decryptedStr);
+          } catch (err) {
+            return res.status(400).json({
+              requiresPassphrase: true,
+              message: 'Frase secreta incorrecta. Intente nuevamente:'
+            });
+          }
+        } else {
+          backupJson = parsedJson;
+        }
 
         // Restaurar archivos físicos: uploads
         const extractedUploads = path.join(extractDir, 'uploads');
@@ -500,7 +593,34 @@ router.post('/restore', authenticate, authorize('admin'), async (req, res) => {
     } else {
       // --- Restauración JSON legacy ---
       const content = await fs.readFile(filePath, 'utf8');
-      backupJson = JSON.parse(content);
+      
+      let parsedJson;
+      try {
+        parsedJson = JSON.parse(content);
+      } catch (err) {
+        return res.status(400).json({ message: 'Formato de backup inválido: JSON corrupto' });
+      }
+
+      if (parsedJson.encrypted) {
+        const { passphrase } = req.body;
+        if (!passphrase) {
+          return res.status(400).json({
+            requiresPassphrase: true,
+            message: 'El backup está cifrado. Ingrese la frase secreta para restaurarlo:'
+          });
+        }
+        try {
+          const decryptedStr = decryptWithPassphrase(content, passphrase);
+          backupJson = JSON.parse(decryptedStr);
+        } catch (err) {
+          return res.status(400).json({
+            requiresPassphrase: true,
+            message: 'Frase secreta incorrecta. Intente nuevamente:'
+          });
+        }
+      } else {
+        backupJson = parsedJson;
+      }
     }
 
     if (!backupJson.data) {
@@ -661,11 +781,39 @@ router.post('/import',
 
           // Leer el JSON de base de datos
           const dataJsonPath = path.join(extractDir, 'data.json');
+          let content;
           try {
-            const content = await fs.readFile(dataJsonPath, 'utf8');
-            backupJson = JSON.parse(content);
+            content = await fs.readFile(dataJsonPath, 'utf8');
           } catch {
-            return res.status(400).json({ message: 'ZIP inválido: no contiene data.json válido' });
+            return res.status(400).json({ message: 'ZIP inválido: no contiene data.json' });
+          }
+
+          let parsedJson;
+          try {
+            parsedJson = JSON.parse(content);
+          } catch (err) {
+            return res.status(400).json({ message: 'Formato de backup inválido: data.json corrupto' });
+          }
+
+          if (parsedJson.encrypted) {
+            const { passphrase } = req.body;
+            if (!passphrase) {
+              return res.status(400).json({
+                requiresPassphrase: true,
+                message: 'El backup está cifrado. Ingrese la frase secreta para importarlo:'
+              });
+            }
+            try {
+              const decryptedStr = decryptWithPassphrase(content, passphrase);
+              backupJson = JSON.parse(decryptedStr);
+            } catch (err) {
+              return res.status(400).json({
+                requiresPassphrase: true,
+                message: 'Frase secreta incorrecta. Intente nuevamente:'
+              });
+            }
+          } else {
+            backupJson = parsedJson;
           }
 
           // Restaurar archivos físicos: uploads
@@ -714,13 +862,42 @@ router.post('/import',
 
       } else {
         // --- Importación JSON (legacy o nuevo formato) ---
+        let content;
         try {
-          const content = await fs.readFile(req.file.path, 'utf8');
-          backupJson = JSON.parse(content);
+          content = await fs.readFile(req.file.path, 'utf8');
+        } catch {
+          await fs.unlink(req.file.path).catch(() => { });
+          return res.status(400).json({ message: 'Error al leer el archivo JSON' });
+        }
+
+        let parsedJson;
+        try {
+          parsedJson = JSON.parse(content);
           await fs.unlink(req.file.path).catch(() => { });
         } catch {
           await fs.unlink(req.file.path).catch(() => { });
           return res.status(400).json({ message: 'JSON inválido' });
+        }
+
+        if (parsedJson.encrypted) {
+          const { passphrase } = req.body;
+          if (!passphrase) {
+            return res.status(400).json({
+              requiresPassphrase: true,
+              message: 'El backup está cifrado. Ingrese la frase secreta para importarlo:'
+            });
+          }
+          try {
+            const decryptedStr = decryptWithPassphrase(content, passphrase);
+            backupJson = JSON.parse(decryptedStr);
+          } catch (err) {
+            return res.status(400).json({
+              requiresPassphrase: true,
+              message: 'Frase secreta incorrecta. Intente nuevamente:'
+            });
+          }
+        } else {
+          backupJson = parsedJson;
         }
       }
 

@@ -311,17 +311,43 @@ router.post('/refresh', async (req, res) => {
       return res.status(401).json({ message: 'Token requerido' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // 🔒 Verificar firma del token ignorando expiración para permitir silent-refresh transparente
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, { ignoreExpiration: true });
+
+    // 🛡️ Prevenir ataques de replay verificando si el token ya está en la denylist
+    const isDenylisted = await TokenDenylist.exists({ token });
+    if (isDenylisted) {
+      return res.status(401).json({ message: 'Sesión terminada. Token ya utilizado o revocado.' });
+    }
+
+    // ⏳ Ventana de gracia de 30 minutos para renovar tokens que ya expiraron
+    const nowSecs = Math.floor(Date.now() / 1000);
+    if (decoded.exp && (nowSecs - decoded.exp > 30 * 60)) {
+      return res.status(401).json({ message: 'Sesión expirada permanentemente. Por favor inicie sesión de nuevo.' });
+    }
 
     const user = await User.findById(decoded.userId);
 
     if (!user || !user.isActive) {
-      return res.status(401).json({ message: 'Usuario no válido' });
+      return res.status(401).json({ message: 'Usuario no válido o inactivo' });
     }
 
     if (user.role === 'guest') {
       return res.status(403).json({ message: 'Los invitados no pueden renovar su sesión' });
     }
+
+    // 🔄 Rotación de tokens: Invalidar el token anterior agregándolo a la denylist
+    const expiresAt = decoded.exp ? new Date(decoded.exp * 1000) : new Date();
+    const denylistExpiresAt = expiresAt > new Date() ? expiresAt : new Date(Date.now() + 5 * 60 * 1000);
+    
+    await TokenDenylist.create({
+      token,
+      expiresAt: denylistExpiresAt
+    }).catch(err => {
+      if (err.code !== 11000) {
+        logger.error({ err }, 'Error registrando token revocado en denylist durante refresh');
+      }
+    });
 
     const newToken = generateToken(user._id, user.role);
     setAuthCookie(req, res, newToken);

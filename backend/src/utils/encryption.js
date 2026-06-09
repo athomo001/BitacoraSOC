@@ -240,7 +240,21 @@ const decrypt = (ciphertext) => {
   }
 };
 
+/**
+ * Genera un hash SHA-256 de un texto para indexar y buscar campos PII de forma determinista
+ * @param {string} text - Texto a hashear
+ * @returns {string} Hash SHA-256 en formato hex
+ */
+const sha256 = (text) => {
+  if (!text) return '';
+  return crypto
+    .createHash('sha256')
+    .update(String(text).trim().toLowerCase())
+    .digest('hex');
+};
+
 module.exports = {
   encrypt,
-  decrypt
+  decrypt,
+  sha256
 };

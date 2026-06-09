@@ -135,6 +135,10 @@ export class AuthService {
     const user = this.getCurrentUser();
     return user ? roles.includes(user.role) : false;
   }
+  refreshSession(): Observable<any> {
+    return this.http.post<any>(`${this.API_URL}/auth/refresh`, {}, { withCredentials: true });
+  }
+
   forgotPassword(email: string): Observable<{ message: string; resetToken?: string; resetUrl?: string }> {
     return this.http.post<{ message: string; resetToken?: string; resetUrl?: string }>(
       `${this.API_URL}/auth/forgot-password`,

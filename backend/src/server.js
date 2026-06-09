@@ -52,12 +52,12 @@ const { getBrandingSnapshot, getAppTitleForText } = require('./utils/branding');
 const { startChecklistAlertScheduler } = require('./utils/checklistAlertScheduler');
 const { startBackupScheduler, stopBackupScheduler } = require('./utils/backup-scheduler');
 const { startAuditRetentionScheduler, stopAuditRetentionScheduler } = require('./utils/audit-retention-scheduler');
-const { startShiftReminderScheduler } = require('./utils/shiftReminderScheduler');
+const { startShiftReminderScheduler, stopShiftReminderScheduler } = require('./utils/shiftReminderScheduler');
 const {
   startComplementCircuitHealthChecks,
   stopComplementCircuitHealthChecks
 } = require('./utils/complement-circuit-breaker');
-const { initEscalationScheduleScheduler } = require('./utils/escalationScheduleScheduler');
+const { initEscalationScheduleScheduler, stopEscalationScheduleScheduler } = require('./utils/escalationScheduleScheduler');
 
 const app = express();
 const HOST = process.env.HOST || '0.0.0.0';
@@ -871,6 +871,8 @@ const gracefulShutdown = (signal) => {
   stopBackupScheduler();
   stopAuditRetentionScheduler();
   stopComplementCircuitHealthChecks();
+  stopShiftReminderScheduler();
+  stopEscalationScheduleScheduler();
 
   const closeTargets = [httpServer, httpsServer].filter(Boolean);
   if (!closeTargets.length) {

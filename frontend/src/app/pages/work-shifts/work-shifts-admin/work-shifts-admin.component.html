@@ -1,4 +1,4 @@
-<div class="container">
+<main class="container">
   <header class="page-header">
     <mat-icon>schedule</mat-icon>
     <div>
@@ -10,20 +10,20 @@
   <mat-tab-group class="dashboard-tabs">
     <!-- PESTAÑA 1: ASIGNACIÓN DE TURNOS SEMANALES -->
     <mat-tab label="Asignación de Turnos Semanales">
-      <div class="weekly-shifts-dashboard">
+      <section class="weekly-shifts-dashboard">
         <!-- Columna Principal -->
-        <div class="main-column">
+        <section class="main-column">
           
           <!-- Vista Resumen Semanal (Gantt) -->
-          <div class="dashboard-card gantt-card-wrapper">
-            <div class="card-header">
+          <article class="dashboard-card gantt-card-wrapper">
+            <header class="card-header">
               <div class="title-with-subtitle">
                 <h3>Vista Resumen Semanal</h3>
                 <span class="week-label">
                   Periodo: {{ ganttWeekStart | date:'dd/MM/yyyy' }} al {{ ganttWeekEnd | date:'dd/MM/yyyy' }}
                 </span>
               </div>
-            </div>
+            </header>
             
             <div class="gantt-chart">
               <!-- Grid de fondo -->
@@ -70,12 +70,12 @@
                 </div>
               </div>
             </div>
-          </div>
+          </article>
 
           <!-- Tarjetas de Proximidad -->
-          <div class="proximity-cards-container">
+          <aside class="proximity-cards-container">
             <!-- Turnos Próximos a Terminar -->
-            <div class="proximity-card-section">
+            <section class="proximity-card-section">
               <h3>
                 <mat-icon color="warn">hourglass_bottom</mat-icon>
                 Turnos Próximos a Terminar (En Curso)
@@ -101,10 +101,10 @@
                   </div>
                 </div>
               </div>
-            </div>
+            </section>
 
             <!-- Próximos Turnos a Iniciar -->
-            <div class="proximity-card-section">
+            <section class="proximity-card-section">
               <h3>
                 <mat-icon color="primary">play_circle_outline</mat-icon>
                 Próximos Turnos a Iniciar
@@ -130,17 +130,17 @@
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
+            </section>
+          </aside>
 
           <!-- Gestión de Asignaciones -->
-          <div class="dashboard-card detailed-table-card">
-            <div class="card-header">
+          <article class="dashboard-card detailed-table-card">
+            <header class="card-header">
               <div class="title-with-subtitle">
                 <h3>Gestión de Asignaciones</h3>
                 <p class="subtitle">Orden: Próximos → En Curso → Pasado. Máximo 50 registros.</p>
               </div>
-            </div>
+            </header>
 
             <!-- Filtros rápidos -->
             <div class="filters-actions-bar">
@@ -256,12 +256,12 @@
 
               <!-- Editor inline (al lado de la tabla) -->
               <div class="inline-editor" *ngIf="showAssignmentForm">
-                <div class="inline-editor-header">
+                <header class="inline-editor-header">
                   <h3>{{ editingWeeklyAssignmentId ? 'Editar Asignación' : 'Nueva Asignación' }}</h3>
                   <button mat-icon-button (click)="cancelWeeklyAssignmentEdit()">
                     <mat-icon>close</mat-icon>
                   </button>
-                </div>
+                </header>
                 <div class="inline-editor-body">
                   <form [formGroup]="assignmentForm" (ngSubmit)="saveWeeklyAssignment()">
                     <mat-form-field appearance="outline" class="full-width">
@@ -339,20 +339,18 @@
               </div>
 
             </div>
-          </div>
+          </article>
 
-        </div>
+        </section>
 
         <!-- Barra Lateral Derecha -->
-        <div class="sidebar-column">
-
-
+        <aside class="sidebar-column">
 
           <!-- Recordatorios -->
-          <div class="dashboard-card config-sidebar-card">
-            <div class="card-header">
+          <article class="dashboard-card config-sidebar-card">
+            <header class="card-header">
               <h3>Recordatorios automáticos</h3>
-            </div>
+            </header>
             <div class="card-body">
               <form [formGroup]="escalationReminderForm" (ngSubmit)="saveEscalationReminderConfig()">
                 <mat-checkbox formControlName="escalationReminderEnabled">
@@ -385,13 +383,13 @@
                 </div>
               </form>
             </div>
-          </div>
+          </article>
 
           <!-- Automatización de Envío -->
-          <div class="dashboard-card config-sidebar-card">
-            <div class="card-header">
+          <article class="dashboard-card config-sidebar-card">
+            <header class="card-header">
               <h3>Envío automatizado semanal</h3>
-            </div>
+            </header>
             <div class="card-body">
               <form [formGroup]="escalationScheduleAutomationForm" (ngSubmit)="saveAutomationConfig()">
                 <mat-checkbox formControlName="enabled">
@@ -442,15 +440,15 @@
                 </div>
               </form>
             </div>
-          </div>
+          </article>
 
-        </div>
-      </div>
+        </aside>
+      </section>
     </mat-tab>
 
     <!-- PESTAÑA 2: TURNOS DIARIOS Y OPERATIVOS -->
     <mat-tab label="Turnos Diarios y Operativos">
-      <div class="tab-content-wrapper">
+      <section class="tab-content-wrapper">
         <!-- Botón agregar -->
         <div class="actions-bar" *ngIf="!showForm">
           <button mat-raised-button color="primary" (click)="addShift()">
@@ -460,7 +458,7 @@
         </div>
 
         <!-- Formulario -->
-        <div *ngIf="showForm" class="shift-panel form-card">
+        <article *ngIf="showForm" class="shift-panel form-card">
           <header class="shift-panel__header">
             <h2 class="shift-panel__title">
               <mat-icon>{{ editingShift ? 'edit' : 'add' }}</mat-icon>
@@ -542,7 +540,7 @@
                   <mat-label>Zona horaria</mat-label>
                   <mat-select formControlName="timezone">
                     <mat-option value="America/Santiago">America/Santiago (Chile)</mat-option>
-                    <mat-option value="America/Argentina/Buenos_Aires">America/Argentina/Buenos_Aires</mat-option>
+                    <mat-option value="America/Argentina/Buenos_Aires">America/America/Argentina/Buenos_Aires</mat-option>
                     <mat-option value="America/New_York">America/New_York</mat-option>
                     <mat-option value="America/Los_Angeles">America/Los_Angeles</mat-option>
                     <mat-option value="Europe/Madrid">Europe/Madrid</mat-option>
@@ -627,10 +625,10 @@
               </div>
             </form>
           </div>
-        </div>
+        </article>
 
         <!-- Tabla de turnos -->
-        <div *ngIf="!showForm" class="shift-panel table-card">
+        <article *ngIf="!showForm" class="shift-panel table-card">
           <header class="shift-panel__header">
             <h2 class="shift-panel__title">
               <mat-icon>list</mat-icon>
@@ -744,13 +742,13 @@
               <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
             </table>
 
-            <div *ngIf="!loading && shifts.length > 0" class="operational-assignment-section">
+            <section *ngIf="!loading && shifts.length > 0" class="operational-assignment-section">
               <mat-divider></mat-divider>
 
-              <div class="operational-header">
+              <header class="operational-header">
                 <h3>Asignación Operativa</h3>
                 <p class="section-description">Vincula analista y turno. El horario se hereda desde la configuración del turno.</p>
-              </div>
+              </header>
 
               <form [formGroup]="operationalAssignmentForm" (ngSubmit)="saveOperationalAssignment()" class="operational-form">
                 <mat-form-field appearance="outline">
@@ -833,18 +831,18 @@
               <div *ngIf="operationalRows.length === 0" class="empty-operational">
                 <p>No hay asignaciones operativas activas.</p>
               </div>
-            </div>
+            </section>
 
             <!-- Sección GLOBAL: Reenvío de Información -->
-            <div *ngIf="!showForm" class="global-email-section">
+            <section *ngIf="!showForm" class="global-email-section">
               <mat-divider></mat-divider>
 
-              <div class="global-email-header">
+              <header class="global-email-header">
                 <h3>📧 Reenvío de Información (General)</h3>
                 <p class="section-description">
                   Configura el envío automático al finalizar turno para todos los turnos
                 </p>
-              </div>
+              </header>
 
               <button mat-raised-button color="primary" (click)="toggleGlobalEmailConfig()" class="toggle-config-btn">
                 <mat-icon>{{ showGlobalEmailConfig ? 'expand_less' : 'expand_more' }}</mat-icon>
@@ -955,11 +953,12 @@
                   </div>
                 </form>
               </div>
-            </div>
+            </section>
 
           </div>
-        </div>
-      </div>
+        </article>
+
+      </section>
     </mat-tab>
   </mat-tab-group>
-</div>
+</main>

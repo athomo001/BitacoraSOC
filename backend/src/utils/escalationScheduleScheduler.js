@@ -8,14 +8,22 @@ const AppConfig = require('../models/AppConfig');
 const escalationController = require('../controllers/escalationController');
 const { logger } = require('./logger');
 
+let escalationCronTask = null;
+
 /**
  * Inicializa el scheduler de automatización de turnos
  */
 function initEscalationScheduleScheduler() {
   logger.info('📅 Initializing Escalation Schedule Scheduler (ESC-SHIFT-111)...');
 
+  // Detener tarea previa si ya está corriendo para evitar fugas
+  if (escalationCronTask) {
+    escalationCronTask.stop();
+    escalationCronTask = null;
+  }
+
   // Ejecutar cada minuto para mayor precisión en la hora configurada
-  cron.schedule('* * * * *', async () => {
+  escalationCronTask = cron.schedule('* * * * *', async () => {
     try {
       const config = await AppConfig.findOne();
       if (!config) return;
@@ -79,4 +87,15 @@ function initEscalationScheduleScheduler() {
   });
 }
 
-module.exports = { initEscalationScheduleScheduler };
+/**
+ * Detiene y limpia la tarea del scheduler si está activa
+ */
+function stopEscalationScheduleScheduler() {
+  if (escalationCronTask) {
+    escalationCronTask.stop();
+    escalationCronTask = null;
+    logger.info('📅 Stopped Escalation Schedule Scheduler.');
+  }
+}
+
+module.exports = { initEscalationScheduleScheduler, stopEscalationScheduleScheduler };

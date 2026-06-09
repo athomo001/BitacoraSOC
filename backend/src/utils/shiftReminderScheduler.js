@@ -261,12 +261,24 @@ async function runShiftReminder() {
   }
 }
 
-// ─── Arranque ─────────────────────────────────────────────────────────────
+let shiftReminderInterval = null;
 
 function startShiftReminderScheduler() {
+  if (shiftReminderInterval) {
+    clearInterval(shiftReminderInterval);
+    shiftReminderInterval = null;
+  }
   runShiftReminder();
-  setInterval(runShiftReminder, POLL_INTERVAL_MS);
-  logger.info('✅ Shift reminder scheduler started (polling cada 5 min)');
+  shiftReminderInterval = setInterval(runShiftReminder, POLL_INTERVAL_MS);
+  logger.info('✅ Shift reminder scheduler started (polling cada 1 min)');
 }
 
-module.exports = { startShiftReminderScheduler, buildReminderHtml, formatReminderTextForEmail };
+function stopShiftReminderScheduler() {
+  if (shiftReminderInterval) {
+    clearInterval(shiftReminderInterval);
+    shiftReminderInterval = null;
+    logger.info('✅ Stopped Shift reminder scheduler.');
+  }
+}
+
+module.exports = { startShiftReminderScheduler, stopShiftReminderScheduler, buildReminderHtml, formatReminderTextForEmail };

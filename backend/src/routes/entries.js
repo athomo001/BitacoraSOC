@@ -323,44 +323,36 @@ router.get('/',
 
       const skip = (page - 1) * limit;
 
-      // Construir filtros
+      // 🔍 Filtros de la colección principal (Entry)
       const filters = {};
 
-      // Búsqueda de texto (sanitizada)
       if (search) {
-        // Escapar caracteres especiales de MongoDB
         const sanitized = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         filters.$text = { $search: sanitized };
       }
 
-      // Filtro por tags
       if (tags) {
         const tagArray = tags.split(',').map(t => t.trim().toLowerCase());
         filters.tags = { $in: tagArray };
       }
 
-      // Filtro por cliente (B2i)
       if (clientId) {
-        filters.clientId = clientId;
+        filters.clientId = new mongoose.Types.ObjectId(clientId);
       }
 
-      // Filtro por tipo
       if (entryType) {
         filters.entryType = entryType;
       }
 
-      // Filtro por rango de fechas
       if (startDate || endDate) {
         filters.entryDate = {};
         if (startDate) filters.entryDate.$gte = new Date(startDate);
         if (endDate) filters.entryDate.$lte = new Date(endDate);
       }
 
-      // Filtro por usuario (sanitizar para prevenir NoSQL injection)
       if (userId) {
-        // 🔒 Bloquear operadores $ en IDs (ej: {"$ne": null})
         if (typeof userId === 'string' && !userId.includes('$')) {
-          filters.createdBy = userId;
+          filters.createdBy = new mongoose.Types.ObjectId(userId);
         } else {
           return res.status(400).json({ message: 'userId inválido' });
         }
@@ -379,6 +371,7 @@ router.get('/',
         };
       }
 
+      // 🔍 Filtros de la colección de unión (ShiftCheck)
       const checklistFilters = {};
       if (startDate || endDate) {
         checklistFilters.checkDate = {};
@@ -386,7 +379,7 @@ router.get('/',
         if (endDate) checklistFilters.checkDate.$lte = new Date(endDate);
       }
       if (userId) {
-        checklistFilters.userId = userId;
+        checklistFilters.userId = new mongoose.Types.ObjectId(userId);
       }
       if (search) {
         const searchRegex = new RegExp(escapeRegex(search), 'i');
@@ -401,41 +394,160 @@ router.get('/',
       const includeChecklistForClient = !clientId
         || String(checklistClientContext.clientId || '') === String(clientId);
 
-      // Para mezclar entradas y checklists en orden cronológico sin usar $union,
-      // traemos una ventana suficiente por fuente y luego paginamos en memoria.
-      const fetchWindow = skip + limit;
+      // 🚀 Pipeline de agregación principal
+      const aggregatePipeline = [];
 
-      const [entriesRows, entriesTotal, checklistRows, checklistTotal] = await Promise.all([
-        includeNormalEntriesByType
-          ? Entry.find(filters)
-              .sort({ entryDate: -1, entryTime: -1, createdAt: -1 })
-              .limit(fetchWindow)
-              .populate('createdBy', 'username fullName role')
-              .lean()
-          : Promise.resolve([]),
+      if (includeNormalEntriesByType) {
+        aggregatePipeline.push({ $match: filters });
+      } else {
+        // Si no se requieren entradas normales, forzar retorno vacío para la colección base
+        aggregatePipeline.push({ $match: { _id: null } });
+      }
+
+      // Normalizar campos de Entry
+      aggregatePipeline.push({
+        $project: {
+          _id: 1,
+          content: 1,
+          entryType: 1,
+          entryDate: 1,
+          entryTime: 1,
+          tags: 1,
+          clientId: 1,
+          clientName: 1,
+          createdBy: 1,
+          createdByUsername: 1,
+          isGuestEntry: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          checklistType: { $literal: null },
+          checklistMetrics: { $literal: null }
+        }
+      });
+
+      // 🔗 Unión nativa con la colección ShiftCheck
+      if (shouldIncludeChecklist && includeChecklistForClient) {
+        aggregatePipeline.push({
+          $unionWith: {
+            coll: 'shiftchecks',
+            pipeline: [
+              { $match: checklistFilters },
+              {
+                $project: {
+                  _id: 1,
+                  content: { $literal: '' }, // Se computará en JS
+                  entryType: { $literal: 'checklist' },
+                  entryDate: { $literal: '' }, // Se computará en JS
+                  entryTime: { $literal: '' }, // Se computará en JS
+                  tags: { $literal: [] },
+                  clientId: { $literal: checklistClientContext.clientId ? new mongoose.Types.ObjectId(checklistClientContext.clientId) : null },
+                  clientName: { $literal: checklistClientContext.clientName || DEFAULT_INTERNAL_CLIENT_NAME },
+                  createdBy: '$userId',
+                  createdByUsername: { $ifNull: ['$username', 'N/A'] },
+                  isGuestEntry: { $literal: false },
+                  createdAt: { $ifNull: ['$checkDate', { $ifNull: ['$createdAt', new Date()] }] },
+                  updatedAt: { $ifNull: ['$updatedAt', { $ifNull: ['$checkDate', { $ifNull: ['$createdAt', new Date()] }] }] },
+                  checklistType: '$type',
+                  checklistMetrics: {
+                    totalServices: { $size: { $ifNull: ['$services', []] } },
+                    totalProblems: {
+                      $size: {
+                        $filter: {
+                          input: { $ifNull: ['$services', []] },
+                          as: 's',
+                          cond: { $eq: ['$$s.status', 'rojo'] }
+                        }
+                      }
+                    }
+                  },
+                  services: '$services',
+                  type: '$type'
+                }
+              }
+            ]
+          }
+        });
+      }
+
+      // ⚙️ Ordenar, paginar y poblar relaciones en base de datos
+      aggregatePipeline.push({ $sort: { createdAt: -1 } });
+      aggregatePipeline.push({ $skip: skip });
+      aggregatePipeline.push({ $limit: limit });
+
+      // Lookup selectivo del creador de la entrada/checklist
+      aggregatePipeline.push({
+        $lookup: {
+          from: 'users',
+          localField: 'createdBy',
+          foreignField: '_id',
+          as: 'createdBy'
+        }
+      });
+      aggregatePipeline.push({
+        $unwind: {
+          path: '$createdBy',
+          preserveNullAndEmptyArrays: true
+        }
+      });
+
+      // Proyección final y filtrado de datos del usuario
+      aggregatePipeline.push({
+        $project: {
+          _id: 1,
+          content: 1,
+          entryType: 1,
+          entryDate: 1,
+          entryTime: 1,
+          tags: 1,
+          clientId: 1,
+          clientName: 1,
+          createdByUsername: 1,
+          isGuestEntry: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          checklistType: 1,
+          checklistMetrics: 1,
+          services: 1,
+          type: 1,
+          createdBy: {
+            $cond: {
+              if: { $not: ['$createdBy._id'] },
+              then: null,
+              else: {
+                _id: '$createdBy._id',
+                username: '$createdBy.username',
+                fullName: '$createdBy.fullName',
+                role: '$createdBy.role'
+              }
+            }
+          }
+        }
+      });
+
+      // 📊 Consultar en paralelo los registros de la página y el conteo de totales
+      const [entriesPage, entriesTotal, checklistTotal] = await Promise.all([
+        Entry.aggregate(aggregatePipeline),
         includeNormalEntriesByType ? Entry.countDocuments(filters) : Promise.resolve(0),
-        (shouldIncludeChecklist && includeChecklistForClient)
-          ? ShiftCheck.find(checklistFilters)
-              .sort({ checkDate: -1, createdAt: -1 })
-              .limit(fetchWindow)
-              .populate('userId', 'username fullName role')
-              .lean()
-          : Promise.resolve([]),
         (shouldIncludeChecklist && includeChecklistForClient)
           ? ShiftCheck.countDocuments(checklistFilters)
           : Promise.resolve(0)
       ]);
 
-      let checklistEntries = checklistRows.map((check) => toChecklistEntryLikeRecord(check, checklistClientContext));
+      // 🔄 Formatear el contenido y fecha/hora en caliente solo para los registros resultantes de la página
+      const pageRows = entriesPage.map((item) => {
+        if (item.entryType === 'checklist') {
+          item.content = buildChecklistSummaryContent(item);
+          
+          const checkDate = new Date(item.createdAt);
+          item.entryDate = `${toSantiagoDate(checkDate)}T00:00:00.000Z`;
+          item.entryTime = toSantiagoTime(checkDate);
+          
+          delete item.services;
+          delete item.type;
+        }
+        return item;
+      });
 
-      const allRows = [...entriesRows, ...checklistEntries]
-        .sort((a, b) => {
-          const aTime = new Date(a.createdAt || `${a.entryDate}T${a.entryTime || '00:00'}:00`).getTime();
-          const bTime = new Date(b.createdAt || `${b.entryDate}T${b.entryTime || '00:00'}:00`).getTime();
-          return bTime - aTime;
-        });
-
-      const pageRows = allRows.slice(skip, skip + limit);
       const total = entriesTotal + checklistTotal;
 
       res.json({

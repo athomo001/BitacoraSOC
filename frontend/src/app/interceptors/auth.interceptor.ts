@@ -29,14 +29,16 @@
  */
 import { Injectable } from '@angular/core';
 import { HttpInterceptor, HttpRequest, HttpHandler, HttpEvent, HttpErrorResponse } from '@angular/common/http';
-import { Observable, throwError } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { Observable, throwError, BehaviorSubject } from 'rxjs';
+import { catchError, switchMap, filter, take } from 'rxjs/operators';
 import { AuthService } from '../services/auth.service';
 import { Router } from '@angular/router';
 
 @Injectable()
 export class AuthInterceptor implements HttpInterceptor {
   private readonly httpsRetryHeader = 'X-Https-Retry';
+  private isRefreshing = false;
+  private refreshTokenSubject = new BehaviorSubject<any>(null);
 
   constructor(
     private authService: AuthService,
@@ -72,16 +74,60 @@ export class AuthInterceptor implements HttpInterceptor {
         }
 
         if (error.status === 401) {
-          // QA: durante bootstrap (`/users/me`) o init de sesión no forzar logout para evitar carrera al arrancar la app.
           const isSessionBootstrapRequest = req.url.includes('/users/me');
+          const isAuthRefreshRequest = req.url.includes('/auth/refresh');
+          const isAuthLoginRequest = req.url.includes('/auth/login');
           const shouldSkipForcedLogout = isSessionBootstrapRequest || this.authService.isInitializingSession();
 
-          if (!shouldSkipForcedLogout && this.authService.getCurrentUser()) {
+          // 🛡️ Evitar bucles infinitos de redirección si el error 401 ocurre en el endpoint de refresh o login
+          if (isAuthRefreshRequest || isAuthLoginRequest) {
             this.authService.logout();
+            return throwError(() => error);
+          }
+
+          if (!shouldSkipForcedLogout && this.authService.getCurrentUser()) {
+            return this.handle401Error(req, next);
           }
         }
         return throwError(() => error);
       })
     );
+  }
+
+  /**
+   * Maneja el refresco silencioso del token al recibir un error 401.
+   * Encola peticiones concurrentes y las reintenta tras renovar la sesión.
+   */
+  private handle401Error(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+    if (!this.isRefreshing) {
+      this.isRefreshing = true;
+      this.refreshTokenSubject.next(null);
+
+      // 🔄 Invocar endpoint de renovación de sesión en el backend
+      return this.authService.refreshSession().pipe(
+        switchMap((res: any) => {
+          this.isRefreshing = false;
+          this.refreshTokenSubject.next(res.token || true);
+          
+          // 🔁 Reintentar la solicitud original con las credenciales actualizadas
+          return next.handle(request.clone({ withCredentials: true }));
+        }),
+        catchError((refreshError) => {
+          this.isRefreshing = false;
+          // 🚪 Si el refresco silencioso falla, forzar logout y desviar al analista
+          this.authService.logout();
+          return throwError(() => refreshError);
+        })
+      );
+    } else {
+      // ⏳ Si ya se está procesando un refresco, encolar hasta que se complete
+      return this.refreshTokenSubject.pipe(
+        filter(token => token !== null),
+        take(1),
+        switchMap(() => {
+          return next.handle(request.clone({ withCredentials: true }));
+        })
+      );
+    }
   }
 }

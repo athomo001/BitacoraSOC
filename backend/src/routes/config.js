@@ -33,6 +33,22 @@ const verifyImageFile = async (filePath, mimetype, isFavicon = false) => {
   }
 };
 
+const verifyImageBuffer = async (buffer, mimeSubtype, isFavicon = false) => {
+  try {
+    if (isFavicon && (mimeSubtype === 'x-icon' || mimeSubtype === 'vnd.microsoft.icon')) {
+      if (buffer.length >= 4 && buffer[0] === 0x00 && buffer[1] === 0x00 && buffer[2] === 0x01 && buffer[3] === 0x00) {
+        return true;
+      }
+      return false;
+    }
+    const metadata = await sharp(buffer).metadata();
+    const formats = isFavicon ? ['png', 'ico'] : ['jpeg', 'jpg', 'png', 'webp', 'svg'];
+    return formats.includes(metadata.format);
+  } catch (err) {
+    return false;
+  }
+};
+
 // Configurar multer para logo
 const logoStorage = multer.diskStorage({
   destination: async (req, file, cb) => {
@@ -692,6 +708,11 @@ router.post('/logo',
             return res.status(400).json({ message: 'La imagen es muy grande (máx 5MB)' });
           }
 
+          const isValid = await verifyImageBuffer(buffer, parsed.mimeSubtype, false);
+          if (!isValid) {
+            return res.status(400).json({ message: 'El contenido de la imagen no es un logo válido o está dañado' });
+          }
+
           const uploadDir = path.join(__dirname, '../../uploads/logos');
           await fs.mkdir(uploadDir, { recursive: true });
 
@@ -832,6 +853,11 @@ router.post('/favicon',
           const buffer = Buffer.from(parsed.base64Data, 'base64');
           if (buffer.length > 256 * 1024) {
             return res.status(400).json({ message: 'El favicon es muy grande (máx 256KB)' });
+          }
+
+          const isValid = await verifyImageBuffer(buffer, parsed.mimeSubtype, true);
+          if (!isValid) {
+            return res.status(400).json({ message: 'El contenido del archivo no es un favicon válido (debe ser PNG o ICO válido)' });
           }
 
           const uploadDir = path.join(__dirname, '../../uploads/favicons');
