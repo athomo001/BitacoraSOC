@@ -98,6 +98,9 @@ entrySchema.index({ createdBy: 1 });
 entrySchema.index({ isGuestEntry: 1 });
 entrySchema.index({ ownerComplementId: 1, createdAt: -1 });
 
+// QA-DB-INDEX-OPTIMIZATION-001: Índice compuesto para optimizar el ordenamiento por fecha y hora de la bitácora
+entrySchema.index({ entryDate: -1, entryTime: -1, createdAt: -1 });
+
 // Índice compuesto para filtros comunes
 entrySchema.index({ entryType: 1, createdAt: -1 });
 entrySchema.index({ tags: 1, createdAt: -1 });
