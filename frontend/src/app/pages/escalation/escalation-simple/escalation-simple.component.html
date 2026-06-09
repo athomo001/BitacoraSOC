@@ -1,469 +1,588 @@
 <div class="container">
-  <header class="page-header">
-    <h1>⚡ Escalación y Turnos</h1>
-    <p>Vista simplificada de contactos y turnos de la semana</p>
-  </header>
+  
+  <!-- Se elimina el header gigante para subir las pestañas y optimizar el espacio vertical -->
 
-  <!-- SECCIÓN 1: TURNOS DE LA SEMANA (Interno) -->
-  <section class="section-card">
-    <div class="week-header">
-      <h2>👥 Turnos de esta Semana</h2>
-      <div class="week-navigation">
-        <button mat-icon-button (click)="previousWeek()" matTooltip="Semana anterior">
-          <mat-icon>chevron_left</mat-icon>
-        </button>
-        <span class="week-label">{{ getWeekLabel() }}</span>
-        <button mat-icon-button (click)="nextWeek()" matTooltip="Semana siguiente">
-          <mat-icon>chevron_right</mat-icon>
-        </button>
+  <!-- Pestañas Operativas de Navegación Premium -->
+  <mat-tab-group class="elegant-tabs">
+    
+    <!-- PESTAÑA 1: Turnos del SOC -->
+    <mat-tab>
+      <ng-template matTabLabel>
+        <mat-icon>schedule</mat-icon>
+        <span>Turnos SOC (Semana)</span>
+      </ng-template>
+
+      <!-- Subtítulo de Contexto -->
+      <div class="tab-desc-row">
+        <h2>👥 Asignación de Turnos</h2>
+        <p class="subtitle">Personal de turno y especialistas de infraestructura activos durante el ciclo semanal</p>
+      </div>
+
+      <!-- Controles de Navegación de Semanas -->
+      <div class="week-header-controls">
+        <div class="week-navigation">
+          <button mat-icon-button (click)="previousWeek()" matTooltip="Semana anterior">
+            <mat-icon>chevron_left</mat-icon>
+          </button>
+          <span class="week-label">{{ getWeekLabel() }}</span>
+          <button mat-icon-button (click)="nextWeek()" matTooltip="Semana siguiente">
+            <mat-icon>chevron_right</mat-icon>
+          </button>
+        </div>
         <button mat-raised-button color="primary" (click)="setCurrentWeek(); loadWeekShifts()" *ngIf="!isCurrentWeek()" class="btn-current">
           <mat-icon>today</mat-icon>
           Semana Actual
         </button>
       </div>
-    </div>
-    <p class="subtitle">Personal de turno en nuestra empresa</p>
 
-    <div *ngIf="loadingShifts" class="loading-container">
-      <mat-spinner diameter="40"></mat-spinner>
-    </div>
+      <!-- Estado de Carga -->
+      <div *ngIf="loadingShifts" class="loading-container">
+        <mat-spinner diameter="40"></mat-spinner>
+      </div>
 
-    <div *ngIf="!loadingShifts" class="shifts-grid">
-      <!-- N2 -->
-      <div class="shift-card">
-        <div class="shift-header n2">
-          <mat-icon>engineering</mat-icon>
-          <h3>N2 - Soporte Técnico</h3>
-        </div>
-        <div class="shift-body">
-          <div class="shift-user" *ngIf="weekShifts.N2">
-            <mat-icon>person</mat-icon>
-            <div class="user-info">
-              <strong>{{ weekShifts.N2?.currentUser?.name || 'No asignado' }}</strong>
-              <small *ngIf="weekShifts.N2?.currentUser?.email">📧 {{ weekShifts.N2.currentUser.email }}</small>
-              <small *ngIf="weekShifts.N2?.currentUser?.phone">📱 {{ weekShifts.N2.currentUser.phone }}</small>
+      <!-- Grilla de Turnos Estilizada -->
+      <div *ngIf="!loadingShifts" class="shifts-grid">
+        
+        <!-- Turno N2 -->
+        <div class="shift-card">
+          <div class="shift-header n2">
+            <mat-icon>engineering</mat-icon>
+            <h3>N2 • Soporte Técnico</h3>
+          </div>
+          <div class="shift-body">
+            <div class="shift-user" *ngIf="weekShifts.N2">
+              <div class="avatar-circle">
+                {{ (weekShifts.N2?.currentUser?.name || 'N2').substring(0, 2).toUpperCase() }}
+              </div>
+              <div class="user-info">
+                <strong>{{ weekShifts.N2?.currentUser?.name || 'No asignado' }}</strong>
+                <small *ngIf="weekShifts.N2?.currentUser?.email">📧 {{ weekShifts.N2.currentUser.email }}</small>
+                <small *ngIf="weekShifts.N2?.currentUser?.phone">📱 {{ weekShifts.N2.currentUser.phone }}</small>
+              </div>
+            </div>
+            <div class="shift-empty" *ngIf="!weekShifts.N2">
+              <mat-icon>person_off</mat-icon>
+              <span>Sin analista asignado</span>
             </div>
           </div>
-          <div class="shift-empty" *ngIf="!weekShifts.N2">
-            <mat-icon>person_off</mat-icon>
-            <span>Sin asignar</span>
-          </div>
         </div>
-      </div>
 
-      <!-- TI -->
-      <div class="shift-card">
-        <div class="shift-header ti">
-          <mat-icon>computer</mat-icon>
-          <h3>TI - Infraestructura</h3>
-        </div>
-        <div class="shift-body">
-          <div class="shift-user" *ngIf="weekShifts.TI">
-            <mat-icon>person</mat-icon>
-            <div class="user-info">
-              <strong>{{ weekShifts.TI?.currentUser?.name || 'No asignado' }}</strong>
-              <small *ngIf="weekShifts.TI?.currentUser?.email">📧 {{ weekShifts.TI.currentUser.email }}</small>
-              <small *ngIf="weekShifts.TI?.currentUser?.phone">📱 {{ weekShifts.TI.currentUser.phone }}</small>
+        <!-- Turno TI -->
+        <div class="shift-card">
+          <div class="shift-header ti">
+            <mat-icon>computer</mat-icon>
+            <h3>TI • Infraestructura</h3>
+          </div>
+          <div class="shift-body">
+            <div class="shift-user" *ngIf="weekShifts.TI">
+              <div class="avatar-circle">
+                {{ (weekShifts.TI?.currentUser?.name || 'TI').substring(0, 2).toUpperCase() }}
+              </div>
+              <div class="user-info">
+                <strong>{{ weekShifts.TI?.currentUser?.name || 'No asignado' }}</strong>
+                <small *ngIf="weekShifts.TI?.currentUser?.email">📧 {{ weekShifts.TI.currentUser.email }}</small>
+                <small *ngIf="weekShifts.TI?.currentUser?.phone">📱 {{ weekShifts.TI.currentUser.phone }}</small>
+              </div>
+            </div>
+            <div class="shift-empty" *ngIf="!weekShifts.TI">
+              <mat-icon>person_off</mat-icon>
+              <span>Sin especialista asignado</span>
             </div>
           </div>
-          <div class="shift-empty" *ngIf="!weekShifts.TI">
-            <mat-icon>person_off</mat-icon>
-            <span>Sin asignar</span>
-          </div>
         </div>
-      </div>
 
-      <!-- N1 NO HÁBIL -->
-      <div class="shift-card">
-        <div class="shift-header n1">
-          <mat-icon>schedule</mat-icon>
-          <h3>N1 - No Hábil</h3>
-        </div>
-        <div class="shift-body">
-          <div class="shift-user" *ngIf="weekShifts.N1_NO_HABIL">
-            <mat-icon>person</mat-icon>
-            <div class="user-info">
-              <strong>{{ weekShifts.N1_NO_HABIL?.currentUser?.name || 'No asignado' }}</strong>
-              <small *ngIf="weekShifts.N1_NO_HABIL?.currentUser?.email">📧 {{ weekShifts.N1_NO_HABIL.currentUser.email }}</small>
-              <small *ngIf="weekShifts.N1_NO_HABIL?.currentUser?.phone">📱 {{ weekShifts.N1_NO_HABIL.currentUser.phone }}</small>
+        <!-- Turno N1 NO HÁBIL -->
+        <div class="shift-card">
+          <div class="shift-header n1">
+            <mat-icon>schedule</mat-icon>
+            <h3>N1 • Horas No Hábiles</h3>
+          </div>
+          <div class="shift-body">
+            <div class="shift-user" *ngIf="weekShifts.N1_NO_HABIL">
+              <div class="avatar-circle">
+                {{ (weekShifts.N1_NO_HABIL?.currentUser?.name || 'N1').substring(0, 2).toUpperCase() }}
+              </div>
+              <div class="user-info">
+                <strong>{{ weekShifts.N1_NO_HABIL?.currentUser?.name || 'No asignado' }}</strong>
+                <small *ngIf="weekShifts.N1_NO_HABIL?.currentUser?.email">📧 {{ weekShifts.N1_NO_HABIL.currentUser.email }}</small>
+                <small *ngIf="weekShifts.N1_NO_HABIL?.currentUser?.phone">📱 {{ weekShifts.N1_NO_HABIL.currentUser.phone }}</small>
+              </div>
+            </div>
+            <div class="shift-empty" *ngIf="!weekShifts.N1_NO_HABIL">
+              <mat-icon>person_off</mat-icon>
+              <span>Sin analista asignado</span>
             </div>
           </div>
-          <div class="shift-empty" *ngIf="!weekShifts.N1_NO_HABIL">
-            <mat-icon>person_off</mat-icon>
-            <span>Sin asignar</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- SECCIÓN 2: TABLA DE ESCALAMIENTO -->
-  <section class="section-card">
-    <h2>📋 Contactos de Escalamiento</h2>
-    <p class="subtitle">Lista de contactos por servicio</p>
-
-    <!-- Selector de Cliente -->
-    <div class="client-selector" *ngIf="allClients.length > 0">
-      <mat-form-field appearance="outline" class="client-field">
-        <mat-label>Cliente</mat-label>
-        <input
-          matInput
-          [(ngModel)]="clientSearchTerm"
-          (ngModelChange)="onClientSearchChange()"
-          [matAutocomplete]="autoClientSimple"
-          placeholder="Buscar y seleccionar cliente">
-        <mat-icon matSuffix>search</mat-icon>
-        <mat-autocomplete #autoClientSimple="matAutocomplete" [displayWith]="displayClientOption" (optionSelected)="onClientAutocompleteSelected($event.option.value)">
-          <mat-option *ngFor="let client of filteredClients" [value]="client">
-            {{ client.name }}
-          </mat-option>
-          <mat-option *ngIf="filteredClients.length === 0" disabled>
-            Sin resultados para "{{ clientSearchTerm }}"
-          </mat-option>
-        </mat-autocomplete>
-      </mat-form-field>
-
-      <button mat-stroked-button color="accent" type="button" (click)="toggleQuickClientForm(clientSearchTerm)">
-        <mat-icon>person_add</mat-icon>
-        Cliente no está en la lista
-      </button>
-    </div>
-
-    <section *ngIf="showQuickClientForm" class="quick-client-form">
-      <h4>Agregar cliente nuevo al listado central</h4>
-      <div class="quick-client-form__row">
-        <mat-form-field appearance="outline" class="client-field">
-          <mat-label>Nombre del cliente</mat-label>
-          <input matInput [(ngModel)]="quickClientName" name="quickClientName" required>
-        </mat-form-field>
-        <mat-form-field appearance="outline" class="client-field">
-          <mat-label>Descripción (opcional)</mat-label>
-          <input matInput [(ngModel)]="quickClientDescription" name="quickClientDescription">
-        </mat-form-field>
-      </div>
-      <div class="quick-client-form__actions">
-        <button mat-raised-button color="primary" type="button" [disabled]="savingQuickClient" (click)="saveQuickClient()">
-          {{ savingQuickClient ? 'Guardando...' : 'Guardar cliente' }}
-        </button>
-        <button mat-button type="button" (click)="showQuickClientForm = false">Cancelar</button>
-      </div>
-    </section>
-
-    <div *ngIf="loading" class="loading-container">
-      <mat-spinner diameter="40"></mat-spinner>
-    </div>
-
-    <div *ngIf="!loading && selectedClient" class="dynamic-flow-view">
-      <div *ngIf="loadingClientFlow" class="loading-inline">
-        <mat-spinner diameter="24"></mat-spinner>
-      </div>
-
-      <app-escalation-flow-preview
-        *ngIf="!loadingClientFlow"
-        [clientName]="selectedClient?.name || ''"
-        [clientSelected]="!!selectedClient"
-        [flowSteps]="selectedClientFlow?.flow || []"
-        [legend]="selectedClientFlow?.legend || ''">
-      </app-escalation-flow-preview>
-    </div>
-
-    <div *ngIf="!loading && selectedClient && selectedClientData" class="excel-table-container">
-      <h3 class="client-title">{{ selectedClient.name }}</h3>
-      
-      <div *ngFor="let service of selectedClientData.services" class="service-section">
-        <div class="service-header-row">
-          <h4>{{ selectedClient?.name }} — {{ service.name }}</h4>
-          <span *ngIf="service.emergencyPhone" class="emergency-badge">Teléfono emergencia: {{ service.emergencyPhone }}</span>
         </div>
 
-        <table class="excel-table simple-table">
+      </div>
+
+      <!-- SECCIÓN NUEVA: Personal en Teletrabajo y Apoyo (Layout en Tabla Escalable) -->
+      <div class="tab-desc-row" style="margin-top: 32px; border-top: 1px dashed var(--outline-subtle); padding-top: 24px;">
+        <h2>🏡 Personal en Teletrabajo y Apoyo</h2>
+        <p class="subtitle">Estado operativo de analistas de apoyo, teletrabajo y registros de vacaciones del equipo</p>
+      </div>
+
+      <div class="excel-table-container">
+        <!-- Tabla estructurada con columnas de contacto separadas y funcionalidad de copiado rápido al portapapeles -->
+        <table class="excel-table">
           <thead>
             <tr>
               <th>Nombre</th>
-              <th>Para</th>
-              <th>CC</th>
+              <th>Correo</th>
               <th>Teléfono</th>
+              <th>Cargo</th>
+              <th>Situación</th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let contact of service.contacts" class="data-row">
-              <td class="cell-name">{{ contact.name || '-' }}</td>
-              <td class="cell-email clickable"
-                  (click)="copyToClipboard(contact.role === 'PARA' ? contact.email : '-')">
-                {{ contact.role === 'PARA' ? (contact.email || '-') : '-' }}
+            <tr *ngFor="let staff of teleworkStaff" class="data-row" [class.row-vacation]="staff.status === 'vacation'">
+              <td class="cell-name">{{ staff.name }}</td>
+              <td class="cell-email clickable" (click)="copyToClipboard(staff.email)">
+                <span *ngIf="staff.email !== '-'">📧 {{ staff.email }}</span>
+                <span *ngIf="staff.email === '-'">-</span>
               </td>
-              <td class="cell-email clickable"
-                  (click)="copyToClipboard(contact.role === 'CC' ? contact.email : '-')">
-                {{ contact.role === 'CC' ? (contact.email || '-') : '-' }}
+              <td class="cell-phone clickable" (click)="copyToClipboard(staff.phone)">
+                <span *ngIf="staff.phone !== '-'">📱 {{ staff.phone }}</span>
+                <span *ngIf="staff.phone === '-'">-</span>
               </td>
-              <td class="cell-phone highlight">{{ contact.phone || '-' }}</td>
+              <td>{{ staff.role || '-' }}</td>
+              <td>
+                <span class="badge-status" [class]="staff.status">
+                  <mat-icon *ngIf="staff.status === 'telework'">home</mat-icon>
+                  <mat-icon *ngIf="staff.status === 'office'">business</mat-icon>
+                  <mat-icon *ngIf="staff.status === 'vacation'">event_busy</mat-icon>
+                  <mat-icon *ngIf="staff.status === 'upcoming-vacation'">event_note</mat-icon>
+                  <mat-icon *ngIf="staff.status === 'unassigned'">help_outline</mat-icon>
+                  <span>{{ staff.statusLabel }}</span>
+                </span>
+              </td>
             </tr>
-            <tr *ngIf="!service.contacts || service.contacts.length === 0" class="no-data-row">
-              <td colspan="4" class="text-center text-muted">Sin contactos configurados</td>
+          </tbody>
+        </table>
+      </div>
+    </mat-tab>
+
+    <!-- PESTAÑA 2: Contactos y Flujo de Escalamiento -->
+    <mat-tab>
+      <ng-template matTabLabel>
+        <mat-icon>call</mat-icon>
+        <span>Contactos y Flujos</span>
+      </ng-template>
+
+      <!-- Subtítulo de Contexto -->
+      <div class="tab-desc-row">
+        <h2>📞 Líneas de Escalamiento y Directorios</h2>
+        <p class="subtitle">Consulta el orden de llamados críticos y los datos de contacto específicos por cliente</p>
+      </div>
+
+      <!-- Selector de Cliente (Autocomplete Integrado) -->
+      <div class="client-selector" *ngIf="allClients.length > 0">
+        <mat-form-field appearance="outline" class="client-field">
+          <mat-label>Selecciona un Cliente</mat-label>
+          <!-- Enlace de eventos para facilitar la selección al enfocar el buscador -->
+          <input
+            matInput
+            [(ngModel)]="clientSearchTerm"
+            (ngModelChange)="onClientSearchChange()"
+            [matAutocomplete]="autoClientSimple"
+            (focus)="onInputFocus($event)"
+            (click)="onInputFocus($event)"
+            placeholder="Buscar por nombre...">
+          <button *ngIf="clientSearchTerm" matSuffix mat-icon-button aria-label="Clear" (click)="clearClientSelection()">
+            <mat-icon>close</mat-icon>
+          </button>
+          <mat-icon *ngIf="!clientSearchTerm" matSuffix>search</mat-icon>
+          <mat-autocomplete #autoClientSimple="matAutocomplete" [displayWith]="displayClientOption" (optionSelected)="onClientAutocompleteSelected($event.option.value)">
+            <mat-option *ngFor="let client of filteredClients" [value]="client">
+              <strong>{{ client.name }}</strong>
+            </mat-option>
+            <mat-option *ngIf="filteredClients.length === 0" disabled>
+              Sin resultados para "{{ clientSearchTerm }}"
+            </mat-option>
+          </mat-autocomplete>
+        </mat-form-field>
+
+        <button mat-stroked-button color="accent" type="button" (click)="toggleQuickClientForm(clientSearchTerm)">
+          <mat-icon>{{ showQuickClientForm ? 'close' : 'person_add' }}</mat-icon>
+          {{ showQuickClientForm ? 'Cancelar' : 'Cliente no listado' }}
+        </button>
+      </div>
+
+      <!-- Formulario de Nuevo Cliente (Inline Expandible) -->
+      <section *ngIf="showQuickClientForm" class="quick-client-form">
+        <h4>Agregar cliente nuevo al listado central</h4>
+        <div class="quick-client-form__row">
+          <mat-form-field appearance="outline" class="client-field">
+            <mat-label>Nombre del cliente</mat-label>
+            <input matInput [(ngModel)]="quickClientName" name="quickClientName" placeholder="Ej: ACME Corp" required>
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="client-field">
+            <mat-label>Descripción (opcional)</mat-label>
+            <input matInput [(ngModel)]="quickClientDescription" placeholder="Breve nota descriptiva" name="quickClientDescription">
+          </mat-form-field>
+        </div>
+        <div class="quick-client-form__actions">
+          <button mat-raised-button color="primary" type="button" [disabled]="savingQuickClient" (click)="saveQuickClient()">
+            {{ savingQuickClient ? 'Guardando...' : 'Guardar Cliente' }}
+          </button>
+        </div>
+      </section>
+
+      <!-- Spinner general -->
+      <div *ngIf="loading" class="loading-container">
+        <mat-spinner diameter="40"></mat-spinner>
+      </div>
+
+      <!-- Proyección del Flujo de Llamados Dinámico -->
+      <div *ngIf="!loading && selectedClient" class="dynamic-flow-view">
+        <div *ngIf="loadingClientFlow" class="loading-inline">
+          <mat-spinner diameter="24"></mat-spinner>
+          <span style="font-size: 0.85rem; color: var(--text-secondary);">Proyectando flujo de llamados...</span>
+        </div>
+
+        <app-escalation-flow-preview
+          *ngIf="!loadingClientFlow"
+          [clientName]="selectedClient?.name || ''"
+          [clientSelected]="!!selectedClient"
+          [flowSteps]="selectedClientFlow?.flow || []"
+          [legend]="selectedClientFlow?.legend || ''">
+        </app-escalation-flow-preview>
+      </div>
+
+      <!-- Tabla de Contactos del Cliente Seleccionado -->
+      <div *ngIf="!loading && selectedClient && selectedClientData" class="excel-table-container">
+        <h3 class="client-title" style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--primary-color); padding-bottom: 8px; margin: 24px 0 16px 0;">
+          Directorio de Servicios: {{ selectedClient.name }}
+        </h3>
+        
+        <div *ngFor="let service of selectedClientData.services" class="service-section">
+          <div class="service-header-row">
+            <h4>{{ selectedClient?.name }} • {{ service.name }}</h4>
+            <span *ngIf="service.emergencyPhone" class="emergency-badge">Teléfono Emergencia: {{ service.emergencyPhone }}</span>
+          </div>
+
+          <table class="excel-table">
+            <thead>
+              <tr>
+                <th>Nombre del Contacto</th>
+                <th>Envío Principal (PARA)</th>
+                <th>Envío en Copia (CC)</th>
+                <th>Teléfono</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let contact of service.contacts" class="data-row">
+                <td class="cell-name">{{ contact.name || '-' }}</td>
+                <td class="cell-email clickable"
+                    [class.clickable]="contact.role === 'PARA'"
+                    (click)="contact.role === 'PARA' && contact.email ? copyToClipboard(contact.email) : null">
+                  {{ contact.role === 'PARA' ? (contact.email || '-') : '-' }}
+                </td>
+                <td class="cell-email clickable"
+                    [class.clickable]="contact.role === 'CC'"
+                    (click)="contact.role === 'CC' && contact.email ? copyToClipboard(contact.email) : null">
+                  {{ contact.role === 'CC' ? (contact.email || '-') : '-' }}
+                </td>
+                <td class="cell-phone">{{ contact.phone || '-' }}</td>
+              </tr>
+              <tr *ngIf="!service.contacts || service.contacts.length === 0" class="no-data-row">
+                <td colspan="4" class="text-center text-muted" style="padding: 20px; text-align: center; color: var(--text-muted); font-style: italic;">Sin contactos configurados</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Alerta de Servicio no Configurado -->
+        <div *ngIf="!selectedClientData.services || selectedClientData.services.length === 0" class="no-data-message">
+          <mat-icon>info</mat-icon>
+          <p>No hay servicios configurados para este cliente</p>
+        </div>
+      </div>
+
+      <!-- Estado Inicial / Sin Selección -->
+      <div *ngIf="!loading && !selectedClient" class="no-data-message">
+        <mat-icon>contact_phone</mat-icon>
+        <p>Selecciona un cliente en el buscador superior para proyectar el flujo de llamados y directorio de servicios.</p>
+      </div>
+
+      <!-- Subsección: Contactos sin servicio asignado (Global) -->
+      <div *ngIf="!loading && unassignedContacts.length > 0" style="margin-top: 40px; border-top: 1px dashed var(--outline-subtle); padding-top: 32px;">
+        <h3 style="font-size: 1.15rem; font-weight: 600; margin-bottom: 8px;">📋 Contactos sin Servicio Asignado</h3>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 16px;">
+          Estos contactos pertenecen a la agenda pero no están adscritos a ningún servicio en particular. Asígnalos desde la consola de administración si es requerido.
+        </p>
+        <div class="excel-table-container">
+          <table class="excel-table">
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Estado</th>
+                <th>Nombre (PARA)</th>
+                <th>Nombre (CC)</th>
+                <th>Correo Electrónico</th>
+                <th>Teléfono</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let contact of unassignedContacts; let i = index" class="data-row">
+                <td class="cell-name" *ngIf="i === 0" [attr.rowspan]="unassignedContacts.length">Sin Servicio</td>
+                <td class="cell-name" *ngIf="i === 0" [attr.rowspan]="unassignedContacts.length">-</td>
+                <td><span *ngIf="contact.role === 'PARA'">{{ contact.name }}</span><span *ngIf="contact.role !== 'PARA'">-</span></td>
+                <td><span *ngIf="contact.role === 'CC'">{{ contact.name }}</span><span *ngIf="contact.role !== 'CC'">-</span></td>
+                <td class="cell-email clickable" (click)="contact.email ? copyToClipboard(contact.email) : null">{{ contact.email || '-' }}</td>
+                <td class="cell-phone">{{ contact.phone || '-' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- PESTAÑA 3: Matriz RACI -->
+    <mat-tab>
+      <ng-template matTabLabel>
+        <mat-icon>assignment</mat-icon>
+        <span>Matriz RACI</span>
+      </ng-template>
+
+      <!-- Subtítulo de Contexto -->
+      <div class="tab-desc-row">
+        <h2>📋 Matriz de Responsabilidades (RACI)</h2>
+        <p class="subtitle">Define los roles de Responsable, Aprobador, Consultado e Informado para cada actividad operativa del cliente</p>
+      </div>
+
+      <!-- Selector de Cliente RACI -->
+      <div class="client-selector" *ngIf="raciClients.length > 0">
+        <mat-form-field appearance="outline" class="client-field">
+          <mat-label>Selecciona un Cliente para RACI</mat-label>
+          <!-- Enlace de eventos para la matriz RACI que permite seleccionar todo al enfocar o hacer clic -->
+          <input
+            matInput
+            [(ngModel)]="raciClientSearchTerm"
+            (ngModelChange)="onRaciClientSearchChange()"
+            [matAutocomplete]="autoRaciClientSimple"
+            (focus)="onInputFocus($event)"
+            (click)="onInputFocus($event)"
+            placeholder="Buscar cliente...">
+          <button *ngIf="raciClientSearchTerm" matSuffix mat-icon-button aria-label="Clear" (click)="clearRaciClientSelection()">
+            <mat-icon>close</mat-icon>
+          </button>
+          <mat-icon *ngIf="!raciClientSearchTerm" matSuffix>search</mat-icon>
+          <mat-autocomplete #autoRaciClientSimple="matAutocomplete" [displayWith]="displayRaciClientOption" (optionSelected)="onRaciClientAutocompleteSelected($event.option.value)">
+            <mat-option *ngFor="let client of filteredRaciClients" [value]="client">
+              <strong>{{ client.name }}</strong>
+            </mat-option>
+            <mat-option *ngIf="filteredRaciClients.length === 0" disabled>
+              Sin resultados para "{{ raciClientSearchTerm }}"
+            </mat-option>
+          </mat-autocomplete>
+        </mat-form-field>
+      </div>
+
+      <!-- Spinner RACI -->
+      <div *ngIf="loadingRaci" class="loading-container">
+        <mat-spinner diameter="32"></mat-spinner>
+      </div>
+
+      <!-- Tabla RACI estilo Excel -->
+      <div *ngIf="!loadingRaci && selectedRaciClient" class="excel-table-container">
+        <table class="excel-table">
+          <thead>
+            <tr>
+              <th>Tópico</th>
+              <th>Actividad / Proceso</th>
+              <th>Responsable (R)</th>
+              <th>Aprobador (A)</th>
+              <th>Consultado (C)</th>
+              <th>Informado (I)</th>
+              <th>Notas Contextuales</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let raci of raciEntries" class="data-row">
+              <td class="cell-name">{{ raci.topic || '-' }}</td>
+              <td class="cell-name">{{ raci.activity }}</td>
+              
+              <!-- Responsable -->
+              <td>
+                <div *ngIf="raci.responsible?.name">
+                  <strong>{{ raci.responsible.name }}</strong><br>
+                  <small *ngIf="raci.responsible.email" class="cell-email clickable" (click)="copyToClipboard(raci.responsible.email)">
+                    📧 {{ raci.responsible.email }}
+                  </small><br *ngIf="raci.responsible.email">
+                  <small *ngIf="raci.responsible.phone" class="cell-phone" style="font-size: 0.8rem;">📱 {{ raci.responsible.phone }}</small>
+                </div>
+                <span *ngIf="!raci.responsible?.name">-</span>
+              </td>
+
+              <!-- Aprobador -->
+              <td>
+                <div *ngIf="raci.accountable?.name">
+                  <strong>{{ raci.accountable.name }}</strong><br>
+                  <small *ngIf="raci.accountable.email" class="cell-email clickable" (click)="copyToClipboard(raci.accountable.email)">
+                    📧 {{ raci.accountable.email }}
+                  </small><br *ngIf="raci.accountable.email">
+                  <small *ngIf="raci.accountable.phone" class="cell-phone" style="font-size: 0.8rem;">📱 {{ raci.accountable.phone }}</small>
+                </div>
+                <span *ngIf="!raci.accountable?.name">-</span>
+              </td>
+
+              <!-- Consultado -->
+              <td>
+                <div *ngIf="raci.consulted?.name">
+                  <strong>{{ raci.consulted.name }}</strong><br>
+                  <small *ngIf="raci.consulted.email" class="cell-email clickable" (click)="copyToClipboard(raci.consulted.email)">
+                    📧 {{ raci.consulted.email }}
+                  </small><br *ngIf="raci.consulted.email">
+                  <small *ngIf="raci.consulted.phone" class="cell-phone" style="font-size: 0.8rem;">📱 {{ raci.consulted.phone }}</small>
+                </div>
+                <span *ngIf="!raci.consulted?.name">-</span>
+              </td>
+
+              <!-- Informado -->
+              <td>
+                <div *ngIf="raci.informed?.name">
+                  <strong>{{ raci.informed.name }}</strong><br>
+                  <small *ngIf="raci.informed.email" class="cell-email clickable" (click)="copyToClipboard(raci.informed.email)">
+                    📧 {{ raci.informed.email }}
+                  </small><br *ngIf="raci.informed.email">
+                  <small *ngIf="raci.informed.phone" class="cell-phone" style="font-size: 0.8rem;">📱 {{ raci.informed.phone }}</small>
+                </div>
+                <span *ngIf="!raci.informed?.name">-</span>
+              </td>
+
+              <td>{{ raci.notes || '-' }}</td>
+            </tr>
+            <tr *ngIf="!raciEntries || raciEntries.length === 0" class="no-data-row">
+              <td colspan="7" class="text-center text-muted" style="padding: 24px; text-align: center; font-style: italic;">Sin entradas de RACI asignadas a este cliente</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <!-- Sin servicios -->
-      <div *ngIf="!selectedClientData.services || selectedClientData.services.length === 0" class="no-data-message">
+      <!-- Sin selección -->
+      <div *ngIf="!loadingRaci && !selectedRaciClient" class="no-data-message">
         <mat-icon>info</mat-icon>
-        <p>No hay servicios configurados para este cliente</p>
+        <p>Selecciona un cliente del listado superior para consultar su matriz de responsabilidades RACI.</p>
       </div>
-    </div>
+    </mat-tab>
 
-    <!-- Sin datos -->
-    <div *ngIf="!loading && (!selectedClient || allClients.length === 0)" class="no-data-message">
-      <mat-icon>warning</mat-icon>
-      <p>No hay datos de escalamiento disponibles</p>
-    </div>
-  </section>
+    <!-- PESTAÑA 4: Mantenimientos Programados -->
+    <mat-tab>
+      <ng-template matTabLabel>
+        <mat-icon>build</mat-icon>
+        <span>Mantenimientos</span>
+      </ng-template>
 
-  <!-- SECCIÓN 3: RACI POR CLIENTE -->
-  <section class="section-card" *ngIf="!loading">
-    <h2>📋 RACI</h2>
-    <p class="subtitle">Matriz de responsabilidades por cliente</p>
+      <!-- Subtítulo de Contexto -->
+      <div class="tab-desc-row">
+        <h2>🔧 Ventanas de Mantenimiento</h2>
+        <p class="subtitle">Planifica y administra las ventanas técnicas programadas que suspenden de forma controlada el envío de alertas</p>
+      </div>
 
-    <div class="client-selector" *ngIf="raciClients.length > 0">
-      <mat-form-field appearance="outline" class="client-field">
-        <mat-label>Cliente</mat-label>
-        <input
-          matInput
-          [(ngModel)]="raciClientSearchTerm"
-          [matAutocomplete]="autoRaciClientSimple"
-          placeholder="Buscar y seleccionar cliente">
-        <mat-icon matSuffix>search</mat-icon>
-        <mat-autocomplete #autoRaciClientSimple="matAutocomplete" [displayWith]="displayRaciClientOption" (optionSelected)="onRaciClientAutocompleteSelected($event.option.value)">
-          <mat-option *ngFor="let client of filteredRaciClients" [value]="client">
-            {{ client.name }}
-          </mat-option>
-          <mat-option *ngIf="filteredRaciClients.length === 0" disabled>
-            Sin resultados para "{{ raciClientSearchTerm }}"
-          </mat-option>
-        </mat-autocomplete>
-      </mat-form-field>
-    </div>
-
-    <div *ngIf="loadingRaci" class="loading-container">
-      <mat-spinner diameter="32"></mat-spinner>
-    </div>
-
-    <div *ngIf="!loadingRaci && selectedRaciClient" class="excel-table-container">
-      <table class="excel-table simple-table">
-        <thead>
-          <tr>
-            <th>Tópico</th>
-            <th>Actividad/Proceso</th>
-            <th>Responsable (R)</th>
-            <th>Aprobador (A)</th>
-            <th>Consultado (C)</th>
-            <th>Informado (I)</th>
-            <th>Notas</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let raci of raciEntries" class="data-row">
-            <td class="cell-name">{{ raci.topic || '-' }}</td>
-            <td class="cell-name">{{ raci.activity }}</td>
-            <td>
-              <div *ngIf="raci.responsible?.name">
-                <strong>{{ raci.responsible.name }}</strong><br>
-                <small *ngIf="raci.responsible.email" class="clickable" (click)="copyToClipboard(raci.responsible.email)">
-                  📧 {{ raci.responsible.email }}
-                </small><br *ngIf="raci.responsible.email">
-                <small *ngIf="raci.responsible.phone" class="highlight">📱 {{ raci.responsible.phone }}</small>
-              </div>
-              <span *ngIf="!raci.responsible?.name">-</span>
-            </td>
-            <td>
-              <div *ngIf="raci.accountable?.name">
-                <strong>{{ raci.accountable.name }}</strong><br>
-                <small *ngIf="raci.accountable.email" class="clickable" (click)="copyToClipboard(raci.accountable.email)">
-                  📧 {{ raci.accountable.email }}
-                </small><br *ngIf="raci.accountable.email">
-                <small *ngIf="raci.accountable.phone" class="highlight">📱 {{ raci.accountable.phone }}</small>
-              </div>
-              <span *ngIf="!raci.accountable?.name">-</span>
-            </td>
-            <td>
-              <div *ngIf="raci.consulted?.name">
-                <strong>{{ raci.consulted.name }}</strong><br>
-                <small *ngIf="raci.consulted.email" class="clickable" (click)="copyToClipboard(raci.consulted.email)">
-                  📧 {{ raci.consulted.email }}
-                </small><br *ngIf="raci.consulted.email">
-                <small *ngIf="raci.consulted.phone" class="highlight">📱 {{ raci.consulted.phone }}</small>
-              </div>
-              <span *ngIf="!raci.consulted?.name">-</span>
-            </td>
-            <td>
-              <div *ngIf="raci.informed?.name">
-                <strong>{{ raci.informed.name }}</strong><br>
-                <small *ngIf="raci.informed.email" class="clickable" (click)="copyToClipboard(raci.informed.email)">
-                  📧 {{ raci.informed.email }}
-                </small><br *ngIf="raci.informed.email">
-                <small *ngIf="raci.informed.phone" class="highlight">📱 {{ raci.informed.phone }}</small>
-              </div>
-              <span *ngIf="!raci.informed?.name">-</span>
-            </td>
-            <td>{{ raci.notes || '-' }}</td>
-          </tr>
-          <tr *ngIf="!raciEntries || raciEntries.length === 0" class="no-data-row">
-            <td colspan="7" class="text-center text-muted">No hay datos de RACI disponibles</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div *ngIf="!loadingRaci && raciClients.length === 0" class="no-data-message">
-      <mat-icon>warning</mat-icon>
-      <p>No hay clientes (Log Sources) disponibles</p>
-    </div>
-
-    <div *ngIf="!loadingRaci && raciClients.length > 0 && !selectedRaciClient" class="no-data-message">
-      <mat-icon>info</mat-icon>
-      <p>Selecciona un cliente para ver la matriz RACI</p>
-    </div>
-  </section>
-
-  <!-- Contactos sin servicio asignado (global) -->
-  <section class="section-card" *ngIf="!loading && unassignedContacts.length > 0">
-    <h2>📋 Contactos sin servicio asignado</h2>
-    <p class="subtitle">Asigna estos contactos a un servicio desde el administrador.</p>
-    <div class="service-section">
-      <table class="excel-table">
-        <thead>
-          <tr>
-            <th rowspan="2" class="header-service">Escalamiento</th>
-            <th rowspan="2" class="header-service">Servicio</th>
-            <th colspan="2" class="header-contacts">Envíos de correos</th>
-            <th rowspan="2" class="header-phone">Correo</th>
-            <th rowspan="2" class="header-phone">Teléfono</th>
-          </tr>
-          <tr>
-            <th class="subheader">PARA</th>
-            <th class="subheader">CC</th>
-          </tr>
-        </thead>
-        <tbody>
-            <tr *ngFor="let contact of unassignedContacts; let i = index" class="data-row">
-              <td class="cell-service" *ngIf="i === 0" [attr.rowspan]="unassignedContacts.length">
-                <strong>Sin servicio</strong>
-              </td>
-              <td class="cell-service" *ngIf="i === 0" [attr.rowspan]="unassignedContacts.length">
-                <strong>-</strong>
-              </td>
-            <td class="cell-contact">
-              <span *ngIf="contact.role === 'PARA'">{{ contact.name }}</span>
-              <span *ngIf="contact.role !== 'PARA'">-</span>
-            </td>
-            <td class="cell-contact">
-              <span *ngIf="contact.role === 'CC'">{{ contact.name }}</span>
-              <span *ngIf="contact.role !== 'CC'">-</span>
-            </td>
-            <td class="cell-email">{{ contact.email || '-' }}</td>
-            <td class="cell-phone">{{ contact.phone || '-' }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <!-- ── ESC-MAINT-042: Gestión de Mantenimientos Programados ── -->
-  <section class="section-card maintenance-section">
-    <div class="maintenance-header">
-      <h2>🔧 Mantenimientos Programados</h2>
-      <button mat-raised-button color="primary" (click)="openMaintenanceForm(null)">
-        <mat-icon>add</mat-icon> Nuevo Mantenimiento
-      </button>
-    </div>
-    <p class="subtitle">Crea y gestiona ventanas de mantenimiento para clientes.</p>
-
-    <div *ngIf="loadingMaintenances" class="loading-container">
-      <mat-spinner diameter="40"></mat-spinner>
-    </div>
-
-    <ng-container *ngIf="!loadingMaintenances">
-      <table class="catalog-table" *ngIf="maintenanceRules.length > 0">
-        <thead>
-          <tr>
-            <th>Título</th>
-            <th>Mensaje</th>
-            <th>Desde</th>
-            <th>Hasta</th>
-            <th>Bloqueante</th>
-            <th>Estado</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let rule of maintenanceRules" [class.row-disabled]="!rule.enabled">
-            <td><strong>{{ rule.maintenanceTitle || rule.name || '-' }}</strong></td>
-            <td class="cell-truncate">{{ rule.alertMessage || '-' }}</td>
-            <td>{{ rule.validFrom ? (rule.validFrom | date:'dd/MM/yyyy HH:mm') : 'Sin límite' }}</td>
-            <td>{{ rule.validTo ? (rule.validTo | date:'dd/MM/yyyy HH:mm') : 'Sin límite' }}</td>
-            <td>
-              <span *ngIf="rule.blocking" class="badge-pill badge-surface-error">Sí</span>
-              <span *ngIf="!rule.blocking" class="badge-pill badge-surface-neutral">No</span>
-            </td>
-            <td>
-              <span *ngIf="rule.enabled" class="badge-pill badge-surface-success">Activo</span>
-              <span *ngIf="!rule.enabled" class="badge-pill badge-pill-muted">Inactivo</span>
-            </td>
-            <td class="cell-actions">
-              <button mat-icon-button color="primary" (click)="openMaintenanceForm(rule)" matTooltip="Editar">
-                <mat-icon>edit</mat-icon>
-              </button>
-              <button mat-icon-button color="warn" (click)="deleteMaintenance(rule)" matTooltip="Eliminar">
-                <mat-icon>delete</mat-icon>
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <p class="empty-hint" *ngIf="maintenanceRules.length === 0">
-        No hay mantenimientos programados.
-      </p>
-    </ng-container>
-
-    <!-- Formulario inline de creación/edición -->
-    <div class="maintenance-form-panel" *ngIf="maintenanceFormOpen">
-      <h3>{{ editingMaintenance ? 'Editar Mantenimiento' : 'Nuevo Mantenimiento' }}</h3>
-      <form [formGroup]="maintenanceForm" (ngSubmit)="saveMaintenance()" class="maint-form">
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Título del mantenimiento</mat-label>
-          <input matInput formControlName="maintenanceTitle" placeholder="Ej: Mantenimiento equipo firewall" maxlength="200">
-        </mat-form-field>
-
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Mensaje (descripción)</mat-label>
-          <textarea matInput formControlName="alertMessage" rows="2" maxlength="500"
-            placeholder="Ej: Equipo fuera de servicio por actualización de firmware."></textarea>
-        </mat-form-field>
-
-        <div class="maint-form-row">
-          <mat-form-field appearance="outline">
-            <mat-label>Fecha/hora inicio</mat-label>
-            <input matInput type="datetime-local" formControlName="validFrom">
-          </mat-form-field>
-
-          <mat-form-field appearance="outline">
-            <mat-label>Fecha/hora fin</mat-label>
-            <input matInput type="datetime-local" formControlName="validTo">
-          </mat-form-field>
-        </div>
-
-        <div class="maint-form-checks">
-          <mat-checkbox formControlName="blocking">Bloqueante (oculta Alertas Especiales)</mat-checkbox>
-          <mat-checkbox formControlName="enabled">Activo</mat-checkbox>
-        </div>
-
-        <div class="maint-form-actions">
-          <button mat-raised-button color="primary" type="submit" [disabled]="maintenanceForm.invalid || savingMaintenance">
-            {{ editingMaintenance ? 'Guardar cambios' : 'Crear mantenimiento' }}
+      <!-- Sección de Mantenimientos Activos -->
+      <section class="maintenance-section">
+        <div class="maintenance-header">
+          <h2>Ventanas de Mantenimiento Registradas</h2>
+          <button mat-raised-button color="primary" (click)="openMaintenanceForm(null)">
+            <mat-icon>add</mat-icon> 
+            Nuevo Mantenimiento
           </button>
-          <button mat-stroked-button type="button" (click)="cancelMaintenanceForm()">Cancelar</button>
         </div>
-      </form>
-    </div>
-  </section>
+
+        <div *ngIf="loadingMaintenances" class="loading-container">
+          <mat-spinner diameter="40"></mat-spinner>
+        </div>
+
+        <ng-container *ngIf="!loadingMaintenances">
+          <table class="catalog-table" *ngIf="maintenanceRules.length > 0">
+            <thead>
+              <tr>
+                <th>Título</th>
+                <th>Mensaje Informativo</th>
+                <th>Inicio Autorizado</th>
+                <th>Fin Programado</th>
+                <th>Bloqueante</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let rule of maintenanceRules" [class.row-disabled]="!rule.enabled">
+                <td><strong>{{ rule.maintenanceTitle || rule.name || '-' }}</strong></td>
+                <td class="cell-truncate">{{ rule.alertMessage || '-' }}</td>
+                <td>{{ rule.validFrom ? (rule.validFrom | date:'dd/MM/yyyy HH:mm') : 'Sin límite' }}</td>
+                <td>{{ rule.validTo ? (rule.validTo | date:'dd/MM/yyyy HH:mm') : 'Sin límite' }}</td>
+                <td>
+                  <span *ngIf="rule.blocking" class="badge-pill badge-surface-error" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem;">Sí</span>
+                  <span *ngIf="!rule.blocking" class="badge-pill badge-surface-neutral" style="background: var(--outline-subtle); color: var(--text-secondary); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">No</span>
+                </td>
+                <td>
+                  <span *ngIf="rule.enabled" class="badge-pill badge-surface-success" style="background: rgba(16, 185, 129, 0.1); color: #10b981; padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem;">Activo</span>
+                  <span *ngIf="!rule.enabled" class="badge-pill badge-pill-muted" style="background: var(--outline-subtle); color: var(--text-muted); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">Inactivo</span>
+                </td>
+                <td class="cell-actions">
+                  <button mat-icon-button color="primary" (click)="openMaintenanceForm(rule)" matTooltip="Editar">
+                    <mat-icon>edit</mat-icon>
+                  </button>
+                  <button mat-icon-button color="warn" (click)="deleteMaintenance(rule)" matTooltip="Eliminar">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          
+          <p class="empty-hint" *ngIf="maintenanceRules.length === 0">
+            No se registran ventanas de mantenimiento activas en el sistema.
+          </p>
+        </ng-container>
+
+        <!-- Formulario Inline Expandible de Edición/Creación -->
+        <div class="maintenance-form-panel" *ngIf="maintenanceFormOpen">
+          <h3>{{ editingMaintenance ? 'Modificar Ventana de Mantenimiento' : 'Programar Nueva Ventana de Mantenimiento' }}</h3>
+          
+          <form [formGroup]="maintenanceForm" (ngSubmit)="saveMaintenance()" class="maint-form">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Título del Mantenimiento</mat-label>
+              <input matInput formControlName="maintenanceTitle" placeholder="Ej: Mantención de Switch Core Nivel 2" maxlength="200">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Mensaje de Notificación (Alertas)</mat-label>
+              <textarea matInput formControlName="alertMessage" rows="2" maxlength="500"
+                placeholder="Ej: Interrupción temporal del servicio por reemplazo físico de fibra óptica."></textarea>
+            </mat-form-field>
+
+            <div class="maint-form-row">
+              <mat-form-field appearance="outline">
+                <mat-label>Fecha/Hora de Inicio</mat-label>
+                <input matInput type="datetime-local" formControlName="validFrom">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Fecha/Hora de Finalización</mat-label>
+                <input matInput type="datetime-local" formControlName="validTo">
+              </mat-form-field>
+            </div>
+
+            <div class="maint-form-checks">
+              <mat-checkbox formControlName="blocking">Bloqueante (suspende Alertas Especiales del cliente)</mat-checkbox>
+              <mat-checkbox formControlName="enabled">Activo e Inmediato</mat-checkbox>
+            </div>
+
+            <div class="maint-form-actions">
+              <button mat-raised-button color="primary" type="submit" [disabled]="maintenanceForm.invalid || savingMaintenance">
+                {{ editingMaintenance ? 'Guardar Cambios' : 'Registrar Mantenimiento' }}
+              </button>
+              <button mat-button type="button" (click)="cancelMaintenanceForm()">Cancelar</button>
+            </div>
+          </form>
+        </div>
+      </section>
+    </mat-tab>
+
+  </mat-tab-group>
+
 </div>

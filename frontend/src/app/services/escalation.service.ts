@@ -385,7 +385,33 @@ export class EscalationService {
   // 🔧 CRUD ADMIN - Asignaciones de Turno
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+  /**
+   * Consulta pública de asignaciones de turno (accesible para analistas autenticados).
+   * Usada para poblar la tabla de teletrabajo/vacaciones en la vista operativa.
+   */
   getAssignments(roleCode?: string, fromDate?: string, toDate?: string, limit?: number): Observable<ShiftAssignment[]> {
+    let params = new HttpParams();
+    if (roleCode) {
+      params = params.set('roleCode', roleCode);
+    }
+    if (fromDate) {
+      params = params.set('fromDate', fromDate);
+    }
+    if (toDate) {
+      params = params.set('toDate', toDate);
+    }
+    if (limit && limit > 0) {
+      params = params.set('limit', String(limit));
+    }
+    // Usa ruta pública (/assignments) accesible para todos los analistas autenticados
+    return this.http.get<ShiftAssignment[]>(`${this.apiUrl}/assignments`, { params });
+  }
+
+  /**
+   * Consulta administrativa de asignaciones (requiere rol admin).
+   * Usada en /main/admin/work-shifts para gestión completa.
+   */
+  getAssignmentsAdmin(roleCode?: string, fromDate?: string, toDate?: string, limit?: number): Observable<ShiftAssignment[]> {
     let params = new HttpParams();
     if (roleCode) {
       params = params.set('roleCode', roleCode);

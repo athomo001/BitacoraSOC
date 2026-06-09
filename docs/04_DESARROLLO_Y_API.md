@@ -1,4 +1,4 @@
-﻿# Documentación de la API
+# Documentación de la API
 
 # 🌐 Documentación API - Bitácora SOC
 
@@ -246,6 +246,7 @@ El servidor acepta tokens con diferencia de ±60 segundos (previene errores por 
 | GET | `/api/escalation/services` | Autenticado |
 | GET | `/api/escalation/contacts` | Autenticado |
 | GET | `/api/escalation/internal-shifts` | Autenticado |
+| GET | `/api/escalation/assignments` | Autenticado |
 | GET | `/api/escalation/raci` | Autenticado |
 | GET | `/api/escalation/flow/:clientId` | Autenticado |
 | PUT | `/api/escalation/flow/:clientId` | Admin |
@@ -302,6 +303,7 @@ El servidor acepta tokens con diferencia de ±60 segundos (previene errores por 
 | DELETE | `/api/escalation/admin/external-people/:id` | Admin |
 | POST | `/api/escalation/admin/reminder/test` | Admin |
 | POST | `/api/escalation/admin/automation/trigger-send` | Admin |
+
 
 ### Módulo: glpi
 

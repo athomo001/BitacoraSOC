@@ -2,6 +2,35 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.93-beta] - 2026-06-09
+
+### Correcciones y Mejoras en Teletrabajo, Vacaciones y Permisos de Asignaciones
+
+- **Ruta Pública de Asignaciones (`/assignments`):** Se añadió una nueva ruta GET `/api/escalation/assignments` accesible para analistas autenticados (sin requerir rol admin). Esto permite que la tabla operativa de "Personal en Teletrabajo y Apoyo" en `/main/escalation/view` cargue correctamente para todos los usuarios sin recibir un `403 Forbidden`.
+- **Separación de Métodos en EscalationService:** Se creó el método `getAssignmentsAdmin()` que apunta a la ruta protegida `/admin/assignments`, reservado exclusivamente para la pantalla de administración de turnos. El método `getAssignments()` ahora apunta a la ruta pública, utilizada por el panel operativo.
+- **Corrección de Permisos en `/main/admin/work-shifts`:** Los dos puntos de carga (`loadWeeklyAssignments` y `loadHistoricalAssignments`) del componente admin fueron actualizados para invocar `getAssignmentsAdmin()`, manteniéndose correctamente sobre la ruta protegida de administración.
+- **Fila Completa en Rojo para Vacaciones:** La tabla de teletrabajo en `/main/escalation/view` aplica el estilo `row-vacation` (fondo rojo) a toda la fila cuando el analista está de vacaciones activas, haciéndolas visibles de inmediato.
+- **Estado "Pronto Vacaciones" en Azul:** Se implementó la detección de vacaciones futuras (dentro de las próximas 2 semanas) mostrando el badge en azul con la etiqueta "Pronto Vacaciones". Las vacaciones que inician en más de 2 semanas no aparecen en esta lista, evitando ruido innecesario.
+- **Orden de Prioridad en la Tabla:** El orden de aparición es fijo: Vacaciones (primero, rojo) → Pronto Vacaciones (azul) → Teletrabajo → En Oficina.
+
+## [v1.5.92-beta] - 2026-06-09
+
+### Gestión de Teletrabajo y Vacaciones en Administración de Turnos
+
+- **Roles de Asignación Expandidos:** Incorporación de los roles de "Teletrabajo" (`TELEWORK`) y "Vacaciones" (`VACATION`) en el formulario de edición y en el selector de filtros de `/main/admin/work-shifts`.
+- **Validación de Conflictos Adaptativa:** Se ajustaron las alertas de solapes de rol y disponibilidad locales para permitir que las asignaciones de "Teletrabajo" coexistan con turnos regulares. Asimismo, se omiten bloqueos locales al registrar "Vacaciones", permitiendo que el backend maneje el flujo de autoliberación.
+- **Notificación de Autolimpieza de Vacaciones:** Se integró la captura de la respuesta del backend durante el guardado de Vacaciones, alertando al administrador mediante snackbars descriptivos cuando se liberan/eliminan automáticamente turnos normales del analista en ese mismo rango de fechas.
+- **Visualización y Mapeo Amigable en UI/Gantt:** Se modificó la visualización en la tabla de asignaciones, diagrama Gantt de resumen semanal y tarjetas de proximidad para mostrar etiquetas formateadas en español ("Teletrabajo", "Vacaciones") en lugar de los códigos internos de BD y se agregaron sus respectivos carriles en el Gantt.
+- **Guía de Importación CSV:** Se actualizaron los paneles de ayuda del frontend para notificar a los operadores que el importador CSV acepta "Teletrabajo" y "Vacaciones" como roles de asignación válidos.
+
+## [v1.5.91-beta] - 2026-06-09
+
+### Mejoras de Usabilidad en Filtro de Clientes y Tabla de Teletrabajo
+
+- **Lógica declarativa de autocompletado libre de flags:** Se eliminaron los flags inestables de foco y se rediseñó el getter de clientes filtrados (`filteredClients`/`filteredRaciClients`). Ahora, si el término de búsqueda coincide exactamente con el cliente seleccionado (indicando que no hay cambios o que recién se abrió el panel), se despliega de inmediato la totalidad de los clientes activos del sistema. Esto elimina por completo el tener que presionar la "X" o borrar letras.
+- **Rediseño a Tabla Escalable de Teletrabajo:** Se reemplazó el diseño de tarjetas por una tabla limpia (`excel-table`) con columnas de Nombre, Contacto, Cargo y Ubicación Actual. Esto soluciona la escalabilidad de visualización ante grandes volúmenes de personal (e.g. 50+ registros) y se agregaron insignias con código de colores HSL (`badge-status`) con iconos contextuales.
+- **Mocks realistas integrados:** Se incorporaron 8 registros de prueba en `teleworkStaff` para simular la visualización a escala (incluyendo estados en oficina, en teletrabajo, vacaciones en color rojo de alerta y no asignados).
+
 ## [v1.5.90-beta] - 2026-06-09
 
 ### Corrección de legibilidad del HUD del Easter Egg (#bat)

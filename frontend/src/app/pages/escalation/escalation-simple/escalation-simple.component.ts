@@ -7,7 +7,7 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, forkJoin } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule } from '@angular/material/table';
@@ -74,6 +74,7 @@ export class EscalationSimpleComponent implements OnInit {
   loadingRaciClients = false;
   raciEntries: any[] = [];
   loadingRaci = false;
+  // Flags obsoletos de foco removidos para dar paso a la lógica declarativa de filtros
 
   // Datos para turnos de la semana
   weekShifts: any = {
@@ -309,23 +310,53 @@ export class EscalationSimpleComponent implements OnInit {
 
   onClientSearchChange(): void {
     const term = this.clientSearchTerm.trim();
-    // If search is cleared, also clear the selected client
     if (!term && this.selectedClient) {
       this.selectedClient = null;
       this.selectedClientFlow = null;
     }
   }
 
+  onRaciClientSearchChange(): void {
+    const term = this.raciClientSearchTerm.trim();
+    if (!term && this.selectedRaciClient) {
+      this.selectedRaciClient = null;
+      this.raciEntries = [];
+    }
+  }
+
   get filteredClients(): any[] {
-    const term = this.clientSearchTerm.trim().toLowerCase();
-    if (!term) return this.allClients;
-    return this.allClients.filter((client) => String(client?.name || '').toLowerCase().includes(term));
+    const term = this.clientSearchTerm.trim();
+    // Si el campo está vacío o coincide exactamente con el cliente seleccionado, se despliega toda la lista
+    // para evitar obligar al usuario a borrar el input o presionar la X.
+    if (!term || (this.selectedClient && term === this.selectedClient.name)) {
+      return this.allClients;
+    }
+    const lowerTerm = term.toLowerCase();
+    return this.allClients.filter((client) => String(client?.name || '').toLowerCase().includes(lowerTerm));
+  }
+
+  clearClientSelection(): void {
+    this.clientSearchTerm = '';
+    this.selectedClient = null;
+    this.selectedClientFlow = null;
+    this.cdr.detectChanges();
+  }
+
+  clearRaciClientSelection(): void {
+    this.raciClientSearchTerm = '';
+    this.selectedRaciClient = null;
+    this.raciEntries = [];
+    this.cdr.detectChanges();
   }
 
   get filteredRaciClients(): CatalogLogSource[] {
-    const term = this.raciClientSearchTerm.trim().toLowerCase();
-    if (!term) return this.raciClients;
-    return this.raciClients.filter((client) => String(client?.name || '').toLowerCase().includes(term));
+    const term = this.raciClientSearchTerm.trim();
+    // Despliega la lista completa si el campo está vacío o coincide exactamente con el cliente RACI seleccionado.
+    if (!term || (this.selectedRaciClient && term === this.selectedRaciClient.name)) {
+      return this.raciClients;
+    }
+    const lowerTerm = term.toLowerCase();
+    return this.raciClients.filter((client) => String(client?.name || '').toLowerCase().includes(lowerTerm));
   }
 
   toggleQuickClientForm(prefill?: string): void {
@@ -451,13 +482,153 @@ export class EscalationSimpleComponent implements OnInit {
           N1_NO_HABIL: shifts.find((s: any) => s.role === 'N1_NO_HABIL') || null
         };
         this.loadingShifts = false;
+        this.loadTeleworkStaff();
         this.cdr.detectChanges();
       },
       error: (err) => {
         console.error('Error loading internal shifts:', err);
         this.loadingShifts = false;
+        this.loadTeleworkStaff();
       }
     });
+  }
+
+  /**
+   * Carga dinámicamente al personal de teletrabajo, vacaciones (activas y futuras) y oficina en el periodo semanal seleccionado.
+   */
+  loadTeleworkStaff(): void {
+    const assignments$ = this.escalationService.getAssignments(undefined, this.currentWeekStart.toISOString(), this.currentWeekEnd.toISOString());
+    const futureVacations$ = this.escalationService.getAssignments('VACATION', this.currentWeekStart.toISOString(), undefined, 100);
+
+    forkJoin([assignments$, futureVacations$]).subscribe({
+      next: ([assignments, futureVacations]) => {
+        const list: any[] = [];
+        const processedUserIds = new Set<string>();
+        const processedExtIds = new Set<string>();
+
+        // 1. Procesar primero las vacaciones activas de esta semana (Prioridad máxima)
+        assignments.forEach(asg => {
+          const personName = asg.userId?.fullName || asg.externalPersonId?.name || 'Sin asignar';
+          const personPhone = asg.userId?.phone || asg.externalPersonId?.phone || '-';
+          const personEmail = asg.userId?.email || asg.externalPersonId?.email || '-';
+          const roleName = asg.userId?.cargoLabel || asg.externalPersonId?.position || this.getRoleLabelTranslated(asg.roleCode);
+          const userIdStr = asg.userId?._id || asg.userId;
+          const extIdStr = asg.externalPersonId?._id || asg.externalPersonId;
+
+          if (asg.roleCode === 'VACATION') {
+            list.push({
+              name: personName,
+              phone: personPhone,
+              email: personEmail,
+              role: roleName,
+              status: 'vacation',
+              statusLabel: 'VACACIONES'
+            });
+            if (userIdStr) processedUserIds.add(String(userIdStr));
+            if (extIdStr) processedExtIds.add(String(extIdStr));
+          }
+        });
+
+        // 2. Procesar vacaciones futuras que inician pronto (dentro de las próximas 2 semanas / 14 días)
+        const referenceEnd = new Date(this.currentWeekEnd);
+        const futureLimit = new Date(referenceEnd);
+        futureLimit.setDate(futureLimit.getDate() + 14);
+
+        futureVacations.forEach(asg => {
+          const userIdStr = asg.userId?._id || asg.userId;
+          const extIdStr = asg.externalPersonId?._id || asg.externalPersonId;
+
+          // Evitar duplicar si la persona ya está de vacaciones activas
+          if (userIdStr && processedUserIds.has(String(userIdStr))) return;
+          if (extIdStr && processedExtIds.has(String(extIdStr))) return;
+
+          const vStart = new Date(asg.weekStartDate);
+          if (vStart > referenceEnd && vStart <= futureLimit) {
+            const personName = asg.userId?.fullName || asg.externalPersonId?.name || 'Sin asignar';
+            const personPhone = asg.userId?.phone || asg.externalPersonId?.phone || '-';
+            const personEmail = asg.userId?.email || asg.externalPersonId?.email || '-';
+            const roleName = asg.userId?.cargoLabel || asg.externalPersonId?.position || this.getRoleLabelTranslated(asg.roleCode);
+
+            list.push({
+              name: personName,
+              phone: personPhone,
+              email: personEmail,
+              role: roleName,
+              status: 'upcoming-vacation',
+              statusLabel: 'Pronto Vacaciones'
+            });
+
+            if (userIdStr) processedUserIds.add(String(userIdStr));
+            if (extIdStr) processedExtIds.add(String(extIdStr));
+          }
+        });
+
+        // 3. Procesar asignaciones regulares (Teletrabajo y Oficina) de la semana actual
+        assignments.forEach(asg => {
+          const userIdStr = asg.userId?._id || asg.userId;
+          const extIdStr = asg.externalPersonId?._id || asg.externalPersonId;
+
+          // No duplicar si el usuario ya está en vacaciones o pronto vacaciones
+          if (userIdStr && processedUserIds.has(String(userIdStr))) return;
+          if (extIdStr && processedExtIds.has(String(extIdStr))) return;
+
+          const personName = asg.userId?.fullName || asg.externalPersonId?.name || 'Sin asignar';
+          const personPhone = asg.userId?.phone || asg.externalPersonId?.phone || '-';
+          const personEmail = asg.userId?.email || asg.externalPersonId?.email || '-';
+          const roleName = asg.userId?.cargoLabel || asg.externalPersonId?.position || this.getRoleLabelTranslated(asg.roleCode);
+
+          if (asg.roleCode === 'TELEWORK') {
+            list.push({
+              name: personName,
+              phone: personPhone,
+              email: personEmail,
+              role: roleName,
+              status: 'telework',
+              statusLabel: 'En Teletrabajo'
+            });
+            if (userIdStr) processedUserIds.add(String(userIdStr));
+            if (extIdStr) processedExtIds.add(String(extIdStr));
+          } else if (asg.roleCode !== 'VACATION') {
+            // Analistas regulares en oficina
+            list.push({
+              name: personName,
+              phone: personPhone,
+              email: personEmail,
+              role: roleName,
+              status: 'office',
+              statusLabel: 'En Oficina'
+            });
+            if (userIdStr) processedUserIds.add(String(userIdStr));
+            if (extIdStr) processedExtIds.add(String(extIdStr));
+          }
+        });
+
+        // Orden estricto: Vacaciones (0) -> Pronto Vacaciones (1) -> Teletrabajo (2) -> Oficina (3)
+        const order: { [key: string]: number } = {
+          'vacation': 0,
+          'upcoming-vacation': 1,
+          'telework': 2,
+          'office': 3
+        };
+        this.teleworkStaff = list.sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Error loading telework/vacation staff:', err);
+      }
+    });
+  }
+
+  /**
+   * Traduce el código de rol para la presentación del listado.
+   */
+  getRoleLabelTranslated(roleCode: string): string {
+    if (roleCode === 'N1_NO_HABIL') return 'N1 - No Hábil';
+    if (roleCode === 'N2') return 'N2 - Soporte Técnico';
+    if (roleCode === 'TI') return 'TI - Infraestructura';
+    if (roleCode === 'TELEWORK') return 'Teletrabajo';
+    if (roleCode === 'VACATION') return 'Vacaciones';
+    return roleCode;
   }
 
   showError(message: string): void {
@@ -576,5 +747,18 @@ export class EscalationSimpleComponent implements OnInit {
         this.showError('Error al eliminar el mantenimiento');
       }
     });
+  }
+
+  // Personal de apoyo en teletrabajo, oficina y vacaciones según distribución de turnos
+  teleworkStaff: any[] = [];
+
+  // Selecciona todo el texto del input al enfocar para facilitar la escritura inmediata
+  onInputFocus(event: any): void {
+    const input = event.target;
+    if (input) {
+      setTimeout(() => {
+        input.select();
+      }, 60); // Retraso de 60ms para evitar que Angular Material descarte la selección en cascada
+    }
   }
 }

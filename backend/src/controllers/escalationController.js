@@ -135,6 +135,11 @@ const cargoMatchesRoleCode = (cargoLabel, roleCode) => {
 };
 
 const findAssignmentConflict = async ({ roleCode, weekStartDate, weekEndDate, excludeId }) => {
+  // Las asignaciones de teletrabajo o vacaciones no tienen conflicto de exclusividad de rol único
+  if (roleCode === 'TELEWORK' || roleCode === 'VACATION') {
+    return null;
+  }
+
   const conflictFilter = {
     roleCode,
     weekStartDate,
@@ -1599,8 +1604,8 @@ exports.getAssignments = async (req, res) => {
     }
     const parsedLimit = parsePositiveInt(limit, 0, 1000);
     let query = ShiftAssignment.find(filter)
-      .populate('userId', 'fullName email')
-      .populate('externalPersonId', 'name email')
+      .populate('userId', 'fullName email phone cargoLabel')
+      .populate('externalPersonId', 'name email phone position')
       .sort({ weekStartDate: -1 });
     if (parsedLimit > 0) {
       query = query.limit(parsedLimit);
@@ -1659,10 +1664,12 @@ exports.importAssignmentsCsv = async (req, res) => {
 
     for (const row of parsed.rows) {
       try {
-        const rawRol = String(row.rol || row.rolecode || '').trim().toUpperCase();
+        let rawRol = String(row.rol || row.rolecode || '').trim().toUpperCase();
+        if (rawRol === 'TELETRABAJO') rawRol = 'TELEWORK';
+        if (rawRol === 'VACACIONES') rawRol = 'VACATION';
         const roleCode = rawRol === 'N1' ? 'N1_NO_HABIL' : rawRol;
-        if (!['N2', 'TI', 'N1_NO_HABIL'].includes(roleCode)) {
-          throw new Error(`Rol inválido: ${rawRol}. Usa N1, N2 o TI`);
+        if (!['N2', 'TI', 'N1_NO_HABIL', 'TELEWORK', 'VACATION'].includes(roleCode)) {
+          throw new Error(`Rol inválido: ${rawRol}. Usa N1, N2, TI, Teletrabajo o Vacaciones`);
         }
 
         const weekStartDate = buildAssignmentDateTime(row.fechainicio || row.weekstartdate, row.horainicio || row.weekstarttime);
@@ -1679,6 +1686,28 @@ exports.importAssignmentsCsv = async (req, res) => {
         const assignee = await resolveAssignmentAssignee(row);
         if (assignee.user && !cargoMatchesRoleCode(assignee.user.cargoLabel, roleCode)) {
           throw new Error(`El usuario ${assignee.label} no tiene cargo compatible con el rol ${roleCode}`);
+        }
+
+        const assigneeFilter = assignee.userId ? { userId: assignee.userId } : { externalPersonId: assignee.externalPersonId };
+
+        // Si es vacaciones, liberar automáticamente los otros turnos que se solapen en este período
+        if (roleCode === 'VACATION') {
+          await ShiftAssignment.deleteMany({
+            ...assigneeFilter,
+            weekStartDate: { $lt: weekEndDate },
+            weekEndDate: { $gt: weekStartDate }
+          });
+        } else {
+          // Si no es vacaciones, validar que no esté de vacaciones en el período solicitado
+          const onVacation = await ShiftAssignment.findOne({
+            ...assigneeFilter,
+            roleCode: 'VACATION',
+            weekStartDate: { $lt: weekEndDate },
+            weekEndDate: { $gt: weekStartDate }
+          });
+          if (onVacation) {
+            throw new Error(`El analista está de Vacaciones en este período.`);
+          }
         }
 
         const payload = {
@@ -1737,6 +1766,8 @@ exports.createAssignment = async (req, res) => {
       return res.status(400).json({ error: 'Fechas de asignación inválidas' });
     }
 
+    const assigneeFilter = req.body.userId ? { userId: req.body.userId } : { externalPersonId: req.body.externalPersonId };
+
     if (req.body.userId) {
       const user = await User.findById(req.body.userId).select('cargoLabel fullName username');
       if (!user) {
@@ -1748,6 +1779,37 @@ exports.createAssignment = async (req, res) => {
         return res.status(400).json({
           error: `El usuario ${userName} no tiene cargo compatible con el rol ${req.body.roleCode}`
         });
+      }
+    }
+
+    // Si no es vacaciones, validar que no esté de vacaciones en el período solicitado
+    if (req.body.roleCode !== 'VACATION') {
+      const onVacation = await ShiftAssignment.findOne({
+        ...assigneeFilter,
+        roleCode: 'VACATION',
+        weekStartDate: { $lt: weekEndDate },
+        weekEndDate: { $gt: weekStartDate }
+      });
+      if (onVacation) {
+        return res.status(409).json({
+          error: `El analista ya está registrado en Vacaciones en este período (${new Date(onVacation.weekStartDate).toLocaleDateString('es-CL')} - ${new Date(onVacation.weekEndDate).toLocaleDateString('es-CL')}).`
+        });
+      }
+    }
+
+    let vacationAutoCleaned = false;
+    let deletedShiftsCount = 0;
+
+    // Si es vacaciones, eliminar automáticamente cualquier otra asignación en este período para el mismo analista
+    if (req.body.roleCode === 'VACATION') {
+      const cleanResult = await ShiftAssignment.deleteMany({
+        ...assigneeFilter,
+        weekStartDate: { $lt: weekEndDate },
+        weekEndDate: { $gt: weekStartDate }
+      });
+      deletedShiftsCount = cleanResult.deletedCount || 0;
+      if (deletedShiftsCount > 0) {
+        vacationAutoCleaned = true;
       }
     }
 
@@ -1763,10 +1825,18 @@ exports.createAssignment = async (req, res) => {
 
     const assignment = new ShiftAssignment(req.body);
     await assignment.save();
-    await assignment.populate('userId', 'fullName email');
-    await assignment.populate('externalPersonId', 'name email');
+    await assignment.populate('userId', 'fullName email phone cargoLabel');
+    await assignment.populate('externalPersonId', 'name email phone position');
     logger.info('Shift assignment created:', { assignmentId: assignment._id, roleCode: assignment.roleCode });
-    res.status(201).json(assignment);
+
+    const responseObj = assignment.toObject();
+    if (vacationAutoCleaned) {
+      responseObj.vacationAutoCleaned = true;
+      responseObj.deletedShiftsCount = deletedShiftsCount;
+      responseObj.message = `Turno de vacaciones registrado. Se liberaron automáticamente ${deletedShiftsCount} turno(s) previo(s) del analista en este período.`;
+    }
+
+    res.status(201).json(responseObj);
   } catch (error) {
     logger.error('Error in createAssignment:', error);
     res.status(400).json({ error: error.message });
@@ -1786,6 +1856,7 @@ exports.updateAssignment = async (req, res) => {
     const weekStartDate = req.body.weekStartDate ? new Date(req.body.weekStartDate) : new Date(existing.weekStartDate);
     const weekEndDate = req.body.weekEndDate ? new Date(req.body.weekEndDate) : new Date(existing.weekEndDate);
     const userId = req.body.userId !== undefined ? req.body.userId : existing.userId;
+    const externalPersonId = req.body.externalPersonId !== undefined ? req.body.externalPersonId : existing.externalPersonId;
 
     if (Number.isNaN(weekStartDate.getTime()) || Number.isNaN(weekEndDate.getTime())) {
       return res.status(400).json({ error: 'Fechas de asignación inválidas' });
@@ -1805,6 +1876,41 @@ exports.updateAssignment = async (req, res) => {
       }
     }
 
+    const assigneeFilter = userId ? { userId: userId } : { externalPersonId: externalPersonId };
+
+    // Si no es vacaciones, validar que no esté de vacaciones en el período solicitado
+    if (roleCode !== 'VACATION') {
+      const onVacation = await ShiftAssignment.findOne({
+        ...assigneeFilter,
+        roleCode: 'VACATION',
+        weekStartDate: { $lt: weekEndDate },
+        weekEndDate: { $gt: weekStartDate },
+        _id: { $ne: id }
+      });
+      if (onVacation) {
+        return res.status(409).json({
+          error: `El analista ya está registrado en Vacaciones en este período (${new Date(onVacation.weekStartDate).toLocaleDateString('es-CL')} - ${new Date(onVacation.weekEndDate).toLocaleDateString('es-CL')}).`
+        });
+      }
+    }
+
+    let vacationAutoCleaned = false;
+    let deletedShiftsCount = 0;
+
+    // Si es vacaciones, eliminar automáticamente cualquier otra asignación en este período para el mismo analista
+    if (roleCode === 'VACATION') {
+      const cleanResult = await ShiftAssignment.deleteMany({
+        ...assigneeFilter,
+        weekStartDate: { $lt: weekEndDate },
+        weekEndDate: { $gt: weekStartDate },
+        _id: { $ne: id }
+      });
+      deletedShiftsCount = cleanResult.deletedCount || 0;
+      if (deletedShiftsCount > 0) {
+        vacationAutoCleaned = true;
+      }
+    }
+
     const conflict = await findAssignmentConflict({
       roleCode,
       weekStartDate,
@@ -1817,10 +1923,18 @@ exports.updateAssignment = async (req, res) => {
     }
 
     const assignment = await ShiftAssignment.findByIdAndUpdate(id, req.body, { new: true, runValidators: true })
-      .populate('userId', 'fullName email')
-      .populate('externalPersonId', 'name email');
+      .populate('userId', 'fullName email phone cargoLabel')
+      .populate('externalPersonId', 'name email phone position');
     logger.info('Shift assignment updated:', { assignmentId: assignment._id, roleCode: assignment.roleCode });
-    res.json(assignment);
+
+    const responseObj = assignment.toObject();
+    if (vacationAutoCleaned) {
+      responseObj.vacationAutoCleaned = true;
+      responseObj.deletedShiftsCount = deletedShiftsCount;
+      responseObj.message = `Turno de vacaciones actualizado. Se liberaron automáticamente ${deletedShiftsCount} turno(s) previo(s) del analista en este período.`;
+    }
+
+    res.json(responseObj);
   } catch (error) {
     logger.error('Error in updateAssignment:', error);
     res.status(400).json({ error: error.message });

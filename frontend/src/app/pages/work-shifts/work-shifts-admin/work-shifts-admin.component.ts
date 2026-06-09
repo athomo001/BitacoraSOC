@@ -118,7 +118,8 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
   filteredExternalPeopleForAssignment: any[] = [];
   filteredDirectoryContactsForAssignment: DirectoryContact[] = [];
   showExternalPeopleForAssignment = true;
-  roles = ['N2', 'TI', 'N1_NO_HABIL'];
+  // Lista de roles admitidos, agregando Teletrabajo y Vacaciones
+  roles = ['N2', 'TI', 'N1_NO_HABIL', 'TELEWORK', 'VACATION'];
   editingWeeklyAssignmentId: string | null = null;
 
   // Filtros de asignación semanal
@@ -543,7 +544,8 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     const currentDate = new Date();
     const fromDate = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() - 1).toISOString();
 
-    this.escalationService.getAssignments(undefined, fromDate).subscribe({
+    // Usa ruta admin para que el administrador obtenga todas las asignaciones con filtros completos
+    this.escalationService.getAssignmentsAdmin(undefined, fromDate).subscribe({
       next: (data: any[]) => {
         this.weeklyAssignments = [...data].sort((a: any, b: any) => 
           new Date(b.weekStartDate).getTime() - new Date(a.weekStartDate).getTime()
@@ -567,7 +569,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     const currentDate = new Date();
     const previousMonthEnd = this.getEndOfMonth(currentDate.getFullYear(), currentDate.getMonth() - 1).toISOString();
 
-    this.escalationService.getAssignments(undefined, undefined, previousMonthEnd, 200).subscribe({
+    this.escalationService.getAssignmentsAdmin(undefined, undefined, previousMonthEnd, 200).subscribe({
       next: (data: any[]) => {
         const currentMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth());
         const previousMonthStart = this.getStartOfMonth(currentDate.getFullYear(), currentDate.getMonth() - 1);
@@ -717,9 +719,14 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
         : this.escalationService.createAssignment(data);
 
       obs$.subscribe({
-        next: () => {
+        next: (res: any) => {
           this.ngZone.run(() => {
-            this.showSuccess(this.editingWeeklyAssignmentId ? 'Turno actualizado correctamente' : 'Turno asignado correctamente');
+            // Si el backend autolimpia turnos previos por vacaciones, se notifica detalladamente
+            if (res && res.vacationAutoCleaned) {
+              this.showSuccess(res.message || 'Turno de vacaciones guardado y turnos anteriores liberados.');
+            } else {
+              this.showSuccess(this.editingWeeklyAssignmentId ? 'Turno actualizado correctamente' : 'Turno asignado correctamente');
+            }
             this.cancelWeeklyAssignmentEdit();
             this.loadWeeklyAssignments();
             this.savingWeeklyAssignment = false;
@@ -903,6 +910,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     }
     this.ganttTicks = ticks;
 
+    // Solo mostramos los turnos operativos en el diagrama de Gantt
     const roles = ['N2', 'TI', 'N1_NO_HABIL'];
     this.ganttRoles = roles.map(roleCode => {
       const matches = this.weeklyAssignments.filter(asg => {
@@ -950,10 +958,15 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * Obtiene la etiqueta amigable para mostrar el nombre del rol en español.
+   */
   getRoleLabel(roleCode: string): string {
     if (roleCode === 'N1_NO_HABIL') return 'N1_NO_HABIL';
     if (roleCode === 'N2') return 'N2';
     if (roleCode === 'TI') return 'TI';
+    if (roleCode === 'TELEWORK') return 'Teletrabajo';
+    if (roleCode === 'VACATION') return 'Vacaciones';
     return roleCode;
   }
 
@@ -1157,6 +1170,10 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       targetPersonName = match?.fullName || match?.username || 'Usuario';
     }
 
+    // Los conflictos no aplican si la nueva asignación es Teletrabajo o Vacaciones
+    // (Teletrabajo permite coexistir con otros turnos, y Vacaciones realiza limpieza automática en el backend)
+    const isCurrentTeleworkOrVacation = roleCode === 'TELEWORK' || roleCode === 'VACATION';
+
     for (const asg of this.weeklyAssignments) {
       if (this.editingWeeklyAssignmentId && asg._id === this.editingWeeklyAssignmentId) {
         continue;
@@ -1170,27 +1187,34 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
         continue;
       }
 
-      // 1. Conflicto de Rol
-      if (asg.roleCode === roleCode) {
+      // 1. Conflicto de Rol (Solo si no es teletrabajo ni vacaciones, y el rol coincide)
+      if (asg.roleCode === roleCode && !isCurrentTeleworkOrVacation && asg.roleCode !== 'TELEWORK' && asg.roleCode !== 'VACATION') {
         const assignedName = asg.userId?.fullName || asg.externalPersonId?.name || 'otra persona';
         const startStr = asgStart.toLocaleDateString('es-CL');
         const endStr = asgEnd.toLocaleDateString('es-CL');
         this.roleConflictMsg = `⚠️ Conflicto de Rol: Ya existe un turno asignado para el rol ${this.getRoleLabel(roleCode)} en este período (${startStr} - ${endStr}) por ${assignedName}.`;
       }
 
-      // 2. Conflicto de Persona
+      // 2. Conflicto de Persona (Disponibilidad)
       const matchesUser = targetUserId && asg.userId && String(asg.userId._id || asg.userId) === String(targetUserId);
       const matchesExt = targetExtId && asg.externalPersonId && String(asg.externalPersonId._id || asg.externalPersonId) === String(targetExtId);
       
       if (matchesUser || matchesExt) {
-        const otherRole = this.getRoleLabel(asg.roleCode);
-        const startStr = asgStart.toLocaleDateString('es-CL');
-        const endStr = asgEnd.toLocaleDateString('es-CL');
-        this.personConflictMsg = `⚠️ Conflicto de Disponibilidad: ${targetPersonName} ya tiene asignado otro turno (${otherRole}) en este período (${startStr} - ${endStr}).`;
+        // Un analista en teletrabajo igual puede estar de turno. Por ende, no aplica conflicto si
+        // la asignación actual o la existente es de Teletrabajo. Tampoco bloqueamos si la actual es Vacaciones (autolimpieza).
+        if (!isCurrentTeleworkOrVacation && asg.roleCode !== 'TELEWORK') {
+          const otherRole = this.getRoleLabel(asg.roleCode);
+          const startStr = asgStart.toLocaleDateString('es-CL');
+          const endStr = asgEnd.toLocaleDateString('es-CL');
+          this.personConflictMsg = `⚠️ Conflicto de Disponibilidad: ${targetPersonName} ya tiene asignado otro turno (${otherRole}) en este período (${startStr} - ${endStr}).`;
+        }
       }
     }
   }
 
+  /**
+   * Determina si una asignación tiene conflictos visuales de solape de rol o disponibilidad.
+   */
   hasRowConflict(asg: any): boolean {
     const start = new Date(asg.weekStartDate);
     const end = new Date(asg.weekEndDate);
@@ -1206,15 +1230,23 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       const overlap = start < otherEnd && end > otherStart;
       if (!overlap) continue;
 
-      if (other.roleCode === roleCode) return true;
+      // El conflicto de rol no aplica si uno es Teletrabajo o Vacaciones
+      if (other.roleCode === roleCode && roleCode !== 'TELEWORK' && roleCode !== 'VACATION') return true;
 
       const matchesUser = userId && other.userId && String(other.userId._id || other.userId) === String(userId);
       const matchesExt = extId && other.externalPersonId && String(other.externalPersonId._id || other.externalPersonId) === String(extId);
-      if (matchesUser || matchesExt) return true;
+      if (matchesUser || matchesExt) {
+        // Si cualquiera es Teletrabajo, no representa conflicto de disponibilidad
+        if (roleCode === 'TELEWORK' || other.roleCode === 'TELEWORK') continue;
+        return true;
+      }
     }
     return false;
   }
 
+  /**
+   * Genera el mensaje descriptivo del tooltip cuando hay un conflicto.
+   */
   getRowConflictTooltip(asg: any): string {
     const start = new Date(asg.weekStartDate);
     const end = new Date(asg.weekEndDate);
@@ -1230,7 +1262,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       const overlap = start < otherEnd && end > otherStart;
       if (!overlap) continue;
 
-      if (other.roleCode === roleCode) {
+      if (other.roleCode === roleCode && roleCode !== 'TELEWORK' && roleCode !== 'VACATION') {
         const name = other.userId?.fullName || other.externalPersonId?.name || 'otra persona';
         return `Conflicto de Rol: ${this.getRoleLabel(roleCode)} ya está asignado a ${name} en este período.`;
       }
@@ -1238,6 +1270,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       const matchesUser = userId && other.userId && String(other.userId._id || other.userId) === String(userId);
       const matchesExt = extId && other.externalPersonId && String(other.externalPersonId._id || other.externalPersonId) === String(extId);
       if (matchesUser || matchesExt) {
+        if (roleCode === 'TELEWORK' || other.roleCode === 'TELEWORK') continue;
         return `Conflicto de Disponibilidad: Esta persona tiene otro turno (${this.getRoleLabel(other.roleCode)}) en este período.`;
       }
     }

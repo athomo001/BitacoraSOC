@@ -1,76 +1,142 @@
-// Escalamiento (vista simple): tablas y mantenimientos usan tokens globales; badges vía .badge-pill + .badge-surface-*.
+/*
+   Consola de Escalación y Turnos - Hoja de Estilos Premium
+   Estilo: Command Center (Asimétrico/Tabs)
+   Comentarios: Español profesional para garantizar mantenibilidad del equipo técnico.
+*/
+
 .container {
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 32px;
+
+  @media (max-width: 768px) {
+    padding: 16px;
+  }
 }
 
+/* Cabecera integrada y minimalista */
 .page-header {
-  margin-bottom: 24px;
-  padding: var(--space-5);
-  text-align: center;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow);
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
-  color: var(--on-primary-color);
+  margin-bottom: 28px;
+  border-bottom: 1px solid var(--outline-subtle);
+  padding-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 16px;
+
+  .header-titles {
+    display: flex;
+    flex-direction: column;
+  }
 
   h1 {
-    margin: 0 0 8px 0;
-    font-size: 28px;
-    font-weight: 500;
-    color: var(--on-primary-color) !important;
+    margin: 0;
+    font-size: 1.85rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
 
   p {
-    margin: 0;
-    opacity: 0.9;
-    font-size: 14px;
-    color: var(--on-primary-color) !important;
+    margin: 6px 0 0 0;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
   }
 }
 
-.section-card {
+/* ── Sobrescribir Pestañas de Angular Material ── */
+::ng-deep .mat-mdc-tab-group {
+  background: var(--surface-card) !important;
+  border: 1px solid var(--outline-subtle) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--shadow-sm, 0 2px 8px rgba(0, 0, 0, 0.04)) !important;
+  overflow: hidden !important;
+}
+
+::ng-deep .mat-mdc-tab-header {
+  border-bottom: 1px solid var(--outline-subtle) !important;
+  background: rgba(var(--primary-color-rgb, 99, 102, 241), 0.02) !important;
+}
+
+::ng-deep .mat-mdc-tab {
+  height: 54px !important;
+  font-weight: 600 !important;
+  font-size: 0.9rem !important;
+  color: var(--text-secondary) !important;
+  letter-spacing: 0.03em !important;
+
+  &.mdc-tab--active {
+    color: var(--primary-color) !important;
+    background: rgba(var(--primary-color-rgb, 99, 102, 241), 0.02) !important;
+
+    .mdc-tab__text-label {
+      color: var(--primary-color) !important;
+    }
+  }
+
+  .mdc-tab__text-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+}
+
+::ng-deep .mat-mdc-tab-body-wrapper {
+  padding: 32px !important;
+  background: var(--surface-card) !important;
+
+  @media (max-width: 768px) {
+    padding: 16px !important;
+  }
+}
+
+/* Subtítulo descriptivo de pestañas */
+.tab-desc-row {
   margin-bottom: 24px;
-  padding: 24px;
-  background: var(--surface-card);
-  border: 1px solid var(--outline-subtle);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow);
+  border-bottom: 1px dashed var(--outline-subtle);
+  padding-bottom: 12px;
 
   h2 {
-    margin: 0 0 8px 0;
-    font-size: 20px;
+    margin: 0 0 4px 0;
+    font-size: 1.2rem;
+    font-weight: 600;
     color: var(--text-primary);
   }
 
   .subtitle {
-    margin: 0 0 20px 0;
+    margin: 0;
+    font-size: 0.875rem;
     color: var(--text-secondary);
-    font-size: 14px;
   }
 }
 
-// HEADER DE NAVEGACIÓN DE SEMANAS
-.week-header {
+/* ── Pestaña 1: Turnos de la Semana ── */
+.week-header-controls {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
-
-  h2 {
-    margin: 0;
-  }
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+  background: var(--surface-muted);
+  padding: 12px 20px;
+  border-radius: 8px;
+  border: 1px solid var(--outline-subtle);
 }
 
 .week-navigation {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 
   .week-label {
-    font-weight: 500;
+    font-weight: 600;
+    font-size: 0.95rem;
     color: var(--text-primary);
-    min-width: 160px;
+    min-width: 180px;
     text-align: center;
   }
 
@@ -79,192 +145,88 @@
   }
 }
 
-// SELECTOR DE CLIENTE
-.client-selector {
-  margin-bottom: 20px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-  
-  .client-field {
-    width: 100%;
-    max-width: 400px;
-  }
-}
-
-.quick-client-form {
-  margin-bottom: 16px;
-  padding: 12px;
-  border: 1px dashed var(--outline-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-muted);
-
-  h4 {
-    margin: 0 0 8px 0;
-    color: var(--text-primary);
-  }
-}
-
-.quick-client-form__row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.quick-client-form__actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.client-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 20px 0;
-  padding-bottom: 10px;
-  border-bottom: 3px solid var(--primary-color);
-}
-
-.service-section {
-  margin-bottom: 30px;
-  
-  &:last-child {
-    margin-bottom: 0;
-  }
-}
-
-.dynamic-flow-view {
-  margin-bottom: 20px;
-}
-
-.loading-inline {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.flow-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.flow-step-box {
-  border: 1px solid var(--outline-subtle);
-  border-radius: var(--radius-md);
-  padding: 10px;
-  background: var(--surface-muted);
-
-  h4 {
-    margin: 0 0 4px 0;
-  }
-}
-
-.flow-unique {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 8px;
-}
-
-.flow-pool-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.flow-pool-item {
-  background: var(--surface-card);
-  border: 1px solid var(--outline-subtle);
-  border-radius: 8px;
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.flow-legend-view {
-  border-left: 4px solid var(--primary-color);
-  background: var(--surface-muted);
-  padding: 10px;
-
-  p {
-    margin: 6px 0 0;
-    white-space: pre-wrap;
-  }
-}
-
-// ESTILOS PARA TURNOS DE LA SEMANA
 .shifts-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 24px;
+  margin-top: 8px;
 }
 
 .shift-card {
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  background: var(--surface-card);
+  border: 1px solid var(--outline-subtle);
+  border-radius: 10px;
   overflow: hidden;
-  transition: box-shadow 0.2s;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
 
   &:hover {
-    box-shadow: var(--shadow);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--outline-accent);
   }
 }
 
 .shift-header {
-  padding: 16px;
+  padding: 16px 20px;
   display: flex;
   align-items: center;
   gap: 12px;
-  color: white;
-  font-weight: 500;
+  color: #ffffff;
+  font-weight: 600;
 
   &.n2 {
     background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
   }
 
   &.ti {
-    background: linear-gradient(135deg, var(--chart-4) 0%, var(--state-error) 100%);
+    background: linear-gradient(135deg, var(--chart-4, #ec4899) 0%, var(--state-error, #ef4444) 100%);
   }
 
   &.n1 {
-    background: linear-gradient(135deg, var(--chart-2) 0%, var(--state-info) 100%);
+    background: linear-gradient(135deg, var(--chart-2, #3b82f6) 0%, var(--state-info, #3b82f6) 100%);
   }
 
   mat-icon {
-    font-size: 28px;
-    width: 28px;
-    height: 28px;
+    font-size: 22px;
+    width: 22px;
+    height: 22px;
   }
 
   h3 {
     margin: 0;
-    font-size: 16px;
-    font-weight: 500;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 700;
   }
 }
 
 .shift-body {
   padding: 20px;
-  background: var(--surface-muted);
+  min-height: 120px;
+  display: flex;
+  align-items: center;
 }
 
 .shift-user {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  font-size: 16px;
-  color: var(--text-primary);
+  gap: 14px;
+  width: 100%;
 
-  mat-icon {
-    color: var(--state-success);
-    margin-top: 2px;
+  .avatar-circle {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: rgba(var(--primary-color-rgb, 99, 102, 241), 0.08);
+    color: var(--primary-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.95rem;
+    border: 1px solid rgba(var(--primary-color-rgb, 99, 102, 241), 0.15);
   }
 
   .user-info {
@@ -275,15 +237,16 @@
 
     strong {
       color: var(--text-primary);
-      font-size: 14px;
+      font-size: 0.925rem;
+      font-weight: 600;
     }
 
     small {
       color: var(--text-secondary);
-      font-size: 12px;
+      font-size: 0.775rem;
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 6px;
     }
   }
 }
@@ -292,199 +255,257 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--text-secondary);
   font-style: italic;
+  width: 100%;
 
   mat-icon {
-    color: var(--border-color);
+    color: var(--outline-accent);
+    font-size: 22px;
+    width: 22px;
+    height: 22px;
   }
 }
 
-// ESTILOS PARA TABLA EXCEL
+/* ── Pestaña 2: Contactos y Flujo de Llamados ── */
+.client-selector {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+
+  .client-field {
+    flex: 1;
+    max-width: 480px;
+    margin-bottom: 0;
+
+    ::ng-deep .mat-mdc-text-field-wrapper {
+      background-color: var(--surface-card) !important;
+    }
+  }
+
+  button {
+    height: 48px;
+  }
+}
+
+/* Formulario inline de nuevo cliente */
+.quick-client-form {
+  margin-bottom: 24px;
+  padding: 20px;
+  border: 1px dashed var(--outline-subtle);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  animation: slideDown 0.25s ease-out;
+
+  h4 {
+    margin: 0 0 16px 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+}
+
+.quick-client-form__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 16px;
+
+  .client-field {
+    flex: 1;
+    min-width: 240px;
+    margin-bottom: 0;
+  }
+}
+
+.quick-client-form__actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* Sección de Servicios del Cliente */
+.service-section {
+  margin-bottom: 36px;
+  border: 1px solid var(--outline-subtle);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  background: var(--surface-card);
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.service-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: rgba(var(--primary-color-rgb, 99, 102, 241), 0.02);
+  border-bottom: 1px solid var(--outline-subtle);
+  flex-wrap: wrap;
+  gap: 12px;
+
+  h4 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .emergency-badge {
+    font-size: 0.825rem;
+    font-weight: 700;
+    color: #ffffff;
+    background: var(--state-error, #ef4444);
+    padding: 4px 12px;
+    border-radius: 20px;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+  }
+}
+
+/* ── Tablas de Contacto (Estilo Excel Limpio) ── */
 .excel-table-container {
+  width: 100%;
   overflow-x: auto;
-  border: 2px solid var(--border-color);
-  border-radius: 4px;
 }
 
 .excel-table {
   width: 100%;
   border-collapse: collapse;
-  background: var(--surface-color);
-  font-family: 'Segoe UI', Arial, sans-serif;
+  font-family: inherit;
 
   thead {
-    background: var(--alert-bg);
-    font-weight: bold;
-
     th {
-      padding: 12px 16px;
-      border: 1px solid var(--border-color);
-      text-align: center;
-      font-size: 14px;
-      color: var(--text-primary);
+      background: var(--surface-muted) !important;
+      color: var(--text-secondary) !important;
+      font-weight: 700 !important;
+      text-transform: uppercase;
+      font-size: 0.775rem;
+      letter-spacing: 0.05em;
+      padding: 14px 18px;
+      border-bottom: 2px solid var(--outline-subtle);
+      border-right: 1px solid var(--outline-subtle);
+      text-align: left;
 
-      &.header-service {
-        width: 20%;
-        background: var(--alert-bg);
-      }
-
-      &.header-contacts {
-        background: var(--alert-bg);
-      }
-
-      &.header-phone {
-        width: 15%;
-        background: var(--alert-bg);
-      }
-
-      &.subheader {
-        background: var(--state-warning-bg);
-        font-size: 12px;
+      &:last-child {
+        border-right: none;
       }
     }
   }
 
   tbody {
-    tr.data-row {
-      &:nth-child(odd) {
-        background: var(--surface-muted);
+    tr {
+      border-bottom: 1px solid var(--outline-subtle);
+      transition: background-color 0.18s ease;
+
+      &:last-child {
+        border-bottom: none;
       }
 
       &:hover {
-        background: var(--hover-bg);
+        background-color: var(--hover-bg, rgba(var(--primary-color-rgb, 99, 102, 241), 0.015));
       }
     }
 
     td {
-      padding: 12px 16px;
-      border: 1px solid var(--border-color);
-      font-size: 13px;
-      vertical-align: top;
+      padding: 14px 18px;
+      border-right: 1px solid var(--outline-subtle);
+      font-size: 0.875rem;
+      color: var(--text-primary);
+      vertical-align: middle;
 
-      &.cell-service {
-        font-weight: bold;
-        background: var(--state-warning-bg);
-        border-right: 2px solid var(--border-color);
-
-        .client-name {
-          color: var(--text-secondary);
-          font-weight: normal;
-          font-size: 11px;
-        }
+      &:last-child {
+        border-right: none;
       }
 
-      &.cell-contact {
-        .contact-info {
-          strong {
-            display: block;
-            margin-bottom: 4px;
-            color: var(--text-primary);
-          }
+      &.cell-name {
+        font-weight: 600;
+      }
 
-          .contact-details {
-            font-size: 12px;
-            color: var(--state-info);
-          }
+      &.cell-email {
+        font-family: var(--font-mono, monospace);
+        font-size: 0.8rem;
+        color: var(--primary-color);
+        cursor: pointer;
+
+        &.clickable:hover {
+          text-decoration: underline;
         }
       }
 
       &.cell-phone {
-        text-align: center;
-        font-weight: bold;
-        color: var(--state-error);
-        font-size: 14px;
-      }
+        font-weight: 700;
+        color: var(--accent-color);
 
-      &.cell-empty {
-        text-align: center;
-        color: var(--text-secondary);
-        font-style: italic;
+        &.clickable {
+          cursor: pointer;
+
+          &:hover {
+            text-decoration: underline;
+          }
+        }
       }
     }
   }
 }
 
-.table-footer {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  background: var(--alert-bg);
-  border-top: 2px solid var(--border-color);
-  font-weight: bold;
-  font-size: 14px;
-
-  mat-icon {
-    color: var(--state-error);
-  }
-}
-
-// UTILIDADES
-.loading-container {
-  display: flex;
-  justify-content: center;
-  padding: 40px;
-}
-
-.no-data {
-  text-align: center;
-  padding: 40px;
-  color: var(--text-secondary);
-
-  mat-icon {
-    font-size: 48px;
-    width: 48px;
-    height: 48px;
-    margin-bottom: 16px;
-    opacity: 0.5;
-  }
-
-  p {
-    margin: 0 0 8px 0;
-    font-size: 16px;
-  }
-
-  small {
-    font-size: 12px;
-  }
-}
-
-// ── ESC-MAINT-042 — Mantenimientos
+/* ── Pestaña 4: Mantenimientos Programados ── */
 .maintenance-section {
   .maintenance-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 8px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
 
-    h2 { margin: 0; }
+    h2 {
+      margin: 0;
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
   }
 
   .catalog-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 14px;
+    border: 1px solid var(--outline-subtle);
+    border-radius: 8px;
+    overflow: hidden;
 
     th {
       background: var(--surface-muted);
-      padding: 8px 12px;
+      padding: 12px 16px;
       text-align: left;
-      border-bottom: 2px solid var(--border-color);
-      font-weight: 600;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      border-bottom: 2px solid var(--outline-subtle);
     }
 
     td {
-      padding: 8px 12px;
-      border-bottom: 1px solid var(--border-color);
-      vertical-align: middle;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--outline-subtle);
+      font-size: 0.875rem;
+      color: var(--text-primary);
     }
 
-    tr.row-disabled td { opacity: 0.5; }
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr.row-disabled td {
+      opacity: 0.55;
+    }
 
     .cell-truncate {
-      max-width: 200px;
+      max-width: 220px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -495,32 +516,41 @@
     }
   }
 
-  // Badges de fila: clases globales .badge-pill + .badge-surface-* (styles.scss / UI-COMP-048)
-
   .empty-hint {
     text-align: center;
-    color: var(--text-secondary);
-    padding: 20px;
+    color: var(--text-muted);
+    padding: 32px;
+    font-size: 0.875rem;
+    font-style: italic;
   }
 
   .maintenance-form-panel {
-    margin-top: 16px;
-    padding: 16px;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md, 8px);
+    margin-top: 24px;
+    padding: 24px;
+    border: 1px solid var(--outline-subtle);
+    border-radius: 8px;
     background: var(--surface-muted);
+    animation: slideDown 0.25s ease-out;
 
-    h3 { margin: 0 0 16px 0; }
+    h3 {
+      margin: 0 0 20px 0;
+      font-size: 1.05rem;
+      font-weight: 600;
+    }
 
     .maint-form {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 16px;
 
       .maint-form-row {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 12px;
+        gap: 16px;
+
+        @media (max-width: 576px) {
+          grid-template-columns: 1fr;
+        }
       }
 
       .maint-form-checks {
@@ -531,8 +561,186 @@
 
       .maint-form-actions {
         display: flex;
-        gap: 8px;
+        gap: 10px;
+        margin-top: 8px;
       }
     }
   }
 }
+
+/* ── Empty States / Mensajes Informativos ── */
+.no-data-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  color: var(--text-secondary);
+  text-align: center;
+
+  mat-icon {
+    font-size: 44px;
+    width: 44px;
+    height: 44px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.9rem;
+    max-width: 400px;
+    line-height: 1.45;
+  }
+}
+
+/* Utilitarios de Carga */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 64px;
+}
+
+.code-hint {
+  margin-left: 8px;
+  opacity: 0.5;
+  font-size: 11px;
+  font-family: monospace;
+}
+
+/* Animaciones */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Personal de Teletrabajo y Vacaciones ── */
+/* Contenedor con scroll horizontal para la tabla en pantallas pequeñas */
+.excel-table-container {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Tabla estructurada al estilo Excel para el listado de personal operativo */
+.excel-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+
+  thead tr {
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+
+    th {
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--text-secondary, #aaa);
+      white-space: nowrap;
+      font-size: 0.775rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+  }
+
+  tbody tr.data-row {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    transition: background-color 0.15s ease;
+
+    td {
+      padding: 10px 14px;
+      vertical-align: middle;
+      color: var(--text-primary, #e2e8f0);
+    }
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.03);
+    }
+
+    &.row-vacation {
+      background-color: rgba(239, 68, 68, 0.06) !important;
+
+      td {
+        color: #dc2626 !important;
+        font-weight: 600;
+      }
+
+      &:hover {
+        background-color: rgba(239, 68, 68, 0.1) !important;
+      }
+    }
+  }
+
+  /* Columnas clickeables (email y teléfono) para copiar al portapapeles */
+  td.clickable {
+    cursor: pointer;
+    user-select: none;
+
+    &:hover {
+      text-decoration: underline;
+      color: var(--accent-color, #7c3aed) !important;
+    }
+  }
+}
+
+/* Estilos para badges de estado de Ubicación Actual en la tabla de teletrabajo y apoyo */
+.badge-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.775rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+
+  mat-icon {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    margin: 0;
+  }
+
+  &.telework {
+    background-color: rgba(16, 185, 129, 0.08);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+  }
+
+  &.office {
+    background-color: rgba(139, 92, 246, 0.08);
+    color: #8b5cf6;
+    border: 1px solid rgba(139, 92, 246, 0.2);
+  }
+
+  &.vacation {
+    background-color: rgba(239, 68, 68, 0.08);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  &.upcoming-vacation {
+    background-color: rgba(59, 130, 246, 0.08);
+    color: #3b82f6;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    font-weight: 700;
+  }
+
+  &.unassigned {
+    background-color: rgba(107, 114, 128, 0.08);
+    color: #6b7280;
+    border: 1px solid rgba(107, 114, 128, 0.2);
+  }
+}
+
