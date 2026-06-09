@@ -38,8 +38,13 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 ![Pantalla principal](docs/images/screenshots/01-main-nueva-entrada.png)
 
 ![Generador de reportes](docs/images/screenshots/04-generador-reportes.png)
+![Generador de reportes](docs/images/screenshots/04.1-generador-reportes.png)
+![Generador de reportes](docs/images/screenshots/04.2-generador-reportes.png)
 
 ![Configuracion administrativa](docs/images/screenshots/05-menu-configuracion.png)
+![Configuracion administrativa](docs/images/screenshots/05.1-menu-configuracion.png)
+
+![Modulo de Turnos](docs/images/screenshots/11-Turnos.png)
 
 ![Modulo de backup](docs/images/screenshots/06-menu-admin-backup.png)
 
