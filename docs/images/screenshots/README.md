@@ -11,7 +11,7 @@ Esta carpeta contiene las capturas de pantalla del sistema BitacoraSOC.
   ![Escalación y turnos](02-escalacion-turnos.png)
 
 - `02.1-escalacion-turnos.png` - Eescalación Telefonica.
-  ![Escalación Telefonica](02.1-escalacion-turnos.png))
+  ![Escalación Telefonica](02.1-escalacion-turnos.png)
 
 - `11-Turnos.png` - Configuracion de turnos semanales y escalación.
   ![Configuracion de turnos](11-Turnos.png)
