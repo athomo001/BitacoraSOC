@@ -11,10 +11,10 @@ Esta carpeta contiene las capturas de pantalla del sistema BitacoraSOC.
   ![Escalación y turnos](02-escalacion-turnos.png)
 
 - `02.1-escalacion-turnos.png` - Eescalación Telefonica.
-  ![Escalación Telefonica](02.1-escalacion-turnos.png)
+  ![Escalación Telefonica](02.1-escalacion-turnos.png?v=1)
 
 - `11-Turnos.png` - Configuracion de turnos semanales y escalación.
-  ![Configuracion de turnos](11-Turnos.png)
+  ![Configuracion de turnos](11-Turnos.png?v=1)
 - `03-buscar-entradas.png` - Búsqueda y filtrado de entradas.
   ![Buscar entradas](03-buscar-entradas.png)
 
@@ -22,7 +22,7 @@ Esta carpeta contiene las capturas de pantalla del sistema BitacoraSOC.
   ![Generador de reportes](04-generador-reportes.png)
 
 - `12-Estadisticas.png` - Estadisticas de incidentes.
-  ![Estadisticas de incidentes](12-Estadisticas.png)
+  ![Estadisticas de incidentes](12-Estadisticas.png?v=1)
 
 - `06-menu-admin-backup.png` - Menú admin con backup seleccionado.
   ![Menú admin - backup](06-menu-admin-backup.png)
