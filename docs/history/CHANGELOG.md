@@ -2,6 +2,13 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.90-beta] - 2026-06-09
+
+### Corrección de legibilidad del HUD del Easter Egg (#bat)
+
+- **Corrección de color y contraste del HUD:** Se solucionó un problema por el cual los números del minijuego de murciélagos (`#bat`) aparecían de color negro/gris oscuro (invisibles) debido a la regla global de estilos `p, span, label` en `styles.scss` que sobrescribía el color en cascada. Se implementó el color blanco directo con `!important` y se simplificaron las etiquetas `span` para evitar conflictos de especificidad CSS.
+- **Fondo sólido para contraste:** Se reemplazó el fondo semitransparente por un fondo oscuro sólido (`#1e1e1e`) con borde visible (`#333333`), asegurando que las letras verdes dinámicas del fondo del Easter Egg no afecten la lectura de los contadores.
+
 ## [v1.5.89-beta] - 2026-06-09
 
 ### Auditoría de QA y UX/UI: Contraste, Aviso de Privacidad Dinámico, Rediseño Premium de Backups y Resolución de Backlog de QA

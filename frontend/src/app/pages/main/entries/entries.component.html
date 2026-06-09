@@ -108,23 +108,7 @@
     <img [src]="easterEggImageUrl" alt="Bender" class="easter-egg-image" />
   </div>
 
-  <!-- HUD superior central para el minijuego de cacería de murciélagos (#bat) -->
-  <div class="bat-hud" *ngIf="batInstances.length > 0 || batsCaught > 0">
-    <div class="hud-item">
-      <span>🦇 ACTIVOS:</span>
-      <span class="hud-value">{{ batInstances.length }}</span>
-    </div>
-    <div class="hud-divider"></div>
-    <div class="hud-item">
-      <span>🎯 INTENTOS:</span>
-      <span class="hud-value">{{ batClickAttempts }}</span>
-    </div>
-    <div class="hud-divider"></div>
-    <div class="hud-item">
-      <span>🏆 CAZADOS:</span>
-      <span class="hud-value">{{ batsCaught }}</span>
-    </div>
-  </div>
+
 
   <!-- 🦇 EE-BAT-001: Murciélago Pixel-Art | Activado por #bat en tiempo real -->
   <!-- Persiste indefinidamente hasta F5 — NO cierra al hacer clic en pestaña/UI -->
@@ -138,7 +122,7 @@
       (click)="onBatClick(bat.id)"
       (mouseenter)="onBatHover()"
       (mouseleave)="onBatHoverLeave()"
-      [title]="'🦇 Bat #' + bat.id + ' | Intentos de captura: ' + batClickAttempts + ' | Total activos: ' + batInstances.length + '/100'">
+      [title]="'🦇 Bat #' + bat.id + ' | Intentos: ' + (batService.snapshot.attempts) + ' | Cazados: ' + (batService.snapshot.caught) + ' | Activos: ' + batInstances.length + '/100'">
       <div class="bat-pixel"></div>
     </div>
   </div>

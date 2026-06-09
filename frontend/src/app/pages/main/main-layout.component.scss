@@ -456,3 +456,76 @@
     padding: 14px 12px 18px;
   }
 }
+
+// =====================================================
+// 🦇 EE-BAT-001 — HUD Global de Cacería de Murciélagos
+// Debe vivir en el layout principal (fuera del content-wrapper
+// con overflow-y:auto) para que position:fixed sea relativo
+// al viewport y no al contenedor con scroll.
+// =====================================================
+
+// Contenedor transparente: solo existe para que el *ngIf funcione
+.bat-hud-global {
+  pointer-events: none; // No interfiere con clicks de la UI
+}
+
+// El HUD visible: cyberpunk, pequeño, anclado al centro superior del viewport
+.bat-hud {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2000; // Por encima de toolbars (z-index: 10) pero sin bloquear alertas del sistema
+  pointer-events: auto;
+
+  // Estilo Cyberpunk / Matrix
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 18px;
+  background: rgba(2, 12, 2, 0.92);
+  border: 1.5px solid #00ff41;
+  box-shadow: 0 0 12px rgba(0, 255, 65, 0.35), inset 0 0 6px rgba(0, 255, 65, 0.06);
+  border-radius: 6px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #00ff41;
+  text-shadow: 0 0 5px #00ff41;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  animation: batHudSlideDown 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+
+  .hud-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  // Valor numérico en blanco brillante para máximo contraste
+  .hud-value {
+    color: #ffffff;
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.7);
+    min-width: 18px;
+    text-align: center;
+  }
+
+  // Separador vertical sutil
+  .hud-divider {
+    width: 1px;
+    height: 14px;
+    background: rgba(0, 255, 65, 0.28);
+    flex-shrink: 0;
+  }
+}
+
+@keyframes batHudSlideDown {
+  from {
+    transform: translate(-50%, -120%);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
