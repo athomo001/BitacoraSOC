@@ -37,6 +37,8 @@ const { audit } = require('../utils/audit');
 const { getBrandingSnapshot, getAppTitleForText } = require('../utils/branding');
 const { buildFrontendResetUrl } = require('../utils/frontend-url');
 const { logger } = require('../utils/logger');
+const { getTokenFromCookie } = require('../utils/cookie-helper');
+const { sendEmail } = require('../utils/email');
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -47,25 +49,6 @@ const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  * - Cookies: opciones dependen de entorno y localhost (SameSite); probar redirect tras login.
  * - Refresh: guests pueden renovar JWT; documentado riesgo en comentario TODO del endpoint.
  */
-
-const getTokenFromCookie = (req) => {
-  const cookieHeader = req.headers.cookie;
-  if (!cookieHeader) {
-    return null;
-  }
-
-  const authCookie = cookieHeader
-    .split(';')
-    .map((value) => value.trim())
-    .find((value) => value.startsWith('auth_token='));
-
-  if (!authCookie) {
-    return null;
-  }
-
-  const tokenValue = authCookie.substring('auth_token='.length);
-  return tokenValue ? decodeURIComponent(tokenValue) : null;
-};
 
 const resolveCookieSecure = (req) => {
   if (process.env.COOKIE_SECURE === 'true') {
@@ -407,60 +390,46 @@ router.post('/forgot-password',
 
       const resetUrl = buildFrontendResetUrl(req, resetToken);
 
-      // Intentar enviar email si SMTP está configurado
-      const SmtpConfig = require('../models/SmtpConfig');
-      const nodemailer = require('nodemailer');
-      const { decrypt } = require('../utils/encryption');
-
-      let emailSent = false;
-      const smtpConfig = await SmtpConfig.findOne({ isActive: true });
+      // Intentar enviar email utilizando el servicio común sendEmail (QA-CODE-SMTP-001)
       const { appTitle } = await getBrandingSnapshot();
       const systemName = getAppTitleForText(appTitle, 'el sistema');
       const teamName = appTitle ? `Equipo ${appTitle}` : 'Equipo de soporte';
+      const subject = appTitle ? `Recuperación de Contraseña - ${appTitle}` : 'Recuperación de Contraseña';
+      const text = `Hola,\n\nHemos recibido una solicitud para resetear tu contraseña en ${systemName}.\n\nHaz click en el siguiente enlace para crear una nueva contraseña:\n${resetUrl}\n\nEste enlace expirará en 5 minutos.\n\nSi no solicitaste este cambio, ignora este email.\n\nSaludos,\n${teamName}`;
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #1976d2;">Recuperación de Contraseña</h2>
+          <p>Hola,</p>
+          <p>Hemos recibido una solicitud para resetear tu contraseña en ${systemName}.</p>
+          <p>Haz click en el siguiente botón para crear una nueva contraseña:</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${resetUrl}" style="background-color: #1976d2; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; display: inline-block;">
+              Resetear Contraseña
+            </a>
+          </div>
+          <p><small>O copia y pega este enlace en tu navegador:<br>${resetUrl}</small></p>
+          <p style="color: #f44336;"><strong>⏰ Este enlace expirará en 5 minutos.</strong></p>
+          <p>Si no solicitaste este cambio, ignora este email.</p>
+          <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
+          <p style="color: #666; font-size: 12px;">Saludos,<br>${teamName}</p>
+        </div>
+      `;
 
-      if (smtpConfig) {
-        try {
-          const secure = smtpConfig.port === 465;
-          const transporter = nodemailer.createTransport({
-            host: smtpConfig.host,
-            port: smtpConfig.port,
-            secure: secure,
-            auth: {
-              user: smtpConfig.username,
-              pass: decrypt(smtpConfig.password)
-            }
-          });
-
-          await transporter.sendMail({
-            from: `"${smtpConfig.senderName}" <${smtpConfig.senderEmail}>`,
-            to: email,
-            subject: appTitle ? `Recuperación de Contraseña - ${appTitle}` : 'Recuperación de Contraseña',
-            text: `Hola,\n\nHemos recibido una solicitud para resetear tu contraseña en ${systemName}.\n\nHaz click en el siguiente enlace para crear una nueva contraseña:\n${resetUrl}\n\nEste enlace expirará en 5 minutos.\n\nSi no solicitaste este cambio, ignora este email.\n\nSaludos,\n${teamName}`,
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #1976d2;">Recuperación de Contraseña</h2>
-                <p>Hola,</p>
-                <p>Hemos recibido una solicitud para resetear tu contraseña en ${systemName}.</p>
-                <p>Haz click en el siguiente botón para crear una nueva contraseña:</p>
-                <div style="text-align: center; margin: 30px 0;">
-                  <a href="${resetUrl}" style="background-color: #1976d2; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; display: inline-block;">
-                    Resetear Contraseña
-                  </a>
-                </div>
-                <p><small>O copia y pega este enlace en tu navegador:<br>${resetUrl}</small></p>
-                <p style="color: #f44336;"><strong>⏰ Este enlace expirará en 5 minutos.</strong></p>
-                <p>Si no solicitaste este cambio, ignora este email.</p>
-                <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
-                <p style="color: #666; font-size: 12px;">Saludos,<br>${teamName}</p>
-              </div>
-            `
-          });
-
-          emailSent = true;
-        } catch (emailError) {
-          console.error('Error enviando email de recuperación:', emailError);
-          // Continuar aunque falle el email
-        }
+      let emailSent = false;
+      try {
+        await sendEmail({
+          to: email,
+          subject,
+          text,
+          html,
+          auditContext: {
+            sourceModule: 'auth',
+            triggerType: 'forgot-password'
+          }
+        });
+        emailSent = true;
+      } catch (emailError) {
+        logger.error({ err: emailError }, 'Error al enviar email de recuperación con sendEmail centralizado');
       }
 
       // Si está en desarrollo Y el email no se envió, solo hacemos log

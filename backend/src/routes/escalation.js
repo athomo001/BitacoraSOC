@@ -69,6 +69,14 @@ router.get('/contacts', authenticate, escalationController.getContactsPublic);
 router.get('/internal-shifts', authenticate, escalationController.getInternalShiftsNow);
 
 /**
+ * @route   GET /api/escalation/assignments
+ * @desc    Obtener asignaciones de turno (teletrabajo, vacaciones, turnos regulares)
+ *          para la vista operativa. Accesible a analistas autenticados.
+ * @access  Private (Analyst/Admin)
+ */
+router.get('/assignments', authenticate, escalationController.getAssignments);
+
+/**
  * @route   GET /api/escalation/raci?clientId=...&serviceId=...
  * @desc    Obtener matriz RACI por cliente/servicio
  * @access  Private (Analyst/Admin)

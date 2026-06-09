@@ -23,17 +23,15 @@ const { sendEmail } = require('./email');
 const { logger } = require('./logger');
 
 const POLL_INTERVAL_MS = 1 * 60 * 1000;
-const DEFAULT_TIMEZONE = 'America/Santiago';
+const { DEFAULT_TIMEZONE } = require('./date-utils');
 const FIXED_TOLERANCE_MINUTES = 1;
 
 // ─── Helpers de tiempo ────────────────────────────────────────────────────
 
 function isTimeInRange(time, start, end) {
-  if (!time || !start || !end) return false;
-  if (end <= start) {
-    return time >= start || time < end;
-  }
-  return time >= start && time < end;
+  // Delegar la evaluación de rango horario al helper centralizado
+  const { isTimeInRange: checkTimeRange } = require('./time-helper');
+  return checkTimeRange(time, start, end);
 }
 
 function currentTimeStr(timezone, now) {

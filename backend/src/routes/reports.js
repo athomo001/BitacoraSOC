@@ -24,6 +24,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs').promises;
 const sharp = require('sharp');
+const { parseBooleanFlag } = require('../utils/boolean-helper');
 const router = express.Router();
 const Entry = require('../models/Entry');
 const ShiftCheck = require('../models/ShiftCheck');
@@ -36,6 +37,16 @@ const { audit } = require('../utils/audit');
 const { sendEmail } = require('../utils/email');
 const { analyzeRecipientEmails } = require('../utils/contactDirectory');
 const { buildIncidentEmail } = require('../utils/incidentEmailTemplate');
+const {
+  htmlToBasicPlainText,
+  locateFirstImgSrcRange,
+  extractFirstImgSrc,
+  replaceFirstImgSrc,
+  removeFirstImgTag,
+  removeLeadingDataImageTags,
+  contentTypeFromLogoFilename,
+  contentTypeFromDataSubtype
+} = require('../utils/email-templates-helper');
 
 /**
  * CID estable para multipart/related (imagen inline). Debe coincidir con el atributo src del HTML.
@@ -48,15 +59,6 @@ const NEWSLETTER_DEBUG_LOGS = true;
 const normalizeAnalyticsLabel = (value, fallback = 'Sin dato') => {
   const normalized = String(value || '').trim();
   return normalized || fallback;
-};
-
-const parseBooleanFlag = (value, defaultValue = false) => {
-  if (typeof value === 'boolean') return value;
-  if (value === null || value === undefined || value === '') return defaultValue;
-  const normalized = String(value).trim().toLowerCase();
-  if (['true', '1', 'yes', 'y', 'si', 'sí', 'on'].includes(normalized)) return true;
-  if (['false', '0', 'no', 'n', 'off'].includes(normalized)) return false;
-  return defaultValue;
 };
 
 const extractEmailDomain = (email) => {
@@ -197,124 +199,8 @@ function newsletterDebug(event, details = {}) {
   console.log(`[newsletter/send][debug] ${event}`, safe);
 }
 
-/** Texto plano mínimo para multipart/alternative (mejor tránsito por relays tipo Exchange). */
-function htmlToBasicPlainText(html) {
-  return String(html)
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(p|div|h[1-6]|tr|li)>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-    .slice(0, 200000);
-}
-
-function locateFirstImgSrcRange(html) {
-  const str = String(html);
-  const imgIdx = str.search(/<img\b/i);
-  if (imgIdx === -1) return null;
-  const lower = str.toLowerCase();
-  let i = imgIdx + 4;
-
-  while (i < str.length) {
-    const idxSrc = lower.indexOf('src', i);
-    if (idxSrc === -1) return null;
-
-    let j = idxSrc + 3;
-    while (j < str.length && /\s/.test(str[j])) j++;
-    if (str[j] !== '=') {
-      i = idxSrc + 1;
-      continue;
-    }
-    j++;
-    while (j < str.length && /\s/.test(str[j])) j++;
-
-    const q = str[j];
-    if (q !== '"' && q !== "'") {
-      i = idxSrc + 1;
-      continue;
-    }
-
-    const valueStart = j + 1;
-    const valueEnd = str.indexOf(q, valueStart);
-    if (valueEnd === -1) return null;
-    return { valueStart, valueEnd };
-  }
-
-  return null;
-}
-
-function extractFirstImgSrc(html) {
-  const str = String(html);
-  const r = locateFirstImgSrcRange(str);
-  return r ? str.slice(r.valueStart, r.valueEnd).trim() : null;
-}
-
-function replaceFirstImgSrc(html, newSrc) {
-  const str = String(html);
-  const r = locateFirstImgSrcRange(str);
-  if (!r) return str;
-  return str.slice(0, r.valueStart) + String(newSrc) + str.slice(r.valueEnd);
-}
-
-function removeFirstImgTag(html) {
-  const str = String(html);
-  const idx = str.search(/<img\b/i);
-  if (idx === -1) return str;
-
-  let i = idx;
-  let inQuote = null;
-  while (i < str.length) {
-    const c = str[i];
-    if (inQuote) {
-      if (c === inQuote) inQuote = null;
-    } else if (c === '"' || c === "'") {
-      inQuote = c;
-    } else if (c === '>') {
-      return str.slice(0, idx) + str.slice(i + 1);
-    }
-    i++;
-  }
-
-  return str;
-}
-
-function removeLeadingDataImageTags(html) {
-  let out = String(html);
-  let guard = 0;
-  while (guard < 10) {
-    const src = extractFirstImgSrc(out);
-    if (!src || !/^data:image\//i.test(src)) break;
-    out = removeFirstImgTag(out);
-    guard++;
-  }
-  return out;
-}
-
-function contentTypeFromLogoFilename(filename) {
-  const e = path.extname(filename || '').toLowerCase();
-  if (e === '.jpg' || e === '.jpeg') return 'image/jpeg';
-  if (e === '.png') return 'image/png';
-  if (e === '.gif') return 'image/gif';
-  if (e === '.webp') return 'image/webp';
-  if (e === '.svg') return 'image/svg+xml';
-  return 'image/png';
-}
-
-function contentTypeFromDataSubtype(sub) {
-  const s = String(sub || '').toLowerCase();
-  if (s === 'jpeg' || s === 'jpg') return 'image/jpeg';
-  if (s === 'png') return 'image/png';
-  if (s === 'gif') return 'image/gif';
-  if (s === 'webp') return 'image/webp';
-  if (s === 'svg+xml') return 'image/svg+xml';
-  return 'image/png';
-}
+// Nota: Las funciones auxiliares de procesamiento HTML e imágenes de correo
+// fueron modularizadas y se importan desde backend/src/utils/email-templates-helper.js
 
 async function readUploadedLogoFromWebPath(webPath) {
   if (!webPath || typeof webPath !== 'string') return null;
@@ -695,7 +581,7 @@ router.get('/history', authenticate, async (req, res) => {
 });
 
 // POST /api/reports/history - Registrar item en historial compartido
-router.post('/history', authenticate, async (req, res) => {
+router.post('/history', authenticate, authorize('admin', 'user'), async (req, res) => {
   try {
     const type = String(req.body?.type || '').trim();
     const title = String(req.body?.title || '').trim();
@@ -871,12 +757,29 @@ router.get('/export-entries', authenticate, authorize('admin'), async (req, res)
       .sort({ createdAt: -1 })
       .lean();
 
-    // Generar CSV
+    // Generar CSV sanitizado contra inyecciones de fórmulas (mitigación de CSV Injection)
+    const escapeCsvValue = (val) => {
+      let strVal = String(val === null || val === undefined ? '' : val);
+      if (strVal.startsWith('=') || strVal.startsWith('+') || strVal.startsWith('-') || strVal.startsWith('@')) {
+        strVal = `'` + strVal;
+      }
+      return strVal;
+    };
+
     const csvHeader = 'ID,Fecha,Hora,Tipo,Contenido,Tags,Usuario,Es Invitado,Creado\n';
     const csvRows = entries.map(e => {
-      const content = `"${(e.content || '').replace(/"/g, '""')}"`;
-      const tags = e.tags.join('; ');
-      return `${e._id},${e.entryDate.toISOString().split('T')[0]},${e.entryTime},${e.entryType},${content},${tags},${e.createdByUsername},${e.isGuestEntry},${e.createdAt.toISOString()}`;
+      const id = escapeCsvValue(e._id);
+      const date = e.entryDate ? e.entryDate.toISOString().split('T')[0] : '';
+      const time = escapeCsvValue(e.entryTime);
+      const type = escapeCsvValue(e.entryType);
+      const rawContent = escapeCsvValue(e.content || '');
+      const content = `"${rawContent.replace(/"/g, '""')}"`;
+      const tags = escapeCsvValue(e.tags ? e.tags.join('; ') : '');
+      const username = escapeCsvValue(e.createdByUsername);
+      const isGuest = escapeCsvValue(e.isGuestEntry);
+      const createdAt = e.createdAt ? e.createdAt.toISOString() : '';
+
+      return `${id},${date},${time},${type},${content},${tags},${username},${isGuest},${createdAt}`;
     }).join('\n');
 
     const csv = csvHeader + csvRows;
@@ -1355,7 +1258,7 @@ router.post('/newsletter/validate', authenticate, async (req, res) => {
 });
 
 // POST /api/reports/newsletter/send - Envío de boletines (1:1 o agrupado por dominio con CC compartido)
-router.post('/newsletter/send', authenticate, async (req, res) => {
+router.post('/newsletter/send', authenticate, authorize('admin', 'user'), async (req, res) => {
   try {
     const { recipients, cc, subject, html, analytics } = req.body;
     const groupByDomain = parseBooleanFlag(req.body?.groupByDomain, true);
@@ -1546,7 +1449,7 @@ router.post('/incident/preview', authenticate, async (req, res) => {
 });
 
 // POST /api/reports/incident/send - Envío de reporte de incidente (MJML)
-router.post('/incident/send', authenticate, async (req, res) => {
+router.post('/incident/send', authenticate, authorize('admin', 'user'), async (req, res) => {
   const { to, cc, subject, reportData, images } = req.body;
   try {
 

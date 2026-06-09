@@ -319,15 +319,25 @@ app.use(helmet({
   xssFilter: true
 }));
 
-// Body parsers con límites dinámicos por ruta
+// Body parsers con límites dinámicos por ruta y validación temprana (QA-SERVER-DOS-001)
 app.use((req, res, next) => {
   const isLogoRoute = req.path === '/api/config/logo' || req.path === '/api/config/favicon';
-  const limit = isLogoRoute ? '10mb' : '2mb';
+  if (isLogoRoute && (req.method === 'POST' || req.method === 'PUT')) {
+    const contentType = req.headers['content-type'] || '';
+    // Permitir JSON, urlencoded o multipart/form-data para configuración de branding
+    if (
+      !contentType.includes('application/json') &&
+      !contentType.includes('application/x-www-form-urlencoded') &&
+      !contentType.includes('multipart/form-data')
+    ) {
+      return res.status(400).json({ message: 'Content-Type no soportado para configuración de branding.' });
+    }
+  }
+  const limit = '2mb'; // Límite estricto de 2MB para evitar DoS
   express.json({ limit })(req, res, next);
 });
 app.use((req, res, next) => {
-  const isLogoRoute = req.path === '/api/config/logo' || req.path === '/api/config/favicon';
-  const limit = isLogoRoute ? '10mb' : '2mb';
+  const limit = '2mb'; // Límite estricto de 2MB para evitar DoS
   express.urlencoded({ extended: true, limit })(req, res, next);
 });
 
@@ -447,6 +457,29 @@ app.use('/uploads', async (req, res, next) => {
   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+
+  // Interceptar aviso-privacidad.html para inyectar dinámicamente el título del branding (CDC o personalizado)
+  if (req.path === '/aviso-privacidad.html') {
+    try {
+      const fs = require('fs').promises;
+      const filePath = path.join(__dirname, '../uploads/aviso-privacidad.html');
+      let html = await fs.readFile(filePath, 'utf8');
+
+      // Obtener el título del branding de la base de datos
+      const AppConfig = require('./models/AppConfig');
+      const config = await AppConfig.findOne();
+      const appTitle = config && config.appTitle ? config.appTitle.trim() : 'Bitácora SOC';
+
+      // Reemplazar ocurrencias del nombre por defecto con el nombre personalizado
+      html = html.replace(/Bitácora SOC/g, appTitle);
+      html = html.replace(/Bitacora SOC/g, appTitle);
+
+      res.setHeader('Content-Type', 'text/html; charset=UTF-8');
+      return res.send(html);
+    } catch (err) {
+      console.error('[Branding] Error inyectando título en aviso-privacidad:', err);
+    }
+  }
 
   // Proteger artefactos de complementos: no deben quedar públicos por conocer la URL.
   if (req.path.startsWith('/complements/')) {

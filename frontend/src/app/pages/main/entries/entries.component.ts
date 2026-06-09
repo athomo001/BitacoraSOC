@@ -18,6 +18,7 @@ import { CatalogLogSource } from '../../../models/catalog.model';
 import { CreateEntryRequest } from '../../../models/entry.model';
 import { AuthService } from '../../../services/auth.service';
 import { ConfigService } from '../../../services/config.service';
+import { BatEasterEggService } from '../../../services/bat-easter-egg.service';
 import { EasterEggRule } from '../../../models/config.model';
 import { MatFormField, MatLabel, MatHint } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
@@ -46,7 +47,7 @@ export class EntriesComponent implements OnInit, OnDestroy {
 
   // 🦇 EE-BAT-001: Easter Egg Murciélago Pixel-Art
   batInstances: BatInstance[] = [];
-  batClickAttempts = 0;
+  // batClickAttempts y batsCaught se leen directamente del BatEasterEggService
   private mouseX = 0;
   private mouseY = 0;
   private lastProximityCheck = 0;
@@ -64,7 +65,9 @@ export class EntriesComponent implements OnInit, OnDestroy {
     private catalogService: CatalogService,
     private configService: ConfigService,
     private snackBar: MatSnackBar,
-    private authService: AuthService
+    private authService: AuthService,
+    // Servicio global del easter egg: el HUD se renderiza en el layout principal
+    readonly batService: BatEasterEggService
   ) {
     this.entryForm = this.fb.group({
       content: ['', [Validators.required, Validators.maxLength(50000)]],
@@ -200,9 +203,20 @@ export class EntriesComponent implements OnInit, OnDestroy {
 
   // 🦇 EE-BAT-001 — Interactividad
   onBatClick(batId: number): void {
-    this.batClickAttempts++;
-    console.log(`[EASTER_EGG] 🦇 ¡Intento fallido! Capturas intentadas: ${this.batClickAttempts}`);
-    this.triggerBatEvasion(batId, 420, 24);
+    // 35% de probabilidad de cazar el murciélago con éxito
+    const isSuccess = Math.random() < 0.35;
+    if (isSuccess) {
+      // Elimina la instancia cazada y notifica al servicio global del HUD
+      this.batInstances = this.batInstances.filter(bat => bat.id !== batId);
+      this.batService.registerCatch(this.batInstances.length);
+      this.snackBar.open('🦇 ¡Murciélago cazado con éxito! (+1)', 'Cerrar', { duration: 2000 });
+      console.log(`[EASTER_EGG] 🦇 ¡Murciélago cazado! Total: ${this.batService.snapshot.caught}`);
+    } else {
+      // Registra el intento fallido en el servicio global y fuerza la evasión
+      this.batService.registerAttempt();
+      console.log(`[EASTER_EGG] 🦇 ¡Fallo! Intentos: ${this.batService.snapshot.attempts}`);
+      this.triggerBatEvasion(batId, 420, 24);
+    }
   }
 
   onBatHover(): void {
@@ -318,6 +332,8 @@ export class EntriesComponent implements OnInit, OnDestroy {
       this.batInstances.push(this.createRandomBatInstance());
     }
 
+    // Notifica al servicio global para que el HUD del layout principal se actualice
+    this.batService.setActiveBats(this.batInstances.length);
     console.log(`[EASTER_EGG] 🦇 Murciélagos activos: ${this.batInstances.length}/100`);
   }
 

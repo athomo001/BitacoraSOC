@@ -27,15 +27,9 @@ const { logger } = require('../utils/logger');
 const { sendEmail } = require('../utils/email');
 const { sendShiftReport } = require('../utils/shift-report');
 const moment = require('moment-timezone');
+const { isTimeInRange } = require('../utils/time-helper');
 
 const isSameDay = (a, b) => a && b && a.toDateString() === b.toDateString();
-
-const isTimeInRange = (time, start, end) => {
-  if (start < end) {
-    return time >= start && time < end;
-  }
-  return time >= start || time < end;
-};
 
 const getCurrentShift = async (date = new Date()) => {
   const referenceMoment = moment(date);

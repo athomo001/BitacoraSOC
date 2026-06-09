@@ -56,6 +56,7 @@ const ShiftRotationCycle = require('../models/ShiftRotationCycle');
 const SmtpConfig = require('../models/SmtpConfig');
 const multer = require('multer');
 const { backupModels, BACKUP_EXPORT_VERSION } = require('../utils/backup-manifest');
+const { parseBooleanFlag } = require('../utils/boolean-helper');
 
 const PURGE_CONFIRM_PHRASE = 'PURGAR TODO';
 
@@ -77,15 +78,6 @@ const { prepareBackupSchedule, startBackupScheduler, stopBackupScheduler, runBac
 // Helper de validación de filename para evitar Path Traversal
 const isValidBackupFilename = (filename) => {
   return typeof filename === 'string' && /^backup-[a-zA-Z0-9.\-_]+\.(json|zip)$/.test(filename);
-};
-
-const parseBooleanFlag = (value) => {
-  if (value === true || value === 1) return true;
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase();
-    return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on';
-  }
-  return false;
 };
 
 // Helper: convertir array de objetos a CSV

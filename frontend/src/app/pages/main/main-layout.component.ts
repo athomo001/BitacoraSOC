@@ -22,7 +22,7 @@ import { Complement } from '../../models/complement.model';
 import { environment } from '../../../environments/environment';
 import { MatSidenavContainer, MatSidenav, MatSidenavContent } from '@angular/material/sidenav';
 import { MatToolbar } from '@angular/material/toolbar';
-import { NgIf, NgFor, NgClass } from '@angular/common';
+import { NgIf, NgFor, NgClass, AsyncPipe } from '@angular/common';
 import { MatIcon } from '@angular/material/icon';
 import { MatNavList, MatListItem, MatListItemIcon, MatListItemTitle } from '@angular/material/list';
 import { RouterLinkActive, RouterLink, RouterOutlet } from '@angular/router';
@@ -35,6 +35,7 @@ import { MatIconButton } from '@angular/material/button';
 import { MatMenuTrigger, MatMenu, MatMenuItem } from '@angular/material/menu';
 import { MatTooltip } from '@angular/material/tooltip';
 import { Title } from '@angular/platform-browser';
+import { BatEasterEggService } from '../../services/bat-easter-egg.service';
 
 type MenuItem = {
   icon: string;
@@ -129,7 +130,9 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     private complementBridgeService: ComplementBridgeService,
     private workShiftService: WorkShiftService,
     private systemHealthService: SystemHealthService,
-    private titleService: Title
+    private titleService: Title,
+    // Servicio global del Easter Egg #bat — el HUD se suscribe a su estado aquí
+    readonly batService: BatEasterEggService
   ) { }
 
   getAssetUrl(url: string): string {

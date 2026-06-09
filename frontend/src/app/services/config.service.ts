@@ -30,6 +30,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { shareReplay, tap } from 'rxjs/operators';
 import { environment } from '@env/environment';
 import { AppConfig, UpdateConfigRequest, ShiftReminder } from '../models/config.model';
 
@@ -38,6 +39,7 @@ import { AppConfig, UpdateConfigRequest, ShiftReminder } from '../models/config.
 })
 export class ConfigService {
   private readonly API_URL = `${environment.apiUrl}/config`;
+  private logoCache$?: Observable<{ logoUrl: string; loginTheme?: string; appTitle?: string }>;
 
   constructor(private http: HttpClient) { }
 
@@ -52,11 +54,21 @@ export class ConfigService {
   uploadLogo(file: File): Observable<{ message: string; logoUrl: string }> {
     const formData = new FormData();
     formData.append('logo', file);
-    return this.http.post<{ message: string; logoUrl: string }>(`${this.API_URL}/logo`, formData);
+    return this.http.post<{ message: string; logoUrl: string }>(`${this.API_URL}/logo`, formData).pipe(
+      tap(() => {
+        // Invalidar caché de logo para forzar la recarga
+        this.logoCache$ = undefined;
+      })
+    );
   }
 
-  getLogo(): Observable<{ logoUrl: string; loginTheme?: string; appTitle?: string }> {
-    return this.http.get<{ logoUrl: string; loginTheme?: string; appTitle?: string }>(`${this.API_URL}/logo`);
+  getLogo(forceRefresh = false): Observable<{ logoUrl: string; loginTheme?: string; appTitle?: string }> {
+    if (!this.logoCache$ || forceRefresh) {
+      this.logoCache$ = this.http.get<{ logoUrl: string; loginTheme?: string; appTitle?: string }>(`${this.API_URL}/logo`).pipe(
+        shareReplay(1)
+      );
+    }
+    return this.logoCache$;
   }
 
   getFavicon(): Observable<{ faviconUrl: string }> {

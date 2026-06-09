@@ -67,6 +67,17 @@
           </div>
         </div>
 
+        <!-- Privacy consent checkbox (QA-COMPLIANCE-PRIVACY-NOTICE) -->
+        <div class="form-group privacy-consent-group" *ngIf="showPrivacyConsent">
+          <label class="crt-checkbox-label">
+            <input type="checkbox" formControlName="privacyConsent" class="crt-checkbox" />
+            ACEPTO EL <a [href]="getAssetUrl('/uploads/aviso-privacidad.html')" target="_blank" class="privacy-link">AVISO DE PRIVACIDAD</a>
+          </label>
+          <div class="error-messages" *ngIf="loginForm.get('privacyConsent')?.invalid && loginForm.get('privacyConsent')?.touched">
+            <div class="error-text">CONSENTIMIENTO REQUERIDO</div>
+          </div>
+        </div>
+
         <!-- Submit button -->
         <button type="submit" class="crt-button" [disabled]="loading || loginForm.invalid" [class.loading]="loading">
           <span *ngIf="!loading">[ LOGIN ]</span>
@@ -204,6 +215,17 @@
               class="cy-error-text">
               LA CONTRASEÑA ES REQUERIDA
             </span>
+          </div>
+        </div>
+
+        <!-- Casilla de Privacidad (QA-COMPLIANCE-PRIVACY-NOTICE) -->
+        <div class="cy-field privacy-consent-group" *ngIf="showPrivacyConsent">
+          <label class="cy-checkbox-label">
+            <input type="checkbox" formControlName="privacyConsent" class="cy-checkbox" />
+            Acepto el <a [href]="getAssetUrl('/uploads/aviso-privacidad.html')" target="_blank" class="cy-privacy-link">Aviso de Privacidad</a>
+          </label>
+          <div class="cy-errors" *ngIf="loginForm.get('privacyConsent')?.invalid && loginForm.get('privacyConsent')?.touched">
+            <span class="cy-error-text">DEBE ACEPTAR EL AVISO DE PRIVACIDAD</span>
           </div>
         </div>
 

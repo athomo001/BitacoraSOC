@@ -19,11 +19,17 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../models/User');
 const TokenDenylist = require('../models/TokenDenylist');
+const { getTokenFromCookie } = require('../utils/cookie-helper');
 
 const READ_ONLY_ROLES = new Set(['guest', 'auditor']);
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
-const canEditOwnProfile = (req) => {
+/**
+ * Valida si la petición de escritura (PUT/PATCH) está permitida para roles de solo lectura (Perfil propio o Nota personal propia).
+ * @param {Object} req - Objeto de petición Express.
+ * @returns {boolean} True si está permitida la escritura.
+ */
+const isAllowedWriteForReadOnly = (req) => {
   if (!req) {
     return false;
   }
@@ -35,7 +41,18 @@ const canEditOwnProfile = (req) => {
 
   const baseUrl = req.baseUrl || '';
   const path = req.path || '';
-  return baseUrl.endsWith('/users') && path === '/me';
+
+  // Permitir edición del perfil propio
+  if (baseUrl.endsWith('/users') && path === '/me') {
+    return true;
+  }
+
+  // Permitir edición de la nota personal propia (QA-NOTES-GUEST-WRITE-BLOCKED)
+  if (baseUrl.endsWith('/notes') && path === '/personal') {
+    return true;
+  }
+
+  return false;
 };
 
 const sessionIpTracker = new Map();
@@ -45,27 +62,8 @@ const sessionIpTracker = new Map();
  * - Token aceptado desde `Authorization: Bearer` o cookie `auth_token` (compatibilidad browser/API).
  * - Guest expirado: se desactiva cuenta y 401 (coherente con login).
  * - Sesión: hash del token en tracker (no almacena JWT completo); cambio de IP → auditoría warn, no bloquea.
- * - Roles solo lectura: guest/auditor bloquean métodos mutadores salvo PATCH/PUT `/users/me`.
+ * - Roles solo lectura: guest/auditor bloquean métodos mutadores salvo PATCH/PUT `/users/me` y `/notes/personal`.
  */
-
-const getTokenFromCookie = (req) => {
-  const cookieHeader = req.headers.cookie;
-  if (!cookieHeader) {
-    return null;
-  }
-
-  const authCookie = cookieHeader
-    .split(';')
-    .map((value) => value.trim())
-    .find((value) => value.startsWith('auth_token='));
-
-  if (!authCookie) {
-    return null;
-  }
-
-  const tokenValue = authCookie.substring('auth_token='.length);
-  return tokenValue ? decodeURIComponent(tokenValue) : null;
-};
 
 // 🔐 Middleware para verificar JWT y cargar usuario
 const authenticate = async (req, res, next) => {
@@ -162,7 +160,7 @@ const authenticate = async (req, res, next) => {
 
     req.user = user;
 
-    if (READ_ONLY_ROLES.has(user.role) && !SAFE_METHODS.has(req.method) && !canEditOwnProfile(req)) {
+    if (READ_ONLY_ROLES.has(user.role) && !SAFE_METHODS.has(req.method) && !isAllowedWriteForReadOnly(req)) {
       return res.status(403).json({ message: 'Este rol es de solo lectura y no puede modificar información' });
     }
 

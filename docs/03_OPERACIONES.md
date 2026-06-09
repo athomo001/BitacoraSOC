@@ -1,4 +1,4 @@
-﻿# Operaciones Generales
+# Operaciones Generales
 
 # Operacion Completa - Desde Cero
 
@@ -876,6 +876,201 @@ Links:
 
 - **Despliegue:** [DEPLOY.md](./DEPLOY.md)
 - **Instalación:** [SETUP.md](./SETUP.md)
+- Fecha, Hora
+- Tipo (operativa/incidente)
+- Contenido
+- Tags
+- Usuario
+- Es Guest
+
+**Uso:**
+- Auditorías
+- Análisis externo
+- Respaldo adicional
+
+---
+
+## Configuración Avanzada (Admin)
+
+### Catálogo de Servicios
+
+**Admin → Checklist → Servicios:**
+
+**Agregar servicio:**
+1. Click "Nuevo servicio"
+2. Título (ej: "QRadar")
+3. Orden (opcional, drag & drop después)
+4. Guardar
+
+**Editar/Eliminar:**
+- Click sobre servicio → Editar/Eliminar
+- ⚠️ Si eliminas servicio, checks pasados lo mantienen
+
+**Activar/Desactivar:**
+- Toggle "Activo"
+- Inactivos no aparecen en checklist nuevo
+- Checks pasados siguen visibles
+
+### Cooldown
+
+**Admin → Config General:**
+
+- **Cooldown entre checks:** 1-24 horas
+- Default: 4 horas
+- Afecta a todos los usuarios
+
+**Caso de uso:**
+- Turnos 8h → cooldown 7h
+- Turnos 12h → cooldown 11h
+
+### Modo Invitado
+
+**Admin → Config General:**
+
+- **Habilitar modo invitado:** Sí/No
+- **Duración máxima:** 1-30 días (default 2)
+
+**Creación guest:**
+1. Admin → Admin Usuarios → Nuevo
+2. Role: Guest
+3. Se calcula automáticamente `guestExpiresAt`
+
+**Expiración:**
+- Login bloqueado después de fecha
+- Mensaje: "Cuenta de invitado expirada"
+
+---
+
+## Historial y Búsqueda
+
+### Ver entradas
+
+**🌍 Ver todas:**
+
+**Filtros disponibles:**
+- Búsqueda texto completo (contenido)
+- Por tags (multiselect)
+- Por tipo (operativa/incidente)
+- Por rango fechas
+- Por usuario (admin ve selector, users no)
+- Paginación (20 por página)
+
+**Ordenamiento:**
+- Más recientes primero (default)
+
+**Acciones:**
+- Ver detalle
+- Editar (solo creador o admin)
+- Eliminar (solo creador o admin)
+
+### Historial Checklist
+
+**Checklist → Historial:**
+
+**Filtros:**
+- Por tipo (inicio/cierre)
+- Por rango fechas
+- Por usuario (admin only)
+
+**Vista:**
+- Fecha/hora
+- Tipo
+- Usuario
+- Resumen (cuántos rojos)
+- Click para ver detalle completo
+
+---
+
+## Troubleshooting Operativo
+
+### Checklist no permite registrar
+
+**Error: "No puedes registrar dos inicio consecutivos"**
+
+**Causa:** Ya hiciste "inicio" y estás intentando otro "inicio"
+
+**Solución:** Registra "cierre" primero
+
+---
+
+**Error: "Debes esperar X horas entre checks"**
+
+**Causa:** Cooldown no cumplido
+
+**Solución:**
+- Esperar tiempo restante, O
+- Pedir a admin que reduzca cooldown temporalmente
+
+---
+
+**Error: "Debes evaluar todos los servicios"**
+
+**Causa:** Faltan servicios en la lista
+
+**Solución:** Asegurar que lista tenga todos los servicios activos (acordeón muestra cuáles faltan)
+
+---
+
+**Error: "Servicio QRadar está en rojo y requiere observación"**
+
+**Causa:** No pusiste observación en servicio rojo
+
+**Solución:** Agregar observación (mín 10 chars)
+
+### Email no se envía
+
+**Verificar:**
+1. Admin configuró SMTP (Admin → SMTP)
+2. Configuración es válida (test OK)
+3. Toggle "Enviar solo si hay rojos" coincide con tu check
+
+**Log error:**
+- Console backend muestra: "Error sending checklist email"
+- Check se registra igual (email es opcional)
+
+### No puedo editar entrada
+
+**Causa:** Solo el creador o admin pueden editar
+
+**Solución:**
+- Si eres admin: editar normalmente
+- Si no eres el creador: pedir al admin
+
+---
+
+## Checklist Pre-Turno
+
+### Analista Entrante
+
+- [ ] Verificar que MongoDB está corriendo
+- [ ] Login exitoso
+- [ ] Leer notas del administrador
+- [ ] Registrar checklist inicio
+- [ ] Revisar últimas entradas (30 min antes)
+- [ ] Abrir dashboards SOC (QRadar, Zabbix, etc.)
+
+### Analista Saliente
+
+- [ ] Registrar checklist cierre
+- [ ] Documentar incidentes no resueltos
+- [ ] Actualizar notas personales (pendientes)
+- [ ] Verificar que no quedan alertas críticas sin documentar
+- [ ] Logout
+
+### Admin
+
+- [ ] Revisar reportes diarios
+- [ ] Verificar backups automáticos
+- [ ] Revisar logs de auditoría (si log forwarding activo)
+- [ ] Actualizar notas del administrador si hay cambios
+- [ ] Gestionar usuarios (activar/desactivar, renovar guests)
+
+---
+
+## Referencias
+
+- **Despliegue:** [DEPLOY.md](./DEPLOY.md)
+- **Instalación:** [SETUP.md](./SETUP.md)
 - **API:** [API.md](./API.md)
 - **Logging:** [LOGGING.md](./LOGGING.md)
 - **Backup:** [BACKUP.md](./BACKUP.md)
@@ -885,66 +1080,6 @@ Links:
 
 
 # Matriz de Escalación
-
-# 📞 Módulo de Escalaciones - Bitácora SOC
-
-Sistema centralizado para gestionar información de escalación: contactos externos por cliente/servicio y turnos internos con rotaciones semanales configurables.
-
----
-
-## 🎯 Funcionalidades
-
-### Para Analistas (Vista de Consulta)
-- **Búsqueda rápida**: Seleccionar Cliente → Servicio
-- **Contactos externos**: 
-  - Correos Para/CC
-  - Teléfono de emergencia
-- **Turnos internos actuales**:
-  - N2 (Nivel 2)
-  - TI (Soporte TI)
-  - N1 No Hábil
-  - Muestra quién está de turno AHORA
-  - Incluye overrides temporales (vacaciones, licencias, etc.)
-
-### Para Administradores (Gestión Completa)
-- **CRUD de Clientes**: Organizaciones (ACME Corp, Global Tech, etc.)
-- **CRUD de Servicios**: Servicios por cliente (ACME - Service A, etc.)
-- **CRUD de Contactos**: Base de datos de personas con email/teléfono
-- **Directorio Global**: Fuente de verdad centralizada para contactos internos, externos y listas, con filtros operativos, copia rápida y edición contextual en fila.
-- **Reglas de Escalación**: Configurar Para/CC/Emergencia por servicio
-- **Asignaciones de Turno**: Planificar turnos semanales por rol
-- **Overrides Manuales**: Reemplazos temporales con vigencia y motivo
-- **Ciclos de Rotación**: Definir hora/día de inicio de semanas (NO fijos a 00:00)
-
----
-
-## 🚀 Instalación y Configuración
-
-### 1. Inicializar Roles de Turno
-
-```powershell
-cd backend
-node src/scripts/seed-shift-roles.js
-```
-
-Esto crea los 3 roles predefinidos: N2, TI, N1_NO_HABIL.
-
-### 2. Acceder al Módulo
-
-**Frontend:**
-- Vista Analista: `http://localhost:4200/main/escalation/view`
-- Vista Admin: `http://localhost:4200/main/escalation/admin`
-- Directorio Global: `http://localhost:4200/main/escalation/directory`
-
-**Backend API:**
-- Base: `/api/escalation`
-- Swagger: `http://localhost:3000/api-docs` (buscar "escalation")
-
----
-
-## 📚 Guía de Uso
-
-### Flujo Inicial (Administrador)
 
 1. **Crear Clientes** (Tab "Clientes")
    ```json

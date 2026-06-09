@@ -45,7 +45,7 @@
               <!-- Filas Gantt -->
               <div class="gantt-row" *ngFor="let role of ganttRoles">
                 <div class="gantt-label-col">
-                  <strong>{{ role.roleCode }}</strong>
+                  <strong>{{ role.roleLabel }}</strong>
                 </div>
                 <div class="gantt-timeline-col">
                   <!-- Barras de Asignación -->
@@ -88,7 +88,7 @@
               <div class="proximity-row" *ngFor="let item of upcomingEndAssignments">
                 <div class="proximity-info">
                   <span class="proximity-text">
-                    <strong>{{ item.personName }}</strong> - {{ item.roleCode }}
+                    <strong>{{ item.personName }}</strong> - {{ getRoleLabel(item.roleCode) }}
                   </span>
                   <span class="proximity-time">{{ item.remainingText }}</span>
                 </div>
@@ -117,7 +117,7 @@
               <div class="proximity-row" *ngFor="let item of upcomingStartAssignments">
                 <div class="proximity-info">
                   <span class="proximity-text">
-                    <strong>{{ item.personName }}</strong> - {{ item.roleCode }}
+                    <strong>{{ item.personName }}</strong> - {{ getRoleLabel(item.roleCode) }}
                   </span>
                   <span class="proximity-time upcoming">{{ item.timeUntilText }}</span>
                 </div>
@@ -158,6 +158,8 @@
                     <mat-option value="N2">Operador N2</mat-option>
                     <mat-option value="TI">Especialista TI</mat-option>
                     <mat-option value="N1_NO_HABIL">Guardia N1 No Hábil</mat-option>
+                    <mat-option value="TELEWORK">Teletrabajo</mat-option>
+                    <mat-option value="VACATION">Vacaciones</mat-option>
                   </mat-select>
                   <mat-icon matPrefix>filter_list</mat-icon>
                 </mat-form-field>
@@ -189,7 +191,7 @@
               <h4>📋 Formato de Datos de Asignación</h4>
               <p>Campos esperados para el registro o importación CSV de turnos:</p>
               <ul>
-                <li><strong>rol:</strong> N1, N2 o TI.</li>
+                <li><strong>rol:</strong> N1, N2, TI, Teletrabajo o Vacaciones.</li>
                 <li><strong>usuario:</strong> Username recomendado; también acepta email o nombre completo. El sistema detecta si es usuario interno o persona externa.</li>
                 <li><strong>fechaInicio / horaInicio:</strong> Formato YYYY-MM-DD y HH:MM (ej: 2026-05-26, 09:00).</li>
                 <li><strong>fechaFin / horaFin:</strong> Formato YYYY-MM-DD y HH:MM (ej: 2026-06-02, 08:59).</li>
@@ -227,7 +229,7 @@
                           <strong>{{ asg.weekEndDate | date:'dd/MM/yyyy HH:mm' }}</strong>
                         </div>
                       </td>
-                      <td><span class="role-badge">{{ asg.roleCode }}</span></td>
+                      <td><span class="role-badge">{{ getRoleLabel(asg.roleCode) }}</span></td>
                       <td>
                         <div class="person-cell">
                           <mat-icon class="warning-icon" color="warn" *ngIf="hasRowConflict(asg)" [matTooltip]="getRowConflictTooltip(asg)">warning</mat-icon>
@@ -268,6 +270,8 @@
                         <mat-option value="N2">Operador N2</mat-option>
                         <mat-option value="TI">Especialista TI</mat-option>
                         <mat-option value="N1_NO_HABIL">Guardia N1 No Hábil</mat-option>
+                        <mat-option value="TELEWORK">Teletrabajo</mat-option>
+                        <mat-option value="VACATION">Vacaciones</mat-option>
                       </mat-select>
                     </mat-form-field>
 

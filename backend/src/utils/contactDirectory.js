@@ -1,22 +1,14 @@
 /**
  * File Purpose: backend/src/utils/contactDirectory.js
- * Responsibilities: Define the module behavior and maintain clear contracts.
- * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ * Responsibilities: Define el comportamiento del módulo y mantiene contratos claros de directorio de contactos.
+ * QA Notes: Todos los comentarios dentro del código deben escribirse en español de forma profesional.
  */
 
 const CONTACT_TYPE_VALUES = ['escalation', 'preventive'];
+const { parseBooleanLike } = require('./boolean-helper');
 
 function normalizeContactType(value) {
   return String(value || '').trim().toLowerCase() === 'preventive' ? 'preventive' : 'escalation';
-}
-
-function parseBooleanLike(value, fallback = false) {
-  if (typeof value === 'boolean') return value;
-  if (value === null || value === undefined || value === '') return fallback;
-  const normalized = String(value).trim().toLowerCase();
-  if (['true', '1', 'yes', 'y', 'si', 'sí', 'activo', 'on'].includes(normalized)) return true;
-  if (['false', '0', 'no', 'n', 'inactivo', 'off'].includes(normalized)) return false;
-  return fallback;
 }
 
 function isValidEmail(value) {

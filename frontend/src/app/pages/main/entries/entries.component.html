@@ -108,6 +108,8 @@
     <img [src]="easterEggImageUrl" alt="Bender" class="easter-egg-image" />
   </div>
 
+
+
   <!-- 🦇 EE-BAT-001: Murciélago Pixel-Art | Activado por #bat en tiempo real -->
   <!-- Persiste indefinidamente hasta F5 — NO cierra al hacer clic en pestaña/UI -->
   <div class="bat-container" *ngIf="batInstances.length > 0">
@@ -120,7 +122,7 @@
       (click)="onBatClick(bat.id)"
       (mouseenter)="onBatHover()"
       (mouseleave)="onBatHoverLeave()"
-      [title]="'🦇 Bat #' + bat.id + ' | Intentos de captura: ' + batClickAttempts + ' | Total activos: ' + batInstances.length + '/100'">
+      [title]="'🦇 Bat #' + bat.id + ' | Intentos: ' + (batService.snapshot.attempts) + ' | Cazados: ' + (batService.snapshot.caught) + ' | Activos: ' + batInstances.length + '/100'">
       <div class="bat-pixel"></div>
     </div>
   </div>

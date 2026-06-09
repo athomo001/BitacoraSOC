@@ -13,6 +13,7 @@ const WorkShift = require('../models/WorkShift');
 const WorkShiftAssignment = require('../models/WorkShiftAssignment');
 const moment = require('moment-timezone');
 const { logger } = require('../utils/logger');
+const { isTimeInRange } = require('../utils/time-helper');
 
 const normalizeAssignedUsersPayload = (payload = {}) => {
   const nextPayload = { ...payload };
@@ -501,21 +502,4 @@ router.post('/:id/send-report-poc',
 );
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 🛠️ FUNCIONES AUXILIARES
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-/**
- * Verifica si una hora está dentro de un rango
- * Maneja cruces de medianoche (ej: 22:00 - 06:00)
- */
-function isTimeInRange(time, start, end) {
-  if (start < end) {
-    // Rango normal (no cruza medianoche)
-    return time >= start && time < end;
-  } else {
-    // Rango que cruza medianoche
-    return time >= start || time < end;
-  }
-}
-
 module.exports = router;

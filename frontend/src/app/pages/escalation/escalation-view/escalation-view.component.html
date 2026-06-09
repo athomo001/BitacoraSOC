@@ -1,282 +1,351 @@
+<!-- Contenedor Maestre de la Vista Operativa -->
 <div class="escalation-view-container">
-  <!-- Encabezado -->
-  <section class="header-card escalation-view-panel">
-    <header class="escalation-view-panel__header">
-      <h2 class="escalation-view-panel__title">
-        <mat-icon>contact_phone</mat-icon>
-        Información de Escalamiento
-      </h2>
-    </header>
-    <div class="escalation-view-panel__body">
-      <!-- Selectores -->
-      <div class="selectors">
-        <mat-form-field appearance="outline" class="selector-field">
-          <mat-label>Cliente</mat-label>
-          <input
-            type="text"
-            matInput
-            [formControl]="clientControl"
-            [matAutocomplete]="autoClient"
-            placeholder="Seleccione un cliente">
-          <mat-icon matSuffix>business</mat-icon>
-          <mat-autocomplete
-            #autoClient="matAutocomplete"
-            [displayWith]="displayClientFn"
-            (optionSelected)="onClientSelected($event.option.value)">
-            <mat-option *ngFor="let client of filteredClients | async" [value]="client">
-              <strong>{{ client.name }}</strong>
-              <span class="code-hint">({{ client.code }})</span>
-            </mat-option>
-          </mat-autocomplete>
-        </mat-form-field>
+  
+  <!-- Cabecera Limpia de Control y Buscadores -->
+  <div class="escalation-controls">
+    <div class="controls-left">
+      <!-- Selector de Cliente -->
+      <mat-form-field appearance="outline" class="selector-field">
+        <mat-label>Cliente</mat-label>
+        <input
+          type="text"
+          matInput
+          [formControl]="clientControl"
+          [matAutocomplete]="autoClient"
+          placeholder="Buscar cliente...">
+        <mat-icon matSuffix>business</mat-icon>
+        <mat-autocomplete
+          #autoClient="matAutocomplete"
+          [displayWith]="displayClientFn"
+          (optionSelected)="onClientSelected($event.option.value)">
+          <mat-option *ngFor="let client of filteredClients | async" [value]="client">
+            <strong>{{ client.name }}</strong>
+            <span class="code-hint">({{ client.code }})</span>
+          </mat-option>
+        </mat-autocomplete>
+      </mat-form-field>
 
-        <mat-form-field appearance="outline" class="selector-field">
-          <mat-label>Servicio</mat-label>
-          <input
-            type="text"
-            matInput
-            [formControl]="serviceControl"
-            [matAutocomplete]="autoService"
-            [disabled]="services.length === 0"
-            placeholder="Seleccione un servicio">
-          <mat-icon matSuffix>business_center</mat-icon>
-          <mat-autocomplete
-            #autoService="matAutocomplete"
-            [displayWith]="displayServiceFn"
-            (optionSelected)="onServiceSelected($event.option.value)">
-            <mat-option *ngFor="let service of filteredServices | async" [value]="service">
-              <strong>{{ service.name }}</strong>
-              <span class="code-hint">({{ service.code }})</span>
-            </mat-option>
-          </mat-autocomplete>
-        </mat-form-field>
-
-        <button mat-raised-button color="primary" (click)="refresh()" [disabled]="!escalationData || loading">
-          <mat-icon>refresh</mat-icon>
-          Actualizar
-        </button>
-
-        <button mat-stroked-button color="accent" type="button" (click)="toggleQuickClientForm()">
-          <mat-icon>person_add</mat-icon>
-          Cliente no está en la lista
-        </button>
-      </div>
-
-      <section *ngIf="showQuickClientForm" class="flow-legend">
-        <h3>Agregar cliente nuevo al listado central</h3>
-        <div class="selectors">
-          <mat-form-field appearance="outline" class="selector-field">
-            <mat-label>Nombre del cliente</mat-label>
-            <input matInput [value]="quickClientName" (input)="quickClientName = $any($event.target).value">
-          </mat-form-field>
-          <mat-form-field appearance="outline" class="selector-field">
-            <mat-label>Descripción (opcional)</mat-label>
-            <input matInput [value]="quickClientDescription" (input)="quickClientDescription = $any($event.target).value">
-          </mat-form-field>
-          <button mat-raised-button color="primary" type="button" [disabled]="savingQuickClient" (click)="saveQuickClient()">
-            {{ savingQuickClient ? 'Guardando...' : 'Guardar cliente' }}
-          </button>
-        </div>
-      </section>
+      <!-- Selector de Servicio -->
+      <mat-form-field appearance="outline" class="selector-field">
+        <mat-label>Servicio</mat-label>
+        <input
+          type="text"
+          matInput
+          [formControl]="serviceControl"
+          [matAutocomplete]="autoService"
+          [disabled]="services.length === 0"
+          placeholder="Seleccionar servicio...">
+        <mat-icon matSuffix>business_center</mat-icon>
+        <mat-autocomplete
+          #autoService="matAutocomplete"
+          [displayWith]="displayServiceFn"
+          (optionSelected)="onServiceSelected($event.option.value)">
+          <mat-option *ngFor="let service of filteredServices | async" [value]="service">
+            <strong>{{ service.name }}</strong>
+            <span class="code-hint">({{ service.code }})</span>
+          </mat-option>
+        </mat-autocomplete>
+      </mat-form-field>
     </div>
-  </section>
 
-  <!-- Loading -->
-  <div *ngIf="loading" class="loading-container">
-    <mat-spinner></mat-spinner>
+    <!-- Acciones Rápidas -->
+    <div class="controls-right">
+      <button mat-flat-button color="primary" (click)="refresh()" [disabled]="!escalationData || loading">
+        <mat-icon>refresh</mat-icon>
+        Actualizar
+      </button>
+
+      <button mat-stroked-button color="accent" type="button" (click)="toggleQuickClientForm()">
+        <mat-icon>{{ showQuickClientForm ? 'close' : 'person_add' }}</mat-icon>
+        {{ showQuickClientForm ? 'Cancelar' : 'Cliente no listado' }}
+      </button>
+    </div>
   </div>
 
-  <!-- Error -->
-  <section *ngIf="error && !loading" class="error-card escalation-view-panel">
-    <div class="escalation-view-panel__body escalation-view-panel__body--row">
-      <mat-icon color="warn">error</mat-icon>
-      {{ error }}
+  <!-- Formulario Rápido de Nuevo Cliente (Expandible Inline) -->
+  <div *ngIf="showQuickClientForm" class="quick-client-panel">
+    <h3>Agregar cliente nuevo al listado central</h3>
+    <div class="quick-client-fields">
+      <mat-form-field appearance="outline" class="field">
+        <mat-label>Nombre del cliente</mat-label>
+        <input matInput [value]="quickClientName" (input)="quickClientName = $any($event.target).value" placeholder="Ej: ACME Corp">
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="field">
+        <mat-label>Descripción (opcional)</mat-label>
+        <input matInput [value]="quickClientDescription" (input)="quickClientDescription = $any($event.target).value" placeholder="Breve nota">
+      </mat-form-field>
+      <button mat-raised-button color="primary" type="button" [disabled]="savingQuickClient" (click)="saveQuickClient()">
+        {{ savingQuickClient ? 'Guardando...' : 'Guardar' }}
+      </button>
     </div>
-  </section>
+  </div>
 
-  <!-- Datos de Escalamiento -->
-  <div *ngIf="escalationData && !loading" class="escalation-data">
+  <!-- Estado de Carga (Spinner) -->
+  <div *ngIf="loading" class="loading-container">
+    <mat-spinner diameter="50"></mat-spinner>
+  </div>
 
-    <!-- Info del Servicio -->
-    <section class="info-card escalation-view-panel">
-      <header class="escalation-view-panel__header">
-        <h2 class="escalation-view-panel__title">{{ escalationData.service.name }}</h2>
-        <p class="escalation-view-panel__subtitle">Cliente: {{ escalationData.service.clientName }}</p>
-      </header>
-      <div class="escalation-view-panel__body">
-        <p class="timestamp">
-          <mat-icon>schedule</mat-icon>
-          Consultado: {{ formatDateTime(escalationData.timestamp) }}
-        </p>
-      </div>
-    </section>
+  <!-- Banner de Errores Operativos -->
+  <div *ngIf="error && !loading" class="error-banner animate-fade-in">
+    <mat-icon>error</mat-icon>
+    <span>{{ error }}</span>
+  </div>
 
-    <section *ngIf="escalationFlow" class="flow-card escalation-view-panel">
-      <header class="escalation-view-panel__header">
-        <h2 class="escalation-view-panel__title">
-          <mat-icon>call</mat-icon>
-          Flujo de Llamados de Escalamiento
-        </h2>
-      </header>
-      <div class="escalation-view-panel__body">
-        <div *ngIf="escalationFlow.flow.length > 0" class="flow-grid">
-          <article *ngFor="let step of escalationFlow.flow" class="flow-step">
-            <h3>{{ step.title }}</h3>
-            <p class="step-meta">Paso {{ step.order }}</p>
-
-            <div *ngIf="step.type === 'unique'" class="step-contact">
-              <div><strong>{{ step.contactName || 'Sin nombre' }}</strong></div>
-              <div>{{ step.contactTel || 'Sin teléfono' }}</div>
-              <div *ngIf="step.callAt">Fecha/Hora: {{ formatDateTime(step.callAt) }}</div>
-            </div>
-
-            <div *ngIf="step.type === 'pool'" class="pool-responsive-grid">
-              <div class="pool-contact" *ngFor="let contact of step.contacts || []">
-                <strong>{{ contact.name || 'Sin nombre' }}</strong>
-                <span>{{ contact.tel || 'Sin teléfono' }}</span>
+  <!-- Datos de Escalamiento (Solo si se han cargado y no está cargando) -->
+  <div *ngIf="escalationData && !loading" class="escalation-layout animate-fade-in">
+    
+    <!-- COLUMNA PRINCIPAL (Izquierda - Flujo de llamados y Turnos) -->
+    <div class="escalation-main-col">
+      
+      <!-- Flujo de Llamados (Timeline Vertical) -->
+      <section class="elegant-card">
+        <header class="card-header">
+          <h2 class="card-title">
+            <mat-icon>call</mat-icon>
+            Flujo de Llamados de Escalamiento
+          </h2>
+          <span class="badge" *ngIf="escalationFlow">{{ escalationFlow.flow.length }} Pasos</span>
+        </header>
+        <div class="card-body">
+          <div *ngIf="escalationFlow && escalationFlow.flow.length > 0" class="escalation-timeline">
+            <article *ngFor="let step of escalationFlow.flow" class="timeline-item">
+              <div class="timeline-node">
+                <span class="node-number">{{ step.order }}</span>
               </div>
+              <div class="timeline-content">
+                <h4>{{ step.title }}</h4>
+                <span class="step-meta">Contacto asignado al nivel de escalamiento</span>
+
+                <!-- Tipo de Contacto Único -->
+                <div *ngIf="step.type === 'unique'" class="step-contact">
+                  <div><strong>{{ step.contactName || 'Sin contacto asignado' }}</strong></div>
+                  <a *ngIf="step.contactTel" [href]="'tel:' + step.contactTel" class="tel-link">
+                    <mat-icon>phone</mat-icon>
+                    <span>{{ step.contactTel }}</span>
+                  </a>
+                  <div *ngIf="step.callAt" class="step-meta" style="margin-top: 6px; margin-bottom: 0;">
+                    Llamada registrada: {{ formatDateTime(step.callAt) }}
+                  </div>
+                </div>
+
+                <!-- Tipo de Pool de Contactos -->
+                <div *ngIf="step.type === 'pool'" class="pool-contacts-grid">
+                  <div class="pool-contact-card" *ngFor="let contact of step.contacts || []">
+                    <span class="contact-name">{{ contact.name || 'Sin nombre' }}</span>
+                    <a *ngIf="contact.tel" [href]="'tel:' + contact.tel" class="contact-tel tel-link" style="margin-top: 4px; font-weight: 500;">
+                      <mat-icon style="font-size: 14px; width:14px; height:14px;">phone</mat-icon>
+                      <span>{{ contact.tel }}</span>
+                    </a>
+                    <span *ngIf="!contact.tel" class="contact-tel">Sin teléfono</span>
+                  </div>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <!-- Sin Flujo Configurado -->
+          <div *ngIf="!escalationFlow || escalationFlow.flow.length === 0" class="no-data">
+            <mat-icon>info</mat-icon>
+            <p>No hay un flujo de llamados configurado para este cliente</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Turnos Internos (Analistas en Turno) -->
+      <section class="elegant-card">
+        <header class="card-header">
+          <h2 class="card-title">
+            <mat-icon>groups</mat-icon>
+            Turnos Internos del SOC
+          </h2>
+        </header>
+        <div class="card-body">
+          <div *ngIf="escalationData.internalShifts.length > 0" class="shifts-grid">
+            <article *ngFor="let shift of escalationData.internalShifts" class="shift-card-item" [class.override-shift]="shift.isOverride">
+              
+              <div class="shift-item-header">
+                <span class="role-badge" [class]="getRoleBadgeClass(shift.role)">
+                  {{ shift.roleName }}
+                </span>
+                <span *ngIf="shift.isOverride" class="override-pill">
+                  <mat-icon>swap_horiz</mat-icon>
+                  Reemplazo Activo
+                </span>
+              </div>
+
+              <!-- Perfil del Analista Asignado -->
+              <div *ngIf="shift.currentUser" class="user-profile">
+                <div class="avatar">
+                  {{ shift.currentUser.name.substring(0, 2).toUpperCase() }}
+                </div>
+                <div class="profile-details">
+                  <span class="name">{{ shift.currentUser.name }}</span>
+                  <span class="email">{{ shift.currentUser.email }}</span>
+                </div>
+              </div>
+
+              <!-- Alerta de Turno Vacante -->
+              <div *ngIf="!shift.currentUser" class="unassigned-profile">
+                <mat-icon>warning</mat-icon>
+                <span>Sin analista asignado para este turno</span>
+              </div>
+
+              <!-- Periodo de Vigencia del Turno -->
+              <div *ngIf="shift.shiftPeriod" class="period">
+                <mat-icon>event</mat-icon>
+                <span>Vigencia: {{ formatDateTime(shift.shiftPeriod.start) }} - {{ formatDateTime(shift.shiftPeriod.end) }}</span>
+              </div>
+
+              <!-- Justificación del Reemplazo -->
+              <div *ngIf="shift.isOverride && shift.overrideReason" class="reason-box">
+                <mat-icon>info</mat-icon>
+                <em>Causa: {{ shift.overrideReason }}</em>
+              </div>
+
+            </article>
+          </div>
+
+          <!-- Sin Turnos Asignados -->
+          <div *ngIf="escalationData.internalShifts.length === 0" class="no-data">
+            <mat-icon>info</mat-icon>
+            <p>No se encontraron turnos activos o planificados para este período</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- COLUMNA LATERAL (Derecha - Metadatos e Información de Contactos) -->
+    <div class="escalation-sidebar-col">
+      
+      <!-- Detalle de Servicio Seleccionado -->
+      <section class="elegant-card info-service-card">
+        <div class="card-body">
+          <span class="escalation-view-panel__subtitle">SERVICIO ACTIVO</span>
+          <h3 class="escalation-view-panel__title">{{ escalationData.service.name }}</h3>
+          <p class="escalation-view-panel__subtitle">Cliente: {{ escalationData.service.clientName }}</p>
+          
+          <div class="timestamp-row">
+            <mat-icon>schedule</mat-icon>
+            <span>Consulta oficial: {{ formatDateTime(escalationData.timestamp) }}</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Contactos Externos -->
+      <section class="elegant-card">
+        <header class="card-header">
+          <h2 class="card-title">
+            <mat-icon>email</mat-icon>
+            Contactos Externos
+          </h2>
+        </header>
+        <div class="card-body">
+          
+          <!-- Lista PARA -->
+          <div class="contact-group" *ngIf="escalationData.externalContacts.to.length > 0">
+            <div class="group-title">
+              <span class="badge-to">PARA</span>
             </div>
-          </article>
-        </div>
-
-        <div *ngIf="escalationFlow.flow.length === 0" class="no-data compact-no-data">
-          <mat-icon>info</mat-icon>
-          <p>No hay flujo de escalamiento configurado para este cliente</p>
-        </div>
-
-        <div *ngIf="escalationFlow.legend" class="flow-legend">
-          <h3>Leyenda / Recordatorio</h3>
-          <p>{{ escalationFlow.legend }}</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Contactos Externos -->
-    <section class="contacts-card escalation-view-panel">
-      <header class="escalation-view-panel__header">
-        <h2 class="escalation-view-panel__title">
-          <mat-icon>email</mat-icon>
-          Contactos Externos
-        </h2>
-      </header>
-      <div class="escalation-view-panel__body">
-        <!-- Para -->
-        <div class="contact-section" *ngIf="escalationData.externalContacts.to.length > 0">
-          <h3>
-            <mat-chip color="primary">PARA</mat-chip>
-          </h3>
-          <div class="contact-list">
-            <div *ngFor="let contact of escalationData.externalContacts.to" class="contact-item">
-              <mat-icon>person</mat-icon>
-              <div class="contact-info">
-                <strong>{{ contact.name }}</strong>
-                <span *ngIf="contact.email">{{ contact.email }}</span>
+            <div class="external-contacts-list">
+              <div *ngFor="let contact of escalationData.externalContacts.to" class="external-contact-row">
+                <mat-icon>person</mat-icon>
+                <div class="info">
+                  <strong>{{ contact.name }}</strong>
+                  <span>{{ contact.email || 'Sin correo registrado' }}</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <mat-divider *ngIf="escalationData.externalContacts.to.length > 0 && escalationData.externalContacts.cc.length > 0"></mat-divider>
-
-        <!-- CC -->
-        <div class="contact-section" *ngIf="escalationData.externalContacts.cc.length > 0">
-          <h3>
-            <mat-chip color="accent">CC</mat-chip>
-          </h3>
-          <div class="contact-list">
-            <div *ngFor="let contact of escalationData.externalContacts.cc" class="contact-item">
-              <mat-icon>person</mat-icon>
-              <div class="contact-info">
-                <strong>{{ contact.name }}</strong>
-                <span *ngIf="contact.email">{{ contact.email }}</span>
+          <!-- Lista CC -->
+          <div class="contact-group" *ngIf="escalationData.externalContacts.cc.length > 0">
+            <div class="group-title">
+              <span class="badge-cc">CC</span>
+            </div>
+            <div class="external-contacts-list">
+              <div *ngFor="let contact of escalationData.externalContacts.cc" class="external-contact-row">
+                <mat-icon>person</mat-icon>
+                <div class="info">
+                  <strong>{{ contact.name }}</strong>
+                  <span>{{ contact.email || 'Sin correo registrado' }}</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <mat-divider *ngIf="escalationData.externalContacts.emergency.phone"></mat-divider>
-
-        <!-- Emergencia -->
-        <div class="contact-section" *ngIf="escalationData.externalContacts.emergency.phone">
-          <h3>
-            <mat-chip color="warn">EMERGENCIA</mat-chip>
-          </h3>
-          <div class="emergency-contact">
-            <mat-icon>phone</mat-icon>
-            <div class="contact-info">
-              <strong>{{ escalationData.externalContacts.emergency.phone }}</strong>
-              <span *ngIf="escalationData.externalContacts.emergency.contactName">
+          <!-- Alerta de Emergencia Destacada -->
+          <div *ngIf="escalationData.externalContacts.emergency.phone" class="emergency-alert-card">
+            <div class="emergency-icon-container">
+              <mat-icon>phone_in_talk</mat-icon>
+            </div>
+            <div class="info">
+              <span class="label">Contacto de Emergencia</span>
+              <a [href]="'tel:' + escalationData.externalContacts.emergency.phone" class="phone tel-link" style="font-size: 1.1rem; padding: 0; color: inherit;">
+                {{ escalationData.externalContacts.emergency.phone }}
+              </a>
+              <span class="name" *ngIf="escalationData.externalContacts.emergency.contactName">
                 {{ escalationData.externalContacts.emergency.contactName }}
               </span>
             </div>
           </div>
-        </div>
 
-        <!-- Sin contactos -->
-        <div *ngIf="escalationData.externalContacts.to.length === 0 &&
-                    escalationData.externalContacts.cc.length === 0 &&
-                    !escalationData.externalContacts.emergency.phone"
-             class="no-data">
-          <mat-icon>info</mat-icon>
-          <p>No hay contactos externos configurados para este servicio</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Turnos Internos -->
-    <section class="shifts-card escalation-view-panel">
-      <header class="escalation-view-panel__header">
-        <h2 class="escalation-view-panel__title">
-          <mat-icon>groups</mat-icon>
-          Turnos Internos
-        </h2>
-      </header>
-      <div class="escalation-view-panel__body">
-        <div *ngIf="escalationData.internalShifts.length > 0" class="shifts-list">
-          <div *ngFor="let shift of escalationData.internalShifts" class="shift-item">
-            <div class="shift-header">
-              <mat-chip [class]="getRoleBadgeClass(shift.role)">
-                {{ shift.roleName }}
-              </mat-chip>
-              <mat-chip *ngIf="shift.isOverride" color="warn" class="override-badge">
-                <mat-icon>swap_horiz</mat-icon>
-                REEMPLAZO
-              </mat-chip>
-            </div>
-
-            <div *ngIf="shift.currentUser" class="shift-user">
-              <mat-icon>account_circle</mat-icon>
-              <div class="user-info">
-                <strong>{{ shift.currentUser.name }}</strong>
-                <span>{{ shift.currentUser.email }}</span>
-              </div>
-            </div>
-
-            <div *ngIf="!shift.currentUser" class="no-user">
-              <mat-icon color="warn">warning</mat-icon>
-              <span>No hay nadie asignado</span>
-            </div>
-
-            <div *ngIf="shift.shiftPeriod" class="shift-period">
-              <mat-icon>event</mat-icon>
-              <span>
-                {{ formatDateTime(shift.shiftPeriod.start) }} - {{ formatDateTime(shift.shiftPeriod.end) }}
-              </span>
-            </div>
-
-            <div *ngIf="shift.isOverride && shift.overrideReason" class="override-reason">
-              <mat-icon>info</mat-icon>
-              <em>{{ shift.overrideReason }}</em>
-            </div>
+          <!-- Sin Contactos Configurables -->
+          <div *ngIf="escalationData.externalContacts.to.length === 0 &&
+                      escalationData.externalContacts.cc.length === 0 &&
+                      !escalationData.externalContacts.emergency.phone"
+               class="no-data">
+            <mat-icon>info</mat-icon>
+            <p>Sin contactos externos configurados para este servicio</p>
           </div>
-        </div>
 
-        <div *ngIf="escalationData.internalShifts.length === 0" class="no-data">
-          <mat-icon>info</mat-icon>
-          <p>No hay turnos internos configurados</p>
         </div>
-      </div>
-    </section>
+      </section>
+
+      <!-- Leyenda / Notas del Flujo de Llamados -->
+      <section *ngIf="escalationFlow && escalationFlow.legend" class="elegant-card flow-legend-card">
+        <div class="card-body">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-weight: 600;">
+            <mat-icon style="color: var(--primary-color);">note</mat-icon>
+            <span>Recordatorios Operativos</span>
+          </div>
+          <p>{{ escalationFlow.legend }}</p>
+        </div>
+      </section>
+
+    </div>
 
   </div>
+
+  <!-- Estado Inicial Premium (Empty State) -->
+  <div *ngIf="!escalationData && !loading" class="escalation-empty-state">
+    <div class="empty-icon-container">
+      <mat-icon>contact_phone</mat-icon>
+    </div>
+    <h3>Consola de Información de Escalamiento</h3>
+    <p>
+      Selecciona un cliente y un servicio activo en los buscadores superiores para proyectar 
+      la línea de tiempo de llamados de emergencia, los analistas del SOC asignados a turnos 
+      y los contactos externos autorizados.
+    </p>
+    
+    <div class="features-grid">
+      <div class="feature-item">
+        <mat-icon>call</mat-icon>
+        <strong>Flujo de Llamadas</strong>
+        <span>Pasos interactivos de escalamiento y enlaces rápidos telefónicos.</span>
+      </div>
+      <div class="feature-item">
+        <mat-icon>groups</mat-icon>
+        <strong>Turnos Internos</strong>
+        <span>Visualización de analistas asignados a roles (N1, N2, TI) y reemplazos.</span>
+      </div>
+      <div class="feature-item">
+        <mat-icon>email</mat-icon>
+        <strong>Contactos Externos</strong>
+        <span>Listados centralizados (PARA, CC) y teléfonos de emergencia críticos.</span>
+      </div>
+    </div>
+  </div>
+
 </div>

@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: beta. Validar siempre los flujos criticos en un entorno controlado antes de pasar a operacion formal.
 >
-> Version referencial actual (segun `docs/history/CHANGELOG.md`): v1.5.86-beta
+> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.5.93-beta**
 
 Stack principal:
 
@@ -47,36 +47,48 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 
 ## Novedades recientes (resumen rapido)
 
-### v1.5.86-beta (hora oficial de servidor en turnos)
+### v1.5.93-beta (permisos de asignaciones y tabla de teletrabajo)
+
+- nueva ruta publica `GET /api/escalation/assignments` para que analistas autenticados consulten asignaciones sin requerir rol admin.
+- separados los metodos `getAssignments()` (vista operativa) y `getAssignmentsAdmin()` (administracion de turnos) en el servicio frontend para evitar errores `403`.
+- estilos CSS completos para la tabla `excel-table` en la vista operativa: fila completa en rojo para vacaciones activas, azul para pronto-vacaciones.
+
+### v1.5.92-beta (teletrabajo y vacaciones en administracion de turnos)
+
+- roles `TELEWORK` y `VACATION` disponibles en el formulario de asignacion de `/main/admin/work-shifts`.
+- validacion de conflictos adaptativa: teletrabajo coexiste con turnos regulares; vacaciones dispara autoliberacion de turnos previos en backend.
+- notificacion al guardar vacaciones si se liberaron turnos automaticamente.
+- etiquetas en espanol en tabla, Gantt y tarjetas de proximidad.
+- importacion CSV acepta `Teletrabajo` y `Vacaciones` como roles validos.
+
+### v1.5.91-beta (UX y tabla de teletrabajo escalable)
+
+- autocomplete de clientes sin necesidad de borrar texto ni presionar X; el panel despliega todos los clientes si el valor actual ya coincide exactamente con la seleccion.
+- tabla escalable para el listado de personal en teletrabajo y apoyo con columnas Nombre, Correo (copiable), Telefono (copiable), Cargo y Situacion con badges de color.
+- soporte de estados: En Teletrabajo, En Oficina, VACACIONES (rojo), Pronto Vacaciones (azul, dentro de 2 semanas).
+
+### v1.5.89-beta (auditoria QA y UX/UI)
+
+- ajuste de contraste en flujo de recuperacion de contrasena en tema Matrix.
+- aviso de privacidad con branding dinamico desde la base de datos; consentimiento persistente en `localStorage`.
+- rediseno asimetrico de la vista de backups con layout de dos columnas.
+- easter egg `#bat` con HUD cyberpunk y mecanica de caceria interactiva.
+- correccion de texto borroso en el panel central (remocion de `will-change: transform`).
+- limites de recursos CPU/RAM en `docker-compose.yml` para todos los contenedores.
+- refactorizacion de helpers duplicados: `cookie-helper.js`, `boolean-helper.js`, `time-helper.js`, `date-utils.js`.
+- cierre de hallazgos de auditoria de seguridad: JWT denylist, rate-limit en MongoDB, CORS estricto, guards robustecidos.
+
+### v1.5.88-beta (ortografia y v1.5.87 / historial compartido)
+
+- correccion masiva de tildes y acentos en la UI (labels, placeholders, snackbars).
+- historial de reportes/boletines migrado a backend compartido para que todos los usuarios autenticados vean los envios del equipo.
+- borrado de historial restringido a rol admin.
+
+### v1.5.86-beta (hora oficial del servidor en turnos)
 
 - la vista de turnos semanales ahora usa hora oficial del backend como fuente de verdad.
 - el endpoint `GET /api/work-shifts/current` entrega `currentDateTime` y `currentTimestamp` para sincronizacion temporal robusta.
 - el Gantt calcula linea de dia actual y estados (`Pasado`, `En Curso`, `Proximo`) con tiempo de servidor.
-- se endurecio el frontend contra manipulacion de hora local usando referencia oficial + reloj monotono (`performance.now()`).
-
-### v1.5.85-beta y v1.5.84-beta (seguridad y CSV de turnos)
-
-- cierre de auditoria de seguridad con mitigaciones de severidad media.
-- invalidacion de JWT en logout via denylist persistente en MongoDB.
-- eventos forenses de autorizacion denegada (`auth.authorize.fail`) en auditoria.
-- rate-limit centralizado en Mongo para escenarios multi-contenedor/multi-replica.
-- CORS mas estricto y reducción de superficie para payloads grandes.
-- validacion de archivos reforzada para logos/favicons (MIME + estructura interna).
-- simplificacion del CSV de asignacion de turnos con formato operativo reducido y mapeo funcional de roles.
-
-### v1.5.81-beta y v1.5.80-beta (UX reportes y catalogos)
-
-- simplificacion del flujo de destinatarios en boletines/incidentes desde el panel lateral.
-- bloqueo de conflictos entre `Para` y `CC` con validacion y feedback inmediato en UI.
-- reordenamiento del formulario de reporte de incidentes para captura mas rapida.
-- actualizacion de nomenclatura en admin a **Clientes y Catalogos** y reorden operativo de pestanas.
-
-### v1.5.79-beta a v1.5.77-beta (turnos semanales)
-
-- migracion de gestion de turnos semanales hacia `/main/admin/work-shifts`.
-- dashboard de turnos con resumen tipo Gantt, proximos turnos y editor lateral.
-- timeline extendido para dar visibilidad anticipada de la proxima semana.
-- mejoras de selector TI y barras de progreso de turnos proximos.
 
 ### Estado IA local
 

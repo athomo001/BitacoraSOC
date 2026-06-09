@@ -43,16 +43,30 @@ const buildChecklistSummaryContent = (check) => {
   return `[${kind}] Estado general: CON PROBLEMAS ${detail} - Servicios Evaluados ${totalServices} - Servicios con Problemas ${totalProblems}`;
 };
 
-const toSantiagoDate = (value) => new Date(value).toLocaleDateString('en-CA', {
-  timeZone: 'America/Santiago'
-});
+const toSantiagoDate = (value) => {
+  const d = new Date(value);
+  // QA-ENTRIES-DATE-FORMAT-CRASH: Evitar crash por fechas inválidas o corruptas en la base de datos
+  if (isNaN(d.getTime())) {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
+  }
+  return d.toLocaleDateString('en-CA', {
+    timeZone: 'America/Santiago'
+  });
+};
 
-const toSantiagoTime = (value) => new Date(value).toLocaleTimeString('es-CL', {
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-  timeZone: 'America/Santiago'
-});
+const toSantiagoTime = (value) => {
+  const d = new Date(value);
+  // QA-ENTRIES-DATE-FORMAT-CRASH: Evitar crash por fechas inválidas o corruptas en la base de datos
+  if (isNaN(d.getTime())) {
+    return '00:00';
+  }
+  return d.toLocaleTimeString('es-CL', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'America/Santiago'
+  });
+};
 
 const DEFAULT_INTERNAL_CLIENT_NAME = 'Cliente interno';
 
@@ -94,7 +108,11 @@ const resolveDefaultClientContext = async () => {
 };
 
 const toChecklistEntryLikeRecord = (check, clientContext = {}) => {
-  const checkDate = new Date(check.checkDate || check.createdAt || new Date());
+  let checkDate = new Date(check.checkDate || check.createdAt || new Date());
+  // QA-ENTRIES-DATE-FORMAT-CRASH: Fallback seguro a la fecha actual si la fecha es corrupta o inválida
+  if (isNaN(checkDate.getTime())) {
+    checkDate = new Date();
+  }
   const entryDate = `${toSantiagoDate(checkDate)}T00:00:00.000Z`;
   const entryTime = toSantiagoTime(checkDate);
   return {
@@ -479,8 +497,9 @@ router.put('/:id',
         return res.status(404).json({ message: 'Entrada no encontrada' });
       }
 
-      // Solo el creador o admin puede editar
-      if (entry.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      // Solo el creador o admin puede editar (QA-ENTRIES-NULL-CREATOR-001)
+      const createdByIdStr = entry.createdBy ? entry.createdBy.toString() : null;
+      if (createdByIdStr !== req.user._id.toString() && req.user.role !== 'admin') {
         return res.status(403).json({ message: 'No tienes permiso para editar esta entrada' });
       }
 
@@ -544,8 +563,9 @@ router.delete('/:id', authenticate, notGuest, async (req, res) => {
       return res.status(404).json({ message: 'Entrada no encontrada' });
     }
 
-    // Solo el creador o admin puede eliminar
-    if (entry.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    // Solo el creador o admin puede eliminar (QA-ENTRIES-NULL-CREATOR-001)
+    const createdByIdStr = entry.createdBy ? entry.createdBy.toString() : null;
+    if (createdByIdStr !== req.user._id.toString() && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'No tienes permiso para eliminar esta entrada' });
     }
 
@@ -574,7 +594,10 @@ router.get('/tags/suggest', authenticate, async (req, res) => {
     const regex = new RegExp(`^${escapeRegex(q)}`, 'i');
 
     const tags = await Entry.aggregate([
+      // QA-ENTRIES-TAGS-SUGGEST-PERF: Filtrar primero con $match para usar el índice multikey de tags
+      { $match: { tags: regex } },
       { $unwind: '$tags' },
+      // Filtrar post-unwind para excluir otros tags del mismo documento que no coincidan con la búsqueda
       { $match: { tags: regex } },
       { $group: { _id: '$tags', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
