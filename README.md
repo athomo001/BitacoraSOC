@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: beta. Validar siempre los flujos criticos en un entorno controlado antes de pasar a operacion formal.
 >
-> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.14.2-beta**
+> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.5.94-beta**
 
 Stack principal:
 
@@ -52,7 +52,7 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 
 ## Novedades recientes (resumen rapido)
 
-### v1.14.2-beta (seguridad, MFA, SSO, PII y robustez)
+### v1.5.94-beta (seguridad, MFA, SSO, PII y robustez)
 
 - **MFA (TOTP):** Autenticación multifactor por software configurable por usuario (activable por administrador) con enrolamiento de código QR.
 - **SSO Google/Microsoft:** Soporte integrado de Single Sign-On para proveedores corporativos mediante variables de entorno.

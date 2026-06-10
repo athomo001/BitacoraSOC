@@ -2,7 +2,7 @@
 
 Registro de cambios relevantes del proyecto.
 
-## [v1.14.2-beta] - 2026-06-10
+## [v1.5.94-beta] - 2026-06-10
 
 ### Seguridad, Autenticación (MFA, SSO), Cifrado de Datos y Robustez en Turnos (QA-REMEDIATIONS)
 
