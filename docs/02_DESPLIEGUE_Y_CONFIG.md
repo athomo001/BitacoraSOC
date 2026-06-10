@@ -666,7 +666,7 @@ Los certificados son almacenados internamente bajo un volumen Docker estricto en
 ### Instalación de Certificados Reales
 
 1. Entrar a la plataforma web como Administrador.
-2. Navegar a **Configuración > HTTPS / Seguridad**.
+2. Navegar a **Configuración > Seguridad**.
 3. Seleccionar los archivos `.crt` (Certificado) y `.key` (Llave Privada).
 4. Activar check de **Habilitar listener HTTPS del backend**.
 5. Apretar **"Subir SSL y Activar (0-Downtime)"**.

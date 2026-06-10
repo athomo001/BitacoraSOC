@@ -27,8 +27,10 @@ export class AdminConsoleComponent {
     { label: 'Turnos', route: '/main/admin/work-shifts' },
     { label: 'Clientes y Catálogos', route: '/main/admin/catalogs' },
     { label: 'Escalación', route: '/main/admin/escalation' },
+    // Configuración general de correo y envío de notificaciones
     { label: 'EMAIL Config', route: '/main/admin/smtp' },
-    { label: 'HTTPS / Seguridad', route: '/main/admin/security' },
+    // Parámetros de certificados SSL/TLS y autenticación Single Sign-On (SSO)
+    { label: 'Seguridad', route: '/main/admin/security' },
     { label: 'Integraciones', route: '/main/admin/integrations' },
     { label: 'Complementos', route: '/main/admin/complements' }
   ];

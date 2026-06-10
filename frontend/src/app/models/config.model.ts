@@ -46,6 +46,13 @@ export interface AppConfig {
     ccRecipients: string[];
     lastSentAt?: Date;
   };
+  // Autenticación Single Sign-On (SSO)
+  googleSsoEnabled?: boolean;
+  googleClientId?: string;
+  microsoftSsoEnabled?: boolean;
+  microsoftClientId?: string;
+  microsoftTenantId?: string;
+
   lastUpdatedBy?: string;
   createdAt?: Date;
   updatedAt?: Date;
@@ -155,4 +162,9 @@ export interface UpdateConfigRequest {
     recipients: string[];
     ccRecipients: string[];
   };
+  googleSsoEnabled?: boolean;
+  googleClientId?: string;
+  microsoftSsoEnabled?: boolean;
+  microsoftClientId?: string;
+  microsoftTenantId?: string;
 }

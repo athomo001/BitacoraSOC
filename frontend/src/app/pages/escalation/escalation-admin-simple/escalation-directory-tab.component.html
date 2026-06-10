@@ -51,7 +51,20 @@
           <mat-icon aria-hidden="true">person_add</mat-icon>
           Agregar contacto
         </button>
-        <button mat-stroked-button color="primary" type="button" (click)="directoryRefresh.emit()" [disabled]="loadingDirectoryContacts || rebuildingDirectory || mergingDirectoryDuplicates">
+        <!-- Permite importar múltiples contactos del directorio mediante un archivo CSV -->
+        <button mat-raised-button color="accent" type="button" (click)="csvFileInput.click()" [disabled]="!canDirectoryWrite || importingCsv">
+          <mat-spinner diameter="18" *ngIf="importingCsv" style="display: inline-block; margin-right: 8px;"></mat-spinner>
+          <mat-icon aria-hidden="true" *ngIf="!importingCsv">file_upload</mat-icon>
+          Importar CSV
+        </button>
+        <input #csvFileInput type="file" accept=".csv" class="hidden-input" (change)="onCsvFileSelected($event)" style="display: none;">
+        
+        <button mat-button type="button" (click)="downloadCsvTemplate()" [disabled]="importingCsv">
+          <mat-icon aria-hidden="true">download</mat-icon>
+          Plantilla CSV
+        </button>
+        
+        <button mat-stroked-button color="primary" type="button" (click)="directoryRefresh.emit()" [disabled]="loadingDirectoryContacts || rebuildingDirectory || mergingDirectoryDuplicates || importingCsv">
           <mat-icon aria-hidden="true">{{ loadingDirectoryContacts ? 'hourglass_empty' : 'refresh' }}</mat-icon>
           {{ loadingDirectoryContacts ? 'Actualizando...' : 'Actualizar' }}
         </button>

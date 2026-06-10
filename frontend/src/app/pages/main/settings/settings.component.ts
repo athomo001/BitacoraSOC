@@ -222,13 +222,9 @@ export class SettingsComponent implements OnInit {
     private authService: AuthService,
     private onboardingService: OnboardingService
   ) {
+    // Formulario de configuración general simplificado para el acceso de invitados
     this.appConfigForm = this.fb.group({
-      guestEnabled: [false],
-      googleSsoEnabled: [false],
-      googleClientId: [''],
-      microsoftSsoEnabled: [false],
-      microsoftClientId: [''],
-      microsoftTenantId: ['common']
+      guestEnabled: [false]
     });
 
     this.smtpForm = this.fb.group({
@@ -295,13 +291,9 @@ export class SettingsComponent implements OnInit {
   loadConfig(): void {
     this.configService.getConfig().subscribe({
       next: (config: any) => {
+        // Cargar estado de habilitación de cuentas de tipo invitado
         this.appConfigForm.patchValue({
-          guestEnabled: config.guestModeEnabled,
-          googleSsoEnabled: config.googleSsoEnabled || false,
-          googleClientId: config.googleClientId || '',
-          microsoftSsoEnabled: config.microsoftSsoEnabled || false,
-          microsoftClientId: config.microsoftClientId || '',
-          microsoftTenantId: config.microsoftTenantId || 'common'
+          guestEnabled: config.guestModeEnabled
         });
       },
       error: (err) => console.error('Error cargando config:', err)
@@ -407,14 +399,9 @@ export class SettingsComponent implements OnInit {
 
   saveAppConfig(): void {
     if (this.appConfigForm.valid) {
-      // Mapear campos de configuración general incluyendo los nuevos campos de SSO
+      // Guardar el estado de modo invitado en la configuración del sistema
       const data: any = {
-        guestModeEnabled: this.appConfigForm.value.guestEnabled,
-        googleSsoEnabled: this.appConfigForm.value.googleSsoEnabled,
-        googleClientId: this.appConfigForm.value.googleClientId,
-        microsoftSsoEnabled: this.appConfigForm.value.microsoftSsoEnabled,
-        microsoftClientId: this.appConfigForm.value.microsoftClientId,
-        microsoftTenantId: this.appConfigForm.value.microsoftTenantId
+        guestModeEnabled: this.appConfigForm.value.guestEnabled
       };
       this.configService.updateConfig(data).subscribe({
         next: () => this.snackBar.open('Configuración guardada', 'Cerrar', { duration: 2000 }),

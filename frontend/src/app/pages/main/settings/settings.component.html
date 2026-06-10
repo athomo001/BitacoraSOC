@@ -15,50 +15,18 @@
     </div>
   </div>
 
+  <!-- Panel de Configuración General: Modo Invitado -->
   <div class="settings-panel settings-panel--config" id="general-config">
     <header class="settings-panel__header">
-      <h2 class="settings-panel__title">Configuración General y Autenticación SSO</h2>
+      <h2 class="settings-panel__title">Configuración General</h2>
     </header>
     <div class="settings-panel__body">
       <form [formGroup]="appConfigForm" (ngSubmit)="saveAppConfig()">
         <div style="margin-bottom: 20px;">
+          <!-- Permite habilitar/deshabilitar el acceso temporal para usuarios invitados -->
           <mat-checkbox formControlName="guestEnabled" id="guest-mode">
             Habilitar modo invitado
           </mat-checkbox>
-        </div>
-
-        <hr style="border: 0; border-top: 1px solid var(--outline-subtle, rgba(0,0,0,0.07)); margin: 20px 0;">
-
-        <h3 style="margin-top: 0; margin-bottom: 15px; font-weight: 500; font-size: 15px;">Google Single Sign-On (SSO)</h3>
-        <div class="grid two-cols" style="gap: 15px; margin-bottom: 15px;">
-          <div style="display: flex; align-items: center;">
-            <mat-checkbox formControlName="googleSsoEnabled" id="google-sso-enabled">
-              Activar Google SSO
-            </mat-checkbox>
-          </div>
-          <mat-form-field appearance="outline" style="width: 100%;">
-            <mat-label>Client ID de Google</mat-label>
-            <input matInput formControlName="googleClientId" placeholder="client-id.apps.googleusercontent.com">
-          </mat-form-field>
-        </div>
-
-        <hr style="border: 0; border-top: 1px solid var(--outline-subtle, rgba(0,0,0,0.07)); margin: 20px 0;">
-
-        <h3 style="margin-top: 0; margin-bottom: 15px; font-weight: 500; font-size: 15px;">Microsoft Single Sign-On (SSO)</h3>
-        <div class="grid three-cols" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
-          <div style="display: flex; align-items: center;">
-            <mat-checkbox formControlName="microsoftSsoEnabled" id="microsoft-sso-enabled">
-              Activar Microsoft SSO
-            </mat-checkbox>
-          </div>
-          <mat-form-field appearance="outline" style="width: 100%;">
-            <mat-label>Client ID de Microsoft</mat-label>
-            <input matInput formControlName="microsoftClientId" placeholder="00000000-0000-0000-0000-000000000000">
-          </mat-form-field>
-          <mat-form-field appearance="outline" style="width: 100%;">
-            <mat-label>Tenant ID (Microsoft)</mat-label>
-            <input matInput formControlName="microsoftTenantId" placeholder="common o ID del Tenant">
-          </mat-form-field>
         </div>
 
         <button mat-raised-button color="primary" type="submit" [disabled]="!appConfigForm.valid">

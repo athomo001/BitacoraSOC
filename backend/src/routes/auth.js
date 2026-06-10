@@ -839,7 +839,15 @@ router.post('/sso/google', async (req, res) => {
     }
 
     const userEmail = tokenInfo.email.toLowerCase();
-    const user = await User.findOne({ email: userEmail, isActive: true });
+    
+    // Buscar el usuario de manera flexible por email o nombre de usuario para asociar cuentas locales manuales
+    const user = await User.findOne({
+      $or: [
+        { email: userEmail },
+        { username: userEmail }
+      ],
+      isActive: true
+    });
 
     if (!user) {
       await audit(req, {
@@ -921,7 +929,14 @@ router.post('/sso/microsoft', async (req, res) => {
       return res.status(401).json({ message: 'No se pudo resolver el correo desde Microsoft Graph' });
     }
 
-    const user = await User.findOne({ email: microsoftEmail, isActive: true });
+    // Buscar el usuario de manera flexible por email o nombre de usuario para asociar cuentas locales manuales
+    const user = await User.findOne({
+      $or: [
+        { email: microsoftEmail },
+        { username: microsoftEmail }
+      ],
+      isActive: true
+    });
 
     if (!user) {
       await audit(req, {

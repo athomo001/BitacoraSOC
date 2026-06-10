@@ -1,7 +1,7 @@
 /**
  * File Purpose: frontend/src/app/pages/main/admin-security/admin-security.component.ts
- * Responsibilities: Define the module behavior and maintain clear contracts.
- * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ * Responsibilities: Definir el comportamiento del módulo de seguridad y mantener contratos claros.
+ * QA Notes: Mantener reglas explícitas de negocio, validar casos de borde y preservar trazabilidad.
  */
 
 import { Component, OnInit } from '@angular/core';
@@ -12,6 +12,7 @@ import { MatFormField, MatHint, MatLabel } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
+import { MatIcon } from '@angular/material/icon';
 import { NgIf } from '@angular/common';
 import { ConfigService } from '../../../services/config.service';
 import { SecurityConfig, UpdateConfigRequest } from '../../../models/config.model';
@@ -29,19 +30,27 @@ import { SecurityConfig, UpdateConfigRequest } from '../../../models/config.mode
     MatButton,
     MatHint,
     MatProgressSpinner,
+    MatIcon,
     NgIf
   ]
 })
 export class AdminSecurityComponent implements OnInit {
+  // Formulario para configuración de TLS/Red
   securityForm: FormGroup;
+  // Formulario independiente para configuración de SSO
+  ssoForm: FormGroup;
+  
   isSaving = false;
+  isSavingSso = false;
   countdownMessage = '';
+  
   certFile: File | null = null;
   keyFile: File | null = null;
   caFile: File | null = null;
   certStatus = '';
   keyStatus = '';
   caStatus = '';
+  
   private certUploaded = false;
   private keyUploaded = false;
 
@@ -58,22 +67,44 @@ export class AdminSecurityComponent implements OnInit {
       tlsKeyPath: [''],
       tlsCaPath: ['']
     });
+
+    this.ssoForm = this.fb.group({
+      googleSsoEnabled: [false],
+      googleClientId: [''],
+      microsoftSsoEnabled: [false],
+      microsoftClientId: [''],
+      microsoftTenantId: ['common']
+    });
   }
 
   ngOnInit(): void {
     this.loadConfig();
   }
 
+  /**
+   * Obtiene la configuración global y pobla los formularios correspondientes a HTTPS y SSO.
+   */
   loadConfig(): void {
     this.configService.getConfig().subscribe({
       next: (config) => {
+        // Cargar sección de Red / HTTPS
         const security: SecurityConfig = {
           httpsEnabled: config.security?.httpsEnabled ?? false,
           forceHttps: config.security?.forceHttps ?? false,
-          httpsPort: config.security?.httpsPort
+          httpsPort: config.security?.httpsPort ?? 3443
         };
-
         this.securityForm.patchValue(security);
+
+        // Cargar sección de Autenticación SSO
+        this.ssoForm.patchValue({
+          googleSsoEnabled: config.googleSsoEnabled || false,
+          googleClientId: config.googleClientId || '',
+          microsoftSsoEnabled: config.microsoftSsoEnabled || false,
+          microsoftClientId: config.microsoftClientId || '',
+          microsoftTenantId: config.microsoftTenantId || 'common'
+        });
+
+        // Configurar estado de carga de certificados
         this.certStatus = config.security?.certFileName ? `Certificado cargado: ${config.security.certFileName}` : 'Sin certificado cargado';
         this.keyStatus = config.security?.keyFileName ? `Llave cargada: ${config.security.keyFileName}` : 'Sin llave cargada';
         this.caStatus = config.security?.caFileName ? `CA cargada: ${config.security.caFileName}` : 'Sin CA cargada';
@@ -81,11 +112,14 @@ export class AdminSecurityComponent implements OnInit {
         this.keyUploaded = !!config.security?.keyUploaded;
       },
       error: () => {
-        this.snackBar.open('Error cargando configuración HTTPS', 'Cerrar', { duration: 3000 });
+        this.snackBar.open('Error cargando configuración de seguridad', 'Cerrar', { duration: 3000 });
       }
     });
   }
 
+  /**
+   * Guarda los parámetros de Red / HTTPS e inicia la cuenta regresiva para reconexión.
+   */
   save(): void {
     if (this.securityForm.invalid) {
       this.securityForm.markAllAsTouched();
@@ -96,7 +130,7 @@ export class AdminSecurityComponent implements OnInit {
     if (enableHttps && (!this.certUploaded || !this.keyUploaded)) {
       const hasPendingFiles = !!this.certFile || !!this.keyFile;
       const message = hasPendingFiles
-        ? 'Primero presiona "Guardar certificados SSL" para subir cert + key, luego guarda HTTPS'
+        ? 'Primero presiona "Subir SSL y Activar" para subir cert + key, luego guarda HTTPS'
         : 'Para habilitar HTTPS primero debes cargar certificado y llave privada';
       this.snackBar.open(message, 'Cerrar', { duration: 5000 });
       return;
@@ -113,7 +147,7 @@ export class AdminSecurityComponent implements OnInit {
     this.isSaving = true;
     this.configService.updateConfig(payload).subscribe({
       next: () => {
-        this.snackBar.open('Configuración guardada. Reiniciando frontend...', 'Espere', { duration: 15000 });
+        this.snackBar.open('Configuración de red guardada. Reiniciando frontend...', 'Espere', { duration: 15000 });
 
         const isHttps = this.securityForm.value.httpsEnabled && this.certUploaded && this.keyUploaded;
         const protocol = isHttps ? 'https' : 'http';
@@ -142,6 +176,9 @@ export class AdminSecurityComponent implements OnInit {
     this.caFile = input.files?.[0] || null;
   }
 
+  /**
+   * Envía los archivos de certificados SSL y activa el listener correspondiente.
+   */
   uploadCertificates(): void {
     if (!this.certFile && !this.keyFile && !this.caFile) {
       this.snackBar.open('Selecciona al menos un archivo', 'Cerrar', { duration: 3000 });
@@ -178,13 +215,16 @@ export class AdminSecurityComponent implements OnInit {
       error: (err) => {
         this.isSaving = false;
         const errorMessage = err?.status === 404
-          ? 'Endpoint TLS no disponible en backend (verifica que esté corriendo la versión actual)'
+          ? 'Endpoint TLS no disponible en backend'
           : (err?.error?.message || 'Error subiendo certificados TLS');
         this.snackBar.open(errorMessage, 'Cerrar', { duration: 5000 });
       }
     });
   }
 
+  /**
+   * Restaura la configuración de red al protocolo HTTP inseguro por defecto.
+   */
   resetHttpsConfiguration(): void {
     const word = window.prompt('Escribe RESET en mayúsculas para confirmar que deseas eliminar toda la configuración TLS y volver a HTTP inseguro:');
     if (word !== 'RESET') {
@@ -219,6 +259,36 @@ export class AdminSecurityComponent implements OnInit {
       error: (err) => {
         this.isSaving = false;
         this.snackBar.open(err?.error?.message || 'Error al restablecer HTTPS/TLS', 'Cerrar', { duration: 5000 });
+      }
+    });
+  }
+
+  /**
+   * Guarda los datos de Single Sign-On (SSO) de Google y Microsoft de manera independiente.
+   */
+  saveSso(): void {
+    if (this.ssoForm.invalid) {
+      this.ssoForm.markAllAsTouched();
+      return;
+    }
+
+    const payload: UpdateConfigRequest = {
+      googleSsoEnabled: !!this.ssoForm.value.googleSsoEnabled,
+      googleClientId: this.ssoForm.value.googleClientId || '',
+      microsoftSsoEnabled: !!this.ssoForm.value.microsoftSsoEnabled,
+      microsoftClientId: this.ssoForm.value.microsoftClientId || '',
+      microsoftTenantId: this.ssoForm.value.microsoftTenantId || 'common'
+    };
+
+    this.isSavingSso = true;
+    this.configService.updateConfig(payload).subscribe({
+      next: () => {
+        this.isSavingSso = false;
+        this.snackBar.open('Configuración SSO guardada correctamente', 'Cerrar', { duration: 3000 });
+      },
+      error: (err) => {
+        this.isSavingSso = false;
+        this.snackBar.open(err?.error?.message || 'Error guardando configuración SSO', 'Cerrar', { duration: 4000 });
       }
     });
   }

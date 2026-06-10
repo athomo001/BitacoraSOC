@@ -2,6 +2,16 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.95-beta] - 2026-06-10
+
+### Importación CSV de Directorio, Plantilla de Datos y Consolidación de Seguridad (SSO)
+
+- **Importación Masiva de Directorio (CSV):** Se implementó la importación masiva de contactos del directorio en `/main/escalation/directory` a través de archivos CSV con parseo adaptativo de campos comunes y alias de idioma, previniendo sobreescrituras en contactos de sistema (`source === 'User'`).
+- **Descarga de Plantilla CSV:** Se incorporó un botón "Plantilla CSV" interactivo en el frontend para descargar un CSV de muestra con formato BOM UTF-8 y codificación de columnas para evitar fallos de importación.
+- **Consolidación del Panel de Seguridad:** Se reorganizó la configuración de SSO (Google y Microsoft) moviéndola desde el panel de Configuración General al panel de Seguridad (`/main/admin/security`), implementando un diseño premium de dos columnas simétricas (HTTPS y SSO).
+- **Vinculación Inteligente de SSO:** Se optimizó la autenticación de SSO en el backend para realizar una búsqueda flexible (`$or` por email y username), vinculando de manera automática perfiles de usuario manuales preexistentes con sus correspondientes inicios de sesión de SSO y evitando cuentas duplicadas.
+- **Optimización Estética de Tabla:** Se ajustó la altura y el espaciado vertical (`padding`) de la tabla del directorio, así como el tamaño de las fuentes, para brindar una presentación de datos más profesional y compacta.
+
 ## [v1.5.94-beta] - 2026-06-10
 
 ### Seguridad, Autenticación (MFA, SSO), Cifrado de Datos y Robustez en Turnos (QA-REMEDIATIONS)

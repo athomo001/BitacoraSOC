@@ -5,8 +5,15 @@
  */
 
 const express = require('express');
+const multer = require('multer');
 const { authenticate } = require('../middleware/auth');
 const controller = require('../controllers/directoryContactController');
+
+// Configuración de multer para carga de archivos en memoria con límite de 2MB
+const csvUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024 }
+});
 
 const router = express.Router();
 
@@ -82,5 +89,8 @@ router.get('/:id', authenticate, controller.getDirectoryContactById);
 router.post('/', authenticate, requireDirectoryWrite, controller.createDirectoryContact);
 router.put('/:id', authenticate, requireDirectoryWrite, controller.updateDirectoryContact);
 router.delete('/:id', authenticate, requireDirectoryDelete, controller.deleteDirectoryContact);
+
+// Endpoint para importar contactos del directorio mediante archivo CSV
+router.post('/import-csv', authenticate, requireDirectoryWrite, csvUpload.single('file'), controller.importDirectoryContactsCsv);
 
 module.exports = router;

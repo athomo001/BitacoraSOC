@@ -101,4 +101,26 @@ export class DirectoryService {
       updatedUsers: number;
     }>(`${this.apiUrl}/sync-users-from-directory`, {});
   }
+
+  /**
+   * Envía un archivo CSV al backend para importar masivamente contactos al directorio.
+   * @param file - Archivo CSV a importar.
+   */
+  importCsv(file: File): Observable<{
+    message: string;
+    created: number;
+    updated: number;
+    errorCount: number;
+    errors?: any[];
+  }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<{
+      message: string;
+      created: number;
+      updated: number;
+      errorCount: number;
+      errors?: any[];
+    }>(`${this.apiUrl}/import-csv`, formData);
+  }
 }

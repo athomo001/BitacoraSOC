@@ -54,6 +54,8 @@ export class EscalationDirectoryTabComponent implements OnInit {
   savingDirectoryContact = false;
   editingDirectoryContactId: string | null = null;
   isEditingInternalContact = false;
+  // Indicador de estado para la carga del archivo CSV
+  importingCsv = false;
 
   directoryFormModel = {
     name: '',
@@ -303,5 +305,64 @@ export class EscalationDirectoryTabComponent implements OnInit {
 
   showSuccess(message: string): void {
     this.snackBar.open(message, 'Cerrar', { duration: 3000 });
+  }
+
+  /**
+   * Captura el evento de selección del archivo CSV e invoca al servicio para su importación masiva.
+   * @param event - Evento nativo de selección de archivos.
+   */
+  onCsvFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+
+    const file = input.files[0];
+    
+    // Limpiar el valor para permitir re-seleccionar el mismo archivo
+    input.value = '';
+
+    this.importingCsv = true;
+    this.directoryService.importCsv(file).subscribe({
+      next: (res) => {
+        this.importingCsv = false;
+        let message = `Importación completada: ${res.created} nuevos, ${res.updated} actualizados.`;
+        if (res.errorCount > 0) {
+          message += ` Con ${res.errorCount} observaciones no importadas.`;
+        }
+        this.showSuccess(message);
+
+        // Si se encontraron errores de parseo en filas individuales, detallar el primero en pantalla
+        if (res.errors && res.errors.length > 0) {
+          const firstErr = res.errors[0];
+          console.warn('[CSV Import] Observaciones encontradas:', res.errors);
+          this.snackBar.open(`Observación en fila ${firstErr.row}: ${firstErr.message}`, 'Cerrar', { duration: 6000 });
+        }
+
+        this.directoryRefresh.emit();
+      },
+      error: (err) => {
+        this.importingCsv = false;
+        this.showError(err?.error?.error || err?.error?.message || 'Error al procesar el archivo de importación CSV');
+      }
+    });
+  }
+
+  /**
+   * Genera y descarga un archivo CSV de plantilla para la importación de contactos.
+   */
+  downloadCsvTemplate(): void {
+    const headers = ['Nombre', 'Correo', 'Teléfono', 'Empresa', 'Cargo', 'Tipo', 'Ámbito', 'Favorito'];
+    const exampleRow = ['Juan Pérez', 'juan.perez@empresa.cl', '+56912345678', 'Empresa Ejemplo', 'Analista SOC', 'External', 'External', 'false'];
+    
+    // Contenido del CSV delimitado por comas con BOM para que Excel detecte correctamente UTF-8
+    const csvContent = '\uFEFF' + [headers.join(','), exampleRow.join(',')].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'plantilla_contactos_directorio.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 }

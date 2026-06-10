@@ -1,7 +1,62 @@
+/**
+ * File Purpose: frontend/src/app/pages/main/admin-security/admin-security.component.scss
+ * Responsibilities: Definir la presentación visual del panel de administración de seguridad.
+ * QA Notes: Mantener compatibilidad móvil, aplicar variables globales de diseño y asegurar legibilidad.
+ */
+
+// Contenedor principal de seguridad alineado con el ancho general de la aplicación
 .security-admin {
-  max-width: 920px;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 8px;
 }
 
+// Estructura de cabecera de página con soporte para iconos grandes
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+
+  mat-icon {
+    font-size: 32px;
+    width: 32px;
+    height: 32px;
+    color: var(--primary-color, #1976d2);
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 1.75rem;
+    font-weight: 600;
+  }
+
+  .subtitle {
+    margin: 4px 0 0 0;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+  }
+}
+
+// Distribución flex adaptable: dos columnas lado a lado en desktop, una sola columna en móvil
+.security-row {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+
+  @media (max-width: 960px) {
+    flex-direction: column;
+  }
+}
+
+// Columna que ocupa el ancho simétrico restante
+.security-col {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+}
+
+// Tarjeta del panel de seguridad con sombras y bordes curvos premium
 .security-panel {
   background: var(--surface-card);
   border: 1px solid var(--outline-subtle);
@@ -17,7 +72,7 @@
 
 .security-panel__title {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.125rem;
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -33,43 +88,24 @@
 form {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 
+// Estilo para toggles de red
 .toggles {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
-.notes {
-  border-left: 4px solid var(--state-warning);
-  background: var(--state-warning-bg);
-  color: var(--state-warning);
-  padding: 10px 12px;
-  border-radius: 4px;
-
-  p {
-    margin: 0;
-  }
-
-  p + p {
-    margin-top: 6px;
-  }
-}
-
-button mat-spinner {
-  display: inline-block;
-  margin-right: 8px;
-}
-
+// Caja de carga de certificados TLS
 .tls-files {
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.12));
   border-radius: 8px;
-  padding: 12px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
 .tls-row {
@@ -82,16 +118,74 @@ button mat-spinner {
 .tls-label {
   color: var(--text-primary);
   font-weight: 500;
+  font-size: 0.9rem;
 }
 
 .hidden-input {
   display: none;
 }
 
-.danger-action {
-  align-self: flex-start;
+// Panel de advertencias/notas en la parte inferior
+.notes {
+  border-left: 4px solid var(--state-warning);
+  background: var(--state-warning-bg);
+  color: var(--state-warning);
+  padding: 10px 12px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+
+  p {
+    margin: 0;
+  }
+}
+
+// Botones inferiores organizados
+.button-group {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 15px;
+  gap: 12px;
+  
+  @media (max-width: 480px) {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+}
+
+// Secciones internas de SSO
+.sso-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sso-section-title {
+  margin: 0 0 4px 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sso-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-left: 4px;
+}
+
+.section-divider {
+  border: 0;
+  border-top: 1px solid var(--outline-subtle, rgba(0,0,0,0.07));
+  margin: 10px 0;
 }
 
 small {
   color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+button mat-spinner {
+  display: inline-block;
+  margin-right: 8px;
 }

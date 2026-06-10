@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: beta. Validar siempre los flujos criticos en un entorno controlado antes de pasar a operacion formal.
 >
-> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.5.94-beta**
+> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.5.95-beta**
 
 Stack principal:
 
@@ -51,6 +51,13 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 ---
 
 ## Novedades recientes (resumen rapido)
+
+### v1.5.95-beta (importación CSV directorio y consolidación SSO)
+
+- **Importación CSV de Directorio:** Nueva funcionalidad para carga masiva de contactos en el Directorio Centralizado, incluyendo prevención de sobreescritura de usuarios del sistema (`source === 'User'`) y registro de auditoría.
+- **Descarga de Plantilla CSV:** Botón interactivo para descargar una plantilla formateada en UTF-8 con BOM compatible con Microsoft Excel.
+- **Seguridad y SSO Consolidados:** Reubicación de la parametrización de Single Sign-On al panel unificado de Seguridad (`/main/admin/security`) con diseño adaptativo de dos columnas (HTTPS y SSO).
+- **Vinculación Inteligente de SSO:** Inicio de sesión que detecta y vincula cuentas locales existentes para evitar perfiles duplicados.
 
 ### v1.5.94-beta (seguridad, MFA, SSO, PII y robustez)
 
