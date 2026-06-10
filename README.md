@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: beta. Validar siempre los flujos criticos en un entorno controlado antes de pasar a operacion formal.
 >
-> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.5.95-beta**
+> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.5.94-beta**
 
 Stack principal:
 
@@ -26,6 +26,24 @@ Stack principal:
 - backups y restore desde la plataforma
 - branding, SMTP, catalogos y escalacion
 - complementos con iframe seguro, API interna y circuit breaker
+
+---
+
+## Comparativa con herramientas similares
+
+| Característica / Enfoque | Bitácora SOC | TheHive / Cortex |
+| :--- | :--- | :--- |
+| **Objetivo Principal** | Registro del turno, control de inicio/cierre de analistas y continuidad operacional. | Gestión profunda de incidentes, triage de malware e investigación forense. |
+| **Gobernanza del Turno** | **Sí** (Checklist de inicio/cierre con cooldown por turno. Opera como indicador de cumplimiento/KPI operativo y de preparación diaria). | No (Se enfoca en incidentes individuales, sin controles de guardia ni KPIs de cumplimiento diario). |
+| **Gestión Operativa y de Equipo** | **Automatización Interna** (Generación automática de minutas/informes de turno para N2 o superiores con lo que pasó en el turno, notificaciones automáticas de turnos a otras áreas, visibilidad en tiempo real de quién está en teletrabajo/vacaciones en el área, y estadísticas de uso del SOC abiertas a todo el equipo). | **Gestión de Casos** (No gestiona dotación de personal, estado presencial de analistas, turnos de guardia, minutas de relevo ni estadísticas operativas del equipo). |
+| **Enfoque de Escalación** | **Humana y Organizacional** (Directorio de contactos, matriz RACI, y flujos definidos de quién llamar o enviar correos ante incidentes). | **Técnica y Automatizada** (Orquestación mediante Cortex para análisis de IOCs y acciones automatizadas en sistemas). |
+| **Flexibilidad de Entrada** | **Bitácora general y libre** (Permite anotar incidentes, pero también tareas de mantenimiento, bitácora de guardias de seguridad o eventos de rutina. Clasificación rápida por hashtags `#` para búsquedas inmediatas). | **Estructurada y Rígida** (Enfocada estrictamente en casos de incidentes, tareas asignadas, logs de auditoría técnica y observables). |
+| **Búsqueda y Respaldos** | **Histórico y Narrativo Humano** (Búsqueda por texto y hashtags del relato redactado por el analista. Diseñado como respaldo legal e histórico de lo que pasó en el turno, no orientado a correlación automatizada). | **Técnico y Basado en IOCs** (Búsqueda técnica de observables e indicadores de compromiso correlacionables y estructurados en bases como MISP). |
+| **Reportes y Clientes** | Generador de boletines y reportes ejecutivos. Permite exportar reportes como imágenes para respaldar o enviar directamente a clientes, con unificación opcional de destinatarios por dominio. | No (Requiere herramientas complementarias para reportes de cara al cliente). |
+| **Herramientas de Analista** | **Complementos Flexibles** (Módulo de plugins embebidos en iframe para cualquier utilidad del analista que no pertenezca estrictamente a la bitácora: traductores de logs, explicaciones de comandos Linux, o incluso entretenimiento como DOOM). | **Análisis Técnico Estricto** (Integración exclusiva con Cortex para consulta automatizada de reputación e inteligencia de amenazas sobre IOCs). |
+| **Tematización y Apariencia** | **Optimización para Turnos** (Múltiples temas como Cyberpunk, Matrix, Sepia, etc., diseñados para reducir la fatiga visual de analistas y personal de guardia en turnos de 12/24 horas, además de branding personalizado de logos). | **Estándar** (Interfaz visual rígida con soporte básico de modo claro/oscuro). |
+| **Respaldos y Resiliencia** | **Respaldos Completos Cifrados** (Módulo integrado en UI para crear, restaurar y descargar backups cifrados con AES-256/PBKDF2 que incluyen base de datos, archivos de evidencias y secretos de configuración). | **De Infraestructura** (Delegado a herramientas externas de base de datos o scripts del administrador de sistemas). |
+| **Curva de Aprendizaje** | Baja/Inmediata (Diseñado para el operador de primer nivel N1 o personal de guardia). | Alta (Diseñado para analistas de incidentes N2/N3 y cazadores de amenazas). |
 
 ---
 
@@ -51,13 +69,6 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 ---
 
 ## Novedades recientes (resumen rapido)
-
-### v1.5.95-beta (importación CSV directorio y consolidación SSO)
-
-- **Importación CSV de Directorio:** Nueva funcionalidad para carga masiva de contactos en el Directorio Centralizado, incluyendo prevención de sobreescritura de usuarios del sistema (`source === 'User'`) y registro de auditoría.
-- **Descarga de Plantilla CSV:** Botón interactivo para descargar una plantilla formateada en UTF-8 con BOM compatible con Microsoft Excel.
-- **Seguridad y SSO Consolidados:** Reubicación de la parametrización de Single Sign-On al panel unificado de Seguridad (`/main/admin/security`) con diseño adaptativo de dos columnas (HTTPS y SSO).
-- **Vinculación Inteligente de SSO:** Inicio de sesión que detecta y vincula cuentas locales existentes para evitar perfiles duplicados.
 
 ### v1.5.94-beta (seguridad, MFA, SSO, PII y robustez)
 
