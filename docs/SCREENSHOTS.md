@@ -14,6 +14,7 @@ Documentación visual de las principales funcionalidades del sistema.
 6. [Configuración de Administrador](#-configuración-de-administrador)
 7. [Menú Admin - Backup](#-menú-admin---backup)
 8. [Sidebar - Menú de Navegación](#-sidebar---menú-de-navegación)
+9. [Seguridad - Configuración de HTTPS y SSO](#-seguridad---configuración-de-https-y-sso)
 
 ---
 
@@ -173,17 +174,17 @@ Documentación visual de las principales funcionalidades del sistema.
 
 Sección expandida con opciones administrativas:
 
-| Icono | Opción | Descripción |
-| ----- | ------ | ----------- |
-| 👥 | **Usuarios** | Gestión de usuarios, roles y permisos |
-| 📋 | **Checklist** | Configuración y asignación de checklists operativos de turno |
-| ⏰ | **Turnos** | Administración de turnos rotativos semanales (soporte para Teletrabajo y Vacaciones) |
-| 📚 | **Clientes y Catálogos** | Configuración de clientes, servicios, tipos de operación y catálogo de eventos |
-| 📞 | **Escalación** | Configuración de contactos externos y turnos internos de escalación |
-| 📧 | **EMAIL Config** | Configuración del servidor SMTP y parámetros de correo |
-| 🔒 | **Seguridad** | Administración de certificados SSL/TLS, directivas de seguridad y Single Sign-On (SSO) |
-| 🔌 | **Integraciones** | Administración de webhooks y conectores externos |
-| 🧩 | **Complementos** | Gestión de complementos modulares adicionales |
+| Icono | Opción                   | Descripción                                                                            |
+| ----- | ------------------------ | -------------------------------------------------------------------------------------- |
+| 👥    | **Usuarios**             | Gestión de usuarios, roles y permisos                                                  |
+| 📋    | **Checklist**            | Configuración y asignación de checklists operativos de turno                           |
+| ⏰    | **Turnos**               | Administración de turnos rotativos semanales (soporte para Teletrabajo y Vacaciones)   |
+| 📚    | **Clientes y Catálogos** | Configuración de clientes, servicios, tipos de operación y catálogo de eventos         |
+| 📞    | **Escalación**           | Configuración de contactos externos y turnos internos de escalación                    |
+| 📧    | **EMAIL Config**         | Configuración del servidor SMTP y parámetros de correo                                 |
+| 🔒    | **Seguridad**            | Administración de certificados SSL/TLS, directivas de seguridad y Single Sign-On (SSO) |
+| 🔌    | **Integraciones**        | Administración de webhooks y conectores externos                                       |
+| 🧩    | **Complementos**         | Gestión de complementos modulares adicionales                                          |
 
 > La consola admin puede incluir más entradas según versión/rol (por ejemplo: Integraciones, Seguridad, Apariencia y Complementos).
 
@@ -225,6 +226,18 @@ Opciones visibles en la sección de configuración:
 - Validación de integridad de datos
 
 Ver documentación completa en [backend/scripts/README.md](../backend/scripts/README.md#5-restaurar-un-backup)
+
+---
+
+## 🔒 Seguridad - Configuración de HTTPS y SSO
+
+![Configuración de Seguridad (HTTPS & SSO)](images/screenshots/15-HTTPS-SSO.png)
+
+**Funcionalidades visibles:**
+
+- **Cifrado de Red (HTTPS):** Gestión e instalación interactiva de certificados TLS (`.crt`, `.key` y `.ca`) con inyección dinámica en caliente y reinicio controlado de escuchas.
+- **Autenticación Single Sign-On (SSO):** Panel simétrico dedicado para parametrizar las variables de integración de Google SSO y Microsoft SSO/Entra ID.
+- **⚠️ Nota / Disclaimer sobre estado Beta:** Dado que el proyecto completo de BitacoraSOC se encuentra en fase **beta**, la parametrización visual de los flujos de inicio de sesión SSO (Google y Microsoft) es de reciente incorporación y no está 100% probada en todos los escenarios de despliegue corporativos. No obstante, la inyección y el soporte de cifrado **HTTPS** dinámico está completamente probado, estable y funcional para su uso productivo.
 
 ---
 
@@ -312,8 +325,8 @@ Ver documentación completa en [backend/scripts/README.md](../backend/scripts/RE
 
 ## 📊 Estadísticas del Sistema
 
-**Capturas documentadas:** 13  
-**Última actualización:** 18 de mayo de 2026  
+**Capturas documentadas:** 14  
+**Última actualización:** 10 de junio de 2026  
 **Cobertura visual:** módulos principales (vista referencial, no exhaustiva)
 
 **Áreas documentadas:**
@@ -325,6 +338,7 @@ Ver documentación completa en [backend/scripts/README.md](../backend/scripts/RE
 - ✅ Generación de reportes
 - ✅ Configuración administrativa
 - ✅ Sistema de backup
+- ✅ Seguridad (HTTPS y SSO)
 
 ---
 
@@ -349,4 +363,4 @@ Ver documentación completa en [backend/scripts/README.md](../backend/scripts/RE
 
 ---
 
-_Última actualización: 2026-05-18_
+_Última actualización: 2026-06-10_

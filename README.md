@@ -66,6 +66,10 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 
 ![Modulo de backup](docs/images/screenshots/06-menu-admin-backup.png)
 
+![Configuración de Seguridad (HTTPS & SSO)](docs/images/screenshots/15-HTTPS-SSO.png)
+
+> ⚠️ **Nota sobre la Consola de Seguridad (HTTPS & SSO):** El panel unificado de HTTPS y Single Sign-On (SSO) es una funcionalidad reciente. Dado que el proyecto se encuentra en etapa **beta**, la integración completa de SSO (Google/Microsoft) sigue bajo validación activa y su flujo no está 100% probado en todos los entornos corporativos. Sin embargo, el soporte para la inyección y rotación de certificados **HTTPS** (0-Downtime) es altamente funcional y estable.
+
 ---
 
 ## Novedades recientes (resumen rapido)
