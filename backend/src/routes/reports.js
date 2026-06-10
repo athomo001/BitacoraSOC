@@ -93,8 +93,8 @@ const getValidSOCDomains = async () => {
   try {
     const [users, contacts, dirContacts] = await Promise.all([
       User.find({}, 'email').lean(),
-      Contact.find({ active: true }, 'email').lean(),
-      DirectoryContact.find({}, 'email').lean()
+      Contact.find({ active: true }, 'email'),
+      DirectoryContact.find({}, 'email')
     ]);
 
     const addEmailDomain = (email) => {
@@ -1382,129 +1382,162 @@ router.post('/newsletter/send', authenticate, authorize('admin', 'user'), async 
       });
     }
 
-    const recipientBatches = buildRecipientBatches(analysis.valid, groupByDomain);
+    const auditUser = req.user;
+    const auditIp = req.ip;
+    const auditHeaders = req.headers;
+    const inlineAttachments = req.body.inlineAttachments;
 
-    const prepared = await prepareNewsletterEmailPayload(html, req.body.inlineAttachments);
-    const emailHtml = prepared.html;
-    const newsletterAttachments = prepared.attachments;
-    const plainText = htmlToBasicPlainText(emailHtml);
+    // Responder inmediatamente indicando que el boletín ha sido aceptado para procesamiento en segundo plano
+    res.status(202).json({
+      success: true,
+      message: 'El envío del boletín ha sido encolado en segundo plano.',
+      processedRecipients: analysis.valid.length,
+      ccCount: validCcBase.length
+    });
 
-    // Envío secuencial por lote: por dominio cuando groupByDomain=true,
-    // o 1:1 cuando groupByDomain=false.
-    let successCount = 0;
-    let failCount = 0;
-    let lastError = null;
-    let successGroups = 0;
-    let failGroups = 0;
-
-    const tasks = recipientBatches.map((batch) => async () => {
-      // Excluir del CC cualquier correo que ya esté en Para dentro del lote actual.
-      const toSetBatch = new Set(batch.to.map((email) => email.toLowerCase()));
-      const ccForThis = validCcBase.filter(c => !toSetBatch.has(c.toLowerCase()));
+    // Procesamiento asíncrono desacoplado de la respuesta HTTP
+    setImmediate(async () => {
       try {
-        const sendResult = await sendEmail({
-          to: batch.to,
-          cc: ccForThis.length ? ccForThis : undefined,
-          subject: subject || 'Boletín de Seguridad',
-          html: emailHtml,
-          text: plainText,
-          attachments: newsletterAttachments.length ? newsletterAttachments : undefined,
-          auditContext: {
-            sourceModule: 'ReportGenerator',
-            triggerType: 'manual_newsletter',
-            extra: {
-              type: 'newsletter',
-              mode: sendMode,
-              criticality: String(analytics?.criticality || '').trim().toLowerCase() || null,
-              bulletinTitle: String(analytics?.title || subject || '').trim() || null,
-              vendor: String(analytics?.vendor || '').trim() || null,
-              newsletterAttachmentParts: newsletterAttachments.length,
-              duplicateCount: analysis.duplicates.length,
-              invalidCount: analysis.invalid.length,
-              ccCount: ccForThis.length,
-              groupedByDomain: groupByDomain,
-              recipientBatchDomain: batch.domain,
-              recipientBatchSize: batch.to.length
-            }
+        const recipientBatches = buildRecipientBatches(analysis.valid, groupByDomain);
+        const prepared = await prepareNewsletterEmailPayload(html, inlineAttachments);
+        const emailHtml = prepared.html;
+        const newsletterAttachments = prepared.attachments;
+        const plainText = htmlToBasicPlainText(emailHtml);
+
+        let successCount = 0;
+        let failCount = 0;
+        let lastError = null;
+        let successGroups = 0;
+        let failGroups = 0;
+
+        const tasks = recipientBatches.map((batch) => async () => {
+          const toSetBatch = new Set(batch.to.map((email) => email.toLowerCase()));
+          const ccForThis = validCcBase.filter(c => !toSetBatch.has(c.toLowerCase()));
+          try {
+            const sendResult = await sendEmail({
+              to: batch.to,
+              cc: ccForThis.length ? ccForThis : undefined,
+              subject: subject || 'Boletín de Seguridad',
+              html: emailHtml,
+              text: plainText,
+              attachments: newsletterAttachments.length ? newsletterAttachments : undefined,
+              auditContext: {
+                sourceModule: 'ReportGenerator',
+                triggerType: 'manual_newsletter',
+                extra: {
+                  type: 'newsletter',
+                  mode: sendMode,
+                  criticality: String(analytics?.criticality || '').trim().toLowerCase() || null,
+                  bulletinTitle: String(analytics?.title || subject || '').trim() || null,
+                  vendor: String(analytics?.vendor || '').trim() || null,
+                  newsletterAttachmentParts: newsletterAttachments.length,
+                  duplicateCount: analysis.duplicates.length,
+                  invalidCount: analysis.invalid.length,
+                  ccCount: ccForThis.length,
+                  groupedByDomain: groupByDomain,
+                  recipientBatchDomain: batch.domain,
+                  recipientBatchSize: batch.to.length
+                }
+              }
+            });
+
+            const attemptedSet = new Set(batch.to.map((email) => email.toLowerCase()));
+            const acceptedSet = new Set(
+              (Array.isArray(sendResult?.acceptedTo) ? sendResult.acceptedTo : [])
+                .map((email) => String(email || '').toLowerCase())
+                .filter((email) => attemptedSet.has(email))
+            );
+            const rejectedSet = new Set(
+              (Array.isArray(sendResult?.rejectedTo) ? sendResult.rejectedTo : [])
+                .map((email) => String(email || '').toLowerCase())
+                .filter((email) => attemptedSet.has(email))
+            );
+
+            const acceptedCount = acceptedSet.size > 0 ? acceptedSet.size : batch.to.length;
+            const unresolvedCount = Math.max(0, batch.to.length - acceptedCount - rejectedSet.size);
+            const failCountForBatch = rejectedSet.size + unresolvedCount;
+
+            return {
+              success: true,
+              acceptedCount,
+              failCountForBatch,
+              batchKey: batch.key
+            };
+          } catch (err) {
+            console.error(`[newsletter/send] Error al enviar lote ${batch.key}:`, err.message);
+            return {
+              success: false,
+              error: err.message,
+              batchSize: batch.to.length,
+              batchKey: batch.key
+            };
           }
         });
 
-        const attemptedSet = new Set(batch.to.map((email) => email.toLowerCase()));
-        const acceptedSet = new Set(
-          (Array.isArray(sendResult?.acceptedTo) ? sendResult.acceptedTo : [])
-            .map((email) => String(email || '').toLowerCase())
-            .filter((email) => attemptedSet.has(email))
-        );
-        const rejectedSet = new Set(
-          (Array.isArray(sendResult?.rejectedTo) ? sendResult.rejectedTo : [])
-            .map((email) => String(email || '').toLowerCase())
-            .filter((email) => attemptedSet.has(email))
-        );
+        // Ejecutar envíos en paralelo controlado con concurrencia máxima de 4
+        const taskResults = await limitConcurrency(tasks, 4);
 
-        // Si el transport no informa accepted/rejected por destinatario, asumimos éxito total del lote.
-        const acceptedCount = acceptedSet.size > 0 ? acceptedSet.size : batch.to.length;
-        const unresolvedCount = Math.max(0, batch.to.length - acceptedCount - rejectedSet.size);
-        const failCountForBatch = rejectedSet.size + unresolvedCount;
+        for (const resTask of taskResults) {
+          if (resTask.success) {
+            successCount += resTask.acceptedCount;
+            failCount += resTask.failCountForBatch;
+            if (resTask.acceptedCount > 0) successGroups += 1;
+            if (resTask.failCountForBatch > 0) failGroups += 1;
+          } else {
+            lastError = resTask.error;
+            failCount += resTask.batchSize;
+            failGroups += 1;
+          }
+        }
 
-        return {
-          success: true,
-          acceptedCount,
-          failCountForBatch,
-          batchKey: batch.key
-        };
+        // Registrar auditoría final con el resultado general
+        await audit({
+          user: auditUser,
+          ip: auditIp,
+          headers: auditHeaders
+        }, {
+          event: 'newsletter.send.completed',
+          level: successCount > 0 ? 'info' : 'error',
+          result: {
+            success: successCount > 0,
+            successCount,
+            failCount,
+            successGroups,
+            failGroups,
+            processedGroups: recipientBatches.length
+          },
+          metadata: {
+            subject,
+            groupByDomain,
+            totalRecipients: analysis.valid.length,
+            criticality: String(analytics?.criticality || '').trim().toLowerCase() || null,
+            title: String(analytics?.title || subject || '').trim() || null,
+            lastError: lastError || null
+          }
+        });
+
       } catch (err) {
-        console.error(`[newsletter/send] Error al enviar lote ${batch.key}:`, err.message);
-        return {
-          success: false,
-          error: err.message,
-          batchSize: batch.to.length,
-          batchKey: batch.key
-        };
+        console.error('[newsletter/send] Error asíncrono en segundo plano:', err);
+        try {
+          await audit({
+            user: auditUser,
+            ip: auditIp,
+            headers: auditHeaders
+          }, {
+            event: 'newsletter.send.failed',
+            level: 'error',
+            result: { success: false, error: err.message },
+            metadata: { subject }
+          });
+        } catch (auditErr) {
+          console.error('[newsletter/send] Error al registrar auditoría de fallo asíncrono:', auditErr.message);
+        }
       }
-    });
-
-    // Ejecutar envíos en paralelo de forma controlada (límite de concurrencia: 4)
-    const taskResults = await limitConcurrency(tasks, 4);
-
-    for (const resTask of taskResults) {
-      if (resTask.success) {
-        successCount += resTask.acceptedCount;
-        failCount += resTask.failCountForBatch;
-        if (resTask.acceptedCount > 0) successGroups += 1;
-        if (resTask.failCountForBatch > 0) failGroups += 1;
-      } else {
-        lastError = resTask.error;
-        failCount += resTask.batchSize;
-        failGroups += 1;
-      }
-    }
-
-    if (successCount === 0 && failCount > 0) {
-      return res.status(500).json({
-        message: 'Error SMTP al enviar boletín',
-        detail: lastError || 'Error desconocido — revisa la configuración SMTP en Admin.'
-      });
-    }
-
-    res.json({
-      success: true,
-      mode: sendMode,
-      groupByDomain,
-      successCount,
-      failCount,
-      successGroups,
-      failGroups,
-      processedGroups: recipientBatches.length,
-      ccCount: validCcBase.length,
-      duplicateCount: analysis.duplicates.length,
-      invalidCount: analysis.invalid.length,
-      processedRecipients: analysis.valid.length,
-      message: `Boletín enviado: ${successCount} correctos, ${failCount} fallidos`
     });
   } catch (error) {
-    console.error('[newsletter/send] Error inesperado:', error);
+    console.error('[newsletter/send] Error inesperado en validaciones sincrónicas:', error);
     res.status(500).json({
-      message: 'Error interno al enviar boletines',
+      message: 'Error interno al procesar boletines',
       detail: error.message
     });
   }

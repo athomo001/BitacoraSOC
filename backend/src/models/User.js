@@ -103,6 +103,19 @@ const userSchema = new mongoose.Schema({
   lockedUntil: {
     type: Date,
     default: null
+  },
+  // Autenticación Multifactor (MFA)
+  mfaSecret: {
+    type: String,
+    default: null
+  },
+  mfaEnabled: {
+    type: Boolean,
+    default: false
+  },
+  mfaTempSecret: {
+    type: String,
+    default: null
   }
 }, {
   timestamps: true // Añade createdAt y updatedAt automáticamente

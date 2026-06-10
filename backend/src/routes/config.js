@@ -49,6 +49,39 @@ const verifyImageBuffer = async (buffer, mimeSubtype, isFavicon = false) => {
   }
 };
 
+/**
+ * Valiza que una URL o ruta de imagen no contenga path traversal y sea una URL externa válida o ruta permitida.
+ * @param {string} url - La URL o ruta de la imagen a validar.
+ * @returns {boolean} True si es válida y segura, de lo contrario False.
+ */
+const isValidImageConfigUrl = (url) => {
+  if (typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (!trimmed) return true;
+
+  // Prevenir inyección de path traversal
+  if (trimmed.includes('..') || trimmed.includes('\\')) {
+    return false;
+  }
+
+  // Si es una URL externa (http / https)
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      new URL(trimmed);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // Si es una ruta interna, debe apuntar estrictamente a /uploads/logos/ o /uploads/favicons/
+  if (trimmed.startsWith('/uploads/logos/') || trimmed.startsWith('/uploads/favicons/')) {
+    return true;
+  }
+
+  return false;
+};
+
 // Configurar multer para logo
 const logoStorage = multer.diskStorage({
   destination: async (req, file, cb) => {
@@ -317,6 +350,11 @@ router.put('/',
     body('escalationReminderDaysAhead').optional().isInt({ min: 1, max: 60 }).toInt().withMessage('Días de antelación inválidos (1-60)'),
     body('appTitle').optional().isString().trim().isLength({ max: 80 }).withMessage('El título no puede superar 80 caracteres'),
     body('loginTheme').optional().isIn(['crt', 'infoflow']).withMessage('Tema inválido'),
+    body('googleSsoEnabled').optional().isBoolean(),
+    body('googleClientId').optional().isString().trim(),
+    body('microsoftSsoEnabled').optional().isBoolean(),
+    body('microsoftClientId').optional().isString().trim(),
+    body('microsoftTenantId').optional().isString().trim(),
     body('security.httpsEnabled').optional().isBoolean(),
     body('security.forceHttps').optional().isBoolean(),
     body('security.httpsPort').optional({ nullable: true }).custom((value) => {
@@ -330,8 +368,20 @@ router.put('/',
     body('security.tlsCertPath').optional().isString().trim().isLength({ max: 500 }),
     body('security.tlsKeyPath').optional().isString().trim().isLength({ max: 500 }),
     body('security.tlsCaPath').optional().isString().trim().isLength({ max: 500 }),
-    body('logoUrl').optional().trim(),
-    body('faviconUrl').optional().trim(),
+    body('logoUrl').optional().trim().custom((value) => {
+      // Se valida que la URL del logo sea segura y cumpla el formato permitido
+      if (value && !isValidImageConfigUrl(value)) {
+        throw new Error('URL de logo inválida o insegura');
+      }
+      return true;
+    }),
+    body('faviconUrl').optional().trim().custom((value) => {
+      // Se valida que la URL del favicon sea segura y cumpla el formato permitido
+      if (value && !isValidImageConfigUrl(value)) {
+        throw new Error('URL de favicon inválida o insegura');
+      }
+      return true;
+    }),
     body('defaultLogSourceId').optional({ checkFalsy: true }).isMongoId().withMessage('ID de LogSource inválido'),
     body('emailReportConfig.enabled').optional().isBoolean(),
     body('emailReportConfig.recipients').optional().isArray(),
@@ -606,8 +656,17 @@ router.get('/logo', async (req, res) => {
       return res.json({ logoUrl: '', loginTheme: 'crt', appTitle: '' });
     }
 
-    // Devolver ruta relativa - el navegador la resolverá automáticamente
-    res.json({ logoUrl: config.logoUrl || '', loginTheme: config.loginTheme || 'crt', appTitle: config.appTitle || '' });
+    // Devolver ruta relativa - el navegador la resolverá automáticamente incluyendo propiedades SSO habilitadas
+    res.json({
+      logoUrl: config.logoUrl || '',
+      loginTheme: config.loginTheme || 'crt',
+      appTitle: config.appTitle || '',
+      googleSsoEnabled: config.googleSsoEnabled || false,
+      googleClientId: config.googleClientId || '',
+      microsoftSsoEnabled: config.microsoftSsoEnabled || false,
+      microsoftClientId: config.microsoftClientId || '',
+      microsoftTenantId: config.microsoftTenantId || 'common'
+    });
   } catch (error) {
     console.error('Error al obtener logo:', error);
     res.status(500).json({ message: 'Error al obtener logo' });
@@ -723,7 +782,10 @@ router.post('/logo',
           config.logoUrl = `/uploads/logos/${filename}`;
           config.logoType = 'upload';
         } else if (logoUrl) {
-          // URL externa
+          // Validar URL externa de logo
+          if (!isValidImageConfigUrl(logoUrl)) {
+            return res.status(400).json({ message: 'URL de logo inválida o insegura' });
+          }
           config.logoUrl = logoUrl;
           config.logoType = 'external';
         }
@@ -871,6 +933,10 @@ router.post('/favicon',
           config.faviconUrl = `/uploads/favicons/${filename}`;
           config.faviconType = 'upload';
         } else if (faviconUrl) {
+          // Validar URL externa de favicon
+          if (!isValidImageConfigUrl(faviconUrl)) {
+            return res.status(400).json({ message: 'URL de favicon inválida o insegura' });
+          }
           config.faviconUrl = faviconUrl;
           config.faviconType = 'external';
         }

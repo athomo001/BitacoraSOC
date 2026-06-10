@@ -625,7 +625,8 @@ router.post('/check',
         }
       }
 
-      const lastCheck = await ShiftCheck.findOne({}).sort({ createdAt: -1 });
+      // Buscar el último checklist registrado específicamente para este turno para evitar bloqueos entre turnos paralelos
+      const lastCheck = await ShiftCheck.findOne({ shiftId }).sort({ createdAt: -1 });
       if (lastCheck && lastCheck.type === type) {
         const expectedType = type === 'inicio' ? 'cierre' : 'inicio';
 
@@ -633,7 +634,7 @@ router.post('/check',
           event: 'shiftcheck.block.consecutive',
           level: 'warn',
           result: { success: false, reason: `Consecutive ${type} blocked` },
-          metadata: { type, lastCheckType: lastCheck.type, expectedType, lastCheckUserId: lastCheck.userId }
+          metadata: { type, lastCheckType: lastCheck.type, expectedType, lastCheckUserId: lastCheck.userId, shiftId }
         });
 
         return res.status(400).json({ message: `No puedes registrar dos "${type}" consecutivos. Debes hacer "${expectedType}" primero.` });
@@ -657,7 +658,8 @@ router.post('/check',
               cooldownMinutes,
               minutesSinceLastCheck: minutesSinceLastCheck.toFixed(2),
               remainingMinutes,
-              sameDay
+              sameDay,
+              shiftId
             }
           });
 
@@ -688,7 +690,8 @@ router.post('/check',
         hasRedServices,
         checkDate: new Date(),
         ipAddress: req.clientIp,
-        userAgent: req.clientUserAgent
+        userAgent: req.clientUserAgent,
+        shiftId // Guardamos el shiftId para segregar el historial secuencial del turno
       });
 
       await check.save();

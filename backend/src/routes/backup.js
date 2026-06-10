@@ -136,6 +136,37 @@ function decryptWithPassphrase(encryptedJsonStr, passphrase) {
   }
 }
 
+/**
+ * Extrae un archivo ZIP de manera segura previniendo la vulnerabilidad de Zip Slip.
+ * Valida que ninguna de las rutas extraídas escape del directorio base.
+ * @param {string} zipFilePath - Ruta del archivo zip a extraer.
+ * @param {string} extractDir - Directorio base donde se realizará la extracción.
+ */
+async function safeExtractZip(zipFilePath, extractDir) {
+  const directory = await unzipper.Open.file(zipFilePath);
+  for (const entry of directory.files) {
+    const targetPath = path.resolve(extractDir, entry.path);
+    const relative = path.relative(extractDir, targetPath);
+    // Validar que el archivo no escape del directorio base (Zip Slip check)
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+      throw new Error(`Intento de Zip Slip detectado para la ruta: ${entry.path}`);
+    }
+
+    if (entry.type === 'Directory') {
+      await fs.mkdir(targetPath, { recursive: true });
+    } else {
+      // Crear directorios padres de forma recursiva antes de escribir el archivo
+      await fs.mkdir(path.dirname(targetPath), { recursive: true });
+      await new Promise((resolve, reject) => {
+        entry.stream()
+          .pipe(fsSync.createWriteStream(targetPath))
+          .on('finish', resolve)
+          .on('error', reject);
+      });
+    }
+  }
+}
+
 // Helper: convertir array de objetos a CSV
 const arrayToCSV = (data) => {
   if (!data || data.length === 0) return '';
@@ -508,13 +539,8 @@ router.post('/restore', authenticate, authorize('admin'), async (req, res) => {
       await fs.mkdir(extractDir, { recursive: true });
 
       try {
-        // Descomprimir el ZIP
-        await new Promise((resolve, reject) => {
-          fsSync.createReadStream(filePath)
-            .pipe(unzipper.Extract({ path: extractDir }))
-            .on('close', resolve)
-            .on('error', reject);
-        });
+        // Descomprimir el ZIP de forma segura contra Zip Slip
+        await safeExtractZip(filePath, extractDir);
 
         // Leer el JSON de base de datos
         const dataJsonPath = path.join(extractDir, 'data.json');
@@ -771,13 +797,8 @@ router.post('/import',
         await fs.mkdir(extractDir, { recursive: true });
 
         try {
-          // Descomprimir el ZIP
-          await new Promise((resolve, reject) => {
-            fsSync.createReadStream(req.file.path)
-              .pipe(unzipper.Extract({ path: extractDir }))
-              .on('close', resolve)
-              .on('error', reject);
-          });
+          // Descomprimir el ZIP de forma segura contra Zip Slip
+          await safeExtractZip(req.file.path, extractDir);
 
           // Leer el JSON de base de datos
           const dataJsonPath = path.join(extractDir, 'data.json');
@@ -968,7 +989,8 @@ const emptyDirectory = async (dirPath) => {
   try {
     const files = await fs.readdir(dirPath);
     for (const file of files) {
-      if (file === '.gitkeep') continue;
+      // Se excluye la llave de cifrado keyring para evitar pérdida de acceso a backups cifrados
+      if (file === '.gitkeep' || file === 'encryption-keyring.json') continue;
       const filePath = path.join(dirPath, file);
       const stat = await fs.stat(filePath);
       if (stat.isDirectory()) {

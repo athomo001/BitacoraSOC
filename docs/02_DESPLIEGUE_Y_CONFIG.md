@@ -1,4 +1,4 @@
-﻿# Configuración Inicial (Setup)
+# Configuración Inicial (Setup)
 
 # 🔧 Instalación y Configuración - BitacoraSOC
 
@@ -139,8 +139,15 @@ COMPLEMENT_ALLOW_PRIVATE_URLS=true
 # Timezone
 TZ=America/Santiago
 
-# Encryption (passwords SMTP)
+# Encryption (passwords SMTP y PII)
 ENCRYPTION_KEY=GENERAR_CON_OPENSSL    # 64 caracteres hex (32 bytes)
+# Nota: La base de datos persistirá un keyring de claves en /app/secrets/encryption-keyring.json
+# para permitir descifrar datos históricos en caso de que cambie la ENCRYPTION_KEY actual.
+
+# Single Sign-On (SSO) Google / Microsoft
+GOOGLE_CLIENT_ID=
+AZURE_CLIENT_ID=
+AZURE_TENANT_ID=
 
 # Logging
 LOG_LEVEL=info                        # info | debug | warn | error
@@ -609,6 +616,11 @@ RATE_LIMIT_MAX_AUTH_REQUESTS=2000
 RATE_LIMIT_LOGIN_MAX=20
 # Opcional: cadena >= 24 chars (openssl rand -base64 32). POST /api/system/rate-limit-reset
 RATE_LIMIT_RESET_SECRET=
+
+# Configuración SSO (Opcionales)
+GOOGLE_CLIENT_ID=google_client_id_aca
+AZURE_CLIENT_ID=azure_client_id_aca
+AZURE_TENANT_ID=azure_tenant_id_aca
 
 # ============================
 # BASE DE DATOS MONGODB

@@ -37,7 +37,7 @@ import { RouterModule } from '@angular/router';
 import { EasterEggSignal } from '../../models/user.model';
 import { Title } from '@angular/platform-browser';
 
-type ViewState = 'login' | 'recovery';
+type ViewState = 'login' | 'recovery' | 'mfa';
 type LoginTheme = 'crt' | 'infoflow';
 
 @Component({
@@ -54,6 +54,7 @@ type LoginTheme = 'crt' | 'infoflow';
 export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
   loginForm!: FormGroup;
   recoveryForm!: FormGroup;
+  mfaForm!: FormGroup;
   loading = false;
   hidePassword = true;
   logoUrl: string = '';
@@ -63,11 +64,22 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
   bannerType: 'success' | 'error' | 'info' = 'info';
   showEasterEggOverlay = false;
   easterEggImageUrl = '/scripts/Bender.png';
+  mfaToken = '';
+  needsMfaSetup = false;
+  mfaQrCode = '';
+  mfaSecret = '';
   private easterEggTimer?: ReturnType<typeof setTimeout>;
 
   // Tema activo cargado desde config
   activeTheme: LoginTheme = 'crt';
   showPrivacyConsent = true;
+
+  // Configuración SSO habilitada
+  googleSsoEnabled = false;
+  googleClientId = '';
+  microsoftSsoEnabled = false;
+  microsoftClientId = '';
+  microsoftTenantId = 'common';
 
   // Reloj digital para modal recovery (tema infoflow)
   currentTime: string = '';
@@ -115,11 +127,19 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // Cargar logo y tema de login
     this.configService.getLogo().subscribe({
-      next: (response) => {
+      next: (response: any) => {
         this.logoUrl = response.logoUrl;
         this.activeTheme = response.loginTheme === 'infoflow' ? 'infoflow' : 'crt';
         this.appTitle = (response.appTitle || '').trim();
         this.titleService.setTitle(this.appTitle);
+        
+        // Configuración de Single Sign-On
+        this.googleSsoEnabled = response.googleSsoEnabled || false;
+        this.googleClientId = response.googleClientId || '';
+        this.microsoftSsoEnabled = response.microsoftSsoEnabled || false;
+        this.microsoftClientId = response.microsoftClientId || '';
+        this.microsoftTenantId = response.microsoftTenantId || 'common';
+
         console.log('[Login] Tema cargado:', this.activeTheme, '| Título:', this.appTitle);
         this.themeLoaded = true;
         this.cdr.detectChanges();
@@ -127,6 +147,16 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
           this.startClock();
           this.startTyping();
           setTimeout(() => this.initMatrixCanvas(), 100);
+        }
+
+        // Cargar Google GSI dinámicamente si está habilitado
+        if (this.googleSsoEnabled && this.googleClientId) {
+          this.initGoogleSSO();
+        }
+
+        // Revisar si venimos redireccionados desde Microsoft SSO
+        if (this.microsoftSsoEnabled && this.microsoftClientId) {
+          this.checkMicrosoftRedirect();
         }
       },
       error: () => {
@@ -149,6 +179,10 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.recoveryForm = this.fb.group({
       email: ['', [Validators.required, Validators.email]]
+    });
+
+    this.mfaForm = this.fb.group({
+      code: ['', [Validators.required, Validators.pattern(/^\d{6}$/)]]
     });
   }
 
@@ -271,9 +305,21 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.authService.login(this.loginForm.value).subscribe({
       next: (response) => {
+        if (response.requireMFA) {
+          this.loading = false;
+          localStorage.setItem('privacyConsentAccepted', 'true');
+          this.currentView = 'mfa';
+          this.mfaToken = response.mfaToken || '';
+          this.needsMfaSetup = !!response.needsSetup;
+          if (this.needsMfaSetup) {
+            this.startMfaSetupForLogin();
+          }
+          return;
+        }
+
         this.loading = false;
         localStorage.setItem('privacyConsentAccepted', 'true');
-        this.showSuccessBanner(`ACCESO CONCEDIDO - BIENVENIDO ${response.user.fullName?.toUpperCase()}`);
+        this.showSuccessBanner(`ACCESO CONCEDIDO - BIENVENIDO ${response.user?.fullName?.toUpperCase()}`);
         setTimeout(() => {
           this.router.navigate(['/main/checklist']);
         }, 1500);
@@ -389,5 +435,192 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
       this.showEasterEggOverlay = false;
       this.easterEggTimer = undefined;
     }, durationMs);
+  }
+
+  /**
+   * Procesa el código TOTP para enrolamiento de primer uso o autenticación estándar.
+   */
+  onMfaSubmit(): void {
+    if (this.mfaForm.invalid) return;
+    this.loading = true;
+    const code = this.mfaForm.value.code;
+
+    if (this.needsMfaSetup) {
+      // Flujo de enrolamiento inicial
+      this.authService.mfaVerify(code, this.mfaToken).subscribe({
+        next: (response) => {
+          this.loading = false;
+          this.showSuccessBanner('MFA ENROLADO Y ACCESO CONCEDIDO');
+          setTimeout(() => {
+            this.router.navigate(['/main/checklist']);
+          }, 1500);
+        },
+        error: (error) => {
+          this.loading = false;
+          this.showErrorBanner(error?.error?.message || 'Código de verificación incorrecto');
+        }
+      });
+    } else {
+      // Flujo de autenticación recurrente
+      this.authService.mfaAuthenticate(code, this.mfaToken).subscribe({
+        next: (response) => {
+          this.loading = false;
+          this.showSuccessBanner('CÓDIGO CORRECTO - BIENVENIDO');
+          setTimeout(() => {
+            this.router.navigate(['/main/checklist']);
+          }, 1500);
+        },
+        error: (error) => {
+          this.loading = false;
+          this.showErrorBanner(error?.error?.message || 'Código TOTP inválido o expirado');
+        }
+      });
+    }
+  }
+
+  /**
+   * Obtiene del backend la imagen QR y el secreto en texto plano para enrolamiento en el login.
+   */
+  startMfaSetupForLogin(): void {
+    this.loading = true;
+    this.authService.mfaSetup(this.mfaToken).subscribe({
+      next: (res) => {
+        this.mfaQrCode = res.qrCode;
+        this.mfaSecret = res.secret;
+        this.loading = false;
+      },
+      error: (err) => {
+        console.error('Error al iniciar setup de MFA en login:', err);
+        this.showErrorBanner('No se pudo generar el código QR de configuración');
+        this.loading = false;
+      }
+    });
+  }
+
+  /**
+   * Cancela la pantalla de MFA y retorna al formulario de inicio de sesión básico.
+   */
+  /**
+   * Cancela la pantalla de MFA y retorna al formulario de inicio de sesión básico.
+   */
+  cancelMfa(): void {
+    this.currentView = 'login';
+    this.mfaToken = '';
+    this.needsMfaSetup = false;
+    this.mfaQrCode = '';
+    this.mfaSecret = '';
+    this.mfaForm.reset();
+    this.showBanner = false;
+  }
+
+  // ── Métodos de soporte para Single Sign-On (SSO) ─────────────────────────────
+
+  /**
+   * Carga el script oficial de Google Identity Services dinámicamente si no está en memoria.
+   */
+  initGoogleSSO(): void {
+    const win = window as any;
+    if (win.google && win.google.accounts) {
+      this.setupGoogleButton();
+    } else {
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = () => this.setupGoogleButton();
+      document.head.appendChild(script);
+    }
+  }
+
+  /**
+   * Inicializa y renderiza el botón nativo de Google SSO.
+   */
+  setupGoogleButton(): void {
+    const win = window as any;
+    if (win.google && win.google.accounts) {
+      win.google.accounts.id.initialize({
+        client_id: this.googleClientId,
+        callback: (response: any) => {
+          this.ngZone.run(() => {
+            this.handleGoogleSSOLogin(response.credential);
+          });
+        }
+      });
+      // Renderizar en el contenedor del DOM si está presente
+      const btnContainer = document.getElementById('google-btn-container');
+      if (btnContainer) {
+        win.google.accounts.id.renderButton(btnContainer, {
+          theme: 'outline',
+          size: 'large',
+          width: 250
+        });
+      }
+    }
+  }
+
+  /**
+   * Envía el token de Google SSO al backend para autenticación definitiva.
+   */
+  handleGoogleSSOLogin(idToken: string): void {
+    this.loading = true;
+    this.authService.loginGoogle(idToken).subscribe({
+      next: (response) => {
+        this.loading = false;
+        this.showSuccessBanner(`ACCESO CONCEDIDO (GOOGLE) - BIENVENIDO ${response.user?.fullName?.toUpperCase()}`);
+        setTimeout(() => {
+          this.router.navigate(['/main/checklist']);
+        }, 1500);
+      },
+      error: (error) => {
+        this.loading = false;
+        this.showErrorBanner(error?.error?.message || 'Error al iniciar sesión con Google');
+      }
+    });
+  }
+
+  /**
+   * Redirige al usuario al portal de autenticación de Microsoft.
+   */
+  loginWithMicrosoft(): void {
+    const redirectUri = window.location.origin + '/login';
+    const authUrl = `https://login.microsoftonline.com/${this.microsoftTenantId}/oauth2/v2.0/authorize` +
+      `?client_id=${this.microsoftClientId}` +
+      `&response_type=token` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&scope=openid%20profile%20User.Read` +
+      `&state=microsoft`;
+    window.location.href = authUrl;
+  }
+
+  /**
+   * Analiza el hash del redireccionamiento para capturar el token de Microsoft.
+   */
+  checkMicrosoftRedirect(): void {
+    const hash = window.location.hash;
+    if (!hash) return;
+
+    const params = new URLSearchParams(hash.substring(1));
+    const accessToken = params.get('access_token');
+    const state = params.get('state');
+
+    if (accessToken && state === 'microsoft') {
+      // Remover los tokens de la barra del navegador por motivos de seguridad
+      history.replaceState('', document.title, window.location.pathname + window.location.search);
+      
+      this.loading = true;
+      this.authService.loginMicrosoft(accessToken).subscribe({
+        next: (response) => {
+          this.loading = false;
+          this.showSuccessBanner(`ACCESO CONCEDIDO (MICROSOFT) - BIENVENIDO ${response.user?.fullName?.toUpperCase()}`);
+          setTimeout(() => {
+            this.router.navigate(['/main/checklist']);
+          }, 1500);
+        },
+        error: (error) => {
+          this.loading = false;
+          this.showErrorBanner(error?.error?.message || 'Error al iniciar sesión con Microsoft');
+        }
+      });
+    }
   }
 }

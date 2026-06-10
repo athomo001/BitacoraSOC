@@ -13,6 +13,7 @@ const User = require('../models/User');
 const { syncManyDirectoryContacts, mergeDirectoryDuplicates } = require('../utils/directory-sync');
 const { audit } = require('../utils/audit');
 const { logger } = require('../utils/logger');
+const { sha256 } = require('../utils/encryption');
 
 const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const sanitizeText = (value, max = 180) => {
@@ -209,10 +210,10 @@ exports.updateDirectoryContact = async (req, res) => {
 
     const identityFilters = [];
     if (oldSnapshot.email) {
-      identityFilters.push({ email: oldSnapshot.email });
+      identityFilters.push({ emailHash: sha256(oldSnapshot.email) });
     }
     if (oldSnapshot.name && oldSnapshot.phone) {
-      identityFilters.push({ name: oldSnapshot.name, phone: oldSnapshot.phone });
+      identityFilters.push({ name: oldSnapshot.name, phoneHash: sha256(oldSnapshot.phone) });
     }
     if (oldSnapshot.name && oldSnapshot.company) {
       identityFilters.push({ name: oldSnapshot.name, organization: oldSnapshot.company });
@@ -350,10 +351,10 @@ exports.deleteDirectoryContact = async (req, res) => {
 
     const contactDeleteOr = [];
     if (email) {
-      contactDeleteOr.push({ email });
+      contactDeleteOr.push({ emailHash: sha256(email) });
     }
     if (name && phone) {
-      contactDeleteOr.push({ name, phone });
+      contactDeleteOr.push({ name, phoneHash: sha256(phone) });
     }
     if (name && company) {
       contactDeleteOr.push({ name, organization: company });
@@ -403,12 +404,21 @@ exports.searchDirectoryContacts = async (req, res) => {
     }
 
     const regex = new RegExp(escapeRegex(query), 'i');
+    const conditions = [
+      { name: regex },
+      { company: regex }
+    ];
+
+    if (query.includes('@')) {
+      conditions.push({ emailHash: sha256(query) });
+    }
+    // Si parece un número de teléfono (dígitos, guiones, espacios y longitud mínima), buscar por hash determinista
+    if (/^\+?[0-9\-\s]+$/.test(query) && query.length >= 6) {
+      conditions.push({ phoneHash: sha256(query) });
+    }
+
     const contacts = await DirectoryContact.find({
-      $or: [
-        { name: regex },
-        { email: regex },
-        { company: regex }
-      ]
+      $or: conditions
     })
       .sort({ isFavorite: -1, name: 1 })
       .limit(20);
@@ -423,8 +433,8 @@ exports.searchDirectoryContacts = async (req, res) => {
 exports.rebuildDirectoryFromEscalation = async (req, res) => {
   try {
     const [contacts, externalPeople, raciEntries, clients, users] = await Promise.all([
-      Contact.find({}).select('name email phone organization role favorite isMailingList').lean(),
-      ExternalPerson.find({}).select('name email phone position').lean(),
+      Contact.find({}).select('name email phone organization role favorite isMailingList'),
+      ExternalPerson.find({}).select('name email phone position'),
       RaciEntry.find({}).select('responsible accountable consulted informed').lean(),
       CatalogLogSource.find({}).select('escalationFlow').lean(),
       User.find({ isActive: true, role: { $in: ['admin', 'user', 'auditor'] } })
@@ -560,8 +570,7 @@ exports.syncUsersFromDirectoryNow = async (req, res) => {
         }
       ]
     })
-      .select('email name phone')
-      .lean();
+      .select('email name phone');
 
     let matchedUsers = 0;
     let updatedUsers = 0;

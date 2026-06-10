@@ -87,7 +87,13 @@ const shiftCheckSchema = new mongoose.Schema({
   },
   // Metadata
   ipAddress: String,
-  userAgent: String
+  userAgent: String,
+  // Identificador del turno asociado para segregación secuencial
+  shiftId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'WorkShift',
+    default: null
+  }
 }, {
   timestamps: true
 });
@@ -98,5 +104,6 @@ shiftCheckSchema.index({ type: 1 });
 shiftCheckSchema.index({ checkDate: -1 });
 shiftCheckSchema.index({ hasRedServices: 1 });
 shiftCheckSchema.index({ checklistId: 1 });
+shiftCheckSchema.index({ shiftId: 1 });
 
 module.exports = mongoose.model('ShiftCheck', shiftCheckSchema);

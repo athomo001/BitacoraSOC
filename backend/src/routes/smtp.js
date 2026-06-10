@@ -226,64 +226,6 @@ router.get('/', authenticate, authorize('admin'), async (_req, res) => {
   }
 });
 
-// GET /api/smtp/password - Obtener contraseña SMTP descifrada (solo admin)
-router.get('/password', authenticate, authorize('admin'), async (req, res) => {
-  try {
-    const config = await findStoredSmtpConfig();
-    if (!config || !config.password) {
-      await audit(req, {
-        event: 'smtp.password.reveal.rejected',
-        level: 'warn',
-        result: { success: false, reason: 'No hay contraseña SMTP guardada' },
-        metadata: {
-          hasConfig: Boolean(config),
-          hasEncryptedPassword: Boolean(config?.password)
-        }
-      });
-      return res.status(404).json({ message: 'No hay contraseña SMTP guardada' });
-    }
-
-    const decryptedPassword = safeDecrypt(config.password, { allowPlainFallback: false });
-    if (!decryptedPassword) {
-      await audit(req, {
-        event: 'smtp.password.reveal.rejected',
-        level: 'warn',
-        result: { success: false, reason: 'No se pudo descifrar contraseña SMTP guardada' },
-        metadata: {
-          hasConfig: true,
-          hasEncryptedPassword: true
-        }
-      });
-      return res.status(400).json({ message: 'No se pudo descifrar contraseña SMTP guardada' });
-    }
-
-    await audit(req, {
-      event: 'smtp.password.reveal.success',
-      level: 'warn',
-      result: { success: true, reason: 'Contraseña SMTP revelada en UI por administrador' },
-      metadata: {
-        host: config.host,
-        port: config.port,
-        username: config.username,
-        passwordLength: decryptedPassword.length
-      }
-    });
-
-    return res.json({ password: decryptedPassword });
-  } catch (error) {
-    await audit(req, {
-      event: 'smtp.password.reveal.error',
-      level: 'error',
-      result: { success: false, reason: error.message },
-      metadata: {
-        sourceModule: 'smtp-settings'
-      }
-    });
-
-    return res.status(500).json({ message: 'Error al revelar contraseña SMTP' });
-  }
-});
-
 // POST /api/smtp - Guardar config solo si la prueba es exitosa
 router.post('/',
   authenticate,

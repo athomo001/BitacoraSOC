@@ -2,6 +2,21 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.14.2-beta] - 2026-06-10
+
+### Seguridad, Autenticación (MFA, SSO), Cifrado de Datos y Robustez en Turnos (QA-REMEDIATIONS)
+
+- **Autenticación Multifactor (MFA TOTP):** Se implementó autenticación multifactor mediante TOTP (RFC 6238) desactivada por defecto. El administrador puede activarla por usuario en la sección de usuarios del sistema. En el primer inicio de sesión tras ser habilitado, se exige enrolamiento obligatorio por código QR y verificación posterior persistente en perfil y login.
+- **Single Sign-On (SSO):** Se integró soporte nativo de SSO para Google y Microsoft Azure AD/Entra ID configurado con variables de entorno (`GOOGLE_CLIENT_ID`, `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`).
+- **Cifrado de Datos Personales (PII):** Los campos de contacto (correos y teléfonos) ahora se almacenan cifrados en base de datos con AES-256-GCM y se descifran transparentemente en el backend antes de enviarlos a la UI. Búsquedas deterministicas integradas vía hashes SHA-256.
+- **Cifrado de Respaldos (Backups):** Se añadió opción de cifrar backups con AES-256-GCM y clave derivada por PBKDF2 mediante passphrase ingresada en UI, y descifrado transparente en caliente al importar.
+- **Resiliencia ante Zip Slip:** Mitigación del hallazgo Zip Slip en importación/restauración de copias de seguridad mediante validación estricta de rutas relativas dentro del archivo ZIP.
+- **Keyring de Cifrado Resiliente:** Clave persistente en `/secrets/encryption-keyring.json` que sobrevive a purgas de base de datos y permite descifrado multi-llave tras restauraciones.
+- **Segregación de Checklists por Turno:** Se introdujo el campo indexado `shiftId` en Mongoose `ShiftCheck` y la lógica para admitir checklists concurrentes/segregados por turno, evitando bloqueos si ocurren en paralelo.
+- **Restricción de Rol de Auditor:** Se aplicó la lista blanca `AUDITOR_GET_WHITELIST` en middleware, bloqueando la descarga de copias de seguridad, el envío de correos, y ocultando datos sensibles de contacto en directorios a los roles Auditor e Invitado.
+- **Prevención de CSV Injection:** Las exportaciones de bitácoras ahora sanitizan celdas agregando comilla simple de escape en caracteres iniciales (`=`, `+`, `-`, `@`).
+- **Validación de URL de Logos:** Control estricto con `isValidImageConfigUrl` para evitar SSRF o rutas inválidas al configurar logotipos.
+
 ## [v1.5.93-beta] - 2026-06-09
 
 ### Correcciones y Mejoras en Teletrabajo, Vacaciones y Permisos de Asignaciones

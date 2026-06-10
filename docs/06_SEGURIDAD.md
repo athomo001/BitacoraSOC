@@ -22,10 +22,13 @@ Decisiones de seguridad, hardening y checklist pre-producción.
 - Se revocan efectivamente al regenerar token o eliminar el complemento.
 
 **RBAC (Role-Based Access Control):**
-- Admin: Acceso completo
-- User: Operación diaria (entradas, checklist, notas personales)
-- Auditor: Lectura de auditoría y trazabilidad
-- Guest: Acceso limitado; entradas marcadas como invitado
+- Admin: Acceso completo.
+- User: Operación diaria (entradas, checklist, notas personales).
+- Auditor: Lectura de auditoría y trazabilidad operativa. No posee permisos de modificación.
+- Guest: Acceso limitado y temporal; entradas marcadas visualmente como invitado.
+
+**Restricciones específicas del Rol Auditor y Lista Blanca:**
+Para asegurar que el rol de solo lectura no pueda abusar de privilegios, se implementó el middleware de autorización con la constante `AUDITOR_GET_WHITELIST` que define los únicos endpoints `GET` que puede consumir. Endpoints como `GET /api/backup/download/:filename` o `POST /api/backup/restore` son bloqueados con `403 Forbidden` a nivel middleware si el usuario posee el rol `auditor` o `guest`. Además, la API enmascara dinámicamente correos y teléfonos (datos PII) en los listados consultados por estos roles.
 
 **Validación de Roles:**
 - Middleware de autenticación para cookie/JWT y autorización por rol.
@@ -38,12 +41,14 @@ Decisiones de seguridad, hardening y checklist pre-producción.
 - Rounds: 8
 - No se loguean nunca
 
-**Passwords SMTP:**
-- Algoritmo: AES-256-GCM
-- Key: `ENCRYPTION_KEY` en `.env`
-- Generación: `openssl rand -hex 32` (64 chars hex = 32 bytes)
-- IV: Aleatorio por cada cifrado (almacenado con datos)
-- Auth tag: Verificación de integridad
+**Passwords SMTP y Cifrado PII:**
+- Algoritmo: AES-256-GCM.
+- Key: `ENCRYPTION_KEY` en `.env`.
+- Generación: `openssl rand -hex 32` (32 bytes = 64 chars hex).
+- IV: Vector de inicialización aleatorio por cada cifrado de datos (almacenado junto con los datos cifrados).
+- Auth tag: Verificación de integridad y autenticación del mensaje para evitar manipulación en caliente (tampering).
+- **Keyring de Cifrado Resiliente:** En `/app/secrets/encryption-keyring.json` se almacena un llavero histórico de claves de enéctación antiguas. Al rotar la variable `ENCRYPTION_KEY`, el sistema intenta descifrar usando la clave actual; si falla, realiza un rollback ordenado recorriendo el Keyring para evitar pérdida de acceso a contraseñas SMTP y datos PII históricos.
+- **Cifrado de Datos Personales (PII) en BD:** Los datos de contacto de analistas y directorio se almacenan en la base de datos cifrados con AES-256-GCM. Para posibilitar búsquedas indexadas y búsquedas exactas eficientes por parte del backend sin descifrar de forma masiva la colección, se guarda en paralelo un hash **SHA-256** determinista de los campos (`emailHash` y `phoneHash`).
 
 **Generación de Claves:**
 ```powershell
@@ -336,6 +341,29 @@ User.findOne({ username: req.body.username });
 - `backend/src/routes/authRoutes.js`
 - `backend/src/routes/entryRoutes.js`
 - `backend/src/routes/userRoutes.js`
+
+### Zip Slip (Path Traversal en Descompresión)
+
+**Problema (ANTES):**
+Al descomprimir backups empaquetados ZIP mediante librerías de descompresión sin validación de rutas, un archivo maliciosamente manipulado con nombres como `../../etc/passwd` o `../../app/server.js` podía sobrescribir archivos del sistema fuera del directorio objetivo.
+
+**Solución (DESPUÉS):**
+Al restaurar/importar un respaldo ZIP, el backend valida de forma estricta la ruta de descompresión de cada entrada del archivo utilizando `path.relative` y `path.resolve`. Si el destino final queda fuera del directorio raíz de restauración asignado (`temp/` u `uploads/`), la operación es abortada inmediatamente y se registra un evento crítico en auditoría (`security.backup.zip_slip_attempt`).
+
+**Archivos afectados:**
+- `backend/src/controllers/backupController.js`
+
+### CSV Formula Injection (Formula Injection)
+
+**Problema (ANTES):**
+Al exportar bitácoras y checklists de turno a formato CSV, celdas que contenían caracteres especiales como `=`, `+`, `-`, `@` ingresadas por analistas eran interpretadas como fórmulas activas por suites de hojas de cálculo (Microsoft Excel o Google Sheets), permitiendo ejecución de comandos locales o fugas de información.
+
+**Solución (DESPUÉS):**
+Toda exportación a formato CSV en el backend sanitiza el contenido de cada celda de forma dinámica. Si una celda comienza con alguno de los caracteres `=`, `+`, `-` o `@`, el sistema le antepone una comilla simple (`'`) que neutraliza su interpretación como fórmula en el software cliente.
+
+**Archivos afectados:**
+- `backend/src/controllers/reportsController.js`
+- `backend/src/controllers/backupController.js`
 
 ### ReDoS (Regular Expression Denial of Service)
 

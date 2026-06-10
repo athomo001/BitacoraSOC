@@ -223,7 +223,12 @@ export class SettingsComponent implements OnInit {
     private onboardingService: OnboardingService
   ) {
     this.appConfigForm = this.fb.group({
-      guestEnabled: [false]
+      guestEnabled: [false],
+      googleSsoEnabled: [false],
+      googleClientId: [''],
+      microsoftSsoEnabled: [false],
+      microsoftClientId: [''],
+      microsoftTenantId: ['common']
     });
 
     this.smtpForm = this.fb.group({
@@ -289,9 +294,14 @@ export class SettingsComponent implements OnInit {
 
   loadConfig(): void {
     this.configService.getConfig().subscribe({
-      next: (config) => {
+      next: (config: any) => {
         this.appConfigForm.patchValue({
-          guestEnabled: config.guestModeEnabled
+          guestEnabled: config.guestModeEnabled,
+          googleSsoEnabled: config.googleSsoEnabled || false,
+          googleClientId: config.googleClientId || '',
+          microsoftSsoEnabled: config.microsoftSsoEnabled || false,
+          microsoftClientId: config.microsoftClientId || '',
+          microsoftTenantId: config.microsoftTenantId || 'common'
         });
       },
       error: (err) => console.error('Error cargando config:', err)
@@ -357,31 +367,9 @@ export class SettingsComponent implements OnInit {
   }
 
   toggleSmtpPasswordVisibility(): void {
-    const shouldShow = !this.showSmtpPassword;
-
-    if (shouldShow) {
-      const hasTypedValue = !!String(this.smtpForm.get('password')?.value || '').trim();
-      if (!hasTypedValue && this.hasStoredSmtpConfig) {
-        this.smtpService.getStoredPassword().subscribe({
-          next: (resp) => {
-            const password = String(resp?.password || '');
-            this.smtpForm.patchValue({ password }, { emitEvent: false });
-            this.showSmtpPassword = true;
-          },
-          error: (err) => {
-            this.smtpLastError = this.buildSmtpDiagnostic(err);
-            this.snackBar.open(
-              'No se pudo revelar la contraseña SMTP guardada. Revisa Logs de Auditoría.',
-              'Cerrar',
-              { duration: 5000 }
-            );
-          }
-        });
-        return;
-      }
-    }
-
-    this.showSmtpPassword = shouldShow;
+    // Solo alternamos la visibilidad de lo que el usuario ha escrito.
+    // No revelamos la contraseña persistida desde el servidor por motivos de seguridad (write-only).
+    this.showSmtpPassword = !this.showSmtpPassword;
   }
 
   private applyProviderPreset(provider: string, keepExistingHost = false): void {
@@ -419,13 +407,17 @@ export class SettingsComponent implements OnInit {
 
   saveAppConfig(): void {
     if (this.appConfigForm.valid) {
-      const data: UpdateConfigRequest = {
-        guestModeEnabled: this.appConfigForm.value.guestEnabled
+      // Mapear campos de configuración general incluyendo los nuevos campos de SSO
+      const data: any = {
+        guestModeEnabled: this.appConfigForm.value.guestEnabled,
+        googleSsoEnabled: this.appConfigForm.value.googleSsoEnabled,
+        googleClientId: this.appConfigForm.value.googleClientId,
+        microsoftSsoEnabled: this.appConfigForm.value.microsoftSsoEnabled,
+        microsoftClientId: this.appConfigForm.value.microsoftClientId,
+        microsoftTenantId: this.appConfigForm.value.microsoftTenantId
       };
       this.configService.updateConfig(data).subscribe({
-        // Corrección ortográfica: tilde agregada en Configuración
         next: () => this.snackBar.open('Configuración guardada', 'Cerrar', { duration: 2000 }),
-        // Corrección ortográfica y de redacción para el mensaje de error
         error: () => this.snackBar.open('Error al guardar configuración', 'Cerrar', { duration: 3000 })
       });
     }
