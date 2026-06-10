@@ -29,12 +29,14 @@ const router = express.Router();
 const Entry = require('../models/Entry');
 const ShiftCheck = require('../models/ShiftCheck');
 const User = require('../models/User');
+const Contact = require('../models/Contact');
+const DirectoryContact = require('../models/DirectoryContact');
 const AppConfig = require('../models/AppConfig');
 const ReportHistory = require('../models/ReportHistory');
 const { authenticate, authorize } = require('../middleware/auth');
 const AuditLog = require('../models/AuditLog');
 const { audit } = require('../utils/audit');
-const { sendEmail } = require('../utils/email');
+const { sendEmail, getSMTPConfig } = require('../utils/email');
 const { analyzeRecipientEmails } = require('../utils/contactDirectory');
 const { buildIncidentEmail } = require('../utils/incidentEmailTemplate');
 const {
@@ -59,6 +61,59 @@ const NEWSLETTER_DEBUG_LOGS = true;
 const normalizeAnalyticsLabel = (value, fallback = 'Sin dato') => {
   const normalized = String(value || '').trim();
   return normalized || fallback;
+};
+
+/**
+ * Obtiene dinámicamente la lista de dominios de email válidos del SOC
+ * a partir de la configuración SMTP, usuarios registrados y directorio de contactos.
+ * @returns {Promise<Set<string>>} Conjunto de dominios válidos en minúsculas
+ */
+const getValidSOCDomains = async () => {
+  const domains = new Set();
+  
+  // 1. Dominio del remitente SMTP configurado
+  try {
+    const smtpConfig = await getSMTPConfig();
+    if (smtpConfig) {
+      if (smtpConfig.from) {
+        const fromEmail = smtpConfig.from.includes('<') ? smtpConfig.from.match(/<\s*([^>]+)\s*>/)?.[1] : smtpConfig.from;
+        if (fromEmail && fromEmail.includes('@')) {
+          domains.add(fromEmail.split('@')[1].toLowerCase().trim());
+        }
+      }
+      if (smtpConfig.user && smtpConfig.user.includes('@')) {
+        domains.add(smtpConfig.user.split('@')[1].toLowerCase().trim());
+      }
+    }
+  } catch (err) {
+    console.error('[getValidSOCDomains] Error leyendo dominio SMTP:', err.message);
+  }
+
+  // 2. Dominios de usuarios, contactos y directorio de contactos
+  try {
+    const [users, contacts, dirContacts] = await Promise.all([
+      User.find({}, 'email').lean(),
+      Contact.find({ active: true }, 'email'),
+      DirectoryContact.find({}, 'email')
+    ]);
+
+    const addEmailDomain = (email) => {
+      if (email && email.includes('@')) {
+        const parts = email.split('@');
+        if (parts[1]) {
+          domains.add(parts[1].toLowerCase().trim());
+        }
+      }
+    };
+
+    users.forEach(u => addEmailDomain(u.email));
+    contacts.forEach(c => addEmailDomain(c.email));
+    dirContacts.forEach(d => addEmailDomain(d.email));
+  } catch (err) {
+    console.error('[getValidSOCDomains] Error al consultar colecciones:', err.message);
+  }
+
+  return domains;
 };
 
 const extractEmailDomain = (email) => {
@@ -1257,6 +1312,28 @@ router.post('/newsletter/validate', authenticate, async (req, res) => {
   }
 });
 
+/**
+ * Ejecuta una lista de tareas asíncronas de forma concurrente con un límite máximo
+ * @param {Array<Function>} tasks - Funciones que devuelven promesas
+ * @param {number} limit - Límite máximo de concurrencia activa
+ * @returns {Promise<Array>} Resultados de todas las promesas
+ */
+const limitConcurrency = async (tasks, limit) => {
+  const results = [];
+  const executing = new Set();
+  for (const task of tasks) {
+    const p = Promise.resolve().then(() => task());
+    results.push(p);
+    executing.add(p);
+    const clean = () => executing.delete(p);
+    p.then(clean, clean);
+    if (executing.size >= limit) {
+      await Promise.race(executing);
+    }
+  }
+  return Promise.all(results);
+};
+
 // POST /api/reports/newsletter/send - Envío de boletines (1:1 o agrupado por dominio con CC compartido)
 router.post('/newsletter/send', authenticate, authorize('admin', 'user'), async (req, res) => {
   try {
@@ -1280,6 +1357,21 @@ router.post('/newsletter/send', authenticate, authorize('admin', 'user'), async 
     const ccAnalysis = analyzeRecipientEmails(Array.isArray(cc) ? cc : []);
     const validCcBase = ccAnalysis.valid; // lista CC sin filtrar por destinatario
 
+    // Validar abusos de SMTP Relay: dominios autorizados del SOC
+    const validDomains = await getValidSOCDomains();
+    const allDestEmails = [...new Set([...analysis.valid, ...validCcBase])].map(email => String(email || '').toLowerCase().trim());
+    
+    for (const email of allDestEmails) {
+      if (!email.includes('@')) continue;
+      const domain = email.split('@')[1];
+      if (!validDomains.has(domain)) {
+        return res.status(400).json({
+          message: 'Destinatario no autorizado',
+          detail: `El dominio del correo ${email} no pertenece a los destinatarios válidos del SOC.`
+        });
+      }
+    }
+
     const toSet = new Set(analysis.valid.map((email) => email.toLowerCase()));
     const overlapRecipients = validCcBase.filter((email) => toSet.has(email.toLowerCase()));
     if (overlapRecipients.length > 0) {
@@ -1290,108 +1382,162 @@ router.post('/newsletter/send', authenticate, authorize('admin', 'user'), async 
       });
     }
 
-    const recipientBatches = buildRecipientBatches(analysis.valid, groupByDomain);
+    const auditUser = req.user;
+    const auditIp = req.ip;
+    const auditHeaders = req.headers;
+    const inlineAttachments = req.body.inlineAttachments;
 
-    const prepared = await prepareNewsletterEmailPayload(html, req.body.inlineAttachments);
-    const emailHtml = prepared.html;
-    const newsletterAttachments = prepared.attachments;
-    const plainText = htmlToBasicPlainText(emailHtml);
+    // Responder inmediatamente indicando que el boletín ha sido aceptado para procesamiento en segundo plano
+    res.status(202).json({
+      success: true,
+      message: 'El envío del boletín ha sido encolado en segundo plano.',
+      processedRecipients: analysis.valid.length,
+      ccCount: validCcBase.length
+    });
 
-    // Envío secuencial por lote: por dominio cuando groupByDomain=true,
-    // o 1:1 cuando groupByDomain=false.
-    let successCount = 0;
-    let failCount = 0;
-    let lastError = null;
-    let successGroups = 0;
-    let failGroups = 0;
-
-    for (const batch of recipientBatches) {
-      // Excluir del CC cualquier correo que ya esté en Para dentro del lote actual.
-      const toSetBatch = new Set(batch.to.map((email) => email.toLowerCase()));
-      const ccForThis = validCcBase.filter(c => !toSetBatch.has(c.toLowerCase()));
+    // Procesamiento asíncrono desacoplado de la respuesta HTTP
+    setImmediate(async () => {
       try {
-        const sendResult = await sendEmail({
-          to: batch.to,
-          cc: ccForThis.length ? ccForThis : undefined,
-          subject: subject || 'Boletín de Seguridad',
-          html: emailHtml,
-          text: plainText,
-          attachments: newsletterAttachments.length ? newsletterAttachments : undefined,
-          auditContext: {
-            sourceModule: 'ReportGenerator',
-            triggerType: 'manual_newsletter',
-            extra: {
-              type: 'newsletter',
-              mode: sendMode,
-              criticality: String(analytics?.criticality || '').trim().toLowerCase() || null,
-              bulletinTitle: String(analytics?.title || subject || '').trim() || null,
-              vendor: String(analytics?.vendor || '').trim() || null,
-              newsletterAttachmentParts: newsletterAttachments.length,
-              duplicateCount: analysis.duplicates.length,
-              invalidCount: analysis.invalid.length,
-              ccCount: ccForThis.length,
-              groupedByDomain: groupByDomain,
-              recipientBatchDomain: batch.domain,
-              recipientBatchSize: batch.to.length
-            }
+        const recipientBatches = buildRecipientBatches(analysis.valid, groupByDomain);
+        const prepared = await prepareNewsletterEmailPayload(html, inlineAttachments);
+        const emailHtml = prepared.html;
+        const newsletterAttachments = prepared.attachments;
+        const plainText = htmlToBasicPlainText(emailHtml);
+
+        let successCount = 0;
+        let failCount = 0;
+        let lastError = null;
+        let successGroups = 0;
+        let failGroups = 0;
+
+        const tasks = recipientBatches.map((batch) => async () => {
+          const toSetBatch = new Set(batch.to.map((email) => email.toLowerCase()));
+          const ccForThis = validCcBase.filter(c => !toSetBatch.has(c.toLowerCase()));
+          try {
+            const sendResult = await sendEmail({
+              to: batch.to,
+              cc: ccForThis.length ? ccForThis : undefined,
+              subject: subject || 'Boletín de Seguridad',
+              html: emailHtml,
+              text: plainText,
+              attachments: newsletterAttachments.length ? newsletterAttachments : undefined,
+              auditContext: {
+                sourceModule: 'ReportGenerator',
+                triggerType: 'manual_newsletter',
+                extra: {
+                  type: 'newsletter',
+                  mode: sendMode,
+                  criticality: String(analytics?.criticality || '').trim().toLowerCase() || null,
+                  bulletinTitle: String(analytics?.title || subject || '').trim() || null,
+                  vendor: String(analytics?.vendor || '').trim() || null,
+                  newsletterAttachmentParts: newsletterAttachments.length,
+                  duplicateCount: analysis.duplicates.length,
+                  invalidCount: analysis.invalid.length,
+                  ccCount: ccForThis.length,
+                  groupedByDomain: groupByDomain,
+                  recipientBatchDomain: batch.domain,
+                  recipientBatchSize: batch.to.length
+                }
+              }
+            });
+
+            const attemptedSet = new Set(batch.to.map((email) => email.toLowerCase()));
+            const acceptedSet = new Set(
+              (Array.isArray(sendResult?.acceptedTo) ? sendResult.acceptedTo : [])
+                .map((email) => String(email || '').toLowerCase())
+                .filter((email) => attemptedSet.has(email))
+            );
+            const rejectedSet = new Set(
+              (Array.isArray(sendResult?.rejectedTo) ? sendResult.rejectedTo : [])
+                .map((email) => String(email || '').toLowerCase())
+                .filter((email) => attemptedSet.has(email))
+            );
+
+            const acceptedCount = acceptedSet.size > 0 ? acceptedSet.size : batch.to.length;
+            const unresolvedCount = Math.max(0, batch.to.length - acceptedCount - rejectedSet.size);
+            const failCountForBatch = rejectedSet.size + unresolvedCount;
+
+            return {
+              success: true,
+              acceptedCount,
+              failCountForBatch,
+              batchKey: batch.key
+            };
+          } catch (err) {
+            console.error(`[newsletter/send] Error al enviar lote ${batch.key}:`, err.message);
+            return {
+              success: false,
+              error: err.message,
+              batchSize: batch.to.length,
+              batchKey: batch.key
+            };
           }
         });
 
-        const attemptedSet = new Set(batch.to.map((email) => email.toLowerCase()));
-        const acceptedSet = new Set(
-          (Array.isArray(sendResult?.acceptedTo) ? sendResult.acceptedTo : [])
-            .map((email) => String(email || '').toLowerCase())
-            .filter((email) => attemptedSet.has(email))
-        );
-        const rejectedSet = new Set(
-          (Array.isArray(sendResult?.rejectedTo) ? sendResult.rejectedTo : [])
-            .map((email) => String(email || '').toLowerCase())
-            .filter((email) => attemptedSet.has(email))
-        );
+        // Ejecutar envíos en paralelo controlado con concurrencia máxima de 4
+        const taskResults = await limitConcurrency(tasks, 4);
 
-        // Si el transport no informa accepted/rejected por destinatario, asumimos éxito total del lote.
-        const acceptedCount = acceptedSet.size > 0 ? acceptedSet.size : batch.to.length;
-        const unresolvedCount = Math.max(0, batch.to.length - acceptedCount - rejectedSet.size);
-        const failCountForBatch = rejectedSet.size + unresolvedCount;
+        for (const resTask of taskResults) {
+          if (resTask.success) {
+            successCount += resTask.acceptedCount;
+            failCount += resTask.failCountForBatch;
+            if (resTask.acceptedCount > 0) successGroups += 1;
+            if (resTask.failCountForBatch > 0) failGroups += 1;
+          } else {
+            lastError = resTask.error;
+            failCount += resTask.batchSize;
+            failGroups += 1;
+          }
+        }
 
-        successCount += acceptedCount;
-        failCount += failCountForBatch;
-        if (acceptedCount > 0) successGroups += 1;
-        if (failCountForBatch > 0) failGroups += 1;
+        // Registrar auditoría final con el resultado general
+        await audit({
+          user: auditUser,
+          ip: auditIp,
+          headers: auditHeaders
+        }, {
+          event: 'newsletter.send.completed',
+          level: successCount > 0 ? 'info' : 'error',
+          result: {
+            success: successCount > 0,
+            successCount,
+            failCount,
+            successGroups,
+            failGroups,
+            processedGroups: recipientBatches.length
+          },
+          metadata: {
+            subject,
+            groupByDomain,
+            totalRecipients: analysis.valid.length,
+            criticality: String(analytics?.criticality || '').trim().toLowerCase() || null,
+            title: String(analytics?.title || subject || '').trim() || null,
+            lastError: lastError || null
+          }
+        });
+
       } catch (err) {
-        console.error(`[newsletter/send] Error al enviar lote ${batch.key}:`, err.message);
-        lastError = err.message;
-        failCount += batch.to.length;
-        failGroups += 1;
+        console.error('[newsletter/send] Error asíncrono en segundo plano:', err);
+        try {
+          await audit({
+            user: auditUser,
+            ip: auditIp,
+            headers: auditHeaders
+          }, {
+            event: 'newsletter.send.failed',
+            level: 'error',
+            result: { success: false, error: err.message },
+            metadata: { subject }
+          });
+        } catch (auditErr) {
+          console.error('[newsletter/send] Error al registrar auditoría de fallo asíncrono:', auditErr.message);
+        }
       }
-    }
-
-    if (successCount === 0 && failCount > 0) {
-      return res.status(500).json({
-        message: 'Error SMTP al enviar boletín',
-        detail: lastError || 'Error desconocido — revisa la configuración SMTP en Admin.'
-      });
-    }
-
-    res.json({
-      success: true,
-      mode: sendMode,
-      groupByDomain,
-      successCount,
-      failCount,
-      successGroups,
-      failGroups,
-      processedGroups: recipientBatches.length,
-      ccCount: validCcBase.length,
-      duplicateCount: analysis.duplicates.length,
-      invalidCount: analysis.invalid.length,
-      processedRecipients: analysis.valid.length,
-      message: `Boletín enviado: ${successCount} correctos, ${failCount} fallidos`
     });
   } catch (error) {
-    console.error('[newsletter/send] Error inesperado:', error);
+    console.error('[newsletter/send] Error inesperado en validaciones sincrónicas:', error);
     res.status(500).json({
-      message: 'Error interno al enviar boletines',
+      message: 'Error interno al procesar boletines',
       detail: error.message
     });
   }
@@ -1462,6 +1608,21 @@ router.post('/incident/send', authenticate, authorize('admin', 'user'), async (r
       });
     }
     const validCc = analyzeRecipientEmails(cc || []).valid;
+
+    // Validar abusos de SMTP Relay: dominios autorizados del SOC
+    const validDomains = await getValidSOCDomains();
+    const allDestEmails = [...new Set([...analysisTo.valid, ...validCc])].map(email => String(email || '').toLowerCase().trim());
+    
+    for (const email of allDestEmails) {
+      if (!email.includes('@')) continue;
+      const domain = email.split('@')[1];
+      if (!validDomains.has(domain)) {
+        return res.status(400).json({
+          message: 'Destinatario no autorizado',
+          detail: `El dominio del correo ${email} no pertenece a los destinatarios válidos del SOC.`
+        });
+      }
+    }
 
     if (!reportData) {
       return res.status(400).json({ message: 'Se requiere reportData con los campos del incidente' });

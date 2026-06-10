@@ -39,6 +39,9 @@ const { buildFrontendResetUrl } = require('../utils/frontend-url');
 const { logger } = require('../utils/logger');
 const { getTokenFromCookie } = require('../utils/cookie-helper');
 const { sendEmail } = require('../utils/email');
+const qrcode = require('qrcode');
+const { generateSecret, verifyTOTP } = require('../utils/totp');
+const { authenticate, authorize } = require('../middleware/auth');
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -243,6 +246,33 @@ router.post('/login',
         await user.save();
       }
 
+      // Interceptar login si MFA está activo
+      if (user.mfaEnabled) {
+        const mfaToken = jwt.sign(
+          { userId: user._id, isMfaPending: true },
+          process.env.JWT_SECRET,
+          { expiresIn: '5m' }
+        );
+
+        await audit(req, {
+          event: 'auth.login.mfa_required',
+          level: 'info',
+          actor: {
+            userId: user._id,
+            username: user.username,
+            role: user.role
+          },
+          result: { success: true, reason: 'MFA verification required' },
+          metadata: { userId: user._id }
+        }).catch(err => logger.error({ err }, 'Audit error'));
+
+        return res.json({
+          requireMFA: true,
+          mfaToken,
+          needsSetup: !user.mfaSecret
+        });
+      }
+
       const token = generateToken(user._id, user.role);
       setAuthCookie(req, res, token);
 
@@ -311,17 +341,43 @@ router.post('/refresh', async (req, res) => {
       return res.status(401).json({ message: 'Token requerido' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // 🔒 Verificar firma del token ignorando expiración para permitir silent-refresh transparente
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, { ignoreExpiration: true });
+
+    // 🛡️ Prevenir ataques de replay verificando si el token ya está en la denylist
+    const isDenylisted = await TokenDenylist.exists({ token });
+    if (isDenylisted) {
+      return res.status(401).json({ message: 'Sesión terminada. Token ya utilizado o revocado.' });
+    }
+
+    // ⏳ Ventana de gracia de 30 minutos para renovar tokens que ya expiraron
+    const nowSecs = Math.floor(Date.now() / 1000);
+    if (decoded.exp && (nowSecs - decoded.exp > 30 * 60)) {
+      return res.status(401).json({ message: 'Sesión expirada permanentemente. Por favor inicie sesión de nuevo.' });
+    }
 
     const user = await User.findById(decoded.userId);
 
     if (!user || !user.isActive) {
-      return res.status(401).json({ message: 'Usuario no válido' });
+      return res.status(401).json({ message: 'Usuario no válido o inactivo' });
     }
 
     if (user.role === 'guest') {
       return res.status(403).json({ message: 'Los invitados no pueden renovar su sesión' });
     }
+
+    // 🔄 Rotación de tokens: Invalidar el token anterior agregándolo a la denylist
+    const expiresAt = decoded.exp ? new Date(decoded.exp * 1000) : new Date();
+    const denylistExpiresAt = expiresAt > new Date() ? expiresAt : new Date(Date.now() + 5 * 60 * 1000);
+    
+    await TokenDenylist.create({
+      token,
+      expiresAt: denylistExpiresAt
+    }).catch(err => {
+      if (err.code !== 11000) {
+        logger.error({ err }, 'Error registrando token revocado en denylist durante refresh');
+      }
+    });
 
     const newToken = generateToken(user._id, user.role);
     setAuthCookie(req, res, newToken);
@@ -505,5 +561,427 @@ router.post('/reset-password',
     }
   }
 );
+
+// Middleware auxiliar para validar setup/verify de MFA (desde perfil o login con token temporal)
+const mfaSetupVerifyAuth = async (req, res, next) => {
+  try {
+    // 1. Intentar con usuario ya autenticado (desde el perfil)
+    const cookieToken = getTokenFromCookie(req);
+    const authHeader = req.headers.authorization;
+    const headerToken = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    const token = headerToken || cookieToken;
+
+    if (token) {
+      const isDenylisted = await TokenDenylist.exists({ token });
+      if (!isDenylisted) {
+        try {
+          const decoded = jwt.verify(token, process.env.JWT_SECRET);
+          const user = await User.findById(decoded.userId);
+          if (user && user.isActive) {
+            req.user = user;
+            return next();
+          }
+        } catch (e) {
+          // Token inválido o expirado, continuar al paso 2
+        }
+      }
+    }
+
+    // 2. Intentar con token temporal de MFA (desde el login)
+    const mfaToken = req.body.mfaToken || req.headers['x-mfa-token'];
+    if (mfaToken) {
+      const decoded = jwt.verify(mfaToken, process.env.JWT_SECRET);
+      if (decoded.isMfaPending) {
+        const user = await User.findById(decoded.userId);
+        if (user && user.isActive) {
+          req.user = user;
+          req.isMfaPending = true;
+          return next();
+        }
+      }
+    }
+
+    return res.status(401).json({ message: 'No autorizado para configurar MFA' });
+  } catch (error) {
+    return res.status(401).json({ message: 'Sesión expirada o token de MFA inválido' });
+  }
+};
+
+// POST /api/auth/mfa/setup - Obtener código QR y secreto para enrolamiento
+router.post('/mfa/setup', mfaSetupVerifyAuth, async (req, res) => {
+  try {
+    const user = req.user;
+
+    if (user.mfaEnabled && user.mfaSecret && req.isMfaPending) {
+      return res.status(400).json({ message: 'MFA ya configurado y activo' });
+    }
+
+    const secret = generateSecret();
+    user.mfaTempSecret = secret;
+    await user.save();
+
+    const appTitle = 'BitacoraSOC';
+    const label = `${appTitle}:${user.username}`;
+    const otpauthUrl = `otpauth://totp/${encodeURIComponent(label)}?secret=${secret}&issuer=${encodeURIComponent(appTitle)}`;
+
+    const qrCodeDataUrl = await qrcode.toDataURL(otpauthUrl);
+
+    res.json({
+      secret,
+      qrCode: qrCodeDataUrl
+    });
+  } catch (error) {
+    logger.error('Error en MFA setup:', error);
+    res.status(500).json({ message: 'Error al iniciar configuración de MFA' });
+  }
+});
+
+// POST /api/auth/mfa/verify - Validar token inicial para activar MFA
+router.post('/mfa/verify', mfaSetupVerifyAuth, async (req, res) => {
+  try {
+    const { code } = req.body;
+    const user = req.user;
+
+    if (!user.mfaTempSecret) {
+      return res.status(400).json({ message: 'No hay configuración de MFA en curso' });
+    }
+
+    const isValid = verifyTOTP(code, user.mfaTempSecret);
+    if (!isValid) {
+      return res.status(400).json({ message: 'Código de verificación incorrecto o expirado' });
+    }
+
+    user.mfaSecret = user.mfaTempSecret;
+    user.mfaEnabled = true;
+    user.mfaTempSecret = null;
+    await user.save();
+
+    await audit(req, {
+      event: 'auth.mfa.enabled',
+      level: 'info',
+      actor: {
+        userId: user._id,
+        username: user.username,
+        role: user.role
+      },
+      result: { success: true, reason: 'MFA enabled successfully' },
+      metadata: { userId: user._id }
+    }).catch(err => logger.error({ err }, 'Audit error'));
+
+    let sessionResponse = { success: true, mfaEnabled: true };
+    if (req.isMfaPending) {
+      const token = generateToken(user._id, user.role);
+      setAuthCookie(req, res, token);
+      sessionResponse.token = token;
+      sessionResponse.user = {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        cargoLabel: user.cargoLabel,
+        role: user.role,
+        theme: user.theme,
+        avatar: user.avatar,
+        guestExpiresAt: user.guestExpiresAt
+      };
+    }
+
+    res.json(sessionResponse);
+  } catch (error) {
+    logger.error('Error en MFA verify:', error);
+    res.status(500).json({ message: 'Error al verificar código de MFA' });
+  }
+});
+
+// POST /api/auth/mfa/disable - Desactivar MFA propio (requiere contraseña)
+router.post('/mfa/disable', authenticate, async (req, res) => {
+  try {
+    const { password } = req.body;
+    const user = req.user;
+
+    if (!password) {
+      return res.status(400).json({ message: 'Contraseña requerida para desactivar MFA' });
+    }
+
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Contraseña incorrecta' });
+    }
+
+    user.mfaEnabled = false;
+    user.mfaSecret = null;
+    user.mfaTempSecret = null;
+    await user.save();
+
+    await audit(req, {
+      event: 'auth.mfa.disabled',
+      level: 'warn',
+      actor: {
+        userId: user._id,
+        username: user.username,
+        role: user.role
+      },
+      result: { success: true, reason: 'MFA disabled by user' },
+      metadata: { userId: user._id }
+    }).catch(err => logger.error({ err }, 'Audit error'));
+
+    res.json({ success: true, message: 'MFA desactivado correctamente' });
+  } catch (error) {
+    logger.error('Error en MFA disable:', error);
+    res.status(500).json({ message: 'Error al desactivar MFA' });
+  }
+});
+
+// POST /api/auth/mfa/authenticate - Validar token MFA para login final
+router.post('/mfa/authenticate', async (req, res) => {
+  try {
+    const { code, mfaToken } = req.body;
+    if (!code || !mfaToken) {
+      return res.status(400).json({ message: 'Código y token de autenticación requeridos' });
+    }
+
+    const decoded = jwt.verify(mfaToken, process.env.JWT_SECRET);
+    if (!decoded.isMfaPending) {
+      return res.status(401).json({ message: 'Token de MFA inválido' });
+    }
+
+    const user = await User.findById(decoded.userId);
+    if (!user || !user.isActive) {
+      return res.status(401).json({ message: 'Usuario no encontrado o inactivo' });
+    }
+
+    if (!user.mfaEnabled || !user.mfaSecret) {
+      return res.status(400).json({ message: 'MFA no está habilitado para este usuario' });
+    }
+
+    const isValid = verifyTOTP(code, user.mfaSecret);
+    if (!isValid) {
+      return res.status(401).json({ message: 'Código TOTP incorrecto o expirado' });
+    }
+
+    const token = generateToken(user._id, user.role);
+    setAuthCookie(req, res, token);
+
+    await audit(req, {
+      event: 'auth.login.success',
+      level: 'info',
+      actor: {
+        userId: user._id,
+        username: user.username,
+        role: user.role
+      },
+      result: { success: true, reason: 'Login successful via MFA' },
+      metadata: {
+        userId: user._id,
+        username: user.username,
+        role: user.role,
+        mfaVerified: true
+      }
+    }).catch(err => logger.error({ err }, 'Audit error'));
+
+    res.json({
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        cargoLabel: user.cargoLabel,
+        role: user.role,
+        theme: user.theme,
+        avatar: user.avatar,
+        guestExpiresAt: user.guestExpiresAt
+      }
+    });
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'El tiempo límite de MFA ha expirado. Vuelve a iniciar sesión.' });
+    }
+    logger.error('Error en MFA authenticate:', error);
+    res.status(401).json({ message: 'Token de MFA inválido o expirado' });
+  }
+});
+
+// POST /api/auth/sso/google - Autenticación con Google SSO
+router.post('/sso/google', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ message: 'Token de Google requerido' });
+    }
+
+    // Obtener la configuración global para verificar que Google SSO está activo
+    const config = await AppConfig.findOne().select('googleSsoEnabled googleClientId');
+    if (!config || !config.googleSsoEnabled) {
+      return res.status(400).json({ message: 'Google SSO no está habilitado en el sistema' });
+    }
+
+    // Validar el ID Token con el endpoint de Google
+    const verifyUrl = `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(token)}`;
+    const response = await fetch(verifyUrl);
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.warn({ errorText }, 'Error al validar ID Token de Google');
+      return res.status(401).json({ message: 'Token de Google inválido' });
+    }
+
+    const tokenInfo = await response.json();
+    
+    // Validar el client_id y que el correo esté verificado
+    if (tokenInfo.aud !== config.googleClientId) {
+      logger.warn({ aud: tokenInfo.aud, expected: config.googleClientId }, 'El Client ID de Google no coincide');
+      return res.status(401).json({ message: 'Audience del token incorrecto' });
+    }
+
+    const emailVerified = tokenInfo.email_verified === 'true' || tokenInfo.email_verified === true;
+    if (!emailVerified || !tokenInfo.email) {
+      return res.status(401).json({ message: 'El correo electrónico de Google no está verificado' });
+    }
+
+    const userEmail = tokenInfo.email.toLowerCase();
+    
+    // Buscar el usuario de manera flexible por email o nombre de usuario para asociar cuentas locales manuales
+    const user = await User.findOne({
+      $or: [
+        { email: userEmail },
+        { username: userEmail }
+      ],
+      isActive: true
+    });
+
+    if (!user) {
+      await audit(req, {
+        event: 'auth.sso_login.fail',
+        level: 'warn',
+        result: { success: false, reason: 'Usuario de Google SSO no encontrado en el sistema' },
+        metadata: { email: userEmail, provider: 'google' }
+      });
+      return res.status(401).json({ message: 'Usuario no registrado en BitacoraSOC' });
+    }
+
+    // Generar sesión JWT
+    const sessionToken = generateToken(user._id, user.role);
+    setAuthCookie(req, res, sessionToken);
+
+    await audit(req, {
+      event: 'auth.login.success',
+      level: 'info',
+      actor: {
+        userId: user._id,
+        username: user.username,
+        role: user.role
+      },
+      result: { success: true, reason: 'Login successful via Google SSO' },
+      metadata: { userId: user._id, sso: 'google' }
+    });
+
+    return res.json({
+      token: sessionToken,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        cargoLabel: user.cargoLabel,
+        role: user.role,
+        theme: user.theme,
+        avatar: user.avatar,
+        guestExpiresAt: user.guestExpiresAt
+      }
+    });
+  } catch (error) {
+    logger.error('Error en Google SSO login:', error);
+    return res.status(500).json({ message: 'Error interno en Google SSO' });
+  }
+});
+
+// POST /api/auth/sso/microsoft - Autenticación con Microsoft SSO
+router.post('/sso/microsoft', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ message: 'Access Token de Microsoft requerido' });
+    }
+
+    // Obtener la configuración global para verificar que Microsoft SSO está activo
+    const config = await AppConfig.findOne().select('microsoftSsoEnabled');
+    if (!config || !config.microsoftSsoEnabled) {
+      return res.status(400).json({ message: 'Microsoft SSO no está habilitado en el sistema' });
+    }
+
+    // Consultar el perfil del usuario mediante Microsoft Graph API
+    const response = await fetch('https://graph.microsoft.com/v1.0/me', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.warn({ errorText }, 'Error al validar Access Token con Microsoft Graph');
+      return res.status(401).json({ message: 'Token de Microsoft inválido' });
+    }
+
+    const profile = await response.json();
+    const microsoftEmail = (profile.mail || profile.userPrincipalName || '').toLowerCase();
+
+    if (!microsoftEmail) {
+      return res.status(401).json({ message: 'No se pudo resolver el correo desde Microsoft Graph' });
+    }
+
+    // Buscar el usuario de manera flexible por email o nombre de usuario para asociar cuentas locales manuales
+    const user = await User.findOne({
+      $or: [
+        { email: microsoftEmail },
+        { username: microsoftEmail }
+      ],
+      isActive: true
+    });
+
+    if (!user) {
+      await audit(req, {
+        event: 'auth.sso_login.fail',
+        level: 'warn',
+        result: { success: false, reason: 'Usuario de Microsoft SSO no encontrado en el sistema' },
+        metadata: { email: microsoftEmail, provider: 'microsoft' }
+      });
+      return res.status(401).json({ message: 'Usuario no registrado en BitacoraSOC' });
+    }
+
+    // Generar sesión JWT
+    const sessionToken = generateToken(user._id, user.role);
+    setAuthCookie(req, res, sessionToken);
+
+    await audit(req, {
+      event: 'auth.login.success',
+      level: 'info',
+      actor: {
+        userId: user._id,
+        username: user.username,
+        role: user.role
+      },
+      result: { success: true, reason: 'Login successful via Microsoft SSO' },
+      metadata: { userId: user._id, sso: 'microsoft' }
+    });
+
+    return res.json({
+      token: sessionToken,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        cargoLabel: user.cargoLabel,
+        role: user.role,
+        theme: user.theme,
+        avatar: user.avatar,
+        guestExpiresAt: user.guestExpiresAt
+      }
+    });
+  } catch (error) {
+    logger.error('Error en Microsoft SSO login:', error);
+    return res.status(500).json({ message: 'Error interno en Microsoft SSO' });
+  }
+});
 
 module.exports = router;

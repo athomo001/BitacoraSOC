@@ -176,6 +176,25 @@ const authenticate = async (req, res, next) => {
   }
 };
 
+// Lista de prefijos seguros para endpoints GET administrativos que el rol auditor está autorizado a consultar
+const AUDITOR_GET_WHITELIST = [
+  '/api/config',
+  '/api/checklist/templates',
+  '/api/checklist/services/all',
+  '/api/checklist/alerts/weekly-log',
+  '/api/checklist/shift-reminders',
+  '/api/logging/config',
+  '/api/logging/configs',
+  '/api/users',
+  '/api/work-shifts',
+  '/api/work-shift-assignments',
+  '/api/tags/stats',
+  '/api/smtp',
+  '/api/system/health-summary',
+  '/api/glpi/config',
+  '/api/glpi'
+];
+
 // Middleware para verificar roles
 const authorize = (...roles) => {
   return (req, res, next) => {
@@ -184,10 +203,14 @@ const authorize = (...roles) => {
     }
 
     const hasRole = roles.includes(req.user.role);
+    const fullPath = (req.baseUrl || '') + (req.path || '');
+    
+    // El auditor tiene permitido el bypass de GET administrativo únicamente si la ruta está en la lista blanca
     const auditorReadOnlyAdmin =
       req.user.role === 'auditor' &&
       roles.includes('admin') &&
-      SAFE_METHODS.has(req.method);
+      SAFE_METHODS.has(req.method) &&
+      AUDITOR_GET_WHITELIST.some(prefix => fullPath.startsWith(prefix));
 
     if (!hasRole && !auditorReadOnlyAdmin) {
       const { audit } = require('../utils/audit');

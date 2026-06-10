@@ -180,26 +180,30 @@ const decrypt = (ciphertext) => {
             console.log(`[DECRYPT] ✓ Llave ${i} funcionó (crypto-js legacy)`);
             return decoded;
           }
-          console.log(`[DECRYPT] ✗ Llave ${i} descifró basura (${decoded.substring(0, 20)}...)`);
+          // QA-ENCRYPT-LOG-001: Se remueve la impresión de fragmentos del secreto descifrado para evitar fugas en logs de consola
+          console.log(`[DECRYPT] ✗ Llave ${i} descifró formato no válido`);
         } catch (e) {
           console.log(`[DECRYPT] ✗ Llave ${i} error: ${e.message}`);
         }
       }
 
-      try {
-        console.log(`[DECRYPT] Intentando ENCRYPTION_KEY de env...`);
-        const bytes = CryptoJS.AES.decrypt(ciphertext, process.env.ENCRYPTION_KEY || 'default-key-change-me!!!!!!!!');
-        const decoded = bytes.toString(CryptoJS.enc.Utf8);
-        if (decoded && /^[\x20-\x7E\t\n\r]*$/.test(decoded)) {
-          console.log(`[DECRYPT] ✓ ENCRYPTION_KEY funcionó`);
-          return decoded;
+      // QA-ENCRYPT-KEY-001: Se elimina el fallback de clave de cifrado estática para garantizar la seguridad criptográfica del sistema
+      const envKey = process.env.ENCRYPTION_KEY;
+      if (envKey) {
+        try {
+          console.log(`[DECRYPT] Intentando ENCRYPTION_KEY de env...`);
+          const bytes = CryptoJS.AES.decrypt(ciphertext, envKey);
+          const decoded = bytes.toString(CryptoJS.enc.Utf8);
+          if (decoded && /^[\x20-\x7E\t\n\r]*$/.test(decoded)) {
+            console.log(`[DECRYPT] ✓ ENCRYPTION_KEY funcionó`);
+            return decoded;
+          }
+          console.log(`[DECRYPT] ✗ ENCRYPTION_KEY descifró formato no válido`);
+        } catch (e) {
+          console.log(`[DECRYPT] ✗ ENCRYPTION_KEY error: ${e.message}`);
         }
-        console.log(`[DECRYPT] ✗ ENCRYPTION_KEY descifró basura`);
-        return '';
-      } catch (e) {
-        console.log(`[DECRYPT] ✗ ENCRYPTION_KEY error: ${e.message}`);
-        return '';
       }
+      return '';
     }
     
     console.log(`[DECRYPT] Formato AES-256-GCM detectado, intentando ${getAvailableHexKeys().length} llaves...`);
@@ -236,7 +240,21 @@ const decrypt = (ciphertext) => {
   }
 };
 
+/**
+ * Genera un hash SHA-256 de un texto para indexar y buscar campos PII de forma determinista
+ * @param {string} text - Texto a hashear
+ * @returns {string} Hash SHA-256 en formato hex
+ */
+const sha256 = (text) => {
+  if (!text) return '';
+  return crypto
+    .createHash('sha256')
+    .update(String(text).trim().toLowerCase())
+    .digest('hex');
+};
+
 module.exports = {
   encrypt,
-  decrypt
+  decrypt,
+  sha256
 };

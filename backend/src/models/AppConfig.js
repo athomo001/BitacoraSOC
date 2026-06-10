@@ -239,6 +239,31 @@ const appConfigSchema = new mongoose.Schema({
     enum: ['url', 'upload', 'external'],
     default: 'url'
   },
+  // Configuración de Single Sign-On (SSO) Google
+  googleSsoEnabled: {
+    type: Boolean,
+    default: false
+  },
+  googleClientId: {
+    type: String,
+    default: '',
+    trim: true
+  },
+  // Configuración de Single Sign-On (SSO) Microsoft
+  microsoftSsoEnabled: {
+    type: Boolean,
+    default: false
+  },
+  microsoftClientId: {
+    type: String,
+    default: '',
+    trim: true
+  },
+  microsoftTenantId: {
+    type: String,
+    default: 'common',
+    trim: true
+  },
   // LogSource por defecto para entradas sin cliente
   defaultLogSourceId: {
     type: mongoose.Schema.Types.ObjectId,

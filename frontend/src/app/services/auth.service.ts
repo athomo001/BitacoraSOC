@@ -80,14 +80,96 @@ export class AuthService {
     return this.http.post<LoginResponse>(`${this.API_URL}/auth/login`, credentials, { withCredentials: true })
       .pipe(
         tap(response => {
-          console.log('[AuthService] Login response:', response);
-          console.log('[AuthService] User role:', response.user.role);
-          this.setUser(response.user);
-          this.currentUserSubject.next(response.user);
-          console.log('[AuthService] User saved to localStorage');
-          console.log('[AuthService] Current user now:', this.getCurrentUser());
+          if (!response.requireMFA && response.user) {
+            console.log('[AuthService] Login response:', response);
+            console.log('[AuthService] User role:', response.user.role);
+            this.setUser(response.user);
+            this.currentUserSubject.next(response.user);
+            console.log('[AuthService] User saved to localStorage');
+            console.log('[AuthService] Current user now:', this.getCurrentUser());
+          }
         })
       );
+  }
+
+  // Autenticación SSO Google
+  loginGoogle(token: string): Observable<LoginResponse> {
+    return this.http.post<LoginResponse>(`${this.API_URL}/auth/sso/google`, { token }, { withCredentials: true })
+      .pipe(
+        tap(response => {
+          if (response.user) {
+            this.setUser(response.user);
+            this.currentUserSubject.next(response.user);
+          }
+        })
+      );
+  }
+
+  // Autenticación SSO Microsoft
+  loginMicrosoft(token: string): Observable<LoginResponse> {
+    return this.http.post<LoginResponse>(`${this.API_URL}/auth/sso/microsoft`, { token }, { withCredentials: true })
+      .pipe(
+        tap(response => {
+          if (response.user) {
+            this.setUser(response.user);
+            this.currentUserSubject.next(response.user);
+          }
+        })
+      );
+  }
+
+  mfaSetup(mfaToken?: string): Observable<{ secret: string; qrCode: string }> {
+    const headers: { [key: string]: string } = {};
+    if (mfaToken) {
+      headers['x-mfa-token'] = mfaToken;
+    }
+    return this.http.post<{ secret: string; qrCode: string }>(
+      `${this.API_URL}/auth/mfa/setup`,
+      { mfaToken },
+      { headers, withCredentials: true }
+    );
+  }
+
+  mfaVerify(code: string, mfaToken?: string): Observable<any> {
+    const headers: { [key: string]: string } = {};
+    if (mfaToken) {
+      headers['x-mfa-token'] = mfaToken;
+    }
+    return this.http.post<any>(
+      `${this.API_URL}/auth/mfa/verify`,
+      { code, mfaToken },
+      { headers, withCredentials: true }
+    ).pipe(
+      tap(response => {
+        if (response.user) {
+          this.setUser(response.user);
+          this.currentUserSubject.next(response.user);
+        }
+      })
+    );
+  }
+
+  mfaDisable(password: string): Observable<any> {
+    return this.http.post<any>(
+      `${this.API_URL}/auth/mfa/disable`,
+      { password },
+      { withCredentials: true }
+    );
+  }
+
+  mfaAuthenticate(code: string, mfaToken: string): Observable<LoginResponse> {
+    return this.http.post<LoginResponse>(
+      `${this.API_URL}/auth/mfa/authenticate`,
+      { code, mfaToken },
+      { withCredentials: true }
+    ).pipe(
+      tap(response => {
+        if (response.user) {
+          this.setUser(response.user);
+          this.currentUserSubject.next(response.user);
+        }
+      })
+    );
   }
 
   logout(): void {
@@ -135,6 +217,10 @@ export class AuthService {
     const user = this.getCurrentUser();
     return user ? roles.includes(user.role) : false;
   }
+  refreshSession(): Observable<any> {
+    return this.http.post<any>(`${this.API_URL}/auth/refresh`, {}, { withCredentials: true });
+  }
+
   forgotPassword(email: string): Observable<{ message: string; resetToken?: string; resetUrl?: string }> {
     return this.http.post<{ message: string; resetToken?: string; resetUrl?: string }>(
       `${this.API_URL}/auth/forgot-password`,

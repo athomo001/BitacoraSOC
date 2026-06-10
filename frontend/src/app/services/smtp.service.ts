@@ -47,9 +47,6 @@ export class SmtpService {
     return this.http.get<SmtpConfig | null>(this.API_URL);
   }
 
-  getStoredPassword(): Observable<{ password: string }> {
-    return this.http.get<{ password: string }>(`${this.API_URL}/password`);
-  }
 
   saveConfig(data: SmtpConfigRequest): Observable<{ message: string; config: SmtpConfig }> {
     return this.http.post<{ message: string; config: SmtpConfig }>(this.API_URL, data);

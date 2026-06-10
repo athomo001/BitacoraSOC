@@ -133,6 +133,9 @@ auditLogSchema.index({ 'actor.userId': 1, timestamp: -1 }); // Query: actividad 
 auditLogSchema.index({ event: 1, 'result.success': 1 }); // Query: fallos por tipo
 auditLogSchema.index({ source: 1, sourceId: 1, timestamp: -1 });
 
+// QA-DB-INDEX-OPTIMIZATION-001: Índice compuesto para optimizar filtros por tipo de evento ordenados por fecha
+auditLogSchema.index({ event: 1, timestamp: -1 });
+
 /**
  * Índice TTL: Expiración Automática
  * 

@@ -116,7 +116,8 @@
     border-collapse: collapse;
 
     th, td {
-      padding: 1rem;
+      // Optimización del relleno vertical para reducir el espacio excesivo entre filas
+      padding: 0.5rem 0.75rem;
       text-align: left;
       border-bottom: 1px solid var(--border-color);
     }
@@ -124,14 +125,15 @@
     th {
       background: var(--bg-card);
       font-weight: 600;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       color: var(--text-secondary);
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.06em;
+      border-bottom: 2px solid var(--border-color);
     }
 
     td {
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       color: var(--text-primary);
     }
 
@@ -139,8 +141,9 @@
       border-bottom: none;
     }
 
+    // Efecto de hover discreto para una visualización premium
     tr:hover {
-      background: rgba(255, 255, 255, 0.02);
+      background: rgba(var(--primary-rgb), 0.02);
     }
 
     tr.directory-row--editing {

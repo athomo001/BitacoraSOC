@@ -19,20 +19,28 @@ import { MatOption } from '@angular/material/core';
 import { MatButton } from '@angular/material/button';
 import { NgIf } from '@angular/common';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
+import { MatIcon } from '@angular/material/icon';
 
 @Component({
     selector: 'app-profile',
     templateUrl: './profile.component.html',
     styleUrls: ['./profile.component.scss'],
-    imports: [ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatSelect, MatOption, MatButton, NgIf, MatProgressSpinner, MatHint]
+    imports: [ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatSelect, MatOption, MatButton, NgIf, MatProgressSpinner, MatHint, MatIcon]
 })
 export class ProfileComponent implements OnInit {
   profileForm!: FormGroup;
   passwordForm!: FormGroup;
+  mfaForm!: FormGroup;
+  mfaDisableForm!: FormGroup;
   currentUser: any;
   isSavingProfile = false;
   isChangingPassword = false;
+  isSavingMfa = false;
+  isDisablingMfa = false;
   themes: Theme[] = ['light', 'dark', 'sepia', 'pastel', 'cyberpunk'];
+  mfaStep: 'inactive' | 'setup' | 'active' = 'inactive';
+  mfaQrCode = '';
+  mfaSecret = '';
 
   constructor(
     private fb: FormBuilder,
@@ -44,6 +52,9 @@ export class ProfileComponent implements OnInit {
 
   ngOnInit(): void {
     this.currentUser = this.authService.getCurrentUser();
+    if (this.currentUser) {
+      this.mfaStep = this.currentUser.mfaEnabled ? 'active' : 'inactive';
+    }
     this.initForms();
     this.loadProfile();
   }
@@ -60,6 +71,14 @@ export class ProfileComponent implements OnInit {
       newPassword: ['', [Validators.required, Validators.minLength(6)]],
       confirmPassword: ['', Validators.required]
     });
+
+    this.mfaForm = this.fb.group({
+      code: ['', [Validators.required, Validators.pattern(/^\d{6}$/)]]
+    });
+
+    this.mfaDisableForm = this.fb.group({
+      password: ['', Validators.required]
+    });
   }
 
   onThemeChange(theme: Theme): void {
@@ -70,6 +89,7 @@ export class ProfileComponent implements OnInit {
     this.userService.getProfile().subscribe({
       next: (user) => {
         this.currentUser = user;
+        this.mfaStep = user.mfaEnabled ? 'active' : 'inactive';
         this.profileForm.patchValue({
           fullName: user.fullName,
           email: user.email,
@@ -140,5 +160,83 @@ export class ProfileComponent implements OnInit {
           this.snackBar.open(err.error?.message || 'No se pudo cambiar la contraseña', 'Cerrar', { duration: 3000 });
         }
       });
+  }
+
+  /**
+   * Inicia el proceso de enrolamiento de MFA solicitando la semilla/QR al backend.
+   */
+  startMfaSetup(): void {
+    this.isSavingMfa = true;
+    this.authService.mfaSetup().subscribe({
+      next: (res) => {
+        this.mfaQrCode = res.qrCode;
+        this.mfaSecret = res.secret;
+        this.mfaStep = 'setup';
+        this.mfaForm.reset();
+        this.isSavingMfa = false;
+      },
+      error: (err) => {
+        console.error('Error al iniciar setup de MFA:', err);
+        this.snackBar.open(err.error?.message || 'No se pudo iniciar la configuración de MFA', 'Cerrar', { duration: 3000 });
+        this.isSavingMfa = false;
+      }
+    });
+  }
+
+  /**
+   * Cancela el flujo actual de configuración y limpia variables temporales.
+   */
+  cancelMfaSetup(): void {
+    this.mfaStep = 'inactive';
+    this.mfaQrCode = '';
+    this.mfaSecret = '';
+    this.mfaForm.reset();
+  }
+
+  /**
+   * Envía el código TOTP de prueba al backend para activar el MFA.
+   */
+  verifyMfaSetup(): void {
+    if (this.mfaForm.invalid) return;
+    this.isSavingMfa = true;
+    const code = this.mfaForm.value.code;
+    this.authService.mfaVerify(code).subscribe({
+      next: (res) => {
+        this.snackBar.open('MFA activado con éxito', 'Cerrar', { duration: 3000 });
+        this.mfaStep = 'active';
+        this.currentUser.mfaEnabled = true;
+        this.authService.updateCurrentUser(this.currentUser);
+        this.isSavingMfa = false;
+      },
+      error: (err) => {
+        console.error('Error al verificar MFA:', err);
+        this.snackBar.open(err.error?.message || 'Código de verificación inválido', 'Cerrar', { duration: 3000 });
+        this.isSavingMfa = false;
+      }
+    });
+  }
+
+  /**
+   * Solicita al backend desactivar el MFA validando la contraseña actual.
+   */
+  disableMfa(): void {
+    if (this.mfaDisableForm.invalid) return;
+    this.isDisablingMfa = true;
+    const password = this.mfaDisableForm.value.password;
+    this.authService.mfaDisable(password).subscribe({
+      next: () => {
+        this.snackBar.open('MFA desactivado con éxito', 'Cerrar', { duration: 3000 });
+        this.mfaStep = 'inactive';
+        this.currentUser.mfaEnabled = false;
+        this.authService.updateCurrentUser(this.currentUser);
+        this.mfaDisableForm.reset();
+        this.isDisablingMfa = false;
+      },
+      error: (err) => {
+        console.error('Error al desactivar MFA:', err);
+        this.snackBar.open(err.error?.message || 'Contraseña incorrecta', 'Cerrar', { duration: 3000 });
+        this.isDisablingMfa = false;
+      }
+    });
   }
 }

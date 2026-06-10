@@ -13,6 +13,7 @@ const User = require('../models/User');
 const { syncManyDirectoryContacts, mergeDirectoryDuplicates } = require('../utils/directory-sync');
 const { audit } = require('../utils/audit');
 const { logger } = require('../utils/logger');
+const { sha256 } = require('../utils/encryption');
 
 const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const sanitizeText = (value, max = 180) => {
@@ -209,10 +210,10 @@ exports.updateDirectoryContact = async (req, res) => {
 
     const identityFilters = [];
     if (oldSnapshot.email) {
-      identityFilters.push({ email: oldSnapshot.email });
+      identityFilters.push({ emailHash: sha256(oldSnapshot.email) });
     }
     if (oldSnapshot.name && oldSnapshot.phone) {
-      identityFilters.push({ name: oldSnapshot.name, phone: oldSnapshot.phone });
+      identityFilters.push({ name: oldSnapshot.name, phoneHash: sha256(oldSnapshot.phone) });
     }
     if (oldSnapshot.name && oldSnapshot.company) {
       identityFilters.push({ name: oldSnapshot.name, organization: oldSnapshot.company });
@@ -350,10 +351,10 @@ exports.deleteDirectoryContact = async (req, res) => {
 
     const contactDeleteOr = [];
     if (email) {
-      contactDeleteOr.push({ email });
+      contactDeleteOr.push({ emailHash: sha256(email) });
     }
     if (name && phone) {
-      contactDeleteOr.push({ name, phone });
+      contactDeleteOr.push({ name, phoneHash: sha256(phone) });
     }
     if (name && company) {
       contactDeleteOr.push({ name, organization: company });
@@ -403,12 +404,21 @@ exports.searchDirectoryContacts = async (req, res) => {
     }
 
     const regex = new RegExp(escapeRegex(query), 'i');
+    const conditions = [
+      { name: regex },
+      { company: regex }
+    ];
+
+    if (query.includes('@')) {
+      conditions.push({ emailHash: sha256(query) });
+    }
+    // Si parece un número de teléfono (dígitos, guiones, espacios y longitud mínima), buscar por hash determinista
+    if (/^\+?[0-9\-\s]+$/.test(query) && query.length >= 6) {
+      conditions.push({ phoneHash: sha256(query) });
+    }
+
     const contacts = await DirectoryContact.find({
-      $or: [
-        { name: regex },
-        { email: regex },
-        { company: regex }
-      ]
+      $or: conditions
     })
       .sort({ isFavorite: -1, name: 1 })
       .limit(20);
@@ -423,8 +433,8 @@ exports.searchDirectoryContacts = async (req, res) => {
 exports.rebuildDirectoryFromEscalation = async (req, res) => {
   try {
     const [contacts, externalPeople, raciEntries, clients, users] = await Promise.all([
-      Contact.find({}).select('name email phone organization role favorite isMailingList').lean(),
-      ExternalPerson.find({}).select('name email phone position').lean(),
+      Contact.find({}).select('name email phone organization role favorite isMailingList'),
+      ExternalPerson.find({}).select('name email phone position'),
       RaciEntry.find({}).select('responsible accountable consulted informed').lean(),
       CatalogLogSource.find({}).select('escalationFlow').lean(),
       User.find({ isActive: true, role: { $in: ['admin', 'user', 'auditor'] } })
@@ -560,8 +570,7 @@ exports.syncUsersFromDirectoryNow = async (req, res) => {
         }
       ]
     })
-      .select('email name phone')
-      .lean();
+      .select('email name phone');
 
     let matchedUsers = 0;
     let updatedUsers = 0;
@@ -601,3 +610,205 @@ exports.syncUsersFromDirectoryNow = async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 };
+
+/**
+ * Divide una línea de texto CSV en columnas teniendo en cuenta campos entrecomillados.
+ * @param {string} line - Línea de texto CSV a parsear.
+ * @returns {string[]} Array de celdas obtenidas.
+ */
+function splitCsvLine(line) {
+  const output = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === ',' && !inQuotes) {
+      output.push(current);
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  output.push(current);
+  return output.map((entry) => String(entry || '').trim());
+}
+
+/**
+ * Parsea el texto de un CSV de contactos asignándoles las propiedades de Directorio Centralizado.
+ * @param {string} csvText - Contenido del CSV.
+ * @returns {object} Objeto con filas válidas parseadas y observaciones/errores encontrados.
+ */
+function parseDirectoryContactsCsv(csvText) {
+  const text = String(csvText || '').replace(/^\uFEFF/, '').trim();
+  if (!text) {
+    return { validRows: [], errors: [{ row: 0, message: 'El archivo CSV está vacío' }] };
+  }
+
+  const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  if (lines.length === 0) {
+    return { validRows: [], errors: [{ row: 0, message: 'No se encontraron registros en el CSV' }] };
+  }
+
+  const headers = splitCsvLine(lines[0]).map((h) => h.toLowerCase());
+  const validRows = [];
+  const errors = [];
+
+  const resolve = (rowValues, aliases) => {
+    const key = aliases.find((alias) => headers.includes(alias));
+    if (!key) return '';
+    return rowValues[headers.indexOf(key)] || '';
+  };
+
+  const parseBoolean = (val) => {
+    const s = String(val).toLowerCase().trim();
+    return s === 'true' || s === '1' || s === 'si' || s === 'sí' || s === 'yes' || s === 'x';
+  };
+
+  for (let i = 1; i < lines.length; i += 1) {
+    const values = splitCsvLine(lines[i]);
+    const rowNumber = i + 1;
+
+    const rawType = resolve(values, ['type', 'tipo']);
+    const resolvedType = ['Internal', 'External', 'List'].includes(rawType) 
+      ? rawType 
+      : (String(rawType).toLowerCase() === 'lista' ? 'List' : 'External');
+
+    const rawScope = resolve(values, ['scope', 'ambito', 'ámbito']);
+    const resolvedScope = ['Internal', 'External'].includes(rawScope)
+      ? rawScope
+      : (String(rawScope).toLowerCase() === 'interno' ? 'Internal' : 'External');
+
+    const entry = {
+      name: sanitizeText(resolve(values, ['name', 'nombre']), 120),
+      email: sanitizeText(resolve(values, ['email', 'correo', 'mail', 'correo electrónico']), 180).toLowerCase(),
+      phone: sanitizeText(resolve(values, ['phone', 'telefono', 'teléfono']), 80),
+      company: sanitizeText(resolve(values, ['company', 'empresa', 'organization', 'organización']), 160),
+      position: sanitizeText(resolve(values, ['position', 'cargo', 'role', 'rol']), 120),
+      type: resolvedType,
+      scope: resolvedScope,
+      isFavorite: parseBoolean(resolve(values, ['favorite', 'favorito', 'isfavorite']))
+    };
+
+    const rowErrors = [];
+    if (!entry.name) {
+      rowErrors.push('el nombre es requerido');
+    }
+    if (entry.email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(entry.email)) {
+      rowErrors.push('correo con formato inválido');
+    }
+
+    if (rowErrors.length > 0) {
+      errors.push({ row: rowNumber, message: rowErrors.join(', '), raw: lines[i] });
+      continue;
+    }
+
+    validRows.push(entry);
+  }
+
+  return { validRows, errors };
+}
+
+/**
+ * POST /api/directory/import-csv
+ * Importa múltiples contactos al directorio mediante la carga de un archivo CSV.
+ */
+exports.importDirectoryContactsCsv = async (req, res) => {
+  try {
+    const csvText = req.file?.buffer
+      ? req.file.buffer.toString('utf8')
+      : String(req.body?.csvText || '');
+
+    if (!csvText.trim()) {
+      return res.status(400).json({ error: 'Adjunta un archivo CSV o contenido csvText válido' });
+    }
+
+    const { validRows, errors } = parseDirectoryContactsCsv(csvText);
+    if (validRows.length === 0) {
+      return res.status(400).json({
+        error: 'No se encontraron filas válidas para importar',
+        errors: errors.slice(0, 100)
+      });
+    }
+
+    let created = 0;
+    let updated = 0;
+    const importErrors = [...errors];
+
+    for (const row of validRows) {
+      let existing = null;
+      
+      // Buscar contacto existente por correo o por combinación de nombre y empresa
+      if (row.email) {
+        const hash = sha256(row.email.toLowerCase());
+        existing = await DirectoryContact.findOne({ emailHash: hash });
+      }
+      
+      if (!existing) {
+        existing = await DirectoryContact.findOne({ name: row.name, company: row.company });
+      }
+
+      if (existing) {
+        // Ignorar de forma segura si el contacto es de tipo User (sincronizado de usuarios del sistema)
+        if (existing.source === 'User') {
+          importErrors.push({
+            row: row.name,
+            message: 'No se permite actualizar contactos sincronizados de Usuarios a través de CSV'
+          });
+          continue;
+        }
+
+        // Actualizar datos
+        Object.assign(existing, row);
+        existing.source = 'Manual';
+        await existing.save();
+        updated += 1;
+      } else {
+        // Crear nuevo contacto del directorio
+        const newContact = new DirectoryContact({
+          ...row,
+          source: 'Manual'
+        });
+        await newContact.save();
+        created += 1;
+      }
+    }
+
+    // Registrar auditoría de la importación
+    await audit(req, {
+      event: 'directory.central.import_csv',
+      result: { success: true },
+      metadata: {
+        created,
+        updated,
+        errorCount: importErrors.length
+      }
+    });
+
+    res.json({
+      message: `Importación completada: ${created} nuevos, ${updated} actualizados, ${importErrors.length} observaciones`,
+      created,
+      updated,
+      errorCount: importErrors.length,
+      errors: importErrors.slice(0, 100)
+    });
+
+  } catch (error) {
+    logger.error('Error in importDirectoryContactsCsv:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+

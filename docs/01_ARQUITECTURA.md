@@ -1,4 +1,4 @@
-﻿# Arquitectura General
+# Arquitectura General
 
 # 🧭 Arquitectura y Flujos - Bitacora SOC
 
@@ -74,6 +74,58 @@ sequenceDiagram
 
 - La sesión web usa cookie `auth_token` HttpOnly.
 - El frontend rehidrata sesión al arrancar usando `/api/users/me`.
+
+### 🔑 Flujo de Autenticación de Terceros (SSO)
+
+```mermaid
+sequenceDiagram
+  participant User as Analista
+  participant FE as Frontend (Angular)
+  participant Providers as Proveedor SSO (Google/MS)
+  participant API as Backend (Express)
+  participant DB as MongoDB
+
+  User->>FE: Click "Iniciar sesión con Google/Microsoft"
+  FE->>Providers: Redirección / Solicitud de Autenticación
+  Providers-->>FE: Retorna ID Token / Token de Acceso
+  FE->>API: POST /api/auth/sso (idToken / provider)
+  API->>Providers: Valida token con API pública del proveedor
+  API->>DB: Busca usuario por hash determinista SHA-256 de email
+  API-->>FE: Cookie HttpOnly auth_token + Datos de usuario
+```
+
+### 🔐 Flujo de Autenticación Multifactor (MFA - TOTP)
+
+El sistema soporta MFA por software (TOTP - RFC 6238). Por defecto está desactivado. El administrador lo habilita individualmente por usuario.
+
+```mermaid
+sequenceDiagram
+  participant User as Analista
+  participant FE as Frontend (Angular)
+  participant API as Backend (Express)
+  participant DB as MongoDB
+
+  User->>FE: Hace Login (Base o SSO)
+  FE->>API: POST /api/auth/login o /api/auth/sso
+  API->>DB: Verifica credenciales
+  Note over API: Si MFA está habilitado por el Admin
+  API-->>FE: Retorna HTTP 200 con status "MFA_PENDING"
+  Note over FE: Redirecciona a pantalla de verificación TOTP
+  User->>FE: Introduce código TOTP de su app Authenticator
+  FE->>API: POST /api/auth/verify-mfa (código TOTP)
+  API->>API: Verifica código temporal
+  API-->>FE: Retorna cookie de sesión final auth_token
+```
+
+### 🔒 Arquitectura de Privacidad y Cifrado PII
+
+Para asegurar el cumplimiento de privacidad de la información personal identificable (PII), los campos `email` y `phone` se protegen mediante criptografía fuerte en MongoDB:
+1. **Cifrado Probabilístico:** Se utiliza **AES-256-GCM** con un Vector de Inicialización (IV) aleatorio por cada registro. Esto garantiza que el mismo correo cifrado dos veces tenga salidas cifradas distintas en base de datos.
+2. **Búsqueda Indexada Determinista:** Se genera un hash **SHA-256** determinista de los campos PII (`emailHash` y `phoneHash`) indexados en MongoDB. De este modo, las búsquedas por correo se resuelven de forma extremadamente rápida sin descifrar toda la colección.
+
+### ⚡ Paginación Nativa en Base de Datos (`$unionWith`)
+
+Para optimizar el rendimiento y evitar el consumo excesivo de memoria Heap en el backend al mezclar registros de `Entry` y `ShiftCheck`, la paginación y ordenamiento se delegan por completo a MongoDB utilizando la etapa `$unionWith`. El pipeline unifica las colecciones, aplica `$sort` por fecha, y segmenta con `$skip` y `$limit` de forma nativa antes de poblar las referencias de usuarios.
 
 ---
 

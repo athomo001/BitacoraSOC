@@ -1,7 +1,7 @@
 /**
  * File Purpose: frontend/src/app/models/user.model.ts
- * Responsibilities: Define the module behavior and maintain clear contracts.
- * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ * Responsibilities: Definir la estructura y los contratos de datos de usuario.
+ * QA Notes: Mantener tipos explícitos para alineación estricta con el backend.
  */
 
 export interface User {
@@ -16,6 +16,7 @@ export interface User {
   theme: Theme;
   avatar?: string;
   guestExpiresAt?: Date;
+  mfaEnabled?: boolean;
   createdAt: Date;
   updatedAt?: Date;
 }
@@ -26,8 +27,11 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  token: string;
+  token?: string;
   user: User;
+  requireMFA?: boolean;
+  mfaToken?: string;
+  needsSetup?: boolean;
   easterEgg?: EasterEggSignal;
 }
 
@@ -51,6 +55,7 @@ export interface CreateUserRequest {
   phone?: string;
   role: 'admin' | 'user' | 'auditor' | 'guest';
   cargoLabel?: string | null;
+  mfaEnabled?: boolean;
 }
 
 export interface UpdateProfileRequest {

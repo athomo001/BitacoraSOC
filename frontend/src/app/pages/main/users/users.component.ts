@@ -73,7 +73,7 @@ export class UsersComponent implements OnInit {
   readonly customCargoOption = '__custom__';
   users: User[] = [];
   userForm: FormGroup;
-  displayedColumns: string[] = ['username', 'fullName', 'email', 'phone', 'cargoLabel', 'role', 'isActive', 'actions'];
+  displayedColumns: string[] = ['username', 'fullName', 'email', 'phone', 'cargoLabel', 'role', 'mfaEnabled', 'isActive', 'actions'];
   editingUserId: string | null = null;
 
   constructor(
@@ -91,7 +91,8 @@ export class UsersComponent implements OnInit {
       phone: [''],
       role: ['user', Validators.required],
       cargoOption: [this.baseCargos[0], Validators.required],
-      cargoCustom: ['']
+      cargoCustom: [''],
+      mfaEnabled: [false]
     });
   }
 
@@ -173,7 +174,8 @@ export class UsersComponent implements OnInit {
           email: this.userForm.value.email,
           phone: this.userForm.value.phone || undefined,
           role: this.userForm.value.role,
-          cargoLabel: this.resolveCargoLabelFromForm()
+          cargoLabel: this.resolveCargoLabelFromForm(),
+          mfaEnabled: this.userForm.value.mfaEnabled
         };
         // Incluir newPassword solo si el admin escribió algo
         const newPwd = (this.userForm.value.newPassword || '').trim();
@@ -200,7 +202,8 @@ export class UsersComponent implements OnInit {
           email: this.userForm.value.email,
           phone: this.userForm.value.phone,
           role: this.userForm.value.role,
-          cargoLabel: this.resolveCargoLabelFromForm()
+          cargoLabel: this.resolveCargoLabelFromForm(),
+          mfaEnabled: this.userForm.value.mfaEnabled
         };
         if (data.phone === '') {
           delete data.phone;
@@ -208,7 +211,7 @@ export class UsersComponent implements OnInit {
         this.userService.createUser(data).subscribe({
           next: () => {
             this.snackBar.open('Usuario creado', 'Cerrar', { duration: 2000 });
-            this.userForm.reset({ role: 'user', cargoOption: this.baseCargos[0], cargoCustom: '' });
+            this.userForm.reset({ role: 'user', cargoOption: this.baseCargos[0], cargoCustom: '', mfaEnabled: false });
             this.applyCargoValidators();
             this.loadUsers();
           },
@@ -231,7 +234,8 @@ export class UsersComponent implements OnInit {
       role: user.role,
       cargoOption: '',
       cargoCustom: '',
-      newPassword: ''
+      newPassword: '',
+      mfaEnabled: !!user.mfaEnabled
     });
 
     if (user.role !== 'guest') {
@@ -253,7 +257,7 @@ export class UsersComponent implements OnInit {
 
   cancelEdit(): void {
     this.editingUserId = null;
-    this.userForm.reset({ role: 'user', cargoOption: this.baseCargos[0], cargoCustom: '', newPassword: '' });
+    this.userForm.reset({ role: 'user', cargoOption: this.baseCargos[0], cargoCustom: '', newPassword: '', mfaEnabled: false });
     this.userForm.get('username')?.enable();
     this.userForm.get('password')?.setValidators([Validators.required]);
     this.userForm.get('password')?.updateValueAndValidity();

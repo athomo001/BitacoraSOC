@@ -15,18 +15,22 @@
     </div>
   </div>
 
+  <!-- Panel de Configuración General: Modo Invitado -->
   <div class="settings-panel settings-panel--config" id="general-config">
     <header class="settings-panel__header">
       <h2 class="settings-panel__title">Configuración General</h2>
     </header>
     <div class="settings-panel__body">
       <form [formGroup]="appConfigForm" (ngSubmit)="saveAppConfig()">
-        <mat-checkbox formControlName="guestEnabled" id="guest-mode">
-          Habilitar modo invitado
-        </mat-checkbox>
+        <div style="margin-bottom: 20px;">
+          <!-- Permite habilitar/deshabilitar el acceso temporal para usuarios invitados -->
+          <mat-checkbox formControlName="guestEnabled" id="guest-mode">
+            Habilitar modo invitado
+          </mat-checkbox>
+        </div>
 
         <button mat-raised-button color="primary" type="submit" [disabled]="!appConfigForm.valid">
-          Guardar
+          Guardar Configuración
         </button>
       </form>
     </div>

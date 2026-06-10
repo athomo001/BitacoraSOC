@@ -1,76 +1,161 @@
+<!-- Contenedor principal de administración de seguridad -->
 <div class="security-admin">
-  <div class="security-panel">
-    <header class="security-panel__header">
-      <h1 class="security-panel__title">HTTPS / Seguridad</h1>
-    </header>
-    <div class="security-panel__body">
-      <form [formGroup]="securityForm" (ngSubmit)="save()">
-        <div class="toggles">
-          <mat-checkbox formControlName="httpsEnabled">Habilitar listener HTTPS del backend</mat-checkbox>
-          <mat-checkbox formControlName="forceHttps">Forzar HTTPS (redirección desde HTTP)</mat-checkbox>
-        </div>
-
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Puerto HTTPS backend</mat-label>
-          <input matInput type="number" formControlName="httpsPort" min="1" max="65535">
-          <mat-hint>Corresponde al listener HTTPS del backend (API), no al puerto del frontend</mat-hint>
-        </mat-form-field>
-
-        <div class="tls-files">
-          <div class="tls-row">
-            <span class="tls-label">SSL/TLS certificate</span>
-            <input #certInput type="file" accept=".pem,.crt,.cer,.key" class="hidden-input"
-              (change)="onCertSelected($event)">
-            <button mat-stroked-button type="button" (click)="certInput.click()">Seleccionar archivo</button>
-          </div>
-          <small>{{ certFile?.name || certStatus }}</small>
-
-          <div class="tls-row">
-            <span class="tls-label">SSL/TLS private key</span>
-            <input #keyInput type="file" accept=".pem,.crt,.cer,.key" class="hidden-input"
-              (change)="onKeySelected($event)">
-            <button mat-stroked-button type="button" (click)="keyInput.click()">Seleccionar archivo</button>
-          </div>
-          <small>{{ keyFile?.name || keyStatus }}</small>
-
-          <div class="tls-row">
-            <span class="tls-label">CA bundle (opcional)</span>
-            <input #caInput type="file" accept=".pem,.crt,.cer,.key" class="hidden-input"
-              (change)="onCaSelected($event)">
-            <button mat-stroked-button type="button" (click)="caInput.click()">Seleccionar archivo</button>
-          </div>
-          <small>{{ caFile?.name || caStatus }}</small>
-          <small>Se aceptan archivos formato PEM (.crt, .key, .pem). No soportamos llaves encriptadas con
-            contraseña.</small>
-
-          <button mat-raised-button color="accent" type="button" (click)="uploadCertificates()" [disabled]="isSaving">
-            <mat-spinner *ngIf="isSaving" diameter="18"></mat-spinner>
-            <span *ngIf="!isSaving">Subir SSL y Activar (0-Downtime)</span>
-            <span *ngIf="isSaving && countdownMessage">Activando TLS... {{ countdownMessage }}</span>
-            <span *ngIf="isSaving && !countdownMessage">Subiendo...</span>
-          </button>
-        </div>
-
-        <div class="notes">
-          <p>Los cambios de certificados se aplican instantáneamente en caliente sin reiniciar la red (SNI Hot-Reload).
-          </p>
-          <p><strong>Nota Local:</strong> Si estás usando "pnpm start" (localhost), "Forzar HTTPS" se ignorará de forma
-            segura para no romper tu sesión HTTP. Funcionará en Producción o Docker.</p>
-        </div>
-
-        <button mat-stroked-button color="warn" type="button" class="danger-action" (click)="resetHttpsConfiguration()"
-          [disabled]="isSaving">
-          <span *ngIf="!isSaving">Restaurar a HTTP inseguro por defecto</span>
-          <span *ngIf="isSaving && countdownMessage">Restableciendo... {{ countdownMessage }}</span>
-          <span *ngIf="isSaving && !countdownMessage">Cargando...</span>
-        </button>
-
-        <button mat-raised-button color="primary" type="submit" [disabled]="isSaving">
-          <mat-spinner *ngIf="isSaving" diameter="18"></mat-spinner>
-          <span *ngIf="!isSaving">Aplicar Configuración Red (Puerto/Redirección)</span>
-          <span *ngIf="isSaving && countdownMessage">Reiniciando nodo... {{ countdownMessage }}</span>
-        </button>
-      </form>
+  <!-- Cabecera de la sección con estilo premium -->
+  <header class="page-header">
+    <mat-icon>security</mat-icon>
+    <div>
+      <h1>Seguridad del Sistema</h1>
+      <p class="subtitle">Administración de cifrado SSL/TLS y autenticación Single Sign-On (SSO)</p>
     </div>
+  </header>
+
+  <!-- Fila principal del layout de dos columnas -->
+  <div class="security-row">
+    
+    <!-- ── Columna Izquierda: Configuración de Red y Cifrado HTTPS ────────────────── -->
+    <div class="security-col">
+      <div class="security-panel">
+        <header class="security-panel__header">
+          <h2 class="security-panel__title">Cifrado de Red (HTTPS)</h2>
+        </header>
+        <div class="security-panel__body">
+          <form [formGroup]="securityForm" (ngSubmit)="save()">
+            
+            <!-- Habilitar listener y redirección HTTPS -->
+            <div class="toggles">
+              <mat-checkbox formControlName="httpsEnabled">
+                Habilitar listener HTTPS del backend
+              </mat-checkbox>
+              <mat-checkbox formControlName="forceHttps">
+                Forzar HTTPS (redirección desde HTTP)
+              </mat-checkbox>
+            </div>
+
+            <!-- Puerto de escucha del backend -->
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Puerto HTTPS backend</mat-label>
+              <input matInput type="number" formControlName="httpsPort" min="1" max="65535">
+              <mat-hint>Corresponde al listener HTTPS del backend (API), no al puerto del frontend</mat-hint>
+            </mat-form-field>
+
+            <!-- Sección de archivos de certificados SSL/TLS -->
+            <div class="tls-files">
+              <div class="tls-row">
+                <span class="tls-label">SSL/TLS certificate</span>
+                <input #certInput type="file" accept=".pem,.crt,.cer,.key" class="hidden-input"
+                  (change)="onCertSelected($event)">
+                <button mat-stroked-button type="button" (click)="certInput.click()">Seleccionar archivo</button>
+              </div>
+              <small class="tls-status">{{ certFile?.name || certStatus }}</small>
+
+              <div class="tls-row">
+                <span class="tls-label">SSL/TLS private key</span>
+                <input #keyInput type="file" accept=".pem,.crt,.cer,.key" class="hidden-input"
+                  (change)="onKeySelected($event)">
+                <button mat-stroked-button type="button" (click)="keyInput.click()">Seleccionar archivo</button>
+              </div>
+              <small class="tls-status">{{ keyFile?.name || keyStatus }}</small>
+
+              <div class="tls-row">
+                <span class="tls-label">CA bundle (opcional)</span>
+                <input #caInput type="file" accept=".pem,.crt,.cer,.key" class="hidden-input"
+                  (change)="onCaSelected($event)">
+                <button mat-stroked-button type="button" (click)="caInput.click()">Seleccionar archivo</button>
+              </div>
+              <small class="tls-status">{{ caFile?.name || caStatus }}</small>
+              
+              <small class="helper-text">Se aceptan archivos formato PEM (.crt, .key, .pem). No soportamos llaves encriptadas con contraseña.</small>
+
+              <!-- Botón para subir certificados TLS (Hot Reload) -->
+              <button mat-raised-button color="accent" type="button" (click)="uploadCertificates()" [disabled]="isSaving" style="margin-top: 10px;">
+                <mat-spinner *ngIf="isSaving" diameter="18"></mat-spinner>
+                <span *ngIf="!isSaving">Subir SSL y Activar (0-Downtime)</span>
+                <span *ngIf="isSaving && countdownMessage">Activando TLS... {{ countdownMessage }}</span>
+                <span *ngIf="isSaving && !countdownMessage">Subiendo...</span>
+              </button>
+            </div>
+
+            <!-- Notas importantes de HTTPS -->
+            <div class="notes">
+              <p>Los cambios de certificados se aplican instantáneamente en caliente sin reiniciar la red (SNI Hot-Reload).</p>
+              <p style="margin-top: 4px;"><strong>Nota Local:</strong> Si estás usando "pnpm start" (localhost), "Forzar HTTPS" se ignorará de forma segura para no romper tu sesión HTTP. Funcionará en Producción o Docker.</p>
+            </div>
+
+            <!-- Botones de acción del formulario HTTPS -->
+            <div class="button-group">
+              <button mat-stroked-button color="warn" type="button" class="danger-action" (click)="resetHttpsConfiguration()"
+                [disabled]="isSaving">
+                <span *ngIf="!isSaving">Restaurar a HTTP inseguro por defecto</span>
+                <span *ngIf="isSaving && countdownMessage">Restableciendo... {{ countdownMessage }}</span>
+                <span *ngIf="isSaving && !countdownMessage">Cargando...</span>
+              </button>
+
+              <button mat-raised-button color="primary" type="submit" [disabled]="isSaving">
+                <mat-spinner *ngIf="isSaving" diameter="18"></mat-spinner>
+                <span *ngIf="!isSaving">Aplicar Configuración Red</span>
+                <span *ngIf="isSaving && countdownMessage">Reiniciando nodo... {{ countdownMessage }}</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Columna Derecha: Configuración de Single Sign-On (SSO) ────────────────── -->
+    <div class="security-col">
+      <div class="security-panel">
+        <header class="security-panel__header">
+          <h2 class="security-panel__title">Autenticación Single Sign-On (SSO)</h2>
+        </header>
+        <div class="security-panel__body">
+          <form [formGroup]="ssoForm" (ngSubmit)="saveSso()">
+            
+            <!-- Sección SSO Google -->
+            <div class="sso-section">
+              <h3 class="sso-section-title">Google Single Sign-On (SSO)</h3>
+              <div class="sso-field-group">
+                <mat-checkbox formControlName="googleSsoEnabled">
+                  Activar Google SSO
+                </mat-checkbox>
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Client ID de Google</mat-label>
+                  <input matInput formControlName="googleClientId" placeholder="client-id.apps.googleusercontent.com">
+                  <mat-hint>ID obtenido desde la consola de desarrolladores de Google Cloud</mat-hint>
+                </mat-form-field>
+              </div>
+            </div>
+
+            <hr class="section-divider">
+
+            <!-- Sección SSO Microsoft -->
+            <div class="sso-section">
+              <h3 class="sso-section-title">Microsoft Single Sign-On (SSO)</h3>
+              <div class="sso-field-group">
+                <mat-checkbox formControlName="microsoftSsoEnabled">
+                  Activar Microsoft SSO
+                </mat-checkbox>
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Client ID de Microsoft</mat-label>
+                  <input matInput formControlName="microsoftClientId" placeholder="00000000-0000-0000-0000-000000000000">
+                  <mat-hint>ID de la aplicación registrada en Azure Entra ID</mat-hint>
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="full-width" style="margin-top: 10px;">
+                  <mat-label>Tenant ID (Microsoft)</mat-label>
+                  <input matInput formControlName="microsoftTenantId" placeholder="common o ID del Tenant">
+                  <mat-hint>Usa "common" para multi-inquilino o introduce el ID específico del Tenant</mat-hint>
+                </mat-form-field>
+              </div>
+            </div>
+
+            <!-- Botón para guardar configuración SSO -->
+            <button mat-raised-button color="primary" type="submit" [disabled]="isSavingSso" style="align-self: flex-start; margin-top: 15px;">
+              <mat-spinner *ngIf="isSavingSso" diameter="18"></mat-spinner>
+              <span *ngIf="!isSavingSso">Guardar Configuración SSO</span>
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>

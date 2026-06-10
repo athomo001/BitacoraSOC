@@ -82,6 +82,93 @@ Notas:
 
 El servidor acepta tokens con diferencia de ±60 segundos (previene errores por desincronización de relojes).
 
+### Autenticación con Proveedor Externo (SSO)
+
+**POST** `/api/auth/sso`
+
+Permite iniciar sesión utilizando tokens válidos de Google o Microsoft.
+
+```bash
+curl -X POST http://192.168.100.50:3000/api/auth/sso \
+  -H "Content-Type: application/json" \
+  -d '{
+    "provider": "google",
+    "token": "ID_TOKEN_PROVISTO_POR_EL_PROVEEDOR"
+  }'
+```
+
+**Respuesta (Login Exitoso sin MFA):**
+Igual a `/api/auth/login`.
+
+**Respuesta (Login con MFA Pendiente):**
+HTTP `200 OK`
+```json
+{
+  "mfaPending": true,
+  "userId": "675e12345...",
+  "message": "Se requiere código TOTP de verificación"
+}
+```
+
+### Configuración e Inicialización de MFA
+
+**POST** `/api/auth/mfa/setup` (Autenticado)
+
+Genera la clave secreta TOTP y los códigos de recuperación si el usuario no tiene MFA configurado.
+
+```bash
+curl -X POST http://192.168.100.50:3000/api/auth/mfa/setup \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Respuesta:**
+```json
+{
+  "secret": "JBSWY3DPEHPK3PXP",
+  "qrCode": "data:image/png;base64,iVBORw0KGgo...",
+  "backupCodes": [
+    "1234-5678",
+    "9012-3456"
+  ]
+}
+```
+
+**POST** `/api/auth/mfa/verify` (Autenticado)
+
+Verifica y activa definitivamente el MFA para la cuenta utilizando el primer código temporal.
+
+```bash
+curl -X POST http://192.168.100.50:3000/api/auth/mfa/verify \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "code": "123456"
+  }'
+```
+
+**Respuesta:**
+```json
+{
+  "message": "Autenticación de doble factor configurada exitosamente"
+}
+```
+
+**POST** `/api/auth/mfa/validate`
+
+Valida el código TOTP temporal para finalizar el inicio de sesión cuando se recibió el estado `mfaPending`.
+
+```bash
+curl -X POST http://192.168.100.50:3000/api/auth/mfa/validate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId": "675e12345...",
+    "code": "123456"
+  }'
+```
+
+**Respuesta:**
+Retorna la cookie de sesión `auth_token` y el objeto usuario idéntico a `/api/auth/login`.
+
 ---
 
 ## Endpoints Principales (Autogenerado)
@@ -122,6 +209,10 @@ El servidor acepta tokens con diferencia de ±60 segundos (previene errores por 
 | POST | `/api/auth/logout` | Todos |
 | POST | `/api/auth/forgot-password` | Todos |
 | POST | `/api/auth/reset-password` | Todos |
+| POST | `/api/auth/sso` | Todos |
+| POST | `/api/auth/mfa/setup` | Autenticado |
+| POST | `/api/auth/mfa/verify` | Autenticado |
+| POST | `/api/auth/mfa/validate` | Todos |
 
 ### Módulo: backup
 
@@ -758,6 +849,60 @@ curl -X POST http://192.168.100.50:3000/api/entries \
       "message": "El tipo de entrada es requerido"
     }
   ]
+}
+```
+
+### Crear Backup (Cifrado Opcional)
+
+**POST** `/api/backup/create` (Solo Admin)
+
+Crea un archivo de respaldo empaquetado ZIP con base de datos, uploads y secretos. Si se pasa `passphrase` en el cuerpo de la petición, se cifra utilizando AES-256-GCM.
+
+```bash
+curl -X POST http://192.168.100.50:3000/api/backup/create \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "passphrase": "MI_CLAVE_SECRETA_OPCIONAL"
+  }'
+```
+
+**Respuesta:**
+```json
+{
+  "message": "Backup completo creado exitosamente",
+  "filename": "backup-2026-06-10T04-00-00-000Z.zip",
+  "collections": 32,
+  "documents": 120,
+  "sizeBytes": 142345,
+  "encrypted": true
+}
+```
+
+### Restaurar Backup (Cifrado Opcional)
+
+**POST** `/api/backup/restore` (Solo Admin)
+
+Restaura el archivo ZIP especificado. Si el respaldo original fue cifrado con frase de paso, se debe proveer la `passphrase` idéntica.
+
+```bash
+curl -X POST http://192.168.100.50:3000/api/backup/restore \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "filename": "backup-2026-06-10T04-00-00-000Z.zip",
+    "clearBeforeRestore": true,
+    "passphrase": "MI_CLAVE_SECRETA_OPCIONAL"
+  }'
+```
+
+**Respuesta:**
+```json
+{
+  "message": "Restauración completada exitosamente",
+  "restoredUploads": true,
+  "restoredSecrets": true,
+  "keyringPresentAfterRestore": true
 }
 ```
 

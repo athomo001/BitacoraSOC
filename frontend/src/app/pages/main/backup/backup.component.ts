@@ -178,8 +178,12 @@ export class BackupComponent implements OnInit {
   createBackup(): void {
     if (!confirm('¿Crear backup completo de la base de datos?')) return;
 
+    // Solicitar de forma opcional una frase secreta de cifrado
+    const passphrase = prompt('Opcional: Ingrese una frase secreta para cifrar el backup (deje vacío para no cifrar):');
+    if (passphrase === null) return; // Cancelado por el usuario
+
     this.isExporting = true;
-    this.http.post<any>(`${environment.apiUrl}/backup/create`, {}).subscribe({
+    this.http.post<any>(`${environment.apiUrl}/backup/create`, { passphrase }).subscribe({
       next: (response) => {
         this.isExporting = false;
         this.snackBar.open('Backup creado: ' + response.filename, 'Cerrar', { duration: 5000 });
@@ -196,10 +200,15 @@ export class BackupComponent implements OnInit {
     const action = this.clearBeforeRestore ? 'BORRAR TODOS LOS DATOS y restaurar' : 'agregar datos del';
     if (!confirm(`¿Confirmar ${action} backup ${backup.filename}? Esta operación no se puede deshacer.`)) return;
 
+    this.performRestore(backup.filename, '');
+  }
+
+  private performRestore(filename: string, passphrase?: string): void {
     this.isImporting = true;
     this.http.post<any>(`${environment.apiUrl}/backup/restore`, { 
-      filename: backup.filename,
-      clearBeforeRestore: this.clearBeforeRestore
+      filename,
+      clearBeforeRestore: this.clearBeforeRestore,
+      passphrase
     }).subscribe({
       next: (response) => {
         this.isImporting = false;
@@ -207,7 +216,14 @@ export class BackupComponent implements OnInit {
       },
       error: (err) => {
         this.isImporting = false;
-        this.snackBar.open(err.error?.message || 'Error restaurando', 'Cerrar', { duration: 3000 });
+        if (err.status === 400 && err.error?.requiresPassphrase) {
+          const pass = prompt(err.error.message || 'El backup está cifrado. Ingrese la frase secreta para restaurarlo:');
+          if (pass !== null) {
+            this.performRestore(filename, pass);
+          }
+        } else {
+          this.snackBar.open(err.error?.message || 'Error restaurando', 'Cerrar', { duration: 3000 });
+        }
       }
     });
   }
@@ -238,9 +254,16 @@ export class BackupComponent implements OnInit {
 
     if (!confirm('¿Importar este backup? Esto agregará los datos al sistema.')) return;
 
+    this.performImport(file, input, '');
+  }
+
+  private performImport(file: File, input: HTMLInputElement, passphrase?: string): void {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('clearBeforeRestore', String(this.clearBeforeRestore));
+    if (passphrase) {
+      formData.append('passphrase', passphrase);
+    }
 
     this.isImporting = true;
     this.http.post<any>(`${environment.apiUrl}/backup/import`, formData).subscribe({
@@ -251,8 +274,17 @@ export class BackupComponent implements OnInit {
       },
       error: (err) => {
         this.isImporting = false;
-        this.snackBar.open(err.error?.message || 'Error importando', 'Cerrar', { duration: 3000 });
-        input.value = '';
+        if (err.status === 400 && err.error?.requiresPassphrase) {
+          const pass = prompt(err.error.message || 'El backup está cifrado. Ingrese la frase secreta para importarlo:');
+          if (pass !== null) {
+            this.performImport(file, input, pass);
+          } else {
+            input.value = '';
+          }
+        } else {
+          this.snackBar.open(err.error?.message || 'Error importando', 'Cerrar', { duration: 3000 });
+          input.value = '';
+        }
       }
     });
   }

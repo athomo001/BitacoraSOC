@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: beta. Validar siempre los flujos criticos en un entorno controlado antes de pasar a operacion formal.
 >
-> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.5.93-beta**
+> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.5.95-beta**
 
 Stack principal:
 
@@ -51,6 +51,23 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 ---
 
 ## Novedades recientes (resumen rapido)
+
+### v1.5.95-beta (importación CSV directorio y consolidación SSO)
+
+- **Importación CSV de Directorio:** Nueva funcionalidad para carga masiva de contactos en el Directorio Centralizado, incluyendo prevención de sobreescritura de usuarios del sistema (`source === 'User'`) y registro de auditoría.
+- **Descarga de Plantilla CSV:** Botón interactivo para descargar una plantilla formateada en UTF-8 con BOM compatible con Microsoft Excel.
+- **Seguridad y SSO Consolidados:** Reubicación de la parametrización de Single Sign-On al panel unificado de Seguridad (`/main/admin/security`) con diseño adaptativo de dos columnas (HTTPS y SSO).
+- **Vinculación Inteligente de SSO:** Inicio de sesión que detecta y vincula cuentas locales existentes para evitar perfiles duplicados.
+
+### v1.5.94-beta (seguridad, MFA, SSO, PII y robustez)
+
+- **MFA (TOTP):** Autenticación multifactor por software configurable por usuario (activable por administrador) con enrolamiento de código QR.
+- **SSO Google/Microsoft:** Soporte integrado de Single Sign-On para proveedores corporativos mediante variables de entorno.
+- **Cifrado de PII:** Almacenamiento seguro AES-256-GCM para datos personales (email, teléfono) en BD y hashes deterministas SHA-256 para búsquedas rápidas.
+- **Cifrado de Backups:** Opción de cifrar respaldos con contraseña en UI y descifrado en caliente al importar.
+- **Zip Slip y Sanitización CSV:** Mitigaciones contra path traversal en restauración de copias de seguridad y prevención de inyección de fórmulas en reportes CSV.
+- **Restricciones del Rol Auditor:** Implementación de lista blanca para restringir backups, envíos de correo y datos sensibles al rol Auditor e Invitado.
+- **Segregación de Checklists por Turno:** Soporte para ejecuciones de checklist en paralelo agregando el campo `shiftId`.
 
 ### v1.5.93-beta (permisos de asignaciones y tabla de teletrabajo)
 
@@ -115,8 +132,8 @@ cp .env.example .env
 #    - JWT_SECRET
 #    - ENCRYPTION_KEY
 #    - COMPLEMENT_TOKEN_SECRET
-#    - (Opcional) RATE_LIMIT_RESET_SECRET — cadena >= 24 caracteres para reinicio
-#      de contadores 429 sin reiniciar el backend; formato y uso en docs/SECURITY.md
+#    - (Opcional) GOOGLE_CLIENT_ID / AZURE_CLIENT_ID / AZURE_TENANT_ID (para SSO)
+#    - (Opcional) RATE_LIMIT_RESET_SECRET — reinicio de rate limit; ver docs/06_SEGURIDAD.md
 
 # 3. Levantar stack
 docker compose up -d --build
@@ -247,31 +264,21 @@ BitacoraSOC/
 
 ## Documentacion
 
-Documentos principales:
+Documentos principales (Gobernanza Armonizada):
 
-- `docs/OPERATIONS.md`: como levantar desde cero, semillas y validaciones operativas
-- `docs/DISASTER-RECOVERY.md`: plan de recuperacion total ante desastre
-- `docs/COMPLEMENTS.md`: guia integral del modulo de complementos
-- `docs/COMPLEMENTS_CATALOG.md`: catalogo de complementos de prueba (doom-browser, diccionario-logs-ciber)
-- `docs/API.md`: referencia de endpoints
-- `docs/ARCHITECTURE.md`: arquitectura y flujos
-- `docs/DEPLOY.md`: despliegue, actualizacion y operacion
-- `docs/SETUP.md`: instalacion y configuracion detallada
-- `docs/SECURITY.md`: hardening, auth, rate limiting y secreto `RATE_LIMIT_RESET_SECRET` (reinicio operativo de 429)
-- `docs/RUNBOOK.md`: operacion diaria del SOC
-- `docs/BACKUP.md`: backup, restore e implicancias para complementos
-- `docs/TROUBLESHOOTING.md`: diagnostico de fallas comunes
-- `docs/SCREENSHOTS.md`: galeria visual de la interfaz y modulos principales
-- `docs/CHANGELOG.md`: cambios relevantes por version
+- `docs/01_ARQUITECTURA.md`: Arquitectura del sistema, flujos Mermaid y diseño de TLS/SSL.
+- `docs/02_DESPLIEGUE_Y_CONFIG.md`: Guía de instalación, variables de entorno (.env) y despliegue con Docker Compose.
+- `docs/03_OPERACIONES.md`: Guía operativa general, bitácoras, checklists de turno, roles de usuario, backup/restore y runbook del SOC.
+- `docs/04_DESARROLLO_Y_API.md`: Documentación de la API REST, Swagger y endpoints integrados.
+- `docs/05_MODULOS_EXTRAS.md`: Gestión e integración del módulo de complementos e iframe sandbox.
+- `docs/06_SEGURIDAD.md`: Hardening, Helmet, rate limiting, mitigación de Zip Slip y directivas de seguridad.
+- `docs/SCREENSHOTS.md`: Galería visual de la interfaz y módulos principales.
+- `docs/history/CHANGELOG.md`: Historial de cambios relevantes por versión.
+- `docs/history/ISSUES.md`: Plan de trabajo y control de issues del SOC.
 
 Documentos funcionales complementarios:
 
-- `docs/ESCALATION.md`: escalacion, directorio global, agenda preventiva y turnos
-- `docs/CATALOGS.md`
-- `docs/LOGGING.md`
-- `docs/TLS_SSL_ARCHITECTURE.md`
-- `docs/UI-GOVERNANCE.md`
-- `backend/scripts/README.md`
+- `docs/UI-GOVERNANCE.md`: Estándares de desarrollo de interfaz y componentes.
 
 ---
 

@@ -287,9 +287,10 @@ Documentos base para operación:
 - Configuración log forwarding (SIEM)
 - Gestión de complementos
 
-### Auditor
-- Lectura de logs de auditoría
-- Consulta de actividad (sin cambios de configuración)
+### Auditor (Rol de Solo Lectura con Restricción Estricta)
+- Lectura de logs de auditoría en la consola.
+- Consulta de actividad operativa del SOC.
+- **Restricción de Seguridad:** El rol Auditor no tiene autorización para descargar copias de seguridad (backups), enviar reportes o boletines por correo, o modificar ninguna configuración. Toda la información PII (correos, teléfonos) en la lista de usuarios y directorios es enmascarada u ocultada para este rol.
 
 ### User (Analista)
 - Registrar entradas operativas/incidentes
@@ -314,7 +315,10 @@ Documentos base para operación:
 
 1. **Login** → `http://IP_SERVIDOR:4200`
    - En despliegue Docker por defecto: `http://IP_SERVIDOR` (puerto 80)
-   - Username / Password
+   - Permite autenticación local (`Username/Password`) o vía Single Sign-On (**SSO Google o Microsoft**).
+   - **Autenticación Multifactor (MFA/TOTP):** Si el administrador habilitó MFA para su cuenta:
+     - En el primer inicio de sesión se le presentará una pantalla de enrolamiento con un **código QR**. Escanee este código QR usando una aplicación de autenticación TOTP (e.g. Google Authenticator, Microsoft Authenticator o Bitwarden) e introduzca el código de verificación para completar el enlace. Guarde de forma segura los códigos de recuperación generados.
+     - En inicios de sesión posteriores, tras ingresar sus credenciales básicas o SSO, se le solicitará el código TOTP temporal generado en su aplicación móvil.
    - Si guest: verificar que no haya expirado
 
 2. **Revisar Notas del Administrador** (sidebar derecho)
@@ -743,6 +747,24 @@ Links:
 **Expiración:**
 - Login bloqueado después de fecha
 - Mensaje: "Cuenta de invitado expirada"
+
+---
+
+### Autenticación Multifactor (MFA) - Administración
+
+**Admin → Administración de Usuarios:**
+1. El administrador puede habilitar o deshabilitar la autenticación multifactor individualmente para cualquier usuario del sistema desde el panel de edición de usuarios.
+2. Al crearse una cuenta nueva o por defecto, la autenticación MFA se encuentra **desactivada**.
+3. Al activar la opción **"Habilitar MFA por TOTP"** y guardar el perfil del usuario, el backend requerirá de forma obligatoria que el usuario complete su enrolamiento y verifique su código en su siguiente login.
+4. Si el usuario pierde su dispositivo móvil o su llave TOTP, el administrador puede desactivar el flag MFA en el perfil del usuario para **restablecer** el acceso, permitiéndole ingresar nuevamente solo con contraseña o SSO y volver a enrolarse si es necesario.
+
+### Cifrado de Respaldos (Backups)
+
+**Admin → Backup/Restore:**
+1. Al momento de generar un backup manual (`Crear Backup`) o configurar un backup automático, el administrador tiene la opción de cifrar el archivo de salida `.zip` ingresando una **Passphrase** (Frase de paso).
+2. Si se ingresa una Passphrase, el sistema aplicará cifrado fuerte **AES-256-GCM** sobre el archivo empaquetado, derivando la clave criptográfica mediante **PBKDF2**.
+3. **⚠️ IMPORTANTE:** El administrador es responsable de almacenar de forma segura la Passphrase. El SOC no podrá restaurar o importar el archivo de respaldo sin la clave exacta ingresada al momento de la creación.
+4. Al importar o restaurar un backup cifrado, el sistema detectará el cifrado y solicitará la Passphrase para descifrar el flujo de datos en caliente antes de restaurarlo a MongoDB.
 
 ---
 

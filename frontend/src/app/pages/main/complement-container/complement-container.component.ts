@@ -13,6 +13,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { ComplementService } from '../../../services/complement.service';
 import { Complement } from '../../../models/complement.model';
 import { ComplementBridgeService } from '../../../services/complement-bridge.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-complement-container',
@@ -191,6 +192,7 @@ export class ComplementContainerComponent implements OnInit, OnDestroy {
   loading = true;
   safeIframeUrl: SafeResourceUrl | null = null;
   accessDenied = false;
+  private routeSub?: Subscription;
 
   constructor(
     private route: ActivatedRoute,
@@ -200,16 +202,28 @@ export class ComplementContainerComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    const slug = this.route.snapshot.paramMap.get('slug');
-    if (!slug) {
-      this.loading = false;
-      return;
-    }
-
-    this.loadComplement(slug);
+    // Suscripción reactiva para escuchar cambios en los parámetros de ruta sin forzar F5
+    this.routeSub = this.route.paramMap.subscribe(params => {
+      const slug = params.get('slug');
+      // Desregistrar bridge del frame anterior si ya existía
+      if (this.complement) {
+        this.bridgeService.unregisterFrame(this.complement.slug);
+      }
+      if (!slug) {
+        this.complement = null;
+        this.safeIframeUrl = null;
+        this.loading = false;
+        return;
+      }
+      this.loadComplement(slug);
+    });
   }
 
   ngOnDestroy(): void {
+    // Limpieza de suscripciones y bridges al destruir el componente
+    if (this.routeSub) {
+      this.routeSub.unsubscribe();
+    }
     if (this.complement) {
       this.bridgeService.unregisterFrame(this.complement.slug);
     }

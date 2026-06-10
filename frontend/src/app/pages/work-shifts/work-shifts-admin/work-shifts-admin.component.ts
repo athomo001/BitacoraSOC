@@ -26,7 +26,7 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { Observable, Subscription, interval, Subject, forkJoin, of } from 'rxjs';
-import { startWith, takeUntil, map, catchError } from 'rxjs/operators';
+import { startWith, takeUntil, map, catchError, take } from 'rxjs/operators';
 import { WorkShiftService } from '../../../services/work-shift.service';
 import { AuthService } from '../../../services/auth.service';
 import { ConfigService } from '../../../services/config.service';
@@ -220,9 +220,8 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.loadData();
     this.loadChecklistTemplates();
-    this.syncServerClock();
 
-    // Refresco en vivo cada minuto para el estado de turnos operativos
+    // Refresco en vivo cada minuto para el estado de turnos operativos (startWith(0) ejecuta la primera llamada al inicio)
     interval(60000)
       .pipe(startWith(0), takeUntil(this.destroy$))
       .subscribe(() => {
@@ -982,7 +981,10 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
   private syncServerClock(): void {
     const requestStartedMonotonicMs = performance.now();
     this.workShiftService.getCurrentShift()
-      .pipe(takeUntil(this.destroy$))
+      .pipe(
+        take(1), // QA-SHIFTS-PERF-001: Se fuerza la finalización explícita para evitar fugas de memoria por suscripciones anidadas
+        takeUntil(this.destroy$)
+      )
       .subscribe({
         next: (response) => {
           const requestEndedMonotonicMs = performance.now();

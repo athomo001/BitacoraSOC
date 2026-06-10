@@ -181,7 +181,7 @@ Sección expandida con opciones administrativas:
 | 📚 | **Clientes y Catálogos** | Configuración de clientes, servicios, tipos de operación y catálogo de eventos |
 | 📞 | **Escalación** | Configuración de contactos externos y turnos internos de escalación |
 | 📧 | **EMAIL Config** | Configuración del servidor SMTP y parámetros de correo |
-| 🔒 | **HTTPS / Seguridad** | Administración de certificados SSL/TLS y directivas de seguridad |
+| 🔒 | **Seguridad** | Administración de certificados SSL/TLS, directivas de seguridad y Single Sign-On (SSO) |
 | 🔌 | **Integraciones** | Administración de webhooks y conectores externos |
 | 🧩 | **Complementos** | Gestión de complementos modulares adicionales |
 
@@ -211,7 +211,7 @@ Opciones visibles en la sección de configuración:
 - **Clientes y Catálogos** - Configuración del SOC
 - **Escalación** - Matriz de contactos telefónicos
 - **EMAIL Config** - Parámetros SMTP
-- **HTTPS / Seguridad** - Certificados y seguridad SSL
+- **Seguridad** - Certificados, directivas y Single Sign-On (SSO)
 - **Integraciones** - Webhooks y APIs externas
 - **Complementos** - Módulos adicionales y backups (seleccionado)
 

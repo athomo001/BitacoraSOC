@@ -222,6 +222,7 @@ export class SettingsComponent implements OnInit {
     private authService: AuthService,
     private onboardingService: OnboardingService
   ) {
+    // Formulario de configuración general simplificado para el acceso de invitados
     this.appConfigForm = this.fb.group({
       guestEnabled: [false]
     });
@@ -289,7 +290,8 @@ export class SettingsComponent implements OnInit {
 
   loadConfig(): void {
     this.configService.getConfig().subscribe({
-      next: (config) => {
+      next: (config: any) => {
+        // Cargar estado de habilitación de cuentas de tipo invitado
         this.appConfigForm.patchValue({
           guestEnabled: config.guestModeEnabled
         });
@@ -357,31 +359,9 @@ export class SettingsComponent implements OnInit {
   }
 
   toggleSmtpPasswordVisibility(): void {
-    const shouldShow = !this.showSmtpPassword;
-
-    if (shouldShow) {
-      const hasTypedValue = !!String(this.smtpForm.get('password')?.value || '').trim();
-      if (!hasTypedValue && this.hasStoredSmtpConfig) {
-        this.smtpService.getStoredPassword().subscribe({
-          next: (resp) => {
-            const password = String(resp?.password || '');
-            this.smtpForm.patchValue({ password }, { emitEvent: false });
-            this.showSmtpPassword = true;
-          },
-          error: (err) => {
-            this.smtpLastError = this.buildSmtpDiagnostic(err);
-            this.snackBar.open(
-              'No se pudo revelar la contraseña SMTP guardada. Revisa Logs de Auditoría.',
-              'Cerrar',
-              { duration: 5000 }
-            );
-          }
-        });
-        return;
-      }
-    }
-
-    this.showSmtpPassword = shouldShow;
+    // Solo alternamos la visibilidad de lo que el usuario ha escrito.
+    // No revelamos la contraseña persistida desde el servidor por motivos de seguridad (write-only).
+    this.showSmtpPassword = !this.showSmtpPassword;
   }
 
   private applyProviderPreset(provider: string, keepExistingHost = false): void {
@@ -419,13 +399,12 @@ export class SettingsComponent implements OnInit {
 
   saveAppConfig(): void {
     if (this.appConfigForm.valid) {
-      const data: UpdateConfigRequest = {
+      // Guardar el estado de modo invitado en la configuración del sistema
+      const data: any = {
         guestModeEnabled: this.appConfigForm.value.guestEnabled
       };
       this.configService.updateConfig(data).subscribe({
-        // Corrección ortográfica: tilde agregada en Configuración
         next: () => this.snackBar.open('Configuración guardada', 'Cerrar', { duration: 2000 }),
-        // Corrección ortográfica y de redacción para el mensaje de error
         error: () => this.snackBar.open('Error al guardar configuración', 'Cerrar', { duration: 3000 })
       });
     }

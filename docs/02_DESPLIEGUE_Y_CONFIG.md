@@ -1,4 +1,4 @@
-﻿# Configuración Inicial (Setup)
+# Configuración Inicial (Setup)
 
 # 🔧 Instalación y Configuración - BitacoraSOC
 
@@ -139,8 +139,15 @@ COMPLEMENT_ALLOW_PRIVATE_URLS=true
 # Timezone
 TZ=America/Santiago
 
-# Encryption (passwords SMTP)
+# Encryption (passwords SMTP y PII)
 ENCRYPTION_KEY=GENERAR_CON_OPENSSL    # 64 caracteres hex (32 bytes)
+# Nota: La base de datos persistirá un keyring de claves en /app/secrets/encryption-keyring.json
+# para permitir descifrar datos históricos en caso de que cambie la ENCRYPTION_KEY actual.
+
+# Single Sign-On (SSO) Google / Microsoft
+GOOGLE_CLIENT_ID=
+AZURE_CLIENT_ID=
+AZURE_TENANT_ID=
 
 # Logging
 LOG_LEVEL=info                        # info | debug | warn | error
@@ -610,6 +617,11 @@ RATE_LIMIT_LOGIN_MAX=20
 # Opcional: cadena >= 24 chars (openssl rand -base64 32). POST /api/system/rate-limit-reset
 RATE_LIMIT_RESET_SECRET=
 
+# Configuración SSO (Opcionales)
+GOOGLE_CLIENT_ID=google_client_id_aca
+AZURE_CLIENT_ID=azure_client_id_aca
+AZURE_TENANT_ID=azure_tenant_id_aca
+
 # ============================
 # BASE DE DATOS MONGODB
 # ============================
@@ -654,7 +666,7 @@ Los certificados son almacenados internamente bajo un volumen Docker estricto en
 ### Instalación de Certificados Reales
 
 1. Entrar a la plataforma web como Administrador.
-2. Navegar a **Configuración > HTTPS / Seguridad**.
+2. Navegar a **Configuración > Seguridad**.
 3. Seleccionar los archivos `.crt` (Certificado) y `.key` (Llave Privada).
 4. Activar check de **Habilitar listener HTTPS del backend**.
 5. Apretar **"Subir SSL y Activar (0-Downtime)"**.

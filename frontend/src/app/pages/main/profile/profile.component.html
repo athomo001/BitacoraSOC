@@ -73,5 +73,84 @@
         </button>
       </form>
     </div>
+  <div class="profile-panel">
+    <header class="profile-panel__header">
+      <h2 class="profile-panel__title" style="display: flex; align-items: center; gap: 8px;">
+        <mat-icon>security</mat-icon> Autenticación Multifactor (MFA/TOTP)
+      </h2>
+    </header>
+    <div class="profile-panel__body">
+      <!-- Estado: Desactivado -->
+      <div *ngIf="mfaStep === 'inactive'" class="mfa-status-block">
+        <p class="mfa-description" style="margin-bottom: 15px; color: var(--text-muted);">
+          Añade una capa de seguridad extra a tu cuenta. Al activar MFA, deberás ingresar un código de 6 dígitos generado por tu aplicación móvil de autenticación (Google Authenticator, Authy, Microsoft Authenticator, etc.) cada vez que inicies sesión.
+        </p>
+        <button mat-raised-button color="primary" (click)="startMfaSetup()" [disabled]="isSavingMfa">
+          <mat-spinner *ngIf="isSavingMfa" diameter="20" style="display: inline-block; margin-right: 8px; vertical-align: middle;"></mat-spinner>
+          Configurar MFA
+        </button>
+      </div>
+
+      <!-- Estado: Configurando / Setup -->
+      <div *ngIf="mfaStep === 'setup'" class="mfa-setup-block" style="display: flex; flex-direction: column; gap: 20px;">
+        <div style="display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap;">
+          <div *ngIf="mfaQrCode" class="qr-container" style="background: white; padding: 10px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: fit-content;">
+            <img [src]="mfaQrCode" alt="Código QR MFA" style="display: block; width: 180px; height: 180px;">
+          </div>
+          <div style="flex: 1; min-width: 250px;">
+            <h3 style="margin-top: 0; color: var(--text-color);">1. Escanea el código QR</h3>
+            <p style="font-size: 14px; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px;">
+              Abre tu aplicación de autenticación y escanea el código QR de la izquierda. Si no puedes escanear el código QR, ingresa la siguiente clave manualmente:
+            </p>
+            <div style="background: rgba(0,0,0,0.05); padding: 8px 12px; border-radius: 4px; font-family: monospace; font-size: 14px; margin-bottom: 15px; display: inline-block; border: 1px solid rgba(0,0,0,0.1); word-break: break-all; color: var(--primary-color); font-weight: bold;">
+              {{ mfaSecret }}
+            </div>
+            
+            <h3 style="color: var(--text-color);">2. Ingresa el código de verificación</h3>
+            <p style="font-size: 14px; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px;">
+              Una vez escaneado, introduce el código de 6 dígitos que te proporciona la aplicación para confirmar la activación.
+            </p>
+
+            <form [formGroup]="mfaForm" (ngSubmit)="verifyMfaSetup()" style="display: flex; align-items: center; gap: 12px;">
+              <mat-form-field appearance="outline" style="max-width: 150px; margin-bottom: 0;">
+                <mat-label>Código</mat-label>
+                <input matInput formControlName="code" placeholder="123456" maxlength="6">
+              </mat-form-field>
+              
+              <button mat-raised-button color="primary" type="submit" [disabled]="mfaForm.invalid || isSavingMfa" style="height: 54px; margin-top: -4px;">
+                Activar MFA
+              </button>
+
+              <button mat-stroked-button type="button" (click)="cancelMfaSetup()" style="height: 54px; margin-top: -4px;">
+                Cancelar
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Estado: Activado -->
+      <div *ngIf="mfaStep === 'active'" class="mfa-active-block" style="display: flex; flex-direction: column; gap: 15px;">
+        <div style="display: flex; align-items: center; gap: 10px; color: #4caf50; background: rgba(76, 175, 80, 0.1); padding: 12px; border-radius: 6px;">
+          <mat-icon>check_circle</mat-icon>
+          <span style="font-weight: 500;">La autenticación multifactor está ACTIVA en tu cuenta.</span>
+        </div>
+        <p style="font-size: 14px; color: var(--text-muted);">
+          Tu cuenta está protegida con verificación en dos pasos. Si deseas desactivar el servicio de MFA, introduce tu contraseña actual a continuación.
+        </p>
+
+        <form [formGroup]="mfaDisableForm" (ngSubmit)="disableMfa()" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <mat-form-field appearance="outline" style="min-width: 200px; margin-bottom: 0;">
+            <mat-label>Contraseña Actual</mat-label>
+            <input matInput formControlName="password" type="password" placeholder="Ingresa tu contraseña">
+          </mat-form-field>
+
+          <button mat-raised-button color="warn" type="submit" [disabled]="mfaDisableForm.invalid || isDisablingMfa" style="height: 54px; margin-top: -4px;">
+            <mat-spinner *ngIf="isDisablingMfa" diameter="20" style="display: inline-block; margin-right: 8px; vertical-align: middle;"></mat-spinner>
+            Desactivar MFA
+          </button>
+        </form>
+      </div>
+    </div>
   </div>
 </div>

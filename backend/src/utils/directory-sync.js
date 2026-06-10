@@ -5,6 +5,7 @@
  */
 
 const DirectoryContact = require('../models/DirectoryContact');
+const { sha256 } = require('./encryption');
 
 const isEmptyLike = (value = '') => {
   const normalized = String(value || '').trim().toLowerCase();
@@ -54,12 +55,12 @@ const resolveDirectorySource = (payload = {}) => {
 const buildUpsertFilter = (normalized) => {
   const filters = [];
 
-  if (normalized.email) {
-    filters.push({ email: normalized.email });
+  if (normalized.emailHash) {
+    filters.push({ emailHash: normalized.emailHash });
   }
 
-  if (normalized.phone && normalized.name) {
-    filters.push({ phone: normalized.phone, name: normalized.name });
+  if (normalized.phoneHash && normalized.name) {
+    filters.push({ phoneHash: normalized.phoneHash, name: normalized.name });
   }
 
   if (normalized.name && normalized.company) {
@@ -82,7 +83,9 @@ const syncDirectoryContact = async (payload = {}) => {
   const normalized = {
     name,
     email: sanitize(payload.email, 180).toLowerCase(),
+    emailHash: payload.email ? sha256(payload.email) : '',
     phone: sanitize(payload.phone, 80),
+    phoneHash: payload.phone ? sha256(payload.phone) : '',
     company: sanitize(payload.company || payload.organization, 160),
     position: sanitize(payload.position || payload.role, 120),
     type: resolveDirectoryType(payload),

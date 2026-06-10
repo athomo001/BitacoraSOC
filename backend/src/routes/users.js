@@ -179,12 +179,13 @@ router.post('/',
     body('role').isIn(['admin', 'user', 'auditor', 'guest']).withMessage('Rol inválido'),
     body('phone').optional().trim().isLength({ min: 6, max: 20 }).withMessage('Teléfono inválido'),
     body('cargoLabel').optional({ nullable: true }).isString().trim().isLength({ max: MAX_CARGO_LENGTH })
-      .withMessage(`Cargo inválido (máx ${MAX_CARGO_LENGTH} caracteres)`)
+      .withMessage(`Cargo inválido (máx ${MAX_CARGO_LENGTH} caracteres)`),
+    body('mfaEnabled').optional().isBoolean().withMessage('MFAEnabled debe ser booleano')
   ],
   validate,
   async (req, res) => {
     try {
-      const { username, email, password, fullName, role, phone } = req.body;
+      const { username, email, password, fullName, role, phone, mfaEnabled } = req.body;
       const cargoLabel = normalizeCargoLabel(req.body?.cargoLabel);
 
       const matchingUsers = await User.find({ $or: [{ username }, { email }] })
@@ -239,6 +240,11 @@ router.post('/',
         user.cargoLabel = role === 'guest' ? null : cargoLabel;
         user.guestExpiresAt = guestExpiresAt;
         user.isActive = true;
+        user.mfaEnabled = mfaEnabled === true;
+        if (mfaEnabled === false) {
+          user.mfaSecret = null;
+          user.mfaTempSecret = null;
+        }
         await user.save();
         await syncUserAsDirectoryInternal(user);
         auditEvent = 'admin.users.reactivate';
@@ -251,7 +257,8 @@ router.post('/',
           phone,
           role,
           cargoLabel: role === 'guest' ? null : cargoLabel,
-          guestExpiresAt
+          guestExpiresAt,
+          mfaEnabled: mfaEnabled === true
         });
 
         await user.save();
@@ -313,7 +320,8 @@ router.put('/:id',
     body('phone').optional().trim().isLength({ min: 6, max: 20 }),
     body('cargoLabel').optional({ nullable: true }).isString().trim().isLength({ max: MAX_CARGO_LENGTH })
       .withMessage(`Cargo inválido (máx ${MAX_CARGO_LENGTH} caracteres)`),
-    body('newPassword').optional().isLength({ min: 6 }).withMessage('La nueva contraseña debe tener al menos 6 caracteres') // Validación unificada a mínimo 6 caracteres
+    body('newPassword').optional().isLength({ min: 6 }).withMessage('La nueva contraseña debe tener al menos 6 caracteres'), // Validación unificada a mínimo 6 caracteres
+    body('mfaEnabled').optional().isBoolean().withMessage('MFAEnabled debe ser booleano')
   ],
   validate,
   async (req, res) => {
@@ -328,6 +336,11 @@ router.put('/:id',
       delete updates.newPassword;
       delete updates.password;
       delete updates.username;
+
+      if (updates.mfaEnabled === false) {
+        updates.mfaSecret = null;
+        updates.mfaTempSecret = null;
+      }
 
       if (Object.prototype.hasOwnProperty.call(updates, 'cargoLabel')) {
         updates.cargoLabel = normalizeCargoLabel(updates.cargoLabel);

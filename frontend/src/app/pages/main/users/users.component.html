@@ -71,6 +71,16 @@
           <mat-hint>Máximo 120 caracteres</mat-hint>
         </mat-form-field>
 
+        <div class="mfa-checkbox-container" style="margin-bottom: 20px; grid-column: span 2;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-color); font-size: 14px;">
+            <input type="checkbox" formControlName="mfaEnabled" style="cursor: pointer; width: 16px; height: 16px;">
+            Habilitar Autenticación Multifactor (MFA/TOTP)
+          </label>
+          <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px; padding-left: 24px;">
+            Si se activa, el usuario deberá enrolar su dispositivo en el próximo inicio de sesión.
+          </div>
+        </div>
+
         <div class="form-actions">
           <button mat-raised-button color="primary" type="submit" 
                   [disabled]="!userForm.valid">
@@ -122,6 +132,15 @@
         <ng-container matColumnDef="cargoLabel">
           <th mat-header-cell *matHeaderCellDef>Cargo</th>
           <td mat-cell *matCellDef="let user">{{ user.cargoLabel || '—' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="mfaEnabled">
+          <th mat-header-cell *matHeaderCellDef>MFA</th>
+          <td mat-cell *matCellDef="let user">
+            <span class="status-badge" [class.active]="user.mfaEnabled" [class.inactive]="!user.mfaEnabled" style="font-size: 11px; padding: 2px 6px;">
+              {{ user.mfaEnabled ? 'MFA ACTIVO' : 'MFA INACTIVO' }}
+            </span>
+          </td>
         </ng-container>
 
         <ng-container matColumnDef="isActive">
