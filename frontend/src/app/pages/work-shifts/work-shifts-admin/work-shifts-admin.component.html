@@ -36,9 +36,9 @@
                 </div>
               </div>
 
-              <!-- Cabecera Gantt -->
+              <!-- Cabecera Gantt (se actualiza la etiqueta de la columna a Condición) -->
               <div class="gantt-header-row">
-                <div class="gantt-label-col">Rol</div>
+                <div class="gantt-label-col">Condición</div>
                 <div class="gantt-timeline-col"></div>
               </div>
 
@@ -151,10 +151,11 @@
                   <mat-icon matPrefix>search</mat-icon>
                 </mat-form-field>
 
+                <!-- Filtro por Condición en lugar de Rol para reflejar el estado administrativo/técnico -->
                 <mat-form-field appearance="outline">
-                  <mat-label>Rol</mat-label>
+                  <mat-label>Condición</mat-label>
                   <mat-select [(ngModel)]="filterRole">
-                    <mat-option value="">Todos los Roles</mat-option>
+                    <mat-option value="">Todas las Condiciones</mat-option>
                     <mat-option value="N2">Operador N2</mat-option>
                     <mat-option value="TI">Especialista TI</mat-option>
                     <mat-option value="N1_NO_HABIL">Guardia N1 No Hábil</mat-option>
@@ -191,7 +192,7 @@
               <h4>📋 Formato de Datos de Asignación</h4>
               <p>Campos esperados para el registro o importación CSV de turnos:</p>
               <ul>
-                <li><strong>rol:</strong> N1, N2, TI, Teletrabajo o Vacaciones.</li>
+                <li><strong>condición:</strong> N1, N2, TI, Teletrabajo o Vacaciones.</li>
                 <li><strong>usuario:</strong> Username recomendado; también acepta email o nombre completo. El sistema detecta si es usuario interno o persona externa.</li>
                 <li><strong>fechaInicio / horaInicio:</strong> Formato YYYY-MM-DD y HH:MM (ej: 2026-05-26, 09:00).</li>
                 <li><strong>fechaFin / horaFin:</strong> Formato YYYY-MM-DD y HH:MM (ej: 2026-06-02, 08:59).</li>
@@ -208,7 +209,8 @@
                     <tr>
                       <th>Estado</th>
                       <th>Semana / Periodo</th>
-                      <th>Rol</th>
+                      <!-- Se cambia la columna de cabecera a Condición -->
+                      <th>Condición</th>
                       <th>Asignado A</th>
                       <th>Acciones</th>
                     </tr>
@@ -264,8 +266,9 @@
                 </header>
                 <div class="inline-editor-body">
                   <form [formGroup]="assignmentForm" (ngSubmit)="saveWeeklyAssignment()">
+                    <!-- Selección de Condición (antes Rol) -->
                     <mat-form-field appearance="outline" class="full-width">
-                      <mat-label>Rol</mat-label>
+                      <mat-label>Condición</mat-label>
                       <mat-select formControlName="roleCode">
                         <mat-option value="N2">Operador N2</mat-option>
                         <mat-option value="TI">Especialista TI</mat-option>

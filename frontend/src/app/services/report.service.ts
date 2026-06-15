@@ -33,7 +33,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '@env/environment';
-import { MailAnalytics, ReportOverview, TagStats } from '../models/report.model';
+import { MailAnalytics, ReportOverview, TagStats, PeriodSummaryReport } from '../models/report.model';
 
 @Injectable({
   providedIn: 'root'
@@ -60,9 +60,10 @@ export class ReportService {
   }
 
   getTagsTrend(tags: string[], days = 30): Observable<any[]> {
-    let params = new HttpParams()
-      .set('days', days.toString())
-      .set('tags', tags.join(','));
+    let params = new HttpParams().set('days', days.toString());
+    tags.forEach(tag => {
+      params = params.append('tags', tag);
+    });
     return this.http.get<any[]>(`${this.API_URL}/tags-trend`, { params });
   }
 
@@ -79,5 +80,17 @@ export class ReportService {
   getMailAnalytics(days = 30): Observable<MailAnalytics> {
     const params = new HttpParams().set('days', days.toString());
     return this.http.get<MailAnalytics>(`${this.API_URL}/mail-analytics`, { params });
+  }
+
+  /**
+   * Obtiene el resumen consolidado analítico y narrativo para un rango de fechas.
+   * @param startDate Fecha de inicio (formato ISO)
+   * @param endDate Fecha de fin (formato ISO)
+   */
+  getPeriodSummary(startDate: string, endDate: string): Observable<PeriodSummaryReport> {
+    const params = new HttpParams()
+      .set('startDate', startDate)
+      .set('endDate', endDate);
+    return this.http.get<PeriodSummaryReport>(`${this.API_URL}/period-summary`, { params });
   }
 }

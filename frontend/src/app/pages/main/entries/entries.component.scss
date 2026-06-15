@@ -1,16 +1,18 @@
 .entries-container {
+  /* Estilos para el contenedor de entradas. Se reduce padding y se centra el título */
   max-width: 1200px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 12px 16px;
 
   h1 {
-    margin-bottom: 24px;
+    margin-bottom: 12px;
+    text-align: center;
     color: var(--text-primary);
   }
 }
 
 .entry-panel {
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-4);
   background: var(--surface-card);
   border: 1px solid var(--outline-subtle);
   border-radius: var(--radius-md);
@@ -19,7 +21,7 @@
 }
 
 .entry-panel__body {
-  padding: var(--space-6);
+  padding: var(--space-4);
 }
 
 .entry-form-layout {

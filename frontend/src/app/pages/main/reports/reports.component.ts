@@ -35,9 +35,11 @@
  */
 import { Component, OnInit, HostListener } from '@angular/core';
 import { ReportService } from '../../../services/report.service';
-import { MailAnalytics, ReportOverview } from '../../../models/report.model';
+import { ConfigService } from '../../../services/config.service';
+import { environment } from '@env/environment';
+import { MailAnalytics, ReportOverview, PeriodSummaryReport } from '../../../models/report.model';
 import { Color, ScaleType } from '@swimlane/ngx-charts';
-import { NgIf, NgFor } from '@angular/common';
+import { NgIf, NgFor, DatePipe } from '@angular/common';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -45,6 +47,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { FormsModule } from '@angular/forms';
 import { NgxChartsModule } from '@swimlane/ngx-charts';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+
 
 @Component({
     selector: 'app-reports',
@@ -53,6 +57,7 @@ import { NgxChartsModule } from '@swimlane/ngx-charts';
     imports: [
       NgIf,
       NgFor,
+      DatePipe,
       MatButton, 
       MatIconButton,
       MatIcon,
@@ -60,7 +65,8 @@ import { NgxChartsModule } from '@swimlane/ngx-charts';
       MatFormFieldModule,
       MatSelectModule,
       FormsModule,
-      NgxChartsModule
+      NgxChartsModule,
+      MatProgressSpinnerModule
     ]
 })
 export class ReportsComponent implements OnInit {
@@ -124,13 +130,22 @@ export class ReportsComponent implements OnInit {
   // Colores pre-cacheados para el heatmap
   private heatmapColors: string[] = [];
   private heatmapEmptyColor = '';
+  
+  logoUrl = '';
+  private backendBaseUrl = environment.backendBaseUrl;
 
-  constructor(private reportService: ReportService) {}
+  constructor(
+    private reportService: ReportService,
+    private configService: ConfigService
+  ) {}
 
   ngOnInit(): void {
     this.updateTrendView();
     this.applyThemeColorSchemes();
     this.loadOverview();
+    this.initPeriodDates();
+    this.generatePeriodReport();
+    this.loadLogo();
   }
 
   @HostListener('window:resize')
@@ -398,5 +413,122 @@ export class ReportsComponent implements OnInit {
   
   formatPercentage(value: number): string {
     return `${value.toFixed(1)}%`;
+  }
+
+  // --- Informe de Período Consolidados ---
+  presetSelected = 'semana';
+  reportStartDate = '';
+  reportEndDate = '';
+  showPeriodReportPreview = false;
+  isGeneratingPeriodReport = false;
+  periodReportData: PeriodSummaryReport | null = null;
+  todayDate = new Date();
+
+  /**
+   * Inicializa las fechas del informe en base al preset semanal (últimos 7 días)
+   */
+  initPeriodDates(): void {
+    const today = new Date();
+    this.reportEndDate = today.toISOString().split('T')[0];
+    
+    const pastDate = new Date();
+    pastDate.setDate(today.getDate() - 7);
+    this.reportStartDate = pastDate.toISOString().split('T')[0];
+  }
+
+  /**
+   * Cambia el rango de fechas al seleccionar un preset predefinido
+   */
+  onPresetChange(): void {
+    const today = new Date();
+    this.reportEndDate = today.toISOString().split('T')[0];
+
+    let daysToSubtract = 7;
+    if (this.presetSelected === 'quincena') {
+      daysToSubtract = 15;
+    } else if (this.presetSelected === 'mes') {
+      daysToSubtract = 30;
+    } else if (this.presetSelected === 'personalizado') {
+      return;
+    }
+
+    const pastDate = new Date();
+    pastDate.setDate(today.getDate() - daysToSubtract);
+    this.reportStartDate = pastDate.toISOString().split('T')[0];
+    
+    // Generación automática tras cambio de preset
+    this.generatePeriodReport();
+  }
+
+  /**
+   * Consulta al backend las métricas y la narrativa generada para el período seleccionado
+   */
+  generatePeriodReport(): void {
+    if (!this.reportStartDate || !this.reportEndDate) return;
+    this.isGeneratingPeriodReport = true;
+    this.showPeriodReportPreview = false;
+    
+    this.reportService.getPeriodSummary(this.reportStartDate, this.reportEndDate).subscribe({
+      next: (data) => {
+        this.periodReportData = data;
+        this.showPeriodReportPreview = true;
+        this.isGeneratingPeriodReport = false;
+      },
+      error: (err) => {
+        console.error('Error generando reporte de período:', err);
+        this.isGeneratingPeriodReport = false;
+      }
+    });
+  }
+
+  /**
+   * Ejecuta el diálogo de impresión nativo del navegador
+   */
+  printReport(): void {
+    if (typeof window !== 'undefined') {
+      window.print();
+    }
+  }
+
+
+
+  /**
+   * Carga el logo personalizado de branding
+   */
+  loadLogo(): void {
+    this.configService.getLogo().subscribe({
+      next: (response) => {
+        this.logoUrl = response.logoUrl || '';
+      },
+      error: () => {
+        this.logoUrl = '';
+      }
+    });
+  }
+
+  /**
+   * Construye la URL de activos
+   */
+  getAssetUrl(url: string): string {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    return `${this.backendBaseUrl}${url}`;
+  }
+
+  /**
+   * Calcula los días analizados
+   */
+  calculateReportDays(start: string | Date, end: string | Date): number {
+    if (!start || !end) return 0;
+    const s = new Date(start);
+    const e = new Date(end);
+    // Reiniciar horas para el cálculo de días completos
+    s.setHours(0, 0, 0, 0);
+    e.setHours(0, 0, 0, 0);
+    const diffTime = Math.abs(e.getTime() - s.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Incluir ambos días
+    return diffDays;
   }
 }

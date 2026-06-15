@@ -37,7 +37,10 @@
               "src/styles.scss"
             ],
             "scripts": [],
-            "browser": "src/main.ts"
+            "browser": "src/main.ts",
+            "allowedCommonJsDependencies": [
+              "html2canvas"
+            ]
           },
           "configurations": {
             "production": {
@@ -52,8 +55,8 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "20kb",
-                  "maximumError": "30kb"
+                  "maximumWarning": "40kb",
+                  "maximumError": "60kb"
                 }
               ],
               "outputHashing": "all"

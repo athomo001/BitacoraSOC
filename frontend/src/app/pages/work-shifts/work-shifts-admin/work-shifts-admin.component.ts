@@ -1189,12 +1189,13 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
         continue;
       }
 
-      // 1. Conflicto de Rol (Solo si no es teletrabajo ni vacaciones, y el rol coincide)
+      // 1. Conflicto de Condición (Solo si no es teletrabajo ni vacaciones, y la condición coincide)
       if (asg.roleCode === roleCode && !isCurrentTeleworkOrVacation && asg.roleCode !== 'TELEWORK' && asg.roleCode !== 'VACATION') {
         const assignedName = asg.userId?.fullName || asg.externalPersonId?.name || 'otra persona';
         const startStr = asgStart.toLocaleDateString('es-CL');
         const endStr = asgEnd.toLocaleDateString('es-CL');
-        this.roleConflictMsg = `⚠️ Conflicto de Rol: Ya existe un turno asignado para el rol ${this.getRoleLabel(roleCode)} en este período (${startStr} - ${endStr}) por ${assignedName}.`;
+        // Se actualiza el mensaje de alerta de colisión refiriéndose a Condición en lugar de Rol
+        this.roleConflictMsg = `⚠️ Conflicto de Condición: Ya existe un turno asignado para la condición ${this.getRoleLabel(roleCode)} en este período (${startStr} - ${endStr}) por ${assignedName}.`;
       }
 
       // 2. Conflicto de Persona (Disponibilidad)
@@ -1232,7 +1233,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       const overlap = start < otherEnd && end > otherStart;
       if (!overlap) continue;
 
-      // El conflicto de rol no aplica si uno es Teletrabajo o Vacaciones
+      // El conflicto de condición no aplica si uno es Teletrabajo o Vacaciones
       if (other.roleCode === roleCode && roleCode !== 'TELEWORK' && roleCode !== 'VACATION') return true;
 
       const matchesUser = userId && other.userId && String(other.userId._id || other.userId) === String(userId);
@@ -1265,8 +1266,8 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       if (!overlap) continue;
 
       if (other.roleCode === roleCode && roleCode !== 'TELEWORK' && roleCode !== 'VACATION') {
-        const name = other.userId?.fullName || other.externalPersonId?.name || 'otra persona';
-        return `Conflicto de Rol: ${this.getRoleLabel(roleCode)} ya está asignado a ${name} en este período.`;
+        // Se retorna un texto de colisión adaptado a Condición para consistencia
+        return `Conflicto de Condición: ${this.getRoleLabel(roleCode)} ya está asignado a ${name} en este período.`;
       }
 
       const matchesUser = userId && other.userId && String(other.userId._id || other.userId) === String(userId);

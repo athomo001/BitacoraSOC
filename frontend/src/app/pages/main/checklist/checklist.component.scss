@@ -294,7 +294,8 @@
 }
 
 .writer-below {
-  margin-top: 32px;
+  /* Margen superior reducido para disminuir el espacio entre el checklist y el formulario de nueva entrada */
+  margin-top: 12px;
 }
 
 .loading-spinner {

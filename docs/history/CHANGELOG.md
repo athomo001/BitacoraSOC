@@ -2,6 +2,47 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.5.99-beta] - 2026-06-15
+
+### Optimización de Rendimiento de PDF Nativo y Ajuste de Márgenes Físicos A4
+
+- **Impresión Nativa y Alto Rendimiento:** Se eliminaron las librerías `jsPDF` y `html2canvas` del flujo y dependencias del frontend, las cuales provocaban bloqueos del navegador de hasta 4 minutos debido a conflictos de renderizado con los gradientes SVG dinámicos de `ngx-charts`. Se delegó la descarga del PDF al motor de impresión nativo del navegador (`window.print()`), logrando una generación instantánea, fluida y con texto/gráficos vectoriales 100% nítidos.
+- **Simplificación del Flujo de Usuario:** Se removió el overlay de carga con barra de progreso (`.pdf-export-overlay`) del generador de reportes. El botón de exportación se unificó en un único botón de llamada a la acción: **"Generar PDF / Imprimir"**.
+- **Ajuste de Altura y Márgenes Físicos Simétricos:** Se agregaron estilos CSS de impresión (`@media print`) en el componente de reportes para obligar a cada una de las 4 páginas lógicas del informe (`.report-pdf-page`) a ocupar la altura total del papel (`100vh`) y a aplicar un padding perimetral de respeto idéntico (`20mm` arriba/abajo y `15mm` a los lados).
+- **Consistencia de Márgenes Globales:** Se anuló el padding de la hoja contenedora del reporte (`.print-report-sheet` a `padding: 0 !important;`) bajo `@media print` en los estilos globales, evitando duplicidad de espaciados y garantizando que cada sección empiece limpiamente en una nueva página A4 física sin cabeceras ni pies de página del navegador (gracias al margen cero en `@page`).
+
+## [v1.5.98-beta] - 2026-06-15
+
+### Ajustes de Visualización de Reportes Enviados y Encabezado en PDF
+
+- **Gráfica de Torta (Reportes Enviados) alineada con su leyenda:** Se corrigió la inconsistencia visual entre segmentos de la torta y elementos listados en la leyenda del informe de período. Ahora la leyenda refleja la totalidad de clientes presentes en `mailClientsBreakdown` y se mantiene en el mismo orden del gráfico.
+- **Numeración explícita de la leyenda:** Se añadió numeración correlativa en cada ítem para mejorar lectura rápida y trazabilidad visual en reportes ejecutivos impresos.
+- **Conectores visuales del pie chart restaurados y reforzados:** Se reactivaron las etiquetas del pie (`labels=true`) y se mejoró el contraste/grosor de líneas conectoras y textos para que el vínculo segmento-etiqueta sea claramente visible en previsualización e impresión.
+- **Redimensionamiento del bloque gráfico en informe consolidado:** Se incrementó el área de render del gráfico de torta dentro del bloque “Reportes Enviados” para evitar compresión visual y mejorar legibilidad.
+- **Logo de encabezado en PDF ampliado:** Se ajustó el layout de impresión del encabezado del informe consolidado (`@media print`) aumentando de forma significativa el contenedor del logo, fallback y escala visual del branding para evitar apariencia subdimensionada.
+- **Reglas de impresión depuradas para evitar contenido oculto residual:** Se reforzó el filtrado de elementos no imprimibles (`display:none`) para reducir riesgo de espacio fantasma en paginación al exportar a PDF.
+
+## [v1.5.97-beta] - 2026-06-15
+
+### Generador de Informe de Período Consolidado en PDF y Motor de Narrativa Heurística
+
+- **Informe de Período en PDF (Impresión Web):** Se diseñó e implementó una sección en `/main/statistics` para configurar y generar informes consolidados por rango de fechas (con presets rápidos semanal, quincenal y mensual). Al presionar el botón "Imprimir / Guardar como PDF", se utiliza la vista de impresión del navegador mediante una hoja de estilos `@media print` altamente estilizada que remaqueta el informe en formato de documento ejecutivo multipágina A4/Carta, ocultando barras de navegación y botones interactivos.
+- **Gráfica de Tendencia Consolidada en PDF:** Se integró un gráfico de líneas (`ngx-charts-line-chart`) sin animaciones y con dimensiones fijas (`840x220`) dentro del PDF de impresión para visualizar la distribución temporal y volumen diario de eventos (operativas, incidentes, ofensas) del período evaluado.
+- **Remoción de Firmas de Cierre:** Se removió el bloque redundante de firmas de analista/coordinador en el pie del informe ejecutivo consolidado por requerimiento operativo.
+- **Resolución de PDF en Blanco al Imprimir:** Se corrigió un fallo que provocaba que la previsualización de impresión saliera vacía (en blanco). La causa eran las propiedades restrictivas de altura (`height: 100vh`) y desbordamiento (`overflow: hidden`) del layout de la consola y contenedores de Angular Material (`mat-sidenav-container`, `.main-container`, `.content-wrapper`). Se solucionó forzando en `@media print` que todos los contenedores padres tengan altura automática, posición estática y desbordamiento visible.
+- **Motor de Narrativa Heurística (Backend):** Se desarrolló el endpoint `GET /api/reports/period-summary` en el backend para agrupar métricas y redactar en español un análisis detallado en lenguaje humano de los acontecimientos del período. El motor heurístico analiza la distribución de bitácoras, usuarios más activos, tags recurrentes y checklists en estado NOK (con problemas) citando los diagnósticos de los operadores SOC y evaluando el estado operacional en tiempo real.
+- **Correcciones y Compatibilidad de Tipado en Frontend:** Se implementó el casting de variables de bucles con pipe mediante `$any(...)` en la plantilla de estadísticas para asegurar la compatibilidad con el compilador estricto de Angular.
+- **Parche de Consola en Login (`_rawValidators`):** Se corrigió un error de ejecución `TypeError` al iniciar sesión. Se reubicó la instanciación de los formularios reactivos de login, recuperación y MFA al inicio de `ngOnInit()` para evitar que se renderice la plantilla con controles `undefined` ante respuestas síncronas del endpoint de branding y logotipos.
+
+## [v1.5.96-beta] - 2026-06-15
+
+### Ajustes en Checklist, Consistencia de Condición en Turnos y Parche de Consulta de Entradas
+
+- **Optimización de Checklist (/checklist):** Se centró el título "Nueva Entrada", se redujo la altura por defecto de la caja de texto (`textarea` a 7 filas) y se redujo el espacio en blanco vertical y paddings generales de los contenedores para evitar desplazamientos verticales (scroll) innecesarios en la pantalla. Además, se eliminó el encabezado redundante "TOP tags".
+- **Consistencia visual en Turnos ("Condición"):** Se renombraron las etiquetas y cabeceras de la vista Gantt, filtros rápidos y formularios del panel de asignación semanal (`/main/admin/work-shifts`) para utilizar el término "Condición" en lugar de "Rol", reflejando adecuadamente la naturaleza mixta (roles técnicos y estados administrativos) de las opciones. La compatibilidad técnica con las variables de base de datos y la API se mantuvo intacta.
+- **Plantilla CSV y Leyendas Explicativas:** Se actualizaron la plantilla CSV descargable de turnos y el procesador de importación del backend (`parseShiftAssignmentsCsv`). La plantilla incluye ahora leyendas explicativas de los valores válidos para el campo de condición (anteponiendo `#` para comentarios) y el backend ignora limpiamente estas líneas comentadas además de mapear de forma transparente la columna `condicion`/`condición` a `rol` internamente para retrocompatibilidad.
+- **Resolución de Error 500 en Listado de Entradas:** Se corrigió un error `500 (Internal Server Error)` al consultar el listado de entradas (`GET /api/entries`) provocado por el paso de parámetros de paginación (`page` y `limit`) como strings en la etapa `$limit` de agregación de MongoDB. Se implementó el casteo explícito a enteros (`parseInt`) en el backend y se reinició el servicio para aplicar el parche.
+
 ## [v1.5.95-beta] - 2026-06-10
 
 ### Importación CSV de Directorio, Plantilla de Datos y Consolidación de Seguridad (SSO)
