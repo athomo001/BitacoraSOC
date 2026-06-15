@@ -138,19 +138,20 @@ const toChecklistEntryLikeRecord = (check, clientContext = {}) => {
     }
   };
 };
+const TAG_VALIDATION_REGEX = /^[a-z][a-z0-9_-]{0,49}$/i;
 
 // Helper: extraer hashtags (con protección ReDoS)
 const extractHashtags = (text) => {
   if (!text || text.length > 100000) return []; // Límite de seguridad
 
-  const regex = /#(\w+)/g;
+  const regex = /#([a-z][a-z0-9_-]{0,49})/gi;
   const tags = [];
   let match;
   let iterations = 0;
   const MAX_ITERATIONS = 500; // Prevenir ReDoS
 
   while ((match = regex.exec(text)) !== null && iterations++ < MAX_ITERATIONS) {
-    if (match[1].length <= 50) { // Tags max 50 chars
+    if (TAG_VALIDATION_REGEX.test(match[1])) { // Solo tags semánticos, no IDs numéricos
       tags.push(match[1].toLowerCase());
     }
   }
@@ -711,6 +712,7 @@ router.get('/tags/suggest', authenticate, async (req, res) => {
       { $unwind: '$tags' },
       // Filtrar post-unwind para excluir otros tags del mismo documento que no coincidan con la búsqueda
       { $match: { tags: regex } },
+      { $match: { tags: TAG_VALIDATION_REGEX } },
       { $group: { _id: '$tags', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 10 },
