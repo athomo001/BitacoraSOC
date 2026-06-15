@@ -18,6 +18,7 @@ import { CatalogLogSource } from '../../../models/catalog.model';
 import { CreateEntryRequest } from '../../../models/entry.model';
 import { AuthService } from '../../../services/auth.service';
 import { ConfigService } from '../../../services/config.service';
+import { TagService } from '../../../services/tag.service';
 import { BatEasterEggService } from '../../../services/bat-easter-egg.service';
 import { EasterEggRule } from '../../../models/config.model';
 import { MatFormField, MatLabel, MatHint } from '@angular/material/form-field';
@@ -42,6 +43,7 @@ export class EntriesComponent implements OnInit, OnDestroy {
   nowTime = '';
   isSubmitting = false;
   logSources: CatalogLogSource[] = [];
+  topTags: string[] = [];
   showEasterEggOverlay = false;
   easterEggImageUrl = '/scripts/Bender.png';
 
@@ -58,12 +60,14 @@ export class EntriesComponent implements OnInit, OnDestroy {
   private entryEasterEggRules: EasterEggRule[] = [];
   private easterEggTimer?: ReturnType<typeof setTimeout>;
   private lastEasterEggTriggerAt = 0;
+  private contentTags = new Set<string>();
 
   constructor(
     private fb: FormBuilder,
     private entryService: EntryService,
     private catalogService: CatalogService,
     private configService: ConfigService,
+    private tagService: TagService,
     private snackBar: MatSnackBar,
     private authService: AuthService,
     // Servicio global del easter egg: el HUD se renderiza en el layout principal
@@ -81,6 +85,8 @@ export class EntriesComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.loadTopTags();
+
     // Mouse tracking para el murciélago (EE-BAT-001)
     this.batMouseMoveHandler = (e: MouseEvent) => {
       this.mouseX = e.clientX;
@@ -110,8 +116,12 @@ export class EntriesComponent implements OnInit, OnDestroy {
     this.entryForm.get('content')?.valueChanges
       .pipe(debounceTime(280))
       .subscribe((value: string) => {
-        this.triggerEntryEasterEggIfNeeded(value || '');
+        const currentContent = value || '';
+        this.syncContentTags(currentContent);
+        this.triggerEntryEasterEggIfNeeded(currentContent);
       });
+
+    this.syncContentTags(String(this.entryForm.get('content')?.value || ''));
 
     // Cargar clientes disponibles
     this.catalogService.searchLogSources('').subscribe(
@@ -186,11 +196,96 @@ export class EntriesComponent implements OnInit, OnDestroy {
   }
 
   private extractTagsFromContent(content: string): string[] {
-    const tagRegex = /#(\w+)/g;
+    const tagRegex = /#([a-z][a-z0-9_-]{0,49})/gi;
     const matches = content.match(tagRegex);
     if (!matches) return [];
     
     return matches.map(tag => tag.substring(1).toLowerCase());
+  }
+
+  addTopTag(tag: string): void {
+    const normalizedTag = this.normalizeTag(tag);
+    if (!normalizedTag) {
+      return;
+    }
+
+    if (this.hasTagInContent(normalizedTag)) {
+      return;
+    }
+
+    const contentControl = this.entryForm.get('content');
+    if (!contentControl) {
+      return;
+    }
+
+    const currentValue = String(contentControl.value || '');
+    const separator = currentValue.length > 0 && !/\s$/.test(currentValue) ? ' ' : '';
+    const updatedValue = `${currentValue}${separator}#${normalizedTag}`;
+
+    if (updatedValue.length > this.contentMaxLength) {
+      this.snackBar.open('No se puede agregar el tag: se alcanzó el máximo de caracteres', 'Cerrar', { duration: 2500 });
+      return;
+    }
+
+    contentControl.setValue(updatedValue);
+    contentControl.markAsDirty();
+    contentControl.markAsTouched();
+  }
+
+  hasTagInContent(tag: string): boolean {
+    return this.contentTags.has(this.normalizeTag(tag));
+  }
+
+  private loadTopTags(): void {
+    this.tagService.getAll().subscribe({
+      next: (response) => {
+        const rawTags = Array.isArray((response as any)?.tags)
+          ? (response as any).tags
+          : Array.isArray(response as any)
+            ? (response as any)
+            : [];
+
+        const uniqueTags = new Set<string>();
+        const tags: string[] = rawTags
+          .map((tagInfo: unknown) => this.extractTagName(tagInfo))
+          .map((tagName: string) => this.normalizeTag(tagName))
+          .filter((tagName: string) => {
+            if (!tagName || uniqueTags.has(tagName)) {
+              return false;
+            }
+            uniqueTags.add(tagName);
+            return true;
+          });
+
+        this.topTags = tags.slice(0, 10);
+      },
+      error: () => {
+        this.topTags = [];
+      }
+    });
+  }
+
+  private syncContentTags(content: string): void {
+    this.contentTags = new Set(this.extractTagsFromContent(content));
+  }
+
+  private normalizeTag(tag: string): string {
+    return String(tag || '').trim().replace(/^#/, '').toLowerCase();
+  }
+
+  private extractTagName(tagInfo: unknown): string {
+    if (typeof tagInfo === 'string') {
+      return tagInfo;
+    }
+
+    if (!tagInfo || typeof tagInfo !== 'object') {
+      return '';
+    }
+
+    const source = tagInfo as Record<string, unknown>;
+    const candidates = [source['tag'], source['name'], source['_id']];
+    const found = candidates.find((value) => typeof value === 'string' && String(value).trim().length > 0);
+    return typeof found === 'string' ? found : '';
   }
 
   closeEasterEggOverlay(): void {

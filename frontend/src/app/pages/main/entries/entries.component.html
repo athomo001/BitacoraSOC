@@ -28,6 +28,27 @@
               </mat-form-field>
             </div>
 
+            <section class="top-tags-box">
+              <div class="top-tags-box__header">
+                <h3>TOP tags</h3>
+                <p>Haz clic para agregar al texto. Cada tag se inserta una sola vez.</p>
+              </div>
+              <div class="top-tags-list" *ngIf="topTags.length > 0; else noTopTags">
+                <button
+                  mat-stroked-button
+                  type="button"
+                  *ngFor="let tag of topTags"
+                  class="top-tag-button"
+                  [disabled]="hasTagInContent(tag)"
+                  (click)="addTopTag(tag)">
+                  #{{ tag }}
+                </button>
+              </div>
+              <ng-template #noTopTags>
+                <p class="top-tags-empty">Aun no hay tags frecuentes para sugerir.</p>
+              </ng-template>
+            </section>
+
             <!-- Área de texto GRANDE -->
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Escribe aquí. Usa # para tags (ej: #Trellix #hunting)</mat-label>

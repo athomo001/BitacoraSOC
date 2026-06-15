@@ -31,6 +31,7 @@ const Entry = require('../models/Entry');
 const { authenticate, authorize } = require('../middleware/auth');
 
 const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const TAG_VALIDATION_REGEX = /^[a-z][a-z0-9_-]{0,49}$/i;
 
 // Normaliza un nombre de tag: trim + lowercase y valida longitud
 const normalizeTagName = (name = '') => {
@@ -44,6 +45,7 @@ router.get('/', authenticate, async (req, res) => {
   try {
     const tags = await Entry.aggregate([
       { $unwind: '$tags' },
+      { $match: { tags: TAG_VALIDATION_REGEX } },
       { $group: { _id: '$tags', count: { $sum: 1 } } },
       { $project: { tag: '$_id', count: 1, _id: 0 } },
       { $sort: { count: -1, tag: 1 } }
@@ -61,6 +63,7 @@ router.get('/stats', authenticate, authorize('admin'), async (req, res) => {
   try {
     const tagStats = await Entry.aggregate([
       { $unwind: '$tags' },
+      { $match: { tags: TAG_VALIDATION_REGEX } },
       { $group: { _id: '$tags', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 50 },
@@ -78,7 +81,10 @@ router.get('/stats', authenticate, authorize('admin'), async (req, res) => {
 router.get('/list', authenticate, async (req, res) => {
   try {
     const tags = await Entry.distinct('tags');
-    res.json(tags.sort());
+    const safeTags = tags
+      .filter((tag) => typeof tag === 'string' && TAG_VALIDATION_REGEX.test(tag))
+      .sort();
+    res.json(safeTags);
   } catch (error) {
     console.error('Error al obtener lista de tags:', error);
     res.status(500).json({ message: 'Error al obtener tags' });
@@ -103,6 +109,7 @@ router.get('/suggest', authenticate, async (req, res) => {
     const tags = await Entry.aggregate([
       { $unwind: '$tags' },
       { $match: { tags: regex } },
+      { $match: { tags: TAG_VALIDATION_REGEX } },
       { $group: { _id: '$tags', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 10 },
