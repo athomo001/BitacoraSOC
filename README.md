@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: beta. Validar siempre los flujos criticos en un entorno controlado antes de pasar a operacion formal.
 >
-> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.5.94-beta**
+> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.5.99-beta**
 
 Stack principal:
 
@@ -79,6 +79,45 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 
 ## Novedades recientes (resumen rapido)
 
+### v1.5.99-beta (optimización de rendimiento PDF nativo y márgenes vectoriales)
+
+- reemplazo de generación de PDF pesada (jsPDF y html2canvas) por flujo de impresión nativa del navegador para evitar congelamiento de pantalla.
+- remoción del overlay y barra de carga obsoletos en el frontend para una experiencia instantánea.
+- estilización de páginas físicas en impresión forzando 100vh de altura y padding perimetral de 20mm arriba/abajo y 15mm a los lados.
+- anulación de márgenes en el contenedor global de impresión para evitar espaciados duplicados en el PDF.
+
+### v1.5.98-beta (reportes PDF: torta, conectores, leyenda y logo)
+
+- grafica de torta “Reportes Enviados” ajustada para mayor legibilidad y mejor proporcion visual en el informe consolidado.
+- leyenda sincronizada con todos los segmentos reales del pie chart (sin truncar items) y con numeracion correlativa visible.
+- conectores/lineas y etiquetas del pie chart restaurados y reforzados en contraste para mejorar lectura en pantalla y PDF.
+- logo de encabezado del informe en impresion ampliado para evitar visualizacion enana en exportacion PDF.
+- depuracion de reglas de impresion para ocultar bloques no imprimibles sin dejar espacio residual.
+
+### v1.5.97-beta (informe consolidado por periodo + narrativa)
+
+- nuevo informe ejecutivo consolidado por rango de fechas en la vista de estadisticas, con presets rapidos semanal, quincenal y mensual.
+- integracion de impresion/guardado PDF con layout formal multipagina para reporte ejecutivo.
+- incorporacion de grafica de tendencia temporal de eventos dentro del documento imprimible.
+- endpoint de backend para resumen de periodo con narrativa heuristica en lenguaje humano.
+- correccion de compatibilidad de template Angular usando casting con $any en bucles de datos.
+- ajuste de layout de impresion para evitar reporte completamente en blanco por restricciones de altura y overflow del shell.
+
+### v1.5.96-beta (checklist, condicion en turnos y fix entradas)
+
+- optimizacion visual de checklist: menor alto de textarea, menos espacio vertical y limpieza de encabezados redundantes.
+- normalizacion del termino Condicion en Gantt, filtros y formularios de turnos, manteniendo compatibilidad con API y datos existentes.
+- plantilla CSV de turnos con leyendas explicativas y soporte de lineas comentadas en backend.
+- solucion de error 500 en listado de entradas por casteo explicito de page y limit a enteros antes del pipeline de MongoDB.
+
+### v1.5.95-beta (directorio CSV y consolidacion SSO)
+
+- importacion masiva de directorio via CSV con parseo adaptable y resguardo de contactos de sistema.
+- descarga de plantilla CSV de ejemplo en frontend para estandarizar formato de carga.
+- consolidacion del panel de seguridad moviendo configuracion SSO al modulo HTTPS y SSO.
+- vinculacion inteligente de cuentas SSO con usuarios existentes para evitar duplicados.
+- ajuste estetico de tabla de directorio con mejor densidad visual y legibilidad.
+
 ### v1.5.94-beta (seguridad, MFA, SSO, PII y robustez)
 
 - **MFA (TOTP):** Autenticación multifactor por software configurable por usuario (activable por administrador) con enrolamiento de código QR.
@@ -89,48 +128,6 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 - **Restricciones del Rol Auditor:** Implementación de lista blanca para restringir backups, envíos de correo y datos sensibles al rol Auditor e Invitado.
 - **Segregación de Checklists por Turno:** Soporte para ejecuciones de checklist en paralelo agregando el campo `shiftId`.
 
-### v1.5.93-beta (permisos de asignaciones y tabla de teletrabajo)
-
-- nueva ruta publica `GET /api/escalation/assignments` para que analistas autenticados consulten asignaciones sin requerir rol admin.
-- separados los metodos `getAssignments()` (vista operativa) y `getAssignmentsAdmin()` (administracion de turnos) en el servicio frontend para evitar errores `403`.
-- estilos CSS completos para la tabla `excel-table` en la vista operativa: fila completa en rojo para vacaciones activas, azul para pronto-vacaciones.
-
-### v1.5.92-beta (teletrabajo y vacaciones en administracion de turnos)
-
-- roles `TELEWORK` y `VACATION` disponibles en el formulario de asignacion de `/main/admin/work-shifts`.
-- validacion de conflictos adaptativa: teletrabajo coexiste con turnos regulares; vacaciones dispara autoliberacion de turnos previos en backend.
-- notificacion al guardar vacaciones si se liberaron turnos automaticamente.
-- etiquetas en espanol en tabla, Gantt y tarjetas de proximidad.
-- importacion CSV acepta `Teletrabajo` y `Vacaciones` como roles validos.
-
-### v1.5.91-beta (UX y tabla de teletrabajo escalable)
-
-- autocomplete de clientes sin necesidad de borrar texto ni presionar X; el panel despliega todos los clientes si el valor actual ya coincide exactamente con la seleccion.
-- tabla escalable para el listado de personal en teletrabajo y apoyo con columnas Nombre, Correo (copiable), Telefono (copiable), Cargo y Situacion con badges de color.
-- soporte de estados: En Teletrabajo, En Oficina, VACACIONES (rojo), Pronto Vacaciones (azul, dentro de 2 semanas).
-
-### v1.5.89-beta (auditoria QA y UX/UI)
-
-- ajuste de contraste en flujo de recuperacion de contrasena en tema Matrix.
-- aviso de privacidad con branding dinamico desde la base de datos; consentimiento persistente en `localStorage`.
-- rediseno asimetrico de la vista de backups con layout de dos columnas.
-- easter egg `#bat` con HUD cyberpunk y mecanica de caceria interactiva.
-- correccion de texto borroso en el panel central (remocion de `will-change: transform`).
-- limites de recursos CPU/RAM en `docker-compose.yml` para todos los contenedores.
-- refactorizacion de helpers duplicados: `cookie-helper.js`, `boolean-helper.js`, `time-helper.js`, `date-utils.js`.
-- cierre de hallazgos de auditoria de seguridad: JWT denylist, rate-limit en MongoDB, CORS estricto, guards robustecidos.
-
-### v1.5.88-beta (ortografia y v1.5.87 / historial compartido)
-
-- correccion masiva de tildes y acentos en la UI (labels, placeholders, snackbars).
-- historial de reportes/boletines migrado a backend compartido para que todos los usuarios autenticados vean los envios del equipo.
-- borrado de historial restringido a rol admin.
-
-### v1.5.86-beta (hora oficial del servidor en turnos)
-
-- la vista de turnos semanales ahora usa hora oficial del backend como fuente de verdad.
-- el endpoint `GET /api/work-shifts/current` entrega `currentDateTime` y `currentTimestamp` para sincronizacion temporal robusta.
-- el Gantt calcula linea de dia actual y estados (`Pasado`, `En Curso`, `Proximo`) con tiempo de servidor.
 
 ### Estado IA local
 

@@ -1,4 +1,5 @@
 <div class="entries-container">
+  <!-- Centrado del título y optimización de espacio vertical en el panel de entradas -->
   <h1>Nueva Entrada</h1>
 
   <!-- Formulario de Nueva Entrada (PANTALLA PRINCIPAL) -->
@@ -30,7 +31,6 @@
 
             <section class="top-tags-box">
               <div class="top-tags-box__header">
-                <h3>TOP tags</h3>
                 <p>Haz clic para agregar al texto. Cada tag se inserta una sola vez.</p>
               </div>
               <div class="top-tags-list" *ngIf="topTags.length > 0; else noTopTags">
@@ -52,7 +52,7 @@
             <!-- Área de texto GRANDE -->
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Escribe aquí. Usa # para tags (ej: #Trellix #hunting)</mat-label>
-              <textarea matInput formControlName="content" rows="12"
+              <textarea matInput formControlName="content" rows="7"
                         maxlength="50000"
                         (input)="enforceContentMaxLength()"
                         placeholder="Escribe aquí. Usa # para tags (ej: #Trellix #hunting)"></textarea>

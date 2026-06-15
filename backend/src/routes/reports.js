@@ -1799,4 +1799,396 @@ router.post('/incident/send', authenticate, authorize('admin', 'user'), async (r
   }
 });
 
+/**
+ * GET /api/reports/period-summary
+ * Genera un resumen analítico y narrativo en lenguaje humano para un período de tiempo dado.
+ * Requiere parámetros query: startDate y endDate.
+ */
+router.get('/period-summary', authenticate, async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ message: 'Los parámetros startDate y endDate son requeridos.' });
+    }
+
+    const sDate = new Date(startDate);
+    const eDate = new Date(endDate);
+
+    if (isNaN(sDate.getTime()) || isNaN(eDate.getTime())) {
+      return res.status(400).json({ message: 'Las fechas proporcionadas no son válidas.' });
+    }
+
+    // Ajustar fin de día para abarcar el rango completo (hasta las 23:59:59.999) si se provee una fecha sin hora específica
+    if (endDate.length <= 10) {
+      eDate.setHours(23, 59, 59, 999);
+    }
+
+    // Consultar las entradas de bitácora creadas en el rango de fechas
+    const entries = await Entry.find({
+      createdAt: { $gte: sDate, $lte: eDate }
+    })
+      .populate('createdBy', 'username fullName')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Consultar checklists completados en el rango de fechas
+    const checklists = await ShiftCheck.find({
+      createdAt: { $gte: sDate, $lte: eDate }
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Procesar métricas numéricas agregadas
+    const entriesByType = { operativa: 0, incidente: 0, ofensa: 0 };
+    const tagsMap = new Map();
+    const analystsMap = new Map();
+    const clientsMap = new Map();
+
+    entries.forEach(e => {
+      if (entriesByType[e.entryType] !== undefined) {
+        entriesByType[e.entryType]++;
+      }
+      if (Array.isArray(e.tags)) {
+        e.tags.forEach(tag => {
+          const t = tag.trim().toLowerCase();
+          if (t) tagsMap.set(t, (tagsMap.get(t) || 0) + 1);
+        });
+      }
+      const analystName = e.createdBy?.fullName || e.createdByUsername || 'Sistema/Invitado';
+      analystsMap.set(analystName, (analystsMap.get(analystName) || 0) + 1);
+
+      const client = e.clientName || 'Cliente interno';
+      clientsMap.set(client, (clientsMap.get(client) || 0) + 1);
+    });
+
+    const totalChecklists = checklists.length;
+    const nokChecklists = checklists.filter(c => c.hasRedServices);
+    const totalNok = nokChecklists.length;
+    const totalOk = totalChecklists - totalNok;
+
+    // Obtener desglose de fallas en checklists y agrupar observaciones por servicio
+    const nokServicesMap = new Map();
+    const checklistObservations = [];
+
+    nokChecklists.forEach(c => {
+      if (Array.isArray(c.services)) {
+        c.services.forEach(s => {
+          if (s.status === 'rojo') {
+            nokServicesMap.set(s.serviceTitle, (nokServicesMap.get(s.serviceTitle) || 0) + 1);
+            if (s.observation && s.observation.trim()) {
+              checklistObservations.push({
+                serviceTitle: s.serviceTitle,
+                observation: s.observation.trim(),
+                user: c.username || 'Analista',
+                createdAt: c.createdAt
+              });
+            }
+          }
+        });
+      }
+    });
+
+    // Formatear listas de tops ordenados
+    const topTags = Array.from(tagsMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 15)
+      .map(([name, value]) => ({ name, value }));
+
+    const topAnalysts = Array.from(analystsMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, value]) => ({ name, value }));
+
+    const topClients = Array.from(clientsMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, value]) => ({ name, value }));
+
+    const topNokServices = Array.from(nokServicesMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, value]) => ({ name, value }));
+
+    // Filtrar incidentes críticos para el reporte
+    const criticalIncidents = entries
+      .filter(e => e.entryType === 'incidente' || e.entryType === 'ofensa')
+      .map(e => ({
+        _id: e._id,
+        entryType: e.entryType,
+        content: e.content,
+        clientName: e.clientName || 'Cliente interno',
+        createdByUsername: e.createdByUsername,
+        createdAt: e.createdAt
+      }));
+
+    // Generar la narrativa en lenguaje humano
+    const narrative = generateHeuristicNarrative(entries, checklists, sDate, eDate);
+
+    // Calcular la tendencia diaria de entradas por tipo para el gráfico temporal del período consolidado
+    const trendAgg = await Entry.aggregate([
+      { $match: { createdAt: { $gte: sDate, $lte: eDate } } },
+      {
+        $group: {
+          _id: {
+            date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'America/Santiago' } },
+            type: '$entryType'
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id.date': 1 } }
+    ]);
+
+    // Crear un mapa temporal indexado por tipo de entrada para poblar todas las fechas del rango sin omitir días sin actividad
+    const trendMap = {
+      operativa: new Map(),
+      incidente: new Map(),
+      ofensa: new Map()
+    };
+
+    // Inicializar el cursor de fechas barriendo el rango completo
+    const dateCursor = new Date(sDate);
+    const endDateCursor = new Date(eDate);
+    while (dateCursor <= endDateCursor) {
+      const dateStr = dateCursor.toISOString().split('T')[0];
+      trendMap.operativa.set(dateStr, 0);
+      trendMap.incidente.set(dateStr, 0);
+      trendMap.ofensa.set(dateStr, 0);
+      dateCursor.setDate(dateCursor.getDate() + 1);
+    }
+
+    // Incorporar los conteos reales provenientes de la agregación de la base de datos
+    trendAgg.forEach(item => {
+      const type = item._id.type;
+      const dateStr = item._id.date;
+      if (trendMap[type]) {
+        trendMap[type].set(dateStr, item.count);
+      }
+    });
+
+    // Construir la estructura multiserie final esperada por NGX-Charts
+    const periodTrend = [
+      {
+        name: 'Operativas',
+        series: Array.from(trendMap.operativa.entries()).map(([name, value]) => ({ name, value }))
+      },
+      {
+        name: 'Incidentes',
+        series: Array.from(trendMap.incidente.entries()).map(([name, value]) => ({ name, value }))
+      },
+      {
+        name: 'Ofensas',
+        series: Array.from(trendMap.ofensa.entries()).map(([name, value]) => ({ name, value }))
+      }
+    ];
+
+    // Calcular el top de reportes de incidentes enviados a clientes durante el período
+    const mailLogs = await AuditLog.find({
+      timestamp: { $gte: sDate, $lte: eDate },
+      event: { $in: ['mail.incident.sent', 'mail.send.success'] },
+      'metadata.sourceModule': 'ReportGenerator'
+    }).select('metadata').lean();
+
+    const mailClientsMap = new Map();
+    mailLogs.forEach(log => {
+      const metadata = log.metadata || {};
+      const clientLabel = resolveClientLabelFromMetadata(metadata);
+      if (clientLabel) {
+        mailClientsMap.set(clientLabel, (mailClientsMap.get(clientLabel) || 0) + 1);
+      }
+    });
+
+    const mailClientsBreakdown = Array.from(mailClientsMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, value]) => ({ name, value }));
+
+    // Obtener los últimos 5 boletines de seguridad enviados en el período
+    const recentNewsletters = await ReportHistory.find({
+      type: 'newsletter',
+      timestamp: { $gte: sDate, $lte: eDate }
+    })
+      .sort({ timestamp: -1 })
+      .limit(5)
+      .select('title timestamp')
+      .lean();
+
+    const recentBulletins = recentNewsletters.map(n => ({
+      title: n.title,
+      timestamp: n.timestamp
+    }));
+
+    // Auditar la generación del reporte
+    await audit(req, {
+      event: 'user.reports.period_summary.generate',
+      level: 'info',
+      result: { success: true },
+      metadata: {
+        startDate,
+        endDate,
+        entriesCount: entries.length,
+        checklistsCount: totalChecklists
+      }
+    }).catch(err => console.error('[period-summary] audit error:', err.message));
+
+    res.json({
+      period: { startDate: sDate, endDate: eDate },
+      entriesCount: {
+        total: entries.length,
+        ...entriesByType
+      },
+      checklistsCount: {
+        total: totalChecklists,
+        ok: totalOk,
+        nok: totalNok
+      },
+      topTags,
+      topAnalysts,
+      topClients,
+      topNokServices,
+      checklistObservations,
+      criticalIncidents,
+      narrative,
+      periodTrend,
+      mailClientsBreakdown,
+      recentBulletins
+    });
+  } catch (error) {
+    console.error('Error generando resumen de periodo:', error);
+    res.status(500).json({ message: 'Error interno del servidor al generar el resumen de periodo.' });
+  }
+});
+
+// Función auxiliar para construir la narrativa de negocio de manera estructurada y formal
+function generateHeuristicNarrative(entries, checklists, sDate, eDate) {
+  const totalEntries = entries.length;
+  const entriesByType = { operativa: 0, incidente: 0, ofensa: 0 };
+  const tagsCount = {};
+  const analystCount = {};
+  const clientCount = {};
+
+  entries.forEach(e => {
+    if (entriesByType[e.entryType] !== undefined) {
+      entriesByType[e.entryType]++;
+    }
+    if (Array.isArray(e.tags)) {
+      e.tags.forEach(t => {
+        tagsCount[t] = (tagsCount[t] || 0) + 1;
+      });
+    }
+    const userKey = e.createdBy?.fullName || e.createdByUsername || 'Sistema/Invitado';
+    analystCount[userKey] = (analystCount[userKey] || 0) + 1;
+
+    const client = e.clientName || 'Cliente interno';
+    clientCount[client] = (clientCount[client] || 0) + 1;
+  });
+
+  const totalChecklists = checklists.length;
+  const nokChecklists = checklists.filter(c => c.hasRedServices);
+  const totalNok = nokChecklists.length;
+
+  const serviceNokCount = {};
+  const observationsList = [];
+  nokChecklists.forEach(c => {
+    if (Array.isArray(c.services)) {
+      c.services.forEach(s => {
+        if (s.status === 'rojo') {
+          serviceNokCount[s.serviceTitle] = (serviceNokCount[s.serviceTitle] || 0) + 1;
+          if (s.observation && s.observation.trim()) {
+            observationsList.push({
+              service: s.serviceTitle,
+              observation: s.observation.trim(),
+              user: c.username || 'Analista'
+            });
+          }
+        }
+      });
+    }
+  });
+
+  const sortedTags = Object.entries(tagsCount).sort((a, b) => b[1] - a[1]);
+  const sortedAnalysts = Object.entries(analystCount).sort((a, b) => b[1] - a[1]);
+  const sortedClients = Object.entries(clientCount).sort((a, b) => b[1] - a[1]);
+  const sortedNokServices = Object.entries(serviceNokCount).sort((a, b) => b[1] - a[1]);
+
+  const options = { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Santiago' };
+  const sDateStr = sDate.toLocaleDateString('es-CL', options);
+  const eDateStr = eDate.toLocaleDateString('es-CL', options);
+
+  // 1. Resumen Ejecutivo
+  let resumenEjecutivo = `Durante el período comprendido desde el ${sDateStr} hasta el ${eDateStr}, la operación del SOC registró un total de ${totalEntries} entradas en la bitácora `;
+  if (totalEntries === 0) {
+    resumenEjecutivo += `operativa, lo que indica un período de actividad extremadamente bajo o sin registros reportados en los sistemas. `;
+  } else {
+    resumenEjecutivo += `y se llevaron a cabo ${totalChecklists} evaluaciones de checklists de turno. `;
+    const mostCommonType = Object.entries(entriesByType).sort((a, b) => b[1] - a[1])[0];
+    resumenEjecutivo += `El flujo principal de registros estuvo enfocado en actividades de tipo "${mostCommonType[0]}" (${mostCommonType[1]} registros). `;
+    
+    if (entriesByType.incidente > 0 || entriesByType.ofensa > 0) {
+      resumenEjecutivo += `Se detectaron e investigaron un total de ${entriesByType.incidente} incidentes y ${entriesByType.ofensa} ofensas de seguridad, las cuales requirieron análisis técnico e intervenciones oportunas para mitigar riesgos. `;
+    } else {
+      resumenEjecutivo += `No se reportaron incidentes ni ofensas críticas de seguridad durante este lapso, manteniendo una operación estable y nominal en toda la infraestructura de los clientes. `;
+    }
+  }
+
+  // 2. Análisis de Actividad y Comportamiento de Bitácora
+  let analisisActividad = `En relación con el comportamiento de la bitácora, `;
+  if (totalEntries > 0) {
+    if (sortedAnalysts.length > 0) {
+      analisisActividad += `el analista más activo del período fue ${sortedAnalysts[0][0]} con ${sortedAnalysts[0][1]} registros cargados. `;
+    }
+    if (sortedClients.length > 0) {
+      analisisActividad += `Los esfuerzos de monitoreo y análisis se concentraron principalmente en el origen o cliente "${sortedClients[0][0]}" con un volumen de ${sortedClients[0][1]} registros. `;
+    }
+    if (sortedTags.length > 0) {
+      const topTagsStr = sortedTags.slice(0, 3).map(t => `#${t[0]} (${t[1]} veces)`).join(', ');
+      analisisActividad += `Las etiquetas (tags) más recurrentes dentro de las bitácoras fueron: ${topTagsStr}, lo que denota una concentración operativa en estas temáticas específicas. `;
+    }
+  } else {
+    analisisActividad += `no se dispone de suficiente información de bitácora para evaluar picos o tendencias de analistas. `;
+  }
+
+  // 3. Análisis de Infraestructura y Checklists de Turno
+  let analisisInfraestructura = `Respecto a los checklists de infraestructura y servicios del turno, se registraron ${totalChecklists} revisiones en total, de las cuales `;
+  if (totalChecklists > 0) {
+    if (totalNok === 0) {
+      analisisInfraestructura += `todas finalizaron en estado "OK" (nominal). No se registraron fallas operacionales ni caídas de servicios críticos en los controles de inicio y cierre de turno. `;
+    } else {
+      analisisInfraestructura += `${totalNok} resultaron en estado "NOK" (con problemas detectados), representando el ${Math.round((totalNok / totalChecklists) * 100)}% del total de las revisiones. `;
+      if (sortedNokServices.length > 0) {
+        analisisInfraestructura += `El servicio que reportó la mayor cantidad de alertas fue "${sortedNokServices[0][0]}" con ${sortedNokServices[0][1]} registros en estado rojo. `;
+      }
+      if (observationsList.length > 0) {
+        const obsSample = observationsList.slice(0, 2).map(o => `"${o.observation}" en el servicio [${o.service}]`).join(' y ');
+        analisisInfraestructura += `Entre las bitácoras del equipo técnico, destacan detalles de error como: ${obsSample}. `;
+      }
+    }
+  } else {
+    analisisInfraestructura += `no se registraron evaluaciones de cambio de turno durante este rango de fechas. `;
+  }
+
+  // 4. Diagnóstico del Estado Actual ("Qué está pasando")
+  let diagnosticoActual = `Al concluir el análisis del período, `;
+  if (checklists.length > 0) {
+    const lastCheck = checklists[0]; // Ordenado desc por fecha (más reciente primero)
+    const lastCheckDateStr = new Date(lastCheck.createdAt).toLocaleString('es-CL', { timeZone: 'America/Santiago' });
+    if (lastCheck.hasRedServices) {
+      const redServicesNames = lastCheck.services.filter(s => s.status === 'rojo').map(s => s.serviceTitle).join(', ');
+      diagnosticoActual += `el último checklist realizado el ${lastCheckDateStr} reporta servicios caídos o en estado crítico: [${redServicesNames}]. Esto indica que la infraestructura del SOC mantiene incidentes activos o alertas pendientes de resolución. `;
+    } else {
+      diagnosticoActual += `el último checklist del turno (realizado el ${lastCheckDateStr}) finalizó en estado "OK" (completamente nominal), lo que denota que los servicios críticos del SOC se encuentran estables y operando sin anomalías reportadas en este momento. `;
+    }
+  } else {
+    diagnosticoActual += `no es posible determinar el estado operacional actual debido a la falta de checklists recientes en el sistema. `;
+  }
+
+  return {
+    resumenEjecutivo,
+    analisisActividad,
+    analisisInfraestructura,
+    diagnosticoActual
+  };
+}
+
 module.exports = router;

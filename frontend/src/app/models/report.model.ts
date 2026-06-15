@@ -108,3 +108,49 @@ export interface MailAnalytics {
     clientMissing: number;
   };
 }
+
+export interface PeriodSummaryReport {
+  period: { startDate: string | Date; endDate: string | Date };
+  entriesCount: {
+    total: number;
+    operativa: number;
+    incidente: number;
+    ofensa: number;
+  };
+  checklistsCount: {
+    total: number;
+    ok: number;
+    nok: number;
+  };
+  topTags: Array<{ name: string; value: number }>;
+  topAnalysts: Array<{ name: string; value: number }>;
+  topClients: Array<{ name: string; value: number }>;
+  topNokServices: Array<{ name: string; value: number }>;
+  checklistObservations: Array<{
+    serviceTitle: string;
+    observation: string;
+    user: string;
+    createdAt: string | Date;
+  }>;
+  criticalIncidents: Array<{
+    _id: string;
+    entryType: string;
+    content: string;
+    clientName: string;
+    createdByUsername: string;
+    createdAt: string | Date;
+  }>;
+  narrative: {
+    resumenEjecutivo: string;
+    analisisActividad: string;
+    analisisInfraestructura: string;
+    diagnosticoActual: string;
+  };
+  periodTrend: Array<{
+    name: string;
+    series: Array<{ name: string; value: number }>;
+  }>;
+  mailClientsBreakdown: Array<{ name: string; value: number }>;
+  recentBulletins: Array<{ title: string; timestamp: string | Date }>;
+}
+

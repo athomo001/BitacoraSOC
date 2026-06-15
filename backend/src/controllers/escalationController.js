@@ -237,25 +237,46 @@ const splitCsvLine = (line = '') => {
   return values;
 };
 
+// Generación de la plantilla CSV con comentarios explicativos sobre los valores válidos para Condición (antes Rol)
 const formatShiftAssignmentsTemplateCsv = () => ([
-  'rol,usuario,fechaInicio,horaInicio,fechaFin,horaFin',
+  '# LEYENDA E INSTRUCCIONES DE IMPORTACIÓN DE TURNOS',
+  '# ------------------------------------------------',
+  '# Columna "condicion": Especifica el estado administrativo o técnico del analista en el turno.',
+  '# Valores válidos permitidos:',
+  '#   - N2 (Operador N2)',
+  '#   - TI (Especialista TI)',
+  '#   - N1 (Guardia N1 No Hábil)',
+  '#   - Teletrabajo (o TELEWORK)',
+  '#   - Vacaciones (o VACATION)',
+  '# Columna "usuario": Username, correo electrónico o nombre completo registrado del analista.',
+  '# Columna "fechaInicio" / "fechaFin": Fecha en formato AAAA-MM-DD (Ej: 2026-06-15)',
+  '# Columna "horaInicio" / "horaFin": Hora en formato HH:MM de 24 horas (Ej: 09:00)',
+  '# ------------------------------------------------',
+  'condicion,usuario,fechaInicio,horaInicio,fechaFin,horaFin',
   'N2,usuario.n2,2026-05-04,09:00,2026-05-11,08:59',
   'TI,usuario.ti,2026-05-04,09:00,2026-05-11,08:59',
-  'N1,guardia.externa,2026-05-04,09:00,2026-05-11,08:59'
+  'Vacaciones,usuario.n2,2026-05-11,09:00,2026-05-18,08:59'
 ].join('\n'));
 
+// Procesador de CSV que ignora líneas explicativas y mapea 'condición' a 'rol' para mantener la lógica interna
 const parseShiftAssignmentsCsv = (csvText = '') => {
   const text = String(csvText || '').replace(/^\uFEFF/, '').trim();
   if (!text) {
     return { rows: [], errors: [{ row: 0, message: 'CSV vacío' }] };
   }
 
-  const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  // Filtrar las líneas vacías y omitir las que comiencen con '#' para las leyendas de ayuda
+  const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0 && !line.trim().startsWith('#'));
   if (lines.length < 2) {
     return { rows: [], errors: [{ row: 0, message: 'El CSV debe incluir encabezado y al menos una fila' }] };
   }
 
-  const headers = splitCsvLine(lines[0]).map((header) => header.trim().toLowerCase());
+  // Mapear 'condicion' o 'condición' a 'rol' para asegurar compatibilidad con la base de datos
+  const headers = splitCsvLine(lines[0]).map((header) => {
+    const h = header.trim().toLowerCase();
+    if (h === 'condicion' || h === 'condición') return 'rol';
+    return h;
+  });
   const requiredHeaders = ['rol', 'usuario', 'fechainicio', 'horainicio', 'fechafin', 'horafin'];
   const missingHeaders = requiredHeaders.filter((header) => !headers.includes(header));
 
@@ -282,7 +303,7 @@ const parseShiftAssignmentsCsv = (csvText = '') => {
     }
 
     if (!row.rol || !row.usuario || !row.fechainicio || !row.horainicio || !row.fechafin || !row.horafin) {
-      errors.push({ row: row.rowNumber, message: 'Fila incompleta. Revisa rol, usuario y fechas/horas.' });
+      errors.push({ row: row.rowNumber, message: 'Fila incompleta. Revisa condicion, usuario y fechas/horas.' });
       continue;
     }
 
@@ -1668,8 +1689,9 @@ exports.importAssignmentsCsv = async (req, res) => {
         if (rawRol === 'TELETRABAJO') rawRol = 'TELEWORK';
         if (rawRol === 'VACACIONES') rawRol = 'VACATION';
         const roleCode = rawRol === 'N1' ? 'N1_NO_HABIL' : rawRol;
+        // Validar que la condición ingresada esté dentro del listado permitido de valores administrativos y técnicos
         if (!['N2', 'TI', 'N1_NO_HABIL', 'TELEWORK', 'VACATION'].includes(roleCode)) {
-          throw new Error(`Rol inválido: ${rawRol}. Usa N1, N2, TI, Teletrabajo o Vacaciones`);
+          throw new Error(`Condición inválida: ${rawRol}. Usa N1, N2, TI, Teletrabajo o Vacaciones`);
         }
 
         const weekStartDate = buildAssignmentDateTime(row.fechainicio || row.weekstartdate, row.horainicio || row.weekstarttime);

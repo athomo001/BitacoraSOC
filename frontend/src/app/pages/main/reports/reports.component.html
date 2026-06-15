@@ -476,10 +476,361 @@
     </section>
 
     <!-- Acciones -->
-    <div class="form-actions">
+    <div class="form-actions no-print">
       <button mat-raised-button color="primary" (click)="exportEntries()">
         <mat-icon aria-hidden="true">download</mat-icon>
         Exportar Entradas a CSV
+      </button>
+    </div>
+
+    <!-- Generador de Informes de Período -->
+    <section class="chart-card reports-panel no-print period-report-selector-panel">
+      <header class="reports-panel__header">
+        <h2 class="reports-panel__title">📋 Generar Informe de Actividad SOC</h2>
+      </header>
+      <div class="reports-panel__body">
+        <p class="chart-description">
+          Selecciona un rango de fechas o un período predefinido para consolidar la bitácora y los checklists, y generar un informe completo listo para imprimir o guardar como PDF.
+        </p>
+        
+        <div class="period-controls-grid">
+          <!-- Preset Selector -->
+          <div class="control-field">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Período Predefinido</mat-label>
+              <mat-select [(ngModel)]="presetSelected" (selectionChange)="onPresetChange()">
+                <mat-option value="semana">Últimos 7 días (Semanal)</mat-option>
+                <mat-option value="quincena">Últimos 15 días (Quincenal)</mat-option>
+                <mat-option value="mes">Últimos 30 días (Mensual)</mat-option>
+                <mat-option value="personalizado">Rango Personalizado</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+
+          <!-- Rango de fecha manual -->
+          <div class="control-field date-inputs-container">
+            <div class="input-date-wrapper">
+              <label class="custom-date-label">Desde</label>
+              <input type="date" class="custom-date-input" [(ngModel)]="reportStartDate" [disabled]="presetSelected !== 'personalizado'">
+            </div>
+            <div class="input-date-wrapper">
+              <label class="custom-date-label">Hasta</label>
+              <input type="date" class="custom-date-input" [(ngModel)]="reportEndDate" [disabled]="presetSelected !== 'personalizado'">
+            </div>
+          </div>
+
+          <!-- Acción de Generar -->
+          <div class="control-field action-button-container">
+            <button mat-raised-button color="accent" class="btn-generate-report" (click)="generatePeriodReport()">
+              <mat-icon aria-hidden="true">analytics</mat-icon>
+              Analizar y Generar
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Indicador de carga -->
+    <div *ngIf="isGeneratingPeriodReport" class="report-loading-container no-print">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>Generando resumen analítico y redactando narrativa en lenguaje humano...</p>
+    </div>
+
+    <!-- Vista Previa del Informe Imprimible Estructurada por Páginas -->
+    <article class="print-report-sheet" *ngIf="showPeriodReportPreview && periodReportData">
+      
+      <!-- PÁGINA 1: Encabezado Principal y Resumen Ejecutivo -->
+      <div class="report-pdf-page" id="pdfPage1">
+        <!-- Encabezado del documento formal (Visible solo en impresión o como preview físico) -->
+        <header class="report-document-header">
+          <div class="header-logo-title-row">
+            <div class="report-app-logo-container">
+              <img *ngIf="logoUrl" [src]="getAssetUrl(logoUrl)" alt="Logo Branding" class="report-branding-logo">
+              <div *ngIf="!logoUrl" class="report-app-logo-fallback">🛡️</div>
+            </div>
+            <div class="report-brand-title">
+              <h2>INFORME EJECUTIVO DE OPERACIONES</h2>
+              <p class="report-subtitle">Bitácora Consolidada e Infraestructura</p>
+            </div>
+          </div>
+          <div class="report-metadata-bar">
+            <div class="metadata-item period-highlight">
+              <strong>PERÍODO EVALUADO:</strong> 
+              <span class="date-range-text">{{ periodReportData.period.startDate | date:'dd/MM/yyyy' }} al {{ periodReportData.period.endDate | date:'dd/MM/yyyy' }}</span>
+              <span class="days-badge">({{ calculateReportDays(periodReportData.period.startDate, periodReportData.period.endDate) }} días de análisis)</span>
+            </div>
+            <div class="metadata-item">
+              <strong>Fecha de emisión:</strong> {{ todayDate | date:'dd/MM/yyyy HH:mm' }}
+            </div>
+          </div>
+        </header>
+
+        <!-- SECCIÓN 1: Narrativa en Lenguaje Humano (Resumen Ejecutivo) -->
+        <section class="report-document-section">
+          <h3 class="section-title-document"><mat-icon>chat_bubble_outline</mat-icon> 1. Resumen Ejecutivo</h3>
+          
+          <div class="narrative-body-container">
+            <div class="narrative-paragraph-card">
+              <h4>Operación General</h4>
+              <p>{{ periodReportData.narrative.resumenEjecutivo }}</p>
+            </div>
+
+            <div class="narrative-paragraph-card">
+              <h4>Análisis de Actividad en Bitácoras</h4>
+              <p>{{ periodReportData.narrative.analisisActividad }}</p>
+            </div>
+
+            <div class="narrative-paragraph-card">
+              <h4>Estado de la Infraestructura (Checklists)</h4>
+              <p>{{ periodReportData.narrative.analisisInfraestructura }}</p>
+            </div>
+
+            <div class="narrative-paragraph-card alert-highlight">
+              <h4>Diagnóstico de Situación Actual</h4>
+              <p>{{ periodReportData.narrative.diagnosticoActual }}</p>
+            </div>
+          </div>
+        </section>
+
+        <footer class="report-document-footer-decor">
+          <span class="footer-decor-text">Confidencial - Uso SOC Interno</span>
+        </footer>
+      </div>
+
+      <!-- PÁGINA 2: KPIs, Gráficas y Boletines -->
+      <div class="report-pdf-page" id="pdfPage2">
+        <header class="report-document-mini-header">
+          <div class="mini-header-logo-container">
+            <img *ngIf="logoUrl" [src]="getAssetUrl(logoUrl)" alt="Logo Branding" class="report-branding-logo-mini">
+            <div *ngIf="!logoUrl" class="report-app-logo-fallback-mini">🛡️</div>
+          </div>
+          <div class="mini-header-brand-title">
+            <h3>INFORME EJECUTIVO DE OPERACIONES SOC</h3>
+            <p class="report-subtitle-mini">Período: {{ periodReportData.period.startDate | date:'dd/MM/yyyy' }} al {{ periodReportData.period.endDate | date:'dd/MM/yyyy' }}</p>
+          </div>
+        </header>
+
+        <!-- SECCIÓN 2: Métricas y KPIs Consolidados -->
+        <section class="report-document-section">
+          <h3 class="section-title-document"><mat-icon>insert_chart_outlined</mat-icon> 2. KPIs y Métricas del Período</h3>
+          
+          <div class="report-kpi-grid">
+            <div class="report-kpi-box">
+              <span class="kpi-num">{{ periodReportData.entriesCount.total }}</span>
+              <span class="kpi-txt">Entradas Totales</span>
+            </div>
+            <div class="report-kpi-box">
+              <span class="kpi-num">{{ periodReportData.entriesCount.operativa }}</span>
+              <span class="kpi-txt">Operativas</span>
+            </div>
+            <div class="report-kpi-box rojo">
+              <span class="kpi-num">{{ periodReportData.entriesCount.incidente }}</span>
+              <span class="kpi-txt">Incidentes</span>
+            </div>
+            <div class="report-kpi-box naranja">
+              <span class="kpi-num">{{ periodReportData.entriesCount.ofensa }}</span>
+              <span class="kpi-txt">Ofensas</span>
+            </div>
+            <div class="report-kpi-box">
+              <span class="kpi-num">{{ periodReportData.checklistsCount.total }}</span>
+              <span class="kpi-txt">Checklists Evaluados</span>
+            </div>
+            <div class="report-kpi-box verde">
+              <span class="kpi-num">{{ periodReportData.checklistsCount.ok }}</span>
+              <span class="kpi-txt">Checklists OK</span>
+            </div>
+            <div class="report-kpi-box rojo">
+              <span class="kpi-num">{{ periodReportData.checklistsCount.nok }}</span>
+              <span class="kpi-txt">Checklists NOK</span>
+            </div>
+          </div>
+
+          <!-- Distribución e Impactos en formato visual de 3 columnas -->
+          <div class="period-report-tops-row">
+            <div class="top-list-block" *ngIf="periodReportData.topTags.length > 0">
+              <h4>🏷️ Tags Recurrentes (Top 5)</h4>
+              <ul>
+                <li *ngFor="let item of periodReportData.topTags | slice:0:5">
+                  <span>#{{ $any(item).name }}</span>
+                  <strong>{{ $any(item).value }} registros</strong>
+                </li>
+              </ul>
+            </div>
+
+            <div class="top-list-block" *ngIf="periodReportData.topClients.length > 0">
+              <h4>🖥️ Clientes con Registros (Top 5)</h4>
+              <ul>
+                <li *ngFor="let item of periodReportData.topClients | slice:0:5">
+                  <span>{{ $any(item).name }}</span>
+                  <strong>{{ $any(item).value }} registros</strong>
+                </li>
+              </ul>
+            </div>
+
+            <!-- Nueva gráfica de torta de reportes enviados a clientes (Req 5) -->
+            <div class="top-list-block pie-chart-block" *ngIf="periodReportData.mailClientsBreakdown && periodReportData.mailClientsBreakdown.length > 0">
+              <h4>📊 Reportes Enviados</h4>
+              <div class="pie-chart-container">
+                <ngx-charts-pie-chart
+                  [view]="[360, 220]"
+                  [results]="periodReportData.mailClientsBreakdown"
+                  [scheme]="colorScheme"
+                  [animations]="false"
+                  [labels]="true"
+                  [legend]="false">
+                </ngx-charts-pie-chart>
+                <div class="pie-chart-legend">
+                  <div class="legend-item" *ngFor="let item of periodReportData.mailClientsBreakdown; let i = index">
+                    <span class="legend-index">{{ i + 1 }}</span>
+                    <span class="legend-dot" [style.background-color]="colorScheme.domain[i]"></span>
+                    <span class="legend-text" [title]="item.name">{{ item.name }} ({{ item.value }})</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Gráfica de tendencia temporal de eventos en el período consolidado -->
+          <div class="period-report-chart-container" *ngIf="periodReportData.periodTrend && periodReportData.periodTrend.length > 0">
+            <h4 class="chart-title-document">📈 Distribución Temporal de Eventos</h4>
+            <div class="period-chart-wrapper">
+              <ngx-charts-line-chart
+                [view]="[840, 200]"
+                [results]="periodReportData.periodTrend"
+                [xAxis]="true"
+                [yAxis]="true"
+                [legend]="true"
+                [showXAxisLabel]="false"
+                [showYAxisLabel]="true"
+                yAxisLabel="Entradas"
+                [scheme]="colorScheme"
+                [animations]="false">
+              </ngx-charts-line-chart>
+            </div>
+          </div>
+
+          <!-- Nuevos últimos 5 boletines de seguridad enviados (Req 6) -->
+          <div class="recent-bulletins-block" *ngIf="periodReportData.recentBulletins && periodReportData.recentBulletins.length > 0">
+            <h4>📨 Últimos 5 Boletines de Seguridad Enviados</h4>
+            <ul class="bulletins-list">
+              <li *ngFor="let bulletin of periodReportData.recentBulletins">
+                <mat-icon>mail_outline</mat-icon>
+                <span class="bulletin-title" [title]="bulletin.title">{{ bulletin.title }}</span>
+                <span class="bulletin-date">{{ bulletin.timestamp | date:'dd/MM/yyyy HH:mm' }}</span>
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <footer class="report-document-footer-decor">
+          <span class="footer-decor-text">Confidencial - Uso SOC Interno</span>
+        </footer>
+      </div>
+
+      <!-- PÁGINA 3: Detalle de Incidentes Críticos (Opcional) -->
+      <div class="report-pdf-page" id="pdfPage3" *ngIf="periodReportData.criticalIncidents.length > 0">
+        <header class="report-document-mini-header">
+          <div class="mini-header-logo-container">
+            <img *ngIf="logoUrl" [src]="getAssetUrl(logoUrl)" alt="Logo Branding" class="report-branding-logo-mini">
+            <div *ngIf="!logoUrl" class="report-app-logo-fallback-mini">🛡️</div>
+          </div>
+          <div class="mini-header-brand-title">
+            <h3>INFORME EJECUTIVO DE OPERACIONES SOC</h3>
+            <p class="report-subtitle-mini">Período: {{ periodReportData.period.startDate | date:'dd/MM/yyyy' }} al {{ periodReportData.period.endDate | date:'dd/MM/yyyy' }}</p>
+          </div>
+        </header>
+
+        <!-- SECCIÓN 3: Detalle de Incidentes Críticos -->
+        <section class="report-document-section">
+          <h3 class="section-title-document"><mat-icon>warning_amber</mat-icon> 3. Bitácora de Incidentes y Ofensas Críticas</h3>
+          <p class="section-desc">Listado detallado de los incidentes y ofensas registrados por los analistas durante el período.</p>
+          
+          <table class="report-document-table">
+            <thead>
+              <tr>
+                <th>Fecha y Hora</th>
+                <th>Tipo</th>
+                <th>Cliente / Log Source</th>
+                <th>Detalle del Incidente</th>
+                <th>Analista</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of periodReportData.criticalIncidents | slice:0:15">
+                <td class="col-date">{{ item.createdAt | date:'dd/MM/yyyy HH:mm' }}</td>
+                <td class="col-type"><span class="badge" [class.badge-incidente]="item.entryType === 'incidente'" [class.badge-ofensa]="item.entryType === 'ofensa'">{{ item.entryType | uppercase }}</span></td>
+                <td class="col-client">{{ item.clientName }}</td>
+                <td class="col-content">
+                  {{ (item.content.length > 180) ? (item.content | slice:0:180) + '...' : item.content }}
+                </td>
+                <td class="col-user">{{ item.createdByUsername }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="report-table-limit-notice" *ngIf="periodReportData.criticalIncidents.length > 15">
+            * Mostrando únicamente los 15 incidentes/ofensas más recientes de un total de {{ periodReportData.criticalIncidents.length }}. El listado completo se encuentra disponible en la consola.
+          </p>
+        </section>
+
+        <footer class="report-document-footer-decor">
+          <span class="footer-decor-text">Confidencial - Uso SOC Interno</span>
+        </footer>
+      </div>
+  
+      <!-- PÁGINA 4: Observaciones de Checklist con Fallas (Opcional) -->
+      <div class="report-pdf-page" id="pdfPage4" *ngIf="periodReportData.checklistObservations.length > 0">
+        <header class="report-document-mini-header">
+          <div class="mini-header-logo-container">
+            <img *ngIf="logoUrl" [src]="getAssetUrl(logoUrl)" alt="Logo Branding" class="report-branding-logo-mini">
+            <div *ngIf="!logoUrl" class="report-app-logo-fallback-mini">🛡️</div>
+          </div>
+          <div class="mini-header-brand-title">
+            <h3>INFORME EJECUTIVO DE OPERACIONES SOC</h3>
+            <p class="report-subtitle-mini">Período: {{ periodReportData.period.startDate | date:'dd/MM/yyyy' }} al {{ periodReportData.period.endDate | date:'dd/MM/yyyy' }}</p>
+          </div>
+        </header>
+
+        <!-- SECCIÓN 4: Observaciones de Checklist con Fallas (NOK) -->
+        <section class="report-document-section">
+          <h3 class="section-title-document"><mat-icon>error_outline</mat-icon> 4. Registro de Anomalías en Checklists (NOK)</h3>
+          <p class="section-desc">Revisiones en las cuales se detectaron servicios caídos o en estado crítico con su respectiva observación técnica.</p>
+          
+          <table class="report-document-table">
+            <thead>
+              <tr>
+                <th>Fecha y Hora</th>
+                <th>Servicio Afectado</th>
+                <th>Observación de Falla / Diagnóstico</th>
+                <th>Reportado Por</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let obs of periodReportData.checklistObservations | slice:0:15">
+                <td class="col-date">{{ obs.createdAt | date:'dd/MM/yyyy HH:mm' }}</td>
+                <td class="col-service"><strong>{{ obs.serviceTitle }}</strong></td>
+                <td class="col-observation">
+                  {{ (obs.observation.length > 180) ? (obs.observation | slice:0:180) + '...' : obs.observation }}
+                </td>
+                <td class="col-user">{{ obs.user }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="report-table-limit-notice" *ngIf="periodReportData.checklistObservations.length > 15">
+            * Mostrando únicamente las 15 anomalías más recientes de un total de {{ periodReportData.checklistObservations.length }}. El historial completo se encuentra en la consola.
+          </p>
+        </section>
+
+        <footer class="report-document-footer-decor">
+          <span class="footer-decor-text">Confidencial - Uso SOC Interno</span>
+        </footer>
+      </div>
+    </article>
+ 
+    <!-- Comentario: Botones de acción del reporte ejecutivo. Se simplifica el flujo a una única acción de impresión nativa rápida y libre de marcas, delegando la generación del PDF al motor vectorial del navegador. -->
+    <div class="form-actions period-report-print-actions no-print" *ngIf="showPeriodReportPreview && periodReportData">
+      <button mat-raised-button color="primary" (click)="printReport()">
+        <mat-icon aria-hidden="true">print</mat-icon>
+        Generar PDF / Imprimir
       </button>
     </div>
   </div>

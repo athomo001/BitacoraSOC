@@ -125,6 +125,25 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
       this.router.navigate(['/']);
     }
 
+    // Inicializar los formularios reactivos inmediatamente al inicio del ciclo de vida
+    // para prevenir errores de renderizado en plantillas si configService.getLogo responde de forma sincrona.
+    const hasAccepted = localStorage.getItem('privacyConsentAccepted') === 'true';
+    this.showPrivacyConsent = !hasAccepted;
+
+    this.loginForm = this.fb.group({
+      username: ['', [Validators.required, Validators.minLength(3)]],
+      password: ['', [Validators.required]],
+      privacyConsent: [hasAccepted, [Validators.requiredTrue]] // Requerido para compliance (QA-COMPLIANCE-PRIVACY-NOTICE)
+    });
+
+    this.recoveryForm = this.fb.group({
+      email: ['', [Validators.required, Validators.email]]
+    });
+
+    this.mfaForm = this.fb.group({
+      code: ['', [Validators.required, Validators.pattern(/^\d{6}$/)]]
+    });
+
     // Cargar logo y tema de login
     this.configService.getLogo().subscribe({
       next: (response: any) => {
@@ -166,23 +185,6 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
         this.themeLoaded = true;
         this.cdr.detectChanges();
       }
-    });
-
-    const hasAccepted = localStorage.getItem('privacyConsentAccepted') === 'true';
-    this.showPrivacyConsent = !hasAccepted;
-
-    this.loginForm = this.fb.group({
-      username: ['', [Validators.required, Validators.minLength(3)]],
-      password: ['', [Validators.required]],
-      privacyConsent: [hasAccepted, [Validators.requiredTrue]] // Requerido para compliance (QA-COMPLIANCE-PRIVACY-NOTICE)
-    });
-
-    this.recoveryForm = this.fb.group({
-      email: ['', [Validators.required, Validators.email]]
-    });
-
-    this.mfaForm = this.fb.group({
-      code: ['', [Validators.required, Validators.pattern(/^\d{6}$/)]]
     });
   }
 

@@ -311,8 +311,8 @@ router.get('/',
   async (req, res) => {
     try {
       const {
-        page = 1,
-        limit = 20,
+        page,
+        limit,
         search,
         tags,
         clientId,
@@ -322,7 +322,10 @@ router.get('/',
         userId
       } = req.query;
 
-      const skip = (page - 1) * limit;
+      // Asegurar que page y limit sean números enteros para prevenir fallas en MongoDB ($skip / $limit)
+      const pageNum = parseInt(page, 10) || 1;
+      const limitNum = parseInt(limit, 10) || 20;
+      const skip = (pageNum - 1) * limitNum;
 
       // 🔍 Filtros de la colección principal (Entry)
       const filters = {};
@@ -473,7 +476,7 @@ router.get('/',
       // ⚙️ Ordenar, paginar y poblar relaciones en base de datos
       aggregatePipeline.push({ $sort: { createdAt: -1 } });
       aggregatePipeline.push({ $skip: skip });
-      aggregatePipeline.push({ $limit: limit });
+      aggregatePipeline.push({ $limit: limitNum });
 
       // Lookup selectivo del creador de la entrada/checklist
       aggregatePipeline.push({
@@ -555,9 +558,9 @@ router.get('/',
         entries: pageRows,
         pagination: {
           total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit)
+          page: pageNum,
+          limit: limitNum,
+          totalPages: Math.ceil(total / limitNum)
         }
       });
     } catch (error) {
