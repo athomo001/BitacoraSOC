@@ -180,18 +180,11 @@
       <button mat-icon-button [matMenuTriggerFor]="themeMenu">
         <mat-icon>palette</mat-icon>
       </button>
+      <!-- Comentario: Menú de temas visuales simplificado. Se eliminan las opciones dark y sepia para agilizar la interfaz de usuario. -->
       <mat-menu #themeMenu="matMenu">
         <button mat-menu-item (click)="changeTheme('light')">
           <mat-icon>wb_sunny</mat-icon>
           Light
-        </button>
-        <button mat-menu-item (click)="changeTheme('dark')">
-          <mat-icon>nightlight</mat-icon>
-          Dark
-        </button>
-        <button mat-menu-item (click)="changeTheme('sepia')">
-          <mat-icon>auto_stories</mat-icon>
-          Sepia
         </button>
         <button mat-menu-item (click)="changeTheme('pastel')">
           <mat-icon>gradient</mat-icon>

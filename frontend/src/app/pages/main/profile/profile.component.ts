@@ -37,7 +37,8 @@ export class ProfileComponent implements OnInit {
   isChangingPassword = false;
   isSavingMfa = false;
   isDisablingMfa = false;
-  themes: Theme[] = ['light', 'dark', 'sepia', 'pastel', 'cyberpunk'];
+  // Comentario: Listado local de temas visuales que se exponen al usuario en su formulario de perfil. Se eliminan sepia y dark.
+  themes: Theme[] = ['light', 'pastel', 'cyberpunk'];
   mfaStep: 'inactive' | 'setup' | 'active' = 'inactive';
   mfaQrCode = '';
   mfaSecret = '';

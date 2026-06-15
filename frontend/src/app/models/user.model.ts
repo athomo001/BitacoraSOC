@@ -66,4 +66,5 @@ export interface UpdateProfileRequest {
   newPassword?: string;
 }
 
-export type Theme = 'light' | 'dark' | 'sepia' | 'pastel' | 'cyberpunk';
+// Comentario: Definición simplificada de temas visuales soportados en la plataforma para evitar sobreingeniería de estilos.
+export type Theme = 'light' | 'pastel' | 'cyberpunk';
