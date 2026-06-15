@@ -5,7 +5,7 @@
 Guía detallada para instalar y configurar el sistema desde cero.
 
 > Aviso: Los valores de ejemplo son placeholders. Reemplazarlos por credenciales reales desde `.env` antes de usar en producción.
-> Estado: Proyecto en **beta**. Validar los flujos críticos en entorno de pruebas antes de pasar a operación.
+> Estado: Proyecto **estable**. Validar en entornos de pruebas antes de pasar a operación de producción.
 
 ---
 
@@ -68,6 +68,8 @@ Si no está instalado:
 - **Windows:** [Descargar MongoDB Community](https://www.mongodb.com/try/download/community)
 - **Instalación:** Incluir MongoDB Compass (GUI opcional)
 - **Servicio:** Configurar como servicio Windows (auto-start)
+
+> 💡 **Alta Disponibilidad Opcional:** Si deseas configurar MongoDB con réplicas (Replica Set) en Docker Compose para tolerancia a fallos, consulta la [Guía de Configuración de MongoDB Replica Set](./07_MONGO_REPLICA_SET.md).
 
 ---
 

@@ -4,9 +4,9 @@
 
 Plataforma web para operacion SOC con bitacora operativa, checklists de turno, escalacion, auditoria, backup, integraciones y modulo de complementos embebidos.
 
-> Estado del proyecto: beta. Validar siempre los flujos criticos en un entorno controlado antes de pasar a operacion formal.
+> Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.5.99-beta**
+> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.00**
 
 Stack principal:
 
@@ -73,11 +73,16 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 
 ![Configuración de Seguridad (HTTPS & SSO)](docs/images/screenshots/15-HTTPS-SSO.png)
 
-> ⚠️ **Nota sobre la Consola de Seguridad (HTTPS & SSO):** El panel unificado de HTTPS y Single Sign-On (SSO) es una funcionalidad reciente. Dado que el proyecto se encuentra en etapa **beta**, la integración completa de SSO (Google/Microsoft) sigue bajo validación activa y su flujo no está 100% probado en todos los entornos corporativos. Sin embargo, el soporte para la inyección y rotación de certificados **HTTPS** (0-Downtime) es altamente funcional y estable.
+> 💡 **Nota sobre la Consola de Seguridad (HTTPS & SSO):** El panel unificado de HTTPS y Single Sign-On (SSO) está completamente integrado. El soporte para la inyección y rotación de certificados **HTTPS** (0-Downtime) es altamente funcional y estable, mientras que el inicio de sesión vía SSO (Google/Microsoft) está disponible como opción de autenticación.
 
 ---
 
 ## Novedades recientes (resumen rapido)
+
+### v1.6.00 (simplificación de temas y guía de réplicas)
+
+- simplificación visual del panel de temas eliminando sepia y oscuro (dark) para reducir mantenimiento y sobreingeniería.
+- incorporación de guía opcional de despliegue para réplicas de base de datos (MongoDB Replica Set) de alta disponibilidad.
 
 ### v1.5.99-beta (optimización de rendimiento PDF nativo y márgenes vectoriales)
 
@@ -289,6 +294,7 @@ Documentos principales (Gobernanza Armonizada):
 - `docs/04_DESARROLLO_Y_API.md`: Documentación de la API REST, Swagger y endpoints integrados.
 - `docs/05_MODULOS_EXTRAS.md`: Gestión e integración del módulo de complementos e iframe sandbox.
 - `docs/06_SEGURIDAD.md`: Hardening, Helmet, rate limiting, mitigación de Zip Slip y directivas de seguridad.
+- `docs/07_MONGO_REPLICA_SET.md`: Guía opcional para la configuración de réplicas de base de datos (Replica Set) en alta disponibilidad.
 - `docs/SCREENSHOTS.md`: Galería visual de la interfaz y módulos principales.
 - `docs/history/CHANGELOG.md`: Historial de cambios relevantes por versión.
 - `docs/history/ISSUES.md`: Plan de trabajo y control de issues del SOC.

@@ -8,14 +8,12 @@
  * Servicio de Temas (Theming)
  * 
  * Funcionalidad:
- *   - Gestionar tema visual de la aplicación (light, dark, sepia, pastel, cyberpunk)
+ *   - Gestionar tema visual de la aplicación (light, pastel, cyberpunk)
  *   - Persistir preferencia en localStorage
  *   - Observable para cambios reactivos en UI
  * 
  * Temas SOC:
  *   - light: Tema claro (default)
- *   - dark: Tema oscuro (reducir fatiga visual en turnos nocturnos)
- *   - sepia: Tono cálido (reduce luz azul)
  *   - pastel: Colores suaves (alternativa visual)
  *   - cyberpunk: Alto contraste neon para uso opcional
  * 
@@ -27,7 +25,7 @@
  * Uso:
  *   - Usuario cambia tema en settings o header
  *   - Se persiste entre sesiones (localStorage)
- *   - CSS usa [data-theme='dark'] para estilos condicionales
+ *   - CSS usa [data-theme='light'] para estilos condicionales
  */
 import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
@@ -38,7 +36,8 @@ import { Theme } from '../models/user.model';
 })
 export class ThemeService {
   private readonly THEME_KEY = 'bitacora_theme';
-  private readonly SUPPORTED_THEMES: Theme[] = ['light', 'dark', 'sepia', 'pastel', 'cyberpunk'];
+  // Comentario: Listado simplificado de temas visuales de la interfaz. Se eliminaron sepia y dark para evitar mantenimiento redundante de CSS.
+  private readonly SUPPORTED_THEMES: Theme[] = ['light', 'pastel', 'cyberpunk'];
   private currentThemeSubject = new BehaviorSubject<Theme>(this.getStoredTheme());
   public currentTheme$ = this.currentThemeSubject.asObservable();
 

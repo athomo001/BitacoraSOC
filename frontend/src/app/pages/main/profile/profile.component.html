@@ -22,10 +22,9 @@
         <mat-form-field appearance="outline" class="full-width">
           <!-- Corrección ortográfica: tilde agregada en Aplicación -->
           <mat-label>Tema de la Aplicación</mat-label>
+          <!-- Comentario: Selector de temas de perfil simplificado. Se eliminan las opciones dark y sepia. -->
           <mat-select formControlName="theme" (selectionChange)="onThemeChange($event.value)">
             <mat-option value="light">Claro</mat-option>
-            <mat-option value="dark">Oscuro</mat-option>
-            <mat-option value="sepia">Sepia</mat-option>
             <mat-option value="pastel">Pastel</mat-option>
             <mat-option value="cyberpunk">Cyberpunk</mat-option>
           </mat-select>

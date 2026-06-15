@@ -2,6 +2,13 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.00] - 2026-06-16
+
+### Simplificación de Temas Visuales y Documentación de Alta Disponibilidad
+
+- **Simplificación de Temas Visuales:** Se eliminaron los temas "oscuro" (dark) y "sepia" del tipo `Theme` en los modelos de datos, en el listado de temas activos del servicio en el frontend y en los selectores de la barra superior del layout principal y de la edición de perfil. Esto reduce sobreingeniería y el peso de mantenimiento visual de hojas de estilo.
+- **Guía de Réplicas (MongoDB Replica Set):** Se diseñó e implementó la guía técnica opcional `docs/07_MONGO_REPLICA_SET.md` para configurar MongoDB en alta disponibilidad (1 primario + 2 secundarios) con failover automático usando Docker Compose, enlazándola en el índice del README y en el manual de instalación.
+
 ## [v1.5.99-beta] - 2026-06-15
 
 ### Optimización de Rendimiento de PDF Nativo y Ajuste de Márgenes Físicos A4
