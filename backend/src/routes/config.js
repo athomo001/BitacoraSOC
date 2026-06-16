@@ -12,6 +12,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const AppConfig = require('../models/AppConfig');
 const { authenticate, authorize } = require('../middleware/auth');
+const { getFontName } = require('../utils/font-parser');
 const validate = require('../middleware/validate');
 const { invalidateCache } = require('../utils/email');
 const { validateCryptoPair, isPortFree } = require('../utils/tls-validator');
@@ -1038,5 +1039,166 @@ router.get('/shift-reminders', authenticate, authorize('admin'), shiftReminderCt
 router.post('/shift-reminders', authenticate, authorize('admin'), shiftReminderValidators, validate, shiftReminderCtrl.create);
 router.put('/shift-reminders/:id', authenticate, authorize('admin'), shiftReminderValidators, validate, shiftReminderCtrl.update);
 router.delete('/shift-reminders/:id', authenticate, authorize('admin'), shiftReminderCtrl.remove);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GESTIÓN DE FUENTES TIPOGRÁFICAS PERSONALIZADAS
+// Permite a los administradores subir archivos .ttf/.otf/.woff/.woff2
+// ─────────────────────────────────────────────────────────────────────────────
+const CustomFont = require('../models/CustomFont');
+
+// Configuración de almacenamiento multer para almacenar archivos de fuentes
+const fontStorage = multer.diskStorage({
+  destination: async (req, file, cb) => {
+    const uploadDir = path.join(__dirname, '../../uploads/fonts');
+    try {
+      await fs.mkdir(uploadDir, { recursive: true });
+      cb(null, uploadDir);
+    } catch (error) {
+      cb(error);
+    }
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const namePart = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '');
+    cb(null, `${namePart}-${Date.now()}${ext}`);
+  }
+});
+
+// Middleware de carga con filtros de seguridad y límites
+const uploadFont = multer({
+  storage: fontStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // Límite de 5MB por archivo
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const allowedExtensions = ['.ttf', '.otf', '.woff', '.woff2'];
+    if (allowedExtensions.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Formato de fuente inválido. Solo se admiten archivos .ttf, .otf, .woff y .woff2.'));
+    }
+  }
+});
+
+// GET /api/config/fonts - Listar todas las fuentes personalizadas subidas por el usuario
+router.get('/fonts', async (req, res) => {
+  try {
+    const fonts = await CustomFont.find().sort({ createdAt: 1 }).lean();
+    res.json(fonts);
+  } catch (error) {
+    console.error('Error al obtener fuentes personalizadas:', error);
+    res.status(500).json({ message: 'Error al obtener fuentes personalizadas' });
+  }
+});
+
+// POST /api/config/fonts - Subir un archivo de fuente tipográfica (solo admin)
+router.post('/fonts',
+  authenticate,
+  authorize('admin'),
+  (req, res, next) => {
+    uploadFont.single('fontFile')(req, res, (err) => {
+      if (err) {
+        console.error('Error al procesar archivo de fuente:', err);
+        return res.status(400).json({ message: err.message || 'Error al procesar el archivo de fuente' });
+      }
+      next();
+    });
+  },
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'No se ha proporcionado ningún archivo de fuente' });
+      }
+
+      const ext = path.extname(req.file.originalname).toLowerCase();
+      let format = 'truetype';
+      if (ext === '.otf') format = 'opentype';
+      else if (ext === '.woff') format = 'woff';
+      else if (ext === '.woff2') format = 'woff2';
+
+      let name = '';
+      
+      // Intentar extraer el nombre de familia interno usando el parser binario
+      try {
+        name = await getFontName(req.file.path);
+      } catch (parseError) {
+        console.warn('No se pudo extraer el nombre interno de la fuente binaria, aplicando fallback:', parseError.message);
+        // Fallback al nombre del archivo original sin la extensión
+        name = path.basename(req.file.originalname, ext).replace(/[^a-zA-Z0-9 _-]/g, '').trim();
+      }
+
+      if (!name) {
+        name = `Font-${Date.now()}`;
+      }
+
+      // Validación de duplicados (case-insensitive)
+      const existing = await CustomFont.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
+      if (existing) {
+        await fs.unlink(req.file.path);
+        return res.status(400).json({ message: `Ya existe una fuente con el nombre "${name}"` });
+      }
+
+      const fontUrl = `/uploads/fonts/${req.file.filename}`;
+
+      const customFont = new CustomFont({
+        name,
+        filename: req.file.filename,
+        url: fontUrl,
+        format,
+        uploadedBy: req.user._id
+      });
+
+      await customFont.save();
+
+      res.status(201).json({
+        message: 'Fuente personalizada agregada exitosamente',
+        font: customFont
+      });
+    } catch (error) {
+      console.error('Error al registrar fuente personalizada:', error);
+      if (req.file) {
+        try {
+          await fs.unlink(req.file.path);
+        } catch (_) {}
+      }
+      res.status(500).json({ message: 'Error al registrar la fuente personalizada' });
+    }
+  }
+);
+
+// DELETE /api/config/fonts/:id - Eliminar una fuente personalizada (solo admin)
+router.delete('/fonts/:id',
+  authenticate,
+  authorize('admin'),
+  async (req, res) => {
+    try {
+      const font = await CustomFont.findById(req.params.id);
+      if (!font) {
+        return res.status(404).json({ message: 'La fuente no existe' });
+      }
+
+      // Eliminar el archivo físico en disco
+      const filepath = path.join(__dirname, '../..', font.url);
+      try {
+        await fs.unlink(filepath);
+      } catch (err) {
+        console.warn(`No se pudo eliminar el archivo de fuente física: ${filepath}`, err.message);
+      }
+
+      // Restablecer AppConfig a la fuente por defecto si la fuente eliminada estaba activa
+      const config = await AppConfig.findOne();
+      if (config && config.titleFont === font.name) {
+        config.titleFont = 'Monarchia Momentum';
+        await config.save();
+      }
+
+      await CustomFont.findByIdAndDelete(req.params.id);
+
+      res.json({ message: 'Fuente personalizada eliminada exitosamente' });
+    } catch (error) {
+      console.error('Error al eliminar fuente personalizada:', error);
+      res.status(500).json({ message: 'Error al eliminar la fuente personalizada' });
+    }
+  }
+);
 
 module.exports = router;

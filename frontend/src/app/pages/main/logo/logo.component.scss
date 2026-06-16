@@ -1,120 +1,519 @@
-.logo-container {
+.branding-container {
   padding: 24px;
+  position: relative;
+  /* Espacio extra en el fondo para evitar que la barra sticky oculte contenidos al hacer scroll */
+  padding-bottom: 120px;
 
   h1 {
     color: var(--text-primary);
-    margin-bottom: 8px;
+    font-size: 1.85rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+    letter-spacing: -0.02em;
   }
 
   .subtitle {
     color: var(--text-secondary);
-    margin-bottom: 24px;
+    font-size: 0.95rem;
+    margin-bottom: 28px;
   }
 }
 
-.logo-grid {
+.branding-layout {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 24px;
+  grid-template-columns: 1.2fr 0.8fr; /* Layout de dos columnas: ~60% izquierda y ~40% derecha */
+  gap: 28px;
+  align-items: start;
 }
 
-.logo-panel.logo-card {
-  background: var(--surface-card);
-  border: 1px solid var(--outline-subtle);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow);
+/* Tarjeta contenedora modular SaaS */
+.branding-card {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
   overflow: hidden;
-}
-
-.logo-panel__header {
-  padding: var(--space-4);
-  border-bottom: 1px solid var(--outline-subtle);
-}
-
-.logo-panel__title {
-  margin: 0;
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.logo-panel__body {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: var(--space-4);
-}
-
-.logo-preview, .upload-zone {
-  width: 100%;
-  height: 200px;
-  border: 2px dashed var(--border-color);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  background-color: var(--background-color);
-
-  img {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-  }
-}
-
-.favicon-preview {
-  height: 120px;
-
-  img {
-    width: 64px;
-    height: 64px;
-    object-fit: contain;
-  }
-}
-
-.upload-zone {
-  cursor: pointer;
-  transition: border-color 0.3s;
+  transition: box-shadow 0.3s ease;
 
   &:hover {
-    border-color: var(--primary-color);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.06);
   }
 }
 
-.no-logo, .upload-placeholder {
-  text-align: center;
-  color: var(--text-secondary);
+.branding-card__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 24px;
+  background: color-mix(in srgb, var(--surface-muted) 35%, transparent);
+  border-bottom: 1px solid var(--border-color);
 
   mat-icon {
-    font-size: 48px;
-    width: 48px;
-    height: 48px;
-    margin-bottom: 8px;
+    color: var(--primary-color);
+    font-size: 22px;
+    width: 22px;
+    height: 22px;
+  }
+
+  h2 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+  }
+}
+
+.branding-card__body {
+  padding: 24px;
+}
+
+/* Divisor estético sutil */
+.branding-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 24px 0;
+  opacity: 0.8;
+}
+
+/* Bloques de Formulario e Identidad */
+.branding-block {
+  h3 {
+    margin-top: 0;
+    margin-bottom: 18px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+}
+
+.branding-row {
+  display: grid;
+  grid-template-columns: 180px 1fr; /* Simetría: Izquierda vista previa, derecha subida */
+  gap: 24px;
+  align-items: start;
+}
+
+/* Panel de Vista Previa */
+.image-preview-pane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+
+  .preview-box {
+    width: 100%;
+    height: 120px;
+    border: 1px dashed var(--border-color);
+    border-radius: 8px;
+    background-color: var(--surface-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: 8px;
+
+    img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    &.preview-box--favicon {
+      height: 80px;
+      width: 80px;
+      border-radius: 6px;
+      margin: 0 auto;
+
+      img {
+        width: 32px;
+        height: 32px;
+      }
+    }
+  }
+
+  .btn-text-delete {
+    background: transparent;
+    border: none;
+    color: var(--state-error);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+
+    &:hover {
+      background-color: var(--state-error-bg);
+    }
+
+    mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+    }
+  }
+}
+
+/* Panel de Carga / Pestañas */
+.image-upload-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Tabs personalizados tipo toggle */
+.custom-tabs {
+  display: flex;
+  background: var(--surface-muted);
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  align-self: start;
+
+  .tab-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 16px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+    }
+
+    &.active {
+      background: var(--surface-color);
+      color: var(--primary-color);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+      font-weight: 600;
+    }
+  }
+}
+
+.tab-content {
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+}
+
+/* Zona de Drag & Drop para archivos */
+.drag-drop-zone {
+  width: 100%;
+  padding: 16px 20px;
+  border: 1.5px dashed var(--border-color);
+  border-radius: 8px;
+  text-align: center;
+  background: var(--surface-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  mat-icon {
+    font-size: 32px;
+    width: 32px;
+    height: 32px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    opacity: 0.75;
   }
 
   p {
-    margin: 0;
+    margin: 0 0 2px 0;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-primary);
   }
 
   small {
-    display: block;
-    margin-top: 4px;
-    opacity: 0.7;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
   }
+
+  &:hover {
+    border-color: var(--primary-color);
+    background: color-mix(in srgb, var(--primary-color) 4%, transparent);
+    
+    mat-icon {
+      color: var(--primary-color);
+      opacity: 1;
+    }
+  }
+
+  &.drag-drop-zone--favicon {
+    padding: 10px 16px;
+    
+    mat-icon {
+      font-size: 24px;
+      width: 24px;
+      height: 24px;
+      margin-bottom: 2px;
+    }
+  }
+
+  &.drag-drop-zone--font {
+    border-style: dashed;
+    padding: 20px;
+
+    mat-icon {
+      font-size: 36px;
+      width: 36px;
+      height: 36px;
+    }
+    
+    .font-selected-name {
+      color: var(--primary-color);
+      font-weight: 600;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+  }
+}
+
+.url-input-wrapper {
+  width: 100%;
 }
 
 .full-width {
   width: 100%;
 }
 
-button {
-  mat-spinner {
-    display: inline-block;
-    margin-right: 8px;
+.hidden-file-input {
+  display: none;
+}
+
+/* Columna Derecha: Bloques y Controles */
+.form-block {
+  h3 {
+    margin-top: 0;
+    margin-bottom: 16px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
   }
 }
 
-.hidden-file-input {
-  display: none;
+.form-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Fuentes personalizadas */
+.font-upload-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.installed-fonts-section {
+  h3 {
+    margin-top: 10px;
+    margin-bottom: 12px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 6px;
+  }
+}
+
+.fonts-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+
+.font-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-color);
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  .font-meta {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+
+    .font-preview-text {
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    small {
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      margin-top: 2px;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+  }
+
+  button {
+    flex-shrink: 0;
+  }
+}
+
+.no-fonts-notice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 18px;
+  background: var(--surface-muted);
+  border: 1px dashed var(--border-color);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+/* BARRA FLOTANTE STICKY INFERIOR */
+.sticky-actions-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 80px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border-color);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.04);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+
+  &.visible {
+    transform: translateY(0);
+  }
+}
+
+/* Adaptación del layout según temas oscuros / cyberpunk */
+[data-theme="dark"] .sticky-actions-bar,
+[data-theme="cyberpunk"] .sticky-actions-bar {
+  background: rgba(26, 29, 39, 0.9);
+}
+
+.sticky-actions-content {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.changes-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  font-weight: 500;
+
+  mat-icon {
+    color: var(--primary-color);
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.actions-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  /* Botones primarios en Azul corporativo profesional */
+  .btn-save-global {
+    background-color: var(--primary-color) !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    padding: 0 24px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-cancel {
+    border-color: var(--border-color) !important;
+    color: var(--text-secondary) !important;
+    font-weight: 500;
+    padding: 0 20px;
+    height: 40px;
+    border-radius: 8px;
+    background: transparent;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: var(--surface-muted);
+      color: var(--text-primary) !important;
+    }
+  }
+}
+
+/* Responsividad responsiva */
+@media (max-width: 960px) {
+  .branding-layout {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .branding-row {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .image-preview-pane .preview-box--favicon {
+    margin: 0;
+  }
+
+  .sticky-actions-content {
+    flex-direction: column;
+    gap: 12px;
+    justify-content: center;
+    padding: 8px 16px;
+  }
+
+  .sticky-actions-bar {
+    height: auto;
+    padding: 12px 0;
+  }
 }

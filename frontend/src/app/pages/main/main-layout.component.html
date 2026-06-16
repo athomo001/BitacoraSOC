@@ -173,7 +173,8 @@
         <mat-icon>menu</mat-icon>
       </button>
 
-      <span class="toolbar-title" *ngIf="appTitle">{{ appTitle }}</span>
+      <!-- Se enlaza dinámicamente la fuente tipográfica seleccionada desde el Branding -->
+      <span class="toolbar-title" *ngIf="appTitle" [style.font-family]="appTitleFont">{{ appTitle }}</span>
 
       <span class="spacer"></span>
 

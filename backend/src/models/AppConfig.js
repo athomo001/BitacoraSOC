@@ -192,6 +192,12 @@ const appConfigSchema = new mongoose.Schema({
     trim: true,
     maxlength: 80
   },
+  // Fuente tipográfica para el título de la barra superior.
+  // Permite seleccionar dinámicamente entre las fuentes predefinidas o las subidas por el usuario.
+  titleFont: {
+    type: String,
+    default: 'Monarchia Momentum'
+  },
   // Seguridad HTTPS
   security: {
     httpsEnabled: {

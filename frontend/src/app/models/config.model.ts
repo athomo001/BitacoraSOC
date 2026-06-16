@@ -26,6 +26,8 @@ export interface AppConfig {
   lastEscalationReminderWeekStartDate?: Date;
   lastChecklistAlertDate?: Date;
   appTitle?: string;
+  // Fuente tipográfica seleccionada para el título de la barra superior.
+  titleFont?: string;
   security?: SecurityConfig;
   logoUrl?: string;
   logoType?: 'url' | 'upload' | 'external';
@@ -145,6 +147,8 @@ export interface UpdateConfigRequest {
   escalationReminderCargoLabels?: string[];
   escalationReminderDaysAhead?: number;
   appTitle?: string;
+  // Fuente tipográfica opcional para actualizar en el branding.
+  titleFont?: string;
   security?: Partial<SecurityConfig>;
   logoUrl?: string;
   faviconUrl?: string;

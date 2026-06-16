@@ -114,6 +114,8 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   hasConfigAccess = false;
   logoUrl: string = '';
   appTitle: string = '';
+  // Fuente tipográfica del título de la aplicación recuperada del backend
+  appTitleFont: string = 'Monarchia Momentum';
   healthCheckedAt: string | null = null;
   healthServices: { key: 'smtp' | 'mongo' | 'internalApi' | 'integrations'; label: string; state: HealthServiceState }[] = [];
   activeComplements: Complement[] = [];
@@ -325,11 +327,50 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (config: any) => {
           this.appTitle = (config?.appTitle || '').trim();
+          // Carga la fuente tipográfica configurada desde el backend (con fallback a la fuente predeterminada)
+          this.appTitleFont = config?.titleFont || 'Monarchia Momentum';
           this.titleService.setTitle(this.appTitle);
+          // Cargar e inyectar las fuentes personalizadas en el DOM
+          this.loadAndInjectCustomFonts();
         },
         error: () => {
           this.appTitle = '';
+          this.appTitleFont = 'Monarchia Momentum';
           this.titleService.setTitle('');
+          this.loadAndInjectCustomFonts();
+        }
+      });
+  }
+
+  // Método para cargar las fuentes tipográficas personalizadas del backend y agregarlas al head mediante @font-face
+  loadAndInjectCustomFonts(): void {
+    this.configService.getCustomFonts()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (fonts) => {
+          // Remover el elemento anterior si existía para evitar duplicados
+          const oldStyle = document.getElementById('dynamic-custom-fonts');
+          if (oldStyle) {
+            oldStyle.remove();
+          }
+
+          if (fonts && fonts.length > 0) {
+            const style = document.createElement('style');
+            style.id = 'dynamic-custom-fonts';
+            style.innerHTML = fonts.map(f => `
+              @font-face {
+                font-family: '${f.name}';
+                src: url('${this.getAssetUrl(f.url)}') format('${f.format}');
+                font-weight: normal;
+                font-style: normal;
+                font-display: swap;
+              }
+            `).join('\n');
+            document.head.appendChild(style);
+          }
+        },
+        error: (err) => {
+          console.error('Error al inyectar fuentes tipográficas:', err);
         }
       });
   }
