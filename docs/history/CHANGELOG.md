@@ -2,6 +2,15 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.01] - 2026-06-17
+
+### Rediseño de Perfil, Carga de Avatar y Sincronización de Contacto Centralizado
+
+- **Rediseño del Panel de Perfil:** Se reestructuró la página de perfil `/main/profile` a un layout responsivo moderno de dos columnas, ubicando una tarjeta de información rápida del usuario con su foto de avatar a la izquierda, y los paneles de edición de datos, cambio de contraseña y doble factor (MFA) a la derecha.
+- **Subida de Avatar Física:** Se implementó el endpoint `PUT /api/users/me/avatar` para cargar imágenes de avatar y servirlas de forma estática en `/uploads/avatars/`. Las cargas están validadas mediante `multer` y la biblioteca `sharp` en el backend para verificar la firma de imagen e impedir desbordamiento de recursos (límite estricto de 2MB).
+- **Sincronización del Teléfono en Directorio:** Se añadió el campo `phone` al formulario reactivo de actualización de perfil y en el endpoint `PUT /api/users/me` del backend. Cualquier cambio del número de teléfono se propaga síncronamente al directorio centralizado `DirectoryContact` a través de `syncUserAsDirectoryInternal()` mediante el hash de correo del usuario.
+- **Barra Lateral Reactiva:** Se modificó el layout de la aplicación para suscribirse reactivamente al observable `currentUser$` de `AuthService`. Esto permite que el avatar circular pequeño (o el placeholder de iniciales de repuesto) en el menú lateral izquierdo se actualice instantáneamente sin recargar la página tras subir una nueva foto o modificar el nombre completo.
+
 ## [v1.6.00] - 2026-06-16
 
 ### Simplificación de Temas Visuales, Alta Disponibilidad y Extracción de Fuentes Tipográficas (Branding)

@@ -1,154 +1,233 @@
 <div class="profile-container">
-  <h1>Mi Perfil</h1>
+  <header class="profile-header">
+    <h1>Configuración de Perfil</h1>
+    <p class="subtitle">Gestiona tu identidad, información de contacto y parámetros de seguridad del SOC.</p>
+  </header>
 
-  <div class="profile-panel">
-    <header class="profile-panel__header">
-      <!-- Corrección ortográfica: tilde agregada en Información -->
-      <h2 class="profile-panel__title">Información Personal</h2>
-    </header>
-    <div class="profile-panel__body">
-      <form [formGroup]="profileForm" (ngSubmit)="saveProfile()">
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Nombre Completo</mat-label>
-          <input matInput formControlName="fullName" placeholder="Tu nombre">
-        </mat-form-field>
+  <div class="profile-grid">
+    <!-- COLUMNA IZQUIERDA: TARJETA DE PERFIL Y AVATAR -->
+    <div class="profile-sidebar-column">
+      <div class="profile-card">
+        <div class="profile-card__avatar-section">
+          <!-- Input oculto para la subida de archivos de imagen -->
+          <input type="file" #avatarInput (change)="onAvatarSelected($event)" style="display: none" accept="image/png, image/jpeg, image/jpg, image/webp">
+          
+          <div class="avatar-wrapper" [class.uploading]="isUploadingAvatar" (click)="triggerAvatarUpload(avatarInput)" matTooltip="Haz clic para cambiar tu foto de perfil">
+            <!-- Imagen real del avatar -->
+            <img *ngIf="currentUser?.avatar" [src]="getAssetUrl(currentUser.avatar)" alt="Avatar de {{ currentUser?.fullName }}" class="avatar-img">
+            
+            <!-- Placeholder con iniciales si no hay avatar definido -->
+            <div *ngIf="!currentUser?.avatar" class="avatar-placeholder">
+              {{ currentUser?.fullName?.substring(0, 1)?.toUpperCase() || 'U' }}
+            </div>
 
-        <mat-form-field appearance="outline" class="full-width">
-          <!-- Corrección ortográfica: tilde agregada en Electrónico -->
-          <mat-label>Correo Electrónico</mat-label>
-          <input matInput formControlName="email" type="email" placeholder="tu@email.com">
-        </mat-form-field>
+            <!-- Overlay en Hover para cambiar foto -->
+            <div class="avatar-overlay">
+              <mat-icon>photo_camera</mat-icon>
+              <span>Cambiar Foto</span>
+            </div>
 
-        <mat-form-field appearance="outline" class="full-width">
-          <!-- Corrección ortográfica: tilde agregada en Aplicación -->
-          <mat-label>Tema de la Aplicación</mat-label>
-          <!-- Comentario: Selector de temas de perfil simplificado. Se eliminan las opciones dark y sepia. -->
-          <mat-select formControlName="theme" (selectionChange)="onThemeChange($event.value)">
-            <mat-option value="light">Claro</mat-option>
-            <mat-option value="pastel">Pastel</mat-option>
-            <mat-option value="cyberpunk">Cyberpunk</mat-option>
-          </mat-select>
-        </mat-form-field>
-
-        <div class="user-info-display">
-          <p><strong>Rol:</strong> {{ currentUser?.role }}</p>
-          <p><strong>Usuario:</strong> {{ currentUser?.username }}</p>
+            <!-- Spinner de carga durante la subida -->
+            <div *ngIf="isUploadingAvatar" class="avatar-spinner">
+              <mat-spinner diameter="40"></mat-spinner>
+            </div>
+          </div>
         </div>
 
-        <button mat-raised-button color="primary" type="submit" [disabled]="isSavingProfile || profileForm.invalid">
-          <mat-spinner *ngIf="isSavingProfile" diameter="20"></mat-spinner>
-          <span *ngIf="!isSavingProfile">Guardar Cambios</span>
-        </button>
-      </form>
+        <div class="profile-card__info-section">
+          <h2 class="user-fullname">{{ currentUser?.fullName }}</h2>
+          <span class="role-badge" [attr.data-role]="currentUser?.role">{{ currentUser?.role | uppercase }}</span>
+          
+          <div class="user-metadata-list">
+            <div class="metadata-item">
+              <mat-icon>account_circle</mat-icon>
+              <div class="metadata-text">
+                <span class="label">Usuario</span>
+                <span class="value">{{ currentUser?.username }}</span>
+              </div>
+            </div>
+
+            <div class="metadata-item" *ngIf="currentUser?.cargoLabel">
+              <mat-icon>badge</mat-icon>
+              <div class="metadata-text">
+                <span class="label">Cargo</span>
+                <span class="value">{{ currentUser?.cargoLabel }}</span>
+              </div>
+            </div>
+
+            <div class="metadata-item" *ngIf="currentUser?.phone">
+              <mat-icon>phone</mat-icon>
+              <div class="metadata-text">
+                <span class="label">Contacto</span>
+                <span class="value">{{ currentUser?.phone }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
 
-  <div class="profile-panel">
-    <header class="profile-panel__header">
-      <h2 class="profile-panel__title">Cambiar Contraseña</h2>
-    </header>
-    <div class="profile-panel__body">
-      <form [formGroup]="passwordForm" (ngSubmit)="changePassword()">
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Contraseña Actual</mat-label>
-          <input matInput formControlName="currentPassword" type="password">
-        </mat-form-field>
+    <!-- COLUMNA DERECHA: FORMULARIOS DE CONFIGURACIÓN -->
+    <div class="profile-main-column">
+      <!-- PANEL 1: INFORMACIÓN PERSONAL -->
+      <div class="profile-panel">
+        <header class="profile-panel__header">
+          <mat-icon>person</mat-icon>
+          <h2 class="profile-panel__title">Información Personal</h2>
+        </header>
+        <div class="profile-panel__body">
+          <form [formGroup]="profileForm" (ngSubmit)="saveProfile()">
+            <div class="form-row">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Nombre Completo</mat-label>
+                <input matInput formControlName="fullName" placeholder="Tu nombre completo">
+                <mat-icon matSuffix>badge</mat-icon>
+              </mat-form-field>
 
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Nueva Contraseña</mat-label>
-          <input matInput formControlName="newPassword" type="password">
-          <!-- Corrección ortográfica: tilde agregada en Mínimo -->
-          <mat-hint>Mínimo 6 caracteres</mat-hint>
-        </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Correo Electrónico</mat-label>
+                <input matInput formControlName="email" type="email" placeholder="tu@email.com">
+                <mat-icon matSuffix>email</mat-icon>
+              </mat-form-field>
+            </div>
 
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Confirmar Nueva Contraseña</mat-label>
-          <input matInput formControlName="confirmPassword" type="password">
-        </mat-form-field>
+            <div class="form-row">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Número de Teléfono</mat-label>
+                <input matInput formControlName="phone" placeholder="Ej: +56 9 1234 5678" type="tel">
+                <mat-icon matSuffix>phone</mat-icon>
+                <mat-hint>Visible en el directorio de escalación del SOC</mat-hint>
+              </mat-form-field>
 
-        <button mat-raised-button color="accent" type="submit" [disabled]="isChangingPassword || passwordForm.invalid">
-          <mat-spinner *ngIf="isChangingPassword" diameter="20"></mat-spinner>
-          <span *ngIf="!isChangingPassword">Cambiar Contraseña</span>
-        </button>
-      </form>
-    </div>
-  <div class="profile-panel">
-    <header class="profile-panel__header">
-      <h2 class="profile-panel__title" style="display: flex; align-items: center; gap: 8px;">
-        <mat-icon>security</mat-icon> Autenticación Multifactor (MFA/TOTP)
-      </h2>
-    </header>
-    <div class="profile-panel__body">
-      <!-- Estado: Desactivado -->
-      <div *ngIf="mfaStep === 'inactive'" class="mfa-status-block">
-        <p class="mfa-description" style="margin-bottom: 15px; color: var(--text-muted);">
-          Añade una capa de seguridad extra a tu cuenta. Al activar MFA, deberás ingresar un código de 6 dígitos generado por tu aplicación móvil de autenticación (Google Authenticator, Authy, Microsoft Authenticator, etc.) cada vez que inicies sesión.
-        </p>
-        <button mat-raised-button color="primary" (click)="startMfaSetup()" [disabled]="isSavingMfa">
-          <mat-spinner *ngIf="isSavingMfa" diameter="20" style="display: inline-block; margin-right: 8px; vertical-align: middle;"></mat-spinner>
-          Configurar MFA
-        </button>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Tema visual</mat-label>
+                <mat-select formControlName="theme" (selectionChange)="onThemeChange($event.value)">
+                  <mat-option value="light">Claro</mat-option>
+                  <mat-option value="pastel">Pastel</mat-option>
+                  <mat-option value="cyberpunk">Cyberpunk</mat-option>
+                </mat-select>
+                <mat-icon matSuffix>palette</mat-icon>
+              </mat-form-field>
+            </div>
+
+            <div class="form-actions">
+              <button mat-flat-button color="primary" type="submit" [disabled]="isSavingProfile || profileForm.invalid">
+                <mat-spinner *ngIf="isSavingProfile" diameter="20"></mat-spinner>
+                <span *ngIf="!isSavingProfile">Guardar Cambios</span>
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
 
-      <!-- Estado: Configurando / Setup -->
-      <div *ngIf="mfaStep === 'setup'" class="mfa-setup-block" style="display: flex; flex-direction: column; gap: 20px;">
-        <div style="display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap;">
-          <div *ngIf="mfaQrCode" class="qr-container" style="background: white; padding: 10px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: fit-content;">
-            <img [src]="mfaQrCode" alt="Código QR MFA" style="display: block; width: 180px; height: 180px;">
-          </div>
-          <div style="flex: 1; min-width: 250px;">
-            <h3 style="margin-top: 0; color: var(--text-color);">1. Escanea el código QR</h3>
-            <p style="font-size: 14px; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px;">
-              Abre tu aplicación de autenticación y escanea el código QR de la izquierda. Si no puedes escanear el código QR, ingresa la siguiente clave manualmente:
-            </p>
-            <div style="background: rgba(0,0,0,0.05); padding: 8px 12px; border-radius: 4px; font-family: monospace; font-size: 14px; margin-bottom: 15px; display: inline-block; border: 1px solid rgba(0,0,0,0.1); word-break: break-all; color: var(--primary-color); font-weight: bold;">
-              {{ mfaSecret }}
-            </div>
-            
-            <h3 style="color: var(--text-color);">2. Ingresa el código de verificación</h3>
-            <p style="font-size: 14px; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px;">
-              Una vez escaneado, introduce el código de 6 dígitos que te proporciona la aplicación para confirmar la activación.
-            </p>
+      <!-- PANEL 2: CAMBIAR CONTRASEÑA -->
+      <div class="profile-panel">
+        <header class="profile-panel__header">
+          <mat-icon>lock</mat-icon>
+          <h2 class="profile-panel__title">Seguridad de la Cuenta</h2>
+        </header>
+        <div class="profile-panel__body">
+          <form [formGroup]="passwordForm" (ngSubmit)="changePassword()">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Contraseña Actual</mat-label>
+              <input matInput formControlName="currentPassword" type="password" placeholder="Introduce tu contraseña actual">
+            </mat-form-field>
 
-            <form [formGroup]="mfaForm" (ngSubmit)="verifyMfaSetup()" style="display: flex; align-items: center; gap: 12px;">
-              <mat-form-field appearance="outline" style="max-width: 150px; margin-bottom: 0;">
-                <mat-label>Código</mat-label>
-                <input matInput formControlName="code" placeholder="123456" maxlength="6">
+            <div class="form-row">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Nueva Contraseña</mat-label>
+                <input matInput formControlName="newPassword" type="password" placeholder="Mínimo 6 caracteres">
+                <mat-hint>Usa una clave robusta alfanumérica</mat-hint>
               </mat-form-field>
-              
-              <button mat-raised-button color="primary" type="submit" [disabled]="mfaForm.invalid || isSavingMfa" style="height: 54px; margin-top: -4px;">
-                Activar MFA
-              </button>
 
-              <button mat-stroked-button type="button" (click)="cancelMfaSetup()" style="height: 54px; margin-top: -4px;">
-                Cancelar
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Confirmar Nueva Contraseña</mat-label>
+                <input matInput formControlName="confirmPassword" type="password" placeholder="Repite la nueva contraseña">
+              </mat-form-field>
+            </div>
+
+            <div class="form-actions">
+              <button mat-flat-button color="accent" type="submit" [disabled]="isChangingPassword || passwordForm.invalid">
+                <mat-spinner *ngIf="isChangingPassword" diameter="20"></mat-spinner>
+                <span *ngIf="!isChangingPassword">Actualizar Contraseña</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- PANEL 3: MFA -->
+      <div class="profile-panel">
+        <header class="profile-panel__header">
+          <mat-icon>security</mat-icon>
+          <h2 class="profile-panel__title">Autenticación Multifactor (MFA/TOTP)</h2>
+        </header>
+        <div class="profile-panel__body">
+          <!-- Estado: Desactivado -->
+          <div *ngIf="mfaStep === 'inactive'" class="mfa-status-block">
+            <p class="mfa-description">
+              Añade una capa de protección adicional. Al activar MFA, se requerirá un código dinámico de 6 dígitos generado por tu aplicación móvil (Google Authenticator, Authy, etc.) cada vez que ingreses al sistema.
+            </p>
+            <button mat-flat-button color="primary" (click)="startMfaSetup()" [disabled]="isSavingMfa">
+              <mat-spinner *ngIf="isSavingMfa" diameter="20"></mat-spinner>
+              Configurar MFA
+            </button>
+          </div>
+
+          <!-- Estado: Configurando / Setup -->
+          <div *ngIf="mfaStep === 'setup'" class="mfa-setup-block">
+            <div class="mfa-setup-grid">
+              <div *ngIf="mfaQrCode" class="qr-container">
+                <img [src]="mfaQrCode" alt="Código QR MFA">
+              </div>
+              <div class="mfa-setup-instructions">
+                <h3>1. Escanea el código QR</h3>
+                <p>Abre tu aplicación de autenticación y escanea el código QR. Si no puedes escanearlo, ingresa la siguiente clave manualmente:</p>
+                <div class="mfa-secret-badge">{{ mfaSecret }}</div>
+                
+                <h3>2. Ingresa el código de verificación</h3>
+                <p>Introduce el código de 6 dígitos generado por tu app móvil para confirmar el enlace.</p>
+
+                <form [formGroup]="mfaForm" (ngSubmit)="verifyMfaSetup()" class="mfa-verification-form">
+                  <mat-form-field appearance="outline" class="mfa-code-field">
+                    <mat-label>Código TOTP</mat-label>
+                    <input matInput formControlName="code" placeholder="123456" maxlength="6">
+                  </mat-form-field>
+                  
+                  <div class="mfa-actions">
+                    <button mat-flat-button color="primary" type="submit" [disabled]="mfaForm.invalid || isSavingMfa">
+                      Activar MFA
+                    </button>
+                    <button mat-stroked-button type="button" (click)="cancelMfaSetup()">
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <!-- Estado: Activado -->
+          <div *ngIf="mfaStep === 'active'" class="mfa-active-block">
+            <div class="mfa-status-banner">
+              <mat-icon>check_circle</mat-icon>
+              <span>La autenticación de doble factor está activa en tu cuenta.</span>
+            </div>
+            <p class="mfa-active-desc">Para desactivar el servicio de segundo factor, introduce tu contraseña actual a continuación:</p>
+
+            <form [formGroup]="mfaDisableForm" (ngSubmit)="disableMfa()" class="mfa-disable-form">
+              <mat-form-field appearance="outline">
+                <mat-label>Contraseña Actual</mat-label>
+                <input matInput formControlName="password" type="password" placeholder="Tu contraseña">
+              </mat-form-field>
+
+              <button mat-flat-button color="warn" type="submit" [disabled]="mfaDisableForm.invalid || isDisablingMfa">
+                <mat-spinner *ngIf="isDisablingMfa" diameter="20"></mat-spinner>
+                Desactivar MFA
               </button>
             </form>
           </div>
         </div>
-      </div>
-
-      <!-- Estado: Activado -->
-      <div *ngIf="mfaStep === 'active'" class="mfa-active-block" style="display: flex; flex-direction: column; gap: 15px;">
-        <div style="display: flex; align-items: center; gap: 10px; color: #4caf50; background: rgba(76, 175, 80, 0.1); padding: 12px; border-radius: 6px;">
-          <mat-icon>check_circle</mat-icon>
-          <span style="font-weight: 500;">La autenticación multifactor está ACTIVA en tu cuenta.</span>
-        </div>
-        <p style="font-size: 14px; color: var(--text-muted);">
-          Tu cuenta está protegida con verificación en dos pasos. Si deseas desactivar el servicio de MFA, introduce tu contraseña actual a continuación.
-        </p>
-
-        <form [formGroup]="mfaDisableForm" (ngSubmit)="disableMfa()" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-          <mat-form-field appearance="outline" style="min-width: 200px; margin-bottom: 0;">
-            <mat-label>Contraseña Actual</mat-label>
-            <input matInput formControlName="password" type="password" placeholder="Ingresa tu contraseña">
-          </mat-form-field>
-
-          <button mat-raised-button color="warn" type="submit" [disabled]="mfaDisableForm.invalid || isDisablingMfa" style="height: 54px; margin-top: -4px;">
-            <mat-spinner *ngIf="isDisablingMfa" diameter="20" style="display: inline-block; margin-right: 8px; vertical-align: middle;"></mat-spinner>
-            Desactivar MFA
-          </button>
-        </form>
       </div>
     </div>
   </div>

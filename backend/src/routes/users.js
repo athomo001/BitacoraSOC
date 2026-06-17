@@ -17,6 +17,53 @@ const validate = require('../middleware/validate');
 const { audit } = require('../utils/audit');
 const { logger } = require('../utils/logger');
 const { syncDirectoryContact } = require('../utils/directory-sync');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs').promises;
+const sharp = require('sharp');
+
+// Verificación de integridad de imagen mediante sharp
+const verifyImageFile = async (filePath, mimetype) => {
+  try {
+    const metadata = await sharp(filePath).metadata();
+    return ['jpeg', 'jpg', 'png', 'webp'].includes(metadata.format);
+  } catch (err) {
+    return false;
+  }
+};
+
+// Configuración del storage multer para avatares en uploads/avatars
+const avatarStorage = multer.diskStorage({
+  destination: async (req, file, cb) => {
+    const uploadDir = path.join(__dirname, '../../uploads/avatars');
+    try {
+      await fs.mkdir(uploadDir, { recursive: true });
+      cb(null, uploadDir);
+    } catch (error) {
+      cb(error);
+    }
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `avatar-${req.user._id}-${Date.now()}${ext || '.png'}`);
+  }
+});
+
+// Límite de tamaño de avatar a 2MB
+const uploadAvatar = multer({
+  storage: avatarStorage,
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|webp/;
+    const mimeType = allowedTypes.test(file.mimetype);
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+
+    if (mimeType && extname) {
+      return cb(null, true);
+    }
+    cb(new Error('Solo se permiten imágenes (jpg, jpeg, png, webp) de hasta 2MB'));
+  }
+});
 
 const MAX_CARGO_LENGTH = 120;
 
@@ -104,13 +151,14 @@ router.put('/me',
     body('email').optional().isEmail().normalizeEmail(),
     body('fullName').optional().trim().notEmpty(),
     body('theme').optional().isIn(['light', 'dark', 'sepia', 'pastel', 'cyberpunk']),
+    body('phone').optional().trim().isLength({ min: 6, max: 20 }).withMessage('Teléfono inválido'),
     body('currentPassword').optional().notEmpty(),
     body('newPassword').optional().isLength({ min: 6 })
   ],
   validate,
   async (req, res) => {
     try {
-      const { email, fullName, theme, currentPassword, newPassword } = req.body;
+      const { email, fullName, theme, phone, currentPassword, newPassword } = req.body;
 
       const user = await User.findById(req.user._id);
       if (!user) {
@@ -127,6 +175,7 @@ router.put('/me',
       if (email) user.email = email;
       if (fullName) user.fullName = fullName;
       if (theme) user.theme = theme;
+      if (phone !== undefined) user.phone = phone || null;
 
       if (currentPassword || newPassword) {
         if (!currentPassword || !newPassword) {
@@ -142,6 +191,9 @@ router.put('/me',
       }
 
       await user.save();
+      
+      // Sincronizar los cambios con el directorio centralizado
+      await syncUserAsDirectoryInternal(user);
 
       await audit(req, {
         event: 'user.profile.update',
@@ -166,6 +218,71 @@ router.put('/me',
     }
   }
 );
+
+// PUT /api/users/me/avatar - Actualizar avatar propio (cualquier usuario autenticado)
+router.put('/me/avatar', authenticate, async (req, res) => {
+  uploadAvatar.single('avatar')(req, res, async (err) => {
+    if (err) {
+      return res.status(400).json({ message: err.message || 'Error al procesar archivo' });
+    }
+
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'No se proporcionó archivo de avatar' });
+      }
+
+      const isValidImg = await verifyImageFile(req.file.path, req.file.mimetype);
+      if (!isValidImg) {
+        await fs.unlink(req.file.path).catch(() => {});
+        return res.status(400).json({ message: 'El archivo no es una imagen válida o está corrompido' });
+      }
+
+      const user = await User.findById(req.user._id);
+      if (!user) {
+        await fs.unlink(req.file.path).catch(() => {});
+        return res.status(404).json({ message: 'Usuario no encontrado' });
+      }
+
+      const oldAvatar = user.avatar;
+      const newAvatarUrl = `/uploads/avatars/${req.file.filename}`;
+
+      user.avatar = newAvatarUrl;
+      await user.save();
+
+      // Sincronizar en el directorio centralizado
+      await syncUserAsDirectoryInternal(user);
+
+      // Limpiar avatar antiguo si existía
+      if (oldAvatar && oldAvatar.startsWith('/uploads/avatars/')) {
+        const oldPath = path.join(__dirname, '../..', oldAvatar);
+        await fs.unlink(oldPath).catch(() => {});
+      }
+
+      await audit(req, {
+        event: 'user.profile.avatar',
+        level: 'info',
+        result: { success: true },
+        metadata: {
+          targetUserId: user._id,
+          before: oldAvatar,
+          after: newAvatarUrl
+        }
+      });
+
+      res.json({
+        message: 'Avatar actualizado con éxito',
+        avatarUrl: newAvatarUrl,
+        user: user.toJSON()
+      });
+    } catch (error) {
+      if (req.file) {
+        await fs.unlink(req.file.path).catch(() => {});
+      }
+      console.error('Error al actualizar avatar:', error);
+      res.status(500).json({ message: 'Error al actualizar avatar' });
+    }
+  });
+});
 
 // POST /api/users - Crear usuario (solo admin)
 router.post('/',

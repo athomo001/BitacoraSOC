@@ -4,33 +4,6 @@
  * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
  */
 
-/**
- * Servicio de Gestión de Usuarios
- * 
- * Funcionalidad:
- *   - CRUD de usuarios (solo admin)
- *   - Perfil del usuario actual
- * 
- * Endpoints Admin:
- *   - GET    /api/users     - Listar todos los usuarios
- *   - POST   /api/users     - Crear usuario (admin/user/guest)
- *   - PUT    /api/users/:id - Actualizar usuario
- *   - DELETE /api/users/:id - Eliminar usuario
- * 
- * Endpoints Usuario:
- *   - GET /api/users/me - Perfil del usuario autenticado
- *   - PUT /api/users/me - Actualizar perfil propio (theme, fullName)
- * 
- * Reglas SOC:
- *   - Solo admin puede crear/editar/eliminar usuarios
- *   - Guests NO pueden editar su perfil (managed by admin)
- *   - Passwords hasheados en backend (bcrypt 10 rounds)
- *   - Guest expiresAt: calculado según AppConfig
- * 
- * Uso:
- *   - Admin gestiona equipo desde /main/users
- *   - Users editan su propio perfil (fullName, theme)
- */
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
@@ -74,5 +47,11 @@ export class UserService {
 
   updateProfile(data: UpdateProfileRequest): Observable<{ message: string; user: User }> {
     return this.http.put<{ message: string; user: User }>(`${this.API_URL}/me`, data);
+  }
+
+  uploadAvatar(file: File): Observable<{ message: string; avatarUrl: string; user: User }> {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    return this.http.put<{ message: string; avatarUrl: string; user: User }>(`${this.API_URL}/me/avatar`, formData);
   }
 }

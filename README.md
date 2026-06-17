@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.00**
+> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.01**
 
 Stack principal:
 
@@ -78,6 +78,13 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 ---
 
 ## Novedades recientes (resumen rapido)
+
+### v1.6.01 (rediseño de perfil, carga de avatar y contacto sincronizado)
+
+- rediseño visual de `/main/profile` a un layout premium responsivo de dos columnas.
+- soporte de subida física de avatares de usuario validando integridad binaria de imagen vía backend.
+- sincronización en tiempo real de edición de teléfono propio con el directorio centralizado del SOC.
+- barra lateral reactiva para actualizar avatar y placeholder de iniciales al instante.
 
 ### v1.6.00 (simplificación de temas y guía de réplicas)
 
