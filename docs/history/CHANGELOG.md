@@ -2,6 +2,15 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.02] - 2026-06-17
+
+### Aislamiento de Previsualizaciones en Cyberpunk, Márgenes del Logotipo y Navegación por Teclado
+
+- **Aislamiento de Previsualización de Informes:** Se agregaron reglas específicas de exclusión y reseteo en la hoja de estilos global para evitar que el contenedor `.html-preview` y sus elementos hijos hereden colores negros, scanlines o tipografías neón del tema Cyberpunk. Esto garantiza que las vistas previas de boletines de seguridad e informes de incidentes mantengan sus paletas de colores y estilos inline originales para su revisión fiel antes del envío a clientes.
+- **Optimización de Márgenes del Logotipo en Sidebar:** Se modificó la cabecera `mat-toolbar` de la barra lateral para permitir una altura dinámica (`height: auto !important`) y un min-height de `84px !important`, aplicando un padding respirable de `16px 20px !important`. Se limitó la altura del logotipo `.sidebar-logo` a `52px !important` para que quepa de forma balanceada y sin recortes en ningún tema visual.
+- **Navegación Táctica por Teclado en Escalamientos:** Se implementó una directiva de teclado en la vista de escalamientos (`/main/escalation/view`) para alternar pestañas (Turnos SOC, Contactos, Matriz RACI, Mantenimientos) de manera fluida utilizando las teclas de dirección izquierda/derecha (`ArrowLeft` / `ArrowRight`), previniendo capturas del evento si el foco del usuario se encuentra en un campo de texto interactivo.
+- **Refinamiento Estético Cyberpunk Edgerunners:** Ajustes tipográficos generales, asignación de paleta amarillo Edgerunners (`#fcee0a`) y cian táctico (`#00f0ff`) para títulos y elementos activos, y corrección de contraste en los roles del pie del sidebar sobre fondos oscuros.
+
 ## [v1.6.01] - 2026-06-17
 
 ### Rediseño de Perfil, Carga de Avatar y Sincronización de Contacto Centralizado

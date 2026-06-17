@@ -4,7 +4,7 @@
  * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
  */
 
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom, forkJoin } from 'rxjs';
@@ -55,6 +55,31 @@ import { EscalationFlowPreviewComponent } from '../shared/escalation-flow-previe
     styleUrls: ['./escalation-simple.component.scss']
 })
 export class EscalationSimpleComponent implements OnInit {
+  // Índice de la pestaña activa para navegación con teclado
+  activeTabIndex = 0;
+
+  // Escucha de eventos de teclado para la navegación rápida por pestañas con flechas direccionales
+  @HostListener('window:keydown', ['$event'])
+  handleKeyDown(event: KeyboardEvent): void {
+    const activeEl = document.activeElement;
+    // Evitar interceptar si el usuario está enfocado en campos de texto de búsqueda o formularios
+    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.hasAttribute('contenteditable'))) {
+      return;
+    }
+
+    if (event.key === 'ArrowRight') {
+      if (this.activeTabIndex < 3) {
+        this.activeTabIndex++;
+        this.cdr.detectChanges();
+      }
+    } else if (event.key === 'ArrowLeft') {
+      if (this.activeTabIndex > 0) {
+        this.activeTabIndex--;
+        this.cdr.detectChanges();
+      }
+    }
+  }
+
   // Datos para la vista Excel
   escalationData: any[] = [];
   allClients: any[] = [];

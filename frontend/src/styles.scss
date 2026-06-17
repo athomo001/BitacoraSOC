@@ -1597,51 +1597,80 @@ p, span, label {
 
 /* ========== CYBERPUNK THEME SPECIFIC OVERRIDES ========== */
 [data-theme="cyberpunk"] {
+  --primary-color: #00f0ff; /* Cian neón */
+  --accent-color: #ff0055; /* Magenta neón */
+  --warn-color: #fcee0a; /* Amarillo neón */
+  --background-color: #000000; /* Fondo negro puro */
+  --surface-color: #050508; /* Gris militar táctico */
+  --surface-card: #0c0c0c;
+  --surface-raised: #14141f; /* Superficie elevada para mejor contraste visual */
+  --sidebar-bg: #000000;
+  --sidebar-text: #00f0ff;
+  --text-primary: #00f0ff;
+  --text-secondary: #ff0055;
+  --text-muted: #5a5a6a;
+  --border-color: #1a1a24;
+  --outline-subtle: rgba(0, 240, 255, 0.2);
+  --hover-bg: #ff0055;
+  --state-success: #00f0ff;
+  --state-success-bg: rgba(0, 240, 255, 0.1);
+  --state-warning: #fcee0a;
+  --state-warning-bg: rgba(252, 238, 10, 0.1);
+  --state-error: #ff0055;
+  --state-error-bg: rgba(255, 0, 85, 0.1);
+  
   color-scheme: dark;
+}
+
+/* Forzar la geometría angular (Anti-Redondez) en todo el tema */
+[data-theme="cyberpunk"] *,
+.theme-cyberpunk * {
+  border-radius: 0px !important;
 }
 
 [data-theme="cyberpunk"] body,
 [data-theme="cyberpunk"] .mat-sidenav-content {
-  font-family: 'Orbitron', 'Audiowide', 'Segoe UI', sans-serif;
-  font-size: 0.92rem;
-  line-height: 1.4;
-  letter-spacing: 0.008em;
+  /* Se cambia a una fuente sans-serif limpia y legible para evitar fatiga visual */
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 0.95rem; /* Se incrementa ligeramente el tamaño de la letra */
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+  background-color: #000000 !important;
+  /* Se reduce la opacidad de las scanlines para mayor nitidez tipográfica */
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0 2px, rgba(0, 0, 0, 0.02) 2px 4px),
-    radial-gradient(circle at 20% 18%, rgba(255, 0, 140, 0.22), transparent 40%),
-    radial-gradient(circle at 78% 8%, rgba(0, 224, 255, 0.2), transparent 36%),
-    linear-gradient(180deg, #0d0d0d 0%, #121212 55%, #171717 100%);
-  background-size: 32px 32px, 32px 32px, 100% 4px, auto, auto, auto;
+    linear-gradient(rgba(0, 240, 255, 0.008) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 240, 255, 0.008) 1px, transparent 1px),
+    repeating-linear-gradient(180deg, rgba(0, 0, 0, 0) 0 2px, rgba(0, 240, 255, 0.01) 2px 4px);
+  background-size: 24px 24px, 24px 24px, 100% 4px;
 }
 
+/* Títulos nítidos usando la fuente Orbitron con un glow muy sutil sin glitch que cause borrosidad */
 [data-theme="cyberpunk"] h1,
 [data-theme="cyberpunk"] h2,
 [data-theme="cyberpunk"] .top-toolbar,
 [data-theme="cyberpunk"] .left-sidebar mat-toolbar span,
 [data-theme="cyberpunk"] .right-sidebar mat-toolbar span,
 [data-theme="cyberpunk"] .mat-expansion-panel-header-title {
-  font-family: 'Orbitron', 'Audiowide', 'Segoe UI', sans-serif;
-  letter-spacing: 0.025em;
+  font-family: 'Orbitron', 'Segoe UI', Roboto, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  line-height: 1.18;
-  text-shadow:
-    0 0 4px rgba(255, 0, 140, 0.8),
-    0 0 10px rgba(0, 224, 255, 0.55);
+  line-height: 1.2;
+  color: #fcee0a !important; /* Amarillo Cyberpunk Edgerunners */
+  text-shadow: 0 0 4px rgba(252, 238, 10, 0.4); /* Glow neón amarillo */
 }
 
 [data-theme="cyberpunk"] h1 {
-  font-size: clamp(1.7rem, 2.6vw, 2.45rem);
+  font-size: clamp(1.7rem, 2.5vw, 2.35rem);
 }
 
 [data-theme="cyberpunk"] h2 {
-  font-size: clamp(1.2rem, 1.9vw, 1.65rem);
+  font-size: clamp(1.2rem, 1.8vw, 1.55rem);
 }
 
 [data-theme="cyberpunk"] .toolbar-title {
-  font-size: clamp(1.15rem, 2.1vw, 1.85rem);
-  letter-spacing: 0.025em;
+  font-size: clamp(1.2rem, 2vw, 1.75rem);
+  letter-spacing: 0.05em;
 }
 
 [data-theme="dark"] .mat-expansion-panel-header,
@@ -1662,33 +1691,63 @@ p, span, label {
   animation: blood-dragon-glitch 4.2s infinite steps(2, end);
 }
 
+/* Banners y Encabezados con Scanlines */
 [data-theme="cyberpunk"] .top-toolbar,
 [data-theme="cyberpunk"] .page-header,
 [data-theme="cyberpunk"] .hero-section {
-  background: linear-gradient(90deg, #ff008c 0%, #9900ff 46%, #00e0ff 100%);
-  border: 1px solid rgba(0, 224, 255, 0.5);
-  box-shadow:
-    0 0 0 1px rgba(255, 0, 140, 0.3),
-    0 0 14px rgba(255, 0, 140, 0.35),
-    0 0 20px rgba(0, 224, 255, 0.28);
+  background: #000000 !important;
+  border: 1px solid #00f0ff !important;
+  border-bottom: 2px solid #00f0ff !important;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.15);
+  position: relative;
+  overflow: hidden;
+}
+
+[data-theme="cyberpunk"] .top-toolbar::before,
+[data-theme="cyberpunk"] .page-header::before,
+[data-theme="cyberpunk"] .hero-section::before {
+  content: "" !important;
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 240, 255, 0.02) 2px,
+    rgba(0, 240, 255, 0.02) 4px
+  ) !important;
+  pointer-events: none;
+  z-index: 1;
 }
 
 [data-theme="cyberpunk"] .mat-mdc-menu-item,
 [data-theme="cyberpunk"] .mat-mdc-tab,
 [data-theme="cyberpunk"] .mat-mdc-list-item-title,
 [data-theme="cyberpunk"] .mat-mdc-chip {
-  font-family: 'Orbitron', 'Audiowide', 'Segoe UI', sans-serif;
-  font-size: 0.88rem;
-  letter-spacing: 0.02em;
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 0.9rem; /* Incrementado para legibilidad */
+  letter-spacing: 0.03em;
   text-transform: uppercase;
-  line-height: 1.2;
+  line-height: 1.25;
+}
+
+/* Menú Lateral (Sidebar) Cyberpunk HUD */
+[data-theme="cyberpunk"] .left-sidebar mat-toolbar {
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%) !important;
+  background: #000000 !important;
+  border-bottom: 3px solid #ff0055 !important;
+  border-right: 3px solid #ff0055 !important;
+  margin-bottom: 12px;
 }
 
 [data-theme="cyberpunk"] .left-sidebar .mdc-list-item__primary-text,
 [data-theme="cyberpunk"] .mat-mdc-menu-panel .mdc-list-item__primary-text {
-  font-size: 0.84rem !important;
-  letter-spacing: 0.018em !important;
-  line-height: 1.2 !important;
+  font-size: 0.9rem !important; /* Aumentado de 0.82rem */
+  letter-spacing: 0.03em !important;
+  line-height: 1.3 !important;
   white-space: normal !important;
   word-break: break-word;
 }
@@ -1696,11 +1755,30 @@ p, span, label {
 [data-theme="cyberpunk"] .left-sidebar .mat-expansion-panel-header-title,
 [data-theme="cyberpunk"] .left-sidebar .mat-expansion-panel-header-description,
 [data-theme="cyberpunk"] .left-sidebar .mat-expansion-panel-header-title mat-panel-title {
-  font-size: 0.8rem !important;
-  letter-spacing: 0.012em !important;
-  line-height: 1.1 !important;
+  font-size: 0.85rem !important; /* Aumentado de 0.78rem */
+  letter-spacing: 0.03em !important;
+  line-height: 1.2 !important;
   white-space: nowrap !important;
   word-break: normal !important;
+}
+
+[data-theme="cyberpunk"] .left-sidebar .menu-accordion mat-panel-title,
+[data-theme="cyberpunk"] .left-sidebar .mat-expansion-panel-header-title {
+  text-transform: uppercase !important;
+  font-family: 'Orbitron', 'Segoe UI', Roboto, sans-serif !important;
+  font-weight: bold !important;
+}
+
+[data-theme="cyberpunk"] .left-sidebar .menu-accordion mat-panel-title::before,
+[data-theme="cyberpunk"] .left-sidebar .mat-expansion-panel-header-title::before {
+  content: "// " !important;
+  color: #ff0055 !important;
+}
+
+[data-theme="cyberpunk"] .left-sidebar .menu-accordion mat-panel-title::after,
+[data-theme="cyberpunk"] .left-sidebar .mat-expansion-panel-header-title::after {
+  content: " _" !important;
+  color: #00f0ff !important;
 }
 
 [data-theme="cyberpunk"] .left-sidebar .mat-expansion-panel-header-title {
@@ -1713,62 +1791,344 @@ p, span, label {
   overflow: visible !important;
 }
 
+/* Hover instantáneo y sin transiciones en el Sidebar */
+[data-theme="cyberpunk"] .left-sidebar .mat-mdc-list-item:hover,
+[data-theme="cyberpunk"] .left-sidebar a.mat-list-item:hover {
+  background-color: #00f0ff !important;
+  transition: none !important;
+}
+
+[data-theme="cyberpunk"] .left-sidebar .mat-mdc-list-item:hover .mdc-list-item__primary-text,
+[data-theme="cyberpunk"] .left-sidebar .mat-mdc-list-item:hover .mat-icon,
+[data-theme="cyberpunk"] .left-sidebar a.mat-list-item:hover .mdc-list-item__primary-text,
+[data-theme="cyberpunk"] .left-sidebar a.mat-list-item:hover .mat-icon {
+  color: #000000 !important;
+}
+
+[data-theme="cyberpunk"] .left-sidebar .active-link,
+[data-theme="cyberpunk"] .left-sidebar .router-link-active,
+[data-theme="cyberpunk"] .left-sidebar .mat-mdc-nav-list .mdc-list-item--activated {
+  background-color: #fcee0a !important; /* Amarillo Cyberpunk */
+  box-shadow: none !important;
+  transition: none !important;
+}
+
+[data-theme="cyberpunk"] .left-sidebar .active-link .mdc-list-item__primary-text,
+[data-theme="cyberpunk"] .left-sidebar .active-link .mat-icon,
+[data-theme="cyberpunk"] .left-sidebar .router-link-active .mdc-list-item__primary-text,
+[data-theme="cyberpunk"] .left-sidebar .router-link-active .mat-icon,
+[data-theme="cyberpunk"] .left-sidebar .mat-mdc-nav-list .mdc-list-item--activated .mdc-list-item__primary-text,
+[data-theme="cyberpunk"] .left-sidebar .mat-mdc-nav-list .mdc-list-item--activated .mat-icon {
+  color: #000000 !important;
+}
+
+/* Tarjetas y Paneles con Esquinas Biseladas */
 [data-theme="cyberpunk"] .mat-mdc-card,
 [data-theme="cyberpunk"] .mat-expansion-panel,
 [data-theme="cyberpunk"] .mat-mdc-menu-panel,
-[data-theme="cyberpunk"] .mat-mdc-dialog-surface {
-  border: 1px solid color-mix(in srgb, #9900ff 72%, #00e0ff 28%);
-  box-shadow:
-    0 0 0 1px rgba(255, 0, 140, 0.2),
-    0 0 14px rgba(0, 224, 255, 0.2),
-    var(--shadow);
+[data-theme="cyberpunk"] .mat-mdc-dialog-surface,
+[data-theme="cyberpunk"] .profile-card,
+[data-theme="cyberpunk"] .profile-panel,
+[data-theme="cyberpunk"] .card {
+  clip-path: polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15px 100%, 0 calc(100% - 15px)) !important;
+  background: #0c0c0c !important;
+  border: 1px solid #00f0ff !important;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.15) !important;
 }
 
+/* Formulario e Inputs Militares */
 [data-theme="cyberpunk"] .mat-mdc-form-field .mdc-notched-outline__leading,
 [data-theme="cyberpunk"] .mat-mdc-form-field .mdc-notched-outline__trailing,
 [data-theme="cyberpunk"] .mat-mdc-form-field .mdc-notched-outline__notch {
-  border-color: color-mix(in srgb, #9900ff 65%, #00e0ff 35%);
+  border-color: #2a2a35 !important;
+  border-width: 1px !important;
 }
 
 [data-theme="cyberpunk"] .mat-mdc-form-field.mat-focused .mdc-notched-outline__leading,
 [data-theme="cyberpunk"] .mat-mdc-form-field.mat-focused .mdc-notched-outline__trailing,
 [data-theme="cyberpunk"] .mat-mdc-form-field.mat-focused .mdc-notched-outline__notch {
-  border-color: #00e0ff;
-  box-shadow: 0 0 12px rgba(0, 224, 255, 0.42);
+  border-color: #fcee0a !important; /* Amarillo Cyberpunk en foco */
+  border-width: 2px !important;
+  box-shadow: none !important; /* Sin suavizado difuso */
 }
 
+[data-theme="cyberpunk"] input.mat-mdc-input-element,
+[data-theme="cyberpunk"] textarea.mat-mdc-input-element,
+[data-theme="cyberpunk"] .mat-mdc-select-value {
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+  color: #00f0ff !important;
+  font-size: 0.95rem !important;
+}
+
+/* Botones Cyberpunk */
 [data-theme="cyberpunk"] .mat-mdc-raised-button,
 [data-theme="cyberpunk"] .mat-mdc-unelevated-button,
 [data-theme="cyberpunk"] .mat-mdc-outlined-button,
 [data-theme="cyberpunk"] .btn-primary {
-  border: 1px solid rgba(0, 224, 255, 0.72);
-  transition: box-shadow 0.28s ease, transform 0.28s ease, background-color 0.28s ease, color 0.28s ease;
-  box-shadow:
-    0 0 0 1px rgba(255, 0, 140, 0.26),
-    0 0 12px rgba(0, 224, 255, 0.34);
+  border: 1px solid #00f0ff !important;
+  background-color: transparent !important;
+  color: #00f0ff !important;
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+  font-weight: bold !important;
+  text-transform: uppercase !important;
+  transition: none !important;
+  box-shadow: 0 0 6px rgba(0, 240, 255, 0.2) !important;
 }
 
 [data-theme="cyberpunk"] .mat-mdc-raised-button:hover,
 [data-theme="cyberpunk"] .mat-mdc-unelevated-button:hover,
 [data-theme="cyberpunk"] .mat-mdc-outlined-button:hover,
 [data-theme="cyberpunk"] .btn-primary:hover {
-  background-color: #ff008c;
-  color: #ffffff;
-  transform: translateY(-1px);
-  box-shadow:
-    0 0 0 1px rgba(255, 0, 140, 0.45),
-    0 0 18px rgba(255, 0, 140, 0.6),
-    0 0 24px rgba(0, 224, 255, 0.5);
-}
-
-[data-theme="cyberpunk"] .mat-mdc-nav-list .mdc-list-item:hover,
-[data-theme="cyberpunk"] .mat-mdc-nav-list .mdc-list-item--activated {
-  background-color: color-mix(in srgb, var(--hover-bg) 70%, #ff008c 30%);
-  box-shadow: inset 3px 0 0 #00e0ff;
+  background-color: #ff0055 !important;
+  color: #000000 !important;
+  border-color: #ff0055 !important;
+  box-shadow: 0 0 14px rgba(255, 0, 85, 0.45) !important;
 }
 
 [data-theme="cyberpunk"] .mat-mdc-tab .mdc-tab__text-label {
-  text-shadow: 0 0 6px rgba(0, 224, 255, 0.45);
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+  font-weight: 600;
+  text-shadow: 0 0 3px rgba(0, 240, 255, 0.3);
+}
+
+/* Tablas e información de celdas */
+[data-theme="cyberpunk"] table:not(.html-preview *):not(.print-report-sheet *),
+[data-theme="cyberpunk"] .mat-mdc-table {
+  /* 
+   * Evitamos que las tablas de previsualización (boletines y reportes) y de impresión 
+   * hereden el color de fondo negro del tema Cyberpunk, permitiendo que se usen sus colores 
+   * originales y estilos en línea (inline).
+   */
+  background-color: #000000 !important;
+  border: 1px solid #1a1a24 !important;
+}
+
+[data-theme="cyberpunk"] th.mat-mdc-header-cell,
+[data-theme="cyberpunk"] .mat-mdc-header-row {
+  background-color: #00f0ff !important;
+  color: #000000 !important;
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+  font-weight: bold !important;
+  text-transform: uppercase !important;
+  border-bottom: 2px solid #00f0ff !important;
+}
+
+[data-theme="cyberpunk"] td.mat-mdc-cell,
+[data-theme="cyberpunk"] tr.mat-mdc-row {
+  border-bottom: 1px dashed rgba(0, 240, 255, 0.15) !important;
+  background-color: #040406 !important;
+  font-size: 0.9rem !important;
+}
+
+/* Forzar monospace únicamente en datos técnicos, números, correos e identificadores */
+[data-theme="cyberpunk"] .monospace-data,
+[data-theme="cyberpunk"] .tel-link,
+[data-theme="cyberpunk"] .email-cell,
+[data-theme="cyberpunk"] .phone-cell,
+[data-theme="cyberpunk"] .metadata-item .value,
+[data-theme="cyberpunk"] .health-chip,
+[data-theme="cyberpunk"] .last-check-info p,
+[data-theme="cyberpunk"] code,
+[data-theme="cyberpunk"] pre {
+  font-family: 'Courier New', Courier, monospace !important;
+}
+
+/* Badges Rectangulares con Corchetes y Colores Semánticos de Rol */
+[data-theme="cyberpunk"] .role-badge,
+[data-theme="cyberpunk"] .badge-pill {
+  border-radius: 0px !important;
+  background: transparent !important;
+  border: none !important;
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+  text-transform: uppercase !important;
+  font-weight: bold !important;
+  padding: 2px 4px !important;
+  display: inline-block !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  color: #00f0ff !important; /* Color por defecto: cian */
+}
+
+/* Colores de roles específicos en cyberpunk */
+[data-theme="cyberpunk"] .role-badge.admin,
+[data-theme="cyberpunk"] .role-badge[data-role="admin"] {
+  color: #ff0055 !important; /* Admin = Magenta neón */
+}
+
+[data-theme="cyberpunk"] .role-badge.user,
+[data-theme="cyberpunk"] .role-badge[data-role="user"] {
+  color: #00f0ff !important; /* User = Cian neón */
+}
+
+[data-theme="cyberpunk"] .role-badge.guest,
+[data-theme="cyberpunk"] .role-badge.auditor,
+[data-theme="cyberpunk"] .role-badge[data-role="auditor"],
+[data-theme="cyberpunk"] .role-badge[data-role="guest"] {
+  color: #fcee0a !important; /* Auditor/Guest = Amarillo neón */
+}
+
+/* Sobrescribir fondo del pie del sidebar en cyberpunk para que no use el magenta brillante de --hover-bg */
+[data-theme="cyberpunk"] .user-info {
+  background-color: #050508 !important; /* Fondo gris militar oscuro */
+  border-top: 1px solid #00f0ff !important;
+}
+
+[data-theme="cyberpunk"] .role-badge::before,
+[data-theme="cyberpunk"] .badge-pill::before {
+  content: "[ " !important;
+  color: #00f0ff !important;
+}
+
+[data-theme="cyberpunk"] .role-badge::after,
+[data-theme="cyberpunk"] .badge-pill::after {
+  content: " ]" !important;
+  color: #00f0ff !important;
+}
+
+/* Tarjetas Analíticas de Métricas */
+[data-theme="cyberpunk"] .metric-card,
+[data-theme="cyberpunk"] .stat-card {
+  clip-path: polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15px 100%, 0 calc(100% - 15px)) !important;
+  background: #050508 !important;
+  border: 1px solid #00f0ff !important;
+}
+
+[data-theme="cyberpunk"] .metric-value.zero,
+[data-theme="cyberpunk"] .stat-value[data-value="0"] {
+  color: #3a3a4a !important; /* Gris apagado */
+  text-shadow: none !important;
+}
+
+[data-theme="cyberpunk"] .metric-value:not(.zero),
+[data-theme="cyberpunk"] .stat-value:not([data-value="0"]) {
+  color: #ff0055 !important;
+  text-shadow: 0 0 3px rgba(255, 0, 85, 0.4) !important; /* Glow suave y nítido sin desplazamiento doble */
+}
+
+/* Contraste en selectores y autocompletados de Material overlay */
+[data-theme="cyberpunk"] .mat-mdc-select-panel,
+[data-theme="cyberpunk"] .mat-mdc-autocomplete-panel,
+[data-theme="cyberpunk"] .mat-mdc-option {
+  background-color: #0c0c0c !important;
+  color: #00f0ff !important;
+}
+
+[data-theme="cyberpunk"] .mat-mdc-option.mdc-list-item--selected:not(.mdc-list-item--disabled) {
+  background-color: #fcee0a !important; /* Amarillo Cyberpunk */
+}
+
+[data-theme="cyberpunk"] .mat-mdc-option.mdc-list-item--selected:not(.mdc-list-item--disabled) .mdc-list-item__primary-text {
+  color: #000000 !important;
+}
+
+/* Estilo y contraste para botones alternadores (Button Toggle) en cyberpunk */
+[data-theme="cyberpunk"] mat-button-toggle-group,
+[data-theme="cyberpunk"] .mat-button-toggle-group {
+  background-color: #0c0c0c !important;
+  border: 1px solid #00f0ff !important;
+}
+
+[data-theme="cyberpunk"] mat-button-toggle,
+[data-theme="cyberpunk"] .mat-button-toggle {
+  background-color: #0c0c0c !important;
+  color: #00f0ff !important;
+  border-right: 1px solid rgba(0, 240, 255, 0.3) !important;
+}
+
+[data-theme="cyberpunk"] .mat-button-toggle-checked {
+  background-color: #fcee0a !important; /* Amarillo Cyberpunk en lugar de magenta */
+  color: #000000 !important; /* Letras oscuras para contraste ideal */
+}
+
+[data-theme="cyberpunk"] .mat-button-toggle-checked .mat-button-toggle-label-content {
+  color: #000000 !important;
+}
+
+[data-theme="cyberpunk"] .mat-button-toggle-checked mat-icon {
+  color: #000000 !important;
+}
+
+/* Pestañas activas de la Consola Administrativa en Amarillo Cyberpunk */
+[data-theme="cyberpunk"] .admin-link {
+  border: 1px solid #00f0ff !important;
+  color: #00f0ff !important;
+  background-color: #050508 !important;
+  font-family: 'Orbitron', 'Segoe UI', Roboto, sans-serif !important;
+  font-weight: 600;
+  text-transform: uppercase;
+  border-radius: 0px !important;
+}
+
+[data-theme="cyberpunk"] .admin-link:hover {
+  background-color: rgba(0, 240, 255, 0.1) !important;
+  color: #00f0ff !important;
+}
+
+[data-theme="cyberpunk"] .admin-link.active {
+  background-color: #fcee0a !important; /* Amarillo Cyberpunk */
+  color: #000000 !important;
+  border-color: #fcee0a !important;
+}
+
+/* Mejorar legibilidad de textos secundarios sobre fondo negro */
+[data-theme="cyberpunk"] .admin-console-header p,
+[data-theme="cyberpunk"] .users-panel__header p,
+[data-theme="cyberpunk"] .page-header p.subtitle,
+[data-theme="cyberpunk"] .mat-card-subtitle,
+[data-theme="cyberpunk"] .mat-expansion-panel-header-description,
+[data-theme="cyberpunk"] .text-secondary {
+  color: #00f0ff !important; /* Forzar cian brillante en lugar de rojo oscuro apagado */
+}
+
+/* Evitar que el reporte de operaciones herede estilos cyberpunk (tanto en pantalla como en impresión) */
+[data-theme="cyberpunk"] .print-report-sheet,
+[data-theme="cyberpunk"] .print-report-sheet * {
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+  color: #0f172a !important;
+  text-shadow: none !important;
+  clip-path: none !important;
+  border-radius: 4px !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: none !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+}
+
+/* 
+ * Aislamiento para la previsualización de reportes de incidentes y boletines de seguridad.
+ * Esta regla neutraliza la tipografía neón, scanlines, glows, sombras y clip-paths biselados del tema Cyberpunk.
+ * Esto asegura que todo el contenido y elementos internos de las tablas de previsualización utilicen sus 
+ * fuentes Arial/sans-serif normales y hereden correctamente los colores de fondo/texto inline del HTML, 
+ * renderizándose de manera idéntica a cómo los recibirá el cliente de correo.
+ */
+[data-theme="cyberpunk"] .html-preview,
+[data-theme="cyberpunk"] .html-preview * {
+  font-family: Arial, Helvetica, sans-serif !important;
+  background-image: none !important;
+  text-shadow: none !important;
+  clip-path: none !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  box-shadow: none !important;
+  border-radius: initial !important;
+}
+
+/* Gráficos con Rejillas Tácticas y Rayas Industriales */
+[data-theme="cyberpunk"] .ngx-charts .gridline-path {
+  stroke: rgba(0, 240, 255, 0.12) !important;
+  stroke-dasharray: 4 4 !important;
+}
+
+[data-theme="cyberpunk"] .ngx-charts .bar {
+  fill: repeating-linear-gradient(
+    45deg,
+    #ff0055,
+    #ff0055 6px,
+    #000000 6px,
+    #000000 12px
+  ) !important;
 }
 
 .warning-box {

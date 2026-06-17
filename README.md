@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.01**
+> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.02**
 
 Stack principal:
 
@@ -31,24 +31,24 @@ Stack principal:
 
 ## Comparativa con herramientas similares
 
-| Característica / Enfoque | Bitácora SOC | TheHive / Cortex | ITSM / Ticketing Genérico (JSM, ServiceNow, GLPI, etc.) |
-| :--- | :--- | :--- | :--- |
-| **Objetivo Principal** | Continuidad operacional por turno: qué pasó, quién lo tomó, qué quedó pendiente y a quién llamar. | Gestión de incidentes de ciberseguridad e investigación técnica profunda (IOC, forense, respuesta). | Gestión de solicitudes/incidentes de servicio con trazabilidad administrativa y SLA. |
-| **Centro de Gravedad** | **Operación en tiempo real y relevo de guardia** (SOC, NOC, TI on-call y equipos de emergencia). | **Investigación de amenazas** y respuesta técnica especializada orientada a la ciberseguridad. | **Proceso de atención** (tickets, colas, aprobaciones, catálogo de servicios). |
-| **Naturaleza de la Escalada** | **Humana y directa**: la bitácora documenta a quién llamar, qué equipo contactar y qué ruta seguir; no depende de un ticket para disparar la ayuda inmediata. | **Técnica y orientada a caso**: prioriza el análisis y la orquestación sobre la llamada operativa. | **Automática por flujo de atención**: el ticket se enruta al área o cola definida y puede escalarse por reglas de proceso. |
-| **Gobernanza del Turno** | **Sí** (checklist de inicio/cierre, segregación por `shiftId`, métricas de cumplimiento y disciplina operativa diaria). | No nativo (el foco está en casos; no en rituales de apertura/cierre de guardia). | Parcial (se puede modelar con customización, pero no suele venir listo como flujo operativo de relevo). |
-| **Gestión Operativa y de Equipo** | **Sí** (minutas/informes de turno, visibilidad de teletrabajo/vacaciones, asignaciones internas y recordatorios automatizados). | No orientado a dotación y coordinación de guardias. | Parcial (fuerte en asignación de tickets; más débil en vista táctica de dotación en turno). |
-| **Analíticas y KPI Operativos** | **Sí** (métricas de uso por usuario, volumen de entradas, acciones registradas, alertas atendidas y trazabilidad de actividad para medir disciplina operativa). | Enfoque más orientado a casos e investigación que a KPI de relevo diario. | Sí, pero centradas en SLAs, colas y tiempos de atención, no en bitácora de turno. |
-| **Alertas y Confirmaciones** | **Sí** (avisos para checklist, alertas NOK, recordatorios y alertas por cliente; el usuario puede confirmar lectura/cierre cuando corresponda y volver a cerrarlas según el flujo operativo). | Sí, pero orientadas a incidentes/casos de seguridad. | Sí, normalmente mediante notificaciones y estados del ticket. |
-| **Flexibilidad de Entrada** | **Alta** (bitácora narrativa con hashtags para incidentes, mantenimiento, guardias físicas y operación multiárea). | Media-baja (estructura centrada en caso de ciber). | Media (campos estructurados y formularios; menos natural para narrativa cronológica de guardia). |
-| **Modelo de Datos Operativo** | **Evento + narrativa + checklist + auditoría** (prioriza contexto de turno, continuidad entre personas y seguimiento de acciones). | **Caso + observable + tarea** (prioriza investigación y evidencia técnica). | **Ticket + estado + SLA** (prioriza ciclo de vida de atención). |
-| **Búsqueda y Trazabilidad** | Búsqueda textual/narrativa por contenido y hashtags, útil para reconstrucción operativa y respaldo histórico. | Búsqueda técnica por observables/IOCs para correlación de amenazas. | Búsqueda por ticket, campos, estados y reportes de servicio. |
-| **Reportes y Comunicación** | Boletines/reportes ejecutivos con envío por correo, agrupación por dominio y historial de envíos para saber cuándo se avisó a clientes o equipos. | Requiere capas adicionales para reporteo ejecutivo orientado a cliente. | Muy fuerte en reportes de servicio/SLA; menos enfocado en narrativa de relevo de guardia. |
-| **Auditoría y Cumplimiento** | Auditoría persistente transversal (acciones operativas y administrativas) + control de acceso por roles (admin/user/auditor/guest). | Auditoría orientada a investigación y acciones sobre casos. | Auditoría administrativa madura, generalmente centrada en proceso ITSM. |
-| **Resiliencia y Backups** | Backups/restores desde UI con cifrado y alcance integral (BD + evidencias + secretos). | Normalmente delegado a estrategia de infraestructura/plataforma. | Depende del producto y plan; suele manejarse a nivel plataforma/instancia. |
-| **Extensibilidad del Operador** | Complementos embebidos con sandbox, bridge de contexto y circuit breaker para utilidades de terreno. | Extensible a través de integraciones orientadas a seguridad. | Marketplace e integraciones robustas, usualmente orientadas a flujos ITSM corporativos. |
-| **Cobertura de Dominio** | **SOC-first pero no SOC-only**: también aplica a NOC, mesas TI, guardias físicas y equipos con múltiples escalamientos/monitoreo. | **Ciberseguridad-first y especializada**. | **Empresa-first y transversal**, con foco en gobierno de servicios más que en bitácora de turno. |
-| **Curva de Aprendizaje** | Baja a media (entrada rápida para N1/operador de guardia, con crecimiento progresivo). | Media-alta (perfil analista de seguridad N2/N3). | Media (requiere adopción de procesos y configuración de catálogo/flujo). |
+| Característica / Enfoque          | Bitácora SOC                                                                                                                                                                                  | TheHive / Cortex                                                                                    | ITSM / Ticketing Genérico (JSM, ServiceNow, GLPI, etc.)                                                                    |
+| :-------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------- |
+| **Objetivo Principal**            | Continuidad operacional por turno: qué pasó, quién lo tomó, qué quedó pendiente y a quién llamar.                                                                                             | Gestión de incidentes de ciberseguridad e investigación técnica profunda (IOC, forense, respuesta). | Gestión de solicitudes/incidentes de servicio con trazabilidad administrativa y SLA.                                       |
+| **Centro de Gravedad**            | **Operación en tiempo real y relevo de guardia** (SOC, NOC, TI on-call y equipos de emergencia).                                                                                              | **Investigación de amenazas** y respuesta técnica especializada orientada a la ciberseguridad.      | **Proceso de atención** (tickets, colas, aprobaciones, catálogo de servicios).                                             |
+| **Naturaleza de la Escalada**     | **Humana y directa**: la bitácora documenta a quién llamar, qué equipo contactar y qué ruta seguir; no depende de un ticket para disparar la ayuda inmediata.                                 | **Técnica y orientada a caso**: prioriza el análisis y la orquestación sobre la llamada operativa.  | **Automática por flujo de atención**: el ticket se enruta al área o cola definida y puede escalarse por reglas de proceso. |
+| **Gobernanza del Turno**          | **Sí** (checklist de inicio/cierre, segregación por `shiftId`, métricas de cumplimiento y disciplina operativa diaria).                                                                       | No nativo (el foco está en casos; no en rituales de apertura/cierre de guardia).                    | Parcial (se puede modelar con customización, pero no suele venir listo como flujo operativo de relevo).                    |
+| **Gestión Operativa y de Equipo** | **Sí** (minutas/informes de turno, visibilidad de teletrabajo/vacaciones, asignaciones internas y recordatorios automatizados).                                                               | No orientado a dotación y coordinación de guardias.                                                 | Parcial (fuerte en asignación de tickets; más débil en vista táctica de dotación en turno).                                |
+| **Analíticas y KPI Operativos**   | **Sí** (métricas de uso por usuario, volumen de entradas, acciones registradas, alertas atendidas y trazabilidad de actividad para medir disciplina operativa).                               | Enfoque más orientado a casos e investigación que a KPI de relevo diario.                           | Sí, pero centradas en SLAs, colas y tiempos de atención, no en bitácora de turno.                                          |
+| **Alertas y Confirmaciones**      | **Sí** (avisos para checklist, alertas NOK, recordatorios y alertas por cliente; el usuario puede confirmar lectura/cierre cuando corresponda y volver a cerrarlas según el flujo operativo). | Sí, pero orientadas a incidentes/casos de seguridad.                                                | Sí, normalmente mediante notificaciones y estados del ticket.                                                              |
+| **Flexibilidad de Entrada**       | **Alta** (bitácora narrativa con hashtags para incidentes, mantenimiento, guardias físicas y operación multiárea).                                                                            | Media-baja (estructura centrada en caso de ciber).                                                  | Media (campos estructurados y formularios; menos natural para narrativa cronológica de guardia).                           |
+| **Modelo de Datos Operativo**     | **Evento + narrativa + checklist + auditoría** (prioriza contexto de turno, continuidad entre personas y seguimiento de acciones).                                                            | **Caso + observable + tarea** (prioriza investigación y evidencia técnica).                         | **Ticket + estado + SLA** (prioriza ciclo de vida de atención).                                                            |
+| **Búsqueda y Trazabilidad**       | Búsqueda textual/narrativa por contenido y hashtags, útil para reconstrucción operativa y respaldo histórico.                                                                                 | Búsqueda técnica por observables/IOCs para correlación de amenazas.                                 | Búsqueda por ticket, campos, estados y reportes de servicio.                                                               |
+| **Reportes y Comunicación**       | Boletines/reportes ejecutivos con envío por correo, agrupación por dominio y historial de envíos para saber cuándo se avisó a clientes o equipos.                                             | Requiere capas adicionales para reporteo ejecutivo orientado a cliente.                             | Muy fuerte en reportes de servicio/SLA; menos enfocado en narrativa de relevo de guardia.                                  |
+| **Auditoría y Cumplimiento**      | Auditoría persistente transversal (acciones operativas y administrativas) + control de acceso por roles (admin/user/auditor/guest).                                                           | Auditoría orientada a investigación y acciones sobre casos.                                         | Auditoría administrativa madura, generalmente centrada en proceso ITSM.                                                    |
+| **Resiliencia y Backups**         | Backups/restores desde UI con cifrado y alcance integral (BD + evidencias + secretos).                                                                                                        | Normalmente delegado a estrategia de infraestructura/plataforma.                                    | Depende del producto y plan; suele manejarse a nivel plataforma/instancia.                                                 |
+| **Extensibilidad del Operador**   | Complementos embebidos con sandbox, bridge de contexto y circuit breaker para utilidades de terreno.                                                                                          | Extensible a través de integraciones orientadas a seguridad.                                        | Marketplace e integraciones robustas, usualmente orientadas a flujos ITSM corporativos.                                    |
+| **Cobertura de Dominio**          | **SOC-first pero no SOC-only**: también aplica a NOC, mesas TI, guardias físicas y equipos con múltiples escalamientos/monitoreo.                                                             | **Ciberseguridad-first y especializada**.                                                           | **Empresa-first y transversal**, con foco en gobierno de servicios más que en bitácora de turno.                           |
+| **Curva de Aprendizaje**          | Baja a media (entrada rápida para N1/operador de guardia, con crecimiento progresivo).                                                                                                        | Media-alta (perfil analista de seguridad N2/N3).                                                    | Media (requiere adopción de procesos y configuración de catálogo/flujo).                                                   |
 
 ---
 
@@ -78,6 +78,13 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 ---
 
 ## Novedades recientes (resumen rapido)
+
+### v1.6.02 (estética cyberpunk, navegación por teclado y márgenes del logo)
+
+- aislamiento del contenedor `.html-preview` bajo el tema Cyberpunk para previsualizar reportes y boletines con su diseño y colores reales.
+- márgenes expandidos y control de altura proporcional (`52px` máx) en el logo del sidebar para evitar recortes en todos los temas.
+- navegación ágil con teclas de dirección (`<-` y `->`) para pestañas de escalamiento (Turnos, Contactos, Matriz RACI, Mantenimientos) con prevención de captura en campos de texto editables.
+- mejoras en el contraste tipográfico del tema Cyberpunk y alineación con la paleta de colores de Edgerunners (amarillo y cian).
 
 ### v1.6.01 (rediseño de perfil, carga de avatar y contacto sincronizado)
 
@@ -114,32 +121,6 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 - endpoint de backend para resumen de periodo con narrativa heuristica en lenguaje humano.
 - correccion de compatibilidad de template Angular usando casting con $any en bucles de datos.
 - ajuste de layout de impresion para evitar reporte completamente en blanco por restricciones de altura y overflow del shell.
-
-### v1.5.96-beta (checklist, condicion en turnos y fix entradas)
-
-- optimizacion visual de checklist: menor alto de textarea, menos espacio vertical y limpieza de encabezados redundantes.
-- normalizacion del termino Condicion en Gantt, filtros y formularios de turnos, manteniendo compatibilidad con API y datos existentes.
-- plantilla CSV de turnos con leyendas explicativas y soporte de lineas comentadas en backend.
-- solucion de error 500 en listado de entradas por casteo explicito de page y limit a enteros antes del pipeline de MongoDB.
-
-### v1.5.95-beta (directorio CSV y consolidacion SSO)
-
-- importacion masiva de directorio via CSV con parseo adaptable y resguardo de contactos de sistema.
-- descarga de plantilla CSV de ejemplo en frontend para estandarizar formato de carga.
-- consolidacion del panel de seguridad moviendo configuracion SSO al modulo HTTPS y SSO.
-- vinculacion inteligente de cuentas SSO con usuarios existentes para evitar duplicados.
-- ajuste estetico de tabla de directorio con mejor densidad visual y legibilidad.
-
-### v1.5.94-beta (seguridad, MFA, SSO, PII y robustez)
-
-- **MFA (TOTP):** Autenticación multifactor por software configurable por usuario (activable por administrador) con enrolamiento de código QR.
-- **SSO Google/Microsoft:** Soporte integrado de Single Sign-On para proveedores corporativos mediante variables de entorno.
-- **Cifrado de PII:** Almacenamiento seguro AES-256-GCM para datos personales (email, teléfono) en BD y hashes deterministas SHA-256 para búsquedas rápidas.
-- **Cifrado de Backups:** Opción de cifrar respaldos con contraseña en UI y descifrado en caliente al importar.
-- **Zip Slip y Sanitización CSV:** Mitigaciones contra path traversal en restauración de copias de seguridad y prevención de inyección de fórmulas en reportes CSV.
-- **Restricciones del Rol Auditor:** Implementación de lista blanca para restringir backups, envíos de correo y datos sensibles al rol Auditor e Invitado.
-- **Segregación de Checklists por Turno:** Soporte para ejecuciones de checklist en paralelo agregando el campo `shiftId`.
-
 
 ### Estado IA local
 

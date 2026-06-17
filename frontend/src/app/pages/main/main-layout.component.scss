@@ -47,19 +47,31 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    /* Cabecera del drawer: deja aire para un logo horizontal sin recortarlo */
-    min-height: 72px;
-    padding-top: 10px;
-    padding-bottom: 10px;
+    /* 
+     * Optimización de cabecera: Se fuerza la altura a automática y se define un min-height 
+     * adecuado para evitar que el componente nativo de Material restrinja el espacio vertical a 64px.
+     * El padding expandido a 16px vertical y 20px horizontal garantiza que la imagen tenga márgenes 
+     * limpios y no colisione con los bordes redondeados del contenedor.
+     */
+    height: auto !important;
+    min-height: 84px !important;
+    padding: 16px 20px !important;
+    box-sizing: border-box;
+    overflow: visible !important;
 
     .sidebar-logo {
-      /* object-fit: contain mantiene proporción (sin estirar); el ancho sigue el asset */
+      /* 
+       * Mantiene la proporción de aspecto original de la imagen subida. 
+       * El límite max-height de 52px asegura que encaje de manera perfecta dentro de la altura 
+       * libre calculada (84px de min-height - 32px de padding vertical = 52px libres).
+       */
       height: auto;
       width: auto;
-      max-height: 52px;
-      max-width: min(232px, calc(100% - 8px));
+      max-height: 52px !important;
+      max-width: 100%;
       object-fit: contain;
       object-position: left center;
+      display: block;
     }
 
     .sidebar-icon {
