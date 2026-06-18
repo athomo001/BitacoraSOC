@@ -538,4 +538,39 @@ export class EscalationService {
   triggerAutomationSend(payload?: { recipients?: string[]; ccRecipients?: string[] }): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.apiUrl}/admin/automation/trigger-send`, payload || {});
   }
+
+  /**
+   * Obtiene la lista completa de todas las programaciones de notificaciones de turnos.
+   */
+  getNotificationSchedules(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/admin/notification-schedules`);
+  }
+
+  /**
+   * Crea una nueva programación de notificación automatizada.
+   */
+  createNotificationSchedule(data: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/admin/notification-schedules`, data);
+  }
+
+  /**
+   * Actualiza una programación de notificación existente por su ID.
+   */
+  updateNotificationSchedule(id: string, data: any): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}/admin/notification-schedules/${id}`, data);
+  }
+
+  /**
+   * Elimina una programación de notificación por su ID.
+   */
+  deleteNotificationSchedule(id: string): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.apiUrl}/admin/notification-schedules/${id}`);
+  }
+
+  /**
+   * Dispara manualmente el envío de correo inmediato para una programación específica.
+   */
+  triggerNotificationScheduleSend(id: string, payload?: { recipients?: string[]; ccRecipients?: string[] }): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/admin/notification-schedules/${id}/trigger-send`, payload || {});
+  }
 }

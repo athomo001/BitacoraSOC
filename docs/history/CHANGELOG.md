@@ -2,6 +2,13 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.06] - 2026-06-18
+
+### Habilitación de Permisos de Directorio Central para Perfil N1 y Flexibilización de Contraseñas del Administrador
+
+- **Escritura en Directorio para Analistas N1:** Se modificaron los permisos de acceso en el backend (`backend/src/routes/directory.js`) y en el frontend (`escalation-admin-simple.component.ts`) para permitir que los analistas con cargo N1 (`cargoLabel = 'n1'`) puedan crear, modificar e importar de manera masiva contactos en el Directorio Central. La funcionalidad de eliminación de contactos sigue estando restringida únicamente a perfiles de jerarquía superior (N2, N3, Jefe de Área, Gerente y Arquitecto SIEM), respondiendo con error `403 Forbidden` a nivel de API.
+- **Eliminación de Mínimo de Contraseña para el Administrador:** Se removió la validación de longitud mínima de contraseña (`.isLength({ min: 6 })`) de los endpoints exclusivos de administración (`POST /api/users` y `PUT /api/users/:id`). Esto permite que el Administrador cree y edite usuarios asignándoles contraseñas de cualquier longitud (por ejemplo, un punto `.`), resolviendo la inconsistencia con la interfaz de usuario.
+
 ## [v1.6.05] - 2026-06-18
 
 ### Creación del Tema de Login "Surrealismo Digital"
