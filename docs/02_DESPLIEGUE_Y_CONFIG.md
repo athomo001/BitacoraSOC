@@ -12,7 +12,7 @@ Guía detallada para instalar y configurar el sistema desde cero.
 ## Requisitos
 
 - **Node.js** 22 LTS o superior
-- **pnpm** 11.x (via Corepack: `corepack enable && corepack prepare pnpm@11.0.0 --activate`)
+- **pnpm** 11.x (via Corepack: `corepack enable && corepack prepare pnpm@11.7.0 --activate`)
 - **Express** 5.1+
 - **MongoDB** 8+ (local o remoto)
 - **mongodump/mongorestore** (para backups)

@@ -12,7 +12,7 @@ ENV APP_VERSION=${APP_VERSION}
 ENV PNPM_HOME=/pnpm
 ENV PATH=${PNPM_HOME}:${PATH}
 
-RUN corepack enable && corepack prepare pnpm@11.0.0 --activate
+RUN corepack enable && corepack prepare pnpm@11.7.0 --activate
 
 # Copiar archivos de dependencias
 COPY package.json pnpm-lock.yaml ./
@@ -24,7 +24,7 @@ RUN if ! grep -q '^nodejs:' /etc/group; then addgroup -g 1001 -S nodejs; fi && \
 # Instalar dependencias de producción usando cache mount para velocidad local
 RUN --mount=type=cache,id=pnpm-store-backend,target=/pnpm/store \
     pnpm config set store-dir /pnpm/store && \
-    NPM_CONFIG_USER_AGENT=pnpm/11.0.0 pnpm install --prod --frozen-lockfile --ignore-scripts
+    NPM_CONFIG_USER_AGENT=pnpm/11.7.0 pnpm install --prod --frozen-lockfile --ignore-scripts
 
 # Copiar código fuente
 COPY src ./src

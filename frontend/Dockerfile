@@ -8,7 +8,7 @@ USER root
 ENV PNPM_HOME=/pnpm
 ENV PATH=${PNPM_HOME}:${PATH}
 
-RUN corepack enable && corepack prepare pnpm@11.0.0 --activate
+RUN corepack enable && corepack prepare pnpm@11.7.0 --activate
 
 # Version del build (inyectada desde Docker Compose/CI)
 ARG APP_VERSION=dev
@@ -17,7 +17,7 @@ ARG APP_VERSION=dev
 COPY package.json pnpm-lock.yaml ./
 RUN --mount=type=cache,id=pnpm-store-frontend,target=/pnpm/store \
   pnpm config set store-dir /pnpm/store && \
-  NPM_CONFIG_USER_AGENT=pnpm/11.0.0 pnpm install --frozen-lockfile --ignore-scripts
+  NPM_CONFIG_USER_AGENT=pnpm/11.7.0 pnpm install --frozen-lockfile --ignore-scripts
 
 # Copiar código y compilar para producción
 COPY . .
