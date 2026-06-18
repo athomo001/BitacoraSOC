@@ -147,8 +147,10 @@
       gap: 12px;
       color: var(--text-primary);
       font-weight: 500;
+      min-width: 0; /* Asegura flexibilidad en el título previniendo desbordes toscos */
 
       mat-icon {
+        flex-shrink: 0; /* Impide la deformación o compresión del icono indicador */
         &.status-verde {
           color: var(--state-success);
         }
@@ -245,6 +247,17 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 8px;
+    gap: 12px; /* Añade espaciado mínimo para evitar solapamientos con títulos largos */
+
+    /* Permite que el bloque de texto ocupe el espacio disponible sin empujar en exceso */
+    > div {
+      min-width: 0;
+    }
+
+    /* Impide que el icono de estado (Material Icon) se deforme o se corte verticalmente ante títulos largos */
+    mat-icon {
+      flex-shrink: 0;
+    }
   }
 
   .child-selector {

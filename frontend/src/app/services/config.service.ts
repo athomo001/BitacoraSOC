@@ -111,4 +111,23 @@ export class ConfigService {
   deleteShiftReminder(id: string): Observable<{ message: string }> {
     return this.http.delete<{ message: string }>(`${this.API_URL}/shift-reminders/${id}`);
   }
+
+  // ─── GESTIÓN DE FUENTES PERSONALIZADAS ─────────────────────────────────────
+
+  // Obtener la lista de fuentes personalizadas subidas por el usuario
+  getCustomFonts(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.API_URL}/fonts`);
+  }
+
+  // Subir un archivo de fuente tipográfica para que sea detectada y registrada en el servidor
+  uploadCustomFont(file: File): Observable<any> {
+    const formData = new FormData();
+    formData.append('fontFile', file);
+    return this.http.post<any>(`${this.API_URL}/fonts`, formData);
+  }
+
+  // Eliminar una fuente personalizada cargada por el usuario
+  deleteCustomFont(id: string): Observable<any> {
+    return this.http.delete<any>(`${this.API_URL}/fonts/${id}`);
+  }
 }

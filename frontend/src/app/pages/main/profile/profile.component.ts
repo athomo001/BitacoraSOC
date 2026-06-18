@@ -12,12 +12,13 @@ import { AuthService } from '../../../services/auth.service';
 import { ThemeService } from '../../../services/theme.service';
 import { Theme } from '../../../models/user.model';
 import { UserService } from '../../../services/user.service';
+import { environment } from '@env/environment';
 import { MatFormField, MatLabel, MatHint } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatSelect } from '@angular/material/select';
 import { MatOption } from '@angular/material/core';
 import { MatButton } from '@angular/material/button';
-import { NgIf } from '@angular/common';
+import { NgIf, UpperCasePipe } from '@angular/common';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatIcon } from '@angular/material/icon';
 
@@ -25,7 +26,7 @@ import { MatIcon } from '@angular/material/icon';
     selector: 'app-profile',
     templateUrl: './profile.component.html',
     styleUrls: ['./profile.component.scss'],
-    imports: [ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatSelect, MatOption, MatButton, NgIf, MatProgressSpinner, MatHint, MatIcon]
+    imports: [ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatSelect, MatOption, MatButton, NgIf, UpperCasePipe, MatProgressSpinner, MatHint, MatIcon]
 })
 export class ProfileComponent implements OnInit {
   profileForm!: FormGroup;
@@ -37,6 +38,8 @@ export class ProfileComponent implements OnInit {
   isChangingPassword = false;
   isSavingMfa = false;
   isDisablingMfa = false;
+  isUploadingAvatar = false;
+  backendBaseUrl = environment.backendBaseUrl;
   // Comentario: Listado local de temas visuales que se exponen al usuario en su formulario de perfil. Se eliminan sepia y dark.
   themes: Theme[] = ['light', 'pastel', 'cyberpunk'];
   mfaStep: 'inactive' | 'setup' | 'active' = 'inactive';
@@ -64,7 +67,8 @@ export class ProfileComponent implements OnInit {
     this.profileForm = this.fb.group({
       fullName: [this.currentUser?.fullName || '', Validators.required],
       email: [this.currentUser?.email || '', [Validators.required, Validators.email]],
-      theme: [this.themeService.getCurrentTheme(), Validators.required]
+      theme: [this.themeService.getCurrentTheme(), Validators.required],
+      phone: [this.currentUser?.phone || '', [Validators.maxLength(20)]]
     });
 
     this.passwordForm = this.fb.group({
@@ -94,7 +98,8 @@ export class ProfileComponent implements OnInit {
         this.profileForm.patchValue({
           fullName: user.fullName,
           email: user.email,
-          theme: user.theme || this.themeService.getCurrentTheme()
+          theme: user.theme || this.themeService.getCurrentTheme(),
+          phone: user.phone || ''
         });
         this.authService.updateCurrentUser(user);
       },
@@ -233,11 +238,56 @@ export class ProfileComponent implements OnInit {
         this.mfaDisableForm.reset();
         this.isDisablingMfa = false;
       },
-      error: (err) => {
-        console.error('Error al desactivar MFA:', err);
-        this.snackBar.open(err.error?.message || 'Contraseña incorrecta', 'Cerrar', { duration: 3000 });
-        this.isDisablingMfa = false;
-      }
-    });
+        error: (err) => {
+          console.error('Error al desactivar MFA:', err);
+          this.snackBar.open(err.error?.message || 'Contraseña incorrecta', 'Cerrar', { duration: 3000 });
+          this.isDisablingMfa = false;
+        }
+      });
+  }
+
+  getAssetUrl(url: string): string {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    return `${this.backendBaseUrl}${url}`;
+  }
+
+  triggerAvatarUpload(input: HTMLInputElement): void {
+    input.click();
+  }
+
+  onAvatarSelected(event: any): void {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      this.snackBar.open('Formato no permitido. Solo se aceptan imágenes JPG, JPEG, PNG y WEBP.', 'Cerrar', { duration: 3000 });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      this.snackBar.open('El archivo es demasiado grande. Máximo 2MB.', 'Cerrar', { duration: 3000 });
+      return;
+    }
+
+    this.isUploadingAvatar = true;
+    this.userService.uploadAvatar(file)
+      .pipe(finalize(() => {
+        this.isUploadingAvatar = false;
+      }))
+      .subscribe({
+        next: (res) => {
+          this.currentUser = res.user;
+          this.authService.updateCurrentUser(res.user);
+          this.snackBar.open('Avatar actualizado con éxito', 'Cerrar', { duration: 3000 });
+        },
+        error: (err) => {
+          console.error('Error al subir avatar:', err);
+          this.snackBar.open(err.error?.message || 'Error al subir la imagen de avatar', 'Cerrar', { duration: 3000 });
+        }
+      });
   }
 }

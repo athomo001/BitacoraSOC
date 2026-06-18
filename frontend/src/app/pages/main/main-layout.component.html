@@ -93,10 +93,18 @@
       <span matListItemTitle>Cerrar Sesión</span>
     </a>
 
-    <!-- Info usuario -->
+    <!-- Info usuario con Avatar -->
     <div class="user-info">
-      <p><strong>{{ currentUser?.fullName }}</strong></p>
-      <p class="role-badge">{{ currentUser?.role }}</p>
+      <div class="user-info__avatar-container">
+        <img *ngIf="currentUser?.avatar" [src]="getAssetUrl(currentUser.avatar)" alt="Avatar" class="user-sidebar-avatar">
+        <div *ngIf="!currentUser?.avatar" class="user-sidebar-avatar-placeholder">
+          {{ currentUser?.fullName?.substring(0,1)?.toUpperCase() || 'U' }}
+        </div>
+      </div>
+      <div class="user-info__details">
+        <p class="user-info__name"><strong>{{ currentUser?.fullName }}</strong></p>
+        <p class="role-badge" [attr.data-role]="currentUser?.role">{{ currentUser?.role }}</p>
+      </div>
     </div>
   </mat-sidenav>
 
@@ -173,7 +181,8 @@
         <mat-icon>menu</mat-icon>
       </button>
 
-      <span class="toolbar-title" *ngIf="appTitle">{{ appTitle }}</span>
+      <!-- Se enlaza dinámicamente la fuente tipográfica seleccionada desde el Branding -->
+      <span class="toolbar-title" *ngIf="appTitle" [style.font-family]="appTitleFont">{{ appTitle }}</span>
 
       <span class="spacer"></span>
 

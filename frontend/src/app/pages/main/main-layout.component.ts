@@ -114,6 +114,8 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   hasConfigAccess = false;
   logoUrl: string = '';
   appTitle: string = '';
+  // Fuente tipográfica del título de la aplicación recuperada del backend
+  appTitleFont: string = 'Monarchia Momentum';
   healthCheckedAt: string | null = null;
   healthServices: { key: 'smtp' | 'mongo' | 'internalApi' | 'integrations'; label: string; state: HealthServiceState }[] = [];
   activeComplements: Complement[] = [];
@@ -197,22 +199,30 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   }
 
   loadUserData(): void {
-    this.currentUser = this.authService.getCurrentUser();
-    if (this.currentUser) {
-      this.isAdmin = this.currentUser.role === 'admin';
-      this.isUser = this.currentUser.role === 'user';
-      this.isGuest = this.currentUser.role === 'guest';
-    }
+    this.authService.currentUser$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(user => {
+        this.currentUser = user;
+        if (user) {
+          this.isAdmin = user.role === 'admin';
+          this.isUser = user.role === 'user';
+          this.isGuest = user.role === 'guest';
+        } else {
+          this.isAdmin = false;
+          this.isUser = false;
+          this.isGuest = false;
+        }
 
-    this.complementBridgeService.updateContext({
-      user: this.currentUser ? {
-        username: this.currentUser.username,
-        role: this.currentUser.role,
-        fullName: this.currentUser.fullName
-      } : null
-    });
+        this.complementBridgeService.updateContext({
+          user: user ? {
+            username: user.username,
+            role: user.role,
+            fullName: user.fullName
+          } : null
+        });
 
-    this.updateVisibleMenus();
+        this.updateVisibleMenus();
+      });
   }
 
   loadActiveComplements(): void {
@@ -325,11 +335,50 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (config: any) => {
           this.appTitle = (config?.appTitle || '').trim();
+          // Carga la fuente tipográfica configurada desde el backend (con fallback a la fuente predeterminada)
+          this.appTitleFont = config?.titleFont || 'Monarchia Momentum';
           this.titleService.setTitle(this.appTitle);
+          // Cargar e inyectar las fuentes personalizadas en el DOM
+          this.loadAndInjectCustomFonts();
         },
         error: () => {
           this.appTitle = '';
+          this.appTitleFont = 'Monarchia Momentum';
           this.titleService.setTitle('');
+          this.loadAndInjectCustomFonts();
+        }
+      });
+  }
+
+  // Método para cargar las fuentes tipográficas personalizadas del backend y agregarlas al head mediante @font-face
+  loadAndInjectCustomFonts(): void {
+    this.configService.getCustomFonts()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (fonts) => {
+          // Remover el elemento anterior si existía para evitar duplicados
+          const oldStyle = document.getElementById('dynamic-custom-fonts');
+          if (oldStyle) {
+            oldStyle.remove();
+          }
+
+          if (fonts && fonts.length > 0) {
+            const style = document.createElement('style');
+            style.id = 'dynamic-custom-fonts';
+            style.innerHTML = fonts.map(f => `
+              @font-face {
+                font-family: '${f.name}';
+                src: url('${this.getAssetUrl(f.url)}') format('${f.format}');
+                font-weight: normal;
+                font-style: normal;
+                font-display: swap;
+              }
+            `).join('\n');
+            document.head.appendChild(style);
+          }
+        },
+        error: (err) => {
+          console.error('Error al inyectar fuentes tipográficas:', err);
         }
       });
   }

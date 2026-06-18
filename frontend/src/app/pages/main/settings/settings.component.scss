@@ -364,4 +364,18 @@ form {
   }
 }
 
+// Corrección de solapamiento en hints multilínea de Angular Material
+::ng-deep .settings-container {
+  .mat-mdc-form-field-subscript-wrapper {
+    position: relative !important;
+    padding: 0 16px !important;
+    margin-top: 4px !important;
+  }
+  
+  .mat-mdc-form-field-subscript-wrapper:empty {
+    display: none !important;
+  }
+}
+
+
 

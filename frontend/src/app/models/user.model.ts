@@ -62,6 +62,7 @@ export interface UpdateProfileRequest {
   email?: string;
   fullName?: string;
   theme?: Theme;
+  phone?: string;
   currentPassword?: string;
   newPassword?: string;
 }

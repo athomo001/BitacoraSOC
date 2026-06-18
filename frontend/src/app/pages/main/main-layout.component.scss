@@ -47,19 +47,31 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    /* Cabecera del drawer: deja aire para un logo horizontal sin recortarlo */
-    min-height: 72px;
-    padding-top: 10px;
-    padding-bottom: 10px;
+    /* 
+     * Optimización de cabecera: Se fuerza la altura a automática y se define un min-height 
+     * adecuado para evitar que el componente nativo de Material restrinja el espacio vertical a 64px.
+     * El padding expandido a 16px vertical y 20px horizontal garantiza que la imagen tenga márgenes 
+     * limpios y no colisione con los bordes redondeados del contenedor.
+     */
+    height: auto !important;
+    min-height: 84px !important;
+    padding: 16px 20px !important;
+    box-sizing: border-box;
+    overflow: visible !important;
 
     .sidebar-logo {
-      /* object-fit: contain mantiene proporción (sin estirar); el ancho sigue el asset */
+      /* 
+       * Mantiene la proporción de aspecto original de la imagen subida. 
+       * El límite max-height de 52px asegura que encaje de manera perfecta dentro de la altura 
+       * libre calculada (84px de min-height - 32px de padding vertical = 52px libres).
+       */
       height: auto;
       width: auto;
-      max-height: 52px;
-      max-width: min(232px, calc(100% - 8px));
+      max-height: 52px !important;
+      max-width: 100%;
       object-fit: contain;
       object-position: left center;
+      display: block;
     }
 
     .sidebar-icon {
@@ -175,19 +187,77 @@
 
   .user-info {
     flex-shrink: 0;
-    padding: 12px 16px;
+    padding: 16px;
     background-color: var(--hover-bg);
     border-top: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 12px;
 
-    p {
-      margin: 4px 0;
+    .user-info__avatar-container {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      overflow: hidden;
+      flex-shrink: 0;
+      border: 1.5px solid var(--primary-color, #00ffcc);
+      box-shadow: 0 0 8px rgba(0, 255, 204, 0.15);
+      background: var(--background-color, #121212);
+    }
+
+    .user-sidebar-avatar {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .user-sidebar-avatar-placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--primary-color, #00ffcc);
+      background: var(--surface-color, #1e1e1e);
+    }
+
+    .user-info__details {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .user-info__name {
+      margin: 0 0 2px 0;
+      font-size: 0.9rem;
+      color: var(--text-primary, #ffffff);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .role-badge {
-      font-size: 0.85em;
+      font-size: 0.725em;
       text-transform: uppercase;
-      color: var(--primary-color);
-      font-weight: 500;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      display: inline-block;
+      width: fit-content;
+
+      &[data-role="admin"] {
+        color: #ff3366;
+      }
+
+      &[data-role="user"] {
+        color: #00ffcc;
+      }
+
+      &[data-role="auditor"] {
+        color: #ffaa00;
+      }
     }
   }
 }

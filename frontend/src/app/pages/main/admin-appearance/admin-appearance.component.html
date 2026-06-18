@@ -22,13 +22,26 @@
       </div>
 
       <div class="theme-option" [class.selected]="loginTheme === 'infoflow'">
+        <!-- Tema original Matrix / Infoflow (Cyberpunk) -->
         <mat-radio-button value="infoflow">
-          <span class="theme-name">💻 Matrix / Infoflow</span>
+          <span class="theme-name">💻 Matrix / Infoflow (Cyberpunk)</span>
         </mat-radio-button>
         <p class="theme-desc">
-          Estilo cyberpunk con lluvia tipo Matrix animada, card glassmorphism con borde neon,
+          Estilo cyberpunk con lluvia tipo Matrix animada, card glassmorphism con borde neón,
           título con efecto glitch, botones con flecha animada y modal de recuperación
           con reloj digital en tiempo real.
+        </p>
+      </div>
+
+      <div class="theme-option" [class.selected]="loginTheme === 'modern'">
+        <!-- Nuevo Tema Moderno / Split-Screen -->
+        <mat-radio-button value="modern">
+          <span class="theme-name">💻 Moderno / Split-Screen</span>
+        </mat-radio-button>
+        <p class="theme-desc">
+          Diseño profesional premium en pantalla dividida (split-screen). Panel izquierdo con 
+          formulario de acceso limpio (soporta MFA y recuperación de contraseña) y panel derecho 
+          con fondo arquitectónico corporativo y una lluvia sutil de código Matrix animada.
         </p>
       </div>
     </mat-radio-group>

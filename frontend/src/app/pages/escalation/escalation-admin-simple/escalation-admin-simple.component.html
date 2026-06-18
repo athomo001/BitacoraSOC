@@ -18,7 +18,7 @@
 
   <mat-tab-group *ngIf="!directoryOnlyAccess" class="escalation-admin-tabs" animationDuration="0ms">
     <!-- TAB 0: FLUJO DINÁMICO -->
-    <mat-tab *ngIf="!directoryOnlyAccess" label="📲 Flujo de llamadas">
+    <mat-tab *ngIf="!directoryOnlyAccess" label="Flujo de llamadas">
       <app-escalation-flow-tab
         [isAdminUser]="isAdminUser"
         [directoryContacts]="directoryContacts"
@@ -28,7 +28,7 @@
     </mat-tab>
 
     <!-- TAB 1: CONTACTOS Y AGENDA -->
-    <mat-tab *ngIf="!directoryOnlyAccess" label="📇 Flujo de Correos">
+    <mat-tab *ngIf="!directoryOnlyAccess" label="Flujo de Correos">
       <app-escalation-contacts-tab
         [isAdminUser]="isAdminUser"
         [directoryContacts]="directoryContacts"
@@ -37,7 +37,7 @@
     </mat-tab>
 
     <!-- TAB 2: RACI -->
-    <mat-tab label="📋 Matriz RACI">
+    <mat-tab label="Matriz RACI">
       <app-escalation-raci-tab 
         [directoryContacts]="directoryContacts">
       </app-escalation-raci-tab>

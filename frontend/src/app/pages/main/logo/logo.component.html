@@ -1,203 +1,279 @@
-<div class="logo-container">
-  <h1>🎨 Branding</h1>
-  <p class="subtitle">Personaliza el branding de la aplicación</p>
+<div class="branding-container">
+  <header class="branding-header">
+    <h1>🎨 Configuración de Branding</h1>
+    <p class="subtitle">Personaliza la identidad visual, el título superior y el estilo de la consola del SOC.</p>
+  </header>
 
-  <div class="logo-grid">
-    <!-- Logo actual -->
-    <div class="logo-panel logo-card">
-      <header class="logo-panel__header">
-        <h2 class="logo-panel__title">Logo Actual</h2>
-      </header>
-      <div class="logo-panel__body">
-        <div class="logo-preview">
-          <img *ngIf="currentLogo" [src]="getAssetUrl(currentLogo)" alt="Logo actual">
-          <div *ngIf="!currentLogo" class="no-logo">
-            <mat-icon>image</mat-icon>
-            <p>Sin logo configurado</p>
+  <div class="branding-layout">
+    <!-- COLUMNA IZQUIERDA: Identidad Visual -->
+    <div class="branding-col branding-col--left">
+      <div class="branding-card">
+        <header class="branding-card__header">
+          <mat-icon>palette</mat-icon>
+          <h2>Identidad Visual</h2>
+        </header>
+
+        <div class="branding-card__body">
+          <!-- BLOQUE 1: LOGOTIPO DE LA APLICACIÓN -->
+          <div class="branding-block">
+            <h3>Logotipo de la Aplicación</h3>
+            <div class="branding-row">
+              <!-- Lado Izquierdo: Vista Previa y Eliminación -->
+              <div class="image-preview-pane">
+                <div class="preview-box">
+                  <!-- Mostrar preview pendiente si existe, sino el actual, sino placeholder -->
+                  <img *ngIf="pendingLogoPreview" [src]="pendingLogoPreview" alt="Preview pendiente logo">
+                  <img *ngIf="!pendingLogoPreview && currentLogo && !logoDeleted" [src]="getAssetUrl(currentLogo)" alt="Logo actual">
+                  <div *ngIf="(!pendingLogoPreview && !currentLogo) || logoDeleted" class="no-image-placeholder">
+                    <mat-icon>image</mat-icon>
+                    <span>Sin Logo</span>
+                  </div>
+                </div>
+                <button *ngIf="(currentLogo && !logoDeleted) || pendingLogoPreview" type="button" class="btn-text-delete" (click)="deleteLogoVisual()">
+                  <mat-icon>delete</mat-icon>
+                  Eliminar Logo
+                </button>
+              </div>
+
+              <!-- Lado Derecho: Opciones de Carga -->
+              <div class="image-upload-pane">
+                <!-- Selector de origen tipo Tabs personalizados -->
+                <div class="custom-tabs">
+                  <button type="button" class="tab-btn" [class.active]="logoSourceType === 'upload'" (click)="setLogoSourceType('upload')">
+                    <mat-icon>cloud_upload</mat-icon>
+                    Archivo Local
+                  </button>
+                  <button type="button" class="tab-btn" [class.active]="logoSourceType === 'url'" (click)="setLogoSourceType('url')">
+                    <mat-icon>link</mat-icon>
+                    URL Externa
+                  </button>
+                </div>
+
+                <!-- Contenido según Tab -->
+                <div class="tab-content">
+                  <!-- Archivo Local -->
+                  <div *ngIf="logoSourceType === 'upload'" class="upload-area-wrapper">
+                    <input type="file" #logoFileInput (change)="onLogoFileSelected($event)" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="hidden-file-input">
+                    <div class="drag-drop-zone" (click)="logoFileInput.click()">
+                      <mat-icon>insert_photo</mat-icon>
+                      <p>Click para seleccionar imagen</p>
+                      <small>PNG, JPG, WEBP o SVG (máx 5MB)</small>
+                    </div>
+                  </div>
+
+                  <!-- URL Externa -->
+                  <div *ngIf="logoSourceType === 'url'" class="url-input-wrapper">
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>URL del Logotipo</mat-label>
+                      <input matInput [(ngModel)]="pendingLogoUrl" (ngModelChange)="onImageUrlChanged()" placeholder="https://ejemplo.com/logo.png">
+                      <mat-hint>Ingresa la URL directa de la imagen</mat-hint>
+                    </mat-form-field>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Divisor sutil -->
+          <div class="branding-divider"></div>
+
+          <!-- BLOQUE 2: FAVICON DE LA APLICACIÓN -->
+          <div class="branding-block">
+            <h3>Favicon de la Aplicación</h3>
+            <div class="branding-row">
+              <!-- Lado Izquierdo: Vista Previa Favicon -->
+              <div class="image-preview-pane">
+                <div class="preview-box preview-box--favicon">
+                  <img *ngIf="pendingFaviconPreview" [src]="pendingFaviconPreview" alt="Preview pendiente favicon">
+                  <img *ngIf="!pendingFaviconPreview && currentFavicon && !faviconDeleted" [src]="getAssetUrl(currentFavicon)" alt="Favicon actual">
+                  <div *ngIf="(!pendingFaviconPreview && !currentFavicon) || faviconDeleted" class="no-image-placeholder">
+                    <mat-icon>broken_image</mat-icon>
+                    <span>Sin Favicon</span>
+                  </div>
+                </div>
+                <button *ngIf="(currentFavicon && !faviconDeleted) || pendingFaviconPreview" type="button" class="btn-text-delete" (click)="deleteFaviconVisual()">
+                  <mat-icon>delete</mat-icon>
+                  Eliminar Favicon
+                </button>
+              </div>
+
+              <!-- Lado Derecho: Opciones de Carga Favicon -->
+              <div class="image-upload-pane">
+                <div class="custom-tabs">
+                  <button type="button" class="tab-btn" [class.active]="faviconSourceType === 'upload'" (click)="setFaviconSourceType('upload')">
+                    <mat-icon>cloud_upload</mat-icon>
+                    Archivo Local
+                  </button>
+                  <button type="button" class="tab-btn" [class.active]="faviconSourceType === 'url'" (click)="setFaviconSourceType('url')">
+                    <mat-icon>link</mat-icon>
+                    URL Externa
+                  </button>
+                </div>
+
+                <div class="tab-content">
+                  <!-- Archivo Local Favicon -->
+                  <div *ngIf="faviconSourceType === 'upload'" class="upload-area-wrapper">
+                    <input type="file" #faviconFileInput (change)="onFaviconFileSelected($event)" accept="image/png,image/x-icon,.ico" class="hidden-file-input">
+                    <div class="drag-drop-zone drag-drop-zone--favicon" (click)="faviconFileInput.click()">
+                      <mat-icon>tab</mat-icon>
+                      <p>Click para seleccionar favicon</p>
+                      <small>PNG o ICO (máx 256KB)</small>
+                    </div>
+                  </div>
+
+                  <!-- URL Externa Favicon -->
+                  <div *ngIf="faviconSourceType === 'url'" class="url-input-wrapper">
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>URL del Favicon</mat-label>
+                      <input matInput [(ngModel)]="pendingFaviconUrl" (ngModelChange)="onImageUrlChanged()" placeholder="https://ejemplo.com/favicon.ico">
+                      <mat-hint>Usa una imagen pequeña y cuadrada</mat-hint>
+                    </mat-form-field>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        <button mat-stroked-button color="warn" (click)="removeLogo()" *ngIf="currentLogo" [disabled]="isLoading">
-          <mat-icon>delete</mat-icon>
-          Eliminar Logo
-        </button>
       </div>
     </div>
 
-    <!-- Favicon actual -->
-    <div class="logo-panel logo-card">
-      <header class="logo-panel__header">
-        <h2 class="logo-panel__title">Favicon Actual</h2>
-      </header>
-      <div class="logo-panel__body">
-        <div class="logo-preview favicon-preview">
-          <img *ngIf="currentFavicon" [src]="getAssetUrl(currentFavicon)" alt="Favicon actual">
-          <div *ngIf="!currentFavicon" class="no-logo">
-            <mat-icon>tab</mat-icon>
-            <p>Sin favicon configurado</p>
-          </div>
+    <!-- COLUMNA DERECHA: Personalización, Aspecto y Fuentes -->
+    <div class="branding-col branding-col--right">
+      <!-- Tarjeta de Aspecto -->
+      <div class="branding-card">
+        <header class="branding-card__header">
+          <mat-icon>settings</mat-icon>
+          <h2>Personalización y Aspecto</h2>
+        </header>
+
+        <div class="branding-card__body">
+          <form [formGroup]="brandingForm" style="display: flex; flex-direction: column; gap: 24px;">
+            <!-- BLOQUE 1: Configuración de la Barra Superior -->
+            <div class="form-block">
+              <h3>Barra Superior</h3>
+              <div class="form-field-group">
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Título en barra superior</mat-label>
+                  <input matInput formControlName="appTitle" maxlength="80" placeholder="Ej: Checklist Diario Analistas N1">
+                  <mat-hint>Texto centrado en la barra superior (vacío = sin título)</mat-hint>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Tipografía del Título</mat-label>
+                  <mat-select formControlName="titleFont">
+                    <mat-option *ngFor="let font of availableFonts" [value]="font">
+                      <span [style.font-family]="font">{{ font }}</span>
+                    </mat-option>
+                  </mat-select>
+                  <mat-hint>Fuente tipográfica para el título superior</mat-hint>
+                </mat-form-field>
+
+                <!-- Gestor de Fuentes Integrado (subir y desinstalar) -->
+                <div class="integrated-font-manager" style="margin-top: 8px; border-top: 1px dashed var(--border-color); padding-top: 16px;">
+                  <button type="button" class="btn-toggle-manager" (click)="toggleFontManager()" style="display: flex; align-items: center; gap: 6px; background: transparent; border: none; color: var(--primary-color); font-weight: 600; cursor: pointer; padding: 4px 0; font-size: 0.85rem;">
+                    <mat-icon style="font-size: 18px; width: 18px; height: 18px;">{{ showFontManager ? 'expand_less' : 'add' }}</mat-icon>
+                    {{ showFontManager ? 'Ocultar gestor de fuentes' : 'Instalar o eliminar fuentes personalizadas (.ttf, .otf)...' }}
+                  </button>
+
+                  <div class="font-manager-panel" *ngIf="showFontManager" style="display: flex; flex-direction: column; gap: 16px; margin-top: 14px; background: var(--surface-muted); padding: 16px; border-radius: 8px; border: 1px solid var(--border-color);">
+                    <!-- Subir archivo de fuente (detección automática del nombre en backend) -->
+                    <div class="font-upload-section" style="display: flex; flex-direction: column; gap: 12px;">
+                      <input type="file" #fontFileInput (change)="onFontFileSelected($event)" accept=".ttf,.otf,.woff,.woff2" class="hidden-file-input">
+                      
+                      <div class="drag-drop-zone drag-drop-zone--font" (click)="fontFileInput.click()" style="padding: 16px;">
+                        <mat-icon *ngIf="!selectedFontFile" style="font-size: 28px; width: 28px; height: 28px; margin-bottom: 4px;">cloud_upload</mat-icon>
+                        <mat-icon *ngIf="selectedFontFile" style="color: var(--primary-color); font-size: 28px; width: 28px; height: 28px; margin-bottom: 4px;">check_circle</mat-icon>
+                        <p *ngIf="!selectedFontFile" style="font-size: 0.8rem; margin: 0 0 2px 0;">Click para seleccionar fuente (.ttf, .otf)</p>
+                        <p *ngIf="selectedFontFile" class="font-selected-name" style="font-size: 0.8rem; font-weight: 600; color: var(--primary-color); margin: 0 0 2px 0;">{{ selectedFontFile.name }}</p>
+                        <small style="font-size: 0.7rem; color: var(--text-secondary);">El sistema detectará el nombre de familia automáticamente</small>
+                      </div>
+
+                      <button mat-raised-button color="primary" class="btn-upload-font" (click)="uploadCustomFont()" [disabled]="!selectedFontFile || uploadingFont" style="width: 100%;">
+                        <mat-spinner *ngIf="uploadingFont" diameter="18"></mat-spinner>
+                        <span *ngIf="!uploadingFont">Subir e Instalar Tipografía</span>
+                      </button>
+                    </div>
+
+                    <!-- Lista de fuentes personalizadas instaladas -->
+                    <div class="installed-fonts-section" style="margin-top: 4px;">
+                      <h4 style="margin: 0 0 8px 0; font-size: 0.8rem; font-weight: 600; color: var(--text-primary);">Fuentes Personalizadas Instaladas</h4>
+                      <div class="fonts-list" *ngIf="customFonts.length > 0" style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; background: var(--surface-color);">
+                        <div *ngFor="let font of customFonts" class="font-list-item" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; border-bottom: 1px solid var(--border-color);">
+                          <div class="font-meta" style="display: flex; flex-direction: column; min-width: 0;">
+                            <span [style.font-family]="font.name" class="font-preview-text" style="font-size: 0.9rem; font-weight: 500; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">{{ font.name }}</span>
+                            <small style="font-size: 0.68rem; color: var(--text-secondary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">{{ font.format }} • {{ font.filename }}</small>
+                          </div>
+                          <button mat-icon-button color="warn" (click)="deleteCustomFont(font._id, font.name)" matTooltip="Eliminar tipografía">
+                            <mat-icon>delete</mat-icon>
+                          </button>
+                        </div>
+                      </div>
+                      <div *ngIf="customFonts.length === 0" class="no-fonts-notice" style="text-align: center; padding: 12px; font-size: 0.78rem; color: var(--text-secondary); border: 1px dashed var(--border-color); border-radius: 6px; background: var(--surface-color);">
+                        <span>No hay fuentes de usuario instaladas.</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Divisor sutil -->
+            <div class="branding-divider"></div>
+
+            <!-- BLOQUE 2: Pantalla de Inicio de Sesión -->
+            <div class="form-block">
+              <h3>Pantalla de Inicio de Sesión</h3>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Tema de Login</mat-label>
+                <mat-select formControlName="loginTheme">
+                  <mat-option value="crt">🖥 CRT Retro (terminal clásico)</mat-option>
+                  <!-- Tema original Matrix/cyberpunk con glassmorphism -->
+                  <mat-option value="infoflow">💻 Matrix / Infoflow (cyberpunk)</mat-option>
+                  <!-- Nuevo tema independiente split-screen profesional -->
+                  <mat-option value="modern">💻 Moderno / Split-Screen</mat-option>
+                </mat-select>
+                <mat-hint>Estilo estético de la pantalla de acceso</mat-hint>
+              </mat-form-field>
+            </div>
+
+            <!-- Divisor sutil -->
+            <div class="branding-divider"></div>
+
+            <!-- BLOQUE 3: Configuración por Defecto -->
+            <div class="form-block">
+              <h3>Asignaciones por Defecto</h3>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Cliente / LogSource por Defecto</mat-label>
+                <mat-select formControlName="defaultLogSourceId">
+                  <mat-option [value]="null">-- Sin LogSource predeterminado --</mat-option>
+                  <mat-option *ngFor="let source of logSources" [value]="source._id">
+                    {{ source.name }}{{ source.parent ? ' (' + source.parent + ')' : '' }}
+                  </mat-option>
+                </mat-select>
+                <mat-hint>Asignación automática para bitácoras sin cliente definido</mat-hint>
+              </mat-form-field>
+            </div>
+          </form>
         </div>
-        <button mat-stroked-button color="warn" (click)="removeFavicon()" *ngIf="currentFavicon" [disabled]="isLoading">
-          <mat-icon>delete</mat-icon>
-          Eliminar Favicon
-        </button>
       </div>
     </div>
+  </div>
 
-    <!-- Subir archivo -->
-    <div class="logo-panel logo-card">
-      <header class="logo-panel__header">
-        <h2 class="logo-panel__title">Subir Imagen</h2>
-      </header>
-      <div class="logo-panel__body">
-        <input type="file"
-               #fileInput
-               (change)="onFileSelected($event)"
-               accept="image/png,image/jpeg,image/webp,image/svg+xml"
-           class="hidden-file-input">
-
-        <button type="button" class="upload-zone" (click)="fileInput.click()">
-          <img *ngIf="previewUrl" [src]="previewUrl" alt="Preview">
-          <div *ngIf="!previewUrl" class="upload-placeholder">
-            <mat-icon>cloud_upload</mat-icon>
-            <p>Click para seleccionar imagen</p>
-            <small>PNG, JPG, WEBP o SVG (máx 2MB)</small>
-          </div>
+  <!-- BARRA INFERIOR FLOTANTE STICKY (Solo se muestra cuando hay cambios pendientes) -->
+  <div class="sticky-actions-bar" [class.visible]="hasPendingChanges()">
+    <div class="sticky-actions-content">
+      <span class="changes-label">
+        <mat-icon>info</mat-icon>
+        Tienes cambios sin guardar en la configuración de branding
+      </span>
+      <div class="actions-group">
+        <button mat-stroked-button class="btn-cancel" (click)="cancelChanges()" [disabled]="savingGlobal">
+          Cancelar
         </button>
-
-        <button mat-raised-button color="primary" (click)="uploadLogo()" [disabled]="!previewUrl || isLoading">
-          <mat-spinner *ngIf="isLoading" diameter="20"></mat-spinner>
-          <span *ngIf="!isLoading">Subir Logo</span>
+        <button mat-raised-button color="primary" class="btn-save-global" (click)="saveGlobalChanges()" [disabled]="savingGlobal">
+          <mat-spinner *ngIf="savingGlobal" diameter="18"></mat-spinner>
+          <span *ngIf="!savingGlobal">Guardar Cambios</span>
         </button>
-      </div>
-    </div>
-
-    <!-- URL externa -->
-    <div class="logo-panel logo-card">
-      <header class="logo-panel__header">
-        <h2 class="logo-panel__title">URL Externa</h2>
-      </header>
-      <div class="logo-panel__body">
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>URL del Logo</mat-label>
-          <input matInput [(ngModel)]="logoUrl" placeholder="https://ejemplo.com/logo.png">
-          <mat-hint>Ingresa la URL directa de una imagen</mat-hint>
-        </mat-form-field>
-
-        <button mat-raised-button color="accent" (click)="saveLogo()" [disabled]="!logoUrl || isLoading">
-          <mat-spinner *ngIf="isLoading" diameter="20"></mat-spinner>
-          <span *ngIf="!isLoading">Guardar URL</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Favicon -->
-    <div class="logo-panel logo-card">
-      <header class="logo-panel__header">
-        <h2 class="logo-panel__title">Favicon (PNG/ICO)</h2>
-      </header>
-      <div class="logo-panel__body">
-        <input type="file"
-               #faviconInput
-               (change)="onFaviconFileSelected($event)"
-               accept="image/png,image/x-icon,.ico"
-           class="hidden-file-input">
-
-        <button type="button" class="upload-zone favicon-preview" (click)="faviconInput.click()">
-          <img *ngIf="faviconPreviewUrl" [src]="faviconPreviewUrl" alt="Preview favicon">
-          <div *ngIf="!faviconPreviewUrl" class="upload-placeholder">
-            <mat-icon>insert_photo</mat-icon>
-            <p>Click para seleccionar favicon</p>
-            <small>PNG o ICO (máx 256KB, ideal 32x32)</small>
-          </div>
-        </button>
-
-        <button mat-raised-button color="primary" (click)="uploadFavicon()" [disabled]="!faviconPreviewUrl || isLoading">
-          <mat-spinner *ngIf="isLoading" diameter="20"></mat-spinner>
-          <span *ngIf="!isLoading">Subir Favicon</span>
-        </button>
-
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>URL del Favicon</mat-label>
-          <input matInput [(ngModel)]="faviconUrl" placeholder="https://ejemplo.com/favicon.ico">
-          <mat-hint>Usa una imagen pequeña y cuadrada (32x32 o 64x64)</mat-hint>
-        </mat-form-field>
-
-        <button mat-raised-button color="accent" (click)="saveFavicon()" [disabled]="!faviconUrl || isLoading">
-          <mat-spinner *ngIf="isLoading" diameter="20"></mat-spinner>
-          <span *ngIf="!isLoading">Guardar URL Favicon</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Título barra superior -->
-    <div class="logo-panel logo-card">
-      <header class="logo-panel__header">
-        <h2 class="logo-panel__title">Título barra superior</h2>
-      </header>
-      <div class="logo-panel__body">
-        <div [formGroup]="brandingForm">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Título en barra superior</mat-label>
-            <input matInput formControlName="appTitle" maxlength="80" placeholder="Ej: Checklist Diario Analistas N1">
-            <mat-hint>Texto centrado en la barra superior (vacío = sin título)</mat-hint>
-          </mat-form-field>
-        </div>
-
-        <button mat-raised-button color="primary" type="button" (click)="saveAppTitle()"
-                [disabled]="savingAppTitle">
-          <mat-spinner *ngIf="savingAppTitle" diameter="18"></mat-spinner>
-          <span *ngIf="!savingAppTitle">Guardar Título</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Tema de Login -->
-    <div class="logo-panel logo-card">
-      <header class="logo-panel__header">
-        <h2 class="logo-panel__title">Tema de Login</h2>
-      </header>
-      <div class="logo-panel__body">
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Estilo visual del login</mat-label>
-          <mat-select [(ngModel)]="loginTheme">
-            <mat-option value="crt">🖥 CRT Retro (terminal clásico)</mat-option>
-            <mat-option value="infoflow">💻 Matrix / Infoflow (cyberpunk)</mat-option>
-          </mat-select>
-          <mat-hint>Cambia el estilo de la pantalla de inicio de sesión</mat-hint>
-        </mat-form-field>
-
-        <button mat-raised-button color="primary" type="button" (click)="saveLoginTheme()"
-                [disabled]="savingLoginTheme">
-          <mat-spinner *ngIf="savingLoginTheme" diameter="18"></mat-spinner>
-          <span *ngIf="!savingLoginTheme">Guardar Tema</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- LogSource por Defecto -->
-    <div class="logo-panel logo-card">
-      <header class="logo-panel__header">
-        <h2 class="logo-panel__title">Configuración por Defecto</h2>
-      </header>
-      <div class="logo-panel__body">
-        <form [formGroup]="brandingForm" (ngSubmit)="saveBrandingConfig()">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>LogSource por Defecto</mat-label>
-            <mat-select formControlName="defaultLogSourceId">
-              <mat-option [value]="null">-- Sin LogSource predeterminado --</mat-option>
-              <mat-option *ngFor="let source of logSources" [value]="source._id">
-                {{ source.name }}{{ source.parent ? ' (' + source.parent + ')' : '' }}
-              </mat-option>
-            </mat-select>
-            <mat-hint>Se asignará automáticamente al crear entradas sin seleccionar cliente</mat-hint>
-          </mat-form-field>
-
-          <button mat-raised-button color="primary" type="submit"
-                  [disabled]="!brandingForm.valid || savingBranding">
-            <mat-spinner *ngIf="savingBranding" diameter="18"></mat-spinner>
-            <span *ngIf="!savingBranding">Guardar Configuración</span>
-          </button>
-        </form>
       </div>
     </div>
   </div>
