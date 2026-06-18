@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.05**
+> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.08**
 
 Stack principal:
 
@@ -80,6 +80,16 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 ---
 
 ## Novedades recientes (resumen rapido)
+
+### v1.6.08 (actualización a pnpm 11.7.0 y dependencias)
+
+- **Migración a pnpm v11.7.0:** Actualización del gestor de paquetes de la v11.0.0 a la v11.7.0 y dependencias en frontend y backend.
+- **Habilitación de compilaciones con allowBuilds:** Migración de la directiva obsoleta `onlyBuiltDependencies` hacia el nuevo esquema `allowBuilds` en los archivos `pnpm-workspace.yaml` de ambos componentes, permitiendo compilación nativa de dependencias críticas en entornos Docker.
+
+### v1.6.07 (prevención de caché y recarga automática ante actualizaciones)
+
+- **Prevención de Caché en index.html (Nginx):** Configuración de directivas `Cache-Control` en Nginx (puertos 80 y 443) para servir el archivo `index.html` con `no-cache, no-store, must-revalidate`. Esto garantiza que los navegadores web obtengan de inmediato el nuevo frontend al subir cambios, mientras los archivos estáticos hasheados siguen usando caché persistente.
+- **Recarga Automática en Caliente (Angular):** Implementación de un `GlobalErrorHandler` que detecta fallas al importar módulos perezosos descatalogados en caliente (`ChunkLoadError`) tras un despliegue de Docker, forzando un refresco transparente para el operador sin cerrar su sesión (manteniendo cookie JWT).
 
 ### v1.6.06 (permisos de directorio para N1 y flexibilización de contraseñas de admin)
 

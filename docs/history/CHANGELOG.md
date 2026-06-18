@@ -2,6 +2,21 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.08] - 2026-06-18
+
+### Actualización de Motor de Paquetes a pnpm v11.7.0 y Dependencias Generales
+
+- **Migración a pnpm v11.7.0:** Se actualizó el gestor de paquetes de `v11.0.0` a `v11.7.0` en los archivos de configuración del proyecto (`package.json` del frontend y backend, Dockerfiles de frontend, backend y complement-stub).
+- **Habilitación de compilaciones con allowBuilds (pnpm v11):** Se estructuraron los archivos `pnpm-workspace.yaml` tanto en `frontend/` como en `backend/` reemplazando la directiva obsoleta `onlyBuiltDependencies` por la nueva propiedad `allowBuilds` nativa de pnpm v11, autorizando explícitamente los scripts de compilación para `sharp`, `unrs-resolver`, `@parcel/watcher`, `core-js`, `esbuild`, `lmdb` y `msgpackr-extract`.
+- **Actualización de Dependencias:** Se ejecutó una actualización general de paquetes mediante `pnpm update` en el frontend (incluyendo actualizaciones de Angular CLI/build v20.3.29) y en el backend (actualizaciones de Mongoose, Helmet, Nodemailer, MJML y Multer), regenerando los archivos de bloqueo `pnpm-lock.yaml`.
+
+## [v1.6.07] - 2026-06-18
+
+### Prevención de Caché Web en Despliegues y Control Automático de Chunk Load Failures
+
+- **Encabezados Cache-Control en Nginx:** Se añadieron y homologaron directivas de expiración y almacenamiento en caché en el archivo de configuración global de Nginx (`frontend/nginx.conf`). El archivo de entrada principal `index.html` se configuró con `Cache-Control "no-cache, no-store, must-revalidate"` en el bloque de servidor HTTP (puerto 80) e HTTPS (puerto 443), previniendo que los navegadores retengan el HTML antiguo tras despliegues de Docker. Los archivos dinámicos generados por la compilación con hashes únicos (`.js`, `.css`) se configuran para ser cacheados persistentemente con `Cache-Control "public, immutable"` por 1 año.
+- **Global Error Handler en Angular para Carga de Chunks:** Se desarrolló un manejador global de excepciones (`GlobalErrorHandler` en `frontend/src/app/utils/global-error-handler.ts`) y se integró en la inicialización de la aplicación en `frontend/src/main.ts`. Este componente intercepta errores de tipo `ChunkLoadError` o fallos en importación dinámica de módulos (típicos de despliegues en caliente de contenedores donde los archivos hasheados antiguos son eliminados de disco) y fuerza de manera transparente una recarga limpia del navegador (`window.location.reload()`) para resolver el problema sin interrumpir ni cerrar la sesión autenticada activa (gracias al token JWT persistido en la cookie segura HttpOnly).
+
 ## [v1.6.06] - 2026-06-18
 
 ### Habilitación de Permisos de Directorio Central para Perfil N1 y Flexibilización de Contraseñas del Administrador

@@ -1,4 +1,4 @@
+# Configuración de compilaciones permitidas para el backend en pnpm v11
 allowBuilds:
-  '@scarf/scarf': set this to true or false
-  sharp: set this to true or false
-  unrs-resolver: set this to true or false
+  sharp: true
+  unrs-resolver: true
