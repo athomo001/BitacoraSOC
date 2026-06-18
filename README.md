@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.04**
+> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.05**
 
 Stack principal:
 
@@ -80,6 +80,12 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 ---
 
 ## Novedades recientes (resumen rapido)
+
+### v1.6.05 (tema de login "Surrealismo Digital")
+
+- **Tema de Login Surrealista:** Implementación del tema visual `'surrealism'` que ubica los formularios de login/MFA/recuperación en una barra lateral izquierda opaca de altura completa (`380px` de ancho y `100vh`).
+- **Fondo Despejado de Alta Fidelidad:** Se ocultó el panel de vidrio derecho en el CSS del tema, permitiendo visualizar de forma completamente limpia y nítida el paisaje de fondo y el monitor retro (PC) en la colina.
+- **Optimización de Visibilidad:** Corrección de la legibilidad de la caja de información en la recuperación de contraseñas, el texto de expiración de sesión y el pie de página de la aplicación mediante selectores específicos con `!important`.
 
 ### v1.6.04 (rediseño e integración del login retro CRT a pantalla completa)
 

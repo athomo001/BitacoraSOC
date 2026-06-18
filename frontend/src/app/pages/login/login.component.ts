@@ -39,8 +39,8 @@ import { Title } from '@angular/platform-browser';
 import anime from 'animejs';
 
 type ViewState = 'login' | 'recovery' | 'mfa';
-// Admite los tres temas de login disponibles: crt, infoflow (cyberpunk) y modern (split-screen)
-type LoginTheme = 'crt' | 'infoflow' | 'modern';
+// Admite los cuatro temas de login disponibles: crt, infoflow (cyberpunk), modern (split-screen) y surrealism (digital surrealism)
+type LoginTheme = 'crt' | 'infoflow' | 'modern' | 'surrealism';
 
 @Component({
     selector: 'app-login',
@@ -151,8 +151,8 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
     this.configService.getLogo().subscribe({
       next: (response: any) => {
         this.logoUrl = response.logoUrl;
-        // Asignación de tema de login incluyendo el nuevo tema 'modern'
-        this.activeTheme = response.loginTheme === 'modern' ? 'modern' : (response.loginTheme === 'infoflow' ? 'infoflow' : 'crt');
+        // Asignación de tema de login incluyendo el nuevo tema 'modern' y 'surrealism'
+        this.activeTheme = response.loginTheme === 'surrealism' ? 'surrealism' : (response.loginTheme === 'modern' ? 'modern' : (response.loginTheme === 'infoflow' ? 'infoflow' : 'crt'));
         this.appTitle = (response.appTitle || '').trim();
         this.titleService.setTitle(this.appTitle);
         
@@ -167,13 +167,15 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
         this.themeLoaded = true;
         this.cdr.detectChanges();
         
-        // Habilitar reloj y canvas de lluvia Matrix para temas infoflow y modern
-        if (this.activeTheme === 'infoflow' || this.activeTheme === 'modern') {
+        // Habilitar reloj y canvas de lluvia Matrix según corresponda
+        if (this.activeTheme === 'infoflow' || this.activeTheme === 'modern' || this.activeTheme === 'surrealism') {
           this.startClock();
           if (this.activeTheme === 'infoflow') {
             this.startTyping();
           }
-          setTimeout(() => this.initMatrixCanvas(), 100);
+          if (this.activeTheme === 'infoflow' || this.activeTheme === 'modern') {
+            setTimeout(() => this.initMatrixCanvas(), 100);
+          }
         }
 
         // Habilitar glitches y encendido animado para tema CRT
