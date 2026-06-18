@@ -61,10 +61,7 @@ eventos-*.json
 !backend/scripts/entradas-ejemplo.json
 !backend/scripts/eventos-ejemplo.json
 
-# Imágenes grandes (usar CDN o issues de GitHub)
-docs/images/screenshots/*.png
-docs/images/screenshots/*.jpg
-!docs/images/screenshots/README.md
+# Las capturas de pantalla de la documentación se deben rastrear en Git
 
 # Seed data (backups de ejemplo grandes, no subir al repo)
 backend/scripts/seed/*.json
