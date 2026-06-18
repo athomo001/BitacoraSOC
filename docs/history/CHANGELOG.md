@@ -2,6 +2,14 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.05] - 2026-06-18
+
+### Creación del Tema de Login "Surrealismo Digital"
+
+- **Diseño Surrealista Lateral:** Se desarrolló una nueva interfaz de login (`'surrealism'`) inspirada en el arte digital. El panel de autenticación, verificación de MFA y recuperación se ubica en una barra lateral izquierda (sidebar) de altura completa (`380px` de ancho y `100vh`), manteniendo el resto de la pantalla totalmente libre y nítida para revelar la imagen de fondo con el monitor iluminado sobre la colina.
+- **Optimización de Contraste y Legibilidad:** Se ajustaron los colores del cuadro de alertas e instrucciones de recuperación (`.info-alert-box`), el indicador de expiración del turno (`.session-info-text`) y el pie de página (`.surreal-footer`) mediante overrides del tema con `!important` para evitar la herencia oscura de componentes Material y garantizar una lectura de alto contraste.
+- **Actualización en API y Configuración:** El backend (`AppConfig.js`, validación de rutas) y el frontend fueron adaptados para soportar y persistir el nuevo tema en el módulo de Branding del Administrador y de Apariencia General.
+
 ## [v1.6.04] - 2026-06-18
 
 ### Rediseño e Integración del Login Retro CRT a Pantalla Completa con Anime.js

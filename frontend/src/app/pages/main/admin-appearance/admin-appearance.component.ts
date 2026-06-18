@@ -26,8 +26,8 @@ import { ConfigService } from '../../../services/config.service';
   ]
 })
 export class AdminAppearanceComponent implements OnInit {
-  // Admite los tres temas de login: crt, infoflow (cyberpunk original) y modern (split-screen)
-  loginTheme: 'crt' | 'infoflow' | 'modern' = 'crt';
+  // Admite los temas de login: crt, infoflow, modern y surrealism
+  loginTheme: 'crt' | 'infoflow' | 'modern' | 'surrealism' = 'crt';
   isSaving = false;
 
   constructor(

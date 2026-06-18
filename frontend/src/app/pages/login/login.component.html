@@ -661,3 +661,205 @@
     <img [src]="easterEggImageUrl" alt="Bender" class="easter-egg-image" />
   </div>
 </div>
+
+
+<!-- ══════════════════════════════════════════════════════════
+     TEMA SURREALISMO DIGITAL (Glassmorphism con monitor)
+     ══════════════════════════════════════════════════════════ -->
+<div *ngIf="activeTheme === 'surrealism' && themeLoaded" class="theme-surrealism">
+  <div class="surreal-card-container">
+    <!-- Panel Izquierdo: Formulario de Autenticación y Controles -->
+    <div class="surreal-left-pane">
+      <div class="surreal-left-content">
+        <!-- Logotipo -->
+        <div class="surreal-logo-container">
+          <img *ngIf="logoUrl" [src]="getAssetUrl(logoUrl)" alt="Logo" class="surreal-logo">
+          <div *ngIf="!logoUrl" class="surreal-logo-placeholder">
+            <span>{{ appTitle || 'SOC' }}</span>
+          </div>
+        </div>
+
+        <!-- Mensajes de Banner -->
+        <div *ngIf="bannerMessage" [class]="'cy-banner banner-' + bannerType">
+          <div class="cy-banner-text">{{ bannerMessage }}</div>
+        </div>
+
+        <!-- VISTA DE LOGIN ESTÁNDAR -->
+        <div *ngIf="currentView === 'login'" class="surreal-form-view">
+          <h1 class="surreal-title">Iniciar Sesión</h1>
+          <p class="surreal-subtitle">Introduce tus credenciales para acceder a la bitácora</p>
+
+          <form [formGroup]="loginForm" (ngSubmit)="onLoginSubmit()" class="surreal-form">
+            <!-- Usuario -->
+            <div class="form-group">
+              <label class="form-label">Usuario</label>
+              <div class="input-wrapper">
+                <input type="text" formControlName="username" class="surreal-input" placeholder="Ingresa tu usuario" autocomplete="username">
+              </div>
+              <div class="error-messages">
+                <span *ngIf="loginForm.get('username')?.touched && loginForm.get('username')?.errors?.['required']" class="error-text">
+                  El usuario es requerido
+                </span>
+              </div>
+            </div>
+
+            <!-- Contraseña -->
+            <div class="form-group">
+              <label class="form-label">Contraseña</label>
+              <div class="input-wrapper">
+                <input [type]="hidePassword ? 'password' : 'text'" formControlName="password" class="surreal-input" placeholder="Ingresa tu contraseña" autocomplete="current-password">
+                <button type="button" class="visibility-toggle" (click)="hidePassword = !hidePassword">
+                  <span>{{ hidePassword ? 'VER' : 'OCULTAR' }}</span>
+                </button>
+              </div>
+              <div class="error-messages">
+                <span *ngIf="loginForm.get('password')?.touched && loginForm.get('password')?.errors?.['required']" class="error-text">
+                  La contraseña es requerida
+                </span>
+              </div>
+            </div>
+
+            <!-- Enlace de Recuperación -->
+            <div class="forgot-password-link-container">
+              <a (click)="switchToRecovery()" class="forgot-link">¿Olvidaste tu contraseña?</a>
+            </div>
+
+            <!-- Consentimiento de Aviso de Privacidad -->
+            <div class="form-group privacy-consent" *ngIf="showPrivacyConsent">
+              <label class="checkbox-label">
+                <input type="checkbox" formControlName="privacyConsent" class="surreal-checkbox" />
+                Acepto el <a [href]="getAssetUrl('/uploads/aviso-privacidad.html')" target="_blank" class="privacy-link">Aviso de Privacidad</a>
+              </label>
+              <div class="error-messages" *ngIf="loginForm.get('privacyConsent')?.invalid && loginForm.get('privacyConsent')?.touched">
+                <span class="error-text">Debe aceptar el aviso de privacidad</span>
+              </div>
+            </div>
+
+            <!-- Botón de Envío -->
+            <button type="submit" class="submit-button" [disabled]="loginForm.invalid || loading">
+              <span *ngIf="!loading">Ingresar</span>
+              <span *ngIf="loading">Accediendo...</span>
+            </button>
+          </form>
+
+          <!-- Separador e Inicio de Sesión Integrado (SSO) -->
+          <div class="sso-divider" *ngIf="googleSsoEnabled || microsoftSsoEnabled">
+            <span>O continuar con</span>
+          </div>
+
+          <div class="sso-buttons-container" *ngIf="googleSsoEnabled || microsoftSsoEnabled">
+            <div id="google-btn-container-cy" *ngIf="googleSsoEnabled" class="google-sso-wrapper">
+              <div id="google-btn-container"></div>
+            </div>
+            <button type="button" class="microsoft-btn" *ngIf="microsoftSsoEnabled" (click)="loginWithMicrosoft()" [disabled]="loading">
+              <img src="https://auth.gfx.ms/16.000.28537.3/images/Microsoft_logo.svg" alt="Microsoft" class="microsoft-logo">
+              Microsoft
+            </button>
+          </div>
+
+          <!-- Información de Expiración -->
+          <div class="session-info-text">
+            ⏰ Expiración: Analistas/Admin 4h | Invitados 2h
+          </div>
+        </div>
+
+        <!-- VISTA DE VERIFICACIÓN MULTIFACTOR (MFA) -->
+        <div *ngIf="currentView === 'mfa'" class="surreal-form-view">
+          <h1 class="surreal-title">Verificación MFA</h1>
+          
+          <div *ngIf="needsMfaSetup" class="mfa-setup-box">
+            <p class="mfa-setup-title">Configuración Obligatoria</p>
+            <p class="mfa-setup-text">Escanea este código QR con tu aplicación autenticadora (Google Authenticator / Authy):</p>
+            <div class="mfa-qr-container">
+              <img [src]="mfaQrCode" alt="MFA QR" class="mfa-qr-img" />
+            </div>
+            <p class="mfa-secret-text">Clave de respaldo: <code>{{ mfaSecret }}</code></p>
+          </div>
+
+          <p *ngIf="!needsMfaSetup" class="mfa-prompt-text">
+            Introduce el código temporal de 6 dígitos generado por tu aplicación para continuar.
+          </p>
+
+          <form [formGroup]="mfaForm" (ngSubmit)="onMfaSubmit()" class="surreal-form">
+            <div class="form-group">
+              <label class="form-label">Código de verificación</label>
+              <div class="input-wrapper">
+                <input type="text" formControlName="code" class="surreal-input" placeholder="123456" maxlength="6" autocomplete="one-time-code">
+              </div>
+              <div class="error-messages">
+                <span *ngIf="mfaForm.get('code')?.touched && mfaForm.get('code')?.invalid" class="error-text">
+                  El código debe tener 6 dígitos numéricos
+                </span>
+              </div>
+            </div>
+
+            <button type="submit" class="submit-button" [disabled]="mfaForm.invalid || loading">
+              <span *ngIf="!loading">Verificar y Acceder</span>
+              <span *ngIf="loading">Verificando...</span>
+            </button>
+
+            <button type="button" class="cancel-button" (click)="cancelMfa()" [disabled]="loading">
+              Cancelar
+            </button>
+          </form>
+        </div>
+
+        <!-- VISTA DE RECUPERACIÓN DE CONTRASEÑA -->
+        <div *ngIf="currentView === 'recovery'" class="surreal-form-view">
+          <h1 class="surreal-title">Recuperar Acceso</h1>
+          <p class="surreal-subtitle">Ingresa tu email registrado para enviarte un enlace de recuperación.</p>
+
+          <div class="info-alert-box">
+            <span>Por motivos de seguridad y anti-enumeración de cuentas, el sistema no informará si la dirección ingresada existe en el sistema.</span>
+          </div>
+
+          <form [formGroup]="recoveryForm" (ngSubmit)="onRecoverySubmit()" class="surreal-form">
+            <div class="form-group">
+              <label class="form-label">Correo electrónico</label>
+              <div class="input-wrapper">
+                <input type="email" formControlName="email" class="surreal-input" placeholder="ejemplo@correo.com">
+              </div>
+              <div class="error-messages">
+                <span *ngIf="recoveryForm.get('email')?.touched && recoveryForm.get('email')?.errors?.['required']" class="error-text">
+                  El email es requerido
+                </span>
+                <span *ngIf="recoveryForm.get('email')?.touched && recoveryForm.get('email')?.errors?.['email']" class="error-text">
+                  Formato de email inválido
+                </span>
+              </div>
+            </div>
+
+            <button type="submit" class="submit-button" [disabled]="recoveryForm.invalid || loading">
+              <span *ngIf="!loading">Enviar enlace</span>
+              <span *ngIf="loading">Enviando...</span>
+            </button>
+
+            <button type="button" class="cancel-button" (click)="switchToLogin()" [disabled]="loading">
+              Volver al Login
+            </button>
+          </form>
+        </div>
+
+        <!-- Pie de página -->
+        <footer class="surreal-footer">
+          {{ appTitle }}<span *ngIf="appTitle"> v{{ appVersion }}</span>
+        </footer>
+      </div>
+    </div>
+
+    <!-- Panel Derecho: Glassmorphism translúcido -->
+    <div class="surreal-right-pane">
+      <div class="surreal-right-content">
+        <h2 class="surreal-right-title">{{ appTitle || 'Bitácora SOC' }}</h2>
+        <p class="surreal-right-desc">
+          Plataforma centralizada del Centro de Operaciones de Ciberseguridad (SOC). Monitoreo continuo y registro de bitácoras tácticas.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Huevo de Pascua -->
+  <div class="easter-egg-overlay" *ngIf="showEasterEggOverlay" (click)="closeEasterEggOverlay()">
+    <img [src]="easterEggImageUrl" alt="Bender" class="easter-egg-image" />
+  </div>
+</div>

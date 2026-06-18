@@ -1,0 +1,523 @@
+ /* ==========================================================================
+   TEMA DE LOGIN: SURREALISMO DIGITAL (DISEÑO BARRA LATERAL)
+   El formulario de inicio de sesión se ubica en una barra lateral izquierda 
+   de altura completa con un fondo marrón-oscuro opaco, dejando el resto de 
+   la pantalla (con la imagen de la colina y el monitor retro) 100% nítida y visible.
+   ========================================================================== */
+
+$surreal-accent: #ff5e36; /* Coral / Naranja crepuscular */
+$surreal-accent-hover: #ff7d5c;
+$surreal-bg-dark: #120f0f; /* Fondo oscuro opaco */
+$surreal-input-bg: rgba(255, 255, 255, 0.05);
+$surreal-input-border: rgba(255, 255, 255, 0.08);
+$surreal-input-focus: rgba(255, 94, 54, 0.4);
+$surreal-text-light: #ffffff;
+$surreal-text-muted: #a09895;
+
+.theme-surrealism {
+  position: relative;
+  min-height: 100vh;
+  background-image: url('/assets/images/surrealism-bg.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  display: flex;
+  justify-content: flex-start;
+  align-items: stretch;
+  font-family: 'Inter', 'Outfit', 'Segoe UI', Roboto, sans-serif;
+  color: $surreal-text-light;
+  overflow: hidden;
+  box-sizing: border-box;
+
+  /* Contenedor principal sin caja delimitadora ni desenfoque general */
+  .surreal-card-container {
+    display: flex;
+    width: 100%;
+    min-height: 100vh;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    overflow: hidden;
+    backdrop-filter: none;
+    align-items: stretch;
+
+    @media (max-width: 768px) {
+      flex-direction: column;
+    }
+  }
+
+  /* Lado Izquierdo: Barra Lateral del Formulario */
+  .surreal-left-pane {
+    flex: 0 0 380px;
+    width: 380px;
+    background: rgba(18, 15, 15, 0.96); /* Opaco para legibilidad excelente */
+    padding: 50px 35px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    box-shadow: 8px 0 35px rgba(0, 0, 0, 0.5);
+    z-index: 5;
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    height: 100vh;
+    overflow-y: auto;
+
+    @media (max-width: 768px) {
+      flex: 1 1 100%;
+      width: 100%;
+      height: 100vh;
+      padding: 35px 25px;
+      box-shadow: none;
+      background: rgba(18, 15, 15, 0.98);
+    }
+  }
+
+  .surreal-left-content {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    margin: auto 0; /* Centrado vertical en la barra lateral */
+  }
+
+  /* Logotipo */
+  .surreal-logo-container {
+    margin-bottom: 30px;
+    display: flex;
+    justify-content: flex-start;
+
+    @media (max-width: 768px) {
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+
+    .surreal-logo {
+      height: 38px;
+      object-fit: contain;
+    }
+
+    .surreal-logo-placeholder {
+      font-size: 24px;
+      color: $surreal-accent;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+    }
+  }
+
+  /* Título de la sección */
+  .surreal-title {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: $surreal-text-light;
+    margin: 0 0 8px 0;
+    letter-spacing: -0.02em;
+
+    @media (max-width: 768px) {
+      text-align: center;
+      font-size: 1.6rem;
+    }
+  }
+
+  .surreal-subtitle {
+    font-size: 0.85rem;
+    color: $surreal-text-muted;
+    margin: 0 0 25px 0;
+    line-height: 1.4;
+
+    @media (max-width: 768px) {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+  }
+
+  /* Formularios */
+  .surreal-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .form-label {
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: $surreal-text-muted;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .surreal-input {
+    width: 100%;
+    padding: 12px 14px;
+    background: $surreal-input-bg;
+    border: 1px solid $surreal-input-border;
+    border-radius: 8px;
+    color: $surreal-text-light;
+    font-family: inherit;
+    font-size: 0.9rem;
+    outline: none;
+    transition: all 0.25s ease;
+
+    &::placeholder {
+      color: rgba(255, 255, 255, 0.18);
+    }
+
+    &:focus {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: $surreal-accent;
+      box-shadow: 0 0 0 3px $surreal-input-focus;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  .visibility-toggle {
+    position: absolute;
+    right: 12px;
+    background: none;
+    border: none;
+    color: $surreal-text-muted;
+    font-size: 0.7rem;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    transition: color 0.15s;
+
+    &:hover {
+      color: $surreal-accent;
+    }
+  }
+
+  /* Enlace de recuperación */
+  .forgot-password-link-container {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: -4px;
+  }
+
+  .forgot-link {
+    font-size: 0.76rem;
+    color: $surreal-text-muted;
+    cursor: pointer;
+    transition: color 0.2s;
+
+    &:hover {
+      color: $surreal-accent;
+      text-decoration: none;
+    }
+  }
+
+  /* Consentimiento de Privacidad */
+  .privacy-consent {
+    margin: 4px 0;
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.76rem;
+    color: $surreal-text-muted;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .surreal-checkbox {
+    appearance: none;
+    width: 15px;
+    height: 15px;
+    border: 1px solid $surreal-input-border;
+    background: $surreal-input-bg;
+    border-radius: 4px;
+    cursor: pointer;
+    position: relative;
+    outline: none;
+    transition: all 0.2s;
+
+    &:checked {
+      background: $surreal-accent;
+      border-color: $surreal-accent;
+
+      &::after {
+        content: '✓';
+        font-size: 9px;
+        color: #000000;
+        font-weight: bold;
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+      }
+    }
+
+    &:hover {
+      border-color: $surreal-accent;
+    }
+  }
+
+  .privacy-link {
+    color: $surreal-accent;
+    text-decoration: underline;
+
+    &:hover {
+      color: $surreal-accent-hover;
+    }
+  }
+
+  /* Botón Principal (Blanco en diseño) */
+  .submit-button {
+    width: 100%;
+    padding: 12px 20px;
+    background: #ffffff;
+    color: #000000;
+    border: none;
+    border-radius: 20px;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+    transition: all 0.25s ease;
+
+    &:hover:not(:disabled) {
+      background: $surreal-accent;
+      color: #ffffff;
+      box-shadow: 0 6px 14px rgba(255, 94, 54, 0.35);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+  }
+
+  .cancel-button {
+    width: 100%;
+    margin-top: 10px;
+    padding: 11px 16px;
+    background: transparent;
+    color: $surreal-text-light;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+  }
+
+  /* Banners de alertas */
+  .cy-banner {
+    padding: 11px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    color: #ffffff;
+    font-size: 0.78rem;
+    text-align: center;
+    margin-bottom: 18px;
+    border-radius: 8px;
+
+    &.banner-success {
+      border-color: rgba(0, 255, 120, 0.3);
+      background: rgba(0, 255, 120, 0.08);
+      color: #00ff78;
+    }
+
+    &.banner-error {
+      border-color: rgba(255, 51, 102, 0.3);
+      background: rgba(255, 51, 102, 0.08);
+      color: #ff3366;
+    }
+  }
+
+  .info-alert-box {
+    padding: 11px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.06);
+    color: #ffd6cb !important;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    margin-bottom: 15px;
+    border-radius: 8px;
+
+    span {
+      color: #ffd6cb !important;
+    }
+  }
+
+  /* MFA Setup */
+  .mfa-setup-box {
+    border: 1px dashed $surreal-accent;
+    background: rgba(255, 94, 54, 0.03);
+    padding: 14px;
+    margin-bottom: 14px;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    .mfa-setup-title {
+      color: $surreal-accent;
+      font-weight: 700;
+      font-size: 0.82rem;
+      margin: 0 0 5px 0;
+    }
+
+    .mfa-setup-text {
+      font-size: 0.74rem;
+      color: $surreal-text-muted;
+      text-align: center;
+      margin: 0 0 10px 0;
+      line-height: 1.4;
+    }
+
+    .mfa-qr-container {
+      background: white;
+      padding: 6px;
+      border-radius: 6px;
+      margin-bottom: 10px;
+
+      .mfa-qr-img {
+        width: 120px;
+        height: 120px;
+        display: block;
+      }
+    }
+
+    .mfa-secret-text {
+      font-size: 0.7rem;
+      color: $surreal-accent;
+      margin: 0;
+
+      code {
+        background: #000000;
+        padding: 2px 5px;
+        border-radius: 4px;
+        color: #ffffff;
+      }
+    }
+  }
+
+  .mfa-prompt-text {
+    font-size: 0.8rem;
+    color: $surreal-text-muted;
+    text-align: center;
+    line-height: 1.4;
+    margin-bottom: 15px;
+  }
+
+  /* SSO Contenedores */
+  .sso-divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.12);
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 8px 0;
+
+    &::before, &::after {
+      content: '';
+      flex: 1;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    &::before { margin-right: 8px; }
+    &::after { margin-left: 8px; }
+  }
+
+  .sso-buttons-container {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 8px;
+    width: 100%;
+
+    .google-sso-wrapper {
+      display: flex;
+      justify-content: center;
+    }
+
+    .microsoft-btn {
+      flex: 1;
+      padding: 9px 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      color: #ffffff;
+      font-size: 0.76rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      .microsoft-logo {
+        height: 12px;
+        width: 12px;
+      }
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.15);
+      }
+    }
+  }
+
+  /* Errores */
+  .error-messages {
+    min-height: 12px;
+    margin-top: 2px;
+  }
+
+  .error-text {
+    font-size: 0.68rem;
+    color: #ff3366;
+    font-weight: 600;
+  }
+
+  .session-info-text {
+    margin-top: 10px;
+    font-size: 0.72rem;
+    color: rgba(255, 255, 255, 0.65) !important;
+    text-align: center;
+  }
+
+  .surreal-footer {
+    margin-top: 25px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    text-align: center;
+    color: rgba(255, 255, 255, 0.5) !important;
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+  }
+
+  /* Se oculta el panel derecho completamente en este layout 
+     para dejar el fondo (con el monitor retro) 100% visible sin empañar */
+  .surreal-right-pane {
+    display: none !important;
+  }
+}
