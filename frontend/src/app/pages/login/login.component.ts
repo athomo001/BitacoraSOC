@@ -36,6 +36,7 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { EasterEggSignal } from '../../models/user.model';
 import { Title } from '@angular/platform-browser';
+import anime from 'animejs';
 
 type ViewState = 'login' | 'recovery' | 'mfa';
 // Admite los tres temas de login disponibles: crt, infoflow (cyberpunk) y modern (split-screen)
@@ -70,6 +71,7 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
   mfaQrCode = '';
   mfaSecret = '';
   private easterEggTimer?: ReturnType<typeof setTimeout>;
+  private glitchTimer?: ReturnType<typeof setTimeout>;
 
   // Tema activo cargado desde config
   activeTheme: LoginTheme = 'crt';
@@ -174,6 +176,12 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
           setTimeout(() => this.initMatrixCanvas(), 100);
         }
 
+        // Habilitar glitches y encendido animado para tema CRT
+        if (this.activeTheme === 'crt') {
+          this.startRandomGlitches();
+          setTimeout(() => this.triggerScreenTurnOn(), 100);
+        }
+
         // Cargar Google GSI dinámicamente si está habilitado
         if (this.googleSsoEnabled && this.googleClientId) {
           this.initGoogleSSO();
@@ -190,6 +198,8 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
         this.titleService.setTitle('');
         this.themeLoaded = true;
         this.cdr.detectChanges();
+        this.startRandomGlitches();
+        setTimeout(() => this.triggerScreenTurnOn(), 100);
       }
     });
   }
@@ -205,6 +215,7 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     this.stopMatrixCanvas();
     this.stopClock();
+    this.stopRandomGlitches();
     if (this.typingTimer) clearTimeout(this.typingTimer);
     if (this.easterEggTimer) clearTimeout(this.easterEggTimer);
   }
@@ -309,7 +320,12 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // ── Formularios ────────────────────────────────────────────
   onLoginSubmit(): void {
-    if (this.loginForm.invalid) return;
+    if (this.loginForm.invalid) {
+      if (this.activeTheme === 'crt') {
+        this.triggerGlitch();
+      }
+      return;
+    }
     this.loading = true;
 
     this.authService.login(this.loginForm.value).subscribe({
@@ -334,6 +350,9 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
         }, 1500);
       },
       error: (error) => {
+        if (this.activeTheme === 'crt') {
+          this.triggerGlitch();
+        }
         this.triggerEasterEgg(error?.error?.easterEgg);
         this.loading = false;
         const backendMessage = typeof error?.error === 'string'
@@ -639,5 +658,173 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
         }
       });
     }
+  }
+
+  // ── Animaciones CRT con Anime.js ──────────────────────────────
+
+  /**
+   * Ejecuta el efecto de encendido inicial del monitor CRT.
+   * Simula el haz de electrones expandiéndose primero horizontalmente y luego verticalmente.
+   */
+  triggerScreenTurnOn(): void {
+    const screen = document.querySelector('.crt-screen');
+    if (!screen) return;
+    
+    // Ejecutar fuera de la zona de Angular para optimizar rendimiento
+    this.ngZone.runOutsideAngular(() => {
+      anime.timeline({
+        easing: 'easeOutExpo'
+      })
+      .add({
+        targets: screen,
+        scaleX: [0, 1.05],
+        scaleY: [0.002, 0.002],
+        filter: 'brightness(30) contrast(4)',
+        opacity: [0, 1],
+        duration: 300,
+      })
+      .add({
+        targets: screen,
+        scaleY: [0.002, 1],
+        scaleX: [1.05, 1],
+        filter: ['brightness(15) contrast(2)', 'brightness(1) contrast(1)'],
+        duration: 400
+      });
+    });
+  }
+
+  /**
+   * Transiciona entre vistas del monitor CRT con efecto de apagado catódico y reencendido.
+   * @param action Callback a ejecutar cuando la pantalla se apague por completo.
+   */
+  animateScreenTransition(action: () => void): void {
+    const screen = document.querySelector('.crt-screen');
+    if (!screen) {
+      action();
+      return;
+    }
+    
+    this.loading = true; // Deshabilita inputs durante la transición
+    this.cdr.detectChanges();
+
+    this.ngZone.runOutsideAngular(() => {
+      anime.timeline({
+        easing: 'easeOutExpo',
+      })
+      .add({
+        targets: screen,
+        scaleY: 0.002,
+        scaleX: 1.05,
+        filter: 'brightness(15) contrast(3)',
+        duration: 250,
+      })
+      .add({
+        targets: screen,
+        scaleX: 0,
+        filter: 'brightness(50) contrast(5)',
+        duration: 180,
+        complete: () => {
+          // Actualiza el estado dentro de la zona de Angular
+          this.ngZone.run(() => {
+            action();
+            this.cdr.detectChanges();
+          });
+        }
+      })
+      .add({
+        targets: screen,
+        scaleX: [0, 1.05],
+        scaleY: [0.002, 0.002],
+        filter: 'brightness(20) contrast(4)',
+        duration: 180,
+      })
+      .add({
+        targets: screen,
+        scaleY: [0.002, 1],
+        scaleX: [1.05, 1],
+        filter: ['brightness(10) contrast(2)', 'brightness(1) contrast(1)'],
+        duration: 300,
+        complete: () => {
+          this.ngZone.run(() => {
+            this.loading = false;
+            this.cdr.detectChanges();
+          });
+        }
+      });
+    });
+  }
+
+  /**
+   * Dispara una distorsión visual (glitch) analógica en la pantalla CRT.
+   * Modifica temporalmente la traslación, inclinación y filtros cromáticos.
+   */
+  triggerGlitch(): void {
+    const screen = document.querySelector('.crt-screen');
+    if (!screen) return;
+
+    const randomSkew = () => (Math.random() - 0.5) * 12;
+    const randomTranslate = () => (Math.random() - 0.5) * 18;
+
+    this.ngZone.runOutsideAngular(() => {
+      anime({
+        targets: screen,
+        translateX: [
+          { value: randomTranslate(), duration: 60 },
+          { value: randomTranslate(), duration: 60 },
+          { value: 0, duration: 60 }
+        ],
+        skewX: [
+          { value: randomSkew(), duration: 60 },
+          { value: randomSkew(), duration: 60 },
+          { value: 0, duration: 60 }
+        ],
+        filter: [
+          { value: 'brightness(1.6) contrast(1.3) hue-rotate(50deg)', duration: 70 },
+          { value: 'brightness(0.7) contrast(1.6) hue-rotate(-40deg)', duration: 70 },
+          { value: 'brightness(1) contrast(1) hue-rotate(0deg)', duration: 90 }
+        ],
+        easing: 'linear'
+      });
+    });
+  }
+
+  /**
+   * Inicia el bucle periódico de interferencias visuales espontáneas.
+   */
+  private startRandomGlitches(): void {
+    this.stopRandomGlitches();
+    const scheduleNext = () => {
+      const delay = Math.random() * 8000 + 7000; // intervalo aleatorio
+      this.glitchTimer = setTimeout(() => {
+        this.triggerGlitch();
+        scheduleNext();
+      }, delay);
+    };
+    scheduleNext();
+  }
+
+  /**
+   * Detiene el bucle periódico de interferencias visuales.
+   */
+  private stopRandomGlitches(): void {
+    if (this.glitchTimer) {
+      clearTimeout(this.glitchTimer);
+      this.glitchTimer = undefined;
+    }
+  }
+
+  /**
+   * Wrappers animados de navegación para el template HTML.
+   */
+  animateToRecovery(): void {
+    this.animateScreenTransition(() => this.switchToRecovery());
+  }
+
+  animateToLogin(): void {
+    this.animateScreenTransition(() => this.switchToLogin());
+  }
+
+  animateCancelMfa(): void {
+    this.animateScreenTransition(() => this.cancelMfa());
   }
 }

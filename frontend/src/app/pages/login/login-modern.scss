@@ -20,7 +20,7 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
   min-height: 100vh;
   background: #000000;
   overflow: hidden;
-  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'Gotham', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   color: #ffffff;
 
   /* Contenedor Split Screen principal */
@@ -103,7 +103,7 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
 
   /* Títulos y Subtítulos de Acceso */
   .login-title {
-    font-family: 'Orbitron', sans-serif;
+    font-family: 'Gotham', sans-serif;
     font-size: 2.1rem;
     font-weight: 700;
     color: #fcee0a !important; /* Amarillo Cyberpunk */
@@ -194,9 +194,9 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
     background: none;
     border: none;
     color: #00f0ff;
-    font-family: 'Orbitron', sans-serif;
+    font-family: 'Gotham', sans-serif;
     font-size: 0.65rem;
-    font-weight: bold;
+    font-weight: 500; /* Gotham Medium */
     cursor: pointer;
     padding: 4px 6px;
     border-radius: 2px;
@@ -235,8 +235,8 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
     color: #000000;
     border: none;
     border-radius: 4px;
-    font-family: 'Orbitron', sans-serif;
-    font-weight: bold;
+    font-family: 'Gotham', sans-serif;
+    font-weight: 500; /* Gotham Medium */
     font-size: 0.95rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -265,8 +265,8 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
     color: #ff0055;
     border: 1px solid rgba(255, 0, 85, 0.4);
     border-radius: 4px;
-    font-family: 'Orbitron', sans-serif;
-    font-weight: 600;
+    font-family: 'Gotham', sans-serif;
+    font-weight: 700; /* Gotham Bold */
     font-size: 0.8rem;
     text-transform: uppercase;
     cursor: pointer;
@@ -527,7 +527,8 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
     text-align: center;
     color: #555555;
     font-size: 0.72rem;
-    font-family: 'Orbitron', sans-serif;
+    font-family: 'Gotham', sans-serif;
+    font-weight: 500; /* Gotham Medium */
     letter-spacing: 0.05em;
     text-transform: uppercase;
   }
@@ -588,7 +589,7 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
   }
 
   .banner-title {
-    font-family: 'Orbitron', sans-serif;
+    font-family: 'Gotham', sans-serif;
     font-size: 2.6rem;
     font-weight: 800;
     color: #00f0ff !important; /* Título principal en cian */
@@ -622,7 +623,7 @@ $font-mono: 'Courier New', 'Lucida Console', monospace;
     }
 
     .clock-time {
-      font-family: 'Orbitron', monospace;
+      font-family: 'Gotham', sans-serif;
       font-size: 1.95rem;
       color: #00f0ff;
       text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
