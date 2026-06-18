@@ -70,11 +70,6 @@ export class ChecklistHistoryComponent implements OnInit {
     });
   }
 
-  /**
-   * Correlaciona dinámicamente servicios marcados en rojo que no cuentan con observaciones,
-   * buscando si las palabras clave del servicio se mencionan en las observaciones de otros
-   * servicios en rojo del mismo checklist.
-   */
   correlateServices(check: ShiftCheck): void {
     if (!check || !Array.isArray(check.services)) return;
 
@@ -84,27 +79,60 @@ export class ChecklistHistoryComponent implements OnInit {
     check.services.forEach(service => {
       // Si el servicio falló y no tiene comentario, buscar si la causa está descrita en otro ítem
       if (service.status === 'rojo' && !service.observation) {
-        let keywords = this.getSearchKeywords(service.serviceTitle);
-        
-        // Heredar palabras clave del servicio padre para aumentar la precisión de la correlación de sub-items
-        if (service.parentServiceId) {
-          const parent = check.services.find(s => s.serviceId === service.parentServiceId);
-          if (parent) {
-            const parentKeywords = this.getSearchKeywords(parent.serviceTitle);
-            keywords = Array.from(new Set([...keywords, ...parentKeywords]));
+        let matchedSource: any = null;
+
+        // 1. Relación Jerárquica Directa: Intentar correlacionar por pertenencia directa de árbol.
+        const currentServiceIdStr = service.serviceId ? service.serviceId.toString() : '';
+
+        // Caso A: El servicio actual es padre de otros servicios.
+        // Buscamos si algún hijo directo está en rojo con observación.
+        if (currentServiceIdStr) {
+          matchedSource = servicesWithObservation.find(other => 
+            other.parentServiceId && other.parentServiceId.toString() === currentServiceIdStr
+          );
+        }
+
+        // Caso B: El servicio actual es hijo de otro servicio.
+        // Buscamos si el padre directo está en rojo con observación, o si algún hermano directo la tiene.
+        if (!matchedSource && service.parentServiceId) {
+          const parentIdStr = service.parentServiceId.toString();
+
+          // Probar con el padre
+          matchedSource = servicesWithObservation.find(other => 
+            other.serviceId && other.serviceId.toString() === parentIdStr
+          );
+
+          // Probar con hermanos directos (hijos del mismo padre)
+          if (!matchedSource) {
+            matchedSource = servicesWithObservation.find(other => 
+              other.parentServiceId && other.parentServiceId.toString() === parentIdStr &&
+              other.serviceId?.toString() !== service.serviceId?.toString()
+            );
           }
         }
 
-        if (keywords.length === 0) return;
-
-        // Buscar si otro servicio en rojo menciona al menos una de las palabras clave significativas de este servicio
-        const matchedSource = servicesWithObservation.find(other => {
-          if (other.serviceTitle === service.serviceTitle) return false;
+        // 2. Correlación Heurística por palabras clave si no se halló enlace por jerarquía.
+        if (!matchedSource) {
+          let keywords = this.getSearchKeywords(service.serviceTitle);
           
-          const observationNormalized = this.normalizeText(other.observation || '');
-          // Coincide si al menos una de las palabras clave está en la observación
-          return keywords.some(keyword => observationNormalized.includes(keyword));
-        });
+          // Heredar palabras clave del servicio padre
+          if (service.parentServiceId) {
+            const parent = check.services.find(s => s.serviceId === service.parentServiceId);
+            if (parent) {
+              const parentKeywords = this.getSearchKeywords(parent.serviceTitle);
+              keywords = Array.from(new Set([...keywords, ...parentKeywords]));
+            }
+          }
+
+          if (keywords.length > 0) {
+            matchedSource = servicesWithObservation.find(other => {
+              if (other.serviceTitle === service.serviceTitle) return false;
+              
+              const observationNormalized = this.normalizeText(other.observation || '');
+              return keywords.some(keyword => observationNormalized.includes(keyword));
+            });
+          }
+        }
 
         if (matchedSource) {
           // Asignar causa relacionada virtual

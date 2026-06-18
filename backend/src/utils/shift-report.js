@@ -290,25 +290,60 @@ const correlateBackendServices = (checklist) => {
 
   checklist.services.forEach(service => {
     if (service.status === 'rojo' && !service.observation) {
-      let keywords = getSearchKeywordsForCorrelation(service.serviceTitle);
-      
-      // Heredar palabras clave del servicio padre para aumentar la precisión de la correlación de sub-items
-      if (service.parentServiceId) {
-        const parent = checklist.services.find(s => s.serviceId?.toString() === service.parentServiceId.toString());
-        if (parent) {
-          const parentKeywords = getSearchKeywordsForCorrelation(parent.serviceTitle);
-          keywords = [...new Set([...keywords, ...parentKeywords])];
+      let matchedSource = null;
+
+      // 1. Relación Jerárquica Directa: Intentar correlacionar por pertenencia directa de árbol.
+      const currentServiceIdStr = service.serviceId ? service.serviceId.toString() : '';
+
+      // Caso A: El servicio actual es padre de otros servicios.
+      // Buscamos si algún hijo directo está en rojo con observación.
+      if (currentServiceIdStr) {
+        matchedSource = servicesWithObservation.find(other => 
+          other.parentServiceId && other.parentServiceId.toString() === currentServiceIdStr
+        );
+      }
+
+      // Caso B: El servicio actual es hijo de otro servicio.
+      // Buscamos si el padre directo está en rojo con observación, o si algún hermano directo la tiene.
+      if (!matchedSource && service.parentServiceId) {
+        const parentIdStr = service.parentServiceId.toString();
+
+        // Probar con el padre
+        matchedSource = servicesWithObservation.find(other => 
+          other.serviceId && other.serviceId.toString() === parentIdStr
+        );
+
+        // Probar con hermanos directos (hijos del mismo padre)
+        if (!matchedSource) {
+          matchedSource = servicesWithObservation.find(other => 
+            other.parentServiceId && other.parentServiceId.toString() === parentIdStr &&
+            other.serviceId?.toString() !== service.serviceId?.toString()
+          );
         }
       }
 
-      if (keywords.length === 0) return;
-
-      const matchedSource = servicesWithObservation.find(other => {
-        if (other.serviceTitle === service.serviceTitle) return false;
+      // 2. Correlación Heurística por palabras clave si no se halló enlace por jerarquía.
+      if (!matchedSource) {
+        let keywords = getSearchKeywordsForCorrelation(service.serviceTitle);
         
-        const obsNormalized = normalizeNameForCorrelation(other.observation || '');
-        return keywords.some(keyword => obsNormalized.includes(keyword));
-      });
+        // Heredar palabras clave del servicio padre
+        if (service.parentServiceId) {
+          const parent = checklist.services.find(s => s.serviceId?.toString() === service.parentServiceId.toString());
+          if (parent) {
+            const parentKeywords = getSearchKeywordsForCorrelation(parent.serviceTitle);
+            keywords = [...new Set([...keywords, ...parentKeywords])];
+          }
+        }
+
+        if (keywords.length > 0) {
+          matchedSource = servicesWithObservation.find(other => {
+            if (other.serviceTitle === service.serviceTitle) return false;
+            
+            const obsNormalized = normalizeNameForCorrelation(other.observation || '');
+            return keywords.some(keyword => obsNormalized.includes(keyword));
+          });
+        }
+      }
 
       if (matchedSource) {
         service.correlatedFrom = {
