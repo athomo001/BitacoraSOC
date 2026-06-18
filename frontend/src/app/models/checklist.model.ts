@@ -1,11 +1,7 @@
 /**
  * File Purpose: frontend/src/app/models/checklist.model.ts
- * Responsibilities: Define the module behavior and maintain clear contracts.
- * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
- */
-
-/**
- * Modelos de Checklist de Turno y Plantillas
+ * Responsibilities: Definir las interfaces de TypeScript de los checklists de turnos.
+ * QA Notes: Mantener sincronizados los tipos con las entidades del backend.
  */
 
 export interface ChecklistItem {
@@ -18,7 +14,7 @@ export interface ChecklistItem {
   children?: ChecklistItem[];
 }
 
-// Alias legacy para mantener compatibilidad con código previo
+// Alias legacy para compatibilidad
 export type ServiceCatalog = ChecklistItem;
 
 export interface ChecklistTemplate {
@@ -34,16 +30,21 @@ export interface ChecklistTemplate {
   updatedAt?: Date;
 }
 
+export type ServiceStatus = 'verde' | 'rojo';
+export type CheckType = 'inicio' | 'cierre';
+
 export interface ServiceCheck {
   serviceId: string;
   parentServiceId?: string | null;
   serviceTitle: string;
   status: ServiceStatus;
   observation: string;
+  // Propiedad virtual inyectada en cliente para representar correlación de incidentes
+  correlatedFrom?: {
+    serviceTitle: string;
+    observation: string;
+  };
 }
-
-export type ServiceStatus = 'verde' | 'rojo';
-export type CheckType = 'inicio' | 'cierre';
 
 export interface ShiftCheck {
   _id: string;

@@ -248,6 +248,113 @@ const buildStatusPill = (label, color) => {
   return `<span style="display:inline-block;background:${color};color:#ffffff;font-size:11px;font-weight:700;line-height:1;padding:6px 10px;border-radius:999px;letter-spacing:0.2px;">${label}</span>`;
 };
 
+/**
+ * Normaliza y limpia una cadena de texto para comparaciones difusas de correlación (remueve diacríticos y convierte a minúsculas).
+ */
+const normalizeNameForCorrelation = (value) => {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+};
+
+/**
+ * Extrae palabras clave significativas de un título para la correlación en el backend.
+ */
+const getSearchKeywordsForCorrelation = (title) => {
+  const cleanTitle = String(title || '')
+    .replace(/\(.*?\)/g, '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  const words = cleanTitle.split(/\s+/).map(w => w.trim()).filter(w => w.length > 2);
+  const stopWords = new Set([
+    'todos', 'los', 'conectar', 'actualizar', 'revision', 'general', 'salud', 
+    'delitos', 'turno', 'anterior', 'del', 'con', 'para', 'una', 'uno', 'las', 
+    'por', 'sus', 'componentes', 'alerta', 'alertas', 'plataforma', 'graves', 'criticos'
+  ]);
+
+  return words.filter(w => !stopWords.has(w));
+};
+
+/**
+ * Correlaciona dinámicamente incidentes de servicios sin comentarios, asociándolos a las observaciones
+ * de otros servicios en el mismo checklist si se menciona alguna palabra clave significativa de los mismos.
+ */
+const correlateBackendServices = (checklist) => {
+  if (!checklist || !Array.isArray(checklist.services)) return;
+
+  const servicesWithObservation = checklist.services.filter(s => s.status === 'rojo' && s.observation);
+
+  checklist.services.forEach(service => {
+    if (service.status === 'rojo' && !service.observation) {
+      let matchedSource = null;
+
+      // 1. Relación Jerárquica Directa: Intentar correlacionar por pertenencia directa de árbol.
+      const currentServiceIdStr = service.serviceId ? service.serviceId.toString() : '';
+
+      // Caso A: El servicio actual es padre de otros servicios.
+      // Buscamos si algún hijo directo está en rojo con observación.
+      if (currentServiceIdStr) {
+        matchedSource = servicesWithObservation.find(other => 
+          other.parentServiceId && other.parentServiceId.toString() === currentServiceIdStr
+        );
+      }
+
+      // Caso B: El servicio actual es hijo de otro servicio.
+      // Buscamos si el padre directo está en rojo con observación, o si algún hermano directo la tiene.
+      if (!matchedSource && service.parentServiceId) {
+        const parentIdStr = service.parentServiceId.toString();
+
+        // Probar con el padre
+        matchedSource = servicesWithObservation.find(other => 
+          other.serviceId && other.serviceId.toString() === parentIdStr
+        );
+
+        // Probar con hermanos directos (hijos del mismo padre)
+        if (!matchedSource) {
+          matchedSource = servicesWithObservation.find(other => 
+            other.parentServiceId && other.parentServiceId.toString() === parentIdStr &&
+            other.serviceId?.toString() !== service.serviceId?.toString()
+          );
+        }
+      }
+
+      // 2. Correlación Heurística por palabras clave si no se halló enlace por jerarquía.
+      if (!matchedSource) {
+        let keywords = getSearchKeywordsForCorrelation(service.serviceTitle);
+        
+        // Heredar palabras clave del servicio padre
+        if (service.parentServiceId) {
+          const parent = checklist.services.find(s => s.serviceId?.toString() === service.parentServiceId.toString());
+          if (parent) {
+            const parentKeywords = getSearchKeywordsForCorrelation(parent.serviceTitle);
+            keywords = [...new Set([...keywords, ...parentKeywords])];
+          }
+        }
+
+        if (keywords.length > 0) {
+          matchedSource = servicesWithObservation.find(other => {
+            if (other.serviceTitle === service.serviceTitle) return false;
+            
+            const obsNormalized = normalizeNameForCorrelation(other.observation || '');
+            return keywords.some(keyword => obsNormalized.includes(keyword));
+          });
+        }
+      }
+
+      if (matchedSource) {
+        service.correlatedFrom = {
+          serviceTitle: matchedSource.serviceTitle,
+          observation: matchedSource.observation
+        };
+      }
+    }
+  });
+};
+
 const renderServiceStatusBlock = ({ service, entryService = null, isExit = false, allowRepaired = false }) => {
   if (!service) {
     return `
@@ -281,10 +388,21 @@ const renderServiceStatusBlock = ({ service, entryService = null, isExit = false
     ? `<div style="margin-top:6px;font-size:12px;color:#37474f;line-height:1.35;"><strong>Obs:</strong> ${escapeHtml(observation)}</div>`
     : '';
 
+  // Inyección de bloque HTML responsivo para el correo en caso de existir correlación
+  const correlationHtml = (!observation && service.correlatedFrom)
+    ? `
+      <div style="margin-top:6px;padding:6px 8px;background-color:#fffdf6;border-radius:4px;border:1px dashed #ffd54f;font-size:11px;line-height:1.3;color:#263238;">
+        <strong style="color:#ef6c00;">Causa relacionada (${escapeHtml(service.correlatedFrom.serviceTitle)}):</strong>
+        <div style="font-style:italic;margin-top:2px;">"${escapeHtml(service.correlatedFrom.observation)}"</div>
+      </div>
+    `
+    : '';
+
   return `
     <div>${pill}</div>
     ${repairedHint}
     ${observationHtml}
+    ${correlationHtml}
   `;
 };
 
@@ -316,6 +434,13 @@ async function generateReportHTML({ shift, checklistEntry, checklistExit, entrie
     ? `${formatDate(periodStart)} ${formatTime(periodStart)} - ${formatDate(periodEnd)} ${formatTime(periodEnd)}`
     : '';
   const includeChecklist = shift.emailReportConfig?.includeChecklist;
+
+  // Correlacionar incidentes de manera inteligente antes de generar las filas del checklist
+  if (includeChecklist) {
+    correlateBackendServices(checklistEntry);
+    correlateBackendServices(checklistExit);
+  }
+
   const includeEntries = shift.emailReportConfig?.includeEntries;
   const serviceRows = includeChecklist ? buildServiceRows(checklistEntry, checklistExit) : [];
   const parentServiceIds = includeChecklist ? buildParentServiceIdSet(checklistEntry, checklistExit) : new Set();
@@ -379,13 +504,19 @@ async function generateReportHTML({ shift, checklistEntry, checklistExit, entrie
         isExit: true,
         allowRepaired: canCompareForRepair
       });
+
+      const isChild = Boolean(row.entry?.parentServiceId || row.exit?.parentServiceId);
+      const sectionPadding = isChild ? '0 24px 10px 54px' : '0 24px 10px 24px';
+      const indicator = isChild ? '<span style="color:#78909c;margin-right:6px;font-weight:700;">└─</span>' : '';
+      const backgroundHeader = isChild ? '#fafbfc' : '#f7f9fb';
+
       return `
-        <mj-section padding="0 24px 10px 24px">
+        <mj-section padding="${sectionPadding}">
           <mj-column>
             <mj-text padding="0">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e3e7ea;border-radius:8px;background:#ffffff;overflow:hidden;">
                 <tr>
-                  <td style="background:#f7f9fb;padding:12px 14px;font-size:14px;font-weight:700;color:#263238;">${title}</td>
+                  <td style="background:${backgroundHeader};padding:12px 14px;font-size:14px;font-weight:700;color:#263238;">${indicator}${title}</td>
                 </tr>
                 <tr>
                   <td style="padding:10px 14px 12px 14px;">
@@ -561,19 +692,35 @@ function generateReportText({ shift, checklistEntry, checklistExit, entries, per
   lines.push('');
 
   if (shift.emailReportConfig.includeChecklist && (checklistEntry || checklistExit)) {
+    // Correlacionar antes de renderizar texto
+    correlateBackendServices(checklistEntry);
+    correlateBackendServices(checklistExit);
+
     const entryTime = formatTime(checklistEntry?.createdAt || checklistEntry?.checkDate);
     const exitTime = formatTime(checklistExit?.createdAt || checklistExit?.checkDate);
     const serviceRows = buildServiceRows(checklistEntry, checklistExit);
-    const parentServiceIds = buildParentServiceIdSet(checklistEntry, checklistExit);
-    const leafServiceRows = serviceRows.filter((row) => !parentServiceIds.has(row.serviceId));
 
     lines.push('Checklist de Entrada y Salida');
     lines.push(`Entrada: ${entryTime} | Salida: ${exitTime}`);
-    leafServiceRows.forEach((row) => {
+    serviceRows.forEach((row) => {
       const title = row.entry?.serviceTitle || row.exit?.serviceTitle || 'Servicio';
-      const entryStatus = row.entry ? `${row.entry.status.toUpperCase()}${row.entry.observation ? ` - ${row.entry.observation}` : ''}` : 'No registrado';
-      const exitStatus = row.exit ? `${row.exit.status.toUpperCase()}${row.exit.observation ? ` - ${row.exit.observation}` : ''}` : 'No registrado';
-      lines.push(`- ${title}: Entrada=${entryStatus} | Salida=${exitStatus}`);
+
+      const getStatusText = (srv) => {
+        if (!srv) return 'No registrado';
+        let statusStr = srv.status.toUpperCase();
+        if (srv.observation) {
+          statusStr += ` - Obs: ${srv.observation}`;
+        } else if (srv.correlatedFrom) {
+          statusStr += ` - Causa Relacionada (${srv.correlatedFrom.serviceTitle}): "${srv.correlatedFrom.observation}"`;
+        }
+        return statusStr;
+      };
+
+      const entryStatus = getStatusText(row.entry);
+      const exitStatus = getStatusText(row.exit);
+      const isChild = Boolean(row.entry?.parentServiceId || row.exit?.parentServiceId);
+      const prefix = isChild ? '  └─ ' : '- ';
+      lines.push(`${prefix}${title}: Entrada=${entryStatus} | Salida=${exitStatus}`);
     });
     lines.push('');
   }
@@ -1083,5 +1230,6 @@ module.exports = {
   sendShiftReport,
   sendShiftReportPoc,
   generateReportHTML,
+  generateReportText,
   replaceSubjectVariables
 };

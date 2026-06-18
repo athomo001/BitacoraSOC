@@ -78,11 +78,13 @@
           </h3>
 
           <div class="services-list">
-            <div *ngFor="let service of check.services" class="service-item" [class]="getStatusColor(service.status)">
+            <div *ngFor="let service of check.services" class="service-item" [class]="getStatusColor(service.status)"
+                 [class.is-child]="service.parentServiceId">
               <div class="service-header">
                 <mat-icon class="service-status-icon">
                   {{ service.status === 'verde' ? 'check_circle' : 'error' }}
                 </mat-icon>
+                <span *ngIf="service.parentServiceId" class="sub-item-indicator">└─</span>
                 <span class="service-title">{{ service.serviceTitle }}</span>
                 <span class="service-status-badge" [class]="getStatusColor(service.status)">
                   {{ service.status | uppercase }}
@@ -91,6 +93,13 @@
               <div *ngIf="service.observation" class="service-observation">
                 <mat-icon>comment</mat-icon>
                 <p>{{ service.observation }}</p>
+              </div>
+              <div *ngIf="!service.observation && service.correlatedFrom" class="service-correlation">
+                <mat-icon>info</mat-icon>
+                <div class="correlation-content">
+                  <strong>Causa relacionada detectada en "{{ service.correlatedFrom.serviceTitle }}":</strong>
+                  <p>"{{ service.correlatedFrom.observation }}"</p>
+                </div>
               </div>
             </div>
           </div>

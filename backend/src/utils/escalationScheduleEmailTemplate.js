@@ -43,14 +43,15 @@ const PALETTE = {
 };
 
 /**
- * Genera el HTML del correo de turnos de escalamiento
+ * Genera el HTML del correo de turnos de escalamiento y asignaciones
  * @param {Object} data - Datos del turno
  * @param {Array} data.schedule - Lista de turnos [{ analystName, startDate, endDate, cargoLabel, isCurrent }]
  * @param {string} data.periodLabel - Texto del periodo (ej: "Semana del 07 al 13 de Mayo")
  * @param {string} data.logoCid - CID del logo para adjuntar
  * @param {string} data.brandName - Nombre de la marca (Bitácora SOC)
+ * @param {string} data.title - Título personalizado para el encabezado del correo
  */
-async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', logoCid = null, brandName = 'Bitácora CDC' }) {
+async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', logoCid = null, brandName = 'Bitácora CDC', title = 'Turnos de Escalamiento SOC' }) {
   
   const scheduleRows = schedule.map((s, i) => {
     const isLast = i === schedule.length - 1;
@@ -106,13 +107,13 @@ async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', l
               </td>
               <td style="width:50%; text-align:right; vertical-align:middle;">
                 <!-- Cambiado de Escalación a Escalamiento para corregir la redacción en la cabecera del correo enviado a otras áreas -->
-                <span style="font-size:12px; font-weight:700; color:${PALETTE.headerText}; letter-spacing:1px;">CALENDARIO DE ESCALAMIENTO</span>
+                <span style="font-size:12px; font-weight:700; color:${PALETTE.headerText}; letter-spacing:1px;">${e((title || 'CALENDARIO').toUpperCase())}</span>
               </td>
             </tr>
           </mj-table>
           <mj-text align="center" color="${PALETTE.headerText}" font-size="28px" font-weight="700" padding="10px 0">
-            <!-- Corrección de texto en el título del cuerpo del correo -->
-            Turnos de Escalamiento SOC
+            <!-- Título del cuerpo del correo dinámico según la programación -->
+            ${e(title)}
           </mj-text>
           <mj-text align="center" color="${PALETTE.cardAccent}" font-size="16px" font-weight="400" padding="0">
             ${e(periodLabel)}

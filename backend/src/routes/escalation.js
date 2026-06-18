@@ -203,5 +203,12 @@ router.post('/admin/reminder/test', authenticate, requireAdmin, escalationContro
 // 📅 Automatización de Turnos (ESC-SHIFT-111)
 router.post('/admin/automation/trigger-send', authenticate, requireAdmin, escalationController.triggerEscalationScheduleSend);
 
+// 📅 CRUD ADMIN - Programación de Notificaciones de Turnos (ShiftNotificationSchedule)
+router.get('/admin/notification-schedules', authenticate, requireAdmin, escalationController.getNotificationSchedules);
+router.post('/admin/notification-schedules', authenticate, requireAdmin, escalationController.createNotificationSchedule);
+router.put('/admin/notification-schedules/:id', authenticate, requireAdmin, escalationController.updateNotificationSchedule);
+router.delete('/admin/notification-schedules/:id', authenticate, requireAdmin, escalationController.deleteNotificationSchedule);
+router.post('/admin/notification-schedules/:id/trigger-send', authenticate, requireAdmin, escalationController.triggerNotificationScheduleSend);
+
 module.exports = router;
 

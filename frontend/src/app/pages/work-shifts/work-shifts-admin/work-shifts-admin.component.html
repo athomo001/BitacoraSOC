@@ -388,19 +388,101 @@
             </div>
           </article>
 
-          <!-- Automatización de Envío -->
+          <!-- Automatización de Envío (Múltiples Programaciones) -->
           <article class="dashboard-card config-sidebar-card">
             <header class="card-header">
-              <h3>Envío automatizado semanal</h3>
+              <h3>Envío automatizado de turnos</h3>
             </header>
             <div class="card-body">
-              <form [formGroup]="escalationScheduleAutomationForm" (ngSubmit)="saveAutomationConfig()">
-                <mat-checkbox formControlName="enabled">
-                  Activar envío automático
-                </mat-checkbox>
+              
+              <!-- Vista de Lista de Programaciones -->
+              <div *ngIf="!showScheduleForm">
+                <div style="margin-bottom: 15px; display: flex; justify-content: flex-end;">
+                  <button mat-flat-button color="primary" type="button" (click)="addNotificationSchedule()">
+                    <mat-icon>add</mat-icon> Nueva Notificación
+                  </button>
+                </div>
 
-                <div class="automation-fields" *ngIf="escalationScheduleAutomationForm.get('enabled')?.value">
+                <div class="schedule-list">
+                  <div *ngFor="let s of notificationSchedules" class="schedule-item-card" [class.disabled]="!s.enabled" 
+                       style="border: 1px solid var(--soft-line, #D7DEC0); border-radius: 8px; padding: 12px; margin-bottom: 12px; background-color: var(--card-bg, #fbfbf0);">
+                    <div class="schedule-item-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                      <div style="display: flex; flex-direction: column;">
+                        <strong style="font-size: 14px; color: var(--body-text, #173831);">{{ s.name }}</strong>
+                        <span style="font-size: 11px; color: #7f7f7f;">
+                          {{ s.frequency === 'weekly' ? 'Semanal' : 'Mensual' }} •
+                          {{ s.frequency === 'weekly' ? getWeekdaysLabel([s.dayOfWeek]) : 'Día 1' }} a las {{ s.time }}
+                        </span>
+                      </div>
+                      <span class="status-badge" [style.background-color]="s.enabled ? '#155F50' : '#9e9e9e'" 
+                            style="color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; line-height: 1;">
+                        {{ s.enabled ? 'Activa' : 'Inactiva' }}
+                      </span>
+                    </div>
+                    
+                    <!-- Filtros de roles en chips pequeños -->
+                    <div class="schedule-item-roles" style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px;">
+                      <span *ngIf="s.roleFilter?.includes('N2') || s.roleFilter?.includes('TI') || s.roleFilter?.includes('N1_NO_HABIL')" 
+                            style="font-size: 10px; background-color: #e3f2fd; color: #0d47a1; padding: 2px 6px; border-radius: 4px; font-weight: 500;">
+                        Guardia
+                      </span>
+                      <span *ngIf="s.roleFilter?.includes('TELEWORK')" 
+                            style="font-size: 10px; background-color: #e8f5e9; color: #1b5e20; padding: 2px 6px; border-radius: 4px; font-weight: 500;">
+                        Teletrabajo
+                      </span>
+                      <span *ngIf="s.roleFilter?.includes('VACATION')" 
+                            style="font-size: 10px; background-color: #fff3e0; color: #e65100; padding: 2px 6px; border-radius: 4px; font-weight: 500;">
+                        Vacaciones
+                      </span>
+                    </div>
+                    
+                    <div class="schedule-item-actions" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed var(--soft-line, #D7DEC0); padding-top: 8px;">
+                      <button mat-icon-button color="accent" type="button" (click)="triggerManualSendForSchedule(s)" matTooltip="Enviar ahora" style="width: 30px; height: 30px; line-height: 30px;">
+                        <mat-icon style="font-size: 18px;">send</mat-icon>
+                      </button>
+                      <div style="display: flex; gap: 4px;">
+                        <button mat-icon-button color="primary" type="button" (click)="editNotificationSchedule(s)" matTooltip="Editar" style="width: 30px; height: 30px; line-height: 30px;">
+                          <mat-icon style="font-size: 18px;">edit</mat-icon>
+                        </button>
+                        <button mat-icon-button color="warn" type="button" (click)="deleteNotificationSchedule(s._id)" matTooltip="Eliminar" style="width: 30px; height: 30px; line-height: 30px;">
+                          <mat-icon style="font-size: 18px;">delete</mat-icon>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div *ngIf="notificationSchedules.length === 0" style="text-align: center; color: #5B695D; padding: 20px 0; font-size: 13px;">
+                    No hay notificaciones programadas.
+                  </div>
+                </div>
+              </div>
+
+              <!-- Vista de Formulario Inline para Crear/Editar -->
+              <div *ngIf="showScheduleForm">
+                <form [formGroup]="scheduleForm" (ngSubmit)="saveNotificationSchedule()">
+                  <h4 style="margin-top: 0; margin-bottom: 15px; color: var(--body-text, #173831); font-weight: bold; font-size: 15px;">
+                    {{ editingScheduleId ? 'Editar Notificación' : 'Nueva Notificación' }}
+                  </h4>
+                  
                   <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Nombre descriptivo</mat-label>
+                    <input matInput formControlName="name" placeholder="Ej: Teletrabajo RRHH">
+                    <mat-error *ngIf="scheduleForm.get('name')?.hasError('required')">Nombre requerido</mat-error>
+                  </mat-form-field>
+
+                  <mat-checkbox formControlName="enabled" style="margin-bottom: 12px; display: inline-block;">
+                    Activar envío automático
+                  </mat-checkbox>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Frecuencia</mat-label>
+                    <mat-select formControlName="frequency">
+                      <mat-option value="weekly">Semanal</mat-option>
+                      <mat-option value="monthly">Mensual</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="full-width" *ngIf="scheduleForm.get('frequency')?.value === 'weekly'">
                     <mat-label>Día de envío</mat-label>
                     <mat-select formControlName="dayOfWeek">
                       <mat-option *ngFor="let d of daysOfWeek" [value]="d.value">{{ d.label }}</mat-option>
@@ -410,11 +492,13 @@
                   <mat-form-field appearance="outline" class="full-width">
                     <mat-label>Hora de envío</mat-label>
                     <input matInput type="time" formControlName="time">
+                    <mat-error *ngIf="scheduleForm.get('time')?.hasError('required')">Hora de envío requerida</mat-error>
                   </mat-form-field>
 
                   <mat-form-field appearance="outline" class="full-width">
                     <mat-label>Destinatarios (emails separados por coma)</mat-label>
                     <input matInput formControlName="recipients" (input)="onAutomationRecipientsInput(autoRec.value)" #autoRec>
+                    <mat-error *ngIf="scheduleForm.get('recipients')?.hasError('required')">Al menos un destinatario es requerido</mat-error>
                   </mat-form-field>
                   <div class="autocomplete-suggestions" *ngIf="automationRecipientSuggestions.length > 0">
                     <div class="suggestion-item" *ngFor="let c of automationRecipientSuggestions" (click)="useAutomationRecipientEmail(c.email || '')">
@@ -431,17 +515,28 @@
                       {{ c.name }} &lt;{{ c.email }}&gt;
                     </div>
                   </div>
-                </div>
 
-                <div class="automation-actions">
-                  <button mat-stroked-button type="button" (click)="triggerManualSend()" [disabled]="triggeringManualSend">
-                    Enviar ahora
-                  </button>
-                  <button mat-raised-button color="primary" type="submit" [disabled]="savingAutomationConfig">
-                    Guardar
-                  </button>
-                </div>
-              </form>
+                  <!-- Checkboxes para seleccionar condiciones (Roles) a incluir -->
+                  <div class="condition-filters-section" style="margin-top: 10px; margin-bottom: 20px; border-top: 1px solid var(--soft-line, #D7DEC0); padding-top: 12px;">
+                    <h5 style="margin-top: 0; margin-bottom: 8px; font-weight: bold; color: var(--body-text, #173831); font-size: 13px;">Condiciones a Notificar:</h5>
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                      <mat-checkbox formControlName="includeGuard">Turno de Guardia (N1/N2/TI)</mat-checkbox>
+                      <mat-checkbox formControlName="includeTelework">Teletrabajo</mat-checkbox>
+                      <mat-checkbox formControlName="includeVacation">Vacaciones</mat-checkbox>
+                    </div>
+                  </div>
+
+                  <div class="automation-actions" style="display: flex; gap: 8px; justify-content: flex-end;">
+                    <button mat-stroked-button type="button" (click)="cancelScheduleForm()">
+                      Cancelar
+                    </button>
+                    <button mat-raised-button color="primary" type="submit" [disabled]="scheduleForm.invalid || savingSchedule">
+                      {{ savingSchedule ? 'Guardando...' : 'Guardar' }}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
             </div>
           </article>
 

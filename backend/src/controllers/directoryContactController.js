@@ -52,7 +52,10 @@ const normalizePayload = (body = {}, existing = {}) => ({
 
 exports.listDirectoryContacts = async (req, res) => {
   try {
-    await mergeDirectoryDuplicates();
+    // NOTA DE OPTIMIZACIÓN: Se remueve el proceso de consolidación de duplicados ('mergeDirectoryDuplicates')
+    // en caliente de esta consulta para evitar bloqueos masivos en el hilo principal (event loop) de Node.js
+    // causados por la comparación cuadrática de distancia Levenshtein. Este proceso pesado de fusión ahora
+    // se realiza únicamente a demanda a través del endpoint 'POST /api/directory/merge-duplicates'.
     const { type, favorite } = req.query;
     const filter = {};
     if (type && ['Internal', 'External', 'List'].includes(type)) {

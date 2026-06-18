@@ -48,7 +48,9 @@ const canWriteDirectory = (req) => {
     return true;
   }
   const cargo = normalizeCargo(req?.user?.cargoLabel || '');
-  return !!cargo && cargo !== 'n1';
+  // Permite la creación y edición de contactos a cualquier cargo definido,
+  // incluyendo a los analistas de nivel N1 ('n1'). La eliminación sigue restringida.
+  return !!cargo;
 };
 
 const canDeleteDirectory = (req) => {

@@ -95,8 +95,8 @@ export class EscalationAdminSimpleComponent implements OnInit {
     
     const normalizedCargo = this.normalizeCargoLabel(user?.cargoLabel || '');
     const fullAccessCargos = new Set(['n2', 'n3', 'jefe area', 'gerente area', 'arquitecto siem']);
-    
-    this.canDirectoryWrite = this.isAdminUser || (!!normalizedCargo && normalizedCargo !== 'n1');
+    // Habilita la capacidad de crear y modificar contactos en el directorio central para analistas N1.
+    this.canDirectoryWrite = this.isAdminUser || !!normalizedCargo;
     this.canDirectoryDelete = this.isAdminUser || fullAccessCargos.has(normalizedCargo);
     this.directoryOnlyAccess = this.router.url.includes('/main/escalation/directory');
   }

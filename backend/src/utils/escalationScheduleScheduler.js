@@ -5,6 +5,7 @@
 
 const cron = require('node-cron');
 const AppConfig = require('../models/AppConfig');
+const ShiftNotificationSchedule = require('../models/ShiftNotificationSchedule');
 const escalationController = require('../controllers/escalationController');
 const { logger } = require('./logger');
 
@@ -25,60 +26,94 @@ function initEscalationScheduleScheduler() {
   // Ejecutar cada minuto para mayor precisión en la hora configurada
   escalationCronTask = cron.schedule('* * * * *', async () => {
     try {
-      const config = await AppConfig.findOne();
-      if (!config) return;
+      // 1. Ejecutar migración única de datos antiguos si aplica
+      const count = await ShiftNotificationSchedule.countDocuments();
+      if (count === 0) {
+        const config = await AppConfig.findOne();
+        if (config && config.escalationScheduleAutomation) {
+          const auto = config.escalationScheduleAutomation;
+          if (auto.recipients && auto.recipients.length > 0) {
+            logger.info('📦 Migrating legacy escalation email automation to new notification schedules model...');
+            const defaultSchedule = new ShiftNotificationSchedule({
+              name: 'Envío General de Guardia',
+              enabled: auto.enabled ?? false,
+              frequency: auto.frequency || 'weekly',
+              dayOfWeek: auto.dayOfWeek ?? 1,
+              time: auto.time || '09:00',
+              recipients: auto.recipients || [],
+              ccRecipients: auto.ccRecipients || [],
+              roleFilter: ['N2', 'TI', 'N1_NO_HABIL'], // Roles predeterminados legacy
+              lastSentAt: auto.lastSentAt
+            });
+            await defaultSchedule.save();
 
-      const automation = config.escalationScheduleAutomation;
-      if (!automation || !automation.enabled) return;
+            // Deshabilitar el antiguo para prevenir duplicidad en futuras migraciones
+            await AppConfig.updateOne({}, {
+              $set: { 'escalationScheduleAutomation.enabled': false }
+            });
+            logger.info('✅ Legacy email automation successfully migrated.');
+          }
+        }
+      }
+
+      // 2. Consultar todas las notificaciones programadas y habilitadas
+      const activeSchedules = await ShiftNotificationSchedule.find({ enabled: true });
+      if (activeSchedules.length === 0) return;
 
       const now = new Date();
       const currentDay = now.getDay(); // 0-6 (Domingo-Sábado)
       const currentTime = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); // "HH:mm"
 
-      // 1. Verificar si coincide el día y la hora
-      const dayMatches = automation.frequency === 'monthly' 
-        ? now.getDate() === 1 // Primer día del mes
-        : currentDay === automation.dayOfWeek;
+      for (const schedule of activeSchedules) {
+        // Verificar si coincide el día y la hora
+        const dayMatches = schedule.frequency === 'monthly'
+          ? now.getDate() === 1 // Primer día del mes
+          : currentDay === schedule.dayOfWeek;
 
-      const timeMatches = currentTime === automation.time;
+        const timeMatches = currentTime === schedule.time;
 
-      if (dayMatches && timeMatches) {
-        // 2. Verificar si ya se envió hoy (evitar múltiples envíos en el mismo minuto)
-        const lastSentAt = automation.lastSentAt;
-        const alreadySentToday = lastSentAt && 
-          lastSentAt.getDate() === now.getDate() && 
-          lastSentAt.getMonth() === now.getMonth() &&
-          lastSentAt.getFullYear() === now.getFullYear();
+        if (dayMatches && timeMatches) {
+          // Verificar si ya se envió hoy (evitar múltiples envíos en el mismo minuto)
+          const lastSentAt = schedule.lastSentAt;
+          const alreadySentToday = lastSentAt && 
+            lastSentAt.getDate() === now.getDate() && 
+            lastSentAt.getMonth() === now.getMonth() &&
+            lastSentAt.getFullYear() === now.getFullYear();
 
-        if (alreadySentToday) return;
+          if (alreadySentToday) continue;
 
-        logger.info('🚀 Triggering automated escalation schedule send...', { 
-          frequency: automation.frequency,
-          recipients: automation.recipients?.length
-        });
-
-        const recipients = automation.recipients || [];
-        const ccRecipients = automation.ccRecipients || [];
-
-        if (recipients.length === 0) {
-          logger.warn('⚠️ Automated send skipped: No recipients configured.');
-          return;
-        }
-
-        const result = await escalationController.sendEscalationScheduleInternal({
-          recipients,
-          ccRecipients,
-          frequency: automation.frequency
-        });
-
-        if (result.success) {
-          logger.info('✅ Automated escalation schedule sent successfully.');
-          // Actualizar última fecha de envío
-          await AppConfig.updateOne({}, { 
-            $set: { 'escalationScheduleAutomation.lastSentAt': now } 
+          logger.info(`🚀 Triggering automated send for schedule: "${schedule.name}"`, { 
+            id: schedule._id,
+            frequency: schedule.frequency,
+            recipients: schedule.recipients?.length,
+            roleFilter: schedule.roleFilter
           });
-        } else {
-          logger.error('❌ Error in automated escalation schedule send:', result.error);
+
+          const recipients = schedule.recipients || [];
+          const ccRecipients = schedule.ccRecipients || [];
+
+          if (recipients.length === 0) {
+            logger.warn(`⚠️ Automated send skipped for "${schedule.name}": No recipients configured.`);
+            continue;
+          }
+
+          const result = await escalationController.sendEscalationScheduleInternal({
+            name: schedule.name,
+            recipients,
+            ccRecipients,
+            frequency: schedule.frequency,
+            roleFilter: schedule.roleFilter
+          });
+
+          if (result.success) {
+            logger.info(`✅ Automated schedule "${schedule.name}" sent successfully.`);
+            // Actualizar última fecha de envío de esta notificación específica
+            await ShiftNotificationSchedule.updateOne({ _id: schedule._id }, { 
+              $set: { lastSentAt: now } 
+            });
+          } else {
+            logger.error(`❌ Error in automated schedule "${schedule.name}" send:`, result.error);
+          }
         }
       }
     } catch (error) {

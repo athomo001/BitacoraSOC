@@ -291,7 +291,8 @@ router.post('/',
   [
     body('username').trim().isLength({ min: 3 }).withMessage('El usuario debe tener al menos 3 caracteres'),
     body('email').isEmail().normalizeEmail().withMessage('Email invalido'),
-    body('password').isLength({ min: 6 }).withMessage('La contraseña debe tener al menos 6 caracteres'), // Validación unificada a mínimo 6 caracteres
+    // Permite al administrador definir contraseñas de cualquier longitud
+    body('password').notEmpty().withMessage('La contraseña es requerida'),
     body('fullName').trim().notEmpty().withMessage('El nombre completo es requerido'),
     body('role').isIn(['admin', 'user', 'auditor', 'guest']).withMessage('Rol inválido'),
     body('phone').optional().trim().isLength({ min: 6, max: 20 }).withMessage('Teléfono inválido'),
@@ -437,7 +438,8 @@ router.put('/:id',
     body('phone').optional().trim().isLength({ min: 6, max: 20 }),
     body('cargoLabel').optional({ nullable: true }).isString().trim().isLength({ max: MAX_CARGO_LENGTH })
       .withMessage(`Cargo inválido (máx ${MAX_CARGO_LENGTH} caracteres)`),
-    body('newPassword').optional().isLength({ min: 6 }).withMessage('La nueva contraseña debe tener al menos 6 caracteres'), // Validación unificada a mínimo 6 caracteres
+    // Permite al administrador establecer una nueva contraseña de cualquier longitud
+    body('newPassword').optional(),
     body('mfaEnabled').optional().isBoolean().withMessage('MFAEnabled debe ser booleano')
   ],
   validate,

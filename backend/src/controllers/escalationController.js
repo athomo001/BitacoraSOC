@@ -19,6 +19,7 @@ const ExternalPerson = require('../models/ExternalPerson');
 const RaciEntry = require('../models/RaciEntry');
 const AppConfig = require('../models/AppConfig');
 const SmtpConfig = require('../models/SmtpConfig');
+const ShiftNotificationSchedule = require('../models/ShiftNotificationSchedule');
 const { sendEscalationInternalReminderEmail } = require('../routes/smtp');
 const { audit } = require('../utils/audit');
 const { logger } = require('../utils/logger');
@@ -2246,7 +2247,7 @@ exports.triggerEscalationScheduleSend = async (req, res) => {
 /**
  * Lógica compartida para generar y enviar el reporte de turnos
  */
-exports.sendEscalationScheduleInternal = async ({ recipients, ccRecipients, frequency = 'weekly' }) => {
+exports.sendEscalationScheduleInternal = async ({ name, recipients, ccRecipients, frequency = 'weekly', roleFilter = [] }) => {
   try {
     const now = new Date();
     let startDate = new Date(now);
@@ -2316,31 +2317,37 @@ exports.sendEscalationScheduleInternal = async ({ recipients, ccRecipients, freq
     .populate('externalPersonId', 'name email')
     .sort({ weekStartDate: 1 });
 
-    // Mapear a formato de template
-    // Regla semanal: incluir cualquier turno que se cruce con la semana objetivo,
-    // para que turnos largos (ej. 2 semanas) aparezcan en ambas semanas.
+    // Filtrar asignaciones según los roles especificados en la programación de notificaciones.
+    // Si no se define filtro, por compatibilidad retrospectiva se asumen los roles de guardia tradicionales.
+    const targetRoles = (Array.isArray(roleFilter) && roleFilter.length > 0)
+      ? roleFilter.map(r => String(r || '').toUpperCase())
+      : INTERNAL_SHIFT_ROLE_CODES;
+
     const overlappingInternalAssignments = assignments.filter((assignment) => {
       const overlapsRequestedPeriod = assignment.weekStartDate <= endDate && assignment.weekEndDate >= startDate;
-      const isInternalRole = INTERNAL_SHIFT_ROLE_CODES.includes(String(assignment.roleCode || '').toUpperCase());
-      const isInternalPerson = !!assignment.userId && !assignment.externalPersonId;
-      return overlapsRequestedPeriod && isInternalRole && isInternalPerson;
+      const isTargetRole = targetRoles.includes(String(assignment.roleCode || '').toUpperCase());
+      const hasAssignedPerson = !!assignment.userId || !!assignment.externalPersonId;
+      return overlapsRequestedPeriod && isTargetRole && hasAssignedPerson;
     });
 
     let selectedAssignments = [];
     if (frequency === 'weekly') {
+      // Para reporte semanal, si hay duplicados por rol, priorizar la asignación más reciente o de inicio posterior
       const latestAssignmentByRole = new Map();
       for (const assignment of overlappingInternalAssignments) {
         const roleCode = String(assignment.roleCode || '').toUpperCase();
-        const current = latestAssignmentByRole.get(roleCode);
+        const assignedId = String(assignment.userId?._id || assignment.externalPersonId?._id || 'anon');
+        const key = `${roleCode}_${assignedId}`;
+        const current = latestAssignmentByRole.get(key);
         if (!current) {
-          latestAssignmentByRole.set(roleCode, assignment);
+          latestAssignmentByRole.set(key, assignment);
           continue;
         }
 
         const startsLater = new Date(assignment.weekStartDate).getTime() > new Date(current.weekStartDate).getTime();
         const updatedLater = new Date(assignment.updatedAt || assignment.createdAt || 0).getTime() > new Date(current.updatedAt || current.createdAt || 0).getTime();
         if (startsLater || (!startsLater && updatedLater)) {
-          latestAssignmentByRole.set(roleCode, assignment);
+          latestAssignmentByRole.set(key, assignment);
         }
       }
 
@@ -2358,16 +2365,31 @@ exports.sendEscalationScheduleInternal = async ({ recipients, ccRecipients, freq
 
     const scheduleData = selectedAssignments.map((assignment) => {
       const isCurrent = assignment.weekStartDate <= now && assignment.weekEndDate >= now;
+      let analystName = 'Pendiente';
+      let cargoLabel = assignment.roleCode || '-';
+      
+      if (assignment.userId) {
+        analystName = assignment.userId.fullName || 'Pendiente';
+        cargoLabel = assignment.userId.cargoLabel || assignment.roleCode || '-';
+      } else if (assignment.externalPersonId) {
+        analystName = assignment.externalPersonId.name || 'Pendiente';
+        cargoLabel = assignment.roleCode || '-';
+      }
+
       return {
-      analystName: assignment.userId?.fullName || 'Pendiente',
-      startDate: assignment.weekStartDate,
-      endDate: assignment.weekEndDate,
-      cargoLabel: assignment.userId?.cargoLabel || assignment.roleCode || '-',
-      isCurrent
-    };
+        analystName,
+        startDate: assignment.weekStartDate,
+        endDate: assignment.weekEndDate,
+        cargoLabel,
+        isCurrent
+      };
     });
 
-    logger.info('Escalation schedule email generation', {
+    const reportTitle = name || 'Turnos de Escalamiento SOC';
+    const emailSubject = `[${brandName}] ${reportTitle} - ${periodLabel}`;
+
+    logger.info('Generación de reporte automatizado de turnos', {
+      reportTitle,
       periodLabel,
       assignmentsFound: assignments.length,
       overlappingInternalAssignments: overlappingInternalAssignments.length,
@@ -2379,7 +2401,6 @@ exports.sendEscalationScheduleInternal = async ({ recipients, ccRecipients, freq
 
     if (scheduleData.length === 0) {
       logger.warn('No hay turnos programados para el periodo', { periodLabel });
-      // Crear email con mensaje de "Sin turnos"
       const emptyScheduleData = [{
         analystName: 'Sin asignaciones',
         startDate: startDate,
@@ -2392,14 +2413,14 @@ exports.sendEscalationScheduleInternal = async ({ recipients, ccRecipients, freq
         schedule: emptyScheduleData,
         periodLabel,
         logoCid,
-        brandName
+        brandName,
+        title: reportTitle
       });
 
-      // Envío de correo electrónico para notificar la ausencia de turnos programados en el periodo evaluado
       const emailResult = await sendEmail({
         to: recipients,
         cc: ccRecipients,
-        subject: `[${brandName}] Turnos de Escalamiento - ${periodLabel}`,
+        subject: emailSubject,
         html: emptyScheduleEmailBuild.html,
         attachments: attachments.length ? attachments : undefined,
         auditContext: {
@@ -2416,11 +2437,12 @@ exports.sendEscalationScheduleInternal = async ({ recipients, ccRecipients, freq
       schedule: scheduleData,
       periodLabel,
       logoCid,
-      brandName
+      brandName,
+      title: reportTitle
     });
 
     if (emailBuild.errors && emailBuild.errors.length > 0) {
-      logger.warn('MJML compilation warnings for escalation schedule email', {
+      logger.warn('Advertencias de compilación MJML para correo de turnos', {
         errors: emailBuild.errors,
         scheduleDataCount: scheduleData.length
       });
@@ -2428,11 +2450,10 @@ exports.sendEscalationScheduleInternal = async ({ recipients, ccRecipients, freq
 
     const { html } = emailBuild;
 
-    // Envío del correo electrónico que contiene la tabla de turnos de escalamiento programados
     const emailResult = await sendEmail({
       to: recipients,
       cc: ccRecipients,
-      subject: `[${brandName}] Turnos de Escalamiento - ${periodLabel}`,
+      subject: emailSubject,
       html,
       attachments: attachments.length ? attachments : undefined,
       auditContext: {
@@ -2443,7 +2464,179 @@ exports.sendEscalationScheduleInternal = async ({ recipients, ccRecipients, freq
 
     return { success: true, messageId: emailResult.messageId };
   } catch (error) {
-    logger.error('Error in sendEscalationScheduleInternal:', error);
+    logger.error('Error en sendEscalationScheduleInternal:', error);
     return { success: false, error: error.message };
+  }
+};
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 🔧 CRUD ADMIN - Programación de Notificaciones de Turnos (ShiftNotificationSchedule)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/**
+ * Obtiene la lista completa de todas las programaciones de notificaciones de turnos.
+ */
+exports.getNotificationSchedules = async (req, res) => {
+  try {
+    const schedules = await ShiftNotificationSchedule.find().sort({ createdAt: -1 });
+    res.json(schedules);
+  } catch (error) {
+    logger.error('Error en getNotificationSchedules:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Crea una nueva programación de notificación automatizada.
+ */
+exports.createNotificationSchedule = async (req, res) => {
+  try {
+    const { name, enabled, frequency, dayOfWeek, time, recipients, ccRecipients, roleFilter } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({ error: 'El nombre es obligatorio' });
+    }
+
+    const schedule = new ShiftNotificationSchedule({
+      name,
+      enabled: enabled ?? true,
+      frequency: frequency || 'weekly',
+      dayOfWeek: dayOfWeek ?? 1,
+      time: time || '09:00',
+      recipients: Array.isArray(recipients) ? recipients : [],
+      ccRecipients: Array.isArray(ccRecipients) ? ccRecipients : [],
+      roleFilter: Array.isArray(roleFilter) ? roleFilter : []
+    });
+
+    await schedule.save();
+
+    await audit(req, {
+      event: 'escalation.notification_schedule.create',
+      result: { success: true },
+      metadata: { id: schedule._id, name: schedule.name }
+    }).catch(auditError => logger.warn({ err: auditError }, 'Error al registrar auditoría de creación de notificación'));
+
+    res.status(201).json(schedule);
+  } catch (error) {
+    logger.error('Error en createNotificationSchedule:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Actualiza los campos de una programación de notificación existente por su ID.
+ */
+exports.updateNotificationSchedule = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, enabled, frequency, dayOfWeek, time, recipients, ccRecipients, roleFilter } = req.body;
+
+    const schedule = await ShiftNotificationSchedule.findById(id);
+    if (!schedule) {
+      return res.status(404).json({ error: 'Programación no encontrada' });
+    }
+
+    if (name !== undefined) schedule.name = name;
+    if (enabled !== undefined) schedule.enabled = enabled;
+    if (frequency !== undefined) schedule.frequency = frequency;
+    if (dayOfWeek !== undefined) schedule.dayOfWeek = dayOfWeek;
+    if (time !== undefined) schedule.time = time;
+    if (recipients !== undefined) schedule.recipients = Array.isArray(recipients) ? recipients : [];
+    if (ccRecipients !== undefined) schedule.ccRecipients = Array.isArray(ccRecipients) ? ccRecipients : [];
+    if (roleFilter !== undefined) schedule.roleFilter = Array.isArray(roleFilter) ? roleFilter : [];
+
+    await schedule.save();
+
+    await audit(req, {
+      event: 'escalation.notification_schedule.update',
+      result: { success: true },
+      metadata: { id: schedule._id, name: schedule.name }
+    }).catch(auditError => logger.warn({ err: auditError }, 'Error al registrar auditoría de actualización de notificación'));
+
+    res.json(schedule);
+  } catch (error) {
+    logger.error('Error en updateNotificationSchedule:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Elimina de manera lógica/física una programación de notificación por su ID.
+ */
+exports.deleteNotificationSchedule = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const schedule = await ShiftNotificationSchedule.findByIdAndDelete(id);
+    if (!schedule) {
+      return res.status(404).json({ error: 'Programación no encontrada' });
+    }
+
+    await audit(req, {
+      event: 'escalation.notification_schedule.delete',
+      result: { success: true },
+      metadata: { id: schedule._id, name: schedule.name }
+    }).catch(auditError => logger.warn({ err: auditError }, 'Error al registrar auditoría de eliminación de notificación'));
+
+    res.json({ message: 'Programación eliminada correctamente' });
+  } catch (error) {
+    logger.error('Error en deleteNotificationSchedule:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Dispara manualmente el envío de una programación de turnos específica.
+ */
+exports.triggerNotificationScheduleSend = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const schedule = await ShiftNotificationSchedule.findById(id);
+    if (!schedule) {
+      return res.status(404).json({ error: 'Programación no encontrada' });
+    }
+
+    // Procesar listas de correos pasadas temporalmente para sobrescribir (caso de pruebas)
+    const parseEmailList = (raw) => {
+      if (Array.isArray(raw)) return raw.map((s) => String(s || '').trim().toLowerCase()).filter((s) => s.includes('@'));
+      if (typeof raw === 'string') return raw.split(',').map((s) => s.trim().toLowerCase()).filter((s) => s.includes('@'));
+      return [];
+    };
+
+    const recipients = req.body?.recipients
+      ? parseEmailList(req.body.recipients)
+      : schedule.recipients;
+    const ccRecipients = req.body?.ccRecipients
+      ? parseEmailList(req.body.ccRecipients)
+      : schedule.ccRecipients;
+
+    if (recipients.length === 0) {
+      return res.status(400).json({ error: 'No hay destinatarios válidos configurados.' });
+    }
+
+    const result = await exports.sendEscalationScheduleInternal({
+      name: schedule.name,
+      recipients,
+      ccRecipients,
+      frequency: schedule.frequency,
+      roleFilter: schedule.roleFilter
+    });
+
+    if (result.success) {
+      schedule.lastSentAt = new Date();
+      await schedule.save();
+
+      await audit(req, {
+        event: 'escalation.notification_schedule.trigger_send',
+        result: { success: true },
+        metadata: { id: schedule._id, name: schedule.name, recipients }
+      }).catch(auditError => logger.warn({ err: auditError }, 'Error al registrar auditoría de envío de notificación'));
+
+      return res.json({ message: 'Envío de turnos procesado correctamente', messageId: result.messageId });
+    } else {
+      return res.status(500).json({ error: 'Error al enviar el correo de turnos', details: result.error });
+    }
+  } catch (error) {
+    logger.error('Error en triggerNotificationScheduleSend:', error);
+    return res.status(500).json({ error: error.message });
   }
 };

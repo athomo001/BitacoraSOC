@@ -1,7 +1,8 @@
 /**
  * File Purpose: frontend/src/app/pages/main/checklist-history/checklist-history.component.ts
- * Responsibilities: Define the module behavior and maintain clear contracts.
- * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ * Responsibilities: Define el comportamiento de la vista de historial de checklists de turnos,
+ *                   incluyendo paginación, eliminación de registros (admin) y correlación de incidentes.
+ * QA Notes: Mantener comentarios detallados y lógica de correlación robusta ante búsquedas difusas.
  */
 
 import { Component, OnInit } from '@angular/core';
@@ -51,7 +52,12 @@ export class ChecklistHistoryComponent implements OnInit {
     this.isLoading = true;
     this.checklistService.getCheckHistory(this.currentPage, this.limit).subscribe({
       next: (response) => {
-        this.checks = response.checks;
+        const checks = response.checks || [];
+        
+        // Ejecutar correlación automática para cada checklist cargado en el historial
+        checks.forEach((check: ShiftCheck) => this.correlateServices(check));
+
+        this.checks = checks;
         this.totalChecks = response.pagination.total;
         this.totalPages = response.pagination.totalPages;
         this.isLoading = false;
@@ -62,6 +68,117 @@ export class ChecklistHistoryComponent implements OnInit {
         this.isLoading = false;
       }
     });
+  }
+
+  correlateServices(check: ShiftCheck): void {
+    if (!check || !Array.isArray(check.services)) return;
+
+    // Obtener los servicios en rojo que sí tienen observaciones registradas
+    const servicesWithObservation = check.services.filter(s => s.status === 'rojo' && s.observation);
+
+    check.services.forEach(service => {
+      // Si el servicio falló y no tiene comentario, buscar si la causa está descrita en otro ítem
+      if (service.status === 'rojo' && !service.observation) {
+        let matchedSource: any = null;
+
+        // 1. Relación Jerárquica Directa: Intentar correlacionar por pertenencia directa de árbol.
+        const currentServiceIdStr = service.serviceId ? service.serviceId.toString() : '';
+
+        // Caso A: El servicio actual es padre de otros servicios.
+        // Buscamos si algún hijo directo está en rojo con observación.
+        if (currentServiceIdStr) {
+          matchedSource = servicesWithObservation.find(other => 
+            other.parentServiceId && other.parentServiceId.toString() === currentServiceIdStr
+          );
+        }
+
+        // Caso B: El servicio actual es hijo de otro servicio.
+        // Buscamos si el padre directo está en rojo con observación, o si algún hermano directo la tiene.
+        if (!matchedSource && service.parentServiceId) {
+          const parentIdStr = service.parentServiceId.toString();
+
+          // Probar con el padre
+          matchedSource = servicesWithObservation.find(other => 
+            other.serviceId && other.serviceId.toString() === parentIdStr
+          );
+
+          // Probar con hermanos directos (hijos del mismo padre)
+          if (!matchedSource) {
+            matchedSource = servicesWithObservation.find(other => 
+              other.parentServiceId && other.parentServiceId.toString() === parentIdStr &&
+              other.serviceId?.toString() !== service.serviceId?.toString()
+            );
+          }
+        }
+
+        // 2. Correlación Heurística por palabras clave si no se halló enlace por jerarquía.
+        if (!matchedSource) {
+          let keywords = this.getSearchKeywords(service.serviceTitle);
+          
+          // Heredar palabras clave del servicio padre
+          if (service.parentServiceId) {
+            const parent = check.services.find(s => s.serviceId === service.parentServiceId);
+            if (parent) {
+              const parentKeywords = this.getSearchKeywords(parent.serviceTitle);
+              keywords = Array.from(new Set([...keywords, ...parentKeywords]));
+            }
+          }
+
+          if (keywords.length > 0) {
+            matchedSource = servicesWithObservation.find(other => {
+              if (other.serviceTitle === service.serviceTitle) return false;
+              
+              const observationNormalized = this.normalizeText(other.observation || '');
+              return keywords.some(keyword => observationNormalized.includes(keyword));
+            });
+          }
+        }
+
+        if (matchedSource) {
+          // Asignar causa relacionada virtual
+          (service as any).correlatedFrom = {
+            serviceTitle: matchedSource.serviceTitle,
+            observation: matchedSource.observation
+          };
+        }
+      }
+    });
+  }
+
+  /**
+   * Extrae los términos técnicos clave de un título de servicio (por ejemplo "qradar" de "QRadar (Todos los Tenants)").
+   * Remueve paréntesis, diacríticos y stop-words comunes en español.
+   */
+  private getSearchKeywords(title: string): string[] {
+    const cleanTitle = String(title || '')
+      .replace(/\(.*?\)/g, '') // Quitar paréntesis y su contenido
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remover acentos
+      .toLowerCase();
+
+    // Separar en términos de 3 o más letras
+    const words = cleanTitle.split(/\s+/).map(w => w.trim()).filter(w => w.length > 2);
+    
+    // Lista de stop-words comunes que no representan marcas o tecnologías técnicas
+    const stopWords = new Set([
+      'todos', 'los', 'conectar', 'actualizar', 'revision', 'general', 'salud', 
+      'delitos', 'turno', 'anterior', 'del', 'con', 'para', 'una', 'uno', 'las', 
+      'por', 'sus', 'componentes', 'alerta', 'alertas', 'plataforma', 'graves', 'criticos'
+    ]);
+
+    return words.filter(w => !stopWords.has(w));
+  }
+
+  /**
+   * Normaliza textos a minúsculas, removiendo espacios adicionales y diacríticos (acentos)
+   * para realizar búsquedas difusas libres de diferencias tipográficas.
+   */
+  private normalizeText(text: string): string {
+    return String(text || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
   }
 
   getStatusColor(status: string): string {

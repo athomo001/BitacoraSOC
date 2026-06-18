@@ -81,6 +81,11 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 
 ## Novedades recientes (resumen rapido)
 
+### v1.6.06 (permisos de directorio para N1 y flexibilización de contraseñas de admin)
+
+- **Escritura en Directorio para Analistas N1:** Habilitación de permisos en backend y frontend para que los analistas N1 puedan crear, modificar e importar contactos (CSV) en el Directorio Central. La eliminación permanece bloqueada únicamente para perfiles superiores (N2, N3, Jefe de Área, etc.).
+- **Flexibilización de Contraseña para el Administrador:** Eliminación del requisito mínimo de 6 caracteres en la contraseña para las vistas de creación/edición exclusivas del administrador, permitiendo asignaciones de contraseñas de cualquier longitud (ej: `.`).
+
 ### v1.6.05 (tema de login "Surrealismo Digital")
 
 - **Tema de Login Surrealista:** Implementación del tema visual `'surrealism'` que ubica los formularios de login/MFA/recuperación en una barra lateral izquierda opaca de altura completa (`380px` de ancho y `100vh`).

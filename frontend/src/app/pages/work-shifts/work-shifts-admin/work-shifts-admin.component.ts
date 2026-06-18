@@ -153,8 +153,13 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
   savingEscalationReminderConfig = false;
   testingEscalationReminder = false;
   
-  // Automatización Semanal de Envío
-  escalationScheduleAutomationForm!: FormGroup;
+  // Automatización de Envío (Múltiples Programaciones)
+  notificationSchedules: any[] = [];
+  showScheduleForm = false;
+  editingScheduleId: string | null = null;
+  savingSchedule = false;
+  triggeringScheduleSend = false;
+  scheduleForm!: FormGroup;
   loadingAutomationConfig = false;
   savingAutomationConfig = false;
   triggeringManualSend = false;
@@ -337,13 +342,17 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     });
     this.updateEscalationReminderValidators();
 
-    this.escalationScheduleAutomationForm = this.fb.group({
-      enabled: [false],
+    this.scheduleForm = this.fb.group({
+      name: ['', Validators.required],
+      enabled: [true],
       frequency: ['weekly'],
       dayOfWeek: [1],
       time: ['09:00', [Validators.required, Validators.pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)]],
-      recipients: [''],
-      ccRecipients: ['']
+      recipients: ['', Validators.required],
+      ccRecipients: [''],
+      includeGuard: [true],
+      includeTelework: [false],
+      includeVacation: [false]
     });
   }
 
@@ -374,7 +383,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       
       this.loadWeeklyAssignments();
       this.loadEscalationReminderConfig();
-      this.loadAutomationConfig();
+      this.loadNotificationSchedules();
 
       this.loading = false;
       this.cdr.detectChanges();
@@ -466,7 +475,10 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     return 'Usuario asignado';
   }
 
-  private getWeekdaysLabel(weekdays: number[]): string {
+  /**
+   * Obtiene una etiqueta descriptiva en español para los días de la semana asignados.
+   */
+  getWeekdaysLabel(weekdays: number[]): string {
     if (!weekdays || weekdays.length === 0) return 'Sin días';
     if (weekdays.length === 7) return 'Lun-Dom (Todos)';
 
@@ -1474,73 +1486,200 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     daysAheadControl.updateValueAndValidity({ emitEvent: false });
   }
 
-  // ============ AUTOMATIZACIÓN DE TURNOS ============
-  loadAutomationConfig(): void {
+  // ============ AUTOMATIZACIÓN DE TURNOS (MÚLTIPLES NOTIFICACIONES) ============
+
+  /**
+   * Carga todas las programaciones de notificaciones de turnos activas desde la API del backend.
+   */
+  loadNotificationSchedules(): void {
     this.loadingAutomationConfig = true;
-    this.configService.getConfig().subscribe({
-      next: (config: any) => {
-        const auto = config.escalationScheduleAutomation || {};
-        this.escalationScheduleAutomationForm.patchValue({
-          enabled: auto.enabled ?? false,
-          frequency: auto.frequency || 'weekly',
-          dayOfWeek: auto.dayOfWeek ?? 1,
-          time: auto.time || '09:00',
-          recipients: Array.isArray(auto.recipients) ? auto.recipients.join(', ') : '',
-          ccRecipients: Array.isArray(auto.ccRecipients) ? auto.ccRecipients.join(', ') : ''
-        });
+    this.escalationService.getNotificationSchedules().subscribe({
+      next: (schedules) => {
+        this.notificationSchedules = schedules || [];
         this.loadingAutomationConfig = false;
+        this.cdr.detectChanges();
       },
-      error: () => this.loadingAutomationConfig = false
-    });
-  }
-
-  saveAutomationConfig(): void {
-    if (this.escalationScheduleAutomationForm.invalid || this.savingAutomationConfig) return;
-    this.savingAutomationConfig = true;
-    
-    const val = this.escalationScheduleAutomationForm.value;
-    const payload = {
-      escalationScheduleAutomation: {
-        enabled: val.enabled,
-        frequency: val.frequency,
-        dayOfWeek: val.dayOfWeek,
-        time: val.time,
-        recipients: val.recipients.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean),
-        ccRecipients: val.ccRecipients.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean)
+      error: (error) => {
+        console.error('Error al cargar notificaciones programadas:', error);
+        this.loadingAutomationConfig = false;
+        this.cdr.detectChanges();
       }
-    };
-
-    this.configService.updateConfig(payload).subscribe({
-      next: () => this.showSuccess('Configuración de automatización guardada'),
-      error: () => this.showError('Error al guardar configuración'),
-      complete: () => this.savingAutomationConfig = false
     });
   }
 
-  triggerManualSend(): void {
-    if (this.triggeringManualSend) return;
+  /**
+   * Prepara el formulario reactivo para añadir una nueva programación de notificación.
+   */
+  addNotificationSchedule(): void {
+    this.showScheduleForm = true;
+    this.editingScheduleId = null;
+    this.scheduleForm.reset({
+      name: '',
+      enabled: true,
+      frequency: 'weekly',
+      dayOfWeek: 1,
+      time: '09:00',
+      recipients: '',
+      ccRecipients: '',
+      includeGuard: true,
+      includeTelework: false,
+      includeVacation: false
+    });
+    this._recipientsRaw = '';
+    this._ccRaw = '';
+    this.cdr.detectChanges();
+  }
 
-    const val = this.escalationScheduleAutomationForm.value;
-    const parseEmails = (raw: string): string[] =>
-      String(raw || '').split(',').map((s) => s.trim().toLowerCase()).filter((s) => s.includes('@'));
+  /**
+   * Carga los datos de una programación seleccionada al formulario para permitir su edición.
+   */
+  editNotificationSchedule(schedule: any): void {
+    this.showScheduleForm = true;
+    this.editingScheduleId = schedule._id;
 
-    const formRecipients = parseEmails(val.recipients || '');
-    const formCc = parseEmails(val.ccRecipients || '');
+    // Analizar el filtro de roles guardado para marcar los checkboxes correspondientes
+    const filter = schedule.roleFilter || [];
+    const includeGuard = filter.includes('N2') || filter.includes('TI') || filter.includes('N1_NO_HABIL');
+    const includeTelework = filter.includes('TELEWORK');
+    const includeVacation = filter.includes('VACATION');
 
-    if (formRecipients.length === 0) {
-      this.showError('No hay destinatarios válidos. Agrega al menos un correo en el campo "Destinatarios".');
+    const recs = Array.isArray(schedule.recipients) ? schedule.recipients.join(', ') : '';
+    const ccs = Array.isArray(schedule.ccRecipients) ? schedule.ccRecipients.join(', ') : '';
+
+    this.scheduleForm.setValue({
+      name: schedule.name || '',
+      enabled: schedule.enabled ?? true,
+      frequency: schedule.frequency || 'weekly',
+      dayOfWeek: schedule.dayOfWeek ?? 1,
+      time: schedule.time || '09:00',
+      recipients: recs,
+      ccRecipients: ccs,
+      includeGuard,
+      includeTelework,
+      includeVacation
+    });
+
+    this._recipientsRaw = recs;
+    this._ccRaw = ccs;
+    this.cdr.detectChanges();
+  }
+
+  /**
+   * Guarda los cambios de la programación actual, ya sea creando una nueva o editando una existente.
+   */
+  saveNotificationSchedule(): void {
+    if (this.scheduleForm.invalid || this.savingSchedule) {
+      this.showError('Complete los campos obligatorios del formulario.');
       return;
     }
 
-    if (!confirm('¿Desea enviar los turnos ahora a los destinatarios configurados?')) return;
+    const formVal = this.scheduleForm.value;
 
-    this.triggeringManualSend = true;
-    const payload = { recipients: formRecipients, ccRecipients: formCc };
-    this.escalationService.triggerAutomationSend(payload).subscribe({
-      next: (res: any) => this.showSuccess(res.message || 'Envío procesado correctamente'),
-      error: (err: any) => this.showError(err?.error?.error || 'Error al disparar el envío'),
-      complete: () => this.triggeringManualSend = false
+    // Convertir las condiciones seleccionadas a la lista de roles de base de datos correspondiente
+    const roleFilter: string[] = [];
+    if (formVal.includeGuard) {
+      roleFilter.push('N2', 'TI', 'N1_NO_HABIL');
+    }
+    if (formVal.includeTelework) {
+      roleFilter.push('TELEWORK');
+    }
+    if (formVal.includeVacation) {
+      roleFilter.push('VACATION');
+    }
+
+    if (roleFilter.length === 0) {
+      this.showError('Debe seleccionar al menos una condición a notificar (Guardia, Teletrabajo o Vacaciones).');
+      return;
+    }
+
+    this.savingSchedule = true;
+
+    const payload = {
+      name: formVal.name,
+      enabled: formVal.enabled,
+      frequency: formVal.frequency,
+      dayOfWeek: formVal.dayOfWeek,
+      time: formVal.time,
+      recipients: String(formVal.recipients || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
+      ccRecipients: String(formVal.ccRecipients || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
+      roleFilter
+    };
+
+    const request$ = this.editingScheduleId
+      ? this.escalationService.updateNotificationSchedule(this.editingScheduleId, payload)
+      : this.escalationService.createNotificationSchedule(payload);
+
+    request$.subscribe({
+      next: () => {
+        this.showSuccess(this.editingScheduleId ? 'Notificación programada actualizada' : 'Nueva programación de notificación creada');
+        this.cancelScheduleForm();
+        this.loadNotificationSchedules();
+      },
+      error: (error) => {
+        console.error('Error al guardar programación de notificación:', error);
+        this.showError(error?.error?.error || 'Error al guardar la programación.');
+      },
+      complete: () => {
+        this.savingSchedule = false;
+        this.cdr.detectChanges();
+      }
     });
+  }
+
+  /**
+   * Elimina una programación de notificación seleccionada.
+   */
+  deleteNotificationSchedule(id: string): void {
+    if (!confirm('¿Está seguro de eliminar esta programación de notificación?')) {
+      return;
+    }
+
+    this.escalationService.deleteNotificationSchedule(id).subscribe({
+      next: () => {
+        this.showSuccess('Programación de notificación eliminada correctamente.');
+        this.loadNotificationSchedules();
+      },
+      error: (error) => {
+        console.error('Error al eliminar programación de notificación:', error);
+        this.showError('Error al eliminar la programación.');
+      }
+    });
+  }
+
+  /**
+   * Fuerza el envío manual inmediato de la notificación seleccionada.
+   */
+  triggerManualSendForSchedule(schedule: any): void {
+    if (this.triggeringScheduleSend) return;
+
+    if (!confirm(`¿Desea forzar el envío de la notificación "${schedule.name}" en este momento?`)) {
+      return;
+    }
+
+    this.triggeringScheduleSend = true;
+    this.escalationService.triggerNotificationScheduleSend(schedule._id).subscribe({
+      next: (res: any) => {
+        this.showSuccess(res.message || 'Envío de turnos procesado correctamente.');
+        this.loadNotificationSchedules();
+      },
+      error: (err: any) => {
+        console.error('Error al disparar envío manual de notificación:', err);
+        this.showError(err?.error?.error || 'Error al forzar el envío.');
+      },
+      complete: () => {
+        this.triggeringScheduleSend = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  /**
+   * Cancela la creación/edición de programación y retorna a la lista.
+   */
+  cancelScheduleForm(): void {
+    this.showScheduleForm = false;
+    this.editingScheduleId = null;
+    this.cdr.detectChanges();
   }
 
   onAutomationRecipientsInput(rawValue: string): void {
@@ -1584,7 +1723,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     }
 
     const newValue = existing.join(', ');
-    const control = this.escalationScheduleAutomationForm.get(controlName);
+    const control = this.scheduleForm.get(controlName);
     control?.setValue(newValue);
 
     if (controlName === 'recipients') {
