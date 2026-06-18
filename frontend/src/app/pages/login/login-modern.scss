@@ -1,0 +1,643 @@
+/* ==========================================================================
+   TEMA DE LOGIN: MODERNO / SPLIT-SCREEN
+   Diseño profesional premium en pantalla dividida (split-screen).
+   Panel izquierdo responsivo y panel derecho con imagen de fondo y
+   reloj de turno sincronizado del SOC.
+   ========================================================================== */
+
+$neon: #00ff41;
+$neon-dim: #00cc33;
+$neon-glow: rgba(0, 255, 65, 0.55);
+$bg-deep: #000000;
+$card-bg: rgba(0, 8, 0, 0.95);
+$text-high: #ffffff;
+$text-on-neon: #000000;
+$danger: #ff3366;
+$font-mono: 'Courier New', 'Lucida Console', monospace;
+
+.theme-modern {
+  position: relative;
+  min-height: 100vh;
+  background: #000000;
+  overflow: hidden;
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color: #ffffff;
+
+  /* Contenedor Split Screen principal */
+  .login-split-container {
+    display: flex;
+    width: 100%;
+    min-height: 100vh;
+    align-items: stretch;
+    justify-content: stretch;
+  }
+
+  /* Panel Izquierdo: Formulario de Login */
+  .login-left-pane {
+    flex: 0 0 42%;
+    background: #050508; /* Gris militar táctico muy oscuro */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 60px 80px;
+    z-index: 5;
+    position: relative;
+    border-right: 1px solid rgba(0, 240, 255, 0.15);
+    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.8);
+
+    @media (max-width: 1100px) {
+      padding: 40px 50px;
+      flex: 0 0 50%;
+    }
+
+    @media (max-width: 968px) {
+      flex: 1 1 100%;
+      padding: 30px 24px;
+      border-right: none;
+      box-shadow: none;
+      background: #000000;
+    }
+  }
+
+  .login-left-content {
+    max-width: 380px;
+    width: 100%;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Logotipo Corporativo */
+  .login-logo-container {
+    margin-bottom: 30px;
+    display: flex;
+    justify-content: flex-start;
+
+    @media (max-width: 968px) {
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+
+    .login-logo {
+      height: 48px;
+      object-fit: contain;
+      filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.45));
+    }
+
+    .login-logo-placeholder {
+      width: 48px;
+      height: 48px;
+      background: rgba(0, 240, 255, 0.1);
+      border: 1px solid #00f0ff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      box-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
+
+      .shield-icon {
+        font-size: 24px;
+      }
+    }
+  }
+
+  /* Títulos y Subtítulos de Acceso */
+  .login-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2.1rem;
+    font-weight: 700;
+    color: #fcee0a !important; /* Amarillo Cyberpunk */
+    margin: 0 0 6px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-shadow: 0 0 10px rgba(252, 238, 10, 0.35);
+
+    @media (max-width: 968px) {
+      font-size: 1.85rem;
+      text-align: center;
+    }
+  }
+
+  .login-subtitle {
+    font-size: 0.88rem;
+    color: #b3b3b3;
+    margin: 0 0 28px;
+    line-height: 1.4;
+
+    @media (max-width: 968px) {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+  }
+
+  /* Formulario reactivo modernizado */
+  .login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .form-label {
+    font-size: 0.72rem;
+    font-weight: bold;
+    color: #ff0055; /* Magenta Cyberpunk */
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .input-icon {
+    position: absolute;
+    left: 14px;
+    font-size: 15px;
+    color: #ff0055;
+    pointer-events: none;
+    line-height: 1;
+  }
+
+  .modern-input {
+    width: 100%;
+    padding: 12px 42px 12px 38px;
+    background: #000000;
+    border: 1px solid rgba(255, 0, 85, 0.45);
+    border-radius: 4px;
+    color: #ffffff;
+    font-family: 'Segoe UI', Roboto, sans-serif;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+    &::placeholder {
+      color: rgba(255, 255, 255, 0.3);
+    }
+
+    &:focus {
+      border-color: #00f0ff; /* Cambia a cian neón al recibir el foco */
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+    }
+  }
+
+  .visibility-toggle {
+    position: absolute;
+    right: 12px;
+    background: none;
+    border: none;
+    color: #00f0ff;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.65rem;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 2px;
+    line-height: 1;
+
+    &:hover {
+      background: rgba(0, 240, 255, 0.12);
+      text-shadow: 0 0 4px #00f0ff;
+    }
+  }
+
+  .forgot-password-link-container {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: -6px;
+  }
+
+  .forgot-link {
+    font-size: 0.76rem;
+    color: #00f0ff;
+    cursor: pointer;
+    font-weight: 600;
+    transition: color 0.2s ease;
+
+    &:hover {
+      color: #ff0055;
+      text-decoration: underline;
+    }
+  }
+
+  /* Botón de Envío Premium */
+  .submit-button {
+    width: 100%;
+    padding: 14px 20px;
+    background: #00f0ff; /* Cian neón */
+    color: #000000;
+    border: none;
+    border-radius: 4px;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: bold;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.35);
+    transition: all 0.2s ease;
+
+    &:hover:not(:disabled) {
+      background: #ff0055; /* Cambia a magenta neón en hover */
+      color: #ffffff;
+      box-shadow: 0 0 16px rgba(255, 0, 85, 0.5);
+    }
+
+    &:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+  }
+
+  .cancel-button {
+    width: 100%;
+    margin-top: 10px;
+    padding: 11px 16px;
+    background: transparent;
+    color: #ff0055;
+    border: 1px solid rgba(255, 0, 85, 0.4);
+    border-radius: 4px;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: rgba(255, 0, 85, 0.1);
+      color: #ffffff;
+      border-color: #ff0055;
+    }
+  }
+
+  /* Consentimiento Aviso Privacidad */
+  .privacy-consent {
+    margin: 4px 0;
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.76rem;
+    color: #b3b3b3;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .modern-checkbox {
+    appearance: none;
+    width: 15px;
+    height: 15px;
+    border: 1px solid rgba(0, 240, 255, 0.45);
+    background: #000000;
+    border-radius: 2px;
+    cursor: pointer;
+    position: relative;
+    outline: none;
+
+    &:checked::after {
+      content: '✔';
+      font-size: 10px;
+      color: #00f0ff;
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    &:hover {
+      border-color: #00f0ff;
+      box-shadow: 0 0 6px rgba(0, 240, 255, 0.4);
+    }
+  }
+
+  .privacy-link {
+    color: #00f0ff;
+    text-decoration: underline;
+    font-weight: 600;
+
+    &:hover {
+      color: #ff0055;
+      text-shadow: 0 0 6px rgba(255, 0, 85, 0.4);
+    }
+  }
+
+  /* SSO Integraciones */
+  .sso-divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    color: #666666;
+    font-size: 0.72rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin: 8px 0;
+
+    &::before,
+    &::after {
+      content: '';
+      flex: 1;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.12);
+    }
+
+    &::before { margin-right: 10px; }
+    &::after { margin-left: 10px; }
+  }
+
+  .sso-buttons-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 10px;
+
+    .google-sso-wrapper {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+    }
+
+    .microsoft-btn {
+      width: 100%;
+      padding: 11px 16px;
+      background: #1a1a1f;
+      border: 1px solid #ff0055;
+      border-radius: 4px;
+      color: #ffffff;
+      font-size: 0.88rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      .microsoft-logo {
+        height: 16px;
+        width: 16px;
+      }
+
+      &:hover {
+        background: rgba(255, 0, 85, 0.1);
+        border-color: #ff0055;
+        box-shadow: 0 0 10px rgba(255, 0, 85, 0.2);
+      }
+    }
+  }
+
+  /* Cajas de Alerta e Información: Se fuerza color cian en span para evitar herencias oscuras */
+  .info-alert-box {
+    padding: 12px 14px;
+    border: 1px solid rgba(0, 240, 255, 0.35);
+    background: rgba(0, 240, 255, 0.08);
+    color: #00f0ff !important;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    margin-bottom: 18px;
+    border-radius: 4px;
+
+    span {
+      color: #00f0ff !important;
+    }
+  }
+
+  .mfa-setup-box {
+    border: 1px dashed #ff0055;
+    background: rgba(255, 0, 85, 0.03);
+    padding: 16px;
+    margin-bottom: 18px;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    .mfa-setup-title {
+      font-family: 'Orbitron', sans-serif;
+      color: #ff0055;
+      font-weight: bold;
+      font-size: 0.85rem;
+      margin: 0 0 6px;
+      letter-spacing: 0.05em;
+    }
+
+    .mfa-setup-text {
+      font-size: 0.78rem;
+      color: #b3b3b3;
+      text-align: center;
+      margin: 0 0 12px;
+      line-height: 1.4;
+    }
+
+    .mfa-qr-container {
+      background: white;
+      padding: 8px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+      display: inline-block;
+
+      .mfa-qr-img {
+        width: 140px;
+        height: 140px;
+        display: block;
+      }
+    }
+
+    .mfa-secret-text {
+      font-size: 0.72rem;
+      color: #00f0ff;
+      margin: 0;
+      code {
+        font-family: monospace;
+        font-weight: bold;
+        background: #000000;
+        padding: 2px 6px;
+        border-radius: 2px;
+      }
+    }
+  }
+
+  .mfa-prompt-text {
+    font-size: 0.82rem;
+    color: #b3b3b3;
+    line-height: 1.5;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+
+  /* Mensajes de error del Formulario */
+  .error-messages {
+    min-height: 14px;
+    margin-top: 4px;
+  }
+
+  .error-text {
+    font-size: 0.7rem;
+    color: #ff3366;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .cy-banner {
+    padding: 12px;
+    border: 1px solid rgba(0, 240, 255, 0.4);
+    background: rgba(0, 240, 255, 0.08);
+    color: #ffffff;
+    font-size: 0.82rem;
+    line-height: 1.4;
+    text-align: center;
+    margin-bottom: 20px;
+    border-radius: 4px;
+
+    &.banner-success {
+      border-color: #00f0ff;
+      background: rgba(0, 240, 255, 0.05);
+      color: #00f0ff;
+    }
+
+    &.banner-error {
+      border-color: #ff3366;
+      background: rgba(255, 51, 102, 0.05);
+      color: #ff3366;
+    }
+  }
+
+  .session-info-text {
+    margin-top: 14px;
+    font-size: 0.72rem;
+    color: #666666;
+    text-align: center;
+  }
+
+  .login-footer {
+    margin-top: 30px;
+    padding-top: 16px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
+    text-align: center;
+    color: #555555;
+    font-size: 0.72rem;
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  /* Panel Derecho: Imagen y Reloj */
+  .login-right-pane {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+
+    @media (max-width: 968px) {
+      display: none; /* Se oculta completamente en móviles para optimizar espacio */
+    }
+  }
+
+  .login-right-bg {
+    position: absolute;
+    inset: 0;
+    background-image: url('/assets/images/login-bg.png');
+    background-size: cover;
+    background-position: center;
+    /* Aplica filtro en escala de grises de alto contraste con leve desenfoque */
+    filter: grayscale(100%) brightness(0.48) contrast(1.15) blur(0.5px);
+    z-index: 0;
+  }
+
+  #matrix-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    opacity: 0.14; /* Lluvia de Matrix extremadamente sutil de fondo */
+    pointer-events: none;
+  }
+
+  .login-right-overlay {
+    position: absolute;
+    inset: 0;
+    /* Degradado oscuro lineal desde la izquierda para integrarse con el panel de login */
+    background: linear-gradient(90deg, #050508 0%, rgba(5, 5, 8, 0.8) 25%, rgba(0, 0, 0, 0.35) 100%);
+    z-index: 2;
+  }
+
+  .login-right-content {
+    position: relative;
+    z-index: 3;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 80px 100px;
+    max-width: 750px;
+
+    @media (max-width: 1200px) {
+      padding: 60px;
+    }
+  }
+
+  .banner-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2.6rem;
+    font-weight: 800;
+    color: #00f0ff !important; /* Título principal en cian */
+    margin: 0 0 18px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-shadow: 0 0 12px rgba(0, 240, 255, 0.45);
+  }
+
+  .banner-text {
+    font-size: 1.05rem;
+    line-height: 1.65;
+    color: #cccccc;
+    margin: 0 0 42px;
+    letter-spacing: 0.01em;
+  }
+
+  .banner-clock {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border-left: 3px solid #ff0055;
+    padding-left: 16px;
+
+    .clock-label {
+      font-size: 0.7rem;
+      color: #ff0055; /* Subtítulo en magenta */
+      font-weight: bold;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .clock-time {
+      font-family: 'Orbitron', monospace;
+      font-size: 1.95rem;
+      color: #00f0ff;
+      text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+      font-weight: 700;
+    }
+  }
+}
+
+@keyframes cy-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

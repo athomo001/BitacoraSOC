@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.02**
+> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.03**
 
 Stack principal:
 
@@ -78,6 +78,13 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 ---
 
 ## Novedades recientes (resumen rapido)
+
+### v1.6.03 (optimización de fuentes, contraste y desbordes en cyberpunk)
+
+- corrección de visibilidad en Datepicker (calendario) aplicando fondo negro y números de días en blanco para contraste óptimo.
+- ajuste de contraste de tags/chips de tablas para evitar la herencia de texto oscuro sobre fondo oscuro.
+- corrección de fondo del panel de ayuda de nuevas entradas (`.entry-type-hint`) cambiando a `--surface-muted` para neutralizar el magenta chillón.
+- prevención de desbordes en sidebar (reducción a `0.78rem`/`0.82rem` y tracking `0.01em`) y colapso de iconos por títulos muy largos en checklist.
 
 ### v1.6.02 (estética cyberpunk, navegación por teclado y márgenes del logo)
 

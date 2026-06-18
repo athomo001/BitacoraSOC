@@ -425,3 +425,224 @@
     <img [src]="easterEggImageUrl" alt="Bender" class="easter-egg-image" />
   </div>
 </div>
+
+<!-- ══════════════════════════════════════════════════════════
+     TEMA MODERNO (Layout Split Screen Profesional)
+     Se añade de forma independiente para no alterar el tema infoflow
+     ══════════════════════════════════════════════════════════ -->
+<div *ngIf="activeTheme === 'modern' && themeLoaded" class="theme-modern">
+  <div class="login-split-container">
+    <!-- Panel Izquierdo: Formulario de Autenticación y Controles -->
+    <div class="login-left-pane">
+      <div class="login-left-content">
+        <!-- Contenedor del Logotipo Corporativo del SOC -->
+        <div class="login-logo-container">
+          <img *ngIf="logoUrl" [src]="getAssetUrl(logoUrl)" alt="Logo" class="login-logo">
+          <div *ngIf="!logoUrl" class="login-logo-placeholder">
+            <span class="shield-icon">🛡️</span>
+          </div>
+        </div>
+
+        <!-- Banner de mensajes informativos, de éxito o error -->
+        <div *ngIf="bannerMessage" [class]="'cy-banner banner-' + bannerType">
+          <div class="cy-banner-text">{{ bannerMessage }}</div>
+        </div>
+
+        <!-- VISTA DE LOGIN ESTÁNDAR -->
+        <div *ngIf="currentView === 'login'" class="login-form-view">
+          <h1 class="login-title">Iniciar Sesión</h1>
+          <p class="login-subtitle">Introduce tus credenciales para acceder a la bitácora</p>
+
+          <form [formGroup]="loginForm" (ngSubmit)="onLoginSubmit()" class="login-form">
+            <!-- Campo de Usuario -->
+            <div class="form-group">
+              <label class="form-label">Usuario</label>
+              <div class="input-wrapper">
+                <span class="input-icon">👤</span>
+                <input type="text" formControlName="username" class="modern-input" placeholder="Ingresa tu usuario" autocomplete="username">
+              </div>
+              <div class="error-messages">
+                <span *ngIf="loginForm.get('username')?.touched && loginForm.get('username')?.errors?.['required']" class="error-text">
+                  El usuario es requerido
+                </span>
+              </div>
+            </div>
+
+            <!-- Campo de Contraseña -->
+            <div class="form-group">
+              <label class="form-label">Contraseña</label>
+              <div class="input-wrapper">
+                <span class="input-icon">🔒</span>
+                <input [type]="hidePassword ? 'password' : 'text'" formControlName="password" class="modern-input" placeholder="Ingresa tu contraseña" autocomplete="current-password">
+                <button type="button" class="visibility-toggle" (click)="hidePassword = !hidePassword">
+                  <span>{{ hidePassword ? 'VER' : 'OCULTAR' }}</span>
+                </button>
+              </div>
+              <div class="error-messages">
+                <span *ngIf="loginForm.get('password')?.touched && loginForm.get('password')?.errors?.['required']" class="error-text">
+                  La contraseña es requerida
+                </span>
+              </div>
+            </div>
+
+            <!-- Enlace de Recuperación rápida -->
+            <div class="forgot-password-link-container">
+              <a (click)="switchToRecovery()" class="forgot-link">¿Olvidaste tu contraseña?</a>
+            </div>
+
+            <!-- Consentimiento de Aviso de Privacidad (Compliance GDPR/Local) -->
+            <div class="form-group privacy-consent" *ngIf="showPrivacyConsent">
+              <label class="checkbox-label">
+                <input type="checkbox" formControlName="privacyConsent" class="modern-checkbox" />
+                Acepto el <a [href]="getAssetUrl('/uploads/aviso-privacidad.html')" target="_blank" class="privacy-link">Aviso de Privacidad</a>
+              </label>
+              <div class="error-messages" *ngIf="loginForm.get('privacyConsent')?.invalid && loginForm.get('privacyConsent')?.touched">
+                <span class="error-text">Debe aceptar el aviso de privacidad</span>
+              </div>
+            </div>
+
+            <!-- Botón de Envío -->
+            <button type="submit" class="submit-button" [disabled]="loginForm.invalid || loading">
+              <span *ngIf="!loading">Ingresar</span>
+              <span *ngIf="loading">Accediendo...</span>
+            </button>
+          </form>
+
+          <!-- Separador e Inicio de Sesión Integrado con Proveedores Externos (SSO) -->
+          <div class="sso-divider" *ngIf="googleSsoEnabled || microsoftSsoEnabled">
+            <span>O continuar con</span>
+          </div>
+
+          <div class="sso-buttons-container" *ngIf="googleSsoEnabled || microsoftSsoEnabled">
+            <div id="google-btn-container-cy" *ngIf="googleSsoEnabled" class="google-sso-wrapper">
+              <div id="google-btn-container"></div>
+            </div>
+            <button type="button" class="microsoft-btn" *ngIf="microsoftSsoEnabled" (click)="loginWithMicrosoft()" [disabled]="loading">
+              <img src="https://auth.gfx.ms/16.000.28537.3/images/Microsoft_logo.svg" alt="Microsoft" class="microsoft-logo">
+              Microsoft Sign-In
+            </button>
+          </div>
+
+          <!-- Información de Expiración Operacional de Sesión -->
+          <div class="session-info-text">
+            ⏰ Expiración: Analistas/Admin 4h | Invitados 2h
+          </div>
+        </div>
+
+        <!-- VISTA DE VERIFICACIÓN MULTIFACTOR (MFA) -->
+        <div *ngIf="currentView === 'mfa'" class="login-form-view">
+          <h1 class="login-title">Verificación MFA</h1>
+          
+          <!-- Enrolamiento Inicial Obligatorio para usuarios nuevos con MFA habilitado -->
+          <div *ngIf="needsMfaSetup" class="mfa-setup-box">
+            <p class="mfa-setup-title">Configuración Obligatoria</p>
+            <p class="mfa-setup-text">Escanea este código QR con tu aplicación autenticadora (Google Authenticator / Authy):</p>
+            <div class="mfa-qr-container">
+              <img [src]="mfaQrCode" alt="MFA QR" class="mfa-qr-img" />
+            </div>
+            <p class="mfa-secret-text">Clave de respaldo: <code>{{ mfaSecret }}</code></p>
+          </div>
+
+          <p *ngIf="!needsMfaSetup" class="mfa-prompt-text">
+            Introduce el código temporal de 6 dígitos generado por tu aplicación para continuar.
+          </p>
+
+          <form [formGroup]="mfaForm" (ngSubmit)="onMfaSubmit()" class="login-form">
+            <div class="form-group">
+              <label class="form-label">Código de verificación</label>
+              <div class="input-wrapper">
+                <span class="input-icon">🔑</span>
+                <input type="text" formControlName="code" class="modern-input" placeholder="123456" maxlength="6" autocomplete="one-time-code">
+              </div>
+              <div class="error-messages">
+                <span *ngIf="mfaForm.get('code')?.touched && mfaForm.get('code')?.invalid" class="error-text">
+                  El código debe tener 6 dígitos numéricos
+                </span>
+              </div>
+            </div>
+
+            <button type="submit" class="submit-button" [disabled]="mfaForm.invalid || loading">
+              <span *ngIf="!loading">Verificar y Acceder</span>
+              <span *ngIf="loading">Verificando...</span>
+            </button>
+
+            <button type="button" class="cancel-button" (click)="cancelMfa()" [disabled]="loading">
+              Cancelar
+            </button>
+          </form>
+        </div>
+
+        <!-- VISTA DE RECUPERACIÓN DE CONTRASEÑA -->
+        <div *ngIf="currentView === 'recovery'" class="login-form-view">
+          <h1 class="login-title">Recuperar Acceso</h1>
+          <p class="login-subtitle">Ingresa tu email registrado para enviarte un enlace de recuperación.</p>
+
+          <div class="info-alert-box">
+            <span>Por motivos de seguridad y anti-enumeración de cuentas, el sistema no informará si la dirección ingresada existe en el sistema.</span>
+          </div>
+
+          <form [formGroup]="recoveryForm" (ngSubmit)="onRecoverySubmit()" class="login-form">
+            <div class="form-group">
+              <label class="form-label">Correo electrónico</label>
+              <div class="input-wrapper">
+                <span class="input-icon">📧</span>
+                <input type="email" formControlName="email" class="modern-input" placeholder="ejemplo@correo.com">
+              </div>
+              <div class="error-messages">
+                <span *ngIf="recoveryForm.get('email')?.touched && recoveryForm.get('email')?.errors?.['required']" class="error-text">
+                  El email es requerido
+                </span>
+                <span *ngIf="recoveryForm.get('email')?.touched && recoveryForm.get('email')?.errors?.['email']" class="error-text">
+                  Formato de email inválido
+                </span>
+              </div>
+            </div>
+
+            <button type="submit" class="submit-button" [disabled]="recoveryForm.invalid || loading">
+              <span *ngIf="!loading">Enviar enlace</span>
+              <span *ngIf="loading">Enviando...</span>
+            </button>
+
+            <button type="button" class="cancel-button" (click)="switchToLogin()">
+              Volver al Login
+            </button>
+          </form>
+        </div>
+
+        <!-- Pie de página del Formulario -->
+        <footer class="login-footer">
+          {{ appTitle }}<span *ngIf="appTitle"> v{{ appVersion }}</span>
+        </footer>
+      </div>
+    </div>
+
+    <!-- Panel Derecho: Imagen y Reloj de Trazabilidad del Servidor con Lluvia de Matrix Integrada -->
+    <div class="login-right-pane">
+      <!-- Imagen de fondo arquitectónica premium -->
+      <div class="login-right-bg"></div>
+      
+      <!-- Canvas dinámico de lluvia de Matrix sutil de fondo -->
+      <canvas id="matrix-canvas"></canvas>
+
+      <!-- Overlay oscuro degradado para mejorar legibilidad de texto superpuesto -->
+      <div class="login-right-overlay"></div>
+
+      <!-- Contenido Informativo y Reloj de Turno del SOC -->
+      <div class="login-right-content">
+        <h2 class="banner-title">{{ appTitle || 'Bitácora SOC' }}</h2>
+        <p class="banner-text">
+          Plataforma centralizada de bitácoras operativas y continuidad de turnos. Monitoreo unificado, control de checklists de relevo de guardia y escalamientos técnicos en tiempo real.
+        </p>
+        <div class="banner-clock">
+          <span class="clock-label">Hora Oficial del Servidor (NTP):</span>
+          <span class="clock-time">{{ currentTime }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Huevo de Pascua oculto -->
+  <div class="easter-egg-overlay" *ngIf="showEasterEggOverlay" (click)="closeEasterEggOverlay()">
+    <img [src]="easterEggImageUrl" alt="Bender" class="easter-egg-image" />
+  </div>
+</div>

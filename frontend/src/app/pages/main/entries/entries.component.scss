@@ -164,7 +164,8 @@
   .entry-type-hint {
     margin-top: 16px;
     padding: 12px;
-    background-color: var(--hover-bg);
+    /* Se cambia el fondo a --surface-muted en lugar de --hover-bg para neutralizar el color de fondo en temas oscuros/cyberpunk, garantizando legibilidad y evitando el color magenta chillón pasivo. */
+    background-color: var(--surface-muted);
     border-radius: 4px;
     font-size: 13px;
     line-height: 1.6;

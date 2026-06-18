@@ -2,6 +2,18 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.03] - 2026-06-18
+
+### Optimización de Fuentes, Contraste de Controles y Prevención de Desbordes en Cyberpunk y Dark
+
+- **Corrección de Colores y Visibilidad en Datepicker (Calendario):** Se añadieron reglas de sobrescritura específicas para `.mat-datepicker-content` y `.mat-calendar` en los temas `cyberpunk` y `dark`. En Cyberpunk se aplica fondo negro puro con bordes y botones cian/amarillo, forzando texto de días en blanco (`#ffffff`) y el día seleccionado en fondo magenta (`#ff0055`) con texto negro para garantizar un contraste óptimo.
+- **Ajuste de Contraste en Tags/Chips de Tablas:** Se añadieron overrides de estilos para `.mat-mdc-chip` y `.mdc-evolution-chip` en los temas `cyberpunk` y `dark` para prevenir la herencia de texto oscuro sobre fondo oscuro en las tablas, forzando bordes e indicación de brillo neón en cian y gris militar táctico.
+- **Corrección del Fondo de Nueva Entrada:** Se reemplazó el color de fondo del bloque informativo `.entry-type-hint` en `entries.component.scss` utilizando la variable `--surface-muted` en lugar de `--hover-bg` (que era asignada al magenta chillón en Cyberpunk), neutralizando el fondo y asegurando la lectura de las pautas de entrada.
+- **Prevención de Desbordes y Colapso de Iconos:**
+  - Se añadieron propiedades de flexbox (`flex-shrink: 0` en `mat-icon` y `min-width: 0` en los contenedores de texto) en las cabeceras e items de `checklist.component.scss` para evitar que los títulos largos de checklist aplasten y recorten los iconos de estado de forma vertical.
+  - Se redujeron las fuentes y el letter-spacing del sidebar en el tema Cyberpunk en `styles.scss` (a `0.78rem`/`0.82rem` and `0.01em`) para que las secciones colapsables como "Historial y Entradas" y "Complementos" no se solapen ni corten sus indicadores.
+- **Creación de Nuevo Tema de Login 'Moderno / Split-Screen':** Se implementó un tercer tema de login independiente llamado `'modern'` con un diseño split-screen (pantalla dividida), panel izquierdo interactivo con soporte para login/MFA/recuperación, y panel derecho con fondo arquitectónico de alta resolución y reloj sincronizado. Se modificó el backend (`AppConfig.js`, validación de rutas en `config.js`) y el frontend para dar soporte completo a este nuevo tema sin alterar la maquetación cyberpunk clásica del tema `'infoflow'`. Adicionalmente, se corrigió el contraste y legibilidad de la caja de información en la pantalla de recuperación de contraseña forzando la visualización del texto en color cian neón sobre el fondo oscuro.
+
 ## [v1.6.02] - 2026-06-17
 
 ### Aislamiento de Previsualizaciones en Cyberpunk, Márgenes del Logotipo y Navegación por Teclado

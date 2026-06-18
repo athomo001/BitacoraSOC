@@ -38,7 +38,8 @@ import { EasterEggSignal } from '../../models/user.model';
 import { Title } from '@angular/platform-browser';
 
 type ViewState = 'login' | 'recovery' | 'mfa';
-type LoginTheme = 'crt' | 'infoflow';
+// Admite los tres temas de login disponibles: crt, infoflow (cyberpunk) y modern (split-screen)
+type LoginTheme = 'crt' | 'infoflow' | 'modern';
 
 @Component({
     selector: 'app-login',
@@ -148,7 +149,8 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
     this.configService.getLogo().subscribe({
       next: (response: any) => {
         this.logoUrl = response.logoUrl;
-        this.activeTheme = response.loginTheme === 'infoflow' ? 'infoflow' : 'crt';
+        // Asignación de tema de login incluyendo el nuevo tema 'modern'
+        this.activeTheme = response.loginTheme === 'modern' ? 'modern' : (response.loginTheme === 'infoflow' ? 'infoflow' : 'crt');
         this.appTitle = (response.appTitle || '').trim();
         this.titleService.setTitle(this.appTitle);
         
@@ -162,9 +164,13 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
         console.log('[Login] Tema cargado:', this.activeTheme, '| Título:', this.appTitle);
         this.themeLoaded = true;
         this.cdr.detectChanges();
-        if (this.activeTheme === 'infoflow') {
+        
+        // Habilitar reloj y canvas de lluvia Matrix para temas infoflow y modern
+        if (this.activeTheme === 'infoflow' || this.activeTheme === 'modern') {
           this.startClock();
-          this.startTyping();
+          if (this.activeTheme === 'infoflow') {
+            this.startTyping();
+          }
           setTimeout(() => this.initMatrixCanvas(), 100);
         }
 
@@ -190,7 +196,8 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngAfterViewInit(): void {
     // Si el tema ya era infoflow al init (raro, pero seguro)
-    if (this.activeTheme === 'infoflow') {
+    // Si el tema activo requiere canvas animado de lluvia de Matrix
+    if (this.activeTheme === 'infoflow' || this.activeTheme === 'modern') {
       setTimeout(() => this.initMatrixCanvas(), 100);
     }
   }
@@ -384,13 +391,21 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
   switchToRecovery(): void {
     this.currentView = 'recovery';
     this.showBanner = false;
-    this.loginForm.reset();
+    // Evitamos resetear todo el formulario para no limpiar el consentimiento de privacidad (MFA/GDPR)
+    this.loginForm.get('username')?.setValue('');
+    this.loginForm.get('username')?.markAsUntouched();
+    this.loginForm.get('password')?.setValue('');
+    this.loginForm.get('password')?.markAsUntouched();
   }
 
   switchToLogin(): void {
     this.currentView = 'login';
     this.showBanner = false;
     this.recoveryForm.reset();
+    
+    // Se restaura el valor actual de consentimiento de privacidad para que no quede en null/false tras un reset implícito
+    const hasAccepted = localStorage.getItem('privacyConsentAccepted') === 'true';
+    this.loginForm.get('privacyConsent')?.setValue(hasAccepted);
   }
 
   closeRecoveryOnBackdrop(event: MouseEvent): void {

@@ -446,7 +446,8 @@ const appConfigSchema = new mongoose.Schema({
   // Tema visual del login
   loginTheme: {
     type: String,
-    enum: ['crt', 'infoflow'],
+    // Se añade el tema 'modern' para soportar el diseño split-screen independiente de infoflow
+    enum: ['crt', 'infoflow', 'modern'],
     default: 'crt'
   },
   easterEggRules: {

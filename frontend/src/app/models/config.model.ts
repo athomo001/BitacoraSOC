@@ -38,7 +38,7 @@ export interface AppConfig {
   incidentEmailPaletteKey?: string;
   smtpConfig?: SmtpConfig;
   easterEggRules?: EasterEggRule[];
-  loginTheme?: 'crt' | 'infoflow';
+  loginTheme?: 'crt' | 'infoflow' | 'modern';
   escalationScheduleAutomation?: {
     enabled: boolean;
     frequency: 'weekly' | 'monthly';
@@ -157,7 +157,7 @@ export interface UpdateConfigRequest {
   incidentEmailPaletteKey?: string;
   smtpConfig?: SmtpConfig;
   easterEggRules?: EasterEggRule[];
-  loginTheme?: 'crt' | 'infoflow';
+  loginTheme?: 'crt' | 'infoflow' | 'modern';
   escalationScheduleAutomation?: {
     enabled: boolean;
     frequency: 'weekly' | 'monthly';
