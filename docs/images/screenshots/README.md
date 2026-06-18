@@ -32,3 +32,12 @@ Esta carpeta contiene las capturas de pantalla del sistema BitacoraSOC.
 
 - `08-Historial de entradas.png` - Historial de entradas.
   ![Historial de entradas](05-menu-configuracion.png)
+
+- `13.1-Login.png` - Pantalla de login (Tema CRT Retro).
+  ![Login Tema CRT Retro](13.1-Login.png)
+
+- `13.2-Login.png` - Pantalla de login (Tema Cyberpunk).
+  ![Login Tema Cyberpunk](13.2-Login.png)
+
+- `13.3-Login.png` - Pantalla de login (Tema Moderno).
+  ![Login Tema Moderno](13.3-Login.png)

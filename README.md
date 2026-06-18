@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.03**
+> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.04**
 
 Stack principal:
 
@@ -60,6 +60,8 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 
 ![Pantalla principal](docs/images/screenshots/01-main-nueva-entrada.png)
 
+![Pantalla de Login Retro CRT](docs/images/screenshots/13.1-Login.png)
+
 ![Generador de reportes](docs/images/screenshots/04-generador-reportes.png)
 ![Generador de reportes](docs/images/screenshots/04.1-generador-reportes.png?v=1)
 ![Generador de reportes](docs/images/screenshots/04.2-generador-reportes.png?v=1)
@@ -78,6 +80,13 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 ---
 
 ## Novedades recientes (resumen rapido)
+
+### v1.6.04 (rediseño e integración del login retro CRT a pantalla completa)
+
+- rediseño del monitor analógico `.crt-monitor` y de la pantalla curvada `.crt-screen` para que ocupen todo el viewport (`position: fixed; inset: 0`).
+- modificación de los selectores de las animaciones en Anime.js para que las transiciones de encendido, apagado catódico e interferencias afecten a toda la pantalla.
+- importación de la fuente tipográfica de fósforo pixelada `VT323` y adición de un cursor terminal parpadeante en los inputs de texto.
+- inclusión de las capturas de pantalla de los tres temas de login (`13.1-Login.png`, `13.2-Login.png`, `13.3-Login.png`) en `docs/SCREENSHOTS.md` y en la vista rápida del `README.md`.
 
 ### v1.6.03 (optimización de fuentes, contraste y desbordes en cyberpunk)
 

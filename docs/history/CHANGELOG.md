@@ -2,6 +2,15 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.04] - 2026-06-18
+
+### Rediseño e Integración del Login Retro CRT a Pantalla Completa con Anime.js
+
+- **Login CRT a Pantalla Completa:** Se modificaron los estilos del tema retro CRT para que el monitor analógico `.crt-monitor` abarque todo el viewport (`position: fixed; inset: 0`) con un bisel de 24px de ancho (8px en dispositivos móviles). La pantalla curvada `.crt-screen` ocupa ahora el 100% de la ventana, centrando el formulario con Flexbox.
+- **Efectos de Tubo Catódico y Glitches Totales:** Se reconfiguraron los selectores de las animaciones en `login.component.ts` para apuntar a `.crt-screen`, permitiendo que el efecto de encendido inicial, la animación de colapso catódico de apagado al cambiar de vista y las distorsiones visuales por glitches afecten a todo el viewport del navegador.
+- **Tipografía y Cursor Terminal:** Se importó la fuente `VT323` de Google Fonts y se estilizó un cursor terminal parpadeante en los inputs enfocados.
+- **Actualización de Documentación Visual:** Se agregaron las capturas de los tres estilos de login (`13.1-Login.png`, `13.2-Login.png`, `13.3-Login.png`) al manual `docs/SCREENSHOTS.md` y se integró la primera de ellas en el `README.md` principal.
+
 ## [v1.6.03] - 2026-06-18
 
 ### Optimización de Fuentes, Contraste de Controles y Prevención de Desbordes en Cyberpunk y Dark

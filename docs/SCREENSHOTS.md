@@ -15,6 +15,7 @@ Documentación visual de las principales funcionalidades del sistema.
 7. [Menú Admin - Backup](#-menú-admin---backup)
 8. [Sidebar - Menú de Navegación](#-sidebar---menú-de-navegación)
 9. [Seguridad - Configuración de HTTPS y SSO](#-seguridad---configuración-de-https-y-sso)
+10. [Pantallas de Login](#-pantallas-de-login)
 
 ---
 
@@ -238,6 +239,20 @@ Ver documentación completa en [backend/scripts/README.md](../backend/scripts/RE
 - **Cifrado de Red (HTTPS):** Gestión e instalación interactiva de certificados TLS (`.crt`, `.key` y `.ca`) con inyección dinámica en caliente y reinicio controlado de escuchas.
 - **Autenticación Single Sign-On (SSO):** Panel simétrico dedicado para parametrizar las variables de integración de Google SSO y Microsoft SSO/Entra ID.
 - **⚠️ Nota / Disclaimer sobre estado Beta:** Dado que el proyecto completo de BitacoraSOC se encuentra en fase **beta**, la parametrización visual de los flujos de inicio de sesión SSO (Google y Microsoft) es de reciente incorporación y no está 100% probada en todos los escenarios de despliegue corporativos. No obstante, la inyección y el soporte de cifrado **HTTPS** dinámico está completamente probado, estable y funcional para su uso productivo.
+
+---
+
+## 🔑 Pantallas de Login
+
+![Login Tema CRT](images/screenshots/13.1-Login.png)
+![Login Tema Cyberpunk](images/screenshots/13.2-Login.png)
+![Login Tema Moderno](images/screenshots/13.3-Login.png)
+
+**Estilos y Temas de Autenticación:**
+
+- **Tema CRT Retro (Pantalla Completa):** Estilo terminal fósforo verde monocromático con bisel físico de monitor, líneas de escaneo analógicas móviles y colapso catódico de encendido/apagado.
+- **Tema Cyberpunk (Matrix):** Lluvia digital binaria animada en verde fluorescente con reloj oficial de sincronización de turno del SOC en tiempo real.
+- **Tema Moderno:** Diseño profesional en pantalla dividida (split-screen) con logotipo, fondo premium y reloj unificado.
 
 ---
 
