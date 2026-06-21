@@ -30,12 +30,15 @@ import { MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionP
 import { MatDivider } from '@angular/material/divider';
 import { MatFormField, MatLabel, MatHint } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
-import { ReactiveFormsModule, FormsModule } from '@angular/forms';
+import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatIconButton } from '@angular/material/button';
 import { MatMenuTrigger, MatMenu, MatMenuItem } from '@angular/material/menu';
 import { MatTooltip } from '@angular/material/tooltip';
 import { Title } from '@angular/platform-browser';
 import { BatEasterEggService } from '../../services/bat-easter-egg.service';
+import { UserService } from '../../services/user.service';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatProgressSpinner } from '@angular/material/progress-spinner';
 
 type MenuItem = {
   icon: string;
@@ -49,7 +52,7 @@ type MenuItem = {
   selector: 'app-main-layout',
   templateUrl: './main-layout.component.html',
   styleUrls: ['./main-layout.component.scss'],
-  imports: [MatSidenavContainer, MatSidenav, MatToolbar, NgIf, MatIcon, MatNavList, NgFor, MatListItem, RouterLinkActive, RouterLink, MatListItemIcon, MatListItemTitle, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatExpansionPanelDescription, MatDivider, MatFormField, MatLabel, MatInput, ReactiveFormsModule, FormsModule, MatHint, MatSidenavContent, MatIconButton, MatMenuTrigger, MatMenu, MatMenuItem, RouterOutlet, MatTooltip, NgClass]
+  imports: [MatSidenavContainer, MatSidenav, MatToolbar, NgIf, MatIcon, MatNavList, NgFor, MatListItem, RouterLinkActive, RouterLink, MatListItemIcon, MatListItemTitle, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatExpansionPanelDescription, MatDivider, MatFormField, MatLabel, MatInput, ReactiveFormsModule, FormsModule, MatHint, MatSidenavContent, MatIconButton, MatMenuTrigger, MatMenu, MatMenuItem, RouterOutlet, MatTooltip, NgClass, MatProgressSpinner]
 })
 export class MainLayoutComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
@@ -63,6 +66,11 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   isAdmin = false;
   isUser = false;
   isGuest = false;
+
+  // Propiedades para el setup obligatorio inicial
+  forceSetupForm!: FormGroup;
+  isSavingForceSetup = false;
+  isUploadingForceAvatar = false;
 
   // Sidebar states
   leftSidebarOpened = true;
@@ -133,6 +141,9 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     private workShiftService: WorkShiftService,
     private systemHealthService: SystemHealthService,
     private titleService: Title,
+    private userService: UserService,
+    private snackBar: MatSnackBar,
+    private fb: FormBuilder,
     // Servicio global del Easter Egg #bat — el HUD se suscribe a su estado aquí
     readonly batService: BatEasterEggService
   ) { }
@@ -207,6 +218,11 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
           this.isAdmin = user.role === 'admin';
           this.isUser = user.role === 'user';
           this.isGuest = user.role === 'guest';
+
+          // Inicializar el formulario si el usuario está obligado a completar su perfil
+          if (user.mustChangePassword && !this.forceSetupForm) {
+            this.initForceSetupForm();
+          }
         } else {
           this.isAdmin = false;
           this.isUser = false;
@@ -642,6 +658,91 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     this.themeService.setTheme(theme as Theme);
     this.complementBridgeService.updateContext({ theme: theme as Theme });
     this.complementBridgeService.publish('THEME_CHANGE', { theme });
+  }
+
+  // Inicializa el formulario reactivo de setup obligatorio
+  initForceSetupForm(): void {
+    let birthdayVal = '';
+    // Si el usuario ya cuenta con su fecha de cumpleaños registrada en su perfil,
+    // se formatea como YYYY-MM-DD para inicializar correctamente el formulario reactivo.
+    if (this.currentUser?.birthday) {
+      const dateObj = new Date(this.currentUser.birthday);
+      if (!isNaN(dateObj.getTime())) {
+        birthdayVal = dateObj.toISOString().split('T')[0];
+      }
+    }
+
+    this.forceSetupForm = this.fb.group({
+      newPassword: ['', [Validators.required, Validators.minLength(6)]],
+      confirmPassword: ['', Validators.required],
+      birthday: [birthdayVal, Validators.required]
+    });
+  }
+
+  // Carga la foto de perfil en el formulario inicial de forma asíncrona
+  triggerForceAvatarUpload(input: HTMLInputElement): void {
+    input.click();
+  }
+
+  // Maneja la subida del avatar temporal durante el flujo de force-setup
+  onForceAvatarSelected(event: any): void {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      this.snackBar.open('Formato no permitido. Solo se aceptan imágenes JPG, JPEG, PNG y WEBP.', 'Cerrar', { duration: 3000 });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      this.snackBar.open('El archivo es demasiado grande. Máximo 2MB.', 'Cerrar', { duration: 3000 });
+      return;
+    }
+
+    this.isUploadingForceAvatar = true;
+    this.userService.uploadAvatar(file).subscribe({
+      next: (res) => {
+        this.currentUser = res.user;
+        this.authService.updateCurrentUser(res.user);
+        this.snackBar.open('Avatar actualizado con éxito', 'Cerrar', { duration: 3000 });
+        this.isUploadingForceAvatar = false;
+      },
+      error: (err) => {
+        this.snackBar.open(err.error?.message || 'Error al subir la imagen', 'Cerrar', { duration: 3000 });
+        this.isUploadingForceAvatar = false;
+      }
+    });
+  }
+
+  // Envía el formulario para configurar la contraseña y la fecha de cumpleaños obligatoria
+  submitForceSetup(): void {
+    if (this.forceSetupForm.invalid) return;
+
+    const { newPassword, confirmPassword, birthday } = this.forceSetupForm.value;
+
+    if (newPassword !== confirmPassword) {
+      this.snackBar.open('Las contraseñas nuevas no coinciden', 'Cerrar', { duration: 3000 });
+      return;
+    }
+
+    this.isSavingForceSetup = true;
+
+    // Convertir la fecha a formato ISO String
+    const formattedBirthday = new Date(birthday).toISOString();
+
+    this.userService.forceSetup({ newPassword, birthday: formattedBirthday }).subscribe({
+      next: (res) => {
+        this.snackBar.open('Configuración inicial guardada con éxito', 'Cerrar', { duration: 3000 });
+        this.currentUser = res.user;
+        this.authService.updateCurrentUser(res.user);
+        this.isSavingForceSetup = false;
+      },
+      error: (err) => {
+        this.snackBar.open(err.error?.message || 'Error al guardar la configuración obligatoria', 'Cerrar', { duration: 4000 });
+        this.isSavingForceSetup = false;
+      }
+    });
   }
 
   logout(): void {

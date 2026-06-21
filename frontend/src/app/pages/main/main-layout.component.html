@@ -1,3 +1,4 @@
+<ng-container *ngIf="!currentUser?.mustChangePassword; else forceSetupTemplate">
 <mat-sidenav-container class="main-container" [hasBackdrop]="false" autosize>
   <!-- LEFT SIDEBAR - Solo Menú -->
   <mat-sidenav
@@ -230,4 +231,71 @@
     </div>
   </mat-sidenav-content>
 </mat-sidenav-container>
+</ng-container>
+
+<ng-template #forceSetupTemplate>
+  <div class="force-setup-overlay">
+    <div class="force-setup-card">
+      <header class="force-setup-header">
+        <div class="shield-badge">
+          <mat-icon>security</mat-icon>
+        </div>
+        <h2>Configuración Obligatoria</h2>
+        <p class="force-setup-desc">Por políticas de seguridad del SOC, debes actualizar tu contraseña temporal y registrar tu fecha de nacimiento antes de acceder.</p>
+      </header>
+      
+      <div class="avatar-setup-section">
+        <input type="file" #avatarInput (change)="onForceAvatarSelected($event)" style="display: none" accept="image/png, image/jpeg, image/jpg, image/webp">
+        <div class="force-avatar-wrapper" [class.uploading]="isUploadingForceAvatar" (click)="triggerForceAvatarUpload(avatarInput)" matTooltip="Haz clic para subir tu foto de perfil (Opcional)">
+          <img *ngIf="currentUser?.avatar" [src]="getAssetUrl(currentUser.avatar)" alt="Avatar" class="force-avatar-img">
+          <div *ngIf="!currentUser?.avatar" class="force-avatar-placeholder">
+            {{ currentUser?.fullName?.substring(0, 1)?.toUpperCase() || 'U' }}
+          </div>
+          <div class="force-avatar-overlay">
+            <mat-icon>photo_camera</mat-icon>
+            <span>Subir Foto</span>
+          </div>
+          <div *ngIf="isUploadingForceAvatar" class="force-avatar-spinner">
+            <mat-spinner diameter="30"></mat-spinner>
+          </div>
+        </div>
+        <p class="avatar-hint">Foto de Perfil (Opcional)</p>
+      </div>
+
+      <form [formGroup]="forceSetupForm" (ngSubmit)="submitForceSetup()" class="setup-form">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Nueva Contraseña</mat-label>
+          <input matInput formControlName="newPassword" type="password" placeholder="Mínimo 6 caracteres" required>
+          <mat-icon matSuffix>lock</mat-icon>
+          <mat-hint>Utiliza una contraseña alfanumérica segura</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Confirmar Nueva Contraseña</mat-label>
+          <input matInput formControlName="confirmPassword" type="password" placeholder="Repite la contraseña" required>
+          <mat-icon matSuffix>lock</mat-icon>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width" *ngIf="!currentUser?.birthday">
+          <mat-label>Fecha de Nacimiento</mat-label>
+          <input matInput formControlName="birthday" type="date" required>
+          <mat-icon matSuffix>cake</mat-icon>
+          <mat-hint>Ingresa tu fecha de cumpleaños (Obligatorio)</mat-hint>
+        </mat-form-field>
+
+        <div class="form-actions">
+          <button mat-flat-button color="primary" type="submit" [disabled]="forceSetupForm.invalid || isSavingForceSetup" class="btn-submit">
+            <mat-spinner *ngIf="isSavingForceSetup" diameter="20"></mat-spinner>
+            <span *ngIf="!isSavingForceSetup">Completar Registro</span>
+          </button>
+          
+          <button mat-stroked-button type="button" (click)="logout()" class="btn-logout">
+            <mat-icon>exit_to_app</mat-icon>
+            Cerrar Sesión
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</ng-template>
 

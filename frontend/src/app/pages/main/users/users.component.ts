@@ -33,11 +33,13 @@
  *   - Actions: editar, activar/desactivar, eliminar
  */
 import { Component, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { ConfirmDialogComponent } from '../../../components/confirm-dialog/confirm-dialog.component';
 import { UserService } from '../../../services/user.service';
+import { ConfigService } from '../../../services/config.service';
+import { AuthService } from '../../../services/auth.service';
 import { User, CreateUserRequest } from '../../../models/user.model';
 import { MatFormField, MatLabel, MatHint } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
@@ -48,12 +50,13 @@ import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow } from '@angular/material/table';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MatIcon } from '@angular/material/icon';
+import { MatCheckbox } from '@angular/material/checkbox';
 
 @Component({
     selector: 'app-users',
     templateUrl: './users.component.html',
     styleUrls: ['./users.component.scss'],
-    imports: [ReactiveFormsModule, MatFormField, MatLabel, MatInput, NgIf, NgFor, MatHint, MatSelect, MatOption, MatButton, MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatIconButton, MatTooltip, MatIcon, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow]
+    imports: [ReactiveFormsModule, FormsModule, MatFormField, MatLabel, MatInput, NgIf, NgFor, MatHint, MatSelect, MatOption, MatButton, MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatIconButton, MatTooltip, MatIcon, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow, MatCheckbox]
 })
 export class UsersComponent implements OnInit {
   readonly baseCargos: string[] = [
@@ -76,11 +79,18 @@ export class UsersComponent implements OnInit {
   displayedColumns: string[] = ['username', 'fullName', 'email', 'phone', 'cargoLabel', 'role', 'mfaEnabled', 'isActive', 'actions'];
   editingUserId: string | null = null;
 
+  // Estado y configuraciones para la automatización de correos de cumpleaños
+  birthdayEmailsEnabled: boolean = false;
+  birthdayEmailsTime: string = '09:00';
+  isSavingBirthdayConfig: boolean = false;
+
   constructor(
     private fb: FormBuilder,
     private userService: UserService,
     private snackBar: MatSnackBar,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private configService: ConfigService,
+    private authService: AuthService
   ) {
     this.userForm = this.fb.group({
       username: ['', Validators.required],
@@ -99,6 +109,7 @@ export class UsersComponent implements OnInit {
   ngOnInit(): void {
     this.loadUsers();
     this.configureCargoValidators();
+    this.loadBirthdayConfig();
   }
 
   private configureCargoValidators(): void {
@@ -309,5 +320,118 @@ export class UsersComponent implements OnInit {
         });
       }
     });
+  }
+
+  /**
+   * Carga la configuración global de la aplicación, específicamente los parámetros
+   * relacionados con el envío programado de felicitaciones de cumpleaños.
+   */
+  loadBirthdayConfig(): void {
+    this.configService.getConfig().subscribe({
+      next: (config) => {
+        this.birthdayEmailsEnabled = !!config.birthdayEmailsEnabled;
+        this.birthdayEmailsTime = config.birthdayEmailsTime || '09:00';
+      },
+      error: (err) => {
+        console.error('Error cargando configuración de cumpleaños:', err);
+        this.snackBar.open('Error al cargar la configuración de cumpleaños', 'Cerrar', { duration: 3000 });
+      }
+    });
+  }
+
+  /**
+   * Guarda los cambios de configuración del envío automático de felicitaciones de cumpleaños.
+   * Valida que la hora tenga un formato válido de 24 horas si las felicitaciones están habilitadas.
+   */
+  saveBirthdayConfig(): void {
+    if (this.birthdayEmailsEnabled && !this.birthdayEmailsTime) {
+      this.snackBar.open('Por favor, especifica una hora válida de envío', 'Cerrar', { duration: 3000 });
+      return;
+    }
+
+    this.isSavingBirthdayConfig = true;
+    this.configService.updateConfig({
+      birthdayEmailsEnabled: this.birthdayEmailsEnabled,
+      birthdayEmailsTime: this.birthdayEmailsTime
+    }).subscribe({
+      next: (res) => {
+        this.snackBar.open('Configuración de cumpleaños actualizada con éxito', 'Cerrar', { duration: 2000 });
+        this.isSavingBirthdayConfig = false;
+      },
+      error: (err) => {
+        console.error('Error guardando configuración de cumpleaños:', err);
+        this.snackBar.open(err.error?.message || 'Error al guardar la configuración de cumpleaños', 'Cerrar', { duration: 3000 });
+        this.isSavingBirthdayConfig = false;
+      }
+    });
+  }
+
+  /**
+   * Solicita confirmación y fuerza a todos los usuarios activos del sistema a restablecer
+   * su contraseña y configurar su fecha de nacimiento en el próximo inicio de sesión.
+   * Se excluye explícitamente al administrador actual para evitar bloqueos.
+   */
+  forcePasswordResetAll(): void {
+    const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+      data: {
+        title: 'Restablecimiento Masivo de Contraseñas',
+        message: '¿Estás seguro de forzar el restablecimiento de contraseñas para TODOS los usuarios activos? Se les obligará a cambiar su contraseña y establecer su cumpleaños al ingresar.',
+        confirmText: 'Forzar Masivo',
+        isDestructive: true
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.userService.forcePasswordChangeAll().subscribe({
+          next: (res) => {
+            this.snackBar.open(res.message || 'Restablecimiento masivo ordenado correctamente', 'Cerrar', { duration: 3000 });
+            this.loadUsers();
+          },
+          error: (err) => {
+            console.error('Error al forzar restablecimiento masivo:', err);
+            this.snackBar.open(err.error?.message || 'Error al ejecutar el restablecimiento masivo', 'Cerrar', { duration: 3000 });
+          }
+        });
+      }
+    });
+  }
+
+  /**
+   * Solicita confirmación para obligar a un usuario en particular a cambiar su contraseña
+   * y establecer su fecha de nacimiento en su próximo ingreso.
+   */
+  forcePasswordResetIndividual(user: User): void {
+    const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+      data: {
+        title: 'Forzar Restablecimiento de Contraseña',
+        message: `¿Estás seguro de obligar a <strong>${user.username}</strong> a cambiar su contraseña y registrar su cumpleaños en su próximo ingreso?`,
+        confirmText: 'Forzar Restablecimiento',
+        isDestructive: true
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.userService.updateUser(user._id, { mustChangePassword: true }).subscribe({
+          next: () => {
+            this.snackBar.open(`Se ha forzado el cambio de contraseña para ${user.username}`, 'Cerrar', { duration: 2000 });
+            this.loadUsers();
+          },
+          error: (err) => {
+            console.error('Error al forzar restablecimiento individual:', err);
+            this.snackBar.open('Error al forzar restablecimiento individual', 'Cerrar', { duration: 3000 });
+          }
+        });
+      }
+    });
+  }
+
+  /**
+   * Determina si el usuario proveído corresponde al administrador con sesión iniciada actualmente.
+   */
+  isCurrentUser(user: User): boolean {
+    const currentUser = this.authService.getCurrentUser();
+    return currentUser ? currentUser._id === user._id : false;
   }
 }

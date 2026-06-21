@@ -62,6 +62,14 @@
                 <span class="value">{{ currentUser?.phone }}</span>
               </div>
             </div>
+
+            <div class="metadata-item" *ngIf="currentUser?.birthday">
+              <mat-icon>cake</mat-icon>
+              <div class="metadata-text">
+                <span class="label">Cumpleaños</span>
+                <span class="value">{{ currentUser?.birthday | date:'dd/MM/yyyy' }}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -96,7 +104,7 @@
                 <mat-label>Número de Teléfono</mat-label>
                 <input matInput formControlName="phone" placeholder="Ej: +56 9 1234 5678" type="tel">
                 <mat-icon matSuffix>phone</mat-icon>
-                <mat-hint>Visible en el directorio de escalación del SOC</mat-hint>
+                <mat-hint>Visible en el SOC</mat-hint>
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="full-width">
@@ -107,6 +115,15 @@
                   <mat-option value="cyberpunk">Cyberpunk</mat-option>
                 </mat-select>
                 <mat-icon matSuffix>palette</mat-icon>
+              </mat-form-field>
+            </div>
+
+            <div class="form-row">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Fecha de Nacimiento</mat-label>
+                <input matInput formControlName="birthday" type="date">
+                <mat-icon matSuffix>cake</mat-icon>
+                <mat-hint>Usada para felicitaciones automáticas</mat-hint>
               </mat-form-field>
             </div>
 

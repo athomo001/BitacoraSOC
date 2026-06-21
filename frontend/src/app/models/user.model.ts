@@ -17,6 +17,10 @@ export interface User {
   avatar?: string;
   guestExpiresAt?: Date;
   mfaEnabled?: boolean;
+  // Indicador de que el usuario debe cambiar su contraseña y perfil obligatoriamente
+  mustChangePassword?: boolean;
+  // Fecha de nacimiento / cumpleaños del usuario
+  birthday?: Date | string;
   createdAt: Date;
   updatedAt?: Date;
 }
@@ -63,6 +67,7 @@ export interface UpdateProfileRequest {
   fullName?: string;
   theme?: Theme;
   phone?: string;
+  birthday?: string | Date;
   currentPassword?: string;
   newPassword?: string;
 }

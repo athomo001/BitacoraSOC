@@ -599,3 +599,230 @@
     opacity: 1;
   }
 }
+
+// =====================================================
+// Estilos Premium de Configuración Obligatoria (Force Setup)
+// =====================================================
+
+.force-setup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at center, rgba(18, 30, 26, 0.96) 0%, rgba(10, 15, 12, 0.99) 100%);
+  backdrop-filter: blur(16px);
+  padding: 20px;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+.force-setup-card {
+  width: 100%;
+  max-width: 480px;
+  background: color-mix(in srgb, var(--surface-color) 85%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-color) 35%, transparent);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4), inset 0 0 1px 1px rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  padding: 36px 32px;
+  box-sizing: border-box;
+  backdrop-filter: blur(10px);
+  animation: setupCardFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  .force-setup-header {
+    text-align: center;
+    margin-bottom: 28px;
+
+    .shield-badge {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: color-mix(in srgb, var(--primary-color, #00ffcc) 12%, transparent);
+      border: 1.5px solid var(--primary-color, #00ffcc);
+      box-shadow: 0 0 15px rgba(0, 255, 204, 0.2);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+
+      mat-icon {
+        font-size: 32px;
+        width: 32px;
+        height: 32px;
+        color: var(--primary-color, #00ffcc);
+      }
+    }
+
+    h2 {
+      margin: 0 0 10px 0;
+      font-size: 1.6rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: 0.5px;
+    }
+
+    .force-setup-desc {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      line-height: 1.45;
+    }
+  }
+}
+
+.avatar-setup-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 24px;
+
+  .force-avatar-wrapper {
+    position: relative;
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    border: 2px dashed color-mix(in srgb, var(--primary-color, #00ffcc) 45%, transparent);
+    background: color-mix(in srgb, var(--surface-color) 60%, transparent);
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+
+    &:hover {
+      border-color: var(--primary-color, #00ffcc);
+      box-shadow: 0 0 15px rgba(0, 255, 204, 0.2);
+
+      .force-avatar-overlay {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    &.uploading {
+      pointer-events: none;
+      opacity: 0.7;
+    }
+
+    .force-avatar-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .force-avatar-placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--primary-color, #00ffcc);
+    }
+
+    .force-avatar-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.75);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      color: #ffffff;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.25s ease-out;
+
+      mat-icon {
+        font-size: 20px;
+        width: 20px;
+        height: 20px;
+      }
+
+      span {
+        font-size: 11px;
+        font-weight: 600;
+      }
+    }
+
+    .force-avatar-spinner {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+  }
+
+  .avatar-hint {
+    margin: 8px 0 0 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+}
+
+.setup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  mat-form-field {
+    width: 100%;
+  }
+
+  .form-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 14px;
+
+    .btn-submit {
+      width: 100%;
+      padding: 12px 0;
+      height: 48px;
+      font-weight: 600;
+      border-radius: 8px;
+      letter-spacing: 0.5px;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 14px rgba(0, 255, 204, 0.25);
+
+      &:hover:not(:disabled) {
+        box-shadow: 0 6px 20px rgba(0, 255, 204, 0.4);
+      }
+    }
+
+    .btn-logout {
+      width: 100%;
+      height: 44px;
+      border-radius: 8px;
+      color: var(--text-secondary);
+      font-weight: 500;
+      letter-spacing: 0.3px;
+      
+      mat-icon {
+        margin-right: 6px;
+      }
+    }
+  }
+}
+
+@keyframes setupCardFadeIn {
+  from {
+    transform: scale(0.95) translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+

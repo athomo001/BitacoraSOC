@@ -160,6 +160,27 @@ const authenticate = async (req, res, next) => {
 
     req.user = user;
 
+    // Si el usuario debe cambiar su contraseña obligatoriamente, restringir accesos
+    if (user.mustChangePassword) {
+      const baseUrl = req.baseUrl || '';
+      const path = req.path || '';
+      const method = (req.method || '').toUpperCase();
+      
+      // Permitir únicamente obtener sus propios datos, subir avatar, completar setup y cerrar sesión
+      const isAllowed = 
+        (baseUrl.endsWith('/users') && path === '/me' && method === 'GET') ||
+        (baseUrl.endsWith('/users') && path === '/me/avatar' && method === 'PUT') ||
+        (baseUrl.endsWith('/users') && path === '/me/force-setup' && method === 'PUT') ||
+        (baseUrl.endsWith('/auth') && path === '/logout' && method === 'POST');
+
+      if (!isAllowed) {
+        return res.status(403).json({ 
+          message: 'Debe cambiar su contraseña y configurar su fecha de nacimiento para continuar.', 
+          code: 'FORCE_SETUP_REQUIRED' 
+        });
+      }
+    }
+
     if (READ_ONLY_ROLES.has(user.role) && !SAFE_METHODS.has(req.method) && !isAllowedWriteForReadOnly(req)) {
       return res.status(403).json({ message: 'Este rol es de solo lectura y no puede modificar información' });
     }

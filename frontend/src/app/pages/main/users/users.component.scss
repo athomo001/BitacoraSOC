@@ -107,3 +107,140 @@
     color: var(--state-error);
   }
 }
+
+.users-top-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: var(--space-6);
+  margin-bottom: var(--space-6);
+  align-items: start;
+  
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.users-form-col {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.users-panel--form {
+  margin-bottom: 0;
+}
+
+.users-panel--list {
+  width: 100%;
+  margin-bottom: var(--space-6);
+}
+
+.users-side-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.config-card {
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-card);
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-md);
+  
+  .users-panel__body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+}
+
+.card-header-accent {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--primary) 5%, transparent) 0%, transparent 100%);
+  
+  &.danger {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--state-error) 5%, transparent) 0%, transparent 100%);
+    .header-icon {
+      color: var(--state-error);
+    }
+  }
+  
+  .header-icon {
+    color: var(--primary);
+  }
+}
+
+.config-desc {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: var(--space-4);
+}
+
+.config-form-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.config-checkbox {
+  margin-top: 8px;
+}
+
+.time-field {
+  max-width: 180px;
+}
+
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+  padding-top: var(--space-2);
+}
+
+.mass-reset-box {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding-top: var(--space-2);
+}
+
+.mass-reset-btn {
+  width: 100%;
+  padding: 12px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.5px;
+}
+
+.force-reset-btn {
+  color: #ff9800 !important;
+  
+  &:disabled {
+    color: var(--text-muted) !important;
+    opacity: 0.5;
+  }
+}
+
+.active-warning {
+  animation: pulse-orange 2s infinite;
+}
+
+@keyframes pulse-orange {
+  0% {
+    color: #ff9800;
+  }
+  50% {
+    color: color-mix(in srgb, #ff9800 30%, transparent);
+  }
+  100% {
+    color: #ff9800;
+  }
+}

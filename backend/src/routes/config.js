@@ -384,6 +384,8 @@ router.put('/',
       }
       return true;
     }),
+    body('birthdayEmailsEnabled').optional().isBoolean(),
+    body('birthdayEmailsTime').optional().matches(/^\d{2}:\d{2}$/).withMessage('Formato de hora de envío inválido (HH:mm)'),
     body('defaultLogSourceId').optional({ checkFalsy: true }).isMongoId().withMessage('ID de LogSource inválido'),
     body('emailReportConfig.enabled').optional().isBoolean(),
     body('emailReportConfig.recipients').optional().isArray(),
@@ -416,6 +418,11 @@ router.put('/',
         const previousEmailReportConfig = config.emailReportConfig
           ? config.emailReportConfig.toObject()
           : {};
+        
+        // Guardar valores anteriores de cumpleaños antes de la asignación destructiva
+        const previousBirthdayEmailsTime = config.birthdayEmailsTime;
+        const previousBirthdayEmailsEnabled = config.birthdayEmailsEnabled;
+
         Object.assign(config, req.body);
 
         if (incomingSecurity) {
@@ -439,6 +446,15 @@ router.put('/',
 
         if (req.body.incidentEmailPaletteKey !== undefined) {
           config.incidentEmailPaletteKey = String(req.body.incidentEmailPaletteKey).trim() || 'cdc-verde';
+        }
+
+        // Si se modifica la hora del programador de cumpleaños o se vuelve a activar la función,
+        // se reinicia lastBirthdayEmailsDate a null para que el scheduler evalúe el envío el día de hoy
+        if (req.body.birthdayEmailsTime !== undefined && req.body.birthdayEmailsTime !== previousBirthdayEmailsTime) {
+          config.lastBirthdayEmailsDate = null;
+        }
+        if (req.body.birthdayEmailsEnabled === true && previousBirthdayEmailsEnabled === false) {
+          config.lastBirthdayEmailsDate = null;
         }
 
         // Preserve password if it wasn't provided or was sent as empty string (masked)
