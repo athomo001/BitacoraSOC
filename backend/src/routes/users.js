@@ -152,13 +152,14 @@ router.put('/me',
     body('fullName').optional().trim().notEmpty(),
     body('theme').optional().isIn(['light', 'dark', 'sepia', 'pastel', 'cyberpunk']),
     body('phone').optional().trim().isLength({ min: 6, max: 20 }).withMessage('Teléfono inválido'),
+    body('birthday').optional().isISO8601().toDate().withMessage('Fecha de nacimiento inválida'),
     body('currentPassword').optional().notEmpty(),
     body('newPassword').optional().isLength({ min: 6 })
   ],
   validate,
   async (req, res) => {
     try {
-      const { email, fullName, theme, phone, currentPassword, newPassword } = req.body;
+      const { email, fullName, theme, phone, currentPassword, newPassword, birthday } = req.body;
 
       const user = await User.findById(req.user._id);
       if (!user) {
@@ -169,13 +170,15 @@ router.put('/me',
         email: user.email,
         fullName: user.fullName,
         theme: user.theme,
-        phone: user.phone
+        phone: user.phone,
+        birthday: user.birthday
       };
 
       if (email) user.email = email;
       if (fullName) user.fullName = fullName;
       if (theme) user.theme = theme;
       if (phone !== undefined) user.phone = phone || null;
+      if (birthday !== undefined) user.birthday = birthday || null;
 
       if (currentPassword || newPassword) {
         if (!currentPassword || !newPassword) {
@@ -206,6 +209,7 @@ router.put('/me',
             fullName: user.fullName,
             theme: user.theme,
             phone: user.phone,
+            birthday: user.birthday,
             passwordChanged: !!newPassword
           }
         }
@@ -215,6 +219,86 @@ router.put('/me',
     } catch (error) {
       console.error('Error al actualizar perfil:', error);
       res.status(500).json({ message: 'Error al actualizar perfil' });
+    }
+  }
+);
+
+// PUT /api/users/me/force-setup - Configuración obligatoria de contraseña y cumpleaños al inicio
+router.put('/me/force-setup',
+  authenticate,
+  [
+    body('newPassword').isLength({ min: 6 }).withMessage('La nueva contraseña debe tener al menos 6 caracteres'),
+    body('birthday').isISO8601().toDate().withMessage('Fecha de nacimiento inválida')
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const { newPassword, birthday } = req.body;
+      const user = await User.findById(req.user._id);
+
+      if (!user) {
+        return res.status(404).json({ message: 'Usuario no encontrado' });
+      }
+
+      // Guardar nueva contraseña y cumpleaños, y limpiar flag mustChangePassword
+      user.password = newPassword;
+      user.birthday = birthday;
+      user.mustChangePassword = false;
+
+      await user.save();
+      await syncUserAsDirectoryInternal(user);
+
+      await audit(req, {
+        event: 'user.force_setup.success',
+        level: 'info',
+        result: { success: true },
+        metadata: {
+          userId: user._id,
+          username: user.username,
+          birthdaySet: true,
+          passwordChanged: true
+        }
+      });
+
+      res.json({
+        message: 'Contraseña y fecha de nacimiento actualizadas correctamente.',
+        user: user.toJSON()
+      });
+    } catch (error) {
+      console.error('Error en force-setup:', error);
+      res.status(500).json({ message: 'Error al completar la configuración obligatoria' });
+    }
+  }
+);
+
+// POST /api/users/force-password-change-all - Forzar cambio de contraseña a todos los usuarios (solo admin)
+router.post('/force-password-change-all',
+  authenticate,
+  authorize('admin'),
+  async (req, res) => {
+    try {
+      // Modificar todos los usuarios activos excepto a sí mismo
+      const result = await User.updateMany(
+        { _id: { $ne: req.user._id }, isActive: true },
+        { $set: { mustChangePassword: true } }
+      );
+
+      await audit(req, {
+        event: 'admin.users.force_reset_all',
+        level: 'warn',
+        result: { success: true },
+        metadata: {
+          modifiedCount: result.modifiedCount,
+          matchedCount: result.matchedCount
+        }
+      });
+
+      res.json({
+        message: `Se ha forzado el cambio de contraseña a ${result.modifiedCount} usuarios activos.`
+      });
+    } catch (error) {
+      console.error('Error al forzar cambio de contraseña masivo:', error);
+      res.status(500).json({ message: 'Error al forzar cambio de contraseña masivo' });
     }
   }
 );
@@ -359,6 +443,7 @@ router.post('/',
         user.guestExpiresAt = guestExpiresAt;
         user.isActive = true;
         user.mfaEnabled = mfaEnabled === true;
+        user.mustChangePassword = true; // Obligar a cambiar contraseña en la reactivación
         if (mfaEnabled === false) {
           user.mfaSecret = null;
           user.mfaTempSecret = null;
@@ -376,7 +461,8 @@ router.post('/',
           role,
           cargoLabel: role === 'guest' ? null : cargoLabel,
           guestExpiresAt,
-          mfaEnabled: mfaEnabled === true
+          mfaEnabled: mfaEnabled === true,
+          mustChangePassword: true // Por defecto obligar a cambiar la contraseña en creación
         });
 
         await user.save();
@@ -440,7 +526,8 @@ router.put('/:id',
       .withMessage(`Cargo inválido (máx ${MAX_CARGO_LENGTH} caracteres)`),
     // Permite al administrador establecer una nueva contraseña de cualquier longitud
     body('newPassword').optional(),
-    body('mfaEnabled').optional().isBoolean().withMessage('MFAEnabled debe ser booleano')
+    body('mfaEnabled').optional().isBoolean().withMessage('MFAEnabled debe ser booleano'),
+    body('mustChangePassword').optional().isBoolean().withMessage('mustChangePassword debe ser booleano')
   ],
   validate,
   async (req, res) => {

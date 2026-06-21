@@ -2,6 +2,21 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.09] - 2026-06-21
+
+### Obligatoriedad de Cumpleaños, Contraseña Forzada y Envío de Correo de Felicitaciones con CIDs
+
+- **Forzado Masivo e Individual de Contraseña**: Se implementó una funcionalidad en el módulo de usuarios que permite obligar a un usuario de forma individual o de manera masiva (para todos los usuarios activos a la vez, excluyendo al administrador que ejecuta la acción) a realizar un cambio de contraseña y establecer su fecha de cumpleaños en el primer inicio de sesión, bloqueando la navegación mediante un panel completo de configuración obligatoria.
+- **Envío de Correo de Cumpleaños**: Se programó un scheduler en el backend (`birthdayEmailScheduler.js`) para enviar de forma automática y diaria un correo estéticamente atractivo al usuario en el día de su cumpleaños (en su hora local definida).
+- **Corrección de Imágenes Rotas en Correos mediante CIDs**: Se reestructuró la plantilla de correos de felicitación y el scheduler para leer e incrustar la ilustración kawaii de cumpleaños (`birthday_kawaii.png`) y el logotipo de branding personalizado del sistema directamente desde el sistema de archivos del servidor, adjuntándolos en el email como adjuntos en línea mediante **Content-ID (CID)** (`src="cid:..."`), lo cual previene que los clientes de correo externos bloqueen o muestren las imágenes rotas por URLs locales.
+- **Optimización y Estabilidad del Scheduler**:
+  - Se movió la ilustración kawaii al directorio de recursos estáticos del código de la app (`src/assets/branding/birthday_kawaii.png`) para evitar que se oculte por el volumen `/app/uploads` en Docker.
+  - Se redujo el intervalo de revisión de cumpleaños de 5 a 2 minutos.
+  - Se reinicia el bloqueo de envío de hoy (`lastBirthdayEmailsDate = null`) de forma transparente al guardar una hora de envío modificada o reactivar el servicio, permitiendo pruebas inmediatas en el mismo día.
+- **Ajustes en UI de Administración**:
+  - Se amplió la columna de configuración lateral de usuarios a **`340px`** en el frontend para evitar espaciados verticales comprimidos y mejorar el aspecto visual.
+  - Se mantiene el control de hora siempre visible en la interfaz, inhabilitándolo de manera reactiva mediante `[disabled]` en lugar de usar `*ngIf`.
+
 ## [v1.6.08] - 2026-06-18
 
 ### Actualización de Motor de Paquetes a pnpm v11.7.0 y Dependencias Generales

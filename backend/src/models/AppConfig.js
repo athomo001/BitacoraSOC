@@ -464,6 +464,21 @@ const appConfigSchema = new mongoose.Schema({
       { scope: 'entry', triggerType: 'hashtag', hashtag: 'bender', enabled: true }
     ])
   },
+  // Habilitar o deshabilitar el envío automático de correos de cumpleaños
+  birthdayEmailsEnabled: {
+    type: Boolean,
+    default: false
+  },
+  // Hora del día en formato HH:mm a la cual se enviarán los correos de cumpleaños
+  birthdayEmailsTime: {
+    type: String,
+    default: '09:00'
+  },
+  // Registrar la última fecha en que se enviaron los correos para evitar duplicados
+  lastBirthdayEmailsDate: {
+    type: Date,
+    default: null
+  },
   // Última actualización
   lastUpdatedBy: {
     type: mongoose.Schema.Types.ObjectId,

@@ -7,7 +7,10 @@
     </div>
   </header>
 
-  <section class="users-panel users-panel--form">
+  <div class="users-top-layout">
+    <!-- Columna Izquierda: Creación y Edición de Usuarios -->
+    <div class="users-form-col">
+      <section class="users-panel users-panel--form">
     <header class="users-panel__header">
       <h2 class="users-panel__title">{{ editingUserId ? 'Editar Usuario' : 'Crear Nuevo Usuario' }}</h2>
     </header>
@@ -95,6 +98,58 @@
       </form>
     </div>
   </section>
+  </div> <!-- Fin de users-form-col -->
+
+  <!-- Columna Lateral: Configuraciones Especiales -->
+  <div class="users-side-col">
+    <!-- Automatización de Cumpleaños -->
+    <section class="users-panel config-card">
+      <header class="users-panel__header card-header-accent">
+        <mat-icon class="header-icon">cake</mat-icon>
+        <h2 class="users-panel__title">Automatización de Cumpleaños</h2>
+      </header>
+      <div class="users-panel__body">
+        <p class="config-desc">
+          Envía un correo de felicitación a los miembros del equipo en su día de cumpleaños de forma automática.
+        </p>
+        <div class="config-form-row">
+          <mat-checkbox [(ngModel)]="birthdayEmailsEnabled" class="config-checkbox">
+            Habilitar felicitaciones
+          </mat-checkbox>
+
+          <mat-form-field appearance="outline" class="time-field" style="width: 100%;">
+            <mat-label>Hora de envío (Local)</mat-label>
+            <input matInput type="time" [(ngModel)]="birthdayEmailsTime" name="birthdayEmailsTime" [disabled]="!birthdayEmailsEnabled">
+            <mat-icon matSuffix>schedule</mat-icon>
+          </mat-form-field>
+        </div>
+        <div class="card-actions">
+          <button mat-raised-button color="primary" style="width: 100%;" [disabled]="isSavingBirthdayConfig" (click)="saveBirthdayConfig()">
+            <mat-icon>save</mat-icon> Guardar Configuración
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Restablecimiento Masivo de Contraseñas -->
+    <section class="users-panel config-card">
+      <header class="users-panel__header card-header-accent danger">
+        <mat-icon class="header-icon">security</mat-icon>
+        <h2 class="users-panel__title">Control de Credenciales Masivo</h2>
+      </header>
+      <div class="users-panel__body">
+        <p class="config-desc">
+          Fuerza a todos los usuarios de la plataforma a cambiar su contraseña en su próximo ingreso. No afecta tu sesión actual.
+        </p>
+        <div class="mass-reset-box">
+          <button mat-raised-button color="warn" class="mass-reset-btn" (click)="forcePasswordResetAll()">
+            <mat-icon>lock_reset</mat-icon> Forzar Cambio Masivo
+          </button>
+        </div>
+      </div>
+    </section>
+  </div>
+</div> <!-- Fin de users-top-layout -->
 
   <section class="users-panel users-panel--list">
     <header class="users-panel__header">
@@ -159,12 +214,18 @@
                     matTooltip="Editar usuario">
               <mat-icon>edit</mat-icon>
             </button>
+            <button mat-icon-button class="force-reset-btn" (click)="forcePasswordResetIndividual(user)"
+                    [disabled]="isCurrentUser(user)"
+                    matTooltip="Forzar restablecimiento de contraseña">
+              <mat-icon [class.active-warning]="user.mustChangePassword">lock_reset</mat-icon>
+            </button>
             <button mat-icon-button [color]="user.isActive ? 'accent' : 'primary'" 
                     (click)="toggleActive(user)"
                     [matTooltip]="user.isActive ? 'Desactivar' : 'Activar'">
               <mat-icon>{{ user.isActive ? 'toggle_on' : 'toggle_off' }}</mat-icon>
             </button>
             <button mat-icon-button color="warn" (click)="deleteUser(user._id)"
+                    [disabled]="isCurrentUser(user)"
                     matTooltip="Eliminar usuario">
               <mat-icon>delete</mat-icon>
             </button>
@@ -176,4 +237,4 @@
       </table>
     </div>
   </section>
-</div>
+</div> <!-- Fin de users-container -->

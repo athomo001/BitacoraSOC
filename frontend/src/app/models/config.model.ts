@@ -8,6 +8,10 @@ export interface AppConfig {
   _id?: string;
   guestModeEnabled: boolean;
   guestMaxDurationDays: number;
+  // Habilitar envío de correos de cumpleaños
+  birthdayEmailsEnabled?: boolean;
+  // Hora de envío de correos de cumpleaños
+  birthdayEmailsTime?: string;
   shiftCheckCooldownHours: number;
   checklistCloseEmailEnabled?: boolean;
   alertNokEnabled?: boolean;
@@ -171,4 +175,7 @@ export interface UpdateConfigRequest {
   microsoftSsoEnabled?: boolean;
   microsoftClientId?: string;
   microsoftTenantId?: string;
+  // Configuración de cumpleaños
+  birthdayEmailsEnabled?: boolean;
+  birthdayEmailsTime?: string;
 }

@@ -18,7 +18,7 @@ import { MatInput } from '@angular/material/input';
 import { MatSelect } from '@angular/material/select';
 import { MatOption } from '@angular/material/core';
 import { MatButton } from '@angular/material/button';
-import { NgIf, UpperCasePipe } from '@angular/common';
+import { NgIf, UpperCasePipe, DatePipe } from '@angular/common';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatIcon } from '@angular/material/icon';
 
@@ -26,7 +26,7 @@ import { MatIcon } from '@angular/material/icon';
     selector: 'app-profile',
     templateUrl: './profile.component.html',
     styleUrls: ['./profile.component.scss'],
-    imports: [ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatSelect, MatOption, MatButton, NgIf, UpperCasePipe, MatProgressSpinner, MatHint, MatIcon]
+    imports: [ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatSelect, MatOption, MatButton, NgIf, UpperCasePipe, DatePipe, MatProgressSpinner, MatHint, MatIcon]
 })
 export class ProfileComponent implements OnInit {
   profileForm!: FormGroup;
@@ -68,7 +68,8 @@ export class ProfileComponent implements OnInit {
       fullName: [this.currentUser?.fullName || '', Validators.required],
       email: [this.currentUser?.email || '', [Validators.required, Validators.email]],
       theme: [this.themeService.getCurrentTheme(), Validators.required],
-      phone: [this.currentUser?.phone || '', [Validators.maxLength(20)]]
+      phone: [this.currentUser?.phone || '', [Validators.maxLength(20)]],
+      birthday: [this.currentUser?.birthday ? this.formatDateForInput(this.currentUser.birthday) : '']
     });
 
     this.passwordForm = this.fb.group({
@@ -99,7 +100,8 @@ export class ProfileComponent implements OnInit {
           fullName: user.fullName,
           email: user.email,
           theme: user.theme || this.themeService.getCurrentTheme(),
-          phone: user.phone || ''
+          phone: user.phone || '',
+          birthday: user.birthday ? this.formatDateForInput(user.birthday) : ''
         });
         this.authService.updateCurrentUser(user);
       },
@@ -120,7 +122,14 @@ export class ProfileComponent implements OnInit {
     if (this.profileForm.invalid) return;
 
     this.isSavingProfile = true;
-    this.userService.updateProfile(this.profileForm.value)
+    const formValue = { ...this.profileForm.value };
+    if (formValue.birthday) {
+      formValue.birthday = new Date(formValue.birthday).toISOString();
+    } else {
+      formValue.birthday = null;
+    }
+
+    this.userService.updateProfile(formValue)
       .pipe(finalize(() => {
         this.isSavingProfile = false;
       }))
@@ -252,6 +261,16 @@ export class ProfileComponent implements OnInit {
       return url;
     }
     return `${this.backendBaseUrl}${url}`;
+  }
+
+  // Formatea la fecha en formato YYYY-MM-DD para controles input type="date"
+  formatDateForInput(date: any): string {
+    if (!date) return '';
+    const d = new Date(date);
+    const year = d.getUTCFullYear();
+    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   triggerAvatarUpload(input: HTMLInputElement): void {

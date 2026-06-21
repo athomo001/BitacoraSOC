@@ -50,6 +50,7 @@ const inputSanitizer = require('./middleware/input-sanitizer');
 const { logger } = require('./utils/logger');
 const { getBrandingSnapshot, getAppTitleForText } = require('./utils/branding');
 const { startChecklistAlertScheduler } = require('./utils/checklistAlertScheduler');
+const { startBirthdayEmailScheduler, stopBirthdayEmailScheduler } = require('./utils/birthdayEmailScheduler');
 const { startBackupScheduler, stopBackupScheduler } = require('./utils/backup-scheduler');
 const { startAuditRetentionScheduler, stopAuditRetentionScheduler } = require('./utils/audit-retention-scheduler');
 const { startShiftReminderScheduler, stopShiftReminderScheduler } = require('./utils/shiftReminderScheduler');
@@ -855,6 +856,7 @@ const startServers = async () => {
     startComplementCircuitHealthChecks();
     startShiftReminderScheduler();
     initEscalationScheduleScheduler();
+    startBirthdayEmailScheduler();
 
     const { startScheduler: startShiftReportScheduler } = require('./utils/shift-scheduler');
     startShiftReportScheduler();
@@ -873,6 +875,7 @@ const gracefulShutdown = (signal) => {
   stopComplementCircuitHealthChecks();
   stopShiftReminderScheduler();
   stopEscalationScheduleScheduler();
+  stopBirthdayEmailScheduler();
 
   const closeTargets = [httpServer, httpsServer].filter(Boolean);
   if (!closeTargets.length) {

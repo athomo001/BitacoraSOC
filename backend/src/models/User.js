@@ -95,6 +95,16 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  // Fecha de nacimiento para envío de correo de cumpleaños
+  birthday: {
+    type: Date,
+    default: null
+  },
+  // Indicador para obligar al usuario a actualizar su contraseña y perfil en su próximo acceso
+  mustChangePassword: {
+    type: Boolean,
+    default: false
+  },
   // Seguridad y Bloqueo de Cuenta
   failedAttempts: {
     type: Number,

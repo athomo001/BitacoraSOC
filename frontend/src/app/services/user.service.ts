@@ -54,4 +54,14 @@ export class UserService {
     formData.append('avatar', file);
     return this.http.put<{ message: string; avatarUrl: string; user: User }>(`${this.API_URL}/me/avatar`, formData);
   }
+
+  // Completa el flujo de configuración obligatoria inicial de contraseña y cumpleaños
+  forceSetup(data: { newPassword?: string; birthday?: string }): Observable<{ message: string; user: User }> {
+    return this.http.put<{ message: string; user: User }>(`${this.API_URL}/me/force-setup`, data);
+  }
+
+  // Fuerza de manera masiva el cambio de contraseña a todos los usuarios activos (excepto el administrador actual)
+  forcePasswordChangeAll(): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.API_URL}/force-password-change-all`, {});
+  }
 }

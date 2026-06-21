@@ -758,6 +758,21 @@ Links:
 3. Al activar la opción **"Habilitar MFA por TOTP"** y guardar el perfil del usuario, el backend requerirá de forma obligatoria que el usuario complete su enrolamiento y verifique su código en su siguiente login.
 4. Si el usuario pierde su dispositivo móvil o su llave TOTP, el administrador puede desactivar el flag MFA en el perfil del usuario para **restablecer** el acceso, permitiéndole ingresar nuevamente solo con contraseña o SSO y volver a enrolarse si es necesario.
 
+### Forzado de Cambio de Contraseña y Setup de Cumpleaños
+
+**Admin → Administración de Usuarios:**
+1. **Forzado Individual**: El administrador puede hacer clic en el botón de candado/llave en la fila de un usuario para marcar que este debe cambiar su contraseña de manera obligatoria en su próximo inicio de sesión.
+2. **Forzado Masivo**: En la barra lateral o superior, el administrador puede presionar el botón "Forzar Restablecimiento Masivo" para exigir el cambio de credenciales a todos los usuarios del sistema de forma simultánea (excluyendo la cuenta de administrador que realiza la acción).
+3. **Bloqueo de Navegación**: Los usuarios afectados son redirigidos de forma obligatoria a una pantalla de configuración inicial al iniciar sesión. En esta interfaz, deben cambiar su contraseña (mínimo 6 caracteres) y establecer su fecha de nacimiento (cumpleaños). Hasta que no completen esta configuración, el sistema bloqueará todo acceso a los módulos operativos y APIs.
+
+### Automatización de Correos de Cumpleaños
+
+**Admin → Configuración de Usuarios (Lateral):**
+1. **Habilitación**: Permite activar o desactivar el envío automático de correos de cumpleaños a los analistas del SOC.
+2. **Hora de Envío**: Permite definir la hora local exacta (formato `HH:mm`) en la cual se evaluará y enviará el correo el día de hoy. El campo permanece siempre visible, pero se inhabilita mediante `[disabled]` si la automatización está apagada.
+3. **Envío con Imágenes y CIDs**: Los correos se envían de forma automática utilizando una plantilla estética con diseño kawaii de felicitaciones. El logo de branding de la bitácora y la ilustración del correo se incrustan como adjuntos en línea mediante **Content-ID (CID)** para evitar imágenes rotas o vacías en clientes de correo externos.
+4. **Resiliencia de Pruebas**: Al guardar una hora modificada en el panel o reactivar la automatización, se limpia automáticamente el registro de ejecución de hoy (`lastBirthdayEmailsDate`), permitiendo gatillar el envío inmediato para fines de verificación.
+
 ### Cifrado de Respaldos (Backups)
 
 **Admin → Backup/Restore:**

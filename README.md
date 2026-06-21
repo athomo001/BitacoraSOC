@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.08**
+> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.09**
 
 Stack principal:
 
@@ -80,6 +80,13 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 ---
 
 ## Novedades recientes (resumen rapido)
+
+### v1.6.09 (obligatoriedad de cumpleaños, contraseña forzada y felicitaciones con CIDs)
+
+- **Forzado de Cambio de Contraseña**: Capacidades para exigir el restablecimiento de contraseñas de forma individual o masiva a todos los usuarios del sistema. Bloqueo reactivo total mediante un formulario de configuración inicial obligatoria de contraseña y fecha de cumpleaños.
+- **Automatización de Correos de Cumpleaños**: Scheduler diario (`birthdayEmailScheduler.js`) para el envío automático de felicitaciones en formato HTML en base a la hora de envío local configurada.
+- **Solución a Imágenes Rotas (MIME Inline + CID)**: Reestructuración de la lógica de envío de correos para adjuntar la ilustración kawaii (`birthday_kawaii.png`) y el logotipo de branding en línea mediante Content-ID (CID). Movimiento de la ilustración a los recursos estáticos del código (`src/assets/branding/`) para evitar enmascaramientos del volumen de Docker uploads.
+- **Optimización y Testabilidad del Programador**: Disminución del intervalo de comprobación a 2 minutos y reinicio del bloqueo del envío diario de hoy de forma transparente cuando el administrador modifica la hora de envío o reactiva el servicio.
 
 ### v1.6.08 (actualización a pnpm 11.7.0 y dependencias)
 

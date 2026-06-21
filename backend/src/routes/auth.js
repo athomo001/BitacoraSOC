@@ -305,7 +305,9 @@ router.post('/login',
           role: user.role,
           theme: user.theme,
           avatar: user.avatar,
-          guestExpiresAt: user.guestExpiresAt
+          guestExpiresAt: user.guestExpiresAt,
+          mustChangePassword: user.mustChangePassword,
+          birthday: user.birthday
         }
       });
     } catch (error) {
@@ -682,7 +684,9 @@ router.post('/mfa/verify', mfaSetupVerifyAuth, async (req, res) => {
         role: user.role,
         theme: user.theme,
         avatar: user.avatar,
-        guestExpiresAt: user.guestExpiresAt
+        guestExpiresAt: user.guestExpiresAt,
+        mustChangePassword: user.mustChangePassword,
+        birthday: user.birthday
       };
     }
 
@@ -790,7 +794,9 @@ router.post('/mfa/authenticate', async (req, res) => {
         role: user.role,
         theme: user.theme,
         avatar: user.avatar,
-        guestExpiresAt: user.guestExpiresAt
+        guestExpiresAt: user.guestExpiresAt,
+        mustChangePassword: user.mustChangePassword,
+        birthday: user.birthday
       }
     });
   } catch (error) {
