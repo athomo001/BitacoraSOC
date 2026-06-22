@@ -40,6 +40,11 @@ const SHIFT_ROLE_ORDER = {
   N2: 2,
   TI: 3
 };
+const ROLE_TELEWORK = 'TELEWORK';
+const ROLE_VACATION = 'VACATION';
+const ROLE_MEDICAL_LEAVE = 'MEDICAL_LEAVE';
+const ABSENCE_ROLE_CODES = ['VACATION', 'MEDICAL_LEAVE'];
+const NON_EXCLUSIVE_ASSIGNMENT_ROLE_CODES = [ROLE_TELEWORK, ...ABSENCE_ROLE_CODES];
 const UPLOADS_LOGOS_DIR = path.resolve(path.join(__dirname, '../../uploads/logos'));
 
 const contentTypeFromLogoFilename = (filename) => {
@@ -136,15 +141,16 @@ const cargoMatchesRoleCode = (cargoLabel, roleCode) => {
 };
 
 const findAssignmentConflict = async ({ roleCode, weekStartDate, weekEndDate, excludeId }) => {
-  // Las asignaciones de teletrabajo o vacaciones no tienen conflicto de exclusividad de rol único
-  if (roleCode === 'TELEWORK' || roleCode === 'VACATION') {
+  // Teletrabajo y ausencias no tienen conflicto de exclusividad de rol único
+  if (NON_EXCLUSIVE_ASSIGNMENT_ROLE_CODES.includes(roleCode)) {
     return null;
   }
 
   const conflictFilter = {
     roleCode,
     weekStartDate,
-    weekEndDate
+    weekEndDate,
+    isPaused: { $ne: true }
   };
 
   if (excludeId) {
@@ -154,6 +160,94 @@ const findAssignmentConflict = async ({ roleCode, weekStartDate, weekEndDate, ex
   return ShiftAssignment.findOne(conflictFilter)
     .populate('userId', 'fullName')
     .populate('externalPersonId', 'name');
+};
+
+const findOverlappingMedicalLeave = async ({ assigneeFilter, weekStartDate, weekEndDate, excludeId }) => {
+  const filter = {
+    ...assigneeFilter,
+    roleCode: ROLE_MEDICAL_LEAVE,
+    isPaused: { $ne: true },
+    weekStartDate: { $lt: weekEndDate },
+    weekEndDate: { $gt: weekStartDate }
+  };
+
+  if (excludeId) {
+    filter._id = { $ne: excludeId };
+  }
+
+  return ShiftAssignment.findOne(filter);
+};
+
+const pauseAssignmentsForMedicalLeave = async ({ medicalLeaveId, assigneeFilter, weekStartDate, weekEndDate }) => {
+  const pauseFilter = {
+    ...assigneeFilter,
+    _id: { $ne: medicalLeaveId },
+    roleCode: { $ne: ROLE_MEDICAL_LEAVE },
+    weekStartDate: { $lt: weekEndDate },
+    weekEndDate: { $gt: weekStartDate },
+    isPaused: { $ne: true }
+  };
+
+  const pauseResult = await ShiftAssignment.updateMany(
+    pauseFilter,
+    {
+      $set: {
+        isPaused: true,
+        pausedByMedicalLeaveId: medicalLeaveId
+      }
+    }
+  );
+
+  return pauseResult.modifiedCount || 0;
+};
+
+const restoreAssignmentsPausedByMedicalLeave = async (medicalLeaveId) => {
+  const restoreResult = await ShiftAssignment.updateMany(
+    { pausedByMedicalLeaveId: medicalLeaveId },
+    {
+      $set: { isPaused: false },
+      $unset: { pausedByMedicalLeaveId: '' }
+    }
+  );
+
+  return restoreResult.modifiedCount || 0;
+};
+
+const restoreExpiredMedicalLeavePauses = async (referenceDate = new Date()) => {
+  const pausedMedicalLeaveIds = await ShiftAssignment.distinct('pausedByMedicalLeaveId', {
+    isPaused: true,
+    pausedByMedicalLeaveId: { $ne: null }
+  });
+
+  if (!pausedMedicalLeaveIds.length) {
+    return 0;
+  }
+
+  const activeMedicalLeaves = await ShiftAssignment.find({
+    _id: { $in: pausedMedicalLeaveIds },
+    roleCode: ROLE_MEDICAL_LEAVE,
+    weekEndDate: { $gte: referenceDate }
+  }).select('_id');
+
+  const activeIds = new Set(activeMedicalLeaves.map((leave) => String(leave._id)));
+  const expiredMedicalLeaveIds = pausedMedicalLeaveIds.filter((leaveId) => !activeIds.has(String(leaveId)));
+
+  if (!expiredMedicalLeaveIds.length) {
+    return 0;
+  }
+
+  const restoreResult = await ShiftAssignment.updateMany(
+    {
+      isPaused: true,
+      pausedByMedicalLeaveId: { $in: expiredMedicalLeaveIds }
+    },
+    {
+      $set: { isPaused: false },
+      $unset: { pausedByMedicalLeaveId: '' }
+    }
+  );
+
+  return restoreResult.modifiedCount || 0;
 };
 
 const formatConflictMessage = (conflict) => {
@@ -249,6 +343,7 @@ const formatShiftAssignmentsTemplateCsv = () => ([
   '#   - N1 (Guardia N1 No Hábil)',
   '#   - Teletrabajo (o TELEWORK)',
   '#   - Vacaciones (o VACATION)',
+  '#   - Licencia medica (o MEDICAL_LEAVE)',
   '# Columna "usuario": Username, correo electrónico o nombre completo registrado del analista.',
   '# Columna "fechaInicio" / "fechaFin": Fecha en formato AAAA-MM-DD (Ej: 2026-06-15)',
   '# Columna "horaInicio" / "horaFin": Hora en formato HH:MM de 24 horas (Ej: 09:00)',
@@ -458,6 +553,8 @@ async function getEscalationNow(serviceId, now = new Date()) {
  */
 async function resolveCurrentShift(roleCode, now) {
   try {
+    await restoreExpiredMedicalLeavePauses(now);
+
     // 1. Buscar override activo
     const override = await ShiftOverride.findOne({
       roleCode,
@@ -488,6 +585,7 @@ async function resolveCurrentShift(roleCode, now) {
     // 2. Buscar asignación regular que cubra "now"
     const assignment = await ShiftAssignment.findOne({
       roleCode,
+      isPaused: { $ne: true },
       weekStartDate: { $lte: now },
       weekEndDate: { $gte: now }
     }).populate('userId', 'fullName email phone').populate('externalPersonId', 'name email phone');
@@ -1610,6 +1708,8 @@ exports.deleteCycle = async (req, res) => {
 
 exports.getAssignments = async (req, res) => {
   try {
+    await restoreExpiredMedicalLeavePauses();
+
     const { roleCode, fromDate, toDate, limit } = req.query;
     const filter = {};
     if (roleCode) {
@@ -1624,6 +1724,8 @@ exports.getAssignments = async (req, res) => {
         filter.weekStartDate.$lte = new Date(toDate);
       }
     }
+    filter.isPaused = { $ne: true };
+
     const parsedLimit = parsePositiveInt(limit, 0, 1000);
     let query = ShiftAssignment.find(filter)
       .populate('userId', 'fullName email phone cargoLabel')
@@ -1664,6 +1766,8 @@ exports.downloadAssignmentTemplateCsv = async (_req, res) => {
 
 exports.importAssignmentsCsv = async (req, res) => {
   try {
+    await restoreExpiredMedicalLeavePauses();
+
     const csvText = req.file?.buffer
       ? req.file.buffer.toString('utf8')
       : String(req.body?.csvText || '');
@@ -1689,10 +1793,11 @@ exports.importAssignmentsCsv = async (req, res) => {
         let rawRol = String(row.rol || row.rolecode || '').trim().toUpperCase();
         if (rawRol === 'TELETRABAJO') rawRol = 'TELEWORK';
         if (rawRol === 'VACACIONES') rawRol = 'VACATION';
+        if (rawRol === 'LICENCIA MEDICA' || rawRol === 'LICENCIA MÉDICA' || rawRol === 'LICENCIA_MEDICA') rawRol = 'MEDICAL_LEAVE';
         const roleCode = rawRol === 'N1' ? 'N1_NO_HABIL' : rawRol;
         // Validar que la condición ingresada esté dentro del listado permitido de valores administrativos y técnicos
-        if (!['N2', 'TI', 'N1_NO_HABIL', 'TELEWORK', 'VACATION'].includes(roleCode)) {
-          throw new Error(`Condición inválida: ${rawRol}. Usa N1, N2, TI, Teletrabajo o Vacaciones`);
+        if (!['N2', 'TI', 'N1_NO_HABIL', 'TELEWORK', 'VACATION', 'MEDICAL_LEAVE'].includes(roleCode)) {
+          throw new Error(`Condición inválida: ${rawRol}. Usa N1, N2, TI, Teletrabajo, Vacaciones o Licencia médica`);
         }
 
         const weekStartDate = buildAssignmentDateTime(row.fechainicio || row.weekstartdate, row.horainicio || row.weekstarttime);
@@ -1713,23 +1818,43 @@ exports.importAssignmentsCsv = async (req, res) => {
 
         const assigneeFilter = assignee.userId ? { userId: assignee.userId } : { externalPersonId: assignee.externalPersonId };
 
-        // Si es vacaciones, liberar automáticamente los otros turnos que se solapen en este período
-        if (roleCode === 'VACATION') {
+        if (roleCode === ROLE_MEDICAL_LEAVE) {
+          const overlappingMedicalLeave = await findOverlappingMedicalLeave({
+            assigneeFilter,
+            weekStartDate,
+            weekEndDate
+          });
+          if (overlappingMedicalLeave) {
+            throw new Error('El analista ya tiene una Licencia médica registrada en este período.');
+          }
+        } else if (roleCode === ROLE_VACATION) {
+          const medicalLeave = await findOverlappingMedicalLeave({
+            assigneeFilter,
+            weekStartDate,
+            weekEndDate
+          });
+          if (medicalLeave) {
+            throw new Error('El analista está en Licencia médica en este período.');
+          }
+
           await ShiftAssignment.deleteMany({
             ...assigneeFilter,
+            roleCode: { $ne: ROLE_MEDICAL_LEAVE },
             weekStartDate: { $lt: weekEndDate },
             weekEndDate: { $gt: weekStartDate }
           });
         } else {
-          // Si no es vacaciones, validar que no esté de vacaciones en el período solicitado
-          const onVacation = await ShiftAssignment.findOne({
+          // Si no es ausencia, validar que no tenga ausencias en el período solicitado
+          const onAbsence = await ShiftAssignment.findOne({
             ...assigneeFilter,
-            roleCode: 'VACATION',
+            roleCode: { $in: ABSENCE_ROLE_CODES },
+            isPaused: { $ne: true },
             weekStartDate: { $lt: weekEndDate },
             weekEndDate: { $gt: weekStartDate }
           });
-          if (onVacation) {
-            throw new Error(`El analista está de Vacaciones en este período.`);
+          if (onAbsence) {
+            const absenceLabel = onAbsence.roleCode === 'MEDICAL_LEAVE' ? 'Licencia médica' : 'Vacaciones';
+            throw new Error(`El analista está en ${absenceLabel} en este período.`);
           }
         }
 
@@ -1742,13 +1867,24 @@ exports.importAssignmentsCsv = async (req, res) => {
         };
 
         const existing = await findAssignmentConflict({ roleCode, weekStartDate, weekEndDate });
+        let savedAssignment = null;
         if (existing) {
-          await ShiftAssignment.findByIdAndUpdate(existing._id, payload, { new: true, runValidators: true });
+          savedAssignment = await ShiftAssignment.findByIdAndUpdate(existing._id, payload, { new: true, runValidators: true });
           results.updated += 1;
         } else {
           const assignment = new ShiftAssignment(payload);
           await assignment.save();
+          savedAssignment = assignment;
           results.created += 1;
+        }
+
+        if (roleCode === ROLE_MEDICAL_LEAVE && savedAssignment?._id) {
+          await pauseAssignmentsForMedicalLeave({
+            medicalLeaveId: savedAssignment._id,
+            assigneeFilter,
+            weekStartDate,
+            weekEndDate
+          });
         }
       } catch (error) {
         results.errorCount += 1;
@@ -1782,6 +1918,8 @@ exports.importAssignmentsCsv = async (req, res) => {
 
 exports.createAssignment = async (req, res) => {
   try {
+    await restoreExpiredMedicalLeavePauses();
+
     const weekStartDate = new Date(req.body.weekStartDate);
     const weekEndDate = new Date(req.body.weekEndDate);
 
@@ -1805,34 +1943,62 @@ exports.createAssignment = async (req, res) => {
       }
     }
 
-    // Si no es vacaciones, validar que no esté de vacaciones en el período solicitado
-    if (req.body.roleCode !== 'VACATION') {
-      const onVacation = await ShiftAssignment.findOne({
+    // Reglas de compatibilidad por tipo de condición
+    if (req.body.roleCode === ROLE_MEDICAL_LEAVE) {
+      const overlappingMedicalLeave = await findOverlappingMedicalLeave({
+        assigneeFilter,
+        weekStartDate,
+        weekEndDate
+      });
+
+      if (overlappingMedicalLeave) {
+        return res.status(409).json({
+          error: `El analista ya tiene una Licencia médica registrada en este período (${new Date(overlappingMedicalLeave.weekStartDate).toLocaleDateString('es-CL')} - ${new Date(overlappingMedicalLeave.weekEndDate).toLocaleDateString('es-CL')}).`
+        });
+      }
+    } else if (req.body.roleCode === ROLE_VACATION) {
+      const medicalLeave = await findOverlappingMedicalLeave({
+        assigneeFilter,
+        weekStartDate,
+        weekEndDate
+      });
+
+      if (medicalLeave) {
+        return res.status(409).json({
+          error: `El analista está en Licencia médica en este período (${new Date(medicalLeave.weekStartDate).toLocaleDateString('es-CL')} - ${new Date(medicalLeave.weekEndDate).toLocaleDateString('es-CL')}).`
+        });
+      }
+    } else {
+      const onAbsence = await ShiftAssignment.findOne({
         ...assigneeFilter,
-        roleCode: 'VACATION',
+        roleCode: { $in: ABSENCE_ROLE_CODES },
+        isPaused: { $ne: true },
         weekStartDate: { $lt: weekEndDate },
         weekEndDate: { $gt: weekStartDate }
       });
-      if (onVacation) {
+      if (onAbsence) {
+        const absenceLabel = onAbsence.roleCode === 'MEDICAL_LEAVE' ? 'Licencia médica' : 'Vacaciones';
         return res.status(409).json({
-          error: `El analista ya está registrado en Vacaciones en este período (${new Date(onVacation.weekStartDate).toLocaleDateString('es-CL')} - ${new Date(onVacation.weekEndDate).toLocaleDateString('es-CL')}).`
+          error: `El analista ya está registrado en ${absenceLabel} en este período (${new Date(onAbsence.weekStartDate).toLocaleDateString('es-CL')} - ${new Date(onAbsence.weekEndDate).toLocaleDateString('es-CL')}).`
         });
       }
     }
 
-    let vacationAutoCleaned = false;
+    let absenceAutoCleaned = false;
     let deletedShiftsCount = 0;
+    let pausedAssignmentsCount = 0;
 
-    // Si es vacaciones, eliminar automáticamente cualquier otra asignación en este período para el mismo analista
-    if (req.body.roleCode === 'VACATION') {
+    // Vacaciones mantiene el comportamiento histórico de limpieza para evitar solapes.
+    if (req.body.roleCode === ROLE_VACATION) {
       const cleanResult = await ShiftAssignment.deleteMany({
         ...assigneeFilter,
+        roleCode: { $ne: ROLE_MEDICAL_LEAVE },
         weekStartDate: { $lt: weekEndDate },
         weekEndDate: { $gt: weekStartDate }
       });
       deletedShiftsCount = cleanResult.deletedCount || 0;
       if (deletedShiftsCount > 0) {
-        vacationAutoCleaned = true;
+        absenceAutoCleaned = true;
       }
     }
 
@@ -1848,15 +2014,35 @@ exports.createAssignment = async (req, res) => {
 
     const assignment = new ShiftAssignment(req.body);
     await assignment.save();
+
+    if (req.body.roleCode === ROLE_MEDICAL_LEAVE) {
+      pausedAssignmentsCount = await pauseAssignmentsForMedicalLeave({
+        medicalLeaveId: assignment._id,
+        assigneeFilter,
+        weekStartDate,
+        weekEndDate
+      });
+
+      if (pausedAssignmentsCount > 0) {
+        absenceAutoCleaned = true;
+      }
+    }
+
     await assignment.populate('userId', 'fullName email phone cargoLabel');
     await assignment.populate('externalPersonId', 'name email phone position');
     logger.info('Shift assignment created:', { assignmentId: assignment._id, roleCode: assignment.roleCode });
 
     const responseObj = assignment.toObject();
-    if (vacationAutoCleaned) {
+    if (absenceAutoCleaned) {
       responseObj.vacationAutoCleaned = true;
+      responseObj.absenceAutoCleaned = true;
       responseObj.deletedShiftsCount = deletedShiftsCount;
-      responseObj.message = `Turno de vacaciones registrado. Se liberaron automáticamente ${deletedShiftsCount} turno(s) previo(s) del analista en este período.`;
+      responseObj.pausedAssignmentsCount = pausedAssignmentsCount;
+      if (req.body.roleCode === ROLE_MEDICAL_LEAVE) {
+        responseObj.message = `Licencia médica registrada. Se pausaron automáticamente ${pausedAssignmentsCount} turno(s) previo(s) del analista en este período.`;
+      } else {
+        responseObj.message = `Turno de vacaciones registrado. Se liberaron automáticamente ${deletedShiftsCount} turno(s) previo(s) del analista en este período.`;
+      }
     }
 
     res.status(201).json(responseObj);
@@ -1868,6 +2054,8 @@ exports.createAssignment = async (req, res) => {
 
 exports.updateAssignment = async (req, res) => {
   try {
+    await restoreExpiredMedicalLeavePauses();
+
     const { id } = req.params;
 
     const existing = await ShiftAssignment.findById(id);
@@ -1901,36 +2089,72 @@ exports.updateAssignment = async (req, res) => {
 
     const assigneeFilter = userId ? { userId: userId } : { externalPersonId: externalPersonId };
 
-    // Si no es vacaciones, validar que no esté de vacaciones en el período solicitado
-    if (roleCode !== 'VACATION') {
-      const onVacation = await ShiftAssignment.findOne({
+    // Reglas de compatibilidad por tipo de condición
+    if (roleCode === ROLE_MEDICAL_LEAVE) {
+      const overlappingMedicalLeave = await findOverlappingMedicalLeave({
+        assigneeFilter,
+        weekStartDate,
+        weekEndDate,
+        excludeId: id
+      });
+
+      if (overlappingMedicalLeave) {
+        return res.status(409).json({
+          error: `El analista ya tiene una Licencia médica registrada en este período (${new Date(overlappingMedicalLeave.weekStartDate).toLocaleDateString('es-CL')} - ${new Date(overlappingMedicalLeave.weekEndDate).toLocaleDateString('es-CL')}).`
+        });
+      }
+    } else if (roleCode === ROLE_VACATION) {
+      const medicalLeave = await findOverlappingMedicalLeave({
+        assigneeFilter,
+        weekStartDate,
+        weekEndDate,
+        excludeId: id
+      });
+
+      if (medicalLeave) {
+        return res.status(409).json({
+          error: `El analista está en Licencia médica en este período (${new Date(medicalLeave.weekStartDate).toLocaleDateString('es-CL')} - ${new Date(medicalLeave.weekEndDate).toLocaleDateString('es-CL')}).`
+        });
+      }
+    } else {
+      const onAbsence = await ShiftAssignment.findOne({
         ...assigneeFilter,
-        roleCode: 'VACATION',
+        roleCode: { $in: ABSENCE_ROLE_CODES },
+        isPaused: { $ne: true },
         weekStartDate: { $lt: weekEndDate },
         weekEndDate: { $gt: weekStartDate },
         _id: { $ne: id }
       });
-      if (onVacation) {
+      if (onAbsence) {
+        const absenceLabel = onAbsence.roleCode === 'MEDICAL_LEAVE' ? 'Licencia médica' : 'Vacaciones';
         return res.status(409).json({
-          error: `El analista ya está registrado en Vacaciones en este período (${new Date(onVacation.weekStartDate).toLocaleDateString('es-CL')} - ${new Date(onVacation.weekEndDate).toLocaleDateString('es-CL')}).`
+          error: `El analista ya está registrado en ${absenceLabel} en este período (${new Date(onAbsence.weekStartDate).toLocaleDateString('es-CL')} - ${new Date(onAbsence.weekEndDate).toLocaleDateString('es-CL')}).`
         });
       }
     }
 
-    let vacationAutoCleaned = false;
+    let absenceAutoCleaned = false;
     let deletedShiftsCount = 0;
+    let pausedAssignmentsCount = 0;
+    let restoredAssignmentsCount = 0;
 
-    // Si es vacaciones, eliminar automáticamente cualquier otra asignación en este período para el mismo analista
-    if (roleCode === 'VACATION') {
+    // Si esta asignación era licencia médica, restaurar primero su estado pausado anterior
+    if (existing.roleCode === ROLE_MEDICAL_LEAVE) {
+      restoredAssignmentsCount = await restoreAssignmentsPausedByMedicalLeave(existing._id);
+    }
+
+    // Vacaciones mantiene el comportamiento histórico de limpieza para evitar solapes.
+    if (roleCode === ROLE_VACATION) {
       const cleanResult = await ShiftAssignment.deleteMany({
         ...assigneeFilter,
+        roleCode: { $ne: ROLE_MEDICAL_LEAVE },
         weekStartDate: { $lt: weekEndDate },
         weekEndDate: { $gt: weekStartDate },
         _id: { $ne: id }
       });
       deletedShiftsCount = cleanResult.deletedCount || 0;
       if (deletedShiftsCount > 0) {
-        vacationAutoCleaned = true;
+        absenceAutoCleaned = true;
       }
     }
 
@@ -1948,13 +2172,37 @@ exports.updateAssignment = async (req, res) => {
     const assignment = await ShiftAssignment.findByIdAndUpdate(id, req.body, { new: true, runValidators: true })
       .populate('userId', 'fullName email phone cargoLabel')
       .populate('externalPersonId', 'name email phone position');
+
+    // Si la asignación final es licencia médica, volver a pausar según su nuevo rango.
+    if (roleCode === ROLE_MEDICAL_LEAVE) {
+      pausedAssignmentsCount = await pauseAssignmentsForMedicalLeave({
+        medicalLeaveId: assignment._id,
+        assigneeFilter,
+        weekStartDate,
+        weekEndDate
+      });
+    }
+
+    if (pausedAssignmentsCount > 0 || deletedShiftsCount > 0 || restoredAssignmentsCount > 0) {
+      absenceAutoCleaned = true;
+    }
+
     logger.info('Shift assignment updated:', { assignmentId: assignment._id, roleCode: assignment.roleCode });
 
     const responseObj = assignment.toObject();
-    if (vacationAutoCleaned) {
+    if (absenceAutoCleaned) {
       responseObj.vacationAutoCleaned = true;
+      responseObj.absenceAutoCleaned = true;
       responseObj.deletedShiftsCount = deletedShiftsCount;
-      responseObj.message = `Turno de vacaciones actualizado. Se liberaron automáticamente ${deletedShiftsCount} turno(s) previo(s) del analista en este período.`;
+      responseObj.pausedAssignmentsCount = pausedAssignmentsCount;
+      responseObj.restoredAssignmentsCount = restoredAssignmentsCount;
+      if (roleCode === ROLE_MEDICAL_LEAVE) {
+        responseObj.message = `Licencia médica actualizada. Se pausaron ${pausedAssignmentsCount} turno(s) y se reactivaron ${restoredAssignmentsCount} turno(s) previos según el nuevo período.`;
+      } else if (existing.roleCode === ROLE_MEDICAL_LEAVE && restoredAssignmentsCount > 0) {
+        responseObj.message = `Asignación actualizada. Se reactivaron ${restoredAssignmentsCount} turno(s) que estaban en pausa por la licencia médica anterior.`;
+      } else {
+        responseObj.message = `Turno de vacaciones actualizado. Se liberaron automáticamente ${deletedShiftsCount} turno(s) previo(s) del analista en este período.`;
+      }
     }
 
     res.json(responseObj);
@@ -1967,11 +2215,26 @@ exports.updateAssignment = async (req, res) => {
 exports.deleteAssignment = async (req, res) => {
   try {
     const { id } = req.params;
-    const assignment = await ShiftAssignment.findByIdAndDelete(id);
+    const assignment = await ShiftAssignment.findById(id);
     if (!assignment) {
       return res.status(404).json({ error: 'Shift assignment not found' });
     }
+
+    let restoredAssignmentsCount = 0;
+    if (assignment.roleCode === ROLE_MEDICAL_LEAVE) {
+      restoredAssignmentsCount = await restoreAssignmentsPausedByMedicalLeave(assignment._id);
+    }
+
+    await ShiftAssignment.findByIdAndDelete(id);
+
     logger.info('Shift assignment deleted:', { assignmentId: assignment._id });
+    if (restoredAssignmentsCount > 0) {
+      return res.json({
+        message: `Licencia médica eliminada. Se reactivaron ${restoredAssignmentsCount} turno(s) que estaban en pausa.`,
+        restoredAssignmentsCount
+      });
+    }
+
     res.json({ message: 'Shift assignment deleted successfully' });
   } catch (error) {
     logger.error('Error in deleteAssignment:', error);
@@ -2249,6 +2512,8 @@ exports.triggerEscalationScheduleSend = async (req, res) => {
  */
 exports.sendEscalationScheduleInternal = async ({ name, recipients, ccRecipients, frequency = 'weekly', roleFilter = [] }) => {
   try {
+    await restoreExpiredMedicalLeavePauses();
+
     const now = new Date();
     let startDate = new Date(now);
     let endDate = new Date(now);
@@ -2307,6 +2572,7 @@ exports.sendEscalationScheduleInternal = async ({ name, recipients, ccRecipients
 
     // Obtener asignaciones en el rango
     const assignments = await ShiftAssignment.find({
+      isPaused: { $ne: true },
       $or: [
         { weekStartDate: { $gte: startDate, $lte: endDate } },
         { weekEndDate: { $gte: startDate, $lte: endDate } },
