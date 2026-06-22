@@ -12,7 +12,7 @@ const shiftAssignmentSchema = new mongoose.Schema({
     required: true,
     uppercase: true,
     trim: true,
-    enum: ['N2', 'TI', 'N1_NO_HABIL', 'TELEWORK', 'VACATION']
+    enum: ['N2', 'TI', 'N1_NO_HABIL', 'TELEWORK', 'VACATION', 'MEDICAL_LEAVE']
   },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -33,6 +33,15 @@ const shiftAssignmentSchema = new mongoose.Schema({
   notes: {
     type: String,
     trim: true
+  },
+  isPaused: {
+    type: Boolean,
+    default: false
+  },
+  pausedByMedicalLeaveId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ShiftAssignment',
+    default: null
   }
 }, {
   timestamps: true
@@ -42,6 +51,7 @@ const shiftAssignmentSchema = new mongoose.Schema({
 shiftAssignmentSchema.index({ roleCode: 1, weekStartDate: 1, weekEndDate: 1 });
 shiftAssignmentSchema.index({ userId: 1 });
 shiftAssignmentSchema.index({ externalPersonId: 1 });
+shiftAssignmentSchema.index({ pausedByMedicalLeaveId: 1 });
 
 // Validación: weekEndDate debe ser mayor a weekStartDate
 shiftAssignmentSchema.pre('save', function(next) {

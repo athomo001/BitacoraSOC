@@ -54,7 +54,7 @@ const shiftNotificationScheduleSchema = new mongoose.Schema({
     type: String,
     trim: true,
     uppercase: true,
-    enum: ['N2', 'TI', 'N1_NO_HABIL', 'TELEWORK', 'VACATION']
+    enum: ['N2', 'TI', 'N1_NO_HABIL', 'TELEWORK', 'VACATION', 'MEDICAL_LEAVE']
   }],
   // Almacena la fecha y hora del último envío automático exitoso
   lastSentAt: {

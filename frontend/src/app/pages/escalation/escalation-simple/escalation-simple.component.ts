@@ -524,14 +524,16 @@ export class EscalationSimpleComponent implements OnInit {
   loadTeleworkStaff(): void {
     const assignments$ = this.escalationService.getAssignments(undefined, this.currentWeekStart.toISOString(), this.currentWeekEnd.toISOString());
     const futureVacations$ = this.escalationService.getAssignments('VACATION', this.currentWeekStart.toISOString(), undefined, 100);
+    const futureMedicalLeaves$ = this.escalationService.getAssignments('MEDICAL_LEAVE', this.currentWeekStart.toISOString(), undefined, 100);
 
-    forkJoin([assignments$, futureVacations$]).subscribe({
-      next: ([assignments, futureVacations]) => {
+    forkJoin([assignments$, futureVacations$, futureMedicalLeaves$]).subscribe({
+      next: ([assignments, futureVacations, futureMedicalLeaves]) => {
+        const futureAbsences = [...futureVacations, ...futureMedicalLeaves];
         const list: any[] = [];
         const processedUserIds = new Set<string>();
         const processedExtIds = new Set<string>();
 
-        // 1. Procesar primero las vacaciones activas de esta semana (Prioridad máxima)
+        // 1. Procesar primero las ausencias activas de esta semana (Prioridad máxima)
         assignments.forEach(asg => {
           const personName = asg.userId?.fullName || asg.externalPersonId?.name || 'Sin asignar';
           const personPhone = asg.userId?.phone || asg.externalPersonId?.phone || '-';
@@ -540,26 +542,27 @@ export class EscalationSimpleComponent implements OnInit {
           const userIdStr = asg.userId?._id || asg.userId;
           const extIdStr = asg.externalPersonId?._id || asg.externalPersonId;
 
-          if (asg.roleCode === 'VACATION') {
+          if (asg.roleCode === 'VACATION' || asg.roleCode === 'MEDICAL_LEAVE') {
+            const isMedicalLeave = asg.roleCode === 'MEDICAL_LEAVE';
             list.push({
               name: personName,
               phone: personPhone,
               email: personEmail,
               role: roleName,
               status: 'vacation',
-              statusLabel: 'VACACIONES'
+              statusLabel: isMedicalLeave ? 'LICENCIA MÉDICA' : 'VACACIONES'
             });
             if (userIdStr) processedUserIds.add(String(userIdStr));
             if (extIdStr) processedExtIds.add(String(extIdStr));
           }
         });
 
-        // 2. Procesar vacaciones futuras que inician pronto (dentro de las próximas 2 semanas / 14 días)
+        // 2. Procesar ausencias futuras que inician pronto (dentro de las próximas 2 semanas / 14 días)
         const referenceEnd = new Date(this.currentWeekEnd);
         const futureLimit = new Date(referenceEnd);
         futureLimit.setDate(futureLimit.getDate() + 14);
 
-        futureVacations.forEach(asg => {
+        futureAbsences.forEach(asg => {
           const userIdStr = asg.userId?._id || asg.userId;
           const extIdStr = asg.externalPersonId?._id || asg.externalPersonId;
 
@@ -568,6 +571,7 @@ export class EscalationSimpleComponent implements OnInit {
           if (extIdStr && processedExtIds.has(String(extIdStr))) return;
 
           const vStart = new Date(asg.weekStartDate);
+          const isMedicalLeave = asg.roleCode === 'MEDICAL_LEAVE';
           if (vStart > referenceEnd && vStart <= futureLimit) {
             const personName = asg.userId?.fullName || asg.externalPersonId?.name || 'Sin asignar';
             const personPhone = asg.userId?.phone || asg.externalPersonId?.phone || '-';
@@ -580,7 +584,7 @@ export class EscalationSimpleComponent implements OnInit {
               email: personEmail,
               role: roleName,
               status: 'upcoming-vacation',
-              statusLabel: 'Pronto Vacaciones'
+              statusLabel: isMedicalLeave ? 'Pronto Licencia médica' : 'Pronto Vacaciones'
             });
 
             if (userIdStr) processedUserIds.add(String(userIdStr));
@@ -613,7 +617,7 @@ export class EscalationSimpleComponent implements OnInit {
             });
             if (userIdStr) processedUserIds.add(String(userIdStr));
             if (extIdStr) processedExtIds.add(String(extIdStr));
-          } else if (asg.roleCode !== 'VACATION') {
+          } else if (asg.roleCode !== 'VACATION' && asg.roleCode !== 'MEDICAL_LEAVE') {
             // Analistas regulares en oficina
             list.push({
               name: personName,
@@ -639,7 +643,7 @@ export class EscalationSimpleComponent implements OnInit {
         this.cdr.detectChanges();
       },
       error: (err) => {
-        console.error('Error loading telework/vacation staff:', err);
+        console.error('Error loading telework/absence staff:', err);
       }
     });
   }
@@ -653,6 +657,7 @@ export class EscalationSimpleComponent implements OnInit {
     if (roleCode === 'TI') return 'TI - Infraestructura';
     if (roleCode === 'TELEWORK') return 'Teletrabajo';
     if (roleCode === 'VACATION') return 'Vacaciones';
+    if (roleCode === 'MEDICAL_LEAVE') return 'Licencia médica';
     return roleCode;
   }
 
