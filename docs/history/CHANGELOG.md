@@ -2,6 +2,19 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.11] - 2026-06-23
+
+### Corrección de Error 400 al Crear Usuarios de Forma Consecutiva
+
+- **Fix de validación al crear usuarios (`POST /api/users`)**: Se corrigió un bug que provocaba `400 Bad Request` con mensaje genérico `Errores de validación` al crear un segundo usuario consecutivo desde la UI de administración. El problema se activaba cuando el campo `phone` quedaba en `null` tras un `reset()` del formulario y luego era reenviado al backend.
+- **Normalización defensiva en frontend**: En el formulario de administración de usuarios se normaliza el teléfono antes de enviar la solicitud. Si el valor viene vacío o nulo, se omite del payload (`undefined`) para evitar validaciones falsas.
+- **Compatibilidad endurecida en backend**: Se actualizaron validaciones en rutas de usuarios para aceptar `phone` nullable en:
+  - `POST /api/users`
+  - `PUT /api/users/:id`
+  - `PUT /api/users/me`
+  Esto evita rechazos cuando algún cliente legítimo envía `null` en lugar de string vacío.
+- **Mejora de experiencia de error en UI**: Cuando el backend responde con `errors[]` de `express-validator`, ahora se muestra en snackbar el primer mensaje específico de validación (`errors[0].msg`) en vez de solo el mensaje genérico.
+
 ## [v1.6.10] - 2026-06-22
 
 ### Confirmación Visual Mejorada y Notificación de Cambio de Contraseña a Usuarios Internos

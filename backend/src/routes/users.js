@@ -153,7 +153,7 @@ router.put('/me',
     body('email').optional().isEmail().normalizeEmail(),
     body('fullName').optional().trim().notEmpty(),
     body('theme').optional().isIn(['light', 'dark', 'sepia', 'pastel', 'cyberpunk']),
-    body('phone').optional().trim().isLength({ min: 6, max: 20 }).withMessage('Teléfono inválido'),
+    body('phone').optional({ nullable: true }).trim().isLength({ min: 6, max: 20 }).withMessage('Teléfono inválido'),
     body('birthday').optional().isISO8601().toDate().withMessage('Fecha de nacimiento inválida'),
     body('currentPassword').optional().notEmpty(),
     body('newPassword').optional().isLength({ min: 6 })
@@ -463,7 +463,7 @@ router.post('/',
     body('password').notEmpty().withMessage('La contraseña es requerida'),
     body('fullName').trim().notEmpty().withMessage('El nombre completo es requerido'),
     body('role').isIn(['admin', 'user', 'auditor', 'guest']).withMessage('Rol inválido'),
-    body('phone').optional().trim().isLength({ min: 6, max: 20 }).withMessage('Teléfono inválido'),
+    body('phone').optional({ nullable: true }).trim().isLength({ min: 6, max: 20 }).withMessage('Teléfono inválido'),
     body('cargoLabel').optional({ nullable: true }).isString().trim().isLength({ max: MAX_CARGO_LENGTH })
       .withMessage(`Cargo inválido (máx ${MAX_CARGO_LENGTH} caracteres)`),
     body('mfaEnabled').optional().isBoolean().withMessage('MFAEnabled debe ser booleano')
@@ -605,7 +605,7 @@ router.put('/:id',
     body('fullName').optional().trim().notEmpty(),
     body('role').optional().isIn(['admin', 'user', 'auditor', 'guest']),
     body('isActive').optional().isBoolean(),
-    body('phone').optional().trim().isLength({ min: 6, max: 20 }),
+    body('phone').optional({ nullable: true }).trim().isLength({ min: 6, max: 20 }),
     body('cargoLabel').optional({ nullable: true }).isString().trim().isLength({ max: MAX_CARGO_LENGTH })
       .withMessage(`Cargo inválido (máx ${MAX_CARGO_LENGTH} caracteres)`),
     // Permite al administrador establecer una nueva contraseña de cualquier longitud
