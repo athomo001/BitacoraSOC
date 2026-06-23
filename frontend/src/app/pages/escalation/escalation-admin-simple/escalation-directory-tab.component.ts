@@ -230,11 +230,21 @@ export class EscalationDirectoryTabComponent implements OnInit {
     const runMergeAndUserSync = () => this.directoryService.mergeDuplicates().subscribe({
       next: () => {
         this.directoryService.syncUsersFromDirectory().subscribe({
-          next: (syncResult: any) => {
-            this.mergingDirectoryDuplicates = false;
-            const updated = Number(syncResult?.updatedUsers || 0);
-            this.showSuccess(`Duplicados consolidados y usuarios sincronizados (${updated} actualizados)`);
-            this.directoryRefresh.emit();
+          next: (syncFromResult: any) => {
+            this.directoryService.syncUsersToDirectory().subscribe({
+              next: (syncToResult: any) => {
+                this.mergingDirectoryDuplicates = false;
+                const retroactive = Number(syncFromResult?.updatedUsers || 0);
+                const synced = Number(syncToResult?.syncedCount || 0);
+                this.showSuccess(`Duplicados consolidados (${retroactive} retroactivos, ${synced} al directorio)`);
+                this.directoryRefresh.emit();
+              },
+              error: () => {
+                this.mergingDirectoryDuplicates = false;
+                this.showError('Sincronización retroactiva OK, pero falló la de usuarios al directorio');
+                this.directoryRefresh.emit();
+              }
+            });
           },
           error: () => {
             this.mergingDirectoryDuplicates = false;

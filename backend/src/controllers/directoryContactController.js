@@ -10,7 +10,8 @@ const ExternalPerson = require('../models/ExternalPerson');
 const RaciEntry = require('../models/RaciEntry');
 const CatalogLogSource = require('../models/CatalogLogSource');
 const User = require('../models/User');
-const { syncManyDirectoryContacts, mergeDirectoryDuplicates } = require('../utils/directory-sync');
+const AppConfig = require('../models/AppConfig');
+const { syncManyDirectoryContacts, mergeDirectoryDuplicates, syncDirectoryContact } = require('../utils/directory-sync');
 const { audit } = require('../utils/audit');
 const { logger } = require('../utils/logger');
 const { sha256 } = require('../utils/encryption');
@@ -610,6 +611,70 @@ exports.syncUsersFromDirectoryNow = async (req, res) => {
     });
   } catch (error) {
     logger.error('Error in syncUsersFromDirectoryNow:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+exports.syncUsersToDirectoryNow = async (req, res) => {
+  try {
+    // Obtener configuración global para el LogSource por defecto
+    const config = await AppConfig.findOne();
+    let defaultCompany = '';
+    
+    if (config?.defaultLogSourceId) {
+      const logSource = await CatalogLogSource.findById(config.defaultLogSourceId);
+      defaultCompany = logSource?.name || '';
+    }
+
+    // Obtener todos los usuarios internos (admin, user, auditor, guest)
+    const internalUsers = await User.find({
+      role: { $in: ['admin', 'user', 'auditor', 'guest'] },
+      isActive: true
+    }).select('_id fullName email phone cargoLabel role');
+
+    let syncedCount = 0;
+    let errorCount = 0;
+
+    for (const user of internalUsers) {
+      try {
+        // Sincronizar cada usuario al directorio con la empresa configurada
+        await syncDirectoryContact({
+          name: user.fullName,
+          email: user.email,
+          phone: user.phone,
+          position: user.cargoLabel || user.role,
+          company: defaultCompany,
+          type: 'Internal',
+          scope: 'Internal',
+          source: 'User'
+        });
+        syncedCount++;
+      } catch (userError) {
+        logger.warn({ err: userError, userId: user._id }, 'Error sincronizando usuario individual al directorio');
+        errorCount++;
+      }
+    }
+
+    await audit(req, {
+      event: 'directory.central.sync_users_to_directory',
+      result: { success: true },
+      metadata: {
+        totalUsers: internalUsers.length,
+        syncedCount,
+        errorCount,
+        defaultCompany: defaultCompany || '(ninguna)'
+      }
+    });
+
+    return res.json({
+      message: 'Sincronización de usuarios al directorio completada',
+      totalUsers: internalUsers.length,
+      syncedCount,
+      errorCount,
+      defaultCompany: defaultCompany || '(ninguna)'
+    });
+  } catch (error) {
+    logger.error('Error in syncUsersToDirectoryNow:', error);
     return res.status(500).json({ error: error.message });
   }
 };
