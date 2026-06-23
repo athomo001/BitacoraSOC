@@ -2,6 +2,29 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.12] - 2026-06-23
+
+### Auto-Población de Empresa para Usuarios Internos en Directorio de Contactos
+
+- **Nuevo Campo de Configuración Global**: Se agregó el campo `defaultCompanyName` al modelo `AppConfig` en el backend, permitiendo a los administradores definir una empresa por defecto de forma centralizada. Este valor se utiliza automáticamente en la sincronización de usuarios internos al directorio de contactos, eliminando la necesidad de ingreso manual por usuario.
+- **Auto-Sincronización Mejorada**: Se actualizó la función `syncUserAsDirectoryInternal()` en la ruta de usuarios para que:
+  - Sea asíncrona y obtenga el valor de `AppConfig.defaultCompanyName` de forma automática.
+  - Incluya el campo `company` en la sincronización al modelo `DirectoryContact`.
+  - Aplique el valor de empresa a todos los usuarios con roles operacionales (admin, user, auditor) durante la creación/actualización.
+  - Maneje errores de sincronización sin detener el flujo de creación/actualización de usuarios (fallback graceful).
+- **Interfaz de Usuario en Panel de Administración**: Se agregó un nuevo campo de entrada de texto en la pantalla de branding (`/main/logo`) bajo la sección "Asignaciones por Defecto":
+  - Campo: "Empresa por Defecto (Usuarios Internos)" con límite de 160 caracteres.
+  - Hint explicativo: "Se asignará automáticamente a los usuarios internos en el directorio de contactos".
+  - Integración completa con el formulario reactivo y guardado sincronizado con otras configuraciones de branding.
+- **Modelos TypeScript Actualizados**: Se añadió el campo `defaultCompanyName?: string;` en:
+  - Interfaz `AppConfig` en `frontend/src/app/models/config.model.ts`
+  - Interfaz `UpdateConfigRequest` para completar el contrato de actualización de configuración.
+- **Beneficios de Negocio**:
+  - Eliminación de duplicación manual de empresa para cada usuario interno.
+  - Centralización de configuración empresarial (single source of truth).
+  - Mejor integridad de datos en el directorio de contactos.
+  - Reducción de errores por omisión de campo.
+
 ## [v1.6.11] - 2026-06-23
 
 ### Corrección de Error 400 al Crear Usuarios de Forma Consecutiva

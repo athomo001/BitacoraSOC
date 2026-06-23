@@ -38,6 +38,7 @@ export interface AppConfig {
   faviconUrl?: string;
   faviconType?: 'url' | 'upload' | 'external';
   defaultLogSourceId?: string | { _id: string; name: string; enabled: boolean };
+  defaultCompanyName?: string;
   emailReportConfig?: EmailReportConfig;
   incidentEmailPaletteKey?: string;
   smtpConfig?: SmtpConfig;
@@ -157,6 +158,7 @@ export interface UpdateConfigRequest {
   logoUrl?: string;
   faviconUrl?: string;
   defaultLogSourceId?: string | null;
+  defaultCompanyName?: string;
   emailReportConfig?: EmailReportConfig;
   incidentEmailPaletteKey?: string;
   smtpConfig?: SmtpConfig;
