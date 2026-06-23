@@ -150,6 +150,7 @@
               <td>
                 <span class="badge-status" [class]="staff.status">
                   <mat-icon *ngIf="staff.status === 'telework'">home</mat-icon>
+                  <mat-icon *ngIf="staff.status === 'training'">school</mat-icon>
                   <mat-icon *ngIf="staff.status === 'office'">business</mat-icon>
                   <mat-icon *ngIf="staff.status === 'vacation'">event_busy</mat-icon>
                   <mat-icon *ngIf="staff.status === 'upcoming-vacation'">event_note</mat-icon>

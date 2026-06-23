@@ -12,7 +12,7 @@ const shiftAssignmentSchema = new mongoose.Schema({
     required: true,
     uppercase: true,
     trim: true,
-    enum: ['N2', 'TI', 'N1_NO_HABIL', 'TELEWORK', 'VACATION', 'MEDICAL_LEAVE']
+    enum: ['N2', 'TI', 'N1_NO_HABIL', 'TELEWORK', 'OL', 'VACATION', 'MEDICAL_LEAVE']
   },
   userId: {
     type: mongoose.Schema.Types.ObjectId,

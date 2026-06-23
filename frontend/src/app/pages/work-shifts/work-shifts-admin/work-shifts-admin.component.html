@@ -160,6 +160,7 @@
                     <mat-option value="TI">Especialista TI</mat-option>
                     <mat-option value="N1_NO_HABIL">Guardia N1 No Hábil</mat-option>
                     <mat-option value="TELEWORK">Teletrabajo</mat-option>
+                    <mat-option value="OL">Charla/Capacitación (OL)</mat-option>
                     <mat-option value="VACATION">Vacaciones</mat-option>
                     <mat-option value="MEDICAL_LEAVE">Licencia médica</mat-option>
                   </mat-select>
@@ -193,7 +194,7 @@
               <h4>📋 Formato de Datos de Asignación</h4>
               <p>Campos esperados para el registro o importación CSV de turnos:</p>
               <ul>
-                <li><strong>condición:</strong> N1, N2, TI, Teletrabajo, Vacaciones o Licencia médica.</li>
+                <li><strong>condición:</strong> N1, N2, TI, Teletrabajo, Charla/Capacitación (OL), Vacaciones o Licencia médica.</li>
                 <li><strong>usuario:</strong> Username recomendado; también acepta email o nombre completo. El sistema detecta si es usuario interno o persona externa.</li>
                 <li><strong>fechaInicio / horaInicio:</strong> Formato YYYY-MM-DD y HH:MM (ej: 2026-05-26, 09:00).</li>
                 <li><strong>fechaFin / horaFin:</strong> Formato YYYY-MM-DD y HH:MM (ej: 2026-06-02, 08:59).</li>
@@ -275,6 +276,7 @@
                         <mat-option value="TI">Especialista TI</mat-option>
                         <mat-option value="N1_NO_HABIL">Guardia N1 No Hábil</mat-option>
                         <mat-option value="TELEWORK">Teletrabajo</mat-option>
+                        <mat-option value="OL">Charla/Capacitación (OL)</mat-option>
                         <mat-option value="VACATION">Vacaciones</mat-option>
                         <mat-option value="MEDICAL_LEAVE">Licencia médica</mat-option>
                       </mat-select>
@@ -432,6 +434,10 @@
                             style="font-size: 10px; background-color: #e8f5e9; color: #1b5e20; padding: 2px 6px; border-radius: 4px; font-weight: 500;">
                         Teletrabajo
                       </span>
+                      <span *ngIf="s.roleFilter?.includes('OL')" 
+                            style="font-size: 10px; background-color: #fffde7; color: #8d6e00; padding: 2px 6px; border-radius: 4px; font-weight: 500;">
+                        Charla/Capacitación
+                      </span>
                       <span *ngIf="s.roleFilter?.includes('VACATION')" 
                             style="font-size: 10px; background-color: #fff3e0; color: #e65100; padding: 2px 6px; border-radius: 4px; font-weight: 500;">
                         Vacaciones
@@ -528,6 +534,7 @@
                     <div style="display: flex; flex-direction: column; gap: 6px;">
                       <mat-checkbox formControlName="includeGuard">Turno de Guardia (N1/N2/TI)</mat-checkbox>
                       <mat-checkbox formControlName="includeTelework">Teletrabajo</mat-checkbox>
+                      <mat-checkbox formControlName="includeOl">Charla/Capacitación (OL)</mat-checkbox>
                       <mat-checkbox formControlName="includeVacation">Vacaciones</mat-checkbox>
                       <mat-checkbox formControlName="includeMedicalLeave">Licencia médica</mat-checkbox>
                     </div>

@@ -41,10 +41,11 @@ const SHIFT_ROLE_ORDER = {
   TI: 3
 };
 const ROLE_TELEWORK = 'TELEWORK';
+const ROLE_OL = 'OL';
 const ROLE_VACATION = 'VACATION';
 const ROLE_MEDICAL_LEAVE = 'MEDICAL_LEAVE';
 const ABSENCE_ROLE_CODES = ['VACATION', 'MEDICAL_LEAVE'];
-const NON_EXCLUSIVE_ASSIGNMENT_ROLE_CODES = [ROLE_TELEWORK, ...ABSENCE_ROLE_CODES];
+const NON_EXCLUSIVE_ASSIGNMENT_ROLE_CODES = [ROLE_TELEWORK, ROLE_OL, ...ABSENCE_ROLE_CODES];
 const UPLOADS_LOGOS_DIR = path.resolve(path.join(__dirname, '../../uploads/logos'));
 
 const contentTypeFromLogoFilename = (filename) => {
@@ -342,6 +343,7 @@ const formatShiftAssignmentsTemplateCsv = () => ([
   '#   - TI (Especialista TI)',
   '#   - N1 (Guardia N1 No Hábil)',
   '#   - Teletrabajo (o TELEWORK)',
+  '#   - Charla/Capacitacion (o OL)',
   '#   - Vacaciones (o VACATION)',
   '#   - Licencia medica (o MEDICAL_LEAVE)',
   '# Columna "usuario": Username, correo electrónico o nombre completo registrado del analista.',
@@ -1792,12 +1794,13 @@ exports.importAssignmentsCsv = async (req, res) => {
       try {
         let rawRol = String(row.rol || row.rolecode || '').trim().toUpperCase();
         if (rawRol === 'TELETRABAJO') rawRol = 'TELEWORK';
+        if (rawRol === 'CHARLA/CAPACITACION' || rawRol === 'CHARLA/CAPACITACIÓN' || rawRol === 'CAPACITACION' || rawRol === 'CAPACITACIÓN' || rawRol === 'CHARLA') rawRol = 'OL';
         if (rawRol === 'VACACIONES') rawRol = 'VACATION';
         if (rawRol === 'LICENCIA MEDICA' || rawRol === 'LICENCIA MÉDICA' || rawRol === 'LICENCIA_MEDICA') rawRol = 'MEDICAL_LEAVE';
         const roleCode = rawRol === 'N1' ? 'N1_NO_HABIL' : rawRol;
         // Validar que la condición ingresada esté dentro del listado permitido de valores administrativos y técnicos
-        if (!['N2', 'TI', 'N1_NO_HABIL', 'TELEWORK', 'VACATION', 'MEDICAL_LEAVE'].includes(roleCode)) {
-          throw new Error(`Condición inválida: ${rawRol}. Usa N1, N2, TI, Teletrabajo, Vacaciones o Licencia médica`);
+        if (!['N2', 'TI', 'N1_NO_HABIL', 'TELEWORK', 'OL', 'VACATION', 'MEDICAL_LEAVE'].includes(roleCode)) {
+          throw new Error(`Condición inválida: ${rawRol}. Usa N1, N2, TI, Teletrabajo, Charla/Capacitación (OL), Vacaciones o Licencia médica`);
         }
 
         const weekStartDate = buildAssignmentDateTime(row.fechainicio || row.weekstartdate, row.horainicio || row.weekstarttime);

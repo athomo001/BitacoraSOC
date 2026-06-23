@@ -119,7 +119,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
   filteredDirectoryContactsForAssignment: DirectoryContact[] = [];
   showExternalPeopleForAssignment = true;
   // Lista de condiciones admitidas (operativas y administrativas)
-  roles = ['N2', 'TI', 'N1_NO_HABIL', 'TELEWORK', 'VACATION', 'MEDICAL_LEAVE'];
+  roles = ['N2', 'TI', 'N1_NO_HABIL', 'TELEWORK', 'OL', 'VACATION', 'MEDICAL_LEAVE'];
   editingWeeklyAssignmentId: string | null = null;
 
   // Filtros de asignación semanal
@@ -352,6 +352,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       ccRecipients: [''],
       includeGuard: [true],
       includeTelework: [false],
+      includeOl: [false],
       includeVacation: [false],
       includeMedicalLeave: [false]
     });
@@ -978,6 +979,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     if (roleCode === 'N2') return 'N2';
     if (roleCode === 'TI') return 'TI';
     if (roleCode === 'TELEWORK') return 'Teletrabajo';
+    if (roleCode === 'OL') return 'Charla/Capacitacion (OL)';
     if (roleCode === 'VACATION') return 'Vacaciones';
     if (roleCode === 'MEDICAL_LEAVE') return 'Licencia médica';
     return roleCode;
@@ -1188,7 +1190,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
 
     // Los conflictos de exclusividad no aplican si la nueva asignación es Teletrabajo o una ausencia.
     // Teletrabajo puede coexistir, y las ausencias (vacaciones/licencia) hacen limpieza automática en backend.
-    const isCurrentTeleworkOrAbsence = roleCode === 'TELEWORK' || roleCode === 'VACATION' || roleCode === 'MEDICAL_LEAVE';
+    const isCurrentTeleworkOrAbsence = roleCode === 'TELEWORK' || roleCode === 'OL' || roleCode === 'VACATION' || roleCode === 'MEDICAL_LEAVE';
 
     for (const asg of this.weeklyAssignments) {
       if (this.editingWeeklyAssignmentId && asg._id === this.editingWeeklyAssignmentId) {
@@ -1207,6 +1209,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       if (asg.roleCode === roleCode
         && !isCurrentTeleworkOrAbsence
         && asg.roleCode !== 'TELEWORK'
+        && asg.roleCode !== 'OL'
         && asg.roleCode !== 'VACATION'
         && asg.roleCode !== 'MEDICAL_LEAVE') {
         const assignedName = asg.userId?.fullName || asg.externalPersonId?.name || 'otra persona';
@@ -1224,6 +1227,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
         // Teletrabajo y ausencias no bloquean disponibilidad local porque backend resuelve ausencias.
         if (!isCurrentTeleworkOrAbsence
           && asg.roleCode !== 'TELEWORK'
+          && asg.roleCode !== 'OL'
           && asg.roleCode !== 'VACATION'
           && asg.roleCode !== 'MEDICAL_LEAVE') {
           const otherRole = this.getRoleLabel(asg.roleCode);
@@ -1256,6 +1260,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       // El conflicto de condición no aplica si uno es Teletrabajo o una ausencia.
       if (other.roleCode === roleCode
         && roleCode !== 'TELEWORK'
+        && roleCode !== 'OL'
         && roleCode !== 'VACATION'
         && roleCode !== 'MEDICAL_LEAVE') return true;
 
@@ -1263,8 +1268,8 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       const matchesExt = extId && other.externalPersonId && String(other.externalPersonId._id || other.externalPersonId) === String(extId);
       if (matchesUser || matchesExt) {
         // Si cualquiera es Teletrabajo o ausencia, no representa conflicto visual de disponibilidad.
-        if (roleCode === 'TELEWORK' || roleCode === 'VACATION' || roleCode === 'MEDICAL_LEAVE') continue;
-        if (other.roleCode === 'TELEWORK' || other.roleCode === 'VACATION' || other.roleCode === 'MEDICAL_LEAVE') continue;
+        if (roleCode === 'TELEWORK' || roleCode === 'OL' || roleCode === 'VACATION' || roleCode === 'MEDICAL_LEAVE') continue;
+        if (other.roleCode === 'TELEWORK' || other.roleCode === 'OL' || other.roleCode === 'VACATION' || other.roleCode === 'MEDICAL_LEAVE') continue;
         return true;
       }
     }
@@ -1539,6 +1544,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       ccRecipients: '',
       includeGuard: true,
       includeTelework: false,
+      includeOl: false,
       includeVacation: false,
       includeMedicalLeave: false
     });
@@ -1558,6 +1564,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     const filter = schedule.roleFilter || [];
     const includeGuard = filter.includes('N2') || filter.includes('TI') || filter.includes('N1_NO_HABIL');
     const includeTelework = filter.includes('TELEWORK');
+    const includeOl = filter.includes('OL');
     const includeVacation = filter.includes('VACATION');
     const includeMedicalLeave = filter.includes('MEDICAL_LEAVE');
 
@@ -1574,6 +1581,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       ccRecipients: ccs,
       includeGuard,
       includeTelework,
+      includeOl,
       includeVacation,
       includeMedicalLeave
     });
@@ -1602,6 +1610,9 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     if (formVal.includeTelework) {
       roleFilter.push('TELEWORK');
     }
+    if (formVal.includeOl) {
+      roleFilter.push('OL');
+    }
     if (formVal.includeVacation) {
       roleFilter.push('VACATION');
     }
@@ -1610,7 +1621,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     }
 
     if (roleFilter.length === 0) {
-      this.showError('Debe seleccionar al menos una condición a notificar (Guardia, Teletrabajo, Vacaciones o Licencia médica).');
+      this.showError('Debe seleccionar al menos una condición a notificar (Guardia, Teletrabajo, Charla/Capacitación, Vacaciones o Licencia médica).');
       return;
     }
 
