@@ -77,8 +77,7 @@ export class LogoComponent implements OnInit {
       appTitle: [''],
       titleFont: ['Monarchia Momentum'],
       loginTheme: ['crt'],
-      defaultLogSourceId: [null],
-      defaultCompanyName: ['']
+      defaultLogSourceId: [null]
     });
   }
 
@@ -110,8 +109,7 @@ export class LogoComponent implements OnInit {
         this.brandingForm.patchValue({
           appTitle: config.appTitle || '',
           titleFont: config.titleFont || 'Monarchia Momentum',
-          loginTheme: config.loginTheme || 'crt',
-          defaultCompanyName: config.defaultCompanyName || ''
+          loginTheme: config.loginTheme || 'crt'
         });
 
         // Configurar los orígenes en base al tipo guardado
@@ -317,8 +315,7 @@ export class LogoComponent implements OnInit {
       appTitle: (this.brandingForm.value.appTitle || '').trim(),
       titleFont: this.brandingForm.value.titleFont || 'Monarchia Momentum',
       loginTheme: this.brandingForm.value.loginTheme || 'crt',
-      defaultLogSourceId: this.brandingForm.value.defaultLogSourceId,
-      defaultCompanyName: (this.brandingForm.value.defaultCompanyName || '').trim()
+      defaultLogSourceId: this.brandingForm.value.defaultLogSourceId
     };
 
     operations.push(new Promise((resolve, reject) => {

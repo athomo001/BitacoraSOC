@@ -87,9 +87,17 @@ const syncUserAsDirectoryInternal = async (userDoc) => {
   }
   
   try {
-    // Obtener la empresa configurada por defecto desde AppConfig
+    // Obtener la configuración global para acceder al LogSource por defecto (cliente interno)
     const config = await AppConfig.findOne();
-    const defaultCompany = config?.defaultCompanyName || '';
+    let defaultCompany = '';
+    
+    // Si hay un LogSource por defecto configurado, obtener su nombre (que es la empresa)
+    if (config?.defaultLogSourceId) {
+      const CatalogLogSource = require('../models/CatalogLogSource');
+      const logSource = await CatalogLogSource.findById(config.defaultLogSourceId);
+      // El nombre del LogSource es lo que se muestra como empresa en el directorio
+      defaultCompany = logSource?.name || '';
+    }
     
     return syncDirectoryContact({
       name: userDoc.fullName,

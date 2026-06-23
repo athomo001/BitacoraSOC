@@ -479,13 +479,6 @@ const appConfigSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
-  // Nombre de la empresa por defecto para usuarios internos sincronizados al directorio
-  defaultCompanyName: {
-    type: String,
-    default: '',
-    trim: true,
-    maxlength: 160
-  },
   // Última actualización
   lastUpdatedBy: {
     type: mongoose.Schema.Types.ObjectId,
