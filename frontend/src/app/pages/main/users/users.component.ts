@@ -373,10 +373,12 @@ export class UsersComponent implements OnInit {
    */
   forcePasswordResetAll(): void {
     const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+      disableClose: true,
       data: {
         title: 'Restablecimiento Masivo de Contraseñas',
-        message: '¿Estás seguro de forzar el restablecimiento de contraseñas para TODOS los usuarios activos? Se les obligará a cambiar su contraseña y establecer su cumpleaños al ingresar.',
-        confirmText: 'Forzar Masivo',
+        message: '¿Confirmas forzar el cambio de contraseña para TODOS los usuarios internos activos?<br><br>Además, se enviará un correo informativo a cada usuario interno para avisar que debe actualizar su clave en su próximo ingreso.',
+        confirmText: 'Sí, Forzar y Notificar',
+        cancelText: 'Cancelar',
         isDestructive: true
       }
     });

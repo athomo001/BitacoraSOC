@@ -2,6 +2,33 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.10] - 2026-06-22
+
+### Confirmación Visual Mejorada y Notificación de Cambio de Contraseña a Usuarios Internos
+
+- **Diálogo de Confirmación Bonito con Botones (Sin alert() de JS)**: Se rediseñó el componente `ConfirmDialogComponent` en el frontend para ofrecer una interfaz visual moderna y clara, reemplazando cualquier dependencia a ventanas modales nativas de JavaScript (`alert`, `confirm`). El diálogo ahora incluye:
+  - Ícono contextual en el encabezado (rojo con `warning` para acciones destructivas, azul con `help_outline` para confirmaciones normales).
+  - Tipografía clara con adecuado espaciado y contraste (ancho mínimo 320px, máximo 460px).
+  - Botones visibles: "Cancelar" (stroked) y "Confirmar" (raised, con colores diferenciados según criticidad).
+  - Directiva `disableClose: true` en el modal para obligar al usuario a tomar una decisión explícita mediante botones, evitando cierres accidentales.
+
+- **Actualización de Mensaje de Forzado Masivo de Contraseña**: El diálogo de confirmación para "Forzar Cambio Masivo" en `/main/admin/users` ahora comunica de forma clara que:
+  - Se forzará el cambio de contraseña a TODOS los usuarios internos activos (roles admin, user, auditor).
+  - Se enviará un correo de notificación a cada usuario informando que debe actualizar su clave en el próximo ingreso.
+  - El botón de confirmación pasó de "Forzar Masivo" a "Sí, Forzar y Notificar" para dejar explícito el doble impacto (forzado + correo).
+
+- **Envío Automático de Correos a Usuarios Internos**: Al ejecutar el endpoint `POST /api/users/force-password-change-all` (forzado masivo de contraseñas), el backend ahora:
+  - Obtiene la lista de usuarios internos activos (excluyendo el admin que ejecuta la acción).
+  - Envía un correo individual a cada usuario con asunto personalizado (p. ej., "[Bitácora SOC] Cambio obligatorio de contraseña") y cuerpo HTML amigable que explica la política de seguridad.
+  - Registra métricas en auditoría: cantidad de usuarios notificados, correos exitosos y correos fallidos.
+  - Devuelve un mensaje de resumen (p. ej., "Se ha forzado el cambio a X usuarios internos activos. Correos enviados: Y. Fallidos: Z.").
+  - Utiliza el mismo servicio centralizado de email (`sendEmail()`) y contexto de auditoría (`sourceModule: 'users'`, `triggerType: 'admin-force-password-reset-all'`) para mantener trazabilidad completa.
+
+- **Validaciones y Seguridad**:
+  - Solo usuarios con rol 'admin' pueden ejecutar el forzado masivo (autorización `authorize('admin')`).
+  - Los correos se envían únicamente a usuarios internos (admin, user, auditor) que estén activos y tengan email válido.
+  - Fallos individuales de correo NO detienen el proceso masivo; se registran en auditoría y se reportan en el resumen.
+
 ## [v1.6.09] - 2026-06-21
 
 ### Obligatoriedad de Cumpleaños, Contraseña Forzada y Envío de Correo de Felicitaciones con CIDs

@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.09**
+> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.10**
 
 Stack principal:
 
@@ -81,6 +81,12 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 
 ## Novedades recientes (resumen rapido)
 
+### v1.6.10 (confirmación visual mejorada y notificación de cambio de contraseña a usuarios internos)
+
+- **Diálogo de Confirmación Bonito**: Rediseño del componente de confirmación con ícono contextual, tipografía clara, botones visibles y bloqueo de cierre accidental. Reemplaza completamente los `alert()` nativos de JavaScript.
+- **Mensaje Explícito de Forzado Masivo**: El diálogo de confirmación en `/main/admin/users` ahora comunica que se enviará correo a todos los usuarios internos. Botón: "Sí, Forzar y Notificar".
+- **Notificación por Correo a Usuarios Internos**: Cuando el administrador ejecuta "Forzar Cambio Masivo", el sistema envía automáticamente un correo individual a cada usuario interno activo (admin, user, auditor) informando que debe cambiar su contraseña en el próximo ingreso. Se registran métricas de envío en auditoría (enviados, fallidos).
+
 ### v1.6.09 (obligatoriedad de cumpleaños, contraseña forzada y felicitaciones con CIDs)
 
 - **Forzado de Cambio de Contraseña**: Capacidades para exigir el restablecimiento de contraseñas de forma individual o masiva a todos los usuarios del sistema. Bloqueo reactivo total mediante un formulario de configuración inicial obligatoria de contraseña y fecha de cumpleaños.
@@ -103,68 +109,6 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 - **Escritura en Directorio para Analistas N1:** Habilitación de permisos en backend y frontend para que los analistas N1 puedan crear, modificar e importar contactos (CSV) en el Directorio Central. La eliminación permanece bloqueada únicamente para perfiles superiores (N2, N3, Jefe de Área, etc.).
 - **Flexibilización de Contraseña para el Administrador:** Eliminación del requisito mínimo de 6 caracteres en la contraseña para las vistas de creación/edición exclusivas del administrador, permitiendo asignaciones de contraseñas de cualquier longitud (ej: `.`).
 
-### v1.6.05 (tema de login "Surrealismo Digital")
-
-- **Tema de Login Surrealista:** Implementación del tema visual `'surrealism'` que ubica los formularios de login/MFA/recuperación en una barra lateral izquierda opaca de altura completa (`380px` de ancho y `100vh`).
-- **Fondo Despejado de Alta Fidelidad:** Se ocultó el panel de vidrio derecho en el CSS del tema, permitiendo visualizar de forma completamente limpia y nítida el paisaje de fondo y el monitor retro (PC) en la colina.
-- **Optimización de Visibilidad:** Corrección de la legibilidad de la caja de información en la recuperación de contraseñas, el texto de expiración de sesión y el pie de página de la aplicación mediante selectores específicos con `!important`.
-
-### v1.6.04 (rediseño e integración del login retro CRT a pantalla completa)
-
-- rediseño del monitor analógico `.crt-monitor` y de la pantalla curvada `.crt-screen` para que ocupen todo el viewport (`position: fixed; inset: 0`).
-- modificación de los selectores de las animaciones en Anime.js para que las transiciones de encendido, apagado catódico e interferencias afecten a toda la pantalla.
-- importación de la fuente tipográfica de fósforo pixelada `VT323` y adición de un cursor terminal parpadeante en los inputs de texto.
-- inclusión de las capturas de pantalla de los tres temas de login (`13.1-Login.png`, `13.2-Login.png`, `13.3-Login.png`) en `docs/SCREENSHOTS.md` y en la vista rápida del `README.md`.
-
-### v1.6.03 (optimización de fuentes, contraste y desbordes en cyberpunk)
-
-- corrección de visibilidad en Datepicker (calendario) aplicando fondo negro y números de días en blanco para contraste óptimo.
-- ajuste de contraste de tags/chips de tablas para evitar la herencia de texto oscuro sobre fondo oscuro.
-- corrección de fondo del panel de ayuda de nuevas entradas (`.entry-type-hint`) cambiando a `--surface-muted` para neutralizar el magenta chillón.
-- prevención de desbordes en sidebar (reducción a `0.78rem`/`0.82rem` y tracking `0.01em`) y colapso de iconos por títulos muy largos en checklist.
-
-### v1.6.02 (estética cyberpunk, navegación por teclado y márgenes del logo)
-
-- aislamiento del contenedor `.html-preview` bajo el tema Cyberpunk para previsualizar reportes y boletines con su diseño y colores reales.
-- márgenes expandidos y control de altura proporcional (`52px` máx) en el logo del sidebar para evitar recortes en todos los temas.
-- navegación ágil con teclas de dirección (`<-` y `->`) para pestañas de escalamiento (Turnos, Contactos, Matriz RACI, Mantenimientos) con prevención de captura en campos de texto editables.
-- mejoras en el contraste tipográfico del tema Cyberpunk y alineación con la paleta de colores de Edgerunners (amarillo y cian).
-
-### v1.6.01 (rediseño de perfil, carga de avatar y contacto sincronizado)
-
-- rediseño visual de `/main/profile` a un layout premium responsivo de dos columnas.
-- soporte de subida física de avatares de usuario validando integridad binaria de imagen vía backend.
-- sincronización en tiempo real de edición de teléfono propio con el directorio centralizado del SOC.
-- barra lateral reactiva para actualizar avatar y placeholder de iniciales al instante.
-
-### v1.6.00 (simplificación de temas y guía de réplicas)
-
-- simplificación visual del panel de temas eliminando sepia y oscuro (dark) para reducir mantenimiento y sobreingeniería.
-- incorporación de guía opcional de despliegue para réplicas de base de datos (MongoDB Replica Set) de alta disponibilidad.
-
-### v1.5.99-beta (optimización de rendimiento PDF nativo y márgenes vectoriales)
-
-- reemplazo de generación de PDF pesada (jsPDF y html2canvas) por flujo de impresión nativa del navegador para evitar congelamiento de pantalla.
-- remoción del overlay y barra de carga obsoletos en el frontend para una experiencia instantánea.
-- estilización de páginas físicas en impresión forzando 100vh de altura y padding perimetral de 20mm arriba/abajo y 15mm a los lados.
-- anulación de márgenes en el contenedor global de impresión para evitar espaciados duplicados en el PDF.
-
-### v1.5.98-beta (reportes PDF: torta, conectores, leyenda y logo)
-
-- grafica de torta “Reportes Enviados” ajustada para mayor legibilidad y mejor proporcion visual en el informe consolidado.
-- leyenda sincronizada con todos los segmentos reales del pie chart (sin truncar items) y con numeracion correlativa visible.
-- conectores/lineas y etiquetas del pie chart restaurados y reforzados en contraste para mejorar lectura en pantalla y PDF.
-- logo de encabezado del informe en impresion ampliado para evitar visualizacion enana en exportacion PDF.
-- depuracion de reglas de impresion para ocultar bloques no imprimibles sin dejar espacio residual.
-
-### v1.5.97-beta (informe consolidado por periodo + narrativa)
-
-- nuevo informe ejecutivo consolidado por rango de fechas en la vista de estadisticas, con presets rapidos semanal, quincenal y mensual.
-- integracion de impresion/guardado PDF con layout formal multipagina para reporte ejecutivo.
-- incorporacion de grafica de tendencia temporal de eventos dentro del documento imprimible.
-- endpoint de backend para resumen de periodo con narrativa heuristica en lenguaje humano.
-- correccion de compatibilidad de template Angular usando casting con $any en bucles de datos.
-- ajuste de layout de impresion para evitar reporte completamente en blanco por restricciones de altura y overflow del shell.
 
 ### Estado IA local
 
