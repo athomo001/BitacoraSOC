@@ -15,6 +15,10 @@ Registro de cambios relevantes del proyecto.
   - Admin configura cliente interno en `/main/admin/catalogs` con `isInternal: true`
   - Asigna ese cliente como "Cliente / LogSource por Defecto" en `/main/logo`
   - Todos los usuarios internos creados/editados heredan automáticamente la empresa del cliente asignado
+- **Sincronización Retroactiva desde Directorio**: Se añadió un flujo de re-sincronización para usuarios internos existentes.
+  - Nuevo endpoint backend: `POST /api/directory/sync-users-to-directory`.
+  - El botón **"Sincronizar y consolidar"** ahora ejecuta también esta etapa para empujar usuarios internos al directorio con la empresa vigente del cliente por defecto.
+  - Esto corrige casos donde contactos internos antiguos quedaban con `EMPRESA` vacía (`-`) aun teniendo catálogos y branding correctamente configurados.
 - **Beneficios**:
   - Single source of truth: solo un lugar donde vive la configuración (catálogos).
   - Sincronización automática sin campos adicionales.
