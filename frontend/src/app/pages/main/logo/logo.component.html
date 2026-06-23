@@ -254,6 +254,12 @@
                 </mat-select>
                 <mat-hint>Asignación automática para bitácoras sin cliente definido</mat-hint>
               </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width" style="margin-top: 16px;">
+                <mat-label>Empresa por Defecto (Usuarios Internos)</mat-label>
+                <input matInput formControlName="defaultCompanyName" placeholder="Ej: Netics, CDC, etc." maxlength="160">
+                <mat-hint>Se asignará automáticamente a los usuarios internos en el directorio de contactos</mat-hint>
+              </mat-form-field>
             </div>
           </form>
         </div>

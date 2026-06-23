@@ -77,7 +77,7 @@ const normalizeCargoLabel = (value) => {
   return normalized || null;
 };
 
-const syncUserAsDirectoryInternal = (userDoc) => {
+const syncUserAsDirectoryInternal = async (userDoc) => {
   if (!userDoc) {
     return Promise.resolve();
   }
@@ -85,15 +85,26 @@ const syncUserAsDirectoryInternal = (userDoc) => {
   if (!isOperationalRole || userDoc.isActive === false) {
     return Promise.resolve();
   }
-  return syncDirectoryContact({
-    name: userDoc.fullName,
-    email: userDoc.email,
-    phone: userDoc.phone,
-    position: userDoc.cargoLabel || userDoc.role,
-    type: 'Internal',
-    scope: 'Internal',
-    source: 'User'
-  }).then(() => undefined);
+  
+  try {
+    // Obtener la empresa configurada por defecto desde AppConfig
+    const config = await AppConfig.findOne();
+    const defaultCompany = config?.defaultCompanyName || '';
+    
+    return syncDirectoryContact({
+      name: userDoc.fullName,
+      email: userDoc.email,
+      phone: userDoc.phone,
+      position: userDoc.cargoLabel || userDoc.role,
+      company: defaultCompany,
+      type: 'Internal',
+      scope: 'Internal',
+      source: 'User'
+    }).then(() => undefined);
+  } catch (error) {
+    logger.error({ err: error, userId: userDoc._id }, 'Error sincronizando usuario al directorio');
+    return Promise.resolve();
+  }
 };
 
 // GET /api/users/list - Listar usuarios básicos (cualquier usuario autenticado)
