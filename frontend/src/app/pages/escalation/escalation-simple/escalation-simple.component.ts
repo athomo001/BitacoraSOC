@@ -617,6 +617,17 @@ export class EscalationSimpleComponent implements OnInit {
             });
             if (userIdStr) processedUserIds.add(String(userIdStr));
             if (extIdStr) processedExtIds.add(String(extIdStr));
+          } else if (asg.roleCode === 'OL') {
+            list.push({
+              name: personName,
+              phone: personPhone,
+              email: personEmail,
+              role: roleName,
+              status: 'training',
+              statusLabel: 'En Charla/Capacitacion (Fuera de oficina)'
+            });
+            if (userIdStr) processedUserIds.add(String(userIdStr));
+            if (extIdStr) processedExtIds.add(String(extIdStr));
           } else if (asg.roleCode !== 'VACATION' && asg.roleCode !== 'MEDICAL_LEAVE') {
             // Analistas regulares en oficina
             list.push({
@@ -632,12 +643,13 @@ export class EscalationSimpleComponent implements OnInit {
           }
         });
 
-        // Orden estricto: Vacaciones (0) -> Pronto Vacaciones (1) -> Teletrabajo (2) -> Oficina (3)
+        // Orden estricto: Vacaciones (0) -> Pronto Vacaciones (1) -> Teletrabajo (2) -> Charla/Capacitacion (3) -> Oficina (4)
         const order: { [key: string]: number } = {
           'vacation': 0,
           'upcoming-vacation': 1,
           'telework': 2,
-          'office': 3
+          'training': 3,
+          'office': 4
         };
         this.teleworkStaff = list.sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
         this.cdr.detectChanges();
@@ -656,6 +668,7 @@ export class EscalationSimpleComponent implements OnInit {
     if (roleCode === 'N2') return 'N2 - Soporte Técnico';
     if (roleCode === 'TI') return 'TI - Infraestructura';
     if (roleCode === 'TELEWORK') return 'Teletrabajo';
+    if (roleCode === 'OL') return 'Charla/Capacitación (OL)';
     if (roleCode === 'VACATION') return 'Vacaciones';
     if (roleCode === 'MEDICAL_LEAVE') return 'Licencia médica';
     return roleCode;

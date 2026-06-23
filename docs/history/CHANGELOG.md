@@ -19,6 +19,10 @@ Registro de cambios relevantes del proyecto.
   - Nuevo endpoint backend: `POST /api/directory/sync-users-to-directory`.
   - El botón **"Sincronizar y consolidar"** ahora ejecuta también esta etapa para empujar usuarios internos al directorio con la empresa vigente del cliente por defecto.
   - Esto corrige casos donde contactos internos antiguos quedaban con `EMPRESA` vacía (`-`) aun teniendo catálogos y branding correctamente configurados.
+- **Nueva Condición Operativa OL (Charla/Capacitación)**:
+  - Se agregó `OL` como condición válida de asignación en backend y frontend.
+  - Se incorporó en formularios/filtros de asignación y en plantilla/importación CSV de turnos.
+  - En la sección **🏡 Personal en Teletrabajo y Apoyo** se muestra con estado específico de capacitación/charla, indicando que la persona está fuera de oficina.
 - **Beneficios**:
   - Single source of truth: solo un lugar donde vive la configuración (catálogos).
   - Sincronización automática sin campos adicionales.
