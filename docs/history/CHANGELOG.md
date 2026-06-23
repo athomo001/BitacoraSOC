@@ -4,26 +4,21 @@ Registro de cambios relevantes del proyecto.
 
 ## [v1.6.12] - 2026-06-23
 
-### Auto-Población de Empresa para Usuarios Internos en Directorio de Contactos
+### Auto-Población de Empresa para Usuarios Internos desde Cliente Interno Configurado
 
-- **Nuevo Campo de Configuración Global**: Se agregó el campo `defaultCompanyName` al modelo `AppConfig` en el backend, permitiendo a los administradores definir una empresa por defecto de forma centralizada. Este valor se utiliza automáticamente en la sincronización de usuarios internos al directorio de contactos, eliminando la necesidad de ingreso manual por usuario.
-- **Auto-Sincronización Mejorada**: Se actualizó la función `syncUserAsDirectoryInternal()` en la ruta de usuarios para que:
-  - Sea asíncrona y obtenga el valor de `AppConfig.defaultCompanyName` de forma automática.
-  - Incluya el campo `company` en la sincronización al modelo `DirectoryContact`.
-  - Aplique el valor de empresa a todos los usuarios con roles operacionales (admin, user, auditor) durante la creación/actualización.
-  - Maneje errores de sincronización sin detener el flujo de creación/actualización de usuarios (fallback graceful).
-- **Interfaz de Usuario en Panel de Administración**: Se agregó un nuevo campo de entrada de texto en la pantalla de branding (`/main/logo`) bajo la sección "Asignaciones por Defecto":
-  - Campo: "Empresa por Defecto (Usuarios Internos)" con límite de 160 caracteres.
-  - Hint explicativo: "Se asignará automáticamente a los usuarios internos en el directorio de contactos".
-  - Integración completa con el formulario reactivo y guardado sincronizado con otras configuraciones de branding.
-- **Modelos TypeScript Actualizados**: Se añadió el campo `defaultCompanyName?: string;` en:
-  - Interfaz `AppConfig` en `frontend/src/app/models/config.model.ts`
-  - Interfaz `UpdateConfigRequest` para completar el contrato de actualización de configuración.
-- **Beneficios de Negocio**:
-  - Eliminación de duplicación manual de empresa para cada usuario interno.
-  - Centralización de configuración empresarial (single source of truth).
-  - Mejor integridad de datos en el directorio de contactos.
-  - Reducción de errores por omisión de campo.
+- **Lógica de Sincronización Mejorada**: Se actualizó la función `syncUserAsDirectoryInternal()` en la ruta de usuarios para:
+  - Obtener el `defaultLogSourceId` configurado en AppConfig (cliente/LogSource por defecto asignado en `/main/logo`).
+  - Buscar el CatalogLogSource correspondiente y extraer su nombre (ej: "Netics", "AIEP", "BeyondTrust").
+  - Incluir automáticamente ese nombre como la empresa en la sincronización al DirectoryContact.
+  - Esto sincroniza la información del cliente interno ya configurado en `/main/admin/catalogs` sin requerir campo adicional.
+- **Integración Transparente**: Aprovecha la jerarquía existente:
+  - Admin configura cliente interno en `/main/admin/catalogs` con `isInternal: true`
+  - Asigna ese cliente como "Cliente / LogSource por Defecto" en `/main/logo`
+  - Todos los usuarios internos creados/editados heredan automáticamente la empresa del cliente asignado
+- **Beneficios**:
+  - Single source of truth: solo un lugar donde vive la configuración (catálogos).
+  - Sincronización automática sin campos adicionales.
+  - Coherencia: usuarios siempre reflejan el cliente/empresa asignado globalmente.
 
 ## [v1.6.11] - 2026-06-23
 
