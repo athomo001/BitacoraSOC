@@ -206,19 +206,21 @@ export class UsersComponent implements OnInit {
         });
       } else {
         // Modo creación
+        const rawPhone = this.userForm.value.phone;
+        const normalizedPhone = typeof rawPhone === 'string'
+          ? rawPhone.trim()
+          : '';
+
         const data: CreateUserRequest = {
           username: this.userForm.value.username,
           password: this.userForm.value.password,
           fullName: this.userForm.value.fullName,
           email: this.userForm.value.email,
-          phone: this.userForm.value.phone,
+          phone: normalizedPhone || undefined,
           role: this.userForm.value.role,
           cargoLabel: this.resolveCargoLabelFromForm(),
           mfaEnabled: this.userForm.value.mfaEnabled
         };
-        if (data.phone === '') {
-          delete data.phone;
-        }
         this.userService.createUser(data).subscribe({
           next: () => {
             this.snackBar.open('Usuario creado', 'Cerrar', { duration: 2000 });
@@ -228,7 +230,10 @@ export class UsersComponent implements OnInit {
           },
           error: (err) => {
             console.error('Error creando usuario:', err);
-            this.snackBar.open(err.error?.message || 'Error creando usuario', 'Cerrar', { duration: 3000 });
+            const validationMsg = Array.isArray(err?.error?.errors) && err.error.errors.length > 0
+              ? err.error.errors[0]?.msg
+              : null;
+            this.snackBar.open(validationMsg || err.error?.message || 'Error creando usuario', 'Cerrar', { duration: 3000 });
           }
         });
       }
@@ -373,10 +378,12 @@ export class UsersComponent implements OnInit {
    */
   forcePasswordResetAll(): void {
     const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+      disableClose: true,
       data: {
         title: 'Restablecimiento Masivo de Contraseñas',
-        message: '¿Estás seguro de forzar el restablecimiento de contraseñas para TODOS los usuarios activos? Se les obligará a cambiar su contraseña y establecer su cumpleaños al ingresar.',
-        confirmText: 'Forzar Masivo',
+        message: '¿Confirmas forzar el cambio de contraseña para TODOS los usuarios internos activos?<br><br>Además, se enviará un correo informativo a cada usuario interno para avisar que debe actualizar su clave en su próximo ingreso.',
+        confirmText: 'Sí, Forzar y Notificar',
+        cancelText: 'Cancelar',
         isDestructive: true
       }
     });

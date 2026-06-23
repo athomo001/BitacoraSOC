@@ -16,6 +16,8 @@ const { authenticate, authorize } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const { audit } = require('../utils/audit');
 const { logger } = require('../utils/logger');
+const { sendEmail } = require('../utils/email');
+const { getBrandingSnapshot, getAppTitleForText } = require('../utils/branding');
 const { syncDirectoryContact } = require('../utils/directory-sync');
 const multer = require('multer');
 const path = require('path');
@@ -151,7 +153,7 @@ router.put('/me',
     body('email').optional().isEmail().normalizeEmail(),
     body('fullName').optional().trim().notEmpty(),
     body('theme').optional().isIn(['light', 'dark', 'sepia', 'pastel', 'cyberpunk']),
-    body('phone').optional().trim().isLength({ min: 6, max: 20 }).withMessage('Teléfono inválido'),
+    body('phone').optional({ nullable: true }).trim().isLength({ min: 6, max: 20 }).withMessage('Teléfono inválido'),
     body('birthday').optional().isISO8601().toDate().withMessage('Fecha de nacimiento inválida'),
     body('currentPassword').optional().notEmpty(),
     body('newPassword').optional().isLength({ min: 6 })
@@ -277,11 +279,86 @@ router.post('/force-password-change-all',
   authorize('admin'),
   async (req, res) => {
     try {
-      // Modificar todos los usuarios activos excepto a sí mismo
+      const internalUserFilter = {
+        _id: { $ne: req.user._id },
+        isActive: true,
+        role: { $in: ['admin', 'user', 'auditor'] }
+      };
+
+      // Obtener destinatarios (usuarios internos con email) antes de ejecutar la actualización masiva.
+      const internalUsersToNotify = await User.find({
+        ...internalUserFilter,
+        email: { $exists: true, $ne: '' }
+      })
+        .select('_id username fullName email')
+        .lean();
+
+      // Forzar cambio de contraseña para usuarios internos activos (excepto el admin actual).
       const result = await User.updateMany(
-        { _id: { $ne: req.user._id }, isActive: true },
+        internalUserFilter,
         { $set: { mustChangePassword: true } }
       );
+
+      const { appTitle } = await getBrandingSnapshot();
+      const systemName = getAppTitleForText(appTitle, 'la plataforma');
+      const teamName = appTitle ? `Equipo ${appTitle}` : 'Equipo SOC';
+      const subject = appTitle
+        ? `[${appTitle}] Cambio obligatorio de contraseña`
+        : 'Cambio obligatorio de contraseña';
+
+      let emailedCount = 0;
+      let emailErrorCount = 0;
+
+      for (const user of internalUsersToNotify) {
+        const recipientName = user.fullName || user.username || 'usuario';
+        const text = [
+          `Hola ${recipientName},`,
+          '',
+          `Se ha aplicado una política de seguridad en ${systemName}.`,
+          'En tu próximo ingreso deberás cambiar tu contraseña obligatoriamente.',
+          '',
+          'Si tienes dudas, contacta al administrador del sistema.',
+          '',
+          `Saludos,`,
+          teamName
+        ].join('\n');
+
+        const html = `
+          <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; color: #1f2937;">
+            <h2 style="margin: 0 0 12px; color: #b91c1c;">Cambio obligatorio de contraseña</h2>
+            <p>Hola <strong>${recipientName}</strong>,</p>
+            <p>
+              Se ha aplicado una política de seguridad en <strong>${systemName}</strong>.
+              En tu próximo ingreso deberás cambiar tu contraseña obligatoriamente.
+            </p>
+            <p>Si tienes dudas, contacta al administrador del sistema.</p>
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
+            <p style="font-size: 12px; color: #6b7280; margin: 0;">Mensaje automático de ${teamName}.</p>
+          </div>
+        `;
+
+        try {
+          await sendEmail({
+            to: user.email,
+            subject,
+            text,
+            html,
+            auditContext: {
+              sourceModule: 'users',
+              triggerType: 'admin-force-password-reset-all',
+              triggerContext: 'internal-users-password-rotation',
+              extra: {
+                targetUserId: String(user._id),
+                targetUsername: user.username
+              }
+            }
+          });
+          emailedCount += 1;
+        } catch (emailError) {
+          emailErrorCount += 1;
+          logger.error({ err: emailError, targetUserId: user._id, targetEmail: user.email }, 'Error enviando notificación de cambio obligatorio de contraseña');
+        }
+      }
 
       await audit(req, {
         event: 'admin.users.force_reset_all',
@@ -289,12 +366,19 @@ router.post('/force-password-change-all',
         result: { success: true },
         metadata: {
           modifiedCount: result.modifiedCount,
-          matchedCount: result.matchedCount
+          matchedCount: result.matchedCount,
+          notifiedCount: internalUsersToNotify.length,
+          emailedCount,
+          emailErrorCount
         }
       });
 
+      const emailSummary = emailErrorCount > 0
+        ? ` Correos enviados: ${emailedCount}. Fallidos: ${emailErrorCount}.`
+        : ` Correos enviados: ${emailedCount}.`;
+
       res.json({
-        message: `Se ha forzado el cambio de contraseña a ${result.modifiedCount} usuarios activos.`
+        message: `Se ha forzado el cambio de contraseña a ${result.modifiedCount} usuarios internos activos.${emailSummary}`
       });
     } catch (error) {
       console.error('Error al forzar cambio de contraseña masivo:', error);
@@ -379,7 +463,7 @@ router.post('/',
     body('password').notEmpty().withMessage('La contraseña es requerida'),
     body('fullName').trim().notEmpty().withMessage('El nombre completo es requerido'),
     body('role').isIn(['admin', 'user', 'auditor', 'guest']).withMessage('Rol inválido'),
-    body('phone').optional().trim().isLength({ min: 6, max: 20 }).withMessage('Teléfono inválido'),
+    body('phone').optional({ nullable: true }).trim().isLength({ min: 6, max: 20 }).withMessage('Teléfono inválido'),
     body('cargoLabel').optional({ nullable: true }).isString().trim().isLength({ max: MAX_CARGO_LENGTH })
       .withMessage(`Cargo inválido (máx ${MAX_CARGO_LENGTH} caracteres)`),
     body('mfaEnabled').optional().isBoolean().withMessage('MFAEnabled debe ser booleano')
@@ -521,7 +605,7 @@ router.put('/:id',
     body('fullName').optional().trim().notEmpty(),
     body('role').optional().isIn(['admin', 'user', 'auditor', 'guest']),
     body('isActive').optional().isBoolean(),
-    body('phone').optional().trim().isLength({ min: 6, max: 20 }),
+    body('phone').optional({ nullable: true }).trim().isLength({ min: 6, max: 20 }),
     body('cargoLabel').optional({ nullable: true }).isString().trim().isLength({ max: MAX_CARGO_LENGTH })
       .withMessage(`Cargo inválido (máx ${MAX_CARGO_LENGTH} caracteres)`),
     // Permite al administrador establecer una nueva contraseña de cualquier longitud
