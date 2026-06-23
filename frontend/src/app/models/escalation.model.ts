@@ -212,7 +212,7 @@ export interface ShiftRotationCycle {
 
 export interface ShiftAssignment {
   _id: string;
-  roleCode: 'N2' | 'TI' | 'N1_NO_HABIL' | 'TELEWORK' | 'VACATION' | 'MEDICAL_LEAVE';
+  roleCode: 'N2' | 'TI' | 'N1_NO_HABIL' | 'TELEWORK' | 'OL' | 'VACATION' | 'MEDICAL_LEAVE';
   userId?: any;
   externalPersonId?: any;
   weekStartDate: string; // ISO 8601
@@ -389,7 +389,7 @@ export interface ShiftRotationCycleFormData {
 }
 
 export interface ShiftAssignmentFormData {
-  roleCode: 'N2' | 'TI' | 'N1_NO_HABIL' | 'TELEWORK' | 'VACATION' | 'MEDICAL_LEAVE';
+  roleCode: 'N2' | 'TI' | 'N1_NO_HABIL' | 'TELEWORK' | 'OL' | 'VACATION' | 'MEDICAL_LEAVE';
   userId?: string;
   externalPersonId?: string;
   weekStartDate: string; // ISO 8601
