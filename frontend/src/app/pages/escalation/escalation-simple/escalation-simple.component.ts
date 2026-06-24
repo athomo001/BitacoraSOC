@@ -528,6 +528,20 @@ export class EscalationSimpleComponent implements OnInit {
 
     forkJoin([assignments$, futureVacations$, futureMedicalLeaves$]).subscribe({
       next: ([assignments, futureVacations, futureMedicalLeaves]) => {
+        const now = new Date();
+        const isViewingCurrentWeek = now >= this.currentWeekStart && now <= this.currentWeekEnd;
+        const isAssignmentActiveNow = (asg: any): boolean => {
+          if (!isViewingCurrentWeek) return true;
+
+          const start = new Date(asg?.weekStartDate);
+          const end = new Date(asg?.weekEndDate);
+          if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+            // Si una asignación viene con fechas inválidas, mantener comportamiento visible.
+            return true;
+          }
+          return now >= start && now <= end;
+        };
+
         const futureAbsences = [...futureVacations, ...futureMedicalLeaves];
         const list: any[] = [];
         const processedUserIds = new Set<string>();
@@ -543,6 +557,7 @@ export class EscalationSimpleComponent implements OnInit {
           const extIdStr = asg.externalPersonId?._id || asg.externalPersonId;
 
           if (asg.roleCode === 'VACATION' || asg.roleCode === 'MEDICAL_LEAVE') {
+            if (!isAssignmentActiveNow(asg)) return;
             const isMedicalLeave = asg.roleCode === 'MEDICAL_LEAVE';
             list.push({
               name: personName,
@@ -594,6 +609,8 @@ export class EscalationSimpleComponent implements OnInit {
 
         // 3. Procesar asignaciones regulares (Teletrabajo y Oficina) de la semana actual
         assignments.forEach(asg => {
+          if (!isAssignmentActiveNow(asg)) return;
+
           const userIdStr = asg.userId?._id || asg.userId;
           const extIdStr = asg.externalPersonId?._id || asg.externalPersonId;
 
