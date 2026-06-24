@@ -529,15 +529,12 @@ export class EscalationSimpleComponent implements OnInit {
     forkJoin([assignments$, futureVacations$, futureMedicalLeaves$]).subscribe({
       next: ([assignments, futureVacations, futureMedicalLeaves]) => {
         const now = new Date();
-        const isViewingCurrentWeek = now >= this.currentWeekStart && now <= this.currentWeekEnd;
         const isAssignmentActiveNow = (asg: any): boolean => {
-          if (!isViewingCurrentWeek) return true;
-
           const start = new Date(asg?.weekStartDate);
           const end = new Date(asg?.weekEndDate);
           if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-            // Si una asignación viene con fechas inválidas, mantener comportamiento visible.
-            return true;
+            // Evita mostrar estados fantasma cuando llegan fechas incompletas/inválidas.
+            return false;
           }
           return now >= start && now <= end;
         };
