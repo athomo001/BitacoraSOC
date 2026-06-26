@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.10**
+> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.13**
 
 Stack principal:
 
@@ -52,63 +52,29 @@ Stack principal:
 
 ---
 
-## Vista rapida de la interfaz
-
-Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCREENSHOTS.md`.
-
-### Pantallas principales
-
-![Pantalla principal](docs/images/screenshots/01-main-nueva-entrada.png)
-
-![Pantalla de Login Retro CRT](docs/images/screenshots/13.1-Login.png)
-
-![Generador de reportes](docs/images/screenshots/04-generador-reportes.png)
-![Generador de reportes](docs/images/screenshots/04.1-generador-reportes.png?v=1)
-![Generador de reportes](docs/images/screenshots/04.2-generador-reportes.png?v=1)
-
-![Configuracion administrativa](docs/images/screenshots/05-menu-configuracion.png)
-![Configuracion administrativa](docs/images/screenshots/05.1-menu-configuracion.png?v=1)
-
-![Modulo de Turnos](docs/images/screenshots/11-Turnos.png?v=1)
-
-![Modulo de backup](docs/images/screenshots/06-menu-admin-backup.png)
-
-![Configuración de Seguridad (HTTPS & SSO)](docs/images/screenshots/15-HTTPS-SSO.png)
-
-> 💡 **Nota sobre la Consola de Seguridad (HTTPS & SSO):** El panel unificado de HTTPS y Single Sign-On (SSO) está completamente integrado. El soporte para la inyección y rotación de certificados **HTTPS** (0-Downtime) es altamente funcional y estable, mientras que el inicio de sesión vía SSO (Google/Microsoft) está disponible como opción de autenticación.
-
----
-
 ## Novedades recientes (resumen rapido)
+
+### v1.6.13 (automatización de turnos, envío de pruebas, dinámicos en correo y trámite médico)
+
+- **Condición Trámite Médico**: Se añade compatibilidad no destructiva en backend y frontend para la condición "Trámite Médico" (`MEDICAL_APPOINTMENT`), diferenciándola de "Licencia médica".
+- **Prueba de Correo**: Panel interactivo `🧪 Probar Envío de Correo` en `/main/admin/work-shifts` para validar el correo del formulario en pantalla sin persistir el envío.
+- **Formato de Correo de Turnos**: Reemplazo de los badges `"EN TURNO"` / `"PRÓXIMO"` por badges dinámicos con colores premium específicos del rol/concepto para esa semana. Cabecera dinámica derecha agrupada en `"GUARDIA"` y resto de conceptos para evitar repetición.
+- **Correcciones Visuales**: Solución a la interferencia y desplazamiento de hitboxes en acciones de turnos y sincronización de nuevos iconos (Birrete 🎓, Curita 🩹, Cruz Roja 🏥).
+
+### v1.6.12 (empresa automática en usuarios y condición Charla/Capacitación OL)
+
+- **Auto-Población de Empresa**: Sincronización automática de empresa desde el cliente por defecto asignado globalmente al crear o editar usuarios internos.
+- **Condición OL**: Soporte completo para "Charla/Capacitación (OL)" en turnos, reportes y CSV.
+
+### v1.6.11 (fix de creación consecutiva de usuarios)
+
+- **Fix de Validación**: Corrección del error `400 Bad Request` al registrar consecutivamente usuarios internos en la UI por remanentes nulos en el campo de teléfono.
 
 ### v1.6.10 (confirmación visual mejorada y notificación de cambio de contraseña a usuarios internos)
 
 - **Diálogo de Confirmación Bonito**: Rediseño del componente de confirmación con ícono contextual, tipografía clara, botones visibles y bloqueo de cierre accidental. Reemplaza completamente los `alert()` nativos de JavaScript.
 - **Mensaje Explícito de Forzado Masivo**: El diálogo de confirmación en `/main/admin/users` ahora comunica que se enviará correo a todos los usuarios internos. Botón: "Sí, Forzar y Notificar".
 - **Notificación por Correo a Usuarios Internos**: Cuando el administrador ejecuta "Forzar Cambio Masivo", el sistema envía automáticamente un correo individual a cada usuario interno activo (admin, user, auditor) informando que debe cambiar su contraseña en el próximo ingreso. Se registran métricas de envío en auditoría (enviados, fallidos).
-
-### v1.6.09 (obligatoriedad de cumpleaños, contraseña forzada y felicitaciones con CIDs)
-
-- **Forzado de Cambio de Contraseña**: Capacidades para exigir el restablecimiento de contraseñas de forma individual o masiva a todos los usuarios del sistema. Bloqueo reactivo total mediante un formulario de configuración inicial obligatoria de contraseña y fecha de cumpleaños.
-- **Automatización de Correos de Cumpleaños**: Scheduler diario (`birthdayEmailScheduler.js`) para el envío automático de felicitaciones en formato HTML en base a la hora de envío local configurada.
-- **Solución a Imágenes Rotas (MIME Inline + CID)**: Reestructuración de la lógica de envío de correos para adjuntar la ilustración kawaii (`birthday_kawaii.png`) y el logotipo de branding en línea mediante Content-ID (CID). Movimiento de la ilustración a los recursos estáticos del código (`src/assets/branding/`) para evitar enmascaramientos del volumen de Docker uploads.
-- **Optimización y Testabilidad del Programador**: Disminución del intervalo de comprobación a 2 minutos y reinicio del bloqueo del envío diario de hoy de forma transparente cuando el administrador modifica la hora de envío o reactiva el servicio.
-
-### v1.6.08 (actualización a pnpm 11.7.0 y dependencias)
-
-- **Migración a pnpm v11.7.0:** Actualización del gestor de paquetes de la v11.0.0 a la v11.7.0 y dependencias en frontend y backend.
-- **Habilitación de compilaciones con allowBuilds:** Migración de la directiva obsoleta `onlyBuiltDependencies` hacia el nuevo esquema `allowBuilds` en los archivos `pnpm-workspace.yaml` de ambos componentes, permitiendo compilación nativa de dependencias críticas en entornos Docker.
-
-### v1.6.07 (prevención de caché y recarga automática ante actualizaciones)
-
-- **Prevención de Caché en index.html (Nginx):** Configuración de directivas `Cache-Control` en Nginx (puertos 80 y 443) para servir el archivo `index.html` con `no-cache, no-store, must-revalidate`. Esto garantiza que los navegadores web obtengan de inmediato el nuevo frontend al subir cambios, mientras los archivos estáticos hasheados siguen usando caché persistente.
-- **Recarga Automática en Caliente (Angular):** Implementación de un `GlobalErrorHandler` que detecta fallas al importar módulos perezosos descatalogados en caliente (`ChunkLoadError`) tras un despliegue de Docker, forzando un refresco transparente para el operador sin cerrar su sesión (manteniendo cookie JWT).
-
-### v1.6.06 (permisos de directorio para N1 y flexibilización de contraseñas de admin)
-
-- **Escritura en Directorio para Analistas N1:** Habilitación de permisos en backend y frontend para que los analistas N1 puedan crear, modificar e importar contactos (CSV) en el Directorio Central. La eliminación permanece bloqueada únicamente para perfiles superiores (N2, N3, Jefe de Área, etc.).
-- **Flexibilización de Contraseña para el Administrador:** Eliminación del requisito mínimo de 6 caracteres en la contraseña para las vistas de creación/edición exclusivas del administrador, permitiendo asignaciones de contraseñas de cualquier longitud (ej: `.`).
-
 
 ### Estado IA local
 
@@ -183,6 +149,33 @@ docker compose up -d --build
 ```
 
 Si ves errores de modulo faltante en backend durante arranque, ejecuta rebuild para forzar reinstalacion de dependencias de la imagen.
+
+---
+
+## Vista rapida de la interfaz
+
+Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCREENSHOTS.md`.
+
+### Pantallas principales
+
+![Pantalla principal](docs/images/screenshots/01-main-nueva-entrada.png)
+
+![Pantalla de Login Retro CRT](docs/images/screenshots/13.1-Login.png)
+
+![Generador de reportes](docs/images/screenshots/04-generador-reportes.png)
+![Generador de reportes](docs/images/screenshots/04.1-generador-reportes.png?v=1)
+![Generador de reportes](docs/images/screenshots/04.2-generador-reportes.png?v=1)
+
+![Configuracion administrativa](docs/images/screenshots/05-menu-configuracion.png)
+![Configuracion administrativa](docs/images/screenshots/05.1-menu-configuracion.png?v=1)
+
+![Modulo de Turnos](docs/images/screenshots/11-Turnos.png?v=1)
+
+![Modulo de backup](docs/images/screenshots/06-menu-admin-backup.png)
+
+![Configuración de Seguridad (HTTPS & SSO)](docs/images/screenshots/15-HTTPS-SSO.png)
+
+> 💡 **Nota sobre la Consola de Seguridad (HTTPS & SSO):** El panel unificado de HTTPS y Single Sign-On (SSO) está completamente integrado. El soporte para la inyección y rotación de certificados **HTTPS** (0-Downtime) es altamente funcional y estable, mientras que el inicio de sesión vía SSO (Google/Microsoft) está disponible como opción de autenticación.
 
 ---
 

@@ -2142,6 +2142,53 @@ Output:
 
 ---
 
+## 15. Gestión de Turnos y Automatización de Notificaciones
+
+El módulo de Gestión de Turnos (`/main/admin/work-shifts`) y la automatización de notificaciones por correo electrónico permiten coordinar la dotación del SOC/NOC, registrando tanto las guardias de operación activa como las situaciones administrativas.
+
+### 15.1 Condiciones y Conceptos de Turno Soportados
+
+El sistema distingue entre dos categorías de asignaciones de turnos:
+
+1. **Roles de Guardia Activos (Exclusivos)**:
+   - **Guardia N1 (`N1_NO_HABIL`)**: Operador de primer nivel.
+   - **Operador N2 (`N2`)**: Especialista de segundo nivel.
+   - **Especialista TI (`TI`)**: Especialista de soporte e infraestructura.
+   *Nota: Solo puede haber un rol de guardia activo por bloque horario para evitar colisiones operacionales directas.*
+
+2. **Conceptos Administrativos y de Apoyo**:
+   - **Teletrabajo (`TELEWORK`)**: Trabajo remoto. Convive de forma no destructiva con las guardias.
+   - **Charla/Capacitación (`OL`)**: Capacitación o charla técnica.
+   - **Trámite Médico (`MEDICAL_APPOINTMENT`)**: Ausencia breve por trámites médicos. Convive con guardias activas.
+   - **Vacaciones (`VACATION`)**: Periodo de descanso programado. Pausa la visibilidad de guardias del analista.
+   - **Licencia médica (`MEDICAL_LEAVE`)**: Ausencia por razones de salud con tratamiento prioritario exclusivo. Activa la lógica de pausa y restauración automática de turnos en el backend.
+
+### 15.2 Importación Masiva mediante CSV
+
+El sistema permite la carga de la programación de turnos a través de un archivo CSV que debe incluir la leyenda de cabeceras correspondiente. Los campos aceptados en el CSV para la columna **Condición** son:
+- `"N1"`, `"N2"`, `"TI"`, `"Teletrabajo"`, `"Charla/Capacitación (OL)"`, `"Vacaciones"`, `"Licencia médica"`, `"Trámite Médico"`.
+
+### 15.3 Automatización y Programación de Notificaciones
+
+Los administradores pueden configurar envíos periódicos automáticos de la dotación y asignaciones semanales/mensuales:
+* **Configuración de Tareas**: Frecuencia (semanal o mensual), día de la semana de ejecución, hora exacta local y destinatarios (incluyendo copia CC).
+* **Filtros Personalizados (`roleFilter`)**: Permite que una notificación específica envíe solo los turnos que cumplan con los filtros seleccionados (por ejemplo, reportar únicamente personas en Teletrabajo y Vacaciones).
+* **Prueba de Correo en Tiempo Real (`🧪 Probar Envío de Correo`)**: En la interfaz de edición, se dispone de un botón de prueba para enviar de manera inmediata el formato a un correo específico. La prueba toma el nombre y la selección de roles/filtros que se visualizan en pantalla en ese instante sin necesidad de guardar en base de datos ni alterar la marca de último envío (`lastSentAt`).
+
+### 15.4 Formato de Notificación por Correo Electrónico
+
+Los correos automáticos y de prueba se envían en formato HTML premium (compilado mediante MJML) e incorporan:
+* **Cabecera Dinámica**: En la esquina superior derecha se listan los conceptos filtrados agrupados (ej: `GUARDIA / TELETRABAJO / VACACIONES`) o `CALENDARIO` si no hay filtros, eliminando la redundancia con el título.
+* **Badges de Asignación por Color**: La columna **ESTADO** de la tabla muestra el concepto/condición en el que estará la persona durante la semana de reporte con colores de identificación premium:
+  - **Guardias** (`N1`, `N2`, `TI`): Verde oscuro corporativo (`#155F50`).
+  - **Teletrabajo**: Azul corporativo (`#1E88E5`).
+  - **Charla/Capacitación**: Marrón cálido (`#795548`).
+  - **Vacaciones**: Naranja (`#F57C00`).
+  - **Licencia Médica**: Rojo (`#D32F2F`).
+  - **Trámite Médico**: Púrpura (`#8E24AA`).
+
+---
+
 ## Referencias
 
 - [pino documentation](https://getpino.io/)
