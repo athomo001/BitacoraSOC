@@ -162,7 +162,8 @@
                     <mat-option value="TELEWORK">Teletrabajo</mat-option>
                     <mat-option value="OL">Charla/Capacitación (OL)</mat-option>
                     <mat-option value="VACATION">Vacaciones</mat-option>
-                    <mat-option value="MEDICAL_LEAVE">Trámite Médico</mat-option>
+                    <mat-option value="MEDICAL_APPOINTMENT">Trámite Médico</mat-option>
+                    <mat-option value="MEDICAL_LEAVE">Licencia médica</mat-option>
                   </mat-select>
                   <mat-icon matPrefix>filter_list</mat-icon>
                 </mat-form-field>
@@ -278,7 +279,8 @@
                         <mat-option value="TELEWORK">Teletrabajo</mat-option>
                         <mat-option value="OL">Charla/Capacitación (OL)</mat-option>
                         <mat-option value="VACATION">Vacaciones</mat-option>
-                        <mat-option value="MEDICAL_LEAVE">Trámite Médico</mat-option>
+                        <mat-option value="MEDICAL_APPOINTMENT">Trámite Médico</mat-option>
+                        <mat-option value="MEDICAL_LEAVE">Licencia médica</mat-option>
                       </mat-select>
                     </mat-form-field>
 
@@ -443,6 +445,10 @@
                         Vacaciones
                       </span>
                       <span *ngIf="s.roleFilter?.includes('MEDICAL_LEAVE')" 
+                            style="font-size: 10px; background-color: #fbe9f0; color: #7a1f45; padding: 2px 6px; border-radius: 4px; font-weight: 500; margin-right: 4px;">
+                        Licencia médica
+                      </span>
+                      <span *ngIf="s.roleFilter?.includes('MEDICAL_APPOINTMENT')" 
                             style="font-size: 10px; background-color: #fbe9f0; color: #7a1f45; padding: 2px 6px; border-radius: 4px; font-weight: 500;">
                         Trámite Médico
                       </span>
@@ -536,7 +542,8 @@
                       <mat-checkbox formControlName="includeTelework">Teletrabajo</mat-checkbox>
                       <mat-checkbox formControlName="includeOl">Charla/Capacitación (OL)</mat-checkbox>
                       <mat-checkbox formControlName="includeVacation">Vacaciones</mat-checkbox>
-                      <mat-checkbox formControlName="includeMedicalLeave">Trámite Médico</mat-checkbox>
+                      <mat-checkbox formControlName="includeMedicalAppointment">Trámite Médico</mat-checkbox>
+                      <mat-checkbox formControlName="includeMedicalLeave">Licencia médica</mat-checkbox>
                     </div>
                   </div>
 
