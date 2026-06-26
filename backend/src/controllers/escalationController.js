@@ -1720,12 +1720,30 @@ exports.getAssignments = async (req, res) => {
       filter.roleCode = roleCode;
     }
     if (fromDate || toDate) {
-      filter.weekStartDate = {};
-      if (fromDate) {
-        filter.weekStartDate.$gte = new Date(fromDate);
+      const startLimit = fromDate ? new Date(fromDate) : null;
+      const endLimit = toDate ? new Date(toDate) : null;
+
+      // Se define filtro de solapamiento para asegurar que se incluyan asignaciones de largo aliento
+      const dateConditions = [];
+      if (startLimit && endLimit) {
+        dateConditions.push(
+          { weekStartDate: { $gte: startLimit, $lte: endLimit } },
+          { weekEndDate: { $gte: startLimit, $lte: endLimit } },
+          { weekStartDate: { $lte: startLimit }, weekEndDate: { $gte: endLimit } }
+        );
+      } else if (startLimit) {
+        dateConditions.push(
+          { weekEndDate: { $gte: startLimit } },
+          { weekStartDate: { $gte: startLimit } }
+        );
+      } else if (endLimit) {
+        dateConditions.push(
+          { weekStartDate: { $lte: endLimit } }
+        );
       }
-      if (toDate) {
-        filter.weekStartDate.$lte = new Date(toDate);
+
+      if (dateConditions.length > 0) {
+        filter.$or = dateConditions;
       }
     }
     filter.isPaused = { $ne: true };

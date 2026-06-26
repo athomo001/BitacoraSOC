@@ -529,15 +529,16 @@ export class EscalationSimpleComponent implements OnInit {
 
     forkJoin([assignments$, futureVacations$, futureMedicalLeaves$, futureMedicalAppointments$]).subscribe({
       next: ([assignments, futureVacations, futureMedicalLeaves, futureMedicalAppointments]) => {
-        const now = new Date();
-        const isAssignmentActiveNow = (asg: any): boolean => {
+        // Se determina si la asignación está activa en la semana consultada
+        const isAssignmentActiveInWeek = (asg: any): boolean => {
           const start = new Date(asg?.weekStartDate);
           const end = new Date(asg?.weekEndDate);
           if (isNaN(start.getTime()) || isNaN(end.getTime())) {
             // Evita mostrar estados fantasma cuando llegan fechas incompletas/inválidas.
             return false;
           }
-          return now >= start && now <= end;
+          // Verifica el solapamiento con la semana seleccionada
+          return start <= this.currentWeekEnd && end >= this.currentWeekStart;
         };
 
         const futureAbsences = [...futureVacations, ...futureMedicalLeaves, ...futureMedicalAppointments];
@@ -555,7 +556,8 @@ export class EscalationSimpleComponent implements OnInit {
           const extIdStr = asg.externalPersonId?._id || asg.externalPersonId;
 
           if (asg.roleCode === 'VACATION' || asg.roleCode === 'MEDICAL_LEAVE' || asg.roleCode === 'MEDICAL_APPOINTMENT') {
-            if (!isAssignmentActiveNow(asg)) return;
+            // Verifica que la ausencia esté activa durante la semana
+            if (!isAssignmentActiveInWeek(asg)) return;
             const isMedicalLeave = asg.roleCode === 'MEDICAL_LEAVE';
             const isMedicalAppointment = asg.roleCode === 'MEDICAL_APPOINTMENT';
             list.push({
@@ -613,7 +615,8 @@ export class EscalationSimpleComponent implements OnInit {
 
         // 3. Procesar asignaciones regulares (Teletrabajo y Oficina) de la semana actual
         assignments.forEach(asg => {
-          if (!isAssignmentActiveNow(asg)) return;
+          // Verifica que el teletrabajo o labor regular esté activo durante la semana
+          if (!isAssignmentActiveInWeek(asg)) return;
 
           const userIdStr = asg.userId?._id || asg.userId;
           const extIdStr = asg.externalPersonId?._id || asg.externalPersonId;
