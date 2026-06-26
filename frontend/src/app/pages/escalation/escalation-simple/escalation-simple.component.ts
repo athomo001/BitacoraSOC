@@ -562,7 +562,7 @@ export class EscalationSimpleComponent implements OnInit {
               email: personEmail,
               role: roleName,
               status: 'vacation',
-              statusLabel: isMedicalLeave ? 'LICENCIA MÉDICA' : 'VACACIONES'
+              statusLabel: isMedicalLeave ? 'TRÁMITE MÉDICO' : 'VACACIONES'
             });
             if (userIdStr) processedUserIds.add(String(userIdStr));
             if (extIdStr) processedExtIds.add(String(extIdStr));
@@ -596,7 +596,7 @@ export class EscalationSimpleComponent implements OnInit {
               email: personEmail,
               role: roleName,
               status: 'upcoming-vacation',
-              statusLabel: isMedicalLeave ? 'Pronto Licencia médica' : 'Pronto Vacaciones'
+              statusLabel: isMedicalLeave ? 'Pronto Trámite Médico' : 'Pronto Vacaciones'
             });
 
             if (userIdStr) processedUserIds.add(String(userIdStr));
@@ -684,7 +684,7 @@ export class EscalationSimpleComponent implements OnInit {
     if (roleCode === 'TELEWORK') return 'Teletrabajo';
     if (roleCode === 'OL') return 'Charla/Capacitación (OL)';
     if (roleCode === 'VACATION') return 'Vacaciones';
-    if (roleCode === 'MEDICAL_LEAVE') return 'Licencia médica';
+    if (roleCode === 'MEDICAL_LEAVE') return 'Trámite Médico';
     return roleCode;
   }
 

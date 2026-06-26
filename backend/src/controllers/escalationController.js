@@ -345,7 +345,7 @@ const formatShiftAssignmentsTemplateCsv = () => ([
   '#   - Teletrabajo (o TELEWORK)',
   '#   - Charla/Capacitacion (o OL)',
   '#   - Vacaciones (o VACATION)',
-  '#   - Licencia medica (o MEDICAL_LEAVE)',
+  '#   - Trámite Médico (o MEDICAL_LEAVE)',
   '# Columna "usuario": Username, correo electrónico o nombre completo registrado del analista.',
   '# Columna "fechaInicio" / "fechaFin": Fecha en formato AAAA-MM-DD (Ej: 2026-06-15)',
   '# Columna "horaInicio" / "horaFin": Hora en formato HH:MM de 24 horas (Ej: 09:00)',
@@ -1796,11 +1796,11 @@ exports.importAssignmentsCsv = async (req, res) => {
         if (rawRol === 'TELETRABAJO') rawRol = 'TELEWORK';
         if (rawRol === 'CHARLA/CAPACITACION' || rawRol === 'CHARLA/CAPACITACIÓN' || rawRol === 'CAPACITACION' || rawRol === 'CAPACITACIÓN' || rawRol === 'CHARLA') rawRol = 'OL';
         if (rawRol === 'VACACIONES') rawRol = 'VACATION';
-        if (rawRol === 'LICENCIA MEDICA' || rawRol === 'LICENCIA MÉDICA' || rawRol === 'LICENCIA_MEDICA') rawRol = 'MEDICAL_LEAVE';
+        if (rawRol === 'LICENCIA MEDICA' || rawRol === 'LICENCIA MÉDICA' || rawRol === 'LICENCIA_MEDICA' || rawRol === 'TRAMITE MEDICO' || rawRol === 'TRÁMITE MÉDICO' || rawRol === 'TRAMITE_MEDICO') rawRol = 'MEDICAL_LEAVE';
         const roleCode = rawRol === 'N1' ? 'N1_NO_HABIL' : rawRol;
         // Validar que la condición ingresada esté dentro del listado permitido de valores administrativos y técnicos
         if (!['N2', 'TI', 'N1_NO_HABIL', 'TELEWORK', 'OL', 'VACATION', 'MEDICAL_LEAVE'].includes(roleCode)) {
-          throw new Error(`Condición inválida: ${rawRol}. Usa N1, N2, TI, Teletrabajo, Charla/Capacitación (OL), Vacaciones o Licencia médica`);
+          throw new Error(`Condición inválida: ${rawRol}. Usa N1, N2, TI, Teletrabajo, Charla/Capacitación (OL), Vacaciones o Trámite Médico`);
         }
 
         const weekStartDate = buildAssignmentDateTime(row.fechainicio || row.weekstartdate, row.horainicio || row.weekstarttime);
@@ -1828,7 +1828,7 @@ exports.importAssignmentsCsv = async (req, res) => {
             weekEndDate
           });
           if (overlappingMedicalLeave) {
-            throw new Error('El analista ya tiene una Licencia médica registrada en este período.');
+            throw new Error('El analista ya tiene un Trámite Médico registrado en este período.');
           }
         } else if (roleCode === ROLE_VACATION) {
           const medicalLeave = await findOverlappingMedicalLeave({
@@ -1837,7 +1837,7 @@ exports.importAssignmentsCsv = async (req, res) => {
             weekEndDate
           });
           if (medicalLeave) {
-            throw new Error('El analista está en Licencia médica en este período.');
+            throw new Error('El analista está en Trámite Médico en este período.');
           }
 
           await ShiftAssignment.deleteMany({
@@ -1856,7 +1856,7 @@ exports.importAssignmentsCsv = async (req, res) => {
             weekEndDate: { $gt: weekStartDate }
           });
           if (onAbsence) {
-            const absenceLabel = onAbsence.roleCode === 'MEDICAL_LEAVE' ? 'Licencia médica' : 'Vacaciones';
+            const absenceLabel = onAbsence.roleCode === 'MEDICAL_LEAVE' ? 'Trámite Médico' : 'Vacaciones';
             throw new Error(`El analista está en ${absenceLabel} en este período.`);
           }
         }
@@ -1956,7 +1956,7 @@ exports.createAssignment = async (req, res) => {
 
       if (overlappingMedicalLeave) {
         return res.status(409).json({
-          error: `El analista ya tiene una Licencia médica registrada en este período (${new Date(overlappingMedicalLeave.weekStartDate).toLocaleDateString('es-CL')} - ${new Date(overlappingMedicalLeave.weekEndDate).toLocaleDateString('es-CL')}).`
+          error: `El analista ya tiene un Trámite Médico registrado en este período (${new Date(overlappingMedicalLeave.weekStartDate).toLocaleDateString('es-CL')} - ${new Date(overlappingMedicalLeave.weekEndDate).toLocaleDateString('es-CL')}).`
         });
       }
     } else if (req.body.roleCode === ROLE_VACATION) {
@@ -1968,7 +1968,7 @@ exports.createAssignment = async (req, res) => {
 
       if (medicalLeave) {
         return res.status(409).json({
-          error: `El analista está en Licencia médica en este período (${new Date(medicalLeave.weekStartDate).toLocaleDateString('es-CL')} - ${new Date(medicalLeave.weekEndDate).toLocaleDateString('es-CL')}).`
+          error: `El analista está en Trámite Médico en este período (${new Date(medicalLeave.weekStartDate).toLocaleDateString('es-CL')} - ${new Date(medicalLeave.weekEndDate).toLocaleDateString('es-CL')}).`
         });
       }
     } else {
@@ -1980,7 +1980,7 @@ exports.createAssignment = async (req, res) => {
         weekEndDate: { $gt: weekStartDate }
       });
       if (onAbsence) {
-        const absenceLabel = onAbsence.roleCode === 'MEDICAL_LEAVE' ? 'Licencia médica' : 'Vacaciones';
+        const absenceLabel = onAbsence.roleCode === 'MEDICAL_LEAVE' ? 'Trámite Médico' : 'Vacaciones';
         return res.status(409).json({
           error: `El analista ya está registrado en ${absenceLabel} en este período (${new Date(onAbsence.weekStartDate).toLocaleDateString('es-CL')} - ${new Date(onAbsence.weekEndDate).toLocaleDateString('es-CL')}).`
         });
@@ -2042,7 +2042,7 @@ exports.createAssignment = async (req, res) => {
       responseObj.deletedShiftsCount = deletedShiftsCount;
       responseObj.pausedAssignmentsCount = pausedAssignmentsCount;
       if (req.body.roleCode === ROLE_MEDICAL_LEAVE) {
-        responseObj.message = `Licencia médica registrada. Se pausaron automáticamente ${pausedAssignmentsCount} turno(s) previo(s) del analista en este período.`;
+        responseObj.message = `Trámite Médico registrado. Se pausaron automáticamente ${pausedAssignmentsCount} turno(s) previo(s) del analista en este período.`;
       } else {
         responseObj.message = `Turno de vacaciones registrado. Se liberaron automáticamente ${deletedShiftsCount} turno(s) previo(s) del analista en este período.`;
       }
@@ -2103,7 +2103,7 @@ exports.updateAssignment = async (req, res) => {
 
       if (overlappingMedicalLeave) {
         return res.status(409).json({
-          error: `El analista ya tiene una Licencia médica registrada en este período (${new Date(overlappingMedicalLeave.weekStartDate).toLocaleDateString('es-CL')} - ${new Date(overlappingMedicalLeave.weekEndDate).toLocaleDateString('es-CL')}).`
+          error: `El analista ya tiene un Trámite Médico registrado en este período (${new Date(overlappingMedicalLeave.weekStartDate).toLocaleDateString('es-CL')} - ${new Date(overlappingMedicalLeave.weekEndDate).toLocaleDateString('es-CL')}).`
         });
       }
     } else if (roleCode === ROLE_VACATION) {
@@ -2116,7 +2116,7 @@ exports.updateAssignment = async (req, res) => {
 
       if (medicalLeave) {
         return res.status(409).json({
-          error: `El analista está en Licencia médica en este período (${new Date(medicalLeave.weekStartDate).toLocaleDateString('es-CL')} - ${new Date(medicalLeave.weekEndDate).toLocaleDateString('es-CL')}).`
+          error: `El analista está en Trámite Médico en este período (${new Date(medicalLeave.weekStartDate).toLocaleDateString('es-CL')} - ${new Date(medicalLeave.weekEndDate).toLocaleDateString('es-CL')}).`
         });
       }
     } else {
@@ -2129,7 +2129,7 @@ exports.updateAssignment = async (req, res) => {
         _id: { $ne: id }
       });
       if (onAbsence) {
-        const absenceLabel = onAbsence.roleCode === 'MEDICAL_LEAVE' ? 'Licencia médica' : 'Vacaciones';
+        const absenceLabel = onAbsence.roleCode === 'MEDICAL_LEAVE' ? 'Trámite Médico' : 'Vacaciones';
         return res.status(409).json({
           error: `El analista ya está registrado en ${absenceLabel} en este período (${new Date(onAbsence.weekStartDate).toLocaleDateString('es-CL')} - ${new Date(onAbsence.weekEndDate).toLocaleDateString('es-CL')}).`
         });
@@ -2200,9 +2200,9 @@ exports.updateAssignment = async (req, res) => {
       responseObj.pausedAssignmentsCount = pausedAssignmentsCount;
       responseObj.restoredAssignmentsCount = restoredAssignmentsCount;
       if (roleCode === ROLE_MEDICAL_LEAVE) {
-        responseObj.message = `Licencia médica actualizada. Se pausaron ${pausedAssignmentsCount} turno(s) y se reactivaron ${restoredAssignmentsCount} turno(s) previos según el nuevo período.`;
+        responseObj.message = `Trámite Médico actualizado. Se pausaron ${pausedAssignmentsCount} turno(s) y se reactivaron ${restoredAssignmentsCount} turno(s) previos según el nuevo período.`;
       } else if (existing.roleCode === ROLE_MEDICAL_LEAVE && restoredAssignmentsCount > 0) {
-        responseObj.message = `Asignación actualizada. Se reactivaron ${restoredAssignmentsCount} turno(s) que estaban en pausa por la licencia médica anterior.`;
+        responseObj.message = `Asignación actualizada. Se reactivaron ${restoredAssignmentsCount} turno(s) que estaban en pausa por el trámite médico anterior.`;
       } else {
         responseObj.message = `Turno de vacaciones actualizado. Se liberaron automáticamente ${deletedShiftsCount} turno(s) previo(s) del analista en este período.`;
       }
@@ -2233,7 +2233,7 @@ exports.deleteAssignment = async (req, res) => {
     logger.info('Shift assignment deleted:', { assignmentId: assignment._id });
     if (restoredAssignmentsCount > 0) {
       return res.json({
-        message: `Licencia médica eliminada. Se reactivaron ${restoredAssignmentsCount} turno(s) que estaban en pausa.`,
+        message: `Trámite Médico eliminado. Se reactivaron ${restoredAssignmentsCount} turno(s) que estaban en pausa.`,
         restoredAssignmentsCount
       });
     }
