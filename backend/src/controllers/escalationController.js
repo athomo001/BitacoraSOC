@@ -2595,6 +2595,34 @@ exports.sendEscalationScheduleInternal = async ({ name, recipients, ccRecipients
       ? roleFilter.map(r => String(r || '').toUpperCase())
       : INTERNAL_SHIFT_ROLE_CODES;
 
+    // Generar etiqueta de categorías dinámicas agrupadas en base al filtro seleccionado para el correo
+    const categoriesList = [];
+    const hasGuardRoles = Array.isArray(roleFilter) && roleFilter.some(r => ['N2', 'TI', 'N1_NO_HABIL'].includes(r));
+    if (hasGuardRoles) {
+      categoriesList.push('GUARDIA');
+    }
+    if (Array.isArray(roleFilter)) {
+      if (roleFilter.includes('TELEWORK')) {
+        categoriesList.push('TELETRABAJO');
+      }
+      if (roleFilter.includes('OL')) {
+        categoriesList.push('CHARLA/CAPACITACIÓN');
+      }
+      if (roleFilter.includes('VACATION')) {
+        categoriesList.push('VACACIONES');
+      }
+      if (roleFilter.includes('MEDICAL_LEAVE')) {
+        categoriesList.push('LICENCIA MÉDICA');
+      }
+      if (roleFilter.includes('MEDICAL_APPOINTMENT')) {
+        categoriesList.push('TRÁMITE MÉDICO');
+      }
+    }
+
+    const categoriesLabel = categoriesList.length > 0
+      ? categoriesList.join(' / ')
+      : 'CALENDARIO';
+
     const overlappingInternalAssignments = assignments.filter((assignment) => {
       const overlapsRequestedPeriod = assignment.weekStartDate <= endDate && assignment.weekEndDate >= startDate;
       const isTargetRole = targetRoles.includes(String(assignment.roleCode || '').toUpperCase());
@@ -2653,6 +2681,7 @@ exports.sendEscalationScheduleInternal = async ({ name, recipients, ccRecipients
         startDate: assignment.weekStartDate,
         endDate: assignment.weekEndDate,
         cargoLabel,
+        roleCode: assignment.roleCode,
         isCurrent
       };
     });
@@ -2686,7 +2715,8 @@ exports.sendEscalationScheduleInternal = async ({ name, recipients, ccRecipients
         periodLabel,
         logoCid,
         brandName,
-        title: reportTitle
+        title: reportTitle,
+        categoriesLabel
       });
 
       const emailResult = await sendEmail({
@@ -2710,7 +2740,8 @@ exports.sendEscalationScheduleInternal = async ({ name, recipients, ccRecipients
       periodLabel,
       logoCid,
       brandName,
-      title: reportTitle
+      title: reportTitle,
+      categoriesLabel
     });
 
     if (emailBuild.errors && emailBuild.errors.length > 0) {
@@ -2885,12 +2916,15 @@ exports.triggerNotificationScheduleSend = async (req, res) => {
       return res.status(400).json({ error: 'No hay destinatarios válidos configurados.' });
     }
 
+    const name = req.body?.name || schedule.name;
+    const roleFilter = req.body?.roleFilter || schedule.roleFilter;
+
     const result = await exports.sendEscalationScheduleInternal({
-      name: schedule.name,
+      name,
       recipients,
       ccRecipients,
       frequency: schedule.frequency,
-      roleFilter: schedule.roleFilter
+      roleFilter
     });
 
     if (result.success) {

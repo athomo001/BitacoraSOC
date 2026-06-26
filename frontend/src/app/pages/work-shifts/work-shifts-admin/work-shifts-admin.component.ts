@@ -1733,10 +1733,34 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       return;
     }
 
+    // Obtener los roles seleccionados del formulario actual para pasarlos en la prueba
+    const formVal = this.scheduleForm.value;
+    const roleFilter: string[] = [];
+    if (formVal.includeGuard) {
+      roleFilter.push('N2', 'TI', 'N1_NO_HABIL');
+    }
+    if (formVal.includeTelework) {
+      roleFilter.push('TELEWORK');
+    }
+    if (formVal.includeOl) {
+      roleFilter.push('OL');
+    }
+    if (formVal.includeVacation) {
+      roleFilter.push('VACATION');
+    }
+    if (formVal.includeMedicalLeave) {
+      roleFilter.push('MEDICAL_LEAVE');
+    }
+    if (formVal.includeMedicalAppointment) {
+      roleFilter.push('MEDICAL_APPOINTMENT');
+    }
+
     this.triggeringScheduleSend = true;
     this.escalationService.triggerNotificationScheduleSend(this.editingScheduleId, {
+      name: formVal.name,
       recipients: [this.testRecipientEmail.trim().toLowerCase()],
       ccRecipients: [],
+      roleFilter,
       isTest: true
     } as any).subscribe({
       next: (res: any) => {
