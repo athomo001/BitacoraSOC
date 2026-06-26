@@ -562,7 +562,8 @@ export class EscalationSimpleComponent implements OnInit {
               email: personEmail,
               role: roleName,
               status: 'vacation',
-              statusLabel: isMedicalLeave ? 'TRÁMITE MÉDICO' : 'VACACIONES'
+              statusLabel: isMedicalLeave ? 'TRÁMITE MÉDICO' : 'VACACIONES',
+              isMedicalLeave
             });
             if (userIdStr) processedUserIds.add(String(userIdStr));
             if (extIdStr) processedExtIds.add(String(extIdStr));
@@ -596,7 +597,8 @@ export class EscalationSimpleComponent implements OnInit {
               email: personEmail,
               role: roleName,
               status: 'upcoming-vacation',
-              statusLabel: isMedicalLeave ? 'Pronto Trámite Médico' : 'Pronto Vacaciones'
+              statusLabel: isMedicalLeave ? 'Pronto Trámite Médico' : 'Pronto Vacaciones',
+              isMedicalLeave
             });
 
             if (userIdStr) processedUserIds.add(String(userIdStr));

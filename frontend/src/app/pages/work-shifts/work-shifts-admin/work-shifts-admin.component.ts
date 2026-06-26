@@ -159,6 +159,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
   editingScheduleId: string | null = null;
   savingSchedule = false;
   triggeringScheduleSend = false;
+  testRecipientEmail = '';
   scheduleForm!: FormGroup;
   loadingAutomationConfig = false;
   savingAutomationConfig = false;
@@ -1534,6 +1535,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
   addNotificationSchedule(): void {
     this.showScheduleForm = true;
     this.editingScheduleId = null;
+    this.testRecipientEmail = '';
     this.scheduleForm.reset({
       name: '',
       enabled: true,
@@ -1559,6 +1561,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
   editNotificationSchedule(schedule: any): void {
     this.showScheduleForm = true;
     this.editingScheduleId = schedule._id;
+    this.testRecipientEmail = '';
 
     // Analizar el filtro de roles guardado para marcar los checkboxes correspondientes
     const filter = schedule.roleFilter || [];
@@ -1707,11 +1710,45 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Envía un correo de prueba inmediato para la programación que se está editando.
+   * Utiliza el correo ingresado en el campo de pruebas sin alterar el lastSentAt.
+   */
+  sendTestEmail(): void {
+    if (!this.editingScheduleId) return;
+    if (!this.testRecipientEmail || !this.testRecipientEmail.includes('@')) {
+      this.showError('Ingrese un correo de prueba válido.');
+      return;
+    }
+
+    this.triggeringScheduleSend = true;
+    this.escalationService.triggerNotificationScheduleSend(this.editingScheduleId, {
+      recipients: [this.testRecipientEmail.trim().toLowerCase()],
+      ccRecipients: [],
+      isTest: true
+    } as any).subscribe({
+      next: (res: any) => {
+        this.showSuccess(res.message || 'Envío de prueba procesado correctamente.');
+        this.testRecipientEmail = '';
+        this.cdr.detectChanges();
+      },
+      error: (err: any) => {
+        console.error('Error al disparar envío de prueba:', err);
+        this.showError(err?.error?.error || 'Error al enviar correo de prueba.');
+      },
+      complete: () => {
+        this.triggeringScheduleSend = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  /**
    * Cancela la creación/edición de programación y retorna a la lista.
    */
   cancelScheduleForm(): void {
     this.showScheduleForm = false;
     this.editingScheduleId = null;
+    this.testRecipientEmail = '';
     this.cdr.detectChanges();
   }
 

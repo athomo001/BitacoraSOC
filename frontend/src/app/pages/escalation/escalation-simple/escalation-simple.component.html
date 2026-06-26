@@ -152,8 +152,10 @@
                   <mat-icon *ngIf="staff.status === 'telework'">home</mat-icon>
                   <mat-icon *ngIf="staff.status === 'training'">school</mat-icon>
                   <mat-icon *ngIf="staff.status === 'office'">business</mat-icon>
-                  <mat-icon *ngIf="staff.status === 'vacation'">event_busy</mat-icon>
-                  <mat-icon *ngIf="staff.status === 'upcoming-vacation'">event_note</mat-icon>
+                  <mat-icon *ngIf="staff.status === 'vacation' && !staff.isMedicalLeave">event_busy</mat-icon>
+                  <mat-icon *ngIf="staff.status === 'vacation' && staff.isMedicalLeave">healing</mat-icon>
+                  <mat-icon *ngIf="staff.status === 'upcoming-vacation' && !staff.isMedicalLeave">event_note</mat-icon>
+                  <mat-icon *ngIf="staff.status === 'upcoming-vacation' && staff.isMedicalLeave">healing</mat-icon>
                   <mat-icon *ngIf="staff.status === 'unassigned'">help_outline</mat-icon>
                   <span>{{ staff.statusLabel }}</span>
                 </span>

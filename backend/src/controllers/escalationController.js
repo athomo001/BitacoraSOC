@@ -2891,8 +2891,12 @@ exports.triggerNotificationScheduleSend = async (req, res) => {
     });
 
     if (result.success) {
-      schedule.lastSentAt = new Date();
-      await schedule.save();
+      const isTest = req.body?.isTest === true;
+      if (!isTest) {
+        // Actualizar la fecha del último envío real si no es de prueba
+        schedule.lastSentAt = new Date();
+        await schedule.save();
+      }
 
       await audit(req, {
         event: 'escalation.notification_schedule.trigger_send',
