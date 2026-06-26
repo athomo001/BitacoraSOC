@@ -14,6 +14,7 @@ Registro de cambios relevantes del proyecto.
 - **Mejoras Visuales y de UX en la Gestión de Turnos**:
   - Se añadió un contenedor con scroll vertical de altura máxima (`max-height: 380px`) en las listas de proximidad ("Próximos Turnos a Iniciar" y "Turnos Próximos a Terminar") en la pantalla de administración para evitar que la UI se extienda innecesariamente.
   - Se solucionó un bug en el tooltip de conflictos visuales en el frontend donde no se mostraba el nombre del analista en conflicto por una variable local no definida.
+  - **Alineación de Botones de Acciones**: Se corrigió el centrado geométrico estricto del elemento `mat-icon` dentro de los botones de acción de la tabla (`mat-icon-button`), alineando correctamente el círculo de hover y ripple sobre el icono. Se incrementó la separación (`gap: 12px`) entre los botones de "Editar" y "Eliminar" para prevenir pulsaciones accidentales de eliminación.
 
 ## [v1.6.13] - 2026-06-26
 

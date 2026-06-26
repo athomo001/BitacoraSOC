@@ -645,18 +645,32 @@
     }
   }
 
+  // Alineación de botones de acción en la tabla con mayor separación para evitar clics erróneos
   .actions-cell {
     display: flex;
-    gap: 8px;
+    gap: 12px; // Mayor separación entre el botón de editar y borrar
     align-items: center;
 
     button[mat-icon-button] {
       width: 36px;
       height: 36px;
-      line-height: 36px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      position: relative;
+      padding: 0;
+
+      // Centrado geométrico estricto del icono mat-icon para alinearse con el ripple circular
+      mat-icon {
+        margin: 0;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        font-size: 24px;
+      }
     }
   }
 

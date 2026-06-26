@@ -69,6 +69,7 @@ Stack principal:
 - **Sobrescritura Automática**: Modificación de la detección de colisiones a solapamiento real. Las nuevas asignaciones sobrescriben turnos en conflicto del mismo rol exclusivo.
 - **Scroll en Proximidad**: Incorporación de scroll vertical en el listado lateral de turnos para mejorar el diseño en pantallas de administración.
 - **Tooltip de Conflicto**: Solución al nombre de analista vacío en los mensajes de advertencia del frontend.
+- **Alineación de Acciones**: Centrado geométrico de los iconos en los botones de acción (`mat-icon-button`) para coincidir exactamente con el ripple/hover circular, e incremento de separación (`gap: 12px`) para prevenir eliminaciones accidentales.
 
 ### v1.6.13 (automatización de turnos, envío de pruebas, dinámicos en correo y trámite médico)
 
