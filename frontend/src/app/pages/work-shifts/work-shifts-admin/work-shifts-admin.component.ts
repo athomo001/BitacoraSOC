@@ -981,7 +981,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     if (roleCode === 'TELEWORK') return 'Teletrabajo';
     if (roleCode === 'OL') return 'Charla/Capacitacion (OL)';
     if (roleCode === 'VACATION') return 'Vacaciones';
-    if (roleCode === 'MEDICAL_LEAVE') return 'Licencia médica';
+    if (roleCode === 'MEDICAL_LEAVE') return 'Trámite Médico';
     return roleCode;
   }
 
@@ -1621,7 +1621,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     }
 
     if (roleFilter.length === 0) {
-      this.showError('Debe seleccionar al menos una condición a notificar (Guardia, Teletrabajo, Charla/Capacitación, Vacaciones o Licencia médica).');
+      this.showError('Debe seleccionar al menos una condición a notificar (Guardia, Teletrabajo, Charla/Capacitación, Vacaciones o Trámite Médico).');
       return;
     }
 
