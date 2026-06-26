@@ -529,7 +529,8 @@ export class EscalationSimpleComponent implements OnInit {
 
     forkJoin([assignments$, futureVacations$, futureMedicalLeaves$, futureMedicalAppointments$]).subscribe({
       next: ([assignments, futureVacations, futureMedicalLeaves, futureMedicalAppointments]) => {
-        // Se determina si la asignación está activa en la semana consultada
+        const now = new Date();
+        // Se determina si la asignación está activa en la semana consultada y no ha finalizado en tiempo real
         const isAssignmentActiveInWeek = (asg: any): boolean => {
           const start = new Date(asg?.weekStartDate);
           const end = new Date(asg?.weekEndDate);
@@ -537,8 +538,9 @@ export class EscalationSimpleComponent implements OnInit {
             // Evita mostrar estados fantasma cuando llegan fechas incompletas/inválidas.
             return false;
           }
-          // Verifica el solapamiento con la semana seleccionada
-          return start <= this.currentWeekEnd && end >= this.currentWeekStart;
+          const overlapsWeek = start <= this.currentWeekEnd && end >= this.currentWeekStart;
+          const isNotExpired = end >= now; // Omitir si la actividad ya terminó en tiempo real
+          return overlapsWeek && isNotExpired;
         };
 
         const futureAbsences = [...futureVacations, ...futureMedicalLeaves, ...futureMedicalAppointments];
@@ -568,7 +570,9 @@ export class EscalationSimpleComponent implements OnInit {
               status: isMedicalAppointment ? 'medical-appointment' : 'vacation',
               statusLabel: isMedicalAppointment ? 'TRÁMITE MÉDICO' : (isMedicalLeave ? 'LICENCIA MÉDICA' : 'VACACIONES'),
               isMedicalLeave,
-              isMedicalAppointment
+              isMedicalAppointment,
+              startDate: new Date(asg.weekStartDate),
+              endDate: new Date(asg.weekEndDate)
             });
             if (userIdStr) processedUserIds.add(String(userIdStr));
             if (extIdStr) processedExtIds.add(String(extIdStr));
@@ -605,7 +609,9 @@ export class EscalationSimpleComponent implements OnInit {
               status: isMedicalAppointment ? 'upcoming-medical-appointment' : 'upcoming-vacation',
               statusLabel: isMedicalAppointment ? 'Pronto Trámite Médico' : (isMedicalLeave ? 'Pronto Licencia médica' : 'Pronto Vacaciones'),
               isMedicalLeave,
-              isMedicalAppointment
+              isMedicalAppointment,
+              startDate: new Date(asg.weekStartDate),
+              endDate: new Date(asg.weekEndDate)
             });
 
             if (userIdStr) processedUserIds.add(String(userIdStr));
@@ -637,7 +643,9 @@ export class EscalationSimpleComponent implements OnInit {
               email: personEmail,
               role: roleName,
               status: 'telework',
-              statusLabel: 'En Teletrabajo'
+              statusLabel: 'En Teletrabajo',
+              startDate: new Date(asg.weekStartDate),
+              endDate: new Date(asg.weekEndDate)
             });
             if (userIdStr) processedUserIds.add(String(userIdStr));
             if (extIdStr) processedExtIds.add(String(extIdStr));
@@ -648,7 +656,9 @@ export class EscalationSimpleComponent implements OnInit {
               email: personEmail,
               role: roleName,
               status: 'training',
-              statusLabel: 'En Charla/Capacitacion (Fuera de oficina)'
+              statusLabel: 'En Charla/Capacitacion (Fuera de oficina)',
+              startDate: new Date(asg.weekStartDate),
+              endDate: new Date(asg.weekEndDate)
             });
             if (userIdStr) processedUserIds.add(String(userIdStr));
             if (extIdStr) processedExtIds.add(String(extIdStr));
@@ -660,7 +670,9 @@ export class EscalationSimpleComponent implements OnInit {
               email: personEmail,
               role: roleName,
               status: 'office',
-              statusLabel: 'En Oficina'
+              statusLabel: 'En Oficina',
+              startDate: new Date(asg.weekStartDate),
+              endDate: new Date(asg.weekEndDate)
             });
             if (userIdStr) processedUserIds.add(String(userIdStr));
             if (extIdStr) processedExtIds.add(String(extIdStr));
@@ -819,6 +831,29 @@ export class EscalationSimpleComponent implements OnInit {
 
   // Personal de apoyo en teletrabajo, oficina y vacaciones según distribución de turnos
   teleworkStaff: any[] = [];
+
+  // Formatea un rango de fecha/hora de asignación para mostrarlo de forma compacta y clara
+  formatAssignmentPeriod(startDate: Date | undefined, endDate: Date | undefined, status: string): string {
+    if (!startDate || !endDate) return '';
+    
+    // Para oficina no es necesario mostrar el rango ya que es el horario estándar
+    if (status === 'office') return '';
+
+    const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    const isSameDay = startDate.toDateString() === endDate.toDateString();
+    
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const formatTime = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const formatDate = (d: Date) => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
+
+    if (isSameDay) {
+      const dayName = startDate.toLocaleDateString('es-CL', { weekday: 'long' });
+      const capitalizedDay = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+      return `${capitalizedDay} ${formatDate(startDate)} (${formatTime(startDate)} a ${formatTime(endDate)})`;
+    }
+
+    return `${formatDate(startDate)} ${formatTime(startDate)} al ${formatDate(endDate)} ${formatTime(endDate)}`;
+  }
 
   // Selecciona todo el texto del input al enfocar para facilitar la escritura inmediata
   onInputFocus(event: any): void {
