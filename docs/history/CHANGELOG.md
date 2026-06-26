@@ -2,6 +2,19 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.14] - 2026-06-26
+
+### Corrección de Importación de CSV y Gestión de Solapamiento de Turnos
+
+- **Importación Robusta de CSV de Turnos**:
+  - Se optimizó el parseador de CSV en el backend para omitir correctamente aquellas líneas explicativas o comentarios que vienen envueltos en comillas dobles (por ejemplo, `"# Columna ""condicion"": ..."`), resolviendo el error `400 Bad Request` al cargar plantillas modificadas.
+- **Sobrescritura Automática de Turnos en Conflicto**:
+  - Se modificó la validación de colisiones de turnos para evaluar solapamientos de tiempo reales (usando operadores `$lt` y `$gt`) en lugar de coincidencias exactas de fechas.
+  - Al registrar o importar asignaciones, el sistema ahora sobrescribe/actualiza automáticamente el registro conflictivo del mismo rol exclusivo en el mismo período, eliminando la duplicación en la base de datos.
+- **Mejoras Visuales y de UX en la Gestión de Turnos**:
+  - Se añadió un contenedor con scroll vertical de altura máxima (`max-height: 380px`) en las listas de proximidad ("Próximos Turnos a Iniciar" y "Turnos Próximos a Terminar") en la pantalla de administración para evitar que la UI se extienda innecesariamente.
+  - Se solucionó un bug en el tooltip de conflictos visuales en el frontend donde no se mostraba el nombre del analista en conflicto por una variable local no definida.
+
 ## [v1.6.13] - 2026-06-26
 
 ### Mejora en Automatización de Turnos, Formato de Correo Dinámico y Condición de Trámite Médico

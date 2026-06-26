@@ -148,10 +148,11 @@ const findAssignmentConflict = async ({ roleCode, weekStartDate, weekEndDate, ex
     return null;
   }
 
+  // Se evalúa por solapamiento temporal real en lugar de coincidencia exacta de fechas
   const conflictFilter = {
     roleCode,
-    weekStartDate,
-    weekEndDate,
+    weekStartDate: { $lt: weekEndDate },
+    weekEndDate: { $gt: weekStartDate },
     isPaused: { $ne: true }
   };
 
@@ -2038,12 +2039,14 @@ exports.createAssignment = async (req, res) => {
       weekEndDate
     });
 
+    let assignment;
     if (conflict) {
-      return res.status(409).json({ error: formatConflictMessage(conflict) });
+      // Si ya existe una asignación conflictiva, se sobrescribe (actualiza)
+      assignment = await ShiftAssignment.findByIdAndUpdate(conflict._id, req.body, { new: true, runValidators: true });
+    } else {
+      assignment = new ShiftAssignment(req.body);
+      await assignment.save();
     }
-
-    const assignment = new ShiftAssignment(req.body);
-    await assignment.save();
 
     if (req.body.roleCode === ROLE_MEDICAL_LEAVE) {
       pausedAssignmentsCount = await pauseAssignmentsForMedicalLeave({
