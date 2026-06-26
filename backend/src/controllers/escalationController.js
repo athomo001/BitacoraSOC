@@ -366,7 +366,13 @@ const parseShiftAssignmentsCsv = (csvText = '') => {
   }
 
   // Filtrar las líneas vacías y omitir las que comiencen con '#' para las leyendas de ayuda
-  const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0 && !line.trim().startsWith('#'));
+  // Se eliminan comillas exteriores en caso de que el editor de CSV las haya envuelto (ej. " # Columna ... ")
+  const lines = text.split(/\r?\n/).filter((line) => {
+    const trimmed = line.trim();
+    if (trimmed.length === 0) return false;
+    const cleanLine = trimmed.replace(/^"+|"+$/g, '').trim();
+    return !cleanLine.startsWith('#');
+  });
   if (lines.length < 2) {
     return { rows: [], errors: [{ row: 0, message: 'El CSV debe incluir encabezado y al menos una fila' }] };
   }
