@@ -394,6 +394,12 @@ Retorna la cookie de sesión `auth_token` y el objeto usuario idéntico a `/api/
 | DELETE | `/api/escalation/admin/external-people/:id` | Admin |
 | POST | `/api/escalation/admin/reminder/test` | Admin |
 | POST | `/api/escalation/admin/automation/trigger-send` | Admin |
+| GET | `/api/escalation/admin/notification-schedules` | Admin |
+| POST | `/api/escalation/admin/notification-schedules` | Admin |
+| PUT | `/api/escalation/admin/notification-schedules/:id` | Admin |
+| DELETE | `/api/escalation/admin/notification-schedules/:id` | Admin |
+| POST | `/api/escalation/admin/notification-schedules/:id/trigger-send` | Admin |
+
 
 
 ### Módulo: glpi

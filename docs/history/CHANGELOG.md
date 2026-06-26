@@ -2,6 +2,25 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.13] - 2026-06-26
+
+### Mejora en Automatización de Turnos, Formato de Correo Dinámico y Condición de Trámite Médico
+
+- **Nueva Condición de Asignación: "Trámite Médico" (`MEDICAL_APPOINTMENT`)**:
+  - Incorporada en el backend en los modelos `ShiftAssignment` y `ShiftNotificationSchedule`.
+  - Integrada con comportamiento no exclusivo para coexistir con guardias normales sin reemplazo destructivo, manteniendo la independencia de la "Licencia médica" (`MEDICAL_LEAVE`) y su lógica compleja.
+  - Soportada en el parser de importación/plantilla CSV de turnos mapeando `"Trámite Médico"`.
+- **Sección Interactiva de Correo de Prueba**:
+  - Añadida sección `🧪 Probar Envío de Correo` en el panel de control de turnos (`/main/admin/work-shifts`).
+  - Permite disparar inmediatamente el envío de prueba a cualquier destinatario sin guardar la configuración en BD y sin alterar `lastSentAt`.
+  - El frontend envía temporalmente el nombre y la selección de roles en tiempo real para que la prueba refleje exactamente el formulario en pantalla.
+- **Rediseño del Formato de Correo de Turnos**:
+  - **Cabecera Dinámica**: Se eliminó la repetición del nombre de la notificación en el encabezado superior derecho. Ahora se calcula una etiqueta de categorías agrupando los roles tradicionales en `"GUARDIA"` y el resto en sus nombres específicos (`TELETRABAJO`, `VACACIONES`, `LICENCIA MÉDICA`, `TRÁMITE MÉDICO`, `CHARLA/CAPACITACIÓN`) separados por `" / "`. Muestra `"CALENDARIO"` si no hay filtro activo.
+  - **Badges de Asignación**: Se reemplazaron los badges de estado temporal `"EN TURNO"` / `"PRÓXIMO"` por badges dinámicos con el concepto real en el que estará el analista esa semana, implementando colores premium específicos (Verde para guardias, Azul para teletrabajo, Marrón para capacitaciones, Naranja para vacaciones, Rojo para licencias médicas y Púrpura para trámites médicos).
+- **Mejoras Visuales y UX en Frontend**:
+  - Iconos diferenciados para teletrabajo (`home`), charla (`school` 🎓), licencia médica (`healing` 🩹) y trámite médico (`local_hospital` 🏥).
+  - Corregido el solapamiento visual e interferencia de clics (hitboxes) entre los botones "Modificar" y "Eliminar" en la tabla de asignaciones de turnos.
+
 ## [v1.6.12] - 2026-06-23
 
 ### Auto-Población de Empresa para Usuarios Internos desde Cliente Interno Configurado
