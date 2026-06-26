@@ -1214,7 +1214,8 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
         && asg.roleCode !== 'TELEWORK'
         && asg.roleCode !== 'OL'
         && asg.roleCode !== 'VACATION'
-        && asg.roleCode !== 'MEDICAL_LEAVE') {
+        && asg.roleCode !== 'MEDICAL_LEAVE'
+        && asg.roleCode !== 'MEDICAL_APPOINTMENT') {
         const assignedName = asg.userId?.fullName || asg.externalPersonId?.name || 'otra persona';
         const startStr = asgStart.toLocaleDateString('es-CL');
         const endStr = asgEnd.toLocaleDateString('es-CL');
@@ -1232,7 +1233,8 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
           && asg.roleCode !== 'TELEWORK'
           && asg.roleCode !== 'OL'
           && asg.roleCode !== 'VACATION'
-          && asg.roleCode !== 'MEDICAL_LEAVE') {
+          && asg.roleCode !== 'MEDICAL_LEAVE'
+          && asg.roleCode !== 'MEDICAL_APPOINTMENT') {
           const otherRole = this.getRoleLabel(asg.roleCode);
           const startStr = asgStart.toLocaleDateString('es-CL');
           const endStr = asgEnd.toLocaleDateString('es-CL');
@@ -1265,14 +1267,15 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
         && roleCode !== 'TELEWORK'
         && roleCode !== 'OL'
         && roleCode !== 'VACATION'
-        && roleCode !== 'MEDICAL_LEAVE') return true;
+        && roleCode !== 'MEDICAL_LEAVE'
+        && roleCode !== 'MEDICAL_APPOINTMENT') return true;
 
       const matchesUser = userId && other.userId && String(other.userId._id || other.userId) === String(userId);
       const matchesExt = extId && other.externalPersonId && String(other.externalPersonId._id || other.externalPersonId) === String(extId);
       if (matchesUser || matchesExt) {
         // Si cualquiera es Teletrabajo o ausencia, no representa conflicto visual de disponibilidad.
-        if (roleCode === 'TELEWORK' || roleCode === 'OL' || roleCode === 'VACATION' || roleCode === 'MEDICAL_LEAVE') continue;
-        if (other.roleCode === 'TELEWORK' || other.roleCode === 'OL' || other.roleCode === 'VACATION' || other.roleCode === 'MEDICAL_LEAVE') continue;
+        if (roleCode === 'TELEWORK' || roleCode === 'OL' || roleCode === 'VACATION' || roleCode === 'MEDICAL_LEAVE' || roleCode === 'MEDICAL_APPOINTMENT') continue;
+        if (other.roleCode === 'TELEWORK' || other.roleCode === 'OL' || other.roleCode === 'VACATION' || other.roleCode === 'MEDICAL_LEAVE' || other.roleCode === 'MEDICAL_APPOINTMENT') continue;
         return true;
       }
     }
@@ -1299,8 +1302,10 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
 
       if (other.roleCode === roleCode
         && roleCode !== 'TELEWORK'
+        && roleCode !== 'OL'
         && roleCode !== 'VACATION'
-        && roleCode !== 'MEDICAL_LEAVE') {
+        && roleCode !== 'MEDICAL_LEAVE'
+        && roleCode !== 'MEDICAL_APPOINTMENT') {
         // Se retorna un texto de colisión adaptado a Condición para consistencia
         return `Conflicto de Condición: ${this.getRoleLabel(roleCode)} ya está asignado a ${name} en este período.`;
       }
@@ -1308,8 +1313,8 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       const matchesUser = userId && other.userId && String(other.userId._id || other.userId) === String(userId);
       const matchesExt = extId && other.externalPersonId && String(other.externalPersonId._id || other.externalPersonId) === String(extId);
       if (matchesUser || matchesExt) {
-        if (roleCode === 'TELEWORK' || roleCode === 'VACATION' || roleCode === 'MEDICAL_LEAVE') continue;
-        if (other.roleCode === 'TELEWORK' || other.roleCode === 'VACATION' || other.roleCode === 'MEDICAL_LEAVE') continue;
+        if (roleCode === 'TELEWORK' || roleCode === 'OL' || roleCode === 'VACATION' || roleCode === 'MEDICAL_LEAVE' || roleCode === 'MEDICAL_APPOINTMENT') continue;
+        if (other.roleCode === 'TELEWORK' || other.roleCode === 'OL' || other.roleCode === 'VACATION' || other.roleCode === 'MEDICAL_LEAVE' || other.roleCode === 'MEDICAL_APPOINTMENT') continue;
         return `Conflicto de Disponibilidad: Esta persona tiene otro turno (${this.getRoleLabel(other.roleCode)}) en este período.`;
       }
     }
