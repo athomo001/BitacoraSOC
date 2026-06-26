@@ -119,7 +119,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
   filteredDirectoryContactsForAssignment: DirectoryContact[] = [];
   showExternalPeopleForAssignment = true;
   // Lista de condiciones admitidas (operativas y administrativas)
-  roles = ['N2', 'TI', 'N1_NO_HABIL', 'TELEWORK', 'OL', 'VACATION', 'MEDICAL_LEAVE'];
+  roles = ['N2', 'TI', 'N1_NO_HABIL', 'TELEWORK', 'OL', 'VACATION', 'MEDICAL_LEAVE', 'MEDICAL_APPOINTMENT'];
   editingWeeklyAssignmentId: string | null = null;
 
   // Filtros de asignación semanal
@@ -159,6 +159,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
   editingScheduleId: string | null = null;
   savingSchedule = false;
   triggeringScheduleSend = false;
+  testRecipientEmail = '';
   scheduleForm!: FormGroup;
   loadingAutomationConfig = false;
   savingAutomationConfig = false;
@@ -354,7 +355,8 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       includeTelework: [false],
       includeOl: [false],
       includeVacation: [false],
-      includeMedicalLeave: [false]
+      includeMedicalLeave: [false],
+      includeMedicalAppointment: [false]
     });
   }
 
@@ -981,7 +983,8 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     if (roleCode === 'TELEWORK') return 'Teletrabajo';
     if (roleCode === 'OL') return 'Charla/Capacitacion (OL)';
     if (roleCode === 'VACATION') return 'Vacaciones';
-    if (roleCode === 'MEDICAL_LEAVE') return 'Trámite Médico';
+    if (roleCode === 'MEDICAL_LEAVE') return 'Licencia médica';
+    if (roleCode === 'MEDICAL_APPOINTMENT') return 'Trámite Médico';
     return roleCode;
   }
 
@@ -1190,7 +1193,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
 
     // Los conflictos de exclusividad no aplican si la nueva asignación es Teletrabajo o una ausencia.
     // Teletrabajo puede coexistir, y las ausencias (vacaciones/licencia) hacen limpieza automática en backend.
-    const isCurrentTeleworkOrAbsence = roleCode === 'TELEWORK' || roleCode === 'OL' || roleCode === 'VACATION' || roleCode === 'MEDICAL_LEAVE';
+    const isCurrentTeleworkOrAbsence = roleCode === 'TELEWORK' || roleCode === 'OL' || roleCode === 'VACATION' || roleCode === 'MEDICAL_LEAVE' || roleCode === 'MEDICAL_APPOINTMENT';
 
     for (const asg of this.weeklyAssignments) {
       if (this.editingWeeklyAssignmentId && asg._id === this.editingWeeklyAssignmentId) {
@@ -1534,6 +1537,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
   addNotificationSchedule(): void {
     this.showScheduleForm = true;
     this.editingScheduleId = null;
+    this.testRecipientEmail = '';
     this.scheduleForm.reset({
       name: '',
       enabled: true,
@@ -1546,7 +1550,8 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       includeTelework: false,
       includeOl: false,
       includeVacation: false,
-      includeMedicalLeave: false
+      includeMedicalLeave: false,
+      includeMedicalAppointment: false
     });
     this._recipientsRaw = '';
     this._ccRaw = '';
@@ -1559,6 +1564,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
   editNotificationSchedule(schedule: any): void {
     this.showScheduleForm = true;
     this.editingScheduleId = schedule._id;
+    this.testRecipientEmail = '';
 
     // Analizar el filtro de roles guardado para marcar los checkboxes correspondientes
     const filter = schedule.roleFilter || [];
@@ -1567,6 +1573,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     const includeOl = filter.includes('OL');
     const includeVacation = filter.includes('VACATION');
     const includeMedicalLeave = filter.includes('MEDICAL_LEAVE');
+    const includeMedicalAppointment = filter.includes('MEDICAL_APPOINTMENT');
 
     const recs = Array.isArray(schedule.recipients) ? schedule.recipients.join(', ') : '';
     const ccs = Array.isArray(schedule.ccRecipients) ? schedule.ccRecipients.join(', ') : '';
@@ -1583,7 +1590,8 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       includeTelework,
       includeOl,
       includeVacation,
-      includeMedicalLeave
+      includeMedicalLeave,
+      includeMedicalAppointment
     });
 
     this._recipientsRaw = recs;
@@ -1619,9 +1627,12 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     if (formVal.includeMedicalLeave) {
       roleFilter.push('MEDICAL_LEAVE');
     }
+    if (formVal.includeMedicalAppointment) {
+      roleFilter.push('MEDICAL_APPOINTMENT');
+    }
 
     if (roleFilter.length === 0) {
-      this.showError('Debe seleccionar al menos una condición a notificar (Guardia, Teletrabajo, Charla/Capacitación, Vacaciones o Trámite Médico).');
+      this.showError('Debe seleccionar al menos una condición a notificar (Guardia, Teletrabajo, Charla/Capacitación, Vacaciones, Trámite Médico o Licencia médica).');
       return;
     }
 
@@ -1707,11 +1718,45 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Envía un correo de prueba inmediato para la programación que se está editando.
+   * Utiliza el correo ingresado en el campo de pruebas sin alterar el lastSentAt.
+   */
+  sendTestEmail(): void {
+    if (!this.editingScheduleId) return;
+    if (!this.testRecipientEmail || !this.testRecipientEmail.includes('@')) {
+      this.showError('Ingrese un correo de prueba válido.');
+      return;
+    }
+
+    this.triggeringScheduleSend = true;
+    this.escalationService.triggerNotificationScheduleSend(this.editingScheduleId, {
+      recipients: [this.testRecipientEmail.trim().toLowerCase()],
+      ccRecipients: [],
+      isTest: true
+    } as any).subscribe({
+      next: (res: any) => {
+        this.showSuccess(res.message || 'Envío de prueba procesado correctamente.');
+        this.testRecipientEmail = '';
+        this.cdr.detectChanges();
+      },
+      error: (err: any) => {
+        console.error('Error al disparar envío de prueba:', err);
+        this.showError(err?.error?.error || 'Error al enviar correo de prueba.');
+      },
+      complete: () => {
+        this.triggeringScheduleSend = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  /**
    * Cancela la creación/edición de programación y retorna a la lista.
    */
   cancelScheduleForm(): void {
     this.showScheduleForm = false;
     this.editingScheduleId = null;
+    this.testRecipientEmail = '';
     this.cdr.detectChanges();
   }
 

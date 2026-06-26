@@ -162,7 +162,8 @@
                     <mat-option value="TELEWORK">Teletrabajo</mat-option>
                     <mat-option value="OL">Charla/Capacitación (OL)</mat-option>
                     <mat-option value="VACATION">Vacaciones</mat-option>
-                    <mat-option value="MEDICAL_LEAVE">Trámite Médico</mat-option>
+                    <mat-option value="MEDICAL_APPOINTMENT">Trámite Médico</mat-option>
+                    <mat-option value="MEDICAL_LEAVE">Licencia médica</mat-option>
                   </mat-select>
                   <mat-icon matPrefix>filter_list</mat-icon>
                 </mat-form-field>
@@ -278,7 +279,8 @@
                         <mat-option value="TELEWORK">Teletrabajo</mat-option>
                         <mat-option value="OL">Charla/Capacitación (OL)</mat-option>
                         <mat-option value="VACATION">Vacaciones</mat-option>
-                        <mat-option value="MEDICAL_LEAVE">Trámite Médico</mat-option>
+                        <mat-option value="MEDICAL_APPOINTMENT">Trámite Médico</mat-option>
+                        <mat-option value="MEDICAL_LEAVE">Licencia médica</mat-option>
                       </mat-select>
                     </mat-form-field>
 
@@ -443,6 +445,10 @@
                         Vacaciones
                       </span>
                       <span *ngIf="s.roleFilter?.includes('MEDICAL_LEAVE')" 
+                            style="font-size: 10px; background-color: #fbe9f0; color: #7a1f45; padding: 2px 6px; border-radius: 4px; font-weight: 500; margin-right: 4px;">
+                        Licencia médica
+                      </span>
+                      <span *ngIf="s.roleFilter?.includes('MEDICAL_APPOINTMENT')" 
                             style="font-size: 10px; background-color: #fbe9f0; color: #7a1f45; padding: 2px 6px; border-radius: 4px; font-weight: 500;">
                         Trámite Médico
                       </span>
@@ -536,7 +542,25 @@
                       <mat-checkbox formControlName="includeTelework">Teletrabajo</mat-checkbox>
                       <mat-checkbox formControlName="includeOl">Charla/Capacitación (OL)</mat-checkbox>
                       <mat-checkbox formControlName="includeVacation">Vacaciones</mat-checkbox>
-                      <mat-checkbox formControlName="includeMedicalLeave">Trámite Médico</mat-checkbox>
+                      <mat-checkbox formControlName="includeMedicalAppointment">Trámite Médico</mat-checkbox>
+                      <mat-checkbox formControlName="includeMedicalLeave">Licencia médica</mat-checkbox>
+                    </div>
+                  </div>
+
+                  <!-- Sección de prueba de envío -->
+                  <div *ngIf="editingScheduleId" class="test-send-section" style="margin-top: 15px; margin-bottom: 20px; border-top: 1px solid var(--soft-line, #D7DEC0); padding-top: 12px;">
+                    <h5 style="margin-top: 0; margin-bottom: 8px; font-weight: bold; color: var(--body-text, #173831); font-size: 13px;">🧪 Probar Envío de Correo</h5>
+                    <p style="font-size: 11px; color: #5b695d; margin-top: 0; margin-bottom: 10px;">
+                      Envía un correo de prueba con el formato y turnos reales de esta programación a un destinatario específico.
+                    </p>
+                    <div style="display: flex; gap: 8px; align-items: flex-start;">
+                      <mat-form-field appearance="outline" style="flex: 1; font-size: 12px; margin-bottom: -15px;">
+                        <mat-label>Correo de prueba</mat-label>
+                        <input matInput type="email" placeholder="ejemplo@correo.com" [(ngModel)]="testRecipientEmail" [ngModelOptions]="{standalone: true}">
+                      </mat-form-field>
+                      <button mat-flat-button color="accent" type="button" (click)="sendTestEmail()" [disabled]="!testRecipientEmail || triggeringScheduleSend" style="height: 38px; margin-top: 4px;">
+                        {{ triggeringScheduleSend ? 'Enviando...' : 'Enviar Prueba' }}
+                      </button>
                     </div>
                   </div>
 

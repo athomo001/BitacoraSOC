@@ -525,9 +525,10 @@ export class EscalationSimpleComponent implements OnInit {
     const assignments$ = this.escalationService.getAssignments(undefined, this.currentWeekStart.toISOString(), this.currentWeekEnd.toISOString());
     const futureVacations$ = this.escalationService.getAssignments('VACATION', this.currentWeekStart.toISOString(), undefined, 100);
     const futureMedicalLeaves$ = this.escalationService.getAssignments('MEDICAL_LEAVE', this.currentWeekStart.toISOString(), undefined, 100);
+    const futureMedicalAppointments$ = this.escalationService.getAssignments('MEDICAL_APPOINTMENT', this.currentWeekStart.toISOString(), undefined, 100);
 
-    forkJoin([assignments$, futureVacations$, futureMedicalLeaves$]).subscribe({
-      next: ([assignments, futureVacations, futureMedicalLeaves]) => {
+    forkJoin([assignments$, futureVacations$, futureMedicalLeaves$, futureMedicalAppointments$]).subscribe({
+      next: ([assignments, futureVacations, futureMedicalLeaves, futureMedicalAppointments]) => {
         const now = new Date();
         const isAssignmentActiveNow = (asg: any): boolean => {
           const start = new Date(asg?.weekStartDate);
@@ -539,7 +540,7 @@ export class EscalationSimpleComponent implements OnInit {
           return now >= start && now <= end;
         };
 
-        const futureAbsences = [...futureVacations, ...futureMedicalLeaves];
+        const futureAbsences = [...futureVacations, ...futureMedicalLeaves, ...futureMedicalAppointments];
         const list: any[] = [];
         const processedUserIds = new Set<string>();
         const processedExtIds = new Set<string>();
@@ -553,16 +554,19 @@ export class EscalationSimpleComponent implements OnInit {
           const userIdStr = asg.userId?._id || asg.userId;
           const extIdStr = asg.externalPersonId?._id || asg.externalPersonId;
 
-          if (asg.roleCode === 'VACATION' || asg.roleCode === 'MEDICAL_LEAVE') {
+          if (asg.roleCode === 'VACATION' || asg.roleCode === 'MEDICAL_LEAVE' || asg.roleCode === 'MEDICAL_APPOINTMENT') {
             if (!isAssignmentActiveNow(asg)) return;
             const isMedicalLeave = asg.roleCode === 'MEDICAL_LEAVE';
+            const isMedicalAppointment = asg.roleCode === 'MEDICAL_APPOINTMENT';
             list.push({
               name: personName,
               phone: personPhone,
               email: personEmail,
               role: roleName,
-              status: 'vacation',
-              statusLabel: isMedicalLeave ? 'TRÁMITE MÉDICO' : 'VACACIONES'
+              status: isMedicalAppointment ? 'medical-appointment' : 'vacation',
+              statusLabel: isMedicalAppointment ? 'TRÁMITE MÉDICO' : (isMedicalLeave ? 'LICENCIA MÉDICA' : 'VACACIONES'),
+              isMedicalLeave,
+              isMedicalAppointment
             });
             if (userIdStr) processedUserIds.add(String(userIdStr));
             if (extIdStr) processedExtIds.add(String(extIdStr));
@@ -584,6 +588,7 @@ export class EscalationSimpleComponent implements OnInit {
 
           const vStart = new Date(asg.weekStartDate);
           const isMedicalLeave = asg.roleCode === 'MEDICAL_LEAVE';
+          const isMedicalAppointment = asg.roleCode === 'MEDICAL_APPOINTMENT';
           if (vStart > referenceEnd && vStart <= futureLimit) {
             const personName = asg.userId?.fullName || asg.externalPersonId?.name || 'Sin asignar';
             const personPhone = asg.userId?.phone || asg.externalPersonId?.phone || '-';
@@ -595,8 +600,10 @@ export class EscalationSimpleComponent implements OnInit {
               phone: personPhone,
               email: personEmail,
               role: roleName,
-              status: 'upcoming-vacation',
-              statusLabel: isMedicalLeave ? 'Pronto Trámite Médico' : 'Pronto Vacaciones'
+              status: isMedicalAppointment ? 'upcoming-medical-appointment' : 'upcoming-vacation',
+              statusLabel: isMedicalAppointment ? 'Pronto Trámite Médico' : (isMedicalLeave ? 'Pronto Licencia médica' : 'Pronto Vacaciones'),
+              isMedicalLeave,
+              isMedicalAppointment
             });
 
             if (userIdStr) processedUserIds.add(String(userIdStr));
@@ -684,7 +691,8 @@ export class EscalationSimpleComponent implements OnInit {
     if (roleCode === 'TELEWORK') return 'Teletrabajo';
     if (roleCode === 'OL') return 'Charla/Capacitación (OL)';
     if (roleCode === 'VACATION') return 'Vacaciones';
-    if (roleCode === 'MEDICAL_LEAVE') return 'Trámite Médico';
+    if (roleCode === 'MEDICAL_LEAVE') return 'Licencia médica';
+    if (roleCode === 'MEDICAL_APPOINTMENT') return 'Trámite Médico';
     return roleCode;
   }
 

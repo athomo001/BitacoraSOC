@@ -136,7 +136,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let staff of teleworkStaff" class="data-row" [class.row-vacation]="staff.status === 'vacation'">
+            <tr *ngFor="let staff of teleworkStaff" class="data-row" [class.row-vacation]="staff.status === 'vacation' || staff.status === 'medical-appointment'">
               <td class="cell-name">{{ staff.name }}</td>
               <td class="cell-email clickable" (click)="copyToClipboard(staff.email)">
                 <span *ngIf="staff.email !== '-'">📧 {{ staff.email }}</span>
@@ -152,8 +152,12 @@
                   <mat-icon *ngIf="staff.status === 'telework'">home</mat-icon>
                   <mat-icon *ngIf="staff.status === 'training'">school</mat-icon>
                   <mat-icon *ngIf="staff.status === 'office'">business</mat-icon>
-                  <mat-icon *ngIf="staff.status === 'vacation'">event_busy</mat-icon>
-                  <mat-icon *ngIf="staff.status === 'upcoming-vacation'">event_note</mat-icon>
+                  <mat-icon *ngIf="staff.status === 'vacation' && !staff.isMedicalLeave">event_busy</mat-icon>
+                  <mat-icon *ngIf="staff.status === 'vacation' && staff.isMedicalLeave">healing</mat-icon>
+                  <mat-icon *ngIf="staff.status === 'medical-appointment'">local_hospital</mat-icon>
+                  <mat-icon *ngIf="staff.status === 'upcoming-vacation' && !staff.isMedicalLeave">event_note</mat-icon>
+                  <mat-icon *ngIf="staff.status === 'upcoming-vacation' && staff.isMedicalLeave">healing</mat-icon>
+                  <mat-icon *ngIf="staff.status === 'upcoming-medical-appointment'">local_hospital</mat-icon>
                   <mat-icon *ngIf="staff.status === 'unassigned'">help_outline</mat-icon>
                   <span>{{ staff.statusLabel }}</span>
                 </span>
