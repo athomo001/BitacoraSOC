@@ -51,14 +51,36 @@ const PALETTE = {
  * @param {string} data.brandName - Nombre de la marca (Bitácora SOC)
  * @param {string} data.title - Título personalizado para el encabezado del correo
  */
-async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', logoCid = null, brandName = 'Bitácora CDC', title = 'Turnos de Escalamiento SOC' }) {
+async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', logoCid = null, brandName = 'Bitácora CDC', title = 'Turnos de Escalamiento SOC', categoriesLabel = '' }) {
   
   const scheduleRows = schedule.map((s, i) => {
     const isLast = i === schedule.length - 1;
     const border = isLast ? 'none' : `1px solid ${PALETTE.softLine}`;
-    const badge = s.isCurrent 
-      ? `<span style="display:inline-block; white-space:nowrap; background-color:${PALETTE.accent}; color:${PALETTE.white}; padding:4px 8px; border-radius:4px; font-size:11px; line-height:1; font-weight:700;">EN&nbsp;TURNO</span>`
-      : `<span style="display:inline-block; white-space:nowrap; background-color:${PALETTE.mutedText}; color:${PALETTE.white}; padding:4px 8px; border-radius:4px; font-size:11px; line-height:1; font-weight:700;">PRÓXIMO</span>`;
+    const getBadgeInfo = (roleCode) => {
+      switch (roleCode) {
+        case 'N2':
+          return { label: 'OPERADOR N2', bg: '#155F50' };
+        case 'TI':
+          return { label: 'ESPECIALISTA TI', bg: '#155F50' };
+        case 'N1_NO_HABIL':
+          return { label: 'GUARDIA N1', bg: '#155F50' };
+        case 'TELEWORK':
+          return { label: 'TELETRABAJO', bg: '#1E88E5' };
+        case 'OL':
+          return { label: 'CHARLA/CAPACITACIÓN', bg: '#795548' };
+        case 'VACATION':
+          return { label: 'VACACIONES', bg: '#F57C00' };
+        case 'MEDICAL_LEAVE':
+          return { label: 'LICENCIA MÉDICA', bg: '#D32F2F' };
+        case 'MEDICAL_APPOINTMENT':
+          return { label: 'TRÁMITE MÉDICO', bg: '#8E24AA' };
+        default:
+          return { label: String(roleCode || 'TURNO').toUpperCase(), bg: '#5B695D' };
+      }
+    };
+
+    const badgeInfo = getBadgeInfo(s.roleCode);
+    const badge = `<span style="display:inline-block; white-space:nowrap; background-color:${badgeInfo.bg}; color:${PALETTE.white}; padding:4px 8px; border-radius:4px; font-size:11px; line-height:1; font-weight:700;">${e(badgeInfo.label)}</span>`;
 
     return `
       <tr>
@@ -106,8 +128,8 @@ async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', l
                 }
               </td>
               <td style="width:50%; text-align:right; vertical-align:middle;">
-                <!-- Cambiado de Escalación a Escalamiento para corregir la redacción en la cabecera del correo enviado a otras áreas -->
-                <span style="font-size:12px; font-weight:700; color:${PALETTE.headerText}; letter-spacing:1px;">${e((title || 'CALENDARIO').toUpperCase())}</span>
+                <!-- Cabecera dinámica mostrando las condiciones incluidas en la programación para evitar redundancia con el título -->
+                <span style="font-size:11px; font-weight:700; color:${PALETTE.headerText}; letter-spacing:1px;">${e((categoriesLabel || 'CALENDARIO').toUpperCase())}</span>
               </td>
             </tr>
           </mj-table>
