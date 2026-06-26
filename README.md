@@ -19,13 +19,22 @@ Stack principal:
 
 ## Capacidades principales
 
-- bitacora de entradas operativas, incidentes y ofensas
-- checklists de inicio y cierre de turno
-- consola admin unificada
-- auditoria persistente y forwarding a SIEM
-- backups y restore desde la plataforma
-- branding, SMTP, catalogos y escalacion
-- complementos con iframe seguro, API interna y circuit breaker
+- **Bitácora Operativa Integral**: Registro continuo de eventos en tiempo real, incidentes críticos, mantenciones y ofensas de seguridad, estructurados mediante narrativa y hashtags.
+- **Disciplina Operativa y Checklists**: Gestión del relevo de guardia mediante checklists obligatorios de inicio y cierre de turno, con alertas reactivas e impedimentos de cierre si quedan hallazgos no conformes (NOK) abiertos.
+- **Ruta de Escalación Visual e Interactiva**: Mapa de contactos y diagramas jerárquicos interactivos por cliente y servicio que permiten identificar visualmente a quién llamar primero en caso de incidencias.
+- **Visualización de Flujos de Escalación**: Monitoreo y consulta del flujo de llamadas, flujo de correos y la matriz de responsabilidades RACI editable desde el panel de control.
+- **Directorio Centralizado**: Agenda de correos y teléfonos unificada para la búsqueda veloz de contactos de clientes, analistas de guardia y enlaces a servicios web críticos.
+- **Automatización de Turnos y Correos de Guardia**: Programación automatizada del reporte periódico de turnos para analistas y clientes. Los correos (HTML premium responsivo) se envían con badges y colores corporativos de acuerdo a la condición de turno (Guardia, Teletrabajo, Vacaciones, Licencias o Trámites Médicos).
+- **Pruebas de Correo Interactivas**: Panel para realizar envíos de prueba inmediatos en base a la configuración en caliente de la interfaz, sin alterar el histórico ni las fechas de envío de producción.
+- **Gestión SMTP y Personalización de Marca (Branding)**: Ajuste de servidores de correo, configuración del remitente y opción de subir logotipos y modificar títulos de la aplicación para adaptar la plataforma a la identidad institucional.
+- **Celebración de Cumpleaños**: Mapeo diario automático de cumpleaños de analistas del SOC con felicitaciones estructuradas y envío de imágenes kawaii embebidas en línea (CID).
+- **Seguridad y Acceso Robusto**:
+  - Soporte de Doble Factor de Autenticación (TOTP - Google Authenticator, Authy, etc.).
+  - Integración Single Sign-On (SSO) referencial mediante Google y Microsoft Azure AD *(módulo base implementado; requiere validación, credenciales de API del proveedor y pruebas de configuración en producción)*.
+  - Consola de gestión HTTPS con inyección y rotación de certificados TLS sin detención del servicio (0-Downtime).
+- **Estadísticas y Reportes Automatizados**: Generación de informes ejecutivos e indicadores de uso basados en las entradas de la bitácora para evaluar la actividad y el cumplimiento operacional del equipo.
+- **Resiliencia con Backups Cifrados**: Creación y restauración de copias de seguridad de la base de datos MongoDB y evidencias de disco con empaquetado cifrado por contraseña descargable desde la UI.
+- **Extensibilidad mediante Complementos (Plugins)**: Carga y ejecución de utilidades estáticas (ZIP) y URLs externas integradas por iframes seguros con aislamiento Sandbox, control selectivo de accesos a la API compartida y protección Circuit Breaker contra caídas del complemento.
 
 ---
 
@@ -175,7 +184,7 @@ Galeria visual resumida del producto. Para ver el set completo, revisa `docs/SCR
 
 ![Configuración de Seguridad (HTTPS & SSO)](docs/images/screenshots/15-HTTPS-SSO.png)
 
-> 💡 **Nota sobre la Consola de Seguridad (HTTPS & SSO):** El panel unificado de HTTPS y Single Sign-On (SSO) está completamente integrado. El soporte para la inyección y rotación de certificados **HTTPS** (0-Downtime) es altamente funcional y estable, mientras que el inicio de sesión vía SSO (Google/Microsoft) está disponible como opción de autenticación.
+> 💡 **Nota sobre la Consola de Seguridad (HTTPS & SSO):** El panel unificado de HTTPS y Single Sign-On (SSO) está completamente integrado. El soporte para la inyección y rotación de certificados **HTTPS** (0-Downtime) es altamente funcional y estable, mientras que el inicio de sesión vía SSO (Google/Microsoft) está disponible como esquema base (sujeto a configuración y pruebas finales con el proveedor de identidad corporativo).
 
 ---
 
