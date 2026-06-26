@@ -81,23 +81,25 @@
                 Turnos Próximos a Terminar (En Curso)
               </h3>
               
-              <div *ngIf="upcomingEndAssignments.length === 0" class="empty-proximity">
-                No hay turnos activos terminando próximamente.
-              </div>
-              
-              <div class="proximity-row" *ngFor="let item of upcomingEndAssignments">
-                <div class="proximity-info">
-                  <span class="proximity-text">
-                    <strong>{{ item.personName }}</strong> - {{ getRoleLabel(item.roleCode) }}
-                  </span>
-                  <span class="proximity-time">{{ item.remainingText }}</span>
+              <div class="proximity-scroll-container">
+                <div *ngIf="upcomingEndAssignments.length === 0" class="empty-proximity">
+                  No hay turnos activos terminando próximamente.
                 </div>
-                <div class="proximity-progress-bar">
-                  <div class="proximity-progress-fill" 
-                       [style.width.%]="item.progress"
-                       [class.active-high]="item.progress > 80"
-                       [class.active-medium]="item.progress > 50 && item.progress <= 80"
-                       [class.active-low]="item.progress <= 50">
+                
+                <div class="proximity-row" *ngFor="let item of upcomingEndAssignments">
+                  <div class="proximity-info">
+                    <span class="proximity-text">
+                      <strong>{{ item.personName }}</strong> - {{ getRoleLabel(item.roleCode) }}
+                    </span>
+                    <span class="proximity-time">{{ item.remainingText }}</span>
+                  </div>
+                  <div class="proximity-progress-bar">
+                    <div class="proximity-progress-fill" 
+                         [style.width.%]="item.progress"
+                         [class.active-high]="item.progress > 80"
+                         [class.active-medium]="item.progress > 50 && item.progress <= 80"
+                         [class.active-low]="item.progress <= 50">
+                    </div>
                   </div>
                 </div>
               </div>
@@ -110,23 +112,25 @@
                 Próximos Turnos a Iniciar
               </h3>
               
-              <div *ngIf="upcomingStartAssignments.length === 0" class="empty-proximity">
-                No hay turnos futuros programados.
-              </div>
-              
-              <div class="proximity-row" *ngFor="let item of upcomingStartAssignments">
-                <div class="proximity-info">
-                  <span class="proximity-text">
-                    <strong>{{ item.personName }}</strong> - {{ getRoleLabel(item.roleCode) }}
-                  </span>
-                  <span class="proximity-time upcoming">{{ item.timeUntilText }}</span>
+              <div class="proximity-scroll-container">
+                <div *ngIf="upcomingStartAssignments.length === 0" class="empty-proximity">
+                  No hay turnos futuros programados.
                 </div>
-                <div class="proximity-progress-bar">
-                  <div class="proximity-progress-fill" 
-                       [style.width.%]="item.progress"
-                       [class.active-high]="item.progress > 80"
-                       [class.active-medium]="item.progress > 50 && item.progress <= 80"
-                       [class.active-low]="item.progress <= 50">
+                
+                <div class="proximity-row" *ngFor="let item of upcomingStartAssignments">
+                  <div class="proximity-info">
+                    <span class="proximity-text">
+                      <strong>{{ item.personName }}</strong> - {{ getRoleLabel(item.roleCode) }}
+                    </span>
+                    <span class="proximity-time upcoming">{{ item.timeUntilText }}</span>
+                  </div>
+                  <div class="proximity-progress-bar">
+                    <div class="proximity-progress-fill" 
+                         [style.width.%]="item.progress"
+                         [class.active-high]="item.progress > 80"
+                         [class.active-medium]="item.progress > 50 && item.progress <= 80"
+                         [class.active-low]="item.progress <= 50">
+                    </div>
                   </div>
                 </div>
               </div>

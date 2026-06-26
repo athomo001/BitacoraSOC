@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.13**
+> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.14**
 
 Stack principal:
 
@@ -62,6 +62,13 @@ Stack principal:
 ---
 
 ## Novedades recientes (resumen rapido)
+
+### v1.6.14 (corrección de CSV, solapamientos y scroll de turnos)
+
+- **Importación de CSV**: Corrección al procesar líneas comentadas que vienen con comillas dobles, evitando el error 400 Bad Request.
+- **Sobrescritura Automática**: Modificación de la detección de colisiones a solapamiento real. Las nuevas asignaciones sobrescriben turnos en conflicto del mismo rol exclusivo.
+- **Scroll en Proximidad**: Incorporación de scroll vertical en el listado lateral de turnos para mejorar el diseño en pantallas de administración.
+- **Tooltip de Conflicto**: Solución al nombre de analista vacío en los mensajes de advertencia del frontend.
 
 ### v1.6.13 (automatización de turnos, envío de pruebas, dinámicos en correo y trámite médico)
 

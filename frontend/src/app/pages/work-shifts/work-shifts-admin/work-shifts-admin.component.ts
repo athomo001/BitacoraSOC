@@ -1307,7 +1307,8 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
         && roleCode !== 'MEDICAL_LEAVE'
         && roleCode !== 'MEDICAL_APPOINTMENT') {
         // Se retorna un texto de colisión adaptado a Condición para consistencia
-        return `Conflicto de Condición: ${this.getRoleLabel(roleCode)} ya está asignado a ${name} en este período.`;
+        const otherName = other.userId?.fullName || other.externalPersonId?.name || 'otra persona';
+        return `Conflicto de Condición: ${this.getRoleLabel(roleCode)} ya está asignado a ${otherName} en este período.`;
       }
 
       const matchesUser = userId && other.userId && String(other.userId._id || other.userId) === String(userId);
