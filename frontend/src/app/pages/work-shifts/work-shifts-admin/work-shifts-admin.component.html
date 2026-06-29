@@ -215,70 +215,218 @@
 
               <!-- Tabla -->
               <div class="detailed-table-container">
-                <table class="detailed-table">
-                  <thead>
-                    <tr>
-                      <th style="width: 40px; text-align: center;">
-                        <mat-checkbox 
-                          [checked]="isAllSelected()" 
-                          [indeterminate]="isSomeSelected()" 
-                          (change)="toggleAllSelections($event.checked)">
-                        </mat-checkbox>
-                      </th>
-                      <th>Estado</th>
-                      <th>Semana / Periodo</th>
-                      <!-- Se cambia la columna de cabecera a Condición -->
-                      <th>Condición</th>
-                      <th>Asignado A</th>
-                      <th>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr *ngFor="let asg of getFilteredWeeklyAssignments()"
-                        [class.row-conflict]="hasRowConflict(asg)"
-                        [class.row-editing]="editingWeeklyAssignmentId === asg._id">
-                      <td style="text-align: center; vertical-align: middle;">
-                        <mat-checkbox 
-                          [checked]="isAssignmentSelected(asg)" 
-                          (change)="toggleAssignmentSelection(asg, $event.checked)">
-                        </mat-checkbox>
-                      </td>
-                      <td>
-                        <span class="status-pill" [class]="getWeeklyStatusClass(getAssignmentStatus(asg))">
-                          {{ getAssignmentStatus(asg) }}
-                        </span>
-                      </td>
-                      <td>
-                        <div class="period-text">
-                          <strong>{{ asg.weekStartDate | date:'dd/MM/yyyy HH:mm' }}</strong>
-                          <span class="arrow">➔</span>
-                          <strong>{{ asg.weekEndDate | date:'dd/MM/yyyy HH:mm' }}</strong>
-                        </div>
-                      </td>
-                      <td><span class="role-badge">{{ getRoleLabel(asg.roleCode) }}</span></td>
-                      <td>
-                        <div class="person-cell">
-                          <mat-icon class="warning-icon" color="warn" *ngIf="hasRowConflict(asg)" [matTooltip]="getRowConflictTooltip(asg)">warning</mat-icon>
-                          <span>{{ asg.userId?.fullName || asg.externalPersonId?.name || 'Sin asignar' }}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <div class="actions-cell">
-                          <button mat-icon-button color="primary" (click)="editWeeklyAssignment(asg)" matTooltip="Editar">
-                            <mat-icon>edit</mat-icon>
-                          </button>
-                          <button mat-icon-button color="warn" (click)="deleteWeeklyAssignment(asg._id)" matTooltip="Eliminar">
-                            <mat-icon>delete</mat-icon>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                    <tr *ngIf="getFilteredWeeklyAssignments().length === 0">
-                      <td colspan="6" class="empty-table-cell">No se encontraron asignaciones semanales.</td>
-                    </tr>
-                  </tbody>
-                </table>
+                <mat-tab-group (selectedTabChange)="activeTab = $event.tab.textLabel">
+                  <mat-tab label="En Curso">
+                    <ng-container *ngTemplateOutlet="tableTemplate; context: { status: 'En Curso' }"></ng-container>
+                  </mat-tab>
+                  <mat-tab label="Próximo">
+                    <ng-container *ngTemplateOutlet="tableTemplate; context: { status: 'Próximo' }"></ng-container>
+                  </mat-tab>
+                  <mat-tab label="Pasado">
+                    <ng-container *ngTemplateOutlet="tableTemplate; context: { status: 'Pasado' }"></ng-container>
+                  </mat-tab>
+                </mat-tab-group>
               </div>
+
+<ng-template #tableTemplate let-status="status">
+  <table class="detailed-table">
+    <thead>
+      <tr>
+        <th style="width: 40px; text-align: center;">
+          <mat-checkbox 
+            [checked]="isAllSelected()" 
+            [indeterminate]="isSomeSelected()" 
+            (change)="toggleAllSelections($event.checked)">
+          </mat-checkbox>
+        </th>
+        <th style="width: 40px;"></th>
+        <th>Estado</th>
+        <th>Semana / Periodo</th>
+        <!-- Se cambia la columna de cabecera a Condición -->
+        <th>Condición</th>
+        <th>Asignado A</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      <ng-container *ngFor="let row of getGroupedWeeklyAssignments(status)">
+        <!-- CASO 1: Es un grupo de registros consecutivos (ej. Teletrabajo) -->
+        <tr *ngIf="row.isGroup" class="row-group-header" style="background-color: rgba(63, 81, 181, 0.05);">
+          <td style="text-align: center; vertical-align: middle;">
+            <mat-checkbox 
+              [checked]="isAssignmentSelected(row)" 
+              (change)="toggleAssignmentSelection(row, $event.checked)">
+            </mat-checkbox>
+          </td>
+          <td style="text-align: center; vertical-align: middle;">
+            <button mat-icon-button type="button" (click)="toggleGroupExpansion(row._id)" style="width: 24px; height: 24px; line-height: 24px;">
+              <mat-icon>{{ isGroupExpanded(row._id) ? 'expand_less' : 'expand_more' }}</mat-icon>
+            </button>
+          </td>
+          <td>
+            <span class="status-pill" style="background-color: #3f51b5; color: white;">AGRUPADO</span>
+          </td>
+          <td>
+            <div class="period-text">
+              <strong>{{ row.weekStartDate | date:'dd/MM/yyyy HH:mm' }}</strong>
+              <span class="arrow">➔</span>
+              <strong>{{ row.weekEndDate | date:'dd/MM/yyyy HH:mm' }}</strong>
+              <span style="font-size: 11px; color: #666; margin-left: 8px;">({{ row.items.length }} turnos)</span>
+            </div>
+          </td>
+          <td><span class="role-badge" style="background-color: #e8eaf6; color: #3f51b5;">{{ getRoleLabel(row.roleCode) }}</span></td>
+          <td>
+            <div class="person-cell">
+              <strong>{{ row.userId?.fullName || row.externalPersonId?.name || 'Sin asignar' }}</strong>
+            </div>
+          </td>
+          <td>
+            <div class="actions-cell">
+              <span style="font-size: 11px; color: #888; font-style: italic;">Expandir para gestionar</span>
+            </div>
+          </td>
+        </tr>
+
+        <!-- Sub-filas desglosadas para el grupo cuando se expande -->
+        <ng-container *ngIf="row.isGroup && isGroupExpanded(row._id)">
+          <tr *ngFor="let asg of row.items" class="row-group-child"
+              [class.row-conflict]="hasRowConflict(asg)"
+              [class.row-editing]="editingWeeklyAssignmentId === asg._id"
+              style="background-color: #fafafa; border-left: 3px solid #3f51b5;">
+            <td style="text-align: center; vertical-align: middle; padding-left: 20px;">
+              <mat-checkbox 
+                [checked]="selectedAssignmentIds.has(asg._id)" 
+                (change)="toggleAssignmentSelection(asg, $event.checked)">
+              </mat-checkbox>
+            </td>
+            <td></td>
+            <td>
+              <span class="status-pill" [class]="getWeeklyStatusClass(getAssignmentStatus(asg))" style="transform: scale(0.9);">
+                {{ getAssignmentStatus(asg) }}
+              </span>
+            </td>
+            <td>
+              <div class="period-text" style="font-size: 12px; color: #555;">
+                <span>{{ asg.weekStartDate | date:'dd/MM/yyyy HH:mm' }}</span>
+                <span class="arrow">➔</span>
+                <span>{{ asg.weekEndDate | date:'dd/MM/yyyy HH:mm' }}</span>
+              </div>
+            </td>
+            <td><span class="role-badge" style="transform: scale(0.9);">{{ getRoleLabel(asg.roleCode) }}</span></td>
+            <td>
+              <div class="person-cell">
+                <mat-icon class="warning-icon" color="warn" *ngIf="hasRowConflict(asg)" [matTooltip]="getRowConflictTooltip(asg)">warning</mat-icon>
+                <span style="font-size: 13px;">{{ asg.userId?.fullName || asg.externalPersonId?.name || 'Sin asignar' }}</span>
+              </div>
+            </td>
+            <td>
+              <div class="actions-cell">
+                <button mat-icon-button color="primary" (click)="editWeeklyAssignment(asg)" matTooltip="Editar">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button color="warn" (click)="deleteWeeklyAssignment(asg._id)" matTooltip="Eliminar">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </ng-container>
+
+        <!-- CASO 2: Es un registro individual regular -->
+        <tr *ngIf="!row.isGroup"
+            [class.row-conflict]="hasRowConflict(row)"
+            [class.row-editing]="editingWeeklyAssignmentId === row._id">
+          <td style="text-align: center; vertical-align: middle;">
+            <mat-checkbox 
+              [checked]="isAssignmentSelected(row)" 
+              (change)="toggleAssignmentSelection(row, $event.checked)">
+            </mat-checkbox>
+          </td>
+          <td></td>
+          <td>
+            <span class="status-pill" [class]="getWeeklyStatusClass(getAssignmentStatus(row))">
+              {{ getAssignmentStatus(row) }}
+            </span>
+          </td>
+          <td>
+            <div class="period-text">
+              <strong>{{ row.weekStartDate | date:'dd/MM/yyyy HH:mm' }}</strong>
+              <span class="arrow">➔</span>
+              <strong>{{ row.weekEndDate | date:'dd/MM/yyyy HH:mm' }}</strong>
+            </div>
+          </td>
+          <td><span class="role-badge">{{ getRoleLabel(row.roleCode) }}</span></td>
+          <td>
+            <div class="person-cell">
+              <mat-icon class="warning-icon" color="warn" *ngIf="hasRowConflict(row)" [matTooltip]="getRowConflictTooltip(row)">warning</mat-icon>
+              <span>{{ row.userId?.fullName || row.externalPersonId?.name || 'Sin asignar' }}</span>
+            </div>
+          </td>
+          <td>
+            <div class="actions-cell">
+              <button mat-icon-button color="primary" (click)="editWeeklyAssignment(row)" matTooltip="Editar">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-icon-button color="warn" (click)="deleteWeeklyAssignment(row._id)" matTooltip="Eliminar">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </div>
+          </td>
+        </tr>
+
+        <!-- CASO 2.1: Sub-fila de cobertura N2 vinculada (si aplica) -->
+        <tr *ngIf="!row.isGroup && row.coberturaN2" class="row-coverage-linked" style="background-color: rgba(76, 175, 80, 0.05); border-left: 3px solid #4caf50;">
+          <td></td>
+          <td></td>
+          <td>
+            <span class="status-pill" style="background-color: #4caf50; color: white; font-size: 10px;">COBERTURA</span>
+          </td>
+          <td>
+            <div class="period-text" style="font-size: 12px; color: #333;">
+              <span>{{ row.coberturaN2.weekStartDate | date:'dd/MM/yyyy HH:mm' }}</span>
+              <span class="arrow">➔</span>
+              <span>{{ row.coberturaN2.weekEndDate | date:'dd/MM/yyyy HH:mm' }}</span>
+            </div>
+          </td>
+          <td>
+            <span class="role-badge" style="background-color: #e8f5e9; color: #4caf50;">N2 (Reemplazo)</span>
+          </td>
+          <td>
+            <div class="person-cell" style="color: #2e7d32;">
+              <mat-icon style="font-size: 18px; width: 18px; height: 18px; margin-right: 4px; vertical-align: middle;">shield</mat-icon>
+              <strong>{{ row.coberturaN2.userId?.fullName || row.coberturaN2.externalPersonId?.name || 'Sin asignar' }}</strong>
+            </div>
+          </td>
+          <td>
+            <div class="actions-cell">
+              <button mat-icon-button color="primary" (click)="editWeeklyAssignment(row.coberturaN2)" matTooltip="Editar cobertura">
+                <mat-icon>edit</mat-icon>
+              </button>
+            </div>
+          </td>
+        </tr>
+
+        <!-- CASO 2.2: Alerta si la ausencia no tiene cobertura N2 asociada -->
+        <tr *ngIf="!row.isGroup && (row.roleCode === 'MEDICAL_LEAVE' || row.roleCode === 'VACATION') && !row.coberturaN2" style="background-color: rgba(244, 67, 54, 0.05); border-left: 3px solid #f44336;">
+          <td></td>
+          <td></td>
+          <td colspan="5">
+            <div style="display: flex; align-items: center; color: #c62828; padding: 4px 8px; font-size: 13px;">
+              <mat-icon style="font-size: 18px; width: 18px; height: 18px; margin-right: 8px;">warning</mat-icon>
+              <span>⚠️ <strong>SIN COBERTURA N2:</strong> No hay un reemplazo activo registrado para cubrir esta ausencia.</span>
+            </div>
+          </td>
+        </tr>
+      </ng-container>
+
+      <tr *ngIf="getGroupedWeeklyAssignments(status).length === 0">
+        <td colspan="7" class="empty-table-cell" style="text-align: center; padding: 24px; color: #888;">
+          No se encontraron asignaciones para esta categoría.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</ng-template>
 
               <!-- Editor inline (al lado de la tabla) -->
               <div class="inline-editor" *ngIf="showAssignmentForm">

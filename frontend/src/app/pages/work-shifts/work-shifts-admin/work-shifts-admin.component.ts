@@ -871,36 +871,51 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
 
   // ============ SELECCIÓN MÚLTIPLE Y BORRADO MASIVO ============
   selectedAssignmentIds = new Set<string>();
+  activeTab = 'En Curso';
+  expandedGroups = new Set<string>();
 
   isAssignmentSelected(asg: any): boolean {
+    if (asg.isGroup) {
+      return asg.items.every((item: any) => this.selectedAssignmentIds.has(item._id));
+    }
     return this.selectedAssignmentIds.has(asg._id);
   }
 
   toggleAssignmentSelection(asg: any, checked: boolean): void {
-    if (checked) {
-      this.selectedAssignmentIds.add(asg._id);
+    if (asg.isGroup) {
+      asg.items.forEach((item: any) => {
+        if (checked) {
+          this.selectedAssignmentIds.add(item._id);
+        } else {
+          this.selectedAssignmentIds.delete(item._id);
+        }
+      });
     } else {
-      this.selectedAssignmentIds.delete(asg._id);
+      if (checked) {
+        this.selectedAssignmentIds.add(asg._id);
+      } else {
+        this.selectedAssignmentIds.delete(asg._id);
+      }
     }
   }
 
   isAllSelected(): boolean {
-    const list = this.getFilteredWeeklyAssignments();
-    return list.length > 0 && list.every(asg => this.selectedAssignmentIds.has(asg._id));
+    const visibleItems = this.getVisibleIndividualItems(this.activeTab);
+    return visibleItems.length > 0 && visibleItems.every(id => this.selectedAssignmentIds.has(id));
   }
 
   isSomeSelected(): boolean {
-    const list = this.getFilteredWeeklyAssignments();
-    const count = list.filter(asg => this.selectedAssignmentIds.has(asg._id)).length;
-    return count > 0 && count < list.length;
+    const visibleItems = this.getVisibleIndividualItems(this.activeTab);
+    const count = visibleItems.filter(id => this.selectedAssignmentIds.has(id)).length;
+    return count > 0 && count < visibleItems.length;
   }
 
   toggleAllSelections(checked: boolean): void {
-    const list = this.getFilteredWeeklyAssignments();
+    const visibleItems = this.getVisibleIndividualItems(this.activeTab);
     if (checked) {
-      list.forEach(asg => this.selectedAssignmentIds.add(asg._id));
+      visibleItems.forEach(id => this.selectedAssignmentIds.add(id));
     } else {
-      list.forEach(asg => this.selectedAssignmentIds.delete(asg._id));
+      visibleItems.forEach(id => this.selectedAssignmentIds.delete(id));
     }
   }
 
@@ -925,6 +940,153 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
         this.showError(err?.error?.error || 'Error al realizar el borrado masivo');
       }
     });
+  }
+
+  // ============ GRUPOS DE TURNOS Y COBERTURA N2 (UI/UX) ============
+  toggleGroupExpansion(groupId: string): void {
+    if (this.expandedGroups.has(groupId)) {
+      this.expandedGroups.delete(groupId);
+    } else {
+      this.expandedGroups.add(groupId);
+    }
+  }
+
+  isGroupExpanded(groupId: string): boolean {
+    return this.expandedGroups.has(groupId);
+  }
+
+  getVisibleIndividualItems(status: string): string[] {
+    const list = this.getGroupedWeeklyAssignments(status);
+    const ids: string[] = [];
+    list.forEach(asg => {
+      if (asg.isGroup) {
+        asg.items.forEach((item: any) => ids.push(item._id));
+      } else {
+        ids.push(asg._id);
+      }
+    });
+    return ids;
+  }
+
+  getGroupedWeeklyAssignments(status: string): any[] {
+    // 1. Filtrar las asignaciones por estado
+    let filtered = this.getFilteredWeeklyAssignments().filter(asg => this.getAssignmentStatus(asg) === status);
+
+    // 2. Agrupar asignaciones de Teletrabajo consecutivas del mismo analista
+    const grouped: any[] = [];
+    const processedIds = new Set<string>();
+
+    for (let i = 0; i < filtered.length; i++) {
+      const current = filtered[i];
+      if (processedIds.has(current._id)) continue;
+
+      const userId = current.userId?._id || current.userId;
+      const extId = current.externalPersonId?._id || current.externalPersonId;
+
+      // Solo agrupamos Teletrabajo
+      if (current.roleCode === 'TELEWORK') {
+        const groupItems = [current];
+        processedIds.add(current._id);
+
+        // Buscar consecutivos hacia adelante
+        for (let j = i + 1; j < filtered.length; j++) {
+          const next = filtered[j];
+          if (processedIds.has(next._id)) continue;
+
+          const nextUserId = next.userId?._id || next.userId;
+          const nextExtId = next.externalPersonId?._id || next.externalPersonId;
+
+          const matchesUser = userId && nextUserId && String(userId) === String(nextUserId);
+          const matchesExt = extId && nextExtId && String(extId) === String(nextExtId);
+
+          if (next.roleCode === 'TELEWORK' && (matchesUser || matchesExt)) {
+            // Verificar si el intervalo es consecutivo (< 48 horas)
+            const currentEnd = new Date(groupItems[groupItems.length - 1].weekEndDate);
+            const nextStart = new Date(next.weekStartDate);
+            const diffHours = Math.abs(nextStart.getTime() - currentEnd.getTime()) / (1000 * 60 * 60);
+
+            if (diffHours <= 48) {
+              groupItems.push(next);
+              processedIds.add(next._id);
+            }
+          }
+        }
+
+        if (groupItems.length > 1) {
+          // Ordenar los items del grupo cronológicamente por fecha de inicio
+          groupItems.sort((a, b) => new Date(a.weekStartDate).getTime() - new Date(b.weekStartDate).getTime());
+
+          const minStart = groupItems[0].weekStartDate;
+          const maxEnd = groupItems[groupItems.length - 1].weekEndDate;
+          const groupId = 'group_' + groupItems[0]._id;
+
+          grouped.push({
+            _id: groupId,
+            isGroup: true,
+            roleCode: 'TELEWORK',
+            userId: current.userId,
+            externalPersonId: current.externalPersonId,
+            weekStartDate: minStart,
+            weekEndDate: maxEnd,
+            items: groupItems
+          });
+        } else {
+          // Si solo hay uno, se queda como individual
+          grouped.push(current);
+        }
+      } else {
+        processedIds.add(current._id);
+        grouped.push(current);
+      }
+    }
+
+    // 3. Mapear cobertura N2 paralela para ausencias (MEDICAL_LEAVE, VACATION)
+    grouped.forEach(asg => {
+      const isAbsence = asg.roleCode === 'MEDICAL_LEAVE' || asg.roleCode === 'VACATION';
+      if (isAbsence && !asg.isGroup) {
+        const start = new Date(asg.weekStartDate);
+        const end = new Date(asg.weekEndDate);
+        const userId = asg.userId?._id || asg.userId;
+        const extId = asg.externalPersonId?._id || asg.externalPersonId;
+
+        // Buscar en la lista completa (weeklyAssignments) si hay una cobertura N2 paralela
+        const replacement = this.weeklyAssignments.find(other => {
+          if (other._id === asg._id) return false;
+          if (other.roleCode !== 'N2') return false;
+
+          const otherStart = new Date(other.weekStartDate);
+          const otherEnd = new Date(other.weekEndDate);
+          
+          // Solapamiento inclusivo
+          const overlap = start <= otherEnd && end >= otherStart;
+          if (!overlap) return false;
+
+          const otherUserId = other.userId?._id || other.userId;
+          const otherExtId = other.externalPersonId?._id || other.externalPersonId;
+
+          // No es la misma persona ausente
+          const isSamePerson = (userId && otherUserId && String(userId) === String(otherUserId)) ||
+                               (extId && otherExtId && String(extId) === String(otherExtId));
+          return !isSamePerson;
+        });
+
+        if (replacement) {
+          asg.coberturaN2 = replacement;
+        }
+      }
+    });
+
+    // 4. Si es Pasado, limitar a un máximo de 4 registros/grupos
+    if (status === 'Pasado') {
+      // Ordenar pasados por fecha de inicio descendente para tomar los 4 más recientes
+      grouped.sort((a, b) => new Date(b.weekStartDate).getTime() - new Date(a.weekStartDate).getTime());
+      const limited = grouped.slice(0, 4);
+      // Volver a ordenar cronológicamente ascendente para mantener consistencia
+      limited.sort((a, b) => new Date(a.weekStartDate).getTime() - new Date(b.weekStartDate).getTime());
+      return limited;
+    }
+
+    return grouped;
   }
 
   // ============ GANTT VISUAL SEMANAL ============
