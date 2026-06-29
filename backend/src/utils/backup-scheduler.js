@@ -174,8 +174,9 @@ const resolveBackupReferenceTime = (fileName, stats) => {
   return birth > 0 ? birth : Date.now();
 };
 
-const cleanupOldLocalBackups = async (retentionDays = 30) => {
+const cleanupOldLocalBackups = async (retentionDays = 30, retentionCount = 10) => {
   const retentionMs = Math.max(1, Number(retentionDays) || 30) * 24 * 60 * 60 * 1000;
+  const maxCount = Math.max(1, Number(retentionCount) || 10);
   const now = Date.now();
   const deletedFiles = [];
   const skippedFiles = [];
@@ -185,45 +186,71 @@ const cleanupOldLocalBackups = async (retentionDays = 30) => {
 
   await auditAutoBackupEvent('BACKUP_RETENTION_CLEANUP_STARTED', {
     success: true,
-    reason: 'Inicio de limpieza de backups por retención',
+    reason: 'Inicio de limpieza de backups por retención (tiempo y cantidad)',
     metadata: {
       retentionDays: Math.max(1, Number(retentionDays) || 30),
+      retentionCount: maxCount,
       scannedFiles: backupFiles.length
     }
   });
 
+  // 1. Mapear archivos con su tiempo de referencia para poder ordenarlos
+  const backupFilesWithTime = [];
   for (const name of backupFiles) {
     const fullPath = path.join(backupsDir, name);
-    const stats = await fs.stat(fullPath);
-    const referenceTime = resolveBackupReferenceTime(name, stats);
-    const ageMs = Math.max(0, now - referenceTime);
+    try {
+      const stats = await fs.stat(fullPath);
+      const referenceTime = resolveBackupReferenceTime(name, stats);
+      backupFilesWithTime.push({ name, fullPath, referenceTime, stats });
+    } catch (err) {
+      logger.error({ err, fileName: name }, 'Error al leer estadísticas del backup para limpieza');
+    }
+  }
 
+  // Ordenar de más nuevo a más antiguo (referenceTime descendente)
+  backupFilesWithTime.sort((a, b) => b.referenceTime - a.referenceTime);
+
+  // 2. Evaluar cada archivo para eliminación por antigüedad o por exceder el límite de cantidad
+  let activeCount = 0;
+  for (const file of backupFilesWithTime) {
+    const ageMs = Math.max(0, now - file.referenceTime);
+    let shouldDelete = false;
+    let deleteReason = '';
+
+    // Criterio 1: Expiración por tiempo
     if (ageMs > retentionMs) {
-      await fs.unlink(fullPath);
-      deletedFiles.push({ name, ageDays: Math.floor(ageMs / (24 * 60 * 60 * 1000)) });
-
-      await auditAutoBackupEvent('BACKUP_RETENTION_FILE_DELETED', {
-        success: true,
-        reason: 'Backup eliminado por política de retención',
-        metadata: {
-          fileName: name,
-          ageMs,
-          retentionMs,
-          referenceTime: new Date(referenceTime).toISOString()
-        }
-      });
+      shouldDelete = true;
+      deleteReason = `Excede el tiempo de retención de ${retentionDays} días`;
     } else {
-      skippedFiles.push({ name, ageDays: Math.floor(ageMs / (24 * 60 * 60 * 1000)) });
-      await auditAutoBackupEvent('BACKUP_RETENTION_FILE_SKIPPED', {
-        success: true,
-        reason: 'Backup aún dentro de ventana de retención',
-        metadata: {
-          fileName: name,
-          ageMs,
-          retentionMs,
-          referenceTime: new Date(referenceTime).toISOString()
-        }
-      });
+      // Criterio 2: Límite por cantidad (conservar solo los primeros 'maxCount' más nuevos)
+      activeCount++;
+      if (activeCount > maxCount) {
+        shouldDelete = true;
+        deleteReason = `Supera el límite de cantidad máxima de ${maxCount} respaldos`;
+      }
+    }
+
+    if (shouldDelete) {
+      try {
+        await fs.unlink(file.fullPath);
+        deletedFiles.push({ name: file.name, reason: deleteReason, ageDays: Math.floor(ageMs / (24 * 60 * 60 * 1000)) });
+
+        await auditAutoBackupEvent('BACKUP_RETENTION_FILE_DELETED', {
+          success: true,
+          reason: 'Backup eliminado por política de retención',
+          metadata: {
+            fileName: file.name,
+            deleteReason,
+            ageMs,
+            retentionMs,
+            referenceTime: new Date(file.referenceTime).toISOString()
+          }
+        });
+      } catch (err) {
+        logger.error({ err, fileName: file.name }, 'No se pudo eliminar el backup viejo');
+      }
+    } else {
+      skippedFiles.push({ name: file.name, ageDays: Math.floor(ageMs / (24 * 60 * 60 * 1000)) });
     }
   }
 
@@ -369,7 +396,8 @@ const runBackup = async (options = {}) => {
     });
 
     const retentionDays = appConfig?.backupConfig?.localRetentionDays || 30;
-    const cleanupResult = await cleanupOldLocalBackups(retentionDays);
+    const retentionCount = appConfig?.backupConfig?.localRetentionCount || 10;
+    const cleanupResult = await cleanupOldLocalBackups(retentionDays, retentionCount);
 
     if (isAutomaticRun && appConfig) {
       const backupConfig = ensureBackupConfigState(appConfig);

@@ -2779,6 +2779,9 @@ exports.sendEscalationScheduleInternal = async ({ name, recipients, ccRecipients
       }
     });
 
+    const filterHasVacation = targetRoles.includes('VACATION');
+    const filterHasMedical = targetRoles.includes('MEDICAL_LEAVE');
+
     const overlappingInternalAssignments = assignments.filter((assignment) => {
       const overlapsRequestedPeriod = assignment.weekStartDate <= endDate && assignment.weekEndDate >= startDate;
       const isTargetRole = targetRoles.includes(String(assignment.roleCode || '').toUpperCase());
@@ -2786,15 +2789,19 @@ exports.sendEscalationScheduleInternal = async ({ name, recipients, ccRecipients
       
       if (!overlapsRequestedPeriod || !isTargetRole || !hasAssignedPerson) return false;
 
-      // Omitir el registro de ausencia en sí mismo de este reporte general
+      // Omitir el registro de ausencia en sí mismo de este reporte general solo si el filtro NO las incluye explícitamente
       const isAbsence = ['VACATION', 'MEDICAL_LEAVE'].includes(String(assignment.roleCode || '').toUpperCase());
-      if (isAbsence) return false;
+      if (isAbsence && !filterHasVacation && !filterHasMedical) return false;
 
-      // Omitir cualquier turno a nombre de una persona ausente (licencia o vacaciones) en este periodo
+      // Omitir cualquier turno regular a nombre de una persona ausente (licencia o vacaciones) en este periodo
+      // solo si el reporte NO tiene como objetivo listar ausencias.
       const userId = assignment.userId?._id || assignment.userId;
       const extId = assignment.externalPersonId?._id || assignment.externalPersonId;
-      if (userId && absentUserIds.has(String(userId))) return false;
-      if (extId && absentExtIds.has(String(extId))) return false;
+      const isRegularShift = !isAbsence;
+      if (isRegularShift && (!filterHasVacation || !filterHasMedical)) {
+        if (userId && absentUserIds.has(String(userId))) return false;
+        if (extId && absentExtIds.has(String(extId))) return false;
+      }
 
       return true;
     });
