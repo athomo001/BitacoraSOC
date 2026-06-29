@@ -1814,6 +1814,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     this.testRecipientEmail = '';
 
     // Analizar el filtro de roles guardado para marcar los checkboxes correspondientes
+    const filter = schedule.roleFilter || [];
     const includeGuard = filter.includes('N2') || filter.includes('N1_NO_HABIL');
     const includeTI = filter.includes('TI');
     const includeTelework = filter.includes('TELEWORK');
