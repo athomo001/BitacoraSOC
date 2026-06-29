@@ -2673,21 +2673,21 @@ exports.sendEscalationScheduleInternal = async ({ name, recipients, ccRecipients
       startDate = new Date(now.getFullYear(), now.getMonth(), 1);
       endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
     } else {
-      // Semana actual: lunes actual a domingo actual
+      // Semana operativa real: lunes actual 09:00 al lunes subsiguiente 08:59
       const dayOfWeek = now.getDay(); // 0 = Domingo, 1 = Lunes, ..., 6 = Sábado
-      const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Restar días para llegar a lunes
-      const daysToSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek; // Sumar días para llegar a domingo
+      const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const daysToSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
       
       startDate.setDate(now.getDate() + daysToMonday);
-      startDate.setHours(0, 0, 0, 0);
+      startDate.setHours(9, 0, 0, 0); // Lunes 09:00
       
-      endDate.setDate(now.getDate() + daysToSunday);
-      endDate.setHours(23, 59, 59, 999);
+      endDate.setDate(now.getDate() + daysToSunday + 1); // Lunes subsiguiente
+      endDate.setHours(8, 59, 59, 999); // Lunes subsiguiente a las 08:59
     }
 
     const periodLabel = frequency === 'monthly'
       ? `Periodo Mensual: ${startDate.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })}`
-      : `Periodo Semanal: ${startDate.toLocaleDateString('es-CL')} - ${endDate.toLocaleDateString('es-CL')}`;
+      : `Periodo Semanal: ${startDate.toLocaleDateString('es-CL')} - ${new Date(endDate.getTime() - 24 * 60 * 60 * 1000).toLocaleDateString('es-CL')}`; // Etiqueta muestra Lun - Dom
 
     const appConfig = await AppConfig.findOne().select('logoUrl appTitle').lean();
     const brandName = String(appConfig?.appTitle || 'Bitácora CDC').trim() || 'Bitácora CDC';
@@ -2767,38 +2767,40 @@ exports.sendEscalationScheduleInternal = async ({ name, recipients, ccRecipients
       ? categoriesList.join(' / ')
       : 'CALENDARIO';
 
+    // Identificar IDs de analistas con licencias médicas o vacaciones activas en este periodo
+    const absentUserIds = new Set();
+    const absentExtIds = new Set();
+
+    assignments.forEach(asg => {
+      const isAbsence = ['MEDICAL_LEAVE', 'VACATION'].includes(String(asg.roleCode || '').toUpperCase());
+      if (isAbsence) {
+        if (asg.userId) absentUserIds.add(String(asg.userId._id || asg.userId));
+        if (asg.externalPersonId) absentExtIds.add(String(asg.externalPersonId._id || asg.externalPersonId));
+      }
+    });
+
     const overlappingInternalAssignments = assignments.filter((assignment) => {
       const overlapsRequestedPeriod = assignment.weekStartDate <= endDate && assignment.weekEndDate >= startDate;
       const isTargetRole = targetRoles.includes(String(assignment.roleCode || '').toUpperCase());
       const hasAssignedPerson = !!assignment.userId || !!assignment.externalPersonId;
-      return overlapsRequestedPeriod && isTargetRole && hasAssignedPerson;
+      
+      if (!overlapsRequestedPeriod || !isTargetRole || !hasAssignedPerson) return false;
+
+      // Omitir el registro de ausencia en sí mismo de este reporte general
+      const isAbsence = ['VACATION', 'MEDICAL_LEAVE'].includes(String(assignment.roleCode || '').toUpperCase());
+      if (isAbsence) return false;
+
+      // Omitir cualquier turno a nombre de una persona ausente (licencia o vacaciones) en este periodo
+      const userId = assignment.userId?._id || assignment.userId;
+      const extId = assignment.externalPersonId?._id || assignment.externalPersonId;
+      if (userId && absentUserIds.has(String(userId))) return false;
+      if (extId && absentExtIds.has(String(extId))) return false;
+
+      return true;
     });
 
-    let selectedAssignments = [];
-    if (frequency === 'weekly') {
-      // Para reporte semanal, si hay duplicados por rol, priorizar la asignación más reciente o de inicio posterior
-      const latestAssignmentByRole = new Map();
-      for (const assignment of overlappingInternalAssignments) {
-        const roleCode = String(assignment.roleCode || '').toUpperCase();
-        const assignedId = String(assignment.userId?._id || assignment.externalPersonId?._id || 'anon');
-        const key = `${roleCode}_${assignedId}`;
-        const current = latestAssignmentByRole.get(key);
-        if (!current) {
-          latestAssignmentByRole.set(key, assignment);
-          continue;
-        }
-
-        const startsLater = new Date(assignment.weekStartDate).getTime() > new Date(current.weekStartDate).getTime();
-        const updatedLater = new Date(assignment.updatedAt || assignment.createdAt || 0).getTime() > new Date(current.updatedAt || current.createdAt || 0).getTime();
-        if (startsLater || (!startsLater && updatedLater)) {
-          latestAssignmentByRole.set(key, assignment);
-        }
-      }
-
-      selectedAssignments = Array.from(latestAssignmentByRole.values());
-    } else {
-      selectedAssignments = [...overlappingInternalAssignments];
-    }
+    // Mantener todos los turnos legítimos sin deduplicación destructiva
+    let selectedAssignments = [...overlappingInternalAssignments];
 
     selectedAssignments.sort((left, right) => {
       const leftOrder = SHIFT_ROLE_ORDER[String(left.roleCode || '').toUpperCase()] || 99;

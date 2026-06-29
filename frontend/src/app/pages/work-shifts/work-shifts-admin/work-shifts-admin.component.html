@@ -597,9 +597,13 @@
                     
                     <!-- Filtros de roles en chips pequeños -->
                     <div class="schedule-item-roles" style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px;">
-                      <span *ngIf="s.roleFilter?.includes('N2') || s.roleFilter?.includes('TI') || s.roleFilter?.includes('N1_NO_HABIL')" 
+                      <span *ngIf="s.roleFilter?.includes('N2') || s.roleFilter?.includes('N1_NO_HABIL')" 
                             style="font-size: 10px; background-color: #e3f2fd; color: #0d47a1; padding: 2px 6px; border-radius: 4px; font-weight: 500;">
                         Guardia
+                      </span>
+                      <span *ngIf="s.roleFilter?.includes('TI')" 
+                            style="font-size: 10px; background-color: #ede7f6; color: #512da8; padding: 2px 6px; border-radius: 4px; font-weight: 500;">
+                        Especialista TI
                       </span>
                       <span *ngIf="s.roleFilter?.includes('TELEWORK')" 
                             style="font-size: 10px; background-color: #e8f5e9; color: #1b5e20; padding: 2px 6px; border-radius: 4px; font-weight: 500;">
@@ -707,7 +711,8 @@
                   <div class="condition-filters-section" style="margin-top: 10px; margin-bottom: 20px; border-top: 1px solid var(--soft-line, #D7DEC0); padding-top: 12px;">
                     <h5 style="margin-top: 0; margin-bottom: 8px; font-weight: bold; color: var(--body-text, #173831); font-size: 13px;">Condiciones a Notificar:</h5>
                     <div style="display: flex; flex-direction: column; gap: 6px;">
-                      <mat-checkbox formControlName="includeGuard">Turno de Guardia (N1/N2/TI)</mat-checkbox>
+                      <mat-checkbox formControlName="includeGuard">Turno de Guardia (N1/N2)</mat-checkbox>
+                      <mat-checkbox formControlName="includeTI">Especialista TI (Ente externo)</mat-checkbox>
                       <mat-checkbox formControlName="includeTelework">Teletrabajo</mat-checkbox>
                       <mat-checkbox formControlName="includeOl">Charla/Capacitación (OL)</mat-checkbox>
                       <mat-checkbox formControlName="includeVacation">Vacaciones</mat-checkbox>

@@ -68,6 +68,8 @@ Stack principal:
 - **Solapamientos Inclusivos**: Modificación a rango inclusivo (`$lte`/`$gte` y `<=`/`>=`) en colisión de turnos para mayor seguridad operacional.
 - **Pausas por Vacaciones**: Soporte de pausas automáticas para turnos regulares en lugar de eliminación ante vacaciones del analista, y restauración dinámica al editar/eliminar.
 - **Borrado Masivo**: Endpoint en backend y checkboxes de selección múltiple con botón de borrado masivo en UI.
+- **Correcciones en Correos Automáticos**: Solución al descarte destructivo de múltiples turnos por analista en la semana, alineación del periodo de guardia semanal a lunes 09:00 - lunes 08:59:59 (evita listar turnos ya terminados) y exclusión por privacidad de analistas de licencia/vacaciones en reportes de guardia generales.
+- **Filtro Selectivo de Especialista TI**: Separación del rol `TI` (Especialista TI) de la Guardia general en la configuración de notificaciones, permitiendo al administrador elegir si notificarlo o no, apagado por defecto.
 - **Listado de Teletrabajo**: Corrección al listado para que ausencias futuras no impidan visualizar el teletrabajo de la semana en curso.
 - **Rediseño UI/UX de Turnos**: Organización de turnos por ciclo de vida (`En Curso`, `Próximo` y `Pasado`), acordeón plegable para consolidar teletrabajos consecutivos, y sub-filas dinámicas para enlazar licencias médicas/vacaciones con su reemplazo N2 activo, incluyendo alertas en rojo si el turno queda descubierto.
 - **Optimización de Histórico**: Límite visual de 4 registros históricos de turnos pasados en el panel para evitar abultar la interfaz.

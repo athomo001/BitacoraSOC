@@ -42,7 +42,7 @@ function initEscalationScheduleScheduler() {
               time: auto.time || '09:00',
               recipients: auto.recipients || [],
               ccRecipients: auto.ccRecipients || [],
-              roleFilter: ['N2', 'TI', 'N1_NO_HABIL'], // Roles predeterminados legacy
+              roleFilter: ['N2', 'N1_NO_HABIL'], // Roles predeterminados legacy (se excluye TI por defecto)
               lastSentAt: auto.lastSentAt
             });
             await defaultSchedule.save();
@@ -51,10 +51,16 @@ function initEscalationScheduleScheduler() {
             await AppConfig.updateOne({}, {
               $set: { 'escalationScheduleAutomation.enabled': false }
             });
-            logger.info('✅ Legacy email automation successfully migrated.');
+            logger.info('✅ Legacy email automation successfully migrated (without TI by default).');
           }
         }
       }
+
+      // Limpieza proactiva única: remover TI del schedule predeterminado si existe para que no aparezca por defecto
+      await ShiftNotificationSchedule.updateMany(
+        { name: 'Envío General de Guardia', roleFilter: 'TI' },
+        { $pull: { roleFilter: 'TI' } }
+      );
 
       // 2. Consultar todas las notificaciones programadas y habilitadas
       const activeSchedules = await ShiftNotificationSchedule.find({ enabled: true });

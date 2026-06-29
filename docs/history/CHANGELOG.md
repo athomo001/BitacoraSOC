@@ -15,7 +15,15 @@ Registro de cambios relevantes del proyecto.
   - Se implementaron restauraciones encadenadas al eliminar o modificar ausencias (vacaciones o licencias médicas), devolviendo los turnos previamente pausados a su estado activo (`isPaused: false`).
 - **Borrado Masivo de Asignaciones**:
   - Nuevo endpoint `POST /api/escalation/admin/assignments/bulk-delete` en el backend.
-  - Modificación de la UI del administrador con checkboxes de selección múltiple e incorporación de la acción de borrado masivo "Borrar Seleccionados (N)" con confirmación explícita.
+  - Modificación de la UI del administrador con checkboxes de selección múltiple e incorporación de la acción de borrado masivo "Borrar Seleccionados (N)" con confirmación explícitamente.
+- **Correcciones en Reporte y Envío de Correos Automáticos**:
+  - **Múltiples Turnos por Analista**: Se eliminó la deduplicación del mapa `latestAssignmentByRole` en `sendEscalationScheduleInternal`, garantizando que si un analista tiene varios turnos de teletrabajo en la misma semana (ej. Miércoles y Viernes), aparezcan todos correctamente.
+  - **Alineación de Periodo Semanal**: Se ajustó el periodo de cálculo semanal de Guardia de lunes 09:00 a lunes subsiguiente 08:59:59. Esto evita que turnos ya finalizados (ej. que terminen el lunes a las 08:59) se listen erróneamente en el reporte de la semana entrante que inicia a las 09:00.
+  - **Protección de Privacidad de Ausencias**: Se implementó una exclusión automática para evitar que personas con licencias médicas o vacaciones activas figuren en los reportes de correos de guardia operativos o generales, resguardando la privacidad de su salud y datos personales.
+- **Control Selectivo de Especialista TI (TI)**:
+  - Se separó el rol `TI` (Especialista TI) del filtro "Guardia" en la UI de configuraciones, permitiendo al administrador elegir si desea o no informar este rol externo en los reportes de guardia.
+  - Por defecto, el checkbox de "Especialista TI" en los formularios de notificaciones se inicializa apagado.
+  - Se modificó la migración de datos legacy y se incorporó una rutina de limpieza automática que remueve el rol `TI` del schedule predeterminado "Envío General de Guardia".
 - **Listado Semanal de Teletrabajo**:
   - Corrección en `loadTeleworkStaff()` en el frontend para evitar que las ausencias futuras de un analista bloqueen incorrectamente la visualización de su teletrabajo de la semana en curso.
 - **Rediseño UI/UX de Asignaciones por Ciclos y Coberturas**:
