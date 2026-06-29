@@ -19,7 +19,10 @@ Registro de cambios relevantes del proyecto.
 - **Correcciones en Reporte y Envío de Correos Automáticos**:
   - **Múltiples Turnos por Analista**: Se eliminó la deduplicación del mapa `latestAssignmentByRole` en `sendEscalationScheduleInternal`, garantizando que si un analista tiene varios turnos de teletrabajo en la misma semana (ej. Miércoles y Viernes), aparezcan todos correctamente.
   - **Alineación de Periodo Semanal**: Se ajustó el periodo de cálculo semanal de Guardia de lunes 09:00 a lunes subsiguiente 08:59:59. Esto evita que turnos ya finalizados (ej. que terminen el lunes a las 08:59) se listen erróneamente en el reporte de la semana entrante que inicia a las 09:00.
-  - **Protección de Privacidad de Ausencias**: Se implementó una exclusión automática para evitar que personas con licencias médicas o vacaciones activas figuren en los reportes de correos de guardia operativos o generales, resguardando la privacidad de su salud y datos personales.
+  - **Protección de Privacidad de Ausencias**: Se implementó una exclusión automática para evitar que personas con licencias médicas o vacaciones activas figuren en los reportes de correos de guardia operativos o generales.
+  - **Reporte Selectivo de Ausencias**: Se adaptó el filtro del correo de modo que, si el reporte fue configurado explícitamente para notificar "Vacaciones" o "Licencias Médicas" (ej: "Activos Fuera de la Oficina"), la interfaz sí incluya de manera oportuna dichos registros en el cuerpo del correo.
+- **Identificación Visual por Colores en Panel**:
+  - **Colores Llamativos**: Se implementó el método `getRoleBadgeStyle()` en el frontend que pinta con colores vivos y de alto contraste las distintas condiciones: **Rojo vivo** para Licencia Médica, **Naranja brillante** para Vacaciones, **Verde** para Teletrabajo y **Púrpura** para Trámite Médico, facilitando la identificación visual de las novedades en el panel de administrador.
 - **Control Selectivo de Especialista TI (TI)**:
   - Se separó el rol `TI` (Especialista TI) del filtro "Guardia" en la UI de configuraciones, permitiendo al administrador elegir si desea o no informar este rol externo en los reportes de guardia.
   - Por defecto, el checkbox de "Especialista TI" en los formularios de notificaciones se inicializa apagado.

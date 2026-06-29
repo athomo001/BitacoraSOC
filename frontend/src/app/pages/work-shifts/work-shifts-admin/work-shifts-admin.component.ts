@@ -1211,6 +1211,99 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     return roleCode;
   }
 
+  getRoleBadgeStyle(roleCode: string): { [key: string]: string } {
+    const code = String(roleCode || '').toUpperCase();
+    switch (code) {
+      case 'MEDICAL_LEAVE':
+        return { 
+          'background-color': '#ffebee', 
+          'color': '#c62828', 
+          'border': '1px solid #ffcdd2', 
+          'padding': '4px 8px',
+          'border-radius': '4px',
+          'font-weight': 'bold',
+          'display': 'inline-block',
+          'font-size': '12px'
+        };
+      case 'VACATION':
+        return { 
+          'background-color': '#fff3e0', 
+          'color': '#e65100', 
+          'border': '1px solid #ffe0b2', 
+          'padding': '4px 8px',
+          'border-radius': '4px',
+          'font-weight': 'bold',
+          'display': 'inline-block',
+          'font-size': '12px'
+        };
+      case 'TELEWORK':
+        return { 
+          'background-color': '#e8f5e9', 
+          'color': '#2e7d32', 
+          'border': '1px solid #c8e6c9', 
+          'padding': '4px 8px',
+          'border-radius': '4px',
+          'font-weight': '600',
+          'display': 'inline-block',
+          'font-size': '12px'
+        };
+      case 'MEDICAL_APPOINTMENT':
+        return { 
+          'background-color': '#f3e5f5', 
+          'color': '#7b1fa2', 
+          'border': '1px solid #e1bee7', 
+          'padding': '4px 8px',
+          'border-radius': '4px',
+          'font-weight': '600',
+          'display': 'inline-block',
+          'font-size': '12px'
+        };
+      case 'TI':
+        return { 
+          'background-color': '#eceff1', 
+          'color': '#37474f', 
+          'border': '1px solid #cfd8dc', 
+          'padding': '4px 8px',
+          'border-radius': '4px',
+          'font-weight': '500',
+          'display': 'inline-block',
+          'font-size': '12px'
+        };
+      case 'N2':
+        return { 
+          'background-color': '#e8eaf6', 
+          'color': '#3f51b5', 
+          'border': '1px solid #c5cae9', 
+          'padding': '4px 8px',
+          'border-radius': '4px',
+          'font-weight': '600',
+          'display': 'inline-block',
+          'font-size': '12px'
+        };
+      case 'N1_NO_HABIL':
+        return { 
+          'background-color': '#efebe9', 
+          'color': '#4e342e', 
+          'border': '1px solid #d7ccc8', 
+          'padding': '4px 8px',
+          'border-radius': '4px',
+          'font-weight': '500',
+          'display': 'inline-block',
+          'font-size': '12px'
+        };
+      default:
+        return { 
+          'background-color': '#f5f5f5', 
+          'color': '#616161', 
+          'border': '1px solid #e0e0e0', 
+          'padding': '4px 8px',
+          'border-radius': '4px',
+          'display': 'inline-block',
+          'font-size': '12px'
+        };
+    }
+  }
+
   getAssignmentStatus(asg: any): 'Pasado' | 'En Curso' | 'Próximo' {
     const now = this.getOfficialNow();
     const start = new Date(asg.weekStartDate);
