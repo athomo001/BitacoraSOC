@@ -353,6 +353,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       recipients: ['', Validators.required],
       ccRecipients: [''],
       includeGuard: [true],
+      includeTI: [false],
       includeTelework: [false],
       includeOl: [false],
       includeVacation: [false],
@@ -1792,6 +1793,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       recipients: '',
       ccRecipients: '',
       includeGuard: true,
+      includeTI: false,
       includeTelework: false,
       includeOl: false,
       includeVacation: false,
@@ -1812,8 +1814,8 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     this.testRecipientEmail = '';
 
     // Analizar el filtro de roles guardado para marcar los checkboxes correspondientes
-    const filter = schedule.roleFilter || [];
-    const includeGuard = filter.includes('N2') || filter.includes('TI') || filter.includes('N1_NO_HABIL');
+    const includeGuard = filter.includes('N2') || filter.includes('N1_NO_HABIL');
+    const includeTI = filter.includes('TI');
     const includeTelework = filter.includes('TELEWORK');
     const includeOl = filter.includes('OL');
     const includeVacation = filter.includes('VACATION');
@@ -1832,6 +1834,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       recipients: recs,
       ccRecipients: ccs,
       includeGuard,
+      includeTI,
       includeTelework,
       includeOl,
       includeVacation,
@@ -1858,7 +1861,10 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     // Convertir las condiciones seleccionadas a la lista de roles de base de datos correspondiente
     const roleFilter: string[] = [];
     if (formVal.includeGuard) {
-      roleFilter.push('N2', 'TI', 'N1_NO_HABIL');
+      roleFilter.push('N2', 'N1_NO_HABIL');
+    }
+    if (formVal.includeTI) {
+      roleFilter.push('TI');
     }
     if (formVal.includeTelework) {
       roleFilter.push('TELEWORK');
@@ -1977,7 +1983,10 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     const formVal = this.scheduleForm.value;
     const roleFilter: string[] = [];
     if (formVal.includeGuard) {
-      roleFilter.push('N2', 'TI', 'N1_NO_HABIL');
+      roleFilter.push('N2', 'N1_NO_HABIL');
+    }
+    if (formVal.includeTI) {
+      roleFilter.push('TI');
     }
     if (formVal.includeTelework) {
       roleFilter.push('TELEWORK');
