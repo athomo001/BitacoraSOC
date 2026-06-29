@@ -187,6 +187,10 @@
                   <mat-icon>download</mat-icon>
                   Plantilla CSV
                 </button>
+                <button mat-raised-button color="warn" [disabled]="selectedAssignmentIds.size === 0" (click)="bulkDeleteSelected()">
+                  <mat-icon>delete_sweep</mat-icon>
+                  Borrar Seleccionados ({{ selectedAssignmentIds.size }})
+                </button>
                 <button mat-raised-button color="primary" (click)="addWeeklyAssignment()">
                   <mat-icon>add</mat-icon>
                   Asignar Turno
@@ -214,6 +218,13 @@
                 <table class="detailed-table">
                   <thead>
                     <tr>
+                      <th style="width: 40px; text-align: center;">
+                        <mat-checkbox 
+                          [checked]="isAllSelected()" 
+                          [indeterminate]="isSomeSelected()" 
+                          (change)="toggleAllSelections($event.checked)">
+                        </mat-checkbox>
+                      </th>
                       <th>Estado</th>
                       <th>Semana / Periodo</th>
                       <!-- Se cambia la columna de cabecera a Condición -->
@@ -226,6 +237,12 @@
                     <tr *ngFor="let asg of getFilteredWeeklyAssignments()"
                         [class.row-conflict]="hasRowConflict(asg)"
                         [class.row-editing]="editingWeeklyAssignmentId === asg._id">
+                      <td style="text-align: center; vertical-align: middle;">
+                        <mat-checkbox 
+                          [checked]="isAssignmentSelected(asg)" 
+                          (change)="toggleAssignmentSelection(asg, $event.checked)">
+                        </mat-checkbox>
+                      </td>
                       <td>
                         <span class="status-pill" [class]="getWeeklyStatusClass(getAssignmentStatus(asg))">
                           {{ getAssignmentStatus(asg) }}
@@ -257,7 +274,7 @@
                       </td>
                     </tr>
                     <tr *ngIf="getFilteredWeeklyAssignments().length === 0">
-                      <td colspan="5" class="empty-table-cell">No se encontraron asignaciones semanales.</td>
+                      <td colspan="6" class="empty-table-cell">No se encontraron asignaciones semanales.</td>
                     </tr>
                   </tbody>
                 </table>

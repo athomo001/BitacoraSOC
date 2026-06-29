@@ -37,6 +37,7 @@ import { EscalationService } from '../../../services/escalation.service';
 import { DirectoryService, DirectoryContact } from '../../../services/directory.service';
 import { WorkShift, WorkShiftFormData, SHIFT_TYPE_OPTIONS, DEFAULT_COLORS } from '../../../models/work-shift.model';
 import { isShiftActiveNow } from '../../../utils/shift-time.util';
+import { resolverCondicionVisible } from '../../../utils/work-shift-priority.util';
 
 @Component({
   selector: 'app-work-shifts-admin',
@@ -860,11 +861,70 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       this.escalationService.deleteAssignment(id).subscribe({
         next: () => {
           this.showSuccess('Asignación eliminada');
+          this.selectedAssignmentIds.delete(id); // Limpiar de seleccionados si existe
           this.loadWeeklyAssignments();
         },
         error: () => this.showError('Error al eliminar')
       });
     }
+  }
+
+  // ============ SELECCIÓN MÚLTIPLE Y BORRADO MASIVO ============
+  selectedAssignmentIds = new Set<string>();
+
+  isAssignmentSelected(asg: any): boolean {
+    return this.selectedAssignmentIds.has(asg._id);
+  }
+
+  toggleAssignmentSelection(asg: any, checked: boolean): void {
+    if (checked) {
+      this.selectedAssignmentIds.add(asg._id);
+    } else {
+      this.selectedAssignmentIds.delete(asg._id);
+    }
+  }
+
+  isAllSelected(): boolean {
+    const list = this.getFilteredWeeklyAssignments();
+    return list.length > 0 && list.every(asg => this.selectedAssignmentIds.has(asg._id));
+  }
+
+  isSomeSelected(): boolean {
+    const list = this.getFilteredWeeklyAssignments();
+    const count = list.filter(asg => this.selectedAssignmentIds.has(asg._id)).length;
+    return count > 0 && count < list.length;
+  }
+
+  toggleAllSelections(checked: boolean): void {
+    const list = this.getFilteredWeeklyAssignments();
+    if (checked) {
+      list.forEach(asg => this.selectedAssignmentIds.add(asg._id));
+    } else {
+      list.forEach(asg => this.selectedAssignmentIds.delete(asg._id));
+    }
+  }
+
+  bulkDeleteSelected(): void {
+    const count = this.selectedAssignmentIds.size;
+    if (count === 0) return;
+
+    if (!confirm(`¿Está seguro de eliminar de forma masiva las ${count} asignaciones seleccionadas?`)) {
+      return;
+    }
+
+    const idsArray = Array.from(this.selectedAssignmentIds);
+    this.loadingWeeklyAssignments = true;
+    this.escalationService.bulkDeleteAssignments(idsArray).subscribe({
+      next: (res) => {
+        this.showSuccess(res.message || `Se eliminaron ${res.deletedCount} asignaciones.`);
+        this.selectedAssignmentIds.clear();
+        this.loadWeeklyAssignments();
+      },
+      error: (err) => {
+        this.loadingWeeklyAssignments = false;
+        this.showError(err?.error?.error || 'Error al realizar el borrado masivo');
+      }
+    });
   }
 
   // ============ GANTT VISUAL SEMANAL ============
@@ -1203,7 +1263,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       const asgStart = new Date(asg.weekStartDate);
       const asgEnd = new Date(asg.weekEndDate);
 
-      const overlap = start < asgEnd && end > asgStart;
+      const overlap = start <= asgEnd && end >= asgStart;
       if (!overlap) {
         continue;
       }
@@ -1259,7 +1319,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       
       const otherStart = new Date(other.weekStartDate);
       const otherEnd = new Date(other.weekEndDate);
-      const overlap = start < otherEnd && end > otherStart;
+      const overlap = start <= otherEnd && end >= otherStart;
       if (!overlap) continue;
 
       // El conflicto de condición no aplica si uno es Teletrabajo o una ausencia.
@@ -1297,7 +1357,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       
       const otherStart = new Date(other.weekStartDate);
       const otherEnd = new Date(other.weekEndDate);
-      const overlap = start < otherEnd && end > otherStart;
+      const overlap = start <= otherEnd && end >= otherStart;
       if (!overlap) continue;
 
       if (other.roleCode === roleCode
@@ -1326,6 +1386,22 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
   getFilteredWeeklyAssignments(): any[] {
     let result = [...this.weeklyAssignments];
 
+    // Filtrar para ocultar turnos que están tapados por licencias médicas o vacaciones (inclusivo)
+    result = result.filter(asg => {
+      const userId = asg.userId?._id || asg.userId;
+      const extId = asg.externalPersonId?._id || asg.externalPersonId;
+      const start = new Date(asg.weekStartDate);
+      const end = new Date(asg.weekEndDate);
+
+      const priorityRole = resolverCondicionVisible(this.weeklyAssignments, userId, extId, start, end);
+
+      // Si hay una condición de mayor prioridad en este rango y no coincide con el registro actual, se oculta
+      if (priorityRole && priorityRole !== asg.roleCode) {
+        return false;
+      }
+      return true;
+    });
+
     if (this.filterAnalyst) {
       const q = this.filterAnalyst.toLowerCase().trim();
       result = result.filter(asg => {
@@ -1339,24 +1415,25 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       result = result.filter(asg => asg.roleCode === this.filterRole);
     }
 
-    // Orden: Próximos primero → En Curso → Pasado; luego por fecha inicio ascendente
-    const statusOrder: { [key: string]: number } = {
-      'Próximo': 1,
-      'En Curso': 2,
-      'Pasado': 3
-    };
+    // Separar las asignaciones según su estado
+    const proximos = result.filter(asg => this.getAssignmentStatus(asg) === 'Próximo');
+    const enCurso = result.filter(asg => this.getAssignmentStatus(asg) === 'En Curso');
+    const pasados = result.filter(asg => this.getAssignmentStatus(asg) === 'Pasado');
 
-    result.sort((a, b) => {
-      const statusA = statusOrder[this.getAssignmentStatus(a)] ?? 99;
-      const statusB = statusOrder[this.getAssignmentStatus(b)] ?? 99;
-      if (statusA !== statusB) {
-        return statusA - statusB;
-      }
-      return new Date(a.weekStartDate).getTime() - new Date(b.weekStartDate).getTime();
-    });
+    // Ordenar turnos próximos por fecha de inicio ascendente
+    proximos.sort((a, b) => new Date(a.weekStartDate).getTime() - new Date(b.weekStartDate).getTime());
 
-    // Limitar a 50 registros visuales máximo
-    return result.slice(0, 50);
+    // Ordenar turnos en curso por fecha de inicio ascendente
+    enCurso.sort((a, b) => new Date(a.weekStartDate).getTime() - new Date(b.weekStartDate).getTime());
+
+    // Ordenar turnos pasados de más recientes a más antiguos para tomar solo los 4 últimos
+    pasados.sort((a, b) => new Date(b.weekStartDate).getTime() - new Date(a.weekStartDate).getTime());
+    const pasadosLimitados = pasados.slice(0, 4);
+    // Volver a ordenarlos de forma ascendente para mantener consistencia cronológica
+    pasadosLimitados.sort((a, b) => new Date(a.weekStartDate).getTime() - new Date(b.weekStartDate).getTime());
+
+    // Consolidar el resultado final en el orden: Próximo → En Curso → Pasado
+    return [...proximos, ...enCurso, ...pasadosLimitados];
   }
 
   editWeeklyAssignment(asg: any): void {
