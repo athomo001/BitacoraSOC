@@ -614,8 +614,9 @@ export class EscalationSimpleComponent implements OnInit {
               endDate: new Date(asg.weekEndDate)
             });
 
-            if (userIdStr) processedUserIds.add(String(userIdStr));
-            if (extIdStr) processedExtIds.add(String(extIdStr));
+            // No agregamos al set processedUserIds para evitar excluir sus turnos activos (como teletrabajo) de la semana actual
+            // if (userIdStr) processedUserIds.add(String(userIdStr));
+            // if (extIdStr) processedExtIds.add(String(extIdStr));
           }
         });
 

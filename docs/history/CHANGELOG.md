@@ -2,6 +2,25 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.15] - 2026-06-29
+
+### Gestión Avanzada de Turnos, Cobertura N2, Pausas por Vacaciones y Borrado Masivo Seguro
+
+- **Validación Inclusiva de Solapamientos**:
+  - Se modificaron los operadores de colisión de turnos a inclusivos (`$lte` y `$gte` en backend, y `<=` y `>=` en frontend) para evitar superposiciones no detectadas en los límites de inicio/término de las asignaciones de guardia.
+- **Pausa Automática por Vacaciones**:
+  - Se añadió el campo `pausedByVacationId` en el esquema de Mongoose `ShiftAssignment` con su respectivo índice.
+  - Al registrar o editar asignaciones de vacaciones (`ROLE_VACATION`), el sistema ahora pausa automáticamente las asignaciones regulares de menor jerarquía solapadas en lugar de eliminarlas físicamente, manteniendo la integridad del calendario.
+- **Reactivación Automática de Turnos**:
+  - Se implementaron restauraciones encadenadas al eliminar o modificar ausencias (vacaciones o licencias médicas), devolviendo los turnos previamente pausados a su estado activo (`isPaused: false`).
+- **Borrado Masivo de Asignaciones**:
+  - Nuevo endpoint `POST /api/escalation/admin/assignments/bulk-delete` en el backend.
+  - Modificación de la UI del administrador con checkboxes de selección múltiple e incorporación de la acción de borrado masivo "Borrar Seleccionados (N)" con confirmación explícita.
+- **Listado Semanal de Teletrabajo**:
+  - Corrección en `loadTeleworkStaff()` en el frontend para evitar que las ausencias futuras de un analista bloqueen incorrectamente la visualización de su teletrabajo de la semana en curso.
+- **Optimización de Visualización Histórica**:
+  - Limitación de la cantidad de registros históricos pasados a un máximo de 4 en la vista principal de `/main/admin/work-shifts` para mantener la interfaz de usuario limpia y enfocada en lo operacional actual y próximo.
+
 ## [v1.6.14] - 2026-06-26
 
 ### Corrección de Importación de CSV y Gestión de Solapamiento de Turnos

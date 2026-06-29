@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.14**
+> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.15**
 
 Stack principal:
 
@@ -62,6 +62,14 @@ Stack principal:
 ---
 
 ## Novedades recientes (resumen rapido)
+
+### v1.6.15 (gestión avanzada de turnos, cobertura N2, pausas por vacaciones y borrado masivo)
+
+- **Solapamientos Inclusivos**: Modificación a rango inclusivo (`$lte`/`$gte` y `<=`/`>=`) en colisión de turnos para mayor seguridad operacional.
+- **Pausas por Vacaciones**: Soporte de pausas automáticas para turnos regulares en lugar de eliminación ante vacaciones del analista, y restauración dinámica al editar/eliminar.
+- **Borrado Masivo**: Endpoint en backend y checkboxes de selección múltiple con botón de borrado masivo en UI.
+- **Listado de Teletrabajo**: Corrección al listado para que ausencias futuras no impidan visualizar el teletrabajo de la semana en curso.
+- **Optimización de Histórico**: Límite visual de 4 registros históricos de turnos pasados en el panel para evitar abultar la interfaz.
 
 ### v1.6.14 (corrección de CSV, solapamientos y scroll de turnos)
 

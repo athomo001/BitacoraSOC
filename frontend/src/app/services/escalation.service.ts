@@ -464,6 +464,14 @@ export class EscalationService {
     return this.http.delete<{ message: string }>(`${this.apiUrl}/admin/assignments/${id}`);
   }
 
+  bulkDeleteAssignments(ids: string[]): Observable<{ message: string; deletedCount: number; restoredCount?: number }> {
+    // Permite eliminar múltiples asignaciones de forma masiva en el panel administrativo
+    return this.http.post<{ message: string; deletedCount: number; restoredCount?: number }>(
+      `${this.apiUrl}/admin/assignments/bulk-delete`,
+      { ids }
+    );
+  }
+
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // 🔧 CRUD ADMIN - Overrides Manuales
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

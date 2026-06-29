@@ -176,6 +176,7 @@ router.get('/admin/assignments', authenticate, requireAdmin, escalationControlle
 router.get('/admin/assignments/template-csv', authenticate, requireAdmin, escalationController.downloadAssignmentTemplateCsv);
 router.post('/admin/assignments/import-csv', authenticate, requireAdmin, csvUpload.single('file'), escalationController.importAssignmentsCsv);
 router.post('/admin/assignments', authenticate, requireAdmin, escalationController.createAssignment);
+router.post('/admin/assignments/bulk-delete', authenticate, requireAdmin, escalationController.bulkDeleteAssignments); // Borrado masivo
 router.put('/admin/assignments/:id', authenticate, requireAdmin, escalationController.updateAssignment);
 router.delete('/admin/assignments/:id', authenticate, requireAdmin, escalationController.deleteAssignment);
 

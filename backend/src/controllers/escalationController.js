@@ -148,11 +148,11 @@ const findAssignmentConflict = async ({ roleCode, weekStartDate, weekEndDate, ex
     return null;
   }
 
-  // Se evalúa por solapamiento temporal real en lugar de coincidencia exacta de fechas
+  // Se evalúa por solapamiento temporal real en lugar de coincidencia exacta de fechas (inclusivo)
   const conflictFilter = {
     roleCode,
-    weekStartDate: { $lt: weekEndDate },
-    weekEndDate: { $gt: weekStartDate },
+    weekStartDate: { $lte: weekEndDate },
+    weekEndDate: { $gte: weekStartDate },
     isPaused: { $ne: true }
   };
 
@@ -170,8 +170,8 @@ const findOverlappingMedicalLeave = async ({ assigneeFilter, weekStartDate, week
     ...assigneeFilter,
     roleCode: ROLE_MEDICAL_LEAVE,
     isPaused: { $ne: true },
-    weekStartDate: { $lt: weekEndDate },
-    weekEndDate: { $gt: weekStartDate }
+    weekStartDate: { $lte: weekEndDate },
+    weekEndDate: { $gte: weekStartDate }
   };
 
   if (excludeId) {
@@ -181,13 +181,14 @@ const findOverlappingMedicalLeave = async ({ assigneeFilter, weekStartDate, week
   return ShiftAssignment.findOne(filter);
 };
 
+// Pausa asignaciones del analista debido a una licencia médica activa
 const pauseAssignmentsForMedicalLeave = async ({ medicalLeaveId, assigneeFilter, weekStartDate, weekEndDate }) => {
   const pauseFilter = {
     ...assigneeFilter,
     _id: { $ne: medicalLeaveId },
     roleCode: { $ne: ROLE_MEDICAL_LEAVE },
-    weekStartDate: { $lt: weekEndDate },
-    weekEndDate: { $gt: weekStartDate },
+    weekStartDate: { $lte: weekEndDate },
+    weekEndDate: { $gte: weekStartDate },
     isPaused: { $ne: true }
   };
 
@@ -204,6 +205,7 @@ const pauseAssignmentsForMedicalLeave = async ({ medicalLeaveId, assigneeFilter,
   return pauseResult.modifiedCount || 0;
 };
 
+// Restaura asignaciones pausadas por una licencia médica específica
 const restoreAssignmentsPausedByMedicalLeave = async (medicalLeaveId) => {
   const restoreResult = await ShiftAssignment.updateMany(
     { pausedByMedicalLeaveId: medicalLeaveId },
@@ -216,6 +218,7 @@ const restoreAssignmentsPausedByMedicalLeave = async (medicalLeaveId) => {
   return restoreResult.modifiedCount || 0;
 };
 
+// Restaura asignaciones cuya licencia médica pausadora ha expirado
 const restoreExpiredMedicalLeavePauses = async (referenceDate = new Date()) => {
   const pausedMedicalLeaveIds = await ShiftAssignment.distinct('pausedByMedicalLeaveId', {
     isPaused: true,
@@ -251,6 +254,88 @@ const restoreExpiredMedicalLeavePauses = async (referenceDate = new Date()) => {
   );
 
   return restoreResult.modifiedCount || 0;
+};
+
+// Pausa asignaciones del analista debido a vacaciones activas (misma mecánica que licencia médica)
+const pauseAssignmentsForVacation = async ({ vacationId, assigneeFilter, weekStartDate, weekEndDate }) => {
+  const pauseFilter = {
+    ...assigneeFilter,
+    _id: { $ne: vacationId },
+    roleCode: { $nin: [ROLE_MEDICAL_LEAVE, ROLE_VACATION] }, // no pausar licencias médicas ni otras vacaciones
+    weekStartDate: { $lte: weekEndDate },
+    weekEndDate: { $gte: weekStartDate },
+    isPaused: { $ne: true }
+  };
+
+  const pauseResult = await ShiftAssignment.updateMany(
+    pauseFilter,
+    {
+      $set: {
+        isPaused: true,
+        pausedByVacationId: vacationId
+      }
+    }
+  );
+
+  return pauseResult.modifiedCount || 0;
+};
+
+// Restaura asignaciones pausadas por un registro de vacaciones específico
+const restoreAssignmentsPausedByVacation = async (vacationId) => {
+  const restoreResult = await ShiftAssignment.updateMany(
+    { pausedByVacationId: vacationId },
+    {
+      $set: { isPaused: false },
+      $unset: { pausedByVacationId: '' }
+    }
+  );
+
+  return restoreResult.modifiedCount || 0;
+};
+
+// Restaura asignaciones cuyas vacaciones pausadoras han expirado
+const restoreExpiredVacationPauses = async (referenceDate = new Date()) => {
+  const pausedVacationIds = await ShiftAssignment.distinct('pausedByVacationId', {
+    isPaused: true,
+    pausedByVacationId: { $ne: null }
+  });
+
+  if (!pausedVacationIds.length) {
+    return 0;
+  }
+
+  const activeVacations = await ShiftAssignment.find({
+    _id: { $in: pausedVacationIds },
+    roleCode: ROLE_VACATION,
+    weekEndDate: { $gte: referenceDate }
+  }).select('_id');
+
+  const activeIds = new Set(activeVacations.map((vac) => String(vac._id)));
+  const expiredVacationIds = pausedVacationIds.filter((vacId) => !activeIds.has(String(vacId)));
+
+  if (!expiredVacationIds.length) {
+    return 0;
+  }
+
+  const restoreResult = await ShiftAssignment.updateMany(
+    {
+      isPaused: true,
+      pausedByVacationId: { $in: expiredVacationIds }
+    },
+    {
+      $set: { isPaused: false },
+      $unset: { pausedByVacationId: '' }
+    }
+  );
+
+  return restoreResult.modifiedCount || 0;
+};
+
+// Función unificada para restaurar pausas de ausencias (licencia médica o vacaciones) expiradas
+const restoreExpiredAbsencePauses = async (referenceDate = new Date()) => {
+  const restoredMedical = await restoreExpiredMedicalLeavePauses(referenceDate);
+  const restoredVacation = await restoreExpiredVacationPauses(referenceDate);
+  return restoredMedical + restoredVacation;
 };
 
 const formatConflictMessage = (conflict) => {
@@ -1719,7 +1804,7 @@ exports.deleteCycle = async (req, res) => {
 
 exports.getAssignments = async (req, res) => {
   try {
-    await restoreExpiredMedicalLeavePauses();
+    await restoreExpiredAbsencePauses();
 
     const { roleCode, fromDate, toDate, limit } = req.query;
     const filter = {};
@@ -1795,7 +1880,7 @@ exports.downloadAssignmentTemplateCsv = async (_req, res) => {
 
 exports.importAssignmentsCsv = async (req, res) => {
   try {
-    await restoreExpiredMedicalLeavePauses();
+    await restoreExpiredAbsencePauses();
 
     const csvText = req.file?.buffer
       ? req.file.buffer.toString('utf8')
@@ -1949,7 +2034,7 @@ exports.importAssignmentsCsv = async (req, res) => {
 
 exports.createAssignment = async (req, res) => {
   try {
-    await restoreExpiredMedicalLeavePauses();
+    await restoreExpiredAbsencePauses();
 
     const weekStartDate = new Date(req.body.weekStartDate);
     const weekEndDate = new Date(req.body.weekEndDate);
@@ -2004,8 +2089,8 @@ exports.createAssignment = async (req, res) => {
         ...assigneeFilter,
         roleCode: { $in: ABSENCE_ROLE_CODES },
         isPaused: { $ne: true },
-        weekStartDate: { $lt: weekEndDate },
-        weekEndDate: { $gt: weekStartDate }
+        weekStartDate: { $lte: weekEndDate },
+        weekEndDate: { $gte: weekStartDate }
       });
       if (onAbsence) {
         const absenceLabel = onAbsence.roleCode === 'MEDICAL_LEAVE' ? 'Licencia médica' : 'Vacaciones';
@@ -2016,22 +2101,7 @@ exports.createAssignment = async (req, res) => {
     }
 
     let absenceAutoCleaned = false;
-    let deletedShiftsCount = 0;
     let pausedAssignmentsCount = 0;
-
-    // Vacaciones mantiene el comportamiento histórico de limpieza para evitar solapes.
-    if (req.body.roleCode === ROLE_VACATION) {
-      const cleanResult = await ShiftAssignment.deleteMany({
-        ...assigneeFilter,
-        roleCode: { $ne: ROLE_MEDICAL_LEAVE },
-        weekStartDate: { $lt: weekEndDate },
-        weekEndDate: { $gt: weekStartDate }
-      });
-      deletedShiftsCount = cleanResult.deletedCount || 0;
-      if (deletedShiftsCount > 0) {
-        absenceAutoCleaned = true;
-      }
-    }
 
     const conflict = await findAssignmentConflict({
       roleCode: req.body.roleCode,
@@ -2059,6 +2129,17 @@ exports.createAssignment = async (req, res) => {
       if (pausedAssignmentsCount > 0) {
         absenceAutoCleaned = true;
       }
+    } else if (req.body.roleCode === ROLE_VACATION) {
+      pausedAssignmentsCount = await pauseAssignmentsForVacation({
+        vacationId: assignment._id,
+        assigneeFilter,
+        weekStartDate,
+        weekEndDate
+      });
+
+      if (pausedAssignmentsCount > 0) {
+        absenceAutoCleaned = true;
+      }
     }
 
     await assignment.populate('userId', 'fullName email phone cargoLabel');
@@ -2069,12 +2150,11 @@ exports.createAssignment = async (req, res) => {
     if (absenceAutoCleaned) {
       responseObj.vacationAutoCleaned = true;
       responseObj.absenceAutoCleaned = true;
-      responseObj.deletedShiftsCount = deletedShiftsCount;
       responseObj.pausedAssignmentsCount = pausedAssignmentsCount;
       if (req.body.roleCode === ROLE_MEDICAL_LEAVE) {
         responseObj.message = `Licencia médica registrada. Se pausaron automáticamente ${pausedAssignmentsCount} turno(s) previo(s) del analista en este período.`;
       } else {
-        responseObj.message = `Turno de vacaciones registrado. Se liberaron automáticamente ${deletedShiftsCount} turno(s) previo(s) del analista en este período.`;
+        responseObj.message = `Turno de vacaciones registrado. Se pausaron automáticamente ${pausedAssignmentsCount} turno(s) previo(s) del analista en este período.`;
       }
     }
 
@@ -2087,7 +2167,7 @@ exports.createAssignment = async (req, res) => {
 
 exports.updateAssignment = async (req, res) => {
   try {
-    await restoreExpiredMedicalLeavePauses();
+    await restoreExpiredAbsencePauses();
 
     const { id } = req.params;
 
@@ -2154,8 +2234,8 @@ exports.updateAssignment = async (req, res) => {
         ...assigneeFilter,
         roleCode: { $in: ABSENCE_ROLE_CODES },
         isPaused: { $ne: true },
-        weekStartDate: { $lt: weekEndDate },
-        weekEndDate: { $gt: weekStartDate },
+        weekStartDate: { $lte: weekEndDate },
+        weekEndDate: { $gte: weekStartDate },
         _id: { $ne: id }
       });
       if (onAbsence) {
@@ -2167,28 +2247,14 @@ exports.updateAssignment = async (req, res) => {
     }
 
     let absenceAutoCleaned = false;
-    let deletedShiftsCount = 0;
     let pausedAssignmentsCount = 0;
     let restoredAssignmentsCount = 0;
 
-    // Si esta asignación era licencia médica, restaurar primero su estado pausado anterior
+    // Si esta asignación era licencia médica o vacaciones, restaurar primero su estado pausado anterior
     if (existing.roleCode === ROLE_MEDICAL_LEAVE) {
       restoredAssignmentsCount = await restoreAssignmentsPausedByMedicalLeave(existing._id);
-    }
-
-    // Vacaciones mantiene el comportamiento histórico de limpieza para evitar solapes.
-    if (roleCode === ROLE_VACATION) {
-      const cleanResult = await ShiftAssignment.deleteMany({
-        ...assigneeFilter,
-        roleCode: { $ne: ROLE_MEDICAL_LEAVE },
-        weekStartDate: { $lt: weekEndDate },
-        weekEndDate: { $gt: weekStartDate },
-        _id: { $ne: id }
-      });
-      deletedShiftsCount = cleanResult.deletedCount || 0;
-      if (deletedShiftsCount > 0) {
-        absenceAutoCleaned = true;
-      }
+    } else if (existing.roleCode === ROLE_VACATION) {
+      restoredAssignmentsCount = await restoreAssignmentsPausedByVacation(existing._id);
     }
 
     const conflict = await findAssignmentConflict({
@@ -2206,7 +2272,7 @@ exports.updateAssignment = async (req, res) => {
       .populate('userId', 'fullName email phone cargoLabel')
       .populate('externalPersonId', 'name email phone position');
 
-    // Si la asignación final es licencia médica, volver a pausar según su nuevo rango.
+    // Si la asignación final es licencia médica o vacaciones, volver a pausar según su nuevo rango.
     if (roleCode === ROLE_MEDICAL_LEAVE) {
       pausedAssignmentsCount = await pauseAssignmentsForMedicalLeave({
         medicalLeaveId: assignment._id,
@@ -2214,9 +2280,16 @@ exports.updateAssignment = async (req, res) => {
         weekStartDate,
         weekEndDate
       });
+    } else if (roleCode === ROLE_VACATION) {
+      pausedAssignmentsCount = await pauseAssignmentsForVacation({
+        vacationId: assignment._id,
+        assigneeFilter,
+        weekStartDate,
+        weekEndDate
+      });
     }
 
-    if (pausedAssignmentsCount > 0 || deletedShiftsCount > 0 || restoredAssignmentsCount > 0) {
+    if (pausedAssignmentsCount > 0 || restoredAssignmentsCount > 0) {
       absenceAutoCleaned = true;
     }
 
@@ -2226,15 +2299,14 @@ exports.updateAssignment = async (req, res) => {
     if (absenceAutoCleaned) {
       responseObj.vacationAutoCleaned = true;
       responseObj.absenceAutoCleaned = true;
-      responseObj.deletedShiftsCount = deletedShiftsCount;
       responseObj.pausedAssignmentsCount = pausedAssignmentsCount;
       responseObj.restoredAssignmentsCount = restoredAssignmentsCount;
       if (roleCode === ROLE_MEDICAL_LEAVE) {
         responseObj.message = `Licencia médica actualizada. Se pausaron ${pausedAssignmentsCount} turno(s) y se reactivaron ${restoredAssignmentsCount} turno(s) previos según el nuevo período.`;
-      } else if (existing.roleCode === ROLE_MEDICAL_LEAVE && restoredAssignmentsCount > 0) {
-        responseObj.message = `Asignación actualizada. Se reactivaron ${restoredAssignmentsCount} turno(s) que estaban en pausa por la licencia médica anterior.`;
-      } else {
-        responseObj.message = `Turno de vacaciones actualizado. Se liberaron automáticamente ${deletedShiftsCount} turno(s) previo(s) del analista en este período.`;
+      } else if (roleCode === ROLE_VACATION) {
+        responseObj.message = `Turno de vacaciones actualizado. Se pausaron ${pausedAssignmentsCount} turno(s) y se reactivaron ${restoredAssignmentsCount} turno(s) previos según el nuevo período.`;
+      } else if ((existing.roleCode === ROLE_MEDICAL_LEAVE || existing.roleCode === ROLE_VACATION) && restoredAssignmentsCount > 0) {
+        responseObj.message = `Asignación actualizada. Se reactivaron ${restoredAssignmentsCount} turno(s) que estaban en pausa por la ausencia anterior.`;
       }
     }
 
@@ -2256,14 +2328,17 @@ exports.deleteAssignment = async (req, res) => {
     let restoredAssignmentsCount = 0;
     if (assignment.roleCode === ROLE_MEDICAL_LEAVE) {
       restoredAssignmentsCount = await restoreAssignmentsPausedByMedicalLeave(assignment._id);
+    } else if (assignment.roleCode === ROLE_VACATION) {
+      restoredAssignmentsCount = await restoreAssignmentsPausedByVacation(assignment._id);
     }
 
     await ShiftAssignment.findByIdAndDelete(id);
 
     logger.info('Shift assignment deleted:', { assignmentId: assignment._id });
     if (restoredAssignmentsCount > 0) {
+      const typeLabel = assignment.roleCode === ROLE_MEDICAL_LEAVE ? 'Licencia médica' : 'Vacación';
       return res.json({
-        message: `Licencia médica eliminada. Se reactivaron ${restoredAssignmentsCount} turno(s) que estaban en pausa.`,
+        message: `${typeLabel} eliminada. Se reactivaron ${restoredAssignmentsCount} turno(s) que estaban en pausa.`,
         restoredAssignmentsCount
       });
     }
@@ -2271,6 +2346,48 @@ exports.deleteAssignment = async (req, res) => {
     res.json({ message: 'Shift assignment deleted successfully' });
   } catch (error) {
     logger.error('Error in deleteAssignment:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Elimina múltiples asignaciones de forma segura restaurando pausas asociadas a licencias médicas o vacaciones
+exports.bulkDeleteAssignments = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'Lista de IDs inválida o vacía' });
+    }
+
+    const assignments = await ShiftAssignment.find({ _id: { $in: ids } });
+    if (assignments.length === 0) {
+      return res.status(404).json({ error: 'No se encontraron asignaciones para eliminar' });
+    }
+
+    let restoredAssignmentsCount = 0;
+    const foundIds = assignments.map(a => String(a._id));
+
+    // Restaurar turnos pausados para todas las ausencias que van a ser eliminadas
+    for (const assignment of assignments) {
+      if (assignment.roleCode === ROLE_MEDICAL_LEAVE) {
+        const count = await restoreAssignmentsPausedByMedicalLeave(assignment._id);
+        restoredAssignmentsCount += count;
+      } else if (assignment.roleCode === ROLE_VACATION) {
+        const count = await restoreAssignmentsPausedByVacation(assignment._id);
+        restoredAssignmentsCount += count;
+      }
+    }
+
+    const deleteResult = await ShiftAssignment.deleteMany({ _id: { $in: foundIds } });
+
+    logger.info('Shift assignments bulk deleted:', { count: deleteResult.deletedCount, restoredCount: restoredAssignmentsCount });
+
+    res.json({
+      message: `Se eliminaron correctamente ${deleteResult.deletedCount} asignación(es).${restoredAssignmentsCount > 0 ? ` Se reactivaron ${restoredAssignmentsCount} turno(s) pausado(s).` : ''}`,
+      deletedCount: deleteResult.deletedCount,
+      restoredCount: restoredAssignmentsCount
+    });
+  } catch (error) {
+    logger.error('Error in bulkDeleteAssignments:', error);
     res.status(500).json({ error: error.message });
   }
 };

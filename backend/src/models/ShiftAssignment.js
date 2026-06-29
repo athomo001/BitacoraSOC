@@ -42,6 +42,12 @@ const shiftAssignmentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'ShiftAssignment',
     default: null
+  },
+  pausedByVacationId: {
+    // Registra el ID del turno de vacaciones que pausó esta asignación
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ShiftAssignment',
+    default: null
   }
 }, {
   timestamps: true
@@ -52,6 +58,7 @@ shiftAssignmentSchema.index({ roleCode: 1, weekStartDate: 1, weekEndDate: 1 });
 shiftAssignmentSchema.index({ userId: 1 });
 shiftAssignmentSchema.index({ externalPersonId: 1 });
 shiftAssignmentSchema.index({ pausedByMedicalLeaveId: 1 });
+shiftAssignmentSchema.index({ pausedByVacationId: 1 });
 
 // Validación: weekEndDate debe ser mayor a weekStartDate
 shiftAssignmentSchema.pre('save', function(next) {
