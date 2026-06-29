@@ -376,6 +376,12 @@ const appConfigSchema = new mongoose.Schema({
       min: 1,
       max: 365
     },
+    localRetentionCount: {
+      type: Number,
+      default: 10,
+      min: 1,
+      max: 100
+    },
     // Configuración para destinos externos (encriptados/seguros)
     destinationConfig: {
       type: mongoose.Schema.Types.Mixed,

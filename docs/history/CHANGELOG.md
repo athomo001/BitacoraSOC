@@ -16,6 +16,9 @@ Registro de cambios relevantes del proyecto.
 - **Borrado Masivo de Asignaciones**:
   - Nuevo endpoint `POST /api/escalation/admin/assignments/bulk-delete` en el backend.
   - Modificación de la UI del administrador con checkboxes de selección múltiple e incorporación de la acción de borrado masivo "Borrar Seleccionados (N)" con confirmación explícitamente.
+- **Rotación y Retención de Backups por Cantidad**:
+  - Se añadió el campo `localRetentionCount` al esquema de `backupConfig` en `AppConfig.js` para retención por cantidad máxima de respaldos (por defecto 10).
+  - Se reescribió `cleanupOldLocalBackups()` en `backup-scheduler.js` para ordenar cronológicamente los backups de más nuevo a más antiguo y realizar la purga física de aquellos que excedan la cantidad máxima configurada, complementando la limpieza temporal por días de retención y previniendo el consumo excesivo de disco en el servidor.
 - **Correcciones en Reporte y Envío de Correos Automáticos**:
   - **Múltiples Turnos por Analista**: Se eliminó la deduplicación del mapa `latestAssignmentByRole` en `sendEscalationScheduleInternal`, garantizando que si un analista tiene varios turnos de teletrabajo en la misma semana (ej. Miércoles y Viernes), aparezcan todos correctamente.
   - **Alineación de Periodo Semanal**: Se ajustó el periodo de cálculo semanal de Guardia de lunes 09:00 a lunes subsiguiente 08:59:59. Esto evita que turnos ya finalizados (ej. que terminen el lunes a las 08:59) se listen erróneamente en el reporte de la semana entrante que inicia a las 09:00.
