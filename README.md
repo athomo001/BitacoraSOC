@@ -69,6 +69,7 @@ Stack principal:
 - **Pausas por Vacaciones**: Soporte de pausas automáticas para turnos regulares en lugar de eliminación ante vacaciones del analista, y restauración dinámica al editar/eliminar.
 - **Borrado Masivo**: Endpoint en backend y checkboxes de selección múltiple con botón de borrado masivo en UI.
 - **Listado de Teletrabajo**: Corrección al listado para que ausencias futuras no impidan visualizar el teletrabajo de la semana en curso.
+- **Rediseño UI/UX de Turnos**: Organización de turnos por ciclo de vida (`En Curso`, `Próximo` y `Pasado`), acordeón plegable para consolidar teletrabajos consecutivos, y sub-filas dinámicas para enlazar licencias médicas/vacaciones con su reemplazo N2 activo, incluyendo alertas en rojo si el turno queda descubierto.
 - **Optimización de Histórico**: Límite visual de 4 registros históricos de turnos pasados en el panel para evitar abultar la interfaz.
 
 ### v1.6.14 (corrección de CSV, solapamientos y scroll de turnos)

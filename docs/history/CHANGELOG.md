@@ -18,6 +18,11 @@ Registro de cambios relevantes del proyecto.
   - Modificación de la UI del administrador con checkboxes de selección múltiple e incorporación de la acción de borrado masivo "Borrar Seleccionados (N)" con confirmación explícita.
 - **Listado Semanal de Teletrabajo**:
   - Corrección en `loadTeleworkStaff()` en el frontend para evitar que las ausencias futuras de un analista bloqueen incorrectamente la visualización de su teletrabajo de la semana en curso.
+- **Rediseño UI/UX de Asignaciones por Ciclos y Coberturas**:
+  - **Pestañas de Ciclo de Vida**: Estructuración del listado en tres pestañas separadas según estado (`En Curso`, `Próximo` y `Pasado`) para focalizar la visualización y reducir la carga cognitiva del administrador.
+  - **Consolidación Inteligente (Acordeones)**: Agrupación en el frontend de registros consecutivos del mismo analista (ej. múltiples filas individuales de teletrabajo) en un único acordeón expandible/colapsable con los límites del periodo consolidado, sin alterar los datos del backend.
+  - **Enlace de Cobertura N2**: Si se presenta un turno de ausencia (Licencia médica o Vacación), la interfaz escanea y acopla visualmente una sub-fila de nivel secundario con la información del analista asignado en paralelo para el reemplazo en modo `N2`.
+  - **Alertas de Guardia Descubierta**: Visualización destacada en rojo de alertas críticas de cobertura en caso de que una ausencia carezca de un reemplazo N2 activo en la misma franja horaria.
 - **Optimización de Visualización Histórica**:
   - Limitación de la cantidad de registros históricos pasados a un máximo de 4 en la vista principal de `/main/admin/work-shifts` para mantener la interfaz de usuario limpia y enfocada en lo operacional actual y próximo.
 
