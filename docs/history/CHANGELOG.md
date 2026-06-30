@@ -2,6 +2,21 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.16] - 2026-06-30
+
+### Securización de Consola F12, Trazabilidad de Fallos de Checklist y Solución a Bloqueo Consecutivo
+
+- **Securización Preventiva de Consola F12 en Producción**:
+  - Silenciamiento automático de logs informativos (`console.log`, `console.info`, `console.debug`, etc.) en entornos productivos (`NODE_ENV=production`) para mitigar riesgos de fuga de información de usuarios, roles y payloads de checklists.
+  - Decorador seguro para `console.error` que estructura los errores con metadatos útiles (timestamp, URL de falla, stack trace) y elimina preventivamente valores sensibles (como tokens o contraseñas) mediante patrones regex.
+  - Carga temprana mediante inicialización en `main.ts` antes de instanciar Angular.
+- **Auditoría Enriquecida de Checklist en el Servidor**:
+  - Registro en la colección `AuditLog` de todas las validaciones de negocio fallidas al enviar checklists (servicios obligatorios omitidos, observaciones faltantes para estados en rojo, consecutividad bloqueada o cooldown no cumplido), así como de los errores 500 del servidor.
+  - Humanización avanzada en la interfaz de usuario del SOC de estos nuevos eventos de fallo (`shiftcheck.submit.fail`, `shiftcheck.block.consecutive`, `shiftcheck.block.cooldown`), mostrando descripciones claras de los errores en el panel de auditoría.
+- **Corrección de Bloqueo Inesperado de Checklists por Consecutividad (Bug de Usuarios Nuevos)**:
+  - Modificación en la consulta del backend para restringir la validación de consecutivos (`inicio`/`cierre` alternados) a una ventana temporal de las últimas 18 horas.
+  - Esto evita colisiones con checklists obsoletos de días pasados y resuelve de manera definitiva el bloqueo a usuarios nuevos en horarios no configurados (donde el turno se evaluaba como `null` y chocaba con registros vacíos históricos de otros analistas).
+
 ## [v1.6.15] - 2026-06-29
 
 ### Gestión Avanzada de Turnos, Cobertura N2, Pausas por Vacaciones y Borrado Masivo Seguro

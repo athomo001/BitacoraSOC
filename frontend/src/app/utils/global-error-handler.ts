@@ -14,8 +14,17 @@ export class GlobalErrorHandler implements ErrorHandler {
       // Recarga la ventana omitiendo el caché para descargar el nuevo index.html y assets
       window.location.reload();
     } else {
-      // Mantiene el comportamiento nativo imprimiendo los demás errores en consola
-      console.error(error);
+      // Formatear el error no controlado con metadatos útiles para depuración en el SOC
+      const detailedError = {
+        message: error?.message || (typeof error === 'string' ? error : 'Error no controlado sin mensaje'),
+        stack: error?.stack || 'No disponible',
+        name: error?.name || 'Error genérico',
+        url: window.location.href,
+        timestamp: new Date().toISOString()
+      };
+
+      // Se envía el error estructurado a la consola (donde será procesado o formateado según el entorno)
+      console.error(detailedError);
     }
   }
 }

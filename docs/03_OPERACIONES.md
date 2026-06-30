@@ -1790,6 +1790,7 @@ await audit(req, {
 | `auth.login`         | `.success` / `.fail`                                                                     | info/warn       | Login de usuario           |
 | `entry.create`       | `.update` / `.delete`                                                                    | info            | CRUD de entradas           |
 | `shiftcheck.submit`  | -                                                                                        | info            | Registro de check de turno |
+| `shiftcheck.submit`  | `.fail`                                                                                  | warn/error      | Fallo al enviar check (validaciones/servidor) |
 | `shiftcheck.block`   | `.consecutive` / `.cooldown`                                                             | warn            | Bloqueos de validación     |
 | `admin.users`        | `.create` / `.update` / `.delete`                                                        | info            | Gestión de usuarios        |
 | `admin.backup`       | `.create` / `.restore`                                                                   | info            | Backups                    |
