@@ -16,6 +16,10 @@ import { AppRoutingModule } from './app/app-routing.module';
 import { AppComponent } from './app/app.component';
 import { AuthService } from './app/services/auth.service';
 import { GlobalErrorHandler } from './app/utils/global-error-handler';
+import { securizeConsole } from './app/utils/console-securizer';
+
+// Ejecutar de forma temprana la securización de la consola en producción
+securizeConsole();
 
 // Marca de autor en comentarios: Athan Espinoza.
 registerLocaleData(localeEsCL);

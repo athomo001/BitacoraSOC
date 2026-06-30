@@ -592,10 +592,24 @@ router.post('/check',
 
       const snapshot = await getActiveChecklistSnapshot(shiftId, type);
       if (!snapshot.items || snapshot.items.length === 0) {
+        // Registrar fallo de envío: no existe plantilla o configuración activa
+        await audit(req, {
+          event: 'shiftcheck.submit.fail',
+          level: 'warn',
+          result: { success: false, reason: 'No hay un checklist activo configurado en el sistema' },
+          metadata: { type }
+        });
         return res.status(400).json({ message: 'No hay un checklist activo configurado' });
       }
 
       if (snapshot.type === 'template' && checklistId && checklistId !== String(snapshot.checklistId)) {
+        // Registrar fallo de envío: la versión del checklist ha cambiado
+        await audit(req, {
+          event: 'shiftcheck.submit.fail',
+          level: 'warn',
+          result: { success: false, reason: 'El checklist utilizado ya no se encuentra activo (desactualizado)' },
+          metadata: { type, checklistId, activeChecklistId: snapshot.checklistId }
+        });
         return res.status(400).json({ message: 'El checklist usado ya no esta activo. Refresca y vuelve a intentar.' });
       }
 
@@ -609,11 +623,25 @@ router.post('/check',
         const missingTitles = activeServices
           .filter(s => missingServices.includes(String(s._id)))
           .map(s => s.title);
+        // Registrar fallo de envío: el usuario omitió servicios obligatorios
+        await audit(req, {
+          event: 'shiftcheck.submit.fail',
+          level: 'warn',
+          result: { success: false, reason: `Intento de envío incompleto. Faltó evaluar: ${missingTitles.join(', ')}` },
+          metadata: { type, missingServices: missingTitles }
+        });
         return res.status(400).json({ message: `Debes evaluar todos los servicios. Faltan: ${missingTitles.join(', ')}` });
       }
 
       const extraServices = receivedServiceIds.filter(id => !activeServiceIds.includes(id));
       if (extraServices.length > 0) {
+        // Registrar fallo de envío: payload contiene datos de servicios inactivos/inexistentes
+        await audit(req, {
+          event: 'shiftcheck.submit.fail',
+          level: 'warn',
+          result: { success: false, reason: 'Se incluyeron servicios inactivos o inexistentes en la petición' },
+          metadata: { type, extraServices }
+        });
         return res.status(400).json({ message: 'Se incluyeron servicios inactivos o inexistentes' });
       }
 
@@ -621,20 +649,40 @@ router.post('/check',
         const serviceDefinition = servicesMap.get(String(service.serviceId));
         const hasChildren = Array.isArray(serviceDefinition?.children) && serviceDefinition.children.length > 0;
         if (!hasChildren && service.status === 'rojo' && (!service.observation || service.observation.trim() === '')) {
-          return res.status(400).json({ message: `El servicio "${serviceDefinition?.title || service.serviceId}" esta en rojo y requiere observacion` });
+          const errorMsg = `El servicio "${serviceDefinition?.title || service.serviceId}" esta en rojo y requiere observacion`;
+          // Registrar fallo de envío: omisión de justificación/observación requerida
+          await audit(req, {
+            event: 'shiftcheck.submit.fail',
+            level: 'warn',
+            result: { success: false, reason: errorMsg },
+            metadata: { type, serviceId: service.serviceId, serviceTitle: serviceDefinition?.title }
+          });
+          return res.status(400).json({ message: errorMsg });
         }
       }
 
       // Buscar el último checklist registrado específicamente para este turno para evitar bloqueos entre turnos paralelos
       const lastCheck = await ShiftCheck.findOne({ shiftId }).sort({ createdAt: -1 });
-      if (lastCheck && lastCheck.type === type) {
+
+      // La validación de consecutividad solo aplica si el último check ocurrió dentro de una ventana de tiempo reciente (últimas 18 horas).
+      // Esto previene bloqueos debidos a turnos que quedaron sin cerrar en días anteriores o colisiones en turnos no identificados (shiftId: null).
+      const isRecentCheck = lastCheck && (Date.now() - lastCheck.createdAt.getTime()) < (18 * 60 * 60 * 1000);
+
+      if (isRecentCheck && lastCheck.type === type) {
         const expectedType = type === 'inicio' ? 'cierre' : 'inicio';
 
         await audit(req, {
           event: 'shiftcheck.block.consecutive',
           level: 'warn',
           result: { success: false, reason: `Consecutive ${type} blocked` },
-          metadata: { type, lastCheckType: lastCheck.type, expectedType, lastCheckUserId: lastCheck.userId, shiftId }
+          metadata: { 
+            type, 
+            lastCheckType: lastCheck.type, 
+            expectedType, 
+            lastCheckUserId: lastCheck.userId, 
+            shiftId,
+            lastCheckAgeHours: ((Date.now() - lastCheck.createdAt.getTime()) / (1000 * 60 * 60)).toFixed(2)
+          }
         });
 
         return res.status(400).json({ message: `No puedes registrar dos "${type}" consecutivos. Debes hacer "${expectedType}" primero.` });
@@ -875,6 +923,13 @@ router.post('/check',
       res.status(201).json({ message: 'Checklist registrado exitosamente', check });
     } catch (error) {
       logger.error({ err: error }, 'Error al registrar checklist');
+      // Registrar fallo por error interno del servidor
+      await audit(req, {
+        event: 'shiftcheck.submit.fail',
+        level: 'error',
+        result: { success: false, reason: `Error interno del servidor: ${error.message || 'Desconocido'}` },
+        metadata: { type, errorName: error.name, errorStack: error.stack }
+      });
       res.status(500).json({ message: 'Error al registrar checklist' });
     }
   }

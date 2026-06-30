@@ -688,7 +688,7 @@ export class AuditLogsComponent implements OnInit {
       const template = meta['templateName'] || meta['checklistName'] || 'checklist';
       const rawType = meta['checkType'] || meta['type'];
       const checkType = rawType ? ` (${rawType})` : '';
-      const reason = result.reason ? `| ${result.reason}` : '';
+      const reason = result.reason ? ` — ${result.reason}` : '';
 
       if (event === 'checklist.opened') {
         const items = meta['itemCount'] ? ` | ${meta['itemCount']} ítems` : '';
@@ -698,7 +698,8 @@ export class AuditLogsComponent implements OnInit {
         return `⚠️ [CHECKLIST ABANDONADO] ${template}${checkType} — abierto y cerrado sin enviar`;
       }
 
-      if (event === 'shiftcheck.submit' || event === 'shiftcheck.complete' || event === 'checklist.complete') {
+      // Checklist completado y guardado con éxito
+      if (event === 'shiftcheck.submit' && result.success) {
         const greenCount = Number(meta['greenCount'] || 0);
         const redCount = Number(meta['redCount'] || 0);
         const totals = (greenCount || redCount)
@@ -707,8 +708,26 @@ export class AuditLogsComponent implements OnInit {
         return `✅ [CHECKLIST REALIZADO] ${template}${checkType}${totals}`;
       }
 
+      // Caso en que falla el envío del checklist debido a alguna validación o error
+      if (event === 'shiftcheck.submit.fail') {
+        return `❌ [CHECKLIST FALLIDO] ${template}${checkType}${reason}`;
+      }
+
+      // Caso de intento consecutividad bloqueado
+      if (event === 'shiftcheck.block.consecutive') {
+        const tipoConsecutivo = meta['type'] || 'acción';
+        return `❌ [CHECKLIST BLOQUEADO] ${template}${checkType} — Intento de registrar dos "${tipoConsecutivo}" consecutivos`;
+      }
+
+      // Caso de cooldown de tiempo bloqueado
+      if (event === 'shiftcheck.block.cooldown') {
+        const rem = meta['remainingMinutes'] ? ` (${meta['remainingMinutes']} min restantes)` : '';
+        return `❌ [CHECKLIST BLOQUEADO] ${template}${checkType} — No se cumplió el cooldown de tiempo${rem}`;
+      }
+
+      // Mapeo genérico para otros eventos de checklist no especificados
       const action = event.includes('complete') ? 'COMPLETADO' : event.replace(/checklist\.|shiftcheck\./, '').toUpperCase();
-      return `${status} [CHECKLIST ${action}] ${template} ${reason}`;
+      return `${status} [CHECKLIST ${action}] ${template}${reason}`;
     }
 
     // ====== ESCALACIÓN ======

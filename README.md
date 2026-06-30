@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.15**
+> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.16**
 
 Stack principal:
 
@@ -62,6 +62,12 @@ Stack principal:
 ---
 
 ## Novedades recientes (resumen rapido)
+
+### v1.6.16 (securización de consola, auditoría de fallos y fix de consecutividad)
+
+- **Securización de Consola**: Silenciado de `console.log/info/debug` en producción y envoltura diagnóstica robusta y sanitizada de `console.error` para impedir fugas de tokens o contraseñas.
+- **Trazabilidad de Fallos de Checklist**: Las validaciones de negocio en el backend y errores del servidor ahora registran eventos `'shiftcheck.submit.fail'` en `AuditLog` con motivos detallados, y la interfaz los visualiza de forma humana y estructurada.
+- **Fix de Consecutividad**: Reducción de la ventana de validación de consecutivos (`inicio`/`cierre`) a las últimas 18 horas, solucionando los bloqueos por históricos obsoletos en turnos indefinidos (`null`).
 
 ### v1.6.15 (gestión avanzada de turnos, cobertura N2, pausas por vacaciones y borrado masivo)
 
