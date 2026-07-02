@@ -16,6 +16,9 @@ Registro de cambios relevantes del proyecto.
 - **Corrección de Bloqueo Inesperado de Checklists por Consecutividad (Bug de Usuarios Nuevos)**:
   - Modificación en la consulta del backend para restringir la validación de consecutivos (`inicio`/`cierre` alternados) a una ventana temporal de las últimas 18 horas.
   - Esto evita colisiones con checklists obsoletos de días pasados y resuelve de manera definitiva el bloqueo a usuarios nuevos en horarios no configurados (donde el turno se evaluaba como `null` y chocaba con registros vacíos históricos de otros analistas).
+- **Corrección de Fallo de Construcción de Docker (BuildKit overlayfs)**:
+  - Creación del archivo `.dockerignore` global en la raíz del proyecto para asegurar la exclusión del `node_modules` local del host (y otros directorios temporales de compilación) durante compilaciones con contexto general en Portainer/Compose.
+  - Eliminación de la regla de exclusión de `.dockerignore` en el `.gitignore` de la raíz para permitir el control de versiones y distribución correcta de esta exclusión.
 
 ## [v1.6.15] - 2026-06-29
 

@@ -68,6 +68,7 @@ Stack principal:
 - **Securización de Consola**: Silenciado de `console.log/info/debug` en producción y envoltura diagnóstica robusta y sanitizada de `console.error` para impedir fugas de tokens o contraseñas.
 - **Trazabilidad de Fallos de Checklist**: Las validaciones de negocio en el backend y errores del servidor ahora registran eventos `'shiftcheck.submit.fail'` en `AuditLog` con motivos detallados, y la interfaz los visualiza de forma humana y estructurada.
 - **Fix de Consecutividad**: Reducción de la ventana de validación de consecutivos (`inicio`/`cierre`) a las últimas 18 horas, solucionando los bloqueos por históricos obsoletos en turnos indefinidos (`null`).
+- **Fix de Construcción en Docker**: Incorporación de un archivo `.dockerignore` global en la raíz del proyecto para evitar errores de colisión por archivos locales (`node_modules` del host) en compilaciones multi-contenedor (BuildKit overlayfs) y habilitación de su seguimiento en Git eliminando la regla excluyente en `.gitignore`.
 
 ### v1.6.15 (gestión avanzada de turnos, cobertura N2, pausas por vacaciones y borrado masivo)
 
