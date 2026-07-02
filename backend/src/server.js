@@ -164,6 +164,14 @@ const getTrustedHosts = (req) => {
   return hosts;
 };
 
+const getRequestBodyLimit = (req) => {
+  if (req.path.startsWith('/api/reports/')) {
+    return '20mb';
+  }
+
+  return '2mb';
+};
+
 const isSameTrustedHostOrigin = (req, origin) => {
   try {
     const parsed = new URL(origin);
@@ -334,11 +342,11 @@ app.use((req, res, next) => {
       return res.status(400).json({ message: 'Content-Type no soportado para configuración de branding.' });
     }
   }
-  const limit = '2mb'; // Límite estricto de 2MB para evitar DoS
+  const limit = getRequestBodyLimit(req);
   express.json({ limit })(req, res, next);
 });
 app.use((req, res, next) => {
-  const limit = '2mb'; // Límite estricto de 2MB para evitar DoS
+  const limit = getRequestBodyLimit(req);
   express.urlencoded({ extended: true, limit })(req, res, next);
 });
 

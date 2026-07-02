@@ -523,10 +523,48 @@ export class ReportGeneratorComponent implements OnInit, OnDestroy {
 
         const img = new Image();
         img.onload = () => {
-          this.uploadedImages.push({ name: file.name, dataUrl, width: img.naturalWidth || 0, height: img.naturalHeight || 0 });
+          let width = img.naturalWidth || img.width;
+          let height = img.naturalHeight || img.height;
+          const aspectRatio = width / height;
+
+          let maxWidth: number;
+          let maxHeight: number;
+          if (aspectRatio > 1.4) {
+            maxWidth = 2400;
+            maxHeight = 1600;
+          } else {
+            maxWidth = 1600;
+            maxHeight = 1600;
+          }
+
+          if (width > maxWidth || height > maxHeight) {
+            const ratio = Math.min(maxWidth / width, maxHeight / height);
+            width = Math.round(width * ratio);
+            height = Math.round(height * ratio);
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            this.snackBar.open(`Error al procesar "${file.name}"`, 'Cerrar', { duration: 3000 });
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Elegimos la versión más liviana para evitar payloads grandes en preview/email.
+          const pngCandidate = canvas.toDataURL('image/png');
+          const jpegCandidate = canvas.toDataURL('image/jpeg', 0.9);
+          const resizedDataUrl = jpegCandidate.length < pngCandidate.length
+            ? jpegCandidate
+            : pngCandidate;
+
+          this.uploadedImages.push({ name: file.name, dataUrl: resizedDataUrl, width, height });
         };
         img.onerror = () => {
-          this.uploadedImages.push({ name: file.name, dataUrl, width: 0, height: 0 });
+          this.snackBar.open(`Error al cargar "${file.name}"`, 'Cerrar', { duration: 3000 });
         };
         img.src = dataUrl;
       };
