@@ -39,8 +39,8 @@ import { Title } from '@angular/platform-browser';
 import anime from 'animejs';
 
 type ViewState = 'login' | 'recovery' | 'mfa';
-// Admite los cuatro temas de login disponibles: crt, infoflow (cyberpunk), modern (split-screen) y surrealism (digital surrealism)
-type LoginTheme = 'crt' | 'infoflow' | 'modern' | 'surrealism';
+// Admite los temas de login disponibles: crt, infoflow (cyberpunk), modern (split-screen), surrealism (digital surrealism), win311 (windows retro) y unix89 (unix terminal retro)
+type LoginTheme = 'crt' | 'infoflow' | 'modern' | 'surrealism' | 'win311' | 'unix89';
 
 @Component({
     selector: 'app-login',
@@ -75,7 +75,9 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // Tema activo cargado desde config
   activeTheme: LoginTheme = 'crt';
+  showThemeMenu = false;
   showPrivacyConsent = true;
+  unix89Time = '';
 
   // Configuración SSO habilitada
   googleSsoEnabled = false;
@@ -151,8 +153,15 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
     this.configService.getLogo().subscribe({
       next: (response: any) => {
         this.logoUrl = response.logoUrl;
-        // Asignación de tema de login incluyendo el nuevo tema 'modern' y 'surrealism'
-        this.activeTheme = response.loginTheme === 'surrealism' ? 'surrealism' : (response.loginTheme === 'modern' ? 'modern' : (response.loginTheme === 'infoflow' ? 'infoflow' : 'crt'));
+        
+        // Comentario: Cargar tema preferido desde localStorage si existe, de lo contrario usar el del admin
+        const localTheme = localStorage.getItem('preferredLoginTheme');
+        if (localTheme && ['crt', 'infoflow', 'modern', 'surrealism', 'win311', 'unix89'].includes(localTheme)) {
+          this.activeTheme = localTheme as LoginTheme;
+        } else {
+          this.activeTheme = response.loginTheme === 'unix89' ? 'unix89' : (response.loginTheme === 'win311' ? 'win311' : (response.loginTheme === 'surrealism' ? 'surrealism' : (response.loginTheme === 'modern' ? 'modern' : (response.loginTheme === 'infoflow' ? 'infoflow' : 'crt'))));
+        }
+        
         this.appTitle = (response.appTitle || '').trim();
         this.titleService.setTitle(this.appTitle);
         
@@ -167,22 +176,8 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
         this.themeLoaded = true;
         this.cdr.detectChanges();
         
-        // Habilitar reloj y canvas de lluvia Matrix según corresponda
-        if (this.activeTheme === 'infoflow' || this.activeTheme === 'modern' || this.activeTheme === 'surrealism') {
-          this.startClock();
-          if (this.activeTheme === 'infoflow') {
-            this.startTyping();
-          }
-          if (this.activeTheme === 'infoflow' || this.activeTheme === 'modern') {
-            setTimeout(() => this.initMatrixCanvas(), 100);
-          }
-        }
-
-        // Habilitar glitches y encendido animado para tema CRT
-        if (this.activeTheme === 'crt') {
-          this.startRandomGlitches();
-          setTimeout(() => this.triggerScreenTurnOn(), 100);
-        }
+        // Comentario: Inicializar animaciones y recursos específicos del tema actual
+        this.initializeThemeSpecifics();
 
         // Cargar Google GSI dinámicamente si está habilitado
         if (this.googleSsoEnabled && this.googleClientId) {
@@ -196,22 +191,88 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
       },
       error: () => {
         this.logoUrl = '';
-        this.activeTheme = 'crt';
+        const localTheme = localStorage.getItem('preferredLoginTheme');
+        if (localTheme && ['crt', 'infoflow', 'modern', 'surrealism', 'win311', 'unix89'].includes(localTheme)) {
+          this.activeTheme = localTheme as LoginTheme;
+        } else {
+          this.activeTheme = 'crt';
+        }
         this.titleService.setTitle('');
         this.themeLoaded = true;
         this.cdr.detectChanges();
-        this.startRandomGlitches();
-        setTimeout(() => this.triggerScreenTurnOn(), 100);
+        
+        this.initializeThemeSpecifics();
       }
     });
   }
 
-  ngAfterViewInit(): void {
-    // Si el tema ya era infoflow al init (raro, pero seguro)
-    // Si el tema activo requiere canvas animado de lluvia de Matrix
-    if (this.activeTheme === 'infoflow' || this.activeTheme === 'modern') {
-      setTimeout(() => this.initMatrixCanvas(), 100);
+  // ── Gestión de Temas en Caliente ──────────────────────────
+  toggleThemeMenu(): void {
+    this.showThemeMenu = !this.showThemeMenu;
+  }
+
+  clearLoginForm(): void {
+    // Comentario: Limpiar los valores de usuario y contraseña en el formulario
+    this.loginForm.get('username')?.setValue('');
+    this.loginForm.get('password')?.setValue('');
+    this.loginForm.get('username')?.markAsUntouched();
+    this.loginForm.get('password')?.markAsUntouched();
+  }
+
+  getMaskedPassword(): string {
+    // Comentario: Retorna una cadena de asteriscos del mismo largo de la contraseña para simular la consola
+    const pass = this.loginForm.get('password')?.value || '';
+    return '*'.repeat(pass.length);
+  }
+
+  selectLoginTheme(theme: LoginTheme): void {
+    this.stopThemeSpecifics();
+    this.activeTheme = theme;
+    localStorage.setItem('preferredLoginTheme', theme);
+    this.showThemeMenu = false;
+
+    this.initializeThemeSpecifics();
+    
+    // Comentario: Si transiciona a CRT, gatillar la animación de encendido de pantalla
+    if (theme === 'crt') {
+      setTimeout(() => this.triggerScreenTurnOn(), 100);
     }
+    
+    this.cdr.detectChanges();
+  }
+
+  private initializeThemeSpecifics(): void {
+    // Comentario: Habilitar reloj y Matrix canvas según corresponda al tema
+    if (this.activeTheme === 'infoflow' || this.activeTheme === 'modern' || this.activeTheme === 'surrealism' || this.activeTheme === 'unix89') {
+      this.startClock();
+      if (this.activeTheme === 'infoflow') {
+        this.startTyping();
+      }
+      if (this.activeTheme === 'infoflow' || this.activeTheme === 'modern') {
+        setTimeout(() => this.initMatrixCanvas(), 100);
+      }
+    }
+
+    // Comentario: Habilitar glitches periódicos y encendido animado si es el tema CRT o Unix89
+    if (this.activeTheme === 'crt' || this.activeTheme === 'unix89') {
+      this.startRandomGlitches();
+      setTimeout(() => this.triggerScreenTurnOn(), 100);
+    }
+  }
+
+  private stopThemeSpecifics(): void {
+    this.stopClock();
+    this.stopMatrixCanvas();
+    this.stopRandomGlitches();
+    if (this.typingTimer) {
+      clearTimeout(this.typingTimer);
+      this.typingTimer = undefined;
+    }
+    this.typingTitle = '';
+  }
+
+  ngAfterViewInit(): void {
+    // Comentario: ngAfterViewInit se mantiene vacío ya que la inicialización se gestiona dinámicamente en initializeThemeSpecifics()
   }
 
   ngOnDestroy(): void {
@@ -230,9 +291,39 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
       const m = now.getMinutes().toString().padStart(2, '0');
       const s = now.getSeconds().toString().padStart(2, '0');
       this.currentTime = `${h}:${m}:${s}`;
+      this.unix89Time = this.getUnix89Time();
     };
     tick();
     this.clockInterval = setInterval(tick, 1000);
+  }
+
+  getUnix89Time(): string {
+    const now = new Date();
+    const year1989Date = new Date(now);
+    year1989Date.setFullYear(1989);
+    
+    const options: Intl.DateTimeFormatOptions = {
+      weekday: 'short',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+      timeZone: 'UTC'
+    };
+    
+    const formatter = new Intl.DateTimeFormat('en-US', options);
+    const parts = formatter.formatToParts(year1989Date);
+    
+    const weekday = parts.find(p => p.type === 'weekday')?.value || '';
+    const month = parts.find(p => p.type === 'month')?.value || '';
+    const day = parts.find(p => p.type === 'day')?.value || '';
+    const hour = parts.find(p => p.type === 'hour')?.value || '00';
+    const minute = parts.find(p => p.type === 'minute')?.value || '00';
+    const second = parts.find(p => p.type === 'second')?.value || '00';
+    
+    return `${weekday} ${month} ${day} ${hour}:${minute}:${second} UTC 1989`;
   }
 
   private stopClock(): void {

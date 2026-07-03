@@ -172,6 +172,12 @@ router.put('/me',
     body('email').optional().isEmail().normalizeEmail(),
     body('fullName').optional().trim().notEmpty(),
     body('theme').optional().isIn(['light', 'dark', 'sepia', 'pastel', 'cyberpunk']),
+    body('preferredLoginTheme').optional({ nullable: true }).custom(val => {
+      if (val === null || val === '' || ['crt', 'infoflow', 'modern', 'surrealism', 'win311', 'unix89'].includes(val)) {
+        return true;
+      }
+      throw new Error('Tema de login inválido');
+    }),
     body('phone').optional({ nullable: true }).trim().isLength({ min: 6, max: 20 }).withMessage('Teléfono inválido'),
     body('birthday').optional().isISO8601().toDate().withMessage('Fecha de nacimiento inválida'),
     body('currentPassword').optional().notEmpty(),
@@ -180,7 +186,7 @@ router.put('/me',
   validate,
   async (req, res) => {
     try {
-      const { email, fullName, theme, phone, currentPassword, newPassword, birthday } = req.body;
+      const { email, fullName, theme, preferredLoginTheme, phone, currentPassword, newPassword, birthday } = req.body;
 
       const user = await User.findById(req.user._id);
       if (!user) {
@@ -191,6 +197,7 @@ router.put('/me',
         email: user.email,
         fullName: user.fullName,
         theme: user.theme,
+        preferredLoginTheme: user.preferredLoginTheme,
         phone: user.phone,
         birthday: user.birthday
       };
@@ -198,6 +205,9 @@ router.put('/me',
       if (email) user.email = email;
       if (fullName) user.fullName = fullName;
       if (theme) user.theme = theme;
+      if (preferredLoginTheme !== undefined) {
+        user.preferredLoginTheme = preferredLoginTheme || null;
+      }
       if (phone !== undefined) user.phone = phone || null;
       if (birthday !== undefined) user.birthday = birthday || null;
 
@@ -229,6 +239,7 @@ router.put('/me',
             email: user.email,
             fullName: user.fullName,
             theme: user.theme,
+            preferredLoginTheme: user.preferredLoginTheme,
             phone: user.phone,
             birthday: user.birthday,
             passwordChanged: !!newPassword

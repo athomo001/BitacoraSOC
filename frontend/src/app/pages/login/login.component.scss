@@ -1,6 +1,8 @@
 @use 'login-infoflow';
 @use 'login-modern';
 @use 'login-surrealism';
+@use 'login-win311';
+@use 'login-unix89';
 @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
 
 // =============================================================================
@@ -637,6 +639,130 @@ $crt-glow-strong:0 0 8px rgba(0, 255, 153, 0.95),  0 0 20px rgba(0, 204, 119, 0.
   max-width: min(90vw, 640px);
   max-height: 85vh;
   object-fit: contain;
+}
+
+// =============================================================================
+// SELECTOR FLOTANTE DE TEMAS DE LOGIN (AESTHETIC & PREMIUM GLASSMORPHISM)
+// =============================================================================
+.login-theme-selector-floating {
+  position: fixed;
+  top: 40px;
+  right: 40px;
+  // Comentario: Asegurar posicionamiento por encima de overlays de monitores retro o cyberpunk
+  z-index: 99999;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+
+  .selector-trigger {
+    background: rgba(18, 18, 18, 0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 30px;
+    padding: 10px 18px;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.08);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+    &:hover {
+      background: rgba(30, 30, 30, 0.85);
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+      color: #ffffff;
+    }
+
+    .theme-icon {
+      font-size: 15px;
+    }
+
+    .theme-text {
+      letter-spacing: 0.3px;
+    }
+  }
+
+  .theme-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    background: rgba(15, 15, 15, 0.94);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    width: 220px;
+    padding: 8px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transform-origin: top right;
+    animation: menuFadeIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    .theme-menu-item {
+      background: transparent;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 13px;
+      font-weight: 500;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.2s ease;
+      width: 100%;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.06);
+        color: #ffffff;
+      }
+
+      &.active {
+        background: rgba(0, 255, 65, 0.1);
+        border: 1px solid rgba(0, 255, 65, 0.25);
+        color: #00ff41;
+        font-weight: 600;
+      }
+
+      .item-icon {
+        font-size: 14px;
+      }
+    }
+  }
+}
+
+@keyframes menuFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+// Comentario: Ajuste responsivo para moviles
+@media (max-width: 600px) {
+  .login-theme-selector-floating {
+    top: 15px;
+    right: 15px;
+
+    .selector-trigger {
+      padding: 8px 12px;
+      .theme-text {
+        display: none;
+      }
+    }
+  }
 }
 
 

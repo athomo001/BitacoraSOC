@@ -91,6 +91,12 @@ const userSchema = new mongoose.Schema({
     enum: ['light', 'dark', 'sepia', 'pastel', 'cyberpunk'],
     default: 'light'
   },
+  // Tema de login preferido de forma individual
+  preferredLoginTheme: {
+    type: String,
+    enum: ['crt', 'infoflow', 'modern', 'surrealism', 'win311', 'unix89', null],
+    default: null
+  },
   avatar: {
     type: String,
     default: null

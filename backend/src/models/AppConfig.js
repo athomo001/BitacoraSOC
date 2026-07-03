@@ -452,8 +452,8 @@ const appConfigSchema = new mongoose.Schema({
   // Tema visual del login
   loginTheme: {
     type: String,
-    // Se añade el tema 'modern' y 'surrealism' para soportar los diseños visuales adicionales
-    enum: ['crt', 'infoflow', 'modern', 'surrealism'],
+    // Se añade el tema 'modern', 'surrealism', 'win311' y 'unix89' para soportar los diseños visuales adicionales
+    enum: ['crt', 'infoflow', 'modern', 'surrealism', 'win311', 'unix89'],
     default: 'crt'
   },
   easterEggRules: {

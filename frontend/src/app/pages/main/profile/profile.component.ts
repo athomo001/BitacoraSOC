@@ -68,6 +68,7 @@ export class ProfileComponent implements OnInit {
       fullName: [this.currentUser?.fullName || '', Validators.required],
       email: [this.currentUser?.email || '', [Validators.required, Validators.email]],
       theme: [this.themeService.getCurrentTheme(), Validators.required],
+      preferredLoginTheme: [this.currentUser?.preferredLoginTheme || ''],
       phone: [this.currentUser?.phone || '', [Validators.maxLength(20)]],
       birthday: [this.currentUser?.birthday ? this.formatDateForInput(this.currentUser.birthday) : '']
     });
@@ -100,6 +101,7 @@ export class ProfileComponent implements OnInit {
           fullName: user.fullName,
           email: user.email,
           theme: user.theme || this.themeService.getCurrentTheme(),
+          preferredLoginTheme: user.preferredLoginTheme || '',
           phone: user.phone || '',
           birthday: user.birthday ? this.formatDateForInput(user.birthday) : ''
         });
@@ -139,6 +141,12 @@ export class ProfileComponent implements OnInit {
           this.currentUser = updatedUser;
           this.authService.updateCurrentUser(updatedUser);
           this.themeService.setTheme(updatedUser.theme || this.profileForm.value.theme);
+          // Comentario: Sincronizar el tema de login preferido con localStorage tras actualizar perfil
+          if (updatedUser.preferredLoginTheme) {
+            localStorage.setItem('preferredLoginTheme', updatedUser.preferredLoginTheme);
+          } else {
+            localStorage.removeItem('preferredLoginTheme');
+          }
           this.snackBar.open('Perfil actualizado', 'Cerrar', { duration: 3000 });
         },
         error: (err) => {
