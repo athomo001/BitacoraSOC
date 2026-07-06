@@ -1225,25 +1225,25 @@ mat-chip {
   background: linear-gradient(90deg, rgba(21, 95, 80, 0.12) 0%, rgba(21, 95, 80, 0.02) 100%) !important;
 
   td {
-    padding: 16px 20px !important;
+    padding: 6px 12px !important; /* Reducido para ser más compacto */
     border-bottom: 2px solid rgba(21, 95, 80, 0.25) !important;
-    border-left: 6px solid var(--primary-color) !important; /* Borde de realce izquierdo en la celda */
+    border-left: 5px solid var(--primary-color) !important;
   }
 
   .month-sep-content {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     color: var(--primary-color);
-    font-size: 16px; /* Aumentado para mayor legibilidad */
-    font-weight: 800;
+    font-size: 14px; /* Ajustado para un aspecto delgado */
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 1.5px;
+    letter-spacing: 1px;
 
     mat-icon {
-      font-size: 22px;
-      width: 22px;
-      height: 22px;
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
     }
   }
 }
@@ -1252,25 +1252,25 @@ mat-chip {
   background: rgba(139, 195, 74, 0.06) !important;
 
   td {
-    padding: 10px 24px !important;
+    padding: 4px 16px !important; /* Reducido para ser más compacto */
     border-bottom: 1px solid rgba(139, 195, 74, 0.15) !important;
-    border-left: 4px solid var(--accent-color) !important; /* Borde de realce izquierdo en la celda */
+    border-left: 3px solid var(--accent-color) !important;
   }
 
   .week-sep-content {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     color: var(--text-primary);
     opacity: 0.9;
-    font-size: 13px; /* Aumentado ligeramente */
+    font-size: 12px; /* Ajustado para un aspecto delgado */
     font-weight: 700;
     font-style: italic;
 
     mat-icon {
-      font-size: 18px;
-      width: 18px;
-      height: 18px;
+      font-size: 14px;
+      width: 14px;
+      height: 14px;
     }
   }
 }
