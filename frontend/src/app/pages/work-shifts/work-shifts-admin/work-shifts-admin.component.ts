@@ -1001,12 +1001,13 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
           const matchesExt = extId && nextExtId && String(extId) === String(nextExtId);
 
           if (next.roleCode === 'TELEWORK' && (matchesUser || matchesExt)) {
-            // Verificar si el intervalo es consecutivo (< 48 horas)
+            // Verificar si el intervalo es consecutivo en días hábiles continuos (máximo 18 horas de diferencia)
             const currentEnd = new Date(groupItems[groupItems.length - 1].weekEndDate);
             const nextStart = new Date(next.weekStartDate);
             const diffHours = Math.abs(nextStart.getTime() - currentEnd.getTime()) / (1000 * 60 * 60);
 
-            if (diffHours <= 48) {
+            // Se reduce el límite a 18 horas para no agrupar turnos con días intermedios libres (ej: lunes y miércoles)
+            if (diffHours <= 18) {
               groupItems.push(next);
               processedIds.add(next._id);
             }
