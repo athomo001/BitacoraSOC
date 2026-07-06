@@ -166,6 +166,11 @@ async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', l
           
           <mj-spacer height="20px" />
           
+          <!-- Mensaje aclaratorio de uso interno y flexibilidad de turnos asignados -->
+          <mj-text font-size="12px" line-height="18px" color="${PALETTE.mutedText}" align="center" font-style="italic">
+            Nota: Este correo de aviso es exclusivamente para <b>control interno</b> del área. Los turnos asignados son preliminares y pueden ser modificados en el transcurso de la semana según las necesidades del servicio.
+          </mj-text>
+          <mj-spacer height="10px" />
           <mj-text font-size="13px" line-height="20px" color="${PALETTE.mutedText}" align="center">
             Este es un correo automático generado por el sistema ${e(brandName)}.
           </mj-text>
