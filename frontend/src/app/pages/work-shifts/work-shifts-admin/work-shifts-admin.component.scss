@@ -1225,7 +1225,7 @@ mat-chip {
   background: linear-gradient(90deg, rgba(21, 95, 80, 0.12) 0%, rgba(21, 95, 80, 0.02) 100%) !important;
 
   td {
-    padding: 6px 12px !important; /* Reducido para ser más compacto */
+    padding: 2px 12px !important; /* Aún más compacto verticalmente */
     border-bottom: 2px solid rgba(21, 95, 80, 0.25) !important;
     border-left: 5px solid var(--primary-color) !important;
   }
@@ -1235,7 +1235,7 @@ mat-chip {
     align-items: center;
     gap: 8px;
     color: var(--primary-color);
-    font-size: 14px; /* Ajustado para un aspecto delgado */
+    font-size: 13px; /* Más delgado */
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -1252,7 +1252,7 @@ mat-chip {
   background: rgba(139, 195, 74, 0.06) !important;
 
   td {
-    padding: 4px 16px !important; /* Reducido para ser más compacto */
+    padding: 2px 16px !important; /* Aún más compacto verticalmente */
     border-bottom: 1px solid rgba(139, 195, 74, 0.15) !important;
     border-left: 3px solid var(--accent-color) !important;
   }
@@ -1263,7 +1263,7 @@ mat-chip {
     gap: 6px;
     color: var(--text-primary);
     opacity: 0.9;
-    font-size: 12px; /* Ajustado para un aspecto delgado */
+    font-size: 11px; /* Más delgado */
     font-weight: 700;
     font-style: italic;
 
@@ -1272,6 +1272,28 @@ mat-chip {
       width: 14px;
       height: 14px;
     }
+  }
+}
+
+/* Botón de acordeón del mes centrado milimétricamente para evitar falsos clics */
+.toggle-month-btn {
+  width: 28px !important;
+  height: 28px !important;
+  line-height: 28px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+
+  mat-icon {
+    font-size: 18px !important;
+    width: 18px !important;
+    height: 18px !important;
+    margin: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
 }
 

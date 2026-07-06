@@ -350,8 +350,8 @@
             <div class="month-sep-content" style="display: flex; align-items: center; gap: 10px;">
               <!-- Botón interactivo para colapsar/expandir el mes -->
               <button mat-icon-button type="button" (click)="toggleMonthExpansion(row.monthKey)" 
-                      style="width: 32px; height: 32px; line-height: 32px; color: var(--primary-color);">
-                <mat-icon style="font-size: 20px; width: 20px; height: 20px; vertical-align: middle;">
+                      class="toggle-month-btn" style="color: var(--primary-color);">
+                <mat-icon>
                   {{ isMonthExpanded(row.monthKey) ? 'expand_less' : 'expand_more' }}
                 </mat-icon>
               </button>
