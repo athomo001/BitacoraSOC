@@ -54,6 +54,26 @@
           Diseño surrealista y moderno inspirado en el arte digital. Presenta el formulario interactivo en una barra lateral izquierda de altura completa, dejando visible de forma limpia y nítida la imagen del monitor retro iluminado en el paisaje crepuscular de fondo.
         </p>
       </div>
+
+      <div class="theme-option" [class.selected]="loginTheme === 'win311'">
+        <!-- Nuevo Tema Windows 3.11 -->
+        <mat-radio-button value="win311">
+          <span class="theme-name">🪟 Windows 3.11</span>
+        </mat-radio-button>
+        <p class="theme-desc">
+          Estilo clásico de Windows for Workgroups v3.11. Escritorio verde azulado (Teal) clásico, ventanas grises con bordes biselados 3D retro y Program Manager de fondo.
+        </p>
+      </div>
+
+      <div class="theme-option" [class.selected]="loginTheme === 'unix89'">
+        <!-- Nuevo Tema Unix Terminal -->
+        <mat-radio-button value="unix89">
+          <span class="theme-name">📟 Unix Terminal (1989)</span>
+        </mat-radio-button>
+        <p class="theme-desc">
+          Estilo consola CLI plana clásica de Unix/Linux. Fondo negro puro, texto de fósforo ámbar (naranja), cursor parpadeante clásico y reloj en tiempo real fijado en 1989.
+        </p>
+      </div>
     </mat-radio-group>
 
     <div class="actions">

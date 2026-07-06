@@ -863,3 +863,423 @@
     <img [src]="easterEggImageUrl" alt="Bender" class="easter-egg-image" />
   </div>
 </div>
+
+<!-- ══════════════════════════════════════════════════════════
+     TEMA WINDOWS 3.11 (Retro Desktop)
+     ══════════════════════════════════════════════════════════ -->
+<div *ngIf="activeTheme === 'win311' && themeLoaded" class="theme-win311">
+  <!-- Escritorio de Windows 3.11 (Fondo Teal #008080) -->
+  <div class="win-desktop">
+    
+    <!-- Ventana de fondo simulada: Program Manager -->
+    <div class="win-window program-manager-bg">
+      <div class="win-title-bar">
+        <div class="win-title-icon-box">
+          <div class="win-title-icon-bars"></div>
+        </div>
+        <div class="win-title-text">Program Manager</div>
+        <div class="win-title-buttons">
+          <button type="button" class="win-btn-minimize" disabled>▲</button>
+          <button type="button" class="win-btn-maximize" disabled>▼</button>
+        </div>
+      </div>
+      
+      <!-- Menú de la ventana Program Manager -->
+      <div class="win-menu-bar">
+        <span class="win-menu-item"><u>F</u>ile</span>
+        <span class="win-menu-item"><u>O</u>ptions</span>
+        <span class="win-menu-item"><u>W</u>indow</span>
+        <span class="win-menu-item"><u>H</u>elp</span>
+      </div>
+      
+      <!-- Contenido del Program Manager: Iconos de grupo -->
+      <div class="win-window-body pm-icons-grid">
+        <div class="pm-icon-wrapper">
+          <div class="pm-icon icon-group"></div>
+          <div class="pm-icon-label">Main</div>
+        </div>
+        <div class="pm-icon-wrapper">
+          <div class="pm-icon icon-group"></div>
+          <div class="pm-icon-label">Accessories</div>
+        </div>
+        <div class="pm-icon-wrapper">
+          <div class="pm-icon icon-group"></div>
+          <div class="pm-icon-label">Network</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DIÁLOGO ACTIVO: Welcome to Windows 3.11 -->
+    <div class="win-window win-dialog login-dialog" *ngIf="currentView === 'login'">
+      <div class="win-title-bar active-title">
+        <div class="win-title-icon-box" (click)="toggleThemeMenu()">
+          <div class="win-title-icon-bars"></div>
+        </div>
+        <div class="win-title-text">Welcome to Windows 3.11</div>
+        <div class="win-title-buttons">
+          <button type="button" class="win-btn-close" (click)="switchToRecovery()">?</button>
+        </div>
+      </div>
+
+      <div class="win-window-body dialog-body">
+        <div class="dialog-header-section">
+          <!-- Logo clásico de Windows 3.11 -->
+          <div class="win311-logo-container">
+            <div class="win311-logo-image">
+              <span class="win-flag-square flag-red"></span>
+              <span class="win-flag-square flag-green"></span>
+              <span class="win-flag-square flag-blue"></span>
+              <span class="win-flag-square flag-yellow"></span>
+            </div>
+          </div>
+          <div class="dialog-instruction-text">
+            Welcome to Bitácora SOC for Workgroups v3.11.<br>
+            Please enter your name and password.
+          </div>
+        </div>
+
+        <!-- Banner de alerta / errores -->
+        <div class="win-alert-box" *ngIf="showBanner">
+          <span class="win-alert-icon" *ngIf="bannerType === 'error'">🛑</span>
+          <span class="win-alert-icon" *ngIf="bannerType === 'success'">🛈</span>
+          <div class="win-alert-text">{{ bannerMessage }}</div>
+        </div>
+
+        <form [formGroup]="loginForm" (ngSubmit)="onLoginSubmit()" class="win-form">
+          <div class="form-row-win">
+            <label for="username-win" class="win-label"><u>U</u>ser Name:</label>
+            <input id="username-win" type="text" formControlName="username" class="win-input" autocomplete="username" [disabled]="loading" />
+          </div>
+
+          <div class="form-row-win">
+            <label for="password-win" class="win-label"><u>P</u>assword:</label>
+            <input id="password-win" [type]="hidePassword ? 'password' : 'text'" formControlName="password" class="win-input" autocomplete="current-password" [disabled]="loading" />
+          </div>
+
+          <!-- Checkbox de privacidad -->
+          <div class="form-row-win checkbox-row" *ngIf="showPrivacyConsent">
+            <div class="win-checkbox-wrapper">
+              <input type="checkbox" id="privacy-win" formControlName="privacyConsent" class="win-checkbox-input" />
+              <label for="privacy-win" class="win-checkbox-label">I accept the <a [href]="getAssetUrl('/uploads/aviso-privacidad.html')" target="_blank" class="win-link">Privacy Policy</a></label>
+            </div>
+          </div>
+
+          <!-- Botones de Acción -->
+          <div class="win-dialog-buttons">
+            <button type="submit" class="win-button-3d default-btn" [disabled]="loading || loginForm.invalid">
+              OK
+            </button>
+            <button type="button" class="win-button-3d" (click)="switchToRecovery()" [disabled]="loading">
+              <u>R</u>ecover
+            </button>
+            <button type="button" class="win-button-3d" (click)="clearLoginForm()" [disabled]="loading">
+              <u>C</u>ancel
+            </button>
+          </div>
+        </form>
+
+        <!-- Opciones de SSO -->
+        <div class="win-sso-section" *ngIf="googleSsoEnabled || microsoftSsoEnabled">
+          <div class="win-sso-title">Or sign-in using:</div>
+          <div class="win-sso-buttons">
+            <div id="google-btn-container-win" *ngIf="googleSsoEnabled" class="win-google-sso">
+              <div id="google-btn-container"></div>
+            </div>
+            <button type="button" class="win-button-3d win-sso-btn" *ngIf="microsoftSsoEnabled" (click)="loginWithMicrosoft()" [disabled]="loading">
+              Microsoft
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DIÁLOGO: Recuperar Contraseña -->
+    <div class="win-window win-dialog recovery-dialog" *ngIf="currentView === 'recovery'">
+      <div class="win-title-bar active-title">
+        <div class="win-title-icon-box" (click)="switchToLogin()">
+          <div class="win-title-icon-bars"></div>
+        </div>
+        <div class="win-title-text">Password Recovery</div>
+        <div class="win-title-buttons">
+          <button type="button" class="win-btn-close" (click)="switchToLogin()">?</button>
+        </div>
+      </div>
+
+      <div class="win-window-body dialog-body">
+        <div class="dialog-instruction-text" style="margin-bottom: 15px;">
+          Enter your registered email address to receive a recovery link.
+        </div>
+
+        <form [formGroup]="recoveryForm" (ngSubmit)="onRecoverySubmit()" class="win-form">
+          <div class="form-row-win">
+            <label for="email-win" class="win-label"><u>E</u>mail:</label>
+            <input id="email-win" type="email" formControlName="email" class="win-input" [disabled]="loading" />
+          </div>
+
+          <!-- Banner informativo de ciberseguridad -->
+          <div class="win-info-box" style="margin-top: 15px; margin-bottom: 15px;">
+            <span class="win-info-icon">🛈</span>
+            <div class="win-info-text">For security reasons, the system will not confirm if the account exists.</div>
+          </div>
+
+          <!-- Alerta de éxito -->
+          <div class="win-alert-box" *ngIf="showBanner && bannerType === 'success'">
+            <span class="win-alert-icon">🛈</span>
+            <div class="win-alert-text">Request processed. Check your inbox if the account exists.</div>
+          </div>
+
+          <div class="win-dialog-buttons">
+            <button type="submit" class="win-button-3d default-btn" [disabled]="loading || recoveryForm.invalid">
+              OK
+            </button>
+            <button type="button" class="win-button-3d" (click)="switchToLogin()" [disabled]="loading">
+              <u>C</u>ancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- DIÁLOGO: MFA (Verificación) -->
+    <div class="win-window win-dialog mfa-dialog" *ngIf="currentView === 'mfa'">
+      <div class="win-title-bar active-title">
+        <div class="win-title-icon-box" (click)="cancelMfa()">
+          <div class="win-title-icon-bars"></div>
+        </div>
+        <div class="win-title-text">MFA Authentication</div>
+        <div class="win-title-buttons">
+          <button type="button" class="win-btn-close" (click)="cancelMfa()">?</button>
+        </div>
+      </div>
+
+      <div class="win-window-body dialog-body">
+        <div *ngIf="needsMfaSetup" class="win-mfa-setup-section" style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+          <div class="dialog-instruction-text" style="color: #b22222; font-weight: bold; margin-bottom: 10px;">
+            [MANDATORY ENROLLMENT]
+          </div>
+          <div class="dialog-instruction-text" style="margin-bottom: 10px;">
+            Scan the QR code with your authenticator application (Google Authenticator / Authy):
+          </div>
+          <div class="win-qr-wrapper" style="background: white; padding: 6px; border: 2px inset #000; margin: 10px 0; display: inline-block;">
+            <img [src]="mfaQrCode" alt="MFA QR" class="win-qr-img" style="width: 140px; height: 140px; display: block;" />
+          </div>
+          <div class="dialog-instruction-text" style="font-family: monospace; font-size: 11px; margin-top: 5px; background: #e0e0e0; padding: 4px; border: 1px solid #808080; width: 100%;">
+            Backup Key: {{ mfaSecret }}
+          </div>
+        </div>
+
+        <div *ngIf="!needsMfaSetup" class="dialog-instruction-text" style="margin-bottom: 15px;">
+          Please enter the 6-digit verification code from your authenticator:
+        </div>
+
+        <form [formGroup]="mfaForm" (ngSubmit)="onMfaSubmit()" class="win-form">
+          <div class="form-row-win">
+            <label for="code-win" class="win-label"><u>C</u>ode:</label>
+            <input id="code-win" type="text" formControlName="code" class="win-input" maxlength="6" [disabled]="loading" autocomplete="one-time-code" />
+          </div>
+
+          <div class="win-dialog-buttons" style="margin-top: 20px;">
+            <button type="submit" class="win-button-3d default-btn" [disabled]="loading || mfaForm.invalid">
+              OK
+            </button>
+            <button type="button" class="win-button-3d" (click)="cancelMfa()" [disabled]="loading">
+              <u>C</u>ancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     TEMA UNIX TERMINAL (1989 - Consola Plana Retro)
+     ══════════════════════════════════════════════════════════ -->
+<div *ngIf="activeTheme === 'unix89' && themeLoaded" class="theme-unix89">
+  <div class="unix-desktop">
+    <!-- Contenido del terminal CLI plano -->
+    <div class="unix-terminal">
+      
+      <!-- Cabecera clásica de carga del sistema -->
+      <header class="unix-header">
+        <p>SYSTEM: Unix V Release 3.1</p>
+        <p>TTY:   tty01</p>
+      </header>
+
+      <!-- VISTA DE LOGIN ESTÁNDAR -->
+      <div *ngIf="currentView === 'login'" class="unix-view-panel">
+        <h2 class="unix-section-title">B I T A C O R A   S O C   L O G I N</h2>
+        <div class="unix-divider">-----------------------------</div>
+
+        <!-- Banner de mensajes de estado o errores -->
+        <div class="unix-banner" *ngIf="showBanner">
+          <p class="unix-banner-text" [class.error]="bannerType === 'error'">
+            {{ bannerType === 'error' ? '🛑 ERROR: ' : '🛈 INFO: ' }}{{ bannerMessage }}
+          </p>
+        </div>
+
+        <form [formGroup]="loginForm" (ngSubmit)="onLoginSubmit()" class="unix-form">
+          <div class="unix-form-group">
+            <span class="unix-label">login:</span>
+            <span class="unix-bracket">[</span>
+            <div class="unix-input-wrapper">
+              <span class="unix-render-text">
+                {{ loginForm.get('username')?.value || '' }}<span class="unix-blinking-cursor">_</span>
+              </span>
+              <input type="text" formControlName="username" class="unix-input" autocomplete="username" [disabled]="loading" placeholder="" />
+            </div>
+            <span class="unix-bracket">]</span>
+          </div>
+
+          <div class="unix-form-group">
+            <span class="unix-label">password:</span>
+            <span class="unix-bracket">[</span>
+            <div class="unix-input-wrapper">
+              <span class="unix-render-text">
+                {{ getMaskedPassword() }}<span class="unix-blinking-cursor">_</span>
+              </span>
+              <input [type]="hidePassword ? 'password' : 'text'" formControlName="password" class="unix-input" autocomplete="current-password" [disabled]="loading" placeholder="" />
+            </div>
+            <span class="unix-bracket">]</span>
+            <span class="unix-sub-label">(16 chars max, hidden)</span>
+          </div>
+
+          <!-- Consentimiento de Aviso de Privacidad -->
+          <div class="unix-form-group checkbox-group-win" *ngIf="showPrivacyConsent">
+            <label class="unix-checkbox-label">
+              <input type="checkbox" formControlName="privacyConsent" class="unix-checkbox-input" />
+              I accept the <a [href]="getAssetUrl('/uploads/aviso-privacidad.html')" target="_blank" class="unix-link">Privacy Policy</a>
+            </label>
+          </div>
+
+          <!-- Botones de Acción CLI -->
+          <div class="unix-buttons-group">
+            <button type="submit" class="unix-btn-cli" [disabled]="loading || loginForm.invalid">[ OK ]</button>
+            <button type="button" class="unix-btn-cli" (click)="switchToRecovery()" [disabled]="loading">[ RECOVER ]</button>
+            <button type="button" class="unix-btn-cli" (click)="clearLoginForm()" [disabled]="loading">[ CANCEL ]</button>
+          </div>
+        </form>
+
+        <!-- Opciones SSO estilo Consola -->
+        <div class="unix-sso-container" *ngIf="googleSsoEnabled || microsoftSsoEnabled">
+          <div class="unix-sso-label">--- SSO AUTENTICACIÓN ---</div>
+          <div class="unix-sso-buttons">
+            <div id="google-btn-container-unix" *ngIf="googleSsoEnabled" class="unix-google-sso">
+              <div id="google-btn-container"></div>
+            </div>
+            <button type="button" class="unix-btn-cli" *ngIf="microsoftSsoEnabled" (click)="loginWithMicrosoft()" [disabled]="loading">
+              [ Microsoft Sign-In ]
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- VISTA DE RECUPERACIÓN DE CONTRASEÑA -->
+      <div *ngIf="currentView === 'recovery'" class="unix-view-panel">
+        <h2 class="unix-section-title">P A S S W O R D   R E C O V E R Y</h2>
+        <div class="unix-divider">-----------------------------</div>
+
+        <p class="unix-info-text">Enter your email address to receive a recovery link.</p>
+
+        <form [formGroup]="recoveryForm" (ngSubmit)="onRecoverySubmit()" class="unix-form">
+          <div class="unix-form-group">
+            <span class="unix-label">email:</span>
+            <span class="unix-bracket">[</span>
+            <div class="unix-input-wrapper">
+              <span class="unix-render-text">
+                {{ recoveryForm.get('email')?.value || '' }}<span class="unix-blinking-cursor">_</span>
+              </span>
+              <input type="email" formControlName="email" class="unix-input" [disabled]="loading" />
+            </div>
+            <span class="unix-bracket">]</span>
+          </div>
+
+          <!-- Mensaje anti-enumeración obligatorio de seguridad -->
+          <p class="unix-security-notice">
+            🛈 Notice: For security reasons, the system will not confirm account existence.
+          </p>
+
+          <div class="unix-banner" *ngIf="showBanner && bannerType === 'success'">
+            <p class="unix-banner-text">🛈 SUCCESS: Request processed. Check email.</p>
+          </div>
+
+          <div class="unix-buttons-group">
+            <button type="submit" class="unix-btn-cli" [disabled]="loading || recoveryForm.invalid">[ SEND ]</button>
+            <button type="button" class="unix-btn-cli" (click)="switchToLogin()" [disabled]="loading">[ BACK ]</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- VISTA DE VERIFICACIÓN MFA -->
+      <div *ngIf="currentView === 'mfa'" class="unix-view-panel">
+        <h2 class="unix-section-title">M F A   A U T H E N T I C A T I O N</h2>
+        <div class="unix-divider">-----------------------------</div>
+
+        <div *ngIf="needsMfaSetup" class="unix-mfa-setup" style="margin-bottom: 20px;">
+          <p style="color: #ff3333; font-weight: bold;">[MANDATORY SECURITY ENROLLMENT]</p>
+          <p>Scan QR with authenticator app (Google Authenticator / Authy):</p>
+          <div style="background: white; padding: 6px; border: 2px solid #ffcc00; display: inline-block; margin: 10px 0;">
+            <img [src]="mfaQrCode" alt="MFA QR" style="width: 140px; height: 140px; display: block;" />
+          </div>
+          <p style="font-family: monospace; font-size: 12px; color: #ffcc00;">Backup key: {{ mfaSecret }}</p>
+        </div>
+
+        <p *ngIf="!needsMfaSetup" class="unix-info-text">Please enter the 6-digit authenticator code:</p>
+
+        <form [formGroup]="mfaForm" (ngSubmit)="onMfaSubmit()" class="unix-form">
+          <div class="unix-form-group">
+            <span class="unix-label">code:</span>
+            <span class="unix-bracket">[</span>
+            <div class="unix-input-wrapper">
+              <span class="unix-render-text">
+                {{ mfaForm.get('code')?.value || '' }}<span class="unix-blinking-cursor">_</span>
+              </span>
+              <input type="text" formControlName="code" class="unix-input" maxlength="6" [disabled]="loading" autocomplete="one-time-code" />
+            </div>
+            <span class="unix-bracket">]</span>
+          </div>
+
+          <div class="unix-buttons-group" style="margin-top: 15px;">
+            <button type="submit" class="unix-btn-cli" [disabled]="loading || mfaForm.invalid">[ VERIFY ]</button>
+            <button type="button" class="unix-btn-cli" (click)="cancelMfa()" [disabled]="loading">[ CANCEL ]</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Pie de página de la terminal -->
+      <footer class="unix-footer">
+        <p>System Status: AVAILABLE</p>
+        <p>Console Time: {{ unix89Time }}</p>
+      </footer>
+    </div>
+  </div>
+</div>
+
+<!-- Selector de tema de login flotante y premium -->
+<div class="login-theme-selector-floating" *ngIf="themeLoaded">
+  <button class="selector-trigger" (click)="toggleThemeMenu()" type="button" title="Cambiar tema de login">
+    <span class="theme-icon">🎨</span>
+    <span class="theme-text">Tema de Login</span>
+  </button>
+  <div class="theme-dropdown-menu" *ngIf="showThemeMenu">
+    <button type="button" class="theme-menu-item" (click)="selectLoginTheme('modern')" [class.active]="activeTheme === 'modern'">
+      <span class="item-icon">💻</span> Moderno / Split
+    </button>
+    <button type="button" class="theme-menu-item" (click)="selectLoginTheme('crt')" [class.active]="activeTheme === 'crt'">
+      <span class="item-icon">📟</span> Retro (CRT)
+    </button>
+    <button type="button" class="theme-menu-item" (click)="selectLoginTheme('infoflow')" [class.active]="activeTheme === 'infoflow'">
+      <span class="item-icon">🟢</span> Matrix / Cyber
+    </button>
+    <button type="button" class="theme-menu-item" (click)="selectLoginTheme('surrealism')" [class.active]="activeTheme === 'surrealism'">
+      <span class="item-icon">🌌</span> Surrealismo Digital
+    </button>
+    <button type="button" class="theme-menu-item" (click)="selectLoginTheme('win311')" [class.active]="activeTheme === 'win311'">
+      <span class="item-icon">🪟</span> Windows 3.11
+    </button>
+    <button type="button" class="theme-menu-item" (click)="selectLoginTheme('unix89')" [class.active]="activeTheme === 'unix89'">
+      <span class="item-icon">📟</span> Unix Terminal (1989)
+    </button>
+  </div>
+</div>

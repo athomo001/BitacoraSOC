@@ -2,6 +2,30 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.17] - 2026-07-03
+
+### Personalización de Temas de Login por Usuario y Nuevos Temas Retro (Windows 3.11 y Unix Terminal 1989)
+
+- **Selección de Temas de Login por Usuario**:
+  - Se agregó el campo `preferredLoginTheme` en el esquema de Mongoose `User.js` de MongoDB y se expuso en la API de perfil (`PUT /api/users/me`) y autenticación (`POST /login`, `/mfa/authenticate`, `/sso/google`, `/sso/microsoft`).
+  - Se integró un selector de temas flotante y premium (glassmorphism en SCSS/HTML) en la pantalla de login que permite alternar los temas en caliente y los almacena localmente (`localStorage`).
+  - Se añadió la opción de personalización en la vista del Perfil del Analista (`profile.component.html` y TS) para persistir la preferencia en la base de datos de cada cuenta.
+  - Refactorización de la lógica en `login.component.ts` para separar la inicialización y detención de animaciones y recursos específicos (Matrix canvas, glitches CRT, relojes) y evitar fugas de memoria o superposición de elementos al cambiar de tema en caliente.
+- **Tema Windows 3.11 (Retro)**:
+  - Nuevo diseño de inicio de sesión inspirado en Windows for Workgroups v3.11.
+  - Implementación de un fondo verde azulado (Teal `#008080`), una ventana inactiva simulando el **Program Manager** de fondo y una ventana de diálogo activa **Welcome to Windows 3.11** en primer plano.
+  - Creación del archivo de estilos `login-win311.scss` con tipografía monoespaciada, cajas grises tridimensionales biseladas en 3D clásico, botones clásicos de relieve e inputs hundidos.
+  - Adaptación de los flujos de recuperación de contraseña y MFA bajo la misma estética de diálogos Clásicos de Windows 3.x.
+- **Tema Unix Terminal (1989 - Retro CLI)**:
+  - Nuevo diseño visual inspirado en la consola CLI plana clásica de Unix/Linux a finales de los 80s (Unix System V Release 3.1).
+  - Implementación de un fondo negro puro y tipografía pixelada en fósforo ámbar (naranja retro) de gran luminosidad y legibilidad.
+  - Técnica de **Input Espejo**: Se desarrolló un input real transparente que se posiciona de forma absoluta por encima del prompt, mientras que un span dinámico de texto espejo renderiza las letras escritas y desplaza matemáticamente de izquierda a derecha el cursor de bloque parpadeante retro (`_`).
+  - Integración de contraseñas enmascaradas con asteriscos dinámicos que se expanden a medida que se tipea para mantener el cursor en la posición exacta.
+  - Incorporación de un reloj de consola en tiempo real (`Console Time`) que se actualiza cada segundo y mantiene fijado el año 1989 para conservar la fidelidad de la experiencia retro.
+- **Integraciones de Administración y Branding**:
+  - Modificación de `AppConfig.js` y `LogoComponent` para soportar las nuevas opciones `win311` y `unix89` en la configuración general del branding que define el administrador por defecto.
+  - Soporte e integración de las opciones en el panel de configuración de apariencia del administrador (`AdminAppearanceComponent`).
+
 ## [v1.6.16] - 2026-06-30
 
 ### Securización de Consola F12, Trazabilidad de Fallos de Checklist y Solución a Bloqueo Consecutivo

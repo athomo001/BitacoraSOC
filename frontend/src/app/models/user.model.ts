@@ -21,6 +21,7 @@ export interface User {
   mustChangePassword?: boolean;
   // Fecha de nacimiento / cumpleaños del usuario
   birthday?: Date | string;
+  preferredLoginTheme?: 'crt' | 'infoflow' | 'modern' | 'surrealism' | 'win311' | 'unix89' | null;
   createdAt: Date;
   updatedAt?: Date;
 }
@@ -66,6 +67,7 @@ export interface UpdateProfileRequest {
   email?: string;
   fullName?: string;
   theme?: Theme;
+  preferredLoginTheme?: 'crt' | 'infoflow' | 'modern' | 'surrealism' | 'win311' | 'unix89' | null;
   phone?: string;
   birthday?: string | Date;
   currentPassword?: string;

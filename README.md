@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.16**
+> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.17**
 
 Stack principal:
 
@@ -62,6 +62,13 @@ Stack principal:
 ---
 
 ## Novedades recientes (resumen rapido)
+
+### v1.6.17 (personalización de login por usuario, tema Windows 3.11 y Unix Terminal 1989)
+
+- **Selección de Temas de Login por Usuario**: Los usuarios ahora pueden elegir su propio estilo de pantalla de inicio de sesión desde su panel de Perfil, guardando su preferencia local (`localStorage`) y en la base de datos (se cargará al iniciar sesión). Lógica refactorizada en el frontend para alternar temas en caliente y limpiar animaciones de forma segura.
+- **Tema Windows 3.11**: Nuevo diseño retro inspirado en Windows for Workgroups v3.11. Cuenta con un escritorio clásico verde azulado (Teal), Program Manager de fondo, diálogos grises biselados en 3D clásico, botones clásicos e inputs hundidos para Login, MFA y Recuperación.
+- **Tema Unix Terminal (1989)**: Nuevo diseño retro plano CLI de Unix/Linux a finales de los 80s. Presenta un fondo negro, fuente de fósforo ámbar naranja de alta visibilidad, reloj de consola en tiempo real fijado en 1989 y la técnica de **Input Espejo** que dibuja el texto escrito y desplaza el cursor parpadeante retro hacia la derecha dinámicamente con cada carácter ingresado.
+- **Gestión SMTP y Branding**: Soporte para que el administrador configure `win311` y `unix89` como temas globales predeterminados desde los paneles de Branding y de Apariencia del Administrador.
 
 ### v1.6.16 (securización de consola, auditoría de fallos y fix de consecutividad)
 

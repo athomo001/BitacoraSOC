@@ -304,6 +304,7 @@ router.post('/login',
           cargoLabel: user.cargoLabel,
           role: user.role,
           theme: user.theme,
+          preferredLoginTheme: user.preferredLoginTheme,
           avatar: user.avatar,
           guestExpiresAt: user.guestExpiresAt,
           mustChangePassword: user.mustChangePassword,
@@ -793,6 +794,7 @@ router.post('/mfa/authenticate', async (req, res) => {
         cargoLabel: user.cargoLabel,
         role: user.role,
         theme: user.theme,
+        preferredLoginTheme: user.preferredLoginTheme,
         avatar: user.avatar,
         guestExpiresAt: user.guestExpiresAt,
         mustChangePassword: user.mustChangePassword,
@@ -891,6 +893,7 @@ router.post('/sso/google', async (req, res) => {
         cargoLabel: user.cargoLabel,
         role: user.role,
         theme: user.theme,
+        preferredLoginTheme: user.preferredLoginTheme,
         avatar: user.avatar,
         guestExpiresAt: user.guestExpiresAt
       }
@@ -980,6 +983,7 @@ router.post('/sso/microsoft', async (req, res) => {
         cargoLabel: user.cargoLabel,
         role: user.role,
         theme: user.theme,
+        preferredLoginTheme: user.preferredLoginTheme,
         avatar: user.avatar,
         guestExpiresAt: user.guestExpiresAt
       }

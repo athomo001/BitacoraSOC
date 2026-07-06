@@ -125,6 +125,21 @@
                 <mat-icon matSuffix>cake</mat-icon>
                 <mat-hint>Usada para felicitaciones automáticas</mat-hint>
               </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Tema de Login Preferido</mat-label>
+                <mat-select formControlName="preferredLoginTheme">
+                  <mat-option value="">Por defecto (Configurado por Admin)</mat-option>
+                  <mat-option value="modern">💻 Moderno / Split-Screen</mat-option>
+                  <mat-option value="crt">📟 Retro (CRT)</mat-option>
+                  <mat-option value="infoflow">🟢 Matrix / Cyber</mat-option>
+                  <mat-option value="surrealism">🌌 Surrealismo Digital</mat-option>
+                  <mat-option value="win311">🪟 Windows 3.11</mat-option>
+                  <mat-option value="unix89">📟 Unix Terminal (1989)</mat-option>
+                </mat-select>
+                <mat-icon matSuffix>login</mat-icon>
+                <mat-hint>Se aplicará al salir o iniciar sesión</mat-hint>
+              </mat-form-field>
             </div>
 
             <div class="form-actions">

@@ -236,6 +236,10 @@ export class AuthService {
   }
   private setUser(user: User): void {
     localStorage.setItem(this.USER_KEY, JSON.stringify(user));
+    // Comentario: Sincronizar el tema de login preferido del usuario en el almacenamiento local
+    if (user && user.preferredLoginTheme) {
+      localStorage.setItem('preferredLoginTheme', user.preferredLoginTheme);
+    }
   }
 
   private getUserFromStorage(): User | null {
