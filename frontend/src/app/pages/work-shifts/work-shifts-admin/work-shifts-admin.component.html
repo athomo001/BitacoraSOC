@@ -229,6 +229,18 @@
               </div>
 
 <ng-template #tableTemplate let-status="status">
+  <!-- Controles rápidos del acordeón de meses -->
+  <div class="accordion-controls" style="display: flex; gap: 8px; margin-bottom: 12px;">
+    <button mat-button type="button" (click)="expandAllMonths(status)" style="color: var(--primary-color); font-weight: 600; font-size: 13px;">
+      <mat-icon style="vertical-align: middle; margin-right: 4px; font-size: 18px; width: 18px; height: 18px;">unfold_more</mat-icon>
+      Expandir todos los meses
+    </button>
+    <button mat-button type="button" (click)="collapseAllMonths()" style="color: var(--text-secondary); font-weight: 600; font-size: 13px;">
+      <mat-icon style="vertical-align: middle; margin-right: 4px; font-size: 18px; width: 18px; height: 18px;">unfold_less</mat-icon>
+      Colapsar todos los meses
+    </button>
+  </div>
+
   <table class="detailed-table">
     <thead>
       <tr>
@@ -332,8 +344,44 @@
           </tr>
         </ng-container>
 
+        <!-- CASO 3: Es un separador visual de Mes (Acordeón e Importación/Borrado Masivo) -->
+        <tr *ngIf="row.isMonthSeparator" class="row-month-separator">
+          <td colspan="7">
+            <div class="month-sep-content" style="display: flex; align-items: center; gap: 10px;">
+              <!-- Botón interactivo para colapsar/expandir el mes -->
+              <button mat-icon-button type="button" (click)="toggleMonthExpansion(row.monthKey)" 
+                      style="width: 32px; height: 32px; line-height: 32px; color: var(--primary-color);">
+                <mat-icon style="font-size: 20px; width: 20px; height: 20px; vertical-align: middle;">
+                  {{ isMonthExpanded(row.monthKey) ? 'expand_less' : 'expand_more' }}
+                </mat-icon>
+              </button>
+
+              <!-- Checkbox para seleccionar/deseleccionar todas las asignaciones del mes -->
+              <mat-checkbox 
+                [checked]="isMonthSelected(row.monthKey, status)" 
+                (change)="toggleMonthSelection(row.monthKey, status, $event.checked)"
+                style="margin-right: 4px;">
+              </mat-checkbox>
+
+              <span class="month-label" style="cursor: pointer;" (click)="toggleMonthExpansion(row.monthKey)">
+                {{ row.label }}
+              </span>
+            </div>
+          </td>
+        </tr>
+
+        <!-- CASO 4: Es un separador visual de Semana -->
+        <tr *ngIf="row.isWeekSeparator" class="row-week-separator">
+          <td colspan="7">
+            <div class="week-sep-content">
+              <mat-icon>date_range</mat-icon>
+              <span>{{ row.label }}</span>
+            </div>
+          </td>
+        </tr>
+
         <!-- CASO 2: Es un registro individual regular -->
-        <tr *ngIf="!row.isGroup"
+        <tr *ngIf="!row.isGroup && !row.isMonthSeparator && !row.isWeekSeparator"
             [class.row-conflict]="hasRowConflict(row)"
             [class.row-editing]="editingWeeklyAssignmentId === row._id">
           <td style="text-align: center; vertical-align: middle;">

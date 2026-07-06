@@ -69,6 +69,9 @@ import { resolverCondicionVisible } from '../../../utils/work-shift-priority.uti
   styleUrls: ['./work-shifts-admin.component.scss']
 })
 export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
+  // Set de meses expandidos en el acordeón (por defecto colapsados)
+  expandedMonths = new Set<string>();
+
   // Turnos Operativos Diarios
   shifts: WorkShift[] = [];
   users: any[] = [];
@@ -1079,16 +1082,155 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     });
 
     // 4. Si es Pasado, limitar a un máximo de 4 registros/grupos
+    let listToProcess = grouped;
     if (status === 'Pasado') {
       // Ordenar pasados por fecha de inicio descendente para tomar los 4 más recientes
       grouped.sort((a, b) => new Date(b.weekStartDate).getTime() - new Date(a.weekStartDate).getTime());
-      const limited = grouped.slice(0, 4);
-      // Volver a ordenar cronológicamente ascendente para mantener consistencia
-      limited.sort((a, b) => new Date(a.weekStartDate).getTime() - new Date(b.weekStartDate).getTime());
-      return limited;
+      listToProcess = grouped.slice(0, 4);
     }
 
-    return grouped;
+    // Ordenar ascendentemente de forma estricta para garantizar la coherencia cronológica de los separadores
+    listToProcess.sort((a, b) => new Date(a.weekStartDate).getTime() - new Date(b.weekStartDate).getTime());
+
+    const resultWithSeparators: any[] = [];
+    let lastMonthKey = '';
+    let lastMondayKey = '';
+
+    const MONTH_NAMES = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+
+    // Función auxiliar para obtener la fecha del lunes de la semana correspondiente a una fecha dada
+    const getMondayDate = (d: Date): Date => {
+      const date = new Date(d);
+      const day = date.getDay();
+      const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(date.setDate(diff));
+      monday.setHours(0, 0, 0, 0);
+      return monday;
+    };
+
+    // Función auxiliar para formatear la fecha a formato DD/MM
+    const formatDateLabel = (d: Date): string => {
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      return `${day}/${month}`;
+    };
+
+    for (const item of listToProcess) {
+      const startDate = new Date(item.weekStartDate);
+      const year = startDate.getFullYear();
+      const monthIndex = startDate.getMonth();
+      const monthKey = `${year}-${monthIndex}`;
+
+      const monday = getMondayDate(startDate);
+      const mondayKey = monday.toISOString().split('T')[0];
+
+      // Insertar separador de Mes si cambia
+      if (monthKey !== lastMonthKey) {
+        lastMonthKey = monthKey;
+        lastMondayKey = ''; // Forzar el separador de semana para la primera semana del nuevo mes
+        resultWithSeparators.push({
+          _id: `month_sep_${monthKey}`,
+          isMonthSeparator: true,
+          monthKey: monthKey,
+          label: `${MONTH_NAMES[monthIndex]} ${year}`
+        });
+      }
+
+      // Si el mes está colapsado, no agregamos ni las semanas ni las asignaciones de este mes
+      if (!this.isMonthExpanded(monthKey)) {
+        continue;
+      }
+
+      // Insertar separador de Semana si cambia
+      if (mondayKey !== lastMondayKey) {
+        lastMondayKey = mondayKey;
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        resultWithSeparators.push({
+          _id: `week_sep_${mondayKey}`,
+          isWeekSeparator: true,
+          label: `Semana del ${formatDateLabel(monday)} al ${formatDateLabel(sunday)}`
+        });
+      }
+
+      resultWithSeparators.push(item);
+    }
+
+    return resultWithSeparators;
+  }
+
+  // ============ MÉTODOS DEL ACORDEÓN DE MESES Y SELECCIÓN MASIVA ============
+
+  // Alterna el estado de expansión de un mes
+  toggleMonthExpansion(monthKey: string): void {
+    if (this.expandedMonths.has(monthKey)) {
+      this.expandedMonths.delete(monthKey);
+    } else {
+      this.expandedMonths.add(monthKey);
+    }
+  }
+
+  // Verifica si un mes en particular está expandido
+  isMonthExpanded(monthKey: string): boolean {
+    return this.expandedMonths.has(monthKey);
+  }
+
+  // Expande todos los meses que tienen asignaciones en la pestaña actual
+  expandAllMonths(status: string): void {
+    const list = this.getFilteredWeeklyAssignments().filter(asg => this.getAssignmentStatus(asg) === status);
+    list.forEach(asg => {
+      const startDate = new Date(asg.weekStartDate);
+      const year = startDate.getFullYear();
+      const monthIndex = startDate.getMonth();
+      const monthKey = `${year}-${monthIndex}`;
+      this.expandedMonths.add(monthKey);
+    });
+  }
+
+  // Colapsa todos los meses
+  collapseAllMonths(): void {
+    this.expandedMonths.clear();
+  }
+
+  // Verifica si todas las asignaciones de un mes específico están seleccionadas
+  isMonthSelected(monthKey: string, status: string): boolean {
+    const monthAssignments = this.getAssignmentsByMonthKey(monthKey, status);
+    if (monthAssignments.length === 0) return false;
+    return monthAssignments.every(asg => this.selectedAssignmentIds.has(asg._id));
+  }
+
+  // Selecciona o deselecciona todas las asignaciones pertenecientes a un mes específico
+  toggleMonthSelection(monthKey: string, status: string, checked: boolean): void {
+    const monthAssignments = this.getAssignmentsByMonthKey(monthKey, status);
+    monthAssignments.forEach(asg => {
+      if (checked) {
+        this.selectedAssignmentIds.add(asg._id);
+      } else {
+        this.selectedAssignmentIds.delete(asg._id);
+      }
+    });
+  }
+
+  // Obtiene todas las asignaciones individuales (incluso dentro de grupos) de un mes y pestaña específicos
+  private getAssignmentsByMonthKey(monthKey: string, status: string): any[] {
+    const [year, monthStr] = monthKey.split('-');
+    const targetYear = parseInt(year, 10);
+    const targetMonth = parseInt(monthStr, 10);
+
+    const filtered = this.getFilteredWeeklyAssignments().filter(asg => this.getAssignmentStatus(asg) === status);
+    const list: any[] = [];
+
+    filtered.forEach(asg => {
+      const startDate = new Date(asg.weekStartDate);
+      if (startDate.getFullYear() === targetYear && startDate.getMonth() === targetMonth) {
+        list.push(asg);
+      }
+    });
+
+    return list;
   }
 
   // ============ GANTT VISUAL SEMANAL ============
