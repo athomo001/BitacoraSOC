@@ -1219,3 +1219,88 @@ mat-chip {
     }
   }
 }
+
+/* Estilos para separadores visuales cronológicos en el listado de turnos */
+.row-month-separator {
+  background: linear-gradient(90deg, rgba(21, 95, 80, 0.12) 0%, rgba(21, 95, 80, 0.02) 100%) !important;
+
+  td {
+    padding: 16px 20px !important;
+    border-bottom: 2px solid rgba(21, 95, 80, 0.25) !important;
+    border-left: 6px solid var(--primary-color) !important; /* Borde de realce izquierdo en la celda */
+  }
+
+  .month-sep-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--primary-color);
+    font-size: 16px; /* Aumentado para mayor legibilidad */
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+
+    mat-icon {
+      font-size: 22px;
+      width: 22px;
+      height: 22px;
+    }
+  }
+}
+
+.row-week-separator {
+  background: rgba(139, 195, 74, 0.06) !important;
+
+  td {
+    padding: 10px 24px !important;
+    border-bottom: 1px solid rgba(139, 195, 74, 0.15) !important;
+    border-left: 4px solid var(--accent-color) !important; /* Borde de realce izquierdo en la celda */
+  }
+
+  .week-sep-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-primary);
+    opacity: 0.9;
+    font-size: 13px; /* Aumentado ligeramente */
+    font-weight: 700;
+    font-style: italic;
+
+    mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+  }
+}
+
+/* Controles de expansión y colapso de acordeón */
+.accordion-controls {
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+  border: 1px solid var(--outline-subtle);
+  width: fit-content;
+
+  button {
+    transition: all 0.2s ease-in-out;
+    &:hover {
+      background: rgba(21, 95, 80, 0.08);
+    }
+  }
+}
+
+/* Ajustes de hover y transición para los elementos interactivos del mes */
+.row-month-separator {
+  .month-sep-content {
+    .month-label {
+      transition: color 0.15s ease-in-out;
+      &:hover {
+        color: var(--accent-color);
+      }
+    }
+  }
+}
+
+
