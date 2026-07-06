@@ -1092,6 +1092,11 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     // Ordenar ascendentemente de forma estricta para garantizar la coherencia cronológica de los separadores
     listToProcess.sort((a, b) => new Date(a.weekStartDate).getTime() - new Date(b.weekStartDate).getTime());
 
+    // Desactivamos la lógica de acordeón y separadores visuales únicamente en la pestaña "En Curso"
+    if (status === 'En Curso') {
+      return listToProcess;
+    }
+
     const resultWithSeparators: any[] = [];
     let lastMonthKey = '';
     let lastMondayKey = '';

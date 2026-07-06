@@ -230,7 +230,7 @@
 
 <ng-template #tableTemplate let-status="status">
   <!-- Controles rápidos del acordeón de meses -->
-  <div class="accordion-controls" style="display: flex; gap: 8px; margin-bottom: 12px;">
+  <div *ngIf="status !== 'En Curso'" class="accordion-controls" style="display: flex; gap: 8px; margin-bottom: 12px;">
     <button mat-button type="button" (click)="expandAllMonths(status)" style="color: var(--primary-color); font-weight: 600; font-size: 13px;">
       <mat-icon style="vertical-align: middle; margin-right: 4px; font-size: 18px; width: 18px; height: 18px;">unfold_more</mat-icon>
       Expandir todos los meses
