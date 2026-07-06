@@ -526,9 +526,10 @@ export class EscalationSimpleComponent implements OnInit {
     const futureVacations$ = this.escalationService.getAssignments('VACATION', this.currentWeekStart.toISOString(), undefined, 100);
     const futureMedicalLeaves$ = this.escalationService.getAssignments('MEDICAL_LEAVE', this.currentWeekStart.toISOString(), undefined, 100);
     const futureMedicalAppointments$ = this.escalationService.getAssignments('MEDICAL_APPOINTMENT', this.currentWeekStart.toISOString(), undefined, 100);
+    const users$ = this.escalationService.getUsers();
 
-    forkJoin([assignments$, futureVacations$, futureMedicalLeaves$, futureMedicalAppointments$]).subscribe({
-      next: ([assignments, futureVacations, futureMedicalLeaves, futureMedicalAppointments]) => {
+    forkJoin([assignments$, futureVacations$, futureMedicalLeaves$, futureMedicalAppointments$, users$]).subscribe({
+      next: ([assignments, futureVacations, futureMedicalLeaves, futureMedicalAppointments, users]) => {
         const now = new Date();
         // Se determina si la asignación está activa en la semana consultada y no ha finalizado en tiempo real
         const isAssignmentActiveInWeek = (asg: any): boolean => {
@@ -613,15 +614,20 @@ export class EscalationSimpleComponent implements OnInit {
               startDate: new Date(asg.weekStartDate),
               endDate: new Date(asg.weekEndDate)
             });
-
-            // No agregamos al set processedUserIds para evitar excluir sus turnos activos (como teletrabajo) de la semana actual
-            // if (userIdStr) processedUserIds.add(String(userIdStr));
-            // if (extIdStr) processedExtIds.add(String(extIdStr));
           }
         });
 
-        // 3. Procesar asignaciones regulares (Teletrabajo y Oficina) de la semana actual
-        assignments.forEach(asg => {
+        // 3. Procesar asignaciones regulares (Teletrabajo y Guardia) de la semana actual
+        // Ordenamos las asignaciones de modo que Teletrabajo (TELEWORK) y Capacitación (OL) se procesen primero,
+        // evitando que la guardia operativa (N2/N1_NO_HABIL) marque al usuario como "En Oficina" y tape su estado real.
+        const getPriorityScore = (roleCode: string): number => {
+          if (roleCode === 'TELEWORK') return 1;
+          if (roleCode === 'OL') return 2;
+          return 3;
+        };
+        const sortedAssignments = [...assignments].sort((a, b) => getPriorityScore(a.roleCode) - getPriorityScore(b.roleCode));
+
+        sortedAssignments.forEach(asg => {
           // Verifica que el teletrabajo o labor regular esté activo durante la semana
           if (!isAssignmentActiveInWeek(asg)) return;
 
@@ -657,13 +663,13 @@ export class EscalationSimpleComponent implements OnInit {
               email: personEmail,
               role: roleName,
               status: 'training',
-              statusLabel: 'En Charla/Capacitacion (Fuera de oficina)',
+              statusLabel: 'En Charla/Capacitación (Fuera de oficina)',
               startDate: new Date(asg.weekStartDate),
               endDate: new Date(asg.weekEndDate)
             });
             if (userIdStr) processedUserIds.add(String(userIdStr));
             if (extIdStr) processedExtIds.add(String(extIdStr));
-          } else if (asg.roleCode !== 'VACATION' && asg.roleCode !== 'MEDICAL_LEAVE') {
+          } else if (asg.roleCode !== 'VACATION' && asg.roleCode !== 'MEDICAL_LEAVE' && asg.roleCode !== 'MEDICAL_APPOINTMENT') {
             // Analistas regulares en oficina
             list.push({
               name: personName,
@@ -679,6 +685,28 @@ export class EscalationSimpleComponent implements OnInit {
             if (extIdStr) processedExtIds.add(String(extIdStr));
           }
         });
+
+        // 4. Completar con los analistas activos que no tienen ningún turno especial configurado para esta semana.
+        // Deben aparecer listados como "En Oficina" por defecto. Excluimos invitados y auditores.
+        if (Array.isArray(users)) {
+          users.forEach(u => {
+            if (u.role === 'guest' || u.role === 'auditor') return;
+            const userIdStr = String(u._id);
+            if (processedUserIds.has(userIdStr)) return;
+
+            list.push({
+              name: u.name || u.fullName || 'Sin asignar',
+              phone: u.phone || '-',
+              email: u.email || '-',
+              role: u.cargoLabel || 'Analista',
+              status: 'office',
+              statusLabel: 'En Oficina',
+              startDate: null,
+              endDate: null
+            });
+            processedUserIds.add(userIdStr);
+          });
+        }
 
         // Orden estricto: Vacaciones (0) -> Pronto Vacaciones (1) -> Teletrabajo (2) -> Charla/Capacitacion (3) -> Oficina (4)
         const order: { [key: string]: number } = {

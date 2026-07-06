@@ -1790,21 +1790,8 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
   getFilteredWeeklyAssignments(): any[] {
     let result = [...this.weeklyAssignments];
 
-    // Filtrar para ocultar turnos que están tapados por licencias médicas o vacaciones (inclusivo)
-    result = result.filter(asg => {
-      const userId = asg.userId?._id || asg.userId;
-      const extId = asg.externalPersonId?._id || asg.externalPersonId;
-      const start = new Date(asg.weekStartDate);
-      const end = new Date(asg.weekEndDate);
-
-      const priorityRole = resolverCondicionVisible(this.weeklyAssignments, userId, extId, start, end);
-
-      // Si hay una condición de mayor prioridad en este rango y no coincide con el registro actual, se oculta
-      if (priorityRole && priorityRole !== asg.roleCode) {
-        return false;
-      }
-      return true;
-    });
+    // En el panel de administración no ocultamos ninguna asignación (incluso si hay solapamientos de prioridades como Teletrabajo y Trámite Médico)
+    // para permitir que el administrador visualice y gestione el inventario completo de turnos en el sistema.
 
     if (this.filterAnalyst) {
       const q = this.filterAnalyst.toLowerCase().trim();
