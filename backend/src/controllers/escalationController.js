@@ -1982,7 +1982,20 @@ exports.importAssignmentsCsv = async (req, res) => {
           externalPersonId: assignee.externalPersonId
         };
 
-        const existing = await findAssignmentConflict({ roleCode, weekStartDate, weekEndDate });
+        // Para roles no exclusivos (como Teletrabajo), evitamos duplicar la asignación exacta del mismo analista en el mismo rango de tiempo
+        let existing = null;
+        if (NON_EXCLUSIVE_ASSIGNMENT_ROLE_CODES.includes(roleCode)) {
+          existing = await ShiftAssignment.findOne({
+            roleCode,
+            weekStartDate,
+            weekEndDate,
+            ...assigneeFilter,
+            isPaused: { $ne: true }
+          });
+        } else {
+          existing = await findAssignmentConflict({ roleCode, weekStartDate, weekEndDate });
+        }
+
         let savedAssignment = null;
         if (existing) {
           savedAssignment = await ShiftAssignment.findByIdAndUpdate(existing._id, payload, { new: true, runValidators: true });
