@@ -67,24 +67,32 @@ function initEscalationScheduleScheduler() {
       if (activeSchedules.length === 0) return;
 
       const now = new Date();
-      const currentDay = now.getDay(); // 0-6 (Domingo-Sábado)
-      const currentTime = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); // "HH:mm"
+      
+      // Obtener el día de la semana, día del mes y la hora actual en formato de 24 horas forzando la zona horaria de Chile (America/Santiago)
+      const currentDay = parseInt(now.toLocaleDateString('en-US', { timeZone: 'America/Santiago', weekday: 'numeric' }), 10); // 0 (Domingo) a 6 (Sábado)
+      const currentMonthDay = parseInt(now.toLocaleDateString('en-US', { timeZone: 'America/Santiago', day: 'numeric' }), 10);
+      const currentTime = now.toLocaleTimeString('en-GB', { 
+        timeZone: 'America/Santiago', 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      }); // Formato HH:mm estable de 24 horas
 
       for (const schedule of activeSchedules) {
         // Verificar si coincide el día y la hora
         const dayMatches = schedule.frequency === 'monthly'
-          ? now.getDate() === 1 // Primer día del mes
+          ? currentMonthDay === 1 // Primer día del mes
           : currentDay === schedule.dayOfWeek;
 
         const timeMatches = currentTime === schedule.time;
 
         if (dayMatches && timeMatches) {
-          // Verificar si ya se envió hoy (evitar múltiples envíos en el mismo minuto)
-          const lastSentAt = schedule.lastSentAt;
-          const alreadySentToday = lastSentAt && 
-            lastSentAt.getDate() === now.getDate() && 
-            lastSentAt.getMonth() === now.getMonth() &&
-            lastSentAt.getFullYear() === now.getFullYear();
+          // Verificar si ya se envió hoy (evitar múltiples envíos en el mismo minuto) comparando la fecha en la zona horaria chilena
+          let alreadySentToday = false;
+          if (schedule.lastSentAt) {
+            const lastSentDateStr = new Date(schedule.lastSentAt).toLocaleDateString('en-US', { timeZone: 'America/Santiago' });
+            const nowDateStr = now.toLocaleDateString('en-US', { timeZone: 'America/Santiago' });
+            alreadySentToday = lastSentDateStr === nowDateStr;
+          }
 
           if (alreadySentToday) continue;
 
