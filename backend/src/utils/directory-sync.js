@@ -7,6 +7,8 @@
 const DirectoryContact = require('../models/DirectoryContact');
 const { sha256 } = require('./encryption');
 
+const USER_SOURCE = 'User';
+
 const isEmptyLike = (value = '') => {
   const normalized = String(value || '').trim().toLowerCase();
   if (!normalized) {
@@ -22,6 +24,8 @@ const sanitize = (value, max = 180) => {
   const normalized = String(value ?? '').trim().slice(0, max);
   return isEmptyLike(normalized) ? '' : normalized;
 };
+
+const normalizeEmail = (value = '') => sanitize(value, 180).toLowerCase();
 
 const resolveDirectoryType = (payload = {}) => {
   if (payload.type && ['Internal', 'External', 'List'].includes(payload.type)) {
@@ -82,7 +86,7 @@ const syncDirectoryContact = async (payload = {}) => {
 
   const normalized = {
     name,
-    email: sanitize(payload.email, 180).toLowerCase(),
+    email: normalizeEmail(payload.email),
     emailHash: payload.email ? sha256(payload.email) : '',
     phone: sanitize(payload.phone, 80),
     phoneHash: payload.phone ? sha256(payload.phone) : '',
@@ -114,6 +118,41 @@ const syncDirectoryContact = async (payload = {}) => {
   }
 
   return result;
+};
+
+const removeDirectoryContactsForUser = async (userLike = {}) => {
+  const email = normalizeEmail(userLike.email);
+  if (!email) {
+    return 0;
+  }
+
+  const result = await DirectoryContact.deleteMany({
+    source: USER_SOURCE,
+    emailHash: sha256(email)
+  });
+
+  return Number(result?.deletedCount || 0);
+};
+
+const purgeStaleUserDirectoryContacts = async (activeUsers = []) => {
+  const activeEmailHashes = activeUsers
+    .map((user) => normalizeEmail(user?.email))
+    .filter((email) => Boolean(email))
+    .map((email) => sha256(email));
+
+  const staleFilter = activeEmailHashes.length > 0
+    ? {
+      source: USER_SOURCE,
+      $or: [
+        { emailHash: { $exists: false } },
+        { emailHash: '' },
+        { emailHash: { $nin: activeEmailHashes } }
+      ]
+    }
+    : { source: USER_SOURCE };
+
+  const result = await DirectoryContact.deleteMany(staleFilter);
+  return Number(result?.deletedCount || 0);
 };
 
 const syncManyDirectoryContacts = async (contacts = []) => {
@@ -394,5 +433,7 @@ const mergeDirectoryDuplicates = async () => {
 module.exports = {
   syncDirectoryContact,
   syncManyDirectoryContacts,
-  mergeDirectoryDuplicates
+  mergeDirectoryDuplicates,
+  removeDirectoryContactsForUser,
+  purgeStaleUserDirectoryContacts
 };

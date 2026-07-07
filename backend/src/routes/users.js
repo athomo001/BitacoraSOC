@@ -18,7 +18,7 @@ const { audit } = require('../utils/audit');
 const { logger } = require('../utils/logger');
 const { sendEmail } = require('../utils/email');
 const { getBrandingSnapshot, getAppTitleForText } = require('../utils/branding');
-const { syncDirectoryContact } = require('../utils/directory-sync');
+const { syncDirectoryContact, removeDirectoryContactsForUser } = require('../utils/directory-sync');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
@@ -699,7 +699,11 @@ router.put('/:id',
         return res.status(404).json({ message: 'Usuario no encontrado' });
       }
 
-      await syncUserAsDirectoryInternal(user);
+      if (user.isActive === false) {
+        await removeDirectoryContactsForUser(user);
+      } else {
+        await syncUserAsDirectoryInternal(user);
+      }
 
       await audit(req, {
         event: 'admin.users.update',
@@ -762,6 +766,8 @@ router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'Usuario no encontrado' });
     }
+
+    await removeDirectoryContactsForUser(user);
 
     await audit(req, {
       event: 'admin.users.delete',
