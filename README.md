@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.17**
+> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.18**
 
 Stack principal:
 
@@ -30,7 +30,7 @@ Stack principal:
 - **Celebración de Cumpleaños**: Mapeo diario automático de cumpleaños de analistas del SOC con felicitaciones estructuradas y envío de imágenes kawaii embebidas en línea (CID).
 - **Seguridad y Acceso Robusto**:
   - Soporte de Doble Factor de Autenticación (TOTP - Google Authenticator, Authy, etc.).
-  - Integración Single Sign-On (SSO) referencial mediante Google y Microsoft Azure AD *(módulo base implementado; requiere validación, credenciales de API del proveedor y pruebas de configuración en producción)*.
+  - Integración Single Sign-On (SSO) referencial mediante Google y Microsoft Azure AD _(módulo base implementado; requiere validación, credenciales de API del proveedor y pruebas de configuración en producción)_.
   - Consola de gestión HTTPS con inyección y rotación de certificados TLS sin detención del servicio (0-Downtime).
 - **Estadísticas y Reportes Automatizados**: Generación de informes ejecutivos e indicadores de uso basados en las entradas de la bitácora para evaluar la actividad y el cumplimiento operacional del equipo.
 - **Resiliencia con Backups Cifrados**: Creación y restauración de copias de seguridad de la base de datos MongoDB y evidencias de disco con empaquetado cifrado por contraseña descargable desde la UI.
@@ -63,62 +63,19 @@ Stack principal:
 
 ## Novedades recientes (resumen rapido)
 
+### v1.6.18 (acordeón de meses en turnos, visualización completa en admin, correcciones de escalación y huso horario)
+
+- **Acordeón de Meses y Selección Masiva**: Introducción de acordeones de meses colapsados por defecto en las pestañas "Próximo" y "Pasado" del administrador de turnos para optimizar espacio, junto con botones para expandir/colapsar todo y checkboxes mensuales de selección masiva para borrado rápido. Diseño de celdas ultra compactas y alineación del botón mediante `inline-flex`.
+- **Transparencia en Consola de Administración**: Eliminación de los filtros por prioridad en el listado del administrador. Esto garantiza que el administrador pueda visualizar y gestionar la totalidad de las asignaciones de turnos (trámites médicos, capacitaciones, etc.) sin que se oculten por superposiciones.
+- **Visualización Completa en Escalación Simple**: Ajuste al listado semanal de analistas para listar automáticamente a todo el personal activo que no tiene programada ninguna ausencia especial como "En Oficina" por defecto. Adicionalmente, se priorizó el renderizado de estados de Teletrabajo y Capacitación para evitar que queden solapados por roles de guardia de oficina.
+- **Corrección de Huso Horario de Envío**: Forzado estricto de la zona horaria chilena (`America/Santiago`) en los cálculos del programador automatizado (`escalationScheduleScheduler.js`), previniendo desfases horarios al enviar alertas desde servidores alojados con hora UTC.
+
 ### v1.6.17 (personalización de login por usuario, tema Windows 3.11 y Unix Terminal 1989)
 
 - **Selección de Temas de Login por Usuario**: Los usuarios ahora pueden elegir su propio estilo de pantalla de inicio de sesión desde su panel de Perfil, guardando su preferencia local (`localStorage`) y en la base de datos (se cargará al iniciar sesión). Lógica refactorizada en el frontend para alternar temas en caliente y limpiar animaciones de forma segura.
 - **Tema Windows 3.11**: Nuevo diseño retro inspirado en Windows for Workgroups v3.11. Cuenta con un escritorio clásico verde azulado (Teal), Program Manager de fondo, diálogos grises biselados en 3D clásico, botones clásicos e inputs hundidos para Login, MFA y Recuperación.
 - **Tema Unix Terminal (1989)**: Nuevo diseño retro plano CLI de Unix/Linux a finales de los 80s. Presenta un fondo negro, fuente de fósforo ámbar naranja de alta visibilidad, reloj de consola en tiempo real fijado en 1989 y la técnica de **Input Espejo** que dibuja el texto escrito y desplaza el cursor parpadeante retro hacia la derecha dinámicamente con cada carácter ingresado.
 - **Gestión SMTP y Branding**: Soporte para que el administrador configure `win311` y `unix89` como temas globales predeterminados desde los paneles de Branding y de Apariencia del Administrador.
-
-### v1.6.16 (securización de consola, auditoría de fallos y fix de consecutividad)
-
-- **Securización de Consola**: Silenciado de `console.log/info/debug` en producción y envoltura diagnóstica robusta y sanitizada de `console.error` para impedir fugas de tokens o contraseñas.
-- **Trazabilidad de Fallos de Checklist**: Las validaciones de negocio en el backend y errores del servidor ahora registran eventos `'shiftcheck.submit.fail'` en `AuditLog` con motivos detallados, y la interfaz los visualiza de forma humana y estructurada.
-- **Fix de Consecutividad**: Reducción de la ventana de validación de consecutivos (`inicio`/`cierre`) a las últimas 18 horas, solucionando los bloqueos por históricos obsoletos en turnos indefinidos (`null`).
-- **Fix de Construcción en Docker**: Incorporación de un archivo `.dockerignore` global en la raíz del proyecto para evitar errores de colisión por archivos locales (`node_modules` del host) en compilaciones multi-contenedor (BuildKit overlayfs) y habilitación de su seguimiento en Git eliminando la regla excluyente en `.gitignore`.
-
-### v1.6.15 (gestión avanzada de turnos, cobertura N2, pausas por vacaciones y borrado masivo)
-
-- **Solapamientos Inclusivos**: Modificación a rango inclusivo (`$lte`/`$gte` y `<=`/`>=`) en colisión de turnos para mayor seguridad operacional.
-- **Pausas por Vacaciones**: Soporte de pausas automáticas para turnos regulares en lugar de eliminación ante vacaciones del analista, y restauración dinámica al editar/eliminar.
-- **Borrado Masivo**: Endpoint en backend y checkboxes de selección múltiple con botón de borrado masivo en UI.
-- **Correcciones en Correos Automáticos**: Solución al descarte destructivo de múltiples turnos por analista en la semana, alineación del periodo de guardia semanal a lunes 09:00 - lunes 08:59:59 (evita listar turnos ya terminados), exclusión por privacidad de analistas de licencia/vacaciones en reportes de guardia generales, y reporte dinámico de ausencias solo si el filtro de notificaciones lo solicita activamente.
-- **Identificación por Colores en Panel**: Diseño y aplicación de badges dinámicos con colores de alto contraste (**rojo** para Licencia Médica, **naranja** para Vacaciones, **verde** para Teletrabajo y **púrpura** para Trámite Médico) para agilizar la detección visual del estado de la dotación SOC.
-- **Rotación y Retención de Backups**: Implementación de retención por cantidad máxima de respaldos (por defecto 10) que ordena cronológicamente los backups físicos y purga los excedentes del servidor para evitar el consumo de espacio de disco.
-- **Filtro Selectivo de Especialista TI**: Separación del rol `TI` (Especialista TI) de la Guardia general en la configuración de notificaciones, permitiendo al administrador elegir si notificarlo o no, apagado por defecto.
-- **Listado de Teletrabajo**: Corrección al listado para que ausencias futuras no impidan visualizar el teletrabajo de la semana en curso.
-- **Rediseño UI/UX de Turnos**: Organización de turnos por ciclo de vida (`En Curso`, `Próximo` y `Pasado`), acordeón plegable para consolidar teletrabajos consecutivos, y sub-filas dinámicas para enlazar licencias médicas/vacaciones con su reemplazo N2 activo, incluyendo alertas en rojo si el turno queda descubierto.
-- **Optimización de Histórico**: Límite visual de 4 registros históricos de turnos pasados en el panel para evitar abultar la interfaz.
-
-### v1.6.14 (corrección de CSV, solapamientos y scroll de turnos)
-
-- **Importación de CSV**: Corrección al procesar líneas comentadas que vienen con comillas dobles, evitando el error 400 Bad Request.
-- **Sobrescritura Automática**: Modificación de la detección de colisiones a solapamiento real. Las nuevas asignaciones sobrescriben turnos en conflicto del mismo rol exclusivo.
-- **Scroll en Proximidad**: Incorporación de scroll vertical en el listado lateral de turnos para mejorar el diseño en pantallas de administración.
-- **Tooltip de Conflicto**: Solución al nombre de analista vacío en los mensajes de advertencia del frontend.
-- **Alineación de Acciones**: Centrado geométrico de los iconos en los botones de acción (`mat-icon-button`) para coincidir exactamente con el ripple/hover circular, e incremento de separación (`gap: 12px`) para prevenir eliminaciones accidentales.
-
-### v1.6.13 (automatización de turnos, envío de pruebas, dinámicos en correo y trámite médico)
-
-- **Condición Trámite Médico**: Se añade compatibilidad no destructiva en backend y frontend para la condición "Trámite Médico" (`MEDICAL_APPOINTMENT`), diferenciándola de "Licencia médica".
-- **Prueba de Correo**: Panel interactivo `🧪 Probar Envío de Correo` en `/main/admin/work-shifts` para validar el correo del formulario en pantalla sin persistir el envío.
-- **Formato de Correo de Turnos**: Reemplazo de los badges `"EN TURNO"` / `"PRÓXIMO"` por badges dinámicos con colores premium específicos del rol/concepto para esa semana. Cabecera dinámica derecha agrupada en `"GUARDIA"` y resto de conceptos para evitar repetición.
-- **Correcciones Visuales**: Solución a la interferencia y desplazamiento de hitboxes en acciones de turnos y sincronización de nuevos iconos (Birrete 🎓, Curita 🩹, Cruz Roja 🏥).
-
-### v1.6.12 (empresa automática en usuarios y condición Charla/Capacitación OL)
-
-- **Auto-Población de Empresa**: Sincronización automática de empresa desde el cliente por defecto asignado globalmente al crear o editar usuarios internos.
-- **Condición OL**: Soporte completo para "Charla/Capacitación (OL)" en turnos, reportes y CSV.
-
-### v1.6.11 (fix de creación consecutiva de usuarios)
-
-- **Fix de Validación**: Corrección del error `400 Bad Request` al registrar consecutivamente usuarios internos en la UI por remanentes nulos en el campo de teléfono.
-
-### v1.6.10 (confirmación visual mejorada y notificación de cambio de contraseña a usuarios internos)
-
-- **Diálogo de Confirmación Bonito**: Rediseño del componente de confirmación con ícono contextual, tipografía clara, botones visibles y bloqueo de cierre accidental. Reemplaza completamente los `alert()` nativos de JavaScript.
-- **Mensaje Explícito de Forzado Masivo**: El diálogo de confirmación en `/main/admin/users` ahora comunica que se enviará correo a todos los usuarios internos. Botón: "Sí, Forzar y Notificar".
-- **Notificación por Correo a Usuarios Internos**: Cuando el administrador ejecuta "Forzar Cambio Masivo", el sistema envía automáticamente un correo individual a cada usuario interno activo (admin, user, auditor) informando que debe cambiar su contraseña en el próximo ingreso. Se registran métricas de envío en auditoría (enviados, fallidos).
 
 ### Estado IA local
 

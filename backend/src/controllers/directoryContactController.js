@@ -11,7 +11,12 @@ const RaciEntry = require('../models/RaciEntry');
 const CatalogLogSource = require('../models/CatalogLogSource');
 const User = require('../models/User');
 const AppConfig = require('../models/AppConfig');
-const { syncManyDirectoryContacts, mergeDirectoryDuplicates, syncDirectoryContact } = require('../utils/directory-sync');
+const {
+  syncManyDirectoryContacts,
+  mergeDirectoryDuplicates,
+  syncDirectoryContact,
+  purgeStaleUserDirectoryContacts
+} = require('../utils/directory-sync');
 const { audit } = require('../utils/audit');
 const { logger } = require('../utils/logger');
 const { sha256 } = require('../utils/encryption');
@@ -515,6 +520,7 @@ exports.rebuildDirectoryFromEscalation = async (req, res) => {
     });
 
     await syncManyDirectoryContacts(payload);
+    await purgeStaleUserDirectoryContacts(users);
 
     const total = await DirectoryContact.countDocuments();
     await audit(req, {
@@ -655,6 +661,8 @@ exports.syncUsersToDirectoryNow = async (req, res) => {
       }
     }
 
+    const removedCount = await purgeStaleUserDirectoryContacts(internalUsers);
+
     await audit(req, {
       event: 'directory.central.sync_users_to_directory',
       result: { success: true },
@@ -662,6 +670,7 @@ exports.syncUsersToDirectoryNow = async (req, res) => {
         totalUsers: internalUsers.length,
         syncedCount,
         errorCount,
+        removedCount,
         defaultCompany: defaultCompany || '(ninguna)'
       }
     });
@@ -671,6 +680,7 @@ exports.syncUsersToDirectoryNow = async (req, res) => {
       totalUsers: internalUsers.length,
       syncedCount,
       errorCount,
+      removedCount,
       defaultCompany: defaultCompany || '(ninguna)'
     });
   } catch (error) {

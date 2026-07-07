@@ -2,6 +2,25 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.18] - 2026-07-06
+
+### Acordeón de Meses, Visibilidad Administrativa Completa, Lógica de Escalación Simple y Corrección de Zona Horaria
+
+- **Acordeón de Meses e Interactividad**:
+  - Implementación de un acordeón colapsable por mes para las pestañas "Próximo" y "Pasado" en `work-shifts-admin.component.ts` y `work-shifts-admin.component.html`.
+  - Los meses aparecen colapsados por defecto para optimizar espacio en pantalla.
+  - Incorporación de botones de control superior rápido para "Expandir todos los meses" y "Colapsar todos los meses".
+  - Checkbox en el encabezado mensual que permite la selección masiva de asignaciones para un borrado rápido.
+  - Diseño de celdas ultra compactas y clase `.toggle-month-btn` con `inline-flex` en `work-shifts-admin.component.scss` para centrar milimétricamente el icono de flechita y prevenir falsos clics.
+  - Restricción del acordeón a la pestaña "En Curso" (se visualiza en su formato plano original).
+- **Visibilidad Completa de Turnos**:
+  - Remoción del filtro de prioridades restrictivas `resolverCondicionVisible` en la consulta administrativa de asignaciones en `work-shifts-admin.component.ts`. Ahora el administrador visualiza la totalidad de los turnos registrados (capacitaciones, trámites médicos, vacaciones, licencias médicas, teletrabajos) sin que se oculten por solapamientos.
+- **Mejoras en Vista Simple de Escalación**:
+  - Modificación de `loadTeleworkStaff` en `escalation-simple.component.ts` para consultar la lista de todos los usuarios del sistema. Los analistas activos que no posean turnos especiales asignados en la semana se listan automáticamente en el estado "En Oficina" por defecto.
+  - Priorización en el procesamiento de turnos de "Charla/Capacitación (OL)" y "Teletrabajo (TELEWORK)" sobre guardias regulares de oficina para evitar que se pisen visualmente.
+- **Corrección de Huso Horario en Scheduler**:
+  - Actualización del planificador en `escalationScheduleScheduler.js` forzando el huso horario oficial chileno `America/Santiago` al calcular la hora (`currentTime`), día de la semana (`currentDay`), día del mes y al comparar el último envío diario (`alreadySentToday`), inmunizando el sistema ante la zona horaria UTC del servidor de backend.
+
 ## [v1.6.17] - 2026-07-03
 
 ### Personalización de Temas de Login por Usuario y Nuevos Temas Retro (Windows 3.11 y Unix Terminal 1989)
