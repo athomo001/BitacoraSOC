@@ -21,39 +21,47 @@
       <!-- Corrección ortográfica: tilde agregada en dinámico -->
       <h4>Flujo dinámico configurado</h4>
 
-      <div *ngIf="flowSteps.length > 0" class="preview-flow-grid">
-        <article *ngFor="let step of flowSteps; let index = index" class="preview-step-card">
-          <header>
-            <strong>{{ step.title || ('Paso ' + (index + 1)) }}</strong>
-            <small>Paso {{ step.order || index + 1 }}</small>
-          </header>
+      <div *ngIf="flowSteps.length > 0" class="preview-flow-wrapper">
+        <ng-container *ngFor="let step of flowSteps; let index = index; let last = last">
+          <article class="preview-step-card">
+            <header>
+              <strong>{{ step.title || ('Paso ' + (index + 1)) }}</strong>
+              <small>Paso {{ step.order || index + 1 }}</small>
+            </header>
 
-          <div *ngIf="step.type === 'unique'" class="preview-unique-row">
-            <div><strong>{{ step.contactName || 'Sin nombre' }}</strong></div>
-            <!-- Corrección ortográfica: tilde agregada en teléfono -->
-            <div>{{ step.contactTel || 'Sin teléfono' }}</div>
-            <div *ngIf="step.callAt">{{ formatDateTime(step.callAt) }}</div>
-          </div>
+            <div *ngIf="step.type === 'unique'" class="preview-unique-row">
+              <div><strong>{{ step.contactName || 'Sin nombre' }}</strong></div>
+              <!-- Corrección ortográfica: tilde agregada en teléfono -->
+              <div>{{ step.contactTel || 'Sin teléfono' }}</div>
+              <div *ngIf="step.callAt">{{ formatDateTime(step.callAt) }}</div>
+            </div>
 
-          <div *ngIf="step.type === 'pool'" class="preview-pool-table-wrap">
-            <table class="preview-pool-table">
-              <thead>
-                <tr>
-                  <th>Nombre</th>
-                  <!-- Corrección ortográfica: tilde agregada en Teléfono -->
-                  <th>Teléfono</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let person of step.contacts || []">
-                  <td>{{ person.name || 'Sin nombre' }}</td>
-                  <!-- Corrección ortográfica: tilde agregada en teléfono -->
-                  <td>{{ person.tel || 'Sin teléfono' }}</td>
-                </tr>
-              </tbody>
-            </table>
+            <div *ngIf="step.type === 'pool'" class="preview-pool-table-wrap">
+              <table class="preview-pool-table">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <!-- Corrección ortográfica: tilde agregada en Teléfono -->
+                    <th>Teléfono</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let person of step.contacts || []">
+                    <td>{{ person.name || 'Sin nombre' }}</td>
+                    <!-- Corrección ortográfica: tilde agregada en teléfono -->
+                    <td>{{ person.tel || 'Sin teléfono' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <!-- Indicador visual de la dirección del flujo de escalación -->
+          <div *ngIf="!last" class="flow-arrow-container">
+            <mat-icon class="arrow-horizontal" aria-hidden="true">arrow_forward</mat-icon>
+            <mat-icon class="arrow-vertical" aria-hidden="true">arrow_downward</mat-icon>
           </div>
-        </article>
+        </ng-container>
       </div>
 
       <!-- Corrección ortográfica: tilde agregada en dinámico -->
