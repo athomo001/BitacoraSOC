@@ -18,6 +18,8 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { AuditLogDetailDialogComponent } from './audit-log-detail-dialog.component';
 import { AuthService } from '../../../services/auth.service';
 import { OnboardingService } from '../../../services/onboarding.service';
 import { AuditLogService } from '../../../services/audit-log.service';
@@ -38,7 +40,8 @@ import { AuditLog, AuditLogFilters } from '../../../models/audit-log.model';
     MatIconModule,
     MatChipsModule,
     MatTooltipModule,
-    MatProgressBarModule
+    MatProgressBarModule,
+    MatDialogModule
   ],
   templateUrl: './audit-logs.component.html',
   styleUrls: ['./audit-logs.component.scss']
@@ -79,7 +82,8 @@ export class AuditLogsComponent implements OnInit {
     private fb: FormBuilder,
     private snackBar: MatSnackBar,
     private authService: AuthService,
-    private onboardingService: OnboardingService
+    private onboardingService: OnboardingService,
+    private dialog: MatDialog
   ) {
     this.filterForm = this.fb.group({
       search: [''],
@@ -780,6 +784,24 @@ export class AuditLogsComponent implements OnInit {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit'
+    });
+  }
+
+  /**
+   * Abre el modal de diálogo con el detalle completo del log de auditoría.
+   * @param log Log de auditoría seleccionado.
+   */
+  openLogDetails(log: AuditLog): void {
+    this.dialog.open(AuditLogDetailDialogComponent, {
+      width: '750px',
+      maxWidth: '90vw',
+      data: {
+        log,
+        formattedDate: this.formatDate(log.timestamp),
+        reasonText: this.getReasonText(log),
+        categoryLabel: this.getActionCategoryLabel(log),
+        actionType: this.getActionType(log)
+      }
     });
   }
 }

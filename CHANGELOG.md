@@ -14,6 +14,10 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 * **Registro de Auditoría de API (Logs en Tiempo Real):**
   * Interceptación asíncrona del ciclo de respuesta para guardar IP, endpoint, método, estado HTTP y detalles en base de datos sin afectar la latencia del cliente.
   * Vista de logs en tiempo real integrada en el panel administrativo del SOC con paginación interactiva.
+* **Visualización de Logs de Auditoría Extendida:**
+  * Diálogo detallado `AuditLogDetailDialogComponent` para leer logs extensos y metadatos JSON completos sin truncado.
+  * Botón interactivo de expansión rápida en hover de la celda de detalle del log.
+  * Funcionalidad de copiado rápido al portapapeles del objeto JSON de metadatos del evento.
 * **Endpoint de Renderizado y Despacho SMTP Integrado:**
   * Exposición de ruta `POST /api/v1/templates/render` para procesamiento MJML.
   * Soporte opcional para envío automático de correos electrónicos vía SMTP del SOC mediante el parámetro `"sendEmail": true` en el JSON Payload.

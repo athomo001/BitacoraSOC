@@ -1,0 +1,103 @@
+<!--
+  Propósito del Archivo: frontend/src/app/pages/main/audit-logs/audit-log-detail-dialog.component.html
+  Responsabilidad: Renderizar los detalles de un log de auditoría en un modal limpio y ordenado.
+-->
+<div class="audit-detail-container">
+  <header class="audit-detail-header">
+    <div class="header-title-row">
+      <h2 mat-dialog-title class="dialog-title">
+        <mat-icon class="title-icon">policy</mat-icon>
+        Detalle de Log de Auditoría
+      </h2>
+      <button mat-icon-button mat-dialog-close class="close-btn" aria-label="Cerrar diálogo">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    
+    <div class="header-meta-row">
+      <mat-chip [color]="getLevelColor(data.log.level)" class="level-chip text-uppercase">
+        {{ data.log.level }}
+      </mat-chip>
+      <span class="category-badge" [ngClass]="'category-' + data.actionType">
+        {{ data.categoryLabel }}
+      </span>
+      <span class="timestamp-label">{{ data.formattedDate }}</span>
+    </div>
+  </header>
+
+  <mat-dialog-content class="audit-detail-content">
+    <!-- Panel del Mensaje/Razón Completa -->
+    <div class="detail-section reason-panel">
+      <h3 class="section-title">Detalle del Evento</h3>
+      <div class="reason-full-text">
+        {{ data.reasonText }}
+      </div>
+    </div>
+
+    <!-- Rejilla de Información Estructurada -->
+    <div class="detail-grid">
+      <div class="grid-item">
+        <span class="item-label">Evento del Sistema</span>
+        <span class="item-value code-font">{{ data.log.event }}</span>
+      </div>
+
+      <div class="grid-item" *ngIf="data.log.source">
+        <span class="item-label">Origen / Módulo</span>
+        <span class="item-value">{{ data.log.source }} <span *ngIf="data.log.sourceId" class="text-muted">({{ data.log.sourceId }})</span></span>
+      </div>
+
+      <div class="grid-item">
+        <span class="item-label">Actor (Usuario)</span>
+        <span class="item-value">
+          <mat-icon class="inline-icon">person</mat-icon>
+          {{ data.log.actor?.username || 'Sistema' }}
+          <span *ngIf="data.log.actor?.role" class="actor-role">({{ data.log.actor?.role }})</span>
+          <span *ngIf="data.log.actor?.isGuest" class="guest-badge">Invitado</span>
+        </span>
+      </div>
+
+      <div class="grid-item" *ngIf="data.log.request?.ip">
+        <span class="item-label">Dirección IP</span>
+        <span class="item-value">
+          <mat-icon class="inline-icon">dns</mat-icon>
+          {{ data.log.request?.ip }}
+          <span *ngIf="data.log.request?.isLikelyVpnOrProxy" class="vpn-badge">VPN/Proxy detectado</span>
+        </span>
+      </div>
+
+      <div class="grid-item" *ngIf="data.log.request?.path">
+        <span class="item-label">Ruta HTTP (Request)</span>
+        <span class="item-value code-font">
+          <span class="http-method">{{ data.log.request?.method }}</span>
+          {{ data.log.request?.path }}
+        </span>
+      </div>
+
+      <div class="grid-item" *ngIf="data.log.result?.statusCode">
+        <span class="item-label">Resultado API</span>
+        <span class="item-value">
+          <span class="status-code" [ngClass]="data.log.result?.success ? 'status-success' : 'status-error'">
+            {{ data.log.result?.statusCode }}
+          </span>
+          <span class="status-reason" *ngIf="data.log.result?.reason"> - {{ data.log.result?.reason }}</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Metadatos Completos (JSON) -->
+    <div class="detail-section json-section" *ngIf="getFormattedMetadata()">
+      <div class="json-header">
+        <h3 class="section-title">Metadatos & Variables (JSON)</h3>
+        <button mat-stroked-button color="primary" class="copy-btn" (click)="copyMetadataToClipboard()">
+          <mat-icon>content_copy</mat-icon>
+          Copiar JSON
+        </button>
+      </div>
+      <pre class="json-content"><code>{{ getFormattedMetadata() }}</code></pre>
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end" class="audit-detail-actions">
+    <button mat-flat-button color="primary" mat-dialog-close>Entendido</button>
+  </mat-dialog-actions>
+</div>
