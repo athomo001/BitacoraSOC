@@ -167,6 +167,10 @@
     .reason-cell {
       max-width: 100%;
       cursor: help;
+
+      &.clickable-cell {
+        cursor: pointer;
+      }
     }
 
     .reason-container {
@@ -175,6 +179,46 @@
       align-items: flex-start;
       flex-wrap: wrap;
       word-break: break-word;
+      position: relative;
+      padding-right: 36px;
+
+      .expand-log-btn {
+        position: absolute;
+        right: 0;
+        top: 2px;
+        width: 28px;
+        height: 28px;
+        line-height: 28px;
+        opacity: 0;
+        transition: opacity 0.2s ease, background-color 0.2s ease;
+        color: var(--primary-color, #1976d2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        ::ng-deep .mat-mdc-button-touch-target {
+          width: 28px;
+          height: 28px;
+        }
+
+        mat-icon {
+          font-size: 16px;
+          width: 16px;
+          height: 16px;
+          line-height: 16px;
+        }
+      }
+
+      &:hover {
+        .expand-log-btn {
+          opacity: 0.8;
+          
+          &:hover {
+            opacity: 1;
+            background-color: var(--hover-bg, rgba(0,0,0,0.04));
+          }
+        }
+      }
 
       .action-category {
         display: inline-block;
