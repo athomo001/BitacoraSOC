@@ -2,6 +2,35 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.20] - 2026-07-09
+
+### API Keys robustas, logs de auditoría en tiempo real, renderizador de MJML y envío SMTP de incidentes
+
+- **Módulo de Gestión de API Keys**:
+  - Panel administrativo completo con encriptación hash SHA-256 de credenciales y asignación selectiva de permisos (scopes) para integraciones externas (SOAR, Syslog parsers, etc.).
+- **Auditoría de Consumo de API**:
+  - Registro no bloqueante de logs de acceso en tiempo real (IP, método, endpoint, estado HTTP, fecha, clave consumida) con paginación interactiva en el panel del SOC.
+- **API Externa de Incidentes y SMTP**:
+  - Exposición de `/api/v1/templates/render` para procesamiento de plantillas MJML con soporte opcional para envío automático de alertas por correo mediante el SMTP del SOC pasándole `"sendEmail": true`. Se inyecta automáticamente el logo de Netics (`Sharp-processed`) y se autocompletan los campos de incidentes (ofensa, ticket, criticidad) provistos en el JSON.
+- **Visualización de Logs de Auditoría Extendida**:
+  - Diálogo detallado `AuditLogDetailDialogComponent` para leer logs extensos y metadatos JSON completos sin truncado.
+  - Botón interactivo de expansión rápida en hover de la celda de detalle del log.
+  - Funcionalidad de copiado rápido al portapapeles del objeto JSON de metadatos del evento.
+- **Manuales de Integración y Postman**:
+  - Creación del manual detallado de la API externa e incrustación de un panel interactivo paso a paso de uso con Postman y ejemplos de JSON Payload en el frontend del SOC.
+
+---
+
+## [v1.6.19] - 2026-07-07
+
+### Mantenimiento de Contactos y Directorio Centralizado
+
+- **Limpieza de Contactos obsoletos**:
+  - Limpieza automática de contactos obsoletos en el directorio centralizado de contactos.
+  - Pruebas y validaciones automáticas para el borrado de contactos de usuarios.
+
+---
+
 ## [v1.6.18] - 2026-07-06
 
 ### Acordeón de Meses, Visibilidad Administrativa Completa, Lógica de Escalación Simple y Corrección de Zona Horaria

@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `CHANGELOG.md`): **v1.7.0**
+> Version referencial actual (segun `CHANGELOG.md`): **v1.6.20**
 
 Stack principal:
 
@@ -64,7 +64,7 @@ Stack principal:
 
 ## Novedades recientes (resumen rapido)
 
-### v1.7.0 (API Keys robustas, logs de auditoría en tiempo real, renderizador de MJML y envío SMTP de incidentes)
+### v1.6.20 (API Keys robustas, logs de auditoría en tiempo real, renderizador de MJML y envío SMTP de incidentes)
 
 - **Módulo de Gestión de API Keys**: Panel administrativo completo con encriptación hash SHA-256 de credenciales y asignación selectiva de permisos (scopes) para integraciones externas (SOAR, Syslog parsers, etc.).
 - **Auditoría de Consumo de API**: Registro no bloqueante de logs de acceso en tiempo real (IP, método, endpoint, estado HTTP, fecha, clave consumida) con paginación interactiva en el panel del SOC.
