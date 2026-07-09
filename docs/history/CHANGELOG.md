@@ -18,6 +18,11 @@ Registro de cambios relevantes del proyecto.
   - Funcionalidad de copiado rápido al portapapeles del objeto JSON de metadatos del evento.
 - **Manuales de Integración y Postman**:
   - Creación del manual detallado de la API externa e incrustación de un panel interactivo paso a paso de uso con Postman y ejemplos de JSON Payload en el frontend del SOC.
+- **Flujo de Correos y Servicios Estructurados**:
+  - Reemplazo de las tablas planas gigantes de servicios y contactos por una interfaz compacta unificada bajo un único selector central de cliente.
+  - Rediseño visual de los **Servicios de Escalación** del cliente en formato de chips interactivos con botones de borrado discreto.
+  - Diseño de tarjetas de servicio independientes que agrupan los contactos asignados (PARA / CC).
+  - Pre-rellenado automático e inteligente de cliente y servicio al agregar nuevos registros desde el panel contextual del cliente seleccionado.
 
 ---
 

@@ -4,90 +4,94 @@
     <p class="subtitle">Este módulo corresponde al flujo operativo de escalación/turnos. La libreta preventiva de boletines vive abajo y se mantiene separada.</p>
   </header>
 
-  <section class="section">
-    <h3>1. Servicios de Escalación</h3>
-    <button mat-raised-button color="accent" (click)="addService()">
-      <mat-icon aria-hidden="true">add</mat-icon>
-      Agregar Servicio
-    </button>
-
-    <article *ngIf="showServiceForm" class="inline-form">
-      <form [formGroup]="serviceForm" (ngSubmit)="saveService()">
-        <mat-form-field appearance="outline">
-          <mat-label>Cliente</mat-label>
-          <input
-            matInput
-            placeholder="Escriba para buscar cliente..."
-            [value]="serviceClientSearch"
-            (input)="onServiceClientSearchInput($any($event.target).value)"
-            [matAutocomplete]="autoServiceClient">
-          <mat-autocomplete
-            #autoServiceClient="matAutocomplete"
-            (optionSelected)="onServiceClientSelected($event.option.value)">
-            <mat-option *ngFor="let client of filteredClientsForServiceForm" [value]="client">
-              {{ client.name }}
-            </mat-option>
-          </mat-autocomplete>
-          <mat-error *ngIf="serviceForm.get('clientId')?.invalid">El cliente es obligatorio</mat-error>
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Nombre del Servicio</mat-label>
-          <input matInput formControlName="name" placeholder="Ej: ACME - Service A">
-        </mat-form-field>
-        <div class="form-actions">
-          <button mat-raised-button color="primary" type="submit" [disabled]="serviceForm.invalid">
-            Guardar
-          </button>
-          <button mat-button type="button" (click)="showServiceForm = false">Cancelar</button>
-        </div>
-      </form>
-    </article>
-
-    <div class="simple-table services-table-container" *ngIf="!loadingServices && services.length > 0">
-      <table>
-        <thead>
-          <tr>
-            <th>Cliente</th>
-            <th>Servicio</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let service of services">
-            <td>{{ service.clientId?.name || 'N/A' }}</td>
-            <td><strong>{{ service.name }}</strong></td>
-            <td>
-              <button mat-icon-button color="warn" (click)="deleteService(service._id)" aria-label="Eliminar servicio">
-                <mat-icon aria-hidden="true">delete</mat-icon>
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <div *ngIf="loadingServices" class="loading-inline" role="status" aria-live="polite">
-      <mat-spinner diameter="30"></mat-spinner>
-      <p>Cargando servicios...</p>
-    </div>
+  <!-- Selector de Cliente Principal al inicio del Tab -->
+  <section class="client-selection-panel" style="margin-bottom: 2rem;">
+    <mat-form-field appearance="outline" class="client-selector-field">
+      <mat-label>Cliente para configurar escalación</mat-label>
+      <input
+        matInput
+        placeholder="Escriba para buscar cliente..."
+        [value]="contactsClientSearchInput"
+        (input)="onContactsClientSearchInput($any($event.target).value)"
+        [matAutocomplete]="autoContactsClient">
+      <mat-icon matSuffix aria-hidden="true">search</mat-icon>
+      <mat-autocomplete
+        #autoContactsClient="matAutocomplete"
+        (optionSelected)="onContactsClientSelected($event.option.value)">
+        <mat-option [value]="null">Todos los Clientes</mat-option>
+        <mat-option *ngFor="let client of filteredClientsForContacts" [value]="client">
+          {{ client.name }}
+        </mat-option>
+      </mat-autocomplete>
+    </mat-form-field>
   </section>
 
-  <section class="section">
-    <h3>2. Contactos de Escalación</h3>
-    <p class="subtitle">Usa esta sección solo para contactos ligados a escalación, turnos y servicio activo. No es una agenda comercial general.</p>
+  <!-- Si hay un cliente seleccionado, mostramos la interfaz organizada -->
+  <ng-container *ngIf="selectedClientIdForContacts">
+    
+    <!-- 1. Servicios de Escalación del Cliente (Formato de Chips Compactos) -->
+    <section class="section compact-section">
+      <div class="section-title-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h3 style="margin: 0;">1. Servicios de Escalación</h3>
+        <button mat-raised-button color="accent" (click)="addService(selectedClientIdForContacts)">
+          <mat-icon aria-hidden="true">add</mat-icon>
+          Agregar Servicio
+        </button>
+      </div>
 
-    <button mat-raised-button color="accent" (click)="addContact('escalation')" style="margin-top: 1rem;">
-      <mat-icon aria-hidden="true">add</mat-icon>
-      Agregar Contacto de Escalación
-    </button>
+      <!-- Formulario inline para agregar/editar servicio -->
+      <article *ngIf="showServiceForm" class="inline-form" style="margin-top: 1rem; margin-bottom: 1rem;">
+        <form [formGroup]="serviceForm" (ngSubmit)="saveService()">
+          <mat-form-field appearance="outline">
+            <mat-label>Cliente</mat-label>
+            <input matInput [value]="contactsClientSearchInput" disabled>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Nombre del Servicio</mat-label>
+            <input matInput formControlName="name" placeholder="Ej: Qradar, Ciber Vigilancia">
+          </mat-form-field>
+          <div class="form-actions">
+            <button mat-raised-button color="primary" type="submit" [disabled]="serviceForm.invalid">
+              Guardar
+            </button>
+            <button mat-button type="button" (click)="showServiceForm = false">Cancelar</button>
+          </div>
+        </form>
+      </article>
 
-    <div class="form-row filters-row">
-      <mat-form-field appearance="outline">
-        <mat-label>Buscar por cliente</mat-label>
-        <input matInput [(ngModel)]="escalationClientSearch" placeholder="Ej: ACME, Cliente X">
-        <mat-icon matSuffix aria-hidden="true">search</mat-icon>
-      </mat-form-field>
-    </div>
+      <!-- Rejilla de Chips de Servicios del Cliente -->
+      <div *ngIf="!loadingServices && servicesForSelectedClient.length > 0" class="services-chips-grid">
+        <div *ngFor="let service of servicesForSelectedClient" class="service-chip-item animate-fade-in">
+          <mat-icon>business_center</mat-icon>
+          <span class="service-name">{{ service.name }}</span>
+          <button mat-icon-button color="warn" class="delete-service-chip-btn" (click)="deleteService(service._id)" matTooltip="Eliminar servicio" aria-label="Eliminar servicio">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </div>
+      </div>
 
+      <div *ngIf="!loadingServices && servicesForSelectedClient.length === 0" class="no-services-placeholder" style="padding: 1.5rem; background: var(--bg-surface); border-radius: 8px; color: var(--text-secondary); display: flex; align-items: center; gap: 8px;">
+        <mat-icon>info</mat-icon>
+        <span>No hay servicios configurados para este cliente. Agrega uno con el botón de arriba.</span>
+      </div>
+
+      <div *ngIf="loadingServices" class="loading-inline" role="status" aria-live="polite">
+        <mat-spinner diameter="20"></mat-spinner>
+        <p>Cargando servicios del cliente...</p>
+      </div>
+    </section>
+
+    <!-- 2. Contactos de Escalación del Cliente (Tarjetas por Servicio) -->
+    <section class="section">
+      <h3>2. Contactos de Escalación</h3>
+      <p class="subtitle">Usa esta sección solo para contactos ligados a escalación, turnos y servicio activo. No es una agenda comercial general.</p>
+
+      <button mat-raised-button color="accent" (click)="addContact('escalation')" style="margin-bottom: 1.5rem;">
+        <mat-icon aria-hidden="true">add</mat-icon>
+        Agregar Contacto de Escalación
+      </button>
+
+    <!-- Formulario inline para agregar/editar contacto (Mantenemos su estructura pero permitimos pre-cargar) -->
     <article *ngIf="showContactForm && contactForm.get('contactType')?.value !== 'preventive'" class="inline-form">
       <div class="toolbar-row">
         <button mat-stroked-button type="button" color="primary" (click)="openDirectoryQuickPicker('contact', contactForm.get('name')?.value || '')">
@@ -192,51 +196,80 @@
       </form>
     </article>
 
-    <div class="simple-table" *ngIf="!loadingContacts && escalationContacts.length > 0">
-      <table>
-        <thead>
-          <tr>
-            <th>Cliente</th>
-            <th>Servicio</th>
-            <th>Nombre</th>
-            <th>Email</th>
-            <th>Teléfono</th>
-            <th>Tipo</th>
-            <th>Estado</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let contact of escalationContacts">
-            <td>{{ contact.serviceId?.clientId?.name || 'N/A' }}</td>
-            <td>{{ contact.serviceId?.name || 'N/A' }}</td>
-            <td><strong>{{ contact.name }}</strong></td>
-            <td>{{ contact.email || '-' }}</td>
-            <td>{{ contact.phone || '-' }}</td>
-            <td><span class="badge" [class.para]="contact.role === 'PARA'">{{ contact.role }}</span></td>
-            <td>
-              <span class="badge outline" *ngIf="contact.active !== false">Activo</span>
-              <span class="badge muted" *ngIf="contact.active === false">Inactivo</span>
-            </td>
-            <td>
-              <button mat-icon-button color="primary" (click)="editContact(contact)" matTooltip="Editar" aria-label="Editar contacto">
-                <mat-icon aria-hidden="true">edit</mat-icon>
-              </button>
-              <button mat-icon-button color="warn" (click)="deleteContact(contact._id)" matTooltip="Eliminar" aria-label="Eliminar contacto">
-                <mat-icon aria-hidden="true">delete</mat-icon>
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <!-- Vista Organizada por Cliente y sus Servicios -->
+    <div *ngIf="selectedClientIdForContacts && !loadingContacts" class="organized-contacts-container animate-fade-in">
+      <div *ngIf="servicesForSelectedClient.length === 0" class="no-data compact-no-data">
+        <mat-icon aria-hidden="true">business_center</mat-icon>
+        <p>Este cliente no tiene servicios configurados en la sección "1. Servicios de Escalación" de arriba.</p>
+      </div>
+
+      <div *ngFor="let service of servicesForSelectedClient" class="service-contacts-card">
+        <header class="service-card-header">
+          <div class="service-title-info">
+            <mat-icon>business_center</mat-icon>
+            <h4>Servicio: <strong>{{ service.name }}</strong></h4>
+          </div>
+          <button mat-stroked-button color="primary" (click)="addContact('escalation', service._id)">
+            <mat-icon aria-hidden="true">add_circle</mat-icon>
+            Agregar Contacto
+          </button>
+        </header>
+
+        <div class="service-card-body">
+          <div class="simple-table" *ngIf="getContactsForService(service._id).length > 0">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Email</th>
+                  <th>Teléfono</th>
+                  <th>Tipo (Rol)</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let contact of getContactsForService(service._id)">
+                  <td><strong>{{ contact.name }}</strong></td>
+                  <td>{{ contact.email || '-' }}</td>
+                  <td>{{ contact.phone || '-' }}</td>
+                  <td><span class="badge" [class.para]="contact.role === 'PARA'">{{ contact.role }}</span></td>
+                  <td>
+                    <span class="badge outline" *ngIf="contact.active !== false">Activo</span>
+                    <span class="badge muted" *ngIf="contact.active === false">Inactivo</span>
+                  </td>
+                  <td>
+                    <button mat-icon-button color="primary" (click)="editContact(contact)" matTooltip="Editar" aria-label="Editar contacto">
+                      <mat-icon aria-hidden="true">edit</mat-icon>
+                    </button>
+                    <button mat-icon-button color="warn" (click)="deleteContact(contact._id)" matTooltip="Eliminar" aria-label="Eliminar contacto">
+                      <mat-icon aria-hidden="true">delete</mat-icon>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div *ngIf="getContactsForService(service._id).length === 0" class="no-contacts-alert">
+            <mat-icon>info</mat-icon>
+            <span>No hay contactos configurados para este servicio. Hojas de reporte se enviarán vacías.</span>
+          </div>
+        </div>
+      </div>
     </div>
+
     <div *ngIf="loadingContacts" class="loading-inline" role="status" aria-live="polite">
       <mat-spinner diameter="30"></mat-spinner>
-      <p>Cargando contactos...</p>
-    </div>
-    <div *ngIf="!loadingContacts && escalationContacts.length === 0" class="no-data compact-no-data">
-      <p>No hay contactos de escalación para el cliente buscado.</p>
+      <p>Cargando contactos de escalación...</p>
     </div>
   </section>
+</ng-container>
+
+<!-- Vista Plana Alternativa (si no hay cliente seleccionado se invita a seleccionarlo) -->
+<div *ngIf="!selectedClientIdForContacts && !loadingContacts" class="no-data compact-no-data">
+  <mat-icon aria-hidden="true">person_search</mat-icon>
+  <p>Seleccione un cliente arriba para organizar y gestionar sus contactos de correo.</p>
+</div>
 
 </div>

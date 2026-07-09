@@ -226,3 +226,195 @@
     z-index: 1;
   }
 }
+
+// Estilos del Contenedor de Contactos Organizados por Cliente y Servicio
+.organized-contacts-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.client-selector-field {
+  max-width: 450px;
+  width: 100%;
+}
+
+.service-contacts-card {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+  overflow: hidden;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+
+  &:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+    border-color: var(--primary-color, #1976d2);
+  }
+
+  .service-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: var(--bg-surface, #f8f9fa);
+    border-bottom: 1px solid var(--border-color, #e0e0e0);
+
+    .service-title-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-primary);
+
+      mat-icon {
+        color: var(--primary-color, #1976d2);
+      }
+
+      h4 {
+        margin: 0;
+        font-size: 1.05rem;
+        font-weight: 500;
+
+        strong {
+          color: var(--primary-color, #1976d2);
+        }
+      }
+    }
+  }
+
+  .service-card-body {
+    padding: 0;
+
+    .simple-table {
+      margin-top: 0;
+      
+      table {
+        th {
+          background: transparent;
+          border-bottom: 2px solid var(--border-color, #e0e0e0);
+          padding: 0.75rem 1.5rem;
+        }
+
+        td {
+          padding: 0.75rem 1.5rem;
+        }
+      }
+    }
+
+    .no-contacts-alert {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 1.5rem;
+      background: var(--bg-surface, #f8f9fa);
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+
+      mat-icon {
+        color: var(--state-warning, #e65100);
+      }
+    }
+  }
+}
+
+.no-data.compact-no-data {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  background: var(--bg-surface, #f8f9fa);
+  border: 1px dashed var(--border-color, #e0e0e0);
+  border-radius: var(--radius-md, 8px);
+  text-align: center;
+  color: var(--text-secondary);
+  gap: 12px;
+
+  mat-icon {
+    font-size: 40px;
+    width: 40px;
+    height: 40px;
+    color: var(--text-secondary);
+    opacity: 0.6;
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.95rem;
+  }
+}
+
+// Rejilla de chips de servicios del cliente
+.services-chips-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 1rem;
+}
+
+.service-chip-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 20px;
+  font-size: 0.88rem;
+  color: var(--text-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    border-color: var(--primary-color, #1976d2);
+  }
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    color: var(--primary-color, #1976d2);
+  }
+
+  .service-name {
+    font-weight: 500;
+  }
+
+  .delete-service-chip-btn {
+    width: 24px;
+    height: 24px;
+    line-height: 24px;
+    margin-right: -6px;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+
+    &:hover {
+      opacity: 1;
+    }
+
+    mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+      color: var(--state-error, #d32f2f) !important;
+    }
+  }
+}
+
+.no-services-placeholder {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 1.5rem;
+  background: var(--bg-surface, #f8f9fa);
+  color: var(--text-secondary);
+  border: 1px dashed var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  font-size: 0.9rem;
+
+  mat-icon {
+    color: var(--primary-color, #1976d2);
+  }
+}
