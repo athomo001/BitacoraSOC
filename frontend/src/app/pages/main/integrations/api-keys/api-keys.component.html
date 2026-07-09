@@ -1,0 +1,421 @@
+<div class="api-keys-module">
+  
+  <!-- BANNER DE CREDENCIAL GENERADA (MUESTRA ÚNICA) -->
+  <div *ngIf="newApiKeySecret" class="secret-banner">
+    <div class="secret-banner__header">
+      <span class="secret-banner__badge">GUARDADO OBLIGATORIO</span>
+      <h3>Clave de API Generada Exitosamente</h3>
+    </div>
+    <p class="secret-banner__warning">
+      Por motivos de seguridad, esta clave se muestra <strong>únicamente esta vez</strong>. Si sale de esta pantalla o actualiza la página, no podrá volver a visualizarla. Por favor, cópiela y resguárdela en un lugar seguro (por ejemplo, en su gestor de credenciales o bóveda de contraseñas).
+    </p>
+    <div class="secret-banner__key-container">
+      <code class="secret-banner__key">{{ newApiKeySecret }}</code>
+      <button mat-raised-button color="accent" class="copy-btn" (click)="copySecretToClipboard()">
+        Copiar Clave
+      </button>
+    </div>
+    <div class="secret-banner__footer">
+      <button mat-button class="dismiss-btn" (click)="dismissSecretBanner()">Entendido, he guardado la clave</button>
+    </div>
+  </div>
+
+  <!-- SECCIÓN DE ACCIONES DE GESTIÓN -->
+  <div class="header-actions">
+    <h2>Credenciales de Integración (API Keys)</h2>
+    <button mat-raised-button color="primary" *ngIf="!showCreateForm" (click)="showCreateForm = true">
+      Generar Nueva API Key
+    </button>
+  </div>
+
+  <!-- FORMULARIO DE CREACIÓN DE CLAVES -->
+  <div *ngIf="showCreateForm" class="create-form-card">
+    <h3>Generar Nueva Clave de API</h3>
+    <form [formGroup]="apiKeyForm" (ngSubmit)="onCreateKey()">
+      <div class="form-grid">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Nombre Identificativo de la Integración</mat-label>
+          <input matInput formControlName="name" placeholder="Ej: SOAR QRadar / Script Automatizado Incidentes" required>
+          <mat-hint>Ingrese un nombre descriptivo para identificar el origen de las peticiones en los logs.</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Permisos Asignados (Scopes)</mat-label>
+          <mat-select formControlName="permissions" multiple required>
+            <mat-option *ngFor="let p of availablePermissions" [value]="p.value">
+              {{ p.label }}
+            </mat-option>
+          </mat-select>
+          <mat-hint>Seleccione únicamente los permisos estrictamente necesarios para esta integración.</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Fecha de Expiración (Opcional)</mat-label>
+          <input matInput type="date" formControlName="expiresAt">
+          <mat-hint>Deje en blanco si desea que la clave no expire automáticamente.</mat-hint>
+        </mat-form-field>
+      </div>
+
+      <div class="form-actions">
+        <button mat-stroked-button type="button" (click)="showCreateForm = false">Cancelar</button>
+        <button mat-raised-button color="primary" type="submit" [disabled]="creatingKey">
+          {{ creatingKey ? 'Generando...' : 'Generar Credencial' }}
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- LISTADO DE CLAVES EXISTENTES -->
+  <div class="keys-list-card">
+    <div class="card-header">
+      <h3>API Keys Activas e Historial</h3>
+      <button mat-button color="primary" (click)="loadApiKeys()" [disabled]="loadingKeys">Actualizar</button>
+    </div>
+    
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Prefijo</th>
+            <th>Permisos (Scopes)</th>
+            <th>Estado</th>
+            <th>Expiración</th>
+            <th>Último Uso</th>
+            <th>Creado</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="apiKeys.length === 0 && !loadingKeys">
+            <td colspan="8" class="empty-message">No se han generado credenciales de API para el sistema.</td>
+          </tr>
+          <tr *ngIf="loadingKeys">
+            <td colspan="8" class="loading-message">Cargando credenciales de API...</td>
+          </tr>
+          <tr *ngFor="let key of apiKeys" [class.revoked-row]="key.status === 'revoked'">
+            <td class="bold-text">{{ key.name }}</td>
+            <td><code>{{ key.prefix }}</code></td>
+            <td>
+              <div class="scope-chips">
+                <span *ngFor="let scope of key.permissions" class="scope-chip">{{ scope }}</span>
+              </div>
+            </td>
+            <td>
+              <span class="status-badge" [class.badge-active]="key.status === 'active'"
+                    [class.badge-revoked]="key.status === 'revoked'"
+                    [class.badge-expired]="key.status === 'expired'">
+                {{ key.status === 'active' ? 'Activo' : key.status === 'revoked' ? 'Revocado' : 'Expirado' }}
+              </span>
+            </td>
+            <td>{{ key.expiresAt ? (key.expiresAt | date:'dd/MM/yyyy') : 'Nunca' }}</td>
+            <td>{{ key.lastUsedAt ? (key.lastUsedAt | date:'dd/MM/yyyy HH:mm') : 'Sin uso' }}</td>
+            <td>{{ key.createdAt | date:'dd/MM/yyyy' }}</td>
+            <td>
+              <button mat-stroked-button color="warn" size="small"
+                      *ngIf="key.status === 'active'"
+                      [disabled]="revokingKeyId === key._id"
+                      (click)="onRevokeKey(key._id)">
+                {{ revokingKeyId === key._id ? 'Revocando...' : 'Revocar' }}
+              </button>
+              <span *ngIf="key.status !== 'active'" class="revoked-text">Inhabilitada</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- DOCUMENTACIÓN TÉCNICA E INTEGRACIÓN SOAR -->
+  <div class="docs-section">
+    <h3>Guía de Integración y Documentación de la API (v1)</h3>
+    <mat-accordion>
+      <mat-expansion-panel>
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            <strong>Autenticación y Cabeceras</strong>
+          </mat-panel-title>
+          <mat-panel-description>
+            Cómo enviar credenciales en llamadas programáticas
+          </mat-panel-description>
+        </mat-expansion-panel-header>
+        
+        <div class="panel-content">
+          <p>Para consumir los endpoints de la API, debe enviar su clave de API generada a través de alguna de las siguientes cabeceras HTTP:</p>
+          <ul>
+            <li><strong>X-API-KEY:</strong> <code>bsoc_key_tu_token_aqui</code></li>
+            <li><strong>Authorization:</strong> <code>Bearer bsoc_key_tu_token_aqui</code></li>
+          </ul>
+
+          <div class="url-guide-box" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 14px; margin: 16px 0;">
+            <strong style="color: #1e293b;">📌 Cómo armar la URL del servidor (Base URL):</strong>
+            <p style="margin: 6px 0 0 0; font-size: 13px;">
+              Los ejemplos del manual usan rutas relativas (ej: <code>/api/v1/users</code>). En Postman, scripts o SOAR, debe anteponer la IP o dominio del servidor del Backend:
+            </p>
+            <ul style="margin: 6px 0 0 0; padding-left: 20px; font-size: 13px;">
+              <li><strong>Local (Desarrollo):</strong> <code>http://localhost:3000/api/v1/users</code></li>
+              <li><strong>Servidor (Producción):</strong> <code>https://IP_DEL_SERVIDOR/api/v1/users</code> o <code>https://dominio-bitacora.com/api/v1/users</code></li>
+            </ul>
+          </div>
+
+          <p>Ejemplo básico de consulta completa en <code>cURL</code>:</p>
+          <pre class="code-block" ngNonBindable><code>curl -X GET http://localhost:3000/api/v1/users \
+  -H "X-API-KEY: bsoc_key_tu_token_aqui"</code></pre>
+        </div>
+      </mat-expansion-panel>
+
+      <mat-expansion-panel>
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            <strong>Renderizar Plantilla de Correo (templates:render)</strong>
+          </mat-panel-title>
+          <mat-panel-description>
+            Ideal para integrar el motor de plantillas de la Bitácora con un SOAR externo
+          </mat-panel-description>
+        </mat-expansion-panel-header>
+
+        <div class="panel-content">
+          <p>El endpoint <code>POST /api/v1/templates/render</code> procesa la información de un incidente y retorna el código HTML final optimizado e inyectado con la plantilla correspondiente.</p>
+          
+          <h4>Detalle del JSON Payload (Cuerpo del Mensaje):</h4>
+          <table class="params-table">
+            <thead>
+              <tr>
+                <th>Campo</th>
+                <th>Tipo</th>
+                <th>Obligatorio</th>
+                <th>Descripción</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>to</strong></td>
+                <td>Array de strings</td>
+                <td>Sí</td>
+                <td>Lista de correos autorizados del SOC que recibirán el reporte final.</td>
+              </tr>
+              <tr>
+                <td><strong>subject</strong></td>
+                <td>String</td>
+                <td>No</td>
+                <td>Asunto personalizado para el correo.</td>
+              </tr>
+              <tr>
+                <td><strong>paletteKey</strong></td>
+                <td>String</td>
+                <td>No</td>
+                <td>Color de plantilla. Opciones: <code>cdc-verde</code>, <code>noche-azul</code>, <code>slate-pro</code>, <code>carbon</code>, <code>indigo</code>, <code>bosque</code>.</td>
+              </tr>
+              <tr>
+                <td><strong>reportData</strong></td>
+                <td>Object</td>
+                <td>Sí</td>
+                <td>Contenedor de datos del reporte. Campos internos admitidos:
+                  <ul>
+                    <li><code>logSource</code> (String, Requerido): Nombre de la plataforma, cliente o fuente de logs (ej: "Sentinel_SOC").</li>
+                    <li><code>criticidad</code> (String, Requerido): Nivel de criticidad (critica, alta, media, baja, informativa).</li>
+                    <li><code>ofensa</code> (String): Número de alerta o ID de ofensa.</li>
+                    <li><code>tipoOperacion</code> (String): Ej. "Fuerza Bruta / Ransomware".</li>
+                    <li><code>nombreEvento</code> (String): Nombre descriptivo de la alerta.</li>
+                    <li><code>motivoEvento</code> (String): Breve resumen del porqué se disparó la regla.</li>
+                    <li><code>origenConexion</code> (String): Dirección IP/Hostname del host atacante.</li>
+                    <li><code>destino</code> (String): Dirección IP/Hostname del host comprometido.</li>
+                    <li><code>reputacionOrigen</code> (String): Estado de reputación del origen.</li>
+                    <li><code>observaciones</code> (String): Notas detalladas agregadas por la automatización o analista.</li>
+                    <li><code>recomendacion</code> (String): Instrucciones de respuesta y mitigación.</li>
+                    <li><code>evidenciaTexto</code> (String): Logs o fragmentos de evidencias en texto.</li>
+                  </ul>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>images</strong></td>
+                <td>Array de objetos</td>
+                <td>No</td>
+                <td>Lista de capturas de evidencia a embeber dentro de la plantilla. Estructura:
+                  <ul>
+                    <li><code>name</code> (String): Nombre del archivo de imagen (ej: "log_screen.png").</li>
+                    <li><code>contentType</code> (String): Tipo MIME de la imagen (ej: "image/png").</li>
+                    <li><code>contentBase64</code> (String): Datos Base64 puros sin encabezado dataURI.</li>
+                  </ul>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>sendEmail</strong></td>
+                <td>Boolean</td>
+                <td>No</td>
+                <td>Si es <code>true</code>, envía el correo de inmediato a la lista <code>to</code> usando el servidor SMTP configurado. (Por defecto: <code>false</code>).</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h4>Ejemplo de Petición cURL:</h4>
+          <pre class="code-block"><code>curl -X POST http://localhost:3000/api/v1/templates/render \
+  -H "X-API-KEY: bsoc_key_tu_token_aqui" \
+  -H "Content-Type: application/json" \
+  -d '{{ '{' }}
+    "to": ["destinatario@dominio-soc.com"],
+    "sendEmail": true,
+    "reportData": {{ '{' }}
+      "logSource": "Firewall Principal",
+      "criticidad": "alta",
+      "ofensa": "99827",
+      "nombreEvento": "Tráfico C2 Detectado",
+      "origenConexion": "198.51.100.12",
+      "destino": "10.0.4.150",
+      "observaciones": "Se detectó tráfico recurrente hacia IPs reportadas de C2 CobaltStrike.",
+      "recomendacion": "Aislar la máquina 10.0.4.150 de la red corporativa."
+    {{ '}' }}
+  {{ '}' }}'</code></pre>
+
+          <h4>Respuesta Exitosa (HTTP 200):</h4>
+          <pre class="code-block"><code>{{ '{' }}
+  "success": true,
+  "emailSent": true,
+  "emailError": null,
+  "subject": "Reporte de Incidente de Seguridad",
+  "html": "&lt;!doctype html&gt;&lt;html&gt;...&lt;/html&gt;",
+  "text": "Información del Evento...\nOfensa: 99827..."
+{{ '}' }}</code></pre>
+        </div>
+      </mat-expansion-panel>
+
+      <mat-expansion-panel>
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            <strong>Registrar Entrada en Bitácora (events:write)</strong>
+          </mat-panel-title>
+          <mat-panel-description>
+            Crear un evento o log de forma programática en la bitácora operativa
+          </mat-panel-description>
+        </mat-expansion-panel-header>
+
+        <div class="panel-content">
+          <p>Para registrar eventos en la bitácora del turno actual, realice una petición <code>POST /api/v1/events</code> con la siguiente estructura:</p>
+          <pre class="code-block"><code>curl -X POST /api/v1/events \
+  -H "X-API-KEY: bsoc_key_tu_token_aqui" \
+  -H "Content-Type: application/json" \
+  -d '{{ '{' }}
+    "content": "Alerta automática: Caída de enlace principal ISP en DataCenter",
+    "entryType": "operativa",
+    "tags": ["Incidente", "Infraestructura"],
+    "clientName": "SOC Global"
+  {{ '}' }}'</code></pre>
+        </div>
+      </mat-expansion-panel>
+
+      <mat-expansion-panel>
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            <strong style="color: #0f172a;">🛠️ Guía de Inicio Rápido con Postman (Paso a Paso)</strong>
+          </mat-panel-title>
+          <mat-panel-description>
+            Guía didáctica para configurar y probar los endpoints manualmente
+          </mat-panel-description>
+        </mat-expansion-panel-header>
+
+        <div class="panel-content" style="font-size: 13.5px; line-height: 1.6;">
+          <p>Sigue estos pasos precisos en Postman para evitar los errores comunes de configuración:</p>
+          <ol style="margin-left: 20px;">
+            <li><strong>Configurar la Petición y la URL:</strong>
+              <ul>
+                <li>Cambia el tipo de petición a <strong>POST</strong>.</li>
+                <li>Pega la URL limpia: <code>http://localhost:3000/api/v1/templates/render</code>.</li>
+                <li style="color: #ef4444;"><em>⚠️ Nota: No pongas signos de igual "=" ni llaves en la barra de direcciones de la URL.</em></li>
+              </ul>
+            </li>
+            <li style="margin-top: 8px;"><strong>Configurar Autenticación (API Key):</strong>
+              <ul>
+                <li>Ve a la pestaña <strong>Authorization</strong> (abajo de la URL).</li>
+                <li>En <em>Type</em>, selecciona <strong>Bearer Token</strong>.</li>
+                <li>En <em>Token</em>, pega tu API Key completa (comienza con <code>bsoc_key_...</code>).</li>
+              </ul>
+            </li>
+            <li style="margin-top: 8px;"><strong>Configurar el Payload (Cuerpo):</strong>
+              <ul>
+                <li>Ve a la pestaña <strong>Body</strong>.</li>
+                <li>Selecciona la opción <strong>raw</strong>.</li>
+                <li>En el selector desplegable de la derecha (donde dice <em>Text</em>), cámbialo a <strong>JSON</strong>.</li>
+                <li>Pega tu JSON sin comentarios de línea:
+                  <pre class="code-block" style="margin-top: 6px;"><code>{{ '{' }}
+  "to": ["tu-correo@netics.cl"],
+  "sendEmail": true,
+  "reportData": {{ '{' }}
+    "logSource": "Firewall Principal",
+    "criticidad": "alta",
+    "nombreEvento": "Detección de malware"
+  {{ '}' }}
+{{ '}' }}</code></pre>
+                </li>
+              </ul>
+            </li>
+            <li style="margin-top: 8px;"><strong>Verificar Params (Vacío):</strong>
+              <ul>
+                <li>Asegúrate de que la pestaña <strong>Params</strong> esté completamente limpia.</li>
+              </ul>
+            </li>
+            <li style="margin-top: 8px;"><strong>Enviar:</strong>
+              <ul>
+                <li>Presiona el botón azul <strong>Send</strong>. Verás un código de estado <code>200 OK</code> y recibirás el correo electrónico.</li>
+              </ul>
+            </li>
+          </ol>
+        </div>
+      </mat-expansion-panel>
+    </mat-accordion>
+  </div>
+
+  <!-- REGISTRO DE AUDITORÍA (APILOG) -->
+  <div class="logs-card">
+    <div class="card-header">
+      <h3>Historial de Auditoría de API (Logs en Tiempo Real)</h3>
+      <button mat-button color="primary" (click)="loadLogs()" [disabled]="loadingLogs">Actualizar</button>
+    </div>
+
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Origen / Clave</th>
+            <th>Método</th>
+            <th>Ruta / Endpoint</th>
+            <th>IP Origen</th>
+            <th>Estado</th>
+            <th>Detalle del Evento</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="logs.length === 0 && !loadingLogs">
+            <td colspan="7" class="empty-message">No se registran eventos de consumo de la API en el historial.</td>
+          </tr>
+          <tr *ngIf="loadingLogs">
+            <td colspan="7" class="loading-message">Cargando logs de auditoría...</td>
+          </tr>
+          <tr *ngFor="let log of logs">
+            <td>{{ log.timestamp | date:'dd/MM/yyyy HH:mm:ss' }}</td>
+            <td class="bold-text">{{ log.apiKeyName }}</td>
+            <td><span class="method-tag" [class.method-post]="log.method === 'POST'">{{ log.method }}</span></td>
+            <td><code>{{ log.endpoint }}</code></td>
+            <td>{{ log.ipAddress }}</td>
+            <td>
+              <span class="status-code-badge" 
+                    [class.status-success]="log.status >= 200 && log.status < 300"
+                    [class.status-error]="log.status >= 400">
+                {{ log.status }}
+              </span>
+            </td>
+            <td class="small-text">{{ log.actionDetails }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Paginación de Logs -->
+    <div class="pagination-container" *ngIf="logTotalPages > 1">
+      <button mat-button [disabled]="logPage === 1 || loadingLogs" (click)="goToPrevPage()">Anterior</button>
+      <span class="page-indicator">Página {{ logPage }} de {{ logTotalPages }} (Total: {{ totalLogsCount }} logs)</span>
+      <button mat-button [disabled]="logPage === logTotalPages || loadingLogs" (click)="goToNextPage()">Siguiente</button>
+    </div>
+  </div>
+
+</div>

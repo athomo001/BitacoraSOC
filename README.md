@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `docs/history/CHANGELOG.md`): **v1.6.18**
+> Version referencial actual (segun `CHANGELOG.md`): **v1.7.0**
 
 Stack principal:
 
@@ -35,6 +35,7 @@ Stack principal:
 - **Estadísticas y Reportes Automatizados**: Generación de informes ejecutivos e indicadores de uso basados en las entradas de la bitácora para evaluar la actividad y el cumplimiento operacional del equipo.
 - **Resiliencia con Backups Cifrados**: Creación y restauración de copias de seguridad de la base de datos MongoDB y evidencias de disco con empaquetado cifrado por contraseña descargable desde la UI.
 - **Extensibilidad mediante Complementos (Plugins)**: Carga y ejecución de utilidades estáticas (ZIP) y URLs externas integradas por iframes seguros con aislamiento Sandbox, control selectivo de accesos a la API compartida y protección Circuit Breaker contra caídas del complemento.
+- **Integraciones y API Keys (SOAR / Automática)**: CRUD administrativo de credenciales seguras (SHA-256) con permisos granulares (scopes), logs de auditoría en tiempo real y soporte para renderizado MJML de reportes y envío SMTP automático de alertas de incidentes para integración con herramientas externas.
 
 ---
 
@@ -62,6 +63,13 @@ Stack principal:
 ---
 
 ## Novedades recientes (resumen rapido)
+
+### v1.7.0 (API Keys robustas, logs de auditoría en tiempo real, renderizador de MJML y envío SMTP de incidentes)
+
+- **Módulo de Gestión de API Keys**: Panel administrativo completo con encriptación hash SHA-256 de credenciales y asignación selectiva de permisos (scopes) para integraciones externas (SOAR, Syslog parsers, etc.).
+- **Auditoría de Consumo de API**: Registro no bloqueante de logs de acceso en tiempo real (IP, método, endpoint, estado HTTP, fecha, clave consumida) con paginación interactiva en el panel del SOC.
+- **API Externa de Incidentes y SMTP**: Exposición de `/api/v1/templates/render` para procesamiento de plantillas MJML con soporte opcional para envío automático de alertas por correo mediante el SMTP del SOC pasándole `"sendEmail": true`. Se inyecta automáticamente el logo de Netics (Sharp-processed) y se autocompletan los campos de incidentes (ofensa, ticket, criticidad) provistos en el JSON.
+- **Manuales de Integración y Postman**: Creación del manual detallado de la API externa e incrustación de un panel interactivo paso a paso de uso con Postman y ejemplos de JSON Payload en el frontend del SOC.
 
 ### v1.6.18 (acordeón de meses en turnos, visualización completa en admin, correcciones de escalación y huso horario)
 
@@ -266,7 +274,8 @@ Documentos principales (Gobernanza Armonizada):
 - `docs/06_SEGURIDAD.md`: Hardening, Helmet, rate limiting, mitigación de Zip Slip y directivas de seguridad.
 - `docs/07_MONGO_REPLICA_SET.md`: Guía opcional para la configuración de réplicas de base de datos (Replica Set) en alta disponibilidad.
 - `docs/SCREENSHOTS.md`: Galería visual de la interfaz y módulos principales.
-- `docs/history/CHANGELOG.md`: Historial de cambios relevantes por versión.
+- `docs/api-v1-manual.md`: Manual técnico de la API externa v1 y ejemplos de integración con Postman y SOAR.
+- `CHANGELOG.md`: Historial de cambios relevantes y control de versiones del proyecto.
 - `docs/history/ISSUES.md`: Plan de trabajo y control de issues del SOC.
 
 Documentos funcionales complementarios:

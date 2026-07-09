@@ -165,6 +165,96 @@ function contentTypeFromDataSubtype(sub) {
   return 'image/png';
 }
 
+const fs = require('fs').promises;
+const sharp = require('sharp');
+
+const UPLOADS_LOGOS_DIR = path.resolve(path.join(__dirname, '../../uploads/logos'));
+
+function resolveUploadedLogoWebPath(logoUrl) {
+  if (!logoUrl || typeof logoUrl !== 'string') return null;
+
+  const clean = logoUrl.trim();
+  if (!clean) return null;
+
+  if (clean.startsWith('/uploads/logos/')) {
+    return clean.split('?')[0];
+  }
+
+  if (/^https?:\/\//i.test(clean)) {
+    try {
+      const parsed = new URL(clean);
+      if (parsed.pathname && parsed.pathname.startsWith('/uploads/logos/')) {
+        return parsed.pathname.split('?')[0];
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+async function readUploadedLogoFromWebPath(webPath) {
+  if (!webPath || typeof webPath !== 'string') return null;
+  const clean = webPath.split('?')[0].trim();
+  if (!clean.startsWith('/uploads/logos/')) return null;
+  const base = path.basename(clean);
+  if (!base || base === '.' || base === '..' || base.includes('..')) return null;
+  const full = path.resolve(path.join(UPLOADS_LOGOS_DIR, base));
+  if (!full.startsWith(UPLOADS_LOGOS_DIR)) return null;
+  try {
+    return await fs.readFile(full);
+  } catch {
+    return null;
+  }
+}
+
+async function buildIncidentEmailLogoVariant(buffer, contentType) {
+  if (!buffer || !Buffer.isBuffer(buffer) || !buffer.length) return null;
+
+  const safeContentType = /^image\//.test(String(contentType || '')) ? contentType : 'image/png';
+
+  try {
+    const source = sharp(buffer, { animated: false, density: 300 });
+    const meta = await source.metadata();
+    const width = Math.max(1, Math.min(meta.width || 320, 1600));
+    const height = Math.max(1, Math.min(meta.height || 120, 1600));
+    const sourceDataUri = `data:${safeContentType};base64,${buffer.toString('base64')}`;
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${width + 4}" height="${height + 4}" viewBox="0 0 ${width + 4} ${height + 4}">
+        <defs>
+          <filter id="logo-outline" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">
+            <feMorphology in="SourceAlpha" operator="dilate" radius="2" result="outline-alpha" />
+            <feFlood flood-color="#FFFFFF" result="outline-color" />
+            <feComposite in="outline-color" in2="outline-alpha" operator="in" result="outline-fill" />
+            <feMerge>
+              <feMergeNode in="outline-fill" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        <image
+          x="2"
+          y="2"
+          width="${width}"
+          height="${height}"
+          href="${sourceDataUri}"
+          preserveAspectRatio="xMidYMid meet"
+          filter="url(#logo-outline)"
+        />
+      </svg>`;
+
+    const outlinedBuffer = await sharp(Buffer.from(svg)).png().toBuffer();
+    return {
+      buffer: outlinedBuffer,
+      contentType: 'image/png',
+      extension: 'png'
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
 module.exports = {
   htmlToBasicPlainText,
   locateFirstImgSrcRange,
@@ -173,5 +263,8 @@ module.exports = {
   removeFirstImgTag,
   removeLeadingDataImageTags,
   contentTypeFromLogoFilename,
-  contentTypeFromDataSubtype
+  contentTypeFromDataSubtype,
+  resolveUploadedLogoWebPath,
+  readUploadedLogoFromWebPath,
+  buildIncidentEmailLogoVariant
 };

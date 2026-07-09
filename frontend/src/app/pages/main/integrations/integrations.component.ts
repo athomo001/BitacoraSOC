@@ -1,7 +1,7 @@
 /**
  * File Purpose: frontend/src/app/pages/main/integrations/integrations.component.ts
- * Responsibilities: Define the module behavior and maintain clear contracts.
- * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ * Responsibilities: Define el comportamiento del módulo general de Integraciones.
+ * QA Notes: Integra SIEM, GLPI y Credenciales/API Keys de manera modular usando pestañas de Material.
  */
 
 import { Component, OnDestroy, OnInit } from '@angular/core';
@@ -19,11 +19,13 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { GlpiIntegrationComponent } from '../glpi/glpi-integration.component';
+import { ApiKeysComponent } from './api-keys/api-keys.component';
 
 @Component({
   selector: 'app-integrations',
   templateUrl: './integrations.component.html',
   styleUrls: ['./integrations.component.scss'],
+  standalone: true,
   imports: [
     ReactiveFormsModule,
     MatFormField,
@@ -37,7 +39,8 @@ import { GlpiIntegrationComponent } from '../glpi/glpi-integration.component';
     NgIf,
     NgFor,
     MatTabsModule,
-    GlpiIntegrationComponent
+    GlpiIntegrationComponent,
+    ApiKeysComponent
   ]
 })
 export class IntegrationsComponent implements OnInit, OnDestroy {
@@ -103,7 +106,13 @@ export class IntegrationsComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.loadConfigs();
     this._querySub = this.route.queryParams.subscribe((params) => {
-      this.selectedTabIndex = params['type'] === 'glpi' ? 1 : 0;
+      if (params['type'] === 'glpi') {
+        this.selectedTabIndex = 1;
+      } else if (params['type'] === 'api-keys') {
+        this.selectedTabIndex = 2;
+      } else {
+        this.selectedTabIndex = 0;
+      }
     });
   }
 
@@ -112,7 +121,12 @@ export class IntegrationsComponent implements OnInit, OnDestroy {
   }
 
   onTabChange(index: number): void {
-    const type = index === 1 ? 'glpi' : null;
+    let type = null;
+    if (index === 1) {
+      type = 'glpi';
+    } else if (index === 2) {
+      type = 'api-keys';
+    }
     this.router.navigate([], {
       relativeTo: this.route,
       queryParams: type ? { type } : {},
