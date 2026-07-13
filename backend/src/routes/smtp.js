@@ -28,7 +28,7 @@ const validate = require('../middleware/validate');
 const { getBrandingSnapshot, formatBrandedSubject, getAppTitleForText } = require('../utils/branding');
 const { encrypt, decrypt } = require('../utils/encryption');
 const { invalidateCache, resolveTransportSecurityOptions } = require('../utils/email');
-const logger = require('../utils/logger');
+const { logger } = require('../utils/logger');
 const { auditSystem } = require('../utils/audit');
 const { audit } = require('../utils/audit');
 
@@ -177,6 +177,10 @@ const verifyAndTest = async (config, sendMail = true) => {
     auth: {
       user: config.username,
       pass: config.password
+    },
+    lookup: (hostname, options, callback) => {
+      options.family = 4;
+      return require('dns').lookup(hostname, options, callback);
     }
   });
 
@@ -559,13 +563,23 @@ const sendChecklistEmail = async (check, services) => {
 
     const decryptedPassword = decrypt(config.password);
 
+    const transportSecurity = resolveTransportSecurityOptions({
+      port: config.port,
+      useTLS: config.useTLS
+    });
+
     const transporter = nodemailer.createTransport({
       host: config.host,
-      port: config.port,
-      secure: config.useTLS,
+      port: transportSecurity.port,
+      secure: transportSecurity.secure,
+      requireTLS: transportSecurity.requireTLS,
       auth: {
         user: config.username,
         pass: decryptedPassword
+      },
+      lookup: (hostname, options, callback) => {
+        options.family = 4;
+        return require('dns').lookup(hostname, options, callback);
       }
     });
 
@@ -642,13 +656,23 @@ const sendChecklistAlertEmail = async ({ recipients, alertTime, dateLabel }) => 
 
     const decryptedPassword = decrypt(config.password);
 
+    const transportSecurity = resolveTransportSecurityOptions({
+      port: config.port,
+      useTLS: config.useTLS
+    });
+
     const transporter = nodemailer.createTransport({
       host: config.host,
-      port: config.port,
-      secure: config.useTLS,
+      port: transportSecurity.port,
+      secure: transportSecurity.secure,
+      requireTLS: transportSecurity.requireTLS,
       auth: {
         user: config.username,
         pass: decryptedPassword
+      },
+      lookup: (hostname, options, callback) => {
+        options.family = 4;
+        return require('dns').lookup(hostname, options, callback);
       }
     });
 
@@ -683,12 +707,16 @@ const sendEscalationInternalReminderEmail = async ({
   targetWeekEndLabel,
   daysAhead
 }) => {
+  // Se declaran con 'let' fuera del bloque try para evitar errores de ReferenceError
+  // en el bloque catch al registrar o auditar fallos.
+  let subject = 'Recordatorio de escalación interna';
+  let config = null;
   try {
     if (!recipients || recipients.length === 0) {
       return;
     }
 
-    const config = await SmtpConfig.findOne({ isActive: true });
+    config = await SmtpConfig.findOne({ isActive: true });
     const { appTitle } = await getBrandingSnapshot();
     const systemName = getAppTitleForText(appTitle, 'el sistema');
     if (!config) {
@@ -697,13 +725,26 @@ const sendEscalationInternalReminderEmail = async ({
     }
 
     const decryptedPassword = decrypt(config.password);
+    
+    // Se resuelven las opciones de seguridad del puerto SMTP de forma estandarizada.
+    const transportSecurity = resolveTransportSecurityOptions({
+      port: config.port,
+      useTLS: config.useTLS
+    });
+
     const transporter = nodemailer.createTransport({
       host: config.host,
-      port: config.port,
-      secure: config.useTLS,
+      port: transportSecurity.port,
+      secure: transportSecurity.secure,
+      requireTLS: transportSecurity.requireTLS,
       auth: {
         user: config.username,
         pass: decryptedPassword
+      },
+      // Se fuerza la resolución de IPv4 para prevenir errores ENETUNREACH con IPv6 no ruteado.
+      lookup: (hostname, options, callback) => {
+        options.family = 4;
+        return require('dns').lookup(hostname, options, callback);
       }
     });
 
@@ -719,7 +760,7 @@ const sendEscalationInternalReminderEmail = async ({
       ? `${Number(daysAhead)} día(s)`
       : 'los próximos días';
 
-    const subject = formatBrandedSubject(appTitle, 'Recordatorio de escalación interna');
+    subject = formatBrandedSubject(appTitle, 'Recordatorio de escalación interna');
 
     const emailHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto;">
@@ -805,8 +846,8 @@ const sendEscalationInternalReminderEmail = async ({
         error: error.message,
         errorCode: error.code,
         errorCommand: error.command,
-        host: config.host,
-        port: config.port,
+        host: config?.host,
+        port: config?.port,
         diagnosticHint: 'Revisa credenciales SMTP, conexión de red, o logs del backend para más detalles'
       }
     }).catch((err) => logger.error({ err }, 'Audit escalation.email.failed failed'));

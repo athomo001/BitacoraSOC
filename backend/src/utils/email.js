@@ -311,6 +311,12 @@ async function createTransporter(configOverride = null) {
     auth: {
       user: config.user,
       pass: config.pass
+    },
+    lookup: (hostname, options, callback) => {
+      // Se fuerza la resolución de IPv4 (familia 4) para evitar fallos de conexión (ENETUNREACH)
+      // en entornos de red que no soportan ruteo IPv6 externo (como ciertos contenedores).
+      options.family = 4;
+      return require('dns').lookup(hostname, options, callback);
     }
   });
 }
