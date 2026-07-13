@@ -31,7 +31,8 @@ const {
 } = require('../utils/contactDirectory');
 const { parseBooleanLike } = require('../utils/boolean-helper');
 const { syncDirectoryContact, syncManyDirectoryContacts } = require('../utils/directory-sync');
-const { buildEscalationScheduleEmail } = require('../utils/escalationScheduleEmailTemplate');
+// Importar plantilla de correo centralizada
+const { buildEscalationScheduleEmail } = require('../templates/email');
 const { sendEmail } = require('../utils/email');
 
 const INTERNAL_SHIFT_ROLE_CODES = ['N1_NO_HABIL', 'N2', 'TI'];

@@ -1,19 +1,28 @@
 /**
- * File Purpose: backend/src/utils/incidentEmailTemplate.js
- * Responsibilities: Define the module behavior and maintain clear contracts.
- * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
+ * File Purpose: backend/src/templates/email/incidentReport.js
+ * Responsibilities: Define template generation logic for Incident Reports using MJML.
  */
 
 const fs = require('fs');
 const path = require('path');
 const mjml = require('mjml');
 
+/**
+ * Escapa caracteres HTML especiales para mitigar vulnerabilidades XSS.
+ * @param {any} v - Valor a escapar.
+ * @returns {string} Cadena de texto sanitizada.
+ */
 function e(v) {
   return String(v == null ? '' : v)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+/**
+ * Formatea un objeto fecha o string a formato de fecha dd-mm-aaaa.
+ * @param {Date|string} fecha - Fecha a formatear.
+ * @returns {string} Fecha formateada o guion si no es válida.
+ */
 function formatDate(fecha) {
   if (!fecha) return '-';
   try {
@@ -28,9 +37,8 @@ const CRITICIDAD_COLORS = {
   baja: '#27AE60', informativa: '#2980B9',
 };
 
-// ── Paletas predefinidas para el correo de incidentes ────────────────────────
-// Cada paleta define todos los colores del email.
-// La clave se guarda en AppConfig.incidentEmailPaletteKey.
+// Paletas predefinidas para el correo de incidentes.
+// Define el aspecto visual y contraste según el tipo seleccionado.
 const PALETTES = {
   'cdc-verde': {
     pageBg: '#173831', headerBg: '#155F50',
@@ -76,21 +84,35 @@ const PALETTES = {
   },
 };
 
-// Paleta activa por defecto (puede ser sobreescrita por parámetro paletteKey)
-const PALETTE = PALETTES['cdc-verde'];
-
+/**
+ * Resuelve la paleta de colores según la clave.
+ * @param {string} paletteKey - Clave de la paleta.
+ * @returns {Object} Paleta de colores seleccionada.
+ */
 function resolvePalette(paletteKey) {
   return PALETTES[paletteKey] || PALETTES['cdc-verde'];
 }
+
+/**
+ * Lee la tipografía de node_modules y la codifica en Base64 para incrustarla inline en el correo.
+ * @param {string} fileName - Nombre del archivo de fuente.
+ * @returns {string} Codificación Base64 de la fuente o vacío.
+ */
 function readFontBase64(fileName) {
   try {
-    const filePath = path.resolve(__dirname, '..', '..', 'node_modules', '@fontsource', 'inter', 'files', fileName);
+    // Al moverse a backend/src/templates/email/, debemos resolver la ruta hacia node_modules subiendo 3 niveles.
+    const filePath = path.resolve(__dirname, '..', '..', '..', 'node_modules', '@fontsource', 'inter', 'files', fileName);
     return fs.readFileSync(filePath).toString('base64');
   } catch {
     return '';
   }
 }
 
+/**
+ * Genera el CSS de la fuente embebida para un peso específico.
+ * @param {number} weight - Peso de la tipografía.
+ * @returns {string} Código CSS @font-face o vacío.
+ */
 function buildEmbeddedInterFont(weight) {
   const woff2 = readFontBase64(`inter-latin-ext-${weight}-normal.woff2`) || readFontBase64(`inter-latin-${weight}-normal.woff2`);
   const woff = readFontBase64(`inter-latin-ext-${weight}-normal.woff`) || readFontBase64(`inter-latin-${weight}-normal.woff`);
@@ -116,23 +138,21 @@ const EMBEDDED_INTER_CSS = [buildEmbeddedInterFont(400), buildEmbeddedInterFont(
   .filter(Boolean)
   .join('\n');
 
+/**
+ * Compila y construye el correo MJML para reportes de incidentes a HTML.
+ * @param {Object} data - Parámetros de generación del correo.
+ * @returns {Promise<{html: string, errors: Array}>} HTML final y warnings.
+ */
 async function buildIncidentEmail({ reportData: rd = {}, images = [], logoCid = null, autor = 'Analista SOC', brandName = 'Bitácora SOC', paletteKey = 'cdc-verde' }) {
-  // Resolvemos la paleta de colores según la clave seleccionada
   const P = resolvePalette(paletteKey);
-  // Color dinámico de criticidad (alta, media, baja, etc.)
-  const critStr   = String(rd.criticidad || 'media').toLowerCase();
+  const critStr = String(rd.criticidad || 'media').toLowerCase();
   const critColor = CRITICIDAD_COLORS[critStr] || '#E67E22';
-  const fechaStr  = formatDate(rd.fecha);
+  const fechaStr = formatDate(rd.fecha);
   const usableImages = images.filter((img, idx) => {
     const src = img && (img._isSrcOverride ? img._previewSrc : `cid:evidence-${idx + 1}@bitacora-incident`);
     return Boolean(src);
   });
 
-  const logoBlock = logoCid
-    ? `<mj-image src="${logoCid}" alt="${e(brandName)}" align="left" padding="0" width="188px" fluid-on-mobile="false" />`
-    : `<mj-text css-class="inter-title" align="left" color="${P.headerText}" font-size="28px" font-weight="700" padding="0">${e(brandName)}</mj-text>`;
-
-  // Tabla de "Información del Evento" (lado izquierdo etiqueta, lado derecho valor)
   const fieldDefs = [
     { label: 'Ofensa',                  value: rd.ofensa },
     { label: 'Tipo de operación',       value: rd.tipoOperacion },
@@ -154,8 +174,7 @@ async function buildIncidentEmail({ reportData: rd = {}, images = [], logoCid = 
 </tr>`;
   }).join('\n');
 
-  // Bloques opcionales de texto libre
-  const obsHtml  = rd.observaciones
+  const obsHtml = rd.observaciones
     ? `<mj-text css-class="inter-panel" font-size="14px" color="${P.bodyText}" padding="0px" line-height="24px"><span style="font-weight:700;">Observaciones</span><br/>${e(rd.observaciones).replace(/\n/g, '<br/>')}</mj-text>`
     : '';
   const recomHtml = rd.recomendacion && String(rd.recomendacion).trim()
@@ -175,7 +194,6 @@ async function buildIncidentEmail({ reportData: rd = {}, images = [], logoCid = 
     if (idx < usableImages.length - 1) evidenceContent += `\n        <mj-spacer height="12px"></mj-spacer>`;
   });
 
-  // Sección opcional de evidencia (texto + imágenes)
   const evidenceSection = hasEvidence ? `
     <mj-section background-color="transparent" padding="0">
       <mj-column padding="0">
@@ -191,7 +209,6 @@ async function buildIncidentEmail({ reportData: rd = {}, images = [], logoCid = 
       </mj-column>
     </mj-section>` : '';
 
-  // Sección opcional de información adicional (bloque rojo)
   const infoSection = rd.informacionAdicional && String(rd.informacionAdicional).trim()
     ? `
     <mj-section background-color="transparent" padding="0">
@@ -228,11 +245,8 @@ async function buildIncidentEmail({ reportData: rd = {}, images = [], logoCid = 
   <mj-body background-color="#FFFFFF" width="900px">
     <mj-wrapper background-color="${P.pageBg}" padding="16px 0">
     
-    <!-- CABECERA COMPACTA: Todo en una sola sección para evitar saltos -->
     <mj-section padding="10px 24px 20px 24px" background-color="${P.headerBg}" border-radius="16px 16px 16px 16px">
       <mj-column width="100%">
-        
-        <!-- Fila de Logo y Criticidad: Reducimos el padding inferior a 10px -->
         <mj-table padding="0 0 10px 0">
           <tr>
             <td style="width:60%; vertical-align:middle;">
@@ -250,12 +264,10 @@ async function buildIncidentEmail({ reportData: rd = {}, images = [], logoCid = 
           </tr>
         </mj-table>
 
-        <!-- Título Principal: Bajamos el padding superior de 25px a 5px para que suba -->
         <mj-text css-class="inter-title" align="center" color="${P.headerText}" font-size="28px" font-weight="700" padding="5px 0 15px 0" line-height="32px">
           Reporte de Detección
         </mj-text>
 
-        <!-- Resumen: evento + ticket -->
         <mj-text css-class="inter-title" font-size="18px" color="${P.headerText}" font-weight="700" padding="0 0 2px 0" line-height="22px">
           ${e(rd.nombreEvento || '-')}
         </mj-text>
@@ -267,27 +279,24 @@ async function buildIncidentEmail({ reportData: rd = {}, images = [], logoCid = 
       </mj-column>
     </mj-section>
 
-    <!-- Separador visual entre cabecera y tarjeta principal -->
     <mj-section background-color="transparent" padding="0">
       <mj-column padding="0">
         <mj-spacer height="16px"></mj-spacer>
       </mj-column>
     </mj-section>
 
-    <!-- Tarjeta principal: título de sección -->
     <mj-section background-color="${P.cardBg}" padding="0px" border-radius="10px 10px 0 0">
       <mj-column padding="24px 32px 0 32px">
         <mj-text css-class="inter-panel" font-size="18px" color="${P.bodyText}" font-weight="700" padding="0px">Información del Evento</mj-text>
       </mj-column>
     </mj-section>
 
-    <!-- Tabla de campos del evento -->
     <mj-section padding="0px" background-color="${P.cardBg}">
       <mj-column padding="12px 32px 0 32px">
         <mj-table css-class="inter-panel" font-size="14px" color="${P.bodyText}">${fieldRows}</mj-table>
       </mj-column>
     </mj-section>
-    <!-- Observaciones / recomendación -->
+    
     <mj-section padding="18px 0 24px 0" background-color="${P.cardBg}">
       <mj-column padding="0 32px">
         ${obsHtml}
@@ -295,7 +304,6 @@ async function buildIncidentEmail({ reportData: rd = {}, images = [], logoCid = 
       </mj-column>
     </mj-section>
 
-    <!-- Remate inferior de la tarjeta principal antes de secciones opcionales -->
     <mj-section background-color="${P.cardBg}" padding="0">
       <mj-column padding="0 32px">
         <mj-spacer height="2px"></mj-spacer>
@@ -307,7 +315,6 @@ async function buildIncidentEmail({ reportData: rd = {}, images = [], logoCid = 
     ${infoSection}
     </mj-wrapper>
 
-    <!-- Footer del correo -->
     <mj-section padding="24px 0px">
       <mj-column>
         <mj-text align="center" color="#888888" font-size="12px">
@@ -324,8 +331,7 @@ async function buildIncidentEmail({ reportData: rd = {}, images = [], logoCid = 
 }
 
 /**
- * Versión para preview (navegador): usa data URIs en lugar de CIDs
- * para que las imágenes sean visibles sin adjuntos MIME.
+ * Versión para previsualización (navegador) utilizando data URIs en vez de CIDs de adjunto MIME.
  */
 async function buildIncidentEmailPreview(opts) {
   const { images = [], ...rest } = opts;
