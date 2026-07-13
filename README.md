@@ -64,11 +64,12 @@ Stack principal:
 
 ## Novedades recientes (resumen rapido)
 
-### v1.6.21 (Filtros de búsqueda de entradas, exportación a CSV y corrección de cifrado en directorio)
+### v1.6.21 (Filtros de búsqueda de entradas, exportación a CSV, corrección de cifrado en directorio y reparación de correos SMTP)
 
 - **Mejoras en Búsqueda de Entradas**: Adición de selector de preajustes de fecha (3, 7, 15, 30, 60, 90 días, rango personalizado) con controles interactivos condicionales de calendario, filtro por analista y botón para descargar reportes en CSV en tiempo real.
 - **Exportación en Backend**: Endpoint `/api/entries/export` para descargar la bitácora completa y checklists unificados. Configurado con UTF-8 BOM para apertura directa en Microsoft Excel sin fallas de codificación.
 - **Bugfix de Cifrado en Directorio**: Corrección del error de visualización de datos cifrados con hashes / dos puntos en el directorio global para usuarios internos. Implementada interceptación en `encrypt` para evitar el doble cifrado y ejecutada migración correctora sobre 13 registros afectados.
+- **Bugfix de Notificaciones SMTP**: Resolución de ReferenceError y TypeError de scoping/logging en el bloque catch, junto con forzado de resolución IPv4 e inicio TLS correcto (STARTTLS) sobre puerto 587 para solucionar fallos `ENETUNREACH` de envío de correos automáticos.
 
 ### v1.6.20 (API Keys robustas, logs de auditoría en tiempo real, renderizador de MJML y envío SMTP de incidentes)
 

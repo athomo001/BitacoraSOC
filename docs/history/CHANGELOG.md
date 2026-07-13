@@ -4,7 +4,7 @@ Registro de cambios relevantes del proyecto.
 
 ## [v1.6.21] - 2026-07-13
 
-### Filtros avanzados en búsqueda de entradas, exportación no paginada a CSV y corrección de cifrado en el directorio
+### Filtros avanzados en búsqueda de entradas, exportación no paginada a CSV, corrección de cifrado en el directorio y reparación del envío de correos SMTP
 
 - **Mejoras en Búsqueda de Entradas (`/main/all-entries`)**:
   - Incorporación de un selector de rango predefinido de fechas (3, 7, 15, 30, 60, 90 días, cualquier fecha y rango personalizado).
@@ -19,6 +19,11 @@ Registro de cambios relevantes del proyecto.
   - Corrección del error que provocaba la visualización de datos cifrados con hashes / dos puntos (`:`) para usuarios internos del SOC.
   - Modificación de la función de cifrado (`encrypt`) en `encryption.js` para evitar encriptar cadenas que ya se encuentran cifradas bajo el esquema AES-256-GCM o legacy.
   - Ejecución de un script de migración nativa (`fix-double-encryption.js`) que analizó las colecciones de base de datos `directorycontacts` y `contacts`, corrigiendo exitosamente 13 registros de emails y teléfonos con doble cifrado de vuelta a cifrado simple descifrable.
+- **Bugfix en el Módulo de Notificaciones y Envío de Correos Automáticos (SMTP)**:
+  - Corrección de un error de alcance (`ReferenceError: subject/config is not defined`) en el bloque `catch` de la función `sendEscalationInternalReminderEmail` de `routes/smtp.js`.
+  - Corrección de la importación del logger en `smtp.js` para resolver el error `TypeError: logger.error is not a function`.
+  - Implementación de un resolvedor DNS personalizado (`lookup` con `family: 4`) en todas las instancias de Nodemailer para evitar errores de red inalcanzable (`ENETUNREACH`) asociados a la resolución IPv6 de Office 365.
+  - Integración del helper centralizado `resolveTransportSecurityOptions` en las notificaciones automáticas en segundo plano (`sendChecklistEmail`, `sendChecklistAlertEmail` y `sendEscalationInternalReminderEmail`) para configurar correctamente STARTTLS (puerto 587) en vez de activar ciegamente TLS directo (`secure: true`).
 
 ---
 
