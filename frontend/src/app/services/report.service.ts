@@ -4,36 +4,11 @@
  * QA Notes: Keep business rules explicit, validate edge cases, and preserve traceability.
  */
 
-/**
- * Servicio de Reportes y Análisis
- * 
- * Funcionalidad:
- *   - Dashboard con KPIs y métricas SOC (solo admin)
- *   - Exportación de entradas a CSV
- * 
- * Endpoints:
- *   - GET /api/reports/overview       - KPIs agregados (últimos N días)
- *   - GET /api/reports/export-entries - CSV de entradas (rango fechas)
- * 
- * KPIs Calculados:
- *   - Entradas por tipo (operativa/incidente)
- *   - Incidentes por analista (top 10)
- *   - Tags más usados (top 15)
- *   - Servicios con rojos (frecuencia)
- *   - Tendencia temporal (series por día)
- *   - Total usuarios activos
- *   - Total checks de turno
- * 
- * Uso SOC:
- *   - Admin monitorea operación desde /main/reports
- *   - Identificar analistas más activos, tags recurrentes, servicios problemáticos
- *   - Exports para auditorías externas o backups offline
- */
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '@env/environment';
-import { MailAnalytics, ReportOverview, TagStats, PeriodSummaryReport } from '../models/report.model';
+import { MailAnalytics, ReportOverview, PeriodSummaryReport } from '../models/report.model';
 
 @Injectable({
   providedIn: 'root'
@@ -92,5 +67,18 @@ export class ReportService {
       .set('startDate', startDate)
       .set('endDate', endDate);
     return this.http.get<PeriodSummaryReport>(`${this.API_URL}/period-summary`, { params });
+  }
+
+  /**
+   * Obtiene las estadísticas de uso y el análisis de calidad de los analistas.
+   * @param days Cantidad de días del período analizado
+   * @param userId ID del usuario específico o 'all' para todos
+   */
+  getUserStats(days = 30, userId = 'all', includeAllUsers = false): Observable<any> {
+    const params = new HttpParams()
+      .set('days', days.toString())
+      .set('userId', userId)
+      .set('includeAllUsers', includeAllUsers.toString());
+    return this.http.get<any>(`${this.API_URL}/user-stats`, { params });
   }
 }

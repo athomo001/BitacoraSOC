@@ -28,6 +28,7 @@ const { parseBooleanFlag } = require('../utils/boolean-helper');
 const router = express.Router();
 const Entry = require('../models/Entry');
 const ShiftCheck = require('../models/ShiftCheck');
+const ShiftAssignment = require('../models/ShiftAssignment');
 const User = require('../models/User');
 const Contact = require('../models/Contact');
 const DirectoryContact = require('../models/DirectoryContact');
@@ -636,7 +637,7 @@ router.get('/history', authenticate, async (req, res) => {
 });
 
 // POST /api/reports/history - Registrar item en historial compartido
-router.post('/history', authenticate, authorize('admin', 'user'), async (req, res) => {
+router.post('/history', authenticate, authorize('admin', 'user', 'auditor'), async (req, res) => {
   try {
     const type = String(req.body?.type || '').trim();
     const title = String(req.body?.title || '').trim();
@@ -796,7 +797,7 @@ router.get('/overview', authenticate, async (req, res) => {
 
 // GET /api/reports/export-entries - Exportar entradas a CSV
 // Solo admin puede exportar archivos
-router.get('/export-entries', authenticate, authorize('admin'), async (req, res) => {
+router.get('/export-entries', authenticate, authorize('admin', 'auditor'), async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
 
@@ -1335,7 +1336,7 @@ const limitConcurrency = async (tasks, limit) => {
 };
 
 // POST /api/reports/newsletter/send - Envío de boletines (1:1 o agrupado por dominio con CC compartido)
-router.post('/newsletter/send', authenticate, authorize('admin', 'user'), async (req, res) => {
+router.post('/newsletter/send', authenticate, authorize('admin', 'user', 'auditor'), async (req, res) => {
   try {
     const { recipients, cc, subject, html, analytics } = req.body;
     const groupByDomain = parseBooleanFlag(req.body?.groupByDomain, true);
@@ -1595,7 +1596,7 @@ router.post('/incident/preview', authenticate, async (req, res) => {
 });
 
 // POST /api/reports/incident/send - Envío de reporte de incidente (MJML)
-router.post('/incident/send', authenticate, authorize('admin', 'user'), async (req, res) => {
+router.post('/incident/send', authenticate, authorize('admin', 'user', 'auditor'), async (req, res) => {
   const { to, cc, subject, reportData, images } = req.body;
   try {
 
@@ -2190,5 +2191,667 @@ function generateHeuristicNarrative(entries, checklists, sDate, eDate) {
     diagnosticoActual
   };
 }
+
+/**
+ * Heurísticas de control de calidad y cumplimiento del registro de bitácora.
+ * Evalúa vicios comunes (copy-paste, ráfagas, lote de tickets, extremos del turno).
+ * Retorna un Score del 0 al 100% y alertas de vicios.
+ */
+function calculateUserQuality(entries = [], days = 30) {
+  if (entries.length === 0) {
+    return {
+      score: 0,
+      status: 'Sin registros',
+      vicios: {
+        copyPaste: false,
+        copyPercent: 0,
+        burstLogging: false,
+        burstPercent: 0,
+        batching: false,
+        batchPercent: 0,
+        extremesConcentration: false,
+        extremesPercent: 0,
+        shortEntries: false,
+        shortPercent: 0
+      }
+    };
+  }
+
+  let score = 100;
+  const totalEntries = entries.length;
+
+  // 1. Detección de Copy-Paste (Duplicidad exacta de textos)
+  const contentMap = {};
+  let duplicateCount = 0;
+  entries.forEach(e => {
+    const cleanContent = String(e.content || '').trim().toLowerCase();
+    if (cleanContent.length > 5) {
+      contentMap[cleanContent] = (contentMap[cleanContent] || 0) + 1;
+    }
+  });
+
+  Object.values(contentMap).forEach(count => {
+    if (count > 1) {
+      duplicateCount += (count - 1);
+    }
+  });
+
+  const copyPastePercent = parseFloat(((duplicateCount / totalEntries) * 100).toFixed(1));
+  const copyPastePenalization = Math.min(copyPastePercent * 1.5, 40); // Max 40 pts
+  score -= copyPastePenalization;
+
+  // 2. Detección de Registro en Ráfagas (Burst Logging: diferencia < 2 minutos en creación real)
+  let burstCount = 0;
+  const sortedByCreated = [...entries].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  for (let i = 1; i < sortedByCreated.length; i++) {
+    const diff = new Date(sortedByCreated[i].createdAt).getTime() - new Date(sortedByCreated[i-1].createdAt).getTime();
+    if (diff < 120000) { // < 2 minutos
+      burstCount++;
+    }
+  }
+
+  const burstPercent = parseFloat(((burstCount / totalEntries) * 100).toFixed(1));
+  const burstPenalization = Math.min(burstPercent * 1.0, 30); // Max 30 pts
+  score -= burstPenalization;
+
+  // 3. Detección de Registro Acumulado en Lote (Batching)
+  // Identifica si se consolidan múltiples tickets/casos en una sola entrada general operativa (vicio de lote)
+  let batchCount = 0;
+  entries.forEach(e => {
+    const content = String(e.content || '');
+    const ticketPatternCount = (content.match(/(ticket|inc|incidente|caso|ofensa|id|solicitud|sd)\s*#?\s*\d+/gi) || []).length;
+    const numericListCount = (content.match(/\b\d{4,8}\b/g) || []).length;
+    
+    if (ticketPatternCount > 2 || numericListCount > 2) {
+      batchCount++;
+    }
+  });
+
+  const batchPercent = parseFloat(((batchCount / totalEntries) * 100).toFixed(1));
+  const batchPenalization = Math.min(batchPercent * 0.8, 20); // Max 20 pts
+  score -= batchPenalization;
+
+  // 4. Concentración en Extremos de Turno
+  // Agrupa entradas por día y calcula si solo registra al inicio y al final sin registros intermedios
+  const dailyGroups = {};
+  entries.forEach(e => {
+    if (e.entryDate) {
+      const dayStr = new Date(e.entryDate).toISOString().slice(0, 10);
+      if (!dailyGroups[dayStr]) dailyGroups[dayStr] = [];
+      dailyGroups[dayStr].push(e);
+    }
+  });
+
+  let extremeDaysCount = 0;
+  const totalDaysWithEntries = Object.keys(dailyGroups).length;
+
+  Object.values(dailyGroups).forEach(dayEntries => {
+    if (dayEntries.length < 3) return;
+
+    const hours = dayEntries.map(e => {
+      const parts = e.entryTime.split(':');
+      return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10); // minutos transcurridos en el día
+    }).sort((a, b) => a - b);
+
+    const minTime = hours[0];
+    const maxTime = hours[hours.length - 1];
+    const span = maxTime - minTime;
+    
+    if (span > 300) { // Si hay brecha de más de 5 horas
+      let intermediateCount = 0;
+      hours.forEach(m => {
+        if (m > minTime + 45 && m < maxTime - 45) {
+          intermediateCount++;
+        }
+      });
+      if (intermediateCount === 0) { // Todos en extremos (primeros 45 min o últimos 45 min)
+        extremeDaysCount++;
+      }
+    }
+  });
+
+  const extremesPercent = totalDaysWithEntries > 0 ? parseFloat(((extremeDaysCount / totalDaysWithEntries) * 100).toFixed(1)) : 0;
+  const extremesPenalization = Math.min(extremesPercent * 0.5, 20); // Max 20 pts
+  score -= extremesPenalization;
+
+  // 5. Entradas demasiado cortas o genéricas
+  let shortCount = 0;
+  entries.forEach(e => {
+    if (e.content && e.content.length < 40) {
+      shortCount++;
+    }
+  });
+
+  const shortEntriesPercent = parseFloat(((shortCount / totalEntries) * 100).toFixed(1));
+  const shortPenalization = Math.min(shortEntriesPercent * 0.4, 15); // Max 15 pts
+  score -= shortPenalization;
+
+  // 6. Detección de Rutina Exclusiva de Apertura/Cierre (Falta de registros intermedios intradía)
+  let routineVicioDays = 0;
+  Object.values(dailyGroups).forEach(dayEntries => {
+    // Si tiene 1 o 2 entradas en el día (lo usual para rutina inicio/cierre sin tareas intermedias)
+    if (dayEntries.length <= 2) {
+      let hasRoutineEntry = false;
+      dayEntries.forEach(e => {
+        const text = String(e.content || '').toLowerCase();
+        const hasRoutineKeyword = text.includes('iniciodeturno') || 
+                                  text.includes('cierredeturno') || 
+                                  text.includes('inicio de turno') || 
+                                  text.includes('cierre de turno') ||
+                                  text.includes('[inicio]') ||
+                                  text.includes('[cierre]');
+        const hasRoutineTag = Array.isArray(e.tags) && e.tags.some(t => {
+          const cleanT = String(t || '').toLowerCase().trim();
+          return cleanT === 'iniciodeturno' || cleanT === 'cierredeturno' || cleanT === 'inicio' || cleanT === 'cierre';
+        });
+        if (hasRoutineKeyword || hasRoutineTag) {
+          hasRoutineEntry = true;
+        }
+      });
+      if (hasRoutineEntry) {
+        routineVicioDays++;
+      }
+    }
+  });
+
+  const routinePercent = totalDaysWithEntries > 0 ? parseFloat(((routineVicioDays / totalDaysWithEntries) * 100).toFixed(1)) : 0;
+  const routinePenalization = routinePercent > 30 ? 25 : 0; // Penalización fija de 25 puntos
+  score -= routinePenalization;
+
+  // 7. Bonificación por Riqueza Técnica (Términos del SOC)
+  let technicalCount = 0;
+  const socGlossary = ['firewall', 'puerto', 'ip', 'ticket', 'bloqueo', 'incidente', 'alerta', 'servidor', 'caida', 'backup', 'vpn', 'vulnerabilidad', 'ofensa', 'siem', 'antivirus', 'correo', 'phishing', 'analisis', 'log', 'ips', 'ids', 'mantenimiento', 'nok', 'monitoreo', 'novedad', 'turno', 'cierre', 'inicio'];
+  entries.forEach(e => {
+    const text = String(e.content || '').toLowerCase();
+    const hasSocTerm = socGlossary.some(term => text.includes(term));
+    if (hasSocTerm) {
+      technicalCount++;
+    }
+  });
+
+  const technicalPercent = parseFloat(((technicalCount / totalEntries) * 100).toFixed(1));
+  const technicalBonus = Math.min((technicalPercent / 10), 10); // Max 10 pts
+  score += technicalBonus;
+
+  score = Math.max(0, Math.min(100, Math.round(score)));
+
+  let status = 'Excelente';
+  if (score < 50) status = 'Sospecha de Relleno';
+  else if (score < 75) status = 'Simplificado';
+  else if (score < 90) status = 'Estable';
+
+  return {
+    score,
+    status,
+    vicios: {
+      copyPaste: copyPastePercent > 20,
+      copyPercent: copyPastePercent,
+      burstLogging: burstPercent > 25,
+      burstPercent,
+      batching: batchPercent > 20,
+      batchPercent,
+      extremesConcentration: extremesPercent > 25,
+      extremesPercent,
+      shortEntries: shortEntriesPercent > 30,
+      shortPercent: shortEntriesPercent,
+      routineOnly: routinePercent > 30,
+      routinePercent
+    }
+  };
+}
+
+/**
+ * Extrae las palabras clave más recurrentes (glosario y temas del SOC) omitiendo stop words comunes
+ */
+function extractTopKeywords(entries = [], limit = 6) {
+  const wordsMap = {};
+  const stopWords = new Set([
+    'el', 'la', 'los', 'las', 'de', 'del', 'al', 'en', 'y', 'o', 'un', 'una', 'unos', 'unas',
+    'que', 'se', 'para', 'por', 'con', 'sin', 'su', 'sus', 'lo', 'les', 'nos', 'mi', 'mis',
+    'este', 'esta', 'estos', 'estas', 'eso', 'esa', 'esos', 'esas', 'a', 'ante', 'bajo', 'cabe',
+    'contra', 'desde', 'hacia', 'hasta', 'segun', 'so', 'sobre', 'tras', 'durante', 'mediante',
+    'versus', 'via', 'como', 'cuando', 'donde', 'quien', 'quienes', 'cual', 'cuales', 'cuyo',
+    'cuya', 'cuyos', 'cuyas', 'mas', 'pero', 'sino', 'porque', 'como', 'es', 'son', 'fue',
+    'fueron', 'era', 'eran', 'sera', 'seran', 'he', 'ha', 'han', 'hay', 'hubo', 'habia',
+    'esta', 'estan', 'estaba', 'estaban', 'tiene', 'tienen', 'tenia', 'tenian', 'hacer', 'hace',
+    'hacen', 'hacia', 'hacian', 'todo', 'todos', 'toda', 'todas', 'ya', 'muy', 'tambien', 'solo',
+    'sobre', 'no', 'si', 'sí', 'entonces', 'así', 'algun', 'alguna', 'algunos', 'algunas',
+    'otro', 'otra', 'otros', 'otras', 'caso', 'casos', 'ticket', 'tickets', 'entrada', 'entradas',
+    'bitacora', 'analista', 'analistas', 'turno', 'operativo', 'observacion', 'observaciones',
+    'novedad', 'novedades', 'inicio', 'cierre', 'novedad', 'sin', 'novedades', 'realizo', 'realiza',
+    'se', 'me', 'te', 'le', 'nos', 'os', 'les', 'por', 'para', 'como', 'con', 'contra', 'entre',
+    'hacia', 'hasta', 'para', 'por', 'segun', 'sin', 'sobre', 'tras', 'durante', 'mediante', 'etc'
+  ]);
+
+  entries.forEach(e => {
+    const text = String(e.content || '').toLowerCase();
+    // Limpiar puntuación básica, guiones y barras
+    const words = text.replace(/[.,;:()'"?!-\/]/g, ' ').split(/\s+/);
+    words.forEach(w => {
+      const cleanW = w.trim();
+      if (cleanW.length > 3 && !stopWords.has(cleanW) && isNaN(cleanW)) {
+        wordsMap[cleanW] = (wordsMap[cleanW] || 0) + 1;
+      }
+    });
+  });
+
+  return Object.entries(wordsMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(entry => entry[0]);
+}
+
+// GET /api/reports/user-stats - Estadísticas de uso y cumplimiento de calidad de los analistas
+router.get('/user-stats', authenticate, async (req, res) => {
+  try {
+    // Regla de Seguridad: Solo admin, auditor y analistas N2 pueden ver/ejecutar estos reportes de calidad
+    const isUserN2 = req.user.role === 'user' && req.user.cargoLabel === 'N2';
+    const isAuthorized = req.user.role === 'admin' || req.user.role === 'auditor' || isUserN2;
+    if (!isAuthorized) {
+      return res.status(403).json({ message: 'Acceso denegado: permisos insuficientes para consultar estadísticas de analistas.' });
+    }
+
+    const { days = 30, userId = 'all', includeAllUsers = 'false' } = req.query;
+    const parsedDays = parseInt(days, 10) || 30;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parsedDays);
+    startDate.setHours(0, 0, 0, 0);
+
+    let userQuery = {};
+    let selectedUser = null;
+
+    if (userId && userId !== 'all') {
+      const mongoose = require('mongoose');
+      if (mongoose.Types.ObjectId.isValid(userId)) {
+        selectedUser = await User.findById(userId).lean();
+        if (!selectedUser) {
+          return res.status(404).json({ message: 'Usuario no encontrado' });
+        }
+        userQuery.createdBy = selectedUser._id;
+      } else {
+        return res.status(400).json({ message: 'ID de usuario inválido' });
+      }
+    }
+
+    // Consultar entradas en el período
+    const entries = await Entry.find({
+      entryDate: { $gte: startDate },
+      ...userQuery
+    }).sort({ entryDate: 1, entryTime: 1 }).lean();
+
+    // Obtener analistas activos. Por defecto se centra netamente en N1 y N2, a menos que includeAllUsers sea 'true'
+    const cargoFilter = includeAllUsers === 'true'
+      ? { isActive: true, role: 'user' }
+      : { isActive: true, role: 'user', cargoLabel: { $in: ['N1', 'N2'] } };
+    
+    const activeCargoUsers = await User.find(cargoFilter, 'username fullName cargoLabel').lean();
+
+    // Obtener analistas que tienen registros de entradas en el periodo evaluado
+    const distinctCreatorIds = [...new Set(entries.map(e => String(e.createdBy)).filter(id => id && id !== 'undefined'))];
+    const activeCreators = await User.find({
+      _id: { $in: distinctCreatorIds },
+      role: { $in: ['user', 'admin'] }
+    }, 'username fullName cargoLabel').lean();
+
+    // Unir ambas listas de forma única por ID de usuario
+    const mergedUsersMap = new Map();
+    activeCargoUsers.forEach(u => mergedUsersMap.set(String(u._id), u));
+    activeCreators.forEach(u => mergedUsersMap.set(String(u._id), u));
+    
+    const usersList = Array.from(mergedUsersMap.values());
+
+    // Obtener las ausencias registradas (licencias médicas o vacaciones) que se solapen con el período para los usuarios listados
+    const userIds = usersList.map(u => u._id);
+    const activeAbsences = await ShiftAssignment.find({
+      userId: { $in: userIds },
+      roleCode: { $in: ['MEDICAL_LEAVE', 'VACATION'] },
+      weekStartDate: { $lte: new Date() },
+      weekEndDate: { $gte: startDate }
+    }).lean();
+
+    const absencesByUserId = {};
+    activeAbsences.forEach(abs => {
+      const uid = String(abs.userId);
+      if (!absencesByUserId[uid]) absencesByUserId[uid] = [];
+      absencesByUserId[uid].push(abs);
+    });
+
+    // Si es "Todos los usuarios", calcularemos estadísticas grupales
+    if (userId === 'all') {
+      const statsByUser = {};
+      
+      // Inicializar estadísticas para cada usuario analista de la lista
+      usersList.forEach(u => {
+        statsByUser[u.username] = {
+          userId: String(u._id),
+          username: u.username,
+          fullName: u.fullName,
+          totalEntries: 0,
+          operativa: 0,
+          incidente: 0,
+          ofensa: 0,
+          entries: []
+        };
+      });
+
+      // Agrupar entradas por usuario
+      entries.forEach(e => {
+        const username = e.createdByUsername || 'Desconocido';
+        if (!statsByUser[username]) {
+          // Si no existía en el filtro (ej. administrador o cuenta inactiva que registró entradas), lo ignoramos
+          // ya que queremos restringir el análisis netamente a la lista oficial de analistas N1/N2
+          return;
+        }
+        statsByUser[username].totalEntries++;
+        if (e.entryType === 'operativa') statsByUser[username].operativa++;
+        else if (e.entryType === 'incidente') statsByUser[username].incidente++;
+        else if (e.entryType === 'ofensa') statsByUser[username].ofensa++;
+        statsByUser[username].entries.push(e);
+      });
+
+      // Filtrar usuarios del leaderboard que efectivamente tengan estadísticas calculadas
+      const userListStats = Object.values(statsByUser).map(userStats => {
+        const qualityDetails = calculateUserQuality(userStats.entries, parsedDays);
+        
+        // Calcular métricas temporales individuales para el leaderboard
+        const uEntriesTrend = {};
+        const uHourlyDistribution = Array(24).fill(0);
+        userStats.entries.forEach(e => {
+          if (e.entryDate) {
+            const dateStr = new Date(e.entryDate).toISOString().slice(0, 10);
+            uEntriesTrend[dateStr] = true;
+          }
+          if (e.entryTime) {
+            const hour = parseInt(e.entryTime.split(':')[0], 10);
+            if (hour >= 0 && hour < 24) uHourlyDistribution[hour]++;
+          }
+        });
+        const uActiveDays = Object.keys(uEntriesTrend).length;
+        const uAvgPerActiveDay = uActiveDays > 0 ? parseFloat((userStats.totalEntries / uActiveDays).toFixed(2)) : 0;
+        
+        let uMaxCount = 0;
+        let uPeakHour = 'N/A';
+        uHourlyDistribution.forEach((count, hour) => {
+          if (count > uMaxCount) {
+            uMaxCount = count;
+            uPeakHour = `${hour}:00`;
+          }
+        });
+
+        // Buscar ausencias del usuario en este periodo
+        let totalAbsenceDays = 0;
+        let currentAbsence = null;
+        const hoy = new Date();
+        const uidStr = String(userStats.userId);
+        
+        (absencesByUserId[uidStr] || []).forEach(abs => {
+          const overlapStart = new Date(Math.max(startDate.getTime(), new Date(abs.weekStartDate).getTime()));
+          const overlapEnd = new Date(Math.min(hoy.getTime(), new Date(abs.weekEndDate).getTime()));
+          const diffMs = overlapEnd.getTime() - overlapStart.getTime();
+          if (diffMs > 0) {
+            const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1;
+            totalAbsenceDays += days;
+          }
+          if (new Date(abs.weekStartDate) <= hoy && new Date(abs.weekEndDate) >= hoy) {
+            currentAbsence = abs;
+          }
+        });
+
+        let finalStatus = qualityDetails.status;
+        let finalScore = qualityDetails.score;
+
+        if (userStats.totalEntries === 0 && totalAbsenceDays > 0) {
+          const firstAbs = absencesByUserId[uidStr][0];
+          const isMedical = (currentAbsence ? currentAbsence.roleCode : firstAbs.roleCode) === 'MEDICAL_LEAVE';
+          finalStatus = isMedical ? 'Licencia Médica' : 'Vacaciones';
+          finalScore = 0;
+        }
+
+        return {
+          userId: userStats.userId,
+          username: userStats.username,
+          fullName: userStats.fullName,
+          totalEntries: userStats.totalEntries,
+          operativa: userStats.operativa,
+          incidente: userStats.incidente,
+          ofensa: userStats.ofensa,
+          qualityScore: finalScore,
+          qualityStatus: finalStatus,
+          vicios: qualityDetails.vicios,
+          activeDays: uActiveDays,
+          averageEntriesPerActiveDay: uAvgPerActiveDay,
+          peakHour: uPeakHour,
+          absence: totalAbsenceDays > 0 ? {
+            hasAbsence: true,
+            absenceType: currentAbsence ? currentAbsence.roleCode : absencesByUserId[uidStr][0].roleCode,
+            absenceDays: totalAbsenceDays,
+            absenceLabel: (currentAbsence ? currentAbsence.roleCode : absencesByUserId[uidStr][0].roleCode) === 'MEDICAL_LEAVE' ? 'Licencia Médica' : 'Vacaciones',
+            onAbsenceNow: !!currentAbsence,
+            absencePeriodText: currentAbsence ? `Del ${new Date(currentAbsence.weekStartDate).toLocaleDateString('es-CL')} al ${new Date(currentAbsence.weekEndDate).toLocaleDateString('es-CL')}` : ''
+          } : null
+        };
+      }).sort((a, b) => b.totalEntries - a.totalEntries);
+
+      // Agrupación de métricas globales
+      const globalHourlyDistribution = Array(24).fill(0);
+      const globalWeeklyDistribution = Array(7).fill(0);
+      const globalEntriesTrend = {};
+      const globalTagsMap = {};
+      const globalClientsMap = {};
+
+      // Filtrar entradas globales para considerar únicamente los analistas activos N1/N2
+      const activeUserIds = new Set(usersList.map(u => String(u._id)));
+      const filteredEntries = entries.filter(e => e.createdBy && activeUserIds.has(String(e.createdBy)));
+
+      filteredEntries.forEach(e => {
+        if (e.entryTime) {
+          const hour = parseInt(e.entryTime.split(':')[0], 10);
+          if (hour >= 0 && hour < 24) globalHourlyDistribution[hour]++;
+        }
+        if (e.entryDate) {
+          const day = new Date(e.entryDate).getDay();
+          if (day >= 0 && day < 7) globalWeeklyDistribution[day]++;
+          const dateStr = new Date(e.entryDate).toISOString().slice(0, 10);
+          globalEntriesTrend[dateStr] = (globalEntriesTrend[dateStr] || 0) + 1;
+        }
+        if (Array.isArray(e.tags)) {
+          e.tags.forEach(t => {
+            globalTagsMap[t] = (globalTagsMap[t] || 0) + 1;
+          });
+        }
+        if (e.clientName) {
+          globalClientsMap[e.clientName] = (globalClientsMap[e.clientName] || 0) + 1;
+        }
+      });
+
+      const hourlyData = globalHourlyDistribution.map((count, hour) => ({ name: `${hour}:00`, value: count }));
+      const daysOfWeekNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+      const weeklyData = globalWeeklyDistribution.map((count, dayIndex) => ({ name: daysOfWeekNames[dayIndex], value: count }));
+      const trendData = Object.entries(globalEntriesTrend).map(([date, count]) => ({ name: date, value: count })).sort((a,b) => a.name.localeCompare(b.name));
+      const topTags = Object.entries(globalTagsMap).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value).slice(0, 10);
+      const topClients = Object.entries(globalClientsMap).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value).slice(0, 10);
+
+      let topAnalyst = { username: 'N/A', count: 0 };
+      let topIncidentReporter = { username: 'N/A', count: 0 };
+      userListStats.forEach(u => {
+        if (u.totalEntries > topAnalyst.count) {
+          topAnalyst = { username: u.fullName, count: u.totalEntries };
+        }
+        const totalInc = u.incidente + u.ofensa;
+        if (totalInc > topIncidentReporter.count) {
+          topIncidentReporter = { username: u.fullName, count: totalInc };
+        }
+      });
+
+      // Metricas temporales consolidadas
+      const activeDays = Object.keys(globalEntriesTrend).length;
+      const averageEntriesPerActiveDay = activeDays > 0 ? parseFloat((filteredEntries.length / activeDays).toFixed(2)) : 0;
+      
+      let maxCount = 0;
+      let peakHour = 'N/A';
+      globalHourlyDistribution.forEach((count, hour) => {
+        if (count > maxCount) {
+          maxCount = count;
+          peakHour = `${hour}:00`;
+        }
+      });
+
+      const topKeywords = extractTopKeywords(filteredEntries, 6);
+
+      return res.json({
+        reportMode: 'all',
+        periodDays: parsedDays,
+        totalEntries: filteredEntries.length,
+        analystLeaderboard: userListStats,
+        topAnalyst,
+        topIncidentReporter,
+        hourlyActivity: hourlyData,
+        weeklyActivity: weeklyData,
+        entriesTrend: trendData,
+        topTags,
+        topClients,
+        activeDays,
+        averageEntriesPerActiveDay,
+        peakHour,
+        topKeywords,
+        usersList: usersList.map(u => ({ _id: String(u._id), username: u.username, fullName: u.fullName, cargoLabel: u.cargoLabel }))
+      });
+    } else {
+      // Estadísticas para un analista específico
+      const qualityDetails = calculateUserQuality(entries, parsedDays);
+      
+      const hourlyDistribution = Array(24).fill(0);
+      const weeklyDistribution = Array(7).fill(0);
+      const entriesTrend = {};
+      const tagsMap = {};
+      const clientsMap = {};
+      let totalLength = 0;
+
+      entries.forEach(e => {
+        if (e.entryTime) {
+          const hour = parseInt(e.entryTime.split(':')[0], 10);
+          if (hour >= 0 && hour < 24) hourlyDistribution[hour]++;
+        }
+        if (e.entryDate) {
+          const day = new Date(e.entryDate).getDay();
+          if (day >= 0 && day < 7) weeklyDistribution[day]++;
+          const dateStr = new Date(e.entryDate).toISOString().slice(0, 10);
+          entriesTrend[dateStr] = (entriesTrend[dateStr] || 0) + 1;
+        }
+        if (Array.isArray(e.tags)) {
+          e.tags.forEach(t => {
+            tagsMap[t] = (tagsMap[t] || 0) + 1;
+          });
+        }
+        if (e.clientName) {
+          clientsMap[e.clientName] = (clientsMap[e.clientName] || 0) + 1;
+        }
+        totalLength += e.content ? e.content.length : 0;
+      });
+
+      const hourlyData = hourlyDistribution.map((count, hour) => ({ name: `${hour}:00`, value: count }));
+      const daysOfWeekNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+      const weeklyData = weeklyDistribution.map((count, dayIndex) => ({ name: daysOfWeekNames[dayIndex], value: count }));
+      const trendData = Object.entries(entriesTrend).map(([date, count]) => ({ name: date, value: count })).sort((a,b) => a.name.localeCompare(b.name));
+      const topTags = Object.entries(tagsMap).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value).slice(0, 10);
+      const topClients = Object.entries(clientsMap).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value).slice(0, 10);
+
+      const totalEntriesCount = entries.length;
+      const averageLength = totalEntriesCount > 0 ? Math.round(totalLength / totalEntriesCount) : 0;
+      const averageEntriesPerDay = parseFloat((totalEntriesCount / parsedDays).toFixed(2));
+
+      // Métricas de tiempo y contenido individuales
+      const activeDays = Object.keys(entriesTrend).length;
+      const averageEntriesPerActiveDay = activeDays > 0 ? parseFloat((totalEntriesCount / activeDays).toFixed(2)) : 0;
+      
+      let maxCount = 0;
+      let peakHour = 'N/A';
+      hourlyDistribution.forEach((count, hour) => {
+        if (count > maxCount) {
+          maxCount = count;
+          peakHour = `${hour}:00`;
+        }
+      });
+
+      const topKeywords = extractTopKeywords(entries, 6);
+
+      // Consultar ausencias del analista específico
+      const userAbsences = await ShiftAssignment.find({
+        userId: selectedUser._id,
+        roleCode: { $in: ['MEDICAL_LEAVE', 'VACATION'] },
+        weekStartDate: { $lte: new Date() },
+        weekEndDate: { $gte: startDate }
+      }).lean();
+
+      let totalAbsenceDays = 0;
+      let currentAbsence = null;
+      const hoy = new Date();
+      
+      userAbsences.forEach(abs => {
+        const overlapStart = new Date(Math.max(startDate.getTime(), new Date(abs.weekStartDate).getTime()));
+        const overlapEnd = new Date(Math.min(hoy.getTime(), new Date(abs.weekEndDate).getTime()));
+        const diffMs = overlapEnd.getTime() - overlapStart.getTime();
+        if (diffMs > 0) {
+          const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1;
+          totalAbsenceDays += days;
+        }
+        if (new Date(abs.weekStartDate) <= hoy && new Date(abs.weekEndDate) >= hoy) {
+          currentAbsence = abs;
+        }
+      });
+
+      let finalStatus = qualityDetails.status;
+      let finalScore = qualityDetails.score;
+
+      if (totalEntriesCount === 0 && totalAbsenceDays > 0) {
+        const firstAbs = userAbsences[0];
+        const isMedical = (currentAbsence ? currentAbsence.roleCode : firstAbs.roleCode) === 'MEDICAL_LEAVE';
+        finalStatus = isMedical ? 'Licencia Médica' : 'Vacaciones';
+        finalScore = 0;
+      }
+
+      return res.json({
+        reportMode: 'individual',
+        periodDays: parsedDays,
+        user: {
+          id: String(selectedUser._id),
+          username: selectedUser.username,
+          fullName: selectedUser.fullName,
+          role: selectedUser.role
+        },
+        totalEntries: totalEntriesCount,
+        operativa: entries.filter(e => e.entryType === 'operativa').length,
+        incidente: entries.filter(e => e.entryType === 'incidente').length,
+        ofensa: entries.filter(e => e.entryType === 'ofensa').length,
+        averageEntriesPerDay,
+        averageContentLength: averageLength,
+        qualityScore: finalScore,
+        qualityStatus: finalStatus,
+        vicios: qualityDetails.vicios,
+        hourlyActivity: hourlyData,
+        weeklyActivity: weeklyData,
+        entriesTrend: trendData,
+        topTags,
+        topClients,
+        activeDays,
+        averageEntriesPerActiveDay,
+        peakHour,
+        topKeywords,
+        absence: totalAbsenceDays > 0 ? {
+          hasAbsence: true,
+          absenceType: currentAbsence ? currentAbsence.roleCode : userAbsences[0].roleCode,
+          absenceDays: totalAbsenceDays,
+          absenceLabel: (currentAbsence ? currentAbsence.roleCode : userAbsences[0].roleCode) === 'MEDICAL_LEAVE' ? 'Licencia Médica' : 'Vacaciones',
+          onAbsenceNow: !!currentAbsence,
+          absencePeriodText: currentAbsence ? `Del ${new Date(currentAbsence.weekStartDate).toLocaleDateString('es-CL')} al ${new Date(currentAbsence.weekEndDate).toLocaleDateString('es-CL')}` : ''
+        } : null,
+        usersList: usersList.map(u => ({ _id: String(u._id), username: u.username, fullName: u.fullName, cargoLabel: u.cargoLabel }))
+      });
+    }
+  } catch (error) {
+    console.error('Error in user-stats:', error);
+    res.status(500).json({ message: 'Error al generar estadísticas de usuario' });
+  }
+});
 
 module.exports = router;

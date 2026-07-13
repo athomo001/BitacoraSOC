@@ -65,6 +65,8 @@ export class EscalationContactsTabComponent implements OnInit {
   contactForm!: FormGroup;
   editingContactId: string | null = null;
   escalationClientSearch = '';
+  selectedClientIdForContacts = '';
+  contactsClientSearchInput = '';
   escalationServiceClientFilter = '';
   escalationServiceSearch = '';
   contactClientSearch = '';
@@ -220,6 +222,56 @@ export class EscalationContactsTabComponent implements OnInit {
     });
   }
 
+  get filteredClientsForContacts(): any[] {
+    const term = this.contactsClientSearchInput.trim().toLowerCase();
+    if (!term) return this.clients;
+    return this.clients.filter((client) => String(client?.name || '').toLowerCase().includes(term));
+  }
+
+  onContactsClientSearchInput(value: string): void {
+    this.contactsClientSearchInput = value;
+    const match = this.clients.find(c => c.name.toLowerCase() === value.toLowerCase());
+    if (match) {
+      this.selectedClientIdForContacts = match._id;
+    } else {
+      this.selectedClientIdForContacts = '';
+    }
+  }
+
+  onContactsClientSelected(client: any): void {
+    if (client) {
+      this.selectedClientIdForContacts = client._id;
+      this.contactsClientSearchInput = client.name;
+    } else {
+      this.selectedClientIdForContacts = '';
+      this.contactsClientSearchInput = '';
+    }
+  }
+
+  get servicesForSelectedClient(): any[] {
+    if (!this.selectedClientIdForContacts) return [];
+    return (this.services || []).filter(s => {
+      const sClientId = typeof s.clientId === 'object' && s.clientId !== null
+        ? s.clientId._id
+        : s.clientId;
+      return String(sClientId) === this.selectedClientIdForContacts;
+    });
+  }
+
+  getContactsForService(serviceId: string): any[] {
+    return (this.contacts || [])
+      .filter((contact) => (contact.contactType || 'escalation') !== 'preventive')
+      .filter((contact) => {
+        const cServiceId = typeof contact.serviceId === 'object' && contact.serviceId !== null
+          ? contact.serviceId._id
+          : contact.serviceId;
+        return String(cServiceId) === String(serviceId);
+      })
+      .sort((a, b) => Number((b.active !== false)) - Number((a.active !== false))
+        || String(a.role || '').localeCompare(String(b.role || ''))
+        || String(a.name || '').localeCompare(String(b.name || '')));
+  }
+
   get filteredClientsForServiceForm(): any[] {
     const term = this.serviceClientSearch.trim().toLowerCase();
     if (!term) return this.clients;
@@ -297,11 +349,15 @@ export class EscalationContactsTabComponent implements OnInit {
   }
 
   // Services CRUD
-  addService(): void {
+  addService(clientId?: string): void {
     this.showServiceForm = true;
     this.editingServiceId = null;
     this.serviceClientSearch = '';
-    this.serviceForm.reset({ clientId: '', name: '', active: true });
+    this.serviceForm.reset({
+      clientId: clientId || '',
+      name: '',
+      active: true
+    });
   }
 
   saveService(): void {
@@ -332,18 +388,35 @@ export class EscalationContactsTabComponent implements OnInit {
   }
 
   // Contacts CRUD
-  addContact(contactType: 'escalation' | 'preventive' = 'escalation'): void {
+  addContact(contactType: 'escalation' | 'preventive' = 'escalation', serviceId?: string): void {
     this.showContactForm = true;
     this.editingContactId = null;
-    this.escalationServiceClientFilter = '';
-    this.contactClientSearch = '';
+    
+    if (serviceId) {
+      const service = this.services.find(s => s._id === serviceId);
+      if (service) {
+        const sClientId = typeof service.clientId === 'object' && service.clientId !== null
+          ? service.clientId._id
+          : service.clientId;
+        this.escalationServiceClientFilter = sClientId;
+        const client = this.clients.find(c => c._id === sClientId);
+        this.contactClientSearch = client ? client.name : '';
+      } else {
+        this.escalationServiceClientFilter = '';
+        this.contactClientSearch = '';
+      }
+    } else {
+      this.escalationServiceClientFilter = '';
+      this.contactClientSearch = '';
+    }
+
     this.escalationServiceSearch = '';
     this.selectedContactDirectoryId = '';
     this.contactDirectorySuggestions = [];
     this.filteredOrgSuggestions = [...this.preventiveCompanyOptions];
     this.contactForm.reset({
       contactType,
-      serviceId: '',
+      serviceId: serviceId || '',
       name: '',
       email: '',
       phone: '',

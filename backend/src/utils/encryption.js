@@ -123,6 +123,18 @@ bootstrapKeyring();
 const encrypt = (text) => {
   if (!text) return '';
 
+  // Evitar la doble encriptación si el texto ya está en formato cifrado (AES-256-GCM o legacy)
+  if (typeof text === 'string') {
+    const parts = text.split(':');
+    const isHex = (str) => /^[a-f0-9]+$/i.test(str);
+    if (parts.length === 3 && parts.every(isHex) && parts[0].length === 32 && parts[1].length === 32) {
+      return text;
+    }
+    if (text.startsWith('U2FsdGVkX1')) {
+      return text;
+    }
+  }
+
   const keys = getAvailableBufferKeys();
   if (keys.length === 0) {
     throw new Error('No hay llaves válidas para cifrar');

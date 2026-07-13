@@ -1,8 +1,40 @@
 <div class="reports-container">
   <h1>📊 Reportes y Estadísticas</h1>
 
+  <!-- Selector de Tipo de Reporte -->
+  <section class="report-type-selector reports-panel no-print">
+    <div class="reports-panel__body reports-panel__body--center">
+      <mat-button-toggle-group
+        class="reports-type-toggle"
+        [value]="selectedReportType"
+        (change)="onReportTypeChange($event.value)">
+        <mat-button-toggle value="operative">Informe Operativo SOC</mat-button-toggle>
+        <mat-button-toggle value="user-stats">Estadísticas de Uso de Analistas</mat-button-toggle>
+      </mat-button-toggle-group>
+    </div>
+  </section>
+
+  <!-- Selector de Usuario (Solo si se visualizan estadísticas de analista) -->
+  <section class="user-selector reports-panel no-print" *ngIf="selectedReportType === 'user-stats' && !userStatsAccessDenied">
+    <div class="reports-panel__body reports-panel__body--center user-selector-flex">
+      <mat-form-field appearance="outline" class="user-select-field">
+        <mat-label>Seleccionar Analista</mat-label>
+        <mat-select [value]="selectedUserId" (selectionChange)="onUserChange($event.value)">
+          <mat-option value="all">👥 Todos los Usuarios (Consolidado)</mat-option>
+          <mat-option *ngFor="let user of usersList" [value]="user._id">👤 {{ user.fullName }} ({{ user.username }})</mat-option>
+        </mat-select>
+      </mat-form-field>
+      
+      <div class="cargo-toggle-container" *ngIf="selectedUserId === 'all'">
+        <mat-checkbox [(ngModel)]="showAllCargos" (change)="loadUserStats()" color="primary">
+          Incluir todos los usuarios
+        </mat-checkbox>
+      </div>
+    </div>
+  </section>
+
   <!-- Selector de período -->
-  <section class="period-selector reports-panel">
+  <section class="period-selector reports-panel no-print">
     <div class="reports-panel__body reports-panel__body--center">
       <mat-button-toggle-group
         class="reports-period-toggle"
@@ -17,7 +49,7 @@
     </div>
   </section>
 
-  <div *ngIf="overview">
+  <ng-container *ngIf="selectedReportType === 'operative' && overview">
     <!-- KPIs Cards -->
     <div class="stats-grid">
       <article class="stat-card reports-panel">
@@ -833,5 +865,244 @@
         Generar PDF / Imprimir
       </button>
     </div>
-  </div>
+  </ng-container>
+
+  <!-- ========================================================================= -->
+  <!-- VISTA ESTADÍSTICAS DE USO Y CALIDAD DE ANALISTAS                        -->
+  <!-- ========================================================================= -->
+  <ng-container *ngIf="selectedReportType === 'user-stats'">
+    <!-- Ruleta de Carga -->
+    <div class="user-stats-loading-container" *ngIf="isUserStatsLoading">
+      <mat-spinner diameter="50"></mat-spinner>
+      <p>Analizando registros de bitácora y calculando score de cumplimiento...</p>
+    </div>
+
+    <!-- Mensaje de Acceso Denegado -->
+    <div class="access-denied-container reports-panel" *ngIf="!isUserStatsLoading && userStatsAccessDenied" style="margin-top: 16px;">
+      <div class="reports-panel__body access-denied-body" style="text-align: center; padding: 48px 24px;">
+        <mat-icon style="font-size: 64px; height: 64px; width: 64px; color: #dc2626; margin-bottom: 16px;">shield</mat-icon>
+        <h2 style="font-size: 20px; font-weight: 700; color: #0f172a; margin-bottom: 8px;">Acceso Restringido</h2>
+        <p style="font-size: 14.5px; color: #475569; max-width: 500px; margin: 0 auto;">
+          {{ userStatsErrorMessage || 'Permisos insuficientes para ver estadísticas de analistas. Esta sección está reservada para administradores, auditores y analistas N2.' }}
+        </p>
+      </div>
+    </div>
+
+    <!-- Contenido del Reporte -->
+    <div class="user-stats-report-wrapper" *ngIf="!isUserStatsLoading && userStatsData && !userStatsAccessDenied">
+      
+      <!-- KPIs CARDS - INDIVIDUAL -->
+      <div class="stats-grid" *ngIf="userStatsData.reportMode === 'individual'">
+        <article class="stat-card reports-panel">
+          <dl class="reports-panel__body">
+            <dt class="stat-label">Total Entradas</dt>
+            <dd class="stat-value"><strong>{{ userStatsData.totalEntries }}</strong></dd>
+            <dd class="stat-subtext text-muted">
+              Op: {{ userStatsData.operativa }} | Inc: {{ userStatsData.incidente }} | Off: {{ userStatsData.ofensa }}
+            </dd>
+          </dl>
+        </article>
+        
+        <article class="stat-card reports-panel">
+          <dl class="reports-panel__body">
+            <dt class="stat-label">Promedio Diario</dt>
+            <dd class="stat-value"><strong>{{ userStatsData.averageEntriesPerDay }}</strong></dd>
+            <dd class="stat-subtext">Entradas / día</dd>
+          </dl>
+        </article>
+
+        <article class="stat-card reports-panel">
+          <dl class="reports-panel__body">
+            <dt class="stat-label">Detalle Promedio</dt>
+            <dd class="stat-value"><strong>{{ userStatsData.averageContentLength }}</strong></dd>
+            <dd class="stat-subtext">Caracteres por entrada</dd>
+          </dl>
+        </article>
+
+        <!-- KPI Score de Calidad con borde de color según resultado -->
+        <article class="stat-card reports-panel quality-score-card" [attr.data-status]="userStatsData.qualityStatus">
+          <dl class="reports-panel__body">
+            <dt class="stat-label">Score de Calidad</dt>
+            <dd class="stat-value"><strong>{{ userStatsData.qualityScore }}%</strong></dd>
+            <dd class="stat-subtext">
+              Estado: <span class="quality-badge" [attr.data-status]="userStatsData.qualityStatus">{{ userStatsData.qualityStatus }}</span>
+            </dd>
+          </dl>
+        </article>
+      </div>
+
+      <!-- KPIs CARDS - CONSOLIDADO GRUPAL -->
+      <div class="stats-grid" *ngIf="userStatsData.reportMode === 'all'">
+        <article class="stat-card reports-panel">
+          <dl class="reports-panel__body">
+            <dt class="stat-label">Total Entradas SOC</dt>
+            <dd class="stat-value"><strong>{{ userStatsData.totalEntries }}</strong></dd>
+            <dd class="stat-subtext">Registros consolidados</dd>
+          </dl>
+        </article>
+
+        <article class="stat-card reports-panel" *ngIf="userStatsData.topAnalyst">
+          <dl class="reports-panel__body">
+            <dt class="stat-label">Analista Más Activo</dt>
+            <dd class="stat-value stat-value--name" [title]="userStatsData.topAnalyst.username">
+              <strong>{{ userStatsData.topAnalyst.username }}</strong>
+            </dd>
+            <dd class="stat-subtext">{{ userStatsData.topAnalyst.count }} entradas registradas</dd>
+          </dl>
+        </article>
+        
+        <article class="stat-card reports-panel incidentes" *ngIf="userStatsData.topIncidentReporter">
+          <dl class="reports-panel__body">
+            <dt class="stat-label">Mayor Reporte de Incidentes</dt>
+            <dd class="stat-value stat-value--name" [title]="userStatsData.topIncidentReporter.username">
+              <strong>{{ userStatsData.topIncidentReporter.username }}</strong>
+            </dd>
+            <dd class="stat-subtext">{{ userStatsData.topIncidentReporter.count }} casos documentados</dd>
+          </dl>
+        </article>
+
+        <article class="stat-card reports-panel">
+          <dl class="reports-panel__body">
+            <dt class="stat-label">Analistas Evaluados</dt>
+            <dd class="stat-value"><strong>{{ userStatsData.analystLeaderboard.length }}</strong></dd>
+            <dd class="stat-subtext">Cuentas activas del SOC</dd>
+          </dl>
+        </article>
+      </div>
+
+      <!-- TARJETA PREMIUM DE ANÁLISIS NARRATIVO -->
+      <section class="chart-card reports-panel quality-narrative-card">
+        <header class="reports-panel__header">
+          <h2 class="reports-panel__title">🤖 Análisis Narrativo</h2>
+        </header>
+        <div class="reports-panel__body narrative-content" [innerHTML]="sanitizedQualityNarrative">
+        </div>
+      </section>
+
+      <!-- SECCIÓN LEADERBOARD (Solo en modo consolidado) -->
+      <section class="chart-card reports-panel leaderboard-section" *ngIf="userStatsData.reportMode === 'all'">
+        <header class="reports-panel__header">
+          <h2 class="reports-panel__title">📋 Tabla de Cumplimiento y Calidad de Analistas</h2>
+        </header>
+        <div class="reports-panel__body">
+          <div class="table-responsive">
+            <table class="leaderboard-table">
+              <thead>
+                <tr>
+                  <th>Analista</th>
+                  <th>Total Entradas</th>
+                  <th>Operativas</th>
+                  <th>Incidentes/Ofensas</th>
+                  <th>Score de Calidad</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let row of userStatsData.analystLeaderboard" 
+                    [class.row-danger]="row.qualityScore < 50 && row.qualityStatus !== 'Licencia Médica' && row.qualityStatus !== 'Vacaciones' && row.qualityStatus !== 'Sin registros'" 
+                    [class.row-warning]="row.qualityScore >= 50 && row.qualityScore < 75 && row.qualityStatus !== 'Licencia Médica' && row.qualityStatus !== 'Vacaciones' && row.qualityStatus !== 'Sin registros'">
+                  <td class="col-user-name">
+                    <strong>{{ row.fullName }}</strong> ({{ row.username }})
+                    <span *ngIf="row.absence && row.absence.onAbsenceNow" class="absence-subtext" style="display: block; font-size: 11px; color: #86198f; font-weight: 500; margin-top: 2px;">
+                      ⚠️ {{ row.absence.absenceLabel }} activa
+                    </span>
+                  </td>
+                  <td class="col-center">{{ row.totalEntries }}</td>
+                  <td class="col-center">{{ row.operativa }}</td>
+                  <td class="col-center">{{ row.incidente + row.ofensa }}</td>
+                  <td class="col-center font-bold">
+                    {{ (row.qualityStatus === 'Licencia Médica' || row.qualityStatus === 'Vacaciones' || row.qualityStatus === 'Sin registros') ? '-' : row.qualityScore + '%' }}
+                  </td>
+                  <td>
+                    <span class="leaderboard-badge" [attr.data-status]="row.qualityStatus">{{ row.qualityStatus }}</span>
+                  </td>
+                </tr>
+                <tr *ngIf="userStatsData.analystLeaderboard.length === 0">
+                  <td colspan="6" class="no-records-message">No se registraron entradas de analistas en este período.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- GRÁFICOS Y ANALÍTICAS -->
+      <div class="charts-grid analytics-grid">
+        <!-- Gráfico 1: Tendencia Temporal de Registros -->
+        <div class="chart-wrapper full-width" role="img" aria-label="Gráfico de Tendencia de Registros" *ngIf="userStatsData.entriesTrend && userStatsData.entriesTrend.length > 0">
+          <h3 class="chart-subtitle">Tendencia de Registros por Día</h3>
+          <ngx-charts-line-chart
+            [results]="[{ name: 'Entradas', series: userStatsData.entriesTrend }]"
+            [xAxis]="true"
+            [yAxis]="true"
+            [showXAxisLabel]="true"
+            [showYAxisLabel]="true"
+            xAxisLabel="Día"
+            yAxisLabel="Entradas"
+            [scheme]="colorScheme"
+            [animations]="true">
+          </ngx-charts-line-chart>
+        </div>
+
+        <!-- Gráfico 2: Actividad Horaria -->
+        <div class="chart-wrapper" role="img" aria-label="Gráfico de Actividad por Horas" *ngIf="userStatsData.hourlyActivity && userStatsData.hourlyActivity.length > 0">
+          <h3 class="chart-subtitle">Distribución Horaria de Registros</h3>
+          <ngx-charts-bar-vertical
+            [results]="userStatsData.hourlyActivity"
+            [xAxis]="true"
+            [yAxis]="true"
+            [showXAxisLabel]="true"
+            [showYAxisLabel]="true"
+            xAxisLabel="Hora del Día"
+            yAxisLabel="Entradas"
+            [scheme]="colorScheme">
+          </ngx-charts-bar-vertical>
+        </div>
+
+        <!-- Gráfico 3: Actividad por Día de la Semana -->
+        <div class="chart-wrapper" role="img" aria-label="Gráfico de Actividad por Día de la Semana" *ngIf="userStatsData.weeklyActivity && userStatsData.weeklyActivity.length > 0">
+          <h3 class="chart-subtitle">Distribución por Día de la Semana</h3>
+          <ngx-charts-bar-vertical
+            [results]="userStatsData.weeklyActivity"
+            [xAxis]="true"
+            [yAxis]="true"
+            [showXAxisLabel]="true"
+            [showYAxisLabel]="true"
+            xAxisLabel="Día"
+            yAxisLabel="Entradas"
+            [scheme]="colorScheme">
+          </ngx-charts-bar-vertical>
+        </div>
+
+        <!-- Gráfico 4: Clientes con más Reportes -->
+        <div class="chart-wrapper" role="img" aria-label="Gráfico de Clientes más Reportados" *ngIf="userStatsData.topClients && userStatsData.topClients.length > 0">
+          <h3 class="chart-subtitle">Clientes con más Registros</h3>
+          <ngx-charts-bar-horizontal
+            [results]="userStatsData.topClients"
+            [xAxis]="true"
+            [yAxis]="true"
+            [showXAxisLabel]="true"
+            [showYAxisLabel]="false"
+            xAxisLabel="Registros"
+            [scheme]="colorScheme">
+          </ngx-charts-bar-horizontal>
+        </div>
+
+        <!-- Gráfico 5: Tags más recurrentes -->
+        <div class="chart-wrapper" role="img" aria-label="Gráfico de Tags más usados" *ngIf="userStatsData.topTags && userStatsData.topTags.length > 0">
+          <h3 class="chart-subtitle">Etiquetas (Tags) más Frecuentes</h3>
+          <ngx-charts-bar-horizontal
+            [results]="userStatsData.topTags"
+            [xAxis]="true"
+            [yAxis]="true"
+            [showXAxisLabel]="true"
+            [showYAxisLabel]="false"
+            xAxisLabel="Frecuencia"
+            [scheme]="colorScheme">
+          </ngx-charts-bar-horizontal>
+        </div>
+      </div>
+
+    </div>
+  </ng-container>
 </div>
