@@ -1205,8 +1205,204 @@
     break-before: avoid !important;
   }
 }
+/* Estilos para el Selector de Usuarios e Informes de Calidad */
+.user-selector-flex {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
 
+.cargo-toggle-container {
+  display: flex;
+  align-items: center;
+  height: 56px;
+}
 
+.stat-value--name {
+  white-space: normal !important;
+  word-break: break-word !important;
+  font-size: 1.4rem !important;
+}
 
+/* Tabla del Leaderboard de Analistas */
+.leaderboard-section {
+  margin-top: 24px;
+  
+  .table-responsive {
+    overflow-x: auto;
+    width: 100%;
+  }
+  
+  .leaderboard-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    
+    thead {
+      background-color: var(--surface-muted, #f8fafc);
+      
+      th {
+        padding: 12px 16px;
+        font-weight: 700;
+        color: var(--text-secondary, #475569);
+        border-bottom: 1px solid var(--border-color, #e2e8f0);
+        font-size: 12px;
+        text-transform: uppercase;
+        text-align: left;
+      }
+    }
+    
+    tbody {
+      tr {
+        border-bottom: 1px solid var(--border-color, #f1f5f9);
+        transition: background-color 0.2s ease;
+        
+        &:hover {
+          background-color: var(--surface-hover, #f8fafc);
+        }
+        
+        &.row-warning {
+          background-color: #fffdf5;
+          &:hover { background-color: #fff9e6; }
+        }
+        
+        &.row-danger {
+          background-color: #fffafb;
+          &:hover { background-color: #fff0f2; }
+        }
+      }
+      
+      td {
+        padding: 12px 16px;
+        color: var(--text-primary, #334155);
+        vertical-align: middle;
+        
+        &.col-user-name {
+          color: var(--text-primary-emphasis, #0f172a);
+        }
+        
+        &.col-center {
+          text-align: center;
+        }
+        
+        &.font-bold {
+          font-weight: 700;
+        }
+        
+        .leaderboard-badge {
+          display: inline-block;
+          padding: 3px 10px;
+          border-radius: 20px;
+          font-size: 11px;
+          font-weight: 700;
+          text-align: center;
+          white-space: nowrap;
+          
+          &[data-status="Excelente"],
+          &[data-status="Estable"] {
+            background-color: #d1fae5;
+            color: #065f46;
+          }
+          
+          &[data-status="Simplificado"] {
+            background-color: #fef3c7;
+            color: #92400e;
+          }
+          
+          &[data-status="Sospecha de Relleno"] {
+            background-color: #fee2e2;
+            color: #991b1b;
+          }
 
+          &[data-status="Sin registros"] {
+            background-color: #f1f5f9;
+            color: #475569;
+          }
 
+          &[data-status="Licencia Médica"] {
+            background-color: #fae8ff;
+            color: #86198f;
+          }
+
+          &[data-status="Vacaciones"] {
+            background-color: #e0f2fe;
+            color: #075985;
+          }
+        }
+      }
+    }
+  }
+}
+
+.no-records-message {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-secondary, #64748b);
+  font-weight: 500;
+}
+
+.analytics-grid {
+  row-gap: 32px;
+  
+  .chart-wrapper {
+    height: 340px;
+    position: relative;
+    width: 100%;
+    
+    &.full-width {
+      grid-column: span 2;
+      height: 380px;
+    }
+    
+    @media (max-width: 768px) {
+      height: 300px;
+      
+      &.full-width {
+        grid-column: span 1;
+        height: 300px;
+      }
+    }
+  }
+}
+
+.narrative-content {
+  padding: 20px 24px;
+  line-height: 1.6;
+  font-size: 14.5px;
+  color: var(--text-primary, #334155);
+
+  h3 {
+    margin-top: 20px;
+    margin-bottom: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary-emphasis, #0f172a);
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+    padding-bottom: 6px;
+    
+    &:first-of-type {
+      margin-top: 0;
+    }
+  }
+
+  h4 {
+    margin-top: 18px;
+    margin-bottom: 8px;
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--text-primary-emphasis, #1e293b);
+  }
+
+  li {
+    margin-left: 24px !important; /* Asegura el margen izquierdo para evitar recortes */
+    margin-bottom: 8px;
+    list-style-type: disc !important;
+    padding-left: 4px;
+    display: list-item !important; /* Fuerza la viñeta de lista nativa */
+  }
+
+  strong {
+    color: var(--text-primary-emphasis, #0f172a);
+  }
+}
