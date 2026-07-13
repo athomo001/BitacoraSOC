@@ -28,6 +28,8 @@ import { AuthService } from '../../../services/auth.service';
 import { EntryDetailDialogComponent } from './entry-detail-dialog.component';
 import { AdminEditDialogComponent } from './admin-edit-dialog.component';
 import { ConfirmDialogComponent } from '../../../components/confirm-dialog/confirm-dialog.component';
+import { UserService } from '../../../services/user.service';
+import { User } from '../../../models/user.model';
 
 @Component({
     selector: 'app-all-entries',
@@ -59,6 +61,7 @@ export class AllEntriesComponent implements OnInit {
   isGuest = false;
   isAdmin = false;
   logSources: CatalogLogSource[] = [];
+  analysts: any[] = [];
   
   // Selección masiva
   selectedEntries: Set<string> = new Set();
@@ -79,6 +82,7 @@ export class AllEntriesComponent implements OnInit {
     private entryService: EntryService,
     private catalogService: CatalogService,
     private authService: AuthService,
+    private userService: UserService,
     private snackBar: MatSnackBar,
     private dialog: MatDialog,
     private route: ActivatedRoute
@@ -87,9 +91,11 @@ export class AllEntriesComponent implements OnInit {
       search: [''],
       entryType: [''],
       clientId: [''],
+      datePreset: ['todos'],
       startDate: [''],
       endDate: [''],
-      tags: ['']
+      tags: [''],
+      userId: ['']
     });
   }
 
@@ -116,6 +122,16 @@ export class AllEntriesComponent implements OnInit {
       }
     );
 
+    // Cargar analistas activos en el SOC
+    this.userService.getUsersList().subscribe(
+      (users) => {
+        this.analysts = users || [];
+      },
+      () => {
+        // Error silencioso
+      }
+    );
+
     this.route.queryParamMap.subscribe(params => {
       const tag = params.get('tag')?.trim();
       if (tag) {
@@ -136,9 +152,24 @@ export class AllEntriesComponent implements OnInit {
     if (filters.search?.trim()) params.search = filters.search.trim();
     if (filters.entryType) params.entryType = filters.entryType;
     if (filters.clientId) params.clientId = filters.clientId; // Filtro cliente (B2i)
-    if (filters.startDate) params.startDate = filters.startDate;
-    if (filters.endDate) params.endDate = filters.endDate;
     if (filters.tags?.trim()) params.tags = filters.tags.trim();
+    if (filters.userId) params.userId = filters.userId; // Filtro analista/usuario creador
+
+    // Calcular y asignar fechas de inicio y fin según el preset seleccionado
+    const preset = filters.datePreset;
+    if (preset === 'custom') {
+      if (filters.startDate) params.startDate = filters.startDate;
+      if (filters.endDate) params.endDate = filters.endDate;
+    } else if (preset !== 'todos') {
+      const days = parseInt(preset, 10);
+      if (!isNaN(days)) {
+        const today = new Date();
+        const start = new Date();
+        start.setDate(today.getDate() - days);
+        params.startDate = this.formatDateToYYYYMMDD(start);
+        params.endDate = this.formatDateToYYYYMMDD(today);
+      }
+    }
 
     this.entryService.getEntries(params).subscribe({
       next: (response) => {
@@ -236,12 +267,87 @@ Tags: ${tags}`;
       search: '',
       entryType: '',
       clientId: '',
+      datePreset: 'todos',
       startDate: '',
       endDate: '',
-      tags: ''
+      tags: '',
+      userId: ''
     });
     this.currentPage = 1;
     this.loadEntries();
+  }
+
+  /**
+   * Resetea las fechas personalizadas al cambiar el preajuste de fecha
+   */
+  onDatePresetChange(): void {
+    const preset = this.searchForm.get('datePreset')?.value;
+    if (preset !== 'custom') {
+      this.searchForm.patchValue({
+        startDate: '',
+        endDate: ''
+      });
+    }
+  }
+
+  /**
+   * Exporta la búsqueda actual a formato CSV y descarga el archivo
+   */
+  downloadCSV(): void {
+    const filters = this.searchForm.value;
+    const params: any = {};
+
+    if (filters.search?.trim()) params.search = filters.search.trim();
+    if (filters.entryType) params.entryType = filters.entryType;
+    if (filters.clientId) params.clientId = filters.clientId;
+    if (filters.tags?.trim()) params.tags = filters.tags.trim();
+    if (filters.userId) params.userId = filters.userId;
+
+    // Calcular fechas para la exportación
+    const preset = filters.datePreset;
+    if (preset === 'custom') {
+      if (filters.startDate) params.startDate = filters.startDate;
+      if (filters.endDate) params.endDate = filters.endDate;
+    } else if (preset !== 'todos') {
+      const days = parseInt(preset, 10);
+      if (!isNaN(days)) {
+        const today = new Date();
+        const start = new Date();
+        start.setDate(today.getDate() - days);
+        params.startDate = this.formatDateToYYYYMMDD(start);
+        params.endDate = this.formatDateToYYYYMMDD(today);
+      }
+    }
+
+    this.snackBar.open('Generando descarga de CSV...', 'Cerrar', { duration: 2000 });
+
+    this.entryService.exportEntries(params).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `bitacora_entradas_${this.formatDateToYYYYMMDD(new Date())}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        this.snackBar.open('✅ Descarga completada exitosamente', 'Cerrar', { duration: 2500 });
+      },
+      error: (err) => {
+        const msg = err.error?.message || 'Error al exportar CSV';
+        this.snackBar.open(`❌ ${msg}`, 'Cerrar', { duration: 3000 });
+      }
+    });
+  }
+
+  /**
+   * Helper para formatear Date a cadena YYYY-MM-DD local
+   */
+  private formatDateToYYYYMMDD(d: Date): string {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   // Selección masiva

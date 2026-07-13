@@ -85,6 +85,26 @@ export class EntryService {
   }
 
   /**
+   * Exporta las entradas filtradas en formato CSV
+   * @param filters Filtros aplicados en la búsqueda
+   * @returns Un observable que contiene el archivo blob tipo CSV
+   */
+  exportEntries(filters: EntryFilters = {}): Observable<Blob> {
+    let params = new HttpParams();
+
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params = params.set(key, value.toString());
+      }
+    });
+
+    return this.http.get(`${this.API_URL}/export`, {
+      params,
+      responseType: 'blob'
+    });
+  }
+
+  /**
    * Edición masiva/individual de entradas por admin
    * Solo admin puede editar: tags, clientId, entryType
    * Campos inmutables: content, timestamp, author

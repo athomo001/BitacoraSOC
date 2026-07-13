@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `CHANGELOG.md`): **v1.6.20**
+> Version referencial actual (segun `CHANGELOG.md`): **v1.6.21**
 
 Stack principal:
 
@@ -63,6 +63,12 @@ Stack principal:
 ---
 
 ## Novedades recientes (resumen rapido)
+
+### v1.6.21 (Filtros de búsqueda de entradas, exportación a CSV y corrección de cifrado en directorio)
+
+- **Mejoras en Búsqueda de Entradas**: Adición de selector de preajustes de fecha (3, 7, 15, 30, 60, 90 días, rango personalizado) con controles interactivos condicionales de calendario, filtro por analista y botón para descargar reportes en CSV en tiempo real.
+- **Exportación en Backend**: Endpoint `/api/entries/export` para descargar la bitácora completa y checklists unificados. Configurado con UTF-8 BOM para apertura directa en Microsoft Excel sin fallas de codificación.
+- **Bugfix de Cifrado en Directorio**: Corrección del error de visualización de datos cifrados con hashes / dos puntos en el directorio global para usuarios internos. Implementada interceptación en `encrypt` para evitar el doble cifrado y ejecutada migración correctora sobre 13 registros afectados.
 
 ### v1.6.20 (API Keys robustas, logs de auditoría en tiempo real, renderizador de MJML y envío SMTP de incidentes)
 

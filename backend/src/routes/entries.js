@@ -570,6 +570,307 @@ router.get('/',
   }
 );
 
+// GET /api/entries/export - Exportar entradas filtradas a formato CSV
+// Este endpoint aplica los mismos filtros de búsqueda, realiza la unión con checklists,
+// formatea el contenido y las fechas, y devuelve un archivo CSV optimizado para Excel en español (con BOM).
+router.get('/export',
+  authenticate,
+  [
+    query('search').optional().trim(),
+    query('tags').optional(),
+    query('clientId').optional().isMongoId(),
+    query('entryType').optional().isIn(['operativa', 'incidente', 'ofensa', 'checklist']),
+    query('startDate').optional().isISO8601(),
+    query('endDate').optional().isISO8601(),
+    query('userId').optional().isMongoId()
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const {
+        search,
+        tags,
+        clientId,
+        entryType,
+        startDate,
+        endDate,
+        userId
+      } = req.query;
+
+      // Filtros para la colección principal de Entradas
+      const filters = {};
+
+      if (search) {
+        const sanitized = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        filters.$text = { $search: sanitized };
+      }
+
+      if (tags) {
+        const tagArray = tags.split(',').map(t => t.trim().toLowerCase());
+        filters.tags = { $in: tagArray };
+      }
+
+      if (clientId) {
+        filters.clientId = new mongoose.Types.ObjectId(clientId);
+      }
+
+      if (entryType) {
+        filters.entryType = entryType;
+      }
+
+      if (startDate || endDate) {
+        filters.entryDate = {};
+        if (startDate) filters.entryDate.$gte = new Date(startDate);
+        if (endDate) filters.entryDate.$lte = new Date(endDate);
+      }
+
+      if (userId) {
+        filters.createdBy = new mongoose.Types.ObjectId(userId);
+      }
+
+      const includeChecklistByType = !entryType || entryType === 'checklist';
+      const includeNormalEntriesByType = !entryType || entryType !== 'checklist';
+      const shouldIncludeChecklist = includeChecklistByType && !tags;
+
+      let checklistClientContext = { clientId: null, clientName: DEFAULT_INTERNAL_CLIENT_NAME };
+      if (shouldIncludeChecklist) {
+        const defaultClientContext = await resolveDefaultClientContext();
+        checklistClientContext = {
+          clientId: defaultClientContext.clientId,
+          clientName: defaultClientContext.clientName
+        };
+      }
+
+      // Filtros para la colección de Checklists (ShiftCheck)
+      const checklistFilters = {};
+      if (startDate || endDate) {
+        checklistFilters.checkDate = {};
+        if (startDate) checklistFilters.checkDate.$gte = new Date(startDate);
+        if (endDate) checklistFilters.checkDate.$lte = new Date(endDate);
+      }
+      if (userId) {
+        checklistFilters.userId = new mongoose.Types.ObjectId(userId);
+      }
+      if (search) {
+        const searchRegex = new RegExp(escapeRegex(search), 'i');
+        checklistFilters.$or = [
+          { username: searchRegex },
+          { type: searchRegex },
+          { 'services.serviceTitle': searchRegex },
+          { 'services.observation': searchRegex }
+        ];
+      }
+
+      const includeChecklistForClient = !clientId
+        || String(checklistClientContext.clientId || '') === String(clientId);
+
+      const aggregatePipeline = [];
+
+      if (includeNormalEntriesByType) {
+        aggregatePipeline.push({ $match: filters });
+      } else {
+        aggregatePipeline.push({ $match: { _id: null } });
+      }
+
+      // Normalizar la proyección para que coincida entre ambas colecciones
+      aggregatePipeline.push({
+        $project: {
+          _id: 1,
+          content: 1,
+          entryType: 1,
+          entryDate: 1,
+          entryTime: 1,
+          tags: 1,
+          clientId: 1,
+          clientName: 1,
+          createdBy: 1,
+          createdByUsername: 1,
+          isGuestEntry: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          checklistType: { $literal: null },
+          checklistMetrics: { $literal: null }
+        }
+      });
+
+      // Unión con Checklists si aplica
+      if (shouldIncludeChecklist && includeChecklistForClient) {
+        aggregatePipeline.push({
+          $unionWith: {
+            coll: 'shiftchecks',
+            pipeline: [
+              { $match: checklistFilters },
+              {
+                $project: {
+                  _id: 1,
+                  content: { $literal: '' },
+                  entryType: { $literal: 'checklist' },
+                  entryDate: { $literal: '' },
+                  entryTime: { $literal: '' },
+                  tags: { $literal: [] },
+                  clientId: { $literal: checklistClientContext.clientId ? new mongoose.Types.ObjectId(checklistClientContext.clientId) : null },
+                  clientName: { $literal: checklistClientContext.clientName || DEFAULT_INTERNAL_CLIENT_NAME },
+                  createdBy: '$userId',
+                  createdByUsername: { $ifNull: ['$username', 'N/A'] },
+                  isGuestEntry: { $literal: false },
+                  createdAt: { $ifNull: ['$checkDate', { $ifNull: ['$createdAt', new Date()] }] },
+                  updatedAt: { $ifNull: ['$updatedAt', { $ifNull: ['$checkDate', { $ifNull: ['$createdAt', new Date()] }] }] },
+                  checklistType: '$type',
+                  checklistMetrics: {
+                    totalServices: { $size: { $ifNull: ['$services', []] } },
+                    totalProblems: {
+                      $size: {
+                        $filter: {
+                          input: { $ifNull: ['$services', []] },
+                          as: 's',
+                          cond: { $eq: ['$$s.status', 'rojo'] }
+                        }
+                      }
+                    }
+                  },
+                  services: '$services',
+                  type: '$type'
+                }
+              }
+            ]
+          }
+        });
+      }
+
+      aggregatePipeline.push({ $sort: { createdAt: -1 } });
+      // Límite de seguridad para evitar sobrecarga en la memoria
+      aggregatePipeline.push({ $limit: 10000 });
+
+      // Lookup para obtener los datos del creador
+      aggregatePipeline.push({
+        $lookup: {
+          from: 'users',
+          localField: 'createdBy',
+          foreignField: '_id',
+          as: 'createdBy'
+        }
+      });
+      aggregatePipeline.push({
+        $unwind: {
+          path: '$createdBy',
+          preserveNullAndEmptyArrays: true
+        }
+      });
+
+      // Proyección final
+      aggregatePipeline.push({
+        $project: {
+          _id: 1,
+          content: 1,
+          entryType: 1,
+          entryDate: 1,
+          entryTime: 1,
+          tags: 1,
+          clientId: 1,
+          clientName: 1,
+          createdByUsername: 1,
+          isGuestEntry: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          checklistType: 1,
+          checklistMetrics: 1,
+          services: 1,
+          type: 1,
+          createdBy: {
+            $cond: {
+              if: { $not: ['$createdBy._id'] },
+              then: null,
+              else: {
+                _id: '$createdBy._id',
+                username: '$createdBy.username',
+                fullName: '$createdBy.fullName',
+                role: '$createdBy.role'
+              }
+            }
+          }
+        }
+      });
+
+      const entries = await Entry.aggregate(aggregatePipeline);
+
+      // Escape de caracteres especiales para formato de CSV
+      const escapeCsv = (val) => {
+        const raw = val == null ? '' : String(val);
+        if (/[",\n\r]/.test(raw)) {
+          return `"${raw.replace(/"/g, '""')}"`;
+        }
+        return raw;
+      };
+
+      const headers = ['Fecha', 'Hora', 'Tipo', 'Contenido', 'Tags', 'Cliente', 'Autor'];
+      const csvRows = [headers.join(',')];
+
+      entries.forEach((item) => {
+        let content = item.content || '';
+        let entryDate = item.entryDate;
+        let entryTime = item.entryTime;
+
+        if (item.entryType === 'checklist') {
+          content = buildChecklistSummaryContent(item);
+          const checkDate = new Date(item.createdAt);
+          entryDate = `${toSantiagoDate(checkDate)}T00:00:00.000Z`;
+          entryTime = toSantiagoTime(checkDate);
+        }
+
+        // Formateo de fecha DD/MM/YYYY en UTC para evitar desfases
+        let formattedDate = '';
+        if (entryDate) {
+          const parsedDate = new Date(entryDate);
+          if (!isNaN(parsedDate.getTime())) {
+            const day = String(parsedDate.getUTCDate()).padStart(2, '0');
+            const month = String(parsedDate.getUTCMonth() + 1).padStart(2, '0');
+            const year = parsedDate.getUTCFullYear();
+            formattedDate = `${day}/${month}/${year}`;
+          } else {
+            formattedDate = entryDate;
+          }
+        }
+
+        const typeLabel = item.entryType === 'checklist' ? 'Checklist'
+          : item.entryType === 'incidente' ? 'Incidente'
+          : item.entryType === 'ofensa' ? 'Ofensa'
+          : 'Operativa';
+
+        const row = [
+          formattedDate,
+          entryTime || '',
+          typeLabel,
+          content,
+          (item.tags || []).join(', '),
+          item.clientName || '',
+          item.createdByUsername || (item.createdBy && item.createdBy.username) || 'N/A'
+        ].map(escapeCsv);
+
+        csvRows.push(row.join(','));
+      });
+
+      // Registrar auditoría de exportación
+      await audit(req, {
+        event: 'entry.export',
+        level: 'info',
+        result: { success: true },
+        metadata: {
+          count: entries.length,
+          filters: { search, tags, clientId, entryType, startDate, endDate, userId }
+        }
+      });
+
+      // Configuración de cabeceras de respuesta y BOM para compatibilidad con Excel en español
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename=bitacora_entradas.csv');
+      res.status(200).send('\uFEFF' + csvRows.join('\n'));
+    } catch (error) {
+      console.error('Error al exportar entradas:', error);
+      res.status(500).json({ message: 'Error al exportar entradas' });
+    }
+  }
+);
+
 // GET /api/entries/:id - Obtener entrada por ID
 router.get('/:id', authenticate, async (req, res) => {
   try {

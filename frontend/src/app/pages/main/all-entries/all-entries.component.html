@@ -30,18 +30,44 @@
               </mat-option>
             </mat-select>
           </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Analista</mat-label>
+            <mat-select formControlName="userId">
+              <mat-option value="">-- Todos --</mat-option>
+              <mat-option *ngFor="let analyst of analysts" [value]="analyst._id">
+                {{ analyst.name }} ({{ analyst.username }})
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
         </div>
 
         <div class="search-row">
           <mat-form-field appearance="outline">
-            <mat-label>Fecha desde</mat-label>
-            <input matInput type="date" formControlName="startDate">
+            <mat-label>Rango de Fecha</mat-label>
+            <mat-select formControlName="datePreset" (selectionChange)="onDatePresetChange()">
+              <mat-option value="todos">Cualquier fecha</mat-option>
+              <mat-option value="3">Últimos 3 días</mat-option>
+              <mat-option value="7">Últimos 7 días</mat-option>
+              <mat-option value="15">Últimos 15 días</mat-option>
+              <mat-option value="30">Últimos 30 días</mat-option>
+              <mat-option value="60">Últimos 60 días</mat-option>
+              <mat-option value="90">Últimos 90 días</mat-option>
+              <mat-option value="custom">Rango personalizado</mat-option>
+            </mat-select>
           </mat-form-field>
 
-          <mat-form-field appearance="outline">
-            <mat-label>Fecha hasta</mat-label>
-            <input matInput type="date" formControlName="endDate">
-          </mat-form-field>
+          <ng-container *ngIf="searchForm.get('datePreset')?.value === 'custom'">
+            <mat-form-field appearance="outline">
+              <mat-label>Fecha desde</mat-label>
+              <input matInput type="date" formControlName="startDate">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Fecha hasta</mat-label>
+              <input matInput type="date" formControlName="endDate">
+            </mat-form-field>
+          </ng-container>
 
           <mat-form-field appearance="outline" class="search-input">
             <mat-label>Tags</mat-label>
@@ -66,14 +92,23 @@
   <section class="all-entries-panel results-card">
     <header class="all-entries-panel__header all-entries-panel__header--toolbar">
       <h2 class="all-entries-panel__title">Resultados ({{ totalEntries }} entradas)</h2>
-      <div class="bulk-actions" *ngIf="isAdmin && selectedEntries.size > 0">
-        <button mat-raised-button color="accent" (click)="openAdminEditDialog()">
-          <mat-icon>edit</mat-icon>
-          Editar {{ selectedEntries.size }} seleccionada(s)
-        </button>
-        <button mat-button (click)="clearSelection()">
-          <mat-icon>clear</mat-icon>
-          Deseleccionar
+      <div class="results-header-actions">
+        <!-- Acciones masivas de admin -->
+        <div class="bulk-actions" *ngIf="isAdmin && selectedEntries.size > 0">
+          <button mat-raised-button color="accent" (click)="openAdminEditDialog()">
+            <mat-icon>edit</mat-icon>
+            Editar {{ selectedEntries.size }} seleccionada(s)
+          </button>
+          <button mat-button (click)="clearSelection()">
+            <mat-icon>clear</mat-icon>
+            Deseleccionar
+          </button>
+        </div>
+
+        <!-- Botón para exportar registros -->
+        <button mat-stroked-button color="primary" type="button" (click)="downloadCSV()" [disabled]="totalEntries === 0" matTooltip="Descargar registros filtrados en CSV">
+          <mat-icon>download</mat-icon>
+          Descargar CSV
         </button>
       </div>
     </header>

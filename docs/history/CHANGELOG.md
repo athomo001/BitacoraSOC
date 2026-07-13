@@ -2,6 +2,26 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.21] - 2026-07-13
+
+### Filtros avanzados en búsqueda de entradas, exportación no paginada a CSV y corrección de cifrado en el directorio
+
+- **Mejoras en Búsqueda de Entradas (`/main/all-entries`)**:
+  - Incorporación de un selector de rango predefinido de fechas (3, 7, 15, 30, 60, 90 días, cualquier fecha y rango personalizado).
+  - Implementación de controles interactivos condicionales para "Fecha desde" y "Fecha hasta" utilizando clics en calendarios cuando se escoge la opción de rango personalizado.
+  - Adición de un selector de analista para acotar las entradas de la bitácora según analistas específicos.
+  - Implementación de un botón interactivo "Descargar CSV" para exportar el reporte filtrado en tiempo real.
+- **Exportación a CSV en el Backend**:
+  - Creación del endpoint `/api/entries/export` que recopila, une (mediante `$unionWith` para checklists de turno) y entrega el reporte completo de entradas.
+  - Soporte de descarga UTF-8 con prefijo BOM (`\uFEFF`) para compatibilidad directa y sin problemas de codificación al abrir con Microsoft Excel.
+  - Registro automático del evento de exportación en la bitácora de auditoría (`entry.export`).
+- **Bugfix de Doble Cifrado en el Directorio Global de Contactos (`/main/escalation/directory`)**:
+  - Corrección del error que provocaba la visualización de datos cifrados con hashes / dos puntos (`:`) para usuarios internos del SOC.
+  - Modificación de la función de cifrado (`encrypt`) en `encryption.js` para evitar encriptar cadenas que ya se encuentran cifradas bajo el esquema AES-256-GCM o legacy.
+  - Ejecución de un script de migración nativa (`fix-double-encryption.js`) que analizó las colecciones de base de datos `directorycontacts` y `contacts`, corrigiendo exitosamente 13 registros de emails y teléfonos con doble cifrado de vuelta a cifrado simple descifrable.
+
+---
+
 ## [v1.6.20] - 2026-07-09
 
 ### API Keys robustas, logs de auditoría en tiempo real, renderizador de MJML y envío SMTP de incidentes
