@@ -10,7 +10,8 @@ const User = require('../models/User');
 const Entry = require('../models/Entry');
 const AppConfig = require('../models/AppConfig');
 const Contact = require('../models/Contact');
-const { buildIncidentEmail } = require('../utils/incidentEmailTemplate');
+// Importar plantilla de correo centralizada
+const { buildIncidentEmail } = require('../templates/email');
 const {
   htmlToBasicPlainText,
   resolveUploadedLogoWebPath,

@@ -1,16 +1,26 @@
 /**
- * File Purpose: backend/src/utils/escalationScheduleEmailTemplate.js
+ * File Purpose: backend/src/templates/email/escalationSchedule.js
  * Responsibilities: Generate MJML-based HTML email for escalation schedule notifications.
  */
 
 const mjml = require('mjml');
 
+/**
+ * Escapa caracteres HTML especiales para evitar vulnerabilidades XSS.
+ * @param {any} v - Valor a escapar.
+ * @returns {string} Cadena de texto escapada de forma segura.
+ */
 function e(v) {
   return String(v == null ? '' : v)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+/**
+ * Formatea un objeto fecha o string a formato de fecha dd-mm-aaaa.
+ * @param {Date|string} fecha - Fecha a formatear.
+ * @returns {string} Fecha formateada o guion si no es válida.
+ */
 function formatDate(fecha) {
   if (!fecha) return '-';
   try {
@@ -20,6 +30,11 @@ function formatDate(fecha) {
   } catch { return String(fecha); }
 }
 
+/**
+ * Formatea un objeto fecha o string a formato de hora de 24 horas hh:mm.
+ * @param {Date|string} fecha - Fecha a formatear.
+ * @returns {string} Hora formateada o cadena vacía si no es válida.
+ */
 function formatTime(fecha) {
   if (!fecha) return '-';
   try {
@@ -29,6 +44,22 @@ function formatTime(fecha) {
   } catch { return ''; }
 }
 
+/**
+ * Obtiene el nombre del día de la semana en español con la primera letra en mayúscula.
+ * @param {Date|string} fecha - Objeto Date o cadena representativa de la fecha.
+ * @returns {string} Nombre del día (ej. 'Lunes') o cadena vacía si no es válida.
+ */
+function getDayOfWeek(fecha) {
+  if (!fecha) return '';
+  try {
+    const d = new Date(fecha);
+    if (isNaN(d.getTime())) return '';
+    const dayName = d.toLocaleDateString('es-CL', { weekday: 'long' });
+    return dayName.charAt(0).toUpperCase() + dayName.slice(1);
+  } catch { return ''; }
+}
+
+// Paleta de colores para el estilo visual del correo
 const PALETTE = {
   pageBg: '#173831',
   headerBg: '#155F50',
@@ -43,13 +74,15 @@ const PALETTE = {
 };
 
 /**
- * Genera el HTML del correo de turnos de escalamiento y asignaciones
- * @param {Object} data - Datos del turno
- * @param {Array} data.schedule - Lista de turnos [{ analystName, startDate, endDate, cargoLabel, isCurrent }]
- * @param {string} data.periodLabel - Texto del periodo (ej: "Semana del 07 al 13 de Mayo")
- * @param {string} data.logoCid - CID del logo para adjuntar
- * @param {string} data.brandName - Nombre de la marca (Bitácora SOC)
- * @param {string} data.title - Título personalizado para el encabezado del correo
+ * Genera el HTML compilado a partir de MJML para el correo de turnos de escalamiento.
+ * @param {Object} data - Datos para completar la plantilla del correo.
+ * @param {Array} data.schedule - Listado de asignaciones de turnos.
+ * @param {string} data.periodLabel - Etiqueta representativa de las fechas del período.
+ * @param {string|null} data.logoCid - CID del logo para adjuntar en línea.
+ * @param {string} data.brandName - Nombre de marca de la aplicación.
+ * @param {string} data.title - Título principal de la cabecera.
+ * @param {string} data.categoriesLabel - Categorías de turnos visualizadas.
+ * @returns {Promise<{html: string, errors: Array}>} Resultado HTML y advertencias de compilación.
  */
 async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', logoCid = null, brandName = 'Bitácora CDC', title = 'Turnos de Escalamiento SOC', categoriesLabel = '' }) {
   
@@ -86,10 +119,14 @@ async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', l
       <tr>
         <td style="padding:12px 8px; border-bottom:${border}; color:${PALETTE.bodyText}; font-weight:700; line-height:1.35;">${e(s.analystName)}</td>
         <td style="padding:12px 8px; border-bottom:${border}; color:${PALETTE.bodyText}; font-size:13px;">
+          <!-- Día de la semana en formato destacado de inicio -->
+          <span style="font-weight:bold; font-size:15px; display:inline-block; margin-bottom:2px;">${getDayOfWeek(s.startDate)}</span><br/>
           <span style="white-space:nowrap;">${formatDate(s.startDate)}</span><br/>
           <span style="white-space:nowrap;">${formatTime(s.startDate)}</span>
         </td>
         <td style="padding:12px 8px; border-bottom:${border}; color:${PALETTE.bodyText}; font-size:13px;">
+          <!-- Día de la semana en formato destacado de término -->
+          <span style="font-weight:bold; font-size:15px; display:inline-block; margin-bottom:2px;">${getDayOfWeek(s.endDate)}</span><br/>
           <span style="white-space:nowrap;">${formatDate(s.endDate)}</span><br/>
           <span style="white-space:nowrap;">${formatTime(s.endDate)}</span>
         </td>
@@ -128,13 +165,11 @@ async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', l
                 }
               </td>
               <td style="width:50%; text-align:right; vertical-align:middle;">
-                <!-- Cabecera dinámica mostrando las condiciones incluidas en la programación para evitar redundancia con el título -->
                 <span style="font-size:11px; font-weight:700; color:${PALETTE.headerText}; letter-spacing:1px;">${e((categoriesLabel || 'CALENDARIO').toUpperCase())}</span>
               </td>
             </tr>
           </mj-table>
           <mj-text align="center" color="${PALETTE.headerText}" font-size="28px" font-weight="700" padding="10px 0">
-            <!-- Título del cuerpo del correo dinámico según la programación -->
             ${e(title)}
           </mj-text>
           <mj-text align="center" color="${PALETTE.cardAccent}" font-size="16px" font-weight="400" padding="0">
@@ -166,7 +201,6 @@ async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', l
           
           <mj-spacer height="20px" />
           
-          <!-- Mensaje aclaratorio de uso interno y flexibilidad de turnos asignados -->
           <mj-text font-size="12px" line-height="18px" color="${PALETTE.mutedText}" align="center" font-style="italic">
             Nota: Este correo de aviso es exclusivamente para <b>control interno</b> del área. Los turnos asignados son preliminares y pueden ser modificados en el transcurso de la semana según las necesidades del servicio.
           </mj-text>
@@ -193,8 +227,6 @@ async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', l
   `;
 
   const result = await mjml(template, { validationLevel: 'soft' });
-  
-  // Validar que se generó HTML correctamente
   const html = result?.html || '';
   if (!html || html.trim().length === 0) {
     console.error('[escalationScheduleEmailTemplate] MJML compilation produced empty HTML', {
@@ -202,7 +234,7 @@ async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', l
       hasHtml: !!result?.html,
       htmlLength: result?.html?.length || 0,
       errors: result?.errors || [],
-      template: template.substring(0, 200) // primeros 200 caracteres para debugging
+      template: template.substring(0, 200)
     });
   }
   

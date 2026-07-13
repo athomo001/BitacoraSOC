@@ -39,7 +39,8 @@ const AuditLog = require('../models/AuditLog');
 const { audit } = require('../utils/audit');
 const { sendEmail, getSMTPConfig } = require('../utils/email');
 const { analyzeRecipientEmails } = require('../utils/contactDirectory');
-const { buildIncidentEmail } = require('../utils/incidentEmailTemplate');
+// Importar plantilla de correo centralizada
+const { buildIncidentEmail } = require('../templates/email');
 const {
   htmlToBasicPlainText,
   locateFirstImgSrcRange,
@@ -1579,8 +1580,8 @@ router.post('/incident/preview', authenticate, async (req, res) => {
 
     const autor = req.user?.fullName || req.user?.username || 'Analista SOC';
 
-    // Compilar MJML con data URIs para que el preview sea visible en el navegador
-    const { buildIncidentEmailPreview } = require('../utils/incidentEmailTemplate');
+    // Compilar MJML con data URIs para que el preview sea visible en el navegador (importación centralizada)
+    const { buildIncidentEmailPreview } = require('../templates/email');
     const paletteKey = config?.incidentEmailPaletteKey || 'cdc-verde';
     const { html, errors } = await buildIncidentEmailPreview({
       reportData, images: previewImages, logoCid, autor, brandName, paletteKey
