@@ -67,7 +67,8 @@
               <mat-icon>cake</mat-icon>
               <div class="metadata-text">
                 <span class="label">Cumpleaños</span>
-                <span class="value">{{ currentUser?.birthday | date:'dd/MM/yyyy' }}</span>
+                <!-- Se fuerza el formateo en zona horaria UTC para evitar desfases de un día por la zona horaria del cliente -->
+                <span class="value">{{ currentUser?.birthday | date:'dd/MM/yyyy':'UTC' }}</span>
               </div>
             </div>
           </div>
