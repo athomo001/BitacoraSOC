@@ -21,6 +21,7 @@
  *   - Auditoría de todas las operaciones
  */
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const path = require('path');
 const fs = require('fs').promises;
@@ -475,7 +476,7 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
     // 2. Crear ZIP con el JSON + archivos físicos
     await new Promise((resolve, reject) => {
       const output = fsSync.createWriteStream(filePath);
-      const archive = archiver('zip', { zlib: { level: 9 } });
+      const archive = archiver('zip', { zlib: { level: 1 } });
 
       output.on('close', () => {
         logger.info('💾 Archivo ZIP de backup cerrado e indexado en disco exitosamente.');
