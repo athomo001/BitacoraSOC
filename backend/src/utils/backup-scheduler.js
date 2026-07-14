@@ -11,6 +11,7 @@ const archiver = require('archiver');
 const { logger } = require('./logger');
 const { auditSystem } = require('./audit');
 const { backupModels, BACKUP_EXPORT_VERSION } = require('./backup-manifest');
+const { writeBackupJsonFile } = require('./backup-json-writer');
 
 const AppConfig = require('../models/AppConfig');
 
@@ -317,31 +318,24 @@ const runBackup = async (options = {}) => {
 
     await ensureBackupDir();
 
-    const backupData = {
-      metadata: {
-        createdAt: new Date().toISOString(),
-        source,
-        version: BACKUP_EXPORT_VERSION,
-        collections: Object.keys(backupModels).length,
-        type: 'json-auto'
-      },
-      data: {}
+    const backupMetadata = {
+      createdAt: new Date().toISOString(),
+      source,
+      version: BACKUP_EXPORT_VERSION,
+      collections: Object.keys(backupModels).length,
+      type: 'json-auto'
     };
-
-    for (const [key, model] of Object.entries(backupModels)) {
-      backupData.data[key] = await model.find().lean();
-    }
-
-    const totalDocuments = Object.values(backupData.data).reduce((sum, records) => sum + records.length, 0);
-
-    backupData.metadata.documents = totalDocuments;
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const fileName = `backup-${timestamp}.zip`;
     const filePath = path.join(backupsDir, fileName);
     tempJsonPath = path.join(backupsDir, `_tmp_auto_backup_${Date.now()}.json`);
 
-    await fs.writeFile(tempJsonPath, JSON.stringify(backupData, null, 2), 'utf8');
+    const totalDocuments = await writeBackupJsonFile({
+      filePath: tempJsonPath,
+      metadata: backupMetadata,
+      models: backupModels
+    });
 
     const readableSecrets = [];
     if (fsSync.existsSync(secretsDir)) {
