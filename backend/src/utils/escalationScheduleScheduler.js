@@ -69,8 +69,10 @@ function initEscalationScheduleScheduler() {
       const now = new Date();
       
       // Obtener el día de la semana, día del mes y la hora actual en formato de 24 horas forzando la zona horaria de Chile (America/Santiago)
-      const currentDay = parseInt(now.toLocaleDateString('en-US', { timeZone: 'America/Santiago', weekday: 'numeric' }), 10); // 0 (Domingo) a 6 (Sábado)
-      const currentMonthDay = parseInt(now.toLocaleDateString('en-US', { timeZone: 'America/Santiago', day: 'numeric' }), 10);
+      const santiagoStr = now.toLocaleString('en-US', { timeZone: 'America/Santiago' });
+      const santiagoDate = new Date(santiagoStr);
+      const currentDay = santiagoDate.getDay(); // 0 (Domingo) a 6 (Sábado)
+      const currentMonthDay = santiagoDate.getDate();
       const currentTime = now.toLocaleTimeString('en-GB', { 
         timeZone: 'America/Santiago', 
         hour: '2-digit', 
@@ -131,7 +133,7 @@ function initEscalationScheduleScheduler() {
         }
       }
     } catch (error) {
-      logger.error('Error in escalationScheduleScheduler loop:', error);
+      logger.error({ err: error }, 'Error in escalationScheduleScheduler loop');
     }
   });
 }

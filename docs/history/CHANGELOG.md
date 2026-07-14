@@ -4,7 +4,7 @@ Registro de cambios relevantes del proyecto.
 
 ## [v1.6.22] - 2026-07-14
 
-### Reestructuración de tabla de impresión física en columnas separadas (Día y Situación), remoción de columnas de contacto/Hoy, subtítulo de fechas dinámico, optimización de emails de turnos y actualización de backups MongoDB
+### Reestructuración de tabla de impresión física en columnas separadas (Día y Situación), remoción de columnas de contacto/Hoy, subtítulo de fechas dinámico, optimización de emails de turnos, robustez en backups (solución a 502 Bad Gateway) y corrección de RangeError en scheduler
 
 - **Módulo de Impresión Premium de Teletrabajo (`/main/escalation/simple`)**:
   - **División de Columnas de Situación:** Implementación de procesamiento dinámico del DOM en memoria (`tempDiv`) para insertar una nueva columna física "Día / Asignación" antes de la columna "Situación" en la versión de impresión.
@@ -16,8 +16,11 @@ Registro de cambios relevantes del proyecto.
   - **Fix de Ligandos en Iconos de Material:** Inhabilitación física de iconos (`mat-icon`, `[role="img"]`) a tamaño cero y color transparente para prevenir la renderización literal de ligandos de texto del material design (como `date_range` o `school`).
 - **Módulo de Notificación de Turnos (Backend)**:
   - **Rediseño de Email de Escalación:** Modificación de `escalationSchedule.js` para incrementar el ancho de la plantilla de correo a **880px** y elevar el tamaño y contraste de las fuentes para permitir una lectura óptima y fluida de los analistas de turno en cualquier cliente de correo.
+  - **Bugfix del Scheduler (RangeError de V8 Intl):** Corrección del error en `escalationScheduleScheduler.js` donde el uso de la opción inválida `weekday: 'numeric'` en `toLocaleDateString` provocaba un RangeError en entornos Alpine Linux, bloqueando silenciosamente la ejecución recurrente de turnos cada minuto. Se reemplazó por la extracción de día mediante un objeto Date local (`santiagoDate`) basado en `toLocaleString` con timeZone.
 - **Módulo de Respaldos de Base de Datos (MongoDB)**:
   - **Actualización del Manifiesto de Backups:** Inclusión de los nuevos modelos operacionales (`ShiftNotificationSchedule`, `ShiftReminder`, `ApiKey`, `AvisoLog`, `CustomFont`, y `ReportHistory`) en `backup-manifest.js` para garantizar un respaldo del 100% del estado del sistema.
+  - **Bugfix de 502 Bad Gateway en Creación de Backup (`/api/backup/create`):** Adición de captura de error en el stream de escritura (`output.on('error', reject)`) para evitar que fallas del disco (ej: falta de espacio o problemas de permisos de escritura) lancen excepciones globales no controladas (`Unhandled 'error' event`) que crasheaban el backend e impedían a Nginx obtener respuesta.
+  - **Logs de Trazabilidad:** Inyección de logs informativos detallados para diagnosticar el estado del proceso de backup paso a paso (base de datos temporal, compresión y finalización).
 - **Entorno de Contenedores (Docker / Nginx)**:
   - **Compatibilidad Local offline:** Actualización del Dockerfile del frontend a `nginx:1.27-alpine` para permitir compilar y desplegar localmente de inmediato mediante la caché local de Docker Desktop en cortes o restricciones de red de salida DNS.
 
