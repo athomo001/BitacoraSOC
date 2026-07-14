@@ -397,7 +397,9 @@ router.get('/history', authenticate, authorize('admin'), async (req, res) => {
 // POST /api/backup/create — Backup completo ZIP (MongoDB + archivos físicos)
 router.post('/create', authenticate, authorize('admin'), async (req, res) => {
   const tempJson = path.join(BACKUPS_DIR, `_tmp_data_${Date.now()}.json`);
+  let createdTempJson = false;
   try {
+    logger.info('📦 Iniciando solicitud de creación de backup manual...');
     await fs.mkdir(BACKUPS_DIR, { recursive: true });
     await fs.mkdir(UPLOADS_DIR, { recursive: true });
     await fs.mkdir(GLOBAL_DIR, { recursive: true }).catch(() => {});
@@ -407,8 +409,20 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
     const filename = `backup-${timestamp}.zip`;
     const filePath = path.join(BACKUPS_DIR, filename);
 
+    logger.info('🔍 Consultando colecciones desde base de datos...');
     const backupSnapshotEntries = await Promise.all(
-      Object.entries(backupModels).map(async ([key, Model]) => [key, await Model.find().lean()])
+      Object.entries(backupModels).map(async ([key, Model]) => {
+        try {
+          if (!Model || typeof Model.find !== 'function') {
+            throw new Error(`El modelo para ${key} no está correctamente inicializado o es inválido.`);
+          }
+          const docs = await Model.find().lean();
+          return [key, docs];
+        } catch (dbErr) {
+          logger.error({ err: dbErr, collection: key }, `Error leyendo documentos para la colección ${key}`);
+          throw dbErr;
+        }
+      })
     );
     const backupSnapshot = Object.fromEntries(backupSnapshotEntries);
     const collectionCount = Object.keys(backupModels).length;
@@ -429,11 +443,14 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
     let isEncrypted = false;
     
     if (passphrase && String(passphrase).trim()) {
+      logger.info('🔐 Cifrando JSON de base de datos con contraseña provista...');
       finalJsonData = encryptWithPassphrase(finalJsonData, String(passphrase).trim());
       isEncrypted = true;
     }
 
+    logger.info(`💾 Escribiendo archivo temporal de base de datos en: ${tempJson}`);
     await fs.writeFile(tempJson, finalJsonData);
+    createdTempJson = true;
 
     // Pre-scan secrets legibles ANTES de entrar en el Promise (await no puede usarse dentro de callback sync)
     const readableSecrets = [];
@@ -454,13 +471,28 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
       }
     }
 
+    logger.info(`zip: Comprimiendo archivos en: ${filePath}`);
     // 2. Crear ZIP con el JSON + archivos físicos
     await new Promise((resolve, reject) => {
       const output = fsSync.createWriteStream(filePath);
       const archive = archiver('zip', { zlib: { level: 9 } });
 
-      output.on('close', resolve);
-      archive.on('error', reject);
+      output.on('close', () => {
+        logger.info('💾 Archivo ZIP de backup cerrado e indexado en disco exitosamente.');
+        resolve();
+      });
+
+      // Capturar fallas de escritura en disco (ej. disco lleno ENOSPC o error de permisos) para evitar crasheos globales
+      output.on('error', (err) => {
+        logger.error({ err }, '❌ Error crítico en stream de escritura de backup (createWriteStream)');
+        reject(err);
+      });
+
+      archive.on('error', (err) => {
+        logger.error({ err }, '❌ Error crítico en motor de compresión archiver');
+        reject(err);
+      });
+
       archive.pipe(output);
 
       // JSON de la base de datos
@@ -468,24 +500,31 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
 
       // Archivos físicos de uploads (logos, imágenes)
       if (fsSync.existsSync(UPLOADS_DIR)) {
+        logger.info(`zip: Agregando directorio de uploads: ${UPLOADS_DIR}`);
         archive.directory(UPLOADS_DIR, 'uploads');
       }
 
       // Directorio global opcional del servidor
       if (fsSync.existsSync(GLOBAL_DIR)) {
+        logger.info(`zip: Agregando directorio global: ${GLOBAL_DIR}`);
         archive.directory(GLOBAL_DIR, 'global');
       }
 
       // Certificados SSL (solo los legibles pre-escaneados)
-      for (const s of readableSecrets) {
-        archive.file(s.path, { name: `secrets/${s.name}` });
+      if (readableSecrets.length > 0) {
+        logger.info(`zip: Agregando ${readableSecrets.length} archivos de secrets...`);
+        for (const s of readableSecrets) {
+          archive.file(s.path, { name: `secrets/${s.name}` });
+        }
       }
 
       archive.finalize();
     });
 
     // Limpiar JSON temporal
-    await fs.unlink(tempJson).catch(() => {});
+    if (createdTempJson) {
+      await fs.unlink(tempJson).catch(() => {});
+    }
 
     const stat = await fs.stat(filePath);
     const totalDocs = Object.values(backupData.data).reduce((sum, arr) => sum + arr.length, 0);
@@ -497,6 +536,7 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
       metadata: { encrypted: isEncrypted }
     });
 
+    logger.info(`✅ Backup '${filename}' creado de forma exitosa (${stat.size} bytes).`);
     res.json({
       message: 'Backup completo creado exitosamente',
       filename,
@@ -505,7 +545,9 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
       sizeBytes: stat.size
     });
   } catch (error) {
-    await fs.unlink(tempJson).catch(() => {});
+    if (createdTempJson) {
+      await fs.unlink(tempJson).catch(() => {});
+    }
     logger.error({ err: error }, 'Error creando backup ZIP');
     res.status(500).json({ message: 'Error creando backup' });
   }
