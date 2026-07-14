@@ -71,7 +71,7 @@ const BACKUPS_DIR = path.join(__dirname, '../../backups');
 // Configurar multer para importación — acepta ZIP y JSON hasta 200MB
 const upload = multer({
   dest: path.join(BACKUPS_DIR, 'temp'),
-  limits: { fileSize: 200 * 1024 * 1024 } // 200MB
+  limits: { fileSize: 300 * 1024 * 1024 } // 300MB
 });
 
 // Importar el scheduler de backups para reiniciar si cambia la config

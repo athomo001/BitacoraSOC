@@ -14,7 +14,7 @@ const { assertOutboundUrlSafe } = require('./outbound-url-guard');
 const { issueComplementToken } = require('./complement-token');
 const { requestJson } = require('./complement-http');
 const { probeComplementHealth, getCircuitState } = require('./complement-circuit-breaker');
-const { removePublishedArtifacts } = require('./complement-publisher');
+const { removeAllComplementArtifacts } = require('./complement-publisher');
 
 const PURGE_MODELS = [Entry, ComplementSharedRecord];
 
@@ -530,7 +530,10 @@ const deleteComplement = async (req, complement, reason) => {
   }
 
   await purgeGeneralData(complement);
-  await removePublishedArtifacts(complement.sourceArtifact || {});
+  await removeAllComplementArtifacts({
+    slug: complement.slug,
+    sourceArtifact: complement.sourceArtifact || {}
+  });
   await Complement.deleteOne({ _id: complement._id });
   await verifyWipeOut(complement, privateDb);
 

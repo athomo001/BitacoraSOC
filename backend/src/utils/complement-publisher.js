@@ -13,6 +13,16 @@ const { validateComplementSourceArchive } = require('./complement-source-validat
 const COMPLEMENT_UPLOADS_ROOT = path.join(__dirname, '../../uploads/complements');
 const COMPLEMENT_PREVIEW_ROOT = path.join(COMPLEMENT_UPLOADS_ROOT, 'preview');
 const COMPLEMENT_PUBLISHED_ROOT = path.join(COMPLEMENT_UPLOADS_ROOT, 'published');
+const PREVIEW_RETENTION_HOURS = Math.max(1, Number(process.env.COMPLEMENT_PREVIEW_RETENTION_HOURS) || 24);
+const PREVIEW_RETENTION_MS = PREVIEW_RETENTION_HOURS * 60 * 60 * 1000;
+
+const resolveUploadsRelativePath = (relativePath = '') => {
+  const normalized = String(relativePath || '').replace(/\\/g, '/').replace(/^\/+/, '').trim();
+  if (!normalized || normalized.includes('..')) {
+    return null;
+  }
+  return path.join(path.join(__dirname, '../../uploads'), normalized);
+};
 
 const normalizeArchiveEntry = (entryPath) => String(entryPath || '')
   .replace(/\\/g, '/')
@@ -50,6 +60,45 @@ const assertArchivePathSafe = (entryPath) => {
 
 const ensureDirectory = async (dirPath) => {
   await fs.mkdir(dirPath, { recursive: true });
+};
+
+const listPreviewDirectories = async () => {
+  await ensureDirectory(COMPLEMENT_PREVIEW_ROOT);
+  const entries = await fs.readdir(COMPLEMENT_PREVIEW_ROOT, { withFileTypes: true });
+  return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+};
+
+const cleanupPreviewArtifacts = async ({ slug, mode = 'stale' } = {}) => {
+  const now = Date.now();
+  const previewDirs = await listPreviewDirectories();
+  let deletedCount = 0;
+
+  for (const dirName of previewDirs) {
+    const fullPath = path.join(COMPLEMENT_PREVIEW_ROOT, dirName);
+    const isSlugMatch = slug ? dirName.startsWith(`${slug}-`) : true;
+
+    if (mode === 'slug') {
+      if (!isSlugMatch) {
+        continue;
+      }
+      await fs.rm(fullPath, { recursive: true, force: true });
+      deletedCount++;
+      continue;
+    }
+
+    const stats = await fs.stat(fullPath).catch(() => null);
+    if (!stats) {
+      continue;
+    }
+
+    const isStale = (now - stats.mtimeMs) > PREVIEW_RETENTION_MS;
+    if (isStale) {
+      await fs.rm(fullPath, { recursive: true, force: true });
+      deletedCount++;
+    }
+  }
+
+  return deletedCount;
 };
 
 const writePlatformHealthFile = async (targetDir, slug) => {
@@ -137,6 +186,8 @@ const createStaticPreview = async (req, file, preferredSlug) => {
   }
 
   const slug = String(preferredSlug || analysis.suggestedConfig?.slug || 'complemento').trim().toLowerCase();
+  // Mantener solo el preview más reciente por slug para evitar acumulación de artefactos temporales.
+  await cleanupPreviewArtifacts({ slug, mode: 'slug' });
   const previewTarget = buildPreviewTarget(slug);
   await extractArchiveToDirectory(file.buffer, previewTarget.targetDir);
   await writePlatformHealthFile(previewTarget.targetDir, slug);
@@ -151,6 +202,8 @@ const createStaticPreview = async (req, file, preferredSlug) => {
 };
 
 const publishStaticArchive = async (req, file, slug) => {
+  // Limpieza preventiva de previews antiguos en cada publicación.
+  await cleanupPreviewArtifacts({ mode: 'stale' });
   const publishTarget = buildPublishedTarget(slug);
   await extractArchiveToDirectory(file.buffer, publishTarget.targetDir);
   await writePlatformHealthFile(publishTarget.targetDir, slug);
@@ -173,13 +226,36 @@ const removePublishedArtifacts = async (sourceArtifact = {}) => {
   ].filter(Boolean);
 
   await Promise.all(relativePaths.map(async (relativePath) => {
-    const targetDir = path.join(path.join(__dirname, '../../uploads'), relativePath);
+    const targetDir = resolveUploadsRelativePath(relativePath);
+    if (!targetDir) {
+      return;
+    }
     await fs.rm(targetDir, { recursive: true, force: true });
   }));
 };
 
+const removeAllComplementArtifacts = async ({ slug, sourceArtifact = {} } = {}) => {
+  await removePublishedArtifacts(sourceArtifact);
+
+  const normalizedSlug = String(slug || '').trim().toLowerCase();
+  if (!normalizedSlug) {
+    return;
+  }
+
+  // Publicado estable del complemento (ruta canónica de publicación)
+  await fs.rm(path.join(COMPLEMENT_PUBLISHED_ROOT, normalizedSlug), { recursive: true, force: true });
+
+  // Todos los previews históricos para el slug (previene residuos por múltiples previews)
+  const previewDirs = await listPreviewDirectories().catch(() => []);
+  await Promise.all(previewDirs
+    .filter((dirName) => dirName.startsWith(`${normalizedSlug}-`))
+    .map((dirName) => fs.rm(path.join(COMPLEMENT_PREVIEW_ROOT, dirName), { recursive: true, force: true })));
+};
+
 module.exports = {
+  cleanupPreviewArtifacts,
   createStaticPreview,
   publishStaticArchive,
-  removePublishedArtifacts
+  removePublishedArtifacts,
+  removeAllComplementArtifacts
 };
