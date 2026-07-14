@@ -22,7 +22,7 @@ Registro de cambios relevantes del proyecto.
   - **Bugfix de 502 Bad Gateway en Creación de Backup (`/api/backup/create`):** Adición de captura de error en el stream de escritura (`output.on('error', reject)`) para evitar que fallas del disco (ej: falta de espacio o problemas de permisos de escritura) lancen excepciones globales no controladas (`Unhandled 'error' event`) que crasheaban el backend e impedían a Nginx obtener respuesta.
   - **Logs de Trazabilidad:** Inyección de logs informativos detallados para diagnosticar el estado del proceso de backup paso a paso (base de datos temporal, compresión y finalización).
 - **Entorno de Contenedores (Docker / Nginx)**:
-  - **Compatibilidad Local offline:** Actualización del Dockerfile del frontend a `nginx:1.27-alpine` para permitir compilar y desplegar localmente de inmediato mediante la caché local de Docker Desktop en cortes o restricciones de red de salida DNS.
+  - **Compatibilidad y Estabilidad de Producción:** Reversión de la imagen base del frontend a `nginx:alpine` para garantizar compatibilidad absoluta de permisos y usuarios no-root (`USER nginx`) con el entorno de producción en Portainer.
 
 ---
 

@@ -81,7 +81,7 @@ const isValidBackupFilename = (filename) => {
   return typeof filename === 'string' && /^backup-[a-zA-Z0-9.\-_]+\.(json|zip)$/.test(filename);
 };
 
-const crypto = require('crypto');
+
 
 /**
  * Cifra un texto usando una passphrase
