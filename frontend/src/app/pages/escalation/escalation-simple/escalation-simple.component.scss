@@ -748,5 +748,205 @@
     color: #6b7280;
     border: 1px solid rgba(107, 114, 128, 0.2);
   }
+
+  /* Encapsulación neon suave para situaciones del día de hoy */
+  &.badge-status--today-highlight {
+    animation: badgeNeonPulse 2.5s infinite alternate;
+    font-weight: 750;
+
+    &.telework {
+      background-color: rgba(16, 185, 129, 0.14) !important;
+      color: #10b981 !important;
+      border: 1.5px solid #10b981 !important;
+    }
+
+    &.training {
+      background-color: rgba(245, 158, 11, 0.16) !important;
+      color: #d97706 !important;
+      border: 1.5px solid #f59e0b !important;
+    }
+
+    &.medical-appointment {
+      background-color: rgba(6, 182, 212, 0.14) !important;
+      color: #06b6d4 !important;
+      border: 1.5px solid #06b6d4 !important;
+    }
+  }
+}
+
+/* Animación sutil de pulso neon para situaciones del día de hoy */
+@keyframes badgeNeonPulse {
+  0% {
+    box-shadow: 0 0 4px rgba(255, 255, 255, 0.05), 0 0 0px currentColor;
+  }
+  100% {
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.1), 0 0 8px currentColor;
+  }
+}
+
+/* Cabeceras de Sección y Agrupamientos en la Tabla */
+.table-section-row {
+  background-color: rgba(255, 255, 255, 0.015) !important;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.08) !important;
+  pointer-events: none; // Evitar hover en la cabecera
+}
+
+.table-section-header {
+  padding: 16px 20px !important;
+}
+
+.section-header-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-primary);
+}
+
+.section-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  opacity: 0.85;
+}
+
+.section-title-text {
+  font-weight: 700;
+  font-size: 0.925rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+/* Clases condicionales de filas destacadas de Hoy con borde neon a la izquierda */
+.data-row.row-today {
+  transition: all 0.22s ease;
+  position: relative;
+
+  td:first-child {
+    position: relative;
+  }
+
+  &.row-today-telework {
+    border-left: 4.5px solid #10b981 !important;
+    background-color: rgba(16, 185, 129, 0.015) !important;
+    &:hover {
+      background-color: rgba(16, 185, 129, 0.035) !important;
+    }
+  }
+
+  &.row-today-training {
+    border-left: 4.5px solid #f59e0b !important;
+    background-color: rgba(245, 158, 11, 0.02) !important;
+    &:hover {
+      background-color: rgba(245, 158, 11, 0.04) !important;
+    }
+  }
+
+  &.row-today-medical {
+    border-left: 4.5px solid #06b6d4 !important;
+    background-color: rgba(6, 182, 212, 0.015) !important;
+    &:hover {
+      background-color: rgba(6, 182, 212, 0.035) !important;
+    }
+  }
+
+  &.row-vacation {
+    border-left: 4.5px solid #ef4444 !important;
+    background-color: rgba(239, 68, 68, 0.025) !important;
+    &:hover {
+      background-color: rgba(239, 68, 68, 0.045) !important;
+    }
+  }
+}
+
+/* Badge de píldora de "Hoy" al lado del nombre del analista */
+.badge-today-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 7px;
+  border-radius: 8px;
+  font-size: 0.625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.85) 0%, rgba(139, 92, 246, 0.85) 100%);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 2px 4px rgba(99, 102, 241, 0.15);
+}
+
+/* Columna hoy vertical en el lado izquierdo */
+.cell-header-spacer {
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+  padding: 10px 0 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cell-today-vertical {
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.09) 0%, rgba(168, 85, 247, 0.09) 100%);
+  border-right: 2px solid rgba(99, 102, 241, 0.3) !important;
+  text-align: center;
+  vertical-align: middle;
+  padding: 0 !important;
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+  position: relative;
+}
+
+.today-vertical-text {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.775rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--primary-color, #6366f1);
+  text-shadow: 0 0 10px rgba(99, 102, 241, 0.25);
+  white-space: nowrap;
+  gap: 6px;
+  margin: 0 auto;
+
+  small {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-secondary, #aaa);
+    letter-spacing: 0.04em;
+  }
+
+  /* Modificadores de tamaño dinámico para evitar desbordes */
+  &.today-vertical-text--tiny {
+    font-size: 0.65rem;
+    letter-spacing: 0.06em;
+    gap: 2px;
+    small {
+      font-size: 0.55rem;
+    }
+  }
+
+  &.today-vertical-text--small {
+    font-size: 0.725rem;
+    letter-spacing: 0.08em;
+    gap: 4px;
+    small {
+      font-size: 0.6rem;
+    }
+  }
+}
+
+.cell-today-vertical-empty {
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+  padding: 0 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: transparent;
 }
 
