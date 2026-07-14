@@ -76,10 +76,29 @@ const upload = multer({
 
 // Importar el scheduler de backups para reiniciar si cambia la config
 const { prepareBackupSchedule, startBackupScheduler, stopBackupScheduler, runBackup } = require('../utils/backup-scheduler');
+const IMPORT_INSERT_BATCH_SIZE = Math.max(50, Number(process.env.BACKUP_IMPORT_BATCH_SIZE) || 500);
 
 // Helper de validación de filename para evitar Path Traversal
 const isValidBackupFilename = (filename) => {
   return typeof filename === 'string' && /^backup-[a-zA-Z0-9.\-_]+\.(json|zip)$/.test(filename);
+};
+
+const insertInBatches = async (Model, docs, options = {}) => {
+  const batchSize = Math.max(50, Number(options.batchSize) || IMPORT_INSERT_BATCH_SIZE);
+  let inserted = 0;
+
+  for (let start = 0; start < docs.length; start += batchSize) {
+    const batch = docs.slice(start, start + batchSize);
+    try {
+      await Model.insertMany(batch, { ordered: false });
+      inserted += batch.length;
+    } catch (err) {
+      // Evita abortar toda la importación por duplicados/errores puntuales en un batch.
+      logger.warn({ collection: Model.collection?.collectionName, err }, 'Algunos documentos no pudieron ser importados en un batch');
+    }
+  }
+
+  return inserted;
 };
 
 
@@ -968,13 +987,13 @@ router.post('/import',
       }
 
       for (const [key, Model] of Object.entries(models)) {
-        if (backupJson.data[key]?.length) {
-          try {
-            await Model.insertMany(backupJson.data[key], { ordered: false });
-            imported += backupJson.data[key].length;
-          } catch (err) {
-            logger.warn({ collection: key, err }, 'Algunos documentos no pudieron ser importados');
-          }
+        const records = backupJson.data[key];
+        if (Array.isArray(records) && records.length > 0) {
+          imported += await insertInBatches(Model, records, { batchSize: IMPORT_INSERT_BATCH_SIZE });
+
+          // Liberar memoria progresivamente por colección para evitar OOM en imports grandes.
+          backupJson.data[key] = [];
+          await new Promise((resolve) => setImmediate(resolve));
         }
       }
 
