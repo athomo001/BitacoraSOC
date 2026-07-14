@@ -25,7 +25,7 @@ RUN sed -i "s|__APP_VERSION__|${APP_VERSION}|g" src/environments/environment*.ts
 RUN pnpm run build --configuration production
 
 # Stage 2: Servir con Nginx
-FROM nginx:1.27-alpine
+FROM nginx:alpine
 
 # OpenSSL (certs al arranque) + wget (espera a backend antes de nginx)
 RUN apk add --no-cache openssl wget
