@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `CHANGELOG.md`): **v1.6.21**
+> Version referencial actual (segun `CHANGELOG.md`): **v1.6.22**
 
 Stack principal:
 
@@ -63,6 +63,13 @@ Stack principal:
 ---
 
 ## Novedades recientes (resumen rapido)
+
+### v1.6.22 (Impresión premium Día/Situación divididos, anchos optimizados, subtítulo dinámico, emails turnos y backups)
+
+- **Reporte Impreso de Teletrabajo**: Separación física de las columnas "Día / Asignación" y "Situación" mediante DOM en memoria, incremento a 15px en negrita del día destacado, ocultamiento de datos de contacto (email/teléfono) y spacer Hoy para 100% de confidencialidad, y subtítulo dinámico con el rango de fechas de la semana actual.
+- **Optimización de Emails de Turnos**: Rediseño del template de correo en backend a 880px de ancho y fuentes más grandes para lectura rápida en cualquier dispositivo.
+- **Copias de Seguridad robustas**: Integración de los modelos operacionales recientes (`ShiftNotificationSchedule`, `ShiftReminder`, `ApiKey`, `AvisoLog`, `CustomFont`, y `ReportHistory`) al manifiesto de base de datos para backups completos de MongoDB.
+- **Entorno offline**: Migración a la imagen local `nginx:1.27-alpine` en el Dockerfile de frontend para permitir despliegue inmediato en contingencias de red.
 
 ### v1.6.21 (Filtros de búsqueda de entradas, exportación a CSV, corrección de cifrado en directorio y reparación de correos SMTP)
 

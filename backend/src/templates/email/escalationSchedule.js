@@ -113,25 +113,27 @@ async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', l
     };
 
     const badgeInfo = getBadgeInfo(s.roleCode);
-    const badge = `<span style="display:inline-block; white-space:nowrap; background-color:${badgeInfo.bg}; color:${PALETTE.white}; padding:4px 8px; border-radius:4px; font-size:11px; line-height:1; font-weight:700;">${e(badgeInfo.label)}</span>`;
+    // Incremento de padding y tamaño de letra del badge para mejorar lectura
+    const badge = `<span style="display:inline-block; white-space:nowrap; background-color:${badgeInfo.bg}; color:${PALETTE.white}; padding:6px 12px; border-radius:4px; font-size:13px; line-height:1; font-weight:700;">${e(badgeInfo.label)}</span>`;
 
     return `
       <tr>
-        <td style="padding:12px 8px; border-bottom:${border}; color:${PALETTE.bodyText}; font-weight:700; line-height:1.35;">${e(s.analystName)}</td>
-        <td style="padding:12px 8px; border-bottom:${border}; color:${PALETTE.bodyText}; font-size:13px;">
-          <!-- Día de la semana en formato destacado de inicio -->
-          <span style="font-weight:bold; font-size:15px; display:inline-block; margin-bottom:2px;">${getDayOfWeek(s.startDate)}</span><br/>
+        <!-- Se incrementa el tamaño de fuente de la información del analista -->
+        <td style="padding:14px 8px; border-bottom:${border}; color:${PALETTE.bodyText}; font-size:16px; font-weight:700; line-height:1.35;">${e(s.analystName)}</td>
+        <td style="padding:14px 8px; border-bottom:${border}; color:${PALETTE.bodyText}; font-size:15px;">
+          <!-- Día de la semana y fecha con fuentes aumentadas -->
+          <span style="font-weight:bold; font-size:17px; display:inline-block; margin-bottom:2px;">${getDayOfWeek(s.startDate)}</span><br/>
           <span style="white-space:nowrap;">${formatDate(s.startDate)}</span><br/>
           <span style="white-space:nowrap;">${formatTime(s.startDate)}</span>
         </td>
-        <td style="padding:12px 8px; border-bottom:${border}; color:${PALETTE.bodyText}; font-size:13px;">
-          <!-- Día de la semana en formato destacado de término -->
-          <span style="font-weight:bold; font-size:15px; display:inline-block; margin-bottom:2px;">${getDayOfWeek(s.endDate)}</span><br/>
+        <td style="padding:14px 8px; border-bottom:${border}; color:${PALETTE.bodyText}; font-size:15px;">
+          <!-- Finalización del turno con fuentes aumentadas -->
+          <span style="font-weight:bold; font-size:17px; display:inline-block; margin-bottom:2px;">${getDayOfWeek(s.endDate)}</span><br/>
           <span style="white-space:nowrap;">${formatDate(s.endDate)}</span><br/>
           <span style="white-space:nowrap;">${formatTime(s.endDate)}</span>
         </td>
-        <td style="padding:12px 8px; border-bottom:${border}; color:${PALETTE.mutedText}; font-size:12px; white-space:nowrap;">${e(s.cargoLabel || '-')}</td>
-        <td style="padding:12px 8px; border-bottom:${border}; text-align:right;">${badge}</td>
+        <td style="padding:14px 8px; border-bottom:${border}; color:${PALETTE.mutedText}; font-size:14px; white-space:nowrap;">${e(s.cargoLabel || '-')}</td>
+        <td style="padding:14px 8px; border-bottom:${border}; text-align:right;">${badge}</td>
       </tr>
     `;
   }).join('');
@@ -150,7 +152,8 @@ async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', l
       }
     </mj-style>
   </mj-head>
-  <mj-body background-color="#FFFFFF" width="700px">
+  <!-- Ancho del correo aumentado a 880px para dar mayor legibilidad general -->
+  <mj-body background-color="#FFFFFF" width="880px">
     <mj-wrapper background-color="${PALETTE.pageBg}" padding="20px 0">
       
       <!-- Cabecera -->
@@ -160,19 +163,19 @@ async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', l
             <tr>
               <td style="width:50%; vertical-align:middle;">
                 ${logoCid 
-                  ? `<img src="${logoCid}" width="150" alt="${e(brandName)}" />`
-                  : `<span style="font-size:24px; font-weight:700; color:${PALETTE.headerText};">${e(brandName)}</span>`
+                  ? `<img src="${logoCid}" width="180" alt="${e(brandName)}" />`
+                  : `<span style="font-size:28px; font-weight:700; color:${PALETTE.headerText};">${e(brandName)}</span>`
                 }
               </td>
               <td style="width:50%; text-align:right; vertical-align:middle;">
-                <span style="font-size:11px; font-weight:700; color:${PALETTE.headerText}; letter-spacing:1px;">${e((categoriesLabel || 'CALENDARIO').toUpperCase())}</span>
+                <span style="font-size:13px; font-weight:700; color:${PALETTE.headerText}; letter-spacing:1px;">${e((categoriesLabel || 'CALENDARIO').toUpperCase())}</span>
               </td>
             </tr>
           </mj-table>
-          <mj-text align="center" color="${PALETTE.headerText}" font-size="28px" font-weight="700" padding="10px 0">
+          <mj-text align="center" color="${PALETTE.headerText}" font-size="32px" font-weight="700" padding="10px 0">
             ${e(title)}
           </mj-text>
-          <mj-text align="center" color="${PALETTE.cardAccent}" font-size="16px" font-weight="400" padding="0">
+          <mj-text align="center" color="${PALETTE.cardAccent}" font-size="19px" font-weight="400" padding="0">
             ${e(periodLabel)}
           </mj-text>
         </mj-column>
@@ -181,16 +184,16 @@ async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', l
       <!-- Tabla de Turnos -->
       <mj-section background-color="${PALETTE.cardBg}" padding="30px 24px" border-radius="0 0 12px 12px">
         <mj-column width="100%">
-          <mj-text font-size="18px" font-weight="700" color="${PALETTE.bodyText}" padding="0 0 20px 0">
+          <mj-text font-size="21px" font-weight="700" color="${PALETTE.bodyText}" padding="0 0 20px 0">
             Asignación de Turnos
           </mj-text>
           <mj-table css-class="schedule-table">
             <tr style="border-bottom: 2px solid ${PALETTE.softLine};">
-              <th style="text-align:left; padding:10px 8px; color:${PALETTE.mutedText}; font-size:12px; white-space:nowrap; width:28%;">ANALISTA</th>
-              <th style="text-align:left; padding:10px 8px; color:${PALETTE.mutedText}; font-size:12px; white-space:nowrap; width:22%;">INICIO</th>
-              <th style="text-align:left; padding:10px 8px; color:${PALETTE.mutedText}; font-size:12px; white-space:nowrap; width:22%;">FIN</th>
-              <th style="text-align:left; padding:10px 8px; color:${PALETTE.mutedText}; font-size:12px; white-space:nowrap; width:10%;">CARGO</th>
-              <th style="text-align:right; padding:10px 8px; color:${PALETTE.mutedText}; font-size:12px; white-space:nowrap; width:18%;">ESTADO</th>
+              <th style="text-align:left; padding:10px 8px; color:${PALETTE.mutedText}; font-size:14px; white-space:nowrap; width:28%;">ANALISTA</th>
+              <th style="text-align:left; padding:10px 8px; color:${PALETTE.mutedText}; font-size:14px; white-space:nowrap; width:22%;">INICIO</th>
+              <th style="text-align:left; padding:10px 8px; color:${PALETTE.mutedText}; font-size:14px; white-space:nowrap; width:22%;">FIN</th>
+              <th style="text-align:left; padding:10px 8px; color:${PALETTE.mutedText}; font-size:14px; white-space:nowrap; width:10%;">CARGO</th>
+              <th style="text-align:right; padding:10px 8px; color:${PALETTE.mutedText}; font-size:14px; white-space:nowrap; width:18%;">ESTADO</th>
             </tr>
             ${scheduleRows}
           </mj-table>
@@ -201,11 +204,11 @@ async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', l
           
           <mj-spacer height="20px" />
           
-          <mj-text font-size="12px" line-height="18px" color="${PALETTE.mutedText}" align="center" font-style="italic">
+          <mj-text font-size="14px" line-height="20px" color="${PALETTE.mutedText}" align="center" font-style="italic">
             Nota: Este correo de aviso es exclusivamente para <b>control interno</b> del área. Los turnos asignados son preliminares y pueden ser modificados en el transcurso de la semana según las necesidades del servicio.
           </mj-text>
           <mj-spacer height="10px" />
-          <mj-text font-size="13px" line-height="20px" color="${PALETTE.mutedText}" align="center">
+          <mj-text font-size="15px" line-height="22px" color="${PALETTE.mutedText}" align="center">
             Este es un correo automático generado por el sistema ${e(brandName)}.
           </mj-text>
         </mj-column>
@@ -216,7 +219,7 @@ async function buildEscalationScheduleEmail({ schedule = [], periodLabel = '', l
     <!-- Footer -->
     <mj-section padding="20px 0">
       <mj-column>
-        <mj-text align="center" color="#999999" font-size="11px">
+        <mj-text align="center" color="#999999" font-size="13px">
           &copy; ${new Date().getFullYear()} ${e(brandName)} &middot; Todos los derechos reservados
         </mj-text>
       </mj-column>
