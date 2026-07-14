@@ -128,6 +128,7 @@
         <table class="excel-table">
           <thead>
             <tr>
+              <th class="cell-header-spacer"></th>
               <th>Nombre</th>
               <th>Correo</th>
               <th>Teléfono</th>
@@ -136,38 +137,79 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let staff of teleworkStaff" class="data-row" [class.row-vacation]="staff.status === 'vacation' || staff.status === 'medical-appointment'">
-              <td class="cell-name">{{ staff.name }}</td>
-              <td class="cell-email clickable" (click)="copyToClipboard(staff.email)">
-                <span *ngIf="staff.email !== '-'">📧 {{ staff.email }}</span>
-                <span *ngIf="staff.email === '-'">-</span>
-              </td>
-              <td class="cell-phone clickable" (click)="copyToClipboard(staff.phone)">
-                <span *ngIf="staff.phone !== '-'">📱 {{ staff.phone }}</span>
-                <span *ngIf="staff.phone === '-'">-</span>
-              </td>
-              <td>{{ staff.role || '-' }}</td>
-              <td>
-                <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
-                  <span class="badge-status" [class]="staff.status">
-                    <mat-icon *ngIf="staff.status === 'telework'">home</mat-icon>
-                    <mat-icon *ngIf="staff.status === 'training'">school</mat-icon>
-                    <mat-icon *ngIf="staff.status === 'office'">business</mat-icon>
-                    <mat-icon *ngIf="staff.status === 'vacation' && !staff.isMedicalLeave">event_busy</mat-icon>
-                    <mat-icon *ngIf="staff.status === 'vacation' && staff.isMedicalLeave">healing</mat-icon>
-                    <mat-icon *ngIf="staff.status === 'medical-appointment'">local_hospital</mat-icon>
-                    <mat-icon *ngIf="staff.status === 'upcoming-vacation' && !staff.isMedicalLeave">event_note</mat-icon>
-                    <mat-icon *ngIf="staff.status === 'upcoming-vacation' && staff.isMedicalLeave">healing</mat-icon>
-                    <mat-icon *ngIf="staff.status === 'upcoming-medical-appointment'">local_hospital</mat-icon>
-                    <mat-icon *ngIf="staff.status === 'unassigned'">help_outline</mat-icon>
-                    <span>{{ staff.statusLabel }}</span>
-                  </span>
-                  <span *ngIf="staff.startDate && staff.endDate && staff.status !== 'office'" class="assignment-period-detail" style="font-size: 0.75rem; color: var(--text-secondary); margin-left: 4px;">
-                    {{ formatAssignmentPeriod(staff.startDate, staff.endDate, staff.status) }}
-                  </span>
-                </div>
-              </td>
-            </tr>
+            <ng-container *ngFor="let staff of teleworkStaff; let i = index">
+              <!-- Fila cabecera de sección divisoria (excluyendo Hoy) -->
+              <tr *ngIf="staff.section !== 'today' && (i === 0 || teleworkStaff[i - 1].section !== staff.section)" class="table-section-row">
+                <td colspan="6" class="table-section-header">
+                  <div class="section-header-content">
+                    <mat-icon class="section-icon" *ngIf="staff.section === 'week'">date_range</mat-icon>
+                    <mat-icon class="section-icon" *ngIf="staff.section === 'future'">upcoming</mat-icon>
+                    <mat-icon class="section-icon" *ngIf="staff.section === 'office'">business</mat-icon>
+                    <span class="section-title-text">{{ getSectionLabel(staff.section) }}</span>
+                  </div>
+                </td>
+              </tr>
+              
+              <!-- Fila de datos del analista con estilos específicos -->
+              <tr class="data-row" 
+                  [class.row-today]="staff.section === 'today'" 
+                  [class.row-vacation]="staff.status === 'vacation' || staff.status === 'medical-appointment'"
+                  [class.row-today-telework]="staff.section === 'today' && staff.status === 'telework'"
+                  [class.row-today-training]="staff.section === 'today' && staff.status === 'training'"
+                  [class.row-today-medical]="staff.section === 'today' && staff.status === 'medical-appointment'">
+                
+                <!-- Columna vertical Hoy a la izquierda -->
+                <td *ngIf="staff.section === 'today' && (i === 0 || teleworkStaff[i - 1].section !== 'today')" 
+                    [attr.rowspan]="todayCount" 
+                    class="cell-today-vertical">
+                  <div class="today-vertical-text"
+                       [class.today-vertical-text--tiny]="todayCount <= 1"
+                       [class.today-vertical-text--small]="todayCount === 2">
+                    <span>Hoy</span>
+                    <small>({{ getTodayDateShort() }})</small>
+                  </div>
+                </td>
+                
+                <!-- Celda vacía alineada para las filas de otras secciones -->
+                <td *ngIf="staff.section !== 'today'" class="cell-today-vertical-empty"></td>
+
+                <td class="cell-name">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span>{{ staff.name }}</span>
+                    <span *ngIf="staff.section === 'today'" class="badge-today-pill">Hoy</span>
+                  </div>
+                </td>
+                <td class="cell-email clickable" (click)="copyToClipboard(staff.email)">
+                  <span *ngIf="staff.email !== '-'">📧 {{ staff.email }}</span>
+                  <span *ngIf="staff.email === '-'">-</span>
+                </td>
+                <td class="cell-phone clickable" (click)="copyToClipboard(staff.phone)">
+                  <span *ngIf="staff.phone !== '-'">📱 {{ staff.phone }}</span>
+                  <span *ngIf="staff.phone === '-'">-</span>
+                </td>
+                <td>{{ staff.role || '-' }}</td>
+                <td>
+                  <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
+                    <span class="badge-status" [class]="staff.status" [class.badge-status--today-highlight]="staff.isTodayHighlighted">
+                      <mat-icon *ngIf="staff.status === 'telework'">home</mat-icon>
+                      <mat-icon *ngIf="staff.status === 'training'">school</mat-icon>
+                      <mat-icon *ngIf="staff.status === 'office'">business</mat-icon>
+                      <mat-icon *ngIf="staff.status === 'vacation' && !staff.isMedicalLeave">event_busy</mat-icon>
+                      <mat-icon *ngIf="staff.status === 'vacation' && staff.isMedicalLeave">healing</mat-icon>
+                      <mat-icon *ngIf="staff.status === 'medical-appointment'">local_hospital</mat-icon>
+                      <mat-icon *ngIf="staff.status === 'upcoming-vacation' && !staff.isMedicalLeave">event_note</mat-icon>
+                      <mat-icon *ngIf="staff.status === 'upcoming-vacation' && staff.isMedicalLeave">healing</mat-icon>
+                      <mat-icon *ngIf="staff.status === 'upcoming-medical-appointment'">local_hospital</mat-icon>
+                      <mat-icon *ngIf="staff.status === 'unassigned'">help_outline</mat-icon>
+                      <span>{{ staff.statusLabel }}</span>
+                    </span>
+                    <span *ngIf="staff.startDate && staff.endDate && staff.status !== 'office'" class="assignment-period-detail" style="font-size: 0.75rem; color: var(--text-secondary); margin-left: 4px;">
+                      {{ formatAssignmentPeriod(staff.startDate, staff.endDate, staff.status) }}
+                    </span>
+                  </div>
+                </td>
+              </tr>
+            </ng-container>
           </tbody>
         </table>
       </div>

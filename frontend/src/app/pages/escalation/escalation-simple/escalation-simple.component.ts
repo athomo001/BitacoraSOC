@@ -521,6 +521,10 @@ export class EscalationSimpleComponent implements OnInit {
   /**
    * Carga dinámicamente al personal de teletrabajo, vacaciones (activas y futuras) y oficina en el periodo semanal seleccionado.
    */
+  /**
+   * Carga dinámicamente al personal de teletrabajo, capacitación, trámites médicos y vacaciones en el periodo semanal seleccionado.
+   * Resuelve el bug de ocultamiento de asignaciones agrupando por usuario y aplicando priorización y ordenación cronológica adaptada al día de hoy.
+   */
   loadTeleworkStaff(): void {
     const assignments$ = this.escalationService.getAssignments(undefined, this.currentWeekStart.toISOString(), this.currentWeekEnd.toISOString());
     const futureVacations$ = this.escalationService.getAssignments('VACATION', this.currentWeekStart.toISOString(), undefined, 100);
@@ -531,198 +535,300 @@ export class EscalationSimpleComponent implements OnInit {
     forkJoin([assignments$, futureVacations$, futureMedicalLeaves$, futureMedicalAppointments$, users$]).subscribe({
       next: ([assignments, futureVacations, futureMedicalLeaves, futureMedicalAppointments, users]) => {
         const now = new Date();
-        // Se determina si la asignación está activa en la semana consultada y no ha finalizado en tiempo real
-        const isAssignmentActiveInWeek = (asg: any): boolean => {
-          const start = new Date(asg?.weekStartDate);
-          const end = new Date(asg?.weekEndDate);
-          if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-            // Evita mostrar estados fantasma cuando llegan fechas incompletas/inválidas.
-            return false;
-          }
-          const overlapsWeek = start <= this.currentWeekEnd && end >= this.currentWeekStart;
-          const isNotExpired = end >= now; // Omitir si la actividad ya terminó en tiempo real
-          return overlapsWeek && isNotExpired;
-        };
+        
+        // Parámetros de tiempo del día de hoy en hora local
+        const today = new Date();
+        const todayStart = new Date(today);
+        todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date(today);
+        todayEnd.setHours(23, 59, 59, 999);
 
-        const futureAbsences = [...futureVacations, ...futureMedicalLeaves, ...futureMedicalAppointments];
-        const list: any[] = [];
-        const processedUserIds = new Set<string>();
-        const processedExtIds = new Set<string>();
+        const weekStart = this.currentWeekStart;
+        const weekEnd = this.currentWeekEnd;
 
-        // 1. Procesar primero las ausencias activas de esta semana (Prioridad máxima)
-        assignments.forEach(asg => {
-          const personName = asg.userId?.fullName || asg.externalPersonId?.name || 'Sin asignar';
-          const personPhone = asg.userId?.phone || asg.externalPersonId?.phone || '-';
-          const personEmail = asg.userId?.email || asg.externalPersonId?.email || '-';
-          const roleName = asg.userId?.cargoLabel || asg.externalPersonId?.position || this.getRoleLabelTranslated(asg.roleCode);
-          const userIdStr = asg.userId?._id || asg.userId;
-          const extIdStr = asg.externalPersonId?._id || asg.externalPersonId;
-
-          if (asg.roleCode === 'VACATION' || asg.roleCode === 'MEDICAL_LEAVE' || asg.roleCode === 'MEDICAL_APPOINTMENT') {
-            // Verifica que la ausencia esté activa durante la semana
-            if (!isAssignmentActiveInWeek(asg)) return;
-            const isMedicalLeave = asg.roleCode === 'MEDICAL_LEAVE';
-            const isMedicalAppointment = asg.roleCode === 'MEDICAL_APPOINTMENT';
-            list.push({
-              name: personName,
-              phone: personPhone,
-              email: personEmail,
-              role: roleName,
-              status: isMedicalAppointment ? 'medical-appointment' : 'vacation',
-              statusLabel: isMedicalAppointment ? 'TRÁMITE MÉDICO' : (isMedicalLeave ? 'LICENCIA MÉDICA' : 'VACACIONES'),
-              isMedicalLeave,
-              isMedicalAppointment,
-              startDate: new Date(asg.weekStartDate),
-              endDate: new Date(asg.weekEndDate)
-            });
-            if (userIdStr) processedUserIds.add(String(userIdStr));
-            if (extIdStr) processedExtIds.add(String(extIdStr));
-          }
-        });
-
-        // 2. Procesar ausencias futuras que inician pronto (dentro de las próximas 2 semanas / 14 días)
+        // Ausencias futuras: próximas 2 semanas (14 días de límite)
         const referenceEnd = new Date(this.currentWeekEnd);
         const futureLimit = new Date(referenceEnd);
         futureLimit.setDate(futureLimit.getDate() + 14);
 
-        futureAbsences.forEach(asg => {
-          const userIdStr = asg.userId?._id || asg.userId;
-          const extIdStr = asg.externalPersonId?._id || asg.externalPersonId;
+        // Agrupación de todas las asignaciones detectadas en una sola lista base
+        const allAsgs = [
+          ...assignments,
+          ...futureVacations,
+          ...futureMedicalLeaves,
+          ...futureMedicalAppointments
+        ];
 
-          // Evitar duplicar si la persona ya está de vacaciones activas
-          if (userIdStr && processedUserIds.has(String(userIdStr))) return;
-          if (extIdStr && processedExtIds.has(String(extIdStr))) return;
+        // Diccionario para agrupar asignaciones por analista único
+        const userGroups = new Map<string, {
+          key: string;
+          name: string;
+          email: string;
+          phone: string;
+          role: string;
+          isExternal: boolean;
+          assignments: any[];
+        }>();
 
-          const vStart = new Date(asg.weekStartDate);
-          const isMedicalLeave = asg.roleCode === 'MEDICAL_LEAVE';
-          const isMedicalAppointment = asg.roleCode === 'MEDICAL_APPOINTMENT';
-          if (vStart > referenceEnd && vStart <= futureLimit) {
+        // 1. Inicializar el mapa con todos los usuarios internos del sistema
+        if (Array.isArray(users)) {
+          users.forEach(u => {
+            // Exclusión de roles que no corresponden a analistas operativos del SOC
+            if (u.role === 'guest' || u.role === 'auditor') return;
+            const userIdStr = String(u._id);
+            userGroups.set(userIdStr, {
+              key: userIdStr,
+              name: u.name || u.fullName || 'Sin asignar',
+              phone: u.phone || '-',
+              email: u.email || '-',
+              role: u.cargoLabel || 'Analista',
+              isExternal: false,
+              assignments: []
+            });
+          });
+        }
+
+        // 2. Clasificar y asociar cada asignación con su usuario correspondiente
+        allAsgs.forEach(asg => {
+          if (!asg) return;
+          const userIdStr = asg.userId?._id ? String(asg.userId._id) : (typeof asg.userId === 'string' ? asg.userId : null);
+          const extIdStr = asg.externalPersonId?._id ? String(asg.externalPersonId._id) : (typeof asg.externalPersonId === 'string' ? asg.externalPersonId : null);
+          
+          const key = userIdStr || extIdStr;
+          if (!key) return;
+
+          if (!userGroups.has(key)) {
+            // Incorporación dinámica de personas externas no listadas en la base de usuarios interna
             const personName = asg.userId?.fullName || asg.externalPersonId?.name || 'Sin asignar';
             const personPhone = asg.userId?.phone || asg.externalPersonId?.phone || '-';
             const personEmail = asg.userId?.email || asg.externalPersonId?.email || '-';
             const roleName = asg.userId?.cargoLabel || asg.externalPersonId?.position || this.getRoleLabelTranslated(asg.roleCode);
 
-            list.push({
+            userGroups.set(key, {
+              key,
               name: personName,
               phone: personPhone,
               email: personEmail,
               role: roleName,
-              status: isMedicalAppointment ? 'upcoming-medical-appointment' : 'upcoming-vacation',
-              statusLabel: isMedicalAppointment ? 'Pronto Trámite Médico' : (isMedicalLeave ? 'Pronto Licencia médica' : 'Pronto Vacaciones'),
-              isMedicalLeave,
-              isMedicalAppointment,
-              startDate: new Date(asg.weekStartDate),
-              endDate: new Date(asg.weekEndDate)
+              isExternal: !!extIdStr,
+              assignments: []
             });
+          }
+
+          const group = userGroups.get(key)!;
+          // Evitar registrar la misma asignación si aparece en múltiples consultas de la API
+          const alreadyHas = group.assignments.some(a => String(a._id) === String(asg._id));
+          if (!alreadyHas) {
+            group.assignments.push(asg);
           }
         });
 
-        // 3. Procesar asignaciones regulares (Teletrabajo y Guardia) de la semana actual
-        // Ordenamos las asignaciones de modo que Teletrabajo (TELEWORK) y Capacitación (OL) se procesen primero,
-        // evitando que la guardia operativa (N2/N1_NO_HABIL) marque al usuario como "En Oficina" y tape su estado real.
-        const getPriorityScore = (roleCode: string): number => {
-          if (roleCode === 'TELEWORK') return 1;
-          if (roleCode === 'OL') return 2;
-          return 3;
+        // 3. Determinar la validez de una asignación (filtrando registros caducados en tiempo real para la semana actual)
+        const isValidAssignment = (asg: any): boolean => {
+          const start = new Date(asg?.weekStartDate);
+          const end = new Date(asg?.weekEndDate);
+          if (isNaN(start.getTime()) || isNaN(end.getTime())) return false;
+          
+          const isCurrentWeek = now >= weekStart && now <= weekEnd;
+          // Si estamos visualizando la semana en curso y la asignación ya finalizó, se oculta para no generar ruido
+          if (isCurrentWeek && end < now) return false;
+          return true;
         };
-        const sortedAssignments = [...assignments].sort((a, b) => getPriorityScore(a.roleCode) - getPriorityScore(b.roleCode));
 
-        sortedAssignments.forEach(asg => {
-          // Verifica que el teletrabajo o labor regular esté activo durante la semana
-          if (!isAssignmentActiveInWeek(asg)) return;
+        // 4. Asignación de nivel de prioridad para seleccionar el estado óptimo del analista
+        const getAssignmentPriority = (asg: any): number => {
+          const start = new Date(asg.weekStartDate);
+          const end = new Date(asg.weekEndDate);
+          
+          const isActiveToday = start <= todayEnd && end >= todayStart;
+          const isActiveInWeek = start <= weekEnd && end >= weekStart;
+          const isFuture = start > referenceEnd && start <= futureLimit;
+          const role = asg.roleCode;
 
-          const userIdStr = asg.userId?._id || asg.userId;
-          const extIdStr = asg.externalPersonId?._id || asg.externalPersonId;
-
-          // No duplicar si el usuario ya está en vacaciones o pronto vacaciones
-          if (userIdStr && processedUserIds.has(String(userIdStr))) return;
-          if (extIdStr && processedExtIds.has(String(extIdStr))) return;
-
-          const personName = asg.userId?.fullName || asg.externalPersonId?.name || 'Sin asignar';
-          const personPhone = asg.userId?.phone || asg.externalPersonId?.phone || '-';
-          const personEmail = asg.userId?.email || asg.externalPersonId?.email || '-';
-          const roleName = asg.userId?.cargoLabel || asg.externalPersonId?.position || this.getRoleLabelTranslated(asg.roleCode);
-
-          if (asg.roleCode === 'TELEWORK') {
-            list.push({
-              name: personName,
-              phone: personPhone,
-              email: personEmail,
-              role: roleName,
-              status: 'telework',
-              statusLabel: 'En Teletrabajo',
-              startDate: new Date(asg.weekStartDate),
-              endDate: new Date(asg.weekEndDate)
-            });
-            if (userIdStr) processedUserIds.add(String(userIdStr));
-            if (extIdStr) processedExtIds.add(String(extIdStr));
-          } else if (asg.roleCode === 'OL') {
-            list.push({
-              name: personName,
-              phone: personPhone,
-              email: personEmail,
-              role: roleName,
-              status: 'training',
-              statusLabel: 'En Charla/Capacitación (Fuera de oficina)',
-              startDate: new Date(asg.weekStartDate),
-              endDate: new Date(asg.weekEndDate)
-            });
-            if (userIdStr) processedUserIds.add(String(userIdStr));
-            if (extIdStr) processedExtIds.add(String(extIdStr));
-          } else if (asg.roleCode !== 'VACATION' && asg.roleCode !== 'MEDICAL_LEAVE' && asg.roleCode !== 'MEDICAL_APPOINTMENT') {
-            // Analistas regulares en oficina
-            list.push({
-              name: personName,
-              phone: personPhone,
-              email: personEmail,
-              role: roleName,
-              status: 'office',
-              statusLabel: 'En Oficina',
-              startDate: new Date(asg.weekStartDate),
-              endDate: new Date(asg.weekEndDate)
-            });
-            if (userIdStr) processedUserIds.add(String(userIdStr));
-            if (extIdStr) processedExtIds.add(String(extIdStr));
+          // Prioridades (a menor valor, mayor importancia de visualización)
+          if (isActiveToday && (role === 'VACATION' || role === 'MEDICAL_LEAVE')) return 1; // Ausencia severa hoy
+          if (isActiveToday && role === 'MEDICAL_APPOINTMENT') return 2; // Trámite médico hoy
+          if (isActiveToday && role === 'OL') return 3; // Capacitación hoy (Prioridad mayor que teletrabajo)
+          if (isActiveToday && role === 'TELEWORK') return 4; // Teletrabajo hoy
+          
+          if (isActiveInWeek && (role === 'VACATION' || role === 'MEDICAL_LEAVE')) return 5; // Ausencia en la semana
+          if (isActiveInWeek && role === 'MEDICAL_APPOINTMENT') return 6; // Trámite médico en la semana
+          if (isActiveInWeek && role === 'OL') return 7; // Capacitación en la semana (Prioridad mayor que teletrabajo)
+          if (isActiveInWeek && role === 'TELEWORK') return 8; // Teletrabajo en la semana
+          
+          if (isFuture && (role === 'VACATION' || role === 'MEDICAL_LEAVE' || role === 'MEDICAL_APPOINTMENT')) return 9; // Ausencia futura
+          
+          // Guardias de soporte técnico en oficina
+          if (isActiveInWeek && role !== 'VACATION' && role !== 'MEDICAL_LEAVE' && role !== 'MEDICAL_APPOINTMENT' && role !== 'TELEWORK' && role !== 'OL') {
+            return 10;
           }
-        });
+          return 99;
+        };
 
-        // 4. Completar con los analistas activos que no tienen ningún turno especial configurado para esta semana.
-        // Deben aparecer listados como "En Oficina" por defecto. Excluimos invitados y auditores.
-        if (Array.isArray(users)) {
-          users.forEach(u => {
-            if (u.role === 'guest' || u.role === 'auditor') return;
-            const userIdStr = String(u._id);
-            if (processedUserIds.has(userIdStr)) return;
+        // 5. Procesar cada grupo para decidir qué estado final mostrar en la tabla
+        const list: any[] = [];
+        userGroups.forEach(group => {
+          // Filtrar asignaciones válidas (descartando nulas o ya expiradas)
+          const validAsgs = group.assignments.filter(isValidAssignment);
 
+          if (validAsgs.length === 0) {
+            // El analista no cuenta con asignaciones operativas en el periodo: estado "En Oficina" por defecto
             list.push({
-              name: u.name || u.fullName || 'Sin asignar',
-              phone: u.phone || '-',
-              email: u.email || '-',
-              role: u.cargoLabel || 'Analista',
+              name: group.name,
+              phone: group.phone,
+              email: group.email,
+              role: group.role,
               status: 'office',
               statusLabel: 'En Oficina',
               startDate: null,
-              endDate: null
+              endDate: null,
+              isToday: false,
+              isTodayHighlighted: false,
+              section: 'office'
             });
-            processedUserIds.add(userIdStr);
-          });
-        }
+            return;
+          }
 
-        // Orden estricto: Vacaciones (0) -> Pronto Vacaciones (1) -> Teletrabajo (2) -> Charla/Capacitacion (3) -> Oficina (4)
-        const order: { [key: string]: number } = {
-          'vacation': 0,
-          'upcoming-vacation': 1,
-          'telework': 2,
-          'training': 3,
-          'office': 4
+          // Seleccionar la asignación con el menor puntaje de prioridad (mayor relevancia)
+          validAsgs.sort((a, b) => getAssignmentPriority(a) - getAssignmentPriority(b));
+          const bestAsg = validAsgs[0];
+          const priority = getAssignmentPriority(bestAsg);
+
+          if (priority >= 10) {
+            // Si la asignación con más prioridad es una guardia estándar, se mapea a "En Oficina"
+            list.push({
+              name: group.name,
+              phone: group.phone,
+              email: group.email,
+              role: group.role,
+              status: 'office',
+              statusLabel: 'En Oficina',
+              startDate: new Date(bestAsg.weekStartDate),
+              endDate: new Date(bestAsg.weekEndDate),
+              isToday: false,
+              isTodayHighlighted: false,
+              section: 'office'
+            });
+          } else {
+            const start = new Date(bestAsg.weekStartDate);
+            const end = new Date(bestAsg.weekEndDate);
+            const isActiveToday = start <= todayEnd && end >= todayStart;
+            
+            const role = bestAsg.roleCode;
+            const isMedicalLeave = role === 'MEDICAL_LEAVE';
+            const isMedicalAppointment = role === 'MEDICAL_APPOINTMENT';
+            const isFuture = start > referenceEnd && start <= futureLimit;
+
+            let status = 'office';
+            let statusLabel = 'En Oficina';
+
+            if (role === 'VACATION' || isMedicalLeave) {
+              status = isFuture ? 'upcoming-vacation' : 'vacation';
+              statusLabel = isFuture 
+                ? (isMedicalLeave ? 'Pronto Licencia médica' : 'Pronto Vacaciones')
+                : (isMedicalLeave ? 'LICENCIA MÉDICA' : 'VACACIONES');
+            } else if (isMedicalAppointment) {
+              status = isFuture ? 'upcoming-medical-appointment' : 'medical-appointment';
+              statusLabel = isFuture ? 'Pronto Trámite Médico' : 'TRÁMITE MÉDICO';
+            } else if (role === 'TELEWORK') {
+              status = 'telework';
+              statusLabel = 'En Teletrabajo';
+            } else if (role === 'OL') {
+              status = 'training';
+              statusLabel = 'En Charla/Capacitación (Fuera de oficina)';
+            }
+
+            // Destaque visual tipo neon suave para situaciones del día de hoy
+            // Las vacaciones y licencias médicas no llevan el destaque neon según la especificación del usuario
+            const isTodayHighlighted = isActiveToday && (status === 'telework' || status === 'training' || status === 'medical-appointment');
+
+            let section = 'week';
+            if (isActiveToday && status !== 'office' && !status.startsWith('upcoming-')) {
+              section = 'today';
+            } else if (status.startsWith('upcoming-')) {
+              section = 'future';
+            } else if (status === 'office') {
+              section = 'office';
+            }
+
+            list.push({
+              name: group.name,
+              phone: group.phone,
+              email: group.email,
+              role: group.role,
+              status,
+              statusLabel,
+              isMedicalLeave,
+              isMedicalAppointment,
+              startDate: start,
+              endDate: end,
+              isToday: isActiveToday,
+              isTodayHighlighted,
+              section
+            });
+          }
+        });
+
+        // 6. Ordenamiento adaptado: Priorizar HOY -> Cronológico de la semana -> Ausencias futuras -> Alfabético oficina
+        const getSortScore = (item: any): number => {
+          if (item.section === 'today') return 1;
+          if (item.section === 'week') return 2;
+          if (item.section === 'future') return 3;
+          return 4; // 'office'
         };
-        this.teleworkStaff = list.sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
+
+        this.teleworkStaff = list.sort((a, b) => {
+          const scoreA = getSortScore(a);
+          const scoreB = getSortScore(b);
+
+          if (scoreA !== scoreB) {
+            return scoreA - scoreB;
+          }
+
+          // Para la misma sección 'week' o 'future', ordenamos cronológicamente
+          if ((a.section === 'week' || a.section === 'future') && a.startDate && b.startDate) {
+            return a.startDate.getTime() - b.startDate.getTime();
+          }
+
+          // Para 'today', ordenamos por tipo (vacaciones > trámite > capacitación > teletrabajo)
+          if (a.section === 'today') {
+            const todayOrder: { [key: string]: number } = {
+              'vacation': 1,
+              'medical-appointment': 2,
+              'training': 3,
+              'telework': 4
+            };
+            const typeA = todayOrder[a.status] ?? 5;
+            const typeB = todayOrder[b.status] ?? 5;
+            if (typeA !== typeB) return typeA - typeB;
+          }
+
+          // Criterio de ordenación secundario alfabético
+          return a.name.localeCompare(b.name);
+        });
+
+        this.todayCount = this.teleworkStaff.filter(s => s.section === 'today').length;
         this.cdr.detectChanges();
       },
       error: (err) => {
         console.error('Error loading telework/absence staff:', err);
       }
     });
+  }
+
+  /**
+   * Genera dinámicamente la etiqueta textual de cabecera para cada sección.
+   */
+  getSectionLabel(section: string): string {
+    if (section === 'today') {
+      const todayStr = new Date().toLocaleDateString('es-CL', { weekday: 'long', day: '2-digit', month: '2-digit' });
+      const capitalized = todayStr.charAt(0).toUpperCase() + todayStr.slice(1);
+      return `Hoy (${capitalized})`;
+    }
+    if (section === 'week') return 'Próximas asignaciones en la semana';
+    if (section === 'future') return 'Ausencias planificadas a futuro';
+    if (section === 'office') return 'En Oficina / Sin asignaciones especiales';
+    return '';
   }
 
   /**
@@ -860,6 +966,16 @@ export class EscalationSimpleComponent implements OnInit {
 
   // Personal de apoyo en teletrabajo, oficina y vacaciones según distribución de turnos
   teleworkStaff: any[] = [];
+  todayCount: number = 0;
+
+  /**
+   * Retorna la fecha del día de hoy en un formato abreviado (ej: mar 14/07).
+   */
+  getTodayDateShort(): string {
+    const today = new Date();
+    const dateStr = today.toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: '2-digit' });
+    return dateStr.replace(/\./g, '');
+  }
 
   // Formatea un rango de fecha/hora de asignación para mostrarlo de forma compacta y clara
   formatAssignmentPeriod(startDate: Date | undefined, endDate: Date | undefined, status: string): string {
