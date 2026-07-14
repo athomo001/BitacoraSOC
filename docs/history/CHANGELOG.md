@@ -2,6 +2,27 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.22] - 2026-07-14
+
+### Reestructuración de tabla de impresión física en columnas separadas (Día y Situación), remoción de columnas de contacto/Hoy, subtítulo de fechas dinámico, optimización de emails de turnos y actualización de backups MongoDB
+
+- **Módulo de Impresión Premium de Teletrabajo (`/main/escalation/simple`)**:
+  - **División de Columnas de Situación:** Implementación de procesamiento dinámico del DOM en memoria (`tempDiv`) para insertar una nueva columna física "Día / Asignación" antes de la columna "Situación" en la versión de impresión.
+  - **Destaque de Día a 15px:** Incremento a tamaño grande y vistoso del día de la semana y fecha (`15px` en negrita extra `800` y color negro puro) con el horario detallado abajo en tamaño pequeño (`11.5px`), optimizando el espacio horizontal en el PDF.
+  - **Ocultamiento de Datos de Contacto y Spacer:** Remoción absoluta por reglas de impresión CSS de las columnas de Email, Teléfono, la columna Spacer de Hoy vertical izquierda y los badges individuales de Hoy en los nombres para garantizar confidencialidad y limpieza visual.
+  - **Redistribución de Anchos (Nombre a 32%, Cargo a 16%, Día/Asignación a 34%, Situación a 18%):** Configuración al 100% de la hoja Carta/A4 para un aprovechamiento máximo de la página sin saltos ni recortes feos.
+  - **Cálculo de Semana Dinámico en Subtítulo:** Lógica en JavaScript para determinar las fechas de inicio (lunes) y término (domingo) de la semana en curso de forma dinámica, inyectando el rango completo en el subtítulo del reporte de impresión.
+  - **Remoción de Encabezados/Pies de Página Nativos:** Configuración de `@page { margin: 0 !important; }` para inhabilitar títulos y URLs automáticos del navegador, usando un padding simulado en el body para el margen de la página.
+  - **Fix de Ligandos en Iconos de Material:** Inhabilitación física de iconos (`mat-icon`, `[role="img"]`) a tamaño cero y color transparente para prevenir la renderización literal de ligandos de texto del material design (como `date_range` o `school`).
+- **Módulo de Notificación de Turnos (Backend)**:
+  - **Rediseño de Email de Escalación:** Modificación de `escalationSchedule.js` para incrementar el ancho de la plantilla de correo a **880px** y elevar el tamaño y contraste de las fuentes para permitir una lectura óptima y fluida de los analistas de turno en cualquier cliente de correo.
+- **Módulo de Respaldos de Base de Datos (MongoDB)**:
+  - **Actualización del Manifiesto de Backups:** Inclusión de los nuevos modelos operacionales (`ShiftNotificationSchedule`, `ShiftReminder`, `ApiKey`, `AvisoLog`, `CustomFont`, y `ReportHistory`) en `backup-manifest.js` para garantizar un respaldo del 100% del estado del sistema.
+- **Entorno de Contenedores (Docker / Nginx)**:
+  - **Compatibilidad Local offline:** Actualización del Dockerfile del frontend a `nginx:1.27-alpine` para permitir compilar y desplegar localmente de inmediato mediante la caché local de Docker Desktop en cortes o restricciones de red de salida DNS.
+
+---
+
 ## [v1.6.21] - 2026-07-13
 
 ### Filtros avanzados en búsqueda de entradas, exportación no paginada a CSV, corrección de cifrado en el directorio y reparación del envío de correos SMTP

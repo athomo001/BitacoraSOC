@@ -1009,4 +1009,415 @@ export class EscalationSimpleComponent implements OnInit {
       }, 60); // Retraso de 60ms para evitar que Angular Material descarte la selección en cascada
     }
   }
+
+  printSection(): void {
+    const printContainer = document.querySelector('.print-container');
+    if (!printContainer) {
+      console.error('No se encontró el contenedor .print-container para imprimir.');
+      return;
+    }
+
+    // Parsear el HTML a un fragmento DOM en memoria para realizar una reestructuración de columnas 100% limpia y precisa
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = printContainer.innerHTML;
+
+    // 1. Modificar thead para insertar la columna "Día / Asignación" antes de "Situación"
+    const headers = tempDiv.querySelectorAll('.excel-table thead tr th');
+    if (headers.length >= 6) {
+      const diaHeader = document.createElement('th');
+      diaHeader.innerText = 'Día / Asignación';
+      const lastTh = headers[headers.length - 1];
+      if (lastTh && lastTh.parentNode) {
+        lastTh.parentNode.insertBefore(diaHeader, lastTh);
+      }
+    }
+
+    // 2. Modificar tbody para distribuir el badge de situación y el período en columnas separadas
+    const rows = tempDiv.querySelectorAll('.excel-table tbody tr');
+    rows.forEach(row => {
+      if (row.classList.contains('table-section-row')) {
+        // Al agregar una nueva columna, el total de columnas sube a 7, pero como ocultaremos el Spacer por CSS,
+        // el total de columnas activas para el colspan es 6.
+        const td = row.querySelector('td');
+        if (td) {
+          td.setAttribute('colspan', '6');
+        }
+        return;
+      }
+
+      const cells = row.querySelectorAll('td');
+      if (cells.length > 0) {
+        const situacionCell = cells[cells.length - 1];
+        if (situacionCell) {
+          const badge = situacionCell.querySelector('.badge-status');
+          const period = situacionCell.querySelector('.assignment-period-detail');
+          
+          const diaCell = document.createElement('td');
+          diaCell.className = 'cell-print-day';
+          
+          if (period) {
+            let periodHTML = period.innerHTML;
+            // Simplificar y destacar el día a gran tamaño y las horas abajo
+            periodHTML = periodHTML.replace(/([a-zA-ZáéíóúÁÉÍÓÚñÑ]+ \d{1,2}\/\d{2})\s*(\(\d{2}:\d{2}\s+a\s+\d{2}:\d{2}\))/g, '<span class="print-highlight-day">$1</span><span class="print-time-detail">$2</span>');
+            periodHTML = periodHTML.replace(/(\d{2}\/\d{2} \d{2}:\d{2}) al (\d{2}\/\d{2} \d{2}:\d{2})/g, '<span class="print-highlight-day">$1 al $2</span>');
+            
+            const newPeriod = document.createElement('div');
+            newPeriod.className = 'assignment-period-detail';
+            newPeriod.innerHTML = periodHTML;
+            diaCell.appendChild(newPeriod);
+          } else {
+            diaCell.innerText = '-';
+          }
+          
+          situacionCell.innerHTML = '';
+          if (badge) {
+            let badgeHTML = badge.innerHTML;
+            badgeHTML = badgeHTML.replace(/En Charla\/Capacitación \(Fuera de oficina\)/g, 'Charla/Capacitación');
+            badgeHTML = badgeHTML.replace(/En Teletrabajo/g, 'Teletrabajo');
+            badgeHTML = badgeHTML.replace(/En Oficina \(Sin asignar a soporte\)/g, 'Oficina');
+            
+            const newBadge = badge.cloneNode(true) as HTMLElement;
+            newBadge.innerHTML = badgeHTML;
+            situacionCell.appendChild(newBadge);
+          } else {
+            situacionCell.innerText = '-';
+          }
+          
+          if (situacionCell.parentNode) {
+            situacionCell.parentNode.insertBefore(diaCell, situacionCell);
+          }
+        }
+      }
+    });
+
+    // 3. Calcular rango de fechas de la semana actual (Lunes a Domingo) para inyectar en el subtítulo del PDF
+    const today = new Date();
+    const currentDay = today.getDay();
+    const distanceToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + distanceToMonday);
+
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+
+    const formatDateShort = (d: Date) => {
+      const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      return `${d.getDate()} de ${months[d.getMonth()]}`;
+    };
+
+    const weekRangeText = `Semana del Lunes ${formatDateShort(monday)} al Domingo ${formatDateShort(sunday)} de ${monday.getFullYear()}`;
+
+    const subtitleEl = tempDiv.querySelector('.print-subtitle');
+    if (subtitleEl) {
+      subtitleEl.innerHTML = `<strong>Programación SOC:</strong> ${weekRangeText}`;
+    }
+
+    const printContent = tempDiv.innerHTML;
+    const printWindow = window.open('about:blank', '_blank', 'left=200,top=200,width=1000,height=900');
+    
+    if (!printWindow) {
+      alert('Por favor, permite las ventanas emergentes en este sitio para poder imprimir el reporte.');
+      return;
+    }
+
+    // Estilos de impresión premium inyectados directamente en el contexto limpio de la nueva ventana
+    const styles = `
+      <html>
+        <head>
+          <title>Personal Fuera de la Oficina y Apoyo - CDC Netics</title>
+          <style>
+            @page {
+              size: letter portrait;
+              margin: 0 !important; /* Elimina los encabezados y pies de página nativos del navegador */
+            }
+            body {
+              font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+              margin: 0;
+              padding: 1.2cm 1cm; /* Margen real de la página como padding del body */
+              background-color: #ffffff;
+              color: #0f172a;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .print-button-no-print {
+              display: none !important;
+            }
+            /* Ocultar iconos de forma robusta en impresión */
+            mat-icon,
+            .material-icons,
+            .mat-icon,
+            [role="img"] {
+              display: none !important;
+              visibility: hidden !important;
+              width: 0 !important;
+              height: 0 !important;
+              font-size: 0 !important;
+              color: transparent !important;
+              speak: none;
+            }
+            
+            /* Ocultar columna de teléfono y columna de correo en la versión impresa */
+            .cell-phone,
+            .cell-email {
+              display: none !important;
+            }
+            .excel-table th:nth-child(3),
+            .excel-table th:nth-child(4) {
+              display: none !important;
+            }
+
+            .print-only-header {
+              display: block !important;
+              margin-bottom: 15px;
+              width: 100%;
+            }
+            .print-header-top {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 4px;
+              border-bottom: 2px solid #cbd5e1;
+              padding-bottom: 4px;
+            }
+            .print-brand {
+              font-size: 11px;
+              font-weight: 800;
+              letter-spacing: 0.08em;
+              text-transform: uppercase;
+              color: #1e293b;
+            }
+            .print-date {
+              font-size: 10px;
+              color: #64748b;
+              font-weight: 500;
+            }
+            h1 {
+              font-size: 21px;
+              font-weight: 800;
+              color: #0f172a;
+              margin: 4px 0 2px 0;
+              letter-spacing: -0.02em;
+              line-height: 1.1;
+            }
+            .print-subtitle {
+              font-size: 11px;
+              color: #475569;
+              margin: 0;
+              line-height: 1.3;
+            }
+            .print-header-divider {
+              height: 3px;
+              background: linear-gradient(90deg, #6366f1 0%, #a855f7 100%);
+              margin-top: 8px;
+              border-radius: 2px;
+            }
+            .excel-table-container {
+              width: 100%;
+              overflow: visible;
+              margin-top: 10px;
+            }
+            .excel-table {
+              width: 100%;
+              table-layout: fixed;
+              border-collapse: collapse;
+              border: 1px solid #cbd5e1;
+            }
+            .excel-table thead {
+              display: table-header-group;
+            }
+            .excel-table th {
+              border: 1px solid #cbd5e1;
+              background-color: #f8fafc;
+              color: #0f172a;
+              font-size: 12.5px; /* Cabeceras más legibles */
+              font-weight: 700;
+              padding: 7px 8px;
+              text-align: left;
+            }
+            
+            /* Ocultar la primera columna (Spacer / Hoy vertical) en la impresión física */
+            .cell-header-spacer {
+              display: none !important;
+            }
+            .excel-table th:nth-child(1) {
+              display: none !important;
+            }
+            .cell-today-vertical,
+            .cell-today-vertical-empty {
+              display: none !important;
+            }
+
+            /* Redistribución óptima de anchos de columna tras remover teléfono/correo/Hoy vertical y agregar Día */
+            .excel-table th:nth-child(2) { width: 32%; } /* Gran holgura para nombres completos */
+            .excel-table th:nth-child(5) { width: 16%; } /* Holgura para cargos */
+            .excel-table th:nth-child(6) { width: 34%; } /* Ancho de día destacado de gran tamaño */
+            .excel-table th:nth-child(7) { width: 18%; } /* Columna del tag de Situación */
+            
+            .excel-table td {
+              border: 1px solid #cbd5e1;
+              padding: 7px 8px; /* Incrementado para mejor lectura */
+              font-size: 12px; /* Incrementado para personas mayores */
+              color: #0f172a;
+              vertical-align: middle;
+              word-wrap: break-word;
+              word-break: break-word;
+              line-height: 1.35;
+            }
+            /* Alinear tags al centro de la columna Situación */
+            .excel-table td:nth-child(7) {
+              text-align: center !important;
+            }
+            .table-section-row {
+              background-color: #f1f5f9;
+            }
+            .table-section-row td {
+              padding: 7px 10px;
+              font-weight: 800;
+              color: #0f172a;
+              font-size: 13.5px; /* Días separadores de la semana bien visibles */
+              background-color: #f1f5f9;
+            }
+            .cell-name {
+              font-weight: 700;
+              font-size: 13px; /* Nombres grandes */
+              color: #0f172a;
+              white-space: normal;
+            }
+            .data-row.row-today.row-today-telework {
+              border-left: 4px solid #10b981 !important;
+              background-color: rgba(16, 185, 129, 0.04);
+            }
+            .data-row.row-today.row-today-training {
+              border-left: 4px solid #f59e0b !important;
+              background-color: rgba(245, 158, 11, 0.04);
+            }
+            .data-row.row-today.row-today-medical {
+              border-left: 4px solid #06b6d4 !important;
+              background-color: rgba(6, 182, 212, 0.04);
+            }
+            .data-row.row-vacation {
+              border-left: 4px solid #ef4444 !important;
+              background-color: rgba(239, 68, 68, 0.04);
+            }
+            .badge-status {
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              gap: 4px;
+              padding: 2px 5px; /* Reducido ligeramente para evitar desbordes */
+              font-size: 9.5px; /* Reducido levemente para ajuste óptimo */
+              border-radius: 5px;
+              font-weight: 700;
+              white-space: nowrap !important;
+              max-width: 100%;
+              box-sizing: border-box;
+            }
+            .badge-status.telework { 
+              background-color: rgba(16, 185, 129, 0.1); 
+              color: #047857; 
+              border: 1px solid #10b981; 
+            }
+            .badge-status.training { 
+              background-color: rgba(245, 158, 11, 0.12); 
+              color: #b45309; 
+              border: 1px solid #f59e0b; 
+            }
+            .badge-status.office { 
+              background-color: rgba(139, 92, 246, 0.1); 
+              color: #5b21b6; 
+              border: 1px solid #8b5cf6; 
+            }
+            .badge-status.vacation, .badge-status.medical-appointment { 
+              background-color: rgba(239, 68, 68, 0.1); 
+              color: #b91c1c; 
+              border: 1px solid #ef4444; 
+            }
+            .badge-status.upcoming-vacation { 
+              background-color: rgba(59, 130, 246, 0.1); 
+              color: #1d4ed8; 
+              border: 1px solid #3b82f6; 
+            }
+            /* Ocultar badge de hoy en los nombres de personas en la impresión */
+            .badge-today-pill {
+              display: none !important;
+            }
+            
+            /* Destaque vistoso del día de la semana y fecha en su columna exclusiva */
+            .print-highlight-day {
+              font-size: 15px !important; /* Día mucho más grande */
+              font-weight: 800 !important;
+              color: #0f172a !important;
+              display: block !important;
+              margin-bottom: 2px !important;
+              letter-spacing: -0.015em !important;
+            }
+            .print-time-detail {
+              font-size: 11.5px !important; /* Horas un poco más grandes */
+              color: #475569 !important;
+              font-weight: 500 !important;
+              display: block !important;
+            }
+            
+            /* Estilo del disclaimer al pie de la tabla */
+            .print-disclaimer {
+              margin-top: 20px;
+              padding: 8px 12px;
+              background-color: #f8fafc;
+              border-left: 3px solid #64748b;
+              border-radius: 4px;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            }
+            .disclaimer-icon {
+              font-size: 14px;
+            }
+            .disclaimer-text {
+              font-size: 9.5px;
+              color: #475569;
+              font-style: italic;
+              line-height: 1.35;
+            }
+
+            tr {
+              page-break-inside: avoid;
+              break-inside: avoid;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="print-container">
+            ${printContent}
+            
+            <div class="print-disclaimer">
+              <span class="disclaimer-icon">⚠️</span>
+              <span class="disclaimer-text">Nota de control interno: La presente programación es de carácter representativo y está sujeta a cambios y adaptaciones operativas según las necesidades críticas del servicio SOC durante la semana en curso.</span>
+            </div>
+          </div>
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+                window.close();
+              }, 250);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(styles);
+    printWindow.document.close();
+  }
+
+  getTodayDateFormatted(): string {
+    const today = new Date();
+    const formatted = today.toLocaleDateString('es-CL', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+    return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+  }
 }

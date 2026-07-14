@@ -37,14 +37,22 @@ const SmtpConfig = require('../models/SmtpConfig');
 const User = require('../models/User');
 const WorkShift = require('../models/WorkShift');
 const WorkShiftAssignment = require('../models/WorkShiftAssignment');
+const ApiKey = require('../models/ApiKey');
+const AvisoLog = require('../models/AvisoLog');
+const CustomFont = require('../models/CustomFont');
+const ReportHistory = require('../models/ReportHistory');
+const ShiftNotificationSchedule = require('../models/ShiftNotificationSchedule');
+const ShiftReminder = require('../models/ShiftReminder');
 
 const backupModels = {
   entries: Entry,
   checks: ShiftCheck,
   users: User,
   adminNotes: AdminNote,
+  apiKeys: ApiKey,
   appConfigs: AppConfig,
   auditLogs: AuditLog,
+  avisoLogs: AvisoLog,
   catalogEvents: CatalogEvent,
   catalogLogSources: CatalogLogSource,
   catalogOperationTypes: CatalogOperationType,
@@ -55,6 +63,7 @@ const backupModels = {
   complements: Complement,
   complementSharedRecords: ComplementSharedRecord,
   contacts: Contact,
+  customFonts: CustomFont,
   directoryContacts: DirectoryContact,
   escalationRules: EscalationRule,
   externalPersons: ExternalPerson,
@@ -62,11 +71,14 @@ const backupModels = {
   logForwardingConfigs: LogForwardingConfig,
   personalNotes: PersonalNote,
   raciEntries: RaciEntry,
+  reportHistories: ReportHistory,
   services: Service,
   serviceCatalogs: ServiceCatalog,
   shiftAssignments: ShiftAssignment,
   shiftClosures: ShiftClosure,
+  shiftNotificationSchedules: ShiftNotificationSchedule,
   shiftOverrides: ShiftOverride,
+  shiftReminders: ShiftReminder,
   shiftRoles: ShiftRole,
   shiftRotationCycles: ShiftRotationCycle,
   smtpConfigs: SmtpConfig,

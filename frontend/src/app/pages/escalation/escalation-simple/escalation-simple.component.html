@@ -118,10 +118,28 @@
       </div>
 
       <!-- SECCIÓN NUEVA: Personal en Teletrabajo y Apoyo (Layout en Tabla Escalable) -->
-      <div class="tab-desc-row" style="margin-top: 32px; border-top: 1px dashed var(--outline-subtle); padding-top: 24px;">
-        <h2>🏡 Personal en Teletrabajo y Apoyo</h2>
-        <p class="subtitle">Estado operativo de analistas de apoyo, teletrabajo y registros de vacaciones del equipo</p>
-      </div>
+      <div class="print-container">
+        <!-- Cabecera exclusiva para impresión (oculta en pantalla normal, visible en @media print) -->
+        <div class="print-only-header">
+          <div class="print-header-top">
+            <span class="print-brand">CDC Netics &middot; Control Interno</span>
+            <span class="print-date">Generado el {{ getTodayDateFormatted() }}</span>
+          </div>
+          <h1>Personal Fuera de la Oficina y Apoyo</h1>
+          <p class="print-subtitle">Estado operativo de analistas de apoyo, teletrabajo y registros de vacaciones del equipo</p>
+          <div class="print-header-divider"></div>
+        </div>
+
+        <div class="tab-desc-row print-button-no-print" style="margin-top: 32px; border-top: 1px dashed var(--outline-subtle); padding-top: 24px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px;">
+          <div>
+            <h2>🏡 Personal en Teletrabajo y Apoyo</h2>
+            <p class="subtitle">Estado operativo de analistas de apoyo, teletrabajo y registros de vacaciones del equipo</p>
+          </div>
+          <button mat-stroked-button color="primary" class="print-button-no-print" (click)="printSection()">
+            <mat-icon>print</mat-icon>
+            <span>Imprimir / PDF</span>
+          </button>
+        </div>
 
       <div class="excel-table-container">
         <!-- Tabla estructurada con columnas de contacto separadas y funcionalidad de copiado rápido al portapapeles -->
@@ -213,7 +231,8 @@
           </tbody>
         </table>
       </div>
-    </mat-tab>
+    </div>
+  </mat-tab>
 
     <!-- PESTAÑA 2: Contactos y Flujo de Escalamiento -->
     <mat-tab>

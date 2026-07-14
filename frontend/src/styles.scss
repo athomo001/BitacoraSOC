@@ -2628,9 +2628,11 @@ router-outlet + * {
     display: none !important;
   }
 
-  /* Mostrar únicamente el contenedor de la hoja del reporte y sus descendientes */
+  /* Mostrar únicamente el contenedor de la hoja del reporte, el contenedor de teletrabajo y sus descendientes */
   .print-report-sheet,
-  .print-report-sheet * {
+  .print-report-sheet *,
+  .print-container,
+  .print-container * {
     visibility: visible !important;
   }
 

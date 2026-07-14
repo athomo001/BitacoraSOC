@@ -950,3 +950,320 @@
   background: transparent;
 }
 
+/* Ocultar la cabecera corporativa de impresión por defecto en el navegador */
+.print-only-header {
+  display: none;
+}
+
+/* ── Estilos de Impresión (@media print) para exportación a PDF ── */
+@media print {
+  /* Configuración de tamaño de página y márgenes de impresión físicos */
+  @page {
+    size: letter portrait;
+    margin: 1.2cm 1cm;
+  }
+
+  /* Forzar ancho Carta de 8.5 pulgadas para garantizar maquetación idéntica en cualquier pantalla/viewport */
+  body, html {
+    width: 8.5in !important;
+    min-width: 8.5in !important;
+    max-width: 8.5in !important;
+    height: auto !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+    box-sizing: border-box !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Ocultar mediante display: none para que no ocupen ningún espacio en el cálculo del layout */
+  .sidebar,
+  app-sidebar,
+  .page-header,
+  .mat-mdc-tab-header,
+  .print-button-no-print,
+  .week-header-controls,
+  .tab-desc-row, /* Ocultar todas las cabeceras descriptivas de pantalla normal */
+  .shifts-grid, /* Ocultar la grilla superior de turnos */
+  .loading-container,
+  button,
+  mat-icon {
+    display: none !important;
+  }
+
+  /* Forzar visibilidad del reporte para contrarrestar la regla global de styles.scss */
+  .print-container, 
+  .print-container * {
+    visibility: visible !important;
+  }
+
+  /* Cabecera de Reporte Premium para el PDF */
+  .print-only-header {
+    display: block !important;
+    margin-bottom: 25px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+
+    .print-header-top {
+      display: flex !important;
+      justify-content: space-between !important;
+      align-items: center !important;
+      margin-bottom: 8px !important;
+      border-bottom: 2px solid #cbd5e1 !important;
+      padding-bottom: 6px !important;
+    }
+
+    .print-brand {
+      font-size: 13px !important;
+      font-weight: 800 !important;
+      letter-spacing: 0.08em !important;
+      text-transform: uppercase !important;
+      color: #1e293b !important;
+    }
+
+    .print-date {
+      font-size: 11px !important;
+      color: #64748b !important;
+      font-weight: 500 !important;
+    }
+
+    h1 {
+      font-size: 24px !important;
+      font-weight: 800 !important;
+      color: #0f172a !important;
+      margin: 8px 0 4px 0 !important;
+      letter-spacing: -0.02em !important;
+      line-height: 1.2 !important;
+    }
+
+    .print-subtitle {
+      font-size: 12px !important;
+      color: #475569 !important;
+      margin: 0 !important;
+      line-height: 1.4 !important;
+    }
+
+    .print-header-divider {
+      height: 4px !important;
+      background: linear-gradient(90deg, #6366f1 0%, #a855f7 100%) !important;
+      margin-top: 14px !important;
+      border-radius: 2px !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+  }
+
+  /* Liberar y expandir todos los elementos contenedores padres del layout y Angular Material */
+  .container,
+  .elegant-tabs,
+  mat-tab-group,
+  mat-tab-body,
+  .mat-mdc-tab-body-content,
+  .mat-mdc-tab-body-wrapper,
+  .main-content,
+  .page-content {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
+  }
+
+  /* Asegurar que el contenedor de teletrabajo ocupe el 100% */
+  .print-container {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background-color: #ffffff !important;
+    position: relative !important;
+  }
+
+  /* Remover scrollbars y desbordes del contenedor de tabla */
+  .excel-table-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    border: none !important;
+    margin-top: 15px !important;
+  }
+
+  /* Tabla al 100% del ancho con anchos fijos de columnas para evitar recortes */
+  .excel-table {
+    width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    border: 1px solid #94a3b8 !important;
+
+    /* Forzar al thead a repetirse al inicio de cada nueva página si la tabla se corta */
+    thead {
+      display: table-header-group !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    /* Configuración proporcional del ancho de las 6 columnas */
+    thead th {
+      border: 1px solid #94a3b8 !important;
+      background-color: #f1f5f9 !important;
+      color: #0f172a !important;
+      font-size: 12px !important;
+      font-weight: 700 !important;
+      padding: 10px 8px !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      
+      &:nth-child(1) { width: 8%; }  /* Hoy vertical */
+      &:nth-child(2) { width: 21%; } /* Nombre */
+      &:nth-child(3) { width: 25%; } /* Correo */
+      &:nth-child(4) { width: 17%; } /* Teléfono */
+      &:nth-child(5) { width: 11%; } /* Cargo */
+      &:nth-child(6) { width: 18%; } /* Situación */
+    }
+
+    tbody td {
+      border: 1px solid #cbd5e1 !important;
+      padding: 10px 8px !important;
+      font-size: 11.5px !important;
+      color: #0f172a !important;
+      vertical-align: middle !important;
+      word-wrap: break-word !important;
+      word-break: break-word !important; /* Forzar quiebre de correos muy largos */
+    }
+  }
+
+  /* Divisores horizontales de la tabla en impresión */
+  .table-section-row {
+    background-color: #f8fafc !important;
+    border: 1px solid #cbd5e1 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    
+    td {
+      padding: 10px 12px !important;
+      background-color: #f8fafc !important;
+      font-weight: 700 !important;
+      color: #1e293b !important;
+      font-size: 12px !important;
+    }
+  }
+
+  /* Ajuste de la columna vertical Hoy a la izquierda en impresión */
+  .cell-today-vertical {
+    background-color: #f8fafc !important;
+    border-right: 2.5px solid #6366f1 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    
+    .today-vertical-text {
+      font-size: 0.68rem !important;
+      color: #4f46e5 !important;
+      text-shadow: none !important;
+      
+      small {
+        font-size: 0.58rem !important;
+        color: #475569 !important;
+      }
+    }
+  }
+
+  /* Nombre del analista destacado en negrita y tamaño adecuado para lectura accesible */
+  .cell-name {
+    font-weight: 700 !important;
+    font-size: 12px !important;
+    color: #0f172a !important;
+  }
+
+  /* Filas de la sección Hoy con borde lateral coloreado */
+  .data-row.row-today {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    
+    &.row-today-telework {
+      border-left: 4.5px solid #10b981 !important;
+      background-color: rgba(16, 185, 129, 0.05) !important;
+    }
+    &.row-today-training {
+      border-left: 4.5px solid #f59e0b !important;
+      background-color: rgba(245, 158, 11, 0.05) !important;
+    }
+    &.row-today-medical {
+      border-left: 4.5px solid #06b6d4 !important;
+      background-color: rgba(6, 182, 212, 0.05) !important;
+    }
+    &.row-vacation {
+      border-left: 4.5px solid #ef4444 !important;
+      background-color: rgba(239, 68, 68, 0.05) !important;
+    }
+  }
+
+  /* Ajustes de badges de situación en impresión (con bordes para caso de gráficos desactivados) */
+  .badge-status {
+    padding: 4px 8px !important;
+    font-size: 10px !important;
+    border-radius: 6px !important;
+    box-shadow: none !important;
+    animation: none !important;
+    font-weight: 700 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    
+    /* Configuración de color y bordes sólidos para máxima visibilidad en escala de grises */
+    &.telework { 
+      background-color: rgba(16, 185, 129, 0.1) !important; 
+      color: #047857 !important; 
+      border: 1px solid #10b981 !important; 
+    }
+    &.training { 
+      background-color: rgba(245, 158, 11, 0.12) !important; 
+      color: #b45309 !important; 
+      border: 1px solid #f59e0b !important; 
+    }
+    &.office { 
+      background-color: rgba(139, 92, 246, 0.1) !important; 
+      color: #5b21b6 !important; 
+      border: 1px solid #8b5cf6 !important; 
+    }
+    &.vacation, &.medical-appointment { 
+      background-color: rgba(239, 68, 68, 0.1) !important; 
+      color: #b91c1c !important; 
+      border: 1px solid #ef4444 !important; 
+    }
+    &.upcoming-vacation { 
+      background-color: rgba(59, 130, 246, 0.1) !important; 
+      color: #1d4ed8 !important; 
+      border: 1px solid #3b82f6 !important; 
+    }
+  }
+
+  .badge-today-pill {
+    padding: 2px 5px !important;
+    font-size: 9.5px !important;
+    background-color: #4f46e5 !important;
+    color: #ffffff !important;
+    border: 1px solid #4338ca !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .assignment-period-detail {
+    font-size: 9.5px !important;
+    color: #475569 !important;
+  }
+
+  /* Evitar saltos de página huérfanos dentro de las filas (evita cortes horizontales a la mitad) */
+  .data-row, tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}
+
