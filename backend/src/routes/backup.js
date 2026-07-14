@@ -58,6 +58,7 @@ const SmtpConfig = require('../models/SmtpConfig');
 const multer = require('multer');
 const { backupModels, BACKUP_EXPORT_VERSION } = require('../utils/backup-manifest');
 const { parseBooleanFlag } = require('../utils/boolean-helper');
+const { writeBackupJsonFile } = require('../utils/backup-json-writer');
 
 const PURGE_CONFIRM_PHRASE = 'PURGAR TODO';
 
@@ -410,48 +411,34 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
     const filename = `backup-${timestamp}.zip`;
     const filePath = path.join(BACKUPS_DIR, filename);
 
-    logger.info('🔍 Consultando colecciones desde base de datos...');
-    const backupSnapshotEntries = await Promise.all(
-      Object.entries(backupModels).map(async ([key, Model]) => {
-        try {
-          if (!Model || typeof Model.find !== 'function') {
-            throw new Error(`El modelo para ${key} no está correctamente inicializado o es inválido.`);
-          }
-          const docs = await Model.find().lean();
-          return [key, docs];
-        } catch (dbErr) {
-          logger.error({ err: dbErr, collection: key }, `Error leyendo documentos para la colección ${key}`);
-          throw dbErr;
-        }
-      })
-    );
-    const backupSnapshot = Object.fromEntries(backupSnapshotEntries);
     const collectionCount = Object.keys(backupModels).length;
 
-    const backupData = {
-      metadata: {
-        created: new Date(),
-        version: BACKUP_EXPORT_VERSION,
-        type: 'full-zip',
-        createdBy: req.user._id,
-        collections: collectionCount
-      },
-      data: backupSnapshot
+    const backupMetadata = {
+      created: new Date(),
+      version: BACKUP_EXPORT_VERSION,
+      type: 'full-zip',
+      createdBy: req.user._id,
+      collections: collectionCount
     };
 
+    logger.info('🔍 Exportando colecciones a JSON temporal (modo streaming)...');
+    const totalDocs = await writeBackupJsonFile({
+      filePath: tempJson,
+      metadata: backupMetadata,
+      models: backupModels
+    });
+    createdTempJson = true;
+
     const { passphrase } = req.body;
-    let finalJsonData = JSON.stringify(backupData, null, 2);
     let isEncrypted = false;
-    
+
     if (passphrase && String(passphrase).trim()) {
       logger.info('🔐 Cifrando JSON de base de datos con contraseña provista...');
-      finalJsonData = encryptWithPassphrase(finalJsonData, String(passphrase).trim());
+      const plainJsonData = await fs.readFile(tempJson, 'utf8');
+      const encryptedData = encryptWithPassphrase(plainJsonData, String(passphrase).trim());
+      await fs.writeFile(tempJson, encryptedData, 'utf8');
       isEncrypted = true;
     }
-
-    logger.info(`💾 Escribiendo archivo temporal de base de datos en: ${tempJson}`);
-    await fs.writeFile(tempJson, finalJsonData);
-    createdTempJson = true;
 
     // Pre-scan secrets legibles ANTES de entrar en el Promise (await no puede usarse dentro de callback sync)
     const readableSecrets = [];
@@ -528,7 +515,6 @@ router.post('/create', authenticate, authorize('admin'), async (req, res) => {
     }
 
     const stat = await fs.stat(filePath);
-    const totalDocs = Object.values(backupData.data).reduce((sum, arr) => sum + arr.length, 0);
 
     await audit(req, {
       event: 'admin.backup.create',
