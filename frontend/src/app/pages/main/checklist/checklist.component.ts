@@ -51,6 +51,7 @@ export class ChecklistComponent implements OnInit, OnDestroy {
 
   private checklistOpened = false;
   private checklistSubmitted = false;
+  private checklistOpenTimeoutId: any = null;
   
 
   constructor(
@@ -182,6 +183,10 @@ export class ChecklistComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.checklistOpenTimeoutId) {
+      clearTimeout(this.checklistOpenTimeoutId);
+      this.checklistOpenTimeoutId = null;
+    }
     if (this.checklistOpened && !this.checklistSubmitted) {
       this.checklistService.postAuditEvent('checklist.abandoned', {
         checkType: this.checkType,
@@ -191,6 +196,10 @@ export class ChecklistComponent implements OnInit, OnDestroy {
   }
 
   onCheckTypeChange(): void {
+    if (this.checklistOpenTimeoutId) {
+      clearTimeout(this.checklistOpenTimeoutId);
+      this.checklistOpenTimeoutId = null;
+    }
     this.checklistOpened = false;
     this.loadActiveChecklist();
   }
@@ -209,13 +218,16 @@ export class ChecklistComponent implements OnInit, OnDestroy {
         console.log('[CHECKLIST] IDs de servicios:', flatNodes.map(n => ({ title: n.serviceTitle, id: n.serviceId })));
         this.logAction('checklist.template.load', 'ok', { count: flatNodes.length });
         if (!this.checklistOpened) {
-          this.checklistOpened = true;
           this.checklistSubmitted = false;
-          this.checklistService.postAuditEvent('checklist.opened', {
-            checkType: this.checkType,
-            templateName: template?.name,
-            itemCount: flatNodes.length
-          }).subscribe({ error: () => {} });
+          // Retrasar el envío de checklist.opened 3 segundos para evitar falsos positivos en transiciones rápidas de ruta
+          this.checklistOpenTimeoutId = setTimeout(() => {
+            this.checklistOpened = true;
+            this.checklistService.postAuditEvent('checklist.opened', {
+              checkType: this.checkType,
+              templateName: template?.name,
+              itemCount: flatNodes.length
+            }).subscribe({ error: () => {} });
+          }, 3000);
         }
         this.isLoading = false;
       },

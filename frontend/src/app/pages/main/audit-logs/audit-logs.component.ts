@@ -367,6 +367,11 @@ export class AuditLogsComponent implements OnInit {
       return 'auth';
     }
     
+    // Turnos de Trabajo
+    if (event.startsWith('workshift.')) {
+      return 'workshift';
+    }
+
     // Entrada
     if (event.includes('entry')) {
       return 'entry';
@@ -445,6 +450,7 @@ export class AuditLogsComponent implements OnInit {
       'backup': '💾 Backup',
       'complement': '🧩 Complemento',
       'auth': '🔐 Autenticación',
+      'workshift': '⏰ Turnos',
       'entry': '📝 Entrada',
       'checklist': '✓ Checklist',
       'escalation': '🚨 Escalación',
@@ -564,6 +570,38 @@ export class AuditLogsComponent implements OnInit {
 
       return `${status} [BACKUP] ${result.reason || 'evento de backup registrado'}`;
     }
+
+    // ====== CONFIGURACIÓN SMTP (no envío de correo) ======
+    if (event.startsWith('smtp.config.')) {
+      const status = result.success ? '✅' : '❌';
+      const action = event.replace('smtp.config.save.', '').toUpperCase();
+      const detail = result.reason ? ` — ${result.reason}` : '';
+      return `${status} [CONFIG SMTP] Guardar configuración: ${action}${detail}`;
+    }
+
+    // ====== TURNOS DE TRABAJO ======
+    if (event.startsWith('workshift.')) {
+      const status = result.success ? '✅' : '❌';
+      const action = event.replace('workshift.', '').toUpperCase();
+      const code = meta['code'] ? ` (código: ${meta['code']})` : '';
+      const name = meta['name'] ? ` "${meta['name']}"` : '';
+      
+      if (action === 'CREATE') {
+        return `${status} [TURNO CREADO] Turno${name}${code} creado con éxito`;
+      }
+      if (action === 'UPDATE') {
+        const updated = meta['updatedFields'] ? ` | campos: ${meta['updatedFields'].join(', ')}` : '';
+        return `${status} [TURNO MODIFICADO] Turno${name}${code} actualizado${updated}`;
+      }
+      if (action === 'DELETE') {
+        return `${status} [TURNO ELIMINADO] Turno${name}${code} eliminado`;
+      }
+      if (action === 'REORDER') {
+        const count = meta['shiftsCount'] ? ` (${meta['shiftsCount']} turnos)` : '';
+        return `${status} [TURNOS REORDENADOS] Orden de turnos actualizado${count}`;
+      }
+      return `${status} [TURNO ${action}]${name}${code}`;
+    }
     
     // ====== CORREO / SMTP ======
     if (event.includes('mail') || event.includes('smtp') || event.includes('email')) {
@@ -648,6 +686,9 @@ export class AuditLogsComponent implements OnInit {
       const type = meta['entryType'] || '';
       const typeLabel = type ? `[${type.toUpperCase()}]` : '';
       const reason = result.reason ? `| ${result.reason}` : '';
+      if (action === 'CREATE') return `${status} [NUEVA ENTRADA] Entrada ${typeLabel} creada con éxito${reason}`;
+      if (action === 'UPDATE') return `${status} [ENTRADA MODIFICADA] Entrada ${typeLabel} editada con éxito${reason}`;
+      if (action === 'DELETE') return `${status} [ENTRADA ELIMINADA] Entrada ${typeLabel} eliminada con éxito${reason}`;
       return `${status} [ENTRADA ${action}] ${typeLabel} ${reason}`;
     }
 

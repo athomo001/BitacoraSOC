@@ -963,6 +963,22 @@ router.put('/:id',
 
       await entry.save();
 
+      // Auditar actualización de entrada
+      await audit(req, {
+        event: 'entry.update',
+        level: 'info',
+        result: { success: true },
+        metadata: {
+          entryId: entry._id,
+          entryType: entry.entryType,
+          entryDate: entry.entryDate,
+          tagCount: entry.tags?.length || 0,
+          updatedFields: Object.keys(req.body)
+        }
+      }).catch((auditError) => {
+        logger.error({ err: auditError, entryId: entry._id }, 'Error al registrar auditoría de actualización de entrada');
+      });
+
       res.json({ message: 'Entrada actualizada', entry });
     } catch (error) {
       console.error('Error al actualizar entrada:', error);
@@ -987,6 +1003,21 @@ router.delete('/:id', authenticate, notGuest, async (req, res) => {
     }
 
     await entry.deleteOne();
+
+    // Auditar eliminación de entrada
+    await audit(req, {
+      event: 'entry.delete',
+      level: 'warn',
+      result: { success: true },
+      metadata: {
+        entryId: entry._id,
+        entryType: entry.entryType,
+        entryDate: entry.entryDate,
+        createdByUsername: entry.createdByUsername
+      }
+    }).catch((auditError) => {
+      logger.error({ err: auditError, entryId: entry._id }, 'Error al registrar auditoría de eliminación de entrada');
+    });
 
     res.json({ message: 'Entrada eliminada exitosamente' });
   } catch (error) {

@@ -68,16 +68,7 @@ router.get('/active', authenticate, async (req, res) => {
   const complements = await Complement.find({ status: { $in: ['active', 'maintenance'] } }).sort({ name: 1 });
   const visibleComplements = complements.filter((complement) => isComplementVisibleToUser(complement, req.user));
 
-  await audit(req, {
-    event: 'complement.list.view',
-    result: { success: true },
-    metadata: {
-      visibleCount: visibleComplements.length,
-      role: req.user?.role || 'unknown'
-    }
-  }).catch((auditError) => {
-    logger.warn({ err: auditError }, 'No se pudo registrar auditoría de listado de complementos');
-  });
+  // QA: No auditar la lectura automática del listado de complementos activos en la carga del layout para evitar inundación de logs basura
 
   res.json(visibleComplements.map(getComplementSummary));
 });
