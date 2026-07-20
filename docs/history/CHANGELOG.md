@@ -2,6 +2,23 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.23] - 2026-07-20
+
+### Optimización de estabilidad en logs de auditoría, prevención de falsos positivos en checklists y trazabilidad de acciones críticas de usuarios (edición/eliminación de entradas y turnos)
+
+- **Prevención de falsos positivos en Checklist (Frontend)**:
+  - Implementación de un retardo de 3 segundos antes de disparar el evento de auditoría `checklist.opened` en `ChecklistComponent`. Si el usuario navega a otra sección en menos de 3 segundos, se limpia el temporizador y no se registra apertura ni abandono (`checklist.abandoned`), eliminando falsos logs automáticos generados por el enrutamiento por defecto.
+- **Reducción de ruido en Auditoría de Complementos (Backend & Frontend)**:
+  - Remoción del registro de auditoría automático (`complement.list.view`) en el endpoint de consulta de complementos activos `GET /active`. Esto previene la generación masiva de registros a nombre del usuario en cada recarga del layout principal de la aplicación.
+  - Ajuste en el formateo de logs de complementos sin identificador en el frontend para evitar mostrar la cadena `🧩 [desconocido] Evento de complemento` en el historial.
+- **Trazabilidad de Acciones Críticas de Usuario (Backend)**:
+  - Adición de auditoría a la actualización y eliminación de entradas de la bitácora (`PUT /api/entries/:id` y `DELETE /api/entries/:id`) mediante los eventos `'entry.update'` y `'entry.delete'`.
+  - Implementación de auditoría para la creación (`workshift.create`), actualización (`workshift.update`), eliminación (`workshift.delete`) y reordenamiento (`workshift.reorder`) de turnos de trabajo en `routes/work-shifts.js`.
+- **Ajustes de visualización y formateo de SMTP (Frontend)**:
+  - Formateo dedicado para eventos de configuración de SMTP (`smtp.config.save.*`) para evitar que se confundan visualmente con envíos de correo en el panel de logs de auditoría.
+
+---
+
 ## [v1.6.22] - 2026-07-14
 
 ### Reestructuración de tabla de impresión física en columnas separadas (Día y Situación), remoción de columnas de contacto/Hoy, subtítulo de fechas dinámico, optimización de emails de turnos, robustez en backups (solución a 502 Bad Gateway) y corrección de RangeError en scheduler

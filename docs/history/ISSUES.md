@@ -47,6 +47,7 @@
 
 | ID | Estado | Seccion | Tarea | Notas |
 | :--- | :--- | :--- | :--- | :--- |
+| QA-AUDIT-LOGS-001 | listo | Auditoría / Trazabilidad ALTA | Inundación de logs basura y falta de trazabilidad en bitácoras y turnos | **HALLAZGO:** Logs redundantes de complementos y falsos positivos de `checklist.opened`/`abandoned` saturan la DB de auditoría. Además, no se audita la actualización ni eliminación de entradas y turnos. **REMEDIACIÓN:** Retrasar `checklist.opened` 3s en el cliente, omitir auditoría en `GET /active` de complementos y agregar logs de auditoría en endpoints mutables de entries y work-shifts. |
 | SHIFT-DASH-146 | listo | Admin / Turnos + UX/UI CRITICA | Diseno de Dashboard de Turnos Integrado (Operacion + Administracion) | **OBJETIVO:** Definir el rediseno integral de la vista de turnos en formato "Command Center" con alta densidad de informacion... |
 | QA-SERVER-DOS-001 | listo | Backend / Seguridad MEDIA | Body limit excesivo sin validación de tipo en subida de logos | **HALLAZGO:** Body size de `10mb` expuesto en `/api/config/logo` sin validar estructura. **REMEDIACIÓN:** Integrar validación temprana de cabeceras de contenido y limitar a 2MB. |
 | QA-ANIM-ROUTE-001 | listo | UX-UI / Apariencia MEDIA | Transición suave en el cambio de páginas (Router-Outlet) | **HALLAZGO:** La navegación entre vistas principales es abrupta y causa parpadeos visuales en `.content-wrapper`. **REMEDIACIÓN:** Integrar animación de fade-in y slide-up (`translateY(10px)`) en `router-outlet + *` con aceleración por hardware (`will-change`). |

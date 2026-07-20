@@ -14,6 +14,7 @@ const WorkShiftAssignment = require('../models/WorkShiftAssignment');
 const moment = require('moment-timezone');
 const { logger } = require('../utils/logger');
 const { isTimeInRange } = require('../utils/time-helper');
+const { audit } = require('../utils/audit');
 
 const normalizeAssignedUsersPayload = (payload = {}) => {
   const nextPayload = { ...payload };
@@ -274,6 +275,19 @@ router.put('/reorder',
       await Promise.all(updates);
 
       logger.info('Work shifts reordered:', { count: shifts.length });
+
+      // Auditar reordenamiento de turnos
+      await audit(req, {
+        event: 'workshift.reorder',
+        level: 'info',
+        result: { success: true },
+        metadata: {
+          shiftsCount: shifts.length
+        }
+      }).catch((auditError) => {
+        logger.error({ err: auditError }, 'Error al registrar auditoría de reordenamiento de turnos');
+      });
+
       res.json({ message: 'Orden actualizado correctamente' });
     } catch (error) {
       logger.error('Error reordering work shifts:', error);
@@ -330,6 +344,22 @@ router.post('/',
         .populate('checklistTemplateEndId', 'name');
 
       logger.info('Work shift created:', { shiftId: shift._id, code: shift.code, type: shift.type });
+
+      // Auditar creación de turno
+      await audit(req, {
+        event: 'workshift.create',
+        level: 'info',
+        result: { success: true },
+        metadata: {
+          shiftId: shift._id,
+          code: shift.code,
+          name: shift.name,
+          type: shift.type
+        }
+      }).catch((auditError) => {
+        logger.error({ err: auditError, shiftId: shift._id }, 'Error al registrar auditoría de creación de turno');
+      });
+
       res.status(201).json(shift);
     } catch (error) {
       logger.error('Error creating work shift:', error);
@@ -399,6 +429,22 @@ router.put('/:id',
       }
 
       logger.info('Work shift updated:', { shiftId: shift._id, code: shift.code });
+
+      // Auditar actualización de turno
+      await audit(req, {
+        event: 'workshift.update',
+        level: 'info',
+        result: { success: true },
+        metadata: {
+          shiftId: shift._id,
+          code: shift.code,
+          name: shift.name,
+          updatedFields: Object.keys(req.body)
+        }
+      }).catch((auditError) => {
+        logger.error({ err: auditError, shiftId: shift._id }, 'Error al registrar auditoría de actualización de turno');
+      });
+
       res.json(shift);
     } catch (error) {
       logger.error('Error updating work shift:', error);
@@ -424,6 +470,21 @@ router.delete('/:id',
       }
 
       logger.info('Work shift deleted:', { shiftId: shift._id, code: shift.code });
+
+      // Auditar eliminación de turno
+      await audit(req, {
+        event: 'workshift.delete',
+        level: 'warn',
+        result: { success: true },
+        metadata: {
+          shiftId: shift._id,
+          code: shift.code,
+          name: shift.name
+        }
+      }).catch((auditError) => {
+        logger.error({ err: auditError, shiftId: shift._id }, 'Error al registrar auditoría de eliminación de turno');
+      });
+
       res.json({ message: 'Turno eliminado correctamente' });
     } catch (error) {
       logger.error('Error deleting work shift:', error);
