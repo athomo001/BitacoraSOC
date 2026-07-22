@@ -571,6 +571,7 @@
             <thead>
               <tr>
                 <th>Título</th>
+                <th>Cliente Afectado</th>
                 <th>Mensaje Informativo</th>
                 <th>Inicio Autorizado</th>
                 <th>Fin Programado</th>
@@ -582,6 +583,11 @@
             <tbody>
               <tr *ngFor="let rule of maintenanceRules" [class.row-disabled]="!rule.enabled">
                 <td><strong>{{ rule.maintenanceTitle || rule.name || '-' }}</strong></td>
+                <td>
+                  <span class="badge-pill" [class.badge-surface-neutral]="!rule.clientId" style="background: var(--outline-subtle); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">
+                    {{ getMaintenanceClientLabel(rule) }}
+                  </span>
+                </td>
                 <td class="cell-truncate">{{ rule.alertMessage || '-' }}</td>
                 <td>{{ rule.validFrom ? (rule.validFrom | date:'dd/MM/yyyy HH:mm') : 'Sin límite' }}</td>
                 <td>{{ rule.validTo ? (rule.validTo | date:'dd/MM/yyyy HH:mm') : 'Sin límite' }}</td>
@@ -621,26 +627,60 @@
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Cliente Afectado</mat-label>
+              <mat-select formControlName="clientId">
+                <mat-option [value]="null">Todos los clientes</mat-option>
+                <mat-option *ngFor="let client of allClients" [value]="client._id">{{ client.name }}</mat-option>
+              </mat-select>
+              <mat-hint>Si no seleccionas un cliente, el mantenimiento suspenderá alertas para todos los clientes.</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width">
               <mat-label>Mensaje de Notificación (Alertas)</mat-label>
               <textarea matInput formControlName="alertMessage" rows="2" maxlength="500"
                 placeholder="Ej: Interrupción temporal del servicio por reemplazo físico de fibra óptica."></textarea>
             </mat-form-field>
 
             <div class="maint-form-row">
-              <mat-form-field appearance="outline">
-                <mat-label>Fecha/Hora de Inicio</mat-label>
-                <input matInput type="datetime-local" formControlName="validFrom">
-              </mat-form-field>
+              <div class="datetime-group">
+                <span class="datetime-group-label">Fecha/Hora de Inicio</span>
+                <div class="datetime-group-inputs">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Fecha</mat-label>
+                    <input matInput [matDatepicker]="startDatePicker" formControlName="validFromDate">
+                    <mat-datepicker-toggle matSuffix [for]="startDatePicker"></mat-datepicker-toggle>
+                    <mat-datepicker #startDatePicker></mat-datepicker>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Hora</mat-label>
+                    <input matInput type="time" formControlName="validFromTime">
+                  </mat-form-field>
+                </div>
+              </div>
 
-              <mat-form-field appearance="outline">
-                <mat-label>Fecha/Hora de Finalización</mat-label>
-                <input matInput type="datetime-local" formControlName="validTo">
-              </mat-form-field>
+              <div class="datetime-group">
+                <span class="datetime-group-label">Fecha/Hora de Finalización</span>
+                <div class="datetime-group-inputs">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Fecha</mat-label>
+                    <input matInput [matDatepicker]="endDatePicker" formControlName="validToDate">
+                    <mat-datepicker-toggle matSuffix [for]="endDatePicker"></mat-datepicker-toggle>
+                    <mat-datepicker #endDatePicker></mat-datepicker>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Hora</mat-label>
+                    <input matInput type="time" formControlName="validToTime">
+                  </mat-form-field>
+                </div>
+              </div>
             </div>
 
             <div class="maint-form-checks">
               <mat-checkbox formControlName="blocking">Bloqueante (suspende Alertas Especiales del cliente)</mat-checkbox>
-              <mat-checkbox formControlName="enabled">Activo e Inmediato</mat-checkbox>
+              <div class="check-with-hint">
+                <mat-checkbox formControlName="enabled">Habilitado</mat-checkbox>
+                <small class="hint-text">Enciende/apaga la regla manualmente. El mantenimiento solo mostrará la alerta dentro del rango de Fecha/Hora definido arriba; si dejas las fechas vacías, queda activo sin límite de tiempo mientras esté Habilitado.</small>
+              </div>
             </div>
 
             <div class="maint-form-actions">

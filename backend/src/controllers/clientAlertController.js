@@ -512,7 +512,11 @@ exports.evaluateClientAlert = async (req, res) => {
     }
 
     const rules = await ClientEscalationRule.find({
-      clientId: resolvedClientId,
+      $or: [
+        { clientId: resolvedClientId },
+        // Mantenimientos globales (sin cliente asignado) aplican a todos los clientes
+        { clientId: null, ruleType: 'scheduled_maintenance' }
+      ],
       enabled: true,
       contexts: normalizedContext
     }).sort({ priority: 1, updatedAt: -1 });
@@ -714,6 +718,13 @@ exports.createMaintenanceRule = async (req, res) => {
   try {
     const body = req.body || {};
 
+    if (!(body.maintenanceTitle || '').toString().trim()) {
+      return res.status(400).json({ error: 'El título del mantenimiento es obligatorio' });
+    }
+    if (!(body.alertMessage || '').toString().trim()) {
+      return res.status(400).json({ error: 'El mensaje de notificación es obligatorio' });
+    }
+
     if (body.clientId && !isObjectId(body.clientId)) {
       return res.status(400).json({ error: 'clientId inválido' });
     }
@@ -773,6 +784,12 @@ exports.updateMaintenanceRule = async (req, res) => {
 
     const body = req.body || {};
 
+    if (!(body.maintenanceTitle || '').toString().trim()) {
+      return res.status(400).json({ error: 'El título del mantenimiento es obligatorio' });
+    }
+    if (!(body.alertMessage || '').toString().trim()) {
+      return res.status(400).json({ error: 'El mensaje de notificación es obligatorio' });
+    }
     if (body.clientId && !isObjectId(body.clientId)) {
       return res.status(400).json({ error: 'clientId inválido' });
     }

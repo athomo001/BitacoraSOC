@@ -22,6 +22,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatNativeDateModule } from '@angular/material/core';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { EscalationService } from '../../../services/escalation.service';
 import { CatalogService } from '../../../services/catalog.service';
@@ -48,6 +50,8 @@ import { EscalationFlowPreviewComponent } from '../shared/escalation-flow-previe
         MatAutocompleteModule,
         MatTooltipModule,
         MatCheckboxModule,
+        MatDatepickerModule,
+        MatNativeDateModule,
         ReactiveFormsModule,
         EscalationFlowPreviewComponent
     ],
@@ -127,10 +131,13 @@ export class EscalationSimpleComponent implements OnInit {
     private fb: FormBuilder
   ) {
     this.maintenanceForm = this.fb.group({
+      clientId: [null],
       maintenanceTitle: ['', [Validators.required, Validators.maxLength(200)]],
-      alertMessage: ['', Validators.maxLength(500)],
-      validFrom: [null],
-      validTo: [null],
+      alertMessage: ['', [Validators.required, Validators.maxLength(500)]],
+      validFromDate: [null],
+      validFromTime: [''],
+      validToDate: [null],
+      validToTime: [''],
       blocking: [false],
       enabled: [true]
     });
@@ -866,6 +873,16 @@ export class EscalationSimpleComponent implements OnInit {
 
   // ── ESC-MAINT-042 — Mantenimientos ──────────────────────────────────────
 
+  getMaintenanceClientLabel(rule: ClientAlertRule): string {
+    if (rule.clientId && typeof rule.clientId === 'object' && rule.clientId.name) {
+      return rule.clientId.name;
+    }
+    if (!rule.clientId) {
+      return 'Todos los clientes';
+    }
+    return 'Cliente no encontrado';
+  }
+
   loadMaintenanceRules(): void {
     this.loadingMaintenances = true;
     this.escalationService.getMaintenanceRules().subscribe({
@@ -881,28 +898,54 @@ export class EscalationSimpleComponent implements OnInit {
     });
   }
 
+  private splitDateAndTime(iso: any): { date: Date | null; time: string } {
+    if (!iso) return { date: null, time: '' };
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return { date: null, time: '' };
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return { date: d, time: `${pad(d.getHours())}:${pad(d.getMinutes())}` };
+  }
+
+  private combineDateAndTime(date: Date | null, time: string): Date | null {
+    if (!date) return null;
+    const parts = (time || '00:00').split(':').map((n: string) => parseInt(n, 10));
+    const hours = Number.isFinite(parts[0]) ? parts[0] : 0;
+    const minutes = Number.isFinite(parts[1]) ? parts[1] : 0;
+    const combined = new Date(date);
+    combined.setHours(hours, minutes, 0, 0);
+    return combined;
+  }
+
   openMaintenanceForm(rule: ClientAlertRule | null): void {
     this.editingMaintenance = rule;
     this.maintenanceFormOpen = true;
 
     if (rule) {
-      const toLocal = (iso: any) => {
-        if (!iso) return '';
-        const d = new Date(iso);
-        if (isNaN(d.getTime())) return '';
-        const pad = (n: number) => String(n).padStart(2, '0');
-        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-      };
+      const from = this.splitDateAndTime(rule.validFrom);
+      const to = this.splitDateAndTime(rule.validTo);
       this.maintenanceForm.patchValue({
+        clientId: this.normalizeId(rule.clientId) || null,
         maintenanceTitle: rule.maintenanceTitle || rule.name || '',
         alertMessage: rule.alertMessage || '',
-        validFrom: toLocal(rule.validFrom),
-        validTo: toLocal(rule.validTo),
+        validFromDate: from.date,
+        validFromTime: from.time,
+        validToDate: to.date,
+        validToTime: to.time,
         blocking: rule.blocking === true,
         enabled: rule.enabled !== false
       });
     } else {
-      this.maintenanceForm.reset({ blocking: false, enabled: true, maintenanceTitle: '', alertMessage: '', validFrom: '', validTo: '' });
+      this.maintenanceForm.reset({
+        clientId: null,
+        blocking: false,
+        enabled: true,
+        maintenanceTitle: '',
+        alertMessage: '',
+        validFromDate: null,
+        validFromTime: '',
+        validToDate: null,
+        validToTime: ''
+      });
     }
 
     this.cdr.detectChanges();
@@ -911,20 +954,30 @@ export class EscalationSimpleComponent implements OnInit {
   cancelMaintenanceForm(): void {
     this.maintenanceFormOpen = false;
     this.editingMaintenance = null;
-    this.maintenanceForm.reset({ blocking: false, enabled: true });
+    this.maintenanceForm.reset({ clientId: null, blocking: false, enabled: true });
   }
 
   saveMaintenance(): void {
     if (this.maintenanceForm.invalid) return;
-    this.savingMaintenance = true;
 
     const v = this.maintenanceForm.value;
+    const validFrom = this.combineDateAndTime(v.validFromDate, v.validFromTime);
+    const validTo = this.combineDateAndTime(v.validToDate, v.validToTime);
+
+    if (validFrom && validTo && validTo.getTime() <= validFrom.getTime()) {
+      this.showError('La Fecha/Hora de Finalización debe ser posterior a la de Inicio');
+      return;
+    }
+
+    this.savingMaintenance = true;
+
     const payload: Partial<ClientAlertRule> = {
+      clientId: v.clientId || null,
       maintenanceTitle: (v.maintenanceTitle || '').trim(),
       name: (v.maintenanceTitle || '').trim(),
       alertMessage: (v.alertMessage || '').trim(),
-      validFrom: v.validFrom ? new Date(v.validFrom) as any : null,
-      validTo: v.validTo ? new Date(v.validTo) as any : null,
+      validFrom: validFrom as any,
+      validTo: validTo as any,
       blocking: Boolean(v.blocking),
       enabled: Boolean(v.enabled)
     };
@@ -941,7 +994,7 @@ export class EscalationSimpleComponent implements OnInit {
       },
       error: (err) => {
         console.error('Error guardando mantenimiento:', err);
-        this.showError('Error al guardar el mantenimiento');
+        this.showError(err?.error?.error || 'Error al guardar el mantenimiento');
         this.savingMaintenance = false;
       },
       complete: () => {

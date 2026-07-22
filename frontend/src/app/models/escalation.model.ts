@@ -47,7 +47,7 @@ export interface ClientAlertTimeWindow {
 
 export interface ClientAlertRule {
   _id: string;
-  clientId: string | {
+  clientId: string | null | {
     _id: string;
     name?: string;
     parent?: string | null;
