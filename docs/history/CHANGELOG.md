@@ -2,6 +2,26 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.24] - 2026-07-22
+
+### Bugfix crítico en Ventanas de Mantenimiento (error 400 al guardar), selector de cliente afectado y mejoras de UX en fecha/hora
+
+- **Bugfix (Backend/Frontend) — Error 400 al registrar un Mantenimiento (`/main/escalation/view`, pestaña "Mantenimientos")**:
+  - Causa raíz: el modelo `ClientEscalationRule` exigía `clientId` obligatorio, pero el formulario "Nuevo Mantenimiento" no tenía ningún campo para seleccionar cliente, por lo que Mongoose rechazaba siempre la creación/edición con un 400.
+  - Se volvió opcional `clientId` en `ClientEscalationRule.js` (`null` ahora representa un mantenimiento **global**, aplicable a todos los clientes).
+  - `evaluateClientAlert` (`clientAlertController.js`) fue ajustado para incluir también reglas de mantenimiento globales (`clientId: null`) al evaluar cualquier cliente, además de la regla específica del cliente.
+  - Se agregaron validaciones explícitas de título y mensaje obligatorios en `createMaintenanceRule`/`updateMaintenanceRule` para devolver errores 400 legibles en vez de un error genérico de Mongoose.
+- **Nuevo campo "Cliente Afectado" en el formulario de Mantenimientos**:
+  - Selector con la opción "Todos los clientes" (mantenimiento global) o un cliente específico del catálogo.
+  - Nueva columna "Cliente Afectado" en la tabla de mantenimientos registrados para visualizar el alcance de cada ventana.
+- **Mejora de UX en Fecha/Hora de Inicio y Finalización**:
+  - Reemplazo del campo único `datetime-local` (difícil de completar manualmente) por un selector de **Fecha** con calendario (`mat-datepicker`) más un campo de **Hora** independiente, siguiendo el mismo patrón ya usado en el módulo de Turnos SOC.
+  - Validación en el frontend que impide guardar si la Fecha/Hora de Finalización es anterior o igual a la de Inicio.
+- **Clarificación del checkbox "Activo e Inmediato" → renombrado a "Habilitado"**:
+  - Se agregó un texto explicativo indicando que el checkbox solo enciende/apaga la regla manualmente y que la alerta de mantenimiento únicamente se muestra dentro del rango de Fecha/Hora configurado (eliminando la ambigüedad de si se activaba "de inmediato" al marcarlo).
+
+---
+
 ## [v1.6.23] - 2026-07-20
 
 ### Optimización de estabilidad en logs de auditoría, prevención de falsos positivos en checklists y trazabilidad de acciones críticas de usuarios (edición/eliminación de entradas y turnos)

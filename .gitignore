@@ -28,6 +28,9 @@ build/
 *.swo
 *~
 
+# Claude Code (config personal/local, no compartir rutas de PC de cada dev)
+.claude/settings.local.json
+
 # OS
 .DS_Store
 Thumbs.db

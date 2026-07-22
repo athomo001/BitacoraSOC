@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(grep -m1 '\"version\"' package.json ../package.json ../backend/package.json 2>/dev/null)",
+      "Bash(cd .. && grep -m1 '\"version\"' package.json frontend/package.json backend/package.json 2>/dev/null)"
     ]
   }
 }
