@@ -551,12 +551,44 @@
         @media (max-width: 576px) {
           grid-template-columns: 1fr;
         }
+
+        .datetime-group {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+
+          .datetime-group-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+          }
+
+          .datetime-group-inputs {
+            display: grid;
+            grid-template-columns: 1.4fr 1fr;
+            gap: 8px;
+          }
+        }
       }
 
       .maint-form-checks {
         display: flex;
         gap: 24px;
         flex-wrap: wrap;
+        align-items: flex-start;
+
+        .check-with-hint {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          max-width: 420px;
+
+          .hint-text {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            line-height: 1.35;
+          }
+        }
       }
 
       .maint-form-actions {

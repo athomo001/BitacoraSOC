@@ -96,10 +96,12 @@ const timeWindowSchema = new mongoose.Schema({
 
 const clientEscalationRuleSchema = new mongoose.Schema({
   // En report-generator el "cliente" proviene del catálogo de Log Sources.
+  // null = regla global (aplica a todos los clientes); solo permitido para scheduled_maintenance,
+  // validado a nivel de aplicación en clientAlertController (special_alert siempre exige clientId).
   clientId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'CatalogLogSource',
-    required: true,
+    default: null,
     index: true
   },
   name: {
