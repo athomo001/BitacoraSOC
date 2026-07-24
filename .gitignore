@@ -28,8 +28,8 @@ build/
 *.swo
 *~
 
-# Claude Code (config personal/local, no compartir rutas de PC de cada dev)
-.claude/settings.local.json
+# Claude Code (configuración local de Claude, no subir al repositorio)
+.claude/
 
 # OS
 .DS_Store
