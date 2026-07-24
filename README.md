@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `CHANGELOG.md`): **v1.6.22**
+> Version referencial actual (segun `CHANGELOG.md`): **v1.6.24**
 
 Stack principal:
 
@@ -63,6 +63,13 @@ Stack principal:
 ---
 
 ## Novedades recientes (resumen rapido)
+
+### v1.6.24 (Bugfix de Ventanas de Mantenimiento, selector de cliente afectado y mejoras de UX en fecha/hora)
+
+- **Bugfix del error 400 al registrar Mantenimientos**: el formulario no enviaba `clientId` (campo inexistente en la UI) mientras el backend lo exigía obligatorio, bloqueando siempre el guardado. Ahora `clientId` es opcional (`null` = mantenimiento global aplicable a todos los clientes) y la evaluación de alertas por cliente considera también las reglas globales.
+- **Nuevo campo "Cliente Afectado"**: selector para elegir "Todos los clientes" o uno específico, con columna dedicada en la tabla de mantenimientos registrados.
+- **Fecha/Hora más fáciles de completar**: se reemplazó el campo único `datetime-local` por un selector de Fecha con calendario (`mat-datepicker`) más un campo de Hora independiente, y se valida que el fin sea posterior al inicio.
+- **Checkbox "Activo e Inmediato" renombrado a "Habilitado"** con texto explicativo: aclara que solo enciende/apaga la regla manualmente y que la alerta solo se muestra dentro del rango de Fecha/Hora configurado.
 
 ### v1.6.22 (Impresión premium Día/Situación divididos, anchos optimizados, subtítulo dinámico, emails turnos y backups)
 

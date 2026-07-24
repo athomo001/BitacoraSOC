@@ -28,6 +28,9 @@ build/
 *.swo
 *~
 
+# Claude Code (configuración local de Claude, no subir al repositorio)
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
