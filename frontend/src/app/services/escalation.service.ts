@@ -581,4 +581,11 @@ export class EscalationService {
   triggerNotificationScheduleSend(id: string, payload?: { recipients?: string[]; ccRecipients?: string[] }): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.apiUrl}/admin/notification-schedules/${id}/trigger-send`, payload || {});
   }
+
+  /**
+   * Envía una notificación de turnos de prueba (sin ID) con configuración libre.
+   */
+  testNotificationScheduleSend(payload: any): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/admin/notification-schedules/test-send`, payload);
+  }
 }
