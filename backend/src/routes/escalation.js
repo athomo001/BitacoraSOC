@@ -210,6 +210,8 @@ router.post('/admin/notification-schedules', authenticate, requireAdmin, escalat
 router.put('/admin/notification-schedules/:id', authenticate, requireAdmin, escalationController.updateNotificationSchedule);
 router.delete('/admin/notification-schedules/:id', authenticate, requireAdmin, escalationController.deleteNotificationSchedule);
 router.post('/admin/notification-schedules/:id/trigger-send', authenticate, requireAdmin, escalationController.triggerNotificationScheduleSend);
+// 🧪 Probar envío general de notificaciones con parámetros libres (sin ID)
+router.post('/admin/notification-schedules/test-send', authenticate, requireAdmin, escalationController.testNotificationScheduleSend);
 
 module.exports = router;
 

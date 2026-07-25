@@ -2674,7 +2674,7 @@ exports.triggerEscalationScheduleSend = async (req, res) => {
 /**
  * Lógica compartida para generar y enviar el reporte de turnos
  */
-exports.sendEscalationScheduleInternal = async ({ name, recipients, ccRecipients, frequency = 'weekly', roleFilter = [] }) => {
+exports.sendEscalationScheduleInternal = async ({ name, recipients, ccRecipients, frequency = 'weekly', roleFilter = [], targetPeriod = 'current_week' }) => {
   try {
     await restoreExpiredMedicalLeavePauses();
 
@@ -2697,6 +2697,12 @@ exports.sendEscalationScheduleInternal = async ({ name, recipients, ccRecipients
       
       endDate.setDate(now.getDate() + daysToSunday + 1); // Lunes subsiguiente
       endDate.setHours(8, 59, 59, 999); // Lunes subsiguiente a las 08:59
+
+      // Si el objetivo es notificar los turnos de la semana siguiente, desplazamos el rango por 7 días
+      if (targetPeriod === 'next_week') {
+        startDate.setDate(startDate.getDate() + 7);
+        endDate.setDate(endDate.getDate() + 7);
+      }
     }
 
     const periodLabel = frequency === 'monthly'
@@ -3085,13 +3091,16 @@ exports.triggerNotificationScheduleSend = async (req, res) => {
 
     const name = req.body?.name || schedule.name;
     const roleFilter = req.body?.roleFilter || schedule.roleFilter;
+    // Si se pasa targetPeriod en el body se utiliza, si no, se recurre a la configuración guardada
+    const targetPeriod = req.body?.targetPeriod || schedule.targetPeriod;
 
     const result = await exports.sendEscalationScheduleInternal({
       name,
       recipients,
       ccRecipients,
       frequency: schedule.frequency,
-      roleFilter
+      roleFilter,
+      targetPeriod
     });
 
     if (result.success) {
@@ -3114,6 +3123,47 @@ exports.triggerNotificationScheduleSend = async (req, res) => {
     }
   } catch (error) {
     logger.error('Error en triggerNotificationScheduleSend:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Envía un correo de prueba de turnos utilizando una configuración de notificación temporal.
+ * No persiste ningún cambio en la base de datos ni actualiza la fecha de último envío.
+ */
+exports.testNotificationScheduleSend = async (req, res) => {
+  try {
+    const { name, recipients, ccRecipients, frequency, roleFilter, targetPeriod } = req.body;
+
+    const parseEmailList = (raw) => {
+      if (Array.isArray(raw)) return raw.map((s) => String(s || '').trim().toLowerCase()).filter((s) => s.includes('@'));
+      if (typeof raw === 'string') return raw.split(',').map((s) => s.trim().toLowerCase()).filter((s) => s.includes('@'));
+      return [];
+    };
+
+    const parsedRecipients = parseEmailList(recipients);
+    const parsedCcRecipients = parseEmailList(ccRecipients);
+
+    if (parsedRecipients.length === 0) {
+      return res.status(400).json({ error: 'No hay destinatarios válidos para la prueba.' });
+    }
+
+    const result = await exports.sendEscalationScheduleInternal({
+      name: name || 'Notificación de Prueba',
+      recipients: parsedRecipients,
+      ccRecipients: parsedCcRecipients,
+      frequency: frequency || 'weekly',
+      roleFilter: roleFilter || [],
+      targetPeriod: targetPeriod || 'current_week'
+    });
+
+    if (result.success) {
+      return res.json({ message: 'Correo de prueba enviado correctamente', messageId: result.messageId });
+    } else {
+      return res.status(500).json({ error: 'Error al enviar el correo de prueba', details: result.error });
+    }
+  } catch (error) {
+    logger.error('Error en testNotificationScheduleSend:', error);
     return res.status(500).json({ error: error.message });
   }
 };

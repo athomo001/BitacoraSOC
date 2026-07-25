@@ -60,6 +60,12 @@ const shiftNotificationScheduleSchema = new mongoose.Schema({
   lastSentAt: {
     type: Date,
     default: null
+  },
+  // Determina el período de turnos a notificar (semana en curso o la siguiente semana)
+  targetPeriod: {
+    type: String,
+    enum: ['current_week', 'next_week'],
+    default: 'current_week'
   }
 }, {
   timestamps: true

@@ -118,7 +118,9 @@ function initEscalationScheduleScheduler() {
             recipients,
             ccRecipients,
             frequency: schedule.frequency,
-            roleFilter: schedule.roleFilter
+            roleFilter: schedule.roleFilter,
+            // Período configurado para la notificación (semana actual o siguiente)
+            targetPeriod: schedule.targetPeriod
           });
 
           if (result.success) {

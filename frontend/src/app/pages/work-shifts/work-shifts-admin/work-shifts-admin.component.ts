@@ -361,7 +361,8 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       includeOl: [false],
       includeVacation: [false],
       includeMedicalLeave: [false],
-      includeMedicalAppointment: [false]
+      includeMedicalAppointment: [false],
+      targetPeriod: ['current_week']
     });
   }
 
@@ -2026,7 +2027,8 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       includeOl: false,
       includeVacation: false,
       includeMedicalLeave: false,
-      includeMedicalAppointment: false
+      includeMedicalAppointment: false,
+      targetPeriod: 'current_week'
     });
     this._recipientsRaw = '';
     this._ccRaw = '';
@@ -2068,7 +2070,8 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       includeOl,
       includeVacation,
       includeMedicalLeave,
-      includeMedicalAppointment
+      includeMedicalAppointment,
+      targetPeriod: schedule.targetPeriod || 'current_week'
     });
 
     this._recipientsRaw = recs;
@@ -2126,7 +2129,8 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       time: formVal.time,
       recipients: String(formVal.recipients || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
       ccRecipients: String(formVal.ccRecipients || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
-      roleFilter
+      roleFilter,
+      targetPeriod: formVal.targetPeriod
     };
 
     const request$ = this.editingScheduleId
@@ -2202,7 +2206,6 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
    * Utiliza el correo ingresado en el campo de pruebas sin alterar el lastSentAt.
    */
   sendTestEmail(): void {
-    if (!this.editingScheduleId) return;
     if (!this.testRecipientEmail || !this.testRecipientEmail.includes('@')) {
       this.showError('Ingrese un correo de prueba válido.');
       return;
@@ -2234,13 +2237,28 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
     }
 
     this.triggeringScheduleSend = true;
-    this.escalationService.triggerNotificationScheduleSend(this.editingScheduleId, {
-      name: formVal.name,
-      recipients: [this.testRecipientEmail.trim().toLowerCase()],
-      ccRecipients: [],
-      roleFilter,
-      isTest: true
-    } as any).subscribe({
+
+    // Si ya existe un ID de programación, enviamos la prueba por ID
+    // Si no (creación de nueva programación), usamos el método general de pruebas
+    const request$ = this.editingScheduleId
+      ? this.escalationService.triggerNotificationScheduleSend(this.editingScheduleId, {
+          name: formVal.name,
+          recipients: [this.testRecipientEmail.trim().toLowerCase()],
+          ccRecipients: [],
+          roleFilter,
+          targetPeriod: formVal.targetPeriod,
+          isTest: true
+        } as any)
+      : this.escalationService.testNotificationScheduleSend({
+          name: formVal.name || 'Notificación de Prueba',
+          recipients: [this.testRecipientEmail.trim().toLowerCase()],
+          ccRecipients: [],
+          frequency: formVal.frequency || 'weekly',
+          roleFilter,
+          targetPeriod: formVal.targetPeriod
+        });
+
+    request$.subscribe({
       next: (res: any) => {
         this.showSuccess(res.message || 'Envío de prueba procesado correctamente.');
         this.testRecipientEmail = '';

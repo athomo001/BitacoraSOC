@@ -614,7 +614,7 @@
           <!-- Automatización de Envío (Múltiples Programaciones) -->
           <article class="dashboard-card config-sidebar-card">
             <header class="card-header">
-              <h3>Envío automatizado de turnos</h3>
+              <h3>Notificaciones</h3>
             </header>
             <div class="card-body">
               
@@ -734,6 +734,14 @@
                     <mat-error *ngIf="scheduleForm.get('time')?.hasError('required')">Hora de envío requerida</mat-error>
                   </mat-form-field>
 
+                  <mat-form-field appearance="outline" class="full-width" *ngIf="scheduleForm.get('frequency')?.value === 'weekly'">
+                    <mat-label>Período de turnos a notificar</mat-label>
+                    <mat-select formControlName="targetPeriod">
+                      <mat-option value="current_week">Semana actual (en curso)</mat-option>
+                      <mat-option value="next_week">Semana siguiente (próxima semana)</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+
                   <mat-form-field appearance="outline" class="full-width">
                     <mat-label>Destinatarios (emails separados por coma)</mat-label>
                     <input matInput formControlName="recipients" (input)="onAutomationRecipientsInput(autoRec.value)" #autoRec>
@@ -770,7 +778,7 @@
                   </div>
 
                   <!-- Sección de prueba de envío -->
-                  <div *ngIf="editingScheduleId" class="test-send-section" style="margin-top: 15px; margin-bottom: 20px; border-top: 1px solid var(--soft-line, #D7DEC0); padding-top: 12px;">
+                  <div class="test-send-section" style="margin-top: 15px; margin-bottom: 20px; border-top: 1px solid var(--soft-line, #D7DEC0); padding-top: 12px;">
                     <h5 style="margin-top: 0; margin-bottom: 8px; font-weight: bold; color: var(--body-text, #173831); font-size: 13px;">🧪 Probar Envío de Correo</h5>
                     <p style="font-size: 11px; color: #5b695d; margin-top: 0; margin-bottom: 10px;">
                       Envía un correo de prueba con el formato y turnos reales de esta programación a un destinatario específico.
