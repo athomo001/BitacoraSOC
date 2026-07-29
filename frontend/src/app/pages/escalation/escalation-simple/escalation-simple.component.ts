@@ -31,6 +31,35 @@ import { CatalogLogSource } from '../../../models/catalog.model';
 import { ClientAlertRule, EscalationFlowConfig } from '../../../models/escalation.model';
 import { EscalationFlowPreviewComponent } from '../shared/escalation-flow-preview.component';
 
+// Estados posibles de una celda día/persona en la grilla de teletrabajo y apoyo
+type TeleworkDayStatus = 'telework' | 'training' | 'vacation' | 'medical-leave' | 'medical-appointment' | 'office';
+
+interface TeleworkMatrixColumn {
+  date: Date;
+  dayLabel: string;
+  dayShort: string;
+  dateShort: string;
+  isToday: boolean;
+}
+
+interface TeleworkMatrixDayCell {
+  status: TeleworkDayStatus;
+  icon: string;
+  cssClass: string;
+  printLabel: string;
+  tooltip: string;
+}
+
+interface TeleworkMatrixRow {
+  key: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  hasSpecial: boolean;
+  days: TeleworkMatrixDayCell[];
+}
+
 @Component({
     selector: 'app-escalation-simple',
     imports: [
@@ -525,296 +554,26 @@ export class EscalationSimpleComponent implements OnInit {
     });
   }
 
+  // Metadatos visuales (ícono, clase CSS y abreviación de impresión) por cada estado de la grilla
+  private readonly teleworkStatusMeta: Record<TeleworkDayStatus, { icon: string; label: string; printLabel: string }> = {
+    'medical-leave': { icon: 'healing', label: 'Licencia Médica', printLabel: 'L' },
+    vacation: { icon: 'event_busy', label: 'Vacaciones', printLabel: 'V' },
+    'medical-appointment': { icon: 'local_hospital', label: 'Trámite Médico', printLabel: 'M' },
+    training: { icon: 'school', label: 'Charla/Capacitación', printLabel: 'C' },
+    telework: { icon: 'home', label: 'Teletrabajo', printLabel: 'T' },
+    office: { icon: 'business', label: 'En Oficina', printLabel: '' }
+  };
+
   /**
-   * Carga dinámicamente al personal de teletrabajo, vacaciones (activas y futuras) y oficina en el periodo semanal seleccionado.
-   */
-  /**
-   * Carga dinámicamente al personal de teletrabajo, capacitación, trámites médicos y vacaciones en el periodo semanal seleccionado.
-   * Resuelve el bug de ocultamiento de asignaciones agrupando por usuario y aplicando priorización y ordenación cronológica adaptada al día de hoy.
+   * Carga las asignaciones y usuarios de la semana seleccionada y construye la grilla día por día.
    */
   loadTeleworkStaff(): void {
     const assignments$ = this.escalationService.getAssignments(undefined, this.currentWeekStart.toISOString(), this.currentWeekEnd.toISOString());
-    const futureVacations$ = this.escalationService.getAssignments('VACATION', this.currentWeekStart.toISOString(), undefined, 100);
-    const futureMedicalLeaves$ = this.escalationService.getAssignments('MEDICAL_LEAVE', this.currentWeekStart.toISOString(), undefined, 100);
-    const futureMedicalAppointments$ = this.escalationService.getAssignments('MEDICAL_APPOINTMENT', this.currentWeekStart.toISOString(), undefined, 100);
     const users$ = this.escalationService.getUsers();
 
-    forkJoin([assignments$, futureVacations$, futureMedicalLeaves$, futureMedicalAppointments$, users$]).subscribe({
-      next: ([assignments, futureVacations, futureMedicalLeaves, futureMedicalAppointments, users]) => {
-        const now = new Date();
-        
-        // Parámetros de tiempo del día de hoy en hora local
-        const today = new Date();
-        const todayStart = new Date(today);
-        todayStart.setHours(0, 0, 0, 0);
-        const todayEnd = new Date(today);
-        todayEnd.setHours(23, 59, 59, 999);
-
-        const weekStart = this.currentWeekStart;
-        const weekEnd = this.currentWeekEnd;
-
-        // Ausencias futuras: próximas 2 semanas (14 días de límite)
-        const referenceEnd = new Date(this.currentWeekEnd);
-        const futureLimit = new Date(referenceEnd);
-        futureLimit.setDate(futureLimit.getDate() + 14);
-
-        // Agrupación de todas las asignaciones detectadas en una sola lista base
-        const allAsgs = [
-          ...assignments,
-          ...futureVacations,
-          ...futureMedicalLeaves,
-          ...futureMedicalAppointments
-        ];
-
-        // Diccionario para agrupar asignaciones por analista único
-        const userGroups = new Map<string, {
-          key: string;
-          name: string;
-          email: string;
-          phone: string;
-          role: string;
-          isExternal: boolean;
-          assignments: any[];
-        }>();
-
-        // 1. Inicializar el mapa con todos los usuarios internos del sistema
-        if (Array.isArray(users)) {
-          users.forEach(u => {
-            // Exclusión de roles que no corresponden a analistas operativos del SOC
-            if (u.role === 'guest' || u.role === 'auditor') return;
-            const userIdStr = String(u._id);
-            userGroups.set(userIdStr, {
-              key: userIdStr,
-              name: u.name || u.fullName || 'Sin asignar',
-              phone: u.phone || '-',
-              email: u.email || '-',
-              role: u.cargoLabel || 'Analista',
-              isExternal: false,
-              assignments: []
-            });
-          });
-        }
-
-        // 2. Clasificar y asociar cada asignación con su usuario correspondiente
-        allAsgs.forEach(asg => {
-          if (!asg) return;
-          const userIdStr = asg.userId?._id ? String(asg.userId._id) : (typeof asg.userId === 'string' ? asg.userId : null);
-          const extIdStr = asg.externalPersonId?._id ? String(asg.externalPersonId._id) : (typeof asg.externalPersonId === 'string' ? asg.externalPersonId : null);
-          
-          const key = userIdStr || extIdStr;
-          if (!key) return;
-
-          if (!userGroups.has(key)) {
-            // Incorporación dinámica de personas externas no listadas en la base de usuarios interna
-            const personName = asg.userId?.fullName || asg.externalPersonId?.name || 'Sin asignar';
-            const personPhone = asg.userId?.phone || asg.externalPersonId?.phone || '-';
-            const personEmail = asg.userId?.email || asg.externalPersonId?.email || '-';
-            const roleName = asg.userId?.cargoLabel || asg.externalPersonId?.position || this.getRoleLabelTranslated(asg.roleCode);
-
-            userGroups.set(key, {
-              key,
-              name: personName,
-              phone: personPhone,
-              email: personEmail,
-              role: roleName,
-              isExternal: !!extIdStr,
-              assignments: []
-            });
-          }
-
-          const group = userGroups.get(key)!;
-          // Evitar registrar la misma asignación si aparece en múltiples consultas de la API
-          const alreadyHas = group.assignments.some(a => String(a._id) === String(asg._id));
-          if (!alreadyHas) {
-            group.assignments.push(asg);
-          }
-        });
-
-        // 3. Determinar la validez de una asignación (filtrando registros caducados en tiempo real para la semana actual)
-        const isValidAssignment = (asg: any): boolean => {
-          const start = new Date(asg?.weekStartDate);
-          const end = new Date(asg?.weekEndDate);
-          if (isNaN(start.getTime()) || isNaN(end.getTime())) return false;
-          
-          const isCurrentWeek = now >= weekStart && now <= weekEnd;
-          // Si estamos visualizando la semana en curso y la asignación ya finalizó, se oculta para no generar ruido
-          if (isCurrentWeek && end < now) return false;
-          return true;
-        };
-
-        // 4. Asignación de nivel de prioridad para seleccionar el estado óptimo del analista
-        const getAssignmentPriority = (asg: any): number => {
-          const start = new Date(asg.weekStartDate);
-          const end = new Date(asg.weekEndDate);
-          
-          const isActiveToday = start <= todayEnd && end >= todayStart;
-          const isActiveInWeek = start <= weekEnd && end >= weekStart;
-          const isFuture = start > referenceEnd && start <= futureLimit;
-          const role = asg.roleCode;
-
-          // Prioridades (a menor valor, mayor importancia de visualización)
-          if (isActiveToday && (role === 'VACATION' || role === 'MEDICAL_LEAVE')) return 1; // Ausencia severa hoy
-          if (isActiveToday && role === 'MEDICAL_APPOINTMENT') return 2; // Trámite médico hoy
-          if (isActiveToday && role === 'OL') return 3; // Capacitación hoy (Prioridad mayor que teletrabajo)
-          if (isActiveToday && role === 'TELEWORK') return 4; // Teletrabajo hoy
-          
-          if (isActiveInWeek && (role === 'VACATION' || role === 'MEDICAL_LEAVE')) return 5; // Ausencia en la semana
-          if (isActiveInWeek && role === 'MEDICAL_APPOINTMENT') return 6; // Trámite médico en la semana
-          if (isActiveInWeek && role === 'OL') return 7; // Capacitación en la semana (Prioridad mayor que teletrabajo)
-          if (isActiveInWeek && role === 'TELEWORK') return 8; // Teletrabajo en la semana
-          
-          if (isFuture && (role === 'VACATION' || role === 'MEDICAL_LEAVE' || role === 'MEDICAL_APPOINTMENT')) return 9; // Ausencia futura
-          
-          // Guardias de soporte técnico en oficina
-          if (isActiveInWeek && role !== 'VACATION' && role !== 'MEDICAL_LEAVE' && role !== 'MEDICAL_APPOINTMENT' && role !== 'TELEWORK' && role !== 'OL') {
-            return 10;
-          }
-          return 99;
-        };
-
-        // 5. Procesar cada grupo para decidir qué estado final mostrar en la tabla
-        const list: any[] = [];
-        userGroups.forEach(group => {
-          // Filtrar asignaciones válidas (descartando nulas o ya expiradas)
-          const validAsgs = group.assignments.filter(isValidAssignment);
-
-          if (validAsgs.length === 0) {
-            // El analista no cuenta con asignaciones operativas en el periodo: estado "En Oficina" por defecto
-            list.push({
-              name: group.name,
-              phone: group.phone,
-              email: group.email,
-              role: group.role,
-              status: 'office',
-              statusLabel: 'En Oficina',
-              startDate: null,
-              endDate: null,
-              isToday: false,
-              isTodayHighlighted: false,
-              section: 'office'
-            });
-            return;
-          }
-
-          // Seleccionar la asignación con el menor puntaje de prioridad (mayor relevancia)
-          validAsgs.sort((a, b) => getAssignmentPriority(a) - getAssignmentPriority(b));
-          const bestAsg = validAsgs[0];
-          const priority = getAssignmentPriority(bestAsg);
-
-          if (priority >= 10) {
-            // Si la asignación con más prioridad es una guardia estándar, se mapea a "En Oficina"
-            list.push({
-              name: group.name,
-              phone: group.phone,
-              email: group.email,
-              role: group.role,
-              status: 'office',
-              statusLabel: 'En Oficina',
-              startDate: new Date(bestAsg.weekStartDate),
-              endDate: new Date(bestAsg.weekEndDate),
-              isToday: false,
-              isTodayHighlighted: false,
-              section: 'office'
-            });
-          } else {
-            const start = new Date(bestAsg.weekStartDate);
-            const end = new Date(bestAsg.weekEndDate);
-            const isActiveToday = start <= todayEnd && end >= todayStart;
-            
-            const role = bestAsg.roleCode;
-            const isMedicalLeave = role === 'MEDICAL_LEAVE';
-            const isMedicalAppointment = role === 'MEDICAL_APPOINTMENT';
-            const isFuture = start > referenceEnd && start <= futureLimit;
-
-            let status = 'office';
-            let statusLabel = 'En Oficina';
-
-            if (role === 'VACATION' || isMedicalLeave) {
-              status = isFuture ? 'upcoming-vacation' : 'vacation';
-              statusLabel = isFuture 
-                ? (isMedicalLeave ? 'Pronto Licencia médica' : 'Pronto Vacaciones')
-                : (isMedicalLeave ? 'LICENCIA MÉDICA' : 'VACACIONES');
-            } else if (isMedicalAppointment) {
-              status = isFuture ? 'upcoming-medical-appointment' : 'medical-appointment';
-              statusLabel = isFuture ? 'Pronto Trámite Médico' : 'TRÁMITE MÉDICO';
-            } else if (role === 'TELEWORK') {
-              status = 'telework';
-              statusLabel = 'En Teletrabajo';
-            } else if (role === 'OL') {
-              status = 'training';
-              statusLabel = 'En Charla/Capacitación (Fuera de oficina)';
-            }
-
-            // Destaque visual tipo neon suave para situaciones del día de hoy
-            // Las vacaciones y licencias médicas no llevan el destaque neon según la especificación del usuario
-            const isTodayHighlighted = isActiveToday && (status === 'telework' || status === 'training' || status === 'medical-appointment');
-
-            let section = 'week';
-            if (isActiveToday && status !== 'office' && !status.startsWith('upcoming-')) {
-              section = 'today';
-            } else if (status.startsWith('upcoming-')) {
-              section = 'future';
-            } else if (status === 'office') {
-              section = 'office';
-            }
-
-            list.push({
-              name: group.name,
-              phone: group.phone,
-              email: group.email,
-              role: group.role,
-              status,
-              statusLabel,
-              isMedicalLeave,
-              isMedicalAppointment,
-              startDate: start,
-              endDate: end,
-              isToday: isActiveToday,
-              isTodayHighlighted,
-              section
-            });
-          }
-        });
-
-        // 6. Ordenamiento adaptado: Priorizar HOY -> Cronológico de la semana -> Ausencias futuras -> Alfabético oficina
-        const getSortScore = (item: any): number => {
-          if (item.section === 'today') return 1;
-          if (item.section === 'week') return 2;
-          if (item.section === 'future') return 3;
-          return 4; // 'office'
-        };
-
-        this.teleworkStaff = list.sort((a, b) => {
-          const scoreA = getSortScore(a);
-          const scoreB = getSortScore(b);
-
-          if (scoreA !== scoreB) {
-            return scoreA - scoreB;
-          }
-
-          // Para la misma sección 'week' o 'future', ordenamos cronológicamente
-          if ((a.section === 'week' || a.section === 'future') && a.startDate && b.startDate) {
-            return a.startDate.getTime() - b.startDate.getTime();
-          }
-
-          // Para 'today', ordenamos por tipo (vacaciones > trámite > capacitación > teletrabajo)
-          if (a.section === 'today') {
-            const todayOrder: { [key: string]: number } = {
-              'vacation': 1,
-              'medical-appointment': 2,
-              'training': 3,
-              'telework': 4
-            };
-            const typeA = todayOrder[a.status] ?? 5;
-            const typeB = todayOrder[b.status] ?? 5;
-            if (typeA !== typeB) return typeA - typeB;
-          }
-
-          // Criterio de ordenación secundario alfabético
-          return a.name.localeCompare(b.name);
-        });
-
-        this.todayCount = this.teleworkStaff.filter(s => s.section === 'today').length;
+    forkJoin([assignments$, users$]).subscribe({
+      next: ([assignments, users]) => {
+        this.buildTeleworkMatrix(assignments || [], users || []);
         this.cdr.detectChanges();
       },
       error: (err) => {
@@ -823,34 +582,181 @@ export class EscalationSimpleComponent implements OnInit {
     });
   }
 
+  // Última respuesta cargada (se cachea para poder recalcular la grilla en semana completa al momento de imprimir)
+  private lastMatrixAssignments: any[] = [];
+  private lastMatrixUsers: any[] = [];
+
   /**
-   * Genera dinámicamente la etiqueta textual de cabecera para cada sección.
+   * Construye la grilla semanal (columnas Lunes-Viernes recortadas al día actual, filas por analista) resolviendo,
+   * para cada día, la asignación de mayor prioridad activa. A diferencia del enfoque anterior (una sola asignación
+   * "ganadora" por semana), esto permite ver correctamente a una misma persona con estados distintos en días distintos.
    */
-  getSectionLabel(section: string): string {
-    if (section === 'today') {
-      const todayStr = new Date().toLocaleDateString('es-CL', { weekday: 'long', day: '2-digit', month: '2-digit' });
-      const capitalized = todayStr.charAt(0).toUpperCase() + todayStr.slice(1);
-      return `Hoy (${capitalized})`;
-    }
-    if (section === 'week') return 'Próximas asignaciones en la semana';
-    if (section === 'future') return 'Ausencias planificadas a futuro';
-    if (section === 'office') return 'En Oficina / Sin asignaciones especiales';
-    return '';
+  private buildTeleworkMatrix(assignments: any[], users: any[]): void {
+    this.lastMatrixAssignments = assignments;
+    this.lastMatrixUsers = users;
+
+    this.teleworkMatrixColumns = this.buildWeekdayColumns(false);
+    this.teleworkMatrixRows = this.computeMatrixRows(assignments, users, this.teleworkMatrixColumns);
   }
 
   /**
-   * Traduce el código de rol para la presentación del listado.
+   * Construye las columnas de días hábiles (Lunes-Viernes) de la semana seleccionada.
+   * Cuando fullWeek=false y se está viendo la semana en curso, recorta desde el día actual en adelante
+   * (para no mostrar días ya pasados en pantalla). Para impresión se usa fullWeek=true para ver siempre la semana completa.
    */
-  getRoleLabelTranslated(roleCode: string): string {
-    if (roleCode === 'N1_NO_HABIL') return 'N1 - No Hábil';
-    if (roleCode === 'N2') return 'N2 - Soporte Técnico';
-    if (roleCode === 'TI') return 'TI - Infraestructura';
-    if (roleCode === 'TELEWORK') return 'Teletrabajo';
-    if (roleCode === 'OL') return 'Charla/Capacitación (OL)';
-    if (roleCode === 'VACATION') return 'Vacaciones';
-    if (roleCode === 'MEDICAL_LEAVE') return 'Licencia médica';
-    if (roleCode === 'MEDICAL_APPOINTMENT') return 'Trámite Médico';
-    return roleCode;
+  private buildWeekdayColumns(fullWeek: boolean): TeleworkMatrixColumn[] {
+    const weekdays: Date[] = [];
+    for (let i = 0; i < 5; i++) {
+      const d = new Date(this.currentWeekStart);
+      d.setDate(this.currentWeekStart.getDate() + i);
+      d.setHours(0, 0, 0, 0);
+      weekdays.push(d);
+    }
+
+    const now = new Date();
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+
+    let visibleWeekdays = weekdays;
+    if (!fullWeek && this.isCurrentWeek()) {
+      const todayIsoWeekday = now.getDay(); // 0=Domingo .. 6=Sábado
+      if (todayIsoWeekday >= 1 && todayIsoWeekday <= 5) {
+        visibleWeekdays = weekdays.filter(d => d.getTime() >= today.getTime());
+      }
+    }
+    if (visibleWeekdays.length === 0) {
+      visibleWeekdays = weekdays;
+    }
+
+    return visibleWeekdays.map(d => ({
+      date: d,
+      dayLabel: this.capitalizeFirst(d.toLocaleDateString('es-CL', { weekday: 'long' })),
+      dayShort: this.capitalizeFirst(d.toLocaleDateString('es-CL', { weekday: 'short' })).replace(/\./g, ''),
+      dateShort: d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' }),
+      isToday: d.getTime() === today.getTime()
+    }));
+  }
+
+  /**
+   * Resuelve, para cada usuario y cada columna/día dado, el estado de mayor prioridad activo ese día.
+   */
+  private computeMatrixRows(assignments: any[], users: any[], columns: TeleworkMatrixColumn[]): TeleworkMatrixRow[] {
+    // 1. Agrupar todas las asignaciones detectadas por analista (interno o externo)
+    const userGroups = new Map<string, { key: string; name: string; email: string; phone: string; role: string; assignments: any[] }>();
+
+    if (Array.isArray(users)) {
+      users.forEach(u => {
+        // Exclusión de roles que no corresponden a analistas operativos del SOC
+        if (u.role === 'guest' || u.role === 'auditor') return;
+        const userIdStr = String(u._id);
+        userGroups.set(userIdStr, {
+          key: userIdStr,
+          name: u.name || u.fullName || 'Sin asignar',
+          phone: u.phone || '-',
+          email: u.email || '-',
+          role: u.cargoLabel || 'Analista',
+          assignments: []
+        });
+      });
+    }
+
+    assignments.forEach(asg => {
+      if (!asg) return;
+      // Esta grilla es el roster interno del SOC (Personal en Teletrabajo y Apoyo): solo se consideran asignaciones
+      // de usuarios internos del sistema. Las asignaciones a contactos externos (externalPersonId, ej. especialistas
+      // de otras áreas cargados desde el Directorio de Escalación) no representan personal de la bitácora y se ignoran aquí.
+      const userIdStr = asg.userId?._id ? String(asg.userId._id) : (typeof asg.userId === 'string' ? asg.userId : null);
+      if (!userIdStr || !userGroups.has(userIdStr)) return;
+
+      const group = userGroups.get(userIdStr)!;
+      const alreadyHas = group.assignments.some(a => String(a._id) === String(asg._id));
+      if (!alreadyHas) {
+        group.assignments.push(asg);
+      }
+    });
+
+    // 2. Prioridad para resolver el caso (poco frecuente) de dos asignaciones relevantes solapadas el mismo día
+    const dayPriority: Record<string, number> = {
+      VACATION: 1,
+      MEDICAL_LEAVE: 1,
+      MEDICAL_APPOINTMENT: 2,
+      OL: 3,
+      TELEWORK: 4
+    };
+    const relevantRoles = new Set(Object.keys(dayPriority));
+
+    // 3. Construir una fila por analista, con una celda resuelta para cada columna/día solicitado
+    const rows: TeleworkMatrixRow[] = [];
+    userGroups.forEach(group => {
+      const relevantAsgs = group.assignments.filter(a => relevantRoles.has(a.roleCode) && a.isPaused !== true);
+
+      let hasSpecial = false;
+      const days = columns.map(col => {
+        const dayStart = col.date;
+        const dayEnd = new Date(col.date);
+        dayEnd.setHours(23, 59, 59, 999);
+
+        const activeToday = relevantAsgs.filter(a => {
+          const start = new Date(a.weekStartDate);
+          const end = new Date(a.weekEndDate);
+          return start <= dayEnd && end >= dayStart;
+        });
+
+        if (activeToday.length === 0) {
+          return this.buildTeleworkDayCell('office', null);
+        }
+
+        activeToday.sort((a, b) => (dayPriority[a.roleCode] ?? 9) - (dayPriority[b.roleCode] ?? 9));
+        hasSpecial = true;
+        return this.buildTeleworkDayCell(this.mapRoleToTeleworkStatus(activeToday[0].roleCode), activeToday[0]);
+      });
+
+      rows.push({
+        key: group.key,
+        name: group.name,
+        email: group.email,
+        phone: group.phone,
+        role: group.role,
+        hasSpecial,
+        days
+      });
+    });
+
+    // 4. Ordenar: primero quienes tienen algún día especial esta semana, luego alfabético dentro de cada grupo
+    rows.sort((a, b) => {
+      if (a.hasSpecial !== b.hasSpecial) return a.hasSpecial ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    return rows;
+  }
+
+  private mapRoleToTeleworkStatus(roleCode: string): TeleworkDayStatus {
+    if (roleCode === 'MEDICAL_LEAVE') return 'medical-leave';
+    if (roleCode === 'VACATION') return 'vacation';
+    if (roleCode === 'MEDICAL_APPOINTMENT') return 'medical-appointment';
+    if (roleCode === 'OL') return 'training';
+    if (roleCode === 'TELEWORK') return 'telework';
+    return 'office';
+  }
+
+  private buildTeleworkDayCell(status: TeleworkDayStatus, asg: any | null): TeleworkMatrixDayCell {
+    const meta = this.teleworkStatusMeta[status];
+    const tooltip = asg
+      ? `${meta.label}: ${this.formatAssignmentPeriod(new Date(asg.weekStartDate), new Date(asg.weekEndDate), status)}`
+      : 'En Oficina';
+
+    return {
+      status,
+      icon: meta.icon,
+      cssClass: status,
+      printLabel: meta.printLabel,
+      tooltip
+    };
+  }
+
+  private capitalizeFirst(text: string): string {
+    return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
   }
 
   showError(message: string): void {
@@ -1017,18 +923,9 @@ export class EscalationSimpleComponent implements OnInit {
     });
   }
 
-  // Personal de apoyo en teletrabajo, oficina y vacaciones según distribución de turnos
-  teleworkStaff: any[] = [];
-  todayCount: number = 0;
-
-  /**
-   * Retorna la fecha del día de hoy en un formato abreviado (ej: mar 14/07).
-   */
-  getTodayDateShort(): string {
-    const today = new Date();
-    const dateStr = today.toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: '2-digit' });
-    return dateStr.replace(/\./g, '');
-  }
+  // Grilla semanal (Lunes-Viernes) de personal en teletrabajo, capacitación, vacaciones, licencias y trámites médicos
+  teleworkMatrixColumns: TeleworkMatrixColumn[] = [];
+  teleworkMatrixRows: TeleworkMatrixRow[] = [];
 
   // Formatea un rango de fecha/hora de asignación para mostrarlo de forma compacta y clara
   formatAssignmentPeriod(startDate: Date | undefined, endDate: Date | undefined, status: string): string {
@@ -1064,120 +961,47 @@ export class EscalationSimpleComponent implements OnInit {
   }
 
   printSection(): void {
-    const printContainer = document.querySelector('.print-container');
-    if (!printContainer) {
-      console.error('No se encontró el contenedor .print-container para imprimir.');
-      return;
-    }
+    // La impresión siempre muestra la semana completa (Lunes a Viernes), independiente de qué días se recortaron
+    // en pantalla (ej. si hoy es miércoles, en pantalla se ve desde el miércoles, pero el PDF va completo).
+    const printColumns = this.buildWeekdayColumns(true);
+    const printRows = this.computeMatrixRows(this.lastMatrixAssignments, this.lastMatrixUsers, printColumns);
 
-    // Parsear el HTML a un fragmento DOM en memoria para realizar una reestructuración de columnas 100% limpia y precisa
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = printContainer.innerHTML;
-
-    // 1. Modificar thead para insertar la columna "Día / Asignación" antes de "Situación"
-    const headers = tempDiv.querySelectorAll('.excel-table thead tr th');
-    if (headers.length >= 6) {
-      const diaHeader = document.createElement('th');
-      diaHeader.innerText = 'Día / Asignación';
-      const lastTh = headers[headers.length - 1];
-      if (lastTh && lastTh.parentNode) {
-        lastTh.parentNode.insertBefore(diaHeader, lastTh);
-      }
-    }
-
-    // 2. Modificar tbody para distribuir el badge de situación y el período en columnas separadas
-    const rows = tempDiv.querySelectorAll('.excel-table tbody tr');
-    rows.forEach(row => {
-      if (row.classList.contains('table-section-row')) {
-        // Al agregar una nueva columna, el total de columnas sube a 7, pero como ocultaremos el Spacer por CSS,
-        // el total de columnas activas para el colspan es 6.
-        const td = row.querySelector('td');
-        if (td) {
-          td.setAttribute('colspan', '6');
-        }
-        return;
-      }
-
-      const cells = row.querySelectorAll('td');
-      if (cells.length > 0) {
-        const situacionCell = cells[cells.length - 1];
-        if (situacionCell) {
-          const badge = situacionCell.querySelector('.badge-status');
-          const period = situacionCell.querySelector('.assignment-period-detail');
-          
-          const diaCell = document.createElement('td');
-          diaCell.className = 'cell-print-day';
-          
-          if (period) {
-            let periodHTML = period.innerHTML;
-            // Simplificar y destacar el día a gran tamaño y las horas abajo
-            periodHTML = periodHTML.replace(/([a-zA-ZáéíóúÁÉÍÓÚñÑ]+ \d{1,2}\/\d{2})\s*(\(\d{2}:\d{2}\s+a\s+\d{2}:\d{2}\))/g, '<span class="print-highlight-day">$1</span><span class="print-time-detail">$2</span>');
-            periodHTML = periodHTML.replace(/(\d{2}\/\d{2} \d{2}:\d{2}) al (\d{2}\/\d{2} \d{2}:\d{2})/g, '<span class="print-highlight-day">$1 al $2</span>');
-            
-            const newPeriod = document.createElement('div');
-            newPeriod.className = 'assignment-period-detail';
-            newPeriod.innerHTML = periodHTML;
-            diaCell.appendChild(newPeriod);
-          } else {
-            diaCell.innerText = '-';
-          }
-          
-          situacionCell.innerHTML = '';
-          if (badge) {
-            let badgeHTML = badge.innerHTML;
-            badgeHTML = badgeHTML.replace(/En Charla\/Capacitación \(Fuera de oficina\)/g, 'Charla/Capacitación');
-            badgeHTML = badgeHTML.replace(/En Teletrabajo/g, 'Teletrabajo');
-            badgeHTML = badgeHTML.replace(/En Oficina \(Sin asignar a soporte\)/g, 'Oficina');
-            
-            const newBadge = badge.cloneNode(true) as HTMLElement;
-            newBadge.innerHTML = badgeHTML;
-            situacionCell.appendChild(newBadge);
-          } else {
-            situacionCell.innerText = '-';
-          }
-          
-          if (situacionCell.parentNode) {
-            situacionCell.parentNode.insertBefore(diaCell, situacionCell);
-          }
-        }
-      }
-    });
-
-    // 3. Calcular rango de fechas de la semana actual (Lunes a Domingo) para inyectar en el subtítulo del PDF
-    const today = new Date();
-    const currentDay = today.getDay();
-    const distanceToMonday = currentDay === 0 ? -6 : 1 - currentDay;
-    const monday = new Date(today);
-    monday.setDate(today.getDate() + distanceToMonday);
-
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-
-    const formatDateShort = (d: Date) => {
-      const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-      return `${d.getDate()} de ${months[d.getMonth()]}`;
-    };
-
-    const weekRangeText = `Semana del Lunes ${formatDateShort(monday)} al Domingo ${formatDateShort(sunday)} de ${monday.getFullYear()}`;
-
-    const subtitleEl = tempDiv.querySelector('.print-subtitle');
-    if (subtitleEl) {
-      subtitleEl.innerHTML = `<strong>Programación SOC:</strong> ${weekRangeText}`;
-    }
-
-    const printContent = tempDiv.innerHTML;
-    const printWindow = window.open('about:blank', '_blank', 'left=200,top=200,width=1000,height=900');
-    
+    const printWindow = window.open('about:blank', '_blank', 'left=200,top=200,width=1100,height=900');
     if (!printWindow) {
       alert('Por favor, permite las ventanas emergentes en este sitio para poder imprimir el reporte.');
       return;
     }
 
-    // Estilos de impresión premium inyectados directamente en el contexto limpio de la nueva ventana
+    const formatDateShort = (d: Date) => {
+      const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      return `${d.getDate()} de ${months[d.getMonth()]}`;
+    };
+    const weekRangeText = `Semana del Lunes ${formatDateShort(this.currentWeekStart)} al Viernes ${formatDateShort(this.currentWeekEnd)} de ${this.currentWeekStart.getFullYear()}`;
+
+    const headerHtml = `
+      <div class="print-only-header">
+        <div class="print-header-top">
+          <span class="print-brand">CDC Netics · Control Interno</span>
+          <span class="print-date">Generado el ${this.escapeHtml(this.getTodayDateFormatted())}</span>
+        </div>
+        <h1>Personal Fuera de la Oficina y Apoyo</h1>
+        <p class="print-subtitle"><strong>Programación SOC:</strong> ${weekRangeText}</p>
+        <div class="print-header-divider"></div>
+      </div>
+    `;
+
+    const tableHtml = this.renderPrintMatrixTable(printColumns, printRows);
+    const legendHtml = this.renderPrintLegend();
+
+    // Estilos de impresión premium inyectados directamente en el contexto limpio de la nueva ventana.
+    // Se carga la fuente de Material Icons (misma fuente que usa la app) para que los íconos de estado se
+    // impriman como íconos reales y grandes, en vez de la abreviación de texto usada como respaldo anterior.
     const styles = `
       <html>
         <head>
           <title>Personal Fuera de la Oficina y Apoyo - CDC Netics</title>
+          <link rel="preconnect" href="https://fonts.gstatic.com">
+          <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
           <style>
             @page {
               size: letter portrait;
@@ -1192,35 +1016,24 @@ export class EscalationSimpleComponent implements OnInit {
               -webkit-print-color-adjust: exact;
               print-color-adjust: exact;
             }
-            .print-button-no-print {
-              display: none !important;
-            }
-            /* Ocultar iconos de forma robusta en impresión */
-            mat-icon,
-            .material-icons,
-            .mat-icon,
-            [role="img"] {
-              display: none !important;
-              visibility: hidden !important;
-              width: 0 !important;
-              height: 0 !important;
-              font-size: 0 !important;
-              color: transparent !important;
-              speak: none;
-            }
-            
-            /* Ocultar columna de teléfono y columna de correo en la versión impresa */
-            .cell-phone,
-            .cell-email {
-              display: none !important;
-            }
-            .excel-table th:nth-child(3),
-            .excel-table th:nth-child(4) {
-              display: none !important;
+            .material-icons {
+              font-family: 'Material Icons';
+              font-weight: normal;
+              font-style: normal;
+              display: inline-block;
+              line-height: 1;
+              text-transform: none;
+              letter-spacing: normal;
+              word-wrap: normal;
+              white-space: nowrap;
+              direction: ltr;
+              -webkit-font-smoothing: antialiased;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
             }
 
             .print-only-header {
-              display: block !important;
+              display: block;
               margin-bottom: 15px;
               width: 100%;
             }
@@ -1282,135 +1095,102 @@ export class EscalationSimpleComponent implements OnInit {
               border: 1px solid #cbd5e1;
               background-color: #f8fafc;
               color: #0f172a;
-              font-size: 12.5px; /* Cabeceras más legibles */
+              font-size: 11px;
               font-weight: 700;
-              padding: 7px 8px;
+              padding: 7px 6px;
+              text-align: center;
+            }
+            .excel-table th.col-name {
               text-align: left;
+              width: 26%;
             }
-            
-            /* Ocultar la primera columna (Spacer / Hoy vertical) en la impresión física */
-            .cell-header-spacer {
-              display: none !important;
-            }
-            .excel-table th:nth-child(1) {
-              display: none !important;
-            }
-            .cell-today-vertical,
-            .cell-today-vertical-empty {
-              display: none !important;
+            .day-header-date {
+              display: block;
+              font-size: 9.5px;
+              font-weight: 500;
+              color: #64748b;
+              margin-top: 2px;
             }
 
-            /* Redistribución óptima de anchos de columna tras remover teléfono/correo/Hoy vertical y agregar Día */
-            .excel-table th:nth-child(2) { width: 32%; } /* Gran holgura para nombres completos */
-            .excel-table th:nth-child(5) { width: 16%; } /* Holgura para cargos */
-            .excel-table th:nth-child(6) { width: 34%; } /* Ancho de día destacado de gran tamaño */
-            .excel-table th:nth-child(7) { width: 18%; } /* Columna del tag de Situación */
-            
             .excel-table td {
               border: 1px solid #cbd5e1;
-              padding: 7px 8px; /* Incrementado para mejor lectura */
-              font-size: 12px; /* Incrementado para personas mayores */
+              padding: 8px 6px;
+              font-size: 11.5px;
               color: #0f172a;
               vertical-align: middle;
               word-wrap: break-word;
               word-break: break-word;
               line-height: 1.35;
             }
-            /* Alinear tags al centro de la columna Situación */
-            .excel-table td:nth-child(7) {
-              text-align: center !important;
-            }
-            .table-section-row {
-              background-color: #f1f5f9;
-            }
-            .table-section-row td {
-              padding: 7px 10px;
-              font-weight: 800;
-              color: #0f172a;
-              font-size: 13.5px; /* Días separadores de la semana bien visibles */
-              background-color: #f1f5f9;
-            }
             .cell-name {
+              text-align: left;
+            }
+            .cell-name-text {
               font-weight: 700;
-              font-size: 13px; /* Nombres grandes */
+              font-size: 12.5px;
               color: #0f172a;
               white-space: normal;
+              display: block;
             }
-            .data-row.row-today.row-today-telework {
-              border-left: 4px solid #10b981 !important;
-              background-color: rgba(16, 185, 129, 0.04);
+            .cell-name-role {
+              display: block;
+              font-size: 10px;
+              color: #64748b;
+              margin-top: 2px;
             }
-            .data-row.row-today.row-today-training {
-              border-left: 4px solid #f59e0b !important;
-              background-color: rgba(245, 158, 11, 0.04);
+
+            /* Celda de día: ícono de estado grande y coloreado; los días "En Oficina" quedan en blanco para no saturar */
+            .cell-day {
+              text-align: center;
             }
-            .data-row.row-today.row-today-medical {
-              border-left: 4px solid #06b6d4 !important;
-              background-color: rgba(6, 182, 212, 0.04);
+            .print-day-icon {
+              font-size: 30px !important;
             }
-            .data-row.row-vacation {
-              border-left: 4px solid #ef4444 !important;
-              background-color: rgba(239, 68, 68, 0.04);
+            .print-day-icon.cell-day--telework { color: #059669; }
+            .print-day-icon.cell-day--training { color: #b45309; }
+            .print-day-icon.cell-day--vacation,
+            .print-day-icon.cell-day--medical-leave { color: #dc2626; }
+            .print-day-icon.cell-day--medical-appointment { color: #0e7490; }
+
+            /* Etiqueta de texto debajo de cada ícono, para que el significado quede claro sin depender de la leyenda */
+            .print-day-label {
+              display: block;
+              margin-top: 4px;
+              font-size: 9.5px;
+              font-weight: 800;
+              text-transform: uppercase;
+              letter-spacing: 0.01em;
+              line-height: 1.2;
+              white-space: normal;
             }
-            .badge-status {
+            .print-day-label.cell-day--telework { color: #047857; }
+            .print-day-label.cell-day--training { color: #b45309; }
+            .print-day-label.cell-day--vacation,
+            .print-day-label.cell-day--medical-leave { color: #b91c1c; }
+            .print-day-label.cell-day--medical-appointment { color: #0e7490; }
+
+            .matrix-legend {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 16px;
+              margin-top: 14px;
+            }
+            .matrix-legend .legend-item {
               display: inline-flex;
               align-items: center;
-              justify-content: center;
-              gap: 4px;
-              padding: 2px 5px; /* Reducido ligeramente para evitar desbordes */
-              font-size: 9.5px; /* Reducido levemente para ajuste óptimo */
-              border-radius: 5px;
-              font-weight: 700;
-              white-space: nowrap !important;
-              max-width: 100%;
-              box-sizing: border-box;
+              gap: 5px;
+              font-size: 10.5px;
+              color: #334155;
             }
-            .badge-status.telework { 
-              background-color: rgba(16, 185, 129, 0.1); 
-              color: #047857; 
-              border: 1px solid #10b981; 
+            .print-legend-icon {
+              font-size: 16px !important;
             }
-            .badge-status.training { 
-              background-color: rgba(245, 158, 11, 0.12); 
-              color: #b45309; 
-              border: 1px solid #f59e0b; 
-            }
-            .badge-status.office { 
-              background-color: rgba(139, 92, 246, 0.1); 
-              color: #5b21b6; 
-              border: 1px solid #8b5cf6; 
-            }
-            .badge-status.vacation, .badge-status.medical-appointment { 
-              background-color: rgba(239, 68, 68, 0.1); 
-              color: #b91c1c; 
-              border: 1px solid #ef4444; 
-            }
-            .badge-status.upcoming-vacation { 
-              background-color: rgba(59, 130, 246, 0.1); 
-              color: #1d4ed8; 
-              border: 1px solid #3b82f6; 
-            }
-            /* Ocultar badge de hoy en los nombres de personas en la impresión */
-            .badge-today-pill {
-              display: none !important;
-            }
-            
-            /* Destaque vistoso del día de la semana y fecha en su columna exclusiva */
-            .print-highlight-day {
-              font-size: 15px !important; /* Día mucho más grande */
-              font-weight: 800 !important;
-              color: #0f172a !important;
-              display: block !important;
-              margin-bottom: 2px !important;
-              letter-spacing: -0.015em !important;
-            }
-            .print-time-detail {
-              font-size: 11.5px !important; /* Horas un poco más grandes */
-              color: #475569 !important;
-              font-weight: 500 !important;
-              display: block !important;
-            }
-            
+            .print-legend-icon.cell-day--telework { color: #059669; }
+            .print-legend-icon.cell-day--training { color: #b45309; }
+            .print-legend-icon.cell-day--vacation,
+            .print-legend-icon.cell-day--medical-leave { color: #dc2626; }
+            .print-legend-icon.cell-day--medical-appointment { color: #0e7490; }
+
             /* Estilo del disclaimer al pie de la tabla */
             .print-disclaimer {
               margin-top: 20px;
@@ -1440,20 +1220,33 @@ export class EscalationSimpleComponent implements OnInit {
         </head>
         <body>
           <div class="print-container">
-            ${printContent}
-            
+            ${headerHtml}
+
+            <div class="excel-table-container">
+              ${tableHtml}
+            </div>
+
+            ${legendHtml}
+
             <div class="print-disclaimer">
               <span class="disclaimer-icon">⚠️</span>
               <span class="disclaimer-text">Nota de control interno: La presente programación es de carácter representativo y está sujeta a cambios y adaptaciones operativas según las necesidades críticas del servicio SOC durante la semana en curso.</span>
             </div>
           </div>
           <script>
-            window.onload = function() {
-              setTimeout(function() {
-                window.print();
-                window.close();
-              }, 250);
-            };
+            var alreadyPrinted = false;
+            function triggerPrint() {
+              if (alreadyPrinted) return;
+              alreadyPrinted = true;
+              window.print();
+              window.close();
+            }
+            // Esperar a que la fuente de íconos termine de cargar para que no se impriman como texto plano;
+            // se agrega un respaldo por tiempo en caso de que la promesa de fuentes no resuelva a tiempo.
+            if (document.fonts && document.fonts.ready) {
+              document.fonts.ready.then(triggerPrint).catch(triggerPrint);
+            }
+            setTimeout(triggerPrint, 1200);
           </script>
         </body>
       </html>
@@ -1461,6 +1254,62 @@ export class EscalationSimpleComponent implements OnInit {
 
     printWindow.document.write(styles);
     printWindow.document.close();
+  }
+
+  /**
+   * Genera el HTML de la tabla de impresión (siempre semana completa) con íconos reales de Material Icons por estado.
+   */
+  private renderPrintMatrixTable(columns: TeleworkMatrixColumn[], rows: TeleworkMatrixRow[]): string {
+    const headerCells = columns
+      .map(col => `<th class="col-day">${this.escapeHtml(col.dayShort)}<span class="day-header-date">${this.escapeHtml(col.dateShort)}</span></th>`)
+      .join('');
+
+    const bodyRows = rows.length > 0
+      ? rows.map(row => {
+          const dayCells = row.days.map(day => {
+            const content = day.status === 'office'
+              ? ''
+              : `<span class="material-icons print-day-icon cell-day--${day.cssClass}">${day.icon}</span><span class="print-day-label cell-day--${day.cssClass}">${this.escapeHtml(this.teleworkStatusMeta[day.status].label)}</span>`;
+            return `<td class="cell-day">${content}</td>`;
+          }).join('');
+          const roleHtml = row.role ? `<small class="cell-name-role">${this.escapeHtml(row.role)}</small>` : '';
+          return `<tr class="data-row"><td class="cell-name"><span class="cell-name-text">${this.escapeHtml(row.name)}</span>${roleHtml}</td>${dayCells}</tr>`;
+        }).join('')
+      : `<tr><td colspan="${1 + columns.length}" style="text-align:center; font-style:italic; color:#64748b; padding:20px;">Sin datos de personal para la semana seleccionada</td></tr>`;
+
+    return `
+      <table class="excel-table matrix-table">
+        <thead><tr><th class="col-name">Nombre</th>${headerCells}</tr></thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    `;
+  }
+
+  /**
+   * Genera la leyenda de íconos de impresión (se omite "En Oficina" ya que esas celdas quedan en blanco).
+   */
+  private renderPrintLegend(): string {
+    const items: { status: TeleworkDayStatus; label: string }[] = [
+      { status: 'telework', label: 'Teletrabajo' },
+      { status: 'training', label: 'Charla/Capacitación' },
+      { status: 'vacation', label: 'Vacaciones' },
+      { status: 'medical-leave', label: 'Licencia Médica' },
+      { status: 'medical-appointment', label: 'Trámite Médico' }
+    ];
+
+    const itemsHtml = items
+      .map(item => {
+        const meta = this.teleworkStatusMeta[item.status];
+        return `<span class="legend-item"><span class="material-icons print-legend-icon cell-day--${item.status}">${meta.icon}</span>${this.escapeHtml(item.label)}</span>`;
+      })
+      .join('');
+
+    return `<div class="matrix-legend">${itemsHtml}</div>`;
+  }
+
+  private escapeHtml(text: string): string {
+    const map: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+    return String(text ?? '').replace(/[&<>"']/g, (c) => map[c]);
   }
 
   getTodayDateFormatted(): string {

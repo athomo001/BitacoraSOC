@@ -142,94 +142,49 @@
         </div>
 
       <div class="excel-table-container">
-        <!-- Tabla estructurada con columnas de contacto separadas y funcionalidad de copiado rápido al portapapeles -->
-        <table class="excel-table">
+        <!-- Grilla semanal: filas por analista, columnas por día hábil (Lun-Vie, recortadas al día actual en la semana en curso) -->
+        <table class="excel-table matrix-table">
           <thead>
             <tr>
-              <th class="cell-header-spacer"></th>
-              <th>Nombre</th>
-              <th>Correo</th>
-              <th>Teléfono</th>
-              <th>Cargo</th>
-              <th>Situación</th>
+              <th class="col-name">Nombre</th>
+              <th *ngFor="let col of teleworkMatrixColumns" class="col-day" [class.col-day--today]="col.isToday">
+                <span class="day-header-name">{{ col.dayShort }}</span>
+                <span class="day-header-date">{{ col.dateShort }}</span>
+              </th>
             </tr>
           </thead>
           <tbody>
-            <ng-container *ngFor="let staff of teleworkStaff; let i = index">
-              <!-- Fila cabecera de sección divisoria (excluyendo Hoy) -->
-              <tr *ngIf="staff.section !== 'today' && (i === 0 || teleworkStaff[i - 1].section !== staff.section)" class="table-section-row">
-                <td colspan="6" class="table-section-header">
-                  <div class="section-header-content">
-                    <mat-icon class="section-icon" *ngIf="staff.section === 'week'">date_range</mat-icon>
-                    <mat-icon class="section-icon" *ngIf="staff.section === 'future'">upcoming</mat-icon>
-                    <mat-icon class="section-icon" *ngIf="staff.section === 'office'">business</mat-icon>
-                    <span class="section-title-text">{{ getSectionLabel(staff.section) }}</span>
-                  </div>
-                </td>
-              </tr>
-              
-              <!-- Fila de datos del analista con estilos específicos -->
-              <tr class="data-row" 
-                  [class.row-today]="staff.section === 'today'" 
-                  [class.row-vacation]="staff.status === 'vacation' || staff.status === 'medical-appointment'"
-                  [class.row-today-telework]="staff.section === 'today' && staff.status === 'telework'"
-                  [class.row-today-training]="staff.section === 'today' && staff.status === 'training'"
-                  [class.row-today-medical]="staff.section === 'today' && staff.status === 'medical-appointment'">
-                
-                <!-- Columna vertical Hoy a la izquierda -->
-                <td *ngIf="staff.section === 'today' && (i === 0 || teleworkStaff[i - 1].section !== 'today')" 
-                    [attr.rowspan]="todayCount" 
-                    class="cell-today-vertical">
-                  <div class="today-vertical-text"
-                       [class.today-vertical-text--tiny]="todayCount <= 1"
-                       [class.today-vertical-text--small]="todayCount === 2">
-                    <span>Hoy</span>
-                    <small>({{ getTodayDateShort() }})</small>
-                  </div>
-                </td>
-                
-                <!-- Celda vacía alineada para las filas de otras secciones -->
-                <td *ngIf="staff.section !== 'today'" class="cell-today-vertical-empty"></td>
-
-                <td class="cell-name">
-                  <div style="display: flex; align-items: center; gap: 8px;">
-                    <span>{{ staff.name }}</span>
-                    <span *ngIf="staff.section === 'today'" class="badge-today-pill">Hoy</span>
-                  </div>
-                </td>
-                <td class="cell-email clickable" (click)="copyToClipboard(staff.email)">
-                  <span *ngIf="staff.email !== '-'">📧 {{ staff.email }}</span>
-                  <span *ngIf="staff.email === '-'">-</span>
-                </td>
-                <td class="cell-phone clickable" (click)="copyToClipboard(staff.phone)">
-                  <span *ngIf="staff.phone !== '-'">📱 {{ staff.phone }}</span>
-                  <span *ngIf="staff.phone === '-'">-</span>
-                </td>
-                <td>{{ staff.role || '-' }}</td>
-                <td>
-                  <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
-                    <span class="badge-status" [class]="staff.status" [class.badge-status--today-highlight]="staff.isTodayHighlighted">
-                      <mat-icon *ngIf="staff.status === 'telework'">home</mat-icon>
-                      <mat-icon *ngIf="staff.status === 'training'">school</mat-icon>
-                      <mat-icon *ngIf="staff.status === 'office'">business</mat-icon>
-                      <mat-icon *ngIf="staff.status === 'vacation' && !staff.isMedicalLeave">event_busy</mat-icon>
-                      <mat-icon *ngIf="staff.status === 'vacation' && staff.isMedicalLeave">healing</mat-icon>
-                      <mat-icon *ngIf="staff.status === 'medical-appointment'">local_hospital</mat-icon>
-                      <mat-icon *ngIf="staff.status === 'upcoming-vacation' && !staff.isMedicalLeave">event_note</mat-icon>
-                      <mat-icon *ngIf="staff.status === 'upcoming-vacation' && staff.isMedicalLeave">healing</mat-icon>
-                      <mat-icon *ngIf="staff.status === 'upcoming-medical-appointment'">local_hospital</mat-icon>
-                      <mat-icon *ngIf="staff.status === 'unassigned'">help_outline</mat-icon>
-                      <span>{{ staff.statusLabel }}</span>
-                    </span>
-                    <span *ngIf="staff.startDate && staff.endDate && staff.status !== 'office'" class="assignment-period-detail" style="font-size: 0.75rem; color: var(--text-secondary); margin-left: 4px;">
-                      {{ formatAssignmentPeriod(staff.startDate, staff.endDate, staff.status) }}
-                    </span>
-                  </div>
-                </td>
-              </tr>
-            </ng-container>
+            <tr *ngFor="let row of teleworkMatrixRows" class="data-row" [class.row-has-special]="row.hasSpecial">
+              <td class="cell-name">
+                <span class="cell-name-text">{{ row.name }}</span>
+                <small class="cell-name-role" *ngIf="row.role">{{ row.role }}</small>
+              </td>
+              <td *ngFor="let day of row.days"
+                  class="cell-day"
+                  [class]="'cell-day--' + day.cssClass"
+                  [attr.data-print-label]="day.printLabel"
+                  [matTooltip]="day.tooltip"
+                  matTooltipPosition="above">
+                <mat-icon class="day-icon">{{ day.icon }}</mat-icon>
+              </td>
+            </tr>
+            <tr *ngIf="teleworkMatrixRows.length === 0" class="no-data-row">
+              <td [attr.colspan]="1 + teleworkMatrixColumns.length" class="text-center text-muted" style="padding: 20px; text-align: center; color: var(--text-muted); font-style: italic;">
+                Sin datos de personal para la semana seleccionada
+              </td>
+            </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Leyenda de estados de la grilla -->
+      <div class="matrix-legend">
+        <span class="legend-item"><mat-icon class="day-icon cell-day--telework">home</mat-icon> Teletrabajo</span>
+        <span class="legend-item"><mat-icon class="day-icon cell-day--training">school</mat-icon> Charla/Capacitación</span>
+        <span class="legend-item"><mat-icon class="day-icon cell-day--vacation">event_busy</mat-icon> Vacaciones</span>
+        <span class="legend-item"><mat-icon class="day-icon cell-day--medical-leave">healing</mat-icon> Licencia Médica</span>
+        <span class="legend-item"><mat-icon class="day-icon cell-day--medical-appointment">local_hospital</mat-icon> Trámite Médico</span>
+        <span class="legend-item"><mat-icon class="day-icon cell-day--office">business</mat-icon> En Oficina</span>
       </div>
     </div>
   </mat-tab>
