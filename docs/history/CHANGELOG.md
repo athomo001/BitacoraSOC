@@ -2,6 +2,27 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.6.25] - 2026-07-29
+
+### Rediseño de "Personal en Teletrabajo y Apoyo" como grilla semanal (Lun-Vie) con íconos por día, corrección del bug de asignaciones ocultas y PDF con íconos reales
+
+- **Bugfix (Frontend) — Solo se mostraba 1 asignación por analista aunque tuviera varios días distintos en la semana (`/main/escalation/simple`, pestaña "Turnos SOC")**:
+  - Causa raíz: `loadTeleworkStaff()` colapsaba todas las asignaciones de la semana de una persona en una sola "mejor" asignación por prioridad, por lo que un analista con, por ejemplo, teletrabajo el lunes y trámite médico el jueves solo mostraba uno de los dos estados.
+  - Se reemplazó la tabla de una fila por persona por una **grilla semanal día por día**: cada celda resuelve independientemente el estado activo ese día específico (`buildTeleworkMatrix` / `computeMatrixRows`), permitiendo ver correctamente estados distintos en días distintos para la misma persona.
+- **Nueva Grilla Semanal de Teletrabajo, Capacitación, Vacaciones, Licencias y Trámites Médicos**:
+  - Columnas de Lunes a Viernes con ícono grande por estado (🏠 Teletrabajo, 🎓 Charla/Capacitación, 🏖️ Vacaciones, 🩹 Licencia Médica, 🏥 Trámite Médico) y celda en blanco para "En Oficina", con `matTooltip` mostrando el detalle de fecha/hora al pasar el mouse.
+  - En la semana en curso, la grilla se recorta automáticamente desde el día actual en adelante (si se revisa un miércoles, se ven Miércoles-Viernes); al navegar a otra semana con los controles ya existentes, se ve completa.
+  - El nombre queda con el cargo debajo en tamaño reducido (se removieron las columnas separadas de Contacto y Cargo para dar más espacio a los días); encabezados de día agrandados para mejor legibilidad.
+  - El roster de esta grilla incluye únicamente usuarios internos del sistema; se excluyeron las asignaciones a contactos externos del Directorio de Escalación (`externalPersonId`), que no representan personal de la bitácora.
+- **Reporte Impreso (PDF) Rediseñado (`printSection`)**:
+  - La impresión ahora **siempre muestra la semana completa** (Lunes a Viernes), independiente de qué días se recortaron en pantalla.
+  - Los íconos de estado se imprimen como íconos reales de Material Icons (cargando la fuente vía Google Fonts en la ventana de impresión y esperando `document.fonts.ready` antes de imprimir), en vez de la abreviación de texto usada previamente por falta de la fuente en el documento emergente.
+  - Cada ícono incluye debajo una etiqueta de texto legible con el nombre del estado (Teletrabajo, Vacaciones, etc.), además de la leyenda general al pie de la tabla.
+  - El encabezado y el rango de semana del PDF se generan directamente desde los datos del componente en vez de clonar el DOM de pantalla, evitando desincronizaciones entre lo mostrado en pantalla y lo impreso.
+- **Corrección de bug visual de layout**: se removió un `display: flex` aplicado por error a celdas `<th>`/`<td>` de la grilla, que rompía su participación en la tabla HTML y hacía que los encabezados de día se apilaran verticalmente en vez de alinearse en fila.
+
+---
+
 ## [v1.6.24] - 2026-07-22
 
 ### Bugfix crítico en Ventanas de Mantenimiento (error 400 al guardar), selector de cliente afectado y mejoras de UX en fecha/hora

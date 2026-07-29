@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `CHANGELOG.md`): **v1.6.24**
+> Version referencial actual (segun `CHANGELOG.md`): **v1.6.25**
 
 Stack principal:
 
@@ -64,47 +64,19 @@ Stack principal:
 
 ## Novedades recientes (resumen rapido)
 
+### v1.6.25 (Grilla semanal de Teletrabajo y Apoyo con íconos por día, corrección de asignaciones ocultas y PDF con íconos reales)
+
+- **Grilla semanal en reemplazo de la tabla de una fila por persona**: "Personal en Teletrabajo y Apoyo" ahora muestra columnas Lunes-Viernes con un ícono grande por día y estado (Teletrabajo, Charla/Capacitación, Vacaciones, Licencia Médica, Trámite Médico), corrigiendo el bug donde solo se veía 1 asignación por analista aunque tuviera varios días distintos en la semana.
+- **Recorte inteligente por día actual**: en la semana en curso se ven solo los días desde hoy en adelante; al navegar a otra semana se ve completa.
+- **PDF siempre con la semana completa e íconos reales**: la impresión deja de depender de lo recortado en pantalla y siempre imprime Lunes-Viernes, con íconos de Material Icons reales (y su etiqueta de texto debajo) en vez de abreviaciones.
+- **Roster limpio**: se excluyeron del listado los contactos externos del Directorio de Escalación, dejando solo personal interno de la bitácora.
+
 ### v1.6.24 (Bugfix de Ventanas de Mantenimiento, selector de cliente afectado y mejoras de UX en fecha/hora)
 
 - **Bugfix del error 400 al registrar Mantenimientos**: el formulario no enviaba `clientId` (campo inexistente en la UI) mientras el backend lo exigía obligatorio, bloqueando siempre el guardado. Ahora `clientId` es opcional (`null` = mantenimiento global aplicable a todos los clientes) y la evaluación de alertas por cliente considera también las reglas globales.
 - **Nuevo campo "Cliente Afectado"**: selector para elegir "Todos los clientes" o uno específico, con columna dedicada en la tabla de mantenimientos registrados.
 - **Fecha/Hora más fáciles de completar**: se reemplazó el campo único `datetime-local` por un selector de Fecha con calendario (`mat-datepicker`) más un campo de Hora independiente, y se valida que el fin sea posterior al inicio.
 - **Checkbox "Activo e Inmediato" renombrado a "Habilitado"** con texto explicativo: aclara que solo enciende/apaga la regla manualmente y que la alerta solo se muestra dentro del rango de Fecha/Hora configurado.
-
-### v1.6.22 (Impresión premium Día/Situación divididos, anchos optimizados, subtítulo dinámico, emails turnos y backups)
-
-- **Reporte Impreso de Teletrabajo**: Separación física de las columnas "Día / Asignación" y "Situación" mediante DOM en memoria, incremento a 15px en negrita del día destacado, ocultamiento de datos de contacto (email/teléfono) y spacer Hoy para 100% de confidencialidad, y subtítulo dinámico con el rango de fechas de la semana actual.
-- **Optimización de Emails de Turnos**: Rediseño del template de correo en backend a 880px de ancho y fuentes más grandes para lectura rápida en cualquier dispositivo.
-- **Copias de Seguridad robustas**: Integración de los modelos operacionales recientes (`ShiftNotificationSchedule`, `ShiftReminder`, `ApiKey`, `AvisoLog`, `CustomFont`, y `ReportHistory`) al manifiesto de base de datos para backups completos de MongoDB.
-- **Entorno offline**: Migración a la imagen local `nginx:1.27-alpine` en el Dockerfile de frontend para permitir despliegue inmediato en contingencias de red.
-
-### v1.6.21 (Filtros de búsqueda de entradas, exportación a CSV, corrección de cifrado en directorio y reparación de correos SMTP)
-
-- **Mejoras en Búsqueda de Entradas**: Adición de selector de preajustes de fecha (3, 7, 15, 30, 60, 90 días, rango personalizado) con controles interactivos condicionales de calendario, filtro por analista y botón para descargar reportes en CSV en tiempo real.
-- **Exportación en Backend**: Endpoint `/api/entries/export` para descargar la bitácora completa y checklists unificados. Configurado con UTF-8 BOM para apertura directa en Microsoft Excel sin fallas de codificación.
-- **Bugfix de Cifrado en Directorio**: Corrección del error de visualización de datos cifrados con hashes / dos puntos en el directorio global para usuarios internos. Implementada interceptación en `encrypt` para evitar el doble cifrado y ejecutada migración correctora sobre 13 registros afectados.
-- **Bugfix de Notificaciones SMTP**: Resolución de ReferenceError y TypeError de scoping/logging en el bloque catch, junto con forzado de resolución IPv4 e inicio TLS correcto (STARTTLS) sobre puerto 587 para solucionar fallos `ENETUNREACH` de envío de correos automáticos.
-
-### v1.6.20 (API Keys robustas, logs de auditoría en tiempo real, renderizador de MJML y envío SMTP de incidentes)
-
-- **Módulo de Gestión de API Keys**: Panel administrativo completo con encriptación hash SHA-256 de credenciales y asignación selectiva de permisos (scopes) para integraciones externas (SOAR, Syslog parsers, etc.).
-- **Auditoría de Consumo de API**: Registro no bloqueante de logs de acceso en tiempo real (IP, método, endpoint, estado HTTP, fecha, clave consumida) con paginación interactiva en el panel del SOC.
-- **API Externa de Incidentes y SMTP**: Exposición de `/api/v1/templates/render` para procesamiento de plantillas MJML con soporte opcional para envío automático de alertas por correo mediante el SMTP del SOC pasándole `"sendEmail": true`. Se inyecta automáticamente el logo de Netics (Sharp-processed) y se autocompletan los campos de incidentes (ofensa, ticket, criticidad) provistos en el JSON.
-- **Manuales de Integración y Postman**: Creación del manual detallado de la API externa e incrustación de un panel interactivo paso a paso de uso con Postman y ejemplos de JSON Payload en el frontend del SOC.
-
-### v1.6.18 (acordeón de meses en turnos, visualización completa en admin, correcciones de escalación y huso horario)
-
-- **Acordeón de Meses y Selección Masiva**: Introducción de acordeones de meses colapsados por defecto en las pestañas "Próximo" y "Pasado" del administrador de turnos para optimizar espacio, junto con botones para expandir/colapsar todo y checkboxes mensuales de selección masiva para borrado rápido. Diseño de celdas ultra compactas y alineación del botón mediante `inline-flex`.
-- **Transparencia en Consola de Administración**: Eliminación de los filtros por prioridad en el listado del administrador. Esto garantiza que el administrador pueda visualizar y gestionar la totalidad de las asignaciones de turnos (trámites médicos, capacitaciones, etc.) sin que se oculten por superposiciones.
-- **Visualización Completa en Escalación Simple**: Ajuste al listado semanal de analistas para listar automáticamente a todo el personal activo que no tiene programada ninguna ausencia especial como "En Oficina" por defecto. Adicionalmente, se priorizó el renderizado de estados de Teletrabajo y Capacitación para evitar que queden solapados por roles de guardia de oficina.
-- **Corrección de Huso Horario de Envío**: Forzado estricto de la zona horaria chilena (`America/Santiago`) en los cálculos del programador automatizado (`escalationScheduleScheduler.js`), previniendo desfases horarios al enviar alertas desde servidores alojados con hora UTC.
-
-### v1.6.17 (personalización de login por usuario, tema Windows 3.11 y Unix Terminal 1989)
-
-- **Selección de Temas de Login por Usuario**: Los usuarios ahora pueden elegir su propio estilo de pantalla de inicio de sesión desde su panel de Perfil, guardando su preferencia local (`localStorage`) y en la base de datos (se cargará al iniciar sesión). Lógica refactorizada en el frontend para alternar temas en caliente y limpiar animaciones de forma segura.
-- **Tema Windows 3.11**: Nuevo diseño retro inspirado en Windows for Workgroups v3.11. Cuenta con un escritorio clásico verde azulado (Teal), Program Manager de fondo, diálogos grises biselados en 3D clásico, botones clásicos e inputs hundidos para Login, MFA y Recuperación.
-- **Tema Unix Terminal (1989)**: Nuevo diseño retro plano CLI de Unix/Linux a finales de los 80s. Presenta un fondo negro, fuente de fósforo ámbar naranja de alta visibilidad, reloj de consola en tiempo real fijado en 1989 y la técnica de **Input Espejo** que dibuja el texto escrito y desplaza el cursor parpadeante retro hacia la derecha dinámicamente con cada carácter ingresado.
-- **Gestión SMTP y Branding**: Soporte para que el administrador configure `win311` y `unix89` como temas globales predeterminados desde los paneles de Branding y de Apariencia del Administrador.
 
 ### Estado IA local
 
