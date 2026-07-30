@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `CHANGELOG.md`): **v1.6.25**
+> Version referencial actual (segun `CHANGELOG.md`): **v1.7.0**
 
 Stack principal:
 
