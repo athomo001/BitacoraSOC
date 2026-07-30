@@ -1,9 +1,9 @@
 {
   "name": "bitacora-soc-backend",
-  "version": "1.5.94-beta",
+  "version": "1.7.0",
   "description": "Bitácora SOC - Backend Express + MongoDB",
   "main": "src/server.js",
-  "packageManager": "pnpm@11.7.0",
+  "packageManager": "pnpm@11.11.0",
   "engines": {
     "pnpm": "11.x"
   },

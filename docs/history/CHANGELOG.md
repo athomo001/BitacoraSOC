@@ -1,6 +1,11 @@
 # Changelog
 
 Registro de cambios relevantes del proyecto.
+## [v1.7.00] - 2026-07-30
+
+### Rediseño de "Personal en Teletrabajo y Apoyo" como grilla semanal (Lun-Vie) con íconos por día
+
+- se realiza un cambio en la visualización de  del calendario, se realiza un calendario  diario  y mejora en la facilidad de la visualizacion.
 
 ## [v1.6.25] - 2026-07-29
 
