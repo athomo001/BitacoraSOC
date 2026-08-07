@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `CHANGELOG.md`): **v1.7.0**
+> Version referencial actual (segun `CHANGELOG.md`): **v1.7.1**
 
 Stack principal:
 
@@ -63,6 +63,11 @@ Stack principal:
 ---
 
 ## Novedades recientes (resumen rapido)
+
+### v1.7.1 (Bugfixes en Notificaciones de Turnos: período de envío no se guardaba y área de clic desalineada en botones)
+
+- **Bugfix (Backend) — "Período de turnos a notificar" (semana actual / semana siguiente) no se guardaba**: al crear o editar una notificación en `/main/admin/work-shifts`, el controlador nunca leía ni persistía `targetPeriod`, por lo que toda notificación quedaba forzada a "semana actual" sin importar lo seleccionado, y el envío (programado o de prueba) siempre reportaba la semana en curso.
+- **Bugfix (Frontend) — Área de clic/hover corrida entre los botones Editar y Eliminar** de cada tarjeta de notificación: el touch target invisible de Material se solapaba entre botones vecinos por la poca separación entre ellos, provocando que el hover y el clic apuntaran al ícono equivocado.
 
 ### v1.6.25 (Grilla semanal de Teletrabajo y Apoyo con íconos por día, corrección de asignaciones ocultas y PDF con íconos reales)
 

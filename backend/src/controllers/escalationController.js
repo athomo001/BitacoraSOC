@@ -2967,8 +2967,8 @@ exports.getNotificationSchedules = async (req, res) => {
  */
 exports.createNotificationSchedule = async (req, res) => {
   try {
-    const { name, enabled, frequency, dayOfWeek, time, recipients, ccRecipients, roleFilter } = req.body;
-    
+    const { name, enabled, frequency, dayOfWeek, time, recipients, ccRecipients, roleFilter, targetPeriod } = req.body;
+
     if (!name) {
       return res.status(400).json({ error: 'El nombre es obligatorio' });
     }
@@ -2981,7 +2981,8 @@ exports.createNotificationSchedule = async (req, res) => {
       time: time || '09:00',
       recipients: Array.isArray(recipients) ? recipients : [],
       ccRecipients: Array.isArray(ccRecipients) ? ccRecipients : [],
-      roleFilter: Array.isArray(roleFilter) ? roleFilter : []
+      roleFilter: Array.isArray(roleFilter) ? roleFilter : [],
+      targetPeriod: targetPeriod || 'current_week'
     });
 
     await schedule.save();
@@ -3005,7 +3006,7 @@ exports.createNotificationSchedule = async (req, res) => {
 exports.updateNotificationSchedule = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, enabled, frequency, dayOfWeek, time, recipients, ccRecipients, roleFilter } = req.body;
+    const { name, enabled, frequency, dayOfWeek, time, recipients, ccRecipients, roleFilter, targetPeriod } = req.body;
 
     const schedule = await ShiftNotificationSchedule.findById(id);
     if (!schedule) {
@@ -3020,6 +3021,7 @@ exports.updateNotificationSchedule = async (req, res) => {
     if (recipients !== undefined) schedule.recipients = Array.isArray(recipients) ? recipients : [];
     if (ccRecipients !== undefined) schedule.ccRecipients = Array.isArray(ccRecipients) ? ccRecipients : [];
     if (roleFilter !== undefined) schedule.roleFilter = Array.isArray(roleFilter) ? roleFilter : [];
+    if (targetPeriod !== undefined) schedule.targetPeriod = targetPeriod;
 
     await schedule.save();
 
