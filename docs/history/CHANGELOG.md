@@ -1,6 +1,21 @@
 # Changelog
 
 Registro de cambios relevantes del proyecto.
+
+## [v1.7.1] - 2026-08-07
+
+### Bugfixes en Notificaciones de Turnos (`/main/admin/work-shifts`): período no se guardaba y área de clic desalineada en botones de tarjeta
+
+- **Bugfix (Backend) — El "Período de turnos a notificar" (`targetPeriod`: semana actual / semana siguiente) no se persistía al crear ni editar una notificación**:
+  - Causa raíz: `createNotificationSchedule` y `updateNotificationSchedule` (`escalationController.js`) no leían `targetPeriod` desde el body de la petición, por lo que toda notificación nueva quedaba forzada al valor por defecto del esquema (`current_week`) y editar una notificación existente para cambiar el período no tenía ningún efecto persistente.
+  - El envío programado (cron de los viernes) y el envío de prueba vía notificación guardada sí leían correctamente `targetPeriod` desde la base de datos; el dato simplemente nunca llegaba a guardarse, provocando que se enviara siempre la semana actual aunque el usuario seleccionara "Semana siguiente (próxima semana)".
+  - Se agregó `targetPeriod` a la desestructuración y al payload de creación/actualización en ambos controladores.
+- **Bugfix (Frontend) — Área de clic/hover desalineada ("corrida") entre los botones Editar y Eliminar de cada tarjeta de notificación**:
+  - Causa raíz: los botones `mat-icon-button` se redujeron visualmente a 30px mediante estilos en línea, pero Angular Material conserva un touch target invisible de 48x48 centrado en el botón. Con solo 4px de separación entre "Editar" y "Eliminar", esos touch targets se solapaban, haciendo que el círculo de hover/ripple apareciera desplazado hacia el ícono vecino y que el clic pudiera activar el botón equivocado.
+  - Se ajustó el touch target de Material al tamaño real del botón (`.schedule-item-actions` en `work-shifts-admin.component.scss`) y se aumentó la separación entre botones de 4px a 10px.
+
+---
+
 ## [v1.7.00] - 2026-07-30
 
 ### Rediseño de "Personal en Teletrabajo y Apoyo" como grilla semanal (Lun-Vie) con íconos por día

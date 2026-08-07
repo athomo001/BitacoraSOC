@@ -104,6 +104,24 @@
   }
 }
 
+// Botones de acción (enviar/editar/eliminar) en las tarjetas de notificación.
+// mat-icon-button conserva un touch target invisible de 48x48 centrado en el
+// botón por defecto, aunque el botón se achique por CSS. Con botones de 30px
+// separados por pocos píxeles ese touch target se solapa con el del vecino,
+// provocando que el círculo de hover/ripple aparezca "corrido" hacia el
+// siguiente icono y que el clic active el botón equivocado. Se ajusta el
+// touch target al tamaño real del botón para que quede centrado en su icono.
+.schedule-item-actions {
+  button[mat-icon-button] {
+    position: relative;
+
+    ::ng-deep .mat-mdc-button-touch-target {
+      width: 100%;
+      height: 100%;
+    }
+  }
+}
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // WEEKLY SHIFTS DASHBOARD & LAYOUT (SHIFT-UX-125)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
