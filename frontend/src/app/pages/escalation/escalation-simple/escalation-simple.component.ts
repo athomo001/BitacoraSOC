@@ -1066,10 +1066,14 @@ export class EscalationSimpleComponent implements OnInit {
               line-height: 1.1;
             }
             .print-subtitle {
-              font-size: 11px;
-              color: #475569;
-              margin: 0;
+              font-size: 15px;
+              font-weight: 700;
+              color: #1e293b;
+              margin: 4px 0 0 0;
               line-height: 1.3;
+            }
+            .print-subtitle strong {
+              color: #6366f1;
             }
             .print-header-divider {
               height: 3px;
