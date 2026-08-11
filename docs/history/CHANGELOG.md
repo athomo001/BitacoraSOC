@@ -2,6 +2,15 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.7.2] - 2026-08-11
+
+### Mejora visual en reporte impreso de "Personal en Teletrabajo y Apoyo" (`/main/escalation/view`)
+
+- **Fix (Frontend) — La fecha de la semana ("Programación SOC: Semana del...") se veía muy pequeña y poco visible en el PDF impreso**:
+  - Se aumentó el tamaño de fuente de 11px a 15px, se puso en negrita y se resaltó la etiqueta "Programación SOC:" en color índigo para que la fecha se note a simple vista.
+
+---
+
 ## [v1.7.1] - 2026-08-07
 
 ### Bugfixes en Notificaciones de Turnos (`/main/admin/work-shifts`): período no se guardaba y área de clic desalineada en botones de tarjeta
