@@ -2,6 +2,14 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.8.1] - 2026-08-17
+
+### Ajuste de layout en filtros de Logs de Auditoría (`/main/audit-logs`)
+
+- **Mejora (Frontend) — El campo "Rango de fechas" quedaba solo en su propia fila, ocupando un ancho excesivo para lo que necesitaba mostrar**: se reordenaron los filtros en dos filas — "Buscar" ahora ocupa su propia fila completa junto a los botones de acción (Ver guía rápida / Buscar / Limpiar), y "Categoría", "Usuario", "Nivel" y "Rango de fechas" se agrupan juntos en la fila siguiente, aprovechando mejor el espacio horizontal disponible.
+
+---
+
 ## [v1.8.0] - 2026-08-17
 
 ### Rediseño de filtros en Logs de Auditoría (`/main/audit-logs`): rango de fechas con calendario, filtro por usuario y más espacio para búsqueda
