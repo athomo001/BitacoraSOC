@@ -2,6 +2,8 @@
 
 <!-- Marca de autor en comentarios: Athan Espinoza -->
 
+> 🌐 **Idioma:** Español | [English](README.en.md)
+
 Plataforma web para operacion SOC con bitacora operativa, checklists de turno, escalacion, auditoria, backup, integraciones y modulo de complementos embebidos.
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
