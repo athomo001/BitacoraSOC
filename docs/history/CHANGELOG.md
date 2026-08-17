@@ -2,6 +2,20 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.8.0] - 2026-08-17
+
+### Rediseño de filtros en Logs de Auditoría (`/main/audit-logs`): rango de fechas con calendario, filtro por usuario y más espacio para búsqueda
+
+- **Feature (Frontend) — Fecha/Hora en formato 24 horas**: la columna "Fecha/Hora" de la tabla de auditoría mostraba la hora en formato 12h (AM/PM); ahora se fuerza formato 24h (`hour12: false`) para lectura sin ambigüedad.
+- **Feature (Frontend) — Selector de rango de fechas con calendario único**: se reemplazaron los campos separados "Fecha inicio" / "Fecha fin" (inputs nativos `type="date"`) por un único calendario Material (`mat-date-range-picker`), que siempre parte mostrando el mes actual y permite seleccionar el rango completo (día inicio y día fin) en una sola interacción, en vez de abrir dos selectores independientes.
+- **Feature (Frontend) — Filtro por Usuario en vez de "Evento"**: se quitó el desplegable de "Evento" (listado crudo de nombres técnicos de evento) y se agregó un filtro "Usuario" que lista a las personas reales por nombre (`UserService.getUsersList()`), filtrando por su ID (`actor.userId`).
+- **Feature (Frontend) — Más espacio para "Buscar", se retira "Slug complemento"**: el campo dedicado "Slug complemento" fue eliminado para dar más ancho al campo "Buscar"; el backend ya incluía `sourceId`/`source` (el slug del complemento) dentro de la búsqueda general por texto, por lo que no se perdió cobertura de búsqueda.
+- **Bugfix (Backend) — El filtro de rango de fechas no devolvía resultados del día actual en zonas horarias detrás de UTC (ej. `America/Santiago`)**:
+  - Causa raíz: `buildDateRange` (`backend/src/routes/audit-logs.js`) parseaba `endDate` (formato `YYYY-MM-DD`) como medianoche UTC y luego aplicaba `end.setHours(23, 59, 59, 999)` en **hora local** del servidor. En una zona con offset negativo respecto a UTC, esto retrocedía el `$lte` calculado a un instante *anterior* al `$gte` de inicio de día, dejando el rango vacío o incompleto.
+  - Se cambió a `end.setUTCHours(23, 59, 59, 999)` para que el fin de día quede siempre en la misma referencia horaria (UTC) usada al construir el inicio del rango, garantizando que `$lte >= $gte` sin importar la zona horaria del servidor. Afecta tanto al listado (`GET /api/audit-logs`) como a la exportación (`GET /api/audit-logs/export`).
+
+---
+
 ## [v1.7.2] - 2026-08-11
 
 ### Mejora visual en reporte impreso de "Personal en Teletrabajo y Apoyo" (`/main/escalation/view`)

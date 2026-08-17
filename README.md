@@ -6,7 +6,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `CHANGELOG.md`): **v1.7.1**
+> Version referencial actual (segun `CHANGELOG.md`): **v1.8.0**
 
 Stack principal:
 
@@ -63,6 +63,14 @@ Stack principal:
 ---
 
 ## Novedades recientes (resumen rapido)
+
+### v1.8.0 (Logs de Auditoría: calendario de rango de fechas, filtro por Usuario y bugfix de zona horaria)
+
+- **Rango de fechas con calendario único**: los campos separados "Fecha inicio"/"Fecha fin" fueron reemplazados por un solo selector Material (`mat-date-range-picker`) que permite elegir el día de inicio y fin en una misma interacción.
+- **Filtro por Usuario en vez de "Evento"**: se cambió el desplegable de eventos técnicos crudos por un filtro "Usuario" que lista a las personas por su nombre real.
+- **Más espacio para "Buscar"**: se retiró el campo "Slug complemento" (la búsqueda general ya cubre ese dato) para ampliar el campo de búsqueda principal.
+- **Fecha/Hora en formato 24 horas** en la tabla de auditoría (antes mostraba AM/PM).
+- **Bugfix (Backend)** — el filtro de rango de fechas no devolvía resultados del día actual en zonas horarias detrás de UTC (ej. `America/Santiago`) por una mezcla de hora UTC/local al calcular el fin de día; corregido en `buildDateRange`.
 
 ### v1.7.1 (Bugfixes en Notificaciones de Turnos: período de envío no se guardaba y área de clic desalineada en botones)
 

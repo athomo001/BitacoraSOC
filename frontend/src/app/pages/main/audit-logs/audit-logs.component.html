@@ -19,9 +19,9 @@
     <div class="audit-panel__body">
       <form [formGroup]="filterForm" (ngSubmit)="onSearch()" class="filter-form">
         <div class="filter-row">
-          <mat-form-field appearance="outline">
+          <mat-form-field appearance="outline" class="search-field">
             <mat-label>Buscar</mat-label>
-            <input matInput formControlName="search" placeholder="Usuario, IP, path...">
+            <input matInput formControlName="search" placeholder="Usuario, IP, path, slug complemento...">
             <mat-icon aria-hidden="true" matPrefix>search</mat-icon>
           </mat-form-field>
 
@@ -35,16 +35,11 @@
           </mat-form-field>
 
           <mat-form-field appearance="outline">
-            <mat-label>Slug complemento</mat-label>
-            <input matInput formControlName="sourceSlug" placeholder="scanner-pentest">
-          </mat-form-field>
-
-          <mat-form-field appearance="outline">
-            <mat-label>Evento</mat-label>
-            <mat-select formControlName="event">
+            <mat-label>Usuario</mat-label>
+            <mat-select formControlName="userId">
               <mat-option value="">Todos</mat-option>
-              <mat-option *ngFor="let event of events" [value]="event">
-                {{ event }}
+              <mat-option *ngFor="let user of users" [value]="user._id">
+                {{ user.name || user.username }}
               </mat-option>
             </mat-select>
           </mat-form-field>
@@ -60,14 +55,14 @@
         </div>
 
         <div class="filter-row">
-          <mat-form-field appearance="outline">
-            <mat-label>Fecha inicio</mat-label>
-            <input matInput type="date" formControlName="startDate">
-          </mat-form-field>
-
-          <mat-form-field appearance="outline">
-            <mat-label>Fecha fin</mat-label>
-            <input matInput type="date" formControlName="endDate">
+          <mat-form-field appearance="outline" class="date-range-field">
+            <mat-label>Rango de fechas</mat-label>
+            <mat-date-range-input [rangePicker]="datePicker">
+              <input matStartDate formControlName="startDate" placeholder="Inicio">
+              <input matEndDate formControlName="endDate" placeholder="Fin">
+            </mat-date-range-input>
+            <mat-datepicker-toggle matSuffix [for]="datePicker"></mat-datepicker-toggle>
+            <mat-date-range-picker #datePicker></mat-date-range-picker>
           </mat-form-field>
 
           <div class="filter-actions">
