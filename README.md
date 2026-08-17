@@ -8,7 +8,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `CHANGELOG.md`): **v1.8.0**
+> Version referencial actual (segun `CHANGELOG.md`): **v1.8.1**
 
 Stack principal:
 
@@ -16,6 +16,21 @@ Stack principal:
 - backend: Express 5 + Node 22 LTS
 - base de datos: MongoDB 8
 - despliegue: Docker Compose v2
+
+---
+
+## Índice
+
+- [Capacidades principales](#capacidades-principales)
+- [Comparativa con herramientas similares](#comparativa-con-herramientas-similares)
+- [Novedades recientes](#novedades-recientes-resumen-rapido)
+- [Quick Start con Docker](#quick-start-con-docker)
+- [Vista rapida de la interfaz](#vista-rapida-de-la-interfaz)
+- [Desarrollo local](#desarrollo-local)
+- [Complementos](#complementos)
+- [Estructura del repositorio](#estructura-del-repositorio)
+- [Documentacion](#documentacion)
+- [Licencia](#licencia)
 
 ---
 
@@ -66,36 +81,19 @@ Stack principal:
 
 ## Novedades recientes (resumen rapido)
 
-### v1.8.0 (Logs de Auditoría: calendario de rango de fechas, filtro por Usuario y bugfix de zona horaria)
+> Historial completo y detallado en [`docs/history/CHANGELOG.md`](docs/history/CHANGELOG.md).
 
-- **Rango de fechas con calendario único**: los campos separados "Fecha inicio"/"Fecha fin" fueron reemplazados por un solo selector Material (`mat-date-range-picker`) que permite elegir el día de inicio y fin en una misma interacción.
-- **Filtro por Usuario en vez de "Evento"**: se cambió el desplegable de eventos técnicos crudos por un filtro "Usuario" que lista a las personas por su nombre real.
-- **Más espacio para "Buscar"**: se retiró el campo "Slug complemento" (la búsqueda general ya cubre ese dato) para ampliar el campo de búsqueda principal.
+### v1.8.1 / v1.8.0 (Logs de Auditoría: calendario de rango de fechas, filtro por Usuario, layout de filtros y bugfix de zona horaria)
+
+- **Rango de fechas con calendario único**: reemplaza los campos separados "Fecha inicio"/"Fecha fin" por un selector Material (`mat-date-range-picker`) que permite elegir el día de inicio y fin en una sola interacción.
+- **Filtro por Usuario en vez de "Evento"**: lista a las personas por su nombre real en vez del listado crudo de eventos técnicos.
+- **Layout de filtros reordenado**: "Buscar" tiene su propia fila con más ancho; "Categoría", "Usuario", "Nivel" y "Rango de fechas" comparten la fila siguiente.
 - **Fecha/Hora en formato 24 horas** en la tabla de auditoría (antes mostraba AM/PM).
-- **Bugfix (Backend)** — el filtro de rango de fechas no devolvía resultados del día actual en zonas horarias detrás de UTC (ej. `America/Santiago`) por una mezcla de hora UTC/local al calcular el fin de día; corregido en `buildDateRange`.
-
-### v1.7.1 (Bugfixes en Notificaciones de Turnos: período de envío no se guardaba y área de clic desalineada en botones)
-
-- **Bugfix (Backend) — "Período de turnos a notificar" (semana actual / semana siguiente) no se guardaba**: al crear o editar una notificación en `/main/admin/work-shifts`, el controlador nunca leía ni persistía `targetPeriod`, por lo que toda notificación quedaba forzada a "semana actual" sin importar lo seleccionado, y el envío (programado o de prueba) siempre reportaba la semana en curso.
-- **Bugfix (Frontend) — Área de clic/hover corrida entre los botones Editar y Eliminar** de cada tarjeta de notificación: el touch target invisible de Material se solapaba entre botones vecinos por la poca separación entre ellos, provocando que el hover y el clic apuntaran al ícono equivocado.
-
-### v1.6.25 (Grilla semanal de Teletrabajo y Apoyo con íconos por día, corrección de asignaciones ocultas y PDF con íconos reales)
-
-- **Grilla semanal en reemplazo de la tabla de una fila por persona**: "Personal en Teletrabajo y Apoyo" ahora muestra columnas Lunes-Viernes con un ícono grande por día y estado (Teletrabajo, Charla/Capacitación, Vacaciones, Licencia Médica, Trámite Médico), corrigiendo el bug donde solo se veía 1 asignación por analista aunque tuviera varios días distintos en la semana.
-- **Recorte inteligente por día actual**: en la semana en curso se ven solo los días desde hoy en adelante; al navegar a otra semana se ve completa.
-- **PDF siempre con la semana completa e íconos reales**: la impresión deja de depender de lo recortado en pantalla y siempre imprime Lunes-Viernes, con íconos de Material Icons reales (y su etiqueta de texto debajo) en vez de abreviaciones.
-- **Roster limpio**: se excluyeron del listado los contactos externos del Directorio de Escalación, dejando solo personal interno de la bitácora.
-
-### v1.6.24 (Bugfix de Ventanas de Mantenimiento, selector de cliente afectado y mejoras de UX en fecha/hora)
-
-- **Bugfix del error 400 al registrar Mantenimientos**: el formulario no enviaba `clientId` (campo inexistente en la UI) mientras el backend lo exigía obligatorio, bloqueando siempre el guardado. Ahora `clientId` es opcional (`null` = mantenimiento global aplicable a todos los clientes) y la evaluación de alertas por cliente considera también las reglas globales.
-- **Nuevo campo "Cliente Afectado"**: selector para elegir "Todos los clientes" o uno específico, con columna dedicada en la tabla de mantenimientos registrados.
-- **Fecha/Hora más fáciles de completar**: se reemplazó el campo único `datetime-local` por un selector de Fecha con calendario (`mat-datepicker`) más un campo de Hora independiente, y se valida que el fin sea posterior al inicio.
-- **Checkbox "Activo e Inmediato" renombrado a "Habilitado"** con texto explicativo: aclara que solo enciende/apaga la regla manualmente y que la alerta solo se muestra dentro del rango de Fecha/Hora configurado.
+- **Bugfix (Backend)**: el filtro de rango de fechas no devolvía resultados del día actual en zonas horarias detrás de UTC (ej. `America/Santiago`); corregido en `buildDateRange`.
 
 ### Estado IA local
 
-- alcance definido en `docs/ISSUES.md` (epic `AI-SUMMARY-001` y subitems).
+- alcance definido en `docs/history/ISSUES.md` (epic `AI-SUMMARY-001` y subitems).
 - IA planteada como asistencia operativa efimera y controlada (sin chat de usuario final).
 - estado actual: planificado/documentado, no activado en produccion.
 
@@ -125,17 +123,13 @@ docker compose exec backend node src/scripts/seed-admin.js
 docker compose exec backend node src/scripts/seed.js
 ```
 
-## Inicio rapido
-
-si ya esta descargado y solo resta levantar
+### Ya esta descargado: solo levantar o actualizar
 
 ```bash
+# Levantar (ya descargado, solo resta levantar)
 docker compose build --no-cache && docker compose up -d
-```
 
-Para actualizar
-
-```bash
+# Actualizar a la ultima version
 git pull origin main && docker compose build --no-cache && docker compose up -d
 ```
 

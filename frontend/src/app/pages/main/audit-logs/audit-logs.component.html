@@ -25,6 +25,20 @@
             <mat-icon aria-hidden="true" matPrefix>search</mat-icon>
           </mat-form-field>
 
+          <div class="filter-actions">
+            <button mat-button type="button" (click)="openAuditGuide()">Ver guía rápida</button>
+            <button mat-raised-button color="primary" type="submit">
+              <mat-icon aria-hidden="true">search</mat-icon>
+              Buscar
+            </button>
+            <button mat-button type="button" (click)="onClearFilters()">
+              <mat-icon aria-hidden="true">clear</mat-icon>
+              Limpiar
+            </button>
+          </div>
+        </div>
+
+        <div class="filter-row">
           <mat-form-field appearance="outline">
             <mat-label>Categoría</mat-label>
             <mat-select formControlName="category">
@@ -52,9 +66,7 @@
               </mat-option>
             </mat-select>
           </mat-form-field>
-        </div>
 
-        <div class="filter-row">
           <mat-form-field appearance="outline" class="date-range-field">
             <mat-label>Rango de fechas</mat-label>
             <mat-date-range-input [rangePicker]="datePicker">
@@ -64,18 +76,6 @@
             <mat-datepicker-toggle matSuffix [for]="datePicker"></mat-datepicker-toggle>
             <mat-date-range-picker #datePicker></mat-date-range-picker>
           </mat-form-field>
-
-          <div class="filter-actions">
-            <button mat-button type="button" (click)="openAuditGuide()">Ver guía rápida</button>
-            <button mat-raised-button color="primary" type="submit">
-              <mat-icon aria-hidden="true">search</mat-icon>
-              Buscar
-            </button>
-            <button mat-button type="button" (click)="onClearFilters()">
-              <mat-icon aria-hidden="true">clear</mat-icon>
-              Limpiar
-            </button>
-          </div>
         </div>
 
         <div class="filter-row">

@@ -8,7 +8,7 @@ Web platform for SOC operations with an operational logbook, shift checklists, e
 
 > Project status: stable. Always validate flows in a test environment before moving to formal operation.
 >
-> Current reference version (per `CHANGELOG.md`): **v1.8.0**
+> Current reference version (per `CHANGELOG.md`): **v1.8.1**
 
 Main stack:
 
@@ -16,6 +16,21 @@ Main stack:
 - backend: Express 5 + Node 22 LTS
 - database: MongoDB 8
 - deployment: Docker Compose v2
+
+---
+
+## Table of contents
+
+- [Key capabilities](#key-capabilities)
+- [Comparison with similar tools](#comparison-with-similar-tools)
+- [Recent updates](#recent-updates-quick-summary)
+- [Quick Start with Docker](#quick-start-with-docker)
+- [Quick UI preview](#quick-ui-preview)
+- [Local development](#local-development)
+- [Complements](#complements)
+- [Repository structure](#repository-structure)
+- [Documentation](#documentation)
+- [License](#license)
 
 ---
 
@@ -66,36 +81,19 @@ Main stack:
 
 ## Recent updates (quick summary)
 
-### v1.8.0 (Audit Logs: date-range calendar picker, filter by User and timezone bugfix)
+> Full detailed history in [`docs/history/CHANGELOG.md`](docs/history/CHANGELOG.md).
 
-- **Single-calendar date range picker**: the separate "Start date"/"End date" fields were replaced with a single Material date range picker (`mat-date-range-picker`) that lets you pick the start and end day in one interaction.
-- **Filter by User instead of "Event"**: the raw technical event dropdown was replaced with a "User" filter that lists people by their real name.
-- **More room for "Search"**: the dedicated "Complement slug" field was removed to give the main search field more width; the general search already covers that data.
+### v1.8.1 / v1.8.0 (Audit Logs: date-range calendar picker, filter by User, filter layout and timezone bugfix)
+
+- **Single-calendar date range picker**: replaces the separate "Start date"/"End date" fields with a single Material date range picker (`mat-date-range-picker`) that lets you pick the start and end day in one interaction.
+- **Filter by User instead of "Event"**: lists people by their real name instead of the raw technical event dropdown.
+- **Reordered filter layout**: "Search" now has its own, wider row; "Category", "User", "Level" and "Date range" share the row below it.
 - **24-hour Date/Time format** in the audit table (previously showed AM/PM).
-- **Bugfix (Backend)** — the date-range filter returned no results for the current day in timezones behind UTC (e.g. `America/Santiago`) due to mixing UTC/local time when computing end-of-day; fixed in `buildDateRange`.
-
-### v1.7.1 (Shift Notification bugfixes: target period not saving and misaligned click area on card buttons)
-
-- **Bugfix (Backend) — "Notification target period" (current week / next week) was not being saved**: when creating or editing a notification under `/main/admin/work-shifts`, the controller never read or persisted `targetPeriod`, so every notification was forced to "current week" regardless of the selection, and both scheduled and test sends always reported the current week.
-- **Bugfix (Frontend) — Misaligned click/hover area between the Edit and Delete buttons** on each notification card: Material's invisible touch target overlapped between neighboring buttons due to the small gap between them, causing hover and click to hit the wrong icon.
-
-### v1.6.25 (Weekly Remote Work / Support grid with per-day icons, hidden-assignment fix and PDF with real icons)
-
-- **Weekly grid replacing the one-row-per-person table**: "Remote Work and Support Staff" now shows Monday-Friday columns with a large icon per day/status (Remote Work, Training, Vacation, Medical Leave, Medical Appointment), fixing the bug where only 1 assignment was shown per analyst even if they had several different days in the week.
-- **Smart trim by current day**: in the current week only the days from today onward are shown; navigating to another week shows it in full.
-- **PDF always with the full week and real icons**: printing no longer depends on what's trimmed on screen and always prints Monday-Friday, with real Material Icons (plus a text label below) instead of abbreviations.
-- **Clean roster**: external contacts from the Escalation Directory were excluded from the list, leaving only internal logbook staff.
-
-### v1.6.24 (Maintenance Window bugfix, affected-client selector and date/time UX improvements)
-
-- **Fixed the 400 error when registering a Maintenance window**: the form did not send `clientId` (a field missing from the UI) while the backend required it, always blocking the save. `clientId` is now optional (`null` = a global maintenance window applicable to all clients), and per-client alert evaluation also considers global rules.
-- **New "Affected Client" field**: a selector to choose "All clients" or a specific one, with a dedicated column in the registered maintenance windows table.
-- **Easier Date/Time entry**: the single `datetime-local` field was replaced with a Date picker with calendar (`mat-datepicker`) plus an independent Time field, and it now validates that the end is later than the start.
-- **"Active and Immediate" checkbox renamed to "Enabled"** with explanatory text: clarifies that it only toggles the rule manually and that the alert is only shown within the configured Date/Time range.
+- **Bugfix (Backend)**: the date-range filter returned no results for the current day in timezones behind UTC (e.g. `America/Santiago`); fixed in `buildDateRange`.
 
 ### Local AI status
 
-- scope defined in `docs/ISSUES.md` (epic `AI-SUMMARY-001` and sub-items).
+- scope defined in `docs/history/ISSUES.md` (epic `AI-SUMMARY-001` and sub-items).
 - AI positioned as ephemeral, controlled operational assistance (no end-user chat).
 - current status: planned/documented, not enabled in production.
 
@@ -125,17 +123,13 @@ docker compose exec backend node src/scripts/seed-admin.js
 docker compose exec backend node src/scripts/seed.js
 ```
 
-## Quick start
-
-if it's already downloaded and you just need to bring it up
+### Already deployed: just bring it up or update
 
 ```bash
+# Bring it up (already downloaded, just needs to start)
 docker compose build --no-cache && docker compose up -d
-```
 
-To update
-
-```bash
+# Update to the latest version
 git pull origin main && docker compose build --no-cache && docker compose up -d
 ```
 
