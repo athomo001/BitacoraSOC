@@ -25,8 +25,9 @@ const buildDateRange = (startDate, endDate) => {
   if (endDate) {
     const end = new Date(endDate);
     if (!Number.isNaN(end.getTime())) {
-      // incluir el día completo si viene solo fecha
-      end.setHours(23, 59, 59, 999);
+      // Fechas "YYYY-MM-DD" se parsean como medianoche UTC; usar setUTCHours (no setHours)
+      // para que el fin de día quede en la misma zona y nunca caiga antes que $gte.
+      end.setUTCHours(23, 59, 59, 999);
       range.$lte = end;
     }
   }

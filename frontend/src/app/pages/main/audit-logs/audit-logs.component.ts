@@ -12,6 +12,7 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
@@ -23,6 +24,7 @@ import { AuditLogDetailDialogComponent } from './audit-log-detail-dialog.compone
 import { AuthService } from '../../../services/auth.service';
 import { OnboardingService } from '../../../services/onboarding.service';
 import { AuditLogService } from '../../../services/audit-log.service';
+import { UserService } from '../../../services/user.service';
 import { AuditLog, AuditLogFilters } from '../../../models/audit-log.model';
 
 @Component({
@@ -36,6 +38,7 @@ import { AuditLog, AuditLogFilters } from '../../../models/audit-log.model';
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
+    MatDatepickerModule,
     MatButtonModule,
     MatIconModule,
     MatChipsModule,
@@ -55,6 +58,8 @@ export class AuditLogsComponent implements OnInit {
   currentPage = 1;
   isLoading = false;
   exporting = false;
+  /** GET /users/list responde con "name" (no "fullName") para cada usuario. */
+  users: { _id: string; name: string; username: string }[] = [];
   exportModes = [
     { value: 'filters', label: 'Filtros actuales (incluye fechas)' },
     { value: 'max', label: 'Por cantidad (N registros)' },
@@ -69,7 +74,6 @@ export class AuditLogsComponent implements OnInit {
   auditGuideVisible = false;
 
   filterForm: FormGroup;
-  events: string[] = [];
   levelOptions = [
     { value: '', label: 'Todos' },
     { value: 'info', label: 'Info' },
@@ -79,6 +83,7 @@ export class AuditLogsComponent implements OnInit {
 
   constructor(
     private auditLogService: AuditLogService,
+    private userService: UserService,
     private fb: FormBuilder,
     private snackBar: MatSnackBar,
     private authService: AuthService,
@@ -88,11 +93,10 @@ export class AuditLogsComponent implements OnInit {
     this.filterForm = this.fb.group({
       search: [''],
       category: [''],
-      sourceSlug: [''],
-      event: [''],
+      userId: [''],
       level: [''],
-      startDate: [''],
-      endDate: [''],
+      startDate: [null],
+      endDate: [null],
       exportMode: ['filters'],
       exportValue: [1000],
       exportFormat: ['csv']
@@ -113,7 +117,7 @@ export class AuditLogsComponent implements OnInit {
     const username = this.authService.getCurrentUser()?.username;
     this.auditGuideVisible = this.onboardingService.shouldShow('audit-logs', username);
     this.loadLogs();
-    this.loadEvents();
+    this.loadUsers();
   }
 
   closeAuditGuide(dontShowAgain = false): void {
@@ -133,15 +137,21 @@ export class AuditLogsComponent implements OnInit {
   }
 
   loadLogs(): void {
+    const raw = this.filterForm.value;
     const filters: AuditLogFilters = {
       page: this.currentPage,
       limit: this.pageSize,
-      ...this.filterForm.value
+      search: raw.search || undefined,
+      category: raw.category || undefined,
+      userId: raw.userId || undefined,
+      level: raw.level || undefined,
+      startDate: this.toDateOnlyString(raw.startDate),
+      endDate: this.toDateOnlyString(raw.endDate)
     };
 
     // Filtrar valores vacíos
     Object.keys(filters).forEach(key => {
-      if (filters[key as keyof AuditLogFilters] === '' || filters[key as keyof AuditLogFilters] === null) {
+      if (filters[key as keyof AuditLogFilters] === '' || filters[key as keyof AuditLogFilters] == null) {
         delete filters[key as keyof AuditLogFilters];
       }
     });
@@ -161,15 +171,29 @@ export class AuditLogsComponent implements OnInit {
     });
   }
 
-  loadEvents(): void {
-    this.auditLogService.getEvents().subscribe({
-      next: (response) => {
-        this.events = response.events;
+  loadUsers(): void {
+    this.userService.getUsersList().subscribe({
+      next: (users) => {
+        this.users = users as unknown as { _id: string; name: string; username: string }[];
       },
       error: (error) => {
-        console.error('Error loading events:', error);
+        console.error('Error loading users:', error);
       }
     });
+  }
+
+  /**
+   * Convierte una fecha (Date del datepicker o string) a formato YYYY-MM-DD
+   * usando componentes locales, evitando desfaces de zona horaria.
+   */
+  private toDateOnlyString(value: unknown): string | undefined {
+    if (!value) return undefined;
+    const date = value instanceof Date ? value : new Date(String(value));
+    if (Number.isNaN(date.getTime())) return undefined;
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   onSearch(): void {
@@ -208,11 +232,10 @@ export class AuditLogsComponent implements OnInit {
 
     const filters: AuditLogFilters = {
       category: raw.category || undefined,
-      sourceSlug: raw.sourceSlug || undefined,
-      event: raw.event || undefined,
+      userId: raw.userId || undefined,
       level: raw.level || undefined,
-      startDate: raw.startDate || undefined,
-      endDate: raw.endDate || undefined,
+      startDate: this.toDateOnlyString(raw.startDate),
+      endDate: this.toDateOnlyString(raw.endDate),
       search: raw.search || undefined
     };
 
@@ -824,7 +847,8 @@ export class AuditLogsComponent implements OnInit {
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit'
+      second: '2-digit',
+      hour12: false
     });
   }
 
