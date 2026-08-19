@@ -18,7 +18,7 @@ const { audit } = require('../utils/audit');
 const { logger } = require('../utils/logger');
 const { sendEmail } = require('../utils/email');
 const { getBrandingSnapshot, getAppTitleForText } = require('../utils/branding');
-const { syncDirectoryContact, removeDirectoryContactsForUser } = require('../utils/directory-sync');
+const { syncDirectoryContact, removeDirectoryContactsForUser, removeContactFromEscalationFlows } = require('../utils/directory-sync');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
@@ -701,6 +701,7 @@ router.put('/:id',
 
       if (user.isActive === false) {
         await removeDirectoryContactsForUser(user);
+        await removeContactFromEscalationFlows({ name: user.fullName, phone: user.phone });
       } else {
         await syncUserAsDirectoryInternal(user);
       }
@@ -768,6 +769,7 @@ router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
     }
 
     await removeDirectoryContactsForUser(user);
+    await removeContactFromEscalationFlows({ name: user.fullName, phone: user.phone });
 
     await audit(req, {
       event: 'admin.users.delete',

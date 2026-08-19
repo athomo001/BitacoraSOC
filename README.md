@@ -8,7 +8,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `CHANGELOG.md`): **v1.8.1**
+> Version referencial actual (segun `CHANGELOG.md`): **v1.8.2**
 
 Stack principal:
 
@@ -82,6 +82,10 @@ Stack principal:
 ## Novedades recientes (resumen rapido)
 
 > Historial completo y detallado en [`docs/history/CHANGELOG.md`](docs/history/CHANGELOG.md).
+
+### v1.8.2 (Bugfix: contactos eliminados del Directorio o de Usuarios seguían apareciendo en Escalamiento)
+
+- **Bugfix (Backend)**: `escalationFlow` guardaba una copia del nombre/teléfono del contacto en vez de una referencia, por lo que borrar un contacto del directorio general o de Usuarios no lo quitaba de las Líneas de Escalamiento de los clientes. Se agregó limpieza en cascada (`removeContactFromEscalationFlows`) en los cuatro caminos de borrado/purga de contactos.
 
 ### v1.8.1 / v1.8.0 (Logs de Auditoría: calendario de rango de fechas, filtro por Usuario, layout de filtros y bugfix de zona horaria)
 

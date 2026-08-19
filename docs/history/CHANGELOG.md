@@ -2,6 +2,17 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.8.2] - 2026-08-18
+
+### Bugfix: contactos eliminados del Directorio o del panel de Usuarios seguían apareciendo en Escalamiento (`/main/escalation/view`)
+
+- **Bugfix (Backend) — Un contacto eliminado del directorio general, o un usuario interno eliminado/desactivado desde el panel de Usuarios, seguía apareciendo en las Líneas de Escalamiento de múltiples clientes**:
+  - Causa raíz: `CatalogLogSource.escalationFlow` guarda una **copia denormalizada** (`name`/`tel`) del contacto elegido al configurar cada paso de escalamiento (incluyendo pasos tipo "pool"), en vez de una referencia al contacto. Los manejadores de borrado (`deleteDirectoryContact`, `DELETE /api/users/:id`, desactivación de usuario) solo eliminaban el registro de `DirectoryContact`/`User`, sin limpiar esas copias en `escalationFlow` de cada cliente.
+  - Se agregó `removeContactFromEscalationFlows` (`backend/src/utils/directory-sync.js`) que recorre todos los clientes y quita la copia del contacto de los pasos tipo "pool" (`contacts[]`) y limpia `contactName`/`contactTel` en pasos únicos.
+  - Se conectó en los cuatro caminos que pueden hacer desaparecer un contacto: borrado desde el Directorio general (`directoryContactController.js`), borrado de usuario interno y desactivación de usuario interno (`routes/users.js`), y la purga masiva de contactos de usuario obsoletos (`purgeStaleUserDirectoryContacts`, usada por los endpoints de sincronización administrativa del directorio).
+
+---
+
 ## [v1.8.1] - 2026-08-17
 
 ### Ajuste de layout en filtros de Logs de Auditoría (`/main/audit-logs`)

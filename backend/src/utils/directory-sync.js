@@ -5,6 +5,7 @@
  */
 
 const DirectoryContact = require('../models/DirectoryContact');
+const CatalogLogSource = require('../models/CatalogLogSource');
 const { sha256 } = require('./encryption');
 
 const USER_SOURCE = 'User';
@@ -151,8 +152,75 @@ const purgeStaleUserDirectoryContacts = async (activeUsers = []) => {
     }
     : { source: USER_SOURCE };
 
+  const staleContacts = await DirectoryContact.find(staleFilter).select('name phone');
   const result = await DirectoryContact.deleteMany(staleFilter);
+
+  for (const contact of staleContacts) {
+    await removeContactFromEscalationFlows({ name: contact.name, phone: contact.phone });
+  }
+
   return Number(result?.deletedCount || 0);
+};
+
+/**
+ * Removes a contact's stale copy from every client's escalation flow.
+ * Escalation steps store a denormalized name/tel snapshot (not a reference), so
+ * deleting the contact from the directory or the users panel must also purge it
+ * here or it keeps rendering in /main/escalation/view forever.
+ */
+const removeContactFromEscalationFlows = async ({ name, phone } = {}) => {
+  const targetName = sanitize(name, 120);
+  const targetPhone = sanitize(phone, 80);
+  if (!targetName) {
+    return { clientsUpdated: 0 };
+  }
+
+  const targetNameLower = targetName.toLowerCase();
+
+  const clients = await CatalogLogSource.find({
+    $or: [
+      { 'escalationFlow.contactName': targetName },
+      { 'escalationFlow.contacts.name': targetName }
+    ]
+  });
+
+  let clientsUpdated = 0;
+
+  for (const client of clients) {
+    let changed = false;
+    const flow = Array.isArray(client.escalationFlow) ? client.escalationFlow : [];
+
+    flow.forEach((step) => {
+      if (step?.type === 'pool') {
+        const originalLength = (step.contacts || []).length;
+        step.contacts = (step.contacts || []).filter((contact) => {
+          const sameName = String(contact?.name || '').trim().toLowerCase() === targetNameLower;
+          const samePhone = targetPhone && String(contact?.tel || '').trim() === targetPhone;
+          return !(sameName || samePhone);
+        });
+        if (step.contacts.length !== originalLength) {
+          changed = true;
+        }
+        return;
+      }
+
+      const sameName = String(step?.contactName || '').trim().toLowerCase() === targetNameLower;
+      const samePhone = targetPhone && String(step?.contactTel || '').trim() === targetPhone;
+      if (sameName || samePhone) {
+        step.contactName = '';
+        step.contactTel = '';
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      client.markModified('escalationFlow');
+      await client.save();
+      clientsUpdated += 1;
+    }
+  }
+
+  return { clientsUpdated };
 };
 
 const syncManyDirectoryContacts = async (contacts = []) => {
@@ -435,5 +503,6 @@ module.exports = {
   syncManyDirectoryContacts,
   mergeDirectoryDuplicates,
   removeDirectoryContactsForUser,
-  purgeStaleUserDirectoryContacts
+  purgeStaleUserDirectoryContacts,
+  removeContactFromEscalationFlows
 };
