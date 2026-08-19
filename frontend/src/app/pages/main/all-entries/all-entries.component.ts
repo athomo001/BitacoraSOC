@@ -27,6 +27,7 @@ import { Entry } from '../../../models/entry.model';
 import { AuthService } from '../../../services/auth.service';
 import { EntryDetailDialogComponent } from './entry-detail-dialog.component';
 import { AdminEditDialogComponent } from './admin-edit-dialog.component';
+import { GlpiLinkDialogComponent } from './glpi-link-dialog.component';
 import { ConfirmDialogComponent } from '../../../components/confirm-dialog/confirm-dialog.component';
 import { UserService } from '../../../services/user.service';
 import { User } from '../../../models/user.model';
@@ -447,6 +448,42 @@ Tags: ${tags}`;
 
   isChecklistEntry(entry: Entry): boolean {
     return entry.entryType === 'checklist';
+  }
+
+  openGlpiLinkDialog(entry: Entry): void {
+    const dialogRef = this.dialog.open(GlpiLinkDialogComponent, {
+      data: { entryId: entry._id, currentTicketId: entry.glpiTicketId },
+      width: '480px',
+      maxWidth: '95vw'
+    });
+
+    dialogRef.afterClosed().subscribe((ticketId: string | undefined) => {
+      if (!ticketId) return;
+
+      this.entryService.linkToGlpiTicket(entry._id, ticketId).subscribe({
+        next: (response) => {
+          this.snackBar.open(`✅ ${response.message}`, 'Cerrar', { duration: 3000 });
+          this.loadEntries();
+        },
+        error: (err) => {
+          const msg = err.error?.message || 'Error vinculando la entrada a GLPI';
+          this.snackBar.open(`❌ ${msg}`, 'Cerrar', { duration: 4000 });
+        }
+      });
+    });
+  }
+
+  syncEntryToGlpi(entry: Entry): void {
+    this.entryService.syncToGlpiTicket(entry._id).subscribe({
+      next: (response) => {
+        this.snackBar.open(`✅ ${response.message}`, 'Cerrar', { duration: 3000 });
+        this.loadEntries();
+      },
+      error: (err) => {
+        const msg = err.error?.message || 'Error reenviando la entrada a GLPI';
+        this.snackBar.open(`❌ ${msg}`, 'Cerrar', { duration: 4000 });
+      }
+    });
   }
 
   getEntryTypeLabel(entry: Entry): string {

@@ -871,6 +871,9 @@ const startServers = async () => {
     const { startScheduler: startShiftReportScheduler } = require('./utils/shift-scheduler');
     startShiftReportScheduler();
 
+    const { startGlpiInboundScheduler } = require('./utils/glpi-inbound-sync');
+    startGlpiInboundScheduler();
+
     // Iniciar HTTPS solo cuando HTTP ya está confirmado.
     // Evita ruido de "puerto HTTPS en uso" cuando se ejecuta una segunda instancia
     // y el puerto HTTP ya estaba ocupado por una instancia previa.
@@ -886,6 +889,8 @@ const gracefulShutdown = (signal) => {
   stopShiftReminderScheduler();
   stopEscalationScheduleScheduler();
   stopBirthdayEmailScheduler();
+  const { stopGlpiInboundScheduler } = require('./utils/glpi-inbound-sync');
+  stopGlpiInboundScheduler();
 
   const closeTargets = [httpServer, httpsServer].filter(Boolean);
   if (!closeTargets.length) {
