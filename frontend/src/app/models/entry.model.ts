@@ -29,6 +29,8 @@ export interface Entry {
   };
   createdByUsername: string;
   isGuestEntry: boolean;
+  glpiTicketId?: string | null;
+  glpiLinkedAt?: Date | null;
   ipAddress?: string;
   userAgent?: string;
   createdAt: Date;

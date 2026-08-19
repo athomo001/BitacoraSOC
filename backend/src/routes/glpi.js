@@ -18,8 +18,11 @@ const {
   fillTemplate,
   glpiRequest,
   sanitizeGlpiConfig,
-  withDefaultPath
+  withDefaultPath,
+  withGlpiSession
 } = require('../utils/glpi-dispatch');
+const { runGlpiInboundSync } = require('../utils/glpi-inbound-sync');
+const { ENTRY_TYPES, mergeEntityMappings } = require('../utils/glpi-entity-mappings');
 const { getBrandingSnapshot, getAppTitleForText } = require('../utils/branding');
 const { assertOutboundUrlSafe } = require('../utils/outbound-url-guard');
 
@@ -35,19 +38,22 @@ const validators = [
   body('api.verifyTls').optional().isBoolean(),
   body('api.timeoutMs').optional().isInt({ min: 1000, max: 30000 }),
   body('email.collectorAddress').optional({ checkFalsy: true }).isEmail().normalizeEmail(),
-  body('email.subjectTemplate').optional().isString()
+  body('email.subjectTemplate').optional().isString(),
+  body('entityMappings').optional().isArray(),
+  body('entityMappings.*.entitiesId').optional().isInt(),
+  body('entityMappings.*.label').optional().isString(),
+  body('entityMappings.*.clientId').optional({ nullable: true }).isString(),
+  body('entityMappings.*.defaultEntryType').optional().isIn(ENTRY_TYPES),
+  body('entityMappings.*.enabled').optional().isBoolean(),
+  body('entityMappings.*.categoryOverrides').optional().isArray(),
+  body('entityMappings.*.categoryOverrides.*.itilCategoriesId').optional().isInt(),
+  body('entityMappings.*.categoryOverrides.*.entryType').optional().isIn(ENTRY_TYPES),
+  body('inbound.enabled').optional().isBoolean(),
+  body('inbound.pollingIntervalMinutes').optional().isInt({ min: 1, max: 1440 }),
+  body('inbound.importUserId').optional({ nullable: true }).isString()
 ];
 
-router.get('/config', authenticate, authorize('admin'), async (req, res) => {
-  try {
-    const config = await ensureGlpiConfig();
-    res.json(sanitizeGlpiConfig(config));
-  } catch (error) {
-    res.status(500).json({ message: 'Error obteniendo configuración GLPI', error: error.message });
-  }
-});
-
-router.put('/config', authenticate, authorize('admin'), validators, validate, async (req, res) => {
+const applyGlpiConfigPayload = async (req, res) => {
   try {
     const config = await ensureGlpiConfig();
     const payload = req.body || {};
@@ -96,6 +102,37 @@ router.put('/config', authenticate, authorize('admin'), validators, validate, as
       }
     }
 
+    if (payload.entityMappings !== undefined) {
+      if (!Array.isArray(payload.entityMappings)) {
+        return res.status(400).json({ message: 'entityMappings debe ser un arreglo' });
+      }
+      config.entityMappings = mergeEntityMappings(config.entityMappings, payload.entityMappings);
+      config.markModified('entityMappings');
+    }
+
+    if (payload.inbound) {
+      if (payload.inbound.enabled !== undefined) config.inbound.enabled = !!payload.inbound.enabled;
+      if (payload.inbound.pollingIntervalMinutes !== undefined) {
+        config.inbound.pollingIntervalMinutes = Number(payload.inbound.pollingIntervalMinutes);
+      }
+      if (payload.inbound.importUserId !== undefined) {
+        config.inbound.importUserId = payload.inbound.importUserId || null;
+      }
+    }
+
+    if (config.inbound?.enabled) {
+      if (config.mode !== 'api') {
+        return res.status(400).json({ message: 'La importación entrante requiere el modo "API REST GLPI"' });
+      }
+      if (!config.inbound.importUserId) {
+        return res.status(400).json({ message: 'Selecciona un usuario para registrar las entradas importadas antes de habilitar la importación entrante' });
+      }
+      const hasEnabledMapping = (config.entityMappings || []).some((mapping) => mapping.enabled && mapping.clientId);
+      if (!hasEnabledMapping) {
+        return res.status(400).json({ message: 'Agrega al menos un mapeo de entidad habilitado y con cliente asignado antes de habilitar la importación entrante' });
+      }
+    }
+
     config.lastUpdatedBy = req.user._id;
     await config.save();
 
@@ -108,7 +145,9 @@ router.put('/config', authenticate, authorize('admin'), validators, validate, as
         mode: config.mode,
         dispatchMode: config.dispatchMode,
         hasApiTokens: Boolean(config.api?.appToken) && Boolean(config.api?.userToken),
-        hasCollectorAddress: Boolean(config.email?.collectorAddress)
+        hasCollectorAddress: Boolean(config.email?.collectorAddress),
+        entityMappingsCount: (config.entityMappings || []).length,
+        inboundEnabled: Boolean(config.inbound?.enabled)
       }
     });
 
@@ -121,7 +160,20 @@ router.put('/config', authenticate, authorize('admin'), validators, validate, as
     });
     res.status(500).json({ message: 'Error guardando configuración GLPI', error: error.message });
   }
+};
+
+// Rutas montadas dos veces (/api/glpi y /api/integrations/glpi, ver server.js) — se aceptan
+// ambos paths raíz ('/', '/config') en cada handler para no duplicar la lógica.
+router.get(['/', '/config'], authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const config = await ensureGlpiConfig();
+    res.json(sanitizeGlpiConfig(config));
+  } catch (error) {
+    res.status(500).json({ message: 'Error obteniendo configuración GLPI', error: error.message });
+  }
 });
+
+router.put(['/', '/config'], authenticate, authorize('admin'), validators, validate, applyGlpiConfigPayload);
 
 router.post('/test', authenticate, authorize('admin'), async (req, res) => {
   const retryAttempt = req.body?.retryAttempt === true || req.body?.retryAttempt === 'true';
@@ -255,89 +307,65 @@ router.post('/test', authenticate, authorize('admin'), async (req, res) => {
   }
 });
 
-// Aliases para rutas raíz (cuando el router se monta en /api/integrations/glpi)
-router.get('/', authenticate, authorize('admin'), async (req, res) => {
+// Lista las entidades del GLPI configurado (id + nombre) para poblar el mapeo entidad -> cliente.
+router.get('/entities', authenticate, authorize('admin'), async (req, res) => {
   try {
     const config = await ensureGlpiConfig();
-    res.json(sanitizeGlpiConfig(config));
+    if (!config.enabled || config.mode !== 'api') {
+      return res.status(400).json({ message: 'Habilita GLPI en modo "API REST GLPI" para listar entidades' });
+    }
+
+    const entities = await withGlpiSession(config, async (session) => {
+      const entityUrl = new URL(`${session.apiBase.toString().replace(/\/$/, '')}/Entity?range=0-299`);
+      const result = await glpiRequest({
+        method: 'GET',
+        url: entityUrl,
+        timeoutMs: session.timeoutMs,
+        verifyTls: session.verifyTls,
+        headers: {
+          'Content-Type': 'application/json',
+          'Session-Token': session.sessionToken,
+          'App-Token': session.appToken
+        }
+      });
+      const rows = Array.isArray(result.data) ? result.data : [];
+      return rows
+        .map((row) => ({ id: row.id, name: row.completename || row.name || `Entidad #${row.id}` }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    });
+
+    res.json({ entities });
   } catch (error) {
-    res.status(500).json({ message: 'Error obteniendo configuración GLPI', error: error.message });
+    res.status(500).json({ message: 'Error obteniendo entidades desde GLPI', error: error.message });
   }
 });
 
-router.put('/', authenticate, authorize('admin'), validators, validate, async (req, res) => {
+// Ejecuta un ciclo de importación entrante de inmediato (sin esperar al próximo tick del scheduler).
+router.post('/inbound/run-now', authenticate, authorize('admin'), async (req, res) => {
   try {
+    const result = await runGlpiInboundSync();
     const config = await ensureGlpiConfig();
-    const payload = req.body || {};
-    const incomingAppToken = String(payload.api?.appToken || '').trim();
-    const incomingUserToken = String(payload.api?.userToken || '').trim();
 
-    if (payload.enabled !== undefined) config.enabled = !!payload.enabled;
-    if (payload.mode) config.mode = payload.mode;
-    if (payload.dispatchMode) config.dispatchMode = payload.dispatchMode;
-
-    if (payload.api) {
-      if (payload.api.baseUrl !== undefined) {
-        const candidateBaseUrl = String(payload.api.baseUrl || '').trim();
-        if (candidateBaseUrl) {
-          try {
-            await assertOutboundUrlSafe(candidateBaseUrl, { requireHttps: true });
-          } catch (validationError) {
-            return res.status(400).json({ message: validationError.message });
-          }
-        }
-        config.api.baseUrl = candidateBaseUrl;
-      }
-      if (payload.api.verifyTls !== undefined) config.api.verifyTls = !!payload.api.verifyTls;
-      if (payload.api.timeoutMs !== undefined) config.api.timeoutMs = Number(payload.api.timeoutMs);
-      if (incomingAppToken) config.api.appToken = encrypt(incomingAppToken);
-      if (incomingUserToken) config.api.userToken = encrypt(incomingUserToken);
+    if (result.skipped) {
+      const reasons = {
+        disabled: 'GLPI o la importación entrante están deshabilitados',
+        'no-mappings': 'No hay entidades mapeadas y habilitadas con cliente asignado',
+        'no-import-user': 'Falta seleccionar el usuario para registrar las importaciones',
+        'import-user-not-found': 'El usuario configurado para importar ya no existe'
+      };
+      return res.status(400).json({ message: reasons[result.reason] || 'No se ejecutó la importación' });
     }
-
-    const apiMode = config.mode === 'api';
-    if (apiMode) {
-      const hasAppToken = Boolean(incomingAppToken) || Boolean(config.api?.appToken);
-      const hasUserToken = Boolean(incomingUserToken) || Boolean(config.api?.userToken);
-      if (!hasAppToken || !hasUserToken) {
-        return res.status(400).json({
-          message: 'Para guardar en modo API debes tener App-Token y User Token configurados'
-        });
-      }
-    }
-
-    if (payload.email) {
-      if (payload.email.collectorAddress !== undefined) {
-        config.email.collectorAddress = String(payload.email.collectorAddress || '').trim().toLowerCase();
-      }
-      if (payload.email.subjectTemplate !== undefined) {
-        config.email.subjectTemplate = String(payload.email.subjectTemplate || '').trim() || DEFAULT_EMAIL_SUBJECT;
-      }
-    }
-
-    config.lastUpdatedBy = req.user._id;
-    await config.save();
 
     await audit(req, {
-      event: 'admin.glpi.config.update',
+      event: 'admin.glpi.inbound.run-now',
       level: 'info',
-      result: { success: true },
-      metadata: {
-        enabled: config.enabled,
-        mode: config.mode,
-        dispatchMode: config.dispatchMode,
-        hasApiTokens: Boolean(config.api?.appToken) && Boolean(config.api?.userToken),
-        hasCollectorAddress: Boolean(config.email?.collectorAddress)
-      }
+      result: { success: result.success, reason: config.inbound.lastPollMessage },
+      metadata: { importedCount: result.importedCount }
     });
 
-    res.json({ message: 'Configuración GLPI guardada', config: sanitizeGlpiConfig(config) });
+    res.json({ message: config.inbound.lastPollMessage, config: sanitizeGlpiConfig(config) });
   } catch (error) {
-    await audit(req, {
-      event: 'admin.glpi.config.update',
-      level: 'warn',
-      result: { success: false, reason: error.message }
-    });
-    res.status(500).json({ message: 'Error guardando configuración GLPI', error: error.message });
+    res.status(500).json({ message: 'Error ejecutando importación GLPI', error: error.message });
   }
 });
 

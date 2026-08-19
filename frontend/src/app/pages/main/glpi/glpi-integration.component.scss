@@ -93,3 +93,35 @@
 .integration-error-panel p {
   margin: 0;
 }
+
+h3 {
+  margin: 8px 0 4px;
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.mapping-table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.mapping-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1.4fr 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.mapping-row--header {
+  padding: 0 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.mapping-row .dense {
+  width: 100%;
+}

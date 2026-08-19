@@ -8,7 +8,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `CHANGELOG.md`): **v1.8.2**
+> Version referencial actual (segun `CHANGELOG.md`): **v1.9.0**
 
 Stack principal:
 
@@ -53,6 +53,7 @@ Stack principal:
 - **Resiliencia con Backups Cifrados**: Creación y restauración de copias de seguridad de la base de datos MongoDB y evidencias de disco con empaquetado cifrado por contraseña descargable desde la UI.
 - **Extensibilidad mediante Complementos (Plugins)**: Carga y ejecución de utilidades estáticas (ZIP) y URLs externas integradas por iframes seguros con aislamiento Sandbox, control selectivo de accesos a la API compartida y protección Circuit Breaker contra caídas del complemento.
 - **Integraciones y API Keys (SOAR / Automática)**: CRUD administrativo de credenciales seguras (SHA-256) con permisos granulares (scopes), logs de auditoría en tiempo real y soporte para renderizado MJML de reportes y envío SMTP automático de alertas de incidentes para integración con herramientas externas.
+- **Integración Bidireccional con GLPI**: vincula una entrada de bitácora a un ticket GLPI ya existente (o deja que un incidente cree uno automáticamente) sin reescribir el mismo contenido dos veces; importación automática configurable que trae tickets/seguimientos nuevos de las entidades GLPI mapeadas y los convierte en entradas de bitácora, con tipo (operativa/incidente) configurable por entidad.
 
 ---
 
@@ -82,6 +83,12 @@ Stack principal:
 ## Novedades recientes (resumen rapido)
 
 > Historial completo y detallado en [`docs/history/CHANGELOG.md`](docs/history/CHANGELOG.md).
+
+### v1.9.0 (Integración GLPI bidireccional: vincular entradas a tickets existentes + importación automática de tickets)
+
+- **Saliente**: vincula una entrada de bitácora a un ticket GLPI ya existente y reenvía actualizaciones como seguimientos (`ITILFollowup`), sin duplicar tickets. El ticket creado automáticamente para incidentes/ofensas ahora queda registrado en la propia entrada.
+- **Entrante**: sondeo automático configurable (activable/desactivable) que trae tickets y seguimientos nuevos de las entidades GLPI mapeadas y los convierte en entradas de bitácora — con tipo de entrada (operativa/incidente) configurable por entidad, y sin loops entre ambas direcciones.
+- Compatible con GLPI 9.x-11.x (resuelve los campos de búsqueda dinámicamente, sin IDs hardcodeados). Pendiente de validar contra una instancia GLPI real.
 
 ### v1.8.2 (Bugfix: contactos eliminados del Directorio o de Usuarios seguían apareciendo en Escalamiento)
 

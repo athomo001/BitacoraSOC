@@ -88,6 +88,9 @@ Si no está instalado:
 
 - Para guardar configuración GLPI en modo API se requieren `App-Token` y `User Token` configurados.
 - El backend valida esos campos al guardar (`PUT /api/glpi/config`).
+- **Vincular entradas a tickets existentes** (`POST /api/entries/:id/glpi-link` y `/glpi-sync`) solo funciona con GLPI en modo API — agrega el contenido de la entrada como seguimiento (`ITILFollowup`) del ticket indicado, sin crear tickets duplicados.
+- **Importación entrante** (GLPI → Bitácora, `inbound.enabled`) requiere además: al menos una entidad GLPI mapeada y habilitada en `entityMappings` (con cliente/log source asignado), y un usuario seleccionado en "Registrar importaciones como" (`inbound.importUserId`) — sin eso el backend rechaza habilitarla. El sondeo corre cada `inbound.pollingIntervalMinutes` minutos (5 por defecto); "Sincronizar ahora" en el panel GLPI fuerza un ciclo inmediato para probar sin esperar.
+- Requiere GLPI 9.x o superior con la API REST (`apirest.php`) habilitada; usa `listSearchOptions` para resolver dinámicamente los IDs de campo de búsqueda, así que no depende de plugins ni de una versión exacta.
 
 ---
 

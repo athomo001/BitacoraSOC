@@ -191,6 +191,17 @@
             <button mat-icon-button color="primary" (click)="viewEntry(entry)" matTooltip="Ver completo">
               <mat-icon>visibility</mat-icon>
             </button>
+            <ng-container *ngIf="!isChecklistEntry(entry)">
+              <button mat-icon-button
+                      [color]="entry.glpiTicketId ? 'accent' : ''"
+                      (click)="openGlpiLinkDialog(entry)"
+                      [matTooltip]="entry.glpiTicketId ? ('Vinculada al ticket GLPI #' + entry.glpiTicketId + ' (clic para cambiar)') : 'Vincular a ticket GLPI'">
+                <mat-icon>{{ entry.glpiTicketId ? 'link' : 'add_link' }}</mat-icon>
+              </button>
+              <button mat-icon-button *ngIf="entry.glpiTicketId" (click)="syncEntryToGlpi(entry)" matTooltip="Reenviar contenido actual al ticket GLPI">
+                <mat-icon>sync</mat-icon>
+              </button>
+            </ng-container>
             <button mat-icon-button color="warn" (click)="onDelete(entry)" *ngIf="!isGuest && !isChecklistEntry(entry)">
               <mat-icon>delete</mat-icon>
             </button>

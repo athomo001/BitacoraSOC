@@ -80,6 +80,16 @@ const entrySchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  // Vínculo con ticket GLPI (push manual o creación automática en incidente/ofensa)
+  glpiTicketId: {
+    type: String,
+    default: null,
+    trim: true
+  },
+  glpiLinkedAt: {
+    type: Date,
+    default: null
+  },
   // Metadata
   ipAddress: String,
   userAgent: String
@@ -96,6 +106,7 @@ entrySchema.index({ createdAt: -1 });
 entrySchema.index({ entryDate: -1 });
 entrySchema.index({ createdBy: 1 });
 entrySchema.index({ isGuestEntry: 1 });
+entrySchema.index({ glpiTicketId: 1 });
 entrySchema.index({ ownerComplementId: 1, createdAt: -1 });
 
 // QA-DB-INDEX-OPTIMIZATION-001: Índice compuesto para optimizar el ordenamiento por fecha y hora de la bitácora

@@ -5,7 +5,7 @@
  */
 
 import { Component, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { DatePipe, NgFor, NgIf } from '@angular/common';
@@ -13,8 +13,17 @@ import { MatFormField, MatHint, MatLabel } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { MatOption, MatSelect } from '@angular/material/select';
-import { MatButton } from '@angular/material/button';
+import { MatButton, MatIconButton } from '@angular/material/button';
+import { MatIcon } from '@angular/material/icon';
+import { MatTooltip } from '@angular/material/tooltip';
 import { environment } from '../../../../environments/environment';
+import { CatalogService } from '../../../services/catalog.service';
+import { UserService } from '../../../services/user.service';
+
+interface GlpiEntity {
+  id: number;
+  name: string;
+}
 
 @Component({
   selector: 'app-glpi-integration',
@@ -32,7 +41,10 @@ import { environment } from '../../../../environments/environment';
     MatCheckbox,
     MatSelect,
     MatOption,
-    MatButton
+    MatButton,
+    MatIconButton,
+    MatIcon,
+    MatTooltip
   ]
 })
 export class GlpiIntegrationComponent implements OnInit {
@@ -44,6 +56,11 @@ export class GlpiIntegrationComponent implements OnInit {
   readonly dispatchOptions = [
     { value: 'daily-summary', label: 'Resumen diario' },
     { value: 'immediate', label: 'Evento inmediato' }
+  ];
+
+  readonly entryTypeOptions = [
+    { value: 'operativa', label: 'Operativa' },
+    { value: 'incidente', label: 'Incidente' }
   ];
 
   form: FormGroup;
@@ -63,10 +80,23 @@ export class GlpiIntegrationComponent implements OnInit {
   lastGlpiError: { code: string; probableCause: string; suggestedAction: string; rawMessage?: string } | null = null;
   glpiRetryCount = 0;
 
+  // Importación entrante (GLPI -> Bitácora)
+  glpiEntities: GlpiEntity[] = [];
+  loadingEntities = false;
+  logSources: any[] = [];
+  users: any[] = [];
+  runningInboundNow = false;
+  lastPollAt: string | null = null;
+  lastPollSuccess: boolean | null = null;
+  lastPollMessage = '';
+  lastImportedCount = 0;
+
   constructor(
     private fb: FormBuilder,
     private http: HttpClient,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private catalogService: CatalogService,
+    private userService: UserService
   ) {
     this.form = this.fb.group({
       enabled: [false],
@@ -78,7 +108,11 @@ export class GlpiIntegrationComponent implements OnInit {
       apiVerifyTls: [true],
       apiTimeoutMs: [8000, [Validators.required, Validators.min(1000), Validators.max(30000)]],
       emailCollectorAddress: [''],
-      emailSubjectTemplate: ['[SOC] Cierre de turno {{date}}']
+      emailSubjectTemplate: ['[SOC] Cierre de turno {{date}}'],
+      inboundEnabled: [false],
+      inboundPollingIntervalMinutes: [5, [Validators.required, Validators.min(1), Validators.max(1440)]],
+      inboundImportUserId: [''],
+      entityMappings: this.fb.array([])
     });
 
     this.form.get('mode')?.valueChanges.subscribe((mode) => {
@@ -86,8 +120,28 @@ export class GlpiIntegrationComponent implements OnInit {
     });
   }
 
+  get entityMappingsArray(): FormArray {
+    return this.form.get('entityMappings') as FormArray;
+  }
+
   ngOnInit(): void {
     this.loadConfig();
+    this.catalogService.getAllLogSources().subscribe({
+      next: (response: any) => {
+        this.logSources = response.items || response || [];
+      },
+      error: () => {
+        // Error silencioso: el selector de cliente queda vacío
+      }
+    });
+    this.userService.getUsersList().subscribe({
+      next: (users) => {
+        this.users = users || [];
+      },
+      error: () => {
+        // Error silencioso: el selector de usuario importador queda vacío
+      }
+    });
   }
 
   get isApiMode(): boolean {
@@ -128,7 +182,15 @@ export class GlpiIntegrationComponent implements OnInit {
           apiVerifyTls: config.api?.verifyTls ?? true,
           apiTimeoutMs: config.api?.timeoutMs || 8000,
           emailCollectorAddress: config.email?.collectorAddress || '',
-          emailSubjectTemplate: config.email?.subjectTemplate || '[SOC] Cierre de turno {{date}}'
+          emailSubjectTemplate: config.email?.subjectTemplate || '[SOC] Cierre de turno {{date}}',
+          inboundEnabled: config.inbound?.enabled ?? false,
+          inboundPollingIntervalMinutes: config.inbound?.pollingIntervalMinutes || 5,
+          inboundImportUserId: config.inbound?.importUserId || ''
+        });
+
+        this.entityMappingsArray.clear();
+        (config.entityMappings || []).forEach((mapping: any) => {
+          this.entityMappingsArray.push(this.buildMappingGroup(mapping));
         });
 
         this.apiTokensConfigured = Boolean(config.api?.appTokenConfigured) && Boolean(config.api?.userTokenConfigured);
@@ -141,12 +203,86 @@ export class GlpiIntegrationComponent implements OnInit {
         this.lastDispatchMode = config.lastDispatchMode || 'unknown';
         this.lastDispatchEvent = config.lastDispatchEvent || '';
         this.lastDispatchChannel = config.lastDispatchChannel || 'none';
+        this.lastPollAt = config.inbound?.lastPollAt || null;
+        this.lastPollSuccess = config.inbound?.lastPollSuccess ?? null;
+        this.lastPollMessage = config.inbound?.lastPollMessage || '';
+        this.lastImportedCount = config.inbound?.lastImportedCount || 0;
         this.applyModeValidation(config.mode || 'api');
         this.loading = false;
+
+        // Precarga la lista de entidades para que el mapeo muestre nombres en vez de IDs
+        // crudos sin que el admin tenga que apretar "Cargar entidades" en cada visita.
+        if (config.enabled && config.mode === 'api' && config.api?.appTokenConfigured && config.api?.userTokenConfigured) {
+          this.loadGlpiEntities({ silent: true });
+        }
       },
       error: () => {
         this.loading = false;
         this.snackBar.open('Error cargando configuración GLPI', 'Cerrar', { duration: 3500 });
+      }
+    });
+  }
+
+  private buildMappingGroup(mapping: any = {}): FormGroup {
+    return this.fb.group({
+      _id: [mapping._id || null],
+      entitiesId: [mapping.entitiesId ?? null, [Validators.required]],
+      label: [mapping.label || ''],
+      clientId: [mapping.clientId || '', [Validators.required]],
+      defaultEntryType: [mapping.defaultEntryType || 'operativa', [Validators.required]],
+      enabled: [mapping.enabled ?? true]
+    });
+  }
+
+  addMappingRow(): void {
+    this.entityMappingsArray.push(this.buildMappingGroup());
+  }
+
+  removeMappingRow(index: number): void {
+    this.entityMappingsArray.removeAt(index);
+  }
+
+  loadGlpiEntities(options: { silent?: boolean } = {}): void {
+    this.loadingEntities = true;
+    this.http.get<{ entities: GlpiEntity[] }>(`${environment.apiUrl}/integrations/glpi/entities`).subscribe({
+      next: (response) => {
+        this.glpiEntities = response.entities || [];
+        this.loadingEntities = false;
+        if (this.glpiEntities.length === 0 && !options.silent) {
+          this.snackBar.open('GLPI no devolvió entidades', 'Cerrar', { duration: 3000 });
+        }
+      },
+      error: (err) => {
+        this.loadingEntities = false;
+        if (!options.silent) {
+          const msg = err?.error?.message || 'Error obteniendo entidades desde GLPI';
+          this.snackBar.open(msg, 'Cerrar', { duration: 4000 });
+        }
+      }
+    });
+  }
+
+  onEntitySelected(index: number, entityId: number): void {
+    const entity = this.glpiEntities.find((item) => item.id === Number(entityId));
+    const group = this.entityMappingsArray.at(index);
+    group.patchValue({
+      entitiesId: entity ? entity.id : entityId,
+      label: entity ? entity.name : group.get('label')?.value || ''
+    });
+  }
+
+  runInboundNow(): void {
+    this.runningInboundNow = true;
+    this.http.post<any>(`${environment.apiUrl}/integrations/glpi/inbound/run-now`, {}).subscribe({
+      next: (response) => {
+        this.runningInboundNow = false;
+        this.snackBar.open(response?.message || 'Importación GLPI ejecutada', 'Cerrar', { duration: 3500 });
+        this.loadConfig();
+      },
+      error: (err) => {
+        this.runningInboundNow = false;
+        const msg = err?.error?.message || 'Error ejecutando importación GLPI';
+        this.snackBar.open(msg, 'Cerrar', { duration: 4000 });
       }
     });
   }
@@ -166,6 +302,22 @@ export class GlpiIntegrationComponent implements OnInit {
       return;
     }
 
+    if (value.inboundEnabled) {
+      if (value.mode !== 'api') {
+        this.snackBar.open('La importación entrante requiere el modo "API REST GLPI"', 'Cerrar', { duration: 4000 });
+        return;
+      }
+      if (!value.inboundImportUserId) {
+        this.snackBar.open('Selecciona un usuario para registrar las entradas importadas', 'Cerrar', { duration: 4000 });
+        return;
+      }
+      const hasEnabledMapping = (value.entityMappings || []).some((mapping: any) => mapping.enabled && mapping.clientId);
+      if (!hasEnabledMapping) {
+        this.snackBar.open('Agrega al menos un mapeo de entidad habilitado y con cliente asignado', 'Cerrar', { duration: 4500 });
+        return;
+      }
+    }
+
     const payload: any = {
       enabled: !!value.enabled,
       mode: value.mode,
@@ -178,6 +330,19 @@ export class GlpiIntegrationComponent implements OnInit {
       email: {
         collectorAddress: (value.emailCollectorAddress || '').trim(),
         subjectTemplate: (value.emailSubjectTemplate || '').trim()
+      },
+      entityMappings: (value.entityMappings || []).map((mapping: any) => ({
+        _id: mapping._id || undefined,
+        entitiesId: Number(mapping.entitiesId),
+        label: (mapping.label || '').trim(),
+        clientId: mapping.clientId || null,
+        defaultEntryType: mapping.defaultEntryType || 'operativa',
+        enabled: !!mapping.enabled
+      })),
+      inbound: {
+        enabled: !!value.inboundEnabled,
+        pollingIntervalMinutes: Number(value.inboundPollingIntervalMinutes),
+        importUserId: value.inboundImportUserId || null
       }
     };
 

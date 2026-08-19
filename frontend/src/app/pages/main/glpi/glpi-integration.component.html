@@ -92,6 +92,119 @@
     </div>
   </section>
 
+  <section class="glpi-panel glpi-card" *ngIf="isApiMode">
+    <header class="glpi-panel__header">
+      <h2 class="glpi-panel__title">Importación entrante (GLPI → Bitácora)</h2>
+    </header>
+    <div class="glpi-panel__body">
+      <form [formGroup]="form" class="glpi-form">
+        <div class="grid two">
+          <mat-checkbox formControlName="inboundEnabled">Habilitar importación automática</mat-checkbox>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Intervalo de sondeo (minutos)</mat-label>
+            <input matInput type="number" formControlName="inboundPollingIntervalMinutes" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Registrar importaciones como</mat-label>
+            <mat-select formControlName="inboundImportUserId">
+              <mat-option *ngFor="let user of users" [value]="user._id">{{ user.name || user.username }}</mat-option>
+            </mat-select>
+            <mat-hint>Usuario dueño de las entradas creadas automáticamente desde GLPI</mat-hint>
+          </mat-form-field>
+        </div>
+
+        <h3>Mapeo de entidades GLPI → cliente</h3>
+        <p class="muted">
+          Cada entidad habilitada se sondea periódicamente. Los tickets nuevos crean una entrada;
+          los seguimientos posteriores de un ticket ya importado agregan una entrada nueva enlazada al mismo ticket.
+        </p>
+
+        <div class="actions">
+          <button mat-stroked-button type="button" color="primary" (click)="loadGlpiEntities()" [disabled]="loadingEntities">
+            <mat-icon>cloud_download</mat-icon>
+            {{ loadingEntities ? 'Cargando...' : 'Cargar entidades desde GLPI' }}
+          </button>
+          <button mat-stroked-button type="button" (click)="addMappingRow()">
+            <mat-icon>add</mat-icon>
+            Agregar mapeo
+          </button>
+        </div>
+
+        <div formArrayName="entityMappings" class="mapping-table">
+          <div class="mapping-row mapping-row--header" *ngIf="entityMappingsArray.length > 0">
+            <span>Entidad GLPI</span>
+            <span>Cliente / Log Source</span>
+            <span>Tipo por defecto</span>
+            <span>Activo</span>
+            <span></span>
+          </div>
+
+          <div class="mapping-row" *ngFor="let mappingGroup of entityMappingsArray.controls; let i = index" [formGroupName]="i">
+            <mat-form-field appearance="outline" class="dense">
+              <mat-label>Entidad</mat-label>
+              <mat-select *ngIf="glpiEntities.length > 0"
+                          [value]="mappingGroup.get('entitiesId')?.value"
+                          (selectionChange)="onEntitySelected(i, $event.value)">
+                <mat-option *ngFor="let entity of glpiEntities" [value]="entity.id">{{ entity.name }}</mat-option>
+              </mat-select>
+              <input *ngIf="glpiEntities.length === 0" matInput type="number" formControlName="entitiesId" placeholder="ID de entidad" />
+              <mat-hint *ngIf="mappingGroup.get('label')?.value">{{ mappingGroup.get('label')?.value }}</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="dense">
+              <mat-label>Cliente</mat-label>
+              <mat-select formControlName="clientId">
+                <mat-option *ngFor="let source of logSources" [value]="source._id">{{ source.name }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="dense">
+              <mat-label>Tipo</mat-label>
+              <mat-select formControlName="defaultEntryType">
+                <mat-option *ngFor="let option of entryTypeOptions" [value]="option.value">{{ option.label }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-checkbox formControlName="enabled"></mat-checkbox>
+
+            <button mat-icon-button type="button" color="warn" (click)="removeMappingRow(i)" matTooltip="Quitar mapeo">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+
+          <p *ngIf="entityMappingsArray.length === 0" class="muted">
+            Sin entidades mapeadas todavía. Agrega al menos una para poder habilitar la importación automática.
+          </p>
+        </div>
+
+        <div class="actions">
+          <button mat-raised-button color="primary" (click)="saveConfig()" [disabled]="saving || loading">
+            {{ saving ? 'Guardando...' : 'Guardar Configuración' }}
+          </button>
+          <button mat-stroked-button color="primary" type="button" (click)="runInboundNow()" [disabled]="runningInboundNow || loading">
+            {{ runningInboundNow ? 'Sincronizando...' : 'Sincronizar ahora' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="glpi-panel glpi-card" *ngIf="isApiMode">
+    <header class="glpi-panel__header">
+      <h2 class="glpi-panel__title">Último import</h2>
+    </header>
+    <div class="glpi-panel__body">
+      <p *ngIf="lastPollAt"><strong>Fecha:</strong> {{ lastPollAt | date:'medium' }}</p>
+      <p *ngIf="lastPollSuccess === true" class="ok"><strong>Estado:</strong> Correcto</p>
+      <p *ngIf="lastPollSuccess === false" class="error"><strong>Estado:</strong> Con errores</p>
+      <p *ngIf="lastPollAt"><strong>Entradas importadas:</strong> {{ lastImportedCount }}</p>
+      <p *ngIf="lastPollMessage"><strong>Detalle:</strong> {{ lastPollMessage }}</p>
+      <p *ngIf="!lastPollAt" class="muted">Aún no se ha ejecutado ninguna importación.</p>
+    </div>
+  </section>
+
   <section class="glpi-panel glpi-card">
     <header class="glpi-panel__header">
       <h2 class="glpi-panel__title">Última prueba</h2>

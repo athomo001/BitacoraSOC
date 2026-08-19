@@ -16,7 +16,7 @@ const { authenticate, notGuest } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const captureMetadata = require('../middleware/metadata');
 const { audit } = require('../utils/audit');
-const { dispatchGlpiPayload } = require('../utils/glpi-dispatch');
+const { dispatchGlpiPayload, ensureGlpiConfig, addTicketFollowup } = require('../utils/glpi-dispatch');
 const { logger } = require('../utils/logger');
 
 const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -66,6 +66,22 @@ const toSantiagoTime = (value) => {
     hour12: false,
     timeZone: 'America/Santiago'
   });
+};
+
+// Texto enviado como ITILFollowup al vincular/reenviar una entrada a un ticket GLPI existente.
+const buildGlpiFollowupContent = (entry, username) => {
+  const dateLabel = entry.entryDate instanceof Date
+    ? entry.entryDate.toISOString().slice(0, 10)
+    : String(entry.entryDate || '');
+
+  return [
+    `[Bitácora SOC] ${String(entry.entryType || '').toUpperCase()} — ${dateLabel} ${entry.entryTime || ''}`,
+    `Analista: ${username || entry.createdByUsername || 'N/A'}`,
+    entry.clientName ? `Cliente/Origen: ${entry.clientName}` : null,
+    entry.tags?.length ? `Tags: ${entry.tags.join(', ')}` : null,
+    '',
+    entry.content
+  ].filter((line) => line !== null).join('\n');
 };
 
 const DEFAULT_INTERNAL_CLIENT_NAME = 'Cliente interno';
@@ -271,6 +287,17 @@ router.post('/',
             entryType,
             clientName: clientName || null,
             createdBy: req.user.username
+          }
+        }).then((result) => {
+          // Persiste el ticket creado en GLPI sobre la entrada de origen para poder
+          // reenviar seguimientos más tarde sin tener que volver a vincularla a mano.
+          if (result?.success && result.channel === 'api' && result.externalId) {
+            return Entry.findByIdAndUpdate(entry._id, {
+              glpiTicketId: String(result.externalId),
+              glpiLinkedAt: new Date()
+            }).catch((updateError) => {
+              logger.error({ err: updateError, entryId: entry._id }, 'Error persisting GLPI ticket id on entry');
+            });
           }
         }).catch((error) => {
           logger.error({ err: error, entryId: entry._id, requestId: req.requestId }, 'Error dispatching GLPI immediate ticket');
@@ -1025,6 +1052,87 @@ router.delete('/:id', authenticate, notGuest, async (req, res) => {
     res.status(500).json({ message: 'Error al eliminar entrada' });
   }
 });
+
+// POST /api/entries/:id/glpi-link - Vincula la entrada a un ticket GLPI ya existente
+// y envía su contenido como seguimiento (ITILFollowup) de ese ticket.
+router.post('/:id/glpi-link',
+  authenticate,
+  notGuest,
+  [body('ticketId').trim().notEmpty().withMessage('ticketId es obligatorio')],
+  validate,
+  async (req, res) => {
+    try {
+      const entry = await Entry.findById(req.params.id);
+      if (!entry) {
+        return res.status(404).json({ message: 'Entrada no encontrada' });
+      }
+
+      const ticketId = String(req.body.ticketId).trim();
+      const config = await ensureGlpiConfig();
+      const followup = await addTicketFollowup(config, {
+        ticketId,
+        content: buildGlpiFollowupContent(entry, req.user.username)
+      });
+
+      entry.glpiTicketId = ticketId;
+      entry.glpiLinkedAt = new Date();
+      await entry.save();
+
+      await audit(req, {
+        event: 'entry.glpi.link',
+        result: { success: true },
+        metadata: { entryId: entry._id, ticketId, followupId: followup.followupId }
+      }).catch((auditError) => {
+        logger.error({ err: auditError, entryId: entry._id }, 'Error al registrar auditoría de vínculo GLPI');
+      });
+
+      res.json({ message: `Entrada vinculada al ticket GLPI #${ticketId}`, entry });
+    } catch (error) {
+      logger.error({ err: error, entryId: req.params.id }, 'Error linking entry to GLPI ticket');
+      res.status(400).json({ message: error.message || 'Error vinculando entrada a GLPI' });
+    }
+  }
+);
+
+// POST /api/entries/:id/glpi-sync - Reenvía el contenido actual de la entrada como un nuevo
+// seguimiento del ticket GLPI ya vinculado (sin crear un ticket ni un vínculo nuevo).
+router.post('/:id/glpi-sync',
+  authenticate,
+  notGuest,
+  async (req, res) => {
+    try {
+      const entry = await Entry.findById(req.params.id);
+      if (!entry) {
+        return res.status(404).json({ message: 'Entrada no encontrada' });
+      }
+      if (!entry.glpiTicketId) {
+        return res.status(400).json({ message: 'Esta entrada no está vinculada a ningún ticket GLPI' });
+      }
+
+      const config = await ensureGlpiConfig();
+      const followup = await addTicketFollowup(config, {
+        ticketId: entry.glpiTicketId,
+        content: buildGlpiFollowupContent(entry, req.user.username)
+      });
+
+      entry.glpiLinkedAt = new Date();
+      await entry.save();
+
+      await audit(req, {
+        event: 'entry.glpi.sync',
+        result: { success: true },
+        metadata: { entryId: entry._id, ticketId: entry.glpiTicketId, followupId: followup.followupId }
+      }).catch((auditError) => {
+        logger.error({ err: auditError, entryId: entry._id }, 'Error al registrar auditoría de reenvío GLPI');
+      });
+
+      res.json({ message: `Entrada reenviada al ticket GLPI #${entry.glpiTicketId}`, entry });
+    } catch (error) {
+      logger.error({ err: error, entryId: req.params.id }, 'Error syncing entry to GLPI ticket');
+      res.status(400).json({ message: error.message || 'Error reenviando entrada a GLPI' });
+    }
+  }
+);
 
 // GET /api/entries/tags/suggest - Autocompletar tags
 router.get('/tags/suggest', authenticate, async (req, res) => {

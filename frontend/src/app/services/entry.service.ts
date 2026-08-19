@@ -79,6 +79,22 @@ export class EntryService {
     return this.http.delete<{ message: string }>(`${this.API_URL}/${id}`);
   }
 
+  /**
+   * Vincula la entrada a un ticket GLPI ya existente y envía su contenido
+   * como seguimiento (followup) de ese ticket.
+   */
+  linkToGlpiTicket(id: string, ticketId: string): Observable<{ message: string; entry: Entry }> {
+    return this.http.post<{ message: string; entry: Entry }>(`${this.API_URL}/${id}/glpi-link`, { ticketId });
+  }
+
+  /**
+   * Reenvía el contenido actual de la entrada como un nuevo seguimiento
+   * del ticket GLPI ya vinculado.
+   */
+  syncToGlpiTicket(id: string): Observable<{ message: string; entry: Entry }> {
+    return this.http.post<{ message: string; entry: Entry }>(`${this.API_URL}/${id}/glpi-sync`, {});
+  }
+
   suggestTags(query: string): Observable<TagSuggestion[]> {
     const params = new HttpParams().set('q', query);
     return this.http.get<TagSuggestion[]>(`${this.API_URL}/tags/suggest`, { params });

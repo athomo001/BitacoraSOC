@@ -185,10 +185,22 @@ flowchart LR
   ADMIN[Admin > GLPI] --> GLPIAPI[/api/glpi/config,/test]
   GLPIAPI --> GLPIREST[GLPI REST apirest.php]
   GLPIAPI --> GLPIMAIL[Correo collector GLPI]
+
+  ENTRY[Entry: incidente/ofensa] -->|dispatchGlpiPayload inmediato o resumen de turno| GLPIREST
+  USER[Analista] -->|"Vincular / Reenviar a GLPI (glpi-link, glpi-sync)"| GLPIREST
+  GLPIREST -->|guarda glpiTicketId en la Entry| ENTRY
+
+  CRON[cron * * * * * glpi-inbound-sync] -->|listSearchOptions + search Ticket/ITILFollowup| GLPIREST
+  CRON --> LINK[(GlpiTicketLink: cursor por ticket)]
+  CRON -->|ticket nuevo o followup externo| ENTRY
 ```
 
 - Forwarding SIEM soporta múltiples destinos activos en paralelo.
 - GLPI tiene configuración propia y prueba de conectividad independiente.
+- La integración GLPI es bidireccional:
+  - **Saliente**: una `Entry` tipo `incidente`/`ofensa` crea un ticket automáticamente (según `dispatchMode`), o un analista vincula/reenvía manualmente una entrada a un ticket ya existente (`POST /api/entries/:id/glpi-link` y `/glpi-sync`). Todo followup escrito desde la bitácora lleva un marcador HTML invisible (`GLPI_SYNC_MARKER`) para no reimportarse a sí mismo.
+  - **Entrante**: `glpi-inbound-sync.js` corre cada minuto (respeta `inbound.pollingIntervalMinutes` del `GlpiConfig`) y, por cada entidad GLPI mapeada a un cliente en `entityMappings`, trae tickets/seguimientos nuevos y crea `Entry` automáticamente. `GlpiTicketLink` guarda el cursor de sincronización por ticket para no duplicar ni perder datos entre ciclos (incluida la paginación cuando hay más de 50 resultados).
+  - Los IDs de campo de búsqueda de GLPI (`date_mod`, `entities_id`, etc.) se resuelven en caliente vía `listSearchOptions/:itemtype` en vez de hardcodearse, para tolerar distintas versiones de GLPI.
 
 ---
 

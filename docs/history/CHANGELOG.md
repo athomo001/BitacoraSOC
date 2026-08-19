@@ -2,6 +2,29 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.9.0] - 2026-08-18
+
+### Integración GLPI bidireccional: vincular entradas a tickets existentes e importación automática de tickets (GLPI → Bitácora)
+
+- **Feature (Backend/Frontend) — Vincular una entrada de bitácora a un ticket GLPI ya existente**:
+  - Nuevos endpoints `POST /api/entries/:id/glpi-link` (vincula y envía el contenido como seguimiento `ITILFollowup`) y `POST /api/entries/:id/glpi-sync` (reenvía una actualización al mismo ticket ya vinculado, sin crear tickets duplicados).
+  - Nuevos campos `glpiTicketId` / `glpiLinkedAt` en `Entry`. El ticket creado automáticamente para entradas `incidente`/`ofensa` (modo `immediate`) ahora también se persiste en la entrada de origen — antes ese ID se descartaba después de crear el ticket.
+  - En **Todas las Entradas** (`/main/all-entries`), cada entrada tiene un ícono para vincular/cambiar el ticket GLPI y, una vez vinculada, un ícono para reenviar la entrada actualizada como nuevo seguimiento.
+  - `glpi-dispatch.js` se refactorizó para compartir el manejo de sesión GLPI (`initSession`/`killSession`) entre la creación de tickets y de seguimientos vía un helper `withGlpiSession`.
+- **Feature (Backend/Frontend) — Importación automática de tickets GLPI hacia la bitácora**:
+  - Nueva sección "Importación entrante" en el panel de configuración GLPI (`/main/admin/glpi`, solo modo API): mapeo de entidades GLPI → cliente/log source de la bitácora, con tipo de entrada por defecto (**operativa** o **incidente**) configurable y activable por entidad; selector de usuario para registrar las entradas importadas; intervalo de sondeo configurable (5 minutos por defecto); botón "Sincronizar ahora" para forzar un ciclo sin esperar al scheduler.
+  - `glpi-inbound-sync.js` (nuevo) corre cada minuto vía `node-cron` y, por cada entidad mapeada y habilitada, trae tickets nuevos (crea la entrada original) y seguimientos nuevos de tickets ya importados (crea una entrada adicional enlazada al mismo ticket, sin reescribir historial).
+  - Nuevo modelo `GlpiTicketLink`: lleva el cursor de sincronización por ticket (`lastSyncedDateMod`) de forma independiente a `Entry`, porque un mismo ticket puede generar varias entradas a lo largo del tiempo.
+  - **Anti-loop**: todo seguimiento que la bitácora escribe en GLPI lleva un comentario HTML invisible (`GLPI_SYNC_MARKER`); la importación entrante lo detecta y lo descarta, evitando que un push genere un pull que genere otro push.
+  - Los IDs de campo de búsqueda de GLPI (`date_mod`, `entities_id`, `itilcategories_id`, etc.) se resuelven en caliente vía `listSearchOptions/:itemtype` en vez de hardcodearse, para que el sondeo funcione en distintas versiones de GLPI (9.x-11.x) sin ajustes manuales.
+  - Nuevo endpoint `GET /api/glpi/entities` (lista las entidades reales de la instancia GLPI configurada, para poblar el mapeo sin tener que copiar IDs a mano) y `POST /api/glpi/inbound/run-now` (ejecuta un ciclo de importación inmediato).
+  - **Paginación**: si una entidad tiene más de 50 tickets (o un ticket más de 50 seguimientos) modificados en una misma ventana de sondeo, el importador pagina automáticamente hasta un tope de seguridad (500) y, si aun así no alcanza a cubrir todo, retoma exactamente donde quedó en el siguiente ciclo en vez de saltarse silenciosamente lo que sobró.
+  - `routes/glpi.js` se depuró: las rutas `GET`/`PUT` duplicadas entre `/` y `/config` (el router se monta dos veces, en `/api/glpi` y `/api/integrations/glpi`) ahora comparten un único handler.
+- **Tests (Backend)**: 17 pruebas unitarias nuevas para la lógica pura de la importación (`resolveEntryType`, `stripHtml`, `buildImportedContent`, y el merge de mapeos `mergeEntityMappings`, que preserva el cursor de sondeo de las filas existentes al editarlas).
+- **Alcance explícitamente fuera de esta versión**: overrides de tipo de entrada por categoría GLPI (el modelo ya lo soporta, falta el editor en la UI) y webhook nativo de GLPI 11 (la importación es por sondeo periódico; el webhook queda pendiente de validar contra una instancia GLPI 11 real).
+
+---
+
 ## [v1.8.2] - 2026-08-18
 
 ### Bugfix: contactos eliminados del Directorio o del panel de Usuarios seguían apareciendo en Escalamiento (`/main/escalation/view`)

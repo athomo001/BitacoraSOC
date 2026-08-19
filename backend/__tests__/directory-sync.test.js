@@ -34,6 +34,7 @@ describe('directory-sync cleanup helpers', () => {
   });
 
   test('purgeStaleUserDirectoryContacts conserva hashes activos y elimina huérfanos', async () => {
+    DirectoryContact.find.mockReturnValue({ select: jest.fn().mockResolvedValue([]) });
     DirectoryContact.deleteMany.mockResolvedValue({ deletedCount: 2 });
 
     const deletedCount = await purgeStaleUserDirectoryContacts([

@@ -327,6 +327,8 @@ Retorna la cookie de sesión `auth_token` y el objeto usuario idéntico a `/api/
 | DELETE | `/api/entries/:id` | Autenticado |
 | GET | `/api/entries/tags/suggest` | Autenticado |
 | PUT | `/api/entries/admin/edit` | Todos |
+| POST | `/api/entries/:id/glpi-link` | Autenticado (no guest) |
+| POST | `/api/entries/:id/glpi-sync` | Autenticado (no guest) |
 
 ### Módulo: escalation
 
@@ -411,6 +413,15 @@ Retorna la cookie de sesión `auth_token` y el objeto usuario idéntico a `/api/
 | POST | `/api/glpi/test` | Admin |
 | GET | `/api/glpi` | Admin |
 | PUT | `/api/glpi` | Admin |
+| GET | `/api/glpi/entities` | Admin |
+| POST | `/api/glpi/inbound/run-now` | Admin |
+
+`GET /api/glpi/entities` lista las entidades de la instancia GLPI configurada (id + nombre) para
+poblar el mapeo entidad → cliente. `POST /api/glpi/inbound/run-now` ejecuta un ciclo de
+importación entrante (GLPI → Bitácora) de inmediato, sin esperar al próximo tick del scheduler
+(`* * * * *`, ver `backend/src/utils/glpi-inbound-sync.js`). Los mismos dos endpoints existen
+también bajo el alias `/api/integrations/glpi/*` (mismo router montado dos veces, ver
+`backend/src/server.js`).
 
 ### Módulo: logging
 
