@@ -15,7 +15,8 @@ const {
   syncManyDirectoryContacts,
   mergeDirectoryDuplicates,
   syncDirectoryContact,
-  purgeStaleUserDirectoryContacts
+  purgeStaleUserDirectoryContacts,
+  removeContactFromEscalationFlows
 } = require('../utils/directory-sync');
 const { audit } = require('../utils/audit');
 const { logger } = require('../utils/logger');
@@ -379,6 +380,9 @@ exports.deleteDirectoryContact = async (req, res) => {
     }
 
     await DirectoryContact.findByIdAndDelete(req.params.id);
+
+    const { clientsUpdated } = await removeContactFromEscalationFlows({ name, phone });
+
     await audit(req, {
       event: 'directory.central.delete',
       result: { success: true },
@@ -387,6 +391,7 @@ exports.deleteDirectoryContact = async (req, res) => {
         name: deleted.name,
         email: deleted.email,
         phone: deleted.phone,
+        escalationFlowClientsUpdated: clientsUpdated,
         company: deleted.company,
         removedFromContacts
       }
