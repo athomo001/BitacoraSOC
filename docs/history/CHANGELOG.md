@@ -2,6 +2,16 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.9.1] - 2026-08-20
+
+### Mejoras menores en Directorio de Contactos (`/main/escalation/directory`)
+
+- **Mejora (Frontend) — Renombrado**: la sección se llamaba "Directorio Centralizado" en el menú lateral y "Fuente de Verdad de Contactos" en el título de la página; ambos pasan a llamarse **"Directorio de Contactos"** para mayor claridad.
+- **Mejora (Frontend) — Campo "Empresa" del formulario de contacto como combobox**: al crear/editar un contacto, el campo "Empresa" ahora es un `mat-autocomplete` que sugiere las empresas ya registradas en el directorio (filtrando a medida que se escribe) para evitar duplicados por variaciones de escritura (ej. "AFPModelo" vs "AFP Modelo"), sin dejar de permitir texto libre cuando la empresa todavía no existe.
+- **Mejora (Frontend) — Filtro "Sin empresa"**: el desplegable de filtro por Empresa incorpora una opción "Sin empresa" que lista únicamente los contactos con ese campo vacío, para ubicarlos y completarlos sin tener que revisar la tabla fila por fila.
+
+---
+
 ## [v1.9.0] - 2026-08-18
 
 ### Integración GLPI bidireccional: vincular entradas a tickets existentes e importación automática de tickets (GLPI → Bitácora)

@@ -8,7 +8,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `CHANGELOG.md`): **v1.9.0**
+> Version referencial actual (segun `CHANGELOG.md`): **v1.9.1**
 
 Stack principal:
 
@@ -83,6 +83,12 @@ Stack principal:
 ## Novedades recientes (resumen rapido)
 
 > Historial completo y detallado en [`docs/history/CHANGELOG.md`](docs/history/CHANGELOG.md).
+
+### v1.9.1 (Mejoras menores en Directorio de Contactos)
+
+- Renombrado "Directorio Centralizado" / "Fuente de Verdad de Contactos" a **"Directorio de Contactos"** en el menú lateral y el título de la página.
+- El campo "Empresa" del formulario de contacto ahora es un combobox (`mat-autocomplete`) que sugiere las empresas ya registradas, sin dejar de permitir texto libre.
+- Nuevo filtro "Sin empresa" para ubicar rápido los contactos con ese campo vacío.
 
 ### v1.9.0 (Integración GLPI bidireccional: vincular entradas a tickets existentes + importación automática de tickets)
 

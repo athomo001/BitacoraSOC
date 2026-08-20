@@ -6,6 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -24,6 +25,7 @@ import { DirectoryService, DirectoryContact } from '../../../services/directory.
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
+    MatAutocompleteModule,
     MatProgressSpinnerModule,
     MatSnackBarModule,
     MatCheckboxModule,
@@ -45,6 +47,7 @@ export class EscalationDirectoryTabComponent implements OnInit {
   directoryTypeFilter: '' | 'External' | 'List' = '';
   directoryScopeFilter: '' | 'Internal' | 'External' = '';
   directoryCompanyFilter = '';
+  readonly noCompanyFilterValue = '__NO_COMPANY__';
   directoryPageSize: 50 | 100 | 'all' = 50;
   directoryPageIndex = 0;
 
@@ -85,6 +88,13 @@ export class EscalationDirectoryTabComponent implements OnInit {
     return Array.from(values).sort((a, b) => a.localeCompare(b));
   }
 
+  get filteredDirectoryCompanyOptions(): string[] {
+    const term = String(this.directoryFormModel.company || '').trim().toLowerCase();
+    const options = this.directoryCompanyOptions;
+    if (!term) return options;
+    return options.filter((company) => company.toLowerCase().includes(term));
+  }
+
   get filteredDirectoryContacts(): DirectoryContact[] {
     const term = this.directorySearch.trim().toLowerCase();
     return (this.directoryContacts || []).filter((c) => {
@@ -92,7 +102,10 @@ export class EscalationDirectoryTabComponent implements OnInit {
         .some((v) => String(v || '').toLowerCase().includes(term));
       const matchesType = !this.directoryTypeFilter || c.type === this.directoryTypeFilter;
       const matchesScope = !this.directoryScopeFilter || c.scope === this.directoryScopeFilter;
-      const matchesCompany = !this.directoryCompanyFilter || c.company === this.directoryCompanyFilter;
+      const matchesCompany = !this.directoryCompanyFilter
+        || (this.directoryCompanyFilter === this.noCompanyFilterValue
+          ? !String(c.company || '').trim()
+          : c.company === this.directoryCompanyFilter);
       return matchesTerm && matchesType && matchesScope && matchesCompany;
     });
   }
