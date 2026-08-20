@@ -91,6 +91,15 @@
   --text-muted: #9a9a9a;
 }
 
+[data-theme='win95'] {
+  --surface-variant: #d4d0c8;
+  --surface-card: #c0c0c0;
+  --outline-variant: #808080;
+  --outline-subtle: rgba(0, 0, 0, 0.25);
+  --outline-strong: #000000;
+  --text-muted: #404040;
+}
+
 // =============================================================================
 // Auditoría — chips de categoría en columna “motivo” (audit-logs)
 // =============================================================================
@@ -190,4 +199,23 @@
   --audit-cat-config-fg: #9900ff;
   --audit-cat-other-bg: rgba(255, 255, 255, 0.1);
   --audit-cat-other-fg: #e6e6e6;
+}
+
+[data-theme='win95'] {
+  --audit-cat-integration-bg: rgba(0, 0, 128, 0.15);
+  --audit-cat-integration-fg: #000080;
+  --audit-cat-email-bg: rgba(0, 128, 0, 0.15);
+  --audit-cat-email-fg: #008000;
+  --audit-cat-auth-bg: rgba(128, 0, 0, 0.15);
+  --audit-cat-auth-fg: #800000;
+  --audit-cat-entry-bg: rgba(255, 128, 0, 0.18);
+  --audit-cat-entry-fg: #ff8000;
+  --audit-cat-checklist-bg: rgba(0, 128, 128, 0.15);
+  --audit-cat-checklist-fg: #008080;
+  --audit-cat-escalation-bg: rgba(128, 0, 128, 0.15);
+  --audit-cat-escalation-fg: #800080;
+  --audit-cat-config-bg: rgba(64, 64, 64, 0.15);
+  --audit-cat-config-fg: #404040;
+  --audit-cat-other-bg: rgba(128, 128, 128, 0.18);
+  --audit-cat-other-fg: #606060;
 }

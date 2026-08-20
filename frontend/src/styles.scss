@@ -2,6 +2,8 @@
 // Definición: src/styles/semantic-tokens.scss
 // Marca de autor en comentarios: Athan Espinoza.
 @use 'styles/semantic-tokens';
+// Mapeo de íconos pixel-art del tema Windows 95 (solo activo bajo [data-theme="win95"]).
+@use 'styles/win95-icons';
 
 /* ============================================
    SISTEMA DE TEMAS CON CSS VARIABLES
@@ -141,6 +143,11 @@
   --state-neutral: #424242;
   --state-neutral-bg: #f5f5f5;
 
+  --status-telework: #10b981;
+  --status-training: #f59e0b;
+  --status-vacation: #ef4444;
+  --status-medical: #06b6d4;
+
   --alert-bg: #fff4e5;
   --alert-border: #ffcc80;
   --alert-text: #8a4b00;
@@ -194,6 +201,11 @@
   --state-info-bg: #1c2e46;
   --state-neutral: #c1cad8;
   --state-neutral-bg: #2b3342;
+
+  --status-telework: #34d399;
+  --status-training: #fbbf24;
+  --status-vacation: #f87171;
+  --status-medical: #22d3ee;
 
   --alert-bg: #3d3316;
   --alert-border: #6f5a1d;
@@ -249,6 +261,11 @@
   --state-neutral: #5a5148;
   --state-neutral-bg: #ece5d8;
 
+  --status-telework: #3f7a43;
+  --status-training: #9a5a17;
+  --status-vacation: #a33c3c;
+  --status-medical: #3d5f8f;
+
   --alert-bg: #f6ead6;
   --alert-border: #dfc08f;
   --alert-text: #704318;
@@ -302,6 +319,11 @@
   --state-info-bg: #e8eef9;
   --state-neutral: #5f5560;
   --state-neutral-bg: #f0e8ee;
+
+  --status-telework: #2f8f65;
+  --status-training: #9a5a17;
+  --status-vacation: #b83f64;
+  --status-medical: #4d7ab3;
 
   --alert-bg: #fff0de;
   --alert-border: #ffd19f;
@@ -357,6 +379,11 @@
   --state-neutral: #ffffff;
   --state-neutral-bg: rgba(255, 255, 255, 0.12);
 
+  --status-telework: #00f0ff;
+  --status-training: #fcee0a;
+  --status-vacation: #ff0055;
+  --status-medical: #9900ff;
+
   --alert-bg: rgba(199, 28, 11, 0.2);
   --alert-border: #c71c0b;
   --alert-text: #ffffff;
@@ -378,6 +405,66 @@
   --heatmap-label-color: #ffffff;
 
   --shadow: 0 6px 24px rgba(0, 0, 0, 0.8), 0 0 16px rgba(0, 224, 255, 0.25);
+}
+
+/* ========== WINDOWS 95 THEME ========== */
+[data-theme="win95"] {
+  --app-title-font: "MS Sans Serif", Tahoma, "Segoe UI", sans-serif;
+  --primary-color: #000080;
+  --accent-color: #008080;
+  --on-primary-color: #ffffff;
+  --background-color: #008080;
+  --surface-color: #c0c0c0;
+  --surface-raised: #d4d0c8;
+  --surface-muted: #a0a0a0;
+  --text-primary: #000000;
+  --text-secondary: #202020;
+  --border-color: #000000;
+  --sidebar-bg: #c0c0c0;
+  --sidebar-text: #000000;
+  --hover-bg: #a8a8a8;
+  --focus-ring: rgba(0, 0, 128, 0.5);
+  --disabled-bg: #c0c0c0;
+  --disabled-text: #808080;
+
+  --state-success: #008000;
+  --state-success-bg: #d4f4d4;
+  --state-warning: #ff8000;
+  --state-warning-bg: #ffffcc;
+  --state-error: #800000;
+  --state-error-bg: #ffd4d4;
+  --state-info: #000080;
+  --state-info-bg: #d4d4ff;
+  --state-neutral: #404040;
+  --state-neutral-bg: #e0e0e0;
+
+  --status-telework: #008000;
+  --status-training: #ff8000;
+  --status-vacation: #800000;
+  --status-medical: #000080;
+
+  --alert-bg: #ffffcc;
+  --alert-border: #808000;
+  --alert-text: #000000;
+
+  --chart-1: #000080;
+  --chart-2: #008080;
+  --chart-3: #008000;
+  --chart-4: #800080;
+  --chart-5: #ff8000;
+  --chart-6: #800000;
+  --chart-7: #000000;
+  --chart-8: #808080;
+
+  --heatmap-low: #c0ffc0;
+  --heatmap-low-mid: #80ff80;
+  --heatmap-mid: #ffff00;
+  --heatmap-high: #ff8000;
+  --heatmap-very-high: #ff0000;
+  --heatmap-label-color: #000000;
+
+  --shadow: none;
+  color-scheme: light;
 }
 
 /* ========== GLOBAL STYLES ========== */
@@ -967,6 +1054,304 @@ mat-sidenav {
     color: var(--text-primary) !important;
     fill: var(--text-primary) !important;
   }
+}
+
+/*
+ * Windows 95 hardening: mismo patrón que dark/cyberpunk arriba — redirige los
+ * tokens internos de Material (MDC/M3) a las variables del tema en vez de
+ * dejar los valores claros por defecto del prebuilt indigo-pink.
+ */
+[data-theme='win95'] {
+  --mat-sys-surface: var(--surface-color);
+  --mat-sys-surface-container: var(--surface-raised);
+  --mat-sys-on-surface: var(--text-primary);
+  --mat-sys-on-surface-variant: var(--text-secondary);
+  --mat-sys-outline: var(--border-color);
+  --mat-expansion-container-background-color: var(--surface-color);
+  --mat-expansion-container-text-color: var(--text-primary);
+  --mat-expansion-header-text-color: var(--text-primary);
+  --mat-expansion-header-description-color: var(--text-secondary);
+  --mdc-outlined-text-field-input-text-color: var(--text-primary);
+  --mdc-outlined-text-field-label-text-color: var(--text-secondary);
+  --mdc-outlined-text-field-outline-color: var(--border-color);
+  --mdc-outlined-text-field-hover-outline-color: var(--text-secondary);
+  --mdc-outlined-text-field-focus-outline-color: var(--primary-color);
+  --mat-select-enabled-trigger-text-color: var(--text-primary);
+  --mat-select-enabled-arrow-color: var(--text-secondary);
+  --mat-option-label-text-color: var(--text-primary);
+  --mat-paginator-container-text-color: var(--text-primary);
+  --mat-paginator-enabled-icon-color: var(--text-primary);
+  --mat-paginator-disabled-icon-color: var(--text-secondary);
+
+  .cdk-overlay-container .mat-mdc-menu-panel,
+  .cdk-overlay-container .mat-mdc-select-panel,
+  .cdk-overlay-container .mat-mdc-autocomplete-panel {
+    background: var(--surface-raised) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 0 !important;
+    box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #ffffff !important;
+  }
+
+  .cdk-overlay-container .mat-mdc-menu-item,
+  .cdk-overlay-container .mat-mdc-option,
+  .cdk-overlay-container .mat-mdc-option .mdc-list-item__primary-text,
+  .cdk-overlay-container .mat-mdc-menu-item .mdc-list-item__primary-text,
+  .cdk-overlay-container .mat-mdc-menu-item mat-icon {
+    color: var(--text-primary) !important;
+    opacity: 1 !important;
+  }
+
+  .cdk-overlay-container .mat-mdc-option:hover,
+  .cdk-overlay-container .mat-mdc-option.mdc-list-item--selected:not(.mdc-list-item--disabled),
+  .cdk-overlay-container .mat-mdc-menu-item:hover {
+    background: var(--primary-color) !important;
+    color: var(--on-primary-color) !important;
+  }
+
+  .cdk-overlay-container .mat-mdc-option:hover .mdc-list-item__primary-text,
+  .cdk-overlay-container .mat-mdc-option.mdc-list-item--selected:not(.mdc-list-item--disabled) .mdc-list-item__primary-text,
+  .cdk-overlay-container .mat-mdc-menu-item:hover .mdc-list-item__primary-text,
+  .cdk-overlay-container .mat-mdc-menu-item:hover mat-icon {
+    color: var(--on-primary-color) !important;
+  }
+
+  .mat-mdc-form-field .mat-mdc-text-field-wrapper {
+    background: #ffffff !important;
+  }
+
+  .mat-mdc-form-field .mdc-notched-outline__leading,
+  .mat-mdc-form-field .mdc-notched-outline__trailing,
+  .mat-mdc-form-field .mdc-notched-outline__notch {
+    border-color: var(--border-color) !important;
+  }
+
+  .mat-mdc-form-field .mdc-floating-label,
+  .mat-mdc-form-field .mat-mdc-floating-label {
+    color: var(--text-secondary) !important;
+    opacity: 1 !important;
+  }
+
+  .mat-mdc-form-field .mat-mdc-input-element,
+  .mat-mdc-form-field .mdc-text-field__input,
+  .mat-mdc-form-field .mat-mdc-select-value,
+  .mat-mdc-form-field .mat-mdc-select-min-line,
+  .mat-mdc-form-field .mat-mdc-select-placeholder,
+  .mat-mdc-form-field .mat-mdc-select-value-text,
+  .mat-mdc-form-field .mat-mdc-select-arrow,
+  .mat-mdc-form-field mat-icon {
+    color: var(--text-primary) !important;
+    -webkit-text-fill-color: var(--text-primary) !important;
+    opacity: 1 !important;
+  }
+
+  .mat-mdc-form-field .mdc-text-field__input::placeholder {
+    color: var(--text-secondary) !important;
+  }
+
+  .mat-mdc-table,
+  .mdc-data-table__table,
+  .mat-mdc-row,
+  .mat-mdc-header-row,
+  .mdc-data-table__row {
+    background: var(--surface-color) !important;
+  }
+
+  .mat-mdc-cell,
+  .mat-mdc-header-cell,
+  .mdc-data-table__cell,
+  .mdc-data-table__header-cell {
+    color: var(--text-primary) !important;
+    border-bottom-color: var(--border-color) !important;
+  }
+
+  .mat-mdc-outlined-button,
+  .mat-mdc-stroked-button {
+    background: var(--surface-raised) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+  }
+
+  .mat-mdc-tab-group {
+    --mat-tab-header-active-label-text-color: var(--text-primary);
+    --mat-tab-header-inactive-label-text-color: var(--text-secondary);
+    --mat-tab-header-active-indicator-color: var(--primary-color);
+    --mat-tab-header-active-focus-indicator-color: var(--primary-color);
+    --mat-tab-header-active-hover-indicator-color: var(--primary-color);
+    --mat-tab-header-active-ripple-color: var(--primary-color);
+    --mat-tab-header-inactive-ripple-color: var(--primary-color);
+  }
+
+  .mat-mdc-tab .mdc-tab__text-label {
+    color: var(--text-secondary) !important;
+  }
+
+  .mat-mdc-tab.mdc-tab--active .mdc-tab__text-label {
+    color: var(--text-primary) !important;
+  }
+
+  .mat-mdc-paginator,
+  .mat-mdc-paginator * {
+    color: var(--text-primary) !important;
+    fill: var(--text-primary) !important;
+  }
+}
+
+/*
+ * Windows 95 — geometría cuadrada, biseles 3D clásicos y barra de título
+ * azul en vez de sombras difusas modernas. Todo vive bajo [data-theme='win95'],
+ * así que no puede afectar a los demás temas.
+ */
+[data-theme="win95"] *,
+[data-theme="win95"] *::before,
+[data-theme="win95"] *::after {
+  border-radius: 0 !important;
+  box-shadow: none;
+}
+
+/*
+ * La tipografía retro NO se aplica a todo el body: Tahoma/MS Sans Serif son
+ * más anchas que Roboto y eso truncaba texto en botones, tabs y badges
+ * ajustados al ancho original. Se reserva para títulos/cabeceras, donde
+ * sobra espacio y sí aporta el look Win95.
+ */
+[data-theme="win95"] .page-header h1,
+[data-theme="win95"] .page-header h2,
+[data-theme="win95"] .page-header h3,
+[data-theme="win95"] mat-toolbar .toolbar-title,
+[data-theme="win95"] .top-toolbar .toolbar-title,
+[data-theme="win95"] .mat-mdc-dialog-title {
+  font-family: var(--app-title-font);
+}
+
+[data-theme="win95"] .mat-mdc-raised-button,
+[data-theme="win95"] .mat-mdc-unelevated-button,
+[data-theme="win95"] .mat-mdc-outlined-button,
+[data-theme="win95"] .mat-mdc-stroked-button,
+[data-theme="win95"] button.mat-mdc-button-base:not(.mat-mdc-icon-button):not(.mat-mdc-mini-fab):not(.mat-mdc-fab) {
+  background: var(--surface-raised) !important;
+  color: var(--text-primary) !important;
+  box-shadow: inset -1px -1px 0 #000000, inset 1px 1px 0 #ffffff,
+              inset -2px -2px 0 #808080, inset 2px 2px 0 #dfdfdf !important;
+}
+
+[data-theme="win95"] .mat-mdc-raised-button:active,
+[data-theme="win95"] .mat-mdc-unelevated-button:active,
+[data-theme="win95"] .mat-mdc-outlined-button:active,
+[data-theme="win95"] .mat-mdc-stroked-button:active,
+[data-theme="win95"] button.mat-mdc-button-base:not(.mat-mdc-icon-button):not(.mat-mdc-mini-fab):not(.mat-mdc-fab):active {
+  box-shadow: inset 1px 1px 0 #000000, inset -1px -1px 0 #ffffff,
+              inset 2px 2px 0 #808080, inset -2px -2px 0 #dfdfdf !important;
+}
+
+/*
+ * mat-icon-button (íconos circulares sueltos: enviar/editar/eliminar, toggles
+ * de barra) se queda plano por defecto — Win95 clásico solo mostraba el
+ * bisel de botón al pasar el mouse encima, no en reposo. Excluido arriba de
+ * la regla de botones "de caja" para que no herede el fondo/bisel cuadrado.
+ */
+[data-theme="win95"] .mat-mdc-icon-button {
+  background: transparent !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="win95"] .mat-mdc-icon-button:hover,
+[data-theme="win95"] .mat-mdc-icon-button:focus {
+  background: var(--surface-raised) !important;
+  box-shadow: inset -1px -1px 0 #000000, inset 1px 1px 0 #ffffff,
+              inset -2px -2px 0 #808080, inset 2px 2px 0 #dfdfdf !important;
+}
+
+/*
+ * Los campos de texto NO reciben el bisel 3D vía box-shadow: ese truco no
+ * respeta el "notch" (hueco) donde Material posiciona la etiqueta flotante,
+ * y termina dibujando una línea recta por encima del texto de la etiqueta.
+ * El fondo blanco y el contorno ya quedan cubiertos por el bloque de arriba
+ * (--mdc-outlined-text-field-* y .mat-mdc-text-field-wrapper); solo faltan
+ * las esquinas cuadradas, que ya aplica la regla universal border-radius:0.
+ */
+
+[data-theme="win95"] .mat-mdc-card,
+[data-theme="win95"] .mat-expansion-panel,
+[data-theme="win95"] .mat-mdc-dialog-surface,
+[data-theme="win95"] .card {
+  background: var(--surface-color) !important;
+  box-shadow: inset -1px -1px 0 #000000, inset 1px 1px 0 #ffffff,
+              inset -2px -2px 0 #808080, inset 2px 2px 0 #dfdfdf !important;
+}
+
+[data-theme="win95"] mat-toolbar,
+[data-theme="win95"] .top-toolbar,
+[data-theme="win95"] .page-header {
+  background: linear-gradient(90deg, #000080, #1084d0) !important;
+  color: #ffffff !important;
+  font-weight: bold;
+  box-shadow: inset -1px -1px 0 #000000, inset 1px 1px 0 #dfdfdf !important;
+}
+
+[data-theme="win95"] mat-toolbar mat-icon,
+[data-theme="win95"] .top-toolbar mat-icon,
+[data-theme="win95"] .page-header mat-icon {
+  color: #ffffff !important;
+}
+
+/*
+ * UI-VIS-067/068/069 (styles.scss ~L491) fuerza color: var(--text-primary) en
+ * h1-h6/label/li/td/th de forma global — una regla que apunta directo a un
+ * elemento siempre le gana a un color heredado, aunque el ancestro use
+ * !important. Bajo win95 (--text-primary: negro) eso deja títulos y textos
+ * en negro sobre las cabeceras/tarjetas de color oscuro. Se restaura la
+ * herencia solo para los textos que ya viven dentro de esos contenedores.
+ */
+[data-theme="win95"] .page-header h1,
+[data-theme="win95"] .page-header h2,
+[data-theme="win95"] .page-header h3,
+[data-theme="win95"] .page-header p,
+[data-theme="win95"] .page-header .subtitle,
+[data-theme="win95"] .page-header .description,
+[data-theme="win95"] .shift-header h1,
+[data-theme="win95"] .shift-header h2,
+[data-theme="win95"] .shift-header h3 {
+  color: inherit !important;
+}
+
+[data-theme="win95"] .left-sidebar,
+[data-theme="win95"] .right-sidebar {
+  background: var(--sidebar-bg) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="win95"] .left-sidebar .active-link,
+[data-theme="win95"] .left-sidebar .router-link-active,
+[data-theme="win95"] .left-sidebar .mat-mdc-nav-list .mdc-list-item--activated {
+  background: var(--primary-color) !important;
+}
+
+[data-theme="win95"] .left-sidebar .active-link .mdc-list-item__primary-text,
+[data-theme="win95"] .left-sidebar .active-link mat-icon,
+[data-theme="win95"] .left-sidebar .router-link-active .mdc-list-item__primary-text,
+[data-theme="win95"] .left-sidebar .router-link-active mat-icon {
+  color: #ffffff !important;
+}
+
+[data-theme="win95"] .mat-mdc-chip,
+[data-theme="win95"] .mdc-evolution-chip {
+  border: 1px solid var(--border-color) !important;
+  background: var(--surface-raised) !important;
+}
+
+[data-theme="win95"] ::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+}
+
+[data-theme="win95"] ::-webkit-scrollbar-track {
+  background: #dfdfdf;
+}
+
+[data-theme="win95"] ::-webkit-scrollbar-thumb {
+  background: #c0c0c0;
+  box-shadow: inset -1px -1px 0 #000000, inset 1px 1px 0 #ffffff,
+              inset -2px -2px 0 #808080, inset 2px 2px 0 #dfdfdf;
 }
 
 /*

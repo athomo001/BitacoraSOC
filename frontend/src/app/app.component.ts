@@ -8,6 +8,7 @@ import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { Title } from '@angular/platform-browser';
 import { ThemeService } from './services/theme.service';
+import { Win95IconSyncService } from './services/win95-icon-sync.service';
 import { ConfigService } from './services/config.service';
 import { environment } from '../environments/environment';
 import { RouterOutlet } from '@angular/router';
@@ -23,11 +24,14 @@ export class AppComponent implements OnInit {
 
   constructor(
     private themeService: ThemeService,
+    private win95IconSyncService: Win95IconSyncService,
     private configService: ConfigService,
     private titleService: Title,
     @Inject(PLATFORM_ID) private platformId: Object
   ) {
-    // El tema se aplica automáticamente en el constructor del servicio
+    // El tema se aplica automáticamente en el constructor del servicio.
+    // win95IconSyncService solo se inyecta para forzar su instanciación temprana
+    // (providedIn: 'root'); su lógica queda inactiva salvo que el tema sea 'win95'.
   }
 
   ngOnInit(): void {

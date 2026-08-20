@@ -1,6 +1,6 @@
 {
   "name": "bitacora-soc-frontend",
-  "version": "1.9.1",
+  "version": "1.10.0",
   "packageManager": "pnpm@11.11.0",
   "engines": {
     "pnpm": "11.x"

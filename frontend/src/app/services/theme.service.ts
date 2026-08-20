@@ -37,7 +37,7 @@ import { Theme } from '../models/user.model';
 export class ThemeService {
   private readonly THEME_KEY = 'bitacora_theme';
   // Comentario: Listado simplificado de temas visuales de la interfaz. Se eliminaron sepia y dark para evitar mantenimiento redundante de CSS.
-  private readonly SUPPORTED_THEMES: Theme[] = ['light', 'pastel', 'cyberpunk'];
+  private readonly SUPPORTED_THEMES: Theme[] = ['light', 'pastel', 'cyberpunk', 'win95'];
   private currentThemeSubject = new BehaviorSubject<Theme>(this.getStoredTheme());
   public currentTheme$ = this.currentThemeSubject.asObservable();
 

@@ -791,11 +791,11 @@
       opacity: 0.55;
     }
 
-    &.cell-day--telework .day-icon { color: #10b981; }
-    &.cell-day--training .day-icon { color: #f59e0b; }
-    &.cell-day--vacation .day-icon { color: #ef4444; }
-    &.cell-day--medical-leave .day-icon { color: #ef4444; }
-    &.cell-day--medical-appointment .day-icon { color: #06b6d4; }
+    &.cell-day--telework .day-icon { color: var(--status-telework); }
+    &.cell-day--training .day-icon { color: var(--status-training); }
+    &.cell-day--vacation .day-icon { color: var(--status-vacation); }
+    &.cell-day--medical-leave .day-icon { color: var(--status-vacation); }
+    &.cell-day--medical-appointment .day-icon { color: var(--status-medical); }
   }
 
   tbody tr.row-has-special:hover {
@@ -825,11 +825,11 @@
     height: 22px;
 
     &.cell-day--office { color: var(--text-secondary, #94a3b8); opacity: 0.55; }
-    &.cell-day--telework { color: #10b981; }
-    &.cell-day--training { color: #f59e0b; }
-    &.cell-day--vacation { color: #ef4444; }
-    &.cell-day--medical-leave { color: #ef4444; }
-    &.cell-day--medical-appointment { color: #06b6d4; }
+    &.cell-day--telework { color: var(--status-telework); }
+    &.cell-day--training { color: var(--status-training); }
+    &.cell-day--vacation { color: var(--status-vacation); }
+    &.cell-day--medical-leave { color: var(--status-vacation); }
+    &.cell-day--medical-appointment { color: var(--status-medical); }
   }
 }
 

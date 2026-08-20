@@ -75,4 +75,4 @@ export interface UpdateProfileRequest {
 }
 
 // Comentario: Definición simplificada de temas visuales soportados en la plataforma para evitar sobreingeniería de estilos.
-export type Theme = 'light' | 'pastel' | 'cyberpunk';
+export type Theme = 'light' | 'pastel' | 'cyberpunk' | 'win95';

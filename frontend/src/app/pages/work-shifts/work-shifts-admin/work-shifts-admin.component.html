@@ -263,7 +263,7 @@
     <tbody>
       <ng-container *ngFor="let row of getGroupedWeeklyAssignments(status)">
         <!-- CASO 1: Es un grupo de registros consecutivos (ej. Teletrabajo) -->
-        <tr *ngIf="row.isGroup" class="row-group-header" style="background-color: rgba(63, 81, 181, 0.05);">
+        <tr *ngIf="row.isGroup" class="row-group-header" style="background-color: var(--surface-muted);">
           <td style="text-align: center; vertical-align: middle;">
             <mat-checkbox 
               [checked]="isAssignmentSelected(row)" 
@@ -276,14 +276,14 @@
             </button>
           </td>
           <td>
-            <span class="status-pill" style="background-color: #3f51b5; color: white;">AGRUPADO</span>
+            <span class="status-pill" style="background-color: var(--primary-color); color: var(--on-primary-color);">AGRUPADO</span>
           </td>
           <td>
             <div class="period-text">
               <strong>{{ row.weekStartDate | date:'dd/MM/yyyy HH:mm' }}</strong>
               <span class="arrow">➔</span>
               <strong>{{ row.weekEndDate | date:'dd/MM/yyyy HH:mm' }}</strong>
-              <span style="font-size: 11px; color: #666; margin-left: 8px;">({{ row.items.length }} turnos)</span>
+              <span style="font-size: 11px; color: var(--text-secondary); margin-left: 8px;">({{ row.items.length }} turnos)</span>
             </div>
           </td>
           <td><span [ngStyle]="getRoleBadgeStyle(row.roleCode)">{{ getRoleLabel(row.roleCode) }}</span></td>
@@ -294,7 +294,7 @@
           </td>
           <td>
             <div class="actions-cell">
-              <span style="font-size: 11px; color: #888; font-style: italic;">Expandir para gestionar</span>
+              <span style="font-size: 11px; color: var(--text-muted); font-style: italic;">Expandir para gestionar</span>
             </div>
           </td>
         </tr>
@@ -304,7 +304,7 @@
           <tr *ngFor="let asg of row.items" class="row-group-child"
               [class.row-conflict]="hasRowConflict(asg)"
               [class.row-editing]="editingWeeklyAssignmentId === asg._id"
-              style="background-color: #fafafa; border-left: 3px solid #3f51b5;">
+              style="background-color: var(--surface-muted); border-left: 3px solid var(--primary-color);">
             <td style="text-align: center; vertical-align: middle; padding-left: 20px;">
               <mat-checkbox 
                 [checked]="selectedAssignmentIds.has(asg._id)" 
@@ -318,7 +318,7 @@
               </span>
             </td>
             <td>
-              <div class="period-text" style="font-size: 12px; color: #555;">
+              <div class="period-text" style="font-size: 12px; color: var(--text-secondary);">
                 <span>{{ asg.weekStartDate | date:'dd/MM/yyyy HH:mm' }}</span>
                 <span class="arrow">➔</span>
                 <span>{{ asg.weekEndDate | date:'dd/MM/yyyy HH:mm' }}</span>
@@ -423,24 +423,24 @@
         </tr>
 
         <!-- CASO 2.1: Sub-fila de cobertura N2 vinculada (si aplica) -->
-        <tr *ngIf="!row.isGroup && row.coberturaN2" class="row-coverage-linked" style="background-color: rgba(76, 175, 80, 0.05); border-left: 3px solid #4caf50;">
+        <tr *ngIf="!row.isGroup && row.coberturaN2" class="row-coverage-linked" style="background-color: var(--state-success-bg); border-left: 3px solid var(--state-success);">
           <td></td>
           <td></td>
           <td>
-            <span class="status-pill" style="background-color: #4caf50; color: white; font-size: 10px;">COBERTURA</span>
+            <span class="status-pill" style="background-color: var(--state-success-bg); color: var(--state-success); font-size: 10px;">COBERTURA</span>
           </td>
           <td>
-            <div class="period-text" style="font-size: 12px; color: #333;">
+            <div class="period-text" style="font-size: 12px; color: var(--text-primary);">
               <span>{{ row.coberturaN2.weekStartDate | date:'dd/MM/yyyy HH:mm' }}</span>
               <span class="arrow">➔</span>
               <span>{{ row.coberturaN2.weekEndDate | date:'dd/MM/yyyy HH:mm' }}</span>
             </div>
           </td>
           <td>
-            <span class="role-badge" style="background-color: #e8f5e9; color: #4caf50;">N2 (Reemplazo)</span>
+            <span class="role-badge" style="background-color: var(--state-success-bg); color: var(--state-success);">N2 (Reemplazo)</span>
           </td>
           <td>
-            <div class="person-cell" style="color: #2e7d32;">
+            <div class="person-cell" style="color: var(--state-success);">
               <mat-icon style="font-size: 18px; width: 18px; height: 18px; margin-right: 4px; vertical-align: middle;">shield</mat-icon>
               <strong>{{ row.coberturaN2.userId?.fullName || row.coberturaN2.externalPersonId?.name || 'Sin asignar' }}</strong>
             </div>
@@ -455,11 +455,11 @@
         </tr>
 
         <!-- CASO 2.2: Alerta si la ausencia no tiene cobertura N2 asociada -->
-        <tr *ngIf="!row.isGroup && (row.roleCode === 'MEDICAL_LEAVE' || row.roleCode === 'VACATION') && !row.coberturaN2" style="background-color: rgba(244, 67, 54, 0.05); border-left: 3px solid #f44336;">
+        <tr *ngIf="!row.isGroup && (row.roleCode === 'MEDICAL_LEAVE' || row.roleCode === 'VACATION') && !row.coberturaN2" style="background-color: var(--state-error-bg); border-left: 3px solid var(--state-error);">
           <td></td>
           <td></td>
           <td colspan="5">
-            <div style="display: flex; align-items: center; color: #c62828; padding: 4px 8px; font-size: 13px;">
+            <div style="display: flex; align-items: center; color: var(--state-error); padding: 4px 8px; font-size: 13px;">
               <mat-icon style="font-size: 18px; width: 18px; height: 18px; margin-right: 8px;">warning</mat-icon>
               <span>⚠️ <strong>SIN COBERTURA N2:</strong> No hay un reemplazo activo registrado para cubrir esta ausencia.</span>
             </div>
@@ -468,7 +468,7 @@
       </ng-container>
 
       <tr *ngIf="getGroupedWeeklyAssignments(status).length === 0">
-        <td colspan="7" class="empty-table-cell" style="text-align: center; padding: 24px; color: #888;">
+        <td colspan="7" class="empty-table-cell" style="text-align: center; padding: 24px; color: var(--text-muted);">
           No se encontraron asignaciones para esta categoría.
         </td>
       </tr>
@@ -628,17 +628,18 @@
 
                 <div class="schedule-list">
                   <div *ngFor="let s of notificationSchedules" class="schedule-item-card" [class.disabled]="!s.enabled" 
-                       style="border: 1px solid var(--soft-line, #D7DEC0); border-radius: 8px; padding: 12px; margin-bottom: 12px; background-color: var(--card-bg, #fbfbf0);">
+                       style="border: 1px solid var(--outline-subtle); border-radius: 8px; padding: 12px; margin-bottom: 12px; background-color: var(--surface-card);">
                     <div class="schedule-item-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
                       <div style="display: flex; flex-direction: column;">
-                        <strong style="font-size: 14px; color: var(--body-text, #173831);">{{ s.name }}</strong>
-                        <span style="font-size: 11px; color: #7f7f7f;">
+                        <strong style="font-size: 14px; color: var(--text-primary);">{{ s.name }}</strong>
+                        <span style="font-size: 11px; color: var(--text-secondary);">
                           {{ s.frequency === 'weekly' ? 'Semanal' : 'Mensual' }} •
                           {{ s.frequency === 'weekly' ? getWeekdaysLabel([s.dayOfWeek]) : 'Día 1' }} a las {{ s.time }}
                         </span>
                       </div>
-                      <span class="status-badge" [style.background-color]="s.enabled ? '#155F50' : '#9e9e9e'" 
-                            style="color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; line-height: 1;">
+                      <span class="status-badge" [style.background-color]="s.enabled ? 'var(--state-success-bg)' : 'var(--state-neutral-bg)'"
+                            [style.color]="s.enabled ? 'var(--state-success)' : 'var(--state-neutral)'"
+                            style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; line-height: 1;">
                         {{ s.enabled ? 'Activa' : 'Inactiva' }}
                       </span>
                     </div>
@@ -646,36 +647,36 @@
                     <!-- Filtros de roles en chips pequeños -->
                     <div class="schedule-item-roles" style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px;">
                       <span *ngIf="s.roleFilter?.includes('N2') || s.roleFilter?.includes('N1_NO_HABIL')" 
-                            style="font-size: 10px; background-color: #e3f2fd; color: #0d47a1; padding: 2px 6px; border-radius: 4px; font-weight: 500;">
+                            style="font-size: 10px; background-color: var(--state-info-bg); color: var(--state-info); padding: 2px 6px; border-radius: 4px; font-weight: 500;">
                         Guardia
                       </span>
                       <span *ngIf="s.roleFilter?.includes('TI')" 
-                            style="font-size: 10px; background-color: #ede7f6; color: #512da8; padding: 2px 6px; border-radius: 4px; font-weight: 500;">
+                            style="font-size: 10px; background-color: var(--state-info-bg); color: var(--state-info); padding: 2px 6px; border-radius: 4px; font-weight: 500;">
                         Especialista TI
                       </span>
                       <span *ngIf="s.roleFilter?.includes('TELEWORK')" 
-                            style="font-size: 10px; background-color: #e8f5e9; color: #1b5e20; padding: 2px 6px; border-radius: 4px; font-weight: 500;">
+                            style="font-size: 10px; background-color: var(--state-success-bg); color: var(--state-success); padding: 2px 6px; border-radius: 4px; font-weight: 500;">
                         Teletrabajo
                       </span>
                       <span *ngIf="s.roleFilter?.includes('OL')" 
-                            style="font-size: 10px; background-color: #fffde7; color: #8d6e00; padding: 2px 6px; border-radius: 4px; font-weight: 500;">
+                            style="font-size: 10px; background-color: var(--state-warning-bg); color: var(--state-warning); padding: 2px 6px; border-radius: 4px; font-weight: 500;">
                         Charla/Capacitación
                       </span>
                       <span *ngIf="s.roleFilter?.includes('VACATION')" 
-                            style="font-size: 10px; background-color: #fff3e0; color: #e65100; padding: 2px 6px; border-radius: 4px; font-weight: 500;">
+                            style="font-size: 10px; background-color: var(--state-warning-bg); color: var(--state-warning); padding: 2px 6px; border-radius: 4px; font-weight: 500;">
                         Vacaciones
                       </span>
                       <span *ngIf="s.roleFilter?.includes('MEDICAL_LEAVE')" 
-                            style="font-size: 10px; background-color: #fbe9f0; color: #7a1f45; padding: 2px 6px; border-radius: 4px; font-weight: 500; margin-right: 4px;">
+                            style="font-size: 10px; background-color: var(--state-info-bg); color: var(--state-info); padding: 2px 6px; border-radius: 4px; font-weight: 500; margin-right: 4px;">
                         Licencia médica
                       </span>
                       <span *ngIf="s.roleFilter?.includes('MEDICAL_APPOINTMENT')" 
-                            style="font-size: 10px; background-color: #fbe9f0; color: #7a1f45; padding: 2px 6px; border-radius: 4px; font-weight: 500;">
+                            style="font-size: 10px; background-color: var(--state-info-bg); color: var(--state-info); padding: 2px 6px; border-radius: 4px; font-weight: 500;">
                         Trámite Médico
                       </span>
                     </div>
                     
-                    <div class="schedule-item-actions" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed var(--soft-line, #D7DEC0); padding-top: 8px;">
+                    <div class="schedule-item-actions" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed var(--outline-subtle); padding-top: 8px;">
                       <button mat-icon-button color="accent" type="button" (click)="triggerManualSendForSchedule(s)" matTooltip="Enviar ahora" style="width: 30px; height: 30px; line-height: 30px;">
                         <mat-icon style="font-size: 18px;">send</mat-icon>
                       </button>
@@ -690,7 +691,7 @@
                     </div>
                   </div>
                   
-                  <div *ngIf="notificationSchedules.length === 0" style="text-align: center; color: #5B695D; padding: 20px 0; font-size: 13px;">
+                  <div *ngIf="notificationSchedules.length === 0" style="text-align: center; color: var(--text-secondary); padding: 20px 0; font-size: 13px;">
                     No hay notificaciones programadas.
                   </div>
                 </div>
@@ -699,7 +700,7 @@
               <!-- Vista de Formulario Inline para Crear/Editar -->
               <div *ngIf="showScheduleForm">
                 <form [formGroup]="scheduleForm" (ngSubmit)="saveNotificationSchedule()">
-                  <h4 style="margin-top: 0; margin-bottom: 15px; color: var(--body-text, #173831); font-weight: bold; font-size: 15px;">
+                  <h4 style="margin-top: 0; margin-bottom: 15px; color: var(--text-primary); font-weight: bold; font-size: 15px;">
                     {{ editingScheduleId ? 'Editar Notificación' : 'Nueva Notificación' }}
                   </h4>
                   
@@ -764,8 +765,8 @@
                   </div>
 
                   <!-- Checkboxes para seleccionar condiciones (Roles) a incluir -->
-                  <div class="condition-filters-section" style="margin-top: 10px; margin-bottom: 20px; border-top: 1px solid var(--soft-line, #D7DEC0); padding-top: 12px;">
-                    <h5 style="margin-top: 0; margin-bottom: 8px; font-weight: bold; color: var(--body-text, #173831); font-size: 13px;">Condiciones a Notificar:</h5>
+                  <div class="condition-filters-section" style="margin-top: 10px; margin-bottom: 20px; border-top: 1px solid var(--outline-subtle); padding-top: 12px;">
+                    <h5 style="margin-top: 0; margin-bottom: 8px; font-weight: bold; color: var(--text-primary); font-size: 13px;">Condiciones a Notificar:</h5>
                     <div style="display: flex; flex-direction: column; gap: 6px;">
                       <mat-checkbox formControlName="includeGuard">Turno de Guardia (N1/N2)</mat-checkbox>
                       <mat-checkbox formControlName="includeTI">Especialista TI (Ente externo)</mat-checkbox>
@@ -778,9 +779,9 @@
                   </div>
 
                   <!-- Sección de prueba de envío -->
-                  <div class="test-send-section" style="margin-top: 15px; margin-bottom: 20px; border-top: 1px solid var(--soft-line, #D7DEC0); padding-top: 12px;">
-                    <h5 style="margin-top: 0; margin-bottom: 8px; font-weight: bold; color: var(--body-text, #173831); font-size: 13px;">🧪 Probar Envío de Correo</h5>
-                    <p style="font-size: 11px; color: #5b695d; margin-top: 0; margin-bottom: 10px;">
+                  <div class="test-send-section" style="margin-top: 15px; margin-bottom: 20px; border-top: 1px solid var(--outline-subtle); padding-top: 12px;">
+                    <h5 style="margin-top: 0; margin-bottom: 8px; font-weight: bold; color: var(--text-primary); font-size: 13px;">🧪 Probar Envío de Correo</h5>
+                    <p style="font-size: 11px; color: var(--text-secondary); margin-top: 0; margin-bottom: 10px;">
                       Envía un correo de prueba con el formato y turnos reales de esta programación a un destinatario específico.
                     </p>
                     <div style="display: flex; gap: 8px; align-items: flex-start;">

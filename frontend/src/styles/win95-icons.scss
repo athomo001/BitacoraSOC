@@ -1,0 +1,173 @@
+/*
+ * No se fuerza width/height/font-size aquí a propósito: mat-icon ya trae su
+ * propio tamaño (24px por Material, o el que cada componente le haya puesto
+ * en línea o vía su propio .scss — 18px, 22px, 34px, etc.). Si lo pisamos
+ * con un tamaño fijo, el ícono pixel-art queda descuadrado respecto al
+ * texto/badge que lo rodea. Solo se oculta el glifo de texto (color
+ * transparente, sin tocar el font-size) y se dibuja el ícono como imagen de
+ * fondo dentro de esa misma caja.
+ */
+[data-theme="win95"] mat-icon[data-icon] {
+  color: transparent !important;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+[data-theme="win95"] mat-icon[data-icon="access_time"] { background-image: url('/assets/win95-icons/access_time.svg'); }
+[data-theme="win95"] mat-icon[data-icon="account_circle"] { background-image: url('/assets/win95-icons/account_circle.svg'); }
+[data-theme="win95"] mat-icon[data-icon="add"] { background-image: url('/assets/win95-icons/add.svg'); }
+[data-theme="win95"] mat-icon[data-icon="add_alert"] { background-image: url('/assets/win95-icons/add_alert.svg'); }
+[data-theme="win95"] mat-icon[data-icon="add_circle"] { background-image: url('/assets/win95-icons/add_circle.svg'); }
+[data-theme="win95"] mat-icon[data-icon="add_link"] { background-image: url('/assets/win95-icons/add_link.svg'); }
+[data-theme="win95"] mat-icon[data-icon="admin_panel_settings"] { background-image: url('/assets/win95-icons/admin_panel_settings.svg'); }
+[data-theme="win95"] mat-icon[data-icon="analytics"] { background-image: url('/assets/win95-icons/analytics.svg'); }
+[data-theme="win95"] mat-icon[data-icon="archive"] { background-image: url('/assets/win95-icons/archive.svg'); }
+[data-theme="win95"] mat-icon[data-icon="arrow_back"] { background-image: url('/assets/win95-icons/arrow_back.svg'); }
+[data-theme="win95"] mat-icon[data-icon="arrow_downward"] { background-image: url('/assets/win95-icons/arrow_downward.svg'); }
+[data-theme="win95"] mat-icon[data-icon="arrow_forward"] { background-image: url('/assets/win95-icons/arrow_forward.svg'); }
+[data-theme="win95"] mat-icon[data-icon="assessment"] { background-image: url('/assets/win95-icons/assessment.svg'); }
+[data-theme="win95"] mat-icon[data-icon="assignment"] { background-image: url('/assets/win95-icons/assignment.svg'); }
+[data-theme="win95"] mat-icon[data-icon="backup"] { background-image: url('/assets/win95-icons/backup.svg'); }
+[data-theme="win95"] mat-icon[data-icon="badge"] { background-image: url('/assets/win95-icons/badge.svg'); }
+[data-theme="win95"] mat-icon[data-icon="bolt"] { background-image: url('/assets/win95-icons/bolt.svg'); }
+[data-theme="win95"] mat-icon[data-icon="build"] { background-image: url('/assets/win95-icons/build.svg'); }
+[data-theme="win95"] mat-icon[data-icon="business"] { background-image: url('/assets/win95-icons/business.svg'); }
+[data-theme="win95"] mat-icon[data-icon="business_center"] { background-image: url('/assets/win95-icons/business_center.svg'); }
+[data-theme="win95"] mat-icon[data-icon="cake"] { background-image: url('/assets/win95-icons/cake.svg'); }
+[data-theme="win95"] mat-icon[data-icon="calendar_today"] { background-image: url('/assets/win95-icons/calendar_today.svg'); }
+[data-theme="win95"] mat-icon[data-icon="call"] { background-image: url('/assets/win95-icons/call.svg'); }
+[data-theme="win95"] mat-icon[data-icon="campaign"] { background-image: url('/assets/win95-icons/campaign.svg'); }
+[data-theme="win95"] mat-icon[data-icon="cancel"] { background-image: url('/assets/win95-icons/cancel.svg'); }
+[data-theme="win95"] mat-icon[data-icon="category"] { background-image: url('/assets/win95-icons/category.svg'); }
+[data-theme="win95"] mat-icon[data-icon="chat_bubble_outline"] { background-image: url('/assets/win95-icons/chat_bubble_outline.svg'); }
+[data-theme="win95"] mat-icon[data-icon="check_circle"] { background-image: url('/assets/win95-icons/check_circle.svg'); }
+[data-theme="win95"] mat-icon[data-icon="checklist"] { background-image: url('/assets/win95-icons/checklist.svg'); }
+[data-theme="win95"] mat-icon[data-icon="chevron_left"] { background-image: url('/assets/win95-icons/chevron_left.svg'); }
+[data-theme="win95"] mat-icon[data-icon="chevron_right"] { background-image: url('/assets/win95-icons/chevron_right.svg'); }
+[data-theme="win95"] mat-icon[data-icon="clear"] { background-image: url('/assets/win95-icons/clear.svg'); }
+[data-theme="win95"] mat-icon[data-icon="close"] { background-image: url('/assets/win95-icons/close.svg'); }
+[data-theme="win95"] mat-icon[data-icon="cloud_download"] { background-image: url('/assets/win95-icons/cloud_download.svg'); }
+[data-theme="win95"] mat-icon[data-icon="cloud_upload"] { background-image: url('/assets/win95-icons/cloud_upload.svg'); }
+[data-theme="win95"] mat-icon[data-icon="code"] { background-image: url('/assets/win95-icons/code.svg'); }
+[data-theme="win95"] mat-icon[data-icon="comment"] { background-image: url('/assets/win95-icons/comment.svg'); }
+[data-theme="win95"] mat-icon[data-icon="computer"] { background-image: url('/assets/win95-icons/computer.svg'); }
+[data-theme="win95"] mat-icon[data-icon="contact_page"] { background-image: url('/assets/win95-icons/contact_page.svg'); }
+[data-theme="win95"] mat-icon[data-icon="contact_phone"] { background-image: url('/assets/win95-icons/contact_phone.svg'); }
+[data-theme="win95"] mat-icon[data-icon="contacts"] { background-image: url('/assets/win95-icons/contacts.svg'); }
+[data-theme="win95"] mat-icon[data-icon="content_copy"] { background-image: url('/assets/win95-icons/content_copy.svg'); }
+[data-theme="win95"] mat-icon[data-icon="date_range"] { background-image: url('/assets/win95-icons/date_range.svg'); }
+[data-theme="win95"] mat-icon[data-icon="delete"] { background-image: url('/assets/win95-icons/delete.svg'); }
+[data-theme="win95"] mat-icon[data-icon="delete_forever"] { background-image: url('/assets/win95-icons/delete_forever.svg'); }
+[data-theme="win95"] mat-icon[data-icon="delete_sweep"] { background-image: url('/assets/win95-icons/delete_sweep.svg'); }
+[data-theme="win95"] mat-icon[data-icon="description"] { background-image: url('/assets/win95-icons/description.svg'); }
+[data-theme="win95"] mat-icon[data-icon="dns"] { background-image: url('/assets/win95-icons/dns.svg'); }
+[data-theme="win95"] mat-icon[data-icon="done_all"] { background-image: url('/assets/win95-icons/done_all.svg'); }
+[data-theme="win95"] mat-icon[data-icon="done_outline"] { background-image: url('/assets/win95-icons/done_outline.svg'); }
+[data-theme="win95"] mat-icon[data-icon="download"] { background-image: url('/assets/win95-icons/download.svg'); }
+[data-theme="win95"] mat-icon[data-icon="drag_indicator"] { background-image: url('/assets/win95-icons/drag_indicator.svg'); }
+[data-theme="win95"] mat-icon[data-icon="edit"] { background-image: url('/assets/win95-icons/edit.svg'); }
+[data-theme="win95"] mat-icon[data-icon="email"] { background-image: url('/assets/win95-icons/email.svg'); }
+[data-theme="win95"] mat-icon[data-icon="engineering"] { background-image: url('/assets/win95-icons/engineering.svg'); }
+[data-theme="win95"] mat-icon[data-icon="error"] { background-image: url('/assets/win95-icons/error.svg'); }
+[data-theme="win95"] mat-icon[data-icon="error_outline"] { background-image: url('/assets/win95-icons/error_outline.svg'); }
+[data-theme="win95"] mat-icon[data-icon="event"] { background-image: url('/assets/win95-icons/event.svg'); }
+[data-theme="win95"] mat-icon[data-icon="event_busy"] { background-image: url('/assets/win95-icons/event_busy.svg'); }
+[data-theme="win95"] mat-icon[data-icon="exit_to_app"] { background-image: url('/assets/win95-icons/exit_to_app.svg'); }
+[data-theme="win95"] mat-icon[data-icon="expand_less"] { background-image: url('/assets/win95-icons/expand_less.svg'); }
+[data-theme="win95"] mat-icon[data-icon="expand_more"] { background-image: url('/assets/win95-icons/expand_more.svg'); }
+[data-theme="win95"] mat-icon[data-icon="extension"] { background-image: url('/assets/win95-icons/extension.svg'); }
+[data-theme="win95"] mat-icon[data-icon="fact_check"] { background-image: url('/assets/win95-icons/fact_check.svg'); }
+[data-theme="win95"] mat-icon[data-icon="file_upload"] { background-image: url('/assets/win95-icons/file_upload.svg'); }
+[data-theme="win95"] mat-icon[data-icon="filter_list"] { background-image: url('/assets/win95-icons/filter_list.svg'); }
+[data-theme="win95"] mat-icon[data-icon="folder"] { background-image: url('/assets/win95-icons/folder.svg'); }
+[data-theme="win95"] mat-icon[data-icon="folder_open"] { background-image: url('/assets/win95-icons/folder_open.svg'); }
+[data-theme="win95"] mat-icon[data-icon="gradient"] { background-image: url('/assets/win95-icons/gradient.svg'); }
+[data-theme="win95"] mat-icon[data-icon="group_add"] { background-image: url('/assets/win95-icons/group_add.svg'); }
+[data-theme="win95"] mat-icon[data-icon="groups"] { background-image: url('/assets/win95-icons/groups.svg'); }
+[data-theme="win95"] mat-icon[data-icon="healing"] { background-image: url('/assets/win95-icons/healing.svg'); }
+[data-theme="win95"] mat-icon[data-icon="help_outline"] { background-image: url('/assets/win95-icons/help_outline.svg'); }
+[data-theme="win95"] mat-icon[data-icon="history"] { background-image: url('/assets/win95-icons/history.svg'); }
+[data-theme="win95"] mat-icon[data-icon="home"] { background-image: url('/assets/win95-icons/home.svg'); }
+[data-theme="win95"] mat-icon[data-icon="hourglass_bottom"] { background-image: url('/assets/win95-icons/hourglass_bottom.svg'); }
+[data-theme="win95"] mat-icon[data-icon="hourglass_empty"] { background-image: url('/assets/win95-icons/hourglass_empty.svg'); }
+[data-theme="win95"] mat-icon[data-icon="hourglass_top"] { background-image: url('/assets/win95-icons/hourglass_top.svg'); }
+[data-theme="win95"] mat-icon[data-icon="image"] { background-image: url('/assets/win95-icons/image.svg'); }
+[data-theme="win95"] mat-icon[data-icon="info"] { background-image: url('/assets/win95-icons/info.svg'); }
+[data-theme="win95"] mat-icon[data-icon="insert_chart_outlined"] { background-image: url('/assets/win95-icons/insert_chart_outlined.svg'); }
+[data-theme="win95"] mat-icon[data-icon="insert_photo"] { background-image: url('/assets/win95-icons/insert_photo.svg'); }
+[data-theme="win95"] mat-icon[data-icon="label"] { background-image: url('/assets/win95-icons/label.svg'); }
+[data-theme="win95"] mat-icon[data-icon="link"] { background-image: url('/assets/win95-icons/link.svg'); }
+[data-theme="win95"] mat-icon[data-icon="link_off"] { background-image: url('/assets/win95-icons/link_off.svg'); }
+[data-theme="win95"] mat-icon[data-icon="list"] { background-image: url('/assets/win95-icons/list.svg'); }
+[data-theme="win95"] mat-icon[data-icon="list_alt"] { background-image: url('/assets/win95-icons/list_alt.svg'); }
+[data-theme="win95"] mat-icon[data-icon="local_hospital"] { background-image: url('/assets/win95-icons/local_hospital.svg'); }
+[data-theme="win95"] mat-icon[data-icon="lock"] { background-image: url('/assets/win95-icons/lock.svg'); }
+[data-theme="win95"] mat-icon[data-icon="lock_open"] { background-image: url('/assets/win95-icons/lock_open.svg'); }
+[data-theme="win95"] mat-icon[data-icon="lock_reset"] { background-image: url('/assets/win95-icons/lock_reset.svg'); }
+[data-theme="win95"] mat-icon[data-icon="login"] { background-image: url('/assets/win95-icons/login.svg'); }
+[data-theme="win95"] mat-icon[data-icon="mail_outline"] { background-image: url('/assets/win95-icons/mail_outline.svg'); }
+[data-theme="win95"] mat-icon[data-icon="manage_accounts"] { background-image: url('/assets/win95-icons/manage_accounts.svg'); }
+[data-theme="win95"] mat-icon[data-icon="manage_search"] { background-image: url('/assets/win95-icons/manage_search.svg'); }
+[data-theme="win95"] mat-icon[data-icon="menu"] { background-image: url('/assets/win95-icons/menu.svg'); }
+[data-theme="win95"] mat-icon[data-icon="nightlight"] { background-image: url('/assets/win95-icons/nightlight.svg'); }
+[data-theme="win95"] mat-icon[data-icon="note"] { background-image: url('/assets/win95-icons/note.svg'); }
+[data-theme="win95"] mat-icon[data-icon="notes"] { background-image: url('/assets/win95-icons/notes.svg'); }
+[data-theme="win95"] mat-icon[data-icon="notifications_active"] { background-image: url('/assets/win95-icons/notifications_active.svg'); }
+[data-theme="win95"] mat-icon[data-icon="open_in_new"] { background-image: url('/assets/win95-icons/open_in_new.svg'); }
+[data-theme="win95"] mat-icon[data-icon="palette"] { background-image: url('/assets/win95-icons/palette.svg'); }
+[data-theme="win95"] mat-icon[data-icon="pending"] { background-image: url('/assets/win95-icons/pending.svg'); }
+[data-theme="win95"] mat-icon[data-icon="person"] { background-image: url('/assets/win95-icons/person.svg'); }
+[data-theme="win95"] mat-icon[data-icon="person_add"] { background-image: url('/assets/win95-icons/person_add.svg'); }
+[data-theme="win95"] mat-icon[data-icon="person_off"] { background-image: url('/assets/win95-icons/person_off.svg'); }
+[data-theme="win95"] mat-icon[data-icon="person_search"] { background-image: url('/assets/win95-icons/person_search.svg'); }
+[data-theme="win95"] mat-icon[data-icon="phone"] { background-image: url('/assets/win95-icons/phone.svg'); }
+[data-theme="win95"] mat-icon[data-icon="phone_in_talk"] { background-image: url('/assets/win95-icons/phone_in_talk.svg'); }
+[data-theme="win95"] mat-icon[data-icon="photo_camera"] { background-image: url('/assets/win95-icons/photo_camera.svg'); }
+[data-theme="win95"] mat-icon[data-icon="play_circle_filled"] { background-image: url('/assets/win95-icons/play_circle_filled.svg'); }
+[data-theme="win95"] mat-icon[data-icon="play_circle_outline"] { background-image: url('/assets/win95-icons/play_circle_outline.svg'); }
+[data-theme="win95"] mat-icon[data-icon="playlist_add_check"] { background-image: url('/assets/win95-icons/playlist_add_check.svg'); }
+[data-theme="win95"] mat-icon[data-icon="policy"] { background-image: url('/assets/win95-icons/policy.svg'); }
+[data-theme="win95"] mat-icon[data-icon="preview"] { background-image: url('/assets/win95-icons/preview.svg'); }
+[data-theme="win95"] mat-icon[data-icon="print"] { background-image: url('/assets/win95-icons/print.svg'); }
+[data-theme="win95"] mat-icon[data-icon="priority_high"] { background-image: url('/assets/win95-icons/priority_high.svg'); }
+[data-theme="win95"] mat-icon[data-icon="public"] { background-image: url('/assets/win95-icons/public.svg'); }
+[data-theme="win95"] mat-icon[data-icon="radio_button_unchecked"] { background-image: url('/assets/win95-icons/radio_button_unchecked.svg'); }
+[data-theme="win95"] mat-icon[data-icon="refresh"] { background-image: url('/assets/win95-icons/refresh.svg'); }
+[data-theme="win95"] mat-icon[data-icon="remove_circle"] { background-image: url('/assets/win95-icons/remove_circle.svg'); }
+[data-theme="win95"] mat-icon[data-icon="report_problem"] { background-image: url('/assets/win95-icons/report_problem.svg'); }
+[data-theme="win95"] mat-icon[data-icon="restore"] { background-image: url('/assets/win95-icons/restore.svg'); }
+[data-theme="win95"] mat-icon[data-icon="save"] { background-image: url('/assets/win95-icons/save.svg'); }
+[data-theme="win95"] mat-icon[data-icon="schedule"] { background-image: url('/assets/win95-icons/schedule.svg'); }
+[data-theme="win95"] mat-icon[data-icon="schema"] { background-image: url('/assets/win95-icons/schema.svg'); }
+[data-theme="win95"] mat-icon[data-icon="school"] { background-image: url('/assets/win95-icons/school.svg'); }
+[data-theme="win95"] mat-icon[data-icon="science"] { background-image: url('/assets/win95-icons/science.svg'); }
+[data-theme="win95"] mat-icon[data-icon="search"] { background-image: url('/assets/win95-icons/search.svg'); }
+[data-theme="win95"] mat-icon[data-icon="search_off"] { background-image: url('/assets/win95-icons/search_off.svg'); }
+[data-theme="win95"] mat-icon[data-icon="security"] { background-image: url('/assets/win95-icons/security.svg'); }
+[data-theme="win95"] mat-icon[data-icon="send"] { background-image: url('/assets/win95-icons/send.svg'); }
+[data-theme="win95"] mat-icon[data-icon="settings"] { background-image: url('/assets/win95-icons/settings.svg'); }
+[data-theme="win95"] mat-icon[data-icon="settings_backup_restore"] { background-image: url('/assets/win95-icons/settings_backup_restore.svg'); }
+[data-theme="win95"] mat-icon[data-icon="shield"] { background-image: url('/assets/win95-icons/shield.svg'); }
+[data-theme="win95"] mat-icon[data-icon="sort"] { background-image: url('/assets/win95-icons/sort.svg'); }
+[data-theme="win95"] mat-icon[data-icon="star"] { background-image: url('/assets/win95-icons/star.svg'); }
+[data-theme="win95"] mat-icon[data-icon="subject"] { background-image: url('/assets/win95-icons/subject.svg'); }
+[data-theme="win95"] mat-icon[data-icon="swap_horiz"] { background-image: url('/assets/win95-icons/swap_horiz.svg'); }
+[data-theme="win95"] mat-icon[data-icon="sync"] { background-image: url('/assets/win95-icons/sync.svg'); }
+[data-theme="win95"] mat-icon[data-icon="sync_alt"] { background-image: url('/assets/win95-icons/sync_alt.svg'); }
+[data-theme="win95"] mat-icon[data-icon="tab"] { background-image: url('/assets/win95-icons/tab.svg'); }
+[data-theme="win95"] mat-icon[data-icon="table_chart"] { background-image: url('/assets/win95-icons/table_chart.svg'); }
+[data-theme="win95"] mat-icon[data-icon="today"] { background-image: url('/assets/win95-icons/today.svg'); }
+[data-theme="win95"] mat-icon[data-icon="toggle_off"] { background-image: url('/assets/win95-icons/toggle_off.svg'); }
+[data-theme="win95"] mat-icon[data-icon="toggle_on"] { background-image: url('/assets/win95-icons/toggle_on.svg'); }
+[data-theme="win95"] mat-icon[data-icon="unfold_less"] { background-image: url('/assets/win95-icons/unfold_less.svg'); }
+[data-theme="win95"] mat-icon[data-icon="unfold_more"] { background-image: url('/assets/win95-icons/unfold_more.svg'); }
+[data-theme="win95"] mat-icon[data-icon="update"] { background-image: url('/assets/win95-icons/update.svg'); }
+[data-theme="win95"] mat-icon[data-icon="upload"] { background-image: url('/assets/win95-icons/upload.svg'); }
+[data-theme="win95"] mat-icon[data-icon="upload_file"] { background-image: url('/assets/win95-icons/upload_file.svg'); }
+[data-theme="win95"] mat-icon[data-icon="view_list"] { background-image: url('/assets/win95-icons/view_list.svg'); }
+[data-theme="win95"] mat-icon[data-icon="visibility"] { background-image: url('/assets/win95-icons/visibility.svg'); }
+[data-theme="win95"] mat-icon[data-icon="visibility_off"] { background-image: url('/assets/win95-icons/visibility_off.svg'); }
+[data-theme="win95"] mat-icon[data-icon="warning"] { background-image: url('/assets/win95-icons/warning.svg'); }
+[data-theme="win95"] mat-icon[data-icon="warning_amber"] { background-image: url('/assets/win95-icons/warning_amber.svg'); }
+[data-theme="win95"] mat-icon[data-icon="wb_sunny"] { background-image: url('/assets/win95-icons/wb_sunny.svg'); }
