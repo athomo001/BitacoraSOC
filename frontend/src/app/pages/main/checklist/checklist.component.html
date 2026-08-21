@@ -1,7 +1,4 @@
 <div class="checklist-container">
-  <header class="page-header">
-    <h1>Checklist de Turnos</h1>
-  </header>
   <section #checklistGuideCard class="status-card checklist-panel" *ngIf="checklistGuideVisible">
     <div class="checklist-panel__body">
       <p><strong>Guía rápida Checklist:</strong> selecciona tipo de check, evalúa todos los sub-items, agrega observación obligatoria en rojos y luego envía.</p>
@@ -16,9 +13,8 @@
       <mat-expansion-panel-header>
         <mat-panel-title>
           <mat-icon aria-hidden="true">checklist</mat-icon>
-          Formulario de Checklist
+          Formulario de Checklist Inicio/fin turno
         </mat-panel-title>
-        <mat-panel-description>Inicio / Cierre de Turno</mat-panel-description>
       </mat-expansion-panel-header>
       <div class="checklist-panel__body">
         <form (ngSubmit)="onSubmit()" #checkForm="ngForm">

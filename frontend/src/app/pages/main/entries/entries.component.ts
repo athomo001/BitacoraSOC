@@ -12,6 +12,7 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatDialog } from '@angular/material/dialog';
 import { EntryService } from '../../../services/entry.service';
 import { CatalogService } from '../../../services/catalog.service';
 import { CatalogLogSource } from '../../../models/catalog.model';
@@ -29,6 +30,9 @@ import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatRadioGroup, MatRadioButton } from '@angular/material/radio';
 import { MatSelect, MatOption } from '@angular/material/select';
+import { ConfirmDialogComponent } from '../../../components/confirm-dialog/confirm-dialog.component';
+import { ShiftReportDialogComponent } from './shift-report-dialog.component';
+import { ShiftReportMode } from '../../../utils/shift-report-template.util';
 
 @Component({
     selector: 'app-entries',
@@ -70,6 +74,7 @@ export class EntriesComponent implements OnInit, OnDestroy {
     private tagService: TagService,
     private snackBar: MatSnackBar,
     private authService: AuthService,
+    private dialog: MatDialog,
     // Servicio global del easter egg: el HUD se renderiza en el layout principal
     readonly batService: BatEasterEggService
   ) {
@@ -234,6 +239,54 @@ export class EntriesComponent implements OnInit, OnDestroy {
 
   hasTagInContent(tag: string): boolean {
     return this.contentTags.has(this.normalizeTag(tag));
+  }
+
+  openShiftReportDialog(mode: ShiftReportMode): void {
+    const dialogRef = this.dialog.open(ShiftReportDialogComponent, {
+      data: { mode },
+      width: '720px',
+      maxWidth: '95vw',
+      autoFocus: false
+    });
+
+    dialogRef.afterClosed().subscribe((content: string | null) => {
+      if (!content) {
+        return;
+      }
+
+      const currentValue = String(this.entryForm.get('content')?.value || '').trim();
+      if (!currentValue) {
+        this.applyShiftReportContent(content);
+        return;
+      }
+
+      const confirmRef = this.dialog.open(ConfirmDialogComponent, {
+        data: {
+          title: 'Reemplazar contenido',
+          message: 'Ya hay texto escrito en el formulario. ¿Quieres reemplazarlo con la plantilla generada?',
+          confirmText: 'Reemplazar',
+          cancelText: 'Cancelar'
+        }
+      });
+
+      confirmRef.afterClosed().subscribe((confirmed: boolean) => {
+        if (confirmed) {
+          this.applyShiftReportContent(content);
+        }
+      });
+    });
+  }
+
+  private applyShiftReportContent(content: string): void {
+    const contentControl = this.entryForm.get('content');
+    if (!contentControl) {
+      return;
+    }
+
+    contentControl.setValue(content);
+    contentControl.markAsDirty();
+    contentControl.markAsTouched();
+    this.syncContentTags(content);
   }
 
   private loadTopTags(): void {

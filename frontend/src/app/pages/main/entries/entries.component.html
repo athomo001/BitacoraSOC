@@ -1,9 +1,25 @@
 <div class="entries-container">
-  <!-- Centrado del título y optimización de espacio vertical en el panel de entradas -->
-  <h1>Nueva Entrada</h1>
+  <div class="entries-page-layout">
+    <!-- Panel lateral izquierdo: Plantillas de Inicio/Cierre de Turno (abren un formulario asistido y rellenan el texto de la derecha) -->
+    <aside class="shift-templates-panel">
+      <section class="shift-templates-box">
+        <h3>Plantillas de Turno</h3>
+        <p class="shift-templates-box__hint">Arma el reporte de turno con ayuda y revísalo antes de subir.</p>
+        <div class="shift-templates-box__actions">
+          <button mat-stroked-button type="button" color="primary" (click)="openShiftReportDialog('inicio')">
+            <mat-icon aria-hidden="true">wb_sunny</mat-icon>
+            Inicio de Turno
+          </button>
+          <button mat-stroked-button type="button" color="accent" (click)="openShiftReportDialog('cierre')">
+            <mat-icon aria-hidden="true">nightlight</mat-icon>
+            Fin de Turno
+          </button>
+        </div>
+      </section>
+    </aside>
 
-  <!-- Formulario de Nueva Entrada (PANTALLA PRINCIPAL) -->
-  <div class="entry-panel">
+    <!-- Formulario de Nueva Entrada (PANTALLA PRINCIPAL) -->
+    <div class="entry-panel">
     <div class="entry-panel__body">
       <form [formGroup]="entryForm" (ngSubmit)="onSubmit()">
         <div class="entry-form-layout">
@@ -56,6 +72,7 @@
                         maxlength="50000"
                         (input)="enforceContentMaxLength()"
                         placeholder="Escribe aquí. Usa # para tags (ej: #Trellix #hunting)"></textarea>
+              <mat-hint>Soporta Markdown: **negrita**, *cursiva*, listas con "- " o "* ", `código`, etc. Se ve formateado al abrir "Ver evento".</mat-hint>
               <mat-hint align="end">{{ entryForm.get('content')?.value?.length || 0 }}/50000</mat-hint>
               <mat-hint *ngIf="(entryForm.get('content')?.value?.length || 0) >= 50000" class="max-length-warning">
                 Máximo 50000 caracteres alcanzado
@@ -113,11 +130,11 @@
                   {{ source.name }}
                 </mat-option>
               </mat-select>
-              <mat-hint>Se asignará el LogSource predeterminado configurado por el admin</mat-hint>
             </mat-form-field>
           </div>
         </div>
       </form>
+    </div>
     </div>
   </div>
 

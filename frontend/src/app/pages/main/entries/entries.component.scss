@@ -1,17 +1,38 @@
 .entries-container {
-  /* Estilos para el contenedor de entradas. Se reduce padding y se centra el título */
-  max-width: 1200px;
+  /* Ancho ampliado (1200px -> 1460px) para hacerle sitio al panel de Plantillas de Turno
+     a la izquierda, usando espacio que antes quedaba vacío a los costados de la tarjeta. */
+  max-width: 1460px;
   margin: 0 auto;
-  padding: 12px 16px;
+  padding: 4px 16px 12px;
+}
 
-  h1 {
-    margin-bottom: 12px;
-    text-align: center;
-    color: var(--text-primary);
+.entries-page-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+
+  @media (max-width: 1100px) {
+    flex-direction: column;
+  }
+}
+
+// Panel lateral (izquierda de la tarjeta principal): botones de Inicio/Cierre de Turno
+.shift-templates-panel {
+  flex: 0 0 240px;
+  width: 240px;
+  position: sticky;
+  top: 12px;
+
+  @media (max-width: 1100px) {
+    width: 100%;
+    flex-basis: auto;
+    position: static;
   }
 }
 
 .entry-panel {
+  flex: 1;
+  min-width: 0;
   margin-bottom: var(--space-4);
   background: var(--surface-card);
   border: 1px solid var(--outline-subtle);
@@ -183,6 +204,40 @@
 
 .client-source-field {
   margin-top: 20px;
+}
+
+.shift-templates-box {
+  padding: 12px;
+  border: 1px solid var(--outline-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-color);
+
+  h3 {
+    margin: 0 0 4px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  &__hint {
+    margin: 0 0 10px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  &__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    button {
+      width: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+  }
 }
 
 // Overlay de easter egg: mismo scrim que login (variable global)
