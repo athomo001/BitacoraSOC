@@ -51,6 +51,15 @@
   color: var(--text-secondary);
 }
 
+// Texto de ayuda debajo de un textarea: fuera del mat-form-field a propósito — el mat-hint
+// interno recorta (overflow) el contenido a 1 línea y truncaba este texto más largo.
+.shift-dialog__help {
+  margin: -6px 0 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
 .shift-dialog__actions {
   padding-top: 8px;
   gap: 10px;

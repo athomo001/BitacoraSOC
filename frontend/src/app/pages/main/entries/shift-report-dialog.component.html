@@ -22,19 +22,19 @@
     <mat-label>{{ ticketsSectionLabel }}</mat-label>
     <textarea matInput rows="8" [(ngModel)]="ticketsText" name="ticketsText"
               [placeholder]="ticketsPlaceholder"></textarea>
-    <mat-hint>
-      Pega el dump crudo (N° de ticket + tab/espacios + descripción) tal cual lo copias, o usa
-      <code>{{ ticketsPlaceholder }}</code> por línea para agregar más detalle.
-      Para anotar un ticket, escribe la línea justo debajo (ej: <code>{{ ticketsAnnotationHint }}</code>) — se adjunta a ese ticket, no crea uno nuevo.
-    </mat-hint>
   </mat-form-field>
+  <p class="shift-dialog__help">
+    Pega el dump crudo (N° de ticket + tab/espacios + descripción) tal cual lo copias, o usa
+    <code>{{ ticketsPlaceholder }}</code> por línea para agregar más detalle.
+    Para anotar un ticket, escribe la línea justo debajo (ej: <code>{{ ticketsAnnotationHint }}</code>) — se adjunta a ese ticket, no crea uno nuevo.
+  </p>
 
   <mat-form-field appearance="outline" class="full-width">
     <mat-label>{{ notesSectionLabel }}</mat-label>
     <textarea matInput rows="5" [(ngModel)]="notesText" name="notesText"
               placeholder="Texto libre. Puedes usar Markdown: - viñeta, # Título, **negrita**"></textarea>
-    <mat-hint>Se inserta tal cual lo escribas (respeta tus propias viñetas y títulos).</mat-hint>
   </mat-form-field>
+  <p class="shift-dialog__help">Se inserta tal cual lo escribas (respeta tus propias viñetas y títulos).</p>
 </mat-dialog-content>
 
 <mat-dialog-actions align="end" class="shift-dialog__actions">
