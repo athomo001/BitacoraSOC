@@ -1263,13 +1263,13 @@
         }
         
         &.row-warning {
-          background-color: #fffdf5;
-          &:hover { background-color: #fff9e6; }
+          background-color: var(--state-warning-bg);
+          &:hover { background-color: color-mix(in srgb, var(--state-warning-bg) 80%, var(--state-warning) 20%); }
         }
-        
+
         &.row-danger {
-          background-color: #fffafb;
-          &:hover { background-color: #fff0f2; }
+          background-color: var(--state-error-bg);
+          &:hover { background-color: color-mix(in srgb, var(--state-error-bg) 80%, var(--state-error) 20%); }
         }
       }
       
@@ -1301,33 +1301,33 @@
           
           &[data-status="Excelente"],
           &[data-status="Estable"] {
-            background-color: #d1fae5;
-            color: #065f46;
+            background-color: var(--state-success-bg);
+            color: var(--state-success);
           }
-          
+
           &[data-status="Simplificado"] {
-            background-color: #fef3c7;
-            color: #92400e;
+            background-color: var(--state-warning-bg);
+            color: var(--state-warning);
           }
-          
+
           &[data-status="Sospecha de Relleno"] {
-            background-color: #fee2e2;
-            color: #991b1b;
+            background-color: var(--state-error-bg);
+            color: var(--state-error);
           }
 
           &[data-status="Sin registros"] {
-            background-color: #f1f5f9;
-            color: #475569;
+            background-color: var(--state-neutral-bg);
+            color: var(--state-neutral);
           }
 
           &[data-status="Licencia Médica"] {
-            background-color: #fae8ff;
-            color: #86198f;
+            background-color: color-mix(in srgb, var(--status-medical) 18%, var(--surface-color) 82%);
+            color: var(--status-medical);
           }
 
           &[data-status="Vacaciones"] {
-            background-color: #e0f2fe;
-            color: #075985;
+            background-color: color-mix(in srgb, var(--status-vacation) 18%, var(--surface-color) 82%);
+            color: var(--status-vacation);
           }
         }
       }

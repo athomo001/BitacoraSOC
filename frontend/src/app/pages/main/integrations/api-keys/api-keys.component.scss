@@ -104,31 +104,31 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid var(--outline-subtle);
     padding-bottom: 12px;
 
     h2 {
       margin: 0;
       font-size: 20px;
       font-weight: 600;
-      color: #1a202c;
+      color: var(--text-primary);
     }
   }
 
   // Tarjeta de Formulario de Creación
   .create-form-card {
-    background-color: #ffffff;
-    border: 1px solid #e2e8f0;
+    background-color: var(--surface-card);
+    border: 1px solid var(--outline-subtle);
     border-radius: 8px;
     padding: 24px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+    box-shadow: var(--shadow);
     animation: slideDown 0.3s ease-out;
 
     h3 {
       margin: 0 0 20px 0;
       font-size: 16px;
       font-weight: 600;
-      color: #2d3748;
+      color: var(--text-primary);
     }
 
     .form-grid {
@@ -148,17 +148,17 @@
       gap: 12px;
       margin-top: 24px;
       padding-top: 16px;
-      border-top: 1px solid #edf2f7;
+      border-top: 1px solid var(--outline-subtle);
     }
   }
 
   // Tarjetas de tablas (Listado y Logs)
   .keys-list-card, .logs-card {
-    background-color: #ffffff;
-    border: 1px solid #e2e8f0;
+    background-color: var(--surface-card);
+    border: 1px solid var(--outline-subtle);
     border-radius: 8px;
     padding: 20px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+    box-shadow: var(--shadow);
 
     .card-header {
       display: flex;
@@ -170,7 +170,7 @@
         margin: 0;
         font-size: 16px;
         font-weight: 600;
-        color: #2d3748;
+        color: var(--text-primary);
       }
     }
   }
@@ -179,7 +179,7 @@
   .table-container {
     overflow-x: auto;
     border-radius: 6px;
-    border: 1px solid #edf2f7;
+    border: 1px solid var(--outline-subtle);
   }
 
   .data-table {
@@ -189,11 +189,11 @@
     font-size: 14px;
 
     th {
-      background-color: #f7fafc;
-      color: #4a5568;
+      background-color: var(--surface-muted);
+      color: var(--text-secondary);
       font-weight: 600;
       padding: 12px 16px;
-      border-bottom: 2px solid #edf2f7;
+      border-bottom: 2px solid var(--outline-subtle);
       text-transform: uppercase;
       font-size: 11px;
       letter-spacing: 0.5px;
@@ -201,16 +201,16 @@
 
     td {
       padding: 14px 16px;
-      border-bottom: 1px solid #edf2f7;
-      color: #2d3748;
+      border-bottom: 1px solid var(--outline-subtle);
+      color: var(--text-primary);
       vertical-align: middle;
 
       code {
         font-family: monospace;
-        background-color: #f1f5f9;
+        background-color: var(--surface-muted);
         padding: 2px 6px;
         border-radius: 4px;
-        color: #475569;
+        color: var(--text-secondary);
       }
     }
 
@@ -218,13 +218,13 @@
       transition: background-color 0.15s ease;
 
       &:hover {
-        background-color: #f8fafc;
+        background-color: var(--hover-bg);
       }
 
       &.revoked-row {
-        background-color: #fcfcfc;
+        background-color: var(--disabled-bg);
         td {
-          color: #94a3b8;
+          color: var(--disabled-text);
         }
       }
     }
@@ -232,18 +232,18 @@
     .empty-message, .loading-message {
       text-align: center;
       padding: 40px;
-      color: #718096;
+      color: var(--text-secondary);
       font-style: italic;
     }
 
     .bold-text {
       font-weight: 600;
-      color: #1a202c;
+      color: var(--text-primary);
     }
 
     .small-text {
       font-size: 12px;
-      color: #718096;
+      color: var(--text-secondary);
       max-width: 300px;
       white-space: nowrap;
       overflow: hidden;
@@ -258,13 +258,13 @@
     gap: 6px;
 
     .scope-chip {
-      background-color: #eff6ff;
-      color: #1d4ed8;
+      background-color: var(--state-info-bg);
+      color: var(--state-info);
       font-size: 11px;
       font-weight: 600;
       padding: 2px 8px;
       border-radius: 12px;
-      border: 1px solid #bfdbfe;
+      border: 1px solid var(--state-info);
     }
   }
 
@@ -278,39 +278,39 @@
     text-transform: uppercase;
 
     &.badge-active {
-      background-color: #ecfdf5;
-      color: #047857;
-      border: 1px solid #a7f3d0;
+      background-color: var(--state-success-bg);
+      color: var(--state-success);
+      border: 1px solid var(--state-success);
     }
 
     &.badge-revoked {
-      background-color: #fef2f2;
-      color: #b91c1c;
-      border: 1px solid #fca5a5;
+      background-color: var(--state-error-bg);
+      color: var(--state-error);
+      border: 1px solid var(--state-error);
     }
 
     &.badge-expired {
-      background-color: #fffbeb;
-      color: #b45309;
-      border: 1px solid #fde68a;
+      background-color: var(--state-warning-bg);
+      color: var(--state-warning);
+      border: 1px solid var(--state-warning);
     }
   }
 
   // Tags del Método HTTP en Auditoría
   .method-tag {
-    background-color: #f1f5f9;
-    color: #475569;
+    background-color: var(--surface-muted);
+    color: var(--text-secondary);
     font-size: 11px;
     font-weight: 700;
     padding: 2px 6px;
     border-radius: 4px;
     display: inline-block;
-    border: 1px solid #cbd5e1;
+    border: 1px solid var(--outline-variant);
 
     &.method-post {
-      background-color: #ecfdf5;
-      color: #047857;
-      border: 1px solid #a7f3d0;
+      background-color: var(--state-success-bg);
+      color: var(--state-success);
+      border: 1px solid var(--state-success);
     }
   }
 
@@ -322,18 +322,18 @@
     font-size: 12px;
 
     &.status-success {
-      background-color: #dcfce7;
-      color: #166534;
+      background-color: var(--state-success-bg);
+      color: var(--state-success);
     }
 
     &.status-error {
-      background-color: #fee2e2;
-      color: #991b1b;
+      background-color: var(--state-error-bg);
+      color: var(--state-error);
     }
   }
 
   .revoked-text {
-    color: #94a3b8;
+    color: var(--disabled-text);
     font-size: 13px;
     font-style: italic;
   }
@@ -345,32 +345,32 @@
     align-items: center;
     margin-top: 16px;
     padding-top: 12px;
-    border-top: 1px solid #edf2f7;
+    border-top: 1px solid var(--outline-subtle);
 
     .page-indicator {
       font-size: 13px;
-      color: #4a5568;
+      color: var(--text-secondary);
     }
   }
 
   // Sección de Documentación
   .docs-section {
-    background-color: #ffffff;
-    border: 1px solid #e2e8f0;
+    background-color: var(--surface-card);
+    border: 1px solid var(--outline-subtle);
     border-radius: 8px;
     padding: 20px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+    box-shadow: var(--shadow);
 
     h3 {
       margin: 0 0 16px 0;
       font-size: 16px;
       font-weight: 600;
-      color: #2d3748;
+      color: var(--text-primary);
     }
 
     .panel-content {
       padding: 12px 4px;
-      color: #4a5568;
+      color: var(--text-secondary);
       font-size: 14px;
       line-height: 22px;
 
@@ -382,9 +382,9 @@
       h4 {
         margin: 20px 0 8px 0;
         font-size: 14px;
-        color: #2d3748;
+        color: var(--text-primary);
         font-weight: 600;
-        border-bottom: 1px solid #edf2f7;
+        border-bottom: 1px solid var(--outline-subtle);
         padding-bottom: 6px;
       }
     }
@@ -397,24 +397,24 @@
       font-size: 13px;
 
       th {
-        background-color: #f8fafc;
-        color: #475569;
+        background-color: var(--surface-muted);
+        color: var(--text-secondary);
         font-weight: 600;
         padding: 8px 12px;
-        border-bottom: 1px solid #e2e8f0;
+        border-bottom: 1px solid var(--outline-subtle);
       }
 
       td {
         padding: 8px 12px;
-        border-bottom: 1px solid #f1f5f9;
-        color: #334155;
+        border-bottom: 1px solid var(--outline-subtle);
+        color: var(--text-primary);
         vertical-align: top;
 
         ul {
           margin: 4px 0 0 0;
           padding-left: 15px;
           font-size: 12px;
-          color: #64748b;
+          color: var(--text-secondary);
         }
       }
     }

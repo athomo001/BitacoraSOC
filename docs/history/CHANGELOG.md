@@ -2,6 +2,17 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.10.0] - 2026-08-20
+
+### Saneamiento del sistema de temas + nuevo tema "Windows 95" con íconos pixel-art
+
+- **Feature (Frontend) — Nuevo tema visual "Windows 95"**: se agrega una cuarta opción al selector de temas (junto a Light/Pastel/Cyberpunk), con paleta gris/azul marino clásica, botones y campos con bisel 3D, barra de título con degradado azul, esquinas cuadradas y scrollbar biselado. El mecanismo es 100% aditivo (variables CSS bajo `[data-theme="win95"]`, mismos nombres de token que los demás temas) por lo que no modifica el comportamiento de Light/Pastel/Cyberpunk.
+- **Feature (Frontend) — Íconos pixel-art reales para el tema Windows 95**: 157 de los ~159 íconos Material que usa la aplicación se reemplazan por su equivalente pixel-art de `pixelarticons` (MIT license), solo bajo el tema Windows 95. Un servicio nuevo (`Win95IconSyncService`) sincroniza un atributo `data-icon` en cada `<mat-icon>` a partir de su texto sin tocar nunca el nodo que Angular controla, por lo que los íconos dinámicos (toggles, spinners de carga) se siguen actualizando con normalidad. Los íconos sin equivalente razonable simplemente conservan el glifo Material original (sin roturas visuales).
+- **Bugfix (Frontend) — Colores hardcodeados que rompían el cambio de tema**: varios componentes tenían colores fijos en vez de usar las variables del tema, por lo que al cambiar de tema quedaban con combinaciones ilegibles (ej. texto claro sobre fondo claro). Corregidos: `work-shifts-admin` (el peor caso — referenciaba variables CSS que **no existían en ningún lado**, `--card-bg`/`--body-text`/`--soft-line`, cuyo valor de repliegue hardcodeado era lo único que se aplicaba siempre), `not-found`, `api-keys`, badges de severidad en `report-generator` y `reports`, e íconos de calendario (teletrabajo/capacitación/vacaciones/médico) en `escalation-simple` — estos últimos ahora usan 4 tokens nuevos (`--status-telework/-training/-vacation/-medical`) definidos en los 5 temas. Fuera de alcance a propósito: los 6 skins de la pantalla de login (sistema de temas independiente), el QR de 2FA y las secciones de impresión (intencionalmente fijas en blanco/negro).
+- **Bugfix (Frontend) — Ronda de pulido del tema Windows 95 tras pruebas manuales**: contraste de texto negro sobre cabeceras oscuras (una regla global preexistente forzaba `color: var(--text-primary)` en encabezados, ganándole a cualquier color heredado del contenedor); etiquetas de campos de texto superpuestas con el borde (el bisel 3D no respetaba el "notch" donde Material posiciona la etiqueta flotante); íconos desalineados (se forzaba un tamaño fijo de 20×20 en vez de heredar el tamaño que cada componente ya definía); tipografía retro aplicada a toda la aplicación en vez de solo a títulos (Tahoma/MS Sans Serif es más ancha que Roboto y podía truncar texto en botones/tabs ajustados); y el bug más visible — la regla de bisel para botones (`button.mat-mdc-button-base`) hacía match también con `mat-icon-button` (comparten esa clase base), convirtiendo cada botón circular de solo-ícono (enviar/editar/eliminar) en un cuadrado beige biselado que tapaba el ícono. Ahora los botones de ícono quedan planos por defecto y solo muestran el bisel al pasar el mouse, como en Windows 95 real.
+
+---
+
 ## [v1.9.1] - 2026-08-20
 
 ### Mejoras menores en Directorio de Contactos (`/main/escalation/directory`)

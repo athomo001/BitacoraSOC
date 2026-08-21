@@ -8,7 +8,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `CHANGELOG.md`): **v1.9.1**
+> Version referencial actual (segun `CHANGELOG.md`): **v1.10.0**
 
 Stack principal:
 
@@ -83,6 +83,13 @@ Stack principal:
 ## Novedades recientes (resumen rapido)
 
 > Historial completo y detallado en [`docs/history/CHANGELOG.md`](docs/history/CHANGELOG.md).
+
+### v1.10.0 (Saneamiento del sistema de temas + nuevo tema "Windows 95" con íconos pixel-art)
+
+- **Nuevo tema "Windows 95"**: cuarta opción en el selector de temas, con paleta gris/azul marino, botones y campos con bisel 3D, barra de título degradada y esquinas cuadradas. Aditivo por diseño — no modifica Light/Pastel/Cyberpunk.
+- **Íconos pixel-art**: 157 íconos Material reemplazados por su equivalente `pixelarticons` (MIT) solo bajo el tema Windows 95, vía un servicio que sincroniza el ícono actual sin interferir con la reactividad de Angular.
+- **Bugfix**: varios componentes (`work-shifts-admin`, `not-found`, `api-keys`, badges de severidad, íconos de calendario) tenían colores hardcodeados que rompían el cambio de tema — el caso más grave usaba variables CSS que no existían en ningún lado. Corregidos con los tokens del sistema de temas existente.
+- **Ronda de pulido tras pruebas manuales**: contraste de texto en cabeceras, colisión de etiquetas con bordes de campos, tamaño de íconos, alcance de la tipografía retro, y el bug más visible — botones de solo-ícono (enviar/editar/eliminar) que quedaban convertidos en cuadrados beige biselados por compartir clase base con los botones de texto.
 
 ### v1.9.1 (Mejoras menores en Directorio de Contactos)
 
