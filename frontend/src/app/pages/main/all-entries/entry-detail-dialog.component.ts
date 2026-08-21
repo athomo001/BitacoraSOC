@@ -8,6 +8,7 @@ import { Component, Inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MarkdownPipe } from '../../../pipes/markdown.pipe';
 
 export interface EntryDetailDialogData {
   title: string;
@@ -17,7 +18,7 @@ export interface EntryDetailDialogData {
 
 @Component({
     selector: 'app-entry-detail-dialog',
-    imports: [CommonModule, MatDialogModule, MatButtonModule],
+    imports: [CommonModule, MatDialogModule, MatButtonModule, MarkdownPipe],
     templateUrl: './entry-detail-dialog.component.html',
     styleUrls: ['./entry-detail-dialog.component.scss']
 })

@@ -2,6 +2,20 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.10.1] - 2026-08-21
+
+### Soporte Markdown en la bitácora + formulario asistido de Inicio/Cierre de Turno (`/main/checklist`, `/main/all-entries`)
+
+- **Feature (Frontend) — Soporte Markdown al ver una entrada**: el modal "Ver evento" de **Todas las Entradas** (`/main/all-entries`) ahora renderiza el contenido como Markdown (negrita, cursiva, listas, títulos, código, citas, tablas, enlaces) en vez de texto plano, vía `marked` + sanitización con `DOMPurify` (doble capa junto al sanitizador propio de Angular sobre `[innerHTML]`). El cajón de "Nueva Entrada" sigue siendo texto plano al escribir; el formato se aplica solo al visualizar. Por decisión explícita, un `#` sin espacio al inicio de línea (`#Hola`) también se trata como título igual que con espacio (`# Hola`) — necesario porque los hashtags de la bitácora (`#iniciodeturno`, `#cdc`, etc.) van sin espacio; un tag mencionado a mitad de texto no se ve afectado (la regla solo aplica a inicio de línea), pero un tag que va solo en su propia línea sí sale como título grande.
+- **Feature (Frontend) — Formulario asistido de Inicio/Cierre de Turno**: nuevo panel "Plantillas de Turno" junto al formulario de "Nueva Entrada", con botones que abren un diálogo para armar el reporte de turno (métricas, tickets/incidentes, observaciones) siguiendo la plantilla estándar de traspaso de guardia. El texto armado se inserta en el cajón principal para revisión/edición antes de subir la entrada — el diálogo no crea la entrada directamente.
+  - El cajón de tickets/incidentes acepta tanto el dump crudo que se copia tal cual de CDC/GLPI (número de ticket + tab/espacios + descripción) como el formato `// ticket, cliente[, severidad], descripción` para agregar más detalle por línea; los campos se separan por coma o punto y coma indistintamente. Una línea suelta escrita justo debajo de un ticket se adjunta como anotación de **ese** ticket en vez de crear uno nuevo o duplicarse.
+  - El cajón de observaciones/novedades inserta el texto tal cual se escribe (sin forzar viñetas por línea), para que títulos y formato Markdown propios del usuario se rendericen correctamente al ver la entrada.
+  - Los encabezados de cada sección de la plantilla ("Resumen de Gestión", "Tickets Activos", "Observaciones Generales", etc.) se generan como títulos Markdown (`##`).
+  - El cajón de métricas quedó como un solo campo numérico por modo (Inicio: "Tickets totales CDC"; Cierre: "Incidentes gestionados (SOC)"), validado a enteros de máximo 3 dígitos sin separadores.
+- **Mejora (Frontend) — Optimización de espacio en `/main/checklist`**: se eliminan los títulos redundantes "Checklist de Turnos" y "Nueva Entrada", se fusiona la descripción del panel de checklist en su título ("Formulario de Checklist Inicio/fin turno"), se quita el hint informativo del selector de Cliente/Log Source y se reducen márgenes/paddings entre secciones para que el botón "Subir" quede visible sin necesidad de hacer scroll.
+
+---
+
 ## [v1.10.0] - 2026-08-20
 
 ### Saneamiento del sistema de temas + nuevo tema "Windows 95" con íconos pixel-art

@@ -8,7 +8,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `CHANGELOG.md`): **v1.10.0**
+> Version referencial actual (segun `CHANGELOG.md`): **v1.10.1**
 
 Stack principal:
 
@@ -83,6 +83,12 @@ Stack principal:
 ## Novedades recientes (resumen rapido)
 
 > Historial completo y detallado en [`docs/history/CHANGELOG.md`](docs/history/CHANGELOG.md).
+
+### v1.10.1 (Soporte Markdown en la bitácora + formulario asistido de Inicio/Cierre de Turno)
+
+- **Markdown al ver una entrada**: el modal "Ver evento" (`/main/all-entries`) renderiza el contenido como Markdown (negrita, listas, títulos, código, citas, tablas, enlaces) en vez de texto plano, con sanitización vía `DOMPurify`. Un `#` sin espacio al inicio de línea también se trata como título (necesario porque los hashtags de la bitácora van sin espacio; un tag a mitad de texto no se ve afectado).
+- **Formulario asistido de Inicio/Cierre de Turno**: nuevo panel "Plantillas de Turno" junto a "Nueva Entrada" que arma el reporte de turno (métricas, tickets/incidentes, observaciones) siguiendo la plantilla estándar de traspaso de guardia; el texto se inserta en el cajón principal para revisar antes de subir. El cajón de tickets acepta tanto el dump crudo de CDC/GLPI como el formato `// ticket, cliente[, severidad], descripción`.
+- **Optimización de espacio en `/main/checklist`**: se quitan títulos redundantes, se fusiona el título del panel de checklist con su descripción y se reduce el espaciado para que el botón "Subir" quede visible sin scroll.
 
 ### v1.10.0 (Saneamiento del sistema de temas + nuevo tema "Windows 95" con íconos pixel-art)
 

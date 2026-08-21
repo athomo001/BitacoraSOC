@@ -1,0 +1,64 @@
+.shift-dialog__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.shift-dialog__content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 480px;
+  max-width: 640px;
+
+  @media (max-width: 600px) {
+    min-width: 0;
+  }
+}
+
+.full-width {
+  width: 100%;
+}
+
+.shift-dialog__metrics {
+  margin-bottom: 8px;
+}
+
+.shift-dialog__metrics-title {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.shift-dialog__metrics-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.metric-field {
+  width: 140px;
+}
+
+.shift-dialog__metrics-hint {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.shift-dialog__actions {
+  padding-top: 8px;
+  gap: 10px;
+}
+
+code {
+  font-family: "Courier New", Courier, monospace;
+  background: var(--surface-muted, rgba(0, 0, 0, 0.06));
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+}
