@@ -6,35 +6,45 @@
 <mat-dialog-content class="shift-dialog__content">
   <div class="shift-dialog__metrics">
     <span class="shift-dialog__metrics-title">{{ isInicio ? 'Métricas' : 'Resumen de gestión' }}</span>
-    <div class="shift-dialog__metrics-fields">
-      <mat-form-field appearance="outline" class="metric-field" *ngFor="let field of metricFields">
-        <mat-label>{{ field.label }}</mat-label>
-        <input matInput type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3"
-               [name]="'metric_' + field.key"
-               [(ngModel)]="metricValues[field.key]"
-               (input)="sanitizeMetricInput(field.key)">
-      </mat-form-field>
+    <div class="shift-dialog__metrics-row">
+      <div class="shift-dialog__metrics-fields">
+        <mat-form-field appearance="outline" class="metric-field" *ngFor="let field of metricFields">
+          <mat-label>{{ field.label }}</mat-label>
+          <input matInput type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3"
+                 [name]="'metric_' + field.key"
+                 [(ngModel)]="metricValues[field.key]"
+                 (input)="sanitizeMetricInput(field.key)">
+        </mat-form-field>
+      </div>
+      <p class="shift-dialog__metrics-hint" @hintBox>
+        <mat-icon aria-hidden="true" class="shift-dialog__hint-icon">info</mat-icon>
+        <span>Solo números enteros, máximo 3 dígitos (0-999).</span>
+      </p>
     </div>
-    <p class="shift-dialog__metrics-hint">Solo números enteros, máximo 3 dígitos (0-999).</p>
   </div>
 
   <mat-form-field appearance="outline" class="full-width">
     <mat-label>{{ ticketsSectionLabel }}</mat-label>
     <textarea matInput rows="8" [(ngModel)]="ticketsText" name="ticketsText"
               [placeholder]="ticketsPlaceholder"></textarea>
-    <mat-hint>
-      Pega el dump crudo (N° de ticket + tab/espacios + descripción) tal cual lo copias, o usa
-      <code>{{ ticketsPlaceholder }}</code> por línea para agregar más detalle.
-      Para anotar un ticket, escribe la línea justo debajo (ej: <code>{{ ticketsAnnotationHint }}</code>) — se adjunta a ese ticket, no crea uno nuevo.
-    </mat-hint>
   </mat-form-field>
+  <p class="shift-dialog__help" @hintBox>
+    <mat-icon aria-hidden="true" class="shift-dialog__hint-icon">info</mat-icon>
+    <span>
+      Formato recomendado: <code>{{ ticketsPlaceholder }}</code><br>
+      <code>{{ ticketsAnnotationPrefix }}</code>
+    </span>
+  </p>
 
   <mat-form-field appearance="outline" class="full-width">
     <mat-label>{{ notesSectionLabel }}</mat-label>
     <textarea matInput rows="5" [(ngModel)]="notesText" name="notesText"
               placeholder="Texto libre. Puedes usar Markdown: - viñeta, # Título, **negrita**"></textarea>
-    <mat-hint>Se inserta tal cual lo escribas (respeta tus propias viñetas y títulos).</mat-hint>
   </mat-form-field>
+  <p class="shift-dialog__help" @hintBox>
+    <mat-icon aria-hidden="true" class="shift-dialog__hint-icon">info</mat-icon>
+    <span>Se inserta tal cual lo escribas (respeta tus propias viñetas y títulos).</span>
+  </p>
 </mat-dialog-content>
 
 <mat-dialog-actions align="end" class="shift-dialog__actions">
