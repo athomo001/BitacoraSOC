@@ -67,7 +67,7 @@
               <small class="helper-text">Se aceptan archivos formato PEM (.crt, .key, .pem). No soportamos llaves encriptadas con contraseña.</small>
 
               <!-- Botón para subir certificados TLS (Hot Reload) -->
-              <button mat-raised-button color="accent" type="button" (click)="uploadCertificates()" [disabled]="isSaving" style="margin-top: 10px;">
+              <button mat-raised-button color="accent" type="button" (click)="uploadCertificates()" [disabled]="isSaving">
                 <mat-spinner *ngIf="isSaving" diameter="18"></mat-spinner>
                 <span *ngIf="!isSaving">Subir SSL y Activar (0-Downtime)</span>
                 <span *ngIf="isSaving && countdownMessage">Activando TLS... {{ countdownMessage }}</span>
@@ -78,7 +78,7 @@
             <!-- Notas importantes de HTTPS -->
             <div class="notes">
               <p>Los cambios de certificados se aplican instantáneamente en caliente sin reiniciar la red (SNI Hot-Reload).</p>
-              <p style="margin-top: 4px;"><strong>Nota Local:</strong> Si estás usando "pnpm start" (localhost), "Forzar HTTPS" se ignorará de forma segura para no romper tu sesión HTTP. Funcionará en Producción o Docker.</p>
+              <p><strong>Nota Local:</strong> Si estás usando "pnpm start" (localhost), "Forzar HTTPS" se ignorará de forma segura para no romper tu sesión HTTP. Funcionará en Producción o Docker.</p>
             </div>
 
             <!-- Botones de acción del formulario HTTPS -->
@@ -117,7 +117,7 @@
                 <mat-checkbox formControlName="googleSsoEnabled">
                   Activar Google SSO
                 </mat-checkbox>
-                <mat-form-field appearance="outline" class="full-width">
+                <mat-form-field appearance="outline" class="full-width" *ngIf="ssoForm.get('googleSsoEnabled')?.value">
                   <mat-label>Client ID de Google</mat-label>
                   <input matInput formControlName="googleClientId" placeholder="client-id.apps.googleusercontent.com">
                   <mat-hint>ID obtenido desde la consola de desarrolladores de Google Cloud</mat-hint>
@@ -134,24 +134,28 @@
                 <mat-checkbox formControlName="microsoftSsoEnabled">
                   Activar Microsoft SSO
                 </mat-checkbox>
-                <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Client ID de Microsoft</mat-label>
-                  <input matInput formControlName="microsoftClientId" placeholder="00000000-0000-0000-0000-000000000000">
-                  <mat-hint>ID de la aplicación registrada en Azure Entra ID</mat-hint>
-                </mat-form-field>
-                <mat-form-field appearance="outline" class="full-width" style="margin-top: 10px;">
-                  <mat-label>Tenant ID (Microsoft)</mat-label>
-                  <input matInput formControlName="microsoftTenantId" placeholder="common o ID del Tenant">
-                  <mat-hint>Usa "common" para multi-inquilino o introduce el ID específico del Tenant</mat-hint>
-                </mat-form-field>
+                <ng-container *ngIf="ssoForm.get('microsoftSsoEnabled')?.value">
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Client ID de Microsoft</mat-label>
+                    <input matInput formControlName="microsoftClientId" placeholder="00000000-0000-0000-0000-000000000000">
+                    <mat-hint>ID de la aplicación registrada en Azure Entra ID</mat-hint>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Tenant ID (Microsoft)</mat-label>
+                    <input matInput formControlName="microsoftTenantId" placeholder="common o ID del Tenant">
+                    <mat-hint>Usa "common" para multi-inquilino o introduce el ID específico del Tenant</mat-hint>
+                  </mat-form-field>
+                </ng-container>
               </div>
             </div>
 
             <!-- Botón para guardar configuración SSO -->
-            <button mat-raised-button color="primary" type="submit" [disabled]="isSavingSso" style="align-self: flex-start; margin-top: 15px;">
-              <mat-spinner *ngIf="isSavingSso" diameter="18"></mat-spinner>
-              <span *ngIf="!isSavingSso">Guardar Configuración SSO</span>
-            </button>
+            <div class="form-actions">
+              <button mat-raised-button color="primary" type="submit" [disabled]="isSavingSso">
+                <mat-spinner *ngIf="isSavingSso" diameter="18"></mat-spinner>
+                <span *ngIf="!isSavingSso">Guardar Configuración SSO</span>
+              </button>
+            </div>
           </form>
         </div>
       </div>

@@ -411,8 +411,8 @@ import { UserService } from '../../../services/user.service';
     .complements-admin {
       display: grid;
       grid-template-columns: 320px minmax(0, 1fr);
-      gap: 16px;
-      padding: 16px;
+      gap: var(--space-4);
+      padding: var(--space-4);
     }
 
     .complements-panel {
@@ -425,15 +425,15 @@ import { UserService } from '../../../services/user.service';
 
     .complements-list,
     .complements-form {
-      padding: 12px;
+      padding: var(--space-3);
       color: var(--text-primary);
     }
 
     .complement-item {
       border: 1px solid var(--outline-subtle);
       border-radius: 12px;
-      padding: 12px;
-      margin-top: 12px;
+      padding: var(--space-3);
+      margin-top: var(--space-3);
       cursor: pointer;
       background: var(--surface-color);
     }
@@ -446,35 +446,35 @@ import { UserService } from '../../../services/user.service';
     .grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
+      gap: var(--space-3);
     }
 
     .intro-card {
       display: flex;
       justify-content: space-between;
-      gap: 16px;
+      gap: var(--space-4);
       align-items: center;
       border: 1px solid var(--outline-subtle);
       background: var(--surface-muted);
       border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 16px;
+      padding: var(--space-4);
+      margin-bottom: var(--space-4);
     }
 
     .tab-content {
-      padding-top: 10px;
+      padding-top: var(--space-3);
     }
 
     .upload-intro-card {
-      margin-bottom: 8px;
+      margin-bottom: var(--space-2);
     }
 
     .limits-grid,
     .analysis-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px;
-      margin-bottom: 10px;
+      gap: var(--space-2);
+      margin-bottom: var(--space-3);
     }
 
     .upload-panel,
@@ -483,15 +483,15 @@ import { UserService } from '../../../services/user.service';
     .analysis-files {
       border: 1px solid var(--outline-subtle);
       border-radius: 12px;
-      padding: 12px;
+      padding: var(--space-3);
       background: var(--surface-color);
-      margin-bottom: 10px;
+      margin-bottom: var(--space-3);
     }
 
     .upload-actions {
       display: flex;
-      gap: 12px;
-      margin-top: 12px;
+      gap: var(--space-3);
+      margin-top: var(--space-3);
       flex-wrap: wrap;
     }
 
@@ -502,17 +502,17 @@ import { UserService } from '../../../services/user.service';
     .analysis-error {
       color: var(--state-error);
       font-weight: 600;
-      margin-top: 12px;
+      margin-top: var(--space-3);
     }
 
     .analysis-header {
       display: flex;
       justify-content: space-between;
-      gap: 12px;
+      gap: var(--space-3);
       align-items: center;
       border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 16px;
+      padding: var(--space-4);
+      margin-bottom: var(--space-4);
       background: var(--state-error-bg);
       border: 1px solid color-mix(in srgb, var(--state-error) 55%, var(--outline-subtle));
     }
@@ -528,12 +528,12 @@ import { UserService } from '../../../services/user.service';
     }
 
     .analysis-header p {
-      margin: 4px 0 0;
+      margin: var(--space-1) 0 0;
     }
 
     .analysis-header-actions {
       display: flex;
-      gap: 8px;
+      gap: var(--space-2);
       flex-wrap: wrap;
       justify-content: flex-end;
     }
@@ -545,32 +545,32 @@ import { UserService } from '../../../services/user.service';
       background: #0f1720;
       color: #d9f7eb;
       border-radius: 12px;
-      padding: 12px;
+      padding: var(--space-3);
     }
 
     .intro-card p,
     .guide-item p,
     .permissions-block p {
-      margin: 4px 0 0;
+      margin: var(--space-1) 0 0;
       color: var(--text-secondary);
     }
 
     .guide-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px;
-      margin-bottom: 10px;
+      gap: var(--space-2);
+      margin-bottom: var(--space-3);
     }
 
     .guide-item {
       border: 1px solid var(--outline-subtle);
       border-radius: 12px;
-      padding: 10px;
+      padding: var(--space-3);
       background: var(--surface-muted);
     }
 
     .guide-subtitle {
-      margin-top: 8px;
+      margin-top: var(--space-2);
       font-weight: 600;
       color: var(--text-primary);
     }
@@ -587,7 +587,7 @@ import { UserService } from '../../../services/user.service';
     .permissions-block {
       border: 1px solid var(--outline-subtle);
       border-radius: 12px;
-      padding: 16px;
+      padding: var(--space-4);
       background: var(--surface-color);
     }
 
@@ -598,13 +598,13 @@ import { UserService } from '../../../services/user.service';
     .checkbox-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px 16px;
-      margin-top: 12px;
+      gap: var(--space-3) var(--space-4);
+      margin-top: var(--space-3);
     }
 
     mat-checkbox {
       display: block;
-      padding: 8px 0;
+      padding: var(--space-2) 0;
     }
 
     .checkbox-title {
@@ -616,7 +616,7 @@ import { UserService } from '../../../services/user.service';
       display: block;
       font-size: 12px;
       color: var(--text-secondary);
-      margin-top: 2px;
+      margin-top: var(--space-1);
       white-space: normal;
     }
 
@@ -628,23 +628,23 @@ import { UserService } from '../../../services/user.service';
     .actions {
       display: flex;
       flex-wrap: wrap;
-      gap: 12px;
+      gap: var(--space-3);
     }
 
     .preview-panel {
       border: 1px solid var(--outline-subtle);
       border-radius: 12px;
-      padding: 16px;
+      padding: var(--space-4);
       background: var(--surface-muted);
-      margin-bottom: 16px;
+      margin-bottom: var(--space-4);
     }
 
     .preview-header {
       display: flex;
       justify-content: space-between;
-      gap: 12px;
+      gap: var(--space-3);
       align-items: flex-start;
-      margin-bottom: 12px;
+      margin-bottom: var(--space-3);
     }
 
     .preview-header h3,
@@ -661,11 +661,11 @@ import { UserService } from '../../../services/user.service';
     }
 
     .token-panel {
-      margin-top: 16px;
+      margin-top: var(--space-4);
       background: var(--surface-muted);
       color: var(--text-primary);
       border-radius: 12px;
-      padding: 12px;
+      padding: var(--space-3);
     }
 
     .complements-admin .mat-mdc-form-field .mdc-text-field__input,
@@ -1387,7 +1387,7 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
       <h2 mat-dialog-title>Confirmar eliminación</h2>
       <mat-dialog-content>
         <p>¿Está seguro de que desea eliminar <strong>{{ data.slug }}</strong> con wipe-out completo?</p>
-        <p style="color: var(--state-error); font-size: 12px; margin-top: 12px;">
+        <p class="confirm-delete-warning">
           Esta acción no se puede deshacer.
         </p>
       </mat-dialog-content>
@@ -1402,8 +1402,13 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
       min-width: 300px;
     }
     p {
-      margin: 12px 0;
+      margin: var(--space-3) 0;
       line-height: 1.5;
+    }
+    .confirm-delete-warning {
+      color: var(--state-error);
+      font-size: 12px;
+      margin-top: var(--space-3);
     }
   `]
 })

@@ -306,7 +306,8 @@ export class ChecklistAdminComponent implements OnInit {
   }
 
   shiftNameById(id: string): string {
-    return this.activeShifts.find(s => s._id === id)?.name ?? id;
+    // Si el turno ya no está activo (desactivado/eliminado), no mostrar el ObjectId crudo.
+    return this.activeShifts.find(s => s._id === id)?.name ?? 'Turno inactivo';
   }
 
   get items(): FormArray {

@@ -24,15 +24,14 @@
     }
   }
 
+  // Sin fondo/borde propio: los botones (mat-stroked-button) ya traen su propio
+  // borde, así que envolverlos en otra caja con borde+fondo se veía "caja dentro
+  // de caja" — un solo nivel de borde alcanza.
   .checklist-wizard-nav {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
     margin-bottom: var(--space-4);
-    padding: var(--space-3);
-    background: var(--surface-muted);
-    border: 1px solid var(--outline-subtle);
-    border-radius: var(--radius-md);
   }
 
   // Bloque funcional: barra de contexto sticky + tarjeta de contenido
@@ -99,7 +98,7 @@
 
   .hint {
     color: var(--text-secondary);
-    margin-bottom: 16px;
+    margin-bottom: var(--space-4);
   }
 
   .mat-mdc-form-field {
@@ -133,29 +132,50 @@
 
     .config-form {
       display: flex;
-      gap: 12px;
-      align-items: flex-end;
-      flex-wrap: wrap;
+      flex-direction: column;
+      gap: var(--space-4);
     }
 
     .config-columns {
       display: grid;
       grid-template-columns: repeat(2, minmax(260px, 1fr));
-      gap: 16px;
+      gap: var(--space-5);
       width: 100%;
+      align-items: start;
     }
 
     .config-column {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: var(--space-3);
+    }
+
+    // Fila checkbox + campo dependiente: mismo patrón que .config-form-row en
+    // users.component.scss — align-items:center centra el checkbox contra la
+    // altura real del campo, en vez de apilarlos como bloques sueltos.
+    .config-form-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--space-3);
+    }
+
+    .config-toggle-group {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .time-field {
+      flex: 1 1 200px;
+      max-width: 240px;
     }
 
     .weekly-log-section {
-      margin-top: 16px;
+      margin-top: var(--space-4);
 
       h3 {
-        margin: 0 0 8px 0;
+        margin: 0 0 var(--space-2) 0;
       }
 
       .weekly-log-table {
@@ -165,7 +185,7 @@
 
         th,
         td {
-          padding: 8px;
+          padding: var(--space-2);
           border-bottom: 1px solid var(--border-color);
           text-align: left;
         }
@@ -245,13 +265,13 @@
       line-height: 1.35;
       font-weight: 600;
       color: var(--text-primary);
-      margin-bottom: 6px;
+      margin-bottom: var(--space-2);
     }
 
     .template-list-item__meta {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: var(--space-2);
       color: var(--text-secondary);
     }
 
@@ -278,7 +298,7 @@
     }
 
     .list-actions {
-      padding: 12px;
+      padding: var(--space-3);
       display: flex;
       justify-content: flex-end;
     }
@@ -305,26 +325,26 @@
       background: var(--surface-raised);
       border: 1px solid var(--border-color);
       border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 12px;
+      padding: var(--space-3);
+      margin-bottom: var(--space-3);
 
       h3 {
-        margin: 0 0 4px 0;
+        margin: 0 0 var(--space-1) 0;
         font-size: 1.1rem;
       }
 
       .assignment-grid {
         display: flex;
         flex-direction: column;
-        gap: 8px;
-        margin-top: 12px;
+        gap: var(--space-2);
+        margin-top: var(--space-3);
       }
 
       .assignment-row {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 8px 12px;
+        padding: var(--space-2) var(--space-3);
         background: var(--surface-color);
         border: 1px solid var(--border-color);
         border-radius: 6px;
@@ -335,7 +355,7 @@
 
         .assignment-actions {
           display: flex;
-          gap: 16px;
+          gap: var(--space-4);
         }
       }
     }
@@ -343,8 +363,8 @@
     .items-block {
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      margin-bottom: 12px;
+      gap: var(--space-2);
+      margin-bottom: var(--space-3);
     }
 
     mat-accordion {
@@ -352,7 +372,7 @@
     }
 
     mat-expansion-panel {
-      margin-bottom: 8px;
+      margin-bottom: var(--space-2);
       border: 1px solid var(--border-color);
       border-radius: 8px;
       box-shadow: none;
@@ -375,10 +395,10 @@
     }
 
     .item-row {
-      padding: 8px 0;
+      padding: var(--space-2) 0;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: var(--space-2);
     }
 
     .item-header {
@@ -395,13 +415,13 @@
     .item-actions {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: var(--space-2);
     }
 
     .item-grid {
       display: grid;
       grid-template-columns: 1fr 140px;
-      gap: 8px;
+      gap: var(--space-2);
       width: 100%;
     }
 
@@ -409,10 +429,10 @@
       background: var(--surface-muted);
       border: 1px dashed var(--border-color);
       border-radius: 8px;
-      padding: 6px;
+      padding: var(--space-2);
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: var(--space-2);
     }
 
     .children-header {
@@ -429,10 +449,10 @@
     .child-row {
       border: 1px solid var(--border-color);
       border-radius: 6px;
-      padding: 8px;
+      padding: var(--space-2);
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: var(--space-2);
     }
 
     .full-width {
@@ -450,14 +470,14 @@
     .form-actions {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin-top: 12px;
+      gap: var(--space-2);
+      margin-top: var(--space-3);
       flex-wrap: wrap;
     }
 
     .form-actions__hint {
       flex: 1 1 100%;
-      margin: 0 0 4px;
+      margin: 0 0 var(--space-1);
       font-size: 0.8125rem;
       color: var(--text-secondary);
     }
@@ -594,17 +614,17 @@
     color: var(--text-secondary);
     font-size: 13px;
     text-align: center;
-    padding: 24px 0;
+    padding: var(--space-6) 0;
     margin: 0;
   }
 
   .reminder-form-panel {
-    margin-top: 16px;
+    margin-top: var(--space-4);
     border-top: 1px solid var(--border-color);
-    padding-top: 16px;
+    padding-top: var(--space-4);
 
     h3 {
-      margin: 0 0 16px 0;
+      margin: 0 0 var(--space-4) 0;
       font-size: 16px;
       font-weight: 500;
     }
@@ -612,14 +632,14 @@
     .reminder-form {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: var(--space-3);
       max-width: 680px;
     }
 
     .reminder-freq-row {
       display: flex;
       align-items: flex-start;
-      gap: 16px;
+      gap: var(--space-4);
       flex-wrap: wrap;
 
       .freq-label {
@@ -632,14 +652,14 @@
       .freq-radio-group {
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: var(--space-2);
       }
     }
 
     .fixed-times-block {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: var(--space-2);
 
       .fixed-times-label {
         font-size: 12px;
@@ -649,7 +669,7 @@
       .fixed-time-input-row {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: var(--space-3);
 
         .fixed-time-native {
           border: 1px solid var(--border-color);
@@ -665,7 +685,7 @@
       .fixed-times-chips {
         display: flex;
         flex-wrap: wrap;
-        gap: 4px;
+        gap: var(--space-1);
       }
 
       .fixed-times-error {
@@ -677,8 +697,8 @@
 
     .reminder-form-actions {
       display: flex;
-      gap: 12px;
-      margin-top: 8px;
+      gap: var(--space-3);
+      margin-top: var(--space-2);
     }
   }
 }

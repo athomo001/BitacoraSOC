@@ -273,21 +273,23 @@
           </mat-checkbox>
         </div>
 
-        <mat-form-field appearance="outline">
-          <mat-label>Cargos destinatarios</mat-label>
-          <mat-select formControlName="escalationReminderCargoLabels" multiple>
-            <mat-option *ngFor="let cargo of availableCargoLabels" [value]="cargo">
-              {{ cargo }}
-            </mat-option>
-          </mat-select>
-          <mat-hint>Puedes seleccionar varios cargos a la vez (ej: N2 y N3).</mat-hint>
-        </mat-form-field>
+        <ng-container *ngIf="escalationReminderForm.get('escalationReminderEnabled')?.value">
+          <mat-form-field appearance="outline">
+            <mat-label>Cargos destinatarios</mat-label>
+            <mat-select formControlName="escalationReminderCargoLabels" multiple>
+              <mat-option *ngFor="let cargo of availableCargoLabels" [value]="cargo">
+                {{ cargo }}
+              </mat-option>
+            </mat-select>
+            <mat-hint>Puedes seleccionar varios cargos a la vez (ej: N2 y N3).</mat-hint>
+          </mat-form-field>
 
-        <mat-form-field appearance="outline">
-          <mat-label>Días de antelación</mat-label>
-          <input matInput type="number" min="1" max="60" formControlName="escalationReminderDaysAhead">
-          <mat-hint>Ejemplo: 7 = revisa semana objetivo a una semana de anticipación.</mat-hint>
-        </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Días de antelación</mat-label>
+            <input matInput type="number" min="1" max="60" formControlName="escalationReminderDaysAhead">
+            <mat-hint>Ejemplo: 7 = revisa semana objetivo a una semana de anticipación.</mat-hint>
+          </mat-form-field>
+        </ng-container>
 
         <div class="form-actions">
           <button mat-raised-button color="primary" type="submit" [disabled]="loadingEscalationReminderConfig || savingEscalationReminderConfig">

@@ -53,6 +53,18 @@
   padding-top: var(--space-1);
 }
 
+.mfa-checkbox-container {
+  flex: 1 1 100%;
+  margin-bottom: var(--space-4);
+}
+
+.mfa-checkbox-hint {
+  margin: var(--space-1) 0 0;
+  padding-left: var(--space-6);
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
 .users-table {
   width: 100%;
 }
@@ -113,8 +125,10 @@
   grid-template-columns: 1fr 340px;
   gap: var(--space-6);
   margin-bottom: var(--space-6);
-  align-items: start;
-  
+  // stretch (default de grid): la tarjeta del formulario iguala la altura de la
+  // columna lateral en vez de terminar antes y dejar un hueco gris debajo.
+  align-items: stretch;
+
   @media (max-width: 1024px) {
     grid-template-columns: 1fr;
   }
@@ -128,6 +142,13 @@
 
 .users-panel--form {
   margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+
+  .users-panel__body {
+    flex: 1;
+  }
 }
 
 .users-panel--list {
@@ -204,7 +225,7 @@
 }
 
 .config-checkbox {
-  margin-top: 8px;
+  // Sin margin-top: la fila padre (.config-form-row) ya centra el checkbox con align-items.
   font-size: 0.9rem;
 }
 
@@ -233,7 +254,7 @@
 
 .mass-reset-btn {
   width: 100%;
-  padding: 12px !important;
+  padding: var(--space-3) !important;
   font-weight: 600 !important;
   letter-spacing: 0.5px;
 }

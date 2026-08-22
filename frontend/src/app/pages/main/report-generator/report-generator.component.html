@@ -104,7 +104,7 @@
                   {{ getHint('hint-codigo-interno') }}
                 </div>
                 <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Código Ticket *</mat-label>
+                  <mat-label>Código Ticket</mat-label>
                   <input matInput formControlName="codigoTicket" placeholder="Ej: GLPI-12345"
                          (focus)="handleFieldFocus('hint-codigo-interno')" (blur)="handleFieldBlur()">
                   <mat-error *ngIf="reportForm.get('codigoTicket')?.hasError('required')">
@@ -115,7 +115,7 @@
 
               <!-- Ofensa -->
               <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Ofensa *</mat-label>
+                <mat-label>Ofensa</mat-label>
                 <input matInput formControlName="ofensa" placeholder="Ej: 4056" />
                 <mat-error *ngIf="reportForm.get('ofensa')?.hasError('required')">
                   Campo obligatorio
@@ -148,7 +148,7 @@
                   {{ getHint('hint-fecha') }}
                 </div>
                 <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Fecha *</mat-label>
+                  <mat-label>Fecha</mat-label>
                   <input matInput [matDatepicker]="picker" formControlName="fecha"
                          (focus)="handleFieldFocus('hint-fecha')" (blur)="handleFieldBlur()">
                   <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
@@ -244,7 +244,7 @@
                   {{ getHint('hint-observaciones') }}
                 </div>
                 <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Observaciones *</mat-label>
+                  <mat-label>Observaciones</mat-label>
                   <textarea matInput formControlName="observaciones" rows="4"
                             (focus)="handleFieldFocus('hint-observaciones')" (blur)="handleFieldBlur()"
                             placeholder="Detalla las observaciones relevantes"></textarea>
@@ -421,7 +421,7 @@
                   {{ getHint('hint-nl-titulo') }}
                 </div>
                 <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Título del Boletín / Amenaza *</mat-label>
+                  <mat-label>Título del Boletín / Amenaza</mat-label>
                   <input matInput formControlName="tituloBoletin" placeholder="Ej: Nueva vulnerabilidad crítica en Outlook"
                          (focus)="handleFieldFocus('hint-nl-titulo')" (blur)="handleFieldBlur()">
                   <mat-error *ngIf="newsletterForm.get('tituloBoletin')?.hasError('required')">
@@ -439,7 +439,7 @@
                   {{ getHint('hint-nl-marca') }}
                 </div>
                 <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Marca / Fabricante *</mat-label>
+                  <mat-label>Marca / Fabricante</mat-label>
                   <input matInput formControlName="marcaFabricante" placeholder="Ej: Microsoft"
                          (focus)="handleFieldFocus('hint-nl-marca')" (blur)="handleFieldBlur()">
                   <mat-error *ngIf="newsletterForm.get('marcaFabricante')?.hasError('required')">
@@ -468,7 +468,7 @@
                   {{ getHint('hint-nl-criticidad') }}
                 </div>
                 <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Nivel de Alerta (Criticidad) *</mat-label>
+                  <mat-label>Nivel de Alerta (Criticidad)</mat-label>
                   <mat-select formControlName="criticidad" (openedChange)="$event ? handleFieldFocus('hint-nl-criticidad') : handleFieldBlur()">
                     <mat-option value="baja">
                       <span class="status-dot baja"></span> Bajo (CVSS 0.1 - 3.9)
@@ -494,7 +494,7 @@
                   {{ getHint('hint-nl-productos') }}
                 </div>
                 <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Producto(s) Afectado(s) *</mat-label>
+                  <mat-label>Producto(s) Afectado(s)</mat-label>
                   <textarea matInput formControlName="productosAfectados" rows="3"
                             (focus)="handleFieldFocus('hint-nl-productos')" (blur)="handleFieldBlur()"
                             (paste)="onNewsletterTextareaPaste($event, 'productosAfectados')"
@@ -513,7 +513,7 @@
                   {{ getHint('hint-nl-impacto') }}
                 </div>
                 <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Impacto *</mat-label>
+                  <mat-label>Impacto</mat-label>
                   <textarea matInput formControlName="impacto" rows="3"
                             (focus)="handleFieldFocus('hint-nl-impacto')" (blur)="handleFieldBlur()"
                             (paste)="onNewsletterTextareaPaste($event, 'impacto')"
@@ -532,7 +532,7 @@
                   {{ getHint('hint-nl-recomendacion') }}
                 </div>
                 <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Acciones Recomendadas / Mitigación *</mat-label>
+                  <mat-label>Acciones Recomendadas / Mitigación</mat-label>
                   <textarea matInput formControlName="recomendacion" rows="4"
                             (focus)="handleFieldFocus('hint-nl-recomendacion')" (blur)="handleFieldBlur()"
                             (paste)="onNewsletterTextareaPaste($event, 'recomendacion')"

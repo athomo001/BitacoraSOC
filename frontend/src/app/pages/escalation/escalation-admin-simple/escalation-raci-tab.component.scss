@@ -8,12 +8,17 @@
 
 .tab-header h2 {
   margin: 0 0 0.4rem;
-  font-size: 1.8rem;
+  // Mismo tamaño que contacts-tab/directory-tab/flow-tab (1.4rem) — este título
+  // se veía notoriamente más grande que el resto de las pestañas de Escalación.
+  font-size: 1.4rem;
 }
 
 .tab-header .subtitle {
-  margin: 0;
+  // Mismo espacio que en los otros 3 tabs de Escalación (margin-bottom: 2rem) —
+  // acá quedaba en 0, pegando el subtítulo directo al contenido siguiente.
+  margin: 0 0 2rem;
   color: var(--text-secondary);
+  font-size: 0.95rem;
 }
 
 .toolbar-row {

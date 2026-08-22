@@ -54,11 +54,11 @@
         </button>
         <!-- Permite importar múltiples contactos del directorio mediante un archivo CSV -->
         <button mat-raised-button color="accent" type="button" (click)="csvFileInput.click()" [disabled]="!canDirectoryWrite || importingCsv">
-          <mat-spinner diameter="18" *ngIf="importingCsv" style="display: inline-block; margin-right: 8px;"></mat-spinner>
+          <mat-spinner diameter="18" *ngIf="importingCsv" class="inline-spinner"></mat-spinner>
           <mat-icon aria-hidden="true" *ngIf="!importingCsv">file_upload</mat-icon>
           Importar CSV
         </button>
-        <input #csvFileInput type="file" accept=".csv" class="hidden-input" (change)="onCsvFileSelected($event)" style="display: none;">
+        <input #csvFileInput type="file" accept=".csv" class="hidden-input" (change)="onCsvFileSelected($event)">
         
         <button mat-button type="button" (click)="downloadCsvTemplate()" [disabled]="importingCsv">
           <mat-icon aria-hidden="true">download</mat-icon>
@@ -82,12 +82,12 @@
     </div>
 
     <ng-template #directoryContactForm>
-      <div *ngIf="isEditingInternalContact" class="warning-banner" style="background-color:#fff3cd; border-left:4px solid #ffc107; padding:12px; margin-bottom:16px; border-radius:4px;">
-          <p style="margin:0; color:#856404; font-size:14px;"><strong>⚠️ Contacto sincronizado desde Usuarios:</strong> Solo puedes editar Teléfono, Empresa, Tipo y Ámbito. Para cambiar otros datos, usa la sección de Usuarios.</p>
+      <div *ngIf="isEditingInternalContact" class="warning-banner">
+          <p><strong>⚠️ Contacto sincronizado desde Usuarios:</strong> Solo puedes editar Teléfono, Empresa, Tipo y Ámbito. Para cambiar otros datos, usa la sección de Usuarios.</p>
       </div>
       <form (ngSubmit)="saveDirectoryContact()">
         <mat-form-field appearance="outline">
-          <mat-label>Nombre *</mat-label>
+          <mat-label>Nombre</mat-label>
           <input matInput [(ngModel)]="directoryFormModel.name" name="dirName" required [disabled]="isEditingInternalContact">
           <mat-hint *ngIf="isEditingInternalContact">Editable solo en Usuarios</mat-hint>
         </mat-form-field>

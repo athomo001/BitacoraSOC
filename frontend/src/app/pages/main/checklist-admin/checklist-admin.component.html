@@ -29,41 +29,50 @@
               <mat-label>Cooldown Checklist (minutos)</mat-label>
               <input matInput type="number" formControlName="checklistCooldownHours">
             </mat-form-field>
+
             <mat-checkbox formControlName="checklistCloseEmailEnabled">
               Enviar correo al registrar checklist de cierre
             </mat-checkbox>
 
-            <mat-checkbox formControlName="alertNokEnabled">
-              Enviar alerta por items NOK (rojo)
-            </mat-checkbox>
+            <div class="config-toggle-group">
+              <mat-checkbox formControlName="alertNokEnabled">
+                Enviar alerta por items NOK (rojo)
+              </mat-checkbox>
 
-            <mat-form-field appearance="outline" *ngIf="configForm.get('alertNokEnabled')?.value">
-              <mat-label>Cargos a notificar por NOK</mat-label>
-              <mat-select formControlName="alertNokRoleTarget" multiple>
-                <mat-option *ngFor="let cargo of cargoLabelOptions" [value]="cargo">
-                  {{ cargo }}
-                </mat-option>
-              </mat-select>
-              <mat-hint>Al registrar checklist con estado rojo, se notificará a estos cargos.</mat-hint>
-            </mat-form-field>
+              <mat-form-field appearance="outline" *ngIf="configForm.get('alertNokEnabled')?.value">
+                <mat-label>Cargos a notificar por NOK</mat-label>
+                <mat-select formControlName="alertNokRoleTarget" multiple>
+                  <mat-option *ngFor="let cargo of cargoLabelOptions" [value]="cargo">
+                    {{ cargo }}
+                  </mat-option>
+                </mat-select>
+                <mat-hint>Al registrar checklist con estado rojo, se notificará a estos cargos.</mat-hint>
+              </mat-form-field>
+            </div>
           </div>
 
           <div class="config-column">
-            <mat-checkbox formControlName="checklistAlertEnabled">
-              Avisar checklist no realizado
-            </mat-checkbox>
+            <div class="config-form-row">
+              <mat-checkbox formControlName="checklistAlertEnabled">
+                Avisar checklist no realizado
+              </mat-checkbox>
 
-            <mat-form-field appearance="outline">
-              <mat-label>Hora límite</mat-label>
-              <input matInput type="time" formControlName="checklistAlertTime">
-              <mat-hint>Solo admins pueden cambiar este horario</mat-hint>
-            </mat-form-field>
+              <mat-form-field appearance="outline" class="time-field">
+                <mat-label>Hora límite</mat-label>
+                <input matInput type="time" formControlName="checklistAlertTime">
+                <mat-hint>Solo admins pueden cambiar este horario</mat-hint>
+              </mat-form-field>
+            </div>
           </div>
         </div>
 
-        <button mat-raised-button color="primary" type="submit" [disabled]="configForm.invalid || savingConfig">
-          Guardar
-        </button>
+        <div class="form-actions">
+          <button mat-raised-button color="primary" type="submit" [disabled]="configForm.invalid || savingConfig">
+            <mat-icon *ngIf="!savingConfig">save</mat-icon>
+            <mat-spinner *ngIf="savingConfig" diameter="18" strokeWidth="3"></mat-spinner>
+            {{ savingConfig ? 'Guardando...' : 'Guardar' }}
+          </button>
+        </div>
       </form>
       </div>
     </div>
@@ -137,13 +146,13 @@
         <form [formGroup]="reminderForm" (ngSubmit)="saveReminder()" class="reminder-form">
 
           <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Nombre del recordatorio *</mat-label>
+            <mat-label>Nombre del recordatorio</mat-label>
             <input matInput formControlName="label" placeholder="Ej: Verificar sensores" maxlength="150">
             <mat-hint>Nombre visible en la tabla. Máx. 150 caracteres.</mat-hint>
           </mat-form-field>
 
           <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Texto del correo *</mat-label>
+            <mat-label>Texto del correo</mat-label>
             <textarea matInput formControlName="reminderText" rows="10"
               placeholder="Ej: Recuerda revisar el estado de los sensores y registrar novedades en la bitácora."
               maxlength="5000"></textarea>

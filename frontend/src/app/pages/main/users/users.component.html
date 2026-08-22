@@ -74,14 +74,13 @@
           <mat-hint>Máximo 120 caracteres</mat-hint>
         </mat-form-field>
 
-        <div class="mfa-checkbox-container" style="margin-bottom: 20px; grid-column: span 2;">
-          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-color); font-size: 14px;">
-            <input type="checkbox" formControlName="mfaEnabled" style="cursor: pointer; width: 16px; height: 16px;">
+        <div class="mfa-checkbox-container">
+          <mat-checkbox formControlName="mfaEnabled" color="primary">
             Habilitar Autenticación Multifactor (MFA/TOTP)
-          </label>
-          <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px; padding-left: 24px;">
+          </mat-checkbox>
+          <p class="mfa-checkbox-hint">
             Si se activa, el usuario deberá enrolar su dispositivo en el próximo inicio de sesión.
-          </div>
+          </p>
         </div>
 
         <div class="form-actions">

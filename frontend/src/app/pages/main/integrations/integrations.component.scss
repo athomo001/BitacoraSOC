@@ -1,16 +1,16 @@
 .integrations-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 24px;
+  padding: var(--space-6);
 
   h1 {
-    margin-bottom: 8px;
+    margin-bottom: var(--space-2);
     color: var(--text-primary);
   }
 
   .subtitle {
     color: var(--text-secondary);
-    margin-bottom: 24px;
+    margin-bottom: var(--space-6);
   }
 }
 
@@ -46,15 +46,15 @@
 form {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--space-4);
 }
 
 .connector-toolbar {
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
   align-items: center;
   flex-wrap: wrap;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 
   mat-form-field {
     min-width: 300px;
@@ -65,14 +65,14 @@ form {
 .row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   flex-wrap: wrap;
 }
 
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
+  gap: var(--space-3);
   align-items: center;
 }
 
@@ -80,13 +80,15 @@ form {
   grid-column: 1 / -1;
 }
 
+// Misma forma que la .form-actions global (flex, gap, margin-top) — se mantiene
+// local porque este panel usa "Guardar/Probar" como acciones inline del grid.
 .actions {
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
   flex-wrap: wrap;
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
 .integration-panel--future ul {
-  margin: 10px 0 0 18px;
+  margin: var(--space-3) 0 0 18px;
 }
