@@ -7,6 +7,7 @@
 import { Component, Inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { animate, style, transition, trigger } from '@angular/animations';
 import { MatDialogRef, MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -23,7 +24,18 @@ export interface ShiftReportDialogData {
   standalone: true,
   imports: [CommonModule, FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatIconModule],
   templateUrl: './shift-report-dialog.component.html',
-  styleUrls: ['./shift-report-dialog.component.scss']
+  styleUrls: ['./shift-report-dialog.component.scss'],
+  animations: [
+    trigger('hintBox', [
+      transition(':enter', [
+        style({ opacity: 0, transform: 'translateY(-4px)' }),
+        animate('180ms ease-out', style({ opacity: 1, transform: 'translateY(0)' }))
+      ]),
+      transition(':leave', [
+        animate('120ms ease-in', style({ opacity: 0, transform: 'translateY(-4px)' }))
+      ])
+    ])
+  ]
 })
 export class ShiftReportDialogComponent {
   metricValues: Record<string, string> = {};
@@ -71,6 +83,10 @@ export class ShiftReportDialogComponent {
     return this.isInicio
       ? '└ Estado: (Ej: Esperando logs del cliente / En escalamiento N2 / Monitoreo post-mitigación)'
       : '└ Situación actual: (Ej: Esperando confirmación de cliente sobre falso positivo)';
+  }
+
+  get ticketsAnnotationPrefix(): string {
+    return this.isInicio ? '└ Estado: (escribir comentarios)' : '└ Situación actual: (escribir comentarios)';
   }
 
   insert(): void {
