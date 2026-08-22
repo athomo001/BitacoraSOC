@@ -110,7 +110,7 @@
       </header>
       <div class="users-panel__body">
         <p class="config-desc">
-          Envía un correo de felicitación a los miembros del equipo en su día de cumpleaños de forma automática.
+          Felicita a cada persona el día de su cumpleaños; el área queda en copia (CC) para confirmar el envío.
         </p>
         <div class="config-form-row">
           <mat-checkbox [(ngModel)]="birthdayEmailsEnabled" class="config-checkbox">
@@ -123,6 +123,20 @@
             <mat-icon matSuffix>schedule</mat-icon>
           </mat-form-field>
         </div>
+
+        <mat-form-field appearance="outline" class="cc-email-field">
+          <mat-label>Correo del área (CC)</mat-label>
+          <input matInput [formControl]="birthdayCcEmailControl" [matAutocomplete]="areaEmailAuto"
+                 placeholder="area@empresa.com" [disabled]="!birthdayEmailsEnabled">
+          <mat-icon matSuffix>alternate_email</mat-icon>
+          <mat-autocomplete #areaEmailAuto="matAutocomplete" (optionSelected)="onAreaContactSelected($event)">
+            <mat-option *ngFor="let contact of areaEmailSuggestions" [value]="contact.email">
+              {{ contact.name }} — {{ contact.email }}
+            </mat-option>
+          </mat-autocomplete>
+          <mat-hint>Escribe libre o elige del directorio de contactos</mat-hint>
+        </mat-form-field>
+
         <div class="card-actions">
           <button mat-raised-button color="primary" style="width: 100%;" [disabled]="isSavingBirthdayConfig" (click)="saveBirthdayConfig()">
             <mat-icon>save</mat-icon> Guardar Configuración

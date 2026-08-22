@@ -12,6 +12,8 @@ export interface AppConfig {
   birthdayEmailsEnabled?: boolean;
   // Hora de envío de correos de cumpleaños
   birthdayEmailsTime?: string;
+  // Correo del área que queda en copia (CC) en cada felicitación
+  birthdayEmailsCcAddress?: string;
   shiftCheckCooldownHours: number;
   checklistCloseEmailEnabled?: boolean;
   alertNokEnabled?: boolean;
@@ -178,4 +180,5 @@ export interface UpdateConfigRequest {
   // Configuración de cumpleaños
   birthdayEmailsEnabled?: boolean;
   birthdayEmailsTime?: string;
+  birthdayEmailsCcAddress?: string;
 }

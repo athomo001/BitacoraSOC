@@ -51,6 +51,7 @@ export interface CreateEntryRequest {
   entryDate: string;
   entryTime: string;
   clientId?: string; // Cliente/Log Source (B2i)
+  glpiTicketId?: string; // Ticket GLPI a vincular al crear (opcional, requiere habilitación en Admin > GLPI)
 }
 
 export interface EntriesResponse {

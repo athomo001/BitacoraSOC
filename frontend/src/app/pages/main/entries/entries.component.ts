@@ -22,7 +22,7 @@ import { ConfigService } from '../../../services/config.service';
 import { TagService } from '../../../services/tag.service';
 import { BatEasterEggService } from '../../../services/bat-easter-egg.service';
 import { EasterEggRule } from '../../../models/config.model';
-import { MatFormField, MatLabel, MatHint } from '@angular/material/form-field';
+import { MatFormField, MatLabel, MatHint, MatPrefix } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatButton } from '@angular/material/button';
 import { NgIf, NgFor } from '@angular/common';
@@ -38,7 +38,7 @@ import { ShiftReportMode } from '../../../utils/shift-report-template.util';
     selector: 'app-entries',
     templateUrl: './entries.component.html',
     styleUrls: ['./entries.component.scss'],
-  imports: [ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatHint, MatButton, NgIf, MatIcon, MatProgressSpinner, MatRadioGroup, MatRadioButton, MatSelect, MatOption, NgFor]
+  imports: [ReactiveFormsModule, MatFormField, MatLabel, MatInput, MatHint, MatPrefix, MatButton, NgIf, MatIcon, MatProgressSpinner, MatRadioGroup, MatRadioButton, MatSelect, MatOption, NgFor]
 })
 export class EntriesComponent implements OnInit, OnDestroy {
   private readonly contentMaxLength = 50000;
@@ -48,6 +48,7 @@ export class EntriesComponent implements OnInit, OnDestroy {
   isSubmitting = false;
   logSources: CatalogLogSource[] = [];
   topTags: string[] = [];
+  glpiManualLinkFieldEnabled = false;
   showEasterEggOverlay = false;
   easterEggImageUrl = '/scripts/Bender.png';
 
@@ -81,7 +82,8 @@ export class EntriesComponent implements OnInit, OnDestroy {
     this.entryForm = this.fb.group({
       content: ['', [Validators.required, Validators.maxLength(50000)]],
       entryType: ['operativa', Validators.required],
-      clientId: [null] // Cliente/Log Source (B2i)
+      clientId: [null], // Cliente/Log Source (B2i)
+      glpiTicketId: ['', [Validators.pattern(/^\d*$/)]] // Ticket GLPI a vincular (opcional)
     });
 
     const now = new Date();
@@ -137,6 +139,16 @@ export class EntriesComponent implements OnInit, OnDestroy {
         // Error silencioso, no es crítico
       }
     );
+
+    // Campo opcional de ticket GLPI: solo se muestra si el admin lo habilitó
+    this.entryService.getGlpiManualLinkFieldStatus().subscribe({
+      next: (status) => {
+        this.glpiManualLinkFieldEnabled = !!status.enabled;
+      },
+      error: () => {
+        this.glpiManualLinkFieldEnabled = false;
+      }
+    });
   }
 
   ngOnDestroy(): void {
@@ -158,17 +170,23 @@ export class EntriesComponent implements OnInit, OnDestroy {
     const entryDate = this.getLocalDateString(now);
     const entryTime = this.getLocalTimeString(now);
 
+    const glpiTicketId = String(this.entryForm.value.glpiTicketId || '').trim();
     const data: CreateEntryRequest = {
       ...this.entryForm.value,
       entryDate,
       entryTime,
-      tags: this.extractTagsFromContent(this.entryForm.value.content)
+      tags: this.extractTagsFromContent(this.entryForm.value.content),
+      glpiTicketId: glpiTicketId || undefined
     };
-    
+
     this.isSubmitting = true;
     this.entryService.createEntry(data).subscribe({
-      next: () => {
+      next: (response) => {
         this.snackBar.open('✅ Entrada creada exitosamente', 'Cerrar', { duration: 3000 });
+        const glpiLinkWarning = (response as unknown as { glpiLinkWarning?: string }).glpiLinkWarning;
+        if (glpiLinkWarning) {
+          this.snackBar.open(`⚠️ ${glpiLinkWarning}`, 'Cerrar', { duration: 5000 });
+        }
         this.entryForm.reset({
           entryType: 'operativa'
         });

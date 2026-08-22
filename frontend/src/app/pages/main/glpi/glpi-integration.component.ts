@@ -100,6 +100,7 @@ export class GlpiIntegrationComponent implements OnInit {
   ) {
     this.form = this.fb.group({
       enabled: [false],
+      manualLinkFieldEnabled: [false],
       mode: ['api', Validators.required],
       dispatchMode: ['daily-summary', Validators.required],
       apiBaseUrl: [''],
@@ -115,8 +116,11 @@ export class GlpiIntegrationComponent implements OnInit {
       entityMappings: this.fb.array([])
     });
 
-    this.form.get('mode')?.valueChanges.subscribe((mode) => {
-      this.applyModeValidation(mode);
+    this.form.get('mode')?.valueChanges.subscribe(() => {
+      this.applyModeValidation();
+    });
+    this.form.get('enabled')?.valueChanges.subscribe(() => {
+      this.applyModeValidation();
     });
   }
 
@@ -148,20 +152,28 @@ export class GlpiIntegrationComponent implements OnInit {
     return this.form.get('mode')?.value === 'api';
   }
 
-  private applyModeValidation(mode: string): void {
+  // Los campos de conexión (Base URL / correo collector) solo son obligatorios cuando
+  // "Habilitar GLPI" está activo — así se puede guardar el resto de la configuración
+  // (p. ej. el toggle del campo manual de ticket) sin forzar a completar la conexión.
+  private applyModeValidation(): void {
     const apiBaseUrlCtrl = this.form.get('apiBaseUrl');
     const emailCollectorCtrl = this.form.get('emailCollectorAddress');
+    const enabled = !!this.form.get('enabled')?.value;
+    const mode = this.form.get('mode')?.value;
 
     if (!apiBaseUrlCtrl || !emailCollectorCtrl) {
       return;
     }
 
-    if (mode === 'api') {
+    if (enabled && mode === 'api') {
       apiBaseUrlCtrl.setValidators([Validators.required]);
       emailCollectorCtrl.clearValidators();
-    } else {
+    } else if (enabled) {
       apiBaseUrlCtrl.clearValidators();
       emailCollectorCtrl.setValidators([Validators.required, Validators.email]);
+    } else {
+      apiBaseUrlCtrl.clearValidators();
+      emailCollectorCtrl.clearValidators();
     }
 
     apiBaseUrlCtrl.updateValueAndValidity({ emitEvent: false });
@@ -174,6 +186,7 @@ export class GlpiIntegrationComponent implements OnInit {
       next: (config) => {
         this.form.patchValue({
           enabled: config.enabled ?? false,
+          manualLinkFieldEnabled: config.manualLinkFieldEnabled ?? false,
           mode: config.mode || 'api',
           dispatchMode: config.dispatchMode || 'daily-summary',
           apiBaseUrl: config.api?.baseUrl || '',
@@ -207,7 +220,7 @@ export class GlpiIntegrationComponent implements OnInit {
         this.lastPollSuccess = config.inbound?.lastPollSuccess ?? null;
         this.lastPollMessage = config.inbound?.lastPollMessage || '';
         this.lastImportedCount = config.inbound?.lastImportedCount || 0;
-        this.applyModeValidation(config.mode || 'api');
+        this.applyModeValidation();
         this.loading = false;
 
         // Precarga la lista de entidades para que el mapeo muestre nombres en vez de IDs
@@ -297,7 +310,7 @@ export class GlpiIntegrationComponent implements OnInit {
     const apiAppToken = (value.apiAppToken || '').trim();
     const apiUserToken = (value.apiUserToken || '').trim();
 
-    if (value.mode === 'api' && !this.apiTokensConfigured && (!apiAppToken || !apiUserToken)) {
+    if (value.enabled && value.mode === 'api' && !this.apiTokensConfigured && (!apiAppToken || !apiUserToken)) {
       this.snackBar.open('Para guardar en modo API debes ingresar App-Token y User Token', 'Cerrar', { duration: 4000 });
       return;
     }
@@ -320,6 +333,7 @@ export class GlpiIntegrationComponent implements OnInit {
 
     const payload: any = {
       enabled: !!value.enabled,
+      manualLinkFieldEnabled: !!value.manualLinkFieldEnabled,
       mode: value.mode,
       dispatchMode: value.dispatchMode,
       api: {

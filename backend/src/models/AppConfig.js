@@ -480,6 +480,12 @@ const appConfigSchema = new mongoose.Schema({
     type: String,
     default: '09:00'
   },
+  // Correo del área que queda en copia (CC) en cada felicitación, para que sepan que se envió
+  birthdayEmailsCcAddress: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   // Registrar la última fecha en que se enviaron los correos para evitar duplicados
   lastBirthdayEmailsDate: {
     type: Date,

@@ -30,6 +30,7 @@ const router = express.Router();
 
 const validators = [
   body('enabled').optional().isBoolean(),
+  body('manualLinkFieldEnabled').optional().isBoolean(),
   body('mode').optional().isIn(['api', 'email']),
   body('dispatchMode').optional().isIn(['daily-summary', 'immediate']),
   body('api.baseUrl').optional().isString(),
@@ -61,6 +62,7 @@ const applyGlpiConfigPayload = async (req, res) => {
     const incomingUserToken = String(payload.api?.userToken || '').trim();
 
     if (payload.enabled !== undefined) config.enabled = !!payload.enabled;
+    if (payload.manualLinkFieldEnabled !== undefined) config.manualLinkFieldEnabled = !!payload.manualLinkFieldEnabled;
     if (payload.mode) config.mode = payload.mode;
     if (payload.dispatchMode) config.dispatchMode = payload.dispatchMode;
 
@@ -82,8 +84,11 @@ const applyGlpiConfigPayload = async (req, res) => {
       if (incomingUserToken) config.api.userToken = encrypt(incomingUserToken);
     }
 
-    const apiMode = config.mode === 'api';
-    if (apiMode) {
+    // Solo exige tokens cuando GLPI está realmente habilitado en modo API — si "enabled"
+    // está apagado, permite guardar el resto de la configuración (p. ej. manualLinkFieldEnabled)
+    // sin forzar la conexión.
+    const requiresApiTokens = config.enabled && config.mode === 'api';
+    if (requiresApiTokens) {
       const hasAppToken = Boolean(incomingAppToken) || Boolean(config.api?.appToken);
       const hasUserToken = Boolean(incomingUserToken) || Boolean(config.api?.userToken);
       if (!hasAppToken || !hasUserToken) {
@@ -174,6 +179,20 @@ router.get(['/', '/config'], authenticate, authorize('admin'), async (req, res) 
 });
 
 router.put(['/', '/config'], authenticate, authorize('admin'), validators, validate, applyGlpiConfigPayload);
+
+// GET /api/integrations/glpi/manual-link-field - Indica si el formulario de Nueva Entrada
+// debe mostrar el campo opcional de ticket GLPI. Accesible a cualquier usuario autenticado
+// (no solo admin) porque el formulario de creación lo usa cualquier analista.
+// Nota: independiente del switch maestro "enabled" a propósito — el admin puede querer
+// este campo activo sin prender el resto de la integración (despacho automático, etc.).
+router.get('/manual-link-field', authenticate, async (req, res) => {
+  try {
+    const config = await ensureGlpiConfig();
+    res.json({ enabled: Boolean(config.manualLinkFieldEnabled) });
+  } catch (error) {
+    res.status(500).json({ message: 'Error obteniendo configuración GLPI', error: error.message });
+  }
+});
 
 router.post('/test', authenticate, authorize('admin'), async (req, res) => {
   const retryAttempt = req.body?.retryAttempt === true || req.body?.retryAttempt === 'true';

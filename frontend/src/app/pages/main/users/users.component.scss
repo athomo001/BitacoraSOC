@@ -149,12 +149,21 @@
   background: var(--surface-card);
   border: 1px solid var(--outline-subtle);
   border-radius: var(--radius-md);
-  
+
+  .users-panel__header {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .users-panel__title {
+    font-size: 0.95rem;
+  }
+
   .users-panel__body {
     flex: 1;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    padding: var(--space-3);
   }
 }
 
@@ -163,40 +172,49 @@
   align-items: center;
   gap: var(--space-2);
   background: linear-gradient(90deg, color-mix(in srgb, var(--primary) 5%, transparent) 0%, transparent 100%);
-  
+
   &.danger {
     background: linear-gradient(90deg, color-mix(in srgb, var(--state-error) 5%, transparent) 0%, transparent 100%);
     .header-icon {
       color: var(--state-error);
     }
   }
-  
+
   .header-icon {
     color: var(--primary);
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
   }
 }
 
 .config-desc {
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   color: var(--text-muted);
-  line-height: 1.5;
-  margin-bottom: var(--space-4);
+  line-height: 1.4;
+  margin-bottom: var(--space-3);
 }
 
 .config-form-row {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
-  margin-bottom: var(--space-4);
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
   flex-wrap: wrap;
 }
 
 .config-checkbox {
   margin-top: 8px;
+  font-size: 0.9rem;
 }
 
 .time-field {
   max-width: 180px;
+}
+
+.cc-email-field {
+  width: 100%;
+  margin-bottom: var(--space-2);
 }
 
 .card-actions {

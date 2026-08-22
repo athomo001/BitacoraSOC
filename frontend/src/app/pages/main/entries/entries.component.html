@@ -43,6 +43,13 @@
                        placeholder="HH:MM (24h)"
                        step="60">
               </mat-form-field>
+
+              <mat-form-field appearance="outline" class="glpi-ticket-field" *ngIf="glpiManualLinkFieldEnabled">
+                <mat-label>Ticket GLPI</mat-label>
+                <input matInput formControlName="glpiTicketId" placeholder="Ej: 1024" inputmode="numeric">
+                <mat-icon matPrefix aria-hidden="true">confirmation_number</mat-icon>
+                <mat-hint>Opcional</mat-hint>
+              </mat-form-field>
             </div>
 
             <section class="top-tags-box">
