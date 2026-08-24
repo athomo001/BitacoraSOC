@@ -74,14 +74,13 @@
           <mat-hint>Máximo 120 caracteres</mat-hint>
         </mat-form-field>
 
-        <div class="mfa-checkbox-container" style="margin-bottom: 20px; grid-column: span 2;">
-          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-color); font-size: 14px;">
-            <input type="checkbox" formControlName="mfaEnabled" style="cursor: pointer; width: 16px; height: 16px;">
+        <div class="mfa-checkbox-container">
+          <mat-checkbox formControlName="mfaEnabled" color="primary">
             Habilitar Autenticación Multifactor (MFA/TOTP)
-          </label>
-          <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px; padding-left: 24px;">
+          </mat-checkbox>
+          <p class="mfa-checkbox-hint">
             Si se activa, el usuario deberá enrolar su dispositivo en el próximo inicio de sesión.
-          </div>
+          </p>
         </div>
 
         <div class="form-actions">
@@ -110,7 +109,7 @@
       </header>
       <div class="users-panel__body">
         <p class="config-desc">
-          Envía un correo de felicitación a los miembros del equipo en su día de cumpleaños de forma automática.
+          Felicita a cada persona el día de su cumpleaños; el área queda en copia (CC) para confirmar el envío.
         </p>
         <div class="config-form-row">
           <mat-checkbox [(ngModel)]="birthdayEmailsEnabled" class="config-checkbox">
@@ -123,6 +122,20 @@
             <mat-icon matSuffix>schedule</mat-icon>
           </mat-form-field>
         </div>
+
+        <mat-form-field appearance="outline" class="cc-email-field">
+          <mat-label>Correo del área (CC)</mat-label>
+          <input matInput [formControl]="birthdayCcEmailControl" [matAutocomplete]="areaEmailAuto"
+                 placeholder="area@empresa.com" [disabled]="!birthdayEmailsEnabled">
+          <mat-icon matSuffix>alternate_email</mat-icon>
+          <mat-autocomplete #areaEmailAuto="matAutocomplete" (optionSelected)="onAreaContactSelected($event)">
+            <mat-option *ngFor="let contact of areaEmailSuggestions" [value]="contact.email">
+              {{ contact.name }} — {{ contact.email }}
+            </mat-option>
+          </mat-autocomplete>
+          <mat-hint>Escribe libre o elige del directorio de contactos</mat-hint>
+        </mat-form-field>
+
         <div class="card-actions">
           <button mat-raised-button color="primary" style="width: 100%;" [disabled]="isSavingBirthdayConfig" (click)="saveBirthdayConfig()">
             <mat-icon>save</mat-icon> Guardar Configuración

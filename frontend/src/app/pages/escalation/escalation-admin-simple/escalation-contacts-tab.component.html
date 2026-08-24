@@ -5,7 +5,7 @@
   </header>
 
   <!-- Selector de Cliente Principal al inicio del Tab -->
-  <section class="client-selection-panel" style="margin-bottom: 2rem;">
+  <section class="client-selection-panel">
     <mat-form-field appearance="outline" class="client-selector-field">
       <mat-label>Cliente para configurar escalación</mat-label>
       <input
@@ -31,8 +31,8 @@
     
     <!-- 1. Servicios de Escalación del Cliente (Formato de Chips Compactos) -->
     <section class="section compact-section">
-      <div class="section-title-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <h3 style="margin: 0;">1. Servicios de Escalación</h3>
+      <div class="section-title-row">
+        <h3>1. Servicios de Escalación</h3>
         <button mat-raised-button color="accent" (click)="addService(selectedClientIdForContacts)">
           <mat-icon aria-hidden="true">add</mat-icon>
           Agregar Servicio
@@ -40,7 +40,7 @@
       </div>
 
       <!-- Formulario inline para agregar/editar servicio -->
-      <article *ngIf="showServiceForm" class="inline-form" style="margin-top: 1rem; margin-bottom: 1rem;">
+      <article *ngIf="showServiceForm" class="inline-form">
         <form [formGroup]="serviceForm" (ngSubmit)="saveService()">
           <mat-form-field appearance="outline">
             <mat-label>Cliente</mat-label>
@@ -70,7 +70,7 @@
         </div>
       </div>
 
-      <div *ngIf="!loadingServices && servicesForSelectedClient.length === 0" class="no-services-placeholder" style="padding: 1.5rem; background: var(--bg-surface); border-radius: 8px; color: var(--text-secondary); display: flex; align-items: center; gap: 8px;">
+      <div *ngIf="!loadingServices && servicesForSelectedClient.length === 0" class="no-services-placeholder">
         <mat-icon>info</mat-icon>
         <span>No hay servicios configurados para este cliente. Agrega uno con el botón de arriba.</span>
       </div>
@@ -86,7 +86,7 @@
       <h3>2. Contactos de Escalación</h3>
       <p class="subtitle">Usa esta sección solo para contactos ligados a escalación, turnos y servicio activo. No es una agenda comercial general.</p>
 
-      <button mat-raised-button color="accent" (click)="addContact('escalation')" style="margin-bottom: 1.5rem;">
+      <button mat-raised-button color="accent" class="add-contact-btn" (click)="addContact('escalation')">
         <mat-icon aria-hidden="true">add</mat-icon>
         Agregar Contacto de Escalación
       </button>

@@ -105,6 +105,7 @@ const fillTemplate = (template, values = {}) => {
 const sanitizeGlpiConfig = (doc) => ({
   _id: doc._id,
   enabled: doc.enabled,
+  manualLinkFieldEnabled: doc.manualLinkFieldEnabled || false,
   mode: doc.mode,
   dispatchMode: doc.dispatchMode,
   api: {

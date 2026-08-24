@@ -28,11 +28,14 @@
   }
 }
 
+// Mismo lenguaje de tarjeta que el resto de la consola admin (.admin-panel,
+// .security-panel, .catalog-panel, etc.): var(--radius-md)/var(--shadow) en vez
+// de un radio y sombra propios que la hacían ver distinta al resto de las pestañas.
 .escalation-admin-tabs {
-  background: var(--bg-surface);
-  border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
-  border: 1px solid var(--border-color);
+  background: var(--surface-card, var(--bg-surface));
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--outline-subtle, var(--border-color));
   overflow: hidden;
 
   ::ng-deep {

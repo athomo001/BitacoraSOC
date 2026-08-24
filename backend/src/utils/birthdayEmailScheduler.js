@@ -188,6 +188,7 @@ const runBirthdayEmails = async () => {
       try {
         await sendEmail({
           to: user.email,
+          cc: config.birthdayEmailsCcAddress || undefined,
           subject: `¡Feliz Cumpleaños ${user.fullName || user.username}! 🎂`,
           html: emailHtml,
           attachments: attachments.length ? attachments : undefined,

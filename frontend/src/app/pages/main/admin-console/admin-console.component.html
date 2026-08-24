@@ -1,20 +1,16 @@
 <div class="admin-console">
-  <header class="admin-console-header">
-    <h1>Consola Administrativa</h1>
-    <p>Gestión unificada de usuarios, checklist, turnos, catálogos, escalación y seguridad HTTPS.</p>
-  </header>
-
-  <nav class="admin-console-nav" aria-label="Secciones de administración">
-    <a
-      *ngFor="let section of sections"
-      [routerLink]="section.route"
-      routerLinkActive="active"
-      class="admin-link">
-      {{ section.label }}
+  <nav mat-tab-nav-bar class="admin-console-nav" [tabPanel]="tabPanel" aria-label="Secciones de administración">
+    <a mat-tab-link
+       *ngFor="let section of sections"
+       [routerLink]="section.route"
+       routerLinkActive #rla="routerLinkActive"
+       [active]="rla.isActive">
+      <mat-icon aria-hidden="true">{{ section.icon }}</mat-icon>
+      <span>{{ section.label }}</span>
     </a>
   </nav>
 
-  <section class="admin-console-content">
+  <mat-tab-nav-panel #tabPanel class="admin-console-content">
     <router-outlet></router-outlet>
-  </section>
+  </mat-tab-nav-panel>
 </div>

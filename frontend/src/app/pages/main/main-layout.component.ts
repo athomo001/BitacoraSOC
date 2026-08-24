@@ -5,6 +5,7 @@
  */
 
 import { Component, OnInit, OnDestroy } from '@angular/core';
+import { BreakpointObserver } from '@angular/cdk/layout';
 import { Subject, takeUntil, debounceTime, distinctUntilChanged } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import { NoteService } from '../../services/note.service';
@@ -73,7 +74,13 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   isUploadingForceAvatar = false;
 
   // Sidebar states
-  leftSidebarOpened = true;
+  // Arranca en el estado correcto según el ancho real de la ventana (no siempre
+  // abierto): en pantallas angostas el drawer fijo de 280px dejaba casi sin
+  // espacio al contenido y el texto se veía "cortado" en vez de envolver.
+  private readonly mobileBreakpoint = '(max-width: 960px)';
+  isMobileView = typeof window !== 'undefined' && window.matchMedia(this.mobileBreakpoint).matches;
+  sidenavMode: 'side' | 'over' = this.isMobileView ? 'over' : 'side';
+  leftSidebarOpened = !this.isMobileView;
   rightSidebarOpened = false;
 
   // Notas
@@ -144,6 +151,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     private userService: UserService,
     private snackBar: MatSnackBar,
     private fb: FormBuilder,
+    private breakpointObserver: BreakpointObserver,
     // Servicio global del Easter Egg #bat — el HUD se suscribe a su estado aquí
     readonly batService: BatEasterEggService
   ) { }
@@ -157,6 +165,17 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    // Colapsa el drawer izquierdo a modo overlay en pantallas angostas (celular/tablet
+    // chico): con mode="side" fijo, el panel de 280px le dejaba al contenido tan poco
+    // espacio que el texto se veía cortado en vez de envolver.
+    this.breakpointObserver.observe([this.mobileBreakpoint])
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((state) => {
+        this.isMobileView = state.matches;
+        this.sidenavMode = state.matches ? 'over' : 'side';
+        this.leftSidebarOpened = !state.matches;
+      });
+
     this.loadUserData();
     this.loadNotes();
     this.loadChecklist();
@@ -524,6 +543,13 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   toggleLeftSidebar(): void {
     this.leftSidebarOpened = !this.leftSidebarOpened;
+  }
+
+  // Cierra el drawer al navegar en vista móvil (overlay); en desktop (mode="side") no aplica.
+  onNavLinkClicked(): void {
+    if (this.isMobileView) {
+      this.leftSidebarOpened = false;
+    }
   }
 
   toggleRightSidebar(): void {

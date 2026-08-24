@@ -1,5 +1,7 @@
 .tab-content {
-  padding-top: 1.5rem;
+  // Mismo padding que directory-tab / raci-tab: sin margen lateral, el texto
+  // quedaba pegado al borde del panel en vez de tener aire alrededor.
+  padding: 1.25rem 1rem 1.5rem;
 
   h2 {
     margin-bottom: 0.5rem;

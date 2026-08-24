@@ -8,7 +8,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `CHANGELOG.md`): **v1.10.1**
+> Version referencial actual (segun `CHANGELOG.md`): **v1.11.0**
 
 Stack principal:
 
@@ -83,6 +83,15 @@ Stack principal:
 ## Novedades recientes (resumen rapido)
 
 > Historial completo y detallado en [`docs/history/CHANGELOG.md`](docs/history/CHANGELOG.md).
+
+### v1.11.0 (Vínculo manual a ticket GLPI, CC de área en cumpleaños, sidebar responsivo y auditoría de consistencia visual en Administración)
+
+- **Ticket GLPI opcional en Nueva Entrada**: campo junto a "Hora del Evento" para vincular la entrada a un ticket GLPI existente al crearla; visibilidad controlada por un toggle de admin independiente del interruptor maestro de GLPI.
+- **Correo del área en copia (CC) para cumpleaños**: nuevo campo con autocompletado del Directorio de Contactos; el correo de felicitación se sigue enviando siempre a quien cumple años, con el área en copia si se configura.
+- **Sidebar responsivo**: el menú lateral (antes fijo en 280px) ahora colapsa a overlay en pantallas angostas (<960px), corrigiendo texto cortado en toda la aplicación, no solo en Administración.
+- **Rediseño de la Consola Administrativa**: se reemplaza el banner de título + botones sueltos por una barra de pestañas con íconos (mismo patrón de `/main/escalation/view`), ahorrando espacio vertical.
+- **Auditoría de consistencia visual en 9 páginas de administración**: checkboxes reagrupados junto a su campo relacionado, botones "Guardar" con envoltorio de acciones consistente, ~130 espaciados hardcodeados normalizados a los tokens del sistema de diseño, título de pestaña "Matriz RACI" igualado al resto, columnas de altura desigual en Usuarios corregidas, y 21 casos de asterisco duplicado en campos obligatorios.
+- **Bugfix**: ID de Mongo crudo visible en la tabla de Recordatorios de Checklist cuando el turno referenciado ya no está activo; validación de conexión GLPI que bloqueaba guardar cualquier cambio del panel aunque la integración estuviera apagada.
 
 ### v1.10.1 (Soporte Markdown en la bitácora + formulario asistido de Inicio/Cierre de Turno)
 

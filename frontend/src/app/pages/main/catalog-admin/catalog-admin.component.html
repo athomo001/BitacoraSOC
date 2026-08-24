@@ -12,7 +12,7 @@
           <div class="catalog-panel__body">
             <form [formGroup]="logSourceForm" (ngSubmit)="saveLogSource()">
               <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Nombre *</mat-label>
+                <mat-label>Nombre</mat-label>
                 <input matInput formControlName="name" placeholder="Ej: Firewall Fortigate">
               </mat-form-field>
 
@@ -24,8 +24,8 @@
 
               <mat-checkbox formControlName="isInternal">Cliente interno (nuestra empresa)</mat-checkbox>
 
-              <mat-form-field appearance="outline" class="full-width" style="margin-top: 12px;" *ngIf="logSourceForm.get('isInternal')?.value">
-                <mat-label>Correo de Copia Global (CC) *</mat-label>
+              <mat-form-field appearance="outline" class="full-width" *ngIf="logSourceForm.get('isInternal')?.value">
+                <mat-label>Correo de Copia Global (CC)</mat-label>
                 <textarea matInput formControlName="internalEmail" placeholder="ejemplo1@empresa.com, ejemplo2@empresa.com" rows="2"></textarea>
                 <mat-hint>Separa múltiples correos con comas o saltos de línea</mat-hint>
                  <mat-error *ngIf="internalEmailRequiredError">
@@ -36,9 +36,7 @@
                  </mat-error>
               </mat-form-field>
 
-              <div style="margin-top: 8px;">
-                <mat-checkbox formControlName="enabled">Habilitado</mat-checkbox>
-              </div>
+              <mat-checkbox formControlName="enabled">Habilitado</mat-checkbox>
 
               <div class="form-actions">
                 <button mat-raised-button color="primary" type="submit">
@@ -160,7 +158,7 @@
           <div class="catalog-panel__body">
             <form [formGroup]="operationTypeForm" (ngSubmit)="saveOperationType()" class="compact-form-grid">
               <mat-form-field appearance="outline" class="compact-field">
-                <mat-label>Nombre *</mat-label>
+                <mat-label>Nombre</mat-label>
                 <input matInput formControlName="name" placeholder="Ej: Análisis de malware">
               </mat-form-field>
 
@@ -241,7 +239,7 @@
             <form [formGroup]="clientAlertRuleForm" (ngSubmit)="saveClientAlertRule()">
 
               <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Tipo de regla *</mat-label>
+                <mat-label>Tipo de regla</mat-label>
                 <mat-select formControlName="ruleType">
                   <mat-option value="special_alert">Alerta Especial de Escalamiento</mat-option>
                   <mat-option value="scheduled_maintenance">Mantenimiento Programado</mat-option>
@@ -262,7 +260,7 @@
               </mat-checkbox>
 
               <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Cliente / Log Source *</mat-label>
+                <mat-label>Cliente / Log Source</mat-label>
                 <mat-select formControlName="clientId">
                   <mat-option *ngFor="let source of logSources" [value]="source._id">
                     {{ source.name }}
@@ -423,7 +421,7 @@
           <div class="catalog-panel__body">
             <form [formGroup]="eventForm" (ngSubmit)="saveEvent()">
               <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Nombre *</mat-label>
+                <mat-label>Nombre</mat-label>
                 <input matInput formControlName="name" placeholder="Ej: Phishing">
               </mat-form-field>
 

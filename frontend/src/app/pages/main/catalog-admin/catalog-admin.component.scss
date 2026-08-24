@@ -2,16 +2,16 @@
 .catalog-admin-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 24px;
+  padding: var(--space-6);
 
   h1 {
-    margin-bottom: 8px;
+    margin-bottom: var(--space-2);
     color: var(--text-primary);
   }
 
   .subtitle {
     color: var(--text-secondary);
-    margin-bottom: 24px;
+    margin-bottom: var(--space-6);
     font-size: 16px;
   }
 }
@@ -39,25 +39,33 @@
   padding: var(--space-4);
 }
 
+// Ritmo vertical por defecto de los formularios: mat-form-field ya trae su propio
+// subscript-wrapper, pero mat-checkbox no — sin este gap quedan pegados al campo anterior.
+form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
 .tab-content {
-  padding: 24px 0;
+  padding: var(--space-6) 0;
 }
 
 // Estilos de mat-tab-group.catalog-tabs: ver styles.scss (sin ::ng-deep).
 
 .compact-tab-content {
-  padding: 12px 0;
+  padding: var(--space-3) 0;
 }
 
 .form-card,
 .list-card {
-  margin-bottom: 24px;
+  margin-bottom: var(--space-6);
   background: var(--surface-card);
 }
 
 .compact-tab-content .form-card,
 .compact-tab-content .list-card {
-  margin-bottom: 14px;
+  margin-bottom: var(--space-3);
 }
 
 .full-width {
@@ -66,14 +74,14 @@
 
 .form-actions {
   display: flex;
-  gap: 12px;
-  margin-top: 16px;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
 }
 
 .compact-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 12px;
+  gap: var(--space-3);
   align-items: start;
 }
 
@@ -86,7 +94,7 @@
 }
 
 .compact-form-grid .form-actions {
-  margin-top: 4px;
+  margin-top: var(--space-1);
   grid-column: 1 / -1;
 }
 
@@ -159,7 +167,7 @@
 }
 
 .ml-checkbox {
-  margin-left: 16px;
+  margin-left: var(--space-4);
 }
 
 .table-empty {
@@ -186,14 +194,14 @@
 .form-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
 }
 
 .date-time-group {
   display: grid;
   grid-template-columns: 1fr 120px;
-  gap: 10px;
+  gap: var(--space-3);
   align-items: start;
 }
 

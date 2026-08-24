@@ -15,8 +15,8 @@
 .page-header {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
 
   mat-icon {
     font-size: 32px;
@@ -32,7 +32,7 @@
   }
 
   .subtitle {
-    margin: 4px 0 0 0;
+    margin: var(--space-1) 0 0 0;
     color: var(--text-secondary);
     font-size: 0.875rem;
   }
@@ -41,7 +41,7 @@
 // Distribución flex adaptable: dos columnas lado a lado en desktop, una sola columna en móvil
 .security-row {
   display: flex;
-  gap: 24px;
+  gap: var(--space-6);
   align-items: flex-start;
 
   @media (max-width: 960px) {
@@ -88,31 +88,31 @@
 form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 // Estilo para toggles de red
 .toggles {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 // Caja de carga de certificados TLS
 .tls-files {
   border: 1px solid var(--border-color, rgba(0, 0, 0, 0.12));
   border-radius: 8px;
-  padding: 16px;
+  padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .tls-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .tls-label {
@@ -130,12 +130,16 @@ form {
   border-left: 4px solid var(--state-warning);
   background: var(--state-warning-bg);
   color: var(--state-warning);
-  padding: 10px 12px;
+  padding: var(--space-3);
   border-radius: 4px;
   font-size: 0.85rem;
 
   p {
     margin: 0;
+  }
+
+  p + p {
+    margin-top: var(--space-1);
   }
 }
 
@@ -144,9 +148,9 @@ form {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 15px;
-  gap: 12px;
-  
+  margin-top: var(--space-4);
+  gap: var(--space-3);
+
   @media (max-width: 480px) {
     flex-direction: column-reverse;
     align-items: stretch;
@@ -157,11 +161,11 @@ form {
 .sso-section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .sso-section-title {
-  margin: 0 0 4px 0;
+  margin: 0 0 var(--space-1) 0;
   font-size: 1rem;
   font-weight: 600;
   color: var(--text-primary);
@@ -170,14 +174,14 @@ form {
 .sso-field-group {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding-left: 4px;
+  gap: var(--space-3);
+  padding-left: var(--space-1);
 }
 
 .section-divider {
   border: 0;
   border-top: 1px solid var(--outline-subtle, rgba(0,0,0,0.07));
-  margin: 10px 0;
+  margin: var(--space-3) 0;
 }
 
 small {
@@ -187,5 +191,5 @@ small {
 
 button mat-spinner {
   display: inline-block;
-  margin-right: 8px;
+  margin-right: var(--space-2);
 }

@@ -1,39 +1,22 @@
 .admin-console {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
-.admin-console-header h1 {
-  margin: 0;
-}
-
-.admin-console-header p {
-  margin: 4px 0 0;
-  color: var(--text-secondary);
-}
-
+// Barra de pestañas de navegación (mat-tab-nav-bar): reemplaza el banner de
+// título grande + botones sueltos por el mismo patrón que /main/escalation/view
+// (íconos + texto, sin encabezado propio), más compacto.
 .admin-console-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border-color);
-}
+  border-bottom: 1px solid var(--outline-subtle, var(--border-color));
 
-.admin-link {
-  padding: 8px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  text-decoration: none;
-  color: var(--text-primary);
-  background: var(--surface-color);
-}
+  .mdc-tab {
+    height: 48px;
+  }
 
-.admin-link.active {
-  background: var(--primary-color);
-  color: var(--on-primary-color);
-  border-color: var(--primary-color);
+  mat-icon {
+    margin-right: var(--space-2);
+  }
 }
 
 .admin-console-content {

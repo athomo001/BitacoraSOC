@@ -9,6 +9,11 @@
         <div class="grid two">
           <mat-checkbox formControlName="enabled">Habilitar GLPI</mat-checkbox>
 
+          <div>
+            <mat-checkbox formControlName="manualLinkFieldEnabled">Mostrar campo "Ticket GLPI" en Nueva Entrada</mat-checkbox>
+            <p class="muted">Permite a los analistas escribir un N° de ticket GLPI al crear la entrada, para vincularla de inmediato.</p>
+          </div>
+
           <mat-form-field appearance="outline">
             <mat-label>Modo de integración</mat-label>
             <mat-select formControlName="mode">

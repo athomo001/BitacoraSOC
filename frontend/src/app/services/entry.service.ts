@@ -88,6 +88,14 @@ export class EntryService {
   }
 
   /**
+   * Indica si el formulario de Nueva Entrada debe mostrar el campo opcional de ticket GLPI
+   * (controlado por el admin en Integraciones > GLPI).
+   */
+  getGlpiManualLinkFieldStatus(): Observable<{ enabled: boolean }> {
+    return this.http.get<{ enabled: boolean }>(`${environment.apiUrl}/integrations/glpi/manual-link-field`);
+  }
+
+  /**
    * Reenvía el contenido actual de la entrada como un nuevo seguimiento
    * del ticket GLPI ya vinculado.
    */

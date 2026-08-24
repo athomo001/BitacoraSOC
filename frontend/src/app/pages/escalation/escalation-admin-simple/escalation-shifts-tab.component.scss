@@ -27,6 +27,15 @@
   align-items: center;
 }
 
+// Checkbox que activa/desactiva la sección siguiente: le da a su fila el
+// mismo alto aproximado que un mat-form-field, en vez de quedar suelto y
+// pegado al campo siguiente sin ritmo visual propio.
+.form-row--checkbox {
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+}
+
 .hidden-native-input {
   display: none;
 }

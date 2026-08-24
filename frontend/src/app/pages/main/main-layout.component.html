@@ -1,11 +1,12 @@
 <ng-container *ngIf="!currentUser?.mustChangePassword; else forceSetupTemplate">
-<mat-sidenav-container class="main-container" [hasBackdrop]="false" autosize>
+<mat-sidenav-container class="main-container" [hasBackdrop]="isMobileView" autosize>
   <!-- LEFT SIDEBAR - Solo Menú -->
   <mat-sidenav
-    mode="side"
+    [mode]="sidenavMode"
     [opened]="leftSidebarOpened"
     position="start"
-    class="left-sidebar">
+    class="left-sidebar"
+    (closedStart)="leftSidebarOpened = false">
     
     <mat-toolbar color="primary">
       <img *ngIf="logoUrl" [src]="getAssetUrl(logoUrl)" alt="Logo" class="sidebar-logo">
@@ -17,7 +18,8 @@
       <a mat-list-item
          *ngFor="let item of visiblePrimaryMenuMain; trackBy: trackByMenu"
          [routerLink]="item.route"
-         routerLinkActive="active-link">
+         routerLinkActive="active-link"
+         (click)="onNavLinkClicked()">
         <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
         <span matListItemTitle>{{ item.label }}</span>
       </a>
@@ -36,7 +38,8 @@
           <a mat-list-item
              *ngFor="let item of visiblePrimaryMenuHistory; trackBy: trackByMenu"
              [routerLink]="item.route"
-             routerLinkActive="active-link">
+             routerLinkActive="active-link"
+             (click)="onNavLinkClicked()">
             <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
             <span matListItemTitle>{{ item.label }}</span>
           </a>
@@ -58,7 +61,8 @@
           <a mat-list-item
              *ngFor="let item of visibleComplementItems; trackBy: trackByMenu"
              [routerLink]="item.route"
-             routerLinkActive="active-link">
+             routerLinkActive="active-link"
+             (click)="onNavLinkClicked()">
             <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
             <span matListItemTitle>{{ item.label }}</span>
           </a>
@@ -78,7 +82,8 @@
              *ngFor="let item of visibleConfigItems; trackBy: trackByMenu"
              [routerLink]="item.route"
              [fragment]="item.fragment"
-             routerLinkActive="active-link">
+             routerLinkActive="active-link"
+             (click)="onNavLinkClicked()">
             <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
             <span matListItemTitle>{{ item.label }}</span>
           </a>

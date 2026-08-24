@@ -7,7 +7,7 @@
 // Layout lado a lado
 .settings-row {
   display: flex;
-  gap: 20px;
+  gap: var(--space-5);
   align-items: flex-start;
 
   @media (max-width: 960px) {
@@ -32,12 +32,12 @@
   border-left: 4px solid var(--accent-color);
   background: var(--surface-muted);
   border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 16px;
+  padding: var(--space-3);
+  margin-bottom: var(--space-4);
 }
 
 .onboarding-card p {
-  margin: 0 0 8px 0;
+  margin: 0 0 var(--space-2) 0;
 }
 
 .settings-panel {
@@ -83,25 +83,31 @@
 form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .config-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: var(--space-4);
   align-items: center;
 }
 
-
-
 .grid {
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .two-cols {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+// Checkboxes agrupados aparte del grid de campos (no mezclados como celdas
+// del grid: un mat-checkbox suelto entre mat-form-field desalinea la fila).
+.smtp-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 .status-chip {
@@ -140,10 +146,10 @@ form {
   border: 1px solid var(--state-warning);
   background: var(--state-warning-bg);
   border-radius: 8px;
-  padding: 12px;
+  padding: var(--space-3);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .integration-error-panel p {
@@ -161,7 +167,7 @@ form {
 .color-hint {
   font-size: 13px;
   color: var(--text-secondary);
-  margin: 0 0 12px 0;
+  margin: 0 0 var(--space-3) 0;
 }
 
 .color-group-label {
@@ -170,14 +176,14 @@ form {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-secondary);
-  margin: 12px 0 6px 0;
+  margin: var(--space-3) 0 var(--space-2) 0;
 }
 
 .color-swatch-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
 }
 
 .color-chip {
@@ -213,9 +219,9 @@ form {
 .color-config-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   flex-wrap: wrap;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .color-mode-select {
@@ -226,9 +232,9 @@ form {
 .color-target-row {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-4);
   flex-wrap: wrap;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
   font-size: 13px;
 }
 
@@ -269,7 +275,7 @@ form {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
 .color-swatch-btn {
@@ -295,15 +301,15 @@ form {
 .palette-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
 }
 
 .palette-card {
   position: relative;
   border: 2px solid var(--border-color);
   border-radius: 10px;
-  padding: 10px;
+  padding: var(--space-3);
   cursor: pointer;
   background: var(--surface-muted);
   transition: border-color 0.2s, box-shadow 0.2s;

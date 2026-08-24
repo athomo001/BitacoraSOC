@@ -62,6 +62,13 @@ const glpiConfigSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // Muestra el campo opcional "Ticket GLPI" en el formulario de Nueva Entrada, para
+  // vincular la entrada a un ticket existente al momento de crearla (no requiere enabled=true
+  // para poder ocultarse independiente del resto de la integración).
+  manualLinkFieldEnabled: {
+    type: Boolean,
+    default: false
+  },
   mode: {
     type: String,
     enum: ['api', 'email'],

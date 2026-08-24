@@ -1,5 +1,7 @@
 .tab-content {
-  padding-top: 1.5rem;
+  // Mismo padding que directory-tab / raci-tab: sin margen lateral, el texto
+  // quedaba pegado al borde del panel en vez de tener aire alrededor.
+  padding: 1.25rem 1rem 1.5rem;
 
   h2 {
     margin-bottom: 0.5rem;
@@ -29,6 +31,33 @@
     align-items: center;
     gap: 0.5rem;
   }
+}
+
+.client-selection-panel {
+  margin-bottom: 2rem;
+}
+
+.section-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+
+  h3 {
+    margin: 0;
+  }
+}
+
+.add-contact-btn {
+  margin-bottom: 1.5rem;
+}
+
+// Checkbox junto a un campo dependiente en un formulario inline: centrado
+// contra la altura del campo en vez de quedar suelto en su propia línea.
+.form-row--checkbox {
+  display: flex;
+  align-items: center;
+  min-height: 56px;
 }
 
 .chips-list {

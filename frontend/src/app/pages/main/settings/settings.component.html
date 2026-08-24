@@ -22,16 +22,16 @@
     </header>
     <div class="settings-panel__body">
       <form [formGroup]="appConfigForm" (ngSubmit)="saveAppConfig()">
-        <div style="margin-bottom: 20px;">
-          <!-- Permite habilitar/deshabilitar el acceso temporal para usuarios invitados -->
-          <mat-checkbox formControlName="guestEnabled" id="guest-mode">
-            Habilitar modo invitado
-          </mat-checkbox>
-        </div>
+        <!-- Permite habilitar/deshabilitar el acceso temporal para usuarios invitados -->
+        <mat-checkbox formControlName="guestEnabled" id="guest-mode">
+          Habilitar modo invitado
+        </mat-checkbox>
 
-        <button mat-raised-button color="primary" type="submit" [disabled]="!appConfigForm.valid">
-          Guardar Configuración
-        </button>
+        <div class="form-actions">
+          <button mat-raised-button color="primary" type="submit" [disabled]="!appConfigForm.valid">
+            Guardar Configuración
+          </button>
+        </div>
       </form>
     </div>
   </div>
@@ -70,18 +70,10 @@
                 <input matInput type="number" formControlName="port">
               </mat-form-field>
 
-              <mat-checkbox formControlName="useTLS">
-                Conexión segura (SSL/TLS)
-              </mat-checkbox>
-
               <mat-form-field appearance="outline">
                 <mat-label>Usuario</mat-label>
                 <input matInput formControlName="username" [placeholder]="selectedProviderPreset.usernamePlaceholder">
               </mat-form-field>
-
-              <mat-checkbox formControlName="useUsernameAsSenderEmail" class="full-width">
-                Usar el mismo correo del usuario SMTP como email remitente
-              </mat-checkbox>
 
               <mat-form-field appearance="outline">
                 <mat-label>Contraseña</mat-label>
@@ -117,13 +109,23 @@
               </mat-form-field>
             </div>
 
-            <mat-checkbox formControlName="sendOnlyIfRed">
-              Enviar correo solo si hay servicios en rojo (si no, envía siempre)
-            </mat-checkbox>
+            <div class="smtp-toggles">
+              <mat-checkbox formControlName="useTLS">
+                Conexión segura (SSL/TLS)
+              </mat-checkbox>
 
-            <mat-checkbox formControlName="isActive" (change)="onSmtpActiveChange($event.checked)">
-              Activar envío de correos
-            </mat-checkbox>
+              <mat-checkbox formControlName="useUsernameAsSenderEmail">
+                Usar el mismo correo del usuario SMTP como email remitente
+              </mat-checkbox>
+
+              <mat-checkbox formControlName="sendOnlyIfRed">
+                Enviar correo solo si hay servicios en rojo (si no, envía siempre)
+              </mat-checkbox>
+
+              <mat-checkbox formControlName="isActive" (change)="onSmtpActiveChange($event.checked)">
+                Activar envío de correos
+              </mat-checkbox>
+            </div>
 
             <div class="form-actions">
               <button mat-button type="button" (click)="openSmtpGuide()">Ver guía rápida</button>

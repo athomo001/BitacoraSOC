@@ -46,14 +46,9 @@
                         {{ service.status === 'verde' ? 'check_circle' : service.status === 'rojo' ? 'cancel' :
                         'radio_button_unchecked' }}
                       </mat-icon>
-                      {{ service.serviceTitle }}
-                    </mat-panel-title>
-                    <mat-panel-description *ngIf="service.children?.length">
-                      {{ getStatusLabel(service) }}
-                    </mat-panel-description>
-                    <!-- Si NO tiene hijos, mostrar botones en el header -->
-                    <mat-panel-description *ngIf="!service.children?.length" class="status-header-actions">
-                      <mat-radio-group [(ngModel)]="service.status" [name]="'status_' + i" required
+                      <span class="panel-title-text">{{ service.serviceTitle }}</span>
+                      <!-- Si NO tiene hijos, mostrar los radios junto al titulo para minimizar el recorrido del mouse -->
+                      <mat-radio-group *ngIf="!service.children?.length" [(ngModel)]="service.status" [name]="'status_' + i" required
                         class="status-header-group" (click)="$event.stopPropagation()"
                         (change)="onStatusChange(service, $event.value)">
                         <mat-radio-button value="verde" color="primary" (click)="$event.stopPropagation()">
@@ -65,6 +60,9 @@
                           Rojo (Problema)
                         </mat-radio-button>
                       </mat-radio-group>
+                    </mat-panel-title>
+                    <mat-panel-description *ngIf="service.children?.length">
+                      {{ getStatusLabel(service) }}
                     </mat-panel-description>
                   </mat-expansion-panel-header>
 

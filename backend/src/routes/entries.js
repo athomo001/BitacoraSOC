@@ -194,12 +194,14 @@ router.post('/',
     body('entryType').isIn(['operativa', 'incidente', 'ofensa']).withMessage('Tipo de entrada inválido'),
     body('entryDate').isISO8601().withMessage('Fecha inválida'),
     body('entryTime').matches(/^([01]\d|2[0-3]):([0-5]\d)$/).withMessage('Hora inválida (formato HH:mm)'),
-    body('clientId').optional({ checkFalsy: true }).isMongoId().withMessage('ClientId inválido')
+    body('clientId').optional({ checkFalsy: true }).isMongoId().withMessage('ClientId inválido'),
+    body('glpiTicketId').optional({ checkFalsy: true }).trim().isString()
   ],
   validate,
   async (req, res) => {
     try {
       const { content, entryType, entryDate, entryTime, clientId } = req.body;
+      const glpiTicketId = String(req.body.glpiTicketId || '').trim();
 
       // 🕒 Forzar timezone Chile (America/Santiago)
       const entryDateObj = new Date(entryDate);
@@ -263,7 +265,37 @@ router.post('/',
         }
       });
 
-      if (entryType === 'incidente' || entryType === 'ofensa') {
+      let glpiLinkWarning = null;
+      if (glpiTicketId) {
+        // El campo manual de ticket GLPI es opcional y depende del toggle de admin
+        // (manualLinkFieldEnabled) — se revalida en el servidor por si el front quedó desincronizado.
+        // Independiente de config.enabled a propósito (ver ruta /manual-link-field en glpi.js).
+        const glpiConfig = await ensureGlpiConfig();
+        if (glpiConfig.manualLinkFieldEnabled) {
+          try {
+            const followup = await addTicketFollowup(glpiConfig, {
+              ticketId: glpiTicketId,
+              content: buildGlpiFollowupContent(entry, req.user.username)
+            });
+            entry.glpiTicketId = glpiTicketId;
+            entry.glpiLinkedAt = new Date();
+            await entry.save();
+
+            await audit(req, {
+              event: 'entry.glpi.link',
+              result: { success: true },
+              metadata: { entryId: entry._id, ticketId: glpiTicketId, followupId: followup.followupId, source: 'create' }
+            }).catch((auditError) => {
+              logger.error({ err: auditError, entryId: entry._id }, 'Error al registrar auditoría de vínculo GLPI');
+            });
+          } catch (linkError) {
+            logger.error({ err: linkError, entryId: entry._id, requestId: req.requestId }, 'Error linking entry to GLPI ticket at creation');
+            glpiLinkWarning = `La entrada se creó, pero no se pudo vincular al ticket GLPI #${glpiTicketId}: ${linkError.message}`;
+          }
+        }
+      }
+
+      if ((entryType === 'incidente' || entryType === 'ofensa') && !entry.glpiTicketId) {
         const ticketTitle = `[SOC][${entryType.toUpperCase()}] ${clientName || 'Sin cliente'} ${entryTime}`;
         const ticketText = [
           `Tipo: ${entryType}`,
@@ -306,7 +338,8 @@ router.post('/',
 
       res.status(201).json({
         message: 'Entrada creada exitosamente',
-        entry
+        entry,
+        ...(glpiLinkWarning ? { glpiLinkWarning } : {})
       });
     } catch (error) {
       logger.error({
