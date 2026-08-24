@@ -66,6 +66,12 @@ const shiftNotificationScheduleSchema = new mongoose.Schema({
     type: String,
     enum: ['current_week', 'next_week'],
     default: 'current_week'
+  },
+  // Formato visual del correo: lista tabular (default, histórico) o calendario tipo grilla Lun-Vie
+  emailFormat: {
+    type: String,
+    enum: ['list', 'calendar'],
+    default: 'list'
   }
 }, {
   timestamps: true

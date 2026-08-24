@@ -14,6 +14,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatRadioModule } from '@angular/material/radio';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
@@ -53,6 +54,7 @@ import { resolverCondicionVisible } from '../../../utils/work-shift-priority.uti
     MatInputModule,
     MatSelectModule,
     MatCheckboxModule,
+    MatRadioModule,
     MatChipsModule,
     MatTooltipModule,
     MatSnackBarModule,
@@ -362,7 +364,16 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       includeVacation: [false],
       includeMedicalLeave: [false],
       includeMedicalAppointment: [false],
-      targetPeriod: ['current_week']
+      targetPeriod: ['current_week'],
+      emailFormat: ['list']
+    });
+
+    // El formato Calendario es una grilla Lunes-Viernes: solo tiene sentido para envíos semanales,
+    // así que al elegirlo forzamos la frecuencia y evitamos una combinación inválida.
+    this.scheduleForm.get('emailFormat')?.valueChanges.subscribe((value) => {
+      if (value === 'calendar') {
+        this.scheduleForm.get('frequency')?.setValue('weekly');
+      }
     });
   }
 
@@ -2028,7 +2039,8 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       includeVacation: false,
       includeMedicalLeave: false,
       includeMedicalAppointment: false,
-      targetPeriod: 'current_week'
+      targetPeriod: 'current_week',
+      emailFormat: 'list'
     });
     this._recipientsRaw = '';
     this._ccRaw = '';
@@ -2071,7 +2083,8 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       includeVacation,
       includeMedicalLeave,
       includeMedicalAppointment,
-      targetPeriod: schedule.targetPeriod || 'current_week'
+      targetPeriod: schedule.targetPeriod || 'current_week',
+      emailFormat: schedule.emailFormat === 'calendar' ? 'calendar' : 'list'
     });
 
     this._recipientsRaw = recs;
@@ -2130,7 +2143,8 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       recipients: String(formVal.recipients || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
       ccRecipients: String(formVal.ccRecipients || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
       roleFilter,
-      targetPeriod: formVal.targetPeriod
+      targetPeriod: formVal.targetPeriod,
+      emailFormat: formVal.emailFormat
     };
 
     const request$ = this.editingScheduleId
@@ -2247,6 +2261,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
           ccRecipients: [],
           roleFilter,
           targetPeriod: formVal.targetPeriod,
+          emailFormat: formVal.emailFormat,
           isTest: true
         } as any)
       : this.escalationService.testNotificationScheduleSend({
@@ -2255,7 +2270,8 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
           ccRecipients: [],
           frequency: formVal.frequency || 'weekly',
           roleFilter,
-          targetPeriod: formVal.targetPeriod
+          targetPeriod: formVal.targetPeriod,
+          emailFormat: formVal.emailFormat
         });
 
     request$.subscribe({

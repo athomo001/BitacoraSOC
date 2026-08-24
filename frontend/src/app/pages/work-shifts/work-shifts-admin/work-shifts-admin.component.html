@@ -635,6 +635,7 @@
                         <span style="font-size: 11px; color: var(--text-secondary);">
                           {{ s.frequency === 'weekly' ? 'Semanal' : 'Mensual' }} •
                           {{ s.frequency === 'weekly' ? getWeekdaysLabel([s.dayOfWeek]) : 'Día 1' }} a las {{ s.time }}
+                          • Formato {{ s.emailFormat === 'calendar' ? 'Calendario' : 'Lista' }}
                         </span>
                       </div>
                       <span class="status-badge" [style.background-color]="s.enabled ? 'var(--state-success-bg)' : 'var(--state-neutral-bg)'"
@@ -742,6 +743,17 @@
                       <mat-option value="next_week">Semana siguiente (próxima semana)</mat-option>
                     </mat-select>
                   </mat-form-field>
+
+                  <div class="email-format-section" style="margin-bottom: 15px;">
+                    <span style="display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px;">Formato del correo</span>
+                    <mat-radio-group formControlName="emailFormat" style="display: flex; flex-direction: column; gap: 4px;">
+                      <mat-radio-button value="list">Lista (tabla actual)</mat-radio-button>
+                      <mat-radio-button value="calendar">Calendario (grilla visual estilo impresión)</mat-radio-button>
+                    </mat-radio-group>
+                    <p style="font-size: 10.5px; color: var(--text-secondary); font-style: italic; margin: 6px 0 0 0;">
+                      El formato Calendario está pensado para Teletrabajo/Ausencias (no turnos de guardia) y siempre se envía en frecuencia semanal.
+                    </p>
+                  </div>
 
                   <mat-form-field appearance="outline" class="full-width">
                     <mat-label>Destinatarios (emails separados por coma)</mat-label>
