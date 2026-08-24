@@ -2,6 +2,18 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.11.1] - 2026-08-24
+
+### Nuevo formato de correo "Calendario" para las notificaciones de Personal Fuera de la Oficina / Escalamiento (`/main/admin/work-shifts`)
+
+- **Feature (Backend/Frontend) — Formato de correo seleccionable por programación de notificación (Lista / Calendario)**: cada `ShiftNotificationSchedule` (ej. la programación "Activos Fuera de la Oficina") ahora tiene un campo `emailFormat` (`list` por defecto, retrocompatible con todas las programaciones existentes, incluidas las de turnos de Guardia). El formato **Lista** es la tabla tradicional sin cambios (`escalationSchedule.js`); el nuevo formato **Calendario** renderiza una grilla Nombre × Lunes-Viernes con roster completo del SOC, replicando el mismo layout que ya se usa para imprimir la "Programación SOC" desde Escalaciones (`escalation-simple.component.ts` → `printSection()`), incluyendo la resolución por prioridad de condiciones simultáneas (Vacaciones/Licencia Médica > Trámite Médico > Charla/Capacitación > Teletrabajo) y ordenando primero a quienes tienen alguna novedad esa semana.
+  - Nueva plantilla MJML `backend/src/templates/email/outOfOfficeCalendar.js`: en vez de la fuente Material Icons usada en la impresión (no carga de forma confiable en clientes de correo, especialmente Outlook de escritorio), cada condición se representa con un emoji a color (🏠 Teletrabajo, 🎓 Charla/Capacitación, 🏖️ Vacaciones, 🤒 Licencia Médica, 🏥 Trámite Médico) más su etiqueta, manteniendo la misma paleta y familia visual que el correo de lista.
+  - El formato Calendario está pensado para condiciones de Teletrabajo/Ausencias y siempre se envía en frecuencia semanal (una grilla Lunes-Viernes no aplica a un período mensual); el formulario de administración fuerza la frecuencia a semanal automáticamente al seleccionarlo.
+  - El campo se propaga por todo el flujo existente sin romper compatibilidad: CRUD de programaciones, envío manual, envío de prueba y el cron de envíos automáticos (`escalationScheduleScheduler.js`).
+- **Feature (Frontend) — Selector "Formato del correo" en el formulario de Notificaciones**: nuevo control Lista/Calendario en el formulario de creación/edición de programaciones, con nota aclaratoria sobre su alcance, y un indicador de formato configurado en cada tarjeta de la lista de programaciones existentes.
+
+---
+
 ## [v1.11.0] - 2026-08-22
 
 ### Vínculo manual a ticket GLPI desde Nueva Entrada, copia (CC) de área en cumpleaños, sidebar responsivo y auditoría de consistencia visual en toda la Consola Administrativa

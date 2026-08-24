@@ -8,7 +8,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `CHANGELOG.md`): **v1.11.0**
+> Version referencial actual (segun `CHANGELOG.md`): **v1.11.1**
 
 Stack principal:
 
@@ -83,6 +83,10 @@ Stack principal:
 ## Novedades recientes (resumen rapido)
 
 > Historial completo y detallado en [`docs/history/CHANGELOG.md`](docs/history/CHANGELOG.md).
+
+### v1.11.1 (Formato Calendario para el correo de Personal Fuera de la Oficina)
+
+- **Nuevo formato de correo "Calendario"** (`/main/admin/work-shifts` → Notificaciones): las programaciones de notificación (ej. "Activos Fuera de la Oficina") pueden enviarse como una grilla visual Nombre × Lunes-Viernes con íconos por condición (Teletrabajo, Capacitación, Vacaciones, Licencia Médica, Trámite Médico), replicando el mismo formato que ya se imprime en Escalaciones. El formato de lista original se mantiene intacto y sigue siendo el predeterminado para toda programación existente.
 
 ### v1.11.0 (Vínculo manual a ticket GLPI, CC de área en cumpleaños, sidebar responsivo y auditoría de consistencia visual en Administración)
 

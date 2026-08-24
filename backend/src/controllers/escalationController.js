@@ -32,7 +32,7 @@ const {
 const { parseBooleanLike } = require('../utils/boolean-helper');
 const { syncDirectoryContact, syncManyDirectoryContacts } = require('../utils/directory-sync');
 // Importar plantilla de correo centralizada
-const { buildEscalationScheduleEmail } = require('../templates/email');
+const { buildEscalationScheduleEmail, buildOutOfOfficeCalendarEmail } = require('../templates/email');
 const { sendEmail } = require('../utils/email');
 
 const INTERNAL_SHIFT_ROLE_CODES = ['N1_NO_HABIL', 'N2', 'TI'];
@@ -49,6 +49,101 @@ const ROLE_MEDICAL_APPOINTMENT = 'MEDICAL_APPOINTMENT';
 const ABSENCE_ROLE_CODES = ['VACATION', 'MEDICAL_LEAVE'];
 const NON_EXCLUSIVE_ASSIGNMENT_ROLE_CODES = [ROLE_TELEWORK, ROLE_OL, ROLE_MEDICAL_APPOINTMENT, ...ABSENCE_ROLE_CODES];
 const UPLOADS_LOGOS_DIR = path.resolve(path.join(__dirname, '../../uploads/logos'));
+
+// ── Correo de calendario semanal (formato "Personal Fuera de la Oficina") ──────────────────
+// Prioridad para resolver, día por día, la condición de mayor relevancia cuando un analista tiene más de una
+// asignación activa simultánea. Replica el criterio ya usado por la grilla de impresión de Escalaciones
+// (frontend: computeMatrixRows en escalation-simple.component.ts) para mantener paridad visual entre ambos formatos.
+const OUT_OF_OFFICE_DAY_PRIORITY = {
+  VACATION: 1,
+  MEDICAL_LEAVE: 1,
+  MEDICAL_APPOINTMENT: 2,
+  OL: 3,
+  TELEWORK: 4
+};
+const OUT_OF_OFFICE_RELEVANT_ROLES = new Set(Object.keys(OUT_OF_OFFICE_DAY_PRIORITY));
+const OUT_OF_OFFICE_STATUS_BY_ROLE = {
+  MEDICAL_LEAVE: 'medical-leave',
+  VACATION: 'vacation',
+  MEDICAL_APPOINTMENT: 'medical-appointment',
+  OL: 'training',
+  TELEWORK: 'telework'
+};
+const WEEKDAY_SHORT_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+/**
+ * Construye las columnas Lunes-Viernes de la semana que contiene weekMonday, para el correo de calendario.
+ * @param {Date} weekMonday - Fecha correspondiente al lunes de la semana a representar.
+ * @returns {Array<{date: Date, dayShort: string, dateShort: string}>} Columnas de días hábiles.
+ */
+const buildOutOfOfficeWeekColumns = (weekMonday) => {
+  const columns = [];
+  for (let i = 0; i < 5; i++) {
+    const d = new Date(weekMonday);
+    d.setDate(weekMonday.getDate() + i);
+    d.setHours(0, 0, 0, 0);
+    const dayNum = String(d.getDate()).padStart(2, '0');
+    const monthNum = String(d.getMonth() + 1).padStart(2, '0');
+    columns.push({ date: d, dayShort: WEEKDAY_SHORT_LABELS[d.getDay()], dateShort: `${dayNum}/${monthNum}` });
+  }
+  return columns;
+};
+
+/**
+ * Construye las filas Nombre x Día del correo de calendario, resolviendo por prioridad la condición activa de
+ * mayor relevancia para cada analista y día. Replica el algoritmo de computeMatrixRows del frontend
+ * (escalation-simple.component.ts) para mantener paridad visual con la impresión de Escalaciones.
+ * @param {Array} assignments - Asignaciones (ShiftAssignment, con userId populado) que solapan el período.
+ * @param {Array} users - Roster de usuarios activos a listar (con fullName y cargoLabel).
+ * @param {Array} columns - Columnas de días generadas por buildOutOfOfficeWeekColumns.
+ * @returns {Array} Filas listas para renderizar en la plantilla de correo.
+ */
+const buildOutOfOfficeMatrixRows = (assignments, users, columns) => {
+  const userGroups = new Map();
+  users.forEach((u) => {
+    userGroups.set(String(u._id), { name: u.fullName || 'Sin asignar', cargoLabel: u.cargoLabel || '', assignments: [] });
+  });
+
+  assignments.forEach((asg) => {
+    if (!asg) return;
+    const userIdStr = asg.userId?._id ? String(asg.userId._id) : (typeof asg.userId === 'string' ? asg.userId : null);
+    if (!userIdStr || !userGroups.has(userIdStr)) return;
+    userGroups.get(userIdStr).assignments.push(asg);
+  });
+
+  const rows = [];
+  userGroups.forEach((group) => {
+    const relevantAsgs = group.assignments.filter((a) => OUT_OF_OFFICE_RELEVANT_ROLES.has(a.roleCode) && a.isPaused !== true);
+
+    let hasSpecial = false;
+    const days = columns.map((col) => {
+      const dayStart = col.date;
+      const dayEnd = new Date(col.date);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      const activeToday = relevantAsgs.filter((a) => {
+        const start = new Date(a.weekStartDate);
+        const end = new Date(a.weekEndDate);
+        return start <= dayEnd && end >= dayStart;
+      });
+
+      if (activeToday.length === 0) return { status: 'office' };
+
+      activeToday.sort((a, b) => (OUT_OF_OFFICE_DAY_PRIORITY[a.roleCode] ?? 9) - (OUT_OF_OFFICE_DAY_PRIORITY[b.roleCode] ?? 9));
+      hasSpecial = true;
+      return { status: OUT_OF_OFFICE_STATUS_BY_ROLE[activeToday[0].roleCode] || 'office' };
+    });
+
+    rows.push({ name: group.name, cargoLabel: group.cargoLabel, hasSpecial, days });
+  });
+
+  rows.sort((a, b) => {
+    if (a.hasSpecial !== b.hasSpecial) return a.hasSpecial ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return rows;
+};
 
 const contentTypeFromLogoFilename = (filename) => {
   const extension = path.extname(filename || '').toLowerCase();
@@ -2674,7 +2769,7 @@ exports.triggerEscalationScheduleSend = async (req, res) => {
 /**
  * Lógica compartida para generar y enviar el reporte de turnos
  */
-exports.sendEscalationScheduleInternal = async ({ name, recipients, ccRecipients, frequency = 'weekly', roleFilter = [], targetPeriod = 'current_week' }) => {
+exports.sendEscalationScheduleInternal = async ({ name, recipients, ccRecipients, frequency = 'weekly', roleFilter = [], targetPeriod = 'current_week', emailFormat = 'list' }) => {
   try {
     await restoreExpiredMedicalLeavePauses();
 
@@ -2752,6 +2847,62 @@ exports.sendEscalationScheduleInternal = async ({ name, recipients, ccRecipients
     .populate('userId', 'fullName cargoLabel')
     .populate('externalPersonId', 'name email')
     .sort({ weekStartDate: 1 });
+
+    // Formato calendario: grilla Nombre x Lunes-Viernes (paridad visual con la impresión de Escalaciones),
+    // en vez de la tabla de lista tradicional. Se resuelve y envía por completo aquí, sin tocar la ruta de lista.
+    if (emailFormat === 'calendar') {
+      const weekMonday = new Date(startDate);
+      weekMonday.setHours(0, 0, 0, 0);
+
+      const roster = await User.find({ isActive: true, role: { $nin: ['guest', 'auditor'] } })
+        .select('fullName cargoLabel')
+        .lean();
+
+      const columns = buildOutOfOfficeWeekColumns(weekMonday);
+      const rows = buildOutOfOfficeMatrixRows(assignments, roster, columns);
+
+      const reportTitle = name || 'Personal Fuera de la Oficina y Apoyo';
+      const emailSubject = `[${brandName}] ${reportTitle} - ${periodLabel}`;
+
+      logger.info('Generación de reporte automatizado de calendario (fuera de oficina)', {
+        reportTitle,
+        periodLabel,
+        rosterSize: roster.length,
+        assignmentsFound: assignments.length,
+        weekMonday: weekMonday.toISOString()
+      });
+
+      const calendarEmailBuild = await buildOutOfOfficeCalendarEmail({
+        columns,
+        rows,
+        periodLabel,
+        logoCid,
+        brandName,
+        title: reportTitle
+      });
+
+      if (calendarEmailBuild.errors && calendarEmailBuild.errors.length > 0) {
+        logger.warn('Advertencias de compilación MJML para correo de calendario', {
+          errors: calendarEmailBuild.errors,
+          rowsCount: rows.length
+        });
+      }
+
+      const calendarEmailResult = await sendEmail({
+        to: recipients,
+        cc: ccRecipients,
+        subject: emailSubject,
+        html: calendarEmailBuild.html,
+        attachments: attachments.length ? attachments : undefined,
+        auditContext: {
+          sourceModule: 'escalation-automation',
+          triggerType: 'schedule',
+          format: 'calendar'
+        }
+      });
+
+      return { success: true, messageId: calendarEmailResult.messageId };
+    }
 
     // Filtrar asignaciones según los roles especificados en la programación de notificaciones.
     // Si no se define filtro, por compatibilidad retrospectiva se asumen los roles de guardia tradicionales.
@@ -2967,7 +3118,7 @@ exports.getNotificationSchedules = async (req, res) => {
  */
 exports.createNotificationSchedule = async (req, res) => {
   try {
-    const { name, enabled, frequency, dayOfWeek, time, recipients, ccRecipients, roleFilter, targetPeriod } = req.body;
+    const { name, enabled, frequency, dayOfWeek, time, recipients, ccRecipients, roleFilter, targetPeriod, emailFormat } = req.body;
 
     if (!name) {
       return res.status(400).json({ error: 'El nombre es obligatorio' });
@@ -2982,7 +3133,8 @@ exports.createNotificationSchedule = async (req, res) => {
       recipients: Array.isArray(recipients) ? recipients : [],
       ccRecipients: Array.isArray(ccRecipients) ? ccRecipients : [],
       roleFilter: Array.isArray(roleFilter) ? roleFilter : [],
-      targetPeriod: targetPeriod || 'current_week'
+      targetPeriod: targetPeriod || 'current_week',
+      emailFormat: emailFormat === 'calendar' ? 'calendar' : 'list'
     });
 
     await schedule.save();
@@ -3006,7 +3158,7 @@ exports.createNotificationSchedule = async (req, res) => {
 exports.updateNotificationSchedule = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, enabled, frequency, dayOfWeek, time, recipients, ccRecipients, roleFilter, targetPeriod } = req.body;
+    const { name, enabled, frequency, dayOfWeek, time, recipients, ccRecipients, roleFilter, targetPeriod, emailFormat } = req.body;
 
     const schedule = await ShiftNotificationSchedule.findById(id);
     if (!schedule) {
@@ -3022,6 +3174,7 @@ exports.updateNotificationSchedule = async (req, res) => {
     if (ccRecipients !== undefined) schedule.ccRecipients = Array.isArray(ccRecipients) ? ccRecipients : [];
     if (roleFilter !== undefined) schedule.roleFilter = Array.isArray(roleFilter) ? roleFilter : [];
     if (targetPeriod !== undefined) schedule.targetPeriod = targetPeriod;
+    if (emailFormat !== undefined) schedule.emailFormat = emailFormat === 'calendar' ? 'calendar' : 'list';
 
     await schedule.save();
 
@@ -3095,6 +3248,7 @@ exports.triggerNotificationScheduleSend = async (req, res) => {
     const roleFilter = req.body?.roleFilter || schedule.roleFilter;
     // Si se pasa targetPeriod en el body se utiliza, si no, se recurre a la configuración guardada
     const targetPeriod = req.body?.targetPeriod || schedule.targetPeriod;
+    const emailFormat = req.body?.emailFormat || schedule.emailFormat;
 
     const result = await exports.sendEscalationScheduleInternal({
       name,
@@ -3102,7 +3256,8 @@ exports.triggerNotificationScheduleSend = async (req, res) => {
       ccRecipients,
       frequency: schedule.frequency,
       roleFilter,
-      targetPeriod
+      targetPeriod,
+      emailFormat
     });
 
     if (result.success) {
@@ -3135,7 +3290,7 @@ exports.triggerNotificationScheduleSend = async (req, res) => {
  */
 exports.testNotificationScheduleSend = async (req, res) => {
   try {
-    const { name, recipients, ccRecipients, frequency, roleFilter, targetPeriod } = req.body;
+    const { name, recipients, ccRecipients, frequency, roleFilter, targetPeriod, emailFormat } = req.body;
 
     const parseEmailList = (raw) => {
       if (Array.isArray(raw)) return raw.map((s) => String(s || '').trim().toLowerCase()).filter((s) => s.includes('@'));
@@ -3156,7 +3311,8 @@ exports.testNotificationScheduleSend = async (req, res) => {
       ccRecipients: parsedCcRecipients,
       frequency: frequency || 'weekly',
       roleFilter: roleFilter || [],
-      targetPeriod: targetPeriod || 'current_week'
+      targetPeriod: targetPeriod || 'current_week',
+      emailFormat: emailFormat || 'list'
     });
 
     if (result.success) {

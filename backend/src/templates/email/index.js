@@ -5,6 +5,7 @@
 
 // Importamos todas las plantillas centralizadas
 const { buildEscalationScheduleEmail } = require('./escalationSchedule');
+const { buildOutOfOfficeCalendarEmail } = require('./outOfOfficeCalendar');
 const { buildIncidentEmail, buildIncidentEmailPreview, PALETTES } = require('./incidentReport');
 const { buildShiftReportEmail } = require('./shiftReport');
 const { buildPasswordRecoveryEmail } = require('./passwordRecovery');
@@ -14,6 +15,7 @@ const { buildBirthdayEmail } = require('./birthdayCongratulation');
 // Exportación centralizada
 module.exports = {
   buildEscalationScheduleEmail,
+  buildOutOfOfficeCalendarEmail,
   buildIncidentEmail,
   buildIncidentEmailPreview,
   PALETTES,
