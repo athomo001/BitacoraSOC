@@ -56,7 +56,7 @@ const LEGEND_ORDER = ['telework', 'training', 'vacation', 'medical-leave', 'medi
 async function buildOutOfOfficeCalendarEmail({ columns = [], rows = [], periodLabel = '', logoCid = null, brandName = 'Bitácora CDC', title = 'Personal Fuera de la Oficina y Apoyo' }) {
 
   const headerCells = columns.map((col) => `
-    <th style="text-align:center; padding:10px 6px; color:${PALETTE.mutedText}; font-size:12px; white-space:nowrap; border-bottom: 2px solid ${PALETTE.softLine};">
+    <th style="text-align:center; padding:10px 6px; color:${PALETTE.mutedText}; font-size:12px; white-space:nowrap; border-bottom: 2px solid ${PALETTE.softLine}; border-left: 1px solid ${PALETTE.softLine};">
       ${e(col.dayShort)}<br/><span style="font-weight:400; font-size:10.5px;">${e(col.dateShort)}</span>
     </th>
   `).join('');
@@ -71,7 +71,7 @@ async function buildOutOfOfficeCalendarEmail({ columns = [], rows = [], periodLa
           const content = meta
             ? `<span style="font-size:22px; line-height:1;">${meta.emoji}</span><br/><span style="display:inline-block; margin-top:3px; font-size:9.5px; font-weight:700; text-transform:uppercase; color:${meta.color};">${e(meta.label)}</span>`
             : '';
-          return `<td style="padding:10px 4px; border-bottom:${border}; text-align:center; vertical-align:middle;">${content}</td>`;
+          return `<td style="padding:10px 4px; border-bottom:${border}; border-left: 1px solid ${PALETTE.softLine}; text-align:center; vertical-align:middle;">${content}</td>`;
         }).join('');
 
         const cargoHtml = row.cargoLabel
