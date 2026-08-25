@@ -74,6 +74,13 @@
           <mat-hint>Máximo 120 caracteres</mat-hint>
         </mat-form-field>
 
+        <mat-form-field appearance="outline">
+          <mat-label>Fecha de Nacimiento</mat-label>
+          <input matInput formControlName="birthday" type="date">
+          <mat-icon matSuffix>cake</mat-icon>
+          <mat-hint>Solo si el usuario no la ha configurado en su perfil</mat-hint>
+        </mat-form-field>
+
         <div class="mfa-checkbox-container">
           <mat-checkbox formControlName="mfaEnabled" color="primary">
             Habilitar Autenticación Multifactor (MFA/TOTP)

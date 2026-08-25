@@ -638,6 +638,7 @@ router.put('/:id',
     body('phone').optional({ nullable: true }).trim().isLength({ min: 6, max: 20 }),
     body('cargoLabel').optional({ nullable: true }).isString().trim().isLength({ max: MAX_CARGO_LENGTH })
       .withMessage(`Cargo inválido (máx ${MAX_CARGO_LENGTH} caracteres)`),
+    body('birthday').optional({ nullable: true }).isISO8601().toDate().withMessage('Fecha de nacimiento inválida'),
     // Permite al administrador establecer una nueva contraseña de cualquier longitud
     body('newPassword').optional(),
     body('mfaEnabled').optional().isBoolean().withMessage('MFAEnabled debe ser booleano'),
@@ -720,7 +721,8 @@ router.put('/:id',
             cargoLabel: beforeUser.cargoLabel,
             isActive: beforeUser.isActive,
             phone: beforeUser.phone,
-            theme: beforeUser.theme
+            theme: beforeUser.theme,
+            birthday: beforeUser.birthday
           } : null,
           after: {
             email: user.email,
@@ -730,6 +732,7 @@ router.put('/:id',
             isActive: user.isActive,
             phone: user.phone,
             theme: user.theme,
+            birthday: user.birthday,
             passwordChanged: !!newPasswordToSet
           }
         }

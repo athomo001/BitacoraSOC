@@ -8,7 +8,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `CHANGELOG.md`): **v1.11.1**
+> Version referencial actual (segun `CHANGELOG.md`): **v1.11.2**
 
 Stack principal:
 
@@ -83,6 +83,10 @@ Stack principal:
 ## Novedades recientes (resumen rapido)
 
 > Historial completo y detallado en [`docs/history/CHANGELOG.md`](docs/history/CHANGELOG.md).
+
+### v1.11.2 (Cumpleaños de usuarios configurable por el administrador)
+
+- **El admin ahora puede fijar la fecha de nacimiento de cualquier usuario** (`/main/admin/users`): nuevo campo "Fecha de Nacimiento" en el formulario de edición, para los casos en que el usuario aún no lo haya configurado en su propio perfil. El campo usado por el envío automático de correos de cumpleaños es el mismo; el endpoint de edición de admin ahora lo valida y registra en auditoría igual que el resto de los campos de usuario.
 
 ### v1.11.1 (Formato Calendario para el correo de Personal Fuera de la Oficina)
 
