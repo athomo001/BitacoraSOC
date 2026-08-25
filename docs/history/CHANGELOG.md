@@ -2,6 +2,15 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.11.2] - 2026-08-25
+
+### Cumpleaños de usuarios configurable por el administrador (`/main/admin/users`)
+
+- **Feature (Backend/Frontend) — El admin ahora puede fijar la fecha de nacimiento de cualquier usuario**: hasta ahora el campo `birthday` (usado por el envío automático de correos de cumpleaños) solo podía configurarse desde el propio perfil del usuario o durante el flujo obligatorio de primer ingreso (`force-setup`); si el usuario nunca lo completaba, el admin no tenía forma de arreglarlo. Se agregó el campo "Fecha de Nacimiento" al formulario de edición de usuario en Gestión de Usuarios (`users.component.ts`/`.html`), reutilizando el mismo control `input type="date"` y helper de formateo UTC que ya usa el perfil propio.
+  - El endpoint `PUT /api/users/:id` (edición de usuario por admin) ahora valida `birthday` como fecha ISO 8601 igual que ya hacía `PUT /api/users/me`, y el valor queda incluido en el registro de auditoría `admin.users.update` (before/after).
+
+---
+
 ## [v1.11.1] - 2026-08-24
 
 ### Nuevo formato de correo "Calendario" para las notificaciones de Personal Fuera de la Oficina / Escalamiento (`/main/admin/work-shifts`)

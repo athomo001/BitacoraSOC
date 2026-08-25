@@ -109,7 +109,8 @@ export class UsersComponent implements OnInit {
       role: ['user', Validators.required],
       cargoOption: [this.baseCargos[0], Validators.required],
       cargoCustom: [''],
-      mfaEnabled: [false]
+      mfaEnabled: [false],
+      birthday: ['']
     });
   }
 
@@ -217,7 +218,8 @@ export class UsersComponent implements OnInit {
           phone: this.userForm.value.phone || undefined,
           role: this.userForm.value.role,
           cargoLabel: this.resolveCargoLabelFromForm(),
-          mfaEnabled: this.userForm.value.mfaEnabled
+          mfaEnabled: this.userForm.value.mfaEnabled,
+          birthday: this.userForm.value.birthday ? new Date(this.userForm.value.birthday).toISOString() : null
         };
         // Incluir newPassword solo si el admin escribió algo
         const newPwd = (this.userForm.value.newPassword || '').trim();
@@ -282,7 +284,8 @@ export class UsersComponent implements OnInit {
       cargoOption: '',
       cargoCustom: '',
       newPassword: '',
-      mfaEnabled: !!user.mfaEnabled
+      mfaEnabled: !!user.mfaEnabled,
+      birthday: user.birthday ? this.formatDateForInput(user.birthday) : ''
     });
 
     if (user.role !== 'guest') {
@@ -304,11 +307,21 @@ export class UsersComponent implements OnInit {
 
   cancelEdit(): void {
     this.editingUserId = null;
-    this.userForm.reset({ role: 'user', cargoOption: this.baseCargos[0], cargoCustom: '', newPassword: '', mfaEnabled: false });
+    this.userForm.reset({ role: 'user', cargoOption: this.baseCargos[0], cargoCustom: '', newPassword: '', mfaEnabled: false, birthday: '' });
     this.userForm.get('username')?.enable();
     this.userForm.get('password')?.setValidators([Validators.required]);
     this.userForm.get('password')?.updateValueAndValidity();
     this.applyCargoValidators();
+  }
+
+  // Formatea la fecha en formato YYYY-MM-DD para el control input type="date"
+  formatDateForInput(date: any): string {
+    if (!date) return '';
+    const d = new Date(date);
+    const year = d.getUTCFullYear();
+    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   toggleActive(user: User): void {
