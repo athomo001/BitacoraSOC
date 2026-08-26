@@ -16,13 +16,13 @@ import { MatIcon } from '@angular/material/icon';
 import { MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatExpansionPanelDescription } from '@angular/material/expansion';
 import { MatDivider } from '@angular/material/divider';
 import { MatPaginator } from '@angular/material/paginator';
-import { MatIconButton } from '@angular/material/button';
+import { MatButton, MatIconButton } from '@angular/material/button';
 
 @Component({
     selector: 'app-checklist-history',
     templateUrl: './checklist-history.component.html',
     styleUrls: ['./checklist-history.component.scss'],
-    imports: [NgIf, MatProgressSpinner, MatIcon, MatAccordion, NgFor, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatExpansionPanelDescription, MatDivider, MatPaginator, MatIconButton, UpperCasePipe, DatePipe]
+    imports: [NgIf, MatProgressSpinner, MatIcon, MatAccordion, NgFor, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatExpansionPanelDescription, MatDivider, MatPaginator, MatButton, MatIconButton, UpperCasePipe, DatePipe]
 })
 export class ChecklistHistoryComponent implements OnInit {
   checks: ShiftCheck[] = [];
@@ -33,6 +33,9 @@ export class ChecklistHistoryComponent implements OnInit {
   limit = 20;
   currentUser: any;
   isAdmin = false;
+  // Habilidad de exportar a PDF: reservada a admin y auditor (mismo criterio que la Consola Admin)
+  canExport = false;
+  isExporting = false;
 
   expandedCheckId: string | null = null;
 
@@ -45,6 +48,7 @@ export class ChecklistHistoryComponent implements OnInit {
   ngOnInit(): void {
     this.currentUser = this.authService.getCurrentUser();
     this.isAdmin = this.currentUser?.role === 'admin';
+    this.canExport = this.currentUser?.role === 'admin' || this.currentUser?.role === 'auditor';
     this.loadHistory();
   }
 
@@ -239,5 +243,260 @@ export class ChecklistHistoryComponent implements OnInit {
         this.snackBar.open(err.error?.message || 'Error eliminando checklist', 'Cerrar', { duration: 3000 });
       }
     });
+  }
+
+  /**
+   * Exporta un unico checklist a un PDF optimizado para hoja carta, usando el dialogo
+   * nativo de impresion del navegador ("Guardar como PDF"). Disponible solo para admin/auditor.
+   */
+  exportCheckToPdf(check: ShiftCheck, event?: Event): void {
+    event?.stopPropagation();
+    const title = `Checklist de ${this.getCheckTypeLabel(check.type)} - ${this.getUserDisplay(check)}`;
+    const html = this.buildChecklistsPdfHtml([check], title);
+    this.openPrintWindow(html);
+  }
+
+  /**
+   * Exporta el historial completo (todas las paginas) a un unico PDF optimizado para hoja carta.
+   * Se solicita el total de registros en una sola llamada ya que /check/history no impone limite.
+   */
+  exportAllToPdf(): void {
+    if (this.isExporting) return;
+    this.isExporting = true;
+
+    const total = Math.max(this.totalChecks, 1);
+    this.checklistService.getCheckHistory(1, total).subscribe({
+      next: (response) => {
+        const checks = response.checks || [];
+        checks.forEach((check: ShiftCheck) => this.correlateServices(check));
+
+        const html = this.buildChecklistsPdfHtml(checks, 'Historial Completo de Checklists');
+        this.openPrintWindow(html);
+        this.isExporting = false;
+      },
+      error: (error) => {
+        console.error('Error exportando historial completo a PDF:', error);
+        this.snackBar.open('Error generando el PDF del historial', 'Cerrar', { duration: 3000 });
+        this.isExporting = false;
+      }
+    });
+  }
+
+  private openPrintWindow(html: string): void {
+    const printWindow = window.open('about:blank', '_blank', 'left=200,top=200,width=1000,height=900');
+    if (!printWindow) {
+      this.snackBar.open('Habilita las ventanas emergentes en este sitio para exportar a PDF', 'Cerrar', { duration: 4000 });
+      return;
+    }
+    printWindow.document.write(html);
+    printWindow.document.close();
+  }
+
+  private escapeHtml(text: unknown): string {
+    const map: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+    return String(text ?? '').replace(/[&<>"']/g, (c) => map[c]);
+  }
+
+  private formatPdfDate(date: Date | string | undefined): string {
+    const value = date ? new Date(date) : new Date();
+    return value.toLocaleString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  private renderChecklistCardHtml(check: ShiftCheck): string {
+    const hasIssues = check.hasRedServices;
+    const statusLabel = hasIssues ? 'CON PROBLEMAS' : 'OK';
+    const statusClass = hasIssues ? 'status-error' : 'status-ok';
+    const issuesCount = (check.services || []).filter(s => s.status === 'rojo').length;
+
+    const rows = (check.services || []).map(service => {
+      const isChild = !!service.parentServiceId;
+      const isRed = service.status === 'rojo';
+      const badgeClass = isRed ? 'status-error' : 'status-ok';
+      const badgeLabel = isRed ? 'ROJO' : 'VERDE';
+      const titlePrefix = isChild ? '<span class="child-arrow">&#9492;&#9472;</span> ' : '';
+
+      let note = '&mdash;';
+      if (service.observation) {
+        note = this.escapeHtml(service.observation);
+      } else if (service.correlatedFrom) {
+        note = `<em>Causa relacionada en "${this.escapeHtml(service.correlatedFrom.serviceTitle)}": "${this.escapeHtml(service.correlatedFrom.observation)}"</em>`;
+      }
+
+      return `
+        <tr>
+          <td class="col-service${isChild ? ' row-child' : ''}">${titlePrefix}${this.escapeHtml(service.serviceTitle)}</td>
+          <td class="col-status"><span class="badge ${badgeClass}">${badgeLabel}</span></td>
+          <td class="col-note">${note}</td>
+        </tr>
+      `;
+    }).join('');
+
+    return `
+      <section class="check-card">
+        <div class="check-card-header">
+          <div class="check-card-title">
+            <span class="check-type-badge">${this.escapeHtml(this.getCheckTypeLabel(check.type))}</span>
+            <span class="check-card-status ${statusClass}">${statusLabel}</span>
+          </div>
+          <div class="check-card-meta">
+            <span><strong>Fecha:</strong> ${this.formatPdfDate(check.createdAt)}</span>
+            <span><strong>Responsable:</strong> ${this.escapeHtml(this.getUserDisplay(check))}</span>
+            <span><strong>Checklist:</strong> ${this.escapeHtml(check.checklistName || 'Checklist')}</span>
+            <span><strong>Servicios evaluados:</strong> ${check.services?.length || 0}${issuesCount > 0 ? ` (${issuesCount} con problemas)` : ''}</span>
+          </div>
+        </div>
+        <table class="check-table">
+          <thead>
+            <tr>
+              <th class="col-service">Servicio</th>
+              <th class="col-status">Estado</th>
+              <th class="col-note">Observacion</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      </section>
+    `;
+  }
+
+  private buildChecklistsPdfHtml(checks: ShiftCheck[], title: string): string {
+    const generatedBy = this.currentUser?.fullName || this.currentUser?.username || 'N/A';
+    const generatedAt = this.formatPdfDate(new Date());
+    const cardsHtml = checks.map(check => this.renderChecklistCardHtml(check)).join('');
+    const countLabel = `${checks.length} checklist${checks.length === 1 ? '' : 's'} incluido${checks.length === 1 ? '' : 's'} en este documento`;
+
+    return `
+      <html>
+        <head>
+          <title>${this.escapeHtml(title)}</title>
+          <style>
+            @page {
+              size: letter portrait;
+              margin: 0 !important;
+            }
+            * { box-sizing: border-box; }
+            body {
+              font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+              margin: 0;
+              padding: 1.2cm 1.3cm;
+              background-color: #ffffff;
+              color: #212121;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .doc-header {
+              margin-bottom: 14px;
+              border-bottom: 2px solid #1565c0;
+              padding-bottom: 8px;
+            }
+            .doc-header-top {
+              display: flex;
+              justify-content: space-between;
+              align-items: baseline;
+              font-size: 10px;
+              color: #757575;
+            }
+            .doc-header h1 {
+              margin: 4px 0 2px;
+              font-size: 18px;
+              color: #212121;
+            }
+            .doc-header .doc-subtitle {
+              font-size: 11px;
+              color: #757575;
+            }
+            .check-card {
+              border: 1px solid #e0e0e0;
+              border-radius: 6px;
+              padding: 10px 12px;
+              margin-bottom: 12px;
+              page-break-inside: avoid;
+              break-inside: avoid;
+            }
+            .check-card-header { margin-bottom: 8px; }
+            .check-card-title {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              margin-bottom: 4px;
+            }
+            .check-type-badge { font-weight: 700; font-size: 13px; }
+            .check-card-status {
+              font-size: 10px;
+              font-weight: 700;
+              padding: 2px 8px;
+              border-radius: 10px;
+            }
+            .check-card-status.status-ok { color: #2e7d32; background: #e8f5e9; }
+            .check-card-status.status-error { color: #c62828; background: #ffebee; }
+            .check-card-meta {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 4px 16px;
+              font-size: 10px;
+              color: #424242;
+            }
+            .check-table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 10px;
+            }
+            .check-table th {
+              text-align: left;
+              background: #f5f7fb;
+              padding: 5px 6px;
+              border: 1px solid #e0e0e0;
+              font-size: 9.5px;
+              text-transform: uppercase;
+              letter-spacing: 0.03em;
+              color: #757575;
+            }
+            .check-table td {
+              padding: 5px 6px;
+              border: 1px solid #e0e0e0;
+              vertical-align: top;
+            }
+            .check-table tr { page-break-inside: avoid; break-inside: avoid; }
+            .col-service { width: 34%; }
+            .col-status { width: 12%; }
+            .col-note { width: 54%; }
+            .row-child { color: #424242; padding-left: 18px; }
+            .child-arrow { color: #9e9e9e; }
+            .badge {
+              display: inline-block;
+              padding: 2px 8px;
+              border-radius: 10px;
+              font-size: 9px;
+              font-weight: 700;
+            }
+            .badge.status-ok { color: #2e7d32; background: #e8f5e9; }
+            .badge.status-error { color: #c62828; background: #ffebee; }
+          </style>
+        </head>
+        <body>
+          <div class="doc-header">
+            <div class="doc-header-top">
+              <span>BitacoraSOC &middot; Historial de Checklists</span>
+              <span>Generado el ${generatedAt} por ${this.escapeHtml(generatedBy)}</span>
+            </div>
+            <h1>${this.escapeHtml(title)}</h1>
+            <div class="doc-subtitle">${countLabel}</div>
+          </div>
+          ${cardsHtml}
+          <script>
+            var alreadyPrinted = false;
+            function triggerPrint() {
+              if (alreadyPrinted) return;
+              alreadyPrinted = true;
+              window.print();
+              window.close();
+            }
+            setTimeout(triggerPrint, 400);
+          </script>
+        </body>
+      </html>
+    `;
   }
 }

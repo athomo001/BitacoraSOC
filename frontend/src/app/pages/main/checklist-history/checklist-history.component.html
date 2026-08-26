@@ -16,6 +16,11 @@
     <div class="summary-info">
       <mat-icon>info</mat-icon>
       <span>Total de checklists: <strong>{{ totalChecks }}</strong></span>
+      <button mat-stroked-button color="primary" *ngIf="canExport" class="export-all-btn"
+              [disabled]="isExporting" (click)="exportAllToPdf()">
+        <mat-icon>picture_as_pdf</mat-icon>
+        {{ isExporting ? 'Generando PDF...' : 'Exportar Todo a PDF' }}
+      </button>
     </div>
 
     <mat-accordion multi>
@@ -36,8 +41,11 @@
               </div>
             </div>
           </mat-panel-title>
-          <mat-panel-description *ngIf="isAdmin" class="check-actions">
-            <button mat-icon-button color="warn" (click)="deleteCheck(check); $event.stopPropagation()" aria-label="Eliminar checklist">
+          <mat-panel-description *ngIf="isAdmin || canExport" class="check-actions">
+            <button mat-icon-button color="primary" *ngIf="canExport" (click)="exportCheckToPdf(check, $event)" aria-label="Exportar checklist a PDF">
+              <mat-icon>picture_as_pdf</mat-icon>
+            </button>
+            <button mat-icon-button color="warn" *ngIf="isAdmin" (click)="deleteCheck(check); $event.stopPropagation()" aria-label="Eliminar checklist">
               <mat-icon>delete</mat-icon>
             </button>
           </mat-panel-description>

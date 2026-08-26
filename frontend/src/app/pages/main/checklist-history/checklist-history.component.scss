@@ -51,6 +51,7 @@
 .summary-info {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
   padding: 1rem;
   background-color: var(--surface-muted);
@@ -63,6 +64,15 @@
 
   strong {
     color: var(--state-info);
+  }
+
+  .export-all-btn {
+    margin-left: auto;
+
+    mat-icon {
+      color: inherit;
+      margin-right: 0.35rem;
+    }
   }
 }
 
@@ -143,6 +153,7 @@
   display: flex;
   justify-content: flex-end;
   align-items: center;
+  gap: 0.25rem;
   flex-shrink: 0;
 }
 
