@@ -18,7 +18,8 @@ const { dispatchGlpiPayload } = require('./glpi-dispatch');
  * Genera y envía reporte de turno por correo
  * 
  * Contenido:
- *   - Checklist de entrada y salida (lado a lado)
+ *   - Checklist de entrada y salida: comparativo ítem-a-ítem si ambas usan la misma
+ *     plantilla; dos listas compactas lado a lado si son plantillas distintas.
  *   - Entradas de bitácora del turno
  * 
  * Variables en asunto:
@@ -406,6 +407,57 @@ const renderServiceStatusBlock = ({ service, entryService = null, isExit = false
   `;
 };
 
+/**
+ * Renderiza un checklist completo (entrada o salida) como lista compacta de una línea por ítem.
+ * Se usa cuando las plantillas de entrada y salida son distintas: en vez de fusionar fila a fila
+ * (dejando celdas "—" desperdiciadas y un correo muy largo), se muestran ambos checklists lado a lado.
+ */
+const renderCompactChecklistColumn = ({ checklist, parentServiceIds, columnTitle, timeLabel }) => {
+  const services = (checklist?.services || []).filter((service) => {
+    const id = (service.serviceId || '').toString();
+    return !id || !parentServiceIds.has(id);
+  });
+
+  const rowsHtml = services.length > 0
+    ? services.map((service) => {
+      const isChild = Boolean(service.parentServiceId);
+      const isError = service.status === 'rojo';
+      const pill = buildStatusPill(isError ? 'ERROR' : 'OK', isError ? '#c62828' : '#2e7d32');
+      const title = escapeHtml(service.serviceTitle || 'Servicio');
+      const indicator = isChild ? '<span style="color:#90a4ae;font-weight:700;margin-right:4px;">└─</span>' : '';
+      const indentStyle = isChild ? 'padding-left:16px;' : '';
+      const observation = String(service.observation || '').trim();
+      let detailHtml = '';
+      if (observation) {
+        detailHtml = `<div style="margin:3px 0 0 0;font-size:11px;color:#546e7a;line-height:1.3;"><strong>Obs:</strong> ${escapeHtml(observation)}</div>`;
+      } else if (service.correlatedFrom) {
+        detailHtml = `<div style="margin:3px 0 0 0;font-size:11px;color:#8d6e63;line-height:1.3;">↳ ${escapeHtml(service.correlatedFrom.serviceTitle)}: "${escapeHtml(service.correlatedFrom.observation)}"</div>`;
+      }
+      return `
+        <tr>
+          <td style="padding:7px 0;border-top:1px solid #eef2f5;${indentStyle}">
+            <div style="font-size:12px;color:#263238;line-height:1.5;">${pill}<span style="margin-left:6px;font-weight:600;">${indicator}${title}</span></div>
+            ${detailHtml}
+          </td>
+        </tr>
+      `;
+    }).join('')
+    : '<tr><td style="padding:7px 0;font-size:12px;color:#90a4ae;">Sin registros</td></tr>';
+
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e3e7ea;border-radius:8px;background:#ffffff;overflow:hidden;">
+      <tr>
+        <td style="background:#f7f9fb;padding:11px 13px;font-size:13px;font-weight:700;color:#263238;">${escapeHtml(columnTitle)} <span style="color:#78909c;font-weight:600;">(${escapeHtml(timeLabel)})</span></td>
+      </tr>
+      <tr>
+        <td style="padding:2px 13px 9px 13px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rowsHtml}</table>
+        </td>
+      </tr>
+    </table>
+  `;
+};
+
 const renderSummaryCard = (label, value, styles) => {
   return `
     <td style="display:table-cell !important;width:33.3333% !important;vertical-align:top;padding:0 5px;">
@@ -494,8 +546,7 @@ async function generateReportHTML({ shift, checklistEntry, checklistExit, entrie
     </mj-section>
   `;
 
-  const checklistCards = includeChecklist && leafServiceRows.length > 0
-    ? leafServiceRows.map((row) => {
+  const comparisonCards = leafServiceRows.map((row) => {
       const title = escapeHtml(row.entry?.serviceTitle || row.exit?.serviceTitle || 'Servicio');
       const entryBlock = renderServiceStatusBlock({ service: row.entry });
       const exitBlock = renderServiceStatusBlock({
@@ -539,14 +590,37 @@ async function generateReportHTML({ shift, checklistEntry, checklistExit, entrie
           </mj-column>
         </mj-section>
       `;
-    }).join('')
-    : `
+    }).join('');
+
+  const splitChecklistColumns = `
+      <mj-section padding="0 24px 14px 24px">
+        <mj-column width="50%" vertical-align="top" padding="0 6px 0 0">
+          <mj-text padding="0">${renderCompactChecklistColumn({ checklist: checklistEntry, parentServiceIds, columnTitle: 'Entrada', timeLabel: checklistEntry ? entryTime : '—' })}</mj-text>
+        </mj-column>
+        <mj-column width="50%" vertical-align="top" padding="0 0 0 6px">
+          <mj-text padding="0">${renderCompactChecklistColumn({ checklist: checklistExit, parentServiceIds, columnTitle: 'Salida', timeLabel: checklistExit ? exitTime : '—' })}</mj-text>
+        </mj-column>
+      </mj-section>
+    `;
+
+  const noChecklistDataSection = `
       <mj-section padding="0 32px 14px 32px">
         <mj-column>
           <mj-text font-size="13px" color="#78909c" padding="0">No se registraron datos de checklist para este turno.</mj-text>
         </mj-column>
       </mj-section>
     `;
+
+  let checklistCards;
+  if (!includeChecklist || leafServiceRows.length === 0) {
+    checklistCards = noChecklistDataSection;
+  } else if (canCompareForRepair) {
+    // Misma plantilla en entrada y salida → comparación ítem-a-ítem (permite marcar REPARADO).
+    checklistCards = comparisonCards;
+  } else {
+    // Plantillas distintas → dos listas compactas lado a lado (correo más corto, vista rápida).
+    checklistCards = splitChecklistColumns;
+  }
 
   const checklistSection = includeChecklist
     ? `
@@ -699,30 +773,48 @@ function generateReportText({ shift, checklistEntry, checklistExit, entries, per
     const entryTime = formatTime(checklistEntry?.createdAt || checklistEntry?.checkDate);
     const exitTime = formatTime(checklistExit?.createdAt || checklistExit?.checkDate);
     const serviceRows = buildServiceRows(checklistEntry, checklistExit);
+    const sameChecklistContext = isSameChecklistContext(checklistEntry, checklistExit);
 
-    lines.push('Checklist de Entrada y Salida');
-    lines.push(`Entrada: ${entryTime} | Salida: ${exitTime}`);
-    serviceRows.forEach((row) => {
-      const title = row.entry?.serviceTitle || row.exit?.serviceTitle || 'Servicio';
+    const getStatusText = (srv) => {
+      if (!srv) return 'No registrado';
+      let statusStr = srv.status.toUpperCase();
+      if (srv.observation) {
+        statusStr += ` - Obs: ${srv.observation}`;
+      } else if (srv.correlatedFrom) {
+        statusStr += ` - Causa Relacionada (${srv.correlatedFrom.serviceTitle}): "${srv.correlatedFrom.observation}"`;
+      }
+      return statusStr;
+    };
 
-      const getStatusText = (srv) => {
-        if (!srv) return 'No registrado';
-        let statusStr = srv.status.toUpperCase();
-        if (srv.observation) {
-          statusStr += ` - Obs: ${srv.observation}`;
-        } else if (srv.correlatedFrom) {
-          statusStr += ` - Causa Relacionada (${srv.correlatedFrom.serviceTitle}): "${srv.correlatedFrom.observation}"`;
+    if (sameChecklistContext) {
+      lines.push('Checklist de Entrada y Salida');
+      lines.push(`Entrada: ${entryTime} | Salida: ${exitTime}`);
+      serviceRows.forEach((row) => {
+        const title = row.entry?.serviceTitle || row.exit?.serviceTitle || 'Servicio';
+        const entryStatus = getStatusText(row.entry);
+        const exitStatus = getStatusText(row.exit);
+        const isChild = Boolean(row.entry?.parentServiceId || row.exit?.parentServiceId);
+        const prefix = isChild ? '  └─ ' : '- ';
+        lines.push(`${prefix}${title}: Entrada=${entryStatus} | Salida=${exitStatus}`);
+      });
+      lines.push('');
+    } else {
+      const pushChecklistList = (checklist, label, timeLabel) => {
+        lines.push(`${label} (${timeLabel})`);
+        const services = checklist?.services || [];
+        if (services.length === 0) {
+          lines.push('- Sin registros');
+        } else {
+          services.forEach((srv) => {
+            const prefix = srv.parentServiceId ? '  └─ ' : '- ';
+            lines.push(`${prefix}${srv.serviceTitle || 'Servicio'}: ${getStatusText(srv)}`);
+          });
         }
-        return statusStr;
+        lines.push('');
       };
-
-      const entryStatus = getStatusText(row.entry);
-      const exitStatus = getStatusText(row.exit);
-      const isChild = Boolean(row.entry?.parentServiceId || row.exit?.parentServiceId);
-      const prefix = isChild ? '  └─ ' : '- ';
-      lines.push(`${prefix}${title}: Entrada=${entryStatus} | Salida=${exitStatus}`);
-    });
-    lines.push('');
+      pushChecklistList(checklistEntry, 'Checklist de Entrada', checklistEntry ? entryTime : '—');
+      pushChecklistList(checklistExit, 'Checklist de Salida', checklistExit ? exitTime : '—');
+    }
   }
 
   if (shift.emailReportConfig.includeEntries) {

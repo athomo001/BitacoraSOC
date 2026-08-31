@@ -15,6 +15,7 @@ const csvUpload = multer({
 });
 const escalationController = require('../controllers/escalationController');
 const clientAlertController = require('../controllers/clientAlertController');
+const publicShareController = require('../controllers/publicShareController');
 
 // Middleware para verificar que el usuario es ADMIN
 /*
@@ -212,6 +213,12 @@ router.delete('/admin/notification-schedules/:id', authenticate, requireAdmin, e
 router.post('/admin/notification-schedules/:id/trigger-send', authenticate, requireAdmin, escalationController.triggerNotificationScheduleSend);
 // 🧪 Probar envío general de notificaciones con parámetros libres (sin ID)
 router.post('/admin/notification-schedules/test-send', authenticate, requireAdmin, escalationController.testNotificationScheduleSend);
+
+// 🔗 Enlace público de solo lectura para "Personal en Teletrabajo y Apoyo" (pantalla/TV sin sesión).
+// La página pública se sirve en GET /p/telework/:token (ver routes/public-share.js).
+router.get('/admin/telework-public-link', authenticate, requireAdmin, publicShareController.getTeleworkLink);
+router.post('/admin/telework-public-link/rotate', authenticate, requireAdmin, publicShareController.rotateTeleworkLink);
+router.post('/admin/telework-public-link/set-enabled', authenticate, requireAdmin, publicShareController.setTeleworkLinkEnabled);
 
 module.exports = router;
 

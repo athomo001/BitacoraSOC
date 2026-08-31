@@ -25,8 +25,9 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { EscalationService } from '../../../services/escalation.service';
+import { EscalationService, TeleworkPublicLink } from '../../../services/escalation.service';
 import { CatalogService } from '../../../services/catalog.service';
+import { AuthService } from '../../../services/auth.service';
 import { CatalogLogSource } from '../../../models/catalog.model';
 import { ClientAlertRule, EscalationFlowConfig } from '../../../models/escalation.model';
 import { EscalationFlowPreviewComponent } from '../shared/escalation-flow-preview.component';
@@ -152,12 +153,19 @@ export class EscalationSimpleComponent implements OnInit {
   savingMaintenance = false;
   maintenanceForm: FormGroup;
 
+  // ── Enlace público de solo lectura para "Personal en Teletrabajo y Apoyo" (solo admin) ──
+  isAdmin = false;
+  publicLink: TeleworkPublicLink | null = null;
+  loadingPublicLink = false;
+  generatingPublicLink = false;
+
   constructor(
     private escalationService: EscalationService,
     private catalogService: CatalogService,
     private snackBar: MatSnackBar,
     private cdr: ChangeDetectorRef,
-    private fb: FormBuilder
+    private fb: FormBuilder,
+    private authService: AuthService
   ) {
     this.maintenanceForm = this.fb.group({
       clientId: [null],
@@ -178,6 +186,11 @@ export class EscalationSimpleComponent implements OnInit {
     this.loadRaciClients();
     this.loadWeekShifts();
     this.loadMaintenanceRules();
+
+    this.isAdmin = this.authService.isAdmin();
+    if (this.isAdmin) {
+      this.loadPublicLink();
+    }
   }
 
   private normalizeId(value: any): string {
@@ -774,6 +787,66 @@ export class EscalationSimpleComponent implements OnInit {
       navigator.clipboard.writeText(text).then(() => {
         this.showSuccess('Copiado al portapapeles');
       }).catch((err) => console.error('Error al copiar:', err));
+    }
+  }
+
+  // ── Enlace público de solo lectura (solo admin) ─────────────────────────
+  // Permite dejar la grilla "Personal en Teletrabajo y Apoyo" (semana en curso) en una TV/pantalla
+  // sin sesión. La página se sirve en GET /p/telework/:token y se refresca sola.
+
+  loadPublicLink(): void {
+    this.loadingPublicLink = true;
+    this.escalationService.getTeleworkPublicLink().subscribe({
+      next: (link) => {
+        this.publicLink = link;
+        this.loadingPublicLink = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.loadingPublicLink = false;
+      }
+    });
+  }
+
+  generatePublicLink(): void {
+    if (this.generatingPublicLink) return;
+
+    const isRegen = !!this.publicLink?.exists;
+    if (isRegen && !confirm('Regenerar invalidará el enlace actual. Quien lo tenga guardado deberá reemplazarlo. ¿Continuar?')) {
+      return;
+    }
+
+    this.generatingPublicLink = true;
+    this.escalationService.rotateTeleworkPublicLink().subscribe({
+      next: (link) => {
+        this.publicLink = link;
+        this.generatingPublicLink = false;
+        this.showSuccess(isRegen ? 'Enlace regenerado' : 'Enlace público generado');
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        this.generatingPublicLink = false;
+        this.showError(err?.error?.error || 'No se pudo generar el enlace');
+      }
+    });
+  }
+
+  togglePublicLink(enabled: boolean): void {
+    this.escalationService.setTeleworkPublicLinkEnabled(enabled).subscribe({
+      next: (link) => {
+        this.publicLink = link;
+        this.showSuccess(enabled ? 'Enlace activado' : 'Enlace desactivado');
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        this.showError(err?.error?.error || 'No se pudo actualizar el enlace');
+      }
+    });
+  }
+
+  copyPublicLink(): void {
+    if (this.publicLink?.url) {
+      this.copyToClipboard(this.publicLink.url);
     }
   }
 
