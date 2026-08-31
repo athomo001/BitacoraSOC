@@ -588,4 +588,36 @@ export class EscalationService {
   testNotificationScheduleSend(payload: any): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.apiUrl}/admin/notification-schedules/test-send`, payload);
   }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 🔗 Enlace público de solo lectura — "Personal en Teletrabajo y Apoyo" (admin)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  /** Estado actual del enlace público de la grilla de teletrabajo. */
+  getTeleworkPublicLink(): Observable<TeleworkPublicLink> {
+    return this.http.get<TeleworkPublicLink>(`${this.apiUrl}/admin/telework-public-link`);
+  }
+
+  /** Genera o regenera el enlace (rota el token e invalida el anterior). */
+  rotateTeleworkPublicLink(): Observable<TeleworkPublicLink> {
+    return this.http.post<TeleworkPublicLink>(`${this.apiUrl}/admin/telework-public-link/rotate`, {});
+  }
+
+  /** Activa o desactiva el enlace sin cambiar el token. */
+  setTeleworkPublicLinkEnabled(enabled: boolean): Observable<TeleworkPublicLink> {
+    return this.http.post<TeleworkPublicLink>(`${this.apiUrl}/admin/telework-public-link/set-enabled`, { enabled });
+  }
+}
+
+export interface TeleworkPublicLink {
+  exists: boolean;
+  enabled: boolean;
+  token?: string;
+  path?: string;
+  url?: string;
+  createdByName?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  lastAccessedAt?: string | null;
+  accessCount?: number;
 }

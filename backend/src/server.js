@@ -574,6 +574,9 @@ app.use('/api/internal/v1', require('./routes/internal/v1'));
 app.use('/api/internal/v2', require('./routes/internal/v2'));
 app.use('/api/system', require('./routes/system'));
 
+// Páginas públicas con token (sin sesión), fuera de /api/. DEBE ir antes del estático y del fallback SPA.
+app.use('/p', require('./routes/public-share'));
+
 // Health check (ANTES del fallback SPA)
 app.get('/health', (req, res) => {
   res.json(getHealthPayload());

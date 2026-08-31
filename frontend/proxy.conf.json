@@ -10,5 +10,11 @@
     "secure": false,
     "changeOrigin": true,
     "logLevel": "warn"
+  },
+  "/p": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "warn"
   }
 }

@@ -135,10 +135,43 @@
             <h2>🏡 Personal en Teletrabajo y Apoyo</h2>
             <p class="subtitle">Estado operativo de analistas de apoyo, teletrabajo y registros de vacaciones del equipo</p>
           </div>
-          <button mat-stroked-button color="primary" class="print-button-no-print" (click)="printSection()">
-            <mat-icon>print</mat-icon>
-            <span>Imprimir / PDF</span>
-          </button>
+          <div class="telework-actions">
+            <button mat-stroked-button color="primary" class="print-button-no-print" (click)="printSection()">
+              <mat-icon>print</mat-icon>
+              <span>Imprimir / PDF</span>
+            </button>
+            <button *ngIf="isAdmin && (!publicLink?.exists || !publicLink?.enabled)"
+                    mat-stroked-button (click)="generatePublicLink()" [disabled]="generatingPublicLink">
+              <mat-icon>add_link</mat-icon>
+              <span>{{ publicLink?.exists ? 'Reactivar enlace público' : 'Generar enlace público' }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Enlace público de solo lectura: URL copiable para dejar la grilla (semana en curso) en una pantalla/TV sin sesión -->
+        <div class="public-link-panel print-button-no-print" *ngIf="isAdmin && publicLink?.exists && publicLink?.enabled">
+          <mat-icon class="pl-icon">public</mat-icon>
+          <div class="pl-body">
+            <div class="pl-label">Enlace público de solo lectura · muestra la semana en curso · se actualiza solo</div>
+            <div class="pl-row">
+              <input type="text" readonly [value]="publicLink?.url" (focus)="onInputFocus($event)" class="pl-input" />
+              <button mat-icon-button matTooltip="Copiar enlace" (click)="copyPublicLink()">
+                <mat-icon>content_copy</mat-icon>
+              </button>
+              <a mat-icon-button matTooltip="Abrir en otra pestaña" [href]="publicLink?.url" target="_blank" rel="noopener">
+                <mat-icon>open_in_new</mat-icon>
+              </a>
+            </div>
+            <div class="pl-meta">
+              <button mat-button (click)="generatePublicLink()" [disabled]="generatingPublicLink">
+                <mat-icon>autorenew</mat-icon> Regenerar
+              </button>
+              <button mat-button color="warn" (click)="togglePublicLink(false)">
+                <mat-icon>link_off</mat-icon> Desactivar
+              </button>
+              <span class="pl-stats" *ngIf="publicLink?.accessCount">{{ publicLink?.accessCount }} accesos</span>
+            </div>
+          </div>
         </div>
 
       <div class="excel-table-container">

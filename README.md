@@ -8,7 +8,7 @@ Plataforma web para operacion SOC con bitacora operativa, checklists de turno, e
 
 > Estado del proyecto: estable. Validar siempre los flujos en un entorno de pruebas antes de pasar a operación formal.
 >
-> Version referencial actual (segun `CHANGELOG.md`): **v1.11.2**
+> Version referencial actual (segun `CHANGELOG.md`): **v1.11.3**
 
 Stack principal:
 
@@ -83,6 +83,11 @@ Stack principal:
 ## Novedades recientes (resumen rapido)
 
 > Historial completo y detallado en [`docs/history/CHANGELOG.md`](docs/history/CHANGELOG.md).
+
+### v1.11.3 (Enlace público de solo lectura para "Personal en Teletrabajo y Apoyo")
+
+- **Grilla semanal de teletrabajo/apoyo en una pantalla o TV, sin login** (`/main/escalation/view`): el admin genera desde la interfaz un enlace con token largo aleatorio (`/p/telework/<token>`) que muestra la semana en curso (nombre + cargo + estado por día + leyenda) en una página autónoma que se auto-refresca cada 10 minutos. El enlace es revocable y regenerable; no expone teléfono ni email. Rate limiter propio y respuesta genérica "no disponible" para tokens inválidos.
+- **Correo de fin de turno más corto**: cuando el checklist de inicio y el de cierre usan plantillas distintas, se muestran como dos listas compactas lado a lado (Entrada | Salida) en vez de fusionarse fila por fila; si las plantillas coinciden se mantiene la tarjeta comparativa con "REPARADO".
 
 ### v1.11.2 (Cumpleaños de usuarios configurable por el administrador)
 

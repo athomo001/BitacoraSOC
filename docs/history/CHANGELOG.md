@@ -2,6 +2,22 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.11.3] - 2026-08-31
+
+### Enlace público de solo lectura para "Personal en Teletrabajo y Apoyo" (`/main/escalation/view`)
+
+- **Feature (Backend/Frontend) — Un admin puede publicar la grilla semanal de teletrabajo/apoyo en una pantalla o TV sin sesión**: en la sección "🏡 Personal en Teletrabajo y Apoyo", junto a "Imprimir / PDF", el admin ahora tiene un botón "Generar enlace público" que crea una URL con token largo aleatorio (`/p/telework/<token>`, 256 bits). El panel muestra la URL lista para copiar, con acciones "Regenerar" (rota el token e invalida el anterior) y "Desactivar". El botón y el panel solo son visibles para `admin`.
+  - La página pública (`GET /p/telework/:token`) es HTML autónomo servido por el backend: sin login, sin JS ni fuentes externas, muestra la **semana en curso** (Lun–Vie) con nombre + cargo + estado por día + leyenda, y se auto-refresca cada 10 minutos (`<meta http-equiv="refresh">`). **No expone teléfono ni email.**
+  - La lógica de resolución de la grilla (prioridad Vacaciones/Licencia > Trámite Médico > Charla/Capacitación > Teletrabajo, solape de fechas, exclusión de roles guest/auditor, orden "con novedad primero") se portó a `backend/src/utils/telework-matrix.js`, alineada con `computeMatrixRows` del frontend y cubierta por pruebas (`telework-matrix.test.js`).
+  - Modelo nuevo `PublicShareLink` (un registro por tipo de vista, `enabled`, `createdBy`, contador de accesos). Endpoints admin bajo `/api/escalation/admin/telework-public-link` (`GET` / `rotate` / `set-enabled`), protegidos con `authenticate` + `requireAdmin`.
+  - Seguridad: la ruta pública vive fuera de `/api/` con su propio rate limiter (`publicShareLimiter`, 120 req/10 min por IP), valida el formato del token antes de tocar la BD y responde siempre la misma página "no disponible" (404) para token inexistente, mal formado o desactivado. `nginx.conf` (contenedor frontend) redirige `/p/` al backend en los bloques `:80` y `:443`, pasando `X-Forwarded-Host` para que la URL mostrada conserve host y puerto reales; `proxy.conf.json` hace lo mismo para el modo desarrollo. La URL pública puede fijarse con `PUBLIC_BASE_URL`/`FRONTEND_URL`.
+
+### Reporte de turno por correo: checklist de entrada y salida en dos columnas cuando las plantillas difieren
+
+- **Mejora (Backend) — Correo de fin de turno más corto y legible** (`shift-report.js`): cuando el checklist de inicio y el de cierre usan plantillas distintas, en vez de fusionar servicio por servicio (dejando media fila con "—") ahora se muestran como **dos listas compactas lado a lado** (Entrada | Salida), una línea por ítem. Si ambas plantillas coinciden se mantiene la tarjeta comparativa actual con el distintivo "REPARADO". En móvil las dos columnas se apilan. El texto plano del correo emite dos secciones equivalentes.
+
+---
+
 ## [v1.11.2] - 2026-08-25
 
 ### Cumpleaños de usuarios configurable por el administrador (`/main/admin/users`)

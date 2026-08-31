@@ -230,7 +230,22 @@ const resetPasswordLimiter = rateLimit({
   store: createMongoStore('rate_limits_reset_pw')
 });
 
+/**
+ * Rate limiter para páginas públicas con token (montadas en `/p`, fuera de `/api/`).
+ * Una TV refrescando cada ~10 min consume ~1 req/10min; 120/10min deja margen para varios
+ * visores legítimos y frena el escaneo/fuerza bruta de tokens.
+ */
+const publicShareLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 120,
+  message: 'Demasiadas solicitudes. Intenta de nuevo más tarde.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: createMongoStore('rate_limits_public_share')
+});
+
 module.exports.loginLimiter = loginLimiter;
 module.exports.apiLimiter = apiLimiter;
 module.exports.forgotPasswordLimiter = forgotPasswordLimiter;
 module.exports.resetPasswordLimiter = resetPasswordLimiter;
+module.exports.publicShareLimiter = publicShareLimiter;
