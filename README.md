@@ -90,59 +90,7 @@ Stack principal:
 - **Grilla semanal de teletrabajo/apoyo en una pantalla o TV, sin login** (`/main/escalation/view`): el admin genera desde la interfaz un enlace con token largo aleatorio (`/p/telework/<token>`) que muestra la semana en curso (nombre + cargo + estado por día + leyenda) en una página autónoma que se auto-refresca cada 10 minutos. El enlace es revocable y regenerable; no expone teléfono ni email. Rate limiter propio y respuesta genérica "no disponible" para tokens inválidos.
 - **Correo de fin de turno más corto**: cuando el checklist de inicio y el de cierre usan plantillas distintas, se muestran como dos listas compactas lado a lado (Entrada | Salida) en vez de fusionarse fila por fila; si las plantillas coinciden se mantiene la tarjeta comparativa con "REPARADO".
 
-### v1.11.2 (Cumpleaños de usuarios configurable por el administrador)
 
-- **El admin ahora puede fijar la fecha de nacimiento de cualquier usuario** (`/main/admin/users`): nuevo campo "Fecha de Nacimiento" en el formulario de edición, para los casos en que el usuario aún no lo haya configurado en su propio perfil. El campo usado por el envío automático de correos de cumpleaños es el mismo; el endpoint de edición de admin ahora lo valida y registra en auditoría igual que el resto de los campos de usuario.
-
-### v1.11.1 (Formato Calendario para el correo de Personal Fuera de la Oficina)
-
-- **Nuevo formato de correo "Calendario"** (`/main/admin/work-shifts` → Notificaciones): las programaciones de notificación (ej. "Activos Fuera de la Oficina") pueden enviarse como una grilla visual Nombre × Lunes-Viernes con íconos por condición (Teletrabajo, Capacitación, Vacaciones, Licencia Médica, Trámite Médico), replicando el mismo formato que ya se imprime en Escalaciones. El formato de lista original se mantiene intacto y sigue siendo el predeterminado para toda programación existente.
-
-### v1.11.0 (Vínculo manual a ticket GLPI, CC de área en cumpleaños, sidebar responsivo y auditoría de consistencia visual en Administración)
-
-- **Ticket GLPI opcional en Nueva Entrada**: campo junto a "Hora del Evento" para vincular la entrada a un ticket GLPI existente al crearla; visibilidad controlada por un toggle de admin independiente del interruptor maestro de GLPI.
-- **Correo del área en copia (CC) para cumpleaños**: nuevo campo con autocompletado del Directorio de Contactos; el correo de felicitación se sigue enviando siempre a quien cumple años, con el área en copia si se configura.
-- **Sidebar responsivo**: el menú lateral (antes fijo en 280px) ahora colapsa a overlay en pantallas angostas (<960px), corrigiendo texto cortado en toda la aplicación, no solo en Administración.
-- **Rediseño de la Consola Administrativa**: se reemplaza el banner de título + botones sueltos por una barra de pestañas con íconos (mismo patrón de `/main/escalation/view`), ahorrando espacio vertical.
-- **Auditoría de consistencia visual en 9 páginas de administración**: checkboxes reagrupados junto a su campo relacionado, botones "Guardar" con envoltorio de acciones consistente, ~130 espaciados hardcodeados normalizados a los tokens del sistema de diseño, título de pestaña "Matriz RACI" igualado al resto, columnas de altura desigual en Usuarios corregidas, y 21 casos de asterisco duplicado en campos obligatorios.
-- **Bugfix**: ID de Mongo crudo visible en la tabla de Recordatorios de Checklist cuando el turno referenciado ya no está activo; validación de conexión GLPI que bloqueaba guardar cualquier cambio del panel aunque la integración estuviera apagada.
-
-### v1.10.1 (Soporte Markdown en la bitácora + formulario asistido de Inicio/Cierre de Turno)
-
-- **Markdown al ver una entrada**: el modal "Ver evento" (`/main/all-entries`) renderiza el contenido como Markdown (negrita, listas, títulos, código, citas, tablas, enlaces) en vez de texto plano, con sanitización vía `DOMPurify`. Un `#` sin espacio al inicio de línea también se trata como título (necesario porque los hashtags de la bitácora van sin espacio; un tag a mitad de texto no se ve afectado).
-- **Formulario asistido de Inicio/Cierre de Turno**: nuevo panel "Plantillas de Turno" junto a "Nueva Entrada" que arma el reporte de turno (métricas, tickets/incidentes, observaciones) siguiendo la plantilla estándar de traspaso de guardia; el texto se inserta en el cajón principal para revisar antes de subir. El cajón de tickets acepta tanto el dump crudo de CDC/GLPI como el formato `// ticket, cliente[, severidad], descripción`.
-- **Optimización de espacio en `/main/checklist`**: se quitan títulos redundantes, se fusiona el título del panel de checklist con su descripción y se reduce el espaciado para que el botón "Subir" quede visible sin scroll.
-
-### v1.10.0 (Saneamiento del sistema de temas + nuevo tema "Windows 95" con íconos pixel-art)
-
-- **Nuevo tema "Windows 95"**: cuarta opción en el selector de temas, con paleta gris/azul marino, botones y campos con bisel 3D, barra de título degradada y esquinas cuadradas. Aditivo por diseño — no modifica Light/Pastel/Cyberpunk.
-- **Íconos pixel-art**: 157 íconos Material reemplazados por su equivalente `pixelarticons` (MIT) solo bajo el tema Windows 95, vía un servicio que sincroniza el ícono actual sin interferir con la reactividad de Angular.
-- **Bugfix**: varios componentes (`work-shifts-admin`, `not-found`, `api-keys`, badges de severidad, íconos de calendario) tenían colores hardcodeados que rompían el cambio de tema — el caso más grave usaba variables CSS que no existían en ningún lado. Corregidos con los tokens del sistema de temas existente.
-- **Ronda de pulido tras pruebas manuales**: contraste de texto en cabeceras, colisión de etiquetas con bordes de campos, tamaño de íconos, alcance de la tipografía retro, y el bug más visible — botones de solo-ícono (enviar/editar/eliminar) que quedaban convertidos en cuadrados beige biselados por compartir clase base con los botones de texto.
-
-### v1.9.1 (Mejoras menores en Directorio de Contactos)
-
-- Renombrado "Directorio Centralizado" / "Fuente de Verdad de Contactos" a **"Directorio de Contactos"** en el menú lateral y el título de la página.
-- El campo "Empresa" del formulario de contacto ahora es un combobox (`mat-autocomplete`) que sugiere las empresas ya registradas, sin dejar de permitir texto libre.
-- Nuevo filtro "Sin empresa" para ubicar rápido los contactos con ese campo vacío.
-
-### v1.9.0 (Integración GLPI bidireccional: vincular entradas a tickets existentes + importación automática de tickets)
-
-- **Saliente**: vincula una entrada de bitácora a un ticket GLPI ya existente y reenvía actualizaciones como seguimientos (`ITILFollowup`), sin duplicar tickets. El ticket creado automáticamente para incidentes/ofensas ahora queda registrado en la propia entrada.
-- **Entrante**: sondeo automático configurable (activable/desactivable) que trae tickets y seguimientos nuevos de las entidades GLPI mapeadas y los convierte en entradas de bitácora — con tipo de entrada (operativa/incidente) configurable por entidad, y sin loops entre ambas direcciones.
-- Compatible con GLPI 9.x-11.x (resuelve los campos de búsqueda dinámicamente, sin IDs hardcodeados). Pendiente de validar contra una instancia GLPI real.
-
-### v1.8.2 (Bugfix: contactos eliminados del Directorio o de Usuarios seguían apareciendo en Escalamiento)
-
-- **Bugfix (Backend)**: `escalationFlow` guardaba una copia del nombre/teléfono del contacto en vez de una referencia, por lo que borrar un contacto del directorio general o de Usuarios no lo quitaba de las Líneas de Escalamiento de los clientes. Se agregó limpieza en cascada (`removeContactFromEscalationFlows`) en los cuatro caminos de borrado/purga de contactos.
-
-### v1.8.1 / v1.8.0 (Logs de Auditoría: calendario de rango de fechas, filtro por Usuario, layout de filtros y bugfix de zona horaria)
-
-- **Rango de fechas con calendario único**: reemplaza los campos separados "Fecha inicio"/"Fecha fin" por un selector Material (`mat-date-range-picker`) que permite elegir el día de inicio y fin en una sola interacción.
-- **Filtro por Usuario en vez de "Evento"**: lista a las personas por su nombre real en vez del listado crudo de eventos técnicos.
-- **Layout de filtros reordenado**: "Buscar" tiene su propia fila con más ancho; "Categoría", "Usuario", "Nivel" y "Rango de fechas" comparten la fila siguiente.
-- **Fecha/Hora en formato 24 horas** en la tabla de auditoría (antes mostraba AM/PM).
-- **Bugfix (Backend)**: el filtro de rango de fechas no devolvía resultados del día actual en zonas horarias detrás de UTC (ej. `America/Santiago`); corregido en `buildDateRange`.
 
 ### Estado IA local
 

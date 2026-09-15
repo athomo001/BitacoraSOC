@@ -82,3 +82,5 @@ docs/AUTHOR_WATERMARKS.local.md
 .tmp.*/
 .tmp.driveupload/
 .agents/*
+
+/spec/*
