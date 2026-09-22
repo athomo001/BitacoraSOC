@@ -1,0 +1,17 @@
+# Reverse proxy de desarrollo para el stack de la reescritura (Fase 2 del
+# roadmap). En producción real, Caddy también termina TLS (Let's Encrypt
+# automático) — acá alcanza con el proxy plano sobre HTTP local, ver
+# spec/02-alcance-y-roadmap.md sección 5 Fase 2 tarea 2 y
+# spec/07-backend-arquitectura-go.md sección 3 (por qué Caddy y no un
+# SNICallback custom en Go).
+:80 {
+	# flush_interval -1 es obligatorio para SSE (/api/stream/events): sin él,
+	# Caddy buferea la respuesta del backend y los eventos en vivo nunca
+	# llegan al cliente hasta que la conexión se cierra — comprobado al
+	# levantar este stack por primera vez (la reposición vía Last-Event-ID
+	# funcionaba porque es una ráfaga corta, pero el streaming en vivo
+	# quedaba completamente bloqueado).
+	reverse_proxy bitacora-app:8080 {
+		flush_interval -1
+	}
+}

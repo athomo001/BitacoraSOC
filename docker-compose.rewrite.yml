@@ -1,0 +1,66 @@
+# Stack de la reescritura Go+Angular (spec/02-alcance-y-roadmap.md Fase 2).
+# Separado del docker-compose.yml de producción (Node/Mongo) a propósito —
+# ver docs/adr/0012-repo-monolito-carpetas-nuevas.md: conviven en el mismo
+# repo hasta el corte (Fase 14), sin tocarse entre sí. Puertos distintos a
+# los del stack legacy para poder correr ambos en paralelo durante el desarrollo.
+name: bitacora-rewrite
+
+services:
+  bitacora-db:
+    image: postgres:18
+    container_name: bitacora-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bitacora
+      POSTGRES_USER: bitacora
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bitacora_dev_local}
+    ports:
+      - "127.0.0.1:25432:5432"
+    volumes:
+      # postgres:18 cambió su convención de datos: monta en /var/lib/postgresql
+      # (el propio entrypoint crea la subcarpeta versionada adentro), ya NO en
+      # /var/lib/postgresql/data como las imágenes <18 — montar en /data
+      # rompe el arranque (comprobado al levantar este stack por primera vez).
+      - bitacora-db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bitacora -d bitacora"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - bitacora-rewrite-network
+
+  bitacora-app:
+    build:
+      context: ./backend-go
+      dockerfile: Dockerfile
+    container_name: bitacora-app
+    restart: unless-stopped
+    depends_on:
+      bitacora-db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://bitacora:${POSTGRES_PASSWORD:-bitacora_dev_local}@bitacora-db:5432/bitacora?sslmode=disable
+      HTTP_ADDR: ":8080"
+    networks:
+      - bitacora-rewrite-network
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: bitacora-caddy
+    restart: unless-stopped
+    depends_on:
+      - bitacora-app
+    volumes:
+      - ./Caddyfile.rewrite:/etc/caddy/Caddyfile:ro
+    ports:
+      - "127.0.0.1:8081:80"
+    networks:
+      - bitacora-rewrite-network
+
+networks:
+  bitacora-rewrite-network:
+    driver: bridge
+
+volumes:
+  bitacora-db-data:

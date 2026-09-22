@@ -1,0 +1,42 @@
+name: backend-go CI
+
+on:
+  push:
+    paths:
+      - "backend-go/**"
+      - ".github/workflows/backend-go-ci.yml"
+  pull_request:
+    paths:
+      - "backend-go/**"
+      - ".github/workflows/backend-go-ci.yml"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend-go
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27"
+
+      - name: go build
+        run: go build ./...
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: gofmt (falla si algo no está formateado)
+        run: |
+          fmt_out="$(gofmt -l .)"
+          if [ -n "$fmt_out" ]; then
+            echo "Archivos sin formatear:"
+            echo "$fmt_out"
+            exit 1
+          fi
+
+      - name: go test
+        run: go test ./... -race -count=1
