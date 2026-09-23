@@ -1,0 +1,221 @@
+<div class="directory">
+  <header class="directory__header">
+    <h1 class="directory__title">Directorio de Contactos</h1>
+    <p class="panel__hint">
+      Directorio global que usan la escalación y los formularios operativos. Los contactos internos se administran desde Usuarios.
+    </p>
+  </header>
+
+  <section class="directory__toolbar" aria-label="Filtros y acciones del directorio">
+    <div class="directory__filters">
+      <label class="field directory__search">
+        <span>Buscar en directorio</span>
+        <input type="search" name="q" placeholder="Nombre, cargo, especialidad, organización, correo o teléfono"
+          [ngModel]="search()" (ngModelChange)="onSearch($event)" />
+      </label>
+      <label class="field">
+        <span>Ámbito</span>
+        <select name="scope" [ngModel]="scopeFilter()" (ngModelChange)="scopeFilter.set($event); applyFilters()">
+          <option value="">Todos</option>
+          <option value="internal">Interno</option>
+          <option value="external">Externo</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Organización</span>
+        <select name="org" [ngModel]="organizationFilter()" (ngModelChange)="organizationFilter.set($event); applyFilters()">
+          <option value="">Todas</option>
+          @for (org of organizations(); track org.id) {
+            <option [value]="org.id">{{ org.name }}</option>
+          }
+        </select>
+      </label>
+      <label class="field">
+        <span>Filas por página</span>
+        <select name="pageSize" [ngModel]="pageSize()" (ngModelChange)="pageSize.set(+$event); applyFilters()">
+          <option [value]="50">50</option>
+          <option [value]="100">100</option>
+          <option [value]="500">500</option>
+        </select>
+      </label>
+      <label class="check-row directory__fav-filter">
+        <input type="checkbox" name="fav" [ngModel]="favoritesOnly()" (ngModelChange)="favoritesOnly.set($event); applyFilters()" />
+        <span class="check-row__label">Solo favoritos</span>
+      </label>
+    </div>
+
+    <div class="actions directory__actions">
+      <app-button variant="primary" icon="person_add" [disabled]="!perms.canWriteDirectory()" (pressed)="startCreate()">
+        Agregar contacto
+      </app-button>
+      <label class="file-button" [class.file-button--disabled]="!perms.canWriteDirectory() || importing()">
+        <input type="file" accept=".csv,text/csv" [disabled]="!perms.canWriteDirectory() || importing()" (change)="onCsvSelected($event)" />
+        {{ importing() ? 'Importando…' : 'Importar CSV' }}
+      </label>
+      <select class="directory__import-org" name="importOrg" title="Organización para filas sin columna Empresa"
+        [ngModel]="importOrganization()" (ngModelChange)="importOrganization.set($event)" [disabled]="!perms.canWriteDirectory()">
+        <option value="">CSV: organización por defecto…</option>
+        @for (org of organizations(); track org.id) {
+          <option [value]="org.id">{{ org.name }}</option>
+        }
+      </select>
+      <app-button variant="text" icon="download" (pressed)="downloadTemplate()">Plantilla CSV</app-button>
+      <app-button icon="refresh" [disabled]="loading()" (pressed)="load()">{{ loading() ? 'Actualizando…' : 'Actualizar' }}</app-button>
+      @if (perms.isAdmin()) {
+        <app-button icon="merge_type" [disabled]="merging()" (pressed)="mergeDuplicates()">
+          {{ merging() ? 'Consolidando…' : 'Consolidar duplicados' }}
+        </app-button>
+      }
+    </div>
+  </section>
+
+  @if (!perms.canWriteDirectory()) {
+    <p class="directory__readonly" role="alert">
+      Vista de solo lectura. Tu grupo de permisos no incluye crear ni editar contactos del directorio.
+    </p>
+  }
+  @if (notice(); as n) {
+    <p class="msg" [class.msg--ok]="n.kind === 'ok'" [class.msg--error]="n.kind === 'error'" role="status">{{ n.text }}</p>
+  }
+  @if (importResult(); as r) {
+    @if (r.errors.length > 0) {
+      <ul class="directory__import-errors">
+        @for (e of r.errors; track e.line) {
+          <li><span class="mono">fila {{ e.line }}</span> — {{ e.reason }}</li>
+        }
+      </ul>
+    }
+  }
+
+  <ng-template #contactForm>
+    @if (editingSynced()) {
+      <p class="directory__warning">
+        Contacto sincronizado desde Usuarios: solo se editan teléfono, organización, ámbito y favorito.
+      </p>
+    }
+    <form class="field-grid directory__form" (ngSubmit)="save()">
+      <label class="field">
+        <span>Nombre</span>
+        <input name="name" required [disabled]="editingSynced()" [ngModel]="form().name" (ngModelChange)="setFormField('name', $event)" />
+      </label>
+      <label class="field">
+        <span>Organización</span>
+        <select name="organizationId" [ngModel]="form().organizationId" (ngModelChange)="setFormField('organizationId', $event)">
+          <option value="" disabled>Elegir…</option>
+          @for (org of organizations(); track org.id) {
+            <option [value]="org.id">{{ org.name }}</option>
+          }
+        </select>
+      </label>
+      <label class="field">
+        <span>Cargo</span>
+        <input name="position" [disabled]="editingSynced()" [ngModel]="form().position" (ngModelChange)="setFormField('position', $event)" />
+      </label>
+      <label class="field">
+        <span>Especialidad</span>
+        <input name="specialty" placeholder="Fibra Óptica, Radioenlace, Energía…" [disabled]="editingSynced()"
+          [ngModel]="form().specialty" (ngModelChange)="setFormField('specialty', $event)" />
+      </label>
+      <label class="field">
+        <span>Teléfono</span>
+        <input name="phone" type="tel" [ngModel]="form().phone" (ngModelChange)="setFormField('phone', $event)" />
+      </label>
+      <label class="field">
+        <span>Correo</span>
+        <input name="email" type="email" [disabled]="editingSynced()" [ngModel]="form().email" (ngModelChange)="setFormField('email', $event)" />
+      </label>
+      <label class="field">
+        <span>Ámbito</span>
+        <select name="scopeForm" [ngModel]="form().scope" (ngModelChange)="setFormField('scope', $event)">
+          <option value="external">Externo</option>
+          <option value="internal">Interno</option>
+        </select>
+      </label>
+      <label class="check-row directory__fav-check">
+        <input type="checkbox" name="isFavorite" [ngModel]="form().isFavorite" (ngModelChange)="setFormField('isFavorite', $event)" />
+        <span class="check-row__label">Favorito</span>
+      </label>
+      <div class="actions directory__form-actions">
+        <button type="submit" class="directory__submit" [disabled]="saving()">{{ saving() ? 'Guardando…' : 'Guardar' }}</button>
+        <app-button variant="text" (pressed)="cancelForm()">Cancelar</app-button>
+      </div>
+    </form>
+  </ng-template>
+
+  @if (showCreate() && perms.canWriteDirectory()) {
+    <section class="panel">
+      <h2 class="panel__title">Nuevo contacto del directorio</h2>
+      <ng-container [ngTemplateOutlet]="contactForm" />
+    </section>
+  }
+
+  <div class="directory__table-wrap">
+    <table class="directory__table">
+      <thead>
+        <tr>
+          <th aria-label="Favorito"></th>
+          <th>Nombre</th>
+          <th>Cargo</th>
+          <th>Especialidad</th>
+          <th>Teléfono</th>
+          <th>Correo</th>
+          <th>Organización</th>
+          <th>Ámbito</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (person of contacts(); track person.id) {
+          <tr [class.directory__row--editing]="editingId() === person.id">
+            <td>
+              <button type="button" class="directory__star" [class.directory__star--on]="person.isFavorite"
+                [disabled]="!perms.canWriteDirectory()" (click)="toggleFavorite(person)"
+                [attr.aria-label]="person.isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito'">
+                {{ person.isFavorite ? '★' : '☆' }}
+              </button>
+            </td>
+            <td><button type="button" class="directory__copy directory__name" (click)="copy(person.name, 'Nombre')">{{ person.name }}</button></td>
+            <td>{{ person.position || '—' }}</td>
+            <td>{{ person.specialty || '—' }}</td>
+            <td>
+              @if (person.phone) {
+                <button type="button" class="directory__copy mono" (click)="copy(person.phone, 'Teléfono')">{{ person.phone }}</button>
+              } @else { — }
+            </td>
+            <td>
+              @if (person.email) {
+                <button type="button" class="directory__copy mono" (click)="copy(person.email, 'Correo')">{{ person.email }}</button>
+              } @else { — }
+            </td>
+            <td>{{ person.organizationName }}</td>
+            <td><span class="state" [class.state--on]="person.scope === 'internal'">{{ person.scope === 'internal' ? 'INTERNO' : 'EXTERNO' }}</span></td>
+            <td class="directory__row-actions">
+              <button type="button" class="directory__icon-btn" [disabled]="!perms.canWriteDirectory()" (click)="startEdit(person)" title="Editar contacto">Editar</button>
+              <button type="button" class="directory__icon-btn directory__icon-btn--danger"
+                [disabled]="!perms.canDeleteDirectory() || person.source === 'user_sync'" (click)="remove(person)"
+                [title]="person.source === 'user_sync' ? 'Los sincronizados desde Usuarios no se eliminan desde aquí' : 'Eliminar contacto'">Eliminar</button>
+            </td>
+          </tr>
+          @if (editingId() === person.id) {
+            <tr class="directory__edit-row">
+              <td colspan="9">
+                <ng-container [ngTemplateOutlet]="contactForm" />
+              </td>
+            </tr>
+          }
+        } @empty {
+          <tr>
+            <td colspan="9" class="directory__empty">{{ loading() ? 'Cargando directorio…' : 'No hay personas en el directorio para ese filtro.' }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <nav class="directory__pagination" aria-label="Paginación del directorio">
+    <span class="mono">{{ rangeLabel() }}</span>
+    <app-button icon="chevron_left" [disabled]="meta().page <= 1 || loading()" (pressed)="load(meta().page - 1)">Anterior</app-button>
+    <span>Página {{ meta().page }} de {{ totalPages() }}</span>
+    <app-button icon="chevron_right" [disabled]="meta().page >= totalPages() || loading()" (pressed)="load(meta().page + 1)">Siguiente</app-button>
+  </nav>
+</div>

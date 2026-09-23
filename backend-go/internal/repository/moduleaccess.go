@@ -32,3 +32,15 @@ func (s *ModuleAccess) UserGroupScopes(ctx context.Context, userID uuid.UUID) ([
 	}
 	return scopes, nil
 }
+
+func (s *ModuleAccess) UserCapabilities(ctx context.Context, userID uuid.UUID) ([]string, error) {
+	groups, err := s.Queries.ListUserPermissionGroups(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	var caps []string
+	for _, g := range groups {
+		caps = append(caps, g.Capabilities...)
+	}
+	return caps, nil
+}

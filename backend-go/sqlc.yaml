@@ -25,3 +25,11 @@ sql:
             go_type:
               type: "float64"
               pointer: true
+          - column: "assets.latitude"
+            go_type:
+              type: "float64"
+              pointer: true
+          - column: "assets.longitude"
+            go_type:
+              type: "float64"
+              pointer: true

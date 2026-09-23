@@ -1,0 +1,230 @@
+.directory {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+}
+
+.directory__title {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.directory__toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.directory__filters {
+  display: grid;
+  grid-template-columns: minmax(260px, 2fr) repeat(3, minmax(130px, 1fr)) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.directory__fav-filter {
+  min-height: var(--row-height);
+  align-items: center;
+}
+
+.directory__actions {
+  margin-top: 0;
+  align-items: center;
+}
+
+.directory__import-org {
+  min-height: var(--row-height);
+  padding: 0 8px;
+  background: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.file-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--row-height);
+  padding: 0 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.file-button:hover {
+  background: var(--bg-surface-hover);
+}
+
+.file-button input {
+  display: none;
+}
+
+.file-button--disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.directory__readonly,
+.directory__warning {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--status-warning);
+  background: var(--bg-surface);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.directory__import-errors {
+  max-height: 140px;
+  margin: 0;
+  padding-left: 18px;
+  overflow-y: auto;
+  font-size: 12px;
+  color: var(--status-warning);
+}
+
+.directory__form {
+  align-items: end;
+}
+
+.directory__fav-check {
+  align-items: center;
+}
+
+.directory__form-actions {
+  margin-top: 0;
+}
+
+.directory__submit {
+  min-height: var(--row-height);
+  padding: 0 16px;
+  background: var(--border-active);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--bg-app);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.directory__submit[disabled] {
+  opacity: 0.6;
+}
+
+.directory__table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.directory__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.directory__table th {
+  position: sticky;
+  top: 0;
+  padding: 8px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.directory__table td {
+  height: var(--row-height);
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+
+.directory__row--editing td {
+  background: var(--bg-surface-hover);
+}
+
+.directory__edit-row td {
+  padding: 12px;
+  background: var(--bg-surface);
+}
+
+.directory__copy {
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: copy;
+}
+
+.directory__copy:hover {
+  text-decoration: underline;
+}
+
+.directory__name {
+  font-weight: 600;
+}
+
+.directory__star {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.directory__star--on {
+  color: var(--status-warning);
+}
+
+.directory__row-actions {
+  white-space: nowrap;
+}
+
+.directory__icon-btn {
+  min-height: 28px;
+  margin-right: 4px;
+  padding: 0 10px;
+  background: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.directory__icon-btn--danger {
+  color: var(--status-critical);
+}
+
+.directory__icon-btn[disabled] {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.directory__empty {
+  padding: 24px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.directory__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}

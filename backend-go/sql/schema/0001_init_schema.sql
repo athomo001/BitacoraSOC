@@ -1085,3 +1085,6 @@ CREATE TABLE backup_runs (
 );
 CREATE INDEX idx_backup_runs_kind_started ON backup_runs(kind, started_at DESC);
 
+
+-- Fase 6 (migración 000003): búsqueda sin tildes del directorio.
+CREATE EXTENSION IF NOT EXISTS unaccent;

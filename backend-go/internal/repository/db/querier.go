@@ -12,21 +12,40 @@ import (
 )
 
 type Querier interface {
+	AddTeamMember(ctx context.Context, arg AddTeamMemberParams) (TeamMember, error)
 	AddUserPermissionGroup(ctx context.Context, arg AddUserPermissionGroupParams) error
+	// 409 de spec/04-contratos-api.md: la IP de un activo es su identidad operativa.
+	AssetIPTaken(ctx context.Context, arg AssetIPTakenParams) (bool, error)
 	ClearPasswordResetToken(ctx context.Context, id uuid.UUID) error
+	// A lo sumo un canal preferido por dueño (índice único parcial del esquema):
+	// marcar uno nuevo desmarca el anterior.
+	ClearPreferredContactChannel(ctx context.Context, contactID pgtype.UUID) error
+	ClearPreferredUserChannel(ctx context.Context, userID pgtype.UUID) error
 	CompleteSetup(ctx context.Context, arg CompleteSetupParams) (AppConfig, error)
 	CountAuditLogs(ctx context.Context) (int64, error)
+	CountDirectory(ctx context.Context, arg CountDirectoryParams) (int64, error)
 	CountTerritorialUnits(ctx context.Context, arg CountTerritorialUnitsParams) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
+	CreateAsset(ctx context.Context, arg CreateAssetParams) (uuid.UUID, error)
+	CreateContact(ctx context.Context, arg CreateContactParams) (uuid.UUID, error)
+	CreateContactChannel(ctx context.Context, arg CreateContactChannelParams) (ContactChannel, error)
+	CreateLogSource(ctx context.Context, arg CreateLogSourceParams) (CatalogLogSource, error)
+	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
 	CreatePermissionGroup(ctx context.Context, arg CreatePermissionGroupParams) (PermissionGroup, error)
+	CreateTeam(ctx context.Context, arg CreateTeamParams) (Team, error)
+	CreateTeamGroup(ctx context.Context, arg CreateTeamGroupParams) (TeamGroup, error)
 	CreateTerritorialUnit(ctx context.Context, arg CreateTerritorialUnitParams) (TerritorialUnit, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	CreateUserChannel(ctx context.Context, arg CreateUserChannelParams) (ContactChannel, error)
+	DeactivateLeftoverMemberships(ctx context.Context, duplicateID pgtype.UUID) error
 	// DELETE /api/users/:id se implementa como soft-delete (active=false), no
 	// DELETE real: audit_log.actor_user_id referencia a users(id) sin ON DELETE
 	// CASCADE (a propósito, es append-only e inmutable) — borrar de verdad a un
 	// usuario que alguna vez hizo algo auditado rompería esa FK. Mismo patrón
 	// `active` que ya usa el resto del esquema (organizations, teams, etc.).
 	DeactivateUser(ctx context.Context, id uuid.UUID) error
+	DeleteContactChannel(ctx context.Context, arg DeleteContactChannelParams) (int64, error)
+	DeleteUserChannel(ctx context.Context, arg DeleteUserChannelParams) (int64, error)
 	// POST /api/auth/logout — revoca un JTI puntual sin afectar otras sesiones
 	// del mismo usuario.
 	DenylistToken(ctx context.Context, arg DenylistTokenParams) error
@@ -37,17 +56,28 @@ type Querier interface {
 	// necesita una fila para leer, así que se asegura antes de leer si todavía
 	// no existe, con los defaults de la propia tabla.
 	EnsureAppConfigRow(ctx context.Context) error
+	// Completa los huecos del principal con los datos del duplicado, sin pisar nada.
+	FillContactFromDuplicate(ctx context.Context, arg FillContactFromDuplicateParams) error
+	FindContactByEmailHash(ctx context.Context, emailHash pgtype.Text) (FindContactByEmailHashRow, error)
+	FindContactByNameAndOrg(ctx context.Context, arg FindContactByNameAndOrgParams) (FindContactByNameAndOrgRow, error)
+	// Import CSV: la columna "Empresa" trae lo que el analista escribió; se acepta
+	// tanto el nombre como el código, sin distinguir mayúsculas.
+	FindOrganizationByNameOrCode(ctx context.Context, ref string) (Organization, error)
 	// POST /api/users/force-reset-all — usuarios internos = no invitados
 	// (is_guest=false), activos. Devuelve los afectados para poder notificarlos
 	// por correo sin una segunda consulta.
 	ForceResetAllActivePasswords(ctx context.Context) ([]User, error)
 	GetAppConfig(ctx context.Context) (AppConfig, error)
+	GetAsset(ctx context.Context, id uuid.UUID) (GetAssetRow, error)
+	GetDirectoryContact(ctx context.Context, id uuid.UUID) (GetDirectoryContactRow, error)
 	GetLoginRateLimit(ctx context.Context, ipAddress string) (LoginRateLimit, error)
+	GetOrganization(ctx context.Context, id uuid.UUID) (Organization, error)
 	GetPermissionGroup(ctx context.Context, id uuid.UUID) (PermissionGroup, error)
 	// smtp_config es singleton (id BOOLEAN PRIMARY KEY DEFAULT true), siempre hay
 	// a lo sumo una fila. sqlc.narg permite pgx.ErrNoRows cuando aún no se
 	// configuró SMTP (setup inicial no completado).
 	GetSMTPConfig(ctx context.Context) (GetSMTPConfigRow, error)
+	GetTeam(ctx context.Context, id uuid.UUID) (Team, error)
 	GetTerritorialUnit(ctx context.Context, id uuid.UUID) (TerritorialUnit, error)
 	// Lock de la fila antes del upsert del import: si el code ya existía con
 	// otro path (el dataset lo movió de padre), hay que reubicar sus
@@ -66,12 +96,36 @@ type Querier interface {
 	// (ver spec/09-alta-disponibilidad-2-nodos.md sección 3.2/9.3).
 	InsertSystemEvent(ctx context.Context, arg InsertSystemEventParams) (SystemEvent, error)
 	IsTokenDenylisted(ctx context.Context, jti uuid.UUID) (bool, error)
+	// ip_address es INET: se lee y escribe como texto (::text / ::inet) para que
+	// el tipo Go sea string y Postgres valide el formato (IPv4/IPv6) al insertar.
+	ListAssets(ctx context.Context, arg ListAssetsParams) ([]ListAssetsRow, error)
 	// GET /api/audit-logs — paginado simple, más reciente primero.
 	ListAuditLogs(ctx context.Context, arg ListAuditLogsParams) ([]AuditLog, error)
+	// ===== Canales =====
+	ListChannelsForContacts(ctx context.Context, contactIds []uuid.UUID) ([]ContactChannel, error)
+	ListChannelsForUser(ctx context.Context, userID pgtype.UUID) ([]ContactChannel, error)
+	// ===== Consolidación de duplicados (POST /api/directory/merge-duplicates) =====
+	// Orden por antigüedad: el más antiguo de cada grupo queda como principal,
+	// salvo que otro esté más completo (ver handler).
+	ListContactsForDedupe(ctx context.Context) ([]ListContactsForDedupeRow, error)
+	// Directorio Global de Contactos (spec/04-contratos-api.md, HU-DIR-1/2).
+	// email/phone están cifrados (AES-256-GCM): la búsqueda por esos campos es por
+	// igualdad exacta contra su índice ciego (email_hash/phone_hash, HMAC), igual
+	// que el legacy buscaba por sha256. Nombre/cargo/especialidad/organización sí
+	// admiten búsqueda parcial (ILIKE).
+	ListDirectory(ctx context.Context, arg ListDirectoryParams) ([]ListDirectoryRow, error)
+	ListLogSources(ctx context.Context, arg ListLogSourcesParams) ([]CatalogLogSource, error)
+	ListOrganizations(ctx context.Context, arg ListOrganizationsParams) ([]Organization, error)
 	ListPermissionGroups(ctx context.Context, active pgtype.Bool) ([]PermissionGroup, error)
 	// Reposición tras reconexión: todo lo publicado después de Last-Event-ID.
 	ListSystemEventsSince(ctx context.Context, arg ListSystemEventsSinceParams) ([]SystemEvent, error)
 	ListSystemFeatures(ctx context.Context) ([]SystemFeature, error)
+	ListTeamCoverage(ctx context.Context, teamID uuid.UUID) ([]ListTeamCoverageRow, error)
+	ListTeamGroups(ctx context.Context, arg ListTeamGroupsParams) ([]TeamGroup, error)
+	// Un miembro es un usuario interno O un contacto del directorio (CHECK
+	// exactamente uno): se devuelve el nombre de cualquiera de los dos.
+	ListTeamMembers(ctx context.Context, teamID uuid.UUID) ([]ListTeamMembersRow, error)
+	ListTeams(ctx context.Context, arg ListTeamsParams) ([]ListTeamsRow, error)
 	// GET /api/territorial-units — ?parentId= devuelve un nivel (hijos directos);
 	// sin parentId devuelve el árbol completo aplanado, ordenado por path (el
 	// frontend lo indenta por nlevel sin reconstruir nada). child_count deja al
@@ -85,6 +139,11 @@ type Querier interface {
 	// PATCH /api/config/territorial-labels — merge parcial (jsonb ||): solo pisa
 	// los niveles que vienen en el request, el resto queda como estaba.
 	MergeTerritorialLabels(ctx context.Context, labels []byte) ([]byte, error)
+	// Pierden la marca de preferido: el principal ya puede tener el suyo (a lo
+	// sumo uno por dueño, uq_contact_channels_preferred_contact).
+	MoveContactChannels(ctx context.Context, arg MoveContactChannelsParams) error
+	// Reapunta la membresía al principal, salvo que ya esté en ese equipo.
+	MoveTeamMemberships(ctx context.Context, arg MoveTeamMembershipsParams) error
 	// Prueba mínima de conectividad real a Postgres para /api/health/ready
 	// (más que un simple pgxpool.Ping(): confirma que el pool puede ejecutar SQL
 	// de verdad contra la base, no solo abrir el socket TCP).
@@ -101,18 +160,33 @@ type Querier interface {
 	// 6.5) — a diferencia de UpdateUserPassword, NO toca must_change_password:
 	// esto es transparente para el usuario, no un cambio de contraseña real.
 	RehashPassword(ctx context.Context, arg RehashPasswordParams) error
+	RemoveTeamCoverage(ctx context.Context, arg RemoveTeamCoverageParams) (int64, error)
+	RemoveTeamMember(ctx context.Context, arg RemoveTeamMemberParams) (int64, error)
 	ReplaceUserPermissionGroups(ctx context.Context, userID uuid.UUID) error
 	ResetAllLoginRateLimits(ctx context.Context) error
 	ResetFailedLoginAttempts(ctx context.Context, id uuid.UUID) error
 	// Nueva ventana de 15min, o la válvula de emergencia
 	// (POST /api/system/rate-limit-reset).
 	ResetLoginRateLimit(ctx context.Context, ipAddress string) error
+	// email/phone de contacts son la copia denormalizada del canal preferido de
+	// cada tipo (la fuente de verdad son contact_channels), cifrada + indexada
+	// para listar y buscar sin recorrer los canales.
+	SetContactPrimaryChannels(ctx context.Context, arg SetContactPrimaryChannelsParams) error
 	SetMFASecret(ctx context.Context, arg SetMFASecretParams) error
 	SetModuleFlags(ctx context.Context, arg SetModuleFlagsParams) (AppConfig, error)
 	SetMustChangePassword(ctx context.Context, arg SetMustChangePasswordParams) error
 	SetPasswordResetToken(ctx context.Context, arg SetPasswordResetTokenParams) error
+	// Borrado lógico: el contacto puede estar referenciado por team_members (FK
+	// sin cascada) y por el historial de escalación de fases siguientes.
+	SoftDeleteContact(ctx context.Context, id uuid.UUID) (int64, error)
+	UpdateAsset(ctx context.Context, arg UpdateAssetParams) (int64, error)
+	UpdateChannelValue(ctx context.Context, arg UpdateChannelValueParams) error
+	UpdateContact(ctx context.Context, arg UpdateContactParams) (int64, error)
+	UpdateLogSource(ctx context.Context, arg UpdateLogSourceParams) (CatalogLogSource, error)
+	UpdateOrganization(ctx context.Context, arg UpdateOrganizationParams) (Organization, error)
 	UpdatePermissionGroup(ctx context.Context, arg UpdatePermissionGroupParams) (PermissionGroup, error)
 	UpdateSystemFeature(ctx context.Context, arg UpdateSystemFeatureParams) (SystemFeature, error)
+	UpdateTeam(ctx context.Context, arg UpdateTeamParams) (Team, error)
 	// PATCH /api/territorial-units/:id — correcciones manuales (HU-TERR-3). No
 	// permite cambiar code/kind/parent: eso reescribiría el árbol y es
 	// administración fina fuera del alcance de la Fase 5.
@@ -128,6 +202,7 @@ type Querier interface {
 	// resetear en vez de incrementar (ver internal/service/ratelimit).
 	UpsertLoginAttempt(ctx context.Context, ipAddress string) (LoginRateLimit, error)
 	UpsertSMTPConfig(ctx context.Context, arg UpsertSMTPConfigParams) error
+	UpsertTeamCoverage(ctx context.Context, arg UpsertTeamCoverageParams) (TeamCoverage, error)
 	// POST /api/territorial-units/import — upsert por code (idempotente). No
 	// toca `active` ni `address`: si el admin desactivó o completó a mano una
 	// fila importada, reimportar el dataset no se lo pisa (HU-TERR-3). Las

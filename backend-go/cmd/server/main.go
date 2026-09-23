@@ -24,6 +24,12 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/web"
 )
 
+// Capacidades de permission_groups usadas en las rutas (HU-PERM-1).
+const (
+	capDirectoryWrite  = "directory:write"
+	capDirectoryDelete = "directory:delete"
+)
+
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
@@ -116,6 +122,12 @@ func run(logger *slog.Logger) error {
 	configHandler := &handler.ConfigHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
 	systemFeaturesHandler := &handler.SystemFeaturesHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
 	territorialUnitsHandler := &handler.TerritorialUnitsHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
+	organizationsHandler := &handler.OrganizationsHandler{Queries: queries, AuditLog: auditLog}
+	directoryHandler := &handler.DirectoryHandler{Pool: pool, Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
+	teamsHandler := &handler.TeamsHandler{Queries: queries, AuditLog: auditLog, NOCEnabled: func(r *http.Request) bool {
+		flags, err := (&repository.ModuleAccess{Queries: queries}).InstanceFlags(r.Context())
+		return err == nil && flags.NOC
+	}}
 
 	// Composición de middlewares por ruta — ver internal/middleware/auth.go:
 	// RequireNotForcedPasswordChange NO se aplica a las 4 rutas que
@@ -144,6 +156,10 @@ func run(logger *slog.Logger) error {
 	}
 	nocAdmin := func(h http.HandlerFunc) http.Handler {
 		return authMW.RequireAuth(apiRateLimit(middleware.RequireNotForcedPasswordChange(middleware.RequireModule(moduleAccess, modules.NOC)(middleware.RequireRole("admin")(h)))))
+	}
+	// Permiso por capacidad de permission_groups (HU-PERM-1); admin pasa siempre.
+	withCapability := func(capability string, h http.HandlerFunc) http.Handler {
+		return authMW.RequireAuth(apiRateLimit(middleware.RequireNotForcedPasswordChange(middleware.RequireCapability(moduleAccess, capability)(h))))
 	}
 
 	mux := http.NewServeMux()
@@ -202,6 +218,47 @@ func run(logger *slog.Logger) error {
 	mux.Handle("PATCH /api/territorial-units/{id}", nocAdmin(territorialUnitsHandler.Patch))
 	mux.Handle("POST /api/territorial-units/import", nocAdmin(territorialUnitsHandler.Import))
 	mux.Handle("GET /api/territorial-units/import/template", nocAuthed(territorialUnitsHandler.ImportTemplate))
+
+	// Organizaciones y catálogo de tecnologías (Fase 6) — núcleo compartido SOC/NOC.
+	mux.Handle("GET /api/organizations", authed(organizationsHandler.List))
+	mux.Handle("POST /api/organizations", admin(organizationsHandler.Create))
+	mux.Handle("PATCH /api/organizations/{id}", admin(organizationsHandler.Patch))
+	mux.Handle("GET /api/log-sources", authed(organizationsHandler.ListLogSources))
+	mux.Handle("POST /api/log-sources", admin(organizationsHandler.CreateLogSource))
+	mux.Handle("PATCH /api/log-sources/{id}", admin(organizationsHandler.PatchLogSource))
+
+	// Directorio Global (Fase 6, HU-DIR-1/2): leer = cualquier sesión;
+	// escribir = capacidad directory:write; borrar = directory:delete.
+	mux.Handle("GET /api/directory", authed(directoryHandler.List))
+	mux.Handle("GET /api/directory/search", authed(directoryHandler.Search))
+	mux.Handle("GET /api/directory/{id}", authed(directoryHandler.Get))
+	mux.Handle("POST /api/directory", withCapability(capDirectoryWrite, directoryHandler.Create))
+	mux.Handle("PUT /api/directory/{id}", withCapability(capDirectoryWrite, directoryHandler.Update))
+	mux.Handle("DELETE /api/directory/{id}", withCapability(capDirectoryDelete, directoryHandler.Delete))
+	mux.Handle("POST /api/directory/import-csv", withCapability(capDirectoryWrite, directoryHandler.ImportCSV))
+	mux.Handle("POST /api/directory/merge-duplicates", admin(directoryHandler.MergeDuplicates))
+	mux.Handle("GET /api/contacts/{id}/channels", authed(directoryHandler.ListContactChannels))
+	mux.Handle("POST /api/contacts/{id}/channels", withCapability(capDirectoryWrite, directoryHandler.AddContactChannel))
+	mux.Handle("DELETE /api/contacts/{id}/channels/{channelId}", withCapability(capDirectoryWrite, directoryHandler.DeleteContactChannel))
+	mux.Handle("GET /api/users/{id}/channels", authed(directoryHandler.ListUserChannels))
+	mux.Handle("POST /api/users/{id}/channels", admin(directoryHandler.AddUserChannel))
+	mux.Handle("DELETE /api/users/{id}/channels/{channelId}", admin(directoryHandler.DeleteUserChannel))
+
+	// Equipos (Fase 6). Activos y cobertura territorial son del módulo NOC.
+	mux.Handle("GET /api/team-groups", authed(teamsHandler.ListGroups))
+	mux.Handle("POST /api/team-groups", admin(teamsHandler.CreateGroup))
+	mux.Handle("GET /api/teams", authed(teamsHandler.List))
+	mux.Handle("GET /api/teams/{id}", authed(teamsHandler.Get))
+	mux.Handle("POST /api/teams", admin(teamsHandler.Create))
+	mux.Handle("PATCH /api/teams/{id}", admin(teamsHandler.Patch))
+	mux.Handle("POST /api/teams/{id}/members", admin(teamsHandler.AddMember))
+	mux.Handle("DELETE /api/teams/{id}/members/{memberId}", admin(teamsHandler.RemoveMember))
+	mux.Handle("GET /api/teams/{id}/coverage", nocAuthed(teamsHandler.ListCoverage))
+	mux.Handle("POST /api/teams/{id}/coverage", nocAdmin(teamsHandler.AddCoverage))
+	mux.Handle("DELETE /api/teams/{id}/coverage/{territorialUnitId}", nocAdmin(teamsHandler.RemoveCoverage))
+	mux.Handle("GET /api/assets", nocAuthed(teamsHandler.ListAssets))
+	mux.Handle("POST /api/assets", nocAdmin(teamsHandler.CreateAsset))
+	mux.Handle("PATCH /api/assets/{id}", nocAdmin(teamsHandler.PatchAsset))
 
 	// SPA de Angular embebida (Fase 3) — catch-all, siempre al final.
 	spaHandler, err := web.Handler()

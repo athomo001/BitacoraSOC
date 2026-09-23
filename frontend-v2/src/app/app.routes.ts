@@ -51,8 +51,8 @@ export const routes: Routes = [
       },
       {
         path: 'directory',
-        component: PlaceholderComponent,
-        data: { title: 'Directorio', builtInPhase: 'la Fase 6' },
+        loadComponent: () =>
+          import('./features/directory/directory').then((module) => module.DirectoryComponent),
       },
       {
         path: 'admin',

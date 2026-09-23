@@ -2,13 +2,17 @@ import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { AdminModulesComponent } from './admin-modules';
 import { AdminFeaturesComponent } from './admin-features';
 import { AdminTerritoryComponent } from './admin-territory';
+import { AdminOrganizationsComponent } from './admin-organizations';
+import { AdminTeamsComponent } from './admin-teams';
 
-type AdminTab = 'modules' | 'features' | 'territory';
+type AdminTab = 'modules' | 'features' | 'territory' | 'organizations' | 'teams';
 
 const TABS: readonly { id: AdminTab; label: string }[] = [
   { id: 'modules', label: 'Módulos' },
   { id: 'features', label: 'Funcionalidades' },
   { id: 'territory', label: 'Territorio' },
+  { id: 'organizations', label: 'Organizaciones' },
+  { id: 'teams', label: 'Equipos' },
 ];
 
 /**
@@ -21,7 +25,7 @@ const TABS: readonly { id: AdminTab; label: string }[] = [
 @Component({
   selector: 'app-admin-shell',
   standalone: true,
-  imports: [AdminModulesComponent, AdminFeaturesComponent, AdminTerritoryComponent],
+  imports: [AdminModulesComponent, AdminFeaturesComponent, AdminTerritoryComponent, AdminOrganizationsComponent, AdminTeamsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="admin">
@@ -39,6 +43,8 @@ const TABS: readonly { id: AdminTab; label: string }[] = [
           @case ('modules') { <app-admin-modules /> }
           @case ('features') { <app-admin-features /> }
           @case ('territory') { <app-admin-territory /> }
+          @case ('organizations') { <app-admin-organizations /> }
+          @case ('teams') { <app-admin-teams /> }
         }
       </div>
     </div>

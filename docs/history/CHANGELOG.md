@@ -2701,3 +2701,20 @@ Migración documental de cambios cerrados que estaban marcados como `Listo` en `
 - **Decisión — el producto pasa a llamarse "Bitácora Ops"** (`docs/adr/0013-nombre-producto-bitacora-ops.md`): el sistema ya no es solo la bitácora de un SOC, suma NOC, ticketera y escalación común.
 - **Renombrado lo visible**: título del navegador, asistente de setup, los 6 temas de login (incluidos "Bitácora Ops for Workgroups" del Windows 3.11 y la consola Unix 1989), aviso de privacidad (ahora menciona SOC y NOC y gestión de tickets), asuntos de los correos de recuperación y cambio obligatorio de contraseña, e issuer TOTP.
 - **Sin cambios, a propósito**: módulo Go, repo, contenedores/volúmenes `bitacora-*`, base `bitacora` y la clave de sesión del navegador; renombrarlos rompería imports, datos y sesiones sin beneficio para el usuario.
+
+---
+
+## [Rewrite] Fase 6 — Organizaciones, Directorio y Equipos — CERRADA - 2026-09-23
+
+- **Backend — organizaciones y catálogo**: `/api/organizations` (client/contractor/carrier/internal) y `/api/log-sources` (catálogo de tecnologías, faltaba en el contrato).
+- **Backend — activos (NOC)**: `/api/assets` con IP validada (`INET`, `409` si se repite), metadata JSON y coordenadas.
+- **Backend — Directorio Global portado del legacy** (`internal/directory`, TDD): misma limpieza de datos, misma plantilla CSV (+ Especialidad), consolidación por union-find. Búsqueda sin tildes (`unaccent`, migración `000003`) y sobre datos cifrados por índice ciego.
+- **Seguridad — índice ciego HMAC** (`crypto.Box.BlindIndex`) en vez del `sha256` plano del legacy, y auditoría sin PII.
+- **Fix sobre el legacy**: teléfono normalizado antes de indexar (el legacy nunca encontraba el mismo número escrito distinto); la consolidación ya no fusiona por nombre solo ni por similitud difusa.
+- **Backend — permisos por capacidad** (`middleware.RequireCapability`): `directory:write` / `directory:delete` reemplazan la lista de cargos hardcodeada del legacy.
+- **Backend — equipos**: grupos, equipos, miembros (usuario o contacto), cobertura territorial (NOC) y canales de usuarios internos.
+- **Fix — un solo canal preferido por contacto** (lo exige el esquema; la primera versión marcaba dos y fallaba).
+- **Frontend**: pantalla Directorio portada del legacy (filtros, importar CSV, plantilla, consolidar, solo lectura, clic para copiar, edición en línea), pestañas Organizaciones y Equipos en Administración, `PermissionsService`.
+- **Verificado**: 82 checks de API en base vacía temporal, 22 pasos de navegador real, 39 tests de frontend, Go en verde.
+- **Cierre de fase**: checklist completo en `spec/02-alcance-y-roadmap.md`. Fase 7 (Motor de Escalación) queda desbloqueada.
+

@@ -23,7 +23,8 @@ const KeySize = 32
 // Box cifra/descifra con una llave AES-256-GCM fija, cargada una vez al
 // arrancar el proceso (ver internal/crypto.LoadKeyFromEnv).
 type Box struct {
-	aead cipher.AEAD
+	aead     cipher.AEAD
+	indexKey []byte // subllave HMAC para BlindIndex, derivada de la misma llave maestra
 }
 
 // New construye un Box a partir de una llave de exactamente KeySize bytes.
@@ -39,7 +40,7 @@ func New(key []byte) (*Box, error) {
 	if err != nil {
 		return nil, fmt.Errorf("crypto: creando GCM: %w", err)
 	}
-	return &Box{aead: aead}, nil
+	return &Box{aead: aead, indexKey: deriveIndexKey(key)}, nil
 }
 
 // Encrypt cifra plaintext y devuelve un string base64 (nonce + ciphertext +

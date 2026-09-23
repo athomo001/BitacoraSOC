@@ -1278,21 +1278,21 @@ type AppConfig struct {
 }
 
 type Asset struct {
-	ID                uuid.UUID      `json:"id"`
-	Type              AssetType      `json:"type"`
-	Name              string         `json:"name"`
-	Code              string         `json:"code"`
-	IpAddress         *netip.Addr    `json:"ip_address"`
-	Metadata          []byte         `json:"metadata"`
-	Address           pgtype.Text    `json:"address"`
-	Latitude          pgtype.Numeric `json:"latitude"`
-	Longitude         pgtype.Numeric `json:"longitude"`
-	TerritorialUnitID uuid.UUID      `json:"territorial_unit_id"`
-	ClientID          pgtype.UUID    `json:"client_id"`
-	ContractorID      pgtype.UUID    `json:"contractor_id"`
-	LogSourceID       pgtype.UUID    `json:"log_source_id"`
-	ParentAssetID     pgtype.UUID    `json:"parent_asset_id"`
-	Active            bool           `json:"active"`
+	ID                uuid.UUID   `json:"id"`
+	Type              AssetType   `json:"type"`
+	Name              string      `json:"name"`
+	Code              string      `json:"code"`
+	IpAddress         *netip.Addr `json:"ip_address"`
+	Metadata          []byte      `json:"metadata"`
+	Address           pgtype.Text `json:"address"`
+	Latitude          *float64    `json:"latitude"`
+	Longitude         *float64    `json:"longitude"`
+	TerritorialUnitID uuid.UUID   `json:"territorial_unit_id"`
+	ClientID          pgtype.UUID `json:"client_id"`
+	ContractorID      pgtype.UUID `json:"contractor_id"`
+	LogSourceID       pgtype.UUID `json:"log_source_id"`
+	ParentAssetID     pgtype.UUID `json:"parent_asset_id"`
+	Active            bool        `json:"active"`
 }
 
 type AuditLog struct {
