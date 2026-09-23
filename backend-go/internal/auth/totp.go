@@ -20,7 +20,7 @@ type TOTPEnrollment struct {
 }
 
 // GenerateTOTPSecret genera un secreto TOTP nuevo para accountName (el
-// username) bajo el issuer "BitacoraSOC", con su QR codificado en base64.
+// username) bajo el issuer "Bitácora Ops", con su QR codificado en base64.
 func GenerateTOTPSecret(accountName, issuer string) (TOTPEnrollment, error) {
 	key, err := totp.Generate(totp.GenerateOpts{
 		Issuer:      issuer,

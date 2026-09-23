@@ -42,3 +42,6 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+
+# Copia generada por scripts/copy-seed.mjs — la fuente versionada es ../seed/
+/public/seed/

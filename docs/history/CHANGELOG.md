@@ -61,6 +61,24 @@ Registro de cambios relevantes del proyecto.
 
 ---
 
+## [Rewrite] Fase 5 — Setup Modular y Territorio País-Agnóstico — CERRADA - 2026-09-23
+
+- **Backend — gate de módulos SOC/NOC real** (`internal/modules`, `middleware.RequireModule`, TDD): hasta esta fase `soc_module_enabled`/`noc_module_enabled` no bloqueaban nada. Ahora un endpoint de un módulo apagado responde `403 module-disabled` (también a admin) y un usuario sin el módulo en sus grupos `403 module-not-in-scope`. `GET /api/users/me/capabilities` usa la misma regla.
+- **Backend — `PATCH /api/config/modules`**: `400` si ambos quedan en `false`; nunca borra datos (verificado: apagar y prender NOC deja las 317 unidades intactas). Auditado y publicado por SSE.
+- **Backend — `system_features`** (`GET`/`PATCH /api/system-features/:code`): catálogo sembrado por la migración `000002_seed_system_features` (`native_tickets`, `zabbix_inbound`, `glpi_sync`, apagados). Sin POST/DELETE por diseño (ADR 0009).
+- **Backend — etiquetas territoriales** (`GET`/`PATCH /api/config/territorial-labels`, merge parcial).
+- **Backend — territorio** (`internal/territory`, TDD + `repository.TerritoryStore`): `POST /api/territorial-units/import` idempotente (upsert por `code`) y parcial (savepoint por nodo; la rama rota se reporta y se omite, el resto sigue), reubicación del subárbol ltree cuando un reimport mueve un nodo, respeto de correcciones manuales (`active`/`address`/coordenadas). También `GET` (paginado, `childCount`), `POST`, `PATCH /:id` y `GET /import/template`.
+- **Datos — `seed/territorial_units_chile.json`** (1 país, 16 regiones, 300 ciudades) generado desde dr5hn/countries-states-cities-database con la herramienta nueva `backend-go/cmd/territorial-seed` (reutilizable para cualquier país). Atribución ODbL v1.0 en `THIRD-PARTY-NOTICES.md` y en pantalla.
+- **Fix — spec `03b-guia-import-territorial.md`**: el esquema actual de dr5hn ya no trae `state_code` sino `iso2`/`iso3166_2`; mapeo corregido. Documentado también que el dataset trae ciudades principales, no todas las comunas.
+- **Fix — spec `04-contratos-api.md`**: faltaba `PATCH /api/territorial-units/:id` (lo exigía HU-TERR-3); agregados también los `403` de módulo, `400 weak-password` del bootstrap y la paginación del listado territorial.
+- **Frontend — wizard de setup** (`/setup`, guards `setupCompletedGuard`/`setupPendingGuard`, comodín `**`): módulos → cuenta admin → territorio (solo con NOC: etiquetas + import del seed o de un JSON propio). **Administración** real con pestañas Módulos / Funcionalidades / Territorio.
+- **Fix — bug latente real en `app-button` (Fase 3)**: las variantes `primary`/`critical`/`text` no mostraban su texto (un `<ng-content>` por rama de `@switch`; Angular proyecta en una sola ranura). Corregido con proyección única vía `ng-template` + test de regresión que falla con el código anterior.
+- **Seguridad — contraseña mínima de 12 caracteres para el primer admin**, en frontend y backend (`400 weak-password`).
+- **Verificado**: 67 checks de API contra el binario local y contra la imagen Docker real construida desde cero; 27 pasos de navegador real (Chromium/Playwright) en 2 corridas sobre una base Postgres 18 vacía creada para la prueba; 27 tests de frontend, tests Go en verde, `gofmt`/`vet`/`stylelint` limpios.
+- **Cierre de fase**: checklist de salida completo en `spec/02-alcance-y-roadmap.md`. Fase 6 (Organizaciones, Directorio y Equipos) queda desbloqueada.
+
+---
+
 ## [v1.11.3] - 2026-08-31
 
 ### Enlace público de solo lectura para "Personal en Teletrabajo y Apoyo" (`/main/escalation/view`)
@@ -2666,3 +2684,20 @@ Migración documental de cambios cerrados que estaban marcados como `Listo` en `
 - **Mejoras Dark Mode**: commits previos de contraste/legibilidad detectados en historial (`da9e5d1`, `9fcf7f1`, `9a86aaa`).
 - **Orden/Consola Admin**: consolidación de menú y rutas en `/main/admin` con consola unificada (`frontend/src/app/pages/main/main-layout.component.ts`, `frontend/src/app/pages/main/main.module.ts`, `frontend/src/app/pages/main/admin-console/*`) incluida en `84e6e09`.
 - **Tema login estilo CRT/Cyberpunk**: registrado en historial previo (`05093c8`).
+
+---
+
+## [Rewrite] Login — los 6 temas del legacy portados (corrige la Fase 3) - 2026-09-23
+
+- **Fix — los logins de la Fase 3 no eran los del legacy**: `LoginShellComponent` había reducido los 6 temas a paletas de color sobre un único formulario genérico, siguiendo una instrucción de `spec/06` sección 8 que contradecía el pedido del dueño (reutilizar los logins existentes). Reemplazado por `LoginComponent`, portado de `frontend/src/app/pages/login/`: template y SCSS originales (CRT, Matrix/Infoflow, Moderno split-screen, Surrealismo, Windows 3.11, Unix 1989), selector flotante "Tema de Login", reloj, subtítulo tecleado, lluvia Matrix, animaciones CRT con anime.js 3.2.2, recuperación de contraseña y MFA contra la API Go.
+- **Adaptaciones**: VT323/Orbitron autohospedadas (el legacy usaba Google Fonts); Gotham, imágenes de fondo y aviso de privacidad copiados del legacy; sin SSO ni easter egg (fuera de alcance / sin soporte en el backend nuevo); `*ngIf` → `@if` con la migración oficial; zoneless; se corrigió una fuga del legacy (listener `resize` del canvas Matrix nunca se quitaba).
+- **Spec**: `spec/06-frontend-arquitectura-y-ui.md` sección 8 reescrita con la decisión y la tabla de adaptaciones.
+- **Verificado**: 35 tests de frontend (incluye 12 nuevos del login: cada tema renderiza su propio layout, preferencia recordada, consentimiento obligatorio, MFA con `tempToken`, guía de error 401, recuperación anti-enumeración) y navegador real con los 6 temas: sin errores de JS, cero requests externos, sin assets rotos y login real contra la API en cada uno (24/24).
+
+---
+
+## [Rewrite] Nombre del producto: Bitácora Ops - 2026-09-23
+
+- **Decisión — el producto pasa a llamarse "Bitácora Ops"** (`docs/adr/0013-nombre-producto-bitacora-ops.md`): el sistema ya no es solo la bitácora de un SOC, suma NOC, ticketera y escalación común.
+- **Renombrado lo visible**: título del navegador, asistente de setup, los 6 temas de login (incluidos "Bitácora Ops for Workgroups" del Windows 3.11 y la consola Unix 1989), aviso de privacidad (ahora menciona SOC y NOC y gestión de tickets), asuntos de los correos de recuperación y cambio obligatorio de contraseña, e issuer TOTP.
+- **Sin cambios, a propósito**: módulo Go, repo, contenedores/volúmenes `bitacora-*`, base `bitacora` y la clave de sesión del navegador; renombrarlos rompería imports, datos y sesiones sin beneficio para el usuario.

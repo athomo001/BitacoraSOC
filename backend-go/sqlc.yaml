@@ -15,3 +15,13 @@ sql:
             go_type: "github.com/google/uuid.UUID"
           - db_type: "ltree"
             go_type: "string"
+          # Coordenadas como *float64 (no pgtype.Numeric): NUMERIC(9,6) entra
+          # holgado en un float64 y el JSON de la API las expone como número.
+          - column: "territorial_units.latitude"
+            go_type:
+              type: "float64"
+              pointer: true
+          - column: "territorial_units.longitude"
+            go_type:
+              type: "float64"
+              pointer: true

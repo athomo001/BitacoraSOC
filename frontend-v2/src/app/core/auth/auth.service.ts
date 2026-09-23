@@ -40,6 +40,11 @@ export class AuthService {
     this.setToken(response.data.token);
   }
 
+  /** POST /api/auth/forgot-password — responde igual exista o no la cuenta. */
+  async forgotPassword(email: string): Promise<void> {
+    await firstValueFrom(this.http.post('/api/auth/forgot-password', { email }));
+  }
+
   async loadMe(): Promise<AuthUser> {
     const response = await firstValueFrom(this.http.get<ApiEnvelope<AuthUser>>('/api/users/me'));
     this._user.set(response.data);
@@ -55,6 +60,15 @@ export class AuthService {
     }
     this.clearSession();
     this.router.navigateByUrl('/login');
+  }
+
+  /**
+   * Adopta un JWT emitido por otra vía que no es login — hoy solo
+   * POST /api/setup/bootstrap, que ya devuelve la sesión del admin recién
+   * creado (el wizard sigue con el paso de territorio sin pedir login).
+   */
+  acceptToken(token: string): void {
+    this.setToken(token);
   }
 
   private applyLoginResult(result: LoginResult): void {

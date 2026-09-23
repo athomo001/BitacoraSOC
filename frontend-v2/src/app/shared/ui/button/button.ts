@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { NgTemplateOutlet } from '@angular/common';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'critical' | 'text';
 
@@ -14,9 +15,16 @@ export type ButtonVariant = 'primary' | 'secondary' | 'critical' | 'text';
 @Component({
   selector: 'app-button',
   standalone: true,
-  imports: [MatButtonModule, MatIconModule],
+  imports: [MatButtonModule, MatIconModule, NgTemplateOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
+    <!--
+      Proyección única: Angular proyecta el contenido en UNA sola ranura
+      <ng-content>; con una por rama del @switch, solo la última (default)
+      recibía el texto y primary/critical/text quedaban con el ícono solo
+      (bug real de la Fase 3, encontrado en la Fase 5 con navegador real).
+    -->
+    <ng-template #label><ng-content /></ng-template>
     @switch (variant()) {
       @case ('primary') {
         <button
@@ -29,7 +37,7 @@ export type ButtonVariant = 'primary' | 'secondary' | 'critical' | 'text';
           @if (icon()) {
             <mat-icon>{{ icon() }}</mat-icon>
           }
-          <ng-content />
+          <ng-container [ngTemplateOutlet]="label" />
         </button>
       }
       @case ('critical') {
@@ -43,7 +51,7 @@ export type ButtonVariant = 'primary' | 'secondary' | 'critical' | 'text';
           @if (icon()) {
             <mat-icon>{{ icon() }}</mat-icon>
           }
-          <ng-content />
+          <ng-container [ngTemplateOutlet]="label" />
         </button>
       }
       @case ('text') {
@@ -57,7 +65,7 @@ export type ButtonVariant = 'primary' | 'secondary' | 'critical' | 'text';
           @if (icon()) {
             <mat-icon>{{ icon() }}</mat-icon>
           }
-          <ng-content />
+          <ng-container [ngTemplateOutlet]="label" />
         </button>
       }
       @default {
@@ -71,7 +79,7 @@ export type ButtonVariant = 'primary' | 'secondary' | 'critical' | 'text';
           @if (icon()) {
             <mat-icon>{{ icon() }}</mat-icon>
           }
-          <ng-content />
+          <ng-container [ngTemplateOutlet]="label" />
         </button>
       }
     }

@@ -9,7 +9,7 @@ import (
 )
 
 func TestGenerateTOTPSecret_DevuelveSecretYQR(t *testing.T) {
-	enrollment, err := auth.GenerateTOTPSecret("ana", "BitacoraSOC")
+	enrollment, err := auth.GenerateTOTPSecret("ana", "Bitácora Ops")
 	if err != nil {
 		t.Fatalf("GenerateTOTPSecret() error inesperado: %v", err)
 	}
@@ -22,7 +22,7 @@ func TestGenerateTOTPSecret_DevuelveSecretYQR(t *testing.T) {
 }
 
 func TestVerifyTOTPCode_CodigoValidoPasa(t *testing.T) {
-	enrollment, err := auth.GenerateTOTPSecret("ana", "BitacoraSOC")
+	enrollment, err := auth.GenerateTOTPSecret("ana", "Bitácora Ops")
 	if err != nil {
 		t.Fatalf("GenerateTOTPSecret() error inesperado: %v", err)
 	}
@@ -38,7 +38,7 @@ func TestVerifyTOTPCode_CodigoValidoPasa(t *testing.T) {
 }
 
 func TestVerifyTOTPCode_CodigoInvalidoFalla(t *testing.T) {
-	enrollment, err := auth.GenerateTOTPSecret("ana", "BitacoraSOC")
+	enrollment, err := auth.GenerateTOTPSecret("ana", "Bitácora Ops")
 	if err != nil {
 		t.Fatalf("GenerateTOTPSecret() error inesperado: %v", err)
 	}

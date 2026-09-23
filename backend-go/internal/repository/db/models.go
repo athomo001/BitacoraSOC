@@ -1736,8 +1736,8 @@ type TerritorialUnit struct {
 	Code      string          `json:"code"`
 	Path      string          `json:"path"`
 	Address   pgtype.Text     `json:"address"`
-	Latitude  pgtype.Numeric  `json:"latitude"`
-	Longitude pgtype.Numeric  `json:"longitude"`
+	Latitude  *float64        `json:"latitude"`
+	Longitude *float64        `json:"longitude"`
 	Active    bool            `json:"active"`
 }
 

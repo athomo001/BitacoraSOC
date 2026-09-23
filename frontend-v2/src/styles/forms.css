@@ -1,0 +1,125 @@
+/*
+ * Primitivas de formulario y paneles planos compartidas por setup y
+ * administración (Fase 5). Solo tokens de tokens.css — cero hex sueltos,
+ * sin sombras ni gradientes (spec/06-frontend-arquitectura-y-ui.md 1.2), y
+ * un panel nunca contiene otro panel.
+ */
+.panel {
+  padding: 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.panel__title {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.panel__hint {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.field input,
+.field select {
+  min-height: var(--row-height);
+  padding: 0 10px;
+  background: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  align-items: end; /* inputs alineados aunque una pista ocupe 2 líneas */
+  gap: 12px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.msg {
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+
+.msg--error {
+  color: var(--status-critical);
+}
+
+.msg--ok {
+  color: var(--status-ok);
+}
+
+/* Toggle de 1 clic, área mínima 36px (Ley de Fitts, sección 2.2) */
+.check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: var(--row-height);
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.check-row:has(input:checked) {
+  border-color: var(--border-active);
+}
+
+.check-row input {
+  margin-top: 3px;
+}
+
+.check-row__label {
+  display: block;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.check-row__desc {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Estado semántico: siempre color + texto, nunca solo el punto */
+.state {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.state--on {
+  color: var(--status-ok);
+}
+
+.state--off {
+  color: var(--text-muted);
+}
+
+/* Al final: más específica que .check-row input (no-descending-specificity) */
+.field input:focus-visible {
+  outline: none;
+  border-color: var(--border-active);
+}

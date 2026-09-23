@@ -5,6 +5,7 @@ import (
 
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/middleware"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/modules"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
 	"github.com/google/uuid"
@@ -202,38 +203,22 @@ func (h *PermissionGroupsHandler) MyCapabilities(w http.ResponseWriter, r *http.
 	}
 
 	config, err := h.Queries.GetAppConfig(ctx)
-	socEnabled, nocEnabled := false, false
+	var instance modules.Flags
 	if err == nil {
-		socEnabled, nocEnabled = config.SocModuleEnabled, config.NocModuleEnabled
+		instance = modules.Flags{SOC: config.SocModuleEnabled, NOC: config.NocModuleEnabled}
 	}
 
 	capabilitySet := map[string]bool{}
-	scopeHasSOC, scopeHasNOC := false, false
+	groupScopes := make([]string, 0, len(groups))
 	for _, g := range groups {
 		for _, c := range g.Capabilities {
 			capabilitySet[c] = true
 		}
-		switch g.ModuleScope {
-		case "soc":
-			scopeHasSOC = true
-		case "noc":
-			scopeHasNOC = true
-		case "both":
-			scopeHasSOC, scopeHasNOC = true, true
-		}
+		groupScopes = append(groupScopes, string(g.ModuleScope))
 	}
-	scopeHasSOC = scopeHasSOC && socEnabled
-	scopeHasNOC = scopeHasNOC && nocEnabled
-
-	moduleScope := "none"
-	switch {
-	case scopeHasSOC && scopeHasNOC:
-		moduleScope = "both"
-	case scopeHasSOC:
-		moduleScope = "soc"
-	case scopeHasNOC:
-		moduleScope = "noc"
-	}
+	// Misma regla que middleware.RequireModule — lo que el frontend muestra
+	// y lo que el backend deja pasar no pueden divergir.
+	moduleScope := modules.EffectiveScope(instance, groupScopes)
 
 	capabilities := make([]string, 0, len(capabilitySet))
 	for c := range capabilitySet {

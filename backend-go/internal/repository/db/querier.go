@@ -16,8 +16,10 @@ type Querier interface {
 	ClearPasswordResetToken(ctx context.Context, id uuid.UUID) error
 	CompleteSetup(ctx context.Context, arg CompleteSetupParams) (AppConfig, error)
 	CountAuditLogs(ctx context.Context) (int64, error)
+	CountTerritorialUnits(ctx context.Context, arg CountTerritorialUnitsParams) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
 	CreatePermissionGroup(ctx context.Context, arg CreatePermissionGroupParams) (PermissionGroup, error)
+	CreateTerritorialUnit(ctx context.Context, arg CreateTerritorialUnitParams) (TerritorialUnit, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	// DELETE /api/users/:id se implementa como soft-delete (active=false), no
 	// DELETE real: audit_log.actor_user_id referencia a users(id) sin ON DELETE
@@ -46,6 +48,11 @@ type Querier interface {
 	// a lo sumo una fila. sqlc.narg permite pgx.ErrNoRows cuando aún no se
 	// configuró SMTP (setup inicial no completado).
 	GetSMTPConfig(ctx context.Context) (GetSMTPConfigRow, error)
+	GetTerritorialUnit(ctx context.Context, id uuid.UUID) (TerritorialUnit, error)
+	// Lock de la fila antes del upsert del import: si el code ya existía con
+	// otro path (el dataset lo movió de padre), hay que reubicar sus
+	// descendientes con el path viejo — ver RebaseTerritorialSubtree.
+	GetTerritorialUnitPathByCodeForUpdate(ctx context.Context, code string) (string, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	// El servicio valida la expiración (reset_password_expires_at > now()) en
@@ -64,11 +71,20 @@ type Querier interface {
 	ListPermissionGroups(ctx context.Context, active pgtype.Bool) ([]PermissionGroup, error)
 	// Reposición tras reconexión: todo lo publicado después de Last-Event-ID.
 	ListSystemEventsSince(ctx context.Context, arg ListSystemEventsSinceParams) ([]SystemEvent, error)
+	ListSystemFeatures(ctx context.Context) ([]SystemFeature, error)
+	// GET /api/territorial-units — ?parentId= devuelve un nivel (hijos directos);
+	// sin parentId devuelve el árbol completo aplanado, ordenado por path (el
+	// frontend lo indenta por nlevel sin reconstruir nada). child_count deja al
+	// frontend saber si un nodo es expandible sin pedir otro nivel a ciegas.
+	ListTerritorialUnits(ctx context.Context, arg ListTerritorialUnitsParams) ([]ListTerritorialUnitsRow, error)
 	ListUserPermissionGroups(ctx context.Context, userID uuid.UUID) ([]PermissionGroup, error)
 	// ?role=&active= son opcionales (04-contratos-api.md) — sqlc.narg + el
 	// patrón "columna = $n OR $n IS NULL" evita escribir dos queries a mano.
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	LockUser(ctx context.Context, arg LockUserParams) error
+	// PATCH /api/config/territorial-labels — merge parcial (jsonb ||): solo pisa
+	// los niveles que vienen en el request, el resto queda como estaba.
+	MergeTerritorialLabels(ctx context.Context, labels []byte) ([]byte, error)
 	// Prueba mínima de conectividad real a Postgres para /api/health/ready
 	// (más que un simple pgxpool.Ping(): confirma que el pool puede ejecutar SQL
 	// de verdad contra la base, no solo abrir el socket TCP).
@@ -76,6 +92,10 @@ type Querier interface {
 	// Housekeeping: una vez que un JTI expiró de verdad, ya no hace falta
 	// consultarlo (el JWT tampoco pasaría Verify() por expiración propia).
 	PurgeExpiredDenylistedTokens(ctx context.Context) error
+	// Reubica los descendientes de un nodo cuyo path cambió (reimport que lo
+	// movió de padre) — incluidos los sitios agregados a mano que el dataset
+	// no conoce y por lo tanto no vuelve a upsertear.
+	RebaseTerritorialSubtree(ctx context.Context, arg RebaseTerritorialSubtreeParams) error
 	RegisterFailedLogin(ctx context.Context, id uuid.UUID) (int32, error)
 	// Re-hash oportunista en login (spec/07-backend-arquitectura-go.md sección
 	// 6.5) — a diferencia de UpdateUserPassword, NO toca must_change_password:
@@ -92,6 +112,11 @@ type Querier interface {
 	SetMustChangePassword(ctx context.Context, arg SetMustChangePasswordParams) error
 	SetPasswordResetToken(ctx context.Context, arg SetPasswordResetTokenParams) error
 	UpdatePermissionGroup(ctx context.Context, arg UpdatePermissionGroupParams) (PermissionGroup, error)
+	UpdateSystemFeature(ctx context.Context, arg UpdateSystemFeatureParams) (SystemFeature, error)
+	// PATCH /api/territorial-units/:id — correcciones manuales (HU-TERR-3). No
+	// permite cambiar code/kind/parent: eso reescribiría el árbol y es
+	// administración fina fuera del alcance de la Fase 5.
+	UpdateTerritorialUnit(ctx context.Context, arg UpdateTerritorialUnitParams) (TerritorialUnit, error)
 	// PATCH /api/users/:id — campos parciales: NULL en un parámetro conserva el
 	// valor actual (COALESCE), no lo borra.
 	UpdateUserAdmin(ctx context.Context, arg UpdateUserAdminParams) (User, error)
@@ -103,6 +128,12 @@ type Querier interface {
 	// resetear en vez de incrementar (ver internal/service/ratelimit).
 	UpsertLoginAttempt(ctx context.Context, ipAddress string) (LoginRateLimit, error)
 	UpsertSMTPConfig(ctx context.Context, arg UpsertSMTPConfigParams) error
+	// POST /api/territorial-units/import — upsert por code (idempotente). No
+	// toca `active` ni `address`: si el admin desactivó o completó a mano una
+	// fila importada, reimportar el dataset no se lo pisa (HU-TERR-3). Las
+	// coordenadas solo se actualizan si el import trae un valor, nunca se
+	// borran por venir vacías. `xmax = 0` distingue insert de update.
+	UpsertTerritorialUnit(ctx context.Context, arg UpsertTerritorialUnitParams) (UpsertTerritorialUnitRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

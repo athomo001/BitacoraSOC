@@ -1,0 +1,2253 @@
+{
+  "code": "CL",
+  "kind": "country",
+  "name": "Chile",
+  "latitude": -30,
+  "longitude": -71,
+  "children": [
+    {
+      "code": "CL-AI",
+      "kind": "region",
+      "name": "Aisén del General Carlos Ibañez del Campo",
+      "latitude": -46.459015,
+      "longitude": -72.671839,
+      "children": [
+        {
+          "code": "CL-AI-AYSEN",
+          "kind": "zone",
+          "name": "Aysén",
+          "latitude": -45.40303,
+          "longitude": -72.69184
+        },
+        {
+          "code": "CL-AI-CHILE-CHICO",
+          "kind": "zone",
+          "name": "Chile Chico",
+          "latitude": -46.5376,
+          "longitude": -71.7293
+        },
+        {
+          "code": "CL-AI-CISNES",
+          "kind": "zone",
+          "name": "Cisnes",
+          "latitude": -44.7275,
+          "longitude": -72.6805
+        },
+        {
+          "code": "CL-AI-COCHRANE",
+          "kind": "zone",
+          "name": "Cochrane",
+          "latitude": -47.2539,
+          "longitude": -72.5732
+        },
+        {
+          "code": "CL-AI-COYHAIQUE",
+          "kind": "zone",
+          "name": "Coyhaique",
+          "latitude": -45.57524,
+          "longitude": -72.06619
+        },
+        {
+          "code": "CL-AI-GUAITECAS",
+          "kind": "zone",
+          "name": "Guaitecas",
+          "latitude": -43.883333,
+          "longitude": -73.733333
+        },
+        {
+          "code": "CL-AI-LAGO-VERDE",
+          "kind": "zone",
+          "name": "Lago Verde",
+          "latitude": -44.24031,
+          "longitude": -71.8495
+        },
+        {
+          "code": "CL-AI-O-HIGGINS",
+          "kind": "zone",
+          "name": "O'Higgins",
+          "latitude": -48.466667,
+          "longitude": -72.566667
+        },
+        {
+          "code": "CL-AI-RIO-IBANEZ",
+          "kind": "zone",
+          "name": "Río Ibáñez",
+          "latitude": -46.3,
+          "longitude": -71.933333
+        },
+        {
+          "code": "CL-AI-TORTEL",
+          "kind": "zone",
+          "name": "Tortel",
+          "latitude": -47.833333,
+          "longitude": -73.566667
+        }
+      ]
+    },
+    {
+      "code": "CL-AN",
+      "kind": "region",
+      "name": "Antofagasta",
+      "latitude": -23.604131,
+      "longitude": -69.084278,
+      "children": [
+        {
+          "code": "CL-AN-ANTOFAGASTA",
+          "kind": "zone",
+          "name": "Antofagasta",
+          "latitude": -23.65236,
+          "longitude": -70.3954
+        },
+        {
+          "code": "CL-AN-CALAMA",
+          "kind": "zone",
+          "name": "Calama",
+          "latitude": -22.45667,
+          "longitude": -68.92371
+        },
+        {
+          "code": "CL-AN-MARIA-ELENA",
+          "kind": "zone",
+          "name": "María Elena",
+          "latitude": -22.35,
+          "longitude": -69.666667
+        },
+        {
+          "code": "CL-AN-MEJILLONES",
+          "kind": "zone",
+          "name": "Mejillones",
+          "latitude": -23.1,
+          "longitude": -70.45
+        },
+        {
+          "code": "CL-AN-OLLAGUE",
+          "kind": "zone",
+          "name": "Ollagüe",
+          "latitude": -21.22496,
+          "longitude": -68.25352
+        },
+        {
+          "code": "CL-AN-SAN-PEDRO-DE-ATACAMA",
+          "kind": "zone",
+          "name": "San Pedro de Atacama",
+          "latitude": -22.9111,
+          "longitude": -68.20113
+        },
+        {
+          "code": "CL-AN-SIERRA-GORDA",
+          "kind": "zone",
+          "name": "Sierra Gorda",
+          "latitude": -22.883333,
+          "longitude": -69.316667
+        },
+        {
+          "code": "CL-AN-TALTAL",
+          "kind": "zone",
+          "name": "Taltal",
+          "latitude": -25.40713,
+          "longitude": -70.48554
+        },
+        {
+          "code": "CL-AN-TOCOPILLA",
+          "kind": "zone",
+          "name": "Tocopilla",
+          "latitude": -22.09198,
+          "longitude": -70.19792
+        }
+      ]
+    },
+    {
+      "code": "CL-AP",
+      "kind": "region",
+      "name": "Arica y Parinacota",
+      "latitude": -18.57135,
+      "longitude": -69.788477,
+      "children": [
+        {
+          "code": "CL-AP-ARICA",
+          "kind": "zone",
+          "name": "Arica",
+          "latitude": -18.4746,
+          "longitude": -70.29792
+        },
+        {
+          "code": "CL-AP-CAMARONES",
+          "kind": "zone",
+          "name": "Camarones",
+          "latitude": -19.016667,
+          "longitude": -69.866667
+        },
+        {
+          "code": "CL-AP-GENERAL-LAGOS",
+          "kind": "zone",
+          "name": "General Lagos",
+          "latitude": -17.566667,
+          "longitude": -69.5
+        },
+        {
+          "code": "CL-AP-PUTRE",
+          "kind": "zone",
+          "name": "Putre",
+          "latitude": -18.1964,
+          "longitude": -69.5592
+        }
+      ]
+    },
+    {
+      "code": "CL-AR",
+      "kind": "region",
+      "name": "La Araucanía",
+      "latitude": -40.907131,
+      "longitude": -73.157326,
+      "children": [
+        {
+          "code": "CL-AR-ANGOL",
+          "kind": "zone",
+          "name": "Angol",
+          "latitude": -37.79519,
+          "longitude": -72.71636
+        },
+        {
+          "code": "CL-AR-CARAHUE",
+          "kind": "zone",
+          "name": "Carahue",
+          "latitude": -38.71122,
+          "longitude": -73.16101
+        },
+        {
+          "code": "CL-AR-CHOLCHOL",
+          "kind": "zone",
+          "name": "Cholchol",
+          "latitude": -38.6,
+          "longitude": -72.85
+        },
+        {
+          "code": "CL-AR-COLLIPULLI",
+          "kind": "zone",
+          "name": "Collipulli",
+          "latitude": -37.95453,
+          "longitude": -72.43438
+        },
+        {
+          "code": "CL-AR-CUNCO",
+          "kind": "zone",
+          "name": "Cunco",
+          "latitude": -38.916667,
+          "longitude": -72.033333
+        },
+        {
+          "code": "CL-AR-CURACAUTIN",
+          "kind": "zone",
+          "name": "Curacautín",
+          "latitude": -38.440492,
+          "longitude": -71.905396
+        },
+        {
+          "code": "CL-AR-CURARREHUE",
+          "kind": "zone",
+          "name": "Curarrehue",
+          "latitude": -39.35,
+          "longitude": -71.583333
+        },
+        {
+          "code": "CL-AR-ERCILLA",
+          "kind": "zone",
+          "name": "Ercilla",
+          "latitude": -38.05,
+          "longitude": -72.383333
+        },
+        {
+          "code": "CL-AR-FREIRE",
+          "kind": "zone",
+          "name": "Freire",
+          "latitude": -38.95252,
+          "longitude": -72.62653
+        },
+        {
+          "code": "CL-AR-GALVARINO",
+          "kind": "zone",
+          "name": "Galvarino",
+          "latitude": -38.4,
+          "longitude": -72.783333
+        },
+        {
+          "code": "CL-AR-GORBEA",
+          "kind": "zone",
+          "name": "Gorbea",
+          "latitude": -39.1,
+          "longitude": -72.683333
+        },
+        {
+          "code": "CL-AR-LAUTARO",
+          "kind": "zone",
+          "name": "Lautaro",
+          "latitude": -38.53066,
+          "longitude": -72.43652
+        },
+        {
+          "code": "CL-AR-LONCOCHE",
+          "kind": "zone",
+          "name": "Loncoche",
+          "latitude": -39.36708,
+          "longitude": -72.63087
+        },
+        {
+          "code": "CL-AR-LONQUIMAY",
+          "kind": "zone",
+          "name": "Lonquimay",
+          "latitude": -38.433333,
+          "longitude": -71.233333
+        },
+        {
+          "code": "CL-AR-LOS-SAUCES",
+          "kind": "zone",
+          "name": "Los Sauces",
+          "latitude": -37.966667,
+          "longitude": -72.833333
+        },
+        {
+          "code": "CL-AR-LUMACO",
+          "kind": "zone",
+          "name": "Lumaco",
+          "latitude": -38.15,
+          "longitude": -72.916667
+        },
+        {
+          "code": "CL-AR-MELIPEUCO",
+          "kind": "zone",
+          "name": "Melipeuco",
+          "latitude": -38.85,
+          "longitude": -71.7
+        },
+        {
+          "code": "CL-AR-NUEVA-IMPERIAL",
+          "kind": "zone",
+          "name": "Nueva Imperial",
+          "latitude": -38.74451,
+          "longitude": -72.95025
+        },
+        {
+          "code": "CL-AR-PADRE-LAS-CASAS",
+          "kind": "zone",
+          "name": "Padre Las Casas",
+          "latitude": -38.766667,
+          "longitude": -72.6
+        },
+        {
+          "code": "CL-AR-PERQUENCO",
+          "kind": "zone",
+          "name": "Perquenco",
+          "latitude": -38.416667,
+          "longitude": -72.383333
+        },
+        {
+          "code": "CL-AR-PITRUFQUEN",
+          "kind": "zone",
+          "name": "Pitrufquén",
+          "latitude": -38.98635,
+          "longitude": -72.63721
+        },
+        {
+          "code": "CL-AR-PUCON",
+          "kind": "zone",
+          "name": "Pucón",
+          "latitude": -39.28223,
+          "longitude": -71.95427
+        },
+        {
+          "code": "CL-AR-PUREN",
+          "kind": "zone",
+          "name": "Purén",
+          "latitude": -38.016667,
+          "longitude": -73.083333
+        },
+        {
+          "code": "CL-AR-RENAICO",
+          "kind": "zone",
+          "name": "Renaico",
+          "latitude": -37.71779,
+          "longitude": -72.5757
+        },
+        {
+          "code": "CL-AR-SAAVEDRA",
+          "kind": "zone",
+          "name": "Saavedra",
+          "latitude": -38.783333,
+          "longitude": -73.4
+        },
+        {
+          "code": "CL-AR-TEMUCO",
+          "kind": "zone",
+          "name": "Temuco",
+          "latitude": -38.73965,
+          "longitude": -72.59842
+        },
+        {
+          "code": "CL-AR-TEODORO-SCHMIDT",
+          "kind": "zone",
+          "name": "Teodoro Schmidt",
+          "latitude": -38.966667,
+          "longitude": -73.05
+        },
+        {
+          "code": "CL-AR-TOLTEN",
+          "kind": "zone",
+          "name": "Toltén",
+          "latitude": -39.17852,
+          "longitude": -73.16448
+        },
+        {
+          "code": "CL-AR-TRAIGUEN",
+          "kind": "zone",
+          "name": "Traiguén",
+          "latitude": -38.2496,
+          "longitude": -72.67027
+        },
+        {
+          "code": "CL-AR-VICTORIA",
+          "kind": "zone",
+          "name": "Victoria",
+          "latitude": -38.23291,
+          "longitude": -72.33292
+        },
+        {
+          "code": "CL-AR-VILCUN",
+          "kind": "zone",
+          "name": "Vilcún",
+          "latitude": -38.66875,
+          "longitude": -72.22565
+        },
+        {
+          "code": "CL-AR-VILLARRICA",
+          "kind": "zone",
+          "name": "Villarrica",
+          "latitude": -39.28569,
+          "longitude": -72.2279
+        }
+      ]
+    },
+    {
+      "code": "CL-AT",
+      "kind": "region",
+      "name": "Atacama",
+      "latitude": -27.557178,
+      "longitude": -70.015688,
+      "children": [
+        {
+          "code": "CL-AT-ALTO-DEL-CARMEN",
+          "kind": "zone",
+          "name": "Alto del Carmen",
+          "latitude": -28.933556,
+          "longitude": -70.462278
+        },
+        {
+          "code": "CL-AT-CALDERA",
+          "kind": "zone",
+          "name": "Caldera",
+          "latitude": -27.066667,
+          "longitude": -70.816667
+        },
+        {
+          "code": "CL-AT-CHANARAL",
+          "kind": "zone",
+          "name": "Chañaral",
+          "latitude": -26.3479,
+          "longitude": -70.6224
+        },
+        {
+          "code": "CL-AT-COPIAPO",
+          "kind": "zone",
+          "name": "Copiapó",
+          "latitude": -27.3665,
+          "longitude": -70.3323
+        },
+        {
+          "code": "CL-AT-DIEGO-DE-ALMAGRO",
+          "kind": "zone",
+          "name": "Diego de Almagro",
+          "latitude": -26.36667,
+          "longitude": -70.05
+        },
+        {
+          "code": "CL-AT-FREIRINA",
+          "kind": "zone",
+          "name": "Freirina",
+          "latitude": -28.5,
+          "longitude": -71.066667
+        },
+        {
+          "code": "CL-AT-HUASCO",
+          "kind": "zone",
+          "name": "Huasco",
+          "latitude": -28.45,
+          "longitude": -71.216667
+        },
+        {
+          "code": "CL-AT-TIERRA-AMARILLA",
+          "kind": "zone",
+          "name": "Tierra Amarilla",
+          "latitude": -27.466667,
+          "longitude": -70.266667
+        },
+        {
+          "code": "CL-AT-VALLENAR",
+          "kind": "zone",
+          "name": "Vallenar",
+          "latitude": -28.57617,
+          "longitude": -70.75938
+        }
+      ]
+    },
+    {
+      "code": "CL-BI",
+      "kind": "region",
+      "name": "Biobío",
+      "latitude": -37.339141,
+      "longitude": -72.410683,
+      "children": [
+        {
+          "code": "CL-BI-ALTO-BIOBIO",
+          "kind": "zone",
+          "name": "Alto Biobío",
+          "latitude": -38.05,
+          "longitude": -71.316667
+        },
+        {
+          "code": "CL-BI-ANTUCO",
+          "kind": "zone",
+          "name": "Antuco",
+          "latitude": -37.333333,
+          "longitude": -71.683333
+        },
+        {
+          "code": "CL-BI-ARAUCO",
+          "kind": "zone",
+          "name": "Arauco",
+          "latitude": -37.2463,
+          "longitude": -73.31752
+        },
+        {
+          "code": "CL-BI-CABRERO",
+          "kind": "zone",
+          "name": "Cabrero",
+          "latitude": -37.03394,
+          "longitude": -72.40468
+        },
+        {
+          "code": "CL-BI-CANETE",
+          "kind": "zone",
+          "name": "Cañete",
+          "latitude": -37.80128,
+          "longitude": -73.39616
+        },
+        {
+          "code": "CL-BI-CHIGUAYANTE",
+          "kind": "zone",
+          "name": "Chiguayante",
+          "latitude": -36.9256,
+          "longitude": -73.02841
+        },
+        {
+          "code": "CL-BI-CONCEPCION",
+          "kind": "zone",
+          "name": "Concepción",
+          "latitude": -36.82699,
+          "longitude": -73.04977
+        },
+        {
+          "code": "CL-BI-CONTULMO",
+          "kind": "zone",
+          "name": "Contulmo",
+          "latitude": -38,
+          "longitude": -73.233333
+        },
+        {
+          "code": "CL-BI-CORONEL",
+          "kind": "zone",
+          "name": "Coronel",
+          "latitude": -37.03386,
+          "longitude": -73.14019
+        },
+        {
+          "code": "CL-BI-CURANILAHUE",
+          "kind": "zone",
+          "name": "Curanilahue",
+          "latitude": -37.47793,
+          "longitude": -73.34495
+        },
+        {
+          "code": "CL-BI-FLORIDA",
+          "kind": "zone",
+          "name": "Florida",
+          "latitude": -36.816667,
+          "longitude": -72.666667
+        },
+        {
+          "code": "CL-BI-HUALPEN",
+          "kind": "zone",
+          "name": "Hualpén",
+          "latitude": -36.783333,
+          "longitude": -73.083333
+        },
+        {
+          "code": "CL-BI-HUALQUI",
+          "kind": "zone",
+          "name": "Hualqui",
+          "latitude": -36.97266,
+          "longitude": -72.93559
+        },
+        {
+          "code": "CL-BI-LAJA",
+          "kind": "zone",
+          "name": "Laja",
+          "latitude": -37.28415,
+          "longitude": -72.71105
+        },
+        {
+          "code": "CL-BI-LEBU",
+          "kind": "zone",
+          "name": "Lebu",
+          "latitude": -37.60825,
+          "longitude": -73.65356
+        },
+        {
+          "code": "CL-BI-LOS-ALAMOS",
+          "kind": "zone",
+          "name": "Los Álamos",
+          "latitude": -37.616667,
+          "longitude": -73.466667
+        },
+        {
+          "code": "CL-BI-LOS-ANGELES",
+          "kind": "zone",
+          "name": "Los Ángeles",
+          "latitude": -37.46973,
+          "longitude": -72.35366
+        },
+        {
+          "code": "CL-BI-LOTA",
+          "kind": "zone",
+          "name": "Lota",
+          "latitude": -37.08994,
+          "longitude": -73.1577
+        },
+        {
+          "code": "CL-BI-MULCHEN",
+          "kind": "zone",
+          "name": "Mulchén",
+          "latitude": -37.71893,
+          "longitude": -72.24099
+        },
+        {
+          "code": "CL-BI-NACIMIENTO",
+          "kind": "zone",
+          "name": "Nacimiento",
+          "latitude": -37.50253,
+          "longitude": -72.67307
+        },
+        {
+          "code": "CL-BI-NEGRETE",
+          "kind": "zone",
+          "name": "Negrete",
+          "latitude": -37.583333,
+          "longitude": -72.516667
+        },
+        {
+          "code": "CL-BI-PENCO",
+          "kind": "zone",
+          "name": "Penco",
+          "latitude": -36.74075,
+          "longitude": -72.99528
+        },
+        {
+          "code": "CL-BI-QUILACO",
+          "kind": "zone",
+          "name": "Quilaco",
+          "latitude": -37.684361,
+          "longitude": -72.006361
+        },
+        {
+          "code": "CL-BI-QUILLECO",
+          "kind": "zone",
+          "name": "Quilleco",
+          "latitude": -37.466667,
+          "longitude": -71.966667
+        },
+        {
+          "code": "CL-BI-SAN-PEDRO-DE-LA-PAZ",
+          "kind": "zone",
+          "name": "San Pedro de la Paz",
+          "latitude": -36.84082,
+          "longitude": -73.10311
+        },
+        {
+          "code": "CL-BI-SAN-ROSENDO",
+          "kind": "zone",
+          "name": "San Rosendo",
+          "latitude": -37.266667,
+          "longitude": -72.716667
+        },
+        {
+          "code": "CL-BI-SANTA-BARBARA",
+          "kind": "zone",
+          "name": "Santa Bárbara",
+          "latitude": -37.666667,
+          "longitude": -72.016667
+        },
+        {
+          "code": "CL-BI-SANTA-JUANA",
+          "kind": "zone",
+          "name": "Santa Juana",
+          "latitude": -37.166667,
+          "longitude": -72.933333
+        },
+        {
+          "code": "CL-BI-TALCAHUANO",
+          "kind": "zone",
+          "name": "Talcahuano",
+          "latitude": -36.72494,
+          "longitude": -73.11684
+        },
+        {
+          "code": "CL-BI-TIRUA",
+          "kind": "zone",
+          "name": "Tirúa",
+          "latitude": -38.333333,
+          "longitude": -73.5
+        },
+        {
+          "code": "CL-BI-TOME",
+          "kind": "zone",
+          "name": "Tomé",
+          "latitude": -36.61756,
+          "longitude": -72.95593
+        },
+        {
+          "code": "CL-BI-TUCAPEL",
+          "kind": "zone",
+          "name": "Tucapel",
+          "latitude": -37.283333,
+          "longitude": -71.95
+        },
+        {
+          "code": "CL-BI-YUMBEL",
+          "kind": "zone",
+          "name": "Yumbel",
+          "latitude": -37.0982,
+          "longitude": -72.56084
+        }
+      ]
+    },
+    {
+      "code": "CL-CO",
+      "kind": "region",
+      "name": "Coquimbo",
+      "latitude": -30.754665,
+      "longitude": -70.900554,
+      "children": [
+        {
+          "code": "CL-CO-ANDACOLLO",
+          "kind": "zone",
+          "name": "Andacollo",
+          "latitude": -30.216667,
+          "longitude": -71.083333
+        },
+        {
+          "code": "CL-CO-CANELA",
+          "kind": "zone",
+          "name": "Canela",
+          "latitude": -31.4,
+          "longitude": -71.45
+        },
+        {
+          "code": "CL-CO-COMBARBALA",
+          "kind": "zone",
+          "name": "Combarbalá",
+          "latitude": -31.166667,
+          "longitude": -71.05
+        },
+        {
+          "code": "CL-CO-COQUIMBO",
+          "kind": "zone",
+          "name": "Coquimbo",
+          "latitude": -29.95332,
+          "longitude": -71.33947
+        },
+        {
+          "code": "CL-CO-ILLAPEL",
+          "kind": "zone",
+          "name": "Illapel",
+          "latitude": -31.63349,
+          "longitude": -71.16967
+        },
+        {
+          "code": "CL-CO-LA-HIGUERA",
+          "kind": "zone",
+          "name": "La Higuera",
+          "latitude": -29.5,
+          "longitude": -71.266667
+        },
+        {
+          "code": "CL-CO-LA-SERENA",
+          "kind": "zone",
+          "name": "La Serena",
+          "latitude": -29.90453,
+          "longitude": -71.24894
+        },
+        {
+          "code": "CL-CO-LOS-VILOS",
+          "kind": "zone",
+          "name": "Los Vilos",
+          "latitude": -31.9,
+          "longitude": -71.516667
+        },
+        {
+          "code": "CL-CO-MONTE-PATRIA",
+          "kind": "zone",
+          "name": "Monte Patria",
+          "latitude": -30.69496,
+          "longitude": -70.9577
+        },
+        {
+          "code": "CL-CO-OVALLE",
+          "kind": "zone",
+          "name": "Ovalle",
+          "latitude": -30.60106,
+          "longitude": -71.19901
+        },
+        {
+          "code": "CL-CO-PAIHUANO",
+          "kind": "zone",
+          "name": "Paihuano",
+          "latitude": -30.02884,
+          "longitude": -70.51708
+        },
+        {
+          "code": "CL-CO-PUNITAQUI",
+          "kind": "zone",
+          "name": "Punitaqui",
+          "latitude": -30.9,
+          "longitude": -71.266667
+        },
+        {
+          "code": "CL-CO-RIO-HURTADO",
+          "kind": "zone",
+          "name": "Río Hurtado",
+          "latitude": -30.266667,
+          "longitude": -70.7
+        },
+        {
+          "code": "CL-CO-SALAMANCA",
+          "kind": "zone",
+          "name": "Salamanca",
+          "latitude": -31.77922,
+          "longitude": -70.96389
+        },
+        {
+          "code": "CL-CO-VICUNA",
+          "kind": "zone",
+          "name": "Vicuña",
+          "latitude": -30.03541,
+          "longitude": -70.71274
+        }
+      ]
+    },
+    {
+      "code": "CL-LI",
+      "kind": "region",
+      "name": "Libertador General Bernardo O'Higgins",
+      "latitude": -34.534538,
+      "longitude": -71.035482,
+      "children": [
+        {
+          "code": "CL-LI-CHIMBARONGO",
+          "kind": "zone",
+          "name": "Chimbarongo",
+          "latitude": -34.71247,
+          "longitude": -71.0434
+        },
+        {
+          "code": "CL-LI-CHEPICA",
+          "kind": "zone",
+          "name": "Chépica",
+          "latitude": -34.733333,
+          "longitude": -71.283333
+        },
+        {
+          "code": "CL-LI-CODEGUA",
+          "kind": "zone",
+          "name": "Codegua",
+          "latitude": -34.033333,
+          "longitude": -70.666667
+        },
+        {
+          "code": "CL-LI-COLTAUCO",
+          "kind": "zone",
+          "name": "Coltauco",
+          "latitude": -34.3,
+          "longitude": -71.1
+        },
+        {
+          "code": "CL-LI-COINCO",
+          "kind": "zone",
+          "name": "Coínco",
+          "latitude": -34.266667,
+          "longitude": -70.966667
+        },
+        {
+          "code": "CL-LI-DONIHUE",
+          "kind": "zone",
+          "name": "Doñihue",
+          "latitude": -34.233333,
+          "longitude": -70.966667
+        },
+        {
+          "code": "CL-LI-GRANEROS",
+          "kind": "zone",
+          "name": "Graneros",
+          "latitude": -34.06863,
+          "longitude": -70.72747
+        },
+        {
+          "code": "CL-LI-LA-ESTRELLA",
+          "kind": "zone",
+          "name": "La Estrella",
+          "latitude": -34.2,
+          "longitude": -71.666667
+        },
+        {
+          "code": "CL-LI-LAS-CABRAS",
+          "kind": "zone",
+          "name": "Las Cabras",
+          "latitude": -34.3,
+          "longitude": -71.316667
+        },
+        {
+          "code": "CL-LI-LITUECHE",
+          "kind": "zone",
+          "name": "Litueche",
+          "latitude": -34.116667,
+          "longitude": -71.733333
+        },
+        {
+          "code": "CL-LI-LOLOL",
+          "kind": "zone",
+          "name": "Lolol",
+          "latitude": -34.728611,
+          "longitude": -71.644722
+        },
+        {
+          "code": "CL-LI-MACHALI",
+          "kind": "zone",
+          "name": "Machalí",
+          "latitude": -34.18082,
+          "longitude": -70.64933
+        },
+        {
+          "code": "CL-LI-MALLOA",
+          "kind": "zone",
+          "name": "Malloa",
+          "latitude": -34.45,
+          "longitude": -70.95
+        },
+        {
+          "code": "CL-LI-MARCHIGUE",
+          "kind": "zone",
+          "name": "Marchigüe",
+          "latitude": -34.4,
+          "longitude": -71.633333
+        },
+        {
+          "code": "CL-LI-MOSTAZAL",
+          "kind": "zone",
+          "name": "Mostazal",
+          "latitude": -33.983333,
+          "longitude": -70.7
+        },
+        {
+          "code": "CL-LI-NANCAGUA",
+          "kind": "zone",
+          "name": "Nancagua",
+          "latitude": -34.666667,
+          "longitude": -71.216667
+        },
+        {
+          "code": "CL-LI-NAVIDAD",
+          "kind": "zone",
+          "name": "Navidad",
+          "latitude": -33.933333,
+          "longitude": -71.833333
+        },
+        {
+          "code": "CL-LI-OLIVAR",
+          "kind": "zone",
+          "name": "Olivar",
+          "latitude": -34.21164,
+          "longitude": -70.82012
+        },
+        {
+          "code": "CL-LI-PALMILLA",
+          "kind": "zone",
+          "name": "Palmilla",
+          "latitude": -34.6,
+          "longitude": -71.366667
+        },
+        {
+          "code": "CL-LI-PAREDONES",
+          "kind": "zone",
+          "name": "Paredones",
+          "latitude": -34.783333,
+          "longitude": -71.166667
+        },
+        {
+          "code": "CL-LI-PERALILLO",
+          "kind": "zone",
+          "name": "Peralillo",
+          "latitude": -34.483333,
+          "longitude": -71.483333
+        },
+        {
+          "code": "CL-LI-PEUMO",
+          "kind": "zone",
+          "name": "Peumo",
+          "latitude": -34.4,
+          "longitude": -71.166667
+        },
+        {
+          "code": "CL-LI-PICHIDEGUA",
+          "kind": "zone",
+          "name": "Pichidegua",
+          "latitude": -34.35,
+          "longitude": -71.3
+        },
+        {
+          "code": "CL-LI-PICHILEMU",
+          "kind": "zone",
+          "name": "Pichilemu",
+          "latitude": -34.38333,
+          "longitude": -72
+        },
+        {
+          "code": "CL-LI-PLACILLA",
+          "kind": "zone",
+          "name": "Placilla",
+          "latitude": -34.633333,
+          "longitude": -71.116667
+        },
+        {
+          "code": "CL-LI-PUMANQUE",
+          "kind": "zone",
+          "name": "Pumanque",
+          "latitude": -34.6,
+          "longitude": -71.666667
+        },
+        {
+          "code": "CL-LI-QUINTA-DE-TILCOCO",
+          "kind": "zone",
+          "name": "Quinta de Tilcoco",
+          "latitude": -34.3555,
+          "longitude": -70.96527
+        },
+        {
+          "code": "CL-LI-RANCAGUA",
+          "kind": "zone",
+          "name": "Rancagua",
+          "latitude": -34.17083,
+          "longitude": -70.74444
+        },
+        {
+          "code": "CL-LI-RENGO",
+          "kind": "zone",
+          "name": "Rengo",
+          "latitude": -34.40639,
+          "longitude": -70.85834
+        },
+        {
+          "code": "CL-LI-REQUINOA",
+          "kind": "zone",
+          "name": "Requínoa",
+          "latitude": -34.283333,
+          "longitude": -70.833333
+        },
+        {
+          "code": "CL-LI-SAN-FERNANDO",
+          "kind": "zone",
+          "name": "San Fernando",
+          "latitude": -34.7433,
+          "longitude": -70.60328
+        },
+        {
+          "code": "CL-LI-SAN-VICENTE",
+          "kind": "zone",
+          "name": "San Vicente",
+          "latitude": -34.43859,
+          "longitude": -71.07751
+        },
+        {
+          "code": "CL-LI-SANTA-CRUZ",
+          "kind": "zone",
+          "name": "Santa Cruz",
+          "latitude": -34.63881,
+          "longitude": -71.36576
+        }
+      ]
+    },
+    {
+      "code": "CL-LL",
+      "kind": "region",
+      "name": "Los Lagos",
+      "latitude": -42.300844,
+      "longitude": -73.105387,
+      "children": [
+        {
+          "code": "CL-LL-ANCUD",
+          "kind": "zone",
+          "name": "Ancud",
+          "latitude": -41.8707,
+          "longitude": -73.81622
+        },
+        {
+          "code": "CL-LL-CALBUCO",
+          "kind": "zone",
+          "name": "Calbuco",
+          "latitude": -41.77338,
+          "longitude": -73.13049
+        },
+        {
+          "code": "CL-LL-CASTRO",
+          "kind": "zone",
+          "name": "Castro",
+          "latitude": -42.4721,
+          "longitude": -73.77319
+        },
+        {
+          "code": "CL-LL-CHAITEN",
+          "kind": "zone",
+          "name": "Chaitén",
+          "latitude": -42.91596,
+          "longitude": -72.70632
+        },
+        {
+          "code": "CL-LL-CHONCHI",
+          "kind": "zone",
+          "name": "Chonchi",
+          "latitude": -42.62387,
+          "longitude": -73.775
+        },
+        {
+          "code": "CL-LL-COCHAMO",
+          "kind": "zone",
+          "name": "Cochamó",
+          "latitude": -41.5,
+          "longitude": -72.316667
+        },
+        {
+          "code": "CL-LL-CURACO-DE-VELEZ",
+          "kind": "zone",
+          "name": "Curaco de Vélez",
+          "latitude": -42.4397,
+          "longitude": -73.6029
+        },
+        {
+          "code": "CL-LL-DALCAHUE",
+          "kind": "zone",
+          "name": "Dalcahue",
+          "latitude": -42.37845,
+          "longitude": -73.65011
+        },
+        {
+          "code": "CL-LL-FRESIA",
+          "kind": "zone",
+          "name": "Fresia",
+          "latitude": -41.15364,
+          "longitude": -73.42102
+        },
+        {
+          "code": "CL-LL-FRUTILLAR",
+          "kind": "zone",
+          "name": "Frutillar",
+          "latitude": -41.08716,
+          "longitude": -73.09563
+        },
+        {
+          "code": "CL-LL-FUTALEUFU",
+          "kind": "zone",
+          "name": "Futaleufú",
+          "latitude": -43.18492,
+          "longitude": -71.86722
+        },
+        {
+          "code": "CL-LL-HUALAIHUE",
+          "kind": "zone",
+          "name": "Hualaihué",
+          "latitude": -42.016667,
+          "longitude": -72.683333
+        },
+        {
+          "code": "CL-LL-LLANQUIHUE",
+          "kind": "zone",
+          "name": "Llanquihue",
+          "latitude": -41.34285,
+          "longitude": -72.658
+        },
+        {
+          "code": "CL-LL-LOS-MUERMOS",
+          "kind": "zone",
+          "name": "Los Muermos",
+          "latitude": -41.4,
+          "longitude": -73.483333
+        },
+        {
+          "code": "CL-LL-MAULLIN",
+          "kind": "zone",
+          "name": "Maullín",
+          "latitude": -41.616667,
+          "longitude": -73.6
+        },
+        {
+          "code": "CL-LL-OSORNO",
+          "kind": "zone",
+          "name": "Osorno",
+          "latitude": -40.57395,
+          "longitude": -73.13348
+        },
+        {
+          "code": "CL-LL-PALENA",
+          "kind": "zone",
+          "name": "Palena",
+          "latitude": -43.61876,
+          "longitude": -71.80434
+        },
+        {
+          "code": "CL-LL-PUERTO-MONTT",
+          "kind": "zone",
+          "name": "Puerto Montt",
+          "latitude": -41.4693,
+          "longitude": -72.94237
+        },
+        {
+          "code": "CL-LL-PUERTO-OCTAY",
+          "kind": "zone",
+          "name": "Puerto Octay",
+          "latitude": -40.966667,
+          "longitude": -72.9
+        },
+        {
+          "code": "CL-LL-PUERTO-VARAS",
+          "kind": "zone",
+          "name": "Puerto Varas",
+          "latitude": -41.31946,
+          "longitude": -72.98538
+        },
+        {
+          "code": "CL-LL-PUQUELDON",
+          "kind": "zone",
+          "name": "Puqueldón",
+          "latitude": -42.60001,
+          "longitude": -73.67458
+        },
+        {
+          "code": "CL-LL-PURRANQUE",
+          "kind": "zone",
+          "name": "Purranque",
+          "latitude": -40.91305,
+          "longitude": -73.15913
+        },
+        {
+          "code": "CL-LL-PUYEHUE",
+          "kind": "zone",
+          "name": "Puyehue",
+          "latitude": -40.70968,
+          "longitude": -72.641906
+        },
+        {
+          "code": "CL-LL-QUEILEN",
+          "kind": "zone",
+          "name": "Queilén",
+          "latitude": -42.85572,
+          "longitude": -73.56436
+        },
+        {
+          "code": "CL-LL-QUELLON",
+          "kind": "zone",
+          "name": "Quellón",
+          "latitude": -43.11819,
+          "longitude": -73.61661
+        },
+        {
+          "code": "CL-LL-QUEMCHI",
+          "kind": "zone",
+          "name": "Quemchi",
+          "latitude": -42.133333,
+          "longitude": -73.516667
+        },
+        {
+          "code": "CL-LL-QUINCHAO",
+          "kind": "zone",
+          "name": "Quinchao",
+          "latitude": -42.533333,
+          "longitude": -73.416667
+        },
+        {
+          "code": "CL-LL-RIO-NEGRO",
+          "kind": "zone",
+          "name": "Río Negro",
+          "latitude": -40.79615,
+          "longitude": -73.21614
+        },
+        {
+          "code": "CL-LL-SAN-JUAN-DE-LA-COSTA",
+          "kind": "zone",
+          "name": "San Juan de la Costa",
+          "latitude": -40.516667,
+          "longitude": -73.4
+        },
+        {
+          "code": "CL-LL-SAN-PABLO",
+          "kind": "zone",
+          "name": "San Pablo",
+          "latitude": -40.4,
+          "longitude": -73.016667
+        }
+      ]
+    },
+    {
+      "code": "CL-LR",
+      "kind": "region",
+      "name": "Los Ríos",
+      "latitude": -39.974275,
+      "longitude": -72.667701,
+      "children": [
+        {
+          "code": "CL-LR-CORRAL",
+          "kind": "zone",
+          "name": "Corral",
+          "latitude": -39.8873,
+          "longitude": -73.43101
+        },
+        {
+          "code": "CL-LR-FUTRONO",
+          "kind": "zone",
+          "name": "Futrono",
+          "latitude": -40.133333,
+          "longitude": -72.4
+        },
+        {
+          "code": "CL-LR-LA-UNION",
+          "kind": "zone",
+          "name": "La Unión",
+          "latitude": -40.29313,
+          "longitude": -73.08167
+        },
+        {
+          "code": "CL-LR-LAGO-RANCO",
+          "kind": "zone",
+          "name": "Lago Ranco",
+          "latitude": -40.316667,
+          "longitude": -72.5
+        },
+        {
+          "code": "CL-LR-LANCO",
+          "kind": "zone",
+          "name": "Lanco",
+          "latitude": -39.45246,
+          "longitude": -72.77117
+        },
+        {
+          "code": "CL-LR-LOS-LAGOS",
+          "kind": "zone",
+          "name": "Los Lagos",
+          "latitude": -39.85,
+          "longitude": -72.833333
+        },
+        {
+          "code": "CL-LR-MARIQUINA",
+          "kind": "zone",
+          "name": "Mariquina",
+          "latitude": -39.516667,
+          "longitude": -72.966667
+        },
+        {
+          "code": "CL-LR-MAFIL",
+          "kind": "zone",
+          "name": "Máfil",
+          "latitude": -39.65,
+          "longitude": -72.95
+        },
+        {
+          "code": "CL-LR-PAILLACO",
+          "kind": "zone",
+          "name": "Paillaco",
+          "latitude": -40.0706,
+          "longitude": -72.8727
+        },
+        {
+          "code": "CL-LR-PANGUIPULLI",
+          "kind": "zone",
+          "name": "Panguipulli",
+          "latitude": -39.64355,
+          "longitude": -72.33269
+        },
+        {
+          "code": "CL-LR-RIO-BUENO",
+          "kind": "zone",
+          "name": "Río Bueno",
+          "latitude": -40.33494,
+          "longitude": -72.95564
+        },
+        {
+          "code": "CL-LR-VALDIVIA",
+          "kind": "zone",
+          "name": "Valdivia",
+          "latitude": -39.81422,
+          "longitude": -73.24589
+        }
+      ]
+    },
+    {
+      "code": "CL-MA",
+      "kind": "region",
+      "name": "Magallanes y de la Antártica Chilena",
+      "latitude": -53.352752,
+      "longitude": -71.554778,
+      "children": [
+        {
+          "code": "CL-MA-ANTARTICA",
+          "kind": "zone",
+          "name": "Antártica",
+          "latitude": -53.14139,
+          "longitude": -70.905767
+        },
+        {
+          "code": "CL-MA-CABO-DE-HORNOS",
+          "kind": "zone",
+          "name": "Cabo de Hornos",
+          "latitude": -54.933333,
+          "longitude": -67.616667
+        },
+        {
+          "code": "CL-MA-LAGUNA-BLANCA",
+          "kind": "zone",
+          "name": "Laguna Blanca",
+          "latitude": -52.25,
+          "longitude": -71.916667
+        },
+        {
+          "code": "CL-MA-NATALES",
+          "kind": "zone",
+          "name": "Natales",
+          "latitude": -51.733333,
+          "longitude": -72.516667
+        },
+        {
+          "code": "CL-MA-PORVENIR",
+          "kind": "zone",
+          "name": "Porvenir",
+          "latitude": -53.3,
+          "longitude": -70.366667
+        },
+        {
+          "code": "CL-MA-PRIMAVERA",
+          "kind": "zone",
+          "name": "Primavera",
+          "latitude": -52.716667,
+          "longitude": -69.25
+        },
+        {
+          "code": "CL-MA-PUNTA-ARENAS",
+          "kind": "zone",
+          "name": "Punta Arenas",
+          "latitude": -53.1627,
+          "longitude": -70.9081
+        },
+        {
+          "code": "CL-MA-RIO-VERDE",
+          "kind": "zone",
+          "name": "Río Verde",
+          "latitude": -52.65,
+          "longitude": -71.483333
+        },
+        {
+          "code": "CL-MA-SAN-GREGORIO",
+          "kind": "zone",
+          "name": "San Gregorio",
+          "latitude": -52.316667,
+          "longitude": -69.683333
+        },
+        {
+          "code": "CL-MA-TIMAUKEL",
+          "kind": "zone",
+          "name": "Timaukel",
+          "latitude": -53.666667,
+          "longitude": -69.9
+        },
+        {
+          "code": "CL-MA-TORRES-DEL-PAINE",
+          "kind": "zone",
+          "name": "Torres del Paine",
+          "latitude": -51.266667,
+          "longitude": -72.35
+        }
+      ]
+    },
+    {
+      "code": "CL-ML",
+      "kind": "region",
+      "name": "Maule",
+      "latitude": -35.521347,
+      "longitude": -71.691889,
+      "children": [
+        {
+          "code": "CL-ML-CAUQUENES",
+          "kind": "zone",
+          "name": "Cauquenes",
+          "latitude": -35.9671,
+          "longitude": -72.32248
+        },
+        {
+          "code": "CL-ML-CHANCO",
+          "kind": "zone",
+          "name": "Chanco",
+          "latitude": -35.733333,
+          "longitude": -72.533333
+        },
+        {
+          "code": "CL-ML-COLBUN",
+          "kind": "zone",
+          "name": "Colbún",
+          "latitude": -35.69494,
+          "longitude": -71.40568
+        },
+        {
+          "code": "CL-ML-CONSTITUCION",
+          "kind": "zone",
+          "name": "Constitución",
+          "latitude": -35.33321,
+          "longitude": -72.41156
+        },
+        {
+          "code": "CL-ML-CUREPTO",
+          "kind": "zone",
+          "name": "Curepto",
+          "latitude": -35.083333,
+          "longitude": -72.016667
+        },
+        {
+          "code": "CL-ML-CURICO",
+          "kind": "zone",
+          "name": "Curicó",
+          "latitude": -34.98279,
+          "longitude": -71.23943
+        },
+        {
+          "code": "CL-ML-EMPEDRADO",
+          "kind": "zone",
+          "name": "Empedrado",
+          "latitude": -35.6,
+          "longitude": -72.283333
+        },
+        {
+          "code": "CL-ML-HUALANE",
+          "kind": "zone",
+          "name": "Hualañé",
+          "latitude": -34.976533,
+          "longitude": -71.804786
+        },
+        {
+          "code": "CL-ML-LICANTEN",
+          "kind": "zone",
+          "name": "Licantén",
+          "latitude": -34.983333,
+          "longitude": -72
+        },
+        {
+          "code": "CL-ML-LINARES",
+          "kind": "zone",
+          "name": "Linares",
+          "latitude": -35.84667,
+          "longitude": -71.59308
+        },
+        {
+          "code": "CL-ML-LONGAVI",
+          "kind": "zone",
+          "name": "Longaví",
+          "latitude": -35.96496,
+          "longitude": -71.6836
+        },
+        {
+          "code": "CL-ML-MAULE",
+          "kind": "zone",
+          "name": "Maule",
+          "latitude": -35.533333,
+          "longitude": -71.7
+        },
+        {
+          "code": "CL-ML-MOLINA",
+          "kind": "zone",
+          "name": "Molina",
+          "latitude": -35.11428,
+          "longitude": -71.28232
+        },
+        {
+          "code": "CL-ML-PARRAL",
+          "kind": "zone",
+          "name": "Parral",
+          "latitude": -36.14311,
+          "longitude": -71.82605
+        },
+        {
+          "code": "CL-ML-PELARCO",
+          "kind": "zone",
+          "name": "Pelarco",
+          "latitude": -35.383333,
+          "longitude": -71.45
+        },
+        {
+          "code": "CL-ML-PELLUHUE",
+          "kind": "zone",
+          "name": "Pelluhue",
+          "latitude": -35.833333,
+          "longitude": -72.633333
+        },
+        {
+          "code": "CL-ML-PENCAHUE",
+          "kind": "zone",
+          "name": "Pencahue",
+          "latitude": -35.4,
+          "longitude": -71.816667
+        },
+        {
+          "code": "CL-ML-RAUCO",
+          "kind": "zone",
+          "name": "Rauco",
+          "latitude": -34.92546,
+          "longitude": -71.31722
+        },
+        {
+          "code": "CL-ML-RETIRO",
+          "kind": "zone",
+          "name": "Retiro",
+          "latitude": -36.05,
+          "longitude": -71.766667
+        },
+        {
+          "code": "CL-ML-ROMERAL",
+          "kind": "zone",
+          "name": "Romeral",
+          "latitude": -34.966667,
+          "longitude": -71.133333
+        },
+        {
+          "code": "CL-ML-RIO-CLARO",
+          "kind": "zone",
+          "name": "Río Claro",
+          "latitude": -35.283333,
+          "longitude": -71.266667
+        },
+        {
+          "code": "CL-ML-SAGRADA-FAMILIA",
+          "kind": "zone",
+          "name": "Sagrada Familia",
+          "latitude": -35,
+          "longitude": -71.383333
+        },
+        {
+          "code": "CL-ML-SAN-CLEMENTE",
+          "kind": "zone",
+          "name": "San Clemente",
+          "latitude": -35.53777,
+          "longitude": -71.487
+        },
+        {
+          "code": "CL-ML-SAN-JAVIER",
+          "kind": "zone",
+          "name": "San Javier",
+          "latitude": -35.5952,
+          "longitude": -71.72924
+        },
+        {
+          "code": "CL-ML-SAN-RAFAEL",
+          "kind": "zone",
+          "name": "San Rafael",
+          "latitude": -35.316667,
+          "longitude": -71.533333
+        },
+        {
+          "code": "CL-ML-TALCA",
+          "kind": "zone",
+          "name": "Talca",
+          "latitude": -35.4264,
+          "longitude": -71.65542
+        },
+        {
+          "code": "CL-ML-TENO",
+          "kind": "zone",
+          "name": "Teno",
+          "latitude": -34.87055,
+          "longitude": -71.16219
+        },
+        {
+          "code": "CL-ML-VICHUQUEN",
+          "kind": "zone",
+          "name": "Vichuquén",
+          "latitude": -34.883333,
+          "longitude": -72
+        },
+        {
+          "code": "CL-ML-VILLA-ALEGRE",
+          "kind": "zone",
+          "name": "Villa Alegre",
+          "latitude": -35.666667,
+          "longitude": -71.75
+        },
+        {
+          "code": "CL-ML-YERBAS-BUENAS",
+          "kind": "zone",
+          "name": "Yerbas Buenas",
+          "latitude": -35.75,
+          "longitude": -71.583333
+        }
+      ]
+    },
+    {
+      "code": "CL-NB",
+      "kind": "region",
+      "name": "Ñuble",
+      "latitude": -36.633158,
+      "longitude": -71.938482,
+      "children": [
+        {
+          "code": "CL-NB-BULNES",
+          "kind": "zone",
+          "name": "Bulnes",
+          "latitude": -36.74232,
+          "longitude": -72.29854
+        },
+        {
+          "code": "CL-NB-CHILLAN",
+          "kind": "zone",
+          "name": "Chillán",
+          "latitude": -36.60664,
+          "longitude": -72.10344
+        },
+        {
+          "code": "CL-NB-CHILLAN-VIEJO",
+          "kind": "zone",
+          "name": "Chillán Viejo",
+          "latitude": -36.6229,
+          "longitude": -72.1317
+        },
+        {
+          "code": "CL-NB-COBQUECURA",
+          "kind": "zone",
+          "name": "Cobquecura",
+          "latitude": -36.133333,
+          "longitude": -72.783333
+        },
+        {
+          "code": "CL-NB-COELEMU",
+          "kind": "zone",
+          "name": "Coelemu",
+          "latitude": -36.483333,
+          "longitude": -72.7
+        },
+        {
+          "code": "CL-NB-COIHUECO",
+          "kind": "zone",
+          "name": "Coihueco",
+          "latitude": -36.62785,
+          "longitude": -71.83068
+        },
+        {
+          "code": "CL-NB-EL-CARMEN",
+          "kind": "zone",
+          "name": "El Carmen",
+          "latitude": -36.9,
+          "longitude": -72.033333
+        },
+        {
+          "code": "CL-NB-NINHUE",
+          "kind": "zone",
+          "name": "Ninhue",
+          "latitude": -36.4,
+          "longitude": -72.4
+        },
+        {
+          "code": "CL-NB-PEMUCO",
+          "kind": "zone",
+          "name": "Pemuco",
+          "latitude": -36.966667,
+          "longitude": -72.1
+        },
+        {
+          "code": "CL-NB-PINTO",
+          "kind": "zone",
+          "name": "Pinto",
+          "latitude": -36.7,
+          "longitude": -71.9
+        },
+        {
+          "code": "CL-NB-PORTEZUELO",
+          "kind": "zone",
+          "name": "Portezuelo",
+          "latitude": -36.533333,
+          "longitude": -72.433333
+        },
+        {
+          "code": "CL-NB-QUILLON",
+          "kind": "zone",
+          "name": "Quillón",
+          "latitude": -36.733333,
+          "longitude": -72.466667
+        },
+        {
+          "code": "CL-NB-QUIRIHUE",
+          "kind": "zone",
+          "name": "Quirihue",
+          "latitude": -36.27998,
+          "longitude": -72.54118
+        },
+        {
+          "code": "CL-NB-RANQUIL",
+          "kind": "zone",
+          "name": "Ránquil",
+          "latitude": -36.65,
+          "longitude": -72.55
+        },
+        {
+          "code": "CL-NB-SAN-CARLOS",
+          "kind": "zone",
+          "name": "San Carlos",
+          "latitude": -36.42477,
+          "longitude": -71.958
+        },
+        {
+          "code": "CL-NB-SAN-FABIAN",
+          "kind": "zone",
+          "name": "San Fabián",
+          "latitude": -36.55,
+          "longitude": -71.55
+        },
+        {
+          "code": "CL-NB-SAN-IGNACIO",
+          "kind": "zone",
+          "name": "San Ignacio",
+          "latitude": -36.799999,
+          "longitude": -72.042076
+        },
+        {
+          "code": "CL-NB-SAN-NICOLAS",
+          "kind": "zone",
+          "name": "San Nicolás",
+          "latitude": -36.5,
+          "longitude": -72.216667
+        },
+        {
+          "code": "CL-NB-TREGUACO",
+          "kind": "zone",
+          "name": "Treguaco",
+          "latitude": -36.433333,
+          "longitude": -72.666667
+        },
+        {
+          "code": "CL-NB-YUNGAY",
+          "kind": "zone",
+          "name": "Yungay",
+          "latitude": -37.116667,
+          "longitude": -72.016667
+        },
+        {
+          "code": "CL-NB-NIQUEN",
+          "kind": "zone",
+          "name": "Ñiquén",
+          "latitude": -36.3,
+          "longitude": -71.9
+        }
+      ]
+    },
+    {
+      "code": "CL-RM",
+      "kind": "region",
+      "name": "Región Metropolitana de Santiago",
+      "latitude": -33.573934,
+      "longitude": -70.620552,
+      "children": [
+        {
+          "code": "CL-RM-COLINA",
+          "kind": "zone",
+          "name": "Colina",
+          "latitude": -33.2,
+          "longitude": -70.683333
+        },
+        {
+          "code": "CL-RM-MELIPILLA",
+          "kind": "zone",
+          "name": "Melipilla",
+          "latitude": -33.68909,
+          "longitude": -71.21528
+        },
+        {
+          "code": "CL-RM-PUENTE-ALTO",
+          "kind": "zone",
+          "name": "Puente Alto",
+          "latitude": -33.61169,
+          "longitude": -70.57577
+        },
+        {
+          "code": "CL-RM-SAN-BERNARDO",
+          "kind": "zone",
+          "name": "San Bernardo",
+          "latitude": -33.59217,
+          "longitude": -70.6996
+        },
+        {
+          "code": "CL-RM-SANTIAGO",
+          "kind": "zone",
+          "name": "Santiago",
+          "latitude": -33.45694,
+          "longitude": -70.64827
+        },
+        {
+          "code": "CL-RM-TALAGANTE",
+          "kind": "zone",
+          "name": "Talagante",
+          "latitude": -33.66386,
+          "longitude": -70.92734
+        }
+      ]
+    },
+    {
+      "code": "CL-TA",
+      "kind": "region",
+      "name": "Tarapacá",
+      "latitude": -20.163667,
+      "longitude": -69.546345,
+      "children": [
+        {
+          "code": "CL-TA-ALTO-HOSPICIO",
+          "kind": "zone",
+          "name": "Alto Hospicio",
+          "latitude": -20.25,
+          "longitude": -70.116667
+        },
+        {
+          "code": "CL-TA-CAMINA",
+          "kind": "zone",
+          "name": "Camiña",
+          "latitude": -19.3,
+          "longitude": -69.416667
+        },
+        {
+          "code": "CL-TA-COLCHANE",
+          "kind": "zone",
+          "name": "Colchane",
+          "latitude": -19.275411,
+          "longitude": -68.639646
+        },
+        {
+          "code": "CL-TA-HUARA",
+          "kind": "zone",
+          "name": "Huara",
+          "latitude": -19.966667,
+          "longitude": -69.766667
+        },
+        {
+          "code": "CL-TA-IQUIQUE",
+          "kind": "zone",
+          "name": "Iquique",
+          "latitude": -20.21326,
+          "longitude": -70.15027
+        },
+        {
+          "code": "CL-TA-PICA",
+          "kind": "zone",
+          "name": "Pica",
+          "latitude": -20.5,
+          "longitude": -69.333333
+        },
+        {
+          "code": "CL-TA-POZO-ALMONTE",
+          "kind": "zone",
+          "name": "Pozo Almonte",
+          "latitude": -20.2597,
+          "longitude": -69.7862
+        }
+      ]
+    },
+    {
+      "code": "CL-VS",
+      "kind": "region",
+      "name": "Valparaíso",
+      "latitude": -33.047238,
+      "longitude": -71.612689,
+      "children": [
+        {
+          "code": "CL-VS-ALGARROBO",
+          "kind": "zone",
+          "name": "Algarrobo",
+          "latitude": -33.369256,
+          "longitude": -71.668139
+        },
+        {
+          "code": "CL-VS-CABILDO",
+          "kind": "zone",
+          "name": "Cabildo",
+          "latitude": -32.41737,
+          "longitude": -70.82435
+        },
+        {
+          "code": "CL-VS-CALLE-LARGA",
+          "kind": "zone",
+          "name": "Calle Larga",
+          "latitude": -32.85,
+          "longitude": -70.633333
+        },
+        {
+          "code": "CL-VS-CARTAGENA",
+          "kind": "zone",
+          "name": "Cartagena",
+          "latitude": -33.55384,
+          "longitude": -71.60761
+        },
+        {
+          "code": "CL-VS-CASABLANCA",
+          "kind": "zone",
+          "name": "Casablanca",
+          "latitude": -33.316667,
+          "longitude": -71.416667
+        },
+        {
+          "code": "CL-VS-CATEMU",
+          "kind": "zone",
+          "name": "Catemu",
+          "latitude": -32.633333,
+          "longitude": -71.033333
+        },
+        {
+          "code": "CL-VS-CONCON",
+          "kind": "zone",
+          "name": "Concón",
+          "latitude": -32.916667,
+          "longitude": -71.516667
+        },
+        {
+          "code": "CL-VS-EL-QUISCO",
+          "kind": "zone",
+          "name": "El Quisco",
+          "latitude": -33.4,
+          "longitude": -71.7
+        },
+        {
+          "code": "CL-VS-EL-TABO",
+          "kind": "zone",
+          "name": "El Tabo",
+          "latitude": -33.45,
+          "longitude": -71.666667
+        },
+        {
+          "code": "CL-VS-HIJUELAS",
+          "kind": "zone",
+          "name": "Hijuelas",
+          "latitude": -32.8,
+          "longitude": -71.166667
+        },
+        {
+          "code": "CL-VS-ISLA-DE-PASCUA",
+          "kind": "zone",
+          "name": "Isla de Pascua",
+          "latitude": -27.11048,
+          "longitude": -109.29749
+        },
+        {
+          "code": "CL-VS-JUAN-FERNANDEZ",
+          "kind": "zone",
+          "name": "Juan Fernández",
+          "latitude": -30.025643,
+          "longitude": -82.051921
+        },
+        {
+          "code": "CL-VS-LA-CALERA",
+          "kind": "zone",
+          "name": "La Calera",
+          "latitude": -32.783333,
+          "longitude": -71.216667
+        },
+        {
+          "code": "CL-VS-LA-CRUZ",
+          "kind": "zone",
+          "name": "La Cruz",
+          "latitude": -32.816667,
+          "longitude": -71.233333
+        },
+        {
+          "code": "CL-VS-LA-LIGUA",
+          "kind": "zone",
+          "name": "La Ligua",
+          "latitude": -32.45242,
+          "longitude": -71.23106
+        },
+        {
+          "code": "CL-VS-LIMACHE",
+          "kind": "zone",
+          "name": "Limache",
+          "latitude": -33.01667,
+          "longitude": -71.26667
+        },
+        {
+          "code": "CL-VS-LLAILLAY",
+          "kind": "zone",
+          "name": "Llaillay",
+          "latitude": -32.84043,
+          "longitude": -70.95623
+        },
+        {
+          "code": "CL-VS-LOS-ANDES",
+          "kind": "zone",
+          "name": "Los Andes",
+          "latitude": -32.83369,
+          "longitude": -70.59827
+        },
+        {
+          "code": "CL-VS-NOGALES",
+          "kind": "zone",
+          "name": "Nogales",
+          "latitude": -32.716667,
+          "longitude": -71.233333
+        },
+        {
+          "code": "CL-VS-OLMUE",
+          "kind": "zone",
+          "name": "Olmué",
+          "latitude": -33,
+          "longitude": -71.2
+        },
+        {
+          "code": "CL-VS-PANQUEHUE",
+          "kind": "zone",
+          "name": "Panquehue",
+          "latitude": -32.8,
+          "longitude": -70.833333
+        },
+        {
+          "code": "CL-VS-PAPUDO",
+          "kind": "zone",
+          "name": "Papudo",
+          "latitude": -32.516667,
+          "longitude": -71.45
+        },
+        {
+          "code": "CL-VS-PETORCA",
+          "kind": "zone",
+          "name": "Petorca",
+          "latitude": -32.25,
+          "longitude": -70.933333
+        },
+        {
+          "code": "CL-VS-PUCHUNCAVI",
+          "kind": "zone",
+          "name": "Puchuncaví",
+          "latitude": -32.72575,
+          "longitude": -71.41514
+        },
+        {
+          "code": "CL-VS-PUTAENDO",
+          "kind": "zone",
+          "name": "Putaendo",
+          "latitude": -32.633333,
+          "longitude": -70.733333
+        },
+        {
+          "code": "CL-VS-QUILLOTA",
+          "kind": "zone",
+          "name": "Quillota",
+          "latitude": -32.88341,
+          "longitude": -71.24882
+        },
+        {
+          "code": "CL-VS-QUILPUE",
+          "kind": "zone",
+          "name": "Quilpué",
+          "latitude": -33.04752,
+          "longitude": -71.44249
+        },
+        {
+          "code": "CL-VS-QUINTERO",
+          "kind": "zone",
+          "name": "Quintero",
+          "latitude": -32.783333,
+          "longitude": -71.533333
+        },
+        {
+          "code": "CL-VS-RINCONADA",
+          "kind": "zone",
+          "name": "Rinconada",
+          "latitude": -32.833333,
+          "longitude": -70.7
+        },
+        {
+          "code": "CL-VS-SAN-ANTONIO",
+          "kind": "zone",
+          "name": "San Antonio",
+          "latitude": -33.59473,
+          "longitude": -71.60746
+        },
+        {
+          "code": "CL-VS-SAN-ESTEBAN",
+          "kind": "zone",
+          "name": "San Esteban",
+          "latitude": -32.8,
+          "longitude": -70.583333
+        },
+        {
+          "code": "CL-VS-SAN-FELIPE",
+          "kind": "zone",
+          "name": "San Felipe",
+          "latitude": -32.74976,
+          "longitude": -70.72584
+        },
+        {
+          "code": "CL-VS-SANTA-MARIA",
+          "kind": "zone",
+          "name": "Santa María",
+          "latitude": -32.75,
+          "longitude": -70.666667
+        },
+        {
+          "code": "CL-VS-SANTO-DOMINGO",
+          "kind": "zone",
+          "name": "Santo Domingo",
+          "latitude": -33.647193,
+          "longitude": -71.635279
+        },
+        {
+          "code": "CL-VS-VALPARAISO",
+          "kind": "zone",
+          "name": "Valparaíso",
+          "latitude": -33.036,
+          "longitude": -71.62963
+        },
+        {
+          "code": "CL-VS-VILLA-ALEMANA",
+          "kind": "zone",
+          "name": "Villa Alemana",
+          "latitude": -33.04222,
+          "longitude": -71.37333
+        },
+        {
+          "code": "CL-VS-VINA-DEL-MAR",
+          "kind": "zone",
+          "name": "Viña del Mar",
+          "latitude": -33.02457,
+          "longitude": -71.55183
+        },
+        {
+          "code": "CL-VS-ZAPALLAR",
+          "kind": "zone",
+          "name": "Zapallar",
+          "latitude": -32.5539,
+          "longitude": -71.4577
+        }
+      ]
+    }
+  ]
+}

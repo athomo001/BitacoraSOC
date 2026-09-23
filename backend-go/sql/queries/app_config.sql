@@ -24,3 +24,12 @@ UPDATE app_config SET
   updated_at = now()
 WHERE id = true
 RETURNING *;
+
+-- name: MergeTerritorialLabels :one
+-- PATCH /api/config/territorial-labels — merge parcial (jsonb ||): solo pisa
+-- los niveles que vienen en el request, el resto queda como estaba.
+UPDATE app_config SET
+  territorial_kind_labels = territorial_kind_labels || sqlc.arg('labels')::jsonb,
+  updated_at = now()
+WHERE id = true
+RETURNING territorial_kind_labels;

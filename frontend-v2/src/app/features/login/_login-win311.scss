@@ -1,0 +1,548 @@
+// =============================================================================
+// TEMA DE LOGIN WINDOWS 3.11 RETRO
+// =============================================================================
+// Comentario: Emulación de la estética clásica de 16 colores de Windows 3.x.
+// Utiliza relieve tridimensional clásico mediante sombras duras.
+// =============================================================================
+
+.theme-win311 {
+  --win-teal: #008080;
+  --win-gray: #c0c0c0;
+  --win-dark-gray: #808080;
+  --win-white: #ffffff;
+  --win-black: #000000;
+  --win-navy: #000080;
+  --win-font: "MS Sans Serif", "Courier New", "Tahoma", "Geneva", monospace;
+
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--win-teal);
+  font-family: var(--win-font);
+  color: var(--win-black);
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  font-size: 13px;
+  line-height: 1.4;
+
+  // ─── Desktop ───────────────────────────────────────────────────────────────
+  .win-desktop {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-sizing: border-box;
+  }
+
+  // ─── Estructura de Ventana Clásica ──────────────────────────────────────────
+  .win-window {
+    background-color: var(--win-gray);
+    border: 2px solid;
+    border-top-color: var(--win-white);
+    border-left-color: var(--win-white);
+    border-right-color: var(--win-black);
+    border-bottom-color: var(--win-black);
+    box-shadow: 1px 1px 0px var(--win-white) inset, -1px -1px 0px var(--win-dark-gray) inset;
+    outline: 1px solid var(--win-dark-gray);
+    position: absolute;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  // Ventana de Fondo: Program Manager (Simulado)
+  .program-manager-bg {
+    width: min(92vw, 850px);
+    height: min(85vh, 520px);
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.85;
+
+    // Barra de título inactiva en color gris
+    .win-title-bar {
+      background-color: var(--win-dark-gray);
+      color: var(--win-gray);
+    }
+  }
+
+  // Menú de ventana clásico
+  .win-menu-bar {
+    border-bottom: 2px solid var(--win-dark-gray);
+    padding: 3px 10px;
+    display: flex;
+    gap: 15px;
+    font-size: 12px;
+    background-color: var(--win-gray);
+    
+    .win-menu-item {
+      cursor: pointer;
+      color: var(--win-black);
+      u {
+        text-decoration: underline;
+      }
+    }
+  }
+
+  // Contenido del Program Manager
+  .pm-icons-grid {
+    padding: 25px;
+    display: flex;
+    gap: 30px;
+
+    .pm-icon-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 70px;
+      gap: 6px;
+    }
+
+    .pm-icon {
+      width: 32px;
+      height: 32px;
+      background: rgba(0, 0, 0, 0.1);
+      border: 1px dashed var(--win-dark-gray);
+      position: relative;
+
+      &.icon-group::before {
+        content: "📁";
+        font-size: 24px;
+        position: absolute;
+        top: 2px;
+        left: 3px;
+      }
+    }
+
+    .pm-icon-label {
+      font-size: 11px;
+      text-align: center;
+      word-break: break-word;
+      color: var(--win-black);
+    }
+  }
+
+  // Ventana de Diálogo Activa (Login, Recovery, MFA)
+  .win-dialog {
+    width: min(90vw, 460px);
+    z-index: 10;
+    box-shadow: 4px 4px 20px rgba(0, 0, 0, 0.5);
+
+    &.login-dialog {
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    &.recovery-dialog, &.mfa-dialog {
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+  }
+
+  // ─── Barra de Título Retro ──────────────────────────────────────────────────
+  .win-title-bar {
+    height: 24px;
+    background-color: var(--win-dark-gray);
+    color: var(--win-white);
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 4px;
+    border-bottom: 1px solid var(--win-black);
+    box-sizing: border-box;
+
+    &.active-title {
+      background-color: var(--win-navy);
+      color: var(--win-white);
+    }
+
+    .win-title-icon-box {
+      width: 18px;
+      height: 18px;
+      background-color: var(--win-gray);
+      border: 1px solid;
+      border-top-color: var(--win-white);
+      border-left-color: var(--win-white);
+      border-right-color: var(--win-black);
+      border-bottom-color: var(--win-black);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      pointer-events: auto;
+
+      &:active {
+        border-top-color: var(--win-black);
+        border-left-color: var(--win-black);
+        border-right-color: var(--win-white);
+        border-bottom-color: var(--win-white);
+      }
+
+      .win-title-icon-bars {
+        width: 10px;
+        height: 4px;
+        border-top: 2px solid var(--win-black);
+        border-bottom: 2px solid var(--win-black);
+      }
+    }
+
+    .win-title-text {
+      flex: 1;
+      padding-left: 8px;
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      user-select: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .win-title-buttons {
+      display: flex;
+      gap: 2px;
+
+      button {
+        width: 16px;
+        height: 16px;
+        font-size: 8px;
+        line-height: 14px;
+        font-family: monospace;
+        font-weight: bold;
+        background-color: var(--win-gray);
+        border: 1px solid;
+        border-top-color: var(--win-white);
+        border-left-color: var(--win-white);
+        border-right-color: var(--win-black);
+        border-bottom-color: var(--win-black);
+        color: var(--win-black);
+        cursor: pointer;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        &:active:not([disabled]) {
+          border-top-color: var(--win-black);
+          border-left-color: var(--win-black);
+          border-right-color: var(--win-white);
+          border-bottom-color: var(--win-white);
+        }
+
+        &[disabled] {
+          color: var(--win-dark-gray);
+          cursor: default;
+        }
+      }
+    }
+  }
+
+  // Cuerpo de la Ventana
+  .win-window-body {
+    padding: 15px;
+    box-sizing: border-box;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--win-gray);
+  }
+
+  // ─── Header del Diálogo (Logo y Texto) ──────────────────────────────────────
+  .dialog-header-section {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 18px;
+    border-bottom: 1px solid var(--win-dark-gray);
+    padding-bottom: 12px;
+  }
+
+  // Logo simulado de Windows 3.11 en CSS
+  .win311-logo-container {
+    width: 50px;
+    height: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .win311-logo-image {
+    width: 32px;
+    height: 32px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 2px;
+    transform: skewY(-8deg); // Inclinación clásica del logo de Windows 3.1
+    box-shadow: 2px 2px 0px var(--win-black);
+
+    .win-flag-square {
+      width: 15px;
+      height: 15px;
+      border: 1px solid var(--win-black);
+
+      &.flag-red { background-color: #ff0000; }
+      &.flag-green { background-color: #00ff00; }
+      &.flag-blue { background-color: #0000ff; }
+      &.flag-yellow { background-color: #ffff00; }
+    }
+  }
+
+  .dialog-instruction-text {
+    font-size: 12px;
+    color: var(--win-black);
+    line-height: 1.35;
+  }
+
+  // ─── Formulario Clásico ─────────────────────────────────────────────────────
+  .win-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .form-row-win {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    .win-label {
+      width: 90px;
+      font-size: 12px;
+      font-weight: normal;
+      text-align: left;
+      user-select: none;
+      
+      u {
+        text-decoration: underline;
+      }
+    }
+
+    // Input retro hundido en 3D
+    .win-input {
+      flex: 1;
+      height: 24px;
+      background-color: var(--win-white);
+      color: var(--win-black);
+      font-family: var(--win-font);
+      font-size: 13px;
+      padding: 0 6px;
+      border: 2px solid;
+      border-top-color: var(--win-dark-gray);
+      border-left-color: var(--win-dark-gray);
+      border-right-color: var(--win-white);
+      border-bottom-color: var(--win-white);
+      box-shadow: 1px 1px 0px var(--win-black) inset;
+      outline: none;
+      box-sizing: border-box;
+
+      &:focus {
+        border-color: var(--win-black);
+        box-shadow: none;
+        outline: 1px dotted var(--win-black);
+      }
+
+      &[disabled] {
+        background-color: var(--win-gray);
+        color: var(--win-dark-gray);
+      }
+    }
+  }
+
+  // Fila de Checkbox
+  .checkbox-row {
+    margin-left: 90px;
+    margin-top: 4px;
+  }
+
+  .win-checkbox-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .win-checkbox-input {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      background-color: var(--win-white);
+      border: 2px solid;
+      border-top-color: var(--win-dark-gray);
+      border-left-color: var(--win-dark-gray);
+      border-right-color: var(--win-white);
+      border-bottom-color: var(--win-white);
+      box-shadow: 1px 1px 0px var(--win-black) inset;
+      outline: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      &:checked::before {
+        content: "X";
+        font-family: monospace;
+        font-size: 11px;
+        font-weight: bold;
+        color: var(--win-black);
+      }
+
+      &:focus {
+        outline: 1px dotted var(--win-black);
+      }
+    }
+
+    .win-checkbox-label {
+      font-size: 11px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .win-link {
+      color: var(--win-navy);
+      text-decoration: underline;
+      cursor: pointer;
+
+      &:hover {
+        color: #0000ff;
+      }
+    }
+  }
+
+  // ─── Botones 3D Retro ──────────────────────────────────────────────────────
+  .win-dialog-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 15px;
+    border-top: 1px solid var(--win-dark-gray);
+    padding-top: 12px;
+  }
+
+  .win-button-3d {
+    background-color: var(--win-gray);
+    color: var(--win-black);
+    font-family: var(--win-font);
+    font-size: 12px;
+    height: 25px;
+    min-width: 80px;
+    padding: 0 10px;
+    cursor: pointer;
+    border: 2px solid;
+    border-top-color: var(--win-white);
+    border-left-color: var(--win-white);
+    border-right-color: var(--win-black);
+    border-bottom-color: var(--win-black);
+    box-shadow: 1px 1px 0px rgba(255,255,255,0.7) inset;
+    outline: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+
+    u {
+      text-decoration: underline;
+    }
+
+    // El botón predeterminado tiene una línea negra extra de resalte
+    &.default-btn {
+      outline: 1px solid var(--win-black);
+      box-shadow: 0 0 0 1px var(--win-gray) inset, 2px 2px 0px rgba(255,255,255,0.7) inset;
+    }
+
+    &:active:not([disabled]) {
+      border-top-color: var(--win-black);
+      border-left-color: var(--win-black);
+      border-right-color: var(--win-white);
+      border-bottom-color: var(--win-white);
+      box-shadow: 1px 1px 0px var(--win-black) inset;
+      padding-top: 2px; // Simula hundimiento del botón
+      padding-left: 11px;
+    }
+
+    &[disabled] {
+      color: var(--win-dark-gray);
+      border-color: var(--win-dark-gray);
+      cursor: default;
+      box-shadow: none;
+    }
+  }
+
+  // ─── Caja de Alertas e Información ──────────────────────────────────────────
+  .win-alert-box {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px;
+    margin: 8px 0;
+    border: 1px solid var(--win-black);
+    background-color: var(--win-white);
+    box-shadow: inset 1px 1px 0px var(--win-dark-gray);
+
+    .win-alert-icon {
+      font-size: 16px;
+    }
+
+    .win-alert-text {
+      font-size: 11px;
+      color: #b22222; // Fuego retro
+      line-height: 1.3;
+    }
+  }
+
+  .win-info-box {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px;
+    border: 1px solid var(--win-dark-gray);
+    background-color: #e0e0e0;
+
+    .win-info-icon {
+      font-size: 14px;
+      color: var(--win-navy);
+    }
+
+    .win-info-text {
+      font-size: 11px;
+      color: var(--win-black);
+      line-height: 1.3;
+    }
+  }
+
+  // ─── SSO en Windows 3.11 ────────────────────────────────────────────────────
+  .win-sso-section {
+    margin-top: 15px;
+    border-top: 1px dashed var(--win-dark-gray);
+    padding-top: 10px;
+
+    .win-sso-title {
+      font-size: 11px;
+      color: var(--win-dark-gray);
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    .win-sso-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      align-items: center;
+    }
+
+    .win-sso-btn {
+      height: 25px;
+      min-width: 100px;
+    }
+
+    .win-google-sso {
+      min-height: 30px;
+      display: flex;
+      justify-content: center;
+    }
+  }
+}

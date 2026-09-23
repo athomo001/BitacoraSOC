@@ -1,0 +1,464 @@
+// Tema CYBER (v4) - misma identidad visual, sin hacks de especificidad.
+$neon: #00ff41;
+$neon-dim: #00cc33;
+$neon-glow: rgba(0, 255, 65, 0.55);
+$bg-deep: #000000;
+$card-bg: rgba(0, 8, 0, 0.95);
+$text-high: #ffffff;
+$text-on-neon: #000000;
+$danger: #ff3366;
+$font-mono: 'Courier New', 'Lucida Console', monospace;
+
+.theme-cyber {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: $bg-deep;
+  overflow: hidden;
+  font-family: $font-mono;
+  color: $text-high;
+
+  #matrix-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    opacity: 0.8;
+    pointer-events: none;
+  }
+
+  .cy-card {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    max-width: 500px;
+    margin: 20px;
+    padding: 36px 32px 28px;
+    background: $card-bg;
+    border: 2px solid $neon;
+    border-radius: 8px;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    box-shadow: 0 0 20px $neon-glow, inset 0 0 40px rgba(0, 255, 65, 0.05);
+    animation: cy-card-in 0.45s ease-out;
+  }
+
+  .cy-header {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+
+  .cy-title {
+    margin: 0 0 8px;
+    color: $text-high;
+    font-size: clamp(1.25rem, 4vw, 1.7rem);
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    text-shadow: 0 0 12px rgba(0, 255, 65, 0.6);
+  }
+
+  .cy-subtitle {
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    color: $neon;
+    font-weight: 700;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-shadow: 0 0 8px rgba(0, 255, 65, 0.45);
+
+    &::after {
+      content: '|';
+      margin-left: 2px;
+      animation: cy-blink 0.75s step-end infinite;
+    }
+  }
+
+  .cy-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 18px 0 20px;
+
+    &::before,
+    &::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, $neon, transparent);
+    }
+
+    .cy-shield {
+      color: $neon;
+      font-size: 20px;
+      line-height: 1;
+      text-shadow: 0 0 10px $neon-glow;
+    }
+  }
+
+  .cy-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .cy-field-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    color: $neon;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .cy-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .cy-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px 44px 12px 14px;
+    background: $bg-deep;
+    border: 1px solid $neon-dim;
+    border-radius: 6px;
+    color: $text-high;
+    font-family: $font-mono;
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+    &::placeholder {
+      color: color-mix(in srgb, $neon 70%, #ffffff 30%);
+      opacity: 0.7;
+    }
+
+    &:focus {
+      border-color: $neon;
+      box-shadow: 0 0 0 2px rgba(0, 255, 65, 0.22), 0 0 14px rgba(0, 255, 65, 0.3);
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+  }
+
+  .cy-toggle-btn {
+    position: absolute;
+    right: 10px;
+    border: none;
+    background: transparent;
+    color: $neon;
+    cursor: pointer;
+    font-family: $font-mono;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 4px 0;
+
+    &:hover {
+      color: $text-high;
+    }
+  }
+
+  .cy-errors {
+    min-height: 18px;
+    margin-top: 4px;
+  }
+
+  .cy-error-text {
+    color: $danger;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .cy-submit-btn,
+  .cy-recover-btn,
+  .cy-secondary-btn {
+    width: 100%;
+    border-radius: 6px;
+    font-family: $font-mono;
+    font-weight: 700;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: transform 0.16s ease, box-shadow 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+
+    &:focus-visible {
+      outline: 2px solid $text-high;
+      outline-offset: 2px;
+    }
+  }
+
+  .cy-submit-btn {
+    margin-top: 6px;
+    padding: 13px 16px;
+    border: 1px solid transparent;
+    background: $neon;
+    color: $text-on-neon;
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.45);
+
+    &:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 0 22px rgba(255, 255, 255, 0.45);
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+  }
+
+  .cy-session-info {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, $neon 70%, transparent);
+    border-radius: 6px;
+    background: rgba(0, 255, 65, 0.08);
+    color: $text-high;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .cy-recover-btn {
+    margin-top: 14px;
+    padding: 11px 14px;
+    border: 1px solid $neon;
+    background: transparent;
+    color: $neon;
+
+    &:hover:not(:disabled) {
+      background: rgba(0, 255, 65, 0.12);
+      color: $text-high;
+    }
+  }
+
+  .cy-footer {
+    margin-top: 20px;
+    padding-top: 14px;
+    border-top: 1px solid color-mix(in srgb, $neon 45%, transparent);
+    text-align: center;
+    color: color-mix(in srgb, $text-high 85%, $neon 15%);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .cy-banner {
+    margin-bottom: 18px;
+    padding: 12px 14px;
+    border: 1px solid $neon;
+    border-radius: 6px;
+    background: rgba(0, 255, 65, 0.08);
+    color: $text-high;
+    text-align: center;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    line-height: 1.45;
+  }
+
+  .cy-recovery-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: var(--overlay-scrim);
+  }
+
+  .cy-recovery-modal {
+    width: 100%;
+    max-width: 460px;
+    overflow: hidden;
+    border: 2px solid $neon;
+    border-radius: 10px;
+    background: $bg-deep;
+    box-shadow: 0 0 40px rgba(0, 255, 65, 0.35);
+  }
+
+  .cy-modal-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 12px 16px;
+    background: $neon;
+    color: $text-on-neon;
+  }
+
+  .cy-modal-topbar-left {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .cy-modal-clock {
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+
+  .cy-modal-close {
+    width: 28px;
+    height: 28px;
+    border: 1px solid $text-on-neon;
+    border-radius: 4px;
+    background: transparent;
+    color: $text-on-neon;
+    cursor: pointer;
+    font-weight: 700;
+  }
+
+  .cy-modal-body {
+    padding: 22px;
+  }
+
+  .cy-modal-title {
+    margin: 0 0 16px;
+    padding-left: 10px;
+    border-left: 3px solid $neon;
+    color: $text-high;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .cy-info-box {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 18px;
+    padding: 14px;
+    border: 1px solid color-mix(in srgb, $neon 65%, transparent);
+    border-radius: 6px;
+    background: rgba(0, 255, 65, 0.08);
+    color: #ffffff !important;
+    font-size: 0.85rem;
+    line-height: 1.45;
+
+    span {
+      color: #ffffff !important;
+    }
+
+    span:first-child {
+      color: $neon !important;
+      font-size: 1rem;
+    }
+  }
+
+  .cy-secondary-btn {
+    margin-top: 8px;
+    padding: 11px 14px;
+    border: 1px solid $neon;
+    background: transparent;
+    color: $neon;
+
+    &:hover:not(:disabled) {
+      background: rgba(0, 255, 65, 0.12);
+      color: $text-high;
+    }
+  }
+
+  ::selection {
+    background: $text-high;
+    color: $text-on-neon;
+  }
+
+  .cy-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: $text-high;
+    font-family: $font-mono;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    text-transform: uppercase;
+  }
+
+  .cy-checkbox {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid $neon;
+    background-color: rgba(4, 10, 4, 0.6);
+    border-radius: 3px;
+    cursor: pointer;
+    position: relative;
+    display: inline-block;
+    outline: none;
+
+    &:checked::after {
+      content: '✔';
+      font-size: 10px;
+      font-weight: 700;
+      color: #ffffff;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    &:hover {
+      border-color: #ffffff;
+      box-shadow: 0 0 8px rgba(0, 255, 65, 0.65);
+    }
+  }
+
+  .cy-privacy-link {
+    color: $neon;
+    text-decoration: underline;
+    font-weight: 700;
+
+    &:hover {
+      color: #ffffff;
+      text-shadow: 0 0 8px rgba(0, 255, 65, 0.85);
+    }
+  }
+}
+
+@media (max-width: 520px) {
+  .theme-cyber .cy-card {
+    margin: 12px;
+    padding: 22px 18px 18px;
+  }
+}
+
+@keyframes cy-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes cy-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}

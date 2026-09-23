@@ -45,6 +45,8 @@ func (h *SetupHandler) Status(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+const minAdminPasswordLength = 12
+
 type bootstrapRequest struct {
 	AdminUsername string `json:"adminUsername"`
 	AdminEmail    string `json:"adminEmail"`
@@ -72,6 +74,14 @@ func (h *SetupHandler) Bootstrap(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.AdminUsername == "" || req.AdminEmail == "" || req.AdminPassword == "" {
 		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "adminUsername/adminEmail/adminPassword son obligatorios")
+		return
+	}
+	// Fase 5: el wizard pide 12+ caracteres para el primer admin y la regla
+	// vive también acá — una validación solo de frontend se salta con curl.
+	// (El legacy exigía 6; NIST SP 800-63B recomienda 15 para un solo factor,
+	// 12 es el piso razonable para la cuenta con más privilegios del sistema.)
+	if len([]rune(req.AdminPassword)) < minAdminPasswordLength {
+		problemdetails.Write(w, r, http.StatusBadRequest, "weak-password", "la contraseña del admin debe tener al menos 12 caracteres")
 		return
 	}
 

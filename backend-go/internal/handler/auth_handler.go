@@ -173,7 +173,7 @@ func (h *AuthHandler) MFASetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	enrollment, err := auth.GenerateTOTPSecret(user.Username, "BitacoraSOC")
+	enrollment, err := auth.GenerateTOTPSecret(user.Username, "Bitácora Ops")
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo generar el secreto TOTP")
 		return
@@ -380,7 +380,7 @@ func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 
 	if sender, from, err := buildMailSender(ctx, h.Queries, h.Crypto); err == nil {
 		resetURL := h.PublicBaseURL + "/reset-password?token=" + rawTokenHex
-		_ = sender.Send(user.Email, "Recuperación de contraseña - BitacoraSOC",
+		_ = sender.Send(user.Email, "Recuperación de contraseña - Bitácora Ops",
 			"Solicitaste restablecer tu contraseña. Este enlace vence en 5 minutos:\n\n"+resetURL+"\n\nSi no fuiste vos, ignorá este correo.")
 		_ = from
 	}

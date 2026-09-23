@@ -3,8 +3,8 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve",
-    "build": "ng build",
+    "start": "node scripts/copy-seed.mjs && ng serve",
+    "build": "node scripts/copy-seed.mjs && ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "lint:css": "stylelint \"src/**/*.css\""
@@ -20,6 +20,7 @@
     "@angular/material": "^22.1.7",
     "@angular/platform-browser": "^22.1.0",
     "@angular/router": "^22.1.0",
+    "animejs": "^3.2.2",
     "dompurify": "^3.4.15",
     "marked": "^18.0.13",
     "rxjs": "~7.8.0",
@@ -29,6 +30,7 @@
     "@angular/build": "^22.1.8",
     "@angular/cli": "^22.1.8",
     "@angular/compiler-cli": "^22.1.0",
+    "@types/animejs": "^3.1.13",
     "@types/dompurify": "^3.2.0",
     "jsdom": "^28.0.0",
     "prettier": "^3.8.1",

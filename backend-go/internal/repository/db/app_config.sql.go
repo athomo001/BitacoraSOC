@@ -81,6 +81,23 @@ func (q *Queries) GetAppConfig(ctx context.Context) (AppConfig, error) {
 	return i, err
 }
 
+const mergeTerritorialLabels = `-- name: MergeTerritorialLabels :one
+UPDATE app_config SET
+  territorial_kind_labels = territorial_kind_labels || $1::jsonb,
+  updated_at = now()
+WHERE id = true
+RETURNING territorial_kind_labels
+`
+
+// PATCH /api/config/territorial-labels — merge parcial (jsonb ||): solo pisa
+// los niveles que vienen en el request, el resto queda como estaba.
+func (q *Queries) MergeTerritorialLabels(ctx context.Context, labels []byte) ([]byte, error) {
+	row := q.db.QueryRow(ctx, mergeTerritorialLabels, labels)
+	var territorial_kind_labels []byte
+	err := row.Scan(&territorial_kind_labels)
+	return territorial_kind_labels, err
+}
+
 const setModuleFlags = `-- name: SetModuleFlags :one
 UPDATE app_config SET
   soc_module_enabled = COALESCE($1, soc_module_enabled),

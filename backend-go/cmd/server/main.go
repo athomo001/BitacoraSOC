@@ -17,6 +17,7 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/eventbus"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/handler"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/middleware"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/modules"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/ratelimit"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
@@ -112,6 +113,9 @@ func run(logger *slog.Logger) error {
 		Queries: queries, APILimiter: anonymousAPILimiter, AuditLog: auditLog,
 		ResetSecret: handler.ResetSecretFromEnv(),
 	}
+	configHandler := &handler.ConfigHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
+	systemFeaturesHandler := &handler.SystemFeaturesHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
+	territorialUnitsHandler := &handler.TerritorialUnitsHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
 
 	// Composición de middlewares por ruta — ver internal/middleware/auth.go:
 	// RequireNotForcedPasswordChange NO se aplica a las 4 rutas que
@@ -130,6 +134,16 @@ func run(logger *slog.Logger) error {
 	}
 	public := func(h http.HandlerFunc) http.Handler {
 		return apiRateLimit(h)
+	}
+	// Gate de módulo de dominio (HU-0/0b/PERM-2): 403 si la instancia tiene
+	// el módulo apagado o el usuario no lo tiene en su alcance. Va dentro de
+	// RequireAuth (necesita el usuario) y antes del chequeo de rol.
+	moduleAccess := &repository.ModuleAccess{Queries: queries}
+	nocAuthed := func(h http.HandlerFunc) http.Handler {
+		return authMW.RequireAuth(apiRateLimit(middleware.RequireNotForcedPasswordChange(middleware.RequireModule(moduleAccess, modules.NOC)(h))))
+	}
+	nocAdmin := func(h http.HandlerFunc) http.Handler {
+		return authMW.RequireAuth(apiRateLimit(middleware.RequireNotForcedPasswordChange(middleware.RequireModule(moduleAccess, modules.NOC)(middleware.RequireRole("admin")(h)))))
 	}
 
 	mux := http.NewServeMux()
@@ -172,6 +186,22 @@ func run(logger *slog.Logger) error {
 
 	// Auditoría
 	mux.Handle("GET /api/audit-logs", adminOrAuditor(auditLogHandler.List))
+
+	// Setup modular post-bootstrap y gobernanza de features (Fase 5)
+	mux.Handle("PATCH /api/config/modules", admin(configHandler.PatchModules))
+	mux.Handle("GET /api/system-features", authed(systemFeaturesHandler.List))
+	mux.Handle("PATCH /api/system-features/{code}", admin(systemFeaturesHandler.Patch))
+
+	// Territorio país-agnóstico (Fase 5). Las etiquetas no son del módulo
+	// NOC en el contrato (el wizard las pide antes de que exista territorio);
+	// las unidades sí.
+	mux.Handle("GET /api/config/territorial-labels", authed(configHandler.GetTerritorialLabels))
+	mux.Handle("PATCH /api/config/territorial-labels", admin(configHandler.PatchTerritorialLabels))
+	mux.Handle("GET /api/territorial-units", nocAuthed(territorialUnitsHandler.List))
+	mux.Handle("POST /api/territorial-units", nocAdmin(territorialUnitsHandler.Create))
+	mux.Handle("PATCH /api/territorial-units/{id}", nocAdmin(territorialUnitsHandler.Patch))
+	mux.Handle("POST /api/territorial-units/import", nocAdmin(territorialUnitsHandler.Import))
+	mux.Handle("GET /api/territorial-units/import/template", nocAuthed(territorialUnitsHandler.ImportTemplate))
 
 	// SPA de Angular embebida (Fase 3) — catch-all, siempre al final.
 	spaHandler, err := web.Handler()

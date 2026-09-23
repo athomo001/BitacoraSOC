@@ -1,0 +1,52 @@
+@use 'sass:list';
+
+// Fuentes de los 6 skins de login, portadas del legacy (frontend/src/styles.scss
+// y login.component.scss). El legacy traía VT323 y Orbitron desde Google
+// Fonts; acá se autohospedan (mandato "cero CDN externo") desde public/fonts
+// (SIL OFL 1.1, licencias al lado). Gotham viene tal cual de
+// frontend/src/assets/fonts. Viven en el SCSS del login, no en los estilos
+// globales: solo se descargan cuando se muestra esta pantalla.
+@font-face {
+  font-family: 'VT323';
+  src: url('/fonts/VT323-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@each $weight in (400, 600, 700, 800) {
+  @font-face {
+    font-family: 'Orbitron';
+    src: url('/fonts/Orbitron-#{$weight}.woff2') format('woff2');
+    font-weight: $weight;
+    font-display: swap;
+  }
+}
+
+$gotham: (
+  100: ('Gotham Thin.otf', 'opentype'),
+  200: ('Gotham Extra Light.otf', 'opentype'),
+  300: ('Gotham Book.otf', 'opentype'),
+  400: ('Gotham Regular.otf', 'opentype'),
+  500: ('Gotham Medium.otf', 'opentype'),
+  700: ('Gotham Bold.otf', 'opentype'),
+  800: ('Gotham Black.otf', 'opentype'),
+  900: ('Gotham Ultra.otf', 'opentype'),
+);
+
+@each $weight, $file in $gotham {
+  @font-face {
+    font-family: 'Gotham';
+    src: url('/assets/fonts/#{list.nth($file, 1)}') format(list.nth($file, 2));
+    font-weight: $weight;
+    font-style: normal;
+    font-display: swap;
+  }
+}
+
+@font-face {
+  font-family: 'Gotham';
+  src: url('/assets/fonts/Gotham Bold Italic.ttf') format('truetype');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}

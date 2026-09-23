@@ -1,0 +1,112 @@
+<main class="setup">
+  <header class="setup__header">
+    <h1 class="setup__title">Bitácora Ops — configuración inicial</h1>
+    @if (step() !== 'done') {
+      <p class="setup__progress mono">Paso {{ stepNumber() }} de {{ totalSteps() }}</p>
+    }
+  </header>
+
+  @switch (step()) {
+    @case ('modules') {
+      <section class="panel">
+        <h2 class="panel__title">¿Para qué se va a usar esta instalación?</h2>
+        <p class="panel__hint">
+          Podés activar uno o ambos. Después se puede cambiar desde Administración sin perder datos.
+        </p>
+        <div class="setup__stack">
+          <label class="check-row">
+            <input type="checkbox" name="soc" [ngModel]="socEnabled()" (ngModelChange)="socEnabled.set($event)" />
+            <span>
+              <span class="check-row__label">SOC — Centro de Operaciones de Seguridad</span>
+              <span class="check-row__desc">Clientes, servicios y escalamiento por servicio.</span>
+            </span>
+          </label>
+          <label class="check-row">
+            <input type="checkbox" name="noc" [ngModel]="nocEnabled()" (ngModelChange)="nocEnabled.set($event)" />
+            <span>
+              <span class="check-row__label">NOC — Centro de Operaciones de Red</span>
+              <span class="check-row__desc">Territorio, activos/enlaces, contratas y cobertura de cuadrillas.</span>
+            </span>
+          </label>
+        </div>
+        @if (!canContinueModules()) {
+          <p class="msg msg--error">Elegí al menos un módulo para continuar.</p>
+        }
+        <div class="actions">
+          <app-button variant="primary" icon="arrow_forward" [disabled]="!canContinueModules()" (pressed)="goToAdmin()">
+            Continuar
+          </app-button>
+        </div>
+      </section>
+    }
+
+    @case ('admin') {
+      <section class="panel">
+        <h2 class="panel__title">Cuenta de administrador</h2>
+        <p class="panel__hint">Es la primera cuenta del sistema. Después podés crear el resto desde Administración.</p>
+        <form class="setup__stack" (ngSubmit)="createAdmin()">
+          <label class="field">
+            <span>Usuario</span>
+            <input type="text" name="username" autocomplete="username" [ngModel]="adminUsername()" (ngModelChange)="adminUsername.set($event)" />
+          </label>
+          <label class="field">
+            <span>Correo</span>
+            <input type="email" name="email" autocomplete="email" [ngModel]="adminEmail()" (ngModelChange)="adminEmail.set($event)" />
+          </label>
+          <div class="field-grid">
+            <label class="field">
+              <span>Contraseña (mín. 12 caracteres)</span>
+              <input type="password" name="password" autocomplete="new-password" [ngModel]="adminPassword()" (ngModelChange)="adminPassword.set($event)" />
+            </label>
+            <label class="field">
+              <span>Repetir contraseña</span>
+              <input type="password" name="passwordConfirm" autocomplete="new-password" [ngModel]="adminPasswordConfirm()" (ngModelChange)="adminPasswordConfirm.set($event)" />
+            </label>
+          </div>
+          @if (errorMessage()) {
+            <p class="msg msg--error">{{ errorMessage() }}</p>
+          }
+          <div class="actions">
+            <app-button variant="text" icon="arrow_back" [disabled]="loading()" (pressed)="backToModules()">Volver</app-button>
+            <button type="submit" class="setup__submit" [disabled]="loading()">
+              {{ loading() ? 'Creando…' : 'Crear administrador' }}
+            </button>
+          </div>
+        </form>
+      </section>
+    }
+
+    @case ('territory') {
+      <section class="panel">
+        <h2 class="panel__title">Territorio (módulo NOC)</h2>
+        <p class="panel__hint">
+          Cómo se llama cada nivel de la división administrativa en tu país. Es solo presentación: se puede
+          cambiar cuando quieras sin migrar nada.
+        </p>
+        <app-territorial-labels-form />
+      </section>
+      <section class="panel">
+        <h2 class="panel__title">Cargar la división administrativa</h2>
+        <p class="panel__hint">Opcional. Se puede hacer también después desde Administración → Territorio.</p>
+        <app-territory-import />
+      </section>
+      <div class="actions">
+        <app-button variant="primary" icon="arrow_forward" (pressed)="finishTerritory()">Terminar</app-button>
+      </div>
+    }
+
+    @case ('done') {
+      <section class="panel">
+        <h2 class="panel__title">Listo</h2>
+        <p class="panel__hint">
+          Setup completo con
+          @if (socEnabled() && nocEnabled()) { SOC y NOC } @else if (socEnabled()) { SOC } @else { NOC }
+          activo. Tu sesión de administrador ya está iniciada.
+        </p>
+        <div class="actions">
+          <app-button variant="primary" icon="login" (pressed)="enterApp()">Entrar a Bitácora Ops</app-button>
+        </div>
+      </section>
+    }
+  }
+</main>

@@ -11,6 +11,9 @@ RUN corepack enable
 COPY frontend-v2/package.json frontend-v2/pnpm-lock.yaml frontend-v2/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY frontend-v2/ ./
+# El seed territorial de Chile (Fase 5) se sirve como asset estático del
+# build de Angular — angular.json lo toma de ../seed, igual que en local.
+COPY seed/ /src/seed/
 RUN pnpm run build
 
 FROM golang:1.27 AS build

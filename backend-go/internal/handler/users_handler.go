@@ -185,6 +185,6 @@ func (h *UsersHandler) ForceResetAll(w http.ResponseWriter, r *http.Request) {
 }
 
 func sendForceResetNotice(sender *mail.Sender, u db.User) error {
-	return sender.Send(u.Email, "Cambio de contraseña obligatorio - BitacoraSOC",
+	return sender.Send(u.Email, "Cambio de contraseña obligatorio - Bitácora Ops",
 		"Por un incidente de seguridad, tu contraseña debe cambiarse en tu próximo inicio de sesión.")
 }

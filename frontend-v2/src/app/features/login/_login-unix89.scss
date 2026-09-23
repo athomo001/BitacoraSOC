@@ -1,0 +1,380 @@
+// =============================================================================
+// TEMA DE LOGIN UNIX TERMINAL (1989)
+// =============================================================================
+// Comentario: Consola plana retro ámbar de Unix/Linux clásica sin curvas CRT.
+// =============================================================================
+
+.theme-unix89 {
+  --unix-bg: #000000;
+  --unix-amber: #ffb000;
+  --unix-amber-dim: #cc8800; // Modificado: color ámbar un poco más claro para mejor visibilidad
+  --unix-amber-bright: #ffcc00;
+  --unix-font: "VT323", "Courier New", monospace;
+
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--unix-bg);
+  color: var(--unix-amber);
+  font-family: var(--unix-font);
+  font-size: 21px;
+  line-height: 1.3;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  letter-spacing: 1px;
+
+  // Resaltado de selección clásica
+  ::selection {
+    background: var(--unix-amber);
+    color: var(--unix-bg);
+  }
+
+  // ─── Desktop ───────────────────────────────────────────────────────────────
+  .unix-desktop {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    box-sizing: border-box;
+  }
+
+  // ─── Ventana / Terminal Container ──────────────────────────────────────────
+  .unix-terminal {
+    width: 100%;
+    max-width: 580px;
+    background-color: var(--unix-bg);
+    border: 1px solid var(--unix-amber-dim);
+    padding: 30px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+    box-shadow: 0 0 15px rgba(255, 176, 0, 0.15);
+  }
+
+  // ─── Cabecera ──────────────────────────────────────────────────────────────
+  .unix-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 19px;
+    color: var(--unix-amber) !important;
+    margin-bottom: 5px;
+    
+    p {
+      margin: 0;
+      color: var(--unix-amber) !important;
+      opacity: 1 !important;
+      text-shadow: 0 0 2px rgba(255, 176, 0, 0.3);
+    }
+  }
+
+  // ─── Vistas / Paneles ──────────────────────────────────────────────────────
+  .unix-view-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .unix-section-title {
+    font-size: 26px;
+    font-weight: normal;
+    text-align: center;
+    margin: 0;
+    color: var(--unix-amber-bright);
+    text-shadow: 0 0 4px rgba(255, 176, 0, 0.4);
+    letter-spacing: 4px !important; // Aumentar espaciado del título
+  }
+
+  .unix-divider {
+    text-align: center;
+    color: var(--unix-amber-dim);
+    margin-bottom: 10px;
+    user-select: none;
+    letter-spacing: 2px;
+  }
+
+  .unix-info-text {
+    font-size: 20px;
+    margin: 5px 0 15px 0;
+    line-height: 1.4;
+  }
+
+  .unix-security-notice {
+    font-size: 16px;
+    color: var(--unix-amber-dim);
+    margin: 10px 0;
+    line-height: 1.3;
+  }
+
+  // ─── Formularios CLI ──────────────────────────────────────────────────────
+  .unix-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .unix-form-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+
+    .unix-label {
+      width: 95px;
+      user-select: none;
+      color: var(--unix-amber) !important;
+    }
+
+    .unix-bracket {
+      color: var(--unix-amber-dim);
+      font-weight: bold;
+      user-select: none;
+      font-size: 24px;
+    }
+
+    // Wrapper para simular el input de consola
+    .unix-input-wrapper {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      flex: 1;
+      height: 32px;
+      width: 100%;
+      border-bottom: 1px solid rgba(255, 176, 0, 0.25) !important; // Línea base sutil de escritura
+    }
+
+    // Texto dinámico espejo debajo del input real
+    .unix-render-text {
+      color: var(--unix-amber-bright) !important;
+      font-family: var(--unix-font) !important;
+      font-size: 24px !important;
+      letter-spacing: 1px;
+      white-space: pre; // Respeta espacios en blanco
+      pointer-events: none;
+      z-index: 1;
+      display: inline-flex;
+      align-items: center;
+      height: 100%;
+    }
+
+    // Input transparente real posicionado de forma absoluta encima
+    .unix-input {
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      background: transparent !important;
+      border: none !important;
+      outline: none !important;
+      box-shadow: none !important;
+      color: transparent !important; // Hace el texto invisible para ver el espejo
+      caret-color: transparent !important; // Oculta el cursor vertical nativo
+      font-family: var(--unix-font) !important;
+      font-size: 24px !important;
+      padding: 0 4px !important;
+      z-index: 2; // Por encima para recibir el foco/clic
+      box-sizing: border-box !important;
+      letter-spacing: 1px;
+
+      &::placeholder {
+        color: rgba(255, 176, 0, 0.15) !important;
+      }
+
+      &[disabled] {
+        color: transparent !important;
+      }
+    }
+
+    .unix-sub-label {
+      font-size: 15px;
+      color: var(--unix-amber-dim);
+      margin-left: 5px;
+      user-select: none;
+    }
+  }
+
+  // Consentimiento / Checkbox
+  .checkbox-group-win {
+    margin-top: 5px;
+
+    .unix-checkbox-label {
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .unix-checkbox-input {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border: 1px solid var(--unix-amber);
+      background: transparent;
+      outline: none;
+      cursor: pointer;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      &:checked::before {
+        content: "X";
+        font-family: var(--unix-font);
+        font-size: 16px;
+        color: var(--unix-amber-bright);
+        font-weight: bold;
+      }
+
+      &:focus {
+        border-color: var(--unix-amber-bright);
+        box-shadow: 0 0 4px rgba(255, 176, 0, 0.5);
+      }
+    }
+
+    .unix-link {
+      color: var(--unix-amber-bright);
+      text-decoration: underline;
+      
+      &:hover {
+        color: #ffffff;
+      }
+    }
+  }
+
+  // ─── Cursor de consola parpadeante ─────────────────────────────────────────
+  .unix-blinking-cursor {
+    font-weight: bold;
+    color: var(--unix-amber-bright);
+    animation: unix-blink 1s step-start infinite;
+    user-select: none;
+    visibility: hidden; // Oculto cuando no hay foco para mayor realismo
+    margin-left: 2px;
+  }
+
+  // Mostrar el cursor cuando el input real hermano tiene el foco
+  .unix-input:focus ~ .unix-render-text .unix-blinking-cursor {
+    visibility: visible;
+  }
+
+  @keyframes unix-blink {
+    50% { opacity: 0; }
+  }
+
+  // ─── Botones tipo CLI ──────────────────────────────────────────────────────
+  .unix-buttons-group {
+    display: flex;
+    gap: 15px;
+    margin-top: 15px;
+    flex-wrap: wrap;
+  }
+
+  .unix-btn-cli {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--unix-amber);
+    font-family: var(--unix-font);
+    font-size: 21px;
+    cursor: pointer;
+    padding: 2px 10px;
+    box-sizing: border-box;
+    letter-spacing: 1px;
+    transition: none; // Sin transiciones suaves para simular hardware clasico
+
+    &:hover:not([disabled]) {
+      background-color: var(--unix-amber);
+      color: var(--unix-bg);
+    }
+
+    &:focus {
+      outline: 1px dashed var(--unix-amber-bright);
+    }
+
+    &[disabled] {
+      color: var(--unix-amber-dim);
+      cursor: default;
+    }
+  }
+
+  // ─── Banners de Alerta ─────────────────────────────────────────────────────
+  .unix-banner {
+    border: 1px dashed var(--unix-amber);
+    padding: 8px 12px;
+    margin: 5px 0 15px 0;
+    background-color: rgba(255, 176, 0, 0.03);
+
+    .unix-banner-text {
+      margin: 0;
+      font-size: 18px;
+      color: var(--unix-amber-bright);
+
+      &.error {
+        color: #ff3333;
+        font-weight: bold;
+      }
+    }
+  }
+
+  // ─── SSO ───────────────────────────────────────────────────────────────────
+  .unix-sso-container {
+    margin-top: 20px;
+    border-top: 1px dashed var(--unix-amber-dim);
+    padding-top: 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+
+    .unix-sso-label {
+      font-size: 16px;
+      color: var(--unix-amber-dim);
+      user-select: none;
+    }
+
+    .unix-sso-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: center;
+      width: 100%;
+    }
+
+    .unix-google-sso {
+      min-height: 35px;
+      display: flex;
+      justify-content: center;
+      
+      // Ajuste para el botón de Google Iframe para que no desentone del todo
+      iframe {
+        filter: grayscale(1) contrast(1.2) sepia(1) hue-rotate(-10deg) saturate(3);
+      }
+    }
+  }
+
+  // ─── Pie de Página ─────────────────────────────────────────────────────────
+  .unix-footer {
+    display: flex;
+    justify-content: space-between;
+    font-size: 18px;
+    color: var(--unix-amber) !important;
+    border-top: 1px solid var(--unix-amber-dim);
+    padding-top: 15px;
+    margin-top: 5px;
+    flex-wrap: wrap;
+    gap: 5px;
+
+    p {
+      margin: 0;
+      color: var(--unix-amber) !important;
+      opacity: 1 !important;
+    }
+  }
+}

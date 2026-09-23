@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - "frontend-v2/**"
+      - "seed/**" # el build copia el seed de Chile (scripts/copy-seed.mjs)
       - ".github/workflows/frontend-v2-ci.yml"
   pull_request:
     paths:
       - "frontend-v2/**"
+      - "seed/**" # el build copia el seed de Chile (scripts/copy-seed.mjs)
       - ".github/workflows/frontend-v2-ci.yml"
 
 jobs:
