@@ -23,7 +23,8 @@ Requisitos: Docker, Go 1.27, Node ≥ 24.15 con pnpm, `golang-migrate` y `sqlc`.
 
 ```bash
 # 1. Base de datos, app y Caddy (http://127.0.0.1:8081)
-docker compose -f docker-compose.rewrite.yml up -d --build
+cp .env.example .env   # solo la primera vez
+docker compose up -d --build
 
 # 2. Migraciones (Postgres expuesto en 127.0.0.1:25432)
 cd backend-go

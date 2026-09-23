@@ -1,8 +1,12 @@
-# Stack de la reescritura Go+Angular (spec/02-alcance-y-roadmap.md Fase 2).
-# Separado del docker-compose.yml de producción (Node/Mongo) a propósito —
-# ver docs/adr/0012-repo-monolito-carpetas-nuevas.md: conviven en el mismo
-# repo hasta el corte (Fase 14), sin tocarse entre sí. Puertos distintos a
-# los del stack legacy para poder correr ambos en paralelo durante el desarrollo.
+# Stack de Bitácora Ops 2.0 (Go + Angular + PostgreSQL 18): bitacora-db,
+# bitacora-app y Caddy como único punto de entrada (http://127.0.0.1:8081).
+# Variables en .env (ver .env.example). El legacy v1.x ya no vive en esta
+# carpeta (../BitacoraSOC-legacy, docs/adr/0012).
+#
+# `name: bitacora-rewrite` se mantiene a propósito aunque el archivo ya no se
+# llame .rewrite: de ese nombre dependen el volumen de datos
+# (bitacora-rewrite_bitacora-db-data) y la red; cambiarlo dejaría la base
+# Postgres existente huérfana.
 name: bitacora-rewrite
 
 services:
@@ -61,7 +65,7 @@ services:
     depends_on:
       - bitacora-app
     volumes:
-      - ./Caddyfile.rewrite:/etc/caddy/Caddyfile:ro
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
     ports:
       - "127.0.0.1:8081:80"
     networks:

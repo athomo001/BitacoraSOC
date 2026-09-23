@@ -1,7 +1,7 @@
 # Build multi-stage: build de Angular 22 (frontend-v2) + binario Go estático
 # que lo embebe vía //go:embed (spec/07-backend-arquitectura-go.md sección 1,
 # Fase 3 del roadmap). Contexto de build = raíz del repo (ver
-# docker-compose.rewrite.yml: `context: .`, `dockerfile: backend-go/Dockerfile`)
+# docker-compose.yml: `context: .`, `dockerfile: backend-go/Dockerfile`)
 # porque este Dockerfile necesita copiar frontend-v2/, que vive fuera de
 # backend-go/ — Docker no permite `COPY ../algo` con un contexto más chico.
 
