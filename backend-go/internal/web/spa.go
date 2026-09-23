@@ -3,10 +3,11 @@
 // "//go:embed sirviendo el build de Angular desde el binario Go").
 //
 // dist/browser/ se puebla con el output real de `ng build` (frontend-v2/dist/
-// frontend-v2/browser/*) — ver scripts/build-frontend.sh y Dockerfile. El
-// placeholder mínimo que trae el repo por defecto existe solo para que
-// `go build` nunca falle en un clon fresco antes de correr ese script (Go
-// exige que el path de //go:embed exista de verdad al compilar).
+// frontend-v2/browser/*) — ver scripts/sync-frontend.sh (desarrollo local) y
+// Dockerfile (build de imagen). El placeholder mínimo que trae el repo por
+// defecto existe solo para que `go build` nunca falle en un clon fresco antes
+// de correr uno de esos dos mecanismos (Go exige que el path de //go:embed
+// exista de verdad, con al menos un archivo, al compilar).
 package web
 
 import (

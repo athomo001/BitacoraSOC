@@ -1,0 +1,26 @@
+<!--
+  Placeholder mínimo y versionado para //go:embed (ver internal/web/spa.go).
+
+  Este archivo NO es el frontend real. Existe únicamente para que
+  `go build ./...` funcione en un clon fresco del repositorio — Go exige que
+  el path de un //go:embed exista y tenga al menos un archivo al compilar.
+
+  El build real de Angular (frontend-v2/) reemplaza este directorio completo:
+    - En Docker: backend-go/Dockerfile, stage `build` (`rm -rf` + COPY del
+      stage `frontend-build`).
+    - En desarrollo local sin Docker: scripts/sync-frontend.sh (o .ps1).
+
+  Si estás viendo esta página servida por el backend, significa que el build
+  de Angular todavía no se copió a internal/web/dist/browser/ — corré uno de
+  los dos mecanismos de arriba.
+-->
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>BitacoraSOC 2.0 — placeholder de build</title>
+  </head>
+  <body>
+    <p>Placeholder de build. Falta compilar el frontend (ver comentario del código fuente de este archivo).</p>
+  </body>
+</html>

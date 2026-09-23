@@ -21,6 +21,16 @@ dist/
 build/
 .angular/
 
+# Excepción: placeholder mínimo versionado para //go:embed (backend-go/internal/web/spa.go).
+# Sin esto, un clon fresco no tiene backend-go/internal/web/dist/browser/ y
+# `go build ./...` falla de entrada (bug real detectado en CI: "pattern
+# all:dist/browser: no matching files found"). El build real de Angular pisa
+# este placeholder en Docker y en `scripts/sync-frontend.sh` — nunca se commitea
+# el build real, solo este stub.
+!/backend-go/internal/web/dist/
+!/backend-go/internal/web/dist/browser/
+!/backend-go/internal/web/dist/browser/**
+
 # IDE
 .vscode/
 .idea/
