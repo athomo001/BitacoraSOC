@@ -1,0 +1,181 @@
+<div class="esc">
+  <h1 class="esc__title">Escalamiento / Despacho</h1>
+
+  <section class="panel esc__picker">
+    <div class="esc__kinds" role="tablist" aria-label="Qué está fallando">
+      @if (nocEnabled()) {
+        <button type="button" role="tab" class="esc__kind" [class.esc__kind--active]="scopeKind() === 'asset'" [attr.aria-selected]="scopeKind() === 'asset'" (click)="setKind('asset')">Activo (NOC)</button>
+        <button type="button" role="tab" class="esc__kind" [class.esc__kind--active]="scopeKind() === 'unit'" [attr.aria-selected]="scopeKind() === 'unit'" (click)="setKind('unit')">Zona (NOC)</button>
+      }
+      @if (socEnabled()) {
+        <button type="button" role="tab" class="esc__kind" [class.esc__kind--active]="scopeKind() === 'service'" [attr.aria-selected]="scopeKind() === 'service'" (click)="setKind('service')">Servicio (SOC)</button>
+      }
+    </div>
+    <div class="field-grid esc__select">
+      <label class="field">
+        <span>Buscar</span>
+        <input name="scopeFilter" placeholder="Nombre, código o IP…" [ngModel]="filter()" (ngModelChange)="filter.set($event)" />
+      </label>
+      <label class="field">
+        <span>{{ scopeKind() === 'asset' ? 'Activo' : scopeKind() === 'unit' ? 'Unidad territorial' : 'Servicio' }}</span>
+        <select name="scopeTarget" [ngModel]="selectedId()" (ngModelChange)="pick($event)">
+          <option value="">Elegir… ({{ options().length }})</option>
+          @for (o of options(); track o.id) {
+            <option [value]="o.id">{{ o.label }}{{ o.hint ? ' — ' + o.hint : '' }}</option>
+          }
+        </select>
+      </label>
+    </div>
+  </section>
+
+  @if (error()) { <p class="msg msg--error">{{ error() }}</p> }
+  @if (loading()) { <p class="esc__muted">Resolviendo a quién escalar…</p> }
+
+  @if (notFound()) {
+    <section class="panel esc__empty">
+      <strong>No hay a quién escalar.</strong>
+      <p>Este {{ scopeKind() === 'service' ? 'servicio' : 'activo' }} no tiene política de escalación, ni la tiene su zona o alguna zona superior, y ningún equipo la cubre. Configúralo en Administración → Escalamiento.</p>
+    </section>
+  }
+
+  @if (resolution(); as res) {
+    <section class="panel esc__summary">
+      <div class="esc__via">
+        <span class="esc__muted">Resuelto por</span>
+        <strong>{{ viaLabels[res.resolvedVia] }}</strong>
+        @if (res.resolvedUnit) { <span class="esc__muted">· {{ res.resolvedUnit.name }} <span class="mono">({{ res.resolvedUnit.code }})</span></span> }
+      </div>
+      <div class="esc__summary-actions">
+        @if (countdown(); as cd) {
+          <span class="esc__countdown" [class.esc__countdown--overdue]="cd.overdue" title="Tiempo antes de escalar al siguiente paso">
+            {{ cd.overdue ? 'Escalar ya' : 'Escalar en' }} <span class="mono">{{ cd.text }}</span>
+          </span>
+        }
+        <app-button variant="text" icon="restart_alt" (pressed)="newIncident()">Nuevo incidente</app-button>
+      </div>
+    </section>
+
+    @for (w of windows(); track w.id) {
+      <p class="msg esc__window" [class.esc__window--suppress]="w.suppressNotifications">
+        <strong>Ventana de mantenimiento vigente:</strong> {{ w.title }}
+        ({{ w.startsAt | date: 'dd/MM HH:mm' }} – {{ w.endsAt | date: 'dd/MM HH:mm' }})
+        · {{ w.suppressNotifications ? 'los avisos por correo quedan suprimidos' : 'informativa, los avisos se envían igual' }}
+      </p>
+    }
+
+    @if (state(); as st) {
+      @if (st.answered) { <p class="msg msg--ok">Contestaron. El flujo queda detenido para este incidente.</p> }
+      @if (st.exhausted) { <p class="msg msg--error">Se agotaron todos los pasos sin respuesta.</p> }
+    }
+    @if (flash()) { <output class="esc__flash">{{ flash() }}</output> }
+
+    <label class="field esc__notes">
+      <span>Nota para el próximo intento (opcional)</span>
+      <input name="actionNotes" placeholder="Ej.: dejó mensaje de voz, número fuera de servicio…" [ngModel]="notes()" (ngModelChange)="notes.set($event)" />
+    </label>
+
+    <div class="flow">
+      @for (step of res.steps; track step.order; let last = $last) {
+        <article class="flow-step flow-step--{{ stepStatus(step) }}" [attr.data-step]="step.order">
+          <header class="flow-step__header">
+            <div>
+              <strong>Paso {{ step.order }} · {{ step.team.name }}</strong>
+              <small>
+                {{ step.team.organization?.name ?? 'Sin organización' }}
+                · {{ step.team.audience === 'client' ? 'del cliente' : 'interno' }}
+              </small>
+            </div>
+            <span class="flow-step__badge">
+              @switch (stepStatus(step)) {
+                @case ('current') { En curso }
+                @case ('answered') { Contestó }
+                @case ('failed') { Sin respuesta }
+                @default { Pendiente }
+              }
+            </span>
+          </header>
+          <p class="flow-step__meta">
+            {{ modeLabels[step.mode] }}
+            @if (step.waitBeforeEscalateMinutes > 0) { · esperar {{ step.waitBeforeEscalateMinutes }} min antes de escalar }
+          </p>
+          <ul class="flow-step__members">
+            @for (m of step.team.members; track m.id) {
+              <li class="member" [class.member--next]="state()?.nextMemberId === m.id && stepStatus(step) === 'current'">
+                <div class="member__who">
+                  <strong>{{ m.name }}</strong>
+                  <small>{{ roleLabels[m.roleInTeam] }}@if (m.position) { · {{ m.position }} }@if (m.specialty) { · {{ m.specialty }} }</small>
+                  @if (memberResult(m); as r) { <span class="member__result member__result--{{ r }}">{{ resultLabels[r] }}</span> }
+                </div>
+                <div class="member__channels">
+                  @for (c of m.channels; track c.channelType + c.value) {
+                    @if (c.href) {
+                      <a class="chan" [href]="c.href" target="_blank" rel="noopener" [class.chan--chosen]="chosenChannel(m) === c.channelType"
+                        [title]="c.value" (click)="rememberChannel(m, c.channelType)">{{ channelLabels[c.channelType] }}</a>
+                    } @else {
+                      <span class="chan chan--static" [title]="c.value">{{ c.value }}</span>
+                    }
+                  } @empty {
+                    <span class="esc__muted">Sin canales de contacto</span>
+                  }
+                </div>
+                @if (stepStatus(step) === 'current') {
+                  <fieldset class="member__results" [attr.aria-label]="'Resultado del intento con ' + m.name">
+                    @for (r of results; track r) {
+                      <button type="button" class="res res--{{ r }}" [disabled]="saving()" (click)="record(step, m, r)">{{ resultLabels[r] }}</button>
+                    }
+                  </fieldset>
+                }
+              </li>
+            } @empty {
+              <li class="esc__muted">Equipo sin miembros.</li>
+            }
+          </ul>
+        </article>
+        @if (!last) {
+          <div class="flow-arrow" aria-hidden="true">
+            <span class="flow-arrow__h">→</span>
+            <span class="flow-arrow__v">↓</span>
+          </div>
+        }
+      }
+    </div>
+
+    <div class="esc__bottom">
+      <section class="panel">
+        <h2 class="panel__title">Aviso por correo</h2>
+        <p class="panel__hint">Envía el aviso a los destinatarios del primer paso (Para/CC según el equipo). Queda auditado.</p>
+        <label class="field">
+          <span>Mensaje</span>
+          <textarea name="notifyMessage" rows="3" placeholder="Qué pasa, desde cuándo, qué se necesita…" [ngModel]="notifyMessage()" (ngModelChange)="notifyMessage.set($event)"></textarea>
+        </label>
+        <div class="esc__notify-row">
+          <label class="field">
+            <span>Severidad</span>
+            <select name="notifySeverity" [ngModel]="notifySeverity()" (ngModelChange)="notifySeverity.set($event)">
+              <option value="critical">Crítica</option><option value="high">Alta</option><option value="medium">Media</option><option value="low">Baja</option>
+            </select>
+          </label>
+          <app-button variant="primary" icon="mail" [disabled]="!notifyMessage().trim() || notifying()" (pressed)="notify()">Enviar aviso</app-button>
+        </div>
+        @if (notifyResult(); as nr) { <p class="msg" [class.msg--ok]="nr.ok" [class.msg--error]="!nr.ok">{{ nr.text }}</p> }
+      </section>
+
+      <section class="panel">
+        <h2 class="panel__title">Línea de tiempo del incidente</h2>
+        <ol class="timeline">
+          @for (a of timeline(); track a.id) {
+            <li class="timeline__item">
+              <span class="mono">{{ a.createdAt | date: 'HH:mm:ss' }}</span>
+              <span>Paso {{ a.stepOrder }} · <strong>{{ a.contactName ?? 'usuario interno' }}</strong> · {{ channelLabels[a.channelType] }}</span>
+              <span class="member__result member__result--{{ a.result }}">{{ resultLabels[a.result] }}</span>
+              <span class="esc__muted">{{ a.operatorUsername }}</span>
+              @if (a.notes) { <span class="timeline__notes">{{ a.notes }}</span> }
+            </li>
+          } @empty {
+            <li class="esc__muted">Todavía no hay intentos registrados en este incidente.</li>
+          }
+        </ol>
+      </section>
+    </div>
+  }
+</div>

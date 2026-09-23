@@ -8,6 +8,7 @@ package db
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -24,12 +25,12 @@ func (q *Queries) CountAuditLogs(ctx context.Context) (int64, error) {
 
 const insertAuditLog = `-- name: InsertAuditLog :exec
 INSERT INTO audit_log (
-  event, level, actor_user_id, actor_username, actor_role,
+  id, event, level, actor_user_id, actor_username, actor_role,
   request_id, request_ip, request_path, request_method,
   user_agent, device_fingerprint, ip_changed, previous_ip,
   success, reason, source, source_id, metadata
 ) VALUES (
-  $1, $2, $3, $4, $5,
+  $19, $1, $2, $3, $4, $5,
   $6, $7, $8, $9,
   $10, $11, $12, $13,
   $14, $15, $16, $17, $18
@@ -55,6 +56,7 @@ type InsertAuditLogParams struct {
 	Source            string      `json:"source"`
 	SourceID          pgtype.Text `json:"source_id"`
 	Metadata          []byte      `json:"metadata"`
+	ID                uuid.UUID   `json:"id"`
 }
 
 func (q *Queries) InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) error {
@@ -77,6 +79,7 @@ func (q *Queries) InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) 
 		arg.Source,
 		arg.SourceID,
 		arg.Metadata,
+		arg.ID,
 	)
 	return err
 }

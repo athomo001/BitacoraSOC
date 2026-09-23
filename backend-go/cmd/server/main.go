@@ -108,6 +108,11 @@ func run(logger *slog.Logger) error {
 	// ===== Handlers =====
 	health := &handler.HealthHandler{Queries: queries}
 	setupHandler := &handler.SetupHandler{Queries: queries, JWT: jwtIssuer, AuditLog: auditLog}
+	// Admin por defecto opcional (BOOTSTRAP_ADMIN_* en .env): solo actúa si el
+	// setup todavía no se hizo; si ya hay setup, no toca nada.
+	if envAdmin, ok := handler.EnvBootstrapFromEnv(); ok {
+		setupHandler.BootstrapFromEnv(ctx, envAdmin, logger)
+	}
 	authHandler := &handler.AuthHandler{
 		Queries: queries, JWT: jwtIssuer, Crypto: cryptoBox,
 		LoginLimiter: loginLimiter, AuditLog: auditLog, PublicBaseURL: publicBaseURL,
@@ -124,6 +129,8 @@ func run(logger *slog.Logger) error {
 	territorialUnitsHandler := &handler.TerritorialUnitsHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
 	organizationsHandler := &handler.OrganizationsHandler{Queries: queries, AuditLog: auditLog}
 	directoryHandler := &handler.DirectoryHandler{Pool: pool, Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
+	smtpConfigHandler := &handler.SMTPConfigHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
+	escalationHandler := &handler.EscalationHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, Modules: &repository.ModuleAccess{Queries: queries}}
 	teamsHandler := &handler.TeamsHandler{Queries: queries, AuditLog: auditLog, NOCEnabled: func(r *http.Request) bool {
 		flags, err := (&repository.ModuleAccess{Queries: queries}).InstanceFlags(r.Context())
 		return err == nil && flags.NOC
@@ -156,6 +163,12 @@ func run(logger *slog.Logger) error {
 	}
 	nocAdmin := func(h http.HandlerFunc) http.Handler {
 		return authMW.RequireAuth(apiRateLimit(middleware.RequireNotForcedPasswordChange(middleware.RequireModule(moduleAccess, modules.NOC)(middleware.RequireRole("admin")(h)))))
+	}
+	socAuthed := func(h http.HandlerFunc) http.Handler {
+		return authMW.RequireAuth(apiRateLimit(middleware.RequireNotForcedPasswordChange(middleware.RequireModule(moduleAccess, modules.SOC)(h))))
+	}
+	socAdmin := func(h http.HandlerFunc) http.Handler {
+		return authMW.RequireAuth(apiRateLimit(middleware.RequireNotForcedPasswordChange(middleware.RequireModule(moduleAccess, modules.SOC)(middleware.RequireRole("admin")(h)))))
 	}
 	// Permiso por capacidad de permission_groups (HU-PERM-1); admin pasa siempre.
 	withCapability := func(capability string, h http.HandlerFunc) http.Handler {
@@ -259,6 +272,31 @@ func run(logger *slog.Logger) error {
 	mux.Handle("GET /api/assets", nocAuthed(teamsHandler.ListAssets))
 	mux.Handle("POST /api/assets", nocAdmin(teamsHandler.CreateAsset))
 	mux.Handle("PATCH /api/assets/{id}", nocAdmin(teamsHandler.PatchAsset))
+
+	// Correo SMTP (gap de la Fase 4 construido en la Fase 7: notify lo necesita).
+	mux.Handle("GET /api/config/smtp", admin(smtpConfigHandler.Get))
+	mux.Handle("PUT /api/config/smtp", admin(smtpConfigHandler.Put))
+	mux.Handle("POST /api/config/smtp/test-send", admin(smtpConfigHandler.TestSend))
+
+	// Motor de escalación (Fase 7). resolve/actions/notify/policies aplican el
+	// gate de módulo según el scope del request (serviceId = SOC, assetId /
+	// territorialUnitId = NOC), dentro del handler.
+	mux.Handle("GET /api/services", socAuthed(escalationHandler.ListServices))
+	mux.Handle("POST /api/services", socAdmin(escalationHandler.CreateService))
+	mux.Handle("GET /api/escalation/resolve", authed(escalationHandler.Resolve))
+	mux.Handle("POST /api/escalation/actions", authed(escalationHandler.RecordAction))
+	mux.Handle("GET /api/escalation/actions", authed(escalationHandler.ListActions))
+	mux.Handle("POST /api/escalation/notify", authed(escalationHandler.Notify))
+	mux.Handle("GET /api/escalation/policies", authed(escalationHandler.ListPolicies))
+	mux.Handle("POST /api/escalation/policies", admin(escalationHandler.CreatePolicy))
+	mux.Handle("DELETE /api/escalation/policies/{id}", admin(escalationHandler.DeletePolicy))
+	mux.Handle("POST /api/escalation/policies/{id}/steps", admin(escalationHandler.AddStep))
+	mux.Handle("DELETE /api/escalation/policies/{id}/steps/{stepOrder}", admin(escalationHandler.DeleteStep))
+	mux.Handle("GET /api/maintenance-windows", authed(escalationHandler.ListWindows))
+	mux.Handle("POST /api/maintenance-windows", admin(escalationHandler.CreateWindow))
+	mux.Handle("DELETE /api/maintenance-windows/{id}", admin(escalationHandler.DeleteWindow))
+	mux.Handle("GET /api/raci-assignments", authed(escalationHandler.ListRaci))
+	mux.Handle("POST /api/raci-assignments", admin(escalationHandler.CreateRaci))
 
 	// SPA de Angular embebida (Fase 3) — catch-all, siempre al final.
 	spaHandler, err := web.Handler()

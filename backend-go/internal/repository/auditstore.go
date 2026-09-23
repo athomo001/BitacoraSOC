@@ -6,6 +6,7 @@ import (
 
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -26,7 +27,12 @@ func (s *AuditStore) InsertAuditLog(ctx context.Context, entry audit.Entry) erro
 		actorUserID = pgtype.UUID{Bytes: *entry.ActorUserID, Valid: true}
 	}
 
+	id := entry.ID
+	if id == uuid.Nil {
+		id = uuid.New()
+	}
 	return s.Queries.InsertAuditLog(ctx, db.InsertAuditLogParams{
+		ID:                id,
 		Event:             entry.Event,
 		Level:             string(entry.Level),
 		ActorUserID:       actorUserID,

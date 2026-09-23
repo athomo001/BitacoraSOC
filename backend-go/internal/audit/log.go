@@ -35,6 +35,7 @@ func Failure(reason string) Result { return Result{Success: false, Reason: reaso
 // generado por sqlc para poder probar Log() con un Inserter de prueba sin
 // una base de datos real.
 type Entry struct {
+	ID                uuid.UUID // lo genera Log() antes de insertar, para poder devolverlo
 	Event             string
 	Level             Level
 	ActorUserID       *uuid.UUID
@@ -76,11 +77,14 @@ func NewLogger(inserter Inserter, logger *slog.Logger) *Logger {
 
 // Log registra event con su actor/contexto de request (extraídos de ctx,
 // puestos ahí por los middlewares de auth/metadata — nunca a mano en cada
-// call site) y metadata ya sanitizado. Nunca bloquea el flujo principal: si
+// call site) y metadata ya sanitizado. Devuelve el id del registro (generado
+// acá, no por la DB) para las respuestas que lo exponen, ej. auditLogId de
+// POST /api/escalation/notify; quien no lo necesita simplemente lo ignora. Nunca bloquea el flujo principal: si
 // la persistencia falla, se loguea el error y listo — un audit_log caído no
 // puede tumbar un login o un checklist a las 3 AM.
-func (l *Logger) Log(ctx context.Context, event string, level Level, result Result, metadata map[string]any) {
+func (l *Logger) Log(ctx context.Context, event string, level Level, result Result, metadata map[string]any) uuid.UUID {
 	entry := Entry{
+		ID:       uuid.New(),
 		Event:    event,
 		Level:    level,
 		Success:  result.Success,
@@ -110,4 +114,5 @@ func (l *Logger) Log(ctx context.Context, event string, level Level, result Resu
 	if err := l.inserter.InsertAuditLog(ctx, entry); err != nil {
 		l.logger.Error("audit: no se pudo persistir el evento", "event", event, "error", err)
 	}
+	return entry.ID
 }

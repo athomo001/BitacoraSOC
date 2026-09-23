@@ -2718,3 +2718,37 @@ Migración documental de cambios cerrados que estaban marcados como `Listo` en `
 - **Verificado**: 82 checks de API en base vacía temporal, 22 pasos de navegador real, 39 tests de frontend, Go en verde.
 - **Cierre de fase**: checklist completo en `spec/02-alcance-y-roadmap.md`. Fase 7 (Motor de Escalación) queda desbloqueada.
 
+
+---
+
+## [Rewrite] Fase 7 — Motor de Escalación — CERRADA - 2026-09-23
+
+- **Backend — motor de escalación** (`internal/escalation`, TDD): resuelve a quién avisar con una precedencia fija:
+  1. política propia del activo;
+  2. política de su zona o de la zona superior más cercana;
+  3. equipos que cubren la zona.
+
+  Un servicio SOC usa su propia política. Si no hay nada aplicable, responde 404 explícito, no una lista vacía.
+- **Backend — registro de intentos** (`POST /api/escalation/actions`):
+  - Cada intento (Contestó, No contesta, Ocupado, Inalcanzable) queda en un log **inmutable**: un trigger bloquea UPDATE/DELETE incluso por SQL directo (migración `000004`).
+  - En modo "uno tras otro" el sistema indica a quién llamar después; agotado el paso, escala al siguiente.
+  - La app no llama: el operador llama desde el teléfono dedicado y acá registra el resultado.
+- **Backend — aviso por correo** (`POST /api/escalation/notify`): envía a los destinatarios del primer paso y siempre queda auditado. Respeta las ventanas de mantenimiento: con supresión no envía, informativa envía con nota. Una ventana sobre una zona cubre a todos sus activos.
+- **Backend — nuevos endpoints**:
+  - Ventanas de mantenimiento y RACI (solo dato).
+  - Servicios SOC (`/api/services`), que faltaba.
+  - SMTP (`/api/config/smtp` + prueba de envío), prometido en la Fase 4 y nunca expuesto hasta ahora; la contraseña nunca vuelve al navegador.
+- **Backend — prototipo de shadow-diff** (`cmd/escalation-shadow-diff`): compara el flujo de escalación del legacy contra el nuevo y genera un reporte de discrepancias (pasos, modo, personas, teléfonos). Normaliza tildes y formatos de teléfono. El legacy real no tiene flujos cargados; se probó con casos armados con el mismo modelo.
+- **Backend — primer admin desde `.env`** (`BOOTSTRAP_ADMIN_*`): se crea al arrancar si el setup está pendiente, para poder entrar a revisar sin pasar por el asistente.
+- **Frontend — pantalla Escalamiento / Despacho**:
+  - Tarjetas y flechas animadas **portadas del legacy** (`escalation-flow-preview`).
+  - Botones directos Llamar / WhatsApp / SMS / Correo y botones de resultado.
+  - Paso en curso resaltado con cuenta regresiva, siguiente persona resaltada, línea de tiempo, aviso por correo y banner de ventana vigente.
+  - Sobrevive a un F5; responsive con flechas verticales en móvil.
+- **Frontend — Administración**: pestañas Escalamiento (políticas, pasos, servicios SOC, ventanas de mantenimiento) y Correo (SMTP + prueba).
+- **Fix encontrado al probar**: un `entryId` inexistente devolvía 500; ahora 404. En la tarjeta, un F5 borraba la escalación a medias; ahora se conserva.
+- **Verificado**:
+  - 72 checks de API + 4 de RACI sobre base temporal vacía, con correo real capturado en Mailpit.
+  - 36 pasos de navegador real (escritorio y móvil).
+  - 50 tests de frontend, Go en verde.
+- **Cierre de fase**: checklist completo en `spec/02-alcance-y-roadmap.md`. Fase 8 (Turnos, Rotación y Dotación) queda desbloqueada.

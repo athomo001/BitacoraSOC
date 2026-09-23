@@ -46,8 +46,8 @@ export const routes: Routes = [
       },
       {
         path: 'escalation',
-        component: PlaceholderComponent,
-        data: { title: 'Escalamiento / Despacho', builtInPhase: 'la Fase 7' },
+        loadComponent: () =>
+          import('./features/escalation/escalation').then((module) => module.EscalationComponent),
       },
       {
         path: 'directory',

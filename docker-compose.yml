@@ -55,6 +55,11 @@ services:
       APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:-dkbE1vL8G50ufsA0EsATSDDsu+F1LAhKNNykSrG9Z3w=}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://127.0.0.1:8081}
       RATE_LIMIT_RESET_SECRET: ${RATE_LIMIT_RESET_SECRET:-}
+      # Admin por defecto opcional (ver .env.example): solo si el setup no se hizo.
+      BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      BOOTSTRAP_MODULES: ${BOOTSTRAP_MODULES:-both}
     networks:
       - bitacora-rewrite-network
 

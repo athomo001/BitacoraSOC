@@ -1,6 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ButtonComponent } from '../../shared/ui/button/button';
 import {
   LogSource,
   ORGANIZATION_TYPE_LABELS,
@@ -18,7 +17,7 @@ import { problemDetail } from '../../core/http-error';
 @Component({
   selector: 'app-admin-organizations',
   standalone: true,
-  imports: [FormsModule, ButtonComponent],
+  imports: [FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="panel">

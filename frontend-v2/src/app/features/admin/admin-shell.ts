@@ -4,8 +4,10 @@ import { AdminFeaturesComponent } from './admin-features';
 import { AdminTerritoryComponent } from './admin-territory';
 import { AdminOrganizationsComponent } from './admin-organizations';
 import { AdminTeamsComponent } from './admin-teams';
+import { AdminEscalationComponent } from './admin-escalation';
+import { AdminSmtpComponent } from './admin-smtp';
 
-type AdminTab = 'modules' | 'features' | 'territory' | 'organizations' | 'teams';
+type AdminTab = 'modules' | 'features' | 'territory' | 'organizations' | 'teams' | 'escalation' | 'smtp';
 
 const TABS: readonly { id: AdminTab; label: string }[] = [
   { id: 'modules', label: 'Módulos' },
@@ -13,6 +15,8 @@ const TABS: readonly { id: AdminTab; label: string }[] = [
   { id: 'territory', label: 'Territorio' },
   { id: 'organizations', label: 'Organizaciones' },
   { id: 'teams', label: 'Equipos' },
+  { id: 'escalation', label: 'Escalamiento' },
+  { id: 'smtp', label: 'Correo' },
 ];
 
 /**
@@ -25,7 +29,7 @@ const TABS: readonly { id: AdminTab; label: string }[] = [
 @Component({
   selector: 'app-admin-shell',
   standalone: true,
-  imports: [AdminModulesComponent, AdminFeaturesComponent, AdminTerritoryComponent, AdminOrganizationsComponent, AdminTeamsComponent],
+  imports: [AdminModulesComponent, AdminFeaturesComponent, AdminTerritoryComponent, AdminOrganizationsComponent, AdminTeamsComponent, AdminEscalationComponent, AdminSmtpComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="admin">
@@ -45,6 +49,8 @@ const TABS: readonly { id: AdminTab; label: string }[] = [
           @case ('territory') { <app-admin-territory /> }
           @case ('organizations') { <app-admin-organizations /> }
           @case ('teams') { <app-admin-teams /> }
+          @case ('escalation') { <app-admin-escalation /> }
+          @case ('smtp') { <app-admin-smtp /> }
         }
       </div>
     </div>

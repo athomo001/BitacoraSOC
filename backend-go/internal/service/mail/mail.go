@@ -5,8 +5,10 @@ package mail
 
 import (
 	"fmt"
+	"mime"
 	"net/smtp"
 	"strings"
+	"time"
 )
 
 // Config son los datos de conexión ya resueltos: Password viene DESCIFRADA
@@ -33,11 +35,16 @@ func NewSender(cfg Config) *Sender {
 	return &Sender{cfg: cfg}
 }
 
-// Send despacha un correo de texto plano simple a un único destinatario.
-// Suficiente para "envío de prueba" de esta fase; el despacho MJML real de
-// escalación/reportes llega en fases posteriores sobre esta misma base.
+// Send despacha un correo de texto plano a un único destinatario.
 func (s *Sender) Send(to, subject, body string) error {
-	if to == "" {
+	return s.SendMany([]string{to}, nil, subject, body)
+}
+
+// SendMany despacha un solo correo con varios destinatarios en To y Cc
+// (miembros recipient_type=to/cc de un equipo de escalación).
+func (s *Sender) SendMany(to, cc []string, subject, body string) error {
+	to, cc = nonEmpty(to), nonEmpty(cc)
+	if len(to) == 0 {
 		return fmt.Errorf("mail: destinatario vacío")
 	}
 	addr := fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port)
@@ -50,24 +57,45 @@ func (s *Sender) Send(to, subject, body string) error {
 		auth = smtp.PlainAuth("", s.cfg.Username, s.cfg.Password, s.cfg.Host)
 	}
 
-	msg := buildMessage(s.cfg.FromAddress, to, subject, body)
+	msg := buildMessage(s.cfg.FromAddress, to, cc, subject, body, time.Now())
 
 	// net/smtp.SendMail sube a STARTTLS automáticamente si el servidor lo
 	// anuncia en EHLO. RequireTLS documenta la expectativa del operador; con
 	// un relay interno sin auth (ej. catcher de pruebas) STARTTLS no se puede
 	// forzar desde acá sin reimplementar el protocolo a mano — aceptado como
-	// límite conocido de "SMTP básico" en esta fase, ver spec/07-backend-arquitectura-go.md.
-	return smtp.SendMail(addr, auth, s.cfg.FromAddress, []string{to}, msg)
+	// límite conocido de "SMTP básico", ver spec/07-backend-arquitectura-go.md.
+	rcpt := append(append([]string{}, to...), cc...)
+	return smtp.SendMail(addr, auth, s.cfg.FromAddress, rcpt, msg)
 }
 
-func buildMessage(from, to, subject, body string) []byte {
+func nonEmpty(addrs []string) []string {
+	out := make([]string, 0, len(addrs))
+	for _, a := range addrs {
+		if a = strings.TrimSpace(a); a != "" {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// buildMessage arma el mensaje. El asunto se codifica según RFC 2047
+// (mime.QEncoding): en UTF-8 crudo, "Recuperación de contraseña - Bitácora
+// Ops" llega roto a varios clientes de correo — bug de las fases anteriores,
+// encontrado en la Fase 7. Date es obligatorio según RFC 5322 y su ausencia
+// sube el puntaje de spam.
+func buildMessage(from string, to, cc []string, subject, body string, now time.Time) []byte {
+	const crlf = "\r\n"
 	var b strings.Builder
-	fmt.Fprintf(&b, "From: %s\r\n", from)
-	fmt.Fprintf(&b, "To: %s\r\n", to)
-	fmt.Fprintf(&b, "Subject: %s\r\n", subject)
-	b.WriteString("MIME-Version: 1.0\r\n")
-	b.WriteString("Content-Type: text/plain; charset=\"UTF-8\"\r\n")
-	b.WriteString("\r\n")
+	b.WriteString("From: " + from + crlf)
+	b.WriteString("To: " + strings.Join(to, ", ") + crlf)
+	if len(cc) > 0 {
+		b.WriteString("Cc: " + strings.Join(cc, ", ") + crlf)
+	}
+	b.WriteString("Subject: " + mime.QEncoding.Encode("utf-8", subject) + crlf)
+	b.WriteString("Date: " + now.Format(time.RFC1123Z) + crlf)
+	b.WriteString("MIME-Version: 1.0" + crlf)
+	b.WriteString(`Content-Type: text/plain; charset="UTF-8"` + crlf)
+	b.WriteString(crlf)
 	b.WriteString(body)
 	return []byte(b.String())
 }
