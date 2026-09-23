@@ -1,0 +1,53 @@
+.app-table {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+
+.app-table__header,
+.app-table__row {
+  display: flex;
+  align-items: center;
+  min-height: var(--row-height);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.app-table__header {
+  background: var(--bg-surface-hover);
+  color: var(--text-secondary);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.app-table__row:hover {
+  background: var(--bg-surface-hover);
+  transition: background-color var(--transition-instant);
+}
+
+.app-table__cell {
+  flex: 1 1 0;
+  padding: 0 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-table__cell.mono {
+  font-family: var(--font-mono);
+}
+
+.app-table__viewport {
+  height: calc(var(--row-height) * 18); /* ~18 filas visibles sin scroll, regla 1.2 */
+}
+
+.app-table__empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-muted);
+}

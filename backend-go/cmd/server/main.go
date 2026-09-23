@@ -18,6 +18,7 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/handler"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/web"
 )
 
 func main() {
@@ -69,6 +70,15 @@ func run(logger *slog.Logger) error {
 	// nginx delante todavía). La Fase 4 debe envolver esta ruta con el
 	// middleware de auth, no reescribir el handler.
 	mux.HandleFunc("GET /api/stream/events", sse.Stream)
+
+	// SPA de Angular embebida (Fase 3 del roadmap) — se registra al final:
+	// net/http.ServeMux resuelve por el patrón más específico primero, así
+	// que "/" (catch-all) nunca le gana a "/api/..." aunque se registre acá.
+	spaHandler, err := web.Handler()
+	if err != nil {
+		return err
+	}
+	mux.Handle("/", spaHandler)
 
 	srv := &http.Server{
 		Addr:         addr,

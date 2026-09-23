@@ -26,6 +26,22 @@ Registro de cambios relevantes del proyecto.
 
 ---
 
+## [Rewrite] Fase 3 — Frontend Shell y Design System — CERRADA - 2026-09-22
+
+- **Infra — Node.js actualizado a nivel sistema (autorizado por el dueño)**: Angular 22 exige Node ≥24.15.0/≥22.22.3/≥26.0.0; el equipo tenía 24.13.0. Se actualizó `OpenJS.NodeJS.LTS` a 24.19.0 vía winget. Incidente durante la actualización: el primer intento dejó Node completamente desinstalado a mitad de camino (falla silenciosa del MSI) — detectado de inmediato y corregido reinstalando antes de continuar.
+- **Frontend — Proyecto Angular 22 inicial** (`frontend-v2/`): standalone, zoneless (sin `zone.js` en dependencias), pnpm. `src/styles/tokens.css` (paleta grafito/OLED + semáforo operativo de `spec/06-frontend-arquitectura-y-ui.md` sección 1.1) y `material-theme.scss` (tema de Angular Material pisado con esos tokens, no el azure/Roboto por defecto).
+- **Fix — spec `06-frontend-arquitectura-y-ui.md`**: la sección 3 (navegación) dibujaba 6 secciones maestras (incluía "Métricas y Analítica"), contradiciendo las 5 ya cerradas en `spec/02-alcance-y-roadmap.md` y `spec/00-mapa-mental.md` (`/metrics` completo es Backlog Post-Corte). Corregido antes de construir el shell.
+- **Fix — auto-hospedaje de fuentes real**: `ng add @angular/material` había inyectado `<link>` a `fonts.googleapis.com` (Roboto + Material Icons) en `index.html` por defecto, contradiciendo el mandato de "cero CDN externo de fuentes" ya vigente para Geist Sans/JetBrains Mono. Corregido: se sacaron esos `<link>` y se autohospedó también Material Icons (`public/fonts/MaterialIcons.woff2`, licencia Apache 2.0 incluida) — mismo patrón que Geist Sans/JetBrains Mono.
+- **Frontend — Componentes base**: `app-button` (variantes, pisa `--mdc-*` de Material en vez de `!important`), `app-table` (`DenseTableComponent`, scroll virtual real con `cdk-virtual-scroll-viewport`), `app-modal` (chrome sobre CDK Dialog).
+- **Frontend — `<app-markdown>`** (marked + DOMPurify, TDD): 4 tests — checklist `- [ ]`/`- [x]` renderiza como checkboxes reales, `<script>` inyectado sanitizado, atributo `onerror` inline sanitizado, Markdown básico renderiza.
+- **Frontend — `LoginShellComponent`**: los 6 skins históricos (Modern, Cyber/Infoflow, CRT, Win 3.11, Unix 89, Surrealismo) sobre un único componente, conmutados por `[data-skin]` puro CSS. Verificado con un test que confirma vía `getComputedStyle` que al menos 5 de 6 skins resuelven un color de acento distinto.
+- **Frontend — `ShellComponent`**: las 5 secciones maestras del núcleo con atajos `Alt+1`..`Alt+5`, rutas a un `PlaceholderComponent` compartido (no 5 componentes casi idénticos).
+- **CI — `.stylelintrc.json`**: 3 reglas anti-AI-look de `spec/02-alcance-y-roadmap.md` sección 4 (`color-no-hex` fuera de `tokens.css`/`login-shell.css`, `declaration-no-important`, `::ng-deep` prohibido). Verificado que las 3 reglas realmente fallan ante una violación de prueba antes de confirmar que el código real pasa limpio. `.github/workflows/frontend-v2-ci.yml` agregado (stylelint + test + build).
+- **Backend — `internal/web/spa.go`**: `//go:embed` sirviendo el build real de Angular con fallback SPA a `index.html`. `Dockerfile` rehecho con un stage `frontend-build` (Node) que compila `frontend-v2` y copia el resultado antes de `go build`; `docker-compose.rewrite.yml` movió su contexto de build a la raíz del repo. 2 bugs reales de tooling encontrados y corregidos en el camino: pnpm 12 bloquea `install --frozen-lockfile` sin aprobar scripts de build nativos (`ERR_PNPM_IGNORED_BUILDS`, resuelto con `pnpm-workspace.yaml`/`allowBuilds`), y el Dockerfile no copiaba ese archivo antes del install.
+- **Cierre de fase**: verificado de punta a punta con `docker compose build --no-cache` desde cero + `curl` real a través de Caddy (`/` sirve Angular real, `/entries` cae a `index.html` vía fallback SPA). Checklist de salida completo en `spec/02-alcance-y-roadmap.md`. Fase 4 (Autenticación, Usuarios y Convención de Auditoría) queda desbloqueada.
+
+---
+
 ## [v1.11.3] - 2026-08-31
 
 ### Enlace público de solo lectura para "Personal en Teletrabajo y Apoyo" (`/main/escalation/view`)

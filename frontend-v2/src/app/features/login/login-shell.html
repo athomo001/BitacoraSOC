@@ -1,0 +1,42 @@
+<div class="login-wrapper" [attr.data-skin]="currentSkin()">
+  <div class="skin-selector">
+    @for (skin of skins; track skin.id) {
+      <button
+        type="button"
+        class="skin-selector__btn"
+        [class.skin-selector__btn--active]="currentSkin() === skin.id"
+        (click)="setSkin(skin.id)"
+      >
+        {{ skin.label }}
+      </button>
+    }
+  </div>
+
+  <form class="login-card" (ngSubmit)="onSubmit()">
+    <h1 class="login-card__title">BitacoraSOC</h1>
+
+    <label class="login-field">
+      <span>Usuario</span>
+      <input
+        type="text"
+        name="username"
+        autocomplete="username"
+        [(ngModel)]="username"
+        required
+      />
+    </label>
+
+    <label class="login-field">
+      <span>Contraseña</span>
+      <input
+        type="password"
+        name="password"
+        autocomplete="current-password"
+        [(ngModel)]="password"
+        required
+      />
+    </label>
+
+    <button type="submit" class="login-submit">Ingresar</button>
+  </form>
+</div>

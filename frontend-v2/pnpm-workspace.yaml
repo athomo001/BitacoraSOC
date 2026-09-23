@@ -1,0 +1,15 @@
+# pnpm 12 exige aprobar explícitamente qué dependencias pueden correr scripts
+# de instalación (protección anti supply-chain) — generado con
+# `pnpm approve-builds --all --yes` tras revisar los 4 paquetes: son
+# dependencias transitivas legítimas de las herramientas de build de Angular
+# (esbuild) y de watchers de archivos (@parcel/watcher, lmdb,
+# msgpackr-extract), no algo arbitrario. Sin esto, `pnpm install
+# --frozen-lockfile` falla (ERR_PNPM_IGNORED_BUILDS) — encontrado al intentar
+# el build de Docker de la Fase 3, donde el error sí frena el build (a
+# diferencia de un shell local, donde el mensaje parecía no bloquear nada).
+allowBuilds:
+  "@parcel/watcher": true
+  esbuild: true
+  lmdb: true
+  msgpackr-extract: true
+

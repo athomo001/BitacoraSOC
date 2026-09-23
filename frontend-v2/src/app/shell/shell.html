@@ -1,0 +1,18 @@
+<div class="shell">
+  <nav class="shell__sidebar" aria-label="Navegación principal">
+    @for (item of navItems; track item.path) {
+      <a
+        class="shell__nav-item"
+        [routerLink]="['/', item.path]"
+        routerLinkActive="shell__nav-item--active"
+        [attr.title]="item.label + ' (Alt+' + item.shortcutDigit + ')'"
+      >
+        <mat-icon>{{ item.icon }}</mat-icon>
+        <span class="shell__nav-label">{{ item.label }}</span>
+      </a>
+    }
+  </nav>
+  <main class="shell__workspace">
+    <router-outlet />
+  </main>
+</div>

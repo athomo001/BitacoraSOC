@@ -1,0 +1,42 @@
+name: frontend-v2 CI
+
+on:
+  push:
+    paths:
+      - "frontend-v2/**"
+      - ".github/workflows/frontend-v2-ci.yml"
+  pull_request:
+    paths:
+      - "frontend-v2/**"
+      - ".github/workflows/frontend-v2-ci.yml"
+
+jobs:
+  build-lint-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend-v2
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.19.0"
+          cache: "pnpm"
+          cache-dependency-path: frontend-v2/pnpm-lock.yaml
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: stylelint (anti-AI-look — sin hex sueltos, sin ::ng-deep, sin !important)
+        run: pnpm run lint:css
+
+      - name: Tests (vitest)
+        run: pnpm run test
+
+      - name: Build de producción
+        run: pnpm run build

@@ -1,0 +1,37 @@
+/*
+ * Sistema de tokens industriales (WCAG AAA) — spec/06-frontend-arquitectura-y-ui.md
+ * sección 1.1. Fuente única de verdad de color/tipografía/densidad para toda
+ * la app — ningún componente define un color o radio suelto fuera de acá.
+ */
+:root {
+  /* Fondos y Superficies (Gris Grafito Profundo / OLED) */
+  --bg-app: #0d1117;
+  --bg-surface: #161b22;
+  --bg-surface-hover: #21262d;
+  --border-subtle: #30363d;
+  --border-active: #58a6ff;
+
+  /* Textos y Contrastes */
+  --text-primary: #f0f6fc;
+  --text-secondary: #8b949e;
+  --text-muted: #6e7681;
+
+  /* Semáforo Operativo (cero colores pasteles deslavados) */
+  --status-ok: #238636;
+  --status-warning: #d29922;
+  --status-critical: #da3633;
+  --status-carrier: #1f6feb;
+  --status-system: #8957e5;
+
+  /* Tipografías — Geist Sans auto-hospedada (.woff2, SIL OFL), no Inter (ver
+     spec/06-frontend-arquitectura-y-ui.md sección 1); fallbacks de sistema
+     solo para el instante antes de que cargue el woff2. */
+  --font-ui: "Geist Sans", -apple-system, blinkmacsystemfont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Code", "Fira Code", monospace;
+
+  /* Métricas de densidad */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --row-height: 36px;
+  --transition-instant: 80ms ease-out;
+}

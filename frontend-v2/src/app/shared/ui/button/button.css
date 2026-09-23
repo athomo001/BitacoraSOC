@@ -1,0 +1,18 @@
+.app-button {
+  min-height: 36px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  transition: background-color var(--transition-instant);
+}
+
+.app-button--primary {
+  --mat-sys-primary: var(--border-active);
+}
+
+.app-button--critical {
+  /* Se pisan las variables de tema de Material en vez de forzar con
+     !important (prohibido por la gobernanza de CI, ver
+     spec/06-frontend-arquitectura-y-ui.md sección 7 y stylelint.config.js) */
+  --mdc-filled-button-container-color: var(--status-critical);
+  --mdc-filled-button-label-text-color: var(--text-primary);
+}

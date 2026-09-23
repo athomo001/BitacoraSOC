@@ -32,8 +32,11 @@ services:
 
   bitacora-app:
     build:
-      context: ./backend-go
-      dockerfile: Dockerfile
+      # Contexto = raíz del repo (no ./backend-go): el Dockerfile necesita
+      # copiar también frontend-v2/ para compilar Angular (Fase 3), y Docker
+      # no permite `COPY ../algo` con un contexto más chico que eso.
+      context: .
+      dockerfile: backend-go/Dockerfile
     container_name: bitacora-app
     restart: unless-stopped
     depends_on:

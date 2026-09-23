@@ -1,0 +1,32 @@
+{
+  "extends": "stylelint-config-standard",
+  "rules": {
+    "color-no-hex": true,
+    "declaration-no-important": true,
+    "selector-pseudo-element-no-unknown": [
+      true,
+      {
+        "message": "::ng-deep está prohibido (spec/02-alcance-y-roadmap.md sección 4: 'reglas aplicadas mecánicamente en CI') — usar encapsulación de componente real o :host/::part."
+      }
+    ],
+    "custom-property-pattern": null,
+    "selector-class-pattern": null,
+    "alpha-value-notation": null,
+    "color-function-notation": null
+  },
+  "overrides": [
+    {
+      "files": ["**/tokens.css"],
+      "rules": {
+        "color-no-hex": null
+      }
+    },
+    {
+      "files": ["**/login-shell.css"],
+      "rules": {
+        "color-no-hex": null
+      },
+      "comment": "Los 6 skins históricos de login tienen paletas propias fijas por diseño (spec/06-frontend-arquitectura-y-ui.md sección 8.2) — no son parte del sistema de tokens de la app, es la única otra excepción explícita."
+    }
+  ]
+}

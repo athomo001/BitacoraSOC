@@ -1,0 +1,50 @@
+// Tema de Angular Material — envuelto por nuestro sistema de tokens, nunca
+// crudo (spec/06-frontend-arquitectura-y-ui.md sección 7: "Angular Material
+// como base, nunca crudo en componentes de feature"). Se usa Material por su
+// estructura/accesibilidad (ripple, foco, ARIA), pero se pisan sus variables
+// de sistema para que visualmente sea la paleta grafito/OLED de la sección
+// 1.1, no el azure/Roboto de Material 3 por defecto.
+@use "@angular/material" as mat;
+
+html {
+  height: 100%;
+  color-scheme: dark;
+
+  @include mat.theme(
+    (
+      color: (
+        theme-type: dark,
+        primary: mat.$blue-palette,
+        tertiary: mat.$violet-palette,
+      ),
+      typography: (
+        plain-family: "Geist Sans",
+        brand-family: "Geist Sans",
+      ),
+      density: -1,
+    )
+  );
+
+  // Los tokens de la sección 1.1 (--bg-app, --status-*, etc.) son la fuente
+  // de verdad real del look industrial — acá solo se realinean las variables
+  // de sistema de Material que los componentes mat-* consumen internamente,
+  // para que no se note un salto de paleta entre un <button mat-button> y el
+  // resto de la UI.
+  --mat-sys-surface: var(--bg-app);
+  --mat-sys-surface-container: var(--bg-surface);
+  --mat-sys-surface-container-high: var(--bg-surface-hover);
+  --mat-sys-on-surface: var(--text-primary);
+  --mat-sys-on-surface-variant: var(--text-secondary);
+  --mat-sys-outline: var(--border-subtle);
+  --mat-sys-outline-variant: var(--border-subtle);
+  --mat-sys-primary: var(--border-active);
+}
+
+body {
+  color-scheme: dark;
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  font: var(--mat-sys-body-medium);
+  margin: 0;
+  height: 100%;
+}

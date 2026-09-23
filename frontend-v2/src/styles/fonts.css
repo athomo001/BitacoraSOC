@@ -1,0 +1,69 @@
+/*
+ * Fuentes auto-hospedadas — spec/06-frontend-arquitectura-y-ui.md sección 1.1.
+ * Geist Sans (Vercel + Basement Studio) y JetBrains Mono, ambas SIL OFL 1.1
+ * (mismo tipo de licencia que ya usa OpenDyslexic en esta spec). Licencias
+ * completas en public/fonts/LICENSE-*.txt, requerido por SIL OFL al
+ * redistribuir el binario de la fuente. Nunca Google Fonts / CDN externo —
+ * mismo criterio que OpenDyslexic: self-host el woff2.
+ */
+@font-face {
+  font-family: "Geist Sans";
+  src: url("/fonts/GeistSans-Variable.woff2") format("woff2-variations");
+  font-weight: 100 900; /* fuente variable: un solo archivo cubre todo el rango */
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/JetBrainsMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/JetBrainsMono-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/JetBrainsMono-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/*
+ * Material Icons (Apache License 2.0, licencia completa en
+ * public/fonts/LICENSE-MaterialIcons.txt) — auto-hospedada por el mismo
+ * motivo que Geist/JetBrains Mono: `ng add @angular/material` agrega por
+ * default un <link> a fonts.googleapis.com en index.html, que se sacó de
+ * ahí a propósito (cero CDN externo de fuentes en esta spec).
+ */
+@font-face {
+  font-family: "Material Icons";
+  src: url("/fonts/MaterialIcons.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
+.material-icons {
+  font-family: "Material Icons", sans-serif;
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+}
