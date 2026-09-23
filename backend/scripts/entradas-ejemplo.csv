@@ -1,7 +1,0 @@
-id,email,date,text,tags
-1,analista1@example.com,2025-12-17,"Revisión de alertas en Trellix. Sin alertas críticas. Todo operativo.",#monitoreo #trellix
-2,analista1@example.com,2025-12-17,"Análisis de logs en QRadar. Se detectaron 3 eventos de reconocimiento desde IP 192.168.1.50",#qradar #recon #monitoreo
-3,analista2@example.com,2025-12-17,"Incidente de phishing detectado. Correo sospechoso reportado por usuario. Se bloqueó remitente.",#phishing #email #incidente
-4,analista1@example.com,2025-12-17,"Revisión de firewall Fortinet. Reglas actualizadas según política corporativa.",#fortinet #firewall #configuracion
-5,analista2@example.com,2025-12-17,"Múltiples intentos de bruteforce desde IP externa 203.0.113.42. Se agregó a blacklist.",#bruteforce #incidente #blocked
-6,analista1@example.com,2025-12-18,"Backup de configuraciones completado. Todo OK.",#backup #mantenimiento

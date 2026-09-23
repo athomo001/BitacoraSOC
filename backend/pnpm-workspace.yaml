@@ -1,4 +1,0 @@
-# Configuración de compilaciones permitidas para el backend en pnpm v11
-allowBuilds:
-  sharp: true
-  unrs-resolver: true

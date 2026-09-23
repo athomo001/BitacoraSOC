@@ -1,9 +1,0 @@
-node_modules/
-.env
-*.log
-npm-debug.log*
-.DS_Store
-uploads/
-backups/
-coverage/
-.vscode/
