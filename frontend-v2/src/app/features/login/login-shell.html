@@ -12,31 +12,64 @@
     }
   </div>
 
-  <form class="login-card" (ngSubmit)="onSubmit()">
-    <h1 class="login-card__title">BitacoraSOC</h1>
+  @if (!mfaPending()) {
+    <form class="login-card" (ngSubmit)="onSubmit()">
+      <h1 class="login-card__title">BitacoraSOC</h1>
 
-    <label class="login-field">
-      <span>Usuario</span>
-      <input
-        type="text"
-        name="username"
-        autocomplete="username"
-        [(ngModel)]="username"
-        required
-      />
-    </label>
+      <label class="login-field">
+        <span>Usuario</span>
+        <input
+          type="text"
+          name="username"
+          autocomplete="username"
+          [(ngModel)]="username"
+          required
+        />
+      </label>
 
-    <label class="login-field">
-      <span>Contraseña</span>
-      <input
-        type="password"
-        name="password"
-        autocomplete="current-password"
-        [(ngModel)]="password"
-        required
-      />
-    </label>
+      <label class="login-field">
+        <span>Contraseña</span>
+        <input
+          type="password"
+          name="password"
+          autocomplete="current-password"
+          [(ngModel)]="password"
+          required
+        />
+      </label>
 
-    <button type="submit" class="login-submit">Ingresar</button>
-  </form>
+      @if (errorMessage()) {
+        <p class="login-error">{{ errorMessage() }}</p>
+      }
+
+      <button type="submit" class="login-submit" [disabled]="loading()">
+        {{ loading() ? 'Ingresando…' : 'Ingresar' }}
+      </button>
+    </form>
+  } @else {
+    <form class="login-card" (ngSubmit)="onMfaSubmit()">
+      <h1 class="login-card__title">Verificación en dos pasos</h1>
+      <p class="login-hint">Ingresá el código de tu app de autenticación.</p>
+
+      <label class="login-field">
+        <span>Código</span>
+        <input
+          type="text"
+          name="mfaCode"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          [(ngModel)]="mfaCode"
+          required
+        />
+      </label>
+
+      @if (errorMessage()) {
+        <p class="login-error">{{ errorMessage() }}</p>
+      }
+
+      <button type="submit" class="login-submit" [disabled]="loading()">
+        {{ loading() ? 'Verificando…' : 'Verificar' }}
+      </button>
+    </form>
+  }
 </div>

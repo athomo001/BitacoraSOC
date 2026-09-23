@@ -42,6 +42,25 @@ Registro de cambios relevantes del proyecto.
 
 ---
 
+## [Rewrite] Fase 4 — Autenticación, Usuarios y Convención de Auditoría — CERRADA - 2026-09-22
+
+- **Fix — dependencia circular real en el roadmap**: la Fase 4 exigía poder loguearse como admin, pero el único endpoint que crea el primer admin (`POST /api/setup/bootstrap`) estaba asignado a la Fase 5. Corregido moviendo `GET /api/setup/status` + `POST /api/setup/bootstrap` a la Fase 4 (tarea 0), antes de implementar nada más.
+- **Backend — `internal/auth`** (TDD, 17 tests): `password.go` (bcrypt costo 12 para hashes nuevos, `NeedsRehash` para verificar sin romper hashes legacy costo 8), `jwt.go` (HMAC-SHA256, JTI único, claim `Purpose`), `totp.go` (secreto + QR, verificación con ventana ±1 paso).
+- **Fix — bug de seguridad real (bypass de MFA)**: sin un claim que distinguiera un JWT de acceso completo de un `tempToken` de MFA pendiente, este último habría sido aceptado igual por `RequireAuth`. Se agregó `Purpose` (`access`/`mfa_pending`) a los claims; `RequireAuth` rechaza cualquier token cuyo `Purpose` no sea `access`. Cubierto con test dedicado (`TestJWTIssuer_PreservaPurposeExplicito`).
+- **Fix — gap de esquema real**: no existía dónde persistir el token de `forgot-password`/`reset-password`. Investigado el mecanismo del legacy (`backend/src/routes/auth.js`) antes de diseñar: token de 32 bytes aleatorios, solo se persiste su hash SHA-256, expira a los 5 minutos. Agregadas `reset_password_token_hash`/`reset_password_expires_at` a `users` en `spec/03-esquema-db.sql`, migración 000001 corregida in-place (todavía sin datos reales en producción).
+- **Fix — gap real de integridad referencial**: `DELETE /api/users/:id` (borrado duro) rompería la FK de `audit_log.actor_user_id` en cuanto ese usuario apareciera en cualquier evento auditado. Resuelto como soft-delete (`active=false`), el mismo patrón que ya usa el resto del esquema.
+- **Backend — `internal/audit`** (TDD): convención única `Logger.Log(ctx, event, level, result, metadata)` — actor y metadata de request se extraen de `context.Context`, nunca a mano en cada call site; sanitiza claves sensibles (`password`/`token`/`jwt`/`secret`), trunca metadata >10KB, nunca bloquea el flujo principal si falla la persistencia.
+- **Backend — `internal/ratelimit`**: `LoginLimiter` (Postgres, 5 intentos/15 min por IP, correcto en HA multi-nodo) y `APILimiter` (en memoria por nodo, 300 no-autenticado / 1200 autenticado por 15 min).
+- **Backend — `internal/middleware`**: `Metadata` (request ID/IP/UA), `Auth.RequireAuth` (JWT + denylist + usuario activo + detección de cambio de IP en sesión activa), `RequireNotForcedPasswordChange` (aplicado selectivamente por ruta en `main.go`, no vía introspección de `r.Pattern` — no está disponible para un middleware que envuelve el mux completo desde afuera), `RequireRole`.
+- **Fix — endpoint faltante encontrado al revisar el checklist**: `GET /api/audit-logs` tenía las queries sqlc pero nunca se había escrito el handler HTTP. Agregado `AuditLogHandler` + ruta bajo `adminOrAuditor(...)`.
+- **Backend — handlers nuevos**: `AuthHandler` (login, MFA setup/authenticate/disable, logout, me, change-password, forgot/reset-password), `UsersHandler` (list/create/patch/soft-delete/force-reset-all), `PermissionGroupsHandler` (CRUD + `GET /api/users/me/capabilities`, cruzado contra `app_config.soc/noc_module_enabled`), `SetupHandler`, `SystemHandler` (reset de rate limit con secreto de comparación constante).
+- **Verificado con ejecución real contra el stack Docker completo**: bootstrap del primer admin + reintento `409`; login + `GET /api/users/me` con el JWT; 6 intentos fallidos desde la misma IP → `429`; 5 intentos fallidos sobre la misma cuenta → `423` (cuenta bloqueada) incluso con la contraseña correcta; grupo de permisos `moduleScope='soc'` reflejado en `GET /api/users/me/capabilities`; `force-reset-all` bloquea a los usuarios afectados de todo salvo el allowlist exacto del contrato (403 en capabilities, 204 en logout).
+- **Frontend — `AuthService`/`tokenInterceptor`/`authGuard`** (Signals) + `LoginShellComponent` conectado de verdad (login + flujo de MFA en 2 pasos, mensajes de error) + logout real en `ShellComponent`.
+- **Verificación más rigurosa de la sesión hasta ahora**: el flujo de login se probó con un navegador Chromium real (headless, Playwright) contra el stack Docker real — carga de `/login`, cambio de skin en vivo, error ante credenciales incorrectas, login exitoso, redirección al shell, JWT real en `localStorage`, logout real, guard de ruta sin sesión. Playwright se usó como herramienta de verificación puntual (instalado en el scratchpad, no en `frontend-v2/package.json`) — la spec no cierra ninguna decisión de framework de e2e testing todavía.
+- **Cierre de fase**: checklist de salida completo (5 ítems) en `spec/02-alcance-y-roadmap.md`, todos verificados con evidencia reproducible. Fase 5 (Setup Modular y Territorio País-Agnóstico) queda desbloqueada.
+
+---
+
 ## [v1.11.3] - 2026-08-31
 
 ### Enlace público de solo lectura para "Personal en Teletrabajo y Apoyo" (`/main/escalation/view`)

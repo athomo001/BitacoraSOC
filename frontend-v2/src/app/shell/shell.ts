@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, HostListener, inject } from '@angul
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { SHELL_NAV_ITEMS } from './shell-nav';
+import { AuthService } from '../core/auth/auth.service';
 
 /**
  * Shell principal: 1 nivel de navegación vertical fijo (spec/06-frontend-
@@ -19,6 +20,7 @@ import { SHELL_NAV_ITEMS } from './shell-nav';
 })
 export class ShellComponent {
   protected readonly navItems = SHELL_NAV_ITEMS;
+  protected readonly auth = inject(AuthService);
 
   private readonly router = inject(Router);
 
@@ -33,5 +35,9 @@ export class ShellComponent {
       event.preventDefault();
       this.router.navigate(['/', item.path]);
     }
+  }
+
+  protected logout(): void {
+    void this.auth.logout();
   }
 }

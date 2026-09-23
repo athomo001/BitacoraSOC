@@ -39,11 +39,22 @@ CREATE TABLE users (
   must_change_password BOOLEAN NOT NULL DEFAULT false,
   failed_login_attempts INT NOT NULL DEFAULT 0,
   locked_until TIMESTAMPTZ,
+  -- Gap real encontrado al implementar la Fase 4: POST /api/auth/forgot-password
+  -- /reset-password (04-contratos-api.md) no tenían dónde persistir el token
+  -- de reseteo. Mismo mecanismo que el legacy (`backend/src/routes/auth.js`,
+  -- comentario "C5 — Reducido por seguridad"), investigado antes de diseñar
+  -- (regla de oro): token de 32 bytes aleatorios enviado por correo, se
+  -- guarda acá solo su hash SHA-256 (nunca el token crudo — un dump de esta
+  -- tabla no debe alcanzar para resetear una contraseña), expira a los 5
+  -- minutos (recortado a propósito por el legacy desde 1h original).
+  reset_password_token_hash TEXT,
+  reset_password_expires_at TIMESTAMPTZ,
   active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_users_role ON users(role) WHERE active;
+CREATE INDEX idx_users_reset_token ON users(reset_password_token_hash) WHERE reset_password_token_hash IS NOT NULL;
 
 -- spec/10-armonizacion.md (barrido de gaps): `failed_login_attempts`/`locked_until`
 -- de arriba son bloqueo POR CUENTA (un usuario específico) — el legacy además

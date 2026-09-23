@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { ShellComponent } from './shell/shell';
 import { PlaceholderComponent } from './shared/ui/placeholder/placeholder';
+import { authGuard } from './core/auth/auth.guard';
 
 /**
  * Rutas del núcleo — 5 secciones maestras bajo el shell (spec/06-frontend-
@@ -18,6 +19,7 @@ export const routes: Routes = [
   {
     path: '',
     component: ShellComponent,
+    canActivate: [authGuard],
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'entries' },
       {

@@ -27,6 +27,18 @@
   color: var(--text-secondary);
   text-decoration: none;
   transition: background-color var(--transition-instant);
+
+  /* reset para que el botón de logout se vea igual que los <a> de arriba */
+  background: none;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* El botón de "Salir" queda al fondo de la barra lateral, separado del
+   resto de la navegación. */
+button.shell__nav-item {
+  margin-top: auto;
 }
 
 .shell__nav-item:hover {

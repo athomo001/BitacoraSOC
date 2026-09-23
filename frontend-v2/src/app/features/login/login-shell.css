@@ -64,6 +64,23 @@
   color: var(--login-text-secondary, var(--login-text));
 }
 
+.login-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--login-text-secondary, var(--login-text));
+}
+
+.login-error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--status-critical, #da3633);
+}
+
+.login-submit[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .login-field input {
   min-height: 36px;
   padding: 0 10px;

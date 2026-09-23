@@ -6,23 +6,102 @@ package db
 
 import (
 	"context"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
+	AddUserPermissionGroup(ctx context.Context, arg AddUserPermissionGroupParams) error
+	ClearPasswordResetToken(ctx context.Context, id uuid.UUID) error
+	CompleteSetup(ctx context.Context, arg CompleteSetupParams) (AppConfig, error)
+	CountAuditLogs(ctx context.Context) (int64, error)
+	CountUsers(ctx context.Context) (int64, error)
+	CreatePermissionGroup(ctx context.Context, arg CreatePermissionGroupParams) (PermissionGroup, error)
+	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	// DELETE /api/users/:id se implementa como soft-delete (active=false), no
+	// DELETE real: audit_log.actor_user_id referencia a users(id) sin ON DELETE
+	// CASCADE (a propósito, es append-only e inmutable) — borrar de verdad a un
+	// usuario que alguna vez hizo algo auditado rompería esa FK. Mismo patrón
+	// `active` que ya usa el resto del esquema (organizations, teams, etc.).
+	DeactivateUser(ctx context.Context, id uuid.UUID) error
+	// POST /api/auth/logout — revoca un JTI puntual sin afectar otras sesiones
+	// del mismo usuario.
+	DenylistToken(ctx context.Context, arg DenylistTokenParams) error
+	DisableMFA(ctx context.Context, id uuid.UUID) error
+	EnableMFA(ctx context.Context, id uuid.UUID) error
+	// app_config es singleton pero no viene precargado por la migración inicial
+	// (03-esquema-db.sql no tiene un INSERT semilla) — GET /api/setup/status
+	// necesita una fila para leer, así que se asegura antes de leer si todavía
+	// no existe, con los defaults de la propia tabla.
+	EnsureAppConfigRow(ctx context.Context) error
+	// POST /api/users/force-reset-all — usuarios internos = no invitados
+	// (is_guest=false), activos. Devuelve los afectados para poder notificarlos
+	// por correo sin una segunda consulta.
+	ForceResetAllActivePasswords(ctx context.Context) ([]User, error)
+	GetAppConfig(ctx context.Context) (AppConfig, error)
+	GetLoginRateLimit(ctx context.Context, ipAddress string) (LoginRateLimit, error)
+	GetPermissionGroup(ctx context.Context, id uuid.UUID) (PermissionGroup, error)
 	// smtp_config es singleton (id BOOLEAN PRIMARY KEY DEFAULT true), siempre hay
 	// a lo sumo una fila. sqlc.narg permite pgx.ErrNoRows cuando aún no se
 	// configuró SMTP (setup inicial no completado).
 	GetSMTPConfig(ctx context.Context) (GetSMTPConfigRow, error)
+	GetUserByEmail(ctx context.Context, email string) (User, error)
+	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
+	// El servicio valida la expiración (reset_password_expires_at > now()) en
+	// Go, no acá, para poder distinguir "token no existe" de "token vencido" en
+	// los tests sin depender del reloj de Postgres.
+	GetUserByResetTokenHash(ctx context.Context, resetPasswordTokenHash pgtype.Text) (User, error)
+	GetUserByUsername(ctx context.Context, username string) (User, error)
+	InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) error
 	// Hub SSE genérico (Fase 2 del roadmap) — toda publicación pasa por acá para
 	// que GET /api/stream/events pueda reponer eventos perdidos vía Last-Event-ID
 	// (ver spec/09-alta-disponibilidad-2-nodos.md sección 3.2/9.3).
 	InsertSystemEvent(ctx context.Context, arg InsertSystemEventParams) (SystemEvent, error)
+	IsTokenDenylisted(ctx context.Context, jti uuid.UUID) (bool, error)
+	// GET /api/audit-logs — paginado simple, más reciente primero.
+	ListAuditLogs(ctx context.Context, arg ListAuditLogsParams) ([]AuditLog, error)
+	ListPermissionGroups(ctx context.Context, active pgtype.Bool) ([]PermissionGroup, error)
 	// Reposición tras reconexión: todo lo publicado después de Last-Event-ID.
 	ListSystemEventsSince(ctx context.Context, arg ListSystemEventsSinceParams) ([]SystemEvent, error)
+	ListUserPermissionGroups(ctx context.Context, userID uuid.UUID) ([]PermissionGroup, error)
+	// ?role=&active= son opcionales (04-contratos-api.md) — sqlc.narg + el
+	// patrón "columna = $n OR $n IS NULL" evita escribir dos queries a mano.
+	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	LockUser(ctx context.Context, arg LockUserParams) error
 	// Prueba mínima de conectividad real a Postgres para /api/health/ready
 	// (más que un simple pgxpool.Ping(): confirma que el pool puede ejecutar SQL
 	// de verdad contra la base, no solo abrir el socket TCP).
 	Ping(ctx context.Context) (int32, error)
+	// Housekeeping: una vez que un JTI expiró de verdad, ya no hace falta
+	// consultarlo (el JWT tampoco pasaría Verify() por expiración propia).
+	PurgeExpiredDenylistedTokens(ctx context.Context) error
+	RegisterFailedLogin(ctx context.Context, id uuid.UUID) (int32, error)
+	// Re-hash oportunista en login (spec/07-backend-arquitectura-go.md sección
+	// 6.5) — a diferencia de UpdateUserPassword, NO toca must_change_password:
+	// esto es transparente para el usuario, no un cambio de contraseña real.
+	RehashPassword(ctx context.Context, arg RehashPasswordParams) error
+	ReplaceUserPermissionGroups(ctx context.Context, userID uuid.UUID) error
+	ResetAllLoginRateLimits(ctx context.Context) error
+	ResetFailedLoginAttempts(ctx context.Context, id uuid.UUID) error
+	// Nueva ventana de 15min, o la válvula de emergencia
+	// (POST /api/system/rate-limit-reset).
+	ResetLoginRateLimit(ctx context.Context, ipAddress string) error
+	SetMFASecret(ctx context.Context, arg SetMFASecretParams) error
+	SetModuleFlags(ctx context.Context, arg SetModuleFlagsParams) (AppConfig, error)
+	SetMustChangePassword(ctx context.Context, arg SetMustChangePasswordParams) error
+	SetPasswordResetToken(ctx context.Context, arg SetPasswordResetTokenParams) error
+	UpdatePermissionGroup(ctx context.Context, arg UpdatePermissionGroupParams) (PermissionGroup, error)
+	// PATCH /api/users/:id — campos parciales: NULL en un parámetro conserva el
+	// valor actual (COALESCE), no lo borra.
+	UpdateUserAdmin(ctx context.Context, arg UpdateUserAdminParams) (User, error)
+	// Limpia must_change_password al completar el cambio (04-contratos-api.md:
+	// "Limpia el flag al completar").
+	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
+	// Primer intento desde una IP: crea la fila en 1. Intentos siguientes:
+	// incrementa. El servicio decide si la ventana de 15min ya venció y hay que
+	// resetear en vez de incrementar (ver internal/service/ratelimit).
+	UpsertLoginAttempt(ctx context.Context, ipAddress string) (LoginRateLimit, error)
 	UpsertSMTPConfig(ctx context.Context, arg UpsertSMTPConfigParams) error
 }
 

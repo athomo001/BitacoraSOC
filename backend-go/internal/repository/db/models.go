@@ -1803,22 +1803,24 @@ type TokenDenylist struct {
 }
 
 type User struct {
-	ID                  uuid.UUID          `json:"id"`
-	Username            string             `json:"username"`
-	Email               string             `json:"email"`
-	PasswordHash        string             `json:"password_hash"`
-	Role                UserRole           `json:"role"`
-	CargoLabel          pgtype.Text        `json:"cargo_label"`
-	MfaEnabled          bool               `json:"mfa_enabled"`
-	MfaSecretEncrypted  pgtype.Text        `json:"mfa_secret_encrypted"`
-	IsGuest             bool               `json:"is_guest"`
-	GuestExpiresAt      pgtype.Timestamptz `json:"guest_expires_at"`
-	MustChangePassword  bool               `json:"must_change_password"`
-	FailedLoginAttempts int32              `json:"failed_login_attempts"`
-	LockedUntil         pgtype.Timestamptz `json:"locked_until"`
-	Active              bool               `json:"active"`
-	CreatedAt           pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	ID                     uuid.UUID          `json:"id"`
+	Username               string             `json:"username"`
+	Email                  string             `json:"email"`
+	PasswordHash           string             `json:"password_hash"`
+	Role                   UserRole           `json:"role"`
+	CargoLabel             pgtype.Text        `json:"cargo_label"`
+	MfaEnabled             bool               `json:"mfa_enabled"`
+	MfaSecretEncrypted     pgtype.Text        `json:"mfa_secret_encrypted"`
+	IsGuest                bool               `json:"is_guest"`
+	GuestExpiresAt         pgtype.Timestamptz `json:"guest_expires_at"`
+	MustChangePassword     bool               `json:"must_change_password"`
+	FailedLoginAttempts    int32              `json:"failed_login_attempts"`
+	LockedUntil            pgtype.Timestamptz `json:"locked_until"`
+	ResetPasswordTokenHash pgtype.Text        `json:"reset_password_token_hash"`
+	ResetPasswordExpiresAt pgtype.Timestamptz `json:"reset_password_expires_at"`
+	Active                 bool               `json:"active"`
+	CreatedAt              pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
 }
 
 type UserPermissionGroup struct {

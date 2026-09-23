@@ -11,6 +11,10 @@
         <span class="shell__nav-label">{{ item.label }}</span>
       </a>
     }
+    <button type="button" class="shell__nav-item" title="Cerrar sesión" (click)="logout()">
+      <mat-icon>logout</mat-icon>
+      <span class="shell__nav-label">Salir</span>
+    </button>
   </nav>
   <main class="shell__workspace">
     <router-outlet />
