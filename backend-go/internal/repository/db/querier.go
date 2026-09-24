@@ -32,16 +32,22 @@ type Querier interface {
 	CreateContactChannel(ctx context.Context, arg CreateContactChannelParams) (ContactChannel, error)
 	CreateLogSource(ctx context.Context, arg CreateLogSourceParams) (CatalogLogSource, error)
 	CreateMaintenanceWindow(ctx context.Context, arg CreateMaintenanceWindowParams) (MaintenanceWindow, error)
+	CreateNotificationSchedule(ctx context.Context, arg CreateNotificationScheduleParams) (WorkShiftNotificationSchedule, error)
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
 	CreatePermissionGroup(ctx context.Context, arg CreatePermissionGroupParams) (PermissionGroup, error)
 	CreatePolicy(ctx context.Context, arg CreatePolicyParams) (EscalationPolicy, error)
+	CreatePublicShareLink(ctx context.Context, arg CreatePublicShareLinkParams) (PublicShareLink, error)
 	CreateRaciAssignment(ctx context.Context, arg CreateRaciAssignmentParams) (RaciAssignment, error)
+	CreateRotationCycle(ctx context.Context, arg CreateRotationCycleParams) (RotationCycle, error)
+	CreateRotationOverride(ctx context.Context, arg CreateRotationOverrideParams) (RotationOverride, error)
+	CreateRotationSlot(ctx context.Context, arg CreateRotationSlotParams) (RotationSlot, error)
 	CreateService(ctx context.Context, arg CreateServiceParams) (Service, error)
 	CreateTeam(ctx context.Context, arg CreateTeamParams) (Team, error)
 	CreateTeamGroup(ctx context.Context, arg CreateTeamGroupParams) (TeamGroup, error)
 	CreateTerritorialUnit(ctx context.Context, arg CreateTerritorialUnitParams) (TerritorialUnit, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateUserChannel(ctx context.Context, arg CreateUserChannelParams) (ContactChannel, error)
+	CreateWorkShift(ctx context.Context, arg CreateWorkShiftParams) (WorkShift, error)
 	DeactivateLeftoverMemberships(ctx context.Context, duplicateID pgtype.UUID) error
 	DeactivateMaintenanceWindow(ctx context.Context, id uuid.UUID) (int64, error)
 	// DELETE /api/users/:id se implementa como soft-delete (active=false), no
@@ -78,20 +84,30 @@ type Querier interface {
 	// (is_guest=false), activos. Devuelve los afectados para poder notificarlos
 	// por correo sin una segunda consulta.
 	ForceResetAllActivePasswords(ctx context.Context) ([]User, error)
+	GetActivePublicShareByTokenHash(ctx context.Context, tokenHash string) (PublicShareLink, error)
 	GetAppConfig(ctx context.Context) (AppConfig, error)
 	GetAsset(ctx context.Context, id uuid.UUID) (GetAssetRow, error)
 	GetAssetForResolve(ctx context.Context, id uuid.UUID) (GetAssetForResolveRow, error)
+	// El slot regular cuya semana cubre `now` (independiente de is_paused: el
+	// handler decide qué hacer con eso vía internal/rotation.Resolve).
+	GetCurrentRotationSlot(ctx context.Context, arg GetCurrentRotationSlotParams) (GetCurrentRotationSlotRow, error)
 	GetDirectoryContact(ctx context.Context, id uuid.UUID) (GetDirectoryContactRow, error)
 	GetLoginRateLimit(ctx context.Context, ipAddress string) (LoginRateLimit, error)
+	GetNotificationSchedule(ctx context.Context, id uuid.UUID) (WorkShiftNotificationSchedule, error)
 	GetOrganization(ctx context.Context, id uuid.UUID) (Organization, error)
 	GetPermissionGroup(ctx context.Context, id uuid.UUID) (PermissionGroup, error)
 	GetPolicy(ctx context.Context, id uuid.UUID) (EscalationPolicy, error)
+	// ===== Enlace público TV (slug fijo 'telework', sin UNIQUE en slug: se
+	// resuelve la fila existente en el handler antes de decidir INSERT/UPDATE) =====
+	GetPublicShareBySlug(ctx context.Context, slug string) (PublicShareLink, error)
+	GetRotationCycle(ctx context.Context, id uuid.UUID) (RotationCycle, error)
 	// smtp_config es singleton (id BOOLEAN PRIMARY KEY DEFAULT true), siempre hay
 	// a lo sumo una fila. sqlc.narg permite pgx.ErrNoRows cuando aún no se
 	// configuró SMTP (setup inicial no completado).
 	GetSMTPConfig(ctx context.Context) (GetSMTPConfigRow, error)
 	GetService(ctx context.Context, id uuid.UUID) (Service, error)
 	GetTeam(ctx context.Context, id uuid.UUID) (Team, error)
+	GetTeamMemberDisplay(ctx context.Context, id uuid.UUID) (GetTeamMemberDisplayRow, error)
 	GetTerritorialUnit(ctx context.Context, id uuid.UUID) (TerritorialUnit, error)
 	// Lock de la fila antes del upsert del import: si el code ya existía con
 	// otro path (el dataset lo movió de padre), hay que reubicar sus
@@ -113,9 +129,16 @@ type Querier interface {
 	InsertSystemEvent(ctx context.Context, arg InsertSystemEventParams) (SystemEvent, error)
 	IsTokenDenylisted(ctx context.Context, jti uuid.UUID) (bool, error)
 	ListActionLogs(ctx context.Context, arg ListActionLogsParams) ([]ListActionLogsRow, error)
+	ListActiveOverridesForCycle(ctx context.Context, arg ListActiveOverridesForCycleParams) ([]RotationOverride, error)
 	// ip_address es INET: se lee y escribe como texto (::text / ::inet) para que
 	// el tipo Go sea string y Postgres valide el formato (IPv4/IPv6) al insertar.
 	ListAssets(ctx context.Context, arg ListAssetsParams) ([]ListAssetsRow, error)
+	// Fase 8 del roadmap: matriz semanal de dotación/teletrabajo
+	// (work_shift_assignments), enlace público de solo lectura para TV
+	// (public_share_links) y notificación periódica a RRHH
+	// (work_shift_notification_schedules). Ver spec/04-contratos-api.md sección
+	// "Dotación, Teletrabajo y Pantallas de Sala (TV)".
+	ListAssignmentsForRange(ctx context.Context, arg ListAssignmentsForRangeParams) ([]WorkShiftAssignment, error)
 	// GET /api/audit-logs — paginado simple, más reciente primero.
 	ListAuditLogs(ctx context.Context, arg ListAuditLogsParams) ([]AuditLog, error)
 	// ===== Canales =====
@@ -139,6 +162,8 @@ type Querier interface {
 	// Miembros activos de los equipos a resolver, con lo que la tarjeta necesita
 	// mostrar: nombre, especialidad (solo contactos), rol y prioridad.
 	ListMembersForTeams(ctx context.Context, teamIds []uuid.UUID) ([]ListMembersForTeamsRow, error)
+	// ===== Notificación periódica de dotación (HU-5b) =====
+	ListNotificationSchedules(ctx context.Context) ([]WorkShiftNotificationSchedule, error)
 	ListOrganizations(ctx context.Context, arg ListOrganizationsParams) ([]Organization, error)
 	ListPermissionGroups(ctx context.Context, active pgtype.Bool) ([]PermissionGroup, error)
 	// ===== Políticas y pasos =====
@@ -147,6 +172,14 @@ type Querier interface {
 	ListPolicySteps(ctx context.Context, policyIds []uuid.UUID) ([]ListPolicyStepsRow, error)
 	// ===== RACI (solo dato en esta fase, sin UI) =====
 	ListRaciAssignments(ctx context.Context, arg ListRaciAssignmentsParams) ([]ListRaciAssignmentsRow, error)
+	// Fase 8 del roadmap (spec/02-alcance-y-roadmap.md): motor de rotación
+	// unificado (rotation_cycles/rotation_slots/rotation_overrides) y work_shifts.
+	// GET /api/rotation-slots, POST /api/rotation-slots y PATCH
+	// /api/rotation-slots/:id no estaban en el contrato original (faltaba forma
+	// de armar/pausar el rol semanal, ver 04-contratos-api.md) — agregados acá,
+	// mismo patrón de gap real que las Fases 5-7.
+	ListRotationCyclesByTeam(ctx context.Context, teamID pgtype.UUID) ([]RotationCycle, error)
+	ListRotationSlotsByCycle(ctx context.Context, cycleID uuid.UUID) ([]ListRotationSlotsByCycleRow, error)
 	// ===== Servicios (módulo SOC) =====
 	ListServices(ctx context.Context, arg ListServicesParams) ([]ListServicesRow, error)
 	// Reposición tras reconexión: todo lo publicado después de Last-Event-ID.
@@ -178,6 +211,7 @@ type Querier interface {
 	// cualquier unidad del camino territorial (un mantenimiento sobre toda la
 	// zona Calama también cubre a sus routers).
 	ListWindowsForScope(ctx context.Context, arg ListWindowsForScopeParams) ([]MaintenanceWindow, error)
+	ListWorkShifts(ctx context.Context, active pgtype.Bool) ([]WorkShift, error)
 	LockUser(ctx context.Context, arg LockUserParams) error
 	// PATCH /api/config/territorial-labels — merge parcial (jsonb ||): solo pisa
 	// los niveles que vienen en el request, el resto queda como estaba.
@@ -187,6 +221,9 @@ type Querier interface {
 	MoveContactChannels(ctx context.Context, arg MoveContactChannelsParams) error
 	// Reapunta la membresía al principal, salvo que ya esté en ese equipo.
 	MoveTeamMemberships(ctx context.Context, arg MoveTeamMembershipsParams) error
+	PatchNotificationSchedule(ctx context.Context, arg PatchNotificationScheduleParams) (WorkShiftNotificationSchedule, error)
+	// HU-5: pausar sin borrar la fila (conserva el historial del rol).
+	PatchRotationSlotPause(ctx context.Context, arg PatchRotationSlotPauseParams) (RotationSlot, error)
 	// Prueba mínima de conectividad real a Postgres para /api/health/ready
 	// (más que un simple pgxpool.Ping(): confirma que el pool puede ejecutar SQL
 	// de verdad contra la base, no solo abrir el socket TCP).
@@ -211,6 +248,7 @@ type Querier interface {
 	// Nueva ventana de 15min, o la válvula de emergencia
 	// (POST /api/system/rate-limit-reset).
 	ResetLoginRateLimit(ctx context.Context, ipAddress string) error
+	RotatePublicShareLink(ctx context.Context, arg RotatePublicShareLinkParams) (PublicShareLink, error)
 	// email/phone de contacts son la copia denormalizada del canal preferido de
 	// cada tipo (la fuente de verdad son contact_channels), cifrada + indexada
 	// para listar y buscar sin recorrer los canales.
@@ -219,9 +257,11 @@ type Querier interface {
 	SetModuleFlags(ctx context.Context, arg SetModuleFlagsParams) (AppConfig, error)
 	SetMustChangePassword(ctx context.Context, arg SetMustChangePasswordParams) error
 	SetPasswordResetToken(ctx context.Context, arg SetPasswordResetTokenParams) error
+	SetPublicShareLinkActive(ctx context.Context, arg SetPublicShareLinkActiveParams) (PublicShareLink, error)
 	// Borrado lógico: el contacto puede estar referenciado por team_members (FK
 	// sin cascada) y por el historial de escalación de fases siguientes.
 	SoftDeleteContact(ctx context.Context, id uuid.UUID) (int64, error)
+	TouchPublicShareAccess(ctx context.Context, id uuid.UUID) error
 	UpdateAsset(ctx context.Context, arg UpdateAssetParams) (int64, error)
 	UpdateChannelValue(ctx context.Context, arg UpdateChannelValueParams) error
 	UpdateContact(ctx context.Context, arg UpdateContactParams) (int64, error)
@@ -241,6 +281,10 @@ type Querier interface {
 	// Limpia must_change_password al completar el cambio (04-contratos-api.md:
 	// "Limpia el flag al completar").
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
+	// Un POST sobre el mismo (userId, assignedDate) corrige la condición en vez
+	// de fallar con 409 — mismo criterio "upsert" que UpsertTeamCoverage
+	// (teams.sql) de la Fase 6, más amigable para el admin que corrige un día.
+	UpsertAssignment(ctx context.Context, arg UpsertAssignmentParams) (WorkShiftAssignment, error)
 	// Primer intento desde una IP: crea la fila en 1. Intentos siguientes:
 	// incrementa. El servicio decide si la ventana de 15min ya venció y hay que
 	// resetear en vez de incrementar (ver internal/service/ratelimit).

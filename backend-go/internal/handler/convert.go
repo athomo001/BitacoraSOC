@@ -2,7 +2,9 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/google/uuid"
@@ -68,6 +70,43 @@ func queryBool(raw string) pgtype.Bool {
 		return pgtype.Bool{}
 	}
 	return pgtype.Bool{Bool: raw == "true", Valid: true}
+}
+
+// timeOfDayToString/parseTimeOfDay convierten entre "HH:MM" y pgtype.Time
+// (Fase 8: rotation_cycles.start_time_utc, work_shifts.start_time/end_time).
+func timeOfDayToString(t pgtype.Time) string {
+	if !t.Valid {
+		return ""
+	}
+	totalSeconds := t.Microseconds / 1_000_000
+	return fmt.Sprintf("%02d:%02d", totalSeconds/3600, (totalSeconds%3600)/60)
+}
+
+func parseTimeOfDay(raw string) (pgtype.Time, error) {
+	parsed, err := time.Parse("15:04", strings.TrimSpace(raw))
+	if err != nil {
+		return pgtype.Time{}, err
+	}
+	micros := (int64(parsed.Hour())*3600 + int64(parsed.Minute())*60) * 1_000_000
+	return pgtype.Time{Microseconds: micros, Valid: true}, nil
+}
+
+// dateToString/parseDate convierten entre "YYYY-MM-DD" y pgtype.Date (Fase
+// 8: rotation_slots.week_start_date/week_end_date, work_shift_assignments.
+// assigned_date).
+func dateToString(d pgtype.Date) string {
+	if !d.Valid {
+		return ""
+	}
+	return d.Time.Format("2006-01-02")
+}
+
+func parseDate(raw string) (pgtype.Date, error) {
+	parsed, err := time.Parse("2006-01-02", strings.TrimSpace(raw))
+	if err != nil {
+		return pgtype.Date{}, err
+	}
+	return pgtype.Date{Time: parsed, Valid: true}, nil
 }
 
 func queryText(raw string) pgtype.Text {

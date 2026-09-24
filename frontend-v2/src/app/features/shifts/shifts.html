@@ -1,0 +1,108 @@
+<div class="shifts">
+  <h1 class="shifts__title">Turnos y Dotación</h1>
+
+  <div class="shifts__tabs" role="tablist">
+    <button type="button" role="tab" class="shifts__tab" [class.shifts__tab--active]="tab() === 'dotacion'"
+      [attr.aria-selected]="tab() === 'dotacion'" (click)="tab.set('dotacion')">
+      Dotación
+    </button>
+    <button type="button" role="tab" class="shifts__tab" [class.shifts__tab--active]="tab() === 'checklist'"
+      [attr.aria-selected]="tab() === 'checklist'" (click)="tab.set('checklist')">
+      Mi Turno
+    </button>
+  </div>
+
+  @switch (tab()) {
+    @case ('dotacion') {
+      <section class="panel shifts__panel">
+        <div class="shifts__toolbar">
+          <app-button variant="secondary" (pressed)="shiftWeek(-1)">◀ Semana anterior</app-button>
+          <span class="shifts__week-label">{{ weekLabel() }}</span>
+          <app-button variant="secondary" (pressed)="shiftWeek(1)">Semana siguiente ▶</app-button>
+          <app-button variant="text" (pressed)="goToCurrentWeek()">Semana actual</app-button>
+        </div>
+
+        @if (perms.isAdmin()) {
+          <div class="shifts__tv">
+            <app-button variant="secondary" [disabled]="shareBusy()" (pressed)="shareLinkAction('generate')">Generar enlace TV</app-button>
+            <app-button variant="secondary" [disabled]="shareBusy()" (pressed)="shareLinkAction('regenerate')">Regenerar</app-button>
+            <app-button variant="critical" [disabled]="shareBusy()" (pressed)="shareLinkAction('deactivate')">Desactivar</app-button>
+            @if (share(); as s) {
+              @if (s.publicUrl) {
+                <code class="shifts__tv-url">{{ s.publicUrl }}</code>
+              } @else {
+                <span class="shifts__muted">Enlace desactivado.</span>
+              }
+            }
+          </div>
+        }
+
+        @if (loading()) {
+          <p class="shifts__muted">Cargando matriz…</p>
+        }
+        @if (error()) {
+          <p class="msg msg--error">{{ error() }}</p>
+        }
+
+        @if (matrix(); as m) {
+          <table class="shifts__matrix">
+            <thead>
+              <tr>
+                <th class="shifts__col-name">Nombre</th>
+                @for (col of m.columns; track col.date) {
+                  <th [class.shifts__col--today]="col.isToday">
+                    <span class="shifts__day-name">{{ col.dayShort }}</span>
+                    <span class="shifts__day-date">{{ col.date.slice(5) }}</span>
+                  </th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of m.rows; track row.userId) {
+                <tr>
+                  <td class="shifts__row-name">
+                    <span class="shifts__r-name">{{ row.name }}</span>
+                    <span class="shifts__r-role">{{ row.role }}</span>
+                  </td>
+                  @for (day of row.days; track day.date) {
+                    <td class="shifts__cell" [class.shifts__cell--clickable]="perms.isAdmin()"
+                      [class.shifts__cell--special]="day.condition !== 'office'"
+                      [style.--c]="conditionColorVar[day.condition]"
+                      (click)="startEdit(row.userId, day.date, day.condition)">
+                      @if (isEditing(row.userId, day.date)) {
+                        <div class="shifts__edit" (click)="$event.stopPropagation()">
+                          <select [ngModel]="editCondition()" (ngModelChange)="editCondition.set($event)">
+                            @for (c of conditions; track c) {
+                              <option [value]="c">{{ conditionLabels[c] }}</option>
+                            }
+                          </select>
+                          <div class="shifts__edit-actions">
+                            <app-button variant="primary" [disabled]="savingEdit()" (pressed)="saveEdit()">Guardar</app-button>
+                            <app-button variant="text" [disabled]="savingEdit()" (pressed)="cancelEdit()">Cancelar</app-button>
+                          </div>
+                        </div>
+                      } @else {
+                        @if (day.marker) {
+                          <span class="shifts__marker">{{ day.marker }}</span>
+                        }
+                        <span class="shifts__label">{{ day.label }}</span>
+                      }
+                    </td>
+                  }
+                </tr>
+              }
+              @if (m.rows.length === 0) {
+                <tr>
+                  <td class="shifts__empty" [attr.colspan]="m.columns.length + 1">Sin personal activo para mostrar.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </section>
+    }
+    @case ('checklist') {
+      <app-placeholder title="Mi Turno" builtInPhase="la Fase 11" />
+    }
+  }
+</div>

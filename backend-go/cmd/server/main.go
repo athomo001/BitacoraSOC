@@ -135,6 +135,8 @@ func run(logger *slog.Logger) error {
 		flags, err := (&repository.ModuleAccess{Queries: queries}).InstanceFlags(r.Context())
 		return err == nil && flags.NOC
 	}}
+	rotationHandler := &handler.RotationHandler{Queries: queries, AuditLog: auditLog}
+	dotacionHandler := &handler.DotacionHandler{Queries: queries, AuditLog: auditLog, PublicBaseURL: publicBaseURL}
 
 	// Composición de middlewares por ruta — ver internal/middleware/auth.go:
 	// RequireNotForcedPasswordChange NO se aplica a las 4 rutas que
@@ -297,6 +299,32 @@ func run(logger *slog.Logger) error {
 	mux.Handle("DELETE /api/maintenance-windows/{id}", admin(escalationHandler.DeleteWindow))
 	mux.Handle("GET /api/raci-assignments", authed(escalationHandler.ListRaci))
 	mux.Handle("POST /api/raci-assignments", admin(escalationHandler.CreateRaci))
+
+	// Turnos y rotación de guardia (Fase 8, HU-4/HU-5) — núcleo siempre
+	// activo, sin gate SOC/NOC. GET/POST/PATCH de rotation-slots no estaban
+	// en el contrato original (faltaba forma de armar/pausar el rol semanal,
+	// ver spec/04-contratos-api.md sección "Turnos") — agregados en esta fase.
+	mux.Handle("GET /api/rotation-cycles", authed(rotationHandler.ListCycles))
+	mux.Handle("POST /api/rotation-cycles", admin(rotationHandler.CreateCycle))
+	mux.Handle("GET /api/rotation-slots/current", authed(rotationHandler.CurrentSlot))
+	mux.Handle("GET /api/rotation-slots", authed(rotationHandler.ListSlots))
+	mux.Handle("POST /api/rotation-slots", admin(rotationHandler.CreateSlot))
+	mux.Handle("PATCH /api/rotation-slots/{id}", admin(rotationHandler.PatchSlot))
+	mux.Handle("POST /api/rotation-overrides", admin(rotationHandler.CreateOverride))
+	mux.Handle("GET /api/work-shifts", authed(rotationHandler.ListWorkShifts))
+	mux.Handle("POST /api/work-shifts", admin(rotationHandler.CreateWorkShift))
+
+	// Dotación, teletrabajo y pantalla TV (Fase 8, HU-4b/HU-5b) — núcleo
+	// siempre activo.
+	mux.Handle("GET /api/work-shifts/matrix", authed(dotacionHandler.Matrix))
+	mux.Handle("POST /api/work-shifts/assignments", admin(dotacionHandler.CreateAssignment))
+	mux.Handle("POST /api/public-shares/telework", admin(dotacionHandler.PublicShareAction))
+	mux.Handle("GET /api/work-shifts/notification-schedules", admin(dotacionHandler.ListNotificationSchedules))
+	mux.Handle("POST /api/work-shifts/notification-schedules", admin(dotacionHandler.CreateNotificationSchedule))
+	mux.Handle("PATCH /api/work-shifts/notification-schedules/{id}", admin(dotacionHandler.PatchNotificationSchedule))
+	// Página pública sin login para la TV de sala (HU-4b) — primer endpoint
+	// HTML del backend, fuera del envoltorio {data} y sin auth a propósito.
+	mux.HandleFunc("GET /p/telework/{token}", dotacionHandler.PublicTeleworkPage)
 
 	// SPA de Angular embebida (Fase 3) — catch-all, siempre al final.
 	spaHandler, err := web.Handler()

@@ -133,7 +133,7 @@ type resolvedMemberDTO struct {
 	RoleInTeam    string               `json:"roleInTeam"`
 	RecipientType string               `json:"recipientType"`
 	Priority      int32                `json:"priority"`
-	OnCallNow     bool                 `json:"onCallNow"` // turnos/guardias llegan en la Fase 8: hoy siempre false
+	OnCallNow     bool                 `json:"onCallNow"` // Fase 8: true si el equipo tiene rotación activa y este es quien está de guardia ahora
 	Channels      []resolvedChannelDTO `json:"channels"`
 }
 
@@ -413,7 +413,25 @@ func (h *EscalationHandler) fillSteps(ctx context.Context, res *resolutionDTO, s
 			res.members[m.ID] = memberInfo{dto: dto, stepOr: st.Order}
 			pureMembers = append(pureMembers, escalation.Member{ID: m.ID, Name: m.Name, Role: escalation.Role(m.RoleInTeam), Priority: m.Priority})
 		}
-		// Los miembros salen en el orden de llamada (principales primero).
+		// Fase 8: si el equipo tiene un ciclo de rotación activo, marca quién
+		// está de guardia ahora para que se llame primero — cierra el gap
+		// dejado por la Fase 7 (onCallNow hoy siempre false, ver
+		// resolvedMemberDTO). Un error acá no debe tumbar /resolve: sin datos
+		// de rotación, el equipo simplemente se ordena como antes.
+		if current, err := resolveCurrentTeamMember(ctx, h.Queries, st.TeamID, h.now()); err == nil && current != nil {
+			for i := range pureMembers {
+				if pureMembers[i].ID != current.TeamMemberID {
+					continue
+				}
+				pureMembers[i].OnCall = true
+				if dto, ok := byID[pureMembers[i].ID]; ok {
+					dto.OnCallNow = true
+					byID[pureMembers[i].ID] = dto
+				}
+			}
+		}
+		// Los miembros salen en el orden de llamada (de guardia primero,
+		// luego principales).
 		for _, pm := range escalation.OrderMembers(pureMembers) {
 			teamDTO.Members = append(teamDTO.Members, byID[pm.ID])
 		}

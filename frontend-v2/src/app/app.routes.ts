@@ -41,8 +41,7 @@ export const routes: Routes = [
       },
       {
         path: 'shifts',
-        component: PlaceholderComponent,
-        data: { title: 'Turnos y Checklist', builtInPhase: 'las Fases 8 y 11' },
+        loadComponent: () => import('./features/shifts/shifts').then((module) => module.ShiftsComponent),
       },
       {
         path: 'escalation',

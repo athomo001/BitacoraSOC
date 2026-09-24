@@ -89,6 +89,17 @@ func TestOrderMembers(t *testing.T) {
 	}
 }
 
+func TestOrderMembers_OnCallGoesFirstRegardlessOfRole(t *testing.T) {
+	// Fase 8: quien está de guardia ahora (resuelto por internal/rotation) se
+	// llama primero aunque su rol documental sea "backup".
+	ms := members()
+	ms[0].OnCall = true // "Respaldo" está de guardia ahora
+	got := OrderMembers(ms)
+	if got[0].Name != "Respaldo" {
+		t.Fatalf("esperaba que el miembro de guardia fuera primero, got %s", got[0].Name)
+	}
+}
+
 func TestRecipients_ByMode(t *testing.T) {
 	if r := Recipients(ModePool, members()); len(r) != 3 {
 		t.Fatalf("pool avisa a todos, got %d", len(r))

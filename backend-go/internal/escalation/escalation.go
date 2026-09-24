@@ -129,15 +129,23 @@ func CoverageSteps(teams []CoverageTeam) []Step {
 }
 
 // Member es un miembro de equipo (usuario interno o contacto del directorio).
+// OnCall lo llena el handler consultando el motor de rotación de la Fase 8
+// (internal/rotation.Resolve) cuando el equipo tiene un ciclo activo — un
+// equipo sin rotación configurada deja OnCall=false en todos sus miembros y
+// el orden se resuelve solo por rol/prioridad, igual que antes de la Fase 8.
 type Member struct {
 	ID       uuid.UUID
 	Name     string
 	Role     Role
 	Priority int32
+	OnCall   bool
 }
 
-func roleRank(r Role) int {
-	switch r {
+func roleRank(m Member) int {
+	if m.OnCall {
+		return -1 // quien está de guardia ahora se llama primero, sin importar su rol documental
+	}
+	switch m.Role {
 	case RolePrimary:
 		return 0
 	case RoleLead:
@@ -146,12 +154,13 @@ func roleRank(r Role) int {
 	return 2 // backup al final
 }
 
-// OrderMembers ordena para llamar: principales primero, después líder y
-// respaldo; dentro de cada rol, por prioridad ascendente.
+// OrderMembers ordena para llamar: primero quien está de guardia ahora
+// (Fase 8), después principales, líder y respaldo; dentro de cada grupo, por
+// prioridad ascendente.
 func OrderMembers(members []Member) []Member {
 	out := append([]Member(nil), members...)
 	sort.SliceStable(out, func(i, j int) bool {
-		if ri, rj := roleRank(out[i].Role), roleRank(out[j].Role); ri != rj {
+		if ri, rj := roleRank(out[i]), roleRank(out[j]); ri != rj {
 			return ri < rj
 		}
 		return out[i].Priority < out[j].Priority
