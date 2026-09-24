@@ -239,6 +239,33 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 	return i, err
 }
 
+const listActiveUserEmailsByRole = `-- name: ListActiveUserEmailsByRole :many
+SELECT email FROM users
+WHERE active = true
+  AND ($1::user_role IS NULL OR role = $1)
+ORDER BY email
+`
+
+func (q *Queries) ListActiveUserEmailsByRole(ctx context.Context, role NullUserRole) ([]string, error) {
+	rows, err := q.db.Query(ctx, listActiveUserEmailsByRole, role)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var email string
+		if err := rows.Scan(&email); err != nil {
+			return nil, err
+		}
+		items = append(items, email)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUsers = `-- name: ListUsers :many
 SELECT id, username, email, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at FROM users
 WHERE ($1::user_role IS NULL OR role = $1)

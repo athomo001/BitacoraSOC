@@ -212,6 +212,17 @@ func (q *Queries) GetEntry(ctx context.Context, id uuid.UUID) (GetEntryRow, erro
 	return i, err
 }
 
+const getServiceOrganizationID = `-- name: GetServiceOrganizationID :one
+SELECT organization_id FROM services WHERE id = $1
+`
+
+func (q *Queries) GetServiceOrganizationID(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, getServiceOrganizationID, id)
+	var organization_id uuid.UUID
+	err := row.Scan(&organization_id)
+	return organization_id, err
+}
+
 const listEntries = `-- name: ListEntries :many
 SELECT e.id, e.user_id, e.entry_type, e.scope, e.content, e.tags, e.service_id, e.asset_id, e.work_shift_id, e.glpi_ticket_id, e.glpi_linked_at, e.ticket_id, e.image_url, e.image_hash, e.image_size_bytes, e.created_at, e.updated_at, u.username AS author_username
 FROM entries e JOIN users u ON u.id = e.user_id
@@ -424,6 +435,40 @@ func (q *Queries) PatchEntry(ctx context.Context, arg PatchEntryParams) (Entry, 
 		arg.ServiceID,
 		arg.AssetID,
 	)
+	var i Entry
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.EntryType,
+		&i.Scope,
+		&i.Content,
+		&i.Tags,
+		&i.ServiceID,
+		&i.AssetID,
+		&i.WorkShiftID,
+		&i.GlpiTicketID,
+		&i.GlpiLinkedAt,
+		&i.TicketID,
+		&i.ImageUrl,
+		&i.ImageHash,
+		&i.ImageSizeBytes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateEntryTicket = `-- name: UpdateEntryTicket :one
+UPDATE entries SET ticket_id = $2, updated_at = now() WHERE id = $1 RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at
+`
+
+type UpdateEntryTicketParams struct {
+	ID       uuid.UUID   `json:"id"`
+	TicketID pgtype.UUID `json:"ticket_id"`
+}
+
+func (q *Queries) UpdateEntryTicket(ctx context.Context, arg UpdateEntryTicketParams) (Entry, error) {
+	row := q.db.QueryRow(ctx, updateEntryTicket, arg.ID, arg.TicketID)
 	var i Entry
 	err := row.Scan(
 		&i.ID,

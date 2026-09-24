@@ -4,6 +4,28 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] Fase 11 — Checklists y Cierre de Turno — avance inicial - 2026-09-24
+
+- **Backend**: motor puro de roll-up “peor estado gana” con tests, plantillas activas, creación/listado de checks, alternancia inicio/cierre, cierre formal con KPIs de entradas/tickets, mantenimientos próximas 4h y confirmación del relevo.
+- **Frontend**: la pestaña `Mi Turno` dejó de ser placeholder; permite seleccionar plantilla/turno, responder ítems hoja, registrar observaciones rojas, guardar el check y consultar/confirmar el handover.
+- **Verificación**: `go test ./...`, `pnpm run build` y Stylelint del CSS de turnos en verde. El build mantiene el warning de presupuesto preexistente de `login.component.scss`.
+- **Pendiente para cerrar la fase**: correlación por palabras clave, auditoría `checklist.abandoned` con debounce, alertas NOK por correo, despacho del cierre y resumen detallado de guardia por equipo.
+
+## [Rewrite] Fases 10-11 — cierre de implementación - 2026-09-24
+
+- **Fase 10**: entrada y ticket transaccionales (`createTicket`/`ticketNumber`), conversión y resolución de entradas, reapertura al comentar tickets resueltos, creación de tickets, comentarios y tareas desde Angular, y vínculo desde el cajón de Bitácora.
+- **Fase 11**: entrada automática de checklist en Bitácora, correlación de servicios rojos, auditoría de abandono, alertas NOK SMTP configurables, cierre con despacho de correo y handover con guardia activa.
+- **Integración deliberadamente fuera del corte**: `syncGlpi` responde `409 integration-unavailable`; GLPI continúa en Backlog Post-Corte.
+- **Verificación**: migración `000006` aplicada en PostgreSQL de desarrollo; `go test ./...`, `go vet ./...`, build Angular, 58 tests frontend y Stylelint en verde. Falta la ronda end-to-end autenticada contra datos de negocio reales.
+
+## [Rewrite] Fase 10 — Ticketing Nativo ITIL — avance inicial - 2026-09-24
+
+- **Backend — núcleo de ticketera**: queries sqlc y `TicketsHandler` para listado, creación con correlativo anual atómico (`TKT-YYYY-XXXXX`), detalle, transición de estados, pausa SLA en `pending_vendor`, comentarios, tareas con tiempo trabajado y seguimiento público protegido por token/PIN.
+- **Integración**: gate dinámico `native_tickets`, vínculo `POST /api/entries/:id/ticket-link` con comentario interno automático y rutas públicas/privadas registradas.
+- **Frontend**: servicio y vista `/tickets` con búsqueda, listado, detalle y cambio de estado; navegación opcional añadida al shell.
+- **Verificación**: `go test ./...`, `pnpm run build` y `pnpm exec stylelint src/app/features/tickets/tickets.css` en verde. El build mantiene el warning de presupuesto preexistente de `login.component.scss`.
+- **Pendiente para cerrar la fase**: creación transaccional desde `POST /api/entries` (`createTicket=true`), conversión/resolución de entradas, formulario Angular de alta/comentarios/tareas y verificación end-to-end contra Postgres/browser.
+
 ## [Rewrite] Fase 1 — Decisiones y ADRs - 2026-09-22
 
 - **Docs — Cierre formal de las 4 decisiones abiertas de la Fase 1** (`spec/02-alcance-y-roadmap.md`): (1) Rol de `Client.js` vs `CatalogLogSource.js` investigado en el código legacy real — `Client` no tiene uso activo en ningún controlador, solo lo tocan el dump genérico de backups y un script de migración ya ejecutado (`migrate-escalation-clients-to-log-sources.js`) que consolidó los `Client` existentes hacia `CatalogLogSource`; no se migra. (2) `system_features` vs `app_config.soc_module_enabled`/`noc_module_enabled`: conviven como mecanismos separados (decisión del dueño). (3) Lista de alcance "fuera del corte inicial" aprobada tal cual por el dueño. (4) 11 ADRs redactados en `docs/adr/0001` a `0011` (PostgreSQL sobre MongoDB, backend Go stdlib+sqlc sin chi/ent, corte único con rollback de 14 días, motor de escalación unificado, Docker Compose de 2 contenedores sin Kubernetes, ticketing nativo ITIL como núcleo con GLPI opcional, hashing de contraseñas bcrypt costo 12, rate limiting de login sin Redis, convivencia `system_features`/módulos, no-migración de `Client.js`, design system Geist Sans/paleta grafito).

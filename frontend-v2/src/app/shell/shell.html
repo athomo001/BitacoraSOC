@@ -1,6 +1,6 @@
 <div class="shell">
   <nav class="shell__sidebar" aria-label="Navegación principal">
-    @for (item of navItems; track item.path) {
+    @for (item of navItems(); track item.path) {
       <a
         class="shell__nav-item"
         [routerLink]="['/', item.path]"

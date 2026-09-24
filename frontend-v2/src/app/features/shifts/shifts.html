@@ -102,7 +102,18 @@
       </section>
     }
     @case ('checklist') {
-      <app-placeholder title="Mi Turno" builtInPhase="la Fase 11" />
+      <section class="panel shifts__checklist">
+        <div class="shifts__checklist-head"><div><p class="shifts__eyebrow">Control de turno</p><h2>Mi checklist</h2></div><button type="button" class="shifts__handover-button" (click)="loadHandover()">Ver relevo</button></div>
+        @if (checklistLoading()) { <p class="shifts__muted">Cargando checklist...</p> }
+        @if (checklistSaved(); as message) { <p class="msg msg--success">{{ message }}</p> }
+        @if (selectedTemplate(); as template) {
+          <div class="shifts__checklist-controls"><label>Plantilla<select [ngModel]="template.id" (ngModelChange)="selectTemplate($event); markChecklistTouched()">@for (option of checklistTemplates(); track option.id) { <option [value]="option.id">{{ option.name }}</option> }</select></label><label>Turno<select [ngModel]="selectedWorkShiftId()" (ngModelChange)="selectedWorkShiftId.set($event); markChecklistTouched()"><option value="">Seleccionar turno</option>@for (shift of workShifts(); track shift.id) { <option [value]="shift.id">{{ shift.name }}</option> }</select></label><label>Momento<select [ngModel]="checkType()" (ngModelChange)="checkType.set($event); markChecklistTouched()"><option value="inicio">Inicio</option><option value="cierre">Cierre</option></select></label></div>
+          <div class="shifts__checklist-items">@for (item of template.items; track item.id) { @if (isLeaf(item.id)) { <div class="shifts__check-item"><div><strong>{{ item.title }}</strong><span>Ítem hoja</span></div><div class="shifts__check-answer"><select [(ngModel)]="checkValues[item.id].status" (ngModelChange)="markChecklistTouched()"><option value="verde">Verde</option><option value="rojo">Rojo</option></select><input [(ngModel)]="checkValues[item.id].observation" (ngModelChange)="markChecklistTouched()" placeholder="Observación si queda rojo" /></div></div> } }</div>
+          <button type="button" class="shifts__submit-check" [disabled]="checklistLoading() || !selectedWorkShiftId()" (click)="submitChecklist()">Guardar checklist</button>
+          @if (lastCheck(); as check) { @if (check.checkType === 'cierre') { <div class="shifts__closure-form"><label>Observaciones<textarea [(ngModel)]="closureObservations"></textarea></label><label>Pendientes para el siguiente turno<textarea [(ngModel)]="pendingForNextShift"></textarea></label><label class="shifts__check-toggle"><input type="checkbox" [(ngModel)]="notifyEmail" /> Notificar por correo</label><label class="shifts__check-toggle"><input type="checkbox" [(ngModel)]="syncGlpi" /> Sincronizar con GLPI</label><button type="button" class="shifts__submit-check" [disabled]="checklistLoading()" (click)="closeShift()">Cerrar turno</button></div> } }
+        } @else { <p class="shifts__muted">No hay plantillas activas configuradas.</p> }
+        @if (handover(); as relay) { <aside class="shifts__handover"><h3>Relevo anterior</h3>@if (relay.previousClosure; as closure) { <p>{{ closure.pendingForNextShift || 'Sin pendientes registrados.' }}</p>@if (!closure.acknowledgedAt) { <button type="button" class="shifts__submit-check" (click)="acknowledgeHandover()">Confirmar lectura</button> } @else { <span class="shifts__muted">Relevo confirmado.</span> } } @else { <p class="shifts__muted">No hay cierre anterior.</p> }<h3>Mantenimientos próximas 4h</h3>@for (window of relay.upcomingMaintenanceWindows; track window.id) { <p><strong>{{ window.title }}</strong><br>{{ window.startsAt | date:'HH:mm' }} - {{ window.endsAt | date:'HH:mm' }}</p> }</aside> }
+      </section>
     }
   }
 </div>

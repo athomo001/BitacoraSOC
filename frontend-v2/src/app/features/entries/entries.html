@@ -115,6 +115,10 @@
       <span>Tags (separados por coma)</span>
       <input [ngModel]="draft().tags" (ngModelChange)="updateDraft({ tags: $event })" placeholder="fibra, otdr" />
     </label>
+    <label class="field entries__tags-field">
+      <span>Vincular a ticket existente (opcional)</span>
+      <input [ngModel]="draft().ticketNumber" (ngModelChange)="updateDraft({ ticketNumber: $event })" placeholder="TKT-2026-00042" />
+    </label>
     <div class="entries__image-row">
       @if (composeImage(); as img) {
         <span class="entries__image-preview"><img [src]="img.previewUrl" alt="Evidencia" /> <button type="button" (click)="removeImage()">✖ Quitar</button></span>

@@ -90,8 +90,8 @@ export class EntriesService {
     return (await firstValueFrom(this.http.get<ApiEnvelope<EntryDetail>>(`/api/entries/${id}`))).data;
   }
 
-  async create(entry: { entryType: EntryType; scope?: EntryScope; content: string; tags?: string[]; serviceId?: string; assetId?: string; imageUrl?: string }): Promise<Entry> {
-    return (await firstValueFrom(this.http.post<ApiEnvelope<Entry>>('/api/entries', entry))).data;
+  async create(entry: { entryType: EntryType; scope?: EntryScope; content: string; tags?: string[]; serviceId?: string; assetId?: string; imageUrl?: string; ticketNumber?: string }): Promise<Entry | { entry: Entry; ticket: unknown }> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<Entry | { entry: Entry; ticket: unknown }>>('/api/entries', entry))).data;
   }
 
   async patch(id: string, patch: Partial<{ scope: EntryScope; content: string; tags: string[]; serviceId: string; assetId: string }>): Promise<Entry> {

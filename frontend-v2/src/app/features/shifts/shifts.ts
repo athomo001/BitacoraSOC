@@ -1,9 +1,10 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ButtonComponent } from '../../shared/ui/button/button';
-import { PlaceholderComponent } from '../../shared/ui/placeholder/placeholder';
 import { PermissionsService } from '../../core/auth/permissions.service';
 import { problemDetail } from '../../core/http-error';
+import { ChecklistsService, ChecklistTemplate, Handover, ShiftCheck } from '../../core/checklists/checklists.service';
 import {
   CONDITION_COLOR_VAR,
   CONDITION_LABELS,
@@ -11,6 +12,7 @@ import {
   PublicShare,
   ShiftsService,
   TeleworkCondition,
+  WorkShift,
 } from '../../core/shifts/shifts.service';
 
 type ShiftsTab = 'dotacion' | 'checklist';
@@ -45,7 +47,7 @@ function mondayOf(d: Date): Date {
 @Component({
   selector: 'app-shifts',
   standalone: true,
-  imports: [FormsModule, ButtonComponent, PlaceholderComponent],
+  imports: [FormsModule, DatePipe, ButtonComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './shifts.html',
   styleUrl: './shifts.css',
@@ -56,6 +58,8 @@ export class ShiftsComponent implements OnInit {
   protected readonly conditions = ALL_CONDITIONS;
 
   private readonly api = inject(ShiftsService);
+  private readonly checklistsApi = inject(ChecklistsService);
+  private readonly destroyRef = inject(DestroyRef);
   protected readonly perms = inject(PermissionsService);
 
   protected readonly tab = signal<ShiftsTab>('dotacion');
@@ -70,6 +74,22 @@ export class ShiftsComponent implements OnInit {
   protected readonly editing = signal<{ userId: string; date: string } | null>(null);
   protected readonly editCondition = signal<TeleworkCondition>('office');
   protected readonly savingEdit = signal(false);
+  protected readonly checklistTemplates = signal<ChecklistTemplate[]>([]);
+  protected readonly selectedTemplate = signal<ChecklistTemplate | null>(null);
+  protected readonly workShifts = signal<WorkShift[]>([]);
+  protected readonly selectedWorkShiftId = signal('');
+  protected readonly checkType = signal<'inicio' | 'cierre'>('inicio');
+  protected readonly checklistTouched = signal(false);
+  protected readonly lastCheck = signal<ShiftCheck | null>(null);
+  protected closureObservations = '';
+  protected pendingForNextShift = '';
+  protected notifyEmail = false;
+  protected syncGlpi = false;
+  protected readonly checklistLoading = signal(false);
+  protected readonly checklistSaved = signal<string | null>(null);
+  protected readonly handover = signal<Handover | null>(null);
+  protected readonly handoverLoading = signal(false);
+  protected readonly checkValues: Record<string, { status: 'verde' | 'rojo'; observation: string }> = {};
 
   protected readonly weekLabel = computed(() => {
     const m = this.matrix();
@@ -79,7 +99,83 @@ export class ShiftsComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.perms.load();
-    await this.loadMatrix();
+    await Promise.all([this.loadMatrix(), this.loadChecklist()]);
+    this.destroyRef.onDestroy(() => {
+      if (this.checklistTouched() && !this.checklistSaved()) void this.checklistsApi.abandoned();
+    });
+  }
+
+  private async loadChecklist(): Promise<void> {
+    this.checklistLoading.set(true);
+    try {
+      const [templates, shifts] = await Promise.all([this.checklistsApi.activeTemplates(), this.api.listWorkShifts(true)]);
+      this.checklistTemplates.set(templates);
+      this.workShifts.set(shifts);
+      this.selectedTemplate.set(templates[0] ?? null);
+      this.selectedWorkShiftId.set(shifts[0]?.id ?? '');
+      this.resetCheckValues(templates[0]);
+    } catch (error) {
+      this.error.set(problemDetail(error, 'No se pudieron cargar los checklists.'));
+    } finally {
+      this.checklistLoading.set(false);
+    }
+  }
+
+  protected selectTemplate(id: string): void {
+    const template = this.checklistTemplates().find(item => item.id === id) ?? null;
+    this.selectedTemplate.set(template);
+    this.resetCheckValues(template);
+  }
+
+  private resetCheckValues(template: ChecklistTemplate | null): void {
+    for (const key of Object.keys(this.checkValues)) delete this.checkValues[key];
+    for (const item of template?.items ?? []) {
+      if (!item.parentItemId) this.checkValues[item.id] = { status: 'verde', observation: '' };
+    }
+  }
+
+  protected isLeaf(itemId: string): boolean {
+    return !this.selectedTemplate()?.items.some(item => item.parentItemId === itemId);
+  }
+
+  protected async submitChecklist(): Promise<void> {
+    const template = this.selectedTemplate();
+    if (!template || !this.selectedWorkShiftId()) return;
+    this.checklistLoading.set(true);
+    this.error.set(null);
+    try {
+      const services = template.items.filter(item => this.isLeaf(item.id)).map(item => ({ checklistItemId: item.id, serviceTitle: item.title, status: this.checkValues[item.id].status, observation: this.checkValues[item.id].observation }));
+      this.lastCheck.set(await this.checklistsApi.create({ checklistTemplateId: template.id, workShiftId: this.selectedWorkShiftId(), checkType: this.checkType(), services }));
+      this.checklistSaved.set(`Checklist de ${this.checkType()} guardado.`);
+      this.checklistTouched.set(false);
+    } catch (error) {
+      this.error.set(problemDetail(error, 'No se pudo guardar el checklist.'));
+    } finally {
+      this.checklistLoading.set(false);
+    }
+  }
+
+  protected markChecklistTouched(): void { this.checklistTouched.set(true); }
+
+  protected async closeShift(): Promise<void> {
+    const check = this.lastCheck();
+    if (!check || check.checkType !== 'cierre') return;
+    this.checklistLoading.set(true);
+    try {
+      await this.checklistsApi.close({ closureCheckId: check.id, observations: this.closureObservations, pendingForNextShift: this.pendingForNextShift, notifyEmail: this.notifyEmail, syncGlpi: this.syncGlpi });
+      this.checklistSaved.set('Cierre de turno guardado.');
+    } catch (error) { this.error.set(problemDetail(error, 'No se pudo cerrar el turno.')); } finally { this.checklistLoading.set(false); }
+  }
+
+  protected async loadHandover(): Promise<void> {
+    this.handoverLoading.set(true);
+    try { this.handover.set(await this.checklistsApi.handover()); } catch (error) { this.error.set(problemDetail(error, 'No se pudo cargar el relevo.')); } finally { this.handoverLoading.set(false); }
+  }
+
+  protected async acknowledgeHandover(): Promise<void> {
+    const closure = this.handover()?.previousClosure;
+    if (!closure) return;
+    try { await this.checklistsApi.acknowledge(closure.id); await this.loadHandover(); } catch (error) { this.error.set(problemDetail(error, 'No se pudo confirmar el relevo.')); }
   }
 
   private async loadMatrix(): Promise<void> {

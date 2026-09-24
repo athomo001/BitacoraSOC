@@ -136,8 +136,11 @@ func run(logger *slog.Logger) error {
 		return err == nil && flags.NOC
 	}}
 	rotationHandler := &handler.RotationHandler{Queries: queries, AuditLog: auditLog}
+	checklistsHandler := &handler.ChecklistsHandler{Pool: pool, Queries: queries, AuditLog: auditLog, Crypto: cryptoBox}
 	dotacionHandler := &handler.DotacionHandler{Queries: queries, AuditLog: auditLog, PublicBaseURL: publicBaseURL}
-	entriesHandler := &handler.EntriesHandler{Queries: queries, AuditLog: auditLog}
+	entriesHandler := &handler.EntriesHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
+	ticketsHandler := &handler.TicketsHandler{Pool: pool, Queries: queries}
+	entriesHandler.Tickets = ticketsHandler
 	notesHandler := &handler.NotesHandler{Queries: queries, AuditLog: auditLog}
 	draftsHandler := &handler.DraftsHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
 
@@ -158,6 +161,11 @@ func run(logger *slog.Logger) error {
 	}
 	public := func(h http.HandlerFunc) http.Handler {
 		return apiRateLimit(h)
+	}
+	ticketAuthed := func(h http.HandlerFunc) http.Handler {
+		return authed(func(w http.ResponseWriter, r *http.Request) {
+			ticketsHandler.RequireEnabled(w, r, h)
+		})
 	}
 	// Gate de módulo de dominio (HU-0/0b/PERM-2): 403 si la instancia tiene
 	// el módulo apagado o el usuario no lo tiene en su alcance. Va dentro de
@@ -317,6 +325,15 @@ func run(logger *slog.Logger) error {
 	mux.Handle("GET /api/work-shifts", authed(rotationHandler.ListWorkShifts))
 	mux.Handle("POST /api/work-shifts", admin(rotationHandler.CreateWorkShift))
 
+	// Checklists y cierre de turno (Fase 11).
+	mux.Handle("GET /api/checklist-templates/active", authed(checklistsHandler.ActiveTemplates))
+	mux.Handle("GET /api/shift-checks", authed(checklistsHandler.List))
+	mux.Handle("POST /api/shift-checks", authed(checklistsHandler.Create))
+	mux.Handle("POST /api/shift-checks/abandoned", authed(checklistsHandler.Abandoned))
+	mux.Handle("POST /api/shift-checks/close", authed(checklistsHandler.Close))
+	mux.Handle("GET /api/shift-checks/handover", authed(checklistsHandler.Handover))
+	mux.Handle("POST /api/shift-checks/closures/{id}/acknowledge", authed(checklistsHandler.Acknowledge))
+
 	// Dotación, teletrabajo y pantalla TV (Fase 8, HU-4b/HU-5b) — núcleo
 	// siempre activo.
 	mux.Handle("GET /api/work-shifts/matrix", authed(dotacionHandler.Matrix))
@@ -341,6 +358,21 @@ func run(logger *slog.Logger) error {
 	mux.Handle("DELETE /api/entries/{id}", authed(entriesHandler.Delete))
 	mux.Handle("POST /api/entries/{id}/comments", authed(entriesHandler.AddComment))
 	mux.Handle("GET /api/attachments/{id}", authed(entriesHandler.ServeAttachment))
+
+	// Ticketera nativa ITIL (Fase 10). El feature gate se evalúa por request:
+	// apagar native_tickets revoca inmediatamente todas las rutas privadas.
+	mux.Handle("GET /api/tickets", ticketAuthed(ticketsHandler.List))
+	mux.Handle("POST /api/tickets", ticketAuthed(ticketsHandler.Create))
+	mux.Handle("GET /api/tickets/{id}", ticketAuthed(ticketsHandler.Get))
+	mux.Handle("PATCH /api/tickets/{id}", ticketAuthed(ticketsHandler.Patch))
+	mux.Handle("POST /api/tickets/{id}/comments", ticketAuthed(ticketsHandler.AddComment))
+	mux.Handle("GET /api/tickets/{id}/tasks", ticketAuthed(ticketsHandler.ListTasks))
+	mux.Handle("POST /api/tickets/{id}/tasks", ticketAuthed(ticketsHandler.AddTask))
+	mux.Handle("PATCH /api/tickets/{id}/tasks/{taskId}", ticketAuthed(ticketsHandler.PatchTask))
+	mux.Handle("POST /api/entries/{id}/ticket-link", ticketAuthed(ticketsHandler.LinkEntry))
+	mux.Handle("POST /api/entries/{id}/convert-to-ticket", ticketAuthed(ticketsHandler.ConvertEntry))
+	mux.Handle("POST /api/entries/{id}/resolve", ticketAuthed(ticketsHandler.ResolveEntry))
+	mux.Handle("GET /p/tickets/{token}", public(ticketsHandler.Public))
 
 	// Notas Operativas (Fase 9): pizarrón admin + libreta personal.
 	mux.Handle("GET /api/notes/admin", authed(notesHandler.GetAdmin))

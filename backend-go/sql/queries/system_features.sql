@@ -1,6 +1,9 @@
 -- name: ListSystemFeatures :many
 SELECT * FROM system_features ORDER BY code;
 
+-- name: GetSystemFeature :one
+SELECT * FROM system_features WHERE code = $1;
+
 -- name: UpdateSystemFeature :one
 UPDATE system_features SET
   is_enabled = $2,

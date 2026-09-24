@@ -1355,10 +1355,12 @@ type ChecklistItem struct {
 }
 
 type ChecklistTemplate struct {
-	ID        uuid.UUID          `json:"id"`
-	Name      string             `json:"name"`
-	IsActive  bool               `json:"is_active"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	ID                 uuid.UUID          `json:"id"`
+	Name               string             `json:"name"`
+	IsActive           bool               `json:"is_active"`
+	AlertNokEnabled    bool               `json:"alert_nok_enabled"`
+	AlertNokRoleTarget pgtype.Text        `json:"alert_nok_role_target"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
 }
 
 type Client struct {

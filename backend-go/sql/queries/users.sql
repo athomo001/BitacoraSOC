@@ -23,6 +23,12 @@ WHERE (sqlc.narg('role')::user_role IS NULL OR role = sqlc.narg('role'))
   AND (sqlc.narg('active')::boolean IS NULL OR active = sqlc.narg('active'))
 ORDER BY username;
 
+-- name: ListActiveUserEmailsByRole :many
+SELECT email FROM users
+WHERE active = true
+  AND (sqlc.narg('role')::user_role IS NULL OR role = sqlc.narg('role'))
+ORDER BY email;
+
 -- name: UpdateUserAdmin :one
 -- PATCH /api/users/:id — campos parciales: NULL en un parámetro conserva el
 -- valor actual (COALESCE), no lo borra.

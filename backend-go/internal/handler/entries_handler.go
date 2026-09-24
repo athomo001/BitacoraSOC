@@ -5,8 +5,10 @@ import (
 	"encoding/csv"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,6 +19,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const (
@@ -33,7 +36,9 @@ const (
 // ticketNumber/assignedTeamId, Fase 10) ni GLPI (Backlog Post-Corte). Núcleo
 // siempre activo, sin gate SOC/NOC — `scope` es un dato, no un permiso.
 type EntriesHandler struct {
+	Pool     *pgxpool.Pool
 	Queries  *db.Queries
+	Tickets  *TicketsHandler
 	AuditLog *audit.Logger
 	Now      func() time.Time
 }
@@ -99,6 +104,10 @@ func toEntryDTO(e db.Entry, authorUsername string) entryDTO {
 		dto.UpdatedAt = e.UpdatedAt.Time
 	}
 	return dto
+}
+
+func entryFromRow(row db.GetEntryRow) db.Entry {
+	return db.Entry{ID: row.ID, UserID: row.UserID, EntryType: row.EntryType, Scope: row.Scope, Content: row.Content, Tags: row.Tags, ServiceID: row.ServiceID, AssetID: row.AssetID, WorkShiftID: row.WorkShiftID, GlpiTicketID: row.GlpiTicketID, GlpiLinkedAt: row.GlpiLinkedAt, TicketID: row.TicketID, ImageUrl: row.ImageUrl, ImageHash: row.ImageHash, ImageSizeBytes: row.ImageSizeBytes, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 }
 
 type entryCommentDTO struct {
@@ -195,13 +204,18 @@ func (h *EntriesHandler) List(w http.ResponseWriter, r *http.Request) {
 // ===== Crear =====
 
 type createEntryRequest struct {
-	EntryType string     `json:"entryType"`
-	Scope     string     `json:"scope"`
-	Content   string     `json:"content"`
-	Tags      []string   `json:"tags"`
-	ServiceID *uuid.UUID `json:"serviceId,omitempty"`
-	AssetID   *uuid.UUID `json:"assetId,omitempty"`
-	ImageURL  *string    `json:"imageUrl,omitempty"`
+	EntryType      string     `json:"entryType"`
+	Scope          string     `json:"scope"`
+	Content        string     `json:"content"`
+	Tags           []string   `json:"tags"`
+	ServiceID      *uuid.UUID `json:"serviceId,omitempty"`
+	AssetID        *uuid.UUID `json:"assetId,omitempty"`
+	ImageURL       *string    `json:"imageUrl,omitempty"`
+	CreateTicket   bool       `json:"createTicket,omitempty"`
+	TicketType     string     `json:"ticketType,omitempty"`
+	AssignedTeamID *uuid.UUID `json:"assignedTeamId,omitempty"`
+	ClientID       *uuid.UUID `json:"clientId,omitempty"`
+	TicketNumber   string     `json:"ticketNumber,omitempty"`
 }
 
 func validEntryType(t string) bool {
@@ -232,6 +246,10 @@ func (h *EntriesHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	user, _ := middleware.UserFromContext(ctx)
+	if req.CreateTicket || strings.TrimSpace(req.TicketNumber) != "" {
+		h.createWithTicket(w, r, req, scope, user)
+		return
+	}
 
 	var imageURL, imageHash pgtype.Text
 	var imageSize pgtype.Int4
@@ -276,6 +294,96 @@ func (h *EntriesHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	h.AuditLog.Log(ctx, "entry.created", audit.LevelInfo, audit.Success(), map[string]any{"entryId": entry.ID.String(), "entryType": string(entry.EntryType)})
 	writeData(w, http.StatusCreated, toEntryDTO(entry, user.Username))
+}
+
+func (h *EntriesHandler) createWithTicket(w http.ResponseWriter, r *http.Request, req createEntryRequest, scope db.EntryScope, user middleware.AuthenticatedUser) {
+	if h.Pool == nil {
+		problemdetails.Write(w, r, 500, "internal-error", "ticketing transaccional no está disponible")
+		return
+	}
+	ctx := r.Context()
+	tx, err := h.Pool.Begin(ctx)
+	if err != nil {
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudo iniciar la operación transaccional")
+		return
+	}
+	defer tx.Rollback(ctx)
+	queries := h.Queries.WithTx(tx)
+	var ticket db.Ticket
+	if strings.TrimSpace(req.TicketNumber) != "" {
+		ticket, err = queries.GetTicketByNumber(ctx, strings.TrimSpace(req.TicketNumber))
+		if err == pgx.ErrNoRows {
+			problemdetails.Write(w, r, 404, "not-found", "ticket no encontrado")
+			return
+		}
+		if err != nil {
+			problemdetails.Write(w, r, 500, "internal-error", "no se pudo buscar el ticket")
+			return
+		}
+	} else {
+		if req.AssignedTeamID == nil || *req.AssignedTeamID == uuid.Nil || (req.TicketType != "incident" && req.TicketType != "service_request") {
+			problemdetails.Write(w, r, 400, "invalid-payload", "createTicket requiere ticketType y assignedTeamId")
+			return
+		}
+		clientID := uuid.Nil
+		if req.ClientID != nil {
+			clientID = *req.ClientID
+		} else if req.ServiceID != nil {
+			clientID, err = queries.GetServiceOrganizationID(ctx, *req.ServiceID)
+			if err != nil {
+				problemdetails.Write(w, r, 400, "invalid-payload", "el servicio no tiene una organización cliente")
+				return
+			}
+		}
+		if clientID == uuid.Nil {
+			problemdetails.Write(w, r, 400, "invalid-payload", "createTicket requiere clientId o serviceId")
+			return
+		}
+		now := h.now()
+		if _, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1))", strconv.Itoa(now.Year())); err != nil {
+			problemdetails.Write(w, r, 500, "internal-error", "no se pudo reservar el correlativo")
+			return
+		}
+		var seq int
+		if err = tx.QueryRow(ctx, "SELECT COALESCE(MAX(CAST(right(ticket_number, 5) AS integer)), 0) + 1 FROM tickets WHERE ticket_number LIKE $1", fmt.Sprintf("TKT-%04d-%%", now.Year())).Scan(&seq); err != nil {
+			problemdetails.Write(w, r, 500, "internal-error", "no se pudo generar el correlativo")
+			return
+		}
+		token, tokenErr := randomToken()
+		if tokenErr != nil {
+			problemdetails.Write(w, r, 500, "internal-error", "no se pudo crear el seguimiento público")
+			return
+		}
+		resolution := 8 * time.Hour
+		if req.TicketType == "service_request" {
+			resolution = 72 * time.Hour
+		}
+		ticket, err = queries.CreateTicket(ctx, db.CreateTicketParams{TicketNumber: fmt.Sprintf("TKT-%04d-%05d", now.Year(), seq), TicketType: db.TicketType(req.TicketType), Scope: scope, ClientID: clientID, AssignedTeamID: pgtype.UUID{Bytes: *req.AssignedTeamID, Valid: true}, Impact: db.ItilImpact("medium"), Urgency: db.ItilUrgency("medium"), Priority: db.ItilPriorityP3Medium, Title: req.Content, Description: req.Content, SlaResponseDueAt: pgtype.Timestamptz{Time: now.Add(time.Hour), Valid: true}, SlaResolutionDueAt: pgtype.Timestamptz{Time: now.Add(resolution), Valid: true}, PublicTrackingToken: pgtype.Text{String: token, Valid: true}, CreatedBy: pgtype.UUID{Bytes: user.ID, Valid: true}, ServiceID: optionalUUID(req.ServiceID)})
+		if err != nil {
+			problemdetails.Write(w, r, 400, "invalid-payload", "no se pudo crear el ticket desde la entrada")
+			return
+		}
+	}
+	entry, err := queries.CreateEntry(ctx, db.CreateEntryParams{UserID: user.ID, EntryType: db.EntryType(req.EntryType), Scope: scope, Content: req.Content, Tags: req.Tags, ServiceID: optionalUUID(req.ServiceID), AssetID: optionalUUID(req.AssetID)})
+	if err != nil {
+		problemdetails.Write(w, r, 400, "invalid-payload", "no se pudo crear la entrada vinculada")
+		return
+	}
+	entry, err = queries.UpdateEntryTicket(ctx, db.UpdateEntryTicketParams{ID: entry.ID, TicketID: pgtype.UUID{Bytes: ticket.ID, Valid: true}})
+	if err != nil {
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudo vincular la entrada al ticket")
+		return
+	}
+	if _, err = queries.CreateTicketComment(ctx, db.CreateTicketCommentParams{TicketID: ticket.ID, UserID: pgtype.UUID{Bytes: user.ID, Valid: true}, AuthorName: user.Username, Content: req.Content, IsPublic: false}); err != nil {
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudo sincronizar el comentario")
+		return
+	}
+	if err = tx.Commit(ctx); err != nil {
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudo confirmar la entrada y el ticket")
+		return
+	}
+	h.AuditLog.Log(ctx, "entry.created_with_ticket", audit.LevelInfo, audit.Success(), map[string]any{"entryId": entry.ID.String(), "ticketId": ticket.ID.String()})
+	writeData(w, http.StatusCreated, map[string]any{"entry": toEntryDTO(entry, user.Username), "ticket": toTicketDTO(ticket, true)})
 }
 
 // ===== Leer =====
@@ -469,7 +577,8 @@ func (h *EntriesHandler) Export(w http.ResponseWriter, r *http.Request) {
 // ===== Comentarios (HU-7c) =====
 
 type createCommentRequest struct {
-	Comment string `json:"comment"`
+	Comment      string `json:"comment"`
+	SyncToTicket bool   `json:"syncToTicket"`
 }
 
 func (h *EntriesHandler) AddComment(w http.ResponseWriter, r *http.Request) {
@@ -489,7 +598,8 @@ func (h *EntriesHandler) AddComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	if _, err := h.Queries.GetEntry(ctx, entryID); err != nil {
+	entry, err := h.Queries.GetEntry(ctx, entryID)
+	if err != nil {
 		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "entrada no encontrada")
 		return
 	}
@@ -498,6 +608,12 @@ func (h *EntriesHandler) AddComment(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo agregar el comentario")
 		return
+	}
+	if req.SyncToTicket && entry.TicketID.Valid && h.Tickets != nil {
+		if err := h.Tickets.AddEntryCommentToTicket(ctx, uuid.UUID(entry.TicketID.Bytes), user, req.Comment, false); err != nil {
+			problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo sincronizar el comentario con el ticket")
+			return
+		}
 	}
 	h.AuditLog.Log(ctx, "entry.comment_added", audit.LevelInfo, audit.Success(), map[string]any{"entryId": entryID.String(), "commentId": comment.ID.String()})
 	dto := entryCommentDTO{ID: comment.ID, EntryID: comment.EntryID, AuthorUsername: user.Username, Comment: comment.Comment, IsSystemGenerated: comment.IsSystemGenerated}

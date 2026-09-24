@@ -26,9 +26,10 @@ interface ComposeDraft {
   scope: EntryScope;
   content: string;
   tags: string;
+  ticketNumber: string;
 }
 
-const EMPTY_DRAFT: ComposeDraft = { entryType: 'operativa', scope: 'general', content: '', tags: '' };
+const EMPTY_DRAFT: ComposeDraft = { entryType: 'operativa', scope: 'general', content: '', tags: '', ticketNumber: '' };
 
 /**
  * Muro de Bitácora Operativa (/entries, Fase 9, HU-7 y siguientes). Alcance
@@ -254,6 +255,7 @@ export class EntriesComponent implements OnInit {
         content: d.content.trim(),
         tags: d.tags.split(',').map((t) => t.trim()).filter(Boolean),
         imageUrl: this.composeImage()?.url,
+        ticketNumber: d.ticketNumber.trim() || undefined,
       });
       this.draft.set({ ...EMPTY_DRAFT });
       this.removeImage();

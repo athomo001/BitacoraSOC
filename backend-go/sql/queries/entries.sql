@@ -9,6 +9,12 @@
 INSERT INTO entries (user_id, entry_type, scope, content, tags, service_id, asset_id, image_url, image_hash, image_size_bytes)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *;
 
+-- name: UpdateEntryTicket :one
+UPDATE entries SET ticket_id = $2, updated_at = now() WHERE id = $1 RETURNING *;
+
+-- name: GetServiceOrganizationID :one
+SELECT organization_id FROM services WHERE id = $1;
+
 -- name: GetEntry :one
 SELECT e.*, u.username AS author_username
 FROM entries e JOIN users u ON u.id = e.user_id

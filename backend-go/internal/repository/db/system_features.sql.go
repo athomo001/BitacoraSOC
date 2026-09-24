@@ -11,6 +11,25 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getSystemFeature = `-- name: GetSystemFeature :one
+SELECT code, name, description, is_enabled, config_payload, updated_by, updated_at FROM system_features WHERE code = $1
+`
+
+func (q *Queries) GetSystemFeature(ctx context.Context, code string) (SystemFeature, error) {
+	row := q.db.QueryRow(ctx, getSystemFeature, code)
+	var i SystemFeature
+	err := row.Scan(
+		&i.Code,
+		&i.Name,
+		&i.Description,
+		&i.IsEnabled,
+		&i.ConfigPayload,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const listSystemFeatures = `-- name: ListSystemFeatures :many
 SELECT code, name, description, is_enabled, config_payload, updated_by, updated_at FROM system_features ORDER BY code
 `

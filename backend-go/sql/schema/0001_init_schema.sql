@@ -674,6 +674,8 @@ CREATE TABLE checklist_templates (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT true,
+  alert_nok_enabled BOOLEAN NOT NULL DEFAULT false,
+  alert_nok_role_target TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
