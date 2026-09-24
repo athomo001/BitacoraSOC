@@ -48,7 +48,10 @@ Thumbs.db
 
 # Uploads & Backups
 uploads/
-backups/
+/backups/
+# The frontend backup service is source code, not runtime backup data.
+!frontend-v2/src/app/core/backups/
+!frontend-v2/src/app/core/backups/**
 
 # Docker
 docker-compose.override.yml

@@ -73,6 +73,17 @@ function splitList(raw: string): string[] {
           <div class="actions"><button type="submit" class="shifts-admin__submit">Crear ciclo</button></div>
         </form>
 
+        <div class="shifts-admin__calendar-heading"><div><h3>Calendario de guardias</h3><p class="panel__hint">Vista rápida para saber quién cubre cada ventana sin leer la tabla completa.</p></div></div>
+        <div class="shifts-admin__calendar">
+          @for (s of slots(); track s.id) {
+            <article class="shifts-admin__calendar-card" [class.shifts-admin__calendar-card--paused]="s.isPaused">
+              <span class="shifts-admin__calendar-date">{{ s.weekStartDate }} → {{ s.weekEndDate }}</span>
+              <strong>{{ s.displayName }}</strong>
+              <span>{{ s.isPaused ? 'Pausado' : 'Guardia vigente' }}</span>
+            </article>
+          } @empty { <p class="shifts-admin__empty">Agrega personas al rol para ver el calendario.</p> }
+        </div>
+
         <table class="shifts-admin__table">
           <thead><tr><th>Día</th><th>Hora UTC</th><th>Duración</th><th>Zona</th><th>Activo</th></tr></thead>
           <tbody>
@@ -143,16 +154,6 @@ function splitList(raw: string): string[] {
           </tbody>
         </table>
 
-        <div class="shifts-admin__calendar-heading"><div><h3>Calendario de guardias</h3><p class="panel__hint">Vista rápida para saber quién cubre cada ventana sin leer la tabla completa.</p></div></div>
-        <div class="shifts-admin__calendar">
-          @for (s of slots(); track s.id) {
-            <article class="shifts-admin__calendar-card" [class.shifts-admin__calendar-card--paused]="s.isPaused">
-              <span class="shifts-admin__calendar-date">{{ s.weekStartDate }} → {{ s.weekEndDate }}</span>
-              <strong>{{ s.displayName }}</strong>
-              <span>{{ s.isPaused ? 'Pausado' : 'Guardia vigente' }}</span>
-            </article>
-          } @empty { <p class="shifts-admin__empty">Agrega personas al rol para ver el calendario.</p> }
-        </div>
       </section>
 
       <section class="panel">
@@ -336,9 +337,11 @@ export class AdminShiftsComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.run(async () => {
-      this.teams.set(await this.orgs.listTeams());
+      const teams = await this.orgs.listTeams();
+      this.teams.set(teams);
       this.workShifts.set(await this.api.listWorkShifts());
       this.schedules.set(await this.api.listNotificationSchedules());
+      if (teams.length > 0) await this.selectTeam(teams[0].id);
     });
   }
 
@@ -356,7 +359,11 @@ export class AdminShiftsComponent implements OnInit {
       const detail = await this.orgs.getTeam(teamId);
       this.teamDetail.set(detail);
       this.teamMembers.set(detail.members);
-      this.cycles.set(await this.api.listCycles(teamId));
+      const cycles = await this.api.listCycles(teamId);
+      this.cycles.set(cycles);
+      if (cycles.length > 0) {
+        await this.selectCycle(cycles[0]);
+      }
       await this.refreshGuard();
     });
   }

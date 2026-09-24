@@ -19,13 +19,13 @@ jobs:
       run:
         working-directory: frontend-v2
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@v4
         with:
           version: 12
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@v4
         with:
           node-version: "24.19.0"
           cache: "pnpm"
@@ -34,11 +34,17 @@ jobs:
       - name: Instalar dependencias
         run: pnpm install --frozen-lockfile
 
+      - name: Verificar fuentes versionadas
+        run: git ls-files --error-unmatch src/app/core/backups/backups.service.ts
+
       - name: stylelint (anti-AI-look — sin hex sueltos, sin ::ng-deep, sin !important)
         run: pnpm run lint:css
 
       - name: Tests (vitest)
         run: pnpm run test
+
+      - name: Typecheck Angular
+        run: pnpm exec tsc -p tsconfig.app.json --noEmit
 
       - name: Build de producción
         run: pnpm run build

@@ -242,6 +242,7 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/backups/export-delta", authed(backupsHandler.ExportDelta))
 	mux.Handle("POST /api/backups/import-delta", admin(backupsHandler.ImportDelta))
 	mux.Handle("GET /api/backups/{id}/download", admin(backupsHandler.Download))
+	mux.Handle("POST /api/backups/{id}/validate", admin(backupsHandler.Validate))
 	mux.Handle("DELETE /api/backups/{id}", admin(backupsHandler.Delete))
 
 	// Setup modular post-bootstrap y gobernanza de features (Fase 5)

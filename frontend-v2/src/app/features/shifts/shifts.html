@@ -45,6 +45,18 @@
         }
 
         @if (matrix(); as m) {
+          <section class="shifts__calendar-summary">
+            <div class="shifts__calendar-heading"><div><p class="shifts__eyebrow">Vista operativa</p><h2>Resumen semanal</h2><p class="shifts__muted">{{ weekLabel() }}</p></div><span class="shifts__today-badge">Hoy: {{ todayLabel(m) }}</span></div>
+            <div class="shifts__calendar-grid">
+              <div class="shifts__calendar-label">Persona</div>
+              <div class="shifts__calendar-days" [style.grid-template-columns]="'repeat(' + m.columns.length + ', minmax(0, 1fr))'">@for (col of m.columns; track col.date) { <span [class.shifts__calendar-day--today]="col.isToday">{{ col.dayShort }}<small>{{ col.date.slice(5) }}</small></span> }</div>
+              @for (row of m.rows; track row.userId) {
+                <div class="shifts__calendar-label"><strong>{{ row.name }}</strong><small>{{ row.role }}</small></div>
+                <div class="shifts__calendar-days shifts__calendar-days--bars" [style.grid-template-columns]="'repeat(' + m.columns.length + ', minmax(0, 1fr))'">@for (day of row.days; track day.date) { <span class="shifts__calendar-bar" [class.shifts__calendar-bar--today]="m.columns[$index].isToday" [style.--c]="conditionColorVar[day.condition]" [title]="day.label"><b>{{ day.marker }}</b><em>{{ day.label }}</em></span> }</div>
+              }
+            </div>
+            <div class="shifts__calendar-legend"><span><i class="shifts__legend-dot shifts__legend-dot--ok"></i>Teletrabajo</span><span><i class="shifts__legend-dot shifts__legend-dot--warning"></i>Capacitación</span><span><i class="shifts__legend-dot shifts__legend-dot--critical"></i>Ausencia</span><span><i class="shifts__legend-dot shifts__legend-dot--neutral"></i>Oficina</span></div>
+          </section>
           <table class="shifts__matrix">
             <thead>
               <tr>

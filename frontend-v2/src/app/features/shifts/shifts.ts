@@ -97,6 +97,10 @@ export class ShiftsComponent implements OnInit {
     return `${m.columns[0].date} — ${m.columns[m.columns.length - 1].date}`;
   });
 
+  protected todayLabel(matrix: Matrix): string {
+    return matrix.columns.find((column) => column.isToday)?.date ?? matrix.columns[0]?.date ?? '';
+  }
+
   async ngOnInit(): Promise<void> {
     await this.perms.load();
     await Promise.all([this.loadMatrix(), this.loadChecklist()]);
@@ -183,7 +187,7 @@ export class ShiftsComponent implements OnInit {
     this.error.set(null);
     try {
       const from = isoDate(this.weekStart());
-      const to = isoDate(new Date(this.weekStart().getTime() + 4 * 86_400_000));
+      const to = isoDate(new Date(this.weekStart().getTime() + 12 * 86_400_000));
       this.matrix.set(await this.api.matrix(from, to));
     } catch (error) {
       this.error.set(problemDetail(error, 'No se pudo cargar la matriz de dotación.'));

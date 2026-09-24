@@ -49,15 +49,16 @@ const GROUPS: readonly { label: string; tabs: readonly { id: AdminTab; label: st
   imports: [AdminModulesComponent, AdminFeaturesComponent, AdminTerritoryComponent, AdminOrganizationsComponent, AdminTeamsComponent, AdminEscalationComponent, AdminShiftsComponent, AdminSmtpComponent, AdminReportsComponent, AdminBackupsComponent, AdminAuditComponent, AdminAccessComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="admin">
+    <div class="admin" [class.admin--compact]="compact()">
       <h1 class="admin__title">Administración</h1>
       <div class="admin__layout">
-        <aside class="admin__navigation" aria-label="Secciones de administración">
+        <aside class="admin__navigation" [class.admin__navigation--compact]="compact()" aria-label="Secciones de administración">
+          <button type="button" class="admin__compact-toggle" (click)="toggleCompact()" [attr.aria-label]="compact() ? 'Expandir menú' : 'Compactar menú'">{{ compact() ? '»' : '«' }} <span>{{ compact() ? 'Expandir' : 'Compactar' }}</span></button>
           @for (group of groups; track group.label) {
             <div class="admin__group"><h2>{{ group.label }}</h2><div role="tablist">
               @for (tab of group.tabs; track tab.id) {
                 <button type="button" role="tab" class="admin__tab" [class.admin__tab--active]="active() === tab.id"
-                  [attr.aria-selected]="active() === tab.id" (click)="active.set(tab.id)">{{ tab.label }}</button>
+                  [attr.aria-selected]="active() === tab.id" [attr.title]="tab.label" (click)="active.set(tab.id)"><span class="admin__tab-label">{{ tab.label }}</span><span class="admin__tab-icon">{{ tab.label.charAt(0) }}</span></button>
               }
             </div></div>
           }
@@ -86,7 +87,9 @@ const GROUPS: readonly { label: string; tabs: readonly { id: AdminTab; label: st
       display: flex;
       flex-direction: column;
       gap: 12px;
-      max-width: 1220px;
+      width: 100%;
+      max-width: none;
+      box-sizing: border-box;
       padding: 24px;
     }
     .admin__title {
@@ -108,6 +111,29 @@ const GROUPS: readonly { label: string; tabs: readonly { id: AdminTab; label: st
       padding-right: 16px;
       border-right: 1px solid var(--border-subtle);
     }
+    .admin__compact-toggle {
+      min-height: 30px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      background: var(--bg-surface);
+      color: var(--text-secondary);
+      font: inherit;
+      cursor: pointer;
+      text-align: left;
+    }
+    .admin__compact-toggle:hover { color: var(--text-primary); border-color: var(--border-active); }
+    .admin__navigation--compact { grid-template-columns: 1fr; width: 54px; padding-right: 8px; }
+    .admin__navigation--compact .admin__compact-toggle { padding: 0; text-align: center; }
+    .admin__navigation--compact .admin__compact-toggle span,
+    .admin__tab-icon { display: none; }
+    .admin__navigation--compact .admin__group h2,
+    .admin__navigation--compact .admin__tab-label { display: none; }
+    .admin--compact .admin__layout { grid-template-columns: 62px minmax(0, 1fr); gap: 16px; }
+    .admin--compact .admin__body { min-width: 0; }
+    .admin__navigation--compact .admin__tab { width: 100%; justify-content: center; padding-right: 0; padding-left: 0; text-align: center; white-space: nowrap; writing-mode: horizontal-tb; word-break: keep-all; }
+    .admin__navigation--compact .admin__tab-icon { display: inline-flex; align-items: center; justify-content: center; width: 24px; font-weight: 700; }
+    .admin__navigation--compact .admin__tab { border-left: 0; }
+    .admin__navigation--compact .admin__tab--active { border-right: 2px solid var(--border-active); }
     .admin__group {
       display: grid;
       gap: 6px;
@@ -155,4 +181,11 @@ export class AdminShellComponent {
   protected readonly tabs = TABS;
   protected readonly groups = GROUPS;
   protected readonly active = signal<AdminTab>('access');
+  protected readonly compact = signal(localStorage.getItem('bitacora.admin.compact.v2') === 'true');
+
+  protected toggleCompact(): void {
+    const value = !this.compact();
+    this.compact.set(value);
+    localStorage.setItem('bitacora.admin.compact.v2', String(value));
+  }
 }

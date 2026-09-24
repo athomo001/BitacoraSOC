@@ -201,6 +201,43 @@ func (h *BackupsHandler) Download(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.Copy(w, file)
 }
 
+func (h *BackupsHandler) Validate(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		problemdetails.Write(w, r, 404, "not-found", "backup no encontrado")
+		return
+	}
+	var req struct {
+		Passphrase string `json:"passphrase"`
+	}
+	if err := decodeJSON(w, r, &req); err != nil || req.Passphrase == "" {
+		problemdetails.Write(w, r, 400, "invalid-payload", "passphrase obligatoria")
+		return
+	}
+	run, err := h.Queries.GetBackupRun(r.Context(), id)
+	if err != nil || !run.FilePath.Valid {
+		problemdetails.Write(w, r, 404, "not-found", "backup no encontrado")
+		return
+	}
+	data, err := os.ReadFile(run.FilePath.String)
+	if err != nil {
+		problemdetails.Write(w, r, 404, "not-found", "archivo de backup no encontrado")
+		return
+	}
+	sum := sha256.Sum256(data)
+	checksum := hex.EncodeToString(sum[:])
+	checksumMatches := run.ChecksumSha256.Valid && run.ChecksumSha256.String == checksum
+	envelope, decodeErr := backup.Decode(data, req.Passphrase)
+	if decodeErr != nil || !checksumMatches {
+		writeData(w, 200, map[string]any{"valid": false, "checksumMatches": checksumMatches, "decryptable": decodeErr == nil, "checksumSha256": checksum})
+		return
+	}
+	if h.AuditLog != nil {
+		h.AuditLog.Log(r.Context(), "backup.validated", audit.LevelInfo, audit.Success(), map[string]any{"backupId": id.String()})
+	}
+	writeData(w, 200, map[string]any{"valid": true, "checksumMatches": true, "decryptable": true, "kind": envelope.Kind, "tables": len(envelope.Tables), "checksumSha256": checksum})
+}
+
 func (h *BackupsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
