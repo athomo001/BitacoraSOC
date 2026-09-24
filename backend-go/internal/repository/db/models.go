@@ -1421,7 +1421,7 @@ type Entry struct {
 
 type EntryAttachment struct {
 	ID         uuid.UUID          `json:"id"`
-	EntryID    uuid.UUID          `json:"entry_id"`
+	EntryID    pgtype.UUID        `json:"entry_id"`
 	FileName   string             `json:"file_name"`
 	MimeType   string             `json:"mime_type"`
 	SizeBytes  int32              `json:"size_bytes"`

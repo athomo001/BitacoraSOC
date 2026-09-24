@@ -790,7 +790,11 @@ CREATE INDEX idx_entry_comments_entry ON entry_comments(entry_id, created_at ASC
 -- -----------------------------------------------------------------------------
 CREATE TABLE entry_attachments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  entry_id UUID NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+  -- Nullable desde la Fase 9 (migración 000005): la imagen simple de una
+  -- entrada se sube antes de que la entrada exista (POST
+  -- /api/entries/upload-image) y queda "huérfana" hasta que POST
+  -- /api/entries la reclama.
+  entry_id UUID REFERENCES entries(id) ON DELETE CASCADE,
   file_name TEXT NOT NULL,
   mime_type TEXT NOT NULL,
   size_bytes INT NOT NULL,

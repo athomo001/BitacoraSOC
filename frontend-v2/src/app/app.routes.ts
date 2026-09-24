@@ -1,6 +1,5 @@
 import { Routes } from '@angular/router';
 import { ShellComponent } from './shell/shell';
-import { PlaceholderComponent } from './shared/ui/placeholder/placeholder';
 import { authGuard } from './core/auth/auth.guard';
 import { setupCompletedGuard, setupPendingGuard } from './core/setup/setup.guard';
 
@@ -36,8 +35,7 @@ export const routes: Routes = [
       { path: '', pathMatch: 'full', redirectTo: 'entries' },
       {
         path: 'entries',
-        component: PlaceholderComponent,
-        data: { title: 'Bitácora', builtInPhase: 'la Fase 9' },
+        loadComponent: () => import('./features/entries/entries').then((module) => module.EntriesComponent),
       },
       {
         path: 'shifts',

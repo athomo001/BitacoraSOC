@@ -137,6 +137,9 @@ func run(logger *slog.Logger) error {
 	}}
 	rotationHandler := &handler.RotationHandler{Queries: queries, AuditLog: auditLog}
 	dotacionHandler := &handler.DotacionHandler{Queries: queries, AuditLog: auditLog, PublicBaseURL: publicBaseURL}
+	entriesHandler := &handler.EntriesHandler{Queries: queries, AuditLog: auditLog}
+	notesHandler := &handler.NotesHandler{Queries: queries, AuditLog: auditLog}
+	draftsHandler := &handler.DraftsHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
 
 	// Composición de middlewares por ruta — ver internal/middleware/auth.go:
 	// RequireNotForcedPasswordChange NO se aplica a las 4 rutas que
@@ -325,6 +328,31 @@ func run(logger *slog.Logger) error {
 	// Página pública sin login para la TV de sala (HU-4b) — primer endpoint
 	// HTML del backend, fuera del envoltorio {data} y sin auth a propósito.
 	mux.HandleFunc("GET /p/telework/{token}", dotacionHandler.PublicTeleworkPage)
+
+	// Bitácora (Fase 9, HU-7 y siguientes) — núcleo siempre activo, sin gate
+	// SOC/NOC (`scope` es un dato, no un permiso).
+	mux.Handle("GET /api/entries", authed(entriesHandler.List))
+	mux.Handle("POST /api/entries", authed(entriesHandler.Create))
+	mux.Handle("GET /api/entries/export", authed(entriesHandler.Export))
+	mux.Handle("POST /api/entries/upload-image", authed(entriesHandler.UploadImage))
+	mux.Handle("PATCH /api/entries/bulk", admin(entriesHandler.BulkPatch))
+	mux.Handle("GET /api/entries/{id}", authed(entriesHandler.Get))
+	mux.Handle("PATCH /api/entries/{id}", authed(entriesHandler.Patch))
+	mux.Handle("DELETE /api/entries/{id}", authed(entriesHandler.Delete))
+	mux.Handle("POST /api/entries/{id}/comments", authed(entriesHandler.AddComment))
+	mux.Handle("GET /api/attachments/{id}", authed(entriesHandler.ServeAttachment))
+
+	// Notas Operativas (Fase 9): pizarrón admin + libreta personal.
+	mux.Handle("GET /api/notes/admin", authed(notesHandler.GetAdmin))
+	mux.Handle("PUT /api/notes/admin", admin(notesHandler.PutAdmin))
+	mux.Handle("GET /api/notes/personal", authed(notesHandler.GetPersonal))
+	mux.Handle("PUT /api/notes/personal", authed(notesHandler.PutPersonal))
+
+	// Borradores (Autosave, HU-7d) y notificación de despliegue por SSE.
+	mux.Handle("POST /api/drafts/sync", authed(draftsHandler.Sync))
+	mux.Handle("GET /api/drafts", authed(draftsHandler.List))
+	mux.Handle("DELETE /api/drafts/{id}", authed(draftsHandler.Delete))
+	mux.Handle("POST /api/deployments/notify", admin(draftsHandler.NotifyDeployment))
 
 	// SPA de Angular embebida (Fase 3) — catch-all, siempre al final.
 	spaHandler, err := web.Handler()

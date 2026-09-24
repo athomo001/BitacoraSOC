@@ -1,0 +1,11 @@
+-- Fase 9 (Bitácora): la imagen simple de una entrada (POST
+-- /api/entries/upload-image, sin entryId todavía — se sube antes de guardar
+-- la entrada, HU-7d/mockup "pegar con Ctrl+V" de 06-frontend-arquitectura-y-
+-- ui.md sección 5) reusa entry_attachments para no duplicar la tabla, pero
+-- entry_id NOT NULL lo impedía: no hay entrada todavía en el momento del
+-- upload. Se relaja a nullable — el adjunto queda "huérfano" hasta que
+-- POST /api/entries lo reclama (UPDATE entry_id). No hay escritura a disco
+-- en ningún punto: sigue guardado en Postgres (spec/09-alta-disponibilidad-
+-- 2-nodos.md, "no existen escrituras en el sistema de archivos local para
+-- datos de negocio").
+ALTER TABLE entry_attachments ALTER COLUMN entry_id DROP NOT NULL;

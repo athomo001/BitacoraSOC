@@ -1,0 +1,147 @@
+<div class="entries">
+  @if (deploymentBanner(); as banner) {
+    <div class="entries__deploy-banner">
+      <span>🔄 Nueva versión disponible ({{ banner.version }}): {{ banner.message }}</span>
+      <app-button variant="text" (pressed)="dismissBanner()">Descartar</app-button>
+      <app-button variant="text" (pressed)="dismissBanner(); load()">Recargar ahora</app-button>
+    </div>
+  }
+
+  <h1 class="entries__title">Bitácora</h1>
+
+  @if (error()) {
+    <p class="msg msg--error">{{ error() }}</p>
+  }
+
+  <section class="panel entries__filters">
+    <div class="field-grid">
+      <label class="field">
+        <span>Ámbito</span>
+        <select [ngModel]="filterScope()" (ngModelChange)="filterScope.set($event)">
+          <option value="">Todos</option>
+          @for (s of scopes; track s) { <option [value]="s">{{ scopeLabels[s] }}</option> }
+        </select>
+      </label>
+      <label class="field">
+        <span>Tipo</span>
+        <select [ngModel]="filterType()" (ngModelChange)="filterType.set($event)">
+          <option value="">Todos</option>
+          @for (t of types; track t) { <option [value]="t">{{ typeLabels[t] }}</option> }
+        </select>
+      </label>
+      <label class="field"><span>Tag</span><input [ngModel]="filterTag()" (ngModelChange)="filterTag.set($event)" placeholder="ej. otdr" /></label>
+      <label class="field"><span>Buscar</span><input [ngModel]="filterQ()" (ngModelChange)="filterQ.set($event)" (keyup.enter)="load()" placeholder="texto libre" /></label>
+      <label class="field"><span>Desde</span><input type="date" [ngModel]="filterFrom()" (ngModelChange)="filterFrom.set($event)" /></label>
+      <label class="field"><span>Hasta</span><input type="date" [ngModel]="filterTo()" (ngModelChange)="filterTo.set($event)" /></label>
+      <div class="actions">
+        <app-button variant="primary" (pressed)="load()">Buscar</app-button>
+        <app-button variant="text" (pressed)="clearFilters()">Limpiar</app-button>
+        <app-button variant="secondary" (pressed)="exportCsv()">Exportar CSV</app-button>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel entries__wall">
+    @if (loading()) {
+      <p class="entries__muted">Cargando…</p>
+    }
+    <table class="entries__table">
+      <thead>
+        <tr><th>Hora</th><th>Ámbito</th><th>Tipo</th><th>Autor</th><th>Contenido</th><th>Tags</th><th></th></tr>
+      </thead>
+      <tbody>
+        @for (entry of entries(); track entry.id) {
+          <tr class="entries__row" (click)="select(entry)">
+            <td class="mono">{{ entry.createdAt | date: 'short' }}</td>
+            <td>{{ scopeLabels[entry.scope] }}</td>
+            <td>{{ typeLabels[entry.entryType] }}</td>
+            <td>{{ entry.authorUsername }}</td>
+            <td class="entries__excerpt">{{ entry.content }}</td>
+            <td class="entries__muted">{{ entry.tags.join(', ') }}</td>
+            <td>
+              @if (canModify(entry)) {
+                <button type="button" class="entries__icon-btn" (click)="$event.stopPropagation(); remove(entry)">Borrar</button>
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="7" class="entries__empty">Sin entradas para este filtro.</td></tr>
+        }
+      </tbody>
+    </table>
+    <p class="entries__muted">{{ total() }} entrada(s)</p>
+  </section>
+
+  @if (selected(); as entry) {
+    <section class="panel entries__detail">
+      <div class="entries__detail-header">
+        <h2 class="panel__title">{{ typeLabels[entry.entryType] }} · {{ scopeLabels[entry.scope] }} · {{ entry.authorUsername }}</h2>
+        <app-button variant="text" (pressed)="closeDetail()">Cerrar</app-button>
+      </div>
+      <app-markdown [content]="entry.content" />
+      @if (entry.imageUrl) {
+        <img class="entries__detail-image" [src]="entry.imageUrl" alt="Evidencia adjunta" />
+      }
+      <h3 class="entries__comments-title">Comentarios</h3>
+      <ul class="entries__comments">
+        @for (c of entry.comments; track c.id) {
+          <li><strong>{{ c.authorUsername }}</strong> <span class="entries__muted">{{ c.createdAt | date: 'short' }}</span><br />{{ c.comment }}</li>
+        } @empty {
+          <li class="entries__muted">Sin comentarios todavía.</li>
+        }
+      </ul>
+      <div class="entries__comment-form">
+        <input [ngModel]="newComment()" (ngModelChange)="newComment.set($event)" (keyup.enter)="addComment()" placeholder="Agregar seguimiento…" />
+        <app-button variant="primary" (pressed)="addComment()">Comentar</app-button>
+      </div>
+    </section>
+  }
+
+  <section class="panel entries__composer">
+    <h2 class="panel__title">Redactar entrada rápida</h2>
+    <div class="entries__scope-picker">
+      @for (s of scopes; track s) {
+        <button type="button" class="entries__scope-btn" [class.entries__scope-btn--active]="draft().scope === s" (click)="updateDraft({ scope: s })">
+          {{ scopeLabels[s] }}
+        </button>
+      }
+      <select class="entries__type-select" [ngModel]="draft().entryType" (ngModelChange)="updateDraft({ entryType: $event })">
+        @for (t of types; track t) { <option [value]="t">{{ typeLabels[t] }}</option> }
+      </select>
+    </div>
+    <textarea class="entries__textarea" rows="4" placeholder="Mensaje (Markdown soportado)…"
+      [ngModel]="draft().content" (ngModelChange)="updateDraft({ content: $event })" (paste)="onPaste($event)"></textarea>
+    <label class="field entries__tags-field">
+      <span>Tags (separados por coma)</span>
+      <input [ngModel]="draft().tags" (ngModelChange)="updateDraft({ tags: $event })" placeholder="fibra, otdr" />
+    </label>
+    <div class="entries__image-row">
+      @if (composeImage(); as img) {
+        <span class="entries__image-preview"><img [src]="img.previewUrl" alt="Evidencia" /> <button type="button" (click)="removeImage()">✖ Quitar</button></span>
+      } @else {
+        <label class="entries__file-picker">
+          📎 {{ uploadingImage() ? 'Subiendo…' : 'Adjuntar o pegar imagen (Ctrl+V en el mensaje)' }}
+          <input type="file" accept="image/png,image/jpeg,image/webp" [disabled]="uploadingImage()" (change)="onFileSelected($event)" />
+        </label>
+      }
+    </div>
+    <div class="actions">
+      <app-button variant="primary" [disabled]="saving() || !draft().content.trim()" (pressed)="submitEntry()">Guardar</app-button>
+    </div>
+  </section>
+
+  <div class="entries__notes-row">
+    <section class="panel entries__notes">
+      <h2 class="panel__title">Pizarrón (toda la sala)</h2>
+      @if (perms.isAdmin()) {
+        <textarea rows="4" [ngModel]="adminNotes()" (ngModelChange)="onAdminNotesChange($event)"></textarea>
+      } @else {
+        <app-markdown [content]="adminNotes()" />
+      }
+    </section>
+    <section class="panel entries__notes">
+      <h2 class="panel__title">Mi libreta personal</h2>
+      <textarea rows="4" [ngModel]="personalNotes()" (ngModelChange)="onPersonalNotesChange($event)"></textarea>
+    </section>
+  </div>
+</div>

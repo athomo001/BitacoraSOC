@@ -17,6 +17,12 @@ type Querier interface {
 	AddUserPermissionGroup(ctx context.Context, arg AddUserPermissionGroupParams) error
 	// 409 de spec/04-contratos-api.md: la IP de un activo es su identidad operativa.
 	AssetIPTaken(ctx context.Context, arg AssetIPTakenParams) (bool, error)
+	// PATCH /api/entries/bulk (admin, HU-7g) — reclasificación masiva.
+	BulkPatchEntries(ctx context.Context, arg BulkPatchEntriesParams) (int64, error)
+	// Solo reclama un adjunto todavía huérfano — evita que dos entradas
+	// terminen apuntando a la misma imagen si el cliente reenvía el mismo
+	// imageUrl dos veces.
+	ClaimAttachment(ctx context.Context, arg ClaimAttachmentParams) (int64, error)
 	ClearPasswordResetToken(ctx context.Context, id uuid.UUID) error
 	// A lo sumo un canal preferido por dueño (índice único parcial del esquema):
 	// marcar uno nuevo desmarca el anterior.
@@ -25,15 +31,30 @@ type Querier interface {
 	CompleteSetup(ctx context.Context, arg CompleteSetupParams) (AppConfig, error)
 	CountAuditLogs(ctx context.Context) (int64, error)
 	CountDirectory(ctx context.Context, arg CountDirectoryParams) (int64, error)
+	CountEntries(ctx context.Context, arg CountEntriesParams) (int64, error)
 	CountTerritorialUnits(ctx context.Context, arg CountTerritorialUnitsParams) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
 	CreateAsset(ctx context.Context, arg CreateAssetParams) (uuid.UUID, error)
 	CreateContact(ctx context.Context, arg CreateContactParams) (uuid.UUID, error)
 	CreateContactChannel(ctx context.Context, arg CreateContactChannelParams) (ContactChannel, error)
+	// Fase 9 del roadmap (spec/02-alcance-y-roadmap.md): bitácora — registro
+	// operativo central. HU-7: búsqueda de texto completo con
+	// websearch_to_tsquery, NUNCA to_tsquery directo (rompe con '&'/'!' sueltos),
+	// contra el índice funcional idx_entries_fulltext ya creado en la Fase 2
+	// (to_tsvector('spanish', content)) — la expresión del WHERE debe calzar
+	// exactamente con la del índice para poder usarlo.
+	CreateEntry(ctx context.Context, arg CreateEntryParams) (Entry, error)
+	CreateEntryComment(ctx context.Context, arg CreateEntryCommentParams) (EntryComment, error)
 	CreateLogSource(ctx context.Context, arg CreateLogSourceParams) (CatalogLogSource, error)
 	CreateMaintenanceWindow(ctx context.Context, arg CreateMaintenanceWindowParams) (MaintenanceWindow, error)
 	CreateNotificationSchedule(ctx context.Context, arg CreateNotificationScheduleParams) (WorkShiftNotificationSchedule, error)
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
+	// Fase 9: imagen simple de una entrada (ver migración 000005 — entry_id
+	// nullable a propósito). CreateOrphanAttachment inserta sin entrada todavía
+	// (POST /api/entries/upload-image); ClaimAttachment la asocia al crear la
+	// entrada real. Sin conversión a WebP ni limpieza EXIF (decisión de esta
+	// fase, ver spec/00-mapa-mental.md) — se guarda tal cual se subió.
+	CreateOrphanAttachment(ctx context.Context, arg CreateOrphanAttachmentParams) (EntryAttachment, error)
 	CreatePermissionGroup(ctx context.Context, arg CreatePermissionGroupParams) (PermissionGroup, error)
 	CreatePolicy(ctx context.Context, arg CreatePolicyParams) (EscalationPolicy, error)
 	CreatePublicShareLink(ctx context.Context, arg CreatePublicShareLinkParams) (PublicShareLink, error)
@@ -57,6 +78,9 @@ type Querier interface {
 	// `active` que ya usa el resto del esquema (organizations, teams, etc.).
 	DeactivateUser(ctx context.Context, id uuid.UUID) error
 	DeleteContactChannel(ctx context.Context, arg DeleteContactChannelParams) (int64, error)
+	DeleteDraft(ctx context.Context, arg DeleteDraftParams) (int64, error)
+	// Borrado real (no soft-delete, HU-7g) — RETURNING para el snapshot de auditoría.
+	DeleteEntry(ctx context.Context, id uuid.UUID) (Entry, error)
 	DeletePolicy(ctx context.Context, id uuid.UUID) (int64, error)
 	DeletePolicyStep(ctx context.Context, arg DeletePolicyStepParams) (int64, error)
 	DeleteUserChannel(ctx context.Context, arg DeleteUserChannelParams) (int64, error)
@@ -85,17 +109,24 @@ type Querier interface {
 	// por correo sin una segunda consulta.
 	ForceResetAllActivePasswords(ctx context.Context) ([]User, error)
 	GetActivePublicShareByTokenHash(ctx context.Context, tokenHash string) (PublicShareLink, error)
+	// Notas Operativas (Fase 9): pizarrón admin (fila singleton id=true) y
+	// libreta personal (1:1 por usuario). Ambas con autosave/debounce desde el
+	// frontend, ver spec/04-contratos-api.md sección "Notas Operativas".
+	GetAdminNotes(ctx context.Context) (GetAdminNotesRow, error)
 	GetAppConfig(ctx context.Context) (AppConfig, error)
 	GetAsset(ctx context.Context, id uuid.UUID) (GetAssetRow, error)
 	GetAssetForResolve(ctx context.Context, id uuid.UUID) (GetAssetForResolveRow, error)
+	GetAttachment(ctx context.Context, id uuid.UUID) (EntryAttachment, error)
 	// El slot regular cuya semana cubre `now` (independiente de is_paused: el
 	// handler decide qué hacer con eso vía internal/rotation.Resolve).
 	GetCurrentRotationSlot(ctx context.Context, arg GetCurrentRotationSlotParams) (GetCurrentRotationSlotRow, error)
 	GetDirectoryContact(ctx context.Context, id uuid.UUID) (GetDirectoryContactRow, error)
+	GetEntry(ctx context.Context, id uuid.UUID) (GetEntryRow, error)
 	GetLoginRateLimit(ctx context.Context, ipAddress string) (LoginRateLimit, error)
 	GetNotificationSchedule(ctx context.Context, id uuid.UUID) (WorkShiftNotificationSchedule, error)
 	GetOrganization(ctx context.Context, id uuid.UUID) (Organization, error)
 	GetPermissionGroup(ctx context.Context, id uuid.UUID) (PermissionGroup, error)
+	GetPersonalNotes(ctx context.Context, userID uuid.UUID) (PersonalNote, error)
 	GetPolicy(ctx context.Context, id uuid.UUID) (EscalationPolicy, error)
 	// ===== Enlace público TV (slug fijo 'telework', sin UNIQUE en slug: se
 	// resuelve la fila existente en el handler antes de decidir INSERT/UPDATE) =====
@@ -156,6 +187,11 @@ type Querier interface {
 	// que el legacy buscaba por sha256. Nombre/cargo/especialidad/organización sí
 	// admiten búsqueda parcial (ILIKE).
 	ListDirectory(ctx context.Context, arg ListDirectoryParams) ([]ListDirectoryRow, error)
+	ListDrafts(ctx context.Context, arg ListDraftsParams) ([]EntryDraft, error)
+	ListEntries(ctx context.Context, arg ListEntriesParams) ([]ListEntriesRow, error)
+	// GET /api/entries/export — mismos filtros que ListEntries, sin paginar.
+	ListEntriesForExport(ctx context.Context, arg ListEntriesForExportParams) ([]ListEntriesForExportRow, error)
+	ListEntryComments(ctx context.Context, entryID uuid.UUID) ([]ListEntryCommentsRow, error)
 	ListLogSources(ctx context.Context, arg ListLogSourcesParams) ([]CatalogLogSource, error)
 	// ===== Ventanas de mantenimiento =====
 	ListMaintenanceWindows(ctx context.Context, arg ListMaintenanceWindowsParams) ([]MaintenanceWindow, error)
@@ -221,6 +257,7 @@ type Querier interface {
 	MoveContactChannels(ctx context.Context, arg MoveContactChannelsParams) error
 	// Reapunta la membresía al principal, salvo que ya esté en ese equipo.
 	MoveTeamMemberships(ctx context.Context, arg MoveTeamMembershipsParams) error
+	PatchEntry(ctx context.Context, arg PatchEntryParams) (Entry, error)
 	PatchNotificationSchedule(ctx context.Context, arg PatchNotificationScheduleParams) (WorkShiftNotificationSchedule, error)
 	// HU-5: pausar sin borrar la fila (conserva el historial del rol).
 	PatchRotationSlotPause(ctx context.Context, arg PatchRotationSlotPauseParams) (RotationSlot, error)
@@ -281,14 +318,20 @@ type Querier interface {
 	// Limpia must_change_password al completar el cambio (04-contratos-api.md:
 	// "Limpia el flag al completar").
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
+	UpsertAdminNotes(ctx context.Context, arg UpsertAdminNotesParams) (AdminNote, error)
 	// Un POST sobre el mismo (userId, assignedDate) corrige la condición en vez
 	// de fallar con 409 — mismo criterio "upsert" que UpsertTeamCoverage
 	// (teams.sql) de la Fase 6, más amigable para el admin que corrige un día.
 	UpsertAssignment(ctx context.Context, arg UpsertAssignmentParams) (WorkShiftAssignment, error)
+	// Borradores (Autosave, HU-7d): generaliza personal_notes a cualquier
+	// formulario largo. draft_key es libre (no FK): el recurso final puede no
+	// existir todavía en el momento del autosave.
+	UpsertDraft(ctx context.Context, arg UpsertDraftParams) (EntryDraft, error)
 	// Primer intento desde una IP: crea la fila en 1. Intentos siguientes:
 	// incrementa. El servicio decide si la ventana de 15min ya venció y hay que
 	// resetear en vez de incrementar (ver internal/service/ratelimit).
 	UpsertLoginAttempt(ctx context.Context, ipAddress string) (LoginRateLimit, error)
+	UpsertPersonalNotes(ctx context.Context, arg UpsertPersonalNotesParams) (PersonalNote, error)
 	UpsertSMTPConfig(ctx context.Context, arg UpsertSMTPConfigParams) error
 	UpsertTeamCoverage(ctx context.Context, arg UpsertTeamCoverageParams) (TeamCoverage, error)
 	// POST /api/territorial-units/import — upsert por code (idempotente). No
