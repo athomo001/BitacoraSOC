@@ -1,0 +1,5 @@
+ALTER TABLE users
+  DROP COLUMN IF EXISTS avatar_url,
+  DROP COLUMN IF EXISTS birthday,
+  DROP COLUMN IF EXISTS phone,
+  DROP COLUMN IF EXISTS full_name;

@@ -51,6 +51,16 @@ export class AuthService {
     return response.data;
   }
 
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    await firstValueFrom(this.http.put('/api/users/me/password', { currentPassword, newPassword }));
+  }
+
+  async updateProfile(profile: { fullName: string; phone: string; birthday: string; avatarUrl: string }): Promise<AuthUser> {
+    const response = await firstValueFrom(this.http.patch<ApiEnvelope<AuthUser>>('/api/users/me', profile));
+    this._user.set(response.data);
+    return response.data;
+  }
+
   async logout(): Promise<void> {
     try {
       await firstValueFrom(this.http.post('/api/auth/logout', {}));

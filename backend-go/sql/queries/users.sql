@@ -6,6 +6,16 @@ RETURNING *;
 -- name: GetUserByID :one
 SELECT * FROM users WHERE id = $1;
 
+-- name: UpdateMyProfile :one
+UPDATE users SET
+  full_name = COALESCE(sqlc.narg('full_name'), full_name),
+  phone = COALESCE(sqlc.narg('phone'), phone),
+  birthday = COALESCE(sqlc.narg('birthday'), birthday),
+  avatar_url = COALESCE(sqlc.narg('avatar_url'), avatar_url),
+  updated_at = now()
+WHERE id = $1
+RETURNING *;
+
 -- name: GetUserByUsername :one
 SELECT * FROM users WHERE username = $1;
 

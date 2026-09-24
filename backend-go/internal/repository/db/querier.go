@@ -353,6 +353,7 @@ type Querier interface {
 	UpdateContact(ctx context.Context, arg UpdateContactParams) (int64, error)
 	UpdateEntryTicket(ctx context.Context, arg UpdateEntryTicketParams) (Entry, error)
 	UpdateLogSource(ctx context.Context, arg UpdateLogSourceParams) (CatalogLogSource, error)
+	UpdateMyProfile(ctx context.Context, arg UpdateMyProfileParams) (User, error)
 	UpdateOrganization(ctx context.Context, arg UpdateOrganizationParams) (Organization, error)
 	UpdatePermissionGroup(ctx context.Context, arg UpdatePermissionGroupParams) (PermissionGroup, error)
 	UpdateService(ctx context.Context, arg UpdateServiceParams) (Service, error)

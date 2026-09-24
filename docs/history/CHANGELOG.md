@@ -28,6 +28,12 @@ Registro de cambios relevantes del proyecto.
 - **HA**: no se implementa el clúster opcional de dos nodos; la decisión queda documentada para continuar en single-node.
 - **Verificación**: `sqlc generate`, `go test ./...`, `go vet ./...` y `git diff --check` en verde.
 
+## [Rewrite] Fase 14 — ensayo de migración y corte - 2026-09-24
+
+- **QA de desarrollo**: login real, shell/admin, activación de `native_tickets`, usuarios/grupos, temas, backup completo exitoso con 95 registros y evento `backup.created` visible en Auditoría.
+- **Preparación**: `cmd/escalation-shadow-diff` queda como herramienta de paridad para export legacy + mapeo manual de scopes.
+- **Estado**: no se declara corte completado. La validación final requiere snapshots productivos del legacy, 2-3 ensayos ETL, shadow-diff real, restore físico en base vacía, conteos tabla por tabla y rendimiento con volumen operativo.
+
 ## [Rewrite] Fases 10-11 — cierre de implementación - 2026-09-24
 
 - **Fase 10**: entrada y ticket transaccionales (`createTicket`/`ticketNumber`), conversión y resolución de entradas, reapertura al comentar tickets resueltos, creación de tickets, comentarios y tareas desde Angular, y vínculo desde el cajón de Bitácora.

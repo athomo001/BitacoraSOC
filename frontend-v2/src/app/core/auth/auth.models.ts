@@ -2,6 +2,10 @@ export interface AuthUser {
   id: string;
   username: string;
   email: string;
+  fullName?: string;
+  phone?: string;
+  birthday?: string;
+  avatarUrl?: string;
   role: string;
   mfaEnabled: boolean;
   mustChangePassword: boolean;

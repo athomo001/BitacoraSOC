@@ -18,7 +18,7 @@ export interface ShellNavItem {
 export const SHELL_NAV_ITEMS: readonly ShellNavItem[] = [
   { path: 'entries', label: 'Bitácora', icon: 'assignment', shortcutDigit: '1' },
   { path: 'tickets', label: 'Ticketera ITIL', icon: 'confirmation_number', shortcutDigit: '6' },
-  { path: 'shifts', label: 'Turnos y Checklist', icon: 'schedule', shortcutDigit: '2' },
+  { path: 'shifts', label: 'Checklist y Turnos', icon: 'checklist', shortcutDigit: '2' },
   { path: 'escalation', label: 'Escalamiento / Despacho', icon: 'campaign', shortcutDigit: '3' },
   { path: 'directory', label: 'Directorio', icon: 'contacts', shortcutDigit: '4' },
   { path: 'admin', label: 'Administración', icon: 'settings', shortcutDigit: '5' },

@@ -142,6 +142,17 @@ function splitList(raw: string): string[] {
             }
           </tbody>
         </table>
+
+        <div class="shifts-admin__calendar-heading"><div><h3>Calendario de guardias</h3><p class="panel__hint">Vista rápida para saber quién cubre cada ventana sin leer la tabla completa.</p></div></div>
+        <div class="shifts-admin__calendar">
+          @for (s of slots(); track s.id) {
+            <article class="shifts-admin__calendar-card" [class.shifts-admin__calendar-card--paused]="s.isPaused">
+              <span class="shifts-admin__calendar-date">{{ s.weekStartDate }} → {{ s.weekEndDate }}</span>
+              <strong>{{ s.displayName }}</strong>
+              <span>{{ s.isPaused ? 'Pausado' : 'Guardia vigente' }}</span>
+            </article>
+          } @empty { <p class="shifts-admin__empty">Agrega personas al rol para ver el calendario.</p> }
+        </div>
       </section>
 
       <section class="panel">
@@ -197,7 +208,7 @@ function splitList(raw: string): string[] {
     <section class="panel">
       <h2 class="panel__title">Notificaciones de dotación</h2>
       <p class="panel__hint">Envío periódico de la matriz de dotación a RRHH/jefatura (HU-5b) — distinto de las alertas en pantalla.</p>
-      <form class="field-grid shifts-admin__form" (ngSubmit)="createSchedule()">
+      <form class="field-grid shifts-admin__form" (ngSubmit)="saveSchedule()">
         <label class="field"><span>Nombre</span><input name="nsName" placeholder="Reporte de Guardia RRHH" [ngModel]="nsName()" (ngModelChange)="nsName.set($event)" /></label>
         <label class="field">
           <span>Frecuencia</span>
@@ -216,7 +227,7 @@ function splitList(raw: string): string[] {
         <label class="field"><span>Destinatarios (coma)</span><input name="nsRecipients" placeholder="rrhh@empresa.cl" [ngModel]="nsRecipients()" (ngModelChange)="nsRecipients.set($event)" /></label>
         <label class="field"><span>CC (coma, opcional)</span><input name="nsCc" [ngModel]="nsCc()" (ngModelChange)="nsCc.set($event)" /></label>
         <label class="field"><span>Filtrar por rol (coma, opcional)</span><input name="nsRoleFilter" placeholder="Analista N1" [ngModel]="nsRoleFilter()" (ngModelChange)="nsRoleFilter.set($event)" /></label>
-        <div class="actions"><button type="submit" class="shifts-admin__submit" [disabled]="!nsName().trim() || !nsRecipients().trim()">Crear notificación</button></div>
+        <div class="actions"><button type="submit" class="shifts-admin__submit" [disabled]="!nsName().trim() || !nsRecipients().trim()">{{ editingScheduleId() ? 'Guardar cambios' : 'Crear notificación' }}</button>@if (editingScheduleId()) { <button type="button" class="shifts-admin__btn" (click)="cancelScheduleEdit()">Cancelar</button> }</div>
       </form>
       <table class="shifts-admin__table">
         <thead><tr><th>Nombre</th><th>Frecuencia</th><th>Envío</th><th>Destinatarios</th><th>Estado</th><th></th></tr></thead>
@@ -228,7 +239,7 @@ function splitList(raw: string): string[] {
               <td class="mono">{{ daysOfWeek[s.dayOfWeek] }} {{ s.sendTime }}</td>
               <td class="shifts-admin__muted">{{ s.recipients.join(', ') }}</td>
               <td>{{ s.enabled ? 'Activa' : 'Pausada' }}</td>
-              <td><button type="button" class="shifts-admin__btn" (click)="toggleSchedule(s)">{{ s.enabled ? 'Pausar' : 'Activar' }}</button></td>
+              <td class="shifts-admin__schedule-actions"><button type="button" class="shifts-admin__btn" (click)="beginScheduleEdit(s)">Editar</button><button type="button" class="shifts-admin__btn" (click)="testSchedule(s)">Probar</button><button type="button" class="shifts-admin__btn" (click)="toggleSchedule(s)">{{ s.enabled ? 'Pausar' : 'Activar' }}</button></td>
             </tr>
           } @empty {
             <tr><td colspan="6" class="shifts-admin__empty">Sin notificaciones configuradas.</td></tr>
@@ -252,6 +263,14 @@ function splitList(raw: string): string[] {
     .shifts-admin__table tbody tr { cursor: default; }
     .shifts-admin__row--selected td { background: var(--bg-surface-hover); }
     .shifts-admin__empty { color: var(--text-secondary); text-align: center; }
+    .shifts-admin__calendar-heading { margin-top: 20px; }
+    .shifts-admin__calendar-heading h3 { margin: 0; font-size: 15px; }
+    .shifts-admin__calendar { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; margin-top: 10px; }
+    .shifts-admin__calendar-card { display: grid; gap: 5px; min-height: 88px; padding: 10px; border: 1px solid var(--border-active); border-radius: var(--radius-sm); background: var(--bg-surface-hover); }
+    .shifts-admin__calendar-card--paused { border-color: var(--border-subtle); opacity: .65; }
+    .shifts-admin__calendar-card span:last-child { color: var(--accent-cyan); font-size: 11px; }
+    .shifts-admin__calendar-date { color: var(--text-secondary); font-size: 11px; }
+    .shifts-admin__schedule-actions { display: flex; flex-wrap: wrap; gap: 4px; }
     .shifts-admin__muted { color: var(--text-muted); font-size: 12px; }
     .shifts-admin__guard { margin: 4px 0 12px; font-size: 13px; }
     .shifts-admin__btn {
@@ -313,6 +332,7 @@ export class AdminShiftsComponent implements OnInit {
   protected readonly nsRecipients = signal('');
   protected readonly nsCc = signal('');
   protected readonly nsRoleFilter = signal('');
+  protected readonly editingScheduleId = signal<string | null>(null);
 
   async ngOnInit(): Promise<void> {
     await this.run(async () => {
@@ -436,20 +456,28 @@ export class AdminShiftsComponent implements OnInit {
     });
   }
 
-  protected async createSchedule(): Promise<void> {
+  protected async saveSchedule(): Promise<void> {
     if (!this.nsName().trim() || !this.nsRecipients().trim()) return;
     await this.run(async () => {
-      await this.api.createNotificationSchedule({
-        name: this.nsName().trim(), frequency: this.nsFrequency(), dayOfWeek: this.nsDayOfWeek(),
-        sendTime: this.nsSendTime(), recipients: splitList(this.nsRecipients()),
-        ccRecipients: splitList(this.nsCc()), roleFilter: splitList(this.nsRoleFilter()),
-      });
-      this.nsName.set('');
-      this.nsRecipients.set('');
-      this.nsCc.set('');
-      this.nsRoleFilter.set('');
+      const draft = { name: this.nsName().trim(), frequency: this.nsFrequency(), dayOfWeek: this.nsDayOfWeek(), sendTime: this.nsSendTime(), recipients: splitList(this.nsRecipients()), ccRecipients: splitList(this.nsCc()), roleFilter: splitList(this.nsRoleFilter()) };
+      if (this.editingScheduleId()) await this.api.patchNotificationSchedule(this.editingScheduleId()!, draft);
+      else await this.api.createNotificationSchedule(draft);
+      this.cancelScheduleEdit();
       this.schedules.set(await this.api.listNotificationSchedules());
     });
+  }
+
+  protected beginScheduleEdit(schedule: NotificationSchedule): void {
+    this.editingScheduleId.set(schedule.id);
+    this.nsName.set(schedule.name); this.nsFrequency.set(schedule.frequency); this.nsDayOfWeek.set(schedule.dayOfWeek); this.nsSendTime.set(schedule.sendTime); this.nsRecipients.set(schedule.recipients.join(', ')); this.nsCc.set(schedule.ccRecipients.join(', ')); this.nsRoleFilter.set(schedule.roleFilter.join(', '));
+  }
+
+  protected cancelScheduleEdit(): void {
+    this.editingScheduleId.set(null); this.nsName.set(''); this.nsRecipients.set(''); this.nsCc.set(''); this.nsRoleFilter.set('');
+  }
+
+  protected async testSchedule(schedule: NotificationSchedule): Promise<void> {
+    await this.run(async () => { await this.api.testNotificationSchedule(schedule.id); });
   }
 
   protected async toggleSchedule(schedule: NotificationSchedule): Promise<void> {

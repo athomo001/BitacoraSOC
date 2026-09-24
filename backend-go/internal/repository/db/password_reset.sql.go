@@ -23,7 +23,7 @@ func (q *Queries) ClearPasswordResetToken(ctx context.Context, id uuid.UUID) err
 }
 
 const getUserByResetTokenHash = `-- name: GetUserByResetTokenHash :one
-SELECT id, username, email, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at FROM users WHERE reset_password_token_hash = $1
+SELECT id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at FROM users WHERE reset_password_token_hash = $1
 `
 
 // El servicio valida la expiración (reset_password_expires_at > now()) en
@@ -36,6 +36,10 @@ func (q *Queries) GetUserByResetTokenHash(ctx context.Context, resetPasswordToke
 		&i.ID,
 		&i.Username,
 		&i.Email,
+		&i.FullName,
+		&i.Phone,
+		&i.Birthday,
+		&i.AvatarUrl,
 		&i.PasswordHash,
 		&i.Role,
 		&i.CargoLabel,

@@ -38,7 +38,7 @@
 
 [data-theme="light"] {
   --bg-app: #f6f8fa;
-  --bg-surface: #ffffff;
+  --bg-surface: #fff;
   --bg-surface-hover: #eef1f4;
   --border-subtle: #d0d7de;
   --border-active: #0969da;

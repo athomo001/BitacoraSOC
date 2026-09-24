@@ -4,7 +4,7 @@
 
 Bitácora de operaciones para centros SOC y NOC: registro de turnos, checklist de relevo, escalamiento a contratas y equipos, ticketera ITIL nativa y auditoría. Es la **versión 2.0** (reescritura completa en Go + Angular + PostgreSQL) del sistema que antes se llamaba BitacoraSOC.
 
-> **Estado:** en desarrollo, Fase 5 de 14 cerrada (ver `docs/history/CHANGELOG.md`). Producción sigue corriendo el legacy v1.x en su propio servidor hasta el corte de la Fase 14.
+> **Estado:** implementación del núcleo hasta Fase 13; Fase 14 en ensayo de migración/paridad. Producción sigue corriendo el legacy v1.x en su propio servidor hasta que los snapshots piloto y el checklist de corte pasen sin discrepancias.
 
 ## Estructura
 

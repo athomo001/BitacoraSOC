@@ -1808,6 +1808,10 @@ type User struct {
 	ID                     uuid.UUID          `json:"id"`
 	Username               string             `json:"username"`
 	Email                  string             `json:"email"`
+	FullName               pgtype.Text        `json:"full_name"`
+	Phone                  pgtype.Text        `json:"phone"`
+	Birthday               pgtype.Date        `json:"birthday"`
+	AvatarUrl              pgtype.Text        `json:"avatar_url"`
 	PasswordHash           string             `json:"password_hash"`
 	Role                   UserRole           `json:"role"`
 	CargoLabel             pgtype.Text        `json:"cargo_label"`

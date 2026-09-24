@@ -19,6 +19,10 @@ CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   username TEXT NOT NULL UNIQUE,
   email TEXT NOT NULL UNIQUE,
+  full_name TEXT,
+  phone TEXT,
+  birthday DATE,
+  avatar_url TEXT,
   -- Nunca texto plano (spec/10-armonizacion.md, pregunta directa del dueño).
   -- bcrypt (golang.org/x/crypto/bcrypt), costo 12 para hashes nuevos — ver
   -- 07-backend-arquitectura-go.md sección 6.5 para el razonamiento completo

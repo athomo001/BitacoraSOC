@@ -286,6 +286,52 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, toUserDTO(dbUser))
 }
 
+type updateProfileRequest struct {
+	FullName  *string `json:"fullName"`
+	Phone     *string `json:"phone"`
+	Birthday  *string `json:"birthday"`
+	AvatarURL *string `json:"avatarUrl"`
+}
+
+func (h *AuthHandler) UpdateMyProfile(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	authUser, ok := middleware.UserFromContext(ctx)
+	if !ok {
+		problemdetails.Write(w, r, http.StatusUnauthorized, "missing-token", "no autenticado")
+		return
+	}
+	var req updateProfileRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "cuerpo de la request inválido")
+		return
+	}
+	params := db.UpdateMyProfileParams{ID: authUser.ID}
+	if req.FullName != nil {
+		params.FullName = pgtype.Text{String: *req.FullName, Valid: true}
+	}
+	if req.Phone != nil {
+		params.Phone = pgtype.Text{String: *req.Phone, Valid: true}
+	}
+	if req.Birthday != nil {
+		parsed, err := time.Parse("2006-01-02", *req.Birthday)
+		if err != nil {
+			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "birthday debe tener formato YYYY-MM-DD")
+			return
+		}
+		params.Birthday = pgtype.Date{Time: parsed, Valid: true}
+	}
+	if req.AvatarURL != nil {
+		params.AvatarUrl = pgtype.Text{String: *req.AvatarURL, Valid: true}
+	}
+	updated, err := h.Queries.UpdateMyProfile(ctx, params)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo actualizar el perfil")
+		return
+	}
+	h.AuditLog.Log(ctx, "users.profile.update", audit.LevelInfo, audit.Success(), nil)
+	writeData(w, http.StatusOK, toUserDTO(updated))
+}
+
 type changePasswordRequest struct {
 	CurrentPassword string `json:"currentPassword"`
 	NewPassword     string `json:"newPassword"`

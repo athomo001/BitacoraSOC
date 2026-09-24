@@ -17,6 +17,10 @@ type UserDTO struct {
 	ID                 uuid.UUID `json:"id"`
 	Username           string    `json:"username"`
 	Email              string    `json:"email"`
+	FullName           *string   `json:"fullName,omitempty"`
+	Phone              *string   `json:"phone,omitempty"`
+	Birthday           *string   `json:"birthday,omitempty"`
+	AvatarURL          *string   `json:"avatarUrl,omitempty"`
 	Role               string    `json:"role"`
 	CargoLabel         *string   `json:"cargoLabel,omitempty"`
 	MFAEnabled         bool      `json:"mfaEnabled"`
@@ -34,6 +38,19 @@ func toUserDTO(u db.User) UserDTO {
 		MFAEnabled:         u.MfaEnabled,
 		MustChangePassword: u.MustChangePassword,
 		Active:             u.Active,
+	}
+	if u.FullName.Valid {
+		dto.FullName = &u.FullName.String
+	}
+	if u.Phone.Valid {
+		dto.Phone = &u.Phone.String
+	}
+	if u.Birthday.Valid {
+		birthday := u.Birthday.Time.Format("2006-01-02")
+		dto.Birthday = &birthday
+	}
+	if u.AvatarUrl.Valid {
+		dto.AvatarURL = &u.AvatarUrl.String
 	}
 	if u.CargoLabel.Valid {
 		dto.CargoLabel = &u.CargoLabel.String

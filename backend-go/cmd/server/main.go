@@ -141,7 +141,10 @@ func run(logger *slog.Logger) error {
 	}}
 	rotationHandler := &handler.RotationHandler{Queries: queries, AuditLog: auditLog}
 	checklistsHandler := &handler.ChecklistsHandler{Pool: pool, Queries: queries, AuditLog: auditLog, Crypto: cryptoBox}
-	dotacionHandler := &handler.DotacionHandler{Queries: queries, AuditLog: auditLog, PublicBaseURL: publicBaseURL}
+	dotacionHandler := &handler.DotacionHandler{Queries: queries, AuditLog: auditLog, PublicBaseURL: publicBaseURL, Sender: func(ctx context.Context) (*mail.Sender, error) {
+		sender, _, err := handler.BuildMailSender(ctx, queries, cryptoBox)
+		return sender, err
+	}}
 	entriesHandler := &handler.EntriesHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
 	ticketsHandler := &handler.TicketsHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
 	entriesHandler.Tickets = ticketsHandler
@@ -211,6 +214,7 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/auth/forgot-password", public(authHandler.ForgotPassword))
 	mux.Handle("POST /api/auth/reset-password", public(authHandler.ResetPassword))
 	mux.Handle("GET /api/users/me", authedAllowForced(authHandler.Me))
+	mux.Handle("PATCH /api/users/me", authedAllowForced(authHandler.UpdateMyProfile))
 	mux.Handle("PUT /api/users/me/password", authedAllowForced(authHandler.ChangeMyPassword))
 	mux.Handle("GET /api/users/me/capabilities", authed(permissionGroupsHandler.MyCapabilities))
 
@@ -353,6 +357,7 @@ func run(logger *slog.Logger) error {
 	mux.Handle("GET /api/work-shifts/notification-schedules", admin(dotacionHandler.ListNotificationSchedules))
 	mux.Handle("POST /api/work-shifts/notification-schedules", admin(dotacionHandler.CreateNotificationSchedule))
 	mux.Handle("PATCH /api/work-shifts/notification-schedules/{id}", admin(dotacionHandler.PatchNotificationSchedule))
+	mux.Handle("POST /api/work-shifts/notification-schedules/{id}/test", admin(dotacionHandler.TestNotificationSchedule))
 	// Página pública sin login para la TV de sala (HU-4b) — primer endpoint
 	// HTML del backend, fuera del envoltorio {data} y sin auth a propósito.
 	mux.HandleFunc("GET /p/telework/{token}", dotacionHandler.PublicTeleworkPage)
@@ -414,6 +419,13 @@ func run(logger *slog.Logger) error {
 	}, Schedules: func(ctx context.Context, sender *mail.Sender) error {
 		return dotacionHandler.DispatchDueSchedules(ctx, sender)
 	}}
+	mux.Handle("POST /api/reports/shift/dispatch", admin(func(w http.ResponseWriter, r *http.Request) {
+		if err := reportDispatcher.DispatchPending(r.Context()); err != nil {
+			http.Error(w, "no se pudieron procesar los reportes pendientes", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
 	go scheduler.Run(ctx, time.Minute, reportDispatcher.DispatchPending)
 
 	srv := &http.Server{

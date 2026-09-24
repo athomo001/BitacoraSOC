@@ -282,4 +282,8 @@ export class EscalationService {
   async testSmtp(to: string): Promise<void> {
     await firstValueFrom(this.http.post('/api/config/smtp/test-send', { to }));
   }
+
+  async dispatchPendingShiftReports(): Promise<void> {
+    await firstValueFrom(this.http.post('/api/reports/shift/dispatch', {}));
+  }
 }

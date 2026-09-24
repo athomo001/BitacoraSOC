@@ -232,4 +232,8 @@ export class ShiftsService {
   }>): Promise<NotificationSchedule> {
     return (await firstValueFrom(this.http.patch<ApiEnvelope<NotificationSchedule>>(`/api/work-shifts/notification-schedules/${id}`, patch))).data;
   }
+
+  async testNotificationSchedule(id: string): Promise<void> {
+    await firstValueFrom(this.http.post(`/api/work-shifts/notification-schedules/${id}/test`, {}));
+  }
 }

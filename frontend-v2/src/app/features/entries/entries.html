@@ -9,6 +9,23 @@
 
   <h1 class="entries__title">Bitácora</h1>
 
+  <section class="panel entries__composer entries__composer--primary">
+    <div class="entries__composer-heading"><div><p class="entries__eyebrow">Registro rápido</p><h2 class="panel__title">¿Qué ocurrió?</h2></div><span>Ctrl + Enter para guardar</span></div>
+    <div class="entries__scope-picker">
+      @for (s of scopes; track s) {
+        <button type="button" class="entries__scope-btn" [class.entries__scope-btn--active]="draft().scope === s" (click)="updateDraft({ scope: s })">{{ scopeLabels[s] }}</button>
+      }
+      <select class="entries__type-select" [ngModel]="draft().entryType" (ngModelChange)="updateDraft({ entryType: $event })">
+        @for (t of types; track t) { <option [value]="t">{{ typeLabels[t] }}</option> }
+      </select>
+    </div>
+    <textarea class="entries__textarea" rows="5" autofocus placeholder="Escribe la novedad, incidente o acción…" [ngModel]="draft().content" (ngModelChange)="updateDraft({ content: $event })" (paste)="onPaste($event)"></textarea>
+    <div class="entries__composer-footer"><label class="field entries__tags-field"><span>Tags</span><input [ngModel]="draft().tags" (ngModelChange)="updateDraft({ tags: $event })" placeholder="fibra, otdr" /></label><label class="field entries__tags-field"><span>Ticket (opcional)</span><input [ngModel]="draft().ticketNumber" (ngModelChange)="updateDraft({ ticketNumber: $event })" placeholder="TKT-2026-00042" /></label><div class="actions"><app-button variant="primary" [disabled]="saving() || !draft().content.trim()" (pressed)="submitEntry()">Guardar entrada</app-button></div></div>
+    <div class="entries__image-row">
+      @if (composeImage(); as img) { <span class="entries__image-preview"><img [src]="img.previewUrl" alt="Evidencia" /> <button type="button" (click)="removeImage()">✖ Quitar</button></span> } @else { <label class="entries__file-picker">📎 Adjuntar evidencia<input type="file" accept="image/png,image/jpeg,image/webp" [disabled]="uploadingImage()" (change)="onFileSelected($event)" /></label> }
+    </div>
+  </section>
+
   @if (error()) {
     <p class="msg msg--error">{{ error() }}</p>
   }
@@ -96,43 +113,6 @@
       </div>
     </section>
   }
-
-  <section class="panel entries__composer">
-    <h2 class="panel__title">Redactar entrada rápida</h2>
-    <div class="entries__scope-picker">
-      @for (s of scopes; track s) {
-        <button type="button" class="entries__scope-btn" [class.entries__scope-btn--active]="draft().scope === s" (click)="updateDraft({ scope: s })">
-          {{ scopeLabels[s] }}
-        </button>
-      }
-      <select class="entries__type-select" [ngModel]="draft().entryType" (ngModelChange)="updateDraft({ entryType: $event })">
-        @for (t of types; track t) { <option [value]="t">{{ typeLabels[t] }}</option> }
-      </select>
-    </div>
-    <textarea class="entries__textarea" rows="4" placeholder="Mensaje (Markdown soportado)…"
-      [ngModel]="draft().content" (ngModelChange)="updateDraft({ content: $event })" (paste)="onPaste($event)"></textarea>
-    <label class="field entries__tags-field">
-      <span>Tags (separados por coma)</span>
-      <input [ngModel]="draft().tags" (ngModelChange)="updateDraft({ tags: $event })" placeholder="fibra, otdr" />
-    </label>
-    <label class="field entries__tags-field">
-      <span>Vincular a ticket existente (opcional)</span>
-      <input [ngModel]="draft().ticketNumber" (ngModelChange)="updateDraft({ ticketNumber: $event })" placeholder="TKT-2026-00042" />
-    </label>
-    <div class="entries__image-row">
-      @if (composeImage(); as img) {
-        <span class="entries__image-preview"><img [src]="img.previewUrl" alt="Evidencia" /> <button type="button" (click)="removeImage()">✖ Quitar</button></span>
-      } @else {
-        <label class="entries__file-picker">
-          📎 {{ uploadingImage() ? 'Subiendo…' : 'Adjuntar o pegar imagen (Ctrl+V en el mensaje)' }}
-          <input type="file" accept="image/png,image/jpeg,image/webp" [disabled]="uploadingImage()" (change)="onFileSelected($event)" />
-        </label>
-      }
-    </div>
-    <div class="actions">
-      <app-button variant="primary" [disabled]="saving() || !draft().content.trim()" (pressed)="submitEntry()">Guardar</app-button>
-    </div>
-  </section>
 
   <div class="entries__notes-row">
     <section class="panel entries__notes">

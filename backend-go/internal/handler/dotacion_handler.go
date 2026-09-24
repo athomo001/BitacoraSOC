@@ -32,6 +32,7 @@ type DotacionHandler struct {
 	Queries       *db.Queries
 	AuditLog      *audit.Logger
 	PublicBaseURL string
+	Sender        func(context.Context) (*mail.Sender, error)
 	Now           func() time.Time
 }
 
@@ -72,6 +73,37 @@ func (h *DotacionHandler) DispatchDueSchedules(ctx context.Context, sender *mail
 		}
 	}
 	return nil
+}
+
+func (h *DotacionHandler) TestNotificationSchedule(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil || h.Sender == nil {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "notificación inválida")
+		return
+	}
+	schedule, err := h.Queries.GetNotificationSchedule(r.Context(), id)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "notificación no encontrada")
+		return
+	}
+	now := h.now()
+	matrix, err := h.buildMatrix(r.Context(), mondayOf(now), mondayOf(now).AddDate(0, 0, 4))
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo construir el reporte")
+		return
+	}
+	sender, err := h.Sender(r.Context())
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusBadRequest, "smtp-not-configured", "configurá SMTP antes de probar la notificación")
+		return
+	}
+	subject, _ := buildNotificationMail(schedule, matrix)
+	if err := sender.SendHTML(schedule.Recipients, schedule.CcRecipients, "[Prueba] "+subject, buildNotificationMailHTML(schedule, matrix)); err != nil {
+		problemdetails.Write(w, r, http.StatusBadGateway, "mail-failed", "el envío de prueba falló")
+		return
+	}
+	h.AuditLog.Log(r.Context(), "dotacion.notification.test", audit.LevelInfo, audit.Success(), map[string]any{"scheduleId": id.String()})
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // mondayOf devuelve la medianoche del lunes de la semana que contiene t

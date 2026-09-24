@@ -1,5 +1,8 @@
 <div class="shell">
-  <nav class="shell__sidebar" aria-label="Navegación principal">
+    <nav class="shell__sidebar" aria-label="Navegación principal">
+    <button type="button" class="shell__avatar shell__avatar--sidebar" (click)="profileOpen.set(!profileOpen())" title="Mi perfil">
+      @if (avatarUrl) { <img [src]="avatarUrl" alt="Foto de perfil" /> } @else { <span>{{ avatarInitials() }}</span> }
+    </button>
     @for (item of navItems(); track item.path) {
       <a
         class="shell__nav-item"
@@ -17,7 +20,7 @@
     </button>
   </nav>
   <main class="shell__workspace">
-    <header class="shell__topbar"><span>{{ auth.user()?.username || 'admin' }}</span><label>Idioma <select [value]="language()" (change)="setLanguage($event)"><option value="es">ES</option><option value="en">EN</option></select></label><div class="shell__themes"><button type="button" [class.active]="theme() === 'dark'" (click)="setTheme('dark')" title="Tema oscuro">●</button><button type="button" [class.active]="theme() === 'light'" (click)="setTheme('light')" title="Tema claro">○</button><button type="button" [class.active]="theme() === 'pink'" (click)="setTheme('pink')" title="Tema rosa">●</button></div></header>
+    <header class="shell__topbar"><button type="button" class="shell__profile-trigger" (click)="profileOpen.set(!profileOpen())"><span class="shell__avatar">@if (avatarUrl) { <img [src]="avatarUrl" alt="Foto de perfil" /> } @else { <span>{{ avatarInitials() }}</span> }</span><span>{{ fullName || auth.user()?.username || 'admin' }}</span></button><label>Idioma <select [value]="language()" (change)="setLanguage($event)"><option value="es">ES</option><option value="en">EN</option></select></label><div class="shell__themes"><button type="button" [class.active]="theme() === 'dark'" (click)="setTheme('dark')" title="Tema oscuro">●</button><button type="button" [class.active]="theme() === 'light'" (click)="setTheme('light')" title="Tema claro">○</button><button type="button" [class.active]="theme() === 'pink'" (click)="setTheme('pink')" title="Tema rosa">●</button></div>@if (profileOpen()) { <div class="shell__profile-menu"><div class="shell__profile-heading"><span class="shell__avatar shell__avatar--large">@if (avatarUrl) { <img [src]="avatarUrl" alt="Foto de perfil" /> } @else { <span>{{ avatarInitials() }}</span> }</span><div><strong>{{ fullName || auth.user()?.username || 'Mi perfil' }}</strong><small>{{ auth.user()?.email }}</small></div></div><label>Nombre completo<input type="text" [(ngModel)]="fullName" /></label><label>Teléfono<input type="tel" [(ngModel)]="phone" /></label><label>Cumpleaños<input type="date" [(ngModel)]="birthday" /></label><label class="shell__file-picker">Foto de perfil<input type="file" accept="image/png,image/jpeg,image/webp" (change)="onAvatarSelected($event)" /><span>Elegir imagen…</span></label><button type="button" (click)="saveProfile()">Guardar perfil</button><label>Login preferido<select [value]="loginTheme()" (change)="setLoginTheme($any($event.target).value)"><option value="crt">CRT</option><option value="infoflow">Infoflow</option><option value="modern">Modern</option><option value="surrealism">Surrealism</option><option value="win311">Win 3.1</option><option value="unix89">Unix 89</option></select></label><label>Contraseña actual<input type="password" [(ngModel)]="currentPassword" /></label><label>Nueva contraseña<input type="password" [(ngModel)]="newPassword" /></label><button type="button" (click)="savePassword()">Cambiar contraseña</button>@if (profileMessage(); as message) { <small>{{ message }}</small> }</div> }</header>
     <router-outlet />
   </main>
 </div>
