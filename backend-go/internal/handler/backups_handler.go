@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -68,34 +69,55 @@ func (h *BackupsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudieron enumerar las tablas")
 		return
 	}
-	tables := map[string]json.RawMessage{}
-	records := 0
+	var tableNames []string
 	for rows.Next() {
 		var name string
 		if err = rows.Scan(&name); err != nil {
 			rows.Close()
 			_ = h.fail(r, run.ID, err)
-			problemdetails.Write(w, r, 500, "internal-error", "no se pudo leer el catálogo")
+			problemdetails.Write(w, r, 500, "internal-error", "no se pudo leer el catálogo de tablas")
 			return
 		}
-		identifier := `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
-		var payload []byte
-		if err = tx.QueryRow(r.Context(), `SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM `+identifier+` t`).Scan(&payload); err != nil {
-			rows.Close()
-			_ = h.fail(r, run.ID, err)
-			problemdetails.Write(w, r, 500, "internal-error", "no se pudo serializar una tabla")
-			return
-		}
-		tables[name] = json.RawMessage(payload)
-		var list []json.RawMessage
-		_ = json.Unmarshal(payload, &list)
-		records += len(list)
+		tableNames = append(tableNames, name)
 	}
 	rows.Close()
 	if err = rows.Err(); err != nil {
 		_ = h.fail(r, run.ID, err)
 		problemdetails.Write(w, r, 500, "internal-error", "falló el snapshot")
 		return
+	}
+	tables := map[string]json.RawMessage{}
+	records := 0
+	for _, name := range tableNames {
+		identifier := `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+		var rawPayload any
+		if err = tx.QueryRow(r.Context(), `SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json)::text FROM `+identifier+` t`).Scan(&rawPayload); err != nil {
+			_ = h.fail(r, run.ID, err)
+			problemdetails.Write(w, r, 500, "internal-error", "no se pudo serializar la tabla "+name+": "+err.Error())
+			return
+		}
+		var payload []byte
+		switch value := rawPayload.(type) {
+		case []byte:
+			payload = value
+		case json.RawMessage:
+			payload = []byte(value)
+		case string:
+			payload = []byte(value)
+		case nil:
+			payload = []byte("[]")
+		default:
+			payload = []byte(fmt.Sprint(value))
+		}
+		if !json.Valid(payload) {
+			_ = h.fail(r, run.ID, fmt.Errorf("tabla %s devolvió JSON inválido", name))
+			problemdetails.Write(w, r, 500, "internal-error", "la tabla "+name+" devolvió JSON inválido")
+			return
+		}
+		tables[name] = json.RawMessage(payload)
+		var list []json.RawMessage
+		_ = json.Unmarshal(payload, &list)
+		records += len(list)
 	}
 	if err = tx.Commit(r.Context()); err != nil {
 		_ = h.fail(r, run.ID, err)
@@ -105,7 +127,7 @@ func (h *BackupsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	data, err := backup.Encode(backup.Envelope{Version: 1, Kind: "full", Tables: tables}, req.Passphrase)
 	if err != nil {
 		_ = h.fail(r, run.ID, err)
-		problemdetails.Write(w, r, 500, "internal-error", "no se pudo comprimir/cifrar el backup")
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudo comprimir/cifrar el backup: "+err.Error())
 		return
 	}
 	sum := sha256.Sum256(data)

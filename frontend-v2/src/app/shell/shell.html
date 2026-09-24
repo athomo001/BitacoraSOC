@@ -8,7 +8,7 @@
         [attr.title]="item.label + ' (Alt+' + item.shortcutDigit + ')'"
       >
         <mat-icon>{{ item.icon }}</mat-icon>
-        <span class="shell__nav-label">{{ item.label }}</span>
+        <span class="shell__nav-label">{{ navLabel(item) }}</span>
       </a>
     }
     <button type="button" class="shell__nav-item" title="Cerrar sesión" (click)="logout()">
@@ -17,6 +17,7 @@
     </button>
   </nav>
   <main class="shell__workspace">
+    <header class="shell__topbar"><span>{{ auth.user()?.username || 'admin' }}</span><label>Idioma <select [value]="language()" (change)="setLanguage($event)"><option value="es">ES</option><option value="en">EN</option></select></label><div class="shell__themes"><button type="button" [class.active]="theme() === 'dark'" (click)="setTheme('dark')" title="Tema oscuro">●</button><button type="button" [class.active]="theme() === 'light'" (click)="setTheme('light')" title="Tema claro">○</button><button type="button" [class.active]="theme() === 'pink'" (click)="setTheme('pink')" title="Tema rosa">●</button></div></header>
     <router-outlet />
   </main>
 </div>

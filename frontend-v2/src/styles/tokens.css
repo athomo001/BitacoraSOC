@@ -35,3 +35,25 @@
   --row-height: 36px;
   --transition-instant: 80ms ease-out;
 }
+
+[data-theme="light"] {
+  --bg-app: #f6f8fa;
+  --bg-surface: #ffffff;
+  --bg-surface-hover: #eef1f4;
+  --border-subtle: #d0d7de;
+  --border-active: #0969da;
+  --text-primary: #1f2328;
+  --text-secondary: #656d76;
+  --text-muted: #818b98;
+}
+
+[data-theme="pink"] {
+  --bg-app: #fdf0f6;
+  --bg-surface: #fff8fb;
+  --bg-surface-hover: #f8dce9;
+  --border-subtle: #e5b6ca;
+  --border-active: #d6428f;
+  --text-primary: #3f1f30;
+  --text-secondary: #754d64;
+  --text-muted: #9d7188;
+}

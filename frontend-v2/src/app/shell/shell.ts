@@ -23,10 +23,13 @@ export class ShellComponent implements OnInit {
   protected readonly navItems = signal(SHELL_NAV_ITEMS.filter((item) => item.path !== 'tickets'));
   protected readonly auth = inject(AuthService);
   private readonly systemFeatures = inject(SystemFeaturesService);
+  protected readonly language = signal<'es' | 'en'>((localStorage.getItem('bitacora.language') as 'es' | 'en') || 'es');
+  protected readonly theme = signal<'dark' | 'light' | 'pink'>((localStorage.getItem('bitacora.theme') as 'dark' | 'light' | 'pink') || 'dark');
 
   private readonly router = inject(Router);
 
   async ngOnInit(): Promise<void> {
+    document.documentElement.dataset['theme'] = this.theme();
     try {
       const features = await this.systemFeatures.list();
       if (features.some((feature) => feature.code === 'native_tickets' && feature.isEnabled)) {
@@ -36,6 +39,10 @@ export class ShellComponent implements OnInit {
       // Keep the core navigation available if the feature catalog is unavailable.
     }
   }
+
+  protected setLanguage(event: Event): void { const value = (event.target as HTMLSelectElement).value === 'en' ? 'en' : 'es'; this.language.set(value); localStorage.setItem('bitacora.language', value); }
+  protected setTheme(theme: 'dark' | 'light' | 'pink'): void { this.theme.set(theme); localStorage.setItem('bitacora.theme', theme); document.documentElement.dataset['theme'] = theme; }
+  protected navLabel(item: { path: string; label: string }): string { if (this.language() === 'es') return item.label; return ({ entries: 'Logbook', tickets: 'ITIL Tickets', shifts: 'Shifts & Checklist', escalation: 'Escalation / Dispatch', directory: 'Directory', admin: 'Administration' } as Record<string, string>)[item.path] ?? item.label; }
 
   // Atajos de teclado globales — spec/06-frontend-arquitectura-y-ui.md sección 3.
   @HostListener('window:keydown', ['$event'])
