@@ -19,8 +19,11 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/middleware"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/modules"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/ratelimit"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/reporting"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/scheduler"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/service/mail"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/web"
 )
 
@@ -397,6 +400,13 @@ func run(logger *slog.Logger) error {
 	// rutas públicas, para que hasta un login fallido quede auditado con
 	// contexto completo.
 	rootHandler := middleware.Metadata(mux)
+	reportDispatcher := &reporting.Dispatcher{Queries: queries, Sender: func(ctx context.Context) (*mail.Sender, error) {
+		sender, _, err := handler.BuildMailSender(ctx, queries, cryptoBox)
+		return sender, err
+	}, Schedules: func(ctx context.Context, sender *mail.Sender) error {
+		return dotacionHandler.DispatchDueSchedules(ctx, sender)
+	}}
+	go scheduler.Run(ctx, time.Minute, reportDispatcher.DispatchPending)
 
 	srv := &http.Server{
 		Addr:         addr,

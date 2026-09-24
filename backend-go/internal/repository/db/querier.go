@@ -231,6 +231,7 @@ type Querier interface {
 	// ===== Notificación periódica de dotación (HU-5b) =====
 	ListNotificationSchedules(ctx context.Context) ([]WorkShiftNotificationSchedule, error)
 	ListOrganizations(ctx context.Context, arg ListOrganizationsParams) ([]Organization, error)
+	ListPendingShiftClosures(ctx context.Context) ([]ShiftClosure, error)
 	ListPermissionGroups(ctx context.Context, active pgtype.Bool) ([]PermissionGroup, error)
 	// ===== Políticas y pasos =====
 	ListPolicies(ctx context.Context, arg ListPoliciesParams) ([]EscalationPolicy, error)
@@ -287,6 +288,7 @@ type Querier interface {
 	ListWindowsForScope(ctx context.Context, arg ListWindowsForScopeParams) ([]MaintenanceWindow, error)
 	ListWorkShifts(ctx context.Context, active pgtype.Bool) ([]WorkShift, error)
 	LockUser(ctx context.Context, arg LockUserParams) error
+	MarkNotificationScheduleSent(ctx context.Context, id uuid.UUID) error
 	MarkShiftClosureSent(ctx context.Context, arg MarkShiftClosureSentParams) error
 	// PATCH /api/config/territorial-labels — merge parcial (jsonb ||): solo pisa
 	// los niveles que vienen en el request, el resto queda como estaba.

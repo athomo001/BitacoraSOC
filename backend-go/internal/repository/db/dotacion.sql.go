@@ -237,6 +237,15 @@ func (q *Queries) ListNotificationSchedules(ctx context.Context) ([]WorkShiftNot
 	return items, nil
 }
 
+const markNotificationScheduleSent = `-- name: MarkNotificationScheduleSent :exec
+UPDATE work_shift_notification_schedules SET last_sent_at = now(), updated_at = now() WHERE id = $1
+`
+
+func (q *Queries) MarkNotificationScheduleSent(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, markNotificationScheduleSent, id)
+	return err
+}
+
 const patchNotificationSchedule = `-- name: PatchNotificationSchedule :one
 UPDATE work_shift_notification_schedules SET
   enabled = COALESCE($2, enabled),

@@ -68,6 +68,23 @@ func (s *Sender) SendMany(to, cc []string, subject, body string) error {
 	return smtp.SendMail(addr, auth, s.cfg.FromAddress, rcpt, msg)
 }
 
+// SendHTML sends a UTF-8 HTML message. Existing Send/SendMany callers remain
+// plain text so older operational notifications keep their current format.
+func (s *Sender) SendHTML(to, cc []string, subject, htmlBody string) error {
+	to, cc = nonEmpty(to), nonEmpty(cc)
+	if len(to) == 0 {
+		return fmt.Errorf("mail: destinatario vacío")
+	}
+	addr := fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port)
+	var auth smtp.Auth
+	if s.cfg.Username != "" {
+		auth = smtp.PlainAuth("", s.cfg.Username, s.cfg.Password, s.cfg.Host)
+	}
+	msg := buildHTMLMessage(s.cfg.FromAddress, to, cc, subject, htmlBody, time.Now())
+	rcpt := append(append([]string{}, to...), cc...)
+	return smtp.SendMail(addr, auth, s.cfg.FromAddress, rcpt, msg)
+}
+
 func nonEmpty(addrs []string) []string {
 	out := make([]string, 0, len(addrs))
 	for _, a := range addrs {
@@ -96,6 +113,22 @@ func buildMessage(from string, to, cc []string, subject, body string, now time.T
 	b.WriteString("MIME-Version: 1.0" + crlf)
 	b.WriteString(`Content-Type: text/plain; charset="UTF-8"` + crlf)
 	b.WriteString(crlf)
+	b.WriteString(body)
+	return []byte(b.String())
+}
+
+func buildHTMLMessage(from string, to, cc []string, subject, body string, now time.Time) []byte {
+	const crlf = "\r\n"
+	var b strings.Builder
+	b.WriteString("From: " + from + crlf)
+	b.WriteString("To: " + strings.Join(to, ", ") + crlf)
+	if len(cc) > 0 {
+		b.WriteString("Cc: " + strings.Join(cc, ", ") + crlf)
+	}
+	b.WriteString("Subject: " + mime.QEncoding.Encode("utf-8", subject) + crlf)
+	b.WriteString("Date: " + now.Format(time.RFC1123Z) + crlf)
+	b.WriteString("MIME-Version: 1.0" + crlf)
+	b.WriteString(`Content-Type: text/html; charset="UTF-8"` + crlf + crlf)
 	b.WriteString(body)
 	return []byte(b.String())
 }

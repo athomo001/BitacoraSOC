@@ -98,6 +98,15 @@ func TestBuildNotificationMail_EmptyFilterMatchSaysSo(t *testing.T) {
 	}
 }
 
+func TestBuildNotificationMailHTML_EscapesAndFilters(t *testing.T) {
+	schedule := db.WorkShiftNotificationSchedule{Name: "Reporte HTML", RoleFilter: []string{"N1"}}
+	matrix := matrixDTO{Columns: []matrixColumnDTO{{Date: "2026-09-21"}, {Date: "2026-09-25"}}, Rows: []matrixRowDTO{{Name: "Ana <script>", Role: "N1", Days: []matrixCellDTO{{Date: "2026-09-21", Label: "En Oficina"}}}, {Name: "Beto", Role: "N2"}}}
+	html := buildNotificationMailHTML(schedule, matrix)
+	if strings.Contains(html, "<script>") || !strings.Contains(html, "Ana &lt;script&gt;") || strings.Contains(html, "Beto") {
+		t.Fatalf("HTML inseguro o filtro incorrecto: %s", html)
+	}
+}
+
 func TestRenderTeleworkPage_SmokeTest(t *testing.T) {
 	matrix := matrixDTO{
 		Columns: []matrixColumnDTO{{Date: "2026-09-21", DayShort: "Lun", IsToday: true}},

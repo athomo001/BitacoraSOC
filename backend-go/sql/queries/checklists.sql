@@ -63,6 +63,9 @@ SELECT * FROM shift_closures WHERE id = $1;
 -- name: GetLatestShiftClosure :one
 SELECT * FROM shift_closures ORDER BY shift_end_at DESC LIMIT 1;
 
+-- name: ListPendingShiftClosures :many
+SELECT * FROM shift_closures WHERE sent_status = 'pending' ORDER BY shift_end_at ASC;
+
 -- name: AcknowledgeShiftClosure :one
 UPDATE shift_closures SET acknowledged_by = $2, acknowledged_at = $3 WHERE id = $1 AND acknowledged_at IS NULL RETURNING *;
 

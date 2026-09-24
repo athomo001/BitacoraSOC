@@ -11,6 +11,14 @@ Registro de cambios relevantes del proyecto.
 - **Verificación**: `go test ./...`, `pnpm run build` y Stylelint del CSS de turnos en verde. El build mantiene el warning de presupuesto preexistente de `login.component.scss`.
 - **Pendiente para cerrar la fase**: correlación por palabras clave, auditoría `checklist.abandoned` con debounce, alertas NOK por correo, despacho del cierre y resumen detallado de guardia por equipo.
 
+## [Rewrite] Fase 12 — Notificaciones Programadas y Pulido de Correo — cierre de implementación - 2026-09-24
+
+- **Scheduler**: ticker con apagado graceful que despacha cierres pendientes y horarios de dotación, con deduplicación por estado/fecha.
+- **Reportes**: renderer HTML escapado más fallback texto plano, guardas contra turnos vacíos y estado persistido `pending/success/failed/skipped`.
+- **SMTP**: `SendHTML` agregado sin alterar los envíos texto existentes; notificaciones de dotación migradas al formato HTML.
+- **QA visual**: reporte revisado en desktop y viewport estrecho; se corrigió un overflow horizontal de 5 px en el contenedor del correo. Falta validación contra clientes reales Outlook/Gmail/Apple Mail.
+- **Verificación**: `go test ./...`, `go vet ./...`, 58 tests frontend y Stylelint en verde.
+
 ## [Rewrite] Fases 10-11 — cierre de implementación - 2026-09-24
 
 - **Fase 10**: entrada y ticket transaccionales (`createTicket`/`ticketNumber`), conversión y resolución de entradas, reapertura al comentar tickets resueltos, creación de tickets, comentarios y tareas desde Angular, y vínculo desde el cajón de Bitácora.

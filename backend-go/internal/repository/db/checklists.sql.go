@@ -544,6 +544,51 @@ func (q *Queries) ListHandoverOnCall(ctx context.Context, arg ListHandoverOnCall
 	return items, nil
 }
 
+const listPendingShiftClosures = `-- name: ListPendingShiftClosures :many
+SELECT id, user_id, shift_start_at, shift_end_at, closure_check_id, total_entries, total_incidents, services_down, observations, pending_for_next_shift, acknowledged_by, acknowledged_at, tickets_resolved_count, sla_breaches_count, sent_via, integration_name, sent_status, sent_error, sent_at, created_at FROM shift_closures WHERE sent_status = 'pending' ORDER BY shift_end_at ASC
+`
+
+func (q *Queries) ListPendingShiftClosures(ctx context.Context) ([]ShiftClosure, error) {
+	rows, err := q.db.Query(ctx, listPendingShiftClosures)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ShiftClosure
+	for rows.Next() {
+		var i ShiftClosure
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.ShiftStartAt,
+			&i.ShiftEndAt,
+			&i.ClosureCheckID,
+			&i.TotalEntries,
+			&i.TotalIncidents,
+			&i.ServicesDown,
+			&i.Observations,
+			&i.PendingForNextShift,
+			&i.AcknowledgedBy,
+			&i.AcknowledgedAt,
+			&i.TicketsResolvedCount,
+			&i.SlaBreachesCount,
+			&i.SentVia,
+			&i.IntegrationName,
+			&i.SentStatus,
+			&i.SentError,
+			&i.SentAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listShiftCheckServices = `-- name: ListShiftCheckServices :many
 SELECT id, shift_check_id, checklist_item_id, service_title, status, is_computed, observation, correlated_from_service_id FROM shift_check_services WHERE shift_check_id = $1 ORDER BY id
 `

@@ -18,6 +18,9 @@ VALUES ($1, $2, $3, $4)
 ON CONFLICT (user_id, assigned_date) DO UPDATE SET condition = EXCLUDED.condition, notes = EXCLUDED.notes
 RETURNING *;
 
+-- name: MarkNotificationScheduleSent :exec
+UPDATE work_shift_notification_schedules SET last_sent_at = now(), updated_at = now() WHERE id = $1;
+
 -- ===== Enlace público TV (slug fijo 'telework', sin UNIQUE en slug: se
 -- resuelve la fila existente en el handler antes de decidir INSERT/UPDATE) =====
 

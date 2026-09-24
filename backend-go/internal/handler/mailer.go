@@ -41,3 +41,9 @@ func buildMailSender(ctx context.Context, queries *db.Queries, box *crypto.Box) 
 	})
 	return sender, config.FromAddress, nil
 }
+
+// BuildMailSender exposes the existing SMTP configuration seam to background
+// dispatchers without duplicating decryption and connection policy.
+func BuildMailSender(ctx context.Context, queries *db.Queries, box *crypto.Box) (*mail.Sender, string, error) {
+	return buildMailSender(ctx, queries, box)
+}

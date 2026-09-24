@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"html/template"
 	"net/http"
 	"regexp"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/rotation"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/service/mail"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -38,6 +40,38 @@ func (h *DotacionHandler) now() time.Time {
 		return h.Now()
 	}
 	return time.Now()
+}
+
+func (h *DotacionHandler) DispatchDueSchedules(ctx context.Context, sender *mail.Sender) error {
+	schedules, err := h.Queries.ListNotificationSchedules(ctx)
+	if err != nil {
+		return err
+	}
+	now := h.now()
+	for _, schedule := range schedules {
+		lastSentToday := schedule.LastSentAt.Valid && schedule.LastSentAt.Time.In(now.Location()).YearDay() == now.YearDay() && schedule.LastSentAt.Time.In(now.Location()).Year() == now.Year()
+		currentMinute := int64((now.Hour()*60 + now.Minute()) * 60 * 1_000_000)
+		dueDay := schedule.DayOfWeek == int32(now.Weekday())
+		if schedule.Frequency == db.NotificationScheduleFrequencyMonthly {
+			dueDay = schedule.DayOfWeek == int32(now.Weekday()) && now.Day() <= 7
+		}
+		if !schedule.Enabled || !dueDay || lastSentToday || schedule.SendTime.Microseconds > currentMinute || len(schedule.Recipients) == 0 {
+			continue
+		}
+		monday := mondayOf(now)
+		matrix, matrixErr := h.buildMatrix(ctx, monday, monday.AddDate(0, 0, 4))
+		if matrixErr != nil {
+			return matrixErr
+		}
+		subject, _ := buildNotificationMail(schedule, matrix)
+		if err := sender.SendHTML(schedule.Recipients, schedule.CcRecipients, subject, buildNotificationMailHTML(schedule, matrix)); err != nil {
+			continue
+		}
+		if err := h.Queries.MarkNotificationScheduleSent(ctx, schedule.ID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // mondayOf devuelve la medianoche del lunes de la semana que contiene t
@@ -375,13 +409,7 @@ func (h *DotacionHandler) PublicTeleworkPage(w http.ResponseWriter, r *http.Requ
 	_, _ = w.Write([]byte(renderTeleworkPage(matrix, now)))
 }
 
-// buildNotificationMail arma el asunto y cuerpo en texto plano del correo
-// periódico de dotación (HU-5b, ver dotacion_mail_integration_test.go).
-// mail.Sender solo soporta texto plano hoy (internal/service/mail/mail.go,
-// a propósito: el pulido a HTML/MJML es explícitamente Fase 12
-// "Notificaciones Programadas y Pulido de Correo", no esta fase). El envío
-// real automático (el cron que lo dispara) también llega en la Fase 12 —
-// acá solo se deja la función lista y probada contra un SMTP real.
+// buildNotificationMail preserves the plain-text fallback used by existing tests.
 func buildNotificationMail(schedule db.WorkShiftNotificationSchedule, matrix matrixDTO) (subject, body string) {
 	subject = strings.TrimSpace(schedule.Name)
 	if subject == "" {
@@ -413,6 +441,35 @@ func buildNotificationMail(schedule db.WorkShiftNotificationSchedule, matrix mat
 		b.WriteString("Sin filas para el filtro configurado.\r\n")
 	}
 	return subject, b.String()
+}
+
+var notificationMailTemplate = template.Must(template.New("dotacion-notification").Parse(`<!doctype html><html lang="es"><body style="margin:0;background:#f3f5f6;color:#20252b;font-family:Arial,sans-serif"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td style="padding:16px"><table role="presentation" width="100%" style="box-sizing:border-box;max-width:720px;margin:auto;background:#fff;border:1px solid #d8dde2"><tr><td style="padding:24px;border-bottom:4px solid #087f8c"><h1 style="margin:0;font-size:22px">{{.Subject}}</h1><p style="margin:6px 0 0;color:#66717b">Reporte de dotación</p></td></tr><tr><td style="padding:24px"><p>Semana del {{.WeekStart}} al {{.WeekEnd}}</p>{{range .Rows}}<h2 style="font-size:16px;margin-bottom:4px">{{.Name}} ({{.Role}})</h2><ul style="margin-top:0">{{range .Days}}<li>{{.Date}}: {{.Label}}</li>{{end}}</ul>{{end}}</td></tr></table></td></tr></table></body></html>`))
+
+func buildNotificationMailHTML(schedule db.WorkShiftNotificationSchedule, matrix matrixDTO) string {
+	roleFilter := map[string]bool{}
+	for _, role := range schedule.RoleFilter {
+		roleFilter[strings.ToLower(strings.TrimSpace(role))] = true
+	}
+	rows := make([]matrixRowDTO, 0, len(matrix.Rows))
+	for _, row := range matrix.Rows {
+		if len(roleFilter) == 0 || roleFilter[strings.ToLower(row.Role)] {
+			rows = append(rows, row)
+		}
+	}
+	data := struct {
+		Subject, WeekStart, WeekEnd string
+		Rows                        []matrixRowDTO
+	}{Subject: strings.TrimSpace(schedule.Name), Rows: rows}
+	if data.Subject == "" {
+		data.Subject = "Reporte de Dotación"
+	}
+	if len(matrix.Columns) > 0 {
+		data.WeekStart = matrix.Columns[0].Date
+		data.WeekEnd = matrix.Columns[len(matrix.Columns)-1].Date
+	}
+	var output strings.Builder
+	_ = notificationMailTemplate.Execute(&output, data)
+	return output.String()
 }
 
 // ===== Notificación periódica de dotación (HU-5b) =====
