@@ -19,6 +19,15 @@ Registro de cambios relevantes del proyecto.
 - **QA visual**: reporte revisado en desktop y viewport estrecho; se corrigió un overflow horizontal de 5 px en el contenedor del correo. Falta validación contra clientes reales Outlook/Gmail/Apple Mail.
 - **Verificación**: `go test ./...`, `go vet ./...`, 58 tests frontend y Stylelint en verde.
 
+## [Rewrite] Fase 13 — Backups, Auditoría Completa y Alta Disponibilidad — núcleo implementado - 2026-09-24
+
+- **Backups**: snapshot completo `REPEATABLE READ`, cifrado AES-GCM por passphrase, compresión zstd-19, checksum SHA-256, historial, descarga y eliminación.
+- **Delta**: exportación temporal de datos operacionales e importación idempotente con `ON CONFLICT DO NOTHING`.
+- **Auditoría**: `GET /api/audit-logs/export` con filtros y límite de un año.
+- **Frontend**: Administración incorpora las vistas desktop de Respaldos y Auditoría; se verificó build, tests y Stylelint sin introducir cambios en el lenguaje visual existente.
+- **HA**: no se implementa el clúster opcional de dos nodos; la decisión queda documentada para continuar en single-node.
+- **Verificación**: `sqlc generate`, `go test ./...`, `go vet ./...` y `git diff --check` en verde.
+
 ## [Rewrite] Fases 10-11 — cierre de implementación - 2026-09-24
 
 - **Fase 10**: entrada y ticket transaccionales (`createTicket`/`ticketNumber`), conversión y resolución de entradas, reapertura al comentar tickets resueltos, creación de tickets, comentarios y tareas desde Angular, y vínculo desde el cajón de Bitácora.

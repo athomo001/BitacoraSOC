@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/middleware"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
@@ -25,9 +26,10 @@ const (
 )
 
 type TicketsHandler struct {
-	Pool    *pgxpool.Pool
-	Queries *db.Queries
-	Now     func() time.Time
+	Pool     *pgxpool.Pool
+	Queries  *db.Queries
+	AuditLog *audit.Logger
+	Now      func() time.Time
 }
 
 func (h *TicketsHandler) now() time.Time {
@@ -212,6 +214,9 @@ func (h *TicketsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo confirmar el ticket")
 		return
 	}
+	if h.AuditLog != nil {
+		h.AuditLog.Log(r.Context(), "ticket.created", audit.LevelInfo, audit.Success(), map[string]any{"ticketId": ticket.ID.String()})
+	}
 	writeData(w, http.StatusCreated, toTicketDTO(ticket, true))
 }
 
@@ -362,6 +367,9 @@ func (h *TicketsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 400, "invalid-payload", "no se pudo actualizar el ticket")
 		return
 	}
+	if h.AuditLog != nil {
+		h.AuditLog.Log(r.Context(), "ticket.updated", audit.LevelInfo, audit.Success(), map[string]any{"ticketId": id.String()})
+	}
 	writeData(w, 200, toTicketDTO(t, true))
 }
 
@@ -394,6 +402,9 @@ func (h *TicketsHandler) AddComment(w http.ResponseWriter, r *http.Request) {
 	if len(c) == 0 {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo crear el comentario")
 		return
+	}
+	if h.AuditLog != nil {
+		h.AuditLog.Log(r.Context(), "ticket.comment_added", audit.LevelInfo, audit.Success(), map[string]any{"ticketId": id.String()})
 	}
 	writeData(w, 201, c[len(c)-1])
 }
@@ -449,6 +460,9 @@ func (h *TicketsHandler) LinkEntry(w http.ResponseWriter, r *http.Request) {
 	}
 	u, _ := middleware.UserFromContext(r.Context())
 	_, _ = h.Queries.CreateTicketComment(r.Context(), db.CreateTicketCommentParams{TicketID: ticket.ID, UserID: pgtype.UUID{Bytes: u.ID, Valid: true}, AuthorName: u.Username, Content: "Entrada de bitácora vinculada: " + entryID.String(), IsPublic: false})
+	if h.AuditLog != nil {
+		h.AuditLog.Log(r.Context(), "entry.ticket_linked", audit.LevelInfo, audit.Success(), map[string]any{"entryId": entryID.String(), "ticketId": ticket.ID.String()})
+	}
 	writeData(w, 200, map[string]any{"ticket": toTicketDTO(ticket, true), "entry": entry})
 }
 
@@ -513,6 +527,9 @@ func (h *TicketsHandler) ConvertEntry(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo confirmar la conversión")
 		return
 	}
+	if h.AuditLog != nil {
+		h.AuditLog.Log(r.Context(), "entry.converted_to_ticket", audit.LevelInfo, audit.Success(), map[string]any{"entryId": entryID.String(), "ticketId": ticket.ID.String()})
+	}
 	writeData(w, 201, map[string]any{"ticket": toTicketDTO(ticket, true), "entry": toEntryDTO(updated, entry.AuthorUsername)})
 }
 
@@ -559,6 +576,9 @@ func (h *TicketsHandler) ResolveEntry(w http.ResponseWriter, r *http.Request) {
 		}
 		ticketDTOValue = toTicketDTO(ticket, true)
 	}
+	if h.AuditLog != nil {
+		h.AuditLog.Log(r.Context(), "entry.resolved", audit.LevelInfo, audit.Success(), map[string]any{"entryId": entryID.String(), "closeLinkedTicket": req.CloseLinkedTicket})
+	}
 	writeData(w, 200, map[string]any{"entry": toEntryDTO(entryFromRow(entry), entry.AuthorUsername), "ticket": ticketDTOValue})
 }
 
@@ -604,6 +624,9 @@ func (h *TicketsHandler) AddTask(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 400, "invalid-payload", "no se pudo registrar la tarea")
 		return
 	}
+	if h.AuditLog != nil {
+		h.AuditLog.Log(r.Context(), "ticket.task_added", audit.LevelInfo, audit.Success(), map[string]any{"ticketId": id.String(), "taskId": task.ID.String()})
+	}
 	writeData(w, 201, task)
 }
 func (h *TicketsHandler) PatchTask(w http.ResponseWriter, r *http.Request) {
@@ -632,6 +655,9 @@ func (h *TicketsHandler) PatchTask(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		problemdetails.Write(w, r, 400, "invalid-payload", "no se pudo actualizar la tarea")
 		return
+	}
+	if h.AuditLog != nil {
+		h.AuditLog.Log(r.Context(), "ticket.task_updated", audit.LevelInfo, audit.Success(), map[string]any{"ticketId": ticketID.String(), "taskId": taskID.String()})
 	}
 	writeData(w, 200, updated)
 }

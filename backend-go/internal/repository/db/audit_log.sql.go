@@ -136,3 +136,65 @@ func (q *Queries) ListAuditLogs(ctx context.Context, arg ListAuditLogsParams) ([
 	}
 	return items, nil
 }
+
+const listAuditLogsForExport = `-- name: ListAuditLogsForExport :many
+SELECT id, timestamp, event, level, actor_user_id, actor_username, actor_role, request_id, request_ip, request_path, request_method, user_agent, device_fingerprint, ip_changed, previous_ip, success, reason, source, source_id, metadata FROM audit_log
+WHERE ($1::text IS NULL OR event = $1)
+  AND ($2::uuid IS NULL OR actor_user_id = $2)
+  AND ($3::timestamptz IS NULL OR "timestamp" >= $3)
+  AND ($4::timestamptz IS NULL OR "timestamp" < $4)
+ORDER BY "timestamp" DESC
+`
+
+type ListAuditLogsForExportParams struct {
+	Event       pgtype.Text        `json:"event"`
+	ActorUserID pgtype.UUID        `json:"actor_user_id"`
+	FromDate    pgtype.Timestamptz `json:"from_date"`
+	ToDate      pgtype.Timestamptz `json:"to_date"`
+}
+
+func (q *Queries) ListAuditLogsForExport(ctx context.Context, arg ListAuditLogsForExportParams) ([]AuditLog, error) {
+	rows, err := q.db.Query(ctx, listAuditLogsForExport,
+		arg.Event,
+		arg.ActorUserID,
+		arg.FromDate,
+		arg.ToDate,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AuditLog
+	for rows.Next() {
+		var i AuditLog
+		if err := rows.Scan(
+			&i.ID,
+			&i.Timestamp,
+			&i.Event,
+			&i.Level,
+			&i.ActorUserID,
+			&i.ActorUsername,
+			&i.ActorRole,
+			&i.RequestID,
+			&i.RequestIp,
+			&i.RequestPath,
+			&i.RequestMethod,
+			&i.UserAgent,
+			&i.DeviceFingerprint,
+			&i.IpChanged,
+			&i.PreviousIp,
+			&i.Success,
+			&i.Reason,
+			&i.Source,
+			&i.SourceID,
+			&i.Metadata,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

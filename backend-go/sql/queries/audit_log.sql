@@ -19,3 +19,11 @@ LIMIT $1 OFFSET $2;
 
 -- name: CountAuditLogs :one
 SELECT count(*) FROM audit_log;
+
+-- name: ListAuditLogsForExport :many
+SELECT * FROM audit_log
+WHERE (sqlc.narg('event')::text IS NULL OR event = sqlc.narg('event'))
+  AND (sqlc.narg('actor_user_id')::uuid IS NULL OR actor_user_id = sqlc.narg('actor_user_id'))
+  AND (sqlc.narg('from_date')::timestamptz IS NULL OR "timestamp" >= sqlc.narg('from_date'))
+  AND (sqlc.narg('to_date')::timestamptz IS NULL OR "timestamp" < sqlc.narg('to_date'))
+ORDER BY "timestamp" DESC;

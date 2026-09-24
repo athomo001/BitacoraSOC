@@ -7,8 +7,10 @@ import { AdminTeamsComponent } from './admin-teams';
 import { AdminEscalationComponent } from './admin-escalation';
 import { AdminSmtpComponent } from './admin-smtp';
 import { AdminShiftsComponent } from './admin-shifts';
+import { AdminBackupsComponent } from './admin-backups';
+import { AdminAuditComponent } from './admin-audit';
 
-type AdminTab = 'modules' | 'features' | 'territory' | 'organizations' | 'teams' | 'escalation' | 'smtp' | 'shifts';
+type AdminTab = 'modules' | 'features' | 'territory' | 'organizations' | 'teams' | 'escalation' | 'smtp' | 'shifts' | 'backups' | 'audit';
 
 const TABS: readonly { id: AdminTab; label: string }[] = [
   { id: 'modules', label: 'Módulos' },
@@ -19,6 +21,8 @@ const TABS: readonly { id: AdminTab; label: string }[] = [
   { id: 'escalation', label: 'Escalamiento' },
   { id: 'shifts', label: 'Turnos' },
   { id: 'smtp', label: 'Correo' },
+  { id: 'backups', label: 'Respaldos' },
+  { id: 'audit', label: 'Auditoría' },
 ];
 
 /**
@@ -31,7 +35,7 @@ const TABS: readonly { id: AdminTab; label: string }[] = [
 @Component({
   selector: 'app-admin-shell',
   standalone: true,
-  imports: [AdminModulesComponent, AdminFeaturesComponent, AdminTerritoryComponent, AdminOrganizationsComponent, AdminTeamsComponent, AdminEscalationComponent, AdminShiftsComponent, AdminSmtpComponent],
+  imports: [AdminModulesComponent, AdminFeaturesComponent, AdminTerritoryComponent, AdminOrganizationsComponent, AdminTeamsComponent, AdminEscalationComponent, AdminShiftsComponent, AdminSmtpComponent, AdminBackupsComponent, AdminAuditComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="admin">
@@ -54,6 +58,8 @@ const TABS: readonly { id: AdminTab; label: string }[] = [
           @case ('escalation') { <app-admin-escalation /> }
           @case ('shifts') { <app-admin-shifts /> }
           @case ('smtp') { <app-admin-smtp /> }
+          @case ('backups') { <app-admin-backups /> }
+          @case ('audit') { <app-admin-audit /> }
         }
       </div>
     </div>

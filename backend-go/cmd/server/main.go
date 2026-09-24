@@ -123,6 +123,7 @@ func run(logger *slog.Logger) error {
 	usersHandler := &handler.UsersHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
 	permissionGroupsHandler := &handler.PermissionGroupsHandler{Queries: queries, AuditLog: auditLog}
 	auditLogHandler := &handler.AuditLogHandler{Queries: queries}
+	backupsHandler := &handler.BackupsHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
 	systemHandler := &handler.SystemHandler{
 		Queries: queries, APILimiter: anonymousAPILimiter, AuditLog: auditLog,
 		ResetSecret: handler.ResetSecretFromEnv(),
@@ -142,7 +143,7 @@ func run(logger *slog.Logger) error {
 	checklistsHandler := &handler.ChecklistsHandler{Pool: pool, Queries: queries, AuditLog: auditLog, Crypto: cryptoBox}
 	dotacionHandler := &handler.DotacionHandler{Queries: queries, AuditLog: auditLog, PublicBaseURL: publicBaseURL}
 	entriesHandler := &handler.EntriesHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
-	ticketsHandler := &handler.TicketsHandler{Pool: pool, Queries: queries}
+	ticketsHandler := &handler.TicketsHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
 	entriesHandler.Tickets = ticketsHandler
 	notesHandler := &handler.NotesHandler{Queries: queries, AuditLog: auditLog}
 	draftsHandler := &handler.DraftsHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
@@ -231,6 +232,13 @@ func run(logger *slog.Logger) error {
 
 	// Auditoría
 	mux.Handle("GET /api/audit-logs", adminOrAuditor(auditLogHandler.List))
+	mux.Handle("GET /api/audit-logs/export", adminOrAuditor(auditLogHandler.Export))
+	mux.Handle("GET /api/backups/history", admin(backupsHandler.History))
+	mux.Handle("POST /api/backups/create", admin(backupsHandler.Create))
+	mux.Handle("POST /api/backups/export-delta", authed(backupsHandler.ExportDelta))
+	mux.Handle("POST /api/backups/import-delta", admin(backupsHandler.ImportDelta))
+	mux.Handle("GET /api/backups/{id}/download", admin(backupsHandler.Download))
+	mux.Handle("DELETE /api/backups/{id}", admin(backupsHandler.Delete))
 
 	// Setup modular post-bootstrap y gobernanza de features (Fase 5)
 	mux.Handle("PATCH /api/config/modules", admin(configHandler.PatchModules))

@@ -31,6 +31,7 @@ type Querier interface {
 	ClearPreferredUserChannel(ctx context.Context, userID pgtype.UUID) error
 	CompleteSetup(ctx context.Context, arg CompleteSetupParams) (AppConfig, error)
 	CountAuditLogs(ctx context.Context) (int64, error)
+	CountBackupRuns(ctx context.Context, kind NullBackupKind) (int64, error)
 	CountDirectory(ctx context.Context, arg CountDirectoryParams) (int64, error)
 	CountEntries(ctx context.Context, arg CountEntriesParams) (int64, error)
 	CountEntriesInWindow(ctx context.Context, arg CountEntriesInWindowParams) (int64, error)
@@ -41,6 +42,7 @@ type Querier interface {
 	CountTickets(ctx context.Context, arg CountTicketsParams) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
 	CreateAsset(ctx context.Context, arg CreateAssetParams) (uuid.UUID, error)
+	CreateBackupRun(ctx context.Context, arg CreateBackupRunParams) (BackupRun, error)
 	CreateChecklistEntry(ctx context.Context, arg CreateChecklistEntryParams) (Entry, error)
 	CreateContact(ctx context.Context, arg CreateContactParams) (uuid.UUID, error)
 	CreateContactChannel(ctx context.Context, arg CreateContactChannelParams) (ContactChannel, error)
@@ -90,6 +92,7 @@ type Querier interface {
 	// usuario que alguna vez hizo algo auditado rompería esa FK. Mismo patrón
 	// `active` que ya usa el resto del esquema (organizations, teams, etc.).
 	DeactivateUser(ctx context.Context, id uuid.UUID) error
+	DeleteBackupRun(ctx context.Context, id uuid.UUID) (BackupRun, error)
 	DeleteContactChannel(ctx context.Context, arg DeleteContactChannelParams) (int64, error)
 	DeleteDraft(ctx context.Context, arg DeleteDraftParams) (int64, error)
 	// Borrado real (no soft-delete, HU-7g) — RETURNING para el snapshot de auditoría.
@@ -131,6 +134,7 @@ type Querier interface {
 	GetAsset(ctx context.Context, id uuid.UUID) (GetAssetRow, error)
 	GetAssetForResolve(ctx context.Context, id uuid.UUID) (GetAssetForResolveRow, error)
 	GetAttachment(ctx context.Context, id uuid.UUID) (EntryAttachment, error)
+	GetBackupRun(ctx context.Context, id uuid.UUID) (BackupRun, error)
 	// El slot regular cuya semana cubre `now` (independiente de is_paused: el
 	// handler decide qué hacer con eso vía internal/rotation.Resolve).
 	GetCurrentRotationSlot(ctx context.Context, arg GetCurrentRotationSlotParams) (GetCurrentRotationSlotRow, error)
@@ -200,6 +204,8 @@ type Querier interface {
 	ListAssignmentsForRange(ctx context.Context, arg ListAssignmentsForRangeParams) ([]WorkShiftAssignment, error)
 	// GET /api/audit-logs — paginado simple, más reciente primero.
 	ListAuditLogs(ctx context.Context, arg ListAuditLogsParams) ([]AuditLog, error)
+	ListAuditLogsForExport(ctx context.Context, arg ListAuditLogsForExportParams) ([]AuditLog, error)
+	ListBackupRuns(ctx context.Context, arg ListBackupRunsParams) ([]BackupRun, error)
 	// ===== Canales =====
 	ListChannelsForContacts(ctx context.Context, contactIds []uuid.UUID) ([]ContactChannel, error)
 	ListChannelsForUser(ctx context.Context, userID pgtype.UUID) ([]ContactChannel, error)
@@ -288,6 +294,7 @@ type Querier interface {
 	ListWindowsForScope(ctx context.Context, arg ListWindowsForScopeParams) ([]MaintenanceWindow, error)
 	ListWorkShifts(ctx context.Context, active pgtype.Bool) ([]WorkShift, error)
 	LockUser(ctx context.Context, arg LockUserParams) error
+	MarkBackupRun(ctx context.Context, arg MarkBackupRunParams) (BackupRun, error)
 	MarkNotificationScheduleSent(ctx context.Context, id uuid.UUID) error
 	MarkShiftClosureSent(ctx context.Context, arg MarkShiftClosureSentParams) error
 	// PATCH /api/config/territorial-labels — merge parcial (jsonb ||): solo pisa
