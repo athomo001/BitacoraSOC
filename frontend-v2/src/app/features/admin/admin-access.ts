@@ -12,18 +12,49 @@ interface PermissionGroup { id: string; code: string; name: string; moduleScope:
   <section class="panel access-panel"><header><div><h2>Usuarios y grupos</h2><p>Administra acceso, alcance SOC/NOC y capacidades operativas.</p></div><span>{{ users().length }} usuarios · {{ groups().length }} grupos</span></header>
     <div class="access-grid"><section><h3>Nuevo usuario</h3><form (submit)="$event.preventDefault(); createUser()"><label>Usuario<input name="username" [(ngModel)]="userForm.username" required /></label><label>Correo<input type="email" name="email" [(ngModel)]="userForm.email" required /></label><label>Contraseña temporal<input type="password" name="password" [(ngModel)]="userForm.password" required /></label><label>Rol<select name="role" [(ngModel)]="userForm.role"><option value="user">Analista</option><option value="auditor">Auditor</option><option value="admin">Administrador</option></select></label><button type="submit" [disabled]="busy()">Crear usuario</button></form></section><section><h3>Nuevo grupo</h3><form (submit)="$event.preventDefault(); createGroup()"><label>Código<input name="code" [(ngModel)]="groupForm.code" placeholder="analista-n1" required /></label><label>Nombre<input name="name" [(ngModel)]="groupForm.name" required /></label><label>Alcance<select name="moduleScope" [(ngModel)]="groupForm.moduleScope"><option value="none">Ninguno</option><option value="soc">SOC</option><option value="noc">NOC</option><option value="both">SOC + NOC</option></select></label><label>Capacidades<input name="capabilities" [(ngModel)]="groupForm.capabilities" placeholder="directory:write, tickets:assign" /></label><button type="submit" [disabled]="busy()">Crear grupo</button></form></section></div>
     @if (error()) { <p class="error">{{ error() }}</p> }
-    <h3>Usuarios activos</h3><table><thead><tr><th>Usuario</th><th>Correo</th><th>Rol</th><th>Estado</th><th>Grupos</th></tr></thead><tbody>@for (user of users(); track user.id) { <tr><td>{{ user.username }}</td><td>{{ user.email }}</td><td>{{ user.role }}</td><td>{{ user.active ? 'Activo' : 'Inactivo' }}</td><td><select [ngModel]="userGroups[user.id] || []" (ngModelChange)="assignGroups(user, $event)" multiple>@for (group of groups(); track group.id) { <option [value]="group.id">{{ group.name }}</option> }</select></td></tr> } @empty { <tr><td colspan="5">No hay usuarios.</td></tr> }</tbody></table>
+    <h3>Usuarios activos</h3><table><thead><tr><th>Usuario</th><th>Correo</th><th>Rol</th><th>Estado</th><th>Grupos</th></tr></thead><tbody>@for (user of users(); track user.id) { <tr><td>{{ user.username }}</td><td>{{ user.email }}</td><td>{{ user.role }}</td><td>{{ user.active ? 'Activo' : 'Inactivo' }}</td><td><select [ngModel]="userGroups()[user.id] || []" [disabled]="!groupsLoaded()" (ngModelChange)="assignGroups(user, $event)" multiple>@for (group of groups(); track group.id) { <option [value]="group.id">{{ group.name }}</option> }</select></td></tr> } @empty { <tr><td colspan="5">No hay usuarios.</td></tr> }</tbody></table>
   </section>
 `, styles: [`
-  .access-panel { display:grid; gap:18px; } header { display:flex; justify-content:space-between; gap:24px; border-bottom:1px solid var(--border-subtle); padding-bottom:16px; } h2,h3 { margin:0; } header span { color:var(--accent-cyan); } .access-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; } form { display:grid; gap:10px; } label { display:grid; gap:5px; font-size:13px; } input,select { box-sizing:border-box; width:100%; border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:8px; background:var(--bg-app); color:var(--text-primary); font:inherit; } select[multiple] { min-height:70px; } button { border:0; border-radius:var(--radius-sm); padding:9px 12px; background:var(--accent-cyan); color:var(--bg-app); font:inherit; cursor:pointer; width:max-content; } table { width:100%; border-collapse:collapse; } th,td { border-bottom:1px solid var(--border-subtle); padding:9px; text-align:left; vertical-align:top; } .error { color:var(--status-critical); }
+  .access-panel { display:grid; gap:18px; } header { display:flex; justify-content:space-between; gap:24px; border-bottom:1px solid var(--border-subtle); padding-bottom:16px; } h2,h3 { margin:0; } header span { color:var(--accent); } .access-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; } form { display:grid; gap:10px; } label { display:grid; gap:5px; font-size:13px; } input,select { box-sizing:border-box; width:100%; border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:8px; background:var(--bg-app); color:var(--text-primary); font:inherit; } select[multiple] { min-height:70px; } button { border:0; border-radius:var(--radius-sm); padding:9px 12px; background:var(--accent); color:var(--accent-contrast); font:inherit; cursor:pointer; width:max-content; } table { width:100%; border-collapse:collapse; } th,td { border-bottom:1px solid var(--border-subtle); padding:9px; text-align:left; vertical-align:top; } .error { color:var(--status-critical); }
 ` ] })
 export class AdminAccessComponent implements OnInit {
-  private readonly http = inject(HttpClient); protected readonly users = signal<AdminUser[]>([]); protected readonly groups = signal<PermissionGroup[]>([]); protected readonly error = signal<string | null>(null); protected readonly busy = signal(false); protected userGroups: Record<string, string[]> = {};
+  private readonly http = inject(HttpClient); protected readonly users = signal<AdminUser[]>([]); protected readonly groups = signal<PermissionGroup[]>([]); protected readonly error = signal<string | null>(null); protected readonly busy = signal(false); protected readonly userGroups = signal<Record<string, string[]>>({}); protected readonly groupsLoaded = signal(false);
   protected userForm = { username: '', email: '', password: '', role: 'user' }; protected groupForm = { code: '', name: '', moduleScope: 'both', capabilities: '' };
   async ngOnInit(): Promise<void> { await Promise.all([this.loadUsers(), this.loadGroups()]); }
-  private async loadUsers(): Promise<void> { try { this.users.set((await firstValueFrom(this.http.get<ApiEnvelope<AdminUser[]>>('/api/users'))).data); } catch (error) { this.error.set(problemDetail(error, 'No se pudieron cargar los usuarios.')); } }
+  private async loadUsers(): Promise<void> {
+    try {
+      const users = (await firstValueFrom(this.http.get<ApiEnvelope<AdminUser[]>>('/api/users'))).data;
+      this.users.set(users);
+      await this.loadUserGroups(users);
+    } catch (error) {
+      this.error.set(problemDetail(error, 'No se pudieron cargar los usuarios.'));
+    }
+  }
+  /**
+   * Grupos actuales de cada usuario ANTES de habilitar la edición: el PUT
+   * reemplaza el conjunto completo, y sin esta carga el selector partía
+   * vacío y el primer cambio borraba los grupos reales del usuario.
+   */
+  private async loadUserGroups(users: AdminUser[]): Promise<void> {
+    this.groupsLoaded.set(false);
+    const entries = await Promise.all(users.map(async (user) => {
+      const groups = (await firstValueFrom(this.http.get<ApiEnvelope<PermissionGroup[]>>(`/api/users/${user.id}/permission-groups`))).data;
+      return [user.id, groups.map((group) => group.id)] as const;
+    }));
+    this.userGroups.set(Object.fromEntries(entries));
+    this.groupsLoaded.set(true);
+  }
   private async loadGroups(): Promise<void> { try { this.groups.set((await firstValueFrom(this.http.get<ApiEnvelope<PermissionGroup[]>>('/api/permission-groups'))).data); } catch (error) { this.error.set(problemDetail(error, 'No se pudieron cargar los grupos.')); } }
   protected async createUser(): Promise<void> { this.busy.set(true); try { await firstValueFrom(this.http.post('/api/users', this.userForm)); this.userForm = { username: '', email: '', password: '', role: 'user' }; await this.loadUsers(); } catch (error) { this.error.set(problemDetail(error, 'No se pudo crear el usuario.')); } finally { this.busy.set(false); } }
   protected async createGroup(): Promise<void> { this.busy.set(true); try { await firstValueFrom(this.http.post('/api/permission-groups', { code: this.groupForm.code, name: this.groupForm.name, moduleScope: this.groupForm.moduleScope, capabilities: this.groupForm.capabilities.split(',').map(value => value.trim()).filter(Boolean) })); this.groupForm = { code: '', name: '', moduleScope: 'both', capabilities: '' }; await this.loadGroups(); } catch (error) { this.error.set(problemDetail(error, 'No se pudo crear el grupo.')); } finally { this.busy.set(false); } }
-  protected async assignGroups(user: AdminUser, groupIds: string[]): Promise<void> { this.userGroups[user.id] = groupIds; try { await firstValueFrom(this.http.put(`/api/users/${user.id}/permission-groups`, { permissionGroupIds: groupIds })); } catch (error) { this.error.set(problemDetail(error, 'No se pudieron guardar los grupos del usuario.')); } }
+  protected async assignGroups(user: AdminUser, groupIds: string[]): Promise<void> {
+    const previous = this.userGroups()[user.id] ?? [];
+    this.userGroups.update((current) => ({ ...current, [user.id]: groupIds }));
+    try {
+      await firstValueFrom(this.http.put(`/api/users/${user.id}/permission-groups`, { permissionGroupIds: groupIds }));
+    } catch (error) {
+      this.userGroups.update((current) => ({ ...current, [user.id]: previous }));
+      this.error.set(problemDetail(error, 'No se pudieron guardar los grupos del usuario.'));
+    }
+  }
 }

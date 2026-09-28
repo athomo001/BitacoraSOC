@@ -147,3 +147,10 @@ func slugify(s string) string {
 	}
 	return strings.TrimSuffix(b.String(), "-")
 }
+
+func timestamptzPtr(t pgtype.Timestamptz) *time.Time {
+	if !t.Valid {
+		return nil
+	}
+	return &t.Time
+}

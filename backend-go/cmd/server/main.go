@@ -13,6 +13,7 @@ import (
 
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/auth"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/backup"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/crypto"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/eventbus"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/handler"
@@ -123,7 +124,18 @@ func run(logger *slog.Logger) error {
 	usersHandler := &handler.UsersHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
 	permissionGroupsHandler := &handler.PermissionGroupsHandler{Queries: queries, AuditLog: auditLog}
 	auditLogHandler := &handler.AuditLogHandler{Queries: queries}
-	backupsHandler := &handler.BackupsHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
+	// Respaldos (Fase 13): un solo servicio para la API y el planificador, con un
+	// candado compartido para que copia, restauración y purga nunca se pisen.
+	backupService := &backup.Service{Pool: pool, Queries: queries, Crypto: cryptoBox, LocalDir: os.Getenv("BACKUP_DIR")}
+	backupsHandler := &handler.BackupsHandler{
+		Pool: pool, Queries: queries, AuditLog: auditLog, Crypto: cryptoBox, Service: backupService,
+		// Tras purgar, el sistema queda como recién instalado: si hay admin en .env se recrea; si no, vuelve el asistente /setup.
+		AfterPurge: func(ctx context.Context) {
+			if envAdmin, ok := handler.EnvBootstrapFromEnv(); ok {
+				setupHandler.BootstrapFromEnv(ctx, envAdmin, logger)
+			}
+		},
+	}
 	systemHandler := &handler.SystemHandler{
 		Queries: queries, APILimiter: anonymousAPILimiter, AuditLog: auditLog,
 		ResetSecret: handler.ResetSecretFromEnv(),
@@ -146,7 +158,8 @@ func run(logger *slog.Logger) error {
 		return sender, err
 	}}
 	entriesHandler := &handler.EntriesHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
-	ticketsHandler := &handler.TicketsHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
+	// 30 intentos de PIN por token cada 15 min: un cliente real no llega, un ataque de 10^6 PIN tarda ~1 año.
+	ticketsHandler := &handler.TicketsHandler{Pool: pool, Queries: queries, AuditLog: auditLog, PinLimiter: ratelimit.NewAPILimiter(30, 15*time.Minute), Hub: hub}
 	entriesHandler.Tickets = ticketsHandler
 	notesHandler := &handler.NotesHandler{Queries: queries, AuditLog: auditLog}
 	draftsHandler := &handler.DraftsHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
@@ -224,6 +237,7 @@ func run(logger *slog.Logger) error {
 	mux.Handle("PATCH /api/users/{id}", admin(usersHandler.Patch))
 	mux.Handle("DELETE /api/users/{id}", admin(usersHandler.Delete))
 	mux.Handle("POST /api/users/force-reset-all", admin(usersHandler.ForceResetAll))
+	mux.Handle("GET /api/users/{id}/permission-groups", admin(permissionGroupsHandler.ListUserGroups))
 	mux.Handle("PUT /api/users/{id}/permission-groups", admin(permissionGroupsHandler.ReplaceUserGroups))
 
 	// Grupos de permisos
@@ -244,6 +258,13 @@ func run(logger *slog.Logger) error {
 	mux.Handle("GET /api/backups/{id}/download", admin(backupsHandler.Download))
 	mux.Handle("POST /api/backups/{id}/validate", admin(backupsHandler.Validate))
 	mux.Handle("DELETE /api/backups/{id}", admin(backupsHandler.Delete))
+	mux.Handle("POST /api/backups/{id}/restore", admin(backupsHandler.Restore))
+	mux.Handle("POST /api/backups/upload", admin(backupsHandler.Upload))
+	mux.Handle("GET /api/backups/config", admin(backupsHandler.GetConfig))
+	mux.Handle("PUT /api/backups/config", admin(backupsHandler.UpdateConfig))
+	mux.Handle("POST /api/backups/config/run", admin(backupsHandler.RunNow))
+	mux.Handle("GET /api/backups/export", admin(backupsHandler.Export))
+	mux.Handle("POST /api/backups/purge", admin(backupsHandler.Purge))
 
 	// Setup modular post-bootstrap y gobernanza de features (Fase 5)
 	mux.Handle("PATCH /api/config/modules", admin(configHandler.PatchModules))
@@ -389,6 +410,7 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/entries/{id}/ticket-link", ticketAuthed(ticketsHandler.LinkEntry))
 	mux.Handle("POST /api/entries/{id}/convert-to-ticket", ticketAuthed(ticketsHandler.ConvertEntry))
 	mux.Handle("POST /api/entries/{id}/resolve", ticketAuthed(ticketsHandler.ResolveEntry))
+	mux.Handle("POST /api/tickets/{id}/public-pin", ticketAuthed(ticketsHandler.RegeneratePublicPin))
 	mux.Handle("GET /p/tickets/{token}", public(ticketsHandler.Public))
 
 	// Notas Operativas (Fase 9): pizarrón admin + libreta personal.
@@ -428,6 +450,8 @@ func run(logger *slog.Logger) error {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	go scheduler.Run(ctx, time.Minute, reportDispatcher.DispatchPending)
+	// Respaldos automáticos: revisa cada minuto si toca la copia programada.
+	go scheduler.Run(ctx, time.Minute, func(ctx context.Context) error { return backupService.RunScheduled(ctx, false) })
 
 	srv := &http.Server{
 		Addr:         addr,

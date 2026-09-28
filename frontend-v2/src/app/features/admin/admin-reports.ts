@@ -16,7 +16,7 @@ import { problemDetail } from '../../core/http-error';
   styles: `
     .reports { display: grid; gap: 16px; }
     .reports__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
-    .reports__eyebrow { margin: 0 0 4px; color: var(--accent-cyan); font-size: 11px; text-transform: uppercase; }
+    .reports__eyebrow { margin: 0 0 4px; color: var(--accent); font-size: 11px; text-transform: uppercase; }
     .reports__icon { display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--border-active); border-radius: 50%; color: var(--border-active); font-size: 20px; }
     .reports__actions button { min-height: var(--row-height); padding: 0 16px; border: 0; border-radius: var(--radius-sm); background: var(--border-active); color: var(--bg-app); font: inherit; font-weight: 600; cursor: pointer; }
     .reports__actions button:disabled { opacity: .6; cursor: default; }

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { ButtonComponent } from '../../shared/ui/button/button';
@@ -7,6 +7,7 @@ import { PermissionsService } from '../../core/auth/permissions.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { problemDetail } from '../../core/http-error';
 import { SseService } from '../../core/sse/sse.service';
+import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 import { DraftsService } from '../../core/drafts/drafts.service';
 import { NotesService } from '../../core/notes/notes.service';
 import {
@@ -57,6 +58,9 @@ export class EntriesComponent implements OnInit {
   private readonly notesApi = inject(NotesService);
   private readonly sse = inject(SseService);
   private readonly auth = inject(AuthService);
+  private readonly features = inject(SystemFeaturesService);
+  /** Vincular a un ticket solo existe con la ticketera activa (el backend responde 403 si no). */
+  protected readonly ticketsEnabled = computed(() => this.features.isEnabled('native_tickets'));
   private readonly destroyRef = inject(DestroyRef);
   protected readonly perms = inject(PermissionsService);
 
@@ -255,7 +259,7 @@ export class EntriesComponent implements OnInit {
         content: d.content.trim(),
         tags: d.tags.split(',').map((t) => t.trim()).filter(Boolean),
         imageUrl: this.composeImage()?.url,
-        ticketNumber: d.ticketNumber.trim() || undefined,
+        ticketNumber: this.ticketsEnabled() ? d.ticketNumber.trim() || undefined : undefined,
       });
       this.draft.set({ ...EMPTY_DRAFT });
       this.removeImage();
@@ -299,19 +303,11 @@ export class EntriesComponent implements OnInit {
   }
 
   protected async exportCsv(): Promise<void> {
-    const token = this.auth.token();
-    const url = this.api.exportUrl(this.filters());
-    const response = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-    if (!response.ok) {
-      this.error.set('No se pudo exportar el CSV.');
-      return;
+    try {
+      await this.api.downloadCsv(this.filters());
+    } catch (error) {
+      this.error.set(problemDetail(error, 'No se pudo exportar el CSV.'));
     }
-    const blob = await response.blob();
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'entries.csv';
-    link.click();
-    URL.revokeObjectURL(link.href);
   }
 
   protected dismissBanner(): void {

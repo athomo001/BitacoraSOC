@@ -3,7 +3,25 @@ package reporting
 import (
 	"bytes"
 	"html/template"
+	"strings"
 )
+
+// Recipients limpia la lista de destinatarios configurada en el turno:
+// sin vacíos ni duplicados (sin distinguir mayúsculas).
+func Recipients(configured []string) []string {
+	seen := make(map[string]bool, len(configured))
+	out := make([]string, 0, len(configured))
+	for _, raw := range configured {
+		address := strings.TrimSpace(raw)
+		key := strings.ToLower(address)
+		if address == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, address)
+	}
+	return out
+}
 
 type ShiftReport struct {
 	TicketCount         int

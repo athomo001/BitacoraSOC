@@ -180,6 +180,32 @@ func (h *PermissionGroupsHandler) ReplaceUserGroups(w http.ResponseWriter, r *ht
 	writeData(w, http.StatusOK, map[string]any{"user": toUserDTO(user), "permissionGroups": dtos})
 }
 
+// ListUserGroups es GET /api/users/:id/permission-groups. Sin esta lectura,
+// la pantalla de Usuarios mostraba a todos sin grupos y el primer cambio
+// reemplazaba (PUT) los grupos reales por uno solo.
+func (h *PermissionGroupsHandler) ListUserGroups(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "id inválido")
+		return
+	}
+	if _, err := h.Queries.GetUserByID(ctx, userID); err != nil {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "usuario no encontrado")
+		return
+	}
+	groups, err := h.Queries.ListUserPermissionGroups(ctx, userID)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer los grupos del usuario")
+		return
+	}
+	dtos := make([]permissionGroupDTO, 0, len(groups))
+	for _, g := range groups {
+		dtos = append(dtos, toPermissionGroupDTO(g))
+	}
+	writeData(w, http.StatusOK, dtos)
+}
+
 // MyCapabilities es GET /api/users/me/capabilities — unión de capacidades de
 // todos los grupos del usuario, ya cruzada contra app_config.soc/noc
 // enabled (admin bypassea todo esto, siempre tiene acceso completo).

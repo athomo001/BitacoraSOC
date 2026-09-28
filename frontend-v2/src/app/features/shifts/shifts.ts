@@ -4,7 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { ButtonComponent } from '../../shared/ui/button/button';
 import { PermissionsService } from '../../core/auth/permissions.service';
 import { problemDetail } from '../../core/http-error';
-import { ChecklistsService, ChecklistTemplate, Handover, ShiftCheck } from '../../core/checklists/checklists.service';
+import { ChecklistItem, ChecklistsService, ChecklistTemplate, Handover, ShiftCheck } from '../../core/checklists/checklists.service';
+import { ChecklistAnswers, CheckStatus, depth, emptyAnswers, groupIds, groupStatus, progress, toServices } from '../../core/checklists/checklist-form';
 import {
   CONDITION_COLOR_VAR,
   CONDITION_LABELS,
@@ -84,12 +85,14 @@ export class ShiftsComponent implements OnInit {
   protected closureObservations = '';
   protected pendingForNextShift = '';
   protected notifyEmail = false;
-  protected syncGlpi = false;
   protected readonly checklistLoading = signal(false);
   protected readonly checklistSaved = signal<string | null>(null);
   protected readonly handover = signal<Handover | null>(null);
   protected readonly handoverLoading = signal(false);
-  protected readonly checkValues: Record<string, { status: 'verde' | 'rojo'; observation: string }> = {};
+  /** Respuestas por hoja; todas arrancan sin evaluar (checklist-form.ts). */
+  protected readonly answers = signal<ChecklistAnswers>({});
+  protected readonly checklistProgress = computed(() => progress(this.selectedTemplate()?.items ?? [], this.answers()));
+  private readonly groups = computed(() => groupIds(this.selectedTemplate()?.items ?? []));
 
   protected readonly weekLabel = computed(() => {
     const m = this.matrix();
@@ -132,23 +135,33 @@ export class ShiftsComponent implements OnInit {
   }
 
   private resetCheckValues(template: ChecklistTemplate | null): void {
-    for (const key of Object.keys(this.checkValues)) delete this.checkValues[key];
-    for (const item of template?.items ?? []) {
-      if (!item.parentItemId) this.checkValues[item.id] = { status: 'verde', observation: '' };
-    }
+    this.answers.set(emptyAnswers(template?.items ?? []));
   }
 
-  protected isLeaf(itemId: string): boolean {
-    return !this.selectedTemplate()?.items.some(item => item.parentItemId === itemId);
+  protected isGroup(itemId: string): boolean {
+    return this.groups().has(itemId);
+  }
+
+  protected itemDepth(item: ChecklistItem): number {
+    return depth(item, this.selectedTemplate()?.items ?? []);
+  }
+
+  protected computedStatus(itemId: string): CheckStatus | null {
+    return groupStatus(itemId, this.selectedTemplate()?.items ?? [], this.answers());
+  }
+
+  protected setAnswer(itemId: string, patch: Partial<{ status: CheckStatus; observation: string }>): void {
+    this.answers.update((current) => ({ ...current, [itemId]: { ...current[itemId], ...patch } }));
+    this.markChecklistTouched();
   }
 
   protected async submitChecklist(): Promise<void> {
     const template = this.selectedTemplate();
-    if (!template || !this.selectedWorkShiftId()) return;
+    if (!template || !this.selectedWorkShiftId() || !this.checklistProgress().complete) return;
     this.checklistLoading.set(true);
     this.error.set(null);
     try {
-      const services = template.items.filter(item => this.isLeaf(item.id)).map(item => ({ checklistItemId: item.id, serviceTitle: item.title, status: this.checkValues[item.id].status, observation: this.checkValues[item.id].observation }));
+      const services = toServices(template.items, this.answers());
       this.lastCheck.set(await this.checklistsApi.create({ checklistTemplateId: template.id, workShiftId: this.selectedWorkShiftId(), checkType: this.checkType(), services }));
       this.checklistSaved.set(`Checklist de ${this.checkType()} guardado.`);
       this.checklistTouched.set(false);
@@ -166,7 +179,7 @@ export class ShiftsComponent implements OnInit {
     if (!check || check.checkType !== 'cierre') return;
     this.checklistLoading.set(true);
     try {
-      await this.checklistsApi.close({ closureCheckId: check.id, observations: this.closureObservations, pendingForNextShift: this.pendingForNextShift, notifyEmail: this.notifyEmail, syncGlpi: this.syncGlpi });
+      await this.checklistsApi.close({ closureCheckId: check.id, observations: this.closureObservations, pendingForNextShift: this.pendingForNextShift, notifyEmail: this.notifyEmail, syncGlpi: false });
       this.checklistSaved.set('Cierre de turno guardado.');
     } catch (error) { this.error.set(problemDetail(error, 'No se pudo cerrar el turno.')); } finally { this.checklistLoading.set(false); }
   }

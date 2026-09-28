@@ -1,25 +1,30 @@
+import { MessageKey } from '../core/i18n/messages';
+
 /**
- * Las 5 secciones maestras del núcleo más la ticketera opcional de Fase 10 (spec/06-frontend-arquitectura-y-ui.md
- * sección 3 — corregida esta fase: un diagrama anterior de esa sección
- * incluía "Métricas y Analítica" como 6ta sección, contradiciendo esta
- * lista ya cerrada en spec/02-alcance-y-roadmap.md sección 4 y
- * spec/00-mapa-mental.md; el dashboard /metrics completo es Backlog
- * Post-Corte). Única fuente de verdad de la barra lateral — el atajo de
- * teclado y el ícono viven junto a la ruta, no repetidos en 2 archivos.
+ * Secciones de la barra lateral (spec/06-frontend-arquitectura-y-ui.md
+ * sección 3): las 5 maestras del núcleo, siempre visibles y con Alt+1..5
+ * fijos (invarianza: la memoria muscular del operador no cambia), más la
+ * Ticketera, que es un módulo activable (`system_features.native_tickets`):
+ * cuando está activa aparece como sección propia justo debajo de Bitácora
+ * (pedido del dueño: "si la tengo habilitada debería verla como tal, no
+ * dentro de muchos menús"), con su propio atajo que no desplaza a los demás.
+ * Única fuente de verdad del menú — el atajo y el ícono viven junto a la ruta.
  */
 export interface ShellNavItem {
   path: string;
-  label: string;
+  labelKey: MessageKey;
   icon: string;
-  /** Alt+1..Alt+5, ver ShellComponent.onKeydown */
+  /** Alt+<dígito>, ver ShellComponent.onKeydown */
   shortcutDigit: '1' | '2' | '3' | '4' | '5' | '6';
+  /** Código de `system_features` que debe estar activo para mostrar la sección. */
+  requiresFeature?: string;
 }
 
 export const SHELL_NAV_ITEMS: readonly ShellNavItem[] = [
-  { path: 'entries', label: 'Bitácora', icon: 'assignment', shortcutDigit: '1' },
-  { path: 'tickets', label: 'Ticketera ITIL', icon: 'confirmation_number', shortcutDigit: '6' },
-  { path: 'shifts', label: 'Checklist y Turnos', icon: 'checklist', shortcutDigit: '2' },
-  { path: 'escalation', label: 'Escalamiento / Despacho', icon: 'campaign', shortcutDigit: '3' },
-  { path: 'directory', label: 'Directorio', icon: 'contacts', shortcutDigit: '4' },
-  { path: 'admin', label: 'Administración', icon: 'settings', shortcutDigit: '5' },
+  { path: 'entries', labelKey: 'nav.entries', icon: 'edit_note', shortcutDigit: '1' },
+  { path: 'tickets', labelKey: 'nav.tickets', icon: 'confirmation_number', shortcutDigit: '6', requiresFeature: 'native_tickets' },
+  { path: 'shifts', labelKey: 'nav.shifts', icon: 'schedule', shortcutDigit: '2' },
+  { path: 'escalation', labelKey: 'nav.escalation', icon: 'phone_in_talk', shortcutDigit: '3' },
+  { path: 'directory', labelKey: 'nav.directory', icon: 'contacts', shortcutDigit: '4' },
+  { path: 'admin', labelKey: 'nav.admin', icon: 'settings', shortcutDigit: '5' },
 ];

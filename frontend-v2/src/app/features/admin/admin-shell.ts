@@ -74,7 +74,7 @@ const GROUPS: readonly { label: string; tabs: readonly { id: AdminTab; label: st
           @case ('shifts') { <app-admin-shifts /> }
           @case ('smtp') { <app-admin-smtp /> }
           @case ('reports') { <app-admin-reports /> }
-          @case ('backups') { <app-admin-backups /> }
+          @case ('backups') { <app-admin-backups (goToFeatures)="active.set('features')" /> }
           @case ('audit') { <app-admin-audit /> }
           @case ('access') { <app-admin-access /> }
         }

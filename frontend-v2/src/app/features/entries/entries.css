@@ -28,7 +28,7 @@
 .entries__composer-heading > span,
 .entries__eyebrow {
   margin: 0;
-  color: var(--accent-cyan);
+  color: var(--accent);
   font-size: 11px;
   text-transform: uppercase;
 }

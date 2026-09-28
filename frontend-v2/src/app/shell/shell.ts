@@ -1,85 +1,96 @@
-import { ChangeDetectionStrategy, Component, HostListener, OnInit, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { ChangeDetectionStrategy, Component, DestroyRef, HostListener, Injector, OnInit, computed, inject } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { SHELL_NAV_ITEMS } from './shell-nav';
 import { AuthService } from '../core/auth/auth.service';
-import { SystemFeaturesService } from '../core/system-features/system-features.service';
-import { LOGIN_THEMES, LoginTheme } from '../features/login/login.component';
+import { SystemFeature, SystemFeaturesService } from '../core/system-features/system-features.service';
+import { PreferencesService, Theme } from '../core/preferences/preferences.service';
+import { I18nService } from '../core/i18n/i18n.service';
+import { MessageKey } from '../core/i18n/messages';
+import { SseService } from '../core/sse/sse.service';
+import { UserAvatarComponent } from './user-avatar';
 
-const LOGIN_THEME_STORAGE_KEY = 'preferredLoginTheme';
+/** Ícono y etiqueta del botón de tema: muestran el tema SIGUIENTE (igual que el diseño). */
+const NEXT_THEME: Record<Theme, { icon: string; labelKey: MessageKey }> = {
+  dark: { icon: 'light_mode', labelKey: 'shell.theme.toLight' },
+  light: { icon: 'favorite', labelKey: 'shell.theme.toPink' },
+  pink: { icon: 'dark_mode', labelKey: 'shell.theme.toDark' },
+};
 
 /**
- * Shell principal: 1 nivel de navegación vertical fijo (spec/06-frontend-
- * arquitectura-y-ui.md sección 3) — nunca "menú del submenú del menú".
- * Las pestañas contextuales horizontales de cada sección viven dentro de
- * cada feature, no acá.
+ * Shell principal según el diseño aprobado "BitacoraSOC UI Base": barra
+ * lateral de 1 nivel (spec/06-frontend-arquitectura-y-ui.md sección 3,
+ * nunca "menú del submenú del menú") con marca arriba, secciones con su
+ * atajo Alt+N visible, y al pie el usuario + idioma ES/EN + tema + fuente
+ * para dislexia. Sin barra superior: el área de trabajo es toda de la
+ * sección activa. Las pestañas contextuales viven dentro de cada feature.
  */
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, MatIconModule, FormsModule],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, MatIconModule, UserAvatarComponent],
   templateUrl: './shell.html',
   styleUrl: './shell.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ShellComponent implements OnInit {
-  protected readonly navItems = signal(SHELL_NAV_ITEMS.filter((item) => item.path !== 'tickets'));
   protected readonly auth = inject(AuthService);
-  private readonly systemFeatures = inject(SystemFeaturesService);
-  protected readonly language = signal<'es' | 'en'>((localStorage.getItem('bitacora.language') as 'es' | 'en') || 'es');
-  protected readonly theme = signal<'dark' | 'light' | 'pink'>((localStorage.getItem('bitacora.theme') as 'dark' | 'light' | 'pink') || 'dark');
-  protected readonly loginTheme = signal<LoginTheme>(this.readLoginTheme());
-  protected readonly profileOpen = signal(false);
-  protected currentPassword = '';
-  protected newPassword = '';
-  protected fullName = '';
-  protected phone = '';
-  protected birthday = '';
-  protected avatarUrl = '';
-  protected profileMessage = signal<string | null>(null);
-
+  protected readonly prefs = inject(PreferencesService);
+  protected readonly i18n = inject(I18nService);
+  private readonly features = inject(SystemFeaturesService);
+  private readonly sse = inject(SseService);
+  private readonly injector = inject(Injector);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
+
+  /** Se recalcula solo cuando cambia una funcionalidad: activar la ticketera la muestra al instante. */
+  protected readonly navItems = computed(() =>
+    SHELL_NAV_ITEMS.filter((item) => !item.requiresFeature || this.features.isEnabled(item.requiresFeature)),
+  );
+  protected readonly nextTheme = computed(() => NEXT_THEME[this.prefs.theme()]);
+  protected readonly displayName = computed(() => {
+    const user = this.auth.user();
+    return user?.fullName || user?.username || '';
+  });
 
   async ngOnInit(): Promise<void> {
-    document.documentElement.dataset['theme'] = this.theme();
-    const user = this.auth.user();
-    if (user) {
-      this.fullName = user.fullName ?? '';
-      this.phone = user.phone ?? '';
-      this.birthday = user.birthday ?? '';
-      this.avatarUrl = user.avatarUrl ?? '';
-    }
-    try {
-      const features = await this.systemFeatures.list();
-      if (features.some((feature) => feature.code === 'native_tickets' && feature.isEnabled)) {
-        this.navItems.set([...SHELL_NAV_ITEMS]);
-      }
-    } catch {
-      // Keep the core navigation available if the feature catalog is unavailable.
-    }
-  }
-
-  protected setLanguage(event: Event): void { const value = (event.target as HTMLSelectElement).value === 'en' ? 'en' : 'es'; this.language.set(value); localStorage.setItem('bitacora.language', value); }
-  protected setTheme(theme: 'dark' | 'light' | 'pink'): void { this.theme.set(theme); localStorage.setItem('bitacora.theme', theme); document.documentElement.dataset['theme'] = theme; }
-  protected setLoginTheme(theme: LoginTheme): void { this.loginTheme.set(theme); localStorage.setItem(LOGIN_THEME_STORAGE_KEY, theme); }
-  protected async savePassword(): Promise<void> { this.profileMessage.set(null); try { await this.auth.changePassword(this.currentPassword, this.newPassword); this.currentPassword = ''; this.newPassword = ''; this.profileMessage.set('Contraseña actualizada.'); } catch { this.profileMessage.set('No se pudo actualizar la contraseña.'); } }
-  protected async saveProfile(): Promise<void> { this.profileMessage.set(null); try { await this.auth.updateProfile({ fullName: this.fullName, phone: this.phone, birthday: this.birthday, avatarUrl: this.avatarUrl }); this.profileMessage.set('Perfil actualizado.'); } catch { this.profileMessage.set('No se pudo actualizar el perfil.'); } }
-  protected onAvatarSelected(event: Event): void {
-    const file = (event.target as HTMLInputElement).files?.[0];
-    if (!file || !file.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.addEventListener('load', () => {
-      if (typeof reader.result === 'string') this.avatarUrl = reader.result;
+    // Cambios hechos por otro admin u otra pestaña llegan en vivo.
+    const stop = this.sse.connect((eventType, data) => {
+      if (eventType === 'system_feature.updated' && isFeature(data)) this.features.apply(data);
     });
-    reader.readAsDataURL(file);
+    this.destroyRef.onDestroy(stop);
+    await Promise.all([this.loadUser(), this.loadFeatures()]);
   }
-  protected avatarInitials(): string { return (this.fullName || this.auth.user()?.username || 'U').split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase(); }
-  protected navLabel(item: { path: string; label: string }): string { if (this.language() === 'es') return item.label; return ({ entries: 'Logbook', tickets: 'ITIL Tickets', shifts: 'Shifts & Checklist', escalation: 'Escalation / Dispatch', directory: 'Directory', admin: 'Administration' } as Record<string, string>)[item.path] ?? item.label; }
 
-  private readLoginTheme(): LoginTheme {
-    const stored = localStorage.getItem(LOGIN_THEME_STORAGE_KEY) as LoginTheme | null;
-    return stored && LOGIN_THEMES.includes(stored) ? stored : 'crt';
+  /** Tras un F5 solo sobrevive el token: el usuario (nombre, avatar) se vuelve a pedir. */
+  private async loadUser(): Promise<void> {
+    if (this.auth.user()) return;
+    try {
+      await this.auth.loadMe();
+    } catch {
+      // Un token vencido lo resuelve el interceptor; acá solo falta el nombre en la barra.
+    }
+  }
+
+  private async loadFeatures(): Promise<void> {
+    try {
+      await this.features.list();
+    } catch {
+      // Sin catálogo de funcionalidades el núcleo sigue navegable; solo faltan los módulos opcionales.
+    }
+  }
+
+  /**
+   * Carga diferida: el modal arrastra CDK Dialog y los botones de Material
+   * (~150 kB); si se importara arriba, iría en el bundle inicial de toda la
+   * app solo por algo que se abre de vez en cuando.
+   */
+  protected async openProfile(): Promise<void> {
+    const [{ Dialog }, { ProfileDialogComponent }] = await Promise.all([
+      import('@angular/cdk/dialog'),
+      import('./profile-dialog'),
+    ]);
+    this.injector.get(Dialog).open(ProfileDialogComponent, { ariaLabel: this.i18n.t('profile.title') });
   }
 
   // Atajos de teclado globales — spec/06-frontend-arquitectura-y-ui.md sección 3.
@@ -98,4 +109,13 @@ export class ShellComponent implements OnInit {
   protected logout(): void {
     void this.auth.logout();
   }
+}
+
+function isFeature(data: unknown): data is Pick<SystemFeature, 'code' | 'isEnabled'> {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    typeof (data as SystemFeature).code === 'string' &&
+    typeof (data as SystemFeature).isEnabled === 'boolean'
+  );
 }

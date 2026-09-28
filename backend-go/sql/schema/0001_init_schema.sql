@@ -1098,3 +1098,26 @@ CREATE INDEX idx_backup_runs_kind_started ON backup_runs(kind, started_at DESC);
 
 -- Fase 6 (migración 000003): búsqueda sin tildes del directorio.
 CREATE EXTENSION IF NOT EXISTS unaccent;
+
+-- Migración 000008: respaldos automáticos y purga (Fase 13, pantalla aprobada).
+ALTER TABLE backup_runs
+  ADD COLUMN trigger_source TEXT NOT NULL DEFAULT 'manual'
+    CHECK (trigger_source IN ('manual', 'auto', 'upload', 'pre_restore'));
+
+CREATE TABLE backup_config (
+  id BOOLEAN PRIMARY KEY DEFAULT true CHECK (id),
+  enabled BOOLEAN NOT NULL DEFAULT false,
+  interval_days INT NOT NULL DEFAULT 1 CHECK (interval_days BETWEEN 1 AND 365),
+  run_at TIME NOT NULL DEFAULT '03:00',
+  timezone TEXT NOT NULL DEFAULT 'America/Santiago',
+  retention_days INT NOT NULL DEFAULT 30 CHECK (retention_days BETWEEN 1 AND 365),
+  destination_type TEXT NOT NULL DEFAULT 'local' CHECK (destination_type IN ('local', 'smb', 'nfs')),
+  destination_path TEXT,
+  passphrase_encrypted TEXT,
+  next_run_at TIMESTAMPTZ,
+  last_run_at TIMESTAMPTZ,
+  last_status TEXT NOT NULL DEFAULT 'idle' CHECK (last_status IN ('idle', 'running', 'success', 'failed')),
+  last_message TEXT,
+  updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

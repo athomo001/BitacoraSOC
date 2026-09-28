@@ -39,6 +39,19 @@
 }
 
 /*
+ * OpenDyslexic (SIL OFL 1.1, licencia en public/fonts/LICENSE-OpenDyslexic.txt)
+ * — fuente del modo de accesibilidad para dislexia (`[data-font="dyslexic"]`
+ * en tokens.css). `swap`: solo se descarga cuando alguien activa el modo.
+ */
+@font-face {
+  font-family: OpenDyslexic;
+  src: url("/fonts/OpenDyslexic-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/*
  * Material Icons (Apache License 2.0, licencia completa en
  * public/fonts/LICENSE-MaterialIcons.txt) — auto-hospedada por el mismo
  * motivo que Geist/JetBrains Mono: `ng add @angular/material` agrega por

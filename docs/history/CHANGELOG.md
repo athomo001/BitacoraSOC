@@ -4,6 +4,34 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] Fase 13 — Respaldos al nivel del legacy, con las mejoras del rewrite - 2026-09-27
+
+- **Pantalla** (artboard "Administración: Respaldos"): automáticos (cada N días a una hora, retención, destino local/SMB/NFS, frase guardada cifrada, estado del planificador, "Ejecutar prueba ahora"); historial con validar, descargar, **restaurar** (unir sin duplicar o reemplazar todo con `RESTAURAR`) y eliminar con confirmación en la fila; respaldo manual, subir una copia, delta operativo con descarga inmediata, CSV (bitácora, checklists, tickets, todo en ZIP) y zona de peligro. ES/EN.
+- **Purga** (decisión del dueño): solo con `system_features.allow_purge` (migración 000008, apagado por defecto) + frase `PURGAR TODO`; conserva catálogos, reinicia la programación, borra copias locales y recrea el admin del `.env`.
+- **Backend**: `internal/backup` con foto `REPEATABLE READ`, restauración en orden de FK (tests del orden y de ciclos), secuencias al día, respaldo de seguridad antes de reemplazar, planificador en el tick de 1 minuto con retención. Migración 000008 (`backup_config`, `backup_runs.trigger_source`).
+- **Bugs encontrados al verificar contra Postgres real**: (1) `TRUNCATE ... CASCADE` vaciaba también `backup_runs`/`backup_config`/`system_features` por sus FK a `users` — reemplazar borraba el respaldo de seguridad y purgar borraba el catálogo; ahora se resguardan en tablas temporales y se reinsertan. (2) `GET /api/backups/export/{kind}` chocaba con `/{id}/download` y el servidor no arrancaba (pánico del ServeMux, invisible para build y tests) → `?kind=`. (3) Guardar un destino de red inexistente lo "creaba" en disco local → ahora se rechaza.
+- **Verificación**: 27/27 contra Postgres 18 real (conteos idénticos tabla por tabla tras reemplazar, unir dos veces sin duplicar, copia tomada con 40 escrituras concurrentes restaurable, retención, subida, CSV con BOM, purga), migración 000008 sube/baja/sube, 97 tests frontend, capturas oscuro/claro.
+
+## [Rewrite] Fase 10 — Ticketera rehecha según el diseño aprobado - 2026-09-27
+
+- **Pantalla** (artboard "Ticketera" del canvas aprobado): resumen de la cola (abiertos, SLA vencido, en pausa, resueltos hoy), filtros de un clic, tabla densa con prioridad/estado como pastillas del semáforo y barra de SLA, detalle fijo con los dos relojes, solo las transiciones válidas, actividad pública/interna (interno por defecto), trabajo con tiempos legibles, bitácora vinculada, enlace público y nuevo PIN. Nuevo ticket con cliente/equipo desde listas (nunca UUID) y prioridad ITIL en vivo. ES/EN completo.
+- **Backend**: paquete puro `internal/tickets` (transiciones, matriz ITIL, relojes de SLA con pausa) con tests; `GET /api/tickets` con nombres, relojes, `allowedTransitions`, `openOnly` y resumen; detalle en camelCase (antes comentarios/tareas/entradas salían en snake_case y la UI no mostraba autores); `PATCH` rechaza saltos inválidos (409) y recalcula prioridad; primera respuesta registrada; `POST /api/tickets/:id/public-pin`; SSE `ticket.updated`.
+- **Verificación**: 13/13 contra Postgres real (base desechable), 90 tests frontend, capturas en los 3 temas y EN.
+
+## [Rewrite] Revisión de Fases 10-13: base visual y bugs corregidos - 2026-09-27
+
+Revisión de lo construido en las Fases 10-13 contra el roadmap, los mockups de `spec/06` y el diseño aprobado "BitacoraSOC UI Base". Las fases siguen abiertas: faltan rehacer pantallas (ticketera, checklist/relevo, administración) y funcionalidades pendientes (restore de backups, página pública del ticket, filtros de auditoría).
+
+- **Base visual (diseño aprobado)**: barra lateral con marca, atajos `Alt+N` visibles y pie con ES/EN, tema (oscuro/claro/rosa) y fuente OpenDyslexic; paleta completa por tema (incluye `--status-*-bg` y `--accent`). Se eliminó `--accent-cyan`, que nunca existió y dejaba botones sin fondo. "Mi perfil" pasa a modal. Traducción ES/EN con `I18nService` (por ahora shell y perfil).
+- **Ticketera en el menú**: aparece como sección propia al activarse, en vivo (PATCH o SSE `system_feature.updated`), sin recargar.
+- **Checklist**: las plantillas jerárquicas no se podían guardar (backend rechazaba hojas con padre, frontend inicializaba solo raíces); las hojas ya no parten en verde y el envío se bloquea hasta completar; correlación solo hacia atrás (antes quedaban enlaces circulares).
+- **Cierre y relevo**: respuestas en camelCase (el relevo nunca mostraba pendientes); ventana según la hora de inicio y zona del turno (antes 8h fijas); `syncGlpi` se rechaza antes de crear el cierre; un check se cierra una sola vez; el reporte va a `work_shifts.email_recipients` vía scheduler (antes a todos los usuarios, dentro de la request) y `notifyEmail=false` se respeta.
+- **Ticketera**: vista pública sin datos del técnico ni comentarios internos, PIN en tiempo constante y con tope por token (30/15 min); comentarios públicos desde la UI; alta de tickets unificada (estaba copiada 3 veces); crear/vincular desde la bitácora conserva la imagen, reabre tickets resueltos, usa la primera línea como título y respeta el módulo apagado (403).
+- **Administración**: nuevo `GET /api/users/:id/permission-groups` (la pantalla borraba los grupos reales al primer cambio); descargas autenticadas de auditoría, respaldos y bitácora (los enlaces directos daban 401).
+- **Backups**: el delta ahora incluye `shift_check_services` y `shift_closures`.
+- **Calidad**: `lint:css` verifica que toda `var(--x)` exista y que los 3 temas tengan la misma paleta; bundle inicial de 566 kB a 362 kB (el shell arrastraba el login completo).
+- **Verificación**: `go test ./...`, `go vet`, 81 tests frontend, build y lint en verde; 31/31 verificaciones de punta a punta contra Postgres 18 real en una base desechable; capturas con Playwright de los 3 temas, EN + dislexia, vista angosta y el checklist contra el backend real.
+
 ## [Rewrite] Fase 11 — Checklists y Cierre de Turno — avance inicial - 2026-09-24
 
 - **Backend**: motor puro de roll-up “peor estado gana” con tests, plantillas activas, creación/listado de checks, alternancia inicio/cierre, cierre formal con KPIs de entradas/tickets, mantenimientos próximas 4h y confirmación del relevo.

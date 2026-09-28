@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { ApiEnvelope } from '../auth/auth.models';
+import { downloadFile } from '../download';
 
 export type EntryType = 'operativa' | 'incidente' | 'ofensa';
 export type EntryScope = 'soc' | 'noc' | 'general';
@@ -115,6 +116,10 @@ export class EntriesService {
     const form = new FormData();
     form.append('image', file);
     return (await firstValueFrom(this.http.post<ApiEnvelope<UploadImageResult>>('/api/entries/upload-image', form))).data;
+  }
+
+  downloadCsv(filters: EntryFilters = {}): Promise<void> {
+    return downloadFile(this.http, this.exportUrl(filters), 'bitacora.csv');
   }
 
   exportUrl(filters: EntryFilters = {}): string {

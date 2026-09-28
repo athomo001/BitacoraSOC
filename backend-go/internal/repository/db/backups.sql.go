@@ -25,7 +25,7 @@ func (q *Queries) CountBackupRuns(ctx context.Context, kind NullBackupKind) (int
 
 const createBackupRun = `-- name: CreateBackupRun :one
 INSERT INTO backup_runs (kind, window_from, window_to, triggered_by)
-VALUES ($1, $3, $4, $2) RETURNING id, kind, window_from, window_to, records_count, started_at, finished_at, status, file_path, file_size_bytes, checksum_sha256, compression_algorithm, encrypted, triggered_by, error_message
+VALUES ($1, $3, $4, $2) RETURNING id, kind, window_from, window_to, records_count, started_at, finished_at, status, file_path, file_size_bytes, checksum_sha256, compression_algorithm, encrypted, triggered_by, error_message, trigger_source
 `
 
 type CreateBackupRunParams struct {
@@ -59,12 +59,48 @@ func (q *Queries) CreateBackupRun(ctx context.Context, arg CreateBackupRunParams
 		&i.Encrypted,
 		&i.TriggeredBy,
 		&i.ErrorMessage,
+		&i.TriggerSource,
+	)
+	return i, err
+}
+
+const createBackupRunWithSource = `-- name: CreateBackupRunWithSource :one
+INSERT INTO backup_runs (kind, trigger_source, triggered_by)
+VALUES ($1, $2, $3) RETURNING id, kind, window_from, window_to, records_count, started_at, finished_at, status, file_path, file_size_bytes, checksum_sha256, compression_algorithm, encrypted, triggered_by, error_message, trigger_source
+`
+
+type CreateBackupRunWithSourceParams struct {
+	Kind          BackupKind  `json:"kind"`
+	TriggerSource string      `json:"trigger_source"`
+	TriggeredBy   pgtype.UUID `json:"triggered_by"`
+}
+
+func (q *Queries) CreateBackupRunWithSource(ctx context.Context, arg CreateBackupRunWithSourceParams) (BackupRun, error) {
+	row := q.db.QueryRow(ctx, createBackupRunWithSource, arg.Kind, arg.TriggerSource, arg.TriggeredBy)
+	var i BackupRun
+	err := row.Scan(
+		&i.ID,
+		&i.Kind,
+		&i.WindowFrom,
+		&i.WindowTo,
+		&i.RecordsCount,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.Status,
+		&i.FilePath,
+		&i.FileSizeBytes,
+		&i.ChecksumSha256,
+		&i.CompressionAlgorithm,
+		&i.Encrypted,
+		&i.TriggeredBy,
+		&i.ErrorMessage,
+		&i.TriggerSource,
 	)
 	return i, err
 }
 
 const deleteBackupRun = `-- name: DeleteBackupRun :one
-DELETE FROM backup_runs WHERE id=$1 RETURNING id, kind, window_from, window_to, records_count, started_at, finished_at, status, file_path, file_size_bytes, checksum_sha256, compression_algorithm, encrypted, triggered_by, error_message
+DELETE FROM backup_runs WHERE id=$1 RETURNING id, kind, window_from, window_to, records_count, started_at, finished_at, status, file_path, file_size_bytes, checksum_sha256, compression_algorithm, encrypted, triggered_by, error_message, trigger_source
 `
 
 func (q *Queries) DeleteBackupRun(ctx context.Context, id uuid.UUID) (BackupRun, error) {
@@ -86,12 +122,40 @@ func (q *Queries) DeleteBackupRun(ctx context.Context, id uuid.UUID) (BackupRun,
 		&i.Encrypted,
 		&i.TriggeredBy,
 		&i.ErrorMessage,
+		&i.TriggerSource,
+	)
+	return i, err
+}
+
+const getBackupConfig = `-- name: GetBackupConfig :one
+SELECT id, enabled, interval_days, run_at, timezone, retention_days, destination_type, destination_path, passphrase_encrypted, next_run_at, last_run_at, last_status, last_message, updated_by, updated_at FROM backup_config WHERE id
+`
+
+func (q *Queries) GetBackupConfig(ctx context.Context) (BackupConfig, error) {
+	row := q.db.QueryRow(ctx, getBackupConfig)
+	var i BackupConfig
+	err := row.Scan(
+		&i.ID,
+		&i.Enabled,
+		&i.IntervalDays,
+		&i.RunAt,
+		&i.Timezone,
+		&i.RetentionDays,
+		&i.DestinationType,
+		&i.DestinationPath,
+		&i.PassphraseEncrypted,
+		&i.NextRunAt,
+		&i.LastRunAt,
+		&i.LastStatus,
+		&i.LastMessage,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getBackupRun = `-- name: GetBackupRun :one
-SELECT id, kind, window_from, window_to, records_count, started_at, finished_at, status, file_path, file_size_bytes, checksum_sha256, compression_algorithm, encrypted, triggered_by, error_message FROM backup_runs WHERE id=$1
+SELECT id, kind, window_from, window_to, records_count, started_at, finished_at, status, file_path, file_size_bytes, checksum_sha256, compression_algorithm, encrypted, triggered_by, error_message, trigger_source FROM backup_runs WHERE id=$1
 `
 
 func (q *Queries) GetBackupRun(ctx context.Context, id uuid.UUID) (BackupRun, error) {
@@ -113,12 +177,13 @@ func (q *Queries) GetBackupRun(ctx context.Context, id uuid.UUID) (BackupRun, er
 		&i.Encrypted,
 		&i.TriggeredBy,
 		&i.ErrorMessage,
+		&i.TriggerSource,
 	)
 	return i, err
 }
 
 const listBackupRuns = `-- name: ListBackupRuns :many
-SELECT id, kind, window_from, window_to, records_count, started_at, finished_at, status, file_path, file_size_bytes, checksum_sha256, compression_algorithm, encrypted, triggered_by, error_message FROM backup_runs WHERE ($1::backup_kind IS NULL OR kind=$1) ORDER BY started_at DESC LIMIT $3 OFFSET $2
+SELECT id, kind, window_from, window_to, records_count, started_at, finished_at, status, file_path, file_size_bytes, checksum_sha256, compression_algorithm, encrypted, triggered_by, error_message, trigger_source FROM backup_runs WHERE ($1::backup_kind IS NULL OR kind=$1) ORDER BY started_at DESC LIMIT $3 OFFSET $2
 `
 
 type ListBackupRunsParams struct {
@@ -152,6 +217,7 @@ func (q *Queries) ListBackupRuns(ctx context.Context, arg ListBackupRunsParams) 
 			&i.Encrypted,
 			&i.TriggeredBy,
 			&i.ErrorMessage,
+			&i.TriggerSource,
 		); err != nil {
 			return nil, err
 		}
@@ -163,8 +229,73 @@ func (q *Queries) ListBackupRuns(ctx context.Context, arg ListBackupRunsParams) 
 	return items, nil
 }
 
+const listExpiredAutoBackups = `-- name: ListExpiredAutoBackups :many
+SELECT id, kind, window_from, window_to, records_count, started_at, finished_at, status, file_path, file_size_bytes, checksum_sha256, compression_algorithm, encrypted, triggered_by, error_message, trigger_source FROM backup_runs WHERE trigger_source = 'auto' AND started_at < $1
+`
+
+// Copias automáticas fuera de la retención: el planificador las borra (archivo y fila).
+func (q *Queries) ListExpiredAutoBackups(ctx context.Context, startedAt pgtype.Timestamptz) ([]BackupRun, error) {
+	rows, err := q.db.Query(ctx, listExpiredAutoBackups, startedAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []BackupRun
+	for rows.Next() {
+		var i BackupRun
+		if err := rows.Scan(
+			&i.ID,
+			&i.Kind,
+			&i.WindowFrom,
+			&i.WindowTo,
+			&i.RecordsCount,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.Status,
+			&i.FilePath,
+			&i.FileSizeBytes,
+			&i.ChecksumSha256,
+			&i.CompressionAlgorithm,
+			&i.Encrypted,
+			&i.TriggeredBy,
+			&i.ErrorMessage,
+			&i.TriggerSource,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const markBackupConfigRun = `-- name: MarkBackupConfigRun :exec
+UPDATE backup_config SET last_run_at = $2, last_status = $1, last_message = $3,
+  next_run_at = COALESCE($4, next_run_at)
+WHERE id
+`
+
+type MarkBackupConfigRunParams struct {
+	LastStatus  string             `json:"last_status"`
+	LastRunAt   pgtype.Timestamptz `json:"last_run_at"`
+	LastMessage pgtype.Text        `json:"last_message"`
+	NextRunAt   pgtype.Timestamptz `json:"next_run_at"`
+}
+
+func (q *Queries) MarkBackupConfigRun(ctx context.Context, arg MarkBackupConfigRunParams) error {
+	_, err := q.db.Exec(ctx, markBackupConfigRun,
+		arg.LastStatus,
+		arg.LastRunAt,
+		arg.LastMessage,
+		arg.NextRunAt,
+	)
+	return err
+}
+
 const markBackupRun = `-- name: MarkBackupRun :one
-UPDATE backup_runs SET records_count=$2, finished_at=now(), status=$3, file_path=$4, file_size_bytes=$5, checksum_sha256=$6, error_message=$7 WHERE id=$1 RETURNING id, kind, window_from, window_to, records_count, started_at, finished_at, status, file_path, file_size_bytes, checksum_sha256, compression_algorithm, encrypted, triggered_by, error_message
+UPDATE backup_runs SET records_count=$2, finished_at=now(), status=$3, file_path=$4, file_size_bytes=$5, checksum_sha256=$6, error_message=$7 WHERE id=$1 RETURNING id, kind, window_from, window_to, records_count, started_at, finished_at, status, file_path, file_size_bytes, checksum_sha256, compression_algorithm, encrypted, triggered_by, error_message, trigger_source
 `
 
 type MarkBackupRunParams struct {
@@ -204,6 +335,63 @@ func (q *Queries) MarkBackupRun(ctx context.Context, arg MarkBackupRunParams) (B
 		&i.Encrypted,
 		&i.TriggeredBy,
 		&i.ErrorMessage,
+		&i.TriggerSource,
+	)
+	return i, err
+}
+
+const updateBackupConfig = `-- name: UpdateBackupConfig :one
+UPDATE backup_config SET
+  enabled = $1, interval_days = $2, run_at = $3, timezone = $4, retention_days = $5,
+  destination_type = $6, destination_path = $7,
+  passphrase_encrypted = COALESCE($8, passphrase_encrypted),
+  next_run_at = $9, updated_by = $10, updated_at = now()
+WHERE id RETURNING id, enabled, interval_days, run_at, timezone, retention_days, destination_type, destination_path, passphrase_encrypted, next_run_at, last_run_at, last_status, last_message, updated_by, updated_at
+`
+
+type UpdateBackupConfigParams struct {
+	Enabled             bool               `json:"enabled"`
+	IntervalDays        int32              `json:"interval_days"`
+	RunAt               pgtype.Time        `json:"run_at"`
+	Timezone            string             `json:"timezone"`
+	RetentionDays       int32              `json:"retention_days"`
+	DestinationType     string             `json:"destination_type"`
+	DestinationPath     pgtype.Text        `json:"destination_path"`
+	PassphraseEncrypted pgtype.Text        `json:"passphrase_encrypted"`
+	NextRunAt           pgtype.Timestamptz `json:"next_run_at"`
+	UpdatedBy           pgtype.UUID        `json:"updated_by"`
+}
+
+func (q *Queries) UpdateBackupConfig(ctx context.Context, arg UpdateBackupConfigParams) (BackupConfig, error) {
+	row := q.db.QueryRow(ctx, updateBackupConfig,
+		arg.Enabled,
+		arg.IntervalDays,
+		arg.RunAt,
+		arg.Timezone,
+		arg.RetentionDays,
+		arg.DestinationType,
+		arg.DestinationPath,
+		arg.PassphraseEncrypted,
+		arg.NextRunAt,
+		arg.UpdatedBy,
+	)
+	var i BackupConfig
+	err := row.Scan(
+		&i.ID,
+		&i.Enabled,
+		&i.IntervalDays,
+		&i.RunAt,
+		&i.Timezone,
+		&i.RetentionDays,
+		&i.DestinationType,
+		&i.DestinationPath,
+		&i.PassphraseEncrypted,
+		&i.NextRunAt,
+		&i.LastRunAt,
+		&i.LastStatus,
+		&i.LastMessage,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

@@ -269,7 +269,7 @@ function splitList(raw: string): string[] {
     .shifts-admin__calendar { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; margin-top: 10px; }
     .shifts-admin__calendar-card { display: grid; gap: 5px; min-height: 88px; padding: 10px; border: 1px solid var(--border-active); border-radius: var(--radius-sm); background: var(--bg-surface-hover); }
     .shifts-admin__calendar-card--paused { border-color: var(--border-subtle); opacity: .65; }
-    .shifts-admin__calendar-card span:last-child { color: var(--accent-cyan); font-size: 11px; }
+    .shifts-admin__calendar-card span:last-child { color: var(--accent); font-size: 11px; }
     .shifts-admin__calendar-date { color: var(--text-secondary); font-size: 11px; }
     .shifts-admin__schedule-actions { display: flex; flex-wrap: wrap; gap: 4px; }
     .shifts-admin__muted { color: var(--text-muted); font-size: 12px; }

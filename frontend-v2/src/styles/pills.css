@@ -1,0 +1,112 @@
+/*
+ * Pastillas de estado del diseño aprobado ("BitacoraSOC UI Base"): texto +
+ * fondo suave del semáforo. El color siempre dice un estado real (spec/06
+ * §1.2), por eso los tonos son semánticos y no decorativos.
+ */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface-hover);
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.pill .material-icons,
+.pill mat-icon {
+  width: 13px;
+  height: 13px;
+  font-size: 13px;
+}
+
+.tone-ok {
+  background: var(--status-ok-bg);
+  color: var(--status-ok);
+}
+
+.tone-warn {
+  background: var(--status-warning-bg);
+  color: var(--status-warning);
+}
+
+.tone-bad {
+  background: var(--status-critical-bg);
+  color: var(--status-critical);
+}
+
+.tone-info {
+  background: var(--status-carrier-bg);
+  color: var(--status-carrier);
+}
+
+.tone-system {
+  background: var(--status-system-bg);
+  color: var(--status-system);
+}
+
+.tone-accent {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.tone-neutral {
+  background: var(--bg-surface-hover);
+  color: var(--text-secondary);
+}
+
+/* Barra de avance (SLA): el relleno toma el color del tono. */
+.meter {
+  display: block;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--bg-surface-hover);
+}
+
+.meter > span {
+  display: block;
+  height: 100%;
+  background: currentcolor;
+}
+
+.text-ok { color: var(--status-ok); }
+.text-warn { color: var(--status-warning); }
+.text-bad { color: var(--status-critical); }
+.text-info { color: var(--status-carrier); }
+.text-system { color: var(--status-system); }
+.text-accent { color: var(--accent); }
+.text-neutral { color: var(--text-secondary); }
+
+/* Botones segmentados de un clic (filtros, impacto/urgencia). */
+.seg {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.seg:hover {
+  color: var(--text-primary);
+}
+
+.seg[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.seg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

@@ -45,6 +45,42 @@ func (q *Queries) CountTickets(ctx context.Context, arg CountTicketsParams) (int
 	return count, err
 }
 
+const countTicketsView = `-- name: CountTicketsView :one
+SELECT count(*) FROM tickets t
+WHERE ($1::ticket_type IS NULL OR t.ticket_type = $1::ticket_type)
+  AND ($2::entry_scope IS NULL OR t.scope = $2::entry_scope)
+  AND ($3::ticket_status IS NULL OR t.status = $3::ticket_status)
+  AND ($4::uuid IS NULL OR t.assigned_team_id = $4::uuid)
+  AND ($5::uuid IS NULL OR t.client_id = $5::uuid)
+  AND ($6::text IS NULL OR t.ticket_number ILIKE '%' || $6::text || '%' OR t.title ILIKE '%' || $6::text || '%')
+  AND (NOT $7::bool OR t.status NOT IN ('resolved', 'closed', 'cancelled'))
+`
+
+type CountTicketsViewParams struct {
+	TicketType     NullTicketType   `json:"ticket_type"`
+	Scope          NullEntryScope   `json:"scope"`
+	Status         NullTicketStatus `json:"status"`
+	AssignedTeamID pgtype.UUID      `json:"assigned_team_id"`
+	ClientID       pgtype.UUID      `json:"client_id"`
+	Q              pgtype.Text      `json:"q"`
+	OpenOnly       bool             `json:"open_only"`
+}
+
+func (q *Queries) CountTicketsView(ctx context.Context, arg CountTicketsViewParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countTicketsView,
+		arg.TicketType,
+		arg.Scope,
+		arg.Status,
+		arg.AssignedTeamID,
+		arg.ClientID,
+		arg.Q,
+		arg.OpenOnly,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createTicket = `-- name: CreateTicket :one
 INSERT INTO tickets (ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, public_tracking_token, created_by)
 VALUES ($1, $2, $3, $4, $15, $16, $5, $17, 'new', $6, $7, $8, $9, $10, $11, $12, $13, $14)
@@ -348,6 +384,64 @@ func (q *Queries) GetTicketTask(ctx context.Context, id uuid.UUID) (TicketTask, 
 	return i, err
 }
 
+const getTicketView = `-- name: GetTicketView :one
+SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at, o.name AS client_name, tm.name AS team_name, u.username AS assignee_username
+FROM tickets t
+JOIN organizations o ON o.id = t.client_id
+LEFT JOIN teams tm ON tm.id = t.assigned_team_id
+LEFT JOIN users u ON u.id = t.assigned_user_id
+WHERE t.id = $1
+`
+
+type GetTicketViewRow struct {
+	Ticket           Ticket      `json:"ticket"`
+	ClientName       string      `json:"client_name"`
+	TeamName         pgtype.Text `json:"team_name"`
+	AssigneeUsername pgtype.Text `json:"assignee_username"`
+}
+
+func (q *Queries) GetTicketView(ctx context.Context, id uuid.UUID) (GetTicketViewRow, error) {
+	row := q.db.QueryRow(ctx, getTicketView, id)
+	var i GetTicketViewRow
+	err := row.Scan(
+		&i.Ticket.ID,
+		&i.Ticket.TicketNumber,
+		&i.Ticket.TicketType,
+		&i.Ticket.Scope,
+		&i.Ticket.ClientID,
+		&i.Ticket.AssetID,
+		&i.Ticket.ServiceID,
+		&i.Ticket.AssignedTeamID,
+		&i.Ticket.AssignedUserID,
+		&i.Ticket.AssignedContactID,
+		&i.Ticket.Status,
+		&i.Ticket.Impact,
+		&i.Ticket.Urgency,
+		&i.Ticket.Priority,
+		&i.Ticket.Title,
+		&i.Ticket.Description,
+		&i.Ticket.SlaResponseDueAt,
+		&i.Ticket.SlaResolutionDueAt,
+		&i.Ticket.SlaOnHoldSince,
+		&i.Ticket.SlaPausedSeconds,
+		&i.Ticket.FirstRespondedAt,
+		&i.Ticket.ResolvedAt,
+		&i.Ticket.ClosedAt,
+		&i.Ticket.ReopenedCount,
+		&i.Ticket.ReopenedAt,
+		&i.Ticket.PublicTrackingToken,
+		&i.Ticket.PublicTrackingEnabled,
+		&i.Ticket.PublicTrackingPin,
+		&i.Ticket.CreatedBy,
+		&i.Ticket.CreatedAt,
+		&i.Ticket.UpdatedAt,
+		&i.ClientName,
+		&i.TeamName,
+		&i.AssigneeUsername,
+	)
+	return i, err
+}
+
 const linkEntryToTicket = `-- name: LinkEntryToTicket :one
 UPDATE entries SET ticket_id = $2, updated_at = now() WHERE id = $1 RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at
 `
@@ -488,6 +582,46 @@ func (q *Queries) ListTicketEntries(ctx context.Context, ticketID pgtype.UUID) (
 	return items, nil
 }
 
+const listTicketEntriesWithAuthor = `-- name: ListTicketEntriesWithAuthor :many
+SELECT e.id, e.entry_type, e.content, e.created_at, u.username
+FROM entries e JOIN users u ON u.id = e.user_id
+WHERE e.ticket_id = $1 ORDER BY e.created_at DESC
+`
+
+type ListTicketEntriesWithAuthorRow struct {
+	ID        uuid.UUID          `json:"id"`
+	EntryType EntryType          `json:"entry_type"`
+	Content   string             `json:"content"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	Username  string             `json:"username"`
+}
+
+func (q *Queries) ListTicketEntriesWithAuthor(ctx context.Context, ticketID pgtype.UUID) ([]ListTicketEntriesWithAuthorRow, error) {
+	rows, err := q.db.Query(ctx, listTicketEntriesWithAuthor, ticketID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTicketEntriesWithAuthorRow
+	for rows.Next() {
+		var i ListTicketEntriesWithAuthorRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.EntryType,
+			&i.Content,
+			&i.CreatedAt,
+			&i.Username,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTicketTasks = `-- name: ListTicketTasks :many
 SELECT id, ticket_id, user_id, content, time_spent_seconds, is_public, performed_at, created_at FROM ticket_tasks WHERE ticket_id = $1 ORDER BY performed_at ASC
 `
@@ -510,6 +644,54 @@ func (q *Queries) ListTicketTasks(ctx context.Context, ticketID uuid.UUID) ([]Ti
 			&i.IsPublic,
 			&i.PerformedAt,
 			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTicketTasksWithUser = `-- name: ListTicketTasksWithUser :many
+SELECT tt.id, tt.ticket_id, tt.user_id, tt.content, tt.time_spent_seconds, tt.is_public, tt.performed_at, tt.created_at, u.username
+FROM ticket_tasks tt JOIN users u ON u.id = tt.user_id
+WHERE tt.ticket_id = $1 ORDER BY tt.performed_at DESC
+`
+
+type ListTicketTasksWithUserRow struct {
+	ID               uuid.UUID          `json:"id"`
+	TicketID         uuid.UUID          `json:"ticket_id"`
+	UserID           uuid.UUID          `json:"user_id"`
+	Content          string             `json:"content"`
+	TimeSpentSeconds int32              `json:"time_spent_seconds"`
+	IsPublic         bool               `json:"is_public"`
+	PerformedAt      pgtype.Timestamptz `json:"performed_at"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	Username         string             `json:"username"`
+}
+
+func (q *Queries) ListTicketTasksWithUser(ctx context.Context, ticketID uuid.UUID) ([]ListTicketTasksWithUserRow, error) {
+	rows, err := q.db.Query(ctx, listTicketTasksWithUser, ticketID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTicketTasksWithUserRow
+	for rows.Next() {
+		var i ListTicketTasksWithUserRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TicketID,
+			&i.UserID,
+			&i.Content,
+			&i.TimeSpentSeconds,
+			&i.IsPublic,
+			&i.PerformedAt,
+			&i.CreatedAt,
+			&i.Username,
 		); err != nil {
 			return nil, err
 		}
@@ -606,6 +788,172 @@ func (q *Queries) ListTickets(ctx context.Context, arg ListTicketsParams) ([]Tic
 	return items, nil
 }
 
+const listTicketsView = `-- name: ListTicketsView :many
+SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at, o.name AS client_name, tm.name AS team_name, u.username AS assignee_username
+FROM tickets t
+JOIN organizations o ON o.id = t.client_id
+LEFT JOIN teams tm ON tm.id = t.assigned_team_id
+LEFT JOIN users u ON u.id = t.assigned_user_id
+WHERE ($1::ticket_type IS NULL OR t.ticket_type = $1::ticket_type)
+  AND ($2::entry_scope IS NULL OR t.scope = $2::entry_scope)
+  AND ($3::ticket_status IS NULL OR t.status = $3::ticket_status)
+  AND ($4::uuid IS NULL OR t.assigned_team_id = $4::uuid)
+  AND ($5::uuid IS NULL OR t.client_id = $5::uuid)
+  AND ($6::text IS NULL OR t.ticket_number ILIKE '%' || $6::text || '%' OR t.title ILIKE '%' || $6::text || '%')
+  AND (NOT $7::bool OR t.status NOT IN ('resolved', 'closed', 'cancelled'))
+ORDER BY (t.status IN ('resolved', 'closed', 'cancelled')), t.priority, t.updated_at DESC
+LIMIT $9 OFFSET $8
+`
+
+type ListTicketsViewParams struct {
+	TicketType     NullTicketType   `json:"ticket_type"`
+	Scope          NullEntryScope   `json:"scope"`
+	Status         NullTicketStatus `json:"status"`
+	AssignedTeamID pgtype.UUID      `json:"assigned_team_id"`
+	ClientID       pgtype.UUID      `json:"client_id"`
+	Q              pgtype.Text      `json:"q"`
+	OpenOnly       bool             `json:"open_only"`
+	PageOffset     int32            `json:"page_offset"`
+	PageSize       int32            `json:"page_size"`
+}
+
+type ListTicketsViewRow struct {
+	Ticket           Ticket      `json:"ticket"`
+	ClientName       string      `json:"client_name"`
+	TeamName         pgtype.Text `json:"team_name"`
+	AssigneeUsername pgtype.Text `json:"assignee_username"`
+}
+
+// Vista de la cola (Fase 10, pantalla aprobada): nombres ya resueltos para no
+// mostrar UUID, abiertos primero y por prioridad, luego lo más reciente.
+func (q *Queries) ListTicketsView(ctx context.Context, arg ListTicketsViewParams) ([]ListTicketsViewRow, error) {
+	rows, err := q.db.Query(ctx, listTicketsView,
+		arg.TicketType,
+		arg.Scope,
+		arg.Status,
+		arg.AssignedTeamID,
+		arg.ClientID,
+		arg.Q,
+		arg.OpenOnly,
+		arg.PageOffset,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTicketsViewRow
+	for rows.Next() {
+		var i ListTicketsViewRow
+		if err := rows.Scan(
+			&i.Ticket.ID,
+			&i.Ticket.TicketNumber,
+			&i.Ticket.TicketType,
+			&i.Ticket.Scope,
+			&i.Ticket.ClientID,
+			&i.Ticket.AssetID,
+			&i.Ticket.ServiceID,
+			&i.Ticket.AssignedTeamID,
+			&i.Ticket.AssignedUserID,
+			&i.Ticket.AssignedContactID,
+			&i.Ticket.Status,
+			&i.Ticket.Impact,
+			&i.Ticket.Urgency,
+			&i.Ticket.Priority,
+			&i.Ticket.Title,
+			&i.Ticket.Description,
+			&i.Ticket.SlaResponseDueAt,
+			&i.Ticket.SlaResolutionDueAt,
+			&i.Ticket.SlaOnHoldSince,
+			&i.Ticket.SlaPausedSeconds,
+			&i.Ticket.FirstRespondedAt,
+			&i.Ticket.ResolvedAt,
+			&i.Ticket.ClosedAt,
+			&i.Ticket.ReopenedCount,
+			&i.Ticket.ReopenedAt,
+			&i.Ticket.PublicTrackingToken,
+			&i.Ticket.PublicTrackingEnabled,
+			&i.Ticket.PublicTrackingPin,
+			&i.Ticket.CreatedBy,
+			&i.Ticket.CreatedAt,
+			&i.Ticket.UpdatedAt,
+			&i.ClientName,
+			&i.TeamName,
+			&i.AssigneeUsername,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const markTicketResponded = `-- name: MarkTicketResponded :exec
+UPDATE tickets SET first_responded_at = COALESCE(first_responded_at, $2::timestamptz), updated_at = now() WHERE id = $1
+`
+
+type MarkTicketRespondedParams struct {
+	ID uuid.UUID          `json:"id"`
+	At pgtype.Timestamptz `json:"at"`
+}
+
+// Primera acción del equipo = cumple el SLA de respuesta (solo la primera cuenta).
+func (q *Queries) MarkTicketResponded(ctx context.Context, arg MarkTicketRespondedParams) error {
+	_, err := q.db.Exec(ctx, markTicketResponded, arg.ID, arg.At)
+	return err
+}
+
+const setTicketPublicPin = `-- name: SetTicketPublicPin :one
+UPDATE tickets SET public_tracking_pin = $2, updated_at = now() WHERE id = $1 RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at
+`
+
+type SetTicketPublicPinParams struct {
+	ID                uuid.UUID   `json:"id"`
+	PublicTrackingPin pgtype.Text `json:"public_tracking_pin"`
+}
+
+func (q *Queries) SetTicketPublicPin(ctx context.Context, arg SetTicketPublicPinParams) (Ticket, error) {
+	row := q.db.QueryRow(ctx, setTicketPublicPin, arg.ID, arg.PublicTrackingPin)
+	var i Ticket
+	err := row.Scan(
+		&i.ID,
+		&i.TicketNumber,
+		&i.TicketType,
+		&i.Scope,
+		&i.ClientID,
+		&i.AssetID,
+		&i.ServiceID,
+		&i.AssignedTeamID,
+		&i.AssignedUserID,
+		&i.AssignedContactID,
+		&i.Status,
+		&i.Impact,
+		&i.Urgency,
+		&i.Priority,
+		&i.Title,
+		&i.Description,
+		&i.SlaResponseDueAt,
+		&i.SlaResolutionDueAt,
+		&i.SlaOnHoldSince,
+		&i.SlaPausedSeconds,
+		&i.FirstRespondedAt,
+		&i.ResolvedAt,
+		&i.ClosedAt,
+		&i.ReopenedCount,
+		&i.ReopenedAt,
+		&i.PublicTrackingToken,
+		&i.PublicTrackingEnabled,
+		&i.PublicTrackingPin,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const sumTicketTaskTime = `-- name: SumTicketTaskTime :one
 SELECT COALESCE(sum(time_spent_seconds), 0)::bigint FROM ticket_tasks WHERE ticket_id = $1
 `
@@ -615,6 +963,42 @@ func (q *Queries) SumTicketTaskTime(ctx context.Context, ticketID uuid.UUID) (in
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const ticketQueueSummary = `-- name: TicketQueueSummary :one
+SELECT
+  count(*) FILTER (WHERE status NOT IN ('resolved', 'closed', 'cancelled'))::bigint AS open_count,
+  count(*) FILTER (WHERE status NOT IN ('resolved', 'closed', 'cancelled') AND sla_on_hold_since IS NULL
+                   AND sla_resolution_due_at + make_interval(secs => sla_paused_seconds) < $1::timestamptz)::bigint AS breached_count,
+  count(*) FILTER (WHERE status = 'pending_vendor')::bigint AS paused_count,
+  count(*) FILTER (WHERE resolved_at >= $2::timestamptz)::bigint AS resolved_today_count
+FROM tickets
+`
+
+type TicketQueueSummaryParams struct {
+	Now           pgtype.Timestamptz `json:"now"`
+	ResolvedSince pgtype.Timestamptz `json:"resolved_since"`
+}
+
+type TicketQueueSummaryRow struct {
+	OpenCount          int64 `json:"open_count"`
+	BreachedCount      int64 `json:"breached_count"`
+	PausedCount        int64 `json:"paused_count"`
+	ResolvedTodayCount int64 `json:"resolved_today_count"`
+}
+
+// Resumen de la cola para la cabecera. "Vencido" = abierto, no en pausa y
+// pasado el vencimiento real (pactado + pausas acumuladas), igual que tickets.ResolutionClock.
+func (q *Queries) TicketQueueSummary(ctx context.Context, arg TicketQueueSummaryParams) (TicketQueueSummaryRow, error) {
+	row := q.db.QueryRow(ctx, ticketQueueSummary, arg.Now, arg.ResolvedSince)
+	var i TicketQueueSummaryRow
+	err := row.Scan(
+		&i.OpenCount,
+		&i.BreachedCount,
+		&i.PausedCount,
+		&i.ResolvedTodayCount,
+	)
+	return i, err
 }
 
 const updateTicket = `-- name: UpdateTicket :one

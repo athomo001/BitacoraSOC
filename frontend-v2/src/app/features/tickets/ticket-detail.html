@@ -1,0 +1,142 @@
+@if (detail(); as d) {
+  @let t = d.ticket;
+  <header class="td__head">
+    <div class="td__ids">
+      <span class="mono td__number">{{ t.ticketNumber }}</span>
+      <span class="pill mono" [class]="'tone-' + priorityTone[t.priority]">{{ priorityShort[t.priority] }}</span>
+      <span class="pill">{{ i18n.t(typeKey(t)) }} · {{ t.scope.toUpperCase() }}</span>
+    </div>
+    <h2 class="td__title">{{ t.title }}</h2>
+    <dl class="td__facts">
+      <dt>{{ i18n.t('tickets.detail.client') }}</dt><dd>{{ t.clientName }}</dd>
+      <dt>{{ i18n.t('tickets.detail.team') }}</dt><dd>{{ t.teamName ?? '—' }}</dd>
+      <dt>{{ i18n.t('tickets.detail.assignee') }}</dt><dd>{{ t.assigneeUsername ?? i18n.t('tickets.detail.unassigned') }}</dd>
+      <dt>{{ i18n.t('tickets.detail.impactUrgency') }}</dt><dd>{{ i18n.t(levelKey(t.impact)) }} · {{ i18n.t(urgencyKey(t.urgency)) }}</dd>
+    </dl>
+  </header>
+
+  <section class="td__block td__sla" [attr.aria-label]="i18n.t('tickets.detail.sla')">
+    <div class="td__row">
+      <span class="td__label">{{ i18n.t('tickets.detail.sla') }}</span>
+      @if (t.status === 'pending_vendor') {
+        <span class="pill tone-warn"><mat-icon>pause_circle</mat-icon>{{ i18n.t('tickets.detail.pausedBadge') }}</span>
+      }
+    </div>
+    @if (t.sla.response; as c) {
+      <div class="td__clock" [class]="'td__clock text-' + clockTone(c)">
+        <div class="td__clock-row"><span class="td__clock-name">{{ i18n.t('tickets.detail.response') }}</span><span class="mono">{{ clockLabel(c) }}</span></div>
+        <span class="meter"><span [style.width.%]="meterPercent(c)"></span></span>
+      </div>
+    }
+    @if (t.sla.resolution; as c) {
+      <div class="td__clock" [class]="'td__clock text-' + clockTone(c)">
+        <div class="td__clock-row"><span class="td__clock-name">{{ i18n.t('tickets.detail.resolution') }}</span><span class="mono">{{ clockLabel(c) }}</span></div>
+        <span class="meter"><span [style.width.%]="meterPercent(c)"></span></span>
+        <span class="mono td__muted">{{ i18n.t('tickets.detail.due') }} {{ c.dueAt | date: 'dd/MM HH:mm' }} · {{ i18n.t('tickets.detail.pausedTotal') }} {{ duration(t.slaPausedSeconds + (c.pausedForSeconds ?? 0)) }}</span>
+      </div>
+    }
+  </section>
+
+  <section class="td__block">
+    <div class="td__row">
+      <span class="td__label">{{ i18n.t('tickets.detail.state') }}</span>
+      <span class="pill" [class]="'tone-' + statusTone[t.status]">{{ i18n.t(statusKey(t.status)) }}</span>
+      @if (t.reopenedCount > 0) {
+        <span class="pill tone-system">{{ i18n.t('tickets.detail.reopened') }} ×<span class="mono">{{ t.reopenedCount }}</span></span>
+      }
+    </div>
+    <div class="td__actions">
+      @for (a of actions(); track a.to) {
+        <button type="button" class="td__btn" [class.td__btn--primary]="a.primary" [disabled]="busy()" (click)="transition(a.to)">
+          <mat-icon>{{ a.icon }}</mat-icon>{{ i18n.t(a.key) }}
+        </button>
+      } @empty {
+        <span class="td__muted">{{ i18n.t('tickets.detail.noActions') }}</span>
+      }
+    </div>
+  </section>
+
+  <div class="td__tabs" role="tablist">
+    <button type="button" role="tab" class="td__tab" [attr.aria-selected]="tab() === 'activity'" (click)="tab.set('activity')">{{ i18n.t('tickets.tab.activity') }} <span class="mono">{{ d.comments.length }}</span></button>
+    <button type="button" role="tab" class="td__tab" [attr.aria-selected]="tab() === 'tasks'" (click)="tab.set('tasks')">{{ i18n.t('tickets.tab.tasks') }} <span class="mono">{{ duration(d.totalTimeSpentSeconds) }}</span></button>
+    <button type="button" role="tab" class="td__tab" [attr.aria-selected]="tab() === 'entries'" (click)="tab.set('entries')">{{ i18n.t('tickets.tab.entries') }} <span class="mono">{{ d.entries.length }}</span></button>
+  </div>
+
+  <div class="td__feed" role="tabpanel">
+    @switch (tab()) {
+      @case ('activity') {
+        @for (c of d.comments; track c.id) {
+          <article class="td__comment" [class.td__comment--public]="c.isPublic">
+            <div class="td__comment-meta">
+              <span class="mono">{{ c.createdAt | date: 'dd/MM HH:mm' }}</span><span>·</span><span>{{ c.authorName }}</span>
+              <span class="pill td__vis" [class.tone-info]="c.isPublic">
+                <mat-icon>{{ c.isPublic ? 'visibility' : 'lock' }}</mat-icon>{{ i18n.t(c.isPublic ? 'tickets.activity.public' : 'tickets.activity.internal') }}
+              </span>
+            </div>
+            <app-markdown [content]="c.content" />
+          </article>
+        } @empty {
+          <p class="td__muted">{{ i18n.t('tickets.activity.empty') }}</p>
+        }
+      }
+      @case ('tasks') {
+        <div class="td__task-form">
+          <input class="td__input" [(ngModel)]="taskContent" [placeholder]="i18n.t('tickets.tasks.placeholder')" [attr.aria-label]="i18n.t('tickets.tasks.placeholder')" />
+          <div class="td__task-row">
+            @for (m of taskPresets; track m) {
+              <button type="button" class="seg" [attr.aria-pressed]="taskMinutes() === m" (click)="taskMinutes.set(m)">{{ duration(m * 60) }}</button>
+            }
+            <button type="button" class="td__btn td__btn--primary td__push" [disabled]="busy() || !taskContent.trim()" (click)="addTask()"><mat-icon>timer</mat-icon>{{ i18n.t('tickets.tasks.add') }}</button>
+          </div>
+        </div>
+        @for (k of d.tasks; track k.id) {
+          <div class="td__task">
+            <span class="mono td__task-time">{{ duration(k.timeSpentSeconds) }}</span>
+            <span>{{ k.content }}<span class="td__muted td__task-who">{{ k.username }} · <span class="mono">{{ k.performedAt | date: 'dd/MM HH:mm' }}</span></span></span>
+          </div>
+        } @empty {
+          <p class="td__muted">{{ i18n.t('tickets.tasks.empty') }}</p>
+        }
+      }
+      @case ('entries') {
+        @for (e of d.entries; track e.id) {
+          <div class="td__entry">
+            <span class="mono td__muted">{{ e.createdAt | date: 'dd/MM HH:mm' }}</span>
+            <span class="td__entry-text">{{ e.content }}</span>
+            <span class="td__muted">{{ e.authorUsername }}</span>
+          </div>
+        } @empty {
+          <p class="td__muted">{{ i18n.t('tickets.entries.empty') }}</p>
+        }
+      }
+    }
+  </div>
+
+  <form class="td__composer" (submit)="$event.preventDefault(); addComment()">
+    <textarea class="td__input td__textarea" name="comment" [(ngModel)]="comment" [placeholder]="i18n.t('tickets.comment.placeholder')" [attr.aria-label]="i18n.t('tickets.comment.placeholder')" (keydown.control.enter)="addComment()"></textarea>
+    <div class="td__row">
+      <button type="button" class="td__visibility" [class.td__visibility--public]="commentPublic()" [attr.aria-pressed]="commentPublic()" (click)="commentPublic.set(!commentPublic())">
+        <mat-icon>{{ commentPublic() ? 'visibility' : 'lock' }}</mat-icon>{{ i18n.t(commentPublic() ? 'tickets.comment.public' : 'tickets.comment.internal') }}
+      </button>
+      <button type="submit" class="td__btn td__btn--primary td__push" [disabled]="busy() || !comment.trim()">{{ i18n.t('tickets.comment.submit') }} <span class="mono td__kbd">Ctrl+↵</span></button>
+    </div>
+  </form>
+
+  <footer class="td__public">
+    <mat-icon>public</mat-icon>
+    <span class="td__public-text">
+      <strong>{{ i18n.t('tickets.public.title') }}</strong>
+      <span class="mono td__muted td__ellipsis">{{ publicUrl() ?? '—' }} · PIN {{ d.publicTrackingPin ?? i18n.t('tickets.public.noPin') }}</span>
+    </span>
+    <button type="button" class="td__btn td__btn--small" [disabled]="!publicUrl()" (click)="copyLink()"><mat-icon>content_copy</mat-icon>{{ i18n.t(copied() ? 'tickets.public.copied' : 'tickets.public.copy') }}</button>
+    <button type="button" class="td__btn td__btn--small" [disabled]="busy()" (click)="regeneratePin()">{{ i18n.t('tickets.public.newPin') }}</button>
+  </footer>
+
+  @if (error()) {
+    <p class="msg msg--error td__error" role="alert">{{ error() }}</p>
+  }
+} @else if (error()) {
+  <p class="msg msg--error td__error" role="alert">{{ error() }}</p>
+} @else {
+  <p class="td__muted td__loading">{{ i18n.t('tickets.loading') }}</p>
+}

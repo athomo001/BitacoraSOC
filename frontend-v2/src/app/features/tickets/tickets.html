@@ -1,12 +1,73 @@
-<main class="ticket-page">
-  <header class="page-heading"><div><p class="eyebrow">Operación ITIL</p><h1>Ticketera</h1><p class="lede">Incidentes y requerimientos con SLA visible y seguimiento trazable.</p></div><span class="count">{{ tickets().length }} abiertos en vista</span></header>
-  <form class="ticket-create" (submit)="$event.preventDefault(); createTicket()"><h2>Nuevo ticket</h2><div class="ticket-form-grid"><label>Tipo<select name="ticketType" [(ngModel)]="ticketForm.ticketType"><option value="incident">Incidente</option><option value="service_request">Requerimiento</option></select></label><label>Ámbito<select name="scope" [(ngModel)]="ticketForm.scope"><option value="general">General</option><option value="soc">SOC</option><option value="noc">NOC</option></select></label><label>Cliente UUID<input name="clientId" [(ngModel)]="ticketForm.clientId" required /></label><label>Equipo UUID<input name="teamId" [(ngModel)]="ticketForm.teamId" required /></label><label>Título<input name="title" [(ngModel)]="ticketForm.title" required /></label><label class="ticket-form-wide">Descripción<textarea name="description" [(ngModel)]="ticketForm.description" required></textarea></label></div><button type="submit">Crear ticket</button></form>
-  <form class="filter-bar" (submit)="$event.preventDefault(); load()"><label for="ticket-search">Buscar ticket</label><input id="ticket-search" name="ticket-search" [(ngModel)]="filter" placeholder="Número o título" /><button type="submit">Buscar</button></form>
-  @if (error()) { <p class="error" role="alert">{{ error() }}</p> }
-  @if (loading()) { <p class="empty">Cargando ticketera...</p> } @else if (tickets().length === 0) { <p class="empty">No hay tickets que mostrar.</p> } @else {
-    <section class="ticket-list" aria-label="Tickets">
-      @for (ticket of tickets(); track ticket.id) { <button class="ticket-row" type="button" (click)="open(ticket)"><span class="ticket-number">{{ ticket.ticketNumber }}</span><span class="ticket-title">{{ ticket.title }}</span><span class="ticket-meta">{{ ticket.status }} · {{ ticket.priority }}</span><time>{{ ticket.updatedAt | date:'dd/MM/yyyy HH:mm' }}</time></button> }
-    </section>
+<div class="tk">
+  <header class="tk__head">
+    <div>
+      <h1 class="tk__title">{{ i18n.t('tickets.title') }}</h1>
+      <p class="tk__subtitle">{{ i18n.t('tickets.subtitle') }}</p>
+    </div>
+    <div class="tk__summary" role="status">
+      <span class="pill tone-neutral"><span class="mono">{{ summary().open }}</span> {{ i18n.t('tickets.summary.open') }}</span>
+      <span class="pill" [class.tone-bad]="summary().breached > 0"><span class="mono">{{ summary().breached }}</span> {{ i18n.t('tickets.summary.breached') }}</span>
+      <span class="pill" [class.tone-warn]="summary().paused > 0"><span class="mono">{{ summary().paused }}</span> {{ i18n.t('tickets.summary.paused') }}</span>
+      <span class="pill tone-ok"><span class="mono">{{ summary().resolvedToday }}</span> {{ i18n.t('tickets.summary.resolvedToday') }}</span>
+    </div>
+    <button type="button" class="tk__new" (click)="openNew()"><mat-icon>add</mat-icon>{{ i18n.t('tickets.new') }}</button>
+  </header>
+
+  <div class="tk__filters">
+    <button type="button" class="seg" [attr.aria-pressed]="typeFilter() === null" (click)="setType(null)">{{ i18n.t('tickets.filter.all') }}</button>
+    <button type="button" class="seg" [attr.aria-pressed]="typeFilter() === 'incident'" (click)="setType('incident')">{{ i18n.t('tickets.filter.incidents') }}</button>
+    <button type="button" class="seg" [attr.aria-pressed]="typeFilter() === 'service_request'" (click)="setType('service_request')">{{ i18n.t('tickets.filter.requests') }}</button>
+    <span class="tk__divider" aria-hidden="true"></span>
+    <button type="button" class="seg" [attr.aria-pressed]="openOnly()" (click)="toggleOpenOnly()">{{ i18n.t('tickets.filter.openOnly') }}</button>
+    <form class="tk__search" (submit)="$event.preventDefault(); load()">
+      <mat-icon>search</mat-icon>
+      <input class="mono" name="q" [(ngModel)]="query" [placeholder]="i18n.t('tickets.search')" [attr.aria-label]="i18n.t('tickets.search')" />
+    </form>
+  </div>
+
+  @if (error()) {
+    <p class="msg msg--error tk__error" role="alert">{{ error() }}</p>
   }
-  @if (selected(); as detail) { <div class="detail-backdrop" role="presentation" (click)="close()"><section class="detail" role="dialog" aria-modal="true" aria-label="Detalle del ticket" (click)="$event.stopPropagation()"><button class="close" type="button" (click)="close()" aria-label="Cerrar">×</button><p class="eyebrow">{{ detail.ticket.ticketNumber }}</p><h2>{{ detail.ticket.title }}</h2><p class="description">{{ detail.ticket.description }}</p><dl><div><dt>Prioridad</dt><dd>{{ detail.ticket.priority }}</dd></div><div><dt>SLA resolución</dt><dd>{{ detail.ticket.slaResolutionDueAt | date:'dd/MM/yyyy HH:mm' }}</dd></div><div><dt>Tiempo trabajado</dt><dd>{{ detail.totalTimeSpentSeconds }} s</dd></div></dl><label for="status">Estado</label><select id="status" [ngModel]="detail.ticket.status" (ngModelChange)="changeStatus(detail, $event)">@for (status of statuses; track status) { <option [value]="status">{{ status }}</option> }</select><div class="ticket-followup"><h3>Comentario interno</h3><textarea [(ngModel)]="comment" placeholder="Registrar avance"></textarea><button type="button" (click)="addComment(detail)">Agregar comentario</button><h3>Tarea y tiempo</h3><textarea [(ngModel)]="task.content" placeholder="Qué trabajo se realizó"></textarea><input type="number" min="1" [(ngModel)]="task.timeSpentSeconds" /><button type="button" (click)="addTask(detail)">Registrar tarea</button><ul>@for (item of detail.comments; track item.id) { <li><strong>{{ item.authorName }}</strong>: {{ item.content }}</li> }</ul></div></section></div> }
-</main>
+
+  <div class="tk__body">
+    <div class="tk__list" role="table" [attr.aria-label]="i18n.t('tickets.title')">
+      <div class="tk__row tk__row--head" role="row">
+        <span role="columnheader">{{ i18n.t('tickets.col.number') }}</span>
+        <span role="columnheader">{{ i18n.t('tickets.col.priority') }}</span>
+        <span role="columnheader">{{ i18n.t('tickets.col.title') }}</span>
+        <span role="columnheader">{{ i18n.t('tickets.col.status') }}</span>
+        <span role="columnheader">{{ i18n.t('tickets.col.sla') }}</span>
+      </div>
+      @if (loading()) {
+        <p class="tk__empty">{{ i18n.t('tickets.loading') }}</p>
+      } @else {
+        @for (t of tickets(); track t.id) {
+          @let clock = t.sla.resolution;
+          <button type="button" class="tk__row" role="row" [class.tk__row--selected]="t.id === selectedId()" [attr.aria-current]="t.id === selectedId()" (click)="selectedId.set(t.id)">
+            <span class="mono tk__number">{{ t.ticketNumber }}</span>
+            <span class="pill mono tk__prio" [class]="'tone-' + priorityTone[t.priority]">{{ priorityShort[t.priority] }}</span>
+            <span class="tk__cell-title">
+              <span class="tk__ticket-title">{{ t.title }}</span>
+              <span class="tk__ticket-sub">{{ i18n.t(typeKey(t)) }} · {{ t.clientName }} · {{ t.teamName ?? '—' }}</span>
+            </span>
+            <span class="pill tk__status" [class]="'tone-' + statusTone[t.status]">{{ i18n.t(statusKey(t)) }}</span>
+            <span class="tk__sla" [class]="'text-' + slaTone(clock)">
+              <span class="mono tk__sla-text">{{ slaLabel(clock) }}</span>
+              <span class="meter"><span [style.width.%]="clock?.state === 'met' ? 100 : (clock?.percent ?? 0)"></span></span>
+            </span>
+          </button>
+        } @empty {
+          <p class="tk__empty">{{ i18n.t('tickets.empty') }}</p>
+        }
+      }
+    </div>
+
+    <aside class="tk__detail">
+      @if (selectedId(); as id) {
+        <app-ticket-detail [ticketId]="id" (changed)="onChanged($event)" />
+      } @else {
+        <p class="tk__empty">{{ i18n.t('tickets.selectHint') }}</p>
+      }
+    </aside>
+  </div>
+</div>

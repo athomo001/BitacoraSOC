@@ -30,9 +30,16 @@ func (d *Dispatcher) DispatchPending(ctx context.Context) error {
 			_ = d.mark(ctx, closure.ID, "skipped", "reporte vacío")
 			continue
 		}
-		recipients, recipientErr := d.Queries.ListActiveUserEmailsByRole(ctx, db.NullUserRole{})
-		if recipientErr != nil || len(recipients) == 0 {
-			_ = d.mark(ctx, closure.ID, "failed", "no hay destinatarios activos")
+		// Destinatarios del TURNO (work_shifts.email_recipients), no todos los
+		// usuarios activos: el reporte de un turno NOC no le llega a toda la empresa.
+		shift, shiftErr := d.Queries.GetWorkShiftForCheck(ctx, closure.ClosureCheckID)
+		if shiftErr != nil {
+			_ = d.mark(ctx, closure.ID, "failed", "no se pudo cargar el turno del cierre")
+			continue
+		}
+		recipients := Recipients(shift.EmailRecipients)
+		if len(recipients) == 0 {
+			_ = d.mark(ctx, closure.ID, "failed", "el turno "+shift.Name+" no tiene destinatarios de correo configurados")
 			continue
 		}
 		sender, senderErr := d.Sender(ctx)

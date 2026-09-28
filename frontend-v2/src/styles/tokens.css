@@ -2,8 +2,15 @@
  * Sistema de tokens industriales (WCAG AAA) — spec/06-frontend-arquitectura-y-ui.md
  * sección 1.1. Fuente única de verdad de color/tipografía/densidad para toda
  * la app — ningún componente define un color o radio suelto fuera de acá.
+ *
+ * Paletas de los 3 temas tomadas tal cual del diseño aprobado por el dueño
+ * (artifact "BitacoraSOC UI Base", artboard "Shell principal"). Cada tema
+ * redefine la paleta COMPLETA — incluido el semáforo con su fondo suave
+ * (`--status-*-bg`, para etiquetas tipo píldora) y el acento — para que
+ * ningún componente quede con un color del modo oscuro en el tema claro.
  */
-:root {
+:root,
+[data-theme="dark"] {
   /* Fondos y Superficies (Gris Grafito Profundo / OLED) */
   --bg-app: #0d1117;
   --bg-surface: #161b22;
@@ -18,11 +25,25 @@
 
   /* Semáforo Operativo (cero colores pasteles deslavados) */
   --status-ok: #238636;
+  --status-ok-bg: #122117;
   --status-warning: #d29922;
+  --status-warning-bg: #271f0a;
   --status-critical: #da3633;
+  --status-critical-bg: #2d1213;
   --status-carrier: #1f6feb;
+  --status-carrier-bg: #0c2d6b;
   --status-system: #8957e5;
+  --status-system-bg: #24193d;
 
+  /* Acento: navegación activa, acción primaria, foco */
+  --accent: #58a6ff;
+  --accent-contrast: #0d1117;
+  --accent-soft: #132b47;
+
+  color-scheme: dark;
+}
+
+:root {
   /* Tipografías — Geist Sans auto-hospedada (.woff2, SIL OFL), no Inter (ver
      spec/06-frontend-arquitectura-y-ui.md sección 1); fallbacks de sistema
      solo para el instante antes de que cargue el woff2. */
@@ -32,28 +53,66 @@
   /* Métricas de densidad */
   --radius-sm: 4px;
   --radius-md: 6px;
+  --radius-pill: 999px;
   --row-height: 36px;
   --transition-instant: 80ms ease-out;
+}
+
+/* Fuente de accesibilidad para dislexia (OpenDyslexic, no Lexend — decisión
+   del dueño). Solo cambia la familia de UI: los datos monoespaciados (IPs,
+   horas, IDs) siguen en JetBrains Mono para no perder alineación. */
+[data-font="dyslexic"] {
+  --font-ui: "OpenDyslexic", "Geist Sans", -apple-system, sans-serif;
 }
 
 [data-theme="light"] {
   --bg-app: #f6f8fa;
   --bg-surface: #fff;
-  --bg-surface-hover: #eef1f4;
+  --bg-surface-hover: #eaeef2;
   --border-subtle: #d0d7de;
   --border-active: #0969da;
   --text-primary: #1f2328;
-  --text-secondary: #656d76;
-  --text-muted: #818b98;
+  --text-secondary: #59636e;
+  --text-muted: #6e7781;
+  --status-ok: #1a7f37;
+  --status-ok-bg: #dafbe1;
+  --status-warning: #9a6700;
+  --status-warning-bg: #fff8c5;
+  --status-critical: #cf222e;
+  --status-critical-bg: #ffebe9;
+  --status-carrier: #0969da;
+  --status-carrier-bg: #ddf4ff;
+  --status-system: #8250df;
+  --status-system-bg: #fbefff;
+  --accent: #0969da;
+  --accent-contrast: #fff;
+  --accent-soft: #ddf4ff;
+
+  color-scheme: light;
 }
 
 [data-theme="pink"] {
   --bg-app: #fdf0f6;
-  --bg-surface: #fff8fb;
-  --bg-surface-hover: #f8dce9;
-  --border-subtle: #e5b6ca;
+  --bg-surface: #fff;
+  --bg-surface-hover: #fbe4ee;
+  --border-subtle: #f3d1e3;
   --border-active: #d6428f;
-  --text-primary: #3f1f30;
-  --text-secondary: #754d64;
-  --text-muted: #9d7188;
+  --text-primary: #3d1f2e;
+  --text-secondary: #7a5468;
+  --text-muted: #9c7d8d;
+  --status-ok: #1a7f37;
+  --status-ok-bg: #dafbe1;
+  --status-warning: #9a6700;
+  --status-warning-bg: #fff8c5;
+  --status-critical: #cf222e;
+  --status-critical-bg: #ffebe9;
+  --status-carrier: #0969da;
+  --status-carrier-bg: #ddf4ff;
+  --status-system: #8957e5;
+  --status-system-bg: #fbefff;
+  --accent: #d6428f;
+  --accent-contrast: #fff;
+  --accent-soft: #fbe0ee;
+
+  color-scheme: light;
 }

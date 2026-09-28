@@ -120,9 +120,35 @@
         @if (checklistSaved(); as message) { <p class="msg msg--success">{{ message }}</p> }
         @if (selectedTemplate(); as template) {
           <div class="shifts__checklist-controls"><label>Plantilla<select [ngModel]="template.id" (ngModelChange)="selectTemplate($event); markChecklistTouched()">@for (option of checklistTemplates(); track option.id) { <option [value]="option.id">{{ option.name }}</option> }</select></label><label>Turno<select [ngModel]="selectedWorkShiftId()" (ngModelChange)="selectedWorkShiftId.set($event); markChecklistTouched()"><option value="">Seleccionar turno</option>@for (shift of workShifts(); track shift.id) { <option [value]="shift.id">{{ shift.name }}</option> }</select></label><label>Momento<select [ngModel]="checkType()" (ngModelChange)="checkType.set($event); markChecklistTouched()"><option value="inicio">Inicio</option><option value="cierre">Cierre</option></select></label></div>
-          <div class="shifts__checklist-items">@for (item of template.items; track item.id) { @if (isLeaf(item.id)) { <div class="shifts__check-item"><div><strong>{{ item.title }}</strong><span>Ítem hoja</span></div><div class="shifts__check-answer"><select [(ngModel)]="checkValues[item.id].status" (ngModelChange)="markChecklistTouched()"><option value="verde">Verde</option><option value="rojo">Rojo</option></select><input [(ngModel)]="checkValues[item.id].observation" (ngModelChange)="markChecklistTouched()" placeholder="Observación si queda rojo" /></div></div> } }</div>
-          <button type="button" class="shifts__submit-check" [disabled]="checklistLoading() || !selectedWorkShiftId()" (click)="submitChecklist()">Guardar checklist</button>
-          @if (lastCheck(); as check) { @if (check.checkType === 'cierre') { <div class="shifts__closure-form"><label>Observaciones<textarea [(ngModel)]="closureObservations"></textarea></label><label>Pendientes para el siguiente turno<textarea [(ngModel)]="pendingForNextShift"></textarea></label><label class="shifts__check-toggle"><input type="checkbox" [(ngModel)]="notifyEmail" /> Notificar por correo</label><label class="shifts__check-toggle"><input type="checkbox" [(ngModel)]="syncGlpi" /> Sincronizar con GLPI</label><button type="button" class="shifts__submit-check" [disabled]="checklistLoading()" (click)="closeShift()">Cerrar turno</button></div> } }
+          <div class="shifts__progress" role="status">
+            <strong class="mono">{{ checklistProgress().evaluated }}/{{ checklistProgress().total }}</strong> evaluados
+            @if (checklistProgress().red > 0) { <span class="shifts__progress-red">· {{ checklistProgress().red }} en rojo</span> }
+          </div>
+          <ul class="shifts__checklist-items">
+            @for (item of template.items; track item.id) {
+              <li class="shifts__check-item" [style.padding-left.px]="12 + itemDepth(item) * 20">
+                @if (isGroup(item.id)) {
+                  @let status = computedStatus(item.id);
+                  <span class="shifts__check-title"><strong>{{ item.title }}</strong><span class="shifts__muted">🔒 calculado: peor estado de sus sub-ítems</span></span>
+                  <span class="shifts__state" [class.shifts__state--ok]="status === 'verde'" [class.shifts__state--bad]="status === 'rojo'">{{ status === 'rojo' ? 'ROJO' : status === 'verde' ? 'VERDE' : 'PENDIENTE' }}</span>
+                } @else {
+                  @let answer = answers()[item.id];
+                  <span class="shifts__check-title"><strong>{{ item.title }}</strong></span>
+                  <span class="shifts__check-answer">
+                    <button type="button" class="shifts__semaforo shifts__semaforo--ok" [attr.aria-pressed]="answer?.status === 'verde'" (click)="setAnswer(item.id, { status: 'verde' })">Verde</button>
+                    <button type="button" class="shifts__semaforo shifts__semaforo--bad" [attr.aria-pressed]="answer?.status === 'rojo'" (click)="setAnswer(item.id, { status: 'rojo' })">Rojo</button>
+                    @if (answer?.status === 'rojo') {
+                      <input class="shifts__check-obs" [ngModel]="answer.observation" (ngModelChange)="setAnswer(item.id, { observation: $event })" placeholder="Observación (obligatoria en rojo)" [attr.aria-label]="'Observación de ' + item.title" />
+                    }
+                  </span>
+                }
+              </li>
+            }
+          </ul>
+          <button type="button" class="shifts__submit-check" [disabled]="checklistLoading() || !selectedWorkShiftId() || !checklistProgress().complete" (click)="submitChecklist()">
+            @if (checklistProgress().complete) { Guardar checklist } @else if (checklistProgress().redWithoutObservation > 0) { Falta justificar {{ checklistProgress().redWithoutObservation }} en rojo } @else { Faltan {{ checklistProgress().total - checklistProgress().evaluated }} por evaluar }
+          </button>
+          @if (lastCheck(); as check) { @if (check.checkType === 'cierre') { <div class="shifts__closure-form"><label>Observaciones<textarea [(ngModel)]="closureObservations"></textarea></label><label>Pendientes para el siguiente turno<textarea [(ngModel)]="pendingForNextShift"></textarea></label><label class="shifts__check-toggle"><input type="checkbox" [(ngModel)]="notifyEmail" /> Notificar por correo</label><button type="button" class="shifts__submit-check" [disabled]="checklistLoading()" (click)="closeShift()">Cerrar turno</button></div> } }
         } @else { <p class="shifts__muted">No hay plantillas activas configuradas.</p> }
         @if (handover(); as relay) { <aside class="shifts__handover"><h3>Relevo anterior</h3>@if (relay.previousClosure; as closure) { <p>{{ closure.pendingForNextShift || 'Sin pendientes registrados.' }}</p>@if (!closure.acknowledgedAt) { <button type="button" class="shifts__submit-check" (click)="acknowledgeHandover()">Confirmar lectura</button> } @else { <span class="shifts__muted">Relevo confirmado.</span> } } @else { <p class="shifts__muted">No hay cierre anterior.</p> }<h3>Mantenimientos próximas 4h</h3>@for (window of relay.upcomingMaintenanceWindows; track window.id) { <p><strong>{{ window.title }}</strong><br>{{ window.startsAt | date:'HH:mm' }} - {{ window.endsAt | date:'HH:mm' }}</p> }</aside> }
       </section>

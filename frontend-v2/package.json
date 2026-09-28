@@ -7,7 +7,7 @@
     "build": "node scripts/copy-seed.mjs && ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "lint:css": "stylelint \"src/**/*.css\""
+    "lint:css": "stylelint \"src/**/*.css\" && node scripts/check-css-vars.mjs"
   },
   "private": true,
   "packageManager": "pnpm@12.4.2",

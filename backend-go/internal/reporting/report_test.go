@@ -19,6 +19,13 @@ func TestHasActivityRejectsEmptyShift(t *testing.T) {
 	}
 }
 
+func TestRecipientsTrimsAndDeduplicates(t *testing.T) {
+	got := Recipients([]string{" noc@synet.cl ", "", "NOC@synet.cl", "jefatura@synet.cl"})
+	if len(got) != 2 || got[0] != "noc@synet.cl" || got[1] != "jefatura@synet.cl" {
+		t.Fatalf("got %#v", got)
+	}
+}
+
 func contains(value, needle string) bool {
 	for i := 0; i+len(needle) <= len(value); i++ {
 		if value[i:i+len(needle)] == needle {

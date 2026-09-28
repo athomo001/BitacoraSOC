@@ -1,0 +1,229 @@
+<div class="bk">
+  <div class="bk__main">
+    <!-- Respaldos automáticos -->
+    <section class="bk__card">
+      <header class="bk__head">
+        <h2 class="bk__title"><mat-icon>schedule</mat-icon>{{ i18n.t('backups.auto.title') }}</h2>
+        <label class="bk__switch">
+          <input type="checkbox" name="autoEnabled" [(ngModel)]="autoEnabled" />
+          <span class="bk__track" aria-hidden="true"><span class="bk__knob"></span></span>
+          {{ i18n.t(autoEnabled ? 'backups.auto.on' : 'backups.auto.off') }}
+        </label>
+      </header>
+      <div class="bk__body">
+        @if (autoEnabled) {
+          <div class="bk__grid">
+            <label class="field"><span>{{ i18n.t('backups.auto.every') }}</span><input type="number" name="intervalDays" min="1" max="365" [(ngModel)]="intervalDays" /></label>
+            <label class="field"><span>{{ i18n.t('backups.auto.at') }}</span><input type="time" name="runAt" [(ngModel)]="runAt" /></label>
+            <label class="field"><span>{{ i18n.t('backups.auto.retention') }}</span><input type="number" name="retentionDays" min="1" max="365" [(ngModel)]="retentionDays" /></label>
+            <label class="field">
+              <span>{{ i18n.t('backups.auto.passphrase') }}</span>
+              <input type="password" name="autoPassphrase" autocomplete="new-password" [(ngModel)]="autoPassphrase"
+                [placeholder]="i18n.t(config()?.passphraseSet ? 'backups.auto.passphraseSaved' : 'backups.auto.passphraseMissing')" />
+            </label>
+          </div>
+          <p class="bk__hint">{{ i18n.t('backups.auto.retentionHint') }}</p>
+          <div class="field">
+            <span>{{ i18n.t('backups.auto.destination') }}</span>
+            <div class="bk__row">
+              <button type="button" class="seg" [attr.aria-pressed]="destinationType === 'local'" (click)="destinationType = 'local'">{{ i18n.t('backups.auto.dest.local') }}</button>
+              <button type="button" class="seg" [attr.aria-pressed]="destinationType === 'smb'" (click)="destinationType = 'smb'">{{ i18n.t('backups.auto.dest.smb') }}</button>
+              <button type="button" class="seg" [attr.aria-pressed]="destinationType === 'nfs'" (click)="destinationType = 'nfs'">{{ i18n.t('backups.auto.dest.nfs') }}</button>
+              <button type="button" class="seg" disabled>{{ i18n.t('backups.auto.dest.s3') }}</button>
+            </div>
+          </div>
+          @if (destinationType !== 'local') {
+            <label class="field"><span>{{ i18n.t('backups.auto.path') }}</span>
+              <input class="mono" name="destinationPath" [(ngModel)]="destinationPath" [placeholder]="destinationType === 'smb' ? '/mnt/nas-soc/respaldos' : '/mnt/respaldos-bitacora'" />
+            </label>
+          }
+        } @else {
+          <p class="bk__hint">{{ i18n.t('backups.auto.offHint') }}</p>
+        }
+
+        @if (config(); as cfg) {
+          @if (cfg.enabled || cfg.lastRunAt) {
+            <div class="bk__status">
+              <span class="pill" [class]="'tone-' + statusTone(cfg)">{{ i18n.t(statusKey(cfg)) }}</span>
+              @if (cfg.lastRunAt) { <span>{{ i18n.t('backups.auto.lastRun') }} <span class="mono">{{ cfg.lastRunAt | date: 'dd/MM HH:mm' }}</span></span> }
+              @if (cfg.nextRunAt && cfg.enabled) { <span>{{ i18n.t('backups.auto.nextRun') }} <span class="mono">{{ cfg.nextRunAt | date: 'dd/MM HH:mm' }}</span></span> }
+              @if (cfg.lastMessage) { <span class="bk__muted">{{ cfg.lastMessage }}</span> }
+            </div>
+          }
+        }
+        @if (configFeedback(); as fb) {
+          <p class="msg" [class.msg--ok]="fb.ok" [class.msg--error]="!fb.ok" role="status">{{ fb.text }}</p>
+        }
+        <div class="bk__row">
+          <button type="button" class="bk__btn bk__btn--primary" [disabled]="busy()" (click)="saveConfig()"><mat-icon>save</mat-icon>{{ i18n.t('backups.auto.save') }}</button>
+          <button type="button" class="bk__btn" [disabled]="busy() || !config()?.passphraseSet" (click)="runNow()"><mat-icon>play_circle</mat-icon>{{ i18n.t('backups.auto.runNow') }}</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Historial -->
+    <section class="bk__card">
+      <header class="bk__head bk__head--wrap">
+        <h2 class="bk__title"><mat-icon>history</mat-icon>{{ i18n.t('backups.history.title') }}</h2>
+        <span class="pill mono">{{ i18n.tf('backups.history.copies', runs().length) }}</span>
+        <span class="bk__mode">
+          {{ i18n.t('backups.history.restoreMode') }}
+          <button type="button" class="seg" [attr.aria-pressed]="restoreMode() === 'merge'" (click)="restoreMode.set('merge')">{{ i18n.t('backups.history.merge') }}</button>
+          <button type="button" class="seg bk__seg-danger" [attr.aria-pressed]="restoreMode() === 'replace'" (click)="restoreMode.set('replace')">{{ i18n.t('backups.history.replace') }}</button>
+        </span>
+      </header>
+
+      @if (feedback(); as fb) {
+        <p class="msg bk__feedback" [class.msg--ok]="fb.ok" [class.msg--error]="!fb.ok" role="status">{{ fb.text }}</p>
+      }
+
+      <div class="bk__table-wrap">
+        <div class="bk__table" role="table" [attr.aria-label]="i18n.t('backups.history.title')">
+          <div class="bk__tr bk__tr--head" role="row">
+            <span>{{ i18n.t('backups.history.col.kind') }}</span><span>{{ i18n.t('backups.history.col.date') }}</span>
+            <span>{{ i18n.t('backups.history.col.size') }}</span><span>{{ i18n.t('backups.history.col.records') }}</span>
+            <span>{{ i18n.t('backups.history.col.integrity') }}</span><span class="bk__right">{{ i18n.t('backups.history.col.actions') }}</span>
+          </div>
+          @for (run of runs(); track run.id) {
+            @let k = kind(run);
+            @let check = integrity(run);
+            @let open = panel()?.id === run.id ? panel()?.action : null;
+            <div class="bk__group" [class.bk__group--open]="open">
+              <div class="bk__tr" role="row">
+                <span><span class="pill" [class]="'tone-' + k.tone">{{ i18n.t(k.key) }}</span></span>
+                <span class="mono">{{ run.startedAt | date: 'dd/MM HH:mm' }}</span>
+                <span class="mono">{{ formatSize(run.fileSizeBytes) }}</span>
+                <span class="mono">{{ formatCount(run.recordsCount) }}</span>
+                <span class="bk__integrity" [class]="'text-' + check.tone"><mat-icon>{{ check.icon }}</mat-icon><span class="mono">{{ run.checksumSha256 ? run.checksumSha256.slice(0, 4) + '…' + run.checksumSha256.slice(-4) : '—' }}</span> · {{ i18n.t(check.key) }}</span>
+                <span class="bk__right bk__icons">
+                  <button type="button" class="bk__icon" [title]="i18n.t('backups.action.validate')" [attr.aria-label]="i18n.t('backups.action.validate')" [disabled]="run.status !== 'success'" (click)="openPanel(run, 'validate')"><mat-icon>verified</mat-icon></button>
+                  <button type="button" class="bk__icon" [title]="i18n.t('backups.action.download')" [attr.aria-label]="i18n.t('backups.action.download')" [disabled]="run.status !== 'success' || busy()" (click)="download(run)"><mat-icon>download</mat-icon></button>
+                  <button type="button" class="bk__icon bk__icon--accent" [title]="i18n.t('backups.action.restore')" [attr.aria-label]="i18n.t('backups.action.restore')" [disabled]="run.status !== 'success' || run.kind !== 'full'" (click)="openPanel(run, 'restore')"><mat-icon>settings_backup_restore</mat-icon></button>
+                  <button type="button" class="bk__icon" [title]="i18n.t('backups.action.delete')" [attr.aria-label]="i18n.t('backups.action.delete')" (click)="openPanel(run, 'delete')"><mat-icon>delete</mat-icon></button>
+                </span>
+              </div>
+
+              @switch (open) {
+                @case ('restore') {
+                  @let replace = restoreMode() === 'replace';
+                  <form class="bk__panel" [class.bk__panel--danger]="replace" (submit)="$event.preventDefault(); restore(run)">
+                    <div class="bk__panel-text">
+                      <mat-icon>{{ replace ? 'warning' : 'merge' }}</mat-icon>
+                      <span>
+                        <strong>{{ i18n.tf(replace ? 'backups.restore.replaceTitle' : 'backups.restore.mergeTitle', (run.startedAt | date: 'dd/MM HH:mm') ?? '') }}</strong>
+                        <span class="bk__muted bk__block">{{ i18n.t(replace ? 'backups.restore.replaceText' : 'backups.restore.mergeText') }}</span>
+                      </span>
+                    </div>
+                    <div class="bk__grid bk__grid--2">
+                      <label class="field"><span>{{ i18n.t('backups.restore.passphrase') }}</span><input type="password" name="rowPassphrase" autocomplete="off" [(ngModel)]="rowPassphrase" /></label>
+                      @if (replace) {
+                        <label class="field"><span>{{ i18n.t('backups.restore.typeConfirm') }}</span><input class="mono" name="rowConfirmation" autocomplete="off" [(ngModel)]="rowConfirmation" /></label>
+                      }
+                    </div>
+                    <div class="bk__row bk__row--end">
+                      <button type="button" class="bk__btn" (click)="panel.set(null)">{{ i18n.t('backups.cancel') }}</button>
+                      <button type="submit" class="bk__btn" [class.bk__btn--danger]="replace" [class.bk__btn--primary]="!replace"
+                        [disabled]="busy() || !rowPassphrase || (replace && rowConfirmation !== 'RESTAURAR')">
+                        {{ i18n.t(replace ? 'backups.restore.replace' : 'backups.restore.merge') }}
+                      </button>
+                    </div>
+                  </form>
+                }
+                @case ('validate') {
+                  <form class="bk__panel" (submit)="$event.preventDefault(); validate(run)">
+                    <div class="bk__grid bk__grid--2">
+                      <label class="field"><span>{{ i18n.t('backups.restore.passphrase') }}</span><input type="password" name="rowPassphrase" autocomplete="off" [(ngModel)]="rowPassphrase" /></label>
+                    </div>
+                    <div class="bk__row bk__row--end">
+                      <button type="button" class="bk__btn" (click)="panel.set(null)">{{ i18n.t('backups.cancel') }}</button>
+                      <button type="submit" class="bk__btn bk__btn--primary" [disabled]="busy() || !rowPassphrase">{{ i18n.t('backups.validate.run') }}</button>
+                    </div>
+                  </form>
+                }
+                @case ('delete') {
+                  <div class="bk__panel bk__panel--inline">
+                    <span>{{ i18n.tf('backups.delete.confirm', (run.startedAt | date: 'dd/MM HH:mm') ?? '') }}</span>
+                    <button type="button" class="bk__btn" (click)="panel.set(null)">{{ i18n.t('backups.cancel') }}</button>
+                    <button type="button" class="bk__btn bk__btn--danger" [disabled]="busy()" (click)="remove(run)">{{ i18n.t('backups.delete.run') }}</button>
+                  </div>
+                }
+              }
+            </div>
+          } @empty {
+            <p class="bk__empty">{{ i18n.t('backups.history.empty') }}</p>
+          }
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="bk__side">
+    <section class="bk__card">
+      <header class="bk__head"><h2 class="bk__title"><mat-icon>construction</mat-icon>{{ i18n.t('backups.actions.title') }}</h2></header>
+      <div class="bk__body">
+        <div class="bk__stack">
+          <span class="bk__label">{{ i18n.t('backups.manual.title') }}</span>
+          <span class="bk__hint">{{ i18n.t('backups.manual.hint') }}</span>
+          <label class="field"><span>{{ i18n.t('backups.manual.passphrase') }}</span><input type="password" name="passphrase" autocomplete="new-password" [(ngModel)]="passphrase" /></label>
+          <button type="button" class="bk__btn bk__btn--primary" [disabled]="busy() || passphrase.length < 8" (click)="createNow()"><mat-icon>backup</mat-icon>{{ i18n.t(busy() ? 'backups.manual.creating' : 'backups.manual.create') }}</button>
+          <span class="bk__or">{{ i18n.t('backups.upload.or') }}</span>
+          <label class="bk__drop" [class.bk__drop--disabled]="passphrase.length < 8">
+            <mat-icon>upload_file</mat-icon>
+            {{ i18n.t('backups.upload.pick') }}
+            <input type="file" accept=".enc" [disabled]="busy() || passphrase.length < 8" (change)="upload($event)" />
+          </label>
+          <span class="bk__hint">{{ i18n.t('backups.upload.hint') }}</span>
+        </div>
+
+        <div class="bk__stack bk__stack--sep">
+          <span class="bk__label">{{ i18n.t('backups.delta.title') }}</span>
+          <span class="bk__hint">{{ i18n.t('backups.delta.hint') }}</span>
+          <div class="bk__row">
+            @for (w of deltaWindows; track w.value) {
+              <button type="button" class="seg" [attr.aria-pressed]="deltaWindow() === w.value" (click)="deltaWindow.set(w.value)">{{ w.label }}</button>
+            }
+          </div>
+          <div class="bk__grid bk__grid--2">
+            <button type="button" class="bk__btn" [disabled]="busy() || passphrase.length < 8" (click)="exportDelta()"><mat-icon>file_download</mat-icon>{{ i18n.t('backups.delta.export') }}</button>
+            <label class="bk__btn" [class.bk__btn--disabled]="passphrase.length < 8"><mat-icon>file_upload</mat-icon>{{ i18n.t('backups.delta.import') }}
+              <input type="file" accept=".enc" class="bk__hidden" [disabled]="busy() || passphrase.length < 8" (change)="importDelta($event)" />
+            </label>
+          </div>
+        </div>
+
+        <div class="bk__stack bk__stack--sep">
+          <span class="bk__label">{{ i18n.t('backups.csv.title') }}</span>
+          <span class="bk__hint">{{ i18n.t('backups.csv.hint') }}</span>
+          <div class="bk__grid bk__grid--3">
+            <button type="button" class="bk__btn" [disabled]="busy()" (click)="exportCsv('entries')">{{ i18n.t('backups.csv.entries') }}</button>
+            <button type="button" class="bk__btn" [disabled]="busy()" (click)="exportCsv('checklists')">{{ i18n.t('backups.csv.checklists') }}</button>
+            <button type="button" class="bk__btn" [disabled]="busy()" (click)="exportCsv('tickets')">{{ i18n.t('backups.csv.tickets') }}</button>
+          </div>
+          <button type="button" class="bk__btn" [disabled]="busy()" (click)="exportCsv('all')"><mat-icon>folder_zip</mat-icon>{{ i18n.t('backups.csv.all') }}</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="bk__card bk__card--danger">
+      <header class="bk__head bk__head--danger"><h2 class="bk__title"><mat-icon>report</mat-icon>{{ i18n.t('backups.danger.title') }}</h2></header>
+      <div class="bk__body">
+        @if (!purgeAllowed()) {
+          <p class="bk__locked"><mat-icon class="bk__lock-icon">lock</mat-icon>{{ i18n.t('backups.danger.locked') }}</p>
+          <button type="button" class="bk__btn" (click)="goToFeatures.emit()"><mat-icon>toggle_on</mat-icon>{{ i18n.t('backups.danger.goFeatures') }}</button>
+        } @else {
+          <span class="pill tone-warn bk__self-start"><mat-icon>science</mat-icon>{{ i18n.t('backups.danger.allowed') }}</span>
+          <p class="bk__text">{{ i18n.t('backups.danger.intro') }}</p>
+          <ul class="bk__list">
+            <li>{{ i18n.t('backups.danger.item1') }}</li>
+            <li>{{ i18n.t('backups.danger.item2') }}</li>
+            <li>{{ i18n.t('backups.danger.item3') }}</li>
+          </ul>
+          <p class="bk__hint">{{ i18n.t('backups.danger.outro') }}</p>
+          <label class="field"><span>{{ i18n.t('backups.danger.type') }}</span><input class="mono" name="purgePhrase" autocomplete="off" [(ngModel)]="purgePhrase" /></label>
+          <button type="button" class="bk__btn bk__btn--danger" [disabled]="busy() || purged() || purgePhrase !== 'PURGAR TODO'" (click)="purge()"><mat-icon>delete_forever</mat-icon>{{ i18n.t('backups.danger.purge') }}</button>
+          @if (purged()) { <p class="msg msg--ok" role="status">{{ i18n.t('backups.danger.done') }}</p> }
+        }
+      </div>
+    </section>
+  </div>
+</div>

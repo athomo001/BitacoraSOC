@@ -89,3 +89,10 @@ LEFT JOIN contacts c ON c.id = tm.contact_id
 WHERE t.active = true
   AND (sqlc.narg('team_id')::uuid IS NULL OR t.id = sqlc.narg('team_id'))
 ORDER BY t.id, tm.priority DESC, tm.id;
+-- name: GetShiftClosureByCheck :one
+-- Un check de cierre se cierra una sola vez: un segundo POST no duplica el cierre ni el reporte.
+SELECT * FROM shift_closures WHERE closure_check_id = $1 LIMIT 1;
+
+-- name: GetWorkShiftForCheck :one
+-- Turno al que pertenece un check: define la ventana real del cierre (no 8h fijas) y los destinatarios del reporte.
+SELECT ws.* FROM work_shifts ws JOIN shift_checks sc ON sc.work_shift_id = ws.id WHERE sc.id = $1;

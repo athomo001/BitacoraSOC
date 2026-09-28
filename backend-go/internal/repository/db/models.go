@@ -1318,6 +1318,24 @@ type AuditLog struct {
 	Metadata          []byte             `json:"metadata"`
 }
 
+type BackupConfig struct {
+	ID                  bool               `json:"id"`
+	Enabled             bool               `json:"enabled"`
+	IntervalDays        int32              `json:"interval_days"`
+	RunAt               pgtype.Time        `json:"run_at"`
+	Timezone            string             `json:"timezone"`
+	RetentionDays       int32              `json:"retention_days"`
+	DestinationType     string             `json:"destination_type"`
+	DestinationPath     pgtype.Text        `json:"destination_path"`
+	PassphraseEncrypted pgtype.Text        `json:"passphrase_encrypted"`
+	NextRunAt           pgtype.Timestamptz `json:"next_run_at"`
+	LastRunAt           pgtype.Timestamptz `json:"last_run_at"`
+	LastStatus          string             `json:"last_status"`
+	LastMessage         pgtype.Text        `json:"last_message"`
+	UpdatedBy           pgtype.UUID        `json:"updated_by"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+}
+
 type BackupRun struct {
 	ID                   uuid.UUID          `json:"id"`
 	Kind                 BackupKind         `json:"kind"`
@@ -1334,6 +1352,7 @@ type BackupRun struct {
 	Encrypted            bool               `json:"encrypted"`
 	TriggeredBy          pgtype.UUID        `json:"triggered_by"`
 	ErrorMessage         pgtype.Text        `json:"error_message"`
+	TriggerSource        string             `json:"trigger_source"`
 }
 
 type CatalogLogSource struct {

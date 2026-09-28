@@ -8,7 +8,6 @@
 
 html {
   height: 100%;
-  color-scheme: dark;
 
   @include mat.theme(
     (
@@ -37,11 +36,13 @@ html {
   --mat-sys-on-surface-variant: var(--text-secondary);
   --mat-sys-outline: var(--border-subtle);
   --mat-sys-outline-variant: var(--border-subtle);
-  --mat-sys-primary: var(--border-active);
+  --mat-sys-primary: var(--accent);
+  --mat-sys-on-primary: var(--accent-contrast);
 }
 
+// color-scheme lo fija cada tema en styles/tokens.css (claro/oscuro/rosa):
+// si se forzara acá, los controles nativos quedarían oscuros en el tema claro.
 body {
-  color-scheme: dark;
   background-color: var(--bg-app);
   color: var(--text-primary);
   font: var(--mat-sys-body-medium);

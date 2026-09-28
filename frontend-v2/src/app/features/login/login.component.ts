@@ -36,11 +36,12 @@ import anime from 'animejs';
 import { AuthService } from '../../core/auth/auth.service';
 import { isMfaPending } from '../../core/auth/auth.models';
 
-type ViewState = 'login' | 'recovery' | 'mfa';
-export type LoginTheme = 'crt' | 'infoflow' | 'modern' | 'surrealism' | 'win311' | 'unix89';
+import { LOGIN_THEMES, LOGIN_THEME_STORAGE_KEY as THEME_STORAGE_KEY, LoginTheme } from './login-themes';
 
-export const LOGIN_THEMES: readonly LoginTheme[] = ['crt', 'infoflow', 'modern', 'surrealism', 'win311', 'unix89'];
-const THEME_STORAGE_KEY = 'preferredLoginTheme';
+export { LOGIN_THEMES };
+export type { LoginTheme };
+
+type ViewState = 'login' | 'recovery' | 'mfa';
 const PRIVACY_STORAGE_KEY = 'privacyConsentAccepted';
 
 @Component({

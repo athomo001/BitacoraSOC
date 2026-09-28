@@ -1,6 +1,7 @@
 @import url("./styles/tokens.css");
 @import url("./styles/fonts.css");
 @import url("./styles/forms.css");
+@import url("./styles/pills.css");
 
 * {
   box-sizing: border-box;

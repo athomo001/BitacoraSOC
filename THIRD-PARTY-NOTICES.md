@@ -10,7 +10,7 @@ ODbL aplica a la base de datos en sí, no al código de BitacoraSOC que la consu
 
 ## Fuentes tipográficas
 
-Geist Sans, JetBrains Mono, VT323 y Orbitron: SIL Open Font License 1.1. Material Icons: Apache 2.0. Las licencias completas viajan junto a los archivos en `frontend-v2/public/fonts/`.
+Geist Sans, JetBrains Mono, VT323, Orbitron y OpenDyslexic: SIL Open Font License 1.1. Material Icons: Apache 2.0. Las licencias completas viajan junto a los archivos en `frontend-v2/public/fonts/`.
 
 **Gotham** (`frontend-v2/public/assets/fonts/`, usada por el tema de login "Moderno"): copiada tal cual del frontend legacy (`frontend/src/assets/fonts/`). Es una fuente **comercial** de Hoefler&Co., no de licencia libre — verificar que la organización tiene la licencia web correspondiente antes de publicar el rewrite; si no, reemplazarla (el CSS ya cae a `Segoe UI`/`Roboto`).
 

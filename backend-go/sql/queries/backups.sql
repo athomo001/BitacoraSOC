@@ -16,3 +16,26 @@ SELECT * FROM backup_runs WHERE id=$1;
 
 -- name: DeleteBackupRun :one
 DELETE FROM backup_runs WHERE id=$1 RETURNING *;
+-- name: CreateBackupRunWithSource :one
+INSERT INTO backup_runs (kind, trigger_source, triggered_by)
+VALUES ($1, $2, sqlc.narg('triggered_by')) RETURNING *;
+
+-- name: GetBackupConfig :one
+SELECT * FROM backup_config WHERE id;
+
+-- name: UpdateBackupConfig :one
+UPDATE backup_config SET
+  enabled = $1, interval_days = $2, run_at = $3, timezone = $4, retention_days = $5,
+  destination_type = $6, destination_path = sqlc.narg('destination_path'),
+  passphrase_encrypted = COALESCE(sqlc.narg('passphrase_encrypted'), passphrase_encrypted),
+  next_run_at = sqlc.narg('next_run_at'), updated_by = sqlc.narg('updated_by'), updated_at = now()
+WHERE id RETURNING *;
+
+-- name: MarkBackupConfigRun :exec
+UPDATE backup_config SET last_run_at = sqlc.narg('last_run_at'), last_status = $1, last_message = sqlc.narg('last_message'),
+  next_run_at = COALESCE(sqlc.narg('next_run_at'), next_run_at)
+WHERE id;
+
+-- name: ListExpiredAutoBackups :many
+-- Copias automáticas fuera de la retención: el planificador las borra (archivo y fila).
+SELECT * FROM backup_runs WHERE trigger_source = 'auto' AND started_at < $1;

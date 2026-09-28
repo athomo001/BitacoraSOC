@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -25,21 +23,6 @@ type ChecklistsHandler struct {
 	AuditLog *audit.Logger
 	Crypto   *crypto.Box
 	Now      func() time.Time
-}
-
-var checklistKeywordPattern = regexp.MustCompile(`[[:alnum:]]{4,}`)
-
-func relatedChecklistTitles(left, right string) bool {
-	seen := make(map[string]struct{})
-	for _, word := range checklistKeywordPattern.FindAllString(strings.ToLower(left), -1) {
-		seen[word] = struct{}{}
-	}
-	for _, word := range checklistKeywordPattern.FindAllString(strings.ToLower(right), -1) {
-		if _, ok := seen[word]; ok {
-			return true
-		}
-	}
-	return false
 }
 
 func (h *ChecklistsHandler) now() time.Time {
@@ -166,6 +149,7 @@ func (h *ChecklistsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 		engineItems = append(engineItems, checklist.Item{ID: item.ID.String(), ParentID: parent, Title: item.Title})
 	}
+	groups := checklist.Groups(engineItems)
 	observations := make(map[string]checklist.Observation, len(req.Services))
 	for _, service := range req.Services {
 		item, ok := itemByID[service.ChecklistItemID]
@@ -177,7 +161,10 @@ func (h *ChecklistsHandler) Create(w http.ResponseWriter, r *http.Request) {
 			problemdetails.Write(w, r, 400, "invalid-payload", "estado de checklist inválido")
 			return
 		}
-		if item.ParentItemID.Valid {
+		// Un grupo (ítem CON sub-ítems) se calcula; una hoja con padre sí se
+		// evalúa a mano (antes se rechazaba por tener padre y ninguna
+		// plantilla jerárquica se podía guardar).
+		if groups[item.ID.String()] {
 			problemdetails.Write(w, r, 400, "invalid-payload", "los ítems con subítems se calculan automáticamente")
 			return
 		}
@@ -220,20 +207,12 @@ func (h *ChecklistsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 		servicesByItem[item.ID] = service
 	}
-	for _, left := range items {
-		if left.ParentItemID.Valid || results[left.ID.String()].Status != checklist.Red {
-			continue
-		}
-		for _, right := range items {
-			if right.ID == left.ID || right.ParentItemID.Valid || results[right.ID.String()].Status != checklist.Red || !relatedChecklistTitles(left.Title, right.Title) {
-				continue
-			}
-			_, err := queries.LinkCorrelatedShiftCheckService(r.Context(), db.LinkCorrelatedShiftCheckServiceParams{ID: servicesByItem[right.ID].ID, CorrelatedFromServiceID: pgtype.UUID{Bytes: servicesByItem[left.ID].ID, Valid: true}})
-			if err != nil {
-				problemdetails.Write(w, r, 500, "internal-error", "no se pudo guardar la correlación")
-				return
-			}
-			break
+	for itemID, fromID := range checklist.Correlate(engineItems, results) {
+		service := servicesByItem[uuid.MustParse(itemID)]
+		from := servicesByItem[uuid.MustParse(fromID)]
+		if _, err := queries.LinkCorrelatedShiftCheckService(r.Context(), db.LinkCorrelatedShiftCheckServiceParams{ID: service.ID, CorrelatedFromServiceID: pgtype.UUID{Bytes: from.ID, Valid: true}}); err != nil {
+			problemdetails.Write(w, r, 500, "internal-error", "no se pudo guardar la correlación")
+			return
 		}
 	}
 	redTitles := make([]string, 0)
@@ -333,111 +312,4 @@ func (h *ChecklistsHandler) Abandoned(w http.ResponseWriter, r *http.Request) {
 		h.AuditLog.Log(r.Context(), "checklist.abandoned", audit.LevelInfo, audit.Success(), metadata)
 	}
 	writeNoContent(w)
-}
-
-func (h *ChecklistsHandler) Close(w http.ResponseWriter, r *http.Request) {
-	var req closeShiftRequest
-	if err := decodeJSON(w, r, &req); err != nil || req.ClosureCheckID == uuid.Nil {
-		problemdetails.Write(w, r, 400, "invalid-payload", "closureCheckId es obligatorio")
-		return
-	}
-	check, err := h.Queries.GetShiftCheck(r.Context(), req.ClosureCheckID)
-	if err != nil || check.CheckType != db.ChecklistCheckTypeCierre {
-		problemdetails.Write(w, r, 400, "invalid-payload", "el check de cierre no es válido")
-		return
-	}
-	services, err := h.Queries.ListShiftCheckServices(r.Context(), check.ID)
-	if err != nil {
-		problemdetails.Write(w, r, 500, "internal-error", "no se pudieron cargar los servicios")
-		return
-	}
-	start := check.CheckDate.Time.Add(-8 * time.Hour)
-	end := check.CheckDate.Time
-	from := pgtype.Timestamptz{Time: start, Valid: true}
-	to := pgtype.Timestamptz{Time: end, Valid: true}
-	totalEntries, _ := h.Queries.CountEntriesInWindow(r.Context(), db.CountEntriesInWindowParams{CreatedAt: from, CreatedAt_2: to})
-	totalIncidents, _ := h.Queries.CountIncidentEntriesInWindow(r.Context(), db.CountIncidentEntriesInWindowParams{CreatedAt: from, CreatedAt_2: to})
-	resolved, _ := h.Queries.CountResolvedTicketsInWindow(r.Context(), db.CountResolvedTicketsInWindowParams{ResolvedAt: from, ResolvedAt_2: to})
-	breaches, _ := h.Queries.CountSLABreachesInWindow(r.Context(), db.CountSLABreachesInWindowParams{ResolvedAt: from, ResolvedAt_2: to})
-	servicesDown := make([]string, 0)
-	for _, service := range services {
-		if service.Status == db.ChecklistStatusRojo {
-			servicesDown = append(servicesDown, service.ServiceTitle)
-		}
-	}
-	user, _ := middleware.UserFromContext(r.Context())
-	closure, err := h.Queries.CreateShiftClosure(r.Context(), db.CreateShiftClosureParams{UserID: user.ID, ShiftStartAt: pgtype.Timestamptz{Time: start, Valid: true}, ShiftEndAt: pgtype.Timestamptz{Time: end, Valid: true}, ClosureCheckID: check.ID, TotalEntries: int32(totalEntries), TotalIncidents: int32(totalIncidents), ServicesDown: servicesDown, Observations: pgtype.Text{String: strings.TrimSpace(req.Observations), Valid: strings.TrimSpace(req.Observations) != ""}, PendingForNextShift: pgtype.Text{String: strings.TrimSpace(req.PendingForNextShift), Valid: strings.TrimSpace(req.PendingForNextShift) != ""}, TicketsResolvedCount: int32(resolved), SlaBreachesCount: int32(breaches)})
-	if err != nil {
-		problemdetails.Write(w, r, 400, "invalid-payload", "no se pudo crear el cierre")
-		return
-	}
-	if req.SyncGLPI {
-		problemdetails.Write(w, r, 409, "integration-unavailable", "la sincronización GLPI sigue fuera del corte inicial")
-		return
-	}
-	if req.NotifyEmail && h.Crypto != nil {
-		recipients, recipientErr := h.Queries.ListActiveUserEmailsByRole(r.Context(), db.NullUserRole{})
-		if recipientErr != nil || len(recipients) == 0 {
-			_ = h.Queries.MarkShiftClosureSent(r.Context(), db.MarkShiftClosureSentParams{ID: closure.ID, SentVia: "email", SentStatus: "failed", SentError: pgtype.Text{String: "no hay destinatarios activos", Valid: true}})
-		} else if sender, _, mailErr := buildMailSender(r.Context(), h.Queries, h.Crypto); mailErr != nil || sender.SendMany(recipients, nil, "Cierre de turno", "Pendientes:\n"+req.PendingForNextShift+"\n\nObservaciones:\n"+req.Observations) != nil {
-			_ = h.Queries.MarkShiftClosureSent(r.Context(), db.MarkShiftClosureSentParams{ID: closure.ID, SentVia: "email", SentStatus: "failed", SentError: pgtype.Text{String: "falló el envío SMTP", Valid: true}})
-		} else {
-			_ = h.Queries.MarkShiftClosureSent(r.Context(), db.MarkShiftClosureSentParams{ID: closure.ID, SentVia: "email", SentStatus: "success", SentError: pgtype.Text{}})
-		}
-	}
-	writeData(w, 201, closure)
-}
-
-func (h *ChecklistsHandler) Handover(w http.ResponseWriter, r *http.Request) {
-	previous, err := h.Queries.GetLatestShiftClosure(r.Context())
-	if err != nil && err != pgx.ErrNoRows {
-		problemdetails.Write(w, r, 500, "internal-error", "no se pudo cargar el cierre anterior")
-		return
-	}
-	previousExists := err == nil
-	now := h.now()
-	windows, maintenanceErr := h.Queries.ListUpcomingMaintenanceWindows(r.Context(), db.ListUpcomingMaintenanceWindowsParams{EndsAt: pgtype.Timestamptz{Time: now, Valid: true}, StartsAt: pgtype.Timestamptz{Time: now.Add(4 * time.Hour), Valid: true}})
-	if maintenanceErr != nil {
-		problemdetails.Write(w, r, 500, "internal-error", "no se pudieron cargar mantenimientos")
-		return
-	}
-	var previousValue any
-	if previousExists {
-		previousValue = previous
-	}
-	var teamID pgtype.UUID
-	if raw := r.URL.Query().Get("teamId"); raw != "" {
-		if parsed, parseErr := uuid.Parse(raw); parseErr == nil {
-			teamID = pgtype.UUID{Bytes: parsed, Valid: true}
-		}
-	}
-	onCallRows, err := h.Queries.ListHandoverOnCall(r.Context(), db.ListHandoverOnCallParams{Today: pgtype.Date{Time: now, Valid: true}, TeamID: teamID})
-	if err != nil {
-		problemdetails.Write(w, r, 500, "internal-error", "no se pudo cargar la guardia activa")
-		return
-	}
-	onCall := make([]map[string]any, 0, len(onCallRows))
-	for _, row := range onCallRows {
-		onCall = append(onCall, map[string]any{"teamId": row.TeamID, "teamName": row.TeamName, "onCallMember": row.OnCallMember})
-	}
-	writeData(w, 200, map[string]any{"previousClosure": previousValue, "upcomingMaintenanceWindows": windows, "onCallSummary": onCall})
-}
-
-func (h *ChecklistsHandler) Acknowledge(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		problemdetails.Write(w, r, 404, "not-found", "cierre no encontrado")
-		return
-	}
-	user, _ := middleware.UserFromContext(r.Context())
-	closure, err := h.Queries.AcknowledgeShiftClosure(r.Context(), db.AcknowledgeShiftClosureParams{ID: id, AcknowledgedBy: pgtype.UUID{Bytes: user.ID, Valid: true}, AcknowledgedAt: pgtype.Timestamptz{Time: h.now(), Valid: true}})
-	if err == pgx.ErrNoRows {
-		problemdetails.Write(w, r, 409, "already-acknowledged", "el relevo ya fue confirmado")
-		return
-	}
-	if err != nil {
-		problemdetails.Write(w, r, 404, "not-found", "cierre no encontrado")
-		return
-	}
-	writeData(w, 200, closure)
 }

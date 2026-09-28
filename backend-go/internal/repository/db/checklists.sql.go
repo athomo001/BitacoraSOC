@@ -410,6 +410,63 @@ func (q *Queries) GetShiftClosure(ctx context.Context, id uuid.UUID) (ShiftClosu
 	return i, err
 }
 
+const getShiftClosureByCheck = `-- name: GetShiftClosureByCheck :one
+SELECT id, user_id, shift_start_at, shift_end_at, closure_check_id, total_entries, total_incidents, services_down, observations, pending_for_next_shift, acknowledged_by, acknowledged_at, tickets_resolved_count, sla_breaches_count, sent_via, integration_name, sent_status, sent_error, sent_at, created_at FROM shift_closures WHERE closure_check_id = $1 LIMIT 1
+`
+
+// Un check de cierre se cierra una sola vez: un segundo POST no duplica el cierre ni el reporte.
+func (q *Queries) GetShiftClosureByCheck(ctx context.Context, closureCheckID uuid.UUID) (ShiftClosure, error) {
+	row := q.db.QueryRow(ctx, getShiftClosureByCheck, closureCheckID)
+	var i ShiftClosure
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.ShiftStartAt,
+		&i.ShiftEndAt,
+		&i.ClosureCheckID,
+		&i.TotalEntries,
+		&i.TotalIncidents,
+		&i.ServicesDown,
+		&i.Observations,
+		&i.PendingForNextShift,
+		&i.AcknowledgedBy,
+		&i.AcknowledgedAt,
+		&i.TicketsResolvedCount,
+		&i.SlaBreachesCount,
+		&i.SentVia,
+		&i.IntegrationName,
+		&i.SentStatus,
+		&i.SentError,
+		&i.SentAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getWorkShiftForCheck = `-- name: GetWorkShiftForCheck :one
+SELECT ws.id, ws.rotation_cycle_id, ws.name, ws.start_time, ws.end_time, ws.timezone, ws.shift_type, ws.checklist_template_start_id, ws.checklist_template_end_id, ws.email_recipients, ws.active FROM work_shifts ws JOIN shift_checks sc ON sc.work_shift_id = ws.id WHERE sc.id = $1
+`
+
+// Turno al que pertenece un check: define la ventana real del cierre (no 8h fijas) y los destinatarios del reporte.
+func (q *Queries) GetWorkShiftForCheck(ctx context.Context, id uuid.UUID) (WorkShift, error) {
+	row := q.db.QueryRow(ctx, getWorkShiftForCheck, id)
+	var i WorkShift
+	err := row.Scan(
+		&i.ID,
+		&i.RotationCycleID,
+		&i.Name,
+		&i.StartTime,
+		&i.EndTime,
+		&i.Timezone,
+		&i.ShiftType,
+		&i.ChecklistTemplateStartID,
+		&i.ChecklistTemplateEndID,
+		&i.EmailRecipients,
+		&i.Active,
+	)
+	return i, err
+}
+
 const linkCorrelatedShiftCheckService = `-- name: LinkCorrelatedShiftCheckService :one
 UPDATE shift_check_services SET correlated_from_service_id = $2 WHERE id = $1 RETURNING id, shift_check_id, checklist_item_id, service_title, status, is_computed, observation, correlated_from_service_id
 `

@@ -1,27 +1,269 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
-import { DatePipe, DecimalPipe, SlicePipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, output, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { MatIconModule } from '@angular/material/icon';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
-import { BackupRun, BackupsService } from '../../core/backups/backups.service';
+import { AuthService } from '../../core/auth/auth.service';
+import { SystemFeaturesService } from '../../core/system-features/system-features.service';
+import {
+  BackupConfig, BackupRun, BackupsService, CsvExport, DeltaWindow, DestinationType, RestoreMode,
+} from '../../core/backups/backups.service';
+import { formatCount, formatSize, runKind } from '../../core/backups/backup-view';
 
-@Component({ selector: 'app-admin-backups', standalone: true, imports: [FormsModule, DatePipe, DecimalPipe, SlicePipe], changeDetection: ChangeDetectionStrategy.OnPush, template: `
-  <section class="panel backup-panel">
-    <header><div><h2>Respaldos del sistema</h2><p>Snapshot completo cifrado y comprimido, con historial verificable.</p></div><span class="status">{{ backups().length }} respaldos</span></header>
-      <div class="backup-actions"><form class="backup-create" (submit)="$event.preventDefault(); create()"><label>Passphrase<input type="password" name="passphrase" [(ngModel)]="passphrase" required /></label><button type="submit" [disabled]="busy()">{{ busy() ? 'Generando...' : 'Crear backup completo' }}</button></form><form class="backup-create" (submit)="$event.preventDefault(); exportDelta()"><label>Delta<input type="password" name="deltaPassphrase" [(ngModel)]="deltaPassphrase" placeholder="Passphrase" required /></label><select name="deltaWindow" [(ngModel)]="deltaWindow"><option value="6h">Últimas 6 horas</option><option value="24h">Últimas 24 horas</option><option value="3d">Últimos 3 días</option><option value="7d">Últimos 7 días</option></select><button type="submit" [disabled]="busy()">Exportar delta</button></form><label class="backup-import">Importar delta<input type="file" accept=".enc,.zst,.backup" (change)="onDeltaSelected($event)" /></label></div>
-    @if (error()) { <p class="error">{{ error() }}</p> }
-      <table><thead><tr><th>Tipo</th><th>Estado</th><th>Registros</th><th>Tamaño</th><th>Checksum</th><th>Fecha</th><th></th></tr></thead><tbody>@for (backup of backups(); track backup.id) { <tr><td>{{ backup.kind }}</td><td>{{ backup.status }}</td><td>{{ backup.records_count }}</td><td>{{ backup.file_size_bytes ? (backup.file_size_bytes / 1024 | number:'1.0-0') + ' KB' : '—' }}</td><td><code>{{ backup.checksum_sha256 ? (backup.checksum_sha256 | slice:0:12) + '…' : '—' }}</code></td><td>{{ backup.started_at | date:'dd/MM/yyyy HH:mm' }}</td><td><button type="button" (click)="validate(backup)">Validar</button><a [href]="api.downloadUrl(backup.id)">Descargar</a><button type="button" (click)="remove(backup)">Eliminar</button></td></tr> } @empty { <tr><td colspan="7">No hay respaldos registrados.</td></tr> }</tbody></table>
-  </section>
-`, styles: [`
-  .backup-panel { display:grid; gap:18px; } header { display:flex; justify-content:space-between; gap:24px; align-items:start; border-bottom:1px solid var(--border-subtle); padding-bottom:16px; } h2 { margin:0; } p { color:var(--text-secondary); } .status { color:var(--accent-cyan); } .backup-actions { display:grid; grid-template-columns:1fr 1fr auto; gap:12px; align-items:end; } .backup-create { display:flex; align-items:end; gap:12px; } label { display:grid; gap:6px; flex:1; font-size:13px; } input,select { width:100%; box-sizing:border-box; border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:9px; background:var(--bg-app); color:var(--text-primary); } button { border:0; border-radius:var(--radius-sm); padding:9px 12px; background:var(--accent-cyan); color:var(--bg-app); cursor:pointer; } button:disabled { opacity:.55; cursor:not-allowed; } .backup-import { min-height:38px; padding:0 12px; border:1px dashed var(--border-active); border-radius:var(--radius-sm); align-items:center; justify-content:center; color:var(--text-secondary); cursor:pointer; } .backup-import input { display:none; } table { width:100%; border-collapse:collapse; } th,td { border-bottom:1px solid var(--border-subtle); padding:10px; text-align:left; } td a { color:var(--accent-cyan); margin-right:12px; } td button { background:transparent; color:var(--text-secondary); } .error { color:var(--status-critical); } @media (max-width: 900px) { .backup-actions { grid-template-columns:1fr; } }
-` ] })
+type RowPanel = { id: string; action: 'restore' | 'validate' | 'delete' };
+type Feedback = { ok: boolean; text: string };
+
+const DELTA_WINDOWS: readonly { value: DeltaWindow; label: string }[] = [
+  { value: '6h', label: '6 h' }, { value: '12h', label: '12 h' }, { value: '24h', label: '24 h' }, { value: '3d', label: '3 d' }, { value: '7d', label: '7 d' },
+];
+
+/**
+ * Administración → Respaldos (Fase 13), artboard aprobado: la estructura del
+ * legacy (automáticos + historial a la izquierda; acciones de datos + zona de
+ * peligro a la derecha) con las mejoras del rewrite: cifrado, zstd-19, foto
+ * consistente, validar integridad, delta operativo, respaldo de seguridad
+ * antes de "Reemplazar todo" y la purga detrás de "Permitir purga".
+ */
+@Component({
+  selector: 'app-admin-backups',
+  standalone: true,
+  imports: [DatePipe, FormsModule, MatIconModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  templateUrl: './admin-backups.html',
+  styleUrl: './admin-backups.css',
+})
 export class AdminBackupsComponent implements OnInit {
-  protected readonly api = inject(BackupsService); protected readonly backups = signal<BackupRun[]>([]); protected readonly error = signal<string | null>(null); protected readonly busy = signal(false); protected passphrase = '';
-  protected deltaPassphrase = ''; protected deltaWindow: '6h' | '12h' | '24h' | '3d' | '7d' = '24h';
-  async ngOnInit(): Promise<void> { await this.load(); }
-  protected async load(): Promise<void> { try { this.backups.set((await this.api.history()).items); } catch (error) { this.error.set(problemDetail(error, 'No se pudo cargar el historial de backups.')); } }
-  protected async create(): Promise<void> { this.busy.set(true); try { await this.api.create(this.passphrase); this.passphrase = ''; await this.load(); } catch (error) { this.error.set(problemDetail(error, 'No se pudo crear el backup.')); } finally { this.busy.set(false); } }
-  protected async exportDelta(): Promise<void> { this.busy.set(true); try { await this.api.exportDelta(this.deltaWindow, this.deltaPassphrase); this.deltaPassphrase = ''; await this.load(); } catch (error) { this.error.set(problemDetail(error, 'No se pudo exportar el delta.')); } finally { this.busy.set(false); } }
-  protected async onDeltaSelected(event: Event): Promise<void> { const file = (event.target as HTMLInputElement).files?.[0]; if (!file) return; const passphrase = window.prompt('Passphrase del delta'); if (!passphrase) return; this.busy.set(true); try { await this.api.importDelta(file, passphrase); await this.load(); } catch (error) { this.error.set(problemDetail(error, 'No se pudo importar el delta.')); } finally { this.busy.set(false); } }
-  protected async validate(backup: BackupRun): Promise<void> { const passphrase = window.prompt('Passphrase del backup'); if (!passphrase) return; this.busy.set(true); try { const result = await this.api.validate(backup.id, passphrase); this.error.set(result.valid ? `Backup íntegro: checksum y descifrado correctos (${result.tables ?? 0} tablas).` : 'Backup inválido: revisá checksum o passphrase.'); } catch (error) { this.error.set(problemDetail(error, 'No se pudo validar el backup.')); } finally { this.busy.set(false); } }
-  protected async remove(backup: BackupRun): Promise<void> { try { await this.api.remove(backup.id); this.backups.update(items => items.filter(item => item.id !== backup.id)); } catch (error) { this.error.set(problemDetail(error, 'No se pudo eliminar el backup.')); } }
+  /** Lleva a Administración → Funcionalidades (para "Permitir purga"). */
+  readonly goToFeatures = output<void>();
+
+  protected readonly i18n = inject(I18nService);
+  private readonly api = inject(BackupsService);
+  private readonly auth = inject(AuthService);
+  private readonly features = inject(SystemFeaturesService);
+
+  protected readonly runs = signal<BackupRun[]>([]);
+  protected readonly config = signal<BackupConfig | null>(null);
+  protected readonly busy = signal(false);
+  protected readonly feedback = signal<Feedback | null>(null);
+  protected readonly configFeedback = signal<Feedback | null>(null);
+  protected readonly restoreMode = signal<RestoreMode>('merge');
+  protected readonly panel = signal<RowPanel | null>(null);
+  protected readonly validated = signal<Record<string, boolean>>({});
+  protected readonly deltaWindow = signal<DeltaWindow>('24h');
+  protected readonly deltaWindows = DELTA_WINDOWS;
+  protected readonly purgeAllowed = computed(() => this.features.isEnabled('allow_purge'));
+  protected readonly purged = signal(false);
+
+  // Formulario de automáticos (se copia de la config al cargar).
+  protected autoEnabled = false;
+  protected intervalDays = 1;
+  protected runAt = '03:00';
+  protected retentionDays = 30;
+  protected destinationType: DestinationType = 'local';
+  protected destinationPath = '';
+  protected autoPassphrase = '';
+
+  protected passphrase = '';
+  protected rowPassphrase = '';
+  protected rowConfirmation = '';
+  protected purgePhrase = '';
+
+  protected readonly formatSize = formatSize;
+  protected readonly formatCount = formatCount;
+
+  async ngOnInit(): Promise<void> {
+    await Promise.all([this.loadRuns(), this.loadConfig(), this.features.list().catch(() => undefined)]);
+  }
+
+  private async loadRuns(): Promise<void> {
+    try {
+      this.runs.set(await this.api.history());
+    } catch (error) {
+      this.feedback.set({ ok: false, text: problemDetail(error, this.i18n.t('backups.error.load')) });
+    }
+  }
+
+  private async loadConfig(): Promise<void> {
+    try {
+      this.applyConfig(await this.api.config());
+    } catch (error) {
+      this.configFeedback.set({ ok: false, text: problemDetail(error, this.i18n.t('backups.error.load')) });
+    }
+  }
+
+  private applyConfig(cfg: BackupConfig): void {
+    this.config.set(cfg);
+    this.autoEnabled = cfg.enabled;
+    this.intervalDays = cfg.intervalDays;
+    this.runAt = cfg.runAt;
+    this.retentionDays = cfg.retentionDays;
+    this.destinationType = cfg.destinationType;
+    this.destinationPath = cfg.destinationPath ?? '';
+    this.autoPassphrase = '';
+  }
+
+  protected kind(run: BackupRun) {
+    return runKind(run);
+  }
+
+  protected statusKey(cfg: BackupConfig): MessageKey {
+    return `backups.auto.status.${cfg.lastStatus}` as MessageKey;
+  }
+
+  protected statusTone(cfg: BackupConfig): string {
+    return { idle: 'neutral', running: 'info', success: 'ok', failed: 'bad' }[cfg.lastStatus];
+  }
+
+  protected integrity(run: BackupRun): { key: MessageKey; tone: string; icon: string } {
+    const checked = this.validated()[run.id];
+    if (checked === true) return { key: 'backups.integrity.ok', tone: 'ok', icon: 'verified' };
+    if (checked === false) return { key: 'backups.integrity.bad', tone: 'bad', icon: 'error' };
+    return { key: 'backups.integrity.unchecked', tone: 'neutral', icon: 'help_outline' };
+  }
+
+  protected openPanel(run: BackupRun, action: RowPanel['action']): void {
+    const current = this.panel();
+    this.panel.set(current?.id === run.id && current.action === action ? null : { id: run.id, action });
+    this.rowPassphrase = '';
+    this.rowConfirmation = '';
+    this.feedback.set(null);
+  }
+
+  // ===== Automáticos =====
+
+  protected async saveConfig(): Promise<void> {
+    await this.runConfig(async () => {
+      this.applyConfig(await this.api.saveConfig({
+        enabled: this.autoEnabled, intervalDays: Number(this.intervalDays), runAt: this.runAt, timezone: this.config()?.timezone ?? 'America/Santiago',
+        retentionDays: Number(this.retentionDays), destinationType: this.destinationType, destinationPath: this.destinationPath, passphrase: this.autoPassphrase,
+      }));
+      this.configFeedback.set({ ok: true, text: this.i18n.t('backups.auto.saved') });
+    });
+  }
+
+  protected async runNow(): Promise<void> {
+    await this.runConfig(async () => {
+      const cfg = await this.api.runNow();
+      this.applyConfig(cfg);
+      this.configFeedback.set({ ok: cfg.lastStatus === 'success', text: cfg.lastMessage ?? this.i18n.t(this.statusKey(cfg)) });
+      await this.loadRuns();
+    });
+  }
+
+  private async runConfig(action: () => Promise<void>): Promise<void> {
+    this.busy.set(true);
+    this.configFeedback.set(null);
+    try {
+      await action();
+    } catch (error) {
+      this.configFeedback.set({ ok: false, text: problemDetail(error, this.i18n.t('backups.error.action')) });
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  // ===== Historial =====
+
+  protected async validate(run: BackupRun): Promise<void> {
+    await this.act(async () => {
+      const result = await this.api.validate(run.id, this.rowPassphrase);
+      this.validated.update((v) => ({ ...v, [run.id]: result.valid }));
+      this.panel.set(null);
+    });
+  }
+
+  protected async restore(run: BackupRun): Promise<void> {
+    const mode = this.restoreMode();
+    await this.act(async () => {
+      const result = await this.api.restore(run.id, this.rowPassphrase, mode, this.rowConfirmation);
+      this.panel.set(null);
+      await this.loadRuns();
+      return mode === 'replace' ? this.i18n.t('backups.restore.replaced') : this.i18n.tf('backups.restore.merged', formatCount(result.inserted));
+    });
+  }
+
+  protected async remove(run: BackupRun): Promise<void> {
+    await this.act(async () => {
+      await this.api.remove(run.id);
+      this.panel.set(null);
+      this.runs.update((list) => list.filter((r) => r.id !== run.id));
+    });
+  }
+
+  protected async download(run: BackupRun): Promise<void> {
+    await this.act(() => this.api.download(run.id));
+  }
+
+  // ===== Acciones de datos =====
+
+  protected async createNow(): Promise<void> {
+    await this.act(async () => {
+      const run = await this.api.create(this.passphrase);
+      await this.loadRuns();
+      return this.i18n.tf('backups.manual.created', formatCount(run.recordsCount));
+    });
+  }
+
+  protected async upload(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    await this.act(async () => {
+      await this.api.upload(file, this.passphrase);
+      await this.loadRuns();
+      return this.i18n.t('backups.upload.done');
+    });
+  }
+
+  protected async exportDelta(): Promise<void> {
+    await this.act(async () => {
+      await this.api.exportDelta(this.deltaWindow(), this.passphrase);
+      await this.loadRuns();
+    });
+  }
+
+  protected async importDelta(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    await this.act(async () => {
+      const result = await this.api.importDelta(file, this.passphrase);
+      return this.i18n.tf('backups.delta.imported', formatCount(result.importedRecords));
+    });
+  }
+
+  protected async exportCsv(kind: CsvExport): Promise<void> {
+    await this.act(() => this.api.exportCsv(kind));
+  }
+
+  // ===== Purga =====
+
+  protected async purge(): Promise<void> {
+    if (this.purgePhrase !== 'PURGAR TODO') return;
+    await this.act(async () => {
+      await this.api.purge(this.purgePhrase);
+      this.purged.set(true);
+      // Los datos (incluido este usuario) ya no existen: se cierra la sesión.
+      setTimeout(() => void this.auth.logout(), 3000);
+      return this.i18n.t('backups.danger.done');
+    });
+  }
+
+  /** Ejecuta una acción del panel mostrando el resultado arriba del historial. */
+  private async act(action: () => Promise<string | void>): Promise<void> {
+    this.busy.set(true);
+    this.feedback.set(null);
+    try {
+      const message = await action();
+      if (message) this.feedback.set({ ok: true, text: message });
+    } catch (error) {
+      this.feedback.set({ ok: false, text: problemDetail(error, this.i18n.t('backups.error.action')) });
+    } finally {
+      this.busy.set(false);
+    }
+  }
 }

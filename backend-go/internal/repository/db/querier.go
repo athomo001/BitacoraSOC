@@ -40,9 +40,11 @@ type Querier interface {
 	CountSLABreachesInWindow(ctx context.Context, arg CountSLABreachesInWindowParams) (int64, error)
 	CountTerritorialUnits(ctx context.Context, arg CountTerritorialUnitsParams) (int64, error)
 	CountTickets(ctx context.Context, arg CountTicketsParams) (int64, error)
+	CountTicketsView(ctx context.Context, arg CountTicketsViewParams) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
 	CreateAsset(ctx context.Context, arg CreateAssetParams) (uuid.UUID, error)
 	CreateBackupRun(ctx context.Context, arg CreateBackupRunParams) (BackupRun, error)
+	CreateBackupRunWithSource(ctx context.Context, arg CreateBackupRunWithSourceParams) (BackupRun, error)
 	CreateChecklistEntry(ctx context.Context, arg CreateChecklistEntryParams) (Entry, error)
 	CreateContact(ctx context.Context, arg CreateContactParams) (uuid.UUID, error)
 	CreateContactChannel(ctx context.Context, arg CreateContactChannelParams) (ContactChannel, error)
@@ -134,6 +136,7 @@ type Querier interface {
 	GetAsset(ctx context.Context, id uuid.UUID) (GetAssetRow, error)
 	GetAssetForResolve(ctx context.Context, id uuid.UUID) (GetAssetForResolveRow, error)
 	GetAttachment(ctx context.Context, id uuid.UUID) (EntryAttachment, error)
+	GetBackupConfig(ctx context.Context) (BackupConfig, error)
 	GetBackupRun(ctx context.Context, id uuid.UUID) (BackupRun, error)
 	// El slot regular cuya semana cubre `now` (independiente de is_paused: el
 	// handler decide qué hacer con eso vía internal/rotation.Resolve).
@@ -161,6 +164,8 @@ type Querier interface {
 	GetServiceOrganizationID(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	GetShiftCheck(ctx context.Context, id uuid.UUID) (ShiftCheck, error)
 	GetShiftClosure(ctx context.Context, id uuid.UUID) (ShiftClosure, error)
+	// Un check de cierre se cierra una sola vez: un segundo POST no duplica el cierre ni el reporte.
+	GetShiftClosureByCheck(ctx context.Context, closureCheckID uuid.UUID) (ShiftClosure, error)
 	GetSystemFeature(ctx context.Context, code string) (SystemFeature, error)
 	GetTeam(ctx context.Context, id uuid.UUID) (Team, error)
 	GetTeamMemberDisplay(ctx context.Context, id uuid.UUID) (GetTeamMemberDisplayRow, error)
@@ -172,6 +177,7 @@ type Querier interface {
 	GetTicket(ctx context.Context, id uuid.UUID) (Ticket, error)
 	GetTicketByNumber(ctx context.Context, ticketNumber string) (Ticket, error)
 	GetTicketTask(ctx context.Context, id uuid.UUID) (TicketTask, error)
+	GetTicketView(ctx context.Context, id uuid.UUID) (GetTicketViewRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	// El servicio valida la expiración (reset_password_expires_at > now()) en
@@ -179,6 +185,8 @@ type Querier interface {
 	// los tests sin depender del reloj de Postgres.
 	GetUserByResetTokenHash(ctx context.Context, resetPasswordTokenHash pgtype.Text) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
+	// Turno al que pertenece un check: define la ventana real del cierre (no 8h fijas) y los destinatarios del reporte.
+	GetWorkShiftForCheck(ctx context.Context, id uuid.UUID) (WorkShift, error)
 	// ===== Intentos (inmutables, ver migración 000004) =====
 	InsertActionLog(ctx context.Context, arg InsertActionLogParams) (EscalationActionLog, error)
 	InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) error
@@ -227,6 +235,8 @@ type Querier interface {
 	// GET /api/entries/export — mismos filtros que ListEntries, sin paginar.
 	ListEntriesForExport(ctx context.Context, arg ListEntriesForExportParams) ([]ListEntriesForExportRow, error)
 	ListEntryComments(ctx context.Context, entryID uuid.UUID) ([]ListEntryCommentsRow, error)
+	// Copias automáticas fuera de la retención: el planificador las borra (archivo y fila).
+	ListExpiredAutoBackups(ctx context.Context, startedAt pgtype.Timestamptz) ([]BackupRun, error)
 	ListHandoverOnCall(ctx context.Context, arg ListHandoverOnCallParams) ([]ListHandoverOnCallRow, error)
 	ListLogSources(ctx context.Context, arg ListLogSourcesParams) ([]CatalogLogSource, error)
 	// ===== Ventanas de mantenimiento =====
@@ -275,8 +285,13 @@ type Querier interface {
 	ListTerritorialUnits(ctx context.Context, arg ListTerritorialUnitsParams) ([]ListTerritorialUnitsRow, error)
 	ListTicketComments(ctx context.Context, ticketID uuid.UUID) ([]TicketComment, error)
 	ListTicketEntries(ctx context.Context, ticketID pgtype.UUID) ([]Entry, error)
+	ListTicketEntriesWithAuthor(ctx context.Context, ticketID pgtype.UUID) ([]ListTicketEntriesWithAuthorRow, error)
 	ListTicketTasks(ctx context.Context, ticketID uuid.UUID) ([]TicketTask, error)
+	ListTicketTasksWithUser(ctx context.Context, ticketID uuid.UUID) ([]ListTicketTasksWithUserRow, error)
 	ListTickets(ctx context.Context, arg ListTicketsParams) ([]Ticket, error)
+	// Vista de la cola (Fase 10, pantalla aprobada): nombres ya resueltos para no
+	// mostrar UUID, abiertos primero y por prioridad, luego lo más reciente.
+	ListTicketsView(ctx context.Context, arg ListTicketsViewParams) ([]ListTicketsViewRow, error)
 	// Quiénes ya se intentaron en este paso durante el incidente en curso (desde
 	// "since"), para que el modo sequential llame al siguiente y no repita.
 	ListTriedContactsForStep(ctx context.Context, arg ListTriedContactsForStepParams) ([]pgtype.UUID, error)
@@ -294,9 +309,12 @@ type Querier interface {
 	ListWindowsForScope(ctx context.Context, arg ListWindowsForScopeParams) ([]MaintenanceWindow, error)
 	ListWorkShifts(ctx context.Context, active pgtype.Bool) ([]WorkShift, error)
 	LockUser(ctx context.Context, arg LockUserParams) error
+	MarkBackupConfigRun(ctx context.Context, arg MarkBackupConfigRunParams) error
 	MarkBackupRun(ctx context.Context, arg MarkBackupRunParams) (BackupRun, error)
 	MarkNotificationScheduleSent(ctx context.Context, id uuid.UUID) error
 	MarkShiftClosureSent(ctx context.Context, arg MarkShiftClosureSentParams) error
+	// Primera acción del equipo = cumple el SLA de respuesta (solo la primera cuenta).
+	MarkTicketResponded(ctx context.Context, arg MarkTicketRespondedParams) error
 	// PATCH /api/config/territorial-labels — merge parcial (jsonb ||): solo pisa
 	// los niveles que vienen en el request, el resto queda como estaba.
 	MergeTerritorialLabels(ctx context.Context, labels []byte) ([]byte, error)
@@ -343,12 +361,17 @@ type Querier interface {
 	SetMustChangePassword(ctx context.Context, arg SetMustChangePasswordParams) error
 	SetPasswordResetToken(ctx context.Context, arg SetPasswordResetTokenParams) error
 	SetPublicShareLinkActive(ctx context.Context, arg SetPublicShareLinkActiveParams) (PublicShareLink, error)
+	SetTicketPublicPin(ctx context.Context, arg SetTicketPublicPinParams) (Ticket, error)
 	// Borrado lógico: el contacto puede estar referenciado por team_members (FK
 	// sin cascada) y por el historial de escalación de fases siguientes.
 	SoftDeleteContact(ctx context.Context, id uuid.UUID) (int64, error)
 	SumTicketTaskTime(ctx context.Context, ticketID uuid.UUID) (int64, error)
+	// Resumen de la cola para la cabecera. "Vencido" = abierto, no en pausa y
+	// pasado el vencimiento real (pactado + pausas acumuladas), igual que tickets.ResolutionClock.
+	TicketQueueSummary(ctx context.Context, arg TicketQueueSummaryParams) (TicketQueueSummaryRow, error)
 	TouchPublicShareAccess(ctx context.Context, id uuid.UUID) error
 	UpdateAsset(ctx context.Context, arg UpdateAssetParams) (int64, error)
+	UpdateBackupConfig(ctx context.Context, arg UpdateBackupConfigParams) (BackupConfig, error)
 	UpdateChannelValue(ctx context.Context, arg UpdateChannelValueParams) error
 	UpdateContact(ctx context.Context, arg UpdateContactParams) (int64, error)
 	UpdateEntryTicket(ctx context.Context, arg UpdateEntryTicketParams) (Entry, error)

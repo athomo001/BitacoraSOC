@@ -29,7 +29,14 @@ var deltaSpecs = map[string]string{
 	"ticket_tasks":           `SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM ticket_tasks t WHERE t.created_at >= $1 AND t.created_at < $2`,
 	"escalation_action_logs": `SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM escalation_action_logs t WHERE t.created_at >= $1 AND t.created_at < $2`,
 	"shift_checks":           `SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM shift_checks t WHERE t.check_date >= $1 AND t.check_date < $2`,
+	// Los ítems de cada checklist viajan con su check (antes el delta traía el check vacío).
+	"shift_check_services": `SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM shift_check_services t JOIN shift_checks c ON c.id = t.shift_check_id WHERE c.check_date >= $1 AND c.check_date < $2`,
+	"shift_closures":       `SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM shift_closures t WHERE t.created_at >= $1 AND t.created_at < $2`,
 }
+
+// deltaImportOrder respeta las FK (padres antes que hijos). Debe cubrir
+// exactamente las tablas de deltaSpecs — lo verifica un test.
+var deltaImportOrder = []string{"tickets", "entries", "entry_comments", "entry_attachments", "ticket_comments", "ticket_tasks", "escalation_action_logs", "shift_checks", "shift_check_services", "shift_closures"}
 
 func deltaWindow(rawPreset, fromRaw, toRaw string, now time.Time) (time.Time, time.Time, error) {
 	if fromRaw != "" || toRaw != "" {
@@ -176,9 +183,8 @@ func (h *BackupsHandler) ImportDelta(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
-	order := []string{"tickets", "entries", "entry_comments", "entry_attachments", "ticket_comments", "ticket_tasks", "escalation_action_logs", "shift_checks"}
 	imported := 0
-	for _, name := range order {
+	for _, name := range deltaImportOrder {
 		payload, ok := envelope.Tables[name]
 		if !ok {
 			continue

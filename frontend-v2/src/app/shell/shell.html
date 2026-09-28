@@ -1,26 +1,58 @@
 <div class="shell">
-    <nav class="shell__sidebar" aria-label="Navegación principal">
-    <button type="button" class="shell__avatar shell__avatar--sidebar" (click)="profileOpen.set(!profileOpen())" title="Mi perfil">
-      @if (avatarUrl) { <img [src]="avatarUrl" alt="Foto de perfil" /> } @else { <span>{{ avatarInitials() }}</span> }
-    </button>
-    @for (item of navItems(); track item.path) {
-      <a
-        class="shell__nav-item"
-        [routerLink]="['/', item.path]"
-        routerLinkActive="shell__nav-item--active"
-        [attr.title]="item.label + ' (Alt+' + item.shortcutDigit + ')'"
+  <nav class="shell__sidebar" [attr.aria-label]="i18n.t('nav.primary')">
+    <div class="shell__brand">
+      <span class="shell__logo" aria-hidden="true">B</span>
+      <span class="shell__brand-name">Bitácora Ops</span>
+    </div>
+
+    <div class="shell__nav">
+      @for (item of navItems(); track item.path) {
+        <a
+          class="shell__nav-item"
+          [routerLink]="['/', item.path]"
+          routerLinkActive="shell__nav-item--active"
+          [attr.title]="i18n.t(item.labelKey) + ' (Alt+' + item.shortcutDigit + ')'"
+        >
+          <mat-icon class="shell__nav-icon">{{ item.icon }}</mat-icon>
+          <span class="shell__nav-label">{{ i18n.t(item.labelKey) }}</span>
+          <span class="shell__shortcut mono">Alt+{{ item.shortcutDigit }}</span>
+        </a>
+      }
+    </div>
+
+    <div class="shell__user">
+      <button type="button" class="shell__profile" [attr.title]="i18n.t('shell.profile')" (click)="openProfile()">
+        <app-user-avatar [name]="displayName()" [src]="auth.user()?.avatarUrl" />
+        <span class="shell__profile-name">{{ displayName() }}</span>
+      </button>
+      <button type="button" class="shell__icon-btn" [attr.aria-label]="i18n.t('shell.logout')" [attr.title]="i18n.t('shell.logout')" (click)="logout()">
+        <mat-icon>logout</mat-icon>
+      </button>
+    </div>
+
+    <div class="shell__prefs">
+      <div class="shell__lang" role="group" [attr.aria-label]="i18n.t('shell.language')">
+        <button type="button" class="shell__seg" [class.shell__seg--active]="prefs.language() === 'es'" [attr.aria-pressed]="prefs.language() === 'es'" (click)="prefs.language.set('es')">ES</button>
+        <button type="button" class="shell__seg" [class.shell__seg--active]="prefs.language() === 'en'" [attr.aria-pressed]="prefs.language() === 'en'" (click)="prefs.language.set('en')">EN</button>
+      </div>
+      <button type="button" class="shell__icon-btn shell__theme" [attr.aria-label]="i18n.t(nextTheme().labelKey)" [attr.title]="i18n.t(nextTheme().labelKey)" (click)="prefs.cycleTheme()">
+        <mat-icon>{{ nextTheme().icon }}</mat-icon>
+      </button>
+      <button
+        type="button"
+        class="shell__icon-btn"
+        [class.shell__icon-btn--on]="prefs.dyslexiaFont()"
+        [attr.aria-pressed]="prefs.dyslexiaFont()"
+        [attr.aria-label]="i18n.t('shell.dyslexia')"
+        [attr.title]="i18n.t('shell.dyslexia')"
+        (click)="prefs.toggleDyslexiaFont()"
       >
-        <mat-icon>{{ item.icon }}</mat-icon>
-        <span class="shell__nav-label">{{ navLabel(item) }}</span>
-      </a>
-    }
-    <button type="button" class="shell__nav-item" title="Cerrar sesión" (click)="logout()">
-      <mat-icon>logout</mat-icon>
-      <span class="shell__nav-label">Salir</span>
-    </button>
+        <mat-icon>accessible</mat-icon>
+      </button>
+    </div>
   </nav>
+
   <main class="shell__workspace">
-    <header class="shell__topbar"><button type="button" class="shell__profile-trigger" (click)="profileOpen.set(!profileOpen())"><span class="shell__avatar">@if (avatarUrl) { <img [src]="avatarUrl" alt="Foto de perfil" /> } @else { <span>{{ avatarInitials() }}</span> }</span><span>{{ fullName || auth.user()?.username || 'admin' }}</span></button><label>Idioma <select [value]="language()" (change)="setLanguage($event)"><option value="es">ES</option><option value="en">EN</option></select></label><div class="shell__themes"><button type="button" [class.active]="theme() === 'dark'" (click)="setTheme('dark')" title="Tema oscuro">●</button><button type="button" [class.active]="theme() === 'light'" (click)="setTheme('light')" title="Tema claro">○</button><button type="button" [class.active]="theme() === 'pink'" (click)="setTheme('pink')" title="Tema rosa">●</button></div>@if (profileOpen()) { <div class="shell__profile-menu"><div class="shell__profile-heading"><span class="shell__avatar shell__avatar--large">@if (avatarUrl) { <img [src]="avatarUrl" alt="Foto de perfil" /> } @else { <span>{{ avatarInitials() }}</span> }</span><div><strong>{{ fullName || auth.user()?.username || 'Mi perfil' }}</strong><small>{{ auth.user()?.email }}</small></div></div><label>Nombre completo<input type="text" [(ngModel)]="fullName" /></label><label>Teléfono<input type="tel" [(ngModel)]="phone" /></label><label>Cumpleaños<input type="date" [(ngModel)]="birthday" /></label><label class="shell__file-picker">Foto de perfil<input type="file" accept="image/png,image/jpeg,image/webp" (change)="onAvatarSelected($event)" /><span>Elegir imagen…</span></label><button type="button" (click)="saveProfile()">Guardar perfil</button><label>Login preferido<select [value]="loginTheme()" (change)="setLoginTheme($any($event.target).value)"><option value="crt">CRT</option><option value="infoflow">Infoflow</option><option value="modern">Modern</option><option value="surrealism">Surrealism</option><option value="win311">Win 3.1</option><option value="unix89">Unix 89</option></select></label><label>Contraseña actual<input type="password" [(ngModel)]="currentPassword" /></label><label>Nueva contraseña<input type="password" [(ngModel)]="newPassword" /></label><button type="button" (click)="savePassword()">Cambiar contraseña</button>@if (profileMessage(); as message) { <small>{{ message }}</small> }</div> }</header>
     <router-outlet />
   </main>
 </div>
