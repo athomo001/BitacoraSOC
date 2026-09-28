@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ViewEncapsulation, computed, inject, input } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
 import DOMPurify from 'dompurify';
 import { marked } from 'marked';
@@ -18,6 +18,10 @@ import { marked } from 'marked';
   standalone: true,
   template: `<div class="app-markdown" [innerHTML]="safeHtml()"></div>`,
   styleUrl: './markdown.css',
+  // El HTML llega por [innerHTML] y no lleva los atributos del encapsulado
+  // emulado: con él, ninguna regla de markdown.css le llegaba. Sin
+  // encapsulado; todas las reglas van bajo `.app-markdown`.
+  encapsulation: ViewEncapsulation.None,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MarkdownComponent {

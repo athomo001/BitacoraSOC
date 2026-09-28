@@ -1,32 +1,36 @@
-.shifts {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-width: 1200px;
-  padding: 24px;
+/* Turnos y Checklist: cabecera + pestañas del artboard aprobado; debajo, cada pestaña. */
+:host {
+  display: block;
+  margin: -16px; /* ocupa todo el área de trabajo del shell, como el mockup */
+}
+
+.shifts__head {
+  padding: 14px 20px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
 }
 
 .shifts__title {
   margin: 0;
-  font-size: 18px;
-  font-weight: 600;
   color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .shifts__tabs {
   display: flex;
-  gap: 4px;
-  border-bottom: 1px solid var(--border-subtle);
+  gap: 2px;
+  margin-top: 8px;
 }
 
 .shifts__tab {
-  min-height: var(--row-height);
-  padding: 0 14px;
-  background: none;
+  padding: 8px 10px;
   border: none;
   border-bottom: 2px solid transparent;
-  color: var(--text-secondary);
+  background: none;
+  color: var(--text-muted);
   font: inherit;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -35,8 +39,13 @@
 }
 
 .shifts__tab--active {
+  border-bottom-color: var(--accent);
   color: var(--text-primary);
-  border-bottom-color: var(--border-active);
+  font-weight: 600;
+}
+
+.shifts__body {
+  padding: 16px 20px;
 }
 
 .shifts__panel {
@@ -320,23 +329,8 @@
   font-style: italic;
 }
 
-.shifts__checklist {
-  display: grid;
-  gap: 20px;
-}
-
-.shifts__checklist-head,
-.shifts__checklist-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.shifts__checklist-head {
-  border-bottom: 1px solid var(--border-subtle);
-  padding-bottom: 16px;
-}
+.shifts__calendar-days--bars > span:first-child { margin-left: 5px; }
+.shifts__calendar-days--bars > span:last-child { margin-right: 5px; }
 
 .shifts__eyebrow {
   margin: 0 0 4px;
@@ -346,210 +340,3 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-
-.shifts__checklist-head h2,
-.shifts__handover h3 {
-  margin: 0;
-}
-
-.shifts__checklist-controls {
-  align-items: end;
-}
-
-.shifts__checklist-controls label {
-  flex: 1;
-}
-
-.shifts__checklist-controls select {
-  display: block;
-  width: 100%;
-  margin-top: 6px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  padding: 8px;
-  background: var(--bg-app);
-  color: inherit;
-  font: inherit;
-}
-
-.shifts__progress {
-  color: var(--text-secondary);
-  font-size: 12.5px;
-}
-
-.shifts__progress strong {
-  color: var(--text-primary);
-}
-
-.shifts__progress-red {
-  color: var(--status-critical);
-  font-weight: 600;
-}
-
-.shifts__checklist-items {
-  display: grid;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.shifts__check-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  min-height: 44px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.shifts__check-title {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 13px;
-}
-
-.shifts__check-title .shifts__muted {
-  font-size: 11.5px;
-}
-
-.shifts__check-answer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-/* Semáforo (spec/06 §6.6): sin preselección; el elegido toma el color del estado. */
-.shifts__semaforo {
-  min-width: 72px;
-  min-height: 30px;
-  padding: 0 12px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--bg-app);
-  color: var(--text-secondary);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.shifts__semaforo--ok[aria-pressed="true"] {
-  border-color: var(--status-ok);
-  background: var(--status-ok-bg);
-  color: var(--status-ok);
-}
-
-.shifts__semaforo--bad[aria-pressed="true"] {
-  border-color: var(--status-critical);
-  background: var(--status-critical-bg);
-  color: var(--status-critical);
-}
-
-.shifts__check-obs {
-  flex-basis: 100%;
-  min-height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--status-critical);
-  border-radius: var(--radius-sm);
-  background: var(--bg-app);
-  color: var(--text-primary);
-  font: inherit;
-  font-size: 12.5px;
-}
-
-.shifts__state {
-  padding: 2px 9px;
-  border-radius: var(--radius-pill);
-  background: var(--bg-surface-hover);
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  font-weight: 600;
-}
-
-.shifts__state--ok {
-  background: var(--status-ok-bg);
-  color: var(--status-ok);
-}
-
-.shifts__state--bad {
-  background: var(--status-critical-bg);
-  color: var(--status-critical);
-}
-
-.shifts__submit-check,
-.shifts__handover-button {
-  border: 0;
-  border-radius: var(--radius-sm);
-  padding: 10px 14px;
-  background: var(--accent);
-  color: var(--accent-contrast);
-  font: inherit;
-  cursor: pointer;
-}
-
-.shifts__submit-check:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.shifts__handover {
-  display: grid;
-  gap: 10px;
-  border-left: 3px solid var(--accent);
-  padding: 16px;
-  background: var(--bg-surface-hover);
-}
-
-.shifts__handover p {
-  margin: 0;
-  white-space: pre-wrap;
-}
-
-.shifts__closure-form {
-  display: grid;
-  gap: 12px;
-  border-top: 1px solid var(--border-subtle);
-  padding-top: 16px;
-}
-
-.shifts__closure-form textarea {
-  display: block;
-  width: 100%;
-  min-height: 80px;
-  margin-top: 6px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  padding: 8px;
-  background: var(--bg-app);
-  color: inherit;
-  font: inherit;
-  resize: vertical;
-}
-
-.shifts__check-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-@media (width <= 720px) {
-  .shifts__checklist-controls,
-  .shifts__check-item {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .shifts__checklist-controls label,
-  .shifts__check-answer {
-    width: 100%;
-    min-width: 0;
-  }
-}
-
-.shifts__calendar-days--bars > span:first-child { margin-left: 5px; }
-.shifts__calendar-days--bars > span:last-child { margin-right: 5px; }

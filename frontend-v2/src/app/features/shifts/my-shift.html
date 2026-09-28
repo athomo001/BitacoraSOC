@@ -1,0 +1,239 @@
+@if (loading()) {
+  <p class="ms__muted">…</p>
+} @else {
+  @if (error(); as message) {
+    <p class="msg msg--error" role="alert">{{ message }}</p>
+  }
+
+  <!-- Relevo: lo que trae el turno entrante, en una sola vista -->
+  @if (handover(); as relay) {
+    @let prev = relay.previousClosure;
+    <section class="ms-card ms-relay" [class.ms-relay--pending]="prev && !prev.acknowledgedAt">
+      <header class="ms-card__head">
+        <span class="ms-card__title"><mat-icon>sync_alt</mat-icon>{{ i18n.t('handover.title') }}
+          @if (prev) { <span class="ms__muted">· {{ i18n.tf('handover.from', prev.username || '—') }} · <span class="mono">{{ prev.shiftEndAt | date: 'dd/MM HH:mm' }}</span></span> }
+        </span>
+        @if (prev) {
+          @if (prev.acknowledgedAt) {
+            <span class="pill tone-ok">{{ i18n.t('handover.reviewed') }}</span>
+            <span class="ms-relay__ack">{{ i18n.tf('handover.confirmedBy', prev.acknowledgedByName || '—') }} · <span class="mono">{{ prev.acknowledgedAt | date: 'HH:mm' }}</span> · {{ i18n.t('handover.noBlock') }}</span>
+          } @else {
+            <span class="pill tone-warn">{{ i18n.t('handover.notReviewed') }}</span>
+            <button type="button" class="ms-btn ms-btn--primary ms-relay__ack" [disabled]="busy()" (click)="acknowledge()"><mat-icon>task_alt</mat-icon>{{ i18n.t('handover.confirm') }}</button>
+          }
+        }
+      </header>
+      <div class="ms-relay__grid">
+        <div class="ms-relay__col">
+          <span class="ms__label">{{ i18n.t('handover.pending') }}</span>
+          @if (!prev) {
+            <p class="ms__muted">{{ i18n.t('handover.none') }}</p>
+          } @else {
+            @if (prev.pendingForNextShift) {
+              <app-markdown class="ms-relay__md" [content]="prev.pendingForNextShift" />
+            } @else {
+              <p class="ms__muted">{{ i18n.t('handover.noPending') }}</p>
+            }
+            <div class="ms__pills">
+              <span class="pill tone-neutral">{{ i18n.tf('stat.entries', prev.totalEntries) }}</span>
+              <span class="pill" [class.tone-bad]="prev.totalIncidents > 0" [class.tone-neutral]="prev.totalIncidents === 0">{{ i18n.tf('stat.incidents', prev.totalIncidents) }}</span>
+              <span class="pill tone-ok">{{ i18n.tf('stat.resolved', prev.ticketsResolvedCount) }}</span>
+              <span class="pill" [class.tone-bad]="prev.slaBreachesCount > 0" [class.tone-neutral]="prev.slaBreachesCount === 0">{{ i18n.tf('stat.breaches', prev.slaBreachesCount) }}</span>
+              @if (prev.servicesDown.length > 0) {
+                <span class="pill tone-bad">{{ i18n.tf('handover.leftRed', prev.servicesDown.join(', ')) }}</span>
+              }
+            </div>
+          }
+        </div>
+        <div class="ms-relay__col">
+          <span class="ms__label">{{ i18n.t('handover.maintenance') }}</span>
+          @for (w of relay.upcomingMaintenanceWindows; track w.id) {
+            <div class="ms-relay__line"><span class="pill tone-warn mono">{{ w.startsAt | date: 'HH:mm' }}–{{ w.endsAt | date: 'HH:mm' }}</span> {{ w.title }}@if (w.suppressNotifications) { <span class="ms__muted"> · {{ i18n.t('handover.mutes') }}</span> }</div>
+          } @empty {
+            <p class="ms__muted">{{ i18n.t('handover.noMaintenance') }}</p>
+          }
+        </div>
+        <div class="ms-relay__col">
+          <span class="ms__label">{{ i18n.t('handover.onCall') }}</span>
+          @for (g of relay.onCallSummary; track g.teamId) {
+            <div class="ms-relay__line ms-relay__line--split"><span>{{ g.teamName }}</span><strong>{{ g.onCallMember }}</strong></div>
+          } @empty {
+            <p class="ms__muted">{{ i18n.t('handover.noOnCall') }}</p>
+          }
+        </div>
+      </div>
+    </section>
+  }
+
+  <div class="ms-main">
+    <!-- Checklist -->
+    <section class="ms-card">
+      @if (shifts().length === 0) {
+        <p class="ms-card__empty">{{ i18n.t('shift.noShifts') }}</p>
+      } @else if (templates().length === 0) {
+        <p class="ms-card__empty">{{ i18n.t('shift.noTemplates') }}</p>
+      } @else {
+        <header class="ms-card__head">
+          <span class="ms-card__title"><mat-icon>checklist</mat-icon>{{ i18n.tf('check.title', momentLabel(moment())) }}</span>
+          <span class="ms-check__moment" role="group" [attr.aria-label]="i18n.t('check.detected')" [attr.title]="i18n.t('check.detected')">
+            <button type="button" class="seg" [attr.aria-pressed]="moment() === 'inicio'" [disabled]="!!saved()" (click)="setMoment('inicio')">{{ i18n.t('check.momentLabel.inicio') }}</button>
+            <button type="button" class="seg" [attr.aria-pressed]="moment() === 'cierre'" [disabled]="!!saved()" (click)="setMoment('cierre')">{{ i18n.t('check.momentLabel.cierre') }}</button>
+          </span>
+        </header>
+        <div class="ms-check__controls">
+          <label>{{ i18n.t('check.shift') }}
+            <select [ngModel]="shiftId()" (ngModelChange)="selectShift($event)" [disabled]="!!saved()">
+              @for (s of shifts(); track s.id) { <option [value]="s.id">{{ s.name }} · {{ s.startTime.slice(0, 5) }}–{{ s.endTime.slice(0, 5) }}</option> }
+            </select>
+          </label>
+          @if (templates().length > 1) {
+            <label>{{ i18n.t('check.template') }}
+              <select [ngModel]="templateId()" (ngModelChange)="selectTemplate($event)" [disabled]="!!saved()">
+                @for (t of templates(); track t.id) { <option [value]="t.id">{{ t.name }}</option> }
+              </select>
+            </label>
+          } @else {
+            <span class="ms__muted">{{ template()?.name }}</span>
+          }
+          <span class="ms__muted ms-check__hint">{{ i18n.t('check.detected') }}</span>
+        </div>
+
+        @if (saved(); as check) {
+          <div class="ms-check__saved">
+            <span class="pill tone-ok"><mat-icon>task_alt</mat-icon>{{ i18n.tf('check.saved', (check.checkDate | date: 'HH:mm') ?? '') }}</span>
+            @if (redLeaves(check).length > 0) {
+              <span class="pill tone-bad">{{ i18n.tf('check.red', redLeaves(check).length) }}</span>
+            }
+            <button type="button" class="ms-btn" (click)="startAnother()">{{ i18n.t('check.again') }}</button>
+          </div>
+        } @else {
+          <div class="ms-check__progress" role="status">
+            <span class="ms-check__dots" aria-hidden="true">
+              @for (d of dots(); track $index) { <i [class.is-ok]="d === 'verde'" [class.is-bad]="d === 'rojo'"></i> }
+            </span>
+            <span><strong class="mono">{{ progress().evaluated }}/{{ progress().total }}</strong> {{ i18n.t('check.evaluated') }}</span>
+            @if (progress().red > 0) { <span class="pill tone-bad">{{ i18n.tf('check.red', progress().red) }}</span> }
+            <span class="ms__muted ms-check__legend">{{ i18n.t('check.legend') }}</span>
+          </div>
+
+          <ul class="ms-check__items">
+            @for (item of template()?.items ?? []; track item.id) {
+              @if (isGroup(item)) {
+                @let status = groupState(item);
+                <li class="ms-item" [style.padding-left.px]="16 + depthOf(item) * 28">
+                  <div class="ms-item__row">
+                    <mat-icon class="ms-item__icon" [class.text-ok]="status === 'verde'" [class.text-bad]="status === 'rojo'">{{ status === 'verde' ? 'check_circle' : status === 'rojo' ? 'cancel' : 'radio_button_unchecked' }}</mat-icon>
+                    <strong class="ms-item__title">{{ item.title }}</strong>
+                    <span class="pill" [class.tone-bad]="status === 'rojo'" [class.tone-ok]="status === 'verde'" [class.tone-neutral]="status === null"><mat-icon>lock</mat-icon>{{ i18n.t(status === 'rojo' ? 'check.group.red' : status === 'verde' ? 'check.group.green' : 'check.group.pending') }}</span>
+                  </div>
+                </li>
+              } @else {
+                @let answer = answers()[item.id];
+                @let suggestion = suggestions()[item.id];
+                <li class="ms-item" [class.ms-item--bad]="answer?.status === 'rojo'" [style.padding-left.px]="16 + depthOf(item) * 28">
+                  <div class="ms-item__row">
+                    <mat-icon class="ms-item__icon" [class.text-ok]="answer?.status === 'verde'" [class.text-bad]="answer?.status === 'rojo'">{{ answer?.status === 'verde' ? 'check_circle' : answer?.status === 'rojo' ? 'cancel' : 'radio_button_unchecked' }}</mat-icon>
+                    <span class="ms-item__title">{{ item.title }}</span>
+                    <span class="ms-item__answer">
+                      <button type="button" class="ms-sema ms-sema--ok" [attr.aria-pressed]="answer?.status === 'verde'" (click)="setAnswer(item.id, { status: 'verde' })"><mat-icon>check_circle</mat-icon>{{ i18n.t('check.green') }}</button>
+                      <button type="button" class="ms-sema ms-sema--bad" [attr.aria-pressed]="answer?.status === 'rojo'" (click)="setAnswer(item.id, { status: 'rojo' })"><mat-icon>cancel</mat-icon>{{ i18n.t('check.redBtn') }}</button>
+                    </span>
+                  </div>
+                  @if (answer?.status === 'rojo') {
+                    <div class="ms-item__obs">
+                      @if (suggestion) {
+                        <div class="ms-item__suggest">
+                          <mat-icon>link</mat-icon>
+                          <span>{{ i18n.tf('check.sameCause', suggestion.fromTitle) }} “{{ suggestion.observation }}”</span>
+                          <button type="button" class="ms-btn ms-btn--system" (click)="setAnswer(item.id, { observation: suggestion.observation })">{{ i18n.t('check.useObs') }}</button>
+                        </div>
+                      }
+                      <div class="ms-item__textarea">
+                        <textarea rows="2" maxlength="1000" [class.is-missing]="!answer.observation.trim()" [ngModel]="answer.observation" (ngModelChange)="setAnswer(item.id, { observation: $event })" [placeholder]="i18n.t('check.obsPlaceholder')" [attr.aria-label]="i18n.tf('check.obsLabel', item.title)"></textarea>
+                        <span class="mono ms-item__count">{{ answer.observation.length }}/1000</span>
+                      </div>
+                    </div>
+                  }
+                </li>
+              }
+            }
+          </ul>
+
+          <footer class="ms-check__foot">
+            <button type="button" class="ms-btn" [class.ms-btn--primary]="progress().complete" [disabled]="busy() || !progress().complete" (click)="submit()">
+              <mat-icon>send</mat-icon>
+              @if (progress().complete) { {{ i18n.t('check.submit') }} } @else if (progress().redWithoutObservation > 0) { {{ i18n.tf('check.missingObs', progress().redWithoutObservation) }} } @else { {{ i18n.tf('check.missing', progress().total - progress().evaluated) }} }
+            </button>
+          </footer>
+        }
+      }
+    </section>
+
+    <!-- Lateral: últimos checklists (legacy checklist-history) y guía rápida -->
+    <aside class="ms-side">
+      <section class="ms-card">
+        <header class="ms-card__head"><span class="ms-card__title"><mat-icon>history</mat-icon>{{ i18n.t('history.recent') }}</span></header>
+        @for (check of recentFour(); track check.id) {
+          @let reds = redLeaves(check).length;
+          <div class="ms-recent">
+            <mat-icon class="ms__muted">{{ check.checkType === 'inicio' ? 'wb_sunny' : 'nightlight' }}</mat-icon>
+            <span class="ms-recent__who"><span class="mono">{{ check.checkDate | date: 'dd/MM HH:mm' }}</span><small>{{ check.username }} · {{ momentLabel(check.checkType) }}</small></span>
+            <span class="pill" [class.tone-bad]="reds > 0" [class.tone-ok]="reds === 0">{{ reds > 0 ? i18n.tf('check.red', reds) : i18n.t('history.allGreen') }}</span>
+          </div>
+        } @empty {
+          <p class="ms-card__empty">{{ i18n.t('history.empty') }}</p>
+        }
+        <div class="ms-side__actions"><button type="button" class="ms-btn" (click)="viewHistory.emit()">{{ i18n.t('history.viewAll') }}</button></div>
+      </section>
+      @if (!guideHidden()) {
+        <section class="ms-card ms-guide">
+          <span class="ms__label">{{ i18n.t('guide.title') }}</span>
+          <p>{{ i18n.t('guide.body') }}</p>
+          <button type="button" class="ms-link" (click)="hideGuide()">{{ i18n.t('guide.hide') }}</button>
+        </section>
+      }
+    </aside>
+  </div>
+
+  <!-- Cierre formal de turno: solo en el checklist de cierre -->
+  @if (moment() === 'cierre' || closureCheck() || closure()) {
+    <section class="ms-card">
+      <header class="ms-card__head">
+        <span class="ms-card__title"><mat-icon>nightlight</mat-icon>{{ i18n.t('closure.title') }}</span>
+        @if (!closureCheck() && !closure()) { <span class="ms__muted">{{ i18n.t('closure.hint') }}</span> }
+      </header>
+      @if (closure(); as done) {
+        <div class="ms-closure__done">
+          <span class="pill tone-ok"><mat-icon>task_alt</mat-icon>{{ i18n.t('closure.done') }} · {{ i18n.t(done.sentStatus === 'skipped' ? 'closure.skipped' : 'closure.queued') }}</span>
+          <span class="ms__label">{{ i18n.t('closure.balance') }}</span>
+          <div class="ms__pills">
+            <span class="pill tone-neutral">{{ i18n.tf('stat.entries', done.totalEntries) }}</span>
+            <span class="pill" [class.tone-bad]="done.totalIncidents > 0" [class.tone-neutral]="done.totalIncidents === 0">{{ i18n.tf('stat.incidents', done.totalIncidents) }}</span>
+            <span class="pill tone-ok">{{ i18n.tf('stat.resolved', done.ticketsResolvedCount) }}</span>
+            <span class="pill" [class.tone-bad]="done.slaBreachesCount > 0" [class.tone-neutral]="done.slaBreachesCount === 0">{{ i18n.tf('stat.breaches', done.slaBreachesCount) }}</span>
+          </div>
+        </div>
+      } @else {
+        <fieldset class="ms-closure" [disabled]="!closureCheck() || busy()">
+          <label class="ms-closure__field">{{ i18n.t('closure.observations') }}
+            <textarea rows="4" [(ngModel)]="closureObservations"></textarea>
+          </label>
+          <label class="ms-closure__field">{{ i18n.t('closure.pending') }}
+            <textarea rows="4" class="mono" [(ngModel)]="pendingForNextShift" placeholder="- [ ] …"></textarea>
+          </label>
+          <div class="ms-closure__foot">
+            <label class="switch">
+              <input class="switch__input" type="checkbox" role="switch" [checked]="notifyEmail()" (change)="notifyEmail.set(!notifyEmail())" />
+              <span class="switch__track" aria-hidden="true"></span>
+              {{ i18n.t('closure.notify') }}
+            </label>
+            <span class="ms__muted">
+              @if (shift()?.emailRecipients?.length) { {{ i18n.tf('closure.recipients', shift()!.emailRecipients.join(', ')) }} } @else { {{ i18n.t('closure.noRecipients') }} }
+            </span>
+            <button type="button" class="ms-btn ms-btn--primary ms-closure__submit" (click)="closeShift()"><mat-icon>logout</mat-icon>{{ i18n.t('closure.close') }}</button>
+          </div>
+        </fieldset>
+      }
+    </section>
+  }
+}

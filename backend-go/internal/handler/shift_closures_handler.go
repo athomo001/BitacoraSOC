@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -24,6 +25,7 @@ import (
 type shiftClosureDTO struct {
 	ID                   uuid.UUID  `json:"id"`
 	UserID               uuid.UUID  `json:"userId"`
+	Username             string     `json:"username,omitempty"`
 	ShiftStartAt         *time.Time `json:"shiftStartAt"`
 	ShiftEndAt           *time.Time `json:"shiftEndAt"`
 	ClosureCheckID       uuid.UUID  `json:"closureCheckId"`
@@ -33,6 +35,7 @@ type shiftClosureDTO struct {
 	Observations         *string    `json:"observations"`
 	PendingForNextShift  *string    `json:"pendingForNextShift"`
 	AcknowledgedBy       *uuid.UUID `json:"acknowledgedBy"`
+	AcknowledgedByName   string     `json:"acknowledgedByName,omitempty"`
 	AcknowledgedAt       *time.Time `json:"acknowledgedAt"`
 	TicketsResolvedCount int32      `json:"ticketsResolvedCount"`
 	SlaBreachesCount     int32      `json:"slaBreachesCount"`
@@ -64,6 +67,15 @@ type maintenanceWindowDTO struct {
 	StartsAt              *time.Time `json:"startsAt"`
 	EndsAt                *time.Time `json:"endsAt"`
 	SuppressNotifications bool       `json:"suppressNotifications"`
+}
+
+// withNames completa quién cerró y quién confirmó el relevo.
+func (d shiftClosureDTO) withNames(ctx context.Context, names *usernames) shiftClosureDTO {
+	d.Username = names.name(ctx, d.UserID)
+	if d.AcknowledgedBy != nil {
+		d.AcknowledgedByName = names.name(ctx, *d.AcknowledgedBy)
+	}
+	return d
 }
 
 func toMaintenanceWindowDTO(m db.MaintenanceWindow) maintenanceWindowDTO {
@@ -165,7 +177,7 @@ func (h *ChecklistsHandler) Handover(w http.ResponseWriter, r *http.Request) {
 	}
 	var previousDTO *shiftClosureDTO
 	if err == nil {
-		dto := toShiftClosureDTO(previous)
+		dto := toShiftClosureDTO(previous).withNames(ctx, &usernames{queries: h.Queries})
 		previousDTO = &dto
 	}
 	now := h.now()
@@ -219,5 +231,5 @@ func (h *ChecklistsHandler) Acknowledge(w http.ResponseWriter, r *http.Request) 
 	if h.AuditLog != nil {
 		h.AuditLog.Log(ctx, "shift.handover_acknowledged", audit.LevelInfo, audit.Success(), map[string]any{"closureId": id.String()})
 	}
-	writeData(w, 200, toShiftClosureDTO(closure))
+	writeData(w, 200, toShiftClosureDTO(closure).withNames(ctx, &usernames{queries: h.Queries}))
 }

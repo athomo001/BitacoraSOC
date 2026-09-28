@@ -26,3 +26,26 @@ body {
 .mono {
   font-family: var(--font-mono);
 }
+
+/*
+ * Impresión / "Exportar PDF" (historial de checklists): solo el contenido,
+ * sin barra lateral ni controles, y con el alto real en vez del scroll.
+ */
+@media print {
+  .shell__sidebar,
+  .shifts__head,
+  .no-print {
+    /* Tiene que ganarle a los estilos encapsulados de cada componente. */
+    /* stylelint-disable-next-line declaration-no-important */
+    display: none !important;
+  }
+
+  html,
+  body,
+  .shell,
+  .shell__workspace {
+    display: block;
+    height: auto;
+    overflow: visible;
+  }
+}

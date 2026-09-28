@@ -63,6 +63,7 @@ type shiftCheckDTO struct {
 	ID                  uuid.UUID              `json:"id"`
 	ChecklistTemplateID uuid.UUID              `json:"checklistTemplateId"`
 	UserID              uuid.UUID              `json:"userId"`
+	Username            string                 `json:"username"`
 	WorkShiftID         uuid.UUID              `json:"workShiftId"`
 	CheckType           string                 `json:"checkType"`
 	CheckDate           time.Time              `json:"checkDate"`
@@ -74,7 +75,33 @@ func toShiftCheckServiceDTO(service db.ShiftCheckService) shiftCheckServiceDTO {
 	return shiftCheckServiceDTO{ID: service.ID, ChecklistItemID: uuidPtr(service.ChecklistItemID), ServiceTitle: service.ServiceTitle, Status: string(service.Status), IsComputed: service.IsComputed, Observation: textPtr(service.Observation), CorrelatedFromServiceID: uuidPtr(service.CorrelatedFromServiceID)}
 }
 
+// usernames resuelve y memoriza nombres de usuario: el historial y el relevo
+// muestran "quién", no un UUID.
+type usernames struct {
+	queries *db.Queries
+	cache   map[uuid.UUID]string
+}
+
+func (u *usernames) name(ctx context.Context, id uuid.UUID) string {
+	if name, ok := u.cache[id]; ok {
+		return name
+	}
+	name := ""
+	if user, err := u.queries.GetUserByID(ctx, id); err == nil {
+		name = user.Username
+	}
+	if u.cache == nil {
+		u.cache = make(map[uuid.UUID]string)
+	}
+	u.cache[id] = name
+	return name
+}
+
 func (h *ChecklistsHandler) shiftCheckDTO(ctx context.Context, check db.ShiftCheck) (shiftCheckDTO, error) {
+	return h.shiftCheckDTOWith(ctx, check, &usernames{queries: h.Queries})
+}
+
+func (h *ChecklistsHandler) shiftCheckDTOWith(ctx context.Context, check db.ShiftCheck, names *usernames) (shiftCheckDTO, error) {
 	services, err := h.Queries.ListShiftCheckServices(ctx, check.ID)
 	if err != nil {
 		return shiftCheckDTO{}, err
@@ -83,7 +110,7 @@ func (h *ChecklistsHandler) shiftCheckDTO(ctx context.Context, check db.ShiftChe
 	for _, service := range services {
 		out = append(out, toShiftCheckServiceDTO(service))
 	}
-	return shiftCheckDTO{ID: check.ID, ChecklistTemplateID: check.ChecklistTemplateID, UserID: check.UserID, WorkShiftID: check.WorkShiftID, CheckType: string(check.CheckType), CheckDate: check.CheckDate.Time, HasRedServices: check.HasRedServices, Services: out}, nil
+	return shiftCheckDTO{ID: check.ID, ChecklistTemplateID: check.ChecklistTemplateID, UserID: check.UserID, Username: names.name(ctx, check.UserID), WorkShiftID: check.WorkShiftID, CheckType: string(check.CheckType), CheckDate: check.CheckDate.Time, HasRedServices: check.HasRedServices, Services: out}, nil
 }
 
 func (h *ChecklistsHandler) ActiveTemplates(w http.ResponseWriter, r *http.Request) {
@@ -276,9 +303,10 @@ func (h *ChecklistsHandler) List(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudieron listar los checklists")
 		return
 	}
+	names := &usernames{queries: h.Queries}
 	out := make([]shiftCheckDTO, 0, len(checks))
 	for _, check := range checks {
-		dto, err := h.shiftCheckDTO(r.Context(), check)
+		dto, err := h.shiftCheckDTOWith(r.Context(), check, names)
 		if err != nil {
 			problemdetails.Write(w, r, 500, "internal-error", "no se pudo cargar un checklist")
 			return

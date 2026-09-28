@@ -23,6 +23,7 @@ export class PermissionsService {
   private readonly _caps = signal<Capabilities | null>(null);
   private inFlight: Promise<void> | null = null;
 
+  readonly user = this._user.asReadonly();
   readonly isAdmin = computed(() => this._user()?.role === 'admin');
   readonly can = (capability: string) => computed(() => this.isAdmin() || !!this._caps()?.capabilities.includes(capability));
   readonly canWriteDirectory = this.can('directory:write');

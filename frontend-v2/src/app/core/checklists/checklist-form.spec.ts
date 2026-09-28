@@ -1,5 +1,5 @@
 import { ChecklistItem } from './checklists.service';
-import { depth, emptyAnswers, groupStatus, leaves, progress, toServices } from './checklist-form';
+import { causeSuggestions, depth, emptyAnswers, groupStatus, leaves, progress, toServices } from './checklist-form';
 
 // Mockup de spec/06 §6.6: un grupo con 2 sub-ítems + ítems sueltos.
 const ITEMS: ChecklistItem[] = [
@@ -55,5 +55,34 @@ describe('checklist-form', () => {
   it('calcula la profundidad para sangrar sub-ítems', () => {
     expect(depth(ITEMS[2], ITEMS)).toBe(1);
     expect(depth(ITEMS[0], ITEMS)).toBe(0);
+  });
+
+  it('sugiere reutilizar la observación de un rojo ANTERIOR con palabra clave en común (misma regla que checklist.Correlate)', () => {
+    const items: ChecklistItem[] = [
+      { id: 'troncal', title: 'Enlace Troncal Fibra', itemOrder: 1 },
+      { id: 'dns', title: 'DNS interno', itemOrder: 2 },
+      { id: 'backup', title: 'Enlace Backup Fibra', itemOrder: 3 },
+    ];
+    const answers = emptyAnswers(items);
+    answers['troncal'] = { status: 'rojo', observation: 'Corte de fibra Km 42' };
+    answers['dns'] = { status: 'rojo', observation: '' };
+    answers['backup'] = { status: 'rojo', observation: '' };
+
+    const suggestions = causeSuggestions(items, answers);
+
+    expect(suggestions['backup']).toEqual({ fromItemId: 'troncal', fromTitle: 'Enlace Troncal Fibra', observation: 'Corte de fibra Km 42' });
+    expect(suggestions['dns']).toBeUndefined(); // sin palabra en común
+    expect(suggestions['troncal']).toBeUndefined(); // ya tiene observación
+  });
+
+  it('no sugiere hacia adelante: un rojo posterior nunca explica a uno anterior', () => {
+    const items: ChecklistItem[] = [
+      { id: 'a', title: 'Enlace Norte', itemOrder: 1 },
+      { id: 'b', title: 'Enlace Sur', itemOrder: 2 },
+    ];
+    const answers = emptyAnswers(items);
+    answers['a'] = { status: 'rojo', observation: '' };
+    answers['b'] = { status: 'rojo', observation: 'Caído' };
+    expect(causeSuggestions(items, answers)).toEqual({});
   });
 });

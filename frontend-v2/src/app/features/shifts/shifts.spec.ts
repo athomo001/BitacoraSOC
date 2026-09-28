@@ -22,6 +22,14 @@ const MATRIX = {
 const ADMIN_USER = { id: 'u-admin', username: 'admin', email: 'admin@bitacora.local', role: 'admin', mfaEnabled: false, mustChangePassword: false, active: true, createdAt: new Date().toISOString() };
 
 describe('ShiftsComponent (Dotación)', () => {
+  it('abre en "Mi turno": es lo que el analista viene a hacer', async () => {
+    const fixture = TestBed.createComponent(ShiftsComponent);
+    fixture.detectChanges();
+    const active = (fixture.nativeElement as HTMLElement).querySelector('[role="tab"][aria-selected="true"]');
+    expect(active?.textContent).toContain('Mi turno');
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-my-shift')).toBeTruthy();
+  });
+
   let httpMock: HttpTestingController;
   const tick = () => new Promise((resolve) => setTimeout(resolve));
 
@@ -42,7 +50,11 @@ describe('ShiftsComponent (Dotación)', () => {
     httpMock.expectOne((r) => r.url === '/api/work-shifts/matrix').flush({ data: MATRIX });
     await tick();
     fixture.detectChanges();
-    return { fixture, el: fixture.nativeElement as HTMLElement };
+    const el = fixture.nativeElement as HTMLElement;
+    // "Mi turno" es la pestaña por defecto; estos tests son de Dotación.
+    ([...el.querySelectorAll('[role="tab"]')].find((t) => t.textContent?.includes('Dotación')) as HTMLElement).click();
+    fixture.detectChanges();
+    return { fixture, el };
   }
 
   it('muestra las columnas y filas de la matriz con marcador/label de la condición', async () => {

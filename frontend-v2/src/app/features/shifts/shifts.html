@@ -1,17 +1,14 @@
 <div class="shifts">
-  <h1 class="shifts__title">Turnos y Dotación</h1>
+  <header class="shifts__head">
+    <h1 class="shifts__title">{{ i18n.t('nav.shifts') }}</h1>
+    <div class="shifts__tabs" role="tablist">
+      <button type="button" role="tab" class="shifts__tab" [class.shifts__tab--active]="tab() === 'mine'" [attr.aria-selected]="tab() === 'mine'" (click)="tab.set('mine')">{{ i18n.t('shift.tab.mine') }}</button>
+      <button type="button" role="tab" class="shifts__tab" [class.shifts__tab--active]="tab() === 'history'" [attr.aria-selected]="tab() === 'history'" (click)="tab.set('history')">{{ i18n.t('shift.tab.history') }}</button>
+      <button type="button" role="tab" class="shifts__tab" [class.shifts__tab--active]="tab() === 'dotacion'" [attr.aria-selected]="tab() === 'dotacion'" (click)="tab.set('dotacion')">{{ i18n.t('shift.tab.staffing') }}</button>
+    </div>
+  </header>
 
-  <div class="shifts__tabs" role="tablist">
-    <button type="button" role="tab" class="shifts__tab" [class.shifts__tab--active]="tab() === 'dotacion'"
-      [attr.aria-selected]="tab() === 'dotacion'" (click)="tab.set('dotacion')">
-      Dotación
-    </button>
-    <button type="button" role="tab" class="shifts__tab" [class.shifts__tab--active]="tab() === 'checklist'"
-      [attr.aria-selected]="tab() === 'checklist'" (click)="tab.set('checklist')">
-      Mi Turno
-    </button>
-  </div>
-
+  <div class="shifts__body">
   @switch (tab()) {
     @case ('dotacion') {
       <section class="panel shifts__panel">
@@ -113,45 +110,12 @@
         }
       </section>
     }
-    @case ('checklist') {
-      <section class="panel shifts__checklist">
-        <div class="shifts__checklist-head"><div><p class="shifts__eyebrow">Control de turno</p><h2>Mi checklist</h2></div><button type="button" class="shifts__handover-button" (click)="loadHandover()">Ver relevo</button></div>
-        @if (checklistLoading()) { <p class="shifts__muted">Cargando checklist...</p> }
-        @if (checklistSaved(); as message) { <p class="msg msg--success">{{ message }}</p> }
-        @if (selectedTemplate(); as template) {
-          <div class="shifts__checklist-controls"><label>Plantilla<select [ngModel]="template.id" (ngModelChange)="selectTemplate($event); markChecklistTouched()">@for (option of checklistTemplates(); track option.id) { <option [value]="option.id">{{ option.name }}</option> }</select></label><label>Turno<select [ngModel]="selectedWorkShiftId()" (ngModelChange)="selectedWorkShiftId.set($event); markChecklistTouched()"><option value="">Seleccionar turno</option>@for (shift of workShifts(); track shift.id) { <option [value]="shift.id">{{ shift.name }}</option> }</select></label><label>Momento<select [ngModel]="checkType()" (ngModelChange)="checkType.set($event); markChecklistTouched()"><option value="inicio">Inicio</option><option value="cierre">Cierre</option></select></label></div>
-          <div class="shifts__progress" role="status">
-            <strong class="mono">{{ checklistProgress().evaluated }}/{{ checklistProgress().total }}</strong> evaluados
-            @if (checklistProgress().red > 0) { <span class="shifts__progress-red">· {{ checklistProgress().red }} en rojo</span> }
-          </div>
-          <ul class="shifts__checklist-items">
-            @for (item of template.items; track item.id) {
-              <li class="shifts__check-item" [style.padding-left.px]="12 + itemDepth(item) * 20">
-                @if (isGroup(item.id)) {
-                  @let status = computedStatus(item.id);
-                  <span class="shifts__check-title"><strong>{{ item.title }}</strong><span class="shifts__muted">🔒 calculado: peor estado de sus sub-ítems</span></span>
-                  <span class="shifts__state" [class.shifts__state--ok]="status === 'verde'" [class.shifts__state--bad]="status === 'rojo'">{{ status === 'rojo' ? 'ROJO' : status === 'verde' ? 'VERDE' : 'PENDIENTE' }}</span>
-                } @else {
-                  @let answer = answers()[item.id];
-                  <span class="shifts__check-title"><strong>{{ item.title }}</strong></span>
-                  <span class="shifts__check-answer">
-                    <button type="button" class="shifts__semaforo shifts__semaforo--ok" [attr.aria-pressed]="answer?.status === 'verde'" (click)="setAnswer(item.id, { status: 'verde' })">Verde</button>
-                    <button type="button" class="shifts__semaforo shifts__semaforo--bad" [attr.aria-pressed]="answer?.status === 'rojo'" (click)="setAnswer(item.id, { status: 'rojo' })">Rojo</button>
-                    @if (answer?.status === 'rojo') {
-                      <input class="shifts__check-obs" [ngModel]="answer.observation" (ngModelChange)="setAnswer(item.id, { observation: $event })" placeholder="Observación (obligatoria en rojo)" [attr.aria-label]="'Observación de ' + item.title" />
-                    }
-                  </span>
-                }
-              </li>
-            }
-          </ul>
-          <button type="button" class="shifts__submit-check" [disabled]="checklistLoading() || !selectedWorkShiftId() || !checklistProgress().complete" (click)="submitChecklist()">
-            @if (checklistProgress().complete) { Guardar checklist } @else if (checklistProgress().redWithoutObservation > 0) { Falta justificar {{ checklistProgress().redWithoutObservation }} en rojo } @else { Faltan {{ checklistProgress().total - checklistProgress().evaluated }} por evaluar }
-          </button>
-          @if (lastCheck(); as check) { @if (check.checkType === 'cierre') { <div class="shifts__closure-form"><label>Observaciones<textarea [(ngModel)]="closureObservations"></textarea></label><label>Pendientes para el siguiente turno<textarea [(ngModel)]="pendingForNextShift"></textarea></label><label class="shifts__check-toggle"><input type="checkbox" [(ngModel)]="notifyEmail" /> Notificar por correo</label><button type="button" class="shifts__submit-check" [disabled]="checklistLoading()" (click)="closeShift()">Cerrar turno</button></div> } }
-        } @else { <p class="shifts__muted">No hay plantillas activas configuradas.</p> }
-        @if (handover(); as relay) { <aside class="shifts__handover"><h3>Relevo anterior</h3>@if (relay.previousClosure; as closure) { <p>{{ closure.pendingForNextShift || 'Sin pendientes registrados.' }}</p>@if (!closure.acknowledgedAt) { <button type="button" class="shifts__submit-check" (click)="acknowledgeHandover()">Confirmar lectura</button> } @else { <span class="shifts__muted">Relevo confirmado.</span> } } @else { <p class="shifts__muted">No hay cierre anterior.</p> }<h3>Mantenimientos próximas 4h</h3>@for (window of relay.upcomingMaintenanceWindows; track window.id) { <p><strong>{{ window.title }}</strong><br>{{ window.startsAt | date:'HH:mm' }} - {{ window.endsAt | date:'HH:mm' }}</p> }</aside> }
-      </section>
+    @case ('mine') {
+      <app-my-shift (viewHistory)="tab.set('history')" />
+    }
+    @case ('history') {
+      <app-shift-history />
     }
   }
+  </div>
 </div>

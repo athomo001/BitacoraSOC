@@ -1,0 +1,104 @@
+/* Paneles de relevo y de cierre de "Mi turno" (hoja aparte solo por el presupuesto de CSS por hoja). */
+.ms-relay--pending {
+  border-color: var(--status-warning);
+}
+
+.ms-relay__ack {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+}
+
+.ms-btn.ms-relay__ack {
+  color: var(--accent-contrast);
+}
+
+.ms-relay__grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+}
+
+.ms-relay__col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 16px;
+}
+
+.ms-relay__col + .ms-relay__col {
+  border-left: 1px solid var(--border-subtle);
+}
+
+.ms-relay__col p {
+  margin: 0;
+}
+
+.ms-relay__md {
+  font-size: 12.5px;
+}
+
+.ms-relay__line {
+  font-size: 12px;
+}
+
+.ms-relay__line--split {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* ===== Cierre ===== */
+.ms-closure {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 0;
+  padding: 14px 16px;
+  border: none;
+}
+
+.ms-closure:disabled {
+  opacity: 0.6;
+}
+
+.ms-closure__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.ms-closure__foot {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.ms-closure__submit {
+  margin-left: auto;
+}
+
+.ms-closure__done {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px 16px;
+}
+
+@media (width <= 960px) {
+  .ms-relay__grid,
+  .ms-closure {
+    grid-template-columns: 1fr;
+  }
+
+  .ms-relay__col + .ms-relay__col {
+    border-top: 1px solid var(--border-subtle);
+    border-left: none;
+  }
+}

@@ -123,3 +123,53 @@
   outline: none;
   border-color: var(--border-active);
 }
+
+/* Interruptor sí/no del diseño aprobado (respaldos automáticos, correo del cierre de turno):
+   <label class="switch"><input class="switch__input" type="checkbox" role="switch"><span class="switch__track"></span>Texto</label> */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.switch__input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.switch__track {
+  position: relative;
+  flex-shrink: 0;
+  width: 34px;
+  height: 18px;
+  border-radius: var(--radius-pill);
+  background: var(--border-subtle);
+}
+
+.switch__track::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  content: "";
+  transition: left 0.15s ease;
+}
+
+.switch__input:checked + .switch__track {
+  background: var(--accent);
+}
+
+.switch__input:checked + .switch__track::after {
+  left: 18px;
+}
+
+.switch__input:focus-visible + .switch__track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

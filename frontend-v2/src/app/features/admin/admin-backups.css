@@ -136,49 +136,8 @@
 }
 
 .bk__switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
   margin-left: auto;
-  font-size: 12px;
   font-weight: 600;
-  cursor: pointer;
-}
-
-.bk__switch input {
-  position: absolute;
-  opacity: 0;
-}
-
-.bk__track {
-  position: relative;
-  width: 34px;
-  height: 18px;
-  border-radius: var(--radius-pill);
-  background: var(--border-subtle);
-}
-
-.bk__knob {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--bg-surface);
-}
-
-.bk__switch:focus-within .bk__track {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-.bk__switch input:checked + .bk__track {
-  background: var(--accent);
-}
-
-.bk__switch input:checked + .bk__track .bk__knob {
-  left: 18px;
 }
 
 .bk__status {

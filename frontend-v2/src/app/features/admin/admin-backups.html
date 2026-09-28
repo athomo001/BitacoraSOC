@@ -4,9 +4,9 @@
     <section class="bk__card">
       <header class="bk__head">
         <h2 class="bk__title"><mat-icon>schedule</mat-icon>{{ i18n.t('backups.auto.title') }}</h2>
-        <label class="bk__switch">
-          <input type="checkbox" name="autoEnabled" [(ngModel)]="autoEnabled" />
-          <span class="bk__track" aria-hidden="true"><span class="bk__knob"></span></span>
+        <label class="switch bk__switch">
+          <input class="switch__input" type="checkbox" role="switch" name="autoEnabled" [(ngModel)]="autoEnabled" />
+          <span class="switch__track" aria-hidden="true"></span>
           {{ i18n.t(autoEnabled ? 'backups.auto.on' : 'backups.auto.off') }}
         </label>
       </header>

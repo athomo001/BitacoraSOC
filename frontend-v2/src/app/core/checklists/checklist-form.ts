@@ -89,3 +89,37 @@ export function toServices(items: readonly ChecklistItem[], answers: ChecklistAn
     observation: answers[leaf.id].observation.trim() || undefined,
   }));
 }
+
+export interface CauseSuggestion {
+  fromItemId: string;
+  fromTitle: string;
+  observation: string;
+}
+
+/** Mismas palabras clave que `relatedTitles` del backend: alfanuméricas ASCII de 4+ letras. */
+function keywords(title: string): string[] {
+  return title.toLowerCase().match(/[a-z0-9]{4,}/g) ?? [];
+}
+
+/**
+ * Sugerencia "¿misma causa?" (legacy: correlación de causas). Para cada hoja
+ * en rojo todavía sin observación, la primera hoja en rojo ANTERIOR ya
+ * justificada cuyo título comparte una palabra clave — la misma regla con la
+ * que el backend guarda `correlated_from_service_id` (checklist.Correlate).
+ */
+export function causeSuggestions(items: readonly ChecklistItem[], answers: ChecklistAnswers): Record<string, CauseSuggestion> {
+  const out: Record<string, CauseSuggestion> = {};
+  const earlier: ChecklistItem[] = [];
+  for (const leaf of leaves(items)) {
+    const answer = answers[leaf.id];
+    if (answer?.status !== 'rojo') continue;
+    if (!answer.observation.trim()) {
+      const words = new Set(keywords(leaf.title));
+      const match = earlier.find((candidate) => keywords(candidate.title).some((word) => words.has(word)));
+      if (match) out[leaf.id] = { fromItemId: match.id, fromTitle: match.title, observation: answers[match.id].observation.trim() };
+    } else {
+      earlier.push(leaf);
+    }
+  }
+  return out;
+}

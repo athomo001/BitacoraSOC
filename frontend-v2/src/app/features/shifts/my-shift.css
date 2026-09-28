@@ -1,0 +1,416 @@
+/* "Mi turno" según el artboard aprobado: relevo arriba, checklist + lateral, cierre abajo. */
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+mat-icon {
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+}
+
+.ms__muted {
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.ms__label {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.ms__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ===== Tarjetas ===== */
+.ms-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.ms-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.ms-card__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ms-card__empty {
+  margin: 0;
+  padding: 16px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* ===== Botones ===== */
+.ms-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ms-btn mat-icon {
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+}
+
+.ms-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ms-btn--primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.ms-btn--system {
+  min-height: 24px;
+  padding: 0 8px;
+  border-color: var(--status-system);
+  background: transparent;
+  color: var(--status-system);
+}
+
+.ms-link {
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+/* ===== Checklist + lateral ===== */
+.ms-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 16px;
+  align-items: start;
+}
+
+.ms-check__moment {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.ms-check__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 14px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.ms-check__controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.ms-check__controls select {
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+}
+
+.ms-check__hint {
+  margin-left: auto;
+  font-size: 11px;
+}
+
+.ms-check__progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 12px;
+}
+
+.ms-check__dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  max-width: 220px;
+}
+
+.ms-check__dots i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--border-subtle);
+}
+
+.ms-check__dots i.is-ok {
+  background: var(--status-ok);
+}
+
+.ms-check__dots i.is-bad {
+  background: var(--status-critical);
+}
+
+.ms-check__legend {
+  margin-left: auto;
+  font-size: 11px;
+}
+
+.ms-check__items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ms-item {
+  padding-top: 10px;
+  padding-right: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.ms-item--bad {
+  background: var(--status-critical-bg);
+}
+
+.ms-item__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.ms-item__icon {
+  color: var(--text-muted);
+}
+
+.ms-item__title {
+  flex: 1;
+  min-width: 160px;
+  font-size: 12.5px;
+}
+
+.ms-item__answer {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.ms-sema {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 96px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ms-sema mat-icon {
+  width: 14px;
+  height: 14px;
+  font-size: 14px;
+}
+
+.ms-sema--ok[aria-pressed="true"] {
+  border-color: var(--status-ok);
+  background: var(--status-ok-bg);
+  color: var(--status-ok);
+}
+
+.ms-sema--bad[aria-pressed="true"] {
+  border-color: var(--status-critical);
+  background: var(--status-critical-bg);
+  color: var(--status-critical);
+}
+
+.ms-item__obs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 0 28px;
+}
+
+.ms-item__suggest {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  background: var(--status-system-bg);
+  color: var(--status-system);
+  font-size: 11.5px;
+}
+
+.ms-item__suggest span {
+  flex: 1;
+  min-width: 160px;
+}
+
+.ms-item__textarea {
+  position: relative;
+}
+
+.ms-item__textarea textarea,
+.ms-closure textarea {
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  resize: vertical;
+}
+
+.ms-item__textarea textarea {
+  padding-right: 64px;
+}
+
+.ms-item__textarea textarea.is-missing {
+  border-color: var(--status-critical);
+}
+
+.ms-item__textarea textarea:focus-visible,
+.ms-closure textarea:focus-visible {
+  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+}
+
+.ms-item__count {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.ms-check__foot,
+.ms-check__saved {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 16px;
+}
+
+.ms-check__saved {
+  justify-content: flex-start;
+}
+
+.ms-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ms-recent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 12px;
+}
+
+.ms-recent__who {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.ms-recent__who small {
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+
+.ms-side__actions {
+  display: flex;
+  padding: 10px 16px;
+}
+
+.ms-side__actions .ms-btn {
+  flex: 1;
+}
+
+.ms-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 16px;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.ms-guide p {
+  margin: 0;
+}
+
+.ms-btn:focus-visible,
+.ms-sema:focus-visible,
+.ms-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+@media (width <= 960px) {
+  .ms-main {
+    grid-template-columns: 1fr;
+  }
+}

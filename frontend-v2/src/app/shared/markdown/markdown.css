@@ -22,3 +22,14 @@
 .app-markdown a {
   color: var(--border-active);
 }
+
+/* Listas de tareas GFM ("- [ ]"): el checkbox reemplaza a la viñeta, no se suma a ella. */
+.app-markdown ul:has(> li > input[type="checkbox"]) {
+  padding-left: 0;
+  list-style: none;
+}
+
+.app-markdown li > input[type="checkbox"] {
+  margin: 0 6px 0 0;
+  vertical-align: -2px;
+}

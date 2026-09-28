@@ -1,0 +1,65 @@
+<section class="sh">
+  <header class="sh__head">
+    <h2 class="sh__title">{{ i18n.t('history.title') }}</h2>
+    <select class="sh__filter no-print" [ngModel]="shiftFilter()" (ngModelChange)="setShiftFilter($event)" [attr.aria-label]="i18n.t('history.col.shift')">
+      <option value="">{{ i18n.t('history.allShifts') }}</option>
+      @for (s of shifts(); track s.id) { <option [value]="s.id">{{ s.name }}</option> }
+    </select>
+    <button type="button" class="sh__btn no-print" (click)="exportPdf()"><mat-icon>picture_as_pdf</mat-icon>{{ i18n.t('history.pdf') }}</button>
+  </header>
+
+  <div class="sh__totals">
+    <div class="sh__stat"><span class="sh__label">{{ i18n.t('history.total') }}</span><strong class="mono">{{ totals().total }}</strong></div>
+    <div class="sh__stat"><span class="sh__label">{{ i18n.t('history.withRed') }}</span><strong class="mono" [class.text-bad]="totals().withRed > 0">{{ totals().withRed }}</strong></div>
+    <div class="sh__stat"><span class="sh__label">{{ i18n.t('history.redServices') }}</span><strong class="mono" [class.text-bad]="totals().redServices > 0">{{ totals().redServices }}</strong></div>
+  </div>
+
+  @if (error(); as message) {
+    <p class="msg msg--error" role="alert">{{ message }}</p>
+  }
+
+  <div class="sh__table-wrap">
+    <table class="sh__table">
+      <thead>
+        <tr>
+          <th>{{ i18n.t('history.col.date') }}</th>
+          <th>{{ i18n.t('history.col.moment') }}</th>
+          <th>{{ i18n.t('history.col.shift') }}</th>
+          <th>{{ i18n.t('history.col.analyst') }}</th>
+          <th>{{ i18n.t('history.col.result') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (check of checks(); track check.id) {
+          @let reds = redLeaves(check);
+          <tr class="sh__row" [class.sh__row--open]="expanded() === check.id" tabindex="0" [attr.aria-expanded]="reds.length > 0 ? expanded() === check.id : null" (click)="toggle(check.id)" (keydown.enter)="toggle(check.id)">
+            <td class="mono">{{ check.checkDate | date: 'dd/MM/yyyy HH:mm' }}</td>
+            <td><mat-icon class="sh__icon">{{ check.checkType === 'inicio' ? 'wb_sunny' : 'nightlight' }}</mat-icon>{{ i18n.t(check.checkType === 'inicio' ? 'check.momentLabel.inicio' : 'check.momentLabel.cierre') }}</td>
+            <td>{{ shiftName(check.workShiftId) }}</td>
+            <td>{{ check.username }}</td>
+            <td><span class="pill" [class.tone-bad]="reds.length > 0" [class.tone-ok]="reds.length === 0">{{ reds.length > 0 ? i18n.tf('check.red', reds.length) : i18n.t('history.allGreen') }}</span></td>
+          </tr>
+          @if (reds.length > 0 && expanded() === check.id) {
+            <tr class="sh__detail">
+              <td colspan="5">
+                <ul>
+                  @for (service of reds; track service.id) {
+                    <li><strong class="text-bad">{{ service.serviceTitle }}</strong> — {{ service.observation }}</li>
+                  }
+                </ul>
+              </td>
+            </tr>
+          }
+        } @empty {
+          @if (!loading()) {
+            <tr><td colspan="5" class="sh__empty">{{ i18n.t('history.empty') }}</td></tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (hasMore()) {
+    <button type="button" class="sh__btn sh__more no-print" [disabled]="loading()" (click)="load(page() + 1)">{{ i18n.t('history.more') }}</button>
+  }
+</section>
