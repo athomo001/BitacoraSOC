@@ -99,6 +99,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// Contraseña correcta: limpiar intentos fallidos y, si el hash viene del
 	// legacy (costo < 12), re-hashearlo transparentemente.
 	_ = h.Queries.ResetFailedLoginAttempts(ctx, user.ID)
+	_ = h.Queries.TouchLastLogin(ctx, user.ID)
 	if auth.NeedsRehash(user.PasswordHash) {
 		if newHash, err := auth.HashPassword(req.Password); err == nil {
 			_ = h.Queries.RehashPassword(ctx, db.RehashPasswordParams{ID: user.ID, PasswordHash: newHash})

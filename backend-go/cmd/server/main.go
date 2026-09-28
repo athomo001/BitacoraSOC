@@ -364,6 +364,12 @@ func run(logger *slog.Logger) error {
 
 	// Checklists y cierre de turno (Fase 11).
 	mux.Handle("GET /api/checklist-templates/active", authed(checklistsHandler.ActiveTemplates))
+	mux.Handle("GET /api/checklist-templates", admin(checklistsHandler.ListTemplates))
+	mux.Handle("POST /api/checklist-templates", admin(checklistsHandler.CreateTemplate))
+	mux.Handle("PUT /api/checklist-templates/{id}", admin(checklistsHandler.UpdateTemplate))
+	mux.Handle("DELETE /api/checklist-templates/{id}", admin(checklistsHandler.DeleteTemplate))
+	mux.Handle("GET /api/config/checklist", admin(checklistsHandler.GetChecklistConfig))
+	mux.Handle("PUT /api/config/checklist", admin(checklistsHandler.PutChecklistConfig))
 	mux.Handle("GET /api/shift-checks", authed(checklistsHandler.List))
 	mux.Handle("POST /api/shift-checks", authed(checklistsHandler.Create))
 	mux.Handle("POST /api/shift-checks/abandoned", authed(checklistsHandler.Abandoned))

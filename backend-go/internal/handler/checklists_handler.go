@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -207,8 +208,10 @@ func (h *ChecklistsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 409, "invalid-sequence", "debes alternar entre inicio y cierre")
 		return
 	}
-	if latestErr == nil && h.now().Sub(latest.CheckDate.Time) < time.Hour {
-		problemdetails.Write(w, r, 409, "cooldown", "debes esperar una hora antes de abrir otro checklist")
+	cooldown := time.Duration(h.cooldownMinutes(r.Context())) * time.Minute
+	if latestErr == nil && h.now().Sub(latest.CheckDate.Time) < cooldown {
+		wait := cooldown - h.now().Sub(latest.CheckDate.Time)
+		problemdetails.Write(w, r, 409, "cooldown", fmt.Sprintf("debes esperar %d min más antes de abrir otro checklist de este turno", int(wait.Minutes())+1))
 		return
 	}
 	user, _ := middleware.UserFromContext(r.Context())

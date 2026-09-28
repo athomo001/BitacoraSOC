@@ -53,4 +53,35 @@ describe('AdminAccessComponent', () => {
     await pending;
     expect(component.userGroups()['u1']).toEqual(['g-noc']);
   });
+
+  it('cambiar el rol desde el panel hace PATCH y, si falla, vuelve al rol anterior', async () => {
+    const fixture = await render();
+    httpMock.expectOne('/api/users/u1/permission-groups').flush({ data: [] });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const auditor = [...el.querySelectorAll<HTMLButtonElement>('.aa-panel .seg')].find((b) => b.textContent?.trim() === 'Auditor')!;
+    auditor.click();
+    await new Promise((r) => setTimeout(r));
+    const req = httpMock.expectOne({ method: 'PATCH', url: '/api/users/u1' });
+    expect(req.request.body).toEqual({ role: 'auditor' });
+    req.flush(null, { status: 409, statusText: 'err' });
+    await new Promise((r) => setTimeout(r));
+    fixture.detectChanges();
+    expect(el.querySelector('.aa-row .pill')?.textContent?.trim()).toBe('Analista');
+  });
+
+  it('las capacidades de un grupo son casillas de la lista cerrada', async () => {
+    const fixture = await render();
+    httpMock.expectOne('/api/users/u1/permission-groups').flush({ data: [] });
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    ([...el.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((b) => b.textContent?.includes('Grupos'))!).click();
+    fixture.detectChanges();
+    const boxes = [...el.querySelectorAll<HTMLButtonElement>('.aa-table button[role="checkbox"]')];
+    expect(boxes.length).toBe(4); // 2 grupos × 2 capacidades
+    boxes[0].click();
+    const req = httpMock.expectOne({ method: 'PATCH', url: '/api/permission-groups/g-noc' });
+    expect(req.request.body).toEqual({ capabilities: ['directory:write'] });
+  });
 });

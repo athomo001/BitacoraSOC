@@ -1264,17 +1264,17 @@ type ApiKey struct {
 }
 
 type AppConfig struct {
-	ID                      bool               `json:"id"`
-	ShiftCheckCooldownHours int32              `json:"shift_check_cooldown_hours"`
-	AlertNokEnabled         bool               `json:"alert_nok_enabled"`
-	AlertNokRoleTarget      []string           `json:"alert_nok_role_target"`
-	AuditTtlDays            int32              `json:"audit_ttl_days"`
-	BackupRetentionDays     int32              `json:"backup_retention_days"`
-	SocModuleEnabled        bool               `json:"soc_module_enabled"`
-	NocModuleEnabled        bool               `json:"noc_module_enabled"`
-	TerritorialKindLabels   []byte             `json:"territorial_kind_labels"`
-	SetupCompletedAt        pgtype.Timestamptz `json:"setup_completed_at"`
-	UpdatedAt               pgtype.Timestamptz `json:"updated_at"`
+	ID                        bool               `json:"id"`
+	ShiftCheckCooldownMinutes int32              `json:"shift_check_cooldown_minutes"`
+	AlertNokEnabled           bool               `json:"alert_nok_enabled"`
+	AlertNokRoleTarget        []string           `json:"alert_nok_role_target"`
+	AuditTtlDays              int32              `json:"audit_ttl_days"`
+	BackupRetentionDays       int32              `json:"backup_retention_days"`
+	SocModuleEnabled          bool               `json:"soc_module_enabled"`
+	NocModuleEnabled          bool               `json:"noc_module_enabled"`
+	TerritorialKindLabels     []byte             `json:"territorial_kind_labels"`
+	SetupCompletedAt          pgtype.Timestamptz `json:"setup_completed_at"`
+	UpdatedAt                 pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Asset struct {
@@ -1846,6 +1846,7 @@ type User struct {
 	Active                 bool               `json:"active"`
 	CreatedAt              pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
+	LastLoginAt            pgtype.Timestamptz `json:"last_login_at"`
 }
 
 type UserPermissionGroup struct {

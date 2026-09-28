@@ -1121,3 +1121,9 @@ CREATE TABLE backup_config (
   updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Migración 000009: administración de checklist y usuarios (pantalla aprobada).
+ALTER TABLE app_config RENAME COLUMN shift_check_cooldown_hours TO shift_check_cooldown_minutes;
+ALTER TABLE app_config ALTER COLUMN shift_check_cooldown_minutes SET DEFAULT 60;
+ALTER TABLE app_config ADD CONSTRAINT chk_shift_check_cooldown_minutes CHECK (shift_check_cooldown_minutes BETWEEN 0 AND 1440);
+ALTER TABLE users ADD COLUMN last_login_at TIMESTAMPTZ;

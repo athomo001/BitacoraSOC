@@ -1,4 +1,7 @@
-import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
+import { MatIconModule } from '@angular/material/icon';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { MessageKey } from '../../core/i18n/messages';
 import { AdminModulesComponent } from './admin-modules';
 import { AdminFeaturesComponent } from './admin-features';
 import { AdminTerritoryComponent } from './admin-territory';
@@ -11,181 +14,203 @@ import { AdminBackupsComponent } from './admin-backups';
 import { AdminAuditComponent } from './admin-audit';
 import { AdminAccessComponent } from './admin-access';
 import { AdminReportsComponent } from './admin-reports';
+import { AdminChecklistComponent } from './admin-checklist';
 
-type AdminTab = 'modules' | 'features' | 'territory' | 'organizations' | 'teams' | 'escalation' | 'smtp' | 'shifts' | 'reports' | 'backups' | 'audit' | 'access';
+export type AdminSection =
+  | 'access' | 'shifts' | 'checklist' | 'escalation' | 'smtp' | 'reports'
+  | 'organizations' | 'territory' | 'teams'
+  | 'modules' | 'features' | 'backups' | 'audit' | 'complements';
 
-const TABS: readonly { id: AdminTab; label: string }[] = [
-  { id: 'modules', label: 'Módulos' },
-  { id: 'features', label: 'Funcionalidades' },
-  { id: 'territory', label: 'Territorio' },
-  { id: 'organizations', label: 'Organizaciones' },
-  { id: 'teams', label: 'Equipos' },
-  { id: 'escalation', label: 'Escalamiento' },
-  { id: 'shifts', label: 'Turnos' },
-  { id: 'smtp', label: 'Correo' },
-  { id: 'reports', label: 'Reportes' },
-  { id: 'backups', label: 'Respaldos' },
-  { id: 'audit', label: 'Auditoría' },
-  { id: 'access', label: 'Usuarios y grupos' },
+interface NavItem { id: AdminSection; icon: string; labelKey: MessageKey; badge?: string; }
+
+/** Mismo orden y agrupación que el artboard aprobado "Administración". */
+const NAV: readonly { labelKey: MessageKey; items: readonly NavItem[] }[] = [
+  { labelKey: 'admin.group.people', items: [{ id: 'access', icon: 'group', labelKey: 'admin.nav.access' }] },
+  {
+    labelKey: 'admin.group.operation',
+    items: [
+      { id: 'shifts', icon: 'schedule', labelKey: 'admin.nav.shifts' },
+      { id: 'checklist', icon: 'checklist', labelKey: 'admin.nav.checklist' },
+      { id: 'escalation', icon: 'call_split', labelKey: 'admin.nav.escalation' },
+      { id: 'smtp', icon: 'mail', labelKey: 'admin.nav.smtp' },
+      { id: 'reports', icon: 'summarize', labelKey: 'admin.nav.reports' },
+    ],
+  },
+  {
+    labelKey: 'admin.group.catalogs',
+    items: [
+      { id: 'organizations', icon: 'business', labelKey: 'admin.nav.organizations' },
+      { id: 'territory', icon: 'map', labelKey: 'admin.nav.territory' },
+      { id: 'teams', icon: 'groups', labelKey: 'admin.nav.teams' },
+    ],
+  },
+  {
+    labelKey: 'admin.group.system',
+    items: [
+      { id: 'modules', icon: 'apps', labelKey: 'admin.nav.modules' },
+      { id: 'features', icon: 'toggle_on', labelKey: 'admin.nav.features' },
+      { id: 'backups', icon: 'backup', labelKey: 'admin.nav.backups' },
+      { id: 'audit', icon: 'policy', labelKey: 'admin.nav.audit' },
+      { id: 'complements', icon: 'extension', labelKey: 'admin.nav.complements', badge: '13b' },
+    ],
+  },
 ];
 
-const GROUPS: readonly { label: string; tabs: readonly { id: AdminTab; label: string }[] }[] = [
-  { label: 'Configuración inicial', tabs: [{ id: 'access', label: 'Usuarios y grupos' }, { id: 'shifts', label: 'Usuarios y turnos' }] },
-  { label: 'Operación NOC', tabs: [{ id: 'escalation', label: 'Escalamiento' }, { id: 'smtp', label: 'Correo' }, { id: 'reports', label: 'Reportes' }, { id: 'backups', label: 'Respaldos' }, { id: 'audit', label: 'Auditoría' }] },
-  { label: 'Catálogos', tabs: [{ id: 'territory', label: 'Territorio' }, { id: 'organizations', label: 'Organizaciones' }, { id: 'teams', label: 'Equipos' }] },
-  { label: 'Plataforma', tabs: [{ id: 'modules', label: 'Módulos' }, { id: 'features', label: 'Funcionalidades' }] },
-];
+const SECTION_KEY = 'bitacora.admin.section';
+
+function readSection(): AdminSection {
+  try {
+    const stored = localStorage.getItem(SECTION_KEY) as AdminSection | null;
+    if (stored && NAV.some((group) => group.items.some((item) => item.id === stored))) return stored;
+  } catch {
+    // Sin almacenamiento se abre en Usuarios y grupos.
+  }
+  return 'access';
+}
+
+function normalize(text: string): string {
+  return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
 
 /**
- * Sección maestra Administración (Alt+5). Pestañas contextuales
- * horizontales dentro de la sección — la barra lateral sigue con 1 solo
- * nivel (spec/06-frontend-arquitectura-y-ui.md sección 3). Pestañas en
- * tokens neutros, nunca un color por pestaña (regla 1.2). Las fases
- * siguientes agregan sus pestañas acá (usuarios, grupos, SMTP…).
+ * Administración (Alt+5) según el artboard aprobado: una sola lista plana
+ * con íconos, agrupada por tema como el legacy, y un buscador de ajustes
+ * (Ctrl+K). Reemplaza el menú anidado con botón "Compactar". Recuerda la
+ * última sección abierta.
  */
 @Component({
   selector: 'app-admin-shell',
   standalone: true,
-  imports: [AdminModulesComponent, AdminFeaturesComponent, AdminTerritoryComponent, AdminOrganizationsComponent, AdminTeamsComponent, AdminEscalationComponent, AdminShiftsComponent, AdminSmtpComponent, AdminReportsComponent, AdminBackupsComponent, AdminAuditComponent, AdminAccessComponent],
+  imports: [
+    MatIconModule, AdminModulesComponent, AdminFeaturesComponent, AdminTerritoryComponent, AdminOrganizationsComponent, AdminTeamsComponent,
+    AdminEscalationComponent, AdminShiftsComponent, AdminSmtpComponent, AdminReportsComponent, AdminBackupsComponent, AdminAuditComponent,
+    AdminAccessComponent, AdminChecklistComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '(document:keydown)': 'onKeydown($event)' },
   template: `
-    <div class="admin" [class.admin--compact]="compact()">
-      <h1 class="admin__title">Administración</h1>
-      <div class="admin__layout">
-        <aside class="admin__navigation" [class.admin__navigation--compact]="compact()" aria-label="Secciones de administración">
-          <button type="button" class="admin__compact-toggle" (click)="toggleCompact()" [attr.aria-label]="compact() ? 'Expandir menú' : 'Compactar menú'">{{ compact() ? '»' : '«' }} <span>{{ compact() ? 'Expandir' : 'Compactar' }}</span></button>
-          @for (group of groups; track group.label) {
-            <div class="admin__group"><h2>{{ group.label }}</h2><div role="tablist">
-              @for (tab of group.tabs; track tab.id) {
-                <button type="button" role="tab" class="admin__tab" [class.admin__tab--active]="active() === tab.id"
-                  [attr.aria-selected]="active() === tab.id" [attr.title]="tab.label" (click)="active.set(tab.id)"><span class="admin__tab-label">{{ tab.label }}</span><span class="admin__tab-icon">{{ tab.label.charAt(0) }}</span></button>
+    <div class="adm">
+      <aside class="adm__nav" [attr.aria-label]="i18n.t('admin.sections')">
+        <div class="adm__head">
+          <h1 class="adm__title">{{ i18n.t('nav.admin') }}</h1>
+          <label class="adm__search">
+            <mat-icon>search</mat-icon>
+            <input #search type="search" [value]="query()" (input)="query.set(search.value)" (keydown.enter)="goFirstMatch()" (keydown.escape)="query.set('')"
+              [placeholder]="i18n.t('admin.search')" [attr.aria-label]="i18n.t('admin.search')" />
+            <kbd class="mono">Ctrl+K</kbd>
+          </label>
+        </div>
+        <div class="adm__groups">
+          @for (group of groups(); track group.labelKey) {
+            <div class="adm__group" role="group" [attr.aria-label]="i18n.t(group.labelKey)">
+              <span class="adm__group-label">{{ i18n.t(group.labelKey) }}</span>
+              @for (item of group.items; track item.id) {
+                <button type="button" class="adm__item" [class.adm__item--active]="active() === item.id" [attr.aria-current]="active() === item.id ? 'page' : null" (click)="go(item.id)">
+                  <mat-icon>{{ item.icon }}</mat-icon>
+                  <span class="adm__item-label">{{ i18n.t(item.labelKey) }}</span>
+                  @if (item.badge) { <span class="pill tone-system">{{ item.badge }}</span> }
+                </button>
               }
-            </div></div>
+            </div>
+          } @empty {
+            <p class="adm__none">{{ i18n.t('admin.searchEmpty') }}</p>
           }
-        </aside>
-        <div class="admin__body">
+        </div>
+      </aside>
+      <main class="adm__body">
         @switch (active()) {
-          @case ('modules') { <app-admin-modules /> }
-          @case ('features') { <app-admin-features /> }
-          @case ('territory') { <app-admin-territory /> }
-          @case ('organizations') { <app-admin-organizations /> }
-          @case ('teams') { <app-admin-teams /> }
-          @case ('escalation') { <app-admin-escalation /> }
+          @case ('access') { <app-admin-access /> }
           @case ('shifts') { <app-admin-shifts /> }
+          @case ('checklist') { <app-admin-checklist /> }
+          @case ('escalation') { <app-admin-escalation /> }
           @case ('smtp') { <app-admin-smtp /> }
           @case ('reports') { <app-admin-reports /> }
-          @case ('backups') { <app-admin-backups (goToFeatures)="active.set('features')" /> }
+          @case ('organizations') { <app-admin-organizations /> }
+          @case ('territory') { <app-admin-territory /> }
+          @case ('teams') { <app-admin-teams /> }
+          @case ('modules') { <app-admin-modules /> }
+          @case ('features') { <app-admin-features /> }
+          @case ('backups') { <app-admin-backups (goToFeatures)="go('features')" /> }
           @case ('audit') { <app-admin-audit /> }
-          @case ('access') { <app-admin-access /> }
+          @case ('complements') {
+            <section class="adm__soon">
+              <mat-icon>extension</mat-icon>
+              <p>{{ i18n.t('admin.complementsSoon') }}</p>
+            </section>
+          }
         }
-        </div>
-      </div>
+      </main>
     </div>
   `,
   styles: `
-    .admin {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      width: 100%;
-      max-width: none;
-      box-sizing: border-box;
-      padding: 24px;
-    }
-    .admin__title {
-      margin: 0;
-      font-size: 18px;
-      font-weight: 600;
-    }
-    .admin__layout {
-      display: grid;
-      grid-template-columns: 220px minmax(0, 1fr);
-      gap: 24px;
-      align-items: start;
-    }
-    .admin__navigation {
-      position: sticky;
-      top: 16px;
-      display: grid;
-      gap: 18px;
-      padding-right: 16px;
-      border-right: 1px solid var(--border-subtle);
-    }
-    .admin__compact-toggle {
-      min-height: 30px;
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-sm);
-      background: var(--bg-surface);
-      color: var(--text-secondary);
-      font: inherit;
-      cursor: pointer;
-      text-align: left;
-    }
-    .admin__compact-toggle:hover { color: var(--text-primary); border-color: var(--border-active); }
-    .admin__navigation--compact { grid-template-columns: 1fr; width: 54px; padding-right: 8px; }
-    .admin__navigation--compact .admin__compact-toggle { padding: 0; text-align: center; }
-    .admin__navigation--compact .admin__compact-toggle span,
-    .admin__tab-icon { display: none; }
-    .admin__navigation--compact .admin__group h2,
-    .admin__navigation--compact .admin__tab-label { display: none; }
-    .admin--compact .admin__layout { grid-template-columns: 62px minmax(0, 1fr); gap: 16px; }
-    .admin--compact .admin__body { min-width: 0; }
-    .admin__navigation--compact .admin__tab { width: 100%; justify-content: center; padding-right: 0; padding-left: 0; text-align: center; white-space: nowrap; writing-mode: horizontal-tb; word-break: keep-all; }
-    .admin__navigation--compact .admin__tab-icon { display: inline-flex; align-items: center; justify-content: center; width: 24px; font-weight: 700; }
-    .admin__navigation--compact .admin__tab { border-left: 0; }
-    .admin__navigation--compact .admin__tab--active { border-right: 2px solid var(--border-active); }
-    .admin__group {
-      display: grid;
-      gap: 6px;
-    }
-    .admin__group h2 {
-      margin: 0;
-      color: var(--text-muted);
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-    }
-    .admin__group > div {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .admin__tab {
-      min-height: 34px;
-      padding: 7px 10px;
-      background: none;
-      border: none;
-      border-left: 2px solid transparent;
-      border-radius: var(--radius-sm);
-      color: var(--text-secondary);
-      font: inherit;
-      text-align: left;
-      cursor: pointer;
-    }
-    .admin__tab:hover {
-      color: var(--text-primary);
-    }
-    .admin__tab--active {
-      color: var(--text-primary);
-      border-left-color: var(--border-active);
-      background: var(--bg-surface-hover);
-    }
+    :host { display: block; height: calc(100% + 32px); margin: -16px; } /* ocupa todo el área de trabajo del shell (que tiene 16px de padding) */
+    .adm { display: grid; grid-template-columns: 212px minmax(0, 1fr); height: 100%; min-height: 0; }
+    .adm__nav { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border-subtle); background: var(--bg-surface); }
+    .adm__head { padding: 14px 14px 10px; }
+    .adm__title { margin: 0; font-size: 15px; font-weight: 600; }
+    .adm__search { display: flex; align-items: center; gap: 6px; margin-top: 10px; padding: 0 8px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-app); color: var(--text-muted); }
+    .adm__search:focus-within { border-color: var(--accent); }
+    .adm__search mat-icon { width: 16px; height: 16px; font-size: 16px; }
+    .adm__search input { flex: 1; min-width: 0; min-height: 30px; border: none; outline: none; background: transparent; color: var(--text-primary); font: inherit; font-size: 12px; }
+    .adm__search kbd { font-size: 10px; }
+    .adm__groups { display: flex; flex: 1; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; padding: 0 8px 12px; }
+    .adm__group { display: flex; flex-direction: column; gap: 1px; }
+    .adm__group-label { padding: 4px 10px; color: var(--text-muted); font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+    .adm__item { display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 10px; border: none; border-radius: var(--radius-md); background: transparent; color: var(--text-secondary); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; }
+    .adm__item mat-icon { width: 17px; height: 17px; font-size: 17px; }
+    .adm__item:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+    .adm__item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .adm__item--active, .adm__item--active:hover { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+    .adm__item-label { flex: 1; }
+    .adm__none { margin: 0; padding: 8px 10px; color: var(--text-muted); font-size: 12px; }
+    .adm__body { min-width: 0; overflow-y: auto; padding: 16px 20px; }
+    .adm__soon { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 32px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-surface); color: var(--text-secondary); text-align: center; }
+    .adm__soon mat-icon { width: 28px; height: 28px; color: var(--text-muted); font-size: 28px; }
+    .adm__soon p { max-width: 60ch; margin: 0; }
     @media (width <= 820px) {
-      .admin__layout { grid-template-columns: 1fr; }
-      .admin__navigation { position: static; grid-template-columns: repeat(2, minmax(0, 1fr)); padding-right: 0; border-right: 0; }
+      .adm { grid-template-columns: minmax(0, 1fr); height: auto; }
+      .adm__nav { border-right: none; border-bottom: 1px solid var(--border-subtle); }
+      .adm__groups { flex-flow: row wrap; }
+      .adm__group { flex: 1 1 180px; }
     }
   `,
 })
 export class AdminShellComponent {
-  protected readonly tabs = TABS;
-  protected readonly groups = GROUPS;
-  protected readonly active = signal<AdminTab>('access');
-  protected readonly compact = signal(localStorage.getItem('bitacora.admin.compact.v2') === 'true');
+  protected readonly i18n = inject(I18nService);
+  private readonly searchInput = viewChild.required<ElementRef<HTMLInputElement>>('search');
 
-  protected toggleCompact(): void {
-    const value = !this.compact();
-    this.compact.set(value);
-    localStorage.setItem('bitacora.admin.compact.v2', String(value));
+  protected readonly active = signal<AdminSection>(readSection());
+  protected readonly query = signal('');
+
+  /** El buscador filtra por nombre de sección o de grupo, sin tildes. */
+  protected readonly groups = computed(() => {
+    const q = normalize(this.query().trim());
+    if (!q) return NAV;
+    return NAV.map((group) => {
+      const groupMatches = normalize(this.i18n.t(group.labelKey)).includes(q);
+      return { ...group, items: group.items.filter((item) => groupMatches || normalize(this.i18n.t(item.labelKey)).includes(q)) };
+    }).filter((group) => group.items.length > 0);
+  });
+
+  protected go(section: AdminSection): void {
+    this.active.set(section);
+    this.query.set('');
+    try {
+      localStorage.setItem(SECTION_KEY, section);
+    } catch {
+      // Recordar la sección es una comodidad, no un requisito.
+    }
+  }
+
+  protected goFirstMatch(): void {
+    const first = this.groups()[0]?.items[0];
+    if (first) this.go(first.id);
+  }
+
+  protected onKeydown(event: KeyboardEvent): void {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      this.searchInput().nativeElement.focus();
+    }
   }
 }

@@ -26,7 +26,7 @@ func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (username, email, password_hash, role, must_change_password)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at
+RETURNING id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at, last_login_at
 `
 
 type CreateUserParams struct {
@@ -69,6 +69,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastLoginAt,
 	)
 	return i, err
 }
@@ -108,7 +109,7 @@ func (q *Queries) EnableMFA(ctx context.Context, id uuid.UUID) error {
 const forceResetAllActivePasswords = `-- name: ForceResetAllActivePasswords :many
 UPDATE users SET must_change_password = true, updated_at = now()
 WHERE active = true AND is_guest = false
-RETURNING id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at
+RETURNING id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at, last_login_at
 `
 
 // POST /api/users/force-reset-all — usuarios internos = no invitados
@@ -146,6 +147,7 @@ func (q *Queries) ForceResetAllActivePasswords(ctx context.Context) ([]User, err
 			&i.Active,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.LastLoginAt,
 		); err != nil {
 			return nil, err
 		}
@@ -158,7 +160,7 @@ func (q *Queries) ForceResetAllActivePasswords(ctx context.Context) ([]User, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at FROM users WHERE email = $1
+SELECT id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at, last_login_at FROM users WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -187,12 +189,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastLoginAt,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at FROM users WHERE id = $1
+SELECT id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at, last_login_at FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -221,12 +224,13 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastLoginAt,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at FROM users WHERE username = $1
+SELECT id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at, last_login_at FROM users WHERE username = $1
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -255,6 +259,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastLoginAt,
 	)
 	return i, err
 }
@@ -287,7 +292,7 @@ func (q *Queries) ListActiveUserEmailsByRole(ctx context.Context, role NullUserR
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at FROM users
+SELECT id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at, last_login_at FROM users
 WHERE ($1::user_role IS NULL OR role = $1)
   AND ($2::boolean IS NULL OR active = $2)
 ORDER BY username
@@ -332,6 +337,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 			&i.Active,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.LastLoginAt,
 		); err != nil {
 			return nil, err
 		}
@@ -424,6 +430,15 @@ func (q *Queries) SetMustChangePassword(ctx context.Context, arg SetMustChangePa
 	return err
 }
 
+const touchLastLogin = `-- name: TouchLastLogin :exec
+UPDATE users SET last_login_at = now() WHERE id = $1
+`
+
+func (q *Queries) TouchLastLogin(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, touchLastLogin, id)
+	return err
+}
+
 const updateMyProfile = `-- name: UpdateMyProfile :one
 UPDATE users SET
   full_name = COALESCE($2, full_name),
@@ -432,7 +447,7 @@ UPDATE users SET
   avatar_url = COALESCE($5, avatar_url),
   updated_at = now()
 WHERE id = $1
-RETURNING id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at
+RETURNING id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at, last_login_at
 `
 
 type UpdateMyProfileParams struct {
@@ -475,6 +490,7 @@ func (q *Queries) UpdateMyProfile(ctx context.Context, arg UpdateMyProfileParams
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastLoginAt,
 	)
 	return i, err
 }
@@ -485,17 +501,19 @@ UPDATE users SET
   role = COALESCE($3, role),
   cargo_label = COALESCE($4, cargo_label),
   active = COALESCE($5, active),
+  must_change_password = COALESCE($6, must_change_password),
   updated_at = now()
 WHERE id = $1
-RETURNING id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at
+RETURNING id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at, last_login_at
 `
 
 type UpdateUserAdminParams struct {
-	ID         uuid.UUID    `json:"id"`
-	Email      pgtype.Text  `json:"email"`
-	Role       NullUserRole `json:"role"`
-	CargoLabel pgtype.Text  `json:"cargo_label"`
-	Active     pgtype.Bool  `json:"active"`
+	ID                 uuid.UUID    `json:"id"`
+	Email              pgtype.Text  `json:"email"`
+	Role               NullUserRole `json:"role"`
+	CargoLabel         pgtype.Text  `json:"cargo_label"`
+	Active             pgtype.Bool  `json:"active"`
+	MustChangePassword pgtype.Bool  `json:"must_change_password"`
 }
 
 // PATCH /api/users/:id — campos parciales: NULL en un parámetro conserva el
@@ -507,6 +525,7 @@ func (q *Queries) UpdateUserAdmin(ctx context.Context, arg UpdateUserAdminParams
 		arg.Role,
 		arg.CargoLabel,
 		arg.Active,
+		arg.MustChangePassword,
 	)
 	var i User
 	err := row.Scan(
@@ -532,6 +551,7 @@ func (q *Queries) UpdateUserAdmin(ctx context.Context, arg UpdateUserAdminParams
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastLoginAt,
 	)
 	return i, err
 }

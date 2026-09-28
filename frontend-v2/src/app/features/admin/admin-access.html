@@ -1,0 +1,189 @@
+<header class="aa__head">
+  <div>
+    <h2 class="aa__title">{{ i18n.t('admin.nav.access') }}</h2>
+    <p class="aa__muted">{{ i18n.t('access.subtitle') }}</p>
+  </div>
+  <span class="aa__tabs" role="tablist">
+    <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'users'" [attr.aria-selected]="tab() === 'users'" (click)="tab.set('users')">{{ i18n.t('access.tab.users') }} <span class="mono">{{ users().length }}</span></button>
+    <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'groups'" [attr.aria-selected]="tab() === 'groups'" (click)="tab.set('groups')">{{ i18n.t('access.tab.groups') }} <span class="mono">{{ groups().length }}</span></button>
+  </span>
+  <button type="button" class="aa-btn aa-btn--primary" (click)="startCreate(tab() === 'users' ? 'user' : 'group')">
+    <mat-icon>{{ tab() === 'users' ? 'person_add' : 'group_add' }}</mat-icon>{{ i18n.t(tab() === 'users' ? 'access.newUser' : 'access.newGroup') }}
+  </button>
+</header>
+
+@if (error(); as message) { <p class="msg msg--error" role="alert">{{ message }}</p> }
+
+@if (tab() === 'users') {
+  <div class="aa">
+    <section class="aa-card">
+      <div class="aa__filters">
+        <label class="aa__search"><mat-icon>search</mat-icon><input type="search" [value]="query()" (input)="query.set($any($event.target).value)" [placeholder]="i18n.t('access.search')" [attr.aria-label]="i18n.t('access.search')" /></label>
+        <button type="button" class="seg" [attr.aria-pressed]="!showInactive()" (click)="showInactive.set(false)">{{ i18n.t('access.filter.active') }}</button>
+        <button type="button" class="seg" [attr.aria-pressed]="showInactive()" (click)="showInactive.set(true)">{{ i18n.t('access.filter.all') }}</button>
+      </div>
+      <div class="aa__table-wrap">
+        <table class="aa-table">
+          <thead><tr><th>{{ i18n.t('access.col.user') }}</th><th>{{ i18n.t('access.col.role') }}</th><th>{{ i18n.t('access.col.groups') }}</th><th>{{ i18n.t('access.col.lastLogin') }}</th><th>{{ i18n.t('access.col.state') }}</th></tr></thead>
+          <tbody>
+            @for (user of visibleUsers(); track user.id) {
+              <tr class="aa-row" [class.aa-row--active]="selectedId() === user.id" tabindex="0" (click)="select(user.id)" (keydown.enter)="select(user.id)">
+                <td>
+                  <span class="aa-user">
+                    <span class="aa-avatar" aria-hidden="true">{{ (user.fullName || user.username).charAt(0).toUpperCase() }}</span>
+                    <span><strong>{{ user.username }}</strong><small>{{ user.fullName || user.email }}</small></span>
+                  </span>
+                </td>
+                <td><span class="pill" [class.tone-system]="user.role === 'admin'" [class.tone-info]="user.role === 'auditor'" [class.tone-neutral]="user.role === 'user'">{{ i18n.t(roleKey(user.role)) }}</span></td>
+                <td><span class="aa-pills">@for (id of userGroups()[user.id] ?? []; track id) { <span class="pill tone-neutral">{{ groupName(id) }}</span> }</span></td>
+                <td class="mono aa__secondary">{{ user.lastLoginAt ? (user.lastLoginAt | date: 'dd/MM HH:mm') : '—' }}</td>
+                <td>
+                  <span class="pill" [class.tone-ok]="user.active" [class.tone-neutral]="!user.active">{{ i18n.t(user.active ? 'access.state.active' : 'access.state.inactive') }}</span>
+                  @if (user.mustChangePassword) { <span class="pill tone-warn" [attr.title]="i18n.t('access.pendingPassword')"><mat-icon>key</mat-icon></span> }
+                </td>
+              </tr>
+            } @empty {
+              <tr><td colspan="5" class="aa__empty">{{ i18n.t('access.noUsers') }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Panel lateral: alta o usuario seleccionado -->
+    @if (creating() === 'user') {
+      <section class="aa-card">
+        <header class="aa-card__head"><span class="aa-card__title"><mat-icon>person_add</mat-icon>{{ i18n.t('access.newUser') }}</span></header>
+        <form class="aa-form" (submit)="$event.preventDefault(); createUser()">
+          <label>{{ i18n.t('access.form.username') }}<input class="aa-input" name="username" [(ngModel)]="userForm.username" required autocomplete="off" /></label>
+          <label>{{ i18n.t('access.form.email') }}<input class="aa-input" type="email" name="email" [(ngModel)]="userForm.email" required autocomplete="off" /></label>
+          <label>{{ i18n.t('access.form.password') }}<input class="aa-input" type="password" name="password" [(ngModel)]="userForm.password" required autocomplete="new-password" /></label>
+          <p class="aa__muted">{{ i18n.t('access.form.passwordHint') }}</p>
+          <label>{{ i18n.t('access.col.role') }}
+            <select class="aa-input" name="role" [(ngModel)]="userForm.role">@for (r of roles; track r) { <option [value]="r">{{ i18n.t(roleKey(r)) }}</option> }</select>
+          </label>
+          <div class="aa-form__actions">
+            <button type="button" class="aa-btn" (click)="creating.set(null)">{{ i18n.t('access.cancel') }}</button>
+            <button type="submit" class="aa-btn aa-btn--primary" [disabled]="busy()">{{ i18n.t('access.create') }}</button>
+          </div>
+        </form>
+      </section>
+    } @else if (selected(); as user) {
+      <section class="aa-card">
+        <header class="aa-card__head"><span class="aa-card__title"><mat-icon>manage_accounts</mat-icon>{{ user.username }}</span></header>
+        <div class="aa-panel">
+          <div class="aa-panel__block">
+            <span class="aa__label">{{ i18n.t('access.nameEmail') }}</span>
+            <span>{{ user.fullName || '—' }}</span>
+            <span class="mono aa__secondary">{{ user.email }}</span>
+          </div>
+          <div class="aa-panel__block">
+            <span class="aa__label">{{ i18n.t('access.col.role') }}</span>
+            <span class="aa__seg-row">
+              @for (r of roles; track r) {
+                <button type="button" class="seg" [attr.aria-pressed]="user.role === r" [disabled]="isMe() && r !== 'admin'" (click)="setRole(user, r)">{{ i18n.t(roleKey(r)) }}</button>
+              }
+            </span>
+            <span class="aa__muted">{{ i18n.t(roleHintKey(user.role)) }}</span>
+            @if (isMe()) { <span class="aa__muted">{{ i18n.t('access.selfNote') }}</span> }
+          </div>
+          <div class="aa-panel__block">
+            <span class="aa__label">{{ i18n.t('access.col.groups') }}</span>
+            @for (group of groups(); track group.id) {
+              @let on = (userGroups()[user.id] ?? []).includes(group.id);
+              <button type="button" class="aa-check" role="checkbox" [attr.aria-checked]="on" [disabled]="!groupsLoaded()" (click)="toggleGroup(user, group.id)">
+                <mat-icon [class.aa-check--on]="on">{{ on ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>{{ group.name }}
+                <span class="pill tone-neutral aa__push">{{ i18n.t(scopeKey(group.moduleScope)) }}</span>
+              </button>
+            } @empty {
+              <span class="aa__muted">{{ i18n.t('access.noGroups') }}</span>
+            }
+          </div>
+          <div class="aa-panel__block">
+            <span class="aa__label">{{ i18n.t('access.security') }}</span>
+            <span class="aa__inline"><mat-icon [class.text-ok]="user.mfaEnabled" [class.text-warn]="!user.mfaEnabled">{{ user.mfaEnabled ? 'verified_user' : 'gpp_maybe' }}</mat-icon>{{ i18n.t(user.mfaEnabled ? 'access.mfaOn' : 'access.mfaOff') }}</span>
+            @if (user.mustChangePassword) { <span class="aa__inline text-warn"><mat-icon>key</mat-icon>{{ i18n.t('access.pendingPassword') }}</span> }
+            <span class="aa__seg-row">
+              <button type="button" class="aa-btn" [disabled]="user.mustChangePassword" (click)="forcePasswordChange(user)">{{ i18n.t('access.forcePassword') }}</button>
+              @if (user.active) {
+                <button type="button" class="aa-btn aa-btn--danger-text" [disabled]="isMe()" (click)="setActive(user, false)">{{ i18n.t('access.deactivate') }}</button>
+              } @else {
+                <button type="button" class="aa-btn" (click)="setActive(user, true)">{{ i18n.t('access.activate') }}</button>
+              }
+            </span>
+          </div>
+        </div>
+      </section>
+    }
+  </div>
+} @else {
+  @if (creating() === 'group') {
+    <section class="aa-card">
+      <header class="aa-card__head"><span class="aa-card__title"><mat-icon>group_add</mat-icon>{{ i18n.t('access.newGroup') }}</span></header>
+      <form class="aa-form aa-form--inline" (submit)="$event.preventDefault(); createGroup()">
+        <label>{{ i18n.t('access.form.code') }}<input class="aa-input mono" name="code" [(ngModel)]="groupForm.code" placeholder="noc-n1" required /></label>
+        <label>{{ i18n.t('access.form.name') }}<input class="aa-input" name="name" [(ngModel)]="groupForm.name" required /></label>
+        <label>{{ i18n.t('access.col.modules') }}
+          <select class="aa-input" name="moduleScope" [(ngModel)]="groupForm.moduleScope">@for (s of scopes; track s) { <option [value]="s">{{ i18n.t(scopeKey(s)) }}</option> }</select>
+        </label>
+        <fieldset class="aa-form__caps">
+          <legend>{{ i18n.t('access.capabilities') }}</legend>
+          @for (cap of capabilities; track cap.code) {
+            @let on = groupForm.capabilities.includes(cap.code);
+            <button type="button" class="aa-check" role="checkbox" [attr.aria-checked]="on" (click)="toggleFormCapability(cap.code)"><mat-icon [class.aa-check--on]="on">{{ on ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>{{ i18n.t(cap.labelKey) }}</button>
+          }
+        </fieldset>
+        <div class="aa-form__actions">
+          <button type="button" class="aa-btn" (click)="creating.set(null)">{{ i18n.t('access.cancel') }}</button>
+          <button type="submit" class="aa-btn aa-btn--primary" [disabled]="busy()">{{ i18n.t('access.create') }}</button>
+        </div>
+      </form>
+    </section>
+  }
+  <section class="aa-card">
+    <div class="aa__table-wrap">
+      <table class="aa-table">
+        <thead>
+          <tr>
+            <th>{{ i18n.t('access.col.group') }}</th>
+            <th>{{ i18n.t('access.col.modules') }}</th>
+            @for (cap of capabilities; track cap.code) { <th class="aa__center">{{ i18n.t(cap.labelKey) }}</th> }
+            <th class="aa__center">{{ i18n.t('access.col.members') }}</th>
+            <th>{{ i18n.t('access.col.state') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (group of groups(); track group.id) {
+            <tr>
+              <td><strong>{{ group.name }}</strong> <span class="mono aa__muted">{{ group.code }}</span></td>
+              <td>
+                <select class="aa-input aa-input--sm" [ngModel]="group.moduleScope" (ngModelChange)="setScope(group, $event)" [attr.aria-label]="i18n.t('access.col.modules') + ' · ' + group.name">
+                  @for (s of scopes; track s) { <option [value]="s">{{ i18n.t(scopeKey(s)) }}</option> }
+                </select>
+              </td>
+              @for (cap of capabilities; track cap.code) {
+                @let on = group.capabilities.includes(cap.code);
+                <td class="aa__center">
+                  <button type="button" class="aa-icon" role="checkbox" [attr.aria-checked]="on" [attr.aria-label]="i18n.t(cap.labelKey) + ' · ' + group.name" (click)="toggleCapability(group, cap.code)">
+                    <mat-icon [class.aa-check--on]="on">{{ on ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
+                  </button>
+                </td>
+              }
+              <td class="aa__center mono">{{ members()[group.id] ?? 0 }}</td>
+              <td>
+                <label class="switch">
+                  <input class="switch__input" type="checkbox" role="switch" [checked]="group.active" (change)="setGroupActive(group, !group.active)" />
+                  <span class="switch__track" aria-hidden="true"></span>
+                  {{ i18n.t(group.active ? 'access.state.active' : 'access.state.inactive') }}
+                </label>
+              </td>
+            </tr>
+          } @empty {
+            <tr><td [attr.colspan]="4 + capabilities.length" class="aa__empty">{{ i18n.t('access.noGroups') }}</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <p class="aa-card__note">{{ i18n.t('access.capsNote') }}</p>
+  </section>
+}

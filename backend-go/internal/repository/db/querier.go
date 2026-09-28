@@ -18,6 +18,8 @@ type Querier interface {
 	AddUserPermissionGroup(ctx context.Context, arg AddUserPermissionGroupParams) error
 	// 409 de spec/04-contratos-api.md: la IP de un activo es su identidad operativa.
 	AssetIPTaken(ctx context.Context, arg AssetIPTakenParams) (bool, error)
+	AssignShiftEndTemplate(ctx context.Context, arg AssignShiftEndTemplateParams) error
+	AssignShiftStartTemplate(ctx context.Context, arg AssignShiftStartTemplateParams) error
 	// PATCH /api/entries/bulk (admin, HU-7g) — reclasificación masiva.
 	BulkPatchEntries(ctx context.Context, arg BulkPatchEntriesParams) (int64, error)
 	// Solo reclama un adjunto todavía huérfano — evita que dos entradas
@@ -29,6 +31,7 @@ type Querier interface {
 	// marcar uno nuevo desmarca el anterior.
 	ClearPreferredContactChannel(ctx context.Context, contactID pgtype.UUID) error
 	ClearPreferredUserChannel(ctx context.Context, userID pgtype.UUID) error
+	ClearTemplateFromShifts(ctx context.Context, checklistTemplateStartID pgtype.UUID) error
 	CompleteSetup(ctx context.Context, arg CompleteSetupParams) (AppConfig, error)
 	CountAuditLogs(ctx context.Context) (int64, error)
 	CountBackupRuns(ctx context.Context, kind NullBackupKind) (int64, error)
@@ -38,6 +41,7 @@ type Querier interface {
 	CountIncidentEntriesInWindow(ctx context.Context, arg CountIncidentEntriesInWindowParams) (int64, error)
 	CountResolvedTicketsInWindow(ctx context.Context, arg CountResolvedTicketsInWindowParams) (int64, error)
 	CountSLABreachesInWindow(ctx context.Context, arg CountSLABreachesInWindowParams) (int64, error)
+	CountShiftChecksForTemplate(ctx context.Context, checklistTemplateID uuid.UUID) (int64, error)
 	CountTerritorialUnits(ctx context.Context, arg CountTerritorialUnitsParams) (int64, error)
 	CountTickets(ctx context.Context, arg CountTicketsParams) (int64, error)
 	CountTicketsView(ctx context.Context, arg CountTicketsViewParams) (int64, error)
@@ -46,6 +50,7 @@ type Querier interface {
 	CreateBackupRun(ctx context.Context, arg CreateBackupRunParams) (BackupRun, error)
 	CreateBackupRunWithSource(ctx context.Context, arg CreateBackupRunWithSourceParams) (BackupRun, error)
 	CreateChecklistEntry(ctx context.Context, arg CreateChecklistEntryParams) (Entry, error)
+	CreateChecklistTemplate(ctx context.Context, arg CreateChecklistTemplateParams) (ChecklistTemplate, error)
 	CreateContact(ctx context.Context, arg CreateContactParams) (uuid.UUID, error)
 	CreateContactChannel(ctx context.Context, arg CreateContactChannelParams) (ContactChannel, error)
 	// Fase 9 del roadmap (spec/02-alcance-y-roadmap.md): bitácora — registro
@@ -95,6 +100,11 @@ type Querier interface {
 	// `active` que ya usa el resto del esquema (organizations, teams, etc.).
 	DeactivateUser(ctx context.Context, id uuid.UUID) error
 	DeleteBackupRun(ctx context.Context, id uuid.UUID) (BackupRun, error)
+	// Un solo DELETE para padres e hijos: la FK de parent_item_id se revisa al
+	// final de la sentencia. El historial conserva el nombre (service_title) y
+	// su checklist_item_id queda en NULL (ON DELETE SET NULL).
+	DeleteChecklistItemsExcept(ctx context.Context, arg DeleteChecklistItemsExceptParams) error
+	DeleteChecklistTemplate(ctx context.Context, id uuid.UUID) error
 	DeleteContactChannel(ctx context.Context, arg DeleteContactChannelParams) (int64, error)
 	DeleteDraft(ctx context.Context, arg DeleteDraftParams) (int64, error)
 	// Borrado real (no soft-delete, HU-7g) — RETURNING para el snapshot de auditoría.
@@ -138,6 +148,8 @@ type Querier interface {
 	GetAttachment(ctx context.Context, id uuid.UUID) (EntryAttachment, error)
 	GetBackupConfig(ctx context.Context) (BackupConfig, error)
 	GetBackupRun(ctx context.Context, id uuid.UUID) (BackupRun, error)
+	GetChecklistCooldown(ctx context.Context) (int32, error)
+	GetChecklistTemplate(ctx context.Context, id uuid.UUID) (ChecklistTemplate, error)
 	// El slot regular cuya semana cubre `now` (independiente de is_paused: el
 	// handler decide qué hacer con eso vía internal/rotation.Resolve).
 	GetCurrentRotationSlot(ctx context.Context, arg GetCurrentRotationSlotParams) (GetCurrentRotationSlotRow, error)
@@ -190,6 +202,7 @@ type Querier interface {
 	// ===== Intentos (inmutables, ver migración 000004) =====
 	InsertActionLog(ctx context.Context, arg InsertActionLogParams) (EscalationActionLog, error)
 	InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) error
+	InsertChecklistItem(ctx context.Context, arg InsertChecklistItemParams) error
 	// Hub SSE genérico (Fase 2 del roadmap) — toda publicación pasa por acá para
 	// que GET /api/stream/events pueda reponer eventos perdidos vía Last-Event-ID
 	// (ver spec/09-alta-disponibilidad-2-nodos.md sección 3.2/9.3).
@@ -219,6 +232,8 @@ type Querier interface {
 	ListChannelsForUser(ctx context.Context, userID pgtype.UUID) ([]ContactChannel, error)
 	ListChannelsForUsers(ctx context.Context, userIds []uuid.UUID) ([]ContactChannel, error)
 	ListChecklistItems(ctx context.Context, templateID uuid.UUID) ([]ChecklistItem, error)
+	// ===== Administración de plantillas (pantalla aprobada "Administración: Checklist") =====
+	ListChecklistTemplates(ctx context.Context) ([]ChecklistTemplate, error)
 	// ===== Consolidación de duplicados (POST /api/directory/merge-duplicates) =====
 	// Orden por antigüedad: el más antiguo de cada grupo queda como principal,
 	// salvo que otro esté más completo (ver handler).
@@ -352,6 +367,7 @@ type Querier interface {
 	// (POST /api/system/rate-limit-reset).
 	ResetLoginRateLimit(ctx context.Context, ipAddress string) error
 	RotatePublicShareLink(ctx context.Context, arg RotatePublicShareLinkParams) (PublicShareLink, error)
+	SetChecklistCooldown(ctx context.Context, shiftCheckCooldownMinutes int32) (int32, error)
 	// email/phone de contacts son la copia denormalizada del canal preferido de
 	// cada tipo (la fuente de verdad son contact_channels), cifrada + indexada
 	// para listar y buscar sin recorrer los canales.
@@ -369,10 +385,13 @@ type Querier interface {
 	// Resumen de la cola para la cabecera. "Vencido" = abierto, no en pausa y
 	// pasado el vencimiento real (pactado + pausas acumuladas), igual que tickets.ResolutionClock.
 	TicketQueueSummary(ctx context.Context, arg TicketQueueSummaryParams) (TicketQueueSummaryRow, error)
+	TouchLastLogin(ctx context.Context, id uuid.UUID) error
 	TouchPublicShareAccess(ctx context.Context, id uuid.UUID) error
 	UpdateAsset(ctx context.Context, arg UpdateAssetParams) (int64, error)
 	UpdateBackupConfig(ctx context.Context, arg UpdateBackupConfigParams) (BackupConfig, error)
 	UpdateChannelValue(ctx context.Context, arg UpdateChannelValueParams) error
+	UpdateChecklistItem(ctx context.Context, arg UpdateChecklistItemParams) error
+	UpdateChecklistTemplate(ctx context.Context, arg UpdateChecklistTemplateParams) (ChecklistTemplate, error)
 	UpdateContact(ctx context.Context, arg UpdateContactParams) (int64, error)
 	UpdateEntryTicket(ctx context.Context, arg UpdateEntryTicketParams) (Entry, error)
 	UpdateLogSource(ctx context.Context, arg UpdateLogSourceParams) (CatalogLogSource, error)

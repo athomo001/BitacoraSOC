@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"slices"
 
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/middleware"
@@ -54,6 +55,21 @@ func (h *PermissionGroupsHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, dtos)
 }
 
+// KnownCapabilities es la lista cerrada de capacidades que el backend
+// realmente revisa (middleware.RequireCapability). Un grupo solo puede
+// llevar estas: antes se escribían a mano y un error de tipeo ("directory:wirte")
+// se guardaba sin aviso y no otorgaba nada. La pantalla las muestra como casillas.
+var KnownCapabilities = []string{"directory:write", "directory:delete"}
+
+func validCapabilities(capabilities []string) (string, bool) {
+	for _, capability := range capabilities {
+		if !slices.Contains(KnownCapabilities, capability) {
+			return capability, false
+		}
+	}
+	return "", true
+}
+
 type createPermissionGroupRequest struct {
 	Code         string   `json:"code"`
 	Name         string   `json:"name"`
@@ -66,6 +82,10 @@ func (h *PermissionGroupsHandler) Create(w http.ResponseWriter, r *http.Request)
 	var req createPermissionGroupRequest
 	if err := decodeJSON(w, r, &req); err != nil || req.Code == "" || req.Name == "" {
 		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "code y name son obligatorios")
+		return
+	}
+	if unknown, ok := validCapabilities(req.Capabilities); !ok {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "capacidad desconocida: "+unknown)
 		return
 	}
 	scope := req.ModuleScope
@@ -113,6 +133,10 @@ func (h *PermissionGroupsHandler) Patch(w http.ResponseWriter, r *http.Request) 
 		params.ModuleScope = db.NullPermissionGroupModuleScope{PermissionGroupModuleScope: db.PermissionGroupModuleScope(*req.ModuleScope), Valid: true}
 	}
 	if req.Capabilities != nil {
+		if unknown, ok := validCapabilities(req.Capabilities); !ok {
+			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "capacidad desconocida: "+unknown)
+			return
+		}
 		params.Capabilities = req.Capabilities
 	}
 	if req.Active != nil {

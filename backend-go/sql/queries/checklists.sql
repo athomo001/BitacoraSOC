@@ -96,3 +96,58 @@ SELECT * FROM shift_closures WHERE closure_check_id = $1 LIMIT 1;
 -- name: GetWorkShiftForCheck :one
 -- Turno al que pertenece un check: define la ventana real del cierre (no 8h fijas) y los destinatarios del reporte.
 SELECT ws.* FROM work_shifts ws JOIN shift_checks sc ON sc.work_shift_id = ws.id WHERE sc.id = $1;
+
+-- ===== Administración de plantillas (pantalla aprobada "Administración: Checklist") =====
+
+-- name: ListChecklistTemplates :many
+SELECT * FROM checklist_templates ORDER BY is_active DESC, name;
+
+-- name: GetChecklistTemplate :one
+SELECT * FROM checklist_templates WHERE id = $1;
+
+-- name: CreateChecklistTemplate :one
+INSERT INTO checklist_templates (name, is_active, alert_nok_enabled, alert_nok_role_target)
+VALUES ($1, $2, $3, sqlc.narg('alert_nok_role_target')) RETURNING *;
+
+-- name: UpdateChecklistTemplate :one
+UPDATE checklist_templates SET name = $2, is_active = $3, alert_nok_enabled = $4, alert_nok_role_target = sqlc.narg('alert_nok_role_target')
+WHERE id = $1 RETURNING *;
+
+-- name: DeleteChecklistTemplate :exec
+DELETE FROM checklist_templates WHERE id = $1;
+
+-- name: CountShiftChecksForTemplate :one
+SELECT count(*) FROM shift_checks WHERE checklist_template_id = $1;
+
+-- name: InsertChecklistItem :exec
+INSERT INTO checklist_items (id, template_id, parent_item_id, title, item_order)
+VALUES ($1, $2, sqlc.narg('parent_item_id'), $3, $4);
+
+-- name: UpdateChecklistItem :exec
+UPDATE checklist_items SET parent_item_id = sqlc.narg('parent_item_id'), title = $3, item_order = $4
+WHERE id = $1 AND template_id = $2;
+
+-- Un solo DELETE para padres e hijos: la FK de parent_item_id se revisa al
+-- final de la sentencia. El historial conserva el nombre (service_title) y
+-- su checklist_item_id queda en NULL (ON DELETE SET NULL).
+-- name: DeleteChecklistItemsExcept :exec
+DELETE FROM checklist_items WHERE template_id = $1 AND NOT (id = ANY(sqlc.arg('keep_ids')::uuid[]));
+
+-- name: ClearTemplateFromShifts :exec
+UPDATE work_shifts SET
+  checklist_template_start_id = CASE WHEN checklist_template_start_id = $1 THEN NULL ELSE checklist_template_start_id END,
+  checklist_template_end_id = CASE WHEN checklist_template_end_id = $1 THEN NULL ELSE checklist_template_end_id END
+WHERE checklist_template_start_id = $1 OR checklist_template_end_id = $1;
+
+-- name: AssignShiftStartTemplate :exec
+UPDATE work_shifts SET checklist_template_start_id = $2 WHERE id = $1;
+
+-- name: AssignShiftEndTemplate :exec
+UPDATE work_shifts SET checklist_template_end_id = $2 WHERE id = $1;
+
+-- name: GetChecklistCooldown :one
+SELECT shift_check_cooldown_minutes FROM app_config WHERE id = true;
+
+-- name: SetChecklistCooldown :one
+UPDATE app_config SET shift_check_cooldown_minutes = $1, updated_at = now() WHERE id = true
+RETURNING shift_check_cooldown_minutes;

@@ -72,7 +72,11 @@ describe('ShiftsComponent (Dotación)', () => {
     fixture.detectChanges();
     await tick();
     const req = httpMock.expectOne((r) => r.url === '/api/work-shifts/matrix');
-    expect(req.request.params.get('from')).toBe('2026-09-28');
+    // Lunes de la semana siguiente a hoy (antes estaba fijo y se rompía al pasar la fecha).
+    const monday = new Date();
+    monday.setHours(0, 0, 0, 0);
+    monday.setDate(monday.getDate() + (monday.getDay() === 0 ? -6 : 1 - monday.getDay()) + 7);
+    expect(req.request.params.get('from')).toBe(monday.toISOString().slice(0, 10));
     req.flush({ data: MATRIX });
   });
 

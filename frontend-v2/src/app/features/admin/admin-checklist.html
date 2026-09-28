@@ -1,0 +1,175 @@
+<header class="ac__head">
+  <div>
+    <h2 class="ac__title">{{ i18n.t('admin.nav.checklist') }}</h2>
+    <p class="ac__muted">{{ i18n.t('adminChecklist.subtitle') }}</p>
+  </div>
+  <div class="ac-card ac__cooldown">
+    <mat-icon>timer</mat-icon>
+    <label for="ac-cooldown">{{ i18n.t('adminChecklist.cooldown') }}</label>
+    <input id="ac-cooldown" class="ac-input mono" type="number" min="0" max="1440" [ngModel]="cooldown()" (ngModelChange)="cooldown.set($event)" (keydown.enter)="saveCooldown()" />
+    <span class="ac__muted">min</span>
+    @if (cooldown() !== cooldownSaved()) {
+      <button type="button" class="ac-btn ac-btn--primary" (click)="saveCooldown()">{{ i18n.t('adminChecklist.save') }}</button>
+    }
+  </div>
+</header>
+
+@if (error(); as message) { <p class="msg msg--error" role="alert">{{ message }}</p> }
+
+@if (!loading()) {
+  <div class="ac">
+    <!-- Plantillas -->
+    <section class="ac-card">
+      <header class="ac-card__head">
+        <span class="ac-card__title"><mat-icon>library_books</mat-icon>{{ i18n.t('adminChecklist.templates') }}</span>
+        <button type="button" class="ac-btn ac__new" (click)="select(null)"><mat-icon>add</mat-icon>{{ i18n.t('adminChecklist.new') }}</button>
+      </header>
+      @for (t of templates(); track t.id) {
+        <button type="button" class="ac-tpl" [class.ac-tpl--active]="draft().id === t.id" [attr.aria-current]="draft().id === t.id ? 'true' : null" (click)="select(t)">
+          <span class="ac-tpl__name">{{ t.name }}
+            <span class="pill" [class.tone-ok]="t.isActive" [class.tone-neutral]="!t.isActive">{{ i18n.t(t.isActive ? 'adminChecklist.active' : 'adminChecklist.inactive') }}</span>
+          </span>
+          <span class="ac__muted">{{ templateMeta(t) }}</span>
+        </button>
+      } @empty {
+        <p class="ac-card__empty">{{ i18n.t('adminChecklist.none') }}</p>
+      }
+      <p class="ac-card__note">{{ i18n.t('adminChecklist.historyNote') }}</p>
+    </section>
+
+    <!-- Editor -->
+    <section class="ac-card">
+      <header class="ac-card__head">
+        <span class="ac-card__title"><mat-icon>edit</mat-icon>{{ i18n.t(draft().id ? 'adminChecklist.edit' : 'adminChecklist.creating') }}</span>
+        <input class="ac-input ac__name" [ngModel]="draft().name" (ngModelChange)="patch({ name: $event })" [placeholder]="i18n.t('adminChecklist.namePlaceholder')" [attr.aria-label]="i18n.t('adminChecklist.name')" maxlength="120" />
+        <label class="switch ac__active">
+          <input class="switch__input" type="checkbox" role="switch" [checked]="draft().isActive" (change)="patch({ isActive: !draft().isActive })" />
+          <span class="switch__track" aria-hidden="true"></span>
+          {{ i18n.t(draft().isActive ? 'adminChecklist.active' : 'adminChecklist.inactive') }}
+        </label>
+      </header>
+
+      <div class="ac-settings">
+        <div class="ac-settings__col">
+          <span class="ac__label">{{ i18n.t('adminChecklist.usedIn') }}</span>
+          @if (shifts().length === 0) {
+            <p class="ac__muted">{{ i18n.t('adminChecklist.noShifts') }}</p>
+          } @else {
+            <table class="ac-assign">
+              <thead><tr><th></th><th>{{ i18n.t('check.momentLabel.inicio') }}</th><th>{{ i18n.t('check.momentLabel.cierre') }}</th></tr></thead>
+              <tbody>
+                @for (s of shifts(); track s.id) {
+                  <tr>
+                    <td>{{ s.name }} <span class="mono ac__muted">{{ s.startTime.slice(0, 5) }}–{{ s.endTime.slice(0, 5) }}</span></td>
+                    @for (moment of ['inicio', 'cierre']; track moment) {
+                      @let m = $any(moment);
+                      @let other = usedBy(s, m);
+                      <td>
+                        <button type="button" class="ac-radio" [attr.aria-pressed]="isAssigned(s.id, m)" [attr.aria-label]="s.name + ' · ' + i18n.t(m === 'inicio' ? 'check.momentLabel.inicio' : 'check.momentLabel.cierre')"
+                          [attr.title]="other && isAssigned(s.id, m) ? i18n.tf('adminChecklist.replaces', other) : other ? i18n.tf('adminChecklist.currently', other) : null" (click)="toggleAssignment(s.id, m)">
+                          <mat-icon>{{ isAssigned(s.id, m) ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>
+                        </button>
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+            <p class="ac__muted">{{ i18n.t('adminChecklist.assignHint') }}</p>
+          }
+        </div>
+        <div class="ac-settings__col">
+          <span class="ac__label">{{ i18n.t('adminChecklist.alert') }}</span>
+          <label class="switch">
+            <input class="switch__input" type="checkbox" role="switch" [checked]="draft().alertNokEnabled" (change)="toggleAlert()" />
+            <span class="switch__track" aria-hidden="true"></span>
+            {{ i18n.t('adminChecklist.alertText') }}
+          </label>
+          @if (draft().alertNokEnabled) {
+            <div class="ac__alert-to">
+              {{ i18n.t('adminChecklist.alertTo') }}
+              <select class="ac-input" [ngModel]="draft().alertNokRoleTarget" (ngModelChange)="patch({ alertNokRoleTarget: $event })" [attr.aria-label]="i18n.t('adminChecklist.alertTo')">
+                @for (r of roles; track r) { <option [value]="r">{{ roleLabel(r) }}</option> }
+              </select>
+              <span class="ac__muted">{{ i18n.tf('adminChecklist.people', roleCounts()[draft().alertNokRoleTarget ?? ''] ?? 0) }}</span>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="ac-items__bar">
+        <span class="ac__label">{{ i18n.t('adminChecklist.items') }}</span>
+        <span class="ac__muted">{{ i18n.tf('adminChecklist.itemsSummary', leafCount()) }} · {{ i18n.tf('adminChecklist.groupsSummary', groupCount()) }}</span>
+        <button type="button" class="ac-btn ac__push" [attr.aria-pressed]="preview()" (click)="preview.set(!preview())"><mat-icon>visibility</mat-icon>{{ i18n.t('adminChecklist.preview') }}</button>
+        <button type="button" class="ac-btn" (click)="addItem()"><mat-icon>add</mat-icon>{{ i18n.t('adminChecklist.addItem') }}</button>
+      </div>
+
+      @if (preview()) {
+        <ul class="ac-preview">
+          @for (row of rows(); track row.item.key) {
+            <li [style.padding-left.px]="16 + (row.depth - 1) * 28">
+              <mat-icon>radio_button_unchecked</mat-icon>
+              <span [class.ac-preview__group]="row.children > 0">{{ row.item.title || '—' }}</span>
+              @if (row.children > 0) {
+                <span class="pill tone-neutral"><mat-icon>lock</mat-icon>{{ i18n.t('check.group.pending') }}</span>
+              } @else {
+                <span class="ac-preview__sema">{{ i18n.t('check.green') }} · {{ i18n.t('check.redBtn') }}</span>
+              }
+            </li>
+          }
+        </ul>
+      } @else {
+        <ol class="ac-items">
+          @for (row of rows(); track row.item.key) {
+            <li class="ac-row" [style.padding-left.px]="12 + (row.depth - 1) * 30">
+              <mat-icon class="ac__muted">{{ row.children > 0 ? 'folder_open' : 'radio_button_unchecked' }}</mat-icon>
+              <input class="ac-input ac-row__title" [class.ac-row__title--group]="row.children > 0" [class.is-missing]="!row.item.title.trim()"
+                [ngModel]="row.item.title" (ngModelChange)="rename(row.item.key, $event)" maxlength="160"
+                [placeholder]="i18n.t(row.depth === 1 ? 'adminChecklist.itemPlaceholder' : 'adminChecklist.subItemPlaceholder')" [attr.aria-label]="i18n.tf('adminChecklist.itemLabel', row.index + 1)" />
+              @if (row.children > 0) {
+                <span class="pill tone-neutral"><mat-icon>lock</mat-icon>{{ i18n.tf('adminChecklist.computedFrom', row.children) }}</span>
+              }
+              @if (row.depth < maxDepth) {
+                <button type="button" class="ac-icon" [attr.title]="i18n.t('adminChecklist.addChild')" [attr.aria-label]="i18n.t('adminChecklist.addChild')" (click)="addChild(row.item.key)"><mat-icon>subdirectory_arrow_right</mat-icon></button>
+              }
+              <button type="button" class="ac-icon" [disabled]="row.first" [attr.title]="i18n.t('adminChecklist.up')" [attr.aria-label]="i18n.t('adminChecklist.up')" (click)="move(row.item.key, -1)"><mat-icon>arrow_upward</mat-icon></button>
+              <button type="button" class="ac-icon" [disabled]="row.last" [attr.title]="i18n.t('adminChecklist.down')" [attr.aria-label]="i18n.t('adminChecklist.down')" (click)="move(row.item.key, 1)"><mat-icon>arrow_downward</mat-icon></button>
+              <button type="button" class="ac-icon" [attr.title]="i18n.t('adminChecklist.remove')" [attr.aria-label]="i18n.t('adminChecklist.remove')" (click)="remove(row.item.key)"><mat-icon>delete_outline</mat-icon></button>
+            </li>
+          } @empty {
+            <li class="ac-card__empty">{{ i18n.t('adminChecklist.problem.items') }}</li>
+          }
+        </ol>
+      }
+
+      <footer class="ac-foot">
+        <span class="ac-foot__status">
+        @if (notice(); as n) {
+          <span class="pill tone-ok"><mat-icon>task_alt</mat-icon>{{ n }}</span>
+        } @else if (problem() && dirty()) {
+          <span class="text-bad ac__small">{{ problemText() }}</span>
+        } @else {
+          <span class="ac__muted">{{ i18n.t(dirty() ? 'adminChecklist.unsaved' : 'adminChecklist.noChanges') }}</span>
+        }
+        </span>
+        @if (selected(); as t) {
+          @if (confirmDelete()) {
+            <span class="ac__confirm">
+              {{ i18n.t('adminChecklist.confirmDelete') }}
+              <button type="button" class="ac-btn ac-btn--danger" (click)="deleteTemplate()">{{ i18n.t('adminChecklist.delete') }}</button>
+              <button type="button" class="ac-btn" (click)="confirmDelete.set(false)">{{ i18n.t('adminChecklist.cancel') }}</button>
+            </span>
+          } @else if (t.checksCount === 0) {
+            <button type="button" class="ac-btn ac-btn--ghost-danger" (click)="confirmDelete.set(true)"><mat-icon>delete_outline</mat-icon>{{ i18n.t('adminChecklist.delete') }}</button>
+          } @else {
+            <span class="pill tone-neutral" [attr.title]="i18n.tf('adminChecklist.inUse', t.checksCount)"><mat-icon>lock</mat-icon>{{ i18n.tf('adminChecklist.inUseShort', t.checksCount) }}</span>
+          }
+        }
+        @if (dirty()) {
+          <button type="button" class="ac-btn ac__push" (click)="discard()">{{ i18n.t('adminChecklist.discard') }}</button>
+        }
+        <button type="button" class="ac-btn ac-btn--primary" [class.ac__push]="!dirty()" [disabled]="!dirty() || !!problem() || busy()" (click)="save()"><mat-icon>save</mat-icon>{{ i18n.t('adminChecklist.saveTemplate') }}</button>
+      </footer>
+    </section>
+  </div>
+}

@@ -1,7 +1,7 @@
 /* Ticketera según el artboard aprobado: cola arriba, tabla densa + detalle fijo. */
 :host {
   display: block;
-  height: 100%;
+  height: calc(100% + 32px); /* el área de trabajo del shell tiene 16px de padding */
   margin: -16px; /* ocupa todo el área de trabajo del shell, como el mockup */
 }
 

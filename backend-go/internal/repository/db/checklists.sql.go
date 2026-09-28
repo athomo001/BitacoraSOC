@@ -50,6 +50,46 @@ func (q *Queries) AcknowledgeShiftClosure(ctx context.Context, arg AcknowledgeSh
 	return i, err
 }
 
+const assignShiftEndTemplate = `-- name: AssignShiftEndTemplate :exec
+UPDATE work_shifts SET checklist_template_end_id = $2 WHERE id = $1
+`
+
+type AssignShiftEndTemplateParams struct {
+	ID                     uuid.UUID   `json:"id"`
+	ChecklistTemplateEndID pgtype.UUID `json:"checklist_template_end_id"`
+}
+
+func (q *Queries) AssignShiftEndTemplate(ctx context.Context, arg AssignShiftEndTemplateParams) error {
+	_, err := q.db.Exec(ctx, assignShiftEndTemplate, arg.ID, arg.ChecklistTemplateEndID)
+	return err
+}
+
+const assignShiftStartTemplate = `-- name: AssignShiftStartTemplate :exec
+UPDATE work_shifts SET checklist_template_start_id = $2 WHERE id = $1
+`
+
+type AssignShiftStartTemplateParams struct {
+	ID                       uuid.UUID   `json:"id"`
+	ChecklistTemplateStartID pgtype.UUID `json:"checklist_template_start_id"`
+}
+
+func (q *Queries) AssignShiftStartTemplate(ctx context.Context, arg AssignShiftStartTemplateParams) error {
+	_, err := q.db.Exec(ctx, assignShiftStartTemplate, arg.ID, arg.ChecklistTemplateStartID)
+	return err
+}
+
+const clearTemplateFromShifts = `-- name: ClearTemplateFromShifts :exec
+UPDATE work_shifts SET
+  checklist_template_start_id = CASE WHEN checklist_template_start_id = $1 THEN NULL ELSE checklist_template_start_id END,
+  checklist_template_end_id = CASE WHEN checklist_template_end_id = $1 THEN NULL ELSE checklist_template_end_id END
+WHERE checklist_template_start_id = $1 OR checklist_template_end_id = $1
+`
+
+func (q *Queries) ClearTemplateFromShifts(ctx context.Context, checklistTemplateStartID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, clearTemplateFromShifts, checklistTemplateStartID)
+	return err
+}
+
 const countEntriesInWindow = `-- name: CountEntriesInWindow :one
 SELECT count(*) FROM entries WHERE created_at >= $1 AND created_at < $2
 `
@@ -114,6 +154,17 @@ func (q *Queries) CountSLABreachesInWindow(ctx context.Context, arg CountSLABrea
 	return count, err
 }
 
+const countShiftChecksForTemplate = `-- name: CountShiftChecksForTemplate :one
+SELECT count(*) FROM shift_checks WHERE checklist_template_id = $1
+`
+
+func (q *Queries) CountShiftChecksForTemplate(ctx context.Context, checklistTemplateID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countShiftChecksForTemplate, checklistTemplateID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createChecklistEntry = `-- name: CreateChecklistEntry :one
 INSERT INTO entries (user_id, entry_type, scope, content, tags, work_shift_id)
 VALUES ($1, 'checklist', 'general', $2, $3, $4) RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at
@@ -152,6 +203,37 @@ func (q *Queries) CreateChecklistEntry(ctx context.Context, arg CreateChecklistE
 		&i.ImageSizeBytes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createChecklistTemplate = `-- name: CreateChecklistTemplate :one
+INSERT INTO checklist_templates (name, is_active, alert_nok_enabled, alert_nok_role_target)
+VALUES ($1, $2, $3, $4) RETURNING id, name, is_active, alert_nok_enabled, alert_nok_role_target, created_at
+`
+
+type CreateChecklistTemplateParams struct {
+	Name               string      `json:"name"`
+	IsActive           bool        `json:"is_active"`
+	AlertNokEnabled    bool        `json:"alert_nok_enabled"`
+	AlertNokRoleTarget pgtype.Text `json:"alert_nok_role_target"`
+}
+
+func (q *Queries) CreateChecklistTemplate(ctx context.Context, arg CreateChecklistTemplateParams) (ChecklistTemplate, error) {
+	row := q.db.QueryRow(ctx, createChecklistTemplate,
+		arg.Name,
+		arg.IsActive,
+		arg.AlertNokEnabled,
+		arg.AlertNokRoleTarget,
+	)
+	var i ChecklistTemplate
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.IsActive,
+		&i.AlertNokEnabled,
+		&i.AlertNokRoleTarget,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -290,12 +372,67 @@ func (q *Queries) CreateShiftClosure(ctx context.Context, arg CreateShiftClosure
 	return i, err
 }
 
+const deleteChecklistItemsExcept = `-- name: DeleteChecklistItemsExcept :exec
+DELETE FROM checklist_items WHERE template_id = $1 AND NOT (id = ANY($2::uuid[]))
+`
+
+type DeleteChecklistItemsExceptParams struct {
+	TemplateID uuid.UUID   `json:"template_id"`
+	KeepIds    []uuid.UUID `json:"keep_ids"`
+}
+
+// Un solo DELETE para padres e hijos: la FK de parent_item_id se revisa al
+// final de la sentencia. El historial conserva el nombre (service_title) y
+// su checklist_item_id queda en NULL (ON DELETE SET NULL).
+func (q *Queries) DeleteChecklistItemsExcept(ctx context.Context, arg DeleteChecklistItemsExceptParams) error {
+	_, err := q.db.Exec(ctx, deleteChecklistItemsExcept, arg.TemplateID, arg.KeepIds)
+	return err
+}
+
+const deleteChecklistTemplate = `-- name: DeleteChecklistTemplate :exec
+DELETE FROM checklist_templates WHERE id = $1
+`
+
+func (q *Queries) DeleteChecklistTemplate(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteChecklistTemplate, id)
+	return err
+}
+
 const getActiveChecklistTemplate = `-- name: GetActiveChecklistTemplate :one
 SELECT id, name, is_active, alert_nok_enabled, alert_nok_role_target, created_at FROM checklist_templates WHERE id = $1 AND is_active = true
 `
 
 func (q *Queries) GetActiveChecklistTemplate(ctx context.Context, id uuid.UUID) (ChecklistTemplate, error) {
 	row := q.db.QueryRow(ctx, getActiveChecklistTemplate, id)
+	var i ChecklistTemplate
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.IsActive,
+		&i.AlertNokEnabled,
+		&i.AlertNokRoleTarget,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getChecklistCooldown = `-- name: GetChecklistCooldown :one
+SELECT shift_check_cooldown_minutes FROM app_config WHERE id = true
+`
+
+func (q *Queries) GetChecklistCooldown(ctx context.Context) (int32, error) {
+	row := q.db.QueryRow(ctx, getChecklistCooldown)
+	var shift_check_cooldown_minutes int32
+	err := row.Scan(&shift_check_cooldown_minutes)
+	return shift_check_cooldown_minutes, err
+}
+
+const getChecklistTemplate = `-- name: GetChecklistTemplate :one
+SELECT id, name, is_active, alert_nok_enabled, alert_nok_role_target, created_at FROM checklist_templates WHERE id = $1
+`
+
+func (q *Queries) GetChecklistTemplate(ctx context.Context, id uuid.UUID) (ChecklistTemplate, error) {
+	row := q.db.QueryRow(ctx, getChecklistTemplate, id)
 	var i ChecklistTemplate
 	err := row.Scan(
 		&i.ID,
@@ -467,6 +604,30 @@ func (q *Queries) GetWorkShiftForCheck(ctx context.Context, id uuid.UUID) (WorkS
 	return i, err
 }
 
+const insertChecklistItem = `-- name: InsertChecklistItem :exec
+INSERT INTO checklist_items (id, template_id, parent_item_id, title, item_order)
+VALUES ($1, $2, $5, $3, $4)
+`
+
+type InsertChecklistItemParams struct {
+	ID           uuid.UUID   `json:"id"`
+	TemplateID   uuid.UUID   `json:"template_id"`
+	Title        string      `json:"title"`
+	ItemOrder    int32       `json:"item_order"`
+	ParentItemID pgtype.UUID `json:"parent_item_id"`
+}
+
+func (q *Queries) InsertChecklistItem(ctx context.Context, arg InsertChecklistItemParams) error {
+	_, err := q.db.Exec(ctx, insertChecklistItem,
+		arg.ID,
+		arg.TemplateID,
+		arg.Title,
+		arg.ItemOrder,
+		arg.ParentItemID,
+	)
+	return err
+}
+
 const linkCorrelatedShiftCheckService = `-- name: LinkCorrelatedShiftCheckService :one
 UPDATE shift_check_services SET correlated_from_service_id = $2 WHERE id = $1 RETURNING id, shift_check_id, checklist_item_id, service_title, status, is_computed, observation, correlated_from_service_id
 `
@@ -542,6 +703,39 @@ func (q *Queries) ListChecklistItems(ctx context.Context, templateID uuid.UUID) 
 			&i.ParentItemID,
 			&i.Title,
 			&i.ItemOrder,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listChecklistTemplates = `-- name: ListChecklistTemplates :many
+
+SELECT id, name, is_active, alert_nok_enabled, alert_nok_role_target, created_at FROM checklist_templates ORDER BY is_active DESC, name
+`
+
+// ===== Administración de plantillas (pantalla aprobada "Administración: Checklist") =====
+func (q *Queries) ListChecklistTemplates(ctx context.Context) ([]ChecklistTemplate, error) {
+	rows, err := q.db.Query(ctx, listChecklistTemplates)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ChecklistTemplate
+	for rows.Next() {
+		var i ChecklistTemplate
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.IsActive,
+			&i.AlertNokEnabled,
+			&i.AlertNokRoleTarget,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -792,4 +986,73 @@ func (q *Queries) MarkShiftClosureSent(ctx context.Context, arg MarkShiftClosure
 		arg.SentError,
 	)
 	return err
+}
+
+const setChecklistCooldown = `-- name: SetChecklistCooldown :one
+UPDATE app_config SET shift_check_cooldown_minutes = $1, updated_at = now() WHERE id = true
+RETURNING shift_check_cooldown_minutes
+`
+
+func (q *Queries) SetChecklistCooldown(ctx context.Context, shiftCheckCooldownMinutes int32) (int32, error) {
+	row := q.db.QueryRow(ctx, setChecklistCooldown, shiftCheckCooldownMinutes)
+	var shift_check_cooldown_minutes int32
+	err := row.Scan(&shift_check_cooldown_minutes)
+	return shift_check_cooldown_minutes, err
+}
+
+const updateChecklistItem = `-- name: UpdateChecklistItem :exec
+UPDATE checklist_items SET parent_item_id = $5, title = $3, item_order = $4
+WHERE id = $1 AND template_id = $2
+`
+
+type UpdateChecklistItemParams struct {
+	ID           uuid.UUID   `json:"id"`
+	TemplateID   uuid.UUID   `json:"template_id"`
+	Title        string      `json:"title"`
+	ItemOrder    int32       `json:"item_order"`
+	ParentItemID pgtype.UUID `json:"parent_item_id"`
+}
+
+func (q *Queries) UpdateChecklistItem(ctx context.Context, arg UpdateChecklistItemParams) error {
+	_, err := q.db.Exec(ctx, updateChecklistItem,
+		arg.ID,
+		arg.TemplateID,
+		arg.Title,
+		arg.ItemOrder,
+		arg.ParentItemID,
+	)
+	return err
+}
+
+const updateChecklistTemplate = `-- name: UpdateChecklistTemplate :one
+UPDATE checklist_templates SET name = $2, is_active = $3, alert_nok_enabled = $4, alert_nok_role_target = $5
+WHERE id = $1 RETURNING id, name, is_active, alert_nok_enabled, alert_nok_role_target, created_at
+`
+
+type UpdateChecklistTemplateParams struct {
+	ID                 uuid.UUID   `json:"id"`
+	Name               string      `json:"name"`
+	IsActive           bool        `json:"is_active"`
+	AlertNokEnabled    bool        `json:"alert_nok_enabled"`
+	AlertNokRoleTarget pgtype.Text `json:"alert_nok_role_target"`
+}
+
+func (q *Queries) UpdateChecklistTemplate(ctx context.Context, arg UpdateChecklistTemplateParams) (ChecklistTemplate, error) {
+	row := q.db.QueryRow(ctx, updateChecklistTemplate,
+		arg.ID,
+		arg.Name,
+		arg.IsActive,
+		arg.AlertNokEnabled,
+		arg.AlertNokRoleTarget,
+	)
+	var i ChecklistTemplate
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.IsActive,
+		&i.AlertNokEnabled,
+		&i.AlertNokRoleTarget,
+		&i.CreatedAt,
+	)
+	return i, err
 }

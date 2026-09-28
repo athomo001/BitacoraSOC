@@ -5,7 +5,10 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"slices"
 	"testing"
+
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/handler"
 )
 
 // Regresión (Fase 13): "GET /api/backups/export/{kind}" chocaba con
@@ -33,5 +36,25 @@ func TestRoutePatternsDoNotConflict(t *testing.T) {
 			}()
 			mux.Handle(p[1], noop)
 		}()
+	}
+}
+
+// La pantalla de grupos ofrece como casillas exactamente las capacidades de
+// handler.KnownCapabilities (y el backend rechaza cualquier otra). Si una
+// ruta empieza a exigir una capacidad nueva, tiene que estar en esa lista o
+// ningún grupo la podría otorgar.
+func TestCapabilitiesUsadasEstanEnLaListaCerrada(t *testing.T) {
+	source, err := os.ReadFile("main.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	used := regexp.MustCompile(`cap[A-Z]\w*\s*=\s*"([^"]+)"`).FindAllStringSubmatch(string(source), -1)
+	if len(used) == 0 {
+		t.Fatal("no se encontraron constantes cap* en main.go")
+	}
+	for _, capability := range used {
+		if !slices.Contains(handler.KnownCapabilities, capability[1]) {
+			t.Errorf("la capacidad %q se exige en una ruta pero no está en handler.KnownCapabilities", capability[1])
+		}
 	}
 }

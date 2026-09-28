@@ -6,6 +6,7 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/auth"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/crypto"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/middleware"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/service/mail"
@@ -93,6 +94,9 @@ type patchUserRequest struct {
 	Role       *string `json:"role"`
 	CargoLabel *string `json:"cargoLabel"`
 	Active     *bool   `json:"active"`
+	// Forzar cambio de contraseña a UNA persona (la pantalla de Usuarios);
+	// force-reset-all sigue siendo el botón para todos.
+	MustChangePassword *bool `json:"mustChangePassword"`
 }
 
 func (h *UsersHandler) Patch(w http.ResponseWriter, r *http.Request) {
@@ -108,6 +112,19 @@ func (h *UsersHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Role != nil && *req.Role != "admin" && *req.Role != "user" && *req.Role != "auditor" {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "rol inválido")
+		return
+	}
+	// Un admin no puede quitarse a sí mismo el rol ni desactivarse: dejaría la
+	// instalación sin nadie que pueda deshacerlo desde la pantalla.
+	if me, ok := middleware.UserFromContext(ctx); ok && me.ID == id {
+		if (req.Role != nil && *req.Role != "admin") || (req.Active != nil && !*req.Active) {
+			problemdetails.Write(w, r, http.StatusConflict, "self-lockout", "no puedes quitarte el rol de administrador ni desactivarte a ti mismo")
+			return
+		}
+	}
+
 	params := db.UpdateUserAdminParams{ID: id}
 	if req.Email != nil {
 		params.Email = pgtype.Text{String: *req.Email, Valid: true}
@@ -120,6 +137,9 @@ func (h *UsersHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Active != nil {
 		params.Active = pgtype.Bool{Bool: *req.Active, Valid: true}
+	}
+	if req.MustChangePassword != nil {
+		params.MustChangePassword = pgtype.Bool{Bool: *req.MustChangePassword, Valid: true}
 	}
 
 	user, err := h.Queries.UpdateUserAdmin(ctx, params)

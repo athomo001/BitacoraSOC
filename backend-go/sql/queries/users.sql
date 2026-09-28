@@ -47,6 +47,7 @@ UPDATE users SET
   role = COALESCE(sqlc.narg('role'), role),
   cargo_label = COALESCE(sqlc.narg('cargo_label'), cargo_label),
   active = COALESCE(sqlc.narg('active'), active),
+  must_change_password = COALESCE(sqlc.narg('must_change_password'), must_change_password),
   updated_at = now()
 WHERE id = $1
 RETURNING *;
@@ -89,6 +90,9 @@ RETURNING failed_login_attempts;
 
 -- name: LockUser :exec
 UPDATE users SET locked_until = $2, updated_at = now() WHERE id = $1;
+
+-- name: TouchLastLogin :exec
+UPDATE users SET last_login_at = now() WHERE id = $1;
 
 -- name: ResetFailedLoginAttempts :exec
 UPDATE users SET failed_login_attempts = 0, locked_until = NULL, updated_at = now() WHERE id = $1;
