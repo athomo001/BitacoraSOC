@@ -698,6 +698,23 @@ type notifyRequest struct {
 	scope
 	Message  string `json:"message"`
 	Severity string `json:"severity"`
+	// StepOrder elige a qué paso va el aviso (el botón "Escalar (correo)" avisa
+	// al paso siguiente); sin él, al primero, como siempre.
+	StepOrder *int32 `json:"stepOrder,omitempty"`
+}
+
+// notifyStepIndex es la posición del paso al que va el aviso: el pedido, o el
+// primero si no se indicó. false si el pedido no existe en la política.
+func notifyStepIndex(steps []resolvedStepDTO, order *int32) (int, bool) {
+	if order == nil {
+		return 0, len(steps) > 0
+	}
+	for i, st := range steps {
+		if st.Order == *order {
+			return i, true
+		}
+	}
+	return 0, false
 }
 
 // Notify es POST /api/escalation/notify: resuelve igual que /resolve, revisa
@@ -742,8 +759,14 @@ func (h *EscalationHandler) Notify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	first := res.steps[0]
-	firstDTO := res.Steps[0]
+	idx, ok := notifyStepIndex(res.Steps, req.StepOrder)
+	if !ok {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "ese paso no existe en la política de escalación")
+		return
+	}
+	first := res.steps[idx]
+	firstDTO := res.Steps[idx]
+	scopeMeta["stepOrder"] = firstDTO.Order
 	var to, cc []string
 	var recipients []map[string]any
 	for _, m := range escalation.Recipients(first.Mode, first.Members) {

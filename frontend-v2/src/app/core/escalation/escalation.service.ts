@@ -12,7 +12,8 @@ export interface EscalationScope {
 
 export type ResolvedVia = 'service' | 'asset' | 'territorial_unit' | 'team_coverage';
 export type StepMode = 'unique' | 'pool' | 'sequential';
-export type ContactResult = 'answered' | 'no_answer' | 'busy' | 'unreachable';
+/** escalated_next_tier = el operador escala a mano al paso siguiente (botón "Escalar"). */
+export type ContactResult = 'answered' | 'no_answer' | 'busy' | 'unreachable' | 'escalated_next_tier';
 export type ChannelType = 'call' | 'sms' | 'whatsapp' | 'email' | 'other';
 
 export const RESULT_LABELS: Record<ContactResult, string> = {
@@ -20,6 +21,7 @@ export const RESULT_LABELS: Record<ContactResult, string> = {
   no_answer: 'No contesta',
   busy: 'Ocupado',
   unreachable: 'Inalcanzable',
+  escalated_next_tier: 'Escaló',
 };
 
 export const MODE_LABELS: Record<StepMode, string> = {
@@ -224,9 +226,11 @@ export class EscalationService {
   }
 
   /** El backend responde 502 con cuerpo útil cuando falla el SMTP: se devuelve igual. */
-  async notify(scope: EscalationScope, message: string, severity: string): Promise<NotifyOutcome> {
+  /** Aviso por correo; sin stepOrder va al primer paso, con él al paso indicado (escalar). */
+  async notify(scope: EscalationScope, message: string, severity: string, stepOrder?: number): Promise<NotifyOutcome> {
     try {
-      return (await firstValueFrom(this.http.post<ApiEnvelope<NotifyOutcome>>('/api/escalation/notify', { ...scope, message, severity }))).data;
+      const body = stepOrder === undefined ? { ...scope, message, severity } : { ...scope, message, severity, stepOrder };
+      return (await firstValueFrom(this.http.post<ApiEnvelope<NotifyOutcome>>('/api/escalation/notify', body))).data;
     } catch (error) {
       const body = error instanceof HttpErrorResponse ? error.error : null;
       if (body?.data && typeof body.data.sent === 'boolean') return body.data as NotifyOutcome;

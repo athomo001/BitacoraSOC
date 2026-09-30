@@ -1125,3 +1125,35 @@ func (h *DirectoryHandler) dedupeChannels(ctx context.Context, q *db.Queries, co
 	}
 	return nil
 }
+
+// ImportContactChannels agrega correo y teléfono a un contacto con las
+// mismas reglas del alta del Directorio: normalización, cifrado, canal
+// preferido (el teléfono si hay; si no, el correo) e índices ciegos. Lo usa
+// el ETL del legacy (spec/13) para que un contacto migrado sea idéntico a
+// uno creado en la app. Devuelve los valores descartados (formato inválido)
+// como motivos, sin el dato.
+func ImportContactChannels(ctx context.Context, q *db.Queries, box *crypto.Box, contactID uuid.UUID, email, phone string) ([]string, error) {
+	h := &DirectoryHandler{Crypto: box}
+	var problems []string
+	phoneOK := false
+	if strings.TrimSpace(phone) != "" {
+		clean, problem := normalizeChannel(channelInput{ChannelType: "call", Value: phone, Preferred: true})
+		if problem != "" {
+			problems = append(problems, "teléfono inválido")
+		} else {
+			if err := h.createChannel(ctx, q, contactID, clean); err != nil {
+				return problems, err
+			}
+			phoneOK = true
+		}
+	}
+	if strings.TrimSpace(email) != "" {
+		clean, problem := normalizeChannel(channelInput{ChannelType: "email", Value: email, Preferred: !phoneOK})
+		if problem != "" {
+			problems = append(problems, "correo inválido")
+		} else if err := h.createChannel(ctx, q, contactID, clean); err != nil {
+			return problems, err
+		}
+	}
+	return problems, h.syncPrimaryChannels(ctx, q, contactID)
+}

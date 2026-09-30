@@ -16,6 +16,8 @@ import { AdminAuditComponent } from './admin-audit';
 import { AdminAccessComponent } from './admin-access';
 import { AdminReportsComponent } from './admin-reports';
 import { AdminChecklistComponent } from './admin-checklist';
+import { AdminComplementsComponent } from './admin-complements';
+import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 
 export type AdminSection =
   | 'access' | 'shifts' | 'checklist' | 'escalation' | 'smtp' | 'reports'
@@ -29,6 +31,8 @@ interface NavItem {
   badge?: string;
   /** Sección de un módulo SOC/NOC: si el módulo no aplica, no aparece (sin aviso de "desactivado"). */
   requiresModule?: DomainModule;
+  /** Funcionalidad opcional (`system_features`): apagada, la sección no aparece. */
+  requiresFeature?: string;
 }
 
 /** Mismo orden y agrupación que el artboard aprobado "Administración". */
@@ -59,7 +63,7 @@ const NAV: readonly { labelKey: MessageKey; items: readonly NavItem[] }[] = [
       { id: 'features', icon: 'toggle_on', labelKey: 'admin.nav.features' },
       { id: 'backups', icon: 'backup', labelKey: 'admin.nav.backups' },
       { id: 'audit', icon: 'policy', labelKey: 'admin.nav.audit' },
-      { id: 'complements', icon: 'extension', labelKey: 'admin.nav.complements', badge: '13b' },
+      { id: 'complements', icon: 'extension', labelKey: 'admin.nav.complements', requiresFeature: 'complements' },
     ],
   },
 ];
@@ -92,7 +96,7 @@ function normalize(text: string): string {
   imports: [
     MatIconModule, AdminModulesComponent, AdminFeaturesComponent, AdminTerritoryComponent, AdminOrganizationsComponent, AdminTeamsComponent,
     AdminEscalationComponent, AdminShiftsComponent, AdminSmtpComponent, AdminReportsComponent, AdminBackupsComponent, AdminAuditComponent,
-    AdminAccessComponent, AdminChecklistComponent,
+    AdminAccessComponent, AdminChecklistComponent, AdminComplementsComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKeydown($event)' },
@@ -140,12 +144,7 @@ function normalize(text: string): string {
           @case ('features') { <app-admin-features /> }
           @case ('backups') { <app-admin-backups (goToFeatures)="go('features')" /> }
           @case ('audit') { <app-admin-audit /> }
-          @case ('complements') {
-            <section class="adm__soon">
-              <mat-icon>extension</mat-icon>
-              <p>{{ i18n.t('admin.complementsSoon') }}</p>
-            </section>
-          }
+          @case ('complements') { <app-admin-complements /> }
         }
       </main>
     </div>
@@ -172,9 +171,6 @@ function normalize(text: string): string {
     .adm__item-label { flex: 1; }
     .adm__none { margin: 0; padding: 8px 10px; color: var(--text-muted); font-size: 12px; }
     .adm__body { min-width: 0; overflow-y: auto; padding: 16px 20px; }
-    .adm__soon { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 32px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-surface); color: var(--text-secondary); text-align: center; }
-    .adm__soon mat-icon { width: 28px; height: 28px; color: var(--text-muted); font-size: 28px; }
-    .adm__soon p { max-width: 60ch; margin: 0; }
     @media (width <= 820px) {
       .adm { grid-template-columns: minmax(0, 1fr); height: auto; }
       .adm__nav { border-right: none; border-bottom: 1px solid var(--border-subtle); }
@@ -188,13 +184,19 @@ export class AdminShellComponent {
   private readonly searchInput = viewChild.required<ElementRef<HTMLInputElement>>('search');
 
   private readonly modules = inject(ModuleAccessService);
+  private readonly features = inject(SystemFeaturesService);
   private readonly modulesLoaded = signal(false);
   private readonly selected = signal<AdminSection>(readSection());
   protected readonly query = signal('');
 
   /** El menú sin las secciones de módulos que no aplican. */
   private readonly nav = computed(() =>
-    NAV.map((group) => ({ ...group, items: group.items.filter((item) => !item.requiresModule || this.modules.has(item.requiresModule)) })).filter(
+    NAV.map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) => (!item.requiresModule || this.modules.has(item.requiresModule)) && (!item.requiresFeature || this.features.isEnabled(item.requiresFeature)),
+      ),
+    })).filter(
       (group) => group.items.length > 0,
     ),
   );

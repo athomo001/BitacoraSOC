@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -117,9 +116,6 @@ func (s *Service) CreateFull(ctx context.Context, passphrase, source, dir string
 }
 
 func (s *Service) createFullLocked(ctx context.Context, passphrase, source, dir string, triggeredBy pgtype.UUID) (db.BackupRun, error) {
-	if passphrase == "" {
-		return db.BackupRun{}, errors.New("falta la frase de cifrado")
-	}
 	if dir == "" {
 		dir = s.localDir()
 	}
@@ -135,7 +131,7 @@ func (s *Service) createFullLocked(ctx context.Context, passphrase, source, dir 
 	if err != nil {
 		return fail(err)
 	}
-	data, err := Encode(Envelope{Version: 1, Kind: "full", Tables: tables}, passphrase)
+	data, err := s.Seal(Envelope{Version: 1, Kind: "full", Tables: tables}, passphrase)
 	if err != nil {
 		return fail(err)
 	}
@@ -148,6 +144,27 @@ func (s *Service) createFullLocked(ctx context.Context, passphrase, source, dir 
 		FilePath: pgtype.Text{String: path, Valid: true}, FileSizeBytes: pgtype.Int8{Int64: int64(len(data)), Valid: true},
 		ChecksumSha256: pgtype.Text{String: checksum, Valid: true},
 	})
+}
+
+// Seal cifra un respaldo: con la frase si vino; sin frase, con la llave de
+// la instalación (pedido del dueño: la frase es opcional).
+func (s *Service) Seal(envelope Envelope, passphrase string) ([]byte, error) {
+	if passphrase != "" {
+		return Encode(envelope, passphrase)
+	}
+	if s.Crypto == nil {
+		return nil, errors.New("sin frase hace falta la llave de la instalación")
+	}
+	return EncodeWithKey(envelope, s.Crypto.BackupKey())
+}
+
+// OpenData abre un respaldo de cualquiera de los dos tipos.
+func (s *Service) OpenData(data []byte, passphrase string) (Envelope, error) {
+	var key [32]byte
+	if s.Crypto != nil {
+		key = s.Crypto.BackupKey()
+	}
+	return Open(data, passphrase, key)
 }
 
 func writeBackupFile(dir, name string, data []byte) (string, string, error) {
@@ -187,13 +204,16 @@ const (
 )
 
 type RestoreResult struct {
-	Mode          RestoreMode `json:"mode"`
-	Inserted      int64       `json:"inserted"`
-	AlreadyThere  int64       `json:"alreadyThere"`
-	Tables        int         `json:"tables"`
-	SafetyBackup  string      `json:"safetyBackupId,omitempty"`
-	RestoredFrom  string      `json:"restoredFrom"`
-	FinishedAtUTC time.Time   `json:"finishedAt"`
+	Mode         RestoreMode `json:"mode"`
+	Inserted     int64       `json:"inserted"`
+	AlreadyThere int64       `json:"alreadyThere"`
+	// Skipped: filas de la copia que apuntaban a algo que no existe ni en la
+	// copia ni en la base, y no se podían dejar sin esa referencia.
+	Skipped       int64     `json:"skipped"`
+	Tables        int       `json:"tables"`
+	SafetyBackup  string    `json:"safetyBackupId,omitempty"`
+	RestoredFrom  string    `json:"restoredFrom"`
+	FinishedAtUTC time.Time `json:"finishedAt"`
 }
 
 // Restore aplica una copia completa. En "replace" primero toma un respaldo
@@ -208,7 +228,7 @@ func (s *Service) Restore(ctx context.Context, run db.BackupRun, passphrase stri
 	if err != nil {
 		return RestoreResult{}, err
 	}
-	envelope, err := Decode(data, passphrase)
+	envelope, err := s.OpenData(data, passphrase)
 	if err != nil {
 		return RestoreResult{}, errors.New("la frase de cifrado no corresponde a esta copia")
 	}
@@ -245,12 +265,13 @@ func (s *Service) Restore(ctx context.Context, run db.BackupRun, passphrase stri
 		}
 	}
 	for _, table := range order {
-		inserted, total, err := insertTable(ctx, tx, table, envelope.Tables[table])
+		inserted, total, skipped, err := insertTableSafe(ctx, tx, table, envelope.Tables[table])
 		if err != nil {
 			return RestoreResult{}, fmt.Errorf("tabla %s: %w", table, err)
 		}
 		result.Inserted += inserted
-		result.AlreadyThere += total - inserted
+		result.Skipped += skipped
+		result.AlreadyThere += total - inserted - skipped
 		result.Tables++
 	}
 	if mode == Replace {
@@ -301,41 +322,6 @@ func (s *Service) restorePlan(ctx context.Context, tx pgx.Tx, tables map[string]
 	}
 	rows.Close()
 	return RestoreOrder(candidates, fks)
-}
-
-// insertTable inserta las filas de una tabla. Solo con las columnas que
-// existen en ambos lados: una copia vieja sin una columna nueva deja que
-// Postgres aplique el DEFAULT en vez de forzar NULL. ON CONFLICT DO NOTHING:
-// lo que ya existe no se toca ni se duplica (modo unir).
-func insertTable(ctx context.Context, tx pgx.Tx, table string, payload json.RawMessage) (inserted, total int64, err error) {
-	var rows []map[string]json.RawMessage
-	if err := json.Unmarshal(payload, &rows); err != nil {
-		return 0, 0, err
-	}
-	if len(rows) == 0 {
-		return 0, 0, nil
-	}
-	colRows, err := tx.Query(ctx, `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1 AND is_generated = 'NEVER'`, table)
-	if err != nil {
-		return 0, 0, err
-	}
-	current, err := pgx.CollectRows(colRows, pgx.RowTo[string])
-	if err != nil {
-		return 0, 0, err
-	}
-	var cols []string
-	for _, c := range current {
-		if _, ok := rows[0][c]; ok {
-			cols = append(cols, quote(c))
-		}
-	}
-	sort.Strings(cols)
-	list := strings.Join(cols, ", ")
-	tag, err := tx.Exec(ctx, `INSERT INTO `+quote(table)+` (`+list+`) OVERRIDING SYSTEM VALUE SELECT `+list+` FROM json_populate_recordset(NULL::`+quote(table)+`, $1) ON CONFLICT DO NOTHING`, []byte(payload))
-	if err != nil {
-		return 0, 0, err
-	}
-	return tag.RowsAffected(), int64(len(rows)), nil
 }
 
 // resetSequences deja cada secuencia por encima del máximo restaurado

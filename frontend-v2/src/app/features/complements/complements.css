@@ -1,0 +1,162 @@
+/* Complementos: pestañas arriba y el iframe en toda el área de trabajo. */
+:host {
+  display: block;
+  height: calc(100% + 32px); /* el área de trabajo del shell tiene 16px de padding */
+  margin: -16px;
+}
+
+mat-icon {
+  width: 17px;
+  height: 17px;
+  font-size: 17px;
+}
+
+.comp {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.comp__bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  min-height: 52px;
+  padding: 0 12px 0 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+}
+
+.comp__tabs {
+  display: flex;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.comp__tab {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 13px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.comp__tab--on {
+  border-bottom-color: var(--accent);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.comp__tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.comp__flag {
+  width: 14px;
+  height: 14px;
+  font-size: 14px;
+}
+
+.comp__flag--warn {
+  color: var(--status-warning);
+}
+
+.comp__flag--bad {
+  color: var(--status-critical);
+}
+
+.comp__isolated {
+  display: flex;
+  align-self: center;
+  align-items: center;
+  gap: 5px;
+  margin-left: 8px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.comp__isolated mat-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--status-ok);
+  font-size: 14px;
+}
+
+.comp__bar > .adm-icon-btn {
+  align-self: center;
+}
+
+.comp__notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--accent-soft);
+  font-size: 12px;
+}
+
+.comp__notice .adm-icon-btn {
+  margin-left: auto;
+}
+
+.comp__area {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
+.comp__frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: var(--bg-app);
+}
+
+.comp__msg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 440px;
+  margin: 16px;
+  padding: 24px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  text-align: center;
+}
+
+.comp__msg strong {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.comp__msg-icon {
+  width: 30px;
+  height: 30px;
+  font-size: 30px;
+}
+
+@media (width <= 700px) {
+  .comp__isolated {
+    display: none;
+  }
+}

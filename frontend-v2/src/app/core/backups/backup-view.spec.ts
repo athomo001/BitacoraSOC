@@ -3,7 +3,7 @@ import { BackupRun } from './backups.service';
 
 const run = (overrides: Partial<BackupRun>): BackupRun => ({
   id: 'r1', kind: 'full', triggerSource: 'manual', status: 'success', startedAt: '', finishedAt: null,
-  recordsCount: 0, fileSizeBytes: null, checksumSha256: null, errorMessage: null, ...overrides,
+  recordsCount: 0, fileSizeBytes: null, checksumSha256: null, errorMessage: null, needsPassphrase: true, ...overrides,
 });
 
 describe('backup-view', () => {

@@ -54,6 +54,24 @@ type backupRunDTO struct {
 	WindowFrom     *time.Time `json:"windowFrom"`
 	WindowTo       *time.Time `json:"windowTo"`
 	ErrorMessage   *string    `json:"errorMessage"`
+	// NeedsPassphrase: se hizo con frase (hay que escribirla para abrirlo);
+	// false = sin frase, lo abre esta instalación sola.
+	NeedsPassphrase bool `json:"needsPassphrase"`
+}
+
+// needsPassphrase mira la cabecera del archivo (unos bytes, sin leerlo entero).
+func needsPassphrase(r db.BackupRun) bool {
+	if !r.FilePath.Valid {
+		return true
+	}
+	f, err := os.Open(r.FilePath.String)
+	if err != nil {
+		return true
+	}
+	defer f.Close()
+	head := make([]byte, 32)
+	n, _ := io.ReadFull(f, head)
+	return backup.NeedsPassphrase(head[:n])
 }
 
 func toBackupRunDTO(r db.BackupRun) backupRunDTO {
@@ -66,6 +84,7 @@ func toBackupRunDTO(r db.BackupRun) backupRunDTO {
 		v := r.FileSizeBytes.Int64
 		d.FileSizeBytes = &v
 	}
+	d.NeedsPassphrase = needsPassphrase(r)
 	return d
 }
 
@@ -97,8 +116,8 @@ func (h *BackupsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if req.Passphrase == "" {
 		req.Passphrase = os.Getenv("BACKUP_PASSPHRASE")
 	}
-	if len(req.Passphrase) < 8 {
-		problemdetails.Write(w, r, 400, "invalid-payload", "la frase de cifrado debe tener al menos 8 caracteres")
+	if req.Passphrase != "" && len(req.Passphrase) < 8 {
+		problemdetails.Write(w, r, 400, "invalid-payload", "la frase de cifrado debe tener al menos 8 caracteres (o déjala vacía)")
 		return
 	}
 	run, err := h.Service.CreateFull(r.Context(), req.Passphrase, "manual", "", actorUUID(r))
@@ -170,8 +189,8 @@ func (h *BackupsHandler) Validate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Passphrase string `json:"passphrase"`
 	}
-	if err := decodeJSON(w, r, &req); err != nil || req.Passphrase == "" {
-		problemdetails.Write(w, r, 400, "invalid-payload", "la frase de cifrado es obligatoria")
+	if err := decodeJSON(w, r, &req); err != nil {
+		problemdetails.Write(w, r, 400, "invalid-payload", "cuerpo inválido")
 		return
 	}
 	data, err := backup.ReadVerified(run)
@@ -183,7 +202,11 @@ func (h *BackupsHandler) Validate(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 404, "not-found", err.Error())
 		return
 	}
-	envelope, decodeErr := backup.Decode(data, req.Passphrase)
+	envelope, decodeErr := h.Service.OpenData(data, req.Passphrase)
+	if errors.Is(decodeErr, backup.ErrPassphraseRequired) {
+		problemdetails.Write(w, r, 400, "passphrase-required", "este respaldo se hizo con frase: escríbela")
+		return
+	}
 	if decodeErr != nil {
 		writeData(w, 200, map[string]any{"valid": false, "checksumMatches": true, "decryptable": false})
 		return
@@ -230,8 +253,8 @@ func (h *BackupsHandler) Restore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req restoreRequest
-	if err := decodeJSON(w, r, &req); err != nil || req.Passphrase == "" {
-		problemdetails.Write(w, r, 400, "invalid-payload", "la frase de cifrado es obligatoria")
+	if err := decodeJSON(w, r, &req); err != nil {
+		problemdetails.Write(w, r, 400, "invalid-payload", "cuerpo inválido")
 		return
 	}
 	mode := backup.RestoreMode(req.Mode)
@@ -244,6 +267,10 @@ func (h *BackupsHandler) Restore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result, err := h.Service.Restore(r.Context(), run, req.Passphrase, mode, actorUUID(r))
+	if errors.Is(err, backup.ErrPassphraseRequired) {
+		problemdetails.Write(w, r, 400, "passphrase-required", "este respaldo se hizo con frase: escríbela")
+		return
+	}
 	if err != nil {
 		h.AuditLog.Log(r.Context(), "backup.restore", audit.LevelWarn, audit.Failure(err.Error()), map[string]any{"backupId": run.ID.String(), "mode": req.Mode})
 		h.writeServiceError(w, r, err, "no se pudo restaurar")
@@ -272,9 +299,13 @@ func (h *BackupsHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 400, "invalid-payload", "no se pudo leer el archivo")
 		return
 	}
-	envelope, err := backup.Decode(data, r.FormValue("passphrase"))
+	envelope, err := h.Service.OpenData(data, r.FormValue("passphrase"))
+	if errors.Is(err, backup.ErrPassphraseRequired) {
+		problemdetails.Write(w, r, 400, "passphrase-required", "este respaldo se hizo con frase: escríbela")
+		return
+	}
 	if err != nil {
-		problemdetails.Write(w, r, 400, "invalid-payload", "el archivo no es un respaldo válido o la frase no corresponde")
+		problemdetails.Write(w, r, 400, "invalid-payload", "el archivo no es un respaldo válido, la frase no corresponde o es de otra instalación")
 		return
 	}
 	kind := db.BackupKindFull
@@ -293,6 +324,17 @@ func (h *BackupsHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo crear la carpeta de respaldos")
 		return
+	}
+	// La frase se escribe una sola vez (pedido del dueño): lo subido se
+	// guarda cifrado con la llave de esta instalación, así restaurarlo no la
+	// vuelve a pedir.
+	if backup.NeedsPassphrase(data) {
+		resealed, err := h.Service.Seal(envelope, "")
+		if err != nil {
+			problemdetails.Write(w, r, 500, "internal-error", "no se pudo guardar la copia")
+			return
+		}
+		data = resealed
 	}
 	path := filepath.Join(dir, run.ID.String()+"."+envelope.Kind+".zst.enc")
 	if err := os.WriteFile(path, data, 0o600); err != nil {
@@ -420,8 +462,7 @@ func (h *BackupsHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 400, "invalid-payload", "destino inválido (local, smb o nfs)")
 		return
 	}
-	current, err := h.Queries.GetBackupConfig(r.Context())
-	if err != nil {
+	if _, err := h.Queries.GetBackupConfig(r.Context()); err != nil {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo leer la configuración")
 		return
 	}
@@ -437,10 +478,6 @@ func (h *BackupsHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		encrypted = pgtype.Text{String: value, Valid: true}
-	}
-	if req.Enabled && !encrypted.Valid && !current.PassphraseEncrypted.Valid {
-		problemdetails.Write(w, r, 400, "invalid-payload", "para activar los respaldos automáticos define una frase de cifrado")
-		return
 	}
 	destination := h.Service.LocalDir
 	if req.DestinationType != "local" {

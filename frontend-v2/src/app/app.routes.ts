@@ -62,6 +62,18 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/directory/directory').then((module) => module.DirectoryComponent),
       },
+      // Complementos (spec/11): una pestaña por complemento; el ítem del menú
+      // solo aparece con la funcionalidad encendida.
+      {
+        path: 'complements',
+        loadComponent: () =>
+          import('./features/complements/complements').then((module) => module.ComplementsComponent),
+      },
+      {
+        path: 'complements/:slug',
+        loadComponent: () =>
+          import('./features/complements/complements').then((module) => module.ComplementsComponent),
+      },
       {
         path: 'admin',
         loadComponent: () =>

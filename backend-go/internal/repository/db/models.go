@@ -183,6 +183,91 @@ func (ns NullChecklistStatus) Value() (driver.Value, error) {
 	return string(ns.ChecklistStatus), nil
 }
 
+type ComplementSource string
+
+const (
+	ComplementSourceZipStatic ComplementSource = "zip_static"
+	ComplementSourceManual    ComplementSource = "manual"
+)
+
+func (e *ComplementSource) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ComplementSource(s)
+	case string:
+		*e = ComplementSource(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ComplementSource: %T", src)
+	}
+	return nil
+}
+
+type NullComplementSource struct {
+	ComplementSource ComplementSource `json:"complement_source"`
+	Valid            bool             `json:"valid"` // Valid is true if ComplementSource is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullComplementSource) Scan(value interface{}) error {
+	if value == nil {
+		ns.ComplementSource, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ComplementSource.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullComplementSource) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ComplementSource), nil
+}
+
+type ComplementStatus string
+
+const (
+	ComplementStatusActive      ComplementStatus = "active"
+	ComplementStatusMaintenance ComplementStatus = "maintenance"
+	ComplementStatusDisabled    ComplementStatus = "disabled"
+)
+
+func (e *ComplementStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ComplementStatus(s)
+	case string:
+		*e = ComplementStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ComplementStatus: %T", src)
+	}
+	return nil
+}
+
+type NullComplementStatus struct {
+	ComplementStatus ComplementStatus `json:"complement_status"`
+	Valid            bool             `json:"valid"` // Valid is true if ComplementStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullComplementStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.ComplementStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ComplementStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullComplementStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ComplementStatus), nil
+}
+
 type ContactAttemptResult string
 
 const (
@@ -1390,6 +1475,62 @@ type Client struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
+type Complement struct {
+	ID                        uuid.UUID          `json:"id"`
+	Slug                      string             `json:"slug"`
+	Name                      string             `json:"name"`
+	Description               pgtype.Text        `json:"description"`
+	Icon                      string             `json:"icon"`
+	SourceType                ComplementSource   `json:"source_type"`
+	Status                    ComplementStatus   `json:"status"`
+	EntryPath                 string             `json:"entry_path"`
+	BaseUrl                   pgtype.Text        `json:"base_url"`
+	InternalBaseUrl           pgtype.Text        `json:"internal_base_url"`
+	HealthPath                pgtype.Text        `json:"health_path"`
+	ApiVersion                string             `json:"api_version"`
+	Scopes                    []string           `json:"scopes"`
+	AllowedCollections        []string           `json:"allowed_collections"`
+	ConnectHosts              []string           `json:"connect_hosts"`
+	VisibleRoles              []string           `json:"visible_roles"`
+	VisiblePermissionGroupIds []uuid.UUID        `json:"visible_permission_group_ids"`
+	TokenHash                 pgtype.Text        `json:"token_hash"`
+	TokenIssuedAt             pgtype.Timestamptz `json:"token_issued_at"`
+	ArtifactSha256            pgtype.Text        `json:"artifact_sha256"`
+	ArtifactBytes             pgtype.Int8        `json:"artifact_bytes"`
+	ArtifactFiles             pgtype.Int4        `json:"artifact_files"`
+	PublishedAt               pgtype.Timestamptz `json:"published_at"`
+	CreatedBy                 pgtype.UUID        `json:"created_by"`
+	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt                 pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ComplementFile struct {
+	ComplementID uuid.UUID `json:"complement_id"`
+	Path         string    `json:"path"`
+	ContentType  string    `json:"content_type"`
+	Sha256       string    `json:"sha256"`
+	Content      []byte    `json:"content"`
+}
+
+type ComplementStorage struct {
+	ComplementID    uuid.UUID          `json:"complement_id"`
+	Key             string             `json:"key"`
+	Value           []byte             `json:"value"`
+	UpdatedByUserID pgtype.UUID        `json:"updated_by_user_id"`
+	UpdatedVia      string             `json:"updated_via"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ComplementUpload struct {
+	ID         uuid.UUID          `json:"id"`
+	Filename   string             `json:"filename"`
+	Analysis   []byte             `json:"analysis"`
+	Content    []byte             `json:"content"`
+	UploadedBy pgtype.UUID        `json:"uploaded_by"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	ExpiresAt  pgtype.Timestamptz `json:"expires_at"`
+}
+
 type Contact struct {
 	ID             uuid.UUID          `json:"id"`
 	OrganizationID uuid.UUID          `json:"organization_id"`
@@ -1421,23 +1562,25 @@ type ContactChannel struct {
 }
 
 type Entry struct {
-	ID             uuid.UUID          `json:"id"`
-	UserID         uuid.UUID          `json:"user_id"`
-	EntryType      EntryType          `json:"entry_type"`
-	Scope          EntryScope         `json:"scope"`
-	Content        string             `json:"content"`
-	Tags           []string           `json:"tags"`
-	ServiceID      pgtype.UUID        `json:"service_id"`
-	AssetID        pgtype.UUID        `json:"asset_id"`
-	WorkShiftID    pgtype.UUID        `json:"work_shift_id"`
-	GlpiTicketID   pgtype.Text        `json:"glpi_ticket_id"`
-	GlpiLinkedAt   pgtype.Timestamptz `json:"glpi_linked_at"`
-	TicketID       pgtype.UUID        `json:"ticket_id"`
-	ImageUrl       pgtype.Text        `json:"image_url"`
-	ImageHash      pgtype.Text        `json:"image_hash"`
-	ImageSizeBytes pgtype.Int4        `json:"image_size_bytes"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	ID                  uuid.UUID          `json:"id"`
+	UserID              uuid.UUID          `json:"user_id"`
+	EntryType           EntryType          `json:"entry_type"`
+	Scope               EntryScope         `json:"scope"`
+	Content             string             `json:"content"`
+	Tags                []string           `json:"tags"`
+	ServiceID           pgtype.UUID        `json:"service_id"`
+	AssetID             pgtype.UUID        `json:"asset_id"`
+	WorkShiftID         pgtype.UUID        `json:"work_shift_id"`
+	GlpiTicketID        pgtype.Text        `json:"glpi_ticket_id"`
+	GlpiLinkedAt        pgtype.Timestamptz `json:"glpi_linked_at"`
+	TicketID            pgtype.UUID        `json:"ticket_id"`
+	ImageUrl            pgtype.Text        `json:"image_url"`
+	ImageHash           pgtype.Text        `json:"image_hash"`
+	ImageSizeBytes      pgtype.Int4        `json:"image_size_bytes"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	OwnerComplementID   pgtype.UUID        `json:"owner_complement_id"`
+	OwnerComplementName pgtype.Text        `json:"owner_complement_name"`
 }
 
 type EntryAttachment struct {
@@ -1683,6 +1826,30 @@ type ShiftClosure struct {
 	SentError            pgtype.Text        `json:"sent_error"`
 	SentAt               pgtype.Timestamptz `json:"sent_at"`
 	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+}
+
+type ShiftReminder struct {
+	ID             uuid.UUID          `json:"id"`
+	Label          string             `json:"label"`
+	ReminderText   string             `json:"reminder_text"`
+	FrequencyType  string             `json:"frequency_type"`
+	IntervalHours  int32              `json:"interval_hours"`
+	FixedTimes     []string           `json:"fixed_times"`
+	TargetShiftIds []uuid.UUID        `json:"target_shift_ids"`
+	Enabled        bool               `json:"enabled"`
+	CreatedBy      pgtype.UUID        `json:"created_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ShiftReminderSend struct {
+	ReminderID      uuid.UUID          `json:"reminder_id"`
+	WorkShiftID     uuid.UUID          `json:"work_shift_id"`
+	TriggerKey      string             `json:"trigger_key"`
+	RecipientsCount int32              `json:"recipients_count"`
+	Status          string             `json:"status"`
+	Error           pgtype.Text        `json:"error"`
+	SentAt          pgtype.Timestamptz `json:"sent_at"`
 }
 
 type SmtpConfig struct {

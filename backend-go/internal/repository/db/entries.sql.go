@@ -71,7 +71,7 @@ func (q *Queries) CountEntries(ctx context.Context, arg CountEntriesParams) (int
 const createEntry = `-- name: CreateEntry :one
 
 INSERT INTO entries (user_id, entry_type, scope, content, tags, service_id, asset_id, image_url, image_hash, image_size_bytes)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name
 `
 
 type CreateEntryParams struct {
@@ -125,12 +125,14 @@ func (q *Queries) CreateEntry(ctx context.Context, arg CreateEntryParams) (Entry
 		&i.ImageSizeBytes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OwnerComplementID,
+		&i.OwnerComplementName,
 	)
 	return i, err
 }
 
 const deleteEntry = `-- name: DeleteEntry :one
-DELETE FROM entries WHERE id = $1 RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at
+DELETE FROM entries WHERE id = $1 RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name
 `
 
 // Borrado real (no soft-delete, HU-7g) — RETURNING para el snapshot de auditoría.
@@ -155,35 +157,39 @@ func (q *Queries) DeleteEntry(ctx context.Context, id uuid.UUID) (Entry, error) 
 		&i.ImageSizeBytes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OwnerComplementID,
+		&i.OwnerComplementName,
 	)
 	return i, err
 }
 
 const getEntry = `-- name: GetEntry :one
-SELECT e.id, e.user_id, e.entry_type, e.scope, e.content, e.tags, e.service_id, e.asset_id, e.work_shift_id, e.glpi_ticket_id, e.glpi_linked_at, e.ticket_id, e.image_url, e.image_hash, e.image_size_bytes, e.created_at, e.updated_at, u.username AS author_username
+SELECT e.id, e.user_id, e.entry_type, e.scope, e.content, e.tags, e.service_id, e.asset_id, e.work_shift_id, e.glpi_ticket_id, e.glpi_linked_at, e.ticket_id, e.image_url, e.image_hash, e.image_size_bytes, e.created_at, e.updated_at, e.owner_complement_id, e.owner_complement_name, u.username AS author_username
 FROM entries e JOIN users u ON u.id = e.user_id
 WHERE e.id = $1
 `
 
 type GetEntryRow struct {
-	ID             uuid.UUID          `json:"id"`
-	UserID         uuid.UUID          `json:"user_id"`
-	EntryType      EntryType          `json:"entry_type"`
-	Scope          EntryScope         `json:"scope"`
-	Content        string             `json:"content"`
-	Tags           []string           `json:"tags"`
-	ServiceID      pgtype.UUID        `json:"service_id"`
-	AssetID        pgtype.UUID        `json:"asset_id"`
-	WorkShiftID    pgtype.UUID        `json:"work_shift_id"`
-	GlpiTicketID   pgtype.Text        `json:"glpi_ticket_id"`
-	GlpiLinkedAt   pgtype.Timestamptz `json:"glpi_linked_at"`
-	TicketID       pgtype.UUID        `json:"ticket_id"`
-	ImageUrl       pgtype.Text        `json:"image_url"`
-	ImageHash      pgtype.Text        `json:"image_hash"`
-	ImageSizeBytes pgtype.Int4        `json:"image_size_bytes"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
-	AuthorUsername string             `json:"author_username"`
+	ID                  uuid.UUID          `json:"id"`
+	UserID              uuid.UUID          `json:"user_id"`
+	EntryType           EntryType          `json:"entry_type"`
+	Scope               EntryScope         `json:"scope"`
+	Content             string             `json:"content"`
+	Tags                []string           `json:"tags"`
+	ServiceID           pgtype.UUID        `json:"service_id"`
+	AssetID             pgtype.UUID        `json:"asset_id"`
+	WorkShiftID         pgtype.UUID        `json:"work_shift_id"`
+	GlpiTicketID        pgtype.Text        `json:"glpi_ticket_id"`
+	GlpiLinkedAt        pgtype.Timestamptz `json:"glpi_linked_at"`
+	TicketID            pgtype.UUID        `json:"ticket_id"`
+	ImageUrl            pgtype.Text        `json:"image_url"`
+	ImageHash           pgtype.Text        `json:"image_hash"`
+	ImageSizeBytes      pgtype.Int4        `json:"image_size_bytes"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	OwnerComplementID   pgtype.UUID        `json:"owner_complement_id"`
+	OwnerComplementName pgtype.Text        `json:"owner_complement_name"`
+	AuthorUsername      string             `json:"author_username"`
 }
 
 func (q *Queries) GetEntry(ctx context.Context, id uuid.UUID) (GetEntryRow, error) {
@@ -207,6 +213,8 @@ func (q *Queries) GetEntry(ctx context.Context, id uuid.UUID) (GetEntryRow, erro
 		&i.ImageSizeBytes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OwnerComplementID,
+		&i.OwnerComplementName,
 		&i.AuthorUsername,
 	)
 	return i, err
@@ -224,7 +232,7 @@ func (q *Queries) GetServiceOrganizationID(ctx context.Context, id uuid.UUID) (u
 }
 
 const listEntries = `-- name: ListEntries :many
-SELECT e.id, e.user_id, e.entry_type, e.scope, e.content, e.tags, e.service_id, e.asset_id, e.work_shift_id, e.glpi_ticket_id, e.glpi_linked_at, e.ticket_id, e.image_url, e.image_hash, e.image_size_bytes, e.created_at, e.updated_at, u.username AS author_username
+SELECT e.id, e.user_id, e.entry_type, e.scope, e.content, e.tags, e.service_id, e.asset_id, e.work_shift_id, e.glpi_ticket_id, e.glpi_linked_at, e.ticket_id, e.image_url, e.image_hash, e.image_size_bytes, e.created_at, e.updated_at, e.owner_complement_id, e.owner_complement_name, u.username AS author_username
 FROM entries e JOIN users u ON u.id = e.user_id
 WHERE ($1::entry_scope IS NULL OR e.scope = $1)
   AND ($2::entry_type IS NULL OR e.entry_type = $2)
@@ -248,24 +256,26 @@ type ListEntriesParams struct {
 }
 
 type ListEntriesRow struct {
-	ID             uuid.UUID          `json:"id"`
-	UserID         uuid.UUID          `json:"user_id"`
-	EntryType      EntryType          `json:"entry_type"`
-	Scope          EntryScope         `json:"scope"`
-	Content        string             `json:"content"`
-	Tags           []string           `json:"tags"`
-	ServiceID      pgtype.UUID        `json:"service_id"`
-	AssetID        pgtype.UUID        `json:"asset_id"`
-	WorkShiftID    pgtype.UUID        `json:"work_shift_id"`
-	GlpiTicketID   pgtype.Text        `json:"glpi_ticket_id"`
-	GlpiLinkedAt   pgtype.Timestamptz `json:"glpi_linked_at"`
-	TicketID       pgtype.UUID        `json:"ticket_id"`
-	ImageUrl       pgtype.Text        `json:"image_url"`
-	ImageHash      pgtype.Text        `json:"image_hash"`
-	ImageSizeBytes pgtype.Int4        `json:"image_size_bytes"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
-	AuthorUsername string             `json:"author_username"`
+	ID                  uuid.UUID          `json:"id"`
+	UserID              uuid.UUID          `json:"user_id"`
+	EntryType           EntryType          `json:"entry_type"`
+	Scope               EntryScope         `json:"scope"`
+	Content             string             `json:"content"`
+	Tags                []string           `json:"tags"`
+	ServiceID           pgtype.UUID        `json:"service_id"`
+	AssetID             pgtype.UUID        `json:"asset_id"`
+	WorkShiftID         pgtype.UUID        `json:"work_shift_id"`
+	GlpiTicketID        pgtype.Text        `json:"glpi_ticket_id"`
+	GlpiLinkedAt        pgtype.Timestamptz `json:"glpi_linked_at"`
+	TicketID            pgtype.UUID        `json:"ticket_id"`
+	ImageUrl            pgtype.Text        `json:"image_url"`
+	ImageHash           pgtype.Text        `json:"image_hash"`
+	ImageSizeBytes      pgtype.Int4        `json:"image_size_bytes"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	OwnerComplementID   pgtype.UUID        `json:"owner_complement_id"`
+	OwnerComplementName pgtype.Text        `json:"owner_complement_name"`
+	AuthorUsername      string             `json:"author_username"`
 }
 
 func (q *Queries) ListEntries(ctx context.Context, arg ListEntriesParams) ([]ListEntriesRow, error) {
@@ -304,6 +314,8 @@ func (q *Queries) ListEntries(ctx context.Context, arg ListEntriesParams) ([]Lis
 			&i.ImageSizeBytes,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.OwnerComplementID,
+			&i.OwnerComplementName,
 			&i.AuthorUsername,
 		); err != nil {
 			return nil, err
@@ -317,7 +329,7 @@ func (q *Queries) ListEntries(ctx context.Context, arg ListEntriesParams) ([]Lis
 }
 
 const listEntriesForExport = `-- name: ListEntriesForExport :many
-SELECT e.id, e.user_id, e.entry_type, e.scope, e.content, e.tags, e.service_id, e.asset_id, e.work_shift_id, e.glpi_ticket_id, e.glpi_linked_at, e.ticket_id, e.image_url, e.image_hash, e.image_size_bytes, e.created_at, e.updated_at, u.username AS author_username
+SELECT e.id, e.user_id, e.entry_type, e.scope, e.content, e.tags, e.service_id, e.asset_id, e.work_shift_id, e.glpi_ticket_id, e.glpi_linked_at, e.ticket_id, e.image_url, e.image_hash, e.image_size_bytes, e.created_at, e.updated_at, e.owner_complement_id, e.owner_complement_name, u.username AS author_username
 FROM entries e JOIN users u ON u.id = e.user_id
 WHERE ($1::entry_scope IS NULL OR e.scope = $1)
   AND ($2::entry_type IS NULL OR e.entry_type = $2)
@@ -338,24 +350,26 @@ type ListEntriesForExportParams struct {
 }
 
 type ListEntriesForExportRow struct {
-	ID             uuid.UUID          `json:"id"`
-	UserID         uuid.UUID          `json:"user_id"`
-	EntryType      EntryType          `json:"entry_type"`
-	Scope          EntryScope         `json:"scope"`
-	Content        string             `json:"content"`
-	Tags           []string           `json:"tags"`
-	ServiceID      pgtype.UUID        `json:"service_id"`
-	AssetID        pgtype.UUID        `json:"asset_id"`
-	WorkShiftID    pgtype.UUID        `json:"work_shift_id"`
-	GlpiTicketID   pgtype.Text        `json:"glpi_ticket_id"`
-	GlpiLinkedAt   pgtype.Timestamptz `json:"glpi_linked_at"`
-	TicketID       pgtype.UUID        `json:"ticket_id"`
-	ImageUrl       pgtype.Text        `json:"image_url"`
-	ImageHash      pgtype.Text        `json:"image_hash"`
-	ImageSizeBytes pgtype.Int4        `json:"image_size_bytes"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
-	AuthorUsername string             `json:"author_username"`
+	ID                  uuid.UUID          `json:"id"`
+	UserID              uuid.UUID          `json:"user_id"`
+	EntryType           EntryType          `json:"entry_type"`
+	Scope               EntryScope         `json:"scope"`
+	Content             string             `json:"content"`
+	Tags                []string           `json:"tags"`
+	ServiceID           pgtype.UUID        `json:"service_id"`
+	AssetID             pgtype.UUID        `json:"asset_id"`
+	WorkShiftID         pgtype.UUID        `json:"work_shift_id"`
+	GlpiTicketID        pgtype.Text        `json:"glpi_ticket_id"`
+	GlpiLinkedAt        pgtype.Timestamptz `json:"glpi_linked_at"`
+	TicketID            pgtype.UUID        `json:"ticket_id"`
+	ImageUrl            pgtype.Text        `json:"image_url"`
+	ImageHash           pgtype.Text        `json:"image_hash"`
+	ImageSizeBytes      pgtype.Int4        `json:"image_size_bytes"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	OwnerComplementID   pgtype.UUID        `json:"owner_complement_id"`
+	OwnerComplementName pgtype.Text        `json:"owner_complement_name"`
+	AuthorUsername      string             `json:"author_username"`
 }
 
 // GET /api/entries/export — mismos filtros que ListEntries, sin paginar.
@@ -393,6 +407,8 @@ func (q *Queries) ListEntriesForExport(ctx context.Context, arg ListEntriesForEx
 			&i.ImageSizeBytes,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.OwnerComplementID,
+			&i.OwnerComplementName,
 			&i.AuthorUsername,
 		); err != nil {
 			return nil, err
@@ -414,7 +430,7 @@ UPDATE entries SET
   asset_id = COALESCE($6, asset_id),
   updated_at = now()
 WHERE id = $1
-RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at
+RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name
 `
 
 type PatchEntryParams struct {
@@ -454,12 +470,14 @@ func (q *Queries) PatchEntry(ctx context.Context, arg PatchEntryParams) (Entry, 
 		&i.ImageSizeBytes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OwnerComplementID,
+		&i.OwnerComplementName,
 	)
 	return i, err
 }
 
 const updateEntryTicket = `-- name: UpdateEntryTicket :one
-UPDATE entries SET ticket_id = $2, updated_at = now() WHERE id = $1 RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at
+UPDATE entries SET ticket_id = $2, updated_at = now() WHERE id = $1 RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name
 `
 
 type UpdateEntryTicketParams struct {
@@ -488,6 +506,8 @@ func (q *Queries) UpdateEntryTicket(ctx context.Context, arg UpdateEntryTicketPa
 		&i.ImageSizeBytes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OwnerComplementID,
+		&i.OwnerComplementName,
 	)
 	return i, err
 }

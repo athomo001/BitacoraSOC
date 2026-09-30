@@ -10,7 +10,7 @@ const CONTACT = {
   isFavorite: true, email: 'jose@x.cl', phone: '+56912345678', channels: [],
 };
 
-describe('DirectoryComponent (portado del legacy)', () => {
+describe('DirectoryComponent (re-vestido, portado del legacy)', () => {
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
@@ -44,18 +44,18 @@ describe('DirectoryComponent (portado del legacy)', () => {
     expect(el.textContent).toContain('Vista de solo lectura');
     const add = [...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Agregar contacto'));
     expect(add?.disabled).toBe(true);
-    const edit = [...el.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Editar');
-    expect(edit?.disabled).toBe(true);
+    const edit = el.querySelector('button[aria-label="Editar"]') as HTMLButtonElement;
+    expect(edit.disabled).toBe(true);
     expect(el.textContent).not.toContain('Consolidar duplicados');
   });
 
   it('con directory:write puede editar pero no eliminar sin directory:delete', async () => {
     const { el } = await render('user', ['directory:write']);
     expect(el.textContent).not.toContain('Vista de solo lectura');
-    const edit = [...el.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Editar');
-    const del = [...el.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Eliminar');
-    expect(edit?.disabled).toBe(false);
-    expect(del?.disabled).toBe(true);
+    const edit = el.querySelector('button[aria-label="Editar"]') as HTMLButtonElement;
+    const del = el.querySelector('button[aria-label="Eliminar"]') as HTMLButtonElement;
+    expect(edit.disabled).toBe(false);
+    expect(del.disabled).toBe(true);
   });
 
   it('admin ve Consolidar duplicados y la tabla muestra los datos del contacto', async () => {
@@ -63,7 +63,7 @@ describe('DirectoryComponent (portado del legacy)', () => {
     expect(el.textContent).toContain('Consolidar duplicados');
     expect(el.textContent).toContain('José Pérez');
     expect(el.textContent).toContain('+56912345678');
-    expect(el.textContent).toContain('★');
+    expect(el.querySelector('button[aria-label="Quitar de favoritos"]')?.getAttribute('aria-pressed')).toBe('true');
     expect(el.textContent).toContain('1-1 de 1');
   });
 
@@ -77,5 +77,30 @@ describe('DirectoryComponent (portado del legacy)', () => {
     expect(req.request.params.get('q')).toBe('perez');
     expect(req.request.params.get('page')).toBe('1');
     req.flush({ data: [], meta: { page: 1, pageSize: 50, total: 0 } });
+  });
+
+  it('eliminar pide confirmación en la página, no con un diálogo del navegador', async () => {
+    const { fixture, el } = await render('admin', []);
+    (el.querySelector('button[aria-label="Eliminar"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('¿Eliminar este contacto?');
+    const confirmBtn = el.querySelector('.dir__row-actions .adm-btn--danger') as HTMLButtonElement;
+    confirmBtn.click();
+    httpMock.expectOne((r) => r.method === 'DELETE' && r.url === '/api/directory/c1').flush(null);
+    await tick();
+    httpMock.expectOne((r) => r.url === '/api/directory').flush({ data: [], meta: { page: 1, pageSize: 50, total: 0 } });
+    await tick();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Contacto eliminado.');
+  });
+
+  it('editar abre el panel lateral con los datos del contacto', async () => {
+    const { fixture, el } = await render('admin', []);
+    (el.querySelector('button[aria-label="Editar"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const aside = el.querySelector('aside');
+    expect(aside?.textContent).toContain('Editar contacto');
+    expect((aside?.querySelector('input[name="name"]') as HTMLInputElement).value).toBe('José Pérez');
   });
 });

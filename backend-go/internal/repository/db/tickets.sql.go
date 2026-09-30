@@ -443,7 +443,7 @@ func (q *Queries) GetTicketView(ctx context.Context, id uuid.UUID) (GetTicketVie
 }
 
 const linkEntryToTicket = `-- name: LinkEntryToTicket :one
-UPDATE entries SET ticket_id = $2, updated_at = now() WHERE id = $1 RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at
+UPDATE entries SET ticket_id = $2, updated_at = now() WHERE id = $1 RETURNING id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name
 `
 
 type LinkEntryToTicketParams struct {
@@ -472,6 +472,8 @@ func (q *Queries) LinkEntryToTicket(ctx context.Context, arg LinkEntryToTicketPa
 		&i.ImageSizeBytes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OwnerComplementID,
+		&i.OwnerComplementName,
 	)
 	return i, err
 }
@@ -541,7 +543,7 @@ func (q *Queries) ListTicketComments(ctx context.Context, ticketID uuid.UUID) ([
 }
 
 const listTicketEntries = `-- name: ListTicketEntries :many
-SELECT id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at FROM entries WHERE ticket_id = $1 ORDER BY created_at ASC
+SELECT id, user_id, entry_type, scope, content, tags, service_id, asset_id, work_shift_id, glpi_ticket_id, glpi_linked_at, ticket_id, image_url, image_hash, image_size_bytes, created_at, updated_at, owner_complement_id, owner_complement_name FROM entries WHERE ticket_id = $1 ORDER BY created_at ASC
 `
 
 func (q *Queries) ListTicketEntries(ctx context.Context, ticketID pgtype.UUID) ([]Entry, error) {
@@ -571,6 +573,8 @@ func (q *Queries) ListTicketEntries(ctx context.Context, ticketID pgtype.UUID) (
 			&i.ImageSizeBytes,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.OwnerComplementID,
+			&i.OwnerComplementName,
 		); err != nil {
 			return nil, err
 		}

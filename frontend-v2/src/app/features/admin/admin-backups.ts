@@ -66,6 +66,13 @@ export class AdminBackupsComponent implements OnInit {
   protected autoPassphrase = '';
 
   protected passphrase = '';
+  /** Arrastrando un archivo sobre la zona de subida. */
+  protected readonly dragging = signal(false);
+
+  /** La frase es opcional; si se escribe, mínimo 8 caracteres. */
+  protected passphraseOk(): boolean {
+    return this.passphrase === '' || this.passphrase.length >= 8;
+  }
   protected rowPassphrase = '';
   protected rowConfirmation = '';
   protected purgePhrase = '';
@@ -126,7 +133,7 @@ export class AdminBackupsComponent implements OnInit {
   protected openPanel(run: BackupRun, action: RowPanel['action']): void {
     const current = this.panel();
     this.panel.set(current?.id === run.id && current.action === action ? null : { id: run.id, action });
-    this.rowPassphrase = '';
+    this.rowPassphrase = this.passphrase;
     this.rowConfirmation = '';
     this.feedback.set(null);
   }
@@ -210,7 +217,23 @@ export class AdminBackupsComponent implements OnInit {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     input.value = '';
-    if (!file) return;
+    if (file) await this.uploadFile(file);
+  }
+
+  /** Soltar un archivo sobre la zona de subida. */
+  protected async onDrop(event: DragEvent): Promise<void> {
+    event.preventDefault();
+    this.dragging.set(false);
+    const file = event.dataTransfer?.files?.[0];
+    if (file && !this.busy() && this.passphraseOk()) await this.uploadFile(file);
+  }
+
+  protected onDragOver(event: DragEvent): void {
+    event.preventDefault();
+    this.dragging.set(true);
+  }
+
+  private async uploadFile(file: File): Promise<void> {
     await this.act(async () => {
       await this.api.upload(file, this.passphrase);
       await this.loadRuns();

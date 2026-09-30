@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { NgTemplateOutlet } from '@angular/common';
-import { ButtonComponent } from '../../shared/ui/button/button';
+import { MatIconModule } from '@angular/material/icon';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { PermissionsService } from '../../core/auth/permissions.service';
 import { ContactForm, DirectoryContact, DirectoryService, ImportCsvResult } from '../../core/directory/directory.service';
 import { Organization, OrganizationsService } from '../../core/organizations/organizations.service';
@@ -25,7 +25,9 @@ const CSV_TEMPLATE =
   'Juan Pérez,juan.perez@empresa.cl,+56912345678,Empresa Ejemplo,Analista SOC,External,External,false,Fibra Óptica\n';
 
 /**
- * Directorio Global (HU-DIR-1/2), portado de
+ * Directorio Global (HU-DIR-1/2), re-vestido con los componentes del diseño
+ * aprobado (tabla densa + panel lateral, como Usuarios y grupos) y traducido.
+ * Portado de
  * frontend/src/app/pages/escalation/escalation-admin-simple/escalation-directory-tab
  * del legacy: misma barra de filtros y acciones, aviso de solo lectura, tabla
  * con clic-para-copiar y edición en línea bajo la fila. Cambios respecto del
@@ -37,12 +39,13 @@ const CSV_TEMPLATE =
 @Component({
   selector: 'app-directory',
   standalone: true,
-  imports: [FormsModule, NgTemplateOutlet, ButtonComponent],
+  imports: [FormsModule, MatIconModule],
   templateUrl: './directory.html',
   styleUrl: './directory.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DirectoryComponent implements OnInit {
+  protected readonly i18n = inject(I18nService);
   protected readonly perms = inject(PermissionsService);
   private readonly directory = inject(DirectoryService);
   private readonly organizationsApi = inject(OrganizationsService);
@@ -72,13 +75,19 @@ export class DirectoryComponent implements OnInit {
   protected readonly importing = signal(false);
   protected readonly importResult = signal<ImportCsvResult | null>(null);
   protected readonly merging = signal(false);
+  protected readonly showImport = signal(false);
+  protected readonly confirmMerge = signal(false);
+  protected readonly confirmDeleteId = signal<string | null>(null);
+
+  /** El panel lateral: alta o edición. */
+  protected readonly panelOpen = computed(() => this.showCreate() || this.editingId() !== null);
 
   protected readonly totalPages = computed(() => Math.max(1, Math.ceil(this.meta().total / this.meta().pageSize)));
   protected readonly rangeLabel = computed(() => {
     const { page, pageSize, total } = this.meta();
     if (total === 0) return '0';
     const start = (page - 1) * pageSize + 1;
-    return `${start}-${Math.min(page * pageSize, total)} de ${total}`;
+    return `${start}-${Math.min(page * pageSize, total)} ${this.i18n.t('audit.of')} ${total}`;
   });
 
   private searchTimer?: ReturnType<typeof setTimeout>;
@@ -107,7 +116,7 @@ export class DirectoryComponent implements OnInit {
       this.contacts.set(contacts);
       this.meta.set(meta);
     } catch (error) {
-      this.showError(problemDetail(error, 'No se pudo cargar el directorio.'));
+      this.showError(problemDetail(error, this.i18n.t('dir.loadError')));
     } finally {
       this.loading.set(false);
     }
@@ -126,6 +135,12 @@ export class DirectoryComponent implements OnInit {
 
   protected setFormField<K extends keyof ContactForm>(key: K, value: ContactForm[K]): void {
     this.form.update((f) => ({ ...f, [key]: value }));
+  }
+
+  /** Cambiar de página o de tamaño vuelve a pedir. */
+  protected setPageSize(size: number): void {
+    this.pageSize.set(size);
+    void this.load(1);
   }
 
   protected startCreate(): void {
@@ -161,11 +176,11 @@ export class DirectoryComponent implements OnInit {
   protected async save(): Promise<void> {
     const form = this.form();
     if (!form.name.trim()) {
-      this.showError('El nombre es obligatorio.');
+      this.showError(this.i18n.t('dir.nameRequired'));
       return;
     }
     if (!form.organizationId) {
-      this.showError('Elige la organización del contacto.');
+      this.showError(this.i18n.t('dir.orgRequired'));
       return;
     }
     this.saving.set(true);
@@ -173,28 +188,29 @@ export class DirectoryComponent implements OnInit {
       const id = this.editingId();
       if (id) {
         await this.directory.update(id, form);
-        this.showOk('Contacto actualizado.');
+        this.showOk(this.i18n.t('dir.updated'));
       } else {
         await this.directory.create(form);
-        this.showOk('Contacto creado.');
+        this.showOk(this.i18n.t('dir.created'));
       }
       this.cancelForm();
       await this.load();
     } catch (error) {
-      this.showError(problemDetail(error, 'No se pudo guardar el contacto.'));
+      this.showError(problemDetail(error, this.i18n.t('dir.saveError')));
     } finally {
       this.saving.set(false);
     }
   }
 
   protected async remove(contact: DirectoryContact): Promise<void> {
-    if (!confirm(`¿Eliminar a ${contact.name} del directorio?`)) return;
+    this.confirmDeleteId.set(null);
     try {
       await this.directory.remove(contact.id);
-      this.showOk('Contacto eliminado.');
+      if (this.editingId() === contact.id) this.cancelForm();
+      this.showOk(this.i18n.t('dir.deleted'));
       await this.load();
     } catch (error) {
-      this.showError(problemDetail(error, 'No se pudo eliminar.'));
+      this.showError(problemDetail(error, this.i18n.t('dir.deleteError')));
     }
   }
 
@@ -204,7 +220,7 @@ export class DirectoryComponent implements OnInit {
       await this.directory.update(contact.id, { isFavorite: !contact.isFavorite });
       await this.load();
     } catch (error) {
-      this.showError(problemDetail(error, 'No se pudo marcar el favorito.'));
+      this.showError(problemDetail(error, this.i18n.t('dir.favoriteError')));
     }
   }
 
@@ -213,9 +229,9 @@ export class DirectoryComponent implements OnInit {
     if (!value) return;
     try {
       await navigator.clipboard.writeText(value);
-      this.showOk(`${label} copiado al portapapeles.`);
+      this.showOk(this.i18n.tf('dir.copied', label));
     } catch {
-      this.showError('El navegador no permitió copiar.');
+      this.showError(this.i18n.t('dir.copyError'));
     }
   }
 
@@ -229,10 +245,10 @@ export class DirectoryComponent implements OnInit {
     try {
       const result = await this.directory.importCsv(file, this.importOrganization() || undefined);
       this.importResult.set(result);
-      this.showOk(`Importación: ${result.importedCount} nuevos, ${result.updatedCount} actualizados, ${result.errors.length} observaciones.`);
+      this.showOk(`${this.i18n.t('dir.imported')} ${result.importedCount} ${this.i18n.t('territory.new')} · ${result.updatedCount} ${this.i18n.t('territory.updated')} · ${result.errors.length} ${this.i18n.t('dir.observations')}`);
       await this.load(1);
     } catch (error) {
-      this.showError(problemDetail(error, 'No se pudo procesar el CSV.'));
+      this.showError(problemDetail(error, this.i18n.t('dir.importError')));
     } finally {
       this.importing.set(false);
     }
@@ -250,14 +266,14 @@ export class DirectoryComponent implements OnInit {
   }
 
   protected async mergeDuplicates(): Promise<void> {
-    if (!confirm('¿Consolidar contactos duplicados (mismo correo, mismo teléfono, o mismo nombre en la misma organización)?')) return;
+    this.confirmMerge.set(false);
     this.merging.set(true);
     try {
       const result = await this.directory.mergeDuplicates();
-      this.showOk(`Consolidación: ${result.consolidatedCount} grupos, ${result.mergedContacts} duplicados fusionados.`);
+      this.showOk(this.i18n.tf('dir.merged', `${result.consolidatedCount} / ${result.mergedContacts}`));
       await this.load(1);
     } catch (error) {
-      this.showError(problemDetail(error, 'No se pudo consolidar.'));
+      this.showError(problemDetail(error, this.i18n.t('dir.mergeError')));
     } finally {
       this.merging.set(false);
     }

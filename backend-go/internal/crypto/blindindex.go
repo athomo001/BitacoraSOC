@@ -25,6 +25,21 @@ func (b *Box) BlindIndex(value string) string {
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
+// backupLabel separa la subllave de los respaldos sin frase.
+const backupLabel = "bitacora-ops/backup-installation/v1"
+
+func deriveBackupKey(key []byte) [32]byte {
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(backupLabel))
+	var out [32]byte
+	copy(out[:], mac.Sum(nil))
+	return out
+}
+
+// BackupKey es la llave de los respaldos hechos sin frase (derivada de la
+// llave maestra de la instalación, nunca la misma).
+func (b *Box) BackupKey() [32]byte { return b.backupKey }
+
 func deriveIndexKey(key []byte) []byte {
 	mac := hmac.New(sha256.New, key)
 	mac.Write([]byte(blindIndexLabel))

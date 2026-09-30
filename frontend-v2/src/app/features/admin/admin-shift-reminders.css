@@ -1,0 +1,92 @@
+/* Recordatorios: lista a la izquierda y editor a la derecha, como el artboard. */
+:host {
+  display: block;
+}
+
+mat-icon {
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+}
+
+.rem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 400px);
+  gap: 14px;
+  align-items: start;
+}
+
+.rem__off {
+  opacity: 0.6;
+}
+
+.rem__segs,
+.rem__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.rem__x {
+  display: inline-flex;
+  margin-left: 2px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.rem__x mat-icon {
+  width: 12px;
+  height: 12px;
+  font-size: 12px;
+}
+
+.rem__time {
+  width: 96px;
+}
+
+.rem__shift {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.rem__warn {
+  color: var(--status-warning);
+}
+
+.rem__preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 9px 11px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+}
+
+.rem__body {
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.rem__foot {
+  justify-content: flex-end;
+  margin: 0 -16px -14px;
+}
+
+.rem__foot .adm-foot__status {
+  flex-basis: 100%;
+}
+
+@media (width <= 1100px) {
+  .rem {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

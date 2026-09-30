@@ -1,0 +1,270 @@
+<header class="adm-head">
+  <div>
+    <h2 class="adm-title">{{ i18n.t('admin.nav.complements') }}</h2>
+    <p class="adm-muted">{{ i18n.t('acomp.subtitle') }}</p>
+  </div>
+  <span class="adm-push ac__actions">
+    <button type="button" class="adm-btn" [disabled]="busy()" (click)="startManual()"><mat-icon>dns</mat-icon>{{ i18n.t('acomp.register') }}</button>
+    <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy()" (click)="startUpload()"><mat-icon>upload_file</mat-icon>{{ i18n.t('acomp.uploadZip') }}</button>
+  </span>
+</header>
+
+@if (error(); as e) { <p class="adm-error" role="alert">{{ e }}</p> }
+
+<div class="ac">
+  <section class="adm-card">
+    <div class="adm-table-wrap">
+      <table class="adm-table">
+        <thead><tr><th>{{ i18n.t('acomp.complement') }}</th><th>{{ i18n.t('acomp.status') }}</th><th>{{ i18n.t('acomp.whoSees') }}</th></tr></thead>
+        <tbody>
+          @for (c of list(); track c.slug) {
+            <tr class="adm-row-click" [class.adm-row--active]="!flow() && selectedSlug() === c.slug" tabindex="0" (click)="select(c.slug)" (keydown.enter)="select(c.slug)">
+              <td>
+                <span class="ac__name">
+                  <mat-icon>{{ c.icon }}</mat-icon>
+                  <span><strong class="adm-block">{{ c.name }}</strong><span class="adm-small adm-secondary">{{ typeLabel(c) }} · <span class="mono">{{ c.slug }}</span></span></span>
+                </span>
+              </td>
+              <td><span class="pill" [class]="stateTone(c)">{{ stateLabel(c) }}</span></td>
+              <td class="adm-small adm-secondary">{{ who(c) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      @if (!list().length) { <p class="adm-empty">{{ i18n.t(loading() ? 'acomp.loading' : 'acomp.empty') }}</p> }
+    </div>
+    <p class="adm-card__note">{{ i18n.t('acomp.isolationNote') }}</p>
+  </section>
+
+  <section class="adm-card">
+    <!-- ===== Ficha ===== -->
+    @if (!flow() && detail(); as c) {
+      <div class="adm-card__head">
+        <h3 class="adm-card__title"><mat-icon>{{ c.icon }}</mat-icon>{{ c.name }}</h3>
+        <span class="pill tone-neutral adm-push">{{ typeLabel(c) }}</span>
+      </div>
+      <div class="adm-card__body">
+        <div class="adm-field">
+          <span class="adm-label">{{ i18n.t('acomp.status') }}</span>
+          <span class="ac__segs" role="group" [attr.aria-label]="i18n.t('acomp.status')">
+            @for (s of statuses; track s) {
+              <button type="button" class="seg" [attr.aria-pressed]="c.status === s" [disabled]="busy()" (click)="setStatus(s)">{{ statusName(s) }}</button>
+            }
+          </span>
+          <span class="adm-hint">{{ statusHint(c.status) }}</span>
+        </div>
+
+        <div class="ac__row">
+          <span class="pill" [class]="c.circuit === 'OPEN' ? 'tone-bad' : 'tone-ok'"><mat-icon>{{ c.circuit === 'OPEN' ? 'cloud_off' : 'check_circle' }}</mat-icon>{{ i18n.t(c.circuit === 'OPEN' ? 'acomp.state.down' : 'acomp.responds') }}</span>
+          <span class="adm-small adm-secondary">{{ tested() ?? i18n.t(c.sourceType === 'zip_static' ? 'acomp.servedFromDb' : 'acomp.healthEvery') }}</span>
+          <button type="button" class="adm-btn adm-push" [disabled]="busy()" (click)="test()"><mat-icon>network_check</mat-icon>{{ i18n.t('acomp.test') }}</button>
+        </div>
+
+        @if (c.sourceType === 'zip_static') {
+          <div class="adm-field">
+            <span class="adm-label">{{ i18n.t('acomp.files') }}</span>
+            <span class="adm-small">{{ i18n.tf('acomp.filesSummary', c.artifactFiles ?? 0) }} · {{ size(c.artifactBytes ?? 0) }} @if (c.publishedAt) { · {{ i18n.t('acomp.published') }} <span class="mono">{{ c.publishedAt | date: 'dd/MM HH:mm' }}</span> }</span>
+            @if (c.artifactSha256) { <span class="mono adm-small adm-secondary">sha256 {{ c.artifactSha256.slice(0, 12) }}…</span> }
+            <button type="button" class="adm-btn ac__self-start" [disabled]="busy()" (click)="startUpload(c.slug)"><mat-icon>upload</mat-icon>{{ i18n.t('acomp.newVersion') }}</button>
+          </div>
+          <div class="adm-field">
+            <span class="adm-label">{{ i18n.t('acomp.hosts') }}</span>
+            <span class="ac__chips">
+              @for (h of c.connectHosts; track h) {
+                <span class="pill tone-neutral mono">{{ h }}<button type="button" class="ac__x" [attr.aria-label]="i18n.tf('acomp.removeHost', h)" (click)="removeHost(h)"><mat-icon>close</mat-icon></button></span>
+              }
+            </span>
+            <span class="ac__row">
+              <input class="adm-input mono" name="newHost" placeholder="https://api.ejemplo.cl" [attr.aria-label]="i18n.t('acomp.hosts')" [ngModel]="newHost()" (ngModelChange)="newHost.set($event)" (keydown.enter)="addHost()" />
+              <button type="button" class="adm-btn" [disabled]="busy() || !newHost().trim()" (click)="addHost()"><mat-icon>add</mat-icon>{{ i18n.t('acomp.add') }}</button>
+            </span>
+            <span class="adm-hint">{{ i18n.t(c.connectHosts.length ? 'acomp.hostsSome' : 'acomp.hostsNone') }}</span>
+          </div>
+        } @else {
+          <div class="adm-field">
+            <span class="adm-label">{{ i18n.t('acomp.service') }}</span>
+            <span class="mono adm-small">{{ c.baseUrl }}{{ c.entryPath }}</span>
+            <span class="adm-small adm-secondary">{{ i18n.t('acomp.health') }} <span class="mono">{{ c.healthPath }}</span>@if (c.internalBaseUrl) { · {{ i18n.t('acomp.internal') }} <span class="mono">{{ c.internalBaseUrl }}</span> }</span>
+          </div>
+          <div class="adm-field">
+            <span class="adm-label">{{ i18n.t('acomp.canDo') }}</span>
+            @for (s of scopes; track s.code) {
+              <label class="ac__check"><input type="checkbox" [checked]="c.scopes.includes(s.code)" [disabled]="busy()" (change)="toggleScope(s.code)" />{{ i18n.t(s.labelKey) }}</label>
+            }
+          </div>
+          <div class="adm-field">
+            <span class="adm-label">{{ i18n.t('acomp.token') }}</span>
+            @if (token(); as t) {
+              <div class="ac__token">
+                <span class="mono">{{ t }}</span>
+                <span class="adm-small">{{ i18n.t('acomp.tokenOnce') }}</span>
+                <button type="button" class="adm-btn ac__self-start" (click)="copyToken()"><mat-icon>content_copy</mat-icon>{{ i18n.t('acomp.copy') }}</button>
+              </div>
+            } @else if (confirmRegen()) {
+              <span class="adm-small">{{ i18n.t('acomp.regenConfirm') }}</span>
+              <span class="ac__row"><button type="button" class="adm-btn" (click)="confirmRegen.set(false)">{{ i18n.t('adminChecklist.cancel') }}</button><button type="button" class="adm-btn adm-btn--danger" [disabled]="busy()" (click)="regenerate()">{{ i18n.t('acomp.regenerate') }}</button></span>
+            } @else {
+              <span class="ac__row">
+                <span class="adm-small adm-secondary">@if (c.tokenIssuedAt) { {{ i18n.t('acomp.issued') }} <span class="mono">{{ c.tokenIssuedAt | date: 'dd/MM/yyyy' }}</span> · } {{ i18n.t('acomp.tokenHidden') }}</span>
+                <button type="button" class="adm-btn adm-push" (click)="confirmRegen.set(true)">{{ i18n.t('acomp.regenerate') }}</button>
+              </span>
+            }
+          </div>
+        }
+
+        <div class="adm-field">
+          <span class="adm-label">{{ i18n.t('acomp.whoSees') }}</span>
+          <span class="ac__chips">
+            @for (r of roles; track r.code) {
+              <button type="button" class="seg" [attr.aria-pressed]="c.visibleRoles.includes(r.code)" [disabled]="busy()" (click)="toggleRole(r.code)">{{ i18n.t(r.labelKey) }}</button>
+            }
+          </span>
+          @if (groups().length) {
+            <span class="ac__chips">
+              @for (g of groups(); track g.id) {
+                <button type="button" class="seg" [attr.aria-pressed]="c.visiblePermissionGroupIds.includes(g.id)" [disabled]="busy()" (click)="toggleGroup(g.id)">{{ i18n.tf('acomp.group', g.name) }}</button>
+              }
+            </span>
+          }
+          <span class="adm-hint">{{ i18n.t(c.visibleRoles.length || c.visiblePermissionGroupIds.length ? 'acomp.whoSome' : 'acomp.whoAll') }}</span>
+        </div>
+
+        <div class="adm-field ac__danger">
+          <span class="adm-label ac__danger-label">{{ i18n.t('acomp.delete') }}</span>
+          @if (deleteOpen()) {
+            <span class="adm-small">{{ i18n.t('acomp.deleteWhat') }} <strong>{{ c.entriesCount ? i18n.tf('acomp.deleteEntries', c.entriesCount) : i18n.t('acomp.deleteNoEntries') }}</strong></span>
+            <label class="adm-field">
+              <span class="adm-small adm-secondary">{{ i18n.tf('acomp.typeSlug', c.slug) }}</span>
+              <input class="adm-input mono" name="deleteTyped" autocomplete="off" [ngModel]="deleteTyped()" (ngModelChange)="deleteTyped.set($event)" />
+            </label>
+            <span class="ac__row">
+              <button type="button" class="adm-btn" (click)="deleteOpen.set(false); deleteTyped.set('')">{{ i18n.t('adminChecklist.cancel') }}</button>
+              <button type="button" class="adm-btn adm-btn--danger" [disabled]="busy() || !canDelete()" (click)="remove()">{{ i18n.t('acomp.delete') }}</button>
+            </span>
+          } @else {
+            <button type="button" class="adm-btn adm-btn--danger ac__self-start" (click)="deleteOpen.set(true)"><mat-icon>delete_outline</mat-icon>{{ i18n.t('acomp.deleteBtn') }}</button>
+          }
+        </div>
+      </div>
+    }
+
+    @if (!flow() && !detail() && !loading()) {
+      <p class="adm-empty">{{ i18n.t('acomp.pickOrAdd') }}</p>
+    }
+
+    <!-- ===== Subir ZIP ===== -->
+    @if (flow() === 'upload') {
+      <div class="adm-card__head">
+        <h3 class="adm-card__title"><mat-icon>upload_file</mat-icon>{{ i18n.t(versionOf() ? 'acomp.newVersion' : 'acomp.uploadZip') }}</h3>
+        <button type="button" class="adm-icon-btn adm-push" [attr.aria-label]="i18n.t('common.close')" (click)="closeFlow()"><mat-icon>close</mat-icon></button>
+      </div>
+      <ol class="ac__steps" [attr.aria-label]="i18n.t('acomp.uploadZip')">
+        @for (label of stepLabels; track label; let i = $index) {
+          <li class="ac__step" [class.ac__step--done]="i < step()" [class.ac__step--now]="i + 1 === step()" [attr.aria-current]="i + 1 === step() ? 'step' : null">{{ i18n.t(label) }}</li>
+        }
+      </ol>
+      <div class="adm-card__body">
+        @switch (step()) {
+          @case (1) {
+            <label class="ac__drop" [class.ac__drop--over]="dragging()" (dragover)="$event.preventDefault(); dragging.set(true)" (dragleave)="dragging.set(false)" (drop)="onDrop($event)">
+              <input type="file" accept=".zip,application/zip" [disabled]="busy()" (change)="onFile($event)" />
+              <mat-icon>cloud_upload</mat-icon>
+              <span>{{ i18n.t(busy() ? 'acomp.analyzing' : 'acomp.drop') }}</span>
+              <span class="adm-small adm-secondary">{{ i18n.t('acomp.dropHint') }}</span>
+            </label>
+            @if (uploadError(); as e) { <p class="adm-error" role="alert">{{ e }}</p> }
+          }
+          @case (2) {
+            @if (upload(); as u) {
+              <p class="ac__row">
+                <mat-icon [class]="u.analysis.publishable ? 'text-ok' : 'text-bad'">{{ u.analysis.publishable ? 'check_circle' : 'block' }}</mat-icon>
+                <span><strong>{{ uploadName() }}</strong> {{ i18n.t(u.analysis.publishable ? 'acomp.canPublish' : 'acomp.cannotPublish') }}</span>
+              </p>
+              @if (u.analysis.reason) { <p class="adm-hint">{{ u.analysis.reason }}</p> }
+              <dl class="ac__facts">
+                <dt>{{ i18n.t('acomp.stack') }}</dt><dd>{{ i18n.t(u.analysis.stack === 'static-html' ? 'acomp.stack.static' : 'acomp.stack.other') }} <span class="mono adm-secondary">{{ u.analysis.stack }}</span></dd>
+                <dt>{{ i18n.t('acomp.entry') }}</dt><dd class="mono">{{ u.analysis.entry }}</dd>
+                <dt>{{ i18n.t('acomp.files') }}</dt><dd class="mono">{{ u.analysis.files }} · {{ size(u.analysis.bytes) }}</dd>
+                <dt>{{ i18n.t('acomp.largest') }}</dt><dd class="mono">{{ u.analysis.largestPath }} · {{ size(u.analysis.largestBytes) }}</dd>
+              </dl>
+              @if (u.analysis.features.length) {
+                <p class="ac__info">{{ i18n.t('acomp.featuresIntro') }} {{ u.analysis.features.join(', ') }}. {{ i18n.t('acomp.featuresOk') }}</p>
+              }
+              @if (u.analysis.connectHosts.length) {
+                <p class="ac__info ac__info--warn">{{ i18n.tf('acomp.hostsDetected', u.analysis.connectHosts.join(', ')) }}</p>
+              }
+              <span class="ac__row">
+                <button type="button" class="adm-btn" (click)="step.set(1)">{{ i18n.t('acomp.back') }}</button>
+                <button type="button" class="adm-btn adm-btn--primary adm-push" [disabled]="busy() || !u.analysis.publishable" (click)="toPreview()">{{ i18n.t('acomp.step3') }}</button>
+              </span>
+            }
+          }
+          @case (3) {
+            @if (previewSrc(); as p) {
+              <iframe class="ac__preview" [src]="p" [title]="i18n.t('acomp.step3')" sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-modals" allow="fullscreen" referrerpolicy="no-referrer"></iframe>
+            }
+            <span class="adm-hint">{{ i18n.t('acomp.previewHint') }}</span>
+            <div class="adm-row">
+              <label class="adm-field"><span class="adm-label">{{ i18n.t('teams.name') }}</span><input class="adm-input" name="pubName" maxlength="80" [ngModel]="pubName()" (ngModelChange)="pubName.set($event)" /></label>
+              <label class="adm-field"><span class="adm-label">{{ i18n.t('acomp.slug') }}</span><input class="adm-input mono" name="pubSlug" maxlength="41" [disabled]="!!versionOf()" [ngModel]="pubSlug()" (ngModelChange)="pubSlug.set($event)" /></label>
+            </div>
+            <span class="adm-hint">{{ i18n.t('acomp.slugHint') }}</span>
+            @if (upload()?.analysis?.connectHosts?.length) {
+              <div class="adm-field">
+                <span class="adm-label">{{ i18n.t('acomp.authorizeHosts') }}</span>
+                @for (h of upload()!.analysis.connectHosts; track h) {
+                  <label class="ac__check"><input type="checkbox" [checked]="pubHosts().includes(h)" (change)="toggleHost(h)" /><span class="mono">{{ h }}</span></label>
+                }
+              </div>
+            }
+            <span class="ac__row">
+              <button type="button" class="adm-btn" (click)="step.set(2)">{{ i18n.t('acomp.back') }}</button>
+              <button type="button" class="adm-btn adm-btn--primary adm-push" [disabled]="busy() || !pubName().trim() || !pubSlug().trim()" (click)="publish()"><mat-icon>publish</mat-icon>{{ i18n.t('acomp.publish') }}</button>
+            </span>
+          }
+          @case (4) {
+            <div class="ac__done">
+              <mat-icon class="text-ok">task_alt</mat-icon>
+              <strong>{{ i18n.tf('acomp.publishedOk', pubName()) }}</strong>
+              <span class="adm-small adm-secondary">{{ i18n.t('acomp.publishedHint') }}</span>
+              <button type="button" class="adm-btn" (click)="closeFlow()">{{ i18n.t('acomp.seeDetail') }}</button>
+            </div>
+          }
+        }
+      </div>
+    }
+
+    <!-- ===== Registrar servicio ===== -->
+    @if (flow() === 'manual') {
+      <div class="adm-card__head">
+        <h3 class="adm-card__title"><mat-icon>dns</mat-icon>{{ i18n.t('acomp.register') }}</h3>
+        <button type="button" class="adm-icon-btn adm-push" [attr.aria-label]="i18n.t('common.close')" (click)="closeFlow()"><mat-icon>close</mat-icon></button>
+      </div>
+      <form class="adm-card__body" (ngSubmit)="register()">
+        <p class="adm-hint">{{ i18n.t('acomp.registerHint') }}</p>
+        <div class="adm-row">
+          <label class="adm-field"><span class="adm-label">{{ i18n.t('teams.name') }}</span><input class="adm-input" name="mName" maxlength="80" [ngModel]="manual().name" (ngModelChange)="editManual({ name: $event })" /></label>
+          <label class="adm-field"><span class="adm-label">{{ i18n.t('acomp.slug') }}</span><input class="adm-input mono" name="mSlug" maxlength="41" placeholder="mapa-enlaces" [ngModel]="manual().slug" (ngModelChange)="editManual({ slug: $event })" /></label>
+        </div>
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('acomp.baseUrl') }}</span><input class="adm-input mono" name="mBase" placeholder="https://mapa.interno.empresa.cl" [ngModel]="manual().baseUrl" (ngModelChange)="editManual({ baseUrl: $event })" /><span class="adm-hint">{{ i18n.t('acomp.baseUrlHint') }}</span></label>
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('acomp.internalUrl') }}</span><input class="adm-input mono" name="mInternal" placeholder="http://mapa:8080" [ngModel]="manual().internalBaseUrl" (ngModelChange)="editManual({ internalBaseUrl: $event })" /><span class="adm-hint">{{ i18n.t('acomp.internalUrlHint') }}</span></label>
+        <div class="adm-row">
+          <label class="adm-field"><span class="adm-label">{{ i18n.t('acomp.health') }}</span><input class="adm-input mono" name="mHealth" [ngModel]="manual().healthPath" (ngModelChange)="editManual({ healthPath: $event })" /></label>
+          <label class="adm-field"><span class="adm-label">{{ i18n.t('acomp.entry') }}</span><input class="adm-input mono" name="mEntry" [ngModel]="manual().entryPath" (ngModelChange)="editManual({ entryPath: $event })" /></label>
+        </div>
+        <span class="adm-hint">{{ i18n.t('acomp.healthHint') }}</span>
+        <div class="adm-field">
+          <span class="adm-label">{{ i18n.t('acomp.canDo') }}</span>
+          @for (s of scopes; track s.code) {
+            <label class="ac__check"><input type="checkbox" [checked]="manual().scopes.includes(s.code)" (change)="toggleManualScope(s.code)" />{{ i18n.t(s.labelKey) }}</label>
+          }
+        </div>
+        <span class="adm-hint">{{ i18n.t('acomp.tokenAfter') }}</span>
+        <span class="ac__row">
+          <button type="button" class="adm-btn" (click)="closeFlow()">{{ i18n.t('adminChecklist.cancel') }}</button>
+          <button type="submit" class="adm-btn adm-btn--primary adm-push" [disabled]="busy() || !manual().name.trim() || !manual().slug.trim() || !manual().baseUrl.trim()">{{ i18n.t('acomp.registerBtn') }}</button>
+        </span>
+      </form>
+    }
+  </section>
+</div>

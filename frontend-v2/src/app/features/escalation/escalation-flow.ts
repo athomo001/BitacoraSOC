@@ -49,10 +49,13 @@ export function flowState(steps: readonly ResolvedStep[], actions: readonly Acti
     }
     const failedContacts = new Set(acts.filter((a) => a.contactId).map((a) => a.contactId as string));
     const trackable = step.team.members.filter((m) => m.contactId);
-    const failed =
+    // "Escalar" cierra el paso de inmediato, en cualquier modo.
+    const escalated = acts.some((a) => a.result === 'escalated_next_tier');
+    const exhaustedByMode =
       step.mode === 'sequential'
         ? trackable.length > 0 && trackable.every((m) => failedContacts.has(m.contactId as string))
         : acts.length > 0;
+    const failed = escalated || exhaustedByMode;
     if (failed) {
       statusByStep.set(step.order, 'failed');
       currentSince = acts.at(-1)?.createdAt ?? currentSince;

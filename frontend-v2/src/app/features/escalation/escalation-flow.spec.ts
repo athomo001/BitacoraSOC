@@ -81,4 +81,10 @@ describe('cuenta regresiva', () => {
     expect(formatCountdown(305)).toBe('05:05');
     expect(formatCountdown(-70)).toBe('-01:10');
   });
+
+  it('"Escalar" cierra el paso aunque sea "uno tras otro" y queden miembros por llamar', () => {
+    const s = flowState(STEPS, [act(1, 'juan', 'escalated_next_tier')], SINCE);
+    expect(s.statusByStep.get(1)).toBe('failed');
+    expect(s.current).toBe(2);
+  });
 });

@@ -127,6 +127,9 @@
 /* Interruptor sí/no del diseño aprobado (respaldos automáticos, correo del cierre de turno):
    <label class="switch"><input class="switch__input" type="checkbox" role="switch"><span class="switch__track"></span>Texto</label> */
 .switch {
+  /* El input va en absoluto: sin esto se escapa de un contenedor con scroll
+     (tabla en móvil) y estira la página hacia el lado. */
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 8px;

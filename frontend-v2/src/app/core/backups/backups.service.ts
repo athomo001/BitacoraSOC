@@ -21,6 +21,8 @@ export interface BackupRun {
   fileSizeBytes: number | null;
   checksumSha256: string | null;
   errorMessage: string | null;
+  /** Se hizo con frase: hay que escribirla para abrirlo. Sin frase lo abre esta instalación sola. */
+  needsPassphrase: boolean;
 }
 
 export interface BackupConfig {

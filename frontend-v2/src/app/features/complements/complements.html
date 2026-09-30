@@ -1,0 +1,41 @@
+<div class="comp">
+  <div class="comp__bar">
+    <div class="comp__tabs" role="tablist" [attr.aria-label]="i18n.t('nav.complements')">
+      @for (c of list(); track c.slug) {
+        <button type="button" role="tab" class="comp__tab" [class.comp__tab--on]="c.slug === slug()" [attr.aria-selected]="c.slug === slug()" (click)="pick(c)">
+          <mat-icon>{{ c.icon }}</mat-icon>{{ c.name }}
+          @if (blocked(c) === 'maintenance') { <mat-icon class="comp__flag comp__flag--warn" [title]="i18n.t('comp.maintenance')">construction</mat-icon> }
+          @if (blocked(c) === 'down') { <mat-icon class="comp__flag comp__flag--bad" [title]="i18n.t('comp.down')">cloud_off</mat-icon> }
+        </button>
+      }
+    </div>
+    @if (originHost()) {
+      <span class="comp__isolated" [title]="i18n.t('comp.isolatedHint')"><mat-icon>shield</mat-icon>{{ i18n.t('comp.isolated') }} · <span class="mono">{{ originHost() }}</span></span>
+    }
+    <button type="button" class="adm-icon-btn" [attr.aria-label]="i18n.t('comp.reload')" [title]="i18n.t('comp.reload')" [disabled]="!current()" (click)="reload()"><mat-icon>refresh</mat-icon></button>
+    <button type="button" class="adm-icon-btn" [attr.aria-label]="i18n.t('comp.fullscreen')" [title]="i18n.t('comp.fullscreen')" [disabled]="!src()" (click)="fullscreen()"><mat-icon>fullscreen</mat-icon></button>
+  </div>
+
+  @if (notice(); as n) {
+    <p class="comp__notice" role="status"><mat-icon>info</mat-icon>{{ n }}<button type="button" class="adm-icon-btn" [attr.aria-label]="i18n.t('common.close')" (click)="notice.set(null)"><mat-icon>close</mat-icon></button></p>
+  }
+
+  <div class="comp__area">
+    @if (src(); as s) {
+      <!-- sandbox de spec/11 §2: allow-same-origin es seguro porque el origen es el aislado, no el de la app -->
+      <iframe #frame class="comp__frame" [src]="s" [title]="current()?.name ?? ''" (load)="onLoad()"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-downloads allow-modals"
+        allow="fullscreen; clipboard-write" referrerpolicy="no-referrer"></iframe>
+    } @else if (blocked(current()) === 'maintenance') {
+      <div class="adm-card comp__msg"><mat-icon class="comp__msg-icon comp__flag--warn">construction</mat-icon><strong>{{ i18n.t('comp.maintenance') }}</strong><span>{{ i18n.t('comp.maintenanceHint') }}</span></div>
+    } @else if (blocked(current()) === 'down') {
+      <div class="adm-card comp__msg"><mat-icon class="comp__msg-icon comp__flag--bad">cloud_off</mat-icon><strong>{{ i18n.t('comp.down') }}</strong><span>{{ i18n.t('comp.downHint') }}</span></div>
+    } @else if (disconnected()) {
+      <div class="adm-card comp__msg"><mat-icon class="comp__msg-icon comp__flag--bad">link_off</mat-icon><strong>{{ i18n.t('comp.disconnected') }}</strong><span>{{ i18n.t('comp.disconnectedHint') }}</span></div>
+    } @else if (error(); as e) {
+      <div class="adm-card comp__msg"><mat-icon class="comp__msg-icon comp__flag--bad">error_outline</mat-icon><strong>{{ e }}</strong></div>
+    } @else if (!loading() && !list().length) {
+      <div class="adm-card comp__msg"><mat-icon class="comp__msg-icon">extension</mat-icon><span>{{ i18n.t('comp.none') }}</span></div>
+    }
+  </div>
+</div>

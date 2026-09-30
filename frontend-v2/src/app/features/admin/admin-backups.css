@@ -387,6 +387,12 @@
   cursor: pointer;
 }
 
+.bk__drop--over {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .bk__drop--disabled {
   cursor: not-allowed;
   opacity: 0.5;

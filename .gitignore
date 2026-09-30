@@ -71,3 +71,12 @@ docs/AUTHOR_WATERMARKS.local.md
 .agents/*
 
 /spec/*
+# Respaldos del legacy (datos personales y llaves de cifrado): nunca al repo.
+# El ETL (spec/13) los lee desde donde estén; no los guardes aquí.
+backup-*.zip
+backup-*.json
+_tmp_auto_backup_*.json
+*.etl-report.json
+
+# Respaldos del legacy y los convertidos por el ETL (spec/13): datos de producción, nunca al repo.
+/respaldos/

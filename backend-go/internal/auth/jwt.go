@@ -3,6 +3,7 @@ package auth
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -117,4 +118,52 @@ func (i *JWTIssuer) Verify(tokenString string) (Claims, error) {
 		JTI:      jti,
 		Purpose:  claims.Purpose,
 	}, nil
+}
+
+// PurposeComplement marca el token de aplicación de un complemento servicio
+// (spec/11 §3): no identifica a un usuario, así que middleware.Auth lo
+// rechaza (exige PurposeAccess) y su subject no es un UUID.
+const PurposeComplement = "complement"
+
+const complementAudience = "complement"
+
+// IssueComplement emite el token de aplicación de un complemento. Se guarda
+// solo su hash: regenerarlo invalida el anterior aunque no haya vencido.
+func (i *JWTIssuer) IssueComplement(slug string, ttl time.Duration) (string, error) {
+	now := time.Now()
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwtClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   "complement:" + slug,
+			Audience:  jwt.ClaimStrings{complementAudience},
+			ID:        uuid.New().String(),
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
+		},
+		Purpose: PurposeComplement,
+	})
+	signed, err := token.SignedString(i.key)
+	if err != nil {
+		return "", fmt.Errorf("auth: firmando token de complemento: %w", err)
+	}
+	return signed, nil
+}
+
+// VerifyComplement valida firma, vencimiento, audiencia y propósito de un
+// token de aplicación y devuelve el slug del complemento.
+func (i *JWTIssuer) VerifyComplement(tokenString string) (string, error) {
+	var claims jwtClaims
+	token, err := jwt.ParseWithClaims(tokenString, &claims, func(t *jwt.Token) (any, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("auth: método de firma inesperado: %v", t.Header["alg"])
+		}
+		return i.key, nil
+	}, jwt.WithAudience(complementAudience))
+	if err != nil || !token.Valid || claims.Purpose != PurposeComplement {
+		return "", errors.New("auth: token de complemento inválido")
+	}
+	slug, ok := strings.CutPrefix(claims.Subject, "complement:")
+	if !ok || slug == "" {
+		return "", errors.New("auth: token de complemento inválido")
+	}
+	return slug, nil
 }

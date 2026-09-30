@@ -1,221 +1,178 @@
-<div class="directory">
-  <header class="directory__header">
-    <h1 class="directory__title">Directorio de Contactos</h1>
-    <p class="panel__hint">
-      Directorio global que usan la escalación y los formularios operativos. Los contactos internos se administran desde Usuarios.
-    </p>
-  </header>
-
-  <section class="directory__toolbar" aria-label="Filtros y acciones del directorio">
-    <div class="directory__filters">
-      <label class="field directory__search">
-        <span>Buscar en directorio</span>
-        <input type="search" name="q" placeholder="Nombre, cargo, especialidad, organización, correo o teléfono"
-          [ngModel]="search()" (ngModelChange)="onSearch($event)" />
+<div class="dir" [class.dir--side]="panelOpen()">
+  <div class="dir__main">
+    <div class="dir__toolbar">
+      <h1 class="dir__title">{{ i18n.t('dir.title') }}</h1>
+      <label class="dir__search">
+        <mat-icon>search</mat-icon>
+        <input type="search" name="q" [placeholder]="i18n.t('dir.search')" [attr.aria-label]="i18n.t('dir.search')" [ngModel]="search()" (ngModelChange)="onSearch($event)" />
       </label>
-      <label class="field">
-        <span>Ámbito</span>
-        <select name="scope" [ngModel]="scopeFilter()" (ngModelChange)="scopeFilter.set($event); applyFilters()">
-          <option value="">Todos</option>
-          <option value="internal">Interno</option>
-          <option value="external">Externo</option>
-        </select>
-      </label>
-      <label class="field">
-        <span>Organización</span>
-        <select name="org" [ngModel]="organizationFilter()" (ngModelChange)="organizationFilter.set($event); applyFilters()">
-          <option value="">Todas</option>
-          @for (org of organizations(); track org.id) {
-            <option [value]="org.id">{{ org.name }}</option>
-          }
-        </select>
-      </label>
-      <label class="field">
-        <span>Filas por página</span>
-        <select name="pageSize" [ngModel]="pageSize()" (ngModelChange)="pageSize.set(+$event); applyFilters()">
-          <option [value]="50">50</option>
-          <option [value]="100">100</option>
-          <option [value]="500">500</option>
-        </select>
-      </label>
-      <label class="check-row directory__fav-filter">
-        <input type="checkbox" name="fav" [ngModel]="favoritesOnly()" (ngModelChange)="favoritesOnly.set($event); applyFilters()" />
-        <span class="check-row__label">Solo favoritos</span>
-      </label>
-    </div>
-
-    <div class="actions directory__actions">
-      <app-button variant="primary" icon="person_add" [disabled]="!perms.canWriteDirectory()" (pressed)="startCreate()">
-        Agregar contacto
-      </app-button>
-      <label class="file-button" [class.file-button--disabled]="!perms.canWriteDirectory() || importing()">
-        <input type="file" accept=".csv,text/csv" [disabled]="!perms.canWriteDirectory() || importing()" (change)="onCsvSelected($event)" />
-        {{ importing() ? 'Importando…' : 'Importar CSV' }}
-      </label>
-      <select class="directory__import-org" name="importOrg" title="Organización para filas sin columna Empresa"
-        [ngModel]="importOrganization()" (ngModelChange)="importOrganization.set($event)" [disabled]="!perms.canWriteDirectory()">
-        <option value="">CSV: organización por defecto…</option>
-        @for (org of organizations(); track org.id) {
-          <option [value]="org.id">{{ org.name }}</option>
-        }
+      <span class="dir__segs" role="group" [attr.aria-label]="i18n.t('dir.scope')">
+        <button type="button" class="seg" [attr.aria-pressed]="scopeFilter() === ''" (click)="scopeFilter.set(''); applyFilters()">{{ i18n.t('entries.all') }}</button>
+        <button type="button" class="seg" [attr.aria-pressed]="scopeFilter() === 'internal'" (click)="scopeFilter.set('internal'); applyFilters()">{{ i18n.t('dir.internal') }}</button>
+        <button type="button" class="seg" [attr.aria-pressed]="scopeFilter() === 'external'" (click)="scopeFilter.set('external'); applyFilters()">{{ i18n.t('dir.external') }}</button>
+      </span>
+      <select class="adm-input dir__org" name="org" [attr.aria-label]="i18n.t('teams.org')" [ngModel]="organizationFilter()" (ngModelChange)="organizationFilter.set($event); applyFilters()">
+        <option value="">{{ i18n.t('dir.allOrgs') }}</option>
+        @for (org of organizations(); track org.id) { <option [value]="org.id">{{ org.name }}</option> }
       </select>
-      <app-button variant="text" icon="download" (pressed)="downloadTemplate()">Plantilla CSV</app-button>
-      <app-button icon="refresh" [disabled]="loading()" (pressed)="load()">{{ loading() ? 'Actualizando…' : 'Actualizar' }}</app-button>
-      @if (perms.isAdmin()) {
-        <app-button icon="merge_type" [disabled]="merging()" (pressed)="mergeDuplicates()">
-          {{ merging() ? 'Consolidando…' : 'Consolidar duplicados' }}
-        </app-button>
-      }
-    </div>
-  </section>
-
-  @if (!perms.canWriteDirectory()) {
-    <p class="directory__readonly" role="alert">
-      Vista de solo lectura. Tu grupo de permisos no incluye crear ni editar contactos del directorio.
-    </p>
-  }
-  @if (notice(); as n) {
-    <p class="msg" [class.msg--ok]="n.kind === 'ok'" [class.msg--error]="n.kind === 'error'" role="status">{{ n.text }}</p>
-  }
-  @if (importResult(); as r) {
-    @if (r.errors.length > 0) {
-      <ul class="directory__import-errors">
-        @for (e of r.errors; track e.line) {
-          <li><span class="mono">fila {{ e.line }}</span> — {{ e.reason }}</li>
+      <button type="button" class="seg" [attr.aria-pressed]="favoritesOnly()" (click)="favoritesOnly.set(!favoritesOnly()); applyFilters()"><mat-icon>star</mat-icon>{{ i18n.t('dir.favorites') }}</button>
+      <span class="dir__push dir__actions">
+        @if (perms.isAdmin()) {
+          <button type="button" class="adm-btn" [disabled]="merging()" (click)="confirmMerge.set(true)"><mat-icon>merge_type</mat-icon>{{ i18n.t(merging() ? 'dir.merging' : 'dir.merge') }}</button>
         }
-      </ul>
-    }
-  }
+        <button type="button" class="adm-btn" [attr.aria-expanded]="showImport()" [disabled]="!perms.canWriteDirectory()" (click)="showImport.set(!showImport())"><mat-icon>upload_file</mat-icon>{{ i18n.t('dir.import') }}</button>
+        <button type="button" class="adm-icon-btn" [title]="i18n.t('dir.refresh')" [attr.aria-label]="i18n.t('dir.refresh')" [disabled]="loading()" (click)="load()"><mat-icon>refresh</mat-icon></button>
+        <button type="button" class="adm-btn adm-btn--primary" [disabled]="!perms.canWriteDirectory()" (click)="startCreate()"><mat-icon>person_add</mat-icon>{{ i18n.t('dir.add') }}</button>
+      </span>
+    </div>
 
-  <ng-template #contactForm>
-    @if (editingSynced()) {
-      <p class="directory__warning">
-        Contacto sincronizado desde Usuarios: solo se editan teléfono, organización, ámbito y favorito.
-      </p>
-    }
-    <form class="field-grid directory__form" (ngSubmit)="save()">
-      <label class="field">
-        <span>Nombre</span>
-        <input name="name" required [disabled]="editingSynced()" [ngModel]="form().name" (ngModelChange)="setFormField('name', $event)" />
-      </label>
-      <label class="field">
-        <span>Organización</span>
-        <select name="organizationId" [ngModel]="form().organizationId" (ngModelChange)="setFormField('organizationId', $event)">
-          <option value="" disabled>Elegir…</option>
-          @for (org of organizations(); track org.id) {
-            <option [value]="org.id">{{ org.name }}</option>
-          }
-        </select>
-      </label>
-      <label class="field">
-        <span>Cargo</span>
-        <input name="position" [disabled]="editingSynced()" [ngModel]="form().position" (ngModelChange)="setFormField('position', $event)" />
-      </label>
-      <label class="field">
-        <span>Especialidad</span>
-        <input name="specialty" placeholder="Fibra Óptica, Radioenlace, Energía…" [disabled]="editingSynced()"
-          [ngModel]="form().specialty" (ngModelChange)="setFormField('specialty', $event)" />
-      </label>
-      <label class="field">
-        <span>Teléfono</span>
-        <input name="phone" type="tel" [ngModel]="form().phone" (ngModelChange)="setFormField('phone', $event)" />
-      </label>
-      <label class="field">
-        <span>Correo</span>
-        <input name="email" type="email" [disabled]="editingSynced()" [ngModel]="form().email" (ngModelChange)="setFormField('email', $event)" />
-      </label>
-      <label class="field">
-        <span>Ámbito</span>
-        <select name="scopeForm" [ngModel]="form().scope" (ngModelChange)="setFormField('scope', $event)">
-          <option value="external">Externo</option>
-          <option value="internal">Interno</option>
-        </select>
-      </label>
-      <label class="check-row directory__fav-check">
-        <input type="checkbox" name="isFavorite" [ngModel]="form().isFavorite" (ngModelChange)="setFormField('isFavorite', $event)" />
-        <span class="check-row__label">Favorito</span>
-      </label>
-      <div class="actions directory__form-actions">
-        <button type="submit" class="directory__submit" [disabled]="saving()">{{ saving() ? 'Guardando…' : 'Guardar' }}</button>
-        <app-button variant="text" (pressed)="cancelForm()">Cancelar</app-button>
+    @if (confirmMerge()) {
+      <div class="dir__strip" role="alertdialog" [attr.aria-label]="i18n.t('dir.merge')">
+        <mat-icon>merge_type</mat-icon>
+        <span>{{ i18n.t('dir.mergeConfirm') }}</span>
+        <span class="dir__push dir__actions">
+          <button type="button" class="adm-btn" (click)="confirmMerge.set(false)">{{ i18n.t('adminChecklist.cancel') }}</button>
+          <button type="button" class="adm-btn adm-btn--primary" (click)="mergeDuplicates()">{{ i18n.t('dir.merge') }}</button>
+        </span>
       </div>
-    </form>
-  </ng-template>
+    }
 
-  @if (showCreate() && perms.canWriteDirectory()) {
-    <section class="panel">
-      <h2 class="panel__title">Nuevo contacto del directorio</h2>
-      <ng-container [ngTemplateOutlet]="contactForm" />
-    </section>
-  }
+    @if (showImport()) {
+      <div class="dir__strip">
+        <mat-icon>upload_file</mat-icon>
+        <span class="adm-small">{{ i18n.t('dir.importHint') }}</span>
+        <select class="adm-input dir__org" name="importOrg" [attr.aria-label]="i18n.t('dir.importOrg')" [title]="i18n.t('dir.importOrg')" [ngModel]="importOrganization()" (ngModelChange)="importOrganization.set($event)">
+          <option value="">{{ i18n.t('dir.importOrg') }}</option>
+          @for (org of organizations(); track org.id) { <option [value]="org.id">{{ org.name }}</option> }
+        </select>
+        <label class="adm-btn adm-btn--primary dir__file" [class.dir__file--busy]="importing()">
+          <input type="file" accept=".csv,text/csv" [disabled]="importing()" (change)="onCsvSelected($event)" />
+          <mat-icon>upload</mat-icon>{{ i18n.t(importing() ? 'territory.importing' : 'dir.chooseCsv') }}
+        </label>
+        <button type="button" class="adm-btn" (click)="downloadTemplate()"><mat-icon>download</mat-icon>{{ i18n.t('territory.template') }}</button>
+      </div>
+    }
 
-  <div class="directory__table-wrap">
-    <table class="directory__table">
-      <thead>
-        <tr>
-          <th aria-label="Favorito"></th>
-          <th>Nombre</th>
-          <th>Cargo</th>
-          <th>Especialidad</th>
-          <th>Teléfono</th>
-          <th>Correo</th>
-          <th>Organización</th>
-          <th>Ámbito</th>
-          <th>Acciones</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (person of contacts(); track person.id) {
-          <tr [class.directory__row--editing]="editingId() === person.id">
-            <td>
-              <button type="button" class="directory__star" [class.directory__star--on]="person.isFavorite"
-                [disabled]="!perms.canWriteDirectory()" (click)="toggleFavorite(person)"
-                [attr.aria-label]="person.isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito'">
-                {{ person.isFavorite ? '★' : '☆' }}
-              </button>
-            </td>
-            <td><button type="button" class="directory__copy directory__name" (click)="copy(person.name, 'Nombre')">{{ person.name }}</button></td>
-            <td>{{ person.position || '—' }}</td>
-            <td>{{ person.specialty || '—' }}</td>
-            <td>
-              @if (person.phone) {
-                <button type="button" class="directory__copy mono" (click)="copy(person.phone, 'Teléfono')">{{ person.phone }}</button>
-              } @else { — }
-            </td>
-            <td>
-              @if (person.email) {
-                <button type="button" class="directory__copy mono" (click)="copy(person.email, 'Correo')">{{ person.email }}</button>
-              } @else { — }
-            </td>
-            <td>{{ person.organizationName }}</td>
-            <td><span class="state" [class.state--on]="person.scope === 'internal'">{{ person.scope === 'internal' ? 'INTERNO' : 'EXTERNO' }}</span></td>
-            <td class="directory__row-actions">
-              <button type="button" class="directory__icon-btn" [disabled]="!perms.canWriteDirectory()" (click)="startEdit(person)" title="Editar contacto">Editar</button>
-              <button type="button" class="directory__icon-btn directory__icon-btn--danger"
-                [disabled]="!perms.canDeleteDirectory() || person.source === 'user_sync'" (click)="remove(person)"
-                [title]="person.source === 'user_sync' ? 'Los sincronizados desde Usuarios no se eliminan desde aquí' : 'Eliminar contacto'">Eliminar</button>
-            </td>
+    @if (!perms.canWriteDirectory()) {
+      <p class="dir__note" role="note"><mat-icon>lock</mat-icon>{{ i18n.t('dir.readonly') }}</p>
+    }
+    @if (notice(); as n) {
+      <p class="dir__note" [class]="n.kind === 'ok' ? 'tone-ok' : 'tone-bad'" role="status">{{ n.text }}</p>
+    }
+    @if (importResult(); as r) {
+      @if (r.errors.length > 0) {
+        <ul class="dir__import-errors">
+          @for (e of r.errors; track e.line) { <li><span class="mono">{{ i18n.tf('dir.row', e.line) }}</span> — {{ e.reason }}</li> }
+        </ul>
+      }
+    }
+
+    <div class="dir__table-wrap" [class.dir__table-wrap--loading]="loading()">
+      <table class="dir-table">
+        <thead>
+          <tr>
+            <th [attr.aria-label]="i18n.t('dir.favorite')"></th>
+            <th>{{ i18n.t('teams.name') }}</th>
+            <th>{{ i18n.t('dir.phone') }}</th>
+            <th>{{ i18n.t('dir.email') }}</th>
+            <th>{{ i18n.t('teams.org') }}</th>
+            <th>{{ i18n.t('dir.scope') }}</th>
+            <th></th>
           </tr>
-          @if (editingId() === person.id) {
-            <tr class="directory__edit-row">
-              <td colspan="9">
-                <ng-container [ngTemplateOutlet]="contactForm" />
+        </thead>
+        <tbody>
+          @for (person of contacts(); track person.id) {
+            <tr class="dir-row" [class.dir-row--active]="editingId() === person.id">
+              <td>
+                <button type="button" class="dir__star" [class.dir__star--on]="person.isFavorite" [disabled]="!perms.canWriteDirectory()" (click)="toggleFavorite(person)"
+                  [attr.aria-label]="i18n.t(person.isFavorite ? 'dir.unfavorite' : 'dir.makeFavorite')" [attr.aria-pressed]="person.isFavorite">
+                  <mat-icon>{{ person.isFavorite ? 'star' : 'star_border' }}</mat-icon>
+                </button>
+              </td>
+              <td>
+                <button type="button" class="dir__copy" [title]="i18n.t('dir.clickToCopy')" (click)="copy(person.name, i18n.t('teams.name'))"><strong>{{ person.name }}</strong></button>
+                <span class="adm-small adm-secondary dir__sub">{{ person.position || '—' }}@if (person.specialty) { · {{ person.specialty }} }</span>
+              </td>
+              <td>
+                @if (person.phone) { <button type="button" class="dir__copy mono" [title]="i18n.t('dir.clickToCopy')" (click)="copy(person.phone, i18n.t('dir.phone'))">{{ person.phone }}</button> } @else { — }
+              </td>
+              <td>
+                @if (person.email) { <button type="button" class="dir__copy mono" [title]="i18n.t('dir.clickToCopy')" (click)="copy(person.email, i18n.t('dir.email'))">{{ person.email }}</button> } @else { — }
+              </td>
+              <td class="adm-secondary">{{ person.organizationName }}</td>
+              <td>
+                <span class="pill" [class]="person.scope === 'internal' ? 'tone-info' : 'tone-neutral'">{{ i18n.t(person.scope === 'internal' ? 'dir.internal' : 'dir.external') }}</span>
+                @if (person.source === 'user_sync') { <span class="pill tone-system dir__synced" [title]="i18n.t('dir.syncedHint')">{{ i18n.t('dir.synced') }}</span> }
+              </td>
+              <td class="dir__row-actions">
+                @if (confirmDeleteId() === person.id) {
+                  <span class="adm-small">{{ i18n.t('dir.confirmDelete') }}</span>
+                  <button type="button" class="adm-btn" (click)="confirmDeleteId.set(null)">{{ i18n.t('adminChecklist.cancel') }}</button>
+                  <button type="button" class="adm-btn adm-btn--danger" (click)="remove(person)">{{ i18n.t('dir.delete') }}</button>
+                } @else {
+                  <button type="button" class="adm-icon-btn" [disabled]="!perms.canWriteDirectory()" [attr.aria-label]="i18n.t('dir.edit')" [title]="i18n.t('dir.edit')" (click)="startEdit(person)"><mat-icon>edit</mat-icon></button>
+                  <button type="button" class="adm-icon-btn adm-icon-btn--danger" [disabled]="!perms.canDeleteDirectory() || person.source === 'user_sync'" [attr.aria-label]="i18n.t('dir.delete')"
+                    [title]="i18n.t(person.source === 'user_sync' ? 'dir.syncedNoDelete' : 'dir.delete')" (click)="confirmDeleteId.set(person.id)"><mat-icon>delete_outline</mat-icon></button>
+                }
               </td>
             </tr>
           }
-        } @empty {
-          <tr>
-            <td colspan="9" class="directory__empty">{{ loading() ? 'Cargando directorio…' : 'No hay personas en el directorio para ese filtro.' }}</td>
-          </tr>
+        </tbody>
+      </table>
+      @if (!contacts().length) { <p class="adm-empty">{{ i18n.t(loading() ? 'dir.loading' : 'dir.empty') }}</p> }
+    </div>
+
+    <footer class="dir__pager">
+      <span class="mono">{{ rangeLabel() }}</span>
+      <span class="dir__push dir__actions">
+        <span class="adm-muted">{{ i18n.t('audit.perPage') }}</span>
+        @for (n of [50, 100, 500]; track n) {
+          <button type="button" class="seg" [attr.aria-pressed]="pageSize() === n" (click)="setPageSize(n)">{{ n }}</button>
         }
-      </tbody>
-    </table>
+      </span>
+      <button type="button" class="adm-icon-btn" [attr.aria-label]="i18n.t('audit.prev')" [disabled]="meta().page <= 1 || loading()" (click)="load(meta().page - 1)"><mat-icon>chevron_left</mat-icon></button>
+      <span class="mono">{{ meta().page }} / {{ totalPages() }}</span>
+      <button type="button" class="adm-icon-btn" [attr.aria-label]="i18n.t('audit.next')" [disabled]="meta().page >= totalPages() || loading()" (click)="load(meta().page + 1)"><mat-icon>chevron_right</mat-icon></button>
+    </footer>
   </div>
 
-  <nav class="directory__pagination" aria-label="Paginación del directorio">
-    <span class="mono">{{ rangeLabel() }}</span>
-    <app-button icon="chevron_left" [disabled]="meta().page <= 1 || loading()" (pressed)="load(meta().page - 1)">Anterior</app-button>
-    <span>Página {{ meta().page }} de {{ totalPages() }}</span>
-    <app-button icon="chevron_right" [disabled]="meta().page >= totalPages() || loading()" (pressed)="load(meta().page + 1)">Siguiente</app-button>
-  </nav>
+  @if (panelOpen() && perms.canWriteDirectory()) {
+    <aside class="dir__side" [attr.aria-label]="i18n.t(editingId() ? 'dir.editTitle' : 'dir.newTitle')">
+      <div class="dir__side-head">
+        <h2 class="adm-card__title"><mat-icon>{{ editingId() ? 'edit' : 'person_add' }}</mat-icon>{{ i18n.t(editingId() ? 'dir.editTitle' : 'dir.newTitle') }}</h2>
+        <button type="button" class="adm-icon-btn dir__push" [attr.aria-label]="i18n.t('common.close')" (click)="cancelForm()"><mat-icon>close</mat-icon></button>
+      </div>
+      <form class="dir__form" (ngSubmit)="save()">
+        @if (editingSynced()) { <p class="adm-hint dir__synced-note"><mat-icon>sync</mat-icon>{{ i18n.t('dir.syncedEdit') }}</p> }
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('teams.name') }}</span><input class="adm-input" name="name" required [disabled]="editingSynced()" [ngModel]="form().name" (ngModelChange)="setFormField('name', $event)" /></label>
+        <label class="adm-field">
+          <span class="adm-label">{{ i18n.t('teams.org') }}</span>
+          <select class="adm-input" name="organizationId" [ngModel]="form().organizationId" (ngModelChange)="setFormField('organizationId', $event)">
+            <option value="" disabled>{{ i18n.t('teams.pick') }}</option>
+            @for (org of organizations(); track org.id) { <option [value]="org.id">{{ org.name }}</option> }
+          </select>
+        </label>
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('dir.position') }}</span><input class="adm-input" name="position" [disabled]="editingSynced()" [ngModel]="form().position" (ngModelChange)="setFormField('position', $event)" /></label>
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('dir.specialty') }}</span><input class="adm-input" name="specialty" [placeholder]="i18n.t('dir.specialtyPlaceholder')" [disabled]="editingSynced()" [ngModel]="form().specialty" (ngModelChange)="setFormField('specialty', $event)" /></label>
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('dir.phone') }}</span><input class="adm-input mono" name="phone" type="tel" [ngModel]="form().phone" (ngModelChange)="setFormField('phone', $event)" /></label>
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('dir.email') }}</span><input class="adm-input" name="email" type="email" [disabled]="editingSynced()" [ngModel]="form().email" (ngModelChange)="setFormField('email', $event)" /></label>
+        <span class="adm-label">{{ i18n.t('dir.scope') }}</span>
+        <span class="dir__segs">
+          <button type="button" class="seg" [attr.aria-pressed]="form().scope === 'external'" (click)="setFormField('scope', 'external')">{{ i18n.t('dir.external') }}</button>
+          <button type="button" class="seg" [attr.aria-pressed]="form().scope === 'internal'" (click)="setFormField('scope', 'internal')">{{ i18n.t('dir.internal') }}</button>
+        </span>
+        <label class="adm-switch-row">
+          <span class="switch">
+            <input class="switch__input" type="checkbox" role="switch" name="isFavorite" [checked]="form().isFavorite" (change)="setFormField('isFavorite', !form().isFavorite)" />
+            <span class="switch__track" aria-hidden="true"></span>
+          </span>
+          <span class="adm-strong">{{ i18n.t('dir.favorite') }}</span>
+        </label>
+        <div class="dir__form-actions">
+          <button type="button" class="adm-btn" (click)="cancelForm()">{{ i18n.t('adminChecklist.cancel') }}</button>
+          <button type="submit" class="adm-btn adm-btn--primary" [disabled]="saving()"><mat-icon>save</mat-icon>{{ i18n.t('admin.save') }}</button>
+        </div>
+      </form>
+    </aside>
+  }
 </div>

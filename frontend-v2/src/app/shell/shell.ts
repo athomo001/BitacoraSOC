@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, HostListener, Injector, OnInit, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, HostListener, Injector, OnInit, computed, effect, inject } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { SHELL_NAV_ITEMS } from './shell-nav';
@@ -9,6 +9,7 @@ import { I18nService } from '../core/i18n/i18n.service';
 import { MessageKey } from '../core/i18n/messages';
 import { SseService } from '../core/sse/sse.service';
 import { UserAvatarComponent } from './user-avatar';
+import { ComplementsService } from '../core/complements/complements.service';
 
 /** Ícono y etiqueta del botón de tema: muestran el tema SIGUIENTE (igual que el diseño). */
 const NEXT_THEME: Record<Theme, { icon: string; labelKey: MessageKey }> = {
@@ -42,10 +43,24 @@ export class ShellComponent implements OnInit {
   private readonly injector = inject(Injector);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly complements = inject(ComplementsService);
+
+  constructor() {
+    // Encender o apagar "Complementos" (aquí o desde otro admin) recarga la
+    // lista de los que ve este usuario; apagado, el ítem desaparece.
+    effect(() => {
+      if (this.features.isEnabled('complements')) void this.complements.refresh();
+      else this.complements.clear();
+    });
+  }
 
   /** Se recalcula solo cuando cambia una funcionalidad: activar la ticketera la muestra al instante. */
   protected readonly navItems = computed(() =>
-    SHELL_NAV_ITEMS.filter((item) => !item.requiresFeature || this.features.isEnabled(item.requiresFeature)),
+    SHELL_NAV_ITEMS.filter(
+      (item) =>
+        (!item.requiresFeature || this.features.isEnabled(item.requiresFeature)) &&
+        (!item.requiresComplements || this.complements.available().length > 0),
+    ),
   );
   protected readonly nextTheme = computed(() => NEXT_THEME[this.prefs.theme()]);
   protected readonly displayName = computed(() => {

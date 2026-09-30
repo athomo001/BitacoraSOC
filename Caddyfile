@@ -15,3 +15,10 @@
 		flush_interval -1
 	}
 }
+
+# Origen aislado de los complementos (spec/11 §2): otro puerto, así un
+# complemento no puede leer la sesión de la app (localStorage es por origen).
+# El binario solo sirve ahí archivos publicados y browser-state.
+:8082 {
+	reverse_proxy bitacora-app:8082
+}

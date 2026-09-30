@@ -141,6 +141,26 @@ export interface NotificationSchedule {
 }
 
 /** Turnos, rotación de guardia y dotación/teletrabajo (Fase 8). */
+/** Recordatorio de turno por correo (Administración → Turnos → Recordatorios). */
+export type ReminderFrequency = 'hours' | 'fixed';
+
+export interface ShiftReminder {
+  id: string;
+  label: string;
+  reminderText: string;
+  frequencyType: ReminderFrequency;
+  intervalHours: number;
+  fixedTimes: string[];
+  /** Vacío = todos los turnos activos. */
+  targetShiftIds: string[];
+  enabled: boolean;
+  lastSentAt?: string;
+  lastRecipientsCount?: number;
+  lastStatus?: 'sent' | 'failed' | 'no_recipients';
+}
+
+export type ShiftReminderDraft = Omit<ShiftReminder, 'id' | 'lastSentAt' | 'lastRecipientsCount' | 'lastStatus'>;
+
 @Injectable({ providedIn: 'root' })
 export class ShiftsService {
   private readonly http = inject(HttpClient);
@@ -240,5 +260,28 @@ export class ShiftsService {
 
   async testNotificationSchedule(id: string): Promise<void> {
     await firstValueFrom(this.http.post(`/api/work-shifts/notification-schedules/${id}/test`, {}));
+  }
+
+  // ===== Recordatorios de turno =====
+
+  async listReminders(): Promise<ShiftReminder[]> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<ShiftReminder[]>>('/api/shift-reminders'))).data;
+  }
+
+  async createReminder(draft: ShiftReminderDraft): Promise<ShiftReminder> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<ShiftReminder>>('/api/shift-reminders', draft))).data;
+  }
+
+  async patchReminder(id: string, patch: Partial<ShiftReminderDraft>): Promise<ShiftReminder> {
+    return (await firstValueFrom(this.http.patch<ApiEnvelope<ShiftReminder>>(`/api/shift-reminders/${id}`, patch))).data;
+  }
+
+  async deleteReminder(id: string): Promise<void> {
+    await firstValueFrom(this.http.delete(`/api/shift-reminders/${id}`));
+  }
+
+  /** Envía una prueba al correo de quien la pide; devuelve a dónde fue. */
+  async testReminder(id: string): Promise<string> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<{ sentTo: string }>>(`/api/shift-reminders/${id}/test`, {}))).data.sentTo;
   }
 }

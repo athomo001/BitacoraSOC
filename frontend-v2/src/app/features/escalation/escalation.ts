@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { MatIconModule } from '@angular/material/icon';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
@@ -9,21 +10,21 @@ import {
   ContactResult,
   EscalationScope,
   EscalationService,
-  MODE_LABELS,
   MaintenanceWindow,
   NotifyOutcome,
-  RESULT_LABELS,
   Resolution,
   ResolvedMember,
   ResolvedStep,
+  ResolvedVia,
+  StepMode,
   SocService,
-  VIA_LABELS,
 } from '../../core/escalation/escalation.service';
 import { TerritoryService } from '../../core/territory/territory.service';
 import { TerritorialUnit } from '../../core/territory/territory.models';
 import { ModuleAccessService } from '../../core/auth/module-access.service';
 import { problemDetail } from '../../core/http-error';
-import { ButtonComponent } from '../../shared/ui/button/button';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { MessageKey } from '../../core/i18n/messages';
 import { FlowState, flowState, formatCountdown, secondsUntilEscalation } from './escalation-flow';
 
 type ScopeKind = 'asset' | 'unit' | 'service';
@@ -34,22 +35,7 @@ interface ScopeOption {
   hint: string;
 }
 
-const CHANNEL_LABELS: Record<ChannelType, string> = {
-  call: 'Llamar',
-  sms: 'SMS',
-  whatsapp: 'WhatsApp',
-  email: 'Correo',
-  other: 'Otro',
-};
-
-const NOTIFY_REASONS: Record<string, string> = {
-  maintenance_window: 'No se envió: hay una ventana de mantenimiento con supresión vigente',
-  no_email_recipients: 'No se envió: nadie del primer paso tiene correo configurado',
-  smtp_not_configured: 'No se envió: el correo saliente (SMTP) no está configurado — Administración → Correo',
-  smtp_error: 'No se envió: el servidor de correo rechazó el envío',
-};
-
-const ROLE_LABELS: Record<string, string> = { primary: 'Principal', backup: 'Respaldo', lead: 'Líder' };
+const CHANNEL_ICON: Record<ChannelType, string> = { call: 'call', sms: 'sms', whatsapp: 'chat', email: 'mail', other: 'link' };
 
 /**
  * Escalamiento / Despacho (Fase 7, HU-1/1t/1u/1z/2/3). Tarjetas de pasos
@@ -65,18 +51,16 @@ const ROLE_LABELS: Record<string, string> = { primary: 'Principal', backup: 'Res
 @Component({
   selector: 'app-escalation',
   standalone: true,
-  imports: [FormsModule, DatePipe, ButtonComponent],
+  imports: [FormsModule, DatePipe, MatIconModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './escalation.html',
   styleUrl: './escalation.css',
 })
 export class EscalationComponent implements OnInit {
-  protected readonly modeLabels = MODE_LABELS;
-  protected readonly resultLabels = RESULT_LABELS;
-  protected readonly channelLabels = CHANNEL_LABELS;
-  protected readonly viaLabels = VIA_LABELS;
-  protected readonly roleLabels = ROLE_LABELS;
-  protected readonly results: ContactResult[] = ['answered', 'no_answer', 'busy', 'unreachable'];
+  protected readonly i18n = inject(I18nService);
+  protected readonly channelIcon = CHANNEL_ICON;
+  /** Los dos resultados menos frecuentes van como botones secundarios. */
+  protected readonly otherResults: ContactResult[] = ['busy', 'unreachable'];
 
   private readonly api = inject(EscalationService);
   private readonly territory = inject(TerritoryService);
@@ -163,7 +147,7 @@ export class EscalationComponent implements OnInit {
         this.socEnabled() ? this.api.listServices().then((s) => this.services.set(s)) : null,
       ]);
     } catch (error) {
-      this.error.set(problemDetail(error, 'No se pudieron cargar los catálogos.'));
+      this.error.set(problemDetail(error, this.i18n.t('esc.catalogError')));
     }
     // Enlazable desde otras pantallas: /escalation?assetId=… (o serviceId / territorialUnitId).
     const params = this.route.snapshot.queryParamMap;
@@ -200,7 +184,7 @@ export class EscalationComponent implements OnInit {
     this.since.set(this.startIncident());
     this.actions.set([]);
     this.notifyResult.set(null);
-    this.flash.set('Nuevo incidente: los intentos anteriores ya no cuentan para este flujo.');
+    this.flash.set(this.i18n.t('esc.newIncidentFlash'));
   }
 
   /**
@@ -260,7 +244,7 @@ export class EscalationComponent implements OnInit {
       await this.loadWindows(res);
     } catch (error) {
       this.resolution.set(null);
-      this.error.set(problemDetail(error, 'No se pudo resolver la escalación.'));
+      this.error.set(problemDetail(error, this.i18n.t('esc.resolveError')));
     } finally {
       this.loading.set(false);
     }
@@ -272,7 +256,8 @@ export class EscalationComponent implements OnInit {
     if (res?.resolvedUnit && this.scopeKind() !== 'unit') scopes.push({ territorialUnitId: res.resolvedUnit.id });
     try {
       const lists = await Promise.all(scopes.map((s) => this.api.listWindows(s, true)));
-      this.windows.set(lists.flat());
+      // Una ventana puede venir por el activo y por su zona: se muestra una vez.
+      this.windows.set([...new Map(lists.flat().map((w) => [w.id, w])).values()]);
     } catch {
       this.windows.set([]);
     }
@@ -294,9 +279,9 @@ export class EscalationComponent implements OnInit {
     return this.lastChannel()[member.id] ?? 'call';
   }
 
-  protected async record(step: ResolvedStep, member: ResolvedMember, result: ContactResult): Promise<void> {
+  protected async record(step: ResolvedStep, member: ResolvedMember, result: ContactResult): Promise<boolean> {
     const res = this.resolution();
-    if (!res || this.saving()) return;
+    if (!res || this.saving()) return false;
     this.saving.set(true);
     this.error.set(null);
     try {
@@ -313,41 +298,108 @@ export class EscalationComponent implements OnInit {
       this.actions.update((list) => [...list, outcome.actionLog]);
       this.notes.set('');
       if (outcome.exhausted) {
-        this.flash.set('Se agotaron todos los pasos sin respuesta. Evalúa escalar por fuera del flujo.');
+        this.flash.set(this.i18n.t('esc.flashExhausted'));
       } else if (outcome.escalatedToNextStep) {
-        this.flash.set(`Escala al paso ${outcome.nextStepOrder}: ${outcome.nextStepTeam?.name ?? ''}.`);
+        this.flash.set(this.i18n.tf('esc.flashNextStep', `${outcome.nextStepOrder} · ${outcome.nextStepTeam?.name ?? ''}`));
       } else if (outcome.nextMember) {
-        this.flash.set(`Siguiente en el paso ${step.order}: ${outcome.nextMember.name}.`);
+        this.flash.set(this.i18n.tf('esc.flashNextMember', outcome.nextMember.name));
       } else if (result === 'answered') {
-        this.flash.set(`${member.name} contestó. Flujo detenido.`);
+        this.flash.set(this.i18n.tf('esc.flashAnswered', member.name));
       } else {
         this.flash.set(null);
       }
+      return true;
     } catch (error) {
-      this.error.set(problemDetail(error, 'No se pudo registrar el intento.'));
+      this.error.set(problemDetail(error, this.i18n.t('esc.recordError')));
+      return false;
     } finally {
       this.saving.set(false);
     }
   }
 
+  /** El paso que sigue al indicado (null si es el último). */
+  protected nextStep(step: ResolvedStep): ResolvedStep | null {
+    const steps = [...(this.resolution()?.steps ?? [])].sort((a, b) => a.order - b.order);
+    return steps.find((s) => s.order > step.order) ?? null;
+  }
+
+  /**
+   * "Escalar (correo)" del artboard: registra que se escala a mano y avisa
+   * por correo al paso siguiente, con la nota del intento o un texto por
+   * defecto. La llamada sigue siendo manual; el correo es el único envío.
+   */
+  protected async escalate(step: ResolvedStep, member: ResolvedMember): Promise<void> {
+    const next = this.nextStep(step);
+    const note = this.notes().trim();
+    const ok = await this.record(step, member, 'escalated_next_tier');
+    if (!ok || !next) return;
+    const message = note || this.i18n.tf('esc.escalateMessage', `${this.targetLabel()} · ${step.team.name} → ${next.team.name}`);
+    await this.sendNotify(message, next.order);
+  }
+
   protected async notify(): Promise<void> {
-    if (!this.notifyMessage().trim() || this.notifying()) return;
+    if (!this.notifyMessage().trim()) return;
+    if (await this.sendNotify(this.notifyMessage().trim())) this.notifyMessage.set('');
+  }
+
+  /** Envía el aviso (al primer paso, o al indicado) y deja el resultado a la vista. */
+  private async sendNotify(message: string, stepOrder?: number): Promise<boolean> {
+    if (this.notifying()) return false;
     this.notifying.set(true);
     this.notifyResult.set(null);
     try {
-      const out: NotifyOutcome = await this.api.notify(this.scope(), this.notifyMessage().trim(), this.notifySeverity());
+      const out: NotifyOutcome = await this.api.notify(this.scope(), message, this.notifySeverity(), stepOrder);
       if (out.sent) {
         const to = (out.recipients ?? []).filter((r) => r.email).map((r) => r.name).join(', ');
-        this.notifyResult.set({ ok: true, text: `Aviso enviado a ${to || 'los destinatarios del primer paso'}.` });
-        this.notifyMessage.set('');
-      } else {
-        const extra = out.reason === 'maintenance_window' && out.maintenanceWindowTitle ? ` («${out.maintenanceWindowTitle}»)` : '';
-        this.notifyResult.set({ ok: false, text: (NOTIFY_REASONS[out.reason ?? ''] ?? 'No se envió el aviso.') + extra });
+        this.notifyResult.set({ ok: true, text: this.i18n.tf('esc.notifySent', to || this.i18n.t('esc.notifyTeam')) });
+        return true;
       }
+      const reasonKey = `esc.notifyReason.${out.reason ?? 'unknown'}` as MessageKey;
+      const extra = out.reason === 'maintenance_window' && out.maintenanceWindowTitle ? ` («${out.maintenanceWindowTitle}»)` : '';
+      this.notifyResult.set({ ok: false, text: this.i18n.t(reasonKey) + extra });
     } catch (error) {
-      this.notifyResult.set({ ok: false, text: problemDetail(error, 'No se pudo enviar el aviso.') });
+      this.notifyResult.set({ ok: false, text: problemDetail(error, this.i18n.t('esc.notifyError')) });
     } finally {
       this.notifying.set(false);
     }
+    return false;
+  }
+
+  // ===== Etiquetas =====
+
+  /** El nombre de lo que se eligió (activo, zona o servicio), para el encabezado. */
+  protected readonly targetLabel = computed(() => this.options().find((o) => o.id === this.selectedId())?.label.replace(/^(— )+/, '') ?? '');
+
+  protected resultKey(r: ContactResult): MessageKey {
+    return `esc.result.${r}` as MessageKey;
+  }
+
+  protected channelKey(c: ChannelType): MessageKey {
+    return `esc.channel.${c}` as MessageKey;
+  }
+
+  protected roleKey(role: string): MessageKey {
+    return `teams.role.${role}` as MessageKey;
+  }
+
+  protected viaKey(via: ResolvedVia): MessageKey {
+    return `esc.via.${via}` as MessageKey;
+  }
+
+  protected modeKey(mode: StepMode): MessageKey {
+    return `escAdmin.mode.${mode}` as MessageKey;
+  }
+
+  protected statusKey(step: ResolvedStep): MessageKey {
+    return `esc.status.${this.stepStatus(step)}` as MessageKey;
+  }
+
+  protected initials(name: string): string {
+    return name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase())
+      .join('');
   }
 }

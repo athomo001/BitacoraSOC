@@ -1,0 +1,12 @@
+DROP TABLE IF EXISTS shift_reminder_sends;
+DROP TABLE IF EXISTS shift_reminders;
+DELETE FROM system_features WHERE code = 'complements';
+DROP INDEX IF EXISTS idx_entries_owner_complement;
+ALTER TABLE entries DROP COLUMN IF EXISTS owner_complement_name;
+ALTER TABLE entries DROP COLUMN IF EXISTS owner_complement_id;
+DROP TABLE IF EXISTS complement_storage;
+DROP TABLE IF EXISTS complement_uploads;
+DROP TABLE IF EXISTS complement_files;
+DROP TABLE IF EXISTS complements;
+DROP TYPE IF EXISTS complement_status;
+DROP TYPE IF EXISTS complement_source;

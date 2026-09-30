@@ -7,8 +7,10 @@ const CONFIG = {
   enabled: true, intervalDays: 1, runAt: '03:00', timezone: 'America/Santiago', retentionDays: 30, destinationType: 'local',
   destinationPath: null, passphraseSet: true, nextRunAt: '2026-09-28T06:00:00Z', lastRunAt: '2026-09-27T06:00:00Z', lastStatus: 'success', lastMessage: 'Copia de 184212 registros (4.2 MB)',
 };
+const UPLOADED_NO_PASS = { id: 'u1', kind: 'full', triggerSource: 'upload', status: 'success', startedAt: '2026-09-28T10:00:00Z', finishedAt: null, recordsCount: 23633, fileSizeBytes: 1742838, checksumSha256: 'aa00000000000001', errorMessage: null, needsPassphrase: false };
+
 const RUNS = [
-  { id: 'a1', kind: 'full', triggerSource: 'auto', status: 'success', startedAt: '2026-09-27T06:00:00Z', finishedAt: null, recordsCount: 184212, fileSizeBytes: 4404019, checksumSha256: '8f3a00000000c21e', errorMessage: null },
+  { id: 'a1', kind: 'full', triggerSource: 'auto', status: 'success', startedAt: '2026-09-27T06:00:00Z', finishedAt: null, recordsCount: 184212, fileSizeBytes: 4404019, checksumSha256: '8f3a00000000c21e', errorMessage: null, needsPassphrase: true },
   { id: 'd1', kind: 'delta', triggerSource: 'manual', status: 'success', startedAt: '2026-09-26T11:00:00Z', finishedAt: null, recordsCount: 1214, fileSizeBytes: 98304, checksumSha256: 'c44e00000000a017', errorMessage: null },
 ];
 
@@ -22,10 +24,10 @@ describe('AdminBackupsComponent', () => {
     httpMock = TestBed.inject(HttpTestingController);
   });
 
-  async function render(purgeAllowed = false) {
+  async function render(purgeAllowed = false, runs: unknown[] = RUNS) {
     const fixture = TestBed.createComponent(AdminBackupsComponent);
     fixture.detectChanges();
-    httpMock.expectOne('/api/backups/history').flush({ data: { items: RUNS } });
+    httpMock.expectOne('/api/backups/history').flush({ data: { items: runs } });
     httpMock.expectOne('/api/backups/config').flush({ data: CONFIG });
     httpMock.expectOne('/api/system-features').flush({ data: [{ code: 'allow_purge', isEnabled: purgeAllowed }] });
     await settle();
@@ -78,6 +80,20 @@ describe('AdminBackupsComponent', () => {
     submit().click();
     const req = httpMock.expectOne({ method: 'POST', url: '/api/backups/a1/restore' });
     expect(req.request.body).toEqual({ passphrase: 'frase-larga-123', mode: 'replace', confirmation: 'RESTAURAR' });
+  });
+
+  it('una copia sin frase se restaura sin pedirla', async () => {
+    const { fixture, el } = await render(false, [UPLOADED_NO_PASS]);
+    (el.querySelector('.bk__icon--accent') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    await settle();
+    fixture.detectChanges();
+    expect(el.querySelector('input[name="rowPassphrase"]')).toBeNull();
+    const submit = el.querySelector('.bk__panel button[type="submit"]') as HTMLButtonElement;
+    expect(submit.disabled).toBe(false);
+    submit.click();
+    const req = httpMock.expectOne({ method: 'POST', url: '/api/backups/u1/restore' });
+    expect(req.request.body.passphrase).toBe('');
   });
 
   it('sin "Permitir purga" la zona de peligro solo ofrece ir a Funcionalidades', async () => {

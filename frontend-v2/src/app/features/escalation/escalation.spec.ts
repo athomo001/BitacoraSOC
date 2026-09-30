@@ -60,8 +60,8 @@ describe('EscalationComponent (tarjetas de escalación)', () => {
     httpMock.expectNone((r) => r.url === '/api/territorial-units');
     await tick();
     fixture.detectChanges();
-    const tabs = [...(fixture.nativeElement as HTMLElement).querySelectorAll('.esc__kind')].map((t) => t.textContent?.trim());
-    expect(tabs).toEqual(['Servicio (SOC)']);
+    const tabs = [...(fixture.nativeElement as HTMLElement).querySelectorAll('.esc__segs .seg')].map((t) => t.textContent?.trim());
+    expect(tabs).toEqual(['Servicio']);
     expect((fixture.nativeElement as HTMLElement).textContent).not.toMatch(/desactivad/i);
   });
 
@@ -89,12 +89,12 @@ describe('EscalationComponent (tarjetas de escalación)', () => {
     return { fixture, el };
   }
 
-  it('muestra los pasos con el paso 1 en curso y los canales directos', async () => {
+  it('muestra los niveles con el 1 en curso y los canales directos', async () => {
     const { el } = await renderResolved();
     expect(el.textContent).toContain('política de la zona');
-    expect(el.textContent).toContain('Paso 1 · Cuadrilla Calama');
-    expect(el.querySelector('[data-step="1"]')?.classList).toContain('flow-step--current');
-    expect(el.querySelector('[data-step="2"]')?.classList).toContain('flow-step--pending');
+    expect(el.textContent).toContain('Nivel 1 · Cuadrilla Calama');
+    expect(el.querySelector('[data-step="1"]')?.classList).toContain('level--current');
+    expect(el.querySelector('[data-step="2"]')?.classList).toContain('level--pending');
     const links = [...el.querySelectorAll('a.chan')].map((a) => a.getAttribute('href'));
     expect(links).toEqual(['tel:+56911110001', 'https://wa.me/56911110001']);
     expect(el.textContent).toContain('Escalar en');
@@ -102,7 +102,7 @@ describe('EscalationComponent (tarjetas de escalación)', () => {
 
   it('"No contesta" registra el intento y resalta al siguiente del paso', async () => {
     const { fixture, el } = await renderResolved();
-    const noAnswer = [...el.querySelectorAll('[data-step="1"] .member')][0].querySelector('.res--no_answer') as HTMLButtonElement;
+    const noAnswer = [...el.querySelectorAll('[data-step="1"] .member')][0].querySelector('.act--bad') as HTMLButtonElement;
     noAnswer.click();
     await tick();
     const req = httpMock.expectOne((r) => r.url === '/api/escalation/actions' && r.method === 'POST');
@@ -115,9 +115,33 @@ describe('EscalationComponent (tarjetas de escalación)', () => {
     });
     await tick();
     fixture.detectChanges();
-    expect(el.textContent).toContain('Siguiente en el paso 1: Pedro Soto');
+    expect(el.textContent).toContain('Siguiente en este nivel: Pedro Soto');
     const members = [...el.querySelectorAll('[data-step="1"] .member')];
     expect(members[1].classList).toContain('member--next');
-    expect(el.querySelector('.timeline')?.textContent).toContain('Juan Pérez');
+    expect(el.querySelector('.forensic')?.textContent).toContain('Juan Pérez');
+  });
+
+  it('"Escalar (correo)" registra el escalamiento y avisa por correo al nivel siguiente', async () => {
+    const { fixture, el } = await renderResolved();
+    const escalate = [...el.querySelectorAll('[data-step="1"] .member')][0].querySelector('.act--warn') as HTMLButtonElement;
+    escalate.click();
+    await tick();
+    const action = httpMock.expectOne((r) => r.url === '/api/escalation/actions' && r.method === 'POST');
+    expect(action.request.body).toMatchObject({ stepOrder: 1, memberId: 'm-juan', result: 'escalated_next_tier' });
+    action.flush({
+      data: {
+        actionLog: { id: 'x2', stepOrder: 1, contactId: 'c-juan', contactName: 'Juan Pérez', channelType: 'call', result: 'escalated_next_tier', operatorId: 'u1', operatorUsername: 'admin', createdAt: new Date().toISOString() },
+        escalatedToNextStep: true, exhausted: false, nextStepOrder: 2, nextStepTeam: { id: 't2', name: 'Supervisión' },
+      },
+    });
+    await tick();
+    const notify = httpMock.expectOne('/api/escalation/notify');
+    expect(notify.request.body).toMatchObject({ assetId: 'a1', stepOrder: 2 });
+    expect(notify.request.body.message).toContain('Cuadrilla Calama → Supervisión');
+    notify.flush({ data: { sent: true, recipients: [{ name: 'Carlos Gómez', email: 'cg@x.cl' }] } });
+    await tick();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Aviso enviado a Carlos Gómez.');
+    expect(el.querySelector('[data-step="1"]')?.classList).toContain('level--failed');
   });
 });

@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -82,10 +83,6 @@ func (h *BackupsHandler) ExportDelta(w http.ResponseWriter, r *http.Request) {
 	if req.Passphrase == "" {
 		req.Passphrase = os.Getenv("BACKUP_PASSPHRASE")
 	}
-	if req.Passphrase == "" {
-		problemdetails.Write(w, r, 400, "invalid-payload", "passphrase no configurada")
-		return
-	}
 	from, to, err := deltaWindow(req.TimeWindowPreset, req.From, req.To, time.Now().UTC())
 	if err != nil || !to.After(from) || to.Sub(from) > 7*24*time.Hour {
 		problemdetails.Write(w, r, 400, "invalid-query", "ventana delta inválida")
@@ -122,7 +119,7 @@ func (h *BackupsHandler) ExportDelta(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo confirmar el delta")
 		return
 	}
-	data, err := backup.Encode(backup.Envelope{Version: 1, Kind: "delta", From: from.Format(time.RFC3339), To: to.Format(time.RFC3339), Tables: tables}, req.Passphrase)
+	data, err := h.Service.Seal(backup.Envelope{Version: 1, Kind: "delta", From: from.Format(time.RFC3339), To: to.Format(time.RFC3339), Tables: tables}, req.Passphrase)
 	if err != nil {
 		_ = h.fail(r, run.ID, err)
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo cifrar el delta")
@@ -172,7 +169,11 @@ func (h *BackupsHandler) ImportDelta(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 400, "invalid-payload", "no se pudo leer delta")
 		return
 	}
-	envelope, err := backup.Decode(data, passphrase)
+	envelope, err := h.Service.OpenData(data, passphrase)
+	if errors.Is(err, backup.ErrPassphraseRequired) {
+		problemdetails.Write(w, r, 400, "passphrase-required", "este delta se hizo con frase: escríbela")
+		return
+	}
 	if err != nil || envelope.Kind != "delta" {
 		problemdetails.Write(w, r, 400, "invalid-payload", "delta corrupto o passphrase incorrecta")
 		return

@@ -65,12 +65,13 @@ func (s *Service) RunScheduled(ctx context.Context, force bool) error {
 			LastMessage: pgtype.Text{String: message, Valid: message != ""}, NextRunAt: next,
 		})
 	}
-	if !cfg.PassphraseEncrypted.Valid || s.Crypto == nil {
-		return record("failed", "falta la frase de cifrado de los respaldos automáticos")
-	}
-	passphrase, err := s.Crypto.Decrypt(cfg.PassphraseEncrypted.String)
-	if err != nil {
-		return record("failed", "no se pudo leer la frase de cifrado guardada")
+	passphrase := ""
+	if cfg.PassphraseEncrypted.Valid && s.Crypto != nil {
+		p, err := s.Crypto.Decrypt(cfg.PassphraseEncrypted.String)
+		if err != nil {
+			return record("failed", "no se pudo leer la frase de cifrado guardada")
+		}
+		passphrase = p
 	}
 	dir := s.DestinationDir(cfg)
 	if err := CheckWritable(dir); err != nil {

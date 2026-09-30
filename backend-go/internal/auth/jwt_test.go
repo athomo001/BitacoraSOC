@@ -130,3 +130,27 @@ func TestJWTIssuer_JTIDistintoPorToken(t *testing.T) {
 		t.Fatal("dos tokens del mismo usuario tienen el mismo JTI — token_denylist necesita JTIs únicos para revocar uno sin afectar al resto")
 	}
 }
+
+func TestComplementTokenIsNotASession(t *testing.T) {
+	issuer := auth.NewJWTIssuer([]byte("llave-de-prueba"))
+	token, err := issuer.IssueComplement("mapa-enlaces", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	slug, err := issuer.VerifyComplement(token)
+	if err != nil || slug != "mapa-enlaces" {
+		t.Fatalf("VerifyComplement: %q %v", slug, err)
+	}
+	// Un token de aplicación nunca pasa como sesión de usuario.
+	if _, err := issuer.Verify(token); err == nil {
+		t.Fatal("Verify aceptó un token de complemento como sesión")
+	}
+	// Y una sesión de usuario nunca pasa como token de complemento.
+	session, _ := issuer.Issue(auth.Claims{UserID: uuid.New(), Username: "ana", Role: "admin"}, time.Hour)
+	if _, err := issuer.VerifyComplement(session); err == nil {
+		t.Fatal("VerifyComplement aceptó una sesión de usuario")
+	}
+	if _, err := auth.NewJWTIssuer([]byte("otra")).VerifyComplement(token); err == nil {
+		t.Fatal("aceptó un token firmado con otra llave")
+	}
+}

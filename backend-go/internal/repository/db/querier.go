@@ -26,6 +26,11 @@ type Querier interface {
 	// terminen apuntando a la misma imagen si el cliente reenvía el mismo
 	// imageUrl dos veces.
 	ClaimAttachment(ctx context.Context, arg ClaimAttachmentParams) (int64, error)
+	// Un enlace de un solo uso: 0 filas = ya se usó.
+	ClaimComplementTicket(ctx context.Context, arg ClaimComplementTicketParams) (int64, error)
+	// Reserva el envío de un bloque u hora: 0 filas = otro nodo (u otra vuelta
+	// del planificador) ya lo tomó, y no se envía de nuevo.
+	ClaimShiftReminderSend(ctx context.Context, arg ClaimShiftReminderSendParams) (int64, error)
 	ClearPasswordResetToken(ctx context.Context, id uuid.UUID) error
 	// A lo sumo un canal preferido por dueño (índice único parcial del esquema):
 	// marcar uno nuevo desmarca el anterior.
@@ -35,6 +40,8 @@ type Querier interface {
 	CompleteSetup(ctx context.Context, arg CompleteSetupParams) (AppConfig, error)
 	CountAuditLogs(ctx context.Context, arg CountAuditLogsParams) (int64, error)
 	CountBackupRuns(ctx context.Context, kind NullBackupKind) (int64, error)
+	CountComplementEntries(ctx context.Context, ownerComplementID pgtype.UUID) (int32, error)
+	CountComplementFiles(ctx context.Context, complementID uuid.UUID) (int32, error)
 	CountDirectory(ctx context.Context, arg CountDirectoryParams) (int64, error)
 	CountEntries(ctx context.Context, arg CountEntriesParams) (int64, error)
 	CountEntriesInWindow(ctx context.Context, arg CountEntriesInWindowParams) (int64, error)
@@ -51,6 +58,10 @@ type Querier interface {
 	CreateBackupRunWithSource(ctx context.Context, arg CreateBackupRunWithSourceParams) (BackupRun, error)
 	CreateChecklistEntry(ctx context.Context, arg CreateChecklistEntryParams) (Entry, error)
 	CreateChecklistTemplate(ctx context.Context, arg CreateChecklistTemplateParams) (ChecklistTemplate, error)
+	CreateComplement(ctx context.Context, arg CreateComplementParams) (Complement, error)
+	// Entrada creada por un complemento (Runtime API o CREATE_ENTRY del iframe).
+	CreateComplementEntry(ctx context.Context, arg CreateComplementEntryParams) (Entry, error)
+	CreateComplementUpload(ctx context.Context, arg CreateComplementUploadParams) (CreateComplementUploadRow, error)
 	CreateContact(ctx context.Context, arg CreateContactParams) (uuid.UUID, error)
 	CreateContactChannel(ctx context.Context, arg CreateContactChannelParams) (ContactChannel, error)
 	// Fase 9 del roadmap (spec/02-alcance-y-roadmap.md): bitácora — registro
@@ -82,6 +93,7 @@ type Querier interface {
 	CreateShiftCheck(ctx context.Context, arg CreateShiftCheckParams) (ShiftCheck, error)
 	CreateShiftCheckService(ctx context.Context, arg CreateShiftCheckServiceParams) (ShiftCheckService, error)
 	CreateShiftClosure(ctx context.Context, arg CreateShiftClosureParams) (ShiftClosure, error)
+	CreateShiftReminder(ctx context.Context, arg CreateShiftReminderParams) (ShiftReminder, error)
 	CreateTeam(ctx context.Context, arg CreateTeamParams) (Team, error)
 	CreateTeamGroup(ctx context.Context, arg CreateTeamGroupParams) (TeamGroup, error)
 	CreateTerritorialUnit(ctx context.Context, arg CreateTerritorialUnitParams) (TerritorialUnit, error)
@@ -105,12 +117,19 @@ type Querier interface {
 	// su checklist_item_id queda en NULL (ON DELETE SET NULL).
 	DeleteChecklistItemsExcept(ctx context.Context, arg DeleteChecklistItemsExceptParams) error
 	DeleteChecklistTemplate(ctx context.Context, id uuid.UUID) error
+	// Archivos y storage caen por CASCADE; las entradas quedan (FK en NULL) con
+	// su owner_complement_name.
+	DeleteComplement(ctx context.Context, id uuid.UUID) (int64, error)
+	DeleteComplementFiles(ctx context.Context, complementID uuid.UUID) error
+	DeleteComplementUpload(ctx context.Context, id uuid.UUID) error
 	DeleteContactChannel(ctx context.Context, arg DeleteContactChannelParams) (int64, error)
 	DeleteDraft(ctx context.Context, arg DeleteDraftParams) (int64, error)
 	// Borrado real (no soft-delete, HU-7g) — RETURNING para el snapshot de auditoría.
 	DeleteEntry(ctx context.Context, id uuid.UUID) (Entry, error)
+	DeleteExpiredComplementUploads(ctx context.Context) (int64, error)
 	DeletePolicy(ctx context.Context, id uuid.UUID) (int64, error)
 	DeletePolicyStep(ctx context.Context, arg DeletePolicyStepParams) (int64, error)
+	DeleteShiftReminder(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteUserChannel(ctx context.Context, arg DeleteUserChannelParams) (int64, error)
 	// POST /api/auth/logout — revoca un JTI puntual sin afectar otras sesiones
 	// del mismo usuario.
@@ -150,6 +169,10 @@ type Querier interface {
 	GetBackupRun(ctx context.Context, id uuid.UUID) (BackupRun, error)
 	GetChecklistCooldown(ctx context.Context) (int32, error)
 	GetChecklistTemplate(ctx context.Context, id uuid.UUID) (ChecklistTemplate, error)
+	GetComplementBySlug(ctx context.Context, slug string) (Complement, error)
+	GetComplementFile(ctx context.Context, arg GetComplementFileParams) (GetComplementFileRow, error)
+	GetComplementStorage(ctx context.Context, arg GetComplementStorageParams) (ComplementStorage, error)
+	GetComplementUpload(ctx context.Context, id uuid.UUID) (ComplementUpload, error)
 	// El slot regular cuya semana cubre `now` (independiente de is_paused: el
 	// handler decide qué hacer con eso vía internal/rotation.Resolve).
 	GetCurrentRotationSlot(ctx context.Context, arg GetCurrentRotationSlotParams) (GetCurrentRotationSlotRow, error)
@@ -178,6 +201,7 @@ type Querier interface {
 	GetShiftClosure(ctx context.Context, id uuid.UUID) (ShiftClosure, error)
 	// Un check de cierre se cierra una sola vez: un segundo POST no duplica el cierre ni el reporte.
 	GetShiftClosureByCheck(ctx context.Context, closureCheckID uuid.UUID) (ShiftClosure, error)
+	GetShiftReminder(ctx context.Context, id uuid.UUID) (ShiftReminder, error)
 	GetSystemFeature(ctx context.Context, code string) (SystemFeature, error)
 	GetTeam(ctx context.Context, id uuid.UUID) (Team, error)
 	GetTeamMemberDisplay(ctx context.Context, id uuid.UUID) (GetTeamMemberDisplayRow, error)
@@ -203,6 +227,7 @@ type Querier interface {
 	InsertActionLog(ctx context.Context, arg InsertActionLogParams) (EscalationActionLog, error)
 	InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) error
 	InsertChecklistItem(ctx context.Context, arg InsertChecklistItemParams) error
+	InsertComplementFile(ctx context.Context, arg InsertComplementFileParams) error
 	// Hub SSE genérico (Fase 2 del roadmap) — toda publicación pasa por acá para
 	// que GET /api/stream/events pueda reponer eventos perdidos vía Last-Event-ID
 	// (ver spec/09-alta-disponibilidad-2-nodos.md sección 3.2/9.3).
@@ -239,6 +264,9 @@ type Querier interface {
 	ListChecklistItems(ctx context.Context, templateID uuid.UUID) ([]ChecklistItem, error)
 	// ===== Administración de plantillas (pantalla aprobada "Administración: Checklist") =====
 	ListChecklistTemplates(ctx context.Context) ([]ChecklistTemplate, error)
+	ListComplementStorage(ctx context.Context, arg ListComplementStorageParams) ([]ComplementStorage, error)
+	// Complementos (spec/11-complementos.md, Fase 13b).
+	ListComplements(ctx context.Context) ([]Complement, error)
 	// ===== Consolidación de duplicados (POST /api/directory/merge-duplicates) =====
 	// Orden por antigüedad: el más antiguo de cada grupo queda como principal,
 	// salvo que otro esté más completo (ver handler).
@@ -251,6 +279,7 @@ type Querier interface {
 	// admiten búsqueda parcial (ILIKE).
 	ListDirectory(ctx context.Context, arg ListDirectoryParams) ([]ListDirectoryRow, error)
 	ListDrafts(ctx context.Context, arg ListDraftsParams) ([]EntryDraft, error)
+	ListEnabledShiftReminders(ctx context.Context) ([]ShiftReminder, error)
 	ListEntries(ctx context.Context, arg ListEntriesParams) ([]ListEntriesRow, error)
 	// GET /api/entries/export — mismos filtros que ListEntries, sin paginar.
 	ListEntriesForExport(ctx context.Context, arg ListEntriesForExportParams) ([]ListEntriesForExportRow, error)
@@ -276,6 +305,9 @@ type Querier interface {
 	ListPublicTicketComments(ctx context.Context, ticketID uuid.UUID) ([]TicketComment, error)
 	// ===== RACI (solo dato en esta fase, sin UI) =====
 	ListRaciAssignments(ctx context.Context, arg ListRaciAssignmentsParams) ([]ListRaciAssignmentsRow, error)
+	ListRecentAuditForComplement(ctx context.Context, limit int32) ([]ListRecentAuditForComplementRow, error)
+	// Runtime API query-general?collection=entries: lo más reciente, sin adjuntos.
+	ListRecentEntriesForComplement(ctx context.Context, limit int32) ([]ListRecentEntriesForComplementRow, error)
 	// Administración → Reportes: los últimos cierres y cómo salió su reporte,
 	// con el turno y a quién iba (sin esto un envío fallido no se veía en ninguna parte).
 	ListRecentShiftReportDeliveries(ctx context.Context) ([]ListRecentShiftReportDeliveriesRow, error)
@@ -291,6 +323,9 @@ type Querier interface {
 	ListServices(ctx context.Context, arg ListServicesParams) ([]ListServicesRow, error)
 	ListShiftCheckServices(ctx context.Context, shiftCheckID uuid.UUID) ([]ShiftCheckService, error)
 	ListShiftChecks(ctx context.Context, arg ListShiftChecksParams) ([]ShiftCheck, error)
+	// Recordatorios de turno por correo (spec/12-pendientes.md §2.3b).
+	// Con el último envío de cada uno, para la tabla de Administración → Turnos.
+	ListShiftReminders(ctx context.Context) ([]ListShiftRemindersRow, error)
 	// Reposición tras reconexión: todo lo publicado después de Last-Event-ID.
 	ListSystemEventsSince(ctx context.Context, arg ListSystemEventsSinceParams) ([]SystemEvent, error)
 	ListSystemFeatures(ctx context.Context) ([]SystemFeature, error)
@@ -326,6 +361,8 @@ type Querier interface {
 	// ?role=&active= son opcionales (04-contratos-api.md) — sqlc.narg + el
 	// patrón "columna = $n OR $n IS NULL" evita escribir dos queries a mano.
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	// Activos o en mantenimiento; la visibilidad por rol y grupo se filtra en Go.
+	ListVisibleComplementCandidates(ctx context.Context) ([]Complement, error)
 	// Candidatas para notify: ventanas activas del servicio, del activo, o de
 	// cualquier unidad del camino territorial (un mantenimiento sobre toda la
 	// zona Calama también cubre a sus routers).
@@ -336,6 +373,7 @@ type Querier interface {
 	MarkBackupRun(ctx context.Context, arg MarkBackupRunParams) (BackupRun, error)
 	MarkNotificationScheduleSent(ctx context.Context, id uuid.UUID) error
 	MarkShiftClosureSent(ctx context.Context, arg MarkShiftClosureSentParams) error
+	MarkShiftReminderSendFailed(ctx context.Context, arg MarkShiftReminderSendFailedParams) error
 	// Primera acción del equipo = cumple el SLA de respuesta (solo la primera cuenta).
 	MarkTicketResponded(ctx context.Context, arg MarkTicketRespondedParams) error
 	// PATCH /api/config/territorial-labels — merge parcial (jsonb ||): solo pisa
@@ -377,6 +415,8 @@ type Querier interface {
 	ResetLoginRateLimit(ctx context.Context, ipAddress string) error
 	RotatePublicShareLink(ctx context.Context, arg RotatePublicShareLinkParams) (PublicShareLink, error)
 	SetChecklistCooldown(ctx context.Context, shiftCheckCooldownMinutes int32) (int32, error)
+	SetComplementArtifact(ctx context.Context, arg SetComplementArtifactParams) error
+	SetComplementToken(ctx context.Context, arg SetComplementTokenParams) error
 	// email/phone de contacts son la copia denormalizada del canal preferido de
 	// cada tipo (la fuente de verdad son contact_channels), cifrada + indexada
 	// para listar y buscar sin recorrer los canales.
@@ -401,6 +441,9 @@ type Querier interface {
 	UpdateChannelValue(ctx context.Context, arg UpdateChannelValueParams) error
 	UpdateChecklistItem(ctx context.Context, arg UpdateChecklistItemParams) error
 	UpdateChecklistTemplate(ctx context.Context, arg UpdateChecklistTemplateParams) (ChecklistTemplate, error)
+	// Ficha del complemento: todo lo editable de una vez (el handler mezcla lo
+	// que llega con lo guardado).
+	UpdateComplement(ctx context.Context, arg UpdateComplementParams) (Complement, error)
 	UpdateContact(ctx context.Context, arg UpdateContactParams) (int64, error)
 	UpdateEntryTicket(ctx context.Context, arg UpdateEntryTicketParams) (Entry, error)
 	UpdateLogSource(ctx context.Context, arg UpdateLogSourceParams) (CatalogLogSource, error)
@@ -408,6 +451,7 @@ type Querier interface {
 	UpdateOrganization(ctx context.Context, arg UpdateOrganizationParams) (Organization, error)
 	UpdatePermissionGroup(ctx context.Context, arg UpdatePermissionGroupParams) (PermissionGroup, error)
 	UpdateService(ctx context.Context, arg UpdateServiceParams) (Service, error)
+	UpdateShiftReminder(ctx context.Context, arg UpdateShiftReminderParams) (ShiftReminder, error)
 	UpdateSystemFeature(ctx context.Context, arg UpdateSystemFeatureParams) (SystemFeature, error)
 	UpdateTeam(ctx context.Context, arg UpdateTeamParams) (Team, error)
 	// PATCH /api/territorial-units/:id — correcciones manuales (HU-TERR-3). No
@@ -430,6 +474,7 @@ type Querier interface {
 	// de fallar con 409 — mismo criterio "upsert" que UpsertTeamCoverage
 	// (teams.sql) de la Fase 6, más amigable para el admin que corrige un día.
 	UpsertAssignment(ctx context.Context, arg UpsertAssignmentParams) (WorkShiftAssignment, error)
+	UpsertComplementStorage(ctx context.Context, arg UpsertComplementStorageParams) (ComplementStorage, error)
 	// Borradores (Autosave, HU-7d): generaliza personal_notes a cualquier
 	// formulario largo. draft_key es libre (no FK): el recurso final puede no
 	// existir todavía en el momento del autosave.

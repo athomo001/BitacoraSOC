@@ -1,0 +1,137 @@
+@if (error(); as e) { <p class="adm-error" role="alert">{{ e }}</p> }
+
+<div class="rem">
+  <section class="adm-card">
+    <div class="adm-card__head">
+      <h3 class="adm-card__title"><mat-icon>notifications_active</mat-icon>{{ i18n.t('rem.title') }} <span class="mono adm-secondary">{{ reminders().length }}</span></h3>
+      <button type="button" class="adm-btn adm-btn--primary adm-push" [disabled]="busy()" (click)="startNew()"><mat-icon>add</mat-icon>{{ i18n.t('rem.new') }}</button>
+    </div>
+    <div class="adm-table-wrap">
+      <table class="adm-table">
+        <thead><tr><th>{{ i18n.t('rem.reminder') }}</th><th>{{ i18n.t('rem.when') }}</th><th>{{ i18n.t('rem.shifts') }}</th><th>{{ i18n.t('rem.lastSent') }}</th><th>{{ i18n.t('orgs.active') }}</th></tr></thead>
+        <tbody>
+          @for (r of reminders(); track r.id) {
+            <tr class="adm-row-click" [class.adm-row--active]="selectedId() === r.id" [class.rem__off]="!r.enabled" tabindex="0" (click)="select(r)" (keydown.enter)="select(r)">
+              <td><strong>{{ r.label }}</strong></td>
+              <td class="mono adm-small adm-secondary">{{ when(r) }}</td>
+              <td class="adm-small adm-secondary">{{ shiftNames(r.targetShiftIds) }}</td>
+              <td class="adm-small adm-secondary">
+                @if (r.lastSentAt) {
+                  <span class="mono">{{ r.lastSentAt | date: 'dd/MM HH:mm' }}</span>
+                  @switch (r.lastStatus) {
+                    @case ('failed') { <span class="pill tone-bad">{{ i18n.t('rem.failed') }}</span> }
+                    @case ('no_recipients') { <span class="pill tone-warn">{{ i18n.t('rem.noRecipientsShort') }}</span> }
+                    @default { · {{ i18n.tf('rem.people', r.lastRecipientsCount ?? 0) }} }
+                  }
+                } @else { {{ i18n.t('rem.never') }} }
+              </td>
+              <td (click)="$event.stopPropagation()">
+                <label class="switch">
+                  <input class="switch__input" type="checkbox" role="switch" [checked]="r.enabled" [disabled]="busy()" (change)="toggleEnabled(r)" [attr.aria-label]="r.label" />
+                  <span class="switch__track" aria-hidden="true"></span>
+                </label>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      @if (!reminders().length) { <p class="adm-empty">{{ i18n.t(loading() ? 'rem.loading' : 'rem.empty') }}</p> }
+    </div>
+    <p class="adm-card__note">{{ i18n.t('rem.rule') }}</p>
+  </section>
+
+  @if (selectedId()) {
+    <section class="adm-card">
+      <div class="adm-card__head">
+        <h3 class="adm-card__title"><mat-icon>{{ selectedId() === 'new' ? 'add' : 'edit' }}</mat-icon>{{ draft().label.trim() || i18n.t('rem.new') }}</h3>
+      </div>
+      <form class="adm-card__body" (ngSubmit)="save()">
+        <label class="adm-field">
+          <span class="adm-label">{{ i18n.t('rem.label') }}</span>
+          <input class="adm-input" name="label" maxlength="150" [placeholder]="i18n.t('rem.labelPlaceholder')" [ngModel]="draft().label" (ngModelChange)="edit({ label: $event })" />
+        </label>
+        <label class="adm-field">
+          <span class="adm-label">{{ i18n.t('rem.text') }}</span>
+          <textarea class="adm-input" name="text" rows="4" maxlength="5000" [placeholder]="i18n.t('rem.textPlaceholder')" [ngModel]="draft().reminderText" (ngModelChange)="edit({ reminderText: $event })"></textarea>
+        </label>
+
+        <div class="adm-field">
+          <span class="adm-label">{{ i18n.t('rem.when') }}</span>
+          <span class="rem__segs" role="group" [attr.aria-label]="i18n.t('rem.when')">
+            <button type="button" class="seg" [attr.aria-pressed]="draft().frequencyType === 'hours'" (click)="setFrequency('hours')">{{ i18n.t('rem.everyN') }}</button>
+            <button type="button" class="seg" [attr.aria-pressed]="draft().frequencyType === 'fixed'" (click)="setFrequency('fixed')">{{ i18n.t('rem.fixed') }}</button>
+          </span>
+          @if (draft().frequencyType === 'hours') {
+            <span class="rem__chips">
+              {{ i18n.t('rem.every') }}
+              @for (n of hourChoices; track n) {
+                <button type="button" class="seg mono" [attr.aria-pressed]="draft().intervalHours === n" (click)="edit({ intervalHours: n })">{{ n }}</button>
+              }
+              {{ i18n.t('rem.hours') }}
+            </span>
+            <span class="adm-hint">{{ i18n.tf('rem.blocksHint', blocksHint()) }}</span>
+          } @else {
+            <span class="rem__chips">
+              @for (t of draft().fixedTimes; track t) {
+                <span class="pill tone-neutral mono">{{ t }}<button type="button" class="rem__x" [attr.aria-label]="i18n.tf('rem.removeTime', t)" (click)="removeTime(t)"><mat-icon>close</mat-icon></button></span>
+              }
+              <input class="adm-input mono rem__time" type="time" name="newTime" [attr.aria-label]="i18n.t('rem.addTime')" [ngModel]="newTime()" (ngModelChange)="newTime.set($event)" />
+              <button type="button" class="adm-btn" (click)="addTime()"><mat-icon>add</mat-icon>{{ i18n.t('rem.addTime') }}</button>
+            </span>
+            <span class="adm-hint">{{ i18n.t('rem.fixedHint') }}</span>
+          }
+        </div>
+
+        <div class="adm-field">
+          <span class="adm-label">{{ i18n.t('rem.whichShifts') }}</span>
+          @for (s of activeShifts(); track s.id) {
+            <label class="rem__shift">
+              <input type="checkbox" [checked]="isTarget(s.id)" (change)="toggleShift(s.id)" />
+              <span>{{ s.name }}</span>
+              <span class="mono adm-small adm-secondary">{{ s.startTime }}–{{ s.endTime }}</span>
+              @if (s.emailRecipients.length) {
+                <span class="adm-small adm-secondary adm-push">{{ i18n.tf('rem.recipientsN', s.emailRecipients.length) }}</span>
+              } @else {
+                <span class="adm-small adm-push" [class.rem__warn]="targets().includes(s)">{{ i18n.t('rem.noRecipients') }}</span>
+              }
+            </label>
+          }
+          @if (!activeShifts().length) { <span class="adm-hint">{{ i18n.t('rem.noShifts') }}</span> }
+          <span class="adm-hint">
+            @if (!draft().targetShiftIds.length) { {{ i18n.t('rem.noneMeansAll') }} }
+            @if (withoutRecipients().length) { <span class="rem__warn">{{ i18n.tf('rem.missingRecipients', missingNames()) }}</span> }
+            @else { {{ i18n.t('rem.recipientsWhere') }} }
+          </span>
+        </div>
+
+        <div class="rem__preview">
+          <span class="adm-label">{{ i18n.t('rem.preview') }}</span>
+          <span class="adm-small"><span class="adm-secondary">{{ i18n.t('rem.subject') }}</span> [Bitácora Ops] {{ draft().label.trim() || '…' }}</span>
+          <span class="adm-small adm-secondary rem__body">{{ draft().reminderText.trim() || '…' }}</span>
+        </div>
+
+        <div class="adm-foot rem__foot">
+          <span class="adm-foot__status adm-small" [class]="status() ? 'text-ok' : dirty() ? 'text-warn' : 'adm-secondary'" role="status">
+            @switch (status()) {
+              @case ('saved') { {{ i18n.t('rem.saved') }} }
+              @case ('tested') { {{ i18n.tf('rem.tested', testedTo()) }} }
+              @default { {{ i18n.t(dirty() ? 'admin.unsaved' : 'rem.noChanges') }} }
+            }
+          </span>
+          @if (selectedId() !== 'new') {
+            @if (confirmDelete()) {
+              <span class="adm-small">{{ i18n.t('rem.confirmDelete') }}</span>
+              <button type="button" class="adm-btn" (click)="confirmDelete.set(false)">{{ i18n.t('adminChecklist.cancel') }}</button>
+              <button type="button" class="adm-btn adm-btn--danger" [disabled]="busy()" (click)="remove()">{{ i18n.t('dir.delete') }}</button>
+            } @else {
+              <button type="button" class="adm-icon-btn adm-icon-btn--danger" [title]="i18n.t('dir.delete')" [attr.aria-label]="i18n.t('dir.delete')" (click)="confirmDelete.set(true)"><mat-icon>delete_outline</mat-icon></button>
+            }
+          }
+          @if (dirty()) { <button type="button" class="adm-btn" (click)="discard()">{{ i18n.t('admin.discard') }}</button> }
+          <button type="button" class="adm-btn" [disabled]="busy() || dirty() || selectedId() === 'new'" [title]="dirty() ? i18n.t('rem.saveFirst') : i18n.t('rem.testHint')" (click)="test()"><mat-icon>send</mat-icon>{{ i18n.t('shiftsAdmin.test') }}</button>
+          <button type="submit" class="adm-btn adm-btn--primary" [disabled]="busy() || !dirty() || !canSave()"><mat-icon>save</mat-icon>{{ i18n.t('admin.save') }}</button>
+        </div>
+      </form>
+    </section>
+  }
+</div>

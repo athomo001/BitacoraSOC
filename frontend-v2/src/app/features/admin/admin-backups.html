@@ -56,7 +56,7 @@
         }
         <div class="bk__row">
           <button type="button" class="bk__btn bk__btn--primary" [disabled]="busy()" (click)="saveConfig()"><mat-icon>save</mat-icon>{{ i18n.t('backups.auto.save') }}</button>
-          <button type="button" class="bk__btn" [disabled]="busy() || !config()?.passphraseSet" (click)="runNow()"><mat-icon>play_circle</mat-icon>{{ i18n.t('backups.auto.runNow') }}</button>
+          <button type="button" class="bk__btn" [disabled]="busy()" (click)="runNow()"><mat-icon>play_circle</mat-icon>{{ i18n.t('backups.auto.runNow') }}</button>
         </div>
       </div>
     </section>
@@ -115,7 +115,9 @@
                       </span>
                     </div>
                     <div class="bk__grid bk__grid--2">
-                      <label class="field"><span>{{ i18n.t('backups.restore.passphrase') }}</span><input type="password" name="rowPassphrase" autocomplete="off" [(ngModel)]="rowPassphrase" /></label>
+                      @if (run.needsPassphrase) {
+                        <label class="field"><span>{{ i18n.t('backups.restore.passphrase') }}</span><input type="password" name="rowPassphrase" autocomplete="off" [(ngModel)]="rowPassphrase" /></label>
+                      }
                       @if (replace) {
                         <label class="field"><span>{{ i18n.t('backups.restore.typeConfirm') }}</span><input class="mono" name="rowConfirmation" autocomplete="off" [(ngModel)]="rowConfirmation" /></label>
                       }
@@ -123,7 +125,7 @@
                     <div class="bk__row bk__row--end">
                       <button type="button" class="bk__btn" (click)="panel.set(null)">{{ i18n.t('backups.cancel') }}</button>
                       <button type="submit" class="bk__btn" [class.bk__btn--danger]="replace" [class.bk__btn--primary]="!replace"
-                        [disabled]="busy() || !rowPassphrase || (replace && rowConfirmation !== 'RESTAURAR')">
+                        [disabled]="busy() || (run.needsPassphrase && !rowPassphrase) || (replace && rowConfirmation !== 'RESTAURAR')">
                         {{ i18n.t(replace ? 'backups.restore.replace' : 'backups.restore.merge') }}
                       </button>
                     </div>
@@ -131,12 +133,16 @@
                 }
                 @case ('validate') {
                   <form class="bk__panel" (submit)="$event.preventDefault(); validate(run)">
-                    <div class="bk__grid bk__grid--2">
-                      <label class="field"><span>{{ i18n.t('backups.restore.passphrase') }}</span><input type="password" name="rowPassphrase" autocomplete="off" [(ngModel)]="rowPassphrase" /></label>
-                    </div>
+                    @if (run.needsPassphrase) {
+                      <div class="bk__grid bk__grid--2">
+                        <label class="field"><span>{{ i18n.t('backups.restore.passphrase') }}</span><input type="password" name="rowPassphrase" autocomplete="off" [(ngModel)]="rowPassphrase" /></label>
+                      </div>
+                    } @else {
+                      <p class="bk__hint">{{ i18n.t('backups.restore.noPassphrase') }}</p>
+                    }
                     <div class="bk__row bk__row--end">
                       <button type="button" class="bk__btn" (click)="panel.set(null)">{{ i18n.t('backups.cancel') }}</button>
-                      <button type="submit" class="bk__btn bk__btn--primary" [disabled]="busy() || !rowPassphrase">{{ i18n.t('backups.validate.run') }}</button>
+                      <button type="submit" class="bk__btn bk__btn--primary" [disabled]="busy() || (run.needsPassphrase && !rowPassphrase)">{{ i18n.t('backups.validate.run') }}</button>
                     </div>
                   </form>
                 }
@@ -165,12 +171,14 @@
           <span class="bk__label">{{ i18n.t('backups.manual.title') }}</span>
           <span class="bk__hint">{{ i18n.t('backups.manual.hint') }}</span>
           <label class="field"><span>{{ i18n.t('backups.manual.passphrase') }}</span><input type="password" name="passphrase" autocomplete="new-password" [(ngModel)]="passphrase" /></label>
-          <button type="button" class="bk__btn bk__btn--primary" [disabled]="busy() || passphrase.length < 8" (click)="createNow()"><mat-icon>backup</mat-icon>{{ i18n.t(busy() ? 'backups.manual.creating' : 'backups.manual.create') }}</button>
+          <span class="bk__hint">{{ i18n.t('backups.manual.optionalHint') }}</span>
+          <button type="button" class="bk__btn bk__btn--primary" [disabled]="busy() || !passphraseOk()" (click)="createNow()"><mat-icon>backup</mat-icon>{{ i18n.t(busy() ? 'backups.manual.creating' : 'backups.manual.create') }}</button>
           <span class="bk__or">{{ i18n.t('backups.upload.or') }}</span>
-          <label class="bk__drop" [class.bk__drop--disabled]="passphrase.length < 8">
+          <label class="bk__drop" [class.bk__drop--disabled]="!passphraseOk()" [class.bk__drop--over]="dragging()"
+            (dragover)="onDragOver($event)" (dragleave)="dragging.set(false)" (drop)="onDrop($event)">
             <mat-icon>upload_file</mat-icon>
             {{ i18n.t('backups.upload.pick') }}
-            <input type="file" accept=".enc" [disabled]="busy() || passphrase.length < 8" (change)="upload($event)" />
+            <input type="file" accept=".enc" [disabled]="busy() || !passphraseOk()" (change)="upload($event)" />
           </label>
           <span class="bk__hint">{{ i18n.t('backups.upload.hint') }}</span>
         </div>
@@ -184,9 +192,9 @@
             }
           </div>
           <div class="bk__grid bk__grid--2">
-            <button type="button" class="bk__btn" [disabled]="busy() || passphrase.length < 8" (click)="exportDelta()"><mat-icon>file_download</mat-icon>{{ i18n.t('backups.delta.export') }}</button>
-            <label class="bk__btn" [class.bk__btn--disabled]="passphrase.length < 8"><mat-icon>file_upload</mat-icon>{{ i18n.t('backups.delta.import') }}
-              <input type="file" accept=".enc" class="bk__hidden" [disabled]="busy() || passphrase.length < 8" (change)="importDelta($event)" />
+            <button type="button" class="bk__btn" [disabled]="busy() || !passphraseOk()" (click)="exportDelta()"><mat-icon>file_download</mat-icon>{{ i18n.t('backups.delta.export') }}</button>
+            <label class="bk__btn" [class.bk__btn--disabled]="!passphraseOk()"><mat-icon>file_upload</mat-icon>{{ i18n.t('backups.delta.import') }}
+              <input type="file" accept=".enc" class="bk__hidden" [disabled]="busy() || !passphraseOk()" (change)="importDelta($event)" />
             </label>
           </div>
         </div>

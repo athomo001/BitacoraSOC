@@ -15,9 +15,11 @@ export interface ShellNavItem {
   labelKey: MessageKey;
   icon: string;
   /** Alt+<dígito>, ver ShellComponent.onKeydown */
-  shortcutDigit: '1' | '2' | '3' | '4' | '5' | '6';
+  shortcutDigit: '1' | '2' | '3' | '4' | '5' | '6' | '7';
   /** Código de `system_features` que debe estar activo para mostrar la sección. */
   requiresFeature?: string;
+  /** Además, que el usuario vea al menos un complemento (si no, no hay nada que abrir). */
+  requiresComplements?: boolean;
 }
 
 export const SHELL_NAV_ITEMS: readonly ShellNavItem[] = [
@@ -26,5 +28,7 @@ export const SHELL_NAV_ITEMS: readonly ShellNavItem[] = [
   { path: 'shifts', labelKey: 'nav.shifts', icon: 'schedule', shortcutDigit: '2' },
   { path: 'escalation', labelKey: 'nav.escalation', icon: 'phone_in_talk', shortcutDigit: '3' },
   { path: 'directory', labelKey: 'nav.directory', icon: 'contacts', shortcutDigit: '4' },
+  // Complementos (spec/11 §7): un solo ítem con una pestaña por complemento.
+  { path: 'complements', labelKey: 'nav.complements', icon: 'extension', shortcutDigit: '7', requiresFeature: 'complements', requiresComplements: true },
   { path: 'admin', labelKey: 'nav.admin', icon: 'settings', shortcutDigit: '5' },
 ];

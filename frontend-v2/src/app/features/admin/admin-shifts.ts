@@ -15,6 +15,7 @@ import {
 import { I18nService } from '../../core/i18n/i18n.service';
 import { PreferencesService } from '../../core/preferences/preferences.service';
 import { problemDetail } from '../../core/http-error';
+import { AdminShiftRemindersComponent } from './admin-shift-reminders';
 
 function splitList(raw: string): string[] {
   return raw.split(',').map((s) => s.trim()).filter(Boolean);
@@ -25,7 +26,8 @@ function splitList(raw: string): string[] {
  * componentes del artboard "Administración". Tres bloques, del más usado al
  * menos: los turnos de trabajo (horario y a quién le llega el reporte de
  * cierre), la rotación de guardia de cada equipo (ciclos, rol semanal y
- * reemplazos) y el correo periódico de dotación. La operación del día a día
+ * reemplazos), el correo periódico de dotación y los recordatorios por
+ * correo a los turnos en curso, en pestañas como el artboard. La operación del día a día
  * (la grilla, el enlace TV) vive en /shifts.
  *
  * Sin panel de "reemplazos activos" a propósito: no hay GET de overrides en
@@ -34,7 +36,7 @@ function splitList(raw: string): string[] {
 @Component({
   selector: 'app-admin-shifts',
   standalone: true,
-  imports: [DatePipe, FormsModule, MatIconModule],
+  imports: [DatePipe, FormsModule, MatIconModule, AdminShiftRemindersComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-shifts.html',
   styles: `
@@ -51,6 +53,7 @@ function splitList(raw: string): string[] {
     .sa__week--paused { border-color: var(--border-subtle); background: var(--bg-app); }
     .sa__row-actions { white-space: nowrap; }
     .sa__row-actions .adm-btn { margin-right: 4px; }
+    .sa__tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-left: auto; }
   `,
 })
 export class AdminShiftsComponent implements OnInit {
@@ -68,6 +71,7 @@ export class AdminShiftsComponent implements OnInit {
     });
   });
 
+  protected readonly tab = signal<'shifts' | 'staffing' | 'reminders'>('shifts');
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);

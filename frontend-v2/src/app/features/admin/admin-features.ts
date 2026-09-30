@@ -13,6 +13,7 @@ import { problemDetail } from '../../core/http-error';
 const KNOWN: Record<string, { name: MessageKey; desc: MessageKey; available: boolean }> = {
   native_tickets: { name: 'features.native_tickets.name', desc: 'features.native_tickets.desc', available: true },
   allow_purge: { name: 'features.allow_purge.name', desc: 'features.allow_purge.desc', available: true },
+  complements: { name: 'features.complements.name', desc: 'features.complements.desc', available: true },
   zabbix_inbound: { name: 'features.zabbix_inbound.name', desc: 'features.zabbix_inbound.desc', available: false },
   glpi_sync: { name: 'features.glpi_sync.name', desc: 'features.glpi_sync.desc', available: false },
 };

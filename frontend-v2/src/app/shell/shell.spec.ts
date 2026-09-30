@@ -63,6 +63,24 @@ describe('ShellComponent', () => {
     expect(el.querySelector('.shell__profile-name')?.textContent?.trim()).toBe('Ana Rojas');
   });
 
+  it('Complementos no aparece apagado, ni encendido sin complementos visibles', async () => {
+    const { fixture, el } = await render([{ code: 'complements', isEnabled: true }]);
+    httpMock.expectOne('/api/complements/active').flush({ data: [] });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(navLabels(el)).not.toContain('Complementos');
+  });
+
+  it('Complementos aparece con la funcionalidad encendida y algún complemento visible', async () => {
+    const { fixture, el } = await render([{ code: 'complements', isEnabled: true }]);
+    httpMock.expectOne('/api/complements/active').flush({
+      data: [{ slug: 'doom', name: 'DOOM', icon: 'sports_esports', status: 'active', sourceType: 'zip_static', circuit: 'CLOSED' }],
+    });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(navLabels(el)).toContain('Complementos');
+  });
+
   it('con la ticketera activa la muestra como sección propia justo debajo de Bitácora', async () => {
     const { el } = await render([{ code: 'native_tickets', isEnabled: true }]);
     expect(navLabels(el).slice(0, 2)).toEqual(['Bitácora', 'Ticketera']);

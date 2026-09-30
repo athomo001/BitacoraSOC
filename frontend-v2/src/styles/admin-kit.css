@@ -87,20 +87,19 @@
 
 .adm-field {
   display: flex;
-  flex: 1 1 180px;
   flex-direction: column;
   gap: 5px;
   min-width: 0;
 }
 
-.adm-field--narrow {
-  flex: 0 0 110px;
+/* El ancho flexible solo dentro de una fila: en una columna, un flex-basis
+ * de 180px sería alto, no ancho (dejaba un hueco vacío bajo el campo). */
+.adm-row > .adm-field {
+  flex: 1 1 180px;
 }
 
-/* Un campo suelto en una columna (no dentro de .adm-row) no debe heredar el
- * flex-basis de 180px: en una columna ese valor es alto, no ancho. */
-.adm-card__body > .adm-field {
-  flex: 0 0 auto;
+.adm-row > .adm-field--narrow {
+  flex: 0 0 110px;
 }
 
 .adm-label {

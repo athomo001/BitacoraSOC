@@ -3,11 +3,17 @@
     <h2 class="adm-title">{{ i18n.t('admin.nav.shifts') }}</h2>
     <p class="adm-muted">{{ i18n.t('shiftsAdmin.subtitle') }}</p>
   </div>
+  <span class="sa__tabs" role="group" [attr.aria-label]="i18n.t('admin.nav.shifts')">
+    <button type="button" class="seg" [attr.aria-pressed]="tab() === 'shifts'" (click)="tab.set('shifts')">{{ i18n.t('shiftsAdmin.tabShifts') }} <span class="mono">{{ workShifts().length }}</span></button>
+    <button type="button" class="seg" [attr.aria-pressed]="tab() === 'staffing'" (click)="tab.set('staffing')">{{ i18n.t('shiftsAdmin.tabStaffing') }}</button>
+    <button type="button" class="seg" [attr.aria-pressed]="tab() === 'reminders'" (click)="tab.set('reminders')">{{ i18n.t('shiftsAdmin.tabReminders') }}</button>
+  </span>
 </header>
 
 @if (error(); as e) { <p class="adm-error" role="alert">{{ e }}</p> }
 @if (notice(); as n) { <p><span class="pill tone-ok"><mat-icon>task_alt</mat-icon>{{ n }}</span></p> }
 
+@if (tab() === 'shifts') {
 <!-- ===== Turnos de trabajo ===== -->
 <section class="adm-card">
   <div class="adm-card__head">
@@ -193,6 +199,9 @@
   }
 </section>
 
+}
+
+@if (tab() === 'staffing') {
 <!-- ===== Notificaciones de dotación ===== -->
 <section class="adm-card">
   <div class="adm-card__head">
@@ -257,3 +266,8 @@
     </div>
   </form>
 </section>
+}
+
+@if (tab() === 'reminders') {
+  <app-admin-shift-reminders />
+}

@@ -55,6 +55,10 @@ services:
       APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:-dkbE1vL8G50ufsA0EsATSDDsu+F1LAhKNNykSrG9Z3w=}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://127.0.0.1:8081}
       RATE_LIMIT_RESET_SECRET: ${RATE_LIMIT_RESET_SECRET:-}
+      RATE_LIMIT_DISABLED: ${RATE_LIMIT_DISABLED:-}
+      # Complementos (spec/11): origen aislado en un segundo puerto.
+      COMPLEMENTS_ADDR: ":8082"
+      COMPLEMENTS_PUBLIC_URL: ${COMPLEMENTS_PUBLIC_URL:-http://127.0.0.1:8082}
       # Admin por defecto opcional (ver .env.example): solo si el setup no se hizo.
       BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-}
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
@@ -73,6 +77,7 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
     ports:
       - "127.0.0.1:8081:80"
+      - "127.0.0.1:8082:8082"
     networks:
       - bitacora-rewrite-network
 

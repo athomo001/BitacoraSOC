@@ -8,12 +8,14 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/auth"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/backup"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/complements"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/crypto"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/eventbus"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/handler"
@@ -108,6 +110,11 @@ func run(logger *slog.Logger) error {
 	// ===== Auth middleware =====
 	authMW := middleware.NewAuth(jwtIssuer, &repository.UserLookup{Queries: queries}, &repository.TokenDenylist{Queries: queries}, auditLog)
 	apiRateLimit := middleware.APIRateLimit(anonymousAPILimiter, authenticatedAPILimiter)
+	rateLimitOff := rateLimitDisabled(publicBaseURL, logger)
+	if rateLimitOff {
+		loginLimiter = nil
+		apiRateLimit = func(next http.Handler) http.Handler { return next }
+	}
 
 	// ===== Handlers =====
 	health := &handler.HealthHandler{Queries: queries}
@@ -157,6 +164,31 @@ func run(logger *slog.Logger) error {
 		sender, _, err := handler.BuildMailSender(ctx, queries, cryptoBox)
 		return sender, err
 	}}
+	// Complementos (spec/11, Fase 13b): se sirven desde un origen aislado
+	// (segundo puerto por defecto) para que no puedan leer la sesión.
+	complementsPublicURL := strings.TrimRight(os.Getenv("COMPLEMENTS_PUBLIC_URL"), "/")
+	if complementsPublicURL == "" {
+		complementsPublicURL = "http://127.0.0.1:8082"
+	}
+	complementsAddr := os.Getenv("COMPLEMENTS_ADDR")
+	if complementsAddr == "" {
+		complementsAddr = ":8082"
+	}
+	complementsHandler := &handler.ComplementsHandler{
+		Pool: pool, Queries: queries, AuditLog: auditLog, JWT: jwtIssuer,
+		Signer: complements.NewSigner([]byte(jwtSigningKey)), Breaker: complements.NewBreaker(),
+		AppOrigin: complements.Origin(publicBaseURL), OriginURL: complementsPublicURL,
+		DeleteLimiter: ratelimit.NewAPILimiter(3, time.Hour),
+	}
+	complementsHandler.PreviewCacheInit()
+	if rateLimitOff {
+		complementsHandler.DeleteLimiter = nil
+	}
+	runtimeAPI := &handler.RuntimeAPI{Complements: complementsHandler, Limiter: ratelimit.NewAPILimiter(200, 15*time.Minute), AppVersion: os.Getenv("APP_VERSION")}
+	if rateLimitOff {
+		runtimeAPI.Limiter = nil
+	}
+	shiftRemindersHandler := &handler.ShiftRemindersHandler{Queries: queries, AuditLog: auditLog, Sender: dotacionHandler.Sender}
 	entriesHandler := &handler.EntriesHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
 	// 30 intentos de PIN por token cada 15 min: un cliente real no llega, un ataque de 10^6 PIN tarda ~1 año.
 	ticketsHandler := &handler.TicketsHandler{Pool: pool, Queries: queries, AuditLog: auditLog, PinLimiter: ratelimit.NewAPILimiter(30, 15*time.Minute), Hub: hub}
@@ -387,6 +419,41 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/work-shifts/notification-schedules", admin(dotacionHandler.CreateNotificationSchedule))
 	mux.Handle("PATCH /api/work-shifts/notification-schedules/{id}", admin(dotacionHandler.PatchNotificationSchedule))
 	mux.Handle("POST /api/work-shifts/notification-schedules/{id}/test", admin(dotacionHandler.TestNotificationSchedule))
+	// Complementos (spec/11 §5). La funcionalidad "complements" se revisa por
+	// request: apagarla corta la administración, el menú y la Runtime API.
+	complAdmin := func(h http.HandlerFunc) http.Handler {
+		return admin(func(w http.ResponseWriter, r *http.Request) { complementsHandler.RequireEnabled(w, r, h) })
+	}
+	complAuthed := func(h http.HandlerFunc) http.Handler {
+		return authed(func(w http.ResponseWriter, r *http.Request) { complementsHandler.RequireEnabled(w, r, h) })
+	}
+	mux.Handle("GET /api/complements", complAdmin(complementsHandler.List))
+	mux.Handle("POST /api/complements", complAdmin(complementsHandler.CreateManual))
+	mux.Handle("GET /api/complements/active", complAuthed(complementsHandler.Active))
+	mux.Handle("POST /api/complements/uploads", complAdmin(complementsHandler.Upload))
+	mux.Handle("GET /api/complements/uploads/{id}/preview", complAdmin(complementsHandler.Preview))
+	mux.Handle("POST /api/complements/uploads/{id}/publish", complAdmin(complementsHandler.Publish))
+	mux.Handle("GET /api/complements/{slug}", complAdmin(complementsHandler.Get))
+	mux.Handle("PATCH /api/complements/{slug}", complAdmin(complementsHandler.Patch))
+	mux.Handle("DELETE /api/complements/{slug}", complAdmin(complementsHandler.Delete))
+	mux.Handle("POST /api/complements/{slug}/token", complAdmin(complementsHandler.RegenerateToken))
+	mux.Handle("POST /api/complements/{slug}/test", complAdmin(complementsHandler.Test))
+	mux.Handle("POST /api/complements/{slug}/embed", complAuthed(complementsHandler.Embed))
+	mux.Handle("POST /api/complements/{slug}/entries", complAuthed(complementsHandler.CreateEntry))
+	// Complement Runtime API (ruta del legacy): token de aplicación, no sesión.
+	mux.HandleFunc("GET /api/internal/versions", runtimeAPI.Versions)
+	mux.Handle("GET /api/internal/v1/context", runtimeAPI.Auth("READ_CONTEXT", runtimeAPI.Context))
+	mux.Handle("POST /api/internal/v1/log-entry", runtimeAPI.Auth("WRITE_ENTRIES", runtimeAPI.LogEntry))
+	mux.Handle("GET /api/internal/v1/query-general", runtimeAPI.Auth("READ_LOGS", runtimeAPI.QueryGeneral))
+	mux.Handle("GET /api/internal/v1/storage", runtimeAPI.Auth("READ_STORAGE", runtimeAPI.StorageGet))
+	mux.Handle("POST /api/internal/v1/storage", runtimeAPI.Auth("WRITE_STORAGE", runtimeAPI.StoragePut))
+	mux.Handle("POST /api/internal/v1/log", runtimeAPI.Auth("WRITE_LOGS", runtimeAPI.Log))
+	// Recordatorios de turno por correo (spec/12-pendientes.md §2.3b).
+	mux.Handle("GET /api/shift-reminders", admin(shiftRemindersHandler.List))
+	mux.Handle("POST /api/shift-reminders", admin(shiftRemindersHandler.Create))
+	mux.Handle("PATCH /api/shift-reminders/{id}", admin(shiftRemindersHandler.Patch))
+	mux.Handle("DELETE /api/shift-reminders/{id}", admin(shiftRemindersHandler.Delete))
+	mux.Handle("POST /api/shift-reminders/{id}/test", admin(shiftRemindersHandler.Test))
 	// Página pública sin login para la TV de sala (HU-4b) — primer endpoint
 	// HTML del backend, fuera del envoltorio {data} y sin auth a propósito.
 	mux.HandleFunc("GET /p/telework/{token}", dotacionHandler.PublicTeleworkPage)
@@ -464,6 +531,10 @@ func run(logger *slog.Logger) error {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	go scheduler.Run(ctx, time.Minute, reportDispatcher.DispatchPending)
+	// Recordatorios de turno: revisa cada minuto cuáles tocan (un envío por bloque u hora).
+	go scheduler.Run(ctx, time.Minute, shiftRemindersHandler.DispatchDue)
+	// Salud de los complementos servicio y limpieza de subidas vencidas.
+	go scheduler.Run(ctx, 30*time.Second, complementsHandler.ProbeAll)
 	// Respaldos automáticos: revisa cada minuto si toca la copia programada.
 	go scheduler.Run(ctx, time.Minute, func(ctx context.Context) error { return backupService.RunScheduled(ctx, false) })
 
@@ -475,7 +546,23 @@ func run(logger *slog.Logger) error {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	serveErr := make(chan error, 1)
+	// Origen aislado de complementos: otro puerto, otro servidor, sin nada
+	// del API de la app (solo archivos publicados y browser-state).
+	complementsSrv := &http.Server{
+		Addr:         complementsAddr,
+		Handler:      middleware.Metadata(complementsHandler.OriginHandler()),
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 60 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	serveErr := make(chan error, 2)
+	go func() {
+		logger.Info("origen de complementos escuchando", "addr", complementsAddr, "public", complementsPublicURL)
+		if err := complementsSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serveErr <- err
+		}
+	}()
 	go func() {
 		logger.Info("bitacora-app escuchando", "addr", addr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -500,5 +587,6 @@ func run(logger *slog.Logger) error {
 	// sección 9.
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
+	_ = complementsSrv.Shutdown(shutdownCtx)
 	return srv.Shutdown(shutdownCtx)
 }
