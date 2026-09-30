@@ -10,8 +10,9 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// Seguimiento público de ticket (GET /p/tickets/:token, spec/06 §6.4):
-// página sin login para el cliente. "Oculta 100% de PII de técnicos,
+// Seguimiento público de ticket (spec/06 §6.4): la página sin login para el
+// cliente vive en /p/tickets/:token (Angular) y lee de
+// GET /api/public/tickets/{token}. "Oculta 100% de PII de técnicos,
 // comentarios internos y notas de escalación" — por eso tiene DTOs propios
 // y nunca serializa structs de sqlc (antes salían user_id y author_name).
 

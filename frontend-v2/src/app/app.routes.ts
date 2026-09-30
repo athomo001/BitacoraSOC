@@ -27,6 +27,13 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/login/login.component').then((module) => module.LoginComponent),
   },
+  // Seguimiento público del ticket (spec/06 §6.4): lo abre el cliente, sin
+  // login ni shell, por eso va sin guards.
+  {
+    path: 'p/tickets/:token',
+    loadComponent: () =>
+      import('./features/tickets/public-ticket').then((module) => module.PublicTicketComponent),
+  },
   {
     path: '',
     component: ShellComponent,

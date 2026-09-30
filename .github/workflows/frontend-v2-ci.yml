@@ -19,13 +19,15 @@ jobs:
       run:
         working-directory: frontend-v2
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      # Sin `version`: instala exactamente la de `packageManager` en package.json
+      # (pnpm-workspace.yaml tiene pmOnFail: error y falla con cualquier otra).
+      - uses: pnpm/action-setup@v6
         with:
-          version: 12
+          package_json_file: frontend-v2/package.json
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "24.19.0"
           cache: "pnpm"

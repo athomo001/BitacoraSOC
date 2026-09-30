@@ -63,6 +63,22 @@ export interface TicketDetail {
 export interface QueueSummary { open: number; breached: number; paused: number; resolvedToday: number; }
 export interface TicketList { items: Ticket[]; total: number; summary: QueueSummary; }
 
+/**
+ * Vista pública del ticket (spec/06 §6.4): sin técnicos ni comentarios
+ * internos; cada comunicado lo firma "Mesa de Operaciones".
+ */
+export interface PublicTicket {
+  ticketNumber: string;
+  title: string;
+  ticketType: TicketType;
+  status: TicketStatus;
+  priority: TicketPriority;
+  clientName: string;
+  openAt: string | null;
+  lastUpdateAt: string | null;
+  publicComments: { author: string; content: string; createdAt: string }[];
+}
+
 export interface TicketFilters { ticketType?: TicketType; openOnly?: boolean; q?: string; }
 
 export interface NewTicket {
@@ -113,5 +129,11 @@ export class TicketsService {
 
   async regeneratePin(id: string): Promise<string> {
     return (await firstValueFrom(this.http.post<ApiEnvelope<{ publicTrackingPin: string }>>(`/api/tickets/${id}/public-pin`, {}))).data.publicTrackingPin;
+  }
+
+  /** Seguimiento sin login: 401 si falta el PIN o no coincide, 404 si el enlace no existe o se desactivó. */
+  async getPublic(token: string, pin?: string): Promise<PublicTicket> {
+    const params: Record<string, string> = pin ? { pin } : {};
+    return (await firstValueFrom(this.http.get<ApiEnvelope<PublicTicket>>(`/api/public/tickets/${encodeURIComponent(token)}`, { params }))).data;
   }
 }

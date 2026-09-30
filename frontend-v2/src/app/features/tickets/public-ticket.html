@@ -1,0 +1,106 @@
+<button type="button" class="pt__theme" (click)="toggleTheme()" [attr.aria-label]="i18n.t(prefs.theme() === 'light' ? 'shell.theme.toDark' : 'shell.theme.toLight')">
+  <mat-icon>{{ prefs.theme() === 'light' ? 'dark_mode' : 'light_mode' }}</mat-icon>
+</button>
+
+<main class="pt">
+  <header class="pt__brand">
+    <span class="pt__logo" aria-hidden="true">B</span>
+    {{ i18n.t('publicTicket.header') }} · Bitácora Ops
+  </header>
+
+  @switch (view()) {
+    @case ('loading') {
+      <p class="pt__card pt__muted" role="status">{{ i18n.t('publicTicket.loading') }}</p>
+    }
+
+    @case ('pin') {
+      <form class="pt__card pt__pin" (submit)="$event.preventDefault(); submitPin()">
+        <h1 class="pt__pin-title">{{ i18n.t('publicTicket.pin.title') }}</h1>
+        <p class="pt__hint">{{ i18n.t('publicTicket.pin.hint') }}</p>
+        <label class="pt__boxes">
+          <span class="pt__sr">{{ i18n.t('publicTicket.pin.label') }}</span>
+          @for (d of pinDigits(); track $index) {
+            <span class="pt__box mono" [class.pt__box--next]="$index === pin().length" aria-hidden="true">{{ d }}</span>
+          }
+          <input #pinInput class="pt__pin-input" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" [value]="pin()" (input)="onPinInput(pinInput)" [attr.aria-invalid]="pinWrong()" [attr.aria-describedby]="pinWrong() || tooMany() ? 'pt-pin-error' : null" />
+        </label>
+        @if (pinWrong()) {
+          <p id="pt-pin-error" class="pt__error" role="alert">{{ i18n.t('publicTicket.pin.wrong') }}</p>
+        } @else if (tooMany()) {
+          <p id="pt-pin-error" class="pt__error" role="alert">{{ i18n.t('publicTicket.tooMany') }}</p>
+        }
+        <div>
+          <button type="submit" class="pt__btn" [disabled]="busy() || pin().length < 6">{{ i18n.t('publicTicket.pin.submit') }}</button>
+        </div>
+      </form>
+    }
+
+    @case ('notFound') {
+      <section class="pt__card pt__pin">
+        <h1 class="pt__pin-title">{{ i18n.t('publicTicket.notFound.title') }}</h1>
+        <p class="pt__hint">{{ i18n.t('publicTicket.notFound.detail') }}</p>
+      </section>
+    }
+
+    @case ('error') {
+      <section class="pt__card pt__pin">
+        <p class="pt__error" role="alert">{{ i18n.t('publicTicket.error') }}</p>
+        <div>
+          <button type="button" class="pt__btn" (click)="retry()">{{ i18n.t('publicTicket.retry') }}</button>
+        </div>
+      </section>
+    }
+
+    @case ('ready') {
+      @if (ticket(); as t) {
+        <article class="pt__card pt__status">
+          <div class="pt__section">
+            <div class="pt__ids">
+              <span class="pt__number mono">{{ t.ticketNumber }}</span>
+              <span class="pill" [class]="'tone-' + priorityTone[t.priority]">{{ i18n.t(priorityKey(t)) }}</span>
+              <span class="pt__updated mono">{{ updatedText() }}</span>
+            </div>
+            <h1 class="pt__title">{{ t.title }}</h1>
+            <p class="pt__client">{{ t.clientName }} · {{ i18n.t(typeKey(t)) }}</p>
+          </div>
+
+          @if (progress(); as p) {
+            <div class="pt__section">
+              @if (p.step !== null) {
+                <ol class="pt__steps">
+                  @for (step of steps; track step; let i = $index) {
+                    <li class="pt__step" [class.pt__step--current]="i === p.step" [class.pt__step--todo]="barTone(i) === 'todo'" [attr.aria-current]="i === p.step ? 'step' : null">
+                      <span class="pt__bar" [class]="'pt__bar--' + barTone(i)"></span>
+                      {{ i18n.t(step) }}
+                    </li>
+                  }
+                </ol>
+              }
+              <p class="pt__callout" [class]="'tone-' + p.tone"><strong>{{ i18n.t(p.title) }}</strong> {{ i18n.t(p.detail) }}</p>
+            </div>
+          }
+
+          <div class="pt__section pt__updates">
+            <h2 class="pt__label">{{ i18n.t('publicTicket.updates') }}</h2>
+            @for (u of updates(); track u.createdAt + $index) {
+              <div class="pt__update">
+                <time class="pt__when mono" [attr.datetime]="u.createdAt">{{ u.createdAt | date: 'dd/MM HH:mm' }}</time>
+                <div class="pt__update-body">
+                  <div class="pt__author">{{ i18n.t('publicTicket.author') }}</div>
+                  <p class="pt__text">{{ u.content }}</p>
+                </div>
+              </div>
+            } @empty {
+              <p class="pt__muted">{{ i18n.t('publicTicket.noUpdates') }}</p>
+            }
+          </div>
+
+          <footer class="pt__privacy">
+            <mat-icon>lock</mat-icon>
+            {{ i18n.t('publicTicket.privacy') }}
+          </footer>
+        </article>
+      }
+    }
+  }
+</main>

@@ -14,10 +14,41 @@ import (
 
 const countAuditLogs = `-- name: CountAuditLogs :one
 SELECT count(*) FROM audit_log
+WHERE ($1::text[] IS NULL
+       OR EXISTS (SELECT 1 FROM unnest($1::text[]) AS p(prefix) WHERE event = p.prefix OR starts_with(event, p.prefix || '.')))
+  AND ($2::text IS NULL OR level = $2)
+  AND ($3::boolean IS NULL OR success = $3)
+  AND ($4::uuid IS NULL OR actor_user_id = $4)
+  AND ($5::timestamptz IS NULL OR "timestamp" >= $5)
+  AND ($6::timestamptz IS NULL OR "timestamp" < $6)
+  AND ($7::text IS NULL
+       OR actor_username ILIKE '%' || $7 || '%'
+       OR request_ip ILIKE '%' || $7 || '%'
+       OR request_path ILIKE '%' || $7 || '%'
+       OR event ILIKE '%' || $7 || '%'
+       OR reason ILIKE '%' || $7 || '%')
 `
 
-func (q *Queries) CountAuditLogs(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countAuditLogs)
+type CountAuditLogsParams struct {
+	Events      []string           `json:"events"`
+	Level       pgtype.Text        `json:"level"`
+	Success     pgtype.Bool        `json:"success"`
+	ActorUserID pgtype.UUID        `json:"actor_user_id"`
+	FromDate    pgtype.Timestamptz `json:"from_date"`
+	ToDate      pgtype.Timestamptz `json:"to_date"`
+	Q           pgtype.Text        `json:"q"`
+}
+
+func (q *Queries) CountAuditLogs(ctx context.Context, arg CountAuditLogsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countAuditLogs,
+		arg.Events,
+		arg.Level,
+		arg.Success,
+		arg.ActorUserID,
+		arg.FromDate,
+		arg.ToDate,
+		arg.Q,
+	)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -85,19 +116,57 @@ func (q *Queries) InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) 
 }
 
 const listAuditLogs = `-- name: ListAuditLogs :many
+
 SELECT id, timestamp, event, level, actor_user_id, actor_username, actor_role, request_id, request_ip, request_path, request_method, user_agent, device_fingerprint, ip_changed, previous_ip, success, reason, source, source_id, metadata FROM audit_log
+WHERE ($1::text[] IS NULL
+       OR EXISTS (SELECT 1 FROM unnest($1::text[]) AS p(prefix) WHERE event = p.prefix OR starts_with(event, p.prefix || '.')))
+  AND ($2::text IS NULL OR level = $2)
+  AND ($3::boolean IS NULL OR success = $3)
+  AND ($4::uuid IS NULL OR actor_user_id = $4)
+  AND ($5::timestamptz IS NULL OR "timestamp" >= $5)
+  AND ($6::timestamptz IS NULL OR "timestamp" < $6)
+  AND ($7::text IS NULL
+       OR actor_username ILIKE '%' || $7 || '%'
+       OR request_ip ILIKE '%' || $7 || '%'
+       OR request_path ILIKE '%' || $7 || '%'
+       OR event ILIKE '%' || $7 || '%'
+       OR reason ILIKE '%' || $7 || '%')
 ORDER BY "timestamp" DESC
-LIMIT $1 OFFSET $2
+LIMIT $9 OFFSET $8
 `
 
 type ListAuditLogsParams struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
+	Events      []string           `json:"events"`
+	Level       pgtype.Text        `json:"level"`
+	Success     pgtype.Bool        `json:"success"`
+	ActorUserID pgtype.UUID        `json:"actor_user_id"`
+	FromDate    pgtype.Timestamptz `json:"from_date"`
+	ToDate      pgtype.Timestamptz `json:"to_date"`
+	Q           pgtype.Text        `json:"q"`
+	PageOffset  int32              `json:"page_offset"`
+	PageLimit   int32              `json:"page_limit"`
 }
 
-// GET /api/audit-logs — paginado simple, más reciente primero.
+// Los tres comparten el mismo filtro (GET /api/audit-logs y su /export):
+//
+//	events  dominios o eventos exactos: ["auth","setup"] trae auth.login.fail, setup.bootstrap…
+//	level   info | warn | error
+//	success true = resultado OK, false = fallo
+//	q       texto libre sobre actor, IP, ruta, evento y motivo (ya escapado para LIKE)
+//
+// Más reciente primero.
 func (q *Queries) ListAuditLogs(ctx context.Context, arg ListAuditLogsParams) ([]AuditLog, error) {
-	rows, err := q.db.Query(ctx, listAuditLogs, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, listAuditLogs,
+		arg.Events,
+		arg.Level,
+		arg.Success,
+		arg.ActorUserID,
+		arg.FromDate,
+		arg.ToDate,
+		arg.Q,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -139,26 +208,41 @@ func (q *Queries) ListAuditLogs(ctx context.Context, arg ListAuditLogsParams) ([
 
 const listAuditLogsForExport = `-- name: ListAuditLogsForExport :many
 SELECT id, timestamp, event, level, actor_user_id, actor_username, actor_role, request_id, request_ip, request_path, request_method, user_agent, device_fingerprint, ip_changed, previous_ip, success, reason, source, source_id, metadata FROM audit_log
-WHERE ($1::text IS NULL OR event = $1)
-  AND ($2::uuid IS NULL OR actor_user_id = $2)
-  AND ($3::timestamptz IS NULL OR "timestamp" >= $3)
-  AND ($4::timestamptz IS NULL OR "timestamp" < $4)
+WHERE ($1::text[] IS NULL
+       OR EXISTS (SELECT 1 FROM unnest($1::text[]) AS p(prefix) WHERE event = p.prefix OR starts_with(event, p.prefix || '.')))
+  AND ($2::text IS NULL OR level = $2)
+  AND ($3::boolean IS NULL OR success = $3)
+  AND ($4::uuid IS NULL OR actor_user_id = $4)
+  AND ($5::timestamptz IS NULL OR "timestamp" >= $5)
+  AND ($6::timestamptz IS NULL OR "timestamp" < $6)
+  AND ($7::text IS NULL
+       OR actor_username ILIKE '%' || $7 || '%'
+       OR request_ip ILIKE '%' || $7 || '%'
+       OR request_path ILIKE '%' || $7 || '%'
+       OR event ILIKE '%' || $7 || '%'
+       OR reason ILIKE '%' || $7 || '%')
 ORDER BY "timestamp" DESC
 `
 
 type ListAuditLogsForExportParams struct {
-	Event       pgtype.Text        `json:"event"`
+	Events      []string           `json:"events"`
+	Level       pgtype.Text        `json:"level"`
+	Success     pgtype.Bool        `json:"success"`
 	ActorUserID pgtype.UUID        `json:"actor_user_id"`
 	FromDate    pgtype.Timestamptz `json:"from_date"`
 	ToDate      pgtype.Timestamptz `json:"to_date"`
+	Q           pgtype.Text        `json:"q"`
 }
 
 func (q *Queries) ListAuditLogsForExport(ctx context.Context, arg ListAuditLogsForExportParams) ([]AuditLog, error) {
 	rows, err := q.db.Query(ctx, listAuditLogsForExport,
-		arg.Event,
+		arg.Events,
+		arg.Level,
+		arg.Success,
 		arg.ActorUserID,
 		arg.FromDate,
 		arg.ToDate,
+		arg.Q,
 	)
 	if err != nil {
 		return nil, err

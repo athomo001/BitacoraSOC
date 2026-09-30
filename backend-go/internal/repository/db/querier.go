@@ -33,7 +33,7 @@ type Querier interface {
 	ClearPreferredUserChannel(ctx context.Context, userID pgtype.UUID) error
 	ClearTemplateFromShifts(ctx context.Context, checklistTemplateStartID pgtype.UUID) error
 	CompleteSetup(ctx context.Context, arg CompleteSetupParams) (AppConfig, error)
-	CountAuditLogs(ctx context.Context) (int64, error)
+	CountAuditLogs(ctx context.Context, arg CountAuditLogsParams) (int64, error)
 	CountBackupRuns(ctx context.Context, kind NullBackupKind) (int64, error)
 	CountDirectory(ctx context.Context, arg CountDirectoryParams) (int64, error)
 	CountEntries(ctx context.Context, arg CountEntriesParams) (int64, error)
@@ -223,7 +223,12 @@ type Querier interface {
 	// (work_shift_notification_schedules). Ver spec/04-contratos-api.md sección
 	// "Dotación, Teletrabajo y Pantallas de Sala (TV)".
 	ListAssignmentsForRange(ctx context.Context, arg ListAssignmentsForRangeParams) ([]WorkShiftAssignment, error)
-	// GET /api/audit-logs — paginado simple, más reciente primero.
+	// Los tres comparten el mismo filtro (GET /api/audit-logs y su /export):
+	//   events  dominios o eventos exactos: ["auth","setup"] trae auth.login.fail, setup.bootstrap…
+	//   level   info | warn | error
+	//   success true = resultado OK, false = fallo
+	//   q       texto libre sobre actor, IP, ruta, evento y motivo (ya escapado para LIKE)
+	// Más reciente primero.
 	ListAuditLogs(ctx context.Context, arg ListAuditLogsParams) ([]AuditLog, error)
 	ListAuditLogsForExport(ctx context.Context, arg ListAuditLogsForExportParams) ([]AuditLog, error)
 	ListBackupRuns(ctx context.Context, arg ListBackupRunsParams) ([]BackupRun, error)

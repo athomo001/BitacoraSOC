@@ -13,3 +13,10 @@ allowBuilds:
   lmdb: true
   msgpackr-extract: true
 
+
+# Exigir exactamente la versión de pnpm de `packageManager` en package.json:
+# con otra versión, pnpm falla en vez de descargar la fijada o seguir. Antes
+# esto vivía en un .npmrc en la raíz (package-manager-strict[-version]), que
+# pnpm 12 ya no reconoce (lo reemplazó `pmOnFail`) y que npm marcaba como
+# "Unknown project config".
+pmOnFail: error

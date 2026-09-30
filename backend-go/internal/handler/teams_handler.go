@@ -449,6 +449,7 @@ func (h *TeamsHandler) RemoveCoverage(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "ese equipo no cubre esa unidad")
 		return
 	}
+	h.AuditLog.Log(r.Context(), "team.coverage.remove", audit.LevelInfo, audit.Success(), map[string]any{"teamId": teamID.String(), "territorialUnitId": unitID.String()})
 	writeNoContent(w)
 }
 

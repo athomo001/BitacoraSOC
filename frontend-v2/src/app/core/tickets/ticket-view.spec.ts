@@ -1,4 +1,4 @@
-import { clockText, formatDuration, priorityOf, transitionAction } from './ticket-view';
+import { clockText, formatDuration, priorityOf, publicProgress, transitionAction } from './ticket-view';
 import { SlaClock } from './tickets.service';
 
 const clock = (state: SlaClock['state'], remainingSeconds: number, elapsedSeconds = 0): SlaClock => ({ state, remainingSeconds, elapsedSeconds, percent: 50, dueAt: '' });
@@ -33,5 +33,16 @@ describe('ticket-view', () => {
     expect(transitionAction('pending_vendor', 'in_progress').key).toBe('tickets.action.resume');
     expect(transitionAction('resolved', 'in_progress')).toMatchObject({ key: 'tickets.action.reopen', primary: false });
     expect(transitionAction('new', 'assigned')).toMatchObject({ key: 'tickets.action.take', primary: true });
+  });
+
+  it('reduce los 7 estados internos a los 3 pasos que ve el cliente', () => {
+    expect(publicProgress('new')).toMatchObject({ step: 0, done: false, tone: 'info' });
+    for (const status of ['assigned', 'in_progress', 'pending_vendor'] as const) {
+      expect(publicProgress(status)).toMatchObject({ step: 1, done: false, tone: 'warn' });
+    }
+    expect(publicProgress('pending_vendor').title).toBe('publicTicket.state.pending_vendor');
+    expect(publicProgress('resolved')).toMatchObject({ step: 2, done: true, tone: 'ok' });
+    expect(publicProgress('closed')).toMatchObject({ step: 2, done: true, tone: 'ok' });
+    expect(publicProgress('cancelled')).toMatchObject({ step: null, tone: 'neutral' });
   });
 });

@@ -116,7 +116,12 @@ func (a *Auth) detectIPChange(ctx context.Context, jti uuid.UUID) context.Contex
 	if seenBefore && previousIP != meta.IP {
 		meta.IPChanged = true
 		meta.PreviousIP = previousIP
-		return audit.WithRequestMeta(ctx, meta)
+		ctx = audit.WithRequestMeta(ctx, meta)
+		// Evento propio (spec/07 §6.2): la mayoría de las requests son GET y
+		// no auditan nada, así que solo marcar el contexto perdía el cambio.
+		if a.AuditLog != nil {
+			a.AuditLog.Log(ctx, "auth.session.ip_change", audit.LevelWarn, audit.Success(), map[string]any{"previousIp": previousIP})
+		}
 	}
 	return ctx
 }

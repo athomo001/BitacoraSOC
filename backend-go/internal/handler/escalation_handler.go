@@ -1071,6 +1071,7 @@ func (h *EscalationHandler) DeleteStep(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "paso no encontrado")
 		return
 	}
+	h.AuditLog.Log(r.Context(), "escalation.step.delete", audit.LevelWarn, audit.Success(), map[string]any{"policyId": policyID.String(), "stepOrder": order})
 	writeNoContent(w)
 }
 

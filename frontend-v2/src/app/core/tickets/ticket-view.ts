@@ -73,6 +73,41 @@ export function transitionAction(from: TicketStatus, to: TicketStatus): Transiti
   return { to, ...actions[to] };
 }
 
+/**
+ * Estado en lenguaje del cliente (artboard "Ticketera: seguimiento público"):
+ * 3 pasos — Recibido, En atención, Resuelto — en vez de los 7 estados
+ * internos. `step` es el paso actual (null si se canceló: no hay avance que
+ * mostrar); `done` marca que el último paso se completó.
+ */
+export interface PublicProgress {
+  step: 0 | 1 | 2 | null;
+  done: boolean;
+  tone: Tone;
+  title: MessageKey;
+  detail: MessageKey;
+}
+
+export const PUBLIC_STEPS: readonly MessageKey[] = ['publicTicket.step.received', 'publicTicket.step.working', 'publicTicket.step.resolved'];
+
+export function publicProgress(status: TicketStatus): PublicProgress {
+  switch (status) {
+    case 'new':
+      return { step: 0, done: false, tone: 'info', title: 'publicTicket.state.new', detail: 'publicTicket.state.new.detail' };
+    case 'assigned':
+      return { step: 1, done: false, tone: 'warn', title: 'publicTicket.state.working', detail: 'publicTicket.state.assigned.detail' };
+    case 'in_progress':
+      return { step: 1, done: false, tone: 'warn', title: 'publicTicket.state.working', detail: 'publicTicket.state.in_progress.detail' };
+    case 'pending_vendor':
+      return { step: 1, done: false, tone: 'warn', title: 'publicTicket.state.pending_vendor', detail: 'publicTicket.state.pending_vendor.detail' };
+    case 'resolved':
+      return { step: 2, done: true, tone: 'ok', title: 'publicTicket.state.resolved', detail: 'publicTicket.state.resolved.detail' };
+    case 'closed':
+      return { step: 2, done: true, tone: 'ok', title: 'publicTicket.state.closed', detail: 'publicTicket.state.closed.detail' };
+    case 'cancelled':
+      return { step: null, done: false, tone: 'neutral', title: 'publicTicket.state.cancelled', detail: 'publicTicket.state.cancelled.detail' };
+  }
+}
+
 /** Enlace público que se entrega al cliente (spec/06 §6.4). */
 export function publicTrackingUrl(origin: string, token: string): string {
   return `${origin}/p/tickets/${token}`;

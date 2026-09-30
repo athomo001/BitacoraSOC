@@ -123,7 +123,7 @@ func run(logger *slog.Logger) error {
 	}
 	usersHandler := &handler.UsersHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
 	permissionGroupsHandler := &handler.PermissionGroupsHandler{Queries: queries, AuditLog: auditLog}
-	auditLogHandler := &handler.AuditLogHandler{Queries: queries}
+	auditLogHandler := &handler.AuditLogHandler{Queries: queries, AuditLog: auditLog}
 	// Respaldos (Fase 13): un solo servicio para la API y el planificador, con un
 	// candado compartido para que copia, restauración y purga nunca se pisen.
 	backupService := &backup.Service{Pool: pool, Queries: queries, Crypto: cryptoBox, LocalDir: os.Getenv("BACKUP_DIR")}
@@ -417,7 +417,11 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/entries/{id}/convert-to-ticket", ticketAuthed(ticketsHandler.ConvertEntry))
 	mux.Handle("POST /api/entries/{id}/resolve", ticketAuthed(ticketsHandler.ResolveEntry))
 	mux.Handle("POST /api/tickets/{id}/public-pin", ticketAuthed(ticketsHandler.RegeneratePublicPin))
-	mux.Handle("GET /p/tickets/{token}", public(ticketsHandler.Public))
+	// Datos del seguimiento público. La URL que recibe el cliente es
+	// /p/tickets/{token}, pero esa la sirve la SPA (catch-all de abajo): si el
+	// JSON viviera en la misma ruta, el navegador mostraría JSON crudo y la
+	// página de Angular nunca cargaría.
+	mux.Handle("GET /api/public/tickets/{token}", public(ticketsHandler.Public))
 
 	// Notas Operativas (Fase 9): pizarrón admin + libreta personal.
 	mux.Handle("GET /api/notes/admin", authed(notesHandler.GetAdmin))
@@ -450,9 +454,11 @@ func run(logger *slog.Logger) error {
 	}}
 	mux.Handle("POST /api/reports/shift/dispatch", admin(func(w http.ResponseWriter, r *http.Request) {
 		if err := reportDispatcher.DispatchPending(r.Context()); err != nil {
+			auditLog.Log(r.Context(), "report.shift.dispatch", audit.LevelError, audit.Failure(err.Error()), nil)
 			http.Error(w, "no se pudieron procesar los reportes pendientes", http.StatusInternalServerError)
 			return
 		}
+		auditLog.Log(r.Context(), "report.shift.dispatch", audit.LevelInfo, audit.Success(), nil)
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	go scheduler.Run(ctx, time.Minute, reportDispatcher.DispatchPending)

@@ -173,6 +173,20 @@ func (h *AuthHandler) MFASetup(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusUnauthorized, "missing-token", "no autenticado")
 		return
 	}
+	// Con MFA activo, reemplazar el secreto aquí dejaba el segundo factor en
+	// manos de quien tuviera la sesión (sin contraseña): el secreto nuevo
+	// quedaba vigente al instante y el dueño de la cuenta perdía el acceso.
+	// Para cambiar de dispositivo, primero se desactiva (eso sí pide contraseña).
+	dbUser, err := h.Queries.GetUserByID(ctx, user.ID)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "usuario no encontrado")
+		return
+	}
+	if dbUser.MfaEnabled {
+		h.AuditLog.Log(ctx, "auth.mfa.setup", audit.LevelWarn, audit.Failure("MFA ya activo"), nil)
+		problemdetails.Write(w, r, http.StatusConflict, "mfa-already-enabled", "MFA ya está activo: desactívalo con tu contraseña antes de configurar otro dispositivo")
+		return
+	}
 
 	enrollment, err := auth.GenerateTOTPSecret(user.Username, "Bitácora Ops")
 	if err != nil {
@@ -188,6 +202,7 @@ func (h *AuthHandler) MFASetup(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo guardar el secreto TOTP")
 		return
 	}
+	h.AuditLog.Log(ctx, "auth.mfa.setup", audit.LevelInfo, audit.Success(), nil)
 
 	writeData(w, http.StatusOK, map[string]any{"qrCodeDataUrl": enrollment.QRCodeDataURL, "secret": enrollment.Secret})
 }

@@ -842,6 +842,7 @@ func (h *DirectoryHandler) DeleteUserChannel(w http.ResponseWriter, r *http.Requ
 		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "canal no encontrado")
 		return
 	}
+	h.AuditLog.Log(r.Context(), "user.channel.delete", audit.LevelInfo, audit.Success(), map[string]any{"userId": id.String(), "channelId": channelID.String()})
 	writeNoContent(w)
 }
 
