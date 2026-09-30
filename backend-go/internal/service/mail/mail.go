@@ -6,6 +6,7 @@ package mail
 import (
 	"fmt"
 	"mime"
+	netmail "net/mail"
 	"net/smtp"
 	"strings"
 	"time"
@@ -22,7 +23,9 @@ type Config struct {
 	Username    string
 	Password    string
 	FromAddress string
-	RequireTLS  bool
+	// FromName es el nombre visible ("Bitácora Ops <noc@empresa.cl>"); vacío = solo la dirección.
+	FromName   string
+	RequireTLS bool
 }
 
 // Sender despacha correo real por SMTP.
@@ -57,7 +60,7 @@ func (s *Sender) SendMany(to, cc []string, subject, body string) error {
 		auth = smtp.PlainAuth("", s.cfg.Username, s.cfg.Password, s.cfg.Host)
 	}
 
-	msg := buildMessage(s.cfg.FromAddress, to, cc, subject, body, time.Now())
+	msg := buildMessage(s.fromHeader(), to, cc, subject, body, time.Now())
 
 	// net/smtp.SendMail sube a STARTTLS automáticamente si el servidor lo
 	// anuncia en EHLO. RequireTLS documenta la expectativa del operador; con
@@ -80,9 +83,20 @@ func (s *Sender) SendHTML(to, cc []string, subject, htmlBody string) error {
 	if s.cfg.Username != "" {
 		auth = smtp.PlainAuth("", s.cfg.Username, s.cfg.Password, s.cfg.Host)
 	}
-	msg := buildHTMLMessage(s.cfg.FromAddress, to, cc, subject, htmlBody, time.Now())
+	msg := buildHTMLMessage(s.fromHeader(), to, cc, subject, htmlBody, time.Now())
 	rcpt := append(append([]string{}, to...), cc...)
 	return smtp.SendMail(addr, auth, s.cfg.FromAddress, rcpt, msg)
+}
+
+// fromHeader arma el From visible. net/mail codifica el nombre según RFC 2047
+// (tildes) y lo entrecomilla, así un nombre con saltos de línea no puede
+// inyectar cabeceras. El remitente del sobre SMTP sigue siendo la dirección.
+func (s *Sender) fromHeader() string {
+	name := strings.TrimSpace(s.cfg.FromName)
+	if name == "" {
+		return s.cfg.FromAddress
+	}
+	return (&netmail.Address{Name: name, Address: s.cfg.FromAddress}).String()
 }
 
 func nonEmpty(addrs []string) []string {

@@ -2,6 +2,7 @@
 @import url("./styles/fonts.css");
 @import url("./styles/forms.css");
 @import url("./styles/pills.css");
+@import url("./styles/admin-kit.css");
 
 * {
   box-sizing: border-box;

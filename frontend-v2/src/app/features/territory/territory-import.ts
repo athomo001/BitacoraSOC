@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, output, signal } from '@angular/core';
-import { ButtonComponent } from '../../shared/ui/button/button';
+import { MatIconModule } from '@angular/material/icon';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { TerritoryService } from '../../core/territory/territory.service';
 import { ImportResult } from '../../core/territory/territory.models';
 import { problemDetail } from '../../core/http-error';
@@ -13,84 +14,47 @@ import { problemDetail } from '../../core/http-error';
 @Component({
   selector: 'app-territory-import',
   standalone: true,
-  imports: [ButtonComponent],
+  imports: [MatIconModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="actions import-actions">
-      <app-button variant="primary" icon="flag" [disabled]="busy()" (pressed)="importChileSeed()">
-        Cargar seed de Chile incluido
-      </app-button>
-      <label class="file-button" [class.file-button--disabled]="busy()">
+    <div class="ti__actions">
+      <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy()" (click)="importChileSeed()"><mat-icon>flag</mat-icon>{{ i18n.t('territory.importChile') }}</button>
+      <label class="adm-btn ti__file" [class.ti__file--disabled]="busy()">
         <input type="file" accept=".json,application/json" [disabled]="busy()" (change)="importFile($event)" />
-        Subir JSON de otro país…
+        <mat-icon>upload_file</mat-icon>{{ i18n.t('territory.importFile') }}
       </label>
-      <app-button variant="text" icon="download" [disabled]="busy()" (pressed)="downloadTemplate()">
-        Descargar plantilla
-      </app-button>
+      <button type="button" class="adm-btn" [disabled]="busy()" (click)="downloadTemplate()"><mat-icon>download</mat-icon>{{ i18n.t('territory.template') }}</button>
     </div>
 
     @if (busy()) {
-      <p class="msg">Importando…</p>
+      <p class="adm-muted" role="status">{{ i18n.t('territory.importing') }}</p>
     }
-    @if (error()) {
-      <p class="msg msg--error">{{ error() }}</p>
+    @if (error(); as e) {
+      <p class="adm-error" role="alert">{{ e }}</p>
     }
     @if (result(); as r) {
-      <p class="msg" [class.msg--ok]="r.errors.length === 0">
-        <span class="mono">{{ r.importedCount }}</span> nuevas ·
-        <span class="mono">{{ r.updatedCount }}</span> actualizadas ·
-        <span class="mono">{{ r.errors.length }}</span> con error
+      <p class="ti__result">
+        <span class="pill" [class]="r.errors.length ? 'tone-warn' : 'tone-ok'"><mat-icon>{{ r.errors.length ? 'warning_amber' : 'task_alt' }}</mat-icon>{{ i18n.t('territory.imported') }}</span>
+        <span><span class="mono">{{ r.importedCount }}</span> {{ i18n.t('territory.new') }} · <span class="mono">{{ r.updatedCount }}</span> {{ i18n.t('territory.updated') }} · <span class="mono">{{ r.errors.length }}</span> {{ i18n.t('territory.withError') }}</span>
       </p>
       @if (r.errors.length > 0) {
-        <ul class="import-errors">
+        <ul class="ti__errors">
           @for (e of r.errors; track e.code) {
-            <li><span class="mono">{{ e.code || '(sin code)' }}</span> — {{ e.reason }}</li>
+            <li><span class="mono">{{ e.code || i18n.t('territory.noCode') }}</span> — {{ e.reason }}</li>
           }
         </ul>
       }
     }
-    <p class="panel__hint attribution">
-      Seed de Chile derivado de countries-states-cities-database (dr5hn), licencia ODbL v1.0.
-      Trae regiones y ciudades principales, no todas las comunas: lo que falte se agrega a mano.
-    </p>
+    <p class="adm-hint">{{ i18n.t('territory.attribution') }}</p>
   `,
   styles: `
-    .import-actions {
-      margin-top: 0;
-      align-items: center;
-    }
-    .file-button {
-      display: inline-flex;
-      align-items: center;
-      min-height: var(--row-height);
-      padding: 0 14px;
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-sm);
-      color: var(--text-primary);
-      font-size: 14px;
-      cursor: pointer;
-    }
-    .file-button:hover {
-      background: var(--bg-surface-hover);
-    }
-    .file-button--disabled {
-      opacity: 0.6;
-      pointer-events: none;
-    }
-    .file-button input {
-      display: none;
-    }
-    .import-errors {
-      max-height: 160px;
-      margin: 4px 0 0;
-      padding-left: 18px;
-      overflow-y: auto;
-      font-size: 12px;
-      color: var(--status-warning);
-    }
-    .attribution {
-      margin: 12px 0 0;
-    }
+    :host { display: flex; flex-direction: column; gap: 10px; }
+    mat-icon { width: 16px; height: 16px; font-size: 16px; }
+    .ti__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .ti__file input { display: none; }
+    .ti__file--disabled { opacity: 0.5; pointer-events: none; }
+    .ti__result { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; font-size: 12px; }
+    .ti__errors { max-height: 160px; margin: 0; padding-left: 18px; overflow-y: auto; color: var(--status-warning); font-size: 11.5px; }
   `,
 })
 export class TerritoryImportComponent {
@@ -100,6 +64,7 @@ export class TerritoryImportComponent {
   protected readonly error = signal<string | null>(null);
   protected readonly result = signal<ImportResult | null>(null);
 
+  protected readonly i18n = inject(I18nService);
   private readonly territory = inject(TerritoryService);
 
   protected async importChileSeed(): Promise<void> {
@@ -126,7 +91,7 @@ export class TerritoryImportComponent {
       link.click();
       URL.revokeObjectURL(url);
     } catch (error) {
-      this.error.set(problemDetail(error, 'No se pudo descargar la plantilla.'));
+      this.error.set(problemDetail(error, this.i18n.t('territory.templateError')));
     }
   }
 
@@ -139,7 +104,7 @@ export class TerritoryImportComponent {
       this.result.set(result);
       this.imported.emit(result);
     } catch (error) {
-      this.error.set(problemDetail(error, 'No se pudo importar el archivo.'));
+      this.error.set(problemDetail(error, this.i18n.t('territory.importError')));
     } finally {
       this.busy.set(false);
     }

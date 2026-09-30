@@ -1,114 +1,176 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { EscalationService } from '../../core/escalation/escalation.service';
+import { MatIconModule } from '@angular/material/icon';
+import { AuthService } from '../../core/auth/auth.service';
+import { EscalationService, SmtpConfig } from '../../core/escalation/escalation.service';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { problemDetail } from '../../core/http-error';
+import { formatDuration } from '../../core/tickets/ticket-view';
+import { SMTP_PRESETS, SmtpPreset, presetFor } from './smtp-presets';
+
+interface SmtpDraft {
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+  fromName: string;
+  fromAddress: string;
+  requireTls: boolean;
+}
+
+const EMPTY: SmtpDraft = { host: '', port: 587, username: '', password: '', fromName: 'Bitácora Ops', fromAddress: '', requireTls: true };
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type Health = 'none' | 'untested' | 'ok' | 'failed';
 
 /**
- * Correo saliente (SMTP) — lo usa el aviso de escalación de la Fase 7. La
- * contraseña se guarda cifrada y nunca vuelve al navegador: el campo vacío
- * al guardar conserva la que ya estaba.
+ * Correo saliente (Administración → Operación → Correo), re-vestido con los
+ * componentes del diseño aprobado. Por aquí salen los avisos de escalación,
+ * los reportes de turno, las alertas NOK y la recuperación de contraseña.
+ * La contraseña se guarda cifrada y nunca vuelve al navegador: dejarla vacía
+ * conserva la guardada. La prueba usa lo guardado, por eso pide guardar antes.
  */
 @Component({
   selector: 'app-admin-smtp',
   standalone: true,
-  imports: [FormsModule],
+  imports: [DatePipe, FormsModule, MatIconModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <section class="panel">
-      <h2 class="panel__title">Correo saliente (SMTP)</h2>
-      <p class="panel__hint">Servidor por el que salen los avisos de escalación. {{ configured() ? '' : 'Todavía no está configurado.' }}</p>
-      <form class="field-grid smtp-form" (ngSubmit)="save()">
-        <label class="field"><span>Servidor</span><input name="host" placeholder="smtp.office365.com" [ngModel]="host()" (ngModelChange)="host.set($event)" /></label>
-        <label class="field"><span>Puerto</span><input name="port" type="number" min="1" max="65535" [ngModel]="port()" (ngModelChange)="port.set(+$event)" /></label>
-        <label class="field"><span>Usuario</span><input name="username" autocomplete="off" [ngModel]="username()" (ngModelChange)="username.set($event)" /></label>
-        <label class="field">
-          <span>Contraseña</span>
-          <input name="password" type="password" autocomplete="new-password" [placeholder]="hasPassword() ? '•••••• (guardada — vacío la conserva)' : ''" [ngModel]="password()" (ngModelChange)="password.set($event)" />
-        </label>
-        <label class="field"><span>Remitente</span><input name="fromAddress" placeholder="noc@empresa.cl" [ngModel]="fromAddress()" (ngModelChange)="fromAddress.set($event)" /></label>
-        <label class="field smtp-check">
-          <input name="requireTls" type="checkbox" [ngModel]="requireTls()" (ngModelChange)="requireTls.set($event)" />
-          <span>Exigir TLS</span>
-        </label>
-        <div class="actions smtp-actions"><button type="submit" class="smtp-submit" [disabled]="!host().trim() || !fromAddress().trim()">Guardar</button></div>
-      </form>
-      <div class="field-grid smtp-form">
-        <label class="field"><span>Enviar correo de prueba a</span><input name="testTo" placeholder="tu@empresa.cl" [ngModel]="testTo()" (ngModelChange)="testTo.set($event)" /></label>
-        <div class="actions smtp-actions"><button type="button" class="smtp-btn" [disabled]="!configured() || !testTo().trim()" (click)="test()">Probar envío</button></div>
-      </div>
-      @if (message(); as m) { <p class="msg" [class.msg--ok]="m.ok" [class.msg--error]="!m.ok">{{ m.text }}</p> }
-    </section>
-  `,
-  styles: `
-    .smtp-form { align-items: end; margin: 12px 0; }
-    .smtp-actions { margin-top: 0; }
-    .smtp-check { flex-direction: row; align-items: center; gap: 6px; min-height: var(--row-height); }
-    .smtp-submit, .smtp-btn {
-      min-height: var(--row-height); padding: 0 14px; border-radius: var(--radius-sm); font: inherit; cursor: pointer;
-    }
-    .smtp-submit { background: var(--border-active); border: none; color: var(--bg-app); font-weight: 600; }
-    .smtp-btn { background: none; border: 1px solid var(--border-subtle); color: var(--text-primary); }
-    .smtp-submit[disabled], .smtp-btn[disabled] { opacity: 0.6; cursor: default; }
-  `,
+  templateUrl: './admin-smtp.html',
+  styleUrl: './admin-smtp.css',
 })
 export class AdminSmtpComponent implements OnInit {
+  protected readonly i18n = inject(I18nService);
   private readonly api = inject(EscalationService);
+  private readonly auth = inject(AuthService);
 
-  protected readonly configured = signal(false);
-  protected readonly host = signal('');
-  protected readonly port = signal(587);
-  protected readonly username = signal('');
-  protected readonly password = signal('');
-  protected readonly hasPassword = signal(false);
-  protected readonly fromAddress = signal('');
-  protected readonly requireTls = signal(true);
+  protected readonly presets = SMTP_PRESETS;
+  protected readonly saved = signal<SmtpConfig | null>(null);
+  protected readonly draft = signal<SmtpDraft>({ ...EMPTY });
+  protected readonly preset = signal<SmtpPreset>(presetFor(''));
   protected readonly testTo = signal('');
-  protected readonly message = signal<{ ok: boolean; text: string } | null>(null);
+  protected readonly busy = signal(false);
+  protected readonly loaded = signal(false);
+  protected readonly notice = signal<string | null>(null);
+  protected readonly error = signal<string | null>(null);
+  protected readonly testError = signal<string | null>(null);
+
+  /** Lo guardado llevado a la forma del formulario (la contraseña nunca viene). */
+  private readonly savedDraft = computed<SmtpDraft>(() => {
+    const s = this.saved();
+    return s ? { host: s.host, port: s.port, username: s.username, password: '', fromName: s.fromName, fromAddress: s.fromAddress, requireTls: s.requireTls } : { ...EMPTY };
+  });
+
+  protected readonly dirty = computed(() => JSON.stringify(this.draft()) !== JSON.stringify(this.savedDraft()) || !this.saved());
+
+  /** Qué falta para poder guardar (null = nada). */
+  protected readonly problem = computed(() => {
+    const d = this.draft();
+    if (!d.host.trim()) return this.i18n.t('smtp.problem.host');
+    if (!(d.port >= 1 && d.port <= 65535)) return this.i18n.t('smtp.problem.port');
+    if (!EMAIL.test(d.fromAddress.trim())) return this.i18n.t('smtp.problem.from');
+    if (d.fromName.length > 100 || /[\r\n\t]/.test(d.fromName)) return this.i18n.t('smtp.problem.name');
+    return null;
+  });
+
+  protected readonly health = computed<Health>(() => {
+    const s = this.saved();
+    if (!s) return 'none';
+    if (!s.lastTest) return 'untested';
+    return s.lastTest.ok ? 'ok' : 'failed';
+  });
+
+  /** "hace 2 h": cuánto hace de la última prueba. */
+  protected readonly testedAgo = computed(() => {
+    const at = this.saved()?.lastTest?.at;
+    return at ? formatDuration((Date.now() - Date.parse(at)) / 1000) : '';
+  });
+
+  /** Así lo verá quien reciba el correo. */
+  protected readonly fromPreview = computed(() => {
+    const d = this.draft();
+    const address = d.fromAddress.trim() || 'noc@empresa.cl';
+    return d.fromName.trim() ? `${d.fromName.trim()} <${address}>` : address;
+  });
 
   async ngOnInit(): Promise<void> {
+    this.testTo.set(this.auth.user()?.email ?? '');
     try {
-      const cfg = await this.api.getSmtp();
-      if (cfg) {
-        this.configured.set(true);
-        this.host.set(cfg.host);
-        this.port.set(cfg.port);
-        this.username.set(cfg.username);
-        this.fromAddress.set(cfg.fromAddress);
-        this.requireTls.set(cfg.requireTls);
-        this.hasPassword.set(cfg.hasPassword);
-      }
+      this.applySaved(await this.api.getSmtp());
     } catch (error) {
-      this.message.set({ ok: false, text: problemDetail(error, 'No se pudo leer la configuración SMTP.') });
+      this.error.set(problemDetail(error, this.i18n.t('smtp.loadError')));
+    } finally {
+      this.loaded.set(true);
     }
   }
 
+  protected patch(changes: Partial<SmtpDraft>): void {
+    this.draft.update((d) => ({ ...d, ...changes }));
+    this.notice.set(null);
+  }
+
+  /** Elegir un proveedor rellena servidor, puerto y TLS; "Otro" solo deja escribirlos. */
+  protected pickPreset(preset: SmtpPreset): void {
+    this.preset.set(preset);
+    if (preset.id !== 'custom') this.patch({ host: preset.host, port: preset.port, requireTls: preset.requireTls });
+  }
+
+  protected onHostChange(host: string): void {
+    this.patch({ host });
+    this.preset.set(presetFor(host, this.draft().username));
+  }
+
+  protected discard(): void {
+    this.draft.set({ ...this.savedDraft() });
+    this.preset.set(presetFor(this.draft().host, this.draft().username));
+    this.error.set(null);
+  }
+
   protected async save(): Promise<void> {
-    this.message.set(null);
+    if (this.problem() || this.busy()) return;
+    const d = this.draft();
+    this.busy.set(true);
+    this.error.set(null);
     try {
-      const cfg = await this.api.putSmtp({
-        host: this.host().trim(),
-        port: this.port(),
-        username: this.username().trim(),
-        password: this.password() || undefined,
-        fromAddress: this.fromAddress().trim(),
-        requireTls: this.requireTls(),
+      const saved = await this.api.putSmtp({
+        host: d.host.trim(), port: d.port, username: d.username.trim(), password: d.password || undefined,
+        fromAddress: d.fromAddress.trim(), fromName: d.fromName.trim(), requireTls: d.requireTls,
       });
-      this.configured.set(true);
-      this.hasPassword.set(cfg.hasPassword);
-      this.password.set('');
-      this.message.set({ ok: true, text: 'Configuración guardada.' });
+      this.applySaved(saved);
+      this.notice.set(this.i18n.t('admin.saved'));
     } catch (error) {
-      this.message.set({ ok: false, text: problemDetail(error, 'No se pudo guardar la configuración.') });
+      this.error.set(problemDetail(error, this.i18n.t('smtp.saveError')));
+    } finally {
+      this.busy.set(false);
     }
   }
 
   protected async test(): Promise<void> {
-    this.message.set(null);
+    const to = this.testTo().trim();
+    if (!EMAIL.test(to) || this.dirty() || this.busy()) return;
+    this.busy.set(true);
+    this.testError.set(null);
     try {
-      await this.api.testSmtp(this.testTo().trim());
-      this.message.set({ ok: true, text: `Correo de prueba enviado a ${this.testTo().trim()}.` });
+      const result = await this.api.testSmtp(to);
+      if (!result.sent) this.testError.set(result.error ?? this.i18n.t('smtp.testFailed'));
+      // La prueba quedó registrada en el servidor: se relee para mostrar el resultado.
+      this.applySaved(await this.api.getSmtp(), false);
     } catch (error) {
-      this.message.set({ ok: false, text: problemDetail(error, 'El envío de prueba falló.') });
+      this.testError.set(problemDetail(error, this.i18n.t('smtp.testFailed')));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected validEmail(value: string): boolean {
+    return EMAIL.test(value.trim());
+  }
+
+  private applySaved(config: SmtpConfig | null, resetDraft = true): void {
+    this.saved.set(config);
+    if (resetDraft) {
+      this.draft.set({ ...this.savedDraft() });
+      this.preset.set(presetFor(this.draft().host, this.draft().username));
     }
   }
 }

@@ -1,131 +1,235 @@
-<div class="entries">
-  @if (deploymentBanner(); as banner) {
-    <div class="entries__deploy-banner">
-      <span>🔄 Nueva versión disponible ({{ banner.version }}): {{ banner.message }}</span>
-      <app-button variant="text" (pressed)="dismissBanner()">Descartar</app-button>
-      <app-button variant="text" (pressed)="dismissBanner(); load()">Recargar ahora</app-button>
-    </div>
-  }
-
-  <h1 class="entries__title">Bitácora</h1>
-
-  <section class="panel entries__composer entries__composer--primary">
-    <div class="entries__composer-heading"><div><p class="entries__eyebrow">Registro rápido</p><h2 class="panel__title">¿Qué ocurrió?</h2></div><span>Ctrl + Enter para guardar</span></div>
-    <div class="entries__scope-picker">
-      @for (s of scopes; track s) {
-        <button type="button" class="entries__scope-btn" [class.entries__scope-btn--active]="draft().scope === s" (click)="updateDraft({ scope: s })">{{ scopeLabels[s] }}</button>
-      }
-      <select class="entries__type-select" [ngModel]="draft().entryType" (ngModelChange)="updateDraft({ entryType: $event })">
-        @for (t of types; track t) { <option [value]="t">{{ typeLabels[t] }}</option> }
-      </select>
-    </div>
-    <textarea class="entries__textarea" rows="5" autofocus placeholder="Escribe la novedad, incidente o acción…" [ngModel]="draft().content" (ngModelChange)="updateDraft({ content: $event })" (paste)="onPaste($event)"></textarea>
-    <div class="entries__composer-footer"><label class="field entries__tags-field"><span>Tags</span><input [ngModel]="draft().tags" (ngModelChange)="updateDraft({ tags: $event })" placeholder="fibra, otdr" /></label>@if (ticketsEnabled()) { <label class="field entries__tags-field"><span>Ticket (opcional)</span><input [ngModel]="draft().ticketNumber" (ngModelChange)="updateDraft({ ticketNumber: $event })" placeholder="TKT-2026-00042" /></label> }<div class="actions"><app-button variant="primary" [disabled]="saving() || !draft().content.trim()" (pressed)="submitEntry()">Guardar entrada</app-button></div></div>
-    <div class="entries__image-row">
-      @if (composeImage(); as img) { <span class="entries__image-preview"><img [src]="img.previewUrl" alt="Evidencia" /> <button type="button" (click)="removeImage()">✖ Quitar</button></span> } @else { <label class="entries__file-picker">📎 Adjuntar evidencia<input type="file" accept="image/png,image/jpeg,image/webp" [disabled]="uploadingImage()" (change)="onFileSelected($event)" /></label> }
-    </div>
-  </section>
-
-  @if (error()) {
-    <p class="msg msg--error">{{ error() }}</p>
-  }
-
-  <section class="panel entries__filters">
-    <div class="field-grid">
-      <label class="field">
-        <span>Ámbito</span>
-        <select [ngModel]="filterScope()" (ngModelChange)="filterScope.set($event)">
-          <option value="">Todos</option>
-          @for (s of scopes; track s) { <option [value]="s">{{ scopeLabels[s] }}</option> }
-        </select>
-      </label>
-      <label class="field">
-        <span>Tipo</span>
-        <select [ngModel]="filterType()" (ngModelChange)="filterType.set($event)">
-          <option value="">Todos</option>
-          @for (t of types; track t) { <option [value]="t">{{ typeLabels[t] }}</option> }
-        </select>
-      </label>
-      <label class="field"><span>Tag</span><input [ngModel]="filterTag()" (ngModelChange)="filterTag.set($event)" placeholder="ej. otdr" /></label>
-      <label class="field"><span>Buscar</span><input [ngModel]="filterQ()" (ngModelChange)="filterQ.set($event)" (keyup.enter)="load()" placeholder="texto libre" /></label>
-      <label class="field"><span>Desde</span><input type="date" [ngModel]="filterFrom()" (ngModelChange)="filterFrom.set($event)" /></label>
-      <label class="field"><span>Hasta</span><input type="date" [ngModel]="filterTo()" (ngModelChange)="filterTo.set($event)" /></label>
-      <div class="actions">
-        <app-button variant="primary" (pressed)="load()">Buscar</app-button>
-        <app-button variant="text" (pressed)="clearFilters()">Limpiar</app-button>
-        <app-button variant="secondary" (pressed)="exportCsv()">Exportar CSV</app-button>
+<div class="en" [class.en--side]="panel() !== 'none'">
+  <div class="en__main">
+    @if (deploymentBanner(); as banner) {
+      <div class="en__banner" role="status">
+        <mat-icon>system_update</mat-icon>
+        <span>{{ i18n.tf('entries.newVersion', banner.version) }} {{ banner.message }}</span>
+        <button type="button" class="adm-btn en__push" (click)="dismissBanner(); load()">{{ i18n.t('entries.reloadNow') }}</button>
+        <button type="button" class="adm-icon-btn" [attr.aria-label]="i18n.t('common.close')" (click)="dismissBanner()"><mat-icon>close</mat-icon></button>
       </div>
-    </div>
-  </section>
-
-  <section class="panel entries__wall">
-    @if (loading()) {
-      <p class="entries__muted">Cargando…</p>
     }
-    <table class="entries__table">
-      <thead>
-        <tr><th>Hora</th><th>Ámbito</th><th>Tipo</th><th>Autor</th><th>Contenido</th><th>Tags</th><th></th></tr>
-      </thead>
-      <tbody>
-        @for (entry of entries(); track entry.id) {
-          <tr class="entries__row" (click)="select(entry)">
-            <td class="mono">{{ entry.createdAt | date: 'short' }}</td>
-            <td>{{ scopeLabels[entry.scope] }}</td>
-            <td>{{ typeLabels[entry.entryType] }}</td>
-            <td>{{ entry.authorUsername }}</td>
-            <td class="entries__excerpt">{{ entry.content }}</td>
-            <td class="entries__muted">{{ entry.tags.join(', ') }}</td>
-            <td>
-              @if (canModify(entry)) {
-                <button type="button" class="entries__icon-btn" (click)="$event.stopPropagation(); remove(entry)">Borrar</button>
-              }
-            </td>
+
+    <!-- Filtro rápido (artboard: "Ámbito: Todos · SOC · NOC") -->
+    <div class="en__toolbar">
+      <span class="en__label">{{ i18n.t('entries.scopeFilter') }}</span>
+      <span class="en__segs" role="group" [attr.aria-label]="i18n.t('entries.scopeFilter')">
+        <button type="button" class="seg" [attr.aria-pressed]="filterScope() === ''" (click)="quickFilter(filterScope, '')">{{ i18n.t('entries.all') }}</button>
+        @for (s of scopes(); track s) {
+          <button type="button" class="seg" [attr.aria-pressed]="filterScope() === s" (click)="quickFilter(filterScope, s)"><mat-icon>{{ scopeIcon[s] }}</mat-icon>{{ i18n.t(scopeKey(s)) }}</button>
+        }
+      </span>
+      <span class="en__segs" role="group" [attr.aria-label]="i18n.t('entries.typeFilter')">
+        <button type="button" class="seg" [attr.aria-pressed]="filterType() === ''" (click)="quickFilter(filterType, '')">{{ i18n.t('entries.allTypes') }}</button>
+        @for (t of types; track t) {
+          <button type="button" class="seg" [attr.aria-pressed]="filterType() === t" (click)="quickFilter(filterType, t)">{{ i18n.t(typeKey(t)) }}</button>
+        }
+      </span>
+      <label class="en__search">
+        <mat-icon>search</mat-icon>
+        <input type="search" [placeholder]="i18n.t('entries.search')" [attr.aria-label]="i18n.t('entries.search')" [ngModel]="filterQ()" (ngModelChange)="filterQ.set($event)" (keyup.enter)="load()" />
+      </label>
+      <button type="button" class="adm-btn" [attr.aria-expanded]="moreFilters()" (click)="moreFilters.set(!moreFilters())"><mat-icon>tune</mat-icon>{{ i18n.t('entries.moreFilters') }}</button>
+      <span class="en__count mono en__push">{{ i18n.tf('entries.count', total()) }}</span>
+      <button type="button" class="adm-btn" [attr.aria-pressed]="panel() === 'notes'" (click)="toggleNotes()"><mat-icon>sticky_note_2</mat-icon>{{ i18n.t('entries.notes') }}</button>
+      <button type="button" class="adm-icon-btn" [title]="i18n.t('entries.exportCsv')" [attr.aria-label]="i18n.t('entries.exportCsv')" (click)="exportCsv()"><mat-icon>download</mat-icon></button>
+    </div>
+
+    @if (moreFilters()) {
+      <div class="en__filters">
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('entries.tag') }}</span><input class="adm-input" placeholder="otdr" [ngModel]="filterTag()" (ngModelChange)="filterTag.set($event)" (keyup.enter)="load()" /></label>
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('audit.range.from') }}</span><input class="adm-input" type="date" [ngModel]="filterFrom()" (ngModelChange)="filterFrom.set($event)" /></label>
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('audit.range.to') }}</span><input class="adm-input" type="date" [ngModel]="filterTo()" (ngModelChange)="filterTo.set($event)" /></label>
+        <button type="button" class="adm-btn adm-btn--primary" (click)="load()"><mat-icon>search</mat-icon>{{ i18n.t('entries.apply') }}</button>
+        @if (hasFilters()) { <button type="button" class="adm-btn" (click)="clearFilters()">{{ i18n.t('audit.clear') }}</button> }
+      </div>
+    }
+
+    @if (error(); as e) { <p class="adm-error en__error" role="alert">{{ e }}</p> }
+
+    <div class="en__table-wrap" [class.en__table-wrap--loading]="loading()">
+      <table class="en-table">
+        <thead>
+          <tr>
+            <th>{{ i18n.t('entries.col.time') }}</th>
+            <th>{{ i18n.t('entries.col.scope') }}</th>
+            <th>{{ i18n.t('entries.col.type') }}</th>
+            <th>{{ i18n.t('entries.col.client') }}</th>
+            <th>{{ i18n.t('entries.col.summary') }}</th>
+            <th>{{ i18n.t('entries.col.author') }}</th>
           </tr>
-        } @empty {
-          <tr><td colspan="7" class="entries__empty">Sin entradas para este filtro.</td></tr>
-        }
-      </tbody>
-    </table>
-    <p class="entries__muted">{{ total() }} entrada(s)</p>
-  </section>
+        </thead>
+        <tbody>
+          @for (entry of entries(); track entry.id) {
+            <tr class="en-row" [class.en-row--active]="selected()?.id === entry.id" tabindex="0" (click)="select(entry)" (keydown.enter)="select(entry)">
+              <td class="mono en__time">{{ entry.createdAt | date: 'dd/MM HH:mm' }}</td>
+              <td><span class="pill" [class]="scopeTone[entry.scope]"><mat-icon>{{ scopeIcon[entry.scope] }}</mat-icon>{{ i18n.t(scopeKey(entry.scope)) }}</span></td>
+              <td><span class="pill" [class]="typeTone[entry.entryType]">{{ i18n.t(typeKey(entry.entryType)) }}</span></td>
+              <td class="en__client">{{ targetName(entry) }}</td>
+              <td class="en__summary">
+                {{ summary(entry) }}
+                @if (entry.imageUrl) { <mat-icon class="en__clip" [title]="i18n.t('entries.hasImage')">attach_file</mat-icon> }
+                @for (tag of entry.tags; track tag) { <span class="pill tone-neutral en__tag">{{ tag }}</span> }
+              </td>
+              <td class="en__author">{{ entry.authorUsername }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      @if (!entries().length && !loading()) { <p class="adm-empty">{{ i18n.t(hasFilters() ? 'entries.noMatch' : 'entries.empty') }}</p> }
+    </div>
 
-  @if (selected(); as entry) {
-    <section class="panel entries__detail">
-      <div class="entries__detail-header">
-        <h2 class="panel__title">{{ typeLabels[entry.entryType] }} · {{ scopeLabels[entry.scope] }} · {{ entry.authorUsername }}</h2>
-        <app-button variant="text" (pressed)="closeDetail()">Cerrar</app-button>
-      </div>
-      <app-markdown [content]="entry.content" />
-      @if (entry.imageUrl) {
-        <img class="entries__detail-image" [src]="entry.imageUrl" alt="Evidencia adjunta" />
-      }
-      <h3 class="entries__comments-title">Comentarios</h3>
-      <ul class="entries__comments">
-        @for (c of entry.comments; track c.id) {
-          <li><strong>{{ c.authorUsername }}</strong> <span class="entries__muted">{{ c.createdAt | date: 'short' }}</span><br />{{ c.comment }}</li>
-        } @empty {
-          <li class="entries__muted">Sin comentarios todavía.</li>
+    <!-- Redactor fijo abajo (artboard: "Redactar entrada rápida (Alt+N) · Ámbito") -->
+    <form class="en__composer" (submit)="$event.preventDefault(); submitEntry()">
+      <div class="en__crow">
+        <span class="en__label">{{ i18n.t('entries.composerLabel') }}</span>
+        <span class="en__segs" role="group" [attr.aria-label]="i18n.t('entries.col.scope')">
+          @for (s of scopes(); track s) {
+            <button type="button" class="seg" [attr.aria-pressed]="draft().scope === s" (click)="updateDraft({ scope: s })"><mat-icon>{{ scopeIcon[s] }}</mat-icon>{{ i18n.t(scopeKey(s)) }}</button>
+          }
+        </span>
+        <span class="en__label">{{ i18n.t('entries.reason') }}</span>
+        <span class="en__segs" role="group" [attr.aria-label]="i18n.t('entries.reason')">
+          @for (t of types; track t) {
+            <button type="button" class="seg" [attr.aria-pressed]="draft().entryType === t" [title]="i18n.t(typeHintKey(t))" (click)="updateDraft({ entryType: t })">{{ i18n.t(typeKey(t)) }}</button>
+          }
+        </span>
+        <span class="adm-hint">{{ i18n.t(typeHintKey(draft().entryType)) }}</span>
+        @if (targetOptions().length) {
+          <label class="en__target en__push">
+            <span class="en__label">{{ i18n.t('entries.target') }}</span>
+            <select class="adm-input" name="target" [ngModel]="draft().target" (ngModelChange)="updateDraft({ target: $event })">
+              <option value="">{{ i18n.t('entries.noTarget') }}</option>
+              @for (o of targetOptions(); track o.id) { <option [value]="o.id">{{ o.label }}</option> }
+            </select>
+          </label>
         }
-      </ul>
-      <div class="entries__comment-form">
-        <input [ngModel]="newComment()" (ngModelChange)="newComment.set($event)" (keyup.enter)="addComment()" placeholder="Agregar seguimiento…" />
-        <app-button variant="primary" (pressed)="addComment()">Comentar</app-button>
       </div>
-    </section>
-  }
 
-  <div class="entries__notes-row">
-    <section class="panel entries__notes">
-      <h2 class="panel__title">Pizarrón (toda la sala)</h2>
-      @if (perms.isAdmin()) {
-        <textarea rows="4" [ngModel]="adminNotes()" (ngModelChange)="onAdminNotesChange($event)"></textarea>
-      } @else {
-        <app-markdown [content]="adminNotes()" />
+      <textarea #composer class="adm-input en__textarea" name="content" rows="3" [placeholder]="i18n.t('entries.placeholder')" [attr.aria-label]="i18n.t('entries.placeholder')"
+        [ngModel]="draft().content" (ngModelChange)="updateDraft({ content: $event })" (paste)="onPaste($event)" (keydown.control.enter)="submitEntry()"></textarea>
+
+      @if (ticketsEnabled() && draft().createTicket) {
+        <div class="en__crow en__ticket">
+          <mat-icon>confirmation_number</mat-icon>
+          <label class="en__target">
+            <span class="en__label">{{ i18n.t('entries.ticketTeam') }}</span>
+            <select class="adm-input" name="ticketTeam" [ngModel]="draft().ticketTeamId" (ngModelChange)="updateDraft({ ticketTeamId: $event })">
+              <option value="">{{ i18n.t('teams.pick') }}</option>
+              @for (t of teams(); track t.id) { <option [value]="t.id">{{ t.name }}</option> }
+            </select>
+          </label>
+          @if (!draft().target?.startsWith('svc:')) {
+            <label class="en__target">
+              <span class="en__label">{{ i18n.t('orgs.type.client') }}</span>
+              <select class="adm-input" name="ticketClient" [ngModel]="draft().ticketClientId" (ngModelChange)="updateDraft({ ticketClientId: $event })">
+                <option value="">{{ i18n.t('teams.pick') }}</option>
+                @for (c of clients(); track c.id) { <option [value]="c.id">{{ c.name }}</option> }
+              </select>
+            </label>
+          } @else {
+            <span class="adm-hint">{{ i18n.t('entries.ticketClientFromService') }}</span>
+          }
+          @if (ticketProblem(); as p) { <span class="adm-error">{{ p }}</span> }
+        </div>
       }
-    </section>
-    <section class="panel entries__notes">
-      <h2 class="panel__title">Mi libreta personal</h2>
-      <textarea rows="4" [ngModel]="personalNotes()" (ngModelChange)="onPersonalNotesChange($event)"></textarea>
-    </section>
+
+      <div class="en__crow">
+        <input class="adm-input en__tags" name="tags" [placeholder]="i18n.t('entries.tagsPlaceholder')" [attr.aria-label]="i18n.t('entries.tag')" [ngModel]="draft().tags" (ngModelChange)="updateDraft({ tags: $event })" />
+        @if (ticketsEnabled()) {
+          <label class="en__check">
+            <input type="checkbox" name="createTicket" [ngModel]="draft().createTicket" (ngModelChange)="updateDraft({ createTicket: $event })" />
+            {{ i18n.t('entries.createTicket') }}
+          </label>
+          @if (!draft().createTicket) {
+            <input class="adm-input mono en__ticket-no" name="ticketNumber" placeholder="TKT-2026-00042" [attr.aria-label]="i18n.t('entries.linkTicket')" [title]="i18n.t('entries.linkTicket')" [ngModel]="draft().ticketNumber" (ngModelChange)="updateDraft({ ticketNumber: $event })" />
+          }
+        }
+        <button type="button" class="adm-btn" [title]="i18n.t('entries.defangHint')" [disabled]="!draft().content.trim()" (click)="defangDraft()"><mat-icon>shield</mat-icon>{{ i18n.t('entries.defang') }}</button>
+        @if (composeImage(); as img) {
+          <span class="en__img"><img [src]="img.previewUrl" [alt]="i18n.t('entries.evidence')" /><button type="button" class="adm-icon-btn" [attr.aria-label]="i18n.t('teams.remove')" (click)="removeImage()"><mat-icon>close</mat-icon></button></span>
+        } @else {
+          <label class="adm-btn en__file" [class.en__file--busy]="uploadingImage()">
+            <input type="file" accept="image/png,image/jpeg,image/webp" [disabled]="uploadingImage()" (change)="onFileSelected($event)" />
+            <mat-icon>attach_file</mat-icon>{{ i18n.t('entries.evidence') }}
+          </label>
+        }
+        <span class="en__save en__push">
+          <kbd class="mono en__kbd">Ctrl+↵</kbd>
+          <button type="submit" class="adm-btn adm-btn--primary" [disabled]="saving() || !draft().content.trim() || !!ticketProblem()"><mat-icon>save</mat-icon>{{ i18n.t('admin.save') }}</button>
+        </span>
+      </div>
+    </form>
   </div>
+
+  @if (panel() !== 'none') {
+    <aside class="en__side" [attr.aria-label]="i18n.t(panel() === 'notes' ? 'entries.notes' : 'entries.detail')">
+      @if (panel() === 'detail' && selected(); as entry) {
+        <div class="en__side-head">
+          <span class="pill" [class]="scopeTone[entry.scope]"><mat-icon>{{ scopeIcon[entry.scope] }}</mat-icon>{{ i18n.t(scopeKey(entry.scope)) }}</span>
+          <span class="pill" [class]="typeTone[entry.entryType]">{{ i18n.t(typeKey(entry.entryType)) }}</span>
+          <button type="button" class="adm-icon-btn en__push" [attr.aria-label]="i18n.t('common.close')" (click)="closePanel()"><mat-icon>close</mat-icon></button>
+        </div>
+        <div class="en__side-body">
+          <p class="adm-small adm-secondary">{{ entry.authorUsername }} · <span class="mono">{{ entry.createdAt | date: 'dd/MM/yyyy HH:mm' }}</span>@if (targetName(entry) !== '—') { · {{ targetName(entry) }} }</p>
+          <app-markdown [content]="entry.content" />
+          @if (entry.imageUrl) { <img class="en__detail-img" [src]="entry.imageUrl" [alt]="i18n.t('entries.evidence')" /> }
+          @if (entry.tags.length) {
+            <p class="en__tags-row">@for (tag of entry.tags; track tag) { <span class="pill tone-neutral">{{ tag }}</span> }</p>
+          }
+
+          <span class="adm-label">{{ i18n.t('entries.followUps') }}</span>
+          <ul class="en__comments">
+            @for (c of entry.comments; track c.id) {
+              <li><strong>{{ c.authorUsername }}</strong><span class="mono adm-small adm-secondary en__cmeta">{{ c.createdAt | date: 'dd/MM HH:mm' }}</span><br />{{ c.comment }}</li>
+            } @empty {
+              <li class="adm-hint">{{ i18n.t('entries.noFollowUps') }}</li>
+            }
+          </ul>
+          <div class="en__comment-form">
+            <input class="adm-input" [placeholder]="i18n.t('entries.addFollowUp')" [attr.aria-label]="i18n.t('entries.addFollowUp')" [ngModel]="newComment()" (ngModelChange)="newComment.set($event)" (keyup.enter)="addComment()" />
+            <button type="button" class="adm-btn adm-btn--primary" [disabled]="!newComment().trim()" (click)="addComment()">{{ i18n.t('entries.comment') }}</button>
+          </div>
+
+          @if (canModify(entry)) {
+            <div class="en__danger">
+              @if (confirmDelete()) {
+                <span class="adm-small">{{ i18n.t('entries.confirmDelete') }}</span>
+                <span class="en__danger-actions">
+                  <button type="button" class="adm-btn" (click)="confirmDelete.set(false)">{{ i18n.t('adminChecklist.cancel') }}</button>
+                  <button type="button" class="adm-btn adm-btn--danger" (click)="remove(entry)">{{ i18n.t('adminChecklist.delete') }}</button>
+                </span>
+              } @else {
+                <button type="button" class="adm-btn adm-btn--danger" (click)="confirmDelete.set(true)"><mat-icon>delete_outline</mat-icon>{{ i18n.t('entries.delete') }}</button>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      @if (panel() === 'notes') {
+        <div class="en__side-head">
+          <span class="en__segs" role="tablist">
+            <button type="button" role="tab" class="seg" [attr.aria-pressed]="notesTab() === 'admin'" [attr.aria-selected]="notesTab() === 'admin'" (click)="notesTab.set('admin')">{{ i18n.t('entries.board') }}</button>
+            <button type="button" role="tab" class="seg" [attr.aria-pressed]="notesTab() === 'personal'" [attr.aria-selected]="notesTab() === 'personal'" (click)="notesTab.set('personal')">{{ i18n.t('entries.notebook') }}</button>
+          </span>
+          <button type="button" class="adm-icon-btn en__push" [attr.aria-label]="i18n.t('common.close')" (click)="closePanel()"><mat-icon>close</mat-icon></button>
+        </div>
+        <div class="en__side-body en__notes">
+          @if (notesTab() === 'admin') {
+            <p class="adm-hint">{{ i18n.t('entries.boardHint') }}</p>
+            @if (perms.isAdmin()) {
+              <textarea class="adm-input en__note-area" [attr.aria-label]="i18n.t('entries.board')" [ngModel]="adminNotes()" (ngModelChange)="onAdminNotesChange($event)"></textarea>
+              <span class="adm-hint">{{ i18n.t(notesSaved().admin ? 'entries.notesSaved' : 'entries.notesAutosave') }}</span>
+            } @else {
+              <app-markdown [content]="adminNotes() || i18n.t('entries.boardEmpty')" />
+            }
+          } @else {
+            <p class="adm-hint">{{ i18n.t('entries.notebookHint') }}</p>
+            <textarea class="adm-input en__note-area" [attr.aria-label]="i18n.t('entries.notebook')" [ngModel]="personalNotes()" (ngModelChange)="onPersonalNotesChange($event)"></textarea>
+            <span class="adm-hint">{{ i18n.t(notesSaved().personal ? 'entries.notesSaved' : 'entries.notesAutosave') }}</span>
+          }
+        </div>
+      }
+    </aside>
+  }
 </div>

@@ -76,3 +76,16 @@ INSERT INTO work_shifts (
   rotation_cycle_id, name, start_time, end_time, timezone, shift_type,
   checklist_template_start_id, checklist_template_end_id, email_recipients
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *;
+
+-- name: UpdateWorkShift :one
+-- Administración → Turnos: editar nombre, horario, zona, destinatarios del
+-- reporte de cierre y activo. Lo que no se manda queda como estaba.
+UPDATE work_shifts SET
+  name = COALESCE(sqlc.narg('name'), name),
+  start_time = COALESCE(sqlc.narg('start_time')::time, start_time),
+  end_time = COALESCE(sqlc.narg('end_time')::time, end_time),
+  timezone = COALESCE(sqlc.narg('timezone'), timezone),
+  email_recipients = COALESCE(sqlc.narg('email_recipients')::text[], email_recipients),
+  active = COALESCE(sqlc.narg('active'), active)
+WHERE id = sqlc.arg('id')
+RETURNING *;

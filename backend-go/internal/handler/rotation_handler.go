@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/directory"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/middleware"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
@@ -481,9 +482,12 @@ func (h *RotationHandler) CreateWorkShift(w http.ResponseWriter, r *http.Request
 	if shiftType == "" {
 		shiftType = "regular"
 	}
-	if req.EmailRecipients == nil {
-		req.EmailRecipients = []string{}
+	recipients, bad := cleanRecipients(req.EmailRecipients)
+	if bad != "" {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "correo inválido: "+bad)
+		return
 	}
+	req.EmailRecipients = recipients
 	shift, err := h.Queries.CreateWorkShift(r.Context(), db.CreateWorkShiftParams{
 		RotationCycleID: optionalUUID(req.RotationCycleID), Name: req.Name,
 		StartTime: startTime, EndTime: endTime, Timezone: timezone, ShiftType: shiftType,
@@ -501,4 +505,101 @@ func (h *RotationHandler) CreateWorkShift(w http.ResponseWriter, r *http.Request
 	}
 	h.AuditLog.Log(r.Context(), "work_shift.created", audit.LevelInfo, audit.Success(), map[string]any{"workShiftId": shift.ID.String(), "name": shift.Name})
 	writeData(w, http.StatusCreated, toWorkShiftDTO(shift))
+}
+
+// cleanRecipients deja los destinatarios sin vacíos ni duplicados y devuelve
+// el primero que no sea un correo válido (antes se guardaba cualquier texto y
+// el reporte de cierre fallaba recién al enviarse).
+func cleanRecipients(in []string) ([]string, string) {
+	out := make([]string, 0, len(in))
+	seen := map[string]bool{}
+	for _, raw := range in {
+		addr := strings.TrimSpace(raw)
+		if addr == "" || seen[strings.ToLower(addr)] {
+			continue
+		}
+		if !directory.ValidEmail(addr) {
+			return nil, addr
+		}
+		seen[strings.ToLower(addr)] = true
+		out = append(out, addr)
+	}
+	return out, ""
+}
+
+type patchWorkShiftRequest struct {
+	Name            *string   `json:"name"`
+	StartTime       *string   `json:"startTime"`
+	EndTime         *string   `json:"endTime"`
+	Timezone        *string   `json:"timezone"`
+	EmailRecipients *[]string `json:"emailRecipients"`
+	Active          *bool     `json:"active"`
+}
+
+// PatchWorkShift es PATCH /api/work-shifts/{id}: sin esto un turno creado sin
+// destinatarios dejaba sus reportes de cierre fallando para siempre.
+func (h *RotationHandler) PatchWorkShift(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "turno no encontrado")
+		return
+	}
+	var req patchWorkShiftRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "cuerpo de la request inválido")
+		return
+	}
+	params := db.UpdateWorkShiftParams{ID: id}
+	if req.Name != nil {
+		name := strings.TrimSpace(*req.Name)
+		if name == "" {
+			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "el nombre no puede quedar vacío")
+			return
+		}
+		params.Name = pgtype.Text{String: name, Valid: true}
+	}
+	for _, t := range []struct {
+		raw *string
+		dst *pgtype.Time
+	}{{req.StartTime, &params.StartTime}, {req.EndTime, &params.EndTime}} {
+		if t.raw == nil {
+			continue
+		}
+		parsed, err := parseTimeOfDay(*t.raw)
+		if err != nil {
+			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "startTime y endTime van en formato HH:MM")
+			return
+		}
+		*t.dst = parsed
+	}
+	if req.Timezone != nil {
+		tz := strings.TrimSpace(*req.Timezone)
+		if _, err := time.LoadLocation(tz); tz == "" || err != nil {
+			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "zona horaria desconocida (ej. America/Santiago)")
+			return
+		}
+		params.Timezone = pgtype.Text{String: tz, Valid: true}
+	}
+	if req.EmailRecipients != nil {
+		recipients, bad := cleanRecipients(*req.EmailRecipients)
+		if bad != "" {
+			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "correo inválido: "+bad)
+			return
+		}
+		params.EmailRecipients = recipients
+	}
+	params.Active = optionalBool(req.Active)
+	shift, err := h.Queries.UpdateWorkShift(r.Context(), params)
+	if errors.Is(err, pgx.ErrNoRows) {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "turno no encontrado")
+		return
+	}
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo guardar el turno")
+		return
+	}
+	h.AuditLog.Log(r.Context(), "work_shift.updated", audit.LevelInfo, audit.Success(), map[string]any{
+		"workShiftId": shift.ID.String(), "name": shift.Name, "recipients": len(shift.EmailRecipients), "active": shift.Active,
+	})
+	writeData(w, http.StatusOK, toWorkShiftDTO(shift))
 }

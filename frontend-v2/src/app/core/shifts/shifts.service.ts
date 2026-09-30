@@ -194,6 +194,11 @@ export class ShiftsService {
     return (await firstValueFrom(this.http.post<ApiEnvelope<WorkShift>>('/api/work-shifts', shift))).data;
   }
 
+  /** Editar un turno; lo que no se manda queda como estaba. */
+  async patchWorkShift(id: string, patch: Partial<{ name: string; startTime: string; endTime: string; timezone: string; emailRecipients: string[]; active: boolean }>): Promise<WorkShift> {
+    return (await firstValueFrom(this.http.patch<ApiEnvelope<WorkShift>>(`/api/work-shifts/${id}`, patch))).data;
+  }
+
   // ===== Matriz y asignaciones de dotación (HU-4b) =====
 
   async matrix(from?: string, to?: string): Promise<Matrix> {

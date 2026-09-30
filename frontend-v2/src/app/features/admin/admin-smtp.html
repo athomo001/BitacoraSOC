@@ -1,0 +1,132 @@
+<header class="sm__head">
+  <div>
+    <h2 class="sm__title">{{ i18n.t('admin.nav.smtp') }}</h2>
+    <p class="sm__muted">{{ i18n.t('smtp.subtitle') }}</p>
+  </div>
+  @if (loaded()) {
+    <span class="sm__push">
+      @switch (health()) {
+        @case ('none') { <span class="pill tone-neutral"><mat-icon>mail_outline</mat-icon>{{ i18n.t('smtp.health.none') }}</span> }
+        @case ('untested') { <span class="pill tone-warn"><mat-icon>help_outline</mat-icon>{{ i18n.t('smtp.health.untested') }}</span> }
+        @case ('ok') { <span class="pill tone-ok"><mat-icon>task_alt</mat-icon>{{ i18n.tf('smtp.health.ok', testedAgo()) }}</span> }
+        @case ('failed') { <span class="pill tone-bad"><mat-icon>error_outline</mat-icon>{{ i18n.t('smtp.health.failed') }}</span> }
+      }
+    </span>
+  }
+</header>
+
+<div class="sm__grid">
+  <section class="sm-card">
+    <div class="sm-card__head"><mat-icon>dns</mat-icon><span class="sm-card__title">{{ i18n.t('smtp.server') }}</span></div>
+
+    <div class="sm-card__body">
+      <div class="sm__field">
+        <span class="sm__label">{{ i18n.t('smtp.provider') }}</span>
+        <span class="sm__segs" role="group" [attr.aria-label]="i18n.t('smtp.provider')">
+          @for (p of presets; track p.id) {
+            <button type="button" class="seg" [attr.aria-pressed]="preset().id === p.id" (click)="pickPreset(p)">{{ p.label || i18n.t('smtp.provider.custom') }}</button>
+          }
+        </span>
+        <span class="sm__hint">{{ i18n.t(preset().hintKey) }}</span>
+      </div>
+
+      <div class="sm__row">
+        <label class="sm__field sm__grow">
+          <span class="sm__label">{{ i18n.t('smtp.host') }}</span>
+          <input class="sm-input mono" name="host" placeholder="smtp.office365.com" [ngModel]="draft().host" (ngModelChange)="onHostChange($event)" />
+        </label>
+        <label class="sm__field sm__port">
+          <span class="sm__label">{{ i18n.t('smtp.port') }}</span>
+          <input class="sm-input mono" name="port" type="number" min="1" max="65535" [ngModel]="draft().port" (ngModelChange)="patch({ port: +$event })" />
+        </label>
+      </div>
+
+      <div class="sm__row">
+        <label class="sm__field sm__grow">
+          <span class="sm__label">{{ i18n.t('smtp.username') }}</span>
+          <input class="sm-input" name="username" autocomplete="off" [placeholder]="preset().usernamePlaceholder" [ngModel]="draft().username" (ngModelChange)="patch({ username: $event })" />
+        </label>
+        <label class="sm__field sm__grow">
+          <span class="sm__label">{{ i18n.t('smtp.password') }}</span>
+          <input class="sm-input" name="password" type="password" autocomplete="new-password"
+            [placeholder]="saved()?.hasPassword ? i18n.t('smtp.passwordKept') : ''" [ngModel]="draft().password" (ngModelChange)="patch({ password: $event })" />
+        </label>
+      </div>
+
+      <div class="sm__row">
+        <label class="sm__field sm__grow">
+          <span class="sm__label">{{ i18n.t('smtp.fromName') }}</span>
+          <input class="sm-input" name="fromName" maxlength="100" placeholder="Bitácora Ops" [ngModel]="draft().fromName" (ngModelChange)="patch({ fromName: $event })" />
+        </label>
+        <label class="sm__field sm__grow">
+          <span class="sm__label">{{ i18n.t('smtp.fromAddress') }}</span>
+          <input class="sm-input" name="fromAddress" type="email" placeholder="noc@empresa.cl" [ngModel]="draft().fromAddress" (ngModelChange)="patch({ fromAddress: $event })" />
+        </label>
+      </div>
+      <p class="sm__hint">{{ i18n.t('smtp.preview') }} <span class="mono">{{ fromPreview() }}</span></p>
+
+      <label class="sm__switch-row">
+        <span class="switch">
+          <input class="switch__input" type="checkbox" role="switch" [checked]="draft().requireTls" (change)="patch({ requireTls: !draft().requireTls })" />
+          <span class="switch__track" aria-hidden="true"></span>
+        </span>
+        <span>
+          <span class="sm__strong">{{ i18n.t('smtp.tls') }}</span>
+          <span class="sm__hint sm__block">{{ i18n.t('smtp.tlsHint') }}</span>
+        </span>
+      </label>
+    </div>
+
+    <footer class="sm-foot">
+      <span class="sm-foot__status">
+        @if (notice(); as n) {
+          <span class="pill tone-ok"><mat-icon>task_alt</mat-icon>{{ n }}</span>
+        } @else if (error(); as e) {
+          <span class="text-bad sm__small" role="alert">{{ e }}</span>
+        } @else if (problem() && dirty()) {
+          <span class="text-bad sm__small">{{ problem() }}</span>
+        } @else {
+          <span class="sm__muted">{{ i18n.t(dirty() ? 'admin.unsaved' : 'admin.noChanges') }}</span>
+        }
+      </span>
+      @if (dirty() && saved()) {
+        <button type="button" class="sm-btn sm__push" (click)="discard()">{{ i18n.t('admin.discard') }}</button>
+      }
+      <button type="button" class="sm-btn sm-btn--primary" [class.sm__push]="!dirty() || !saved()" [disabled]="!dirty() || !!problem() || busy()" (click)="save()">
+        <mat-icon>save</mat-icon>{{ i18n.t('admin.save') }}
+      </button>
+    </footer>
+  </section>
+
+  <section class="sm-card">
+    <div class="sm-card__head"><mat-icon>send</mat-icon><span class="sm-card__title">{{ i18n.t('smtp.test') }}</span></div>
+    <div class="sm-card__body">
+      <p class="sm__hint">{{ i18n.t('smtp.testHint') }}</p>
+      <label class="sm__field">
+        <span class="sm__label">{{ i18n.t('smtp.testTo') }}</span>
+        <input class="sm-input" name="testTo" type="email" placeholder="tu@empresa.cl" [ngModel]="testTo()" (ngModelChange)="testTo.set($event)" (keydown.enter)="test()" />
+      </label>
+      <button type="button" class="sm-btn sm-btn--primary sm__self-start" [disabled]="!saved() || dirty() || busy() || !validEmail(testTo())" (click)="test()">
+        <mat-icon>send</mat-icon>{{ i18n.t('smtp.testSend') }}
+      </button>
+      @if (saved() && dirty()) {
+        <span class="sm__hint">{{ i18n.t('smtp.saveFirst') }}</span>
+      }
+
+      @if (saved()?.lastTest; as last) {
+        <div class="sm__last">
+          <span class="sm__label">{{ i18n.t('smtp.lastTest') }}</span>
+          <span class="sm__last-row">
+            <span class="pill" [class]="last.ok ? 'tone-ok' : 'tone-bad'">{{ i18n.t(last.ok ? 'smtp.lastOk' : 'smtp.lastFail') }}</span>
+            <span class="mono sm__small sm__muted">{{ last.at | date: 'dd/MM/yyyy HH:mm' }}</span>
+          </span>
+          @if (!last.ok && last.error) {
+            <pre class="mono sm__error-box">{{ last.error }}</pre>
+          }
+        </div>
+      } @else if (testError(); as e) {
+        <pre class="mono sm__error-box" role="alert">{{ e }}</pre>
+      }
+    </div>
+  </section>
+</div>

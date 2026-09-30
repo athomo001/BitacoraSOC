@@ -151,3 +151,15 @@ SELECT shift_check_cooldown_minutes FROM app_config WHERE id = true;
 -- name: SetChecklistCooldown :one
 UPDATE app_config SET shift_check_cooldown_minutes = $1, updated_at = now() WHERE id = true
 RETURNING shift_check_cooldown_minutes;
+
+-- name: ListRecentShiftReportDeliveries :many
+-- Administración → Reportes: los últimos cierres y cómo salió su reporte,
+-- con el turno y a quién iba (sin esto un envío fallido no se veía en ninguna parte).
+SELECT sc.id, sc.shift_end_at, sc.sent_status, sc.sent_error, sc.sent_at,
+       u.username, ws.name AS shift_name, ws.email_recipients
+FROM shift_closures sc
+JOIN users u ON u.id = sc.user_id
+LEFT JOIN shift_checks ck ON ck.id = sc.closure_check_id
+LEFT JOIN work_shifts ws ON ws.id = ck.work_shift_id
+ORDER BY sc.shift_end_at DESC
+LIMIT 20;

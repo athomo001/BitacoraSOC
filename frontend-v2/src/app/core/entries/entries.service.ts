@@ -91,7 +91,15 @@ export class EntriesService {
     return (await firstValueFrom(this.http.get<ApiEnvelope<EntryDetail>>(`/api/entries/${id}`))).data;
   }
 
-  async create(entry: { entryType: EntryType; scope?: EntryScope; content: string; tags?: string[]; serviceId?: string; assetId?: string; imageUrl?: string; ticketNumber?: string }): Promise<Entry | { entry: Entry; ticket: unknown }> {
+  /**
+   * Crea la entrada. Con la ticketera activa puede vincularse a un ticket
+   * existente (ticketNumber) o crear uno nuevo en la misma operación
+   * (createTicket + ticketType + assignedTeamId + clientId, o el cliente del servicio).
+   */
+  async create(entry: {
+    entryType: EntryType; scope?: EntryScope; content: string; tags?: string[]; serviceId?: string; assetId?: string; imageUrl?: string; ticketNumber?: string;
+    createTicket?: boolean; ticketType?: 'incident' | 'service_request'; assignedTeamId?: string; clientId?: string;
+  }): Promise<Entry | { entry: Entry; ticket: unknown }> {
     return (await firstValueFrom(this.http.post<ApiEnvelope<Entry | { entry: Entry; ticket: unknown }>>('/api/entries', entry))).data;
   }
 

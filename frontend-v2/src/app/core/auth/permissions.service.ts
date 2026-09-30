@@ -25,6 +25,8 @@ export class PermissionsService {
 
   readonly user = this._user.asReadonly();
   readonly isAdmin = computed(() => this._user()?.role === 'admin');
+  /** Alcance SOC/NOC efectivo que calcula el backend (ya descuenta los módulos apagados). */
+  readonly moduleScope = computed(() => this._caps()?.moduleScope ?? null);
   readonly can = (capability: string) => computed(() => this.isAdmin() || !!this._caps()?.capabilities.includes(capability));
   readonly canWriteDirectory = this.can('directory:write');
   readonly canDeleteDirectory = this.can('directory:delete');

@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signa
 import { MatIconModule } from '@angular/material/icon';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
+import { DomainModule, ModuleAccessService } from '../../core/auth/module-access.service';
 import { AdminModulesComponent } from './admin-modules';
 import { AdminFeaturesComponent } from './admin-features';
 import { AdminTerritoryComponent } from './admin-territory';
@@ -21,7 +22,14 @@ export type AdminSection =
   | 'organizations' | 'territory' | 'teams'
   | 'modules' | 'features' | 'backups' | 'audit' | 'complements';
 
-interface NavItem { id: AdminSection; icon: string; labelKey: MessageKey; badge?: string; }
+interface NavItem {
+  id: AdminSection;
+  icon: string;
+  labelKey: MessageKey;
+  badge?: string;
+  /** Sección de un módulo SOC/NOC: si el módulo no aplica, no aparece (sin aviso de "desactivado"). */
+  requiresModule?: DomainModule;
+}
 
 /** Mismo orden y agrupación que el artboard aprobado "Administración". */
 const NAV: readonly { labelKey: MessageKey; items: readonly NavItem[] }[] = [
@@ -40,7 +48,7 @@ const NAV: readonly { labelKey: MessageKey; items: readonly NavItem[] }[] = [
     labelKey: 'admin.group.catalogs',
     items: [
       { id: 'organizations', icon: 'business', labelKey: 'admin.nav.organizations' },
-      { id: 'territory', icon: 'map', labelKey: 'admin.nav.territory' },
+      { id: 'territory', icon: 'map', labelKey: 'admin.nav.territory', requiresModule: 'noc' },
       { id: 'teams', icon: 'groups', labelKey: 'admin.nav.teams' },
     ],
   },
@@ -179,21 +187,41 @@ export class AdminShellComponent {
   protected readonly i18n = inject(I18nService);
   private readonly searchInput = viewChild.required<ElementRef<HTMLInputElement>>('search');
 
-  protected readonly active = signal<AdminSection>(readSection());
+  private readonly modules = inject(ModuleAccessService);
+  private readonly modulesLoaded = signal(false);
+  private readonly selected = signal<AdminSection>(readSection());
   protected readonly query = signal('');
+
+  /** El menú sin las secciones de módulos que no aplican. */
+  private readonly nav = computed(() =>
+    NAV.map((group) => ({ ...group, items: group.items.filter((item) => !item.requiresModule || this.modules.has(item.requiresModule)) })).filter(
+      (group) => group.items.length > 0,
+    ),
+  );
+
+  /** Si la última sección recordada ya no aplica (se apagó su módulo), se abre Usuarios y grupos. */
+  protected readonly active = computed<AdminSection>(() => {
+    const selected = this.selected();
+    if (!this.modulesLoaded()) return selected;
+    return this.nav().some((group) => group.items.some((item) => item.id === selected)) ? selected : 'access';
+  });
+
+  constructor() {
+    void this.modules.load().finally(() => this.modulesLoaded.set(true));
+  }
 
   /** El buscador filtra por nombre de sección o de grupo, sin tildes. */
   protected readonly groups = computed(() => {
     const q = normalize(this.query().trim());
-    if (!q) return NAV;
-    return NAV.map((group) => {
+    if (!q) return this.nav();
+    return this.nav().map((group) => {
       const groupMatches = normalize(this.i18n.t(group.labelKey)).includes(q);
       return { ...group, items: group.items.filter((item) => groupMatches || normalize(this.i18n.t(item.labelKey)).includes(q)) };
     }).filter((group) => group.items.length > 0);
   });
 
   protected go(section: AdminSection): void {
-    this.active.set(section);
+    this.selected.set(section);
     this.query.set('');
     try {
       localStorage.setItem(SECTION_KEY, section);

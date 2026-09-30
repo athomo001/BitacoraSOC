@@ -1,0 +1,259 @@
+<header class="adm-head">
+  <div>
+    <h2 class="adm-title">{{ i18n.t('admin.nav.shifts') }}</h2>
+    <p class="adm-muted">{{ i18n.t('shiftsAdmin.subtitle') }}</p>
+  </div>
+</header>
+
+@if (error(); as e) { <p class="adm-error" role="alert">{{ e }}</p> }
+@if (notice(); as n) { <p><span class="pill tone-ok"><mat-icon>task_alt</mat-icon>{{ n }}</span></p> }
+
+<!-- ===== Turnos de trabajo ===== -->
+<section class="adm-card">
+  <div class="adm-card__head">
+    <h3 class="adm-card__title"><mat-icon>schedule</mat-icon>{{ i18n.t('shiftsAdmin.workShifts') }} <span class="mono adm-secondary">{{ workShifts().length }}</span></h3>
+  </div>
+  <p class="adm-card__note sa__lead">{{ i18n.t('shiftsAdmin.workShiftsHint') }}</p>
+  <div class="adm-table-wrap">
+    <table class="adm-table">
+      <thead><tr><th>{{ i18n.t('teams.name') }}</th><th>{{ i18n.t('shiftsAdmin.hours') }}</th><th>{{ i18n.t('shiftsAdmin.timezone') }}</th><th>{{ i18n.t('shiftsAdmin.recipients') }}</th><th>{{ i18n.t('orgs.active') }}</th></tr></thead>
+      <tbody>
+        @for (w of workShifts(); track w.id) {
+          <tr class="adm-row-click" [class.adm-row--active]="editingShiftId() === w.id" tabindex="0" (click)="editShift(w)" (keydown.enter)="editShift(w)">
+            <td><strong>{{ w.name }}</strong></td>
+            <td class="mono">{{ w.startTime }}–{{ w.endTime }}</td>
+            <td class="adm-secondary">{{ w.timezone }}</td>
+            <td>
+              @if (w.emailRecipients.length) {
+                <span class="adm-small adm-secondary">{{ w.emailRecipients.join(', ') }}</span>
+              } @else {
+                <span class="pill tone-warn" [title]="i18n.t('shiftsAdmin.noRecipientsHint')"><mat-icon>warning_amber</mat-icon>{{ i18n.t('shiftsAdmin.noRecipients') }}</span>
+              }
+            </td>
+            <td (click)="$event.stopPropagation()">
+              <label class="switch">
+                <input class="switch__input" type="checkbox" role="switch" [checked]="w.active" [disabled]="busy()" (change)="toggleShift(w)" [attr.aria-label]="w.name" />
+                <span class="switch__track" aria-hidden="true"></span>
+              </label>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    @if (!workShifts().length) { <p class="adm-empty">{{ i18n.t('shiftsAdmin.noShifts') }}</p> }
+  </div>
+
+  <form class="adm-card__body sa__form" (ngSubmit)="saveShift()">
+    <span class="adm-label">{{ i18n.t(editingShiftId() ? 'shiftsAdmin.editShift' : 'shiftsAdmin.newShift') }}</span>
+    <div class="adm-row">
+      <label class="adm-field"><span class="adm-label">{{ i18n.t('teams.name') }}</span><input class="adm-input" name="wsName" placeholder="Turno Día" [ngModel]="wsName()" (ngModelChange)="wsName.set($event)" /></label>
+      <label class="adm-field adm-field--narrow"><span class="adm-label">{{ i18n.t('shiftsAdmin.start') }}</span><input class="adm-input mono" name="wsStart" type="time" [ngModel]="wsStart()" (ngModelChange)="wsStart.set($event)" /></label>
+      <label class="adm-field adm-field--narrow"><span class="adm-label">{{ i18n.t('shiftsAdmin.end') }}</span><input class="adm-input mono" name="wsEnd" type="time" [ngModel]="wsEnd()" (ngModelChange)="wsEnd.set($event)" /></label>
+      <label class="adm-field"><span class="adm-label">{{ i18n.t('shiftsAdmin.timezone') }}</span><input class="adm-input" name="wsTz" [ngModel]="wsTimezone()" (ngModelChange)="wsTimezone.set($event)" /></label>
+    </div>
+    <label class="adm-field">
+      <span class="adm-label">{{ i18n.t('shiftsAdmin.reportRecipients') }}</span>
+      <input class="adm-input" name="wsEmails" placeholder="jefe.turno@empresa.cl, noc@empresa.cl" [ngModel]="wsEmails()" (ngModelChange)="wsEmails.set($event)" />
+      <span class="adm-hint">{{ i18n.t('shiftsAdmin.reportRecipientsHint') }}</span>
+    </label>
+    <div class="sa__actions">
+      @if (editingShiftId()) { <button type="button" class="adm-btn" (click)="resetShiftForm()">{{ i18n.t('admin.discard') }}</button> }
+      <button type="submit" class="adm-btn adm-btn--primary" [disabled]="busy() || !wsName().trim()">
+        <mat-icon>{{ editingShiftId() ? 'save' : 'add' }}</mat-icon>{{ i18n.t(editingShiftId() ? 'admin.save' : 'shiftsAdmin.createShift') }}
+      </button>
+    </div>
+  </form>
+</section>
+
+<!-- ===== Rotación de guardia ===== -->
+<section class="adm-card">
+  <div class="adm-card__head">
+    <h3 class="adm-card__title"><mat-icon>autorenew</mat-icon>{{ i18n.t('shiftsAdmin.rotation') }}</h3>
+    <label class="sa__team adm-push">
+      <span class="adm-label">{{ i18n.t('shiftsAdmin.team') }}</span>
+      <select class="adm-input" name="teamPicker" [ngModel]="selectedTeamId()" (ngModelChange)="selectTeam($event)">
+        <option value="">{{ i18n.t('teams.pick') }}</option>
+        @for (t of teams(); track t.id) { <option [value]="t.id">{{ t.name }}</option> }
+      </select>
+    </label>
+  </div>
+  <p class="adm-card__note sa__lead">{{ i18n.t('shiftsAdmin.rotationHint') }}</p>
+
+  @if (selectedTeamId()) {
+    <div class="adm-card__body">
+      @if (guard(); as g) {
+        <p class="sa__guard">
+          <span class="pill" [class]="g.currentMember ? 'tone-ok' : 'tone-warn'"><mat-icon>{{ g.currentMember ? 'shield' : 'gpp_maybe' }}</mat-icon>{{ i18n.t('shiftsAdmin.onCallNow') }}</span>
+          <strong>{{ g.currentMember?.name ?? i18n.t('shiftsAdmin.nobody') }}</strong>
+          @if (g.currentMember && g.until) { <span class="adm-small adm-secondary">· {{ i18n.t('shiftsAdmin.until') }} <span class="mono">{{ g.until | date: 'dd/MM HH:mm' }}</span></span> }
+        </p>
+      }
+
+      <span class="adm-label">{{ i18n.t('shiftsAdmin.cycles') }}</span>
+      <div class="adm-table-wrap">
+        <table class="adm-table">
+          <thead><tr><th>{{ i18n.t('shiftsAdmin.startDay') }}</th><th>{{ i18n.t('shiftsAdmin.startTimeUtc') }}</th><th class="adm-num">{{ i18n.t('shiftsAdmin.days') }}</th><th>{{ i18n.t('shiftsAdmin.timezone') }}</th><th>{{ i18n.t('orgs.active') }}</th></tr></thead>
+          <tbody>
+            @for (c of cycles(); track c.id) {
+              <tr class="adm-row-click" [class.adm-row--active]="selectedCycle()?.id === c.id" tabindex="0" (click)="selectCycle(c)" (keydown.enter)="selectCycle(c)">
+                <td>{{ weekday(c.startDayOfWeek) }}</td>
+                <td class="mono">{{ c.startTimeUtc }}</td>
+                <td class="mono adm-num">{{ c.durationDays }}</td>
+                <td class="adm-secondary">{{ c.timezone }}</td>
+                <td><span class="pill" [class]="c.active ? 'tone-ok' : 'tone-neutral'">{{ i18n.t(c.active ? 'modules.on' : 'modules.off') }}</span></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+        @if (!cycles().length) { <p class="adm-empty">{{ i18n.t('shiftsAdmin.noCycles') }}</p> }
+      </div>
+      <form class="adm-row" (ngSubmit)="createCycle()">
+        <label class="adm-field">
+          <span class="adm-label">{{ i18n.t('shiftsAdmin.startDay') }}</span>
+          <select class="adm-input" name="cycleDay" [ngModel]="cycleStartDay()" (ngModelChange)="cycleStartDay.set(+$event)">
+            @for (d of weekdays(); track $index) { <option [value]="$index">{{ d }}</option> }
+          </select>
+        </label>
+        <label class="adm-field adm-field--narrow"><span class="adm-label">{{ i18n.t('shiftsAdmin.startTimeUtc') }}</span><input class="adm-input mono" name="cycleTime" type="time" [ngModel]="cycleStartTime()" (ngModelChange)="cycleStartTime.set($event)" /></label>
+        <label class="adm-field adm-field--narrow"><span class="adm-label">{{ i18n.t('shiftsAdmin.days') }}</span><input class="adm-input mono" name="cycleDuration" type="number" min="1" [ngModel]="cycleDuration()" (ngModelChange)="cycleDuration.set(+$event)" /></label>
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('shiftsAdmin.timezone') }}</span><input class="adm-input" name="cycleTz" [ngModel]="cycleTimezone()" (ngModelChange)="cycleTimezone.set($event)" /></label>
+        <button type="submit" class="adm-btn" [disabled]="busy()"><mat-icon>add</mat-icon>{{ i18n.t('shiftsAdmin.createCycle') }}</button>
+      </form>
+    </div>
+
+    @if (selectedCycle(); as cycle) {
+      <div class="adm-card__body sa__block">
+        <span class="adm-label">{{ i18n.t('shiftsAdmin.roster') }}</span>
+        @if (slots().length) {
+          <div class="sa__calendar">
+            @for (s of slots(); track s.id) {
+              <article class="sa__week" [class.sa__week--paused]="s.isPaused">
+                <span class="mono adm-small adm-secondary">{{ s.weekStartDate }} → {{ s.weekEndDate }}</span>
+                <strong>{{ s.displayName }}</strong>
+                @if (s.isPaused) {
+                  <span class="pill tone-neutral">{{ i18n.t('shiftsAdmin.paused') }}@if (s.pausedReason) { · {{ s.pausedReason }} }</span>
+                  <button type="button" class="adm-btn" [disabled]="busy()" (click)="resumeSlot(s)">{{ i18n.t('shiftsAdmin.resume') }}</button>
+                } @else if (pausingId() === s.id) {
+                  <input class="adm-input" [placeholder]="i18n.t('shiftsAdmin.pauseReason')" [ngModel]="pauseReason()" (ngModelChange)="pauseReason.set($event)" [ngModelOptions]="{ standalone: true }" />
+                  <span class="sa__actions">
+                    <button type="button" class="adm-btn" (click)="pausingId.set(null)">{{ i18n.t('adminChecklist.cancel') }}</button>
+                    <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy()" (click)="confirmPause(s)">{{ i18n.t('shiftsAdmin.pause') }}</button>
+                  </span>
+                } @else {
+                  <button type="button" class="adm-btn" (click)="startPause(s)">{{ i18n.t('shiftsAdmin.pause') }}</button>
+                }
+              </article>
+            }
+          </div>
+        } @else {
+          <p class="adm-hint">{{ i18n.t('shiftsAdmin.noRoster') }}</p>
+        }
+        <p class="adm-hint">{{ i18n.t('shiftsAdmin.pauseHint') }}</p>
+        <form class="adm-row" (ngSubmit)="createSlot()">
+          <label class="adm-field">
+            <span class="adm-label">{{ i18n.t('shiftsAdmin.person') }}</span>
+            <select class="adm-input" name="slotMember" [ngModel]="slotMemberId()" (ngModelChange)="slotMemberId.set($event)">
+              <option value="">{{ i18n.t('teams.pick') }}</option>
+              @for (m of teamMembers(); track m.id) { <option [value]="m.id">{{ m.displayName }}</option> }
+            </select>
+          </label>
+          <label class="adm-field"><span class="adm-label">{{ i18n.t('shiftsAdmin.weekFrom') }}</span><input class="adm-input" name="slotStart" type="date" [ngModel]="slotWeekStart()" (ngModelChange)="slotWeekStart.set($event)" /></label>
+          <label class="adm-field"><span class="adm-label">{{ i18n.t('shiftsAdmin.weekTo') }}</span><input class="adm-input" name="slotEnd" type="date" [ngModel]="slotWeekEnd()" (ngModelChange)="slotWeekEnd.set($event)" /></label>
+          <button type="submit" class="adm-btn" [disabled]="busy() || !slotMemberId() || !slotWeekStart() || !slotWeekEnd()"><mat-icon>add</mat-icon>{{ i18n.t('shiftsAdmin.addToRoster') }}</button>
+        </form>
+      </div>
+
+      <div class="adm-card__body sa__block">
+        <span class="adm-label">{{ i18n.t('shiftsAdmin.override') }}</span>
+        <p class="adm-hint">{{ i18n.t('shiftsAdmin.overrideHint') }}</p>
+        <form class="adm-row" (ngSubmit)="createOverride()">
+          <label class="adm-field">
+            <span class="adm-label">{{ i18n.t('shiftsAdmin.replaces') }}</span>
+            <select class="adm-input" name="ovOriginal" [ngModel]="overrideOriginal()" (ngModelChange)="overrideOriginal.set($event)">
+              <option value="">{{ i18n.t('shiftsAdmin.anyone') }}</option>
+              @for (m of teamMembers(); track m.id) { <option [value]="m.id">{{ m.displayName }}</option> }
+            </select>
+          </label>
+          <label class="adm-field">
+            <span class="adm-label">{{ i18n.t('shiftsAdmin.replacement') }}</span>
+            <select class="adm-input" name="ovReplacement" [ngModel]="overrideReplacement()" (ngModelChange)="overrideReplacement.set($event)">
+              <option value="">{{ i18n.t('teams.pick') }}</option>
+              @for (m of teamMembers(); track m.id) { <option [value]="m.id">{{ m.displayName }}</option> }
+            </select>
+          </label>
+          <label class="adm-field"><span class="adm-label">{{ i18n.t('audit.range.from') }}</span><input class="adm-input" name="ovStart" type="datetime-local" [ngModel]="overrideStart()" (ngModelChange)="overrideStart.set($event)" /></label>
+          <label class="adm-field"><span class="adm-label">{{ i18n.t('audit.range.to') }}</span><input class="adm-input" name="ovEnd" type="datetime-local" [ngModel]="overrideEnd()" (ngModelChange)="overrideEnd.set($event)" /></label>
+          <label class="adm-field"><span class="adm-label">{{ i18n.t('shiftsAdmin.reason') }}</span><input class="adm-input" name="ovReason" [placeholder]="i18n.t('shiftsAdmin.pauseReason')" [ngModel]="overrideReason()" (ngModelChange)="overrideReason.set($event)" /></label>
+          <button type="submit" class="adm-btn" [disabled]="busy() || !overrideReplacement() || !overrideReason().trim() || !overrideStart() || !overrideEnd()"><mat-icon>swap_horiz</mat-icon>{{ i18n.t('shiftsAdmin.createOverride') }}</button>
+        </form>
+      </div>
+    }
+  } @else if (!teams().length) {
+    <p class="adm-empty">{{ i18n.t('shiftsAdmin.noTeams') }}</p>
+  }
+</section>
+
+<!-- ===== Notificaciones de dotación ===== -->
+<section class="adm-card">
+  <div class="adm-card__head">
+    <h3 class="adm-card__title"><mat-icon>forward_to_inbox</mat-icon>{{ i18n.t('shiftsAdmin.staffing') }} <span class="mono adm-secondary">{{ schedules().length }}</span></h3>
+  </div>
+  <p class="adm-card__note sa__lead">{{ i18n.t('shiftsAdmin.staffingHint') }}</p>
+  <div class="adm-table-wrap">
+    <table class="adm-table">
+      <thead><tr><th>{{ i18n.t('teams.name') }}</th><th>{{ i18n.t('shiftsAdmin.sends') }}</th><th>{{ i18n.t('shiftsAdmin.recipients') }}</th><th>{{ i18n.t('orgs.active') }}</th><th></th></tr></thead>
+      <tbody>
+        @for (s of schedules(); track s.id) {
+          <tr [class.adm-row--active]="editingScheduleId() === s.id">
+            <td><strong>{{ s.name }}</strong>@if (s.lastSentAt) { <span class="adm-small adm-secondary adm-block">{{ i18n.t('shiftsAdmin.lastSent') }} <span class="mono">{{ s.lastSentAt | date: 'dd/MM HH:mm' }}</span></span> }</td>
+            <td class="adm-small">{{ i18n.t(s.frequency === 'weekly' ? 'shiftsAdmin.weekly' : 'shiftsAdmin.monthly') }} · {{ weekday(s.dayOfWeek) }} <span class="mono">{{ s.sendTime }}</span></td>
+            <td class="adm-small adm-secondary">{{ s.recipients.join(', ') }}@if (s.ccRecipients.length) { <span class="adm-block">CC {{ s.ccRecipients.join(', ') }}</span> }</td>
+            <td>
+              <label class="switch">
+                <input class="switch__input" type="checkbox" role="switch" [checked]="s.enabled" [disabled]="busy()" (change)="toggleSchedule(s)" [attr.aria-label]="s.name" />
+                <span class="switch__track" aria-hidden="true"></span>
+              </label>
+            </td>
+            <td class="adm-num sa__row-actions">
+              <button type="button" class="adm-btn" [disabled]="busy()" (click)="testSchedule(s)"><mat-icon>send</mat-icon>{{ i18n.t('shiftsAdmin.test') }}</button>
+              <button type="button" class="adm-icon-btn" [title]="i18n.t('shiftsAdmin.edit')" [attr.aria-label]="i18n.t('shiftsAdmin.edit') + ' ' + s.name" (click)="beginScheduleEdit(s)"><mat-icon>edit</mat-icon></button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    @if (!schedules().length) { <p class="adm-empty">{{ i18n.t('shiftsAdmin.noStaffing') }}</p> }
+  </div>
+  <form class="adm-card__body sa__form" (ngSubmit)="saveSchedule()">
+    <span class="adm-label">{{ i18n.t(editingScheduleId() ? 'shiftsAdmin.editStaffing' : 'shiftsAdmin.newStaffing') }}</span>
+    <div class="adm-row">
+      <label class="adm-field"><span class="adm-label">{{ i18n.t('teams.name') }}</span><input class="adm-input" name="nsName" placeholder="Reporte de guardia RRHH" [ngModel]="nsName()" (ngModelChange)="nsName.set($event)" /></label>
+      <label class="adm-field adm-field--narrow">
+        <span class="adm-label">{{ i18n.t('shiftsAdmin.frequency') }}</span>
+        <select class="adm-input" name="nsFrequency" [ngModel]="nsFrequency()" (ngModelChange)="nsFrequency.set($event)">
+          <option value="weekly">{{ i18n.t('shiftsAdmin.weekly') }}</option>
+          <option value="monthly">{{ i18n.t('shiftsAdmin.monthly') }}</option>
+        </select>
+      </label>
+      <label class="adm-field adm-field--narrow">
+        <span class="adm-label">{{ i18n.t('shiftsAdmin.day') }}</span>
+        <select class="adm-input" name="nsDay" [ngModel]="nsDayOfWeek()" (ngModelChange)="nsDayOfWeek.set(+$event)">
+          @for (d of weekdays(); track $index) { <option [value]="$index">{{ d }}</option> }
+        </select>
+      </label>
+      <label class="adm-field adm-field--narrow"><span class="adm-label">{{ i18n.t('shiftsAdmin.time') }}</span><input class="adm-input mono" name="nsTime" type="time" [ngModel]="nsSendTime()" (ngModelChange)="nsSendTime.set($event)" /></label>
+    </div>
+    <div class="adm-row">
+      <label class="adm-field"><span class="adm-label">{{ i18n.t('shiftsAdmin.recipients') }}</span><input class="adm-input" name="nsRecipients" placeholder="rrhh@empresa.cl" [ngModel]="nsRecipients()" (ngModelChange)="nsRecipients.set($event)" /></label>
+      <label class="adm-field"><span class="adm-label">{{ i18n.t('shiftsAdmin.cc') }}</span><input class="adm-input" name="nsCc" [ngModel]="nsCc()" (ngModelChange)="nsCc.set($event)" /></label>
+      <label class="adm-field"><span class="adm-label">{{ i18n.t('shiftsAdmin.roleFilter') }}</span><input class="adm-input" name="nsRoleFilter" placeholder="Analista N1" [ngModel]="nsRoleFilter()" (ngModelChange)="nsRoleFilter.set($event)" /></label>
+    </div>
+    <span class="adm-hint">{{ i18n.t('shiftsAdmin.commaHint') }}</span>
+    <div class="sa__actions">
+      @if (editingScheduleId()) { <button type="button" class="adm-btn" (click)="cancelScheduleEdit()">{{ i18n.t('admin.discard') }}</button> }
+      <button type="submit" class="adm-btn adm-btn--primary" [disabled]="busy() || !nsName().trim() || !nsRecipients().trim()">
+        <mat-icon>{{ editingScheduleId() ? 'save' : 'add' }}</mat-icon>{{ i18n.t(editingScheduleId() ? 'admin.save' : 'shiftsAdmin.createStaffing') }}
+      </button>
+    </div>
+  </form>
+</section>

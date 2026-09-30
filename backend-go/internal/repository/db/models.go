@@ -1686,13 +1686,17 @@ type ShiftClosure struct {
 }
 
 type SmtpConfig struct {
-	ID                bool        `json:"id"`
-	Host              string      `json:"host"`
-	Port              int32       `json:"port"`
-	Username          pgtype.Text `json:"username"`
-	PasswordEncrypted pgtype.Text `json:"password_encrypted"`
-	FromAddress       string      `json:"from_address"`
-	RequireTls        bool        `json:"require_tls"`
+	ID                bool               `json:"id"`
+	Host              string             `json:"host"`
+	Port              int32              `json:"port"`
+	Username          pgtype.Text        `json:"username"`
+	PasswordEncrypted pgtype.Text        `json:"password_encrypted"`
+	FromAddress       string             `json:"from_address"`
+	RequireTls        bool               `json:"require_tls"`
+	FromName          pgtype.Text        `json:"from_name"`
+	LastTestAt        pgtype.Timestamptz `json:"last_test_at"`
+	LastTestOk        pgtype.Bool        `json:"last_test_ok"`
+	LastTestError     pgtype.Text        `json:"last_test_error"`
 }
 
 type SystemEvent struct {

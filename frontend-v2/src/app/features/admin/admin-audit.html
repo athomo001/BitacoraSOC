@@ -1,0 +1,157 @@
+<header class="aud__head">
+  <div>
+    <h2 class="aud__title">{{ i18n.t('admin.nav.audit') }}</h2>
+    <p class="aud__muted">{{ i18n.t('audit.subtitle') }}</p>
+  </div>
+  <app-button class="aud__push" icon="download" (pressed)="exportCsv()">
+    {{ exportLabel() }}
+  </app-button>
+</header>
+
+<section class="aud-card">
+  <div class="aud__bar">
+    <label class="aud__search">
+      <mat-icon>search</mat-icon>
+      <input #search type="search" [value]="query()" (input)="onSearch(search.value)" [placeholder]="i18n.t('audit.search')" [attr.aria-label]="i18n.t('audit.search')" />
+    </label>
+    <label class="aud__select" [class.aud__select--on]="level()">
+      <span>{{ i18n.t('audit.level') }}:</span>
+      <select #levelSel (change)="setFilter(level, $any(levelSel.value))">
+        @for (l of ['', 'warn', 'error', 'info']; track l) {
+          <option [value]="l" [selected]="level() === l">{{ i18n.t(levelKey(l || 'all')) }}</option>
+        }
+      </select>
+    </label>
+    <label class="aud__select" [class.aud__select--on]="result()">
+      <span>{{ i18n.t('audit.result') }}:</span>
+      <select #resultSel (change)="setFilter(result, $any(resultSel.value))">
+        <option value="" [selected]="!result()">{{ i18n.t('audit.result.all') }}</option>
+        <option value="fail" [selected]="result() === 'fail'">{{ i18n.t('audit.result.fail') }}</option>
+        <option value="ok" [selected]="result() === 'ok'">{{ i18n.t('audit.result.ok') }}</option>
+      </select>
+    </label>
+    <span class="aud__segs">
+      @for (r of ranges; track r) {
+        <button type="button" class="seg" [attr.aria-pressed]="range() === r" (click)="setFilter(range, r)">{{ i18n.t(rangeKey(r)) }}</button>
+      }
+    </span>
+    @if (range() === 'custom') {
+      <span class="aud__dates">
+        <label>{{ i18n.t('audit.range.from') }} <input type="date" class="aud__date" [value]="customFrom()" (change)="setFilter(customFrom, $any($event.target).value)" /></label>
+        <label>{{ i18n.t('audit.range.to') }} <input type="date" class="aud__date" [value]="customTo()" (change)="setFilter(customTo, $any($event.target).value)" /></label>
+      </span>
+    }
+  </div>
+
+  <div class="aud__cats" role="group" [attr.aria-label]="i18n.t('audit.categories')">
+    <button type="button" class="seg" [attr.aria-pressed]="category() === 'all'" (click)="setFilter(category, 'all')">{{ i18n.t('audit.cat.all') }}</button>
+    @for (c of categories; track c.id) {
+      <button type="button" class="seg" [attr.aria-pressed]="category() === c.id" (click)="setFilter(category, c.id)">{{ i18n.t(c.labelKey) }}</button>
+    }
+    @if (filtered()) {
+      <button type="button" class="aud__clear" (click)="clear(); search.value = ''">{{ i18n.t('audit.clear') }}</button>
+    }
+  </div>
+
+  @if (error()) {
+    <p class="msg msg--error aud__error" role="alert">{{ error() }}</p>
+  }
+
+  <div class="aud__body">
+    <div class="aud__list" [class.aud__list--loading]="loading()">
+      <div class="aud__table-wrap">
+        <table class="aud-table">
+          <thead>
+            <tr>
+              <th>{{ i18n.t('audit.col.when') }}</th>
+              <th>{{ i18n.t('audit.col.event') }}</th>
+              <th>{{ i18n.t('audit.col.actor') }}</th>
+              <th>{{ i18n.t('audit.col.ip') }}</th>
+              <th>{{ i18n.t('audit.col.result') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of records(); track r.id) {
+              <tr class="aud-row" [class.aud-row--active]="selectedId() === r.id" tabindex="0" [attr.aria-selected]="selectedId() === r.id"
+                (click)="selectedId.set(r.id)" (keydown.enter)="selectedId.set(r.id)">
+                <td class="mono aud__when">{{ r.timestamp | date: 'dd/MM HH:mm:ss' }}</td>
+                <td>
+                  <span class="aud__event">
+                    <span class="pill" [class]="categoryTone(r.event)">{{ i18n.t(categoryKey(r.event)) }}</span>
+                    <span class="mono">{{ r.event }}</span>
+                    @if (r.level === 'warn') { <mat-icon class="text-warn" [title]="i18n.t('audit.level.warn')">warning</mat-icon> }
+                    @if (r.level === 'error') { <mat-icon class="text-bad" [title]="i18n.t('audit.level.error')">error</mat-icon> }
+                  </span>
+                </td>
+                <td>
+                  <strong>{{ r.actorUsername || i18n.t('audit.system') }}</strong>
+                  @if (roleKey(r.actorRole); as role) { <small class="aud__muted"> {{ i18n.t(role) }}</small> }
+                </td>
+                <td class="mono aud__secondary">
+                  {{ r.requestIp || '—' }}
+                  @if (r.ipChanged) { <mat-icon class="text-warn aud__swap" [title]="i18n.t('audit.ipChanged')">swap_horiz</mat-icon> }
+                </td>
+                <td><span class="pill" [class]="r.success ? 'tone-ok' : 'tone-bad'">{{ i18n.t(r.success ? 'audit.result.ok' : 'audit.result.fail') }}</span></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+        @if (!records().length && !loading() && !error()) {
+          <p class="aud__empty">{{ i18n.t('audit.empty') }}</p>
+        }
+      </div>
+
+      <footer class="aud__pager">
+        <span class="mono">{{ rangeLabel() }}</span>
+        <span class="aud__push aud__sizes">
+          <span class="aud__muted">{{ i18n.t('audit.perPage') }}</span>
+          @for (n of pageSizes; track n) {
+            <button type="button" class="seg" [attr.aria-pressed]="pageSize() === n" (click)="setFilter(pageSize, n)">{{ n }}</button>
+          }
+        </span>
+        <button type="button" class="aud__page" [attr.aria-label]="i18n.t('audit.prev')" [disabled]="page() <= 1" (click)="goPage(-1)"><mat-icon>chevron_left</mat-icon></button>
+        <span class="mono">{{ page() }} / {{ pages() }}</span>
+        <button type="button" class="aud__page" [attr.aria-label]="i18n.t('audit.next')" [disabled]="page() >= pages()" (click)="goPage(1)"><mat-icon>chevron_right</mat-icon></button>
+      </footer>
+    </div>
+
+    <aside class="aud__detail">
+      @if (selected(); as d) {
+        <div class="aud__pills">
+          <span class="pill" [class]="categoryTone(d.event)">{{ i18n.t(categoryKey(d.event)) }}</span>
+          <span class="pill" [class]="d.success ? 'tone-ok' : 'tone-bad'">{{ i18n.t(d.success ? 'audit.result.ok' : 'audit.result.fail') }}</span>
+          <span class="pill" [class]="d.level === 'error' ? 'tone-bad' : d.level === 'warn' ? 'tone-warn' : 'tone-neutral'">{{ i18n.t(levelKey(d.level)) }}</span>
+        </div>
+        <div class="mono aud__detail-event">{{ d.event }}</div>
+        <div class="aud__field"><span class="aud__label">{{ i18n.t('audit.d.when') }}</span><span class="mono">{{ d.timestamp | date: 'dd/MM/yyyy HH:mm:ss' }} ({{ timeZone }})</span></div>
+        <div class="aud__field">
+          <span class="aud__label">{{ i18n.t('audit.d.who') }}</span>
+          <span>{{ d.actorUsername || i18n.t('audit.system') }}@if (roleKey(d.actorRole); as role) { <span class="aud__muted"> · {{ i18n.t(role) }}</span> }</span>
+        </div>
+        @if (d.reason) {
+          <div class="aud__field"><span class="aud__label">{{ i18n.t('audit.d.reason') }}</span><span class="text-bad">{{ d.reason }}</span></div>
+        }
+        <div class="aud__field">
+          <span class="aud__label">{{ i18n.t('audit.d.where') }}</span>
+          <span class="mono">{{ d.requestIp || '—' }}</span>
+          @if (d.ipChanged) { <span class="aud__small text-warn">{{ i18n.t('audit.d.prevIp') }} <span class="mono">{{ d.previousIp }}</span></span> }
+          @if (d.userAgent) { <span class="aud__small aud__muted aud__break">{{ d.userAgent }}</span> }
+        </div>
+        @if (d.requestPath) {
+          <div class="aud__field">
+            <span class="aud__label">{{ i18n.t('audit.d.request') }}</span>
+            <span class="mono aud__small aud__break">{{ d.requestMethod }} {{ d.requestPath }}</span>
+            @if (d.requestId) { <span class="mono aud__small aud__muted">id {{ d.requestId }}</span> }
+          </div>
+        }
+        <div class="aud__field">
+          <span class="aud__label">{{ i18n.t('audit.d.data') }}</span>
+          <pre class="mono aud__json">{{ metadata(d) }}</pre>
+        </div>
+        <p class="aud__small aud__muted">{{ i18n.t('audit.d.secrets') }}</p>
+      } @else {
+        <p class="aud__muted">{{ i18n.t('audit.d.pick') }}</p>
+      }
+    </aside>
+  </div>
+</section>

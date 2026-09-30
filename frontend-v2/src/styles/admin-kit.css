@@ -1,0 +1,330 @@
+/*
+ * Piezas comunes de las secciones de Administración re-vestidas según el
+ * artboard aprobado "Administración" (mismas medidas que Checklist y Correo).
+ * Global (como pills.css y forms.css): una tarjeta, un campo o un botón se
+ * ven igual en todas las secciones sin copiar el CSS en cada componente.
+ */
+
+/* Encabezado de la sección */
+.adm-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.adm-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.adm-muted {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.adm-secondary {
+  color: var(--text-secondary);
+}
+
+.adm-small {
+  font-size: 11px;
+}
+
+.adm-push {
+  margin-left: auto;
+}
+
+/* Tarjeta */
+.adm-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.adm-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.adm-card__title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.adm-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.adm-card__note {
+  margin: 0;
+  padding: 10px 14px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* Campos */
+.adm-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.adm-field {
+  display: flex;
+  flex: 1 1 180px;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.adm-field--narrow {
+  flex: 0 0 110px;
+}
+
+/* Un campo suelto en una columna (no dentro de .adm-row) no debe heredar el
+ * flex-basis de 180px: en una columna ese valor es alto, no ancho. */
+.adm-card__body > .adm-field {
+  flex: 0 0 auto;
+}
+
+.adm-label {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.adm-input {
+  width: 100%;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+}
+
+textarea.adm-input {
+  min-height: 64px;
+  padding: 6px 9px;
+  resize: vertical;
+}
+
+.adm-input:focus-visible {
+  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+}
+
+.adm-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+/* Botones (orden: base → deshabilitado → foco → hover, para que ningún
+ * selector más débil quede después de uno más fuerte) */
+.adm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.adm-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.adm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.adm-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.adm-btn:focus-visible,
+.adm-icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.adm-btn:hover:not(:disabled) {
+  background: var(--bg-surface-hover);
+}
+
+.adm-icon-btn:hover:not(:disabled) {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.adm-btn--primary,
+.adm-btn--primary:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.adm-btn--danger {
+  color: var(--status-critical);
+}
+
+.adm-icon-btn--danger:hover:not(:disabled) {
+  color: var(--status-critical);
+}
+
+/* Tabla densa */
+.adm-table-wrap {
+  overflow-x: auto;
+}
+
+.adm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.adm-table th {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.adm-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+
+.adm-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.adm-table .adm-num {
+  text-align: right;
+}
+
+.adm-row-click {
+  cursor: pointer;
+}
+
+.adm-row-click:hover {
+  background: var(--bg-surface-hover);
+}
+
+.adm-row-click:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.adm-row--active,
+.adm-row--active:hover {
+  background: var(--accent-soft);
+}
+
+.adm-empty {
+  margin: 0;
+  padding: 20px 14px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* Pie con estado y acciones de guardado */
+.adm-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.adm-foot__status {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+/* Fila con interruptor y texto */
+.adm-switch-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.adm-strong {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.adm-block {
+  display: block;
+}
+
+.adm-error {
+  margin: 0;
+  color: var(--status-critical);
+  font-size: 11.5px;
+}
+
+/* Lista + detalle (tarjeta izquierda con lista, derecha con el elegido) */
+.adm-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (width <= 1000px) {
+  .adm-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

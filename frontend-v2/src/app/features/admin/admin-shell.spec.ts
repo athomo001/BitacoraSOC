@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { AdminShellComponent } from './admin-shell';
 
 describe('AdminShellComponent', () => {
@@ -41,6 +41,32 @@ describe('AdminShellComponent', () => {
     expect(el.querySelector('app-admin-audit')).toBeTruthy();
     expect(input.value).toBe('');
     expect(localStorage.getItem('bitacora.admin.section')).toBe('audit');
+  });
+
+  /** Responde el estado de la instalación y el usuario admin que pide ModuleAccessService. */
+  async function answerModules(fixture: { detectChanges(): void }, flags: { socEnabled: boolean; nocEnabled: boolean }) {
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne('/api/setup/status').flush({ data: { setupCompleted: true, ...flags } });
+    http.expectOne('/api/users/me').flush({ data: { id: 'u1', username: 'admin', role: 'admin' } });
+    http.expectOne('/api/users/me/capabilities').flush({ data: { moduleScope: 'both', capabilities: [] } });
+    await settle();
+    fixture.detectChanges();
+  }
+
+  it('con NOC apagado, Territorio no aparece (ni un aviso de "desactivado") y la sección recordada cae en Usuarios y grupos', async () => {
+    localStorage.setItem('bitacora.admin.section', 'territory');
+    const { fixture, el, items } = render();
+    await answerModules(fixture, { socEnabled: true, nocEnabled: false });
+    expect(items()).not.toContain('Territorio');
+    expect(el.textContent).not.toMatch(/desactivad/i);
+    expect(el.querySelector('app-admin-territory')).toBeNull();
+    expect(el.querySelector('[aria-current="page"]')?.textContent).toContain('Usuarios y grupos');
+  });
+
+  it('con NOC encendido, Territorio aparece en Catálogos', async () => {
+    const { fixture, items } = render();
+    await answerModules(fixture, { socEnabled: false, nocEnabled: true });
+    expect(items()).toContain('Territorio');
   });
 
   it('Ctrl+K enfoca el buscador', () => {

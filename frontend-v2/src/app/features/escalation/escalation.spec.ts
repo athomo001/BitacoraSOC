@@ -43,10 +43,32 @@ describe('EscalationComponent (tarjetas de escalación)', () => {
     httpMock = TestBed.inject(HttpTestingController);
   });
 
+  /** Estado de la instalación + usuario analista con su alcance SOC/NOC efectivo. */
+  function answerModules(flags: { socEnabled: boolean; nocEnabled: boolean }, moduleScope: string) {
+    httpMock.expectOne('/api/setup/status').flush({ data: { setupCompleted: true, ...flags } });
+    httpMock.expectOne('/api/users/me').flush({ data: { id: 'u1', username: 'ana', role: 'user' } });
+    httpMock.expectOne('/api/users/me/capabilities').flush({ data: { moduleScope, capabilities: [] } });
+  }
+
+  it('sin NOC en el alcance del analista no ofrece activos ni unidades ni los pide', async () => {
+    const fixture = TestBed.createComponent(EscalationComponent);
+    fixture.detectChanges();
+    answerModules({ socEnabled: true, nocEnabled: true }, 'soc');
+    await tick();
+    httpMock.expectOne('/api/services').flush({ data: [] });
+    httpMock.expectNone('/api/assets');
+    httpMock.expectNone((r) => r.url === '/api/territorial-units');
+    await tick();
+    fixture.detectChanges();
+    const tabs = [...(fixture.nativeElement as HTMLElement).querySelectorAll('.esc__kind')].map((t) => t.textContent?.trim());
+    expect(tabs).toEqual(['Servicio (SOC)']);
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toMatch(/desactivad/i);
+  });
+
   async function renderResolved() {
     const fixture = TestBed.createComponent(EscalationComponent);
     fixture.detectChanges();
-    httpMock.expectOne('/api/setup/status').flush({ data: { setupCompleted: true, socEnabled: false, nocEnabled: true } });
+    answerModules({ socEnabled: false, nocEnabled: true }, 'noc');
     await tick();
     httpMock.expectOne('/api/assets').flush({ data: [{ id: 'a1', type: 'device', name: 'Router Calama 1', code: 'RT-CAL-01', territorialUnitId: 'u-cal' }] });
     httpMock.expectOne((r) => r.url === '/api/territorial-units').flush({ data: [], meta: { page: 1, pageSize: 5000, total: 0 } });

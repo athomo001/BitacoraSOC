@@ -160,13 +160,28 @@ export interface MaintenanceWindow extends EscalationScope {
   active: boolean;
 }
 
+export interface ShiftReportDelivery {
+  id: string;
+  shiftEndAt: string | null;
+  status: 'pending' | 'success' | 'failed' | 'skipped';
+  error: string | null;
+  sentAt: string | null;
+  closedBy: string;
+  shiftName: string | null;
+  recipients: string[];
+}
+
 export interface SmtpConfig {
   host: string;
   port: number;
   username: string;
   fromAddress: string;
+  /** Nombre visible del remitente ("Bitácora Ops <noc@empresa.cl>"); vacío = solo la dirección. */
+  fromName: string;
   requireTls: boolean;
   hasPassword: boolean;
+  /** Última prueba de envío; null si nunca se probó. */
+  lastTest: { at: string; ok: boolean; error?: string } | null;
 }
 
 function scopeParams(scope: EscalationScope): Record<string, string> {
@@ -275,12 +290,24 @@ export class EscalationService {
     }
   }
 
-  async putSmtp(config: { host: string; port: number; username?: string; password?: string; fromAddress: string; requireTls: boolean }): Promise<SmtpConfig> {
+  async putSmtp(config: { host: string; port: number; username?: string; password?: string; fromAddress: string; fromName: string; requireTls: boolean }): Promise<SmtpConfig> {
     return (await firstValueFrom(this.http.put<ApiEnvelope<SmtpConfig>>('/api/config/smtp', config))).data;
   }
 
-  async testSmtp(to: string): Promise<void> {
-    await firstValueFrom(this.http.post('/api/config/smtp/test-send', { to }));
+  /** El backend responde 502 con el error del servidor de correo en el cuerpo: se devuelve para mostrarlo tal cual. */
+  async testSmtp(to: string): Promise<{ sent: boolean; error?: string }> {
+    try {
+      return (await firstValueFrom(this.http.post<ApiEnvelope<{ sent: boolean; error?: string }>>('/api/config/smtp/test-send', { to }))).data;
+    } catch (error) {
+      const body = error instanceof HttpErrorResponse ? error.error : null;
+      if (body?.data && typeof body.data.sent === 'boolean') return body.data as { sent: boolean; error?: string };
+      throw error;
+    }
+  }
+
+  /** Últimos 20 cierres de turno y cómo salió su reporte por correo. */
+  async recentShiftReports(): Promise<ShiftReportDelivery[]> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<ShiftReportDelivery[]>>('/api/reports/shift/recent'))).data;
   }
 
   async dispatchPendingShiftReports(): Promise<void> {

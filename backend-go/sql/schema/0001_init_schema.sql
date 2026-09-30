@@ -1127,3 +1127,9 @@ ALTER TABLE app_config RENAME COLUMN shift_check_cooldown_hours TO shift_check_c
 ALTER TABLE app_config ALTER COLUMN shift_check_cooldown_minutes SET DEFAULT 60;
 ALTER TABLE app_config ADD CONSTRAINT chk_shift_check_cooldown_minutes CHECK (shift_check_cooldown_minutes BETWEEN 0 AND 1440);
 ALTER TABLE users ADD COLUMN last_login_at TIMESTAMPTZ;
+
+-- Migración 000010: remitente con nombre y última prueba de envío (Administración → Correo).
+ALTER TABLE smtp_config ADD COLUMN from_name TEXT;
+ALTER TABLE smtp_config ADD COLUMN last_test_at TIMESTAMPTZ;
+ALTER TABLE smtp_config ADD COLUMN last_test_ok BOOLEAN;
+ALTER TABLE smtp_config ADD COLUMN last_test_error TEXT;

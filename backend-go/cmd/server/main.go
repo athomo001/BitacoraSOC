@@ -361,6 +361,7 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/rotation-overrides", admin(rotationHandler.CreateOverride))
 	mux.Handle("GET /api/work-shifts", authed(rotationHandler.ListWorkShifts))
 	mux.Handle("POST /api/work-shifts", admin(rotationHandler.CreateWorkShift))
+	mux.Handle("PATCH /api/work-shifts/{id}", admin(rotationHandler.PatchWorkShift))
 
 	// Checklists y cierre de turno (Fase 11).
 	mux.Handle("GET /api/checklist-templates/active", authed(checklistsHandler.ActiveTemplates))
@@ -452,6 +453,7 @@ func run(logger *slog.Logger) error {
 	}, Schedules: func(ctx context.Context, sender *mail.Sender) error {
 		return dotacionHandler.DispatchDueSchedules(ctx, sender)
 	}}
+	mux.Handle("GET /api/reports/shift/recent", admin(checklistsHandler.RecentReports))
 	mux.Handle("POST /api/reports/shift/dispatch", admin(func(w http.ResponseWriter, r *http.Request) {
 		if err := reportDispatcher.DispatchPending(r.Context()); err != nil {
 			auditLog.Log(r.Context(), "report.shift.dispatch", audit.LevelError, audit.Failure(err.Error()), nil)

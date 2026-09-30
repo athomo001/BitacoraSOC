@@ -37,6 +37,7 @@ func buildMailSender(ctx context.Context, queries *db.Queries, box *crypto.Box) 
 		Username:    username,
 		Password:    password,
 		FromAddress: config.FromAddress,
+		FromName:    config.FromName.String,
 		RequireTLS:  config.RequireTls,
 	})
 	return sender, config.FromAddress, nil

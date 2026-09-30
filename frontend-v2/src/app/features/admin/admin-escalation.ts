@@ -1,11 +1,11 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
+import { MatIconModule } from '@angular/material/icon';
 import {
   Asset,
   EscalationScope,
   EscalationService,
-  MODE_LABELS,
   MaintenanceWindow,
   Policy,
   SocService,
@@ -14,222 +14,58 @@ import {
 import { Organization, OrganizationsService, TeamSummary } from '../../core/organizations/organizations.service';
 import { TerritoryService } from '../../core/territory/territory.service';
 import { TerritorialUnit } from '../../core/territory/territory.models';
-import { SetupService } from '../../core/setup/setup.service';
+import { ModuleAccessService } from '../../core/auth/module-access.service';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
 
 type ScopeKind = 'asset' | 'unit' | 'service';
+const MODES: readonly StepMode[] = ['unique', 'sequential', 'pool'];
 
 /**
- * Administración del motor de escalación (Fase 7): políticas por servicio
- * (SOC), activo o unidad territorial (NOC) con sus pasos → equipo, servicios
- * SOC y ventanas de mantenimiento. Portado en espíritu de la pestaña
- * "Flujo" y de "Mantenimientos" del legacy (escalation-flow-tab /
- * escalation-simple), pero sobre equipos en vez de contactos sueltos por paso.
+ * Administración del motor de escalación (Fase 7), re-vestido con los
+ * componentes del artboard "Administración": políticas a la izquierda y los
+ * pasos de la elegida a la derecha, servicios SOC y ventanas de
+ * mantenimiento. Portado en espíritu de "Flujo" y "Mantenimientos" del
+ * legacy, pero sobre equipos en vez de contactos sueltos por paso. Solo
+ * ofrece los destinos de los módulos que aplican (sin avisos de "apagado").
  */
 @Component({
   selector: 'app-admin-escalation',
   standalone: true,
-  imports: [FormsModule, DatePipe],
+  imports: [FormsModule, DatePipe, MatIconModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    @if (error()) { <p class="msg msg--error">{{ error() }}</p> }
-
-    <section class="panel">
-      <h2 class="panel__title">Políticas de escalación</h2>
-      <p class="panel__hint">
-        Orden de resolución: política propia del activo → política de su zona (de la más específica a la más general) →
-        equipos que cubren la zona. Un servicio SOC usa su propia política.
-      </p>
-      <form class="field-grid esc-form" (ngSubmit)="createPolicy()">
-        <label class="field">
-          <span>Aplica a</span>
-          <select name="policyKind" [ngModel]="policyKind()" (ngModelChange)="policyKind.set($event); policyTarget.set('')">
-            @if (nocEnabled()) { <option value="asset">Activo</option><option value="unit">Unidad territorial</option> }
-            @if (socEnabled()) { <option value="service">Servicio SOC</option> }
-          </select>
-        </label>
-        <label class="field">
-          <span>Destino</span>
-          <select name="policyTarget" [ngModel]="policyTarget()" (ngModelChange)="policyTarget.set($event)">
-            <option value="">Elegir…</option>
-            @for (o of targetOptions(); track o.id) { <option [value]="o.id">{{ o.label }}</option> }
-          </select>
-        </label>
-        <div class="actions esc-form__actions"><button type="submit" class="esc-submit" [disabled]="!policyTarget()">Crear política</button></div>
-      </form>
-
-      <table class="esc-table">
-        <thead><tr><th>Aplica a</th><th>Pasos</th><th></th></tr></thead>
-        <tbody>
-          @for (p of policies(); track p.id) {
-            <tr class="esc-row" [class.esc-row--selected]="selectedId() === p.id" (click)="selectedId.set(p.id)">
-              <td><strong>{{ scopeLabel(p) }}</strong></td>
-              <td>{{ stepsSummary(p) }}</td>
-              <td><button type="button" class="esc-btn" (click)="$event.stopPropagation(); deletePolicy(p)">Eliminar</button></td>
-            </tr>
-          } @empty {
-            <tr><td colspan="3" class="esc-empty">Todavía no hay políticas. Sin política, un activo usa la cobertura de equipos de su zona.</td></tr>
-          }
-        </tbody>
-      </table>
-    </section>
-
-    @if (selected(); as p) {
-      <section class="panel">
-        <h2 class="panel__title">{{ scopeLabel(p) }} — pasos</h2>
-        <table class="esc-table">
-          <thead><tr><th>Paso</th><th>Equipo</th><th>Modo</th><th>Esperar</th><th></th></tr></thead>
-          <tbody>
-            @for (s of p.steps; track s.stepOrder) {
-              <tr>
-                <td class="mono">{{ s.stepOrder }}</td>
-                <td>{{ s.teamName }}</td>
-                <td>{{ modeLabels[s.mode] }}</td>
-                <td class="mono">{{ s.waitBeforeEscalateMinutes }} min</td>
-                <td><button type="button" class="esc-btn" (click)="deleteStep(p, s.stepOrder)">Quitar</button></td>
-              </tr>
-            } @empty {
-              <tr><td colspan="5" class="esc-empty">Sin pasos: agrega al menos uno.</td></tr>
-            }
-          </tbody>
-        </table>
-        <form class="field-grid esc-form" (ngSubmit)="addStep(p)">
-          <label class="field"><span>Paso</span><input name="stepOrder" type="number" min="1" [ngModel]="stepOrder()" (ngModelChange)="stepOrder.set(+$event)" /></label>
-          <label class="field">
-            <span>Equipo</span>
-            <select name="stepTeam" [ngModel]="stepTeam()" (ngModelChange)="stepTeam.set($event)">
-              <option value="">Elegir…</option>
-              @for (t of teams(); track t.id) { <option [value]="t.id">{{ t.name }}{{ t.organizationName ? ' — ' + t.organizationName : '' }}</option> }
-            </select>
-          </label>
-          <label class="field">
-            <span>Modo</span>
-            <select name="stepMode" [ngModel]="stepMode()" (ngModelChange)="stepMode.set($event)">
-              <option value="unique">Único (el principal)</option>
-              <option value="sequential">Uno tras otro</option>
-              <option value="pool">Todos a la vez</option>
-            </select>
-          </label>
-          <label class="field"><span>Esperar (min)</span><input name="stepWait" type="number" min="0" [ngModel]="stepWait()" (ngModelChange)="stepWait.set(+$event)" /></label>
-          <div class="actions esc-form__actions"><button type="submit" class="esc-submit" [disabled]="!stepTeam()">Agregar paso</button></div>
-        </form>
-      </section>
-    }
-
-    @if (socEnabled()) {
-      <section class="panel">
-        <h2 class="panel__title">Servicios SOC</h2>
-        <p class="panel__hint">El servicio que se monitorea para un cliente (SIEM, EDR, firewall…). Cada uno puede tener su política.</p>
-        <form class="field-grid esc-form" (ngSubmit)="createService()">
-          <label class="field">
-            <span>Cliente</span>
-            <select name="svcOrg" [ngModel]="svcOrg()" (ngModelChange)="svcOrg.set($event)">
-              <option value="">Elegir…</option>
-              @for (o of clients(); track o.id) { <option [value]="o.id">{{ o.name }}</option> }
-            </select>
-          </label>
-          <label class="field"><span>Nombre</span><input name="svcName" placeholder="SIEM Cliente A" [ngModel]="svcName()" (ngModelChange)="svcName.set($event)" /></label>
-          <label class="field"><span>Código</span><input name="svcCode" placeholder="SIEM-A" [ngModel]="svcCode()" (ngModelChange)="svcCode.set($event)" /></label>
-          <div class="actions esc-form__actions"><button type="submit" class="esc-submit" [disabled]="!svcOrg() || !svcName().trim()">Crear servicio</button></div>
-        </form>
-        <table class="esc-table">
-          <thead><tr><th>Servicio</th><th>Código</th><th>Cliente</th></tr></thead>
-          <tbody>
-            @for (s of services(); track s.id) {
-              <tr><td>{{ s.name }}</td><td class="mono">{{ s.code }}</td><td>{{ s.organizationName }}</td></tr>
-            } @empty {
-              <tr><td colspan="3" class="esc-empty">Sin servicios.</td></tr>
-            }
-          </tbody>
-        </table>
-      </section>
-    }
-
-    <section class="panel">
-      <h2 class="panel__title">Ventanas de mantenimiento</h2>
-      <p class="panel__hint">
-        Con supresión, el aviso por correo no se envía mientras la ventana está vigente (queda auditado igual). Una ventana
-        sobre una zona cubre a todos sus activos.
-      </p>
-      <form class="field-grid esc-form" (ngSubmit)="createWindow()">
-        <label class="field">
-          <span>Aplica a</span>
-          <select name="winKind" [ngModel]="winKind()" (ngModelChange)="winKind.set($event); winTarget.set('')">
-            @if (nocEnabled()) { <option value="asset">Activo</option><option value="unit">Unidad territorial</option> }
-            @if (socEnabled()) { <option value="service">Servicio SOC</option> }
-          </select>
-        </label>
-        <label class="field">
-          <span>Destino</span>
-          <select name="winTarget" [ngModel]="winTarget()" (ngModelChange)="winTarget.set($event)">
-            <option value="">Elegir…</option>
-            @for (o of winOptions(); track o.id) { <option [value]="o.id">{{ o.label }}</option> }
-          </select>
-        </label>
-        <label class="field"><span>Título</span><input name="winTitle" placeholder="Mantención troncal Calama" [ngModel]="winTitle()" (ngModelChange)="winTitle.set($event)" /></label>
-        <label class="field"><span>Desde</span><input name="winStart" type="datetime-local" [ngModel]="winStart()" (ngModelChange)="winStart.set($event)" /></label>
-        <label class="field"><span>Hasta</span><input name="winEnd" type="datetime-local" [ngModel]="winEnd()" (ngModelChange)="winEnd.set($event)" /></label>
-        <label class="field esc-check">
-          <input name="winSuppress" type="checkbox" [ngModel]="winSuppress()" (ngModelChange)="winSuppress.set($event)" />
-          <span>Suprimir avisos por correo</span>
-        </label>
-        <div class="actions esc-form__actions">
-          <button type="submit" class="esc-submit" [disabled]="!winTarget() || !winTitle().trim() || !winStart() || !winEnd()">Programar ventana</button>
-        </div>
-      </form>
-      <table class="esc-table">
-        <thead><tr><th>Título</th><th>Aplica a</th><th>Desde</th><th>Hasta</th><th>Supresión</th><th></th></tr></thead>
-        <tbody>
-          @for (w of windows(); track w.id) {
-            <tr [class.esc-row--inactive]="!w.active">
-              <td>{{ w.title }}</td>
-              <td>{{ scopeLabel(w) }}</td>
-              <td class="mono">{{ w.startsAt | date: 'dd/MM/yy HH:mm' }}</td>
-              <td class="mono">{{ w.endsAt | date: 'dd/MM/yy HH:mm' }}</td>
-              <td>{{ w.suppressNotifications ? 'Sí' : 'No (informativa)' }}</td>
-              <td>@if (w.active) { <button type="button" class="esc-btn" (click)="closeWindow(w)">Cerrar</button> } @else { <span class="esc-empty">Cerrada</span> }</td>
-            </tr>
-          } @empty {
-            <tr><td colspan="6" class="esc-empty">Sin ventanas programadas.</td></tr>
-          }
-        </tbody>
-      </table>
-    </section>
-  `,
+  templateUrl: './admin-escalation.html',
   styles: `
     :host { display: flex; flex-direction: column; gap: 16px; }
-    .esc-form { align-items: end; margin: 12px 0; }
-    .esc-form__actions { margin-top: 0; }
-    .esc-check { flex-direction: row; align-items: center; gap: 6px; min-height: var(--row-height); }
-    .esc-submit {
-      min-height: var(--row-height); padding: 0 14px; background: var(--border-active); border: none;
-      border-radius: var(--radius-sm); color: var(--bg-app); font: inherit; font-weight: 600; cursor: pointer;
-    }
-    .esc-submit[disabled] { opacity: 0.6; cursor: default; }
-    .esc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .esc-table th { padding: 6px 8px; border-bottom: 1px solid var(--border-subtle); color: var(--text-muted); font-size: 11px; text-align: left; }
-    .esc-table td { height: var(--row-height); padding: 4px 8px; border-bottom: 1px solid var(--border-subtle); }
-    .esc-row { cursor: pointer; }
-    .esc-row:hover td, .esc-row--selected td { background: var(--bg-surface-hover); }
-    .esc-row--selected td:first-child { box-shadow: inset 2px 0 0 var(--border-active); }
-    .esc-row--inactive td { color: var(--text-muted); }
-    .esc-empty { color: var(--text-secondary); text-align: center; }
-    .esc-btn {
-      min-height: 28px; padding: 0 10px; background: none; border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-sm); color: var(--text-primary); font: inherit; font-size: 12px; cursor: pointer;
-    }
+    mat-icon { width: 16px; height: 16px; font-size: 16px; }
+    .ea__lead { padding-bottom: 0; }
+    .ea__form { padding: 12px 14px; border-bottom: 1px solid var(--border-subtle); }
+    .ea__name { margin-top: 3px; }
+    .ea__step-form { border-top: 1px solid var(--border-subtle); }
+    .ea__win-form { border-bottom: 1px solid var(--border-subtle); }
+    .ea__actions { display: flex; justify-content: flex-end; }
+    .ea__confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
+    .ea__suppress { align-self: center; flex: 0 0 auto; }
+    .ea__inactive td { color: var(--text-muted); }
   `,
 })
 export class AdminEscalationComponent implements OnInit {
-  protected readonly modeLabels = MODE_LABELS;
+  protected readonly i18n = inject(I18nService);
+  protected readonly modes = MODES;
   private readonly api = inject(EscalationService);
   private readonly orgs = inject(OrganizationsService);
   private readonly territory = inject(TerritoryService);
-  private readonly setup = inject(SetupService);
+  private readonly modules = inject(ModuleAccessService);
 
-  protected readonly socEnabled = computed(() => this.setup.status()?.socEnabled ?? false);
-  protected readonly nocEnabled = computed(() => this.setup.status()?.nocEnabled ?? false);
+  protected readonly socEnabled = this.modules.soc;
+  protected readonly nocEnabled = this.modules.noc;
   protected readonly error = signal<string | null>(null);
+  protected readonly busy = signal(false);
+  protected readonly confirmDelete = signal(false);
+
+  /** Destinos posibles según los módulos que aplican. */
+  protected readonly kinds = computed<ScopeKind[]>(() => [...(this.nocEnabled() ? (['asset', 'unit'] as const) : []), ...(this.socEnabled() ? (['service'] as const) : [])]);
 
   protected readonly policies = signal<Policy[]>([]);
   protected readonly teams = signal<TeamSummary[]>([]);
@@ -262,7 +98,7 @@ export class AdminEscalationComponent implements OnInit {
   protected readonly winOptions = computed(() => this.optionsFor(this.winKind()));
 
   async ngOnInit(): Promise<void> {
-    await this.setup.loadStatus();
+    await this.modules.load();
     if (!this.nocEnabled()) {
       this.policyKind.set('service');
       this.winKind.set('service');
@@ -297,22 +133,47 @@ export class AdminEscalationComponent implements OnInit {
     return { serviceId: id };
   }
 
-  protected scopeLabel(s: EscalationScope): string {
+  protected kindOf(s: EscalationScope): ScopeKind {
+    if (s.assetId) return 'asset';
+    if (s.territorialUnitId) return 'unit';
+    return 'service';
+  }
+
+  protected kindKey(kind: ScopeKind): MessageKey {
+    return `escAdmin.kind.${kind}` as MessageKey;
+  }
+
+  protected modeKey(mode: StepMode): MessageKey {
+    return `escAdmin.mode.${mode}` as MessageKey;
+  }
+
+  protected modeHintKey(mode: StepMode): MessageKey {
+    return `escAdmin.modeHint.${mode}` as MessageKey;
+  }
+
+  /** El nombre del activo, zona o servicio al que apunta. */
+  protected targetName(s: EscalationScope): string {
     if (s.assetId) {
       const a = this.assets().find((x) => x.id === s.assetId);
-      return `Activo: ${a ? a.name : s.assetId}`;
+      return a ? a.name : s.assetId;
     }
     if (s.territorialUnitId) {
       const u = this.units().find((x) => x.id === s.territorialUnitId);
-      return `Zona: ${u ? `${u.name} (${u.code})` : s.territorialUnitId}`;
+      return u ? `${u.name} (${u.code})` : s.territorialUnitId;
     }
     const svc = this.services().find((x) => x.id === s.serviceId);
-    return `Servicio: ${svc ? svc.name : s.serviceId}`;
+    return svc ? svc.name : (s.serviceId ?? '');
   }
 
   protected stepsSummary(p: Policy): string {
-    if (p.steps.length === 0) return 'sin pasos';
+    if (p.steps.length === 0) return this.i18n.t('escAdmin.noStepsShort');
     return p.steps.map((s) => `${s.stepOrder}. ${s.teamName}`).join(' → ');
+  }
+
+  protected select(p: Policy): void {
+    this.selectedId.set(p.id);
+    this.confirmDelete.set(false);
+    this.stepOrder.set((p.steps.at(-1)?.stepOrder ?? 0) + 1);
   }
 
   protected async createPolicy(): Promise<void> {
@@ -326,7 +187,7 @@ export class AdminEscalationComponent implements OnInit {
   }
 
   protected async deletePolicy(p: Policy): Promise<void> {
-    if (!confirm(`¿Eliminar la política de ${this.scopeLabel(p)}?`)) return;
+    this.confirmDelete.set(false);
     await this.run(async () => {
       await this.api.deletePolicy(p.id);
       if (this.selectedId() === p.id) this.selectedId.set(null);
@@ -395,10 +256,13 @@ export class AdminEscalationComponent implements OnInit {
 
   private async run(action: () => Promise<unknown>): Promise<void> {
     this.error.set(null);
+    this.busy.set(true);
     try {
       await action();
     } catch (error) {
-      this.error.set(problemDetail(error, 'No se pudo completar la acción.'));
+      this.error.set(problemDetail(error, this.i18n.t('escAdmin.error')));
+    } finally {
+      this.busy.set(false);
     }
   }
 }

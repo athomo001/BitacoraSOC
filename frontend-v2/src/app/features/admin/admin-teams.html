@@ -1,0 +1,165 @@
+<header class="adm-head">
+  <div>
+    <h2 class="adm-title">{{ i18n.t('admin.nav.teams') }}</h2>
+    <p class="adm-muted">{{ i18n.t('teams.subtitle') }}</p>
+  </div>
+</header>
+
+@if (error(); as e) { <p class="adm-error" role="alert">{{ e }}</p> }
+
+<div class="adm-split">
+  <section class="adm-card">
+    <div class="adm-card__head">
+      <h3 class="adm-card__title"><mat-icon>groups</mat-icon>{{ i18n.t('admin.nav.teams') }} <span class="mono adm-secondary">{{ teams().length }}</span></h3>
+    </div>
+    <form class="adm-row tm__create" (ngSubmit)="createTeam()">
+      <label class="adm-field"><span class="adm-label">{{ i18n.t('teams.name') }}</span><input class="adm-input" name="teamName" placeholder="Cuadrilla Calama" [ngModel]="teamName()" (ngModelChange)="teamName.set($event)" /></label>
+      <label class="adm-field">
+        <span class="adm-label">{{ i18n.t('teams.kind') }}</span>
+        <select class="adm-input" name="teamKind" [ngModel]="teamKind()" (ngModelChange)="teamKind.set($event)">
+          @for (k of kinds; track k) { <option [value]="k">{{ i18n.t(kindKey(k)) }}</option> }
+        </select>
+      </label>
+      <label class="adm-field">
+        <span class="adm-label">{{ i18n.t('teams.org') }}</span>
+        <select class="adm-input" name="teamOrg" [ngModel]="teamOrg()" (ngModelChange)="teamOrg.set($event)">
+          <option value="">{{ i18n.t('teams.noOrg') }}</option>
+          @for (o of organizations(); track o.id) { <option [value]="o.id">{{ o.name }}</option> }
+        </select>
+      </label>
+      <button type="submit" class="adm-btn adm-btn--primary" [disabled]="busy() || !teamName().trim()"><mat-icon>add</mat-icon>{{ i18n.t('teams.create') }}</button>
+    </form>
+    <div class="adm-table-wrap">
+      <table class="adm-table">
+        <thead><tr><th>{{ i18n.t('teams.col.team') }}</th><th>{{ i18n.t('teams.kind') }}</th><th class="adm-num">{{ i18n.t('teams.col.members') }}</th></tr></thead>
+        <tbody>
+          @for (t of teams(); track t.id) {
+            <tr class="adm-row-click" [class.adm-row--active]="selected()?.id === t.id" tabindex="0" [attr.aria-selected]="selected()?.id === t.id"
+              (click)="select(t)" (keydown.enter)="select(t)">
+              <td>
+                <strong>{{ t.name }}</strong>
+                <span class="adm-small adm-secondary adm-block">{{ t.organizationName || i18n.t('teams.noOrg') }}</span>
+              </td>
+              <td><span class="pill tone-neutral">{{ i18n.t(kindKey(t.kind)) }}</span></td>
+              <td class="mono adm-num">{{ t.memberCount ?? 0 }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      @if (!teams().length) { <p class="adm-empty">{{ i18n.t('teams.empty') }}</p> }
+    </div>
+  </section>
+
+  <div class="tm__detail">
+    @if (selected(); as team) {
+      <section class="adm-card">
+        <div class="adm-card__head">
+          <h3 class="adm-card__title"><mat-icon>person</mat-icon>{{ team.name }} · {{ i18n.t('teams.members') }}</h3>
+          <span class="mono adm-small adm-secondary adm-push">{{ team.slug }}</span>
+        </div>
+        <div class="adm-table-wrap">
+          <table class="adm-table">
+            <thead><tr><th class="adm-num">{{ i18n.t('teams.priority') }}</th><th>{{ i18n.t('teams.name') }}</th><th>{{ i18n.t('teams.role') }}</th><th>{{ i18n.t('teams.send') }}</th><th></th></tr></thead>
+            <tbody>
+              @for (m of team.members; track m.id) {
+                <tr>
+                  <td class="mono adm-num">{{ m.priority }}</td>
+                  <td>{{ m.displayName }} <span class="adm-small adm-secondary">{{ i18n.t(m.userId ? 'teams.isUser' : 'teams.isContact') }}</span></td>
+                  <td><span class="pill" [class]="m.roleInTeam === 'primary' ? 'tone-info' : 'tone-neutral'">{{ i18n.t(roleKey(m.roleInTeam)) }}</span></td>
+                  <td class="mono adm-secondary">{{ i18n.t(m.recipientType === 'cc' ? 'teams.cc' : 'teams.to') }}</td>
+                  <td class="adm-num">
+                    <button type="button" class="adm-icon-btn adm-icon-btn--danger" [disabled]="busy()" [attr.aria-label]="i18n.t('teams.remove') + ' ' + m.displayName" [title]="i18n.t('teams.remove')" (click)="removeMember(m.id)"><mat-icon>close</mat-icon></button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+          @if (!team.members.length) { <p class="adm-empty">{{ i18n.t('teams.noMembers') }}</p> }
+        </div>
+        <div class="adm-card__body tm__add">
+          <div class="adm-row">
+            <label class="adm-field tm__search">
+              <span class="adm-label">{{ i18n.t('teams.addContact') }}</span>
+              <input class="adm-input" name="memberSearch" [placeholder]="i18n.t('teams.searchContact')" [ngModel]="memberQuery()" (ngModelChange)="searchMembers($event)" />
+            </label>
+            <label class="adm-field adm-field--narrow">
+              <span class="adm-label">{{ i18n.t('teams.role') }}</span>
+              <select class="adm-input" name="memberRole" [ngModel]="memberRole()" (ngModelChange)="memberRole.set($event)">
+                @for (r of roles; track r) { <option [value]="r">{{ i18n.t(roleKey(r)) }}</option> }
+              </select>
+            </label>
+            <label class="adm-field adm-field--narrow">
+              <span class="adm-label">{{ i18n.t('teams.send') }}</span>
+              <select class="adm-input" name="memberRecipient" [ngModel]="memberRecipient()" (ngModelChange)="memberRecipient.set($event)">
+                <option value="to">{{ i18n.t('teams.to') }}</option>
+                <option value="cc">{{ i18n.t('teams.cc') }}</option>
+              </select>
+            </label>
+            <label class="adm-field adm-field--narrow">
+              <span class="adm-label">{{ i18n.t('teams.priority') }}</span>
+              <input class="adm-input mono" name="memberPriority" type="number" min="0" [ngModel]="memberPriority()" (ngModelChange)="memberPriority.set(+$event)" />
+            </label>
+          </div>
+          @if (memberResults().length > 0) {
+            <ul class="tm__results">
+              @for (c of memberResults(); track c.id) {
+                <li>
+                  <button type="button" class="adm-btn" [disabled]="busy()" (click)="addMember(c)"><mat-icon>person_add</mat-icon>{{ i18n.t('teams.add') }}</button>
+                  <span><strong>{{ c.name }}</strong> <span class="adm-small adm-secondary">· {{ c.position || i18n.t('teams.noPosition') }} · {{ c.organizationName }}</span></span>
+                </li>
+              }
+            </ul>
+          } @else if (memberQuery().trim().length >= 2 && !searching()) {
+            <p class="adm-hint">{{ i18n.t('teams.noResults') }}</p>
+          }
+          <p class="adm-hint">{{ i18n.t('teams.priorityHint') }}</p>
+        </div>
+      </section>
+
+      @if (nocEnabled()) {
+        <section class="adm-card">
+          <div class="adm-card__head"><h3 class="adm-card__title"><mat-icon>map</mat-icon>{{ i18n.t('teams.coverage') }}</h3></div>
+          <div class="adm-table-wrap">
+            <table class="adm-table">
+              <thead><tr><th class="adm-num">{{ i18n.t('teams.priority') }}</th><th>{{ i18n.t('teams.unit') }}</th><th>{{ i18n.t('orgs.code') }}</th><th></th></tr></thead>
+              <tbody>
+                @for (c of team.coverage ?? []; track c.territorialUnitId) {
+                  <tr>
+                    <td class="mono adm-num">{{ c.priority }}</td>
+                    <td>{{ c.name }} <span class="adm-small adm-secondary">({{ territory.kindLabel($any(c.kind)) }})</span></td>
+                    <td class="mono adm-secondary">{{ c.code }}</td>
+                    <td class="adm-num">
+                      <button type="button" class="adm-icon-btn adm-icon-btn--danger" [disabled]="busy()" [attr.aria-label]="i18n.t('teams.remove') + ' ' + c.name" [title]="i18n.t('teams.remove')" (click)="removeCoverage(c.territorialUnitId)"><mat-icon>close</mat-icon></button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+            @if (!(team.coverage ?? []).length) { <p class="adm-empty">{{ i18n.t('teams.noCoverage') }}</p> }
+          </div>
+          <div class="adm-card__body tm__add">
+            <div class="adm-row">
+              <label class="adm-field">
+                <span class="adm-label">{{ i18n.t('teams.unit') }}</span>
+                <select class="adm-input" name="coverUnit" [ngModel]="coverUnit()" (ngModelChange)="coverUnit.set($event)">
+                  <option value="">{{ i18n.t('teams.pick') }}</option>
+                  @for (u of units(); track u.id) {
+                    <option [value]="u.id">{{ '— '.repeat(u.depth) }}{{ u.name }}</option>
+                  }
+                </select>
+              </label>
+              <label class="adm-field adm-field--narrow">
+                <span class="adm-label">{{ i18n.t('teams.priority') }}</span>
+                <input class="adm-input mono" name="coverPriority" type="number" min="0" [ngModel]="coverPriority()" (ngModelChange)="coverPriority.set(+$event)" />
+              </label>
+              <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy() || !coverUnit()" (click)="addCoverage()"><mat-icon>add</mat-icon>{{ i18n.t('teams.assign') }}</button>
+            </div>
+            <p class="adm-hint">{{ i18n.t('teams.coverageHint') }}</p>
+          </div>
+        </section>
+      }
+    } @else {
+      <section class="adm-card"><p class="adm-empty">{{ i18n.t(teams().length ? 'teams.pickTeam' : 'teams.createFirst') }}</p></section>
+    }
+  </div>
+</div>

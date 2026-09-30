@@ -1,40 +1,131 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { EscalationService } from '../../core/escalation/escalation.service';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
+import { MatIconModule } from '@angular/material/icon';
+import { EscalationService, ShiftReportDelivery } from '../../core/escalation/escalation.service';
+import { MessageKey } from '../../core/i18n/messages';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { problemDetail } from '../../core/http-error';
 
+/**
+ * Reportes de turno (Administración → Operación), re-vestido con los
+ * componentes del artboard "Administración". Cada cierre de turno con
+ * actividad genera un reporte que sale por el correo configurado; el
+ * planificador procesa la cola cada minuto y este botón lo fuerza a mano.
+ */
 @Component({
   selector: 'app-admin-reports',
   standalone: true,
+  imports: [DatePipe, MatIconModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section class="panel reports">
-      <div class="reports__heading"><div><p class="reports__eyebrow">Operación asistida</p><h2 class="panel__title">Reportería de turnos</h2><p class="panel__hint">Los cierres con actividad se envían por el SMTP configurado a los usuarios activos. El scheduler también procesa esta cola automáticamente.</p></div><span class="reports__icon">✉</span></div>
-      <div class="reports__actions"><button type="button" [disabled]="busy()" (click)="dispatch()">{{ busy() ? 'Procesando…' : 'Enviar reportes pendientes' }}</button></div>
-      @if (message(); as status) { <p class="msg" [class.msg--ok]="status.ok" [class.msg--error]="!status.ok">{{ status.text }}</p> }
+    <header class="adm-head">
+      <div>
+        <h2 class="adm-title">{{ i18n.t('admin.nav.reports') }}</h2>
+        <p class="adm-muted">{{ i18n.t('reports.subtitle') }}</p>
+      </div>
+    </header>
+
+    <section class="adm-card">
+      <div class="adm-card__head"><h3 class="adm-card__title"><mat-icon>outgoing_mail</mat-icon>{{ i18n.t('reports.queue') }}</h3></div>
+      <div class="adm-card__body">
+        <ol class="rp__steps">
+          <li>{{ i18n.t('reports.step1') }}</li>
+          <li>{{ i18n.t('reports.step2') }}</li>
+          <li>{{ i18n.t('reports.step3') }}</li>
+        </ol>
+        <p class="adm-hint">{{ i18n.t('reports.smtpHint') }}</p>
+      </div>
+      <footer class="adm-foot">
+        <span class="adm-foot__status">
+          @if (result(); as r) {
+            @if (r.ok) {
+              <span class="pill tone-ok"><mat-icon>task_alt</mat-icon>{{ i18n.t('reports.done') }}</span>
+              <span class="mono adm-small adm-secondary"> {{ r.at | date: 'HH:mm:ss' }}</span>
+            } @else {
+              <span class="adm-error" role="alert">{{ r.text }}</span>
+            }
+          } @else {
+            <span class="adm-muted">{{ i18n.t('reports.auto') }}</span>
+          }
+        </span>
+        <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy()" (click)="dispatch()">
+          <mat-icon>send</mat-icon>{{ i18n.t(busy() ? 'reports.running' : 'reports.dispatch') }}
+        </button>
+      </footer>
+    </section>
+
+    <section class="adm-card">
+      <div class="adm-card__head"><h3 class="adm-card__title"><mat-icon>history</mat-icon>{{ i18n.t('reports.recent') }}</h3></div>
+      <div class="adm-table-wrap">
+        <table class="adm-table">
+          <thead><tr><th>{{ i18n.t('reports.col.closed') }}</th><th>{{ i18n.t('reports.col.shift') }}</th><th>{{ i18n.t('reports.col.by') }}</th><th>{{ i18n.t('reports.col.status') }}</th><th>{{ i18n.t('reports.col.detail') }}</th></tr></thead>
+          <tbody>
+            @for (d of deliveries(); track d.id) {
+              <tr>
+                <td class="mono adm-secondary">{{ d.shiftEndAt | date: 'dd/MM HH:mm' }}</td>
+                <td>{{ d.shiftName ?? '—' }}</td>
+                <td>{{ d.closedBy }}</td>
+                <td><span class="pill" [class]="statusTone[d.status]">{{ i18n.t(statusKey(d.status)) }}</span></td>
+                <td class="adm-small">
+                  @if (d.status === 'failed' && d.error) {
+                    <span class="text-bad">{{ d.error }}</span>
+                  } @else if (d.status === 'success') {
+                    <span class="adm-secondary">{{ d.recipients.join(', ') }}@if (d.sentAt) { · <span class="mono">{{ d.sentAt | date: 'HH:mm' }}</span> }</span>
+                  } @else if (d.status === 'skipped') {
+                    <span class="adm-secondary">{{ i18n.t('reports.skippedHint') }}</span>
+                  } @else {
+                    <span class="adm-secondary">{{ i18n.t('reports.pendingHint') }}</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+        @if (!deliveries().length) { <p class="adm-empty">{{ i18n.t('reports.noDeliveries') }}</p> }
+      </div>
     </section>
   `,
   styles: `
-    .reports { display: grid; gap: 16px; }
-    .reports__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
-    .reports__eyebrow { margin: 0 0 4px; color: var(--accent); font-size: 11px; text-transform: uppercase; }
-    .reports__icon { display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--border-active); border-radius: 50%; color: var(--border-active); font-size: 20px; }
-    .reports__actions button { min-height: var(--row-height); padding: 0 16px; border: 0; border-radius: var(--radius-sm); background: var(--border-active); color: var(--bg-app); font: inherit; font-weight: 600; cursor: pointer; }
-    .reports__actions button:disabled { opacity: .6; cursor: default; }
+    :host { display: flex; flex-direction: column; gap: 16px; }
+    mat-icon { width: 16px; height: 16px; font-size: 16px; }
+    .rp__steps { display: flex; flex-direction: column; gap: 6px; margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.5; }
   `,
 })
-export class AdminReportsComponent {
+export class AdminReportsComponent implements OnInit {
+  protected readonly i18n = inject(I18nService);
   private readonly api = inject(EscalationService);
+
   protected readonly busy = signal(false);
-  protected readonly message = signal<{ ok: boolean; text: string } | null>(null);
+  protected readonly result = signal<{ ok: boolean; text: string; at: Date } | null>(null);
+  protected readonly deliveries = signal<ShiftReportDelivery[]>([]);
+  protected readonly statusTone: Record<ShiftReportDelivery['status'], string> = { success: 'tone-ok', failed: 'tone-bad', skipped: 'tone-neutral', pending: 'tone-warn' };
+
+  async ngOnInit(): Promise<void> {
+    await this.loadDeliveries();
+  }
+
+  protected statusKey(status: ShiftReportDelivery['status']): MessageKey {
+    return `reports.status.${status}` as MessageKey;
+  }
+
+  private async loadDeliveries(): Promise<void> {
+    try {
+      this.deliveries.set(await this.api.recentShiftReports());
+    } catch {
+      // La lista es informativa: si falla, el botón de procesar sigue sirviendo.
+      this.deliveries.set([]);
+    }
+  }
 
   protected async dispatch(): Promise<void> {
     this.busy.set(true);
-    this.message.set(null);
+    this.result.set(null);
     try {
       await this.api.dispatchPendingShiftReports();
-      this.message.set({ ok: true, text: 'La cola de reportes fue procesada.' });
+      this.result.set({ ok: true, text: '', at: new Date() });
+      await this.loadDeliveries();
     } catch (error) {
-      this.message.set({ ok: false, text: problemDetail(error, 'No se pudieron enviar los reportes.') });
+      this.result.set({ ok: false, text: problemDetail(error, this.i18n.t('reports.error')), at: new Date() });
     } finally {
       this.busy.set(false);
     }

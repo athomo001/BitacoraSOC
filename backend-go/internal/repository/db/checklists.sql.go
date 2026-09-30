@@ -840,6 +840,59 @@ func (q *Queries) ListPendingShiftClosures(ctx context.Context) ([]ShiftClosure,
 	return items, nil
 }
 
+const listRecentShiftReportDeliveries = `-- name: ListRecentShiftReportDeliveries :many
+SELECT sc.id, sc.shift_end_at, sc.sent_status, sc.sent_error, sc.sent_at,
+       u.username, ws.name AS shift_name, ws.email_recipients
+FROM shift_closures sc
+JOIN users u ON u.id = sc.user_id
+LEFT JOIN shift_checks ck ON ck.id = sc.closure_check_id
+LEFT JOIN work_shifts ws ON ws.id = ck.work_shift_id
+ORDER BY sc.shift_end_at DESC
+LIMIT 20
+`
+
+type ListRecentShiftReportDeliveriesRow struct {
+	ID              uuid.UUID          `json:"id"`
+	ShiftEndAt      pgtype.Timestamptz `json:"shift_end_at"`
+	SentStatus      string             `json:"sent_status"`
+	SentError       pgtype.Text        `json:"sent_error"`
+	SentAt          pgtype.Timestamptz `json:"sent_at"`
+	Username        string             `json:"username"`
+	ShiftName       pgtype.Text        `json:"shift_name"`
+	EmailRecipients []string           `json:"email_recipients"`
+}
+
+// Administración → Reportes: los últimos cierres y cómo salió su reporte,
+// con el turno y a quién iba (sin esto un envío fallido no se veía en ninguna parte).
+func (q *Queries) ListRecentShiftReportDeliveries(ctx context.Context) ([]ListRecentShiftReportDeliveriesRow, error) {
+	rows, err := q.db.Query(ctx, listRecentShiftReportDeliveries)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListRecentShiftReportDeliveriesRow
+	for rows.Next() {
+		var i ListRecentShiftReportDeliveriesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ShiftEndAt,
+			&i.SentStatus,
+			&i.SentError,
+			&i.SentAt,
+			&i.Username,
+			&i.ShiftName,
+			&i.EmailRecipients,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listShiftCheckServices = `-- name: ListShiftCheckServices :many
 SELECT id, shift_check_id, checklist_item_id, service_title, status, is_computed, observation, correlated_from_service_id FROM shift_check_services WHERE shift_check_id = $1 ORDER BY id
 `

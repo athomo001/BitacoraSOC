@@ -1,0 +1,232 @@
+/* Correo, re-vestido con los componentes del artboard "Administración"
+ * (mismas medidas de tarjeta, campos, botones y pie que Checklist). */
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+mat-icon {
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+}
+
+.sm__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.sm__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.sm__muted {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.sm__push {
+  margin-left: auto;
+}
+
+.sm__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: start;
+}
+
+.sm-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.sm-card__head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sm-card__title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sm-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.sm__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.sm__field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sm__grow {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.sm__port {
+  flex: 0 0 96px;
+}
+
+.sm__label {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.sm__segs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.sm__hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.sm__block {
+  display: block;
+}
+
+.sm__strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sm__small {
+  font-size: 11.5px;
+}
+
+.sm-input {
+  width: 100%;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+}
+
+.sm-input:focus-visible {
+  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+}
+
+.sm__switch-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.sm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sm-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.sm-btn--primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.sm__self-start {
+  align-self: flex-start;
+}
+
+.sm-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.sm-foot__status {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.sm__last {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.sm__last-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.sm__error-box {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--status-critical-bg);
+  color: var(--status-critical);
+  font-size: 10.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (width <= 1000px) {
+  .sm__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

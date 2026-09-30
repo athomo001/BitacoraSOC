@@ -276,6 +276,9 @@ type Querier interface {
 	ListPublicTicketComments(ctx context.Context, ticketID uuid.UUID) ([]TicketComment, error)
 	// ===== RACI (solo dato en esta fase, sin UI) =====
 	ListRaciAssignments(ctx context.Context, arg ListRaciAssignmentsParams) ([]ListRaciAssignmentsRow, error)
+	// Administración → Reportes: los últimos cierres y cómo salió su reporte,
+	// con el turno y a quién iba (sin esto un envío fallido no se veía en ninguna parte).
+	ListRecentShiftReportDeliveries(ctx context.Context) ([]ListRecentShiftReportDeliveriesRow, error)
 	// Fase 8 del roadmap (spec/02-alcance-y-roadmap.md): motor de rotación
 	// unificado (rotation_cycles/rotation_slots/rotation_overrides) y work_shifts.
 	// GET /api/rotation-slots, POST /api/rotation-slots y PATCH
@@ -358,6 +361,7 @@ type Querier interface {
 	// movió de padre) — incluidos los sitios agregados a mano que el dataset
 	// no conoce y por lo tanto no vuelve a upsertear.
 	RebaseTerritorialSubtree(ctx context.Context, arg RebaseTerritorialSubtreeParams) error
+	RecordSMTPTest(ctx context.Context, arg RecordSMTPTestParams) error
 	RegisterFailedLogin(ctx context.Context, id uuid.UUID) (int32, error)
 	// Re-hash oportunista en login (spec/07-backend-arquitectura-go.md sección
 	// 6.5) — a diferencia de UpdateUserPassword, NO toca must_change_password:
@@ -418,6 +422,9 @@ type Querier interface {
 	// Limpia must_change_password al completar el cambio (04-contratos-api.md:
 	// "Limpia el flag al completar").
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
+	// Administración → Turnos: editar nombre, horario, zona, destinatarios del
+	// reporte de cierre y activo. Lo que no se manda queda como estaba.
+	UpdateWorkShift(ctx context.Context, arg UpdateWorkShiftParams) (WorkShift, error)
 	UpsertAdminNotes(ctx context.Context, arg UpsertAdminNotesParams) (AdminNote, error)
 	// Un POST sobre el mismo (userId, assignedDate) corrige la condición en vez
 	// de fallar con 409 — mismo criterio "upsert" que UpsertTeamCoverage
@@ -432,6 +439,8 @@ type Querier interface {
 	// resetear en vez de incrementar (ver internal/service/ratelimit).
 	UpsertLoginAttempt(ctx context.Context, ipAddress string) (LoginRateLimit, error)
 	UpsertPersonalNotes(ctx context.Context, arg UpsertPersonalNotesParams) (PersonalNote, error)
+	// Guardar no borra el resultado de la última prueba: sigue siendo cierto
+	// para la configuración con la que se hizo hasta que se pruebe de nuevo.
 	UpsertSMTPConfig(ctx context.Context, arg UpsertSMTPConfigParams) error
 	UpsertTeamCoverage(ctx context.Context, arg UpsertTeamCoverageParams) (TeamCoverage, error)
 	// POST /api/territorial-units/import — upsert por code (idempotente). No

@@ -233,3 +233,37 @@ func (h *ChecklistsHandler) Acknowledge(w http.ResponseWriter, r *http.Request) 
 	}
 	writeData(w, 200, toShiftClosureDTO(closure).withNames(ctx, &usernames{queries: h.Queries}))
 }
+
+type shiftReportDeliveryDTO struct {
+	ID         uuid.UUID  `json:"id"`
+	ShiftEndAt *time.Time `json:"shiftEndAt"`
+	Status     string     `json:"status"` // pending | success | failed | skipped
+	Error      *string    `json:"error"`
+	SentAt     *time.Time `json:"sentAt"`
+	ClosedBy   string     `json:"closedBy"`
+	ShiftName  *string    `json:"shiftName"`
+	Recipients []string   `json:"recipients"`
+}
+
+// RecentReports es GET /api/reports/shift/recent (admin): los últimos 20
+// cierres y cómo salió su reporte. Antes un envío fallido (p. ej. turno sin
+// destinatarios) quedaba marcado en la base sin que nadie lo viera.
+func (h *ChecklistsHandler) RecentReports(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.Queries.ListRecentShiftReportDeliveries(r.Context())
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer los envíos")
+		return
+	}
+	out := make([]shiftReportDeliveryDTO, 0, len(rows))
+	for _, row := range rows {
+		recipients := row.EmailRecipients
+		if recipients == nil {
+			recipients = []string{}
+		}
+		out = append(out, shiftReportDeliveryDTO{
+			ID: row.ID, ShiftEndAt: timestamptzPtr(row.ShiftEndAt), Status: row.SentStatus, Error: textPtr(row.SentError),
+			SentAt: timestamptzPtr(row.SentAt), ClosedBy: row.Username, ShiftName: textPtr(row.ShiftName), Recipients: recipients,
+		})
+	}
+	writeData(w, http.StatusOK, out)
+}

@@ -21,7 +21,7 @@ import {
 } from '../../core/escalation/escalation.service';
 import { TerritoryService } from '../../core/territory/territory.service';
 import { TerritorialUnit } from '../../core/territory/territory.models';
-import { SetupService } from '../../core/setup/setup.service';
+import { ModuleAccessService } from '../../core/auth/module-access.service';
 import { problemDetail } from '../../core/http-error';
 import { ButtonComponent } from '../../shared/ui/button/button';
 import { FlowState, flowState, formatCountdown, secondsUntilEscalation } from './escalation-flow';
@@ -80,11 +80,13 @@ export class EscalationComponent implements OnInit {
 
   private readonly api = inject(EscalationService);
   private readonly territory = inject(TerritoryService);
-  private readonly setup = inject(SetupService);
+  private readonly modules = inject(ModuleAccessService);
   private readonly route = inject(ActivatedRoute);
 
-  protected readonly socEnabled = computed(() => this.setup.status()?.socEnabled ?? false);
-  protected readonly nocEnabled = computed(() => this.setup.status()?.nocEnabled ?? false);
+  // Módulo encendido en la instalación y dentro del alcance del usuario:
+  // lo que no aplica ni se muestra ni se pide (evita los 403 de módulo).
+  protected readonly socEnabled = this.modules.soc;
+  protected readonly nocEnabled = this.modules.noc;
 
   protected readonly scopeKind = signal<ScopeKind>('asset');
   protected readonly filter = signal('');
@@ -152,7 +154,7 @@ export class EscalationComponent implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
-    await this.setup.loadStatus();
+    await this.modules.load();
     if (!this.nocEnabled()) this.scopeKind.set('service');
     try {
       await Promise.all([

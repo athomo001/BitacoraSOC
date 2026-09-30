@@ -87,6 +87,10 @@ export class OrganizationsService {
     return (await firstValueFrom(this.http.get<ApiEnvelope<LogSource[]>>('/api/log-sources'))).data;
   }
 
+  async patchLogSource(id: string, patch: { displayName?: string; category?: string; active?: boolean }): Promise<LogSource> {
+    return (await firstValueFrom(this.http.patch<ApiEnvelope<LogSource>>(`/api/log-sources/${id}`, patch))).data;
+  }
+
   async createLogSource(src: { code: string; displayName: string; category: string }): Promise<LogSource> {
     return (await firstValueFrom(this.http.post<ApiEnvelope<LogSource>>('/api/log-sources', src))).data;
   }

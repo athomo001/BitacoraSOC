@@ -458,3 +458,54 @@ func (q *Queries) PatchRotationSlotPause(ctx context.Context, arg PatchRotationS
 	)
 	return i, err
 }
+
+const updateWorkShift = `-- name: UpdateWorkShift :one
+UPDATE work_shifts SET
+  name = COALESCE($1, name),
+  start_time = COALESCE($2::time, start_time),
+  end_time = COALESCE($3::time, end_time),
+  timezone = COALESCE($4, timezone),
+  email_recipients = COALESCE($5::text[], email_recipients),
+  active = COALESCE($6, active)
+WHERE id = $7
+RETURNING id, rotation_cycle_id, name, start_time, end_time, timezone, shift_type, checklist_template_start_id, checklist_template_end_id, email_recipients, active
+`
+
+type UpdateWorkShiftParams struct {
+	Name            pgtype.Text `json:"name"`
+	StartTime       pgtype.Time `json:"start_time"`
+	EndTime         pgtype.Time `json:"end_time"`
+	Timezone        pgtype.Text `json:"timezone"`
+	EmailRecipients []string    `json:"email_recipients"`
+	Active          pgtype.Bool `json:"active"`
+	ID              uuid.UUID   `json:"id"`
+}
+
+// Administración → Turnos: editar nombre, horario, zona, destinatarios del
+// reporte de cierre y activo. Lo que no se manda queda como estaba.
+func (q *Queries) UpdateWorkShift(ctx context.Context, arg UpdateWorkShiftParams) (WorkShift, error) {
+	row := q.db.QueryRow(ctx, updateWorkShift,
+		arg.Name,
+		arg.StartTime,
+		arg.EndTime,
+		arg.Timezone,
+		arg.EmailRecipients,
+		arg.Active,
+		arg.ID,
+	)
+	var i WorkShift
+	err := row.Scan(
+		&i.ID,
+		&i.RotationCycleID,
+		&i.Name,
+		&i.StartTime,
+		&i.EndTime,
+		&i.Timezone,
+		&i.ShiftType,
+		&i.ChecklistTemplateStartID,
+		&i.ChecklistTemplateEndID,
+		&i.EmailRecipients,
+		&i.Active,
+	)
+	return i, err
+}

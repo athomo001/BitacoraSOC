@@ -12,18 +12,23 @@ import (
 )
 
 const getSMTPConfig = `-- name: GetSMTPConfig :one
-SELECT host, port, username, password_encrypted, from_address, require_tls
+SELECT host, port, username, password_encrypted, from_address, from_name, require_tls,
+       last_test_at, last_test_ok, last_test_error
 FROM smtp_config
 WHERE id = true
 `
 
 type GetSMTPConfigRow struct {
-	Host              string      `json:"host"`
-	Port              int32       `json:"port"`
-	Username          pgtype.Text `json:"username"`
-	PasswordEncrypted pgtype.Text `json:"password_encrypted"`
-	FromAddress       string      `json:"from_address"`
-	RequireTls        bool        `json:"require_tls"`
+	Host              string             `json:"host"`
+	Port              int32              `json:"port"`
+	Username          pgtype.Text        `json:"username"`
+	PasswordEncrypted pgtype.Text        `json:"password_encrypted"`
+	FromAddress       string             `json:"from_address"`
+	FromName          pgtype.Text        `json:"from_name"`
+	RequireTls        bool               `json:"require_tls"`
+	LastTestAt        pgtype.Timestamptz `json:"last_test_at"`
+	LastTestOk        pgtype.Bool        `json:"last_test_ok"`
+	LastTestError     pgtype.Text        `json:"last_test_error"`
 }
 
 // smtp_config es singleton (id BOOLEAN PRIMARY KEY DEFAULT true), siempre hay
@@ -38,20 +43,39 @@ func (q *Queries) GetSMTPConfig(ctx context.Context) (GetSMTPConfigRow, error) {
 		&i.Username,
 		&i.PasswordEncrypted,
 		&i.FromAddress,
+		&i.FromName,
 		&i.RequireTls,
+		&i.LastTestAt,
+		&i.LastTestOk,
+		&i.LastTestError,
 	)
 	return i, err
 }
 
+const recordSMTPTest = `-- name: RecordSMTPTest :exec
+UPDATE smtp_config SET last_test_at = now(), last_test_ok = $1, last_test_error = $2 WHERE id = true
+`
+
+type RecordSMTPTestParams struct {
+	LastTestOk    pgtype.Bool `json:"last_test_ok"`
+	LastTestError pgtype.Text `json:"last_test_error"`
+}
+
+func (q *Queries) RecordSMTPTest(ctx context.Context, arg RecordSMTPTestParams) error {
+	_, err := q.db.Exec(ctx, recordSMTPTest, arg.LastTestOk, arg.LastTestError)
+	return err
+}
+
 const upsertSMTPConfig = `-- name: UpsertSMTPConfig :exec
-INSERT INTO smtp_config (id, host, port, username, password_encrypted, from_address, require_tls)
-VALUES (true, $1, $2, $3, $4, $5, $6)
+INSERT INTO smtp_config (id, host, port, username, password_encrypted, from_address, from_name, require_tls)
+VALUES (true, $1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (id) DO UPDATE SET
   host = EXCLUDED.host,
   port = EXCLUDED.port,
   username = EXCLUDED.username,
   password_encrypted = EXCLUDED.password_encrypted,
   from_address = EXCLUDED.from_address,
+  from_name = EXCLUDED.from_name,
   require_tls = EXCLUDED.require_tls
 `
 
@@ -61,9 +85,12 @@ type UpsertSMTPConfigParams struct {
 	Username          pgtype.Text `json:"username"`
 	PasswordEncrypted pgtype.Text `json:"password_encrypted"`
 	FromAddress       string      `json:"from_address"`
+	FromName          pgtype.Text `json:"from_name"`
 	RequireTls        bool        `json:"require_tls"`
 }
 
+// Guardar no borra el resultado de la última prueba: sigue siendo cierto
+// para la configuración con la que se hizo hasta que se pruebe de nuevo.
 func (q *Queries) UpsertSMTPConfig(ctx context.Context, arg UpsertSMTPConfigParams) error {
 	_, err := q.db.Exec(ctx, upsertSMTPConfig,
 		arg.Host,
@@ -71,6 +98,7 @@ func (q *Queries) UpsertSMTPConfig(ctx context.Context, arg UpsertSMTPConfigPara
 		arg.Username,
 		arg.PasswordEncrypted,
 		arg.FromAddress,
+		arg.FromName,
 		arg.RequireTls,
 	)
 	return err

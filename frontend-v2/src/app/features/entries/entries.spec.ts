@@ -7,7 +7,7 @@ const ADMIN_USER = { id: 'u-admin', username: 'admin', email: 'admin@bitacora.lo
 
 const ENTRY = {
   id: 'e1', authorUsername: 'admin', entryType: 'incidente', scope: 'noc',
-  content: 'Corte de fibra confirmado', tags: ['fibra'], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+  content: '## Corte de fibra confirmado\nTécnico en ruta', tags: ['fibra'], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
 };
 
 describe('EntriesComponent (Bitácora)', () => {
@@ -31,12 +31,13 @@ describe('EntriesComponent (Bitácora)', () => {
     globalThis.fetch = originalFetch;
   });
 
-  async function render() {
+  async function render(modules = { socEnabled: false, nocEnabled: true }) {
     const fixture = TestBed.createComponent(EntriesComponent);
     fixture.detectChanges();
 
     httpMock.expectOne('/api/users/me').flush({ data: ADMIN_USER });
     httpMock.expectOne('/api/users/me/capabilities').flush({ data: { moduleScope: 'both', capabilities: [] } });
+    httpMock.expectOne('/api/setup/status').flush({ data: { setupCompleted: true, ...modules } });
     await tick();
     httpMock.expectOne((r) => r.url === '/api/entries').flush({ data: { items: [ENTRY], total: 1 } });
     await tick();
@@ -45,39 +46,84 @@ describe('EntriesComponent (Bitácora)', () => {
     await tick();
     httpMock.expectOne((r) => r.url === '/api/drafts').flush({ data: { items: [] } });
     await tick();
+    httpMock.match('/api/assets').forEach((r) => r.flush({ data: [] }));
+    await tick();
     fixture.detectChanges();
-    return { fixture, el: fixture.nativeElement as HTMLElement };
+    const el = fixture.nativeElement as HTMLElement;
+    const button = (text: string) => [...el.querySelectorAll('button')].find((b) => b.textContent?.trim().endsWith(text)) as HTMLButtonElement;
+    return { fixture, el, button };
   }
 
-  it('muestra las entradas del muro y las notas cargadas', async () => {
+  it('muestra la tabla densa del artboard: ámbito, tipo y la primera línea como resumen', async () => {
     const { el } = await render();
-    expect(el.textContent).toContain('Corte de fibra confirmado');
-    // <textarea> con [ngModel] no refleja su valor en textContent — se lee la propiedad .value.
-    const adminNotesArea = el.querySelectorAll('.entries__notes textarea')[0] as HTMLTextAreaElement;
-    expect(adminNotesArea.value).toBe('Pizarrón de prueba');
+    const row = el.querySelector('tr.en-row') as HTMLElement;
+    expect(row.textContent).toContain('NOC');
+    expect(row.textContent).toContain('Incidente');
+    expect(row.querySelector('.en__summary')?.textContent).toContain('Corte de fibra confirmado');
+    expect(row.querySelector('.en__summary')?.textContent).not.toContain('##');
   });
 
-  it('filtrar por tag vuelve a pedir /api/entries con el parámetro tag', async () => {
-    const { fixture, el } = await render();
-    const tagInput = [...el.querySelectorAll('input')].find((i) => i.placeholder === 'ej. otdr') as HTMLInputElement;
+  it('solo ofrece los ámbitos que aplican: sin SOC no aparece SOC', async () => {
+    const { el } = await render({ socEnabled: false, nocEnabled: true });
+    const scopes = [...el.querySelectorAll('.en__toolbar .en__segs')[0].querySelectorAll('.seg')].map((b) => b.textContent?.trim());
+    expect(scopes.some((s) => s?.endsWith('SOC'))).toBe(false);
+    expect(scopes.some((s) => s?.endsWith('NOC'))).toBe(true);
+  });
+
+  it('el filtro rápido de tipo pide al clic; el de tag vive en "Más filtros"', async () => {
+    const { fixture, el, button } = await render();
+    button('Ofensa').click();
+    await tick();
+    httpMock.expectOne((r) => r.url === '/api/entries' && r.params.get('type') === 'ofensa').flush({ data: { items: [], total: 0 } });
+    await tick();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Ninguna entrada coincide');
+
+    button('Más filtros').click();
+    fixture.detectChanges();
+    const tagInput = el.querySelector('input[placeholder="otdr"]') as HTMLInputElement;
     tagInput.value = 'otdr';
     tagInput.dispatchEvent(new Event('input'));
     fixture.detectChanges();
-    const buscarBtn = [...el.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Buscar');
-    buscarBtn?.dispatchEvent(new Event('click'));
+    button('Aplicar').click();
     await tick();
-    const req = httpMock.expectOne((r) => r.url === '/api/entries' && r.params.get('tag') === 'otdr');
-    req.flush({ data: { items: [], total: 0 } });
+    httpMock.expectOne((r) => r.url === '/api/entries' && r.params.get('tag') === 'otdr' && r.params.get('type') === 'ofensa').flush({ data: { items: [], total: 0 } });
   });
 
-  it('abrir una entrada pide el detalle con comentarios', async () => {
+  it('abrir una entrada muestra el detalle con seguimiento en el panel lateral', async () => {
     const { fixture, el } = await render();
-    const row = el.querySelector('tr.entries__row') as HTMLElement;
-    row.dispatchEvent(new Event('click'));
+    (el.querySelector('tr.en-row') as HTMLElement).click();
     await tick();
     httpMock.expectOne('/api/entries/e1').flush({ data: { ...ENTRY, comments: [{ id: 'c1', entryId: 'e1', authorUsername: 'admin', comment: 'Seguimiento', isSystemGenerated: false, createdAt: new Date().toISOString() }] } });
     await tick();
     fixture.detectChanges();
-    expect(el.textContent).toContain('Seguimiento');
+    expect(el.querySelector('.en__side')?.textContent).toContain('Seguimiento');
+  });
+
+  it('las notas se abren en el panel: pizarrón y libreta', async () => {
+    const { fixture, el, button } = await render();
+    button('Notas').click();
+    fixture.detectChanges();
+    await tick();
+    fixture.detectChanges();
+    const board = el.querySelector('.en__note-area') as HTMLTextAreaElement;
+    expect(board.value).toBe('Pizarrón de prueba');
+    button('Mi libreta').click();
+    fixture.detectChanges();
+    await tick();
+    fixture.detectChanges();
+    expect((el.querySelector('.en__note-area') as HTMLTextAreaElement).value).toBe('Nota personal');
+  });
+
+  it('"Defang IoCs" neutraliza URLs e IPs del texto antes de guardar', async () => {
+    const { fixture, el, button } = await render();
+    const area = el.querySelector('.en__textarea') as HTMLTextAreaElement;
+    area.value = 'Conexión a https://malo.cl desde 185.220.1.1';
+    area.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    button('Defang IoCs').click();
+    fixture.detectChanges();
+    await tick();
+    expect(area.value).toBe('Conexión a hxxps://malo[.]cl desde 185[.]220[.]1[.]1');
   });
 });
