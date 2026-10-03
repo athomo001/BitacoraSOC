@@ -13,13 +13,13 @@ import (
 )
 
 const createOrganization = `-- name: CreateOrganization :one
-INSERT INTO organizations (name, code, type) VALUES ($1, $2, $3) RETURNING id, name, code, type, active, created_at
+INSERT INTO organizations (name, code, type) VALUES ($1, $2, $3) RETURNING id, name, code, type, active, created_at, via_organization_id
 `
 
 type CreateOrganizationParams struct {
-	Name string           `json:"name"`
-	Code string           `json:"code"`
-	Type OrganizationType `json:"type"`
+	Name string `json:"name"`
+	Code string `json:"code"`
+	Type string `json:"type"`
 }
 
 func (q *Queries) CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error) {
@@ -32,12 +32,70 @@ func (q *Queries) CreateOrganization(ctx context.Context, arg CreateOrganization
 		&i.Type,
 		&i.Active,
 		&i.CreatedAt,
+		&i.ViaOrganizationID,
 	)
 	return i, err
 }
 
+const createOrganizationType = `-- name: CreateOrganizationType :one
+INSERT INTO organization_types (code, name, description, is_client, sort_order)
+VALUES ($1, $2, $3, $4, COALESCE((SELECT max(sort_order) FROM organization_types), 0) + 10)
+RETURNING code, name, description, is_client, system, sort_order, created_at
+`
+
+type CreateOrganizationTypeParams struct {
+	Code        string      `json:"code"`
+	Name        string      `json:"name"`
+	Description pgtype.Text `json:"description"`
+	IsClient    bool        `json:"is_client"`
+}
+
+func (q *Queries) CreateOrganizationType(ctx context.Context, arg CreateOrganizationTypeParams) (OrganizationType, error) {
+	row := q.db.QueryRow(ctx, createOrganizationType,
+		arg.Code,
+		arg.Name,
+		arg.Description,
+		arg.IsClient,
+	)
+	var i OrganizationType
+	err := row.Scan(
+		&i.Code,
+		&i.Name,
+		&i.Description,
+		&i.IsClient,
+		&i.System,
+		&i.SortOrder,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const deleteOrganization = `-- name: DeleteOrganization :execrows
+DELETE FROM organizations WHERE id = $1
+`
+
+func (q *Queries) DeleteOrganization(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteOrganization, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteOrganizationType = `-- name: DeleteOrganizationType :execrows
+DELETE FROM organization_types WHERE code = $1 AND NOT system
+`
+
+func (q *Queries) DeleteOrganizationType(ctx context.Context, code string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteOrganizationType, code)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const findOrganizationByNameOrCode = `-- name: FindOrganizationByNameOrCode :one
-SELECT id, name, code, type, active, created_at FROM organizations
+SELECT id, name, code, type, active, created_at, via_organization_id FROM organizations
 WHERE active AND (lower(name) = lower($1::text) OR lower(code) = lower($1::text))
 ORDER BY (lower(code) = lower($1::text)) DESC
 LIMIT 1
@@ -55,12 +113,13 @@ func (q *Queries) FindOrganizationByNameOrCode(ctx context.Context, ref string) 
 		&i.Type,
 		&i.Active,
 		&i.CreatedAt,
+		&i.ViaOrganizationID,
 	)
 	return i, err
 }
 
 const getOrganization = `-- name: GetOrganization :one
-SELECT id, name, code, type, active, created_at FROM organizations WHERE id = $1
+SELECT id, name, code, type, active, created_at, via_organization_id FROM organizations WHERE id = $1
 `
 
 func (q *Queries) GetOrganization(ctx context.Context, id uuid.UUID) (Organization, error) {
@@ -73,38 +132,65 @@ func (q *Queries) GetOrganization(ctx context.Context, id uuid.UUID) (Organizati
 		&i.Type,
 		&i.Active,
 		&i.CreatedAt,
+		&i.ViaOrganizationID,
 	)
 	return i, err
 }
 
-const listOrganizations = `-- name: ListOrganizations :many
-SELECT id, name, code, type, active, created_at FROM organizations
-WHERE ($1::organization_type IS NULL OR type = $1)
-  AND ($2::boolean IS NULL OR active = $2)
-ORDER BY name
+const getOrganizationType = `-- name: GetOrganizationType :one
+SELECT code, name, description, is_client, system, sort_order, created_at FROM organization_types WHERE code = $1
 `
 
-type ListOrganizationsParams struct {
-	Type   NullOrganizationType `json:"type"`
-	Active pgtype.Bool          `json:"active"`
+func (q *Queries) GetOrganizationType(ctx context.Context, code string) (OrganizationType, error) {
+	row := q.db.QueryRow(ctx, getOrganizationType, code)
+	var i OrganizationType
+	err := row.Scan(
+		&i.Code,
+		&i.Name,
+		&i.Description,
+		&i.IsClient,
+		&i.System,
+		&i.SortOrder,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
-func (q *Queries) ListOrganizations(ctx context.Context, arg ListOrganizationsParams) ([]Organization, error) {
-	rows, err := q.db.Query(ctx, listOrganizations, arg.Type, arg.Active)
+const listOrganizationTypes = `-- name: ListOrganizationTypes :many
+SELECT t.code, t.name, t.description, t.is_client, t.system, t.sort_order, t.created_at, (SELECT count(*) FROM organizations o WHERE o.type = t.code)::bigint AS organizations
+FROM organization_types t
+ORDER BY t.sort_order, t.name
+`
+
+type ListOrganizationTypesRow struct {
+	Code          string             `json:"code"`
+	Name          string             `json:"name"`
+	Description   pgtype.Text        `json:"description"`
+	IsClient      bool               `json:"is_client"`
+	System        bool               `json:"system"`
+	SortOrder     int32              `json:"sort_order"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	Organizations int64              `json:"organizations"`
+}
+
+func (q *Queries) ListOrganizationTypes(ctx context.Context) ([]ListOrganizationTypesRow, error) {
+	rows, err := q.db.Query(ctx, listOrganizationTypes)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Organization
+	var items []ListOrganizationTypesRow
 	for rows.Next() {
-		var i Organization
+		var i ListOrganizationTypesRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
 			&i.Code,
-			&i.Type,
-			&i.Active,
+			&i.Name,
+			&i.Description,
+			&i.IsClient,
+			&i.System,
+			&i.SortOrder,
 			&i.CreatedAt,
+			&i.Organizations,
 		); err != nil {
 			return nil, err
 		}
@@ -116,22 +202,135 @@ func (q *Queries) ListOrganizations(ctx context.Context, arg ListOrganizationsPa
 	return items, nil
 }
 
+const listOrganizations = `-- name: ListOrganizations :many
+SELECT o.id, o.name, o.code, o.type, o.active, o.created_at, o.via_organization_id, v.name AS via_name
+FROM organizations o
+JOIN organization_types t ON t.code = o.type
+LEFT JOIN organizations v ON v.id = o.via_organization_id
+WHERE ($1::text IS NULL OR o.type = $1)
+  AND ($2::boolean IS NULL OR o.active = $2)
+  AND (NOT $3::boolean OR t.is_client)
+ORDER BY o.name
+`
+
+type ListOrganizationsParams struct {
+	Type        pgtype.Text `json:"type"`
+	Active      pgtype.Bool `json:"active"`
+	ClientsOnly bool        `json:"clients_only"`
+}
+
+type ListOrganizationsRow struct {
+	ID                uuid.UUID          `json:"id"`
+	Name              string             `json:"name"`
+	Code              string             `json:"code"`
+	Type              string             `json:"type"`
+	Active            bool               `json:"active"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	ViaOrganizationID pgtype.UUID        `json:"via_organization_id"`
+	ViaName           pgtype.Text        `json:"via_name"`
+}
+
+// clients_only: los de tipos que cuentan como cliente (Cliente, Mandante…).
+func (q *Queries) ListOrganizations(ctx context.Context, arg ListOrganizationsParams) ([]ListOrganizationsRow, error) {
+	rows, err := q.db.Query(ctx, listOrganizations, arg.Type, arg.Active, arg.ClientsOnly)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListOrganizationsRow
+	for rows.Next() {
+		var i ListOrganizationsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Code,
+			&i.Type,
+			&i.Active,
+			&i.CreatedAt,
+			&i.ViaOrganizationID,
+			&i.ViaName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const moveOrganizationsToType = `-- name: MoveOrganizationsToType :execrows
+UPDATE organizations SET type = $1 WHERE type = $2
+`
+
+type MoveOrganizationsToTypeParams struct {
+	ToCode   string `json:"to_code"`
+	FromCode string `json:"from_code"`
+}
+
+func (q *Queries) MoveOrganizationsToType(ctx context.Context, arg MoveOrganizationsToTypeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, moveOrganizationsToType, arg.ToCode, arg.FromCode)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const organizationDependents = `-- name: OrganizationDependents :one
+SELECT
+  (SELECT count(*) FROM services s WHERE s.organization_id = $1)::bigint AS services,
+  (SELECT count(*) FROM contacts c WHERE c.organization_id = $1)::bigint AS contacts,
+  (SELECT count(*) FROM tickets t WHERE t.client_id = $1)::bigint AS tickets,
+  (SELECT count(*) FROM teams tm WHERE tm.organization_id = $1)::bigint AS teams,
+  (SELECT count(*) FROM assets a WHERE a.client_id = $1 OR a.contractor_id = $1)::bigint AS assets,
+  ((SELECT count(*) FROM team_groups g WHERE g.client_id = $1) + (SELECT count(*) FROM raci_assignments r WHERE r.client_id = $1))::bigint AS other
+`
+
+type OrganizationDependentsRow struct {
+	Services int64 `json:"services"`
+	Contacts int64 `json:"contacts"`
+	Tickets  int64 `json:"tickets"`
+	Teams    int64 `json:"teams"`
+	Assets   int64 `json:"assets"`
+	Other    int64 `json:"other"`
+}
+
+// Qué tiene asociado una organización antes de eliminarla: si hay algo, no se
+// borra (los contactos caerían en cascada) y se propone desactivarla.
+func (q *Queries) OrganizationDependents(ctx context.Context, organizationID uuid.UUID) (OrganizationDependentsRow, error) {
+	row := q.db.QueryRow(ctx, organizationDependents, organizationID)
+	var i OrganizationDependentsRow
+	err := row.Scan(
+		&i.Services,
+		&i.Contacts,
+		&i.Tickets,
+		&i.Teams,
+		&i.Assets,
+		&i.Other,
+	)
+	return i, err
+}
+
 const updateOrganization = `-- name: UpdateOrganization :one
 UPDATE organizations SET
   name = COALESCE($2, name),
   code = COALESCE($3, code),
   type = COALESCE($4, type),
-  active = COALESCE($5, active)
+  active = COALESCE($5, active),
+  via_organization_id = CASE WHEN $6::boolean THEN $7::uuid ELSE via_organization_id END
 WHERE id = $1
-RETURNING id, name, code, type, active, created_at
+RETURNING id, name, code, type, active, created_at, via_organization_id
 `
 
 type UpdateOrganizationParams struct {
-	ID     uuid.UUID            `json:"id"`
-	Name   pgtype.Text          `json:"name"`
-	Code   pgtype.Text          `json:"code"`
-	Type   NullOrganizationType `json:"type"`
-	Active pgtype.Bool          `json:"active"`
+	ID                uuid.UUID   `json:"id"`
+	Name              pgtype.Text `json:"name"`
+	Code              pgtype.Text `json:"code"`
+	Type              pgtype.Text `json:"type"`
+	Active            pgtype.Bool `json:"active"`
+	SetVia            bool        `json:"set_via"`
+	ViaOrganizationID pgtype.UUID `json:"via_organization_id"`
 }
 
 func (q *Queries) UpdateOrganization(ctx context.Context, arg UpdateOrganizationParams) (Organization, error) {
@@ -141,6 +340,8 @@ func (q *Queries) UpdateOrganization(ctx context.Context, arg UpdateOrganization
 		arg.Code,
 		arg.Type,
 		arg.Active,
+		arg.SetVia,
+		arg.ViaOrganizationID,
 	)
 	var i Organization
 	err := row.Scan(
@@ -149,6 +350,43 @@ func (q *Queries) UpdateOrganization(ctx context.Context, arg UpdateOrganization
 		&i.Code,
 		&i.Type,
 		&i.Active,
+		&i.CreatedAt,
+		&i.ViaOrganizationID,
+	)
+	return i, err
+}
+
+const updateOrganizationType = `-- name: UpdateOrganizationType :one
+UPDATE organization_types SET
+  name = COALESCE($2, name),
+  description = COALESCE($3, description),
+  is_client = COALESCE($4, is_client)
+WHERE code = $1
+RETURNING code, name, description, is_client, system, sort_order, created_at
+`
+
+type UpdateOrganizationTypeParams struct {
+	Code        string      `json:"code"`
+	Name        pgtype.Text `json:"name"`
+	Description pgtype.Text `json:"description"`
+	IsClient    pgtype.Bool `json:"is_client"`
+}
+
+func (q *Queries) UpdateOrganizationType(ctx context.Context, arg UpdateOrganizationTypeParams) (OrganizationType, error) {
+	row := q.db.QueryRow(ctx, updateOrganizationType,
+		arg.Code,
+		arg.Name,
+		arg.Description,
+		arg.IsClient,
+	)
+	var i OrganizationType
+	err := row.Scan(
+		&i.Code,
+		&i.Name,
+		&i.Description,
+		&i.IsClient,
+		&i.System,
+		&i.SortOrder,
 		&i.CreatedAt,
 	)
 	return i, err

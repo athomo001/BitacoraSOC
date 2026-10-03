@@ -53,6 +53,11 @@ export class SetupService {
     return response.data.user;
   }
 
+  /** Cambio de módulos hecho en otra pestaña o por otro admin (evento en vivo). */
+  applyModules(flags: ModuleFlags): void {
+    this._status.update((current) => ({ setupCompleted: current?.setupCompleted ?? true, ...flags }));
+  }
+
   /** PATCH /api/config/modules — nunca borra datos del módulo apagado. */
   async updateModules(patch: Partial<ModuleFlags>): Promise<ModuleFlags> {
     const response = await firstValueFrom(

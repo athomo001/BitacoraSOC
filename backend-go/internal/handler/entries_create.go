@@ -158,9 +158,14 @@ func (h *EntriesHandler) createWithTicket(w http.ResponseWriter, r *http.Request
 			return
 		}
 	} else {
-		if req.AssignedTeamID == nil || *req.AssignedTeamID == uuid.Nil || !validTicketType(req.TicketType) {
-			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "createTicket requiere ticketType y assignedTeamId")
+		if !validTicketType(req.TicketType) {
+			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "createTicket requiere ticketType")
 			return
+		}
+		// El equipo resolutor es opcional: se completa al tomar el ticket.
+		teamID := uuid.Nil
+		if req.AssignedTeamID != nil {
+			teamID = *req.AssignedTeamID
 		}
 		clientID := uuid.Nil
 		if req.ClientID != nil {
@@ -176,7 +181,7 @@ func (h *EntriesHandler) createWithTicket(w http.ResponseWriter, r *http.Request
 			return
 		}
 		ticket, err = h.Tickets.createTicketTx(ctx, tx, newTicket{
-			Type: req.TicketType, Scope: params.Scope, ClientID: clientID, TeamID: *req.AssignedTeamID,
+			Type: req.TicketType, Scope: params.Scope, ClientID: clientID, TeamID: teamID,
 			ServiceID: params.ServiceID, AssetID: params.AssetID,
 			Title: ticketTitleFromContent(req.Content), Description: req.Content,
 			Impact: impact, Urgency: urgency, ActorID: user.ID,
@@ -198,7 +203,7 @@ func (h *EntriesHandler) createWithTicket(w http.ResponseWriter, r *http.Request
 		return
 	}
 	// Mismo camino que un comentario normal: si el ticket estaba resuelto, se reabre.
-	if err = h.Tickets.addTicketComment(ctx, queries, ticket, user, req.Content, false); err != nil {
+	if _, err = h.Tickets.addTicketComment(ctx, queries, ticket, user, req.Content, false); err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo sincronizar el comentario")
 		return
 	}

@@ -148,3 +148,56 @@ UPDATE tickets SET first_responded_at = COALESCE(first_responded_at, sqlc.arg('a
 
 -- name: SetTicketPublicPin :one
 UPDATE tickets SET public_tracking_pin = $2, updated_at = now() WHERE id = $1 RETURNING *;
+
+-- name: DeleteTicket :one
+DELETE FROM tickets WHERE id = $1 RETURNING ticket_number;
+
+-- name: ListTicketResolvers :many
+SELECT r.user_id, u.username, u.full_name, r.added_at
+FROM ticket_resolvers r JOIN users u ON u.id = r.user_id
+WHERE r.ticket_id = $1
+ORDER BY r.added_at, u.username;
+
+-- name: AddTicketResolver :exec
+INSERT INTO ticket_resolvers (ticket_id, user_id, added_by) VALUES ($1, $2, $3)
+ON CONFLICT DO NOTHING;
+
+-- name: RemoveTicketResolver :execrows
+DELETE FROM ticket_resolvers WHERE ticket_id = $1 AND user_id = $2;
+
+-- name: ListTicketAssignees :many
+-- Personas a las que se puede sumar como resolutor (usuarios activos que
+-- operan: admin y analistas).
+SELECT id, username, full_name FROM users
+WHERE active AND role IN ('admin', 'user')
+ORDER BY username;
+
+-- name: CreateTicketImage :one
+INSERT INTO ticket_images (ticket_id, file_name, mime_type, size_bytes, file_data, hash_sha256, uploaded_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, file_name, size_bytes, created_at;
+
+-- name: ClaimTicketImages :execrows
+-- El comentario reclama las imágenes que subió su autor en ese ticket.
+UPDATE ticket_images SET comment_id = sqlc.arg('comment_id')
+WHERE ticket_id = sqlc.arg('ticket_id') AND comment_id IS NULL
+  AND uploaded_by = sqlc.arg('user_id') AND id = ANY(sqlc.arg('ids')::uuid[]);
+
+-- name: ListTicketImages :many
+SELECT i.id, i.comment_id, i.file_name, i.size_bytes, i.created_at, c.is_public, c.author_name
+FROM ticket_images i JOIN ticket_comments c ON c.id = i.comment_id
+WHERE i.ticket_id = $1
+ORDER BY i.created_at DESC;
+
+-- name: GetTicketImage :one
+SELECT i.id, i.ticket_id, i.comment_id, i.mime_type, i.file_name, i.file_data, i.uploaded_by,
+       COALESCE(c.is_public, false)::boolean AS is_public
+FROM ticket_images i LEFT JOIN ticket_comments c ON c.id = i.comment_id
+WHERE i.id = $1 AND i.ticket_id = $2;
+
+-- name: DeletePendingTicketImage :execrows
+DELETE FROM ticket_images WHERE id = $1 AND ticket_id = $2 AND comment_id IS NULL AND uploaded_by = $3;
+
+-- name: DeleteStaleTicketImages :exec
+-- Subidas que nunca llegaron a un comentario (se cerró la pestaña).
+DELETE FROM ticket_images WHERE comment_id IS NULL AND created_at < now() - interval '1 day';

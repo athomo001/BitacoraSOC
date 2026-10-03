@@ -83,7 +83,7 @@ func (h *TicketsHandler) createTicketTx(ctx context.Context, tx pgx.Tx, n newTic
 	}
 	return h.Queries.WithTx(tx).CreateTicket(ctx, db.CreateTicketParams{
 		TicketNumber: fmt.Sprintf("TKT-%04d-%05d", now.Year(), sequence), TicketType: db.TicketType(n.Type), Scope: n.Scope,
-		ClientID: n.ClientID, AssignedTeamID: pgtype.UUID{Bytes: n.TeamID, Valid: true}, AssignedUserID: n.AssignedUserID,
+		ClientID: n.ClientID, AssignedTeamID: pgtype.UUID{Bytes: n.TeamID, Valid: n.TeamID != uuid.Nil}, AssignedUserID: n.AssignedUserID,
 		ServiceID: n.ServiceID, AssetID: n.AssetID,
 		Impact: db.ItilImpact(n.Impact), Urgency: db.ItilUrgency(n.Urgency), Priority: ticketPriority(n.Impact, n.Urgency),
 		Title: n.Title, Description: n.Description,
@@ -98,7 +98,7 @@ func (h *TicketsHandler) createTicketTx(ctx context.Context, tx pgx.Tx, n newTic
 // `resolved`, lo reabre a `in_progress` (spec: una novedad sobre un ticket
 // resuelto lo reabre en vez de exigir uno nuevo). Recibe las queries del
 // llamador para correr dentro de su transacción cuando la hay.
-func (h *TicketsHandler) addTicketComment(ctx context.Context, q *db.Queries, ticket db.Ticket, user middleware.AuthenticatedUser, content string, isPublic bool) error {
+func (h *TicketsHandler) addTicketComment(ctx context.Context, q *db.Queries, ticket db.Ticket, user middleware.AuthenticatedUser, content string, isPublic bool) (db.TicketComment, error) {
 	if ticket.Status == db.TicketStatusResolved {
 		_, err := q.UpdateTicket(ctx, db.UpdateTicketParams{
 			ID: ticket.ID, Status: db.NullTicketStatus{TicketStatus: db.TicketStatusInProgress, Valid: true},
@@ -106,13 +106,14 @@ func (h *TicketsHandler) addTicketComment(ctx context.Context, q *db.Queries, ti
 			ReopenedCount: pgtype.Int4{Int32: ticket.ReopenedCount + 1, Valid: true}, ReopenedAt: pgtype.Timestamptz{Time: h.now(), Valid: true},
 		})
 		if err != nil {
-			return err
+			return db.TicketComment{}, err
 		}
 	}
-	if _, err := q.CreateTicketComment(ctx, db.CreateTicketCommentParams{TicketID: ticket.ID, UserID: pgtype.UUID{Bytes: user.ID, Valid: true}, AuthorName: user.Username, Content: content, IsPublic: isPublic}); err != nil {
-		return err
+	comment, err := q.CreateTicketComment(ctx, db.CreateTicketCommentParams{TicketID: ticket.ID, UserID: pgtype.UUID{Bytes: user.ID, Valid: true}, AuthorName: user.Username, Content: content, IsPublic: isPublic})
+	if err != nil {
+		return db.TicketComment{}, err
 	}
-	return h.markResponded(ctx, q, ticket.ID)
+	return comment, h.markResponded(ctx, q, ticket.ID)
 }
 
 // AddEntryCommentToTicket: un comentario en una entrada vinculada también
@@ -122,7 +123,8 @@ func (h *TicketsHandler) AddEntryCommentToTicket(ctx context.Context, ticketID u
 	if err != nil {
 		return err
 	}
-	return h.addTicketComment(ctx, h.Queries, ticket, user, content, isPublic)
+	_, err = h.addTicketComment(ctx, h.Queries, ticket, user, content, isPublic)
+	return err
 }
 
 // Enabled dice si la ticketera nativa está activa. Lo usa también la
@@ -138,8 +140,8 @@ func (h *TicketsHandler) Enabled(ctx context.Context) (bool, error) {
 
 func (h *TicketsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req createTicketRequest
-	if err := decodeJSON(w, r, &req); err != nil || !validTicketType(req.TicketType) || req.ClientID == uuid.Nil || req.TeamID == uuid.Nil || !validImpact(req.Impact) || !validUrgency(req.Urgency) || strings.TrimSpace(req.Title) == "" || strings.TrimSpace(req.Description) == "" {
-		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "ticketType, scope, clientId, teamId, impacto, urgencia, título y descripción son obligatorios")
+	if err := decodeJSON(w, r, &req); err != nil || !validTicketType(req.TicketType) || req.ClientID == uuid.Nil || !validImpact(req.Impact) || !validUrgency(req.Urgency) || strings.TrimSpace(req.Title) == "" || strings.TrimSpace(req.Description) == "" {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "ticketType, scope, clientId, impacto, urgencia, título y descripción son obligatorios (el equipo resolutor se puede dejar para después)")
 		return
 	}
 	scope := db.EntryScope(req.Scope)

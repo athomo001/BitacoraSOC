@@ -1,0 +1,12 @@
+{
+  "reportData": {
+    "ofensa": "1772",
+    "tipoOperacion": "Ofensas",
+    "nombreEvento": "Firewall Deny"
+  },
+  "images": [],
+  "logoCid": null,
+  "autor": "pveloso",
+  "brandName": "Bitácora CDC",
+  "paletteKey": "cdc-verde"
+}

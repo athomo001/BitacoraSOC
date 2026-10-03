@@ -87,7 +87,14 @@
                 <time class="pt__when mono" [attr.datetime]="u.createdAt">{{ u.createdAt | date: 'dd/MM HH:mm' }}</time>
                 <div class="pt__update-body">
                   <div class="pt__author">{{ i18n.t('publicTicket.author') }}</div>
-                  <p class="pt__text">{{ u.content }}</p>
+                  @if (u.content) { <p class="pt__text">{{ u.content }}</p> }
+                  @if (u.imageIds?.length) {
+                    <div class="pt__images">
+                      @for (id of u.imageIds; track id) {
+                        <a class="pt__image" [href]="imageUrl(id)" target="_blank" rel="noopener"><img [src]="imageUrl(id)" [alt]="i18n.t('publicTicket.image')" loading="lazy" /></a>
+                      }
+                    </div>
+                  }
                 </div>
               </div>
             } @empty {

@@ -17,7 +17,7 @@
       <label class="adm-field">
         <span class="adm-label">{{ i18n.t('teams.kind') }}</span>
         <select class="adm-input" name="teamKind" [ngModel]="teamKind()" (ngModelChange)="teamKind.set($event)">
-          @for (k of kinds; track k) { <option [value]="k">{{ i18n.t(kindKey(k)) }}</option> }
+          @for (k of kinds(); track k) { <option [value]="k">{{ i18n.t(kindKey(k)) }}</option> }
         </select>
       </label>
       <label class="adm-field">

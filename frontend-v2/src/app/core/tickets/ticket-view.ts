@@ -112,3 +112,11 @@ export function publicProgress(status: TicketStatus): PublicProgress {
 export function publicTrackingUrl(origin: string, token: string): string {
   return `${origin}/p/tickets/${token}`;
 }
+
+/**
+ * Equipos que pueden resolver un ticket: los de escalamiento y RACI son
+ * listas de aviso por cliente ("DPP · 2° llamado"), no áreas que resuelven.
+ */
+export function resolverTeams<T extends { kind: string; active: boolean }>(teams: readonly T[]): T[] {
+  return teams.filter((t) => t.active && t.kind !== 'escalation' && t.kind !== 'raci');
+}

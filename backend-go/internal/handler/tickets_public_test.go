@@ -18,18 +18,26 @@ func TestPublicTicketDTO_HidesTechnicianAndInternalComments(t *testing.T) {
 		{ID: uuid.New(), UserID: pgtype.UUID{Bytes: technician, Valid: true}, AuthorName: "carlos.soto", Content: "Cuadrilla en sitio", IsPublic: true},
 		{ID: uuid.New(), UserID: pgtype.UUID{Bytes: technician, Valid: true}, AuthorName: "carlos.soto", Content: "llamar al +56 9 1234 5678", IsPublic: false},
 	}
-	body, err := json.Marshal(toPublicTicketDTO(db.Ticket{TicketNumber: "TKT-2026-00042"}, "Banco Austral", comments))
+	publicImage, internalImage := uuid.New(), uuid.New()
+	images := []db.ListTicketImagesRow{
+		{ID: publicImage, CommentID: pgtype.UUID{Bytes: comments[0].ID, Valid: true}, IsPublic: true},
+		{ID: internalImage, CommentID: pgtype.UUID{Bytes: comments[1].ID, Valid: true}, IsPublic: false},
+	}
+	body, err := json.Marshal(toPublicTicketDTO(db.Ticket{TicketNumber: "TKT-2026-00042"}, "Banco Austral", comments, images))
 	if err != nil {
 		t.Fatal(err)
 	}
 	out := string(body)
-	for _, leak := range []string{"carlos.soto", technician.String(), "user_id", "author_name", "+56 9"} {
+	for _, leak := range []string{"carlos.soto", technician.String(), "user_id", "author_name", "+56 9", internalImage.String()} {
 		if strings.Contains(out, leak) {
 			t.Fatalf("la vista pública expone %q: %s", leak, out)
 		}
 	}
 	if !strings.Contains(out, "Cuadrilla en sitio") || !strings.Contains(out, publicAuthorLabel) || !strings.Contains(out, "Banco Austral") {
 		t.Fatalf("falta el comunicado público o el cliente: %s", out)
+	}
+	if !strings.Contains(out, publicImage.String()) {
+		t.Fatalf("falta la imagen del comentario público: %s", out)
 	}
 }
 

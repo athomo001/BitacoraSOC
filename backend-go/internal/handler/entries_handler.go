@@ -481,34 +481,11 @@ type uploadImageResponse struct {
 // nunca en el sistema de archivos local (spec/09-alta-disponibilidad-2-
 // nodos.md).
 func (h *EntriesHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, maxImageBytes+64<<10)
-	if err := r.ParseMultipartForm(maxImageBytes); err != nil {
-		problemdetails.Write(w, r, http.StatusRequestEntityTooLarge, "payload-too-large", "la imagen supera el límite permitido (5MB)")
+	img, ok := readImageUpload(w, r)
+	if !ok {
 		return
 	}
-	file, header, err := r.FormFile("image")
-	if err != nil {
-		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "falta la imagen en el campo 'image'")
-		return
-	}
-	defer file.Close()
-
-	raw, err := io.ReadAll(io.LimitReader(file, maxImageBytes+1))
-	if err != nil || len(raw) > maxImageBytes {
-		problemdetails.Write(w, r, http.StatusRequestEntityTooLarge, "payload-too-large", "la imagen supera el límite permitido (5MB)")
-		return
-	}
-	mimeType := http.DetectContentType(raw)
-	if !allowedImageTypes[mimeType] {
-		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "formato no soportado (solo png/jpg/webp)")
-		return
-	}
-	sum := sha256.Sum256(raw)
-	hash := hex.EncodeToString(sum[:])
-	fileName := header.Filename
-	if fileName == "" {
-		fileName = "imagen"
-	}
+	raw, mimeType, hash, fileName := img.data, img.mime, img.hash, img.name
 
 	ctx := r.Context()
 	attachment, err := h.Queries.CreateOrphanAttachment(ctx, db.CreateOrphanAttachmentParams{
@@ -545,4 +522,45 @@ func (h *EntriesHandler) ServeAttachment(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(attachment.FileData)
+}
+
+// uploadedImage es una imagen ya validada (tipo real, tamaño, hash).
+type uploadedImage struct {
+	data []byte
+	mime string
+	hash string
+	name string
+}
+
+// readImageUpload lee el campo multipart "image" con los límites de la app
+// (5 MB, png/jpg/webp por el contenido, no por la extensión). Si algo falla
+// ya respondió el error y devuelve false. Lo usan la bitácora y los tickets.
+func readImageUpload(w http.ResponseWriter, r *http.Request) (uploadedImage, bool) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxImageBytes+64<<10)
+	if err := r.ParseMultipartForm(maxImageBytes); err != nil {
+		problemdetails.Write(w, r, http.StatusRequestEntityTooLarge, "payload-too-large", "la imagen supera el límite permitido (5MB)")
+		return uploadedImage{}, false
+	}
+	file, header, err := r.FormFile("image")
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "falta la imagen en el campo 'image'")
+		return uploadedImage{}, false
+	}
+	defer file.Close()
+	raw, err := io.ReadAll(io.LimitReader(file, maxImageBytes+1))
+	if err != nil || len(raw) > maxImageBytes {
+		problemdetails.Write(w, r, http.StatusRequestEntityTooLarge, "payload-too-large", "la imagen supera el límite permitido (5MB)")
+		return uploadedImage{}, false
+	}
+	mimeType := http.DetectContentType(raw)
+	if !allowedImageTypes[mimeType] {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "formato no soportado (solo png/jpg/webp)")
+		return uploadedImage{}, false
+	}
+	sum := sha256.Sum256(raw)
+	name := header.Filename
+	if name == "" {
+		name = "imagen"
+	}
+	return uploadedImage{data: raw, mime: mimeType, hash: hex.EncodeToString(sum[:]), name: name}, true
 }

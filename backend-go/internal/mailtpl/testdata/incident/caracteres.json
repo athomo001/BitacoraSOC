@@ -1,0 +1,28 @@
+{
+  "reportData": {
+    "codigoTicket": "",
+    "ofensa": "5799",
+    "tipoOperacion": "Ofensa",
+    "nombreEvento": "A <b>\"x\"</b> & 'y'",
+    "fecha": "no es fecha",
+    "criticidad": "Critica",
+    "motivoEvento": "Intentos de autenticación fallidos repetidos.",
+    "observaciones": "línea 1\nlínea 2 <script>",
+    "recomendacion": "Bloquear la IP y forzar cambio de clave.",
+    "informacionAdicional": "312 intentos en 15 minutos.",
+    "origenConexion": "185.220.101[.]4",
+    "destino": "portal.dpp[.]cl",
+    "reputacionOrigen": "Maliciosa",
+    "evidenciaTexto": "",
+    "logSource": "DPP"
+  },
+  "images": [
+    {
+      "name": "a&b.png"
+    }
+  ],
+  "logoCid": null,
+  "autor": "O'Brien & <co>",
+  "brandName": "Marca \"X\"",
+  "paletteKey": "noche-azul"
+}

@@ -25,6 +25,16 @@ export interface ShiftClosure {
   slaBreachesCount: number;
   sentStatus: string;
 }
+export interface ShiftStats {
+  shiftStartAt: string;
+  totalEntries: number;
+  totalIncidents: number;
+  ticketsResolvedCount: number;
+  slaBreachesCount: number;
+  inicioWrittenAt: string | null;
+  cierreWrittenAt: string | null;
+}
+
 export interface Handover {
   previousClosure: ShiftClosure | null;
   upcomingMaintenanceWindows: Array<{ id: string; title: string; startsAt: string; endsAt: string; suppressNotifications: boolean }>;
@@ -50,6 +60,10 @@ export class ChecklistsService {
   }
   async close(payload: { closureCheckId: string; observations?: string; pendingForNextShift?: string; notifyEmail: boolean; syncGlpi: boolean }): Promise<ShiftClosure> {
     return (await firstValueFrom(this.http.post<ApiEnvelope<ShiftClosure>>('/api/shift-checks/close', payload))).data;
+  }
+  /** Cifras del turno en curso y si ya se escribió su inicio/cierre (popup de turno). */
+  async shiftStats(workShiftId: string): Promise<ShiftStats> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<ShiftStats>>('/api/shift-checks/stats', { params: { workShiftId } }))).data;
   }
   async handover(): Promise<Handover> {
     return (await firstValueFrom(this.http.get<ApiEnvelope<Handover>>('/api/shift-checks/handover'))).data;

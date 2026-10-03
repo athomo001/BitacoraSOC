@@ -819,12 +819,12 @@ WHERE t.id = ANY($1::uuid[])
 `
 
 type ListTeamsForResolveRow struct {
-	ID               uuid.UUID            `json:"id"`
-	Name             string               `json:"name"`
-	Kind             string               `json:"kind"`
-	Audience         TeamAudience         `json:"audience"`
-	OrganizationName pgtype.Text          `json:"organization_name"`
-	OrganizationType NullOrganizationType `json:"organization_type"`
+	ID               uuid.UUID    `json:"id"`
+	Name             string       `json:"name"`
+	Kind             string       `json:"kind"`
+	Audience         TeamAudience `json:"audience"`
+	OrganizationName pgtype.Text  `json:"organization_name"`
+	OrganizationType pgtype.Text  `json:"organization_type"`
 }
 
 func (q *Queries) ListTeamsForResolve(ctx context.Context, teamIds []uuid.UUID) ([]ListTeamsForResolveRow, error) {

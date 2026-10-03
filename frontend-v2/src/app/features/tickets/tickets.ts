@@ -82,6 +82,12 @@ export class TicketsComponent implements OnInit {
     void this.load(); // el resumen de la cola también cambia
   }
 
+  protected onDeleted(id: string): void {
+    this.tickets.update((list) => list.filter((t) => t.id !== id));
+    this.selectedId.set(null);
+    void this.load();
+  }
+
   protected async openNew(): Promise<void> {
     const [{ Dialog }, { NewTicketDialogComponent }] = await Promise.all([import('@angular/cdk/dialog'), import('./new-ticket-dialog')]);
     const ref = this.injector.get(Dialog).open<string | undefined>(NewTicketDialogComponent, { ariaLabel: this.i18n.t('tickets.newDialog.title') });

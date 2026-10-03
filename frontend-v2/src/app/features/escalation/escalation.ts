@@ -22,6 +22,7 @@ import {
 import { TerritoryService } from '../../core/territory/territory.service';
 import { TerritorialUnit } from '../../core/territory/territory.models';
 import { ModuleAccessService } from '../../core/auth/module-access.service';
+import { MaintenanceWindowsComponent } from './maintenance-windows';
 import { problemDetail } from '../../core/http-error';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
@@ -33,6 +34,8 @@ interface ScopeOption {
   id: string;
   label: string;
   hint: string;
+  /** Texto extra para el buscador que no se muestra (p. ej. el código del servicio). */
+  search?: string;
 }
 
 const CHANNEL_ICON: Record<ChannelType, string> = { call: 'call', sms: 'sms', whatsapp: 'chat', email: 'mail', other: 'link' };
@@ -51,7 +54,7 @@ const CHANNEL_ICON: Record<ChannelType, string> = { call: 'call', sms: 'sms', wh
 @Component({
   selector: 'app-escalation',
   standalone: true,
-  imports: [FormsModule, DatePipe, MatIconModule],
+  imports: [FormsModule, DatePipe, MatIconModule, MaintenanceWindowsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './escalation.html',
   styleUrl: './escalation.css',
@@ -61,6 +64,15 @@ export class EscalationComponent implements OnInit {
   protected readonly channelIcon = CHANNEL_ICON;
   /** Los dos resultados menos frecuentes van como botones secundarios. */
   protected readonly otherResults: ContactResult[] = ['busy', 'unreachable'];
+
+  /**
+   * Tiene un teléfono (llamada, SMS o WhatsApp): solo entonces hay un
+   * resultado de llamada que registrar. Una lista de correo se avisa con
+   * "Aviso por correo" / "Escalar (correo)", no se llama.
+   */
+  protected callable(m: { channels: readonly { channelType: ChannelType }[] }): boolean {
+    return m.channels.some((c) => c.channelType === 'call' || c.channelType === 'sms' || c.channelType === 'whatsapp');
+  }
 
   private readonly api = inject(EscalationService);
   private readonly territory = inject(TerritoryService);
@@ -74,6 +86,8 @@ export class EscalationComponent implements OnInit {
 
   protected readonly scopeKind = signal<ScopeKind>('asset');
   protected readonly filter = signal('');
+  /** Programar o cerrar mantenciones también es del analista (comentario del dueño #16). */
+  protected readonly showMaintenance = signal(false);
   protected readonly selectedId = signal('');
   private readonly assets = signal<Asset[]>([]);
   private readonly units = signal<TerritorialUnit[]>([]);
@@ -111,9 +125,12 @@ export class EscalationComponent implements OnInit {
         all = this.units().map((u) => ({ id: u.id, label: `${'— '.repeat(u.depth)}${u.name}`, hint: u.code }));
         break;
       default:
-        all = this.services().map((s) => ({ id: s.id, label: s.name, hint: [s.code, s.organizationName].filter(Boolean).join(' · ') }));
+        // Varios clientes tienen un servicio con el mismo nombre: el cliente va primero.
+        all = this.services()
+          .map((s) => ({ id: s.id, label: [s.organizationName, s.name].filter(Boolean).join(' · '), hint: '', search: s.code }))
+          .sort((a, b) => a.label.localeCompare(b.label));
     }
-    return q ? all.filter((o) => `${o.label} ${o.hint}`.toLowerCase().includes(q)) : all;
+    return q ? all.filter((o) => `${o.label} ${o.hint} ${o.search ?? ''}`.toLowerCase().includes(q)) : all;
   });
 
   protected readonly state = computed<FlowState | null>(() => {

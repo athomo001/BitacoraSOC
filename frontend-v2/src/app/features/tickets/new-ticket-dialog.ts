@@ -8,7 +8,8 @@ import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
 import { Organization, OrganizationsService, TeamSummary } from '../../core/organizations/organizations.service';
 import { Impact, TicketType, TicketsService, Urgency } from '../../core/tickets/tickets.service';
-import { PRIORITY_SHORT, PRIORITY_TONE, priorityOf } from '../../core/tickets/ticket-view';
+import { PRIORITY_SHORT, PRIORITY_TONE, priorityOf, resolverTeams } from '../../core/tickets/ticket-view';
+import { ModuleAccessService } from '../../core/auth/module-access.service';
 
 const IMPACTS: readonly Impact[] = ['low', 'medium', 'high'];
 const URGENCIES: readonly Urgency[] = ['low', 'medium', 'high', 'critical'];
@@ -37,21 +38,21 @@ const URGENCIES: readonly Urgency[] = ['low', 'medium', 'high', 'critical'];
             <span>{{ i18n.t('tickets.newDialog.client') }}</span>
             <select name="clientId" [(ngModel)]="clientId" required>
               <option value="" disabled>{{ i18n.t('tickets.newDialog.choose') }}</option>
-              @for (c of clients(); track c.id) { <option [value]="c.id">{{ c.name }}</option> }
+              @for (c of clients(); track c.id) { <option [value]="c.id">{{ c.name }}{{ c.viaName ? ' (' + i18n.tf('orgs.viaShort', c.viaName) + ')' : '' }}</option> }
             </select>
           </label>
           <label class="field">
             <span>{{ i18n.t('tickets.newDialog.team') }}</span>
-            <select name="teamId" [(ngModel)]="teamId" required>
-              <option value="" disabled>{{ i18n.t('tickets.newDialog.choose') }}</option>
+            <select name="teamId" [(ngModel)]="teamId">
+              <option value="">{{ i18n.t('tickets.newDialog.teamLater') }}</option>
               @for (tm of teams(); track tm.id) { <option [value]="tm.id">{{ tm.name }}</option> }
             </select>
           </label>
           <label class="field">
             <span>{{ i18n.t('tickets.newDialog.scope') }}</span>
             <select name="scope" [(ngModel)]="scope">
-              <option value="noc">NOC</option>
-              <option value="soc">SOC</option>
+              @if (modules.noc()) { <option value="noc">NOC</option> }
+              @if (modules.soc()) { <option value="soc">SOC</option> }
               <option value="general">General</option>
             </select>
           </label>
@@ -158,6 +159,8 @@ export class NewTicketDialogComponent implements OnInit {
   protected readonly dialogRef = inject(DialogRef<string | undefined>);
   private readonly orgs = inject(OrganizationsService);
   private readonly api = inject(TicketsService);
+  /** Sin NOC (o sin SOC) ese ámbito no se ofrece. */
+  protected readonly modules = inject(ModuleAccessService);
 
   protected readonly impacts = IMPACTS;
   protected readonly urgencies = URGENCIES;
@@ -173,7 +176,7 @@ export class NewTicketDialogComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected clientId = '';
   protected teamId = '';
-  protected scope: 'soc' | 'noc' | 'general' = 'noc';
+  protected scope: 'soc' | 'noc' | 'general' = 'general';
   protected title = '';
   protected description = '';
 
@@ -182,9 +185,11 @@ export class NewTicketDialogComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     try {
-      const [clients, teams] = await Promise.all([this.orgs.list({ type: 'client', active: true }), this.orgs.listTeams()]);
+      const [clients, teams] = await Promise.all([this.orgs.list({ clients: true, active: true }), this.orgs.listTeams()]);
       this.clients.set(clients);
-      this.teams.set(teams.filter((team) => team.active));
+      await this.modules.load();
+      this.scope = this.modules.soc() ? 'soc' : this.modules.noc() ? 'noc' : 'general';
+      this.teams.set(resolverTeams(teams));
     } catch (error) {
       this.error.set(problemDetail(error, this.i18n.t('tickets.error.load')));
     }
@@ -199,7 +204,7 @@ export class NewTicketDialogComponent implements OnInit {
   }
 
   protected valid(): boolean {
-    return !!this.clientId && !!this.teamId && !!this.title.trim() && !!this.description.trim();
+    return !!this.clientId && !!this.title.trim() && !!this.description.trim();
   }
 
   protected async create(): Promise<void> {
@@ -208,7 +213,7 @@ export class NewTicketDialogComponent implements OnInit {
     this.error.set(null);
     try {
       const created = await this.api.create({
-        ticketType: this.type(), scope: this.scope, clientId: this.clientId, teamId: this.teamId,
+        ticketType: this.type(), scope: this.scope, clientId: this.clientId, teamId: this.teamId || undefined,
         impact: this.impact(), urgency: this.urgency(), title: this.title.trim(), description: this.description.trim(),
       });
       this.dialogRef.close(created.id);

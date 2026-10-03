@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, OnInit, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MarkdownComponent } from '../../shared/markdown/markdown';
+import { AuthImgDirective } from '../../shared/ui/auth-img';
 import { PermissionsService } from '../../core/auth/permissions.service';
 import { ModuleAccessService } from '../../core/auth/module-access.service';
 import { AuthService } from '../../core/auth/auth.service';
@@ -10,6 +11,7 @@ import { problemDetail } from '../../core/http-error';
 import { SseService } from '../../core/sse/sse.service';
 import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 import { DraftsService } from '../../core/drafts/drafts.service';
+import { appendSnippet, openMarkdownHelp } from '../../shared/markdown/markdown-help-dialog';
 import { NotesService } from '../../core/notes/notes.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
@@ -57,7 +59,7 @@ function summaryOf(content: string): string {
 @Component({
   selector: 'app-entries',
   standalone: true,
-  imports: [FormsModule, DatePipe, MatIconModule, MarkdownComponent],
+  imports: [FormsModule, DatePipe, MatIconModule, MarkdownComponent, AuthImgDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKeydown($event)' },
   templateUrl: './entries.html',
@@ -72,6 +74,7 @@ export class EntriesComponent implements OnInit {
 
   private readonly api = inject(EntriesService);
   private readonly drafts = inject(DraftsService);
+  private readonly injector = inject(Injector);
   private readonly notesApi = inject(NotesService);
   private readonly sse = inject(SseService);
   private readonly auth = inject(AuthService);
@@ -191,7 +194,7 @@ export class EntriesComponent implements OnInit {
       this.modules.soc() ? safe(this.escalation.listServices(), (v) => this.services.set(v)) : null,
       this.modules.noc() ? safe(this.escalation.listAssets(), (v) => this.assets.set(v)) : null,
       this.ticketsEnabled() ? safe(this.orgs.listTeams(), (v) => this.teams.set(v)) : null,
-      this.ticketsEnabled() ? safe(this.orgs.list({ type: 'client', active: true }), (v) => this.clients.set(v)) : null,
+      this.ticketsEnabled() ? safe(this.orgs.list({ clients: true, active: true }), (v) => this.clients.set(v)) : null,
     ]);
   }
 
@@ -329,6 +332,12 @@ export class EntriesComponent implements OnInit {
 
   private targetOptionsFor(scope: EntryScope): string[] {
     return [...(scope !== 'noc' ? this.services().map((s) => 'svc:' + s.id) : []), ...(scope !== 'soc' ? this.assets().map((a) => 'asset:' + a.id) : [])];
+  }
+
+  /** Guía de formato (comentario del dueño #9): lo elegido se suma al final de la entrada. */
+  protected async openFormat(): Promise<void> {
+    const snippet = await openMarkdownHelp(this.injector);
+    if (snippet) this.updateDraft({ content: appendSnippet(this.draft().content, snippet) });
   }
 
   protected defangDraft(): void {

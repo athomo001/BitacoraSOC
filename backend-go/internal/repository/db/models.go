@@ -746,50 +746,6 @@ func (ns NullNotificationScheduleFrequency) Value() (driver.Value, error) {
 	return string(ns.NotificationScheduleFrequency), nil
 }
 
-type OrganizationType string
-
-const (
-	OrganizationTypeClient     OrganizationType = "client"
-	OrganizationTypeContractor OrganizationType = "contractor"
-	OrganizationTypeCarrier    OrganizationType = "carrier"
-	OrganizationTypeInternal   OrganizationType = "internal"
-)
-
-func (e *OrganizationType) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = OrganizationType(s)
-	case string:
-		*e = OrganizationType(s)
-	default:
-		return fmt.Errorf("unsupported scan type for OrganizationType: %T", src)
-	}
-	return nil
-}
-
-type NullOrganizationType struct {
-	OrganizationType OrganizationType `json:"organization_type"`
-	Valid            bool             `json:"valid"` // Valid is true if OrganizationType is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullOrganizationType) Scan(value interface{}) error {
-	if value == nil {
-		ns.OrganizationType, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.OrganizationType.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullOrganizationType) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.OrganizationType), nil
-}
-
 type PermissionGroupModuleScope string
 
 const (
@@ -1678,12 +1634,23 @@ type MessageTemplate struct {
 }
 
 type Organization struct {
-	ID        uuid.UUID          `json:"id"`
-	Name      string             `json:"name"`
-	Code      string             `json:"code"`
-	Type      OrganizationType   `json:"type"`
-	Active    bool               `json:"active"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	ID                uuid.UUID          `json:"id"`
+	Name              string             `json:"name"`
+	Code              string             `json:"code"`
+	Type              string             `json:"type"`
+	Active            bool               `json:"active"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	ViaOrganizationID pgtype.UUID        `json:"via_organization_id"`
+}
+
+type OrganizationType struct {
+	Code        string             `json:"code"`
+	Name        string             `json:"name"`
+	Description pgtype.Text        `json:"description"`
+	IsClient    bool               `json:"is_client"`
+	System      bool               `json:"system"`
+	SortOrder   int32              `json:"sort_order"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 }
 
 type PermissionGroup struct {
@@ -1975,6 +1942,26 @@ type TicketComment struct {
 	Content    string             `json:"content"`
 	IsPublic   bool               `json:"is_public"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+type TicketImage struct {
+	ID         uuid.UUID          `json:"id"`
+	TicketID   uuid.UUID          `json:"ticket_id"`
+	CommentID  pgtype.UUID        `json:"comment_id"`
+	FileName   string             `json:"file_name"`
+	MimeType   string             `json:"mime_type"`
+	SizeBytes  int32              `json:"size_bytes"`
+	FileData   []byte             `json:"file_data"`
+	HashSha256 string             `json:"hash_sha256"`
+	UploadedBy pgtype.UUID        `json:"uploaded_by"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+type TicketResolver struct {
+	TicketID uuid.UUID          `json:"ticket_id"`
+	UserID   uuid.UUID          `json:"user_id"`
+	AddedBy  pgtype.UUID        `json:"added_by"`
+	AddedAt  pgtype.Timestamptz `json:"added_at"`
 }
 
 type TicketTask struct {

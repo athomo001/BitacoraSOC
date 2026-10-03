@@ -25,7 +25,7 @@ const LIST = {
 };
 
 function detail(t: Ticket): TicketDetail {
-  return { ticket: t, publicTrackingToken: 'tok', publicTrackingPin: null, comments: [], tasks: [], entries: [], totalTimeSpentSeconds: 0 };
+  return { ticket: t, publicTrackingToken: 'tok', publicTrackingPin: null, comments: [], tasks: [], entries: [], totalTimeSpentSeconds: 0, resolvers: [] };
 }
 
 /** Deja correr las promesas pendientes (la app no usa zone.js). */
@@ -94,7 +94,56 @@ describe('TicketsComponent', () => {
     fixture.detectChanges();
     (el.querySelector('.td__composer') as HTMLFormElement).dispatchEvent(new Event('submit'));
     const req = httpMock.expectOne({ method: 'POST', url: '/api/tickets/t1/comments' });
-    expect(req.request.body).toEqual({ content: 'Cuadrilla en sitio', isPublic: false });
+    expect(req.request.body).toEqual({ content: 'Cuadrilla en sitio', isPublic: false, imageIds: [] });
+  });
+
+  it('imágenes: pegar una captura la sube, queda en miniatura y el comentario la incluye (comentario del dueño #14)', async () => {
+    globalThis.URL.createObjectURL ??= () => 'blob:prueba';
+    globalThis.URL.revokeObjectURL ??= () => undefined;
+    const { fixture, el } = await render();
+    const textarea = el.querySelector('.td__textarea') as HTMLTextAreaElement;
+    const file = new File([new Uint8Array([137, 80, 78, 71])], 'captura.png', { type: 'image/png' });
+    const paste = new Event('paste') as Event & { clipboardData: unknown };
+    paste.clipboardData = { files: [file] };
+    textarea.dispatchEvent(paste);
+    const upload = httpMock.expectOne({ method: 'POST', url: '/api/tickets/t1/images' });
+    expect((upload.request.body as FormData).get('image')).toBe(file);
+    upload.flush({ data: { id: 'img-1', fileName: 'captura.png', sizeBytes: 4, createdAt: '' } });
+    await settle();
+    fixture.detectChanges();
+    expect(el.querySelectorAll('.td__pending')).toHaveLength(1);
+    // Sin texto, pero con imagen: se puede comentar.
+    (el.querySelector('.td__composer') as HTMLFormElement).dispatchEvent(new Event('submit'));
+    const req = httpMock.expectOne({ method: 'POST', url: '/api/tickets/t1/comments' });
+    expect(req.request.body).toEqual({ content: '', isPublic: false, imageIds: ['img-1'] });
+  });
+
+  it('imágenes: la pestaña junta las de todos los comentarios y las pide con el token', async () => {
+    const fixture = TestBed.createComponent(TicketsComponent);
+    fixture.detectChanges();
+    httpMock.expectOne((r) => r.url === '/api/tickets').flush({ data: LIST });
+    await settle();
+    fixture.detectChanges();
+    const withImages = detail(LIST.items[0]);
+    withImages.comments = [
+      { id: 'c1', authorName: 'ana', content: 'Captura', isPublic: false, createdAt: '2026-09-27T10:00:00Z', images: [{ id: 'a', fileName: 'a.png', sizeBytes: 10, createdAt: '2026-09-27T10:00:00Z' }] },
+      { id: 'c2', authorName: 'pveloso', content: 'Correo', isPublic: true, createdAt: '2026-09-27T11:00:00Z', images: [{ id: 'b', fileName: 'b.jpg', sizeBytes: 10, createdAt: '2026-09-27T11:00:00Z' }] },
+    ];
+    httpMock.expectOne('/api/tickets/t1').flush({ data: withImages });
+    await settle();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const tab = [...el.querySelectorAll<HTMLButtonElement>('.td__tab')].find((b) => b.textContent?.includes('Imágenes'))!;
+    expect(tab.textContent).toContain('2');
+    tab.click();
+    fixture.detectChanges();
+    const names = [...el.querySelectorAll('.td__gallery-name')].map((n) => n.textContent);
+    expect(names).toEqual(['b.jpg', 'a.png']); // la más nueva primero
+    // Se piden por HttpClient (el interceptor pone el token), no con un <img src> directo.
+    expect(httpMock.match((r) => r.url.startsWith('/api/tickets/t1/images/')).map((r) => r.request.url).sort()).toEqual([
+      '/api/tickets/t1/images/a',
+      '/api/tickets/t1/images/b',
+    ]);
   });
 
   it('cambiar el filtro vuelve a pedir la cola con el tipo', async () => {

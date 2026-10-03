@@ -337,3 +337,25 @@ p.pt__card {
     height: 42px;
   }
 }
+
+.pt__images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.pt__image {
+  display: block;
+  width: 120px;
+  height: 80px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.pt__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

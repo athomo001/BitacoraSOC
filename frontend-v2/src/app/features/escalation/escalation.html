@@ -13,7 +13,7 @@
     </span>
     <label class="esc__search">
       <mat-icon>search</mat-icon>
-      <input name="scopeFilter" [placeholder]="i18n.t('esc.searchTarget')" [attr.aria-label]="i18n.t('esc.searchTarget')" [ngModel]="filter()" (ngModelChange)="filter.set($event)" />
+      <input name="scopeFilter" [placeholder]="i18n.t(nocEnabled() ? 'esc.searchTarget' : 'esc.searchTargetSoc')" [attr.aria-label]="i18n.t(nocEnabled() ? 'esc.searchTarget' : 'esc.searchTargetSoc')" [ngModel]="filter()" (ngModelChange)="filter.set($event)" />
     </label>
     <select class="adm-input esc__target" name="scopeTarget" [attr.aria-label]="i18n.t($any('escAdmin.kind.' + scopeKind()))" [ngModel]="selectedId()" (ngModelChange)="pick($event)">
       <option value="">{{ i18n.tf('esc.pickTarget', options().length) }}</option>
@@ -21,7 +21,14 @@
         <option [value]="o.id">{{ o.label }}{{ o.hint ? ' — ' + o.hint : '' }}</option>
       }
     </select>
+    <button type="button" class="adm-btn esc__maint-btn" [attr.aria-expanded]="showMaintenance()" (click)="showMaintenance.set(!showMaintenance())">
+      <mat-icon>engineering</mat-icon>{{ i18n.t('esc.maintenance') }}
+    </button>
   </div>
+
+  @if (showMaintenance()) {
+    <app-maintenance-windows class="esc__maint" [presetServiceId]="scopeKind() === 'service' ? selectedId() : null" />
+  }
 
   @if (error(); as e) { <p class="adm-error esc__msg" role="alert">{{ e }}</p> }
   @if (loading()) { <p class="adm-muted esc__msg" role="status">{{ i18n.t('esc.resolving') }}</p> }
@@ -29,7 +36,7 @@
   @if (!selectedId() && !loading()) {
     <section class="esc__blank">
       <mat-icon>call_split</mat-icon>
-      <p>{{ i18n.t('esc.blank') }}</p>
+      <p>{{ i18n.t(nocEnabled() ? 'esc.blank' : 'esc.blankSoc') }}</p>
     </section>
   }
 
@@ -73,7 +80,7 @@
     <div class="esc__grid">
       <!-- Izquierda: los niveles -->
       <section class="adm-card esc__levels">
-        <div class="adm-card__head"><h3 class="adm-card__title"><mat-icon>groups</mat-icon>{{ i18n.t('esc.levels') }}</h3></div>
+        <div class="adm-card__head"><h3 class="adm-card__title"><mat-icon>groups</mat-icon>{{ i18n.t(nocEnabled() ? 'esc.levels' : 'esc.levelsSoc') }}</h3></div>
         <div class="esc__levels-body">
           <label class="adm-field esc__notes">
             <span class="adm-label">{{ i18n.t('esc.noteLabel') }}</span>
@@ -120,19 +127,23 @@
                         <span class="adm-hint">{{ i18n.t('esc.noChannels') }}</span>
                       }
                     </div>
-                    @if (stepStatus(step) === 'current') {
+                    @if (stepStatus(step) === 'current' && (callable(m) || nextStep(step))) {
                       <div class="member__actions" role="group" [attr.aria-label]="i18n.tf('esc.resultFor', m.name)">
-                        <button type="button" class="act act--ok" [disabled]="saving()" (click)="record(step, m, 'answered')"><mat-icon>check_circle</mat-icon>{{ i18n.t('esc.result.answered') }}</button>
-                        <button type="button" class="act act--bad" [disabled]="saving()" (click)="record(step, m, 'no_answer')"><mat-icon>phone_missed</mat-icon>{{ i18n.t('esc.result.no_answer') }}</button>
+                        @if (callable(m)) {
+                          <button type="button" class="act act--ok" [disabled]="saving()" (click)="record(step, m, 'answered')"><mat-icon>check_circle</mat-icon>{{ i18n.t('esc.result.answered') }}</button>
+                          <button type="button" class="act act--bad" [disabled]="saving()" (click)="record(step, m, 'no_answer')"><mat-icon>phone_missed</mat-icon>{{ i18n.t('esc.result.no_answer') }}</button>
+                        }
                         @if (nextStep(step)) {
                           <button type="button" class="act act--warn" [disabled]="saving() || notifying()" [title]="i18n.t('esc.escalateHint')" (click)="escalate(step, m)"><mat-icon>forward_to_inbox</mat-icon>{{ i18n.t('esc.escalate') }}</button>
                         }
                       </div>
-                      <div class="member__more">
-                        @for (r of otherResults; track r) {
-                          <button type="button" class="adm-btn" [disabled]="saving()" (click)="record(step, m, r)">{{ i18n.t(resultKey(r)) }}</button>
-                        }
-                      </div>
+                      @if (callable(m)) {
+                        <div class="member__more">
+                          @for (r of otherResults; track r) {
+                            <button type="button" class="adm-btn" [disabled]="saving()" (click)="record(step, m, r)">{{ i18n.t(resultKey(r)) }}</button>
+                          }
+                        </div>
+                      }
                     }
                   </li>
                 } @empty {

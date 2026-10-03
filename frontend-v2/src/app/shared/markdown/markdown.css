@@ -33,3 +33,15 @@
   margin: 0 6px 0 0;
   vertical-align: -2px;
 }
+
+/* Variante compacta (vista previa del popup de turno): los ## no son titulares. */
+.app-markdown--compact .app-markdown :is(h1, h2, h3) {
+  margin: 8px 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.app-markdown--compact .app-markdown :is(p, ul) {
+  margin: 0 0 4px;
+}

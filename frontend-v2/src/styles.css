@@ -29,6 +29,15 @@ body {
 }
 
 /*
+ * Fondo de los diálogos (CDK Dialog): CDK pone la estructura del overlay,
+ * pero el color del fondo es del tema. Sin esto la pantalla de atrás no se
+ * oscurecía (diseño aprobado del popup de turno).
+ */
+.cdk-overlay-dark-backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+/*
  * Impresión / "Exportar PDF" (historial de checklists): solo el contenido,
  * sin barra lateral ni controles, y con el alto real en vez del scroll.
  */

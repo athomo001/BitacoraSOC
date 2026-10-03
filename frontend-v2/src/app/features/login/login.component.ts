@@ -140,7 +140,7 @@ export class LoginComponent implements OnInit, OnDestroy {
 
   getMaskedPassword(): string {
     const pass = this.loginForm.get('password')?.value || '';
-    return '*'.repeat(pass.length);
+    return this.hidePassword ? '*'.repeat(pass.length) : pass;
   }
 
   selectLoginTheme(theme: LoginTheme): void {

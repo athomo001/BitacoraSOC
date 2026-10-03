@@ -1,11 +1,12 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, Injector, OnInit, computed, inject, output, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { PermissionsService } from '../../core/auth/permissions.service';
 import { problemDetail } from '../../core/http-error';
 import { I18nService } from '../../core/i18n/i18n.service';
-import { ChecklistItem, ChecklistsService, ChecklistTemplate, Handover, ShiftCheck, ShiftClosure } from '../../core/checklists/checklists.service';
+import { ChecklistItem, ChecklistsService, ChecklistTemplate, Handover, ShiftCheck, ShiftClosure, ShiftStats } from '../../core/checklists/checklists.service';
+import type { ShiftReportResult } from './shift-report-dialog';
 import { ChecklistAnswers, CheckStatus, causeSuggestions, depth, emptyAnswers, groupIds, groupStatus, progress, toServices } from '../../core/checklists/checklist-form';
 import { currentShift, nextMoment, redLeaves } from '../../core/checklists/shift-detect';
 import { ShiftsService, WorkShift } from '../../core/shifts/shifts.service';
@@ -40,9 +41,11 @@ function readGuideHidden(): boolean {
 export class MyShiftComponent implements OnInit {
   protected readonly i18n = inject(I18nService);
   private readonly api = inject(ChecklistsService);
+  private readonly checklists = this.api;
   private readonly shiftsApi = inject(ShiftsService);
   private readonly perms = inject(PermissionsService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
 
   readonly viewHistory = output<void>();
 
@@ -66,9 +69,8 @@ export class MyShiftComponent implements OnInit {
   /** Check de cierre que falta cerrar formalmente (recién guardado o de antes de recargar). */
   protected readonly closureCheck = signal<ShiftCheck | null>(null);
   protected readonly closure = signal<ShiftClosure | null>(null);
-  protected closureObservations = '';
-  protected pendingForNextShift = '';
-  protected readonly notifyEmail = signal(true);
+  /** Si ya se escribió el inicio / cierre de este turno (botones de arriba). */
+  protected readonly stats = signal<ShiftStats | null>(null);
 
   protected readonly guideHidden = signal(readGuideHidden());
 
@@ -105,6 +107,7 @@ export class MyShiftComponent implements OnInit {
       const detected = currentShift(shifts, new Date());
       if (detected) this.selectShift(detected.id);
       this.resumePendingClosure();
+      void this.refreshStats();
     } catch (error) {
       this.error.set(problemDetail(error, this.i18n.t('shift.loadError')));
     } finally {
@@ -213,27 +216,49 @@ export class MyShiftComponent implements OnInit {
     this.setMoment(nextMoment(saved ?? undefined));
   }
 
-  protected async closeShift(): Promise<void> {
-    const check = this.closureCheck();
-    if (!check || this.busy()) return;
-    this.busy.set(true);
-    this.error.set(null);
+  private async refreshStats(): Promise<void> {
+    const id = this.shiftId();
+    if (!id) return;
     try {
-      this.closure.set(
-        await this.api.close({
-          closureCheckId: check.id,
-          observations: this.closureObservations,
-          pendingForNextShift: this.pendingForNextShift,
-          notifyEmail: this.notifyEmail(),
-          syncGlpi: false,
-        }),
-      );
-      this.closureCheck.set(null);
-    } catch (error) {
-      this.error.set(problemDetail(error, this.i18n.t('closure.error')));
-    } finally {
-      this.busy.set(false);
+      this.stats.set(await this.checklists.shiftStats(id));
+    } catch {
+      // Sin cifras los botones muestran "pendiente"; nada más.
     }
+  }
+
+  /**
+   * Popup de Inicio / Cierre de turno (comentarios del dueño #6/#6.1). Carga
+   * diferida: CDK Dialog y el popup no van en el bundle de la pantalla.
+   */
+  protected async openReport(mode: Moment): Promise<void> {
+    const shift = this.shift();
+    if (!shift) return;
+    const [{ Dialog }, { ShiftReportDialogComponent }] = await Promise.all([import('@angular/cdk/dialog'), import('./shift-report-dialog')]);
+    const ref = this.injector.get(Dialog).open<ShiftReportResult>(ShiftReportDialogComponent, {
+      ariaLabel: this.i18n.t(mode === 'inicio' ? 'shiftReport.title.inicio' : 'shiftReport.title.cierre'),
+      data: { mode, shift, handover: this.handover(), closureCheck: this.closureCheck() },
+      maxWidth: '100vw',
+    });
+    ref.closed.subscribe((result) => {
+      if (!result) return;
+      if (result.relay) this.handover.update((h) => (h ? { ...h, previousClosure: result.relay! } : h));
+      if (result.closure) {
+        this.closure.set(result.closure);
+        this.closureCheck.set(null);
+      }
+      if (result.goToChecklist) {
+        this.saved.set(null);
+        this.setMoment('cierre');
+      }
+      if (result.inicioSaved || result.cierreSaved || result.closure) void this.refreshStats();
+    });
+  }
+
+  /** Estado de cada botón de arriba. */
+  protected reportState(mode: Moment): 'pending' | 'done' | 'closed' {
+    if (mode === 'cierre' && this.closure()) return 'closed';
+    const s = this.stats();
+    return (mode === 'inicio' ? s?.inicioWrittenAt : s?.cierreWrittenAt) ? 'done' : 'pending';
   }
 
   protected hideGuide(): void {

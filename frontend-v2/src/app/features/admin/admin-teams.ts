@@ -12,6 +12,8 @@ import { problemDetail } from '../../core/http-error';
 
 /** Tipos de equipo del backend (teams.kind); la etiqueta sale de i18n. */
 const TEAM_KINDS = ['contractor_field', 'noc_internal', 'escalation', 'oncall', 'raci'] as const;
+/** Tipos que solo existen con NOC: sin NOC no se ofrecen al crear. */
+const NOC_KINDS: ReadonlySet<string> = new Set(['contractor_field', 'noc_internal']);
 const ROLES = ['primary', 'backup', 'lead'] as const;
 
 /**
@@ -40,7 +42,6 @@ const ROLES = ['primary', 'backup', 'lead'] as const;
 })
 export class AdminTeamsComponent implements OnInit {
   protected readonly i18n = inject(I18nService);
-  protected readonly kinds = TEAM_KINDS;
   protected readonly roles = ROLES;
   protected readonly territory = inject(TerritoryService);
   private readonly api = inject(OrganizationsService);
@@ -53,9 +54,10 @@ export class AdminTeamsComponent implements OnInit {
   protected readonly units = signal<TerritorialUnit[]>([]);
   protected readonly error = signal<string | null>(null);
   protected readonly nocEnabled = computed(() => this.setup.status()?.nocEnabled ?? false);
+  protected readonly kinds = computed(() => TEAM_KINDS.filter((k) => this.nocEnabled() || !NOC_KINDS.has(k)));
 
   protected readonly teamName = signal('');
-  protected readonly teamKind = signal('contractor_field');
+  protected readonly teamKind = signal('escalation');
   protected readonly teamOrg = signal('');
   protected readonly memberQuery = signal('');
   protected readonly memberResults = signal<DirectoryContact[]>([]);

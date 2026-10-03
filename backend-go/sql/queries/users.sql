@@ -19,6 +19,14 @@ RETURNING *;
 -- name: GetUserByUsername :one
 SELECT * FROM users WHERE username = $1;
 
+-- name: GetUserForLogin :one
+-- Login con nombre de usuario o correo (pedido del dueño). Si un texto
+-- coincidiera con el usuario de uno y el correo de otro, gana el usuario.
+SELECT * FROM users
+WHERE username = sqlc.arg(login) OR lower(email) = lower(sqlc.arg(login))
+ORDER BY (username = sqlc.arg(login)) DESC
+LIMIT 1;
+
 -- name: GetUserByEmail :one
 SELECT * FROM users WHERE email = $1;
 

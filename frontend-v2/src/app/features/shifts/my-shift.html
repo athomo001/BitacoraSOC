@@ -5,6 +5,18 @@
     <p class="msg msg--error" role="alert">{{ message }}</p>
   }
 
+  <!-- Inicio y Cierre de turno: arriba, sin bajar al final (comentarios del dueño #6/#6.1) -->
+  @if (shift()) {
+    <div class="ms-report-bar">
+      @for (m of ['inicio', 'cierre']; track m) {
+        <button type="button" class="ms-btn ms-report-bar__btn" (click)="openReport($any(m))">
+          <mat-icon>{{ m === 'inicio' ? 'wb_sunny' : 'nightlight' }}</mat-icon>{{ i18n.t(m === 'inicio' ? 'shiftReport.title.inicio' : 'shiftReport.title.cierre') }}
+          <span class="pill" [class.tone-ok]="reportState($any(m)) !== 'pending'" [class.tone-neutral]="reportState($any(m)) === 'pending'">{{ i18n.t($any('shiftReport.state.' + reportState($any(m)))) }}</span>
+        </button>
+      }
+    </div>
+  }
+
   <!-- Relevo: lo que trae el turno entrante, en una sola vista -->
   @if (handover(); as relay) {
     @let prev = relay.previousClosure;
@@ -195,12 +207,14 @@
     </aside>
   </div>
 
-  <!-- Cierre formal de turno: solo en el checklist de cierre -->
-  @if (moment() === 'cierre' || closureCheck() || closure()) {
+  <!-- Cierre formal: se hace en el popup "Cierre de turno"; acá queda el resumen -->
+  @if (closure() || closureCheck()) {
     <section class="ms-card">
       <header class="ms-card__head">
         <span class="ms-card__title"><mat-icon>nightlight</mat-icon>{{ i18n.t('closure.title') }}</span>
-        @if (!closureCheck() && !closure()) { <span class="ms__muted">{{ i18n.t('closure.hint') }}</span> }
+        @if (!closure()) {
+          <button type="button" class="ms-btn ms-btn--primary ms__push" (click)="openReport('cierre')"><mat-icon>logout</mat-icon>{{ i18n.t('closure.close') }}</button>
+        }
       </header>
       @if (closure(); as done) {
         <div class="ms-closure__done">
@@ -214,25 +228,7 @@
           </div>
         </div>
       } @else {
-        <fieldset class="ms-closure" [disabled]="!closureCheck() || busy()">
-          <label class="ms-closure__field">{{ i18n.t('closure.observations') }}
-            <textarea rows="4" [(ngModel)]="closureObservations"></textarea>
-          </label>
-          <label class="ms-closure__field">{{ i18n.t('closure.pending') }}
-            <textarea rows="4" class="mono" [(ngModel)]="pendingForNextShift" placeholder="- [ ] …"></textarea>
-          </label>
-          <div class="ms-closure__foot">
-            <label class="switch">
-              <input class="switch__input" type="checkbox" role="switch" [checked]="notifyEmail()" (change)="notifyEmail.set(!notifyEmail())" />
-              <span class="switch__track" aria-hidden="true"></span>
-              {{ i18n.t('closure.notify') }}
-            </label>
-            <span class="ms__muted">
-              @if (shift()?.emailRecipients?.length) { {{ i18n.tf('closure.recipients', shift()!.emailRecipients.join(', ')) }} } @else { {{ i18n.t('closure.noRecipients') }} }
-            </span>
-            <button type="button" class="ms-btn ms-btn--primary ms-closure__submit" (click)="closeShift()"><mat-icon>logout</mat-icon>{{ i18n.t('closure.close') }}</button>
-          </div>
-        </fieldset>
+        <p class="ms__muted ms-closure__hint">{{ i18n.t('shiftReport.closeHint') }}</p>
       }
     </section>
   }

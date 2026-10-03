@@ -1,0 +1,23 @@
+{
+  "form": {
+    "tituloBoletin": "Título con \"comillas\" & <tags> y 'apóstrofo'",
+    "marcaFabricante": "Fortinet",
+    "cveIdentificadores": "CVE-2026-21762, CVE-2026-21763",
+    "criticidad": "Alta",
+    "productosAfectados": "FortiOS 7.4.0 a 7.4.4\n  FortiOS 7.2.0 a 7.2.9\n\n- Modelos 60F\n    * subnivel",
+    "impacto": "Un atacante remoto sin autenticación puede ejecutar código en el equipo.",
+    "recomendacion": "- Actualizar a FortiOS 7.4.5 o 7.2.10.\n- Mientras tanto, deshabilitar SSL-VPN.",
+    "referencias": "Aviso oficial: https://fortiguard.com/psirt/FG-IR-26-017\nhttps://nvd.nist.gov/vuln/detail/CVE-2026-21762"
+  },
+  "logo": "",
+  "images": [
+    {
+      "dataUrl": "cid:evidence-1@bitacora-bulletin",
+      "width": 0,
+      "height": 0,
+      "name": ""
+    }
+  ],
+  "user": null,
+  "color": "#1E88E5"
+}

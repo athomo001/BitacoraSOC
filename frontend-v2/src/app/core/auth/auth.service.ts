@@ -61,6 +61,17 @@ export class AuthService {
     return response.data;
   }
 
+  /**
+   * El servidor rechazó el token (vencido, revocado, inválido): se borra la
+   * sesión local y se vuelve al login. Nunca se muestra la app con un token
+   * que el backend no acepta.
+   */
+  expireSession(): void {
+    if (this._token() === null) return;
+    this.clearSession();
+    void this.router.navigateByUrl('/login');
+  }
+
   async logout(): Promise<void> {
     try {
       await firstValueFrom(this.http.post('/api/auth/logout', {}));

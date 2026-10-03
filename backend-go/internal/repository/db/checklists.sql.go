@@ -582,6 +582,29 @@ func (q *Queries) GetShiftClosureByCheck(ctx context.Context, closureCheckID uui
 	return i, err
 }
 
+const getWorkShiftByID = `-- name: GetWorkShiftByID :one
+SELECT id, rotation_cycle_id, name, start_time, end_time, timezone, shift_type, checklist_template_start_id, checklist_template_end_id, email_recipients, active FROM work_shifts WHERE id = $1
+`
+
+func (q *Queries) GetWorkShiftByID(ctx context.Context, id uuid.UUID) (WorkShift, error) {
+	row := q.db.QueryRow(ctx, getWorkShiftByID, id)
+	var i WorkShift
+	err := row.Scan(
+		&i.ID,
+		&i.RotationCycleID,
+		&i.Name,
+		&i.StartTime,
+		&i.EndTime,
+		&i.Timezone,
+		&i.ShiftType,
+		&i.ChecklistTemplateStartID,
+		&i.ChecklistTemplateEndID,
+		&i.EmailRecipients,
+		&i.Active,
+	)
+	return i, err
+}
+
 const getWorkShiftForCheck = `-- name: GetWorkShiftForCheck :one
 SELECT ws.id, ws.rotation_cycle_id, ws.name, ws.start_time, ws.end_time, ws.timezone, ws.shift_type, ws.checklist_template_start_id, ws.checklist_template_end_id, ws.email_recipients, ws.active FROM work_shifts ws JOIN shift_checks sc ON sc.work_shift_id = ws.id WHERE sc.id = $1
 `
@@ -628,6 +651,34 @@ func (q *Queries) InsertChecklistItem(ctx context.Context, arg InsertChecklistIt
 		arg.ParentItemID,
 	)
 	return err
+}
+
+const lastTaggedEntryInWindow = `-- name: LastTaggedEntryInWindow :one
+SELECT COALESCE(max(created_at), 'epoch'::timestamptz)::timestamptz AS at
+FROM entries
+WHERE user_id = $1 AND $2::text = ANY(tags)
+  AND created_at >= $3 AND created_at < $4
+`
+
+type LastTaggedEntryInWindowParams struct {
+	UserID uuid.UUID          `json:"user_id"`
+	Tag    string             `json:"tag"`
+	FromAt pgtype.Timestamptz `json:"from_at"`
+	ToAt   pgtype.Timestamptz `json:"to_at"`
+}
+
+// Última entrada del usuario con esa etiqueta en la ventana del turno
+// (#iniciodeturno / #cierredeturno ya escritos).
+func (q *Queries) LastTaggedEntryInWindow(ctx context.Context, arg LastTaggedEntryInWindowParams) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, lastTaggedEntryInWindow,
+		arg.UserID,
+		arg.Tag,
+		arg.FromAt,
+		arg.ToAt,
+	)
+	var at pgtype.Timestamptz
+	err := row.Scan(&at)
+	return at, err
 }
 
 const linkCorrelatedShiftCheckService = `-- name: LinkCorrelatedShiftCheckService :one

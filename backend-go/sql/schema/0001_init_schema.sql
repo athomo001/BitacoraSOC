@@ -170,23 +170,36 @@ CREATE INDEX idx_territorial_units_path ON territorial_units USING GIST (path);
 
 -- Organizaciones unificadas: clientes finales, empresas contratistas/terciarias,
 -- carriers de enlace y nuestra propia operación interna.
-CREATE TYPE organization_type AS ENUM ('client', 'contractor', 'carrier', 'internal');
+-- Tipos configurables desde la migración 000013 (antes, enum fijo): el admin
+-- crea, renombra y borra los suyos; los de sistema solo se renombran.
+CREATE TABLE organization_types (
+  code TEXT PRIMARY KEY CHECK (code ~ '^[a-z0-9_]{2,40}$'),
+  name TEXT NOT NULL,
+  description TEXT,
+  is_client BOOLEAN NOT NULL DEFAULT false, -- se elige como cliente en tickets y escalamiento
+  system BOOLEAN NOT NULL DEFAULT false,    -- lo usa la app: se renombra pero no se borra
+  sort_order INT NOT NULL DEFAULT 100,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
 CREATE TABLE organizations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   code TEXT NOT NULL UNIQUE,
-  type organization_type NOT NULL DEFAULT 'client',
+  type TEXT NOT NULL DEFAULT 'client' REFERENCES organization_types(code) ON UPDATE CASCADE,
   active BOOLEAN NOT NULL DEFAULT true,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- Mandante a través del cual se atiende a esta organización ("JUNJI vía Mundo").
+  via_organization_id UUID REFERENCES organizations(id) ON DELETE SET NULL,
+  CONSTRAINT chk_organizations_via_not_self CHECK (via_organization_id IS NULL OR via_organization_id <> id)
 );
 CREATE INDEX idx_organizations_type ON organizations(type) WHERE active;
 
 -- Vista o alias para mantener compatibilidad semántica con 'clients' del núcleo
 CREATE VIEW clients AS
-  SELECT id, name, code, active, created_at
-  FROM organizations
-  WHERE type = 'client';
+  SELECT o.id, o.name, o.code, o.active, o.created_at
+  FROM organizations o JOIN organization_types t ON t.code = o.type
+  WHERE t.is_client;
 
 CREATE TABLE services (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1239,3 +1252,32 @@ CREATE TABLE shift_reminder_sends (
   PRIMARY KEY (reminder_id, work_shift_id, trigger_key)
 );
 CREATE INDEX idx_shift_reminder_sends_recent ON shift_reminder_sends(reminder_id, sent_at DESC);
+
+-- 000012: varios resolutores por ticket.
+CREATE TABLE ticket_resolvers (
+  ticket_id UUID NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  added_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  added_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (ticket_id, user_id)
+);
+CREATE INDEX idx_ticket_resolvers_user ON ticket_resolvers(user_id);
+
+-- 000014: varias imágenes por comentario de ticket (comentario del dueño #14).
+-- Se suben antes de publicar el comentario (comment_id NULL) y el comentario
+-- las reclama; en Postgres como entry_attachments (sin archivos locales, HA).
+CREATE TABLE ticket_images (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ticket_id UUID NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+  comment_id UUID REFERENCES ticket_comments(id) ON DELETE CASCADE,
+  file_name TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  size_bytes INT NOT NULL,
+  file_data BYTEA NOT NULL,
+  hash_sha256 TEXT NOT NULL,
+  uploaded_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT chk_ticket_image_size CHECK (size_bytes <= 5242880)
+);
+CREATE INDEX idx_ticket_images_ticket ON ticket_images(ticket_id, created_at DESC);
+CREATE INDEX idx_ticket_images_comment ON ticket_images(comment_id);

@@ -61,6 +61,12 @@ export class PublicTicketComponent {
   protected readonly pinDigits = computed(() => Array.from({ length: PIN_LENGTH }, (_, i) => this.pin()[i] ?? ''));
 
   /** Lo más reciente arriba, como en el artboard (el backend los entrega en orden cronológico). */
+  /** Imagen de un comentario público: ruta pública con el mismo PIN aceptado (sin token de sesión). */
+  protected imageUrl(id: string): string {
+    const pin = this.acceptedPin ? `?pin=${encodeURIComponent(this.acceptedPin)}` : '';
+    return `/api/public/tickets/${encodeURIComponent(this.token)}/images/${id}${pin}`;
+  }
+
   protected readonly updates = computed(() => [...(this.ticket()?.publicComments ?? [])].reverse());
 
   protected readonly updatedText = computed(() => {

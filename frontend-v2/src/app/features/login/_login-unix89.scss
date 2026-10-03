@@ -124,7 +124,8 @@
     flex-wrap: wrap;
 
     .unix-label {
-      width: 95px;
+      width: 110px;
+      flex-shrink: 0;
       user-select: none;
       color: var(--unix-amber) !important;
     }
@@ -187,6 +188,23 @@
 
       &[disabled] {
         color: transparent !important;
+      }
+    }
+
+    .unix-toggle {
+      font: inherit;
+      font-size: 15px;
+      color: var(--unix-amber-dim);
+      background: none;
+      border: 0;
+      padding: 0;
+      margin-left: 5px;
+      cursor: pointer;
+
+      &:hover,
+      &:focus-visible {
+        color: var(--unix-amber);
+        outline: none;
       }
     }
 

@@ -1,12 +1,10 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DatePipe } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import {
   Asset,
   EscalationScope,
   EscalationService,
-  MaintenanceWindow,
   Policy,
   SocService,
   StepMode,
@@ -18,6 +16,7 @@ import { ModuleAccessService } from '../../core/auth/module-access.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
+import { MaintenanceWindowsComponent } from '../escalation/maintenance-windows';
 
 type ScopeKind = 'asset' | 'unit' | 'service';
 const MODES: readonly StepMode[] = ['unique', 'sequential', 'pool'];
@@ -33,7 +32,7 @@ const MODES: readonly StepMode[] = ['unique', 'sequential', 'pool'];
 @Component({
   selector: 'app-admin-escalation',
   standalone: true,
-  imports: [FormsModule, DatePipe, MatIconModule],
+  imports: [FormsModule, MatIconModule, MaintenanceWindowsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-escalation.html',
   styles: `
@@ -43,11 +42,8 @@ const MODES: readonly StepMode[] = ['unique', 'sequential', 'pool'];
     .ea__form { padding: 12px 14px; border-bottom: 1px solid var(--border-subtle); }
     .ea__name { margin-top: 3px; }
     .ea__step-form { border-top: 1px solid var(--border-subtle); }
-    .ea__win-form { border-bottom: 1px solid var(--border-subtle); }
     .ea__actions { display: flex; justify-content: flex-end; }
     .ea__confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
-    .ea__suppress { align-self: center; flex: 0 0 auto; }
-    .ea__inactive td { color: var(--text-muted); }
   `,
 })
 export class AdminEscalationComponent implements OnInit {
@@ -71,7 +67,6 @@ export class AdminEscalationComponent implements OnInit {
   protected readonly teams = signal<TeamSummary[]>([]);
   protected readonly services = signal<SocService[]>([]);
   protected readonly clients = signal<Organization[]>([]);
-  protected readonly windows = signal<MaintenanceWindow[]>([]);
   private readonly assets = signal<Asset[]>([]);
   private readonly units = signal<TerritorialUnit[]>([]);
 
@@ -87,31 +82,22 @@ export class AdminEscalationComponent implements OnInit {
   protected readonly svcOrg = signal('');
   protected readonly svcName = signal('');
   protected readonly svcCode = signal('');
-  protected readonly winKind = signal<ScopeKind>('unit');
-  protected readonly winTarget = signal('');
-  protected readonly winTitle = signal('');
-  protected readonly winStart = signal('');
-  protected readonly winEnd = signal('');
-  protected readonly winSuppress = signal(true);
 
   protected readonly targetOptions = computed(() => this.optionsFor(this.policyKind()));
-  protected readonly winOptions = computed(() => this.optionsFor(this.winKind()));
 
   async ngOnInit(): Promise<void> {
     await this.modules.load();
     if (!this.nocEnabled()) {
       this.policyKind.set('service');
-      this.winKind.set('service');
     }
     await this.run(async () => {
       await Promise.all([
         this.refreshPolicies(),
-        this.refreshWindows(),
         this.orgs.listTeams().then((t) => this.teams.set(t)),
         this.nocEnabled() ? this.api.listAssets().then((a) => this.assets.set(a)) : null,
         this.nocEnabled() ? this.territory.list(1, 5000).then((r) => this.units.set(r.units)) : null,
         this.socEnabled() ? this.refreshServices() : null,
-        this.socEnabled() ? this.orgs.list({ type: 'client', active: true }).then((o) => this.clients.set(o)) : null,
+        this.socEnabled() ? this.orgs.list({ clients: true, active: true }).then((o) => this.clients.set(o)) : null,
       ]);
     });
   }
@@ -123,7 +109,9 @@ export class AdminEscalationComponent implements OnInit {
       case 'unit':
         return this.units().map((u) => ({ id: u.id, label: `${'— '.repeat(u.depth)}${u.name}` }));
       default:
-        return this.services().map((s) => ({ id: s.id, label: `${s.name} (${s.code})` }));
+        return this.services()
+          .map((s) => ({ id: s.id, label: serviceLabel(s) }))
+          .sort((a, b) => a.label.localeCompare(b.label));
     }
   }
 
@@ -162,7 +150,7 @@ export class AdminEscalationComponent implements OnInit {
       return u ? `${u.name} (${u.code})` : s.territorialUnitId;
     }
     const svc = this.services().find((x) => x.id === s.serviceId);
-    return svc ? svc.name : (s.serviceId ?? '');
+    return svc ? serviceLabel(svc) : (s.serviceId ?? '');
   }
 
   protected stepsSummary(p: Policy): string {
@@ -220,34 +208,8 @@ export class AdminEscalationComponent implements OnInit {
     });
   }
 
-  protected async createWindow(): Promise<void> {
-    await this.run(async () => {
-      await this.api.createWindow({
-        ...this.scopeOf(this.winKind(), this.winTarget()),
-        title: this.winTitle().trim(),
-        // datetime-local viene sin zona: se interpreta en la hora local del navegador.
-        startsAt: new Date(this.winStart()).toISOString(),
-        endsAt: new Date(this.winEnd()).toISOString(),
-        suppressNotifications: this.winSuppress(),
-      });
-      this.winTitle.set('');
-      await this.refreshWindows();
-    });
-  }
-
-  protected async closeWindow(w: MaintenanceWindow): Promise<void> {
-    await this.run(async () => {
-      await this.api.closeWindow(w.id);
-      await this.refreshWindows();
-    });
-  }
-
   private async refreshPolicies(): Promise<void> {
     this.policies.set(await this.api.listPolicies());
-  }
-
-  private async refreshWindows(): Promise<void> {
-    this.windows.set(await this.api.listWindows());
   }
 
   private async refreshServices(): Promise<void> {
@@ -265,4 +227,9 @@ export class AdminEscalationComponent implements OnInit {
       this.busy.set(false);
     }
   }
+}
+
+/** "Cliente · Servicio": varios clientes tienen un servicio con el mismo nombre. */
+function serviceLabel(s: { name: string; organizationName?: string | null }): string {
+  return [s.organizationName, s.name].filter(Boolean).join(' · ');
 }

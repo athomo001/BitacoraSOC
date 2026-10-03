@@ -12,6 +12,49 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const addTicketResolver = `-- name: AddTicketResolver :exec
+INSERT INTO ticket_resolvers (ticket_id, user_id, added_by) VALUES ($1, $2, $3)
+ON CONFLICT DO NOTHING
+`
+
+type AddTicketResolverParams struct {
+	TicketID uuid.UUID   `json:"ticket_id"`
+	UserID   uuid.UUID   `json:"user_id"`
+	AddedBy  pgtype.UUID `json:"added_by"`
+}
+
+func (q *Queries) AddTicketResolver(ctx context.Context, arg AddTicketResolverParams) error {
+	_, err := q.db.Exec(ctx, addTicketResolver, arg.TicketID, arg.UserID, arg.AddedBy)
+	return err
+}
+
+const claimTicketImages = `-- name: ClaimTicketImages :execrows
+UPDATE ticket_images SET comment_id = $1
+WHERE ticket_id = $2 AND comment_id IS NULL
+  AND uploaded_by = $3 AND id = ANY($4::uuid[])
+`
+
+type ClaimTicketImagesParams struct {
+	CommentID pgtype.UUID `json:"comment_id"`
+	TicketID  uuid.UUID   `json:"ticket_id"`
+	UserID    pgtype.UUID `json:"user_id"`
+	Ids       []uuid.UUID `json:"ids"`
+}
+
+// El comentario reclama las imágenes que subió su autor en ese ticket.
+func (q *Queries) ClaimTicketImages(ctx context.Context, arg ClaimTicketImagesParams) (int64, error) {
+	result, err := q.db.Exec(ctx, claimTicketImages,
+		arg.CommentID,
+		arg.TicketID,
+		arg.UserID,
+		arg.Ids,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const countTickets = `-- name: CountTickets :one
 SELECT count(*) FROM tickets t
 WHERE ($1::ticket_type IS NULL OR t.ticket_type = $1::ticket_type)
@@ -198,6 +241,49 @@ func (q *Queries) CreateTicketComment(ctx context.Context, arg CreateTicketComme
 	return i, err
 }
 
+const createTicketImage = `-- name: CreateTicketImage :one
+INSERT INTO ticket_images (ticket_id, file_name, mime_type, size_bytes, file_data, hash_sha256, uploaded_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, file_name, size_bytes, created_at
+`
+
+type CreateTicketImageParams struct {
+	TicketID   uuid.UUID   `json:"ticket_id"`
+	FileName   string      `json:"file_name"`
+	MimeType   string      `json:"mime_type"`
+	SizeBytes  int32       `json:"size_bytes"`
+	FileData   []byte      `json:"file_data"`
+	HashSha256 string      `json:"hash_sha256"`
+	UploadedBy pgtype.UUID `json:"uploaded_by"`
+}
+
+type CreateTicketImageRow struct {
+	ID        uuid.UUID          `json:"id"`
+	FileName  string             `json:"file_name"`
+	SizeBytes int32              `json:"size_bytes"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) CreateTicketImage(ctx context.Context, arg CreateTicketImageParams) (CreateTicketImageRow, error) {
+	row := q.db.QueryRow(ctx, createTicketImage,
+		arg.TicketID,
+		arg.FileName,
+		arg.MimeType,
+		arg.SizeBytes,
+		arg.FileData,
+		arg.HashSha256,
+		arg.UploadedBy,
+	)
+	var i CreateTicketImageRow
+	err := row.Scan(
+		&i.ID,
+		&i.FileName,
+		&i.SizeBytes,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createTicketTask = `-- name: CreateTicketTask :one
 INSERT INTO ticket_tasks (ticket_id, user_id, content, time_spent_seconds, is_public, performed_at)
 VALUES ($1, $2, $3, $4, $5, COALESCE($6, now())) RETURNING id, ticket_id, user_id, content, time_spent_seconds, is_public, performed_at, created_at
@@ -233,6 +319,45 @@ func (q *Queries) CreateTicketTask(ctx context.Context, arg CreateTicketTaskPara
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const deletePendingTicketImage = `-- name: DeletePendingTicketImage :execrows
+DELETE FROM ticket_images WHERE id = $1 AND ticket_id = $2 AND comment_id IS NULL AND uploaded_by = $3
+`
+
+type DeletePendingTicketImageParams struct {
+	ID         uuid.UUID   `json:"id"`
+	TicketID   uuid.UUID   `json:"ticket_id"`
+	UploadedBy pgtype.UUID `json:"uploaded_by"`
+}
+
+func (q *Queries) DeletePendingTicketImage(ctx context.Context, arg DeletePendingTicketImageParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deletePendingTicketImage, arg.ID, arg.TicketID, arg.UploadedBy)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteStaleTicketImages = `-- name: DeleteStaleTicketImages :exec
+DELETE FROM ticket_images WHERE comment_id IS NULL AND created_at < now() - interval '1 day'
+`
+
+// Subidas que nunca llegaron a un comentario (se cerró la pestaña).
+func (q *Queries) DeleteStaleTicketImages(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deleteStaleTicketImages)
+	return err
+}
+
+const deleteTicket = `-- name: DeleteTicket :one
+DELETE FROM tickets WHERE id = $1 RETURNING ticket_number
+`
+
+func (q *Queries) DeleteTicket(ctx context.Context, id uuid.UUID) (string, error) {
+	row := q.db.QueryRow(ctx, deleteTicket, id)
+	var ticket_number string
+	err := row.Scan(&ticket_number)
+	return ticket_number, err
 }
 
 const getPublicTicket = `-- name: GetPublicTicket :one
@@ -360,6 +485,45 @@ func (q *Queries) GetTicketByNumber(ctx context.Context, ticketNumber string) (T
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getTicketImage = `-- name: GetTicketImage :one
+SELECT i.id, i.ticket_id, i.comment_id, i.mime_type, i.file_name, i.file_data, i.uploaded_by,
+       COALESCE(c.is_public, false)::boolean AS is_public
+FROM ticket_images i LEFT JOIN ticket_comments c ON c.id = i.comment_id
+WHERE i.id = $1 AND i.ticket_id = $2
+`
+
+type GetTicketImageParams struct {
+	ID       uuid.UUID `json:"id"`
+	TicketID uuid.UUID `json:"ticket_id"`
+}
+
+type GetTicketImageRow struct {
+	ID         uuid.UUID   `json:"id"`
+	TicketID   uuid.UUID   `json:"ticket_id"`
+	CommentID  pgtype.UUID `json:"comment_id"`
+	MimeType   string      `json:"mime_type"`
+	FileName   string      `json:"file_name"`
+	FileData   []byte      `json:"file_data"`
+	UploadedBy pgtype.UUID `json:"uploaded_by"`
+	IsPublic   bool        `json:"is_public"`
+}
+
+func (q *Queries) GetTicketImage(ctx context.Context, arg GetTicketImageParams) (GetTicketImageRow, error) {
+	row := q.db.QueryRow(ctx, getTicketImage, arg.ID, arg.TicketID)
+	var i GetTicketImageRow
+	err := row.Scan(
+		&i.ID,
+		&i.TicketID,
+		&i.CommentID,
+		&i.MimeType,
+		&i.FileName,
+		&i.FileData,
+		&i.UploadedBy,
+		&i.IsPublic,
 	)
 	return i, err
 }
@@ -510,6 +674,40 @@ func (q *Queries) ListPublicTicketComments(ctx context.Context, ticketID uuid.UU
 	return items, nil
 }
 
+const listTicketAssignees = `-- name: ListTicketAssignees :many
+SELECT id, username, full_name FROM users
+WHERE active AND role IN ('admin', 'user')
+ORDER BY username
+`
+
+type ListTicketAssigneesRow struct {
+	ID       uuid.UUID   `json:"id"`
+	Username string      `json:"username"`
+	FullName pgtype.Text `json:"full_name"`
+}
+
+// Personas a las que se puede sumar como resolutor (usuarios activos que
+// operan: admin y analistas).
+func (q *Queries) ListTicketAssignees(ctx context.Context) ([]ListTicketAssigneesRow, error) {
+	rows, err := q.db.Query(ctx, listTicketAssignees)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTicketAssigneesRow
+	for rows.Next() {
+		var i ListTicketAssigneesRow
+		if err := rows.Scan(&i.ID, &i.Username, &i.FullName); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTicketComments = `-- name: ListTicketComments :many
 SELECT id, ticket_id, user_id, author_name, content, is_public, created_at FROM ticket_comments WHERE ticket_id = $1 ORDER BY created_at ASC
 `
@@ -615,6 +813,90 @@ func (q *Queries) ListTicketEntriesWithAuthor(ctx context.Context, ticketID pgty
 			&i.Content,
 			&i.CreatedAt,
 			&i.Username,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTicketImages = `-- name: ListTicketImages :many
+SELECT i.id, i.comment_id, i.file_name, i.size_bytes, i.created_at, c.is_public, c.author_name
+FROM ticket_images i JOIN ticket_comments c ON c.id = i.comment_id
+WHERE i.ticket_id = $1
+ORDER BY i.created_at DESC
+`
+
+type ListTicketImagesRow struct {
+	ID         uuid.UUID          `json:"id"`
+	CommentID  pgtype.UUID        `json:"comment_id"`
+	FileName   string             `json:"file_name"`
+	SizeBytes  int32              `json:"size_bytes"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	IsPublic   bool               `json:"is_public"`
+	AuthorName string             `json:"author_name"`
+}
+
+func (q *Queries) ListTicketImages(ctx context.Context, ticketID uuid.UUID) ([]ListTicketImagesRow, error) {
+	rows, err := q.db.Query(ctx, listTicketImages, ticketID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTicketImagesRow
+	for rows.Next() {
+		var i ListTicketImagesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CommentID,
+			&i.FileName,
+			&i.SizeBytes,
+			&i.CreatedAt,
+			&i.IsPublic,
+			&i.AuthorName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTicketResolvers = `-- name: ListTicketResolvers :many
+SELECT r.user_id, u.username, u.full_name, r.added_at
+FROM ticket_resolvers r JOIN users u ON u.id = r.user_id
+WHERE r.ticket_id = $1
+ORDER BY r.added_at, u.username
+`
+
+type ListTicketResolversRow struct {
+	UserID   uuid.UUID          `json:"user_id"`
+	Username string             `json:"username"`
+	FullName pgtype.Text        `json:"full_name"`
+	AddedAt  pgtype.Timestamptz `json:"added_at"`
+}
+
+func (q *Queries) ListTicketResolvers(ctx context.Context, ticketID uuid.UUID) ([]ListTicketResolversRow, error) {
+	rows, err := q.db.Query(ctx, listTicketResolvers, ticketID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTicketResolversRow
+	for rows.Next() {
+		var i ListTicketResolversRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Username,
+			&i.FullName,
+			&i.AddedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -908,6 +1190,23 @@ type MarkTicketRespondedParams struct {
 func (q *Queries) MarkTicketResponded(ctx context.Context, arg MarkTicketRespondedParams) error {
 	_, err := q.db.Exec(ctx, markTicketResponded, arg.ID, arg.At)
 	return err
+}
+
+const removeTicketResolver = `-- name: RemoveTicketResolver :execrows
+DELETE FROM ticket_resolvers WHERE ticket_id = $1 AND user_id = $2
+`
+
+type RemoveTicketResolverParams struct {
+	TicketID uuid.UUID `json:"ticket_id"`
+	UserID   uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) RemoveTicketResolver(ctx context.Context, arg RemoveTicketResolverParams) (int64, error) {
+	result, err := q.db.Exec(ctx, removeTicketResolver, arg.TicketID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const setTicketPublicPin = `-- name: SetTicketPublicPin :one

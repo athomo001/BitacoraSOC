@@ -64,7 +64,7 @@
 
     <aside class="tk__detail">
       @if (selectedId(); as id) {
-        <app-ticket-detail [ticketId]="id" (changed)="onChanged($event)" />
+        <app-ticket-detail [ticketId]="id" (changed)="onChanged($event)" (deleted)="onDeleted($event)" />
       } @else {
         <p class="tk__empty">{{ i18n.t('tickets.selectHint') }}</p>
       }

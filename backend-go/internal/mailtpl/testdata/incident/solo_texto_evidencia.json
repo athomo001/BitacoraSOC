@@ -1,0 +1,24 @@
+{
+  "reportData": {
+    "codigoTicket": "TKT-2026-00042",
+    "ofensa": "5799",
+    "tipoOperacion": "Ofensa",
+    "nombreEvento": "Offense CRE Rule #110593 \"DPP - Nueva Ofensa Mg5\"",
+    "fecha": "2026-10-03T10:30:00",
+    "criticidad": "alta",
+    "motivoEvento": "Intentos de autenticación fallidos repetidos.",
+    "observaciones": "La IP de origen corresponde a un nodo TOR.\nSe bloqueó en el borde.",
+    "recomendacion": "",
+    "informacionAdicional": "  ",
+    "origenConexion": "185.220.101[.]4",
+    "destino": "portal.dpp[.]cl",
+    "reputacionOrigen": "Maliciosa",
+    "evidenciaTexto": "Ver adjunto.",
+    "logSource": "DPP"
+  },
+  "images": [],
+  "logoCid": null,
+  "autor": "ana",
+  "brandName": "Bitácora Ops",
+  "paletteKey": "slate-pro"
+}

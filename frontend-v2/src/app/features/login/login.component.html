@@ -39,7 +39,7 @@
             <form [formGroup]="loginForm" (ngSubmit)="onLoginSubmit()" class="crt-form">
               <!-- Campo de nombre de usuario -->
               <div class="form-group">
-                <label for="username-crt" class="form-label">USUARIO:</label>
+                <label for="username-crt" class="form-label">USUARIO O CORREO:</label>
                 <div class="input-wrapper">
                   <span class="input-prompt">></span>
                   <input
@@ -49,7 +49,7 @@
                     class="crt-input"
                     autocomplete="username"
                     [disabled]="loading"
-                    placeholder="Ingrese usuario"
+                    placeholder="Ingrese usuario o correo"
                   />
                   <span class="input-glow"></span>
                 </div>
@@ -409,7 +409,7 @@
                   type="text"
                   formControlName="username"
                   class="cy-input"
-                  placeholder="Ingresa tu usuario"
+                  placeholder="Ingresa tu usuario o correo"
                   autocomplete="username"
                 />
               </div>
@@ -739,14 +739,14 @@
               <form [formGroup]="loginForm" (ngSubmit)="onLoginSubmit()" class="login-form">
                 <!-- Campo de Usuario -->
                 <div class="form-group">
-                  <label class="form-label">Usuario</label>
+                  <label class="form-label">Usuario o correo</label>
                   <div class="input-wrapper">
                     <span class="input-icon">👤</span>
                     <input
                       type="text"
                       formControlName="username"
                       class="modern-input"
-                      placeholder="Ingresa tu usuario"
+                      placeholder="Ingresa tu usuario o correo"
                       autocomplete="username"
                     />
                   </div>
@@ -1054,13 +1054,13 @@
               <form [formGroup]="loginForm" (ngSubmit)="onLoginSubmit()" class="surreal-form">
                 <!-- Usuario -->
                 <div class="form-group">
-                  <label class="form-label">Usuario</label>
+                  <label class="form-label">Usuario o correo</label>
                   <div class="input-wrapper">
                     <input
                       type="text"
                       formControlName="username"
                       class="surreal-input"
-                      placeholder="Ingresa tu usuario"
+                      placeholder="Ingresa tu usuario o correo"
                       autocomplete="username"
                     />
                   </div>
@@ -1407,7 +1407,7 @@
 
             <form [formGroup]="loginForm" (ngSubmit)="onLoginSubmit()" class="win-form">
               <div class="form-row-win">
-                <label for="username-win" class="win-label"><u>U</u>ser Name:</label>
+                <label for="username-win" class="win-label"><u>U</u>ser / e-mail:</label>
                 <input
                   id="username-win"
                   type="text"
@@ -1428,6 +1428,14 @@
                   autocomplete="current-password"
                   [disabled]="loading"
                 />
+                <button
+                  type="button"
+                  class="win-button-3d win-button-3d--small"
+                  (click)="hidePassword = !hidePassword"
+                  [attr.aria-pressed]="!hidePassword"
+                >
+                  {{ hidePassword ? 'Show' : 'Hide' }}
+                </button>
               </div>
 
               <!-- Checkbox de privacidad -->
@@ -1699,7 +1707,7 @@
 
             <form [formGroup]="loginForm" (ngSubmit)="onLoginSubmit()" class="unix-form">
               <div class="unix-form-group">
-                <span class="unix-label">login:</span>
+                <span class="unix-label">login/mail:</span>
                 <span class="unix-bracket">[</span>
                 <div class="unix-input-wrapper">
                   <span class="unix-render-text">
@@ -1735,7 +1743,14 @@
                   />
                 </div>
                 <span class="unix-bracket">]</span>
-                <span class="unix-sub-label">(16 chars max, hidden)</span>
+                <button
+                  type="button"
+                  class="unix-toggle"
+                  (click)="hidePassword = !hidePassword"
+                  [attr.aria-pressed]="!hidePassword"
+                >
+                  {{ hidePassword ? '[show]' : '[hide]' }}
+                </button>
               </div>
 
               <!-- Consentimiento de Aviso de Privacidad -->

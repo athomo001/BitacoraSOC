@@ -391,7 +391,7 @@ func (h *EscalationHandler) fillSteps(ctx context.Context, res *resolutionDTO, s
 			teamDTO.Organization = &struct {
 				Name string `json:"name"`
 				Type string `json:"type"`
-			}{Name: t.OrganizationName.String, Type: string(t.OrganizationType.OrganizationType)}
+			}{Name: t.OrganizationName.String, Type: t.OrganizationType.String}
 		}
 		pureMembers := []escalation.Member{}
 		byID := map[uuid.UUID]resolvedMemberDTO{}

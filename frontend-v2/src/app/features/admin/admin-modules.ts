@@ -1,25 +1,34 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { SetupService } from '../../core/setup/setup.service';
+import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
 
+type ModuleId = 'soc' | 'noc' | 'tickets';
+type Flags = Record<ModuleId, boolean>;
+
 interface ModuleRow {
-  id: 'soc' | 'noc';
-  name: string;
+  id: ModuleId;
+  nameKey: MessageKey;
   descKey: MessageKey;
 }
 
 const MODULES: readonly ModuleRow[] = [
-  { id: 'soc', name: 'SOC', descKey: 'modules.soc.desc' },
-  { id: 'noc', name: 'NOC', descKey: 'modules.noc.desc' },
+  { id: 'soc', nameKey: 'modules.soc.name', descKey: 'modules.soc.desc' },
+  { id: 'noc', nameKey: 'modules.noc.name', descKey: 'modules.noc.desc' },
+  { id: 'tickets', nameKey: 'features.native_tickets.name', descKey: 'features.native_tickets.desc' },
 ];
 
+/** La Ticketera vive en system_features; acá se muestra junto a SOC y NOC (pedido del dueño). */
+const TICKETS_FEATURE = 'native_tickets';
+
 /**
- * Activar/desactivar SOC/NOC después del setup (HU-0b), re-vestido con los
- * componentes del artboard "Administración". Apagar un módulo nunca borra
- * datos: solo lo saca de menús y bloquea su API hasta reactivarlo.
+ * Activar/desactivar SOC, NOC y la Ticketera después del setup (HU-0b), en
+ * un solo lugar. Apagar un módulo nunca borra datos: solo lo saca de menús y
+ * bloquea su API hasta reactivarlo; el cambio llega en vivo a todas las
+ * pestañas abiertas.
  */
 @Component({
   selector: 'app-admin-modules',
@@ -43,7 +52,7 @@ const MODULES: readonly ModuleRow[] = [
               <span class="switch__track" aria-hidden="true"></span>
             </span>
             <span class="mod__text">
-              <span class="adm-strong">{{ m.name }}</span>
+              <span class="adm-strong">{{ i18n.t(m.nameKey) }}</span>
               <span class="pill" [class]="draft()[m.id] ? 'tone-ok' : 'tone-neutral'">{{ i18n.t(draft()[m.id] ? 'modules.on' : 'modules.off') }}</span>
               <span class="adm-hint adm-block">{{ i18n.t(m.descKey) }}</span>
             </span>
@@ -84,26 +93,28 @@ const MODULES: readonly ModuleRow[] = [
 export class AdminModulesComponent implements OnInit {
   protected readonly i18n = inject(I18nService);
   private readonly setup = inject(SetupService);
+  private readonly features = inject(SystemFeaturesService);
 
   protected readonly modules = MODULES;
-  protected readonly saved = signal({ soc: false, noc: false });
-  protected readonly draft = signal({ soc: false, noc: false });
+  protected readonly saved = signal<Flags>({ soc: false, noc: false, tickets: false });
+  protected readonly draft = signal<Flags>({ soc: false, noc: false, tickets: false });
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
 
-  protected readonly dirty = computed(() => this.draft().soc !== this.saved().soc || this.draft().noc !== this.saved().noc);
+  protected readonly dirty = computed(() => MODULES.some((m) => this.draft()[m.id] !== this.saved()[m.id]));
 
   async ngOnInit(): Promise<void> {
     try {
-      const status = await this.setup.loadStatus();
-      this.apply({ soc: status.socEnabled, noc: status.nocEnabled });
+      const [status, features] = await Promise.all([this.setup.loadStatus(), this.features.list()]);
+      const tickets = features.find((f) => f.code === TICKETS_FEATURE)?.isEnabled ?? false;
+      this.apply({ soc: status.socEnabled, noc: status.nocEnabled, tickets });
     } catch (error) {
       this.error.set(problemDetail(error, this.i18n.t('modules.loadError')));
     }
   }
 
-  protected toggle(id: 'soc' | 'noc'): void {
+  protected toggle(id: ModuleId): void {
     this.draft.update((d) => ({ ...d, [id]: !d[id] }));
     this.notice.set(null);
     this.error.set(null);
@@ -118,10 +129,18 @@ export class AdminModulesComponent implements OnInit {
     if (!d.soc && !d.noc) return;
     this.busy.set(true);
     this.error.set(null);
+    const before = this.saved();
     try {
-      // Actualiza el estado cacheado: los menús de SOC/NOC aparecen o se van al instante.
-      const flags = await this.setup.updateModules({ socEnabled: d.soc, nocEnabled: d.noc });
-      this.apply({ soc: flags.socEnabled, noc: flags.nocEnabled });
+      // Actualiza el estado cacheado: los menús aparecen o se van al instante.
+      let flags = { socEnabled: before.soc, nocEnabled: before.noc };
+      if (d.soc !== before.soc || d.noc !== before.noc) {
+        flags = await this.setup.updateModules({ socEnabled: d.soc, nocEnabled: d.noc });
+      }
+      let tickets = before.tickets;
+      if (d.tickets !== before.tickets) {
+        tickets = (await this.features.setEnabled(TICKETS_FEATURE, d.tickets)).isEnabled;
+      }
+      this.apply({ soc: flags.socEnabled, noc: flags.nocEnabled, tickets });
       this.notice.set(this.i18n.t('admin.saved'));
     } catch (error) {
       this.error.set(problemDetail(error, this.i18n.t('modules.saveError')));
@@ -130,7 +149,7 @@ export class AdminModulesComponent implements OnInit {
     }
   }
 
-  private apply(flags: { soc: boolean; noc: boolean }): void {
+  private apply(flags: Flags): void {
     this.saved.set(flags);
     this.draft.set({ ...flags });
   }

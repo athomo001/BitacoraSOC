@@ -1,0 +1,129 @@
+<div class="sr" role="document">
+  <header class="sr__head">
+    <span class="sr__title">
+      <mat-icon [class.sr__sun]="isInicio()" [class.sr__moon]="!isInicio()">{{ isInicio() ? 'wb_sunny' : 'nightlight' }}</mat-icon>
+      {{ i18n.t(isInicio() ? 'shiftReport.title.inicio' : 'shiftReport.title.cierre') }}
+    </span>
+    <span class="sr__tabs" role="tablist">
+      <button type="button" role="tab" class="seg" [attr.aria-pressed]="isInicio()" [attr.aria-selected]="isInicio()" (click)="setMode('inicio')">{{ i18n.t('shiftReport.tab.inicio') }}</button>
+      <button type="button" role="tab" class="seg" [attr.aria-pressed]="!isInicio()" [attr.aria-selected]="!isInicio()" (click)="setMode('cierre')">{{ i18n.t('shiftReport.tab.cierre') }}</button>
+    </span>
+    <span class="sr__shift">{{ data.shift.name }} · <span class="mono">{{ data.shift.startTime }}–{{ data.shift.endTime }}</span></span>
+    <button type="button" class="sr__x" [attr.aria-label]="i18n.t('shiftReport.later')" (click)="later()"><mat-icon>close</mat-icon></button>
+  </header>
+
+  <div class="sr__body">
+    <div class="sr__form">
+      @if (isInicio() && relay(); as prev) {
+        <section class="sr__relay">
+          <div class="sr__relay-head">
+            <span class="sr__label">{{ i18n.t('shiftReport.relay') }}</span>
+            <span class="sr__muted">{{ prev.username || '—' }} · <span class="mono">{{ prev.shiftEndAt | date: 'dd/MM HH:mm' }}</span></span>
+            @if (prev.acknowledgedAt) {
+              <span class="pill tone-ok sr__push"><mat-icon>task_alt</mat-icon>{{ i18n.t('handover.reviewed') }}</span>
+            } @else {
+              <button type="button" class="sr__btn sr__push" [disabled]="busy()" (click)="ackRelay()"><mat-icon>task_alt</mat-icon>{{ i18n.t('handover.confirm') }}</button>
+            }
+          </div>
+          @if (prev.servicesDown.length || data.handover?.upcomingMaintenanceWindows?.length) {
+            <div class="sr__pills">
+              @if (prev.servicesDown.length) { <span class="pill tone-bad">{{ i18n.tf('handover.leftRed', prev.servicesDown.join(', ')) }}</span> }
+              @for (w of data.handover?.upcomingMaintenanceWindows ?? []; track w.id) {
+                <span class="pill tone-warn">{{ w.title }} <span class="mono">{{ w.startsAt | date: 'HH:mm' }}–{{ w.endsAt | date: 'HH:mm' }}</span></span>
+              }
+            </div>
+          }
+          @for (c of draft().carried; track $index) {
+            <button type="button" class="sr__carried" [class.sr__carried--done]="c.done" (click)="toggleCarried($index)">
+              <mat-icon>{{ c.done ? 'check_box' : 'check_box_outline_blank' }}</mat-icon><span>{{ c.text }}</span>
+            </button>
+          } @empty {
+            <span class="sr__muted">{{ i18n.t('handover.noPending') }}</span>
+          }
+        </section>
+      }
+
+      <div class="sr__metric-row">
+        <label class="sr__field sr__metric">
+          <span class="sr__label">{{ i18n.t(isInicio() ? 'shiftReport.metric.inicio' : 'shiftReport.metric.cierre') }}</span>
+          <input class="mono" name="metric" inputmode="numeric" maxlength="3" [ngModel]="draft().metric" (ngModelChange)="edit({ metric: $event })" />
+        </label>
+        @if (!isInicio() && stats(); as s) {
+          <div class="sr__field">
+            <span class="sr__label">{{ i18n.t('shiftReport.computed') }}</span>
+            <div class="sr__pills">
+              <span class="pill tone-neutral">{{ i18n.tf('stat.entries', s.totalEntries) }}</span>
+              <span class="pill" [class.tone-bad]="s.totalIncidents > 0" [class.tone-neutral]="s.totalIncidents === 0">{{ i18n.tf('stat.incidents', s.totalIncidents) }}</span>
+              <span class="pill tone-ok">{{ i18n.tf('stat.resolved', s.ticketsResolvedCount) }}</span>
+              <span class="pill" [class.tone-bad]="s.slaBreachesCount > 0" [class.tone-neutral]="s.slaBreachesCount === 0">{{ i18n.tf('stat.breaches', s.slaBreachesCount) }}</span>
+            </div>
+          </div>
+        }
+      </div>
+      <span class="sr__hint">{{ i18n.t('shiftReport.metricHint') }}</span>
+
+      <label class="sr__field">
+        <span class="sr__label">{{ i18n.t(isInicio() ? 'shiftReport.ticketsLabel.inicio' : 'shiftReport.ticketsLabel.cierre') }}</span>
+        <textarea class="mono" rows="6" name="tickets" [placeholder]="i18n.t(isInicio() ? 'shiftReport.format.inicio' : 'shiftReport.format.cierre')" [ngModel]="draft().tickets" (ngModelChange)="edit({ tickets: $event })"></textarea>
+        <span class="sr__hint">{{ i18n.t('shiftReport.ticketsHint') }}</span>
+      </label>
+
+      <label class="sr__field">
+        <span class="sr__label">{{ i18n.t(isInicio() ? 'shiftReport.notesLabel.inicio' : 'shiftReport.notesLabel.cierre') }}</span>
+        <textarea rows="3" name="notes" [ngModel]="draft().notes" (ngModelChange)="edit({ notes: $event })"></textarea>
+        <span class="sr__hint">{{ i18n.t('shiftReport.notesHint') }} <button type="button" class="sr__link" (click)="openFormat()">{{ i18n.t('mdHelp.openHint') }}</button></span>
+      </label>
+
+      @if (!isInicio()) {
+        <label class="sr__field">
+          <span class="sr__label">{{ i18n.t('shiftReport.pendingLabel') }}</span>
+          <textarea class="mono" rows="3" name="pending" placeholder="- [ ] …" [ngModel]="draft().pending" (ngModelChange)="edit({ pending: $event })"></textarea>
+          <span class="sr__hint">{{ i18n.t('shiftReport.pendingHint') }}</span>
+        </label>
+        <div class="sr__closing">
+          <span class="sr__check">
+            @if (canClose()) {
+              <mat-icon class="sr__ok">task_alt</mat-icon>{{ i18n.t('shiftReport.checklistDone') }}
+            } @else {
+              <mat-icon class="sr__warn">pending_actions</mat-icon>{{ i18n.t('shiftReport.checklistMissing') }}
+              <button type="button" class="sr__btn sr__push" (click)="goToChecklist()">{{ i18n.t('shiftReport.completeNow') }}</button>
+            }
+          </span>
+          <label class="switch sr__notify">
+            <input class="switch__input" type="checkbox" role="switch" [checked]="notify()" (change)="notify.set(!notify())" />
+            <span class="switch__track" aria-hidden="true"></span>
+            {{ i18n.t('closure.notify') }}
+            <span class="sr__muted">
+              @if (data.shift.emailRecipients.length) { · {{ data.shift.emailRecipients.join(', ') }} } @else { · {{ i18n.t('closure.noRecipients') }} }
+            </span>
+          </label>
+        </div>
+      }
+    </div>
+
+    <aside class="sr__preview" [attr.aria-label]="i18n.t('shiftReport.preview')">
+      <span class="sr__label">{{ i18n.t('shiftReport.preview') }}</span>
+      <div class="sr__entry"><app-markdown class="app-markdown--compact" [content]="content()" /></div>
+      <span class="sr__hint">{{ i18n.t('shiftReport.previewHint') }}</span>
+    </aside>
+  </div>
+
+  <footer class="sr__foot">
+    @if (error(); as e) {
+      <span class="sr__error" role="alert">{{ e }}</span>
+    } @else if (notice(); as n) {
+      <span class="sr__notice" role="status">{{ n }}</span>
+    } @else {
+      <span class="sr__muted">{{ i18n.t(isInicio() ? 'shiftReport.foot.inicio' : canClose() ? 'shiftReport.foot.cierre' : 'shiftReport.foot.cierreBlocked') }}</span>
+    }
+    <span class="sr__actions">
+      <button type="button" class="sr__btn" (click)="later()">{{ i18n.t('shiftReport.later') }}</button>
+      @if (isInicio()) {
+        <button type="button" class="sr__btn sr__btn--primary" [disabled]="busy()" (click)="save()"><mat-icon>save</mat-icon>{{ i18n.t('shiftReport.saveInicio') }}</button>
+      } @else {
+        <button type="button" class="sr__btn" [disabled]="busy()" (click)="save()"><mat-icon>save</mat-icon>{{ i18n.t('shiftReport.saveOnly') }}</button>
+        <button type="button" class="sr__btn sr__btn--primary" [disabled]="busy() || !canClose()" (click)="closeShift()"><mat-icon>logout</mat-icon>{{ i18n.t('closure.close') }}</button>
+      }
+    </span>
+  </footer>
+</div>

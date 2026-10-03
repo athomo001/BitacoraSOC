@@ -1,3 +1,4 @@
+import { I18nService } from '../core/i18n/i18n.service';
 import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
@@ -107,6 +108,8 @@ describe('ShellComponent', () => {
     const { fixture, el } = await render([{ code: 'native_tickets', isEnabled: true }]);
     const en = [...el.querySelectorAll<HTMLButtonElement>('.shell__seg')].find((b) => b.textContent?.trim() === 'EN');
     en?.click();
+    // El inglés se descarga al elegir EN (no va en el bundle inicial).
+    await TestBed.inject(I18nService).loadEnglish();
     fixture.detectChanges();
     expect(navLabels(el)).toEqual(['Logbook', 'Tickets', 'Shifts & Checklist', 'Escalation', 'Directory', 'Administration']);
     expect(document.documentElement.lang).toBe('en');

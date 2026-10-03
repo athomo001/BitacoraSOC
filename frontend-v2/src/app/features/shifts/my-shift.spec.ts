@@ -25,6 +25,11 @@ const HANDOVER = {
   onCallSummary: [{ teamId: 't1', teamName: 'SOC N2', onCallMember: 'Carlos Soto' }],
 };
 
+const STATS = {
+  shiftStartAt: '2026-09-27T11:00:00Z', totalEntries: 18, totalIncidents: 1, ticketsResolvedCount: 2, slaBreachesCount: 0,
+  inicioWrittenAt: '2026-09-27T11:05:00Z', cierreWrittenAt: null,
+};
+
 describe('MyShiftComponent (Mi turno)', () => {
   let httpMock: HttpTestingController;
   const settle = () => new Promise((resolve) => setTimeout(resolve));
@@ -46,6 +51,8 @@ describe('MyShiftComponent (Mi turno)', () => {
     httpMock.expectOne('/api/checklist-templates/active').flush({ data: [TEMPLATE] });
     httpMock.expectOne((r) => r.url === '/api/work-shifts').flush({ data: [SHIFT] });
     httpMock.expectOne((r) => r.url === '/api/shift-checks' && r.method === 'GET').flush({ data: recent });
+    await settle();
+    httpMock.match((r) => r.url === '/api/shift-checks/stats').forEach((req) => req.flush({ data: STATS }));
     await settle();
     fixture.detectChanges();
     await settle();
@@ -77,9 +84,14 @@ describe('MyShiftComponent (Mi turno)', () => {
   it('detecta el momento: si el último check del turno fue un inicio, toca cierre', async () => {
     const { el } = await render([{ id: 'c0', checklistTemplateId: 'tpl-1', userId: 'otro', username: 'otro', workShiftId: 'ws-1', checkType: 'inicio', checkDate: new Date().toISOString(), hasRedServices: false, services: [] }]);
     expect(el.textContent).toContain('Checklist de cierre');
-    // El cierre formal se ve, pero bloqueado hasta guardar el checklist de cierre.
-    expect(el.textContent).toContain('Se habilita al guardar el checklist de cierre.');
-    expect((el.querySelector('fieldset.ms-closure') as HTMLFieldSetElement).disabled).toBe(true);
+    // Ya no hay un formulario de cierre bloqueado al final: se escribe en el popup.
+    expect(el.querySelector('fieldset.ms-closure')).toBeNull();
+  });
+
+  it('arriba: botones de Inicio y Cierre de turno con su estado (comentarios del dueño #6/#6.1)', async () => {
+    const { el } = await render();
+    const bar = [...el.querySelectorAll('.ms-report-bar__btn')].map((b) => b.textContent?.replace(/\s+/g, ' ').trim());
+    expect(bar).toEqual(['wb_sunnyInicio de turno hecho', 'nightlightCierre de turno pendiente']);
   });
 
   it('sugiere la misma causa, la reutiliza y envía el checklist completo', async () => {
@@ -118,7 +130,7 @@ describe('MyShiftComponent (Mi turno)', () => {
     });
   });
 
-  it('tras guardar el checklist de cierre, cierra el turno con envío por correo', async () => {
+  it('tras guardar el checklist de cierre, ofrece cerrar el turno desde el popup', async () => {
     const { fixture, el, button } = await render([{ id: 'c0', checklistTemplateId: 'tpl-1', userId: 'otro', username: 'otro', workShiftId: 'ws-1', checkType: 'inicio', checkDate: new Date().toISOString(), hasRedServices: false, services: [] }]);
     for (const b of [...el.querySelectorAll('.ms-sema--ok')] as HTMLButtonElement[]) b.click();
     fixture.detectChanges();
@@ -131,18 +143,7 @@ describe('MyShiftComponent (Mi turno)', () => {
     await settle();
     fixture.detectChanges();
     expect(el.textContent).toContain('Checklist guardado');
-    expect(el.textContent).toContain('noc@synet.cl');
-    expect((el.querySelector('fieldset.ms-closure') as HTMLFieldSetElement).disabled).toBe(false);
-
-    button('Cerrar turno').click();
-    await settle();
-    const req = httpMock.expectOne('/api/shift-checks/close');
-    expect(req.request.body).toMatchObject({ closureCheckId: 'c1', notifyEmail: true, syncGlpi: false });
-    req.flush({ data: { ...CLOSURE, id: 'cl-2', totalEntries: 18, sentStatus: 'pending' } });
-    await settle();
-    fixture.detectChanges();
-    expect(el.textContent).toContain('Turno cerrado');
-    expect(el.textContent).toContain('reporte en cola de envío');
-    expect(el.textContent).toContain('18 entradas');
+    expect(el.textContent).toContain('escribe el cierre y cierra el turno desde el popup');
+    expect(button('Cerrar turno')).toBeTruthy();
   });
 });

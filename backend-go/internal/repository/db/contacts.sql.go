@@ -311,7 +311,7 @@ type GetDirectoryContactRow struct {
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 	OrganizationName string             `json:"organization_name"`
-	OrganizationType OrganizationType   `json:"organization_type"`
+	OrganizationType string             `json:"organization_type"`
 }
 
 func (q *Queries) GetDirectoryContact(ctx context.Context, id uuid.UUID) (GetDirectoryContactRow, error) {
@@ -510,7 +510,7 @@ type ListDirectoryRow struct {
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 	OrganizationName string             `json:"organization_name"`
-	OrganizationType OrganizationType   `json:"organization_type"`
+	OrganizationType string             `json:"organization_type"`
 }
 
 // Directorio Global de Contactos (spec/04-contratos-api.md, HU-DIR-1/2).

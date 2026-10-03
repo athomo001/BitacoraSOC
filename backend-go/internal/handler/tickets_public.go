@@ -2,6 +2,7 @@ package handler
 
 import (
 	"crypto/subtle"
+	"github.com/google/uuid"
 	"net/http"
 	"time"
 
@@ -23,6 +24,8 @@ type publicCommentDTO struct {
 	Author    string    `json:"author"`
 	Content   string    `json:"content"`
 	CreatedAt time.Time `json:"createdAt"`
+	// ImageIDs: imágenes del comentario (GET /api/public/tickets/{token}/images/{id}).
+	ImageIDs []uuid.UUID `json:"imageIds"`
 }
 
 type publicTicketDTO struct {
@@ -37,7 +40,17 @@ type publicTicketDTO struct {
 	PublicComments []publicCommentDTO `json:"publicComments"`
 }
 
-func toPublicTicketDTO(t db.Ticket, clientName string, comments []db.TicketComment) publicTicketDTO {
+func publicImageIDs(rows []db.ListTicketImagesRow, commentID uuid.UUID) []uuid.UUID {
+	out := []uuid.UUID{}
+	for _, i := range rows {
+		if i.IsPublic && i.CommentID.Valid && uuid.UUID(i.CommentID.Bytes) == commentID {
+			out = append(out, i.ID)
+		}
+	}
+	return out
+}
+
+func toPublicTicketDTO(t db.Ticket, clientName string, comments []db.TicketComment, images []db.ListTicketImagesRow) publicTicketDTO {
 	out := publicTicketDTO{
 		TicketNumber: t.TicketNumber, Title: t.Title, TicketType: string(t.TicketType), Status: string(t.Status),
 		Priority: string(t.Priority), ClientName: clientName,
@@ -48,7 +61,7 @@ func toPublicTicketDTO(t db.Ticket, clientName string, comments []db.TicketComme
 		if !c.IsPublic {
 			continue // defensa en profundidad: la consulta ya filtra, pero esto nunca debe filtrarse
 		}
-		out.PublicComments = append(out.PublicComments, publicCommentDTO{Author: publicAuthorLabel, Content: c.Content, CreatedAt: c.CreatedAt.Time})
+		out.PublicComments = append(out.PublicComments, publicCommentDTO{Author: publicAuthorLabel, Content: c.Content, CreatedAt: c.CreatedAt.Time, ImageIDs: publicImageIDs(images, c.ID)})
 	}
 	return out
 }
@@ -91,5 +104,10 @@ func (h *TicketsHandler) Public(w http.ResponseWriter, r *http.Request) {
 	if org, orgErr := h.Queries.GetOrganization(ctx, t.ClientID); orgErr == nil {
 		clientName = org.Name
 	}
-	writeData(w, 200, toPublicTicketDTO(t, clientName, comments))
+	images, err := h.Queries.ListTicketImages(ctx, t.ID)
+	if err != nil {
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudo cargar el seguimiento")
+		return
+	}
+	writeData(w, 200, toPublicTicketDTO(t, clientName, comments, images))
 }

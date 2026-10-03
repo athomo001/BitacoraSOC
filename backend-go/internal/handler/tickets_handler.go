@@ -3,6 +3,7 @@ package handler
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -148,7 +149,12 @@ func randomToken() (string, error) {
 type commentRequest struct {
 	Content  string `json:"content"`
 	IsPublic bool   `json:"isPublic"`
+	// ImageIDs: imágenes ya subidas a este ticket (POST /api/tickets/{id}/images).
+	ImageIDs []uuid.UUID `json:"imageIds"`
 }
+
+// maxImagesPerComment: tope del diseño aprobado (comentario del dueño #14).
+const maxImagesPerComment = 10
 
 func (h *TicketsHandler) AddComment(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
@@ -157,29 +163,53 @@ func (h *TicketsHandler) AddComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req commentRequest
-	if err = decodeJSON(w, r, &req); err != nil || strings.TrimSpace(req.Content) == "" {
-		problemdetails.Write(w, r, 400, "invalid-payload", "content es obligatorio")
+	if err = decodeJSON(w, r, &req); err != nil || (strings.TrimSpace(req.Content) == "" && len(req.ImageIDs) == 0) {
+		problemdetails.Write(w, r, 400, "invalid-payload", "escribe algo o adjunta al menos una imagen")
 		return
 	}
-	u, _ := middleware.UserFromContext(r.Context())
-	if err := h.AddEntryCommentToTicket(r.Context(), id, u, strings.TrimSpace(req.Content), req.IsPublic); err != nil {
+	if len(req.ImageIDs) > maxImagesPerComment {
+		problemdetails.Write(w, r, 400, "invalid-payload", fmt.Sprintf("hasta %d imágenes por comentario", maxImagesPerComment))
+		return
+	}
+	ctx := r.Context()
+	u, _ := middleware.UserFromContext(ctx)
+	ticket, err := h.Queries.GetTicket(ctx, id)
+	if err != nil {
 		problemdetails.Write(w, r, 404, "not-found", "ticket no encontrado")
 		return
 	}
-	c, err := h.Queries.ListTicketComments(r.Context(), id)
+	tx, err := h.Pool.Begin(ctx)
 	if err != nil {
-		problemdetails.Write(w, r, 500, "internal-error", "no se pudo cargar el comentario creado")
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudo crear el comentario")
 		return
 	}
-	if len(c) == 0 {
+	defer tx.Rollback(ctx)
+	q := h.Queries.WithTx(tx)
+	comment, err := h.addTicketComment(ctx, q, ticket, u, strings.TrimSpace(req.Content), req.IsPublic)
+	if err != nil {
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudo crear el comentario")
+		return
+	}
+	if len(req.ImageIDs) > 0 {
+		claimed, err := q.ClaimTicketImages(ctx, db.ClaimTicketImagesParams{CommentID: pgtype.UUID{Bytes: comment.ID, Valid: true}, TicketID: id, UserID: pgtype.UUID{Bytes: u.ID, Valid: true}, Ids: req.ImageIDs})
+		if err != nil || claimed != int64(len(req.ImageIDs)) {
+			problemdetails.Write(w, r, 400, "invalid-payload", "alguna imagen no es de este ticket, ya se usó o la subió otra persona")
+			return
+		}
+	}
+	if err = tx.Commit(ctx); err != nil {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo crear el comentario")
 		return
 	}
 	if h.AuditLog != nil {
-		h.AuditLog.Log(r.Context(), "ticket.comment_added", audit.LevelInfo, audit.Success(), map[string]any{"ticketId": id.String()})
+		h.AuditLog.Log(ctx, "ticket.comment_added", audit.LevelInfo, audit.Success(), map[string]any{"ticketId": id.String(), "images": len(req.ImageIDs)})
 	}
-	h.notifyChanged(r.Context(), id)
-	writeData(w, 201, toTicketCommentDTO(c[len(c)-1]))
+	h.notifyChanged(ctx, id)
+	dto := toTicketCommentDTO(comment)
+	if images, err := h.Queries.ListTicketImages(ctx, id); err == nil {
+		dto.Images = imagesOfComment(images, comment.ID)
+	}
+	writeData(w, 201, dto)
 }
 
 type linkTicketRequest struct {
@@ -237,8 +267,8 @@ func (h *TicketsHandler) ConvertEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req convertEntryRequest
-	if err = decodeJSON(w, r, &req); err != nil || !validTicketType(req.TicketType) || req.TeamID == uuid.Nil || !validImpact(req.Impact) || !validUrgency(req.Urgency) {
-		problemdetails.Write(w, r, 400, "invalid-payload", "ticketType, teamId, impact y urgency son obligatorios")
+	if err = decodeJSON(w, r, &req); err != nil || !validTicketType(req.TicketType) || !validImpact(req.Impact) || !validUrgency(req.Urgency) {
+		problemdetails.Write(w, r, 400, "invalid-payload", "ticketType, impact y urgency son obligatorios")
 		return
 	}
 	entry, err := h.Queries.GetEntry(r.Context(), entryID)

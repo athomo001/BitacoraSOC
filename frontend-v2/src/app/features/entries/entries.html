@@ -145,6 +145,7 @@
           }
         }
         <button type="button" class="adm-btn" [title]="i18n.t('entries.defangHint')" [disabled]="!draft().content.trim()" (click)="defangDraft()"><mat-icon>shield</mat-icon>{{ i18n.t('entries.defang') }}</button>
+        <button type="button" class="adm-btn" [title]="i18n.t('mdHelp.openHint')" (click)="openFormat()"><mat-icon>text_format</mat-icon>{{ i18n.t('mdHelp.open') }}</button>
         @if (composeImage(); as img) {
           <span class="en__img"><img [src]="img.previewUrl" [alt]="i18n.t('entries.evidence')" /><button type="button" class="adm-icon-btn" [attr.aria-label]="i18n.t('teams.remove')" (click)="removeImage()"><mat-icon>close</mat-icon></button></span>
         } @else {
@@ -172,7 +173,7 @@
         <div class="en__side-body">
           <p class="adm-small adm-secondary">{{ entry.authorUsername }} · <span class="mono">{{ entry.createdAt | date: 'dd/MM/yyyy HH:mm' }}</span>@if (targetName(entry) !== '—') { · {{ targetName(entry) }} }</p>
           <app-markdown [content]="entry.content" />
-          @if (entry.imageUrl) { <img class="en__detail-img" [src]="entry.imageUrl" [alt]="i18n.t('entries.evidence')" /> }
+          @if (entry.imageUrl) { <img class="en__detail-img" [appAuthSrc]="entry.imageUrl" [alt]="i18n.t('entries.evidence')" /> }
           @if (entry.tags.length) {
             <p class="en__tags-row">@for (tag of entry.tags; track tag) { <span class="pill tone-neutral">{{ tag }}</span> }</p>
           }

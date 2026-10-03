@@ -267,3 +267,40 @@ func (h *ChecklistsHandler) RecentReports(w http.ResponseWriter, r *http.Request
 	}
 	writeData(w, http.StatusOK, out)
 }
+
+// ShiftStats es GET /api/shift-checks/stats?workShiftId=: las cifras del
+// turno en curso (las mismas que guardará el cierre) para el popup de cierre,
+// y si el usuario ya escribió su inicio o cierre de turno en la bitácora.
+func (h *ChecklistsHandler) ShiftStats(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, err := uuid.Parse(r.URL.Query().Get("workShiftId"))
+	if err != nil {
+		problemdetails.Write(w, r, 400, "invalid-parameter", "workShiftId es obligatorio")
+		return
+	}
+	shift, err := h.Queries.GetWorkShiftByID(ctx, id)
+	if err != nil {
+		problemdetails.Write(w, r, 404, "not-found", "turno no encontrado")
+		return
+	}
+	start, end := shiftWindow(h.now(), shift.StartTime, shift.Timezone)
+	from := pgtype.Timestamptz{Time: start, Valid: true}
+	to := pgtype.Timestamptz{Time: end.Add(time.Minute), Valid: true}
+	totalEntries, _ := h.Queries.CountEntriesInWindow(ctx, db.CountEntriesInWindowParams{CreatedAt: from, CreatedAt_2: to})
+	totalIncidents, _ := h.Queries.CountIncidentEntriesInWindow(ctx, db.CountIncidentEntriesInWindowParams{CreatedAt: from, CreatedAt_2: to})
+	resolved, _ := h.Queries.CountResolvedTicketsInWindow(ctx, db.CountResolvedTicketsInWindowParams{ResolvedAt: from, ResolvedAt_2: to})
+	breaches, _ := h.Queries.CountSLABreachesInWindow(ctx, db.CountSLABreachesInWindowParams{ResolvedAt: from, ResolvedAt_2: to})
+	user, _ := middleware.UserFromContext(ctx)
+	written := func(tag string) *time.Time {
+		at, err := h.Queries.LastTaggedEntryInWindow(ctx, db.LastTaggedEntryInWindowParams{UserID: user.ID, Tag: tag, FromAt: from, ToAt: to})
+		if err != nil || !at.Valid || at.Time.Year() < 2000 {
+			return nil
+		}
+		return &at.Time
+	}
+	writeData(w, 200, map[string]any{
+		"shiftStartAt": start, "totalEntries": totalEntries, "totalIncidents": totalIncidents,
+		"ticketsResolvedCount": resolved, "slaBreachesCount": breaches,
+		"inicioWrittenAt": written("iniciodeturno"), "cierreWrittenAt": written("cierredeturno"),
+	})
+}

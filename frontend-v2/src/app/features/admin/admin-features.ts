@@ -11,12 +11,14 @@ import { problemDetail } from '../../core/http-error';
  * (backlog post-corte) se muestra sin interruptor: prenderla no haría nada.
  */
 const KNOWN: Record<string, { name: MessageKey; desc: MessageKey; available: boolean }> = {
-  native_tickets: { name: 'features.native_tickets.name', desc: 'features.native_tickets.desc', available: true },
   allow_purge: { name: 'features.allow_purge.name', desc: 'features.allow_purge.desc', available: true },
   complements: { name: 'features.complements.name', desc: 'features.complements.desc', available: true },
   zabbix_inbound: { name: 'features.zabbix_inbound.name', desc: 'features.zabbix_inbound.desc', available: false },
   glpi_sync: { name: 'features.glpi_sync.name', desc: 'features.glpi_sync.desc', available: false },
 };
+
+/** Funcionalidades que se administran en Módulos y no se repiten acá. */
+const IN_MODULES = new Set(['native_tickets']);
 
 /**
  * Funcionalidades opcionales (system_features), re-vestidas con los
@@ -85,7 +87,8 @@ export class AdminFeaturesComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     try {
-      this.features.set(await this.service.list());
+      // La Ticketera se enciende en Módulos, junto a SOC y NOC.
+      this.features.set((await this.service.list()).filter((f) => !IN_MODULES.has(f.code)));
     } catch (error) {
       this.error.set(problemDetail(error, this.i18n.t('features.loadError')));
     }

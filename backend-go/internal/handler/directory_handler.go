@@ -82,7 +82,7 @@ type contactRow struct {
 	ID               uuid.UUID
 	OrganizationID   uuid.UUID
 	OrganizationName string
-	OrganizationType db.OrganizationType
+	OrganizationType string
 	Name             string
 	Position         pgtype.Text
 	Specialty        pgtype.Text
@@ -124,7 +124,7 @@ func (h *DirectoryHandler) toChannelDTO(c db.ContactChannel) channelDTO {
 
 func (h *DirectoryHandler) toContactDTO(c contactRow, channels []db.ContactChannel) contactDTO {
 	dto := contactDTO{
-		ID: c.ID, OrganizationID: c.OrganizationID, OrganizationName: c.OrganizationName, OrganizationType: string(c.OrganizationType),
+		ID: c.ID, OrganizationID: c.OrganizationID, OrganizationName: c.OrganizationName, OrganizationType: c.OrganizationType,
 		Name: c.Name, Position: textPtr(c.Position), Specialty: textPtr(c.Specialty), Scope: string(c.Scope), Source: string(c.Source),
 		IsFavorite: c.IsFavorite, Email: h.decrypt(c.EmailEncrypted), Phone: h.decrypt(c.PhoneEncrypted), Notes: textPtr(c.Notes),
 		Active: c.Active, CreatedAt: c.CreatedAt.Time, UpdatedAt: c.UpdatedAt.Time, Channels: []channelDTO{},

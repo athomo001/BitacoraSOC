@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
@@ -65,7 +66,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	user, err := h.Queries.GetUserByUsername(ctx, req.Username)
+	user, err := h.Queries.GetUserForLogin(ctx, strings.TrimSpace(req.Username))
 	if err != nil {
 		h.AuditLog.Log(ctx, "auth.login.fail", audit.LevelWarn, audit.Failure("usuario inexistente"), map[string]any{"username": req.Username})
 		problemdetails.Write(w, r, http.StatusUnauthorized, "invalid-credentials", "credenciales inválidas")

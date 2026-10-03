@@ -163,3 +163,14 @@ LEFT JOIN shift_checks ck ON ck.id = sc.closure_check_id
 LEFT JOIN work_shifts ws ON ws.id = ck.work_shift_id
 ORDER BY sc.shift_end_at DESC
 LIMIT 20;
+
+-- name: GetWorkShiftByID :one
+SELECT * FROM work_shifts WHERE id = $1;
+
+-- name: LastTaggedEntryInWindow :one
+-- Última entrada del usuario con esa etiqueta en la ventana del turno
+-- (#iniciodeturno / #cierredeturno ya escritos).
+SELECT COALESCE(max(created_at), 'epoch'::timestamptz)::timestamptz AS at
+FROM entries
+WHERE user_id = sqlc.arg('user_id') AND sqlc.arg('tag')::text = ANY(tags)
+  AND created_at >= sqlc.arg('from_at') AND created_at < sqlc.arg('to_at');

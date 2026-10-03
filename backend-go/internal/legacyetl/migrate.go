@@ -185,6 +185,25 @@ func (m *Migrator) uniqueCode(name string) string {
 	return code
 }
 
+// legacyIDSuffix: el legacy armaba el código del servicio como nombre_<ObjectId>.
+var legacyIDSuffix = regexp.MustCompile(`_[0-9a-f]{24}$`)
+
+// serviceCode deja un código legible: cliente_servicio, sin el id del legacy
+// ("qradar_696993296a90fd3291f4b656" de JUNJI → "junji_qradar").
+func serviceCode(orgName, legacyCode string, used map[string]bool) string {
+	svc := legacyIDSuffix.ReplaceAllString(strings.ToLower(strings.TrimSpace(legacyCode)), "")
+	base := strings.Trim(nonCode.ReplaceAllString(normName(orgName)+"_"+svc, "_"), "_")
+	if base == "" {
+		base = "servicio"
+	}
+	code := base
+	for i := 2; used[code]; i++ {
+		code = fmt.Sprintf("%s_%d", base, i)
+	}
+	used[code] = true
+	return code
+}
+
 // orgFor devuelve (o crea) la organización con ese nombre.
 func (m *Migrator) orgFor(ctx context.Context, name, orgType string, id uuid.UUID) (uuid.UUID, bool, error) {
 	key := normName(name)
@@ -251,6 +270,7 @@ func (m *Migrator) migrateUsers(ctx context.Context) error {
 	m.rep.Steps = append(m.rep.Steps, step)
 	seenUser, seenMail := map[string]bool{}, map[string]bool{}
 	now := time.Now()
+	var members []groupMember
 	for _, u := range rows {
 		username := strings.TrimSpace(u.Username)
 		email := strings.ToLower(strings.TrimSpace(u.Email))
@@ -302,6 +322,9 @@ func (m *Migrator) migrateUsers(ctx context.Context) error {
 			return err
 		}
 		m.users[u.ID] = id
+		if role == "user" || role == "auditor" {
+			members = append(members, groupMember{user: id, cargo: strings.TrimSpace(u.CargoLabel)})
+		}
 		if role == "admin" && u.IsActive && m.firstAdmin == uuid.Nil {
 			m.firstAdmin = id
 		}
@@ -309,6 +332,60 @@ func (m *Migrator) migrateUsers(ctx context.Context) error {
 	}
 	if m.firstAdmin == uuid.Nil {
 		return errors.New("la exportación no tiene ningún administrador activo")
+	}
+	return m.permissionGroups(ctx, step, members)
+}
+
+type groupMember struct {
+	user  uuid.UUID
+	cargo string
+}
+
+// Cargos que en el legacy podían además eliminar contactos del directorio
+// (FULL_DIRECTORY_CARGOS de routes/directory.js).
+var fullDirectoryCargos = map[string]bool{"n2": true, "n3": true, "jefe area": true, "gerente area": true, "arquitecto siem": true}
+
+// permissionGroups: en la 2.0 un analista solo ve SOC si un grupo de
+// permisos lo incluye; sin esto los usuarios migrados no veían servicios ni
+// escalamiento. Un grupo por cargo del legacy (SOC), con los permisos de
+// directorio que daba ese cargo; quien no tenía cargo queda en "Sin cargo"
+// (solo lectura).
+func (m *Migrator) permissionGroups(ctx context.Context, step *Step, members []groupMember) error {
+	type group struct {
+		id    uuid.UUID
+		label string
+		caps  []string
+	}
+	groups := map[string]*group{}
+	for _, mb := range members {
+		key := normName(mb.cargo)
+		if _, ok := groups[key]; !ok {
+			g := &group{label: mb.cargo, caps: []string{}}
+			switch {
+			case key == "":
+				g.label = "Sin cargo"
+			case fullDirectoryCargos[key]:
+				g.caps = []string{"directory:write", "directory:delete"}
+			default:
+				g.caps = []string{"directory:write"}
+			}
+			code := strings.Trim(nonCode.ReplaceAllString(key, "_"), "_")
+			if code == "" {
+				code = "sin_cargo"
+			}
+			g.id = ID("permissionGroups", code)
+			if _, err := m.tx.Exec(ctx, `INSERT INTO permission_groups (id, code, name, module_scope, capabilities) VALUES ($1, $2, $3, 'soc', $4)`,
+				g.id, code, g.label, g.caps); err != nil {
+				return err
+			}
+			groups[key] = g
+		}
+		if _, err := m.tx.Exec(ctx, `INSERT INTO user_permission_groups (user_id, permission_group_id) VALUES ($1, $2)`, mb.user, groups[key].id); err != nil {
+			return err
+		}
+	}
+	if len(groups) > 0 {
+		step.note("%d grupos de permisos SOC según el cargo del legacy, con %d usuarios", len(groups), len(members))
 	}
 	return nil
 }
@@ -498,6 +575,11 @@ func (m *Migrator) migrateServices(ctx context.Context) error {
 	step := newStep("servicios", len(rows))
 	m.rep.Steps = append(m.rep.Steps, step)
 	seen := map[string]uuid.UUID{}
+	codes := map[string]bool{}
+	orgNames := map[uuid.UUID]string{}
+	for name, id := range m.orgs {
+		orgNames[id] = name
+	}
 	for _, s := range rows {
 		org, ok := m.clientOrgs[s.ClientID]
 		switch {
@@ -518,8 +600,9 @@ func (m *Migrator) migrateServices(ctx context.Context) error {
 		}
 		id := ID("services", s.ID)
 		seen[key] = id
+		code := serviceCode(orgNames[org], s.Code, codes)
 		if _, err := m.tx.Exec(ctx, `INSERT INTO services (id, organization_id, name, code, active) VALUES ($1,$2,$3,$4,$5)`,
-			id, org, strings.TrimSpace(s.Name), strings.TrimSpace(s.Code), s.Active); err != nil {
+			id, org, strings.TrimSpace(s.Name), code, s.Active); err != nil {
 			return err
 		}
 		m.services[s.ID] = id
@@ -848,6 +931,7 @@ func (m *Migrator) migrateEntries(ctx context.Context) error {
 		EntryType    string   `json:"entryType"`
 		Tags         []string `json:"tags"`
 		CreatedBy    string   `json:"createdBy"`
+		ClientID     *string  `json:"clientId"`
 		ClientName   string   `json:"clientName"`
 		GlpiTicketID *string  `json:"glpiTicketId"`
 		CreatedAt    string   `json:"createdAt"`
@@ -859,6 +943,23 @@ func (m *Migrator) migrateEntries(ctx context.Context) error {
 	step := newStep("entradas", len(rows))
 	m.rep.Steps = append(m.rep.Steps, step)
 	now := time.Now()
+	// Servicios de cada cliente: una entrada con cliente queda en SOC con el
+	// servicio de ese cliente (no como etiqueta "cliente:X" en General).
+	byOrg := map[uuid.UUID][]uuid.UUID{}
+	svcRows, err := m.tx.Query(ctx, `SELECT organization_id, id FROM services ORDER BY name`)
+	if err != nil {
+		return err
+	}
+	for svcRows.Next() {
+		var org, svc uuid.UUID
+		if err := svcRows.Scan(&org, &svc); err != nil {
+			svcRows.Close()
+			return err
+		}
+		byOrg[org] = append(byOrg[org], svc)
+	}
+	svcRows.Close()
+	linked, ambiguous := 0, 0
 	for _, e := range rows {
 		user, ok := m.users[e.CreatedBy]
 		if !ok {
@@ -881,15 +982,41 @@ func (m *Migrator) migrateEntries(ctx context.Context) error {
 				tags = append(tags, t)
 			}
 		}
-		if c := strings.TrimSpace(e.ClientName); c != "" {
-			tags = append(tags, "cliente:"+c)
+		scope, service := "general", (*uuid.UUID)(nil)
+		if c := strings.TrimSpace(e.ClientName); c != "" || e.ClientID != nil {
+			org, ok := uuid.Nil, false
+			if e.ClientID != nil {
+				org, ok = m.clientOrgs[*e.ClientID]
+			}
+			if !ok && c != "" {
+				org, ok = m.orgs[normName(c)]
+			}
+			switch svcs := byOrg[org]; {
+			case ok && len(svcs) == 1:
+				scope, service = "soc", &svcs[0]
+				linked++
+			case ok && len(svcs) > 1:
+				// Varios servicios: no se adivina cuál; queda en SOC y el
+				// cliente como etiqueta para poder filtrarlo.
+				scope = "soc"
+				tags = append(tags, "cliente:"+c)
+				ambiguous++
+			case c != "":
+				tags = append(tags, "cliente:"+c)
+			}
 		}
-		if _, err := m.tx.Exec(ctx, `INSERT INTO entries (id, user_id, entry_type, scope, content, tags, glpi_ticket_id, created_at, updated_at)
-			VALUES ($1,$2,$3,'general',$4,$5,$6,$7,$8)`, ID("entries", e.ID), user, entryType, e.Content, tags, nz(deref(e.GlpiTicketID)),
+		if _, err := m.tx.Exec(ctx, `INSERT INTO entries (id, user_id, entry_type, scope, content, tags, service_id, glpi_ticket_id, created_at, updated_at)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, ID("entries", e.ID), user, entryType, scope, e.Content, tags, service, nz(deref(e.GlpiTicketID)),
 			timeOr(e.CreatedAt, now), timeOr(e.UpdatedAt, now)); err != nil {
 			return err
 		}
 		step.Loaded++
+	}
+	if linked > 0 {
+		step.note("%d entradas quedaron en SOC con el servicio de su cliente", linked)
+	}
+	if ambiguous > 0 {
+		step.note("%d entradas son de un cliente con varios servicios: quedan en SOC sin servicio y con la etiqueta cliente:X (revisar)", ambiguous)
 	}
 	return nil
 }

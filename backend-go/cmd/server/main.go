@@ -150,7 +150,7 @@ func run(logger *slog.Logger) error {
 	configHandler := &handler.ConfigHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
 	systemFeaturesHandler := &handler.SystemFeaturesHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
 	territorialUnitsHandler := &handler.TerritorialUnitsHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
-	organizationsHandler := &handler.OrganizationsHandler{Queries: queries, AuditLog: auditLog}
+	organizationsHandler := &handler.OrganizationsHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
 	directoryHandler := &handler.DirectoryHandler{Pool: pool, Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
 	smtpConfigHandler := &handler.SMTPConfigHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
 	escalationHandler := &handler.EscalationHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, Modules: &repository.ModuleAccess{Queries: queries}}
@@ -208,6 +208,10 @@ func run(logger *slog.Logger) error {
 	admin := func(h http.HandlerFunc) http.Handler {
 		return authMW.RequireAuth(apiRateLimit(middleware.RequireNotForcedPasswordChange(middleware.RequireRole("admin")(h))))
 	}
+	// operator: quien opera (admin o analista); no auditor ni invitado.
+	operator := func(h http.HandlerFunc) http.Handler {
+		return authMW.RequireAuth(apiRateLimit(middleware.RequireNotForcedPasswordChange(middleware.RequireRole("admin", "user")(h))))
+	}
 	adminOrAuditor := func(h http.HandlerFunc) http.Handler {
 		return authMW.RequireAuth(apiRateLimit(middleware.RequireNotForcedPasswordChange(middleware.RequireRole("admin", "auditor")(h))))
 	}
@@ -216,6 +220,11 @@ func run(logger *slog.Logger) error {
 	}
 	ticketAuthed := func(h http.HandlerFunc) http.Handler {
 		return authed(func(w http.ResponseWriter, r *http.Request) {
+			ticketsHandler.RequireEnabled(w, r, h)
+		})
+	}
+	ticketAdmin := func(h http.HandlerFunc) http.Handler {
+		return admin(func(w http.ResponseWriter, r *http.Request) {
 			ticketsHandler.RequireEnabled(w, r, h)
 		})
 	}
@@ -318,6 +327,11 @@ func run(logger *slog.Logger) error {
 	mux.Handle("GET /api/organizations", authed(organizationsHandler.List))
 	mux.Handle("POST /api/organizations", admin(organizationsHandler.Create))
 	mux.Handle("PATCH /api/organizations/{id}", admin(organizationsHandler.Patch))
+	mux.Handle("DELETE /api/organizations/{id}", admin(organizationsHandler.Delete))
+	mux.Handle("GET /api/organization-types", authed(organizationsHandler.ListTypes))
+	mux.Handle("POST /api/organization-types", admin(organizationsHandler.CreateType))
+	mux.Handle("PATCH /api/organization-types/{code}", admin(organizationsHandler.PatchType))
+	mux.Handle("DELETE /api/organization-types/{code}", admin(organizationsHandler.DeleteType))
 	mux.Handle("GET /api/log-sources", authed(organizationsHandler.ListLogSources))
 	mux.Handle("POST /api/log-sources", admin(organizationsHandler.CreateLogSource))
 	mux.Handle("PATCH /api/log-sources/{id}", admin(organizationsHandler.PatchLogSource))
@@ -375,8 +389,9 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/escalation/policies/{id}/steps", admin(escalationHandler.AddStep))
 	mux.Handle("DELETE /api/escalation/policies/{id}/steps/{stepOrder}", admin(escalationHandler.DeleteStep))
 	mux.Handle("GET /api/maintenance-windows", authed(escalationHandler.ListWindows))
-	mux.Handle("POST /api/maintenance-windows", admin(escalationHandler.CreateWindow))
-	mux.Handle("DELETE /api/maintenance-windows/{id}", admin(escalationHandler.DeleteWindow))
+	// Las mantenciones también las programa el analista (comentario del dueño #16).
+	mux.Handle("POST /api/maintenance-windows", operator(escalationHandler.CreateWindow))
+	mux.Handle("DELETE /api/maintenance-windows/{id}", operator(escalationHandler.DeleteWindow))
 	mux.Handle("GET /api/raci-assignments", authed(escalationHandler.ListRaci))
 	mux.Handle("POST /api/raci-assignments", admin(escalationHandler.CreateRaci))
 
@@ -408,6 +423,7 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/shift-checks/abandoned", authed(checklistsHandler.Abandoned))
 	mux.Handle("POST /api/shift-checks/close", authed(checklistsHandler.Close))
 	mux.Handle("GET /api/shift-checks/handover", authed(checklistsHandler.Handover))
+	mux.Handle("GET /api/shift-checks/stats", authed(checklistsHandler.ShiftStats))
 	mux.Handle("POST /api/shift-checks/closures/{id}/acknowledge", authed(checklistsHandler.Acknowledge))
 
 	// Dotación, teletrabajo y pantalla TV (Fase 8, HU-4b/HU-5b) — núcleo
@@ -475,8 +491,15 @@ func run(logger *slog.Logger) error {
 	// apagar native_tickets revoca inmediatamente todas las rutas privadas.
 	mux.Handle("GET /api/tickets", ticketAuthed(ticketsHandler.List))
 	mux.Handle("POST /api/tickets", ticketAuthed(ticketsHandler.Create))
+	mux.Handle("GET /api/tickets/assignees", ticketAuthed(ticketsHandler.Assignees))
 	mux.Handle("GET /api/tickets/{id}", ticketAuthed(ticketsHandler.Get))
 	mux.Handle("PATCH /api/tickets/{id}", ticketAuthed(ticketsHandler.Patch))
+	mux.Handle("DELETE /api/tickets/{id}", ticketAdmin(ticketsHandler.Delete))
+	mux.Handle("POST /api/tickets/{id}/resolvers", ticketAuthed(ticketsHandler.AddResolver))
+	mux.Handle("POST /api/tickets/{id}/images", ticketAuthed(ticketsHandler.UploadImage))
+	mux.Handle("GET /api/tickets/{id}/images/{imageId}", ticketAuthed(ticketsHandler.ServeImage))
+	mux.Handle("DELETE /api/tickets/{id}/images/{imageId}", ticketAuthed(ticketsHandler.DeletePendingImage))
+	mux.Handle("DELETE /api/tickets/{id}/resolvers/{userId}", ticketAuthed(ticketsHandler.RemoveResolver))
 	mux.Handle("POST /api/tickets/{id}/comments", ticketAuthed(ticketsHandler.AddComment))
 	mux.Handle("GET /api/tickets/{id}/tasks", ticketAuthed(ticketsHandler.ListTasks))
 	mux.Handle("POST /api/tickets/{id}/tasks", ticketAuthed(ticketsHandler.AddTask))
@@ -490,6 +513,7 @@ func run(logger *slog.Logger) error {
 	// JSON viviera en la misma ruta, el navegador mostraría JSON crudo y la
 	// página de Angular nunca cargaría.
 	mux.Handle("GET /api/public/tickets/{token}", public(ticketsHandler.Public))
+	mux.Handle("GET /api/public/tickets/{token}/images/{imageId}", public(ticketsHandler.PublicImage))
 
 	// Notas Operativas (Fase 9): pizarrón admin + libreta personal.
 	mux.Handle("GET /api/notes/admin", authed(notesHandler.GetAdmin))

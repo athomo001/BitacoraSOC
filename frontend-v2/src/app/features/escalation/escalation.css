@@ -84,6 +84,14 @@ mat-icon {
   max-width: 420px;
 }
 
+.esc__maint-btn {
+  margin-left: auto;
+}
+
+.esc__maint {
+  margin: 12px 20px 0;
+}
+
 .esc__msg {
   padding: 10px 20px 0;
 }

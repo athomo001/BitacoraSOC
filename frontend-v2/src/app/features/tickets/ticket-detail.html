@@ -9,8 +9,30 @@
     <h2 class="td__title">{{ t.title }}</h2>
     <dl class="td__facts">
       <dt>{{ i18n.t('tickets.detail.client') }}</dt><dd>{{ t.clientName }}</dd>
-      <dt>{{ i18n.t('tickets.detail.team') }}</dt><dd>{{ t.teamName ?? '—' }}</dd>
-      <dt>{{ i18n.t('tickets.detail.assignee') }}</dt><dd>{{ t.assigneeUsername ?? i18n.t('tickets.detail.unassigned') }}</dd>
+      <dt>{{ i18n.t('tickets.detail.team') }}</dt>
+      <dd>
+        <select class="td__inline-select" name="ticketTeam" [attr.aria-label]="i18n.t('tickets.detail.team')" [disabled]="busy()" [ngModel]="t.assignedTeamId ?? ''" (ngModelChange)="setTeam($event)">
+          <option value="" disabled>{{ i18n.t('tickets.detail.noTeam') }}</option>
+          @for (tm of teams(); track tm.id) { <option [value]="tm.id">{{ tm.name }}</option> }
+          @if (t.assignedTeamId && !hasTeam(t.assignedTeamId)) { <option [value]="t.assignedTeamId">{{ t.teamName }}</option> }
+        </select>
+      </dd>
+      <dt>{{ i18n.t('tickets.detail.resolvers') }}</dt>
+      <dd class="td__people">
+        @for (p of d.resolvers; track p.userId) {
+          <span class="td__person">{{ personName(p) }}
+            <button type="button" class="td__person-x" [disabled]="busy()" [attr.aria-label]="i18n.tf('tickets.detail.removeResolver', personName(p))" (click)="removeResolver(p.userId)"><mat-icon>close</mat-icon></button>
+          </span>
+        } @empty {
+          <span class="td__muted">{{ i18n.t('tickets.detail.unassigned') }}</span>
+        }
+        @if (addable().length) {
+          <select class="td__inline-select" name="addResolver" [attr.aria-label]="i18n.t('tickets.detail.addResolver')" [disabled]="busy()" [ngModel]="''" (ngModelChange)="addResolver($event)">
+            <option value="" disabled>+ {{ i18n.t('tickets.detail.addResolver') }}</option>
+            @for (p of addable(); track p.userId) { <option [value]="p.userId">{{ personName(p) }}</option> }
+          </select>
+        }
+      </dd>
       <dt>{{ i18n.t('tickets.detail.impactUrgency') }}</dt><dd>{{ i18n.t(levelKey(t.impact)) }} · {{ i18n.t(urgencyKey(t.urgency)) }}</dd>
     </dl>
   </header>
@@ -53,11 +75,23 @@
       } @empty {
         <span class="td__muted">{{ i18n.t('tickets.detail.noActions') }}</span>
       }
+      @if (canDelete()) {
+        @if (confirmDelete()) {
+          <span class="td__confirm" role="group">
+            {{ i18n.tf('tickets.delete.confirm', t.ticketNumber) }}
+            <button type="button" class="td__btn" (click)="confirmDelete.set(false)">{{ i18n.t('tickets.delete.keep') }}</button>
+            <button type="button" class="td__btn td__btn--danger" [disabled]="busy()" (click)="remove()"><mat-icon>delete_forever</mat-icon>{{ i18n.t('tickets.delete.do') }}</button>
+          </span>
+        } @else {
+          <button type="button" class="td__btn td__btn--danger-ghost" [disabled]="busy()" (click)="confirmDelete.set(true)"><mat-icon>delete</mat-icon>{{ i18n.t('tickets.delete.action') }}</button>
+        }
+      }
     </div>
   </section>
 
   <div class="td__tabs" role="tablist">
     <button type="button" role="tab" class="td__tab" [attr.aria-selected]="tab() === 'activity'" (click)="tab.set('activity')">{{ i18n.t('tickets.tab.activity') }} <span class="mono">{{ d.comments.length }}</span></button>
+    <button type="button" role="tab" class="td__tab" [attr.aria-selected]="tab() === 'images'" (click)="tab.set('images')">{{ i18n.t('tickets.tab.images') }} <span class="mono">{{ gallery().length }}</span></button>
     <button type="button" role="tab" class="td__tab" [attr.aria-selected]="tab() === 'tasks'" (click)="tab.set('tasks')">{{ i18n.t('tickets.tab.tasks') }} <span class="mono">{{ duration(d.totalTimeSpentSeconds) }}</span></button>
     <button type="button" role="tab" class="td__tab" [attr.aria-selected]="tab() === 'entries'" (click)="tab.set('entries')">{{ i18n.t('tickets.tab.entries') }} <span class="mono">{{ d.entries.length }}</span></button>
   </div>
@@ -73,11 +107,34 @@
                 <mat-icon>{{ c.isPublic ? 'visibility' : 'lock' }}</mat-icon>{{ i18n.t(c.isPublic ? 'tickets.activity.public' : 'tickets.activity.internal') }}
               </span>
             </div>
-            <app-markdown [content]="c.content" />
+            @if (c.content) { <app-markdown [content]="c.content" /> }
+            @if (c.images.length) {
+              <div class="td__thumbs">
+                @for (img of c.images; track img.id) {
+                  <button type="button" class="td__thumb" [title]="img.fileName" (click)="openImage(img)">
+                    <img [appAuthSrc]="imageSrc(img.id)" [alt]="img.fileName" loading="lazy" />
+                  </button>
+                }
+              </div>
+            }
           </article>
         } @empty {
           <p class="td__muted">{{ i18n.t('tickets.activity.empty') }}</p>
         }
+      }
+      @case ('images') {
+        <p class="td__muted">{{ i18n.t('tickets.images.galleryHint') }}</p>
+        <div class="td__gallery">
+          @for (img of gallery(); track img.id) {
+            <button type="button" class="td__gallery-item" (click)="viewing.set(img)">
+              <img [appAuthSrc]="imageSrc(img.id)" [alt]="img.fileName" loading="lazy" />
+              <span class="mono td__gallery-name">{{ img.fileName }}</span>
+              <span class="td__muted">{{ img.authorName }} · {{ img.createdAt | date: 'dd/MM HH:mm' }} · {{ i18n.t(img.isPublic ? 'tickets.activity.public' : 'tickets.activity.internal') }}</span>
+            </button>
+          } @empty {
+            <p class="td__muted">{{ i18n.t('tickets.images.none') }}</p>
+          }
+        </div>
       }
       @case ('tasks') {
         <div class="td__task-form">
@@ -112,13 +169,31 @@
     }
   </div>
 
-  <form class="td__composer" (submit)="$event.preventDefault(); addComment()">
-    <textarea class="td__input td__textarea" name="comment" [(ngModel)]="comment" [placeholder]="i18n.t('tickets.comment.placeholder')" [attr.aria-label]="i18n.t('tickets.comment.placeholder')" (keydown.control.enter)="addComment()"></textarea>
+  <form class="td__composer" [class.td__composer--drop]="dragging()" (submit)="$event.preventDefault(); addComment()"
+    (dragover)="onDragOver($event)" (dragleave)="dragging.set(false)" (drop)="onDrop($event)">
+    <textarea class="td__input td__textarea" name="comment" [(ngModel)]="comment" [placeholder]="i18n.t('tickets.comment.placeholder')" [attr.aria-label]="i18n.t('tickets.comment.placeholder')" (keydown.control.enter)="addComment()" (paste)="onPaste($event)"></textarea>
+    <div class="td__attach">
+      @for (p of pending(); track p.id) {
+        <span class="td__pending">
+          <img [src]="p.previewUrl" [alt]="p.fileName" />
+          <button type="button" class="td__pending-x" [attr.aria-label]="i18n.tf('tickets.images.remove', p.fileName)" (click)="removePending(p)"><mat-icon>close</mat-icon></button>
+          <span class="mono td__pending-size">{{ sizeLabel(p.sizeBytes) }}</span>
+        </span>
+      }
+      @if (uploading()) { <span class="td__muted">{{ i18n.t('tickets.images.uploading') }}</span> }
+      <label class="td__btn td__add-img">
+        <mat-icon>add_photo_alternate</mat-icon>{{ i18n.t('tickets.images.add') }}
+        <input type="file" accept="image/png,image/jpeg,image/webp" multiple class="td__file" (change)="onPickImages($event)" />
+      </label>
+      <span class="td__muted">{{ i18n.t('tickets.images.hint') }}</span>
+      @if (imageError(); as e) { <span class="td__img-error" role="alert">{{ e }}</span> }
+    </div>
     <div class="td__row">
       <button type="button" class="td__visibility" [class.td__visibility--public]="commentPublic()" [attr.aria-pressed]="commentPublic()" (click)="commentPublic.set(!commentPublic())">
         <mat-icon>{{ commentPublic() ? 'visibility' : 'lock' }}</mat-icon>{{ i18n.t(commentPublic() ? 'tickets.comment.public' : 'tickets.comment.internal') }}
       </button>
-      <button type="submit" class="td__btn td__btn--primary td__push" [disabled]="busy() || !comment.trim()">{{ i18n.t('tickets.comment.submit') }} <span class="mono td__kbd">Ctrl+↵</span></button>
+      <button type="button" class="td__btn" [title]="i18n.t('mdHelp.openHint')" (click)="openFormat()"><mat-icon>text_format</mat-icon>{{ i18n.t('mdHelp.open') }}</button>
+      <button type="submit" class="td__btn td__btn--primary td__push" [disabled]="busy() || uploading() > 0 || (!comment.trim() && !pending().length)">{{ i18n.t('tickets.comment.submit') }} <span class="mono td__kbd">Ctrl+↵</span></button>
     </div>
   </form>
 
@@ -139,4 +214,18 @@
   <p class="msg msg--error td__error" role="alert">{{ error() }}</p>
 } @else {
   <p class="td__muted td__loading">{{ i18n.t('tickets.loading') }}</p>
+}
+
+@if (viewing(); as v) {
+  <div class="td__viewer" role="dialog" aria-modal="true" [attr.aria-label]="v.fileName" tabindex="-1" #viewer (keydown.escape)="viewing.set(null)" (keydown.arrowleft)="stepImage(-1)" (keydown.arrowright)="stepImage(1)" (click)="viewing.set(null)">
+    <img [appAuthSrc]="imageSrc(v.id)" [alt]="v.fileName" (click)="$event.stopPropagation()" />
+    <div class="td__viewer-bar" (click)="$event.stopPropagation()">
+      <button type="button" class="td__viewer-btn" [attr.aria-label]="i18n.t('tickets.images.prev')" (click)="stepImage(-1)"><mat-icon>chevron_left</mat-icon></button>
+      <span class="mono">{{ v.fileName }}</span>
+      <span class="td__viewer-meta">{{ v.authorName }} · {{ v.createdAt | date: 'dd/MM HH:mm' }}</span>
+      <button type="button" class="td__viewer-btn" [attr.aria-label]="i18n.t('tickets.images.next')" (click)="stepImage(1)"><mat-icon>chevron_right</mat-icon></button>
+      <button type="button" class="td__viewer-btn" (click)="downloadImage(v)"><mat-icon>download</mat-icon>{{ i18n.t('tickets.images.download') }}</button>
+      <button type="button" class="td__viewer-btn" (click)="viewing.set(null)"><mat-icon>close</mat-icon>{{ i18n.t('tickets.images.close') }}</button>
+    </div>
+  </div>
 }

@@ -423,6 +423,11 @@
     padding-top: 12px;
   }
 
+  .win-button-3d.win-button-3d--small {
+    min-width: 56px;
+    height: 24px;
+  }
+
   .win-button-3d {
     background-color: var(--win-gray);
     color: var(--win-black);

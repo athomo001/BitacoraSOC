@@ -46,7 +46,8 @@ export interface Ticket {
   updatedAt: string;
 }
 
-export interface TicketComment { id: string; authorName: string; content: string; isPublic: boolean; createdAt: string; }
+export interface TicketImage { id: string; fileName: string; sizeBytes: number; createdAt: string; }
+export interface TicketComment { id: string; authorName: string; content: string; isPublic: boolean; createdAt: string; images: TicketImage[]; }
 export interface TicketTask { id: string; username: string; content: string; timeSpentSeconds: number; isPublic: boolean; performedAt: string; }
 export interface TicketEntry { id: string; entryType: string; content: string; authorUsername: string; createdAt: string; }
 
@@ -58,7 +59,11 @@ export interface TicketDetail {
   tasks: TicketTask[];
   entries: TicketEntry[];
   totalTimeSpentSeconds: number;
+  /** Quienes trabajan el ticket: quien lo tomó y los que se sumen después. */
+  resolvers: TicketPerson[];
 }
+
+export interface TicketPerson { userId: string; username: string; fullName: string | null; }
 
 export interface QueueSummary { open: number; breached: number; paused: number; resolvedToday: number; }
 export interface TicketList { items: Ticket[]; total: number; summary: QueueSummary; }
@@ -76,7 +81,7 @@ export interface PublicTicket {
   clientName: string;
   openAt: string | null;
   lastUpdateAt: string | null;
-  publicComments: { author: string; content: string; createdAt: string }[];
+  publicComments: { author: string; content: string; createdAt: string; imageIds?: string[] }[];
 }
 
 export interface TicketFilters { ticketType?: TicketType; openOnly?: boolean; q?: string; }
@@ -85,7 +90,8 @@ export interface NewTicket {
   ticketType: TicketType;
   scope: 'soc' | 'noc' | 'general';
   clientId: string;
-  teamId: string;
+  /** Opcional: el equipo resolutor se puede elegir después. */
+  teamId?: string;
   impact: Impact;
   urgency: Urgency;
   title: string;
@@ -119,8 +125,47 @@ export class TicketsService {
     return (await firstValueFrom(this.http.patch<ApiEnvelope<Ticket>>(`/api/tickets/${id}`, body))).data;
   }
 
-  async addComment(id: string, content: string, isPublic: boolean): Promise<TicketComment> {
-    return (await firstValueFrom(this.http.post<ApiEnvelope<TicketComment>>(`/api/tickets/${id}/comments`, { content, isPublic }))).data;
+  /** Usuarios que se pueden sumar como resolutores (admin y analistas activos). */
+  async assignees(): Promise<TicketPerson[]> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<TicketPerson[]>>('/api/tickets/assignees'))).data;
+  }
+
+  async addResolver(id: string, userId: string): Promise<void> {
+    await firstValueFrom(this.http.post(`/api/tickets/${id}/resolvers`, { userId }));
+  }
+
+  async removeResolver(id: string, userId: string): Promise<void> {
+    await firstValueFrom(this.http.delete(`/api/tickets/${id}/resolvers/${userId}`));
+  }
+
+  /** Cambia el equipo resolutor (se puede dejar para después de crear). */
+  async setTeam(id: string, teamId: string): Promise<Ticket> {
+    return (await firstValueFrom(this.http.patch<ApiEnvelope<Ticket>>(`/api/tickets/${id}`, { teamId }))).data;
+  }
+
+  /** DELETE /api/tickets/{id} — solo admin; borra el ticket entero. */
+  async remove(id: string): Promise<void> {
+    await firstValueFrom(this.http.delete(`/api/tickets/${id}`));
+  }
+
+  async addComment(id: string, content: string, isPublic: boolean, imageIds: string[] = []): Promise<TicketComment> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<TicketComment>>(`/api/tickets/${id}/comments`, { content, isPublic, imageIds }))).data;
+  }
+
+  /** Sube una imagen; queda pendiente hasta que el comentario la incluye en imageIds. */
+  async uploadImage(id: string, file: File): Promise<TicketImage> {
+    const form = new FormData();
+    form.append('image', file);
+    return (await firstValueFrom(this.http.post<ApiEnvelope<TicketImage>>(`/api/tickets/${id}/images`, form))).data;
+  }
+
+  /** Quita una imagen pendiente (antes de comentar). */
+  async removePendingImage(id: string, imageId: string): Promise<void> {
+    await firstValueFrom(this.http.delete(`/api/tickets/${id}/images/${imageId}`));
+  }
+
+  imageUrl(ticketId: string, imageId: string): string {
+    return `/api/tickets/${ticketId}/images/${imageId}`;
   }
 
   async addTask(id: string, content: string, timeSpentSeconds: number): Promise<TicketTask> {

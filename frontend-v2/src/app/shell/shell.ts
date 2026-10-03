@@ -10,6 +10,7 @@ import { MessageKey } from '../core/i18n/messages';
 import { SseService } from '../core/sse/sse.service';
 import { UserAvatarComponent } from './user-avatar';
 import { ComplementsService } from '../core/complements/complements.service';
+import { SetupService } from '../core/setup/setup.service';
 
 /** Ícono y etiqueta del botón de tema: muestran el tema SIGUIENTE (igual que el diseño). */
 const NEXT_THEME: Record<Theme, { icon: string; labelKey: MessageKey }> = {
@@ -39,6 +40,7 @@ export class ShellComponent implements OnInit {
   protected readonly prefs = inject(PreferencesService);
   protected readonly i18n = inject(I18nService);
   private readonly features = inject(SystemFeaturesService);
+  private readonly setup = inject(SetupService);
   private readonly sse = inject(SseService);
   private readonly injector = inject(Injector);
   private readonly router = inject(Router);
@@ -51,6 +53,19 @@ export class ShellComponent implements OnInit {
     effect(() => {
       if (this.features.isEnabled('complements')) void this.complements.refresh();
       else this.complements.clear();
+    });
+    // Si apagan (aquí o en otra pestaña) el módulo de la pantalla abierta, se
+    // sale de ella: un módulo apagado no se ve (regla del dueño). Solo cuenta
+    // el paso de encendido a apagado, no la carga inicial.
+    const wasOn = new Map<string, boolean>();
+    effect(() => {
+      for (const item of SHELL_NAV_ITEMS) {
+        if (!item.requiresFeature) continue;
+        const on = this.features.isEnabled(item.requiresFeature);
+        const leaving = wasOn.get(item.path) === true && !on;
+        wasOn.set(item.path, on);
+        if (leaving && this.router.url.split('?')[0].startsWith('/' + item.path)) void this.router.navigateByUrl('/entries');
+      }
     });
   }
 
@@ -72,6 +87,8 @@ export class ShellComponent implements OnInit {
     // Cambios hechos por otro admin u otra pestaña llegan en vivo.
     const stop = this.sse.connect((eventType, data) => {
       if (eventType === 'system_feature.updated' && isFeature(data)) this.features.apply(data);
+      // SOC/NOC encendidos o apagados por otro admin: menús y pantallas cambian sin F5.
+      if (eventType === 'config.modules.updated' && isModules(data)) this.setup.applyModules(data);
     });
     this.destroyRef.onDestroy(stop);
     await Promise.all([this.loadUser(), this.loadFeatures()]);
@@ -124,6 +141,11 @@ export class ShellComponent implements OnInit {
   protected logout(): void {
     void this.auth.logout();
   }
+}
+
+function isModules(data: unknown): data is { socEnabled: boolean; nocEnabled: boolean } {
+  const d = data as { socEnabled?: unknown; nocEnabled?: unknown } | null;
+  return typeof d?.socEnabled === 'boolean' && typeof d?.nocEnabled === 'boolean';
 }
 
 function isFeature(data: unknown): data is Pick<SystemFeature, 'code' | 'isEnabled'> {

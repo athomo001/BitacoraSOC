@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/middleware"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/tickets"
@@ -66,21 +68,43 @@ func toTicketView(t db.Ticket, clientName string, teamName, assignee pgtype.Text
 		v.SLA.Resolution = &c
 	}
 	for _, to := range tickets.Transitions(tickets.Status(t.Status)) {
+		if to == tickets.Cancelled {
+			continue // cancelar = eliminar (admin), no un botón de estado
+		}
 		v.AllowedTransitions = append(v.AllowedTransitions, string(to))
 	}
 	return v
 }
 
 type ticketCommentDTO struct {
-	ID         uuid.UUID `json:"id"`
-	AuthorName string    `json:"authorName"`
-	Content    string    `json:"content"`
-	IsPublic   bool      `json:"isPublic"`
-	CreatedAt  time.Time `json:"createdAt"`
+	ID         uuid.UUID        `json:"id"`
+	AuthorName string           `json:"authorName"`
+	Content    string           `json:"content"`
+	IsPublic   bool             `json:"isPublic"`
+	CreatedAt  time.Time        `json:"createdAt"`
+	Images     []ticketImageDTO `json:"images"`
+}
+
+// ticketImageDTO: los bytes se piden aparte (GET /api/tickets/{id}/images/{imageId}).
+type ticketImageDTO struct {
+	ID        uuid.UUID `json:"id"`
+	FileName  string    `json:"fileName"`
+	SizeBytes int32     `json:"sizeBytes"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+func imagesOfComment(rows []db.ListTicketImagesRow, commentID uuid.UUID) []ticketImageDTO {
+	out := []ticketImageDTO{}
+	for _, i := range rows {
+		if i.CommentID.Valid && uuid.UUID(i.CommentID.Bytes) == commentID {
+			out = append(out, ticketImageDTO{ID: i.ID, FileName: i.FileName, SizeBytes: i.SizeBytes, CreatedAt: i.CreatedAt.Time})
+		}
+	}
+	return out
 }
 
 func toTicketCommentDTO(c db.TicketComment) ticketCommentDTO {
-	return ticketCommentDTO{ID: c.ID, AuthorName: c.AuthorName, Content: c.Content, IsPublic: c.IsPublic, CreatedAt: c.CreatedAt.Time}
+	return ticketCommentDTO{ID: c.ID, AuthorName: c.AuthorName, Content: c.Content, IsPublic: c.IsPublic, CreatedAt: c.CreatedAt.Time, Images: []ticketImageDTO{}}
 }
 
 type ticketTaskDTO struct {
@@ -105,13 +129,21 @@ type ticketEntryDTO struct {
 }
 
 type ticketDetailDTO struct {
-	Ticket                ticketViewDTO      `json:"ticket"`
-	PublicTrackingToken   *string            `json:"publicTrackingToken"`
-	PublicTrackingPin     *string            `json:"publicTrackingPin"`
-	Comments              []ticketCommentDTO `json:"comments"`
-	Tasks                 []ticketTaskDTO    `json:"tasks"`
-	Entries               []ticketEntryDTO   `json:"entries"`
-	TotalTimeSpentSeconds int64              `json:"totalTimeSpentSeconds"`
+	Ticket                ticketViewDTO       `json:"ticket"`
+	PublicTrackingToken   *string             `json:"publicTrackingToken"`
+	PublicTrackingPin     *string             `json:"publicTrackingPin"`
+	Comments              []ticketCommentDTO  `json:"comments"`
+	Tasks                 []ticketTaskDTO     `json:"tasks"`
+	Entries               []ticketEntryDTO    `json:"entries"`
+	TotalTimeSpentSeconds int64               `json:"totalTimeSpentSeconds"`
+	Resolvers             []ticketResolverDTO `json:"resolvers"`
+}
+
+// ticketResolverDTO: una persona que trabaja el ticket (puede haber varias).
+type ticketResolverDTO struct {
+	UserID   uuid.UUID `json:"userId"`
+	Username string    `json:"username"`
+	FullName *string   `json:"fullName"`
 }
 
 type ticketQueueSummaryDTO struct {
@@ -197,15 +229,29 @@ func (h *TicketsHandler) loadDetail(r *http.Request, id uuid.UUID) (ticketDetail
 	if err != nil {
 		return ticketDetailDTO{}, err
 	}
+	resolvers, err := h.Queries.ListTicketResolvers(ctx, id)
+	if err != nil {
+		return ticketDetailDTO{}, err
+	}
+	images, err := h.Queries.ListTicketImages(ctx, id)
+	if err != nil {
+		return ticketDetailDTO{}, err
+	}
 	d := ticketDetailDTO{
 		Ticket:              toTicketView(row.Ticket, row.ClientName, row.TeamName, row.AssigneeUsername, h.now()),
 		PublicTrackingToken: textPtr(row.Ticket.PublicTrackingToken), PublicTrackingPin: textPtr(row.Ticket.PublicTrackingPin),
 		Comments: make([]ticketCommentDTO, 0, len(comments)), Tasks: make([]ticketTaskDTO, 0, len(taskRows)),
 		Entries: make([]ticketEntryDTO, 0, len(entryRows)), TotalTimeSpentSeconds: total,
+		Resolvers: make([]ticketResolverDTO, 0, len(resolvers)),
+	}
+	for _, rv := range resolvers {
+		d.Resolvers = append(d.Resolvers, ticketResolverDTO{UserID: rv.UserID, Username: rv.Username, FullName: textPtr(rv.FullName)})
 	}
 	// Actividad: lo más reciente arriba, como en la pantalla.
 	for i := len(comments) - 1; i >= 0; i-- {
-		d.Comments = append(d.Comments, toTicketCommentDTO(comments[i]))
+		dto := toTicketCommentDTO(comments[i])
+		dto.Images = imagesOfComment(images, comments[i].ID)
+		d.Comments = append(d.Comments, dto)
 	}
 	for _, t := range taskRows {
 		d.Tasks = append(d.Tasks, ticketTaskDTO{ID: t.ID, Username: t.Username, Content: t.Content, TimeSpentSeconds: t.TimeSpentSeconds, IsPublic: t.IsPublic, PerformedAt: t.PerformedAt.Time})
@@ -277,6 +323,12 @@ func (h *TicketsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 			problemdetails.Write(w, r, 400, "invalid-payload", "estado inválido")
 			return
 		}
+		// Cancelar no es un estado de cierre (pedido del dueño): un ticket mal
+		// creado se borra entero, y eso lo hace un admin (DELETE).
+		if to == tickets.Cancelled {
+			problemdetails.Write(w, r, 400, "invalid-payload", "un ticket mal creado no se cancela: un admin lo elimina")
+			return
+		}
 		if !tickets.CanTransition(from, to) {
 			problemdetails.Write(w, r, http.StatusConflict, "invalid-transition", fmt.Sprintf("no se puede pasar de %s a %s", from, to))
 			return
@@ -331,6 +383,11 @@ func (h *TicketsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	if _, err = h.Queries.UpdateTicket(ctx, p); err != nil {
 		problemdetails.Write(w, r, 400, "invalid-payload", "no se pudo actualizar el ticket")
 		return
+	}
+	// Quien toma (o a quien se asigna) el ticket queda como resolutor.
+	if req.AssignedUserID != nil {
+		actor, _ := middleware.UserFromContext(ctx)
+		_ = h.Queries.AddTicketResolver(ctx, db.AddTicketResolverParams{TicketID: id, UserID: *req.AssignedUserID, AddedBy: pgtype.UUID{Bytes: actor.ID, Valid: actor.ID != uuid.Nil}})
 	}
 	if h.AuditLog != nil {
 		meta := map[string]any{"ticketId": id.String()}
@@ -388,4 +445,201 @@ func (h *TicketsHandler) notifyChanged(ctx context.Context, id uuid.UUID) {
 
 func (h *TicketsHandler) markResponded(ctx context.Context, q *db.Queries, id uuid.UUID) error {
 	return q.MarkTicketResponded(ctx, db.MarkTicketRespondedParams{ID: id, At: pgtype.Timestamptz{Time: h.now(), Valid: true}})
+}
+
+// Delete es DELETE /api/tickets/{id} (solo admin): un ticket mal creado o no
+// válido se borra entero — comentarios y tareas caen con él (ON DELETE
+// CASCADE) y las entradas de bitácora que lo enlazaban quedan sin enlace. Su
+// número queda solo en la auditoría.
+func (h *TicketsHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		problemdetails.Write(w, r, 404, "not-found", "ticket no encontrado")
+		return
+	}
+	ctx := r.Context()
+	number, err := h.Queries.DeleteTicket(ctx, id)
+	if err != nil {
+		problemdetails.Write(w, r, 404, "not-found", "ticket no encontrado")
+		return
+	}
+	h.AuditLog.Log(ctx, "ticket.deleted", audit.LevelWarn, audit.Success(), map[string]any{"ticketId": id.String(), "ticketNumber": number})
+	publishSync(ctx, h.Hub, "ticket.updated", map[string]string{"id": id.String()})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// AddResolver es POST /api/tickets/{id}/resolvers {userId}: suma a una
+// persona que trabaja el ticket.
+func (h *TicketsHandler) AddResolver(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		problemdetails.Write(w, r, 404, "not-found", "ticket no encontrado")
+		return
+	}
+	var req struct {
+		UserID uuid.UUID `json:"userId"`
+	}
+	if err = decodeJSON(w, r, &req); err != nil || req.UserID == uuid.Nil {
+		problemdetails.Write(w, r, 400, "invalid-payload", "userId es obligatorio")
+		return
+	}
+	ctx := r.Context()
+	if _, err = h.Queries.GetTicket(ctx, id); err != nil {
+		problemdetails.Write(w, r, 404, "not-found", "ticket no encontrado")
+		return
+	}
+	actor, _ := middleware.UserFromContext(ctx)
+	if err = h.Queries.AddTicketResolver(ctx, db.AddTicketResolverParams{TicketID: id, UserID: req.UserID, AddedBy: pgtype.UUID{Bytes: actor.ID, Valid: true}}); err != nil {
+		problemdetails.Write(w, r, 400, "invalid-payload", "usuario inexistente")
+		return
+	}
+	h.AuditLog.Log(ctx, "ticket.resolver.add", audit.LevelInfo, audit.Success(), map[string]any{"ticketId": id.String(), "userId": req.UserID.String()})
+	h.notifyChanged(ctx, id)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// RemoveResolver es DELETE /api/tickets/{id}/resolvers/{userId}.
+func (h *TicketsHandler) RemoveResolver(w http.ResponseWriter, r *http.Request) {
+	id, err1 := uuid.Parse(r.PathValue("id"))
+	userID, err2 := uuid.Parse(r.PathValue("userId"))
+	if err1 != nil || err2 != nil {
+		problemdetails.Write(w, r, 404, "not-found", "resolutor no encontrado")
+		return
+	}
+	ctx := r.Context()
+	n, err := h.Queries.RemoveTicketResolver(ctx, db.RemoveTicketResolverParams{TicketID: id, UserID: userID})
+	if err != nil || n == 0 {
+		problemdetails.Write(w, r, 404, "not-found", "resolutor no encontrado")
+		return
+	}
+	h.AuditLog.Log(ctx, "ticket.resolver.remove", audit.LevelInfo, audit.Success(), map[string]any{"ticketId": id.String(), "userId": userID.String()})
+	h.notifyChanged(ctx, id)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// Assignees es GET /api/tickets/assignees: a quién se puede sumar como
+// resolutor (lo usa cualquier analista; /api/users es solo admin).
+func (h *TicketsHandler) Assignees(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.Queries.ListTicketAssignees(r.Context())
+	if err != nil {
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudo listar a los usuarios")
+		return
+	}
+	out := make([]ticketResolverDTO, 0, len(rows))
+	for _, u := range rows {
+		out = append(out, ticketResolverDTO{UserID: u.ID, Username: u.Username, FullName: textPtr(u.FullName)})
+	}
+	writeData(w, 200, out)
+}
+
+// UploadImage es POST /api/tickets/{id}/images (multipart "image"): la deja
+// pendiente hasta que un comentario la reclama con imageIds. Las pendientes de
+// más de un día (pestaña cerrada) se limpian acá mismo.
+func (h *TicketsHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		problemdetails.Write(w, r, 404, "not-found", "ticket no encontrado")
+		return
+	}
+	ctx := r.Context()
+	if _, err := h.Queries.GetTicket(ctx, id); err != nil {
+		problemdetails.Write(w, r, 404, "not-found", "ticket no encontrado")
+		return
+	}
+	img, ok := readImageUpload(w, r)
+	if !ok {
+		return
+	}
+	_ = h.Queries.DeleteStaleTicketImages(ctx)
+	u, _ := middleware.UserFromContext(ctx)
+	row, err := h.Queries.CreateTicketImage(ctx, db.CreateTicketImageParams{
+		TicketID: id, FileName: img.name, MimeType: img.mime, SizeBytes: int32(len(img.data)), FileData: img.data,
+		HashSha256: img.hash, UploadedBy: pgtype.UUID{Bytes: u.ID, Valid: true},
+	})
+	if err != nil {
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudo guardar la imagen")
+		return
+	}
+	h.AuditLog.Log(ctx, "ticket.image_uploaded", audit.LevelInfo, audit.Success(), map[string]any{"ticketId": id.String(), "imageId": row.ID.String(), "sizeBytes": row.SizeBytes})
+	writeData(w, 201, ticketImageDTO{ID: row.ID, FileName: row.FileName, SizeBytes: row.SizeBytes, CreatedAt: row.CreatedAt.Time})
+}
+
+// DeletePendingImage es DELETE /api/tickets/{id}/images/{imageId}: quitar
+// una imagen antes de publicar el comentario (solo quien la subió).
+func (h *TicketsHandler) DeletePendingImage(w http.ResponseWriter, r *http.Request) {
+	id, err1 := uuid.Parse(r.PathValue("id"))
+	imageID, err2 := uuid.Parse(r.PathValue("imageId"))
+	if err1 != nil || err2 != nil {
+		problemdetails.Write(w, r, 404, "not-found", "imagen no encontrada")
+		return
+	}
+	ctx := r.Context()
+	u, _ := middleware.UserFromContext(ctx)
+	n, err := h.Queries.DeletePendingTicketImage(ctx, db.DeletePendingTicketImageParams{ID: imageID, TicketID: id, UploadedBy: pgtype.UUID{Bytes: u.ID, Valid: true}})
+	if err != nil || n == 0 {
+		problemdetails.Write(w, r, 404, "not-found", "imagen no encontrada o ya publicada")
+		return
+	}
+	h.AuditLog.Log(ctx, "ticket.image_removed", audit.LevelInfo, audit.Success(), map[string]any{"ticketId": id.String(), "imageId": imageID.String()})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ServeImage es GET /api/tickets/{id}/images/{imageId}: las publicadas, o las
+// pendientes de quien las subió (la miniatura antes de comentar).
+func (h *TicketsHandler) ServeImage(w http.ResponseWriter, r *http.Request) {
+	id, err1 := uuid.Parse(r.PathValue("id"))
+	imageID, err2 := uuid.Parse(r.PathValue("imageId"))
+	if err1 != nil || err2 != nil {
+		problemdetails.Write(w, r, 404, "not-found", "imagen no encontrada")
+		return
+	}
+	img, err := h.Queries.GetTicketImage(r.Context(), db.GetTicketImageParams{ID: imageID, TicketID: id})
+	u, _ := middleware.UserFromContext(r.Context())
+	if err != nil || (!img.CommentID.Valid && (!img.UploadedBy.Valid || uuid.UUID(img.UploadedBy.Bytes) != u.ID)) {
+		problemdetails.Write(w, r, 404, "not-found", "imagen no encontrada")
+		return
+	}
+	writeImage(w, img.MimeType, img.FileName, img.FileData)
+}
+
+// PublicImage es GET /api/public/tickets/{token}/images/{imageId}?pin=: solo
+// imágenes de comentarios visibles al cliente, con el mismo PIN que la página.
+func (h *TicketsHandler) PublicImage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	token := r.PathValue("token")
+	t, err := h.Queries.GetPublicTicket(ctx, pgtype.Text{String: token, Valid: true})
+	if err != nil {
+		problemdetails.Write(w, r, 404, "not-found", "imagen no encontrada")
+		return
+	}
+	// Una página con varias imágenes hace varias peticiones con el PIN ya
+	// aceptado: solo los PIN incorrectos consumen intentos del limitador.
+	if t.PublicTrackingPin.Valid && !publicPinMatches(t.PublicTrackingPin, r.URL.Query().Get("pin")) {
+		if h.PinLimiter != nil && !h.PinLimiter.Allow("ticket-pin:"+token) {
+			problemdetails.Write(w, r, http.StatusTooManyRequests, "too-many-attempts", "demasiados intentos de PIN, espera unos minutos")
+			return
+		}
+		problemdetails.Write(w, r, 401, "pin-required", "PIN requerido o incorrecto")
+		return
+	}
+	imageID, err := uuid.Parse(r.PathValue("imageId"))
+	if err != nil {
+		problemdetails.Write(w, r, 404, "not-found", "imagen no encontrada")
+		return
+	}
+	img, err := h.Queries.GetTicketImage(ctx, db.GetTicketImageParams{ID: imageID, TicketID: t.ID})
+	if err != nil || !img.CommentID.Valid || !img.IsPublic {
+		problemdetails.Write(w, r, 404, "not-found", "imagen no encontrada")
+		return
+	}
+	writeImage(w, img.MimeType, img.FileName, img.FileData)
+}
+
+func writeImage(w http.ResponseWriter, mime, name string, data []byte) {
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Content-Disposition", `inline; filename="`+strings.ReplaceAll(name, `"`, "")+`"`)
+	w.Header().Set("Cache-Control", "private, max-age=86400")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
 }

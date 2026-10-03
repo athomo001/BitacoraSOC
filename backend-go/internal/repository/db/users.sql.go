@@ -264,6 +264,46 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 	return i, err
 }
 
+const getUserForLogin = `-- name: GetUserForLogin :one
+SELECT id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at, last_login_at FROM users
+WHERE username = $1 OR lower(email) = lower($1)
+ORDER BY (username = $1) DESC
+LIMIT 1
+`
+
+// Login con nombre de usuario o correo (pedido del dueño). Si un texto
+// coincidiera con el usuario de uno y el correo de otro, gana el usuario.
+func (q *Queries) GetUserForLogin(ctx context.Context, login string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserForLogin, login)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Email,
+		&i.FullName,
+		&i.Phone,
+		&i.Birthday,
+		&i.AvatarUrl,
+		&i.PasswordHash,
+		&i.Role,
+		&i.CargoLabel,
+		&i.MfaEnabled,
+		&i.MfaSecretEncrypted,
+		&i.IsGuest,
+		&i.GuestExpiresAt,
+		&i.MustChangePassword,
+		&i.FailedLoginAttempts,
+		&i.LockedUntil,
+		&i.ResetPasswordTokenHash,
+		&i.ResetPasswordExpiresAt,
+		&i.Active,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.LastLoginAt,
+	)
+	return i, err
+}
+
 const listActiveUserEmailsByRole = `-- name: ListActiveUserEmailsByRole :many
 SELECT email FROM users
 WHERE active = true
