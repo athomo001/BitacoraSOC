@@ -107,6 +107,9 @@ type workShiftDTO struct {
 	ChecklistTemplateStartID *uuid.UUID `json:"checklistTemplateStartId,omitempty"`
 	ChecklistTemplateEndID   *uuid.UUID `json:"checklistTemplateEndId,omitempty"`
 	EmailRecipients          []string   `json:"emailRecipients"`
+	EmailIncludeChecklist    bool       `json:"emailIncludeChecklist"`
+	EmailIncludeEntries      bool       `json:"emailIncludeEntries"`
+	EmailSubjectTemplate     string     `json:"emailSubjectTemplate"`
 	Active                   bool       `json:"active"`
 }
 
@@ -118,6 +121,8 @@ func toWorkShiftDTO(s db.WorkShift) workShiftDTO {
 		ChecklistTemplateStartID: uuidPtr(s.ChecklistTemplateStartID),
 		ChecklistTemplateEndID:   uuidPtr(s.ChecklistTemplateEndID),
 		EmailRecipients:          s.EmailRecipients, Active: s.Active,
+		EmailIncludeChecklist: s.EmailIncludeChecklist, EmailIncludeEntries: s.EmailIncludeEntries,
+		EmailSubjectTemplate: s.EmailSubjectTemplate,
 	}
 }
 
@@ -534,6 +539,10 @@ type patchWorkShiftRequest struct {
 	Timezone        *string   `json:"timezone"`
 	EmailRecipients *[]string `json:"emailRecipients"`
 	Active          *bool     `json:"active"`
+	// Reporte de Turno por correo (emailReportConfig del legacy).
+	EmailIncludeChecklist *bool   `json:"emailIncludeChecklist"`
+	EmailIncludeEntries   *bool   `json:"emailIncludeEntries"`
+	EmailSubjectTemplate  *string `json:"emailSubjectTemplate"`
 }
 
 // PatchWorkShift es PATCH /api/work-shifts/{id}: sin esto un turno creado sin
@@ -589,6 +598,16 @@ func (h *RotationHandler) PatchWorkShift(w http.ResponseWriter, r *http.Request)
 		params.EmailRecipients = recipients
 	}
 	params.Active = optionalBool(req.Active)
+	params.EmailIncludeChecklist = optionalBool(req.EmailIncludeChecklist)
+	params.EmailIncludeEntries = optionalBool(req.EmailIncludeEntries)
+	if req.EmailSubjectTemplate != nil {
+		subject := strings.TrimSpace(*req.EmailSubjectTemplate)
+		if subject == "" {
+			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "el asunto del reporte no puede quedar vacío")
+			return
+		}
+		params.EmailSubjectTemplate = pgtype.Text{String: subject, Valid: true}
+	}
 	shift, err := h.Queries.UpdateWorkShift(r.Context(), params)
 	if errors.Is(err, pgx.ErrNoRows) {
 		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "turno no encontrado")

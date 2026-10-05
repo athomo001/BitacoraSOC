@@ -543,6 +543,9 @@ func run(logger *slog.Logger) error {
 		return sender, err
 	}, Schedules: func(ctx context.Context, sender *mail.Sender) error {
 		return dotacionHandler.DispatchDueSchedules(ctx, sender)
+	}, Brand: func(context.Context) reporting.Brand {
+		// Hasta que exista Administración → Marca, el nombre del producto.
+		return reporting.Brand{AppTitle: "Bitácora Ops"}
 	}}
 	mux.Handle("GET /api/reports/shift/recent", admin(checklistsHandler.RecentReports))
 	mux.Handle("POST /api/reports/shift/dispatch", admin(func(w http.ResponseWriter, r *http.Request) {

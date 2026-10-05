@@ -797,7 +797,10 @@ func (m *Migrator) migrateWorkShifts(ctx context.Context) error {
 		Type              string `json:"type"`
 		Active            bool   `json:"active"`
 		EmailReportConfig struct {
-			Recipients []string `json:"recipients"`
+			Recipients       []string `json:"recipients"`
+			IncludeChecklist *bool    `json:"includeChecklist"`
+			IncludeEntries   *bool    `json:"includeEntries"`
+			SubjectTemplate  string   `json:"subjectTemplate"`
 		} `json:"emailReportConfig"`
 	}
 	if err := m.ex.Decode("workShifts", &rows); err != nil {
@@ -824,9 +827,17 @@ func (m *Migrator) migrateWorkShifts(ctx context.Context) error {
 		if shiftType == "" {
 			shiftType = "regular"
 		}
+		// Mismos valores por defecto que el modelo WorkShift del legacy.
+		cfg := w.EmailReportConfig
+		subject := strings.TrimSpace(cfg.SubjectTemplate)
+		if subject == "" {
+			subject = "Reporte SOC [fecha] [turno]"
+		}
 		id := ID("workShifts", w.ID)
-		if _, err := m.tx.Exec(ctx, `INSERT INTO work_shifts (id, name, start_time, end_time, timezone, shift_type, email_recipients, active)
-			VALUES ($1,$2,$3::time,$4::time,$5,$6,$7,$8)`, id, strings.TrimSpace(w.Name), w.StartTime, w.EndTime, tz, shiftType, recipients, w.Active); err != nil {
+		if _, err := m.tx.Exec(ctx, `INSERT INTO work_shifts (id, name, start_time, end_time, timezone, shift_type, email_recipients, active,
+			email_include_checklist, email_include_entries, email_subject_template)
+			VALUES ($1,$2,$3::time,$4::time,$5,$6,$7,$8,$9,$10,$11)`, id, strings.TrimSpace(w.Name), w.StartTime, w.EndTime, tz, shiftType, recipients, w.Active,
+			cfg.IncludeChecklist == nil || *cfg.IncludeChecklist, cfg.IncludeEntries == nil || *cfg.IncludeEntries, subject); err != nil {
 			return err
 		}
 		m.shifts[w.ID] = id

@@ -191,6 +191,9 @@ type Querier interface {
 	GetEntry(ctx context.Context, id uuid.UUID) (GetEntryRow, error)
 	GetLatestShiftCheck(ctx context.Context, workShiftID uuid.UUID) (ShiftCheck, error)
 	GetLatestShiftClosure(ctx context.Context) (ShiftClosure, error)
+	// Checklist de inicio más reciente del mismo turno dentro de la ventana
+	// (loadShiftReportData del legacy).
+	GetLatestStartCheckInWindow(ctx context.Context, arg GetLatestStartCheckInWindowParams) (GetLatestStartCheckInWindowRow, error)
 	GetLoginRateLimit(ctx context.Context, ipAddress string) (LoginRateLimit, error)
 	GetNotificationSchedule(ctx context.Context, id uuid.UUID) (WorkShiftNotificationSchedule, error)
 	GetOrganization(ctx context.Context, id uuid.UUID) (Organization, error)
@@ -210,6 +213,8 @@ type Querier interface {
 	GetService(ctx context.Context, id uuid.UUID) (Service, error)
 	GetServiceOrganizationID(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	GetShiftCheck(ctx context.Context, id uuid.UUID) (ShiftCheck, error)
+	// ===== Reporte de Turno por correo (formato legacy, utils/shift-report.js) =====
+	GetShiftCheckForReport(ctx context.Context, id uuid.UUID) (GetShiftCheckForReportRow, error)
 	GetShiftClosure(ctx context.Context, id uuid.UUID) (ShiftClosure, error)
 	// Un check de cierre se cierra una sola vez: un segundo POST no duplica el cierre ni el reporte.
 	GetShiftClosureByCheck(ctx context.Context, closureCheckID uuid.UUID) (ShiftClosure, error)
@@ -303,6 +308,9 @@ type Querier interface {
 	ListEntries(ctx context.Context, arg ListEntriesParams) ([]ListEntriesRow, error)
 	// GET /api/entries/export — mismos filtros que ListEntries, sin paginar.
 	ListEntriesForExport(ctx context.Context, arg ListEntriesForExportParams) ([]ListEntriesForExportRow, error)
+	// Entradas del periodo en orden cronológico; las de checklist son de 2.0
+	// (el legacy no las tenía) y ya van en la sección Checklist.
+	ListEntriesForShiftReport(ctx context.Context, arg ListEntriesForShiftReportParams) ([]ListEntriesForShiftReportRow, error)
 	ListEntryComments(ctx context.Context, entryID uuid.UUID) ([]ListEntryCommentsRow, error)
 	// Copias automáticas fuera de la retención: el planificador las borra (archivo y fila).
 	ListExpiredAutoBackups(ctx context.Context, startedAt pgtype.Timestamptz) ([]BackupRun, error)
@@ -344,6 +352,7 @@ type Querier interface {
 	// ===== Servicios (módulo SOC) =====
 	ListServices(ctx context.Context, arg ListServicesParams) ([]ListServicesRow, error)
 	ListShiftCheckServices(ctx context.Context, shiftCheckID uuid.UUID) ([]ShiftCheckService, error)
+	ListShiftCheckServicesForReport(ctx context.Context, shiftCheckID uuid.UUID) ([]ListShiftCheckServicesForReportRow, error)
 	ListShiftChecks(ctx context.Context, arg ListShiftChecksParams) ([]ShiftCheck, error)
 	// Recordatorios de turno por correo (spec/12-pendientes.md §2.3b).
 	// Con el último envío de cada uno, para la tabla de Administración → Turnos.

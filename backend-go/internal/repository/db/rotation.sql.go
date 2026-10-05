@@ -122,7 +122,7 @@ const createWorkShift = `-- name: CreateWorkShift :one
 INSERT INTO work_shifts (
   rotation_cycle_id, name, start_time, end_time, timezone, shift_type,
   checklist_template_start_id, checklist_template_end_id, email_recipients
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, rotation_cycle_id, name, start_time, end_time, timezone, shift_type, checklist_template_start_id, checklist_template_end_id, email_recipients, active
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, rotation_cycle_id, name, start_time, end_time, timezone, shift_type, checklist_template_start_id, checklist_template_end_id, email_recipients, active, email_include_checklist, email_include_entries, email_subject_template
 `
 
 type CreateWorkShiftParams struct {
@@ -162,6 +162,9 @@ func (q *Queries) CreateWorkShift(ctx context.Context, arg CreateWorkShiftParams
 		&i.ChecklistTemplateEndID,
 		&i.EmailRecipients,
 		&i.Active,
+		&i.EmailIncludeChecklist,
+		&i.EmailIncludeEntries,
+		&i.EmailSubjectTemplate,
 	)
 	return i, err
 }
@@ -396,7 +399,7 @@ func (q *Queries) ListRotationSlotsByCycle(ctx context.Context, cycleID uuid.UUI
 }
 
 const listWorkShifts = `-- name: ListWorkShifts :many
-SELECT id, rotation_cycle_id, name, start_time, end_time, timezone, shift_type, checklist_template_start_id, checklist_template_end_id, email_recipients, active FROM work_shifts
+SELECT id, rotation_cycle_id, name, start_time, end_time, timezone, shift_type, checklist_template_start_id, checklist_template_end_id, email_recipients, active, email_include_checklist, email_include_entries, email_subject_template FROM work_shifts
 WHERE ($1::boolean IS NULL OR active = $1)
 ORDER BY name
 `
@@ -422,6 +425,9 @@ func (q *Queries) ListWorkShifts(ctx context.Context, active pgtype.Bool) ([]Wor
 			&i.ChecklistTemplateEndID,
 			&i.EmailRecipients,
 			&i.Active,
+			&i.EmailIncludeChecklist,
+			&i.EmailIncludeEntries,
+			&i.EmailSubjectTemplate,
 		); err != nil {
 			return nil, err
 		}
@@ -466,19 +472,25 @@ UPDATE work_shifts SET
   end_time = COALESCE($3::time, end_time),
   timezone = COALESCE($4, timezone),
   email_recipients = COALESCE($5::text[], email_recipients),
-  active = COALESCE($6, active)
-WHERE id = $7
-RETURNING id, rotation_cycle_id, name, start_time, end_time, timezone, shift_type, checklist_template_start_id, checklist_template_end_id, email_recipients, active
+  active = COALESCE($6, active),
+  email_include_checklist = COALESCE($7, email_include_checklist),
+  email_include_entries = COALESCE($8, email_include_entries),
+  email_subject_template = COALESCE($9, email_subject_template)
+WHERE id = $10
+RETURNING id, rotation_cycle_id, name, start_time, end_time, timezone, shift_type, checklist_template_start_id, checklist_template_end_id, email_recipients, active, email_include_checklist, email_include_entries, email_subject_template
 `
 
 type UpdateWorkShiftParams struct {
-	Name            pgtype.Text `json:"name"`
-	StartTime       pgtype.Time `json:"start_time"`
-	EndTime         pgtype.Time `json:"end_time"`
-	Timezone        pgtype.Text `json:"timezone"`
-	EmailRecipients []string    `json:"email_recipients"`
-	Active          pgtype.Bool `json:"active"`
-	ID              uuid.UUID   `json:"id"`
+	Name                  pgtype.Text `json:"name"`
+	StartTime             pgtype.Time `json:"start_time"`
+	EndTime               pgtype.Time `json:"end_time"`
+	Timezone              pgtype.Text `json:"timezone"`
+	EmailRecipients       []string    `json:"email_recipients"`
+	Active                pgtype.Bool `json:"active"`
+	EmailIncludeChecklist pgtype.Bool `json:"email_include_checklist"`
+	EmailIncludeEntries   pgtype.Bool `json:"email_include_entries"`
+	EmailSubjectTemplate  pgtype.Text `json:"email_subject_template"`
+	ID                    uuid.UUID   `json:"id"`
 }
 
 // Administración → Turnos: editar nombre, horario, zona, destinatarios del
@@ -491,6 +503,9 @@ func (q *Queries) UpdateWorkShift(ctx context.Context, arg UpdateWorkShiftParams
 		arg.Timezone,
 		arg.EmailRecipients,
 		arg.Active,
+		arg.EmailIncludeChecklist,
+		arg.EmailIncludeEntries,
+		arg.EmailSubjectTemplate,
 		arg.ID,
 	)
 	var i WorkShift
@@ -506,6 +521,9 @@ func (q *Queries) UpdateWorkShift(ctx context.Context, arg UpdateWorkShiftParams
 		&i.ChecklistTemplateEndID,
 		&i.EmailRecipients,
 		&i.Active,
+		&i.EmailIncludeChecklist,
+		&i.EmailIncludeEntries,
+		&i.EmailSubjectTemplate,
 	)
 	return i, err
 }

@@ -1358,4 +1358,8 @@ export const EN: Record<MessageKey, string> = {
   'tickets.images.download': 'Download',
   'tickets.images.close': 'Close (Esc)',
   'publicTicket.image': 'Attached image',
+  'shiftsAdmin.reportSubject': 'Shift report subject',
+  'shiftsAdmin.reportSubjectHint': 'You can use [fecha] (date), [turno] (shift) and [hora] (time). The app name goes in front, as in the legacy app.',
+  'shiftsAdmin.reportIncludeChecklist': 'Include start and closing checklist',
+  'shiftsAdmin.reportIncludeEntries': 'Include log entries',
 };

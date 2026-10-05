@@ -498,6 +498,48 @@ func (q *Queries) GetLatestShiftClosure(ctx context.Context) (ShiftClosure, erro
 	return i, err
 }
 
+const getLatestStartCheckInWindow = `-- name: GetLatestStartCheckInWindow :one
+SELECT sc.id, sc.checklist_template_id, sc.user_id, sc.work_shift_id, sc.check_type, sc.check_date, sc.has_red_services, t.name AS template_name FROM shift_checks sc
+JOIN checklist_templates t ON t.id = sc.checklist_template_id
+WHERE sc.work_shift_id = $1 AND sc.check_type = 'inicio' AND sc.check_date >= $2 AND sc.check_date <= $3
+ORDER BY sc.check_date DESC LIMIT 1
+`
+
+type GetLatestStartCheckInWindowParams struct {
+	WorkShiftID uuid.UUID          `json:"work_shift_id"`
+	CheckDate   pgtype.Timestamptz `json:"check_date"`
+	CheckDate_2 pgtype.Timestamptz `json:"check_date_2"`
+}
+
+type GetLatestStartCheckInWindowRow struct {
+	ID                  uuid.UUID          `json:"id"`
+	ChecklistTemplateID uuid.UUID          `json:"checklist_template_id"`
+	UserID              uuid.UUID          `json:"user_id"`
+	WorkShiftID         uuid.UUID          `json:"work_shift_id"`
+	CheckType           ChecklistCheckType `json:"check_type"`
+	CheckDate           pgtype.Timestamptz `json:"check_date"`
+	HasRedServices      bool               `json:"has_red_services"`
+	TemplateName        string             `json:"template_name"`
+}
+
+// Checklist de inicio más reciente del mismo turno dentro de la ventana
+// (loadShiftReportData del legacy).
+func (q *Queries) GetLatestStartCheckInWindow(ctx context.Context, arg GetLatestStartCheckInWindowParams) (GetLatestStartCheckInWindowRow, error) {
+	row := q.db.QueryRow(ctx, getLatestStartCheckInWindow, arg.WorkShiftID, arg.CheckDate, arg.CheckDate_2)
+	var i GetLatestStartCheckInWindowRow
+	err := row.Scan(
+		&i.ID,
+		&i.ChecklistTemplateID,
+		&i.UserID,
+		&i.WorkShiftID,
+		&i.CheckType,
+		&i.CheckDate,
+		&i.HasRedServices,
+		&i.TemplateName,
+	)
+	return i, err
+}
+
 const getShiftCheck = `-- name: GetShiftCheck :one
 SELECT id, checklist_template_id, user_id, work_shift_id, check_type, check_date, has_red_services FROM shift_checks WHERE id = $1
 `
@@ -513,6 +555,41 @@ func (q *Queries) GetShiftCheck(ctx context.Context, id uuid.UUID) (ShiftCheck, 
 		&i.CheckType,
 		&i.CheckDate,
 		&i.HasRedServices,
+	)
+	return i, err
+}
+
+const getShiftCheckForReport = `-- name: GetShiftCheckForReport :one
+
+SELECT sc.id, sc.checklist_template_id, sc.user_id, sc.work_shift_id, sc.check_type, sc.check_date, sc.has_red_services, t.name AS template_name FROM shift_checks sc
+JOIN checklist_templates t ON t.id = sc.checklist_template_id
+WHERE sc.id = $1
+`
+
+type GetShiftCheckForReportRow struct {
+	ID                  uuid.UUID          `json:"id"`
+	ChecklistTemplateID uuid.UUID          `json:"checklist_template_id"`
+	UserID              uuid.UUID          `json:"user_id"`
+	WorkShiftID         uuid.UUID          `json:"work_shift_id"`
+	CheckType           ChecklistCheckType `json:"check_type"`
+	CheckDate           pgtype.Timestamptz `json:"check_date"`
+	HasRedServices      bool               `json:"has_red_services"`
+	TemplateName        string             `json:"template_name"`
+}
+
+// ===== Reporte de Turno por correo (formato legacy, utils/shift-report.js) =====
+func (q *Queries) GetShiftCheckForReport(ctx context.Context, id uuid.UUID) (GetShiftCheckForReportRow, error) {
+	row := q.db.QueryRow(ctx, getShiftCheckForReport, id)
+	var i GetShiftCheckForReportRow
+	err := row.Scan(
+		&i.ID,
+		&i.ChecklistTemplateID,
+		&i.UserID,
+		&i.WorkShiftID,
+		&i.CheckType,
+		&i.CheckDate,
+		&i.HasRedServices,
+		&i.TemplateName,
 	)
 	return i, err
 }
@@ -583,7 +660,7 @@ func (q *Queries) GetShiftClosureByCheck(ctx context.Context, closureCheckID uui
 }
 
 const getWorkShiftByID = `-- name: GetWorkShiftByID :one
-SELECT id, rotation_cycle_id, name, start_time, end_time, timezone, shift_type, checklist_template_start_id, checklist_template_end_id, email_recipients, active FROM work_shifts WHERE id = $1
+SELECT id, rotation_cycle_id, name, start_time, end_time, timezone, shift_type, checklist_template_start_id, checklist_template_end_id, email_recipients, active, email_include_checklist, email_include_entries, email_subject_template FROM work_shifts WHERE id = $1
 `
 
 func (q *Queries) GetWorkShiftByID(ctx context.Context, id uuid.UUID) (WorkShift, error) {
@@ -601,12 +678,15 @@ func (q *Queries) GetWorkShiftByID(ctx context.Context, id uuid.UUID) (WorkShift
 		&i.ChecklistTemplateEndID,
 		&i.EmailRecipients,
 		&i.Active,
+		&i.EmailIncludeChecklist,
+		&i.EmailIncludeEntries,
+		&i.EmailSubjectTemplate,
 	)
 	return i, err
 }
 
 const getWorkShiftForCheck = `-- name: GetWorkShiftForCheck :one
-SELECT ws.id, ws.rotation_cycle_id, ws.name, ws.start_time, ws.end_time, ws.timezone, ws.shift_type, ws.checklist_template_start_id, ws.checklist_template_end_id, ws.email_recipients, ws.active FROM work_shifts ws JOIN shift_checks sc ON sc.work_shift_id = ws.id WHERE sc.id = $1
+SELECT ws.id, ws.rotation_cycle_id, ws.name, ws.start_time, ws.end_time, ws.timezone, ws.shift_type, ws.checklist_template_start_id, ws.checklist_template_end_id, ws.email_recipients, ws.active, ws.email_include_checklist, ws.email_include_entries, ws.email_subject_template FROM work_shifts ws JOIN shift_checks sc ON sc.work_shift_id = ws.id WHERE sc.id = $1
 `
 
 // Turno al que pertenece un check: define la ventana real del cierre (no 8h fijas) y los destinatarios del reporte.
@@ -625,6 +705,9 @@ func (q *Queries) GetWorkShiftForCheck(ctx context.Context, id uuid.UUID) (WorkS
 		&i.ChecklistTemplateEndID,
 		&i.EmailRecipients,
 		&i.Active,
+		&i.EmailIncludeChecklist,
+		&i.EmailIncludeEntries,
+		&i.EmailSubjectTemplate,
 	)
 	return i, err
 }
@@ -789,6 +872,54 @@ func (q *Queries) ListChecklistTemplates(ctx context.Context) ([]ChecklistTempla
 			&i.AlertNokEnabled,
 			&i.AlertNokRoleTarget,
 			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEntriesForShiftReport = `-- name: ListEntriesForShiftReport :many
+SELECT e.entry_type::text AS entry_type, e.content, e.created_at, COALESCE(o.name, '') AS client_name
+FROM entries e
+LEFT JOIN services sv ON sv.id = e.service_id
+LEFT JOIN organizations o ON o.id = sv.organization_id
+WHERE e.entry_type <> 'checklist' AND e.created_at >= $1 AND e.created_at <= $2
+ORDER BY e.created_at ASC
+`
+
+type ListEntriesForShiftReportParams struct {
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	CreatedAt_2 pgtype.Timestamptz `json:"created_at_2"`
+}
+
+type ListEntriesForShiftReportRow struct {
+	EntryType  string             `json:"entry_type"`
+	Content    string             `json:"content"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	ClientName string             `json:"client_name"`
+}
+
+// Entradas del periodo en orden cronológico; las de checklist son de 2.0
+// (el legacy no las tenía) y ya van en la sección Checklist.
+func (q *Queries) ListEntriesForShiftReport(ctx context.Context, arg ListEntriesForShiftReportParams) ([]ListEntriesForShiftReportRow, error) {
+	rows, err := q.db.Query(ctx, listEntriesForShiftReport, arg.CreatedAt, arg.CreatedAt_2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListEntriesForShiftReportRow
+	for rows.Next() {
+		var i ListEntriesForShiftReportRow
+		if err := rows.Scan(
+			&i.EntryType,
+			&i.Content,
+			&i.CreatedAt,
+			&i.ClientName,
 		); err != nil {
 			return nil, err
 		}
@@ -968,6 +1099,48 @@ func (q *Queries) ListShiftCheckServices(ctx context.Context, shiftCheckID uuid.
 			&i.IsComputed,
 			&i.Observation,
 			&i.CorrelatedFromServiceID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listShiftCheckServicesForReport = `-- name: ListShiftCheckServicesForReport :many
+SELECT s.checklist_item_id, s.service_title, s.status::text AS status, COALESCE(s.observation, '') AS observation, i.parent_item_id
+FROM shift_check_services s
+LEFT JOIN checklist_items i ON i.id = s.checklist_item_id
+WHERE s.shift_check_id = $1
+ORDER BY i.item_order NULLS LAST, s.id
+`
+
+type ListShiftCheckServicesForReportRow struct {
+	ChecklistItemID pgtype.UUID `json:"checklist_item_id"`
+	ServiceTitle    string      `json:"service_title"`
+	Status          string      `json:"status"`
+	Observation     string      `json:"observation"`
+	ParentItemID    pgtype.UUID `json:"parent_item_id"`
+}
+
+func (q *Queries) ListShiftCheckServicesForReport(ctx context.Context, shiftCheckID uuid.UUID) ([]ListShiftCheckServicesForReportRow, error) {
+	rows, err := q.db.Query(ctx, listShiftCheckServicesForReport, shiftCheckID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListShiftCheckServicesForReportRow
+	for rows.Next() {
+		var i ListShiftCheckServicesForReportRow
+		if err := rows.Scan(
+			&i.ChecklistItemID,
+			&i.ServiceTitle,
+			&i.Status,
+			&i.Observation,
+			&i.ParentItemID,
 		); err != nil {
 			return nil, err
 		}

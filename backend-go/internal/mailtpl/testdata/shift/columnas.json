@@ -1,0 +1,63 @@
+{
+  "shift": {
+    "name": "Turno Noche",
+    "startTime": "20:00",
+    "endTime": "08:00",
+    "emailReportConfig": {
+      "includeChecklist": true,
+      "includeEntries": true
+    }
+  },
+  "checklistEntry": {
+    "createdAt": "2026-10-03T23:30:00Z",
+    "checklistId": "tpl-inicio",
+    "services": [
+      {
+        "serviceId": "a1",
+        "serviceTitle": "Enlace Troncal Fibra",
+        "status": "rojo",
+        "observation": "",
+        "parentServiceId": null
+      },
+      {
+        "serviceId": "a2",
+        "serviceTitle": "VPN de terreno",
+        "status": "rojo",
+        "observation": "El enlace troncal está caído, sin VPN",
+        "parentServiceId": null
+      },
+      {
+        "serviceId": "a3",
+        "serviceTitle": "DNS interno",
+        "status": "verde",
+        "observation": "",
+        "parentServiceId": null
+      }
+    ]
+  },
+  "checklistExit": {
+    "createdAt": "2026-10-04T10:55:00Z",
+    "checklistId": "tpl-cierre",
+    "services": [
+      {
+        "serviceId": "b1",
+        "serviceTitle": "Respaldo nocturno",
+        "status": "verde",
+        "observation": "",
+        "parentServiceId": null
+      },
+      {
+        "serviceId": "b2",
+        "serviceTitle": "Cintas",
+        "status": "rojo",
+        "observation": "",
+        "parentServiceId": "b1"
+      }
+    ]
+  },
+  "entries": [],
+  "periodStart": "2026-10-03T23:30:00Z",
+  "periodEnd": "2026-10-04T10:55:00Z",
+  "appTitle": "  ",
+  "faviconUrl": ""
+}

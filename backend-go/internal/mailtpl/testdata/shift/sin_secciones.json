@@ -1,0 +1,24 @@
+{
+  "shift": {
+    "name": "Fin de semana",
+    "startTime": "09:00",
+    "endTime": "21:00",
+    "emailReportConfig": {
+      "includeChecklist": false,
+      "includeEntries": false
+    }
+  },
+  "checklistEntry": null,
+  "checklistExit": null,
+  "entries": [
+    {
+      "entryType": "operativa",
+      "content": "x",
+      "createdAt": "2026-10-04T13:00:00Z"
+    }
+  ],
+  "periodStart": null,
+  "periodEnd": "2026-10-04T23:59:00Z",
+  "appTitle": "",
+  "faviconUrl": ""
+}

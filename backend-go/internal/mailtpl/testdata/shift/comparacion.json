@@ -1,0 +1,122 @@
+{
+  "shift": {
+    "name": "Turno A",
+    "startTime": "09:00",
+    "endTime": "18:20",
+    "emailReportConfig": {
+      "includeChecklist": true,
+      "includeEntries": true
+    }
+  },
+  "checklistEntry": {
+    "createdAt": "2026-10-03T12:05:00Z",
+    "checklistId": "tpl-1",
+    "services": [
+      {
+        "serviceId": "p1",
+        "serviceTitle": "Plataforma QRadar",
+        "status": "rojo",
+        "observation": "",
+        "parentServiceId": null
+      },
+      {
+        "serviceId": "c1",
+        "serviceTitle": "QRadar (Todos los Tenants)",
+        "status": "rojo",
+        "observation": "",
+        "parentServiceId": "p1"
+      },
+      {
+        "serviceId": "c2",
+        "serviceTitle": "Collector DPP",
+        "status": "rojo",
+        "observation": "Sin eventos desde las 08:40 en el collector",
+        "parentServiceId": "p1"
+      },
+      {
+        "serviceId": "z1",
+        "serviceTitle": "Zabbix",
+        "status": "verde",
+        "observation": "",
+        "parentServiceId": null
+      },
+      {
+        "serviceId": "pb",
+        "serviceTitle": "Passbolt",
+        "status": "rojo",
+        "observation": "No responde el login",
+        "parentServiceId": null
+      }
+    ]
+  },
+  "checklistExit": {
+    "createdAt": "2026-10-03T21:10:00Z",
+    "checklistId": "tpl-1",
+    "services": [
+      {
+        "serviceId": "p1",
+        "serviceTitle": "Plataforma QRadar",
+        "status": "verde",
+        "observation": "",
+        "parentServiceId": null
+      },
+      {
+        "serviceId": "c1",
+        "serviceTitle": "QRadar (Todos los Tenants)",
+        "status": "verde",
+        "observation": "",
+        "parentServiceId": "p1"
+      },
+      {
+        "serviceId": "c2",
+        "serviceTitle": "Collector DPP",
+        "status": "verde",
+        "observation": "",
+        "parentServiceId": "p1"
+      },
+      {
+        "serviceId": "z1",
+        "serviceTitle": "Zabbix",
+        "status": "rojo",
+        "observation": "Se cayó el proxy & \"web\"",
+        "parentServiceId": null
+      },
+      {
+        "serviceId": "pb",
+        "serviceTitle": "Passbolt",
+        "status": "verde",
+        "observation": "",
+        "parentServiceId": null
+      }
+    ]
+  },
+  "entries": [
+    {
+      "entryType": "ofensa",
+      "content": "qradar #dpp Offense CRE Rule #110593",
+      "createdAt": "2026-10-03T14:21:00Z",
+      "clientName": "DPP"
+    },
+    {
+      "entryType": "Incidentes",
+      "content": "SCJ <b>login</b>\nsegunda línea",
+      "createdAt": "2026-10-03T16:02:00Z",
+      "clientName": ""
+    },
+    {
+      "entryType": "operativa",
+      "content": "cierredeturno",
+      "createdAt": "2026-10-03T21:05:00Z",
+      "clientName": "Netics"
+    },
+    {
+      "entryType": "",
+      "content": "",
+      "createdAt": "2026-10-03T21:06:00Z"
+    }
+  ],
+  "periodStart": "2026-10-03T12:05:00Z",
+  "periodEnd": "2026-10-03T21:10:00Z",
+  "appTitle": "Bitácora CDC",
+  "faviconUrl": "https://ops.synet.cl/favicon.png"
+}

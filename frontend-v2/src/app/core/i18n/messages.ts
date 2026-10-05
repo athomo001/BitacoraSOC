@@ -1355,6 +1355,10 @@ const ES = {
   'tickets.images.download': 'Descargar',
   'tickets.images.close': 'Cerrar (Esc)',
   'publicTicket.image': 'Imagen adjunta',
+  'shiftsAdmin.reportSubject': 'Asunto del reporte de turno',
+  'shiftsAdmin.reportSubjectHint': 'Puedes usar [fecha], [turno] y [hora]. El nombre de la app va adelante, como en el legacy.',
+  'shiftsAdmin.reportIncludeChecklist': 'Incluir checklist de inicio y cierre',
+  'shiftsAdmin.reportIncludeEntries': 'Incluir entradas de la bitácora',
 } as const;
 
 export type MessageKey = keyof typeof ES;

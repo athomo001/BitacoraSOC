@@ -4,6 +4,13 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] Correos con el formato del legacy: reporte de turno - 2026-10-05
+
+- **Pedido del dueño**: los correos usan los formatos del legacy, que son el estándar del área. Nuevo paquete `internal/mailtpl`: las plantillas MJML del legacy compiladas con el mismo MJML y portadas a Go. Las pruebas comparan **byte a byte** contra HTML generado con el código real del legacy (`testdata/`): Reporte de Detección (incidente, 6 paletas), Boletín de Seguridad y **Reporte de Turno**.
+- **Reporte de Turno**: el correo de cierre que mandaba la 2.0 (diseño propio con KPIs) se reemplazó por el del legacy (`utils/shift-report.js`): resumen OK / NO OK / entradas, entradas por tipo, checklist de entrada contra salida (REPARADO, causa relacionada por jerarquía o palabras clave) o en dos columnas si las plantillas difieren, y la bitácora del periodo. Los datos se juntan como en `loadShiftReportData`: checklist de cierre, el inicio más reciente del mismo turno y las entradas entre ambos (sin las de tipo checklist, que el legacy no tenía).
+- **Configuración por turno** (migración 000015, como `WorkShift.emailReportConfig`): incluir checklist, incluir entradas y asunto con `[fecha]`, `[turno]` y `[hora]` (por defecto `Reporte SOC [fecha] [turno]`), con el nombre de la app adelante (`[Bitácora Ops] …`). Se editan en Administración → Turnos y el ETL los trae del legacy. El nombre de la app es fijo hasta que exista Administración → Marca.
+- Pruebas: Go completo, frontend 192/192; correo armado con datos de desarrollo dentro de una transacción descartada y revisado en el navegador.
+
 ## [Rewrite] Guía de formato e imágenes en tickets - 2026-10-03
 
 - **Guía de formato (#9)** (canvas v17 aprobado, "Bitácora: ayuda de formato"): botón **Formato** en la redacción de la Bitácora, en los comentarios de tickets y en el popup de turno. Cada fila muestra lo que escribes y cómo se ve (renderizado con el mismo Markdown de la app); tocarla la lleva a "Pruébalo" y "Agregar a mi texto" la suma al final de lo escrito.

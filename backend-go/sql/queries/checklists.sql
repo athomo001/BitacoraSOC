@@ -174,3 +174,35 @@ SELECT COALESCE(max(created_at), 'epoch'::timestamptz)::timestamptz AS at
 FROM entries
 WHERE user_id = sqlc.arg('user_id') AND sqlc.arg('tag')::text = ANY(tags)
   AND created_at >= sqlc.arg('from_at') AND created_at < sqlc.arg('to_at');
+
+-- ===== Reporte de Turno por correo (formato legacy, utils/shift-report.js) =====
+
+-- name: GetShiftCheckForReport :one
+SELECT sc.*, t.name AS template_name FROM shift_checks sc
+JOIN checklist_templates t ON t.id = sc.checklist_template_id
+WHERE sc.id = $1;
+
+-- name: GetLatestStartCheckInWindow :one
+-- Checklist de inicio más reciente del mismo turno dentro de la ventana
+-- (loadShiftReportData del legacy).
+SELECT sc.*, t.name AS template_name FROM shift_checks sc
+JOIN checklist_templates t ON t.id = sc.checklist_template_id
+WHERE sc.work_shift_id = $1 AND sc.check_type = 'inicio' AND sc.check_date >= $2 AND sc.check_date <= $3
+ORDER BY sc.check_date DESC LIMIT 1;
+
+-- name: ListShiftCheckServicesForReport :many
+SELECT s.checklist_item_id, s.service_title, s.status::text AS status, COALESCE(s.observation, '') AS observation, i.parent_item_id
+FROM shift_check_services s
+LEFT JOIN checklist_items i ON i.id = s.checklist_item_id
+WHERE s.shift_check_id = $1
+ORDER BY i.item_order NULLS LAST, s.id;
+
+-- name: ListEntriesForShiftReport :many
+-- Entradas del periodo en orden cronológico; las de checklist son de 2.0
+-- (el legacy no las tenía) y ya van en la sección Checklist.
+SELECT e.entry_type::text AS entry_type, e.content, e.created_at, COALESCE(o.name, '') AS client_name
+FROM entries e
+LEFT JOIN services sv ON sv.id = e.service_id
+LEFT JOIN organizations o ON o.id = sv.organization_id
+WHERE e.entry_type <> 'checklist' AND e.created_at >= $1 AND e.created_at <= $2
+ORDER BY e.created_at ASC;

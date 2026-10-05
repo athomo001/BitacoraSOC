@@ -33,6 +33,9 @@ function splitList(raw: string): string[] {
  * Sin panel de "reemplazos activos" a propósito: no hay GET de overrides en
  * el contrato; su efecto se ve en "De guardia ahora".
  */
+/** Asunto por defecto del Reporte de Turno, igual que el legacy (WorkShift.emailReportConfig). */
+const DEFAULT_REPORT_SUBJECT = 'Reporte SOC [fecha] [turno]';
+
 @Component({
   selector: 'app-admin-shifts',
   standalone: true,
@@ -45,6 +48,7 @@ function splitList(raw: string): string[] {
     .sa__lead { padding-bottom: 0; }
     .sa__form { border-top: 1px solid var(--border-subtle); }
     .sa__block { border-top: 1px solid var(--border-subtle); }
+    .sa__report { display: flex; flex-wrap: wrap; gap: 8px 20px; }
     .sa__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
     .sa__team { display: flex; align-items: center; gap: 8px; min-width: 240px; }
     .sa__guard { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; font-size: 12.5px; }
@@ -84,6 +88,9 @@ export class AdminShiftsComponent implements OnInit {
   protected readonly wsEnd = signal('20:00');
   protected readonly wsTimezone = signal('America/Santiago');
   protected readonly wsEmails = signal('');
+  protected readonly wsIncludeChecklist = signal(true);
+  protected readonly wsIncludeEntries = signal(true);
+  protected readonly wsSubject = signal(DEFAULT_REPORT_SUBJECT);
 
   // Rotación de guardia
   protected readonly teams = signal<TeamSummary[]>([]);
@@ -142,6 +149,9 @@ export class AdminShiftsComponent implements OnInit {
     this.wsEnd.set(shift.endTime);
     this.wsTimezone.set(shift.timezone);
     this.wsEmails.set(shift.emailRecipients.join(', '));
+    this.wsIncludeChecklist.set(shift.emailIncludeChecklist ?? true);
+    this.wsIncludeEntries.set(shift.emailIncludeEntries ?? true);
+    this.wsSubject.set(shift.emailSubjectTemplate || DEFAULT_REPORT_SUBJECT);
   }
 
   protected resetShiftForm(): void {
@@ -151,15 +161,22 @@ export class AdminShiftsComponent implements OnInit {
     this.wsEnd.set('20:00');
     this.wsTimezone.set('America/Santiago');
     this.wsEmails.set('');
+    this.wsIncludeChecklist.set(true);
+    this.wsIncludeEntries.set(true);
+    this.wsSubject.set(DEFAULT_REPORT_SUBJECT);
   }
 
   protected async saveShift(): Promise<void> {
     if (!this.wsName().trim()) return;
     const draft = { name: this.wsName().trim(), startTime: this.wsStart(), endTime: this.wsEnd(), timezone: this.wsTimezone().trim(), emailRecipients: splitList(this.wsEmails()) };
+    const report = { emailIncludeChecklist: this.wsIncludeChecklist(), emailIncludeEntries: this.wsIncludeEntries(), emailSubjectTemplate: this.wsSubject().trim() || DEFAULT_REPORT_SUBJECT };
     const editing = this.editingShiftId();
     await this.run(async () => {
-      if (editing) await this.api.patchWorkShift(editing, draft);
-      else await this.api.createWorkShift({ ...draft, shiftType: 'regular' });
+      if (editing) await this.api.patchWorkShift(editing, { ...draft, ...report });
+      else {
+        const created = await this.api.createWorkShift({ ...draft, shiftType: 'regular' });
+        await this.api.patchWorkShift(created.id, report);
+      }
       this.resetShiftForm();
       this.workShifts.set(await this.api.listWorkShifts());
     }, this.i18n.t('admin.saved'));

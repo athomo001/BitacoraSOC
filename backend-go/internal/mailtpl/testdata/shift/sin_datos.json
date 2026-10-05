@@ -1,0 +1,18 @@
+{
+  "shift": {
+    "name": "Turno A",
+    "startTime": "09:00",
+    "endTime": "18:20",
+    "emailReportConfig": {
+      "includeChecklist": true,
+      "includeEntries": true
+    }
+  },
+  "checklistEntry": null,
+  "checklistExit": null,
+  "entries": [],
+  "periodStart": "2026-10-03T12:00:00Z",
+  "periodEnd": "2026-10-03T21:20:00Z",
+  "appTitle": "Bitácora CDC",
+  "faviconUrl": ""
+}

@@ -2026,6 +2026,9 @@ type WorkShift struct {
 	ChecklistTemplateEndID   pgtype.UUID `json:"checklist_template_end_id"`
 	EmailRecipients          []string    `json:"email_recipients"`
 	Active                   bool        `json:"active"`
+	EmailIncludeChecklist    bool        `json:"email_include_checklist"`
+	EmailIncludeEntries      bool        `json:"email_include_entries"`
+	EmailSubjectTemplate     string      `json:"email_subject_template"`
 }
 
 type WorkShiftAssignment struct {

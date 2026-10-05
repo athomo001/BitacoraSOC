@@ -62,6 +62,23 @@
       <input class="adm-input" name="wsEmails" placeholder="jefe.turno@empresa.cl, noc@empresa.cl" [ngModel]="wsEmails()" (ngModelChange)="wsEmails.set($event)" />
       <span class="adm-hint">{{ i18n.t('shiftsAdmin.reportRecipientsHint') }}</span>
     </label>
+    <label class="adm-field">
+      <span class="adm-label">{{ i18n.t('shiftsAdmin.reportSubject') }}</span>
+      <input class="adm-input" name="wsSubject" [ngModel]="wsSubject()" (ngModelChange)="wsSubject.set($event)" />
+      <span class="adm-hint">{{ i18n.t('shiftsAdmin.reportSubjectHint') }}</span>
+    </label>
+    <div class="sa__report">
+      <label class="switch">
+        <input class="switch__input" type="checkbox" role="switch" name="wsIncludeChecklist" [ngModel]="wsIncludeChecklist()" (ngModelChange)="wsIncludeChecklist.set($event)" />
+        <span class="switch__track" aria-hidden="true"></span>
+        {{ i18n.t('shiftsAdmin.reportIncludeChecklist') }}
+      </label>
+      <label class="switch">
+        <input class="switch__input" type="checkbox" role="switch" name="wsIncludeEntries" [ngModel]="wsIncludeEntries()" (ngModelChange)="wsIncludeEntries.set($event)" />
+        <span class="switch__track" aria-hidden="true"></span>
+        {{ i18n.t('shiftsAdmin.reportIncludeEntries') }}
+      </label>
+    </div>
     <div class="sa__actions">
       @if (editingShiftId()) { <button type="button" class="adm-btn" (click)="resetShiftForm()">{{ i18n.t('admin.discard') }}</button> }
       <button type="submit" class="adm-btn adm-btn--primary" [disabled]="busy() || !wsName().trim()">

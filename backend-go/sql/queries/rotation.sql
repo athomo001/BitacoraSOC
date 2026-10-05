@@ -86,6 +86,9 @@ UPDATE work_shifts SET
   end_time = COALESCE(sqlc.narg('end_time')::time, end_time),
   timezone = COALESCE(sqlc.narg('timezone'), timezone),
   email_recipients = COALESCE(sqlc.narg('email_recipients')::text[], email_recipients),
-  active = COALESCE(sqlc.narg('active'), active)
+  active = COALESCE(sqlc.narg('active'), active),
+  email_include_checklist = COALESCE(sqlc.narg('email_include_checklist'), email_include_checklist),
+  email_include_entries = COALESCE(sqlc.narg('email_include_entries'), email_include_entries),
+  email_subject_template = COALESCE(sqlc.narg('email_subject_template'), email_subject_template)
 WHERE id = sqlc.arg('id')
 RETURNING *;

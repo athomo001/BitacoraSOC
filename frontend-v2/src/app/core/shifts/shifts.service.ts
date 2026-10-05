@@ -52,6 +52,10 @@ export interface WorkShift {
   checklistTemplateStartId?: string;
   checklistTemplateEndId?: string;
   emailRecipients: string[];
+  /** Reporte de Turno por correo (formato legacy): secciones y asunto con [fecha] [turno] [hora]. */
+  emailIncludeChecklist?: boolean;
+  emailIncludeEntries?: boolean;
+  emailSubjectTemplate?: string;
   active: boolean;
 }
 
@@ -215,7 +219,7 @@ export class ShiftsService {
   }
 
   /** Editar un turno; lo que no se manda queda como estaba. */
-  async patchWorkShift(id: string, patch: Partial<{ name: string; startTime: string; endTime: string; timezone: string; emailRecipients: string[]; active: boolean }>): Promise<WorkShift> {
+  async patchWorkShift(id: string, patch: Partial<{ name: string; startTime: string; endTime: string; timezone: string; emailRecipients: string[]; active: boolean; emailIncludeChecklist: boolean; emailIncludeEntries: boolean; emailSubjectTemplate: string }>): Promise<WorkShift> {
     return (await firstValueFrom(this.http.patch<ApiEnvelope<WorkShift>>(`/api/work-shifts/${id}`, patch))).data;
   }
 

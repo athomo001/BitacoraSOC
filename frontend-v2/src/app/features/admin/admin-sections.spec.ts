@@ -42,7 +42,7 @@ describe('Administración re-vestida', () => {
     fixture.detectChanges();
     (el.querySelector('form.sa__form') as HTMLFormElement).dispatchEvent(new Event('submit'));
     const patch = http.expectOne((r) => r.method === 'PATCH' && r.url === '/api/work-shifts/w2');
-    expect(patch.request.body).toMatchObject({ name: 'Turno Noche', emailRecipients: ['jefe@empresa.cl', 'noc@empresa.cl'] });
+    expect(patch.request.body).toMatchObject({ name: 'Turno Noche', emailRecipients: ['jefe@empresa.cl', 'noc@empresa.cl'], emailIncludeChecklist: true, emailIncludeEntries: true, emailSubjectTemplate: 'Reporte SOC [fecha] [turno]' });
     patch.flush({ data: {} });
     await settle();
     http.expectOne((r) => r.url === '/api/work-shifts').flush({ data: [] });

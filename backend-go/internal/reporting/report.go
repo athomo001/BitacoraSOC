@@ -1,9 +1,15 @@
 package reporting
 
 import (
-	"bytes"
-	"html/template"
+	"context"
+	"fmt"
 	"strings"
+	"time"
+
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/mailtpl"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // Recipients limpia la lista de destinatarios configurada en el turno:
@@ -23,48 +29,91 @@ func Recipients(configured []string) []string {
 	return out
 }
 
-type ShiftReport struct {
-	TicketCount         int
-	IncidentCount       int
-	SLABreaches         int
-	PendingForNextShift string
-	Observations        string
-	ServicesDown        []string
-}
+// Brand es lo que el correo toma de la marca de la app (título y favicon).
+type Brand struct{ AppTitle, FaviconURL string }
 
-func HasActivity(report ShiftReport) bool {
-	return report.TicketCount > 0 || report.IncidentCount > 0 || report.SLABreaches > 0 || len(report.ServicesDown) > 0 || report.PendingForNextShift != "" || report.Observations != ""
-}
+// ShiftMail es el "Reporte de Turno" listo para enviar.
+type ShiftMail struct{ Subject, HTML string }
 
-var shiftReportTemplate = template.Must(template.New("shift-report").Parse(`<!doctype html>
-<html lang="es"><body style="margin:0;background:#f3f5f6;color:#20252b;font-family:Arial,sans-serif;line-height:1.45">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td style="padding:16px">
-<table role="presentation" width="100%" style="box-sizing:border-box;max-width:680px;margin:auto;background:#fff;border:1px solid #d8dde2">
-<tr><td style="padding:24px;border-bottom:4px solid #087f8c"><h1 style="margin:0;font-size:22px">Reporte de turno</h1><p style="margin:6px 0 0;color:#66717b">Bitácora Ops · cierre operativo</p></td></tr>
-<tr><td style="padding:24px"><table role="presentation" width="100%" cellspacing="0" cellpadding="8"><tr><td><strong>Tickets resueltos</strong><br>{{.TicketCount}}</td><td><strong>Incidentes</strong><br>{{.IncidentCount}}</td><td><strong>SLA incumplidos</strong><br>{{.SLABreaches}}</td></tr></table>
-{{if .ServicesDown}}<h2 style="font-size:16px">Servicios pendientes</h2><ul>{{range .ServicesDown}}<li>{{.}}</li>{{end}}</ul>{{end}}
-{{if .PendingForNextShift}}<h2 style="font-size:16px">Pendientes para el siguiente turno</h2><p style="white-space:pre-wrap">{{.PendingForNextShift}}</p>{{end}}
-{{if .Observations}}<h2 style="font-size:16px">Observaciones</h2><p style="white-space:pre-wrap">{{.Observations}}</p>{{end}}
-</td></tr></table></td></tr></table></body></html>`))
-
-func RenderShiftReportHTML(report ShiftReport) string {
-	var output bytes.Buffer
-	_ = shiftReportTemplate.Execute(&output, report)
-	return output.String()
-}
-
-func RenderShiftReportText(report ShiftReport) string {
-	return "Reporte de turno\n\nTickets resueltos: " + itoa(report.TicketCount) + "\nIncidentes: " + itoa(report.IncidentCount) + "\nSLA incumplidos: " + itoa(report.SLABreaches) + "\nPendientes: " + report.PendingForNextShift + "\nObservaciones: " + report.Observations
-}
-
-func itoa(value int) string {
-	if value == 0 {
-		return "0"
+// BuildShiftMail junta los datos del cierre como loadShiftReportData del
+// legacy: el checklist de cierre, el de inicio más reciente del mismo turno
+// dentro de la ventana, y las entradas entre ambos.
+func BuildShiftMail(ctx context.Context, q *db.Queries, closure db.ShiftClosure, shift db.WorkShift, brand Brand) (ShiftMail, error) {
+	loc, err := time.LoadLocation(shift.Timezone)
+	if err != nil {
+		loc, _ = time.LoadLocation("America/Santiago")
 	}
-	digits := ""
-	for value > 0 {
-		digits = string(rune('0'+value%10)) + digits
-		value /= 10
+	exitCheck, err := q.GetShiftCheckForReport(ctx, closure.ClosureCheckID)
+	if err != nil {
+		return ShiftMail{}, fmt.Errorf("no se pudo cargar el checklist de cierre: %w", err)
 	}
-	return digits
+	exit, err := loadChecklist(ctx, q, exitCheck.ID, exitCheck.ChecklistTemplateID, exitCheck.TemplateName, exitCheck.CheckDate.Time)
+	if err != nil {
+		return ShiftMail{}, err
+	}
+	periodStart, periodEnd := closure.ShiftStartAt.Time, exitCheck.CheckDate.Time
+	var entry *mailtpl.ShiftChecklist
+	startCheck, err := q.GetLatestStartCheckInWindow(ctx, db.GetLatestStartCheckInWindowParams{
+		WorkShiftID: shift.ID, CheckDate: closure.ShiftStartAt, CheckDate_2: exitCheck.CheckDate,
+	})
+	if err == nil {
+		if entry, err = loadChecklist(ctx, q, startCheck.ID, startCheck.ChecklistTemplateID, startCheck.TemplateName, startCheck.CheckDate.Time); err != nil {
+			return ShiftMail{}, err
+		}
+		periodStart = startCheck.CheckDate.Time
+	}
+	rows, err := q.ListEntriesForShiftReport(ctx, db.ListEntriesForShiftReportParams{
+		CreatedAt: pgtype.Timestamptz{Time: periodStart, Valid: true}, CreatedAt_2: pgtype.Timestamptz{Time: periodEnd, Valid: true},
+	})
+	if err != nil {
+		return ShiftMail{}, fmt.Errorf("no se pudieron cargar las entradas del turno: %w", err)
+	}
+	entries := make([]mailtpl.ShiftEntry, 0, len(rows))
+	for _, r := range rows {
+		entries = append(entries, mailtpl.ShiftEntry{
+			EntryType: r.EntryType, Content: r.Content, ClientName: r.ClientName, CreatedAt: r.CreatedAt.Time,
+			Time: r.CreatedAt.Time.In(loc).Format("15:04"),
+		})
+	}
+	startTime, endTime := clock(shift.StartTime), clock(shift.EndTime)
+	html, err := mailtpl.RenderShiftReport(mailtpl.ShiftReportOptions{
+		ShiftName: shift.Name, StartTime: startTime, EndTime: endTime,
+		IncludeChecklist: shift.EmailIncludeChecklist, IncludeEntries: shift.EmailIncludeEntries,
+		Entry: entry, Exit: exit, Entries: entries,
+		PeriodStart: &periodStart, PeriodEnd: &periodEnd,
+		AppTitle: brand.AppTitle, FaviconURL: brand.FaviconURL, Location: loc,
+	})
+	if err != nil {
+		return ShiftMail{}, err
+	}
+	subject := mailtpl.ShiftReportSubject(shift.EmailSubjectTemplate, brand.AppTitle, periodEnd.In(loc).Format("02-01-2006"), shift.Name, endTime)
+	return ShiftMail{Subject: subject, HTML: html}, nil
+}
+
+func loadChecklist(ctx context.Context, q *db.Queries, checkID, templateID uuid.UUID, templateName string, at time.Time) (*mailtpl.ShiftChecklist, error) {
+	services, err := q.ListShiftCheckServicesForReport(ctx, checkID)
+	if err != nil {
+		return nil, fmt.Errorf("no se pudieron cargar los servicios del checklist: %w", err)
+	}
+	out := &mailtpl.ShiftChecklist{CreatedAt: at, ChecklistID: templateID.String(), ChecklistName: templateName}
+	for _, s := range services {
+		out.Services = append(out.Services, mailtpl.ShiftService{
+			ServiceID: uuidText(s.ChecklistItemID), Title: s.ServiceTitle, Status: s.Status,
+			Observation: s.Observation, ParentID: uuidText(s.ParentItemID),
+		})
+	}
+	return out, nil
+}
+
+func uuidText(v pgtype.UUID) string {
+	if !v.Valid {
+		return ""
+	}
+	return uuid.UUID(v.Bytes).String()
+}
+
+// clock deja una hora del día como "HH:MM" (startTime/endTime del legacy).
+func clock(t pgtype.Time) string {
+	minutes := t.Microseconds / 60_000_000
+	return fmt.Sprintf("%02d:%02d", minutes/60, minutes%60)
 }

@@ -1281,3 +1281,10 @@ CREATE TABLE ticket_images (
 );
 CREATE INDEX idx_ticket_images_ticket ON ticket_images(ticket_id, created_at DESC);
 CREATE INDEX idx_ticket_images_comment ON ticket_images(comment_id);
+
+-- 000015: configuración del "Reporte de Turno" por correo, como el legacy
+-- (WorkShift.emailReportConfig): secciones incluidas y plantilla del asunto.
+ALTER TABLE work_shifts
+  ADD COLUMN email_include_checklist BOOLEAN NOT NULL DEFAULT true,
+  ADD COLUMN email_include_entries BOOLEAN NOT NULL DEFAULT true,
+  ADD COLUMN email_subject_template TEXT NOT NULL DEFAULT 'Reporte SOC [fecha] [turno]';
