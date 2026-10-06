@@ -62,6 +62,13 @@
           <button type="button" class="adm-btn adm-btn--danger adm-push" (click)="confirmDelete.set(true)"><mat-icon>delete_outline</mat-icon>{{ i18n.t('escAdmin.deletePolicy') }}</button>
         }
       </div>
+      <form class="ea__reminder" (ngSubmit)="saveReminder(p)">
+        <label class="adm-field">
+          <span class="adm-label">{{ i18n.t('escAdmin.reminder') }}</span>
+          <input class="adm-input" name="reminder" [placeholder]="i18n.t('escAdmin.reminderPlaceholder')" [ngModel]="reminder()" (ngModelChange)="reminder.set($event)" />
+        </label>
+        <button type="submit" class="adm-btn" [disabled]="busy() || reminder().trim() === (p.reminder ?? '')"><mat-icon>save</mat-icon>{{ i18n.t('admin.save') }}</button>
+      </form>
       <div class="adm-table-wrap">
         <table class="adm-table">
           <thead><tr><th class="adm-num">{{ i18n.t('escAdmin.step') }}</th><th>{{ i18n.t('escAdmin.team') }}</th><th>{{ i18n.t('escAdmin.mode') }}</th><th class="adm-num">{{ i18n.t('escAdmin.wait') }}</th><th></th></tr></thead>
@@ -139,5 +146,7 @@
     </div>
   </section>
 }
+
+<app-admin-escalation-pools />
 
 <app-maintenance-windows />

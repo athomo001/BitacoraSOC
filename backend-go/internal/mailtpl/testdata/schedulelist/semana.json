@@ -1,0 +1,72 @@
+{
+  "schedule": [
+    {
+      "analystName": "Ana Pérez",
+      "startDate": "2026-10-05T11:00:00.000Z",
+      "endDate": "2026-10-12T11:00:00.000Z",
+      "cargoLabel": "Analista N2",
+      "roleCode": "N2"
+    },
+    {
+      "analystName": "Bruno <Soto> & \"Cía\"",
+      "startDate": "2026-10-06T03:00:00.000Z",
+      "endDate": "2026-10-09T02:59:00.000Z",
+      "cargoLabel": "",
+      "roleCode": "TELEWORK"
+    },
+    {
+      "analystName": "Carla Díaz",
+      "startDate": "2026-10-05T12:30:00.000Z",
+      "endDate": "2026-10-16T21:00:00.000Z",
+      "cargoLabel": "Especialista",
+      "roleCode": "VACATION"
+    },
+    {
+      "analystName": "Diego",
+      "startDate": "2026-10-07T13:00:00.000Z",
+      "endDate": "2026-10-07T15:00:00.000Z",
+      "cargoLabel": "Jefe",
+      "roleCode": "guardia_externa"
+    },
+    {
+      "analystName": "Eva",
+      "startDate": "2026-10-05T03:00:00.000Z",
+      "endDate": "2026-10-10T03:00:00.000Z",
+      "cargoLabel": "N1",
+      "roleCode": "N1_NO_HABIL"
+    },
+    {
+      "analystName": "Fito",
+      "startDate": "2026-10-05T03:00:00.000Z",
+      "endDate": "2026-10-10T03:00:00.000Z",
+      "cargoLabel": "-",
+      "roleCode": "MEDICAL_LEAVE"
+    },
+    {
+      "analystName": "Gabi",
+      "startDate": "2026-10-05T03:00:00.000Z",
+      "endDate": "2026-10-10T03:00:00.000Z",
+      "cargoLabel": "TI",
+      "roleCode": "TI"
+    },
+    {
+      "analystName": "Hugo",
+      "startDate": "2026-10-05T03:00:00.000Z",
+      "endDate": "2026-10-10T03:00:00.000Z",
+      "cargoLabel": "x",
+      "roleCode": "OL"
+    },
+    {
+      "analystName": "Iris",
+      "startDate": "2026-10-05T03:00:00.000Z",
+      "endDate": "2026-10-10T03:00:00.000Z",
+      "cargoLabel": "y",
+      "roleCode": "MEDICAL_APPOINTMENT"
+    }
+  ],
+  "periodLabel": "Periodo Semanal: 05-10-2026 - 11-10-2026",
+  "logoCid": "cid:bitacora_escalation_logo@bitacora",
+  "brandName": "Bitácora CDC",
+  "title": "Turnos de Escalamiento SOC",
+  "categoriesLabel": "Guardias y teletrabajo"
+}

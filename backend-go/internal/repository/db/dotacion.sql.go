@@ -13,8 +13,8 @@ import (
 )
 
 const createNotificationSchedule = `-- name: CreateNotificationSchedule :one
-INSERT INTO work_shift_notification_schedules (name, frequency, day_of_week, send_time, role_filter, recipients, cc_recipients, created_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, name, enabled, frequency, day_of_week, send_time, timezone, role_filter, recipients, cc_recipients, last_sent_at, created_by, created_at, updated_at
+INSERT INTO work_shift_notification_schedules (name, frequency, day_of_week, send_time, role_filter, recipients, cc_recipients, created_by, target_period, email_format)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, name, enabled, frequency, day_of_week, send_time, timezone, role_filter, recipients, cc_recipients, last_sent_at, created_by, created_at, updated_at, target_period, email_format
 `
 
 type CreateNotificationScheduleParams struct {
@@ -26,6 +26,8 @@ type CreateNotificationScheduleParams struct {
 	Recipients   []string                      `json:"recipients"`
 	CcRecipients []string                      `json:"cc_recipients"`
 	CreatedBy    uuid.UUID                     `json:"created_by"`
+	TargetPeriod string                        `json:"target_period"`
+	EmailFormat  string                        `json:"email_format"`
 }
 
 func (q *Queries) CreateNotificationSchedule(ctx context.Context, arg CreateNotificationScheduleParams) (WorkShiftNotificationSchedule, error) {
@@ -38,6 +40,8 @@ func (q *Queries) CreateNotificationSchedule(ctx context.Context, arg CreateNoti
 		arg.Recipients,
 		arg.CcRecipients,
 		arg.CreatedBy,
+		arg.TargetPeriod,
+		arg.EmailFormat,
 	)
 	var i WorkShiftNotificationSchedule
 	err := row.Scan(
@@ -55,6 +59,8 @@ func (q *Queries) CreateNotificationSchedule(ctx context.Context, arg CreateNoti
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.TargetPeriod,
+		&i.EmailFormat,
 	)
 	return i, err
 }
@@ -105,7 +111,7 @@ func (q *Queries) GetActivePublicShareByTokenHash(ctx context.Context, tokenHash
 }
 
 const getNotificationSchedule = `-- name: GetNotificationSchedule :one
-SELECT id, name, enabled, frequency, day_of_week, send_time, timezone, role_filter, recipients, cc_recipients, last_sent_at, created_by, created_at, updated_at FROM work_shift_notification_schedules WHERE id = $1
+SELECT id, name, enabled, frequency, day_of_week, send_time, timezone, role_filter, recipients, cc_recipients, last_sent_at, created_by, created_at, updated_at, target_period, email_format FROM work_shift_notification_schedules WHERE id = $1
 `
 
 func (q *Queries) GetNotificationSchedule(ctx context.Context, id uuid.UUID) (WorkShiftNotificationSchedule, error) {
@@ -126,6 +132,8 @@ func (q *Queries) GetNotificationSchedule(ctx context.Context, id uuid.UUID) (Wo
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.TargetPeriod,
+		&i.EmailFormat,
 	)
 	return i, err
 }
@@ -196,9 +204,73 @@ func (q *Queries) ListAssignmentsForRange(ctx context.Context, arg ListAssignmen
 	return items, nil
 }
 
+const listGuardSlotsForRange = `-- name: ListGuardSlotsForRange :many
+SELECT s.week_start_date, s.week_end_date, t.name AS team_name, c.start_time_utc, c.timezone,
+  COALESCE(NULLIF(u.full_name, ''), ct.name, 'Pendiente')::text AS person_name,
+  COALESCE(u.cargo_label, '')::text AS cargo_label,
+  tm.user_id
+FROM rotation_slots s
+JOIN rotation_cycles c ON c.id = s.cycle_id
+JOIN teams t ON t.id = c.team_id
+JOIN team_members tm ON tm.id = s.team_member_id
+LEFT JOIN users u ON u.id = tm.user_id
+LEFT JOIN contacts ct ON ct.id = tm.contact_id
+WHERE t.kind = 'oncall' AND NOT s.is_paused
+  AND s.week_start_date <= $1::date AND s.week_end_date >= $2::date
+ORDER BY s.week_start_date, t.name
+`
+
+type ListGuardSlotsForRangeParams struct {
+	ToDate   pgtype.Date `json:"to_date"`
+	FromDate pgtype.Date `json:"from_date"`
+}
+
+type ListGuardSlotsForRangeRow struct {
+	WeekStartDate pgtype.Date `json:"week_start_date"`
+	WeekEndDate   pgtype.Date `json:"week_end_date"`
+	TeamName      string      `json:"team_name"`
+	StartTimeUtc  pgtype.Time `json:"start_time_utc"`
+	Timezone      string      `json:"timezone"`
+	PersonName    string      `json:"person_name"`
+	CargoLabel    string      `json:"cargo_label"`
+	UserID        pgtype.UUID `json:"user_id"`
+}
+
+// Guardias semanales (equipos "oncall": Guardia N2, Guardia TI…) que tocan
+// el periodo, para el correo de dotación en formato lista
+// (sendEscalationScheduleInternal del legacy).
+func (q *Queries) ListGuardSlotsForRange(ctx context.Context, arg ListGuardSlotsForRangeParams) ([]ListGuardSlotsForRangeRow, error) {
+	rows, err := q.db.Query(ctx, listGuardSlotsForRange, arg.ToDate, arg.FromDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListGuardSlotsForRangeRow
+	for rows.Next() {
+		var i ListGuardSlotsForRangeRow
+		if err := rows.Scan(
+			&i.WeekStartDate,
+			&i.WeekEndDate,
+			&i.TeamName,
+			&i.StartTimeUtc,
+			&i.Timezone,
+			&i.PersonName,
+			&i.CargoLabel,
+			&i.UserID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listNotificationSchedules = `-- name: ListNotificationSchedules :many
 
-SELECT id, name, enabled, frequency, day_of_week, send_time, timezone, role_filter, recipients, cc_recipients, last_sent_at, created_by, created_at, updated_at FROM work_shift_notification_schedules ORDER BY name
+SELECT id, name, enabled, frequency, day_of_week, send_time, timezone, role_filter, recipients, cc_recipients, last_sent_at, created_by, created_at, updated_at, target_period, email_format FROM work_shift_notification_schedules ORDER BY name
 `
 
 // ===== Notificación periódica de dotación (HU-5b) =====
@@ -226,6 +298,8 @@ func (q *Queries) ListNotificationSchedules(ctx context.Context) ([]WorkShiftNot
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.TargetPeriod,
+			&i.EmailFormat,
 		); err != nil {
 			return nil, err
 		}
@@ -256,9 +330,11 @@ UPDATE work_shift_notification_schedules SET
   role_filter = COALESCE($7::text[], role_filter),
   recipients = COALESCE($8::text[], recipients),
   cc_recipients = COALESCE($9::text[], cc_recipients),
+  target_period = COALESCE($10, target_period),
+  email_format = COALESCE($11, email_format),
   updated_at = now()
 WHERE id = $1
-RETURNING id, name, enabled, frequency, day_of_week, send_time, timezone, role_filter, recipients, cc_recipients, last_sent_at, created_by, created_at, updated_at
+RETURNING id, name, enabled, frequency, day_of_week, send_time, timezone, role_filter, recipients, cc_recipients, last_sent_at, created_by, created_at, updated_at, target_period, email_format
 `
 
 type PatchNotificationScheduleParams struct {
@@ -271,6 +347,8 @@ type PatchNotificationScheduleParams struct {
 	RoleFilter   []string                          `json:"role_filter"`
 	Recipients   []string                          `json:"recipients"`
 	CcRecipients []string                          `json:"cc_recipients"`
+	TargetPeriod pgtype.Text                       `json:"target_period"`
+	EmailFormat  pgtype.Text                       `json:"email_format"`
 }
 
 func (q *Queries) PatchNotificationSchedule(ctx context.Context, arg PatchNotificationScheduleParams) (WorkShiftNotificationSchedule, error) {
@@ -284,6 +362,8 @@ func (q *Queries) PatchNotificationSchedule(ctx context.Context, arg PatchNotifi
 		arg.RoleFilter,
 		arg.Recipients,
 		arg.CcRecipients,
+		arg.TargetPeriod,
+		arg.EmailFormat,
 	)
 	var i WorkShiftNotificationSchedule
 	err := row.Scan(
@@ -301,6 +381,8 @@ func (q *Queries) PatchNotificationSchedule(ctx context.Context, arg PatchNotifi
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.TargetPeriod,
+		&i.EmailFormat,
 	)
 	return i, err
 }

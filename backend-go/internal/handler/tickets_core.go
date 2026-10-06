@@ -131,7 +131,7 @@ func (h *TicketsHandler) AddEntryCommentToTicket(ctx context.Context, ticketID u
 // bitácora: crear o vincular un ticket desde una entrada es usar la
 // ticketera, aunque la ruta sea /api/entries.
 func (h *TicketsHandler) Enabled(ctx context.Context) (bool, error) {
-	feature, err := h.Queries.GetSystemFeature(ctx, "native_tickets")
+	feature, err := h.Queries.GetSystemFeature(ctx, ticketsFeature)
 	if err != nil {
 		return false, err
 	}

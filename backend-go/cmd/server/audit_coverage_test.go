@@ -14,9 +14,10 @@ import (
 // Rutas de escritura que no auditan a propósito. Agregar una acá exige
 // explicar por qué; lo normal es llamar a AuditLog.Log (spec/07 §6.1).
 var auditExempt = map[string]string{
-	"POST /api/drafts/sync":   "autoguardado de borradores cada pocos segundos; la entrada que resulta sí se audita al crearse",
-	"DELETE /api/drafts/{id}": "descarta un borrador propio del autoguardado; nunca fue un dato de negocio",
-	"PUT /api/notes/personal": "libreta privada con autoguardado cada 3 s (el legacy tampoco la auditaba)",
+	"POST /api/drafts/sync":            "autoguardado de borradores cada pocos segundos; la entrada que resulta sí se audita al crearse",
+	"DELETE /api/drafts/{id}":          "descarta un borrador propio del autoguardado; nunca fue un dato de negocio",
+	"PUT /api/notes/personal":          "libreta privada con autoguardado cada 3 s (el legacy tampoco la auditaba)",
+	"POST /api/reports/{kind}/preview": "solo arma la vista previa del correo, no envía ni guarda nada (el envío sí se audita)",
 }
 
 // TestEveryWriteRouteAudits recorre las rutas POST/PUT/PATCH/DELETE que

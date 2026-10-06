@@ -44,3 +44,31 @@ func TestFromHeader_NombreVisibleCodificadoYSinInyeccion(t *testing.T) {
 		t.Fatalf("un salto de línea en el nombre no puede llegar a la cabecera: %q", h)
 	}
 }
+
+func TestBuildAlternativeMessage_TextAndHTMLInQuotedPrintable(t *testing.T) {
+	long := strings.Repeat("<div>línea</div>", 200)
+	msg := string(buildAlternativeMessage("a@x.cl", []string{"b@x.cl"}, nil, "Recordatorio", "hola", long, time.Now()))
+	if !strings.Contains(msg, "multipart/alternative") || !strings.Contains(msg, "Content-Type: text/plain") || !strings.Contains(msg, "Content-Type: text/html") {
+		t.Fatalf("faltan partes:\n%s", msg)
+	}
+	for _, line := range strings.Split(msg, "\r\n") {
+		if len(line) > 998 {
+			t.Fatalf("línea de %d columnas", len(line))
+		}
+	}
+}
+
+func TestBuildRelatedMessage_InlineImagesWithContentID(t *testing.T) {
+	msg := string(buildRelatedMessage("a@x.cl", []string{"b@x.cl"}, nil, "Reporte", "texto", `<img src="cid:logo@bitacora">`,
+		[]Inline{{CID: "logo@bitacora", Name: "logo.png", ContentType: "image/png", Data: make([]byte, 300)}}, time.Now()))
+	for _, want := range []string{"multipart/related", "multipart/alternative", "Content-ID: <logo@bitacora>", "Content-Disposition: inline", "Content-Transfer-Encoding: base64"} {
+		if !strings.Contains(msg, want) {
+			t.Fatalf("falta %q", want)
+		}
+	}
+	for _, line := range strings.Split(msg, "\r\n") {
+		if len(line) > 998 {
+			t.Fatalf("línea de %d columnas", len(line))
+		}
+	}
+}

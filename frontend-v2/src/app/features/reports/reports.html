@@ -1,0 +1,386 @@
+<div class="rp">
+  <header class="rp__head">
+    <div class="rp__title-row">
+      <h1 class="rp__title">{{ i18n.t('nav.reports') }}</h1>
+      <span class="rp__lead">{{ i18n.t('rpt.lead') }}</span>
+    </div>
+    <div class="rp__tabs" role="tablist">
+      <button type="button" role="tab" class="rp__tab" [attr.aria-selected]="tab() === 'new'" (click)="tab.set('new')">{{ i18n.t('rpt.tab.new') }}</button>
+      <button type="button" role="tab" class="rp__tab" [attr.aria-selected]="tab() === 'history'" (click)="tab.set('history'); loadHistory()">
+        {{ i18n.t('rpt.tab.history') }} <span class="mono">{{ historyTotal() }}</span>
+      </button>
+    </div>
+  </header>
+
+  @if (tab() === 'new') {
+    <div class="rp__split" [class.rp__split--resizing]="resizing()" [style.grid-template-columns]="splitColumns()">
+      <!-- Formulario -->
+      <div class="rp__form" (paste)="onPaste($event)">
+        <div class="rp__modes">
+          <button type="button" class="adm-btn" [class.rp__on]="mode() === 'incident'" [attr.aria-pressed]="mode() === 'incident'" (click)="setMode('incident')"><mat-icon>report</mat-icon>{{ i18n.t('rpt.mode.incident') }}</button>
+          <button type="button" class="adm-btn" [class.rp__on]="mode() === 'bulletin'" [attr.aria-pressed]="mode() === 'bulletin'" (click)="setMode('bulletin')"><mat-icon>campaign</mat-icon>{{ i18n.t('rpt.mode.bulletin') }}</button>
+          <span class="rp__draft">
+            @if (draftSavedAt(); as at) {
+              {{ i18n.t('rpt.draftSaved') }} · <span class="mono">{{ at | date: 'HH:mm' }}</span>
+            }
+            <button type="button" class="adm-icon-btn" [title]="i18n.t('rpt.clear')" [attr.aria-label]="i18n.t('rpt.clear')" (click)="clearForm()"><mat-icon>restart_alt</mat-icon></button>
+          </span>
+        </div>
+
+        <div class="rp__grid3">
+          <label class="adm-field">
+            <span class="adm-label">{{ i18n.t(mode() === 'incident' ? 'rpt.f.client' : 'rpt.f.clientOptional') }}</span>
+            <select class="adm-input" name="org" [ngModel]="organizationId()" (ngModelChange)="pickOrganization($event)">
+              <option value="">{{ i18n.t('rpt.f.chooseClient') }}</option>
+              @for (o of organizations(); track o.id) { <option [value]="o.id">{{ o.name }}</option> }
+            </select>
+          </label>
+          @if (hasServices()) {
+            <label class="adm-field">
+              <span class="adm-label">{{ i18n.t('rpt.f.service') }}</span>
+              <select class="adm-input" name="svc" [disabled]="!organizationId()" [ngModel]="serviceId()" (ngModelChange)="pickService($event)">
+                <option value="">{{ i18n.t('rpt.f.anyService') }}</option>
+                @for (s of services(); track s.id) { <option [value]="s.id">{{ s.name }}</option> }
+              </select>
+            </label>
+          }
+          @if (mode() === 'incident') {
+            <label class="adm-field">
+              <span class="adm-label">{{ i18n.t('rpt.f.date') }}</span>
+              <input class="adm-input mono" type="date" name="fecha" [ngModel]="incident().fecha" (ngModelChange)="setIncident('fecha', $event)" />
+            </label>
+          }
+        </div>
+
+        @if (mode() === 'incident') {
+          @let f = incident();
+          <div class="rp__grid3">
+            <label class="adm-field">
+              <span class="adm-label">{{ i18n.t('rpt.f.ticket') }} *</span>
+              <input class="adm-input mono" name="ticket" placeholder="GLPI-12345" [ngModel]="f.codigoTicket" (ngModelChange)="setIncident('codigoTicket', $event)" />
+            </label>
+            <label class="adm-field">
+              <span class="adm-label">{{ i18n.t('rpt.f.offense') }} *</span>
+              <input class="adm-input" name="ofensa" placeholder="4056" [ngModel]="f.ofensa" (ngModelChange)="setIncident('ofensa', $event)" />
+            </label>
+            <label class="adm-field">
+              <span class="adm-label">{{ i18n.t('rpt.f.operationType') }} *</span>
+              <select class="adm-input" name="tipo" [ngModel]="f.tipoOperacion" (ngModelChange)="pickOperationType($event)">
+                <option value="">{{ i18n.t('rpt.f.choose') }}</option>
+                @for (t of operationTypes(); track t.id) { <option [value]="t.name">{{ t.name }}</option> }
+                @if (f.tipoOperacion && !operationTypes().some(t => t.name === f.tipoOperacion)) { <option [value]="f.tipoOperacion">{{ f.tipoOperacion }}</option> }
+              </select>
+            </label>
+          </div>
+          <label class="adm-field">
+            <span class="adm-label">{{ i18n.t('rpt.f.eventName') }} *</span>
+            <input class="adm-input" name="evento" [ngModel]="f.nombreEvento" (ngModelChange)="setIncident('nombreEvento', $event)" />
+          </label>
+          <div class="adm-field">
+            <span class="adm-label">{{ i18n.t('rpt.f.criticality') }}</span>
+            <span class="rp__segs" role="group">
+              @for (c of criticalities; track c) {
+                <button type="button" class="adm-btn rp__seg" [class.rp__on]="f.criticidad === c" [attr.aria-pressed]="f.criticidad === c" (click)="setIncident('criticidad', c)">{{ i18n.t(critLabel(c)) }}</button>
+              }
+            </span>
+          </div>
+          <label class="adm-field">
+            <span class="adm-label">{{ i18n.t('rpt.f.reason') }}</span>
+            <textarea class="adm-input" rows="2" name="motivo" [ngModel]="f.motivoEvento" (ngModelChange)="setIncident('motivoEvento', $event)"></textarea>
+          </label>
+          <label class="adm-field">
+            <span class="adm-label">{{ i18n.t('rpt.f.observations') }} *</span>
+            <textarea class="adm-input" rows="3" name="obs" [ngModel]="f.observaciones" (ngModelChange)="setIncident('observaciones', $event)"></textarea>
+          </label>
+          <div class="rp__grid3">
+            <label class="adm-field">
+              <span class="adm-label">{{ i18n.t('rpt.f.origin') }}</span>
+              <input class="adm-input mono" name="origen" placeholder="192.168.1.100" [ngModel]="f.origenConexion" (ngModelChange)="setIncident('origenConexion', $event)" />
+            </label>
+            <label class="adm-field">
+              <span class="adm-label">{{ i18n.t('rpt.f.destination') }}</span>
+              <input class="adm-input mono" name="destino" placeholder="10.0.0.50" [ngModel]="f.destino" (ngModelChange)="setIncident('destino', $event)" />
+            </label>
+            <label class="adm-field">
+              <span class="adm-label">{{ i18n.t('rpt.f.reputation') }}</span>
+              <select class="adm-input" name="rep" [ngModel]="f.reputacionOrigen" (ngModelChange)="setIncident('reputacionOrigen', $event)">
+                @for (r of reputations; track r) { <option [value]="r">{{ r }}</option> }
+              </select>
+            </label>
+          </div>
+          <label class="adm-field">
+            <span class="adm-label">{{ i18n.t('rpt.f.logSource') }}</span>
+            <input class="adm-input" name="logsource" list="rp-logsources" [ngModel]="f.logSource" (ngModelChange)="setIncident('logSource', $event)" />
+            <datalist id="rp-logsources">
+              @for (s of logSources(); track s.id) { <option [value]="s.displayName"></option> }
+            </datalist>
+          </label>
+          <label class="adm-field">
+            <span class="adm-label">{{ i18n.t('rpt.f.evidenceText') }}</span>
+            <textarea class="adm-input mono" rows="3" name="evtxt" [ngModel]="f.evidenciaTexto" (ngModelChange)="setIncident('evidenciaTexto', $event)"></textarea>
+          </label>
+          <label class="adm-field">
+            <span class="adm-label">{{ i18n.t('rpt.f.recommendation') }}</span>
+            <textarea class="adm-input" rows="2" name="reco" [ngModel]="f.recomendacion" (ngModelChange)="setIncident('recomendacion', $event)"></textarea>
+          </label>
+          <label class="adm-field">
+            <span class="adm-label">{{ i18n.t('rpt.f.additional') }}</span>
+            <textarea class="adm-input" rows="2" name="info" [ngModel]="f.informacionAdicional" (ngModelChange)="setIncident('informacionAdicional', $event)"></textarea>
+          </label>
+        } @else {
+          @let b = bulletin();
+          <label class="adm-field">
+            <span class="adm-label">{{ i18n.t('rpt.f.bulletinTitle') }} *</span>
+            <input class="adm-input" name="titulo" [ngModel]="b.tituloBoletin" (ngModelChange)="setBulletin('tituloBoletin', $event)" />
+          </label>
+          <div class="rp__grid3">
+            <label class="adm-field">
+              <span class="adm-label">{{ i18n.t('rpt.f.vendor') }} *</span>
+              <input class="adm-input" name="marca" [ngModel]="b.marcaFabricante" (ngModelChange)="setBulletin('marcaFabricante', $event)" />
+            </label>
+            <label class="adm-field">
+              <span class="adm-label">CVE</span>
+              <input class="adm-input mono" name="cve" placeholder="CVE-2026-0000" [ngModel]="b.cveIdentificadores" (ngModelChange)="setBulletin('cveIdentificadores', $event)" />
+            </label>
+            <div class="adm-field">
+              <span class="adm-label">{{ i18n.t('rpt.f.alertLevel') }}</span>
+              <span class="rp__segs" role="group">
+                @for (c of criticalities; track c) {
+                  <button type="button" class="adm-btn rp__seg" [class.rp__on]="b.criticidad === c || (c === 'critica' && b.criticidad === 'crítica')" (click)="setBulletin('criticidad', c === 'critica' ? 'crítica' : c)">{{ i18n.t(critLabel(c)) }}</button>
+                }
+              </span>
+            </div>
+          </div>
+          <label class="adm-field">
+            <span class="adm-label">{{ i18n.t('rpt.f.products') }} *</span>
+            <textarea class="adm-input" rows="2" name="productos" [ngModel]="b.productosAfectados" (ngModelChange)="setBulletin('productosAfectados', $event)"></textarea>
+          </label>
+          <label class="adm-field">
+            <span class="adm-label">{{ i18n.t('rpt.f.impact') }} *</span>
+            <textarea class="adm-input" rows="2" name="impacto" [ngModel]="b.impacto" (ngModelChange)="setBulletin('impacto', $event)"></textarea>
+          </label>
+          <label class="adm-field">
+            <span class="adm-label">{{ i18n.t('rpt.f.mitigation') }} *</span>
+            <textarea class="adm-input" rows="3" name="mitig" [ngModel]="b.recomendacion" (ngModelChange)="setBulletin('recomendacion', $event)"></textarea>
+          </label>
+          <label class="adm-field">
+            <span class="adm-label">{{ i18n.t('rpt.f.references') }}</span>
+            <textarea class="adm-input mono" rows="2" name="refs" [ngModel]="b.referencias" (ngModelChange)="setBulletin('referencias', $event)"></textarea>
+          </label>
+        }
+
+        <!-- Evidencias -->
+        <div class="rp__evidence" [class.rp__evidence--drag]="dragging()" (dragover)="onDragOver($event)" (dragleave)="dragging.set(false)" (drop)="onDrop($event)">
+          <span class="adm-label">{{ i18n.t('rpt.f.images') }}</span>
+          @for (img of images(); track img.url; let i = $index) {
+            <span class="rp__thumb">
+              <img [src]="img.url" [alt]="img.name" />
+              <button type="button" class="rp__thumb-x" [attr.aria-label]="i18n.tf('rpt.images.remove', img.name)" (click)="removeImage(i)"><mat-icon>close</mat-icon></button>
+            </span>
+          }
+          <label class="adm-btn rp__add">
+            <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple (change)="onFiles($event)" />
+            <mat-icon>add_photo_alternate</mat-icon>{{ i18n.t('rpt.images.add') }}
+          </label>
+          <button type="button" class="adm-btn" [title]="i18n.t('rpt.defangHint')" (click)="defangIocs()"><mat-icon>shield</mat-icon>{{ i18n.t('rpt.defang') }}</button>
+        </div>
+
+        <!-- Destinatarios -->
+        <div class="rp__recips">
+          @for (kind of ['to', 'cc']; track kind) {
+            @let k = kind === 'to' ? 'to' : 'cc';
+            <div class="rp__recip-row">
+              <span class="adm-label rp__recip-label">{{ i18n.t(k === 'to' ? 'rpt.to' : 'rpt.cc') }}</span>
+              <span class="rp__chips">
+                @for (email of recipients(k)(); track email) {
+                  <span class="pill tone-neutral rp__chip">{{ email }}<button type="button" [attr.aria-label]="i18n.tf('rpt.removeRecipient', email)" (click)="removeRecipient(k, email)"><mat-icon>close</mat-icon></button></span>
+                }
+                <input
+                  class="rp__chip-input"
+                  [name]="'recip-' + k"
+                  [attr.aria-label]="i18n.t(k === 'to' ? 'rpt.to' : 'rpt.cc')"
+                  [placeholder]="i18n.t('rpt.recipientPlaceholder')"
+                  [ngModel]="k === 'to' ? toInput() : ccInput()"
+                  (ngModelChange)="k === 'to' ? toInput.set($event) : ccInput.set($event)"
+                  (keydown)="onRecipientKey(k, $event)"
+                  (blur)="addTyped(k, k === 'to' ? toInput() : ccInput())"
+                />
+              </span>
+              <button type="button" class="adm-btn rp__dir-btn" [attr.aria-expanded]="pickerFor() === k" (click)="openPicker(k)"><mat-icon>contacts</mat-icon>{{ i18n.t('rpt.fromDirectory') }}</button>
+            </div>
+            @if (pickerFor() === k) {
+              <div class="rp__picker">
+                <input class="adm-input" type="search" name="picker" [attr.aria-label]="i18n.t('rpt.searchDirectory')" [placeholder]="i18n.t('rpt.searchDirectory')" [ngModel]="pickerQuery()" (ngModelChange)="searchDirectory($event)" />
+                @for (c of pickerResults(); track c.id) {
+                  <button type="button" class="rp__pick" (click)="pickContact(c)">
+                    <strong>{{ c.name }}</strong> <span class="adm-muted">{{ c.organizationName }}</span> <span class="mono">{{ c.email }}</span>
+                  </button>
+                }
+              </div>
+            }
+          }
+          <span class="adm-hint">{{ i18n.t(mode() === 'incident' ? 'rpt.recipientsHint' : 'rpt.recipientsHintBulletin') }}</span>
+          @if (mode() === 'bulletin') {
+            <label class="adm-switch-row">
+              <input type="checkbox" name="byDomain" [ngModel]="groupByDomain()" (ngModelChange)="groupByDomain.set($event)" />
+              {{ i18n.t('rpt.groupByDomain') }}
+            </label>
+          }
+          <label class="adm-field">
+            <span class="adm-label rp__with-reset">{{ i18n.t('rpt.subject') }}
+              <button type="button" class="rp__reset" (click)="resetSubject()">{{ i18n.t('rpt.propose') }}</button></span>
+            <input class="adm-input" name="subject" [ngModel]="subject()" (ngModelChange)="setSubject($event)" />
+          </label>
+          <label class="adm-field">
+            <span class="adm-label rp__with-reset">{{ i18n.t('rpt.greeting') }}
+              <button type="button" class="rp__reset" (click)="resetGreeting()">{{ i18n.t('rpt.propose') }}</button></span>
+            <textarea class="adm-input" rows="4" name="greeting" [ngModel]="greeting()" (ngModelChange)="setGreeting($event)"></textarea>
+          </label>
+        </div>
+      </div>
+
+
+      <div
+        class="rp__splitter"
+        role="separator"
+        tabindex="0"
+        aria-orientation="vertical"
+        [attr.aria-label]="i18n.t('rpt.resizePreview')"
+        [title]="i18n.t('rpt.resizePreview')"
+        [attr.aria-valuenow]="previewWidth()"
+        (pointerdown)="startResize($event)"
+        (keydown)="resizeByKey($event)"
+        (dblclick)="resetPreviewWidth()"
+      ></div>
+      <!-- Vista previa -->
+      <aside class="rp__preview">
+        <span class="adm-label">{{ i18n.t('rpt.preview') }}</span>
+        @if (previewError(); as message) {
+          <p class="adm-error" role="status">{{ message }}</p>
+        }
+        @if (previewHtml(); as html) {
+          <iframe class="rp__frame" sandbox="" [title]="i18n.t('rpt.preview')" [srcdoc]="html"></iframe>
+        } @else {
+          <p class="adm-muted">{{ i18n.t('rpt.previewLoading') }}</p>
+        }
+      </aside>
+    </div>
+
+    <footer class="rp__foot">
+      @if (notice(); as n) {
+        <span class="rp__notice" [class]="n.kind === 'ok' ? 'tone-ok' : 'tone-bad'" role="status">{{ n.text }}</span>
+      } @else {
+        <span class="adm-muted rp__notice">{{ i18n.t(mode() === 'incident' ? 'rpt.footIncident' : 'rpt.footBulletin') }}</span>
+      }
+      <span class="rp__actions">
+        <button type="button" class="adm-btn" [disabled]="!previewHtml()" (click)="copy('html')"><mat-icon>content_copy</mat-icon>{{ i18n.t('rpt.copyHtml') }}</button>
+        <button type="button" class="adm-btn" (click)="copy('markdown')"><mat-icon>data_object</mat-icon>{{ i18n.t('rpt.copyMarkdown') }}</button>
+        @if (canSend()) {
+          <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy()" (click)="send()"><mat-icon>send</mat-icon>{{ i18n.t(busy() ? 'rpt.sending' : 'rpt.send') }}</button>
+        }
+      </span>
+    </footer>
+  } @else {
+    <div class="rp__split" [class.rp__split--resizing]="resizing()" [style.grid-template-columns]="splitColumns()">
+      <div class="rp__history">
+        <div class="rp__history-bar">
+          <span class="rp__segs" role="group">
+            <button type="button" class="adm-btn rp__seg" [class.rp__on]="historyKind() === ''" (click)="setHistoryKind('')">{{ i18n.t('entries.all') }}</button>
+            <button type="button" class="adm-btn rp__seg" [class.rp__on]="historyKind() === 'incident'" (click)="setHistoryKind('incident')">{{ i18n.t('rpt.kind.incident') }}</button>
+            <button type="button" class="adm-btn rp__seg" [class.rp__on]="historyKind() === 'bulletin'" (click)="setHistoryKind('bulletin')">{{ i18n.t('rpt.kind.bulletin') }}</button>
+          </span>
+          <button type="button" class="adm-icon-btn" [title]="i18n.t('dir.refresh')" [attr.aria-label]="i18n.t('dir.refresh')" [disabled]="historyLoading()" (click)="loadHistory()"><mat-icon>refresh</mat-icon></button>
+        </div>
+        <div class="adm-table-wrap">
+          <table class="adm-table">
+            <thead>
+              <tr>
+                <th>{{ i18n.t('rpt.col.date') }}</th>
+                <th>{{ i18n.t('rpt.col.kind') }}</th>
+                <th>{{ i18n.t('rpt.col.subject') }}</th>
+                <th>{{ i18n.t('rpt.col.client') }}</th>
+                <th>{{ i18n.t('rpt.col.recipients') }}</th>
+                <th>{{ i18n.t('rpt.col.by') }}</th>
+                <th>{{ i18n.t('rpt.col.status') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (h of history(); track h.id) {
+                <tr class="adm-row-click" tabindex="0" [class.adm-row--active]="selected()?.id === h.id" (click)="selectHistory(h)" (keydown.enter)="selectHistory(h)">
+                  <td class="mono rp__nowrap">{{ h.createdAt | date: 'dd/MM HH:mm' }}</td>
+                  <td><span class="pill" [class]="h.kind === 'bulletin' ? 'tone-system' : 'tone-warn'">{{ i18n.t(h.kind === 'bulletin' ? 'rpt.kind.bulletin' : 'rpt.kind.incident') }}</span></td>
+                  <td>{{ h.subject || h.title }}</td>
+                  <td>{{ h.organizationName || '—' }}</td>
+                  <td class="mono rp__recip-cell">{{ h.recipients.length > 2 ? i18n.tf('rpt.nRecipients', h.recipients.length) : h.recipients.join(', ') || '—' }}</td>
+                  <td>{{ h.sentBy }}</td>
+                  <td><span class="pill" [class]="statusTone(h.status)" [title]="h.error || ''">{{ i18n.t(statusLabel(h.status)) }}</span></td>
+                </tr>
+              } @empty {
+                <tr><td colspan="7" class="adm-empty">{{ i18n.t(historyLoading() ? 'rpt.loading' : 'rpt.historyEmpty') }}</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (historyPages() > 1) {
+          <div class="rp__pager">
+            <button type="button" class="adm-btn" [disabled]="historyPage() <= 1" (click)="setHistoryPage(historyPage() - 1)"><mat-icon>chevron_left</mat-icon></button>
+            <span class="mono">{{ historyPage() }} / {{ historyPages() }}</span>
+            <button type="button" class="adm-btn" [disabled]="historyPage() >= historyPages()" (click)="setHistoryPage(historyPage() + 1)"><mat-icon>chevron_right</mat-icon></button>
+          </div>
+        }
+      </div>
+
+      <div
+        class="rp__splitter"
+        role="separator"
+        tabindex="0"
+        aria-orientation="vertical"
+        [attr.aria-label]="i18n.t('rpt.resizePreview')"
+        [title]="i18n.t('rpt.resizePreview')"
+        [attr.aria-valuenow]="previewWidth()"
+        (pointerdown)="startResize($event)"
+        (keydown)="resizeByKey($event)"
+        (dblclick)="resetPreviewWidth()"
+      ></div>
+
+      <aside class="rp__preview">
+        @if (selected(); as s) {
+          <span class="rp__preview-head">
+            <span class="adm-label">{{ i18n.t('rpt.sentMail') }}</span>
+            <span class="adm-hint mono">{{ s.createdAt | date: 'dd/MM/yyyy HH:mm' }}</span>
+          </span>
+          <span class="adm-small"><strong>{{ s.subject || s.title }}</strong></span>
+          @if (s.recipients.length) {
+            <span class="adm-small mono">{{ i18n.t('rpt.to') }}: {{ s.recipients.join(', ') }}</span>
+          }
+          @if (s.cc.length) {
+            <span class="adm-small mono">{{ i18n.t('rpt.cc') }}: {{ s.cc.join(', ') }}</span>
+          }
+          @if (s.error) {
+            <p class="adm-error">{{ s.error }}</p>
+          }
+          <span class="rp__actions">
+            <button type="button" class="adm-btn" [disabled]="!s.reusable" [title]="s.reusable ? '' : i18n.t('rpt.notReusable')" (click)="reuse(s, false)"><mat-icon>content_copy</mat-icon>{{ i18n.t('rpt.useAsBase') }}</button>
+            @if (canSend()) {
+              <button type="button" class="adm-btn" [disabled]="!s.reusable" (click)="reuse(s, true)"><mat-icon>forward_to_inbox</mat-icon>{{ i18n.t('rpt.resend') }}</button>
+            }
+            @if (perms.isAdmin()) {
+              @if (confirmDelete()) {
+                <button type="button" class="adm-btn adm-btn--danger" (click)="deleteSelected()"><mat-icon>delete</mat-icon>{{ i18n.t('rpt.confirmDelete') }}</button>
+              } @else {
+                <button type="button" class="adm-icon-btn adm-icon-btn--danger" [title]="i18n.t('rpt.delete')" [attr.aria-label]="i18n.t('rpt.delete')" (click)="confirmDelete.set(true)"><mat-icon>delete</mat-icon></button>
+              }
+            }
+          </span>
+          @if (selectedHtml(); as html) {
+            <iframe class="rp__frame" sandbox="" [title]="i18n.t('rpt.sentMail')" [srcdoc]="html"></iframe>
+          } @else {
+            <p class="adm-muted">{{ i18n.t('rpt.loading') }}</p>
+          }
+        } @else {
+          <p class="adm-muted">{{ i18n.t('rpt.pickHistory') }}</p>
+        }
+      </aside>
+    </div>
+  }
+</div>

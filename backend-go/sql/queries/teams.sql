@@ -39,16 +39,17 @@ RETURNING *;
 -- name: ListTeamMembers :many
 -- Un miembro es un usuario interno O un contacto del directorio (CHECK
 -- exactamente uno): se devuelve el nombre de cualquiera de los dos.
-SELECT m.*, COALESCE(u.username, c.name, '')::text AS display_name
+SELECT m.*, COALESCE(u.username, c.name, 'Pool ' || p.name, '')::text AS display_name
 FROM team_members m
 LEFT JOIN users u ON u.id = m.user_id
 LEFT JOIN contacts c ON c.id = m.contact_id
+LEFT JOIN escalation_pools p ON p.id = m.pool_id
 WHERE m.team_id = $1 AND m.active
 ORDER BY m.priority, display_name;
 
 -- name: AddTeamMember :one
-INSERT INTO team_members (team_id, user_id, contact_id, recipient_type, role_in_team, priority)
-VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
+INSERT INTO team_members (team_id, user_id, contact_id, recipient_type, role_in_team, priority, pool_id)
+VALUES ($1, $2, $3, $4, $5, $6, sqlc.narg('pool_id')) RETURNING *;
 
 -- name: RemoveTeamMember :execrows
 DELETE FROM team_members WHERE id = $1 AND team_id = $2;

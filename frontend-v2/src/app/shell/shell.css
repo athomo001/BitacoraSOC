@@ -43,9 +43,17 @@
   font-weight: 700;
 }
 
+.shell__logo--img {
+  object-fit: contain;
+  background: transparent;
+}
+
 .shell__brand-name {
+  overflow: hidden;
+  font-family: var(--app-title-font, var(--font-ui));
   font-size: 14px;
   font-weight: 600;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 

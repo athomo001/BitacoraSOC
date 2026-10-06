@@ -58,6 +58,9 @@ export interface ResolvedMember {
   priority: number;
   onCallNow: boolean;
   channels: ResolvedChannel[];
+  /** La persona viene de un pool del nivel (TI-Mundo…), que se llama en orden. */
+  pool?: { id: string; name: string; organization?: string };
+  poolPosition?: number;
 }
 
 export interface ResolvedTeam {
@@ -82,6 +85,47 @@ export interface Resolution {
   resolvedUnit?: { id: string; name: string; code: string; kind: string };
   scope: EscalationScope;
   steps: ResolvedStep[];
+  /** Recordatorio del cliente bajo el flujo ("Llamar 3 veces y 1 minuto por cada llamada"). */
+  reminder?: string;
+}
+
+/** Un evento escalado ("Virus en RRHH 15:02") enlazado a un ticket GLPI o interno. */
+export interface EscalationIncident extends EscalationScope {
+  id: string;
+  title: string;
+  glpiTicket?: string;
+  ticketId?: string;
+  ticketNumber?: string;
+  openedBy: string;
+  openedAt: string;
+  closedAt?: string;
+}
+
+export interface IncidentNote {
+  id: string;
+  note: string;
+  username: string;
+  createdAt: string;
+}
+
+/** Pool: grupo con nombre de personas de una empresa o área (TI-Mundo, Redes-Mundo…). */
+export interface EscalationPool {
+  id: string;
+  name: string;
+  organizationId?: string;
+  organizationName?: string;
+  active: boolean;
+  members: number;
+  usedIn: number;
+}
+
+export interface EscalationPoolMember {
+  id: string;
+  contactId?: string;
+  userId?: string;
+  name: string;
+  organizationName?: string;
+  position: number;
 }
 
 export interface ActionLog {
@@ -96,6 +140,7 @@ export interface ActionLog {
   entryId?: string;
   operatorId: string;
   operatorUsername?: string;
+  incidentId?: string;
   createdAt: string;
 }
 
@@ -150,6 +195,7 @@ export interface Policy extends EscalationScope {
   id: string;
   active: boolean;
   steps: PolicyStep[];
+  reminder?: string;
 }
 
 export interface MaintenanceWindow extends EscalationScope {
@@ -217,12 +263,67 @@ export class EscalationService {
     result: ContactResult;
     notes?: string;
     since?: string;
+    incidentId?: string;
   }): Promise<ActionOutcome> {
     return (await firstValueFrom(this.http.post<ApiEnvelope<ActionOutcome>>('/api/escalation/actions', action))).data;
   }
 
   async listActions(policyId: string, since: string): Promise<ActionLog[]> {
     return (await firstValueFrom(this.http.get<ApiEnvelope<ActionLog[]>>('/api/escalation/actions', { params: { policyId, since } }))).data;
+  }
+
+  /** Intentos de un incidente (su historial forense). */
+  async listIncidentActions(incidentId: string): Promise<ActionLog[]> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<ActionLog[]>>('/api/escalation/actions', { params: { incidentId } }))).data;
+  }
+
+  async listIncidents(scope: EscalationScope): Promise<EscalationIncident[]> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<EscalationIncident[]>>('/api/escalation/incidents', { params: scopeParams(scope) }))).data;
+  }
+
+  async createIncident(scope: EscalationScope, incident: { title: string; glpiTicket?: string; ticketId?: string }): Promise<EscalationIncident> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<EscalationIncident>>('/api/escalation/incidents', { ...scope, ...incident }))).data;
+  }
+
+  async setIncidentClosed(id: string, closed: boolean): Promise<EscalationIncident> {
+    return (await firstValueFrom(this.http.patch<ApiEnvelope<EscalationIncident>>(`/api/escalation/incidents/${id}`, { closed }))).data;
+  }
+
+  async listIncidentNotes(id: string): Promise<IncidentNote[]> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<IncidentNote[]>>(`/api/escalation/incidents/${id}/notes`))).data;
+  }
+
+  async addIncidentNote(id: string, note: string): Promise<IncidentNote> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<IncidentNote>>(`/api/escalation/incidents/${id}/notes`, { note }))).data;
+  }
+
+  async setPolicyReminder(policyId: string, reminder: string): Promise<void> {
+    await firstValueFrom(this.http.patch(`/api/escalation/policies/${policyId}`, { reminder }));
+  }
+
+  async listPools(): Promise<EscalationPool[]> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<EscalationPool[]>>('/api/escalation/pools'))).data;
+  }
+
+  async createPool(pool: { name: string; organizationId?: string }): Promise<EscalationPool> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<EscalationPool>>('/api/escalation/pools', pool))).data;
+  }
+
+  async patchPool(id: string, patch: { name?: string; active?: boolean; organizationId?: string; clearOrganization?: boolean }): Promise<EscalationPool> {
+    return (await firstValueFrom(this.http.patch<ApiEnvelope<EscalationPool>>(`/api/escalation/pools/${id}`, patch))).data;
+  }
+
+  async deletePool(id: string): Promise<void> {
+    await firstValueFrom(this.http.delete(`/api/escalation/pools/${id}`));
+  }
+
+  async listPoolMembers(id: string): Promise<EscalationPoolMember[]> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<EscalationPoolMember[]>>(`/api/escalation/pools/${id}/members`))).data;
+  }
+
+  /** La lista completa en orden de llamada (reemplaza la anterior). */
+  async setPoolMembers(id: string, members: { contactId?: string; userId?: string }[]): Promise<EscalationPoolMember[]> {
+    return (await firstValueFrom(this.http.put<ApiEnvelope<EscalationPoolMember[]>>(`/api/escalation/pools/${id}/members`, { members }))).data;
   }
 
   /** El backend responde 502 con cuerpo útil cuando falla el SMTP: se devuelve igual. */

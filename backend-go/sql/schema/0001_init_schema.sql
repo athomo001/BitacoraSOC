@@ -1288,3 +1288,201 @@ ALTER TABLE work_shifts
   ADD COLUMN email_include_checklist BOOLEAN NOT NULL DEFAULT true,
   ADD COLUMN email_include_entries BOOLEAN NOT NULL DEFAULT true,
   ADD COLUMN email_subject_template TEXT NOT NULL DEFAULT 'Reporte SOC [fecha] [turno]';
+
+-- 000016: aviso de dotación con el correo del legacy (ShiftNotificationSchedule):
+-- semana informada y formato ('calendar' = grilla Lun–Vie; 'list' = guardias).
+ALTER TABLE work_shift_notification_schedules
+  ADD COLUMN target_period TEXT NOT NULL DEFAULT 'current_week' CHECK (target_period IN ('current_week', 'next_week')),
+  ADD COLUMN email_format TEXT NOT NULL DEFAULT 'calendar' CHECK (email_format IN ('calendar', 'list'));
+
+-- 000017: eliminar una organización la archiva: tickets y contactos conservan
+-- su nombre; servicios, equipos y activos se resuelven antes.
+ALTER TABLE organizations ADD COLUMN archived_at TIMESTAMPTZ;
+
+CREATE OR REPLACE VIEW clients AS
+  SELECT o.id, o.name, o.code, o.active, o.created_at
+  FROM organizations o JOIN organization_types t ON t.code = o.type
+  WHERE t.is_client AND o.archived_at IS NULL;
+
+-- 000018: rediseño de escalamiento (#17, canvas v26 aprobado 2026-10-05).
+
+-- Recordatorio del cliente bajo el flujo de llamados ("Llamar 3 veces y 1
+-- minuto por cada llamada"): catalogLogSources.escalationLegend del legacy.
+ALTER TABLE escalation_policies ADD COLUMN reminder TEXT;
+
+-- Pools: grupo con nombre de personas de una empresa o área (TI-Mundo,
+-- Redes-Mundo, Ciber-Mundo; una empresa puede tener varios) que se agrega a
+-- un nivel como un solo integrante y se llama en orden: si uno no contesta,
+-- el siguiente.
+CREATE TABLE escalation_pools (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID REFERENCES organizations(id),
+  name TEXT NOT NULL,
+  active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX uq_escalation_pools_name ON escalation_pools(COALESCE(organization_id, '00000000-0000-0000-0000-000000000000'::uuid), lower(name));
+
+CREATE TABLE escalation_pool_members (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pool_id UUID NOT NULL REFERENCES escalation_pools(id) ON DELETE CASCADE,
+  contact_id UUID REFERENCES contacts(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  position INT NOT NULL DEFAULT 0,
+  CONSTRAINT chk_pool_member_exactly_one CHECK ((contact_id IS NOT NULL)::int + (user_id IS NOT NULL)::int = 1)
+);
+CREATE INDEX idx_escalation_pool_members_pool ON escalation_pool_members(pool_id, position);
+
+-- Un integrante de nivel puede ser un pool.
+ALTER TABLE team_members ADD COLUMN pool_id UUID REFERENCES escalation_pools(id) ON DELETE CASCADE;
+ALTER TABLE team_members DROP CONSTRAINT chk_team_member_exactly_one;
+ALTER TABLE team_members ADD CONSTRAINT chk_team_member_exactly_one CHECK (
+  (user_id IS NOT NULL)::int + (contact_id IS NOT NULL)::int + (pool_id IS NOT NULL)::int = 1
+);
+
+-- Incidentes: cada escalamiento pertenece a un evento ("Virus en RRHH 15:02"
+-- no es lo mismo que "Phishing 16:31") enlazado a un ticket GLPI o interno.
+CREATE TABLE escalation_incidents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  service_id UUID REFERENCES services(id) ON DELETE SET NULL,
+  asset_id UUID REFERENCES assets(id) ON DELETE SET NULL,
+  territorial_unit_id UUID REFERENCES territorial_units(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  glpi_ticket TEXT,
+  ticket_id UUID REFERENCES tickets(id) ON DELETE SET NULL,
+  opened_by UUID NOT NULL REFERENCES users(id),
+  opened_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  closed_by UUID REFERENCES users(id),
+  closed_at TIMESTAMPTZ
+);
+CREATE INDEX idx_escalation_incidents_service ON escalation_incidents(service_id, opened_at DESC);
+CREATE INDEX idx_escalation_incidents_asset ON escalation_incidents(asset_id, opened_at DESC);
+CREATE INDEX idx_escalation_incidents_unit ON escalation_incidents(territorial_unit_id, opened_at DESC);
+
+ALTER TABLE escalation_action_logs ADD COLUMN incident_id UUID REFERENCES escalation_incidents(id);
+CREATE INDEX idx_escalation_action_logs_incident ON escalation_action_logs(incident_id, created_at);
+
+-- Comentarios del historial forense de cada incidente.
+CREATE TABLE escalation_incident_notes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  incident_id UUID NOT NULL REFERENCES escalation_incidents(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id),
+  note TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_escalation_incident_notes_incident ON escalation_incident_notes(incident_id, created_at);
+
+-- 000019: Marca (comentario del dueño #8, canvas v19/v20 aprobado): cómo se
+-- presenta la app y sus correos. Viene de appConfig del legacy (appTitle,
+-- logoUrl, faviconUrl, titleFont, incidentEmailPaletteKey, loginTheme).
+-- Los archivos van en Postgres, como las imágenes de la bitácora (sin disco
+-- local: respaldos y HA los llevan solos).
+CREATE TABLE app_branding (
+  id BOOLEAN PRIMARY KEY DEFAULT true CHECK (id),
+  app_title TEXT NOT NULL DEFAULT 'Bitácora Ops',
+  logo BYTEA,
+  logo_type TEXT,
+  logo_name TEXT,
+  favicon BYTEA,
+  favicon_type TEXT,
+  -- Favicon externo (el legacy permitía una URL); sin favicon sale del logo.
+  favicon_url TEXT,
+  -- Fuente del título: 'inter' (la de la app) o 'custom' (subida, woff2/ttf).
+  title_font TEXT NOT NULL DEFAULT 'inter',
+  font_file BYTEA,
+  font_type TEXT,
+  font_name TEXT,
+  -- Paleta del "Reporte de Detección" (las 6 del legacy) y color del boletín.
+  incident_palette TEXT NOT NULL DEFAULT 'cdc-verde',
+  bulletin_color TEXT NOT NULL DEFAULT '#EF5350',
+  -- Tema del login por defecto (el usuario puede elegir otro en su navegador).
+  login_theme TEXT,
+  version INT NOT NULL DEFAULT 1,
+  updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT chk_branding_logo_size CHECK (logo IS NULL OR octet_length(logo) <= 2097152),
+  CONSTRAINT chk_branding_favicon_size CHECK (favicon IS NULL OR octet_length(favicon) <= 524288),
+  CONSTRAINT chk_branding_font_size CHECK (font_file IS NULL OR octet_length(font_file) <= 2097152)
+);
+INSERT INTO app_branding (id) VALUES (true);
+
+-- 000020: Reportes (comentario del dueño #10) y Avisos por cliente (canvas
+-- v18–v20 aprobado). Portado de routes/reports.js y clientAlertController.js
+-- del legacy.
+
+-- Historial de envíos: informe de incidente o boletín de seguridad, con el
+-- correo tal como salió (html, con las imágenes en línea) y los campos del
+-- formulario para "Usar como base" (sin imágenes).
+CREATE TABLE report_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  kind TEXT NOT NULL CHECK (kind IN ('incident', 'bulletin')),
+  title TEXT NOT NULL,
+  subject TEXT NOT NULL DEFAULT '',
+  organization_id UUID REFERENCES organizations(id) ON DELETE SET NULL,
+  service_id UUID REFERENCES services(id) ON DELETE SET NULL,
+  recipients TEXT[] NOT NULL DEFAULT '{}',
+  cc_recipients TEXT[] NOT NULL DEFAULT '{}',
+  html TEXT NOT NULL,
+  payload JSONB,
+  -- sent | failed | partial (boletín: algún lote por dominio falló) | legacy
+  status TEXT NOT NULL DEFAULT 'sent',
+  error TEXT,
+  sent_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  sent_by_username TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_report_history_created ON report_history(created_at DESC);
+
+-- Avisos por cliente (clientEscalationRules de tipo special_alert): un
+-- mensaje que sale antes de enviar un reporte a ese cliente, en ciertas
+-- ventanas horarias; si lo pide, hay que confirmar "Leí el aviso".
+CREATE TABLE client_alert_rules (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  name TEXT NOT NULL DEFAULT '',
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  -- report (enviar) y/o copy-report (copiar el reporte), como el legacy.
+  contexts TEXT[] NOT NULL DEFAULT '{report,copy-report}',
+  timezone TEXT NOT NULL DEFAULT 'America/Santiago',
+  priority INT NOT NULL DEFAULT 100,
+  valid_from TIMESTAMPTZ,
+  valid_to TIMESTAMPTZ,
+  holiday_dates DATE[] NOT NULL DEFAULT '{}',
+  -- [{mode, startTime, endTime, daysOfWeek, holidayOnly}] con los modos del
+  -- legacy: always, outside_business_hours, between_hours, after_hour,
+  -- before_hour, weekend_only, weekdays_only.
+  time_windows JSONB NOT NULL DEFAULT '[{"mode":"always","startTime":"09:00","endTime":"17:00","daysOfWeek":[],"holidayOnly":false}]',
+  channels TEXT[] NOT NULL DEFAULT '{}',
+  message TEXT NOT NULL,
+  requires_ack BOOLEAN NOT NULL DEFAULT true,
+  updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_client_alert_rules_org ON client_alert_rules(organization_id) WHERE enabled;
+
+-- "Leí el aviso": una vez por persona, ocurrencia (el día local, o la
+-- vigencia si la regla tiene fechas) y contexto, como readBy del legacy.
+CREATE TABLE client_alert_acks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  rule_id UUID NOT NULL REFERENCES client_alert_rules(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  occurrence_key TEXT NOT NULL,
+  context TEXT NOT NULL,
+  acked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (rule_id, user_id, occurrence_key, context)
+);
+
+-- 000021: tipos de operación del informe de incidente.
+CREATE TABLE report_operation_types (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  info_default TEXT NOT NULL DEFAULT '',
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 000022: la alerta NOK del checklist avisa por cargo (como el legacy).
+ALTER TABLE checklist_templates ADD COLUMN alert_nok_cargos TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE checklist_templates DROP COLUMN alert_nok_role_target;

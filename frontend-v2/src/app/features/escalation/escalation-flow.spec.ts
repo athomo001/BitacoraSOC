@@ -88,3 +88,34 @@ describe('cuenta regresiva', () => {
     expect(s.current).toBe(2);
   });
 });
+
+describe('flowState con pools (TI-Mundo…)', () => {
+  beforeEach(() => (seq = 0));
+  const pooled = (id: string, pos: number): ResolvedMember => ({ ...member(id), pool: { id: 'p-mundo', name: 'Mundo' }, poolPosition: pos });
+  const LEVELS: ResolvedStep[] = [
+    { order: 1, mode: 'pool', waitBeforeEscalateMinutes: 0, team: { id: 't1', name: 'QRADAR', kind: 'escalation', audience: 'client', members: [member('andrea'), pooled('jorge', 0), pooled('mario', 1)] } },
+    { order: 2, mode: 'unique', waitBeforeEscalateMinutes: 0, team: { id: 't2', name: '1er llamado', kind: 'escalation', audience: 'client', members: [member('andrea')] } },
+  ];
+
+  it('si uno del pool no contesta, sigue el siguiente del pool en el mismo nivel', () => {
+    const s = flowState(LEVELS, [act(1, 'jorge', 'no_answer')], SINCE);
+    expect(s.current).toBe(1);
+    expect(s.nextMemberId).toBe('m-mario');
+  });
+
+  it('agotado el pool, pasa al nivel siguiente', () => {
+    const s = flowState(LEVELS, [act(1, 'jorge', 'no_answer'), act(1, 'mario', 'busy')], SINCE);
+    expect(s.current).toBe(2);
+  });
+
+  it('alguien fuera del pool que no contesta en un nivel "todos a la vez" pasa al siguiente', () => {
+    const s = flowState(LEVELS, [act(1, 'andrea', 'no_answer')], SINCE);
+    expect(s.current).toBe(2);
+  });
+
+  it('el resultado de una persona en un nivel no se arrastra a otro nivel donde también aparece', () => {
+    const s = flowState(LEVELS, [act(1, 'andrea', 'no_answer')], SINCE);
+    expect(s.lastResultByStepContact.get('1:c-andrea')).toBe('no_answer');
+    expect(s.lastResultByStepContact.get('2:c-andrea')).toBeUndefined();
+  });
+});

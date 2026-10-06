@@ -98,4 +98,37 @@ describe('Administración re-vestida', () => {
     req.flush({ data: { code: 'native_tickets', name: 'x', isEnabled: true, configPayload: {}, updatedAt: '' } });
     http.expectNone('/api/config/modules');
   });
+
+  it('Módulos: se puede usar solo la Ticketera (enciende la Ticketera antes de apagar SOC)', async () => {
+    const fixture = TestBed.createComponent(AdminModulesComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/setup/status').flush({ data: { setupCompleted: true, socEnabled: true, nocEnabled: false } });
+    http.expectOne('/api/system-features').flush({
+      data: [{ code: 'native_tickets', name: 'x', isEnabled: false, configPayload: {}, updatedAt: '' }],
+    });
+    await settle();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const rows = [...el.querySelectorAll('.adm-switch-row')];
+    const save = () => el.querySelector('.adm-btn--primary') as HTMLButtonElement;
+
+    // Todo apagado no se puede guardar.
+    (rows[0].querySelector('input') as HTMLInputElement).dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(save().disabled).toBe(true);
+    expect(el.textContent).toContain('Al menos uno (SOC, NOC o Ticketera)');
+
+    // Solo la Ticketera: sí.
+    (rows[2].querySelector('input') as HTMLInputElement).dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(save().disabled).toBe(false);
+    save().click();
+    http.expectOne((r) => r.method === 'PATCH' && r.url === '/api/system-features/native_tickets')
+      .flush({ data: { code: 'native_tickets', name: 'x', isEnabled: true, configPayload: {}, updatedAt: '' } });
+    await settle();
+    const modules = http.expectOne((r) => r.method === 'PATCH' && r.url === '/api/config/modules');
+    expect(modules.request.body).toEqual({ socEnabled: false, nocEnabled: false });
+    modules.flush({ data: { socEnabled: false, nocEnabled: false } });
+    await settle();
+  });
 });

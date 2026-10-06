@@ -1,0 +1,29 @@
+{
+  "columns": [
+    {
+      "dayShort": "Lun",
+      "dateShort": "06/10"
+    },
+    {
+      "dayShort": "Mar",
+      "dateShort": "07/10"
+    },
+    {
+      "dayShort": "Mié",
+      "dateShort": "08/10"
+    },
+    {
+      "dayShort": "Jue",
+      "dateShort": "09/10"
+    },
+    {
+      "dayShort": "Vie",
+      "dateShort": "10/10"
+    }
+  ],
+  "rows": [],
+  "periodLabel": "Periodo Semanal: 06-10-2026 - 12-10-2026",
+  "logoCid": null,
+  "brandName": "Bitácora CDC",
+  "title": "Personal Fuera de la Oficina y Apoyo"
+}

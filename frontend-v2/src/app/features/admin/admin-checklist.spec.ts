@@ -7,14 +7,14 @@ const SHIFTS = [
   { id: 'dia', name: 'Turno Día', startTime: '08:00:00', endTime: '20:00:00', timezone: 'x', shiftType: 'regular', emailRecipients: [], active: true, checklistTemplateStartId: 'otra', checklistTemplateEndId: 'noc' },
 ];
 const NOC = {
-  id: 'noc', name: 'NOC Diaria', isActive: true, alertNokEnabled: false, alertNokRoleTarget: null, checksCount: 12,
+  id: 'noc', name: 'NOC Diaria', isActive: true, alertNokEnabled: false, alertNokCargos: [], checksCount: 12,
   assignments: [{ workShiftId: 'dia', moment: 'cierre' }],
   items: [
     { id: 'i1', title: 'Internet', itemOrder: 0 },
     { id: 'i2', parentItemId: 'i1', title: 'Troncal', itemOrder: 1 },
   ],
 };
-const OTRA = { id: 'otra', name: 'SOC Semana', isActive: true, alertNokEnabled: false, alertNokRoleTarget: null, checksCount: 0, assignments: [{ workShiftId: 'dia', moment: 'inicio' }], items: [{ id: 'o1', title: 'EDR', itemOrder: 0 }] };
+const OTRA = { id: 'otra', name: 'SOC Semana', isActive: true, alertNokEnabled: false, alertNokCargos: [], checksCount: 0, assignments: [{ workShiftId: 'dia', moment: 'inicio' }], items: [{ id: 'o1', title: 'EDR', itemOrder: 0 }] };
 
 describe('AdminChecklistComponent', () => {
   let httpMock: HttpTestingController;
@@ -31,7 +31,7 @@ describe('AdminChecklistComponent', () => {
     httpMock.expectOne('/api/checklist-templates').flush({ data: [NOC, OTRA] });
     httpMock.expectOne((r) => r.url === '/api/work-shifts').flush({ data: SHIFTS });
     httpMock.expectOne('/api/config/checklist').flush({ data: { cooldownMinutes: 60 } });
-    httpMock.expectOne('/api/users').flush({ data: [{ role: 'admin', active: true }, { role: 'admin', active: true }, { role: 'user', active: true }] });
+    httpMock.expectOne('/api/users/cargos').flush({ data: [{ cargo: 'N1', people: 3 }, { cargo: 'N2', people: 2 }] });
     await settle();
     fixture.detectChanges();
     await settle();
@@ -87,15 +87,19 @@ describe('AdminChecklistComponent', () => {
     expect(el.textContent).toContain('Guardado');
   });
 
-  it('la alerta NOK pide un rol y muestra a cuántas personas llega', async () => {
+  it('la alerta NOK avisa por cargo (N2 por defecto, como el legacy) y muestra a cuántas personas llega', async () => {
     const { fixture, el } = await render();
     const alert = [...el.querySelectorAll<HTMLInputElement>('input[role="switch"]')][1];
     alert.click();
     fixture.detectChanges();
     await settle();
     fixture.detectChanges();
-    expect(el.textContent).toContain('Personas con ese rol: 2');
-    expect((el.querySelector('.ac__alert-to select') as HTMLSelectElement).value).toBe('admin');
+    expect(el.textContent).toContain('Personas con esos cargos: 2');
+    const n1 = [...el.querySelectorAll<HTMLButtonElement>('.ac__cargo')].find((b) => b.textContent?.includes('N1')) as HTMLButtonElement;
+    expect(n1.getAttribute('aria-pressed')).toBe('false');
+    n1.click();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Personas con esos cargos: 5');
   });
 
   it('guarda la espera mínima entre checks', async () => {

@@ -139,6 +139,10 @@ type Member struct {
 	Role     Role
 	Priority int32
 	OnCall   bool
+	// PoolID: el miembro viene de un pool (TI-Mundo, Redes-Mundo…) que se
+	// llama en orden (PoolPos): si uno no contesta, el siguiente del pool.
+	PoolID  uuid.UUID
+	PoolPos int32
 }
 
 func roleRank(m Member) int {
@@ -163,7 +167,10 @@ func OrderMembers(members []Member) []Member {
 		if ri, rj := roleRank(out[i]), roleRank(out[j]); ri != rj {
 			return ri < rj
 		}
-		return out[i].Priority < out[j].Priority
+		if out[i].Priority != out[j].Priority {
+			return out[i].Priority < out[j].Priority
+		}
+		return out[i].PoolPos < out[j].PoolPos
 	})
 	return out
 }
@@ -187,10 +194,12 @@ type NextAction struct {
 }
 
 // Next calcula el siguiente paso tras un intento (HU-1t). Si contestaron, no
-// se escala. En modo sequential se prueba antes al siguiente miembro no
-// intentado del mismo paso; agotado el paso (o en unique/pool, o si el
-// operador marcó escalated_next_tier) se pasa al paso siguiente. En el
-// último paso sin respuesta, Exhausted.
+// se escala. Si quien no contestó es de un pool, se llama al siguiente del
+// mismo pool (en cualquier modo). En modo sequential se prueba antes al
+// siguiente miembro no intentado del mismo paso; agotado el paso (o en
+// unique/pool, o si el operador marcó escalated_next_tier) se pasa al paso
+// siguiente. En el último paso sin respuesta, Exhausted. tried[0] es el
+// miembro recién intentado.
 func Next(steps []Step, currentOrder int32, tried []uuid.UUID, result Result) NextAction {
 	if result == ResultAnswered {
 		return NextAction{}
@@ -201,11 +210,27 @@ func Next(steps []Step, currentOrder int32, tried []uuid.UUID, result Result) Ne
 			current = &steps[i]
 		}
 	}
-	if current != nil && current.Mode == ModeSequential && result != ResultEscalatedNextTier {
-		triedSet := map[uuid.UUID]bool{}
-		for _, id := range tried {
-			triedSet[id] = true
+	triedSet := map[uuid.UUID]bool{}
+	for _, id := range tried {
+		triedSet[id] = true
+	}
+	if current != nil && result != ResultEscalatedNextTier && len(tried) > 0 {
+		var pool uuid.UUID
+		for _, m := range current.Members {
+			if m.ID == tried[0] {
+				pool = m.PoolID
+			}
 		}
+		if pool != uuid.Nil {
+			for _, m := range OrderMembers(current.Members) {
+				if m.PoolID == pool && !triedSet[m.ID] {
+					member := m
+					return NextAction{NextMember: &member}
+				}
+			}
+		}
+	}
+	if current != nil && current.Mode == ModeSequential && result != ResultEscalatedNextTier {
 		for _, m := range OrderMembers(current.Members) {
 			if !triedSet[m.ID] {
 				member := m

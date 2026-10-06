@@ -83,6 +83,9 @@ export class EntriesComponent implements OnInit {
   private readonly orgs = inject(OrganizationsService);
   private readonly modules = inject(ModuleAccessService);
   private readonly destroyRef = inject(DestroyRef);
+  /** false apenas se destruye: la carga es asíncrona y el operador puede irse antes de que termine. */
+  private alive = true;
+  private readonly markDestroyed = this.destroyRef.onDestroy(() => (this.alive = false));
   protected readonly perms = inject(PermissionsService);
   private readonly composer = viewChild<ElementRef<HTMLTextAreaElement>>('composer');
 
@@ -167,6 +170,13 @@ export class EntriesComponent implements OnInit {
     }
     void this.loadCatalogs();
 
+    // Si se fue de la pantalla mientras cargaba, no se arranca el autosave ni
+    // el SSE (quedarían vivos sin nadie que los cierre: NG0911).
+    if (!this.alive) {
+      clearTimeout(this.adminNotesTimer);
+      clearTimeout(this.personalNotesTimer);
+      return;
+    }
     const stopAutosaveEntry = this.drafts.autosave('entry', 'new', () => this.draft());
     const stopSse = this.sse.connect((eventType, data) => {
       if (eventType === 'deployment_ready') {

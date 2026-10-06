@@ -2,14 +2,18 @@ package handler
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/auth"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/branding"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/crypto"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/mailtpl"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/middleware"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/service/mail"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -191,7 +195,7 @@ func (h *UsersHandler) ForceResetAll(w http.ResponseWriter, r *http.Request) {
 	sender, _, mailErr := buildMailSender(ctx, h.Queries, h.Crypto)
 	for _, u := range affected {
 		if mailErr == nil {
-			if err := sendForceResetNotice(sender, u); err == nil {
+			if err := sendForceResetNotice(sender, branding.Title(ctx, h.Queries), u); err == nil {
 				notified++
 			}
 		}
@@ -204,7 +208,31 @@ func (h *UsersHandler) ForceResetAll(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, map[string]any{"modifiedCount": len(affected), "notifiedCount": notified})
 }
 
-func sendForceResetNotice(sender *mail.Sender, u db.User) error {
-	return sender.Send(u.Email, "Cambio de contraseña obligatorio - Bitácora Ops",
-		"Por un incidente de seguridad, tu contraseña debe cambiarse en tu próximo inicio de sesión.")
+// sendForceResetNotice es el aviso del legacy (routes/users.js), estándar del área.
+func sendForceResetNotice(sender *mail.Sender, appTitle string, u db.User) error {
+	name := u.FullName.String
+	if strings.TrimSpace(name) == "" {
+		name = u.Username
+	}
+	m := mailtpl.ForcedPasswordChange(appTitle, name)
+	return sender.SendAlternative([]string{u.Email}, nil, m.Subject, m.Text, m.HTML)
+}
+
+// Cargos es GET /api/users/cargos (admin): los cargos en uso y cuántas
+// personas activas tiene cada uno (a quién avisa la alerta NOK del checklist).
+func (h *UsersHandler) Cargos(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.Queries.ListCargoLabelCounts(r.Context())
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer los cargos")
+		return
+	}
+	type cargoDTO struct {
+		Cargo  string `json:"cargo"`
+		People int32  `json:"people"`
+	}
+	out := make([]cargoDTO, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, cargoDTO{Cargo: row.Cargo, People: row.People})
+	}
+	writeData(w, http.StatusOK, out)
 }

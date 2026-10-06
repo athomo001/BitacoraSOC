@@ -12,8 +12,36 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const archiveOrganization = `-- name: ArchiveOrganization :execrows
+UPDATE organizations o SET archived_at = now(), active = false, code = o.code || '~' || substr(o.id::text, 1, 8)
+WHERE o.id = $1 AND o.archived_at IS NULL
+  AND NOT EXISTS (SELECT 1 FROM services s WHERE s.organization_id = o.id)
+  AND NOT EXISTS (SELECT 1 FROM teams tm WHERE tm.organization_id = o.id)
+  AND NOT EXISTS (SELECT 1 FROM assets a WHERE a.client_id = o.id OR a.contractor_id = o.id)
+`
+
+// Solo si ya no tiene servicios, equipos ni activos; el código queda libre.
+func (q *Queries) ArchiveOrganization(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, archiveOrganization, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const countOrgContacts = `-- name: CountOrgContacts :one
+SELECT count(*) FROM contacts WHERE organization_id = $1
+`
+
+func (q *Queries) CountOrgContacts(ctx context.Context, organizationID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countOrgContacts, organizationID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createOrganization = `-- name: CreateOrganization :one
-INSERT INTO organizations (name, code, type) VALUES ($1, $2, $3) RETURNING id, name, code, type, active, created_at, via_organization_id
+INSERT INTO organizations (name, code, type) VALUES ($1, $2, $3) RETURNING id, name, code, type, active, created_at, via_organization_id, archived_at
 `
 
 type CreateOrganizationParams struct {
@@ -33,6 +61,7 @@ func (q *Queries) CreateOrganization(ctx context.Context, arg CreateOrganization
 		&i.Active,
 		&i.CreatedAt,
 		&i.ViaOrganizationID,
+		&i.ArchivedAt,
 	)
 	return i, err
 }
@@ -70,16 +99,61 @@ func (q *Queries) CreateOrganizationType(ctx context.Context, arg CreateOrganiza
 	return i, err
 }
 
-const deleteOrganization = `-- name: DeleteOrganization :execrows
-DELETE FROM organizations WHERE id = $1
+const deleteAssetPolicies = `-- name: DeleteAssetPolicies :exec
+DELETE FROM escalation_policies WHERE asset_id = $1
 `
 
-func (q *Queries) DeleteOrganization(ctx context.Context, id uuid.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteOrganization, id)
+func (q *Queries) DeleteAssetPolicies(ctx context.Context, assetID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteAssetPolicies, assetID)
+	return err
+}
+
+const deleteAssetRaci = `-- name: DeleteAssetRaci :exec
+DELETE FROM raci_assignments WHERE asset_id = $1
+`
+
+func (q *Queries) DeleteAssetRaci(ctx context.Context, assetID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteAssetRaci, assetID)
+	return err
+}
+
+const deleteAssetWithoutHistory = `-- name: DeleteAssetWithoutHistory :execrows
+DELETE FROM assets a WHERE a.id = $1 AND (a.client_id = $2 OR a.contractor_id = $2)
+  AND NOT EXISTS (SELECT 1 FROM entries e WHERE e.asset_id = a.id)
+  AND NOT EXISTS (SELECT 1 FROM tickets t WHERE t.asset_id = a.id)
+  AND NOT EXISTS (SELECT 1 FROM maintenance_windows m WHERE m.asset_id = a.id)
+  AND NOT EXISTS (SELECT 1 FROM assets c WHERE c.parent_asset_id = a.id)
+`
+
+type DeleteAssetWithoutHistoryParams struct {
+	ID  uuid.UUID   `json:"id"`
+	Org pgtype.UUID `json:"org"`
+}
+
+func (q *Queries) DeleteAssetWithoutHistory(ctx context.Context, arg DeleteAssetWithoutHistoryParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteAssetWithoutHistory, arg.ID, arg.Org)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const deleteOrganizationGroups = `-- name: DeleteOrganizationGroups :exec
+DELETE FROM team_groups WHERE client_id = $1
+`
+
+func (q *Queries) DeleteOrganizationGroups(ctx context.Context, clientID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteOrganizationGroups, clientID)
+	return err
+}
+
+const deleteOrganizationRaci = `-- name: DeleteOrganizationRaci :exec
+DELETE FROM raci_assignments WHERE client_id = $1
+`
+
+func (q *Queries) DeleteOrganizationRaci(ctx context.Context, clientID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteOrganizationRaci, clientID)
+	return err
 }
 
 const deleteOrganizationType = `-- name: DeleteOrganizationType :execrows
@@ -94,8 +168,87 @@ func (q *Queries) DeleteOrganizationType(ctx context.Context, code string) (int6
 	return result.RowsAffected(), nil
 }
 
+const deleteServicePolicies = `-- name: DeleteServicePolicies :exec
+DELETE FROM escalation_policies WHERE service_id = $1
+`
+
+func (q *Queries) DeleteServicePolicies(ctx context.Context, serviceID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteServicePolicies, serviceID)
+	return err
+}
+
+const deleteServiceRaci = `-- name: DeleteServiceRaci :exec
+DELETE FROM raci_assignments WHERE service_id = $1
+`
+
+// Antes de borrar un servicio sin historial: su RACI y sus políticas de
+// escalamiento (los pasos caen con la política).
+func (q *Queries) DeleteServiceRaci(ctx context.Context, serviceID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteServiceRaci, serviceID)
+	return err
+}
+
+const deleteServiceWithoutHistory = `-- name: DeleteServiceWithoutHistory :execrows
+DELETE FROM services s WHERE s.id = $1 AND s.organization_id = $2
+  AND NOT EXISTS (SELECT 1 FROM entries e WHERE e.service_id = s.id)
+  AND NOT EXISTS (SELECT 1 FROM tickets t WHERE t.service_id = s.id)
+  AND NOT EXISTS (SELECT 1 FROM maintenance_windows m WHERE m.service_id = s.id)
+`
+
+type DeleteServiceWithoutHistoryParams struct {
+	ID  uuid.UUID `json:"id"`
+	Org uuid.UUID `json:"org"`
+}
+
+func (q *Queries) DeleteServiceWithoutHistory(ctx context.Context, arg DeleteServiceWithoutHistoryParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteServiceWithoutHistory, arg.ID, arg.Org)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteTeamRaci = `-- name: DeleteTeamRaci :exec
+DELETE FROM raci_assignments WHERE team_id = $1
+`
+
+// Antes de borrar un equipo sin tickets ni rotaciones: lo saca de los
+// escalamientos y del RACI (integrantes y cobertura caen con él).
+func (q *Queries) DeleteTeamRaci(ctx context.Context, teamID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteTeamRaci, teamID)
+	return err
+}
+
+const deleteTeamSteps = `-- name: DeleteTeamSteps :exec
+DELETE FROM escalation_steps WHERE team_id = $1
+`
+
+func (q *Queries) DeleteTeamSteps(ctx context.Context, teamID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteTeamSteps, teamID)
+	return err
+}
+
+const deleteTeamWithoutHistory = `-- name: DeleteTeamWithoutHistory :execrows
+DELETE FROM teams tm WHERE tm.id = $1 AND tm.organization_id = $2
+  AND NOT EXISTS (SELECT 1 FROM tickets t WHERE t.assigned_team_id = tm.id)
+  AND NOT EXISTS (SELECT 1 FROM rotation_cycles rc WHERE rc.team_id = tm.id)
+`
+
+type DeleteTeamWithoutHistoryParams struct {
+	ID  uuid.UUID   `json:"id"`
+	Org pgtype.UUID `json:"org"`
+}
+
+func (q *Queries) DeleteTeamWithoutHistory(ctx context.Context, arg DeleteTeamWithoutHistoryParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteTeamWithoutHistory, arg.ID, arg.Org)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const findOrganizationByNameOrCode = `-- name: FindOrganizationByNameOrCode :one
-SELECT id, name, code, type, active, created_at, via_organization_id FROM organizations
+SELECT id, name, code, type, active, created_at, via_organization_id, archived_at FROM organizations
 WHERE active AND (lower(name) = lower($1::text) OR lower(code) = lower($1::text))
 ORDER BY (lower(code) = lower($1::text)) DESC
 LIMIT 1
@@ -114,12 +267,13 @@ func (q *Queries) FindOrganizationByNameOrCode(ctx context.Context, ref string) 
 		&i.Active,
 		&i.CreatedAt,
 		&i.ViaOrganizationID,
+		&i.ArchivedAt,
 	)
 	return i, err
 }
 
 const getOrganization = `-- name: GetOrganization :one
-SELECT id, name, code, type, active, created_at, via_organization_id FROM organizations WHERE id = $1
+SELECT id, name, code, type, active, created_at, via_organization_id, archived_at FROM organizations WHERE id = $1
 `
 
 func (q *Queries) GetOrganization(ctx context.Context, id uuid.UUID) (Organization, error) {
@@ -133,6 +287,7 @@ func (q *Queries) GetOrganization(ctx context.Context, id uuid.UUID) (Organizati
 		&i.Active,
 		&i.CreatedAt,
 		&i.ViaOrganizationID,
+		&i.ArchivedAt,
 	)
 	return i, err
 }
@@ -156,8 +311,188 @@ func (q *Queries) GetOrganizationType(ctx context.Context, code string) (Organiz
 	return i, err
 }
 
+const listOrgAssetsForDelete = `-- name: ListOrgAssetsForDelete :many
+SELECT a.id, a.name, a.code, a.type::text AS type,
+  (SELECT count(*) FROM entries e WHERE e.asset_id = a.id)::bigint AS entries,
+  (SELECT count(*) FROM tickets t WHERE t.asset_id = a.id)::bigint AS tickets,
+  (SELECT count(*) FROM maintenance_windows m WHERE m.asset_id = a.id)::bigint AS windows,
+  (SELECT count(*) FROM assets c WHERE c.parent_asset_id = a.id)::bigint AS children
+FROM assets a WHERE a.client_id = $1 OR a.contractor_id = $1 ORDER BY a.name
+`
+
+type ListOrgAssetsForDeleteRow struct {
+	ID       uuid.UUID `json:"id"`
+	Name     string    `json:"name"`
+	Code     string    `json:"code"`
+	Type     string    `json:"type"`
+	Entries  int64     `json:"entries"`
+	Tickets  int64     `json:"tickets"`
+	Windows  int64     `json:"windows"`
+	Children int64     `json:"children"`
+}
+
+func (q *Queries) ListOrgAssetsForDelete(ctx context.Context, clientID pgtype.UUID) ([]ListOrgAssetsForDeleteRow, error) {
+	rows, err := q.db.Query(ctx, listOrgAssetsForDelete, clientID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListOrgAssetsForDeleteRow
+	for rows.Next() {
+		var i ListOrgAssetsForDeleteRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Code,
+			&i.Type,
+			&i.Entries,
+			&i.Tickets,
+			&i.Windows,
+			&i.Children,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOrgServicesForDelete = `-- name: ListOrgServicesForDelete :many
+
+SELECT s.id, s.name, s.code,
+  (SELECT count(*) FROM entries e WHERE e.service_id = s.id)::bigint AS entries,
+  (SELECT count(*) FROM tickets t WHERE t.service_id = s.id)::bigint AS tickets,
+  (SELECT count(*) FROM maintenance_windows m WHERE m.service_id = s.id)::bigint AS windows
+FROM services s WHERE s.organization_id = $1 ORDER BY s.name
+`
+
+type ListOrgServicesForDeleteRow struct {
+	ID      uuid.UUID `json:"id"`
+	Name    string    `json:"name"`
+	Code    string    `json:"code"`
+	Entries int64     `json:"entries"`
+	Tickets int64     `json:"tickets"`
+	Windows int64     `json:"windows"`
+}
+
+// ===== Eliminar organización: popup con lo asociado (canvas v22) =====
+// Historial = entradas, tickets o mantenciones: esos no se borran, se mueven.
+func (q *Queries) ListOrgServicesForDelete(ctx context.Context, organizationID uuid.UUID) ([]ListOrgServicesForDeleteRow, error) {
+	rows, err := q.db.Query(ctx, listOrgServicesForDelete, organizationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListOrgServicesForDeleteRow
+	for rows.Next() {
+		var i ListOrgServicesForDeleteRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Code,
+			&i.Entries,
+			&i.Tickets,
+			&i.Windows,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOrgTeamsForDelete = `-- name: ListOrgTeamsForDelete :many
+SELECT tm.id, tm.name,
+  (SELECT count(*) FROM team_members m WHERE m.team_id = tm.id)::bigint AS members,
+  (SELECT count(DISTINCT p.service_id) FROM escalation_steps st JOIN escalation_policies p ON p.id = st.policy_id WHERE st.team_id = tm.id)::bigint AS services,
+  (SELECT count(*) FROM tickets t WHERE t.assigned_team_id = tm.id)::bigint AS tickets,
+  (SELECT count(*) FROM rotation_cycles r WHERE r.team_id = tm.id)::bigint AS rotations
+FROM teams tm WHERE tm.organization_id = $1 ORDER BY tm.name
+`
+
+type ListOrgTeamsForDeleteRow struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	Members   int64     `json:"members"`
+	Services  int64     `json:"services"`
+	Tickets   int64     `json:"tickets"`
+	Rotations int64     `json:"rotations"`
+}
+
+func (q *Queries) ListOrgTeamsForDelete(ctx context.Context, organizationID pgtype.UUID) ([]ListOrgTeamsForDeleteRow, error) {
+	rows, err := q.db.Query(ctx, listOrgTeamsForDelete, organizationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListOrgTeamsForDeleteRow
+	for rows.Next() {
+		var i ListOrgTeamsForDeleteRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Members,
+			&i.Services,
+			&i.Tickets,
+			&i.Rotations,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOrgTicketsForDelete = `-- name: ListOrgTicketsForDelete :many
+SELECT id, ticket_number, title, status::text AS status, created_at
+FROM tickets WHERE client_id = $1 ORDER BY created_at DESC
+`
+
+type ListOrgTicketsForDeleteRow struct {
+	ID           uuid.UUID          `json:"id"`
+	TicketNumber string             `json:"ticket_number"`
+	Title        string             `json:"title"`
+	Status       string             `json:"status"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) ListOrgTicketsForDelete(ctx context.Context, clientID uuid.UUID) ([]ListOrgTicketsForDeleteRow, error) {
+	rows, err := q.db.Query(ctx, listOrgTicketsForDelete, clientID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListOrgTicketsForDeleteRow
+	for rows.Next() {
+		var i ListOrgTicketsForDeleteRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TicketNumber,
+			&i.Title,
+			&i.Status,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOrganizationTypes = `-- name: ListOrganizationTypes :many
-SELECT t.code, t.name, t.description, t.is_client, t.system, t.sort_order, t.created_at, (SELECT count(*) FROM organizations o WHERE o.type = t.code)::bigint AS organizations
+SELECT t.code, t.name, t.description, t.is_client, t.system, t.sort_order, t.created_at, (SELECT count(*) FROM organizations o WHERE o.type = t.code AND o.archived_at IS NULL)::bigint AS organizations
 FROM organization_types t
 ORDER BY t.sort_order, t.name
 `
@@ -203,11 +538,12 @@ func (q *Queries) ListOrganizationTypes(ctx context.Context) ([]ListOrganization
 }
 
 const listOrganizations = `-- name: ListOrganizations :many
-SELECT o.id, o.name, o.code, o.type, o.active, o.created_at, o.via_organization_id, v.name AS via_name
+SELECT o.id, o.name, o.code, o.type, o.active, o.created_at, o.via_organization_id, o.archived_at, v.name AS via_name
 FROM organizations o
 JOIN organization_types t ON t.code = o.type
 LEFT JOIN organizations v ON v.id = o.via_organization_id
-WHERE ($1::text IS NULL OR o.type = $1)
+WHERE o.archived_at IS NULL
+  AND ($1::text IS NULL OR o.type = $1)
   AND ($2::boolean IS NULL OR o.active = $2)
   AND (NOT $3::boolean OR t.is_client)
 ORDER BY o.name
@@ -227,6 +563,7 @@ type ListOrganizationsRow struct {
 	Active            bool               `json:"active"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	ViaOrganizationID pgtype.UUID        `json:"via_organization_id"`
+	ArchivedAt        pgtype.Timestamptz `json:"archived_at"`
 	ViaName           pgtype.Text        `json:"via_name"`
 }
 
@@ -248,6 +585,7 @@ func (q *Queries) ListOrganizations(ctx context.Context, arg ListOrganizationsPa
 			&i.Active,
 			&i.CreatedAt,
 			&i.ViaOrganizationID,
+			&i.ArchivedAt,
 			&i.ViaName,
 		); err != nil {
 			return nil, err
@@ -258,6 +596,27 @@ func (q *Queries) ListOrganizations(ctx context.Context, arg ListOrganizationsPa
 		return nil, err
 	}
 	return items, nil
+}
+
+const moveAssetToOrganization = `-- name: MoveAssetToOrganization :execrows
+UPDATE assets SET
+  client_id = CASE WHEN client_id = $1 THEN $2 ELSE client_id END,
+  contractor_id = CASE WHEN contractor_id = $1 THEN $2 ELSE contractor_id END
+WHERE id = $3 AND (client_id = $1 OR contractor_id = $1)
+`
+
+type MoveAssetToOrganizationParams struct {
+	FromOrg pgtype.UUID `json:"from_org"`
+	ToOrg   pgtype.UUID `json:"to_org"`
+	ID      uuid.UUID   `json:"id"`
+}
+
+func (q *Queries) MoveAssetToOrganization(ctx context.Context, arg MoveAssetToOrganizationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, moveAssetToOrganization, arg.FromOrg, arg.ToOrg, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const moveOrganizationsToType = `-- name: MoveOrganizationsToType :execrows
@@ -277,39 +636,132 @@ func (q *Queries) MoveOrganizationsToType(ctx context.Context, arg MoveOrganizat
 	return result.RowsAffected(), nil
 }
 
-const organizationDependents = `-- name: OrganizationDependents :one
-SELECT
-  (SELECT count(*) FROM services s WHERE s.organization_id = $1)::bigint AS services,
-  (SELECT count(*) FROM contacts c WHERE c.organization_id = $1)::bigint AS contacts,
-  (SELECT count(*) FROM tickets t WHERE t.client_id = $1)::bigint AS tickets,
-  (SELECT count(*) FROM teams tm WHERE tm.organization_id = $1)::bigint AS teams,
-  (SELECT count(*) FROM assets a WHERE a.client_id = $1 OR a.contractor_id = $1)::bigint AS assets,
-  ((SELECT count(*) FROM team_groups g WHERE g.client_id = $1) + (SELECT count(*) FROM raci_assignments r WHERE r.client_id = $1))::bigint AS other
+const moveServiceToOrganization = `-- name: MoveServiceToOrganization :execrows
+UPDATE services SET organization_id = $1 WHERE id = $2 AND organization_id = $3
 `
 
-type OrganizationDependentsRow struct {
-	Services int64 `json:"services"`
-	Contacts int64 `json:"contacts"`
-	Tickets  int64 `json:"tickets"`
-	Teams    int64 `json:"teams"`
-	Assets   int64 `json:"assets"`
-	Other    int64 `json:"other"`
+type MoveServiceToOrganizationParams struct {
+	ToOrg   uuid.UUID `json:"to_org"`
+	ID      uuid.UUID `json:"id"`
+	FromOrg uuid.UUID `json:"from_org"`
 }
 
-// Qué tiene asociado una organización antes de eliminarla: si hay algo, no se
-// borra (los contactos caerían en cascada) y se propone desactivarla.
-func (q *Queries) OrganizationDependents(ctx context.Context, organizationID uuid.UUID) (OrganizationDependentsRow, error) {
-	row := q.db.QueryRow(ctx, organizationDependents, organizationID)
-	var i OrganizationDependentsRow
-	err := row.Scan(
-		&i.Services,
-		&i.Contacts,
-		&i.Tickets,
-		&i.Teams,
-		&i.Assets,
-		&i.Other,
-	)
-	return i, err
+func (q *Queries) MoveServiceToOrganization(ctx context.Context, arg MoveServiceToOrganizationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, moveServiceToOrganization, arg.ToOrg, arg.ID, arg.FromOrg)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const moveTeamToOrganization = `-- name: MoveTeamToOrganization :execrows
+UPDATE teams SET organization_id = $1 WHERE id = $2 AND organization_id = $3
+`
+
+type MoveTeamToOrganizationParams struct {
+	ToOrg   pgtype.UUID `json:"to_org"`
+	ID      uuid.UUID   `json:"id"`
+	FromOrg pgtype.UUID `json:"from_org"`
+}
+
+func (q *Queries) MoveTeamToOrganization(ctx context.Context, arg MoveTeamToOrganizationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, moveTeamToOrganization, arg.ToOrg, arg.ID, arg.FromOrg)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const moveTicketToOrganization = `-- name: MoveTicketToOrganization :execrows
+UPDATE tickets SET client_id = $1, updated_at = now() WHERE id = $2 AND client_id = $3
+`
+
+type MoveTicketToOrganizationParams struct {
+	ToOrg   uuid.UUID `json:"to_org"`
+	ID      uuid.UUID `json:"id"`
+	FromOrg uuid.UUID `json:"from_org"`
+}
+
+func (q *Queries) MoveTicketToOrganization(ctx context.Context, arg MoveTicketToOrganizationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, moveTicketToOrganization, arg.ToOrg, arg.ID, arg.FromOrg)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const releaseOrganizationGroups = `-- name: ReleaseOrganizationGroups :exec
+UPDATE teams SET team_group_id = NULL WHERE team_group_id IN (SELECT g.id FROM team_groups g WHERE g.client_id = $1)
+`
+
+// Antes de archivar: los equipos dejan sus grupos, quien la tenía como
+// mandante queda sin mandante, y sus grupos y RACI se eliminan.
+func (q *Queries) ReleaseOrganizationGroups(ctx context.Context, clientID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, releaseOrganizationGroups, clientID)
+	return err
+}
+
+const releaseOrganizationVia = `-- name: ReleaseOrganizationVia :exec
+UPDATE organizations SET via_organization_id = NULL WHERE via_organization_id = $1
+`
+
+func (q *Queries) ReleaseOrganizationVia(ctx context.Context, viaOrganizationID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, releaseOrganizationVia, viaOrganizationID)
+	return err
+}
+
+const renameAsset = `-- name: RenameAsset :execrows
+UPDATE assets SET name = $1 WHERE id = $2 AND (client_id = $3 OR contractor_id = $3)
+`
+
+type RenameAssetParams struct {
+	Name string      `json:"name"`
+	ID   uuid.UUID   `json:"id"`
+	Org  pgtype.UUID `json:"org"`
+}
+
+func (q *Queries) RenameAsset(ctx context.Context, arg RenameAssetParams) (int64, error) {
+	result, err := q.db.Exec(ctx, renameAsset, arg.Name, arg.ID, arg.Org)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const renameService = `-- name: RenameService :execrows
+UPDATE services SET name = $1 WHERE id = $2 AND organization_id = $3
+`
+
+type RenameServiceParams struct {
+	Name string    `json:"name"`
+	ID   uuid.UUID `json:"id"`
+	Org  uuid.UUID `json:"org"`
+}
+
+func (q *Queries) RenameService(ctx context.Context, arg RenameServiceParams) (int64, error) {
+	result, err := q.db.Exec(ctx, renameService, arg.Name, arg.ID, arg.Org)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const renameTeam = `-- name: RenameTeam :execrows
+UPDATE teams SET name = $1 WHERE id = $2 AND organization_id = $3
+`
+
+type RenameTeamParams struct {
+	Name string      `json:"name"`
+	ID   uuid.UUID   `json:"id"`
+	Org  pgtype.UUID `json:"org"`
+}
+
+func (q *Queries) RenameTeam(ctx context.Context, arg RenameTeamParams) (int64, error) {
+	result, err := q.db.Exec(ctx, renameTeam, arg.Name, arg.ID, arg.Org)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateOrganization = `-- name: UpdateOrganization :one
@@ -320,7 +772,7 @@ UPDATE organizations SET
   active = COALESCE($5, active),
   via_organization_id = CASE WHEN $6::boolean THEN $7::uuid ELSE via_organization_id END
 WHERE id = $1
-RETURNING id, name, code, type, active, created_at, via_organization_id
+RETURNING id, name, code, type, active, created_at, via_organization_id, archived_at
 `
 
 type UpdateOrganizationParams struct {
@@ -352,6 +804,7 @@ func (q *Queries) UpdateOrganization(ctx context.Context, arg UpdateOrganization
 		&i.Active,
 		&i.CreatedAt,
 		&i.ViaOrganizationID,
+		&i.ArchivedAt,
 	)
 	return i, err
 }

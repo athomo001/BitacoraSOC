@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Injector, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { LogSource, Organization, OrganizationKind, OrganizationsService } from '../../core/organizations/organizations.service';
@@ -102,7 +102,7 @@ const DEFAULT_NAMES: Record<string, string> = { client: 'Cliente', mandante: 'Ma
                       </span>
                     } @else {
                       <button type="button" class="adm-icon-btn" [disabled]="busy()" [title]="i18n.t('orgs.edit')" [attr.aria-label]="i18n.t('orgs.edit') + ' ' + org.name" (click)="startEdit(org)"><mat-icon>edit</mat-icon></button>
-                      <button type="button" class="adm-icon-btn adm-icon-btn--danger" [disabled]="busy()" [title]="i18n.t('adminChecklist.delete')" [attr.aria-label]="i18n.t('adminChecklist.delete') + ' ' + org.name" (click)="deletingId.set(org.id); editingId.set(null)"><mat-icon>delete</mat-icon></button>
+                      <button type="button" class="adm-icon-btn adm-icon-btn--danger" [disabled]="busy()" [title]="i18n.t('adminChecklist.delete')" [attr.aria-label]="i18n.t('adminChecklist.delete') + ' ' + org.name" (click)="askDelete(org)"><mat-icon>delete</mat-icon></button>
                     }
                   </td>
                 </tr>
@@ -243,6 +243,7 @@ const DEFAULT_NAMES: Record<string, string> = { client: 'Cliente', mandante: 'Ma
 export class AdminOrganizationsComponent implements OnInit {
   protected readonly i18n = inject(I18nService);
   private readonly api = inject(OrganizationsService);
+  private readonly injector = inject(Injector);
   private readonly modules = inject(ModuleAccessService);
 
   protected readonly organizations = signal<Organization[]>([]);
@@ -334,6 +335,40 @@ export class AdminOrganizationsComponent implements OnInit {
         }),
       () => this.editingId.set(null),
     );
+  }
+
+  /**
+   * Eliminar (pedido del dueño 2026-10-05, canvas v22): si no tiene nada
+   * asociado se confirma en la fila; si tiene algo se abre el popup para
+   * resolverlo ahí mismo. CDK Dialog y el popup se cargan recién aquí.
+   */
+  protected async askDelete(org: Organization): Promise<void> {
+    this.editingId.set(null);
+    this.error.set(null);
+    this.busy.set(true);
+    let dependents;
+    try {
+      dependents = await this.api.dependents(org.id);
+    } catch (error) {
+      this.error.set(problemDetail(error, this.i18n.t('orgs.saveError')));
+      return;
+    } finally {
+      this.busy.set(false);
+    }
+    const d = dependents;
+    if (!d.services.length && !d.teams.length && !d.assets.length && !d.tickets.length && !d.contacts) {
+      this.deletingId.set(org.id);
+      return;
+    }
+    const [{ Dialog }, { OrgDeleteDialogComponent }] = await Promise.all([import('@angular/cdk/dialog'), import('./org-delete-dialog')]);
+    const ref = this.injector.get(Dialog).open<boolean>(OrgDeleteDialogComponent, {
+      ariaLabel: this.i18n.tf('orgDelete.title', org.name),
+      data: { org, dependents: d, targets: this.organizations().filter((o) => o.id !== org.id) },
+      maxWidth: '100vw',
+    });
+    ref.closed.subscribe((deleted) => {
+      if (deleted) void this.reload();
+    });
   }
 
   protected async remove(org: Organization): Promise<void> {

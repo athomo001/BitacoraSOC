@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"html/template"
 	"net/http"
 	"regexp"
 	"strings"
@@ -18,6 +17,7 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/rotation"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/service/mail"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -59,13 +59,11 @@ func (h *DotacionHandler) DispatchDueSchedules(ctx context.Context, sender *mail
 		if !schedule.Enabled || !dueDay || lastSentToday || schedule.SendTime.Microseconds > currentMinute || len(schedule.Recipients) == 0 {
 			continue
 		}
-		monday := mondayOf(now)
-		matrix, matrixErr := h.buildMatrix(ctx, monday, monday.AddDate(0, 0, 4))
-		if matrixErr != nil {
-			return matrixErr
+		m, buildErr := h.buildDotacionMail(ctx, schedule)
+		if buildErr != nil {
+			return buildErr
 		}
-		subject, _ := buildNotificationMail(schedule, matrix)
-		if err := sender.SendHTML(schedule.Recipients, schedule.CcRecipients, subject, buildNotificationMailHTML(schedule, matrix)); err != nil {
+		if err := sender.SendRich(schedule.Recipients, schedule.CcRecipients, m.subject, htmlToText(m.html), m.html, m.inline); err != nil {
 			continue
 		}
 		if err := h.Queries.MarkNotificationScheduleSent(ctx, schedule.ID); err != nil {
@@ -86,8 +84,7 @@ func (h *DotacionHandler) TestNotificationSchedule(w http.ResponseWriter, r *htt
 		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "notificación no encontrada")
 		return
 	}
-	now := h.now()
-	matrix, err := h.buildMatrix(r.Context(), mondayOf(now), mondayOf(now).AddDate(0, 0, 4))
+	m, err := h.buildDotacionMail(r.Context(), schedule)
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo construir el reporte")
 		return
@@ -97,8 +94,7 @@ func (h *DotacionHandler) TestNotificationSchedule(w http.ResponseWriter, r *htt
 		problemdetails.Write(w, r, http.StatusBadRequest, "smtp-not-configured", "configurá SMTP antes de probar la notificación")
 		return
 	}
-	subject, _ := buildNotificationMail(schedule, matrix)
-	if err := sender.SendHTML(schedule.Recipients, schedule.CcRecipients, "[Prueba] "+subject, buildNotificationMailHTML(schedule, matrix)); err != nil {
+	if err := sender.SendRich(schedule.Recipients, schedule.CcRecipients, "[Prueba] "+m.subject, htmlToText(m.html), m.html, m.inline); err != nil {
 		problemdetails.Write(w, r, http.StatusBadGateway, "mail-failed", "el envío de prueba falló")
 		return
 	}
@@ -441,69 +437,6 @@ func (h *DotacionHandler) PublicTeleworkPage(w http.ResponseWriter, r *http.Requ
 	_, _ = w.Write([]byte(renderTeleworkPage(matrix, now)))
 }
 
-// buildNotificationMail preserves the plain-text fallback used by existing tests.
-func buildNotificationMail(schedule db.WorkShiftNotificationSchedule, matrix matrixDTO) (subject, body string) {
-	subject = strings.TrimSpace(schedule.Name)
-	if subject == "" {
-		subject = "Reporte de Dotación"
-	}
-	roleFilter := map[string]bool{}
-	for _, r := range schedule.RoleFilter {
-		roleFilter[strings.ToLower(strings.TrimSpace(r))] = true
-	}
-
-	var b strings.Builder
-	b.WriteString(subject + "\r\n\r\n")
-	if n := len(matrix.Columns); n > 0 {
-		b.WriteString("Semana del " + matrix.Columns[0].Date + " al " + matrix.Columns[n-1].Date + "\r\n\r\n")
-	}
-	rowsWritten := 0
-	for _, row := range matrix.Rows {
-		if len(roleFilter) > 0 && !roleFilter[strings.ToLower(row.Role)] {
-			continue
-		}
-		b.WriteString(row.Name + " (" + row.Role + ")\r\n")
-		for _, day := range row.Days {
-			b.WriteString("  " + day.Date + ": " + day.Label + "\r\n")
-		}
-		b.WriteString("\r\n")
-		rowsWritten++
-	}
-	if rowsWritten == 0 {
-		b.WriteString("Sin filas para el filtro configurado.\r\n")
-	}
-	return subject, b.String()
-}
-
-var notificationMailTemplate = template.Must(template.New("dotacion-notification").Parse(`<!doctype html><html lang="es"><body style="margin:0;background:#f3f5f6;color:#20252b;font-family:Arial,sans-serif"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td style="padding:16px"><table role="presentation" width="100%" style="box-sizing:border-box;max-width:720px;margin:auto;background:#fff;border:1px solid #d8dde2"><tr><td style="padding:24px;border-bottom:4px solid #087f8c"><h1 style="margin:0;font-size:22px">{{.Subject}}</h1><p style="margin:6px 0 0;color:#66717b">Reporte de dotación</p></td></tr><tr><td style="padding:24px"><p>Semana del {{.WeekStart}} al {{.WeekEnd}}</p>{{range .Rows}}<h2 style="font-size:16px;margin-bottom:4px">{{.Name}} ({{.Role}})</h2><ul style="margin-top:0">{{range .Days}}<li>{{.Date}}: {{.Label}}</li>{{end}}</ul>{{end}}</td></tr></table></td></tr></table></body></html>`))
-
-func buildNotificationMailHTML(schedule db.WorkShiftNotificationSchedule, matrix matrixDTO) string {
-	roleFilter := map[string]bool{}
-	for _, role := range schedule.RoleFilter {
-		roleFilter[strings.ToLower(strings.TrimSpace(role))] = true
-	}
-	rows := make([]matrixRowDTO, 0, len(matrix.Rows))
-	for _, row := range matrix.Rows {
-		if len(roleFilter) == 0 || roleFilter[strings.ToLower(row.Role)] {
-			rows = append(rows, row)
-		}
-	}
-	data := struct {
-		Subject, WeekStart, WeekEnd string
-		Rows                        []matrixRowDTO
-	}{Subject: strings.TrimSpace(schedule.Name), Rows: rows}
-	if data.Subject == "" {
-		data.Subject = "Reporte de Dotación"
-	}
-	if len(matrix.Columns) > 0 {
-		data.WeekStart = matrix.Columns[0].Date
-		data.WeekEnd = matrix.Columns[len(matrix.Columns)-1].Date
-	}
-	var output strings.Builder
-	_ = notificationMailTemplate.Execute(&output, data)
-	return output.String()
-}
-
 // ===== Notificación periódica de dotación (HU-5b) =====
 
 type notificationScheduleDTO struct {
@@ -517,6 +450,8 @@ type notificationScheduleDTO struct {
 	Recipients   []string   `json:"recipients"`
 	CcRecipients []string   `json:"ccRecipients"`
 	LastSentAt   *time.Time `json:"lastSentAt,omitempty"`
+	TargetPeriod string     `json:"targetPeriod"`
+	EmailFormat  string     `json:"emailFormat"`
 }
 
 func toNotificationScheduleDTO(s db.WorkShiftNotificationSchedule) notificationScheduleDTO {
@@ -524,6 +459,7 @@ func toNotificationScheduleDTO(s db.WorkShiftNotificationSchedule) notificationS
 		ID: s.ID, Name: s.Name, Enabled: s.Enabled, Frequency: string(s.Frequency),
 		DayOfWeek: s.DayOfWeek, SendTime: timeOfDayToString(s.SendTime),
 		RoleFilter: s.RoleFilter, Recipients: s.Recipients, CcRecipients: s.CcRecipients,
+		TargetPeriod: s.TargetPeriod, EmailFormat: s.EmailFormat,
 	}
 	if s.LastSentAt.Valid {
 		dto.LastSentAt = &s.LastSentAt.Time
@@ -552,7 +488,15 @@ type createNotificationScheduleRequest struct {
 	RoleFilter   []string `json:"roleFilter,omitempty"`
 	Recipients   []string `json:"recipients"`
 	CcRecipients []string `json:"ccRecipients,omitempty"`
+	TargetPeriod string   `json:"targetPeriod,omitempty"`
+	EmailFormat  string   `json:"emailFormat,omitempty"`
 }
+
+// validEmailFormat: lista (tabla de turnos) o calendario (grilla Lun–Vie), como el legacy.
+func validEmailFormat(v string) bool { return v == "list" || v == "calendar" }
+
+// validTargetPeriod: semana que informa el aviso (targetPeriod del legacy).
+func validTargetPeriod(v string) bool { return v == "current_week" || v == "next_week" }
 
 func (h *DotacionHandler) CreateNotificationSchedule(w http.ResponseWriter, r *http.Request) {
 	var req createNotificationScheduleRequest
@@ -567,6 +511,20 @@ func (h *DotacionHandler) CreateNotificationSchedule(w http.ResponseWriter, r *h
 		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "name, recipients, frequency (weekly|monthly), dayOfWeek (0-6) y sendTime (HH:MM) son obligatorios")
 		return
 	}
+	if req.TargetPeriod == "" {
+		req.TargetPeriod = "current_week"
+	}
+	if !validTargetPeriod(req.TargetPeriod) {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "targetPeriod debe ser current_week o next_week")
+		return
+	}
+	if req.EmailFormat == "" {
+		req.EmailFormat = "calendar"
+	}
+	if !validEmailFormat(req.EmailFormat) {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "emailFormat debe ser list o calendar")
+		return
+	}
 	if req.RoleFilter == nil {
 		req.RoleFilter = []string{}
 	}
@@ -577,7 +535,7 @@ func (h *DotacionHandler) CreateNotificationSchedule(w http.ResponseWriter, r *h
 	schedule, err := h.Queries.CreateNotificationSchedule(r.Context(), db.CreateNotificationScheduleParams{
 		Name: req.Name, Frequency: db.NotificationScheduleFrequency(req.Frequency), DayOfWeek: req.DayOfWeek,
 		SendTime: sendTime, RoleFilter: req.RoleFilter, Recipients: req.Recipients, CcRecipients: req.CcRecipients,
-		CreatedBy: user.ID,
+		CreatedBy: user.ID, TargetPeriod: req.TargetPeriod, EmailFormat: req.EmailFormat,
 	})
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo crear la notificación de dotación")
@@ -596,6 +554,8 @@ type patchNotificationScheduleRequest struct {
 	RoleFilter   []string `json:"roleFilter,omitempty"`
 	Recipients   []string `json:"recipients,omitempty"`
 	CcRecipients []string `json:"ccRecipients,omitempty"`
+	TargetPeriod *string  `json:"targetPeriod,omitempty"`
+	EmailFormat  *string  `json:"emailFormat,omitempty"`
 }
 
 func (h *DotacionHandler) PatchNotificationSchedule(w http.ResponseWriter, r *http.Request) {
@@ -619,6 +579,20 @@ func (h *DotacionHandler) PatchNotificationSchedule(w http.ResponseWriter, r *ht
 			return
 		}
 		params.Frequency = db.NullNotificationScheduleFrequency{NotificationScheduleFrequency: db.NotificationScheduleFrequency(*req.Frequency), Valid: true}
+	}
+	if req.EmailFormat != nil {
+		if !validEmailFormat(*req.EmailFormat) {
+			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "emailFormat debe ser list o calendar")
+			return
+		}
+		params.EmailFormat = pgtype.Text{String: *req.EmailFormat, Valid: true}
+	}
+	if req.TargetPeriod != nil {
+		if !validTargetPeriod(*req.TargetPeriod) {
+			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "targetPeriod debe ser current_week o next_week")
+			return
+		}
+		params.TargetPeriod = pgtype.Text{String: *req.TargetPeriod, Valid: true}
 	}
 	if req.DayOfWeek != nil {
 		params.DayOfWeek = pgtype.Int4{Int32: *req.DayOfWeek, Valid: true}

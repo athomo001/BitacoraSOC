@@ -1,0 +1,6 @@
+{
+  "resetUrl": "https://ops.synet.cl/reset-password?token=abc123",
+  "appTitle": "Bitácora CDC",
+  "subject": "Recuperación de Contraseña - Bitácora CDC",
+  "text": "Hola,\n\nHemos recibido una solicitud para resetear tu contraseña en Bitácora CDC.\n\nHaz click en el siguiente enlace para crear una nueva contraseña:\nhttps://ops.synet.cl/reset-password?token=abc123\n\nEste enlace expirará en 5 minutos.\n\nSi no solicitaste este cambio, ignora este email.\n\nSaludos,\nEquipo Bitácora CDC"
+}

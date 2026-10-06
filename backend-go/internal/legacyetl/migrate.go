@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"path"
 	"regexp"
 	"sort"
 	"strings"
@@ -29,7 +32,7 @@ import (
 // NotMigrated son las colecciones que no se migran por diseño (spec/13 §3).
 var NotMigrated = []string{
 	"tokenDenylist", "avisoLogs", "apiLogs", "customFonts", "glpiConfigs", "logForwardingConfigs",
-	"complementSharedRecords", "catalogOperationTypes", "catalogEvents", "reportHistories (reportes HTML históricos: sin tabla en 2.0)",
+	"complementSharedRecords", "catalogEvents",
 }
 
 // Options del ensayo.
@@ -107,6 +110,8 @@ func Run(ctx context.Context, pool *pgxpool.Pool, backup *Backup, legacy LegacyK
 		{"guardias y dotación", m.migrateShiftAssignments},
 		{"complementos", m.migrateComplements},
 		{"reglas de alerta del cliente", m.migrateClientRules},
+		{"historial de reportes", m.migrateReportHistory},
+		{"tipos de operación", m.migrateOperationTypes},
 		{"configuración", m.migrateAppConfig},
 		{"auditoría", m.migrateAudit},
 		{"verificación", m.verify},
@@ -130,7 +135,7 @@ func Run(ctx context.Context, pool *pgxpool.Pool, backup *Backup, legacy LegacyK
 // ensayo parte de cero (scripts/etl-reset.sh).
 func checkTarget(ctx context.Context, pool *pgxpool.Pool) error {
 	var hasLatest bool
-	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.shift_reminder_sends') IS NOT NULL`).Scan(&hasLatest); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.report_operation_types') IS NOT NULL`).Scan(&hasLatest); err != nil {
 		return err
 	}
 	if !hasLatest {
@@ -1208,6 +1213,8 @@ func (m *Migrator) migrateNotificationSchedules(ctx context.Context) error {
 		CcRecipients []string `json:"ccRecipients"`
 		LastSentAt   string   `json:"lastSentAt"`
 		CreatedAt    string   `json:"createdAt"`
+		TargetPeriod string   `json:"targetPeriod"`
+		EmailFormat  string   `json:"emailFormat"`
 	}
 	if err := m.ex.Decode("shiftNotificationSchedules", &rows); err != nil {
 		return err
@@ -1234,9 +1241,27 @@ func (m *Migrator) migrateNotificationSchedules(ctx context.Context) error {
 			}
 			return v
 		}
-		if _, err := m.tx.Exec(ctx, `INSERT INTO work_shift_notification_schedules (id, name, enabled, frequency, day_of_week, send_time, role_filter, recipients, cc_recipients, last_sent_at, created_by, created_at)
-			VALUES ($1,$2,$3,$4,$5,$6::time,$7,$8,$9,$10,$11,$12)`, ID("shiftNotificationSchedules", s.ID), strings.TrimSpace(s.Name), s.Enabled, freq, s.DayOfWeek, s.Time,
-			nonNil(s.RoleFilter), nonNil(s.Recipients), nonNil(s.CcRecipients), last, m.firstAdmin, timeOr(s.CreatedAt, now)); err != nil {
+		// Mismos valores por defecto que el modelo del legacy: semana actual y
+		// formato lista. En el calendario el legacy no usaba roleFilter (eran
+		// códigos de guardia: TELEWORK, OL…); en la 2.0 el filtro es por cargo,
+		// así que esos códigos no se traen.
+		target := s.TargetPeriod
+		if target != "next_week" {
+			target = "current_week"
+		}
+		format := s.EmailFormat
+		if format != "calendar" {
+			format = "list"
+		}
+		roleFilter := nonNil(s.RoleFilter)
+		if format == "calendar" {
+			roleFilter = []string{}
+		} else {
+			step.note("aviso %q en formato lista (guardias de escalamiento): no se envía hasta el rediseño de escalamiento", strings.TrimSpace(s.Name))
+		}
+		if _, err := m.tx.Exec(ctx, `INSERT INTO work_shift_notification_schedules (id, name, enabled, frequency, day_of_week, send_time, role_filter, recipients, cc_recipients, last_sent_at, created_by, created_at, target_period, email_format)
+			VALUES ($1,$2,$3,$4,$5,$6::time,$7,$8,$9,$10,$11,$12,$13,$14)`, ID("shiftNotificationSchedules", s.ID), strings.TrimSpace(s.Name), s.Enabled, freq, s.DayOfWeek, s.Time,
+			roleFilter, nonNil(s.Recipients), nonNil(s.CcRecipients), last, m.firstAdmin, timeOr(s.CreatedAt, now), target, format); err != nil {
 			return err
 		}
 		step.Loaded++
@@ -1249,6 +1274,13 @@ func (m *Migrator) migrateAppConfig(ctx context.Context) error {
 		ShiftCheckCooldownHours *int     `json:"shiftCheckCooldownHours"`
 		AlertNokEnabled         *bool    `json:"alertNokEnabled"`
 		AlertNokRoleTarget      []string `json:"alertNokRoleTarget"`
+		// Marca (comentario del dueño #8).
+		AppTitle                string `json:"appTitle"`
+		LogoURL                 string `json:"logoUrl"`
+		FaviconURL              string `json:"faviconUrl"`
+		TitleFont               string `json:"titleFont"`
+		IncidentEmailPaletteKey string `json:"incidentEmailPaletteKey"`
+		LoginTheme              string `json:"loginTheme"`
 	}
 	if err := m.ex.Decode("appConfigs", &rows); err != nil {
 		return err
@@ -1279,9 +1311,80 @@ func (m *Migrator) migrateAppConfig(ctx context.Context) error {
 			if _, err := m.tx.Exec(ctx, `UPDATE app_config SET alert_nok_enabled = $1, alert_nok_role_target = $2`, *c.AlertNokEnabled, targets); err != nil {
 				return err
 			}
+			// En el legacy la alerta NOK era una sola para todos los checklists;
+			// en la 2.0 va por plantilla: cada una hereda la del legacy.
+			tag, err := m.tx.Exec(ctx, `UPDATE checklist_templates SET alert_nok_enabled = $1, alert_nok_cargos = $2`, *c.AlertNokEnabled && len(targets) > 0, targets)
+			if err != nil {
+				return err
+			}
+			if *c.AlertNokEnabled {
+				step.note("alerta NOK del checklist a los cargos %s en %d plantillas", strings.Join(targets, ", "), tag.RowsAffected())
+			}
+		}
+		if err := m.migrateBranding(ctx, step, c.AppTitle, c.LogoURL, c.FaviconURL, c.TitleFont, c.IncidentEmailPaletteKey, c.LoginTheme); err != nil {
+			return err
 		}
 		step.Loaded++
 		break
+	}
+	return nil
+}
+
+// migrateBranding pasa la marca del legacy a app_branding: nombre, logo
+// (el archivo de uploads/logos del ZIP), favicon externo, paleta del correo
+// de incidente y tema del login. La fuente del título del legacy venía en
+// el frontend (assets), no en el respaldo: se sube en Administración → Marca.
+func (m *Migrator) migrateBranding(ctx context.Context, step *Step, title, logoURL, faviconURL, titleFont, palette, loginTheme string) error {
+	if _, err := m.tx.Exec(ctx, `INSERT INTO app_branding (id) VALUES (true) ON CONFLICT (id) DO NOTHING`); err != nil {
+		return err
+	}
+	if t := strings.TrimSpace(title); t != "" {
+		if _, err := m.tx.Exec(ctx, `UPDATE app_branding SET app_title = $1`, t); err != nil {
+			return err
+		}
+		step.note("marca: nombre visible «%s»", t)
+	}
+	switch palette {
+	case "cdc-verde", "noche-azul", "slate-pro", "carbon", "indigo", "bosque":
+		if _, err := m.tx.Exec(ctx, `UPDATE app_branding SET incident_palette = $1`, palette); err != nil {
+			return err
+		}
+	}
+	switch loginTheme {
+	case "crt", "infoflow", "modern", "surrealism", "win311", "unix89":
+		if _, err := m.tx.Exec(ctx, `UPDATE app_branding SET login_theme = $1`, loginTheme); err != nil {
+			return err
+		}
+	}
+	if u := strings.TrimSpace(faviconURL); strings.HasPrefix(u, "https://") {
+		if _, err := m.tx.Exec(ctx, `UPDATE app_branding SET favicon_url = $1`, u); err != nil {
+			return err
+		}
+	}
+	if rel := strings.TrimPrefix(strings.TrimSpace(logoURL), "/uploads/"); rel != "" && rel != logoURL {
+		if f, ok := m.uploads[rel]; ok && f.UncompressedSize64 <= 2<<20 {
+			rc, err := f.Open()
+			if err != nil {
+				return err
+			}
+			raw, err := io.ReadAll(rc)
+			_ = rc.Close()
+			if err != nil {
+				return err
+			}
+			mime := http.DetectContentType(raw)
+			if strings.HasPrefix(mime, "image/") {
+				if _, err := m.tx.Exec(ctx, `UPDATE app_branding SET logo = $1, logo_type = $2, logo_name = $3`, raw, mime, path.Base(rel)); err != nil {
+					return err
+				}
+				step.note("marca: logo %s", path.Base(rel))
+			}
+		} else {
+			step.note("marca: el logo %s no está en el respaldo; súbelo en Administración → Marca", logoURL)
+		}
+	}
+	if f := strings.TrimSpace(titleFont); f != "" {
+		step.note("marca: la fuente del título del legacy («%s») venía en el frontend; súbela en Administración → Marca para usarla", f)
 	}
 	return nil
 }

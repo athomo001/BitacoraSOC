@@ -29,3 +29,18 @@ export const setupPendingGuard: CanActivateFn = async () => {
     return router.createUrlTree(['/login']);
   }
 };
+
+/**
+ * Pantallas que necesitan SOC o NOC (Bitácora, Turnos y Checklist,
+ * Escalamiento). Con solo la Ticketera, la app abre en la Ticketera.
+ */
+export const socOrNocGuard: CanActivateFn = async () => {
+  const setup = inject(SetupService);
+  const router = inject(Router);
+  try {
+    const status = await setup.loadStatus();
+    return status.socEnabled || status.nocEnabled || router.parseUrl('/tickets');
+  } catch {
+    return true;
+  }
+};

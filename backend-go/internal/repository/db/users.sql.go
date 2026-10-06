@@ -304,15 +304,18 @@ func (q *Queries) GetUserForLogin(ctx context.Context, login string) (User, erro
 	return i, err
 }
 
-const listActiveUserEmailsByRole = `-- name: ListActiveUserEmailsByRole :many
-SELECT email FROM users
-WHERE active = true
-  AND ($1::user_role IS NULL OR role = $1)
-ORDER BY email
+const listActiveUserEmailsByCargo = `-- name: ListActiveUserEmailsByCargo :many
+SELECT DISTINCT lower(trim(email))::text AS email FROM users
+WHERE active = true AND role IN ('admin', 'user', 'auditor')
+  AND email IS NOT NULL AND trim(email) <> ''
+  AND trim(cargo_label) = ANY($1::text[])
+ORDER BY 1
 `
 
-func (q *Queries) ListActiveUserEmailsByRole(ctx context.Context, role NullUserRole) ([]string, error) {
-	rows, err := q.db.Query(ctx, listActiveUserEmailsByRole, role)
+// Destinatarios de la alerta NOK del checklist: usuarios activos (admin,
+// usuario o auditor) con alguno de esos cargos, como el legacy.
+func (q *Queries) ListActiveUserEmailsByCargo(ctx context.Context, cargos []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, listActiveUserEmailsByCargo, cargos)
 	if err != nil {
 		return nil, err
 	}
@@ -324,6 +327,38 @@ func (q *Queries) ListActiveUserEmailsByRole(ctx context.Context, role NullUserR
 			return nil, err
 		}
 		items = append(items, email)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCargoLabelCounts = `-- name: ListCargoLabelCounts :many
+SELECT trim(cargo_label)::text AS cargo, count(*)::int AS people FROM users
+WHERE active = true AND cargo_label IS NOT NULL AND trim(cargo_label) <> ''
+GROUP BY 1 ORDER BY 1
+`
+
+type ListCargoLabelCountsRow struct {
+	Cargo  string `json:"cargo"`
+	People int32  `json:"people"`
+}
+
+// Cargos en uso y cuántas personas activas los tienen (para elegir a quién avisar).
+func (q *Queries) ListCargoLabelCounts(ctx context.Context) ([]ListCargoLabelCountsRow, error) {
+	rows, err := q.db.Query(ctx, listCargoLabelCounts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListCargoLabelCountsRow
+	for rows.Next() {
+		var i ListCargoLabelCountsRow
+		if err := rows.Scan(&i.Cargo, &i.People); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

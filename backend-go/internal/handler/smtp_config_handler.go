@@ -8,10 +8,13 @@ import (
 	"unicode"
 
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/branding"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/crypto"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/directory"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/mailtpl"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -160,8 +163,9 @@ func (h *SMTPConfigHandler) TestSend(w http.ResponseWriter, r *http.Request) {
 		writeData(w, http.StatusBadGateway, map[string]any{"sent": false, "error": "SMTP no configurado"})
 		return
 	}
-	body := "Este es un correo de prueba de Bitácora Ops.\r\n\r\nSi lo recibiste, la configuración SMTP funciona."
-	if err := sender.Send(strings.TrimSpace(req.To), "Prueba de correo - Bitácora Ops", body); err != nil {
+	// Plantilla del legacy (routes/smtp.js), estándar del área.
+	m := mailtpl.SMTPTest(branding.Title(ctx, h.Queries), time.Now())
+	if err := sender.SendAlternative([]string{strings.TrimSpace(req.To)}, nil, m.Subject, m.Text, m.HTML); err != nil {
 		_ = h.Queries.RecordSMTPTest(ctx, db.RecordSMTPTestParams{LastTestOk: pgtype.Bool{Bool: false, Valid: true}, LastTestError: pgtype.Text{String: err.Error(), Valid: true}})
 		h.AuditLog.Log(ctx, "config.smtp.test_send", audit.LevelWarn, audit.Failure(err.Error()), nil)
 		writeData(w, http.StatusBadGateway, map[string]any{"sent": false, "error": err.Error()})

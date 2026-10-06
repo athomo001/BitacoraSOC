@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"errors"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/branding"
 	"log/slog"
 	"net/http"
 	"os"
@@ -153,7 +154,7 @@ func run(logger *slog.Logger) error {
 	organizationsHandler := &handler.OrganizationsHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
 	directoryHandler := &handler.DirectoryHandler{Pool: pool, Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
 	smtpConfigHandler := &handler.SMTPConfigHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
-	escalationHandler := &handler.EscalationHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, Modules: &repository.ModuleAccess{Queries: queries}}
+	escalationHandler := &handler.EscalationHandler{DB: pool, Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, Modules: &repository.ModuleAccess{Queries: queries}}
 	teamsHandler := &handler.TeamsHandler{Queries: queries, AuditLog: auditLog, NOCEnabled: func(r *http.Request) bool {
 		flags, err := (&repository.ModuleAccess{Queries: queries}).InstanceFlags(r.Context())
 		return err == nil && flags.NOC
@@ -256,6 +257,18 @@ func run(logger *slog.Logger) error {
 
 	// Setup (Fase 4 tarea 0 — ver nota en spec/02-alcance-y-roadmap.md)
 	mux.Handle("GET /api/setup/status", public(setupHandler.Status))
+	brandingHandler := &handler.BrandingHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
+	mux.Handle("GET /api/branding", public(brandingHandler.Get))
+	mux.Handle("GET /api/branding/logo", public(brandingHandler.Logo))
+	mux.Handle("GET /api/branding/favicon", public(brandingHandler.Favicon))
+	mux.Handle("GET /api/branding/font", public(brandingHandler.Font))
+	mux.Handle("PATCH /api/branding", admin(brandingHandler.Patch))
+	mux.Handle("PUT /api/branding/logo", admin(brandingHandler.PutLogo))
+	mux.Handle("DELETE /api/branding/logo", admin(brandingHandler.DeleteLogo))
+	mux.Handle("PUT /api/branding/favicon", admin(brandingHandler.PutFavicon))
+	mux.Handle("DELETE /api/branding/favicon", admin(brandingHandler.DeleteFavicon))
+	mux.Handle("PUT /api/branding/font", admin(brandingHandler.PutFont))
+	mux.Handle("DELETE /api/branding/font", admin(brandingHandler.DeleteFont))
 	mux.Handle("POST /api/setup/bootstrap", public(setupHandler.Bootstrap))
 
 	// Auth
@@ -274,6 +287,7 @@ func run(logger *slog.Logger) error {
 
 	// Usuarios (admin)
 	mux.Handle("GET /api/users", admin(usersHandler.List))
+	mux.Handle("GET /api/users/cargos", admin(usersHandler.Cargos))
 	mux.Handle("POST /api/users", admin(usersHandler.Create))
 	mux.Handle("PATCH /api/users/{id}", admin(usersHandler.Patch))
 	mux.Handle("DELETE /api/users/{id}", admin(usersHandler.Delete))
@@ -328,6 +342,7 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/organizations", admin(organizationsHandler.Create))
 	mux.Handle("PATCH /api/organizations/{id}", admin(organizationsHandler.Patch))
 	mux.Handle("DELETE /api/organizations/{id}", admin(organizationsHandler.Delete))
+	mux.Handle("GET /api/organizations/{id}/dependents", admin(organizationsHandler.Dependents))
 	mux.Handle("GET /api/organization-types", authed(organizationsHandler.ListTypes))
 	mux.Handle("POST /api/organization-types", admin(organizationsHandler.CreateType))
 	mux.Handle("PATCH /api/organization-types/{code}", admin(organizationsHandler.PatchType))
@@ -386,6 +401,18 @@ func run(logger *slog.Logger) error {
 	mux.Handle("GET /api/escalation/policies", authed(escalationHandler.ListPolicies))
 	mux.Handle("POST /api/escalation/policies", admin(escalationHandler.CreatePolicy))
 	mux.Handle("DELETE /api/escalation/policies/{id}", admin(escalationHandler.DeletePolicy))
+	mux.Handle("PATCH /api/escalation/policies/{id}", admin(escalationHandler.PatchPolicy))
+	mux.Handle("GET /api/escalation/incidents", authed(escalationHandler.ListIncidents))
+	mux.Handle("POST /api/escalation/incidents", authed(escalationHandler.CreateIncident))
+	mux.Handle("PATCH /api/escalation/incidents/{id}", authed(escalationHandler.PatchIncident))
+	mux.Handle("GET /api/escalation/incidents/{id}/notes", authed(escalationHandler.ListIncidentNotes))
+	mux.Handle("POST /api/escalation/incidents/{id}/notes", authed(escalationHandler.AddIncidentNote))
+	mux.Handle("GET /api/escalation/pools", authed(escalationHandler.ListPools))
+	mux.Handle("POST /api/escalation/pools", admin(escalationHandler.CreatePool))
+	mux.Handle("PATCH /api/escalation/pools/{id}", admin(escalationHandler.PatchPool))
+	mux.Handle("DELETE /api/escalation/pools/{id}", admin(escalationHandler.DeletePool))
+	mux.Handle("GET /api/escalation/pools/{id}/members", authed(escalationHandler.ListPoolMembers))
+	mux.Handle("PUT /api/escalation/pools/{id}/members", admin(escalationHandler.PutPoolMembers))
 	mux.Handle("POST /api/escalation/policies/{id}/steps", admin(escalationHandler.AddStep))
 	mux.Handle("DELETE /api/escalation/policies/{id}/steps/{stepOrder}", admin(escalationHandler.DeleteStep))
 	mux.Handle("GET /api/maintenance-windows", authed(escalationHandler.ListWindows))
@@ -543,11 +570,33 @@ func run(logger *slog.Logger) error {
 		return sender, err
 	}, Schedules: func(ctx context.Context, sender *mail.Sender) error {
 		return dotacionHandler.DispatchDueSchedules(ctx, sender)
-	}, Brand: func(context.Context) reporting.Brand {
-		// Hasta que exista Administración → Marca, el nombre del producto.
-		return reporting.Brand{AppTitle: "Bitácora Ops"}
+	}, Brand: func(ctx context.Context) reporting.Brand {
+		// Administración → Marca (favicon de la cabecera: la URL externa si hay).
+		b := branding.Load(ctx, queries, false)
+		return reporting.Brand{AppTitle: b.AppTitle, FaviconURL: b.FaviconURL}
 	}}
 	mux.Handle("GET /api/reports/shift/recent", admin(checklistsHandler.RecentReports))
+	// Reportes (comentario del dueño #10) y Avisos por cliente.
+	reportsHandler := &handler.ReportsHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, Sender: func(ctx context.Context) (*mail.Sender, error) {
+		sender, _, err := handler.BuildMailSender(ctx, queries, cryptoBox)
+		return sender, err
+	}}
+	mux.Handle("POST /api/reports/{kind}/preview", authed(reportsHandler.Preview))
+	mux.Handle("POST /api/reports/{kind}/send", operator(reportsHandler.Send))
+	mux.Handle("GET /api/reports/recipients", authed(reportsHandler.Recipients))
+	mux.Handle("GET /api/reports/history", authed(reportsHandler.History))
+	mux.Handle("GET /api/reports/history/{id}", authed(reportsHandler.HistoryItem))
+	mux.Handle("DELETE /api/reports/history/{id}", admin(reportsHandler.DeleteHistory))
+	mux.Handle("GET /api/client-alerts", admin(reportsHandler.ListClientAlerts))
+	mux.Handle("GET /api/client-alerts/active", authed(reportsHandler.ActiveClientAlerts))
+	mux.Handle("POST /api/client-alerts/{id}/ack", authed(reportsHandler.AckClientAlert))
+	mux.Handle("POST /api/client-alerts", admin(reportsHandler.CreateClientAlert))
+	mux.Handle("PUT /api/client-alerts/{id}", admin(reportsHandler.UpdateClientAlert))
+	mux.Handle("DELETE /api/client-alerts/{id}", admin(reportsHandler.DeleteClientAlert))
+	mux.Handle("GET /api/report-operation-types", authed(reportsHandler.ListOperationTypes))
+	mux.Handle("POST /api/report-operation-types", admin(reportsHandler.CreateOperationType))
+	mux.Handle("PUT /api/report-operation-types/{id}", admin(reportsHandler.UpdateOperationType))
+	mux.Handle("DELETE /api/report-operation-types/{id}", admin(reportsHandler.DeleteOperationType))
 	mux.Handle("POST /api/reports/shift/dispatch", admin(func(w http.ResponseWriter, r *http.Request) {
 		if err := reportDispatcher.DispatchPending(r.Context()); err != nil {
 			auditLog.Log(r.Context(), "report.shift.dispatch", audit.LevelError, audit.Failure(err.Error()), nil)

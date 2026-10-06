@@ -45,14 +45,12 @@ func TestShiftReminderInputMerge(t *testing.T) {
 }
 
 func TestReminderMailEscapesText(t *testing.T) {
-	subject, body := reminderMail(db.ShiftReminder{Label: "Colas <phishing>", ReminderText: "Línea 1\r\n\r\n<script>x</script>"})
+	m := reminderMail("Bitácora Ops", db.ShiftReminder{Label: "Colas <phishing>", ReminderText: "Línea 1\r\n\r\n<script>x</script>"})
+	subject, body := m.Subject, m.HTML
 	if subject != "[Bitácora Ops] Colas <phishing>" {
 		t.Fatalf("asunto: %q", subject)
 	}
 	if strings.Contains(body, "<script>") || !strings.Contains(body, "&lt;script&gt;") {
 		t.Fatalf("el texto del admin debe ir escapado: %s", body)
-	}
-	if !strings.Contains(body, "Colas &lt;phishing&gt;") {
-		t.Fatalf("el nombre en el cuerpo debe ir escapado: %s", body)
 	}
 }

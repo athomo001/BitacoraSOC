@@ -44,12 +44,14 @@ export class TicketsComponent implements OnInit {
   protected readonly statusTone = STATUS_TONE;
 
   async ngOnInit(): Promise<void> {
-    await this.load();
-    // Otro analista cambió un ticket: la cola se refresca sola.
+    // Otro analista cambió un ticket: la cola se refresca sola. Se conecta
+    // antes de cargar, así el cierre queda registrado aunque el operador se
+    // vaya de la pantalla mientras carga.
     const stop = this.sse.connect((eventType) => {
       if (eventType.startsWith('ticket.')) void this.load();
     });
     this.destroyRef.onDestroy(stop);
+    await this.load();
   }
 
   protected async load(): Promise<void> {

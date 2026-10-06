@@ -41,12 +41,6 @@ WHERE (sqlc.narg('role')::user_role IS NULL OR role = sqlc.narg('role'))
   AND (sqlc.narg('active')::boolean IS NULL OR active = sqlc.narg('active'))
 ORDER BY username;
 
--- name: ListActiveUserEmailsByRole :many
-SELECT email FROM users
-WHERE active = true
-  AND (sqlc.narg('role')::user_role IS NULL OR role = sqlc.narg('role'))
-ORDER BY email;
-
 -- name: UpdateUserAdmin :one
 -- PATCH /api/users/:id — campos parciales: NULL en un parámetro conserva el
 -- valor actual (COALESCE), no lo borra.
@@ -113,3 +107,18 @@ UPDATE users SET mfa_enabled = true, updated_at = now() WHERE id = $1;
 
 -- name: DisableMFA :exec
 UPDATE users SET mfa_enabled = false, mfa_secret_encrypted = NULL, updated_at = now() WHERE id = $1;
+
+-- name: ListActiveUserEmailsByCargo :many
+-- Destinatarios de la alerta NOK del checklist: usuarios activos (admin,
+-- usuario o auditor) con alguno de esos cargos, como el legacy.
+SELECT DISTINCT lower(trim(email))::text AS email FROM users
+WHERE active = true AND role IN ('admin', 'user', 'auditor')
+  AND email IS NOT NULL AND trim(email) <> ''
+  AND trim(cargo_label) = ANY(sqlc.arg('cargos')::text[])
+ORDER BY 1;
+
+-- name: ListCargoLabelCounts :many
+-- Cargos en uso y cuántas personas activas los tienen (para elegir a quién avisar).
+SELECT trim(cargo_label)::text AS cargo, count(*)::int AS people FROM users
+WHERE active = true AND cargo_label IS NOT NULL AND trim(cargo_label) <> ''
+GROUP BY 1 ORDER BY 1;

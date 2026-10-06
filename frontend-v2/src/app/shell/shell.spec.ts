@@ -47,6 +47,8 @@ describe('ShellComponent', () => {
     httpMock.expectOne('/api/system-features').flush({ data: features });
     await fixture.whenStable();
     fixture.detectChanges();
+    await new Promise((resolve) => setTimeout(resolve));
+    fixture.detectChanges();
     return { fixture, el: fixture.nativeElement as HTMLElement };
   }
 
@@ -54,9 +56,9 @@ describe('ShellComponent', () => {
     return [...el.querySelectorAll('.shell__nav-label')].map((n) => n.textContent?.trim() ?? '');
   }
 
-  it('muestra las 5 secciones del núcleo y oculta la ticketera si está apagada', async () => {
+  it('muestra las 6 secciones del núcleo y oculta la ticketera si está apagada', async () => {
     const { el } = await render([{ code: 'native_tickets', isEnabled: false }]);
-    expect(navLabels(el)).toEqual(['Bitácora', 'Turnos y Checklist', 'Escalamiento', 'Directorio', 'Administración']);
+    expect(navLabels(el)).toEqual(['Bitácora', 'Turnos y Checklist', 'Escalamiento', 'Directorio', 'Reportes', 'Administración']);
   });
 
   it('tras recargar la página vuelve a pedir el usuario y muestra su nombre al pie de la barra', async () => {
@@ -111,7 +113,7 @@ describe('ShellComponent', () => {
     // El inglés se descarga al elegir EN (no va en el bundle inicial).
     await TestBed.inject(I18nService).loadEnglish();
     fixture.detectChanges();
-    expect(navLabels(el)).toEqual(['Logbook', 'Tickets', 'Shifts & Checklist', 'Escalation', 'Directory', 'Administration']);
+    expect(navLabels(el)).toEqual(['Logbook', 'Tickets', 'Shifts & Checklist', 'Escalation', 'Directory', 'Reports', 'Administration']);
     expect(document.documentElement.lang).toBe('en');
   });
 

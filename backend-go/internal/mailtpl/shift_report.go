@@ -247,15 +247,7 @@ func ShiftReportSubject(tpl, appTitle, date, shiftName, hour string) string {
 	subject := caseInsensitive("[fecha]").ReplaceAllLiteralString(tpl, date)
 	subject = caseInsensitive("[turno]").ReplaceAllLiteralString(subject, shiftName)
 	subject = caseInsensitive("[hora]").ReplaceAllLiteralString(subject, hour)
-	title, subject := strings.TrimSpace(appTitle), strings.TrimSpace(subject)
-	switch {
-	case title != "" && subject != "":
-		return "[" + title + "] " + subject
-	case subject != "":
-		return subject
-	default:
-		return title
-	}
+	return BrandedSubject(appTitle, subject)
 }
 
 func caseInsensitive(literal string) *regexp.Regexp {

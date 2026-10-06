@@ -1,3 +1,4 @@
+import { BrandingService, Branding } from '../core/branding/branding.service';
 import { ChangeDetectionStrategy, Component, DestroyRef, HostListener, Injector, OnInit, computed, effect, inject } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
@@ -60,8 +61,8 @@ export class ShellComponent implements OnInit {
     const wasOn = new Map<string, boolean>();
     effect(() => {
       for (const item of SHELL_NAV_ITEMS) {
-        if (!item.requiresFeature) continue;
-        const on = this.features.isEnabled(item.requiresFeature);
+        if (!item.requiresFeature && !item.requiresSocOrNoc) continue;
+        const on = (!item.requiresFeature || this.features.isEnabled(item.requiresFeature)) && (!item.requiresSocOrNoc || this.socOrNoc());
         const leaving = wasOn.get(item.path) === true && !on;
         wasOn.set(item.path, on);
         if (leaving && this.router.url.split('?')[0].startsWith('/' + item.path)) void this.router.navigateByUrl('/entries');
@@ -74,14 +75,22 @@ export class ShellComponent implements OnInit {
     SHELL_NAV_ITEMS.filter(
       (item) =>
         (!item.requiresFeature || this.features.isEnabled(item.requiresFeature)) &&
+        (!item.requiresSocOrNoc || this.socOrNoc()) &&
         (!item.requiresComplements || this.complements.available().length > 0),
     ),
   );
+  /** SOC o NOC encendidos en la instalación (sin estado todavía, se asume que sí). */
+  private readonly socOrNoc = computed(() => {
+    const status = this.setup.status();
+    return !status || status.socEnabled || status.nocEnabled;
+  });
   protected readonly nextTheme = computed(() => NEXT_THEME[this.prefs.theme()]);
   protected readonly displayName = computed(() => {
     const user = this.auth.user();
     return user?.fullName || user?.username || '';
   });
+
+  protected readonly branding = inject(BrandingService);
 
   async ngOnInit(): Promise<void> {
     // Cambios hechos por otro admin u otra pestaña llegan en vivo.
@@ -89,6 +98,8 @@ export class ShellComponent implements OnInit {
       if (eventType === 'system_feature.updated' && isFeature(data)) this.features.apply(data);
       // SOC/NOC encendidos o apagados por otro admin: menús y pantallas cambian sin F5.
       if (eventType === 'config.modules.updated' && isModules(data)) this.setup.applyModules(data);
+      // Marca cambiada por un admin: barra, pestaña y fuente sin F5.
+      if (eventType === 'config.branding.updated' && data && typeof data === 'object' && 'appTitle' in data) this.branding.apply(data as Branding);
     });
     this.destroyRef.onDestroy(stop);
     await Promise.all([this.loadUser(), this.loadFeatures()]);

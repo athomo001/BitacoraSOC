@@ -8,10 +8,17 @@
   <!-- Inicio y Cierre de turno: arriba, sin bajar al final (comentarios del dueño #6/#6.1) -->
   @if (shift()) {
     <div class="ms-report-bar">
-      @for (m of ['inicio', 'cierre']; track m) {
-        <button type="button" class="ms-btn ms-report-bar__btn" (click)="openReport($any(m))">
-          <mat-icon>{{ m === 'inicio' ? 'wb_sunny' : 'nightlight' }}</mat-icon>{{ i18n.t(m === 'inicio' ? 'shiftReport.title.inicio' : 'shiftReport.title.cierre') }}
-          <span class="pill" [class.tone-ok]="reportState($any(m)) !== 'pending'" [class.tone-neutral]="reportState($any(m)) === 'pending'">{{ i18n.t($any('shiftReport.state.' + reportState($any(m)))) }}</span>
+      <p class="ms-report-bar__hint">{{ i18n.t('shiftReport.bar.hint') }}</p>
+      @for (m of moments; track m) {
+        @let state = reportState(m);
+        <button type="button" class="ms-btn ms-report-bar__btn" [class.ms-report-bar__btn--done]="state !== 'pending'" (click)="openReport(m)">
+          <mat-icon>{{ m === 'inicio' ? 'wb_sunny' : 'nightlight' }}</mat-icon>{{ i18n.t(barLabel(m, state)) }}
+          @if (state === 'pending') {
+            <span class="pill tone-neutral">{{ i18n.t('shiftReport.state.pending') }}</span>
+          } @else {
+            @if (reportTime(m); as at) { <span class="mono">· {{ at | date: 'HH:mm' }}</span> }
+            <mat-icon class="ms-report-bar__check" aria-hidden="true">check_circle</mat-icon>
+          }
         </button>
       }
     </div>

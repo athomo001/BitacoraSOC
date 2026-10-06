@@ -53,8 +53,8 @@ SELECT * FROM work_shift_notification_schedules ORDER BY name;
 SELECT * FROM work_shift_notification_schedules WHERE id = $1;
 
 -- name: CreateNotificationSchedule :one
-INSERT INTO work_shift_notification_schedules (name, frequency, day_of_week, send_time, role_filter, recipients, cc_recipients, created_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *;
+INSERT INTO work_shift_notification_schedules (name, frequency, day_of_week, send_time, role_filter, recipients, cc_recipients, created_by, target_period, email_format)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *;
 
 -- name: PatchNotificationSchedule :one
 UPDATE work_shift_notification_schedules SET
@@ -66,6 +66,26 @@ UPDATE work_shift_notification_schedules SET
   role_filter = COALESCE(sqlc.narg('role_filter')::text[], role_filter),
   recipients = COALESCE(sqlc.narg('recipients')::text[], recipients),
   cc_recipients = COALESCE(sqlc.narg('cc_recipients')::text[], cc_recipients),
+  target_period = COALESCE(sqlc.narg('target_period'), target_period),
+  email_format = COALESCE(sqlc.narg('email_format'), email_format),
   updated_at = now()
 WHERE id = $1
 RETURNING *;
+
+-- name: ListGuardSlotsForRange :many
+-- Guardias semanales (equipos "oncall": Guardia N2, Guardia TI…) que tocan
+-- el periodo, para el correo de dotación en formato lista
+-- (sendEscalationScheduleInternal del legacy).
+SELECT s.week_start_date, s.week_end_date, t.name AS team_name, c.start_time_utc, c.timezone,
+  COALESCE(NULLIF(u.full_name, ''), ct.name, 'Pendiente')::text AS person_name,
+  COALESCE(u.cargo_label, '')::text AS cargo_label,
+  tm.user_id
+FROM rotation_slots s
+JOIN rotation_cycles c ON c.id = s.cycle_id
+JOIN teams t ON t.id = c.team_id
+JOIN team_members tm ON tm.id = s.team_member_id
+LEFT JOIN users u ON u.id = tm.user_id
+LEFT JOIN contacts ct ON ct.id = tm.contact_id
+WHERE t.kind = 'oncall' AND NOT s.is_paused
+  AND s.week_start_date <= sqlc.arg('to_date')::date AND s.week_end_date >= sqlc.arg('from_date')::date
+ORDER BY s.week_start_date, t.name;

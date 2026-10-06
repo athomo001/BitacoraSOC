@@ -1177,6 +1177,25 @@ func (q *Queries) ListTicketsView(ctx context.Context, arg ListTicketsViewParams
 	return items, nil
 }
 
+const markEntriesOfDeletedTicket = `-- name: MarkEntriesOfDeletedTicket :exec
+INSERT INTO entry_comments (entry_id, user_id, comment, is_system_generated)
+SELECT e.id, $1, $2, true
+FROM entries e WHERE e.ticket_id = $3
+`
+
+type MarkEntriesOfDeletedTicketParams struct {
+	UserID   uuid.UUID   `json:"user_id"`
+	Comment  string      `json:"comment"`
+	TicketID pgtype.UUID `json:"ticket_id"`
+}
+
+// Al eliminar un ticket (comentario del dueño #20) la entrada de la
+// bitácora se queda: un comentario de sistema deja constancia del ticket.
+func (q *Queries) MarkEntriesOfDeletedTicket(ctx context.Context, arg MarkEntriesOfDeletedTicketParams) error {
+	_, err := q.db.Exec(ctx, markEntriesOfDeletedTicket, arg.UserID, arg.Comment, arg.TicketID)
+	return err
+}
+
 const markTicketResponded = `-- name: MarkTicketResponded :exec
 UPDATE tickets SET first_responded_at = COALESCE(first_responded_at, $2::timestamptz), updated_at = now() WHERE id = $1
 `

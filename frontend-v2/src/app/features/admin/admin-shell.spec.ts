@@ -69,6 +69,14 @@ describe('AdminShellComponent', () => {
     expect(items()).toContain('Territorio');
   });
 
+  it('con solo la Ticketera no aparecen Turnos, Checklist, Escalamiento ni Reportes de turno; Avisos por cliente sí', async () => {
+    const { fixture, items } = render();
+    await answerModules(fixture, { socEnabled: false, nocEnabled: false });
+    for (const hidden of ['Turnos', 'Checklist', 'Escalamiento', 'Reportes de turno']) expect(items()).not.toContain(hidden);
+    expect(items()).toContain('Avisos por cliente');
+    expect(items()).toContain('Correo');
+  });
+
   it('Ctrl+K enfoca el buscador', () => {
     const { el } = render();
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));

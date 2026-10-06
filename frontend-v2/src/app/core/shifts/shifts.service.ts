@@ -142,7 +142,13 @@ export interface NotificationSchedule {
   recipients: string[];
   ccRecipients: string[];
   lastSentAt?: string;
+  /** Semana que informa el correo (targetPeriod del legacy). */
+  targetPeriod: NotificationTargetPeriod;
+  /** calendar = grilla "Personal Fuera de la Oficina"; list = guardias (llega con el rediseño de escalamiento). */
+  emailFormat: 'calendar' | 'list';
 }
+
+export type NotificationTargetPeriod = 'current_week' | 'next_week';
 
 /** Turnos, rotación de guardia y dotación/teletrabajo (Fase 8). */
 /** Recordatorio de turno por correo (Administración → Turnos → Recordatorios). */
@@ -250,14 +256,16 @@ export class ShiftsService {
 
   async createNotificationSchedule(schedule: {
     name: string; frequency: NotificationFrequency; dayOfWeek: number; sendTime: string;
-    roleFilter?: string[]; recipients: string[]; ccRecipients?: string[];
+    roleFilter?: string[]; recipients: string[]; ccRecipients?: string[]; targetPeriod?: NotificationTargetPeriod;
+    emailFormat?: NotificationSchedule['emailFormat'];
   }): Promise<NotificationSchedule> {
     return (await firstValueFrom(this.http.post<ApiEnvelope<NotificationSchedule>>('/api/work-shifts/notification-schedules', schedule))).data;
   }
 
   async patchNotificationSchedule(id: string, patch: Partial<{
     enabled: boolean; name: string; frequency: NotificationFrequency; dayOfWeek: number; sendTime: string;
-    roleFilter: string[]; recipients: string[]; ccRecipients: string[];
+    roleFilter: string[]; recipients: string[]; ccRecipients: string[]; targetPeriod: NotificationTargetPeriod;
+    emailFormat: NotificationSchedule['emailFormat'];
   }>): Promise<NotificationSchedule> {
     return (await firstValueFrom(this.http.patch<ApiEnvelope<NotificationSchedule>>(`/api/work-shifts/notification-schedules/${id}`, patch))).data;
   }

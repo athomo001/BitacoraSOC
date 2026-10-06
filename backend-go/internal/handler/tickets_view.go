@@ -458,12 +458,36 @@ func (h *TicketsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	number, err := h.Queries.DeleteTicket(ctx, id)
+	ticket, err := h.Queries.GetTicket(ctx, id)
 	if err != nil {
 		problemdetails.Write(w, r, 404, "not-found", "ticket no encontrado")
 		return
 	}
-	h.AuditLog.Log(ctx, "ticket.deleted", audit.LevelWarn, audit.Success(), map[string]any{"ticketId": id.String(), "ticketNumber": number})
+	user, _ := middleware.UserFromContext(ctx)
+	tx, err := h.Pool.Begin(ctx)
+	if err != nil {
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudo eliminar el ticket")
+		return
+	}
+	defer tx.Rollback(ctx)
+	q := h.Queries.WithTx(tx)
+	// Comentario del dueño #20: la entrada de la bitácora no se borra con el
+	// ticket; queda con un comentario de sistema que dice qué ticket fue.
+	note := fmt.Sprintf("Ticket %s eliminado por %s el %s: «%s»", ticket.TicketNumber, user.Username, h.now().In(chileTime).Format("02-01-2006 15:04"), ticket.Title)
+	if err := q.MarkEntriesOfDeletedTicket(ctx, db.MarkEntriesOfDeletedTicketParams{UserID: user.ID, Comment: note, TicketID: pgtype.UUID{Bytes: id, Valid: true}}); err != nil {
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudo eliminar el ticket")
+		return
+	}
+	number, err := q.DeleteTicket(ctx, id)
+	if err != nil {
+		problemdetails.Write(w, r, 404, "not-found", "ticket no encontrado")
+		return
+	}
+	if err := tx.Commit(ctx); err != nil {
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudo eliminar el ticket")
+		return
+	}
+	h.AuditLog.Log(ctx, "ticket.deleted", audit.LevelWarn, audit.Success(), map[string]any{"ticketId": id.String(), "ticketNumber": number, "title": ticket.Title})
 	publishSync(ctx, h.Hub, "ticket.updated", map[string]string{"id": id.String()})
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -643,3 +667,12 @@ func writeImage(w http.ResponseWriter, mime, name string, data []byte) {
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(data)
 }
+
+// chileTime es la hora del área para los textos que quedan en la bitácora;
+// sin la base de zonas horarias, la del servidor.
+var chileTime = func() *time.Location {
+	if loc, err := time.LoadLocation("America/Santiago"); err == nil {
+		return loc
+	}
+	return time.Local
+}()

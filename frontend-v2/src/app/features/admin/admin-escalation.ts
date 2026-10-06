@@ -17,6 +17,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
 import { MaintenanceWindowsComponent } from '../escalation/maintenance-windows';
+import { AdminEscalationPoolsComponent } from './admin-escalation-pools';
 
 type ScopeKind = 'asset' | 'unit' | 'service';
 const MODES: readonly StepMode[] = ['unique', 'sequential', 'pool'];
@@ -32,7 +33,7 @@ const MODES: readonly StepMode[] = ['unique', 'sequential', 'pool'];
 @Component({
   selector: 'app-admin-escalation',
   standalone: true,
-  imports: [FormsModule, MatIconModule, MaintenanceWindowsComponent],
+  imports: [FormsModule, MatIconModule, MaintenanceWindowsComponent, AdminEscalationPoolsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-escalation.html',
   styles: `
@@ -44,6 +45,8 @@ const MODES: readonly StepMode[] = ['unique', 'sequential', 'pool'];
     .ea__step-form { border-top: 1px solid var(--border-subtle); }
     .ea__actions { display: flex; justify-content: flex-end; }
     .ea__confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
+    .ea__reminder { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); }
+    .ea__reminder .adm-field { flex: 1 1 260px; }
   `,
 })
 export class AdminEscalationComponent implements OnInit {
@@ -158,8 +161,19 @@ export class AdminEscalationComponent implements OnInit {
     return p.steps.map((s) => `${s.stepOrder}. ${s.teamName}`).join(' → ');
   }
 
+  /** Recordatorio del cliente bajo el flujo de llamados ("Llamar 3 veces y 1 minuto por cada llamada"). */
+  protected readonly reminder = signal('');
+
+  protected async saveReminder(p: Policy): Promise<void> {
+    await this.run(async () => {
+      await this.api.setPolicyReminder(p.id, this.reminder().trim());
+      this.policies.update((list) => list.map((x) => (x.id === p.id ? { ...x, reminder: this.reminder().trim() || undefined } : x)));
+    });
+  }
+
   protected select(p: Policy): void {
     this.selectedId.set(p.id);
+    this.reminder.set(p.reminder ?? '');
     this.confirmDelete.set(false);
     this.stepOrder.set((p.steps.at(-1)?.stepOrder ?? 0) + 1);
   }

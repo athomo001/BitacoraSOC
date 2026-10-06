@@ -5,6 +5,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { PermissionsService } from '../../core/auth/permissions.service';
 import { problemDetail } from '../../core/http-error';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { MessageKey } from '../../core/i18n/messages';
 import { ChecklistItem, ChecklistsService, ChecklistTemplate, Handover, ShiftCheck, ShiftClosure, ShiftStats } from '../../core/checklists/checklists.service';
 import type { ShiftReportResult } from './shift-report-dialog';
 import { ChecklistAnswers, CheckStatus, causeSuggestions, depth, emptyAnswers, groupIds, groupStatus, progress, toServices } from '../../core/checklists/checklist-form';
@@ -255,6 +256,23 @@ export class MyShiftComponent implements OnInit {
   }
 
   /** Estado de cada botón de arriba. */
+  protected readonly moments: readonly Moment[] = ['inicio', 'cierre'];
+
+  /** El botón dice lo que hace mientras está pendiente y lo que ya pasó después. */
+  protected barLabel(mode: Moment, state: 'pending' | 'done' | 'closed'): MessageKey {
+    if (mode === 'inicio') return state === 'pending' ? 'shiftReport.bar.start' : 'shiftReport.bar.started';
+    if (state === 'closed') return 'shiftReport.bar.closed';
+    return state === 'pending' ? 'shiftReport.bar.close' : 'shiftReport.bar.closeWritten';
+  }
+
+  /** Hora en que se escribió el inicio o el cierre (o se cerró el turno). */
+  protected reportTime(mode: Moment): string | null {
+    const s = this.stats();
+    if (mode === 'inicio') return s?.inicioWrittenAt ?? null;
+    if (this.closure()) return this.closureCheck()?.checkDate ?? s?.cierreWrittenAt ?? null;
+    return s?.cierreWrittenAt ?? null;
+  }
+
   protected reportState(mode: Moment): 'pending' | 'done' | 'closed' {
     if (mode === 'cierre' && this.closure()) return 'closed';
     const s = this.stats();

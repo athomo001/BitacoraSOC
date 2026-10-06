@@ -3,7 +3,6 @@ package handler
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -409,36 +408,3 @@ func (h *OrganizationsHandler) PatchLogSource(w http.ResponseWriter, r *http.Req
 // organización sin nada asociado: con servicios, contactos, tickets, equipos
 // o activos responde 409 con el detalle, para desactivarla o mover esos datos
 // antes (los contactos caerían en cascada y el resto quedaría huérfano).
-func (h *OrganizationsHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		problemdetails.Write(w, r, 404, "not-found", "organización no encontrada")
-		return
-	}
-	ctx := r.Context()
-	dep, err := h.Queries.OrganizationDependents(ctx, id)
-	if err != nil {
-		problemdetails.Write(w, r, 500, "internal-error", "no se pudo revisar la organización")
-		return
-	}
-	var parts []string
-	for _, p := range []struct {
-		n    int64
-		name string
-	}{{dep.Services, "servicios"}, {dep.Contacts, "contactos"}, {dep.Tickets, "tickets"}, {dep.Teams, "equipos"}, {dep.Assets, "activos"}, {dep.Other, "otras asignaciones"}} {
-		if p.n > 0 {
-			parts = append(parts, fmt.Sprintf("%d %s", p.n, p.name))
-		}
-	}
-	if len(parts) > 0 {
-		problemdetails.Write(w, r, http.StatusConflict, "organization-in-use", "no se puede eliminar: tiene "+strings.Join(parts, ", ")+". Desactívala o mueve esos datos a otra organización.")
-		return
-	}
-	n, err := h.Queries.DeleteOrganization(ctx, id)
-	if err != nil || n == 0 {
-		problemdetails.Write(w, r, 404, "not-found", "organización no encontrada")
-		return
-	}
-	h.AuditLog.Log(ctx, "organization.delete", audit.LevelWarn, audit.Success(), map[string]any{"organizationId": id.String()})
-	w.WriteHeader(http.StatusNoContent)
-}

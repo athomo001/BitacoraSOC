@@ -12,6 +12,51 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const addEscalationIncidentNote = `-- name: AddEscalationIncidentNote :one
+INSERT INTO escalation_incident_notes (incident_id, user_id, note) VALUES ($1, $2, $3) RETURNING id, incident_id, user_id, note, created_at
+`
+
+type AddEscalationIncidentNoteParams struct {
+	IncidentID uuid.UUID `json:"incident_id"`
+	UserID     uuid.UUID `json:"user_id"`
+	Note       string    `json:"note"`
+}
+
+func (q *Queries) AddEscalationIncidentNote(ctx context.Context, arg AddEscalationIncidentNoteParams) (EscalationIncidentNote, error) {
+	row := q.db.QueryRow(ctx, addEscalationIncidentNote, arg.IncidentID, arg.UserID, arg.Note)
+	var i EscalationIncidentNote
+	err := row.Scan(
+		&i.ID,
+		&i.IncidentID,
+		&i.UserID,
+		&i.Note,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const addEscalationPoolMember = `-- name: AddEscalationPoolMember :exec
+INSERT INTO escalation_pool_members (pool_id, contact_id, user_id, position)
+VALUES ($1, $2, $3, $4)
+`
+
+type AddEscalationPoolMemberParams struct {
+	PoolID    uuid.UUID   `json:"pool_id"`
+	ContactID pgtype.UUID `json:"contact_id"`
+	UserID    pgtype.UUID `json:"user_id"`
+	Position  int32       `json:"position"`
+}
+
+func (q *Queries) AddEscalationPoolMember(ctx context.Context, arg AddEscalationPoolMemberParams) error {
+	_, err := q.db.Exec(ctx, addEscalationPoolMember,
+		arg.PoolID,
+		arg.ContactID,
+		arg.UserID,
+		arg.Position,
+	)
+	return err
+}
+
 const addPolicyStep = `-- name: AddPolicyStep :one
 INSERT INTO escalation_steps (policy_id, step_order, team_id, mode, wait_before_escalate_minutes)
 VALUES ($1, $2, $3, $4, $5) RETURNING id, policy_id, step_order, team_id, mode, wait_before_escalate_minutes
@@ -41,6 +86,97 @@ func (q *Queries) AddPolicyStep(ctx context.Context, arg AddPolicyStepParams) (E
 		&i.TeamID,
 		&i.Mode,
 		&i.WaitBeforeEscalateMinutes,
+	)
+	return i, err
+}
+
+const clearEscalationPoolMembers = `-- name: ClearEscalationPoolMembers :exec
+DELETE FROM escalation_pool_members WHERE pool_id = $1
+`
+
+func (q *Queries) ClearEscalationPoolMembers(ctx context.Context, poolID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, clearEscalationPoolMembers, poolID)
+	return err
+}
+
+const closeEscalationIncident = `-- name: CloseEscalationIncident :execrows
+UPDATE escalation_incidents SET closed_at = now(), closed_by = $2 WHERE id = $1 AND closed_at IS NULL
+`
+
+type CloseEscalationIncidentParams struct {
+	ID       uuid.UUID   `json:"id"`
+	ClosedBy pgtype.UUID `json:"closed_by"`
+}
+
+func (q *Queries) CloseEscalationIncident(ctx context.Context, arg CloseEscalationIncidentParams) (int64, error) {
+	result, err := q.db.Exec(ctx, closeEscalationIncident, arg.ID, arg.ClosedBy)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const createEscalationIncident = `-- name: CreateEscalationIncident :one
+INSERT INTO escalation_incidents (service_id, asset_id, territorial_unit_id, title, glpi_ticket, ticket_id, opened_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, service_id, asset_id, territorial_unit_id, title, glpi_ticket, ticket_id, opened_by, opened_at, closed_by, closed_at
+`
+
+type CreateEscalationIncidentParams struct {
+	ServiceID         pgtype.UUID `json:"service_id"`
+	AssetID           pgtype.UUID `json:"asset_id"`
+	TerritorialUnitID pgtype.UUID `json:"territorial_unit_id"`
+	Title             string      `json:"title"`
+	GlpiTicket        pgtype.Text `json:"glpi_ticket"`
+	TicketID          pgtype.UUID `json:"ticket_id"`
+	OpenedBy          uuid.UUID   `json:"opened_by"`
+}
+
+func (q *Queries) CreateEscalationIncident(ctx context.Context, arg CreateEscalationIncidentParams) (EscalationIncident, error) {
+	row := q.db.QueryRow(ctx, createEscalationIncident,
+		arg.ServiceID,
+		arg.AssetID,
+		arg.TerritorialUnitID,
+		arg.Title,
+		arg.GlpiTicket,
+		arg.TicketID,
+		arg.OpenedBy,
+	)
+	var i EscalationIncident
+	err := row.Scan(
+		&i.ID,
+		&i.ServiceID,
+		&i.AssetID,
+		&i.TerritorialUnitID,
+		&i.Title,
+		&i.GlpiTicket,
+		&i.TicketID,
+		&i.OpenedBy,
+		&i.OpenedAt,
+		&i.ClosedBy,
+		&i.ClosedAt,
+	)
+	return i, err
+}
+
+const createEscalationPool = `-- name: CreateEscalationPool :one
+INSERT INTO escalation_pools (organization_id, name) VALUES ($1, $2) RETURNING id, organization_id, name, active, created_at
+`
+
+type CreateEscalationPoolParams struct {
+	OrganizationID pgtype.UUID `json:"organization_id"`
+	Name           string      `json:"name"`
+}
+
+func (q *Queries) CreateEscalationPool(ctx context.Context, arg CreateEscalationPoolParams) (EscalationPool, error) {
+	row := q.db.QueryRow(ctx, createEscalationPool, arg.OrganizationID, arg.Name)
+	var i EscalationPool
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.Name,
+		&i.Active,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -95,7 +231,7 @@ func (q *Queries) CreateMaintenanceWindow(ctx context.Context, arg CreateMainten
 }
 
 const createPolicy = `-- name: CreatePolicy :one
-INSERT INTO escalation_policies (service_id, asset_id, territorial_unit_id) VALUES ($1, $2, $3) RETURNING id, service_id, asset_id, territorial_unit_id, active
+INSERT INTO escalation_policies (service_id, asset_id, territorial_unit_id) VALUES ($1, $2, $3) RETURNING id, service_id, asset_id, territorial_unit_id, active, reminder
 `
 
 type CreatePolicyParams struct {
@@ -113,6 +249,7 @@ func (q *Queries) CreatePolicy(ctx context.Context, arg CreatePolicyParams) (Esc
 		&i.AssetID,
 		&i.TerritorialUnitID,
 		&i.Active,
+		&i.Reminder,
 	)
 	return i, err
 }
@@ -189,6 +326,18 @@ func (q *Queries) DeactivateMaintenanceWindow(ctx context.Context, id uuid.UUID)
 	return result.RowsAffected(), nil
 }
 
+const deleteEscalationPool = `-- name: DeleteEscalationPool :execrows
+DELETE FROM escalation_pools WHERE id = $1
+`
+
+func (q *Queries) DeleteEscalationPool(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteEscalationPool, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deletePolicy = `-- name: DeletePolicy :execrows
 DELETE FROM escalation_policies WHERE id = $1
 `
@@ -259,8 +408,70 @@ func (q *Queries) GetAssetForResolve(ctx context.Context, id uuid.UUID) (GetAsse
 	return i, err
 }
 
+const getEscalationIncident = `-- name: GetEscalationIncident :one
+SELECT i.id, i.service_id, i.asset_id, i.territorial_unit_id, i.title, i.glpi_ticket, i.ticket_id, i.opened_by, i.opened_at, i.closed_by, i.closed_at, u.username AS opened_by_username, t.ticket_number
+FROM escalation_incidents i
+JOIN users u ON u.id = i.opened_by
+LEFT JOIN tickets t ON t.id = i.ticket_id
+WHERE i.id = $1
+`
+
+type GetEscalationIncidentRow struct {
+	ID                uuid.UUID          `json:"id"`
+	ServiceID         pgtype.UUID        `json:"service_id"`
+	AssetID           pgtype.UUID        `json:"asset_id"`
+	TerritorialUnitID pgtype.UUID        `json:"territorial_unit_id"`
+	Title             string             `json:"title"`
+	GlpiTicket        pgtype.Text        `json:"glpi_ticket"`
+	TicketID          pgtype.UUID        `json:"ticket_id"`
+	OpenedBy          uuid.UUID          `json:"opened_by"`
+	OpenedAt          pgtype.Timestamptz `json:"opened_at"`
+	ClosedBy          pgtype.UUID        `json:"closed_by"`
+	ClosedAt          pgtype.Timestamptz `json:"closed_at"`
+	OpenedByUsername  string             `json:"opened_by_username"`
+	TicketNumber      pgtype.Text        `json:"ticket_number"`
+}
+
+func (q *Queries) GetEscalationIncident(ctx context.Context, id uuid.UUID) (GetEscalationIncidentRow, error) {
+	row := q.db.QueryRow(ctx, getEscalationIncident, id)
+	var i GetEscalationIncidentRow
+	err := row.Scan(
+		&i.ID,
+		&i.ServiceID,
+		&i.AssetID,
+		&i.TerritorialUnitID,
+		&i.Title,
+		&i.GlpiTicket,
+		&i.TicketID,
+		&i.OpenedBy,
+		&i.OpenedAt,
+		&i.ClosedBy,
+		&i.ClosedAt,
+		&i.OpenedByUsername,
+		&i.TicketNumber,
+	)
+	return i, err
+}
+
+const getEscalationPool = `-- name: GetEscalationPool :one
+SELECT id, organization_id, name, active, created_at FROM escalation_pools WHERE id = $1
+`
+
+func (q *Queries) GetEscalationPool(ctx context.Context, id uuid.UUID) (EscalationPool, error) {
+	row := q.db.QueryRow(ctx, getEscalationPool, id)
+	var i EscalationPool
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.Name,
+		&i.Active,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getPolicy = `-- name: GetPolicy :one
-SELECT id, service_id, asset_id, territorial_unit_id, active FROM escalation_policies WHERE id = $1
+SELECT id, service_id, asset_id, territorial_unit_id, active, reminder FROM escalation_policies WHERE id = $1
 `
 
 func (q *Queries) GetPolicy(ctx context.Context, id uuid.UUID) (EscalationPolicy, error) {
@@ -272,6 +483,7 @@ func (q *Queries) GetPolicy(ctx context.Context, id uuid.UUID) (EscalationPolicy
 		&i.AssetID,
 		&i.TerritorialUnitID,
 		&i.Active,
+		&i.Reminder,
 	)
 	return i, err
 }
@@ -295,8 +507,8 @@ func (q *Queries) GetService(ctx context.Context, id uuid.UUID) (Service, error)
 
 const insertActionLog = `-- name: InsertActionLog :one
 
-INSERT INTO escalation_action_logs (entry_id, policy_id, step_order, contact_id, channel_type, result, notes, operator_id)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, entry_id, policy_id, step_order, contact_id, channel_type, result, notes, operator_id, created_at
+INSERT INTO escalation_action_logs (entry_id, policy_id, step_order, contact_id, channel_type, result, notes, operator_id, incident_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, entry_id, policy_id, step_order, contact_id, channel_type, result, notes, operator_id, created_at, incident_id
 `
 
 type InsertActionLogParams struct {
@@ -308,6 +520,7 @@ type InsertActionLogParams struct {
 	Result      ContactAttemptResult `json:"result"`
 	Notes       pgtype.Text          `json:"notes"`
 	OperatorID  uuid.UUID            `json:"operator_id"`
+	IncidentID  pgtype.UUID          `json:"incident_id"`
 }
 
 // ===== Intentos (inmutables, ver migración 000004) =====
@@ -321,6 +534,7 @@ func (q *Queries) InsertActionLog(ctx context.Context, arg InsertActionLogParams
 		arg.Result,
 		arg.Notes,
 		arg.OperatorID,
+		arg.IncidentID,
 	)
 	var i EscalationActionLog
 	err := row.Scan(
@@ -334,27 +548,30 @@ func (q *Queries) InsertActionLog(ctx context.Context, arg InsertActionLogParams
 		&i.Notes,
 		&i.OperatorID,
 		&i.CreatedAt,
+		&i.IncidentID,
 	)
 	return i, err
 }
 
 const listActionLogs = `-- name: ListActionLogs :many
-SELECT l.id, l.entry_id, l.policy_id, l.step_order, l.contact_id, l.channel_type, l.result, l.notes, l.operator_id, l.created_at, u.username AS operator_username, c.name AS contact_name
+SELECT l.id, l.entry_id, l.policy_id, l.step_order, l.contact_id, l.channel_type, l.result, l.notes, l.operator_id, l.created_at, l.incident_id, u.username AS operator_username, c.name AS contact_name
 FROM escalation_action_logs l
 JOIN users u ON u.id = l.operator_id
 LEFT JOIN contacts c ON c.id = l.contact_id
 WHERE ($1::uuid IS NULL OR l.policy_id = $1)
   AND ($2::uuid IS NULL OR l.entry_id = $2)
-  AND ($3::timestamptz IS NULL OR l.created_at >= $3)
+  AND ($3::uuid IS NULL OR l.incident_id = $3)
+  AND ($4::timestamptz IS NULL OR l.created_at >= $4)
 ORDER BY l.created_at DESC
-LIMIT $4
+LIMIT $5
 `
 
 type ListActionLogsParams struct {
-	PolicyID pgtype.UUID        `json:"policy_id"`
-	EntryID  pgtype.UUID        `json:"entry_id"`
-	Since    pgtype.Timestamptz `json:"since"`
-	MaxRows  int32              `json:"max_rows"`
+	PolicyID   pgtype.UUID        `json:"policy_id"`
+	EntryID    pgtype.UUID        `json:"entry_id"`
+	IncidentID pgtype.UUID        `json:"incident_id"`
+	Since      pgtype.Timestamptz `json:"since"`
+	MaxRows    int32              `json:"max_rows"`
 }
 
 type ListActionLogsRow struct {
@@ -368,6 +585,7 @@ type ListActionLogsRow struct {
 	Notes            pgtype.Text          `json:"notes"`
 	OperatorID       uuid.UUID            `json:"operator_id"`
 	CreatedAt        pgtype.Timestamptz   `json:"created_at"`
+	IncidentID       pgtype.UUID          `json:"incident_id"`
 	OperatorUsername string               `json:"operator_username"`
 	ContactName      pgtype.Text          `json:"contact_name"`
 }
@@ -376,6 +594,7 @@ func (q *Queries) ListActionLogs(ctx context.Context, arg ListActionLogsParams) 
 	rows, err := q.db.Query(ctx, listActionLogs,
 		arg.PolicyID,
 		arg.EntryID,
+		arg.IncidentID,
 		arg.Since,
 		arg.MaxRows,
 	)
@@ -397,6 +616,7 @@ func (q *Queries) ListActionLogs(ctx context.Context, arg ListActionLogsParams) 
 			&i.Notes,
 			&i.OperatorID,
 			&i.CreatedAt,
+			&i.IncidentID,
 			&i.OperatorUsername,
 			&i.ContactName,
 		); err != nil {
@@ -462,6 +682,214 @@ func (q *Queries) ListCoverageForUnits(ctx context.Context, unitIds []uuid.UUID)
 	for rows.Next() {
 		var i TeamCoverage
 		if err := rows.Scan(&i.TeamID, &i.TerritorialUnitID, &i.Priority); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEscalationIncidentNotes = `-- name: ListEscalationIncidentNotes :many
+SELECT n.id, n.incident_id, n.user_id, n.note, n.created_at, u.username FROM escalation_incident_notes n JOIN users u ON u.id = n.user_id
+WHERE n.incident_id = $1 ORDER BY n.created_at
+`
+
+type ListEscalationIncidentNotesRow struct {
+	ID         uuid.UUID          `json:"id"`
+	IncidentID uuid.UUID          `json:"incident_id"`
+	UserID     uuid.UUID          `json:"user_id"`
+	Note       string             `json:"note"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	Username   string             `json:"username"`
+}
+
+func (q *Queries) ListEscalationIncidentNotes(ctx context.Context, incidentID uuid.UUID) ([]ListEscalationIncidentNotesRow, error) {
+	rows, err := q.db.Query(ctx, listEscalationIncidentNotes, incidentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListEscalationIncidentNotesRow
+	for rows.Next() {
+		var i ListEscalationIncidentNotesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.IncidentID,
+			&i.UserID,
+			&i.Note,
+			&i.CreatedAt,
+			&i.Username,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEscalationIncidents = `-- name: ListEscalationIncidents :many
+SELECT i.id, i.service_id, i.asset_id, i.territorial_unit_id, i.title, i.glpi_ticket, i.ticket_id, i.opened_by, i.opened_at, i.closed_by, i.closed_at, u.username AS opened_by_username, t.ticket_number
+FROM escalation_incidents i
+JOIN users u ON u.id = i.opened_by
+LEFT JOIN tickets t ON t.id = i.ticket_id
+WHERE ($1::uuid IS NULL OR i.service_id = $1)
+  AND ($2::uuid IS NULL OR i.asset_id = $2)
+  AND ($3::uuid IS NULL OR i.territorial_unit_id = $3)
+  AND (i.closed_at IS NULL OR i.closed_at > now() - interval '48 hours')
+ORDER BY (i.closed_at IS NULL) DESC, i.opened_at DESC
+LIMIT 50
+`
+
+type ListEscalationIncidentsParams struct {
+	ServiceID         pgtype.UUID `json:"service_id"`
+	AssetID           pgtype.UUID `json:"asset_id"`
+	TerritorialUnitID pgtype.UUID `json:"territorial_unit_id"`
+}
+
+type ListEscalationIncidentsRow struct {
+	ID                uuid.UUID          `json:"id"`
+	ServiceID         pgtype.UUID        `json:"service_id"`
+	AssetID           pgtype.UUID        `json:"asset_id"`
+	TerritorialUnitID pgtype.UUID        `json:"territorial_unit_id"`
+	Title             string             `json:"title"`
+	GlpiTicket        pgtype.Text        `json:"glpi_ticket"`
+	TicketID          pgtype.UUID        `json:"ticket_id"`
+	OpenedBy          uuid.UUID          `json:"opened_by"`
+	OpenedAt          pgtype.Timestamptz `json:"opened_at"`
+	ClosedBy          pgtype.UUID        `json:"closed_by"`
+	ClosedAt          pgtype.Timestamptz `json:"closed_at"`
+	OpenedByUsername  string             `json:"opened_by_username"`
+	TicketNumber      pgtype.Text        `json:"ticket_number"`
+}
+
+// Incidentes del servicio, activo o unidad: abiertos primero; los cerrados
+// de las últimas 48 horas también, para revisar lo reciente.
+func (q *Queries) ListEscalationIncidents(ctx context.Context, arg ListEscalationIncidentsParams) ([]ListEscalationIncidentsRow, error) {
+	rows, err := q.db.Query(ctx, listEscalationIncidents, arg.ServiceID, arg.AssetID, arg.TerritorialUnitID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListEscalationIncidentsRow
+	for rows.Next() {
+		var i ListEscalationIncidentsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ServiceID,
+			&i.AssetID,
+			&i.TerritorialUnitID,
+			&i.Title,
+			&i.GlpiTicket,
+			&i.TicketID,
+			&i.OpenedBy,
+			&i.OpenedAt,
+			&i.ClosedBy,
+			&i.ClosedAt,
+			&i.OpenedByUsername,
+			&i.TicketNumber,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEscalationPoolMembers = `-- name: ListEscalationPoolMembers :many
+SELECT pm.id, pm.pool_id, pm.contact_id, pm.user_id, pm.position, COALESCE(c.name, u.username, '')::text AS name, co.name AS organization_name
+FROM escalation_pool_members pm
+LEFT JOIN contacts c ON c.id = pm.contact_id
+LEFT JOIN users u ON u.id = pm.user_id
+LEFT JOIN organizations co ON co.id = c.organization_id
+WHERE pm.pool_id = $1
+ORDER BY pm.position
+`
+
+type ListEscalationPoolMembersRow struct {
+	ID               uuid.UUID   `json:"id"`
+	PoolID           uuid.UUID   `json:"pool_id"`
+	ContactID        pgtype.UUID `json:"contact_id"`
+	UserID           pgtype.UUID `json:"user_id"`
+	Position         int32       `json:"position"`
+	Name             string      `json:"name"`
+	OrganizationName pgtype.Text `json:"organization_name"`
+}
+
+func (q *Queries) ListEscalationPoolMembers(ctx context.Context, poolID uuid.UUID) ([]ListEscalationPoolMembersRow, error) {
+	rows, err := q.db.Query(ctx, listEscalationPoolMembers, poolID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListEscalationPoolMembersRow
+	for rows.Next() {
+		var i ListEscalationPoolMembersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PoolID,
+			&i.ContactID,
+			&i.UserID,
+			&i.Position,
+			&i.Name,
+			&i.OrganizationName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEscalationPools = `-- name: ListEscalationPools :many
+SELECT p.id, p.organization_id, p.name, p.active, p.created_at, o.name AS organization_name,
+  (SELECT count(*) FROM escalation_pool_members pm WHERE pm.pool_id = p.id)::bigint AS members,
+  (SELECT count(*) FROM team_members tm WHERE tm.pool_id = p.id AND tm.active)::bigint AS used_in
+FROM escalation_pools p LEFT JOIN organizations o ON o.id = p.organization_id
+ORDER BY o.name NULLS FIRST, p.name
+`
+
+type ListEscalationPoolsRow struct {
+	ID               uuid.UUID          `json:"id"`
+	OrganizationID   pgtype.UUID        `json:"organization_id"`
+	Name             string             `json:"name"`
+	Active           bool               `json:"active"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	OrganizationName pgtype.Text        `json:"organization_name"`
+	Members          int64              `json:"members"`
+	UsedIn           int64              `json:"used_in"`
+}
+
+func (q *Queries) ListEscalationPools(ctx context.Context) ([]ListEscalationPoolsRow, error) {
+	rows, err := q.db.Query(ctx, listEscalationPools)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListEscalationPoolsRow
+	for rows.Next() {
+		var i ListEscalationPoolsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganizationID,
+			&i.Name,
+			&i.Active,
+			&i.CreatedAt,
+			&i.OrganizationName,
+			&i.Members,
+			&i.UsedIn,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -591,7 +1019,7 @@ func (q *Queries) ListMembersForTeams(ctx context.Context, teamIds []uuid.UUID) 
 
 const listPolicies = `-- name: ListPolicies :many
 
-SELECT id, service_id, asset_id, territorial_unit_id, active FROM escalation_policies
+SELECT id, service_id, asset_id, territorial_unit_id, active, reminder FROM escalation_policies
 WHERE ($1::uuid IS NULL OR service_id = $1)
   AND ($2::uuid IS NULL OR asset_id = $2)
   AND ($3::uuid IS NULL OR territorial_unit_id = $3)
@@ -620,6 +1048,7 @@ func (q *Queries) ListPolicies(ctx context.Context, arg ListPoliciesParams) ([]E
 			&i.AssetID,
 			&i.TerritorialUnitID,
 			&i.Active,
+			&i.Reminder,
 		); err != nil {
 			return nil, err
 		}
@@ -694,6 +1123,84 @@ func (q *Queries) ListPolicySteps(ctx context.Context, policyIds []uuid.UUID) ([
 			&i.Mode,
 			&i.WaitBeforeEscalateMinutes,
 			&i.TeamName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPoolMembersForTeams = `-- name: ListPoolMembersForTeams :many
+
+SELECT m.id AS team_member_id, m.team_id, m.recipient_type, m.role_in_team, m.priority,
+  p.id AS pool_id, p.name AS pool_name, po.name AS pool_organization_name,
+  pm.id AS pool_member_id, pm.position AS pool_position, pm.contact_id, pm.user_id,
+  COALESCE(c.name, u.username, '')::text AS name,
+  c.specialty, c.position, co.name AS contact_organization_name
+FROM team_members m
+JOIN escalation_pools p ON p.id = m.pool_id AND p.active
+JOIN escalation_pool_members pm ON pm.pool_id = p.id
+LEFT JOIN organizations po ON po.id = p.organization_id
+LEFT JOIN contacts c ON c.id = pm.contact_id AND c.active
+LEFT JOIN users u ON u.id = pm.user_id AND u.active
+LEFT JOIN organizations co ON co.id = c.organization_id
+WHERE m.active AND m.team_id = ANY($1::uuid[])
+  AND (c.id IS NOT NULL OR u.id IS NOT NULL)
+ORDER BY m.team_id, m.priority, pm.position
+`
+
+type ListPoolMembersForTeamsRow struct {
+	TeamMemberID            uuid.UUID     `json:"team_member_id"`
+	TeamID                  uuid.UUID     `json:"team_id"`
+	RecipientType           RecipientType `json:"recipient_type"`
+	RoleInTeam              TeamRole      `json:"role_in_team"`
+	Priority                int32         `json:"priority"`
+	PoolID                  uuid.UUID     `json:"pool_id"`
+	PoolName                string        `json:"pool_name"`
+	PoolOrganizationName    pgtype.Text   `json:"pool_organization_name"`
+	PoolMemberID            uuid.UUID     `json:"pool_member_id"`
+	PoolPosition            int32         `json:"pool_position"`
+	ContactID               pgtype.UUID   `json:"contact_id"`
+	UserID                  pgtype.UUID   `json:"user_id"`
+	Name                    string        `json:"name"`
+	Specialty               pgtype.Text   `json:"specialty"`
+	Position                pgtype.Text   `json:"position"`
+	ContactOrganizationName pgtype.Text   `json:"contact_organization_name"`
+}
+
+// ===== Rediseño de escalamiento (#17, canvas v26) =====
+// Integrantes que son un pool (TI-Mundo…): se expanden a sus personas en el
+// orden del pool, con el rol y la prioridad del integrante del nivel.
+func (q *Queries) ListPoolMembersForTeams(ctx context.Context, teamIds []uuid.UUID) ([]ListPoolMembersForTeamsRow, error) {
+	rows, err := q.db.Query(ctx, listPoolMembersForTeams, teamIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPoolMembersForTeamsRow
+	for rows.Next() {
+		var i ListPoolMembersForTeamsRow
+		if err := rows.Scan(
+			&i.TeamMemberID,
+			&i.TeamID,
+			&i.RecipientType,
+			&i.RoleInTeam,
+			&i.Priority,
+			&i.PoolID,
+			&i.PoolName,
+			&i.PoolOrganizationName,
+			&i.PoolMemberID,
+			&i.PoolPosition,
+			&i.ContactID,
+			&i.UserID,
+			&i.Name,
+			&i.Specialty,
+			&i.Position,
+			&i.ContactOrganizationName,
 		); err != nil {
 			return nil, err
 		}
@@ -857,18 +1364,25 @@ func (q *Queries) ListTeamsForResolve(ctx context.Context, teamIds []uuid.UUID) 
 const listTriedContactsForStep = `-- name: ListTriedContactsForStep :many
 SELECT DISTINCT contact_id FROM escalation_action_logs
 WHERE policy_id = $1 AND step_order = $2 AND contact_id IS NOT NULL AND created_at >= $3
+  AND ($4::uuid IS NULL OR incident_id = $4)
 `
 
 type ListTriedContactsForStepParams struct {
-	PolicyID  pgtype.UUID        `json:"policy_id"`
-	StepOrder int32              `json:"step_order"`
-	Since     pgtype.Timestamptz `json:"since"`
+	PolicyID   pgtype.UUID        `json:"policy_id"`
+	StepOrder  int32              `json:"step_order"`
+	Since      pgtype.Timestamptz `json:"since"`
+	IncidentID pgtype.UUID        `json:"incident_id"`
 }
 
 // Quiénes ya se intentaron en este paso durante el incidente en curso (desde
 // "since"), para que el modo sequential llame al siguiente y no repita.
 func (q *Queries) ListTriedContactsForStep(ctx context.Context, arg ListTriedContactsForStepParams) ([]pgtype.UUID, error) {
-	rows, err := q.db.Query(ctx, listTriedContactsForStep, arg.PolicyID, arg.StepOrder, arg.Since)
+	rows, err := q.db.Query(ctx, listTriedContactsForStep,
+		arg.PolicyID,
+		arg.StepOrder,
+		arg.Since,
+		arg.IncidentID,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -979,6 +1493,76 @@ func (q *Queries) ListWindowsForScope(ctx context.Context, arg ListWindowsForSco
 		return nil, err
 	}
 	return items, nil
+}
+
+const reopenEscalationIncident = `-- name: ReopenEscalationIncident :execrows
+UPDATE escalation_incidents SET closed_at = NULL, closed_by = NULL WHERE id = $1 AND closed_at IS NOT NULL
+`
+
+func (q *Queries) ReopenEscalationIncident(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, reopenEscalationIncident, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateEscalationPool = `-- name: UpdateEscalationPool :one
+UPDATE escalation_pools SET
+  name = COALESCE($1, name),
+  active = COALESCE($2, active),
+  organization_id = CASE WHEN $3::boolean THEN $4::uuid ELSE organization_id END
+WHERE id = $5 RETURNING id, organization_id, name, active, created_at
+`
+
+type UpdateEscalationPoolParams struct {
+	Name            pgtype.Text `json:"name"`
+	Active          pgtype.Bool `json:"active"`
+	SetOrganization bool        `json:"set_organization"`
+	OrganizationID  pgtype.UUID `json:"organization_id"`
+	ID              uuid.UUID   `json:"id"`
+}
+
+func (q *Queries) UpdateEscalationPool(ctx context.Context, arg UpdateEscalationPoolParams) (EscalationPool, error) {
+	row := q.db.QueryRow(ctx, updateEscalationPool,
+		arg.Name,
+		arg.Active,
+		arg.SetOrganization,
+		arg.OrganizationID,
+		arg.ID,
+	)
+	var i EscalationPool
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.Name,
+		&i.Active,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updatePolicyReminder = `-- name: UpdatePolicyReminder :one
+UPDATE escalation_policies SET reminder = $1 WHERE id = $2 RETURNING id, service_id, asset_id, territorial_unit_id, active, reminder
+`
+
+type UpdatePolicyReminderParams struct {
+	Reminder pgtype.Text `json:"reminder"`
+	ID       uuid.UUID   `json:"id"`
+}
+
+func (q *Queries) UpdatePolicyReminder(ctx context.Context, arg UpdatePolicyReminderParams) (EscalationPolicy, error) {
+	row := q.db.QueryRow(ctx, updatePolicyReminder, arg.Reminder, arg.ID)
+	var i EscalationPolicy
+	err := row.Scan(
+		&i.ID,
+		&i.ServiceID,
+		&i.AssetID,
+		&i.TerritorialUnitID,
+		&i.Active,
+		&i.Reminder,
+	)
+	return i, err
 }
 
 const updateService = `-- name: UpdateService :one

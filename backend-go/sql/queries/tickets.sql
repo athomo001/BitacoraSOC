@@ -201,3 +201,10 @@ DELETE FROM ticket_images WHERE id = $1 AND ticket_id = $2 AND comment_id IS NUL
 -- name: DeleteStaleTicketImages :exec
 -- Subidas que nunca llegaron a un comentario (se cerró la pestaña).
 DELETE FROM ticket_images WHERE comment_id IS NULL AND created_at < now() - interval '1 day';
+
+-- name: MarkEntriesOfDeletedTicket :exec
+-- Al eliminar un ticket (comentario del dueño #20) la entrada de la
+-- bitácora se queda: un comentario de sistema deja constancia del ticket.
+INSERT INTO entry_comments (entry_id, user_id, comment, is_system_generated)
+SELECT e.id, sqlc.arg('user_id'), sqlc.arg('comment'), true
+FROM entries e WHERE e.ticket_id = sqlc.arg('ticket_id');

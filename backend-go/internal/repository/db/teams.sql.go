@@ -13,8 +13,8 @@ import (
 )
 
 const addTeamMember = `-- name: AddTeamMember :one
-INSERT INTO team_members (team_id, user_id, contact_id, recipient_type, role_in_team, priority)
-VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, team_id, user_id, contact_id, recipient_type, role_in_team, priority, active
+INSERT INTO team_members (team_id, user_id, contact_id, recipient_type, role_in_team, priority, pool_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, team_id, user_id, contact_id, recipient_type, role_in_team, priority, active, pool_id
 `
 
 type AddTeamMemberParams struct {
@@ -24,6 +24,7 @@ type AddTeamMemberParams struct {
 	RecipientType RecipientType `json:"recipient_type"`
 	RoleInTeam    TeamRole      `json:"role_in_team"`
 	Priority      int32         `json:"priority"`
+	PoolID        pgtype.UUID   `json:"pool_id"`
 }
 
 func (q *Queries) AddTeamMember(ctx context.Context, arg AddTeamMemberParams) (TeamMember, error) {
@@ -34,6 +35,7 @@ func (q *Queries) AddTeamMember(ctx context.Context, arg AddTeamMemberParams) (T
 		arg.RecipientType,
 		arg.RoleInTeam,
 		arg.Priority,
+		arg.PoolID,
 	)
 	var i TeamMember
 	err := row.Scan(
@@ -45,6 +47,7 @@ func (q *Queries) AddTeamMember(ctx context.Context, arg AddTeamMemberParams) (T
 		&i.RoleInTeam,
 		&i.Priority,
 		&i.Active,
+		&i.PoolID,
 	)
 	return i, err
 }
@@ -211,10 +214,11 @@ func (q *Queries) ListTeamGroups(ctx context.Context, arg ListTeamGroupsParams) 
 }
 
 const listTeamMembers = `-- name: ListTeamMembers :many
-SELECT m.id, m.team_id, m.user_id, m.contact_id, m.recipient_type, m.role_in_team, m.priority, m.active, COALESCE(u.username, c.name, '')::text AS display_name
+SELECT m.id, m.team_id, m.user_id, m.contact_id, m.recipient_type, m.role_in_team, m.priority, m.active, m.pool_id, COALESCE(u.username, c.name, 'Pool ' || p.name, '')::text AS display_name
 FROM team_members m
 LEFT JOIN users u ON u.id = m.user_id
 LEFT JOIN contacts c ON c.id = m.contact_id
+LEFT JOIN escalation_pools p ON p.id = m.pool_id
 WHERE m.team_id = $1 AND m.active
 ORDER BY m.priority, display_name
 `
@@ -228,6 +232,7 @@ type ListTeamMembersRow struct {
 	RoleInTeam    TeamRole      `json:"role_in_team"`
 	Priority      int32         `json:"priority"`
 	Active        bool          `json:"active"`
+	PoolID        pgtype.UUID   `json:"pool_id"`
 	DisplayName   string        `json:"display_name"`
 }
 
@@ -251,6 +256,7 @@ func (q *Queries) ListTeamMembers(ctx context.Context, teamID uuid.UUID) ([]List
 			&i.RoleInTeam,
 			&i.Priority,
 			&i.Active,
+			&i.PoolID,
 			&i.DisplayName,
 		); err != nil {
 			return nil, err

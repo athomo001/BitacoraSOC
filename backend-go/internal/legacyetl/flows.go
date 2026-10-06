@@ -2,6 +2,7 @@ package legacyetl
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -74,6 +75,9 @@ func (m *Migrator) migrateCallFlows(ctx context.Context) error {
 		ID             string           `json:"_id"`
 		Name           string           `json:"name"`
 		EscalationFlow []legacyFlowStep `json:"escalationFlow"`
+		// Leyenda bajo el flujo ("Llamar 3 veces y 1 minutos por cada
+		// llamada"): pasa al Recordatorio de la política de cada servicio.
+		EscalationLegend string `json:"escalationLegend"`
 	}
 	if err := m.ex.Decode("catalogLogSources", &sources); err != nil {
 		return err
@@ -130,6 +134,14 @@ func (m *Migrator) migrateCallFlows(ctx context.Context) error {
 			for _, c := range fs.Contacts {
 				people = append(people, struct{ name, tel string }{c.Name, c.Tel})
 			}
+			mode := strings.ToLower(strings.TrimSpace(fs.Type))
+			if mode != "pool" && mode != "sequential" {
+				mode = "unique"
+			}
+			// Un paso pool del legacy ("POOL de Mundo") pasa a un pool con
+			// nombre: el nivel lo tiene como un solo integrante y sus personas
+			// se llaman en orden (decisión del dueño 2026-10-05).
+			var poolMembers []uuid.UUID
 			seen := map[uuid.UUID]bool{}
 			for _, p := range people {
 				contact, isNew, err := m.flowContact(ctx, org, p.name, p.tel)
@@ -144,13 +156,29 @@ func (m *Migrator) migrateCallFlows(ctx context.Context) error {
 				}
 				seen[contact] = true
 				c := contact
+				if mode == "pool" {
+					poolMembers = append(poolMembers, c)
+					continue
+				}
 				if _, err := m.addMember(ctx, team, &c, nil, "to", "primary", len(seen)-1); err != nil {
 					return err
 				}
 			}
-			mode := strings.ToLower(strings.TrimSpace(fs.Type))
-			if mode != "pool" && mode != "sequential" {
-				mode = "unique"
+			if len(poolMembers) > 0 {
+				pool := ID("escalation_pools", s.ID+":"+itoa(i))
+				if _, err := m.tx.Exec(ctx, `INSERT INTO escalation_pools (id, organization_id, name) VALUES ($1,$2,$3)`, pool, org, title); err != nil {
+					return err
+				}
+				for pos, c := range poolMembers {
+					if _, err := m.tx.Exec(ctx, `INSERT INTO escalation_pool_members (pool_id, contact_id, position) VALUES ($1,$2,$3)`, pool, c, pos); err != nil {
+						return err
+					}
+				}
+				if _, err := m.tx.Exec(ctx, `INSERT INTO team_members (id, team_id, pool_id, recipient_type, role_in_team, priority, active) VALUES ($1,$2,$3,'to','primary',0,true)`,
+					uuid.New(), team, pool); err != nil {
+					return err
+				}
+				step.note("%s: pool «%s» con %d personas", s.Name, title, len(poolMembers))
 			}
 			teams = append(teams, built{team, mode})
 		}
@@ -172,6 +200,11 @@ func (m *Migrator) migrateCallFlows(ctx context.Context) error {
 					return err
 				}
 			}
+			if legend := strings.TrimSpace(s.EscalationLegend); legend != "" {
+				if _, err := m.tx.Exec(ctx, `UPDATE escalation_policies SET reminder = $2 WHERE id = $1`, policy, legend); err != nil {
+					return err
+				}
+			}
 		}
 		step.note("%s: %d pasos de llamada en %d servicios", s.Name, len(flow), len(services))
 		step.Loaded++
@@ -190,23 +223,34 @@ func sortFlow(flow []legacyFlowStep) {
 	}
 }
 
+// legacyClientRule es un clientEscalationRules del legacy: mantención
+// programada (scheduled_maintenance) o aviso por cliente (special_alert).
+type legacyClientRule struct {
+	ID               string  `json:"_id"`
+	ClientID         *string `json:"clientId"`
+	Name             string  `json:"name"`
+	RuleType         string  `json:"ruleType"`
+	Enabled          bool    `json:"enabled"`
+	Blocking         bool    `json:"blocking"`
+	Priority         int     `json:"priority"`
+	MaintenanceTitle string  `json:"maintenanceTitle"`
+	AlertMessage     string  `json:"alertMessage"`
+	ValidFrom        *string `json:"validFrom"`
+	ValidTo          *string `json:"validTo"`
+	// Avisos por cliente.
+	Contexts                []string          `json:"contexts"`
+	Timezone                string            `json:"timezone"`
+	HolidayDates            []string          `json:"holidayDates"`
+	TimeWindows             []json.RawMessage `json:"timeWindows"`
+	Channels                []string          `json:"channels"`
+	AcknowledgementRequired *bool             `json:"acknowledgementRequired"`
+}
+
 // migrateClientRules pasa las mantenciones programadas (con fecha de
-// inicio y fin) a ventanas de mantenimiento en cada servicio del cliente;
-// las alertas recurrentes se listan (la 2.0 aún no tiene recurrencia).
+// inicio y fin) a ventanas de mantenimiento en cada servicio del cliente, y
+// los avisos por cliente (special_alert) a client_alert_rules.
 func (m *Migrator) migrateClientRules(ctx context.Context) error {
-	var rows []struct {
-		ID               string  `json:"_id"`
-		ClientID         *string `json:"clientId"`
-		Name             string  `json:"name"`
-		RuleType         string  `json:"ruleType"`
-		Enabled          bool    `json:"enabled"`
-		Blocking         bool    `json:"blocking"`
-		Priority         int     `json:"priority"`
-		MaintenanceTitle string  `json:"maintenanceTitle"`
-		AlertMessage     string  `json:"alertMessage"`
-		ValidFrom        *string `json:"validFrom"`
-		ValidTo          *string `json:"validTo"`
-	}
+	var rows []legacyClientRule
 	if err := m.ex.Decode("clientEscalationRules", &rows); err != nil {
 		return err
 	}
@@ -220,7 +264,23 @@ func (m *Migrator) migrateClientRules(ctx context.Context) error {
 		}
 		from, okFrom := ParseTime(deref(r.ValidFrom))
 		to, okTo := ParseTime(deref(r.ValidTo))
-		if r.RuleType != "scheduled_maintenance" || !okFrom || !okTo || !to.After(from) {
+		if r.RuleType != "scheduled_maintenance" {
+			org, ok := uuid.UUID{}, false
+			if r.ClientID != nil {
+				org, ok = m.clientOrgs[*r.ClientID]
+			}
+			if !ok || strings.TrimSpace(r.AlertMessage) == "" {
+				step.skip("aviso sin cliente o sin mensaje")
+				continue
+			}
+			if err := m.insertClientAlert(ctx, org, strings.TrimSpace(r.Name), r, from, okFrom, to, okTo); err != nil {
+				return err
+			}
+			step.note("aviso por cliente: %s", name)
+			step.Loaded++
+			continue
+		}
+		if !okFrom || !okTo || !to.After(from) {
 			step.skip("regla recurrente: la 2.0 aún no tiene recurrencia (post-corte); recrearla como ventana si hace falta")
 			step.note("recurrente, no migrada: %s", name)
 			continue

@@ -33,6 +33,51 @@ export interface Organization {
   viaName?: string | null;
 }
 
+/** Algo asociado a una organización que hay que resolver antes de eliminarla. */
+export interface OrgDependentItem {
+  id: string;
+  name: string;
+  code?: string;
+  detail: string;
+  /** Sin historial (entradas, tickets, mantenciones): se puede eliminar. */
+  deletable: boolean;
+}
+
+export interface OrgDependentTicket {
+  id: string;
+  number: string;
+  title: string;
+  status: string;
+  createdAt: string;
+}
+
+/** Lo que muestra el popup de eliminar organización (canvas v22). */
+export interface OrgDependents {
+  services: OrgDependentItem[];
+  teams: OrgDependentItem[];
+  assets: OrgDependentItem[];
+  /** Opcionales: si no se mueven quedan en el histórico con el nombre de la organización. */
+  tickets: OrgDependentTicket[];
+  /** Los contactos no dependen de la organización: se quedan en el Directorio. */
+  contacts: number;
+}
+
+export type OrgDependentKind = 'service' | 'team' | 'asset' | 'ticket';
+
+export interface OrgDeleteAction {
+  kind: OrgDependentKind;
+  id: string;
+  op: 'move' | 'delete' | 'rename';
+  to?: string;
+  name?: string;
+}
+
+export interface OrgDeletePlan {
+  /** "Todo de una": mueve los servicios, equipos y activos que queden sin resolver. */
+  moveTo?: string;
+  actions: OrgDeleteAction[];
+}
+
 export interface LogSource {
   id: string;
   code: string;
@@ -113,8 +158,13 @@ export class OrganizationsService {
   }
 
   /** Solo si no tiene nada asociado; si no, el backend responde 409 explicando qué tiene. */
-  async remove(id: string): Promise<void> {
-    await firstValueFrom(this.http.delete(`/api/organizations/${id}`));
+  async dependents(id: string): Promise<OrgDependents> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<OrgDependents>>(`/api/organizations/${id}/dependents`))).data;
+  }
+
+  /** Aplica lo decidido en el popup (todo o nada) y elimina (archiva) la organización. */
+  async remove(id: string, plan?: OrgDeletePlan): Promise<void> {
+    await firstValueFrom(this.http.delete(`/api/organizations/${id}`, plan ? { body: plan } : {}));
   }
 
   async patch(id: string, patch: Partial<Organization>): Promise<Organization> {
@@ -145,7 +195,7 @@ export class OrganizationsService {
     return (await firstValueFrom(this.http.post<ApiEnvelope<TeamSummary>>('/api/teams', team))).data;
   }
 
-  async addMember(teamId: string, member: { contactId?: string; userId?: string; roleInTeam: string; recipientType: string; priority: number }): Promise<void> {
+  async addMember(teamId: string, member: { contactId?: string; userId?: string; poolId?: string; roleInTeam: string; recipientType: string; priority: number }): Promise<void> {
     await firstValueFrom(this.http.post(`/api/teams/${teamId}/members`, member));
   }
 

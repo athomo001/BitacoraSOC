@@ -8,11 +8,14 @@ import (
 	"time"
 
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/branding"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/checklist"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/crypto"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/mailtpl"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/middleware"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -272,16 +275,7 @@ func (h *ChecklistsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		h.AuditLog.Log(r.Context(), "checklist.opened", audit.LevelInfo, audit.Success(), map[string]any{"checkId": check.ID.String(), "checkType": req.CheckType})
 	}
 	if template.AlertNokEnabled && hasRed(results) && h.Crypto != nil {
-		role := db.NullUserRole{}
-		if template.AlertNokRoleTarget.Valid {
-			role = db.NullUserRole{UserRole: db.UserRole(template.AlertNokRoleTarget.String), Valid: true}
-		}
-		recipients, recipientErr := h.Queries.ListActiveUserEmailsByRole(r.Context(), role)
-		if recipientErr == nil && len(recipients) > 0 {
-			if sender, _, mailErr := buildMailSender(r.Context(), h.Queries, h.Crypto); mailErr == nil {
-				_ = sender.SendMany(recipients, nil, "Checklist NOK - "+template.Name, content)
-			}
-		}
+		h.sendNokAlert(r.Context(), template, check, user.Username, items, results)
 	}
 	writeData(w, 201, dto)
 }
@@ -343,4 +337,43 @@ func (h *ChecklistsHandler) Abandoned(w http.ResponseWriter, r *http.Request) {
 		h.AuditLog.Log(r.Context(), "checklist.abandoned", audit.LevelInfo, audit.Success(), metadata)
 	}
 	writeNoContent(w)
+}
+
+// sendNokAlert es la alerta "checklist con ítems NOK" del legacy: a los
+// usuarios activos con los cargos de la plantilla, con cada servicio en rojo
+// y su observación. Un fallo de correo no frena el checklist (queda en
+// auditoría).
+func (h *ChecklistsHandler) sendNokAlert(ctx context.Context, template db.ChecklistTemplate, check db.ShiftCheck, username string, items []db.ChecklistItem, results map[string]checklist.Result) {
+	recipients, err := h.Queries.ListActiveUserEmailsByCargo(ctx, template.AlertNokCargos)
+	if err != nil || len(recipients) == 0 {
+		return
+	}
+	var services []mailtpl.NokService
+	for _, item := range items {
+		if res := results[item.ID.String()]; res.Status == checklist.Red {
+			services = append(services, mailtpl.NokService{Title: item.Title, Observation: res.Observation})
+		}
+	}
+	shiftName := ""
+	if shift, err := h.Queries.GetWorkShiftByID(ctx, check.WorkShiftID); err == nil {
+		shiftName = shift.Name
+	}
+	loc, err := time.LoadLocation("America/Santiago")
+	if err != nil {
+		loc = time.Local
+	}
+	m := mailtpl.ChecklistNok(branding.Title(ctx, h.Queries), username, shiftName, string(check.CheckType), template.AlertNokCargos, services, check.CheckDate.Time.In(loc))
+	sender, _, err := buildMailSender(ctx, h.Queries, h.Crypto)
+	if err == nil {
+		err = sender.SendHTML(recipients, nil, m.Subject, m.HTML)
+	}
+	if h.AuditLog == nil {
+		return
+	}
+	meta := map[string]any{"checkId": check.ID.String(), "checkType": string(check.CheckType), "recipientsCount": len(recipients), "cargoTargets": template.AlertNokCargos, "redCount": len(services)}
+	if err != nil {
+		h.AuditLog.Log(ctx, "shiftcheck.nok.alert.fail", audit.LevelWarn, audit.Failure(err.Error()), meta)
+		return
+	}
+	h.AuditLog.Log(ctx, "shiftcheck.nok.alert.sent", audit.LevelInfo, audit.Success(), meta)
 }

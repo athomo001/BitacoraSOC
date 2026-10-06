@@ -7,12 +7,14 @@ import {
   CurrentGuard,
   NotificationFrequency,
   NotificationSchedule,
+  NotificationTargetPeriod,
   RotationCycle,
   RotationSlot,
   ShiftsService,
   WorkShift,
 } from '../../core/shifts/shifts.service';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { MessageKey } from '../../core/i18n/messages';
 import { PreferencesService } from '../../core/preferences/preferences.service';
 import { problemDetail } from '../../core/http-error';
 import { AdminShiftRemindersComponent } from './admin-shift-reminders';
@@ -33,6 +35,23 @@ function splitList(raw: string): string[] {
  * Sin panel de "reemplazos activos" a propósito: no hay GET de overrides en
  * el contrato; su efecto se ve en "De guardia ahora".
  */
+
+/** "Condiciones a notificar" del legacy, con sus códigos (roleFilter). */
+interface StaffingCondition {
+  codes: string[];
+  labelKey: MessageKey;
+}
+
+const STAFFING_CONDITIONS: readonly StaffingCondition[] = [
+  { codes: ['N2', 'N1_NO_HABIL'], labelKey: 'shiftsAdmin.cond.guard' },
+  { codes: ['TI'], labelKey: 'shiftsAdmin.cond.ti' },
+  { codes: ['TELEWORK'], labelKey: 'shiftsAdmin.cond.telework' },
+  { codes: ['OL'], labelKey: 'shiftsAdmin.cond.training' },
+  { codes: ['VACATION'], labelKey: 'shiftsAdmin.cond.vacation' },
+  { codes: ['MEDICAL_APPOINTMENT'], labelKey: 'shiftsAdmin.cond.medicalAppointment' },
+  { codes: ['MEDICAL_LEAVE'], labelKey: 'shiftsAdmin.cond.medicalLeave' },
+];
+
 /** Asunto por defecto del Reporte de Turno, igual que el legacy (WorkShift.emailReportConfig). */
 const DEFAULT_REPORT_SUBJECT = 'Reporte SOC [fecha] [turno]';
 
@@ -47,6 +66,8 @@ const DEFAULT_REPORT_SUBJECT = 'Reporte SOC [fecha] [turno]';
     mat-icon { width: 16px; height: 16px; font-size: 16px; }
     .sa__lead { padding-bottom: 0; }
     .sa__form { border-top: 1px solid var(--border-subtle); }
+    .sa__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .sa__on, .sa__on:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
     .sa__block { border-top: 1px solid var(--border-subtle); }
     .sa__report { display: flex; flex-wrap: wrap; gap: 8px 20px; }
     .sa__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
@@ -124,7 +145,11 @@ export class AdminShiftsComponent implements OnInit {
   protected readonly nsSendTime = signal('09:00');
   protected readonly nsRecipients = signal('');
   protected readonly nsCc = signal('');
-  protected readonly nsRoleFilter = signal('');
+  /** Códigos del legacy que incluye el correo en lista (vacío = las guardias). */
+  protected readonly nsRoleFilter = signal<string[]>([]);
+  protected readonly nsEmailFormat = signal<NotificationSchedule['emailFormat']>('calendar');
+  protected readonly conditions = STAFFING_CONDITIONS;
+  protected readonly nsTargetPeriod = signal<NotificationTargetPeriod>('current_week');
 
   async ngOnInit(): Promise<void> {
     await this.run(async () => {
@@ -295,7 +320,8 @@ export class AdminShiftsComponent implements OnInit {
     await this.run(async () => {
       const draft = {
         name: this.nsName().trim(), frequency: this.nsFrequency(), dayOfWeek: this.nsDayOfWeek(), sendTime: this.nsSendTime(),
-        recipients: splitList(this.nsRecipients()), ccRecipients: splitList(this.nsCc()), roleFilter: splitList(this.nsRoleFilter()),
+        recipients: splitList(this.nsRecipients()), ccRecipients: splitList(this.nsCc()), roleFilter: this.nsRoleFilter(),
+        targetPeriod: this.nsTargetPeriod(), emailFormat: this.nsEmailFormat(),
       };
       const editing = this.editingScheduleId();
       if (editing) await this.api.patchNotificationSchedule(editing, draft);
@@ -313,7 +339,9 @@ export class AdminShiftsComponent implements OnInit {
     this.nsSendTime.set(schedule.sendTime);
     this.nsRecipients.set(schedule.recipients.join(', '));
     this.nsCc.set(schedule.ccRecipients.join(', '));
-    this.nsRoleFilter.set(schedule.roleFilter.join(', '));
+    this.nsRoleFilter.set(schedule.roleFilter.map((code) => code.toUpperCase()));
+    this.nsEmailFormat.set(schedule.emailFormat ?? 'calendar');
+    this.nsTargetPeriod.set(schedule.targetPeriod ?? 'current_week');
   }
 
   protected cancelScheduleEdit(): void {
@@ -321,7 +349,23 @@ export class AdminShiftsComponent implements OnInit {
     this.nsName.set('');
     this.nsRecipients.set('');
     this.nsCc.set('');
-    this.nsRoleFilter.set('');
+    this.nsRoleFilter.set([]);
+    this.nsEmailFormat.set('calendar');
+    this.nsTargetPeriod.set('current_week');
+  }
+
+  protected hasCondition(c: StaffingCondition, filter: readonly string[] = this.nsRoleFilter()): boolean {
+    return c.codes.some((code) => filter.includes(code));
+  }
+
+  protected toggleCondition(c: StaffingCondition): void {
+    const on = this.hasCondition(c);
+    this.nsRoleFilter.update((list) => (on ? list.filter((code) => !c.codes.includes(code)) : [...list, ...c.codes.filter((code) => !list.includes(code))]));
+  }
+
+  protected conditionsOf(schedule: NotificationSchedule): StaffingCondition[] {
+    const filter = schedule.roleFilter.map((code) => code.toUpperCase());
+    return STAFFING_CONDITIONS.filter((c) => this.hasCondition(c, filter));
   }
 
   protected async testSchedule(schedule: NotificationSchedule): Promise<void> {

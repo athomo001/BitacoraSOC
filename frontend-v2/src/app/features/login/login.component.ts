@@ -13,10 +13,9 @@
  *   - Sin SSO Google/Microsoft (fuera de alcance del núcleo, spec 02) ni
  *     easter egg (el backend nuevo no emite la señal): sus bloques se
  *     quitaron del template.
- *   - Tema: preferencia guardada en localStorage (igual que el legacy); el
- *     default configurable por el admin (GET /api/config/logo → loginTheme)
- *     todavía no existe en la API nueva, se usa 'crt' como el legacy.
- *   - Título fijo 'Bitácora Ops' (el legacy lo leía de la config).
+ *   - Tema: preferencia guardada en localStorage (igual que el legacy); si no
+ *     hay, el que eligió el admin en Administración → Marca (GET /api/branding).
+ *   - Título: el nombre visible de Administración → Marca.
  *   - Sin enrolamiento MFA desde el login: la API nueva exige sesión para
  *     /api/auth/mfa/setup, así que needsMfaSetup queda siempre en false.
  */
@@ -33,6 +32,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Title } from '@angular/platform-browser';
 import anime from 'animejs';
+import { BrandingService } from '../../core/branding/branding.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { isMfaPending } from '../../core/auth/auth.models';
 
@@ -94,6 +94,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   private readonly ngZone = inject(NgZone);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly titleService = inject(Title);
+  private readonly branding = inject(BrandingService);
 
   getAssetUrl(url: string): string {
     return url;
@@ -119,8 +120,13 @@ export class LoginComponent implements OnInit, OnDestroy {
       code: ['', [Validators.required, Validators.pattern(/^\d{6}$/)]],
     });
 
+    // Marca (comentario del dueño #8): nombre visible y tema por defecto del
+    // admin; la preferencia guardada en este navegador manda, como el legacy.
+    const brand = this.branding.brand();
+    this.appTitle = brand.appTitle;
     const localTheme = readStorage(THEME_STORAGE_KEY);
-    this.activeTheme = LOGIN_THEMES.includes(localTheme as LoginTheme) ? (localTheme as LoginTheme) : 'crt';
+    const adminTheme = LOGIN_THEMES.includes(brand.loginTheme as LoginTheme) ? (brand.loginTheme as LoginTheme) : 'crt';
+    this.activeTheme = LOGIN_THEMES.includes(localTheme as LoginTheme) ? (localTheme as LoginTheme) : adminTheme;
     this.titleService.setTitle(this.appTitle);
     this.themeLoaded = true;
     this.initializeThemeSpecifics();

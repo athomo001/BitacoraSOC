@@ -105,8 +105,8 @@ ORDER BY preferred DESC, channel_type, id;
 -- ===== Intentos (inmutables, ver migración 000004) =====
 
 -- name: InsertActionLog :one
-INSERT INTO escalation_action_logs (entry_id, policy_id, step_order, contact_id, channel_type, result, notes, operator_id)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *;
+INSERT INTO escalation_action_logs (entry_id, policy_id, step_order, contact_id, channel_type, result, notes, operator_id, incident_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, sqlc.narg('incident_id')) RETURNING *;
 
 -- name: ListActionLogs :many
 SELECT l.*, u.username AS operator_username, c.name AS contact_name
@@ -115,6 +115,7 @@ JOIN users u ON u.id = l.operator_id
 LEFT JOIN contacts c ON c.id = l.contact_id
 WHERE (sqlc.narg('policy_id')::uuid IS NULL OR l.policy_id = sqlc.narg('policy_id'))
   AND (sqlc.narg('entry_id')::uuid IS NULL OR l.entry_id = sqlc.narg('entry_id'))
+  AND (sqlc.narg('incident_id')::uuid IS NULL OR l.incident_id = sqlc.narg('incident_id'))
   AND (sqlc.narg('since')::timestamptz IS NULL OR l.created_at >= sqlc.narg('since'))
 ORDER BY l.created_at DESC
 LIMIT sqlc.arg('max_rows');
@@ -123,7 +124,8 @@ LIMIT sqlc.arg('max_rows');
 -- Quiénes ya se intentaron en este paso durante el incidente en curso (desde
 -- "since"), para que el modo sequential llame al siguiente y no repita.
 SELECT DISTINCT contact_id FROM escalation_action_logs
-WHERE policy_id = $1 AND step_order = $2 AND contact_id IS NOT NULL AND created_at >= sqlc.arg('since');
+WHERE policy_id = $1 AND step_order = $2 AND contact_id IS NOT NULL AND created_at >= sqlc.arg('since')
+  AND (sqlc.narg('incident_id')::uuid IS NULL OR incident_id = sqlc.narg('incident_id'));
 
 -- ===== Ventanas de mantenimiento =====
 
@@ -164,3 +166,105 @@ ORDER BY r.topic, r.role;
 -- name: CreateRaciAssignment :one
 INSERT INTO raci_assignments (client_id, service_id, asset_id, topic, role, team_id)
 VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
+
+-- ===== Rediseño de escalamiento (#17, canvas v26) =====
+
+-- name: ListPoolMembersForTeams :many
+-- Integrantes que son un pool (TI-Mundo…): se expanden a sus personas en el
+-- orden del pool, con el rol y la prioridad del integrante del nivel.
+SELECT m.id AS team_member_id, m.team_id, m.recipient_type, m.role_in_team, m.priority,
+  p.id AS pool_id, p.name AS pool_name, po.name AS pool_organization_name,
+  pm.id AS pool_member_id, pm.position AS pool_position, pm.contact_id, pm.user_id,
+  COALESCE(c.name, u.username, '')::text AS name,
+  c.specialty, c.position, co.name AS contact_organization_name
+FROM team_members m
+JOIN escalation_pools p ON p.id = m.pool_id AND p.active
+JOIN escalation_pool_members pm ON pm.pool_id = p.id
+LEFT JOIN organizations po ON po.id = p.organization_id
+LEFT JOIN contacts c ON c.id = pm.contact_id AND c.active
+LEFT JOIN users u ON u.id = pm.user_id AND u.active
+LEFT JOIN organizations co ON co.id = c.organization_id
+WHERE m.active AND m.team_id = ANY(sqlc.arg('team_ids')::uuid[])
+  AND (c.id IS NOT NULL OR u.id IS NOT NULL)
+ORDER BY m.team_id, m.priority, pm.position;
+
+-- name: ListEscalationPools :many
+SELECT p.*, o.name AS organization_name,
+  (SELECT count(*) FROM escalation_pool_members pm WHERE pm.pool_id = p.id)::bigint AS members,
+  (SELECT count(*) FROM team_members tm WHERE tm.pool_id = p.id AND tm.active)::bigint AS used_in
+FROM escalation_pools p LEFT JOIN organizations o ON o.id = p.organization_id
+ORDER BY o.name NULLS FIRST, p.name;
+
+-- name: GetEscalationPool :one
+SELECT * FROM escalation_pools WHERE id = $1;
+
+-- name: CreateEscalationPool :one
+INSERT INTO escalation_pools (organization_id, name) VALUES (sqlc.narg('organization_id'), sqlc.arg('name')) RETURNING *;
+
+-- name: UpdateEscalationPool :one
+UPDATE escalation_pools SET
+  name = COALESCE(sqlc.narg('name'), name),
+  active = COALESCE(sqlc.narg('active'), active),
+  organization_id = CASE WHEN sqlc.arg('set_organization')::boolean THEN sqlc.narg('organization_id')::uuid ELSE organization_id END
+WHERE id = sqlc.arg('id') RETURNING *;
+
+-- name: DeleteEscalationPool :execrows
+DELETE FROM escalation_pools WHERE id = $1;
+
+-- name: ListEscalationPoolMembers :many
+SELECT pm.*, COALESCE(c.name, u.username, '')::text AS name, co.name AS organization_name
+FROM escalation_pool_members pm
+LEFT JOIN contacts c ON c.id = pm.contact_id
+LEFT JOIN users u ON u.id = pm.user_id
+LEFT JOIN organizations co ON co.id = c.organization_id
+WHERE pm.pool_id = $1
+ORDER BY pm.position;
+
+-- name: ClearEscalationPoolMembers :exec
+DELETE FROM escalation_pool_members WHERE pool_id = $1;
+
+-- name: AddEscalationPoolMember :exec
+INSERT INTO escalation_pool_members (pool_id, contact_id, user_id, position)
+VALUES (sqlc.arg('pool_id'), sqlc.narg('contact_id'), sqlc.narg('user_id'), sqlc.arg('position'));
+
+-- name: UpdatePolicyReminder :one
+UPDATE escalation_policies SET reminder = sqlc.narg('reminder') WHERE id = sqlc.arg('id') RETURNING *;
+
+-- name: CreateEscalationIncident :one
+INSERT INTO escalation_incidents (service_id, asset_id, territorial_unit_id, title, glpi_ticket, ticket_id, opened_by)
+VALUES (sqlc.narg('service_id'), sqlc.narg('asset_id'), sqlc.narg('territorial_unit_id'), sqlc.arg('title'), sqlc.narg('glpi_ticket'), sqlc.narg('ticket_id'), sqlc.arg('opened_by'))
+RETURNING *;
+
+-- name: ListEscalationIncidents :many
+-- Incidentes del servicio, activo o unidad: abiertos primero; los cerrados
+-- de las últimas 48 horas también, para revisar lo reciente.
+SELECT i.*, u.username AS opened_by_username, t.ticket_number
+FROM escalation_incidents i
+JOIN users u ON u.id = i.opened_by
+LEFT JOIN tickets t ON t.id = i.ticket_id
+WHERE (sqlc.narg('service_id')::uuid IS NULL OR i.service_id = sqlc.narg('service_id'))
+  AND (sqlc.narg('asset_id')::uuid IS NULL OR i.asset_id = sqlc.narg('asset_id'))
+  AND (sqlc.narg('territorial_unit_id')::uuid IS NULL OR i.territorial_unit_id = sqlc.narg('territorial_unit_id'))
+  AND (i.closed_at IS NULL OR i.closed_at > now() - interval '48 hours')
+ORDER BY (i.closed_at IS NULL) DESC, i.opened_at DESC
+LIMIT 50;
+
+-- name: GetEscalationIncident :one
+SELECT i.*, u.username AS opened_by_username, t.ticket_number
+FROM escalation_incidents i
+JOIN users u ON u.id = i.opened_by
+LEFT JOIN tickets t ON t.id = i.ticket_id
+WHERE i.id = $1;
+
+-- name: CloseEscalationIncident :execrows
+UPDATE escalation_incidents SET closed_at = now(), closed_by = $2 WHERE id = $1 AND closed_at IS NULL;
+
+-- name: ReopenEscalationIncident :execrows
+UPDATE escalation_incidents SET closed_at = NULL, closed_by = NULL WHERE id = $1 AND closed_at IS NOT NULL;
+
+-- name: AddEscalationIncidentNote :one
+INSERT INTO escalation_incident_notes (incident_id, user_id, note) VALUES ($1, $2, $3) RETURNING *;
+
+-- name: ListEscalationIncidentNotes :many
+SELECT n.*, u.username FROM escalation_incident_notes n JOIN users u ON u.id = n.user_id
+WHERE n.incident_id = $1 ORDER BY n.created_at;

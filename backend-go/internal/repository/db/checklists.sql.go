@@ -210,15 +210,15 @@ func (q *Queries) CreateChecklistEntry(ctx context.Context, arg CreateChecklistE
 }
 
 const createChecklistTemplate = `-- name: CreateChecklistTemplate :one
-INSERT INTO checklist_templates (name, is_active, alert_nok_enabled, alert_nok_role_target)
-VALUES ($1, $2, $3, $4) RETURNING id, name, is_active, alert_nok_enabled, alert_nok_role_target, created_at
+INSERT INTO checklist_templates (name, is_active, alert_nok_enabled, alert_nok_cargos)
+VALUES ($1, $2, $3, $4) RETURNING id, name, is_active, alert_nok_enabled, created_at, alert_nok_cargos
 `
 
 type CreateChecklistTemplateParams struct {
-	Name               string      `json:"name"`
-	IsActive           bool        `json:"is_active"`
-	AlertNokEnabled    bool        `json:"alert_nok_enabled"`
-	AlertNokRoleTarget pgtype.Text `json:"alert_nok_role_target"`
+	Name            string   `json:"name"`
+	IsActive        bool     `json:"is_active"`
+	AlertNokEnabled bool     `json:"alert_nok_enabled"`
+	AlertNokCargos  []string `json:"alert_nok_cargos"`
 }
 
 func (q *Queries) CreateChecklistTemplate(ctx context.Context, arg CreateChecklistTemplateParams) (ChecklistTemplate, error) {
@@ -226,7 +226,7 @@ func (q *Queries) CreateChecklistTemplate(ctx context.Context, arg CreateCheckli
 		arg.Name,
 		arg.IsActive,
 		arg.AlertNokEnabled,
-		arg.AlertNokRoleTarget,
+		arg.AlertNokCargos,
 	)
 	var i ChecklistTemplate
 	err := row.Scan(
@@ -234,8 +234,8 @@ func (q *Queries) CreateChecklistTemplate(ctx context.Context, arg CreateCheckli
 		&i.Name,
 		&i.IsActive,
 		&i.AlertNokEnabled,
-		&i.AlertNokRoleTarget,
 		&i.CreatedAt,
+		&i.AlertNokCargos,
 	)
 	return i, err
 }
@@ -401,7 +401,7 @@ func (q *Queries) DeleteChecklistTemplate(ctx context.Context, id uuid.UUID) err
 }
 
 const getActiveChecklistTemplate = `-- name: GetActiveChecklistTemplate :one
-SELECT id, name, is_active, alert_nok_enabled, alert_nok_role_target, created_at FROM checklist_templates WHERE id = $1 AND is_active = true
+SELECT id, name, is_active, alert_nok_enabled, created_at, alert_nok_cargos FROM checklist_templates WHERE id = $1 AND is_active = true
 `
 
 func (q *Queries) GetActiveChecklistTemplate(ctx context.Context, id uuid.UUID) (ChecklistTemplate, error) {
@@ -412,8 +412,8 @@ func (q *Queries) GetActiveChecklistTemplate(ctx context.Context, id uuid.UUID) 
 		&i.Name,
 		&i.IsActive,
 		&i.AlertNokEnabled,
-		&i.AlertNokRoleTarget,
 		&i.CreatedAt,
+		&i.AlertNokCargos,
 	)
 	return i, err
 }
@@ -430,7 +430,7 @@ func (q *Queries) GetChecklistCooldown(ctx context.Context) (int32, error) {
 }
 
 const getChecklistTemplate = `-- name: GetChecklistTemplate :one
-SELECT id, name, is_active, alert_nok_enabled, alert_nok_role_target, created_at FROM checklist_templates WHERE id = $1
+SELECT id, name, is_active, alert_nok_enabled, created_at, alert_nok_cargos FROM checklist_templates WHERE id = $1
 `
 
 func (q *Queries) GetChecklistTemplate(ctx context.Context, id uuid.UUID) (ChecklistTemplate, error) {
@@ -441,8 +441,8 @@ func (q *Queries) GetChecklistTemplate(ctx context.Context, id uuid.UUID) (Check
 		&i.Name,
 		&i.IsActive,
 		&i.AlertNokEnabled,
-		&i.AlertNokRoleTarget,
 		&i.CreatedAt,
+		&i.AlertNokCargos,
 	)
 	return i, err
 }
@@ -790,7 +790,7 @@ func (q *Queries) LinkCorrelatedShiftCheckService(ctx context.Context, arg LinkC
 }
 
 const listActiveChecklistTemplates = `-- name: ListActiveChecklistTemplates :many
-SELECT id, name, is_active, alert_nok_enabled, alert_nok_role_target, created_at FROM checklist_templates WHERE is_active = true ORDER BY name
+SELECT id, name, is_active, alert_nok_enabled, created_at, alert_nok_cargos FROM checklist_templates WHERE is_active = true ORDER BY name
 `
 
 func (q *Queries) ListActiveChecklistTemplates(ctx context.Context) ([]ChecklistTemplate, error) {
@@ -807,8 +807,8 @@ func (q *Queries) ListActiveChecklistTemplates(ctx context.Context) ([]Checklist
 			&i.Name,
 			&i.IsActive,
 			&i.AlertNokEnabled,
-			&i.AlertNokRoleTarget,
 			&i.CreatedAt,
+			&i.AlertNokCargos,
 		); err != nil {
 			return nil, err
 		}
@@ -852,7 +852,7 @@ func (q *Queries) ListChecklistItems(ctx context.Context, templateID uuid.UUID) 
 
 const listChecklistTemplates = `-- name: ListChecklistTemplates :many
 
-SELECT id, name, is_active, alert_nok_enabled, alert_nok_role_target, created_at FROM checklist_templates ORDER BY is_active DESC, name
+SELECT id, name, is_active, alert_nok_enabled, created_at, alert_nok_cargos FROM checklist_templates ORDER BY is_active DESC, name
 `
 
 // ===== Administración de plantillas (pantalla aprobada "Administración: Checklist") =====
@@ -870,8 +870,8 @@ func (q *Queries) ListChecklistTemplates(ctx context.Context) ([]ChecklistTempla
 			&i.Name,
 			&i.IsActive,
 			&i.AlertNokEnabled,
-			&i.AlertNokRoleTarget,
 			&i.CreatedAt,
+			&i.AlertNokCargos,
 		); err != nil {
 			return nil, err
 		}
@@ -1304,16 +1304,16 @@ func (q *Queries) UpdateChecklistItem(ctx context.Context, arg UpdateChecklistIt
 }
 
 const updateChecklistTemplate = `-- name: UpdateChecklistTemplate :one
-UPDATE checklist_templates SET name = $2, is_active = $3, alert_nok_enabled = $4, alert_nok_role_target = $5
-WHERE id = $1 RETURNING id, name, is_active, alert_nok_enabled, alert_nok_role_target, created_at
+UPDATE checklist_templates SET name = $2, is_active = $3, alert_nok_enabled = $4, alert_nok_cargos = $5
+WHERE id = $1 RETURNING id, name, is_active, alert_nok_enabled, created_at, alert_nok_cargos
 `
 
 type UpdateChecklistTemplateParams struct {
-	ID                 uuid.UUID   `json:"id"`
-	Name               string      `json:"name"`
-	IsActive           bool        `json:"is_active"`
-	AlertNokEnabled    bool        `json:"alert_nok_enabled"`
-	AlertNokRoleTarget pgtype.Text `json:"alert_nok_role_target"`
+	ID              uuid.UUID `json:"id"`
+	Name            string    `json:"name"`
+	IsActive        bool      `json:"is_active"`
+	AlertNokEnabled bool      `json:"alert_nok_enabled"`
+	AlertNokCargos  []string  `json:"alert_nok_cargos"`
 }
 
 func (q *Queries) UpdateChecklistTemplate(ctx context.Context, arg UpdateChecklistTemplateParams) (ChecklistTemplate, error) {
@@ -1322,7 +1322,7 @@ func (q *Queries) UpdateChecklistTemplate(ctx context.Context, arg UpdateCheckli
 		arg.Name,
 		arg.IsActive,
 		arg.AlertNokEnabled,
-		arg.AlertNokRoleTarget,
+		arg.AlertNokCargos,
 	)
 	var i ChecklistTemplate
 	err := row.Scan(
@@ -1330,8 +1330,8 @@ func (q *Queries) UpdateChecklistTemplate(ctx context.Context, arg UpdateCheckli
 		&i.Name,
 		&i.IsActive,
 		&i.AlertNokEnabled,
-		&i.AlertNokRoleTarget,
 		&i.CreatedAt,
+		&i.AlertNokCargos,
 	)
 	return i, err
 }

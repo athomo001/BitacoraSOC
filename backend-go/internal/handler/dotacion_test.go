@@ -69,41 +69,42 @@ func TestNewShareToken_Format(t *testing.T) {
 	}
 }
 
-func TestBuildNotificationMail_FiltersByRole(t *testing.T) {
-	schedule := db.WorkShiftNotificationSchedule{Name: "Reporte N1", RoleFilter: []string{"Analista N1"}}
-	matrix := matrixDTO{
-		Columns: []matrixColumnDTO{{Date: "2026-09-21"}, {Date: "2026-09-25"}},
-		Rows: []matrixRowDTO{
-			{Name: "Ana", Role: "Analista N1", Days: []matrixCellDTO{{Date: "2026-09-21", Label: "En Oficina"}}},
-			{Name: "Beto", Role: "Analista N2", Days: []matrixCellDTO{{Date: "2026-09-21", Label: "En Oficina"}}},
-		},
+func TestSchedulePeriod_LikeLegacy(t *testing.T) {
+	loc := time.FixedZone("CLT", -3*3600)
+	sunday := time.Date(2026, 10, 4, 20, 0, 0, 0, loc)
+	start, label := schedulePeriod(db.WorkShiftNotificationSchedule{TargetPeriod: "next_week"}, sunday)
+	if start.Format("2006-01-02") != "2026-10-05" || label != "Periodo Semanal: 05-10-2026 - 11-10-2026" {
+		t.Fatalf("semana siguiente: %s %q", start, label)
 	}
-
-	subject, body := buildNotificationMail(schedule, matrix)
-	if subject != "Reporte N1" {
-		t.Fatalf("subject = %q, quería el nombre de la programación", subject)
+	start, label = schedulePeriod(db.WorkShiftNotificationSchedule{TargetPeriod: "current_week"}, sunday)
+	if start.Format("2006-01-02") != "2026-09-28" || label != "Periodo Semanal: 28-09-2026 - 04-10-2026" {
+		t.Fatalf("semana actual: %s %q", start, label)
 	}
-	if !strings.Contains(body, "Ana") || strings.Contains(body, "Beto") {
-		t.Fatalf("roleFilter debería incluir solo Analista N1: %s", body)
+	start, label = schedulePeriod(db.WorkShiftNotificationSchedule{Frequency: db.NotificationScheduleFrequencyMonthly}, sunday)
+	if start.Format("2006-01-02") != "2026-10-01" || label != "Periodo Mensual: octubre de 2026" {
+		t.Fatalf("mensual: %s %q", start, label)
 	}
 }
 
-func TestBuildNotificationMail_EmptyFilterMatchSaysSo(t *testing.T) {
-	schedule := db.WorkShiftNotificationSchedule{Name: "Reporte vacío", RoleFilter: []string{"Rol que no existe"}}
-	matrix := matrixDTO{Rows: []matrixRowDTO{{Name: "Ana", Role: "Analista N1"}}}
-
-	_, body := buildNotificationMail(schedule, matrix)
-	if !strings.Contains(body, "Sin filas") {
-		t.Fatalf("un filtro sin coincidencias debería avisarlo explícitamente: %s", body)
+func TestScheduleCategories_LikeLegacy(t *testing.T) {
+	cases := map[string][]string{
+		"CALENDARIO":                         nil,
+		"GUARDIA":                            {"N2", "N1_NO_HABIL"},
+		"GUARDIA / TELETRABAJO / VACACIONES": {"TI", "VACATION", "TELEWORK"},
+		"CHARLA/CAPACITACIÓN / TRÁMITE MÉDICO": {"MEDICAL_APPOINTMENT", "OL"},
+	}
+	for want, filter := range cases {
+		if got := scheduleCategories(filter); got != want {
+			t.Fatalf("%v: %q, se esperaba %q", filter, got, want)
+		}
 	}
 }
 
-func TestBuildNotificationMailHTML_EscapesAndFilters(t *testing.T) {
-	schedule := db.WorkShiftNotificationSchedule{Name: "Reporte HTML", RoleFilter: []string{"N1"}}
-	matrix := matrixDTO{Columns: []matrixColumnDTO{{Date: "2026-09-21"}, {Date: "2026-09-25"}}, Rows: []matrixRowDTO{{Name: "Ana <script>", Role: "N1", Days: []matrixCellDTO{{Date: "2026-09-21", Label: "En Oficina"}}}, {Name: "Beto", Role: "N2"}}}
-	html := buildNotificationMailHTML(schedule, matrix)
-	if strings.Contains(html, "<script>") || !strings.Contains(html, "Ana &lt;script&gt;") || strings.Contains(html, "Beto") {
-		t.Fatalf("HTML inseguro o filtro incorrecto: %s", html)
+func TestListPeriod_SemanaOperativa(t *testing.T) {
+	loc := time.FixedZone("CLT", -3*3600)
+	start, end := listPeriod(db.WorkShiftNotificationSchedule{TargetPeriod: "current_week"}, time.Date(2026, 10, 7, 15, 0, 0, 0, loc))
+	if start.Format("2006-01-02 15:04") != "2026-10-05 09:00" || end.Format("2006-01-02 15:04:05") != "2026-10-12 08:59:59" {
+		t.Fatalf("semana: %s → %s", start, end)
 	}
 }
 

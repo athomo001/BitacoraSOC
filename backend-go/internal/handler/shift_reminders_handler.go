@@ -3,7 +3,8 @@ package handler
 import (
 	"context"
 	"errors"
-	"html"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/branding"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/mailtpl"
 	"net/http"
 	"sort"
 	"strings"
@@ -265,8 +266,8 @@ func (h *ShiftRemindersHandler) Test(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusBadRequest, "smtp-not-configured", "configura el correo antes de probar el recordatorio")
 		return
 	}
-	subject, body := reminderMail(rem)
-	if err := sender.SendHTML([]string{user.Email}, nil, "[Prueba] "+subject, body); err != nil {
+	m := reminderMail(branding.Title(r.Context(), h.Queries), rem)
+	if err := sender.SendAlternative([]string{user.Email}, nil, "[Prueba] "+m.Subject, m.Text, m.HTML); err != nil {
 		h.AuditLog.Log(r.Context(), "shift.reminder.test", audit.LevelWarn, audit.Failure(err.Error()), map[string]any{"reminderId": id.String()})
 		problemdetails.Write(w, r, http.StatusBadGateway, "mail-failed", "el envío de prueba falló: "+err.Error())
 		return
@@ -329,8 +330,8 @@ func (h *ShiftRemindersHandler) DispatchDue(ctx context.Context) error {
 					continue
 				}
 			}
-			subject, body := reminderMail(rem)
-			if err := sender.SendHTML(recipients, nil, subject, body); err != nil {
+			m := reminderMail(branding.Title(ctx, h.Queries), rem)
+			if err := sender.SendAlternative(recipients, nil, m.Subject, m.Text, m.HTML); err != nil {
 				h.markFailed(ctx, rem.ID, shift.ID, key, err.Error())
 				continue
 			}
@@ -371,20 +372,8 @@ func nonEmptyAddresses(in []string) []string {
 	return out
 }
 
-// reminderMail arma el correo: el nombre va en el asunto y el texto se
-// escapa línea por línea (es texto del admin, no HTML).
-func reminderMail(r db.ShiftReminder) (string, string) {
-	subject := "[Bitácora Ops] " + r.Label
-	var b strings.Builder
-	b.WriteString(`<div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.5;color:#1f2328;">`)
-	b.WriteString(`<p style="margin:0 0 12px;font-weight:600;">` + html.EscapeString(r.Label) + `</p>`)
-	for _, line := range strings.Split(strings.ReplaceAll(r.ReminderText, "\r\n", "\n"), "\n") {
-		if strings.TrimSpace(line) == "" {
-			b.WriteString(`<div style="height:12px;"></div>`)
-			continue
-		}
-		b.WriteString(`<div>` + html.EscapeString(line) + `</div>`)
-	}
-	b.WriteString(`<p style="margin:18px 0 0;font-size:12px;color:#6e7781;">Recordatorio automático de turno · Bitácora Ops</p></div>`)
-	return subject, b.String()
+// reminderMail arma el correo con la plantilla del legacy (estándar del
+// área): "Recordatorio de Turno" y el asunto "[Título] etiqueta".
+func reminderMail(appTitle string, r db.ShiftReminder) mailtpl.Mail {
+	return mailtpl.ShiftReminder(appTitle, r.Label, r.ReminderText)
 }

@@ -1,0 +1,445 @@
+/* Reportes (#10, canvas v18–v20): formulario a la izquierda, vista previa
+ * del correo a la derecha, barra de acciones abajo. */
+:host {
+  display: block;
+  height: calc(100% + 32px); /* el área de trabajo del shell tiene 16px de padding */
+  margin: -16px;
+}
+
+mat-icon {
+  width: 15px;
+  height: 15px;
+  font-size: 15px;
+}
+
+.rp {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.rp__head {
+  padding: 14px 20px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+}
+
+.rp__title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.rp__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.rp__lead {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.rp__tabs {
+  display: flex;
+  gap: 2px;
+  margin-top: 8px;
+}
+
+.rp__tab {
+  padding: 8px 10px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.rp__tab[aria-selected='true'] {
+  border-bottom-color: var(--accent);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.rp__split {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 6px 460px;
+}
+
+/* Divisor arrastrable entre el formulario y la vista previa. */
+.rp__splitter {
+  position: relative;
+  cursor: col-resize;
+  background: var(--border-subtle);
+  touch-action: none;
+}
+
+.rp__splitter::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 1px;
+  width: 4px;
+  height: 36px;
+  transform: translateY(-50%);
+  border-radius: var(--radius-pill);
+  background: var(--text-muted);
+  opacity: 0.5;
+}
+
+.rp__splitter:hover,
+.rp__splitter:focus-visible,
+.rp__split--resizing .rp__splitter {
+  background: var(--accent);
+  outline: none;
+}
+
+/* Mientras se arrastra, el iframe no se queda con el mouse. */
+.rp__split--resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.rp__split--resizing iframe {
+  pointer-events: none;
+}
+
+.rp__form,
+.rp__history {
+  overflow: auto;
+  padding: 14px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.rp__modes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.rp__draft {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.rp__on,
+.rp__on:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.rp__grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.rp__segs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.rp__seg {
+  padding: 4px 10px;
+}
+
+.rp__evidence {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px dashed transparent;
+  border-radius: 8px;
+}
+
+.rp__evidence--drag {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.rp__thumb {
+  position: relative;
+  width: 70px;
+  height: 44px;
+}
+
+.rp__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+}
+
+.rp__thumb-x {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--status-critical);
+  color: var(--accent-contrast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.rp__thumb-x mat-icon {
+  width: 12px;
+  height: 12px;
+  font-size: 12px;
+}
+
+.rp__add {
+  border-style: dashed;
+  cursor: pointer;
+}
+
+.rp__add input {
+  display: none;
+}
+
+.rp__recips {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rp__recip-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.rp__recip-label {
+  width: 28px;
+  padding-top: 6px;
+}
+
+.rp__chips {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  min-height: 30px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+}
+
+.rp__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.rp__chip button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.rp__chip mat-icon {
+  width: 13px;
+  height: 13px;
+  font-size: 13px;
+}
+
+.rp__chip-input {
+  flex: 1;
+  min-width: 140px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  padding: 3px 2px;
+}
+
+.rp__dir-btn {
+  flex-shrink: 0;
+}
+
+.rp__picker {
+  margin-left: 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-surface);
+}
+
+.rp__pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+  text-align: left;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.rp__pick:hover,
+.rp__pick:focus-visible {
+  background: var(--bg-surface-hover);
+}
+
+.rp__with-reset {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rp__reset {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 11px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.rp__preview {
+  overflow: auto;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-app);
+  font-size: 12px;
+  min-width: 0;
+}
+
+.rp__preview-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  justify-content: space-between;
+}
+
+.rp__frame {
+  flex: 1;
+  min-height: 520px;
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: white;
+}
+
+.rp__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+}
+
+.rp__notice {
+  font-size: 11.5px;
+  background: transparent;
+}
+
+.rp__actions {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rp__preview .rp__actions {
+  margin-left: 0;
+}
+
+.rp__history-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rp__nowrap {
+  white-space: nowrap;
+}
+
+.rp__recip-cell {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rp__pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+@media (width <= 960px) {
+  :host {
+    height: auto;
+  }
+
+  /* En pantallas angostas va una debajo de la otra (sin divisor). */
+  .rp__split {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .rp__splitter {
+    display: none;
+  }
+
+  .rp__form,
+  .rp__history {
+    border-right: none;
+    padding: 14px 16px;
+  }
+
+  .rp__grid3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rp__picker {
+    margin-left: 0;
+  }
+}

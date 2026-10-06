@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { ShellComponent } from './shell/shell';
 import { authGuard } from './core/auth/auth.guard';
+import { socOrNocGuard } from './core/setup/setup.guard';
 import { setupCompletedGuard, setupPendingGuard } from './core/setup/setup.guard';
 
 /**
@@ -42,6 +43,7 @@ export const routes: Routes = [
       { path: '', pathMatch: 'full', redirectTo: 'entries' },
       {
         path: 'entries',
+        canActivate: [socOrNocGuard],
         loadComponent: () => import('./features/entries/entries').then((module) => module.EntriesComponent),
       },
       {
@@ -50,12 +52,21 @@ export const routes: Routes = [
       },
       {
         path: 'shifts',
+        canActivate: [socOrNocGuard],
         loadComponent: () => import('./features/shifts/shifts').then((module) => module.ShiftsComponent),
       },
       {
         path: 'escalation',
+        // Con solo la Ticketera no hay Bitácora, Turnos ni Escalamiento (este
+        // último es por servicio SOC o activo/zona NOC): socOrNocGuard lleva a
+        // la Ticketera.
+        canActivate: [socOrNocGuard],
         loadComponent: () =>
           import('./features/escalation/escalation').then((module) => module.EscalationComponent),
+      },
+      {
+        path: 'reports',
+        loadComponent: () => import('./features/reports/reports').then((module) => module.ReportsComponent),
       },
       {
         path: 'directory',

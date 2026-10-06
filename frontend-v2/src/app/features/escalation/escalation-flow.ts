@@ -8,28 +8,37 @@ export interface FlowState {
   answered: boolean;
   exhausted: boolean;
   statusByStep: Map<number, StepStatus>;
-  /** Último resultado por contacto, para pintar cada fila de la tarjeta. */
+  /** Último resultado por contacto (en cualquier paso). */
   lastResultByContact: Map<string, ContactResult>;
-  /** En modo sequential, a quién toca llamar ahora dentro del paso actual. */
+  /** Último resultado por paso y contacto ("2:c-juan"): la misma persona puede estar en varios niveles. */
+  lastResultByStepContact: Map<string, ContactResult>;
+  /** A quién toca llamar ahora dentro del paso actual (sequential o un pool). */
   nextMemberId: string | null;
   /** Desde cuándo está en curso el paso actual (para la cuenta regresiva). */
   currentSince: string | null;
 }
 
+export const stepContactKey = (order: number, contactId: string): string => `${order}:${contactId}`;
+
 /**
  * Reconstruye el estado de la tarjeta de escalación a partir de la línea de
  * tiempo del incidente, con las mismas reglas que escalation.Next del
- * backend: en sequential se agota el paso cuando todos sus miembros fallaron;
- * en unique/pool basta un intento fallido para pasar al siguiente. Se deriva
- * de los intentos registrados (no de estado local) para que un F5 o un
- * segundo operador vean exactamente lo mismo.
+ * backend: si quien no contestó es de un pool (TI-Mundo…), se sigue con el
+ * siguiente del pool; agotado el pool, o en unique/pool con alguien que no es
+ * de un pool, se pasa al nivel siguiente; en sequential, cuando todos sus
+ * miembros fallaron. "Escalar" cierra el paso en cualquier modo. Se deriva de
+ * los intentos registrados (no de estado local) para que un F5 o un segundo
+ * operador vean exactamente lo mismo.
  */
 export function flowState(steps: readonly ResolvedStep[], actions: readonly ActionLog[], since: string): FlowState {
   const ordered = [...actions].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const statusByStep = new Map<number, StepStatus>();
   const lastResultByContact = new Map<string, ContactResult>();
+  const lastResultByStepContact = new Map<string, ContactResult>();
   for (const a of ordered) {
-    if (a.contactId) lastResultByContact.set(a.contactId, a.result);
+    if (!a.contactId) continue;
+    lastResultByContact.set(a.contactId, a.result);
+    lastResultByStepContact.set(stepContactKey(a.stepOrder, a.contactId), a.result);
   }
   let current: number | null = null;
   let answered = false;
@@ -47,15 +56,39 @@ export function flowState(steps: readonly ResolvedStep[], actions: readonly Acti
       answered = true;
       continue;
     }
-    const failedContacts = new Set(acts.filter((a) => a.contactId).map((a) => a.contactId as string));
-    const trackable = step.team.members.filter((m) => m.contactId);
-    // "Escalar" cierra el paso de inmediato, en cualquier modo.
-    const escalated = acts.some((a) => a.result === 'escalated_next_tier');
-    const exhaustedByMode =
-      step.mode === 'sequential'
-        ? trackable.length > 0 && trackable.every((m) => failedContacts.has(m.contactId as string))
-        : acts.length > 0;
-    const failed = escalated || exhaustedByMode;
+    const members = step.team.members;
+    const trackable = members.filter((m) => m.contactId);
+    const tried = new Set<string>();
+    let failed = false;
+    let lastPool: string | null = null;
+    for (const a of acts) {
+      if (a.result === 'escalated_next_tier') {
+        failed = true;
+        break;
+      }
+      if (a.contactId) tried.add(a.contactId);
+      const who = members.find((m) => m.contactId && m.contactId === a.contactId);
+      if (who?.pool) {
+        lastPool = who.pool.id;
+        const pool = members.filter((m) => m.pool?.id === who.pool?.id && m.contactId);
+        if (pool.every((m) => tried.has(m.contactId as string))) {
+          lastPool = null;
+          if (step.mode !== 'sequential') {
+            failed = true;
+            break;
+          }
+        }
+        continue;
+      }
+      lastPool = null;
+      if (step.mode !== 'sequential') {
+        failed = true;
+        break;
+      }
+    }
+    if (!failed && step.mode === 'sequential' && trackable.length > 0 && trackable.every((m) => tried.has(m.contactId as string))) {
+      failed = true;
+    }
     if (failed) {
       statusByStep.set(step.order, 'failed');
       currentSince = acts.at(-1)?.createdAt ?? currentSince;
@@ -63,8 +96,10 @@ export function flowState(steps: readonly ResolvedStep[], actions: readonly Acti
     }
     statusByStep.set(step.order, 'current');
     current = step.order;
-    if (step.mode === 'sequential') {
-      nextMemberId = step.team.members.find((m) => !m.contactId || !failedContacts.has(m.contactId))?.id ?? null;
+    if (lastPool) {
+      nextMemberId = members.find((m) => m.pool?.id === lastPool && (!m.contactId || !tried.has(m.contactId)))?.id ?? null;
+    } else if (step.mode === 'sequential') {
+      nextMemberId = members.find((m) => !m.contactId || !tried.has(m.contactId))?.id ?? null;
     }
   }
   const exhausted = !answered && current === null && steps.length > 0;
@@ -74,6 +109,7 @@ export function flowState(steps: readonly ResolvedStep[], actions: readonly Acti
     exhausted,
     statusByStep,
     lastResultByContact,
+    lastResultByStepContact,
     nextMemberId,
     currentSince: current === null ? null : currentSince,
   };

@@ -76,8 +76,9 @@ func (h *ConfigHandler) PatchModules(w http.ResponseWriter, r *http.Request) {
 	if req.NocEnabled != nil {
 		noc = *req.NocEnabled
 	}
-	if !soc && !noc {
-		problemdetails.Write(w, r, http.StatusBadRequest, "no-module-selected", "al menos un módulo (SOC o NOC) debe quedar activo")
+	// Basta con uno: SOC, NOC o la Ticketera sola (pedido del dueño).
+	if !soc && !noc && !featureEnabled(ctx, h.Queries, ticketsFeature) {
+		problemdetails.Write(w, r, http.StatusBadRequest, "no-module-selected", noModuleMessage)
 		return
 	}
 

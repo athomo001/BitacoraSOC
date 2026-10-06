@@ -66,7 +66,7 @@ const TICKETS_FEATURE = 'native_tickets';
             <span class="pill tone-ok"><mat-icon>task_alt</mat-icon>{{ n }}</span>
           } @else if (error(); as e) {
             <span class="adm-error" role="alert">{{ e }}</span>
-          } @else if (!draft().soc && !draft().noc) {
+          } @else if (noneOn()) {
             <span class="adm-error">{{ i18n.t('modules.atLeastOne') }}</span>
           } @else {
             <span class="adm-muted">{{ i18n.t(dirty() ? 'admin.unsaved' : 'admin.noChanges') }}</span>
@@ -75,7 +75,7 @@ const TICKETS_FEATURE = 'native_tickets';
         @if (dirty()) {
           <button type="button" class="adm-btn adm-push" (click)="discard()">{{ i18n.t('admin.discard') }}</button>
         }
-        <button type="button" class="adm-btn adm-btn--primary" [class.adm-push]="!dirty()" [disabled]="!dirty() || busy() || (!draft().soc && !draft().noc)" (click)="save()">
+        <button type="button" class="adm-btn adm-btn--primary" [class.adm-push]="!dirty()" [disabled]="!dirty() || busy() || noneOn()" (click)="save()">
           <mat-icon>save</mat-icon>{{ i18n.t('admin.save') }}
         </button>
       </footer>
@@ -102,6 +102,8 @@ export class AdminModulesComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
 
+  /** Basta con uno encendido: SOC, NOC o la Ticketera sola. */
+  protected readonly noneOn = computed(() => !this.draft().soc && !this.draft().noc && !this.draft().tickets);
   protected readonly dirty = computed(() => MODULES.some((m) => this.draft()[m.id] !== this.saved()[m.id]));
 
   async ngOnInit(): Promise<void> {
@@ -126,19 +128,24 @@ export class AdminModulesComponent implements OnInit {
 
   protected async save(): Promise<void> {
     const d = this.draft();
-    if (!d.soc && !d.noc) return;
+    if (this.noneOn()) return;
     this.busy.set(true);
     this.error.set(null);
     const before = this.saved();
     try {
       // Actualiza el estado cacheado: los menús aparecen o se van al instante.
+      // Lo que se enciende va primero, así nunca quedan los tres apagados a
+      // mitad del guardado (el servidor lo rechazaría).
+      let tickets = before.tickets;
+      if (d.tickets && !before.tickets) {
+        tickets = (await this.features.setEnabled(TICKETS_FEATURE, true)).isEnabled;
+      }
       let flags = { socEnabled: before.soc, nocEnabled: before.noc };
       if (d.soc !== before.soc || d.noc !== before.noc) {
         flags = await this.setup.updateModules({ socEnabled: d.soc, nocEnabled: d.noc });
       }
-      let tickets = before.tickets;
-      if (d.tickets !== before.tickets) {
-        tickets = (await this.features.setEnabled(TICKETS_FEATURE, d.tickets)).isEnabled;
+      if (!d.tickets && before.tickets) {
+        tickets = (await this.features.setEnabled(TICKETS_FEATURE, false)).isEnabled;
       }
       this.apply({ soc: flags.socEnabled, noc: flags.nocEnabled, tickets });
       this.notice.set(this.i18n.t('admin.saved'));

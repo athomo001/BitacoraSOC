@@ -1,3 +1,4 @@
+import { BrandingService } from '../../core/branding/branding.service';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -37,6 +38,7 @@ export class PublicTicketComponent {
   protected readonly i18n = inject(I18nService);
   protected readonly prefs = inject(PreferencesService);
   private readonly api = inject(TicketsService);
+  protected readonly brandTitle = inject(BrandingService).appTitle;
   private readonly token = inject(ActivatedRoute).snapshot.paramMap.get('token') ?? '';
 
   protected readonly view = signal<View>('loading');

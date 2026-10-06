@@ -1,8 +1,10 @@
+import { AdminBrandComponent } from './admin-brand';
 import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { DomainModule, ModuleAccessService } from '../../core/auth/module-access.service';
+import { SetupService } from '../../core/setup/setup.service';
 import { AdminModulesComponent } from './admin-modules';
 import { AdminFeaturesComponent } from './admin-features';
 import { AdminTerritoryComponent } from './admin-territory';
@@ -17,12 +19,13 @@ import { AdminAccessComponent } from './admin-access';
 import { AdminReportsComponent } from './admin-reports';
 import { AdminChecklistComponent } from './admin-checklist';
 import { AdminComplementsComponent } from './admin-complements';
+import { AdminClientAlertsComponent } from './admin-client-alerts';
 import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 
 export type AdminSection =
-  | 'access' | 'shifts' | 'checklist' | 'escalation' | 'smtp' | 'reports'
+  | 'access' | 'shifts' | 'checklist' | 'escalation' | 'clientAlerts' | 'smtp' | 'reports'
   | 'organizations' | 'territory' | 'teams'
-  | 'modules' | 'features' | 'backups' | 'audit' | 'complements';
+  | 'modules' | 'brand' | 'features' | 'backups' | 'audit' | 'complements';
 
 interface NavItem {
   id: AdminSection;
@@ -31,6 +34,8 @@ interface NavItem {
   badge?: string;
   /** Sección de un módulo SOC/NOC: si el módulo no aplica, no aparece (sin aviso de "desactivado"). */
   requiresModule?: DomainModule;
+  /** Necesita SOC o NOC: con solo la Ticketera no aparece (Turnos, Checklist, Escalamiento…). */
+  requiresSocOrNoc?: boolean;
   /** Funcionalidad opcional (`system_features`): apagada, la sección no aparece. */
   requiresFeature?: string;
 }
@@ -41,11 +46,12 @@ const NAV: readonly { labelKey: MessageKey; items: readonly NavItem[] }[] = [
   {
     labelKey: 'admin.group.operation',
     items: [
-      { id: 'shifts', icon: 'schedule', labelKey: 'admin.nav.shifts' },
-      { id: 'checklist', icon: 'checklist', labelKey: 'admin.nav.checklist' },
-      { id: 'escalation', icon: 'call_split', labelKey: 'admin.nav.escalation' },
+      { id: 'shifts', icon: 'schedule', labelKey: 'admin.nav.shifts', requiresSocOrNoc: true },
+      { id: 'checklist', icon: 'checklist', labelKey: 'admin.nav.checklist', requiresSocOrNoc: true },
+      { id: 'escalation', icon: 'call_split', labelKey: 'admin.nav.escalation', requiresSocOrNoc: true },
+      { id: 'clientAlerts', icon: 'campaign', labelKey: 'admin.nav.clientAlerts' },
       { id: 'smtp', icon: 'mail', labelKey: 'admin.nav.smtp' },
-      { id: 'reports', icon: 'summarize', labelKey: 'admin.nav.reports' },
+      { id: 'reports', icon: 'summarize', labelKey: 'admin.nav.reports', requiresSocOrNoc: true },
     ],
   },
   {
@@ -59,6 +65,7 @@ const NAV: readonly { labelKey: MessageKey; items: readonly NavItem[] }[] = [
   {
     labelKey: 'admin.group.system',
     items: [
+      { id: 'brand', icon: 'palette', labelKey: 'admin.nav.brand' },
       { id: 'modules', icon: 'apps', labelKey: 'admin.nav.modules' },
       { id: 'features', icon: 'toggle_on', labelKey: 'admin.nav.features' },
       { id: 'backups', icon: 'backup', labelKey: 'admin.nav.backups' },
@@ -94,9 +101,9 @@ function normalize(text: string): string {
   selector: 'app-admin-shell',
   standalone: true,
   imports: [
-    MatIconModule, AdminModulesComponent, AdminFeaturesComponent, AdminTerritoryComponent, AdminOrganizationsComponent, AdminTeamsComponent,
+    MatIconModule, AdminModulesComponent, AdminBrandComponent, AdminFeaturesComponent, AdminTerritoryComponent, AdminOrganizationsComponent, AdminTeamsComponent,
     AdminEscalationComponent, AdminShiftsComponent, AdminSmtpComponent, AdminReportsComponent, AdminBackupsComponent, AdminAuditComponent,
-    AdminAccessComponent, AdminChecklistComponent, AdminComplementsComponent,
+    AdminAccessComponent, AdminChecklistComponent, AdminComplementsComponent, AdminClientAlertsComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKeydown($event)' },
@@ -135,11 +142,13 @@ function normalize(text: string): string {
           @case ('shifts') { <app-admin-shifts /> }
           @case ('checklist') { <app-admin-checklist /> }
           @case ('escalation') { <app-admin-escalation /> }
+          @case ('clientAlerts') { <app-admin-client-alerts /> }
           @case ('smtp') { <app-admin-smtp /> }
           @case ('reports') { <app-admin-reports /> }
           @case ('organizations') { <app-admin-organizations /> }
           @case ('territory') { <app-admin-territory /> }
           @case ('teams') { <app-admin-teams /> }
+          @case ('brand') { <app-admin-brand /> }
           @case ('modules') { <app-admin-modules /> }
           @case ('features') { <app-admin-features /> }
           @case ('backups') { <app-admin-backups (goToFeatures)="go('features')" /> }
@@ -184,6 +193,12 @@ export class AdminShellComponent {
   private readonly searchInput = viewChild.required<ElementRef<HTMLInputElement>>('search');
 
   private readonly modules = inject(ModuleAccessService);
+  private readonly setup = inject(SetupService);
+  /** SOC o NOC encendidos en la instalación (sin estado todavía, se asume que sí). */
+  private readonly socOrNoc = computed(() => {
+    const status = this.setup.status();
+    return !status || status.socEnabled || status.nocEnabled;
+  });
   private readonly features = inject(SystemFeaturesService);
   private readonly modulesLoaded = signal(false);
   private readonly selected = signal<AdminSection>(readSection());
@@ -194,7 +209,10 @@ export class AdminShellComponent {
     NAV.map((group) => ({
       ...group,
       items: group.items.filter(
-        (item) => (!item.requiresModule || this.modules.has(item.requiresModule)) && (!item.requiresFeature || this.features.isEnabled(item.requiresFeature)),
+        (item) =>
+          (!item.requiresModule || this.modules.has(item.requiresModule)) &&
+          (!item.requiresSocOrNoc || this.socOrNoc()) &&
+          (!item.requiresFeature || this.features.isEnabled(item.requiresFeature)),
       ),
     })).filter(
       (group) => group.items.length > 0,

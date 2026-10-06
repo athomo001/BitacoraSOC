@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // EscalationHandler es el motor de escalación unificado SOC/NOC de la Fase 7
@@ -27,6 +28,8 @@ import (
 // su teléfono y la app solo registra el resultado (ver memoria del proyecto:
 // "no es una central telefónica").
 type EscalationHandler struct {
+	// DB: transacciones (lista de personas de un pool).
+	DB       *pgxpool.Pool
 	Queries  *db.Queries
 	Crypto   *crypto.Box
 	AuditLog *audit.Logger
@@ -135,6 +138,16 @@ type resolvedMemberDTO struct {
 	Priority      int32                `json:"priority"`
 	OnCallNow     bool                 `json:"onCallNow"` // Fase 8: true si el equipo tiene rotación activa y este es quien está de guardia ahora
 	Channels      []resolvedChannelDTO `json:"channels"`
+	// Pool: la persona viene de un pool del nivel (TI-Mundo…), que se llama
+	// en orden (PoolPosition); el id es el de la persona dentro del pool.
+	Pool         *resolvedPoolDTO `json:"pool,omitempty"`
+	PoolPosition int32            `json:"poolPosition,omitempty"`
+}
+
+type resolvedPoolDTO struct {
+	ID           uuid.UUID `json:"id"`
+	Name         string    `json:"name"`
+	Organization *string   `json:"organization,omitempty"`
 }
 
 type resolvedTeamDTO struct {
@@ -169,6 +182,8 @@ type resolutionDTO struct {
 	ResolvedUnit *resolvedUnitDTO  `json:"resolvedUnit,omitempty"`
 	Scope        scope             `json:"scope"`
 	Steps        []resolvedStepDTO `json:"steps"`
+	// Reminder: el Recordatorio del cliente bajo el flujo ("Llamar 3 veces…").
+	Reminder *string `json:"reminder,omitempty"`
 
 	unitPath []uuid.UUID       // camino territorial (para ventanas de mantenimiento)
 	steps    []escalation.Step // lo mismo en el modelo puro (para Next/Recipients)
@@ -302,6 +317,9 @@ func (h *EscalationHandler) resolve(ctx context.Context, s scope) (*resolutionDT
 	res.PolicyID = choice.PolicyID
 	var steps []escalation.Step
 	if choice.PolicyID != nil {
+		if policy, err := h.Queries.GetPolicy(ctx, *choice.PolicyID); err == nil && strings.TrimSpace(policy.Reminder.String) != "" {
+			res.Reminder = &policy.Reminder.String
+		}
 		rows, err := h.Queries.ListPolicySteps(ctx, []uuid.UUID{*choice.PolicyID})
 		if err != nil {
 			return nil, err
@@ -339,6 +357,10 @@ func (h *EscalationHandler) fillSteps(ctx context.Context, res *resolutionDTO, s
 	if err != nil {
 		return err
 	}
+	poolMembers, err := h.Queries.ListPoolMembersForTeams(ctx, teamIDs)
+	if err != nil {
+		return err
+	}
 	var contactIDs, userIDs []uuid.UUID
 	for _, m := range members {
 		if m.ContactID.Valid {
@@ -347,6 +369,18 @@ func (h *EscalationHandler) fillSteps(ctx context.Context, res *resolutionDTO, s
 		if m.UserID.Valid {
 			userIDs = append(userIDs, uuid.UUID(m.UserID.Bytes))
 		}
+	}
+	for _, m := range poolMembers {
+		if m.ContactID.Valid {
+			contactIDs = append(contactIDs, uuid.UUID(m.ContactID.Bytes))
+		}
+		if m.UserID.Valid {
+			userIDs = append(userIDs, uuid.UUID(m.UserID.Bytes))
+		}
+	}
+	poolsByTeam := map[uuid.UUID][]db.ListPoolMembersForTeamsRow{}
+	for _, m := range poolMembers {
+		poolsByTeam[m.TeamID] = append(poolsByTeam[m.TeamID], m)
 	}
 	channelsByOwner := map[uuid.UUID][]resolvedChannelDTO{}
 	addChannels := func(chans []db.ContactChannel) {
@@ -412,6 +446,28 @@ func (h *EscalationHandler) fillSteps(ctx context.Context, res *resolutionDTO, s
 			byID[m.ID] = dto
 			res.members[m.ID] = memberInfo{dto: dto, stepOr: st.Order}
 			pureMembers = append(pureMembers, escalation.Member{ID: m.ID, Name: m.Name, Role: escalation.Role(m.RoleInTeam), Priority: m.Priority})
+		}
+		for _, m := range poolsByTeam[st.TeamID] {
+			// El mismo pool puede estar en varios niveles: el id de la persona
+			// se deriva del integrante del nivel para que no choquen.
+			id := uuid.NewSHA1(m.TeamMemberID, m.PoolMemberID[:])
+			owner := m.ContactID
+			if !owner.Valid {
+				owner = m.UserID
+			}
+			dto := resolvedMemberDTO{
+				ID: id, ContactID: uuidPtr(m.ContactID), UserID: uuidPtr(m.UserID), Name: m.Name,
+				Position: textPtr(m.Position), Specialty: textPtr(m.Specialty), Organization: textPtr(m.ContactOrganizationName),
+				RoleInTeam: string(m.RoleInTeam), RecipientType: string(m.RecipientType), Priority: m.Priority,
+				Channels: channelsByOwner[uuid.UUID(owner.Bytes)],
+				Pool:     &resolvedPoolDTO{ID: m.PoolID, Name: m.PoolName, Organization: textPtr(m.PoolOrganizationName)}, PoolPosition: m.PoolPosition,
+			}
+			if dto.Channels == nil {
+				dto.Channels = []resolvedChannelDTO{}
+			}
+			byID[id] = dto
+			res.members[id] = memberInfo{dto: dto, stepOr: st.Order}
+			pureMembers = append(pureMembers, escalation.Member{ID: id, Name: m.Name, Role: escalation.Role(m.RoleInTeam), Priority: m.Priority, PoolID: m.PoolID, PoolPos: m.PoolPosition})
 		}
 		// Fase 8: si el equipo tiene un ciclo de rotación activo, marca quién
 		// está de guardia ahora para que se llame primero — cierra el gap
@@ -490,6 +546,9 @@ type actionRequest struct {
 	// Since es cuándo empezó el incidente en curso: los intentos anteriores a
 	// esa hora no cuentan como "ya intentados" para el modo sequential.
 	Since *time.Time `json:"since"`
+	// IncidentID: el incidente (evento enlazado a GLPI o ticket interno) al
+	// que pertenece el intento; manda sobre Since.
+	IncidentID *uuid.UUID `json:"incidentId"`
 }
 
 type actionLogDTO struct {
@@ -504,6 +563,7 @@ type actionLogDTO struct {
 	EntryID          *uuid.UUID `json:"entryId,omitempty"`
 	OperatorID       uuid.UUID  `json:"operatorId"`
 	OperatorUsername string     `json:"operatorUsername,omitempty"`
+	IncidentID       *uuid.UUID `json:"incidentId,omitempty"`
 	CreatedAt        time.Time  `json:"createdAt"`
 }
 
@@ -569,6 +629,29 @@ func (h *EscalationHandler) RecordAction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	var incident pgtype.UUID
+	since := h.now().Add(-12 * time.Hour)
+	if req.Since != nil {
+		since = *req.Since
+	}
+	if req.IncidentID != nil {
+		inc, err := h.Queries.GetEscalationIncident(ctx, *req.IncidentID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			problemdetails.Write(w, r, http.StatusNotFound, "incident-not-found", "el incidente no existe")
+			return
+		}
+		if err != nil {
+			problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer el incidente")
+			return
+		}
+		if inc.ClosedAt.Valid {
+			problemdetails.Write(w, r, http.StatusConflict, "incident-closed", "el incidente está cerrado: reábrelo para registrar más intentos")
+			return
+		}
+		incident = pgtype.UUID{Bytes: inc.ID, Valid: true}
+		since = inc.OpenedAt.Time
+	}
+
 	operator, _ := middleware.UserFromContext(ctx)
 	notes := strings.TrimSpace(deref(req.Notes))
 	if member.dto.UserID != nil {
@@ -584,6 +667,7 @@ func (h *EscalationHandler) RecordAction(w http.ResponseWriter, r *http.Request)
 		EntryID: optionalUUID(req.EntryID), PolicyID: policy, StepOrder: req.StepOrder,
 		ContactID: optionalUUID(member.dto.ContactID), ChannelType: db.ContactChannelType(req.ChannelType),
 		Result: db.ContactAttemptResult(req.Result), Notes: nonEmptyText(&notes), OperatorID: operator.ID,
+		IncidentID: incident,
 	})
 	if isForeignKeyViolation(err) {
 		// Lo único que puede faltar a esta altura es la entrada de bitácora
@@ -597,19 +681,15 @@ func (h *EscalationHandler) RecordAction(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Quiénes ya se intentaron en este paso durante el incidente en curso.
-	since := h.now().Add(-12 * time.Hour)
-	if req.Since != nil {
-		since = *req.Since
-	}
 	tried := []uuid.UUID{member.dto.ID}
 	if res.PolicyID != nil {
 		contacts, err := h.Queries.ListTriedContactsForStep(ctx, db.ListTriedContactsForStepParams{
-			PolicyID: policy, StepOrder: req.StepOrder, Since: pgtype.Timestamptz{Time: since, Valid: true},
+			PolicyID: policy, StepOrder: req.StepOrder, Since: pgtype.Timestamptz{Time: since, Valid: true}, IncidentID: incident,
 		})
 		if err == nil {
 			for _, c := range contacts {
 				for id, m := range res.members {
-					if m.dto.ContactID != nil && c.Valid && *m.dto.ContactID == uuid.UUID(c.Bytes) {
+					if m.stepOr == req.StepOrder && m.dto.ContactID != nil && c.Valid && *m.dto.ContactID == uuid.UUID(c.Bytes) {
 						tried = append(tried, id)
 					}
 				}
@@ -651,7 +731,7 @@ func (h *EscalationHandler) RecordAction(w http.ResponseWriter, r *http.Request)
 func toActionLogDTO(l db.EscalationActionLog, contactName, operator string) actionLogDTO {
 	dto := actionLogDTO{ID: l.ID, PolicyID: uuidPtr(l.PolicyID), StepOrder: l.StepOrder, ContactID: uuidPtr(l.ContactID),
 		ChannelType: string(l.ChannelType), Result: string(l.Result), Notes: textPtr(l.Notes), EntryID: uuidPtr(l.EntryID),
-		OperatorID: l.OperatorID, OperatorUsername: operator, CreatedAt: l.CreatedAt.Time}
+		OperatorID: l.OperatorID, OperatorUsername: operator, IncidentID: uuidPtr(l.IncidentID), CreatedAt: l.CreatedAt.Time}
 	if contactName != "" {
 		dto.ContactName = &contactName
 	}
@@ -664,8 +744,9 @@ func (h *EscalationHandler) ListActions(w http.ResponseWriter, r *http.Request) 
 	q := r.URL.Query()
 	policy, e1 := queryUUID(q.Get("policyId"))
 	entry, e2 := queryUUID(q.Get("entryId"))
-	if e1 != nil || e2 != nil {
-		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-parameter", "policyId/entryId inválido")
+	incident, e3 := queryUUID(q.Get("incidentId"))
+	if e1 != nil || e2 != nil || e3 != nil {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-parameter", "policyId/entryId/incidentId inválido")
 		return
 	}
 	var since pgtype.Timestamptz
@@ -677,7 +758,7 @@ func (h *EscalationHandler) ListActions(w http.ResponseWriter, r *http.Request) 
 		}
 		since = pgtype.Timestamptz{Time: t, Valid: true}
 	}
-	rows, err := h.Queries.ListActionLogs(r.Context(), db.ListActionLogsParams{PolicyID: policy, EntryID: entry, Since: since, MaxRows: 200})
+	rows, err := h.Queries.ListActionLogs(r.Context(), db.ListActionLogsParams{PolicyID: policy, EntryID: entry, IncidentID: incident, Since: since, MaxRows: 200})
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer los intentos")
 		return
@@ -686,7 +767,7 @@ func (h *EscalationHandler) ListActions(w http.ResponseWriter, r *http.Request) 
 	for _, l := range rows {
 		dto := toActionLogDTO(db.EscalationActionLog{ID: l.ID, EntryID: l.EntryID, PolicyID: l.PolicyID, StepOrder: l.StepOrder,
 			ContactID: l.ContactID, ChannelType: l.ChannelType, Result: l.Result, Notes: l.Notes, OperatorID: l.OperatorID,
-			CreatedAt: l.CreatedAt}, l.ContactName.String, l.OperatorUsername)
+			CreatedAt: l.CreatedAt, IncidentID: l.IncidentID}, l.ContactName.String, l.OperatorUsername)
 		dtos = append(dtos, dto)
 	}
 	writeData(w, http.StatusOK, dtos)
@@ -936,6 +1017,7 @@ type policyDTO struct {
 	TerritorialUnitID *uuid.UUID      `json:"territorialUnitId,omitempty"`
 	Active            bool            `json:"active"`
 	Steps             []policyStepDTO `json:"steps"`
+	Reminder          *string         `json:"reminder,omitempty"`
 }
 
 func (h *EscalationHandler) policiesWithSteps(ctx context.Context, policies []db.EscalationPolicy) ([]policyDTO, error) {
@@ -955,7 +1037,7 @@ func (h *EscalationHandler) policiesWithSteps(ctx context.Context, policies []db
 	}
 	dtos := make([]policyDTO, 0, len(policies))
 	for _, p := range policies {
-		d := policyDTO{ID: p.ID, ServiceID: uuidPtr(p.ServiceID), AssetID: uuidPtr(p.AssetID), TerritorialUnitID: uuidPtr(p.TerritorialUnitID), Active: p.Active, Steps: steps[p.ID]}
+		d := policyDTO{ID: p.ID, ServiceID: uuidPtr(p.ServiceID), AssetID: uuidPtr(p.AssetID), TerritorialUnitID: uuidPtr(p.TerritorialUnitID), Active: p.Active, Steps: steps[p.ID], Reminder: textPtr(p.Reminder)}
 		if d.Steps == nil {
 			d.Steps = []policyStepDTO{}
 		}

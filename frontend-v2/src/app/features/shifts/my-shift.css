@@ -413,8 +413,22 @@ mat-icon {
 .ms-report-bar {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
   gap: 6px;
+}
+
+.ms-report-bar__hint {
+  margin: 0 auto 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.ms-report-bar__check {
+  color: var(--status-ok);
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
 }
 
 .ms-report-bar__btn .pill {

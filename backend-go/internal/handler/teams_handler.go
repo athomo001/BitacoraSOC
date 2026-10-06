@@ -145,6 +145,7 @@ type memberDTO struct {
 	ID            uuid.UUID  `json:"id"`
 	UserID        *uuid.UUID `json:"userId,omitempty"`
 	ContactID     *uuid.UUID `json:"contactId,omitempty"`
+	PoolID        *uuid.UUID `json:"poolId,omitempty"`
 	DisplayName   string     `json:"displayName"`
 	RecipientType string     `json:"recipientType"`
 	RoleInTeam    string     `json:"roleInTeam"`
@@ -186,7 +187,7 @@ func (h *TeamsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	dto.Members = []memberDTO{}
 	for _, m := range members {
 		dto.Members = append(dto.Members, memberDTO{ID: m.ID, UserID: uuidPtr(m.UserID), ContactID: uuidPtr(m.ContactID),
-			DisplayName: m.DisplayName, RecipientType: string(m.RecipientType), RoleInTeam: string(m.RoleInTeam), Priority: m.Priority})
+			PoolID: uuidPtr(m.PoolID), DisplayName: m.DisplayName, RecipientType: string(m.RecipientType), RoleInTeam: string(m.RoleInTeam), Priority: m.Priority})
 	}
 	if h.NOCEnabled != nil && h.NOCEnabled(r) {
 		cov, err := h.Queries.ListTeamCoverage(ctx, id)
@@ -307,8 +308,10 @@ func (h *TeamsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 }
 
 type addMemberRequest struct {
-	UserID        *uuid.UUID `json:"userId"`
-	ContactID     *uuid.UUID `json:"contactId"`
+	UserID    *uuid.UUID `json:"userId"`
+	ContactID *uuid.UUID `json:"contactId"`
+	// PoolID: el integrante es un pool de escalamiento (TI-Mundo…).
+	PoolID        *uuid.UUID `json:"poolId"`
 	RecipientType string     `json:"recipientType"`
 	RoleInTeam    string     `json:"roleInTeam"`
 	Priority      int32      `json:"priority"`
@@ -326,8 +329,14 @@ func (h *TeamsHandler) AddMember(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "cuerpo de la request inválido")
 		return
 	}
-	if (req.UserID == nil) == (req.ContactID == nil) {
-		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "indica exactamente uno: userId o contactId")
+	given := 0
+	for _, id := range []*uuid.UUID{req.UserID, req.ContactID, req.PoolID} {
+		if id != nil {
+			given++
+		}
+	}
+	if given != 1 {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "indica exactamente uno: userId, contactId o poolId")
 		return
 	}
 	if req.RecipientType == "" {
@@ -345,11 +354,11 @@ func (h *TeamsHandler) AddMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m, err := h.Queries.AddTeamMember(ctx, db.AddTeamMemberParams{
-		TeamID: teamID, UserID: optionalUUID(req.UserID), ContactID: optionalUUID(req.ContactID),
+		TeamID: teamID, UserID: optionalUUID(req.UserID), ContactID: optionalUUID(req.ContactID), PoolID: optionalUUID(req.PoolID),
 		RecipientType: db.RecipientType(req.RecipientType), RoleInTeam: db.TeamRole(req.RoleInTeam), Priority: req.Priority,
 	})
 	if isForeignKeyViolation(err) {
-		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "el usuario o contacto indicado no existe")
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "el usuario, contacto o pool indicado no existe")
 		return
 	}
 	if err != nil {

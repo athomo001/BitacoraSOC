@@ -1,8 +1,12 @@
 <div class="shell">
   <nav class="shell__sidebar" [attr.aria-label]="i18n.t('nav.primary')">
     <div class="shell__brand">
-      <span class="shell__logo" aria-hidden="true">B</span>
-      <span class="shell__brand-name">Bitácora Ops</span>
+      @if (branding.logoUrl(); as logo) {
+        <img class="shell__logo shell__logo--img" [src]="logo" alt="" aria-hidden="true" />
+      } @else {
+        <span class="shell__logo" aria-hidden="true">{{ branding.appTitle().charAt(0) }}</span>
+      }
+      <span class="shell__brand-name">{{ branding.appTitle() }}</span>
     </div>
 
     <div class="shell__nav">

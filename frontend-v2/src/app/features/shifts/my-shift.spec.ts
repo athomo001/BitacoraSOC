@@ -91,7 +91,10 @@ describe('MyShiftComponent (Mi turno)', () => {
   it('arriba: botones de Inicio y Cierre de turno con su estado (comentarios del dueño #6/#6.1)', async () => {
     const { el } = await render();
     const bar = [...el.querySelectorAll('.ms-report-bar__btn')].map((b) => b.textContent?.replace(/\s+/g, ' ').trim());
-    expect(bar).toEqual(['wb_sunnyInicio de turno hecho', 'nightlightCierre de turno pendiente']);
+    // Lo pendiente dice qué hacer; lo hecho, qué pasó y a qué hora.
+    expect(bar[0]).toMatch(/^wb_sunnyTurno iniciado · \d{2}:\d{2}check_circle$/);
+    expect(bar[1]).toBe('nightlightCerrar turno pendiente');
+    expect(el.querySelector('.ms-report-bar__hint')?.textContent).toContain('Registra aquí el inicio y el cierre de tu turno');
   });
 
   it('sugiere la misma causa, la reutiliza y envía el checklist completo', async () => {

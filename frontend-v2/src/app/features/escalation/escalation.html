@@ -1,5 +1,4 @@
 <div class="esc">
-  <!-- Qué está fallando -->
   <div class="esc__toolbar">
     <h1 class="esc__title"><mat-icon>place</mat-icon>{{ i18n.t('esc.title') }}</h1>
     <span class="esc__segs" role="tablist" [attr.aria-label]="i18n.t('esc.whatFails')">
@@ -15,13 +14,7 @@
       <mat-icon>search</mat-icon>
       <input name="scopeFilter" [placeholder]="i18n.t(nocEnabled() ? 'esc.searchTarget' : 'esc.searchTargetSoc')" [attr.aria-label]="i18n.t(nocEnabled() ? 'esc.searchTarget' : 'esc.searchTargetSoc')" [ngModel]="filter()" (ngModelChange)="filter.set($event)" />
     </label>
-    <select class="adm-input esc__target" name="scopeTarget" [attr.aria-label]="i18n.t($any('escAdmin.kind.' + scopeKind()))" [ngModel]="selectedId()" (ngModelChange)="pick($event)">
-      <option value="">{{ i18n.tf('esc.pickTarget', options().length) }}</option>
-      @for (o of options(); track o.id) {
-        <option [value]="o.id">{{ o.label }}{{ o.hint ? ' — ' + o.hint : '' }}</option>
-      }
-    </select>
-    <button type="button" class="adm-btn esc__maint-btn" [attr.aria-expanded]="showMaintenance()" (click)="showMaintenance.set(!showMaintenance())">
+    <button type="button" class="adm-btn esc__push" [attr.aria-expanded]="showMaintenance()" (click)="showMaintenance.set(!showMaintenance())">
       <mat-icon>engineering</mat-icon>{{ i18n.t('esc.maintenance') }}
     </button>
   </div>
@@ -30,15 +23,39 @@
     <app-maintenance-windows class="esc__maint" [presetServiceId]="scopeKind() === 'service' ? selectedId() : null" />
   }
 
+  <!-- Servicio y cliente destacados (canvas v26) -->
+  <section class="hero" [class.hero--empty]="!target()">
+    <span class="hero__icon"><mat-icon>{{ scopeKind() === 'service' ? 'dns' : scopeKind() === 'asset' ? 'router' : 'map' }}</mat-icon></span>
+    <div class="hero__block">
+      <span class="hero__label">{{ i18n.t($any('escAdmin.kind.' + scopeKind())) }}</span>
+      @if (target(); as t) {
+        <span class="hero__name">{{ t.name }} <span class="mono hero__code">{{ t.code }}</span></span>
+        @if (resolution(); as res) {
+          <span class="hero__sub">{{ i18n.t('esc.resolvedBy') }} {{ i18n.t(viaKey(res.resolvedVia)) }}@if (res.resolvedUnit) { · {{ res.resolvedUnit.name }} }</span>
+        }
+      } @else {
+        <span class="hero__sub">{{ i18n.t(nocEnabled() ? 'esc.blank' : 'esc.blankSoc') }}</span>
+      }
+    </div>
+    @if (target()?.client; as client) {
+      <span class="hero__sep" aria-hidden="true"></span>
+      <span class="hero__icon hero__icon--client"><mat-icon>apartment</mat-icon></span>
+      <div class="hero__block">
+        <span class="hero__label hero__label--client">{{ i18n.t('esc.client') }}</span>
+        <span class="hero__name">{{ client }}</span>
+        @if (target()?.via; as via) { <span class="hero__sub">{{ i18n.t('esc.through') }} <strong>{{ via }}</strong></span> }
+      </div>
+    }
+    <select class="adm-input hero__pick" name="scopeTarget" [attr.aria-label]="i18n.t($any('escAdmin.kind.' + scopeKind()))" [ngModel]="selectedId()" (ngModelChange)="pick($event)">
+      <option value="">{{ i18n.tf('esc.pickTarget', options().length) }}</option>
+      @for (o of options(); track o.id) {
+        <option [value]="o.id">{{ o.label }}{{ o.hint ? ' — ' + o.hint : '' }}</option>
+      }
+    </select>
+  </section>
+
   @if (error(); as e) { <p class="adm-error esc__msg" role="alert">{{ e }}</p> }
   @if (loading()) { <p class="adm-muted esc__msg" role="status">{{ i18n.t('esc.resolving') }}</p> }
-
-  @if (!selectedId() && !loading()) {
-    <section class="esc__blank">
-      <mat-icon>call_split</mat-icon>
-      <p>{{ i18n.t(nocEnabled() ? 'esc.blank' : 'esc.blankSoc') }}</p>
-    </section>
-  }
 
   @if (notFound()) {
     <section class="adm-card esc__notfound">
@@ -48,22 +65,41 @@
   }
 
   @if (resolution(); as res) {
-    <!-- Encabezado del incidente (artboard: "Despacho y Escalamiento NOC · cliente · zona") -->
-    <div class="esc__head">
-      <div>
-        <h2 class="esc__target-name">{{ targetLabel() }}</h2>
-        <p class="adm-small adm-secondary">
-          {{ i18n.t('esc.resolvedBy') }} {{ i18n.t(viaKey(res.resolvedVia)) }}
-          @if (res.resolvedUnit) { · {{ res.resolvedUnit.name }} <span class="mono">({{ res.resolvedUnit.code }})</span> }
-        </p>
-      </div>
-      @if (countdown(); as cd) {
-        <span class="pill esc__countdown" [class]="cd.overdue ? 'tone-bad' : 'tone-warn'" [title]="i18n.t('esc.countdownHint')">
-          <mat-icon>timer</mat-icon>{{ i18n.t(cd.overdue ? 'esc.escalateNow' : 'esc.escalateIn') }} <span class="mono">{{ cd.text }}</span>
-        </span>
+    <!-- Incidentes: cada escalamiento es de un evento enlazado a GLPI o a un ticket interno -->
+    <section class="incidents">
+      <span class="incidents__label"><mat-icon>crisis_alert</mat-icon>{{ i18n.t('esc.incident') }}</span>
+      @for (inc of incidents(); track inc.id) {
+        <button type="button" class="incident" [class.incident--active]="inc.id === incidentId()" [class.incident--closed]="inc.closedAt" (click)="selectIncident(inc.id)">
+          <span class="incident__text">
+            <strong>{{ inc.title }}</strong>
+            <span class="incident__meta"><span class="mono">{{ inc.openedAt | date: 'HH:mm' }}</span> · {{ inc.closedAt ? i18n.t('esc.closed') : inc.openedBy }}</span>
+          </span>
+          <span class="pill mono" [class]="inc.glpiTicket ? 'tone-warn' : inc.ticketNumber ? 'tone-system' : 'tone-neutral'">{{ linkLabel(inc) }}</span>
+        </button>
+      } @empty {
+        <span class="adm-hint">{{ i18n.t('esc.noIncidents') }}</span>
       }
-      <button type="button" class="adm-btn esc__push" (click)="newIncident()"><mat-icon>restart_alt</mat-icon>{{ i18n.t('esc.newIncident') }}</button>
-    </div>
+      <button type="button" class="adm-btn esc__push" [attr.aria-expanded]="creating()" (click)="openNewIncident()"><mat-icon>add</mat-icon>{{ i18n.t('esc.newIncident') }}</button>
+      @if (creating()) {
+        <form class="incidents__new" (ngSubmit)="createIncident()">
+          <input class="adm-input incidents__title" name="incTitle" [placeholder]="i18n.t('esc.incidentTitle')" [attr.aria-label]="i18n.t('esc.incidentTitle')" [ngModel]="newTitle()" (ngModelChange)="newTitle.set($event)" />
+          <span class="adm-label">{{ i18n.t('esc.linkTo') }}</span>
+          <button type="button" class="adm-btn" [class.is-on]="linkKind() === 'glpi'" (click)="linkKind.set('glpi')"><mat-icon>confirmation_number</mat-icon>{{ i18n.t('esc.glpi') }}</button>
+          @if (ticketsEnabled()) {
+            <button type="button" class="adm-btn" [class.is-on]="linkKind() === 'internal'" (click)="linkKind.set('internal')"><mat-icon>assignment</mat-icon>{{ i18n.t('esc.internal') }}</button>
+          }
+          @if (linkKind() === 'glpi') {
+            <input class="adm-input mono incidents__link" name="glpi" [placeholder]="i18n.t('esc.glpiPlaceholder')" [attr.aria-label]="i18n.t('esc.glpi')" [ngModel]="glpiNumber()" (ngModelChange)="glpiNumber.set($event)" />
+          } @else {
+            <select class="adm-input incidents__link" name="internalTicket" [attr.aria-label]="i18n.t('esc.internal')" [ngModel]="internalTicketId()" (ngModelChange)="internalTicketId.set($event)">
+              <option value="">{{ i18n.t('esc.pickTicket') }}</option>
+              @for (t of openTickets(); track t.id) { <option [value]="t.id">{{ t.ticketNumber }} · {{ t.title }}</option> }
+            </select>
+          }
+          <button type="submit" class="adm-btn adm-btn--primary" [disabled]="saving() || !newTitle().trim()">{{ i18n.t('esc.createIncident') }}</button>
+        </form>
+      }
+    </section>
 
     @for (w of windows(); track w.id) {
       <p class="esc__window" [class.esc__window--suppress]="w.suppressNotifications">
@@ -78,121 +114,148 @@
     @if (flash()) { <output class="esc__banner tone-info"><mat-icon>info_outline</mat-icon>{{ flash() }}</output> }
 
     <div class="esc__grid">
-      <!-- Izquierda: los niveles -->
-      <section class="adm-card esc__levels">
-        <div class="adm-card__head"><h3 class="adm-card__title"><mat-icon>groups</mat-icon>{{ i18n.t(nocEnabled() ? 'esc.levels' : 'esc.levelsSoc') }}</h3></div>
-        <div class="esc__levels-body">
-          <label class="adm-field esc__notes">
-            <span class="adm-label">{{ i18n.t('esc.noteLabel') }}</span>
-            <input class="adm-input" name="actionNotes" [placeholder]="i18n.t('esc.notePlaceholder')" [ngModel]="notes()" (ngModelChange)="notes.set($event)" />
-          </label>
+      <div class="esc__main">
+        <!-- Flujo de llamados (escalation-flow-preview del legacy) -->
+        <section class="adm-card flow">
+          <div class="adm-card__head">
+            <h3 class="adm-card__title"><mat-icon>call_split</mat-icon>{{ i18n.t('esc.flow') }}</h3>
+            @if (countdown(); as cd) {
+              <span class="pill esc__push" [class]="cd.overdue ? 'tone-bad' : 'tone-warn'" [title]="i18n.t('esc.countdownHint')">
+                <mat-icon>timer</mat-icon>{{ i18n.t(cd.overdue ? 'esc.escalateNow' : 'esc.escalateIn') }} <span class="mono">{{ cd.text }}</span>
+              </span>
+            } @else {
+              <span class="adm-hint esc__push">{{ i18n.t('esc.flowHint') }}</span>
+            }
+          </div>
+          <ol class="flow__steps">
+            @for (step of steps(); track step.order; let last = $last) {
+              <li class="flow__item">
+                <button type="button" class="flow__card" [class]="'flow__card--' + stepStatus(step)" [class.flow__card--viewed]="shownStep()?.order === step.order" [attr.aria-pressed]="shownStep()?.order === step.order" (click)="viewStep(step)">
+                  <span class="flow__top">{{ i18n.tf('esc.level', step.order) }}<span class="pill" [class]="'tone-' + stepStatus(step)">{{ i18n.t(statusKey(step)) }}</span></span>
+                  <span class="flow__name">{{ step.team.name }}</span>
+                  <span class="flow__who">{{ stepWho(step) }}</span>
+                </button>
+                @if (!last) {
+                  <mat-icon class="flow__arrow" [class.flow__arrow--done]="stepStatus(step) === 'failed'" aria-hidden="true">arrow_forward</mat-icon>
+                }
+              </li>
+            }
+          </ol>
+          @if (res.reminder) {
+            <p class="flow__reminder"><mat-icon>lightbulb</mat-icon><strong>{{ i18n.t('esc.reminder') }}</strong> {{ res.reminder }}</p>
+          }
+        </section>
 
-          @for (step of res.steps; track step.order) {
-            <article class="level" [class]="'level--' + stepStatus(step)" [attr.data-step]="step.order">
-              <header class="level__head">
-                <span class="level__title">{{ i18n.tf('esc.level', step.order) }} · {{ step.team.name }}</span>
-                <span class="pill" [class]="stepStatus(step) === 'current' ? 'tone-info' : stepStatus(step) === 'answered' ? 'tone-ok' : stepStatus(step) === 'failed' ? 'tone-bad' : 'tone-neutral'">{{ i18n.t(statusKey(step)) }}</span>
-                <span class="pill mono esc__push" [class]="step.waitBeforeEscalateMinutes > 0 ? 'tone-warn' : 'tone-info'">
-                  {{ step.waitBeforeEscalateMinutes > 0 ? i18n.tf('esc.sla', step.waitBeforeEscalateMinutes) : i18n.t('esc.noLimit') }}
-                </span>
-              </header>
-              <p class="adm-small adm-secondary level__meta">
-                {{ step.team.organization?.name ?? i18n.t('teams.noOrg') }} · {{ i18n.t(step.team.audience === 'client' ? 'esc.clientTeam' : 'esc.internalTeam') }} · {{ i18n.t(modeKey(step.mode)) }}
-              </p>
-              @if (step.mode === 'pool') { <p class="adm-hint">{{ i18n.t('esc.poolHint') }}</p> }
-              @if (stepStatus(step) === 'current') { <p class="adm-hint level__manual"><mat-icon>phone_in_talk</mat-icon>{{ i18n.t('esc.manualCall') }}</p> }
-
-              <ul class="level__members">
-                @for (m of step.team.members; track m.id) {
-                  <li class="member" [class.member--next]="state()?.nextMemberId === m.id && stepStatus(step) === 'current'">
-                    <div class="member__top">
-                      <span class="member__avatar" aria-hidden="true">{{ initials(m.name) }}</span>
-                      <span class="member__who">
-                        <strong>{{ m.name }}</strong>
-                        <span class="adm-small adm-secondary">{{ i18n.t(roleKey(m.roleInTeam)) }}@if (m.position) { · {{ m.position }} }@if (m.specialty) { · {{ m.specialty }} }</span>
-                      </span>
-                      @if (m.onCallNow) { <span class="pill tone-ok member__oncall">{{ i18n.t('esc.onCall') }}</span> }
-                      @if (memberResult(m); as r) { <span class="pill esc__push" [class]="'result--' + r">{{ i18n.t(resultKey(r)) }}</span> }
-                    </div>
-                    <div class="member__channels">
-                      @for (c of m.channels; track c.channelType + c.value) {
-                        @if (c.href) {
-                          <a class="chan" [href]="c.href" target="_blank" rel="noopener" [class.chan--chosen]="chosenChannel(m) === c.channelType" [title]="i18n.t(channelKey(c.channelType))" (click)="rememberChannel(m, c.channelType)">
-                            <mat-icon>{{ channelIcon[c.channelType] }}</mat-icon><span class="mono">{{ c.value }}</span>
-                          </a>
-                        } @else {
-                          <span class="chan chan--static mono" [title]="i18n.t(channelKey(c.channelType))">{{ c.value }}</span>
-                        }
-                      } @empty {
-                        <span class="adm-hint">{{ i18n.t('esc.noChannels') }}</span>
+        <!-- Contactos del nivel elegido -->
+        @if (shownStep(); as step) {
+          <section class="adm-card level">
+            <div class="adm-card__head level__head">
+              <h3 class="adm-card__title"><mat-icon>groups</mat-icon>{{ i18n.tf('esc.level', step.order) }} · {{ step.team.name }}</h3>
+              <span class="pill" [class]="'tone-' + stepStatus(step)">{{ i18n.t(statusKey(step)) }}</span>
+              <span class="adm-small adm-secondary">{{ i18n.t(modeKey(step.mode)) }} · {{ step.waitBeforeEscalateMinutes > 0 ? i18n.tf('esc.sla', step.waitBeforeEscalateMinutes) : i18n.t('esc.noLimit') }}</span>
+              @if (actionable()) {
+                <span class="adm-small adm-secondary esc__push level__manual"><mat-icon>phone_in_talk</mat-icon>{{ i18n.t('esc.manualCall') }}</span>
+              } @else if (!incident()) {
+                <span class="adm-small adm-secondary esc__push">{{ i18n.t('esc.needIncident') }}</span>
+              } @else if (canJump(step)) {
+                <span class="adm-small adm-secondary esc__push">{{ i18n.t('esc.preview') }}</span>
+                <button type="button" class="adm-btn" [disabled]="saving()" (click)="jumpTo(step)"><mat-icon>fast_forward</mat-icon>{{ i18n.t('esc.jump') }}</button>
+              } @else {
+                <span class="adm-small adm-secondary esc__push">{{ i18n.t(stepStatus(step) === 'pending' ? 'esc.preview' : 'esc.alreadyTried') }}</span>
+              }
+            </div>
+            @if (actionable()) {
+              <div class="level__note">
+                <input class="adm-input" name="attemptNote" [placeholder]="i18n.t('esc.notePlaceholder')" [attr.aria-label]="i18n.t('esc.noteLabel')" [ngModel]="attemptNote()" (ngModelChange)="attemptNote.set($event)" />
+              </div>
+            }
+            <ul class="rows">
+              @for (row of rows(); track row.kind === 'pool' ? row.key : row.member.id) {
+                @if (row.kind === 'pool') {
+                  <li>
+                    <button type="button" class="row row--pool" [attr.aria-expanded]="row.open" (click)="togglePool(row.key, row.open)">
+                      <span class="row__avatar row__avatar--pool"><mat-icon>diversity_3</mat-icon></span>
+                      <span class="row__who"><strong>{{ i18n.t('esc.pool') }} {{ row.name }}</strong> <span class="adm-small adm-secondary">{{ i18n.tf('esc.poolCount', row.count) }}</span></span>
+                      @if (row.next) { <span class="adm-small adm-secondary">{{ i18n.tf('esc.poolNext', row.next) }}</span> }
+                      <mat-icon class="row__chevron">{{ row.open ? 'expand_less' : 'expand_more' }}</mat-icon>
+                    </button>
+                  </li>
+                } @else {
+                  @let m = row.member;
+                  @let r = resultOf(step, m);
+                  <li class="row" [class.row--in-pool]="row.inPool" [class.row--next]="isNext(m)">
+                    <span class="row__avatar" aria-hidden="true">{{ initials(m.name) }}</span>
+                    <span class="row__who">
+                      <strong>{{ m.name }}</strong>
+                      <span class="adm-small adm-secondary">{{ i18n.t(roleKey(m.roleInTeam)) }}@if (m.position) { · {{ m.position }} }@if (m.specialty) { · {{ m.specialty }} }</span>
+                    </span>
+                    @if (m.onCallNow) { <span class="pill tone-ok">{{ i18n.t('esc.onCall') }}</span> }
+                    @if (isNext(m)) { <span class="pill tone-current">{{ i18n.t('esc.next') }}</span> }
+                    @if (phoneOf(m); as phone) {
+                      @if (phoneHref(m); as href) {
+                        <a class="chip chip--phone mono" [href]="href" (click)="rememberChannel(m, 'call')"><mat-icon>call</mat-icon>{{ phone }}</a>
+                      } @else {
+                        <span class="chip chip--phone mono"><mat-icon>call</mat-icon>{{ phone }}</span>
                       }
-                    </div>
-                    @if (stepStatus(step) === 'current' && (callable(m) || nextStep(step))) {
-                      <div class="member__actions" role="group" [attr.aria-label]="i18n.tf('esc.resultFor', m.name)">
+                    }
+                    @if (mailOf(m); as mail) { <span class="chip mono"><mat-icon>mail</mat-icon>{{ mail }}</span> }
+                    @if (!phoneOf(m) && !mailOf(m)) { <span class="adm-hint">{{ i18n.t('esc.noChannels') }}</span> }
+                    @if (r) { <span class="pill" [class]="'result--' + r">{{ i18n.t(resultKey(r)) }}</span> }
+                    @if (actionable() && !r) {
+                      <span class="row__actions" role="group" [attr.aria-label]="i18n.tf('esc.resultFor', m.name)">
                         @if (callable(m)) {
                           <button type="button" class="act act--ok" [disabled]="saving()" (click)="record(step, m, 'answered')"><mat-icon>check_circle</mat-icon>{{ i18n.t('esc.result.answered') }}</button>
                           <button type="button" class="act act--bad" [disabled]="saving()" (click)="record(step, m, 'no_answer')"><mat-icon>phone_missed</mat-icon>{{ i18n.t('esc.result.no_answer') }}</button>
+                          <button type="button" class="act" [disabled]="saving()" [attr.aria-label]="i18n.t('esc.moreResults')" [attr.aria-expanded]="moreFor() === m.id" (click)="moreFor.set(moreFor() === m.id ? null : m.id)"><mat-icon>more_horiz</mat-icon></button>
                         }
                         @if (nextStep(step)) {
-                          <button type="button" class="act act--warn" [disabled]="saving() || notifying()" [title]="i18n.t('esc.escalateHint')" (click)="escalate(step, m)"><mat-icon>forward_to_inbox</mat-icon>{{ i18n.t('esc.escalate') }}</button>
+                          <button type="button" class="act act--warn" [disabled]="saving()" [title]="i18n.t('esc.escalateHint')" (click)="escalate(step, m)"><mat-icon>forward_to_inbox</mat-icon>{{ i18n.t('esc.escalate') }}</button>
                         }
-                      </div>
-                      @if (callable(m)) {
-                        <div class="member__more">
-                          @for (r of otherResults; track r) {
-                            <button type="button" class="adm-btn" [disabled]="saving()" (click)="record(step, m, r)">{{ i18n.t(resultKey(r)) }}</button>
-                          }
-                        </div>
+                      </span>
+                      @if (moreFor() === m.id) {
+                        <span class="row__more">
+                          <button type="button" class="adm-btn" [disabled]="saving()" (click)="record(step, m, 'busy')">{{ i18n.t('esc.result.busy') }}</button>
+                          <button type="button" class="adm-btn" [disabled]="saving()" (click)="record(step, m, 'unreachable')">{{ i18n.t('esc.result.unreachable') }}</button>
+                        </span>
                       }
                     }
                   </li>
-                } @empty {
-                  <li class="adm-hint">{{ i18n.t('esc.noMembers') }}</li>
                 }
-              </ul>
-            </article>
+              } @empty {
+                <li class="adm-hint">{{ i18n.t('esc.noMembers') }}</li>
+              }
+            </ul>
+          </section>
+        }
+      </div>
+
+      <!-- Historial forense del incidente -->
+      <section class="adm-card esc__side">
+        <div class="adm-card__head forensic__head">
+          <h3 class="adm-card__title"><mat-icon>history_edu</mat-icon>{{ i18n.t('esc.history') }}</h3>
+          @if (incident(); as inc) {
+            <span class="adm-small adm-secondary">{{ inc.title }} · <span class="mono">{{ linkLabel(inc) }}</span></span>
+            <button type="button" class="adm-btn forensic__close" [disabled]="saving()" (click)="toggleClosed()"><mat-icon>{{ inc.closedAt ? 'lock_open' : 'task_alt' }}</mat-icon>{{ i18n.t(inc.closedAt ? 'esc.reopen' : 'esc.close') }}</button>
           }
         </div>
-      </section>
-
-      <!-- Derecha: aviso por correo e historial forense -->
-      <div class="esc__side">
-        <section class="adm-card">
-          <div class="adm-card__head"><h3 class="adm-card__title"><mat-icon>mail</mat-icon>{{ i18n.t('esc.notify') }}</h3></div>
-          <div class="adm-card__body">
-            <p class="adm-hint">{{ i18n.t('esc.notifyHint') }}</p>
-            <textarea class="adm-input" name="notifyMessage" rows="3" [placeholder]="i18n.t('esc.notifyPlaceholder')" [attr.aria-label]="i18n.t('esc.notify')" [ngModel]="notifyMessage()" (ngModelChange)="notifyMessage.set($event)"></textarea>
-            <div class="esc__notify-row">
-              <label class="esc__sev">
-                <span class="adm-label">{{ i18n.t('esc.severity') }}</span>
-                <select class="adm-input" name="notifySeverity" [ngModel]="notifySeverity()" (ngModelChange)="notifySeverity.set($event)">
-                  @for (sv of ['critical', 'high', 'medium', 'low']; track sv) { <option [value]="sv">{{ i18n.t($any('esc.sev.' + sv)) }}</option> }
-                </select>
-              </label>
-              <button type="button" class="adm-btn adm-btn--primary esc__push" [disabled]="!notifyMessage().trim() || notifying()" (click)="notify()"><mat-icon>send</mat-icon>{{ i18n.t('esc.send') }}</button>
-            </div>
-            @if (notifyResult(); as nr) {
-              <p class="esc__notify-result" [class]="nr.ok ? 'tone-ok' : 'tone-bad'" role="status">{{ nr.text }}</p>
-            }
-          </div>
-        </section>
-
-        <section class="adm-card">
-          <div class="adm-card__head"><h3 class="adm-card__title"><mat-icon>history_edu</mat-icon>{{ i18n.t('esc.history') }}</h3></div>
+        @if (incident()) {
+          <form class="forensic__comment" (ngSubmit)="addComment()">
+            <textarea class="adm-input" name="comment" rows="2" [placeholder]="i18n.t('esc.commentPlaceholder')" [attr.aria-label]="i18n.t('esc.comment')" [ngModel]="comment()" (ngModelChange)="comment.set($event)"></textarea>
+            <button type="submit" class="adm-btn adm-btn--primary" [disabled]="saving() || !comment().trim()"><mat-icon>add_comment</mat-icon>{{ i18n.t('esc.comment') }}</button>
+          </form>
           <ol class="forensic">
-            @for (a of timeline(); track a.id) {
-              <li class="forensic__item" [class]="'forensic__item--' + a.result">
-                <span class="mono adm-small adm-secondary">{{ a.createdAt | date: 'dd/MM HH:mm:ss' }} · {{ a.operatorUsername }}</span>
-                <span>{{ i18n.tf('esc.attempt', a.stepOrder) }} · <strong>{{ a.contactName ?? i18n.t('esc.internalUser') }}</strong> · {{ i18n.t(channelKey(a.channelType)) }}</span>
-                <span class="forensic__result">{{ i18n.t(resultKey(a.result)) }}</span>
-                @if (a.notes) { <span class="adm-small adm-secondary">{{ a.notes }}</span> }
+            @for (h of history(); track h.id) {
+              <li class="forensic__item" [class]="'forensic__item--' + h.tone">
+                <span class="mono adm-small adm-secondary">{{ h.at | date: 'dd/MM HH:mm' }}</span>
+                <mat-icon>{{ h.icon }}</mat-icon>
+                <span class="forensic__text">{{ h.text }}@if (h.detail) { <span class="adm-small adm-secondary forensic__detail">{{ h.detail }}</span> }</span>
               </li>
-            } @empty {
-              <li class="adm-hint forensic__empty">{{ i18n.t('esc.noAttempts') }}</li>
             }
           </ol>
-        </section>
-      </div>
+        } @else {
+          <p class="adm-hint forensic__empty">{{ i18n.t('esc.noIncidentHistory') }}</p>
+        }
+      </section>
     </div>
   }
 </div>

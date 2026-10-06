@@ -232,7 +232,13 @@
         @for (s of schedules(); track s.id) {
           <tr [class.adm-row--active]="editingScheduleId() === s.id">
             <td><strong>{{ s.name }}</strong>@if (s.lastSentAt) { <span class="adm-small adm-secondary adm-block">{{ i18n.t('shiftsAdmin.lastSent') }} <span class="mono">{{ s.lastSentAt | date: 'dd/MM HH:mm' }}</span></span> }</td>
-            <td class="adm-small">{{ i18n.t(s.frequency === 'weekly' ? 'shiftsAdmin.weekly' : 'shiftsAdmin.monthly') }} · {{ weekday(s.dayOfWeek) }} <span class="mono">{{ s.sendTime }}</span></td>
+            <td class="adm-small">
+              {{ i18n.t(s.frequency === 'weekly' ? 'shiftsAdmin.weekly' : 'shiftsAdmin.monthly') }} · {{ weekday(s.dayOfWeek) }} <span class="mono">{{ s.sendTime }}</span>
+              @if (s.frequency === 'weekly' && s.targetPeriod === 'next_week') { · {{ i18n.t('shiftsAdmin.nextWeek') }} }
+              <span class="adm-block adm-secondary">{{ i18n.t(s.emailFormat === 'list' ? 'shiftsAdmin.formatList' : 'shiftsAdmin.formatCalendar') }}
+                @if (s.emailFormat === 'list') { @for (c of conditionsOf(s); track c.labelKey) { <span class="pill tone-info">{{ i18n.t(c.labelKey) }}</span> } }
+              </span>
+            </td>
             <td class="adm-small adm-secondary">{{ s.recipients.join(', ') }}@if (s.ccRecipients.length) { <span class="adm-block">CC {{ s.ccRecipients.join(', ') }}</span> }</td>
             <td>
               <label class="switch">
@@ -268,12 +274,37 @@
         </select>
       </label>
       <label class="adm-field adm-field--narrow"><span class="adm-label">{{ i18n.t('shiftsAdmin.time') }}</span><input class="adm-input mono" name="nsTime" type="time" [ngModel]="nsSendTime()" (ngModelChange)="nsSendTime.set($event)" /></label>
+      @if (nsFrequency() === 'weekly') {
+        <label class="adm-field adm-field--narrow">
+          <span class="adm-label">{{ i18n.t('shiftsAdmin.targetPeriod') }}</span>
+          <select class="adm-input" name="nsTargetPeriod" [ngModel]="nsTargetPeriod()" (ngModelChange)="nsTargetPeriod.set($event)">
+            <option value="current_week">{{ i18n.t('shiftsAdmin.currentWeek') }}</option>
+            <option value="next_week">{{ i18n.t('shiftsAdmin.nextWeek') }}</option>
+          </select>
+        </label>
+      }
     </div>
     <div class="adm-row">
       <label class="adm-field"><span class="adm-label">{{ i18n.t('shiftsAdmin.recipients') }}</span><input class="adm-input" name="nsRecipients" placeholder="rrhh@empresa.cl" [ngModel]="nsRecipients()" (ngModelChange)="nsRecipients.set($event)" /></label>
       <label class="adm-field"><span class="adm-label">{{ i18n.t('shiftsAdmin.cc') }}</span><input class="adm-input" name="nsCc" [ngModel]="nsCc()" (ngModelChange)="nsCc.set($event)" /></label>
-      <label class="adm-field"><span class="adm-label">{{ i18n.t('shiftsAdmin.roleFilter') }}</span><input class="adm-input" name="nsRoleFilter" placeholder="Analista N1" [ngModel]="nsRoleFilter()" (ngModelChange)="nsRoleFilter.set($event)" /></label>
     </div>
+    <div class="adm-field">
+      <span class="adm-label">{{ i18n.t('shiftsAdmin.format') }}</span>
+      <span class="sa__chips" role="radiogroup">
+        <button type="button" class="adm-btn" role="radio" [class.sa__on]="nsEmailFormat() === 'calendar'" [attr.aria-checked]="nsEmailFormat() === 'calendar'" (click)="nsEmailFormat.set('calendar')"><mat-icon>calendar_view_week</mat-icon>{{ i18n.t('shiftsAdmin.formatCalendar') }}</button>
+        <button type="button" class="adm-btn" role="radio" [class.sa__on]="nsEmailFormat() === 'list'" [attr.aria-checked]="nsEmailFormat() === 'list'" (click)="nsEmailFormat.set('list')"><mat-icon>view_list</mat-icon>{{ i18n.t('shiftsAdmin.formatList') }}</button>
+      </span>
+    </div>
+    @if (nsEmailFormat() === 'list') {
+      <div class="adm-field">
+        <span class="adm-label">{{ i18n.t('shiftsAdmin.conditions') }}</span>
+        <span class="sa__chips">
+          @for (c of conditions; track c.labelKey) {
+            <button type="button" class="adm-btn" [class.sa__on]="hasCondition(c)" [attr.aria-pressed]="hasCondition(c)" (click)="toggleCondition(c)">{{ i18n.t(c.labelKey) }}</button>
+          }
+        </span>
+      </div>
+    }
     <span class="adm-hint">{{ i18n.t('shiftsAdmin.commaHint') }}</span>
     <div class="sa__actions">
       @if (editingScheduleId()) { <button type="button" class="adm-btn" (click)="cancelScheduleEdit()">{{ i18n.t('admin.discard') }}</button> }

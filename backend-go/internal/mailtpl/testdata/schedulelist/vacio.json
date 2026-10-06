@@ -1,0 +1,15 @@
+{
+  "schedule": [
+    {
+      "analystName": "Sin asignaciones",
+      "startDate": "2026-10-05T03:00:00.000Z",
+      "endDate": "2026-10-12T02:59:59.000Z",
+      "cargoLabel": "-"
+    }
+  ],
+  "periodLabel": "Periodo Semanal: 05-10-2026 - 11-10-2026",
+  "logoCid": null,
+  "brandName": "Bitácora CDC",
+  "title": "Turnos de Escalamiento SOC",
+  "categoriesLabel": ""
+}

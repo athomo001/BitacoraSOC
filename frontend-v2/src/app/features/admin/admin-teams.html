@@ -100,6 +100,16 @@
               <input class="adm-input mono" name="memberPriority" type="number" min="0" [ngModel]="memberPriority()" (ngModelChange)="memberPriority.set(+$event)" />
             </label>
           </div>
+          @if (poolResults().length > 0) {
+            <ul class="tm__results">
+              @for (p of poolResults(); track p.id) {
+                <li>
+                  <button type="button" class="adm-btn" [disabled]="busy()" (click)="addPool(p)"><mat-icon>diversity_3</mat-icon>{{ i18n.t('teams.addPool') }}</button>
+                  <span><strong>{{ i18n.t('esc.pool') }} {{ p.name }}</strong> <span class="adm-small adm-secondary">· {{ p.organizationName ?? '' }} · {{ i18n.tf('teams.poolPeople', p.members) }}</span></span>
+                </li>
+              }
+            </ul>
+          }
           @if (memberResults().length > 0) {
             <ul class="tm__results">
               @for (c of memberResults(); track c.id) {
@@ -109,7 +119,7 @@
                 </li>
               }
             </ul>
-          } @else if (memberQuery().trim().length >= 2 && !searching()) {
+          } @else if (memberQuery().trim().length >= 2 && !searching() && !poolResults().length) {
             <p class="adm-hint">{{ i18n.t('teams.noResults') }}</p>
           }
           <p class="adm-hint">{{ i18n.t('teams.priorityHint') }}</p>

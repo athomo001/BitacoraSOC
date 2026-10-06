@@ -1,12 +1,9 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
 import { MatIconModule } from '@angular/material/icon';
-import { firstValueFrom } from 'rxjs';
-import { ApiEnvelope } from '../../core/auth/auth.models';
 import { problemDetail } from '../../core/http-error';
 import { I18nService } from '../../core/i18n/i18n.service';
-import { AdminTemplate, AlertRole, ChecklistAdminService, SaveTemplate, TemplateAssignment } from '../../core/checklists/checklist-admin.service';
+import { AdminTemplate, CargoCount, ChecklistAdminService, SaveTemplate, TemplateAssignment } from '../../core/checklists/checklist-admin.service';
 import { EditorItem, MAX_DEPTH, addChild, addRoot, childCount, depthOf, move, problems, remove, rename } from '../../core/checklists/template-editor';
 import { ShiftsService, WorkShift } from '../../core/shifts/shifts.service';
 
@@ -15,7 +12,7 @@ interface Draft {
   name: string;
   isActive: boolean;
   alertNokEnabled: boolean;
-  alertNokRoleTarget: AlertRole | null;
+  alertNokCargos: string[];
   items: EditorItem[];
   assignments: TemplateAssignment[];
 }
@@ -26,13 +23,13 @@ function toDraft(template: AdminTemplate): Draft {
     name: template.name,
     isActive: template.isActive,
     alertNokEnabled: template.alertNokEnabled,
-    alertNokRoleTarget: template.alertNokRoleTarget,
+    alertNokCargos: [...(template.alertNokCargos ?? [])],
     items: template.items.map((item) => ({ key: item.id, parentKey: item.parentItemId ?? null, title: item.title })),
     assignments: [...template.assignments],
   };
 }
 
-const EMPTY: Draft = { id: null, name: '', isActive: true, alertNokEnabled: false, alertNokRoleTarget: null, items: [], assignments: [] };
+const EMPTY: Draft = { id: null, name: '', isActive: true, alertNokEnabled: false, alertNokCargos: [], items: [], assignments: [] };
 
 /**
  * Administración → Checklist (artboard aprobado, del legacy checklist-admin):
@@ -52,11 +49,19 @@ export class AdminChecklistComponent implements OnInit {
   protected readonly i18n = inject(I18nService);
   private readonly api = inject(ChecklistAdminService);
   private readonly shiftsApi = inject(ShiftsService);
-  private readonly http = inject(HttpClient);
 
   protected readonly templates = signal<AdminTemplate[]>([]);
   protected readonly shifts = signal<WorkShift[]>([]);
-  protected readonly roleCounts = signal<Record<string, number>>({});
+  protected readonly cargoCounts = signal<CargoCount[]>([]);
+  /** Cargos para elegir: los en uso y los que ya tiene la plantilla aunque hoy nadie los tenga. */
+  protected readonly cargoOptions = computed(() => {
+    const known = this.cargoCounts();
+    const extra = this.draft().alertNokCargos.filter((c) => !known.some((k) => k.cargo === c)).map((cargo) => ({ cargo, people: 0 }));
+    return [...known, ...extra];
+  });
+  protected readonly alertPeople = computed(() =>
+    this.cargoCounts().filter((c) => this.draft().alertNokCargos.includes(c.cargo)).reduce((sum, c) => sum + c.people, 0),
+  );
   protected readonly loading = signal(true);
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -73,7 +78,6 @@ export class AdminChecklistComponent implements OnInit {
   protected readonly cooldown = signal(60);
   protected readonly cooldownSaved = signal(60);
 
-  protected readonly roles: AlertRole[] = ['admin', 'user', 'auditor'];
   protected readonly maxDepth = MAX_DEPTH;
 
   /** Filas del editor con lo que la plantilla necesita pintar. */
@@ -101,15 +105,13 @@ export class AdminChecklistComponent implements OnInit {
         this.api.list(),
         this.shiftsApi.listWorkShifts(),
         this.api.cooldown(),
-        firstValueFrom(this.http.get<ApiEnvelope<Array<{ role: string; active: boolean }>>>('/api/users')).then((r) => r.data).catch(() => []),
+        this.api.cargos().catch(() => [] as CargoCount[]),
       ]);
       this.templates.set(templates);
       this.shifts.set(shifts);
       this.cooldown.set(cooldown);
       this.cooldownSaved.set(cooldown);
-      const counts: Record<string, number> = {};
-      for (const user of users) if (user.active) counts[user.role] = (counts[user.role] ?? 0) + 1;
-      this.roleCounts.set(counts);
+      this.cargoCounts.set(users);
       if (templates[0]) this.select(templates[0]);
     } catch (error) {
       this.error.set(problemDetail(error, this.i18n.t('adminChecklist.loadError')));
@@ -181,13 +183,16 @@ export class AdminChecklistComponent implements OnInit {
     return `${this.i18n.tf('adminChecklist.itemsCount', leaves)} · ${used.length ? used.join(', ') : this.i18n.t('adminChecklist.unassigned')}`;
   }
 
-  protected roleLabel(role: AlertRole): string {
-    return this.i18n.t(role === 'admin' ? 'adminChecklist.role.admin' : role === 'user' ? 'adminChecklist.role.user' : 'adminChecklist.role.auditor');
+  protected toggleCargo(cargo: string): void {
+    const list = this.draft().alertNokCargos;
+    this.patch({ alertNokCargos: list.includes(cargo) ? list.filter((c) => c !== cargo) : [...list, cargo] });
   }
 
   protected toggleAlert(): void {
     const on = !this.draft().alertNokEnabled;
-    this.patch({ alertNokEnabled: on, alertNokRoleTarget: on ? (this.draft().alertNokRoleTarget ?? 'admin') : this.draft().alertNokRoleTarget });
+    // Como el legacy, por defecto avisa al cargo N2 si existe.
+    const fallback = this.cargoCounts().some((c) => c.cargo === 'N2') ? ['N2'] : [];
+    this.patch({ alertNokEnabled: on, alertNokCargos: on && !this.draft().alertNokCargos.length ? fallback : this.draft().alertNokCargos });
   }
 
   protected async save(): Promise<void> {
@@ -199,7 +204,7 @@ export class AdminChecklistComponent implements OnInit {
       name: draft.name.trim(),
       isActive: draft.isActive,
       alertNokEnabled: draft.alertNokEnabled,
-      alertNokRoleTarget: draft.alertNokEnabled ? draft.alertNokRoleTarget : null,
+      alertNokCargos: draft.alertNokEnabled ? draft.alertNokCargos : [],
       items: draft.items.map((item) => ({ key: item.key, parentKey: item.parentKey ?? '', title: item.title.trim() })),
       assignments: draft.assignments,
     };

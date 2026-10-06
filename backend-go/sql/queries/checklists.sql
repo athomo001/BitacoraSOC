@@ -106,11 +106,11 @@ SELECT * FROM checklist_templates ORDER BY is_active DESC, name;
 SELECT * FROM checklist_templates WHERE id = $1;
 
 -- name: CreateChecklistTemplate :one
-INSERT INTO checklist_templates (name, is_active, alert_nok_enabled, alert_nok_role_target)
-VALUES ($1, $2, $3, sqlc.narg('alert_nok_role_target')) RETURNING *;
+INSERT INTO checklist_templates (name, is_active, alert_nok_enabled, alert_nok_cargos)
+VALUES ($1, $2, $3, $4) RETURNING *;
 
 -- name: UpdateChecklistTemplate :one
-UPDATE checklist_templates SET name = $2, is_active = $3, alert_nok_enabled = $4, alert_nok_role_target = sqlc.narg('alert_nok_role_target')
+UPDATE checklist_templates SET name = $2, is_active = $3, alert_nok_enabled = $4, alert_nok_cargos = $5
 WHERE id = $1 RETURNING *;
 
 -- name: DeleteChecklistTemplate :exec

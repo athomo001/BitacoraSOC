@@ -8,6 +8,7 @@ import { DirectoryContact, DirectoryService } from '../../core/directory/directo
 import { TerritoryService } from '../../core/territory/territory.service';
 import { TerritorialUnit } from '../../core/territory/territory.models';
 import { SetupService } from '../../core/setup/setup.service';
+import { EscalationPool, EscalationService } from '../../core/escalation/escalation.service';
 import { problemDetail } from '../../core/http-error';
 
 /** Tipos de equipo del backend (teams.kind); la etiqueta sale de i18n. */
@@ -47,6 +48,14 @@ export class AdminTeamsComponent implements OnInit {
   private readonly api = inject(OrganizationsService);
   private readonly directory = inject(DirectoryService);
   private readonly setup = inject(SetupService);
+  private readonly escalation = inject(EscalationService);
+  /** Pools (TI-Mundo…): se agregan a un nivel como un solo integrante. */
+  private readonly pools = signal<EscalationPool[]>([]);
+  protected readonly poolResults = computed(() => {
+    const q = this.memberQuery().trim().toLowerCase();
+    if (q.length < 2) return [];
+    return this.pools().filter((p) => p.active && `${p.name} ${p.organizationName ?? ''}`.toLowerCase().includes(q));
+  });
 
   protected readonly teams = signal<TeamSummary[]>([]);
   protected readonly organizations = signal<Organization[]>([]);
@@ -73,6 +82,7 @@ export class AdminTeamsComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.setup.loadStatus();
+    void this.escalation.listPools().then((p) => this.pools.set(p)).catch(() => null);
     try {
       const [teams, orgs] = await Promise.all([this.api.listTeams(), this.api.list({ active: true })]);
       this.teams.set(teams);
@@ -136,6 +146,17 @@ export class AdminTeamsComponent implements OnInit {
     if (!team) return;
     await this.run(async () => {
       await this.api.addMember(team.id, { contactId: contact.id, roleInTeam: this.memberRole(), recipientType: this.memberRecipient(), priority: this.memberPriority() });
+      this.memberQuery.set('');
+      this.memberResults.set([]);
+      await this.reloadSelected();
+    });
+  }
+
+  protected async addPool(pool: EscalationPool): Promise<void> {
+    const team = this.selected();
+    if (!team) return;
+    await this.run(async () => {
+      await this.api.addMember(team.id, { poolId: pool.id, roleInTeam: this.memberRole(), recipientType: this.memberRecipient(), priority: this.memberPriority() });
       this.memberQuery.set('');
       this.memberResults.set([]);
       await this.reloadSelected();

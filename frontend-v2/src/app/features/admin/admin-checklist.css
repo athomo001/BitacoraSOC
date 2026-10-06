@@ -388,3 +388,27 @@ mat-icon {
     border-left: none;
   }
 }
+
+/* Cargos a los que avisa la alerta NOK (como el legacy: por cargo). */
+.ac__cargos {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ac__cargo {
+  padding: 3px 9px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--bg-app);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.ac__cargo--on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}

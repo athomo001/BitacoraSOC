@@ -1304,6 +1304,27 @@ type ApiKey struct {
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 }
 
+type AppBranding struct {
+	ID              bool               `json:"id"`
+	AppTitle        string             `json:"app_title"`
+	Logo            []byte             `json:"logo"`
+	LogoType        pgtype.Text        `json:"logo_type"`
+	LogoName        pgtype.Text        `json:"logo_name"`
+	Favicon         []byte             `json:"favicon"`
+	FaviconType     pgtype.Text        `json:"favicon_type"`
+	FaviconUrl      pgtype.Text        `json:"favicon_url"`
+	TitleFont       string             `json:"title_font"`
+	FontFile        []byte             `json:"font_file"`
+	FontType        pgtype.Text        `json:"font_type"`
+	FontName        pgtype.Text        `json:"font_name"`
+	IncidentPalette string             `json:"incident_palette"`
+	BulletinColor   string             `json:"bulletin_color"`
+	LoginTheme      pgtype.Text        `json:"login_theme"`
+	Version         int32              `json:"version"`
+	UpdatedBy       pgtype.UUID        `json:"updated_by"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
 type AppConfig struct {
 	ID                        bool               `json:"id"`
 	ShiftCheckCooldownMinutes int32              `json:"shift_check_cooldown_minutes"`
@@ -1415,12 +1436,12 @@ type ChecklistItem struct {
 }
 
 type ChecklistTemplate struct {
-	ID                 uuid.UUID          `json:"id"`
-	Name               string             `json:"name"`
-	IsActive           bool               `json:"is_active"`
-	AlertNokEnabled    bool               `json:"alert_nok_enabled"`
-	AlertNokRoleTarget pgtype.Text        `json:"alert_nok_role_target"`
-	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	ID              uuid.UUID          `json:"id"`
+	Name            string             `json:"name"`
+	IsActive        bool               `json:"is_active"`
+	AlertNokEnabled bool               `json:"alert_nok_enabled"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	AlertNokCargos  []string           `json:"alert_nok_cargos"`
 }
 
 type Client struct {
@@ -1429,6 +1450,35 @@ type Client struct {
 	Code      string             `json:"code"`
 	Active    bool               `json:"active"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type ClientAlertAck struct {
+	ID            uuid.UUID          `json:"id"`
+	RuleID        uuid.UUID          `json:"rule_id"`
+	UserID        uuid.UUID          `json:"user_id"`
+	OccurrenceKey string             `json:"occurrence_key"`
+	Context       string             `json:"context"`
+	AckedAt       pgtype.Timestamptz `json:"acked_at"`
+}
+
+type ClientAlertRule struct {
+	ID             uuid.UUID          `json:"id"`
+	OrganizationID uuid.UUID          `json:"organization_id"`
+	Name           string             `json:"name"`
+	Enabled        bool               `json:"enabled"`
+	Contexts       []string           `json:"contexts"`
+	Timezone       string             `json:"timezone"`
+	Priority       int32              `json:"priority"`
+	ValidFrom      pgtype.Timestamptz `json:"valid_from"`
+	ValidTo        pgtype.Timestamptz `json:"valid_to"`
+	HolidayDates   []pgtype.Date      `json:"holiday_dates"`
+	TimeWindows    []byte             `json:"time_windows"`
+	Channels       []string           `json:"channels"`
+	Message        string             `json:"message"`
+	RequiresAck    bool               `json:"requires_ack"`
+	UpdatedBy      pgtype.UUID        `json:"updated_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Complement struct {
@@ -1582,6 +1632,29 @@ type EscalationActionLog struct {
 	Notes       pgtype.Text          `json:"notes"`
 	OperatorID  uuid.UUID            `json:"operator_id"`
 	CreatedAt   pgtype.Timestamptz   `json:"created_at"`
+	IncidentID  pgtype.UUID          `json:"incident_id"`
+}
+
+type EscalationIncident struct {
+	ID                uuid.UUID          `json:"id"`
+	ServiceID         pgtype.UUID        `json:"service_id"`
+	AssetID           pgtype.UUID        `json:"asset_id"`
+	TerritorialUnitID pgtype.UUID        `json:"territorial_unit_id"`
+	Title             string             `json:"title"`
+	GlpiTicket        pgtype.Text        `json:"glpi_ticket"`
+	TicketID          pgtype.UUID        `json:"ticket_id"`
+	OpenedBy          uuid.UUID          `json:"opened_by"`
+	OpenedAt          pgtype.Timestamptz `json:"opened_at"`
+	ClosedBy          pgtype.UUID        `json:"closed_by"`
+	ClosedAt          pgtype.Timestamptz `json:"closed_at"`
+}
+
+type EscalationIncidentNote struct {
+	ID         uuid.UUID          `json:"id"`
+	IncidentID uuid.UUID          `json:"incident_id"`
+	UserID     uuid.UUID          `json:"user_id"`
+	Note       string             `json:"note"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 }
 
 type EscalationPolicy struct {
@@ -1590,6 +1663,23 @@ type EscalationPolicy struct {
 	AssetID           pgtype.UUID `json:"asset_id"`
 	TerritorialUnitID pgtype.UUID `json:"territorial_unit_id"`
 	Active            bool        `json:"active"`
+	Reminder          pgtype.Text `json:"reminder"`
+}
+
+type EscalationPool struct {
+	ID             uuid.UUID          `json:"id"`
+	OrganizationID pgtype.UUID        `json:"organization_id"`
+	Name           string             `json:"name"`
+	Active         bool               `json:"active"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
+type EscalationPoolMember struct {
+	ID        uuid.UUID   `json:"id"`
+	PoolID    uuid.UUID   `json:"pool_id"`
+	ContactID pgtype.UUID `json:"contact_id"`
+	UserID    pgtype.UUID `json:"user_id"`
+	Position  int32       `json:"position"`
 }
 
 type EscalationStep struct {
@@ -1641,6 +1731,7 @@ type Organization struct {
 	Active            bool               `json:"active"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	ViaOrganizationID pgtype.UUID        `json:"via_organization_id"`
+	ArchivedAt        pgtype.Timestamptz `json:"archived_at"`
 }
 
 type OrganizationType struct {
@@ -1689,6 +1780,33 @@ type RaciAssignment struct {
 	Role      RaciRole    `json:"role"`
 	TeamID    uuid.UUID   `json:"team_id"`
 	Active    bool        `json:"active"`
+}
+
+type ReportHistory struct {
+	ID             uuid.UUID          `json:"id"`
+	Kind           string             `json:"kind"`
+	Title          string             `json:"title"`
+	Subject        string             `json:"subject"`
+	OrganizationID pgtype.UUID        `json:"organization_id"`
+	ServiceID      pgtype.UUID        `json:"service_id"`
+	Recipients     []string           `json:"recipients"`
+	CcRecipients   []string           `json:"cc_recipients"`
+	Html           string             `json:"html"`
+	Payload        []byte             `json:"payload"`
+	Status         string             `json:"status"`
+	Error          pgtype.Text        `json:"error"`
+	SentBy         pgtype.UUID        `json:"sent_by"`
+	SentByUsername string             `json:"sent_by_username"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
+type ReportOperationType struct {
+	ID          uuid.UUID          `json:"id"`
+	Name        string             `json:"name"`
+	InfoDefault string             `json:"info_default"`
+	Enabled     bool               `json:"enabled"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
 type RotationCycle struct {
@@ -1885,6 +2003,7 @@ type TeamMember struct {
 	RoleInTeam    TeamRole      `json:"role_in_team"`
 	Priority      int32         `json:"priority"`
 	Active        bool          `json:"active"`
+	PoolID        pgtype.UUID   `json:"pool_id"`
 }
 
 type TerritorialUnit struct {
@@ -2055,4 +2174,6 @@ type WorkShiftNotificationSchedule struct {
 	CreatedBy    uuid.UUID                     `json:"created_by"`
 	CreatedAt    pgtype.Timestamptz            `json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz            `json:"updated_at"`
+	TargetPeriod string                        `json:"target_period"`
+	EmailFormat  string                        `json:"email_format"`
 }

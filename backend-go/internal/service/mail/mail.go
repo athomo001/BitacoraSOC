@@ -4,8 +4,12 @@
 package mail
 
 import (
+	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"mime"
+	"mime/quotedprintable"
 	netmail "net/mail"
 	"net/smtp"
 	"strings"
@@ -88,6 +92,24 @@ func (s *Sender) SendHTML(to, cc []string, subject, htmlBody string) error {
 	return smtp.SendMail(addr, auth, s.cfg.FromAddress, rcpt, msg)
 }
 
+// SendAlternative manda la versión HTML y la de texto plano en un mismo
+// correo (multipart/alternative), como el sendEmail del legacy: el cliente
+// que no muestra HTML usa el texto.
+func (s *Sender) SendAlternative(to, cc []string, subject, textBody, htmlBody string) error {
+	to, cc = nonEmpty(to), nonEmpty(cc)
+	if len(to) == 0 {
+		return fmt.Errorf("mail: destinatario vacío")
+	}
+	addr := fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port)
+	var auth smtp.Auth
+	if s.cfg.Username != "" {
+		auth = smtp.PlainAuth("", s.cfg.Username, s.cfg.Password, s.cfg.Host)
+	}
+	msg := buildAlternativeMessage(s.fromHeader(), to, cc, subject, textBody, htmlBody, time.Now())
+	rcpt := append(append([]string{}, to...), cc...)
+	return smtp.SendMail(addr, auth, s.cfg.FromAddress, rcpt, msg)
+}
+
 // fromHeader arma el From visible. net/mail codifica el nombre según RFC 2047
 // (tildes) y lo entrecomilla, así un nombre con saltos de línea no puede
 // inyectar cabeceras. El remitente del sobre SMTP sigue siendo la dirección.
@@ -117,14 +139,7 @@ func nonEmpty(addrs []string) []string {
 func buildMessage(from string, to, cc []string, subject, body string, now time.Time) []byte {
 	const crlf = "\r\n"
 	var b strings.Builder
-	b.WriteString("From: " + from + crlf)
-	b.WriteString("To: " + strings.Join(to, ", ") + crlf)
-	if len(cc) > 0 {
-		b.WriteString("Cc: " + strings.Join(cc, ", ") + crlf)
-	}
-	b.WriteString("Subject: " + mime.QEncoding.Encode("utf-8", subject) + crlf)
-	b.WriteString("Date: " + now.Format(time.RFC1123Z) + crlf)
-	b.WriteString("MIME-Version: 1.0" + crlf)
+	writeHeaders(&b, from, to, cc, subject, now)
 	b.WriteString(`Content-Type: text/plain; charset="UTF-8"` + crlf)
 	b.WriteString(crlf)
 	b.WriteString(body)
@@ -134,6 +149,40 @@ func buildMessage(from string, to, cc []string, subject, body string, now time.T
 func buildHTMLMessage(from string, to, cc []string, subject, body string, now time.Time) []byte {
 	const crlf = "\r\n"
 	var b strings.Builder
+	writeHeaders(&b, from, to, cc, subject, now)
+	b.WriteString(`Content-Type: text/html; charset="UTF-8"` + crlf + crlf)
+	b.WriteString(body)
+	return []byte(b.String())
+}
+
+// buildAlternativeMessage arma un multipart/alternative con las partes en
+// quoted-printable: el HTML de las plantillas del legacy tiene líneas más
+// largas que las 998 columnas que permite SMTP.
+func buildAlternativeMessage(from string, to, cc []string, subject, textBody, htmlBody string, now time.Time) []byte {
+	const crlf = "\r\n"
+	random := make([]byte, 12)
+	_, _ = rand.Read(random)
+	boundary := "bitacora-" + hex.EncodeToString(random)
+	var b strings.Builder
+	writeHeaders(&b, from, to, cc, subject, now)
+	b.WriteString(`Content-Type: multipart/alternative; boundary="` + boundary + `"` + crlf + crlf)
+	for _, part := range []struct{ kind, body string }{{"text/plain", textBody}, {"text/html", htmlBody}} {
+		b.WriteString("--" + boundary + crlf)
+		b.WriteString(`Content-Type: ` + part.kind + `; charset="UTF-8"` + crlf)
+		b.WriteString("Content-Transfer-Encoding: quoted-printable" + crlf + crlf)
+		var encoded bytes.Buffer
+		w := quotedprintable.NewWriter(&encoded)
+		_, _ = w.Write([]byte(part.body))
+		_ = w.Close()
+		b.WriteString(encoded.String() + crlf)
+	}
+	b.WriteString("--" + boundary + "--" + crlf)
+	return []byte(b.String())
+}
+
+// writeHeaders escribe las cabeceras comunes a los tres formatos.
+func writeHeaders(b *strings.Builder, from string, to, cc []string, subject string, now time.Time) {
+	const crlf = "\r\n"
 	b.WriteString("From: " + from + crlf)
 	b.WriteString("To: " + strings.Join(to, ", ") + crlf)
 	if len(cc) > 0 {
@@ -142,7 +191,4 @@ func buildHTMLMessage(from string, to, cc []string, subject, body string, now ti
 	b.WriteString("Subject: " + mime.QEncoding.Encode("utf-8", subject) + crlf)
 	b.WriteString("Date: " + now.Format(time.RFC1123Z) + crlf)
 	b.WriteString("MIME-Version: 1.0" + crlf)
-	b.WriteString(`Content-Type: text/html; charset="UTF-8"` + crlf + crlf)
-	b.WriteString(body)
-	return []byte(b.String())
 }

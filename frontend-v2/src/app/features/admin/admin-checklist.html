@@ -88,10 +88,14 @@
           @if (draft().alertNokEnabled) {
             <div class="ac__alert-to">
               {{ i18n.t('adminChecklist.alertTo') }}
-              <select class="ac-input" [ngModel]="draft().alertNokRoleTarget" (ngModelChange)="patch({ alertNokRoleTarget: $event })" [attr.aria-label]="i18n.t('adminChecklist.alertTo')">
-                @for (r of roles; track r) { <option [value]="r">{{ roleLabel(r) }}</option> }
-              </select>
-              <span class="ac__muted">{{ i18n.tf('adminChecklist.people', roleCounts()[draft().alertNokRoleTarget ?? ''] ?? 0) }}</span>
+              <span class="ac__cargos" role="group" [attr.aria-label]="i18n.t('adminChecklist.alertTo')">
+                @for (c of cargoOptions(); track c.cargo) {
+                  <button type="button" class="ac__cargo" [class.ac__cargo--on]="draft().alertNokCargos.includes(c.cargo)" [attr.aria-pressed]="draft().alertNokCargos.includes(c.cargo)" (click)="toggleCargo(c.cargo)">{{ c.cargo }} <span class="mono">{{ c.people }}</span></button>
+                } @empty {
+                  <span class="ac__muted">{{ i18n.t('adminChecklist.noCargos') }}</span>
+                }
+              </span>
+              <span class="ac__muted">{{ i18n.tf('adminChecklist.people', alertPeople()) }}</span>
             </div>
           }
         </div>

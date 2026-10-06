@@ -1,0 +1,93 @@
+{
+  "columns": [
+    {
+      "dayShort": "Lun",
+      "dateShort": "06/10"
+    },
+    {
+      "dayShort": "Mar",
+      "dateShort": "07/10"
+    },
+    {
+      "dayShort": "Mié",
+      "dateShort": "08/10"
+    },
+    {
+      "dayShort": "Jue",
+      "dateShort": "09/10"
+    },
+    {
+      "dayShort": "Vie",
+      "dateShort": "10/10"
+    }
+  ],
+  "rows": [
+    {
+      "name": "Ana Pérez",
+      "cargoLabel": "Analista N2",
+      "days": [
+        {
+          "status": "telework"
+        },
+        {
+          "status": "telework"
+        },
+        {
+          "status": "office"
+        },
+        {
+          "status": "training"
+        },
+        {
+          "status": "medical-appointment"
+        }
+      ]
+    },
+    {
+      "name": "Bruno <Soto> & \"Cía\"",
+      "cargoLabel": "",
+      "days": [
+        {
+          "status": "vacation"
+        },
+        {
+          "status": "vacation"
+        },
+        {
+          "status": "vacation"
+        },
+        {
+          "status": "medical-leave"
+        },
+        {
+          "status": "office"
+        }
+      ]
+    },
+    {
+      "name": "Carla Díaz",
+      "cargoLabel": "Jefa de Área",
+      "days": [
+        {
+          "status": "office"
+        },
+        {
+          "status": "office"
+        },
+        {
+          "status": "office"
+        },
+        {
+          "status": "office"
+        },
+        {
+          "status": "office"
+        }
+      ]
+    }
+  ],
+  "periodLabel": "Periodo Semanal: 06-10-2026 - 12-10-2026",
+  "logoCid": "cid:bitacora_escalation_logo@bitacora",
+  "brandName": "Bitácora CDC",
+  "title": "Activos Fuera de la oficina"
+}

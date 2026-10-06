@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/checklist"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -33,7 +35,7 @@ type adminChecklistTemplateDTO struct {
 	Name               string                  `json:"name"`
 	IsActive           bool                    `json:"isActive"`
 	AlertNokEnabled    bool                    `json:"alertNokEnabled"`
-	AlertNokRoleTarget *string                 `json:"alertNokRoleTarget"`
+	AlertNokCargos     []string                `json:"alertNokCargos"`
 	Items              []checklistItemDTO      `json:"items"`
 	Assignments        []templateAssignmentDTO `json:"assignments"`
 	ChecksCount        int64                   `json:"checksCount"`
@@ -63,7 +65,7 @@ func (h *ChecklistsHandler) adminTemplateDTO(ctx context.Context, template db.Ch
 	}
 	dto := adminChecklistTemplateDTO{
 		ID: template.ID, Name: template.Name, IsActive: template.IsActive, AlertNokEnabled: template.AlertNokEnabled,
-		AlertNokRoleTarget: textPtr(template.AlertNokRoleTarget), Items: make([]checklistItemDTO, 0, len(items)),
+		AlertNokCargos: nonNilStrings(template.AlertNokCargos), Items: make([]checklistItemDTO, 0, len(items)),
 		Assignments: templateAssignments(shifts, template.ID), ChecksCount: checks,
 	}
 	for _, item := range items {
@@ -108,12 +110,24 @@ type saveTemplateRequest struct {
 	Name               string                  `json:"name"`
 	IsActive           bool                    `json:"isActive"`
 	AlertNokEnabled    bool                    `json:"alertNokEnabled"`
-	AlertNokRoleTarget *string                 `json:"alertNokRoleTarget"`
+	AlertNokCargos     []string                `json:"alertNokCargos"`
 	Items              []templateItemRequest   `json:"items"`
 	Assignments        []templateAssignmentDTO `json:"assignments"`
 }
 
-var alertRoles = map[string]bool{"admin": true, "user": true, "auditor": true}
+// cargos normaliza los cargos de la alerta NOK (normalizeCargoLabels del legacy).
+func (req saveTemplateRequest) cargos() []string {
+	out := []string{}
+	seen := map[string]bool{}
+	for _, c := range req.AlertNokCargos {
+		c = strings.TrimSpace(c)
+		if c != "" && !seen[c] {
+			seen[c] = true
+			out = append(out, c)
+		}
+	}
+	return out
+}
 
 func (req saveTemplateRequest) validate() ([]checklist.TemplateItem, error) {
 	items := make([]checklist.TemplateItem, 0, len(req.Items))
@@ -124,8 +138,17 @@ func (req saveTemplateRequest) validate() ([]checklist.TemplateItem, error) {
 	if err != nil {
 		return nil, err
 	}
-	if req.AlertNokEnabled && (req.AlertNokRoleTarget == nil || !alertRoles[*req.AlertNokRoleTarget]) {
-		return nil, errors.New("la alerta NOK necesita un rol a quien avisar")
+	cargos := req.cargos()
+	if req.AlertNokEnabled && len(cargos) == 0 {
+		return nil, errors.New("la alerta NOK necesita al menos un cargo a quien avisar")
+	}
+	if len(cargos) > 20 {
+		return nil, errors.New("la alerta NOK avisa a hasta 20 cargos")
+	}
+	for _, c := range cargos {
+		if len([]rune(c)) > 80 {
+			return nil, errors.New("cargo inválido (hasta 80 caracteres)")
+		}
 	}
 	for _, assignment := range req.Assignments {
 		if assignment.WorkShiftID == uuid.Nil || (assignment.Moment != "inicio" && assignment.Moment != "cierre") {
@@ -164,10 +187,7 @@ func (h *ChecklistsHandler) saveTemplate(w http.ResponseWriter, r *http.Request,
 		problemdetails.Write(w, r, 400, "invalid-payload", err.Error())
 		return
 	}
-	role := pgtype.Text{}
-	if req.AlertNokEnabled {
-		role = pgtype.Text{String: *req.AlertNokRoleTarget, Valid: true}
-	}
+	cargos := req.cargos()
 	ctx := r.Context()
 	tx, err := h.Pool.Begin(ctx)
 	if err != nil {
@@ -180,9 +200,9 @@ func (h *ChecklistsHandler) saveTemplate(w http.ResponseWriter, r *http.Request,
 	var template db.ChecklistTemplate
 	existing := map[uuid.UUID]bool{}
 	if id == uuid.Nil {
-		template, err = queries.CreateChecklistTemplate(ctx, db.CreateChecklistTemplateParams{Name: req.Name, IsActive: req.IsActive, AlertNokEnabled: req.AlertNokEnabled, AlertNokRoleTarget: role})
+		template, err = queries.CreateChecklistTemplate(ctx, db.CreateChecklistTemplateParams{Name: req.Name, IsActive: req.IsActive, AlertNokEnabled: req.AlertNokEnabled, AlertNokCargos: cargos})
 	} else {
-		template, err = queries.UpdateChecklistTemplate(ctx, db.UpdateChecklistTemplateParams{ID: id, Name: req.Name, IsActive: req.IsActive, AlertNokEnabled: req.AlertNokEnabled, AlertNokRoleTarget: role})
+		template, err = queries.UpdateChecklistTemplate(ctx, db.UpdateChecklistTemplateParams{ID: id, Name: req.Name, IsActive: req.IsActive, AlertNokEnabled: req.AlertNokEnabled, AlertNokCargos: cargos})
 		if errors.Is(err, pgx.ErrNoRows) {
 			problemdetails.Write(w, r, 404, "not-found", "plantilla no encontrada")
 			return

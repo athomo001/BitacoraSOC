@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/branding"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/mailtpl"
 	"net/http"
 	"strings"
 	"time"
@@ -441,11 +443,11 @@ func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if sender, from, err := buildMailSender(ctx, h.Queries, h.Crypto); err == nil {
+	if sender, _, err := buildMailSender(ctx, h.Queries, h.Crypto); err == nil {
 		resetURL := h.PublicBaseURL + "/reset-password?token=" + rawTokenHex
-		_ = sender.Send(user.Email, "Recuperación de contraseña - Bitácora Ops",
-			"Solicitaste restablecer tu contraseña. Este enlace vence en 5 minutos:\n\n"+resetURL+"\n\nSi no fuiste vos, ignorá este correo.")
-		_ = from
+		// Plantilla del legacy (buildPasswordRecoveryEmail), estándar del área.
+		m := mailtpl.PasswordRecovery(resetURL, branding.Title(ctx, h.Queries))
+		_ = sender.SendAlternative([]string{user.Email}, nil, m.Subject, m.Text, m.HTML)
 	}
 
 	h.AuditLog.Log(ctx, "auth.password.forgot", audit.LevelInfo, audit.Success(), map[string]any{"username": user.Username})

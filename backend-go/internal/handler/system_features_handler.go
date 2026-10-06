@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -86,6 +87,14 @@ func (h *SystemFeaturesHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		payload = trimmed
 	}
 
+	// La Ticketera es un módulo más: no se apaga si SOC y NOC ya están apagados.
+	if code == ticketsFeature && !*req.IsEnabled {
+		if config, err := h.Queries.GetAppConfig(ctx); err == nil && !config.SocModuleEnabled && !config.NocModuleEnabled {
+			problemdetails.Write(w, r, http.StatusBadRequest, "no-module-selected", noModuleMessage)
+			return
+		}
+	}
+
 	actor, _ := middleware.UserFromContext(ctx)
 	feature, err := h.Queries.UpdateSystemFeature(ctx, db.UpdateSystemFeatureParams{
 		Code: code, IsEnabled: *req.IsEnabled, ConfigPayload: payload,
@@ -105,4 +114,15 @@ func (h *SystemFeaturesHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	})
 	publishSync(ctx, h.Hub, "system_feature.updated", dto)
 	writeData(w, http.StatusOK, dto)
+}
+
+// ticketsFeature es la Ticketera (system_features.native_tickets).
+const ticketsFeature = "native_tickets"
+
+const noModuleMessage = "al menos un módulo (SOC, NOC o Ticketera) debe quedar activo"
+
+// featureEnabled dice si una funcionalidad opcional está encendida.
+func featureEnabled(ctx context.Context, q *db.Queries, code string) bool {
+	f, err := q.GetSystemFeature(ctx, code)
+	return err == nil && f.IsEnabled
 }

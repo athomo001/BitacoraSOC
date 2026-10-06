@@ -188,3 +188,34 @@ func TestActiveWindow(t *testing.T) {
 		t.Fatal("si alguna ventana activa suprime, gana la que suprime (no se despacha)")
 	}
 }
+
+// Un pool (TI-Mundo) se recorre en orden aunque el nivel sea "todos a la
+// vez": si uno no contesta, el siguiente del pool; agotado, el nivel siguiente.
+func TestNextWalksPoolBeforeNextStep(t *testing.T) {
+	pool := uuid.New()
+	a, b, c, solo := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	steps := []Step{
+		{Order: 1, Mode: ModePool, Members: []Member{
+			{ID: solo, Role: RolePrimary},
+			{ID: b, Role: RolePrimary, Priority: 1, PoolID: pool, PoolPos: 1},
+			{ID: a, Role: RolePrimary, Priority: 1, PoolID: pool, PoolPos: 0},
+			{ID: c, Role: RolePrimary, Priority: 1, PoolID: pool, PoolPos: 2},
+		}},
+		{Order: 2, Mode: ModeUnique, Members: []Member{{ID: uuid.New(), Role: RolePrimary}}},
+	}
+	if next := Next(steps, 1, []uuid.UUID{a}, ResultNoAnswer); next.NextMember == nil || next.NextMember.ID != b {
+		t.Fatalf("tras el primero del pool va el segundo: %+v", next)
+	}
+	if next := Next(steps, 1, []uuid.UUID{b, a}, ResultBusy); next.NextMember == nil || next.NextMember.ID != c {
+		t.Fatalf("tras el segundo va el tercero: %+v", next)
+	}
+	if next := Next(steps, 1, []uuid.UUID{c, a, b}, ResultNoAnswer); !next.EscalatedToNextStep || next.NextStepOrder != 2 {
+		t.Fatalf("pool agotado: nivel siguiente: %+v", next)
+	}
+	if next := Next(steps, 1, []uuid.UUID{solo}, ResultNoAnswer); !next.EscalatedToNextStep {
+		t.Fatalf("fuera del pool, en modo pool, pasa al nivel siguiente: %+v", next)
+	}
+	if next := Next(steps, 1, []uuid.UUID{a}, ResultEscalatedNextTier); !next.EscalatedToNextStep {
+		t.Fatalf("escalar a mano salta el pool: %+v", next)
+	}
+}

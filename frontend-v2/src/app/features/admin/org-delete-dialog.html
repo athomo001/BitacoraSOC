@@ -1,0 +1,86 @@
+<div class="od" role="document">
+  <header class="od__head">
+    <mat-icon class="od__danger">delete_forever</mat-icon>
+    <div class="od__head-text">
+      <h2 class="od__title">{{ i18n.tf('orgDelete.title', data.org.name) }}</h2>
+      <p class="od__lead">{{ i18n.t(groups.length ? 'orgDelete.lead' : 'orgDelete.leadEmpty') }}</p>
+    </div>
+    <button type="button" class="od__icon-btn" [attr.aria-label]="i18n.t('orgDelete.close')" (click)="close()"><mat-icon>close</mat-icon></button>
+  </header>
+
+  <div class="od__body">
+    @if (error(); as message) {
+      <p class="msg msg--error" role="alert">{{ message }}</p>
+    }
+
+    @if (groups.length) {
+      <div class="od__bulk">
+        <mat-icon>bolt</mat-icon>
+        <span class="od__bulk-text"><strong>{{ i18n.t('orgDelete.allAtOnce') }}</strong> {{ i18n.t('orgDelete.allAtOnceText') }}</span>
+        <select class="adm-input od__target" name="target" [attr.aria-label]="i18n.t('orgDelete.target')" [ngModel]="target()" (ngModelChange)="target.set($event)">
+          <option value="">{{ i18n.t('orgDelete.chooseTarget') }}</option>
+          @for (o of data.targets; track o.id) { <option [value]="o.id">{{ o.name }}</option> }
+        </select>
+        <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy() || !target()" (click)="moveAllAndDelete()">{{ i18n.t('orgDelete.moveAndDelete') }}</button>
+      </div>
+    }
+
+    @for (g of groups; track g.kind) {
+      <section class="od__group">
+        <h3 class="od__group-title">
+          <mat-icon>{{ g.icon }}</mat-icon>{{ i18n.t(g.title) }}
+          <span class="pill tone-neutral">{{ g.rows.length }}</span>
+          <span class="od__hint">{{ g.kind === 'ticket' ? i18n.tf(g.hint, data.org.name) : i18n.t(g.hint) }}</span>
+        </h3>
+        @for (row of g.rows; track row.id) {
+          @let done = decision(row);
+          <div class="od__row" [class.od__row--done]="done">
+            <div class="od__row-main">
+              @if (editing() === row.id) {
+                <input class="adm-input od__edit" name="editName" [attr.aria-label]="i18n.t('orgDelete.newName')" [ngModel]="editName()" (ngModelChange)="editName.set($event)" (keydown.enter)="saveEdit(row)" />
+              } @else {
+                <div class="od__name" [class.od__name--struck]="done?.op === 'delete'">{{ displayName(row) }} @if (row.code) { <span class="mono od__code">{{ row.code }}</span> }</div>
+              }
+              <div class="od__detail">
+                @if (done?.op === 'move') { {{ resultLabel(row) }} } @else { {{ row.detail }}@if (row.createdAt) { · {{ row.createdAt | date: 'dd-MM-yyyy' }} } }
+              </div>
+            </div>
+
+            @if (done) {
+              <span class="pill tone-ok"><mat-icon>check</mat-icon>{{ resultLabel(row) }}</span>
+              <button type="button" class="adm-btn" (click)="undo(row)">{{ i18n.t('orgDelete.undo') }}</button>
+            } @else if (editing() === row.id) {
+              <button type="button" class="adm-btn adm-btn--primary" (click)="saveEdit(row)">{{ i18n.t('admin.save') }}</button>
+            } @else {
+              @if (row.optional) {
+                <span class="pill tone-neutral"><mat-icon>history</mat-icon>{{ i18n.t('orgDelete.staysInHistory') }}</span>
+              }
+              <button type="button" class="adm-btn" [disabled]="!target()" [title]="target() ? '' : i18n.t('orgDelete.chooseTargetFirst')" (click)="move(row)">
+                <mat-icon>drive_file_move</mat-icon>{{ target() ? i18n.tf('orgDelete.moveTo', targetName()) : i18n.t('orgDelete.move') }}
+              </button>
+              @if (row.optional) {
+                <a class="adm-icon-btn" [routerLink]="['/tickets', row.id]" target="_blank" [title]="i18n.t('orgDelete.openTicket')" [attr.aria-label]="i18n.t('orgDelete.openTicket') + ' ' + row.name"><mat-icon>open_in_new</mat-icon></a>
+              } @else {
+                <button type="button" class="adm-icon-btn" [title]="i18n.t('orgDelete.rename')" [attr.aria-label]="i18n.t('orgDelete.rename') + ' ' + row.name" (click)="startEdit(row)"><mat-icon>edit</mat-icon></button>
+                <button type="button" class="adm-icon-btn adm-icon-btn--danger" [disabled]="!row.deletable" [title]="i18n.t(row.deletable ? 'orgDelete.delete' : 'orgDelete.hasHistory')" [attr.aria-label]="i18n.t('orgDelete.delete') + ' ' + row.name" (click)="remove(row)"><mat-icon>delete</mat-icon></button>
+              }
+            }
+          </div>
+        }
+      </section>
+    }
+
+    @if (data.dependents.contacts > 0) {
+      <p class="od__note"><mat-icon>contact_phone</mat-icon><span>{{ contactsText() }}</span></p>
+    }
+    @if (groups.length) {
+      <p class="od__info"><mat-icon>info</mat-icon>{{ i18n.t('orgDelete.info') }}</p>
+    }
+  </div>
+
+  <footer class="od__foot">
+    <span class="od__status" [class.od__status--ready]="pending() === 0">{{ pending() ? i18n.tf('orgDelete.pending', pending()) : i18n.t('orgDelete.ready') }}</span>
+    <button type="button" class="adm-btn" (click)="close()">{{ i18n.t('adminChecklist.cancel') }}</button>
+    <button type="button" class="adm-btn adm-btn--danger" [disabled]="busy() || pending() > 0" (click)="submit()"><mat-icon>delete_forever</mat-icon>{{ i18n.tf('orgDelete.confirm', data.org.name) }}</button>
+  </footer>
+</div>
