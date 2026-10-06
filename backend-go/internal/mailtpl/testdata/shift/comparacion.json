@@ -107,7 +107,7 @@
       "entryType": "operativa",
       "content": "cierredeturno",
       "createdAt": "2026-10-03T21:05:00Z",
-      "clientName": "Netics"
+      "clientName": "Acme"
     },
     {
       "entryType": "",
@@ -118,5 +118,5 @@
   "periodStart": "2026-10-03T12:05:00Z",
   "periodEnd": "2026-10-03T21:10:00Z",
   "appTitle": "Bitácora CDC",
-  "faviconUrl": "https://ops.synet.cl/favicon.png"
+  "faviconUrl": "https://ops.ejemplo.cl/favicon.png"
 }

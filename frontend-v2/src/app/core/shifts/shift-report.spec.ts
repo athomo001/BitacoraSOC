@@ -18,9 +18,9 @@ describe('reporte de inicio/cierre de turno (portado del legacy)', () => {
   });
 
   it('acepta la lista pegada tal cual del CDC (número, tab, descripción) y mezcla de , y ;', () => {
-    expect(formatTickets('5 245\t[QA] Nueva plataforma\n// 5 193;netics,[QA][2022-180] QA', 'inicio')).toEqual([
+    expect(formatTickets('5 245\t[QA] Nueva plataforma\n// 5 193;acme,[QA][2022-180] QA', 'inicio')).toEqual([
       '* 5245 | [QA] Nueva plataforma',
-      '* 5 193 | netics | [QA][2022-180] QA',
+      '* 5 193 | acme | [QA][2022-180] QA',
     ]);
   });
 

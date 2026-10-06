@@ -7,8 +7,8 @@ import (
 )
 
 func TestRecipientsTrimsAndDeduplicates(t *testing.T) {
-	got := Recipients([]string{" noc@synet.cl ", "", "NOC@synet.cl", "jefatura@synet.cl"})
-	if len(got) != 2 || got[0] != "noc@synet.cl" || got[1] != "jefatura@synet.cl" {
+	got := Recipients([]string{" noc@ejemplo.cl ", "", "NOC@ejemplo.cl", "jefatura@ejemplo.cl"})
+	if len(got) != 2 || got[0] != "noc@ejemplo.cl" || got[1] != "jefatura@ejemplo.cl" {
 		t.Fatalf("got %#v", got)
 	}
 }

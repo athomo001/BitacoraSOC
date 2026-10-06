@@ -17,7 +17,7 @@ func TestRateLimitDisabled(t *testing.T) {
 		{"true", "http://127.0.0.1:8081", true},
 		{"1", "http://localhost", true},
 		{"TRUE", "http://[::1]:8081", true},
-		{"true", "https://bitacora.synet.cl", false},
+		{"true", "https://bitacora.ejemplo.cl", false},
 		{"true", "http://10.0.0.5", false},
 		{"true", "http://localhost.evil.com", false},
 	}

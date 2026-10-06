@@ -12,7 +12,7 @@ const ALERT = {
 };
 const HISTORY = {
   id: 'h1', kind: 'incident', title: 'Ofensa Mg5', subject: '[DPP] Ofensa Mg5 (GLPI-1)', organizationId: 'o1', organizationName: 'Defensoría Penal',
-  recipients: ['seguridad@dpp.cl'], cc: ['control@synet.cl'], status: 'sent', sentBy: 'ana', createdAt: '2026-10-03T12:12:00Z', reusable: true,
+  recipients: ['seguridad@dpp.cl'], cc: ['control@ejemplo.cl'], status: 'sent', sentBy: 'ana', createdAt: '2026-10-03T12:12:00Z', reusable: true,
 };
 
 describe('defang y saludo', () => {
@@ -126,13 +126,13 @@ describe('ReportsComponent (comentario del dueño #10)', () => {
     const { fixture, el } = await render();
     setValue(el, 'select[name="org"]', 'o1');
     await tick();
-    httpMock.expectOne((r) => r.url === '/api/reports/recipients' && r.params.get('organizationId') === 'o1').flush({ data: { to: ['seguridad@dpp.cl'], cc: ['control@synet.cl'] } });
+    httpMock.expectOne((r) => r.url === '/api/reports/recipients' && r.params.get('organizationId') === 'o1').flush({ data: { to: ['seguridad@dpp.cl'], cc: ['control@ejemplo.cl'] } });
     await tick();
     setValue(el, 'input[name="ticket"]', 'GLPI-1');
     setValue(el, 'input[name="evento"]', 'Ofensa Mg5');
     await settle(fixture);
     expect(el.textContent).toContain('seguridad@dpp.cl');
-    expect(el.textContent).toContain('control@synet.cl');
+    expect(el.textContent).toContain('control@ejemplo.cl');
     expect((el.querySelector('input[name="subject"]') as HTMLInputElement).value).toBe('[DPP] Ofensa Mg5 (GLPI-1)');
   });
 

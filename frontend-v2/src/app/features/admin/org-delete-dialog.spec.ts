@@ -5,14 +5,14 @@ import { provideRouter } from '@angular/router';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { OrgDeleteData, OrgDeleteDialogComponent } from './org-delete-dialog';
 
-const ORG = { id: 'net', name: 'Netics', code: 'NET', type: 'internal', active: true };
+const ORG = { id: 'acm', name: 'Acme', code: 'ACM', type: 'internal', active: true };
 const MUNDO = { id: 'mun', name: 'Mundo', code: 'MUN', type: 'client', active: true };
 const DEPENDENTS = {
   services: [
     { id: 's1', name: 'Monitoreo SIEM', code: 'NET-SIEM', detail: '124 entradas · 3 tickets', deletable: false },
     { id: 's2', name: 'Firewall perimetral', code: 'NET-FW', detail: 'Sin historial', deletable: true },
   ],
-  teams: [{ id: 't1', name: 'SOC Netics', detail: '4 integrantes', deletable: true }],
+  teams: [{ id: 't1', name: 'SOC Acme', detail: '4 integrantes', deletable: true }],
   assets: [],
   tickets: [{ id: 'k1', number: '5799', title: 'Offense CRE', status: 'closed', createdAt: '2026-10-03T12:00:00Z' }],
   contacts: 2,
@@ -57,7 +57,7 @@ describe('Popup Eliminar organización (canvas v22)', () => {
     const { el } = render();
     expect(el.querySelector('.od__status')?.textContent).toContain('Faltan 3 por resolver');
     expect(el.textContent).toContain('Se queda en el histórico');
-    expect(el.textContent).toContain('2 contacto(s) se quedan en el Directorio con su empresa «Netics»');
+    expect(el.textContent).toContain('2 contacto(s) se quedan en el Directorio con su empresa «Acme»');
     const confirm = [...el.querySelectorAll('.od__foot button')].pop() as HTMLButtonElement;
     expect(confirm.disabled).toBe(true);
   });
@@ -70,22 +70,22 @@ describe('Popup Eliminar organización (canvas v22)', () => {
     pickTarget();
     click(button(rowOf('Monitoreo SIEM'), 'Mover a Mundo'));
     click(rowOf('Firewall perimetral').querySelector('.adm-icon-btn--danger') as HTMLElement);
-    click(rowOf('SOC Netics').querySelector('[title="Editar nombre"]') as HTMLElement);
+    click(rowOf('SOC Acme').querySelector('[title="Editar nombre"]') as HTMLElement);
     const input = el.querySelector('input[name="editName"]') as HTMLInputElement;
-    input.value = 'SOC Netics (antiguo)';
+    input.value = 'SOC Acme (antiguo)';
     input.dispatchEvent(new Event('input'));
     click(button(el, 'Guardar'));
-    click(button(rowOf('SOC Netics (antiguo)'), 'Mover a Mundo'));
+    click(button(rowOf('SOC Acme (antiguo)'), 'Mover a Mundo'));
 
     expect(el.querySelector('.od__status')?.textContent).toContain('Listo');
     click([...el.querySelectorAll('.od__foot button')].pop() as HTMLElement);
-    const req = httpMock.expectOne((r) => r.method === 'DELETE' && r.url === '/api/organizations/net');
+    const req = httpMock.expectOne((r) => r.method === 'DELETE' && r.url === '/api/organizations/acm');
     expect(req.request.body).toEqual({
       actions: [
-        { kind: 'team', id: 't1', op: 'rename', name: 'SOC Netics (antiguo)' },
+        { kind: 'team', id: 't1', op: 'rename', name: 'SOC Acme (antiguo)' },
         { kind: 'service', id: 's1', op: 'move', to: 'mun', name: 'Monitoreo SIEM' },
         { kind: 'service', id: 's2', op: 'delete' },
-        { kind: 'team', id: 't1', op: 'move', to: 'mun', name: 'SOC Netics (antiguo)' },
+        { kind: 'team', id: 't1', op: 'move', to: 'mun', name: 'SOC Acme (antiguo)' },
       ],
     });
   });

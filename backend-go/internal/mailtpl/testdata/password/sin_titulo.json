@@ -1,6 +1,6 @@
 {
-  "resetUrl": "https://ops.synet.cl/reset-password?token=def456",
+  "resetUrl": "https://ops.ejemplo.cl/reset-password?token=def456",
   "appTitle": "  ",
   "subject": "Recuperación de Contraseña",
-  "text": "Hola,\n\nHemos recibido una solicitud para resetear tu contraseña en el sistema.\n\nHaz click en el siguiente enlace para crear una nueva contraseña:\nhttps://ops.synet.cl/reset-password?token=def456\n\nEste enlace expirará en 5 minutos.\n\nSi no solicitaste este cambio, ignora este email.\n\nSaludos,\nEquipo de soporte"
+  "text": "Hola,\n\nHemos recibido una solicitud para resetear tu contraseña en el sistema.\n\nHaz click en el siguiente enlace para crear una nueva contraseña:\nhttps://ops.ejemplo.cl/reset-password?token=def456\n\nEste enlace expirará en 5 minutos.\n\nSi no solicitaste este cambio, ignora este email.\n\nSaludos,\nEquipo de soporte"
 }

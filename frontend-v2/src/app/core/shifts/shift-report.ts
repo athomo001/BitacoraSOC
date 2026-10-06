@@ -39,7 +39,7 @@ export const SHIFT_REPORT_TAG: Record<ShiftReportMode, string> = { inicio: 'inic
  * seguido de tab o 2+ espacios y la descripción.
  */
 const RAW_DUMP = /^(\d[\d\s]{0,7}\d|\d)\s*(?:\t| {2,})\s*(.+)$/;
-/** Los analistas mezclan coma y punto y coma ("5 193;netics,[QA] …"). */
+/** Los analistas mezclan coma y punto y coma ("5 193;acme,[QA] …"). */
 const FIELD_SPLIT = /[,;]/;
 
 interface ParsedTicket {

@@ -4,7 +4,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { ShiftReportData, ShiftReportDialogComponent } from './shift-report-dialog';
 
-const SHIFT = { id: 'ws-1', name: 'Turno Día', startTime: '08:00', endTime: '20:00', timezone: 'America/Santiago', shiftType: 'regular', emailRecipients: ['noc@synet.cl'], active: true };
+const SHIFT = { id: 'ws-1', name: 'Turno Día', startTime: '08:00', endTime: '20:00', timezone: 'America/Santiago', shiftType: 'regular', emailRecipients: ['noc@ejemplo.cl'], active: true };
 const PREV = {
   id: 'cl-1', username: 'jgonzalez', shiftStartAt: '2026-09-26T20:00:00Z', shiftEndAt: '2026-09-27T08:00:00Z', closureCheckId: 'prev',
   totalEntries: 4, totalIncidents: 0, servicesDown: [], pendingForNextShift: '- [ ] Seguir 5799\n- [ ] Revisar VPN', acknowledgedAt: null,

@@ -5,7 +5,7 @@ import { MyShiftComponent } from './my-shift';
 
 const ME = { id: 'u-me', username: 'ana.rojas', email: 'ana@bitacora.local', role: 'user', mfaEnabled: false, mustChangePassword: false, active: true, createdAt: '2026-01-01T00:00:00Z' };
 // Un solo turno de día completo: la detección por hora siempre cae en él.
-const SHIFT = { id: 'ws-1', name: 'Turno Día', startTime: '00:00:00', endTime: '23:59:00', timezone: 'America/Santiago', shiftType: 'regular', emailRecipients: ['noc@synet.cl'], active: true };
+const SHIFT = { id: 'ws-1', name: 'Turno Día', startTime: '00:00:00', endTime: '23:59:00', timezone: 'America/Santiago', shiftType: 'regular', emailRecipients: ['noc@ejemplo.cl'], active: true };
 const TEMPLATE = {
   id: 'tpl-1',
   name: 'NOC Diaria',
