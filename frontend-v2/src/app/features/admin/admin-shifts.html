@@ -79,6 +79,9 @@
         {{ i18n.t('shiftsAdmin.reportIncludeEntries') }}
       </label>
     </div>
+    @if (editingShiftId(); as shiftId) {
+      <app-admin-shift-members [shiftId]="shiftId" />
+    }
     <div class="sa__actions">
       @if (editingShiftId()) { <button type="button" class="adm-btn" (click)="resetShiftForm()">{{ i18n.t('admin.discard') }}</button> }
       <button type="submit" class="adm-btn adm-btn--primary" [disabled]="busy() || !wsName().trim()">

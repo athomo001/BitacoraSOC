@@ -1486,3 +1486,25 @@ CREATE TABLE report_operation_types (
 -- 000022: la alerta NOK del checklist avisa por cargo (como el legacy).
 ALTER TABLE checklist_templates ADD COLUMN alert_nok_cargos TEXT[] NOT NULL DEFAULT '{}';
 ALTER TABLE checklist_templates DROP COLUMN alert_nok_role_target;
+
+-- 000023: correos de cumpleaños.
+ALTER TABLE app_config
+  ADD COLUMN birthday_emails_enabled BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN birthday_emails_time TEXT NOT NULL DEFAULT '09:00' CHECK (birthday_emails_time ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
+  ADD COLUMN birthday_emails_cc TEXT NOT NULL DEFAULT '',
+  ADD COLUMN birthday_emails_last_date DATE;
+
+-- 000024: personas del turno.
+CREATE TABLE work_shift_members (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  work_shift_id UUID NOT NULL REFERENCES work_shifts(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  -- 0 = domingo … 6 = sábado.
+  weekdays INT[] NOT NULL DEFAULT '{1,2,3,4,5}' CHECK (weekdays <@ ARRAY[0,1,2,3,4,5,6] AND cardinality(weekdays) > 0),
+  active BOOLEAN NOT NULL DEFAULT true,
+  valid_from DATE,
+  valid_to DATE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (work_shift_id, user_id)
+);
+CREATE INDEX idx_work_shift_members_shift ON work_shift_members(work_shift_id) WHERE active;

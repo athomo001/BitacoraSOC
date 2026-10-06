@@ -359,3 +359,8 @@ p.pt__card {
   height: 100%;
   object-fit: cover;
 }
+
+.pt__logo--img {
+  object-fit: contain;
+  background: transparent;
+}

@@ -78,6 +78,11 @@
             <span class="mono aa__secondary">{{ user.email }}</span>
           </div>
           <div class="aa-panel__block">
+            <label class="aa__label" for="aa-birthday">{{ i18n.t('access.birthday') }}</label>
+            <input id="aa-birthday" class="aa-input mono aa__birthday" type="date" [max]="today" [value]="user.birthday ?? ''" (change)="setBirthday(user, $any($event.target).value)" />
+            <span class="aa__muted">{{ i18n.t('access.birthdayHint') }}</span>
+          </div>
+          <div class="aa-panel__block">
             <span class="aa__label">{{ i18n.t('access.col.role') }}</span>
             <span class="aa__seg-row">
               @for (r of roles; track r) {
@@ -116,6 +121,8 @@
       </section>
     }
   </div>
+  <!-- Correos de cumpleaños (en el legacy, en la pantalla de Usuarios). -->
+  <app-admin-birthdays />
 } @else {
   @if (creating() === 'group') {
     <section class="aa-card">

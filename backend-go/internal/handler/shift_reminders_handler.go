@@ -306,7 +306,10 @@ func (h *ShiftRemindersHandler) DispatchDue(ctx context.Context) error {
 			if !ok {
 				continue
 			}
-			recipients := nonEmptyAddresses(shift.EmailRecipients)
+			recipients, err := h.reminderRecipients(ctx, shift, now)
+			if err != nil {
+				return err
+			}
 			status := "sent"
 			if len(recipients) == 0 {
 				status = "no_recipients"
@@ -376,4 +379,26 @@ func nonEmptyAddresses(in []string) []string {
 // área): "Recordatorio de Turno" y el asunto "[Título] etiqueta".
 func reminderMail(appTitle string, r db.ShiftReminder) mailtpl.Mail {
 	return mailtpl.ShiftReminder(appTitle, r.Label, r.ReminderText)
+}
+
+// reminderRecipients es shiftReminderScheduler del legacy: si el turno tiene
+// personas, a las que trabajan ese día (en la zona del turno); si no tiene,
+// a los correos configurados del turno.
+func (h *ShiftRemindersHandler) reminderRecipients(ctx context.Context, shift db.WorkShift, now time.Time) ([]string, error) {
+	count, err := h.Queries.CountActiveWorkShiftMembers(ctx, shift.ID)
+	if err != nil {
+		return nil, err
+	}
+	if count == 0 {
+		return nonEmptyAddresses(shift.EmailRecipients), nil
+	}
+	loc, err := time.LoadLocation(shift.Timezone)
+	if err != nil {
+		loc = time.UTC
+	}
+	local := now.In(loc)
+	day := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
+	return h.Queries.ListShiftReminderMemberEmails(ctx, db.ListShiftReminderMemberEmailsParams{
+		WorkShiftID: shift.ID, Weekday: int32(local.Weekday()), Day: pgtype.Date{Time: day, Valid: true},
+	})
 }

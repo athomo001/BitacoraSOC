@@ -124,13 +124,27 @@ func legacyMode(t string) string {
 // Compare devuelve las discrepancias entre el flujo legacy y la resolución
 // nueva, paso a paso (por orden).
 func Compare(legacy []LegacyStep, fresh []NewStep) []Discrepancy {
+	return CompareWithNotice(legacy, fresh, false)
+}
+
+// CompareWithNotice es Compare cuando el motor nuevo tiene, antes de los
+// pasos de llamada, el aviso por correo a PARA/CC que agrega el ETL (así
+// avisaba el legacy antes de llamar): ese primer paso no se compara.
+func CompareWithNotice(legacy []LegacyStep, fresh []NewStep, noticeFirst bool) []Discrepancy {
 	var out []Discrepancy
+	offset := 0
+	if noticeFirst && len(fresh) > 0 {
+		offset = 1
+		sorted := append([]NewStep(nil), fresh...)
+		sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Order < sorted[j].Order })
+		fresh = sorted[1:]
+	}
 	if len(legacy) != len(fresh) {
 		out = append(out, Discrepancy{Kind: KindStepCount, Detail: fmt.Sprintf("legacy tiene %d pasos, el nuevo %d", len(legacy), len(fresh))})
 	}
 	byOrder := map[int]NewStep{}
 	for _, s := range fresh {
-		byOrder[s.Order] = s
+		byOrder[s.Order-offset] = s
 	}
 	sorted := append([]LegacyStep(nil), legacy...)
 	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Order < sorted[j].Order })

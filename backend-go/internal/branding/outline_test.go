@@ -37,3 +37,33 @@ func TestOutlinedLogoAddsWhiteBorderAroundOpaquePixels(t *testing.T) {
 		t.Fatal("un SVG pasa tal cual")
 	}
 }
+
+// Un logo ancho y grande (escudo + nombre, 3722×1152 en producción) se achica
+// entero, sin recortar: antes quedaba solo el escudo.
+func TestOutlinedLogoScalesWideLogoWithoutCropping(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 3600, 1200))
+	for y := 500; y < 700; y++ {
+		for x := 3400; x < 3590; x++ {
+			src.SetNRGBA(x, y, color.NRGBA{B: 255, A: 255}) // algo opaco a la derecha del todo
+		}
+	}
+	var buf bytes.Buffer
+	_ = png.Encode(&buf, src)
+	out, _ := OutlinedLogo(buf.Bytes(), "image/png")
+	img, err := png.Decode(bytes.NewReader(out))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if img.Bounds().Dx() != 1004 || img.Bounds().Dy() != 337 {
+		t.Fatalf("debe quedar en 1000×333 más el contorno, quedó %v", img.Bounds())
+	}
+	found := false
+	for x := 960; x < 1004 && !found; x++ {
+		if _, _, b, a := img.At(x, 168).RGBA(); a > 0 && b > 0x8000 {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("lo que estaba a la derecha del logo tiene que seguir ahí")
+	}
+}

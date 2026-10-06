@@ -9,6 +9,7 @@ import { PermissionsService } from '../../core/auth/permissions.service';
 import { problemDetail } from '../../core/http-error';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
+import { AdminBirthdaysComponent } from './admin-birthdays';
 
 type Role = 'admin' | 'user' | 'auditor';
 type Scope = 'soc' | 'noc' | 'both' | 'none';
@@ -23,6 +24,8 @@ interface AdminUser {
   mfaEnabled?: boolean;
   mustChangePassword?: boolean;
   lastLoginAt?: string;
+  /** AAAA-MM-DD; lo usan los correos de cumpleaños. */
+  birthday?: string;
 }
 interface PermissionGroup { id: string; code: string; name: string; moduleScope: Scope; capabilities: string[]; active: boolean; }
 
@@ -47,7 +50,7 @@ const SCOPES: readonly Scope[] = ['noc', 'soc', 'both', 'none'];
 @Component({
   selector: 'app-admin-access',
   standalone: true,
-  imports: [FormsModule, DatePipe, MatIconModule],
+  imports: [FormsModule, DatePipe, MatIconModule, AdminBirthdaysComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-access.html',
   styleUrl: './admin-access.css',
@@ -175,6 +178,13 @@ export class AdminAccessComponent implements OnInit {
   protected forcePasswordChange(user: AdminUser): Promise<void> {
     return this.patchUser(user, { mustChangePassword: true });
   }
+
+  protected setBirthday(user: AdminUser, birthday: string): Promise<void> {
+    return (birthday || '') === (user.birthday || '') ? Promise.resolve() : this.patchUser(user, { birthday });
+  }
+
+  /** Hoy, para que el selector no deje elegir una fecha futura. */
+  protected readonly today = new Date().toISOString().slice(0, 10);
 
   protected setActive(user: AdminUser, active: boolean): Promise<void> {
     return this.patchUser(user, { active });

@@ -71,6 +71,21 @@ describe('AdminAccessComponent', () => {
     expect(el.querySelector('.aa-row .pill')?.textContent?.trim()).toBe('Analista');
   });
 
+  it('el cumpleaños se edita desde el panel del usuario (como el legacy) y viaja como AAAA-MM-DD', async () => {
+    const fixture = await render();
+    httpMock.expectOne('/api/users/u1/permission-groups').flush({ data: [] });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const input = el.querySelector('#aa-birthday') as HTMLInputElement;
+    input.value = '1990-10-06';
+    input.dispatchEvent(new Event('change'));
+    await new Promise((r) => setTimeout(r));
+    const req = httpMock.expectOne({ method: 'PATCH', url: '/api/users/u1' });
+    expect(req.request.body).toEqual({ birthday: '1990-10-06' });
+    req.flush({ data: { ...USERS[0], birthday: '1990-10-06' } });
+  });
+
   it('las capacidades de un grupo son casillas de la lista cerrada', async () => {
     const fixture = await render();
     httpMock.expectOne('/api/users/u1/permission-groups').flush({ data: [] });

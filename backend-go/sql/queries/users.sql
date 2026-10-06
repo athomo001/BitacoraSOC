@@ -50,6 +50,8 @@ UPDATE users SET
   cargo_label = COALESCE(sqlc.narg('cargo_label'), cargo_label),
   active = COALESCE(sqlc.narg('active'), active),
   must_change_password = COALESCE(sqlc.narg('must_change_password'), must_change_password),
+  -- Cumpleaños: set_birthday dice si viene (y birthday NULL lo borra).
+  birthday = CASE WHEN sqlc.arg('set_birthday')::boolean THEN sqlc.narg('birthday')::date ELSE birthday END,
   updated_at = now()
 WHERE id = $1
 RETURNING *;

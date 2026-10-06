@@ -40,7 +40,10 @@ type Report struct {
 	ExportVersion   string   `json:"exportVersion"`
 	Steps           []*Step  `json:"steps"`
 	NotMigrated     []string `json:"notMigrated"`
-	Committed       bool     `json:"committed"`
+	// Unread: colecciones con datos que el ETL no lee ni declara como "no se
+	// migran". Deberían quedar vacías: si no, falta un paso.
+	Unread    []string `json:"unread,omitempty"`
+	Committed bool     `json:"committed"`
 }
 
 // Print muestra el reporte como tabla legible.
@@ -63,6 +66,9 @@ func (r *Report) Print(w io.Writer) {
 	}
 	if len(r.NotMigrated) > 0 {
 		fmt.Fprintf(w, "\nNo se migran (por diseño, spec/13 §3): %s\n", strings.Join(r.NotMigrated, ", "))
+	}
+	if len(r.Unread) > 0 {
+		fmt.Fprintf(w, "\n⚠ Colecciones con datos que el ETL no lee (se perderían): %s\n", strings.Join(r.Unread, ", "))
 	}
 	if r.Committed {
 		fmt.Fprintln(w, "\nCarga confirmada.")

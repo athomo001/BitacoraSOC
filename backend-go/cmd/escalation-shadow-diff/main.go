@@ -61,6 +61,7 @@ func main() {
 	api := flag.String("api", "http://127.0.0.1:8081", "URL base de Bitácora Ops")
 	out := flag.String("out", "", "archivo de salida del reporte Markdown (por defecto stdout)")
 	asJSON := flag.Bool("json", false, "emitir el reporte como JSON en vez de Markdown")
+	notice := flag.Bool("aviso-paso-1", false, "el primer paso del motor nuevo es el aviso por correo a PARA/CC que agrega el ETL: no se compara")
 	flag.Parse()
 	token := os.Getenv("SHADOW_DIFF_TOKEN")
 	if *legacyPath == "" || *mapPath == "" || token == "" {
@@ -68,7 +69,7 @@ func main() {
 		flag.Usage()
 		os.Exit(2)
 	}
-	report, err := run(*legacyPath, *mapPath, *api, token)
+	report, err := run(*legacyPath, *mapPath, *api, token, *notice)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "escalation-shadow-diff:", err)
 		os.Exit(1)
@@ -92,7 +93,7 @@ func main() {
 	}
 }
 
-func run(legacyPath, mapPath, api, token string) (shadowdiff.Report, error) {
+func run(legacyPath, mapPath, api, token string, notice bool) (shadowdiff.Report, error) {
 	var sources []legacySource
 	if err := readJSON(legacyPath, &sources); err != nil {
 		return shadowdiff.Report{}, fmt.Errorf("leyendo el export legacy: %w", err)
@@ -119,7 +120,7 @@ func run(legacyPath, mapPath, api, token string) (shadowdiff.Report, error) {
 		if err != nil {
 			result.Error = err.Error()
 		} else {
-			result.Discrepancies = shadowdiff.Compare(src.EscalationFlow, steps)
+			result.Discrepancies = shadowdiff.CompareWithNotice(src.EscalationFlow, steps, notice)
 		}
 		report.Cases = append(report.Cases, result)
 	}

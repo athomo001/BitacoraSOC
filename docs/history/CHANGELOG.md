@@ -4,6 +4,40 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] E2E pendientes: Ticketera pública y Auditoría - 2026-10-06
+
+- **Ticketera (Fase 10), 16/16 con Postgres**: una entrada con "crear ticket" lo crea con número; otra con ese número queda enlazada al mismo ticket; el SLA se pausa en "esperando proveedor" y al volver a "en curso" suma el tiempo pausado; el seguimiento público pide PIN (sin PIN o con uno incorrecto: 401), muestra solo los comunicados públicos (nunca las notas internas) y no expone correos. Datos de prueba borrados; la Ticketera de desarrollo quedó apagada como estaba.
+- **Auditoría, 19/19 con ~22.000 eventos reales**: paginación (440 páginas), filtros por evento (por prefijo: `auth.login` agrupa éxito y fallo), nivel, resultado, texto y fechas, combinados, error claro con un filtro inválido, CSV filtrado y la pantalla (buscar y paginar). El `checklist.abandoned` de Mi turno aparece con su `checkId`.
+- La página pública del ticket mostraba una "B" fija en la cabecera: ahora va el ícono de Marca (sin ícono, la inicial del nombre).
+
+## [Rewrite] El logo del informe de incidente salía recortado - 2026-10-06
+
+- Aviso del dueño: en el "Reporte de Detección" salía solo el escudo, no el logo de Marca completo (escudo + "Netics"). El contorno blanco del legacy (`branding.OutlinedLogo`) recortaba los logos a 1600 px de ancho y el de producción mide 3722 px: quedaba solo la parte izquierda. Ahora se **achica** a 1000 px de lado manteniendo la proporción, sin recortar. Prueba nueva con un logo ancho.
+
+## [Rewrite] Ensayo de paridad 1 (Fase 14) con datos de producción - 2026-10-06
+
+- ETL completo con el respaldo de producción del 25-09 → respaldo 2.0 de **29.482 registros** (`respaldos/`, fuera de git; reemplaza al del 30-09, que pasa a `respaldos/anterior-2026-09-30/`), restaurado en una 2.0 nueva y vacía levantada aparte (puerto 18081, base `bitacora_etl_restore`; la de desarrollo no se tocó).
+- Resultado del checklist de paridad (`spec/12` §2.2): respaldo → restauración idéntico en 44 tablas; auditoría 21.786 = 21.786; rendimiento con volumen real 16–116 ms de mediana; calendario de guardias igual salvo deltas explicados; **shadow-diff de escalamiento 4 de 4 clientes sin diferencias**. El dueño entró con su contraseña del legacy en la 2.0 restaurada. Pendientes: la revisión del equipo SOC del shadow-diff y la ventana de rollback (día del corte).
+- `escalation-shadow-diff`: nueva opción `-aviso-paso-1` para no comparar el aviso por correo a PARA/CC que el ETL pone como paso 1 (así avisaba el legacy antes de llamar); sin ella se comparaba todo desfasado un paso.
+
+## [Rewrite] Modelo entidad-relación legacy ↔ 2.0 y dos huecos del ETL - 2026-10-06
+
+- **Comentario del dueño #18**: `spec/14-modelo-er-legacy-2.0.md` con los dos modelos (Mermaid), la correspondencia colección → tablas con las cantidades del respaldo real, lo que no se migra y por qué, y lo que es nuevo en la 2.0.
+- Al cruzar las 39 colecciones del respaldo con el ETL aparecieron **dos huecos**, ya corregidos:
+  - **Historial de checklists** (`checks`, 339 con 4.976 servicios): no se migraba. Ahora va completo a `shift_checks` + `shift_check_services`; a los 215 checks viejos sin turno se les deduce por la hora (como el legacy) y la plantilla ya borrada se recrea inactiva con su nombre.
+  - **Personas del turno** (`workShiftAssignments`): en el legacy los recordatorios de turno les llegan a las personas asignadas al turno (en producción, 2 en el Turno A, de lunes a viernes); la 2.0 los mandaba a los correos del reporte de cierre, que en producción están vacíos: **después del corte no le habrían llegado a nadie**. Ahora: tabla `work_shift_members` (migración 000024), los recordatorios van a esas personas los días marcados (sin personas, a los correos del turno), se editan en Administración → Turnos y el ETL las trae.
+- El informe del ETL ahora **avisa si alguna colección con datos no se lee** ni está declarada como "no se migra", para que esto no vuelva a pasar. Con el respaldo real: ninguna.
+- Pruebas: Go completo (incluye el aviso), frontend 220/220; ensayo del ETL completo contra el respaldo del 2026-09-25 sin descartes en esos pasos.
+
+## [Rewrite] Correos de cumpleaños - 2026-10-06
+
+- **Comentario del dueño #21**: el ratón de tres brazos del legacy se reemplaza por la ilustración del dueño (hámsters kawaii radiactivos con gorro de fiesta, `docs/cumple.jpg`), reducida a 760 px / 65 KB para correo y embebida en el binario.
+- La 2.0 no enviaba felicitaciones: se porta `birthdayEmailScheduler` del legacy. Una vez al día, desde la hora configurada (hora de Chile), a cada usuario activo que cumple años según su perfil, con el correo del área en copia; queda en auditoría (`birthday.email.sent`). El correo es `buildBirthdayEmail` del legacy byte a byte (logo de Marca, nombre del sistema, "HAPPY BIRTHDAY" y el nombre), asunto "¡Feliz Cumpleaños <nombre>! 🎂".
+- Administración → Usuarios y grupos (donde estaba en el legacy): encender, hora, correo del área en CC y "Enviarme una prueba".
+- El admin también puede poner o borrar el **cumpleaños de cada persona** desde su panel en Usuarios y grupos (como el formulario de usuarios del legacy); antes solo lo ponía cada uno en su perfil. No acepta fechas futuras.
+- Migración 000023 (`app_config.birthday_emails_*`). **ETL**: trae del legacy si estaba encendido, la hora y el CC.
+- Pruebas: 2 casos de referencia del legacy, frontend 220/220, Go completo. Armado con la base de desarrollo sin enviar; encendido queda apagado en desarrollo (el SMTP es el de producción).
+
 ## [Rewrite] Logo de Marca a su tamaño en la barra - 2026-10-06
 
 - Pedido del dueño: el logo de Marca salía diminuto (se encajaba en un cuadrado de 26 px y el de Netics es 3,2 veces más ancho que alto). Ahora va como en el legacy (`.sidebar-logo` de main-layout): solo el logo, con su proporción, hasta 52 px de alto y el ancho de la barra; en la barra angosta (móvil) va el ícono de la pestaña. Sin logo, sigue la inicial con el nombre.

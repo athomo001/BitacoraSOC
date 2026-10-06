@@ -48,6 +48,7 @@ type Querier interface {
 	ClearTemplateFromShifts(ctx context.Context, checklistTemplateStartID pgtype.UUID) error
 	CloseEscalationIncident(ctx context.Context, arg CloseEscalationIncidentParams) (int64, error)
 	CompleteSetup(ctx context.Context, arg CompleteSetupParams) (AppConfig, error)
+	CountActiveWorkShiftMembers(ctx context.Context, workShiftID uuid.UUID) (int32, error)
 	CountAuditLogs(ctx context.Context, arg CountAuditLogsParams) (int64, error)
 	CountBackupRuns(ctx context.Context, kind NullBackupKind) (int64, error)
 	CountComplementEntries(ctx context.Context, ownerComplementID pgtype.UUID) (int32, error)
@@ -173,6 +174,7 @@ type Querier interface {
 	DeleteTeamWithoutHistory(ctx context.Context, arg DeleteTeamWithoutHistoryParams) (int64, error)
 	DeleteTicket(ctx context.Context, id uuid.UUID) (string, error)
 	DeleteUserChannel(ctx context.Context, arg DeleteUserChannelParams) (int64, error)
+	DeleteWorkShiftMember(ctx context.Context, arg DeleteWorkShiftMemberParams) (int64, error)
 	// POST /api/auth/logout — revoca un JTI puntual sin afectar otras sesiones
 	// del mismo usuario.
 	DenylistToken(ctx context.Context, arg DenylistTokenParams) error
@@ -209,6 +211,8 @@ type Querier interface {
 	GetAttachment(ctx context.Context, id uuid.UUID) (EntryAttachment, error)
 	GetBackupConfig(ctx context.Context) (BackupConfig, error)
 	GetBackupRun(ctx context.Context, id uuid.UUID) (BackupRun, error)
+	// ===== Correos de cumpleaños (comentario del dueño #21) =====
+	GetBirthdayConfig(ctx context.Context) (GetBirthdayConfigRow, error)
 	// ===== Marca (comentario del dueño #8) =====
 	// Sin los archivos: lo que necesitan la barra, el login y los correos.
 	GetBranding(ctx context.Context) (GetBrandingRow, error)
@@ -329,6 +333,8 @@ type Querier interface {
 	ListAuditLogs(ctx context.Context, arg ListAuditLogsParams) ([]AuditLog, error)
 	ListAuditLogsForExport(ctx context.Context, arg ListAuditLogsForExportParams) ([]AuditLog, error)
 	ListBackupRuns(ctx context.Context, arg ListBackupRunsParams) ([]BackupRun, error)
+	// Usuarios activos que cumplen años ese día (mes y día) y tienen correo.
+	ListBirthdayUsers(ctx context.Context, arg ListBirthdayUsersParams) ([]ListBirthdayUsersRow, error)
 	// Cargos en uso y cuántas personas activas los tienen (para elegir a quién avisar).
 	ListCargoLabelCounts(ctx context.Context) ([]ListCargoLabelCountsRow, error)
 	// ===== Canales =====
@@ -437,6 +443,9 @@ type Querier interface {
 	ListShiftCheckServices(ctx context.Context, shiftCheckID uuid.UUID) ([]ShiftCheckService, error)
 	ListShiftCheckServicesForReport(ctx context.Context, shiftCheckID uuid.UUID) ([]ListShiftCheckServicesForReportRow, error)
 	ListShiftChecks(ctx context.Context, arg ListShiftChecksParams) ([]ShiftCheck, error)
+	// Recordatorios: las personas activas del turno que trabajan ese día (y
+	// dentro de su vigencia), con correo — como shiftReminderScheduler del legacy.
+	ListShiftReminderMemberEmails(ctx context.Context, arg ListShiftReminderMemberEmailsParams) ([]string, error)
 	// Recordatorios de turno por correo (spec/12-pendientes.md §2.3b).
 	// Con el último envío de cada uno, para la tabla de Administración → Turnos.
 	ListShiftReminders(ctx context.Context) ([]ListShiftRemindersRow, error)
@@ -486,10 +495,13 @@ type Querier interface {
 	// cualquier unidad del camino territorial (un mantenimiento sobre toda la
 	// zona Calama también cubre a sus routers).
 	ListWindowsForScope(ctx context.Context, arg ListWindowsForScopeParams) ([]MaintenanceWindow, error)
+	// ===== Personas del turno (WorkShiftAssignment del legacy) =====
+	ListWorkShiftMembers(ctx context.Context, workShiftID uuid.UUID) ([]ListWorkShiftMembersRow, error)
 	ListWorkShifts(ctx context.Context, active pgtype.Bool) ([]WorkShift, error)
 	LockUser(ctx context.Context, arg LockUserParams) error
 	MarkBackupConfigRun(ctx context.Context, arg MarkBackupConfigRunParams) error
 	MarkBackupRun(ctx context.Context, arg MarkBackupRunParams) (BackupRun, error)
+	MarkBirthdayEmailsSent(ctx context.Context, day pgtype.Date) error
 	// Al eliminar un ticket (comentario del dueño #20) la entrada de la
 	// bitácora se queda: un comentario de sistema deja constancia del ticket.
 	MarkEntriesOfDeletedTicket(ctx context.Context, arg MarkEntriesOfDeletedTicketParams) error
@@ -577,6 +589,8 @@ type Querier interface {
 	TouchPublicShareAccess(ctx context.Context, id uuid.UUID) error
 	UpdateAsset(ctx context.Context, arg UpdateAssetParams) (int64, error)
 	UpdateBackupConfig(ctx context.Context, arg UpdateBackupConfigParams) (BackupConfig, error)
+	// Cambiar la hora o volver a encenderlo permite enviar de nuevo hoy (como el legacy).
+	UpdateBirthdayConfig(ctx context.Context, arg UpdateBirthdayConfigParams) (UpdateBirthdayConfigRow, error)
 	UpdateBranding(ctx context.Context, arg UpdateBrandingParams) error
 	UpdateChannelValue(ctx context.Context, arg UpdateChannelValueParams) error
 	UpdateChecklistItem(ctx context.Context, arg UpdateChecklistItemParams) error
@@ -639,6 +653,7 @@ type Querier interface {
 	// coordenadas solo se actualizan si el import trae un valor, nunca se
 	// borran por venir vacías. `xmax = 0` distingue insert de update.
 	UpsertTerritorialUnit(ctx context.Context, arg UpsertTerritorialUnitParams) (UpsertTerritorialUnitRow, error)
+	UpsertWorkShiftMember(ctx context.Context, arg UpsertWorkShiftMemberParams) (WorkShiftMember, error)
 }
 
 var _ Querier = (*Queries)(nil)

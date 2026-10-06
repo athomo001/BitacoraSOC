@@ -4,7 +4,11 @@
 
 <main class="pt">
   <header class="pt__brand">
-    <span class="pt__logo" aria-hidden="true">B</span>
+    @if (brandIcon(); as icon) {
+      <img class="pt__logo pt__logo--img" [src]="icon" alt="" aria-hidden="true" />
+    } @else {
+      <span class="pt__logo" aria-hidden="true">{{ brandTitle().charAt(0) }}</span>
+    }
     {{ i18n.t('publicTicket.header') }} · {{ brandTitle() }}
   </header>
 

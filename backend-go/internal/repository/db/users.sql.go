@@ -577,6 +577,8 @@ UPDATE users SET
   cargo_label = COALESCE($4, cargo_label),
   active = COALESCE($5, active),
   must_change_password = COALESCE($6, must_change_password),
+  -- Cumpleaños: set_birthday dice si viene (y birthday NULL lo borra).
+  birthday = CASE WHEN $7::boolean THEN $8::date ELSE birthday END,
   updated_at = now()
 WHERE id = $1
 RETURNING id, username, email, full_name, phone, birthday, avatar_url, password_hash, role, cargo_label, mfa_enabled, mfa_secret_encrypted, is_guest, guest_expires_at, must_change_password, failed_login_attempts, locked_until, reset_password_token_hash, reset_password_expires_at, active, created_at, updated_at, last_login_at
@@ -589,6 +591,8 @@ type UpdateUserAdminParams struct {
 	CargoLabel         pgtype.Text  `json:"cargo_label"`
 	Active             pgtype.Bool  `json:"active"`
 	MustChangePassword pgtype.Bool  `json:"must_change_password"`
+	SetBirthday        bool         `json:"set_birthday"`
+	Birthday           pgtype.Date  `json:"birthday"`
 }
 
 // PATCH /api/users/:id — campos parciales: NULL en un parámetro conserva el
@@ -601,6 +605,8 @@ func (q *Queries) UpdateUserAdmin(ctx context.Context, arg UpdateUserAdminParams
 		arg.CargoLabel,
 		arg.Active,
 		arg.MustChangePassword,
+		arg.SetBirthday,
+		arg.Birthday,
 	)
 	var i User
 	err := row.Scan(

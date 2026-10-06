@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"image"
 	"image/color"
-	"image/draw"
 	_ "image/gif"  // decodificador gif
 	_ "image/jpeg" // decodificador jpeg
 	"image/png"
 
+	"golang.org/x/image/draw"
 	_ "golang.org/x/image/webp" // decodificador webp
 )
 
@@ -22,8 +22,23 @@ func OutlinedLogo(data []byte, contentType string) ([]byte, string) {
 		return data, contentType
 	}
 	const radius = 2
+	// Un logo grande se achica (sin recortar: antes se cortaba a 1600 px y de
+	// un logo ancho "escudo + nombre" quedaba solo el escudo). El correo lo
+	// muestra a 160 px; 1000 px de lado sobra y mantiene rápido el contorno.
+	const maxSide = 1000
+	if b := src.Bounds(); b.Dx() > maxSide || b.Dy() > maxSide {
+		w, h := b.Dx(), b.Dy()
+		if w >= h {
+			h, w = max(1, h*maxSide/w), maxSide
+		} else {
+			w, h = max(1, w*maxSide/h), maxSide
+		}
+		scaled := image.NewNRGBA(image.Rect(0, 0, w, h))
+		draw.CatmullRom.Scale(scaled, scaled.Bounds(), src, b, draw.Src, nil)
+		src = scaled
+	}
 	b := src.Bounds()
-	w, h := min(b.Dx(), 1600), min(b.Dy(), 1600)
+	w, h := b.Dx(), b.Dy()
 	out := image.NewNRGBA(image.Rect(0, 0, w+2*radius, h+2*radius))
 	alpha := func(x, y int) uint32 {
 		if x < 0 || y < 0 || x >= w || y >= h {

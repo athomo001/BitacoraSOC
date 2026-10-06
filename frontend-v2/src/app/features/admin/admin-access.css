@@ -387,3 +387,7 @@ mat-icon {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.aa__birthday {
+  max-width: 180px;
+}

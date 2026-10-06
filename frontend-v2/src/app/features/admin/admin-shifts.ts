@@ -18,6 +18,7 @@ import { MessageKey } from '../../core/i18n/messages';
 import { PreferencesService } from '../../core/preferences/preferences.service';
 import { problemDetail } from '../../core/http-error';
 import { AdminShiftRemindersComponent } from './admin-shift-reminders';
+import { AdminShiftMembersComponent } from './admin-shift-members';
 
 function splitList(raw: string): string[] {
   return raw.split(',').map((s) => s.trim()).filter(Boolean);
@@ -58,7 +59,7 @@ const DEFAULT_REPORT_SUBJECT = 'Reporte SOC [fecha] [turno]';
 @Component({
   selector: 'app-admin-shifts',
   standalone: true,
-  imports: [DatePipe, FormsModule, MatIconModule, AdminShiftRemindersComponent],
+  imports: [DatePipe, FormsModule, MatIconModule, AdminShiftRemindersComponent, AdminShiftMembersComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-shifts.html',
   styles: `

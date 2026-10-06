@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/auth"
@@ -101,6 +102,9 @@ type patchUserRequest struct {
 	// Forzar cambio de contraseña a UNA persona (la pantalla de Usuarios);
 	// force-reset-all sigue siendo el botón para todos.
 	MustChangePassword *bool `json:"mustChangePassword"`
+	// Cumpleaños "AAAA-MM-DD" ("" lo borra), como el formulario de usuarios
+	// del legacy; lo usan los correos de cumpleaños.
+	Birthday *string `json:"birthday"`
 }
 
 func (h *UsersHandler) Patch(w http.ResponseWriter, r *http.Request) {
@@ -144,6 +148,17 @@ func (h *UsersHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.MustChangePassword != nil {
 		params.MustChangePassword = pgtype.Bool{Bool: *req.MustChangePassword, Valid: true}
+	}
+	if req.Birthday != nil {
+		params.SetBirthday = true
+		if v := strings.TrimSpace(*req.Birthday); v != "" {
+			day, err := time.Parse("2006-01-02", v)
+			if err != nil || day.After(time.Now()) || day.Year() < 1900 {
+				problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "el cumpleaños va como AAAA-MM-DD y no puede ser futuro")
+				return
+			}
+			params.Birthday = pgtype.Date{Time: day, Valid: true}
+		}
 	}
 
 	user, err := h.Queries.UpdateUserAdmin(ctx, params)

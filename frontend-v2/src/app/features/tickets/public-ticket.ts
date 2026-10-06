@@ -38,7 +38,10 @@ export class PublicTicketComponent {
   protected readonly i18n = inject(I18nService);
   protected readonly prefs = inject(PreferencesService);
   private readonly api = inject(TicketsService);
-  protected readonly brandTitle = inject(BrandingService).appTitle;
+  private readonly branding = inject(BrandingService);
+  protected readonly brandTitle = this.branding.appTitle;
+  /** Ícono de Marca (el de la pestaña); sin él, la inicial del nombre. */
+  protected readonly brandIcon = this.branding.iconUrl;
   private readonly token = inject(ActivatedRoute).snapshot.paramMap.get('token') ?? '';
 
   protected readonly view = signal<View>('loading');

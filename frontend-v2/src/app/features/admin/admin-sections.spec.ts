@@ -36,6 +36,24 @@ describe('Administración re-vestida', () => {
     await settle();
     fixture.detectChanges();
     expect(el.textContent).toContain('Editar turno');
+    // Personas del turno (WorkShiftAssignment del legacy): sin personas, los recordatorios van a los correos.
+    http.expectOne('/api/users').flush({ data: [{ id: 'u1', username: 'ana', fullName: 'Ana Rojas', role: 'user', active: true }] });
+    http.expectOne('/api/work-shifts/w2/members').flush({ data: [] });
+    await settle();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Sin personas: los recordatorios van a los correos del turno.');
+    (el.querySelector('select[name="smUser"]') as HTMLSelectElement).value = 'u1';
+    el.querySelector('select[name="smUser"]')!.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    ([...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Agregar al turno')) as HTMLButtonElement).click();
+    const put = http.expectOne((r) => r.method === 'PUT' && r.url === '/api/work-shifts/w2/members/u1');
+    expect(put.request.body).toEqual({ weekdays: [1, 2, 3, 4, 5] });
+    put.flush(null, { status: 204, statusText: 'No Content' });
+    await settle();
+    http.expectOne('/api/work-shifts/w2/members').flush({ data: [{ userId: 'u1', username: 'ana', displayName: 'Ana Rojas', weekdays: [1, 2, 3, 4, 5], userActive: true }] });
+    await settle();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Ana Rojas');
     const emails = el.querySelector('input[name="wsEmails"]') as HTMLInputElement;
     emails.value = 'jefe@empresa.cl, noc@empresa.cl';
     emails.dispatchEvent(new Event('input'));

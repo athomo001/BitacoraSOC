@@ -18,7 +18,7 @@ UPDATE app_config SET
   setup_completed_at = now(),
   updated_at = now()
 WHERE id = true
-RETURNING id, shift_check_cooldown_minutes, alert_nok_enabled, alert_nok_role_target, audit_ttl_days, backup_retention_days, soc_module_enabled, noc_module_enabled, territorial_kind_labels, setup_completed_at, updated_at
+RETURNING id, shift_check_cooldown_minutes, alert_nok_enabled, alert_nok_role_target, audit_ttl_days, backup_retention_days, soc_module_enabled, noc_module_enabled, territorial_kind_labels, setup_completed_at, updated_at, birthday_emails_enabled, birthday_emails_time, birthday_emails_cc, birthday_emails_last_date
 `
 
 type CompleteSetupParams struct {
@@ -41,6 +41,10 @@ func (q *Queries) CompleteSetup(ctx context.Context, arg CompleteSetupParams) (A
 		&i.TerritorialKindLabels,
 		&i.SetupCompletedAt,
 		&i.UpdatedAt,
+		&i.BirthdayEmailsEnabled,
+		&i.BirthdayEmailsTime,
+		&i.BirthdayEmailsCc,
+		&i.BirthdayEmailsLastDate,
 	)
 	return i, err
 }
@@ -59,7 +63,7 @@ func (q *Queries) EnsureAppConfigRow(ctx context.Context) error {
 }
 
 const getAppConfig = `-- name: GetAppConfig :one
-SELECT id, shift_check_cooldown_minutes, alert_nok_enabled, alert_nok_role_target, audit_ttl_days, backup_retention_days, soc_module_enabled, noc_module_enabled, territorial_kind_labels, setup_completed_at, updated_at FROM app_config WHERE id = true
+SELECT id, shift_check_cooldown_minutes, alert_nok_enabled, alert_nok_role_target, audit_ttl_days, backup_retention_days, soc_module_enabled, noc_module_enabled, territorial_kind_labels, setup_completed_at, updated_at, birthday_emails_enabled, birthday_emails_time, birthday_emails_cc, birthday_emails_last_date FROM app_config WHERE id = true
 `
 
 func (q *Queries) GetAppConfig(ctx context.Context) (AppConfig, error) {
@@ -77,6 +81,10 @@ func (q *Queries) GetAppConfig(ctx context.Context) (AppConfig, error) {
 		&i.TerritorialKindLabels,
 		&i.SetupCompletedAt,
 		&i.UpdatedAt,
+		&i.BirthdayEmailsEnabled,
+		&i.BirthdayEmailsTime,
+		&i.BirthdayEmailsCc,
+		&i.BirthdayEmailsLastDate,
 	)
 	return i, err
 }
@@ -104,7 +112,7 @@ UPDATE app_config SET
   noc_module_enabled = COALESCE($2, noc_module_enabled),
   updated_at = now()
 WHERE id = true
-RETURNING id, shift_check_cooldown_minutes, alert_nok_enabled, alert_nok_role_target, audit_ttl_days, backup_retention_days, soc_module_enabled, noc_module_enabled, territorial_kind_labels, setup_completed_at, updated_at
+RETURNING id, shift_check_cooldown_minutes, alert_nok_enabled, alert_nok_role_target, audit_ttl_days, backup_retention_days, soc_module_enabled, noc_module_enabled, territorial_kind_labels, setup_completed_at, updated_at, birthday_emails_enabled, birthday_emails_time, birthday_emails_cc, birthday_emails_last_date
 `
 
 type SetModuleFlagsParams struct {
@@ -127,6 +135,10 @@ func (q *Queries) SetModuleFlags(ctx context.Context, arg SetModuleFlagsParams) 
 		&i.TerritorialKindLabels,
 		&i.SetupCompletedAt,
 		&i.UpdatedAt,
+		&i.BirthdayEmailsEnabled,
+		&i.BirthdayEmailsTime,
+		&i.BirthdayEmailsCc,
+		&i.BirthdayEmailsLastDate,
 	)
 	return i, err
 }

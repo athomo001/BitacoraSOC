@@ -65,3 +65,20 @@ func TestReport_Markdown(t *testing.T) {
 		}
 	}
 }
+
+// Con el aviso por correo del ETL como paso 1, se salta y el resto se
+// compara alineado.
+func TestCompareSkipsEmailNoticeStep(t *testing.T) {
+	legacy := []LegacyStep{
+		{Order: 1, Type: "unique", ContactName: "Ana Pérez", ContactTel: "+56911111111"},
+		{Order: 2, Type: "pool", Contacts: []LegacyContact{{Name: "Bruno Soto", Tel: "+56922222222"}}},
+	}
+	fresh := []NewStep{
+		{Order: 1, Mode: "pool", Members: []NewMember{{Name: "Lista correo CDC"}}},
+		{Order: 2, Mode: "unique", Members: []NewMember{{Name: "Ana Pérez", Phones: []string{"+56911111111"}}}},
+		{Order: 3, Mode: "pool", Members: []NewMember{{Name: "Bruno Soto", Phones: []string{"+56922222222"}}}},
+	}
+	if d := CompareWithNotice(legacy, fresh, true); len(d) != 0 {
+		t.Fatalf("no debería haber diferencias: %+v", d)
+	}
+}

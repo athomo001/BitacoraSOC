@@ -1337,6 +1337,10 @@ type AppConfig struct {
 	TerritorialKindLabels     []byte             `json:"territorial_kind_labels"`
 	SetupCompletedAt          pgtype.Timestamptz `json:"setup_completed_at"`
 	UpdatedAt                 pgtype.Timestamptz `json:"updated_at"`
+	BirthdayEmailsEnabled     bool               `json:"birthday_emails_enabled"`
+	BirthdayEmailsTime        string             `json:"birthday_emails_time"`
+	BirthdayEmailsCc          string             `json:"birthday_emails_cc"`
+	BirthdayEmailsLastDate    pgtype.Date        `json:"birthday_emails_last_date"`
 }
 
 type Asset struct {
@@ -2157,6 +2161,17 @@ type WorkShiftAssignment struct {
 	Condition    TeleworkCondition  `json:"condition"`
 	Notes        pgtype.Text        `json:"notes"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
+type WorkShiftMember struct {
+	ID          uuid.UUID          `json:"id"`
+	WorkShiftID uuid.UUID          `json:"work_shift_id"`
+	UserID      uuid.UUID          `json:"user_id"`
+	Weekdays    []int32            `json:"weekdays"`
+	Active      bool               `json:"active"`
+	ValidFrom   pgtype.Date        `json:"valid_from"`
+	ValidTo     pgtype.Date        `json:"valid_to"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 }
 
 type WorkShiftNotificationSchedule struct {

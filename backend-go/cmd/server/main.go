@@ -434,6 +434,11 @@ func run(logger *slog.Logger) error {
 	mux.Handle("PATCH /api/rotation-slots/{id}", admin(rotationHandler.PatchSlot))
 	mux.Handle("POST /api/rotation-overrides", admin(rotationHandler.CreateOverride))
 	mux.Handle("GET /api/work-shifts", authed(rotationHandler.ListWorkShifts))
+	// Personas del turno (WorkShiftAssignment del legacy): a quién le llegan los recordatorios.
+	workShiftMembersHandler := &handler.WorkShiftMembersHandler{Queries: queries, AuditLog: auditLog}
+	mux.Handle("GET /api/work-shifts/{id}/members", admin(workShiftMembersHandler.List))
+	mux.Handle("PUT /api/work-shifts/{id}/members/{userId}", admin(workShiftMembersHandler.Put))
+	mux.Handle("DELETE /api/work-shifts/{id}/members/{userId}", admin(workShiftMembersHandler.Delete))
 	mux.Handle("POST /api/work-shifts", admin(rotationHandler.CreateWorkShift))
 	mux.Handle("PATCH /api/work-shifts/{id}", admin(rotationHandler.PatchWorkShift))
 
@@ -609,6 +614,13 @@ func run(logger *slog.Logger) error {
 	go scheduler.Run(ctx, time.Minute, reportDispatcher.DispatchPending)
 	// Recordatorios de turno: revisa cada minuto cuáles tocan (un envío por bloque u hora).
 	go scheduler.Run(ctx, time.Minute, shiftRemindersHandler.DispatchDue)
+	// Correos de cumpleaños (comentario del dueño #21): una vez al día, desde la hora configurada.
+	birthdaysHandler := &handler.BirthdaysHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
+	mux.Handle("GET /api/config/birthday-emails", admin(birthdaysHandler.GetConfig))
+	mux.Handle("PUT /api/config/birthday-emails", admin(birthdaysHandler.UpdateConfig))
+	mux.Handle("POST /api/config/birthday-emails/test", admin(birthdaysHandler.SendTest))
+	mux.Handle("GET /api/config/birthday-emails/image", public(birthdaysHandler.Image))
+	go scheduler.Run(ctx, time.Minute, birthdaysHandler.DispatchDue)
 	// Salud de los complementos servicio y limpieza de subidas vencidas.
 	go scheduler.Run(ctx, 30*time.Second, complementsHandler.ProbeAll)
 	// Respaldos automáticos: revisa cada minuto si toca la copia programada.

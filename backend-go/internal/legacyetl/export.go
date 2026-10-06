@@ -22,10 +22,17 @@ type Export struct {
 		Type        string `json:"type"`
 	} `json:"metadata"`
 	Data map[string][]json.RawMessage `json:"data"`
+
+	// read son las colecciones que algún paso leyó.
+	read map[string]bool
 }
 
 // Decode llena out (puntero a slice) con los documentos de una colección.
 func (e *Export) Decode(collection string, out any) error {
+	if e.read == nil {
+		e.read = map[string]bool{}
+	}
+	e.read[collection] = true
 	raw, err := json.Marshal(e.Data[collection])
 	if err != nil {
 		return err
@@ -143,4 +150,22 @@ func CleanMetadata(v any) any {
 	default:
 		return v
 	}
+}
+
+// Unread son las colecciones con documentos que ningún paso leyó y que no
+// están en skip (las que no se migran por diseño): datos que se perderían
+// sin aviso.
+func (e *Export) Unread(skip []string) []string {
+	skipped := map[string]bool{}
+	for _, s := range skip {
+		skipped[s] = true
+	}
+	var out []string
+	for name, docs := range e.Data {
+		if len(docs) > 0 && !e.read[name] && !skipped[name] {
+			out = append(out, fmt.Sprintf("%s (%d)", name, len(docs)))
+		}
+	}
+	sort.Strings(out)
+	return out
 }

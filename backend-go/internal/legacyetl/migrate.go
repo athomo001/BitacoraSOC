@@ -29,6 +29,9 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
 )
 
+// birthdayTime es la hora HH:MM de los correos de cumpleaños.
+var birthdayTime = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
+
 // NotMigrated son las colecciones que no se migran por diseño (spec/13 §3).
 var NotMigrated = []string{
 	"tokenDenylist", "avisoLogs", "apiLogs", "customFonts", "glpiConfigs", "logForwardingConfigs",
@@ -98,8 +101,10 @@ func Run(ctx context.Context, pool *pgxpool.Pool, backup *Backup, legacy LegacyK
 		{"contactos de escalación", m.migrateEscalationContacts},
 		{"personal externo", m.migrateExternalPersons},
 		{"turnos", m.migrateWorkShifts},
+		{"personas del turno", m.migrateWorkShiftMembers},
 		{"plantillas de checklist", m.migrateChecklistTemplates},
 		{"entradas", m.migrateEntries},
+		{"historial de checklists", m.migrateShiftChecks},
 		{"notas", m.migrateNotes},
 		{"correo (SMTP)", m.migrateSMTP},
 		{"recordatorios de turno", m.migrateShiftReminders},
@@ -121,6 +126,7 @@ func Run(ctx context.Context, pool *pgxpool.Pool, backup *Backup, legacy LegacyK
 			return rep, fmt.Errorf("paso %s: %w", s.name, err)
 		}
 	}
+	rep.Unread = ex.Unread(NotMigrated)
 	if opts.DryRun {
 		return rep, nil
 	}
@@ -135,7 +141,7 @@ func Run(ctx context.Context, pool *pgxpool.Pool, backup *Backup, legacy LegacyK
 // ensayo parte de cero (scripts/etl-reset.sh).
 func checkTarget(ctx context.Context, pool *pgxpool.Pool) error {
 	var hasLatest bool
-	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.report_operation_types') IS NOT NULL`).Scan(&hasLatest); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.work_shift_members') IS NOT NULL`).Scan(&hasLatest); err != nil {
 		return err
 	}
 	if !hasLatest {
@@ -1281,6 +1287,10 @@ func (m *Migrator) migrateAppConfig(ctx context.Context) error {
 		TitleFont               string `json:"titleFont"`
 		IncidentEmailPaletteKey string `json:"incidentEmailPaletteKey"`
 		LoginTheme              string `json:"loginTheme"`
+		// Correos de cumpleaños (comentario del dueño #21).
+		BirthdayEmailsEnabled   *bool  `json:"birthdayEmailsEnabled"`
+		BirthdayEmailsTime      string `json:"birthdayEmailsTime"`
+		BirthdayEmailsCcAddress string `json:"birthdayEmailsCcAddress"`
 	}
 	if err := m.ex.Decode("appConfigs", &rows); err != nil {
 		return err
@@ -1319,6 +1329,19 @@ func (m *Migrator) migrateAppConfig(ctx context.Context) error {
 			}
 			if *c.AlertNokEnabled {
 				step.note("alerta NOK del checklist a los cargos %s en %d plantillas", strings.Join(targets, ", "), tag.RowsAffected())
+			}
+		}
+		if c.BirthdayEmailsEnabled != nil {
+			at := strings.TrimSpace(c.BirthdayEmailsTime)
+			if !birthdayTime.MatchString(at) {
+				at = "09:00"
+			}
+			if _, err := m.tx.Exec(ctx, `UPDATE app_config SET birthday_emails_enabled = $1, birthday_emails_time = $2, birthday_emails_cc = $3`,
+				*c.BirthdayEmailsEnabled, at, strings.TrimSpace(c.BirthdayEmailsCcAddress)); err != nil {
+				return err
+			}
+			if *c.BirthdayEmailsEnabled {
+				step.note("correos de cumpleaños encendidos a las %s", at)
 			}
 		}
 		if err := m.migrateBranding(ctx, step, c.AppTitle, c.LogoURL, c.FaviconURL, c.TitleFont, c.IncidentEmailPaletteKey, c.LoginTheme); err != nil {
