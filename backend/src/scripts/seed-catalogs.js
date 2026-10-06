@@ -86,7 +86,7 @@ const sampleEvents = [
 // Datos de ejemplo - Log Sources
 const sampleLogSources = [
   {
-    name: 'Netics',
+    name: 'Empresa interna',
     parent: 'Sistema Interno',
     description: 'Log source por defecto del sistema',
     enabled: true,

@@ -307,7 +307,7 @@ Registro de cambios relevantes del proyecto.
 - **Auditoría de Consumo de API**:
   - Registro no bloqueante de logs de acceso en tiempo real (IP, método, endpoint, estado HTTP, fecha, clave consumida) con paginación interactiva en el panel del SOC.
 - **API Externa de Incidentes y SMTP**:
-  - Exposición de `/api/v1/templates/render` para procesamiento de plantillas MJML con soporte opcional para envío automático de alertas por correo mediante el SMTP del SOC pasándole `"sendEmail": true`. Se inyecta automáticamente el logo de Netics (`Sharp-processed`) y se autocompletan los campos de incidentes (ofensa, ticket, criticidad) provistos en el JSON.
+  - Exposición de `/api/v1/templates/render` para procesamiento de plantillas MJML con soporte opcional para envío automático de alertas por correo mediante el SMTP del SOC pasándole `"sendEmail": true`. Se inyecta automáticamente el logo de la marca (`Sharp-processed`) y se autocompletan los campos de incidentes (ofensa, ticket, criticidad) provistos en el JSON.
 - **Visualización de Logs de Auditoría Extendida**:
   - Diálogo detallado `AuditLogDetailDialogComponent` para leer logs extensos y metadatos JSON completos sin truncado.
   - Botón interactivo de expansión rápida en hover de la celda de detalle del log.
@@ -470,7 +470,7 @@ Registro de cambios relevantes del proyecto.
 
 - **Lógica de Sincronización Mejorada**: Se actualizó la función `syncUserAsDirectoryInternal()` en la ruta de usuarios para:
   - Obtener el `defaultLogSourceId` configurado en AppConfig (cliente/LogSource por defecto asignado en `/main/logo`).
-  - Buscar el CatalogLogSource correspondiente y extraer su nombre (ej: "Netics", "AIEP", "BeyondTrust").
+  - Buscar el CatalogLogSource correspondiente y extraer su nombre (ej: "AIEP", "BeyondTrust").
   - Incluir automáticamente ese nombre como la empresa en la sincronización al DirectoryContact.
   - Esto sincroniza la información del cliente interno ya configurado en `/main/admin/catalogs` sin requerir campo adicional.
 - **Integración Transparente**: Aprovecha la jerarquía existente:
@@ -807,7 +807,7 @@ Registro de cambios relevantes del proyecto.
 - **Unificación de Entornos (`.env`):** Se eliminó la duplicidad de configuración entre la raíz y el backend. `backend/src/server.js` fue refactorizado para resolver automáticamente el archivo `.env` de la raíz del proyecto, permitiendo que un único archivo actúe como fuente de verdad absoluta tanto para la orquestación Docker como para la ejecución local de Node.js.
 - **Depuración de Scripts Heredados (Clean-up):**
   - Se eliminaron fragmentos obsoletos de inicialización de BD (`seed-escalation-example.js`, `seed-services.js`, `seed-shift-roles.js`, `seed-work-shifts.js`) para consolidar la estrategia en el sembrado oficial (`seed.js` y `seed-admin.js`).
-  - Se borraron scripts manuales de único uso que generaban ruido operativo (`add-netics.js`, `create-users.js`, `shift-dates.js`, `import-sanitized.js`).
+  - Se borraron scripts manuales de único uso que generaban ruido operativo (un script de alta de cliente, `create-users.js`, `shift-dates.js`, `import-sanitized.js`).
   - Se removieron los scripts de migración `mongo8-migration` (y su documentación en `02_DESPLIEGUE_Y_CONFIG.md`), al considerarse un procedimiento puntual ya ejecutado y superado por la arquitectura nativa en Mongo 8.
 - **Resiliencia de Easter Eggs:** Se restituyó y validó la dependencia funcional de `scripts/Bender.png` para los triggers de UI basados en el hashtag `#bender`.
 

@@ -526,7 +526,7 @@ Si vas a realizar pruebas manuales o validar tus credenciales usando **Postman**
 4. Pega el payload JSON sin comentarios de línea en el área de texto:
    ```json
    {
-     "to": ["tu-correo@netics.cl"],
+     "to": ["tu-correo@empresa.cl"],
      "sendEmail": true,
      "reportData": {
        "logSource": "Firewall Principal",

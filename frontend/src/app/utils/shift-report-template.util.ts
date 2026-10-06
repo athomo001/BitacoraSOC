@@ -55,7 +55,7 @@ const TAG_BY_MODE: Record<ShiftReportMode, string> = {
 const RAW_DUMP_REGEX = /^(\d[\d\s]{0,7}\d|\d)\s*(?:\t| {2,})\s*(.+)$/;
 
 // Campos separados por coma O punto y coma: en la práctica el dump que pegan los analistas
-// mezcla ambos (ej: "5 193;netics,[QA][2022-180] Nueva plataforma QA").
+// mezcla ambos (ej: "5 193;acme,[QA][2022-180] Nueva plataforma QA").
 const FIELD_SPLIT_REGEX = /[,;]/;
 
 function isTicketLine(trimmedLine: string): boolean {
