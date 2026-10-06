@@ -31,14 +31,14 @@ type templateAssignmentDTO struct {
 }
 
 type adminChecklistTemplateDTO struct {
-	ID                 uuid.UUID               `json:"id"`
-	Name               string                  `json:"name"`
-	IsActive           bool                    `json:"isActive"`
-	AlertNokEnabled    bool                    `json:"alertNokEnabled"`
-	AlertNokCargos     []string                `json:"alertNokCargos"`
-	Items              []checklistItemDTO      `json:"items"`
-	Assignments        []templateAssignmentDTO `json:"assignments"`
-	ChecksCount        int64                   `json:"checksCount"`
+	ID              uuid.UUID               `json:"id"`
+	Name            string                  `json:"name"`
+	IsActive        bool                    `json:"isActive"`
+	AlertNokEnabled bool                    `json:"alertNokEnabled"`
+	AlertNokCargos  []string                `json:"alertNokCargos"`
+	Items           []checklistItemDTO      `json:"items"`
+	Assignments     []templateAssignmentDTO `json:"assignments"`
+	ChecksCount     int64                   `json:"checksCount"`
 }
 
 func templateAssignments(shifts []db.WorkShift, templateID uuid.UUID) []templateAssignmentDTO {
@@ -107,12 +107,12 @@ type templateItemRequest struct {
 }
 
 type saveTemplateRequest struct {
-	Name               string                  `json:"name"`
-	IsActive           bool                    `json:"isActive"`
-	AlertNokEnabled    bool                    `json:"alertNokEnabled"`
-	AlertNokCargos     []string                `json:"alertNokCargos"`
-	Items              []templateItemRequest   `json:"items"`
-	Assignments        []templateAssignmentDTO `json:"assignments"`
+	Name            string                  `json:"name"`
+	IsActive        bool                    `json:"isActive"`
+	AlertNokEnabled bool                    `json:"alertNokEnabled"`
+	AlertNokCargos  []string                `json:"alertNokCargos"`
+	Items           []templateItemRequest   `json:"items"`
+	Assignments     []templateAssignmentDTO `json:"assignments"`
 }
 
 // cargos normaliza los cargos de la alerta NOK (normalizeCargoLabels del legacy).

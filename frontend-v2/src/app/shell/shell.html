@@ -1,12 +1,16 @@
 <div class="shell">
   <nav class="shell__sidebar" [attr.aria-label]="i18n.t('nav.primary')">
-    <div class="shell__brand">
+    <!-- Con logo, solo el logo a su tamaño (como el legacy); en la barra angosta, el ícono de la pestaña. -->
+    <div class="shell__brand" [class.shell__brand--logo]="branding.logoUrl()">
       @if (branding.logoUrl(); as logo) {
-        <img class="shell__logo shell__logo--img" [src]="logo" alt="" aria-hidden="true" />
+        <img class="shell__brand-logo" [src]="logo" [alt]="branding.appTitle()" />
+        @if (branding.iconUrl(); as icon) {
+          <img class="shell__logo shell__logo--img shell__brand-icon" [src]="icon" alt="" aria-hidden="true" />
+        }
       } @else {
         <span class="shell__logo" aria-hidden="true">{{ branding.appTitle().charAt(0) }}</span>
+        <span class="shell__brand-name">{{ branding.appTitle() }}</span>
       }
-      <span class="shell__brand-name">{{ branding.appTitle() }}</span>
     </div>
 
     <div class="shell__nav">

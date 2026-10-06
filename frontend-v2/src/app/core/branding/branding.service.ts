@@ -51,6 +51,11 @@ export class BrandingService {
   readonly brand = signal<Branding>(DEFAULT);
   readonly appTitle = computed(() => this.brand().appTitle);
   /** URL del logo con la versión, para que el navegador no muestre uno viejo. */
+  /** Ícono de la pestaña (propio, URL externa o sacado del logo); null si no hay. */
+  readonly iconUrl = computed(() => {
+    const b = this.brand();
+    return b.faviconUrl || (b.hasFavicon || b.hasLogo ? `/api/branding/favicon?v=${b.version}` : null);
+  });
   readonly logoUrl = computed(() => (this.brand().hasLogo ? `/api/branding/logo?v=${this.brand().version}` : null));
   private loading: Promise<void> | null = null;
 
@@ -79,7 +84,7 @@ export class BrandingService {
   }
 
   private setFavicon(b: Branding): void {
-    const href = b.faviconUrl || (b.hasFavicon || b.hasLogo ? `/api/branding/favicon?v=${b.version}` : 'favicon.ico');
+    const href = this.iconUrl() ?? 'favicon.ico';
     let link = this.document.querySelector<HTMLLinkElement>('link[rel="icon"]');
     if (!link) {
       link = this.document.createElement('link');

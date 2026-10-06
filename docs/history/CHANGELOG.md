@@ -4,6 +4,11 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] Logo de Marca a su tamaño en la barra - 2026-10-06
+
+- Pedido del dueño: el logo de Marca salía diminuto (se encajaba en un cuadrado de 26 px y el de Netics es 3,2 veces más ancho que alto). Ahora va como en el legacy (`.sidebar-logo` de main-layout): solo el logo, con su proporción, hasta 52 px de alto y el ancho de la barra; en la barra angosta (móvil) va el ícono de la pestaña. Sin logo, sigue la inicial con el nombre.
+- El escudo del "Reporte de Detección" es ese mismo logo de Marca (con el contorno blanco del legacy): cambiarlo o quitarlo en Administración → Marca cambia también los correos.
+
 ## [Rewrite] Solo la Ticketera, sin SOC ni NOC - 2026-10-05
 
 - Pedido del dueño: Administración → Módulos ya no exige SOC o NOC; basta con uno de los tres (SOC, NOC o Ticketera). El servidor tampoco deja apagar la Ticketera si SOC y NOC están apagados; al guardar, lo que se enciende va primero.
