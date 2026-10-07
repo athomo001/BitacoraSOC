@@ -372,6 +372,9 @@ func (h *AuthHandler) ChangeMyPassword(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "newPassword es obligatorio")
 		return
 	}
+	if rejectShortPassword(w, r, h.Queries, req.NewPassword) {
+		return
+	}
 
 	dbUser, err := h.Queries.GetUserByID(ctx, authUser.ID)
 	if err != nil {
@@ -468,6 +471,9 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Token == "" || req.NewPassword == "" {
 		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "token y newPassword son obligatorios")
+		return
+	}
+	if rejectShortPassword(w, r, h.Queries, req.NewPassword) {
 		return
 	}
 

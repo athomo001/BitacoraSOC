@@ -8,6 +8,7 @@ import { Organization, OrganizationsService } from '../../core/organizations/org
 import { PageMeta } from '../../core/territory/territory.models';
 import { problemDetail } from '../../core/http-error';
 
+import '../../core/i18n/packs/directory';
 const EMPTY_FORM: ContactForm = {
   organizationId: '',
   name: '',

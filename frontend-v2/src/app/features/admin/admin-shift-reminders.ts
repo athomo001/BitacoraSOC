@@ -6,6 +6,7 @@ import { ReminderFrequency, ShiftReminder, ShiftReminderDraft, ShiftsService, Wo
 import { I18nService } from '../../core/i18n/i18n.service';
 import { problemDetail } from '../../core/http-error';
 
+import '../../core/i18n/packs/admin';
 const HOUR_CHOICES = [1, 2, 3, 4, 6, 8, 12];
 
 function emptyDraft(): ShiftReminderDraft {

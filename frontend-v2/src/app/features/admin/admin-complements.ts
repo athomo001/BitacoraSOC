@@ -10,6 +10,7 @@ import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
 import { PreferencesService } from '../../core/preferences/preferences.service';
 
+import '../../core/i18n/packs/admin';
 /** Permisos de la Runtime API, con su explicación en lenguaje claro. */
 export const SCOPES: readonly { code: string; labelKey: MessageKey }[] = [
   { code: 'READ_CONTEXT', labelKey: 'acomp.scope.READ_CONTEXT' },

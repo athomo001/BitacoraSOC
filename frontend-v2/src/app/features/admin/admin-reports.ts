@@ -6,6 +6,7 @@ import { MessageKey } from '../../core/i18n/messages';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { problemDetail } from '../../core/http-error';
 
+import '../../core/i18n/packs/admin';
 /**
  * Reportes de turno (Administración → Operación), re-vestido con los
  * componentes del artboard "Administración". Cada cierre de turno con

@@ -169,53 +169,6 @@ func (q *Queries) CreateWorkShift(ctx context.Context, arg CreateWorkShiftParams
 	return i, err
 }
 
-const getCurrentRotationSlot = `-- name: GetCurrentRotationSlot :one
-SELECT s.id, s.cycle_id, s.team_member_id, s.week_start_date, s.week_end_date, s.is_paused, s.paused_reason, COALESCE(u.username, c.name, '')::text AS display_name
-FROM rotation_slots s
-JOIN team_members m ON m.id = s.team_member_id
-LEFT JOIN users u ON u.id = m.user_id
-LEFT JOIN contacts c ON c.id = m.contact_id
-WHERE s.cycle_id = $1
-  AND s.week_start_date <= $2::date
-  AND s.week_end_date >= $2::date
-ORDER BY s.week_start_date DESC
-LIMIT 1
-`
-
-type GetCurrentRotationSlotParams struct {
-	CycleID uuid.UUID   `json:"cycle_id"`
-	Today   pgtype.Date `json:"today"`
-}
-
-type GetCurrentRotationSlotRow struct {
-	ID            uuid.UUID   `json:"id"`
-	CycleID       uuid.UUID   `json:"cycle_id"`
-	TeamMemberID  uuid.UUID   `json:"team_member_id"`
-	WeekStartDate pgtype.Date `json:"week_start_date"`
-	WeekEndDate   pgtype.Date `json:"week_end_date"`
-	IsPaused      bool        `json:"is_paused"`
-	PausedReason  pgtype.Text `json:"paused_reason"`
-	DisplayName   string      `json:"display_name"`
-}
-
-// El slot regular cuya semana cubre `now` (independiente de is_paused: el
-// handler decide qué hacer con eso vía internal/rotation.Resolve).
-func (q *Queries) GetCurrentRotationSlot(ctx context.Context, arg GetCurrentRotationSlotParams) (GetCurrentRotationSlotRow, error) {
-	row := q.db.QueryRow(ctx, getCurrentRotationSlot, arg.CycleID, arg.Today)
-	var i GetCurrentRotationSlotRow
-	err := row.Scan(
-		&i.ID,
-		&i.CycleID,
-		&i.TeamMemberID,
-		&i.WeekStartDate,
-		&i.WeekEndDate,
-		&i.IsPaused,
-		&i.PausedReason,
-		&i.DisplayName,
-	)
-	return i, err
-}
-
 const getRotationCycle = `-- name: GetRotationCycle :one
 SELECT id, team_id, start_day_of_week, start_time_utc, duration_days, timezone, active FROM rotation_cycles WHERE id = $1
 `
@@ -296,6 +249,67 @@ func (q *Queries) ListActiveOverridesForCycle(ctx context.Context, arg ListActiv
 			&i.Reason,
 			&i.CreatedBy,
 			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCurrentRotationSlots = `-- name: ListCurrentRotationSlots :many
+SELECT s.id, s.cycle_id, s.team_member_id, s.week_start_date, s.week_end_date, s.is_paused, s.paused_reason, COALESCE(u.username, c.name, '')::text AS display_name
+FROM rotation_slots s
+JOIN team_members m ON m.id = s.team_member_id
+LEFT JOIN users u ON u.id = m.user_id
+LEFT JOIN contacts c ON c.id = m.contact_id
+WHERE s.cycle_id = $1
+  AND s.week_start_date <= $2::date
+  AND s.week_end_date >= $2::date
+ORDER BY s.week_start_date DESC, display_name
+`
+
+type ListCurrentRotationSlotsParams struct {
+	CycleID uuid.UUID   `json:"cycle_id"`
+	Today   pgtype.Date `json:"today"`
+}
+
+type ListCurrentRotationSlotsRow struct {
+	ID            uuid.UUID   `json:"id"`
+	CycleID       uuid.UUID   `json:"cycle_id"`
+	TeamMemberID  uuid.UUID   `json:"team_member_id"`
+	WeekStartDate pgtype.Date `json:"week_start_date"`
+	WeekEndDate   pgtype.Date `json:"week_end_date"`
+	IsPaused      bool        `json:"is_paused"`
+	PausedReason  pgtype.Text `json:"paused_reason"`
+	DisplayName   string      `json:"display_name"`
+}
+
+// Los slots regulares cuya semana cubre `today` (independiente de is_paused:
+// el handler decide qué hacer con eso vía internal/rotation.Resolve). Puede
+// haber más de uno: en el legacy un rol (N2, OL) tenía a veces 2-3 personas
+// a la vez, y todas están de guardia.
+func (q *Queries) ListCurrentRotationSlots(ctx context.Context, arg ListCurrentRotationSlotsParams) ([]ListCurrentRotationSlotsRow, error) {
+	rows, err := q.db.Query(ctx, listCurrentRotationSlots, arg.CycleID, arg.Today)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListCurrentRotationSlotsRow
+	for rows.Next() {
+		var i ListCurrentRotationSlotsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CycleID,
+			&i.TeamMemberID,
+			&i.WeekStartDate,
+			&i.WeekEndDate,
+			&i.IsPaused,
+			&i.PausedReason,
+			&i.DisplayName,
 		); err != nil {
 			return nil, err
 		}

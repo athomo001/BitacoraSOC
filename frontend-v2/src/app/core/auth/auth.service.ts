@@ -2,7 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { ApiEnvelope, AuthUser, LoginResult } from './auth.models';
+import { ApiEnvelope, AuthUser, LoginResult, MfaEnrollment } from './auth.models';
 
 const TOKEN_STORAGE_KEY = 'bitacorasoc.token';
 
@@ -53,6 +53,29 @@ export class AuthService {
 
   async changePassword(currentPassword: string, newPassword: string): Promise<void> {
     await firstValueFrom(this.http.put('/api/users/me/password', { currentPassword, newPassword }));
+  }
+
+  /** Largo mínimo de contraseña que fija el admin (público: también lo usa el reseteo por correo). */
+  async passwordMinLength(): Promise<number> {
+    const response = await firstValueFrom(this.http.get<ApiEnvelope<{ minLength: number }>>('/api/auth/password-policy'));
+    return response.data.minLength;
+  }
+
+  /** Paso 1 de la verificación en dos pasos: genera el secreto y su QR (aún no queda activa). */
+  async mfaSetup(): Promise<MfaEnrollment> {
+    const response = await firstValueFrom(this.http.post<ApiEnvelope<MfaEnrollment>>('/api/auth/mfa/setup', {}));
+    return response.data;
+  }
+
+  /** Paso 2: con el primer código correcto queda activa. */
+  async mfaVerify(code: string): Promise<void> {
+    await firstValueFrom(this.http.post('/api/auth/mfa/verify', { code }));
+    await this.loadMe();
+  }
+
+  async mfaDisable(password: string): Promise<void> {
+    await firstValueFrom(this.http.post('/api/auth/mfa/disable', { password }));
+    await this.loadMe();
   }
 
   async updateProfile(profile: { fullName: string; phone: string; birthday: string; avatarUrl: string }): Promise<AuthUser> {

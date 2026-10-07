@@ -17,6 +17,7 @@ import { OrganizationsService, TeamSummary } from '../../core/organizations/orga
 import { resolverTeams } from '../../core/tickets/ticket-view';
 import { CLOCK_TONE, PRIORITY_SHORT, PRIORITY_TONE, STATUS_TONE, clockText, formatDuration, publicTrackingUrl, transitionAction } from '../../core/tickets/ticket-view';
 
+import '../../core/i18n/packs/tickets';
 type Tab = 'activity' | 'images' | 'tasks' | 'entries';
 
 /** Tope del diseño aprobado (comentario del dueño #14); el backend también lo exige. */

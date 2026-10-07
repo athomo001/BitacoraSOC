@@ -34,6 +34,18 @@ func (q *Queries) AckClientAlert(ctx context.Context, arg AckClientAlertParams) 
 	return err
 }
 
+const countReportEvents = `-- name: CountReportEvents :one
+SELECT count(*) FROM report_events
+WHERE ($1::text = '' OR name ILIKE '%' || $1::text || '%' OR parent ILIKE '%' || $1::text || '%')
+`
+
+func (q *Queries) CountReportEvents(ctx context.Context, q_ string) (int64, error) {
+	row := q.db.QueryRow(ctx, countReportEvents, q_)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countReportHistory = `-- name: CountReportHistory :one
 SELECT count(*) FROM report_history WHERE ($1::text IS NULL OR kind = $1)
 `
@@ -109,6 +121,40 @@ func (q *Queries) CreateClientAlertRule(ctx context.Context, arg CreateClientAle
 	return i, err
 }
 
+const createReportEvent = `-- name: CreateReportEvent :one
+INSERT INTO report_events (name, parent, description, motivo_default, enabled) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, parent, description, motivo_default, enabled, created_at, updated_at
+`
+
+type CreateReportEventParams struct {
+	Name          string `json:"name"`
+	Parent        string `json:"parent"`
+	Description   string `json:"description"`
+	MotivoDefault string `json:"motivo_default"`
+	Enabled       bool   `json:"enabled"`
+}
+
+func (q *Queries) CreateReportEvent(ctx context.Context, arg CreateReportEventParams) (ReportEvent, error) {
+	row := q.db.QueryRow(ctx, createReportEvent,
+		arg.Name,
+		arg.Parent,
+		arg.Description,
+		arg.MotivoDefault,
+		arg.Enabled,
+	)
+	var i ReportEvent
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Parent,
+		&i.Description,
+		&i.MotivoDefault,
+		&i.Enabled,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const createReportOperationType = `-- name: CreateReportOperationType :one
 INSERT INTO report_operation_types (name, info_default, enabled) VALUES ($1, $2, $3) RETURNING id, name, info_default, enabled, created_at, updated_at
 `
@@ -139,6 +185,18 @@ DELETE FROM client_alert_rules WHERE id = $1
 
 func (q *Queries) DeleteClientAlertRule(ctx context.Context, id uuid.UUID) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteClientAlertRule, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteReportEvent = `-- name: DeleteReportEvent :execrows
+DELETE FROM report_events WHERE id = $1
+`
+
+func (q *Queries) DeleteReportEvent(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteReportEvent, id)
 	if err != nil {
 		return 0, err
 	}
@@ -529,6 +587,48 @@ func (q *Queries) ListEscalationEmailsForOrganization(ctx context.Context, arg L
 	return items, nil
 }
 
+const listReportEvents = `-- name: ListReportEvents :many
+SELECT id, name, parent, description, motivo_default, enabled, created_at, updated_at FROM report_events
+WHERE ($1::text = '' OR name ILIKE '%' || $1::text || '%' OR parent ILIKE '%' || $1::text || '%')
+ORDER BY name
+LIMIT $3::int OFFSET $2::int
+`
+
+type ListReportEventsParams struct {
+	Q   string `json:"q"`
+	Off int32  `json:"off"`
+	Lim int32  `json:"lim"`
+}
+
+func (q *Queries) ListReportEvents(ctx context.Context, arg ListReportEventsParams) ([]ReportEvent, error) {
+	rows, err := q.db.Query(ctx, listReportEvents, arg.Q, arg.Off, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReportEvent
+	for rows.Next() {
+		var i ReportEvent
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Parent,
+			&i.Description,
+			&i.MotivoDefault,
+			&i.Enabled,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listReportHistory = `-- name: ListReportHistory :many
 SELECT h.id, h.kind, h.title, h.subject, h.organization_id, o.name AS organization_name, h.recipients, h.cc_recipients,
   h.status, h.error, h.sent_by_username, h.created_at, (h.payload IS NOT NULL)::boolean AS reusable
@@ -628,6 +728,53 @@ func (q *Queries) ListReportOperationTypes(ctx context.Context) ([]ReportOperati
 	return items, nil
 }
 
+const suggestReportEvents = `-- name: SuggestReportEvents :many
+
+SELECT id, name, parent, description, motivo_default, enabled, created_at, updated_at FROM report_events
+WHERE enabled
+  AND (name ILIKE '%' || $1::text || '%' OR parent ILIKE '%' || $1::text || '%')
+ORDER BY (lower(name) LIKE lower($1::text) || '%') DESC, length(name), name
+LIMIT $2::int
+`
+
+type SuggestReportEventsParams struct {
+	Q   string `json:"q"`
+	Lim int32  `json:"lim"`
+}
+
+// ===== Eventos del informe de incidente (catalogEvents del legacy) =====
+// Sugerencias al escribir: lo que empieza igual primero, luego lo que lo
+// contiene (nombre o categoría); sin tildes no hace falta porque el legacy
+// tampoco los normalizaba y el texto se escribe como en el catálogo.
+func (q *Queries) SuggestReportEvents(ctx context.Context, arg SuggestReportEventsParams) ([]ReportEvent, error) {
+	rows, err := q.db.Query(ctx, suggestReportEvents, arg.Q, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReportEvent
+	for rows.Next() {
+		var i ReportEvent
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Parent,
+			&i.Description,
+			&i.MotivoDefault,
+			&i.Enabled,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateClientAlertRule = `-- name: UpdateClientAlertRule :one
 UPDATE client_alert_rules SET organization_id = $1, name = $2, enabled = $3, contexts = $4,
   timezone = $5, priority = $6, valid_from = $7, valid_to = $8,
@@ -689,6 +836,42 @@ func (q *Queries) UpdateClientAlertRule(ctx context.Context, arg UpdateClientAle
 		&i.Message,
 		&i.RequiresAck,
 		&i.UpdatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateReportEvent = `-- name: UpdateReportEvent :one
+UPDATE report_events SET name = $2, parent = $3, description = $4, motivo_default = $5, enabled = $6, updated_at = now() WHERE id = $1 RETURNING id, name, parent, description, motivo_default, enabled, created_at, updated_at
+`
+
+type UpdateReportEventParams struct {
+	ID            uuid.UUID `json:"id"`
+	Name          string    `json:"name"`
+	Parent        string    `json:"parent"`
+	Description   string    `json:"description"`
+	MotivoDefault string    `json:"motivo_default"`
+	Enabled       bool      `json:"enabled"`
+}
+
+func (q *Queries) UpdateReportEvent(ctx context.Context, arg UpdateReportEventParams) (ReportEvent, error) {
+	row := q.db.QueryRow(ctx, updateReportEvent,
+		arg.ID,
+		arg.Name,
+		arg.Parent,
+		arg.Description,
+		arg.MotivoDefault,
+		arg.Enabled,
+	)
+	var i ReportEvent
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Parent,
+		&i.Description,
+		&i.MotivoDefault,
+		&i.Enabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

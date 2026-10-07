@@ -1341,6 +1341,7 @@ type AppConfig struct {
 	BirthdayEmailsTime        string             `json:"birthday_emails_time"`
 	BirthdayEmailsCc          string             `json:"birthday_emails_cc"`
 	BirthdayEmailsLastDate    pgtype.Date        `json:"birthday_emails_last_date"`
+	PasswordMinLength         int16              `json:"password_min_length"`
 }
 
 type Asset struct {
@@ -1651,6 +1652,7 @@ type EscalationIncident struct {
 	OpenedAt          pgtype.Timestamptz `json:"opened_at"`
 	ClosedBy          pgtype.UUID        `json:"closed_by"`
 	ClosedAt          pgtype.Timestamptz `json:"closed_at"`
+	EntryID           pgtype.UUID        `json:"entry_id"`
 }
 
 type EscalationIncidentNote struct {
@@ -1784,6 +1786,17 @@ type RaciAssignment struct {
 	Role      RaciRole    `json:"role"`
 	TeamID    uuid.UUID   `json:"team_id"`
 	Active    bool        `json:"active"`
+}
+
+type ReportEvent struct {
+	ID            uuid.UUID          `json:"id"`
+	Name          string             `json:"name"`
+	Parent        string             `json:"parent"`
+	Description   string             `json:"description"`
+	MotivoDefault string             `json:"motivo_default"`
+	Enabled       bool               `json:"enabled"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
 
 type ReportHistory struct {

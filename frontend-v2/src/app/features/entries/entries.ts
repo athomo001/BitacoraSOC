@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, O
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
+import { ActivatedRoute } from '@angular/router';
 import { MarkdownComponent } from '../../shared/markdown/markdown';
 import { AuthImgDirective } from '../../shared/ui/auth-img';
 import { PermissionsService } from '../../core/auth/permissions.service';
@@ -20,6 +21,7 @@ import { Organization, OrganizationsService, TeamSummary } from '../../core/orga
 import { defang } from '../../core/entries/defang';
 import { Entry, EntryComment, EntryDetail, EntryFilters, EntryScope, EntryType, EntriesService } from '../../core/entries/entries.service';
 
+import '../../core/i18n/packs/entries';
 interface ComposeDraft {
   entryType: EntryType;
   scope: EntryScope;
@@ -108,6 +110,7 @@ export class EntriesComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
 
   protected readonly panel = signal<SidePanel>('none');
+  private readonly route = inject(ActivatedRoute, { optional: true });
   protected readonly selected = signal<EntryDetail | null>(null);
   protected readonly newComment = signal('');
   protected readonly confirmDelete = signal(false);
@@ -151,6 +154,9 @@ export class EntriesComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     await Promise.all([this.perms.load(), this.modules.load()]);
     await this.load();
+    // /entries?entry=<id>: abre esa entrada (p. ej. desde un incidente de escalamiento).
+    const linked = this.route?.snapshot.queryParamMap.get('entry');
+    if (linked) await this.select({ id: linked } as Entry);
 
     try {
       const [admin, personal] = await Promise.all([this.notesApi.getAdmin(), this.notesApi.getPersonal()]);

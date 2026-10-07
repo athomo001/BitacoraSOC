@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
 import { DialogRef } from '@angular/cdk/dialog';
 import { MatIconModule } from '@angular/material/icon';
 
@@ -18,7 +18,7 @@ import { MatIconModule } from '@angular/material/icon';
   imports: [MatIconModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="app-modal">
+    <div class="app-modal" [class.app-modal--wide]="wide()">
       <header class="app-modal__header">
         <ng-content select="[app-modal-title]" />
         <button
@@ -41,6 +41,8 @@ import { MatIconModule } from '@angular/material/icon';
   styleUrl: './modal.css',
 })
 export class ModalComponent {
+  /** Para diálogos con pestañas o columnas (ej. Mi perfil). */
+  readonly wide = input(false);
   // Opcional: null en tests donde no se abre vía Dialog real.
   protected readonly dialogRef = inject(DialogRef<unknown, ModalComponent>, { optional: true });
 }

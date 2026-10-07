@@ -13,29 +13,29 @@
     @case ('dotacion') {
       <section class="panel shifts__panel">
         <div class="shifts__toolbar">
-          <app-button variant="secondary" (pressed)="shiftWeek(-1)">◀ Semana anterior</app-button>
+          <app-button variant="secondary" (pressed)="shiftWeek(-1)">{{ i18n.t('staff.prevWeek') }}</app-button>
           <span class="shifts__week-label">{{ weekLabel() }}</span>
-          <app-button variant="secondary" (pressed)="shiftWeek(1)">Semana siguiente ▶</app-button>
-          <app-button variant="text" (pressed)="goToCurrentWeek()">Semana actual</app-button>
+          <app-button variant="secondary" (pressed)="shiftWeek(1)">{{ i18n.t('staff.nextWeek') }}</app-button>
+          <app-button variant="text" (pressed)="goToCurrentWeek()">{{ i18n.t('staff.thisWeek') }}</app-button>
         </div>
 
         @if (perms.isAdmin()) {
           <div class="shifts__tv">
-            <app-button variant="secondary" [disabled]="shareBusy()" (pressed)="shareLinkAction('generate')">Generar enlace TV</app-button>
-            <app-button variant="secondary" [disabled]="shareBusy()" (pressed)="shareLinkAction('regenerate')">Regenerar</app-button>
-            <app-button variant="critical" [disabled]="shareBusy()" (pressed)="shareLinkAction('deactivate')">Desactivar</app-button>
+            <app-button variant="secondary" [disabled]="shareBusy()" (pressed)="shareLinkAction('generate')">{{ i18n.t('staff.tvGenerate') }}</app-button>
+            <app-button variant="secondary" [disabled]="shareBusy()" (pressed)="shareLinkAction('regenerate')">{{ i18n.t('staff.tvRegenerate') }}</app-button>
+            <app-button variant="critical" [disabled]="shareBusy()" (pressed)="shareLinkAction('deactivate')">{{ i18n.t('staff.tvDeactivate') }}</app-button>
             @if (share(); as s) {
               @if (s.publicUrl) {
                 <code class="shifts__tv-url">{{ s.publicUrl }}</code>
               } @else {
-                <span class="shifts__muted">Enlace desactivado.</span>
+                <span class="shifts__muted">{{ i18n.t('staff.tvOff') }}</span>
               }
             }
           </div>
         }
 
         @if (loading()) {
-          <p class="shifts__muted">Cargando matriz…</p>
+          <p class="shifts__muted">{{ i18n.t('staff.loading') }}</p>
         }
         @if (error()) {
           <p class="msg msg--error">{{ error() }}</p>
@@ -43,21 +43,21 @@
 
         @if (matrix(); as m) {
           <section class="shifts__calendar-summary">
-            <div class="shifts__calendar-heading"><div><p class="shifts__eyebrow">Vista operativa</p><h2>Resumen semanal</h2><p class="shifts__muted">{{ weekLabel() }}</p></div><span class="shifts__today-badge">Hoy: {{ todayLabel(m) }}</span></div>
+            <div class="shifts__calendar-heading"><div><p class="shifts__eyebrow">{{ i18n.t('staff.eyebrow') }}</p><h2>{{ i18n.t('staff.summary') }}</h2><p class="shifts__muted">{{ weekLabel() }}</p></div><span class="shifts__today-badge">{{ i18n.tf('staff.today', todayLabel(m)) }}</span></div>
             <div class="shifts__calendar-grid">
-              <div class="shifts__calendar-label">Persona</div>
+              <div class="shifts__calendar-label">{{ i18n.t('staff.person') }}</div>
               <div class="shifts__calendar-days" [style.grid-template-columns]="'repeat(' + m.columns.length + ', minmax(0, 1fr))'">@for (col of m.columns; track col.date) { <span [class.shifts__calendar-day--today]="col.isToday">{{ col.dayShort }}<small>{{ col.date.slice(5) }}</small></span> }</div>
               @for (row of m.rows; track row.userId) {
                 <div class="shifts__calendar-label"><strong>{{ row.name }}</strong><small>{{ row.role }}</small></div>
                 <div class="shifts__calendar-days shifts__calendar-days--bars" [style.grid-template-columns]="'repeat(' + m.columns.length + ', minmax(0, 1fr))'">@for (day of row.days; track day.date) { <span class="shifts__calendar-bar" [class.shifts__calendar-bar--today]="m.columns[$index].isToday" [style.--c]="conditionColorVar[day.condition]" [title]="day.label"><b>{{ day.marker }}</b><em>{{ day.label }}</em></span> }</div>
               }
             </div>
-            <div class="shifts__calendar-legend"><span><i class="shifts__legend-dot shifts__legend-dot--ok"></i>Teletrabajo</span><span><i class="shifts__legend-dot shifts__legend-dot--warning"></i>Capacitación</span><span><i class="shifts__legend-dot shifts__legend-dot--critical"></i>Ausencia</span><span><i class="shifts__legend-dot shifts__legend-dot--neutral"></i>Oficina</span></div>
+            <div class="shifts__calendar-legend"><span><i class="shifts__legend-dot shifts__legend-dot--ok"></i>{{ i18n.t('staff.legend.telework') }}</span><span><i class="shifts__legend-dot shifts__legend-dot--warning"></i>{{ i18n.t('staff.legend.training') }}</span><span><i class="shifts__legend-dot shifts__legend-dot--critical"></i>{{ i18n.t('staff.legend.absence') }}</span><span><i class="shifts__legend-dot shifts__legend-dot--neutral"></i>{{ i18n.t('staff.legend.office') }}</span></div>
           </section>
           <table class="shifts__matrix">
             <thead>
               <tr>
-                <th class="shifts__col-name">Nombre</th>
+                <th class="shifts__col-name">{{ i18n.t('staff.name') }}</th>
                 @for (col of m.columns; track col.date) {
                   <th [class.shifts__col--today]="col.isToday">
                     <span class="shifts__day-name">{{ col.dayShort }}</span>
@@ -82,12 +82,12 @@
                         <div class="shifts__edit" (click)="$event.stopPropagation()">
                           <select [ngModel]="editCondition()" (ngModelChange)="editCondition.set($event)">
                             @for (c of conditions; track c) {
-                              <option [value]="c">{{ conditionLabels[c] }}</option>
+                              <option [value]="c">{{ i18n.t(conditionKey(c)) }}</option>
                             }
                           </select>
                           <div class="shifts__edit-actions">
-                            <app-button variant="primary" [disabled]="savingEdit()" (pressed)="saveEdit()">Guardar</app-button>
-                            <app-button variant="text" [disabled]="savingEdit()" (pressed)="cancelEdit()">Cancelar</app-button>
+                            <app-button variant="primary" [disabled]="savingEdit()" (pressed)="saveEdit()">{{ i18n.t('staff.save') }}</app-button>
+                            <app-button variant="text" [disabled]="savingEdit()" (pressed)="cancelEdit()">{{ i18n.t('staff.cancel') }}</app-button>
                           </div>
                         </div>
                       } @else {
@@ -102,7 +102,7 @@
               }
               @if (m.rows.length === 0) {
                 <tr>
-                  <td class="shifts__empty" [attr.colspan]="m.columns.length + 1">Sin personal activo para mostrar.</td>
+                  <td class="shifts__empty" [attr.colspan]="m.columns.length + 1">{{ i18n.t('staff.empty') }}</td>
                 </tr>
               }
             </tbody>

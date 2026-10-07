@@ -72,10 +72,42 @@
               </select>
             </label>
           </div>
-          <label class="adm-field">
-            <span class="adm-label">{{ i18n.t('rpt.f.eventName') }} *</span>
-            <input class="adm-input" name="evento" [ngModel]="f.nombreEvento" (ngModelChange)="setIncident('nombreEvento', $event)" />
-          </label>
+          <div class="adm-field rp__suggest" (focusout)="onEventBlur($event)">
+            <label class="adm-label" for="rp-evento">{{ i18n.t('rpt.f.eventName') }} *</label>
+            <input
+              id="rp-evento"
+              class="adm-input"
+              name="evento"
+              role="combobox"
+              autocomplete="off"
+              aria-autocomplete="list"
+              aria-controls="rp-evento-list"
+              [attr.aria-expanded]="eventOpen()"
+              [attr.aria-activedescendant]="eventOpen() ? 'rp-ev-' + eventActive() : null"
+              [placeholder]="i18n.t('rpt.f.eventPlaceholder')"
+              [ngModel]="f.nombreEvento"
+              (ngModelChange)="onEventInput($event)"
+              (keydown)="onEventKey($event)"
+            />
+            @if (eventOpen()) {
+              <ul id="rp-evento-list" class="rp__suggest-list" role="listbox">
+                @for (ev of eventSuggestions(); track ev.id; let i = $index) {
+                  <li
+                    role="option"
+                    class="rp__suggest-opt"
+                    [id]="'rp-ev-' + i"
+                    [class.rp__suggest-opt--on]="i === eventActive()"
+                    [attr.aria-selected]="i === eventActive()"
+                    (mousedown)="$event.preventDefault(); pickEvent(ev)"
+                    (mouseenter)="eventActive.set(i)"
+                  >
+                    <span class="rp__suggest-name">{{ ev.name }}</span>
+                    @if (ev.parent) { <span class="rp__suggest-parent">{{ ev.parent }}</span> }
+                  </li>
+                }
+              </ul>
+            }
+          </div>
           <div class="adm-field">
             <span class="adm-label">{{ i18n.t('rpt.f.criticality') }}</span>
             <span class="rp__segs" role="group">

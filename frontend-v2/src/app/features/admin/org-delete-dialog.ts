@@ -15,6 +15,7 @@ import { problemDetail } from '../../core/http-error';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 
+import '../../core/i18n/packs/admin';
 export interface OrgDeleteData {
   org: Organization;
   dependents: OrgDependents;

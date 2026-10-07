@@ -9,6 +9,7 @@ import { problemDetail } from '../../core/http-error';
 import { formatDuration } from '../../core/tickets/ticket-view';
 import { SMTP_PRESETS, SmtpPreset, presetFor } from './smtp-presets';
 
+import '../../core/i18n/packs/admin';
 interface SmtpDraft {
   host: string;
   port: number;

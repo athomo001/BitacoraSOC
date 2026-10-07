@@ -7,6 +7,7 @@ import { AdminTemplate, CargoCount, ChecklistAdminService, SaveTemplate, Templat
 import { EditorItem, MAX_DEPTH, addChild, addRoot, childCount, depthOf, move, problems, remove, rename } from '../../core/checklists/template-editor';
 import { ShiftsService, WorkShift } from '../../core/shifts/shifts.service';
 
+import '../../core/i18n/packs/admin';
 interface Draft {
   id: string | null;
   name: string;

@@ -350,17 +350,25 @@ func (h *RotationHandler) CreateOverride(w http.ResponseWriter, r *http.Request)
 
 // ===== Quién está de guardia ahora (HU-4) =====
 
-// resolveCurrentTeamMember consulta los ciclos activos del equipo y resuelve
-// quién está de guardia ahora (internal/rotation.Resolve) — compartida entre
-// RotationHandler.CurrentSlot y EscalationHandler.resolve (onCallNow,
-// cerrando el gap dejado por la Fase 7: ver comentario histórico en
-// resolvedMemberDTO.OnCallNow). Si el equipo tiene más de un ciclo activo
-// (caso borde no contemplado en el roadmap), se devuelve la primera
-// resolución vigente que se encuentre.
-func resolveCurrentTeamMember(ctx context.Context, queries *db.Queries, teamID uuid.UUID, now time.Time) (*rotation.Current, error) {
+// resolveCurrentTeamMembers consulta los ciclos activos del equipo y resuelve
+// quiénes están de guardia ahora (internal/rotation.Resolve) — compartida
+// entre RotationHandler.CurrentSlot y EscalationHandler.resolve (onCallNow).
+// Pueden ser varios: en el legacy un rol (N2, OL) tenía a veces 2-3 personas
+// a la vez y todas estaban de guardia (antes se mostraba solo una). El orden
+// es el de los slots (semana más reciente primero, luego por nombre) y no se
+// repite a nadie.
+func resolveCurrentTeamMembers(ctx context.Context, queries *db.Queries, teamID uuid.UUID, now time.Time) ([]rotation.Current, error) {
 	cycles, err := queries.ListRotationCyclesByTeam(ctx, pgtype.UUID{Bytes: teamID, Valid: true})
 	if err != nil {
 		return nil, err
+	}
+	var out []rotation.Current
+	seen := map[uuid.UUID]bool{}
+	add := func(c *rotation.Current) {
+		if c != nil && !seen[c.TeamMemberID] {
+			seen[c.TeamMemberID] = true
+			out = append(out, *c)
+		}
 	}
 	for _, cycle := range cycles {
 		if !cycle.Active {
@@ -381,33 +389,30 @@ func resolveCurrentTeamMember(ctx context.Context, queries *db.Queries, teamID u
 				End:                     o.EndDate.Time,
 			})
 		}
-
-		var slot *rotation.Slot
-		slotRow, err := queries.GetCurrentRotationSlot(ctx, db.GetCurrentRotationSlotParams{
+		slots, err := queries.ListCurrentRotationSlots(ctx, db.ListCurrentRotationSlotsParams{
 			CycleID: cycle.ID, Today: pgtype.Date{Time: now, Valid: true},
 		})
-		switch {
-		case err == nil:
+		if err != nil {
+			return nil, err
+		}
+		if len(slots) == 0 {
+			// sin slot regular vigente esta semana — un override ad-hoc igual puede aplicar
+			add(rotation.Resolve(overrides, nil, now))
+			continue
+		}
+		for _, row := range slots {
 			// week_end_date es el ÚLTIMO día cubierto (inclusive) — se le suma
 			// un día para que el límite exclusivo de rotation.Resolve incluya
 			// ese día completo (medianoche del día siguiente), no solo su 00:00.
-			slot = &rotation.Slot{
-				TeamMemberID: slotRow.TeamMemberID,
-				WeekStart:    slotRow.WeekStartDate.Time,
-				WeekEnd:      slotRow.WeekEndDate.Time.AddDate(0, 0, 1),
-				IsPaused:     slotRow.IsPaused,
-			}
-		case errors.Is(err, pgx.ErrNoRows):
-			// sin slot regular vigente esta semana — un override ad-hoc igual puede aplicar
-		default:
-			return nil, err
-		}
-
-		if current := rotation.Resolve(overrides, slot, now); current != nil {
-			return current, nil
+			add(rotation.Resolve(overrides, &rotation.Slot{
+				TeamMemberID: row.TeamMemberID,
+				WeekStart:    row.WeekStartDate.Time,
+				WeekEnd:      row.WeekEndDate.Time.AddDate(0, 0, 1),
+				IsPaused:     row.IsPaused,
+			}, now))
 		}
 	}
-	return nil, nil
+	return out, nil
 }
 
 func (h *RotationHandler) CurrentSlot(w http.ResponseWriter, r *http.Request) {
@@ -417,24 +422,30 @@ func (h *RotationHandler) CurrentSlot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	current, err := resolveCurrentTeamMember(ctx, h.Queries, teamID, h.now())
+	current, err := resolveCurrentTeamMembers(ctx, h.Queries, teamID, h.now())
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo resolver la guardia vigente")
 		return
 	}
-	if current == nil {
-		writeData(w, http.StatusOK, map[string]any{"currentMember": nil})
+	if len(current) == 0 {
+		writeData(w, http.StatusOK, map[string]any{"currentMember": nil, "currentMembers": []any{}})
 		return
 	}
-	member, err := h.Queries.GetTeamMemberDisplay(ctx, current.TeamMemberID)
-	if err != nil {
-		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo resolver el nombre del miembro de guardia")
-		return
+	members := make([]map[string]any, 0, len(current))
+	for _, c := range current {
+		member, err := h.Queries.GetTeamMemberDisplay(ctx, c.TeamMemberID)
+		if err != nil {
+			problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo resolver el nombre del miembro de guardia")
+			return
+		}
+		members = append(members, map[string]any{"teamMemberId": member.ID, "name": member.DisplayName, "since": c.Since, "until": c.Until})
 	}
+	// currentMember/since/until: el primero, como antes (compatibilidad).
 	writeData(w, http.StatusOK, map[string]any{
-		"currentMember": map[string]any{"teamMemberId": member.ID, "name": member.DisplayName},
-		"since":         current.Since,
-		"until":         current.Until,
+		"currentMember":  members[0],
+		"currentMembers": members,
+		"since":          current[0].Since,
+		"until":          current[0].Until,
 	})
 }
 

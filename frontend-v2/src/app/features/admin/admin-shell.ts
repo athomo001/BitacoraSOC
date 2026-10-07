@@ -22,6 +22,7 @@ import { AdminComplementsComponent } from './admin-complements';
 import { AdminClientAlertsComponent } from './admin-client-alerts';
 import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 
+import '../../core/i18n/packs/admin';
 export type AdminSection =
   | 'access' | 'shifts' | 'checklist' | 'escalation' | 'clientAlerts' | 'smtp' | 'reports'
   | 'organizations' | 'territory' | 'teams'

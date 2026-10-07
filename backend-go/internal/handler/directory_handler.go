@@ -237,6 +237,11 @@ func (h *DirectoryHandler) List(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer los canales")
 		return
 	}
+	// Lectura de PII auditada como en el legacy (directory.central.list.view).
+	// No se guarda lo buscado: puede ser un teléfono o un correo.
+	h.AuditLog.Log(ctx, "directory.central.list.view", audit.LevelInfo, audit.Success(), map[string]any{
+		"hasQuery": q.Valid, "page": page, "results": len(dtos), "total": total,
+	})
 	writeDataMeta(w, http.StatusOK, dtos, map[string]any{"page": page, "pageSize": pageSize, "total": total})
 }
 
@@ -267,6 +272,7 @@ func (h *DirectoryHandler) Search(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer los canales")
 		return
 	}
+	h.AuditLog.Log(ctx, "directory.central.list.view", audit.LevelInfo, audit.Success(), map[string]any{"hasQuery": true, "results": len(dtos), "typeahead": true})
 	writeData(w, http.StatusOK, dtos)
 }
 
@@ -297,6 +303,7 @@ func (h *DirectoryHandler) Get(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer el contacto")
 		return
 	}
+	h.AuditLog.Log(r.Context(), "directory.central.detail.view", audit.LevelInfo, audit.Success(), map[string]any{"contactId": id.String()})
 	writeData(w, http.StatusOK, dto)
 }
 
@@ -697,6 +704,7 @@ func (h *DirectoryHandler) ListContactChannels(w http.ResponseWriter, r *http.Re
 	for _, c := range chans {
 		dtos = append(dtos, h.toChannelDTO(c))
 	}
+	h.AuditLog.Log(r.Context(), "directory.central.detail.view", audit.LevelInfo, audit.Success(), map[string]any{"contactId": id.String(), "channels": true})
 	writeData(w, http.StatusOK, dtos)
 }
 

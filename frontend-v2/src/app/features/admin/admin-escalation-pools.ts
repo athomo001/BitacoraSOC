@@ -7,6 +7,7 @@ import { DirectoryContact, DirectoryService } from '../../core/directory/directo
 import { I18nService } from '../../core/i18n/i18n.service';
 import { problemDetail } from '../../core/http-error';
 
+import '../../core/i18n/packs/admin';
 interface DraftMember {
   contactId?: string;
   userId?: string;

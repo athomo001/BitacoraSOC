@@ -277,6 +277,9 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/auth/mfa/setup", authed(authHandler.MFASetup))
 	mux.Handle("POST /api/auth/mfa/verify", authed(authHandler.MFAVerify))
 	mux.Handle("POST /api/auth/mfa/disable", authed(authHandler.MFADisable))
+	passwordPolicyHandler := &handler.PasswordPolicyHandler{Queries: queries, AuditLog: auditLog}
+	mux.Handle("GET /api/auth/password-policy", public(passwordPolicyHandler.Get))
+	mux.Handle("PUT /api/config/password-policy", admin(passwordPolicyHandler.Update))
 	mux.Handle("POST /api/auth/logout", authedAllowForced(authHandler.Logout))
 	mux.Handle("POST /api/auth/forgot-password", public(authHandler.ForgotPassword))
 	mux.Handle("POST /api/auth/reset-password", public(authHandler.ResetPassword))
@@ -335,6 +338,7 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/territorial-units", nocAdmin(territorialUnitsHandler.Create))
 	mux.Handle("PATCH /api/territorial-units/{id}", nocAdmin(territorialUnitsHandler.Patch))
 	mux.Handle("POST /api/territorial-units/import", nocAdmin(territorialUnitsHandler.Import))
+	mux.Handle("POST /api/territorial-units/bulk-active", nocAdmin(territorialUnitsHandler.BulkActive))
 	mux.Handle("GET /api/territorial-units/import/template", nocAuthed(territorialUnitsHandler.ImportTemplate))
 
 	// Organizaciones y catálogo de tecnologías (Fase 6) — núcleo compartido SOC/NOC.
@@ -602,6 +606,11 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/report-operation-types", admin(reportsHandler.CreateOperationType))
 	mux.Handle("PUT /api/report-operation-types/{id}", admin(reportsHandler.UpdateOperationType))
 	mux.Handle("DELETE /api/report-operation-types/{id}", admin(reportsHandler.DeleteOperationType))
+	mux.Handle("GET /api/report-events", authed(reportsHandler.SuggestReportEvents))
+	mux.Handle("GET /api/report-events/all", admin(reportsHandler.ListReportEvents))
+	mux.Handle("POST /api/report-events", admin(reportsHandler.CreateReportEvent))
+	mux.Handle("PUT /api/report-events/{id}", admin(reportsHandler.UpdateReportEvent))
+	mux.Handle("DELETE /api/report-events/{id}", admin(reportsHandler.DeleteReportEvent))
 	mux.Handle("POST /api/reports/shift/dispatch", admin(func(w http.ResponseWriter, r *http.Request) {
 		if err := reportDispatcher.DispatchPending(r.Context()); err != nil {
 			auditLog.Log(r.Context(), "report.shift.dispatch", audit.LevelError, audit.Failure(err.Error()), nil)

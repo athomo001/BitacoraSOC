@@ -12,6 +12,7 @@ import {
 } from '../../core/backups/backups.service';
 import { formatCount, formatSize, runKind } from '../../core/backups/backup-view';
 
+import '../../core/i18n/packs/admin';
 type RowPanel = { id: string; action: 'restore' | 'validate' | 'delete' };
 type Feedback = { ok: boolean; text: string };
 

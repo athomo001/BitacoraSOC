@@ -25,7 +25,15 @@
                 "input": "public"
               }
             ],
-            "styles": ["src/material-theme.scss", "src/styles.css"]
+            "styles": [
+              "src/material-theme.scss",
+              "src/styles.css",
+              { "input": "src/app/features/login/_login-infoflow.scss", "bundleName": "login-infoflow", "inject": false },
+              { "input": "src/app/features/login/_login-modern.scss", "bundleName": "login-modern", "inject": false },
+              { "input": "src/app/features/login/_login-surrealism.scss", "bundleName": "login-surrealism", "inject": false },
+              { "input": "src/app/features/login/_login-win311.scss", "bundleName": "login-win311", "inject": false },
+              { "input": "src/app/features/login/_login-unix89.scss", "bundleName": "login-unix89", "inject": false }
+            ]
           },
           "configurations": {
             "production": {

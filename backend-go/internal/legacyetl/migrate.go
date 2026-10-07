@@ -35,7 +35,7 @@ var birthdayTime = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
 // NotMigrated son las colecciones que no se migran por diseño (spec/13 §3).
 var NotMigrated = []string{
 	"tokenDenylist", "avisoLogs", "apiLogs", "customFonts", "glpiConfigs", "logForwardingConfigs",
-	"complementSharedRecords", "catalogEvents",
+	"complementSharedRecords",
 }
 
 // Options del ensayo.
@@ -117,6 +117,7 @@ func Run(ctx context.Context, pool *pgxpool.Pool, backup *Backup, legacy LegacyK
 		{"reglas de alerta del cliente", m.migrateClientRules},
 		{"historial de reportes", m.migrateReportHistory},
 		{"tipos de operación", m.migrateOperationTypes},
+		{"eventos de reporte", m.migrateReportEvents},
 		{"configuración", m.migrateAppConfig},
 		{"auditoría", m.migrateAudit},
 		{"verificación", m.verify},
@@ -141,7 +142,7 @@ func Run(ctx context.Context, pool *pgxpool.Pool, backup *Backup, legacy LegacyK
 // ensayo parte de cero (scripts/etl-reset.sh).
 func checkTarget(ctx context.Context, pool *pgxpool.Pool) error {
 	var hasLatest bool
-	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.work_shift_members') IS NOT NULL`).Scan(&hasLatest); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.report_events') IS NOT NULL`).Scan(&hasLatest); err != nil {
 		return err
 	}
 	if !hasLatest {

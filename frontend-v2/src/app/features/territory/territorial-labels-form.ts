@@ -7,6 +7,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
 
+import '../../core/i18n/packs/territory';
 /**
  * Renombra los 4 niveles de la jerarquía para el país real de la
  * instalación (HU-TERR-1). Solo presentación: no migra nada. Lo usan el

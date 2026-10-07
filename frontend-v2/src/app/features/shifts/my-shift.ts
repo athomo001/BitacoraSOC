@@ -13,6 +13,7 @@ import { currentShift, nextMoment, redLeaves } from '../../core/checklists/shift
 import { ShiftsService, WorkShift } from '../../core/shifts/shifts.service';
 import { MarkdownComponent } from '../../shared/markdown/markdown';
 
+import '../../core/i18n/packs/shifts';
 type Moment = 'inicio' | 'cierre';
 
 const GUIDE_KEY = 'bitacora.shiftGuideHidden';

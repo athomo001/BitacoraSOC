@@ -4,17 +4,18 @@ import { ButtonComponent } from '../../shared/ui/button/button';
 import { PermissionsService } from '../../core/auth/permissions.service';
 import { problemDetail } from '../../core/http-error';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { MessageKey } from '../../core/i18n/messages';
 import { MyShiftComponent } from './my-shift';
 import { ShiftHistoryComponent } from './shift-history';
 import {
   CONDITION_COLOR_VAR,
-  CONDITION_LABELS,
   Matrix,
   PublicShare,
   ShiftsService,
   TeleworkCondition,
 } from '../../core/shifts/shifts.service';
 
+import '../../core/i18n/packs/shifts';
 type ShiftsTab = 'mine' | 'history' | 'dotacion';
 
 const ALL_CONDITIONS: TeleworkCondition[] = ['office', 'telework', 'guardia', 'training', 'medical_appointment', 'vacation', 'medical_leave'];
@@ -54,7 +55,6 @@ function mondayOf(d: Date): Date {
   styleUrl: './shifts.css',
 })
 export class ShiftsComponent implements OnInit {
-  protected readonly conditionLabels = CONDITION_LABELS;
   protected readonly conditionColorVar = CONDITION_COLOR_VAR;
   protected readonly conditions = ALL_CONDITIONS;
 
@@ -81,6 +81,10 @@ export class ShiftsComponent implements OnInit {
     return `${m.columns[0].date} — ${m.columns[m.columns.length - 1].date}`;
   });
 
+  protected conditionKey(condition: TeleworkCondition): MessageKey {
+    return `staff.cond.${condition}` as MessageKey;
+  }
+
   protected todayLabel(matrix: Matrix): string {
     return matrix.columns.find((column) => column.isToday)?.date ?? matrix.columns[0]?.date ?? '';
   }
@@ -98,7 +102,7 @@ export class ShiftsComponent implements OnInit {
       const to = isoDate(new Date(this.weekStart().getTime() + 12 * 86_400_000));
       this.matrix.set(await this.api.matrix(from, to));
     } catch (error) {
-      this.error.set(problemDetail(error, 'No se pudo cargar la matriz de dotación.'));
+      this.error.set(problemDetail(error, this.i18n.t('staff.loadError')));
     } finally {
       this.loading.set(false);
     }
@@ -143,7 +147,7 @@ export class ShiftsComponent implements OnInit {
       this.editing.set(null);
       await this.loadMatrix();
     } catch (error) {
-      this.error.set(problemDetail(error, 'No se pudo guardar la asignación.'));
+      this.error.set(problemDetail(error, this.i18n.t('staff.saveError')));
     } finally {
       this.savingEdit.set(false);
     }
@@ -156,7 +160,7 @@ export class ShiftsComponent implements OnInit {
     try {
       this.share.set(await this.api.publicShareAction(action));
     } catch (error) {
-      this.error.set(problemDetail(error, 'No se pudo actualizar el enlace público de TV.'));
+      this.error.set(problemDetail(error, this.i18n.t('staff.tvError')));
     } finally {
       this.shareBusy.set(false);
     }

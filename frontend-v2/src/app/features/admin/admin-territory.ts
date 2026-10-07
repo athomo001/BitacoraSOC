@@ -9,6 +9,7 @@ import { problemDetail } from '../../core/http-error';
 import { TerritorialLabelsFormComponent } from '../territory/territorial-labels-form';
 import { TerritoryImportComponent } from '../territory/territory-import';
 
+import '../../core/i18n/packs/admin';
 type TerritoryRow = TerritorialUnit & Record<string, unknown>;
 
 function normalize(text: string): string {
@@ -62,6 +63,26 @@ function normalize(text: string): string {
             <input #q type="search" [value]="query()" (input)="query.set(q.value)" [placeholder]="i18n.t('territory.search')" [attr.aria-label]="i18n.t('territory.search')" />
           </label>
         </div>
+        <div class="tr__bulk">
+          <label class="tr__check">
+            <input
+              type="checkbox"
+              name="selectVisible"
+              [checked]="allVisibleSelected()"
+              [indeterminate]="someVisibleSelected()"
+              [disabled]="visibleRows().length === 0"
+              (change)="toggleVisible()"
+            />
+            {{ i18n.tf(query() ? 'territory.selectMatches' : 'territory.selectAll', visibleRows().length) }}
+          </label>
+          @if (selected().size > 0) {
+            <span class="mono adm-secondary">{{ i18n.tf('territory.selectedCount', selected().size) }}</span>
+            <button type="button" class="adm-btn" [disabled]="busy()" (click)="bulk(true)"><mat-icon>toggle_on</mat-icon>{{ i18n.t('territory.bulkOn') }}</button>
+            <button type="button" class="adm-btn" [disabled]="busy()" (click)="bulk(false)"><mat-icon>toggle_off</mat-icon>{{ i18n.t('territory.bulkOff') }}</button>
+            <button type="button" class="adm-btn" [disabled]="busy()" (click)="selected.set(empty())">{{ i18n.t('territory.clearSelection') }}</button>
+          }
+          @if (notice(); as n) { <span class="pill tone-ok adm-push"><mat-icon>task_alt</mat-icon>{{ n }}</span> }
+        </div>
         @if (error(); as e) { <p class="adm-error tr__error" role="alert">{{ e }}</p> }
         @if (truncated()) {
           <p class="adm-card__note">{{ i18n.tf('territory.truncated', rows().length) }}</p>
@@ -70,7 +91,10 @@ function normalize(text: string): string {
           <ng-template #cell let-row let-column="column">
             @switch (column) {
               @case ('name') {
-                <span [style.padding-left.px]="query() ? 0 : row.depth * 16" [class.tr__inactive]="!row.active">{{ row.name }}</span>
+                <label class="tr__name" [style.padding-left.px]="query() ? 0 : row.depth * 16">
+                  <input type="checkbox" [checked]="selected().has(row.id)" (change)="toggleOne(row.id)" [attr.aria-label]="row.name" />
+                  <span [class.tr__inactive]="!row.active">{{ row.name }}</span>
+                </label>
               }
               @case ('kind') {
                 {{ territory.kindLabel(row.kind) }}
@@ -103,6 +127,10 @@ function normalize(text: string): string {
     .tr__table { display: block; }
     .tr__inactive { color: var(--text-muted); text-decoration: line-through; }
     .tr__error { padding: 10px 14px 0; }
+    .tr__bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 40px; padding: 6px 14px; border-bottom: 1px solid var(--border-subtle); font-size: 12px; }
+    .tr__check, .tr__name { display: inline-flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer; }
+    .tr__name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tr__check input, .tr__name input { accent-color: var(--accent); }
     @media (width <= 1100px) { .tr__grid { grid-template-columns: minmax(0, 1fr); } }
   `,
 })
@@ -115,6 +143,16 @@ export class AdminTerritoryComponent implements OnInit {
   protected readonly total = signal(0);
   protected readonly query = signal('');
   protected readonly error = signal<string | null>(null);
+  protected readonly notice = signal<string | null>(null);
+  protected readonly busy = signal(false);
+  /** Selección para activar o desactivar varias de una vez (pedido del dueño 2026-10-07). */
+  protected readonly selected = signal<ReadonlySet<string>>(new Set());
+  protected readonly allVisibleSelected = computed(() => {
+    const rows = this.visibleRows();
+    const sel = this.selected();
+    return rows.length > 0 && rows.every((r) => sel.has(r.id));
+  });
+  protected readonly someVisibleSelected = computed(() => !this.allVisibleSelected() && this.visibleRows().some((r) => this.selected().has(r.id)));
   protected readonly truncated = computed(() => this.total() > this.rows().length);
   protected readonly nocEnabled = computed(() => this.setup.status()?.nocEnabled ?? false);
 
@@ -150,6 +188,54 @@ export class AdminTerritoryComponent implements OnInit {
       this.total.set(meta.total);
     } catch (error) {
       this.error.set(problemDetail(error, this.i18n.t('territory.loadError')));
+    }
+  }
+
+  protected empty(): ReadonlySet<string> {
+    return new Set();
+  }
+
+  protected toggleOne(id: string): void {
+    this.notice.set(null);
+    this.selected.update((sel) => {
+      const next = new Set(sel);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  /** Marca o desmarca todas las que se ven (con búsqueda, solo las que coinciden). */
+  protected toggleVisible(): void {
+    this.notice.set(null);
+    const ids = this.visibleRows().map((r) => r.id);
+    const all = this.allVisibleSelected();
+    this.selected.update((sel) => {
+      const next = new Set(sel);
+      for (const id of ids) {
+        if (all) next.delete(id);
+        else next.add(id);
+      }
+      return next;
+    });
+  }
+
+  protected async bulk(active: boolean): Promise<void> {
+    const ids = [...this.selected()];
+    if (ids.length === 0) return;
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      const changed = await this.territory.setActiveMany(ids, active);
+      const set = new Set(ids);
+      this.rows.update((list) => list.map((u) => (set.has(u.id) ? { ...u, active } : u)));
+      this.selected.set(new Set());
+      this.notice.set(this.i18n.tf(active ? 'territory.bulkOnDone' : 'territory.bulkOffDone', changed));
+    } catch (error) {
+      this.error.set(problemDetail(error, this.i18n.t('territory.toggleError')));
+    } finally {
+      this.busy.set(false);
     }
   }
 

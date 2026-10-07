@@ -61,6 +61,52 @@ describe('EscalationComponent (flujo de llamados, canvas v26)', () => {
     expect(tabs).toEqual(['Servicio']);
   });
 
+  it('al escribir en Zona propone lo más probable primero, sin importar tildes', async () => {
+    const fixture = TestBed.createComponent(EscalationComponent);
+    fixture.detectChanges();
+    answerModules({ socEnabled: false, nocEnabled: true }, 'noc');
+    await tick();
+    httpMock.expectOne('/api/assets').flush({ data: [] });
+    const unit = (id: string, name: string, code: string, depth: number) => ({ id, name, code, kind: depth ? 'region' : 'country', depth, active: true });
+    httpMock.expectOne((r) => r.url === '/api/territorial-units').flush({
+      data: [unit('u0', 'Chile', 'CL', 0), unit('u1', 'Aisén del General Carlos Ibáñez del Campo', 'CL-AI', 1), unit('u2', 'Los Ríos', 'CL-LR', 1), unit('u3', 'Río Ibáñez', 'CL-AI-RI', 2)],
+      meta: { page: 1, pageSize: 5000, total: 4 },
+    });
+    httpMock.match((r) => r.url === '/api/organizations').forEach((r) => r.flush({ data: [] }));
+    await tick();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    ([...el.querySelectorAll('.esc__segs .seg')].find((b) => b.textContent?.trim() === 'Zona') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    const input = el.querySelector('input[name="scopeTarget"]') as HTMLInputElement;
+    input.dispatchEvent(new Event('focus'));
+    input.value = 'rio';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    const labels = () => [...el.querySelectorAll('.pick__opt .pick__label')].map((o) => o.textContent?.trim());
+    expect(labels()).toEqual(['Río Ibáñez', 'Los Ríos']);
+
+    input.value = 'aisen';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(labels()[0]).toBe('Aisén del General Carlos Ibáñez del Campo');
+
+    input.value = 'zzz';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(el.querySelector('.pick__list')?.textContent).toContain('Sin coincidencias');
+
+    input.value = 'cl-lr';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    await tick();
+    fixture.detectChanges();
+    expect(httpMock.match((r) => r.url === '/api/escalation/resolve' && r.params.get('territorialUnitId') === 'u2').length).toBe(1);
+    expect(input.value).toBe('Los Ríos');
+  });
+
   async function render(incidents: unknown[] = [INCIDENT]) {
     const fixture = TestBed.createComponent(EscalationComponent);
     fixture.detectChanges();
@@ -70,9 +116,12 @@ describe('EscalationComponent (flujo de llamados, canvas v26)', () => {
     httpMock.expectOne((r) => r.url === '/api/organizations').flush({ data: [{ id: 'o-dpp', name: 'DPP', code: 'dpp', type: 'client', active: true, viaName: 'Mundo' }] });
     await tick();
     const el = fixture.nativeElement as HTMLElement;
-    const select = el.querySelector('select[name="scopeTarget"]') as HTMLSelectElement;
-    select.value = 's1';
-    select.dispatchEvent(new Event('change'));
+    const input = el.querySelector('input[name="scopeTarget"]') as HTMLInputElement;
+    input.dispatchEvent(new Event('focus'));
+    input.value = 'qrad';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
     await tick();
     httpMock.expectOne((r) => r.url === '/api/escalation/resolve').flush({ data: RESOLUTION });
     httpMock.expectOne((r) => r.url === '/api/escalation/incidents').flush({ data: incidents });

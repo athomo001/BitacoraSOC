@@ -5,6 +5,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
 
+import '../../core/i18n/packs/admin';
 /**
  * Textos por código (el backend los guarda solo en español) y cuáles existen
  * de verdad. Una funcionalidad de la base que todavía no está construida

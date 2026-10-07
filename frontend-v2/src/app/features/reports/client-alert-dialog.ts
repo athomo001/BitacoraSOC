@@ -6,6 +6,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { MarkdownComponent } from '../../shared/markdown/markdown';
 import { problemDetail } from '../../core/http-error';
 
+import '../../core/i18n/packs/reports';
 export interface ClientAlertDialogData {
   clientName: string;
   context: AlertContext;

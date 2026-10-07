@@ -69,6 +69,9 @@ func (h *UsersHandler) Create(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "username/email/password/role son obligatorios")
 		return
 	}
+	if rejectShortPassword(w, r, h.Queries, req.Password) {
+		return
+	}
 
 	hash, err := auth.HashPassword(req.Password)
 	if err != nil {

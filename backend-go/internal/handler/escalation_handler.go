@@ -474,9 +474,13 @@ func (h *EscalationHandler) fillSteps(ctx context.Context, res *resolutionDTO, s
 		// dejado por la Fase 7 (onCallNow hoy siempre false, ver
 		// resolvedMemberDTO). Un error acá no debe tumbar /resolve: sin datos
 		// de rotación, el equipo simplemente se ordena como antes.
-		if current, err := resolveCurrentTeamMember(ctx, h.Queries, st.TeamID, h.now()); err == nil && current != nil {
+		if current, err := resolveCurrentTeamMembers(ctx, h.Queries, st.TeamID, h.now()); err == nil {
+			onCall := map[uuid.UUID]bool{}
+			for _, c := range current {
+				onCall[c.TeamMemberID] = true
+			}
 			for i := range pureMembers {
-				if pureMembers[i].ID != current.TeamMemberID {
+				if !onCall[pureMembers[i].ID] {
 					continue
 				}
 				pureMembers[i].OnCall = true
@@ -528,6 +532,12 @@ func (h *EscalationHandler) Resolve(w http.ResponseWriter, r *http.Request) {
 		h.writeResolveError(w, r, err)
 		return
 	}
+	// Ver a quién llamar (nombres y teléfonos) es lectura de PII: auditada
+	// como en el legacy (escalation.view.contacts.read).
+	h.AuditLog.Log(r.Context(), "escalation.view.contacts.read", audit.LevelInfo, audit.Success(), map[string]any{
+		"serviceId": uuidString(s.ServiceID), "assetId": uuidString(s.AssetID), "territorialUnitId": uuidString(s.TerritorialUnitID),
+		"resolvedVia": res.ResolvedVia, "contacts": len(res.members),
+	})
 	writeData(w, http.StatusOK, res)
 }
 
@@ -629,7 +639,7 @@ func (h *EscalationHandler) RecordAction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var incident pgtype.UUID
+	var incident, incidentEntry pgtype.UUID
 	since := h.now().Add(-12 * time.Hour)
 	if req.Since != nil {
 		since = *req.Since
@@ -649,6 +659,7 @@ func (h *EscalationHandler) RecordAction(w http.ResponseWriter, r *http.Request)
 			return
 		}
 		incident = pgtype.UUID{Bytes: inc.ID, Valid: true}
+		incidentEntry = inc.EntryID
 		since = inc.OpenedAt.Time
 	}
 
@@ -715,11 +726,20 @@ func (h *EscalationHandler) RecordAction(w http.ResponseWriter, r *http.Request)
 			}
 		}
 	}
-	if req.EntryID != nil {
-		// HU-1t punto 2: el auto-comentario en la bitácora llega con la Fase 9
-		// (entries/entry_comments todavía no tienen API). El intento ya quedó
-		// vinculado por entry_id y se puede reconstruir después.
-		resp["entryCommentPending"] = true
+	// HU-1t punto 2: la evidencia queda sola en la bitácora — en la entrada
+	// del incidente o, sin incidente, en la entrada indicada.
+	logEntry := incidentEntry
+	if !logEntry.Valid {
+		logEntry = optionalUUID(req.EntryID)
+	}
+	if logEntry.Valid {
+		var nextStep int32
+		if next.EscalatedToNextStep {
+			nextStep = next.NextStepOrder
+		}
+		text := attemptText(req.StepOrder, member.dto.Name, req.Result, req.ChannelType, deref(req.Notes), nextStep)
+		resp["loggedToEntry"] = h.logToEntry(ctx, logEntry, operator.ID, text)
+		resp["entryId"] = uuid.UUID(logEntry.Bytes)
 	}
 	h.AuditLog.Log(ctx, "escalation.action", audit.LevelInfo, audit.Success(), map[string]any{
 		"actionLogId": log.ID.String(), "stepOrder": req.StepOrder, "result": req.Result, "channelType": req.ChannelType,

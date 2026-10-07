@@ -1,0 +1,244 @@
+<app-modal [wide]="true">
+  <span app-modal-title>{{ i18n.t('profile.title') }}</span>
+
+  <div class="pf">
+    <div class="pf__identity">
+      <div class="pf__photo">
+        <app-user-avatar [name]="fullName || user()?.username || ''" [src]="avatarUrl" size="large" />
+        <label class="pf__camera" [title]="i18n.t('profile.avatarPick')">
+          <span class="material-icons" aria-hidden="true">photo_camera</span>
+          <input type="file" accept="image/png,image/jpeg,image/webp" [attr.aria-label]="i18n.t('profile.avatarPick')" (change)="onAvatarSelected($event)" />
+        </label>
+      </div>
+      <div class="pf__who">
+        <strong class="pf__name">{{ fullName || user()?.username }}</strong>
+        <span class="pf__tags">
+          <span class="mono pf__muted">&#64;{{ user()?.username }}</span>
+          @if (user()?.cargoLabel; as cargo) {
+            <span class="pill pf__pill--cargo">{{ cargo }}</span>
+          }
+          @if (roleKey(); as key) {
+            <span class="pill pf__pill--role">{{ i18n.t(key) }}</span>
+          }
+        </span>
+        <span class="mono pf__email">{{ user()?.email }}</span>
+      </div>
+      @if (lastLogin(); as last) {
+        <span class="pf__last">{{ i18n.t('profile.lastLogin') }}<br /><span class="mono">{{ last }}</span></span>
+      }
+    </div>
+
+    <div class="pf__tabs" role="tablist">
+      @for (t of tabs; track t.id) {
+        <button
+          type="button"
+          role="tab"
+          class="pf__tab"
+          [class.pf__tab--on]="tab() === t.id"
+          [attr.aria-selected]="tab() === t.id"
+          (click)="selectTab(t.id)"
+        >
+          <span class="material-icons" aria-hidden="true">{{ t.icon }}</span>{{ i18n.t(t.label) }}
+        </button>
+      }
+    </div>
+
+    @switch (tab()) {
+      @case ('data') {
+        <div class="pf__panel pf__grid" role="tabpanel">
+          <label class="field">
+            <span>{{ i18n.t('profile.fullName') }}</span>
+            <input type="text" name="fullName" [(ngModel)]="fullName" />
+          </label>
+          <div class="field">
+            <span>{{ i18n.t('profile.email') }}</span>
+            <span class="pf__readonly mono">{{ user()?.email }}<span class="material-icons" aria-hidden="true">lock</span></span>
+            <small class="pf__hint">{{ i18n.t('profile.emailHint') }}</small>
+          </div>
+          <label class="field">
+            <span>{{ i18n.t('profile.phone') }}</span>
+            <input type="tel" name="phone" [(ngModel)]="phone" />
+            <small class="pf__hint">{{ i18n.t('profile.phoneHint') }}</small>
+          </label>
+          <label class="field">
+            <span>{{ i18n.t('profile.birthday') }}</span>
+            <input type="date" name="birthday" [(ngModel)]="birthday" />
+            <small class="pf__hint">{{ i18n.t('profile.birthdayHint') }}</small>
+          </label>
+        </div>
+      }
+      @case ('security') {
+        <div class="pf__panel pf__security" role="tabpanel">
+          <div class="pf__grid pf__grid--3">
+            <label class="field">
+              <span>{{ i18n.t('profile.currentPassword') }}</span>
+              <span class="pf__pw">
+                <input [type]="showPw() ? 'text' : 'password'" name="currentPassword" autocomplete="current-password" [ngModel]="currentPassword()" (ngModelChange)="currentPassword.set($event)" />
+              </span>
+            </label>
+            <label class="field">
+              <span>{{ i18n.t('profile.newPassword') }}</span>
+              <span class="pf__pw">
+                <input [type]="showPw() ? 'text' : 'password'" name="newPassword" autocomplete="new-password" [ngModel]="newPassword()" (ngModelChange)="newPassword.set($event)" />
+              </span>
+            </label>
+            <label class="field">
+              <span>{{ i18n.t('profile.repeatPassword') }}</span>
+              <span class="pf__pw">
+                <input [type]="showPw() ? 'text' : 'password'" name="repeatPassword" autocomplete="new-password" [ngModel]="repeatPassword()" (ngModelChange)="repeatPassword.set($event)" />
+                @if (repeatPassword()) {
+                  <span class="material-icons" [class.pf__ok]="passwordsMatch()" [class.pf__bad]="!passwordsMatch()" aria-hidden="true">
+                    {{ passwordsMatch() ? 'check_circle' : 'cancel' }}
+                  </span>
+                }
+              </span>
+            </label>
+          </div>
+          <div class="pf__meter-row">
+            <span class="pf__meter" aria-hidden="true">
+              @for (i of [1, 2, 3, 4]; track i) {
+                <span [style.background]="i <= strength().score ? strength().color : null"></span>
+              }
+            </span>
+            @if (newPassword()) {
+              <span class="pf__meter-label" [style.color]="strength().color">{{ i18n.t(strength().label) }}</span>
+              <span class="pf__hint">{{ i18n.tf('profile.passwordRule', minPassword()) }}</span>
+            }
+            <button type="button" class="pf__link" (click)="showPw.set(!showPw())">
+              <span class="material-icons pf__ico" aria-hidden="true">{{ showPw() ? 'visibility_off' : 'visibility' }}</span>
+              {{ i18n.t(showPw() ? 'profile.hidePasswords' : 'profile.showPasswords') }}
+            </button>
+            <app-button variant="primary" [disabled]="saving() || !canChangePassword()" (pressed)="savePassword()">
+              <span class="material-icons pf__ico" aria-hidden="true">key</span>{{ i18n.t('profile.changePassword') }}
+            </app-button>
+          </div>
+          @if (passwordFeedback(); as fb) {
+            <span class="msg" [class.msg--ok]="fb.ok" [class.msg--error]="!fb.ok">{{ i18n.t(fb.key) }}</span>
+          }
+
+          <section class="pf__mfa" [class.pf__mfa--on]="user()?.mfaEnabled">
+            <header class="pf__mfa-head">
+              <span class="material-icons" aria-hidden="true">verified_user</span>
+              <strong>{{ i18n.t('profile.mfa') }}</strong>
+              <span class="pill" [class.pf__pill--ok]="user()?.mfaEnabled">
+                {{ i18n.t(user()?.mfaEnabled ? 'profile.mfaOn' : 'profile.mfaOff') }}
+              </span>
+            </header>
+            @if (user()?.mfaEnabled) {
+              @if (disabling()) {
+                <div class="pf__mfa-body">
+                  <label class="field pf__grow">
+                    <span>{{ i18n.t('profile.mfaDisablePassword') }}</span>
+                    <input type="password" name="mfaPassword" autocomplete="current-password" [ngModel]="mfaPassword()" (ngModelChange)="mfaPassword.set($event)" (keydown.enter)="disableMfa()" />
+                  </label>
+                  <app-button variant="critical" [disabled]="saving() || !mfaPassword()" (pressed)="disableMfa()">{{ i18n.t('profile.mfaDisable') }}</app-button>
+                  <app-button (pressed)="cancelMfa()">{{ i18n.t('profile.cancel') }}</app-button>
+                </div>
+              } @else {
+                <div class="pf__mfa-body">
+                  <span class="material-icons pf__ok" aria-hidden="true">phonelink_lock</span>
+                  <span class="pf__muted pf__grow">{{ i18n.t('profile.mfaOnHint') }}</span>
+                  <app-button (pressed)="disabling.set(true)">
+                    <span class="material-icons pf__ico pf__bad" aria-hidden="true">no_encryption</span>{{ i18n.t('profile.mfaDisable') }}
+                  </app-button>
+                </div>
+              }
+            } @else if (enrollment(); as e) {
+              <div class="pf__mfa-setup">
+                <img class="pf__qr" [src]="e.qrCodeDataUrl" [alt]="i18n.t('profile.mfaQrAlt')" />
+                <div class="pf__steps">
+                  <span><b>1.</b> {{ i18n.t('profile.mfaStep1') }}</span>
+                  <span class="pf__hint">{{ i18n.t('profile.mfaManual') }} <span class="mono pf__secret">{{ groupedSecret() }}</span></span>
+                  <span><b>2.</b> {{ i18n.t('profile.mfaStep2') }}</span>
+                  <span class="pf__code-row">
+                    <input
+                      class="mono pf__code"
+                      name="mfaCode"
+                      inputmode="numeric"
+                      autocomplete="one-time-code"
+                      maxlength="6"
+                      [attr.aria-label]="i18n.t('profile.mfaStep2')"
+                      [ngModel]="mfaCode()"
+                      (ngModelChange)="mfaCode.set($event)"
+                      (keydown.enter)="confirmMfa()"
+                    />
+                    <app-button variant="primary" [disabled]="saving() || !codeReady()" (pressed)="confirmMfa()">
+                      <span class="material-icons pf__ico" aria-hidden="true">check</span>{{ i18n.t('profile.mfaConfirm') }}
+                    </app-button>
+                    <app-button (pressed)="cancelMfa()">{{ i18n.t('profile.cancel') }}</app-button>
+                  </span>
+                </div>
+              </div>
+            } @else {
+              <div class="pf__mfa-body">
+                <span class="pf__muted pf__grow">{{ i18n.t('profile.mfaOffHint') }}</span>
+                <app-button variant="primary" [disabled]="saving()" (pressed)="startMfa()">
+                  <span class="material-icons pf__ico" aria-hidden="true">qr_code_2</span>{{ i18n.t('profile.mfaEnable') }}
+                </app-button>
+              </div>
+            }
+            @if (mfaFeedback(); as fb) {
+              <span class="msg pf__mfa-msg" [class.msg--ok]="fb.ok" [class.msg--error]="!fb.ok">{{ i18n.t(fb.key) }}</span>
+            }
+          </section>
+        </div>
+      }
+      @case ('prefs') {
+        <div class="pf__panel pf__prefs" role="tabpanel">
+          <div class="pf__grid pf__grid--3">
+            <div class="field">
+              <span>{{ i18n.t('profile.theme') }}</span>
+              <span class="pf__seg">
+                @for (o of themes; track o.id) {
+                  <button type="button" class="pf__chip" [class.pf__chip--on]="prefs.theme() === o.id" [attr.aria-pressed]="prefs.theme() === o.id" (click)="prefs.theme.set(o.id)">
+                    <span class="material-icons" aria-hidden="true">{{ o.icon }}</span>{{ i18n.t(o.label) }}
+                  </button>
+                }
+              </span>
+            </div>
+            <div class="field">
+              <span>{{ i18n.t('shell.language') }}</span>
+              <span class="pf__seg">
+                <button type="button" class="pf__chip" [class.pf__chip--on]="prefs.language() === 'es'" [attr.aria-pressed]="prefs.language() === 'es'" (click)="prefs.language.set('es')">Español</button>
+                <button type="button" class="pf__chip" [class.pf__chip--on]="prefs.language() === 'en'" [attr.aria-pressed]="prefs.language() === 'en'" (click)="prefs.language.set('en')">English</button>
+              </span>
+            </div>
+            <div class="field">
+              <span>{{ i18n.t('profile.reading') }}</span>
+              <button type="button" class="pf__switch" role="switch" [attr.aria-checked]="prefs.dyslexiaFont()" (click)="prefs.toggleDyslexiaFont()">
+                <span class="pf__track" [class.pf__track--on]="prefs.dyslexiaFont()"><span></span></span>
+                {{ i18n.t('shell.dyslexia') }}
+              </button>
+            </div>
+          </div>
+          <div class="field">
+            <span>{{ i18n.t('profile.loginTheme') }}</span>
+            <span class="pf__logins">
+              @for (theme of loginThemes; track theme) {
+                <button type="button" class="pf__login" [class.pf__login--on]="loginTheme() === theme" [attr.aria-pressed]="loginTheme() === theme" (click)="setLoginTheme(theme)">
+                  <span class="pf__login-thumb" [style.background]="loginPreview[theme].bg">{{ loginPreview[theme].mark }}</span>
+                  <span class="pf__login-name">{{ loginThemeLabels[theme] }}</span>
+                </button>
+              }
+            </span>
+          </div>
+        </div>
+      }
+    }
+  </div>
+
+  @if (tab() === 'data') {
+    <div app-modal-actions class="pf__foot">
+      @if (profileFeedback(); as fb) {
+        <span class="msg" [class.msg--ok]="fb.ok" [class.msg--error]="!fb.ok">{{ i18n.t(fb.key) }}</span>
+      }
+      <app-button variant="primary" [disabled]="saving()" (pressed)="saveProfile()">
+        <span class="material-icons pf__ico" aria-hidden="true">save</span>{{ i18n.t('profile.save') }}
+      </app-button>
+    </div>
+  } @else if (tab() === 'prefs') {
+    <div app-modal-actions class="pf__foot">
+      <span class="pf__hint">{{ i18n.t('profile.prefsHint') }}</span>
+    </div>
+  }
+</app-modal>

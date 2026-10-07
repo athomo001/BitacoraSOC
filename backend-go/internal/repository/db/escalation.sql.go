@@ -119,7 +119,7 @@ func (q *Queries) CloseEscalationIncident(ctx context.Context, arg CloseEscalati
 const createEscalationIncident = `-- name: CreateEscalationIncident :one
 INSERT INTO escalation_incidents (service_id, asset_id, territorial_unit_id, title, glpi_ticket, ticket_id, opened_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, service_id, asset_id, territorial_unit_id, title, glpi_ticket, ticket_id, opened_by, opened_at, closed_by, closed_at
+RETURNING id, service_id, asset_id, territorial_unit_id, title, glpi_ticket, ticket_id, opened_by, opened_at, closed_by, closed_at, entry_id
 `
 
 type CreateEscalationIncidentParams struct {
@@ -155,6 +155,7 @@ func (q *Queries) CreateEscalationIncident(ctx context.Context, arg CreateEscala
 		&i.OpenedAt,
 		&i.ClosedBy,
 		&i.ClosedAt,
+		&i.EntryID,
 	)
 	return i, err
 }
@@ -409,7 +410,7 @@ func (q *Queries) GetAssetForResolve(ctx context.Context, id uuid.UUID) (GetAsse
 }
 
 const getEscalationIncident = `-- name: GetEscalationIncident :one
-SELECT i.id, i.service_id, i.asset_id, i.territorial_unit_id, i.title, i.glpi_ticket, i.ticket_id, i.opened_by, i.opened_at, i.closed_by, i.closed_at, u.username AS opened_by_username, t.ticket_number
+SELECT i.id, i.service_id, i.asset_id, i.territorial_unit_id, i.title, i.glpi_ticket, i.ticket_id, i.opened_by, i.opened_at, i.closed_by, i.closed_at, i.entry_id, u.username AS opened_by_username, t.ticket_number
 FROM escalation_incidents i
 JOIN users u ON u.id = i.opened_by
 LEFT JOIN tickets t ON t.id = i.ticket_id
@@ -428,6 +429,7 @@ type GetEscalationIncidentRow struct {
 	OpenedAt          pgtype.Timestamptz `json:"opened_at"`
 	ClosedBy          pgtype.UUID        `json:"closed_by"`
 	ClosedAt          pgtype.Timestamptz `json:"closed_at"`
+	EntryID           pgtype.UUID        `json:"entry_id"`
 	OpenedByUsername  string             `json:"opened_by_username"`
 	TicketNumber      pgtype.Text        `json:"ticket_number"`
 }
@@ -447,6 +449,7 @@ func (q *Queries) GetEscalationIncident(ctx context.Context, id uuid.UUID) (GetE
 		&i.OpenedAt,
 		&i.ClosedBy,
 		&i.ClosedAt,
+		&i.EntryID,
 		&i.OpenedByUsername,
 		&i.TicketNumber,
 	)
@@ -734,7 +737,7 @@ func (q *Queries) ListEscalationIncidentNotes(ctx context.Context, incidentID uu
 }
 
 const listEscalationIncidents = `-- name: ListEscalationIncidents :many
-SELECT i.id, i.service_id, i.asset_id, i.territorial_unit_id, i.title, i.glpi_ticket, i.ticket_id, i.opened_by, i.opened_at, i.closed_by, i.closed_at, u.username AS opened_by_username, t.ticket_number
+SELECT i.id, i.service_id, i.asset_id, i.territorial_unit_id, i.title, i.glpi_ticket, i.ticket_id, i.opened_by, i.opened_at, i.closed_by, i.closed_at, i.entry_id, u.username AS opened_by_username, t.ticket_number
 FROM escalation_incidents i
 JOIN users u ON u.id = i.opened_by
 LEFT JOIN tickets t ON t.id = i.ticket_id
@@ -764,6 +767,7 @@ type ListEscalationIncidentsRow struct {
 	OpenedAt          pgtype.Timestamptz `json:"opened_at"`
 	ClosedBy          pgtype.UUID        `json:"closed_by"`
 	ClosedAt          pgtype.Timestamptz `json:"closed_at"`
+	EntryID           pgtype.UUID        `json:"entry_id"`
 	OpenedByUsername  string             `json:"opened_by_username"`
 	TicketNumber      pgtype.Text        `json:"ticket_number"`
 }
@@ -791,6 +795,7 @@ func (q *Queries) ListEscalationIncidents(ctx context.Context, arg ListEscalatio
 			&i.OpenedAt,
 			&i.ClosedBy,
 			&i.ClosedAt,
+			&i.EntryID,
 			&i.OpenedByUsername,
 			&i.TicketNumber,
 		); err != nil {
@@ -1505,6 +1510,20 @@ func (q *Queries) ReopenEscalationIncident(ctx context.Context, id uuid.UUID) (i
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const setEscalationIncidentEntry = `-- name: SetEscalationIncidentEntry :exec
+UPDATE escalation_incidents SET entry_id = $2 WHERE id = $1
+`
+
+type SetEscalationIncidentEntryParams struct {
+	ID      uuid.UUID   `json:"id"`
+	EntryID pgtype.UUID `json:"entry_id"`
+}
+
+func (q *Queries) SetEscalationIncidentEntry(ctx context.Context, arg SetEscalationIncidentEntryParams) error {
+	_, err := q.db.Exec(ctx, setEscalationIncidentEntry, arg.ID, arg.EntryID)
+	return err
 }
 
 const updateEscalationPool = `-- name: UpdateEscalationPool :one

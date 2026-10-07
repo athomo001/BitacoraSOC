@@ -110,7 +110,7 @@
       @if (guard(); as g) {
         <p class="sa__guard">
           <span class="pill" [class]="g.currentMember ? 'tone-ok' : 'tone-warn'"><mat-icon>{{ g.currentMember ? 'shield' : 'gpp_maybe' }}</mat-icon>{{ i18n.t('shiftsAdmin.onCallNow') }}</span>
-          <strong>{{ g.currentMember?.name ?? i18n.t('shiftsAdmin.nobody') }}</strong>
+          <strong>{{ guardNames(g) || i18n.t('shiftsAdmin.nobody') }}</strong>
           @if (g.currentMember && g.until) { <span class="adm-small adm-secondary">· {{ i18n.t('shiftsAdmin.until') }} <span class="mono">{{ g.until | date: 'dd/MM HH:mm' }}</span></span> }
         </p>
       }

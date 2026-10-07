@@ -2,18 +2,14 @@
   <div class="esc__toolbar">
     <h1 class="esc__title"><mat-icon>place</mat-icon>{{ i18n.t('esc.title') }}</h1>
     <span class="esc__segs" role="tablist" [attr.aria-label]="i18n.t('esc.whatFails')">
+      @if (socEnabled()) {
+        <button type="button" role="tab" class="seg" [attr.aria-pressed]="scopeKind() === 'service'" [attr.aria-selected]="scopeKind() === 'service'" (click)="setKind('service')">{{ i18n.t('escAdmin.kind.service') }}</button>
+      }
       @if (nocEnabled()) {
         <button type="button" role="tab" class="seg" [attr.aria-pressed]="scopeKind() === 'asset'" [attr.aria-selected]="scopeKind() === 'asset'" (click)="setKind('asset')">{{ i18n.t('escAdmin.kind.asset') }}</button>
         <button type="button" role="tab" class="seg" [attr.aria-pressed]="scopeKind() === 'unit'" [attr.aria-selected]="scopeKind() === 'unit'" (click)="setKind('unit')">{{ i18n.t('escAdmin.kind.unit') }}</button>
       }
-      @if (socEnabled()) {
-        <button type="button" role="tab" class="seg" [attr.aria-pressed]="scopeKind() === 'service'" [attr.aria-selected]="scopeKind() === 'service'" (click)="setKind('service')">{{ i18n.t('escAdmin.kind.service') }}</button>
-      }
     </span>
-    <label class="esc__search">
-      <mat-icon>search</mat-icon>
-      <input name="scopeFilter" [placeholder]="i18n.t(nocEnabled() ? 'esc.searchTarget' : 'esc.searchTargetSoc')" [attr.aria-label]="i18n.t(nocEnabled() ? 'esc.searchTarget' : 'esc.searchTargetSoc')" [ngModel]="filter()" (ngModelChange)="filter.set($event)" />
-    </label>
     <button type="button" class="adm-btn esc__push" [attr.aria-expanded]="showMaintenance()" (click)="showMaintenance.set(!showMaintenance())">
       <mat-icon>engineering</mat-icon>{{ i18n.t('esc.maintenance') }}
     </button>
@@ -25,6 +21,49 @@
 
   <!-- Servicio y cliente destacados (canvas v26) -->
   <section class="hero" [class.hero--empty]="!target()">
+    <div class="pick hero__pick" (focusout)="onPickBlur($event)">
+      <mat-icon aria-hidden="true">search</mat-icon>
+      <input
+        class="pick__input"
+        name="scopeTarget"
+        role="combobox"
+        autocomplete="off"
+        aria-autocomplete="list"
+        aria-controls="esc-pick-list"
+        [attr.aria-expanded]="pickOpen()"
+        [attr.aria-activedescendant]="pickOpen() && matches().shown.length ? 'esc-opt-' + pickActive() : null"
+        [attr.aria-label]="i18n.t($any('escAdmin.kind.' + scopeKind()))"
+        [placeholder]="i18n.tf(scopeKind() === 'asset' ? 'esc.typeAsset' : 'esc.typeToPick', options().length)"
+        [value]="pickOpen() ? filter() : (target()?.name ?? '')"
+        (input)="onPickInput($any($event.target).value)"
+        (focus)="openPick()"
+        (click)="openPick()"
+        (keydown)="onPickKey($event)"
+      />
+      @if (pickOpen()) {
+        <ul id="esc-pick-list" class="pick__list" role="listbox">
+          @for (o of matches().shown; track o.id; let i = $index) {
+            <li
+              role="option"
+              class="pick__opt"
+              [id]="'esc-opt-' + i"
+              [class.pick__opt--on]="i === pickActive()"
+              [attr.aria-selected]="o.id === selectedId()"
+              (mousedown)="$event.preventDefault(); choose(o.id)"
+              (mouseenter)="pickActive.set(i)"
+            >
+              <span class="pick__label" [style.padding-left.px]="filter() ? 0 : (o.depth ?? 0) * 12">{{ o.label }}</span>
+              @if (o.hint) { <span class="mono pick__hint">{{ o.hint }}</span> }
+            </li>
+          } @empty {
+            <li class="pick__none">{{ i18n.t('esc.noMatch') }}</li>
+          }
+          @if (matches().more > 0) {
+            <li class="pick__none">{{ i18n.tf('esc.keepTyping', matches().more) }}</li>
+          }
+        </ul>
+      }
+    </div>
     <span class="hero__icon"><mat-icon>{{ scopeKind() === 'service' ? 'dns' : scopeKind() === 'asset' ? 'router' : 'map' }}</mat-icon></span>
     <div class="hero__block">
       <span class="hero__label">{{ i18n.t($any('escAdmin.kind.' + scopeKind())) }}</span>
@@ -46,12 +85,6 @@
         @if (target()?.via; as via) { <span class="hero__sub">{{ i18n.t('esc.through') }} <strong>{{ via }}</strong></span> }
       </div>
     }
-    <select class="adm-input hero__pick" name="scopeTarget" [attr.aria-label]="i18n.t($any('escAdmin.kind.' + scopeKind()))" [ngModel]="selectedId()" (ngModelChange)="pick($event)">
-      <option value="">{{ i18n.tf('esc.pickTarget', options().length) }}</option>
-      @for (o of options(); track o.id) {
-        <option [value]="o.id">{{ o.label }}{{ o.hint ? ' — ' + o.hint : '' }}</option>
-      }
-    </select>
   </section>
 
   @if (error(); as e) { <p class="adm-error esc__msg" role="alert">{{ e }}</p> }
@@ -235,6 +268,9 @@
           <h3 class="adm-card__title"><mat-icon>history_edu</mat-icon>{{ i18n.t('esc.history') }}</h3>
           @if (incident(); as inc) {
             <span class="adm-small adm-secondary">{{ inc.title }} · <span class="mono">{{ linkLabel(inc) }}</span></span>
+            @if (inc.entryId) {
+              <a class="adm-btn" [routerLink]="['/entries']" [queryParams]="{ entry: inc.entryId }"><mat-icon>edit_note</mat-icon>{{ i18n.t('esc.seeInLogbook') }}</a>
+            }
             <button type="button" class="adm-btn forensic__close" [disabled]="saving()" (click)="toggleClosed()"><mat-icon>{{ inc.closedAt ? 'lock_open' : 'task_alt' }}</mat-icon>{{ i18n.t(inc.closedAt ? 'esc.reopen' : 'esc.close') }}</button>
           }
         </div>

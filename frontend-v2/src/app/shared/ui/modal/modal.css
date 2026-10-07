@@ -10,6 +10,10 @@
   font-family: var(--font-ui);
 }
 
+.app-modal--wide {
+  max-width: min(800px, calc(100vw - 32px));
+}
+
 .app-modal__header {
   display: flex;
   align-items: center;

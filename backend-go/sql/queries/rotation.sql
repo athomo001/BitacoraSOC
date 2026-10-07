@@ -26,9 +26,11 @@ LEFT JOIN contacts c ON c.id = m.contact_id
 WHERE s.cycle_id = $1
 ORDER BY s.week_start_date DESC;
 
--- name: GetCurrentRotationSlot :one
--- El slot regular cuya semana cubre `now` (independiente de is_paused: el
--- handler decide qué hacer con eso vía internal/rotation.Resolve).
+-- name: ListCurrentRotationSlots :many
+-- Los slots regulares cuya semana cubre `today` (independiente de is_paused:
+-- el handler decide qué hacer con eso vía internal/rotation.Resolve). Puede
+-- haber más de uno: en el legacy un rol (N2, OL) tenía a veces 2-3 personas
+-- a la vez, y todas están de guardia.
 SELECT s.*, COALESCE(u.username, c.name, '')::text AS display_name
 FROM rotation_slots s
 JOIN team_members m ON m.id = s.team_member_id
@@ -37,8 +39,7 @@ LEFT JOIN contacts c ON c.id = m.contact_id
 WHERE s.cycle_id = $1
   AND s.week_start_date <= sqlc.arg('today')::date
   AND s.week_end_date >= sqlc.arg('today')::date
-ORDER BY s.week_start_date DESC
-LIMIT 1;
+ORDER BY s.week_start_date DESC, display_name;
 
 -- name: CreateRotationSlot :one
 INSERT INTO rotation_slots (cycle_id, team_member_id, week_start_date, week_end_date)

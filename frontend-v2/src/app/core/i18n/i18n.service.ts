@@ -1,6 +1,7 @@
 import { Injectable, effect, inject, signal } from '@angular/core';
 import { PreferencesService } from '../preferences/preferences.service';
-import { MESSAGES_ES, MessageKey } from './messages';
+import { CoreKey, MESSAGES_ES, MessageKey } from './messages';
+import { packText } from './registry';
 
 /**
  * Traducción ES/EN en caliente (diseño aprobado: el selector ES/EN cambia
@@ -15,7 +16,7 @@ import { MESSAGES_ES, MessageKey } from './messages';
 @Injectable({ providedIn: 'root' })
 export class I18nService {
   private readonly prefs = inject(PreferencesService);
-  private readonly en = signal<Record<MessageKey, string> | null>(null);
+  private readonly en = signal<Record<CoreKey, string> | null>(null);
   private loading: Promise<void> | null = null;
 
   constructor() {
@@ -25,8 +26,10 @@ export class I18nService {
   }
 
   t(key: MessageKey): string {
-    const en = this.prefs.language() === 'en' ? this.en() : null;
-    return (en ?? MESSAGES_ES)[key];
+    const language = this.prefs.language();
+    const core: Record<string, string | undefined> = (language === 'en' ? this.en() : null) ?? MESSAGES_ES;
+    // Núcleo primero; si no, el pack de la pantalla (ya registrado al cargar su código).
+    return core[key] ?? packText(language, key) ?? key;
   }
 
   /** Texto con un valor: "Quedan {v}" → "Quedan 2 h" / "{v} left" → "2 h left". */

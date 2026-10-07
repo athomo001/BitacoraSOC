@@ -13,4 +13,6 @@ export interface BootstrapRequest extends ModuleFlags {
   adminUsername: string;
   adminEmail: string;
   adminPassword: string;
+  /** Enciende la Ticketera; sola (sin SOC ni NOC) = "solo Ticketera". */
+  ticketsEnabled?: boolean;
 }

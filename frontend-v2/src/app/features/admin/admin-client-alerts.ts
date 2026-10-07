@@ -6,7 +6,9 @@ import { Organization, OrganizationsService } from '../../core/organizations/org
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
+import { AdminReportEventsComponent } from './admin-report-events';
 
+import '../../core/i18n/packs/admin';
 type Mode = AlertWindow['mode'];
 
 export const ALERT_MODES: readonly Mode[] = [
@@ -65,7 +67,7 @@ export function fromLocalInput(value: string): string | null {
 @Component({
   selector: 'app-admin-client-alerts',
   standalone: true,
-  imports: [FormsModule, MatIconModule],
+  imports: [FormsModule, MatIconModule, AdminReportEventsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host { display: flex; flex-direction: column; gap: 14px; }
@@ -286,6 +288,8 @@ export function fromLocalInput(value: string): string | null {
         </table>
       </div>
     </section>
+
+    <app-admin-report-events />
   `,
 })
 export class AdminClientAlertsComponent implements OnInit {

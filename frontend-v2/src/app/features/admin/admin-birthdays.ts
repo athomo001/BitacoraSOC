@@ -7,6 +7,7 @@ import { ApiEnvelope } from '../../core/auth/auth.models';
 import { problemDetail } from '../../core/http-error';
 import { I18nService } from '../../core/i18n/i18n.service';
 
+import '../../core/i18n/packs/admin';
 interface BirthdayConfig {
   enabled: boolean;
   time: string;

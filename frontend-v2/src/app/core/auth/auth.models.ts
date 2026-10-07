@@ -7,10 +7,12 @@ export interface AuthUser {
   birthday?: string;
   avatarUrl?: string;
   role: string;
+  cargoLabel?: string;
   mfaEnabled: boolean;
   mustChangePassword: boolean;
   active: boolean;
   createdAt: string;
+  lastLoginAt?: string;
 }
 
 export interface LoginSuccess {
@@ -33,4 +35,10 @@ export function isMfaPending(result: LoginResult): result is LoginMfaPending {
 export interface ApiEnvelope<T> {
   data: T;
   meta?: unknown;
+}
+
+/** POST /api/auth/mfa/setup — el QR ya viene armado por el servidor. */
+export interface MfaEnrollment {
+  qrCodeDataUrl: string;
+  secret: string;
 }

@@ -11,6 +11,7 @@ import { SetupService } from '../../core/setup/setup.service';
 import { EscalationPool, EscalationService } from '../../core/escalation/escalation.service';
 import { problemDetail } from '../../core/http-error';
 
+import '../../core/i18n/packs/admin';
 /** Tipos de equipo del backend (teams.kind); la etiqueta sale de i18n. */
 const TEAM_KINDS = ['contractor_field', 'noc_internal', 'escalation', 'oncall', 'raci'] as const;
 /** Tipos que solo existen con NOC: sin NOC no se ofrecen al crear. */

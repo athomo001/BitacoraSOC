@@ -5,6 +5,7 @@ import { TerritoryService } from '../../core/territory/territory.service';
 import { ImportResult } from '../../core/territory/territory.models';
 import { problemDetail } from '../../core/http-error';
 
+import '../../core/i18n/packs/territory';
 /**
  * Carga la división administrativa desde JSON anidado (HU-TERR-2): el seed
  * de Chile que trae el proyecto, o el archivo propio de otro país. Reimportar

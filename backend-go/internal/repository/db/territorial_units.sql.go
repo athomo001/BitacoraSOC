@@ -201,6 +201,39 @@ func (q *Queries) RebaseTerritorialSubtree(ctx context.Context, arg RebaseTerrit
 	return err
 }
 
+const setTerritorialUnitsActive = `-- name: SetTerritorialUnitsActive :many
+UPDATE territorial_units SET active = $1
+WHERE id = ANY($2::uuid[]) AND active <> $1
+RETURNING id
+`
+
+type SetTerritorialUnitsActiveParams struct {
+	Active bool        `json:"active"`
+	Ids    []uuid.UUID `json:"ids"`
+}
+
+// POST /api/territorial-units/bulk-active — activar o desactivar varias de
+// una vez (pedido del dueño 2026-10-07). Solo toca las que cambian.
+func (q *Queries) SetTerritorialUnitsActive(ctx context.Context, arg SetTerritorialUnitsActiveParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, setTerritorialUnitsActive, arg.Active, arg.Ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateTerritorialUnit = `-- name: UpdateTerritorialUnit :one
 UPDATE territorial_units SET
   name = COALESCE($2, name),

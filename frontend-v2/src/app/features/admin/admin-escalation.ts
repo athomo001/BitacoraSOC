@@ -19,6 +19,7 @@ import { problemDetail } from '../../core/http-error';
 import { MaintenanceWindowsComponent } from '../escalation/maintenance-windows';
 import { AdminEscalationPoolsComponent } from './admin-escalation-pools';
 
+import '../../core/i18n/packs/admin';
 type ScopeKind = 'asset' | 'unit' | 'service';
 const MODES: readonly StepMode[] = ['unique', 'sequential', 'pool'];
 

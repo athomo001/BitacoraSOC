@@ -4,6 +4,43 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] Cierre de pendientes del spec (todo menos el orquestador) - 2026-10-07
+
+- **Evidencia del escalamiento en la bitácora (HU-1t punto 2)**: quedaba un "llega con la Fase 9" en el servidor y la pantalla nunca lo usaba. Ahora, al abrir un incidente de escalamiento se crea en la misma transacción su entrada de bitácora (tipo incidente, tag `escalamiento`, servicio/activo/zona y GLPI). Cada intento ("Nivel 1 · Persona · No contesta (llamada) — nota → pasa al nivel 2"), comentario, cierre y reapertura queda ahí como comentario de sistema. El incidente trae "Ver en la bitácora", y `/entries?entry=<id>` abre esa entrada. Migración `000026` (`escalation_incidents.entry_id`).
+- **Eventos del informe (catalogEvents del legacy)**: decidido migrarlos. 1.858 de 1.863 (5 repetidos) pasan a `report_events` (migración `000027`, paso nuevo del ETL; verificación 102/102). En Reportes, "Nombre del evento" sugiere del catálogo mientras se escribe y, al elegir, rellena "Motivo" con su texto por defecto, como el legacy, sin pisar lo escrito a mano. En Administración → Avisos por cliente hay una tarjeta "Eventos del informe" con búsqueda, páginas, alta, edición, activar y borrar.
+- **Lecturas sensibles auditadas** (decisión: sí, paridad con el legacy, con los mismos nombres de evento): ver a quién llamar (`escalation.view.contacts.read`), listar o buscar en el Directorio (`directory.central.list.view`, sin guardar lo buscado porque puede ser un teléfono o correo) y ver un contacto (`directory.central.detail.view`). Los reportes por usuario del legacy no existen en la 2.0.
+- **Setup inicial**: traducido ES/EN y con la opción **Ticketera**; sola es la instalación "solo Ticketera" (`ticketsEnabled` en `POST /api/setup/bootstrap`; `BOOTSTRAP_MODULES=tickets` para el arranque por `.env`).
+- **Dotación** (Turnos) traducida ES/EN, incluidas las condiciones. Territorio ya lo estaba.
+- **Guardia actual con varias personas**: cuando un rol tiene 2 o 3 personas a la vez (como en el legacy), ahora se muestran todas en Administración → Turnos y todas salen marcadas "de guardia" en Escalamiento. Antes salía una. `GET /api/rotation-slots/current` agrega `currentMembers`.
+- **Bundle inicial 459,7 → 381,9 kB**: los textos de cada pantalla viajan con su código (`core/i18n/packs/`). En la carga inicial queda solo lo del shell y lo compartido. Se quitaron 33 textos que ya no se usaban. Recorrido de todas las pantallas y secciones en ES y EN sin ninguna clave sin traducir.
+- **Login 57 → 14 kB de CSS**: CRT queda en el componente y los otros 5 temas son hojas aparte que se cargan solo al elegirlos (sin destello). Capturas de los 6 temas antes y después idénticas, dentro del ruido del fondo animado.
+- Limpieza: fuera el componente placeholder de la Fase 3 y sus comentarios; `tickets:assign` no se implementa (hoy cualquier analista con Ticketera toma y asigna, como se pidió en el comentario #13); `GET /api/audit-logs/events` fuera del contrato (nunca existió); el reporte NOC sigue con el formato del legacy (regla: no se diseñan correos nuevos).
+- Datos de prueba: el incidente de prueba "Prueba E2E HU-1t (borrar)" quedó cerrado en la base de desarrollo, porque los intentos son inmutables por diseño; su entrada de bitácora sí se borró.
+
+## [Rewrite] Territorio masivo y buscador en Escalamiento - 2026-10-07
+
+- **Activar o desactivar varias zonas a la vez** (Administración → Territorio): casilla en cada fila y "Seleccionar todas" (con búsqueda, "las que coinciden"); Activar o Desactivar va en una sola llamada (`POST /api/territorial-units/bulk-active`, solo toca las que cambian, auditado `territorial_unit.bulk_active` con cuántas). Nunca borra.
+- **Escalamiento: escribir para elegir.** El "Elegir…" pasa a ser un buscador: mientras se escribe se llena con lo más probable primero (empieza igual → empieza una palabra → contiene → código/IP), sin importar tildes; flechas + Enter para elegir, Esc cierra. Sirve en Servicio, Activo y Zona. La búsqueda aparte de la barra superior se quitó porque hacía lo mismo.
+- Probado contra la base de desarrollo: desactivar y reactivar quedó igual (317 de 317 activas).
+
+## [Rewrite] Largo mínimo de contraseña configurable - 2026-10-07
+
+- Pedido del dueño: el admin lo fija en Administración → Accesos (tarjeta "Contraseñas"), entre 4 y 64; **6 por defecto**, como el legacy. Migración `000025` (`app_config.password_min_length`).
+- El servidor lo exige en los tres lugares donde se fija una contraseña: cambio propio, recuperación por correo y alta de usuario (`400 weak-password` con el mínimo en el mensaje). Las contraseñas que ya existen siguen sirviendo. El cambio queda en Auditoría (`password_policy.update`, con el valor anterior).
+- Mi perfil lee el mínimo del servidor (`GET /api/auth/password-policy`, público para que también lo use la recuperación) y no deja enviar una más corta. Probado contra Postgres: alta y cambio propio con 7 caracteres rechazados con mínimo 10; desarrollo quedó en 6.
+
+## [Rewrite] Escalamiento: Servicio primero y el selector a la izquierda - 2026-10-07
+
+- Pedido del dueño: Servicio es lo que más se usa, así que ahora es la primera pestaña y viene elegida si SOC está activo (con solo NOC sigue partiendo en Activo). El selector "Elegir…" pasa al lado izquierdo, al inicio del bloque, para no tener que cruzar la pantalla.
+
+## [Rewrite] Mi perfil rehecho, con verificación en dos pasos - 2026-10-07
+
+- Pedido del dueño ("el panel de usuario está bien feo"). Diseño aprobado en el canvas (artboard "Mi perfil"), tomado del perfil del legacy: identidad arriba (foto con botón de cámara, nombre, usuario, cargo, rol, correo y último ingreso) y tres pestañas.
+- **Datos personales**: nombre, teléfono y cumpleaños; el correo se ve con candado (lo cambia un administrador).
+- **Seguridad**: contraseña actual, nueva y repetir (como el legacy), con medidor y botón Ver; el mínimo lo fija el admin (ver la entrada de arriba). **Verificación en dos pasos (TOTP)**: el servidor ya la tenía pero no había pantalla. Activar → QR + clave para escribir a mano + código de 6 dígitos → activa; desactivar pide la contraseña (una contraseña equivocada no cierra la sesión).
+- **Preferencias**: tema, idioma, letra para dislexia y pantalla de login con miniaturas.
+- `app-modal` acepta `[wide]` para diálogos más anchos. Pruebas nuevas en `profile-dialog.spec.ts` (6).
+
 ## [Rewrite] E2E pendientes: Ticketera pública y Auditoría - 2026-10-06
 
 - **Ticketera (Fase 10), 16/16 con Postgres**: una entrada con "crear ticket" lo crea con número; otra con ese número queda enlazada al mismo ticket; el SLA se pausa en "esperando proveedor" y al volver a "en curso" suma el tiempo pausado; el seguimiento público pide PIN (sin PIN o con uno incorrecto: 401), muestra solo los comunicados públicos (nunca las notas internas) y no expone correos. Datos de prueba borrados; la Ticketera de desarrollo quedó apagada como estaba.

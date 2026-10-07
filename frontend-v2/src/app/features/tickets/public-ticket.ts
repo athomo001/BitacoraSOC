@@ -11,6 +11,7 @@ import { PreferencesService } from '../../core/preferences/preferences.service';
 import { PublicTicket, TicketsService } from '../../core/tickets/tickets.service';
 import { PRIORITY_TONE, PUBLIC_STEPS, Tone, formatDuration, publicProgress } from '../../core/tickets/ticket-view';
 
+import '../../core/i18n/packs/tickets';
 type View = 'loading' | 'pin' | 'ready' | 'notFound' | 'error';
 
 const PIN_LENGTH = 6;

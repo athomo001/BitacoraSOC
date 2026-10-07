@@ -9,6 +9,7 @@ import { PreferencesService } from '../../core/preferences/preferences.service';
 import { problemDetail } from '../../core/http-error';
 import { ButtonComponent } from '../../shared/ui/button/button';
 
+import '../../core/i18n/packs/admin';
 const PAGE_SIZES = [25, 50, 100] as const;
 const RANGES: readonly AuditRange[] = ['today', '7d', '30d', 'custom'];
 const SEARCH_DELAY_MS = 300;

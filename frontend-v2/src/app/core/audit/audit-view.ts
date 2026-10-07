@@ -24,7 +24,7 @@ export const AUDIT_CATEGORIES: readonly AuditCategory[] = [
   {
     id: 'admin',
     labelKey: 'audit.cat.admin',
-    prefixes: ['users', 'permissiongroup', 'user.permissiongroups', 'config', 'system_feature', 'system', 'team', 'team_group', 'organization', 'territorial_unit', 'log_source', 'service', 'asset', 'deployment'],
+    prefixes: ['users', 'permissiongroup', 'user.permissiongroups', 'config', 'password_policy', 'system_feature', 'system', 'team', 'team_group', 'organization', 'territorial_unit', 'log_source', 'service', 'asset', 'deployment'],
     tone: 'system',
   },
   { id: 'backups', labelKey: 'audit.cat.backups', prefixes: ['backup'], tone: 'system' },

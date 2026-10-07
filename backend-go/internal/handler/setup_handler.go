@@ -12,6 +12,7 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/auth"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // SetupHandler cubre GET /api/setup/status y POST /api/setup/bootstrap
@@ -57,6 +58,9 @@ type bootstrapRequest struct {
 	AdminPassword string `json:"adminPassword"`
 	SocEnabled    bool   `json:"socEnabled"`
 	NocEnabled    bool   `json:"nocEnabled"`
+	// TicketsEnabled enciende la Ticketera; sola (sin SOC ni NOC) es la
+	// instalación "solo Ticketera".
+	TicketsEnabled bool `json:"ticketsEnabled"`
 }
 
 type bootstrapResponse struct {
@@ -76,8 +80,8 @@ func (e *bootstrapError) Error() string { return e.msg }
 // runBootstrap es la única implementación del primer arranque: la usan el
 // endpoint (asistente /setup) y BootstrapFromEnv, con las mismas reglas.
 func (h *SetupHandler) runBootstrap(ctx context.Context, req bootstrapRequest) (db.User, *bootstrapError) {
-	if !req.SocEnabled && !req.NocEnabled {
-		return db.User{}, &bootstrapError{http.StatusBadRequest, "no-module-selected", "debés activar al menos un módulo (SOC o NOC)"}
+	if !req.SocEnabled && !req.NocEnabled && !req.TicketsEnabled {
+		return db.User{}, &bootstrapError{http.StatusBadRequest, "no-module-selected", "activa al menos uno: SOC, NOC o Ticketera"}
 	}
 	if req.AdminUsername == "" || req.AdminEmail == "" || req.AdminPassword == "" {
 		return db.User{}, &bootstrapError{http.StatusBadRequest, "invalid-payload", "adminUsername/adminEmail/adminPassword son obligatorios"}
@@ -110,6 +114,13 @@ func (h *SetupHandler) runBootstrap(ctx context.Context, req bootstrapRequest) (
 	if err != nil {
 		return db.User{}, &bootstrapError{http.StatusConflict, "duplicate-user", "el username o email ya existe"}
 	}
+	if req.TicketsEnabled {
+		if _, err := h.Queries.UpdateSystemFeature(ctx, db.UpdateSystemFeatureParams{
+			Code: ticketsFeature, IsEnabled: true, UpdatedBy: pgtype.UUID{Bytes: user.ID, Valid: true},
+		}); err != nil {
+			return db.User{}, &bootstrapError{http.StatusInternalServerError, "internal-error", "no se pudo encender la Ticketera"}
+		}
+	}
 	if _, err := h.Queries.CompleteSetup(ctx, db.CompleteSetupParams{SocModuleEnabled: req.SocEnabled, NocModuleEnabled: req.NocEnabled}); err != nil {
 		return db.User{}, &bootstrapError{http.StatusInternalServerError, "internal-error", "no se pudo completar el setup"}
 	}
@@ -134,7 +145,7 @@ func (h *SetupHandler) Bootstrap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.AuditLog.Log(ctx, "setup.bootstrap", audit.LevelInfo, audit.Success(), map[string]any{
-		"username": user.Username, "socEnabled": req.SocEnabled, "nocEnabled": req.NocEnabled,
+		"username": user.Username, "socEnabled": req.SocEnabled, "nocEnabled": req.NocEnabled, "ticketsEnabled": req.TicketsEnabled,
 	})
 	writeData(w, http.StatusCreated, bootstrapResponse{User: toUserDTO(user), Token: token})
 }
@@ -142,11 +153,12 @@ func (h *SetupHandler) Bootstrap(w http.ResponseWriter, r *http.Request) {
 // EnvBootstrap es el admin por defecto opcional de .env (BOOTSTRAP_ADMIN_*).
 type EnvBootstrap struct {
 	Username, Email, Password string
-	SOC, NOC                  bool
+	SOC, NOC, Tickets         bool
 }
 
 // EnvBootstrapFromEnv lee BOOTSTRAP_ADMIN_USERNAME/EMAIL/PASSWORD y
-// BOOTSTRAP_MODULES (soc | noc | both, default both). Devuelve ok=false si no
+// BOOTSTRAP_MODULES (soc | noc | both | tickets, default both; "tickets" =
+// solo Ticketera). Devuelve ok=false si no
 // hay usuario/contraseña configurados (el caso normal: se usa el asistente).
 func EnvBootstrapFromEnv() (EnvBootstrap, bool) {
 	cfg := EnvBootstrap{
@@ -165,6 +177,8 @@ func EnvBootstrapFromEnv() (EnvBootstrap, bool) {
 		cfg.SOC = true
 	case "noc":
 		cfg.NOC = true
+	case "tickets":
+		cfg.Tickets = true
 	default:
 		cfg.SOC, cfg.NOC = true, true
 	}
@@ -179,7 +193,7 @@ func EnvBootstrapFromEnv() (EnvBootstrap, bool) {
 func (h *SetupHandler) BootstrapFromEnv(ctx context.Context, cfg EnvBootstrap, logger *slog.Logger) {
 	user, berr := h.runBootstrap(ctx, bootstrapRequest{
 		AdminUsername: cfg.Username, AdminEmail: cfg.Email, AdminPassword: cfg.Password,
-		SocEnabled: cfg.SOC, NocEnabled: cfg.NOC,
+		SocEnabled: cfg.SOC, NocEnabled: cfg.NOC, TicketsEnabled: cfg.Tickets,
 	})
 	switch {
 	case berr == nil:

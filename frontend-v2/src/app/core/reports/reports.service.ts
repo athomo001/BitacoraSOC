@@ -124,6 +124,16 @@ export interface OperationType {
   enabled: boolean;
 }
 
+/** Evento del catálogo (catalogEvents del legacy): al elegirlo, "Motivo" toma su texto por defecto. */
+export interface ReportEvent {
+  id: string;
+  name: string;
+  parent: string;
+  description: string;
+  motivoDefault: string;
+  enabled: boolean;
+}
+
 export type ClientAlertForm = Omit<ClientAlertRule, 'id' | 'organizationName' | 'acked'>;
 
 /** /api/reports/* y /api/client-alerts/*. */
@@ -187,6 +197,28 @@ export class ReportsService {
 
   async deleteOperationType(id: string): Promise<void> {
     await firstValueFrom(this.http.delete(`/api/report-operation-types/${id}`));
+  }
+
+  /** Sugerencias para "Nombre del evento" (hasta 20 activos). */
+  async suggestEvents(q: string): Promise<ReportEvent[]> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<ReportEvent[]>>('/api/report-events', { params: { q } }))).data;
+  }
+
+  /** Todo el catálogo, también los desactivados (admin), de a 50. */
+  async listEvents(q: string, page: number): Promise<{ events: ReportEvent[]; total: number }> {
+    const res = await firstValueFrom(this.http.get<ApiEnvelope<ReportEvent[]>>('/api/report-events/all', { params: { q, page } }));
+    return { events: res.data, total: (res.meta as { total: number }).total };
+  }
+
+  async saveEvent(event: Omit<ReportEvent, 'id'>, id?: string): Promise<ReportEvent> {
+    const req = id
+      ? this.http.put<ApiEnvelope<ReportEvent>>(`/api/report-events/${id}`, event)
+      : this.http.post<ApiEnvelope<ReportEvent>>('/api/report-events', event);
+    return (await firstValueFrom(req)).data;
+  }
+
+  async deleteEvent(id: string): Promise<void> {
+    await firstValueFrom(this.http.delete(`/api/report-events/${id}`));
   }
 
   async listAlerts(): Promise<ClientAlertRule[]> {

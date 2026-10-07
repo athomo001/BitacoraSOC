@@ -12,6 +12,7 @@ import { WorkShift } from '../../core/shifts/shifts.service';
 import { MarkdownComponent } from '../../shared/markdown/markdown';
 import { appendSnippet, openMarkdownHelp } from '../../shared/markdown/markdown-help-dialog';
 
+import '../../core/i18n/packs/shifts';
 export interface ShiftReportData {
   mode: ShiftReportMode;
   shift: WorkShift;

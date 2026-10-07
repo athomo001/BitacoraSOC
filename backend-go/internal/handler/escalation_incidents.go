@@ -31,16 +31,18 @@ type incidentDTO struct {
 	GlpiTicket        *string    `json:"glpiTicket,omitempty"`
 	TicketID          *uuid.UUID `json:"ticketId,omitempty"`
 	TicketNumber      *string    `json:"ticketNumber,omitempty"`
-	OpenedBy          string     `json:"openedBy"`
-	OpenedAt          time.Time  `json:"openedAt"`
-	ClosedAt          *time.Time `json:"closedAt,omitempty"`
+	// EntryID: la entrada de bitácora donde queda la evidencia del incidente.
+	EntryID  *uuid.UUID `json:"entryId,omitempty"`
+	OpenedBy string     `json:"openedBy"`
+	OpenedAt time.Time  `json:"openedAt"`
+	ClosedAt *time.Time `json:"closedAt,omitempty"`
 }
 
 func toIncidentDTO(r db.ListEscalationIncidentsRow) incidentDTO {
 	dto := incidentDTO{
 		ID: r.ID, ServiceID: uuidPtr(r.ServiceID), AssetID: uuidPtr(r.AssetID), TerritorialUnitID: uuidPtr(r.TerritorialUnitID),
 		Title: r.Title, GlpiTicket: textPtr(r.GlpiTicket), TicketID: uuidPtr(r.TicketID), TicketNumber: textPtr(r.TicketNumber),
-		OpenedBy: r.OpenedByUsername, OpenedAt: r.OpenedAt.Time,
+		EntryID: uuidPtr(r.EntryID), OpenedBy: r.OpenedByUsername, OpenedAt: r.OpenedAt.Time,
 	}
 	if r.ClosedAt.Valid {
 		dto.ClosedAt = &r.ClosedAt.Time
@@ -109,13 +111,27 @@ func (h *EscalationHandler) CreateIncident(w http.ResponseWriter, r *http.Reques
 	}
 	user, _ := middleware.UserFromContext(ctx)
 	svc, asset, unit := scopeParams(req.scope)
-	inc, err := h.Queries.CreateEscalationIncident(ctx, db.CreateEscalationIncidentParams{
+	// Incidente y su entrada de bitácora (HU-1t punto 2) van juntos o no van.
+	tx, err := h.DB.Begin(ctx)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo abrir el incidente")
+		return
+	}
+	defer tx.Rollback(ctx)
+	q := h.Queries.WithTx(tx)
+	inc, err := q.CreateEscalationIncident(ctx, db.CreateEscalationIncidentParams{
 		ServiceID: svc, AssetID: asset, TerritorialUnitID: unit, Title: title,
 		GlpiTicket: pgtype.Text{String: glpi, Valid: glpi != ""}, TicketID: optionalUUID(req.TicketID), OpenedBy: user.ID,
 	})
 	if isForeignKeyViolation(err) {
 		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "el servicio, activo, unidad o ticket indicado no existe")
 		return
+	}
+	if err == nil {
+		err = h.openIncidentEntry(ctx, q, inc, req.scope, user.ID, glpi)
+	}
+	if err == nil {
+		err = tx.Commit(ctx)
 	}
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo abrir el incidente")
@@ -177,10 +193,11 @@ func (h *EscalationHandler) PatchIncident(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if n > 0 {
-		event := "escalation.incident.reopened"
+		event, text := "escalation.incident.reopened", "Incidente reabierto"
 		if *req.Closed {
-			event = "escalation.incident.closed"
+			event, text = "escalation.incident.closed", "Incidente cerrado"
 		}
+		h.logToEntry(ctx, row.EntryID, user.ID, text)
 		h.AuditLog.Log(ctx, event, audit.LevelInfo, audit.Success(), map[string]any{"incidentId": id.String()})
 	}
 	writeData(w, http.StatusOK, toIncidentDTO(db.ListEscalationIncidentsRow(row)))
@@ -244,6 +261,9 @@ func (h *EscalationHandler) AddIncidentNote(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo guardar el comentario")
 		return
+	}
+	if inc, getErr := h.Queries.GetEscalationIncident(ctx, id); getErr == nil {
+		h.logToEntry(ctx, inc.EntryID, user.ID, "Comentario: "+note)
 	}
 	h.AuditLog.Log(ctx, "escalation.incident.note", audit.LevelInfo, audit.Success(), map[string]any{"incidentId": id.String(), "noteId": n.ID.String()})
 	writeData(w, http.StatusCreated, incidentNoteDTO{ID: n.ID, Note: n.Note, Username: user.Username, CreatedAt: n.CreatedAt.Time})

@@ -8,6 +8,7 @@ import { PreferencesService } from '../../core/preferences/preferences.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { problemDetail } from '../../core/http-error';
 
+import '../../core/i18n/packs/complements';
 /** Más de 100 mensajes en 10 s desconecta el iframe (protección del legacy). */
 const MAX_MESSAGES = 100;
 const WINDOW_MS = 10_000;

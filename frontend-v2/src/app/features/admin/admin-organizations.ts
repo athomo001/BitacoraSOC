@@ -7,6 +7,7 @@ import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
 import { ModuleAccessService } from '../../core/auth/module-access.service';
 
+import '../../core/i18n/packs/admin';
 /** Tipos que solo tienen sentido con NOC (contratas de terreno y carriers). */
 const NOC_TYPES: ReadonlySet<string> = new Set(['contractor', 'carrier']);
 const TYPE_TONE: Record<string, string> = { client: 'tone-info', mandante: 'tone-ok', contractor: 'tone-warn', carrier: 'tone-system', internal: 'tone-neutral' };

@@ -6,6 +6,7 @@ import { LOGIN_THEMES, LOGIN_THEME_LABELS } from '../login/login-themes';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { problemDetail } from '../../core/http-error';
 
+import '../../core/i18n/packs/admin';
 /**
  * Administración → Marca (comentario del dueño #8, canvas v19/v20 aprobado):
  * nombre visible, logo, favicon (por defecto sale del logo), fuente del

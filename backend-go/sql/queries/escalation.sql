@@ -268,3 +268,6 @@ INSERT INTO escalation_incident_notes (incident_id, user_id, note) VALUES ($1, $
 -- name: ListEscalationIncidentNotes :many
 SELECT n.*, u.username FROM escalation_incident_notes n JOIN users u ON u.id = n.user_id
 WHERE n.incident_id = $1 ORDER BY n.created_at;
+
+-- name: SetEscalationIncidentEntry :exec
+UPDATE escalation_incidents SET entry_id = $2 WHERE id = $1;

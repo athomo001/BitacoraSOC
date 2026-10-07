@@ -1,8 +1,5 @@
-@use 'login-infoflow';
-@use 'login-modern';
-@use 'login-surrealism';
-@use 'login-win311';
-@use 'login-unix89';
+// Los otros 5 temas son hojas aparte (angular.json, inject: false) que el
+// componente carga solo al elegirlos: así no viajan ~45 kB que nadie usa.
 @use 'login-fonts';
 
 // =============================================================================

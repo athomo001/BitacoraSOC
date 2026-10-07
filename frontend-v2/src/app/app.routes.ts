@@ -5,11 +5,9 @@ import { socOrNocGuard } from './core/setup/setup.guard';
 import { setupCompletedGuard, setupPendingGuard } from './core/setup/setup.guard';
 
 /**
- * Rutas del núcleo — 5 secciones maestras y ticketera opcional bajo el shell (spec/06-frontend-
- * arquitectura-y-ui.md sección 3) + login fuera del shell. Todas apuntan a
- * PlaceholderComponent por ahora (Fase 3: sin lógica de negocio, sin HTTP
- * real) — cada fase posterior reemplaza su placeholder por la pantalla real,
- * sin tocar la estructura de rutas.
+ * Rutas del núcleo — las secciones maestras y la ticketera opcional bajo el
+ * shell (spec/06-frontend-arquitectura-y-ui.md sección 3) + login fuera del
+ * shell. Cada pantalla se carga al entrar (loadComponent).
  *
  * Fase 5 (HU-0): setupCompletedGuard va primero en todo — mientras no haya
  * setup, cualquier ruta (incluida una inexistente, vía el comodín final)

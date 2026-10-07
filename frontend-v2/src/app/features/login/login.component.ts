@@ -18,10 +18,13 @@
  *   - Título: el nombre visible de Administración → Marca.
  *   - Sin enrolamiento MFA desde el login: la API nueva exige sesión para
  *     /api/auth/mfa/setup, así que needsMfaSetup queda siempre en false.
+ *   - Estilos: CRT (el de por defecto) va en el componente; los otros 5 son
+ *     hojas aparte que se cargan al elegirlos (loadSkin), sin cambiar su CSS.
  */
 import {
   ChangeDetectorRef,
   Component,
+  DOCUMENT,
   NgZone,
   OnDestroy,
   OnInit,
@@ -42,12 +45,23 @@ export { LOGIN_THEMES };
 export type { LoginTheme };
 
 type ViewState = 'login' | 'recovery' | 'mfa';
+
+/** Hoja de cada tema que no es CRT (angular.json, inject: false). */
+const SKIN_FILES: Partial<Record<LoginTheme, string>> = {
+  infoflow: 'login-infoflow.css',
+  modern: 'login-modern.css',
+  surrealism: 'login-surrealism.css',
+  win311: 'login-win311.css',
+  unix89: 'login-unix89.css',
+};
 const PRIVACY_STORAGE_KEY = 'privacyConsentAccepted';
 
 @Component({
   selector: 'app-login',
   standalone: true,
   imports: [ReactiveFormsModule],
+  // Mientras llega la hoja del tema no se muestra nada (sin destello sin estilos).
+  host: { '[style.visibility]': "skinPending ? 'hidden' : null" },
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss',
 })
@@ -82,6 +96,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   private matrixResize?: () => void;
 
   themeLoaded = false;
+  skinPending = false;
   appTitle = 'Bitácora Ops';
   appVersion = 'dev';
   typingTitle = '';
@@ -95,6 +110,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly titleService = inject(Title);
   private readonly branding = inject(BrandingService);
+  private readonly document = inject(DOCUMENT);
 
   getAssetUrl(url: string): string {
     return url;
@@ -129,7 +145,47 @@ export class LoginComponent implements OnInit, OnDestroy {
     this.activeTheme = LOGIN_THEMES.includes(localTheme as LoginTheme) ? (localTheme as LoginTheme) : adminTheme;
     this.titleService.setTitle(this.appTitle);
     this.themeLoaded = true;
+    this.applySkin(this.activeTheme);
     this.initializeThemeSpecifics();
+  }
+
+  /** Carga la hoja del tema (una vez) y oculta la pantalla hasta que llega. */
+  private applySkin(theme: LoginTheme): void {
+    if (!SKIN_FILES[theme]) {
+      this.skinPending = false;
+      return;
+    }
+    this.skinPending = true;
+    void this.loadSkin(theme).then(() => {
+      if (this.activeTheme !== theme) return;
+      this.skinPending = false;
+      this.render();
+    });
+  }
+
+  private loadSkin(theme: LoginTheme): Promise<void> {
+    const href = SKIN_FILES[theme] as string;
+    const id = `login-skin-${theme}`;
+    let link = this.document.getElementById(id) as HTMLLinkElement | null;
+    if (link?.dataset['loaded'] === 'true') return Promise.resolve();
+    if (!link) {
+      link = this.document.createElement('link');
+      link.id = id;
+      link.rel = 'stylesheet';
+      link.href = href;
+      this.document.head.appendChild(link);
+    }
+    const sheet = link;
+    return new Promise((resolve) => {
+      const done = () => {
+        sheet.dataset['loaded'] = 'true';
+        resolve();
+      };
+      sheet.addEventListener('load', done, { once: true });
+      sheet.addEventListener('error', () => resolve(), { once: true });
+      // Si la red no responde, se muestra igual (mejor sin estilo que en blanco).
+      setTimeout(resolve, 4000);
+    });
   }
 
   // ── Gestión de Temas en Caliente ──────────────────────────
@@ -154,6 +210,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     this.activeTheme = theme;
     writeStorage(THEME_STORAGE_KEY, theme);
     this.showThemeMenu = false;
+    this.applySkin(theme);
     this.initializeThemeSpecifics();
     this.render();
   }

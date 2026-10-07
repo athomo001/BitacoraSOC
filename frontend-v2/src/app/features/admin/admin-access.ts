@@ -10,7 +10,9 @@ import { problemDetail } from '../../core/http-error';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { AdminBirthdaysComponent } from './admin-birthdays';
+import { AdminPasswordPolicyComponent } from './admin-password-policy';
 
+import '../../core/i18n/packs/admin';
 type Role = 'admin' | 'user' | 'auditor';
 type Scope = 'soc' | 'noc' | 'both' | 'none';
 
@@ -50,7 +52,7 @@ const SCOPES: readonly Scope[] = ['noc', 'soc', 'both', 'none'];
 @Component({
   selector: 'app-admin-access',
   standalone: true,
-  imports: [FormsModule, DatePipe, MatIconModule, AdminBirthdaysComponent],
+  imports: [FormsModule, DatePipe, MatIconModule, AdminBirthdaysComponent, AdminPasswordPolicyComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-access.html',
   styleUrl: './admin-access.css',

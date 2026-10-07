@@ -84,6 +84,14 @@ export class TerritoryService {
     return { units: response.data, meta: response.meta as PageMeta };
   }
 
+  /** Activa o desactiva varias de una vez; devuelve cuántas cambiaron. */
+  async setActiveMany(ids: string[], active: boolean): Promise<number> {
+    const response = await firstValueFrom(
+      this.http.post<ApiEnvelope<{ changed: number }>>('/api/territorial-units/bulk-active', { ids, active }),
+    );
+    return response.data.changed;
+  }
+
   async setActive(id: string, active: boolean): Promise<TerritorialUnit> {
     const response = await firstValueFrom(
       this.http.patch<ApiEnvelope<TerritorialUnit>>(`/api/territorial-units/${id}`, { active }),

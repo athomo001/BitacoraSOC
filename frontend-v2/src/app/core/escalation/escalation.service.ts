@@ -99,6 +99,8 @@ export interface EscalationIncident extends EscalationScope {
   openedBy: string;
   openedAt: string;
   closedAt?: string;
+  /** Entrada de bitácora donde queda la evidencia del incidente. */
+  entryId?: string;
 }
 
 export interface IncidentNote {
@@ -152,7 +154,9 @@ export interface ActionOutcome {
   nextStepOrder?: number;
   nextStepTeam?: ResolvedTeam;
   waitBeforeEscalateMinutes?: number;
-  entryCommentPending?: boolean;
+  /** El intento quedó también como comentario en la bitácora. */
+  loggedToEntry?: boolean;
+  entryId?: string;
 }
 
 export interface NotifyOutcome {

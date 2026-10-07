@@ -55,6 +55,13 @@ UPDATE territorial_units
 SET path = sqlc.arg('new_path')::ltree || subpath(path, nlevel(sqlc.arg('old_path')::ltree))
 WHERE path <@ sqlc.arg('old_path')::ltree AND path <> sqlc.arg('old_path')::ltree;
 
+-- name: SetTerritorialUnitsActive :many
+-- POST /api/territorial-units/bulk-active — activar o desactivar varias de
+-- una vez (pedido del dueño 2026-10-07). Solo toca las que cambian.
+UPDATE territorial_units SET active = sqlc.arg('active')
+WHERE id = ANY(sqlc.arg('ids')::uuid[]) AND active <> sqlc.arg('active')
+RETURNING id;
+
 -- name: UpdateTerritorialUnit :one
 -- PATCH /api/territorial-units/:id — correcciones manuales (HU-TERR-3). No
 -- permite cambiar code/kind/parent: eso reescribiría el árbol y es

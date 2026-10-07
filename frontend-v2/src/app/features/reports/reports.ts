@@ -21,12 +21,14 @@ import {
   OperationType,
   ReportHistoryItem,
   ReportImage,
+  ReportEvent,
   ReportKind,
   ReportRequest,
   ReportsService,
 } from '../../core/reports/reports.service';
 import { ClientAlertDialogComponent, ClientAlertDialogData } from './client-alert-dialog';
 
+import '../../core/i18n/packs/reports';
 const DRAFT_KEY = 'bitacora.reports.draft';
 const PREVIEW_WIDTH_KEY = 'bitacora.reports.previewWidth';
 const PREVIEW_DEFAULT = 460;
@@ -148,6 +150,14 @@ export class ReportsComponent implements OnInit {
   private readonly allServices = signal<SocService[]>([]);
   protected readonly logSources = signal<LogSource[]>([]);
   protected readonly operationTypes = signal<OperationType[]>([]);
+
+  // "Nombre del evento" sugiere del catálogo (catalogEvents del legacy).
+  protected readonly eventSuggestions = signal<ReportEvent[]>([]);
+  protected readonly eventOpen = signal(false);
+  protected readonly eventActive = signal(0);
+  private eventTimer: ReturnType<typeof setTimeout> | null = null;
+  /** El "Motivo" que puso la última sugerencia: si el analista no lo tocó, otra sugerencia lo reemplaza. */
+  private autoMotivo = '';
   protected readonly hasServices = computed(() => this.allServices().length > 0);
   protected readonly services = computed(() => this.allServices().filter((s) => s.active && s.organizationId === this.organizationId()));
 
@@ -327,6 +337,69 @@ export class ReportsComponent implements OnInit {
 
   protected setBulletin<K extends keyof BulletinFields>(key: K, value: BulletinFields[K]): void {
     this.bulletin.update((f) => ({ ...f, [key]: value }));
+  }
+
+  protected onEventInput(value: string): void {
+    this.setIncident('nombreEvento', value);
+    this.eventActive.set(0);
+    if (this.eventTimer) clearTimeout(this.eventTimer);
+    const q = value.trim();
+    if (q.length < 2) {
+      this.eventSuggestions.set([]);
+      this.eventOpen.set(false);
+      return;
+    }
+    this.eventTimer = setTimeout(async () => {
+      try {
+        const found = await this.reports.suggestEvents(q);
+        if (this.incident().nombreEvento.trim() !== q) return; // ya escribió otra cosa
+        this.eventSuggestions.set(found);
+        this.eventOpen.set(found.length > 0);
+      } catch {
+        this.eventSuggestions.set([]);
+      }
+    }, 200);
+  }
+
+  protected onEventKey(event: KeyboardEvent): void {
+    const list = this.eventSuggestions();
+    if (!this.eventOpen() || !list.length) return;
+    switch (event.key) {
+      case 'ArrowDown':
+        event.preventDefault();
+        this.eventActive.update((i) => (i + 1) % list.length);
+        break;
+      case 'ArrowUp':
+        event.preventDefault();
+        this.eventActive.update((i) => (i - 1 + list.length) % list.length);
+        break;
+      case 'Enter':
+        event.preventDefault();
+        this.pickEvent(list[this.eventActive()]);
+        break;
+      case 'Escape':
+        event.preventDefault();
+        event.stopPropagation();
+        this.eventOpen.set(false);
+        break;
+    }
+  }
+
+  protected onEventBlur(event: FocusEvent): void {
+    const next = event.relatedTarget as Node | null;
+    if (next && (event.currentTarget as HTMLElement).contains(next)) return;
+    this.eventOpen.set(false);
+  }
+
+  /** Como el legacy: elegir el evento rellena "Motivo" (sin pisar lo que el analista escribió). */
+  protected pickEvent(ev: ReportEvent): void {
+    this.incident.update((f) => {
+      const keepOwn = f.motivoEvento.trim() !== '' && f.motivoEvento !== this.autoMotivo;
+      const motivo = keepOwn || !ev.motivoDefault ? f.motivoEvento : ev.motivoDefault;
+      if (!keepOwn && ev.motivoDefault) this.autoMotivo = ev.motivoDefault;
+      return { ...f, nombreEvento: ev.name, motivoEvento: motivo };
+    });
+    this.eventOpen.set(false);
   }
 
   /** Como el legacy: elegir el tipo rellena "Información adicional". */

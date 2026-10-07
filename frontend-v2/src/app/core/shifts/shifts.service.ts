@@ -37,6 +37,8 @@ export interface RotationOverride {
 
 export interface CurrentGuard {
   currentMember: { teamMemberId: string; name: string } | null;
+  /** Todas las personas de guardia ahora (un rol puede tener 2-3 a la vez, como en el legacy). */
+  currentMembers?: { teamMemberId: string; name: string; until?: string }[];
   since?: string;
   until?: string;
 }
@@ -60,17 +62,6 @@ export interface WorkShift {
 }
 
 export type TeleworkCondition = 'telework' | 'office' | 'guardia' | 'vacation' | 'medical_leave' | 'medical_appointment' | 'training';
-
-/** Mismo texto/orden de relevancia que internal/rotation.Meta en el backend. */
-export const CONDITION_LABELS: Record<TeleworkCondition, string> = {
-  medical_leave: 'Licencia Médica',
-  vacation: 'Vacaciones',
-  medical_appointment: 'Trámite Médico',
-  training: 'Capacitación',
-  guardia: 'Guardia',
-  telework: 'Teletrabajo',
-  office: 'En Oficina',
-};
 
 /**
  * Color por condición para la grilla — SIEMPRE los 5 tokens `--status-*` ya

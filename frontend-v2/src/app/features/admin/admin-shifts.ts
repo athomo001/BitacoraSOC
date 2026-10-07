@@ -20,6 +20,7 @@ import { problemDetail } from '../../core/http-error';
 import { AdminShiftRemindersComponent } from './admin-shift-reminders';
 import { AdminShiftMembersComponent } from './admin-shift-members';
 
+import '../../core/i18n/packs/admin';
 function splitList(raw: string): string[] {
   return raw.split(',').map((s) => s.trim()).filter(Boolean);
 }
@@ -122,6 +123,12 @@ export class AdminShiftsComponent implements OnInit {
   protected readonly selectedCycle = signal<RotationCycle | null>(null);
   protected readonly slots = signal<RotationSlot[]>([]);
   protected readonly guard = signal<CurrentGuard | null>(null);
+
+  /** "Ana, Pedro y Luis": todas las personas de guardia ahora. */
+  protected guardNames(g: CurrentGuard): string {
+    const names = (g.currentMembers?.length ? g.currentMembers : g.currentMember ? [g.currentMember] : []).map((m) => m.name);
+    return names.length > 1 ? `${names.slice(0, -1).join(', ')} ${this.i18n.t('shiftsAdmin.and')} ${names[names.length - 1]}` : (names[0] ?? '');
+  }
   protected readonly cycleStartDay = signal(1);
   protected readonly cycleStartTime = signal('08:00');
   protected readonly cycleDuration = signal(7);

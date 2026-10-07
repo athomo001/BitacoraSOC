@@ -58,6 +58,7 @@ type Querier interface {
 	CountEntriesInWindow(ctx context.Context, arg CountEntriesInWindowParams) (int64, error)
 	CountIncidentEntriesInWindow(ctx context.Context, arg CountIncidentEntriesInWindowParams) (int64, error)
 	CountOrgContacts(ctx context.Context, organizationID uuid.UUID) (int64, error)
+	CountReportEvents(ctx context.Context, q_ string) (int64, error)
 	CountReportHistory(ctx context.Context, kind pgtype.Text) (int64, error)
 	CountResolvedTicketsInWindow(ctx context.Context, arg CountResolvedTicketsInWindowParams) (int64, error)
 	CountSLABreachesInWindow(ctx context.Context, arg CountSLABreachesInWindowParams) (int64, error)
@@ -103,6 +104,7 @@ type Querier interface {
 	CreatePolicy(ctx context.Context, arg CreatePolicyParams) (EscalationPolicy, error)
 	CreatePublicShareLink(ctx context.Context, arg CreatePublicShareLinkParams) (PublicShareLink, error)
 	CreateRaciAssignment(ctx context.Context, arg CreateRaciAssignmentParams) (RaciAssignment, error)
+	CreateReportEvent(ctx context.Context, arg CreateReportEventParams) (ReportEvent, error)
 	CreateReportOperationType(ctx context.Context, arg CreateReportOperationTypeParams) (ReportOperationType, error)
 	CreateRotationCycle(ctx context.Context, arg CreateRotationCycleParams) (RotationCycle, error)
 	CreateRotationOverride(ctx context.Context, arg CreateRotationOverrideParams) (RotationOverride, error)
@@ -157,6 +159,7 @@ type Querier interface {
 	DeletePendingTicketImage(ctx context.Context, arg DeletePendingTicketImageParams) (int64, error)
 	DeletePolicy(ctx context.Context, id uuid.UUID) (int64, error)
 	DeletePolicyStep(ctx context.Context, arg DeletePolicyStepParams) (int64, error)
+	DeleteReportEvent(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteReportHistory(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteReportOperationType(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteServicePolicies(ctx context.Context, serviceID pgtype.UUID) error
@@ -226,9 +229,6 @@ type Querier interface {
 	GetComplementFile(ctx context.Context, arg GetComplementFileParams) (GetComplementFileRow, error)
 	GetComplementStorage(ctx context.Context, arg GetComplementStorageParams) (ComplementStorage, error)
 	GetComplementUpload(ctx context.Context, id uuid.UUID) (ComplementUpload, error)
-	// El slot regular cuya semana cubre `now` (independiente de is_paused: el
-	// handler decide qué hacer con eso vía internal/rotation.Resolve).
-	GetCurrentRotationSlot(ctx context.Context, arg GetCurrentRotationSlotParams) (GetCurrentRotationSlotRow, error)
 	GetDirectoryContact(ctx context.Context, id uuid.UUID) (GetDirectoryContactRow, error)
 	GetEntry(ctx context.Context, id uuid.UUID) (GetEntryRow, error)
 	GetEscalationIncident(ctx context.Context, id uuid.UUID) (GetEscalationIncidentRow, error)
@@ -242,6 +242,7 @@ type Querier interface {
 	GetNotificationSchedule(ctx context.Context, id uuid.UUID) (WorkShiftNotificationSchedule, error)
 	GetOrganization(ctx context.Context, id uuid.UUID) (Organization, error)
 	GetOrganizationType(ctx context.Context, code string) (OrganizationType, error)
+	GetPasswordMinLength(ctx context.Context) (int16, error)
 	GetPermissionGroup(ctx context.Context, id uuid.UUID) (PermissionGroup, error)
 	GetPersonalNotes(ctx context.Context, userID uuid.UUID) (PersonalNote, error)
 	GetPolicy(ctx context.Context, id uuid.UUID) (EscalationPolicy, error)
@@ -354,6 +355,11 @@ type Querier interface {
 	// salvo que otro esté más completo (ver handler).
 	ListContactsForDedupe(ctx context.Context) ([]ListContactsForDedupeRow, error)
 	ListCoverageForUnits(ctx context.Context, unitIds []uuid.UUID) ([]TeamCoverage, error)
+	// Los slots regulares cuya semana cubre `today` (independiente de is_paused:
+	// el handler decide qué hacer con eso vía internal/rotation.Resolve). Puede
+	// haber más de uno: en el legacy un rol (N2, OL) tenía a veces 2-3 personas
+	// a la vez, y todas están de guardia.
+	ListCurrentRotationSlots(ctx context.Context, arg ListCurrentRotationSlotsParams) ([]ListCurrentRotationSlotsRow, error)
 	// Directorio Global de Contactos (spec/04-contratos-api.md, HU-DIR-1/2).
 	// email/phone están cifrados (AES-256-GCM): la búsqueda por esos campos es por
 	// igualdad exacta contra su índice ciego (email_hash/phone_hash, HMAC), igual
@@ -426,6 +432,7 @@ type Querier interface {
 	// Administración → Reportes: los últimos cierres y cómo salió su reporte,
 	// con el turno y a quién iba (sin esto un envío fallido no se veía en ninguna parte).
 	ListRecentShiftReportDeliveries(ctx context.Context) ([]ListRecentShiftReportDeliveriesRow, error)
+	ListReportEvents(ctx context.Context, arg ListReportEventsParams) ([]ReportEvent, error)
 	// Sin el html (pesa): la lista del historial.
 	ListReportHistory(ctx context.Context, arg ListReportHistoryParams) ([]ListReportHistoryRow, error)
 	// ===== Tipos de operación del informe de incidente =====
@@ -572,15 +579,25 @@ type Querier interface {
 	// cada tipo (la fuente de verdad son contact_channels), cifrada + indexada
 	// para listar y buscar sin recorrer los canales.
 	SetContactPrimaryChannels(ctx context.Context, arg SetContactPrimaryChannelsParams) error
+	SetEscalationIncidentEntry(ctx context.Context, arg SetEscalationIncidentEntryParams) error
 	SetMFASecret(ctx context.Context, arg SetMFASecretParams) error
 	SetModuleFlags(ctx context.Context, arg SetModuleFlagsParams) (AppConfig, error)
 	SetMustChangePassword(ctx context.Context, arg SetMustChangePasswordParams) error
+	SetPasswordMinLength(ctx context.Context, passwordMinLength int16) (int16, error)
 	SetPasswordResetToken(ctx context.Context, arg SetPasswordResetTokenParams) error
 	SetPublicShareLinkActive(ctx context.Context, arg SetPublicShareLinkActiveParams) (PublicShareLink, error)
+	// POST /api/territorial-units/bulk-active — activar o desactivar varias de
+	// una vez (pedido del dueño 2026-10-07). Solo toca las que cambian.
+	SetTerritorialUnitsActive(ctx context.Context, arg SetTerritorialUnitsActiveParams) ([]uuid.UUID, error)
 	SetTicketPublicPin(ctx context.Context, arg SetTicketPublicPinParams) (Ticket, error)
 	// Borrado lógico: el contacto puede estar referenciado por team_members (FK
 	// sin cascada) y por el historial de escalación de fases siguientes.
 	SoftDeleteContact(ctx context.Context, id uuid.UUID) (int64, error)
+	// ===== Eventos del informe de incidente (catalogEvents del legacy) =====
+	// Sugerencias al escribir: lo que empieza igual primero, luego lo que lo
+	// contiene (nombre o categoría); sin tildes no hace falta porque el legacy
+	// tampoco los normalizaba y el texto se escribe como en el catálogo.
+	SuggestReportEvents(ctx context.Context, arg SuggestReportEventsParams) ([]ReportEvent, error)
 	SumTicketTaskTime(ctx context.Context, ticketID uuid.UUID) (int64, error)
 	// Resumen de la cola para la cabecera. "Vencido" = abierto, no en pausa y
 	// pasado el vencimiento real (pactado + pausas acumuladas), igual que tickets.ResolutionClock.
@@ -608,6 +625,7 @@ type Querier interface {
 	UpdateOrganizationType(ctx context.Context, arg UpdateOrganizationTypeParams) (OrganizationType, error)
 	UpdatePermissionGroup(ctx context.Context, arg UpdatePermissionGroupParams) (PermissionGroup, error)
 	UpdatePolicyReminder(ctx context.Context, arg UpdatePolicyReminderParams) (EscalationPolicy, error)
+	UpdateReportEvent(ctx context.Context, arg UpdateReportEventParams) (ReportEvent, error)
 	UpdateReportOperationType(ctx context.Context, arg UpdateReportOperationTypeParams) (ReportOperationType, error)
 	UpdateService(ctx context.Context, arg UpdateServiceParams) (Service, error)
 	UpdateShiftReminder(ctx context.Context, arg UpdateShiftReminderParams) (ShiftReminder, error)

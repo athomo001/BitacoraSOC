@@ -228,6 +228,32 @@ func (h *TerritorialUnitsHandler) Patch(w http.ResponseWriter, r *http.Request) 
 	writeData(w, http.StatusOK, toTerritorialUnitDTO(unit))
 }
 
+// maxBulkActive limita cuántas unidades se tocan en una sola llamada.
+const maxBulkActive = 10000
+
+// BulkActive es POST /api/territorial-units/bulk-active: activa o desactiva
+// varias unidades de una vez (pedido del dueño 2026-10-07). Nunca borra;
+// cada unidad mantiene su lugar en el árbol.
+func (h *TerritorialUnitsHandler) BulkActive(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	var req struct {
+		IDs    []uuid.UUID `json:"ids"`
+		Active *bool       `json:"active"`
+	}
+	if err := decodeJSON(w, r, &req); err != nil || req.Active == nil || len(req.IDs) == 0 || len(req.IDs) > maxBulkActive {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "se necesitan ids (1 a 10000) y active")
+		return
+	}
+	changed, err := h.Queries.SetTerritorialUnitsActive(ctx, db.SetTerritorialUnitsActiveParams{Active: *req.Active, Ids: req.IDs})
+	if err != nil {
+		h.AuditLog.Log(ctx, "territorial_unit.bulk_active", audit.LevelWarn, audit.Failure(err.Error()), map[string]any{"requested": len(req.IDs), "active": *req.Active})
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron actualizar las unidades")
+		return
+	}
+	h.AuditLog.Log(ctx, "territorial_unit.bulk_active", audit.LevelInfo, audit.Success(), map[string]any{"requested": len(req.IDs), "changed": len(changed), "active": *req.Active})
+	writeData(w, http.StatusOK, map[string]any{"changed": len(changed)})
+}
+
 // Import es POST /api/territorial-units/import: JSON anidado, upsert por
 // code, parcial. Todo en una sola transacción con un savepoint por nodo
 // (ver repository.TerritoryStore).

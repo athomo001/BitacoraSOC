@@ -1,5 +1,6 @@
 import { MessageKey } from '../../core/i18n/messages';
 
+import '../../core/i18n/packs/admin';
 /**
  * Proveedores de correo con sus valores conocidos, portados del legacy
  * (settings.component.ts, smtpProviderPresets). Elegir uno solo rellena

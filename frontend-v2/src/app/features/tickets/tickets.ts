@@ -9,6 +9,7 @@ import { QueueSummary, SlaClock, Ticket, TicketFilters, TicketType, TicketsServi
 import { CLOCK_TONE, PRIORITY_SHORT, PRIORITY_TONE, STATUS_TONE, clockText } from '../../core/tickets/ticket-view';
 import { TicketDetailComponent } from './ticket-detail';
 
+import '../../core/i18n/packs/tickets';
 /**
  * Ticketera (/tickets, Fase 10) según el diseño aprobado: resumen de la cola
  * arriba, filtros de un clic, tabla densa con prioridad/estado como pastillas

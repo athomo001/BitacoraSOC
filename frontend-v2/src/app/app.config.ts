@@ -9,10 +9,8 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideHttpClient(withInterceptors([tokenInterceptor])),
-    // withComponentInputBinding: los `data` de cada ruta llegan como
-    // @Input()/input() del componente sin código de resolución manual — así
-    // las 5 secciones maestras comparten un solo PlaceholderComponent
-    // (ver app.routes.ts) en vez de 5 archivos casi idénticos.
+    // withComponentInputBinding: los `data` y parámetros de cada ruta llegan
+    // como input() del componente sin código de resolución manual.
     provideRouter(routes, withComponentInputBinding()),
     // Marca (comentario del dueño #8): nombre, favicon y fuente del título desde el primer pintado.
     provideAppInitializer(() => inject(BrandingService).load()),

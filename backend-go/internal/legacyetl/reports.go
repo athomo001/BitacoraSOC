@@ -152,3 +152,47 @@ func (m *Migrator) migrateOperationTypes(ctx context.Context) error {
 	}
 	return nil
 }
+
+// migrateReportEvents trae catalogEvents (~1.900): nombre, categoría,
+// descripción y el texto por defecto de "Motivo" del informe de incidente.
+// Los repetidos (mismo nombre y categoría) se cargan una vez.
+func (m *Migrator) migrateReportEvents(ctx context.Context) error {
+	var rows []struct {
+		ID            string  `json:"_id"`
+		Name          string  `json:"name"`
+		Parent        *string `json:"parent"`
+		Description   *string `json:"description"`
+		MotivoDefault *string `json:"motivoDefault"`
+		Enabled       *bool   `json:"enabled"`
+		CreatedAt     string  `json:"createdAt"`
+	}
+	if err := m.ex.Decode("catalogEvents", &rows); err != nil {
+		return err
+	}
+	step := newStep("eventos de reporte", len(rows))
+	m.rep.Steps = append(m.rep.Steps, step)
+	text := func(p *string, max int) string {
+		if p == nil {
+			return ""
+		}
+		return truncate(strings.TrimSpace(*p), max)
+	}
+	seen := map[string]bool{}
+	for _, r := range rows {
+		name := truncate(strings.TrimSpace(r.Name), 200)
+		parent := text(r.Parent, 200)
+		key := strings.ToLower(name + "|" + parent)
+		if name == "" || seen[key] {
+			step.skip("sin nombre o repetido")
+			continue
+		}
+		seen[key] = true
+		created := timeOr(r.CreatedAt, time.Now())
+		if _, err := m.tx.Exec(ctx, `INSERT INTO report_events (id, name, parent, description, motivo_default, enabled, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$7)`,
+			ID("catalogEvents", r.ID), name, parent, text(r.Description, 1000), text(r.MotivoDefault, 500), r.Enabled == nil || *r.Enabled, created); err != nil {
+			return err
+		}
+		step.Loaded++
+	}
+	return nil
+}

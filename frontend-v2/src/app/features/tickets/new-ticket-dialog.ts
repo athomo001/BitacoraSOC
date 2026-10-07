@@ -11,6 +11,7 @@ import { Impact, TicketType, TicketsService, Urgency } from '../../core/tickets/
 import { PRIORITY_SHORT, PRIORITY_TONE, priorityOf, resolverTeams } from '../../core/tickets/ticket-view';
 import { ModuleAccessService } from '../../core/auth/module-access.service';
 
+import '../../core/i18n/packs/tickets';
 const IMPACTS: readonly Impact[] = ['low', 'medium', 'high'];
 const URGENCIES: readonly Urgency[] = ['low', 'medium', 'high', 'critical'];
 

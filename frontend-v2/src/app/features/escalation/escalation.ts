@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, injec
 import { MatIconModule } from '@angular/material/icon';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import {
   ActionLog,
   Asset,
@@ -33,7 +33,15 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { FlowState, StepStatus, flowState, formatCountdown, secondsUntilEscalation, stepContactKey } from './escalation-flow';
 
+import '../../core/i18n/packs/escalation';
 type ScopeKind = 'asset' | 'unit' | 'service';
+
+/** Cuántas opciones se pintan en la lista del buscador (con más, se sigue escribiendo). */
+const PICK_LIMIT = 80;
+
+function fold(text: string): string {
+  return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
 
 interface ScopeOption {
   id: string;
@@ -41,6 +49,8 @@ interface ScopeOption {
   hint: string;
   /** Texto extra para el buscador que no se muestra (p. ej. el código del servicio). */
   search?: string;
+  /** Sangría del árbol de zonas. */
+  depth?: number;
 }
 
 /** Una fila de la lista del nivel: una persona, o la cabecera plegable de un pool. */
@@ -82,7 +92,7 @@ const CHANNEL_ICON: Record<ChannelType, string> = { call: 'call', sms: 'sms', wh
 @Component({
   selector: 'app-escalation',
   standalone: true,
-  imports: [FormsModule, DatePipe, MatIconModule, MaintenanceWindowsComponent],
+  imports: [FormsModule, DatePipe, MatIconModule, RouterLink, MaintenanceWindowsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './escalation.html',
   styleUrl: './escalation.css',
@@ -147,23 +157,47 @@ export class EscalationComponent implements OnInit {
 
   private readonly now = signal(Date.now());
 
+  /** Todo lo elegible del tipo actual (sin filtrar). */
   protected readonly options = computed<ScopeOption[]>(() => {
-    const q = this.filter().trim().toLowerCase();
-    let all: ScopeOption[];
     switch (this.scopeKind()) {
       case 'asset':
-        all = this.assets().map((a) => ({ id: a.id, label: a.name, hint: [a.code, a.ipAddress].filter(Boolean).join(' · ') }));
-        break;
+        return this.assets().map((a) => ({ id: a.id, label: a.name, hint: [a.code, a.ipAddress].filter(Boolean).join(' · ') }));
       case 'unit':
-        all = this.units().map((u) => ({ id: u.id, label: `${'— '.repeat(u.depth)}${u.name}`, hint: u.code }));
-        break;
+        return this.units().map((u) => ({ id: u.id, label: u.name, hint: u.code, depth: u.depth }));
       default:
-        all = this.services()
+        return this.services()
           .map((s) => ({ id: s.id, label: [s.organizationName, s.name].filter(Boolean).join(' · '), hint: '', search: s.code }))
           .sort((a, b) => a.label.localeCompare(b.label));
     }
-    return q ? all.filter((o) => `${o.label} ${o.hint} ${o.search ?? ''}`.toLowerCase().includes(q)) : all;
   });
+
+  /**
+   * Lo que coincide con lo escrito, lo más probable primero (pedido del
+   * dueño 2026-10-07): empieza igual → empieza una palabra → contiene. Sin
+   * tildes ni mayúsculas. Se muestran hasta PICK_LIMIT.
+   */
+  protected readonly matches = computed(() => {
+    const q = fold(this.filter().trim());
+    const all = this.options();
+    if (!q) return { shown: all.slice(0, PICK_LIMIT), more: Math.max(0, all.length - PICK_LIMIT) };
+    const ranked: { o: ScopeOption; rank: number }[] = [];
+    for (const o of all) {
+      const label = fold(o.label);
+      const rest = fold(`${o.hint} ${o.search ?? ''}`);
+      let rank: number;
+      if (label.startsWith(q)) rank = 0;
+      else if (label.includes(` ${q}`) || label.includes(`·${q}`) || label.includes(`· ${q}`)) rank = 1;
+      else if (label.includes(q)) rank = 2;
+      else if (rest.includes(q)) rank = 3;
+      else continue;
+      ranked.push({ o, rank });
+    }
+    ranked.sort((a, b) => a.rank - b.rank || a.o.label.length - b.o.label.length);
+    return { shown: ranked.slice(0, PICK_LIMIT).map((r) => r.o), more: Math.max(0, ranked.length - PICK_LIMIT) };
+  });
+
+  protected readonly pickOpen = signal(false);
+  protected readonly pickActive = signal(0);
 
   /** Lo que se destaca arriba: servicio y cliente (o activo / zona en NOC). */
   protected readonly target = computed(() => {
@@ -261,7 +295,8 @@ export class EscalationComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.modules.load();
-    if (!this.nocEnabled()) this.scopeKind.set('service');
+    // Servicio es lo que más se usa: parte elegido si SOC está activo.
+    this.scopeKind.set(this.socEnabled() || !this.nocEnabled() ? 'service' : 'asset');
     try {
       await Promise.all([
         this.nocEnabled() ? this.api.listAssets().then((a) => this.assets.set(a)) : null,
@@ -285,6 +320,61 @@ export class EscalationComponent implements OnInit {
         break;
       }
     }
+  }
+
+  protected openPick(): void {
+    if (this.pickOpen()) return;
+    this.filter.set('');
+    this.pickActive.set(0);
+    this.pickOpen.set(true);
+  }
+
+  protected onPickInput(value: string): void {
+    this.filter.set(value);
+    this.pickActive.set(0);
+    this.pickOpen.set(true);
+  }
+
+  protected onPickKey(event: KeyboardEvent): void {
+    const count = this.matches().shown.length;
+    switch (event.key) {
+      case 'ArrowDown':
+        event.preventDefault();
+        if (!this.pickOpen()) this.openPick();
+        else if (count) this.pickActive.update((i) => (i + 1) % count);
+        break;
+      case 'ArrowUp':
+        event.preventDefault();
+        if (count) this.pickActive.update((i) => (i - 1 + count) % count);
+        break;
+      case 'Enter': {
+        const o = this.matches().shown[this.pickActive()];
+        if (this.pickOpen() && o) {
+          event.preventDefault();
+          void this.choose(o.id);
+        }
+        break;
+      }
+      case 'Escape':
+        if (this.pickOpen()) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.pickOpen.set(false);
+        }
+        break;
+    }
+  }
+
+  protected onPickBlur(event: FocusEvent): void {
+    const next = event.relatedTarget as Node | null;
+    if (next && (event.currentTarget as HTMLElement).contains(next)) return;
+    this.pickOpen.set(false);
+  }
+
+  protected async choose(id: string): Promise<void> {
+    this.pickOpen.set(false);
+    this.filter.set('');
+    if (id !== this.selectedId()) await this.pick(id);
   }
 
   protected setKind(kind: ScopeKind): void {

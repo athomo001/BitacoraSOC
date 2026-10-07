@@ -144,6 +144,45 @@ describe('ReportsComponent (comentario del dueño #10)', () => {
     expect((el.querySelector('textarea[name="info"]') as HTMLTextAreaElement).value).toBe('Texto por defecto de ofensas.');
   });
 
+  it('"Nombre del evento" sugiere del catálogo y rellena "Motivo" sin pisar lo escrito a mano', async () => {
+    const { fixture, el } = await render();
+    const PHISH = { id: 'e1', name: 'Phishing detectado', parent: 'Email Security', description: '', motivoDefault: 'Correo con enlace malicioso.', enabled: true };
+    const MALWARE = { id: 'e2', name: 'Malware en equipo', parent: 'Endpoint', description: '', motivoDefault: 'Detección del antivirus.', enabled: true };
+    setValue(el, 'input[name="evento"]', 'phish');
+    await tick(250);
+    httpMock.expectOne((r) => r.url === '/api/report-events' && r.params.get('q') === 'phish').flush({ data: [PHISH] });
+    await tick();
+    fixture.detectChanges();
+    const opt = el.querySelector('.rp__suggest-opt') as HTMLElement;
+    expect(opt.textContent).toContain('Phishing detectado');
+    expect(opt.textContent).toContain('Email Security');
+    opt.dispatchEvent(new MouseEvent('mousedown'));
+    await settle(fixture);
+    expect((el.querySelector('input[name="evento"]') as HTMLInputElement).value).toBe('Phishing detectado');
+    expect((el.querySelector('textarea[name="motivo"]') as HTMLTextAreaElement).value).toBe('Correo con enlace malicioso.');
+
+    // Otra sugerencia reemplaza el motivo puesto por la anterior…
+    setValue(el, 'input[name="evento"]', 'malw');
+    await tick(250);
+    httpMock.expectOne((r) => r.url === '/api/report-events').flush({ data: [MALWARE] });
+    await tick();
+    fixture.detectChanges();
+    (el.querySelector('input[name="evento"]') as HTMLInputElement).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    await settle(fixture);
+    expect((el.querySelector('textarea[name="motivo"]') as HTMLTextAreaElement).value).toBe('Detección del antivirus.');
+
+    // …pero no lo escrito a mano.
+    setValue(el, 'textarea[name="motivo"]', 'Mi propio motivo');
+    setValue(el, 'input[name="evento"]', 'phish');
+    await tick(250);
+    httpMock.expectOne((r) => r.url === '/api/report-events').flush({ data: [PHISH] });
+    await tick();
+    fixture.detectChanges();
+    (el.querySelector('.rp__suggest-opt') as HTMLElement).dispatchEvent(new MouseEvent('mousedown'));
+    await settle(fixture);
+    expect((el.querySelector('textarea[name="motivo"]') as HTMLTextAreaElement).value).toBe('Mi propio motivo');
+  });
+
   it('sin los campos obligatorios no envía y dice qué falta', async () => {
     const { fixture, el } = await render();
     button(el, 'Enviar').click();

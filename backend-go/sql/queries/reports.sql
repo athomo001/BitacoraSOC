@@ -94,3 +94,34 @@ UPDATE report_operation_types SET name = $2, info_default = $3, enabled = $4, up
 
 -- name: DeleteReportOperationType :execrows
 DELETE FROM report_operation_types WHERE id = $1;
+
+-- ===== Eventos del informe de incidente (catalogEvents del legacy) =====
+
+-- name: SuggestReportEvents :many
+-- Sugerencias al escribir: lo que empieza igual primero, luego lo que lo
+-- contiene (nombre o categoría); sin tildes no hace falta porque el legacy
+-- tampoco los normalizaba y el texto se escribe como en el catálogo.
+SELECT * FROM report_events
+WHERE enabled
+  AND (name ILIKE '%' || sqlc.arg('q')::text || '%' OR parent ILIKE '%' || sqlc.arg('q')::text || '%')
+ORDER BY (lower(name) LIKE lower(sqlc.arg('q')::text) || '%') DESC, length(name), name
+LIMIT sqlc.arg('lim')::int;
+
+-- name: ListReportEvents :many
+SELECT * FROM report_events
+WHERE (sqlc.arg('q')::text = '' OR name ILIKE '%' || sqlc.arg('q')::text || '%' OR parent ILIKE '%' || sqlc.arg('q')::text || '%')
+ORDER BY name
+LIMIT sqlc.arg('lim')::int OFFSET sqlc.arg('off')::int;
+
+-- name: CountReportEvents :one
+SELECT count(*) FROM report_events
+WHERE (sqlc.arg('q')::text = '' OR name ILIKE '%' || sqlc.arg('q')::text || '%' OR parent ILIKE '%' || sqlc.arg('q')::text || '%');
+
+-- name: CreateReportEvent :one
+INSERT INTO report_events (name, parent, description, motivo_default, enabled) VALUES ($1, $2, $3, $4, $5) RETURNING *;
+
+-- name: UpdateReportEvent :one
+UPDATE report_events SET name = $2, parent = $3, description = $4, motivo_default = $5, enabled = $6, updated_at = now() WHERE id = $1 RETURNING *;
+
+-- name: DeleteReportEvent :execrows
+DELETE FROM report_events WHERE id = $1;

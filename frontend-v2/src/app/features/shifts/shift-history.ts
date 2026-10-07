@@ -8,6 +8,7 @@ import { ChecklistsService, ShiftCheck } from '../../core/checklists/checklists.
 import { redLeaves } from '../../core/checklists/shift-detect';
 import { ShiftsService, WorkShift } from '../../core/shifts/shifts.service';
 
+import '../../core/i18n/packs/shifts';
 const PAGE_SIZE = 50;
 
 /**
