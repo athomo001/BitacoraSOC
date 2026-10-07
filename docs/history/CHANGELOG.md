@@ -4,6 +4,14 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] Documentación nueva - 2026-10-07
+
+- README reescrito: qué hace, inicio rápido, cómo está hecho y un mapa de la documentación.
+- Documentos nuevos en `docs/`, escritos a partir del código: `guia-de-uso.md` (cada pantalla y los roles), `instalacion.md` (desarrollo y producción con HTTPS, respaldos fuera del contenedor y problemas comunes), `configuracion.md` (todas las variables de entorno y lo que se configura en la app), `operacion.md` (respaldos, restaurar, actualizar, monitoreo, emergencias), `arquitectura.md`, `api.md` (las 277 rutas generadas desde `main.go`, con su nivel de acceso, autenticación, errores y límites), `desarrollo.md` (entorno, pruebas, recetas y convenciones) y `migracion-legacy.md` (ETL, comparador de escalamiento, semilla territorial y corte), más un índice en `docs/README.md`.
+- READMEs propios para `backend-go/` y `frontend-v2/` (este último era la plantilla de Angular CLI).
+- `.env.example`: `BOOTSTRAP_MODULES` documenta también `tickets`.
+- Hallazgo para producción, ahora documentado: sin `BACKUP_DIR` en un volumen, las copias quedan dentro del contenedor y se pierden al recrearlo.
+
 ## [Rewrite] Turnos: guardias en línea de tiempo - 2026-10-07
 
 - Pedido del dueño: la semana del legacy era fácil de leer ("quién viene próximo"), pero equivocarse era fácil. Diseño aprobado en el canvas (artboard "Turnos: guardias", v31). Ahora es la primera pestaña de Administración → Turnos, **Guardias**.

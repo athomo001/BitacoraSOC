@@ -1,59 +1,37 @@
-# FrontendV2
+# frontend-v2
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.1.8.
+Aplicación web de Bitácora Ops: Angular 22 con componentes standalone, signals y sin `zone.js`. En producción no se sirve sola: se compila y queda **embebida en el binario Go** (ver [backend-go](../backend-go/README.md)).
 
-## Development server
+## Carpetas
 
-To start a local development server, run:
+| Ruta | Qué hay |
+| --- | --- |
+| `src/app/app.routes.ts` | Rutas y guards: `/setup`, `/login`, enlace público de tickets `/p/tickets/:token` y las pantallas con sesión. |
+| `src/app/core/` | Servicios HTTP por área, autenticación, i18n, preferencias (idioma, tema, dislexia) y eventos en vivo (SSE). |
+| `src/app/features/` | Pantallas: `entries` (Bitácora), `shifts`, `escalation`, `directory`, `reports`, `tickets`, `complements`, `admin`, `setup`, `login`, `territory`. |
+| `src/app/shared/` | Componentes reutilizables: `modal`, botones, tabla densa y Markdown. |
+| `src/app/shell/` | Marco de la app: menú lateral, Mi perfil, idioma y tema. |
+| `src/styles/` | Estilos globales: `tokens.css` (variables de los 3 temas), `admin-kit.css`, `forms.css`, `pills.css` y `fonts.css`. |
+| `scripts/copy-seed.mjs` | Copia `../seed/territorial_units_chile.json` a `public/seed/` antes de compilar. |
+| `scripts/check-css-vars.mjs` | Verifica que toda `var(--…)` usada exista en los 3 temas. |
 
-```bash
-ng serve
-```
-
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
-```bash
-ng generate component component-name
-```
-
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+## Comandos
 
 ```bash
-ng generate --help
+pnpm install                                   # dependencias
+pnpm run build                                 # build de producción → dist/frontend-v2/browser
+pnpm exec ng test --watch=false                # pruebas (Vitest)
+pnpm exec tsc -p tsconfig.app.json --noEmit    # tipos
+pnpm run lint:css                              # lint de estilos + variables de tema
 ```
 
-## Building
+> `pnpm start` (`ng serve`) levanta solo el frontend **sin proxy a la API**. Para ver la app funcionando usa el stack de Docker (<http://127.0.0.1:8081>) o `../scripts/sync-frontend.sh` + `go run` (ver [desarrollo.md](../docs/desarrollo.md#1-entorno-local)).
 
-To build the project run:
+## Reglas rápidas
 
-```bash
-ng build
-```
+- Componentes standalone con `ChangeDetectionStrategy.OnPush` y signals.
+- Todo texto visible pasa por `i18n.t('clave')`, con la clave en ES y EN. Los textos de un área van en `core/i18n/packs/<área>.ts` y el componente importa ese pack.
+- Colores solo con variables de tema (`var(--accent)`…): el lint rechaza los hexadecimales.
+- Lo que el usuario no puede usar (módulo apagado, sin permiso) no se muestra.
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+Más detalle en [desarrollo.md](../docs/desarrollo.md) y [arquitectura.md](../docs/arquitectura.md#4-frontend-angular).
