@@ -94,7 +94,7 @@ describe('AdminAccessComponent', () => {
     ([...el.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((b) => b.textContent?.includes('Grupos'))!).click();
     fixture.detectChanges();
     const boxes = [...el.querySelectorAll<HTMLButtonElement>('.aa-table button[role="checkbox"]')];
-    expect(boxes.length).toBe(4); // 2 grupos × 2 capacidades
+    expect(boxes.length).toBe(6); // 2 grupos × 3 capacidades (directorio ×2, cambiar cliente de un ticket)
     boxes[0].click();
     const req = httpMock.expectOne({ method: 'PATCH', url: '/api/permission-groups/g-noc' });
     expect(req.request.body).toEqual({ capabilities: ['directory:write'] });

@@ -937,8 +937,8 @@ SELECT DISTINCT ON (t.id) t.id AS team_id, t.name AS team_name,
 FROM teams t
 JOIN rotation_cycles rc ON rc.team_id = t.id AND rc.active = true
 JOIN rotation_slots rs ON rs.cycle_id = rc.id
-  AND rs.week_start_date <= $1::date
-  AND rs.week_end_date >= $1::date
+  AND rs.starts_at <= $1::timestamptz
+  AND rs.ends_at > $1::timestamptz
   AND rs.is_paused = false
 JOIN team_members tm ON tm.id = rs.team_member_id AND tm.active = true
 LEFT JOIN users u ON u.id = tm.user_id
@@ -949,8 +949,8 @@ ORDER BY t.id, tm.priority DESC, tm.id
 `
 
 type ListHandoverOnCallParams struct {
-	Today  pgtype.Date `json:"today"`
-	TeamID pgtype.UUID `json:"team_id"`
+	Now    pgtype.Timestamptz `json:"now"`
+	TeamID pgtype.UUID        `json:"team_id"`
 }
 
 type ListHandoverOnCallRow struct {
@@ -960,7 +960,7 @@ type ListHandoverOnCallRow struct {
 }
 
 func (q *Queries) ListHandoverOnCall(ctx context.Context, arg ListHandoverOnCallParams) ([]ListHandoverOnCallRow, error) {
-	rows, err := q.db.Query(ctx, listHandoverOnCall, arg.Today, arg.TeamID)
+	rows, err := q.db.Query(ctx, listHandoverOnCall, arg.Now, arg.TeamID)
 	if err != nil {
 		return nil, err
 	}

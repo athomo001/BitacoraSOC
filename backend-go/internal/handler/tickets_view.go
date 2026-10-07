@@ -41,6 +41,10 @@ type ticketViewDTO struct {
 	ResolvedAt         *time.Time `json:"resolvedAt"`
 	SLA                slaDTO     `json:"sla"`
 	AllowedTransitions []string   `json:"allowedTransitions"`
+	// Padre/hijo y unir (000028): para agrupar y marcar la cola.
+	ParentNumber     *string `json:"parentNumber,omitempty"`
+	MergedIntoNumber *string `json:"mergedIntoNumber,omitempty"`
+	ChildCount       int32   `json:"childCount"`
 }
 
 func slaInput(t db.Ticket) tickets.SLAInput {
@@ -67,6 +71,9 @@ func toTicketView(t db.Ticket, clientName string, teamName, assignee pgtype.Text
 		c := tickets.ResolutionClock(in, now)
 		v.SLA.Resolution = &c
 	}
+	if t.MergedIntoID.Valid {
+		return v // unido a otro: no tiene acciones propias
+	}
 	for _, to := range tickets.Transitions(tickets.Status(t.Status)) {
 		if to == tickets.Cancelled {
 			continue // cancelar = eliminar (admin), no un botón de estado
@@ -83,6 +90,8 @@ type ticketCommentDTO struct {
 	IsPublic   bool             `json:"isPublic"`
 	CreatedAt  time.Time        `json:"createdAt"`
 	Images     []ticketImageDTO `json:"images"`
+	// Origin: '' propio, 'parent:TKT-…', 'child:TKT-…' o 'merged:TKT-…'.
+	Origin string `json:"origin"`
 }
 
 // ticketImageDTO: los bytes se piden aparte (GET /api/tickets/{id}/images/{imageId}).
@@ -104,7 +113,7 @@ func imagesOfComment(rows []db.ListTicketImagesRow, commentID uuid.UUID) []ticke
 }
 
 func toTicketCommentDTO(c db.TicketComment) ticketCommentDTO {
-	return ticketCommentDTO{ID: c.ID, AuthorName: c.AuthorName, Content: c.Content, IsPublic: c.IsPublic, CreatedAt: c.CreatedAt.Time, Images: []ticketImageDTO{}}
+	return ticketCommentDTO{ID: c.ID, AuthorName: c.AuthorName, Content: c.Content, IsPublic: c.IsPublic, CreatedAt: c.CreatedAt.Time, Images: []ticketImageDTO{}, Origin: c.Origin}
 }
 
 type ticketTaskDTO struct {
@@ -137,6 +146,32 @@ type ticketDetailDTO struct {
 	Entries               []ticketEntryDTO    `json:"entries"`
 	TotalTimeSpentSeconds int64               `json:"totalTimeSpentSeconds"`
 	Resolvers             []ticketResolverDTO `json:"resolvers"`
+	Parent                *ticketRefDTO       `json:"parent"`
+	MergedInto            *ticketRefDTO       `json:"mergedInto"`
+	Children              []ticketChildDTO    `json:"children"`
+}
+
+type ticketRefDTO struct {
+	ID           uuid.UUID `json:"id"`
+	TicketNumber string    `json:"ticketNumber"`
+	Title        string    `json:"title"`
+}
+
+type ticketChildDTO struct {
+	ticketRefDTO
+	Status     string `json:"status"`
+	ClientName string `json:"clientName"`
+}
+
+func (h *TicketsHandler) ticketRef(ctx context.Context, id pgtype.UUID) *ticketRefDTO {
+	if !id.Valid {
+		return nil
+	}
+	ref, err := h.Queries.GetTicketRef(ctx, uuid.UUID(id.Bytes))
+	if err != nil {
+		return nil
+	}
+	return &ticketRefDTO{ID: ref.ID, TicketNumber: ref.TicketNumber, Title: ref.Title}
 }
 
 // ticketResolverDTO: una persona que trabaja el ticket (puede haber varias).
@@ -199,7 +234,9 @@ func (h *TicketsHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	items := make([]ticketViewDTO, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, toTicketView(row.Ticket, row.ClientName, row.TeamName, row.AssigneeUsername, now))
+		v := toTicketView(row.Ticket, row.ClientName, row.TeamName, row.AssigneeUsername, now)
+		v.ParentNumber, v.MergedIntoNumber, v.ChildCount = textPtr(row.ParentNumber), textPtr(row.MergedIntoNumber), row.ChildCount
+		items = append(items, v)
 	}
 	writeData(w, 200, map[string]any{
 		"items": items, "total": total,
@@ -247,6 +284,22 @@ func (h *TicketsHandler) loadDetail(r *http.Request, id uuid.UUID) (ticketDetail
 	for _, rv := range resolvers {
 		d.Resolvers = append(d.Resolvers, ticketResolverDTO{UserID: rv.UserID, Username: rv.Username, FullName: textPtr(rv.FullName)})
 	}
+	d.Parent, d.MergedInto = h.ticketRef(ctx, row.Ticket.ParentID), h.ticketRef(ctx, row.Ticket.MergedIntoID)
+	if d.Parent != nil {
+		d.Ticket.ParentNumber = &d.Parent.TicketNumber
+	}
+	if d.MergedInto != nil {
+		d.Ticket.MergedIntoNumber = &d.MergedInto.TicketNumber
+	}
+	children, err := h.Queries.ListTicketChildren(ctx, pgtype.UUID{Bytes: id, Valid: true})
+	if err != nil {
+		return ticketDetailDTO{}, err
+	}
+	d.Children = make([]ticketChildDTO, 0, len(children))
+	for _, c := range children {
+		d.Children = append(d.Children, ticketChildDTO{ticketRefDTO: ticketRefDTO{ID: c.ID, TicketNumber: c.TicketNumber, Title: c.Title}, Status: string(c.Status), ClientName: c.ClientName})
+	}
+	d.Ticket.ChildCount = int32(len(children))
 	// Actividad: lo más reciente arriba, como en la pantalla.
 	for i := len(comments) - 1; i >= 0; i-- {
 		dto := toTicketCommentDTO(comments[i])
@@ -287,6 +340,8 @@ type updateTicketRequest struct {
 	AssignedContactID *uuid.UUID `json:"assignedContactId"`
 	Impact            *string    `json:"impact"`
 	Urgency           *string    `json:"urgency"`
+	// AlsoChildren: al resolver un padre, resolver también sus hijos abiertos.
+	AlsoChildren bool `json:"alsoChildren"`
 }
 
 // Patch cambia estado/asignación/impacto. Solo acepta transiciones válidas
@@ -314,8 +369,12 @@ func (h *TicketsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 400, "invalid-payload", "impacto o urgencia inválidos")
 		return
 	}
+	if old.MergedIntoID.Valid {
+		problemdetails.Write(w, r, http.StatusConflict, "ticket-merged", "este ticket se unió a otro: se trabaja en el principal")
+		return
+	}
 	now := h.now()
-	p := db.UpdateTicketParams{ID: id, SlaOnHoldSince: old.SlaOnHoldSince, ResolvedAt: old.ResolvedAt, ClosedAt: old.ClosedAt, ReopenedAt: old.ReopenedAt, SlaPausedSeconds: pgtype.Int4{Int32: old.SlaPausedSeconds, Valid: true}, ReopenedCount: pgtype.Int4{Int32: old.ReopenedCount, Valid: true}}
+	p := baseTicketUpdate(old)
 	from := tickets.Status(old.Status)
 	if req.Status != nil && tickets.Status(*req.Status) != from {
 		to := tickets.Status(*req.Status)
@@ -337,27 +396,7 @@ func (h *TicketsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 			problemdetails.Write(w, r, 400, "invalid-payload", "indica a quién se asigna el ticket (assignedUserId)")
 			return
 		}
-		p.Status = db.NullTicketStatus{TicketStatus: db.TicketStatus(to), Valid: true}
-		if to == tickets.PendingVendor {
-			p.SlaOnHoldSince = pgtype.Timestamptz{Time: now, Valid: true}
-		}
-		if from == tickets.PendingVendor && old.SlaOnHoldSince.Valid {
-			p.SlaPausedSeconds.Int32 += int32(now.Sub(old.SlaOnHoldSince.Time).Seconds())
-			p.SlaOnHoldSince = pgtype.Timestamptz{}
-		}
-		switch to {
-		case tickets.Resolved:
-			p.ResolvedAt = pgtype.Timestamptz{Time: now, Valid: true}
-		case tickets.Closed:
-			p.ClosedAt = pgtype.Timestamptz{Time: now, Valid: true}
-		}
-		if tickets.IsReopen(from, to) {
-			p.ReopenedCount.Int32++
-			p.ReopenedAt = pgtype.Timestamptz{Time: now, Valid: true}
-			p.ResolvedAt = pgtype.Timestamptz{}
-			p.ClosedAt = pgtype.Timestamptz{}
-		}
-		p.FirstRespondedAt = pgtype.Timestamptz{Time: now, Valid: true} // COALESCE: solo cuenta la primera
+		applyTicketStatus(&p, old, to, now)
 	}
 	if req.TeamID != nil {
 		p.AssignedTeamID = pgtype.UUID{Bytes: *req.TeamID, Valid: true}
@@ -384,6 +423,12 @@ func (h *TicketsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 400, "invalid-payload", "no se pudo actualizar el ticket")
 		return
 	}
+	// Padre/hijo: el cambio de estado se ve en el padre y, desde un padre,
+	// se propaga a los hijos abiertos que corresponde.
+	if req.Status != nil && tickets.Status(*req.Status) != from {
+		actor, _ := middleware.UserFromContext(ctx)
+		h.afterStatusChange(ctx, old, tickets.Status(*req.Status), req.AlsoChildren, actor, now)
+	}
 	// Quien toma (o a quien se asigna) el ticket queda como resolutor.
 	if req.AssignedUserID != nil {
 		actor, _ := middleware.UserFromContext(ctx)
@@ -403,6 +448,39 @@ func (h *TicketsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeData(w, 200, toTicketView(row.Ticket, row.ClientName, row.TeamName, row.AssigneeUsername, now))
+}
+
+// baseTicketUpdate copia lo que UpdateTicket no debe perder (fechas y contadores).
+func baseTicketUpdate(old db.Ticket) db.UpdateTicketParams {
+	return db.UpdateTicketParams{ID: old.ID, SlaOnHoldSince: old.SlaOnHoldSince, ResolvedAt: old.ResolvedAt, ClosedAt: old.ClosedAt, ReopenedAt: old.ReopenedAt, SlaPausedSeconds: pgtype.Int4{Int32: old.SlaPausedSeconds, Valid: true}, ReopenedCount: pgtype.Int4{Int32: old.ReopenedCount, Valid: true}}
+}
+
+// applyTicketStatus arma un cambio de estado: pausa y reanudación del SLA,
+// fechas de resuelto/cerrado, reapertura y primera respuesta. Lo usan el
+// PATCH y la propagación de un padre a sus hijos.
+func applyTicketStatus(p *db.UpdateTicketParams, old db.Ticket, to tickets.Status, now time.Time) {
+	from := tickets.Status(old.Status)
+	p.Status = db.NullTicketStatus{TicketStatus: db.TicketStatus(to), Valid: true}
+	if to == tickets.PendingVendor {
+		p.SlaOnHoldSince = pgtype.Timestamptz{Time: now, Valid: true}
+	}
+	if from == tickets.PendingVendor && old.SlaOnHoldSince.Valid {
+		p.SlaPausedSeconds.Int32 += int32(now.Sub(old.SlaOnHoldSince.Time).Seconds())
+		p.SlaOnHoldSince = pgtype.Timestamptz{}
+	}
+	switch to {
+	case tickets.Resolved:
+		p.ResolvedAt = pgtype.Timestamptz{Time: now, Valid: true}
+	case tickets.Closed:
+		p.ClosedAt = pgtype.Timestamptz{Time: now, Valid: true}
+	}
+	if tickets.IsReopen(from, to) {
+		p.ReopenedCount.Int32++
+		p.ReopenedAt = pgtype.Timestamptz{Time: now, Valid: true}
+		p.ResolvedAt = pgtype.Timestamptz{}
+		p.ClosedAt = pgtype.Timestamptz{}
+	}
+	p.FirstRespondedAt = pgtype.Timestamptz{Time: now, Valid: true} // COALESCE: solo cuenta la primera
 }
 
 // newPublicPin: 6 dígitos (spec/06 §6.4) con crypto/rand.
@@ -651,7 +729,11 @@ func (h *TicketsHandler) PublicImage(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 404, "not-found", "imagen no encontrada")
 		return
 	}
-	img, err := h.Queries.GetTicketImage(ctx, db.GetTicketImageParams{ID: imageID, TicketID: t.ID})
+	ticketID := t.ID
+	if t.MergedIntoID.Valid { // la página de un ticket unido muestra las imágenes del principal
+		ticketID = uuid.UUID(t.MergedIntoID.Bytes)
+	}
+	img, err := h.Queries.GetTicketImage(ctx, db.GetTicketImageParams{ID: imageID, TicketID: ticketID})
 	if err != nil || !img.CommentID.Valid || !img.IsPublic {
 		problemdetails.Write(w, r, 404, "not-found", "imagen no encontrada")
 		return

@@ -37,6 +37,8 @@
     </dl>
   </header>
 
+  <app-ticket-relations [detail]="d" (reload)="reloadAll()" (open)="navigate.emit($event)" />
+
   <section class="td__block td__sla" [attr.aria-label]="i18n.t('tickets.detail.sla')">
     <div class="td__row">
       <span class="td__label">{{ i18n.t('tickets.detail.sla') }}</span>
@@ -103,6 +105,7 @@
           <article class="td__comment" [class.td__comment--public]="c.isPublic">
             <div class="td__comment-meta">
               <span class="mono">{{ c.createdAt | date: 'dd/MM HH:mm' }}</span><span>·</span><span>{{ c.authorName }}</span>
+              @if (c.origin) { <span class="pill" [class]="c.origin.startsWith('parent') ? 'tone-system' : c.origin.startsWith('child') ? 'tone-info' : 'tone-neutral'">{{ originLabel(c.origin) }}</span> }
               <span class="pill td__vis" [class.tone-info]="c.isPublic">
                 <mat-icon>{{ c.isPublic ? 'visibility' : 'lock' }}</mat-icon>{{ i18n.t(c.isPublic ? 'tickets.activity.public' : 'tickets.activity.internal') }}
               </span>
@@ -192,6 +195,11 @@
       <button type="button" class="td__visibility" [class.td__visibility--public]="commentPublic()" [attr.aria-pressed]="commentPublic()" (click)="commentPublic.set(!commentPublic())">
         <mat-icon>{{ commentPublic() ? 'visibility' : 'lock' }}</mat-icon>{{ i18n.t(commentPublic() ? 'tickets.comment.public' : 'tickets.comment.internal') }}
       </button>
+      @if (openChildren() > 0) {
+        <button type="button" class="td__visibility" [class.td__visibility--public]="alsoChildren()" [attr.aria-pressed]="alsoChildren()" (click)="alsoChildren.set(!alsoChildren())">
+          <mat-icon>{{ alsoChildren() ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>{{ i18n.tf('tkrel.alsoChildren', openChildren()) }}
+        </button>
+      }
       <button type="button" class="td__btn" [title]="i18n.t('mdHelp.openHint')" (click)="openFormat()"><mat-icon>text_format</mat-icon>{{ i18n.t('mdHelp.open') }}</button>
       <button type="submit" class="td__btn td__btn--primary td__push" [disabled]="busy() || uploading() > 0 || (!comment.trim() && !pending().length)">{{ i18n.t('tickets.comment.submit') }} <span class="mono td__kbd">Ctrl+↵</span></button>
     </div>

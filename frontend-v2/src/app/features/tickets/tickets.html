@@ -41,14 +41,17 @@
       @if (loading()) {
         <p class="tk__empty">{{ i18n.t('tickets.loading') }}</p>
       } @else {
-        @for (t of tickets(); track t.id) {
+        @for (t of rows(); track t.id) {
           @let clock = t.sla.resolution;
-          <button type="button" class="tk__row" role="row" [class.tk__row--selected]="t.id === selectedId()" [attr.aria-current]="t.id === selectedId()" (click)="selectedId.set(t.id)">
-            <span class="mono tk__number">{{ t.ticketNumber }}</span>
+          <button type="button" class="tk__row" role="row" [class.tk__row--selected]="t.id === selectedId()" [class.tk__row--child]="t.parentId" [class.tk__row--merged]="t.mergedIntoId" [attr.aria-current]="t.id === selectedId()" (click)="selectedId.set(t.id)">
+            <span class="mono tk__number">@if (t.parentId) { <span aria-hidden="true">↳ </span> }{{ t.ticketNumber }}</span>
             <span class="pill mono tk__prio" [class]="'tone-' + priorityTone[t.priority]">{{ priorityShort[t.priority] }}</span>
             <span class="tk__cell-title">
               <span class="tk__ticket-title">{{ t.title }}</span>
-              <span class="tk__ticket-sub">{{ i18n.t(typeKey(t)) }} · {{ t.clientName }} · {{ t.teamName ?? '—' }}</span>
+              <span class="tk__ticket-sub">{{ i18n.t(typeKey(t)) }} · {{ t.clientName }} · {{ t.teamName ?? '—' }}
+                @if (t.childCount) { · <strong class="tk__rel">{{ i18n.tf('tkrel.childCount', t.childCount) }}</strong> }
+                @if (t.mergedIntoNumber) { · <strong class="tk__rel">{{ i18n.tf('tkrel.mergedShort', t.mergedIntoNumber) }}</strong> }
+              </span>
             </span>
             <span class="pill tk__status" [class]="'tone-' + statusTone[t.status]">{{ i18n.t(statusKey(t)) }}</span>
             <span class="tk__sla" [class]="'text-' + slaTone(clock)">
@@ -64,7 +67,7 @@
 
     <aside class="tk__detail">
       @if (selectedId(); as id) {
-        <app-ticket-detail [ticketId]="id" (changed)="onChanged($event)" (deleted)="onDeleted($event)" />
+        <app-ticket-detail [ticketId]="id" (changed)="onChanged($event)" (deleted)="onDeleted($event)" (navigate)="selectedId.set($event)" />
       } @else {
         <p class="tk__empty">{{ i18n.t('tickets.selectHint') }}</p>
       }

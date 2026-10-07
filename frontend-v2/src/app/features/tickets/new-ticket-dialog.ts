@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DialogRef } from '@angular/cdk/dialog';
+import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { ModalComponent } from '../../shared/ui/modal/modal';
 import { ButtonComponent } from '../../shared/ui/button/button';
 import { I18nService } from '../../core/i18n/i18n.service';
@@ -15,6 +15,14 @@ import '../../core/i18n/packs/tickets';
 const IMPACTS: readonly Impact[] = ['low', 'medium', 'high'];
 const URGENCIES: readonly Urgency[] = ['low', 'medium', 'high', 'critical'];
 
+/** "Crear hijo" (Ticketera: unir y padre/hijo): prellena cliente y ámbito del padre. */
+export interface NewChildData {
+  parentId: string;
+  parentNumber: string;
+  clientId: string;
+  scope: 'soc' | 'noc' | 'general';
+}
+
 /**
  * Alta de ticket (diseño aprobado): cliente y equipo desde listas reales —
  * nunca un UUID escrito a mano — e impacto/urgencia con un clic, mostrando la
@@ -27,7 +35,7 @@ const URGENCIES: readonly Urgency[] = ['low', 'medium', 'high', 'critical'];
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <app-modal>
-      <span app-modal-title>{{ i18n.t('tickets.newDialog.title') }}</span>
+      <span app-modal-title>{{ parent ? i18n.tf('tkrel.newChildOf', parent.parentNumber) : i18n.t('tickets.newDialog.title') }}</span>
       <form class="nt" id="new-ticket-form" (submit)="$event.preventDefault(); create()">
         <div class="nt__row">
           <button type="button" class="seg" [attr.aria-pressed]="type() === 'incident'" (click)="type.set('incident')">{{ i18n.t('tickets.type.incident') }}</button>
@@ -158,6 +166,7 @@ const URGENCIES: readonly Urgency[] = ['low', 'medium', 'high', 'critical'];
 export class NewTicketDialogComponent implements OnInit {
   protected readonly i18n = inject(I18nService);
   protected readonly dialogRef = inject(DialogRef<string | undefined>);
+  protected readonly parent = inject<NewChildData | null>(DIALOG_DATA, { optional: true });
   private readonly orgs = inject(OrganizationsService);
   private readonly api = inject(TicketsService);
   /** Sin NOC (o sin SOC) ese ámbito no se ofrece. */
@@ -175,7 +184,7 @@ export class NewTicketDialogComponent implements OnInit {
   protected readonly urgency = signal<Urgency>('medium');
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
-  protected clientId = '';
+  protected clientId = this.parent?.clientId ?? '';
   protected teamId = '';
   protected scope: 'soc' | 'noc' | 'general' = 'general';
   protected title = '';
@@ -189,7 +198,7 @@ export class NewTicketDialogComponent implements OnInit {
       const [clients, teams] = await Promise.all([this.orgs.list({ clients: true, active: true }), this.orgs.listTeams()]);
       this.clients.set(clients);
       await this.modules.load();
-      this.scope = this.modules.soc() ? 'soc' : this.modules.noc() ? 'noc' : 'general';
+      this.scope = this.parent?.scope ?? (this.modules.soc() ? 'soc' : this.modules.noc() ? 'noc' : 'general');
       this.teams.set(resolverTeams(teams));
     } catch (error) {
       this.error.set(problemDetail(error, this.i18n.t('tickets.error.load')));
@@ -216,6 +225,7 @@ export class NewTicketDialogComponent implements OnInit {
       const created = await this.api.create({
         ticketType: this.type(), scope: this.scope, clientId: this.clientId, teamId: this.teamId || undefined,
         impact: this.impact(), urgency: this.urgency(), title: this.title.trim(), description: this.description.trim(),
+        parentId: this.parent?.parentId,
       });
       this.dialogRef.close(created.id);
     } catch (error) {

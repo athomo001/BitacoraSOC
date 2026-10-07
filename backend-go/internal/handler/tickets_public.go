@@ -38,6 +38,9 @@ type publicTicketDTO struct {
 	OpenAt         *time.Time         `json:"openAt"`
 	LastUpdateAt   *time.Time         `json:"lastUpdateAt"`
 	PublicComments []publicCommentDTO `json:"publicComments"`
+	// MergedInto: si el ticket se unió a otro, su número; lo de arriba es el
+	// avance de ese principal (mismo cliente, se validó al unir).
+	MergedInto *string `json:"mergedInto,omitempty"`
 }
 
 func publicImageIDs(rows []db.ListTicketImagesRow, commentID uuid.UUID) []uuid.UUID {
@@ -95,6 +98,14 @@ func (h *TicketsHandler) Public(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// Unido a otro: el cliente ve el avance del principal (mismo cliente).
+	var mergedInto *string
+	if t.MergedIntoID.Valid {
+		if main, mainErr := h.Queries.GetTicket(ctx, uuid.UUID(t.MergedIntoID.Bytes)); mainErr == nil {
+			mergedInto = &main.TicketNumber
+			t = main
+		}
+	}
 	comments, err := h.Queries.ListPublicTicketComments(ctx, t.ID)
 	if err != nil {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo cargar el seguimiento")
@@ -109,5 +120,7 @@ func (h *TicketsHandler) Public(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo cargar el seguimiento")
 		return
 	}
-	writeData(w, 200, toPublicTicketDTO(t, clientName, comments, images))
+	dto := toPublicTicketDTO(t, clientName, comments, images)
+	dto.MergedInto = mergedInto
+	writeData(w, 200, dto)
 }

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, Injector, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, Injector, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { I18nService } from '../../core/i18n/i18n.service';
@@ -39,6 +39,22 @@ export class TicketsComponent implements OnInit {
   protected readonly typeFilter = signal<TicketType | null>(null);
   protected readonly openOnly = signal(false);
   protected query = '';
+
+  /** Los hijos van justo debajo de su padre cuando los dos están en la página. */
+  protected readonly rows = computed(() => {
+    const list = this.tickets();
+    const ids = new Set(list.map((t) => t.id));
+    const childrenOf = new Map<string, Ticket[]>();
+    for (const t of list) {
+      if (t.parentId && ids.has(t.parentId)) childrenOf.set(t.parentId, [...(childrenOf.get(t.parentId) ?? []), t]);
+    }
+    const out: Ticket[] = [];
+    for (const t of list) {
+      if (t.parentId && ids.has(t.parentId)) continue;
+      out.push(t, ...(childrenOf.get(t.id) ?? []));
+    }
+    return out;
+  });
 
   protected readonly priorityShort = PRIORITY_SHORT;
   protected readonly priorityTone = PRIORITY_TONE;

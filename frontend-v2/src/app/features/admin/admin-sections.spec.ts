@@ -26,9 +26,14 @@ describe('Administración re-vestida', () => {
       data: [{ id: 'w2', name: 'Turno Noche', startTime: '20:00', endTime: '08:00', timezone: 'America/Santiago', shiftType: 'regular', emailRecipients: [], active: true }],
     });
     http.expectOne('/api/work-shifts/notification-schedules').flush({ data: [] });
+    // Abre en Guardias (línea de tiempo): sin guardias configuradas.
+    const empty = { from: '', to: '', now: new Date().toISOString(), guards: [], slots: [], overrides: [], absences: [], workShifts: [] };
+    http.match((r) => r.url === '/api/guards').forEach((r) => r.flush({ data: empty }));
     await settle();
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
+    ([...el.querySelectorAll('.sa__tabs button')].find((b) => b.textContent?.includes('Turnos y rotación')) as HTMLButtonElement).click();
+    fixture.detectChanges();
     expect(el.textContent).toContain('Sin destinatarios');
 
     (el.querySelector('.adm-row-click') as HTMLElement).click();

@@ -14,7 +14,7 @@ import (
 
 const createRotationCycle = `-- name: CreateRotationCycle :one
 INSERT INTO rotation_cycles (team_id, start_day_of_week, start_time_utc, duration_days, timezone)
-VALUES ($1, $2, $3, $4, $5) RETURNING id, team_id, start_day_of_week, start_time_utc, duration_days, timezone, active
+VALUES ($1, $2, $3, $4, $5) RETURNING id, team_id, start_day_of_week, start_time_utc, duration_days, timezone, active, must_be_covered
 `
 
 type CreateRotationCycleParams struct {
@@ -42,6 +42,7 @@ func (q *Queries) CreateRotationCycle(ctx context.Context, arg CreateRotationCyc
 		&i.DurationDays,
 		&i.Timezone,
 		&i.Active,
+		&i.MustBeCovered,
 	)
 	return i, err
 }
@@ -87,23 +88,29 @@ func (q *Queries) CreateRotationOverride(ctx context.Context, arg CreateRotation
 }
 
 const createRotationSlot = `-- name: CreateRotationSlot :one
-INSERT INTO rotation_slots (cycle_id, team_member_id, week_start_date, week_end_date)
-VALUES ($1, $2, $3, $4) RETURNING id, cycle_id, team_member_id, week_start_date, week_end_date, is_paused, paused_reason
+INSERT INTO rotation_slots (cycle_id, team_member_id, week_start_date, week_end_date, starts_at, ends_at)
+SELECT c.id, $1, $2::date, $3::date,
+  $2::date::timestamp AT TIME ZONE c.timezone,
+  ($3::date + 1)::timestamp AT TIME ZONE c.timezone
+FROM rotation_cycles c WHERE c.id = $4
+RETURNING id, cycle_id, team_member_id, week_start_date, week_end_date, is_paused, paused_reason, starts_at, ends_at
 `
 
 type CreateRotationSlotParams struct {
-	CycleID       uuid.UUID   `json:"cycle_id"`
 	TeamMemberID  uuid.UUID   `json:"team_member_id"`
 	WeekStartDate pgtype.Date `json:"week_start_date"`
 	WeekEndDate   pgtype.Date `json:"week_end_date"`
+	CycleID       uuid.UUID   `json:"cycle_id"`
 }
 
+// Ruta antigua por fechas: la guardia va del inicio del primer día al final
+// del último (la línea de tiempo usa CreateGuardSlot, con hora exacta).
 func (q *Queries) CreateRotationSlot(ctx context.Context, arg CreateRotationSlotParams) (RotationSlot, error) {
 	row := q.db.QueryRow(ctx, createRotationSlot,
-		arg.CycleID,
 		arg.TeamMemberID,
 		arg.WeekStartDate,
 		arg.WeekEndDate,
+		arg.CycleID,
 	)
 	var i RotationSlot
 	err := row.Scan(
@@ -114,6 +121,8 @@ func (q *Queries) CreateRotationSlot(ctx context.Context, arg CreateRotationSlot
 		&i.WeekEndDate,
 		&i.IsPaused,
 		&i.PausedReason,
+		&i.StartsAt,
+		&i.EndsAt,
 	)
 	return i, err
 }
@@ -170,7 +179,7 @@ func (q *Queries) CreateWorkShift(ctx context.Context, arg CreateWorkShiftParams
 }
 
 const getRotationCycle = `-- name: GetRotationCycle :one
-SELECT id, team_id, start_day_of_week, start_time_utc, duration_days, timezone, active FROM rotation_cycles WHERE id = $1
+SELECT id, team_id, start_day_of_week, start_time_utc, duration_days, timezone, active, must_be_covered FROM rotation_cycles WHERE id = $1
 `
 
 func (q *Queries) GetRotationCycle(ctx context.Context, id uuid.UUID) (RotationCycle, error) {
@@ -184,6 +193,7 @@ func (q *Queries) GetRotationCycle(ctx context.Context, id uuid.UUID) (RotationC
 		&i.DurationDays,
 		&i.Timezone,
 		&i.Active,
+		&i.MustBeCovered,
 	)
 	return i, err
 }
@@ -261,39 +271,41 @@ func (q *Queries) ListActiveOverridesForCycle(ctx context.Context, arg ListActiv
 }
 
 const listCurrentRotationSlots = `-- name: ListCurrentRotationSlots :many
-SELECT s.id, s.cycle_id, s.team_member_id, s.week_start_date, s.week_end_date, s.is_paused, s.paused_reason, COALESCE(u.username, c.name, '')::text AS display_name
+SELECT s.id, s.cycle_id, s.team_member_id, s.week_start_date, s.week_end_date, s.is_paused, s.paused_reason, s.starts_at, s.ends_at, COALESCE(u.username, c.name, '')::text AS display_name
 FROM rotation_slots s
 JOIN team_members m ON m.id = s.team_member_id
 LEFT JOIN users u ON u.id = m.user_id
 LEFT JOIN contacts c ON c.id = m.contact_id
 WHERE s.cycle_id = $1
-  AND s.week_start_date <= $2::date
-  AND s.week_end_date >= $2::date
-ORDER BY s.week_start_date DESC, display_name
+  AND s.starts_at <= $2::timestamptz
+  AND s.ends_at > $2::timestamptz
+ORDER BY s.starts_at DESC, display_name
 `
 
 type ListCurrentRotationSlotsParams struct {
-	CycleID uuid.UUID   `json:"cycle_id"`
-	Today   pgtype.Date `json:"today"`
+	CycleID uuid.UUID          `json:"cycle_id"`
+	Now     pgtype.Timestamptz `json:"now"`
 }
 
 type ListCurrentRotationSlotsRow struct {
-	ID            uuid.UUID   `json:"id"`
-	CycleID       uuid.UUID   `json:"cycle_id"`
-	TeamMemberID  uuid.UUID   `json:"team_member_id"`
-	WeekStartDate pgtype.Date `json:"week_start_date"`
-	WeekEndDate   pgtype.Date `json:"week_end_date"`
-	IsPaused      bool        `json:"is_paused"`
-	PausedReason  pgtype.Text `json:"paused_reason"`
-	DisplayName   string      `json:"display_name"`
+	ID            uuid.UUID          `json:"id"`
+	CycleID       uuid.UUID          `json:"cycle_id"`
+	TeamMemberID  uuid.UUID          `json:"team_member_id"`
+	WeekStartDate pgtype.Date        `json:"week_start_date"`
+	WeekEndDate   pgtype.Date        `json:"week_end_date"`
+	IsPaused      bool               `json:"is_paused"`
+	PausedReason  pgtype.Text        `json:"paused_reason"`
+	StartsAt      pgtype.Timestamptz `json:"starts_at"`
+	EndsAt        pgtype.Timestamptz `json:"ends_at"`
+	DisplayName   string             `json:"display_name"`
 }
 
-// Los slots regulares cuya semana cubre `today` (independiente de is_paused:
-// el handler decide qué hacer con eso vía internal/rotation.Resolve). Puede
-// haber más de uno: en el legacy un rol (N2, OL) tenía a veces 2-3 personas
-// a la vez, y todas están de guardia.
+// Los slots que cubren `now` con su hora exacta (000029; independiente de
+// is_paused: el handler decide qué hacer con eso vía internal/rotation.Resolve).
+// Puede haber más de uno: en el legacy un rol (N2, OL) tenía a veces 2-3
+// personas a la vez, y todas están de guardia.
 func (q *Queries) ListCurrentRotationSlots(ctx context.Context, arg ListCurrentRotationSlotsParams) ([]ListCurrentRotationSlotsRow, error) {
-	rows, err := q.db.Query(ctx, listCurrentRotationSlots, arg.CycleID, arg.Today)
+	rows, err := q.db.Query(ctx, listCurrentRotationSlots, arg.CycleID, arg.Now)
 	if err != nil {
 		return nil, err
 	}
@@ -309,6 +321,8 @@ func (q *Queries) ListCurrentRotationSlots(ctx context.Context, arg ListCurrentR
 			&i.WeekEndDate,
 			&i.IsPaused,
 			&i.PausedReason,
+			&i.StartsAt,
+			&i.EndsAt,
 			&i.DisplayName,
 		); err != nil {
 			return nil, err
@@ -323,7 +337,7 @@ func (q *Queries) ListCurrentRotationSlots(ctx context.Context, arg ListCurrentR
 
 const listRotationCyclesByTeam = `-- name: ListRotationCyclesByTeam :many
 
-SELECT id, team_id, start_day_of_week, start_time_utc, duration_days, timezone, active FROM rotation_cycles
+SELECT id, team_id, start_day_of_week, start_time_utc, duration_days, timezone, active, must_be_covered FROM rotation_cycles
 WHERE ($1::uuid IS NULL OR team_id = $1)
 ORDER BY team_id
 `
@@ -351,6 +365,7 @@ func (q *Queries) ListRotationCyclesByTeam(ctx context.Context, teamID pgtype.UU
 			&i.DurationDays,
 			&i.Timezone,
 			&i.Active,
+			&i.MustBeCovered,
 		); err != nil {
 			return nil, err
 		}
@@ -363,7 +378,7 @@ func (q *Queries) ListRotationCyclesByTeam(ctx context.Context, teamID pgtype.UU
 }
 
 const listRotationSlotsByCycle = `-- name: ListRotationSlotsByCycle :many
-SELECT s.id, s.cycle_id, s.team_member_id, s.week_start_date, s.week_end_date, s.is_paused, s.paused_reason, COALESCE(u.username, c.name, '')::text AS display_name
+SELECT s.id, s.cycle_id, s.team_member_id, s.week_start_date, s.week_end_date, s.is_paused, s.paused_reason, s.starts_at, s.ends_at, COALESCE(u.username, c.name, '')::text AS display_name
 FROM rotation_slots s
 JOIN team_members m ON m.id = s.team_member_id
 LEFT JOIN users u ON u.id = m.user_id
@@ -373,14 +388,16 @@ ORDER BY s.week_start_date DESC
 `
 
 type ListRotationSlotsByCycleRow struct {
-	ID            uuid.UUID   `json:"id"`
-	CycleID       uuid.UUID   `json:"cycle_id"`
-	TeamMemberID  uuid.UUID   `json:"team_member_id"`
-	WeekStartDate pgtype.Date `json:"week_start_date"`
-	WeekEndDate   pgtype.Date `json:"week_end_date"`
-	IsPaused      bool        `json:"is_paused"`
-	PausedReason  pgtype.Text `json:"paused_reason"`
-	DisplayName   string      `json:"display_name"`
+	ID            uuid.UUID          `json:"id"`
+	CycleID       uuid.UUID          `json:"cycle_id"`
+	TeamMemberID  uuid.UUID          `json:"team_member_id"`
+	WeekStartDate pgtype.Date        `json:"week_start_date"`
+	WeekEndDate   pgtype.Date        `json:"week_end_date"`
+	IsPaused      bool               `json:"is_paused"`
+	PausedReason  pgtype.Text        `json:"paused_reason"`
+	StartsAt      pgtype.Timestamptz `json:"starts_at"`
+	EndsAt        pgtype.Timestamptz `json:"ends_at"`
+	DisplayName   string             `json:"display_name"`
 }
 
 func (q *Queries) ListRotationSlotsByCycle(ctx context.Context, cycleID uuid.UUID) ([]ListRotationSlotsByCycleRow, error) {
@@ -400,6 +417,8 @@ func (q *Queries) ListRotationSlotsByCycle(ctx context.Context, cycleID uuid.UUI
 			&i.WeekEndDate,
 			&i.IsPaused,
 			&i.PausedReason,
+			&i.StartsAt,
+			&i.EndsAt,
 			&i.DisplayName,
 		); err != nil {
 			return nil, err
@@ -454,7 +473,7 @@ func (q *Queries) ListWorkShifts(ctx context.Context, active pgtype.Bool) ([]Wor
 }
 
 const patchRotationSlotPause = `-- name: PatchRotationSlotPause :one
-UPDATE rotation_slots SET is_paused = $2, paused_reason = $3 WHERE id = $1 RETURNING id, cycle_id, team_member_id, week_start_date, week_end_date, is_paused, paused_reason
+UPDATE rotation_slots SET is_paused = $2, paused_reason = $3 WHERE id = $1 RETURNING id, cycle_id, team_member_id, week_start_date, week_end_date, is_paused, paused_reason, starts_at, ends_at
 `
 
 type PatchRotationSlotPauseParams struct {
@@ -475,6 +494,8 @@ func (q *Queries) PatchRotationSlotPause(ctx context.Context, arg PatchRotationS
 		&i.WeekEndDate,
 		&i.IsPaused,
 		&i.PausedReason,
+		&i.StartsAt,
+		&i.EndsAt,
 	)
 	return i, err
 }

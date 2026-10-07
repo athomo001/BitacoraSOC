@@ -99,6 +99,12 @@ func (h *TicketsHandler) createTicketTx(ctx context.Context, tx pgx.Tx, n newTic
 // resuelto lo reabre en vez de exigir uno nuevo). Recibe las queries del
 // llamador para correr dentro de su transacción cuando la hay.
 func (h *TicketsHandler) addTicketComment(ctx context.Context, q *db.Queries, ticket db.Ticket, user middleware.AuthenticatedUser, content string, isPublic bool) (db.TicketComment, error) {
+	return h.addTicketCommentFrom(ctx, q, ticket, user, content, isPublic, "")
+}
+
+// addTicketCommentFrom es addTicketComment con el origen del comentario
+// ('parent:TKT-…', 'child:TKT-…'; ” si es propio).
+func (h *TicketsHandler) addTicketCommentFrom(ctx context.Context, q *db.Queries, ticket db.Ticket, user middleware.AuthenticatedUser, content string, isPublic bool, origin string) (db.TicketComment, error) {
 	if ticket.Status == db.TicketStatusResolved {
 		_, err := q.UpdateTicket(ctx, db.UpdateTicketParams{
 			ID: ticket.ID, Status: db.NullTicketStatus{TicketStatus: db.TicketStatusInProgress, Valid: true},
@@ -109,7 +115,7 @@ func (h *TicketsHandler) addTicketComment(ctx context.Context, q *db.Queries, ti
 			return db.TicketComment{}, err
 		}
 	}
-	comment, err := q.CreateTicketComment(ctx, db.CreateTicketCommentParams{TicketID: ticket.ID, UserID: pgtype.UUID{Bytes: user.ID, Valid: true}, AuthorName: user.Username, Content: content, IsPublic: isPublic})
+	comment, err := q.CreateTicketComment(ctx, db.CreateTicketCommentParams{TicketID: ticket.ID, UserID: pgtype.UUID{Bytes: user.ID, Valid: true}, AuthorName: user.Username, Content: content, IsPublic: isPublic, Origin: origin})
 	if err != nil {
 		return db.TicketComment{}, err
 	}
@@ -150,6 +156,20 @@ func (h *TicketsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	actor, _ := middleware.UserFromContext(ctx)
+	var parent *db.Ticket
+	if req.ParentID != nil {
+		p, err := h.Queries.GetTicket(ctx, *req.ParentID)
+		if err != nil {
+			problemdetails.Write(w, r, http.StatusNotFound, "not-found", "el ticket padre no existe")
+			return
+		}
+		// Un ticket nuevo no tiene hijos: basta revisar el padre.
+		if slug, msg := h.validParent(ctx, db.Ticket{}, p); slug != "" {
+			problemdetails.Write(w, r, http.StatusConflict, slug, msg)
+			return
+		}
+		parent = &p
+	}
 	tx, err := h.Pool.Begin(ctx)
 	if err != nil {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo iniciar la creación")
@@ -166,6 +186,17 @@ func (h *TicketsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "no se pudo crear el ticket; verifica cliente, equipo y relaciones")
 		return
 	}
+	if parent != nil {
+		q := h.Queries.WithTx(tx)
+		ticket.ParentID = pgtype.UUID{Bytes: parent.ID, Valid: true}
+		if err = q.SetTicketParent(ctx, db.SetTicketParentParams{ID: ticket.ID, ParentID: ticket.ParentID}); err == nil {
+			err = ticketNote(ctx, q, parent.ID, actor, ticket.TicketNumber+" se creó como hijo.", false, "child:"+ticket.TicketNumber)
+		}
+		if err != nil {
+			problemdetails.Write(w, r, 500, "internal-error", "no se pudo crear el hijo")
+			return
+		}
+	}
 	if err = tx.Commit(ctx); err != nil {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo confirmar el ticket")
 		return
@@ -174,5 +205,8 @@ func (h *TicketsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		h.AuditLog.Log(ctx, "ticket.created", audit.LevelInfo, audit.Success(), map[string]any{"ticketId": ticket.ID.String()})
 	}
 	h.notifyChanged(ctx, ticket.ID)
+	if parent != nil {
+		h.notifyChanged(ctx, parent.ID)
+	}
 	writeData(w, http.StatusCreated, toTicketDTO(ticket, true))
 }

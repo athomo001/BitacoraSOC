@@ -250,3 +250,20 @@
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
+
+.tk__row--child .tk__number {
+  padding-left: 4px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.tk__row--merged .tk__number,
+.tk__row--merged .tk__ticket-title {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.tk__rel {
+  color: var(--status-system);
+  font-weight: 600;
+}

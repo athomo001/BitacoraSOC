@@ -1531,3 +1531,47 @@ CREATE TABLE report_events (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_report_events_name ON report_events (lower(name));
+
+-- 000028: unir tickets duplicados y tickets padre/hijo (pedido del dueño
+-- 2026-10-07, canvas "Ticketera: unir y padre/hijo").
+-- parent_id: un solo nivel (un padre no tiene padre; un hijo no tiene hijos),
+-- lo valida el servidor. merged_into_id: el ticket que se unió a otro queda
+-- cerrado apuntando al principal; su historial se movió a ese principal.
+ALTER TABLE tickets
+  ADD COLUMN parent_id UUID REFERENCES tickets(id) ON DELETE SET NULL,
+  ADD COLUMN merged_into_id UUID REFERENCES tickets(id) ON DELETE SET NULL,
+  ADD CONSTRAINT chk_ticket_parent_self CHECK (parent_id IS NULL OR parent_id <> id),
+  ADD CONSTRAINT chk_ticket_merged_self CHECK (merged_into_id IS NULL OR merged_into_id <> id);
+CREATE INDEX idx_tickets_parent ON tickets(parent_id) WHERE parent_id IS NOT NULL;
+
+-- De dónde viene un comentario: '' (propio), 'parent:TKT-…' (copiado del
+-- padre), 'child:TKT-…' (aviso de un hijo), 'merged:TKT-…' (de un ticket unido).
+ALTER TABLE ticket_comments ADD COLUMN origin TEXT NOT NULL DEFAULT '';
+
+-- 000029: guardias con hora exacta (pedido del dueño 2026-10-07, canvas
+-- "Turnos: guardias (línea de tiempo)"). Antes un slot era de fecha a fecha
+-- y el lunes de cambio quedaban dos personas de guardia todo el día; en el
+-- legacy el cambio es a una hora (09:00). starts_at/ends_at mandan; las
+-- columnas de fecha se mantienen (las leen el correo de dotación y Mi turno).
+ALTER TABLE rotation_slots
+  ADD COLUMN starts_at TIMESTAMPTZ,
+  ADD COLUMN ends_at TIMESTAMPTZ;
+
+UPDATE rotation_slots s SET
+  starts_at = (s.week_start_date + time '09:00') AT TIME ZONE c.timezone,
+  ends_at = ((CASE WHEN s.week_end_date > s.week_start_date THEN s.week_end_date ELSE s.week_start_date + 1 END) + time '09:00') AT TIME ZONE c.timezone
+FROM rotation_cycles c
+WHERE c.id = s.cycle_id;
+
+ALTER TABLE rotation_slots
+  ALTER COLUMN starts_at SET NOT NULL,
+  ALTER COLUMN ends_at SET NOT NULL,
+  ADD CONSTRAINT chk_rotation_slot_range CHECK (ends_at > starts_at);
+CREATE INDEX idx_rotation_slots_range ON rotation_slots(cycle_id, starts_at, ends_at);
+
+-- Guardias que nunca pueden quedar sin nadie (decisión del dueño: N1 y N2).
+-- La línea de tiempo marca sus huecos en rojo.
+ALTER TABLE rotation_cycles ADD COLUMN must_be_covered BOOLEAN NOT NULL DEFAULT false;
+UPDATE rotation_cycles c SET must_be_covered = true
+FROM teams t
+WHERE t.id = c.team_id AND t.name IN ('Guardia N2', 'Guardia N1_NO_HABIL');

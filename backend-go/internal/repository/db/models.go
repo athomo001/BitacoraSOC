@@ -1834,6 +1834,7 @@ type RotationCycle struct {
 	DurationDays   int32       `json:"duration_days"`
 	Timezone       string      `json:"timezone"`
 	Active         bool        `json:"active"`
+	MustBeCovered  bool        `json:"must_be_covered"`
 }
 
 type RotationOverride struct {
@@ -1849,13 +1850,15 @@ type RotationOverride struct {
 }
 
 type RotationSlot struct {
-	ID            uuid.UUID   `json:"id"`
-	CycleID       uuid.UUID   `json:"cycle_id"`
-	TeamMemberID  uuid.UUID   `json:"team_member_id"`
-	WeekStartDate pgtype.Date `json:"week_start_date"`
-	WeekEndDate   pgtype.Date `json:"week_end_date"`
-	IsPaused      bool        `json:"is_paused"`
-	PausedReason  pgtype.Text `json:"paused_reason"`
+	ID            uuid.UUID          `json:"id"`
+	CycleID       uuid.UUID          `json:"cycle_id"`
+	TeamMemberID  uuid.UUID          `json:"team_member_id"`
+	WeekStartDate pgtype.Date        `json:"week_start_date"`
+	WeekEndDate   pgtype.Date        `json:"week_end_date"`
+	IsPaused      bool               `json:"is_paused"`
+	PausedReason  pgtype.Text        `json:"paused_reason"`
+	StartsAt      pgtype.Timestamptz `json:"starts_at"`
+	EndsAt        pgtype.Timestamptz `json:"ends_at"`
 }
 
 type ScheduledAlert struct {
@@ -2068,6 +2071,8 @@ type Ticket struct {
 	CreatedBy             pgtype.UUID        `json:"created_by"`
 	CreatedAt             pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
+	ParentID              pgtype.UUID        `json:"parent_id"`
+	MergedIntoID          pgtype.UUID        `json:"merged_into_id"`
 }
 
 type TicketComment struct {
@@ -2078,6 +2083,7 @@ type TicketComment struct {
 	Content    string             `json:"content"`
 	IsPublic   bool               `json:"is_public"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	Origin     string             `json:"origin"`
 }
 
 type TicketImage struct {

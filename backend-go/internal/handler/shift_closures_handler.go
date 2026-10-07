@@ -194,7 +194,7 @@ func (h *ChecklistsHandler) Handover(w http.ResponseWriter, r *http.Request) {
 	if parsed, parseErr := uuid.Parse(r.URL.Query().Get("teamId")); parseErr == nil {
 		teamID = pgtype.UUID{Bytes: parsed, Valid: true}
 	}
-	onCallRows, err := h.Queries.ListHandoverOnCall(ctx, db.ListHandoverOnCallParams{Today: pgtype.Date{Time: now, Valid: true}, TeamID: teamID})
+	onCallRows, err := h.Queries.ListHandoverOnCall(ctx, db.ListHandoverOnCallParams{Now: pgtype.Timestamptz{Time: now, Valid: true}, TeamID: teamID})
 	if err != nil {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo cargar la guardia activa")
 		return

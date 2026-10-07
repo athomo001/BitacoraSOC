@@ -27,23 +27,29 @@ WHERE s.cycle_id = $1
 ORDER BY s.week_start_date DESC;
 
 -- name: ListCurrentRotationSlots :many
--- Los slots regulares cuya semana cubre `today` (independiente de is_paused:
--- el handler decide qué hacer con eso vía internal/rotation.Resolve). Puede
--- haber más de uno: en el legacy un rol (N2, OL) tenía a veces 2-3 personas
--- a la vez, y todas están de guardia.
+-- Los slots que cubren `now` con su hora exacta (000029; independiente de
+-- is_paused: el handler decide qué hacer con eso vía internal/rotation.Resolve).
+-- Puede haber más de uno: en el legacy un rol (N2, OL) tenía a veces 2-3
+-- personas a la vez, y todas están de guardia.
 SELECT s.*, COALESCE(u.username, c.name, '')::text AS display_name
 FROM rotation_slots s
 JOIN team_members m ON m.id = s.team_member_id
 LEFT JOIN users u ON u.id = m.user_id
 LEFT JOIN contacts c ON c.id = m.contact_id
 WHERE s.cycle_id = $1
-  AND s.week_start_date <= sqlc.arg('today')::date
-  AND s.week_end_date >= sqlc.arg('today')::date
-ORDER BY s.week_start_date DESC, display_name;
+  AND s.starts_at <= sqlc.arg('now')::timestamptz
+  AND s.ends_at > sqlc.arg('now')::timestamptz
+ORDER BY s.starts_at DESC, display_name;
 
 -- name: CreateRotationSlot :one
-INSERT INTO rotation_slots (cycle_id, team_member_id, week_start_date, week_end_date)
-VALUES ($1, $2, $3, $4) RETURNING *;
+-- Ruta antigua por fechas: la guardia va del inicio del primer día al final
+-- del último (la línea de tiempo usa CreateGuardSlot, con hora exacta).
+INSERT INTO rotation_slots (cycle_id, team_member_id, week_start_date, week_end_date, starts_at, ends_at)
+SELECT c.id, sqlc.arg('team_member_id'), sqlc.arg('week_start_date')::date, sqlc.arg('week_end_date')::date,
+  sqlc.arg('week_start_date')::date::timestamp AT TIME ZONE c.timezone,
+  (sqlc.arg('week_end_date')::date + 1)::timestamp AT TIME ZONE c.timezone
+FROM rotation_cycles c WHERE c.id = sqlc.arg('cycle_id')
+RETURNING *;
 
 -- name: PatchRotationSlotPause :one
 -- HU-5: pausar sin borrar la fila (conserva el historial del rol).

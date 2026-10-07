@@ -14,7 +14,7 @@ function ticket(overrides: Partial<Ticket>): Ticket {
     teamName: 'Cuadrilla Fibra Sur', assigneeUsername: null, status: 'new', impact: 'high', urgency: 'high', priority: 'p1_critical',
     title: 'Corte FO Nodo Puerto Montt', description: 'x', slaPausedSeconds: 0, reopenedCount: 0, onHoldSince: null,
     sla: { resolution: clock('on_time', 30, 10_500) as Ticket['sla']['resolution'] }, allowedTransitions: ['assigned', 'cancelled'],
-    createdAt: '', updatedAt: '', ...overrides,
+    createdAt: '', updatedAt: '', childCount: 0, ...overrides,
   };
 }
 
@@ -25,7 +25,7 @@ const LIST = {
 };
 
 function detail(t: Ticket): TicketDetail {
-  return { ticket: t, publicTrackingToken: 'tok', publicTrackingPin: null, comments: [], tasks: [], entries: [], totalTimeSpentSeconds: 0, resolvers: [] };
+  return { ticket: t, publicTrackingToken: 'tok', publicTrackingPin: null, comments: [], tasks: [], entries: [], totalTimeSpentSeconds: 0, resolvers: [], parent: null, mergedInto: null, children: [] };
 }
 
 /** Deja correr las promesas pendientes (la app no usa zone.js). */
@@ -94,7 +94,7 @@ describe('TicketsComponent', () => {
     fixture.detectChanges();
     (el.querySelector('.td__composer') as HTMLFormElement).dispatchEvent(new Event('submit'));
     const req = httpMock.expectOne({ method: 'POST', url: '/api/tickets/t1/comments' });
-    expect(req.request.body).toEqual({ content: 'Cuadrilla en sitio', isPublic: false, imageIds: [] });
+    expect(req.request.body).toEqual({ content: 'Cuadrilla en sitio', isPublic: false, imageIds: [], alsoChildren: false });
   });
 
   it('imágenes: pegar una captura la sube, queda en miniatura y el comentario la incluye (comentario del dueño #14)', async () => {
@@ -115,7 +115,7 @@ describe('TicketsComponent', () => {
     // Sin texto, pero con imagen: se puede comentar.
     (el.querySelector('.td__composer') as HTMLFormElement).dispatchEvent(new Event('submit'));
     const req = httpMock.expectOne({ method: 'POST', url: '/api/tickets/t1/comments' });
-    expect(req.request.body).toEqual({ content: '', isPublic: false, imageIds: ['img-1'] });
+    expect(req.request.body).toEqual({ content: '', isPublic: false, imageIds: ['img-1'], alsoChildren: false });
   });
 
   it('imágenes: la pestaña junta las de todos los comentarios y las pide con el token', async () => {
@@ -126,8 +126,8 @@ describe('TicketsComponent', () => {
     fixture.detectChanges();
     const withImages = detail(LIST.items[0]);
     withImages.comments = [
-      { id: 'c1', authorName: 'ana', content: 'Captura', isPublic: false, createdAt: '2026-09-27T10:00:00Z', images: [{ id: 'a', fileName: 'a.png', sizeBytes: 10, createdAt: '2026-09-27T10:00:00Z' }] },
-      { id: 'c2', authorName: 'pveloso', content: 'Correo', isPublic: true, createdAt: '2026-09-27T11:00:00Z', images: [{ id: 'b', fileName: 'b.jpg', sizeBytes: 10, createdAt: '2026-09-27T11:00:00Z' }] },
+      { id: 'c1', authorName: 'ana', content: 'Captura', isPublic: false, createdAt: '2026-09-27T10:00:00Z', origin: '', images: [{ id: 'a', fileName: 'a.png', sizeBytes: 10, createdAt: '2026-09-27T10:00:00Z' }] },
+      { id: 'c2', authorName: 'pveloso', content: 'Correo', isPublic: true, createdAt: '2026-09-27T11:00:00Z', origin: '', images: [{ id: 'b', fileName: 'b.jpg', sizeBytes: 10, createdAt: '2026-09-27T11:00:00Z' }] },
     ];
     httpMock.expectOne('/api/tickets/t1').flush({ data: withImages });
     await settle();

@@ -19,6 +19,7 @@ import { PreferencesService } from '../../core/preferences/preferences.service';
 import { problemDetail } from '../../core/http-error';
 import { AdminShiftRemindersComponent } from './admin-shift-reminders';
 import { AdminShiftMembersComponent } from './admin-shift-members';
+import { AdminGuardsComponent } from './admin-guards';
 
 import '../../core/i18n/packs/admin';
 function splitList(raw: string): string[] {
@@ -60,7 +61,7 @@ const DEFAULT_REPORT_SUBJECT = 'Reporte SOC [fecha] [turno]';
 @Component({
   selector: 'app-admin-shifts',
   standalone: true,
-  imports: [DatePipe, FormsModule, MatIconModule, AdminShiftRemindersComponent, AdminShiftMembersComponent],
+  imports: [DatePipe, FormsModule, MatIconModule, AdminShiftRemindersComponent, AdminShiftMembersComponent, AdminGuardsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-shifts.html',
   styles: `
@@ -98,7 +99,7 @@ export class AdminShiftsComponent implements OnInit {
     });
   });
 
-  protected readonly tab = signal<'shifts' | 'staffing' | 'reminders'>('shifts');
+  protected readonly tab = signal<'guards' | 'shifts' | 'staffing' | 'reminders'>('guards');
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);

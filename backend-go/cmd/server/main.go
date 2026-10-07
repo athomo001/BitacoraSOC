@@ -35,6 +35,8 @@ import (
 const (
 	capDirectoryWrite  = "directory:write"
 	capDirectoryDelete = "directory:delete"
+	// Cambiar el cliente de un ticket registrado mal (se asigna a N2, N3… por grupo).
+	capTicketsChangeClient = "tickets:change_client"
 )
 
 func main() {
@@ -249,6 +251,11 @@ func run(logger *slog.Logger) error {
 	withCapability := func(capability string, h http.HandlerFunc) http.Handler {
 		return authMW.RequireAuth(apiRateLimit(middleware.RequireNotForcedPasswordChange(middleware.RequireCapability(moduleAccess, capability)(h))))
 	}
+	ticketCapability := func(capability string, h http.HandlerFunc) http.Handler {
+		return withCapability(capability, func(w http.ResponseWriter, r *http.Request) {
+			ticketsHandler.RequireEnabled(w, r, h)
+		})
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health/live", health.Live)
@@ -437,6 +444,16 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/rotation-slots", admin(rotationHandler.CreateSlot))
 	mux.Handle("PATCH /api/rotation-slots/{id}", admin(rotationHandler.PatchSlot))
 	mux.Handle("POST /api/rotation-overrides", admin(rotationHandler.CreateOverride))
+	// Guardias en línea de tiempo (canvas "Turnos: guardias", 2026-10-07).
+	guardsHandler := &handler.GuardsHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
+	mux.Handle("GET /api/guards", authed(guardsHandler.Timeline))
+	mux.Handle("PATCH /api/guards/{cycleId}", admin(guardsHandler.UpdateGuard))
+	mux.Handle("POST /api/guards/slots", admin(guardsHandler.CreateSlot))
+	mux.Handle("PUT /api/guards/slots/{id}", admin(guardsHandler.UpdateSlot))
+	mux.Handle("DELETE /api/guards/slots/{id}", admin(guardsHandler.DeleteSlot))
+	mux.Handle("POST /api/guards/rotation", admin(guardsHandler.GenerateRotation))
+	mux.Handle("GET /api/guards/import/template", admin(guardsHandler.Template))
+	mux.Handle("POST /api/guards/import", admin(guardsHandler.Import))
 	mux.Handle("GET /api/work-shifts", authed(rotationHandler.ListWorkShifts))
 	// Personas del turno (WorkShiftAssignment del legacy): a quién le llegan los recordatorios.
 	workShiftMembersHandler := &handler.WorkShiftMembersHandler{Queries: queries, AuditLog: auditLog}
@@ -531,6 +548,9 @@ func run(logger *slog.Logger) error {
 	mux.Handle("GET /api/tickets/{id}", ticketAuthed(ticketsHandler.Get))
 	mux.Handle("PATCH /api/tickets/{id}", ticketAuthed(ticketsHandler.Patch))
 	mux.Handle("DELETE /api/tickets/{id}", ticketAdmin(ticketsHandler.Delete))
+	mux.Handle("POST /api/tickets/merge", ticketAuthed(ticketsHandler.Merge))
+	mux.Handle("PUT /api/tickets/{id}/parent", ticketAuthed(ticketsHandler.SetParent))
+	mux.Handle("PUT /api/tickets/{id}/client", ticketCapability(capTicketsChangeClient, ticketsHandler.ChangeClient))
 	mux.Handle("POST /api/tickets/{id}/resolvers", ticketAuthed(ticketsHandler.AddResolver))
 	mux.Handle("POST /api/tickets/{id}/images", ticketAuthed(ticketsHandler.UploadImage))
 	mux.Handle("GET /api/tickets/{id}/images/{imageId}", ticketAuthed(ticketsHandler.ServeImage))

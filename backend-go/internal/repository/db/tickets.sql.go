@@ -55,6 +55,33 @@ func (q *Queries) ClaimTicketImages(ctx context.Context, arg ClaimTicketImagesPa
 	return result.RowsAffected(), nil
 }
 
+const copyTicketResolvers = `-- name: CopyTicketResolvers :exec
+INSERT INTO ticket_resolvers (ticket_id, user_id, added_by, added_at)
+SELECT $1, r.user_id, r.added_by, r.added_at FROM ticket_resolvers r WHERE r.ticket_id = $2
+ON CONFLICT (ticket_id, user_id) DO NOTHING
+`
+
+type CopyTicketResolversParams struct {
+	MainID  uuid.UUID `json:"main_id"`
+	OtherID uuid.UUID `json:"other_id"`
+}
+
+func (q *Queries) CopyTicketResolvers(ctx context.Context, arg CopyTicketResolversParams) error {
+	_, err := q.db.Exec(ctx, copyTicketResolvers, arg.MainID, arg.OtherID)
+	return err
+}
+
+const countTicketChildren = `-- name: CountTicketChildren :one
+SELECT count(*) FROM tickets WHERE parent_id = $1
+`
+
+func (q *Queries) CountTicketChildren(ctx context.Context, parentID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countTicketChildren, parentID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countTickets = `-- name: CountTickets :one
 SELECT count(*) FROM tickets t
 WHERE ($1::ticket_type IS NULL OR t.ticket_type = $1::ticket_type)
@@ -127,7 +154,7 @@ func (q *Queries) CountTicketsView(ctx context.Context, arg CountTicketsViewPara
 const createTicket = `-- name: CreateTicket :one
 INSERT INTO tickets (ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, public_tracking_token, created_by)
 VALUES ($1, $2, $3, $4, $15, $16, $5, $17, 'new', $6, $7, $8, $9, $10, $11, $12, $13, $14)
-RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at
+RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id
 `
 
 type CreateTicketParams struct {
@@ -203,13 +230,15 @@ func (q *Queries) CreateTicket(ctx context.Context, arg CreateTicketParams) (Tic
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ParentID,
+		&i.MergedIntoID,
 	)
 	return i, err
 }
 
 const createTicketComment = `-- name: CreateTicketComment :one
-INSERT INTO ticket_comments (ticket_id, user_id, author_name, content, is_public)
-VALUES ($1, $2, $3, $4, $5) RETURNING id, ticket_id, user_id, author_name, content, is_public, created_at
+INSERT INTO ticket_comments (ticket_id, user_id, author_name, content, is_public, origin)
+VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, ticket_id, user_id, author_name, content, is_public, created_at, origin
 `
 
 type CreateTicketCommentParams struct {
@@ -218,6 +247,7 @@ type CreateTicketCommentParams struct {
 	AuthorName string      `json:"author_name"`
 	Content    string      `json:"content"`
 	IsPublic   bool        `json:"is_public"`
+	Origin     string      `json:"origin"`
 }
 
 func (q *Queries) CreateTicketComment(ctx context.Context, arg CreateTicketCommentParams) (TicketComment, error) {
@@ -227,6 +257,7 @@ func (q *Queries) CreateTicketComment(ctx context.Context, arg CreateTicketComme
 		arg.AuthorName,
 		arg.Content,
 		arg.IsPublic,
+		arg.Origin,
 	)
 	var i TicketComment
 	err := row.Scan(
@@ -237,6 +268,7 @@ func (q *Queries) CreateTicketComment(ctx context.Context, arg CreateTicketComme
 		&i.Content,
 		&i.IsPublic,
 		&i.CreatedAt,
+		&i.Origin,
 	)
 	return i, err
 }
@@ -361,7 +393,7 @@ func (q *Queries) DeleteTicket(ctx context.Context, id uuid.UUID) (string, error
 }
 
 const getPublicTicket = `-- name: GetPublicTicket :one
-SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at FROM tickets WHERE public_tracking_token = $1 AND public_tracking_enabled = true
+SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id FROM tickets WHERE public_tracking_token = $1 AND public_tracking_enabled = true
 `
 
 func (q *Queries) GetPublicTicket(ctx context.Context, publicTrackingToken pgtype.Text) (Ticket, error) {
@@ -399,12 +431,14 @@ func (q *Queries) GetPublicTicket(ctx context.Context, publicTrackingToken pgtyp
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ParentID,
+		&i.MergedIntoID,
 	)
 	return i, err
 }
 
 const getTicket = `-- name: GetTicket :one
-SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at FROM tickets WHERE id = $1
+SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id FROM tickets WHERE id = $1
 `
 
 func (q *Queries) GetTicket(ctx context.Context, id uuid.UUID) (Ticket, error) {
@@ -442,12 +476,14 @@ func (q *Queries) GetTicket(ctx context.Context, id uuid.UUID) (Ticket, error) {
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ParentID,
+		&i.MergedIntoID,
 	)
 	return i, err
 }
 
 const getTicketByNumber = `-- name: GetTicketByNumber :one
-SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at FROM tickets WHERE ticket_number = $1
+SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id FROM tickets WHERE ticket_number = $1
 `
 
 func (q *Queries) GetTicketByNumber(ctx context.Context, ticketNumber string) (Ticket, error) {
@@ -485,6 +521,53 @@ func (q *Queries) GetTicketByNumber(ctx context.Context, ticketNumber string) (T
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ParentID,
+		&i.MergedIntoID,
+	)
+	return i, err
+}
+
+const getTicketByNumberForMerge = `-- name: GetTicketByNumberForMerge :one
+SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id FROM tickets WHERE ticket_number = $1
+`
+
+func (q *Queries) GetTicketByNumberForMerge(ctx context.Context, ticketNumber string) (Ticket, error) {
+	row := q.db.QueryRow(ctx, getTicketByNumberForMerge, ticketNumber)
+	var i Ticket
+	err := row.Scan(
+		&i.ID,
+		&i.TicketNumber,
+		&i.TicketType,
+		&i.Scope,
+		&i.ClientID,
+		&i.AssetID,
+		&i.ServiceID,
+		&i.AssignedTeamID,
+		&i.AssignedUserID,
+		&i.AssignedContactID,
+		&i.Status,
+		&i.Impact,
+		&i.Urgency,
+		&i.Priority,
+		&i.Title,
+		&i.Description,
+		&i.SlaResponseDueAt,
+		&i.SlaResolutionDueAt,
+		&i.SlaOnHoldSince,
+		&i.SlaPausedSeconds,
+		&i.FirstRespondedAt,
+		&i.ResolvedAt,
+		&i.ClosedAt,
+		&i.ReopenedCount,
+		&i.ReopenedAt,
+		&i.PublicTrackingToken,
+		&i.PublicTrackingEnabled,
+		&i.PublicTrackingPin,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ParentID,
+		&i.MergedIntoID,
 	)
 	return i, err
 }
@@ -528,6 +611,23 @@ func (q *Queries) GetTicketImage(ctx context.Context, arg GetTicketImageParams) 
 	return i, err
 }
 
+const getTicketRef = `-- name: GetTicketRef :one
+SELECT id, ticket_number, title FROM tickets WHERE id = $1
+`
+
+type GetTicketRefRow struct {
+	ID           uuid.UUID `json:"id"`
+	TicketNumber string    `json:"ticket_number"`
+	Title        string    `json:"title"`
+}
+
+func (q *Queries) GetTicketRef(ctx context.Context, id uuid.UUID) (GetTicketRefRow, error) {
+	row := q.db.QueryRow(ctx, getTicketRef, id)
+	var i GetTicketRefRow
+	err := row.Scan(&i.ID, &i.TicketNumber, &i.Title)
+	return i, err
+}
+
 const getTicketTask = `-- name: GetTicketTask :one
 SELECT id, ticket_id, user_id, content, time_spent_seconds, is_public, performed_at, created_at FROM ticket_tasks WHERE id = $1
 `
@@ -549,7 +649,7 @@ func (q *Queries) GetTicketTask(ctx context.Context, id uuid.UUID) (TicketTask, 
 }
 
 const getTicketView = `-- name: GetTicketView :one
-SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at, o.name AS client_name, tm.name AS team_name, u.username AS assignee_username
+SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at, t.parent_id, t.merged_into_id, o.name AS client_name, tm.name AS team_name, u.username AS assignee_username
 FROM tickets t
 JOIN organizations o ON o.id = t.client_id
 LEFT JOIN teams tm ON tm.id = t.assigned_team_id
@@ -599,6 +699,8 @@ func (q *Queries) GetTicketView(ctx context.Context, id uuid.UUID) (GetTicketVie
 		&i.Ticket.CreatedBy,
 		&i.Ticket.CreatedAt,
 		&i.Ticket.UpdatedAt,
+		&i.Ticket.ParentID,
+		&i.Ticket.MergedIntoID,
 		&i.ClientName,
 		&i.TeamName,
 		&i.AssigneeUsername,
@@ -642,8 +744,66 @@ func (q *Queries) LinkEntryToTicket(ctx context.Context, arg LinkEntryToTicketPa
 	return i, err
 }
 
+const listOpenChildTickets = `-- name: ListOpenChildTickets :many
+SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id FROM tickets WHERE parent_id = $1 AND status NOT IN ('resolved', 'closed', 'cancelled') ORDER BY created_at
+`
+
+func (q *Queries) ListOpenChildTickets(ctx context.Context, parentID pgtype.UUID) ([]Ticket, error) {
+	rows, err := q.db.Query(ctx, listOpenChildTickets, parentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Ticket
+	for rows.Next() {
+		var i Ticket
+		if err := rows.Scan(
+			&i.ID,
+			&i.TicketNumber,
+			&i.TicketType,
+			&i.Scope,
+			&i.ClientID,
+			&i.AssetID,
+			&i.ServiceID,
+			&i.AssignedTeamID,
+			&i.AssignedUserID,
+			&i.AssignedContactID,
+			&i.Status,
+			&i.Impact,
+			&i.Urgency,
+			&i.Priority,
+			&i.Title,
+			&i.Description,
+			&i.SlaResponseDueAt,
+			&i.SlaResolutionDueAt,
+			&i.SlaOnHoldSince,
+			&i.SlaPausedSeconds,
+			&i.FirstRespondedAt,
+			&i.ResolvedAt,
+			&i.ClosedAt,
+			&i.ReopenedCount,
+			&i.ReopenedAt,
+			&i.PublicTrackingToken,
+			&i.PublicTrackingEnabled,
+			&i.PublicTrackingPin,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ParentID,
+			&i.MergedIntoID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPublicTicketComments = `-- name: ListPublicTicketComments :many
-SELECT id, ticket_id, user_id, author_name, content, is_public, created_at FROM ticket_comments WHERE ticket_id = $1 AND is_public = true ORDER BY created_at ASC
+SELECT id, ticket_id, user_id, author_name, content, is_public, created_at, origin FROM ticket_comments WHERE ticket_id = $1 AND is_public = true ORDER BY created_at ASC
 `
 
 func (q *Queries) ListPublicTicketComments(ctx context.Context, ticketID uuid.UUID) ([]TicketComment, error) {
@@ -663,6 +823,7 @@ func (q *Queries) ListPublicTicketComments(ctx context.Context, ticketID uuid.UU
 			&i.Content,
 			&i.IsPublic,
 			&i.CreatedAt,
+			&i.Origin,
 		); err != nil {
 			return nil, err
 		}
@@ -708,8 +869,49 @@ func (q *Queries) ListTicketAssignees(ctx context.Context) ([]ListTicketAssignee
 	return items, nil
 }
 
+const listTicketChildren = `-- name: ListTicketChildren :many
+SELECT t.id, t.ticket_number, t.title, t.status, o.name AS client_name
+FROM tickets t JOIN organizations o ON o.id = t.client_id
+WHERE t.parent_id = $1
+ORDER BY t.created_at
+`
+
+type ListTicketChildrenRow struct {
+	ID           uuid.UUID    `json:"id"`
+	TicketNumber string       `json:"ticket_number"`
+	Title        string       `json:"title"`
+	Status       TicketStatus `json:"status"`
+	ClientName   string       `json:"client_name"`
+}
+
+func (q *Queries) ListTicketChildren(ctx context.Context, parentID pgtype.UUID) ([]ListTicketChildrenRow, error) {
+	rows, err := q.db.Query(ctx, listTicketChildren, parentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTicketChildrenRow
+	for rows.Next() {
+		var i ListTicketChildrenRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TicketNumber,
+			&i.Title,
+			&i.Status,
+			&i.ClientName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTicketComments = `-- name: ListTicketComments :many
-SELECT id, ticket_id, user_id, author_name, content, is_public, created_at FROM ticket_comments WHERE ticket_id = $1 ORDER BY created_at ASC
+SELECT id, ticket_id, user_id, author_name, content, is_public, created_at, origin FROM ticket_comments WHERE ticket_id = $1 ORDER BY created_at ASC
 `
 
 func (q *Queries) ListTicketComments(ctx context.Context, ticketID uuid.UUID) ([]TicketComment, error) {
@@ -729,6 +931,7 @@ func (q *Queries) ListTicketComments(ctx context.Context, ticketID uuid.UUID) ([
 			&i.Content,
 			&i.IsPublic,
 			&i.CreatedAt,
+			&i.Origin,
 		); err != nil {
 			return nil, err
 		}
@@ -990,7 +1193,7 @@ func (q *Queries) ListTicketTasksWithUser(ctx context.Context, ticketID uuid.UUI
 }
 
 const listTickets = `-- name: ListTickets :many
-SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at
+SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at, t.parent_id, t.merged_into_id
 FROM tickets t
 WHERE ($1::ticket_type IS NULL OR t.ticket_type = $1::ticket_type)
   AND ($2::entry_scope IS NULL OR t.scope = $2::entry_scope)
@@ -1063,6 +1266,8 @@ func (q *Queries) ListTickets(ctx context.Context, arg ListTicketsParams) ([]Tic
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ParentID,
+			&i.MergedIntoID,
 		); err != nil {
 			return nil, err
 		}
@@ -1075,11 +1280,15 @@ func (q *Queries) ListTickets(ctx context.Context, arg ListTicketsParams) ([]Tic
 }
 
 const listTicketsView = `-- name: ListTicketsView :many
-SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at, o.name AS client_name, tm.name AS team_name, u.username AS assignee_username
+SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at, t.parent_id, t.merged_into_id, o.name AS client_name, tm.name AS team_name, u.username AS assignee_username,
+  p.ticket_number AS parent_number, m.ticket_number AS merged_into_number,
+  (SELECT count(*) FROM tickets c WHERE c.parent_id = t.id)::int AS child_count
 FROM tickets t
 JOIN organizations o ON o.id = t.client_id
 LEFT JOIN teams tm ON tm.id = t.assigned_team_id
 LEFT JOIN users u ON u.id = t.assigned_user_id
+LEFT JOIN tickets p ON p.id = t.parent_id
+LEFT JOIN tickets m ON m.id = t.merged_into_id
 WHERE ($1::ticket_type IS NULL OR t.ticket_type = $1::ticket_type)
   AND ($2::entry_scope IS NULL OR t.scope = $2::entry_scope)
   AND ($3::ticket_status IS NULL OR t.status = $3::ticket_status)
@@ -1108,6 +1317,9 @@ type ListTicketsViewRow struct {
 	ClientName       string      `json:"client_name"`
 	TeamName         pgtype.Text `json:"team_name"`
 	AssigneeUsername pgtype.Text `json:"assignee_username"`
+	ParentNumber     pgtype.Text `json:"parent_number"`
+	MergedIntoNumber pgtype.Text `json:"merged_into_number"`
+	ChildCount       int32       `json:"child_count"`
 }
 
 // Vista de la cola (Fase 10, pantalla aprobada): nombres ya resueltos para no
@@ -1163,9 +1375,14 @@ func (q *Queries) ListTicketsView(ctx context.Context, arg ListTicketsViewParams
 			&i.Ticket.CreatedBy,
 			&i.Ticket.CreatedAt,
 			&i.Ticket.UpdatedAt,
+			&i.Ticket.ParentID,
+			&i.Ticket.MergedIntoID,
 			&i.ClientName,
 			&i.TeamName,
 			&i.AssigneeUsername,
+			&i.ParentNumber,
+			&i.MergedIntoNumber,
+			&i.ChildCount,
 		); err != nil {
 			return nil, err
 		}
@@ -1196,6 +1413,24 @@ func (q *Queries) MarkEntriesOfDeletedTicket(ctx context.Context, arg MarkEntrie
 	return err
 }
 
+const markTicketMerged = `-- name: MarkTicketMerged :exec
+UPDATE tickets
+SET status = 'closed', closed_at = now(), merged_into_id = $1::uuid, parent_id = NULL,
+    sla_on_hold_since = NULL, updated_at = now()
+WHERE id = $2
+`
+
+type MarkTicketMergedParams struct {
+	MainID  uuid.UUID `json:"main_id"`
+	OtherID uuid.UUID `json:"other_id"`
+}
+
+// El que se une queda cerrado apuntando al principal (no se borra).
+func (q *Queries) MarkTicketMerged(ctx context.Context, arg MarkTicketMergedParams) error {
+	_, err := q.db.Exec(ctx, markTicketMerged, arg.MainID, arg.OtherID)
+	return err
+}
+
 const markTicketResponded = `-- name: MarkTicketResponded :exec
 UPDATE tickets SET first_responded_at = COALESCE(first_responded_at, $2::timestamptz), updated_at = now() WHERE id = $1
 `
@@ -1208,6 +1443,94 @@ type MarkTicketRespondedParams struct {
 // Primera acción del equipo = cumple el SLA de respuesta (solo la primera cuenta).
 func (q *Queries) MarkTicketResponded(ctx context.Context, arg MarkTicketRespondedParams) error {
 	_, err := q.db.Exec(ctx, markTicketResponded, arg.ID, arg.At)
+	return err
+}
+
+const moveTicketChildren = `-- name: MoveTicketChildren :exec
+UPDATE tickets SET parent_id = $1::uuid, updated_at = now() WHERE parent_id = $2::uuid
+`
+
+type MoveTicketChildrenParams struct {
+	MainID  uuid.UUID `json:"main_id"`
+	OtherID uuid.UUID `json:"other_id"`
+}
+
+func (q *Queries) MoveTicketChildren(ctx context.Context, arg MoveTicketChildrenParams) error {
+	_, err := q.db.Exec(ctx, moveTicketChildren, arg.MainID, arg.OtherID)
+	return err
+}
+
+const moveTicketComments = `-- name: MoveTicketComments :exec
+UPDATE ticket_comments
+SET ticket_id = $1,
+    origin = CASE WHEN origin = '' THEN 'merged:' || $2::text ELSE origin END
+WHERE ticket_id = $3
+`
+
+type MoveTicketCommentsParams struct {
+	MainID      uuid.UUID `json:"main_id"`
+	OtherNumber string    `json:"other_number"`
+	OtherID     uuid.UUID `json:"other_id"`
+}
+
+func (q *Queries) MoveTicketComments(ctx context.Context, arg MoveTicketCommentsParams) error {
+	_, err := q.db.Exec(ctx, moveTicketComments, arg.MainID, arg.OtherNumber, arg.OtherID)
+	return err
+}
+
+const moveTicketEntries = `-- name: MoveTicketEntries :exec
+UPDATE entries SET ticket_id = $1::uuid, updated_at = now() WHERE ticket_id = $2::uuid
+`
+
+type MoveTicketEntriesParams struct {
+	MainID  uuid.UUID `json:"main_id"`
+	OtherID uuid.UUID `json:"other_id"`
+}
+
+func (q *Queries) MoveTicketEntries(ctx context.Context, arg MoveTicketEntriesParams) error {
+	_, err := q.db.Exec(ctx, moveTicketEntries, arg.MainID, arg.OtherID)
+	return err
+}
+
+const moveTicketEscalationIncidents = `-- name: MoveTicketEscalationIncidents :exec
+UPDATE escalation_incidents SET ticket_id = $1::uuid WHERE ticket_id = $2::uuid
+`
+
+type MoveTicketEscalationIncidentsParams struct {
+	MainID  uuid.UUID `json:"main_id"`
+	OtherID uuid.UUID `json:"other_id"`
+}
+
+func (q *Queries) MoveTicketEscalationIncidents(ctx context.Context, arg MoveTicketEscalationIncidentsParams) error {
+	_, err := q.db.Exec(ctx, moveTicketEscalationIncidents, arg.MainID, arg.OtherID)
+	return err
+}
+
+const moveTicketImages = `-- name: MoveTicketImages :exec
+UPDATE ticket_images SET ticket_id = $1 WHERE ticket_id = $2
+`
+
+type MoveTicketImagesParams struct {
+	MainID  uuid.UUID `json:"main_id"`
+	OtherID uuid.UUID `json:"other_id"`
+}
+
+func (q *Queries) MoveTicketImages(ctx context.Context, arg MoveTicketImagesParams) error {
+	_, err := q.db.Exec(ctx, moveTicketImages, arg.MainID, arg.OtherID)
+	return err
+}
+
+const moveTicketTasks = `-- name: MoveTicketTasks :exec
+UPDATE ticket_tasks SET ticket_id = $1 WHERE ticket_id = $2
+`
+
+type MoveTicketTasksParams struct {
+	MainID  uuid.UUID `json:"main_id"`
+	OtherID uuid.UUID `json:"other_id"`
+}
+
+func (q *Queries) MoveTicketTasks(ctx context.Context, arg MoveTicketTasksParams) error {
+	_, err := q.db.Exec(ctx, moveTicketTasks, arg.MainID, arg.OtherID)
 	return err
 }
 
@@ -1228,8 +1551,92 @@ func (q *Queries) RemoveTicketResolver(ctx context.Context, arg RemoveTicketReso
 	return result.RowsAffected(), nil
 }
 
+const setTicketClient = `-- name: SetTicketClient :one
+UPDATE tickets
+SET client_id = $1,
+    service_id = CASE WHEN service_id IS NULL OR EXISTS (SELECT 1 FROM services s WHERE s.id = tickets.service_id AND s.organization_id = $1)
+                      THEN service_id ELSE NULL END,
+    public_tracking_token = $2,
+    public_tracking_pin = CASE WHEN public_tracking_pin IS NULL THEN NULL ELSE $3 END,
+    updated_at = now()
+WHERE tickets.id = $4
+RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id
+`
+
+type SetTicketClientParams struct {
+	ClientID uuid.UUID   `json:"client_id"`
+	Token    pgtype.Text `json:"token"`
+	Pin      pgtype.Text `json:"pin"`
+	ID       uuid.UUID   `json:"id"`
+}
+
+// Cambiar el cliente (registrado mal): el servicio se quita si era del
+// cliente anterior; enlace público y PIN nuevos (el cliente equivocado deja
+// de ver el ticket).
+func (q *Queries) SetTicketClient(ctx context.Context, arg SetTicketClientParams) (Ticket, error) {
+	row := q.db.QueryRow(ctx, setTicketClient,
+		arg.ClientID,
+		arg.Token,
+		arg.Pin,
+		arg.ID,
+	)
+	var i Ticket
+	err := row.Scan(
+		&i.ID,
+		&i.TicketNumber,
+		&i.TicketType,
+		&i.Scope,
+		&i.ClientID,
+		&i.AssetID,
+		&i.ServiceID,
+		&i.AssignedTeamID,
+		&i.AssignedUserID,
+		&i.AssignedContactID,
+		&i.Status,
+		&i.Impact,
+		&i.Urgency,
+		&i.Priority,
+		&i.Title,
+		&i.Description,
+		&i.SlaResponseDueAt,
+		&i.SlaResolutionDueAt,
+		&i.SlaOnHoldSince,
+		&i.SlaPausedSeconds,
+		&i.FirstRespondedAt,
+		&i.ResolvedAt,
+		&i.ClosedAt,
+		&i.ReopenedCount,
+		&i.ReopenedAt,
+		&i.PublicTrackingToken,
+		&i.PublicTrackingEnabled,
+		&i.PublicTrackingPin,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ParentID,
+		&i.MergedIntoID,
+	)
+	return i, err
+}
+
+const setTicketParent = `-- name: SetTicketParent :exec
+
+UPDATE tickets SET parent_id = $1, updated_at = now() WHERE id = $2
+`
+
+type SetTicketParentParams struct {
+	ParentID pgtype.UUID `json:"parent_id"`
+	ID       uuid.UUID   `json:"id"`
+}
+
+// ===== Unir tickets y padre/hijo (000028) =====
+func (q *Queries) SetTicketParent(ctx context.Context, arg SetTicketParentParams) error {
+	_, err := q.db.Exec(ctx, setTicketParent, arg.ParentID, arg.ID)
+	return err
+}
+
 const setTicketPublicPin = `-- name: SetTicketPublicPin :one
-UPDATE tickets SET public_tracking_pin = $2, updated_at = now() WHERE id = $1 RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at
+UPDATE tickets SET public_tracking_pin = $2, updated_at = now() WHERE id = $1 RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id
 `
 
 type SetTicketPublicPinParams struct {
@@ -1272,6 +1679,8 @@ func (q *Queries) SetTicketPublicPin(ctx context.Context, arg SetTicketPublicPin
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ParentID,
+		&i.MergedIntoID,
 	)
 	return i, err
 }
@@ -1341,7 +1750,7 @@ UPDATE tickets SET
   reopened_at = $15,
   updated_at = now()
 WHERE id = $1
-RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at
+RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id
 `
 
 type UpdateTicketParams struct {
@@ -1413,6 +1822,8 @@ func (q *Queries) UpdateTicket(ctx context.Context, arg UpdateTicketParams) (Tic
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ParentID,
+		&i.MergedIntoID,
 	)
 	return i, err
 }

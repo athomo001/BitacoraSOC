@@ -80,8 +80,8 @@ SELECT DISTINCT ON (t.id) t.id AS team_id, t.name AS team_name,
 FROM teams t
 JOIN rotation_cycles rc ON rc.team_id = t.id AND rc.active = true
 JOIN rotation_slots rs ON rs.cycle_id = rc.id
-  AND rs.week_start_date <= sqlc.arg('today')::date
-  AND rs.week_end_date >= sqlc.arg('today')::date
+  AND rs.starts_at <= sqlc.arg('now')::timestamptz
+  AND rs.ends_at > sqlc.arg('now')::timestamptz
   AND rs.is_paused = false
 JOIN team_members tm ON tm.id = rs.team_member_id AND tm.active = true
 LEFT JOIN users u ON u.id = tm.user_id

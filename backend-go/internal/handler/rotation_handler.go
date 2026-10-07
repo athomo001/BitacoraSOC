@@ -390,7 +390,7 @@ func resolveCurrentTeamMembers(ctx context.Context, queries *db.Queries, teamID 
 			})
 		}
 		slots, err := queries.ListCurrentRotationSlots(ctx, db.ListCurrentRotationSlotsParams{
-			CycleID: cycle.ID, Today: pgtype.Date{Time: now, Valid: true},
+			CycleID: cycle.ID, Now: pgtype.Timestamptz{Time: now, Valid: true},
 		})
 		if err != nil {
 			return nil, err
@@ -401,13 +401,12 @@ func resolveCurrentTeamMembers(ctx context.Context, queries *db.Queries, teamID 
 			continue
 		}
 		for _, row := range slots {
-			// week_end_date es el ÚLTIMO día cubierto (inclusive) — se le suma
-			// un día para que el límite exclusivo de rotation.Resolve incluya
-			// ese día completo (medianoche del día siguiente), no solo su 00:00.
+			// Hora exacta (000029): el cambio de guardia es a la hora del turno
+			// enlazado (09:00), no a medianoche.
 			add(rotation.Resolve(overrides, &rotation.Slot{
 				TeamMemberID: row.TeamMemberID,
-				WeekStart:    row.WeekStartDate.Time,
-				WeekEnd:      row.WeekEndDate.Time.AddDate(0, 0, 1),
+				WeekStart:    row.StartsAt.Time,
+				WeekEnd:      row.EndsAt.Time,
 				IsPaused:     row.IsPaused,
 			}, now))
 		}

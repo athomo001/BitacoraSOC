@@ -44,10 +44,18 @@ export interface Ticket {
   allowedTransitions: TicketStatus[];
   createdAt: string;
   updatedAt: string;
+  createdById?: string;
+  /** Padre/hijo y unir: un solo nivel; un ticket unido queda cerrado apuntando al principal. */
+  parentId?: string;
+  parentNumber?: string;
+  mergedIntoId?: string;
+  mergedIntoNumber?: string;
+  childCount: number;
 }
 
 export interface TicketImage { id: string; fileName: string; sizeBytes: number; createdAt: string; }
-export interface TicketComment { id: string; authorName: string; content: string; isPublic: boolean; createdAt: string; images: TicketImage[]; }
+/** origin: '' propio, 'parent:TKT-…' (del padre), 'child:TKT-…' (de un hijo), 'merged:TKT-…' (de un ticket unido). */
+export interface TicketComment { id: string; authorName: string; content: string; isPublic: boolean; createdAt: string; images: TicketImage[]; origin: string; }
 export interface TicketTask { id: string; username: string; content: string; timeSpentSeconds: number; isPublic: boolean; performedAt: string; }
 export interface TicketEntry { id: string; entryType: string; content: string; authorUsername: string; createdAt: string; }
 
@@ -61,7 +69,13 @@ export interface TicketDetail {
   totalTimeSpentSeconds: number;
   /** Quienes trabajan el ticket: quien lo tomó y los que se sumen después. */
   resolvers: TicketPerson[];
+  parent: TicketRef | null;
+  mergedInto: TicketRef | null;
+  children: TicketChild[];
 }
+
+export interface TicketRef { id: string; ticketNumber: string; title: string; }
+export interface TicketChild extends TicketRef { status: TicketStatus; clientName: string; }
 
 export interface TicketPerson { userId: string; username: string; fullName: string | null; }
 
@@ -82,6 +96,8 @@ export interface PublicTicket {
   openAt: string | null;
   lastUpdateAt: string | null;
   publicComments: { author: string; content: string; createdAt: string; imageIds?: string[] }[];
+  /** Si este ticket se unió a otro: su número (lo de arriba es el avance de ese principal). */
+  mergedInto?: string;
 }
 
 export interface TicketFilters { ticketType?: TicketType; openOnly?: boolean; q?: string; }
@@ -96,6 +112,8 @@ export interface NewTicket {
   urgency: Urgency;
   title: string;
   description: string;
+  /** "Crear hijo": el ticket nace como hijo de este. */
+  parentId?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -118,10 +136,14 @@ export class TicketsService {
     return (await firstValueFrom(this.http.post<ApiEnvelope<{ id: string }>>('/api/tickets', ticket))).data;
   }
 
-  /** Cambia de estado; al pasar a "asignado" se envía quién lo toma. */
-  async transition(id: string, status: TicketStatus, assignedUserId?: string): Promise<Ticket> {
-    const body: Record<string, string> = { status };
+  /**
+   * Cambia de estado; al pasar a "asignado" se envía quién lo toma. En un
+   * padre, alsoChildren al resolver resuelve también sus hijos abiertos.
+   */
+  async transition(id: string, status: TicketStatus, assignedUserId?: string, alsoChildren = false): Promise<Ticket> {
+    const body: Record<string, string | boolean> = { status };
     if (assignedUserId) body['assignedUserId'] = assignedUserId;
+    if (alsoChildren) body['alsoChildren'] = true;
     return (await firstValueFrom(this.http.patch<ApiEnvelope<Ticket>>(`/api/tickets/${id}`, body))).data;
   }
 
@@ -148,8 +170,24 @@ export class TicketsService {
     await firstValueFrom(this.http.delete(`/api/tickets/${id}`));
   }
 
-  async addComment(id: string, content: string, isPublic: boolean, imageIds: string[] = []): Promise<TicketComment> {
-    return (await firstValueFrom(this.http.post<ApiEnvelope<TicketComment>>(`/api/tickets/${id}/comments`, { content, isPublic, imageIds }))).data;
+  /** alsoChildren: en un padre, el comentario llega también a sus hijos abiertos. */
+  async addComment(id: string, content: string, isPublic: boolean, imageIds: string[] = [], alsoChildren = false): Promise<TicketComment> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<TicketComment>>(`/api/tickets/${id}/comments`, { content, isPublic, imageIds, alsoChildren }))).data;
+  }
+
+  /** Une `otherId` en `mainId` (no se deshace): devuelve el detalle del principal. */
+  async merge(mainId: string, otherId: string, reason: string): Promise<TicketDetail> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<TicketDetail>>('/api/tickets/merge', { mainId, otherId, reason }))).data;
+  }
+
+  /** Hace hijo de `parentNumber` (TKT-…); vacío quita el padre. */
+  async setParent(id: string, parentNumber: string): Promise<void> {
+    await firstValueFrom(this.http.put(`/api/tickets/${id}/parent`, { parentNumber }));
+  }
+
+  /** Corrige el cliente (admin o permiso tickets:change_client); renueva enlace público y PIN. */
+  async changeClient(id: string, clientId: string, reason: string): Promise<TicketDetail> {
+    return (await firstValueFrom(this.http.put<ApiEnvelope<TicketDetail>>(`/api/tickets/${id}/client`, { clientId, reason }))).data;
   }
 
   /** Sube una imagen; queda pendiente hasta que el comentario la incluye en imageIds. */

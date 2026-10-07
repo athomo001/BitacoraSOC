@@ -366,9 +366,11 @@ func (m *Migrator) migrateShiftAssignments(ctx context.Context) error {
 				return err
 			}
 			cycle := ID("rotation_cycles", code)
-			// Semana de lunes a lunes; la hora de cambio no viene en el legacy.
-			if _, err := m.tx.Exec(ctx, `INSERT INTO rotation_cycles (id, team_id, start_day_of_week, start_time_utc, duration_days, timezone, active)
-				VALUES ($1,$2,1,'12:00',7,'America/Santiago',true)`, cycle, team); err != nil {
+			// Semana de lunes a lunes; cada guardia trae su hora exacta (000029).
+			// N1 y N2 nunca pueden quedar sin nadie (decisión del dueño 2026-10-07).
+			mustCover := code == "N2" || code == "N1_NO_HABIL"
+			if _, err := m.tx.Exec(ctx, `INSERT INTO rotation_cycles (id, team_id, start_day_of_week, start_time_utc, duration_days, timezone, active, must_be_covered)
+				VALUES ($1,$2,1,'12:00',7,'America/Santiago',true,$3)`, cycle, team, mustCover); err != nil {
 				return err
 			}
 			g = &guard{cycle: cycle, members: map[string]uuid.UUID{}}
@@ -390,8 +392,12 @@ func (m *Migrator) migrateShiftAssignments(ctx context.Context) error {
 			}
 			g.members[memberKey] = member
 		}
-		if _, err := m.tx.Exec(ctx, `INSERT INTO rotation_slots (cycle_id, team_member_id, week_start_date, week_end_date, is_paused) VALUES ($1,$2,$3,$4,$5)`,
-			g.cycle, member, start.Format("2006-01-02"), end.Format("2006-01-02"), a.IsPaused); err != nil {
+		if !end.After(start) {
+			end = start.Add(time.Hour) // una charla sin duración: una hora
+		}
+		if _, err := m.tx.Exec(ctx, `INSERT INTO rotation_slots (cycle_id, team_member_id, week_start_date, week_end_date, starts_at, ends_at, is_paused)
+			VALUES ($1,$2,($3::timestamptz AT TIME ZONE 'America/Santiago')::date,($4::timestamptz AT TIME ZONE 'America/Santiago')::date,$3,$4,$5)`,
+			g.cycle, member, start, end, a.IsPaused); err != nil {
 			return err
 		}
 		slots++

@@ -66,6 +66,7 @@
             </div>
             <h1 class="pt__title">{{ t.title }}</h1>
             <p class="pt__client">{{ t.clientName }} · {{ i18n.t(typeKey(t)) }}</p>
+            @if (t.mergedInto) { <p class="pt__client">{{ i18n.tf('tkrel.publicMerged', t.mergedInto) }}</p> }
           </div>
 
           @if (progress(); as p) {

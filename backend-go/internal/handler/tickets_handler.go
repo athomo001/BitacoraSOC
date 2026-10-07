@@ -79,6 +79,9 @@ type ticketDTO struct {
 	SLAPausedSeconds    int32      `json:"slaPausedSeconds"`
 	ReopenedCount       int32      `json:"reopenedCount"`
 	PublicTrackingToken *string    `json:"publicTrackingToken,omitempty"`
+	ParentID            *uuid.UUID `json:"parentId,omitempty"`
+	MergedIntoID        *uuid.UUID `json:"mergedIntoId,omitempty"`
+	CreatedByID         *uuid.UUID `json:"createdById,omitempty"`
 	CreatedAt           time.Time  `json:"createdAt"`
 	UpdatedAt           time.Time  `json:"updatedAt"`
 }
@@ -93,6 +96,7 @@ func toTicketDTO(t db.Ticket, exposeToken bool) ticketDTO {
 		v := t.SlaResolutionDueAt.Time
 		d.SLAResolutionDueAt = &v
 	}
+	d.ParentID, d.MergedIntoID, d.CreatedByID = uuidPtr(t.ParentID), uuidPtr(t.MergedIntoID), uuidPtr(t.CreatedBy)
 	if exposeToken && t.PublicTrackingToken.Valid {
 		v := t.PublicTrackingToken.String
 		d.PublicTrackingToken = &v
@@ -118,6 +122,8 @@ type createTicketRequest struct {
 	Urgency        string     `json:"urgency"`
 	Title          string     `json:"title"`
 	Description    string     `json:"description"`
+	// ParentID: crear el ticket ya como hijo de otro ("Crear hijo").
+	ParentID *uuid.UUID `json:"parentId"`
 }
 
 // ticketPriority aplica la matriz ITIL compartida (internal/tickets).
@@ -151,6 +157,8 @@ type commentRequest struct {
 	IsPublic bool   `json:"isPublic"`
 	// ImageIDs: imágenes ya subidas a este ticket (POST /api/tickets/{id}/images).
 	ImageIDs []uuid.UUID `json:"imageIds"`
+	// AlsoChildren: en un padre, copiar el comentario a los hijos abiertos.
+	AlsoChildren bool `json:"alsoChildren"`
 }
 
 // maxImagesPerComment: tope del diseño aprobado (comentario del dueño #14).
@@ -178,6 +186,10 @@ func (h *TicketsHandler) AddComment(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 404, "not-found", "ticket no encontrado")
 		return
 	}
+	if ticket.MergedIntoID.Valid {
+		problemdetails.Write(w, r, http.StatusConflict, "ticket-merged", "este ticket se unió a otro: comenta en el principal")
+		return
+	}
 	tx, err := h.Pool.Begin(ctx)
 	if err != nil {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo crear el comentario")
@@ -201,8 +213,9 @@ func (h *TicketsHandler) AddComment(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo crear el comentario")
 		return
 	}
+	copied := h.cascadeComment(ctx, ticket, u, strings.TrimSpace(req.Content), req.IsPublic, req.AlsoChildren)
 	if h.AuditLog != nil {
-		h.AuditLog.Log(ctx, "ticket.comment_added", audit.LevelInfo, audit.Success(), map[string]any{"ticketId": id.String(), "images": len(req.ImageIDs)})
+		h.AuditLog.Log(ctx, "ticket.comment_added", audit.LevelInfo, audit.Success(), map[string]any{"ticketId": id.String(), "images": len(req.ImageIDs), "copiedToChildren": copied})
 	}
 	h.notifyChanged(ctx, id)
 	dto := toTicketCommentDTO(comment)

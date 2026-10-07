@@ -1,0 +1,319 @@
+<div class="gd" [class.gd--panel]="panel()">
+  <div class="gd__main">
+    <header class="gd__head">
+      <div>
+        <h3 class="adm-card__title"><mat-icon>shield_moon</mat-icon>{{ i18n.t('guards.title') }}</h3>
+        <p class="adm-muted adm-small">{{ i18n.t('guards.subtitle') }}</p>
+      </div>
+      <span class="gd__tools">
+        <button type="button" class="adm-icon-btn" [attr.aria-label]="i18n.t('guards.prev')" [disabled]="busy()" (click)="shift(-1)"><mat-icon>chevron_left</mat-icon></button>
+        <button type="button" class="adm-btn" [disabled]="busy()" (click)="today()">{{ i18n.t('guards.today') }}</button>
+        <button type="button" class="adm-icon-btn" [attr.aria-label]="i18n.t('guards.next')" [disabled]="busy()" (click)="shift(1)"><mat-icon>chevron_right</mat-icon></button>
+        <span class="gd__seg" role="group" [attr.aria-label]="i18n.t('guards.zoom')">
+          <button type="button" class="seg" [attr.aria-pressed]="spanDays() === 14" (click)="zoom(14)">{{ i18n.t('guards.len.twoWeeks') }}</button>
+          <button type="button" class="seg" [attr.aria-pressed]="spanDays() === 28" (click)="zoom(28)">{{ i18n.t('guards.fourWeeks') }}</button>
+        </span>
+        <button type="button" class="adm-btn" (click)="openImport()"><mat-icon>upload_file</mat-icon>{{ i18n.t('guards.import') }}</button>
+        <button type="button" class="adm-btn" [disabled]="!guards().length" (click)="openRotation()"><mat-icon>autorenew</mat-icon>{{ i18n.t('guards.rotate') }}</button>
+        <button type="button" class="adm-btn adm-btn--primary" [disabled]="!guards().length" (click)="openNew()"><mat-icon>add</mat-icon>{{ i18n.t('guards.new') }}</button>
+      </span>
+    </header>
+
+    @if (error(); as e) { <p class="adm-error" role="alert">{{ e }}</p> }
+    @if (notice(); as n) { <p><span class="pill tone-ok"><mat-icon>task_alt</mat-icon>{{ n }}</span></p> }
+
+    @if (view() && !guards().length) {
+      <p class="adm-empty">{{ i18n.t('guards.empty') }}</p>
+    }
+
+    <!-- Ahora de guardia -->
+    <div class="gd__now">
+      @for (c of nowCards(); track c.guard.cycleId) {
+        <div class="gd__card" [class.gd__card--alert]="c.alert">
+          <span class="adm-label">{{ c.guard.label }}</span>
+          <strong class="gd__who">{{ c.names }}</strong>
+          @if (c.until) { <span class="adm-small adm-muted">{{ c.until }}</span> }
+          <span class="adm-small gd__after"><mat-icon>east</mat-icon>{{ c.next }}</span>
+        </div>
+      }
+    </div>
+
+    <!-- Línea de tiempo -->
+    @if (guards().length) {
+    <section class="gd__tl">
+      <div class="gd__tl-head">
+        <strong>{{ f(start(), false) }} – {{ f(end() - 1, false) }}</strong>
+        <span class="gd__legend">
+          <span><i class="gd__sw gd__sw--now"></i>{{ i18n.t('guards.legend.now') }}</span>
+          <span><i class="gd__sw gd__sw--next"></i>{{ i18n.t('guards.legend.next') }}</span>
+          <span><i class="gd__sw gd__sw--past"></i>{{ i18n.t('guards.legend.past') }}</span>
+          <span><i class="gd__sw gd__sw--swap"></i>{{ i18n.t('guards.override') }}</span>
+          <span><i class="gd__sw gd__sw--gap"></i>{{ i18n.t('guards.legend.gap') }}</span>
+        </span>
+      </div>
+      <div class="gd__scroll">
+        <div class="gd__grid" [style.--days]="spanDays()">
+          <div class="gd__days">
+            @for (d of dayHeads(); track d.ms) {
+              <span class="gd__day" [class.gd__day--today]="d.today" [class.gd__day--weekend]="d.weekend">{{ d.label }}</span>
+            }
+          </div>
+          @for (r of rows(); track r.guard.cycleId) {
+            <div class="gd__row" [style.min-height.px]="r.height">
+              <div class="gd__label">
+                <span class="gd__label-top">
+                  <strong>{{ r.guard.label }}</strong>
+                  @if (r.guard.mustBeCovered) { <mat-icon class="gd__must" [title]="i18n.t('guards.mustBeCovered')">verified_user</mat-icon> }
+                  <button type="button" class="adm-icon-btn gd__cfg" [attr.aria-label]="i18n.t('guards.config.title') + ' ' + r.guard.label" (click)="openConfig(r.guard)"><mat-icon>tune</mat-icon></button>
+                </span>
+                <span class="adm-small adm-muted">{{ r.hint }}</span>
+              </div>
+              <div class="gd__track">
+                @for (g of r.holes; track g.from) {
+                  <button type="button" class="gd__gap" [style.left.%]="g.left" [style.width.%]="g.width" [title]="g.title" (click)="openNew(r.guard.cycleId, g.from, g.to)">⚠ {{ g.label }}</button>
+                }
+                @for (s of r.swapBars; track s.id) {
+                  <span class="gd__bar gd__bar--swap" [style.left.%]="s.left" [style.width.%]="s.width" [style.top.px]="s.top" [style.height.px]="s.h" [title]="s.title">{{ s.label }}</span>
+                }
+                @for (b of r.bars; track b.id) {
+                  <button type="button" class="gd__bar" [class]="'gd__bar gd__bar--' + b.state" [class.gd__bar--sel]="b.selected" [style.left.%]="b.left" [style.width.%]="b.width" [style.top.px]="b.top" [style.height.px]="b.h" [title]="b.title" (click)="edit(b.slot)">{{ b.label }}</button>
+                }
+                @if (nowPct() !== null) { <i class="gd__nowline" [style.left.%]="nowPct()"></i> }
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+      <p class="adm-small adm-muted gd__foot">{{ i18n.t('guards.help') }}</p>
+    </section>
+
+    <!-- Relevos y revisión -->
+    <div class="gd__pair">
+      <section class="gd__box">
+        <h4 class="adm-card__title"><mat-icon>swap_horiz</mat-icon>{{ i18n.t('guards.handoffs') }}</h4>
+        @for (h of handoffs(); track h.t + h.guard) {
+          <div class="gd__handoff">
+            <span class="mono adm-small">{{ h.when }}</span>
+            <span class="pill">{{ h.guard }}</span>
+            <span>{{ h.from }} <mat-icon class="gd__arrow">east</mat-icon> <strong>{{ h.to }}</strong></span>
+            <span class="adm-small" [class.gd__soon]="h.soon">{{ h.inText }}</span>
+          </div>
+        } @empty {
+          <p class="adm-empty">{{ i18n.t('guards.noHandoffs') }}</p>
+        }
+      </section>
+      <section class="gd__box">
+        <h4 class="adm-card__title"><mat-icon>rule</mat-icon>{{ i18n.t('guards.review') }} <span class="adm-small adm-muted adm-push">{{ i18n.t('guards.nextFourWeeks') }}</span></h4>
+        @for (i of issues(); track $index) {
+          <div class="gd__issue">
+            <mat-icon [class]="'gd__tone--' + i.tone">{{ i.icon }}</mat-icon>
+            <span>{{ i.text }}</span>
+            <button type="button" class="adm-btn" (click)="i.fix()">{{ i18n.t(i.action) }}</button>
+          </div>
+        } @empty {
+          <div class="gd__issue"><mat-icon class="gd__tone--ok">check_circle</mat-icon><span>{{ i18n.t('guards.allCovered') }}</span></div>
+        }
+      </section>
+    </div>
+    }
+  </div>
+
+  <!-- Panel lateral -->
+  @if (panel(); as p) {
+  <aside class="gd__panel" [attr.aria-label]="i18n.t('guards.title')">
+    <header class="gd__panel-head">
+      <strong>
+        @switch (p.kind) {
+          @case ('slot') { {{ i18n.t(draft()?.id ? 'guards.edit' : 'guards.new') }} }
+          @case ('rotation') { {{ i18n.t('guards.rotate') }} }
+          @case ('config') { {{ i18n.t('guards.config.title') }} · {{ guardOf(p.cycleId)?.label }} }
+          @case ('import') { {{ i18n.t('guards.import') }} }
+        }
+      </strong>
+      <button type="button" class="adm-icon-btn adm-push" [attr.aria-label]="i18n.t('guards.close')" (click)="closePanel()"><mat-icon>close</mat-icon></button>
+    </header>
+
+    <div class="gd__panel-body">
+      @if (draft(); as d) {
+        <div class="adm-field">
+          <span class="adm-label">{{ i18n.t('guards.guard') }}</span>
+          <span class="gd__seg gd__wrap">
+            @for (g of guards(); track g.cycleId) {
+              <button type="button" class="seg" [attr.aria-pressed]="d.cycleId === g.cycleId" [disabled]="!!d.id && d.cycleId !== g.cycleId" (click)="pickGuard(g.cycleId)">{{ g.label }}</button>
+            }
+          </span>
+        </div>
+        <div class="adm-field">
+          <span class="adm-label">{{ i18n.t('guards.person') }}</span>
+          <span class="gd__people">
+            @for (o of people(); track o.member.teamMemberId) {
+              <button type="button" class="gd__person" [class.gd__person--on]="o.on" [attr.aria-pressed]="o.on" (click)="patchDraft({ teamMemberId: o.member.teamMemberId })">
+                <mat-icon>{{ o.on ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>{{ o.member.name }}
+                <span class="adm-small adm-push" [class]="'adm-small adm-push gd__tone--' + o.note.tone">{{ o.note.text }}</span>
+              </button>
+            } @empty {
+              <span class="adm-small adm-muted">{{ i18n.t('guards.noMembers') }}</span>
+            }
+          </span>
+          <span class="adm-hint">{{ i18n.t('guards.peopleHint') }}</span>
+        </div>
+        <div class="gd__two">
+          <label class="adm-field"><span class="adm-label">{{ i18n.t('guards.from') }}</span><input class="adm-input mono" type="datetime-local" [ngModel]="toInput(d.from)" (ngModelChange)="setFrom($event)" /></label>
+          <label class="adm-field"><span class="adm-label">{{ i18n.t('guards.to') }}</span><input class="adm-input mono" type="datetime-local" [ngModel]="toInput(d.to)" (ngModelChange)="setTo($event)" /></label>
+        </div>
+        <span class="gd__seg gd__wrap">
+          <span class="adm-small adm-muted">{{ i18n.t('guards.length') }}</span>
+          @for (l of lengths; track l.days) {
+            <button type="button" class="seg" [attr.aria-pressed]="d.to - d.from === l.days * 86400000" (click)="patchDraft({ to: d.from + l.days * 86400000 })">{{ i18n.t(l.key) }}</button>
+          }
+        </span>
+        @if (draftGuard(); as g) {
+          <span class="adm-hint">{{ fill('guards.changeAt', { g: g.label, d: weekdays()[g.changeDay], t: g.changeTime }) }}</span>
+        }
+        <div class="adm-field">
+          <span class="adm-label">{{ i18n.t('guards.checks') }}</span>
+          @for (c of draftChecks(); track $index) {
+            <div class="gd__check" [class]="'gd__check gd__check--' + c.tone"><mat-icon>{{ c.icon }}</mat-icon><span>{{ c.text }}</span></div>
+          }
+        </div>
+        @if (d.id) {
+          @if (!overrideOpen()) {
+            <button type="button" class="adm-btn gd__center" (click)="openOverride()"><mat-icon>content_cut</mat-icon>{{ i18n.t('guards.overrideOpen') }}</button>
+          } @else {
+            <div class="gd__sub">
+              <span class="adm-label">{{ i18n.t('guards.overrideOpen') }}</span>
+              <span class="adm-hint">{{ i18n.t('guards.overrideHint') }}</span>
+              <label class="adm-field"><span class="adm-label">{{ i18n.t('guards.replacement') }}</span>
+                <select class="adm-input" [ngModel]="overrideMemberId()" (ngModelChange)="overrideMemberId.set($event)">
+                  <option value="">—</option>
+                  @for (m of draftGuard()?.members ?? []; track m.teamMemberId) {
+                    @if (m.teamMemberId !== d.teamMemberId) { <option [value]="m.teamMemberId">{{ m.name }}</option> }
+                  }
+                </select>
+              </label>
+              <div class="gd__two">
+                <label class="adm-field"><span class="adm-label">{{ i18n.t('guards.from') }}</span><input class="adm-input mono" type="datetime-local" [ngModel]="overrideFrom()" (ngModelChange)="overrideFrom.set($event)" /></label>
+                <label class="adm-field"><span class="adm-label">{{ i18n.t('guards.to') }}</span><input class="adm-input mono" type="datetime-local" [ngModel]="overrideTo()" (ngModelChange)="overrideTo.set($event)" /></label>
+              </div>
+              <label class="adm-field"><span class="adm-label">{{ i18n.t('guards.reason') }}</span><input class="adm-input" [ngModel]="overrideReason()" (ngModelChange)="overrideReason.set($event)" /></label>
+              <span class="gd__seg">
+                <button type="button" class="adm-btn adm-push" (click)="overrideOpen.set(false)">{{ i18n.t('guards.cancel') }}</button>
+                <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy() || !overrideMemberId()" (click)="saveOverride()">{{ i18n.t('guards.overrideSave') }}</button>
+              </span>
+            </div>
+          }
+        }
+      }
+
+      @if (rotation(); as r) {
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('guards.guard') }}</span>
+          <select class="adm-input" [ngModel]="r.cycleId" (ngModelChange)="rotationGuard($event)">
+            @for (g of guards(); track g.cycleId) { <option [value]="g.cycleId">{{ g.label }}</option> }
+          </select>
+        </label>
+        <div class="adm-field">
+          <span class="adm-label">{{ i18n.t('guards.rot.order') }}</span>
+          @for (m of rotationMembers(); track m.teamMemberId) {
+            <div class="gd__order" [class.gd__order--off]="!inRotation(m.teamMemberId)">
+              <input type="checkbox" [checked]="inRotation(m.teamMemberId)" (change)="toggleInRotation(m.teamMemberId)" [attr.aria-label]="m.name" />
+              @if (inRotation(m.teamMemberId)) { <span class="mono adm-small">{{ r.order.indexOf(m.teamMemberId) + 1 }}.</span> }
+              <span>{{ m.name }}</span>
+              @if (inRotation(m.teamMemberId)) {
+                <button type="button" class="adm-icon-btn adm-push" [attr.aria-label]="i18n.t('guards.rot.up')" (click)="move(m.teamMemberId, -1)"><mat-icon>arrow_upward</mat-icon></button>
+                <button type="button" class="adm-icon-btn" [attr.aria-label]="i18n.t('guards.rot.down')" (click)="move(m.teamMemberId, 1)"><mat-icon>arrow_downward</mat-icon></button>
+              }
+            </div>
+          }
+          <span class="adm-hint">{{ i18n.t('guards.rot.orderHint') }}</span>
+        </div>
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('guards.from') }}</span><input class="adm-input mono" type="datetime-local" [ngModel]="toInput(r.from)" (ngModelChange)="setRotationFrom($event)" /></label>
+        <div class="adm-field">
+          <span class="adm-label">{{ i18n.t('guards.rot.each') }}</span>
+          <span class="gd__seg gd__wrap">
+            @for (l of lengths; track l.days) {
+              <button type="button" class="seg" [attr.aria-pressed]="r.daysEach === l.days" (click)="patchRotation({ daysEach: l.days })">{{ i18n.t(l.key) }}</button>
+            }
+          </span>
+        </div>
+        <div class="adm-field">
+          <span class="adm-label">{{ i18n.t('guards.rot.count') }}</span>
+          <span class="gd__seg">
+            @for (n of [4, 8, 12]; track n) {
+              <button type="button" class="seg" [attr.aria-pressed]="r.count === n" (click)="patchRotation({ count: n })">{{ n }}</button>
+            }
+          </span>
+        </div>
+        <div class="adm-field">
+          <span class="adm-label">{{ i18n.t('guards.rot.preview') }}</span>
+          @for (p of rotationPreview(); track $index) {
+            <div class="gd__preview"><span class="mono adm-small">{{ p.range }}</span><span>{{ p.name }}</span><span class="adm-small" [class]="'adm-small gd__tone--' + p.note.tone">{{ p.note.text }}</span></div>
+          } @empty {
+            <span class="adm-small adm-muted">{{ i18n.t('guards.rot.pickSomeone') }}</span>
+          }
+        </div>
+      }
+
+      @if (config(); as c) {
+        <label class="adm-switch-row">
+          <span class="switch">
+            <input class="switch__input" type="checkbox" role="switch" [checked]="c.mustBeCovered" (change)="patchConfig({ mustBeCovered: !c.mustBeCovered })" />
+            <span class="switch__track" aria-hidden="true"></span>
+          </span>
+          <span>{{ i18n.t('guards.mustBeCovered') }}</span>
+        </label>
+        <span class="adm-hint">{{ i18n.t('guards.config.mustHint') }}</span>
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('guards.config.day') }}</span>
+          <select class="adm-input" [ngModel]="c.changeDay" (ngModelChange)="patchConfig({ changeDay: +$event })">
+            @for (w of weekdays(); track $index) { <option [ngValue]="$index">{{ w }}</option> }
+          </select>
+        </label>
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('guards.config.shift') }}</span>
+          <select class="adm-input" [ngModel]="c.workShiftId" (ngModelChange)="patchConfig({ workShiftId: $event })">
+            <option value="">{{ i18n.t('guards.config.noShift') }}</option>
+            @for (w of workShifts(); track w.id) { <option [value]="w.id">{{ w.name }} ({{ w.startTime }})</option> }
+          </select>
+        </label>
+        <span class="adm-hint">{{ fill('guards.config.timeHint', { t: configTime(c.workShiftId) }) }}</span>
+      }
+
+      @if (p.kind === 'import') {
+        <p class="adm-small">{{ i18n.t('guards.csv.hint') }}</p>
+        <code class="gd__code">condicion,usuario,fechaInicio,horaInicio,fechaFin,horaFin</code>
+        <span class="gd__seg gd__wrap">
+          <button type="button" class="adm-btn" (click)="downloadTemplate()"><mat-icon>download</mat-icon>{{ i18n.t('guards.csv.template') }}</button>
+          <label class="adm-btn adm-btn--primary gd__file"><mat-icon>upload_file</mat-icon>{{ i18n.t('guards.csv.pick') }}<input type="file" accept=".csv,text/csv" [disabled]="busy()" (change)="importFile($event)" /></label>
+        </span>
+        @if (importResult(); as res) {
+          <div class="gd__check gd__check--ok"><mat-icon>task_alt</mat-icon><span>{{ fill('guards.csv.done', { g: '' + res.guards, d: '' + res.dotacionDays }) }}</span></div>
+          @for (e of res.errors; track e.row) {
+            <div class="gd__check gd__check--crit"><mat-icon>error</mat-icon><span>{{ fill('guards.csv.rowError', { r: '' + e.row, m: e.message }) }}</span></div>
+          }
+        }
+      }
+    </div>
+
+    <footer class="gd__panel-foot">
+      @switch (p.kind) {
+        @case ('slot') {
+          @if (draft()?.id) {
+            <button type="button" class="adm-btn adm-btn--danger" [disabled]="busy()" (click)="deleteSlot()">{{ i18n.t(confirmDelete() ? 'guards.deleteSure' : 'guards.delete') }}</button>
+          }
+          <button type="button" class="adm-btn adm-push" (click)="closePanel()">{{ i18n.t('guards.cancel') }}</button>
+          <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy() || !canSave()" (click)="saveSlot()">{{ i18n.t(draft()?.id ? 'guards.saveChanges' : 'guards.create') }}</button>
+        }
+        @case ('rotation') {
+          <button type="button" class="adm-btn adm-push" (click)="closePanel()">{{ i18n.t('guards.cancel') }}</button>
+          <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy() || !rotationPreview().length" (click)="applyRotation()">{{ fill('guards.rot.apply', { n: '' + rotationPreview().length }) }}</button>
+        }
+        @case ('config') {
+          <button type="button" class="adm-btn adm-push" (click)="closePanel()">{{ i18n.t('guards.cancel') }}</button>
+          <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy()" (click)="saveConfig()">{{ i18n.t('guards.saveChanges') }}</button>
+        }
+        @case ('import') {
+          <button type="button" class="adm-btn adm-push" (click)="closePanel()">{{ i18n.t('guards.close') }}</button>
+        }
+      }
+    </footer>
+  </aside>
+  }
+</div>

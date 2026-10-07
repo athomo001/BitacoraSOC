@@ -54,8 +54,8 @@ RETURNING *;
 SELECT * FROM ticket_comments WHERE ticket_id = $1 ORDER BY created_at ASC;
 
 -- name: CreateTicketComment :one
-INSERT INTO ticket_comments (ticket_id, user_id, author_name, content, is_public)
-VALUES ($1, $2, $3, $4, $5) RETURNING *;
+INSERT INTO ticket_comments (ticket_id, user_id, author_name, content, is_public, origin)
+VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
 
 -- name: ListTicketTasks :many
 SELECT * FROM ticket_tasks WHERE ticket_id = $1 ORDER BY performed_at ASC;
@@ -88,11 +88,15 @@ SELECT * FROM entries WHERE ticket_id = $1 ORDER BY created_at ASC;
 -- name: ListTicketsView :many
 -- Vista de la cola (Fase 10, pantalla aprobada): nombres ya resueltos para no
 -- mostrar UUID, abiertos primero y por prioridad, luego lo más reciente.
-SELECT sqlc.embed(t), o.name AS client_name, tm.name AS team_name, u.username AS assignee_username
+SELECT sqlc.embed(t), o.name AS client_name, tm.name AS team_name, u.username AS assignee_username,
+  p.ticket_number AS parent_number, m.ticket_number AS merged_into_number,
+  (SELECT count(*) FROM tickets c WHERE c.parent_id = t.id)::int AS child_count
 FROM tickets t
 JOIN organizations o ON o.id = t.client_id
 LEFT JOIN teams tm ON tm.id = t.assigned_team_id
 LEFT JOIN users u ON u.id = t.assigned_user_id
+LEFT JOIN tickets p ON p.id = t.parent_id
+LEFT JOIN tickets m ON m.id = t.merged_into_id
 WHERE (sqlc.narg('ticket_type')::ticket_type IS NULL OR t.ticket_type = sqlc.narg('ticket_type')::ticket_type)
   AND (sqlc.narg('scope')::entry_scope IS NULL OR t.scope = sqlc.narg('scope')::entry_scope)
   AND (sqlc.narg('status')::ticket_status IS NULL OR t.status = sqlc.narg('status')::ticket_status)
@@ -208,3 +212,73 @@ DELETE FROM ticket_images WHERE comment_id IS NULL AND created_at < now() - inte
 INSERT INTO entry_comments (entry_id, user_id, comment, is_system_generated)
 SELECT e.id, sqlc.arg('user_id'), sqlc.arg('comment'), true
 FROM entries e WHERE e.ticket_id = sqlc.arg('ticket_id');
+
+-- ===== Unir tickets y padre/hijo (000028) =====
+
+-- name: SetTicketParent :exec
+UPDATE tickets SET parent_id = sqlc.narg('parent_id'), updated_at = now() WHERE id = sqlc.arg('id');
+
+-- name: CountTicketChildren :one
+SELECT count(*) FROM tickets WHERE parent_id = $1;
+
+-- name: ListTicketChildren :many
+SELECT t.id, t.ticket_number, t.title, t.status, o.name AS client_name
+FROM tickets t JOIN organizations o ON o.id = t.client_id
+WHERE t.parent_id = $1
+ORDER BY t.created_at;
+
+-- name: ListOpenChildTickets :many
+SELECT * FROM tickets WHERE parent_id = $1 AND status NOT IN ('resolved', 'closed', 'cancelled') ORDER BY created_at;
+
+-- name: GetTicketRef :one
+SELECT id, ticket_number, title FROM tickets WHERE id = $1;
+
+-- name: GetTicketByNumberForMerge :one
+SELECT * FROM tickets WHERE ticket_number = $1;
+
+-- name: MoveTicketComments :exec
+UPDATE ticket_comments
+SET ticket_id = sqlc.arg('main_id'),
+    origin = CASE WHEN origin = '' THEN 'merged:' || sqlc.arg('other_number')::text ELSE origin END
+WHERE ticket_id = sqlc.arg('other_id');
+
+-- name: MoveTicketTasks :exec
+UPDATE ticket_tasks SET ticket_id = sqlc.arg('main_id') WHERE ticket_id = sqlc.arg('other_id');
+
+-- name: MoveTicketImages :exec
+UPDATE ticket_images SET ticket_id = sqlc.arg('main_id') WHERE ticket_id = sqlc.arg('other_id');
+
+-- name: MoveTicketEntries :exec
+UPDATE entries SET ticket_id = sqlc.arg('main_id')::uuid, updated_at = now() WHERE ticket_id = sqlc.arg('other_id')::uuid;
+
+-- name: MoveTicketEscalationIncidents :exec
+UPDATE escalation_incidents SET ticket_id = sqlc.arg('main_id')::uuid WHERE ticket_id = sqlc.arg('other_id')::uuid;
+
+-- name: CopyTicketResolvers :exec
+INSERT INTO ticket_resolvers (ticket_id, user_id, added_by, added_at)
+SELECT sqlc.arg('main_id'), r.user_id, r.added_by, r.added_at FROM ticket_resolvers r WHERE r.ticket_id = sqlc.arg('other_id')
+ON CONFLICT (ticket_id, user_id) DO NOTHING;
+
+-- name: MoveTicketChildren :exec
+UPDATE tickets SET parent_id = sqlc.arg('main_id')::uuid, updated_at = now() WHERE parent_id = sqlc.arg('other_id')::uuid;
+
+-- name: MarkTicketMerged :exec
+-- El que se une queda cerrado apuntando al principal (no se borra).
+UPDATE tickets
+SET status = 'closed', closed_at = now(), merged_into_id = sqlc.arg('main_id')::uuid, parent_id = NULL,
+    sla_on_hold_since = NULL, updated_at = now()
+WHERE id = sqlc.arg('other_id');
+
+-- name: SetTicketClient :one
+-- Cambiar el cliente (registrado mal): el servicio se quita si era del
+-- cliente anterior; enlace público y PIN nuevos (el cliente equivocado deja
+-- de ver el ticket).
+UPDATE tickets
+SET client_id = sqlc.arg('client_id'),
+    service_id = CASE WHEN service_id IS NULL OR EXISTS (SELECT 1 FROM services s WHERE s.id = tickets.service_id AND s.organization_id = sqlc.arg('client_id'))
+                      THEN service_id ELSE NULL END,
+    public_tracking_token = sqlc.arg('token'),
+    public_tracking_pin = CASE WHEN public_tracking_pin IS NULL THEN NULL ELSE sqlc.narg('pin') END,
+    updated_at = now()
+WHERE tickets.id = sqlc.arg('id')
+RETURNING *;

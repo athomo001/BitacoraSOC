@@ -16,6 +16,7 @@ import { HttpClient } from '@angular/common/http';
 import { OrganizationsService, TeamSummary } from '../../core/organizations/organizations.service';
 import { resolverTeams } from '../../core/tickets/ticket-view';
 import { CLOCK_TONE, PRIORITY_SHORT, PRIORITY_TONE, STATUS_TONE, clockText, formatDuration, publicTrackingUrl, transitionAction } from '../../core/tickets/ticket-view';
+import { TicketRelationsComponent } from './ticket-relations';
 
 import '../../core/i18n/packs/tickets';
 type Tab = 'activity' | 'images' | 'tasks' | 'entries';
@@ -49,7 +50,7 @@ const TASK_PRESETS = [15, 30, 60] as const;
 @Component({
   selector: 'app-ticket-detail',
   standalone: true,
-  imports: [DatePipe, FormsModule, MatIconModule, MarkdownComponent, AuthImgDirective],
+  imports: [DatePipe, FormsModule, MatIconModule, MarkdownComponent, AuthImgDirective, TicketRelationsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './ticket-detail.html',
   styleUrl: './ticket-detail.css',
@@ -60,6 +61,13 @@ export class TicketDetailComponent {
   readonly changed = output<Ticket>();
   /** Un admin lo eliminó: la lista lo saca y deja de mostrarlo. */
   readonly deleted = output<string>();
+  /** Abrir otro ticket (padre, hijo o el principal de uno unido). */
+  readonly navigate = output<string>();
+  private readonly relations = viewChild(TicketRelationsComponent);
+  /** Padre: hijos que siguen abiertos (el comentario puede llegarles). */
+  protected readonly openChildren = computed(() => (this.detail()?.children ?? []).filter((c) => !['resolved', 'closed', 'cancelled'].includes(c.status)).length);
+  /** En un padre, por defecto el comentario llega también a los hijos abiertos. */
+  protected readonly alsoChildren = signal(true);
 
   protected readonly i18n = inject(I18nService);
   private readonly api = inject(TicketsService);
@@ -213,6 +221,11 @@ export class TicketDetailComponent {
   protected async transition(to: TicketStatus): Promise<void> {
     const t = this.detail()?.ticket;
     if (!t) return;
+    // Un padre con hijos abiertos: se pregunta si se resuelven con él.
+    if (to === 'resolved' && this.openChildren() > 0) {
+      this.relations()?.askResolve();
+      return;
+    }
     await this.run(async () => {
       // "Tomar": el ticket queda asignado a quien lo toma.
       const updated = await this.api.transition(t.id, to, to === 'assigned' ? this.auth.user()?.id : undefined);
@@ -242,13 +255,28 @@ export class TicketDetailComponent {
     const images = this.pending();
     if (!t || (!content && !images.length) || this.uploading()) return;
     await this.run(async () => {
-      await this.api.addComment(t.id, content, this.commentPublic(), images.map((i) => i.id));
+      await this.api.addComment(t.id, content, this.commentPublic(), images.map((i) => i.id), this.openChildren() > 0 && this.alsoChildren());
       images.forEach((i) => URL.revokeObjectURL(i.previewUrl));
       this.pending.set([]);
       this.comment = '';
       this.commentPublic.set(false);
       this.tab.set('activity');
     });
+  }
+
+  /** Tras unir, hacer hijo o cambiar cliente: recarga y avisa a la lista. */
+  protected async reloadAll(): Promise<void> {
+    await this.run(() => Promise.resolve());
+  }
+
+  /** "↑ Padre" / "↓ TKT-…" / "desde TKT-…": de dónde vino un comentario. */
+  protected originLabel(origin: string): string {
+    const [kind, number] = origin.split(':');
+    const short = number ? number.replace(/^TKT-\d{4}-/, 'TKT-') : '';
+    if (kind === 'parent') return this.i18n.t('tkrel.fromParent');
+    if (kind === 'child') return '↓ ' + short;
+    if (kind === 'merged') return this.i18n.tf('tkrel.fromMerged', short);
+    return '';
   }
 
   protected async addTask(): Promise<void> {
