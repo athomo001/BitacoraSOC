@@ -6,8 +6,8 @@ import {
   EscalationScope,
   EscalationService,
   Policy,
+  EscalationPool,
   SocService,
-  StepMode,
 } from '../../core/escalation/escalation.service';
 import { Organization, OrganizationsService, TeamSummary } from '../../core/organizations/organizations.service';
 import { TerritoryService } from '../../core/territory/territory.service';
@@ -18,10 +18,10 @@ import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
 import { MaintenanceWindowsComponent } from '../escalation/maintenance-windows';
 import { AdminEscalationPoolsComponent } from './admin-escalation-pools';
+import { EscalationStepsComponent } from './escalation-steps';
 
 import '../../core/i18n/packs/admin';
 type ScopeKind = 'asset' | 'unit' | 'service';
-const MODES: readonly StepMode[] = ['unique', 'sequential', 'pool'];
 
 /**
  * Administración del motor de escalación (Fase 7), re-vestido con los
@@ -34,7 +34,7 @@ const MODES: readonly StepMode[] = ['unique', 'sequential', 'pool'];
 @Component({
   selector: 'app-admin-escalation',
   standalone: true,
-  imports: [FormsModule, MatIconModule, MaintenanceWindowsComponent, AdminEscalationPoolsComponent],
+  imports: [FormsModule, MatIconModule, MaintenanceWindowsComponent, AdminEscalationPoolsComponent, EscalationStepsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-escalation.html',
   styles: `
@@ -43,8 +43,6 @@ const MODES: readonly StepMode[] = ['unique', 'sequential', 'pool'];
     .ea__lead { padding-bottom: 0; }
     .ea__form { padding: 12px 14px; border-bottom: 1px solid var(--border-subtle); }
     .ea__name { margin-top: 3px; }
-    .ea__step-form { border-top: 1px solid var(--border-subtle); }
-    .ea__actions { display: flex; justify-content: flex-end; }
     .ea__confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
     .ea__reminder { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); }
     .ea__reminder .adm-field { flex: 1 1 260px; }
@@ -52,7 +50,6 @@ const MODES: readonly StepMode[] = ['unique', 'sequential', 'pool'];
 })
 export class AdminEscalationComponent implements OnInit {
   protected readonly i18n = inject(I18nService);
-  protected readonly modes = MODES;
   private readonly api = inject(EscalationService);
   private readonly orgs = inject(OrganizationsService);
   private readonly territory = inject(TerritoryService);
@@ -79,10 +76,8 @@ export class AdminEscalationComponent implements OnInit {
 
   protected readonly policyKind = signal<ScopeKind>('asset');
   protected readonly policyTarget = signal('');
-  protected readonly stepOrder = signal(1);
-  protected readonly stepTeam = signal('');
-  protected readonly stepMode = signal<StepMode>('unique');
-  protected readonly stepWait = signal(10);
+  /** Pools con nombre (POOL de Mundo…): se agregan a un llamado como una persona. */
+  protected readonly pools = signal<EscalationPool[]>([]);
   protected readonly svcOrg = signal('');
   protected readonly svcName = signal('');
   protected readonly svcCode = signal('');
@@ -97,7 +92,8 @@ export class AdminEscalationComponent implements OnInit {
     await this.run(async () => {
       await Promise.all([
         this.refreshPolicies(),
-        this.orgs.listTeams().then((t) => this.teams.set(t)),
+        this.orgs.listTeams().then((t) => this.teams.set(t.filter((x) => x.active))),
+        this.api.listPools().then((p) => this.pools.set(p)),
         this.nocEnabled() ? this.api.listAssets().then((a) => this.assets.set(a)) : null,
         this.nocEnabled() ? this.territory.list(1, 5000).then((r) => this.units.set(r.units)) : null,
         this.socEnabled() ? this.refreshServices() : null,
@@ -135,14 +131,6 @@ export class AdminEscalationComponent implements OnInit {
     return `escAdmin.kind.${kind}` as MessageKey;
   }
 
-  protected modeKey(mode: StepMode): MessageKey {
-    return `escAdmin.mode.${mode}` as MessageKey;
-  }
-
-  protected modeHintKey(mode: StepMode): MessageKey {
-    return `escAdmin.modeHint.${mode}` as MessageKey;
-  }
-
   /** El nombre del activo, zona o servicio al que apunta. */
   protected targetName(s: EscalationScope): string {
     if (s.assetId) {
@@ -159,7 +147,7 @@ export class AdminEscalationComponent implements OnInit {
 
   protected stepsSummary(p: Policy): string {
     if (p.steps.length === 0) return this.i18n.t('escAdmin.noStepsShort');
-    return p.steps.map((s) => `${s.stepOrder}. ${s.teamName}`).join(' → ');
+    return p.steps.map((s) => `${s.stepOrder}. ${s.title}`).join(' → ');
   }
 
   /** Recordatorio del cliente bajo el flujo de llamados ("Llamar 3 veces y 1 minuto por cada llamada"). */
@@ -176,7 +164,11 @@ export class AdminEscalationComponent implements OnInit {
     this.selectedId.set(p.id);
     this.reminder.set(p.reminder ?? '');
     this.confirmDelete.set(false);
-    this.stepOrder.set((p.steps.at(-1)?.stepOrder ?? 0) + 1);
+  }
+
+  /** El editor de llamados devuelve la política ya guardada. */
+  protected replacePolicy(policy: Policy): void {
+    this.policies.update((list) => list.map((x) => (x.id === policy.id ? { ...x, steps: policy.steps } : x)));
   }
 
   protected async createPolicy(): Promise<void> {
@@ -185,7 +177,6 @@ export class AdminEscalationComponent implements OnInit {
       this.policyTarget.set('');
       await this.refreshPolicies();
       this.selectedId.set(p.id);
-      this.stepOrder.set(1);
     });
   }
 
@@ -194,22 +185,6 @@ export class AdminEscalationComponent implements OnInit {
     await this.run(async () => {
       await this.api.deletePolicy(p.id);
       if (this.selectedId() === p.id) this.selectedId.set(null);
-      await this.refreshPolicies();
-    });
-  }
-
-  protected async addStep(p: Policy): Promise<void> {
-    await this.run(async () => {
-      await this.api.addStep(p.id, { stepOrder: this.stepOrder(), teamId: this.stepTeam(), mode: this.stepMode(), waitBeforeEscalateMinutes: this.stepWait() });
-      this.stepTeam.set('');
-      this.stepOrder.update((n) => n + 1);
-      await this.refreshPolicies();
-    });
-  }
-
-  protected async deleteStep(p: Policy, order: number): Promise<void> {
-    await this.run(async () => {
-      await this.api.deleteStep(p.id, order);
       await this.refreshPolicies();
     });
   }

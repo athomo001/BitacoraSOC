@@ -58,8 +58,8 @@ func (q *Queries) AddEscalationPoolMember(ctx context.Context, arg AddEscalation
 }
 
 const addPolicyStep = `-- name: AddPolicyStep :one
-INSERT INTO escalation_steps (policy_id, step_order, team_id, mode, wait_before_escalate_minutes)
-VALUES ($1, $2, $3, $4, $5) RETURNING id, policy_id, step_order, team_id, mode, wait_before_escalate_minutes
+INSERT INTO escalation_steps (policy_id, step_order, team_id, mode, wait_before_escalate_minutes, title)
+VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, policy_id, step_order, team_id, mode, wait_before_escalate_minutes, title
 `
 
 type AddPolicyStepParams struct {
@@ -68,6 +68,7 @@ type AddPolicyStepParams struct {
 	TeamID                    uuid.UUID      `json:"team_id"`
 	Mode                      EscalationMode `json:"mode"`
 	WaitBeforeEscalateMinutes int32          `json:"wait_before_escalate_minutes"`
+	Title                     pgtype.Text    `json:"title"`
 }
 
 func (q *Queries) AddPolicyStep(ctx context.Context, arg AddPolicyStepParams) (EscalationStep, error) {
@@ -77,6 +78,7 @@ func (q *Queries) AddPolicyStep(ctx context.Context, arg AddPolicyStepParams) (E
 		arg.TeamID,
 		arg.Mode,
 		arg.WaitBeforeEscalateMinutes,
+		arg.Title,
 	)
 	var i EscalationStep
 	err := row.Scan(
@@ -86,6 +88,7 @@ func (q *Queries) AddPolicyStep(ctx context.Context, arg AddPolicyStepParams) (E
 		&i.TeamID,
 		&i.Mode,
 		&i.WaitBeforeEscalateMinutes,
+		&i.Title,
 	)
 	return i, err
 }
@@ -96,6 +99,15 @@ DELETE FROM escalation_pool_members WHERE pool_id = $1
 
 func (q *Queries) ClearEscalationPoolMembers(ctx context.Context, poolID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, clearEscalationPoolMembers, poolID)
+	return err
+}
+
+const clearTeamMembers = `-- name: ClearTeamMembers :exec
+DELETE FROM team_members WHERE team_id = $1
+`
+
+func (q *Queries) ClearTeamMembers(ctx context.Context, teamID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, clearTeamMembers, teamID)
 	return err
 }
 
@@ -315,6 +327,23 @@ func (q *Queries) CreateService(ctx context.Context, arg CreateServiceParams) (S
 	return i, err
 }
 
+const createStepTeam = `-- name: CreateStepTeam :one
+INSERT INTO teams (name, slug, kind, audience) VALUES ($1, $2, 'step', 'client') RETURNING id
+`
+
+type CreateStepTeamParams struct {
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
+// Sin organización: el grupo es de la política, no de un cliente.
+func (q *Queries) CreateStepTeam(ctx context.Context, arg CreateStepTeamParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, createStepTeam, arg.Name, arg.Slug)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const deactivateMaintenanceWindow = `-- name: DeactivateMaintenanceWindow :execrows
 UPDATE maintenance_windows SET active = false WHERE id = $1 AND active
 `
@@ -366,6 +395,16 @@ func (q *Queries) DeletePolicyStep(ctx context.Context, arg DeletePolicyStepPara
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const deleteStepTeam = `-- name: DeleteStepTeam :exec
+DELETE FROM teams WHERE id = $1 AND kind = 'step'
+`
+
+// Solo grupos de paso: un equipo real nunca se borra al quitar un llamado.
+func (q *Queries) DeleteStepTeam(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteStepTeam, id)
+	return err
 }
 
 const findPolicyByAsset = `-- name: FindPolicyByAsset :one
@@ -487,6 +526,80 @@ func (q *Queries) GetPolicy(ctx context.Context, id uuid.UUID) (EscalationPolicy
 		&i.TerritorialUnitID,
 		&i.Active,
 		&i.Reminder,
+	)
+	return i, err
+}
+
+const getPolicyStep = `-- name: GetPolicyStep :one
+SELECT st.id, st.policy_id, st.step_order, st.team_id, st.mode, st.wait_before_escalate_minutes, st.title, t.kind AS team_kind FROM escalation_steps st JOIN teams t ON t.id = st.team_id
+WHERE st.id = $1 AND st.policy_id = $2
+`
+
+type GetPolicyStepParams struct {
+	ID       uuid.UUID `json:"id"`
+	PolicyID uuid.UUID `json:"policy_id"`
+}
+
+type GetPolicyStepRow struct {
+	ID                        uuid.UUID      `json:"id"`
+	PolicyID                  uuid.UUID      `json:"policy_id"`
+	StepOrder                 int32          `json:"step_order"`
+	TeamID                    uuid.UUID      `json:"team_id"`
+	Mode                      EscalationMode `json:"mode"`
+	WaitBeforeEscalateMinutes int32          `json:"wait_before_escalate_minutes"`
+	Title                     pgtype.Text    `json:"title"`
+	TeamKind                  string         `json:"team_kind"`
+}
+
+func (q *Queries) GetPolicyStep(ctx context.Context, arg GetPolicyStepParams) (GetPolicyStepRow, error) {
+	row := q.db.QueryRow(ctx, getPolicyStep, arg.ID, arg.PolicyID)
+	var i GetPolicyStepRow
+	err := row.Scan(
+		&i.ID,
+		&i.PolicyID,
+		&i.StepOrder,
+		&i.TeamID,
+		&i.Mode,
+		&i.WaitBeforeEscalateMinutes,
+		&i.Title,
+		&i.TeamKind,
+	)
+	return i, err
+}
+
+const getPolicyStepByOrder = `-- name: GetPolicyStepByOrder :one
+SELECT st.id, st.policy_id, st.step_order, st.team_id, st.mode, st.wait_before_escalate_minutes, st.title, t.kind AS team_kind FROM escalation_steps st JOIN teams t ON t.id = st.team_id
+WHERE st.policy_id = $1 AND st.step_order = $2
+`
+
+type GetPolicyStepByOrderParams struct {
+	PolicyID  uuid.UUID `json:"policy_id"`
+	StepOrder int32     `json:"step_order"`
+}
+
+type GetPolicyStepByOrderRow struct {
+	ID                        uuid.UUID      `json:"id"`
+	PolicyID                  uuid.UUID      `json:"policy_id"`
+	StepOrder                 int32          `json:"step_order"`
+	TeamID                    uuid.UUID      `json:"team_id"`
+	Mode                      EscalationMode `json:"mode"`
+	WaitBeforeEscalateMinutes int32          `json:"wait_before_escalate_minutes"`
+	Title                     pgtype.Text    `json:"title"`
+	TeamKind                  string         `json:"team_kind"`
+}
+
+func (q *Queries) GetPolicyStepByOrder(ctx context.Context, arg GetPolicyStepByOrderParams) (GetPolicyStepByOrderRow, error) {
+	row := q.db.QueryRow(ctx, getPolicyStepByOrder, arg.PolicyID, arg.StepOrder)
+	var i GetPolicyStepByOrderRow
+	err := row.Scan(
+		&i.ID,
+		&i.PolicyID,
+		&i.StepOrder,
+		&i.TeamID,
+		&i.Mode,
+		&i.WaitBeforeEscalateMinutes,
+		&i.Title,
+		&i.TeamKind,
 	)
 	return i, err
 }
@@ -1096,7 +1209,7 @@ func (q *Queries) ListPoliciesForUnits(ctx context.Context, unitIds []uuid.UUID)
 }
 
 const listPolicySteps = `-- name: ListPolicySteps :many
-SELECT st.id, st.policy_id, st.step_order, st.team_id, st.mode, st.wait_before_escalate_minutes, t.name AS team_name FROM escalation_steps st JOIN teams t ON t.id = st.team_id
+SELECT st.id, st.policy_id, st.step_order, st.team_id, st.mode, st.wait_before_escalate_minutes, st.title, t.name AS team_name, t.kind AS team_kind FROM escalation_steps st JOIN teams t ON t.id = st.team_id
 WHERE st.policy_id = ANY($1::uuid[])
 ORDER BY st.policy_id, st.step_order
 `
@@ -1108,7 +1221,9 @@ type ListPolicyStepsRow struct {
 	TeamID                    uuid.UUID      `json:"team_id"`
 	Mode                      EscalationMode `json:"mode"`
 	WaitBeforeEscalateMinutes int32          `json:"wait_before_escalate_minutes"`
+	Title                     pgtype.Text    `json:"title"`
 	TeamName                  string         `json:"team_name"`
+	TeamKind                  string         `json:"team_kind"`
 }
 
 func (q *Queries) ListPolicySteps(ctx context.Context, policyIds []uuid.UUID) ([]ListPolicyStepsRow, error) {
@@ -1127,7 +1242,9 @@ func (q *Queries) ListPolicySteps(ctx context.Context, policyIds []uuid.UUID) ([
 			&i.TeamID,
 			&i.Mode,
 			&i.WaitBeforeEscalateMinutes,
+			&i.Title,
 			&i.TeamName,
+			&i.TeamKind,
 		); err != nil {
 			return nil, err
 		}
@@ -1324,6 +1441,64 @@ func (q *Queries) ListServices(ctx context.Context, arg ListServicesParams) ([]L
 	return items, nil
 }
 
+const listStepMembers = `-- name: ListStepMembers :many
+
+SELECT m.id, m.team_id, m.user_id, m.contact_id, m.pool_id, m.priority,
+  COALESCE(NULLIF(u.full_name, ''), u.username, c.name, p.name, '')::text AS display_name,
+  CASE WHEN m.user_id IS NOT NULL THEN 'user' WHEN m.contact_id IS NOT NULL THEN 'contact' ELSE 'pool' END::text AS member_kind,
+  COALESCE((SELECT string_agg(DISTINCT ch.channel_type::text, ',') FROM contact_channels ch WHERE ch.contact_id = m.contact_id), '')::text AS channels
+FROM team_members m
+LEFT JOIN users u ON u.id = m.user_id
+LEFT JOIN contacts c ON c.id = m.contact_id
+LEFT JOIN escalation_pools p ON p.id = m.pool_id
+WHERE m.team_id = ANY($1::uuid[]) AND m.active
+ORDER BY m.team_id, m.priority, display_name
+`
+
+type ListStepMembersRow struct {
+	ID          uuid.UUID   `json:"id"`
+	TeamID      uuid.UUID   `json:"team_id"`
+	UserID      pgtype.UUID `json:"user_id"`
+	ContactID   pgtype.UUID `json:"contact_id"`
+	PoolID      pgtype.UUID `json:"pool_id"`
+	Priority    int32       `json:"priority"`
+	DisplayName string      `json:"display_name"`
+	MemberKind  string      `json:"member_kind"`
+	Channels    string      `json:"channels"`
+}
+
+// ===== Llamados dentro de la política (000030) =====
+// Personas de los grupos de los pasos: usuario, contacto del Directorio o pool.
+func (q *Queries) ListStepMembers(ctx context.Context, teamIds []uuid.UUID) ([]ListStepMembersRow, error) {
+	rows, err := q.db.Query(ctx, listStepMembers, teamIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListStepMembersRow
+	for rows.Next() {
+		var i ListStepMembersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TeamID,
+			&i.UserID,
+			&i.ContactID,
+			&i.PoolID,
+			&i.Priority,
+			&i.DisplayName,
+			&i.MemberKind,
+			&i.Channels,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTeamsForResolve = `-- name: ListTeamsForResolve :many
 SELECT t.id, t.name, t.kind, t.audience, o.name AS organization_name, o.type AS organization_type
 FROM teams t LEFT JOIN organizations o ON o.id = t.organization_id
@@ -1500,6 +1675,37 @@ func (q *Queries) ListWindowsForScope(ctx context.Context, arg ListWindowsForSco
 	return items, nil
 }
 
+const nextPolicyStepOrder = `-- name: NextPolicyStepOrder :one
+SELECT COALESCE(max(step_order), 0)::int + 1 FROM escalation_steps WHERE policy_id = $1
+`
+
+func (q *Queries) NextPolicyStepOrder(ctx context.Context, policyID uuid.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, nextPolicyStepOrder, policyID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const renumberPolicySteps = `-- name: RenumberPolicySteps :exec
+UPDATE escalation_steps s SET step_order = x.rn
+FROM (
+  SELECT e.id, row_number() OVER (ORDER BY COALESCE(array_position($1::uuid[], e.id), 0) = 0, array_position($1::uuid[], e.id), e.step_order)::int AS rn
+  FROM escalation_steps e WHERE e.policy_id = $2
+) x
+WHERE s.id = x.id
+`
+
+type RenumberPolicyStepsParams struct {
+	StepIds  []uuid.UUID `json:"step_ids"`
+	PolicyID uuid.UUID   `json:"policy_id"`
+}
+
+// Deja los pasos 1..n: en el orden de step_ids si se da, si no en el actual.
+func (q *Queries) RenumberPolicySteps(ctx context.Context, arg RenumberPolicyStepsParams) error {
+	_, err := q.db.Exec(ctx, renumberPolicySteps, arg.StepIds, arg.PolicyID)
+	return err
+}
+
 const reopenEscalationIncident = `-- name: ReopenEscalationIncident :execrows
 UPDATE escalation_incidents SET closed_at = NULL, closed_by = NULL WHERE id = $1 AND closed_at IS NOT NULL
 `
@@ -1523,6 +1729,16 @@ type SetEscalationIncidentEntryParams struct {
 
 func (q *Queries) SetEscalationIncidentEntry(ctx context.Context, arg SetEscalationIncidentEntryParams) error {
 	_, err := q.db.Exec(ctx, setEscalationIncidentEntry, arg.ID, arg.EntryID)
+	return err
+}
+
+const shiftPolicySteps = `-- name: ShiftPolicySteps :exec
+UPDATE escalation_steps SET step_order = step_order + 100000 WHERE policy_id = $1
+`
+
+// Renumerar en dos pasadas por la restricción única (policy_id, step_order).
+func (q *Queries) ShiftPolicySteps(ctx context.Context, policyID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, shiftPolicySteps, policyID)
 	return err
 }
 
@@ -1580,6 +1796,41 @@ func (q *Queries) UpdatePolicyReminder(ctx context.Context, arg UpdatePolicyRemi
 		&i.TerritorialUnitID,
 		&i.Active,
 		&i.Reminder,
+	)
+	return i, err
+}
+
+const updatePolicyStep = `-- name: UpdatePolicyStep :one
+UPDATE escalation_steps SET team_id = $1, mode = $2,
+  wait_before_escalate_minutes = $3, title = $4
+WHERE id = $5 RETURNING id, policy_id, step_order, team_id, mode, wait_before_escalate_minutes, title
+`
+
+type UpdatePolicyStepParams struct {
+	TeamID                    uuid.UUID      `json:"team_id"`
+	Mode                      EscalationMode `json:"mode"`
+	WaitBeforeEscalateMinutes int32          `json:"wait_before_escalate_minutes"`
+	Title                     pgtype.Text    `json:"title"`
+	ID                        uuid.UUID      `json:"id"`
+}
+
+func (q *Queries) UpdatePolicyStep(ctx context.Context, arg UpdatePolicyStepParams) (EscalationStep, error) {
+	row := q.db.QueryRow(ctx, updatePolicyStep,
+		arg.TeamID,
+		arg.Mode,
+		arg.WaitBeforeEscalateMinutes,
+		arg.Title,
+		arg.ID,
+	)
+	var i EscalationStep
+	err := row.Scan(
+		&i.ID,
+		&i.PolicyID,
+		&i.StepOrder,
+		&i.TeamID,
+		&i.Mode,
+		&i.WaitBeforeEscalateMinutes,
+		&i.Title,
 	)
 	return i, err
 }

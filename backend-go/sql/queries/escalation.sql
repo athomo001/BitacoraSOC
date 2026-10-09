@@ -37,13 +37,13 @@ INSERT INTO escalation_policies (service_id, asset_id, territorial_unit_id) VALU
 DELETE FROM escalation_policies WHERE id = $1;
 
 -- name: ListPolicySteps :many
-SELECT st.*, t.name AS team_name FROM escalation_steps st JOIN teams t ON t.id = st.team_id
+SELECT st.*, t.name AS team_name, t.kind AS team_kind FROM escalation_steps st JOIN teams t ON t.id = st.team_id
 WHERE st.policy_id = ANY(sqlc.arg('policy_ids')::uuid[])
 ORDER BY st.policy_id, st.step_order;
 
 -- name: AddPolicyStep :one
-INSERT INTO escalation_steps (policy_id, step_order, team_id, mode, wait_before_escalate_minutes)
-VALUES ($1, $2, $3, $4, $5) RETURNING *;
+INSERT INTO escalation_steps (policy_id, step_order, team_id, mode, wait_before_escalate_minutes, title)
+VALUES ($1, $2, $3, $4, $5, sqlc.narg('title')) RETURNING *;
 
 -- name: DeletePolicyStep :execrows
 DELETE FROM escalation_steps WHERE policy_id = $1 AND step_order = $2;
@@ -271,3 +271,58 @@ WHERE n.incident_id = $1 ORDER BY n.created_at;
 
 -- name: SetEscalationIncidentEntry :exec
 UPDATE escalation_incidents SET entry_id = $2 WHERE id = $1;
+
+-- ===== Llamados dentro de la política (000030) =====
+
+-- name: ListStepMembers :many
+-- Personas de los grupos de los pasos: usuario, contacto del Directorio o pool.
+SELECT m.id, m.team_id, m.user_id, m.contact_id, m.pool_id, m.priority,
+  COALESCE(NULLIF(u.full_name, ''), u.username, c.name, p.name, '')::text AS display_name,
+  CASE WHEN m.user_id IS NOT NULL THEN 'user' WHEN m.contact_id IS NOT NULL THEN 'contact' ELSE 'pool' END::text AS member_kind,
+  COALESCE((SELECT string_agg(DISTINCT ch.channel_type::text, ',') FROM contact_channels ch WHERE ch.contact_id = m.contact_id), '')::text AS channels
+FROM team_members m
+LEFT JOIN users u ON u.id = m.user_id
+LEFT JOIN contacts c ON c.id = m.contact_id
+LEFT JOIN escalation_pools p ON p.id = m.pool_id
+WHERE m.team_id = ANY(sqlc.arg('team_ids')::uuid[]) AND m.active
+ORDER BY m.team_id, m.priority, display_name;
+
+-- name: GetPolicyStep :one
+SELECT st.*, t.kind AS team_kind FROM escalation_steps st JOIN teams t ON t.id = st.team_id
+WHERE st.id = sqlc.arg('id') AND st.policy_id = sqlc.arg('policy_id');
+
+-- name: GetPolicyStepByOrder :one
+SELECT st.*, t.kind AS team_kind FROM escalation_steps st JOIN teams t ON t.id = st.team_id
+WHERE st.policy_id = sqlc.arg('policy_id') AND st.step_order = sqlc.arg('step_order');
+
+-- name: NextPolicyStepOrder :one
+SELECT COALESCE(max(step_order), 0)::int + 1 FROM escalation_steps WHERE policy_id = $1;
+
+-- name: CreateStepTeam :one
+-- Sin organización: el grupo es de la política, no de un cliente.
+INSERT INTO teams (name, slug, kind, audience) VALUES (sqlc.arg('name'), sqlc.arg('slug'), 'step', 'client') RETURNING id;
+
+-- name: ClearTeamMembers :exec
+DELETE FROM team_members WHERE team_id = $1;
+
+-- name: UpdatePolicyStep :one
+UPDATE escalation_steps SET team_id = sqlc.arg('team_id'), mode = sqlc.arg('mode'),
+  wait_before_escalate_minutes = sqlc.arg('wait_before_escalate_minutes'), title = sqlc.narg('title')
+WHERE id = sqlc.arg('id') RETURNING *;
+
+-- name: DeleteStepTeam :exec
+-- Solo grupos de paso: un equipo real nunca se borra al quitar un llamado.
+DELETE FROM teams WHERE id = $1 AND kind = 'step';
+
+-- name: ShiftPolicySteps :exec
+-- Renumerar en dos pasadas por la restricción única (policy_id, step_order).
+UPDATE escalation_steps SET step_order = step_order + 100000 WHERE policy_id = $1;
+
+-- name: RenumberPolicySteps :exec
+-- Deja los pasos 1..n: en el orden de step_ids si se da, si no en el actual.
+UPDATE escalation_steps s SET step_order = x.rn
+FROM (
+  SELECT e.id, row_number() OVER (ORDER BY COALESCE(array_position(sqlc.arg('step_ids')::uuid[], e.id), 0) = 0, array_position(sqlc.arg('step_ids')::uuid[], e.id), e.step_order)::int AS rn
+  FROM escalation_steps e WHERE e.policy_id = sqlc.arg('policy_id')
+) x
+WHERE s.id = x.id;

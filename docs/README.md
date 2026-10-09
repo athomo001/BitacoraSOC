@@ -37,3 +37,4 @@
 
 - [CHANGELOG](history/CHANGELOG.md): qué se construyó en cada etapa.
 - [ISSUES](history/ISSUES.md): plan de trabajo y control de tareas del legacy (histórico).
+- [Pendientes cerrados](history/pendientes-cerrados.md): lo que salió de `spec/12-pendientes.md` al quedar hecho o decidido.

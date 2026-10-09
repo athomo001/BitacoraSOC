@@ -1,0 +1,81 @@
+@if (error(); as e) { <p class="adm-error" role="alert">{{ e }}</p> }
+
+<div class="st">
+  @for (s of policy().steps; track s.id; let first = $first; let last = $last) {
+    <div class="st__card">
+      <div class="st__head">
+        <span class="st__n">{{ s.stepOrder }}</span>
+        <input class="adm-input st__title" [attr.aria-label]="i18n.t('steps.title')" [ngModel]="s.title" (blur)="setTitle(s, $any($event.target).value)" (keydown.enter)="$any($event.target).blur()" [disabled]="busy()" />
+        <span class="st__seg" role="group" [attr.aria-label]="i18n.t('steps.source')">
+          <button type="button" class="seg" [attr.aria-pressed]="s.ownPeople" [disabled]="busy()" (click)="setSource(s, true)">{{ i18n.t('steps.people') }}</button>
+          <button type="button" class="seg" [attr.aria-pressed]="!s.ownPeople" [disabled]="busy() || !teams().length" (click)="setSource(s, false)">{{ i18n.t('steps.team') }}</button>
+        </span>
+        <span class="st__tools">
+          <label class="st__wait">
+            <span class="adm-small adm-muted">{{ i18n.t('steps.waitLabel') }}</span>
+            <input class="adm-input mono" type="number" min="0" [ngModel]="s.waitBeforeEscalateMinutes" (blur)="setWait(s, $any($event.target).value)" (keydown.enter)="$any($event.target).blur()" [disabled]="busy()" [attr.aria-label]="i18n.t('escAdmin.waitMin')" />
+            <span class="adm-small adm-muted">min</span>
+          </label>
+          <button type="button" class="adm-icon-btn" [disabled]="busy() || first" [attr.aria-label]="i18n.t('steps.up')" (click)="move(s, -1)"><mat-icon>arrow_upward</mat-icon></button>
+          <button type="button" class="adm-icon-btn" [disabled]="busy() || last" [attr.aria-label]="i18n.t('steps.down')" (click)="move(s, 1)"><mat-icon>arrow_downward</mat-icon></button>
+          <button type="button" class="adm-icon-btn adm-icon-btn--danger" [disabled]="busy()" [attr.aria-label]="i18n.t('steps.remove') + ' ' + s.title" (click)="remove(s)"><mat-icon>delete_outline</mat-icon></button>
+        </span>
+      </div>
+
+      @if (s.ownPeople) {
+        <div class="st__people">
+          @for (m of s.members; track m.id) {
+            <span class="st__chip">
+              <mat-icon>{{ m.kind === 'pool' ? 'groups' : 'person' }}</mat-icon>
+              <strong>{{ m.name }}</strong>
+              @if (m.kind === 'pool') { <span class="adm-small adm-muted">{{ i18n.t('steps.pool') }}</span> }
+              @for (c of m.channels; track c) { <span class="adm-small adm-muted">{{ i18n.t(channelKey(c)) }}</span> }
+              <button type="button" class="st__x" [disabled]="busy()" [attr.aria-label]="i18n.t('steps.removePerson') + ' ' + m.name" (click)="removeMember(s, m.refId)"><mat-icon>close</mat-icon></button>
+            </span>
+          } @empty {
+            <span class="adm-small st__nobody">{{ i18n.t('steps.nobody') }}</span>
+          }
+          <span class="st__pick">
+            <button type="button" class="adm-btn" [disabled]="busy()" (click)="openPicker(s)"><mat-icon>person_add</mat-icon>{{ i18n.t('steps.addPerson') }}</button>
+            @if (pickingId() === s.id) {
+              <div class="st__menu">
+                <input class="adm-input" type="search" [placeholder]="i18n.t('steps.searchHint')" [attr.aria-label]="i18n.t('steps.addPerson')" [ngModel]="query()" (ngModelChange)="search($event)" (keydown.escape)="pickingId.set(null)" />
+                @for (o of options(); track o.id) {
+                  <button type="button" class="st__opt" (click)="pick(s, o)"><strong>{{ o.name }}</strong><span class="adm-small adm-muted">{{ o.detail }}</span></button>
+                } @empty {
+                  <span class="adm-small adm-muted st__hint">{{ i18n.t(query().trim().length < 2 ? 'steps.typeTwo' : 'steps.noMatch') }}</span>
+                }
+              </div>
+            }
+          </span>
+        </div>
+        @if (s.members.length > 1) {
+          <div class="st__mode">
+            <label class="adm-small adm-muted">{{ i18n.t('steps.manyPeople') }}
+              <select class="adm-input" [ngModel]="s.mode" (ngModelChange)="setMode(s, $event)" [disabled]="busy()">
+                @for (m of modes; track m) { <option [value]="m">{{ i18n.t(modeKey(m)) }}</option> }
+              </select>
+            </label>
+            <span class="adm-hint">{{ i18n.t(modeHintKey(s.mode)) }}</span>
+          </div>
+        }
+      } @else {
+        <div class="st__team">
+          <select class="adm-input" [attr.aria-label]="i18n.t('escAdmin.team')" [ngModel]="s.teamId" (ngModelChange)="setTeam(s, $event)" [disabled]="busy()">
+            @for (t of teams(); track t.id) { <option [value]="t.id">{{ t.name }}{{ t.organizationName ? ' — ' + t.organizationName : '' }}</option> }
+          </select>
+          <select class="adm-input st__mode-select" [attr.aria-label]="i18n.t('escAdmin.mode')" [ngModel]="s.mode" (ngModelChange)="setMode(s, $event)" [disabled]="busy()">
+            @for (m of modes; track m) { <option [value]="m">{{ i18n.t(modeKey(m)) }}</option> }
+          </select>
+          <span class="adm-hint">{{ i18n.t(modeHintKey(s.mode)) }}</span>
+        </div>
+      }
+    </div>
+  } @empty {
+    <p class="adm-empty">{{ i18n.t('escAdmin.noSteps') }}</p>
+  }
+  <div class="st__foot">
+    <span class="adm-hint">{{ i18n.t('steps.footHint') }}</span>
+    <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy()" (click)="add()"><mat-icon>add</mat-icon>{{ i18n.t('steps.add') }}</button>
+  </div>
+</div>

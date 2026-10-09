@@ -69,46 +69,7 @@
         </label>
         <button type="submit" class="adm-btn" [disabled]="busy() || reminder().trim() === (p.reminder ?? '')"><mat-icon>save</mat-icon>{{ i18n.t('admin.save') }}</button>
       </form>
-      <div class="adm-table-wrap">
-        <table class="adm-table">
-          <thead><tr><th class="adm-num">{{ i18n.t('escAdmin.step') }}</th><th>{{ i18n.t('escAdmin.team') }}</th><th>{{ i18n.t('escAdmin.mode') }}</th><th class="adm-num">{{ i18n.t('escAdmin.wait') }}</th><th></th></tr></thead>
-          <tbody>
-            @for (s of p.steps; track s.stepOrder) {
-              <tr>
-                <td class="mono adm-num">{{ s.stepOrder }}</td>
-                <td><strong>{{ s.teamName }}</strong></td>
-                <td><span class="pill tone-neutral">{{ i18n.t(modeKey(s.mode)) }}</span></td>
-                <td class="mono adm-num">{{ s.waitBeforeEscalateMinutes }} min</td>
-                <td class="adm-num">
-                  <button type="button" class="adm-icon-btn adm-icon-btn--danger" [disabled]="busy()" [title]="i18n.t('teams.remove')" [attr.aria-label]="i18n.t('teams.remove') + ' ' + s.stepOrder" (click)="deleteStep(p, s.stepOrder)"><mat-icon>close</mat-icon></button>
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-        @if (!p.steps.length) { <p class="adm-empty">{{ i18n.t('escAdmin.noSteps') }}</p> }
-      </div>
-      <form class="adm-card__body ea__step-form" (ngSubmit)="addStep(p)">
-        <div class="adm-row">
-          <label class="adm-field adm-field--narrow"><span class="adm-label">{{ i18n.t('escAdmin.step') }}</span><input class="adm-input mono" name="stepOrder" type="number" min="1" [ngModel]="stepOrder()" (ngModelChange)="stepOrder.set(+$event)" /></label>
-          <label class="adm-field">
-            <span class="adm-label">{{ i18n.t('escAdmin.team') }}</span>
-            <select class="adm-input" name="stepTeam" [ngModel]="stepTeam()" (ngModelChange)="stepTeam.set($event)">
-              <option value="">{{ i18n.t('teams.pick') }}</option>
-              @for (t of teams(); track t.id) { <option [value]="t.id">{{ t.name }}{{ t.organizationName ? ' — ' + t.organizationName : '' }}</option> }
-            </select>
-          </label>
-          <label class="adm-field">
-            <span class="adm-label">{{ i18n.t('escAdmin.mode') }}</span>
-            <select class="adm-input" name="stepMode" [ngModel]="stepMode()" (ngModelChange)="stepMode.set($event)">
-              @for (m of modes; track m) { <option [value]="m">{{ i18n.t(modeKey(m)) }}</option> }
-            </select>
-          </label>
-          <label class="adm-field adm-field--narrow"><span class="adm-label">{{ i18n.t('escAdmin.waitMin') }}</span><input class="adm-input mono" name="stepWait" type="number" min="0" [ngModel]="stepWait()" (ngModelChange)="stepWait.set(+$event)" /></label>
-        </div>
-        <p class="adm-hint">{{ i18n.t(modeHintKey(stepMode())) }}</p>
-        <div class="ea__actions"><button type="submit" class="adm-btn adm-btn--primary" [disabled]="busy() || !stepTeam()"><mat-icon>add</mat-icon>{{ i18n.t('escAdmin.addStep') }}</button></div>
-      </form>
+      <app-escalation-steps [policy]="p" [teams]="teams()" [pools]="pools()" (changed)="replacePolicy($event)" />
     } @else {
       <p class="adm-empty">{{ i18n.t(policies().length ? 'escAdmin.pickPolicy' : 'escAdmin.noPoliciesYet') }}</p>
     }

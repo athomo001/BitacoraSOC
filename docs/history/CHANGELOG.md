@@ -4,6 +4,28 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] Equipos: llamados dentro de la política, acciones en lote y borrado - 2026-10-07
+
+- **Problema (dueño):** al restaurar el respaldo del legacy, Equipos se llenaba de "DPP · 1er Llamado", "DPP · 2er Llamado"… (el ETL creaba un equipo por cada llamado), no se podían borrar, y los equipos de una organización desactivada seguían ahí. Diseño aprobado en el canvas (artboard "Equipos y llamados de escalamiento", v32).
+- **Llamados dentro de la política** (migración `000030`):
+  - Cada paso tiene título ("1er llamado") y avisa a sus propias **personas del Directorio** (o a un pool con nombre), o a un **equipo real** (guardia, contrata).
+  - El grupo de personas de un paso (`teams.kind = 'step'`) no tiene organización, no aparece en Equipos y se borra con su paso (trigger).
+  - La migración convierte los datos ya restaurados: 19 de 20 pasos pasaron a ser llamados propios; el que queda como equipo tiene un ticket asignado. Los equipos que compartían varios servicios se copiaron, uno por paso, para poder editarlos por separado. El primer paso del ETL se titula "Aviso por correo (PARA y CC)".
+  - **Administración → Escalamiento:** tarjetas por llamado con nombre, personas (búsqueda en el Directorio y pools), o un equipo; modo con varias personas; espera; subir y bajar; quitar; agregar. Cada cambio se guarda al momento. La resolución muestra el título del llamado.
+- **Equipos:**
+  - Agrupados por organización, con filtro por tipo, búsqueda y qué usa cada equipo (políticas, RACI, guardias, tickets).
+  - Selección por fila o por organización y acciones en lote: **Activar, Desactivar, Borrar**.
+  - Borrar avisa antes qué se lleva y, si se confirma, borra en cascada (llamados, RACI, guardias con sus turnos y reemplazos, integrantes, cobertura). Los tickets quedan sin equipo y **los contactos del Directorio no se tocan**. "Solo desactivar" como alternativa. Las políticas que pierden un llamado se renumeran.
+  - La lista va a todo el ancho; el detalle se abre al lado al elegir un equipo.
+- **Organización desactivada → sus equipos también** (`teams.deactivated_by_org`): se ocultan (filtro para verlos) y al reactivarla vuelven solo los que ella apagó.
+- **ETL:** crea los llamados así desde el principio. Con el respaldo de prueba, Equipos baja de 38 a 19 (avisos preventivos, guardias y RACI).
+- **API:** `PUT /api/escalation/policies/{id}/steps/{stepId}`, `POST /api/escalation/policies/{id}/steps/reorder` y `POST /api/teams/bulk`. `POST …/steps` acepta personas o equipo y devuelve la política. `GET /api/teams` trae `usage`, `organizationActive` y `deactivatedByOrg`.
+- **Verificación:**
+  - Contra Postgres: 24/24 (agregar, editar, reordenar y borrar llamados; usar un equipo real; no se puede usar el grupo de otro llamado; org desactivada y reactivada; activar, desactivar y borrar en cascada; sin grupos huérfanos). Datos de prueba borrados.
+  - Frontend: 261/261 pruebas; Go: todas en verde.
+  - Capturas en ES/EN, claro y oscuro, sin scroll horizontal.
+- **Canvas:** a pedido del dueño quedó solo con lo pendiente (v33). La versión completa está en `respaldos/canvas-v32-completo.html` y en el historial del artifact.
+
 ## [Rewrite] Documentación nueva - 2026-10-07
 
 - README reescrito: qué hace, inicio rápido, cómo está hecho y un mapa de la documentación.

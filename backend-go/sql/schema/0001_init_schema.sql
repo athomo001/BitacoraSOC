@@ -1575,3 +1575,6 @@ ALTER TABLE rotation_cycles ADD COLUMN must_be_covered BOOLEAN NOT NULL DEFAULT 
 UPDATE rotation_cycles c SET must_be_covered = true
 FROM teams t
 WHERE t.id = c.team_id AND t.name IN ('Guardia N2', 'Guardia N1_NO_HABIL');
+
+ALTER TABLE escalation_steps ADD COLUMN title TEXT;
+ALTER TABLE teams ADD COLUMN deactivated_by_org BOOLEAN NOT NULL DEFAULT false;

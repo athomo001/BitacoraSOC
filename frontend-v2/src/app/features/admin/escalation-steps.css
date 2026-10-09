@@ -1,0 +1,192 @@
+:host {
+  display: block;
+}
+
+mat-icon {
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+}
+
+.st {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.st__card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+}
+
+.st__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.st__n {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.st__title {
+  flex: 1 1 160px;
+  max-width: 260px;
+}
+
+.st__seg {
+  display: flex;
+  gap: 4px;
+}
+
+.st__tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.st__wait {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 6px;
+}
+
+.st__wait .adm-input {
+  width: 64px;
+  text-align: center;
+}
+
+.st__people {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.st__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px 3px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface-hover);
+  font-size: 12px;
+}
+
+.st__chip mat-icon {
+  color: var(--text-muted);
+}
+
+.st__x {
+  display: flex;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.st__x:hover {
+  color: var(--status-critical);
+}
+
+.st__nobody {
+  color: var(--status-warning);
+}
+
+.st__pick {
+  position: relative;
+}
+
+.st__menu {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 4px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: min(320px, 80vw);
+  padding: 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 30%);
+}
+
+.st__opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.st__opt:hover,
+.st__opt:focus-visible {
+  background: var(--bg-surface-hover);
+}
+
+.st__opt .adm-small {
+  margin-left: auto;
+}
+
+.st__hint {
+  padding: 6px 8px;
+}
+
+.st__mode,
+.st__team {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.st__mode label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.st__team > .adm-input:first-child {
+  flex: 0 1 300px;
+}
+
+.st__mode-select {
+  flex: 0 1 220px;
+}
+
+.st__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.st__foot .adm-btn {
+  margin-left: auto;
+}

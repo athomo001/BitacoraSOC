@@ -128,7 +128,7 @@ docker compose up -d
 curl -s http://127.0.0.1:8081/api/health/ready
 ```
 
-- **Qué migraciones faltan:** `migrate … version` muestra la versión actual. La última de este repositorio es `000029_guard_timeline`.
+- **Qué migraciones faltan:** `migrate … version` muestra la versión actual. La última de este repositorio es `000030_step_teams`.
 - **Volver atrás una migración:** `migrate … down 1` ejecuta el `down.sql` de la última. Algunas migraciones reordenan datos: prueba primero sobre una copia.
 - **Volver atrás la versión completa:** vuelve al código anterior (`git checkout <tag>`), baja las migraciones que agregó la versión nueva y reconstruye. Si algo sale mal, restaura la copia del paso 1.
 

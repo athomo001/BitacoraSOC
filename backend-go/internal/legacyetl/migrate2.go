@@ -136,11 +136,13 @@ func (m *Migrator) migrateEscalation(ctx context.Context) error {
 		svcs = append(svcs, s)
 	}
 	sort.Slice(svcs, func(i, j int) bool { return svcs[i].String() < svcs[j].String() })
-	teams, policies := 0, 0
+	policies := 0
 	for _, svc := range svcs {
 		org := orgOf(svc)
+		// El aviso es el primer llamado de la política: grupo propio del paso
+		// (kind 'step', sin organización), no un equipo suelto en Equipos.
 		team := ID("teams", "escalation:"+svc.String())
-		if err := m.createTeam(ctx, team, org, serviceName[svc]+" · "+orgName(org), "escalation", "client"); err != nil {
+		if err := m.createTeam(ctx, team, nil, serviceName[svc]+" · "+orgName(org), "step", "client"); err != nil {
 			return err
 		}
 		seen := map[uuid.UUID]bool{}
@@ -159,11 +161,10 @@ func (m *Migrator) migrateEscalation(ctx context.Context) error {
 			return err
 		}
 		// El legacy avisaba a todos los PARA con los CC en copia: modo pool.
-		if _, err := m.tx.Exec(ctx, `INSERT INTO escalation_steps (id, policy_id, step_order, team_id, mode, wait_before_escalate_minutes) VALUES ($1,$2,1,$3,'pool',0)`,
+		if _, err := m.tx.Exec(ctx, `INSERT INTO escalation_steps (id, policy_id, step_order, team_id, mode, wait_before_escalate_minutes, title) VALUES ($1,$2,1,$3,'pool',0,'Aviso por correo (PARA y CC)')`,
 			uuid.New(), policy, team); err != nil {
 			return err
 		}
-		teams++
 		policies++
 	}
 	for svc, list := range preventive {
@@ -183,7 +184,6 @@ func (m *Migrator) migrateEscalation(ctx context.Context) error {
 				return err
 			}
 		}
-		teams++
 	}
 	for org, list := range preventiveByOrg {
 		o := org
@@ -202,11 +202,10 @@ func (m *Migrator) migrateEscalation(ctx context.Context) error {
 				return err
 			}
 		}
-		teams++
 	}
-	step.note("%d equipos y %d políticas de escalación (un paso, avisa a todos los PARA con los CC en copia)", teams, policies)
+	step.note("%d políticas de escalación: su llamado 1 avisa por correo a todos los PARA con los CC en copia", policies)
 	if n := len(preventive) + len(preventiveByOrg); n > 0 {
-		step.note("%d de esos equipos son de avisos preventivos (sin política: se usan desde Equipos)", n)
+		step.note("%d equipos de avisos preventivos (sin política: se usan desde Equipos)", n)
 	}
 
 	return nil

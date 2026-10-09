@@ -157,7 +157,7 @@ func run(logger *slog.Logger) error {
 	directoryHandler := &handler.DirectoryHandler{Pool: pool, Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
 	smtpConfigHandler := &handler.SMTPConfigHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
 	escalationHandler := &handler.EscalationHandler{DB: pool, Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, Modules: &repository.ModuleAccess{Queries: queries}}
-	teamsHandler := &handler.TeamsHandler{Queries: queries, AuditLog: auditLog, NOCEnabled: func(r *http.Request) bool {
+	teamsHandler := &handler.TeamsHandler{Pool: pool, Queries: queries, AuditLog: auditLog, NOCEnabled: func(r *http.Request) bool {
 		flags, err := (&repository.ModuleAccess{Queries: queries}).InstanceFlags(r.Context())
 		return err == nil && flags.NOC
 	}}
@@ -386,6 +386,7 @@ func run(logger *slog.Logger) error {
 	mux.Handle("GET /api/teams/{id}", authed(teamsHandler.Get))
 	mux.Handle("POST /api/teams", admin(teamsHandler.Create))
 	mux.Handle("PATCH /api/teams/{id}", admin(teamsHandler.Patch))
+	mux.Handle("POST /api/teams/bulk", admin(teamsHandler.Bulk))
 	mux.Handle("POST /api/teams/{id}/members", admin(teamsHandler.AddMember))
 	mux.Handle("DELETE /api/teams/{id}/members/{memberId}", admin(teamsHandler.RemoveMember))
 	mux.Handle("GET /api/teams/{id}/coverage", nocAuthed(teamsHandler.ListCoverage))
@@ -426,6 +427,8 @@ func run(logger *slog.Logger) error {
 	mux.Handle("PUT /api/escalation/pools/{id}/members", admin(escalationHandler.PutPoolMembers))
 	mux.Handle("POST /api/escalation/policies/{id}/steps", admin(escalationHandler.AddStep))
 	mux.Handle("DELETE /api/escalation/policies/{id}/steps/{stepOrder}", admin(escalationHandler.DeleteStep))
+	mux.Handle("PUT /api/escalation/policies/{id}/steps/{stepId}", admin(escalationHandler.UpdateStep))
+	mux.Handle("POST /api/escalation/policies/{id}/steps/reorder", admin(escalationHandler.ReorderSteps))
 	mux.Handle("GET /api/maintenance-windows", authed(escalationHandler.ListWindows))
 	// Las mantenciones también las programa el analista (comentario del dueño #16).
 	mux.Handle("POST /api/maintenance-windows", operator(escalationHandler.CreateWindow))

@@ -188,6 +188,8 @@ type resolutionDTO struct {
 	unitPath []uuid.UUID       // camino territorial (para ventanas de mantenimiento)
 	steps    []escalation.Step // lo mismo en el modelo puro (para Next/Recipients)
 	members  map[uuid.UUID]memberInfo
+	// stepTitles: el nombre del llamado ("1er llamado") por orden, si tiene.
+	stepTitles map[int32]string
 }
 
 type memberInfo struct {
@@ -326,6 +328,12 @@ func (h *EscalationHandler) resolve(ctx context.Context, s scope) (*resolutionDT
 		}
 		for _, st := range rows {
 			steps = append(steps, escalation.Step{Order: st.StepOrder, TeamID: st.TeamID, Mode: escalation.Mode(st.Mode), WaitMinutes: st.WaitBeforeEscalateMinutes})
+			if title := strings.TrimSpace(st.Title.String); title != "" {
+				if res.stepTitles == nil {
+					res.stepTitles = map[int32]string{}
+				}
+				res.stepTitles[st.StepOrder] = title
+			}
 		}
 	} else {
 		steps = escalation.CoverageSteps(choice.Coverage)
@@ -421,6 +429,9 @@ func (h *EscalationHandler) fillSteps(ctx context.Context, res *resolutionDTO, s
 	for _, st := range steps {
 		t := teamByID[st.TeamID]
 		teamDTO := resolvedTeamDTO{ID: t.ID, Name: t.Name, Kind: t.Kind, Audience: string(t.Audience), Members: []resolvedMemberDTO{}}
+		if title, ok := res.stepTitles[st.Order]; ok {
+			teamDTO.Name = title
+		}
 		if t.OrganizationName.Valid {
 			teamDTO.Organization = &struct {
 				Name string `json:"name"`
@@ -1022,14 +1033,6 @@ func (h *EscalationHandler) CreateService(w http.ResponseWriter, r *http.Request
 
 // ===== Políticas y pasos =====
 
-type policyStepDTO struct {
-	StepOrder                 int32     `json:"stepOrder"`
-	TeamID                    uuid.UUID `json:"teamId"`
-	TeamName                  string    `json:"teamName"`
-	Mode                      string    `json:"mode"`
-	WaitBeforeEscalateMinutes int32     `json:"waitBeforeEscalateMinutes"`
-}
-
 type policyDTO struct {
 	ID                uuid.UUID       `json:"id"`
 	ServiceID         *uuid.UUID      `json:"serviceId,omitempty"`
@@ -1038,32 +1041,6 @@ type policyDTO struct {
 	Active            bool            `json:"active"`
 	Steps             []policyStepDTO `json:"steps"`
 	Reminder          *string         `json:"reminder,omitempty"`
-}
-
-func (h *EscalationHandler) policiesWithSteps(ctx context.Context, policies []db.EscalationPolicy) ([]policyDTO, error) {
-	ids := make([]uuid.UUID, 0, len(policies))
-	for _, p := range policies {
-		ids = append(ids, p.ID)
-	}
-	steps := map[uuid.UUID][]policyStepDTO{}
-	if len(ids) > 0 {
-		rows, err := h.Queries.ListPolicySteps(ctx, ids)
-		if err != nil {
-			return nil, err
-		}
-		for _, s := range rows {
-			steps[s.PolicyID] = append(steps[s.PolicyID], policyStepDTO{StepOrder: s.StepOrder, TeamID: s.TeamID, TeamName: s.TeamName, Mode: string(s.Mode), WaitBeforeEscalateMinutes: s.WaitBeforeEscalateMinutes})
-		}
-	}
-	dtos := make([]policyDTO, 0, len(policies))
-	for _, p := range policies {
-		d := policyDTO{ID: p.ID, ServiceID: uuidPtr(p.ServiceID), AssetID: uuidPtr(p.AssetID), TerritorialUnitID: uuidPtr(p.TerritorialUnitID), Active: p.Active, Steps: steps[p.ID], Reminder: textPtr(p.Reminder)}
-		if d.Steps == nil {
-			d.Steps = []policyStepDTO{}
-		}
-		dtos = append(dtos, d)
-	}
-	return dtos, nil
 }
 
 func (h *EscalationHandler) ListPolicies(w http.ResponseWriter, r *http.Request) {
@@ -1133,70 +1110,6 @@ func (h *EscalationHandler) DeletePolicy(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	h.AuditLog.Log(r.Context(), "escalation.policy.delete", audit.LevelWarn, audit.Success(), map[string]any{"policyId": id.String()})
-	writeNoContent(w)
-}
-
-type addStepRequest struct {
-	StepOrder                 int32     `json:"stepOrder"`
-	TeamID                    uuid.UUID `json:"teamId"`
-	Mode                      string    `json:"mode"`
-	WaitBeforeEscalateMinutes int32     `json:"waitBeforeEscalateMinutes"`
-}
-
-func (h *EscalationHandler) AddStep(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	policyID, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "id inválido")
-		return
-	}
-	var req addStepRequest
-	if err := decodeJSON(w, r, &req); err != nil || req.StepOrder < 1 || req.TeamID == uuid.Nil || req.WaitBeforeEscalateMinutes < 0 {
-		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "stepOrder (>= 1), teamId y waitBeforeEscalateMinutes (>= 0) son obligatorios")
-		return
-	}
-	if req.Mode == "" {
-		req.Mode = "unique"
-	}
-	if req.Mode != "unique" && req.Mode != "pool" && req.Mode != "sequential" {
-		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "mode debe ser unique, pool o sequential")
-		return
-	}
-	st, err := h.Queries.AddPolicyStep(ctx, db.AddPolicyStepParams{PolicyID: policyID, StepOrder: req.StepOrder, TeamID: req.TeamID, Mode: db.EscalationMode(req.Mode), WaitBeforeEscalateMinutes: req.WaitBeforeEscalateMinutes})
-	if isUniqueViolation(err) {
-		problemdetails.Write(w, r, http.StatusConflict, "duplicate-step", "ya existe un paso con ese orden en la política")
-		return
-	}
-	if isForeignKeyViolation(err) {
-		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "la política o el equipo no existe")
-		return
-	}
-	if err != nil {
-		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo agregar el paso")
-		return
-	}
-	h.AuditLog.Log(ctx, "escalation.step.create", audit.LevelInfo, audit.Success(), map[string]any{"policyId": policyID.String(), "stepOrder": st.StepOrder})
-	writeData(w, http.StatusCreated, map[string]any{"stepOrder": st.StepOrder, "teamId": st.TeamID, "mode": st.Mode, "waitBeforeEscalateMinutes": st.WaitBeforeEscalateMinutes})
-}
-
-func (h *EscalationHandler) DeleteStep(w http.ResponseWriter, r *http.Request) {
-	policyID, err := uuid.Parse(r.PathValue("id"))
-	var order int32
-	_, errOrder := fmt.Sscan(r.PathValue("stepOrder"), &order)
-	if err != nil || errOrder != nil {
-		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "id o paso inválido")
-		return
-	}
-	n, err := h.Queries.DeletePolicyStep(r.Context(), db.DeletePolicyStepParams{PolicyID: policyID, StepOrder: order})
-	if err != nil {
-		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo borrar el paso")
-		return
-	}
-	if n == 0 {
-		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "paso no encontrado")
-		return
-	}
-	h.AuditLog.Log(r.Context(), "escalation.step.delete", audit.LevelWarn, audit.Success(), map[string]any{"policyId": policyID.String(), "stepOrder": order})
 	writeNoContent(w)
 }
 

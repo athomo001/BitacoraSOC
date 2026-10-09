@@ -187,10 +187,29 @@ export interface Asset {
   territorialUnitId: string;
 }
 
+/** Persona (o pool) de un llamado con personas propias. */
+export interface StepMember { id: string; kind: 'contact' | 'user' | 'pool'; refId: string; name: string; channels: string[]; }
+
+/** Un llamado de la política: sus propias personas (ownPeople) o un equipo real. */
 export interface PolicyStep {
+  id: string;
   stepOrder: number;
+  title: string;
   teamId: string;
   teamName: string;
+  ownPeople: boolean;
+  members: StepMember[];
+  mode: StepMode;
+  waitBeforeEscalateMinutes: number;
+}
+
+/** Lo que se guarda de un llamado: equipo real (teamId) o personas. */
+export interface StepInput {
+  title: string;
+  teamId?: string;
+  contactIds?: string[];
+  userIds?: string[];
+  poolIds?: string[];
   mode: StepMode;
   waitBeforeEscalateMinutes: number;
 }
@@ -367,8 +386,17 @@ export class EscalationService {
     await firstValueFrom(this.http.delete(`/api/escalation/policies/${id}`));
   }
 
-  async addStep(policyId: string, step: { stepOrder: number; teamId: string; mode: StepMode; waitBeforeEscalateMinutes: number }): Promise<void> {
-    await firstValueFrom(this.http.post(`/api/escalation/policies/${policyId}/steps`, step));
+  /** Agrega un llamado al final; devuelve la política actualizada. */
+  async addStep(policyId: string, step: StepInput): Promise<Policy> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<Policy>>(`/api/escalation/policies/${policyId}/steps`, step))).data;
+  }
+
+  async updateStep(policyId: string, stepId: string, step: StepInput): Promise<Policy> {
+    return (await firstValueFrom(this.http.put<ApiEnvelope<Policy>>(`/api/escalation/policies/${policyId}/steps/${stepId}`, step))).data;
+  }
+
+  async reorderSteps(policyId: string, stepIds: string[]): Promise<Policy> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<Policy>>(`/api/escalation/policies/${policyId}/steps/reorder`, { stepIds }))).data;
   }
 
   async deleteStep(policyId: string, stepOrder: number): Promise<void> {

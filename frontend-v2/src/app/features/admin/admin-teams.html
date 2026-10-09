@@ -7,7 +7,8 @@
 
 @if (error(); as e) { <p class="adm-error" role="alert">{{ e }}</p> }
 
-<div class="adm-split">
+<!-- A todo el ancho mientras no hay equipo elegido; al elegir uno, lista y detalle lado a lado. -->
+<div [class.adm-split]="selected()">
   <section class="adm-card">
     <div class="adm-card__head">
       <h3 class="adm-card__title"><mat-icon>groups</mat-icon>{{ i18n.t('admin.nav.teams') }} <span class="mono adm-secondary">{{ teams().length }}</span></h3>
@@ -29,25 +30,58 @@
       </label>
       <button type="submit" class="adm-btn adm-btn--primary" [disabled]="busy() || !teamName().trim()"><mat-icon>add</mat-icon>{{ i18n.t('teams.create') }}</button>
     </form>
-    <div class="adm-table-wrap">
-      <table class="adm-table">
-        <thead><tr><th>{{ i18n.t('teams.col.team') }}</th><th>{{ i18n.t('teams.kind') }}</th><th class="adm-num">{{ i18n.t('teams.col.members') }}</th></tr></thead>
-        <tbody>
-          @for (t of teams(); track t.id) {
-            <tr class="adm-row-click" [class.adm-row--active]="selected()?.id === t.id" tabindex="0" [attr.aria-selected]="selected()?.id === t.id"
-              (click)="select(t)" (keydown.enter)="select(t)">
-              <td>
-                <strong>{{ t.name }}</strong>
-                <span class="adm-small adm-secondary adm-block">{{ t.organizationName || i18n.t('teams.noOrg') }}</span>
-              </td>
-              <td><span class="pill tone-neutral">{{ i18n.t(kindKey(t.kind)) }}</span></td>
-              <td class="mono adm-num">{{ t.memberCount ?? 0 }}</td>
-            </tr>
-          }
-        </tbody>
-      </table>
-      @if (!teams().length) { <p class="adm-empty">{{ i18n.t('teams.empty') }}</p> }
+    <div class="tm__filters">
+      <input class="adm-input tm__find" type="search" [placeholder]="i18n.t('teams.find')" [attr.aria-label]="i18n.t('teams.find')" [ngModel]="find()" (ngModelChange)="find.set($event)" />
+      <span class="tm__kinds" role="group" [attr.aria-label]="i18n.t('teams.kind')">
+        @for (k of kindTabs(); track k.kind) {
+          <button type="button" class="seg" [attr.aria-pressed]="kindFilter() === k.kind" (click)="kindFilter.set(k.kind)">{{ k.kind === 'all' ? i18n.t('teams.allKinds') : i18n.t(kindKey(k.kind)) }} <span class="mono">{{ k.count }}</span></button>
+        }
+      </span>
+      <label class="tm__check adm-small">
+        <input type="checkbox" [checked]="showInactiveOrgs()" (change)="showInactiveOrgs.set(!showInactiveOrgs())" />
+        {{ i18n.t('teams.showInactiveOrgs') }}
+      </label>
     </div>
+    <p class="adm-card__note tm__note"><mat-icon>info</mat-icon>{{ i18n.t('teams.stepsMoved') }} {{ i18n.t(teams().length ? 'teams.pickTeam' : 'teams.createFirst') }}</p>
+
+    @if (selectedIds().length) {
+      <div class="tm__bulk" role="toolbar" [attr.aria-label]="i18n.t('teams.bulk')">
+        <strong>{{ i18n.tf('teams.selectedN', selectedIds().length) }}</strong>
+        <button type="button" class="adm-btn" [disabled]="busy()" (click)="bulk('activate')"><mat-icon>toggle_on</mat-icon>{{ i18n.t('teams.activate') }}</button>
+        <button type="button" class="adm-btn" [disabled]="busy()" (click)="bulk('deactivate')"><mat-icon>toggle_off</mat-icon>{{ i18n.t('teams.deactivate') }}</button>
+        <button type="button" class="adm-btn adm-btn--danger" [disabled]="busy()" (click)="askDelete()"><mat-icon>delete_outline</mat-icon>{{ i18n.t('teams.delete') }}</button>
+        <button type="button" class="adm-btn adm-push" (click)="checked.set({})">{{ i18n.t('teams.clearSelection') }}</button>
+      </div>
+    }
+
+    @for (g of groups(); track g.key) {
+      <div class="tm__group">
+        <div class="tm__group-head">
+          <input type="checkbox" [checked]="g.all" [indeterminate]="g.some && !g.all" (change)="toggleGroup(g.teams, !g.all)" [attr.aria-label]="i18n.t('teams.selectGroup') + ' ' + g.name" />
+          <mat-icon>business</mat-icon>
+          <strong>{{ g.name }}</strong>
+          @if (g.orgInactive) { <span class="pill tone-warn">{{ i18n.t('teams.orgInactive') }}</span> }
+          <span class="adm-small adm-muted adm-push">{{ g.teams.length }}</span>
+        </div>
+        @for (t of g.teams; track t.id) {
+          <div class="tm__row" [class.tm__row--off]="!t.active" [class.adm-row--active]="selected()?.id === t.id">
+            <input type="checkbox" [checked]="!!checked()[t.id]" (change)="toggle(t.id)" [attr.aria-label]="i18n.t('teams.select') + ' ' + t.name" />
+            <button type="button" class="tm__name" [attr.aria-expanded]="selected()?.id === t.id" [title]="usageText(t)" (click)="select(t)">
+              <strong>{{ t.name }}</strong>
+              <span class="adm-small adm-muted">{{ usageText(t) }}</span>
+            </button>
+            <span class="pill tone-neutral">{{ i18n.t(kindKey(t.kind)) }}</span>
+            <span class="mono adm-small adm-muted" [title]="i18n.t('teams.col.members')">{{ t.memberCount ?? 0 }}</span>
+            <label class="switch" [title]="t.deactivatedByOrg ? i18n.t('teams.offByOrg') : ''">
+              <input class="switch__input" type="checkbox" role="switch" [checked]="t.active" [disabled]="busy()" (change)="setActive(t, !t.active)" [attr.aria-label]="i18n.t('teams.activeSwitch') + ' ' + t.name" />
+              <span class="switch__track" aria-hidden="true"></span>
+            </label>
+          </div>
+        }
+      </div>
+    } @empty {
+      <p class="adm-empty">{{ i18n.t('teams.empty') }}</p>
+    }
   </section>
 
   <div class="tm__detail">
@@ -168,8 +202,6 @@
           </div>
         </section>
       }
-    } @else {
-      <section class="adm-card"><p class="adm-empty">{{ i18n.t(teams().length ? 'teams.pickTeam' : 'teams.createFirst') }}</p></section>
     }
   </div>
 </div>

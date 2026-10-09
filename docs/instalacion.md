@@ -90,7 +90,7 @@ migrate -path backend-go/sql/migrations \
 Si cambiaste `POSTGRES_PASSWORD` en `.env`, usa esa contraseña en la URL. La salida termina con la última migración aplicada:
 
 ```text
-29/u guard_timeline (512.3ms)
+30/u step_teams (141.7ms)
 ```
 
 Reinicia la aplicación para que arranque con las tablas ya creadas:

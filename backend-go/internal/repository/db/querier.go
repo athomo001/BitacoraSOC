@@ -46,6 +46,7 @@ type Querier interface {
 	// marcar uno nuevo desmarca el anterior.
 	ClearPreferredContactChannel(ctx context.Context, contactID pgtype.UUID) error
 	ClearPreferredUserChannel(ctx context.Context, userID pgtype.UUID) error
+	ClearTeamMembers(ctx context.Context, teamID uuid.UUID) error
 	ClearTemplateFromShifts(ctx context.Context, checklistTemplateStartID pgtype.UUID) error
 	CloseEscalationIncident(ctx context.Context, arg CloseEscalationIncidentParams) (int64, error)
 	CompleteSetup(ctx context.Context, arg CompleteSetupParams) (AppConfig, error)
@@ -120,6 +121,8 @@ type Querier interface {
 	CreateShiftCheckService(ctx context.Context, arg CreateShiftCheckServiceParams) (ShiftCheckService, error)
 	CreateShiftClosure(ctx context.Context, arg CreateShiftClosureParams) (ShiftClosure, error)
 	CreateShiftReminder(ctx context.Context, arg CreateShiftReminderParams) (ShiftReminder, error)
+	// Sin organización: el grupo es de la política, no de un cliente.
+	CreateStepTeam(ctx context.Context, arg CreateStepTeamParams) (uuid.UUID, error)
 	CreateTeam(ctx context.Context, arg CreateTeamParams) (Team, error)
 	CreateTeamGroup(ctx context.Context, arg CreateTeamGroupParams) (TeamGroup, error)
 	CreateTerritorialUnit(ctx context.Context, arg CreateTerritorialUnitParams) (TerritorialUnit, error)
@@ -132,6 +135,7 @@ type Querier interface {
 	CreateWorkShift(ctx context.Context, arg CreateWorkShiftParams) (WorkShift, error)
 	DeactivateLeftoverMemberships(ctx context.Context, duplicateID pgtype.UUID) error
 	DeactivateMaintenanceWindow(ctx context.Context, id uuid.UUID) (int64, error)
+	DeactivateOrganizationTeams(ctx context.Context, organizationID pgtype.UUID) (int64, error)
 	// DELETE /api/users/:id se implementa como soft-delete (active=false), no
 	// DELETE real: audit_log.actor_user_id referencia a users(id) sin ON DELETE
 	// CASCADE (a propósito, es append-only e inmutable) — borrar de verdad a un
@@ -166,6 +170,7 @@ type Querier interface {
 	DeletePendingTicketImage(ctx context.Context, arg DeletePendingTicketImageParams) (int64, error)
 	DeletePolicy(ctx context.Context, id uuid.UUID) (int64, error)
 	DeletePolicyStep(ctx context.Context, arg DeletePolicyStepParams) (int64, error)
+	DeleteRaciOfTeams(ctx context.Context, ids []uuid.UUID) (int64, error)
 	DeleteReportEvent(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteReportHistory(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteReportOperationType(ctx context.Context, id uuid.UUID) (int64, error)
@@ -177,11 +182,19 @@ type Querier interface {
 	DeleteShiftReminder(ctx context.Context, id uuid.UUID) (int64, error)
 	// Subidas que nunca llegaron a un comentario (se cerró la pestaña).
 	DeleteStaleTicketImages(ctx context.Context) error
+	// Solo grupos de paso: un equipo real nunca se borra al quitar un llamado.
+	DeleteStepTeam(ctx context.Context, id uuid.UUID) error
+	DeleteStepsOfTeams(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error)
+	DeleteTeamCycles(ctx context.Context, ids []uuid.UUID) error
+	// Guardias de esos equipos: reemplazos, turnos y ciclos (los turnos de
+	// trabajo enlazados quedan sin ciclo).
+	DeleteTeamGuards(ctx context.Context, ids []uuid.UUID) error
 	// Antes de borrar un equipo sin tickets ni rotaciones: lo saca de los
 	// escalamientos y del RACI (integrantes y cobertura caen con él).
 	DeleteTeamRaci(ctx context.Context, teamID uuid.UUID) error
 	DeleteTeamSteps(ctx context.Context, teamID uuid.UUID) error
 	DeleteTeamWithoutHistory(ctx context.Context, arg DeleteTeamWithoutHistoryParams) (int64, error)
+	DeleteTeams(ctx context.Context, ids []uuid.UUID) (int64, error)
 	DeleteTicket(ctx context.Context, id uuid.UUID) (string, error)
 	DeleteUserChannel(ctx context.Context, arg DeleteUserChannelParams) (int64, error)
 	DeleteWorkShiftMember(ctx context.Context, arg DeleteWorkShiftMemberParams) (int64, error)
@@ -258,6 +271,8 @@ type Querier interface {
 	GetPermissionGroup(ctx context.Context, id uuid.UUID) (PermissionGroup, error)
 	GetPersonalNotes(ctx context.Context, userID uuid.UUID) (PersonalNote, error)
 	GetPolicy(ctx context.Context, id uuid.UUID) (EscalationPolicy, error)
+	GetPolicyStep(ctx context.Context, arg GetPolicyStepParams) (GetPolicyStepRow, error)
+	GetPolicyStepByOrder(ctx context.Context, arg GetPolicyStepByOrderParams) (GetPolicyStepByOrderRow, error)
 	// ===== Enlace público TV (slug fijo 'telework', sin UNIQUE en slug: se
 	// resuelve la fila existente en el handler antes de decidir INSERT/UPDATE) =====
 	GetPublicShareBySlug(ctx context.Context, slug string) (PublicShareLink, error)
@@ -484,6 +499,9 @@ type Querier interface {
 	// Recordatorios de turno por correo (spec/12-pendientes.md §2.3b).
 	// Con el último envío de cada uno, para la tabla de Administración → Turnos.
 	ListShiftReminders(ctx context.Context) ([]ListShiftRemindersRow, error)
+	// ===== Llamados dentro de la política (000030) =====
+	// Personas de los grupos de los pasos: usuario, contacto del Directorio o pool.
+	ListStepMembers(ctx context.Context, teamIds []uuid.UUID) ([]ListStepMembersRow, error)
 	// Reposición tras reconexión: todo lo publicado después de Last-Event-ID.
 	ListSystemEventsSince(ctx context.Context, arg ListSystemEventsSinceParams) ([]SystemEvent, error)
 	ListSystemFeatures(ctx context.Context) ([]SystemFeature, error)
@@ -492,6 +510,9 @@ type Querier interface {
 	// Un miembro es un usuario interno O un contacto del directorio (CHECK
 	// exactamente uno): se devuelve el nombre de cualquiera de los dos.
 	ListTeamMembers(ctx context.Context, teamID uuid.UUID) ([]ListTeamMembersRow, error)
+	// Los grupos de un paso de escalamiento (kind 'step', 000030) son parte de
+	// su política: no se listan salvo que se pidan con kind=step. Cada equipo
+	// trae qué lo usa, para avisar antes de borrar.
 	ListTeams(ctx context.Context, arg ListTeamsParams) ([]ListTeamsRow, error)
 	ListTeamsForResolve(ctx context.Context, teamIds []uuid.UUID) ([]ListTeamsForResolveRow, error)
 	// GET /api/territorial-units — ?parentId= devuelve un nivel (hijos directos);
@@ -567,6 +588,7 @@ type Querier interface {
 	MoveTicketImages(ctx context.Context, arg MoveTicketImagesParams) error
 	MoveTicketTasks(ctx context.Context, arg MoveTicketTasksParams) error
 	MoveTicketToOrganization(ctx context.Context, arg MoveTicketToOrganizationParams) (int64, error)
+	NextPolicyStepOrder(ctx context.Context, policyID uuid.UUID) (int32, error)
 	PatchEntry(ctx context.Context, arg PatchEntryParams) (Entry, error)
 	PatchNotificationSchedule(ctx context.Context, arg PatchNotificationScheduleParams) (WorkShiftNotificationSchedule, error)
 	// HU-5: pausar sin borrar la fila (conserva el historial del rol).
@@ -578,6 +600,7 @@ type Querier interface {
 	// Housekeeping: una vez que un JTI expiró de verdad, ya no hace falta
 	// consultarlo (el JWT tampoco pasaría Verify() por expiración propia).
 	PurgeExpiredDenylistedTokens(ctx context.Context) error
+	ReactivateOrganizationTeams(ctx context.Context, organizationID pgtype.UUID) (int64, error)
 	// Reubica los descendientes de un nodo cuyo path cambió (reimport que lo
 	// movió de padre) — incluidos los sitios agregados a mano que el dataset
 	// no conoce y por lo tanto no vuelve a upsertear.
@@ -598,6 +621,8 @@ type Querier interface {
 	RenameAsset(ctx context.Context, arg RenameAssetParams) (int64, error)
 	RenameService(ctx context.Context, arg RenameServiceParams) (int64, error)
 	RenameTeam(ctx context.Context, arg RenameTeamParams) (int64, error)
+	// Deja los pasos 1..n: en el orden de step_ids si se da, si no en el actual.
+	RenumberPolicySteps(ctx context.Context, arg RenumberPolicyStepsParams) error
 	ReopenEscalationIncident(ctx context.Context, id uuid.UUID) (int64, error)
 	ReplaceUserPermissionGroups(ctx context.Context, userID uuid.UUID) error
 	ResetAllLoginRateLimits(ctx context.Context) error
@@ -623,6 +648,8 @@ type Querier interface {
 	SetPasswordMinLength(ctx context.Context, passwordMinLength int16) (int16, error)
 	SetPasswordResetToken(ctx context.Context, arg SetPasswordResetTokenParams) error
 	SetPublicShareLinkActive(ctx context.Context, arg SetPublicShareLinkActiveParams) (PublicShareLink, error)
+	// Activar o desactivar a mano anula lo que hizo la organización.
+	SetTeamsActive(ctx context.Context, arg SetTeamsActiveParams) (int64, error)
 	// POST /api/territorial-units/bulk-active — activar o desactivar varias de
 	// una vez (pedido del dueño 2026-10-07). Solo toca las que cambian.
 	SetTerritorialUnitsActive(ctx context.Context, arg SetTerritorialUnitsActiveParams) ([]uuid.UUID, error)
@@ -633,6 +660,8 @@ type Querier interface {
 	// ===== Unir tickets y padre/hijo (000028) =====
 	SetTicketParent(ctx context.Context, arg SetTicketParentParams) error
 	SetTicketPublicPin(ctx context.Context, arg SetTicketPublicPinParams) (Ticket, error)
+	// Renumerar en dos pasadas por la restricción única (policy_id, step_order).
+	ShiftPolicySteps(ctx context.Context, policyID uuid.UUID) error
 	// Borrado lógico: el contacto puede estar referenciado por team_members (FK
 	// sin cascada) y por el historial de escalación de fases siguientes.
 	SoftDeleteContact(ctx context.Context, id uuid.UUID) (int64, error)
@@ -647,6 +676,10 @@ type Querier interface {
 	TicketQueueSummary(ctx context.Context, arg TicketQueueSummaryParams) (TicketQueueSummaryRow, error)
 	TouchLastLogin(ctx context.Context, id uuid.UUID) error
 	TouchPublicShareAccess(ctx context.Context, id uuid.UUID) error
+	// Borrado en cascada (decisión del dueño 2026-10-07): todo lo que cuelga del
+	// equipo se va, menos los contactos del Directorio; los tickets quedan sin
+	// equipo asignado. Se ejecutan en este orden dentro de una transacción.
+	UnassignTeamTickets(ctx context.Context, ids []uuid.UUID) (int64, error)
 	UnlinkWorkShiftsFromCycle(ctx context.Context, rotationCycleID pgtype.UUID) error
 	UpdateAsset(ctx context.Context, arg UpdateAssetParams) (int64, error)
 	UpdateBackupConfig(ctx context.Context, arg UpdateBackupConfigParams) (BackupConfig, error)
@@ -671,6 +704,7 @@ type Querier interface {
 	UpdateOrganizationType(ctx context.Context, arg UpdateOrganizationTypeParams) (OrganizationType, error)
 	UpdatePermissionGroup(ctx context.Context, arg UpdatePermissionGroupParams) (PermissionGroup, error)
 	UpdatePolicyReminder(ctx context.Context, arg UpdatePolicyReminderParams) (EscalationPolicy, error)
+	UpdatePolicyStep(ctx context.Context, arg UpdatePolicyStepParams) (EscalationStep, error)
 	UpdateReportEvent(ctx context.Context, arg UpdateReportEventParams) (ReportEvent, error)
 	UpdateReportOperationType(ctx context.Context, arg UpdateReportOperationTypeParams) (ReportOperationType, error)
 	UpdateService(ctx context.Context, arg UpdateServiceParams) (Service, error)

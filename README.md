@@ -116,7 +116,7 @@ No hay Redis, ni colas, ni Kubernetes. Detalle en **[docs/arquitectura.md](docs/
 | [Configuración](docs/configuracion.md) | Quien instala | Todas las variables de entorno y lo que se configura desde la app |
 | [Operación](docs/operacion.md) | Quien mantiene el servidor | Respaldos, actualizaciones, monitoreo y problemas comunes |
 | [Arquitectura](docs/arquitectura.md) | Desarrolladores | Cómo se conectan las piezas, seguridad y permisos |
-| [API](docs/api.md) | Desarrolladores e integraciones | Las 277 rutas, quién puede usarlas y el formato de errores |
+| [API](docs/api.md) | Desarrolladores e integraciones | Las 280 rutas, quién puede usarlas y el formato de errores |
 | [Desarrollo](docs/desarrollo.md) | Desarrolladores | Entorno local, pruebas, convenciones y cómo agregar cosas |
 | [Migración desde el legacy](docs/migracion-legacy.md) | Quien hace el corte | ETL, verificación y comparador de escalamiento |
 | [Decisiones (ADR)](docs/adr/) | Todos | Por qué se eligió cada cosa |

@@ -221,18 +221,39 @@ Solo para administradores. El menú se agrupa así:
 | Personas | **Usuarios y grupos** | Usuarios, roles, grupos de permisos, cargos, largo mínimo de contraseña (6 por defecto) y correos de cumpleaños. |
 | Operación | **Turnos** | Guardias, turnos de trabajo, dotación programada y recordatorios (detalle abajo). |
 | | **Checklist** | Plantillas de inicio y cierre, servicios y alertas de ítems en rojo. |
-| | **Escalamiento** | Políticas por servicio, activo o zona; niveles, tiempos y grupos de contacto. |
+| | **Escalamiento** | Políticas por servicio, activo o zona, con sus llamados en orden (detalle abajo). |
 | | **Avisos por cliente** | Avisos que aparecen al trabajar con un cliente y el catálogo de eventos de los informes. |
 | | **Correo** | SMTP y remitente, con plantillas para los proveedores comunes y correo de prueba. |
 | | **Reportes de turno** | Formato y estado de los reportes de cierre. |
 | Catálogos | **Organizaciones y servicios** | Clientes, tipos, servicios y fuentes de log. |
 | | **Territorio** (NOC) | Regiones, zonas y sitios, con importación CSV y activar o desactivar en lote. |
-| | **Equipos** | Equipos, contratas, guardias, integrantes y cobertura territorial. |
+| | **Equipos** | Equipos, contratas, guardias, integrantes y cobertura territorial, con acciones en lote (detalle abajo). |
 | Sistema | **Marca** | Nombre, logo, favicon y fuente. |
 | | **Módulos** y **Funcionalidades** | Qué partes del sistema están encendidas. |
 | | **Respaldos** | Copias, restauración y exportación (ver [operacion.md](operacion.md)). |
 | | **Auditoría** | Quién hizo qué y cuándo, con filtros y exportación. |
 | | **Complementos** | Subir y publicar mini-aplicaciones. |
+
+### Escalamiento → llamados de una política
+
+Cada política (de un servicio, un activo o una zona) es una lista de **llamados** en orden: "Aviso por correo (PARA y CC)", "1er llamado", "2do llamado"…
+
+- Cada llamado avisa a **personas del Directorio** (o a un **pool** con nombre), o a **un equipo** real: una guardia, una contrata.
+- **Persona del Directorio:** escribe un nombre y elígelo. Las personas no se copian: si cambias un teléfono en el Directorio, cambia en todas las políticas.
+- Con varias personas en un llamado eliges cómo se avisa: una por vez, en orden, o todas a la vez (pool).
+- **"Si no contesta, pasar en N min":** el tiempo antes de pasar al llamado siguiente.
+- Las flechas reordenan los llamados y el basurero quita uno; los demás se renumeran solos.
+- Todo se guarda al momento, sin botón "Guardar".
+
+### Equipos
+
+- Los equipos se ven **agrupados por organización**, con filtro por tipo (escalamiento, guardia, RACI…) y búsqueda.
+- Cada equipo dice **qué lo usa**: políticas ("QRadar · DPP #2"), RACI, guardias o tickets.
+- **Selección en lote:** marca equipos (o una organización entera) y elige **Activar**, **Desactivar** o **Borrar…**.
+- **Borrar** primero avisa qué se lleva cada equipo. Si confirmas, se borra en cascada: sus llamados en las políticas, su RACI y sus guardias. Los tickets se conservan, solo quedan sin equipo asignado. **Los contactos del Directorio nunca se borran.** Si prefieres no perder nada, usa "Solo desactivar".
+- **Organización desactivada:** sus equipos se desactivan y se ocultan (filtro "Ver de organizaciones desactivadas"). Al reactivarla, vuelven los que ella había apagado.
+- Los llamados de las políticas **no aparecen aquí**: se editan en Escalamiento.
+- Clic en un equipo abre sus integrantes al lado. Otro clic lo cierra.
 
 ### Turnos → Guardias
 

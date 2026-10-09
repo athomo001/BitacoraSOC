@@ -157,7 +157,23 @@ func (h *OrganizationsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "no se pudo actualizar la organización (¿el mandante existe?)")
 		return
 	}
-	h.AuditLog.Log(ctx, "organization.update", audit.LevelInfo, audit.Success(), map[string]any{"organizationId": id.String()})
+	// Desactivarla desactiva sus equipos (dejan de aparecer y de usarse);
+	// reactivarla devuelve solo los que apagó ella (decisión del dueño 2026-10-07).
+	details := map[string]any{"organizationId": id.String()}
+	if req.Active != nil {
+		var n int64
+		if *req.Active {
+			n, err = h.Queries.ReactivateOrganizationTeams(ctx, pgtype.UUID{Bytes: id, Valid: true})
+		} else {
+			n, err = h.Queries.DeactivateOrganizationTeams(ctx, pgtype.UUID{Bytes: id, Valid: true})
+		}
+		if err != nil {
+			problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "la organización se guardó, pero no se pudieron actualizar sus equipos")
+			return
+		}
+		details["teams"] = n
+	}
+	h.AuditLog.Log(ctx, "organization.update", audit.LevelInfo, audit.Success(), details)
 	writeData(w, http.StatusOK, toOrganizationDTO(org))
 }
 

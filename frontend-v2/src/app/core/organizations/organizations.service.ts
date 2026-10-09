@@ -96,7 +96,18 @@ export interface TeamSummary {
   organizationName?: string;
   active: boolean;
   memberCount?: number;
+  /** Solo en la lista: false si su organización está desactivada. */
+  organizationActive?: boolean;
+  /** Lo desactivó su organización (vuelve si se reactiva). */
+  deactivatedByOrg?: boolean;
+  /** Qué lo usa: se avisa antes de borrar. */
+  usage?: TeamUsage;
 }
+
+/** steps: "QRadar · DPP #2, …": política y número de llamado (vacío si ninguna lo usa). */
+export interface TeamUsage { steps: string; raci: number; guards: number; tickets: number; }
+
+export type TeamBulkAction = 'activate' | 'deactivate' | 'delete';
 
 export interface TeamMember {
   id: string;
@@ -185,6 +196,11 @@ export class OrganizationsService {
 
   async listTeams(): Promise<TeamSummary[]> {
     return (await firstValueFrom(this.http.get<ApiEnvelope<TeamSummary[]>>('/api/teams'))).data;
+  }
+
+  /** Activar, desactivar o borrar varios equipos. Borrar es en cascada (menos el Directorio). */
+  async bulkTeams(ids: string[], action: TeamBulkAction): Promise<void> {
+    await firstValueFrom(this.http.post('/api/teams/bulk', { ids, action }));
   }
 
   async getTeam(id: string): Promise<TeamDetail> {

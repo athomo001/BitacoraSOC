@@ -96,7 +96,7 @@ backend-go/
 │   └── territorial-seed/       # genera la semilla territorial de un país
 ├── internal/                   # el código de la aplicación (ver tabla)
 ├── sql/
-│   ├── migrations/             # 000001 … 000029 (golang-migrate, up/down)
+│   ├── migrations/             # 000001 … 000030 (golang-migrate, up/down)
 │   ├── queries/                # SQL con anotaciones sqlc, un archivo por área
 │   └── schema/                 # esquema completo, lo usa sqlc para tipar
 └── sqlc.yaml
@@ -167,7 +167,7 @@ PostgreSQL 18 con 73 tablas. Las principales por área:
 | --- | --- |
 | Usuarios y acceso | `users`, `permission_groups`, `user_permission_groups`, `token_denylist`, `login_rate_limits` |
 | Catálogos | `organizations`, `organization_types`, `services`, `catalog_log_sources`, `territorial_units`, `assets` |
-| Equipos y contactos | `teams`, `team_members`, `team_coverage`, `contacts`, `contact_channels` |
+| Equipos y contactos | `teams` (incluye los grupos de personas de cada llamado, `kind = 'step'`, que pertenecen a su paso y se borran con él), `team_members`, `team_coverage`, `contacts`, `contact_channels` |
 | Bitácora | `entries`, `entry_comments`, `entry_attachments`, `entry_drafts`, `admin_notes`, `personal_notes` |
 | Turnos | `work_shifts`, `work_shift_members`, `work_shift_assignments` (dotación), `shift_checks`, `shift_closures`, `checklist_templates`, `checklist_items` |
 | Guardias | `rotation_cycles`, `rotation_slots` (con hora exacta), `rotation_overrides` |

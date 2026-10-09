@@ -1695,6 +1695,7 @@ type EscalationStep struct {
 	TeamID                    uuid.UUID      `json:"team_id"`
 	Mode                      EscalationMode `json:"mode"`
 	WaitBeforeEscalateMinutes int32          `json:"wait_before_escalate_minutes"`
+	Title                     pgtype.Text    `json:"title"`
 }
 
 type LoginRateLimit struct {
@@ -1990,14 +1991,15 @@ type SystemFeature struct {
 }
 
 type Team struct {
-	ID             uuid.UUID    `json:"id"`
-	OrganizationID pgtype.UUID  `json:"organization_id"`
-	TeamGroupID    pgtype.UUID  `json:"team_group_id"`
-	Name           string       `json:"name"`
-	Slug           string       `json:"slug"`
-	Kind           string       `json:"kind"`
-	Audience       TeamAudience `json:"audience"`
-	Active         bool         `json:"active"`
+	ID               uuid.UUID    `json:"id"`
+	OrganizationID   pgtype.UUID  `json:"organization_id"`
+	TeamGroupID      pgtype.UUID  `json:"team_group_id"`
+	Name             string       `json:"name"`
+	Slug             string       `json:"slug"`
+	Kind             string       `json:"kind"`
+	Audience         TeamAudience `json:"audience"`
+	Active           bool         `json:"active"`
+	DeactivatedByOrg bool         `json:"deactivated_by_org"`
 }
 
 type TeamCoverage struct {

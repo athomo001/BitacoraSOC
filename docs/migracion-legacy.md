@@ -214,7 +214,7 @@ flowchart LR
 
 - El legacy **no se borra**: queda disponible para volver atrás durante **14 días** ([ADR 0003](adr/0003-corte-unico-ventana-rollback-14-dias.md)).
 - Pruebas de humo mínimas: login, bitácora, checklist de inicio, escalamiento de un servicio, envío de un correo de prueba y "de guardia ahora".
-- Aplica en producción **todas** las migraciones hasta la última (`000029`) antes de restaurar.
+- Aplica en producción **todas** las migraciones hasta la última (`000030`) antes de restaurar.
 
 ---
 

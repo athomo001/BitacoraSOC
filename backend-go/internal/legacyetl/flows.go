@@ -111,21 +111,20 @@ func (m *Migrator) migrateCallFlows(ctx context.Context) error {
 		}
 		flow := append([]legacyFlowStep(nil), s.EscalationFlow...)
 		sortFlow(flow)
-		// Un equipo por paso, compartido por los servicios del cliente.
+		// Cada llamado es un grupo propio de su paso (kind 'step', 000030):
+		// primero se arman sus personas (y el pool con nombre, que sí se
+		// comparte), después cada servicio recibe sus llamados.
 		type built struct {
-			team uuid.UUID
-			mode string
+			title    string
+			mode     string
+			contacts []uuid.UUID
+			pool     *uuid.UUID
 		}
-		var teams []built
+		var calls []built
 		for i, fs := range flow {
 			title := strings.TrimSpace(fs.Title)
 			if title == "" {
 				title = "Paso " + itoa(i+1)
-			}
-			team := ID("teams", "flow:"+s.ID+":"+itoa(i))
-			o := org
-			if err := m.createTeam(ctx, team, &o, s.Name+" · "+title, "escalation", "client"); err != nil {
-				return err
 			}
 			people := []struct{ name, tel string }{}
 			if fs.ContactName != "" || fs.ContactTel != "" {
@@ -138,10 +137,7 @@ func (m *Migrator) migrateCallFlows(ctx context.Context) error {
 			if mode != "pool" && mode != "sequential" {
 				mode = "unique"
 			}
-			// Un paso pool del legacy ("POOL de Mundo") pasa a un pool con
-			// nombre: el nivel lo tiene como un solo integrante y sus personas
-			// se llaman en orden (decisión del dueño 2026-10-05).
-			var poolMembers []uuid.UUID
+			b := built{title: title, mode: mode}
 			seen := map[uuid.UUID]bool{}
 			for _, p := range people {
 				contact, isNew, err := m.flowContact(ctx, org, p.name, p.tel)
@@ -155,32 +151,25 @@ func (m *Migrator) migrateCallFlows(ctx context.Context) error {
 					created++
 				}
 				seen[contact] = true
-				c := contact
-				if mode == "pool" {
-					poolMembers = append(poolMembers, c)
-					continue
-				}
-				if _, err := m.addMember(ctx, team, &c, nil, "to", "primary", len(seen)-1); err != nil {
-					return err
-				}
+				b.contacts = append(b.contacts, contact)
 			}
-			if len(poolMembers) > 0 {
+			// Un paso pool del legacy ("POOL de Mundo") pasa a un pool con
+			// nombre: el llamado lo tiene como un solo integrante y sus
+			// personas se llaman en orden (decisión del dueño 2026-10-05).
+			if mode == "pool" && len(b.contacts) > 0 {
 				pool := ID("escalation_pools", s.ID+":"+itoa(i))
 				if _, err := m.tx.Exec(ctx, `INSERT INTO escalation_pools (id, organization_id, name) VALUES ($1,$2,$3)`, pool, org, title); err != nil {
 					return err
 				}
-				for pos, c := range poolMembers {
+				for pos, c := range b.contacts {
 					if _, err := m.tx.Exec(ctx, `INSERT INTO escalation_pool_members (pool_id, contact_id, position) VALUES ($1,$2,$3)`, pool, c, pos); err != nil {
 						return err
 					}
 				}
-				if _, err := m.tx.Exec(ctx, `INSERT INTO team_members (id, team_id, pool_id, recipient_type, role_in_team, priority, active) VALUES ($1,$2,$3,'to','primary',0,true)`,
-					uuid.New(), team, pool); err != nil {
-					return err
-				}
-				step.note("%s: pool «%s» con %d personas", s.Name, title, len(poolMembers))
+				b.pool = &pool
+				step.note("%s: pool «%s» con %d personas", s.Name, title, len(b.contacts))
 			}
-			teams = append(teams, built{team, mode})
+			calls = append(calls, b)
 		}
 		for _, svc := range services {
 			policy := ID("escalation_policies", svc.String())
@@ -194,9 +183,26 @@ func (m *Migrator) migrateCallFlows(ctx context.Context) error {
 			} else if _, err := m.tx.Exec(ctx, `INSERT INTO escalation_policies (id, service_id, active) VALUES ($1,$2,true)`, policy, svc); err != nil {
 				return err
 			}
-			for i, t := range teams {
-				if _, err := m.tx.Exec(ctx, `INSERT INTO escalation_steps (id, policy_id, step_order, team_id, mode, wait_before_escalate_minutes) VALUES ($1,$2,$3,$4,$5,0)`,
-					uuid.New(), policy, next+i, t.team, t.mode); err != nil {
+			for i, b := range calls {
+				team := ID("teams", "flow:"+s.ID+":"+itoa(i)+":"+svc.String())
+				if err := m.createTeam(ctx, team, nil, s.Name+" · "+b.title, "step", "client"); err != nil {
+					return err
+				}
+				if b.pool != nil {
+					if _, err := m.tx.Exec(ctx, `INSERT INTO team_members (id, team_id, pool_id, recipient_type, role_in_team, priority, active) VALUES ($1,$2,$3,'to','primary',0,true)`,
+						uuid.New(), team, *b.pool); err != nil {
+						return err
+					}
+				} else {
+					for pos, c := range b.contacts {
+						c := c
+						if _, err := m.addMember(ctx, team, &c, nil, "to", "primary", pos); err != nil {
+							return err
+						}
+					}
+				}
+				if _, err := m.tx.Exec(ctx, `INSERT INTO escalation_steps (id, policy_id, step_order, team_id, mode, wait_before_escalate_minutes, title) VALUES ($1,$2,$3,$4,$5,0,$6)`,
+					uuid.New(), policy, next+i, team, b.mode, b.title); err != nil {
 					return err
 				}
 			}

@@ -149,7 +149,7 @@ Para desbloquear en una emergencia: [operacion.md](operacion.md#desbloquear-el-l
 ## Referencia de rutas
 
 Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. Las rutas con `{id}` llevan el identificador en esa posición. Los cuerpos de cada ruta están en los `struct` de petición de `backend-go/internal/handler/`.
-<!-- generado desde cmd/server/main.go: 277 rutas -->
+<!-- generado desde cmd/server/main.go: 280 rutas -->
 
 ### Salud
 
@@ -400,6 +400,8 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `PUT` | `/api/escalation/pools/{id}/members` | Admin |
 | `POST` | `/api/escalation/policies/{id}/steps` | Admin |
 | `DELETE` | `/api/escalation/policies/{id}/steps/{stepOrder}` | Admin |
+| `PUT` | `/api/escalation/policies/{id}/steps/{stepId}` | Admin |
+| `POST` | `/api/escalation/policies/{id}/steps/reorder` | Admin |
 
 ### Directorio
 
@@ -446,6 +448,7 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `GET` | `/api/teams/{id}` | Sesión |
 | `POST` | `/api/teams` | Admin |
 | `PATCH` | `/api/teams/{id}` | Admin |
+| `POST` | `/api/teams/bulk` | Admin |
 | `POST` | `/api/teams/{id}/members` | Admin |
 | `DELETE` | `/api/teams/{id}/members/{memberId}` | Admin |
 | `GET` | `/api/teams/{id}/coverage` | Sesión · módulo NOC |

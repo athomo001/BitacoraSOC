@@ -54,7 +54,7 @@ func (q *Queries) AddTeamMember(ctx context.Context, arg AddTeamMemberParams) (T
 
 const createTeam = `-- name: CreateTeam :one
 INSERT INTO teams (name, slug, kind, organization_id, team_group_id, audience)
-VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, organization_id, team_group_id, name, slug, kind, audience, active
+VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, organization_id, team_group_id, name, slug, kind, audience, active, deactivated_by_org
 `
 
 type CreateTeamParams struct {
@@ -85,6 +85,7 @@ func (q *Queries) CreateTeam(ctx context.Context, arg CreateTeamParams) (Team, e
 		&i.Kind,
 		&i.Audience,
 		&i.Active,
+		&i.DeactivatedByOrg,
 	)
 	return i, err
 }
@@ -112,8 +113,95 @@ func (q *Queries) CreateTeamGroup(ctx context.Context, arg CreateTeamGroupParams
 	return i, err
 }
 
+const deactivateOrganizationTeams = `-- name: DeactivateOrganizationTeams :execrows
+UPDATE teams SET active = false, deactivated_by_org = true
+WHERE organization_id = $1 AND active AND kind <> 'step'
+`
+
+func (q *Queries) DeactivateOrganizationTeams(ctx context.Context, organizationID pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deactivateOrganizationTeams, organizationID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteRaciOfTeams = `-- name: DeleteRaciOfTeams :execrows
+DELETE FROM raci_assignments WHERE team_id = ANY($1::uuid[])
+`
+
+func (q *Queries) DeleteRaciOfTeams(ctx context.Context, ids []uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteRaciOfTeams, ids)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteStepsOfTeams = `-- name: DeleteStepsOfTeams :many
+DELETE FROM escalation_steps WHERE team_id = ANY($1::uuid[]) RETURNING policy_id
+`
+
+func (q *Queries) DeleteStepsOfTeams(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, deleteStepsOfTeams, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var policy_id uuid.UUID
+		if err := rows.Scan(&policy_id); err != nil {
+			return nil, err
+		}
+		items = append(items, policy_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const deleteTeamCycles = `-- name: DeleteTeamCycles :exec
+DELETE FROM rotation_cycles WHERE team_id = ANY($1::uuid[])
+`
+
+func (q *Queries) DeleteTeamCycles(ctx context.Context, ids []uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteTeamCycles, ids)
+	return err
+}
+
+const deleteTeamGuards = `-- name: DeleteTeamGuards :exec
+WITH cycles AS (SELECT id FROM rotation_cycles WHERE team_id = ANY($1::uuid[])),
+members AS (SELECT id FROM team_members WHERE team_id = ANY($1::uuid[])),
+unlink AS (UPDATE work_shifts SET rotation_cycle_id = NULL WHERE rotation_cycle_id IN (SELECT id FROM cycles)),
+overrides AS (DELETE FROM rotation_overrides WHERE cycle_id IN (SELECT id FROM cycles)
+  OR original_team_member_id IN (SELECT id FROM members) OR replacement_team_member_id IN (SELECT id FROM members)),
+slots AS (DELETE FROM rotation_slots WHERE cycle_id IN (SELECT id FROM cycles) OR team_member_id IN (SELECT id FROM members))
+SELECT 1
+`
+
+// Guardias de esos equipos: reemplazos, turnos y ciclos (los turnos de
+// trabajo enlazados quedan sin ciclo).
+func (q *Queries) DeleteTeamGuards(ctx context.Context, ids []uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteTeamGuards, ids)
+	return err
+}
+
+const deleteTeams = `-- name: DeleteTeams :execrows
+DELETE FROM teams WHERE id = ANY($1::uuid[])
+`
+
+func (q *Queries) DeleteTeams(ctx context.Context, ids []uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteTeams, ids)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getTeam = `-- name: GetTeam :one
-SELECT id, organization_id, team_group_id, name, slug, kind, audience, active FROM teams WHERE id = $1
+SELECT id, organization_id, team_group_id, name, slug, kind, audience, active, deactivated_by_org FROM teams WHERE id = $1
 `
 
 func (q *Queries) GetTeam(ctx context.Context, id uuid.UUID) (Team, error) {
@@ -128,6 +216,7 @@ func (q *Queries) GetTeam(ctx context.Context, id uuid.UUID) (Team, error) {
 		&i.Kind,
 		&i.Audience,
 		&i.Active,
+		&i.DeactivatedByOrg,
 	)
 	return i, err
 }
@@ -270,10 +359,19 @@ func (q *Queries) ListTeamMembers(ctx context.Context, teamID uuid.UUID) ([]List
 }
 
 const listTeams = `-- name: ListTeams :many
-SELECT t.id, t.organization_id, t.team_group_id, t.name, t.slug, t.kind, t.audience, t.active, o.name AS organization_name,
-  (SELECT count(*) FROM team_members m WHERE m.team_id = t.id AND m.active)::int AS member_count
+SELECT t.id, t.organization_id, t.team_group_id, t.name, t.slug, t.kind, t.audience, t.active, t.deactivated_by_org, o.name AS organization_name, COALESCE(o.active, true) AS organization_active,
+  (SELECT count(*) FROM team_members m WHERE m.team_id = t.id AND m.active)::int AS member_count,
+  COALESCE((SELECT string_agg(COALESCE(sv.name || ' · ' || so.name, sv.name, a.name, u.name, 'política') || ' #' || st.step_order, ', ' ORDER BY st.step_order)
+    FROM escalation_steps st JOIN escalation_policies p ON p.id = st.policy_id
+    LEFT JOIN services sv ON sv.id = p.service_id LEFT JOIN organizations so ON so.id = sv.organization_id
+    LEFT JOIN assets a ON a.id = p.asset_id LEFT JOIN territorial_units u ON u.id = p.territorial_unit_id
+    WHERE st.team_id = t.id), '')::text AS used_in_steps,
+  (SELECT count(*) FROM raci_assignments ra WHERE ra.team_id = t.id)::int AS raci_count,
+  (SELECT count(*) FROM rotation_slots rs JOIN rotation_cycles rc ON rc.id = rs.cycle_id WHERE rc.team_id = t.id)::int AS guard_count,
+  (SELECT count(*) FROM tickets tk WHERE tk.assigned_team_id = t.id)::int AS ticket_count
 FROM teams t LEFT JOIN organizations o ON o.id = t.organization_id
 WHERE ($1::text IS NULL OR t.kind = $1)
+  AND (t.kind <> 'step' OR $1::text = 'step')
   AND ($2::uuid IS NULL OR t.organization_id = $2)
   AND ($3::uuid IS NULL OR t.team_group_id = $3)
   AND ($4::team_audience IS NULL OR t.audience = $4)
@@ -290,18 +388,27 @@ type ListTeamsParams struct {
 }
 
 type ListTeamsRow struct {
-	ID               uuid.UUID    `json:"id"`
-	OrganizationID   pgtype.UUID  `json:"organization_id"`
-	TeamGroupID      pgtype.UUID  `json:"team_group_id"`
-	Name             string       `json:"name"`
-	Slug             string       `json:"slug"`
-	Kind             string       `json:"kind"`
-	Audience         TeamAudience `json:"audience"`
-	Active           bool         `json:"active"`
-	OrganizationName pgtype.Text  `json:"organization_name"`
-	MemberCount      int32        `json:"member_count"`
+	ID                 uuid.UUID    `json:"id"`
+	OrganizationID     pgtype.UUID  `json:"organization_id"`
+	TeamGroupID        pgtype.UUID  `json:"team_group_id"`
+	Name               string       `json:"name"`
+	Slug               string       `json:"slug"`
+	Kind               string       `json:"kind"`
+	Audience           TeamAudience `json:"audience"`
+	Active             bool         `json:"active"`
+	DeactivatedByOrg   bool         `json:"deactivated_by_org"`
+	OrganizationName   pgtype.Text  `json:"organization_name"`
+	OrganizationActive bool         `json:"organization_active"`
+	MemberCount        int32        `json:"member_count"`
+	UsedInSteps        string       `json:"used_in_steps"`
+	RaciCount          int32        `json:"raci_count"`
+	GuardCount         int32        `json:"guard_count"`
+	TicketCount        int32        `json:"ticket_count"`
 }
 
+// Los grupos de un paso de escalamiento (kind 'step', 000030) son parte de
+// su política: no se listan salvo que se pidan con kind=step. Cada equipo
+// trae qué lo usa, para avisar antes de borrar.
 func (q *Queries) ListTeams(ctx context.Context, arg ListTeamsParams) ([]ListTeamsRow, error) {
 	rows, err := q.db.Query(ctx, listTeams,
 		arg.Kind,
@@ -326,8 +433,14 @@ func (q *Queries) ListTeams(ctx context.Context, arg ListTeamsParams) ([]ListTea
 			&i.Kind,
 			&i.Audience,
 			&i.Active,
+			&i.DeactivatedByOrg,
 			&i.OrganizationName,
+			&i.OrganizationActive,
 			&i.MemberCount,
+			&i.UsedInSteps,
+			&i.RaciCount,
+			&i.GuardCount,
+			&i.TicketCount,
 		); err != nil {
 			return nil, err
 		}
@@ -337,6 +450,19 @@ func (q *Queries) ListTeams(ctx context.Context, arg ListTeamsParams) ([]ListTea
 		return nil, err
 	}
 	return items, nil
+}
+
+const reactivateOrganizationTeams = `-- name: ReactivateOrganizationTeams :execrows
+UPDATE teams SET active = true, deactivated_by_org = false
+WHERE organization_id = $1 AND deactivated_by_org
+`
+
+func (q *Queries) ReactivateOrganizationTeams(ctx context.Context, organizationID pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, reactivateOrganizationTeams, organizationID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const removeTeamCoverage = `-- name: RemoveTeamCoverage :execrows
@@ -373,6 +499,41 @@ func (q *Queries) RemoveTeamMember(ctx context.Context, arg RemoveTeamMemberPara
 	return result.RowsAffected(), nil
 }
 
+const setTeamsActive = `-- name: SetTeamsActive :execrows
+UPDATE teams SET active = $1, deactivated_by_org = false
+WHERE id = ANY($2::uuid[]) AND kind <> 'step'
+`
+
+type SetTeamsActiveParams struct {
+	Active bool        `json:"active"`
+	Ids    []uuid.UUID `json:"ids"`
+}
+
+// Activar o desactivar a mano anula lo que hizo la organización.
+func (q *Queries) SetTeamsActive(ctx context.Context, arg SetTeamsActiveParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setTeamsActive, arg.Active, arg.Ids)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const unassignTeamTickets = `-- name: UnassignTeamTickets :execrows
+
+UPDATE tickets SET assigned_team_id = NULL, updated_at = now() WHERE assigned_team_id = ANY($1::uuid[])
+`
+
+// Borrado en cascada (decisión del dueño 2026-10-07): todo lo que cuelga del
+// equipo se va, menos los contactos del Directorio; los tickets quedan sin
+// equipo asignado. Se ejecutan en este orden dentro de una transacción.
+func (q *Queries) UnassignTeamTickets(ctx context.Context, ids []uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, unassignTeamTickets, ids)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const updateTeam = `-- name: UpdateTeam :one
 UPDATE teams SET
   name = COALESCE($2, name),
@@ -382,7 +543,7 @@ UPDATE teams SET
   audience = COALESCE($6, audience),
   active = COALESCE($7, active)
 WHERE id = $1
-RETURNING id, organization_id, team_group_id, name, slug, kind, audience, active
+RETURNING id, organization_id, team_group_id, name, slug, kind, audience, active, deactivated_by_org
 `
 
 type UpdateTeamParams struct {
@@ -415,6 +576,7 @@ func (q *Queries) UpdateTeam(ctx context.Context, arg UpdateTeamParams) (Team, e
 		&i.Kind,
 		&i.Audience,
 		&i.Active,
+		&i.DeactivatedByOrg,
 	)
 	return i, err
 }

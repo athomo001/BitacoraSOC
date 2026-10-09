@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // TeamsHandler cubre /api/team-groups, /api/teams/*, /api/assets (módulo NOC)
@@ -22,6 +23,7 @@ import (
 // de 1 persona es el caso SOC clásico, uno de N con team_coverage es una
 // cuadrilla NOC (spec/01-arquitectura.md sección 4).
 type TeamsHandler struct {
+	Pool       *pgxpool.Pool // borrado en cascada (teams_bulk.go)
 	Queries    *db.Queries
 	AuditLog   *audit.Logger
 	NOCEnabled func(r *http.Request) bool // para incluir/omitir coverage en el detalle
@@ -91,18 +93,23 @@ func (h *TeamsHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 }
 
 type teamDTO struct {
-	ID               uuid.UUID     `json:"id"`
-	Name             string        `json:"name"`
-	Slug             string        `json:"slug"`
-	Kind             string        `json:"kind"`
-	Audience         string        `json:"audience"`
-	OrganizationID   *uuid.UUID    `json:"organizationId,omitempty"`
-	OrganizationName *string       `json:"organizationName,omitempty"`
-	TeamGroupID      *uuid.UUID    `json:"teamGroupId,omitempty"`
-	Active           bool          `json:"active"`
-	MemberCount      *int32        `json:"memberCount,omitempty"`
-	Members          []memberDTO   `json:"members,omitempty"`
-	Coverage         []coverageDTO `json:"coverage,omitempty"`
+	ID               uuid.UUID  `json:"id"`
+	Name             string     `json:"name"`
+	Slug             string     `json:"slug"`
+	Kind             string     `json:"kind"`
+	Audience         string     `json:"audience"`
+	OrganizationID   *uuid.UUID `json:"organizationId,omitempty"`
+	OrganizationName *string    `json:"organizationName,omitempty"`
+	TeamGroupID      *uuid.UUID `json:"teamGroupId,omitempty"`
+	Active           bool       `json:"active"`
+	MemberCount      *int32     `json:"memberCount,omitempty"`
+	// Solo en la lista: si su organización está activa y qué lo usa (para
+	// avisar antes de borrar).
+	OrganizationActive *bool         `json:"organizationActive,omitempty"`
+	DeactivatedByOrg   bool          `json:"deactivatedByOrg,omitempty"`
+	Usage              *teamUsage    `json:"usage,omitempty"`
+	Members            []memberDTO   `json:"members,omitempty"`
+	Coverage           []coverageDTO `json:"coverage,omitempty"`
 }
 
 func toTeamDTO(t db.Team) teamDTO {
@@ -136,6 +143,10 @@ func (h *TeamsHandler) List(w http.ResponseWriter, r *http.Request) {
 			TeamGroupID: uuidPtr(t.TeamGroupID), Active: t.Active}
 		count := t.MemberCount
 		dto.MemberCount = &count
+		orgActive := t.OrganizationActive
+		dto.OrganizationActive = &orgActive
+		dto.DeactivatedByOrg = t.DeactivatedByOrg
+		dto.Usage = &teamUsage{Steps: t.UsedInSteps, Raci: t.RaciCount, Guards: t.GuardCount, Tickets: t.TicketCount}
 		dtos = append(dtos, dto)
 	}
 	writeData(w, http.StatusOK, dtos)
