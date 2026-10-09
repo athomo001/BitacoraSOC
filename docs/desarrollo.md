@@ -86,7 +86,8 @@ migrate create -ext sql -dir sql/migrations -seq nombre_corto
 1. Escribe `NNNNNN_nombre_corto.up.sql` y su `down.sql` (que deshaga exactamente lo mismo).
 2. Agrega el mismo contenido del `up` al final de `sql/schema/0001_init_schema.sql`, porque `sqlc` tipa contra ese archivo.
 3. Aplica: `migrate -path sql/migrations -database "postgres://bitacora:…@127.0.0.1:25432/bitacora?sslmode=disable" up`.
-4. Si la migración toca datos que vienen del legacy, revisa también el ETL (`internal/legacyetl`).
+4. Si la migración toca datos que vienen del legacy, revisa también el ETL (`internal/legacyetl`) y [modelo-er-legacy-2.0.md](modelo-er-legacy-2.0.md).
+5. Regenera el modelo de datos: `go run ./cmd/er-docs` (escribe `docs/modelo-de-datos.md`). Si la tabla es nueva, ubícala antes en un dominio (`domains` en `cmd/er-docs/main.go`). Una prueba falla si el documento no coincide con el esquema.
 
 ### Agregar una consulta SQL
 

@@ -4,6 +4,13 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] Modelo de datos en docs - 2026-10-09
+
+- **`docs/modelo-de-datos.md`**: diagramas entidad-relación de las 73 tablas, en 13 dominios, generados desde el esquema real (`backend-go/sql/schema/0001_init_schema.sql`, con todas las migraciones). El diagrama del spec (`spec/03a`) era del diseño original y le faltaban 23 tablas (pools, incidentes, avisos por cliente, eventos del informe, marca, complementos, permisos…); queda congelado como referencia.
+- **Herramienta nueva `backend-go/cmd/er-docs`**: regenera el documento (`go run ./cmd/er-docs`). Falla si una tabla nueva no tiene dominio, y una prueba falla si el documento no coincide con el esquema, así no vuelve a quedar atrás. Los 13 diagramas pasan el parser oficial de Mermaid.
+- **`docs/modelo-er-legacy-2.0.md`** (antes `spec/14`, que no estaba en git): correspondencia colección del legacy → tablas, al día con los llamados dentro de la política (000030) y las guardias con hora exacta (000029).
+- Enlaces en `docs/README.md`, `arquitectura.md`, `desarrollo.md` (paso nuevo al agregar una migración) y `migracion-legacy.md`.
+
 ## [Rewrite] Equipos: llamados dentro de la política, acciones en lote y borrado - 2026-10-07
 
 - **Problema (dueño):** al restaurar el respaldo del legacy, Equipos se llenaba de "DPP · 1er Llamado", "DPP · 2er Llamado"… (el ETL creaba un equipo por cada llamado), no se podían borrar, y los equipos de una organización desactivada seguían ahí. Diseño aprobado en el canvas (artboard "Equipos y llamados de escalamiento", v32).

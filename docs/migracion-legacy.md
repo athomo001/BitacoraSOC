@@ -17,6 +17,7 @@ Cómo pasar los datos del sistema anterior (BitacoraSOC v1.x: Node + MongoDB) a 
 - El **legacy sigue en producción** hasta el corte. El corte **no tiene fecha fija**: se hace cuando la 2.0 está lista.
 - Por eso el ETL está hecho para **repetirse** cuantas veces haga falta, siempre desde un respaldo nuevo del legacy, contra una base de ensayo vacía.
 - **Nunca se conecta a la base de producción del legacy.** Solo lee el archivo de respaldo que el legacy genera.
+- A qué tablas va cada colección del legacy, qué se transforma y qué no se migra: [modelo-er-legacy-2.0.md](modelo-er-legacy-2.0.md).
 - El código del legacy está congelado en el tag `legacy-v1-final` y se consulta en la carpeta hermana `../BitacoraSOC-legacy/`:
 
   ```bash

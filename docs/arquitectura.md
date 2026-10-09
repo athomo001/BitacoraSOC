@@ -178,6 +178,7 @@ PostgreSQL 18 con 73 tablas. Las principales por área:
 
 - **Migraciones:** `backend-go/sql/migrations/NNNNNN_nombre.{up,down}.sql`. Se aplican con `golang-migrate` y la aplicación nunca las ejecuta sola.
 - **Esquema espejo:** `sql/schema/0001_init_schema.sql` tiene el esquema completo para que `sqlc` tipe las consultas. Cada migración nueva se agrega también ahí.
+- **Diagramas:** [modelo-de-datos.md](modelo-de-datos.md), generado desde el esquema espejo, con todas las tablas por dominio.
 - **Inmutables:** `escalation_action_logs` no admite `UPDATE` ni `DELETE` (lo impide un trigger), porque es la evidencia de cada intento de contacto.
 
 ---
