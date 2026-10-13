@@ -49,64 +49,41 @@
               <div class="shifts__calendar-days" [style.grid-template-columns]="'repeat(' + m.columns.length + ', minmax(0, 1fr))'">@for (col of m.columns; track col.date) { <span [class.shifts__calendar-day--today]="col.isToday">{{ col.dayShort }}<small>{{ col.date.slice(5) }}</small></span> }</div>
               @for (row of m.rows; track row.userId) {
                 <div class="shifts__calendar-label"><strong>{{ row.name }}</strong><small>{{ row.role }}</small></div>
-                <div class="shifts__calendar-days shifts__calendar-days--bars" [style.grid-template-columns]="'repeat(' + m.columns.length + ', minmax(0, 1fr))'">@for (day of row.days; track day.date) { <span class="shifts__calendar-bar" [class.shifts__calendar-bar--today]="m.columns[$index].isToday" [style.--c]="conditionColorVar[day.condition]" [title]="day.label"><b>{{ day.marker }}</b><em>{{ day.label }}</em></span> }</div>
+                <div class="shifts__calendar-days shifts__calendar-days--bars" [style.grid-template-columns]="'repeat(' + m.columns.length + ', minmax(0, 1fr))'">
+                  @for (day of row.days; track day.date) {
+                    <span class="shifts__calendar-bar" [class.shifts__calendar-bar--today]="m.columns[$index].isToday"
+                      [class.shifts__calendar-bar--clickable]="perms.isAdmin()" [class.shifts__calendar-bar--editing]="isEditing(row.userId, day.date)"
+                      [style.--c]="conditionColorVar[day.condition]" [title]="day.label"
+                      [attr.role]="perms.isAdmin() ? 'button' : null" [attr.tabindex]="perms.isAdmin() ? 0 : null"
+                      (click)="startEdit(row.userId, day.date, day.condition)" (keydown.enter)="startEdit(row.userId, day.date, day.condition)"><b>{{ day.marker }}</b><em>{{ day.label }}</em></span>
+                  }
+                </div>
+                @if (editing(); as e) {
+                  @if (e.userId === row.userId) {
+                    <div class="shifts__edit">
+                      <strong>{{ row.name }} · {{ e.date }}</strong>
+                      <select [ngModel]="editCondition()" (ngModelChange)="editCondition.set($event)" [attr.aria-label]="row.name">
+                        @for (c of conditions; track c) {
+                          <option [value]="c">{{ i18n.t(conditionKey(c)) }}</option>
+                        }
+                      </select>
+                      <label class="shifts__edit-until">{{ i18n.t('staff.until') }}
+                        <input type="date" [min]="e.date" [ngModel]="editUntil()" (ngModelChange)="editUntil.set($event)" />
+                      </label>
+                      <span class="shifts__edit-actions">
+                        <app-button variant="primary" [disabled]="savingEdit()" (pressed)="saveEdit()">{{ i18n.t('staff.save') }}</app-button>
+                        <app-button variant="text" [disabled]="savingEdit()" (pressed)="cancelEdit()">{{ i18n.t('staff.cancel') }}</app-button>
+                      </span>
+                    </div>
+                  }
+                }
+              }
+              @if (m.rows.length === 0) {
+                <p class="shifts__empty">{{ i18n.t('staff.empty') }}</p>
               }
             </div>
             <div class="shifts__calendar-legend"><span><i class="shifts__legend-dot shifts__legend-dot--ok"></i>{{ i18n.t('staff.legend.telework') }}</span><span><i class="shifts__legend-dot shifts__legend-dot--warning"></i>{{ i18n.t('staff.legend.training') }}</span><span><i class="shifts__legend-dot shifts__legend-dot--critical"></i>{{ i18n.t('staff.legend.absence') }}</span><span><i class="shifts__legend-dot shifts__legend-dot--neutral"></i>{{ i18n.t('staff.legend.office') }}</span></div>
           </section>
-          <table class="shifts__matrix">
-            <thead>
-              <tr>
-                <th class="shifts__col-name">{{ i18n.t('staff.name') }}</th>
-                @for (col of m.columns; track col.date) {
-                  <th [class.shifts__col--today]="col.isToday">
-                    <span class="shifts__day-name">{{ col.dayShort }}</span>
-                    <span class="shifts__day-date">{{ col.date.slice(5) }}</span>
-                  </th>
-                }
-              </tr>
-            </thead>
-            <tbody>
-              @for (row of m.rows; track row.userId) {
-                <tr>
-                  <td class="shifts__row-name">
-                    <span class="shifts__r-name">{{ row.name }}</span>
-                    <span class="shifts__r-role">{{ row.role }}</span>
-                  </td>
-                  @for (day of row.days; track day.date) {
-                    <td class="shifts__cell" [class.shifts__cell--clickable]="perms.isAdmin()"
-                      [class.shifts__cell--special]="day.condition !== 'office'"
-                      [style.--c]="conditionColorVar[day.condition]"
-                      (click)="startEdit(row.userId, day.date, day.condition)">
-                      @if (isEditing(row.userId, day.date)) {
-                        <div class="shifts__edit" (click)="$event.stopPropagation()">
-                          <select [ngModel]="editCondition()" (ngModelChange)="editCondition.set($event)">
-                            @for (c of conditions; track c) {
-                              <option [value]="c">{{ i18n.t(conditionKey(c)) }}</option>
-                            }
-                          </select>
-                          <div class="shifts__edit-actions">
-                            <app-button variant="primary" [disabled]="savingEdit()" (pressed)="saveEdit()">{{ i18n.t('staff.save') }}</app-button>
-                            <app-button variant="text" [disabled]="savingEdit()" (pressed)="cancelEdit()">{{ i18n.t('staff.cancel') }}</app-button>
-                          </div>
-                        </div>
-                      } @else {
-                        @if (day.marker) {
-                          <span class="shifts__marker">{{ day.marker }}</span>
-                        }
-                        <span class="shifts__label">{{ day.label }}</span>
-                      }
-                    </td>
-                  }
-                </tr>
-              }
-              @if (m.rows.length === 0) {
-                <tr>
-                  <td class="shifts__empty" [attr.colspan]="m.columns.length + 1">{{ i18n.t('staff.empty') }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
         }
       </section>
     }

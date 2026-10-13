@@ -82,7 +82,7 @@ describe('ShiftsComponent (Dotación)', () => {
 
   it('admin puede editar una celda y guarda la nueva condición', async () => {
     const { fixture, el } = await render();
-    const cells = [...el.querySelectorAll('td.shifts__cell')];
+    const cells = [...el.querySelectorAll('.shifts__calendar-bar')];
     (cells[0] as HTMLElement).click();
     fixture.detectChanges();
     await tick();

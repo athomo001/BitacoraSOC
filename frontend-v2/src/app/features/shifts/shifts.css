@@ -222,92 +222,17 @@
   font-size: 13px;
 }
 
-.shifts__matrix {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-
-.shifts__matrix th,
-.shifts__matrix td {
-  border: 1px solid var(--border-subtle);
-  padding: 8px;
-  text-align: center;
-  vertical-align: top;
-}
-
-.shifts__col-name,
-.shifts__row-name {
-  width: 20%;
+.shifts__edit-until {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--text-secondary);
   text-align: left;
 }
 
-.shifts__col--today {
-  background: var(--bg-surface-hover);
-}
-
-.shifts__day-name {
-  display: block;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.shifts__day-date {
-  display: block;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-
-.shifts__r-name {
-  display: block;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.shifts__r-role {
-  display: block;
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-
-.shifts__cell {
-  min-height: 48px;
-}
-
-.shifts__cell--clickable {
-  cursor: pointer;
-}
-
-.shifts__cell--special {
-  background: color-mix(in srgb, var(--c, var(--text-secondary)) 12%, var(--bg-surface));
-  border-bottom: 3px solid var(--c, var(--text-secondary));
-}
-
-.shifts__marker {
-  display: block;
-  font-size: 18px;
-  line-height: 1.2;
-}
-
-.shifts__label {
-  display: block;
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-
-.shifts__cell--special .shifts__label {
-  color: var(--c, var(--text-secondary));
-  font-weight: 600;
-}
-
-.shifts__edit {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.shifts__edit select {
+.shifts__edit select,
+.shifts__edit input {
   min-height: var(--row-height);
   background: var(--bg-app);
   border: 1px solid var(--border-subtle);
@@ -317,13 +242,34 @@
   font-size: 12px;
 }
 
+.shifts__calendar-bar--clickable { cursor: pointer; }
+.shifts__calendar-bar--clickable:hover,
+.shifts__calendar-bar--clickable:focus-visible { filter: brightness(1.15); }
+.shifts__calendar-bar--editing { outline: 2px solid var(--border-active); outline-offset: 1px; }
+
+/* Edición de un día: franja bajo la fila de la persona, a todo el ancho. */
+.shifts__edit {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  font-size: 12px;
+}
+
+.shifts__edit > strong { align-self: center; }
+
 .shifts__edit-actions {
   display: flex;
   gap: 4px;
-  justify-content: center;
 }
 
 .shifts__empty {
+  grid-column: 1 / -1;
+  margin: 0;
   padding: 24px;
   color: var(--text-secondary);
   font-style: italic;
@@ -339,4 +285,15 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+/* Temas claros (blanco, rosado): la barra casi sólida del oscuro queda
+   apagada y con poco contraste; aquí va un tinte suave con el texto y el
+   borde del color de la condición. */
+:host-context([data-theme="light"]) .shifts__calendar-days--bars > span,
+:host-context([data-theme="pink"]) .shifts__calendar-days--bars > span {
+  background: color-mix(in srgb, var(--c) 14%, var(--bg-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 35%, transparent), inset 4px 0 0 var(--c);
+  color: color-mix(in srgb, var(--c) 80%, var(--text-primary));
+  text-shadow: none;
 }

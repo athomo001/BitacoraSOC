@@ -1,5 +1,5 @@
 -- Guardias en línea de tiempo (000029, canvas "Turnos: guardias"): los
--- equipos "oncall" (Guardia N2, Guardia TI, Guardia N1_NO_HABIL, Guardia OL)
+-- equipos "oncall" (Guardia N2, Guardia TI, Guardia N1_NO_HABIL)
 -- con su ciclo, sus integrantes y sus guardias con hora exacta.
 
 -- name: ListGuardCycles :many

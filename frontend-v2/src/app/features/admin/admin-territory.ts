@@ -16,11 +16,19 @@ function normalize(text: string): string {
   return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
+/** ¿`row` está debajo de `path`? (ltree: "CL.CL-BI" contiene "CL.CL-BI.CL-BI-CONCE"). */
+function isUnder(row: TerritorialUnit, path: string): boolean {
+  return row.path.startsWith(path + '.');
+}
+
 /**
  * Territorio (Administración → Catálogos, solo con NOC), re-vestido con los
  * componentes del artboard "Administración": nombres de cada nivel, import
  * y el árbol aplanado por path con búsqueda. Activar/desactivar es la
  * corrección más común de un import genérico (HU-TERR-3) y nunca borra.
+ *
+ * Árbol (pendiente #23 del dueño): marcar una región marca todo lo que tiene
+ * abajo; cada nodo se abre y cierra, y arranca con las regiones cerradas.
  */
 @Component({
   selector: 'app-admin-territory',
@@ -64,6 +72,10 @@ function normalize(text: string): string {
           </label>
         </div>
         <div class="tr__bulk">
+          @if (!query()) {
+            <button type="button" class="adm-btn" (click)="expandAll()"><mat-icon>unfold_more</mat-icon>{{ i18n.t('territory.expandAll') }}</button>
+            <button type="button" class="adm-btn" (click)="collapseAll()"><mat-icon>unfold_less</mat-icon>{{ i18n.t('territory.collapseAll') }}</button>
+          }
           <label class="tr__check">
             <input
               type="checkbox"
@@ -91,10 +103,21 @@ function normalize(text: string): string {
           <ng-template #cell let-row let-column="column">
             @switch (column) {
               @case ('name') {
-                <label class="tr__name" [style.padding-left.px]="query() ? 0 : row.depth * 16">
-                  <input type="checkbox" [checked]="selected().has(row.id)" (change)="toggleOne(row.id)" [attr.aria-label]="row.name" />
-                  <span [class.tr__inactive]="!row.active">{{ row.name }}</span>
-                </label>
+                <span class="tr__node" [style.padding-left.px]="query() ? 0 : row.depth * 16">
+                  @if (!query() && hasChildren(row)) {
+                    <button type="button" class="tr__twist" [attr.aria-expanded]="!collapsed().has(row.id)"
+                      [attr.aria-label]="i18n.t(collapsed().has(row.id) ? 'territory.expand' : 'territory.collapse') + ' ' + row.name"
+                      (click)="toggleCollapsed(row.id)"><mat-icon>{{ collapsed().has(row.id) ? 'chevron_right' : 'expand_more' }}</mat-icon></button>
+                  } @else if (!query()) {
+                    <span class="tr__twist" aria-hidden="true"></span>
+                  }
+                  <label class="tr__name">
+                    <input type="checkbox" [checked]="checkState().get(row.id) === 'all'" [indeterminate]="checkState().get(row.id) === 'some'" (change)="toggleOne(row.id)" [attr.aria-label]="row.name" />
+                    <span [class.tr__inactive]="!row.active">{{ row.name }}</span>
+                    @if (hasChildren(row)) { <span class="adm-small adm-secondary mono">{{ row.childCount }}</span> }
+                    @if (inactiveBelow().get(row.id); as n) { <span class="tr__off">{{ i18n.tf('territory.inactiveBelow', n) }}</span> }
+                  </label>
+                </span>
               }
               @case ('kind') {
                 {{ territory.kindLabel(row.kind) }}
@@ -126,8 +149,12 @@ function normalize(text: string): string {
     .tr__search input { min-width: 180px; min-height: 28px; border: none; outline: none; background: transparent; color: var(--text-primary); font: inherit; font-size: 12px; }
     .tr__table { display: block; }
     .tr__inactive { color: var(--text-muted); text-decoration: line-through; }
+    .tr__off { flex: none; padding: 0 6px; border-radius: var(--radius-sm); background: var(--status-warning-bg); color: var(--status-warning); font-size: 11px; }
     .tr__error { padding: 10px 14px 0; }
     .tr__bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 40px; padding: 6px 14px; border-bottom: 1px solid var(--border-subtle); font-size: 12px; }
+    .tr__node { display: inline-flex; align-items: center; gap: 2px; min-width: 0; }
+    .tr__twist { display: inline-grid; place-items: center; flex: none; width: 22px; height: 22px; padding: 0; border: none; border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); cursor: pointer; }
+    button.tr__twist:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
     .tr__check, .tr__name { display: inline-flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer; }
     .tr__name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .tr__check input, .tr__name input { accent-color: var(--accent); }
@@ -167,12 +194,102 @@ export class AdminTerritoryComponent implements OnInit {
   /** Alto justo para las filas (36 px c/u + encabezado), hasta 540 px; más allá, scroll virtual. */
   protected readonly tableHeight = computed(() => Math.min(540, 40 + Math.max(this.visibleRows().length, 2) * 36));
 
-  /** Con búsqueda se pierde la sangría del árbol: se ve la lista plana de lo que coincide. */
+  /** Nodos cerrados: lo que tienen debajo no se ve (sin búsqueda). */
+  protected readonly collapsed = signal<ReadonlySet<string>>(new Set());
+
+  /**
+   * Con búsqueda se pierde la sangría del árbol: se ve la lista plana de lo
+   * que coincide. Sin búsqueda, el árbol sin lo que cuelga de un nodo cerrado
+   * (las filas vienen ordenadas por path: los hijos siguen al padre).
+   */
   protected readonly visibleRows = computed(() => {
     const q = normalize(this.query().trim());
-    if (!q) return this.rows();
-    return this.rows().filter((r) => normalize(r.name).includes(q) || normalize(r.code ?? '').includes(q));
+    if (q) return this.rows().filter((r) => normalize(r.name).includes(q) || normalize(r.code ?? '').includes(q));
+    const closed = this.collapsed();
+    const out: TerritoryRow[] = [];
+    let hiddenUnder: string | null = null;
+    for (const r of this.rows()) {
+      if (hiddenUnder !== null && isUnder(r, hiddenUnder)) continue;
+      hiddenUnder = closed.has(r.id) ? r.path : null;
+      out.push(r);
+    }
+    return out;
   });
+
+  /**
+   * Estado de cada casilla: 'all' si el nodo y todo lo de abajo está marcado,
+   * 'some' si solo una parte. Se calcula de una pasada de hojas a raíz.
+   */
+  protected readonly checkState = computed(() => {
+    const sel = this.selected();
+    const total = new Map<string, number>();
+    const marked = new Map<string, number>();
+    const rows = this.rows();
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const r = rows[i];
+      const t = (total.get(r.id) ?? 0) + 1;
+      const m = (marked.get(r.id) ?? 0) + (sel.has(r.id) ? 1 : 0);
+      total.set(r.id, t);
+      marked.set(r.id, m);
+      if (r.parentId) {
+        total.set(r.parentId, (total.get(r.parentId) ?? 0) + t);
+        marked.set(r.parentId, (marked.get(r.parentId) ?? 0) + m);
+      }
+    }
+    const state = new Map<string, 'all' | 'some' | 'none'>();
+    for (const r of rows) {
+      const m = marked.get(r.id) ?? 0;
+      state.set(r.id, m === 0 ? 'none' : m === total.get(r.id) ? 'all' : 'some');
+    }
+    return state;
+  });
+
+  /**
+   * Cuántas inactivas tiene cada nodo debajo (todos los niveles): con el nodo
+   * cerrado es lo único que dice que activar o desactivar hizo algo.
+   */
+  protected readonly inactiveBelow = computed(() => {
+    const below = new Map<string, number>();
+    const rows = this.rows();
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const r = rows[i];
+      if (!r.parentId) continue;
+      const n = (below.get(r.id) ?? 0) + (r.active ? 0 : 1);
+      if (n) below.set(r.parentId, (below.get(r.parentId) ?? 0) + n);
+    }
+    return below;
+  });
+
+  protected hasChildren(row: TerritorialUnit): boolean {
+    return (row.childCount ?? 0) > 0;
+  }
+
+  protected toggleCollapsed(id: string): void {
+    this.collapsed.update((set) => {
+      const next = new Set(set);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  protected expandAll(): void {
+    this.collapsed.set(new Set());
+  }
+
+  /** Deja abierta solo la raíz (el país): se ven las regiones, cerradas. */
+  protected collapseAll(): void {
+    const rows = this.rows();
+    const top = Math.min(...rows.map((r) => r.depth));
+    this.collapsed.set(new Set(rows.filter((r) => r.depth > top && this.hasChildren(r)).map((r) => r.id)));
+  }
+
+  /** El nodo y todo lo que tiene debajo. */
+  private withDescendants(id: string): string[] {
+    const node = this.rows().find((r) => r.id === id);
+    if (!node) return [id];
+    return [id, ...this.rows().filter((r) => isUnder(r, node.path)).map((r) => r.id)];
+  }
 
   async ngOnInit(): Promise<void> {
     await this.setup.loadStatus();
@@ -184,8 +301,10 @@ export class AdminTerritoryComponent implements OnInit {
   protected async reload(): Promise<void> {
     try {
       const { units, meta } = await this.territory.list(1, 5000);
+      const first = this.rows().length === 0;
       this.rows.set(units as TerritoryRow[]);
       this.total.set(meta.total);
+      if (first) this.collapseAll();
     } catch (error) {
       this.error.set(problemDetail(error, this.i18n.t('territory.loadError')));
     }
@@ -195,12 +314,17 @@ export class AdminTerritoryComponent implements OnInit {
     return new Set();
   }
 
+  /** Marcar un nodo marca todo lo de abajo; desmarcarlo (o uno a medias) lo desmarca entero. */
   protected toggleOne(id: string): void {
     this.notice.set(null);
+    const on = this.checkState().get(id) !== 'all';
+    const ids = this.withDescendants(id);
     this.selected.update((sel) => {
       const next = new Set(sel);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      for (const x of ids) {
+        if (on) next.add(x);
+        else next.delete(x);
+      }
       return next;
     });
   }
@@ -208,7 +332,7 @@ export class AdminTerritoryComponent implements OnInit {
   /** Marca o desmarca todas las que se ven (con búsqueda, solo las que coinciden). */
   protected toggleVisible(): void {
     this.notice.set(null);
-    const ids = this.visibleRows().map((r) => r.id);
+    const ids = this.visibleRows().flatMap((r) => this.withDescendants(r.id));
     const all = this.allVisibleSelected();
     this.selected.update((sel) => {
       const next = new Set(sel);

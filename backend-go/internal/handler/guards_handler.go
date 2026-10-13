@@ -473,8 +473,8 @@ func (h *GuardsHandler) UpdateGuard(w http.ResponseWriter, r *http.Request) {
 const guardCSVTemplate = "# LEYENDA E INSTRUCCIONES DE IMPORTACIÓN DE TURNOS\n" +
 	"# ------------------------------------------------\n" +
 	"# Columna \"condicion\": la guardia o la condición de Dotación.\n" +
-	"# Guardias: N2, TI, N1 (Guardia N1 No Hábil), OL (Charla/Capacitación)\n" +
-	"# Dotación: Teletrabajo, Vacaciones, Trámite Médico, Licencia médica\n" +
+	"# Guardias: N2, TI, N1 (Guardia N1 No Hábil)\n" +
+	"# Dotación: Teletrabajo, OL (Charla/Capacitación), Vacaciones, Trámite Médico, Licencia médica\n" +
 	"# Columna \"usuario\": username, correo o nombre completo del analista.\n" +
 	"# Columnas \"fechaInicio\" / \"fechaFin\": AAAA-MM-DD (Ej: 2026-06-15)\n" +
 	"# Columnas \"horaInicio\" / \"horaFin\": HH:MM de 24 horas (Ej: 09:00)\n" +
@@ -512,8 +512,8 @@ func csvCondition(raw string) (team string, dotacion string, ok bool) {
 		return "Guardia TI", "", true
 	case "n1", "n1nohabil":
 		return "Guardia N1_NO_HABIL", "", true
-	case "ol", "charlacapacitacion", "charlacapacitacionol":
-		return "Guardia OL", "", true
+	case "ol", "charlacapacitacion", "charlacapacitacionol", "capacitacion", "training":
+		return "", "training", true
 	case "teletrabajo", "telework":
 		return "", "telework", true
 	case "vacaciones", "vacation":

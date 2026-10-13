@@ -169,6 +169,8 @@ export class AdminTeamsComponent implements OnInit {
   protected readonly organizations = signal<Organization[]>([]);
   protected readonly selected = signal<TeamDetail | null>(null);
   protected readonly units = signal<TerritorialUnit[]>([]);
+  /** Solo las activas se eligen para cubrir: desactivar es sacarlas de uso. */
+  protected readonly activeUnits = computed(() => this.units().filter((u) => u.active));
   protected readonly error = signal<string | null>(null);
   protected readonly nocEnabled = computed(() => this.setup.status()?.nocEnabled ?? false);
   protected readonly kinds = computed(() => TEAM_KINDS.filter((k) => this.nocEnabled() || !NOC_KINDS.has(k)));

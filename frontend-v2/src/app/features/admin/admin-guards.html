@@ -15,7 +15,7 @@
         </span>
         <button type="button" class="adm-btn" (click)="openImport()"><mat-icon>upload_file</mat-icon>{{ i18n.t('guards.import') }}</button>
         <button type="button" class="adm-btn" [disabled]="!guards().length" (click)="openRotation()"><mat-icon>autorenew</mat-icon>{{ i18n.t('guards.rotate') }}</button>
-        <button type="button" class="adm-btn adm-btn--primary" [disabled]="!guards().length" (click)="openNew()"><mat-icon>add</mat-icon>{{ i18n.t('guards.new') }}</button>
+        <button type="button" class="adm-btn adm-btn--primary" (click)="guards().length ? openNew() : openCondition()"><mat-icon>add</mat-icon>{{ i18n.t('guards.new') }}</button>
       </span>
     </header>
 
@@ -128,6 +128,7 @@
           @case ('rotation') { {{ i18n.t('guards.rotate') }} }
           @case ('config') { {{ i18n.t('guards.config.title') }} · {{ guardOf(p.cycleId)?.label }} }
           @case ('import') { {{ i18n.t('guards.import') }} }
+          @case ('condition') { {{ i18n.t('guards.new') }} }
         }
       </strong>
       <button type="button" class="adm-icon-btn adm-push" [attr.aria-label]="i18n.t('guards.close')" (click)="closePanel()"><mat-icon>close</mat-icon></button>
@@ -136,10 +137,18 @@
     <div class="gd__panel-body">
       @if (draft(); as d) {
         <div class="adm-field">
-          <span class="adm-label">{{ i18n.t('guards.guard') }}</span>
+          <span class="adm-label">{{ i18n.t(d.id ? 'guards.guard' : 'guards.kind') }}</span>
           <span class="gd__seg gd__wrap">
             @for (g of guards(); track g.cycleId) {
               <button type="button" class="seg" [attr.aria-pressed]="d.cycleId === g.cycleId" [disabled]="!!d.id && d.cycleId !== g.cycleId" (click)="pickGuard(g.cycleId)">{{ g.label }}</button>
+            }
+            @if (!d.id) {
+              <span class="gd__sep" aria-hidden="true"></span>
+              @for (m of markable; track m.value) {
+                @if (m.value !== 'office') {
+                  <button type="button" class="seg" [attr.aria-pressed]="false" (click)="openCondition(m.value)">{{ i18n.t(m.key) }}</button>
+                }
+              }
             }
           </span>
         </div>
@@ -276,6 +285,33 @@
         <span class="adm-hint">{{ fill('guards.config.timeHint', { t: configTime(c.workShiftId) }) }}</span>
       }
 
+      @if (condition(); as c) {
+        <div class="adm-field">
+          <span class="adm-label">{{ i18n.t('guards.kind') }}</span>
+          <span class="gd__seg gd__wrap">
+            @for (g of guards(); track g.cycleId) {
+              <button type="button" class="seg" [attr.aria-pressed]="false" (click)="openNew(g.cycleId)">{{ g.label }}</button>
+            }
+            <span class="gd__sep" aria-hidden="true"></span>
+            @for (m of markable; track m.value) {
+              <button type="button" class="seg" [attr.aria-pressed]="c.condition === m.value" (click)="patchCondition({ condition: m.value })">{{ i18n.t(m.key) }}</button>
+            }
+          </span>
+        </div>
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('guards.cond.person') }}</span>
+          <select class="adm-input" [ngModel]="c.userId" (ngModelChange)="patchCondition({ userId: $event })">
+            <option value="">—</option>
+            @for (u of staff(); track u.id) { <option [value]="u.id">{{ u.name }}</option> }
+          </select>
+        </label>
+        <div class="gd__two">
+          <label class="adm-field"><span class="adm-label">{{ i18n.t('guards.from') }}</span><input class="adm-input mono" type="date" [ngModel]="c.from" (ngModelChange)="patchCondition({ from: $event })" /></label>
+          <label class="adm-field"><span class="adm-label">{{ i18n.t('guards.to') }}</span><input class="adm-input mono" type="date" [min]="c.from" [ngModel]="c.to" (ngModelChange)="patchCondition({ to: $event })" /></label>
+        </div>
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('guards.cond.notes') }}</span><input class="adm-input" [ngModel]="c.notes" (ngModelChange)="patchCondition({ notes: $event })" /></label>
+        <span class="adm-hint">{{ i18n.t('guards.cond.hint') }}</span>
+      }
+
       @if (p.kind === 'import') {
         <p class="adm-small">{{ i18n.t('guards.csv.hint') }}</p>
         <code class="gd__code">condicion,usuario,fechaInicio,horaInicio,fechaFin,horaFin</code>
@@ -311,6 +347,10 @@
         }
         @case ('import') {
           <button type="button" class="adm-btn adm-push" (click)="closePanel()">{{ i18n.t('guards.close') }}</button>
+        }
+        @case ('condition') {
+          <button type="button" class="adm-btn adm-push" (click)="closePanel()">{{ i18n.t('guards.cancel') }}</button>
+          <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy() || !canSaveCondition()" (click)="saveCondition()">{{ i18n.t('guards.cond.save') }}</button>
         }
       }
     </footer>

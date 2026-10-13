@@ -107,7 +107,7 @@ export class AdminEscalationComponent implements OnInit {
       case 'asset':
         return this.assets().map((a) => ({ id: a.id, label: `${a.name} (${a.code})` }));
       case 'unit':
-        return this.units().map((u) => ({ id: u.id, label: `${'— '.repeat(u.depth)}${u.name}` }));
+        return this.units().filter((u) => u.active).map((u) => ({ id: u.id, label: `${'— '.repeat(u.depth)}${u.name}` }));
       default:
         return this.services()
           .map((s) => ({ id: s.id, label: serviceLabel(s) }))

@@ -257,7 +257,7 @@ Cada política (de un servicio, un activo o una zona) es una lista de **llamados
 
 ### Turnos → Guardias
 
-La pantalla para organizar las guardias (N2, TI, N1 No hábil, OL…).
+La pantalla para organizar las guardias (N2, TI, N1 No hábil…) y marcar condiciones de una persona (teletrabajo, charla/capacitación, vacaciones, licencias) con "Marcar condición".
 
 - **Ahora de guardia:** quién está en cada guardia, hasta cuándo y quién sigue.
 - **Línea de tiempo** de 2 o 4 semanas, con una línea roja en "ahora".

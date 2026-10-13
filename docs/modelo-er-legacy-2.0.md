@@ -46,7 +46,7 @@ Notas del legacy que explican varias decisiones:
 
 - El **cliente real** estaba repartido entre `clients` y `catalogLogSources` (la fuente de logs hacía de cliente): en la 2.0 ambos son `organizations`.
 - `checklistTemplates` guarda los ítems **anidados** dentro del documento; `checks` guarda una copia del título de cada servicio.
-- `shiftAssignments` mezcla dos cosas: **guardias semanales** (N2, N1 inhábil, TI, OL) y **condiciones del día** (teletrabajo, vacaciones, licencia…).
+- `shiftAssignments` mezcla dos cosas: **guardias semanales** (N2, N1 inhábil, TI) y **condiciones del día** (teletrabajo, charla/capacitación OL, vacaciones, licencia…).
 - `appConfigs` es un documento único con todo: marca, alerta NOK, cumpleaños, cooldown de checklist.
 
 ## 2. 2.0 (PostgreSQL): tablas que reciben datos del legacy
@@ -107,7 +107,7 @@ Tablas de configuración (fila única): `app_config`, `app_branding`, `smtp_conf
 | `checks` | 339 | `shift_checks`, `shift_check_services` | 4.976 servicios. Cada servicio se enlaza con su ítem de plantilla cuando existe. El turno faltante (215 checks viejos) se deduce por la hora; las plantillas ya borradas se recrean inactivas con su nombre. |
 | `entries` | 966 | `entries` | Tipo, ámbito (SOC/NOC), etiquetas y cliente (por servicio). |
 | `adminNotes`, `personalNotes` | 1, 10 | `admin_notes`, `personal_notes` | Se descarta la nota de un usuario que ya no existe. |
-| `shiftAssignments` | 330 | `work_shift_assignments`, `teams`, `team_members`, `rotation_cycles`, `rotation_slots` | Condiciones del día (teletrabajo, vacaciones, licencia…) → un registro por día. Guardias (N2, N1 inhábil, TI, OL) → un equipo "Guardia X" con su ciclo semanal; cada guardia es un tramo con la **fecha y hora exactas** del legacy (`starts_at`/`ends_at`). N2 y N1 inhábil quedan como guardias que siempre deben estar cubiertas (`must_be_covered`). |
+| `shiftAssignments` | 330 | `work_shift_assignments`, `teams`, `team_members`, `rotation_cycles`, `rotation_slots` | Condiciones del día (teletrabajo, charla/capacitación OL, vacaciones, licencia…) → un registro por día. Guardias (N2, N1 inhábil, TI) → un equipo "Guardia X" con su ciclo semanal; cada guardia es un tramo con la **fecha y hora exactas** del legacy (`starts_at`/`ends_at`). N2 y N1 inhábil quedan como guardias que siempre deben estar cubiertas (`must_be_covered`). |
 | `shiftReminders` | 1 | `shift_reminders` | |
 | `shiftNotificationSchedules` | 2 | `work_shift_notification_schedules` | Formato (lista/calendario) y condiciones a notificar con los códigos del legacy. |
 | `smtpConfigs` | 1 | `smtp_config` | La contraseña se re-cifra con la llave 2.0. |

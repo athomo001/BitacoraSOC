@@ -299,10 +299,11 @@ func (m *Migrator) migrateRaci(ctx context.Context) error {
 // ===== guardias y dotación =====
 
 // dotaciónCodes: códigos del legacy que son una condición del día (matriz
-// de dotación); el resto de los códigos son roles de guardia.
+// de dotación); el resto de los códigos son roles de guardia. OL es la
+// "Charla/Capacitación" del legacy: una persona un día, no una guardia.
 var dotacionCodes = map[string]string{
 	"TELEWORK": "telework", "OFFICE": "office", "VACATION": "vacation", "MEDICAL_LEAVE": "medical_leave",
-	"MEDICAL_APPOINTMENT": "medical_appointment", "TRAINING": "training",
+	"MEDICAL_APPOINTMENT": "medical_appointment", "TRAINING": "training", "OL": "training",
 }
 
 func (m *Migrator) migrateShiftAssignments(ctx context.Context) error {

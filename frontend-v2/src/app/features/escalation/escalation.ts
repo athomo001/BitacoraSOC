@@ -163,7 +163,7 @@ export class EscalationComponent implements OnInit {
       case 'asset':
         return this.assets().map((a) => ({ id: a.id, label: a.name, hint: [a.code, a.ipAddress].filter(Boolean).join(' · ') }));
       case 'unit':
-        return this.units().map((u) => ({ id: u.id, label: u.name, hint: u.code, depth: u.depth }));
+        return this.units().filter((u) => u.active).map((u) => ({ id: u.id, label: u.name, hint: u.code, depth: u.depth }));
       default:
         return this.services()
           .map((s) => ({ id: s.id, label: [s.organizationName, s.name].filter(Boolean).join(' · '), hint: '', search: s.code }))

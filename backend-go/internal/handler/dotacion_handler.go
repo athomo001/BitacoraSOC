@@ -290,7 +290,13 @@ type createAssignmentRequest struct {
 	AssignedDate string    `json:"assignedDate"`
 	Condition    string    `json:"condition"`
 	Notes        *string   `json:"notes,omitempty"`
+	// UntilDate (opcional, inclusive): la misma condición hasta ese día, como
+	// la asignación por rango del legacy (licencia o vacaciones de varios días).
+	UntilDate *string `json:"untilDate,omitempty"`
 }
+
+// maxAssignmentDays acota un rango: más de un año es casi seguro un error de tipeo.
+const maxAssignmentDays = 366
 
 func (h *DotacionHandler) CreateAssignment(w http.ResponseWriter, r *http.Request) {
 	var req createAssignmentRequest
@@ -303,21 +309,40 @@ func (h *DotacionHandler) CreateAssignment(w http.ResponseWriter, r *http.Reques
 		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "userId, assignedDate (YYYY-MM-DD) y condition válidos son obligatorios")
 		return
 	}
-	assignment, err := h.Queries.UpsertAssignment(r.Context(), db.UpsertAssignmentParams{
-		UserID: req.UserID, AssignedDate: date, Condition: db.TeleworkCondition(req.Condition), Notes: nonEmptyText(req.Notes),
-	})
-	if err != nil {
-		if isForeignKeyViolation(err) {
-			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "el usuario indicado no existe")
+	until := date
+	if req.UntilDate != nil && strings.TrimSpace(*req.UntilDate) != "" {
+		parsed, err := parseDate(*req.UntilDate)
+		if err != nil || parsed.Time.Before(date.Time) {
+			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "untilDate debe ser YYYY-MM-DD y no anterior a assignedDate")
 			return
 		}
-		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo guardar la asignación")
-		return
+		if parsed.Time.Sub(date.Time) >= maxAssignmentDays*24*time.Hour {
+			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "el rango no puede superar un año")
+			return
+		}
+		until = parsed
+	}
+	var first db.WorkShiftAssignment
+	for d := date.Time; !d.After(until.Time); d = d.AddDate(0, 0, 1) {
+		assignment, err := h.Queries.UpsertAssignment(r.Context(), db.UpsertAssignmentParams{
+			UserID: req.UserID, AssignedDate: pgtype.Date{Time: d, Valid: true}, Condition: db.TeleworkCondition(req.Condition), Notes: nonEmptyText(req.Notes),
+		})
+		if err != nil {
+			if isForeignKeyViolation(err) {
+				problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "el usuario indicado no existe")
+				return
+			}
+			problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo guardar la asignación")
+			return
+		}
+		if d.Equal(date.Time) {
+			first = assignment
+		}
 	}
 	h.AuditLog.Log(r.Context(), "work_shift_assignment.upserted", audit.LevelInfo, audit.Success(), map[string]any{
-		"userId": assignment.UserID.String(), "date": req.AssignedDate, "condition": string(assignment.Condition),
+		"userId": first.UserID.String(), "date": req.AssignedDate, "until": until.Time.Format("2006-01-02"), "condition": string(first.Condition),
 	})
-	writeData(w, http.StatusCreated, toAssignmentDTO(assignment))
+	writeData(w, http.StatusCreated, toAssignmentDTO(first))
 }
 
 // ===== Enlace público TV (HU-4b) =====

@@ -3,7 +3,11 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideHttpClient } from '@angular/common/http';
 import { AdminTerritoryComponent } from './admin-territory';
 
-const unit = (id: string, name: string, code: string, depth: number, active = true) => ({ id, name, code, kind: depth ? 'region' : 'country', depth, active });
+const unit = (id: string, name: string, path: string, parentId: string | null, childCount = 0) => {
+  const code = path.split('.').pop()!;
+  const depth = path.split('.').length - 1;
+  return { id, name, code, path, parentId, childCount, kind: ['country', 'region', 'zone'][depth], depth, active: true };
+};
 
 describe('AdminTerritoryComponent (activar/desactivar masivo, pedido del dueño 2026-10-07)', () => {
   let httpMock: HttpTestingController;
@@ -20,7 +24,12 @@ describe('AdminTerritoryComponent (activar/desactivar masivo, pedido del dueño 
     httpMock.expectOne('/api/setup/status').flush({ data: { setupCompleted: true, socEnabled: false, nocEnabled: true } });
     await tick();
     httpMock.expectOne((r) => r.url === '/api/territorial-units').flush({
-      data: [unit('u0', 'Chile', 'CL', 0), unit('u1', 'Aisén', 'CL-AI', 1), unit('u2', 'Los Ríos', 'CL-LR', 1), unit('u3', 'Río Ibáñez', 'CL-AI-RI', 2)],
+      data: [
+        unit('u0', 'Chile', 'CL', null, 2),
+        unit('u1', 'Aisén', 'CL.CL-AI', 'u0', 1),
+        unit('u3', 'Río Ibáñez', 'CL.CL-AI.CL-AI-RI', 'u1'),
+        unit('u2', 'Los Ríos', 'CL.CL-LR', 'u0'),
+      ],
       meta: { page: 1, pageSize: 5000, total: 4 },
     });
     httpMock.match(() => true).forEach((r) => r.flush({ data: {} }));
@@ -48,7 +57,7 @@ describe('AdminTerritoryComponent (activar/desactivar masivo, pedido del dueño 
 
     button(el, 'Desactivar').click();
     const req = httpMock.expectOne('/api/territorial-units/bulk-active');
-    expect(req.request.body).toEqual({ ids: ['u2', 'u3'], active: false });
+    expect(req.request.body).toEqual({ ids: ['u3', 'u2'], active: false });
     req.flush({ data: { changed: 2 } });
     await tick();
     fixture.detectChanges();
@@ -57,10 +66,54 @@ describe('AdminTerritoryComponent (activar/desactivar masivo, pedido del dueño 
     expect(el.querySelectorAll('.tr__inactive').length).toBe(2);
   });
 
-  it('marcar una por una y quitar la selección', async () => {
+  it('con la región cerrada, avisa cuántas inactivas tiene abajo y se actualiza al activar', async () => {
+    const { fixture, el } = await render();
+    const search = el.querySelector('input[type="search"]') as HTMLInputElement;
+    search.value = 'ibanez';
+    search.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    (el.querySelector('.tr__name input[type="checkbox"]') as HTMLInputElement).click();
+    fixture.detectChanges();
+    button(el, 'Desactivar').click();
+    httpMock.expectOne('/api/territorial-units/bulk-active').flush({ data: { changed: 1 } });
+    await tick();
+    search.value = '';
+    search.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect([...el.querySelectorAll('.tr__off')].map((x) => x.textContent?.trim())).toEqual(['1 inactivas abajo', '1 inactivas abajo']);
+    (el.querySelectorAll('.tr__name input[type="checkbox"]')[1] as HTMLInputElement).click(); // Aisén
+    fixture.detectChanges();
+    button(el, 'Activar').click();
+    httpMock.expectOne('/api/territorial-units/bulk-active').flush({ data: { changed: 1 } });
+    await tick();
+    fixture.detectChanges();
+    expect(el.querySelectorAll('.tr__off').length).toBe(0);
+  });
+
+  it('árbol: las regiones arrancan cerradas y se abren con la flecha', async () => {
+    const { fixture, el } = await render();
+    expect(el.textContent).not.toContain('Río Ibáñez');
+    (el.querySelector('button.tr__twist[aria-expanded="false"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Río Ibáñez');
+  });
+
+  it('marcar una región marca todo lo que tiene abajo; desmarcarla lo quita entero', async () => {
     const { fixture, el } = await render();
     const boxes = () => [...el.querySelectorAll<HTMLInputElement>('.tr__name input[type="checkbox"]')];
+    boxes()[1].click(); // Aisén
+    fixture.detectChanges();
+    expect(el.textContent).toContain('2 seleccionadas');
+    expect(boxes()[0].indeterminate).toBe(true); // Chile: una parte
     boxes()[1].click();
+    fixture.detectChanges();
+    expect(el.textContent).not.toContain('seleccionadas');
+  });
+
+  it('marcar y quitar la selección', async () => {
+    const { fixture, el } = await render();
+    const boxes = () => [...el.querySelectorAll<HTMLInputElement>('.tr__name input[type="checkbox"]')];
+    boxes()[2].click(); // Los Ríos, sin nada abajo
     fixture.detectChanges();
     expect(el.textContent).toContain('1 seleccionadas');
     expect((el.querySelector('input[name="selectVisible"]') as HTMLInputElement).indeterminate).toBe(true);

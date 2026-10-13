@@ -73,6 +73,8 @@ export class ShiftsComponent implements OnInit {
 
   protected readonly editing = signal<{ userId: string; date: string } | null>(null);
   protected readonly editCondition = signal<TeleworkCondition>('office');
+  /** Último día (inclusive) al que se aplica la condición: licencias de varios días. */
+  protected readonly editUntil = signal('');
   protected readonly savingEdit = signal(false);
 
   protected readonly weekLabel = computed(() => {
@@ -99,7 +101,7 @@ export class ShiftsComponent implements OnInit {
     this.error.set(null);
     try {
       const from = isoDate(this.weekStart());
-      const to = isoDate(new Date(this.weekStart().getTime() + 12 * 86_400_000));
+      const to = isoDate(new Date(this.weekStart().getTime() + 6 * 86_400_000));
       this.matrix.set(await this.api.matrix(from, to));
     } catch (error) {
       this.error.set(problemDetail(error, this.i18n.t('staff.loadError')));
@@ -126,6 +128,7 @@ export class ShiftsComponent implements OnInit {
     if (!this.perms.isAdmin()) return;
     this.editing.set({ userId, date });
     this.editCondition.set(condition);
+    this.editUntil.set(date);
   }
 
   protected isEditing(userId: string, date: string): boolean {
@@ -143,7 +146,11 @@ export class ShiftsComponent implements OnInit {
     this.savingEdit.set(true);
     this.error.set(null);
     try {
-      await this.api.setAssignment({ userId: target.userId, assignedDate: target.date, condition: this.editCondition() });
+      const until = this.editUntil();
+      await this.api.setAssignment({
+        userId: target.userId, assignedDate: target.date, condition: this.editCondition(),
+        ...(until > target.date ? { untilDate: until } : {}),
+      });
       this.editing.set(null);
       await this.loadMatrix();
     } catch (error) {

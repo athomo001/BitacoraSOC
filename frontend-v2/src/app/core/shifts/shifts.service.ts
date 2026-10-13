@@ -229,7 +229,7 @@ export class ShiftsService {
     return (await firstValueFrom(this.http.get<ApiEnvelope<Matrix>>('/api/work-shifts/matrix', { params }))).data;
   }
 
-  async setAssignment(assignment: { userId: string; assignedDate: string; condition: TeleworkCondition; notes?: string }): Promise<Assignment> {
+  async setAssignment(assignment: { userId: string; assignedDate: string; condition: TeleworkCondition; notes?: string; untilDate?: string }): Promise<Assignment> {
     return (await firstValueFrom(this.http.post<ApiEnvelope<Assignment>>('/api/work-shifts/assignments', assignment))).data;
   }
 

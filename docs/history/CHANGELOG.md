@@ -4,6 +4,13 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] Turnos: condiciones con rango, OL deja de ser guardia, Dotación en una vista y territorio en árbol - 2026-10-13
+
+- **OL es "Charla/Capacitación", no una guardia** (como el legacy): el ETL y el CSV de guardias la cargan como condición `training` de Dotación. La migración `000031` convierte el equipo "Guardia OL" ya restaurado en días de Dotación (19 tramos → 24 días) y lo borra.
+- **Asignar condiciones como el legacy:** en Administración → Turnos → Guardias, "Nueva asignación" ofrece en un solo selector las guardias (N1 No hábil, N2, TI) y las condiciones (Teletrabajo, Charla/Capacitación, Vacaciones, Trámite Médico, Licencia médica), con persona, desde y hasta. `POST /api/work-shifts/assignments` acepta `untilDate` (rango inclusive, máx. 1 año).
+- **Dotación (TV):** muestra solo la semana actual (lunes a domingo). Queda una sola vista (la "Vista operativa"; se quitó la tabla repetida de abajo), editable con un clic por el admin, con "Hasta" para varios días. En los temas blanco y rosado las barras usan un tinte suave con texto del color de la condición.
+- **Territorio en árbol (pendiente #23):** marcar una región marca todo lo que tiene abajo (el padre queda a medias si solo una parte está marcada); cada nodo se abre y cierra, las regiones arrancan cerradas y hay Expandir/Contraer todo.
+
 ## [Rewrite] Modelo de datos en docs - 2026-10-09
 
 - **`docs/modelo-de-datos.md`**: diagramas entidad-relación de las 73 tablas, en 13 dominios, generados desde el esquema real (`backend-go/sql/schema/0001_init_schema.sql`, con todas las migraciones). El diagrama del spec (`spec/03a`) era del diseño original y le faltaban 23 tablas (pools, incidentes, avisos por cliente, eventos del informe, marca, complementos, permisos…); queda congelado como referencia.

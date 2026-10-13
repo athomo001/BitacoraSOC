@@ -187,7 +187,7 @@
                 <span class="adm-label">{{ i18n.t('teams.unit') }}</span>
                 <select class="adm-input" name="coverUnit" [ngModel]="coverUnit()" (ngModelChange)="coverUnit.set($event)">
                   <option value="">{{ i18n.t('teams.pick') }}</option>
-                  @for (u of units(); track u.id) {
+                  @for (u of activeUnits(); track u.id) {
                     <option [value]="u.id">{{ '— '.repeat(u.depth) }}{{ u.name }}</option>
                   }
                 </select>

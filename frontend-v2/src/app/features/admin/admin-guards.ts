@@ -1,6 +1,10 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
+import { firstValueFrom } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
+import { ApiEnvelope } from '../../core/auth/auth.models';
+import { ShiftsService, TeleworkCondition } from '../../core/shifts/shifts.service';
 import { Absence, Guard, GuardImportResult, GuardSlot, GuardTimeline, GuardsService } from '../../core/shifts/guards.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
@@ -10,12 +14,31 @@ import { Check, DAY, DAYS_EN, DAYS_ES, Draft, absenceInterval, checks, fmt, from
 
 import '../../core/i18n/packs/admin';
 
-/** Panel lateral: una guardia, la rotación, la configuración de una guardia o el CSV. */
+/** Panel lateral: una guardia, la rotación, la configuración de una guardia, el CSV o una condición de Dotación. */
 type Panel =
   | { kind: 'slot'; draft: Draft }
   | { kind: 'rotation'; cycleId: string; order: string[]; from: number; daysEach: number; count: number }
   | { kind: 'config'; cycleId: string; mustBeCovered: boolean; changeDay: number; workShiftId: string }
-  | { kind: 'import' };
+  | { kind: 'import' }
+  | { kind: 'condition'; userId: string; condition: TeleworkCondition; from: string; to: string; notes: string };
+
+/** Condiciones que se marcan a mano, como el formulario del legacy ("guardia" sale de la línea de tiempo). */
+const MARKABLE: { value: TeleworkCondition; key: MessageKey }[] = [
+  { value: 'telework', key: 'shiftsAdmin.cond.telework' },
+  { value: 'training', key: 'shiftsAdmin.cond.training' },
+  { value: 'vacation', key: 'shiftsAdmin.cond.vacation' },
+  { value: 'medical_appointment', key: 'shiftsAdmin.cond.medicalAppointment' },
+  { value: 'medical_leave', key: 'shiftsAdmin.cond.medicalLeave' },
+  { value: 'office', key: 'guards.cond.office' },
+];
+
+interface UserOption { id: string; username: string; fullName?: string; role: string; active: boolean; }
+
+/** AAAA-MM-DD local de `ms`. */
+function isoDay(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 const ABSENCE_KEY: Record<Absence['condition'], MessageKey> = {
   vacation: 'shiftsAdmin.cond.vacation',
@@ -63,6 +86,8 @@ export class AdminGuardsComponent implements OnInit {
   protected readonly i18n = inject(I18nService);
   private readonly prefs = inject(PreferencesService);
   private readonly api = inject(GuardsService);
+  private readonly shiftsApi = inject(ShiftsService);
+  private readonly http = inject(HttpClient);
 
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -528,6 +553,65 @@ export class AdminGuardsComponent implements OnInit {
       this.panel.set(null);
       await this.load();
     }, this.i18n.t('guards.config.saved'));
+  }
+
+  // ===== Panel: condición de Dotación (teletrabajo, charla, licencia…) =====
+
+  protected readonly markable = MARKABLE;
+  private readonly users = signal<UserOption[]>([]);
+  protected readonly staff = computed(() =>
+    this.users()
+      .filter((u) => u.active && u.role !== 'guest')
+      .map((u) => ({ id: u.id, name: u.fullName || u.username }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  );
+
+  protected readonly condition = computed(() => {
+    const p = this.panel();
+    return p?.kind === 'condition' ? p : null;
+  });
+
+  /** Desde una nueva guardia se pasa a una condición (y viceversa): un solo formulario, como el legacy. */
+  protected async openCondition(condition: TeleworkCondition = 'telework'): Promise<void> {
+    const c = this.condition();
+    if (c) {
+      this.patchCondition({ condition });
+      return;
+    }
+    const d = this.draft();
+    const day = isoDay(d && !d.id ? d.from : Date.now());
+    this.setPanel({ kind: 'condition', userId: '', condition, from: day, to: day, notes: '' });
+    if (!this.users().length) {
+      await this.run(async () => this.users.set((await firstValueFrom(this.http.get<ApiEnvelope<UserOption[]>>('/api/users'))).data));
+    }
+  }
+
+  protected patchCondition(patch: Partial<Extract<Panel, { kind: 'condition' }>>): void {
+    const c = this.condition();
+    if (!c) return;
+    const next = { ...c, ...patch };
+    // Mover "Desde" más allá de "Hasta" arrastra "Hasta": un día suelto es lo común.
+    if (patch.from && next.to < next.from) next.to = next.from;
+    this.panel.set(next);
+  }
+
+  protected canSaveCondition(): boolean {
+    const c = this.condition();
+    return !!c && !!c.userId && !!c.from && !!c.to && c.to >= c.from;
+  }
+
+  protected async saveCondition(): Promise<void> {
+    const c = this.condition();
+    if (!c || !this.canSaveCondition()) return;
+    await this.run(async () => {
+      await this.shiftsApi.setAssignment({
+        userId: c.userId, assignedDate: c.from, condition: c.condition,
+        ...(c.to !== c.from ? { untilDate: c.to } : {}),
+        ...(c.notes.trim() ? { notes: c.notes.trim() } : {}),
+      });
+      this.panel.set(null);
+      await this.load();
+    }, this.i18n.t('guards.cond.saved'));
   }
 
   // ===== Panel: CSV =====

@@ -18,7 +18,7 @@ function timeline(now: number): GuardTimeline {
         members: [{ teamMemberId: 'm1', name: 'Ana Rojas', userId: 'u1' }, { teamMemberId: 'm2', name: 'Beto Soto', userId: 'u2' }],
       },
       {
-        cycleId: 'c4', teamId: 't4', label: 'OL', mustBeCovered: false, changeDay: 1, changeTime: '09:00', timezone: 'America/Santiago',
+        cycleId: 'c4', teamId: 't4', label: 'TI', mustBeCovered: false, changeDay: 1, changeTime: '09:00', timezone: 'America/Santiago',
         members: [{ teamMemberId: 'm5', name: 'Pablo E', userId: 'u5' }],
       },
     ],
@@ -63,7 +63,7 @@ describe('AdminGuardsComponent (línea de tiempo de guardias)', () => {
     expect(el.querySelector('.gd__issue')?.textContent).toContain('N2 sin nadie');
   });
 
-  it('OL no es "siempre cubierta": no marca huecos en su fila', async () => {
+  it('TI no es "siempre cubierta": no marca huecos en su fila', async () => {
     const { el } = await render();
     const rows = el.querySelectorAll('.gd__row');
     expect(rows[1].querySelectorAll('.gd__gap').length).toBe(0);
@@ -116,6 +116,41 @@ describe('AdminGuardsComponent (línea de tiempo de guardias)', () => {
     const req = httpMock.expectOne('/api/guards/c2');
     expect(req.request.method).toBe('PATCH');
     expect(req.request.body).toEqual({ mustBeCovered: true, changeDay: 1, workShiftId: 'w1' });
+    req.flush({ data: {} });
+  });
+
+  it('nueva asignación también marca condiciones: licencia de varios días en Dotación', async () => {
+    const { fixture, el } = await render();
+    const open = [...el.querySelectorAll('.gd__tools button')].find((b) => b.textContent?.includes('Nueva asignación')) as HTMLButtonElement;
+    open.click();
+    fixture.detectChanges();
+    // Mismo selector que las guardias, como el legacy: N2, TI… y las condiciones.
+    const tele = [...el.querySelectorAll('.gd__panel .seg')].find((b) => b.textContent?.includes('Teletrabajo')) as HTMLButtonElement;
+    tele.click();
+    await tick();
+    httpMock.expectOne('/api/users').flush({ data: [
+      { id: 'u1', username: 'arojas', fullName: 'Ana Rojas', role: 'user', active: true },
+      { id: 'u9', username: 'invitado', role: 'guest', active: true },
+    ] });
+    await tick();
+    fixture.detectChanges();
+    const person = el.querySelector('.gd__panel select') as HTMLSelectElement;
+    expect(person.options.length).toBe(2);
+    person.value = 'u1';
+    person.dispatchEvent(new Event('change'));
+    const leave = [...el.querySelectorAll('.gd__panel .seg')].find((b) => b.textContent?.includes('Licencia')) as HTMLButtonElement;
+    leave.click();
+    fixture.detectChanges();
+    const [from, to] = [...el.querySelectorAll('.gd__panel input[type=date]')] as HTMLInputElement[];
+    from.value = '2026-10-14';
+    from.dispatchEvent(new Event('input'));
+    to.value = '2026-10-20';
+    to.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    (el.querySelector('.gd__panel-foot .adm-btn--primary') as HTMLButtonElement).click();
+    await tick();
+    const req = httpMock.expectOne('/api/work-shifts/assignments');
+    expect(req.request.body).toEqual({ userId: 'u1', assignedDate: '2026-10-14', condition: 'medical_leave', untilDate: '2026-10-20' });
     req.flush({ data: {} });
   });
 });

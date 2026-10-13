@@ -425,7 +425,7 @@ type Querier interface {
 	// Copias automáticas fuera de la retención: el planificador las borra (archivo y fila).
 	ListExpiredAutoBackups(ctx context.Context, startedAt pgtype.Timestamptz) ([]BackupRun, error)
 	// Guardias en línea de tiempo (000029, canvas "Turnos: guardias"): los
-	// equipos "oncall" (Guardia N2, Guardia TI, Guardia N1_NO_HABIL, Guardia OL)
+	// equipos "oncall" (Guardia N2, Guardia TI, Guardia N1_NO_HABIL)
 	// con su ciclo, sus integrantes y sus guardias con hora exacta.
 	// La hora de cambio sale del turno de trabajo enlazado a la guardia
 	// (Administración → Turnos → Turnos de trabajo); sin turno enlazado, 09:00.

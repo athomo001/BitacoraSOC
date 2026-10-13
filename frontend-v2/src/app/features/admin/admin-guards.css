@@ -445,3 +445,6 @@ mat-icon {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Separa las guardias de las condiciones de Dotación en el selector. */
+.gd__sep { width: 1px; align-self: stretch; margin: 0 4px; background: var(--border-subtle); }
