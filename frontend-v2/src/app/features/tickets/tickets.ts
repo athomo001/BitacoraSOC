@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, Injector, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
+import { ActivatedRoute } from '@angular/router';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
@@ -30,6 +31,7 @@ export class TicketsComponent implements OnInit {
   private readonly sse = inject(SseService);
   private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly route = inject(ActivatedRoute, { optional: true });
 
   protected readonly tickets = signal<Ticket[]>([]);
   protected readonly summary = signal<QueueSummary>({ open: 0, breached: 0, paused: 0, resolvedToday: 0 });
@@ -61,6 +63,9 @@ export class TicketsComponent implements OnInit {
   protected readonly statusTone = STATUS_TONE;
 
   async ngOnInit(): Promise<void> {
+    // "Abrir el ticket" de los correos: /tickets?id=…
+    const fromLink = this.route?.snapshot.queryParamMap.get('id');
+    if (fromLink) this.selectedId.set(fromLink);
     // Otro analista cambió un ticket: la cola se refresca sola. Se conecta
     // antes de cargar, así el cierre queda registrado aunque el operador se
     // vaya de la pantalla mientras carga.

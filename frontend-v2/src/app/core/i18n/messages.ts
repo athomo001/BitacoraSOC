@@ -8,6 +8,7 @@ import type { ReportsKey } from './packs/reports';
 import type { ShiftsKey } from './packs/shifts';
 import type { TerritoryKey } from './packs/territory';
 import type { TicketsKey } from './packs/tickets';
+import type { TeamKey } from './packs/team';
 
 const ES = {
   'nav.entries': 'Bitácora',
@@ -156,6 +157,7 @@ const ES = {
   'mdHelp.s.own': 'Propio de la bitácora',
   'esc.pool': 'Pool',
   'nav.reports': 'Reportes',
+  'nav.team': 'Mi equipo',
   'rpt.f.chooseClient': 'Elige el cliente…',
   'rpt.f.additional': 'Información adicional',
   'rpt.col.client': 'Cliente',
@@ -218,7 +220,8 @@ export type MessageKey =
   | ReportsKey
   | ShiftsKey
   | TerritoryKey
-  | TicketsKey;
+  | TicketsKey
+  | TeamKey;
 
 /**
  * El inglés va en messages-en.ts y se descarga solo al cambiar a EN: así no

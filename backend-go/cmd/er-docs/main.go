@@ -50,13 +50,13 @@ type domain struct {
 
 var domains = []domain{
 	{"Usuarios, acceso y permisos", "Cuentas, sesiones revocadas, llaves de API y los grupos de permisos que acotan qué módulos y capacidades tiene cada usuario.",
-		[]string{"users", "login_rate_limits", "token_denylist", "api_keys", "permission_groups", "user_permission_groups"}},
+		[]string{"users", "login_rate_limits", "token_denylist", "api_keys", "permission_groups", "permission_group_areas", "areas", "levels", "user_permission_groups"}},
 	{"Territorio, organizaciones y activos", "Árbol territorial genérico (país → región → zona → sitio), organizaciones con tipos configurables, sus servicios y los activos.",
 		[]string{"territorial_units", "organization_types", "organizations", "services", "catalog_log_sources", "assets"}},
 	{"Directorio de contactos", "Personas externas e internas a las que se avisa, con sus canales.",
 		[]string{"contacts", "contact_channels"}},
 	{"Ticketera", "Tickets con SLA, comentarios, tareas con tiempo, resolutores, imágenes, padre/hijo y unidos.",
-		[]string{"tickets", "ticket_comments", "ticket_tasks", "ticket_resolvers", "ticket_images"}},
+		[]string{"tickets", "ticket_comments", "ticket_tasks", "ticket_resolvers", "ticket_images", "ticket_settings", "ticket_mail_outbox"}},
 	{"Equipos y escalamiento", "Equipos, políticas con sus llamados, pools con nombre, incidentes con sus intentos y notas, ventanas de mantenimiento y RACI. Un equipo con `kind = 'step'` es el grupo de personas de un solo llamado: no tiene organización, no aparece en Equipos y se borra con su paso.",
 		[]string{"team_groups", "teams", "team_members", "team_coverage", "escalation_policies", "escalation_steps", "escalation_pools", "escalation_pool_members", "escalation_incidents", "escalation_incident_notes", "escalation_action_logs", "maintenance_windows", "raci_assignments"}},
 	{"Turnos, guardias y dotación", "Turnos de trabajo y sus integrantes, guardias con hora exacta (ciclos, tramos y reemplazos), dotación, recordatorios y cierre de turno.",

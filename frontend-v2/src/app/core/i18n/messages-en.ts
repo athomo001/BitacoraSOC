@@ -148,6 +148,7 @@ export const EN: Record<CoreKey, string> = {
   'mdHelp.s.own': 'Specific to the log',
   'esc.pool': 'Pool',
   'nav.reports': 'Reports',
+  'nav.team': 'My team',
   'rpt.f.chooseClient': 'Choose the client…',
   'rpt.f.additional': 'Additional information',
   'rpt.col.client': 'Client',

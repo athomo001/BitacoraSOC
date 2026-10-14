@@ -40,10 +40,12 @@ describe('ShellComponent', () => {
     delete document.documentElement.dataset['font'];
   });
 
-  async function render(features: { code: string; isEnabled: boolean }[]) {
+  async function render(features: { code: string; isEnabled: boolean }[], capabilities: string[] = []) {
     const fixture = TestBed.createComponent(ShellComponent);
     fixture.detectChanges();
-    httpMock.expectOne('/api/users/me').flush({ data: { id: '1', username: 'ana.rojas', fullName: 'Ana Rojas', email: 'ana@x.cl' } });
+    // El usuario lo piden la sesión y los permisos (capacidades de grupo).
+    for (const req of httpMock.match('/api/users/me')) req.flush({ data: { id: '1', username: 'ana.rojas', fullName: 'Ana Rojas', email: 'ana@x.cl', role: 'user' } });
+    httpMock.expectOne('/api/users/me/capabilities').flush({ data: { moduleScope: 'both', capabilities } });
     httpMock.expectOne('/api/system-features').flush({ data: features });
     await fixture.whenStable();
     fixture.detectChanges();
@@ -59,6 +61,11 @@ describe('ShellComponent', () => {
   it('muestra las 6 secciones del núcleo y oculta la ticketera si está apagada', async () => {
     const { el } = await render([{ code: 'native_tickets', isEnabled: false }]);
     expect(navLabels(el)).toEqual(['Bitácora', 'Turnos y Checklist', 'Escalamiento', 'Directorio', 'Reportes', 'Administración']);
+  });
+
+  it('Mi equipo solo aparece para la jefatura de área', async () => {
+    const { el } = await render([], ['area:lead']);
+    expect(navLabels(el)).toContain('Mi equipo');
   });
 
   it('tras recargar la página vuelve a pedir el usuario y muestra su nombre al pie de la barra', async () => {

@@ -20,6 +20,7 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/complements"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/ratelimit"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/reminders"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
 )
 
@@ -113,8 +114,8 @@ func requireCollection(w http.ResponseWriter, c db.Complement, collection string
 func (a *RuntimeAPI) Context(w http.ResponseWriter, r *http.Request, c db.Complement) {
 	q := a.Complements.Queries
 	out := map[string]any{"version": "v1", "appVersion": a.AppVersion, "requestId": r.Header.Get("X-Request-Id"), "shift": nil}
-	if cfg, err := q.GetAppConfig(r.Context()); err == nil {
-		out["modules"] = map[string]bool{"soc": cfg.SocModuleEnabled, "noc": cfg.NocModuleEnabled}
+	if flags, err := repository.AreaFlags(r.Context(), q); err == nil {
+		out["modules"] = map[string]bool{"soc": flags.SOC, "noc": flags.NOC}
 	}
 	shifts, _ := q.ListWorkShifts(r.Context(), pgtype.Bool{Bool: true, Valid: true})
 	now := time.Now()

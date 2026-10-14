@@ -1578,3 +1578,152 @@ WHERE t.id = c.team_id AND t.name IN ('Guardia N2', 'Guardia N1_NO_HABIL');
 
 ALTER TABLE escalation_steps ADD COLUMN title TEXT;
 ALTER TABLE teams ADD COLUMN deactivated_by_org BOOLEAN NOT NULL DEFAULT false;
+
+-- Administración → Ticketera (pedido del dueño 2026-10-13: "todo lo de
+-- tickets en una sección de admin, para configurarlo a gusto") y los avisos
+-- por correo de spec/15-ticketera-avisos-correo.md.
+--
+-- ticket_settings es de una sola fila. Los valores por defecto son los que
+-- antes estaban fijos en el código: respuesta 1 h; resolución 8 h (incidente)
+-- y 72 h (requerimiento); "en riesgo" desde el 75 %; firma "Mesa de
+-- Operaciones". Los avisos vienen apagados (decisión del dueño, spec/15 §11).
+CREATE TABLE ticket_settings (
+  id BOOLEAN PRIMARY KEY DEFAULT true CHECK (id),
+  -- SLA en minutos: incidentes por prioridad y requerimientos aparte.
+  sla_p1_response_minutes INT NOT NULL DEFAULT 60 CHECK (sla_p1_response_minutes > 0),
+  sla_p1_resolution_minutes INT NOT NULL DEFAULT 480 CHECK (sla_p1_resolution_minutes > 0),
+  sla_p2_response_minutes INT NOT NULL DEFAULT 60 CHECK (sla_p2_response_minutes > 0),
+  sla_p2_resolution_minutes INT NOT NULL DEFAULT 480 CHECK (sla_p2_resolution_minutes > 0),
+  sla_p3_response_minutes INT NOT NULL DEFAULT 60 CHECK (sla_p3_response_minutes > 0),
+  sla_p3_resolution_minutes INT NOT NULL DEFAULT 480 CHECK (sla_p3_resolution_minutes > 0),
+  sla_p4_response_minutes INT NOT NULL DEFAULT 60 CHECK (sla_p4_response_minutes > 0),
+  sla_p4_resolution_minutes INT NOT NULL DEFAULT 480 CHECK (sla_p4_resolution_minutes > 0),
+  sla_request_response_minutes INT NOT NULL DEFAULT 60 CHECK (sla_request_response_minutes > 0),
+  sla_request_resolution_minutes INT NOT NULL DEFAULT 4320 CHECK (sla_request_resolution_minutes > 0),
+  at_risk_percent INT NOT NULL DEFAULT 75 CHECK (at_risk_percent BETWEEN 1 AND 99),
+  public_signature TEXT NOT NULL DEFAULT 'Mesa de Operaciones' CHECK (length(trim(public_signature)) > 0),
+  -- Avisos por correo (spec/15 §4).
+  mail_enabled BOOLEAN NOT NULL DEFAULT false,
+  mail_team_link BOOLEAN NOT NULL DEFAULT true,
+  mail_skip_actor BOOLEAN NOT NULL DEFAULT true,
+  mail_team_enabled BOOLEAN NOT NULL DEFAULT true,
+  mail_backup_emails TEXT[] NOT NULL DEFAULT '{}',
+  mail_client_enabled BOOLEAN NOT NULL DEFAULT false,
+  mail_affects_rule TEXT NOT NULL DEFAULT 'p1p2' CHECK (mail_affects_rule IN ('p1p2', 'incidents', 'none')),
+  mail_comment_batch_minutes INT NOT NULL DEFAULT 15 CHECK (mail_comment_batch_minutes IN (0, 5, 15, 30, 60)),
+  mail_include_pin BOOLEAN NOT NULL DEFAULT false,
+  -- Eventos encendidos ('team.created', 'client.resolved'…). Por defecto,
+  -- los marcados "sí" en spec/15 §4.2 y §4.3.
+  mail_events TEXT[] NOT NULL DEFAULT ARRAY[
+    'team.created', 'team.assigned', 'team.resolver_added', 'team.sla_response_breached',
+    'team.sla_resolution_breached', 'team.reopened', 'team.merged', 'team.client_changed',
+    'client.opened', 'client.comment', 'client.resolved', 'client.reopened'
+  ],
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO ticket_settings (id) VALUES (true);
+
+-- En cada ticket (spec/15 §5): la marca, los destinatarios propios (NULL =
+-- los del cliente) y cuándo ya se avisó cada SLA (se avisa una sola vez).
+ALTER TABLE tickets
+  ADD COLUMN affects_client BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN notify_to TEXT[],
+  ADD COLUMN notify_cc TEXT[],
+  ADD COLUMN sla_response_breach_notified_at TIMESTAMPTZ,
+  ADD COLUMN sla_resolution_warn_notified_at TIMESTAMPTZ,
+  ADD COLUMN sla_resolution_breach_notified_at TIMESTAMPTZ;
+
+-- Cola de correos de la Ticketera (spec/15 §7): la acción del analista nunca
+-- espera al correo; un despachador los envía con reintentos. 'waiting' es un
+-- aviso de comentarios al cliente que junta los que lleguen en la ventana
+-- (comments guarda cada uno: {"at": …, "text": …}).
+CREATE TABLE ticket_mail_outbox (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ticket_id UUID NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+  event TEXT NOT NULL,
+  mail_group TEXT NOT NULL CHECK (mail_group IN ('team', 'client')),
+  to_emails TEXT[] NOT NULL DEFAULT '{}',
+  cc_emails TEXT[] NOT NULL DEFAULT '{}',
+  subject TEXT NOT NULL DEFAULT '',
+  html TEXT NOT NULL DEFAULT '',
+  body_text TEXT NOT NULL DEFAULT '',
+  comments JSONB NOT NULL DEFAULT '[]',
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'waiting', 'sent', 'failed', 'no_recipients')),
+  attempts INT NOT NULL DEFAULT 0,
+  last_error TEXT,
+  send_after TIMESTAMPTZ NOT NULL DEFAULT now(),
+  sent_at TIMESTAMPTZ,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_ticket_mail_outbox_due ON ticket_mail_outbox(send_after) WHERE status IN ('pending', 'waiting');
+CREATE INDEX idx_ticket_mail_outbox_ticket ON ticket_mail_outbox(ticket_id, created_at DESC);
+
+-- Áreas, niveles y perfiles (spec/16 §3, etapa 9a del dueño 2026-10-13).
+-- Hasta acá la app conocía dos áreas fijas, SOC y NOC, en dos lugares:
+-- qué existe (app_config.soc/noc_module_enabled) y quién ve qué
+-- (permission_groups.module_scope). Ahora las áreas son un catálogo y un
+-- grupo de permisos se asocia a una o varias. SOC y NOC quedan como áreas de
+-- sistema con ids fijos (los respaldos anteriores a esta migración se
+-- actualizan al restaurarlos con esos mismos ids). Para el usuario no cambia
+-- nada: cada grupo queda con sus mismas áreas y el perfil Operativo.
+
+CREATE TABLE areas (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code TEXT NOT NULL UNIQUE CHECK (code ~ '^[a-z0-9_]+$'),
+  name TEXT NOT NULL CHECK (length(trim(name)) > 0),
+  -- active: el área existe en esta instalación (SOC/NOC: los antiguos
+  -- soc/noc_module_enabled). Un área apagada no aparece en ningún menú.
+  active BOOLEAN NOT NULL DEFAULT true,
+  -- is_system: SOC y NOC; no se borran ni cambian de código.
+  is_system BOOLEAN NOT NULL DEFAULT false,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO areas (id, code, name, active, is_system, sort_order) VALUES
+  ('a0000000-0000-4000-8000-000000000001', 'soc', 'SOC', COALESCE((SELECT soc_module_enabled FROM app_config WHERE id), false), true, 10),
+  ('a0000000-0000-4000-8000-000000000002', 'noc', 'NOC', COALESCE((SELECT noc_module_enabled FROM app_config WHERE id), false), true, 20);
+
+-- Niveles: catálogo configurable, se combinan con el área ("N1 de Infra").
+CREATE TABLE levels (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code TEXT NOT NULL UNIQUE CHECK (code ~ '^[a-z0-9_]+$'),
+  name TEXT NOT NULL CHECK (length(trim(name)) > 0),
+  rank INT NOT NULL DEFAULT 0,
+  active BOOLEAN NOT NULL DEFAULT true
+);
+
+INSERT INTO levels (id, code, name, rank) VALUES
+  ('a0000000-0000-4000-8000-000000000101', 'n1', 'N1', 1),
+  ('a0000000-0000-4000-8000-000000000102', 'n2', 'N2', 2),
+  ('a0000000-0000-4000-8000-000000000103', 'n3', 'N3', 3);
+
+-- Un grupo de permisos = área(s) + nivel + perfil (spec/16 §3.3). El perfil
+-- decide qué pantallas tiene; los grupos que existen son Operativos.
+ALTER TABLE permission_groups
+  ADD COLUMN profile TEXT NOT NULL DEFAULT 'operativo' CHECK (profile IN ('operativo', 'resolutor', 'gestion')),
+  ADD COLUMN level_id UUID REFERENCES levels(id) ON DELETE SET NULL;
+
+CREATE TABLE permission_group_areas (
+  permission_group_id UUID NOT NULL REFERENCES permission_groups(id) ON DELETE CASCADE,
+  area_id UUID NOT NULL REFERENCES areas(id) ON DELETE CASCADE,
+  PRIMARY KEY (permission_group_id, area_id)
+);
+CREATE INDEX idx_permission_group_areas_area ON permission_group_areas(area_id);
+
+INSERT INTO permission_group_areas (permission_group_id, area_id)
+SELECT id, 'a0000000-0000-4000-8000-000000000001'::uuid FROM permission_groups WHERE module_scope IN ('soc', 'both')
+UNION ALL
+SELECT id, 'a0000000-0000-4000-8000-000000000002'::uuid FROM permission_groups WHERE module_scope IN ('noc', 'both');
+
+ALTER TABLE permission_groups DROP COLUMN module_scope;
+DROP TYPE permission_group_module_scope;
+ALTER TABLE app_config DROP COLUMN soc_module_enabled, DROP COLUMN noc_module_enabled;
+
+-- 000034: perfil por defecto de cada área (los grupos que se arman solos al
+-- ubicar a una persona por área y nivel).
+ALTER TABLE areas
+  ADD COLUMN default_profile TEXT NOT NULL DEFAULT 'resolutor'
+  CHECK (default_profile IN ('operativo', 'resolutor', 'gestion'));
+UPDATE areas SET default_profile = 'operativo' WHERE code IN ('soc', 'noc');

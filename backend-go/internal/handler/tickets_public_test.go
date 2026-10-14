@@ -23,7 +23,7 @@ func TestPublicTicketDTO_HidesTechnicianAndInternalComments(t *testing.T) {
 		{ID: publicImage, CommentID: pgtype.UUID{Bytes: comments[0].ID, Valid: true}, IsPublic: true},
 		{ID: internalImage, CommentID: pgtype.UUID{Bytes: comments[1].ID, Valid: true}, IsPublic: false},
 	}
-	body, err := json.Marshal(toPublicTicketDTO(db.Ticket{TicketNumber: "TKT-2026-00042"}, "Banco Austral", comments, images))
+	body, err := json.Marshal(toPublicTicketDTO(db.Ticket{TicketNumber: "TKT-2026-00042"}, "Banco Austral", comments, images, ""))
 	if err != nil {
 		t.Fatal(err)
 	}

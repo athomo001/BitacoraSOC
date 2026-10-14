@@ -1,6 +1,6 @@
 -- name: CreatePermissionGroup :one
-INSERT INTO permission_groups (code, name, module_scope, capabilities)
-VALUES ($1, $2, $3, $4)
+INSERT INTO permission_groups (code, name, capabilities, profile, level_id)
+VALUES ($1, $2, $3, sqlc.arg('profile'), sqlc.narg('level_id'))
 RETURNING *;
 
 -- name: ListPermissionGroups :many
@@ -14,7 +14,8 @@ SELECT * FROM permission_groups WHERE id = $1;
 -- name: UpdatePermissionGroup :one
 UPDATE permission_groups SET
   name = COALESCE(sqlc.narg('name'), name),
-  module_scope = COALESCE(sqlc.narg('module_scope'), module_scope),
+  profile = COALESCE(sqlc.narg('profile'), profile),
+  level_id = CASE WHEN sqlc.arg('set_level')::bool THEN sqlc.narg('level_id')::uuid ELSE level_id END,
   capabilities = COALESCE(sqlc.narg('capabilities'), capabilities),
   active = COALESCE(sqlc.narg('active'), active)
 WHERE id = $1

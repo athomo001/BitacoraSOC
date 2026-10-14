@@ -35,6 +35,8 @@ type TicketsHandler struct {
 	PinLimiter *ratelimit.APILimiter
 	// Hub avisa por SSE que la cola cambió (otro analista la ve al instante).
 	Hub eventPublisher
+	// Mailer: avisos por correo (spec/15); nil = sin avisos (tests).
+	Mailer *TicketMailer
 }
 
 func (h *TicketsHandler) now() time.Time {
@@ -124,6 +126,8 @@ type createTicketRequest struct {
 	Description    string     `json:"description"`
 	// ParentID: crear el ticket ya como hijo de otro ("Crear hijo").
 	ParentID *uuid.UUID `json:"parentId"`
+	// AffectsClient: nil = según la regla de Administración → Ticketera.
+	AffectsClient *bool `json:"affectsClient"`
 }
 
 // ticketPriority aplica la matriz ITIL compartida (internal/tickets).
@@ -213,6 +217,7 @@ func (h *TicketsHandler) AddComment(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo crear el comentario")
 		return
 	}
+	h.afterComment(ctx, ticket, u.ID, strings.TrimSpace(req.Content), req.IsPublic)
 	copied := h.cascadeComment(ctx, ticket, u, strings.TrimSpace(req.Content), req.IsPublic, req.AlsoChildren)
 	if h.AuditLog != nil {
 		h.AuditLog.Log(ctx, "ticket.comment_added", audit.LevelInfo, audit.Success(), map[string]any{"ticketId": id.String(), "images": len(req.ImageIDs), "copiedToChildren": copied})
@@ -330,6 +335,7 @@ func (h *TicketsHandler) ConvertEntry(w http.ResponseWriter, r *http.Request) {
 	if h.AuditLog != nil {
 		h.AuditLog.Log(r.Context(), "entry.converted_to_ticket", audit.LevelInfo, audit.Success(), map[string]any{"entryId": entryID.String(), "ticketId": ticket.ID.String()})
 	}
+	h.afterCreate(r.Context(), ticket, actor.ID)
 	writeData(w, 201, map[string]any{"ticket": toTicketDTO(ticket, true), "entry": toEntryDTO(updated, entry.AuthorUsername)})
 }
 
@@ -377,6 +383,7 @@ func (h *TicketsHandler) ResolveEntry(w http.ResponseWriter, r *http.Request) {
 				problemdetails.Write(w, r, 500, "internal-error", "no se pudo resolver el ticket")
 				return
 			}
+			h.afterStatusMail(r.Context(), ticket.ID, tickets.Status(ticket.Status), tickets.Resolved, actor.ID)
 			ticket = updated
 		}
 		ticketDTOValue = toTicketDTO(ticket, true)

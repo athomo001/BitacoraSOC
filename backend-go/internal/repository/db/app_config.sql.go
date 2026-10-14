@@ -7,27 +7,19 @@ package db
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const completeSetup = `-- name: CompleteSetup :one
 UPDATE app_config SET
-  soc_module_enabled = $1,
-  noc_module_enabled = $2,
   setup_completed_at = now(),
   updated_at = now()
 WHERE id = true
-RETURNING id, shift_check_cooldown_minutes, alert_nok_enabled, alert_nok_role_target, audit_ttl_days, backup_retention_days, soc_module_enabled, noc_module_enabled, territorial_kind_labels, setup_completed_at, updated_at, birthday_emails_enabled, birthday_emails_time, birthday_emails_cc, birthday_emails_last_date, password_min_length
+RETURNING id, shift_check_cooldown_minutes, alert_nok_enabled, alert_nok_role_target, audit_ttl_days, backup_retention_days, territorial_kind_labels, setup_completed_at, updated_at, birthday_emails_enabled, birthday_emails_time, birthday_emails_cc, birthday_emails_last_date, password_min_length
 `
 
-type CompleteSetupParams struct {
-	SocModuleEnabled bool `json:"soc_module_enabled"`
-	NocModuleEnabled bool `json:"noc_module_enabled"`
-}
-
-func (q *Queries) CompleteSetup(ctx context.Context, arg CompleteSetupParams) (AppConfig, error) {
-	row := q.db.QueryRow(ctx, completeSetup, arg.SocModuleEnabled, arg.NocModuleEnabled)
+// Qué áreas quedan activas lo guarda SetAreaActiveByCode (000033).
+func (q *Queries) CompleteSetup(ctx context.Context) (AppConfig, error) {
+	row := q.db.QueryRow(ctx, completeSetup)
 	var i AppConfig
 	err := row.Scan(
 		&i.ID,
@@ -36,8 +28,6 @@ func (q *Queries) CompleteSetup(ctx context.Context, arg CompleteSetupParams) (A
 		&i.AlertNokRoleTarget,
 		&i.AuditTtlDays,
 		&i.BackupRetentionDays,
-		&i.SocModuleEnabled,
-		&i.NocModuleEnabled,
 		&i.TerritorialKindLabels,
 		&i.SetupCompletedAt,
 		&i.UpdatedAt,
@@ -64,7 +54,7 @@ func (q *Queries) EnsureAppConfigRow(ctx context.Context) error {
 }
 
 const getAppConfig = `-- name: GetAppConfig :one
-SELECT id, shift_check_cooldown_minutes, alert_nok_enabled, alert_nok_role_target, audit_ttl_days, backup_retention_days, soc_module_enabled, noc_module_enabled, territorial_kind_labels, setup_completed_at, updated_at, birthday_emails_enabled, birthday_emails_time, birthday_emails_cc, birthday_emails_last_date, password_min_length FROM app_config WHERE id = true
+SELECT id, shift_check_cooldown_minutes, alert_nok_enabled, alert_nok_role_target, audit_ttl_days, backup_retention_days, territorial_kind_labels, setup_completed_at, updated_at, birthday_emails_enabled, birthday_emails_time, birthday_emails_cc, birthday_emails_last_date, password_min_length FROM app_config WHERE id = true
 `
 
 func (q *Queries) GetAppConfig(ctx context.Context) (AppConfig, error) {
@@ -77,8 +67,6 @@ func (q *Queries) GetAppConfig(ctx context.Context) (AppConfig, error) {
 		&i.AlertNokRoleTarget,
 		&i.AuditTtlDays,
 		&i.BackupRetentionDays,
-		&i.SocModuleEnabled,
-		&i.NocModuleEnabled,
 		&i.TerritorialKindLabels,
 		&i.SetupCompletedAt,
 		&i.UpdatedAt,
@@ -106,42 +94,4 @@ func (q *Queries) MergeTerritorialLabels(ctx context.Context, labels []byte) ([]
 	var territorial_kind_labels []byte
 	err := row.Scan(&territorial_kind_labels)
 	return territorial_kind_labels, err
-}
-
-const setModuleFlags = `-- name: SetModuleFlags :one
-UPDATE app_config SET
-  soc_module_enabled = COALESCE($1, soc_module_enabled),
-  noc_module_enabled = COALESCE($2, noc_module_enabled),
-  updated_at = now()
-WHERE id = true
-RETURNING id, shift_check_cooldown_minutes, alert_nok_enabled, alert_nok_role_target, audit_ttl_days, backup_retention_days, soc_module_enabled, noc_module_enabled, territorial_kind_labels, setup_completed_at, updated_at, birthday_emails_enabled, birthday_emails_time, birthday_emails_cc, birthday_emails_last_date, password_min_length
-`
-
-type SetModuleFlagsParams struct {
-	SocModuleEnabled pgtype.Bool `json:"soc_module_enabled"`
-	NocModuleEnabled pgtype.Bool `json:"noc_module_enabled"`
-}
-
-func (q *Queries) SetModuleFlags(ctx context.Context, arg SetModuleFlagsParams) (AppConfig, error) {
-	row := q.db.QueryRow(ctx, setModuleFlags, arg.SocModuleEnabled, arg.NocModuleEnabled)
-	var i AppConfig
-	err := row.Scan(
-		&i.ID,
-		&i.ShiftCheckCooldownMinutes,
-		&i.AlertNokEnabled,
-		&i.AlertNokRoleTarget,
-		&i.AuditTtlDays,
-		&i.BackupRetentionDays,
-		&i.SocModuleEnabled,
-		&i.NocModuleEnabled,
-		&i.TerritorialKindLabels,
-		&i.SetupCompletedAt,
-		&i.UpdatedAt,
-		&i.BirthdayEmailsEnabled,
-		&i.BirthdayEmailsTime,
-		&i.BirthdayEmailsCc,
-		&i.BirthdayEmailsLastDate,
-		&i.PasswordMinLength,
-	)
-	return i, err
 }

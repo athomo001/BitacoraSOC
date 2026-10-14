@@ -11,6 +11,7 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/middleware"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -89,7 +90,7 @@ func (h *SystemFeaturesHandler) Patch(w http.ResponseWriter, r *http.Request) {
 
 	// La Ticketera es un módulo más: no se apaga si SOC y NOC ya están apagados.
 	if code == ticketsFeature && !*req.IsEnabled {
-		if config, err := h.Queries.GetAppConfig(ctx); err == nil && !config.SocModuleEnabled && !config.NocModuleEnabled {
+		if flags, err := repository.AreaFlags(ctx, h.Queries); err == nil && !flags.SOC && !flags.NOC {
 			problemdetails.Write(w, r, http.StatusBadRequest, "no-module-selected", noModuleMessage)
 			return
 		}

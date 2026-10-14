@@ -230,3 +230,11 @@ mat-icon {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Resultado de "Enviar todas las muestras". */
+.sm__samples { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 12.5px; }
+.sm__samples li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.sm__samples mat-icon { width: 16px; height: 16px; font-size: 16px; }
+.sm__ok { color: var(--status-ok); }
+.sm__fail { color: var(--status-critical); }
+.sm__progress { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }

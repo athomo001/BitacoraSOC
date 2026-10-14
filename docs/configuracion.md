@@ -99,7 +99,8 @@ Todo esto está en **Administración** (solo administradores) y queda registrado
 
 | Sección | Qué se configura |
 | --- | --- |
-| **Usuarios y grupos** | Usuarios, roles, grupos de permisos (alcance SOC/NOC y capacidades), cargos, largo mínimo de contraseña, forzar cambio de clave a todos y correos de cumpleaños. |
+| **Usuarios y grupos** | Usuarios y roles; en el panel de cada persona, su nivel en cada área, «Jefe» y permisos extra (los grupos se arman solos). También cargos, largo mínimo de contraseña, forzar cambio de clave a todos y correos de cumpleaños. |
+| **Áreas y niveles** | Las áreas (SOC, NOC y las que se creen), su perfil y los niveles N1, N2, N3. SOC y NOC se encienden aquí. |
 | **Turnos** | **Guardias** (línea de tiempo, rotación, quién debe estar siempre cubierto, día y hora de cambio, CSV), **turnos de trabajo** (horario, destinatarios del reporte de cierre, personas), **dotación programada** (correo periódico) y **recordatorios** por correo. |
 | **Checklist** | Plantillas de inicio y cierre de turno, ítems y quién recibe las alertas de un ítem en rojo. |
 | **Escalamiento** | Políticas por servicio, activo o zona; pasos y grupos de contacto. |
@@ -130,7 +131,7 @@ Todo esto está en **Administración** (solo administradores) y queda registrado
 | **NOC** | Lo mismo con enfoque de red: territorio, activos, cobertura de equipos y ventanas de mantención. |
 | **Ticketera** | Tickets ITIL. Puede usarse sola. |
 
-Cada usuario tiene además su propio **alcance** (SOC, NOC o ambos) según sus grupos de permisos.
+SOC y NOC son **áreas**: se encienden en *Administración → Áreas y niveles*. Cada usuario ve las áreas donde está ubicado (su nivel en cada área); Bitácora, Turnos, Escalamiento y Reportes los abre solo el perfil **Operativo** (SOC y NOC lo son por defecto).
 
 **Funcionalidades** (*Administración → Funcionalidades*, tabla `system_features`).
 

@@ -16,11 +16,13 @@ type Querier interface {
 	AcknowledgeShiftClosure(ctx context.Context, arg AcknowledgeShiftClosureParams) (ShiftClosure, error)
 	AddEscalationIncidentNote(ctx context.Context, arg AddEscalationIncidentNoteParams) (EscalationIncidentNote, error)
 	AddEscalationPoolMember(ctx context.Context, arg AddEscalationPoolMemberParams) error
+	AddGroupAreasByCode(ctx context.Context, arg AddGroupAreasByCodeParams) (int64, error)
 	AddGuardMember(ctx context.Context, arg AddGuardMemberParams) (uuid.UUID, error)
 	AddPolicyStep(ctx context.Context, arg AddPolicyStepParams) (EscalationStep, error)
 	AddTeamMember(ctx context.Context, arg AddTeamMemberParams) (TeamMember, error)
 	AddTicketResolver(ctx context.Context, arg AddTicketResolverParams) error
 	AddUserPermissionGroup(ctx context.Context, arg AddUserPermissionGroupParams) error
+	AppendWaitingComment(ctx context.Context, arg AppendWaitingCommentParams) (int64, error)
 	// Solo si ya no tiene servicios, equipos ni activos; el código queda libre.
 	ArchiveOrganization(ctx context.Context, id uuid.UUID) (int64, error)
 	// 409 de spec/04-contratos-api.md: la IP de un activo es su identidad operativa.
@@ -41,6 +43,7 @@ type Querier interface {
 	// El comentario reclama las imágenes que subió su autor en ese ticket.
 	ClaimTicketImages(ctx context.Context, arg ClaimTicketImagesParams) (int64, error)
 	ClearEscalationPoolMembers(ctx context.Context, poolID uuid.UUID) error
+	ClearGroupAreas(ctx context.Context, permissionGroupID uuid.UUID) error
 	ClearPasswordResetToken(ctx context.Context, id uuid.UUID) error
 	// A lo sumo un canal preferido por dueño (índice único parcial del esquema):
 	// marcar uno nuevo desmarca el anterior.
@@ -49,7 +52,8 @@ type Querier interface {
 	ClearTeamMembers(ctx context.Context, teamID uuid.UUID) error
 	ClearTemplateFromShifts(ctx context.Context, checklistTemplateStartID pgtype.UUID) error
 	CloseEscalationIncident(ctx context.Context, arg CloseEscalationIncidentParams) (int64, error)
-	CompleteSetup(ctx context.Context, arg CompleteSetupParams) (AppConfig, error)
+	// Qué áreas quedan activas lo guarda SetAreaActiveByCode (000033).
+	CompleteSetup(ctx context.Context) (AppConfig, error)
 	CopyTicketResolvers(ctx context.Context, arg CopyTicketResolversParams) error
 	CountActiveWorkShiftMembers(ctx context.Context, workShiftID uuid.UUID) (int32, error)
 	CountAuditLogs(ctx context.Context, arg CountAuditLogsParams) (int64, error)
@@ -71,6 +75,7 @@ type Querier interface {
 	CountTickets(ctx context.Context, arg CountTicketsParams) (int64, error)
 	CountTicketsView(ctx context.Context, arg CountTicketsViewParams) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
+	CreateArea(ctx context.Context, arg CreateAreaParams) (Area, error)
 	CreateAsset(ctx context.Context, arg CreateAssetParams) (uuid.UUID, error)
 	CreateBackupRun(ctx context.Context, arg CreateBackupRunParams) (BackupRun, error)
 	CreateBackupRunWithSource(ctx context.Context, arg CreateBackupRunWithSourceParams) (BackupRun, error)
@@ -94,6 +99,7 @@ type Querier interface {
 	CreateEscalationIncident(ctx context.Context, arg CreateEscalationIncidentParams) (EscalationIncident, error)
 	CreateEscalationPool(ctx context.Context, arg CreateEscalationPoolParams) (EscalationPool, error)
 	CreateGuardSlot(ctx context.Context, arg CreateGuardSlotParams) (RotationSlot, error)
+	CreateLevel(ctx context.Context, arg CreateLevelParams) (Level, error)
 	CreateLogSource(ctx context.Context, arg CreateLogSourceParams) (CatalogLogSource, error)
 	CreateMaintenanceWindow(ctx context.Context, arg CreateMaintenanceWindowParams) (MaintenanceWindow, error)
 	CreateNotificationSchedule(ctx context.Context, arg CreateNotificationScheduleParams) (WorkShiftNotificationSchedule, error)
@@ -125,10 +131,13 @@ type Querier interface {
 	CreateStepTeam(ctx context.Context, arg CreateStepTeamParams) (uuid.UUID, error)
 	CreateTeam(ctx context.Context, arg CreateTeamParams) (Team, error)
 	CreateTeamGroup(ctx context.Context, arg CreateTeamGroupParams) (TeamGroup, error)
+	CreateTeamUser(ctx context.Context, arg CreateTeamUserParams) (User, error)
 	CreateTerritorialUnit(ctx context.Context, arg CreateTerritorialUnitParams) (TerritorialUnit, error)
 	CreateTicket(ctx context.Context, arg CreateTicketParams) (Ticket, error)
 	CreateTicketComment(ctx context.Context, arg CreateTicketCommentParams) (TicketComment, error)
 	CreateTicketImage(ctx context.Context, arg CreateTicketImageParams) (CreateTicketImageRow, error)
+	// ===== Cola de correos (spec/15 §7) =====
+	CreateTicketMail(ctx context.Context, arg CreateTicketMailParams) (TicketMailOutbox, error)
 	CreateTicketTask(ctx context.Context, arg CreateTicketTaskParams) (TicketTask, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateUserChannel(ctx context.Context, arg CreateUserChannelParams) (ContactChannel, error)
@@ -218,6 +227,9 @@ type Querier interface {
 	FindPolicyByAsset(ctx context.Context, assetID pgtype.UUID) (uuid.UUID, error)
 	// ===== Resolución =====
 	FindPolicyByService(ctx context.Context, serviceID pgtype.UUID) (uuid.UUID, error)
+	// Un grupo activo con exactamente esa forma: un área (o ninguna), ese nivel
+	// (o ninguno) y esas capacidades. El más antiguo, si hubiera varios.
+	FindShapedGroup(ctx context.Context, arg FindShapedGroupParams) (uuid.UUID, error)
 	FindTeamMemberByUser(ctx context.Context, arg FindTeamMemberByUserParams) (uuid.UUID, error)
 	// usuario del CSV del legacy: username, correo o nombre completo.
 	FindUserForGuardImport(ctx context.Context, q_ string) (FindUserForGuardImportRow, error)
@@ -227,6 +239,7 @@ type Querier interface {
 	ForceResetAllActivePasswords(ctx context.Context) ([]User, error)
 	GetActiveChecklistTemplate(ctx context.Context, id uuid.UUID) (ChecklistTemplate, error)
 	GetActivePublicShareByTokenHash(ctx context.Context, tokenHash string) (PublicShareLink, error)
+	GetActiveUserEmail(ctx context.Context, id uuid.UUID) (string, error)
 	// Notas Operativas (Fase 9): pizarrón admin (fila singleton id=true) y
 	// libreta personal (1:1 por usuario). Ambas con autosave/debounce desde el
 	// frontend, ver spec/04-contratos-api.md sección "Notas Operativas".
@@ -306,6 +319,8 @@ type Querier interface {
 	GetTicketByNumberForMerge(ctx context.Context, ticketNumber string) (Ticket, error)
 	GetTicketImage(ctx context.Context, arg GetTicketImageParams) (GetTicketImageRow, error)
 	GetTicketRef(ctx context.Context, id uuid.UUID) (GetTicketRefRow, error)
+	// Administración → Ticketera (000032): SLA, firma y avisos por correo.
+	GetTicketSettings(ctx context.Context) (TicketSetting, error)
 	GetTicketTask(ctx context.Context, id uuid.UUID) (TicketTask, error)
 	GetTicketView(ctx context.Context, id uuid.UUID) (GetTicketViewRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
@@ -318,9 +333,12 @@ type Querier interface {
 	// Login con nombre de usuario o correo (pedido del dueño). Si un texto
 	// coincidiera con el usuario de uno y el correo de otro, gana el usuario.
 	GetUserForLogin(ctx context.Context, login string) (User, error)
+	// El aviso de comentarios al cliente que todavía junta (ventana abierta).
+	GetWaitingCommentMail(ctx context.Context, ticketID uuid.UUID) (TicketMailOutbox, error)
 	GetWorkShiftByID(ctx context.Context, id uuid.UUID) (WorkShift, error)
 	// Turno al que pertenece un check: define la ventana real del cierre (no 8h fijas) y los destinatarios del reporte.
 	GetWorkShiftForCheck(ctx context.Context, id uuid.UUID) (WorkShift, error)
+	GroupCodeTaken(ctx context.Context, code string) (bool, error)
 	HasClientAlertAck(ctx context.Context, arg HasClientAlertAckParams) (bool, error)
 	// ===== Intentos (inmutables, ver migración 000004) =====
 	InsertActionLog(ctx context.Context, arg InsertActionLogParams) (EscalationActionLog, error)
@@ -343,12 +361,25 @@ type Querier interface {
 	// Vacaciones, licencias y trámites médicos (Dotación) para avisar choques.
 	ListAbsencesBetween(ctx context.Context, arg ListAbsencesBetweenParams) ([]ListAbsencesBetweenRow, error)
 	ListActionLogs(ctx context.Context, arg ListActionLogsParams) ([]ListActionLogsRow, error)
+	ListActiveAreas(ctx context.Context) ([]ListActiveAreasRow, error)
 	ListActiveChecklistTemplates(ctx context.Context) ([]ChecklistTemplate, error)
 	ListActiveClientAlertRules(ctx context.Context, organizationID uuid.UUID) ([]ListActiveClientAlertRulesRow, error)
 	ListActiveOverridesForCycle(ctx context.Context, arg ListActiveOverridesForCycleParams) ([]RotationOverride, error)
 	// Destinatarios de la alerta NOK del checklist: usuarios activos (admin,
 	// usuario o auditor) con alguno de esos cargos, como el legacy.
 	ListActiveUserEmailsByCargo(ctx context.Context, cargos []string) ([]string, error)
+	// Los grupos activos de un área, con todas sus áreas y su nivel: el handler
+	// decide cuáles puede asignar la jefatura (los que no salen de sus áreas).
+	ListAreaGroups(ctx context.Context, areaID uuid.UUID) ([]ListAreaGroupsRow, error)
+	// Las personas con algún grupo del área (también las dadas de baja, para
+	// reactivarlas), con sus tickets abiertos y vencidos (mismo "vencido" que
+	// TicketQueueSummary): los asignados y en los que es resolutor.
+	ListAreaPeople(ctx context.Context, arg ListAreaPeopleParams) ([]ListAreaPeopleRow, error)
+	ListAreaPeopleGroups(ctx context.Context, areaID uuid.UUID) ([]ListAreaPeopleGroupsRow, error)
+	// Áreas y niveles (000033, spec/16 §3).
+	ListAreas(ctx context.Context) ([]Area, error)
+	// ===== Administración → Áreas y niveles (spec/16, 9b) =====
+	ListAreasWithUsage(ctx context.Context) ([]ListAreasWithUsageRow, error)
 	// ip_address es INET: se lee y escribe como texto (::text / ::inet) para que
 	// el tipo Go sea string y Postgres valide el formato (IPv4/IPv6) al insertar.
 	ListAssets(ctx context.Context, arg ListAssetsParams) ([]ListAssetsRow, error)
@@ -400,6 +431,7 @@ type Querier interface {
 	// admiten búsqueda parcial (ILIKE).
 	ListDirectory(ctx context.Context, arg ListDirectoryParams) ([]ListDirectoryRow, error)
 	ListDrafts(ctx context.Context, arg ListDraftsParams) ([]EntryDraft, error)
+	ListDueTicketMails(ctx context.Context, now pgtype.Timestamptz) ([]TicketMailOutbox, error)
 	// Correos conocidos para los dominios permitidos (getValidSOCDomains del
 	// legacy): usuarios en claro; los de contactos van cifrados y se descifran
 	// en Go.
@@ -424,6 +456,8 @@ type Querier interface {
 	ListEscalationPools(ctx context.Context) ([]ListEscalationPoolsRow, error)
 	// Copias automáticas fuera de la retención: el planificador las borra (archivo y fila).
 	ListExpiredAutoBackups(ctx context.Context, startedAt pgtype.Timestamptz) ([]BackupRun, error)
+	// Las áreas de varios grupos de una vez (para listarlos sin N consultas).
+	ListGroupAreaCodes(ctx context.Context, groupIds []uuid.UUID) ([]ListGroupAreaCodesRow, error)
 	// Guardias en línea de tiempo (000029, canvas "Turnos: guardias"): los
 	// equipos "oncall" (Guardia N2, Guardia TI, Guardia N1_NO_HABIL)
 	// con su ciclo, sus integrantes y sus guardias con hora exacta.
@@ -438,6 +472,11 @@ type Querier interface {
 	// (sendEscalationScheduleInternal del legacy).
 	ListGuardSlotsForRange(ctx context.Context, arg ListGuardSlotsForRangeParams) ([]ListGuardSlotsForRangeRow, error)
 	ListHandoverOnCall(ctx context.Context, arg ListHandoverOnCallParams) ([]ListHandoverOnCallRow, error)
+	// Mi equipo: la jefatura de área (spec/16 §3.5, 9d). Un grupo con la
+	// capacidad area:lead es jefe de las áreas de ese grupo.
+	ListLeadAreas(ctx context.Context, userID uuid.UUID) ([]ListLeadAreasRow, error)
+	ListLevels(ctx context.Context) ([]Level, error)
+	ListLevelsWithUsage(ctx context.Context) ([]ListLevelsWithUsageRow, error)
 	ListLogSources(ctx context.Context, arg ListLogSourcesParams) ([]CatalogLogSource, error)
 	// ===== Ventanas de mantenimiento =====
 	ListMaintenanceWindows(ctx context.Context, arg ListMaintenanceWindowsParams) ([]MaintenanceWindow, error)
@@ -447,6 +486,8 @@ type Querier interface {
 	// ===== Notificación periódica de dotación (HU-5b) =====
 	ListNotificationSchedules(ctx context.Context) ([]WorkShiftNotificationSchedule, error)
 	ListOpenChildTickets(ctx context.Context, parentID pgtype.UUID) ([]Ticket, error)
+	// Tickets abiertos a los que todavía les falta algún aviso de SLA.
+	ListOpenTicketsForSLAMail(ctx context.Context) ([]Ticket, error)
 	ListOrgAssetsForDelete(ctx context.Context, clientID pgtype.UUID) ([]ListOrgAssetsForDeleteRow, error)
 	// ===== Eliminar organización: popup con lo asociado (canvas v22) =====
 	// Historial = entradas, tickets o mantenciones: esos no se borran, se mueven.
@@ -458,6 +499,7 @@ type Querier interface {
 	ListOrganizations(ctx context.Context, arg ListOrganizationsParams) ([]ListOrganizationsRow, error)
 	ListPendingShiftClosures(ctx context.Context) ([]ShiftClosure, error)
 	ListPermissionGroups(ctx context.Context, active pgtype.Bool) ([]PermissionGroup, error)
+	ListPersonOpenTickets(ctx context.Context, arg ListPersonOpenTicketsParams) ([]ListPersonOpenTicketsRow, error)
 	// ===== Políticas y pasos =====
 	ListPolicies(ctx context.Context, arg ListPoliciesParams) ([]EscalationPolicy, error)
 	ListPoliciesForUnits(ctx context.Context, unitIds []uuid.UUID) ([]ListPoliciesForUnitsRow, error)
@@ -528,6 +570,9 @@ type Querier interface {
 	ListTicketEntries(ctx context.Context, ticketID pgtype.UUID) ([]Entry, error)
 	ListTicketEntriesWithAuthor(ctx context.Context, ticketID pgtype.UUID) ([]ListTicketEntriesWithAuthorRow, error)
 	ListTicketImages(ctx context.Context, ticketID uuid.UUID) ([]ListTicketImagesRow, error)
+	ListTicketMails(ctx context.Context, ticketID uuid.UUID) ([]ListTicketMailsRow, error)
+	// ===== Datos para armar los avisos =====
+	ListTicketResolverEmails(ctx context.Context, ticketID uuid.UUID) ([]ListTicketResolverEmailsRow, error)
 	ListTicketResolvers(ctx context.Context, ticketID uuid.UUID) ([]ListTicketResolversRow, error)
 	ListTicketTasks(ctx context.Context, ticketID uuid.UUID) ([]TicketTask, error)
 	ListTicketTasksWithUser(ctx context.Context, ticketID uuid.UUID) ([]ListTicketTasksWithUserRow, error)
@@ -542,7 +587,22 @@ type Querier interface {
 	// menos: es el orden en que se busca política o cobertura (HU-1).
 	ListUnitAncestors(ctx context.Context, id uuid.UUID) ([]ListUnitAncestorsRow, error)
 	ListUpcomingMaintenanceWindows(ctx context.Context, arg ListUpcomingMaintenanceWindowsParams) ([]MaintenanceWindow, error)
+	// Las áreas que ve un usuario: la unión de las de sus grupos activos.
+	ListUserAreaCodes(ctx context.Context, userID uuid.UUID) ([]string, error)
+	// Usuarios por área y nivel (2026-10-13): la persona se ubica en cada área
+	// con un nivel; los grupos («Infra N1», «Jefatura Infra», «Directorio:
+	// escribir») se arman solos.
+	// Los grupos activos de la persona con su forma: áreas, nivel y capacidades.
+	ListUserGroupShapes(ctx context.Context, userID uuid.UUID) ([]ListUserGroupShapesRow, error)
+	// Todos los grupos activos de una persona con sus áreas (vacío = grupo sin
+	// área): para saber si la jefatura puede tocarla.
+	ListUserGroupsWithAreas(ctx context.Context, userID uuid.UUID) ([]ListUserGroupsWithAreasRow, error)
+	// Las áreas que abren SOC/NOC (Bitácora, Turnos, Escalamiento, Reportes):
+	// solo las de grupos con perfil Operativo (spec/16 §3.2, 9c). Un Resolutor o
+	// un grupo de Gestión con el área SOC ve sus datos, no la bitácora.
+	ListUserModuleAreaCodes(ctx context.Context, userID uuid.UUID) ([]string, error)
 	ListUserPermissionGroups(ctx context.Context, userID uuid.UUID) ([]PermissionGroup, error)
+	ListUserProfiles(ctx context.Context, userID uuid.UUID) ([]string, error)
 	// ?role=&active= son opcionales (04-contratos-api.md) — sqlc.narg + el
 	// patrón "columna = $n OR $n IS NULL" evita escribir dos queries a mano.
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
@@ -565,10 +625,14 @@ type Querier interface {
 	MarkNotificationScheduleSent(ctx context.Context, id uuid.UUID) error
 	MarkShiftClosureSent(ctx context.Context, arg MarkShiftClosureSentParams) error
 	MarkShiftReminderSendFailed(ctx context.Context, arg MarkShiftReminderSendFailedParams) error
+	// Reintentos (1, 5 y 30 min): al tercer fallo queda 'failed' y se reenvía a mano.
+	MarkTicketMailFailed(ctx context.Context, arg MarkTicketMailFailedParams) error
+	MarkTicketMailSent(ctx context.Context, arg MarkTicketMailSentParams) error
 	// El que se une queda cerrado apuntando al principal (no se borra).
 	MarkTicketMerged(ctx context.Context, arg MarkTicketMergedParams) error
 	// Primera acción del equipo = cumple el SLA de respuesta (solo la primera cuenta).
 	MarkTicketResponded(ctx context.Context, arg MarkTicketRespondedParams) error
+	MarkTicketSLANotified(ctx context.Context, arg MarkTicketSLANotifiedParams) error
 	// PATCH /api/config/territorial-labels — merge parcial (jsonb ||): solo pisa
 	// los niveles que vienen en el request, el resto queda como estaba.
 	MergeTerritorialLabels(ctx context.Context, labels []byte) ([]byte, error)
@@ -618,7 +682,9 @@ type Querier interface {
 	RemoveTeamCoverage(ctx context.Context, arg RemoveTeamCoverageParams) (int64, error)
 	RemoveTeamMember(ctx context.Context, arg RemoveTeamMemberParams) (int64, error)
 	RemoveTicketResolver(ctx context.Context, arg RemoveTicketResolverParams) (int64, error)
+	RemoveUserPermissionGroup(ctx context.Context, arg RemoveUserPermissionGroupParams) error
 	RenameAsset(ctx context.Context, arg RenameAssetParams) (int64, error)
+	RenameLevel(ctx context.Context, arg RenameLevelParams) (Level, error)
 	RenameService(ctx context.Context, arg RenameServiceParams) (int64, error)
 	RenameTeam(ctx context.Context, arg RenameTeamParams) (int64, error)
 	// Deja los pasos 1..n: en el orden de step_ids si se da, si no en el actual.
@@ -630,7 +696,11 @@ type Querier interface {
 	// Nueva ventana de 15min, o la válvula de emergencia
 	// (POST /api/system/rate-limit-reset).
 	ResetLoginRateLimit(ctx context.Context, ipAddress string) error
+	// Reabrir permite volver a avisar el SLA de resolución (spec/15 §4.2).
+	ResetTicketResolutionSLANotified(ctx context.Context, id uuid.UUID) error
+	RetryTicketMail(ctx context.Context, arg RetryTicketMailParams) (int64, error)
 	RotatePublicShareLink(ctx context.Context, arg RotatePublicShareLinkParams) (PublicShareLink, error)
+	SetAreaActiveByCode(ctx context.Context, arg SetAreaActiveByCodeParams) (Area, error)
 	SetBrandingFavicon(ctx context.Context, arg SetBrandingFaviconParams) error
 	SetBrandingFont(ctx context.Context, arg SetBrandingFontParams) error
 	SetBrandingLogo(ctx context.Context, arg SetBrandingLogoParams) error
@@ -642,8 +712,8 @@ type Querier interface {
 	// para listar y buscar sin recorrer los canales.
 	SetContactPrimaryChannels(ctx context.Context, arg SetContactPrimaryChannelsParams) error
 	SetEscalationIncidentEntry(ctx context.Context, arg SetEscalationIncidentEntryParams) error
+	SetLevelRank(ctx context.Context, arg SetLevelRankParams) (int64, error)
 	SetMFASecret(ctx context.Context, arg SetMFASecretParams) error
-	SetModuleFlags(ctx context.Context, arg SetModuleFlagsParams) (AppConfig, error)
 	SetMustChangePassword(ctx context.Context, arg SetMustChangePasswordParams) error
 	SetPasswordMinLength(ctx context.Context, passwordMinLength int16) (int16, error)
 	SetPasswordResetToken(ctx context.Context, arg SetPasswordResetTokenParams) error
@@ -657,9 +727,13 @@ type Querier interface {
 	// cliente anterior; enlace público y PIN nuevos (el cliente equivocado deja
 	// de ver el ticket).
 	SetTicketClient(ctx context.Context, arg SetTicketClientParams) (Ticket, error)
+	// "Afecta al cliente" y "Avisar a" del ticket (spec/15 §5). Recipients NULL
+	// = volver a los del cliente.
+	SetTicketMailRecipients(ctx context.Context, arg SetTicketMailRecipientsParams) (Ticket, error)
 	// ===== Unir tickets y padre/hijo (000028) =====
 	SetTicketParent(ctx context.Context, arg SetTicketParentParams) error
 	SetTicketPublicPin(ctx context.Context, arg SetTicketPublicPinParams) (Ticket, error)
+	SetUserActive(ctx context.Context, arg SetUserActiveParams) (User, error)
 	// Renumerar en dos pasadas por la restricción única (policy_id, step_order).
 	ShiftPolicySteps(ctx context.Context, policyID uuid.UUID) error
 	// Borrado lógico: el contacto puede estar referenciado por team_members (FK
@@ -681,6 +755,7 @@ type Querier interface {
 	// equipo asignado. Se ejecutan en este orden dentro de una transacción.
 	UnassignTeamTickets(ctx context.Context, ids []uuid.UUID) (int64, error)
 	UnlinkWorkShiftsFromCycle(ctx context.Context, rotationCycleID pgtype.UUID) error
+	UpdateArea(ctx context.Context, arg UpdateAreaParams) (Area, error)
 	UpdateAsset(ctx context.Context, arg UpdateAssetParams) (int64, error)
 	UpdateBackupConfig(ctx context.Context, arg UpdateBackupConfigParams) (BackupConfig, error)
 	// Cambiar la hora o volver a encenderlo permite enviar de nuevo hoy (como el legacy).
@@ -716,6 +791,7 @@ type Querier interface {
 	// administración fina fuera del alcance de la Fase 5.
 	UpdateTerritorialUnit(ctx context.Context, arg UpdateTerritorialUnitParams) (TerritorialUnit, error)
 	UpdateTicket(ctx context.Context, arg UpdateTicketParams) (Ticket, error)
+	UpdateTicketSettings(ctx context.Context, arg UpdateTicketSettingsParams) (TicketSetting, error)
 	UpdateTicketTask(ctx context.Context, arg UpdateTicketTaskParams) (TicketTask, error)
 	// PATCH /api/users/:id — campos parciales: NULL en un parámetro conserva el
 	// valor actual (COALESCE), no lo borra.

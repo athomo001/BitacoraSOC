@@ -194,7 +194,10 @@ func run(logger *slog.Logger) error {
 	shiftRemindersHandler := &handler.ShiftRemindersHandler{Queries: queries, AuditLog: auditLog, Sender: dotacionHandler.Sender}
 	entriesHandler := &handler.EntriesHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
 	// 30 intentos de PIN por token cada 15 min: un cliente real no llega, un ataque de 10^6 PIN tarda ~1 año.
-	ticketsHandler := &handler.TicketsHandler{Pool: pool, Queries: queries, AuditLog: auditLog, PinLimiter: ratelimit.NewAPILimiter(30, 15*time.Minute), Hub: hub}
+	// Avisos por correo de la Ticketera (spec/15) y Administración → Ticketera.
+	ticketMailer := &handler.TicketMailer{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, PublicBaseURL: publicBaseURL}
+	ticketSettingsHandler := &handler.TicketSettingsHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
+	ticketsHandler := &handler.TicketsHandler{Pool: pool, Queries: queries, AuditLog: auditLog, PinLimiter: ratelimit.NewAPILimiter(30, 15*time.Minute), Hub: hub, Mailer: ticketMailer}
 	entriesHandler.Tickets = ticketsHandler
 	notesHandler := &handler.NotesHandler{Queries: queries, AuditLog: auditLog}
 	draftsHandler := &handler.DraftsHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
@@ -304,10 +307,31 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/users/force-reset-all", admin(usersHandler.ForceResetAll))
 	mux.Handle("GET /api/users/{id}/permission-groups", admin(permissionGroupsHandler.ListUserGroups))
 	mux.Handle("PUT /api/users/{id}/permission-groups", admin(permissionGroupsHandler.ReplaceUserGroups))
+	// Usuarios por área y nivel: los grupos se arman solos (2026-10-13).
+	placementHandler := &handler.PlacementHandler{Queries: queries, Pool: pool, AuditLog: auditLog}
+	mux.Handle("GET /api/users/{id}/placement", admin(placementHandler.Get))
+	mux.Handle("PUT /api/users/{id}/placement", admin(placementHandler.Put))
 
 	// Grupos de permisos
 	mux.Handle("GET /api/permission-groups", authed(permissionGroupsHandler.List))
 	mux.Handle("POST /api/permission-groups", admin(permissionGroupsHandler.Create))
+	// Administración → Áreas y niveles (spec/16, 9b).
+	areasHandler := &handler.AreasHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
+	mux.Handle("GET /api/areas", admin(areasHandler.List))
+	mux.Handle("POST /api/areas", admin(areasHandler.Create))
+	mux.Handle("PATCH /api/areas/{code}", admin(areasHandler.Patch))
+	mux.Handle("GET /api/levels", admin(areasHandler.ListLevels))
+	mux.Handle("POST /api/levels", admin(areasHandler.CreateLevel))
+	mux.Handle("PUT /api/levels/order", admin(areasHandler.OrderLevels))
+	mux.Handle("PATCH /api/levels/{id}", admin(areasHandler.RenameLevel))
+	// Mi equipo: jefatura de área (spec/16 §3.5, 9d).
+	teamHandler := &handler.TeamHandler{Queries: queries, Pool: pool, AuditLog: auditLog}
+	mux.Handle("GET /api/team/areas", withCapability(handler.CapAreaLead, teamHandler.Areas))
+	mux.Handle("GET /api/team", withCapability(handler.CapAreaLead, teamHandler.Get))
+	mux.Handle("GET /api/team/people/{id}/tickets", withCapability(handler.CapAreaLead, teamHandler.PersonTickets))
+	mux.Handle("POST /api/team/people", withCapability(handler.CapAreaLead, teamHandler.CreatePerson))
+	mux.Handle("PUT /api/team/people/{id}/group", withCapability(handler.CapAreaLead, teamHandler.SetGroup))
+	mux.Handle("PATCH /api/team/people/{id}", withCapability(handler.CapAreaLead, teamHandler.SetActive))
 	mux.Handle("PATCH /api/permission-groups/{id}", admin(permissionGroupsHandler.Patch))
 
 	// Válvula de emergencia — secreto compartido, no JWT (ver handler).
@@ -567,6 +591,12 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/entries/{id}/convert-to-ticket", ticketAuthed(ticketsHandler.ConvertEntry))
 	mux.Handle("POST /api/entries/{id}/resolve", ticketAuthed(ticketsHandler.ResolveEntry))
 	mux.Handle("POST /api/tickets/{id}/public-pin", ticketAuthed(ticketsHandler.RegeneratePublicPin))
+	mux.Handle("GET /api/tickets/{id}/mails", ticketAuthed(ticketsHandler.Mails))
+	mux.Handle("PUT /api/tickets/{id}/notify", ticketAuthed(ticketsHandler.SetNotify))
+	mux.Handle("POST /api/tickets/{id}/mails/{mailId}/retry", ticketAuthed(ticketsHandler.RetryMail))
+	mux.Handle("GET /api/config/tickets", ticketAdmin(ticketSettingsHandler.GetConfig))
+	mux.Handle("PUT /api/config/tickets", ticketAdmin(ticketSettingsHandler.UpdateConfig))
+	mux.Handle("POST /api/config/tickets/mail-test", ticketAdmin(ticketSettingsHandler.SendTest))
 	// Datos del seguimiento público. La URL que recibe el cliente es
 	// /p/tickets/{token}, pero esa la sirve la SPA (catch-all de abajo): si el
 	// JSON viviera en la misma ruta, el navegador mostraría JSON crudo y la
@@ -653,6 +683,12 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/config/birthday-emails/test", admin(birthdaysHandler.SendTest))
 	mux.Handle("GET /api/config/birthday-emails/image", public(birthdaysHandler.Image))
 	go scheduler.Run(ctx, time.Minute, birthdaysHandler.DispatchDue)
+	// Muestras de todos los correos (pendiente 4: revisarlos en Outlook y Gmail).
+	mailSamplesHandler := &handler.MailSamplesHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, PublicBaseURL: publicBaseURL, Reports: reportsHandler, Dotacion: dotacionHandler, Birthdays: birthdaysHandler}
+	mux.Handle("GET /api/config/smtp/samples", admin(mailSamplesHandler.ListSamples))
+	mux.Handle("POST /api/config/smtp/samples/{n}", admin(mailSamplesHandler.SendSample))
+	// Avisos por correo de la Ticketera: SLA y cola, cada 30 s (spec/15 §7).
+	go scheduler.Run(ctx, 30*time.Second, ticketMailer.Dispatch)
 	// Salud de los complementos servicio y limpieza de subidas vencidas.
 	go scheduler.Run(ctx, 30*time.Second, complementsHandler.ProbeAll)
 	// Respaldos automáticos: revisa cada minuto si toca la copia programada.

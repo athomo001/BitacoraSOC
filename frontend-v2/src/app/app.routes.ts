@@ -83,6 +83,11 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/complements/complements').then((module) => module.ComplementsComponent),
       },
+      // Mi equipo (spec/16 §3.5, 9d): la jefatura de área. El backend exige la capacidad.
+      {
+        path: 'team',
+        loadComponent: () => import('./features/team/team').then((module) => module.TeamComponent),
+      },
       {
         path: 'admin',
         loadComponent: () =>

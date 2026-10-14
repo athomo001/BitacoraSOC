@@ -13,24 +13,28 @@ type ModuleAccess struct {
 	Queries *db.Queries
 }
 
+// InstanceFlags: si las áreas SOC y NOC están activas (000033).
 func (s *ModuleAccess) InstanceFlags(ctx context.Context) (modules.Flags, error) {
-	config, err := s.Queries.GetAppConfig(ctx)
+	return AreaFlags(ctx, s.Queries)
+}
+
+// AreaFlags lee las áreas y devuelve el estado de SOC y NOC.
+func AreaFlags(ctx context.Context, q *db.Queries) (modules.Flags, error) {
+	areas, err := q.ListAreas(ctx)
 	if err != nil {
 		return modules.Flags{}, err
 	}
-	return modules.Flags{SOC: config.SocModuleEnabled, NOC: config.NocModuleEnabled}, nil
+	active := map[string]bool{}
+	for _, a := range areas {
+		active[a.Code] = a.Active
+	}
+	return modules.FlagsFromAreas(active), nil
 }
 
-func (s *ModuleAccess) UserGroupScopes(ctx context.Context, userID uuid.UUID) ([]string, error) {
-	groups, err := s.Queries.ListUserPermissionGroups(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	scopes := make([]string, 0, len(groups))
-	for _, g := range groups {
-		scopes = append(scopes, string(g.ModuleScope))
-	}
-	return scopes, nil
+// UserModuleAreaCodes: las áreas de los grupos Operativos del usuario, las
+// únicas que abren SOC/NOC (spec/16 §3.2).
+func (s *ModuleAccess) UserModuleAreaCodes(ctx context.Context, userID uuid.UUID) ([]string, error) {
+	return s.Queries.ListUserModuleAreaCodes(ctx, userID)
 }
 
 func (s *ModuleAccess) UserCapabilities(ctx context.Context, userID uuid.UUID) ([]string, error) {

@@ -12,6 +12,7 @@ import { SseService } from '../core/sse/sse.service';
 import { UserAvatarComponent } from './user-avatar';
 import { ComplementsService } from '../core/complements/complements.service';
 import { SetupService } from '../core/setup/setup.service';
+import { PermissionsService } from '../core/auth/permissions.service';
 
 /** Ícono y etiqueta del botón de tema: muestran el tema SIGUIENTE (igual que el diseño). */
 const NEXT_THEME: Record<Theme, { icon: string; labelKey: MessageKey }> = {
@@ -47,6 +48,7 @@ export class ShellComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private readonly complements = inject(ComplementsService);
+  private readonly perms = inject(PermissionsService);
 
   constructor() {
     // Encender o apagar "Complementos" (aquí o desde otro admin) recarga la
@@ -76,7 +78,8 @@ export class ShellComponent implements OnInit {
       (item) =>
         (!item.requiresFeature || this.features.isEnabled(item.requiresFeature)) &&
         (!item.requiresSocOrNoc || this.socOrNoc()) &&
-        (!item.requiresComplements || this.complements.available().length > 0),
+        (!item.requiresComplements || this.complements.available().length > 0) &&
+        (!item.requiresCapability || this.perms.can(item.requiresCapability)()),
     ),
   );
   /** SOC o NOC encendidos en la instalación (sin estado todavía, se asume que sí). */
@@ -93,6 +96,8 @@ export class ShellComponent implements OnInit {
   protected readonly branding = inject(BrandingService);
 
   async ngOnInit(): Promise<void> {
+    // Las capacidades de grupo deciden ítems como Mi equipo (jefatura).
+    void this.perms.load();
     // Cambios hechos por otro admin u otra pestaña llegan en vivo.
     const stop = this.sse.connect((eventType, data) => {
       if (eventType === 'system_feature.updated' && isFeature(data)) this.features.apply(data);

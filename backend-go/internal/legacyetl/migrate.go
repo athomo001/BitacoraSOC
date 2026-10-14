@@ -386,8 +386,12 @@ func (m *Migrator) permissionGroups(ctx context.Context, step *Step, members []g
 				code = "sin_cargo"
 			}
 			g.id = ID("permissionGroups", code)
-			if _, err := m.tx.Exec(ctx, `INSERT INTO permission_groups (id, code, name, module_scope, capabilities) VALUES ($1, $2, $3, 'soc', $4)`,
+			if _, err := m.tx.Exec(ctx, `INSERT INTO permission_groups (id, code, name, capabilities) VALUES ($1, $2, $3, $4)`,
 				g.id, code, g.label, g.caps); err != nil {
+				return err
+			}
+			// El legacy era solo SOC: el grupo queda en el área SOC (000033).
+			if _, err := m.tx.Exec(ctx, `INSERT INTO permission_group_areas (permission_group_id, area_id) SELECT $1, id FROM areas WHERE code = 'soc'`, g.id); err != nil {
 				return err
 			}
 			groups[key] = g
@@ -1303,7 +1307,10 @@ func (m *Migrator) migrateAppConfig(ctx context.Context) error {
 	}
 	// El legacy era un SOC: se enciende SOC y se da el setup por hecho (los
 	// datos ya están). NOC se enciende después desde Módulos si aplica.
-	if _, err := m.tx.Exec(ctx, `UPDATE app_config SET soc_module_enabled = true, setup_completed_at = COALESCE(setup_completed_at, now())`); err != nil {
+	if _, err := m.tx.Exec(ctx, `UPDATE areas SET active = true WHERE code = 'soc'`); err != nil {
+		return err
+	}
+	if _, err := m.tx.Exec(ctx, `UPDATE app_config SET setup_completed_at = COALESCE(setup_completed_at, now())`); err != nil {
 		return err
 	}
 	step.note("módulo SOC encendido y setup marcado como hecho; NOC queda apagado")

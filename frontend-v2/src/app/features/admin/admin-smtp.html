@@ -127,6 +127,44 @@
       } @else if (testError(); as e) {
         <pre class="mono sm__error-box" role="alert">{{ e }}</pre>
       }
+
+      <div class="sm__last">
+        <span class="sm__label">{{ i18n.t('smtp.samples') }}</span>
+        <p class="sm__hint">{{ i18n.t('smtp.samplesHint') }}</p>
+        <input class="sm-input" name="samplesTo" type="text" placeholder="tu@empresa.cl, tu@gmail.com" [attr.aria-label]="i18n.t('smtp.samples')" [ngModel]="samplesTo()" (ngModelChange)="samplesTo.set($event)" />
+        <button type="button" class="sm-btn sm__self-start" [disabled]="!saved() || dirty() || busy() || !samplesList().length" (click)="sendSamples()">
+          <mat-icon>forward_to_inbox</mat-icon>{{ i18n.t(sendingSamples() ? 'smtp.samplesSending' : 'smtp.samplesSend') }}
+        </button>
+        @if (samplesProgress(); as p) {
+          <div class="sm__progress" role="status">
+            <span>{{ i18n.t('smtp.samplesSending') }} <strong class="mono">{{ p.current }}/{{ p.total }}</strong> · {{ p.name }}</span>
+            <span class="meter"><span [style.width.%]="(p.current / p.total) * 100"></span></span>
+            <span class="sm__hint">{{ i18n.t('smtp.samplesSlow') }}</span>
+          </div>
+        } @else if (samplesResult(); as r) {
+          @if (r.length) {
+            <span class="sm__hint">{{ i18n.tf('smtp.samplesDone', r.length - samplesFailed().length + ' / ' + r.length) }}</span>
+          }
+        }
+        @if (samplesError(); as e) {
+          <pre class="mono sm__error-box" role="alert">{{ e }}</pre>
+        }
+        @if (samplesResult(); as r) {
+          <ul class="sm__samples">
+            @for (s of r; track s.name) {
+              <li>
+                <mat-icon [class]="s.ok ? 'sm__ok' : 'sm__fail'">{{ s.ok ? 'check_circle' : 'error' }}</mat-icon>
+                <span class="mono sm__small sm__muted">{{ s.n }}</span>
+                <span>{{ s.name }}</span>
+                @if (s.error) { <span class="mono sm__small sm__muted">{{ s.error }}</span> }
+              </li>
+            }
+          </ul>
+          @if (samplesFailed().length && !sendingSamples()) {
+            <button type="button" class="sm-btn sm__self-start" [disabled]="busy()" (click)="retryFailedSamples()"><mat-icon>refresh</mat-icon>{{ i18n.t('smtp.samplesRetry') }}</button>
+          }
+        }
+      </div>
     </div>
   </section>
 </div>

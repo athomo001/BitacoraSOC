@@ -9,18 +9,9 @@ SELECT * FROM app_config WHERE id = true;
 INSERT INTO app_config (id) VALUES (true) ON CONFLICT (id) DO NOTHING;
 
 -- name: CompleteSetup :one
+-- Qué áreas quedan activas lo guarda SetAreaActiveByCode (000033).
 UPDATE app_config SET
-  soc_module_enabled = $1,
-  noc_module_enabled = $2,
   setup_completed_at = now(),
-  updated_at = now()
-WHERE id = true
-RETURNING *;
-
--- name: SetModuleFlags :one
-UPDATE app_config SET
-  soc_module_enabled = COALESCE(sqlc.narg('soc_module_enabled'), soc_module_enabled),
-  noc_module_enabled = COALESCE(sqlc.narg('noc_module_enabled'), noc_module_enabled),
   updated_at = now()
 WHERE id = true
 RETURNING *;

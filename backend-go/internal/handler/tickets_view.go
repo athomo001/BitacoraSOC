@@ -14,6 +14,7 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/middleware"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/ticketmail"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/tickets"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -47,6 +48,14 @@ type ticketViewDTO struct {
 	ChildCount       int32   `json:"childCount"`
 }
 
+// atRiskPercent: el umbral "en riesgo" de Administración → Ticketera.
+func (h *TicketsHandler) atRiskPercent(ctx context.Context) int {
+	if s, err := h.Queries.GetTicketSettings(ctx); err == nil {
+		return int(s.AtRiskPercent)
+	}
+	return tickets.DefaultAtRiskPercent
+}
+
 func slaInput(t db.Ticket) tickets.SLAInput {
 	return tickets.SLAInput{
 		Status: tickets.Status(t.Status), CreatedAt: t.CreatedAt.Time,
@@ -56,13 +65,14 @@ func slaInput(t db.Ticket) tickets.SLAInput {
 	}
 }
 
-func toTicketView(t db.Ticket, clientName string, teamName, assignee pgtype.Text, now time.Time) ticketViewDTO {
+func toTicketView(t db.Ticket, clientName string, teamName, assignee pgtype.Text, now time.Time, atRisk int) ticketViewDTO {
 	v := ticketViewDTO{
 		ticketDTO: toTicketDTO(t, false), ClientName: clientName, TeamName: textPtr(teamName), AssigneeUsername: textPtr(assignee),
 		OnHoldSince: timestamptzPtr(t.SlaOnHoldSince), FirstRespondedAt: timestamptzPtr(t.FirstRespondedAt), ResolvedAt: timestamptzPtr(t.ResolvedAt),
 		AllowedTransitions: []string{},
 	}
 	in := slaInput(t)
+	in.AtRiskPercent = atRisk
 	if t.SlaResponseDueAt.Valid && t.CreatedAt.Valid {
 		c := tickets.ResponseClock(in, now)
 		v.SLA.Response = &c
@@ -233,8 +243,9 @@ func (h *TicketsHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	items := make([]ticketViewDTO, 0, len(rows))
+	atRisk := h.atRiskPercent(ctx)
 	for _, row := range rows {
-		v := toTicketView(row.Ticket, row.ClientName, row.TeamName, row.AssigneeUsername, now)
+		v := toTicketView(row.Ticket, row.ClientName, row.TeamName, row.AssigneeUsername, now, atRisk)
 		v.ParentNumber, v.MergedIntoNumber, v.ChildCount = textPtr(row.ParentNumber), textPtr(row.MergedIntoNumber), row.ChildCount
 		items = append(items, v)
 	}
@@ -275,7 +286,7 @@ func (h *TicketsHandler) loadDetail(r *http.Request, id uuid.UUID) (ticketDetail
 		return ticketDetailDTO{}, err
 	}
 	d := ticketDetailDTO{
-		Ticket:              toTicketView(row.Ticket, row.ClientName, row.TeamName, row.AssigneeUsername, h.now()),
+		Ticket:              toTicketView(row.Ticket, row.ClientName, row.TeamName, row.AssigneeUsername, h.now(), h.atRiskPercent(ctx)),
 		PublicTrackingToken: textPtr(row.Ticket.PublicTrackingToken), PublicTrackingPin: textPtr(row.Ticket.PublicTrackingPin),
 		Comments: make([]ticketCommentDTO, 0, len(comments)), Tasks: make([]ticketTaskDTO, 0, len(taskRows)),
 		Entries: make([]ticketEntryDTO, 0, len(entryRows)), TotalTimeSpentSeconds: total,
@@ -430,9 +441,15 @@ func (h *TicketsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		h.afterStatusChange(ctx, old, tickets.Status(*req.Status), req.AlsoChildren, actor, now)
 	}
 	// Quien toma (o a quien se asigna) el ticket queda como resolutor.
+	actor, _ := middleware.UserFromContext(ctx)
 	if req.AssignedUserID != nil {
-		actor, _ := middleware.UserFromContext(ctx)
 		_ = h.Queries.AddTicketResolver(ctx, db.AddTicketResolverParams{TicketID: id, UserID: *req.AssignedUserID, AddedBy: pgtype.UUID{Bytes: actor.ID, Valid: actor.ID != uuid.Nil}})
+		if !old.AssignedUserID.Valid || uuid.UUID(old.AssignedUserID.Bytes) != *req.AssignedUserID {
+			h.Mailer.Emit(ctx, mailEmission{Event: ticketmail.TeamAssigned, TicketID: id, ActorID: actor.ID, Targets: []uuid.UUID{*req.AssignedUserID}})
+		}
+	}
+	if req.Status != nil && tickets.Status(*req.Status) != from {
+		h.afterStatusMail(ctx, id, from, tickets.Status(*req.Status), actor.ID)
 	}
 	if h.AuditLog != nil {
 		meta := map[string]any{"ticketId": id.String()}
@@ -447,7 +464,7 @@ func (h *TicketsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo recargar el ticket")
 		return
 	}
-	writeData(w, 200, toTicketView(row.Ticket, row.ClientName, row.TeamName, row.AssigneeUsername, now))
+	writeData(w, 200, toTicketView(row.Ticket, row.ClientName, row.TeamName, row.AssigneeUsername, now, h.atRiskPercent(ctx)))
 }
 
 // baseTicketUpdate copia lo que UpdateTicket no debe perder (fechas y contadores).
@@ -596,6 +613,7 @@ func (h *TicketsHandler) AddResolver(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.AuditLog.Log(ctx, "ticket.resolver.add", audit.LevelInfo, audit.Success(), map[string]any{"ticketId": id.String(), "userId": req.UserID.String()})
+	h.Mailer.Emit(ctx, mailEmission{Event: ticketmail.TeamResolverAdded, TicketID: id, ActorID: actor.ID, Targets: []uuid.UUID{req.UserID}})
 	h.notifyChanged(ctx, id)
 	w.WriteHeader(http.StatusNoContent)
 }

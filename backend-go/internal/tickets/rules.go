@@ -78,8 +78,9 @@ const (
 	Met      ClockState = "met"
 )
 
-// atRiskPercent: desde qué porcentaje consumido un SLA se marca en riesgo.
-const atRiskPercent = 75
+// DefaultAtRiskPercent: desde qué porcentaje consumido un SLA se marca en
+// riesgo si Administración → Ticketera no dice otra cosa.
+const DefaultAtRiskPercent = 75
 
 type SLAInput struct {
 	Status           Status
@@ -90,6 +91,15 @@ type SLAInput struct {
 	OnHoldSince      *time.Time
 	FirstRespondedAt *time.Time
 	ResolvedAt       *time.Time
+	// AtRiskPercent viene de Administración → Ticketera; 0 = DefaultAtRiskPercent.
+	AtRiskPercent int
+}
+
+func (in SLAInput) atRisk() int {
+	if in.AtRiskPercent > 0 {
+		return in.AtRiskPercent
+	}
+	return DefaultAtRiskPercent
 }
 
 type Clock struct {
@@ -125,7 +135,7 @@ func ResolutionClock(in SLAInput, now time.Time) Clock {
 	case pausedNow > 0:
 		c.State = Paused
 		c.PausedForSeconds = seconds(pausedNow)
-	case c.Percent >= atRiskPercent:
+	case c.Percent >= in.atRisk():
 		c.State = AtRisk
 	default:
 		c.State = OnTime
@@ -148,7 +158,7 @@ func ResponseClock(in SLAInput, now time.Time) Clock {
 		c.State = Met
 	case reference.After(in.ResponseDueAt):
 		c.State = Breached
-	case c.Percent >= atRiskPercent:
+	case c.Percent >= in.atRisk():
 		c.State = AtRisk
 	default:
 		c.State = OnTime

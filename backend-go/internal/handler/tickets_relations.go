@@ -12,6 +12,7 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/middleware"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/ticketmail"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/tickets"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -78,6 +79,7 @@ func (h *TicketsHandler) afterStatusChange(ctx context.Context, old db.Ticket, t
 			continue
 		}
 		_ = ticketNote(ctx, h.Queries, c.ID, actor, note, false, origin)
+		h.afterStatusMail(ctx, c.ID, cs, target, actor.ID)
 		h.notifyChanged(ctx, c.ID)
 	}
 }
@@ -92,6 +94,7 @@ func (h *TicketsHandler) cascadeComment(ctx context.Context, ticket db.Ticket, u
 		if err == nil {
 			for _, c := range children {
 				if _, err := h.addTicketCommentFrom(ctx, h.Queries, c, user, content, isPublic, "parent:"+ticket.TicketNumber); err == nil {
+					h.afterComment(ctx, c, user.ID, content, isPublic)
 					copied++
 					h.notifyChanged(ctx, c.ID)
 				}
@@ -224,6 +227,13 @@ func (h *TicketsHandler) Merge(w http.ResponseWriter, r *http.Request) {
 	h.AuditLog.Log(ctx, "ticket.merged", audit.LevelInfo, audit.Success(), map[string]any{
 		"mainId": main.ID.String(), "mainNumber": main.TicketNumber, "otherId": other.ID.String(), "otherNumber": other.TicketNumber, "reason": reason,
 	})
+	var creators []uuid.UUID
+	for _, t := range []db.Ticket{main, other} {
+		if t.CreatedBy.Valid {
+			creators = append(creators, uuid.UUID(t.CreatedBy.Bytes))
+		}
+	}
+	h.Mailer.Emit(ctx, mailEmission{Event: ticketmail.TeamMerged, TicketID: main.ID, ActorID: user.ID, Targets: creators, Extra: other.TicketNumber})
 	h.notifyChanged(ctx, main.ID)
 	h.notifyChanged(ctx, other.ID)
 	d, err := h.loadDetail(r, main.ID)
@@ -409,6 +419,7 @@ func (h *TicketsHandler) ChangeClient(w http.ResponseWriter, r *http.Request) {
 	h.AuditLog.Log(ctx, "ticket.client_changed", audit.LevelWarn, audit.Success(), map[string]any{
 		"ticketId": id.String(), "fromClientId": old.ClientID.String(), "toClientId": req.ClientID.String(), "reason": reason,
 	})
+	h.Mailer.Emit(ctx, mailEmission{Event: ticketmail.TeamClientChanged, TicketID: id, ActorID: user.ID, Extra: from.Name + " → " + to.Name})
 	h.notifyChanged(ctx, id)
 	d, err := h.loadDetail(r, id)
 	if err != nil {

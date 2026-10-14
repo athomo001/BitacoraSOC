@@ -20,11 +20,13 @@ import { AdminReportsComponent } from './admin-reports';
 import { AdminChecklistComponent } from './admin-checklist';
 import { AdminComplementsComponent } from './admin-complements';
 import { AdminClientAlertsComponent } from './admin-client-alerts';
+import { AdminTicketsComponent } from './admin-tickets';
+import { AdminAreasComponent } from './admin-areas';
 import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 
 import '../../core/i18n/packs/admin';
 export type AdminSection =
-  | 'access' | 'shifts' | 'checklist' | 'escalation' | 'clientAlerts' | 'smtp' | 'reports'
+  | 'access' | 'areas' | 'shifts' | 'checklist' | 'escalation' | 'tickets' | 'clientAlerts' | 'smtp' | 'reports'
   | 'organizations' | 'territory' | 'teams'
   | 'modules' | 'brand' | 'features' | 'backups' | 'audit' | 'complements';
 
@@ -43,13 +45,20 @@ interface NavItem {
 
 /** Mismo orden y agrupación que el artboard aprobado "Administración". */
 const NAV: readonly { labelKey: MessageKey; items: readonly NavItem[] }[] = [
-  { labelKey: 'admin.group.people', items: [{ id: 'access', icon: 'group', labelKey: 'admin.nav.access' }] },
+  {
+    labelKey: 'admin.group.people',
+    items: [
+      { id: 'access', icon: 'group', labelKey: 'admin.nav.access' },
+      { id: 'areas', icon: 'hub', labelKey: 'admin.nav.areas' },
+    ],
+  },
   {
     labelKey: 'admin.group.operation',
     items: [
       { id: 'shifts', icon: 'schedule', labelKey: 'admin.nav.shifts', requiresSocOrNoc: true },
       { id: 'checklist', icon: 'checklist', labelKey: 'admin.nav.checklist', requiresSocOrNoc: true },
       { id: 'escalation', icon: 'call_split', labelKey: 'admin.nav.escalation', requiresSocOrNoc: true },
+      { id: 'tickets', icon: 'confirmation_number', labelKey: 'admin.nav.tickets', requiresFeature: 'native_tickets' },
       { id: 'clientAlerts', icon: 'campaign', labelKey: 'admin.nav.clientAlerts' },
       { id: 'smtp', icon: 'mail', labelKey: 'admin.nav.smtp' },
       { id: 'reports', icon: 'summarize', labelKey: 'admin.nav.reports', requiresSocOrNoc: true },
@@ -104,7 +113,7 @@ function normalize(text: string): string {
   imports: [
     MatIconModule, AdminModulesComponent, AdminBrandComponent, AdminFeaturesComponent, AdminTerritoryComponent, AdminOrganizationsComponent, AdminTeamsComponent,
     AdminEscalationComponent, AdminShiftsComponent, AdminSmtpComponent, AdminReportsComponent, AdminBackupsComponent, AdminAuditComponent,
-    AdminAccessComponent, AdminChecklistComponent, AdminComplementsComponent, AdminClientAlertsComponent,
+    AdminAccessComponent, AdminChecklistComponent, AdminComplementsComponent, AdminClientAlertsComponent, AdminTicketsComponent, AdminAreasComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKeydown($event)' },
@@ -139,10 +148,12 @@ function normalize(text: string): string {
       </aside>
       <main class="adm__body">
         @switch (active()) {
-          @case ('access') { <app-admin-access /> }
+          @case ('access') { <app-admin-access (goToAreas)="go('areas')" /> }
+          @case ('areas') { <app-admin-areas (goToAccess)="go('access')" /> }
           @case ('shifts') { <app-admin-shifts /> }
           @case ('checklist') { <app-admin-checklist /> }
           @case ('escalation') { <app-admin-escalation /> }
+          @case ('tickets') { <app-admin-tickets /> }
           @case ('clientAlerts') { <app-admin-client-alerts /> }
           @case ('smtp') { <app-admin-smtp /> }
           @case ('reports') { <app-admin-reports /> }
@@ -150,7 +161,7 @@ function normalize(text: string): string {
           @case ('territory') { <app-admin-territory /> }
           @case ('teams') { <app-admin-teams /> }
           @case ('brand') { <app-admin-brand /> }
-          @case ('modules') { <app-admin-modules /> }
+          @case ('modules') { <app-admin-modules (goToAreas)="go('areas')" /> }
           @case ('features') { <app-admin-features /> }
           @case ('backups') { <app-admin-backups (goToFeatures)="go('features')" /> }
           @case ('audit') { <app-admin-audit /> }

@@ -33,10 +33,7 @@ func (s *Sender) SendRich(to, cc []string, subject, textBody, htmlBody string, i
 		return fmt.Errorf("mail: destinatario vacío")
 	}
 	addr := fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port)
-	var auth smtp.Auth
-	if s.cfg.Username != "" {
-		auth = smtp.PlainAuth("", s.cfg.Username, s.cfg.Password, s.cfg.Host)
-	}
+	auth := s.auth()
 	msg := buildRelatedMessage(s.fromHeader(), to, cc, subject, textBody, htmlBody, inline, time.Now())
 	rcpt := append(append([]string{}, to...), cc...)
 	return smtp.SendMail(addr, auth, s.cfg.FromAddress, rcpt, msg)

@@ -251,22 +251,48 @@ export class ReportsComponent implements OnInit {
     groupByDomain: this.mode() === 'bulletin' ? this.groupByDomain() : undefined,
   }));
 
+  /** Campos obligatorios vacíos del formulario actual, en el orden de la pantalla. */
+  protected readonly missingFields = computed<{ field: string; labelKey: MessageKey }[]>(() => {
+    const required: [string, string, MessageKey][] =
+      this.mode() === 'incident'
+        ? (() => {
+            const f = this.incident();
+            return [
+              ['codigoTicket', f.codigoTicket, 'rpt.f.ticket'], ['ofensa', f.ofensa, 'rpt.f.offense'],
+              ['tipoOperacion', f.tipoOperacion, 'rpt.f.operationType'], ['nombreEvento', f.nombreEvento, 'rpt.f.eventName'],
+              ['observaciones', f.observaciones, 'rpt.f.observations'],
+            ];
+          })()
+        : (() => {
+            const b = this.bulletin();
+            return [
+              ['tituloBoletin', b.tituloBoletin, 'rpt.f.bulletinTitle'], ['marcaFabricante', b.marcaFabricante, 'rpt.f.vendor'],
+              ['productosAfectados', b.productosAfectados, 'rpt.f.products'], ['impacto', b.impacto, 'rpt.f.impact'],
+              ['recomendacion', b.recomendacion, 'rpt.f.mitigation'],
+            ];
+          })();
+    return required.filter(([, value]) => !value.trim()).map(([field, , labelKey]) => ({ field, labelKey }));
+  });
+
+  /** Se intentó enviar con campos vacíos: desde ahí se marcan en rojo. */
+  protected readonly attempted = signal(false);
+
+  protected isMissing(field: string): boolean {
+    return this.attempted() && this.missingFields().some((m) => m.field === field);
+  }
+
   protected readonly missing = computed<MessageKey | null>(() => {
-    if (this.mode() === 'incident') {
-      const f = this.incident();
-      if (!this.organizationId()) return 'rpt.missing.client';
-      if (!f.codigoTicket.trim() || !f.ofensa.trim() || !f.tipoOperacion.trim() || !f.nombreEvento.trim() || !f.observaciones.trim()) {
-        return 'rpt.missing.fields';
-      }
-    } else {
-      const f = this.bulletin();
-      if (!f.tituloBoletin.trim() || !f.marcaFabricante.trim() || !f.productosAfectados.trim() || !f.impacto.trim() || !f.recomendacion.trim()) {
-        return 'rpt.missing.fields';
-      }
-    }
+    if (this.mode() === 'incident' && !this.organizationId()) return 'rpt.missing.client';
+    if (this.missingFields().length) return 'rpt.missing.fields';
     if (!this.to().length) return 'rpt.missing.to';
     return null;
   });
+
+  /** El mensaje dice qué falta, no solo "los marcados con *". */
+  private missingText(key: MessageKey): string {
+    if (key !== 'rpt.missing.fields') return this.i18n.t(key);
+    return this.i18n.tf('rpt.missing.named', this.missingFields().map((m) => this.i18n.t(m.labelKey)).join(', '));
+  }
 
   constructor() {
     this.restoreDraft();
@@ -715,7 +741,14 @@ export class ReportsComponent implements OnInit {
   protected async send(retry = true): Promise<void> {
     const missing = this.missing();
     if (missing) {
-      this.notice.set({ kind: 'error', text: this.i18n.t(missing) });
+      this.attempted.set(true);
+      this.notice.set({ kind: 'error', text: this.missingText(missing) });
+      // Lleva al primer campo que falta.
+      setTimeout(() => {
+        const el = document.querySelector<HTMLElement>('.rp__invalid');
+        el?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+        el?.focus({ preventScroll: true });
+      });
       return;
     }
     if (!(await this.passClientAlerts('report'))) return;

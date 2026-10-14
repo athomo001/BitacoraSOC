@@ -203,6 +203,7 @@ func (h *EntriesHandler) createWithTicket(w http.ResponseWriter, r *http.Request
 		return
 	}
 	// Mismo camino que un comentario normal: si el ticket estaba resuelto, se reabre.
+	before := ticket
 	if _, err = h.Tickets.addTicketComment(ctx, queries, ticket, user, req.Content, false); err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo sincronizar el comentario")
 		return
@@ -213,6 +214,12 @@ func (h *EntriesHandler) createWithTicket(w http.ResponseWriter, r *http.Request
 	if err = tx.Commit(ctx); err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo confirmar la entrada y el ticket")
 		return
+	}
+	// Avisos por correo (spec/15): ticket nuevo, o reapertura del existente.
+	if req.TicketNumber == "" {
+		h.Tickets.afterCreate(ctx, ticket, user.ID)
+	} else {
+		h.Tickets.afterComment(ctx, before, user.ID, req.Content, false)
 	}
 	h.Tickets.notifyChanged(ctx, ticket.ID)
 	if refreshed, getErr := h.Tickets.Queries.GetTicket(ctx, ticket.ID); getErr == nil {

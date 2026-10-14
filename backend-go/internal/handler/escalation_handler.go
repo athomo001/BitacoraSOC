@@ -102,7 +102,7 @@ func (h *EscalationHandler) checkModule(w http.ResponseWriter, r *http.Request, 
 	if user.Role == "admin" {
 		return true
 	}
-	scopes, err := h.Modules.UserGroupScopes(ctx, user.ID)
+	scopes, err := h.Modules.UserModuleAreaCodes(ctx, user.ID)
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer el alcance del usuario")
 		return false

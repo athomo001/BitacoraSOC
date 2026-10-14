@@ -17,6 +17,7 @@ import { OrganizationsService, TeamSummary } from '../../core/organizations/orga
 import { resolverTeams } from '../../core/tickets/ticket-view';
 import { CLOCK_TONE, PRIORITY_SHORT, PRIORITY_TONE, STATUS_TONE, clockText, formatDuration, publicTrackingUrl, transitionAction } from '../../core/tickets/ticket-view';
 import { TicketRelationsComponent } from './ticket-relations';
+import { TicketMailComponent } from './ticket-mail';
 
 import '../../core/i18n/packs/tickets';
 type Tab = 'activity' | 'images' | 'tasks' | 'entries';
@@ -50,7 +51,7 @@ const TASK_PRESETS = [15, 30, 60] as const;
 @Component({
   selector: 'app-ticket-detail',
   standalone: true,
-  imports: [DatePipe, FormsModule, MatIconModule, MarkdownComponent, AuthImgDirective, TicketRelationsComponent],
+  imports: [DatePipe, FormsModule, MatIconModule, MarkdownComponent, AuthImgDirective, TicketRelationsComponent, TicketMailComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './ticket-detail.html',
   styleUrl: './ticket-detail.css',

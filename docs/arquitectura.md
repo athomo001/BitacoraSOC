@@ -161,11 +161,11 @@ frontend-v2/src/app/
 
 ## 5. Base de datos
 
-PostgreSQL 18 con 73 tablas. Las principales por área:
+PostgreSQL 18 con 78 tablas. Las principales por área:
 
 | Área | Tablas |
 | --- | --- |
-| Usuarios y acceso | `users`, `permission_groups`, `user_permission_groups`, `token_denylist`, `login_rate_limits` |
+| Usuarios y acceso | `users`, `permission_groups`, `user_permission_groups`, `areas`, `levels`, `permission_group_areas`, `token_denylist`, `login_rate_limits` |
 | Catálogos | `organizations`, `organization_types`, `services`, `catalog_log_sources`, `territorial_units`, `assets` |
 | Equipos y contactos | `teams` (incluye los grupos de personas de cada llamado, `kind = 'step'`, que pertenecen a su paso y se borran con él), `team_members`, `team_coverage`, `contacts`, `contact_channels` |
 | Bitácora | `entries`, `entry_comments`, `entry_attachments`, `entry_drafts`, `admin_notes`, `personal_notes` |

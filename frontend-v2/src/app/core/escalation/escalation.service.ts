@@ -450,4 +450,15 @@ export class EscalationService {
   async dispatchPendingShiftReports(): Promise<void> {
     await firstValueFrom(this.http.post('/api/reports/shift/dispatch', {}));
   }
+
+  /** Los correos de muestra que se pueden enviar, en orden. */
+  async mailSamples(): Promise<string[]> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<{ samples: string[] }>>('/api/config/smtp/samples'))).data.samples;
+  }
+
+  /** Manda la muestra n (desde 1), con datos de ejemplo, a estos buzones (hasta 5). */
+  async sendMailSample(n: number, to: string[]): Promise<{ name: string; ok: boolean; error?: string }> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<{ name: string; ok: boolean; error?: string }>>(`/api/config/smtp/samples/${n}`, { to }))).data;
+  }
 }
+

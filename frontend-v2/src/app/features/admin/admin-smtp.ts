@@ -10,6 +10,9 @@ import { formatDuration } from '../../core/tickets/ticket-view';
 import { SMTP_PRESETS, SmtpPreset, presetFor } from './smtp-presets';
 
 import '../../core/i18n/packs/admin';
+
+/** Pausa entre muestra y muestra (Office 365 frena las ráfagas de un mismo remitente). */
+const SAMPLE_PAUSE_MS = 4000;
 interface SmtpDraft {
   host: string;
   port: number;
@@ -50,6 +53,15 @@ export class AdminSmtpComponent implements OnInit {
   protected readonly draft = signal<SmtpDraft>({ ...EMPTY });
   protected readonly preset = signal<SmtpPreset>(presetFor(''));
   protected readonly testTo = signal('');
+  /** Muestras de todos los correos (pendiente 4): a qué buzones, separados por coma. */
+  protected readonly samplesTo = signal('');
+  protected readonly samplesList = computed(() => this.samplesTo().split(/[,;\s]+/).map((e) => e.trim()).filter((e) => EMAIL.test(e)));
+  protected readonly sendingSamples = signal(false);
+  protected readonly samplesResult = signal<{ n: number; name: string; ok: boolean; error?: string }[] | null>(null);
+  protected readonly samplesError = signal<string | null>(null);
+  /** Por cuál va: "3 de 14 · Boletín de seguridad". */
+  protected readonly samplesProgress = signal<{ current: number; total: number; name: string } | null>(null);
+  protected readonly samplesFailed = computed(() => (this.samplesResult() ?? []).filter((r) => !r.ok));
   protected readonly busy = signal(false);
   protected readonly loaded = signal(false);
   protected readonly notice = signal<string | null>(null);
@@ -161,6 +173,47 @@ export class AdminSmtpComponent implements OnInit {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  /**
+   * Manda una muestra de cada correo de la app, de a una y con una pausa entre
+   * cada una: así se ve por cuál va, un rechazo no corta las demás y el
+   * servidor de correo no las frena por llegar todas juntas. `only`: reintentar
+   * solo esas (las que fallaron).
+   */
+  protected async sendSamples(only?: number[]): Promise<void> {
+    const to = this.samplesList();
+    if (!to.length || this.dirty() || this.busy()) return;
+    this.busy.set(true);
+    this.sendingSamples.set(true);
+    this.samplesError.set(null);
+    try {
+      const names = await this.api.mailSamples();
+      const queue = (only ?? names.map((_, i) => i + 1)).filter((n) => n >= 1 && n <= names.length);
+      const kept = only ? (this.samplesResult() ?? []).filter((r) => !only.includes(r.n)) : [];
+      this.samplesResult.set(kept);
+      for (const [i, n] of queue.entries()) {
+        this.samplesProgress.set({ current: i + 1, total: queue.length, name: names[n - 1] });
+        let result: { n: number; name: string; ok: boolean; error?: string };
+        try {
+          result = { n, ...(await this.api.sendMailSample(n, to)) };
+        } catch (error) {
+          result = { n, name: names[n - 1], ok: false, error: problemDetail(error, this.i18n.t('smtp.testFailed')) };
+        }
+        this.samplesResult.update((list) => [...(list ?? []), result].sort((a, b) => a.n - b.n));
+        if (i < queue.length - 1) await new Promise((resolve) => setTimeout(resolve, SAMPLE_PAUSE_MS));
+      }
+    } catch (error) {
+      this.samplesError.set(problemDetail(error, this.i18n.t('smtp.testFailed')));
+    } finally {
+      this.samplesProgress.set(null);
+      this.busy.set(false);
+      this.sendingSamples.set(false);
+    }
+  }
+
+  protected retryFailedSamples(): void {
+    void this.sendSamples(this.samplesFailed().map((r) => r.n));
   }
 
   protected validEmail(value: string): boolean {

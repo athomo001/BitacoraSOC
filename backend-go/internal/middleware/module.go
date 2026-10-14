@@ -13,7 +13,8 @@ import (
 // igual que UserLookup (ver repository.ModuleAccess).
 type ModuleAccess interface {
 	InstanceFlags(ctx context.Context) (modules.Flags, error)
-	UserGroupScopes(ctx context.Context, userID uuid.UUID) ([]string, error)
+	// UserModuleAreaCodes: áreas de los grupos con perfil Operativo (los únicos que abren SOC/NOC).
+	UserModuleAreaCodes(ctx context.Context, userID uuid.UUID) ([]string, error)
 }
 
 // RequireModule bloquea con 403 un endpoint de un módulo de dominio (SOC/NOC)
@@ -21,7 +22,7 @@ type ModuleAccess interface {
 // visual", aplica incluso a admin — un módulo apagado está apagado para
 // todos) o si el usuario no-admin no lo tiene en el alcance de sus
 // permission_groups (HU-PERM-2). Debe montarse después de RequireAuth.
-// Lee app_config en cada request a propósito: PATCH /api/config/modules
+// Lee las áreas en cada request a propósito: PATCH /api/config/modules
 // tiene que surtir efecto en la request siguiente, sin caché que invalidar.
 func RequireModule(access ModuleAccess, module modules.Module) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -43,7 +44,7 @@ func RequireModule(access ModuleAccess, module modules.Module) func(http.Handler
 				return
 			}
 			if user.Role != "admin" {
-				scopes, err := access.UserGroupScopes(ctx, user.ID)
+				scopes, err := access.UserModuleAreaCodes(ctx, user.ID)
 				if err != nil {
 					problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer el alcance del usuario")
 					return

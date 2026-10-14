@@ -2,7 +2,7 @@
 
 > Generado por `backend-go/cmd/er-docs` desde `backend-go/sql/schema/0001_init_schema.sql`, el esquema que usa sqlc, con todas las migraciones aplicadas. **No se edita a mano**: si cambia el esquema, se regenera con `go run ./cmd/er-docs` desde `backend-go/`.
 
-73 tablas en PostgreSQL, agrupadas en 13 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
+78 tablas en PostgreSQL, agrupadas en 13 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
 
 - Cada entidad muestra todas sus columnas salvo `created_at` y `updated_at`. `PK` clave primaria, `FK` referencia a otra tabla, `UK` valor único.
 - Las tablas de otros dominios aparecen como cajas sin columnas: son la misma tabla, dibujada donde se une.
@@ -13,10 +13,10 @@ Correspondencia con el legacy (MongoDB): [modelo-er-legacy-2.0.md](modelo-er-leg
 
 ## Índice
 
-1. [Usuarios, acceso y permisos](#1-usuarios-acceso-y-permisos) — 6 tablas
+1. [Usuarios, acceso y permisos](#1-usuarios-acceso-y-permisos) — 9 tablas
 2. [Territorio, organizaciones y activos](#2-territorio-organizaciones-y-activos) — 6 tablas
 3. [Directorio de contactos](#3-directorio-de-contactos) — 2 tablas
-4. [Ticketera](#4-ticketera) — 5 tablas
+4. [Ticketera](#4-ticketera) — 7 tablas
 5. [Equipos y escalamiento](#5-equipos-y-escalamiento) — 13 tablas
 6. [Turnos, guardias y dotación](#6-turnos-guardias-y-dotación) — 11 tablas
 7. [Checklists](#7-checklists) — 4 tablas
@@ -83,8 +83,29 @@ erDiagram
         uuid id PK
         text code UK
         text name
-        permission_group_module_scope module_scope
         text[] capabilities
+        boolean active
+        text profile
+        uuid level_id FK
+    }
+    PERMISSION_GROUP_AREAS {
+        uuid permission_group_id PK, FK
+        uuid area_id PK, FK
+    }
+    AREAS {
+        uuid id PK
+        text code UK
+        text name
+        boolean active
+        boolean is_system
+        int sort_order
+        text default_profile
+    }
+    LEVELS {
+        uuid id PK
+        text code UK
+        text name
+        int rank
         boolean active
     }
     USER_PERMISSION_GROUPS {
@@ -94,6 +115,9 @@ erDiagram
         uuid assigned_by FK
     }
 
+    AREAS ||--o{ PERMISSION_GROUP_AREAS : "area_id"
+    LEVELS |o--o{ PERMISSION_GROUPS : "level_id"
+    PERMISSION_GROUPS ||--o{ PERMISSION_GROUP_AREAS : "permission_group_id"
     PERMISSION_GROUPS ||--o{ USER_PERMISSION_GROUPS : "permission_group_id"
     USERS ||--o{ TOKEN_DENYLIST : "user_id"
     USERS ||--o{ USER_PERMISSION_GROUPS : "user_id"
@@ -260,6 +284,12 @@ erDiagram
         uuid created_by FK
         uuid parent_id FK
         uuid merged_into_id FK
+        boolean affects_client
+        text[] notify_to
+        text[] notify_cc
+        timestamptz sla_response_breach_notified_at
+        timestamptz sla_resolution_warn_notified_at
+        timestamptz sla_resolution_breach_notified_at
     }
     TICKET_COMMENTS {
         uuid id PK
@@ -296,6 +326,60 @@ erDiagram
         text hash_sha256
         uuid uploaded_by FK
     }
+    TICKET_SETTINGS {
+        boolean id PK
+        int sla_p1_response_minutes
+        int sla_p1_resolution_minutes
+        int sla_p2_response_minutes
+        int sla_p2_resolution_minutes
+        int sla_p3_response_minutes
+        int sla_p3_resolution_minutes
+        int sla_p4_response_minutes
+        int sla_p4_resolution_minutes
+        int sla_request_response_minutes
+        int sla_request_resolution_minutes
+        int at_risk_percent
+        text public_signature
+        boolean mail_enabled
+        boolean mail_team_link
+        boolean mail_skip_actor
+        boolean mail_team_enabled
+        text[] mail_backup_emails
+        boolean mail_client_enabled
+        text mail_affects_rule
+        int mail_comment_batch_minutes
+        boolean mail_include_pin
+        text[] mail_events
+         'team.assigned'
+         'team.resolver_added'
+         'team.sla_response_breached'
+         'team.sla_resolution_breached'
+         'team.reopened'
+         'team.merged'
+         'team.client_changed'
+         'client.opened'
+         'client.comment'
+         'client.resolved'
+        ] 'client.reopened'
+    }
+    TICKET_MAIL_OUTBOX {
+        uuid id PK
+        uuid ticket_id FK
+        text event
+        text mail_group
+        text[] to_emails
+        text[] cc_emails
+        text subject
+        text html
+        text body_text
+        jsonb comments
+        text status
+        int attempts
+        text last_error
+        timestamptz send_after
+        timestamptz sent_at
+        uuid created_by FK
+    }
 
     ASSETS |o--o{ TICKETS : "asset_id"
     CONTACTS |o--o{ TICKETS : "assigned_contact_id"
@@ -306,6 +390,7 @@ erDiagram
     TICKETS |o--o{ TICKETS : "parent_id"
     TICKETS ||--o{ TICKET_COMMENTS : "ticket_id"
     TICKETS ||--o{ TICKET_IMAGES : "ticket_id"
+    TICKETS ||--o{ TICKET_MAIL_OUTBOX : "ticket_id"
     TICKETS ||--o{ TICKET_RESOLVERS : "ticket_id"
     TICKETS ||--o{ TICKET_TASKS : "ticket_id"
     TICKET_COMMENTS |o--o{ TICKET_IMAGES : "comment_id"
@@ -910,8 +995,6 @@ erDiagram
         text[] alert_nok_role_target
         int audit_ttl_days
         int backup_retention_days
-        boolean soc_module_enabled
-        boolean noc_module_enabled
         jsonb territorial_kind_labels
         timestamptz setup_completed_at
         boolean birthday_emails_enabled

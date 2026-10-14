@@ -746,50 +746,6 @@ func (ns NullNotificationScheduleFrequency) Value() (driver.Value, error) {
 	return string(ns.NotificationScheduleFrequency), nil
 }
 
-type PermissionGroupModuleScope string
-
-const (
-	PermissionGroupModuleScopeSoc  PermissionGroupModuleScope = "soc"
-	PermissionGroupModuleScopeNoc  PermissionGroupModuleScope = "noc"
-	PermissionGroupModuleScopeBoth PermissionGroupModuleScope = "both"
-	PermissionGroupModuleScopeNone PermissionGroupModuleScope = "none"
-)
-
-func (e *PermissionGroupModuleScope) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = PermissionGroupModuleScope(s)
-	case string:
-		*e = PermissionGroupModuleScope(s)
-	default:
-		return fmt.Errorf("unsupported scan type for PermissionGroupModuleScope: %T", src)
-	}
-	return nil
-}
-
-type NullPermissionGroupModuleScope struct {
-	PermissionGroupModuleScope PermissionGroupModuleScope `json:"permission_group_module_scope"`
-	Valid                      bool                       `json:"valid"` // Valid is true if PermissionGroupModuleScope is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullPermissionGroupModuleScope) Scan(value interface{}) error {
-	if value == nil {
-		ns.PermissionGroupModuleScope, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.PermissionGroupModuleScope.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullPermissionGroupModuleScope) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.PermissionGroupModuleScope), nil
-}
-
 type RaciRole string
 
 const (
@@ -1332,8 +1288,6 @@ type AppConfig struct {
 	AlertNokRoleTarget        []string           `json:"alert_nok_role_target"`
 	AuditTtlDays              int32              `json:"audit_ttl_days"`
 	BackupRetentionDays       int32              `json:"backup_retention_days"`
-	SocModuleEnabled          bool               `json:"soc_module_enabled"`
-	NocModuleEnabled          bool               `json:"noc_module_enabled"`
 	TerritorialKindLabels     []byte             `json:"territorial_kind_labels"`
 	SetupCompletedAt          pgtype.Timestamptz `json:"setup_completed_at"`
 	UpdatedAt                 pgtype.Timestamptz `json:"updated_at"`
@@ -1342,6 +1296,17 @@ type AppConfig struct {
 	BirthdayEmailsCc          string             `json:"birthday_emails_cc"`
 	BirthdayEmailsLastDate    pgtype.Date        `json:"birthday_emails_last_date"`
 	PasswordMinLength         int16              `json:"password_min_length"`
+}
+
+type Area struct {
+	ID             uuid.UUID          `json:"id"`
+	Code           string             `json:"code"`
+	Name           string             `json:"name"`
+	Active         bool               `json:"active"`
+	IsSystem       bool               `json:"is_system"`
+	SortOrder      int32              `json:"sort_order"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	DefaultProfile string             `json:"default_profile"`
 }
 
 type Asset struct {
@@ -1698,6 +1663,14 @@ type EscalationStep struct {
 	Title                     pgtype.Text    `json:"title"`
 }
 
+type Level struct {
+	ID     uuid.UUID `json:"id"`
+	Code   string    `json:"code"`
+	Name   string    `json:"name"`
+	Rank   int32     `json:"rank"`
+	Active bool      `json:"active"`
+}
+
 type LoginRateLimit struct {
 	IpAddress       string             `json:"ip_address"`
 	AttemptCount    int32              `json:"attempt_count"`
@@ -1752,13 +1725,19 @@ type OrganizationType struct {
 }
 
 type PermissionGroup struct {
-	ID           uuid.UUID                  `json:"id"`
-	Code         string                     `json:"code"`
-	Name         string                     `json:"name"`
-	ModuleScope  PermissionGroupModuleScope `json:"module_scope"`
-	Capabilities []string                   `json:"capabilities"`
-	Active       bool                       `json:"active"`
-	CreatedAt    pgtype.Timestamptz         `json:"created_at"`
+	ID           uuid.UUID          `json:"id"`
+	Code         string             `json:"code"`
+	Name         string             `json:"name"`
+	Capabilities []string           `json:"capabilities"`
+	Active       bool               `json:"active"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	Profile      string             `json:"profile"`
+	LevelID      pgtype.UUID        `json:"level_id"`
+}
+
+type PermissionGroupArea struct {
+	PermissionGroupID uuid.UUID `json:"permission_group_id"`
+	AreaID            uuid.UUID `json:"area_id"`
 }
 
 type PersonalNote struct {
@@ -2042,39 +2021,45 @@ type TerritorialUnit struct {
 }
 
 type Ticket struct {
-	ID                    uuid.UUID          `json:"id"`
-	TicketNumber          string             `json:"ticket_number"`
-	TicketType            TicketType         `json:"ticket_type"`
-	Scope                 EntryScope         `json:"scope"`
-	ClientID              uuid.UUID          `json:"client_id"`
-	AssetID               pgtype.UUID        `json:"asset_id"`
-	ServiceID             pgtype.UUID        `json:"service_id"`
-	AssignedTeamID        pgtype.UUID        `json:"assigned_team_id"`
-	AssignedUserID        pgtype.UUID        `json:"assigned_user_id"`
-	AssignedContactID     pgtype.UUID        `json:"assigned_contact_id"`
-	Status                TicketStatus       `json:"status"`
-	Impact                ItilImpact         `json:"impact"`
-	Urgency               ItilUrgency        `json:"urgency"`
-	Priority              ItilPriority       `json:"priority"`
-	Title                 string             `json:"title"`
-	Description           string             `json:"description"`
-	SlaResponseDueAt      pgtype.Timestamptz `json:"sla_response_due_at"`
-	SlaResolutionDueAt    pgtype.Timestamptz `json:"sla_resolution_due_at"`
-	SlaOnHoldSince        pgtype.Timestamptz `json:"sla_on_hold_since"`
-	SlaPausedSeconds      int32              `json:"sla_paused_seconds"`
-	FirstRespondedAt      pgtype.Timestamptz `json:"first_responded_at"`
-	ResolvedAt            pgtype.Timestamptz `json:"resolved_at"`
-	ClosedAt              pgtype.Timestamptz `json:"closed_at"`
-	ReopenedCount         int32              `json:"reopened_count"`
-	ReopenedAt            pgtype.Timestamptz `json:"reopened_at"`
-	PublicTrackingToken   pgtype.Text        `json:"public_tracking_token"`
-	PublicTrackingEnabled bool               `json:"public_tracking_enabled"`
-	PublicTrackingPin     pgtype.Text        `json:"public_tracking_pin"`
-	CreatedBy             pgtype.UUID        `json:"created_by"`
-	CreatedAt             pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
-	ParentID              pgtype.UUID        `json:"parent_id"`
-	MergedIntoID          pgtype.UUID        `json:"merged_into_id"`
+	ID                            uuid.UUID          `json:"id"`
+	TicketNumber                  string             `json:"ticket_number"`
+	TicketType                    TicketType         `json:"ticket_type"`
+	Scope                         EntryScope         `json:"scope"`
+	ClientID                      uuid.UUID          `json:"client_id"`
+	AssetID                       pgtype.UUID        `json:"asset_id"`
+	ServiceID                     pgtype.UUID        `json:"service_id"`
+	AssignedTeamID                pgtype.UUID        `json:"assigned_team_id"`
+	AssignedUserID                pgtype.UUID        `json:"assigned_user_id"`
+	AssignedContactID             pgtype.UUID        `json:"assigned_contact_id"`
+	Status                        TicketStatus       `json:"status"`
+	Impact                        ItilImpact         `json:"impact"`
+	Urgency                       ItilUrgency        `json:"urgency"`
+	Priority                      ItilPriority       `json:"priority"`
+	Title                         string             `json:"title"`
+	Description                   string             `json:"description"`
+	SlaResponseDueAt              pgtype.Timestamptz `json:"sla_response_due_at"`
+	SlaResolutionDueAt            pgtype.Timestamptz `json:"sla_resolution_due_at"`
+	SlaOnHoldSince                pgtype.Timestamptz `json:"sla_on_hold_since"`
+	SlaPausedSeconds              int32              `json:"sla_paused_seconds"`
+	FirstRespondedAt              pgtype.Timestamptz `json:"first_responded_at"`
+	ResolvedAt                    pgtype.Timestamptz `json:"resolved_at"`
+	ClosedAt                      pgtype.Timestamptz `json:"closed_at"`
+	ReopenedCount                 int32              `json:"reopened_count"`
+	ReopenedAt                    pgtype.Timestamptz `json:"reopened_at"`
+	PublicTrackingToken           pgtype.Text        `json:"public_tracking_token"`
+	PublicTrackingEnabled         bool               `json:"public_tracking_enabled"`
+	PublicTrackingPin             pgtype.Text        `json:"public_tracking_pin"`
+	CreatedBy                     pgtype.UUID        `json:"created_by"`
+	CreatedAt                     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt                     pgtype.Timestamptz `json:"updated_at"`
+	ParentID                      pgtype.UUID        `json:"parent_id"`
+	MergedIntoID                  pgtype.UUID        `json:"merged_into_id"`
+	AffectsClient                 bool               `json:"affects_client"`
+	NotifyTo                      []string           `json:"notify_to"`
+	NotifyCc                      []string           `json:"notify_cc"`
+	SlaResponseBreachNotifiedAt   pgtype.Timestamptz `json:"sla_response_breach_notified_at"`
+	SlaResolutionWarnNotifiedAt   pgtype.Timestamptz `json:"sla_resolution_warn_notified_at"`
+	SlaResolutionBreachNotifiedAt pgtype.Timestamptz `json:"sla_resolution_breach_notified_at"`
 }
 
 type TicketComment struct {
@@ -2101,11 +2086,58 @@ type TicketImage struct {
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 }
 
+type TicketMailOutbox struct {
+	ID        uuid.UUID          `json:"id"`
+	TicketID  uuid.UUID          `json:"ticket_id"`
+	Event     string             `json:"event"`
+	MailGroup string             `json:"mail_group"`
+	ToEmails  []string           `json:"to_emails"`
+	CcEmails  []string           `json:"cc_emails"`
+	Subject   string             `json:"subject"`
+	Html      string             `json:"html"`
+	BodyText  string             `json:"body_text"`
+	Comments  []byte             `json:"comments"`
+	Status    string             `json:"status"`
+	Attempts  int32              `json:"attempts"`
+	LastError pgtype.Text        `json:"last_error"`
+	SendAfter pgtype.Timestamptz `json:"send_after"`
+	SentAt    pgtype.Timestamptz `json:"sent_at"`
+	CreatedBy pgtype.UUID        `json:"created_by"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
 type TicketResolver struct {
 	TicketID uuid.UUID          `json:"ticket_id"`
 	UserID   uuid.UUID          `json:"user_id"`
 	AddedBy  pgtype.UUID        `json:"added_by"`
 	AddedAt  pgtype.Timestamptz `json:"added_at"`
+}
+
+type TicketSetting struct {
+	ID                          bool               `json:"id"`
+	SlaP1ResponseMinutes        int32              `json:"sla_p1_response_minutes"`
+	SlaP1ResolutionMinutes      int32              `json:"sla_p1_resolution_minutes"`
+	SlaP2ResponseMinutes        int32              `json:"sla_p2_response_minutes"`
+	SlaP2ResolutionMinutes      int32              `json:"sla_p2_resolution_minutes"`
+	SlaP3ResponseMinutes        int32              `json:"sla_p3_response_minutes"`
+	SlaP3ResolutionMinutes      int32              `json:"sla_p3_resolution_minutes"`
+	SlaP4ResponseMinutes        int32              `json:"sla_p4_response_minutes"`
+	SlaP4ResolutionMinutes      int32              `json:"sla_p4_resolution_minutes"`
+	SlaRequestResponseMinutes   int32              `json:"sla_request_response_minutes"`
+	SlaRequestResolutionMinutes int32              `json:"sla_request_resolution_minutes"`
+	AtRiskPercent               int32              `json:"at_risk_percent"`
+	PublicSignature             string             `json:"public_signature"`
+	MailEnabled                 bool               `json:"mail_enabled"`
+	MailTeamLink                bool               `json:"mail_team_link"`
+	MailSkipActor               bool               `json:"mail_skip_actor"`
+	MailTeamEnabled             bool               `json:"mail_team_enabled"`
+	MailBackupEmails            []string           `json:"mail_backup_emails"`
+	MailClientEnabled           bool               `json:"mail_client_enabled"`
+	MailAffectsRule             string             `json:"mail_affects_rule"`
+	MailCommentBatchMinutes     int32              `json:"mail_comment_batch_minutes"`
+	MailIncludePin              bool               `json:"mail_include_pin"`
+	MailEvents                  []string           `json:"mail_events"`
+	UpdatedAt                   pgtype.Timestamptz `json:"updated_at"`
 }
 
 type TicketTask struct {

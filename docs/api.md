@@ -201,6 +201,8 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `POST` | `/api/users/force-reset-all` | Admin |
 | `GET` | `/api/users/{id}/permission-groups` | Admin |
 | `PUT` | `/api/users/{id}/permission-groups` | Admin |
+| `GET` | `/api/users/{id}/placement` | Admin |
+| `PUT` | `/api/users/{id}/placement` | Admin |
 | `GET` | `/api/users/{id}/channels` | Sesión |
 | `POST` | `/api/users/{id}/channels` | Admin |
 | `DELETE` | `/api/users/{id}/channels/{channelId}` | Admin |
@@ -212,6 +214,29 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `GET` | `/api/permission-groups` | Sesión |
 | `POST` | `/api/permission-groups` | Admin |
 | `PATCH` | `/api/permission-groups/{id}` | Admin |
+
+### Áreas y niveles
+
+| Método | Ruta | Acceso |
+| --- | --- | --- |
+| `GET` | `/api/areas` | Admin |
+| `POST` | `/api/areas` | Admin |
+| `PATCH` | `/api/areas/{code}` | Admin |
+| `GET` | `/api/levels` | Admin |
+| `POST` | `/api/levels` | Admin |
+| `PUT` | `/api/levels/order` | Admin |
+| `PATCH` | `/api/levels/{id}` | Admin |
+
+### Mi equipo (jefatura de área)
+
+| Método | Ruta | Acceso |
+| --- | --- | --- |
+| `GET` | `/api/team/areas` | Capacidad `area:lead` |
+| `GET` | `/api/team?area=` | Capacidad `area:lead` |
+| `GET` | `/api/team/people/{id}/tickets?area=` | Capacidad `area:lead` |
+| `POST` | `/api/team/people` | Capacidad `area:lead` |
+| `PUT` | `/api/team/people/{id}/group` | Capacidad `area:lead` |
+| `PATCH` | `/api/team/people/{id}` | Capacidad `area:lead` |
 
 ### Configuración
 

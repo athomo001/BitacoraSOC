@@ -1,0 +1,191 @@
+<header class="adm-head">
+  <div>
+    <h2 class="adm-title">{{ i18n.t('admin.nav.tickets') }}</h2>
+    <p class="adm-muted">{{ i18n.t('tkAdmin.subtitle') }}</p>
+  </div>
+  <span class="tk__tabs" role="tablist">
+    <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'general'" [attr.aria-selected]="tab() === 'general'" (click)="tab.set('general')">{{ i18n.t('tkAdmin.tab.general') }}</button>
+    <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'mail'" [attr.aria-selected]="tab() === 'mail'" (click)="tab.set('mail')">{{ i18n.t('tkAdmin.tab.mail') }}</button>
+  </span>
+</header>
+
+@if (draft(); as d) {
+  @if (tab() === 'general') {
+    <div class="tk__grid">
+      <section class="adm-card">
+        <div class="adm-card__head"><h3 class="adm-card__title"><mat-icon>timer</mat-icon>{{ i18n.t('tkAdmin.sla.title') }}</h3></div>
+        <div class="adm-card__body">
+          <table class="tk__sla">
+            <thead>
+              <tr><th></th><th>{{ i18n.t('tkAdmin.sla.response') }}</th><th>{{ i18n.t('tkAdmin.sla.resolution') }}</th></tr>
+            </thead>
+            <tbody>
+              @for (row of slaRows; track row.key) {
+                <tr>
+                  <td>{{ i18n.t(row.labelKey) }}</td>
+                  <td><input class="adm-input mono" type="number" min="0.25" step="0.25" [attr.aria-label]="i18n.t(row.labelKey) + ' · ' + i18n.t('tkAdmin.sla.response')" [ngModel]="hours(d.sla[row.key].response)" (ngModelChange)="setSla(row.key, 'response', $event)" /></td>
+                  <td><input class="adm-input mono" type="number" min="0.25" step="0.25" [attr.aria-label]="i18n.t(row.labelKey) + ' · ' + i18n.t('tkAdmin.sla.resolution')" [ngModel]="hours(d.sla[row.key].resolution)" (ngModelChange)="setSla(row.key, 'resolution', $event)" /></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+          <p class="adm-hint">{{ i18n.t('tkAdmin.sla.hint') }}</p>
+        </div>
+      </section>
+
+      <section class="adm-card">
+        <div class="adm-card__head"><h3 class="adm-card__title"><mat-icon>tune</mat-icon>{{ i18n.t('tkAdmin.general') }}</h3></div>
+        <div class="adm-card__body tk__stack">
+          <label class="adm-field adm-field--narrow">
+            <span class="adm-label">{{ i18n.t('tkAdmin.atRisk') }}</span>
+            <input class="adm-input mono" type="number" min="1" max="99" [ngModel]="d.atRiskPercent" (ngModelChange)="patch({ atRiskPercent: +$event })" />
+            <span class="adm-hint">{{ i18n.t('tkAdmin.atRiskHint') }}</span>
+          </label>
+          <label class="adm-field">
+            <span class="adm-label">{{ i18n.t('tkAdmin.signature') }}</span>
+            <input class="adm-input" maxlength="80" [ngModel]="d.publicSignature" (ngModelChange)="patch({ publicSignature: $event })" />
+            <span class="adm-hint">{{ i18n.t('tkAdmin.signatureHint') }}</span>
+          </label>
+        </div>
+      </section>
+    </div>
+  } @else {
+    <section class="adm-card">
+      <div class="adm-card__body tk__stack">
+        <label class="switch">
+          <input class="switch__input" type="checkbox" role="switch" [disabled]="!d.smtpConfigured && !d.mail.enabled" [checked]="d.mail.enabled" (change)="patchMail({ enabled: !d.mail.enabled })" />
+          <span class="switch__track" aria-hidden="true"></span>
+          {{ i18n.t('tkAdmin.mail.enabled') }}
+        </label>
+        @if (d.smtpConfigured) {
+          <span class="adm-hint">{{ i18n.t('tkAdmin.mail.smtp') }}</span>
+        } @else {
+          <span class="pill tone-warn"><mat-icon>warning</mat-icon>{{ i18n.t('tkAdmin.mail.noSmtp') }}</span>
+        }
+      </div>
+    </section>
+
+    <div class="tk__grid" [class.tk__off]="!d.mail.enabled">
+      <section class="adm-card">
+        <div class="adm-card__head">
+          <h3 class="adm-card__title"><mat-icon>groups</mat-icon>{{ i18n.t('tkAdmin.team') }}</h3>
+          <label class="switch adm-push">
+            <input class="switch__input" type="checkbox" role="switch" [attr.aria-label]="i18n.t('tkAdmin.team')" [ngModel]="d.mail.teamEnabled" (ngModelChange)="patchMail({ teamEnabled: $event })" />
+            <span class="switch__track" aria-hidden="true"></span>
+          </label>
+        </div>
+        <div class="adm-card__body tk__stack">
+          <div class="adm-field">
+            <span class="adm-label">{{ i18n.t('tkAdmin.backup') }}</span>
+            <span class="tk__chips">
+              @for (b of d.mail.backupEmails; track b) {
+                <span class="tk__chip mono">{{ b }}<button type="button" [attr.aria-label]="i18n.t('tkAdmin.remove') + ' ' + b" (click)="removeBackup(b)"><mat-icon>close</mat-icon></button></span>
+              } @empty {
+                <span class="adm-small adm-muted">{{ i18n.t('tkAdmin.backupEmpty') }}</span>
+              }
+            </span>
+            <span class="tk__add">
+              <input class="adm-input" type="email" placeholder="noc@empresa.cl" [attr.aria-label]="i18n.t('tkAdmin.backupAdd')" [ngModel]="newBackup()" (ngModelChange)="newBackup.set($event)" (keydown.enter)="addBackup()" />
+              <button type="button" class="adm-btn" [disabled]="!newBackup().trim() || d.mail.backupEmails.length >= 20" (click)="addBackup()"><mat-icon>add</mat-icon>{{ i18n.t('tkAdmin.backupAdd') }}</button>
+            </span>
+            <span class="adm-hint">{{ i18n.t('tkAdmin.backupHint') }}</span>
+          </div>
+          <div class="tk__events">
+            @for (ev of teamEvents; track ev) {
+              <label class="tk__event">
+                <span class="switch">
+                  <input class="switch__input" type="checkbox" role="switch" [checked]="isOn(ev)" (change)="toggleEvent(ev)" [attr.aria-label]="eventLabel(ev)" />
+                  <span class="switch__track" aria-hidden="true"></span>
+                </span>
+                <span class="tk__event-label">{{ eventLabel(ev) }}</span>
+                <span class="tk__event-who">{{ eventWho(ev) }}</span>
+              </label>
+            }
+          </div>
+          <label class="switch">
+            <input class="switch__input" type="checkbox" role="switch" [ngModel]="d.mail.skipActor" (ngModelChange)="patchMail({ skipActor: $event })" />
+            <span class="switch__track" aria-hidden="true"></span>
+            {{ i18n.t('tkAdmin.skipActor') }}
+          </label>
+          <label class="switch">
+            <input class="switch__input" type="checkbox" role="switch" [ngModel]="d.mail.teamLink" (ngModelChange)="patchMail({ teamLink: $event })" />
+            <span class="switch__track" aria-hidden="true"></span>
+            {{ i18n.t('tkAdmin.teamLink') }}
+          </label>
+        </div>
+      </section>
+
+      <section class="adm-card">
+        <div class="adm-card__head">
+          <h3 class="adm-card__title"><mat-icon>apartment</mat-icon>{{ i18n.t('tkAdmin.client') }}</h3>
+          <label class="switch adm-push">
+            <input class="switch__input" type="checkbox" role="switch" [attr.aria-label]="i18n.t('tkAdmin.client')" [ngModel]="d.mail.clientEnabled" (ngModelChange)="patchMail({ clientEnabled: $event })" />
+            <span class="switch__track" aria-hidden="true"></span>
+          </label>
+        </div>
+        <div class="adm-card__body tk__stack">
+          <span class="adm-hint">{{ i18n.t('tkAdmin.clientHint') }}</span>
+          <div class="tk__events">
+            @for (ev of clientEvents; track ev) {
+              <label class="tk__event">
+                <span class="switch">
+                  <input class="switch__input" type="checkbox" role="switch" [checked]="isOn(ev)" (change)="toggleEvent(ev)" [attr.aria-label]="eventLabel(ev)" />
+                  <span class="switch__track" aria-hidden="true"></span>
+                </span>
+                <span class="tk__event-label">{{ eventLabel(ev) }}</span>
+                <span class="tk__event-who">{{ eventWho(ev) }}</span>
+              </label>
+            }
+          </div>
+          <div class="adm-field">
+            <span class="adm-label">{{ i18n.t('tkAdmin.recipients') }}</span>
+            <span class="adm-hint">{{ i18n.t('tkAdmin.recipientsHint') }}</span>
+          </div>
+          <div class="adm-field">
+            <span class="adm-label">{{ i18n.t('tkAdmin.batch') }}</span>
+            <span class="tk__seg" role="group" [attr.aria-label]="i18n.t('tkAdmin.batch')">
+              @for (b of batchOptions; track b) {
+                <button type="button" class="seg" [attr.aria-pressed]="d.mail.commentBatchMinutes === b" (click)="patchMail({ commentBatchMinutes: b })">{{ batchLabel(b) }}</button>
+              }
+            </span>
+            <span class="adm-hint">{{ i18n.t('tkAdmin.batchHint') }}</span>
+          </div>
+          <div class="adm-field">
+            <span class="adm-label">{{ i18n.t('tkAdmin.affects') }}</span>
+            <span class="tk__seg" role="group" [attr.aria-label]="i18n.t('tkAdmin.affects')">
+              @for (a of affectsOptions; track a.value) {
+                <button type="button" class="seg" [attr.aria-pressed]="d.mail.affectsRule === a.value" (click)="patchMail({ affectsRule: a.value })">{{ i18n.t(a.labelKey) }}</button>
+              }
+            </span>
+            <span class="adm-hint">{{ i18n.t('tkAdmin.affectsHint') }}</span>
+          </div>
+          <label class="switch">
+            <input class="switch__input" type="checkbox" role="switch" [ngModel]="d.mail.includePin" (ngModelChange)="patchMail({ includePin: $event })" />
+            <span class="switch__track" aria-hidden="true"></span>
+            {{ i18n.t('tkAdmin.includePin') }}
+          </label>
+        </div>
+      </section>
+    </div>
+  }
+
+  <section class="adm-card">
+    <footer class="adm-foot">
+      <span class="adm-foot__status">
+        @if (error(); as e) {
+          <span class="adm-error" role="alert">{{ e }}</span>
+        } @else if (notice(); as n) {
+          <span class="pill tone-ok"><mat-icon>task_alt</mat-icon>{{ n }}</span>
+        } @else {
+          <span class="adm-muted">{{ i18n.t(dirty() ? 'admin.unsaved' : 'admin.noChanges') }}</span>
+        }
+      </span>
+      @if (tab() === 'mail') {
+        <button type="button" class="adm-btn adm-push" [disabled]="busy() || !d.smtpConfigured" (click)="sendTest()"><mat-icon>send</mat-icon>{{ i18n.t('tkAdmin.test') }}</button>
+      }
+      <button type="button" class="adm-btn adm-btn--primary" [class.adm-push]="tab() !== 'mail'" [disabled]="!dirty() || busy()" (click)="save()"><mat-icon>save</mat-icon>{{ i18n.t('admin.save') }}</button>
+    </footer>
+  </section>
+} @else if (error(); as e) {
+  <p class="adm-error" role="alert">{{ e }}</p>
+}

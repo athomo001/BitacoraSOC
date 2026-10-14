@@ -84,7 +84,8 @@ export interface TicketList { items: Ticket[]; total: number; summary: QueueSumm
 
 /**
  * Vista pública del ticket (spec/06 §6.4): sin técnicos ni comentarios
- * internos; cada comunicado lo firma "Mesa de Operaciones".
+ * internos; cada comunicado lo firma la firma ante el cliente de
+ * Administración → Ticketera ("Mesa de Operaciones" por defecto).
  */
 export interface PublicTicket {
   ticketNumber: string;
@@ -115,6 +116,63 @@ export interface NewTicket {
   /** "Crear hijo": el ticket nace como hijo de este. */
   parentId?: string;
 }
+
+/** Plazos de SLA en minutos (Administración → Ticketera). */
+export interface SlaPair { response: number; resolution: number; }
+
+export type AffectsRule = 'p1p2' | 'incidents' | 'none';
+
+/** Administración → Ticketera: SLA, firma y avisos por correo (spec/15). */
+export interface TicketSettings {
+  sla: { p1: SlaPair; p2: SlaPair; p3: SlaPair; p4: SlaPair; request: SlaPair };
+  atRiskPercent: number;
+  publicSignature: string;
+  mail: {
+    enabled: boolean;
+    teamLink: boolean;
+    skipActor: boolean;
+    teamEnabled: boolean;
+    backupEmails: string[];
+    clientEnabled: boolean;
+    affectsRule: AffectsRule;
+    commentBatchMinutes: number;
+    includePin: boolean;
+    events: string[];
+  };
+  /** Solo lectura: sin servidor de correo no se pueden encender los avisos. */
+  smtpConfigured: boolean;
+}
+
+export type TicketMailStatus = 'pending' | 'waiting' | 'sent' | 'failed' | 'no_recipients';
+
+export interface TicketMail {
+  id: string;
+  event: string;
+  group: 'team' | 'client';
+  to: string[];
+  cc: string[];
+  subject: string;
+  status: TicketMailStatus;
+  attempts: number;
+  error?: string;
+  createdAt: string;
+  sendAfter: string;
+  sentAt?: string;
+}
+
+/** Avisos de un ticket: la marca, a quién del cliente y lo enviado. */
+export interface TicketMails {
+  mailEnabled: boolean;
+  clientEnabled: boolean;
+  affectsClient: boolean;
+  to: string[];
+  cc: string[];
+  /** true si el Para/CC se cambió a mano en este ticket. */
+  custom: boolean;
+  items: TicketMail[];
+}
+
+export interface TicketNotifyChange { affectsClient?: boolean; to?: string[]; cc?: string[]; reset?: boolean; }
 
 @Injectable({ providedIn: 'root' })
 export class TicketsService {
@@ -212,6 +270,32 @@ export class TicketsService {
 
   async regeneratePin(id: string): Promise<string> {
     return (await firstValueFrom(this.http.post<ApiEnvelope<{ publicTrackingPin: string }>>(`/api/tickets/${id}/public-pin`, {}))).data.publicTrackingPin;
+  }
+
+  async mails(id: string): Promise<TicketMails> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<TicketMails>>(`/api/tickets/${id}/mails`))).data;
+  }
+
+  /** "Afecta al cliente" y "Avisar a"; marcar "Afecta" en un ticket abierto le avisa al cliente. */
+  async setNotify(id: string, change: TicketNotifyChange): Promise<TicketMails> {
+    return (await firstValueFrom(this.http.put<ApiEnvelope<TicketMails>>(`/api/tickets/${id}/notify`, change))).data;
+  }
+
+  async retryMail(id: string, mailId: string): Promise<void> {
+    await firstValueFrom(this.http.post(`/api/tickets/${id}/mails/${mailId}/retry`, {}));
+  }
+
+  async settings(): Promise<TicketSettings> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<TicketSettings>>('/api/config/tickets'))).data;
+  }
+
+  async saveSettings(settings: TicketSettings): Promise<TicketSettings> {
+    return (await firstValueFrom(this.http.put<ApiEnvelope<TicketSettings>>('/api/config/tickets', settings))).data;
+  }
+
+  /** Los tres modelos de aviso con datos de ejemplo, solo al admin que lo pide. */
+  async sendMailTest(): Promise<string> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<{ to: string }>>('/api/config/tickets/mail-test', {}))).data.to;
   }
 
   /** Seguimiento sin login: 401 si falta el PIN o no coincide, 404 si el enlace no existe o se desactivó. */

@@ -93,15 +93,42 @@
             @if (isMe()) { <span class="aa__muted">{{ i18n.t('access.selfNote') }}</span> }
           </div>
           <div class="aa-panel__block">
-            <span class="aa__label">{{ i18n.t('access.col.groups') }}</span>
-            @for (group of groups(); track group.id) {
-              @let on = (userGroups()[user.id] ?? []).includes(group.id);
-              <button type="button" class="aa-check" role="checkbox" [attr.aria-checked]="on" [disabled]="!groupsLoaded()" (click)="toggleGroup(user, group.id)">
-                <mat-icon [class.aa-check--on]="on">{{ on ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>{{ group.name }}
-                <span class="pill tone-neutral aa__push">{{ i18n.t(scopeKey(group.moduleScope)) }}</span>
-              </button>
-            } @empty {
-              <span class="aa__muted">{{ i18n.t('access.noGroups') }}</span>
+            <span class="aa__label">{{ i18n.t('access.place.title') }}</span>
+            @if (draft(); as d) {
+              @for (a of activeAreas(); track a.code) {
+                @let row = placeRow(a.code);
+                <div class="aa-place" [class.aa-place--in]="row">
+                  <span class="aa-place__area"><strong>{{ a.name }}</strong><span class="aa__muted">{{ i18n.t(profileKey(a.profile)) }}</span></span>
+                  <span class="aa__seg-row">
+                    <button type="button" class="seg" [attr.aria-pressed]="!row" [attr.aria-label]="a.name + ': ' + i18n.t('access.place.out')" (click)="setPlaceLevel(a.code, null)">—</button>
+                    @for (l of levelList(); track l.id) {
+                      <button type="button" class="seg" [attr.aria-pressed]="row?.levelId === l.id" [attr.aria-label]="a.name + ' ' + l.name" (click)="setPlaceLevel(a.code, l.id)">{{ l.name }}</button>
+                    }
+                  </span>
+                  <button type="button" class="seg aa-place__lead" [attr.aria-pressed]="!!row?.lead" [disabled]="!row" (click)="togglePlaceLead(a.code)">
+                    <mat-icon>{{ row?.lead ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>{{ i18n.t('access.place.lead') }}
+                  </button>
+                </div>
+              }
+              <span class="aa__muted">{{ i18n.t('access.place.hint') }}</span>
+              <span class="aa__label aa__label--gap">{{ i18n.t('access.place.extras') }}</span>
+              @for (cap of extraCapabilities; track cap.code) {
+                @let on = d.extras.includes(cap.code);
+                <button type="button" class="aa-check" role="checkbox" [attr.aria-checked]="on" (click)="togglePlaceExtra(cap.code)"><mat-icon [class.aa-check--on]="on">{{ on ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>{{ i18n.t(cap.labelKey) }}</button>
+              }
+              <div class="aa-shape__preview">
+                <span class="aa__label">{{ i18n.t('access.menuPreview') }}</span>
+                <span class="aa__seg-row">
+                  @for (m of placeMenu(); track m.labelKey) { <span class="pill tone-neutral"><mat-icon>{{ m.icon }}</mat-icon>{{ i18n.t(m.labelKey) }}</span> }
+                </span>
+              </div>
+              <div class="aa-place__actions">
+                <span class="aa__muted">{{ i18n.t('access.place.auto') }}</span>
+                <button type="button" class="aa-btn" [disabled]="!placeDirty() || busy()" (click)="resetPlacement()">{{ i18n.t('access.cancel') }}</button>
+                <button type="button" class="aa-btn aa-btn--primary" [disabled]="!placeDirty() || busy()" (click)="savePlacement(user)"><mat-icon>save</mat-icon>{{ i18n.t('access.place.save') }}</button>
+              </div>
+            } @else {
+              <span class="aa__muted">{{ i18n.t('access.place.loading') }}</span>
             }
           </div>
           <div class="aa-panel__block">
@@ -131,9 +158,6 @@
       <form class="aa-form aa-form--inline" (submit)="$event.preventDefault(); createGroup()">
         <label>{{ i18n.t('access.form.code') }}<input class="aa-input mono" name="code" [(ngModel)]="groupForm.code" placeholder="noc-n1" required /></label>
         <label>{{ i18n.t('access.form.name') }}<input class="aa-input" name="name" [(ngModel)]="groupForm.name" required /></label>
-        <label>{{ i18n.t('access.col.modules') }}
-          <select class="aa-input" name="moduleScope" [(ngModel)]="groupForm.moduleScope">@for (s of scopes; track s) { <option [value]="s">{{ i18n.t(scopeKey(s)) }}</option> }</select>
-        </label>
         <fieldset class="aa-form__caps">
           <legend>{{ i18n.t('access.capabilities') }}</legend>
           @for (cap of capabilities; track cap.code) {
@@ -146,6 +170,93 @@
           <button type="submit" class="aa-btn aa-btn--primary" [disabled]="busy()">{{ i18n.t('access.create') }}</button>
         </div>
       </form>
+      <div class="aa-shape">
+        <div class="aa-shape__block">
+          <span class="aa__label">{{ i18n.t('access.areas') }}</span>
+          <span class="aa__seg-row">
+            @for (a of activeAreas(); track a.id) {
+              <button type="button" class="seg" [attr.aria-pressed]="shape().areas.includes(a.code)" (click)="toggleShapeArea(a.code)">{{ a.name }}</button>
+            }
+          </span>
+          <span class="aa__muted">{{ i18n.t('access.areasHint') }} <button type="button" class="aa-link" (click)="goToAreas.emit()">{{ i18n.t('access.missingArea') }}</button></span>
+        </div>
+        <div class="aa-shape__block">
+          <span class="aa__label">{{ i18n.t('access.level') }}</span>
+          <span class="aa__seg-row">
+            <button type="button" class="seg" [attr.aria-pressed]="shape().levelId === ''" (click)="setShapeLevel('')">—</button>
+            @for (l of levelList(); track l.id) {
+              <button type="button" class="seg" [attr.aria-pressed]="shape().levelId === l.id" (click)="setShapeLevel(l.id)">{{ l.name }}</button>
+            }
+          </span>
+        </div>
+        <div class="aa-shape__block">
+          <span class="aa__label">{{ i18n.t('access.profile') }}</span>
+          <div class="aa-shape__profiles">
+            @for (p of profiles; track p) {
+              <button type="button" class="aa-prof" [class.aa-prof--on]="shape().profile === p" [attr.aria-pressed]="shape().profile === p" (click)="setShapeProfile(p)">
+                <strong><mat-icon>{{ profileIcon[p] }}</mat-icon>{{ i18n.t(profileKey(p)) }}</strong>
+                <span class="aa__muted">{{ i18n.t(profileDescKey(p)) }}</span>
+              </button>
+            }
+          </div>
+        </div>
+        <div class="aa-shape__preview">
+          <span class="aa__label">{{ i18n.t('access.menuPreview') }}</span>
+          <span class="aa__seg-row">
+            @for (m of menuPreview(); track m.labelKey) { <span class="pill tone-neutral"><mat-icon>{{ m.icon }}</mat-icon>{{ i18n.t(m.labelKey) }}</span> }
+          </span>
+          @if (previewWithoutModules()) { <span class="aa__muted text-warn">{{ i18n.t('access.noModulesHint') }}</span> }
+          @if (shape().profile !== 'operativo') { <span class="aa__muted">{{ i18n.t('access.dataOnlyHint') }}</span> }
+        </div>
+      </div>
+    </section>
+  }
+  @if (editingGroupId(); as editingId) {
+    <section class="aa-card">
+      <header class="aa-card__head">
+        <span class="aa-card__title"><mat-icon>tune</mat-icon>{{ groupName(editingId) }}</span>
+        <button type="button" class="aa-btn aa__push" (click)="closeGroupEditor()">{{ i18n.t('access.cancel') }}</button>
+        <button type="button" class="aa-btn aa-btn--primary" [disabled]="busy()" (click)="saveGroupShape()"><mat-icon>save</mat-icon>{{ i18n.t('access.save') }}</button>
+      </header>
+      <div class="aa-shape">
+        <div class="aa-shape__block">
+          <span class="aa__label">{{ i18n.t('access.areas') }}</span>
+          <span class="aa__seg-row">
+            @for (a of activeAreas(); track a.id) {
+              <button type="button" class="seg" [attr.aria-pressed]="shape().areas.includes(a.code)" (click)="toggleShapeArea(a.code)">{{ a.name }}</button>
+            }
+          </span>
+          <span class="aa__muted">{{ i18n.t('access.areasHint') }} <button type="button" class="aa-link" (click)="goToAreas.emit()">{{ i18n.t('access.missingArea') }}</button></span>
+        </div>
+        <div class="aa-shape__block">
+          <span class="aa__label">{{ i18n.t('access.level') }}</span>
+          <span class="aa__seg-row">
+            <button type="button" class="seg" [attr.aria-pressed]="shape().levelId === ''" (click)="setShapeLevel('')">—</button>
+            @for (l of levelList(); track l.id) {
+              <button type="button" class="seg" [attr.aria-pressed]="shape().levelId === l.id" (click)="setShapeLevel(l.id)">{{ l.name }}</button>
+            }
+          </span>
+        </div>
+        <div class="aa-shape__block">
+          <span class="aa__label">{{ i18n.t('access.profile') }}</span>
+          <div class="aa-shape__profiles">
+            @for (p of profiles; track p) {
+              <button type="button" class="aa-prof" [class.aa-prof--on]="shape().profile === p" [attr.aria-pressed]="shape().profile === p" (click)="setShapeProfile(p)">
+                <strong><mat-icon>{{ profileIcon[p] }}</mat-icon>{{ i18n.t(profileKey(p)) }}</strong>
+                <span class="aa__muted">{{ i18n.t(profileDescKey(p)) }}</span>
+              </button>
+            }
+          </div>
+        </div>
+        <div class="aa-shape__preview">
+          <span class="aa__label">{{ i18n.t('access.menuPreview') }}</span>
+          <span class="aa__seg-row">
+            @for (m of menuPreview(); track m.labelKey) { <span class="pill tone-neutral"><mat-icon>{{ m.icon }}</mat-icon>{{ i18n.t(m.labelKey) }}</span> }
+          </span>
+          @if (previewWithoutModules()) { <span class="aa__muted text-warn">{{ i18n.t('access.noModulesHint') }}</span> }
+          @if (shape().profile !== 'operativo') { <span class="aa__muted">{{ i18n.t('access.dataOnlyHint') }}</span> }
+        </div>
+      </div>
     </section>
   }
   <section class="aa-card">
@@ -154,7 +265,9 @@
         <thead>
           <tr>
             <th>{{ i18n.t('access.col.group') }}</th>
-            <th>{{ i18n.t('access.col.modules') }}</th>
+            <th>{{ i18n.t('access.areas') }}</th>
+            <th>{{ i18n.t('access.level') }}</th>
+            <th>{{ i18n.t('access.profile') }}</th>
             @for (cap of capabilities; track cap.code) { <th class="aa__center">{{ i18n.t(cap.labelKey) }}</th> }
             <th class="aa__center">{{ i18n.t('access.col.members') }}</th>
             <th>{{ i18n.t('access.col.state') }}</th>
@@ -163,12 +276,14 @@
         <tbody>
           @for (group of groups(); track group.id) {
             <tr>
-              <td><strong>{{ group.name }}</strong> <span class="mono aa__muted">{{ group.code }}</span></td>
               <td>
-                <select class="aa-input aa-input--sm" [ngModel]="group.moduleScope" (ngModelChange)="setScope(group, $event)" [attr.aria-label]="i18n.t('access.col.modules') + ' · ' + group.name">
-                  @for (s of scopes; track s) { <option [value]="s">{{ i18n.t(scopeKey(s)) }}</option> }
-                </select>
+                <button type="button" class="aa-link" [attr.aria-label]="i18n.t('access.editGroup') + ' ' + group.name" (click)="editGroup(group)"><strong>{{ group.name }}</strong></button>
+                <span class="mono aa__muted aa__code">{{ group.code }}</span>
               </td>
+              <td><span class="aa__seg-row">@for (c of group.areas; track c) { <span class="pill tone-accent">{{ areaName(c) }}</span> } @empty { <span class="aa__muted">{{ i18n.t('access.noAreas') }}</span> }</span>
+                @if (!group.areas.length && group.capabilities.includes('area:lead')) { <div class="aa__muted text-warn">{{ i18n.t('access.leadNoAreas') }}</div> }</td>
+              <td class="mono">{{ levelName(group.levelId) }}</td>
+              <td><span class="pill" [class]="'pill ' + profileTone[group.profile]">{{ i18n.t(profileKey(group.profile)) }}</span></td>
               @for (cap of capabilities; track cap.code) {
                 @let on = group.capabilities.includes(cap.code);
                 <td class="aa__center">
@@ -187,7 +302,7 @@
               </td>
             </tr>
           } @empty {
-            <tr><td [attr.colspan]="4 + capabilities.length" class="aa__empty">{{ i18n.t('access.noGroups') }}</td></tr>
+            <tr><td [attr.colspan]="6 + capabilities.length" class="aa__empty">{{ i18n.t('access.noGroups') }}</td></tr>
           }
         </tbody>
       </table>

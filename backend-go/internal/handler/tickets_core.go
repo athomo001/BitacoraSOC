@@ -13,6 +13,8 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/middleware"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/ticketmail"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/tickets"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -38,6 +40,8 @@ type newTicket struct {
 	Impact         string
 	Urgency        string
 	ActorID        uuid.UUID
+	// AffectsClient: nil = según la regla de Administración → Ticketera.
+	AffectsClient *bool
 }
 
 const ticketTitleMaxRunes = 120
@@ -59,13 +63,6 @@ func ticketTitleFromContent(content string) string {
 	return strings.TrimSpace(string(runes[:ticketTitleMaxRunes-1])) + "…"
 }
 
-func resolutionWindow(ticketType string) time.Duration {
-	if ticketType == "service_request" {
-		return 72 * time.Hour
-	}
-	return 8 * time.Hour
-}
-
 // createTicketTx asigna el correlativo TKT-YYYY-NNNNN bajo un advisory lock
 // por año (dos altas simultáneas nunca repiten número) y crea el ticket
 // dentro de la transacción del llamador.
@@ -81,17 +78,95 @@ func (h *TicketsHandler) createTicketTx(ctx context.Context, tx pgx.Tx, n newTic
 	if err != nil {
 		return db.Ticket{}, err
 	}
-	return h.Queries.WithTx(tx).CreateTicket(ctx, db.CreateTicketParams{
+	q := h.Queries.WithTx(tx)
+	// Plazos de SLA y "Afecta al cliente": Administración → Ticketera.
+	settings, err := q.GetTicketSettings(ctx)
+	if err != nil {
+		return db.Ticket{}, err
+	}
+	priority := ticketPriority(n.Impact, n.Urgency)
+	response, resolution := slaWindows(settings, n.Type, string(priority))
+	affects := ticketmail.AffectsByDefault(settings.MailAffectsRule, n.Type, string(priority))
+	if n.AffectsClient != nil {
+		affects = *n.AffectsClient
+	}
+	return q.CreateTicket(ctx, db.CreateTicketParams{
 		TicketNumber: fmt.Sprintf("TKT-%04d-%05d", now.Year(), sequence), TicketType: db.TicketType(n.Type), Scope: n.Scope,
 		ClientID: n.ClientID, AssignedTeamID: pgtype.UUID{Bytes: n.TeamID, Valid: n.TeamID != uuid.Nil}, AssignedUserID: n.AssignedUserID,
 		ServiceID: n.ServiceID, AssetID: n.AssetID,
-		Impact: db.ItilImpact(n.Impact), Urgency: db.ItilUrgency(n.Urgency), Priority: ticketPriority(n.Impact, n.Urgency),
+		Impact: db.ItilImpact(n.Impact), Urgency: db.ItilUrgency(n.Urgency), Priority: priority,
 		Title: n.Title, Description: n.Description,
-		SlaResponseDueAt:    pgtype.Timestamptz{Time: now.Add(time.Hour), Valid: true},
-		SlaResolutionDueAt:  pgtype.Timestamptz{Time: now.Add(resolutionWindow(n.Type)), Valid: true},
+		SlaResponseDueAt:    pgtype.Timestamptz{Time: now.Add(response), Valid: true},
+		SlaResolutionDueAt:  pgtype.Timestamptz{Time: now.Add(resolution), Valid: true},
 		PublicTrackingToken: pgtype.Text{String: token, Valid: true},
 		CreatedBy:           pgtype.UUID{Bytes: n.ActorID, Valid: true},
+		AffectsClient:       affects,
 	})
+}
+
+// afterCreate: avisos de un ticket nuevo (respaldo, cliente si lo afecta y
+// el responsable si ya viene asignado). Corre después del commit.
+func (h *TicketsHandler) afterCreate(ctx context.Context, t db.Ticket, actorID uuid.UUID) {
+	h.Mailer.Emit(ctx, mailEmission{Event: ticketmail.TeamCreated, TicketID: t.ID, ActorID: actorID})
+	if t.AssignedUserID.Valid {
+		h.Mailer.Emit(ctx, mailEmission{Event: ticketmail.TeamAssigned, TicketID: t.ID, ActorID: actorID, Targets: []uuid.UUID{uuid.UUID(t.AssignedUserID.Bytes)}})
+	}
+	if t.AffectsClient {
+		h.Mailer.Emit(ctx, mailEmission{Event: ticketmail.ClientOpened, TicketID: t.ID, ActorID: actorID})
+	}
+}
+
+// afterComment: un comentario visible al cliente le llega (si el ticket lo
+// afecta); si el ticket estaba resuelto, el comentario lo reabrió.
+func (h *TicketsHandler) afterComment(ctx context.Context, before db.Ticket, actorID uuid.UUID, content string, isPublic bool) {
+	if before.Status == db.TicketStatusResolved {
+		h.afterReopen(ctx, before.ID, actorID)
+	}
+	if isPublic && strings.TrimSpace(content) != "" {
+		h.Mailer.Emit(ctx, mailEmission{Event: ticketmail.ClientComment, TicketID: before.ID, ActorID: actorID, Comment: content})
+	}
+}
+
+// afterReopen: avisos de reabrir; el SLA de resolución se puede volver a avisar.
+func (h *TicketsHandler) afterReopen(ctx context.Context, id, actorID uuid.UUID) {
+	_ = h.Queries.ResetTicketResolutionSLANotified(ctx, id)
+	h.Mailer.Emit(ctx, mailEmission{Event: ticketmail.TeamReopened, TicketID: id, ActorID: actorID})
+	h.Mailer.Emit(ctx, mailEmission{Event: ticketmail.ClientReopened, TicketID: id, ActorID: actorID})
+}
+
+// afterStatusMail: avisos de un cambio de estado (spec/15 §4.2 y §4.3).
+func (h *TicketsHandler) afterStatusMail(ctx context.Context, id uuid.UUID, from, to tickets.Status, actorID uuid.UUID) {
+	emit := func(event, comment string) {
+		h.Mailer.Emit(ctx, mailEmission{Event: event, TicketID: id, ActorID: actorID, Comment: comment})
+	}
+	switch {
+	case tickets.IsReopen(from, to):
+		h.afterReopen(ctx, id, actorID)
+	case to == tickets.PendingVendor:
+		emit(ticketmail.TeamPendingVendor, "")
+		emit(ticketmail.ClientPendingVendor, "")
+	case from == tickets.PendingVendor && to == tickets.InProgress:
+		emit(ticketmail.ClientResumed, "")
+	case to == tickets.Resolved:
+		emit(ticketmail.TeamResolved, "")
+		emit(ticketmail.ClientResolved, h.lastPublicComment(ctx, id))
+	case to == tickets.Closed:
+		emit(ticketmail.ClientClosed, "")
+	}
+}
+
+// lastPublicComment: la solución que se le muestra al cliente al resolver.
+func (h *TicketsHandler) lastPublicComment(ctx context.Context, id uuid.UUID) string {
+	comments, err := h.Queries.ListTicketComments(ctx, id)
+	if err != nil {
+		return ""
+	}
+	for i := len(comments) - 1; i >= 0; i-- {
+		if comments[i].IsPublic && comments[i].Origin == "" {
+			return comments[i].Content
+		}
+	}
+	return ""
 }
 
 // addTicketComment registra un comentario sobre un ticket y, si estaba
@@ -129,8 +204,11 @@ func (h *TicketsHandler) AddEntryCommentToTicket(ctx context.Context, ticketID u
 	if err != nil {
 		return err
 	}
-	_, err = h.addTicketComment(ctx, h.Queries, ticket, user, content, isPublic)
-	return err
+	if _, err = h.addTicketComment(ctx, h.Queries, ticket, user, content, isPublic); err != nil {
+		return err
+	}
+	h.afterComment(ctx, ticket, user.ID, content, isPublic)
+	return nil
 }
 
 // Enabled dice si la ticketera nativa está activa. Lo usa también la
@@ -180,7 +258,7 @@ func (h *TicketsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Type: req.TicketType, Scope: scope, ClientID: req.ClientID, TeamID: req.TeamID,
 		ServiceID: optionalUUID(req.ServiceID), AssetID: optionalUUID(req.AssetID), AssignedUserID: optionalUUID(req.AssignedUserID),
 		Title: strings.TrimSpace(req.Title), Description: strings.TrimSpace(req.Description),
-		Impact: req.Impact, Urgency: req.Urgency, ActorID: actor.ID,
+		Impact: req.Impact, Urgency: req.Urgency, ActorID: actor.ID, AffectsClient: req.AffectsClient,
 	}, h.now())
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "no se pudo crear el ticket; verifica cliente, equipo y relaciones")
@@ -204,6 +282,7 @@ func (h *TicketsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if h.AuditLog != nil {
 		h.AuditLog.Log(ctx, "ticket.created", audit.LevelInfo, audit.Success(), map[string]any{"ticketId": ticket.ID.String()})
 	}
+	h.afterCreate(ctx, ticket, actor.ID)
 	h.notifyChanged(ctx, ticket.ID)
 	if parent != nil {
 		h.notifyChanged(ctx, parent.ID)

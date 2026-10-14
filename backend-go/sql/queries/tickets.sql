@@ -26,8 +26,8 @@ SELECT * FROM tickets WHERE id = $1;
 SELECT * FROM tickets WHERE ticket_number = $1;
 
 -- name: CreateTicket :one
-INSERT INTO tickets (ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, public_tracking_token, created_by)
-VALUES ($1, $2, $3, $4, sqlc.narg('asset_id'), sqlc.narg('service_id'), $5, sqlc.narg('assigned_user_id'), 'new', $6, $7, $8, $9, $10, $11, $12, $13, $14)
+INSERT INTO tickets (ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, public_tracking_token, created_by, affects_client)
+VALUES ($1, $2, $3, $4, sqlc.narg('asset_id'), sqlc.narg('service_id'), $5, sqlc.narg('assigned_user_id'), 'new', $6, $7, $8, $9, $10, $11, $12, $13, $14, sqlc.arg('affects_client'))
 RETURNING *;
 
 -- name: UpdateTicket :one

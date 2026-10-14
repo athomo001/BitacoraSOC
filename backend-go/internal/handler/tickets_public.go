@@ -17,7 +17,8 @@ import (
 // comentarios internos y notas de escalación" — por eso tiene DTOs propios
 // y nunca serializa structs de sqlc (antes salían user_id y author_name).
 
-// publicAuthorLabel reemplaza el nombre del técnico en cada comunicado.
+// publicAuthorLabel reemplaza el nombre del técnico en cada comunicado si
+// Administración → Ticketera no tiene una firma (la firma ante el cliente).
 const publicAuthorLabel = "Mesa de Operaciones"
 
 type publicCommentDTO struct {
@@ -53,7 +54,10 @@ func publicImageIDs(rows []db.ListTicketImagesRow, commentID uuid.UUID) []uuid.U
 	return out
 }
 
-func toPublicTicketDTO(t db.Ticket, clientName string, comments []db.TicketComment, images []db.ListTicketImagesRow) publicTicketDTO {
+func toPublicTicketDTO(t db.Ticket, clientName string, comments []db.TicketComment, images []db.ListTicketImagesRow, signature string) publicTicketDTO {
+	if signature == "" {
+		signature = publicAuthorLabel
+	}
 	out := publicTicketDTO{
 		TicketNumber: t.TicketNumber, Title: t.Title, TicketType: string(t.TicketType), Status: string(t.Status),
 		Priority: string(t.Priority), ClientName: clientName,
@@ -64,7 +68,7 @@ func toPublicTicketDTO(t db.Ticket, clientName string, comments []db.TicketComme
 		if !c.IsPublic {
 			continue // defensa en profundidad: la consulta ya filtra, pero esto nunca debe filtrarse
 		}
-		out.PublicComments = append(out.PublicComments, publicCommentDTO{Author: publicAuthorLabel, Content: c.Content, CreatedAt: c.CreatedAt.Time, ImageIDs: publicImageIDs(images, c.ID)})
+		out.PublicComments = append(out.PublicComments, publicCommentDTO{Author: signature, Content: c.Content, CreatedAt: c.CreatedAt.Time, ImageIDs: publicImageIDs(images, c.ID)})
 	}
 	return out
 }
@@ -120,7 +124,11 @@ func (h *TicketsHandler) Public(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo cargar el seguimiento")
 		return
 	}
-	dto := toPublicTicketDTO(t, clientName, comments, images)
+	signature := ""
+	if s, err := h.Queries.GetTicketSettings(r.Context()); err == nil {
+		signature = s.PublicSignature
+	}
+	dto := toPublicTicketDTO(t, clientName, comments, images, signature)
 	dto.MergedInto = mergedInto
 	writeData(w, 200, dto)
 }

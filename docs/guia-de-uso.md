@@ -29,7 +29,8 @@ Qué hace cada pantalla de Bitácora Ops y cómo se usa en el día a día. Las p
 Además del rol, cada usuario pertenece a **grupos de permisos**. Los grupos definen su alcance (SOC, NOC o ambos) y le dan capacidades puntuales, por ejemplo:
 
 - editar o borrar en el Directorio,
-- cambiar el cliente de un ticket.
+- cambiar el cliente de un ticket,
+- ser **jefatura de área** (ver *Mi equipo*).
 
 ---
 
@@ -186,7 +187,7 @@ Tickets ITIL de **incidente** o **requerimiento**. Solo aparece si el módulo Ti
 | Concepto | Cómo funciona |
 | --- | --- |
 | **Prioridad** | Sale de impacto × urgencia (P1 crítica a P4 baja). |
-| **SLA** | Plazos de respuesta y resolución. Se **pausa** mientras se espera al proveedor y muestra si está en riesgo o vencido. |
+| **SLA** | Plazos de respuesta y resolución por prioridad (se configuran en Administración → Ticketera). Se **pausa** mientras se espera al proveedor y muestra si está en riesgo o vencido. |
 | **Estados** | Nuevo → Asignado → En curso → Esperando proveedor → Resuelto → Cerrado (o Cancelado). |
 | **Asignación** | Equipo y resolutores. Cualquier analista puede tomar o asignar. |
 | **Tareas** | Lista de pasos dentro del ticket, con tiempo. |
@@ -204,11 +205,29 @@ Tickets ITIL de **incidente** o **requerimiento**. Solo aparece si el módulo Ti
 
 **Enlace público:** cada ticket tiene un enlace con **PIN** para que el cliente vea el avance en 3 pasos y los comunicados públicos, sin cuenta. Tras 30 PIN incorrectos en 15 minutos, el enlace se bloquea un rato.
 
+**Avisos por correo** (si están encendidos en Administración → Ticketera):
+
+- **Al equipo:** copia de respaldo al crear el ticket, al responsable cuando se le asigna, SLA vencido o por vencer, reabierto, unido y cliente cambiado. Quien hace el cambio no recibe el aviso de su propia acción.
+- **Al cliente:** solo en tickets con **Afecta al cliente** (viene marcado en P1 y P2). Le llega al abrir, en cada comentario visible al cliente (los seguidos se juntan en un correo) y al resolver. Nunca lleva comentarios internos ni nombres de técnicos.
+- **En el ticket:** la casilla *Afecta al cliente*, *Avisar a* (Para/CC del escalamiento del cliente, editable solo para ese ticket) y *Correos enviados*, con *Reenviar* si uno falló.
+
 ---
 
 ## Complementos
 
 Mini-aplicaciones propias (herramientas, diccionarios, utilidades) que se abren dentro de Bitácora Ops. Corren en un **origen aislado**, así que no pueden leer tu sesión. Solo aparecen si la funcionalidad *Complementos* está encendida.
+
+---
+
+## Mi equipo
+
+Solo para la **jefatura de área**: quien tiene un grupo con la capacidad *Jefatura de área* (se marca en Usuarios y grupos → Grupos). Si es jefatura de más de un área, elige el área arriba.
+
+- Arriba: personas activas, tickets abiertos, SLA vencidos y ausentes hoy (vacaciones o licencia en Dotación).
+- La lista muestra el grupo de cada persona, cómo está hoy (oficina, teletrabajo, guardia, vacaciones, licencia), sus tickets abiertos y los vencidos.
+- Al elegir a una persona: su semana, sus tickets (se abren con un clic), cambiarle el grupo y darla de baja o reactivarla.
+- **Agregar persona:** nombre, usuario, correo y un grupo del área. La app genera una contraseña temporal que se muestra **una sola vez**: entrégasela tú. La persona la cambia al primer ingreso.
+- La jefatura solo asigna grupos de sus áreas, nunca da permisos de administrador y no toca a administradores ni a quien tiene grupos de otras áreas. Todo queda en Auditoría.
 
 ---
 
@@ -218,10 +237,12 @@ Solo para administradores. El menú se agrupa así:
 
 | Grupo | Sección | Lo esencial |
 | --- | --- | --- |
-| Personas | **Usuarios y grupos** | Usuarios, roles, grupos de permisos, cargos, largo mínimo de contraseña (6 por defecto) y correos de cumpleaños. |
+| Personas | **Usuarios y grupos** | Usuarios y roles; en el panel de cada persona, su **nivel en cada área** («—» = fuera; puede estar en varias), **Jefe** por área y permisos extra: los grupos se arman solos. También cargos, largo mínimo de contraseña (6 por defecto) y correos de cumpleaños. La pestaña Grupos queda para casos raros. |
+| | **Áreas y niveles** | Las áreas (SOC, NOC y las que se creen: TI, Infraestructura, CSM…), el perfil de cada una (SOC y NOC Operativo; las demás Resolutor) y los niveles N1, N2, N3. SOC y NOC se encienden acá. |
 | Operación | **Turnos** | Guardias, turnos de trabajo, dotación programada y recordatorios (detalle abajo). |
 | | **Checklist** | Plantillas de inicio y cierre, servicios y alertas de ítems en rojo. |
 | | **Escalamiento** | Políticas por servicio, activo o zona, con sus llamados en orden (detalle abajo). |
+| | **Ticketera** | Plazos de SLA por prioridad, umbral "en riesgo", firma ante el cliente y avisos por correo (solo con la Ticketera encendida). |
 | | **Avisos por cliente** | Avisos que aparecen al trabajar con un cliente y el catálogo de eventos de los informes. |
 | | **Correo** | SMTP y remitente, con plantillas para los proveedores comunes y correo de prueba. |
 | | **Reportes de turno** | Formato y estado de los reportes de cierre. |
@@ -229,7 +250,7 @@ Solo para administradores. El menú se agrupa así:
 | | **Territorio** (NOC) | Regiones, zonas y sitios, con importación CSV y activar o desactivar en lote. |
 | | **Equipos** | Equipos, contratas, guardias, integrantes y cobertura territorial, con acciones en lote (detalle abajo). |
 | Sistema | **Marca** | Nombre, logo, favicon y fuente. |
-| | **Módulos** y **Funcionalidades** | Qué partes del sistema están encendidas. |
+| | **Módulos** y **Funcionalidades** | Qué partes del sistema están encendidas (la Ticketera se enciende en Módulos; SOC y NOC, en Áreas y niveles). |
 | | **Respaldos** | Copias, restauración y exportación (ver [operacion.md](operacion.md)). |
 | | **Auditoría** | Quién hizo qué y cuándo, con filtros y exportación. |
 | | **Complementos** | Subir y publicar mini-aplicaciones. |
@@ -257,7 +278,7 @@ Cada política (de un servicio, un activo o una zona) es una lista de **llamados
 
 ### Turnos → Guardias
 
-La pantalla para organizar las guardias (N2, TI, N1 No hábil…) y marcar condiciones de una persona (teletrabajo, charla/capacitación, vacaciones, licencias) con "Marcar condición".
+La pantalla para organizar las guardias (N2, TI, N1 No hábil…) y marcar condiciones de una persona (teletrabajo, charla/capacitación, vacaciones, licencias), todo desde "Nueva asignación".
 
 - **Ahora de guardia:** quién está en cada guardia, hasta cuándo y quién sigue.
 - **Línea de tiempo** de 2 o 4 semanas, con una línea roja en "ahora".
@@ -265,7 +286,9 @@ La pantalla para organizar las guardias (N2, TI, N1 No hábil…) y marcar condi
   - Si hay dos personas a la vez, sus barras se apilan.
   - Clic en una barra para editarla.
 - **Siempre cubierta:** N1 y N2 no pueden quedar sin nadie. Un tramo vacío se marca en rojo y se cubre con un clic.
-- **Nueva guardia:** eliges la guardia y la persona; cada integrante muestra si está libre, en otra guardia o de vacaciones. Hay duraciones rápidas (1 semana, 2 semanas, 2 días).
+- **Nueva asignación:** en el mismo selector están las guardias y las condiciones, como en el legacy.
+  - Una guardia: eliges la persona (cada integrante muestra si está libre, en otra guardia o de vacaciones) y el tramo, con duraciones rápidas (1 semana, 2 semanas, 2 días).
+  - Una condición (teletrabajo, charla/capacitación, vacaciones, trámite médico, licencia): persona, desde y hasta; queda en Dotación.
 - **Antes de guardar** el panel avisa si:
   - la persona ya está en otra guardia,
   - tiene una ausencia en Dotación,
@@ -287,7 +310,7 @@ La pantalla para organizar las guardias (N2, TI, N1 No hábil…) y marcar condi
 
 ## Atajos y accesibilidad
 
-- **Atajos de navegación:** `Alt+1` Bitácora · `Alt+2` Turnos · `Alt+3` Escalamiento · `Alt+4` Directorio · `Alt+5` Administración · `Alt+8` Reportes. Están indicados junto a cada ítem del menú.
+- **Atajos de navegación:** `Alt+1` Bitácora · `Alt+2` Turnos · `Alt+3` Escalamiento · `Alt+4` Directorio · `Alt+5` Administración · `Alt+8` Reportes · `Alt+9` Mi equipo (jefatura). Están indicados junto a cada ítem del menú.
 - **Buscador de Administración:** `Ctrl+K`.
 - **Idioma:** botones ES / EN abajo a la izquierda.
 - **Tema y fuente para dislexia (OpenDyslexic):** íconos abajo a la izquierda o en *Mi perfil → Preferencias*.

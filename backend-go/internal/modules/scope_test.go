@@ -6,15 +6,15 @@ func TestEffectiveScope(t *testing.T) {
 	cases := []struct {
 		name        string
 		instance    Flags
-		groupScopes []string
+		groupScopes []string // códigos de área de los grupos del usuario
 		want        Scope
 	}{
 		{"sin grupos no ve nada", Flags{SOC: true, NOC: true}, nil, ScopeNone},
-		{"grupo both con instancia completa", Flags{SOC: true, NOC: true}, []string{"both"}, ScopeBoth},
-		{"grupo both recortado por instancia solo-NOC", Flags{NOC: true}, []string{"both"}, ScopeNOC},
-		{"grupo soc en instancia solo-NOC no ve nada", Flags{NOC: true}, []string{"soc"}, ScopeNone},
-		{"union de grupos soc+noc", Flags{SOC: true, NOC: true}, []string{"soc", "noc"}, ScopeBoth},
-		{"grupo none no suma nada", Flags{SOC: true, NOC: true}, []string{"none", "soc"}, ScopeSOC},
+		{"áreas SOC y NOC con instancia completa", Flags{SOC: true, NOC: true}, []string{"soc", "noc"}, ScopeBoth},
+		{"SOC y NOC recortado por instancia solo-NOC", Flags{NOC: true}, []string{"soc", "noc"}, ScopeNOC},
+		{"área soc en instancia solo-NOC no ve nada", Flags{NOC: true}, []string{"soc"}, ScopeNone},
+		{"otras áreas no abren SOC ni NOC", Flags{SOC: true, NOC: true}, []string{"ti", "infra"}, ScopeNone},
+		{"ti más soc ve solo SOC", Flags{SOC: true, NOC: true}, []string{"ti", "soc"}, ScopeSOC},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

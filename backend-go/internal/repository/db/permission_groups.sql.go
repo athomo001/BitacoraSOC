@@ -29,40 +29,43 @@ func (q *Queries) AddUserPermissionGroup(ctx context.Context, arg AddUserPermiss
 }
 
 const createPermissionGroup = `-- name: CreatePermissionGroup :one
-INSERT INTO permission_groups (code, name, module_scope, capabilities)
-VALUES ($1, $2, $3, $4)
-RETURNING id, code, name, module_scope, capabilities, active, created_at
+INSERT INTO permission_groups (code, name, capabilities, profile, level_id)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, code, name, capabilities, active, created_at, profile, level_id
 `
 
 type CreatePermissionGroupParams struct {
-	Code         string                     `json:"code"`
-	Name         string                     `json:"name"`
-	ModuleScope  PermissionGroupModuleScope `json:"module_scope"`
-	Capabilities []string                   `json:"capabilities"`
+	Code         string      `json:"code"`
+	Name         string      `json:"name"`
+	Capabilities []string    `json:"capabilities"`
+	Profile      string      `json:"profile"`
+	LevelID      pgtype.UUID `json:"level_id"`
 }
 
 func (q *Queries) CreatePermissionGroup(ctx context.Context, arg CreatePermissionGroupParams) (PermissionGroup, error) {
 	row := q.db.QueryRow(ctx, createPermissionGroup,
 		arg.Code,
 		arg.Name,
-		arg.ModuleScope,
 		arg.Capabilities,
+		arg.Profile,
+		arg.LevelID,
 	)
 	var i PermissionGroup
 	err := row.Scan(
 		&i.ID,
 		&i.Code,
 		&i.Name,
-		&i.ModuleScope,
 		&i.Capabilities,
 		&i.Active,
 		&i.CreatedAt,
+		&i.Profile,
+		&i.LevelID,
 	)
 	return i, err
 }
 
 const getPermissionGroup = `-- name: GetPermissionGroup :one
-SELECT id, code, name, module_scope, capabilities, active, created_at FROM permission_groups WHERE id = $1
+SELECT id, code, name, capabilities, active, created_at, profile, level_id FROM permission_groups WHERE id = $1
 `
 
 func (q *Queries) GetPermissionGroup(ctx context.Context, id uuid.UUID) (PermissionGroup, error) {
@@ -72,16 +75,17 @@ func (q *Queries) GetPermissionGroup(ctx context.Context, id uuid.UUID) (Permiss
 		&i.ID,
 		&i.Code,
 		&i.Name,
-		&i.ModuleScope,
 		&i.Capabilities,
 		&i.Active,
 		&i.CreatedAt,
+		&i.Profile,
+		&i.LevelID,
 	)
 	return i, err
 }
 
 const listPermissionGroups = `-- name: ListPermissionGroups :many
-SELECT id, code, name, module_scope, capabilities, active, created_at FROM permission_groups
+SELECT id, code, name, capabilities, active, created_at, profile, level_id FROM permission_groups
 WHERE ($1::boolean IS NULL OR active = $1)
 ORDER BY name
 `
@@ -99,10 +103,11 @@ func (q *Queries) ListPermissionGroups(ctx context.Context, active pgtype.Bool) 
 			&i.ID,
 			&i.Code,
 			&i.Name,
-			&i.ModuleScope,
 			&i.Capabilities,
 			&i.Active,
 			&i.CreatedAt,
+			&i.Profile,
+			&i.LevelID,
 		); err != nil {
 			return nil, err
 		}
@@ -115,7 +120,7 @@ func (q *Queries) ListPermissionGroups(ctx context.Context, active pgtype.Bool) 
 }
 
 const listUserPermissionGroups = `-- name: ListUserPermissionGroups :many
-SELECT pg.id, pg.code, pg.name, pg.module_scope, pg.capabilities, pg.active, pg.created_at FROM permission_groups pg
+SELECT pg.id, pg.code, pg.name, pg.capabilities, pg.active, pg.created_at, pg.profile, pg.level_id FROM permission_groups pg
 JOIN user_permission_groups upg ON upg.permission_group_id = pg.id
 WHERE upg.user_id = $1 AND pg.active = true
 ORDER BY pg.name
@@ -134,10 +139,11 @@ func (q *Queries) ListUserPermissionGroups(ctx context.Context, userID uuid.UUID
 			&i.ID,
 			&i.Code,
 			&i.Name,
-			&i.ModuleScope,
 			&i.Capabilities,
 			&i.Active,
 			&i.CreatedAt,
+			&i.Profile,
+			&i.LevelID,
 		); err != nil {
 			return nil, err
 		}
@@ -161,26 +167,31 @@ func (q *Queries) ReplaceUserPermissionGroups(ctx context.Context, userID uuid.U
 const updatePermissionGroup = `-- name: UpdatePermissionGroup :one
 UPDATE permission_groups SET
   name = COALESCE($2, name),
-  module_scope = COALESCE($3, module_scope),
-  capabilities = COALESCE($4, capabilities),
-  active = COALESCE($5, active)
+  profile = COALESCE($3, profile),
+  level_id = CASE WHEN $4::bool THEN $5::uuid ELSE level_id END,
+  capabilities = COALESCE($6, capabilities),
+  active = COALESCE($7, active)
 WHERE id = $1
-RETURNING id, code, name, module_scope, capabilities, active, created_at
+RETURNING id, code, name, capabilities, active, created_at, profile, level_id
 `
 
 type UpdatePermissionGroupParams struct {
-	ID           uuid.UUID                      `json:"id"`
-	Name         pgtype.Text                    `json:"name"`
-	ModuleScope  NullPermissionGroupModuleScope `json:"module_scope"`
-	Capabilities []string                       `json:"capabilities"`
-	Active       pgtype.Bool                    `json:"active"`
+	ID           uuid.UUID   `json:"id"`
+	Name         pgtype.Text `json:"name"`
+	Profile      pgtype.Text `json:"profile"`
+	SetLevel     bool        `json:"set_level"`
+	LevelID      pgtype.UUID `json:"level_id"`
+	Capabilities []string    `json:"capabilities"`
+	Active       pgtype.Bool `json:"active"`
 }
 
 func (q *Queries) UpdatePermissionGroup(ctx context.Context, arg UpdatePermissionGroupParams) (PermissionGroup, error) {
 	row := q.db.QueryRow(ctx, updatePermissionGroup,
 		arg.ID,
 		arg.Name,
-		arg.ModuleScope,
+		arg.Profile,
+		arg.SetLevel,
+		arg.LevelID,
 		arg.Capabilities,
 		arg.Active,
 	)
@@ -189,10 +200,11 @@ func (q *Queries) UpdatePermissionGroup(ctx context.Context, arg UpdatePermissio
 		&i.ID,
 		&i.Code,
 		&i.Name,
-		&i.ModuleScope,
 		&i.Capabilities,
 		&i.Active,
 		&i.CreatedAt,
+		&i.Profile,
+		&i.LevelID,
 	)
 	return i, err
 }

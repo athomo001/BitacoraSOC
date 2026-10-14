@@ -15,13 +15,15 @@ export interface ShellNavItem {
   labelKey: MessageKey;
   icon: string;
   /** Alt+<dígito>, ver ShellComponent.onKeydown */
-  shortcutDigit: '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8';
+  shortcutDigit: '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9';
   /** Código de `system_features` que debe estar activo para mostrar la sección. */
   requiresFeature?: string;
   /** Necesita SOC o NOC encendido: con solo la Ticketera no aparece (pedido del dueño). */
   requiresSocOrNoc?: boolean;
   /** Además, que el usuario vea al menos un complemento (si no, no hay nada que abrir). */
   requiresComplements?: boolean;
+  /** Capacidad de grupo que debe tener el usuario (el admin la tiene siempre). */
+  requiresCapability?: string;
 }
 
 export const SHELL_NAV_ITEMS: readonly ShellNavItem[] = [
@@ -35,5 +37,7 @@ export const SHELL_NAV_ITEMS: readonly ShellNavItem[] = [
   { path: 'reports', labelKey: 'nav.reports', icon: 'outgoing_mail', shortcutDigit: '8' },
   // Complementos (spec/11 §7): un solo ítem con una pestaña por complemento.
   { path: 'complements', labelKey: 'nav.complements', icon: 'extension', shortcutDigit: '7', requiresFeature: 'complements', requiresComplements: true },
+  // Mi equipo (spec/16 §3.5, 9d): solo la jefatura de área.
+  { path: 'team', labelKey: 'nav.team', icon: 'groups', shortcutDigit: '9', requiresCapability: 'area:lead' },
   { path: 'admin', labelKey: 'nav.admin', icon: 'settings', shortcutDigit: '5' },
 ];

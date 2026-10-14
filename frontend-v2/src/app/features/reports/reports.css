@@ -491,3 +491,10 @@ mat-icon {
   font-size: 11px;
   white-space: nowrap;
 }
+
+/* Campo obligatorio vacío después de intentar enviar. */
+.rp__invalid,
+.rp__invalid:focus {
+  border-color: var(--status-critical);
+  box-shadow: 0 0 0 1px var(--status-critical);
+}

@@ -17,7 +17,7 @@ type fakeModuleAccess struct {
 }
 
 func (f fakeModuleAccess) InstanceFlags(context.Context) (modules.Flags, error) { return f.flags, nil }
-func (f fakeModuleAccess) UserGroupScopes(context.Context, uuid.UUID) ([]string, error) {
+func (f fakeModuleAccess) UserModuleAreaCodes(context.Context, uuid.UUID) ([]string, error) {
 	return f.scopes, nil
 }
 
@@ -60,7 +60,7 @@ func TestRequireModule_UserOutsideScopeBlocked(t *testing.T) {
 }
 
 func TestRequireModule_UserInScopePasses(t *testing.T) {
-	rec := runRequireModule(t, fakeModuleAccess{flags: modules.Flags{NOC: true}, scopes: []string{"both"}}, AuthenticatedUser{ID: uuid.New(), Role: "user"})
+	rec := runRequireModule(t, fakeModuleAccess{flags: modules.Flags{NOC: true}, scopes: []string{"soc", "noc"}}, AuthenticatedUser{ID: uuid.New(), Role: "user"})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}

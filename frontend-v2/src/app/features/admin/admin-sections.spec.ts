@@ -122,8 +122,10 @@ describe('Administración re-vestida', () => {
     http.expectNone('/api/config/modules');
   });
 
-  it('Módulos: se puede usar solo la Ticketera (enciende la Ticketera antes de apagar SOC)', async () => {
+  it('Módulos: la Ticketera se enciende acá; SOC y NOC llevan a Áreas y niveles', async () => {
     const fixture = TestBed.createComponent(AdminModulesComponent);
+    let wentToAreas = false;
+    fixture.componentInstance.goToAreas.subscribe(() => (wentToAreas = true));
     fixture.detectChanges();
     http.expectOne('/api/setup/status').flush({ data: { setupCompleted: true, socEnabled: true, nocEnabled: false } });
     http.expectOne('/api/system-features').flush({
@@ -132,26 +134,18 @@ describe('Administración re-vestida', () => {
     await settle();
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
-    const rows = [...el.querySelectorAll('.adm-switch-row')];
-    const save = () => el.querySelector('.adm-btn--primary') as HTMLButtonElement;
+    // Solo la Ticketera tiene interruptor.
+    const switches = [...el.querySelectorAll<HTMLInputElement>('.adm-switch-row input[role="switch"]')];
+    expect(switches.length).toBe(1);
+    ([...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.includes('Se enciende en Áreas y niveles'))!).click();
+    expect(wentToAreas).toBe(true);
 
-    // Todo apagado no se puede guardar.
-    (rows[0].querySelector('input') as HTMLInputElement).dispatchEvent(new Event('change'));
+    switches[0].dispatchEvent(new Event('change'));
     fixture.detectChanges();
-    expect(save().disabled).toBe(true);
-    expect(el.textContent).toContain('Al menos uno (SOC, NOC o Ticketera)');
-
-    // Solo la Ticketera: sí.
-    (rows[2].querySelector('input') as HTMLInputElement).dispatchEvent(new Event('change'));
-    fixture.detectChanges();
-    expect(save().disabled).toBe(false);
-    save().click();
+    (el.querySelector('.adm-btn--primary') as HTMLButtonElement).click();
     http.expectOne((r) => r.method === 'PATCH' && r.url === '/api/system-features/native_tickets')
       .flush({ data: { code: 'native_tickets', name: 'x', isEnabled: true, configPayload: {}, updatedAt: '' } });
     await settle();
-    const modules = http.expectOne((r) => r.method === 'PATCH' && r.url === '/api/config/modules');
-    expect(modules.request.body).toEqual({ socEnabled: false, nocEnabled: false });
-    modules.flush({ data: { socEnabled: false, nocEnabled: false } });
-    await settle();
+    http.expectNone('/api/config/modules');
   });
 });

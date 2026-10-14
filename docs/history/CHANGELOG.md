@@ -4,6 +4,60 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] Usuarios por área y nivel: los grupos se arman solos - 2026-10-13
+
+- Pedido del dueño («me complico»); diseño aprobado en el canvas (v36, "Usuarios por área y nivel").
+- **Usuarios y grupos → panel de la persona**: una fila por área con su nivel («—» = fuera), «Jefe» por área, permisos extra y la vista previa del menú; se guarda todo junto. Una persona puede estar en varias áreas con un nivel distinto en cada una.
+- Por debajo se arman o reutilizan solos los grupos («Infraestructura N1», «Jefatura Infraestructura», «Directorio: escribir»). Los grupos hechos a mano se respetan mientras sigan de acuerdo con lo elegido.
+- **Áreas y niveles**: columna Perfil (el de los grupos que se arman solos); migración 000034 (`areas.default_profile`: SOC y NOC Operativo, las demás Resolutor). Los respaldos anteriores se actualizan al restaurar.
+- Enlaces entre pantallas: «¿Falta un área? Créala en Áreas y niveles» y «Ir a Usuarios y grupos». Arreglos: «1 grupos» → «1 grupo»; el nombre del grupo ya no sale pegado a su código; aviso de jefatura sin áreas.
+- Ruta nueva `GET/PUT /api/users/:id/placement` (spec/04).
+
+## [Rewrite] Mi equipo: la jefatura de área (spec/16, etapa 9d) - 2026-10-13
+
+- Diseño aprobado por el dueño en el canvas (v35, "Jefatura de área: Mi equipo").
+- Capacidad nueva **«Jefatura de área»** (`area:lead`) en Usuarios y grupos → Grupos: el grupo es jefatura de sus áreas y ve **Mi equipo** en el menú (`Alt+9`).
+- **Mi equipo**: personas activas, tickets abiertos, SLA vencidos y ausentes hoy; la gente del área con su grupo, cómo está hoy (Dotación y guardias), sus tickets abiertos y vencidos; por persona, su semana y sus tickets.
+- La jefatura agrega personas (rol usuario, contraseña temporal que se muestra una vez), les cambia el grupo y las da de baja o reactiva. Solo grupos de sus áreas, nunca admin; no toca administradores ni a quien tiene grupos de otras áreas. Auditado (`team.person.*`).
+- Rutas nuevas `/api/team/*` (spec/04). Sin migración: usa las tablas de 9a.
+- Guardias y escalamiento del área para la jefatura: en 9e (decisión del dueño).
+
+## [Rewrite] El perfil decide el menú (spec/16, etapa 9c) - 2026-10-13
+
+- Solo los grupos con perfil **Operativo** abren SOC/NOC (Bitácora, Turnos y Checklist, Escalamiento, Reportes). Un grupo Resolutor o de Gestión con el área SOC ve los datos de esa área (tickets), no la bitácora. La regla la aplica el backend (`middleware.RequireModule` y `GET /api/users/me/capabilities`), y el menú la sigue solo: lo que se ve y lo que se deja pasar no pueden divergir.
+- Resolutor y Gestión ven, por ahora, Tickets y Directorio; inventario, trabajos y metas se suman cuando existan (9.2–9.4). La vista previa del editor de grupos muestra eso.
+
+## [Rewrite] Administración → Áreas y niveles y el editor de grupos (spec/16, etapa 9b) - 2026-10-13
+
+- Diseño aprobado por el dueño en el canvas (v34, "Áreas, niveles y perfiles").
+- **Administración → Áreas y niveles** (grupo Personas): crear áreas (el código sale del nombre), renombrarlas, encenderlas o apagarlas, con cuántos grupos usa cada una; SOC y NOC son de sistema. Niveles: crear, renombrar y ordenar.
+- **SOC y NOC se encienden en Áreas y niveles** (propuesta del diseño): Módulos muestra su estado con un botón que lleva ahí y queda con el interruptor de la Ticketera. Se mantiene la regla de que al menos uno de SOC, NOC o la Ticketera quede activo, y el menú cambia al instante.
+- **Usuarios y grupos → Grupos**: la tabla muestra áreas, nivel y perfil; "Editar" abre el panel con áreas (varias), nivel, perfil (Operativo, Resolutor, Gestión, con lo que ve cada uno) y la vista previa del menú. El alta de grupo usa el mismo panel. El perfil se guarda; el menú por perfil llega en 9c.
+- Rutas nuevas: `/api/areas` y `/api/levels` (spec/04).
+
+## [Rewrite] Áreas, niveles y perfiles: la base (spec/16, etapa 9a) - 2026-10-13
+
+- **Migración `000033`**: tablas `areas` (SOC y NOC como áreas de sistema, con ids fijos), `levels` (N1, N2, N3) y `permission_group_areas`; `permission_groups` gana `profile` (operativo, resolutor, gestión; los existentes quedan Operativos) y `level_id`. `permission_groups.module_scope` pasa a las áreas del grupo y `app_config.soc/noc_module_enabled` al `active` de SOC y NOC; las columnas viejas se eliminan.
+- Para el usuario no cambia nada: el acceso se calcula igual (`modules.EffectiveScope` sobre las áreas), Módulos y el asistente inicial encienden las áreas, y Usuarios y grupos mantiene su selector SOC/NOC/ambos/ninguno sobre las áreas del grupo.
+- API de grupos: `areas`, `profile` y `levelId` en lugar de `moduleScope`. `GET /api/users/me/capabilities` suma `areas`.
+- **Respaldos**: uno anterior a 000033 se actualiza al restaurarlo (las áreas salen de sus `module_scope` y de los interruptores). Después de restaurar o purgar se vuelven a sembrar los catálogos que siembran las migraciones si faltan; antes, purgar dejaba la Ticketera sin configuración y crear un ticket fallaba.
+
+## [Rewrite] Correo: login con Office 365 y muestras de todos los correos - 2026-10-13
+
+- **Arreglo — Office 365 rechazaba todos los correos** ("504 5.7.4 Unrecognized authentication type"): la 2.0 siempre iniciaba sesión con PLAIN y Office 365 solo ofrece LOGIN (el legacy, con nodemailer, elegía LOGIN). Ahora se usa el método que anuncia el servidor (PLAIN si está; si no, LOGIN), sin mandar la contraseña sin TLS.
+- **Administración → Correo → Muestras de todos los correos**: manda un ejemplo de cada uno de los 14 correos de la app (prueba, informe, boletín, reporte de turno, checklist en rojo, recordatorio, dotación en calendario y lista, cumpleaños, recuperar y cambiar contraseña, 3 de la Ticketera) a hasta 5 buzones, para revisarlos en Outlook y Gmail (pendiente 4). Usa las mismas funciones que los envíos reales.
+- **Reportes**: si falta un campo obligatorio, el aviso dice cuál ("Falta completar: Nombre del evento"), lo marca en rojo y lleva a él.
+
+## [Rewrite] Administración → Ticketera y avisos por correo - 2026-10-13
+
+- **Sección nueva Administración → Ticketera** (pedido del dueño: "todo lo de tickets en una sección, para configurarlo a gusto"), visible solo con la Ticketera encendida:
+  - **General y SLA**: plazos de respuesta y resolución por prioridad (P1–P4) y para requerimientos, el umbral "en riesgo" del semáforo y la firma ante el cliente. Antes estaban fijos en el código; los valores por defecto son los mismos (1 h / 8 h / 72 h, 75 %, "Mesa de Operaciones").
+  - **Avisos por correo** (spec/15, decisiones del dueño del mismo día): interruptor general, grupo Equipo (copia de respaldo, un interruptor por evento, no avisar a quien hizo el cambio) y grupo Cliente (solo tickets con "Afecta al cliente", P1 y P2 por defecto, comentarios juntados cada 15 min, sin PIN). Vienen apagados.
+- **En cada ticket**: casilla "Afecta al cliente", "Avisar a" (Para/CC del escalamiento del cliente, editable solo para ese ticket) y "Correos enviados" con "Reenviar".
+- **Envío**: cola `ticket_mail_outbox` con despachador cada 30 s, reintentos a 1, 5 y 30 min, y avisos de SLA una sola vez por ticket. Formato del aviso simple del legacy.
+- Migración `000032`. El botón "Abrir el ticket" de los correos abre la Ticketera en ese ticket (`/tickets?id=…`).
+- Prueba de punta a punta contra Postgres y Mailpit dentro de una transacción que se deshace: nunca sale un correo real.
+
 ## [Rewrite] Turnos: condiciones con rango, OL deja de ser guardia, Dotación en una vista y territorio en árbol - 2026-10-13
 
 - **OL es "Charla/Capacitación", no una guardia** (como el legacy): el ETL y el CSV de guardias la cargan como condición `training` de Dotación. La migración `000031` convierte el equipo "Guardia OL" ya restaurado en días de Dotación (19 tramos → 24 días) y lo borra.

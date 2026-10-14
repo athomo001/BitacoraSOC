@@ -11,6 +11,7 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/auth"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -43,10 +44,15 @@ func (h *SetupHandler) Status(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer la configuración")
 		return
 	}
+	flags, err := repository.AreaFlags(ctx, h.Queries)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer la configuración")
+		return
+	}
 	writeData(w, http.StatusOK, setupStatusResponse{
 		SetupCompleted: config.SetupCompletedAt.Valid,
-		SocEnabled:     config.SocModuleEnabled,
-		NocEnabled:     config.NocModuleEnabled,
+		SocEnabled:     flags.SOC,
+		NocEnabled:     flags.NOC,
 	})
 }
 
@@ -121,7 +127,10 @@ func (h *SetupHandler) runBootstrap(ctx context.Context, req bootstrapRequest) (
 			return db.User{}, &bootstrapError{http.StatusInternalServerError, "internal-error", "no se pudo encender la Ticketera"}
 		}
 	}
-	if _, err := h.Queries.CompleteSetup(ctx, db.CompleteSetupParams{SocModuleEnabled: req.SocEnabled, NocModuleEnabled: req.NocEnabled}); err != nil {
+	if err := setModuleAreas(ctx, h.Queries, req.SocEnabled, req.NocEnabled); err != nil {
+		return db.User{}, &bootstrapError{http.StatusInternalServerError, "internal-error", "no se pudieron activar los módulos"}
+	}
+	if _, err := h.Queries.CompleteSetup(ctx); err != nil {
 		return db.User{}, &bootstrapError{http.StatusInternalServerError, "internal-error", "no se pudo completar el setup"}
 	}
 	return user, nil

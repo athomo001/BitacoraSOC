@@ -9,8 +9,8 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/eventbus"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // eventPublisher es lo que los handlers de configuración necesitan del hub
@@ -56,7 +56,7 @@ type patchModulesRequest struct {
 
 // PatchModules activa/desactiva SOC/NOC post-bootstrap. Puramente de
 // acceso: nunca borra ni migra datos del módulo apagado (HU-0b) — solo
-// cambia 2 booleanos que RequireModule lee en cada request.
+// cambia el `active` de las áreas SOC y NOC, que RequireModule lee en cada request.
 func (h *ConfigHandler) PatchModules(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var req patchModulesRequest
@@ -64,12 +64,12 @@ func (h *ConfigHandler) PatchModules(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "cuerpo de la request inválido")
 		return
 	}
-	config, err := h.Queries.GetAppConfig(ctx)
+	before, err := repository.AreaFlags(ctx, h.Queries)
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer la configuración")
 		return
 	}
-	soc, noc := config.SocModuleEnabled, config.NocModuleEnabled
+	soc, noc := before.SOC, before.NOC
 	if req.SocEnabled != nil {
 		soc = *req.SocEnabled
 	}
@@ -82,17 +82,13 @@ func (h *ConfigHandler) PatchModules(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updated, err := h.Queries.SetModuleFlags(ctx, db.SetModuleFlagsParams{
-		SocModuleEnabled: pgtype.Bool{Bool: soc, Valid: true},
-		NocModuleEnabled: pgtype.Bool{Bool: noc, Valid: true},
-	})
-	if err != nil {
+	if err := setModuleAreas(ctx, h.Queries, soc, noc); err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo actualizar los módulos")
 		return
 	}
-	resp := modulesResponse{SocEnabled: updated.SocModuleEnabled, NocEnabled: updated.NocModuleEnabled}
+	resp := modulesResponse{SocEnabled: soc, NocEnabled: noc}
 	h.AuditLog.Log(ctx, "config.modules.update", audit.LevelWarn, audit.Success(), map[string]any{
-		"before": modulesResponse{SocEnabled: config.SocModuleEnabled, NocEnabled: config.NocModuleEnabled},
+		"before": modulesResponse{SocEnabled: before.SOC, NocEnabled: before.NOC},
 		"after":  resp,
 	})
 	publishSync(ctx, h.Hub, "config.modules.updated", resp)

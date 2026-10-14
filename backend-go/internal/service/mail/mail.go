@@ -56,13 +56,7 @@ func (s *Sender) SendMany(to, cc []string, subject, body string) error {
 	}
 	addr := fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port)
 
-	var auth smtp.Auth
-	if s.cfg.Username != "" {
-		// net/smtp.PlainAuth se niega a enviar credenciales si la conexión no
-		// está en TLS (vía STARTTLS) y el host no es localhost — protección
-		// ya incluida en la librería estándar, no reimplementada acá.
-		auth = smtp.PlainAuth("", s.cfg.Username, s.cfg.Password, s.cfg.Host)
-	}
+	auth := s.auth()
 
 	msg := buildMessage(s.fromHeader(), to, cc, subject, body, time.Now())
 
@@ -83,10 +77,7 @@ func (s *Sender) SendHTML(to, cc []string, subject, htmlBody string) error {
 		return fmt.Errorf("mail: destinatario vacío")
 	}
 	addr := fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port)
-	var auth smtp.Auth
-	if s.cfg.Username != "" {
-		auth = smtp.PlainAuth("", s.cfg.Username, s.cfg.Password, s.cfg.Host)
-	}
+	auth := s.auth()
 	msg := buildHTMLMessage(s.fromHeader(), to, cc, subject, htmlBody, time.Now())
 	rcpt := append(append([]string{}, to...), cc...)
 	return smtp.SendMail(addr, auth, s.cfg.FromAddress, rcpt, msg)
@@ -101,10 +92,7 @@ func (s *Sender) SendAlternative(to, cc []string, subject, textBody, htmlBody st
 		return fmt.Errorf("mail: destinatario vacío")
 	}
 	addr := fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port)
-	var auth smtp.Auth
-	if s.cfg.Username != "" {
-		auth = smtp.PlainAuth("", s.cfg.Username, s.cfg.Password, s.cfg.Host)
-	}
+	auth := s.auth()
 	msg := buildAlternativeMessage(s.fromHeader(), to, cc, subject, textBody, htmlBody, time.Now())
 	rcpt := append(append([]string{}, to...), cc...)
 	return smtp.SendMail(addr, auth, s.cfg.FromAddress, rcpt, msg)

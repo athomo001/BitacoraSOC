@@ -57,15 +57,15 @@
           <div class="rp__grid3">
             <label class="adm-field">
               <span class="adm-label">{{ i18n.t('rpt.f.ticket') }} *</span>
-              <input class="adm-input mono" name="ticket" placeholder="GLPI-12345" [ngModel]="f.codigoTicket" (ngModelChange)="setIncident('codigoTicket', $event)" />
+              <input class="adm-input mono" name="ticket" [class.rp__invalid]="isMissing('codigoTicket')" [attr.aria-invalid]="isMissing('codigoTicket') || null" placeholder="GLPI-12345" [ngModel]="f.codigoTicket" (ngModelChange)="setIncident('codigoTicket', $event)" />
             </label>
             <label class="adm-field">
               <span class="adm-label">{{ i18n.t('rpt.f.offense') }} *</span>
-              <input class="adm-input" name="ofensa" placeholder="4056" [ngModel]="f.ofensa" (ngModelChange)="setIncident('ofensa', $event)" />
+              <input class="adm-input" name="ofensa" [class.rp__invalid]="isMissing('ofensa')" [attr.aria-invalid]="isMissing('ofensa') || null" placeholder="4056" [ngModel]="f.ofensa" (ngModelChange)="setIncident('ofensa', $event)" />
             </label>
             <label class="adm-field">
               <span class="adm-label">{{ i18n.t('rpt.f.operationType') }} *</span>
-              <select class="adm-input" name="tipo" [ngModel]="f.tipoOperacion" (ngModelChange)="pickOperationType($event)">
+              <select class="adm-input" name="tipo" [class.rp__invalid]="isMissing('tipoOperacion')" [attr.aria-invalid]="isMissing('tipoOperacion') || null" [ngModel]="f.tipoOperacion" (ngModelChange)="pickOperationType($event)">
                 <option value="">{{ i18n.t('rpt.f.choose') }}</option>
                 @for (t of operationTypes(); track t.id) { <option [value]="t.name">{{ t.name }}</option> }
                 @if (f.tipoOperacion && !operationTypes().some(t => t.name === f.tipoOperacion)) { <option [value]="f.tipoOperacion">{{ f.tipoOperacion }}</option> }
@@ -77,7 +77,7 @@
             <input
               id="rp-evento"
               class="adm-input"
-              name="evento"
+              name="evento" [class.rp__invalid]="isMissing('nombreEvento')" [attr.aria-invalid]="isMissing('nombreEvento') || null"
               role="combobox"
               autocomplete="off"
               aria-autocomplete="list"
@@ -122,7 +122,7 @@
           </label>
           <label class="adm-field">
             <span class="adm-label">{{ i18n.t('rpt.f.observations') }} *</span>
-            <textarea class="adm-input" rows="3" name="obs" [ngModel]="f.observaciones" (ngModelChange)="setIncident('observaciones', $event)"></textarea>
+            <textarea class="adm-input" rows="3" name="obs" [class.rp__invalid]="isMissing('observaciones')" [attr.aria-invalid]="isMissing('observaciones') || null" [ngModel]="f.observaciones" (ngModelChange)="setIncident('observaciones', $event)"></textarea>
           </label>
           <div class="rp__grid3">
             <label class="adm-field">
@@ -163,12 +163,12 @@
           @let b = bulletin();
           <label class="adm-field">
             <span class="adm-label">{{ i18n.t('rpt.f.bulletinTitle') }} *</span>
-            <input class="adm-input" name="titulo" [ngModel]="b.tituloBoletin" (ngModelChange)="setBulletin('tituloBoletin', $event)" />
+            <input class="adm-input" name="titulo" [class.rp__invalid]="isMissing('tituloBoletin')" [attr.aria-invalid]="isMissing('tituloBoletin') || null" [ngModel]="b.tituloBoletin" (ngModelChange)="setBulletin('tituloBoletin', $event)" />
           </label>
           <div class="rp__grid3">
             <label class="adm-field">
               <span class="adm-label">{{ i18n.t('rpt.f.vendor') }} *</span>
-              <input class="adm-input" name="marca" [ngModel]="b.marcaFabricante" (ngModelChange)="setBulletin('marcaFabricante', $event)" />
+              <input class="adm-input" name="marca" [class.rp__invalid]="isMissing('marcaFabricante')" [attr.aria-invalid]="isMissing('marcaFabricante') || null" [ngModel]="b.marcaFabricante" (ngModelChange)="setBulletin('marcaFabricante', $event)" />
             </label>
             <label class="adm-field">
               <span class="adm-label">CVE</span>
@@ -185,15 +185,15 @@
           </div>
           <label class="adm-field">
             <span class="adm-label">{{ i18n.t('rpt.f.products') }} *</span>
-            <textarea class="adm-input" rows="2" name="productos" [ngModel]="b.productosAfectados" (ngModelChange)="setBulletin('productosAfectados', $event)"></textarea>
+            <textarea class="adm-input" rows="2" name="productos" [class.rp__invalid]="isMissing('productosAfectados')" [attr.aria-invalid]="isMissing('productosAfectados') || null" [ngModel]="b.productosAfectados" (ngModelChange)="setBulletin('productosAfectados', $event)"></textarea>
           </label>
           <label class="adm-field">
             <span class="adm-label">{{ i18n.t('rpt.f.impact') }} *</span>
-            <textarea class="adm-input" rows="2" name="impacto" [ngModel]="b.impacto" (ngModelChange)="setBulletin('impacto', $event)"></textarea>
+            <textarea class="adm-input" rows="2" name="impacto" [class.rp__invalid]="isMissing('impacto')" [attr.aria-invalid]="isMissing('impacto') || null" [ngModel]="b.impacto" (ngModelChange)="setBulletin('impacto', $event)"></textarea>
           </label>
           <label class="adm-field">
             <span class="adm-label">{{ i18n.t('rpt.f.mitigation') }} *</span>
-            <textarea class="adm-input" rows="3" name="mitig" [ngModel]="b.recomendacion" (ngModelChange)="setBulletin('recomendacion', $event)"></textarea>
+            <textarea class="adm-input" rows="3" name="mitig" [class.rp__invalid]="isMissing('recomendacion')" [attr.aria-invalid]="isMissing('recomendacion') || null" [ngModel]="b.recomendacion" (ngModelChange)="setBulletin('recomendacion', $event)"></textarea>
           </label>
           <label class="adm-field">
             <span class="adm-label">{{ i18n.t('rpt.f.references') }}</span>

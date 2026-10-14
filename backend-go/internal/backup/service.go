@@ -235,6 +235,8 @@ func (s *Service) Restore(ctx context.Context, run db.BackupRun, passphrase stri
 	if envelope.Kind != "full" {
 		return RestoreResult{}, errors.New("esta copia es un delta: se aplica con Importar delta")
 	}
+	// Un respaldo de una versión anterior se lleva al esquema de hoy.
+	upgradeTables(envelope.Tables)
 	result := RestoreResult{Mode: mode, RestoredFrom: run.ID.String()}
 	if mode == Replace {
 		safety, err := s.createFullLocked(ctx, passphrase, "pre_restore", "", actor)
@@ -278,6 +280,9 @@ func (s *Service) Restore(ctx context.Context, run db.BackupRun, passphrase stri
 		if err := restoreKept(ctx, tx, keep); err != nil {
 			return RestoreResult{}, err
 		}
+	}
+	if err := ensureCatalogDefaults(ctx, tx); err != nil {
+		return RestoreResult{}, err
 	}
 	if err := resetSequences(ctx, tx); err != nil {
 		return RestoreResult{}, err
@@ -381,6 +386,10 @@ func (s *Service) Purge(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	if _, err := tx.Exec(ctx, `INSERT INTO backup_config (id) VALUES (true)`); err != nil {
+		return 0, err
+	}
+	// Lo que siembran las migraciones vuelve a su estado de fábrica.
+	if err := ensureCatalogDefaults(ctx, tx); err != nil {
 		return 0, err
 	}
 	targets := 0
