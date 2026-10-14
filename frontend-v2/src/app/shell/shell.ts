@@ -13,6 +13,7 @@ import { UserAvatarComponent } from './user-avatar';
 import { ComplementsService } from '../core/complements/complements.service';
 import { SetupService } from '../core/setup/setup.service';
 import { PermissionsService } from '../core/auth/permissions.service';
+import { InventoryService } from '../core/inventory/inventory.service';
 
 /** Ícono y etiqueta del botón de tema: muestran el tema SIGUIENTE (igual que el diseño). */
 const NEXT_THEME: Record<Theme, { icon: string; labelKey: MessageKey }> = {
@@ -49,6 +50,8 @@ export class ShellComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly complements = inject(ComplementsService);
   private readonly perms = inject(PermissionsService);
+  /** Solicitudes de baja de equipos que espera el usuario (admin o jefatura): número en el menú. */
+  protected readonly inventory = inject(InventoryService);
 
   constructor() {
     // Encender o apagar "Complementos" (aquí o desde otro admin) recarga la
@@ -109,11 +112,14 @@ export class ShellComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     // Las capacidades de grupo deciden ítems como Mi equipo (jefatura).
     void this.perms.load();
+    void this.inventory.refreshPending();
     // Cambios hechos por otro admin u otra pestaña llegan en vivo.
     const stop = this.sse.connect((eventType, data) => {
       if (eventType === 'system_feature.updated' && isFeature(data)) this.features.apply(data);
       // SOC/NOC encendidos o apagados por otro admin: menús y pantallas cambian sin F5.
       if (eventType === 'config.modules.updated' && isModules(data)) this.setup.applyModules(data);
+      // Alguien pidió (o se decidió) la baja de un equipo: se actualiza el número.
+      if (eventType === 'inventory.request') void this.inventory.refreshPending();
       // Marca cambiada por un admin: barra, pestaña y fuente sin F5.
       if (eventType === 'config.branding.updated' && data && typeof data === 'object' && 'appTitle' in data) this.branding.apply(data as Branding);
     });

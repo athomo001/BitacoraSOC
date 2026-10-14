@@ -94,3 +94,19 @@ func TestUpgradeTablesFillsModuleFlags(t *testing.T) {
 		t.Fatalf("los módulos salen de las áreas del respaldo: %v", config)
 	}
 }
+
+func TestUpgradeTablesFillsTicketAreas(t *testing.T) {
+	tables := map[string]json.RawMessage{
+		"areas":   json.RawMessage(`[{"code":"soc","active":true,"default_profile":"operativo"}]`),
+		"tickets": json.RawMessage(`[{"id":"t1","scope":"soc"},{"id":"t2","scope":"noc"},{"id":"t3","scope":"general"}]`),
+	}
+	upgradeTables(tables)
+	var tickets []map[string]any
+	_ = json.Unmarshal(tables["tickets"], &tickets)
+	want := []string{areaSOCID, areaNOCID, areaSOCID}
+	for i, tk := range tickets {
+		if tk["area_id"] != want[i] || tk["requested_area_id"] != want[i] {
+			t.Errorf("ticket %v: área %v, pedido por %v; quería %s", tk["id"], tk["area_id"], tk["requested_area_id"], want[i])
+		}
+	}
+}

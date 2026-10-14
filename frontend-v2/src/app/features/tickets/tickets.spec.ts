@@ -17,7 +17,8 @@ function ticket(overrides: Partial<Ticket>): Ticket {
     teamName: 'Cuadrilla Fibra Sur', assigneeUsername: null, status: 'new', impact: 'high', urgency: 'high', priority: 'p1_critical',
     title: 'Corte FO Nodo Puerto Montt', description: 'x', slaPausedSeconds: 0, reopenedCount: 0, onHoldSince: null,
     sla: { resolution: clock('on_time', 30, 10_500) as Ticket['sla']['resolution'] }, allowedTransitions: ['assigned', 'cancelled'],
-    createdAt: '', updatedAt: '', childCount: 0, ...overrides,
+    createdAt: '', updatedAt: '', childCount: 0,
+    areaId: 'a-soc', areaCode: 'soc', areaName: 'SOC', requestedAreaId: 'a-soc', requestedAreaCode: 'soc', requestedAreaName: 'SOC', canWork: true, ...overrides,
   };
 }
 
@@ -48,6 +49,9 @@ describe('TicketsComponent', () => {
   async function render() {
     const fixture = TestBed.createComponent(TicketsComponent);
     fixture.detectChanges();
+    // Tickets por área (9.1): primero las colas del usuario.
+    httpMock.match('/api/tickets/scope').forEach((r) => r.flush({ data: { all: true, myAreas: [], areas: [{ id: 'a-soc', code: 'soc', name: 'SOC', resolves: true }], defaultArea: 'soc' } }));
+    await settle();
     httpMock.expectOne((r) => r.url === '/api/tickets').flush({ data: LIST });
     await settle();
     fixture.detectChanges();
@@ -160,6 +164,9 @@ describe('TicketsComponent', () => {
   it('imágenes: la pestaña junta las de todos los comentarios y las pide con el token', async () => {
     const fixture = TestBed.createComponent(TicketsComponent);
     fixture.detectChanges();
+    // Tickets por área (9.1): primero las colas del usuario.
+    httpMock.match('/api/tickets/scope').forEach((r) => r.flush({ data: { all: true, myAreas: [], areas: [{ id: 'a-soc', code: 'soc', name: 'SOC', resolves: true }], defaultArea: 'soc' } }));
+    await settle();
     httpMock.expectOne((r) => r.url === '/api/tickets').flush({ data: LIST });
     await settle();
     fixture.detectChanges();

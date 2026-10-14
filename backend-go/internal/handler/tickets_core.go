@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -36,12 +37,15 @@ type newTicket struct {
 	AssetID   pgtype.UUID
 	// TerritorialUnitID: el lugar; con activo se usa la localidad del activo.
 	TerritorialUnitID pgtype.UUID
-	AssignedUserID    pgtype.UUID
-	Title             string
-	Description       string
-	Impact            string
-	Urgency           string
-	ActorID           uuid.UUID
+	// AreaID y RequestedAreaID (000039); vacíos = según el usuario y el alcance.
+	AreaID          uuid.UUID
+	RequestedAreaID uuid.UUID
+	AssignedUserID  pgtype.UUID
+	Title           string
+	Description     string
+	Impact          string
+	Urgency         string
+	ActorID         uuid.UUID
 	// AffectsClient: nil = según la regla de Administración → Ticketera.
 	AffectsClient *bool
 }
@@ -80,6 +84,16 @@ func (h *TicketsHandler) createTicketTx(ctx context.Context, tx pgx.Tx, n newTic
 	if err != nil {
 		return db.Ticket{}, err
 	}
+	if n.AreaID == uuid.Nil {
+		area, requested, err := h.newTicketAreas(ctx, "", n.Scope)
+		if err != nil {
+			return db.Ticket{}, err
+		}
+		n.AreaID, n.RequestedAreaID = area, requested
+	}
+	if n.RequestedAreaID == uuid.Nil {
+		n.RequestedAreaID = n.AreaID
+	}
 	q := h.Queries.WithTx(tx)
 	// Plazos de SLA y "Afecta al cliente": Administración → Ticketera.
 	settings, err := q.GetTicketSettings(ctx)
@@ -96,6 +110,7 @@ func (h *TicketsHandler) createTicketTx(ctx context.Context, tx pgx.Tx, n newTic
 		TicketNumber: fmt.Sprintf("TKT-%04d-%05d", now.Year(), sequence), TicketType: db.TicketType(n.Type), Scope: n.Scope,
 		ClientID: n.ClientID, AssignedTeamID: pgtype.UUID{Bytes: n.TeamID, Valid: n.TeamID != uuid.Nil}, AssignedUserID: n.AssignedUserID,
 		ServiceID: n.ServiceID, AssetID: n.AssetID, TerritorialUnitID: n.TerritorialUnitID,
+		AreaID: n.AreaID, RequestedAreaID: n.RequestedAreaID,
 		Impact: db.ItilImpact(n.Impact), Urgency: db.ItilUrgency(n.Urgency), Priority: priority,
 		Title: n.Title, Description: n.Description,
 		SlaResponseDueAt:    pgtype.Timestamptz{Time: now.Add(response), Valid: true},
@@ -236,6 +251,14 @@ func (h *TicketsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	actor, _ := middleware.UserFromContext(ctx)
+	area, requested, err := h.newTicketAreas(ctx, strings.TrimSpace(req.Area), "")
+	if errors.Is(err, errNoTicketArea) {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-area", "elige un área activa que reciba tickets")
+		return
+	} else if err != nil {
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudieron leer las áreas")
+		return
+	}
 	var parent *db.Ticket
 	if req.ParentID != nil {
 		p, err := h.Queries.GetTicket(ctx, *req.ParentID)
@@ -261,6 +284,7 @@ func (h *TicketsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		ServiceID: optionalUUID(req.ServiceID), AssetID: optionalUUID(req.AssetID), TerritorialUnitID: optionalUUID(req.TerritorialUnitID), AssignedUserID: optionalUUID(req.AssignedUserID),
 		Title: strings.TrimSpace(req.Title), Description: strings.TrimSpace(req.Description),
 		Impact: req.Impact, Urgency: req.Urgency, ActorID: actor.ID, AffectsClient: req.AffectsClient,
+		AreaID: area, RequestedAreaID: requested,
 	}, h.now())
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "no se pudo crear el ticket; verifica cliente, equipo y relaciones")

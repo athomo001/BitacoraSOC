@@ -80,3 +80,15 @@ SELECT DISTINCT pg.profile
 FROM user_permission_groups upg
 JOIN permission_groups pg ON pg.id = upg.permission_group_id AND pg.active
 WHERE upg.user_id = $1;
+
+-- name: ListUserTicketGroups :many
+-- Tickets por área (9.1): las áreas y perfiles de los grupos activos de un usuario.
+SELECT pg.profile, pa.area_id
+FROM user_permission_groups upg
+JOIN permission_groups pg ON pg.id = upg.permission_group_id AND pg.active
+LEFT JOIN permission_group_areas pa ON pa.permission_group_id = pg.id
+WHERE upg.user_id = $1;
+
+-- name: ListTicketAreas :many
+-- Las áreas activas, en orden, con su perfil (las de Gestión piden, no resuelven).
+SELECT id, code, name, default_profile FROM areas WHERE active ORDER BY sort_order, name;

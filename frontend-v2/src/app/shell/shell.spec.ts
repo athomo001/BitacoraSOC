@@ -60,7 +60,7 @@ describe('ShellComponent', () => {
 
   it('muestra las secciones del núcleo, el Mapa con NOC, y oculta la ticketera si está apagada', async () => {
     const { el } = await render([{ code: 'native_tickets', isEnabled: false }]);
-    expect(navLabels(el)).toEqual(['Bitácora', 'Turnos y Checklist', 'Escalamiento', 'Mapa', 'Directorio', 'Reportes', 'Administración']);
+    expect(navLabels(el)).toEqual(['Bitácora', 'Turnos y Checklist', 'Escalamiento', 'Mapa', 'Directorio', 'Inventario', 'Reportes', 'Administración']);
   });
 
   it('alguien de Infra (no Operativo) ve Turnos y Escalamiento, no Bitácora ni Reportes', async () => {
@@ -78,6 +78,15 @@ describe('ShellComponent', () => {
     fixture.detectChanges();
     expect(navLabels(el)).not.toContain('Mapa');
     expect(navLabels(el)).toContain('Escalamiento');
+  });
+
+  it('Inventario muestra cuántas solicitudes de baja esperan a quien decide', async () => {
+    const { fixture, el } = await render([]);
+    httpMock.match('/api/inventory/requests').forEach((r) => r.flush({ data: [{ id: 'q1' }, { id: 'q2' }] }));
+    await new Promise((resolve) => setTimeout(resolve));
+    fixture.detectChanges();
+    const item = [...el.querySelectorAll('.shell__nav-item')].find((a) => a.textContent?.includes('Inventario'));
+    expect(item?.querySelector('.pill')?.textContent?.trim()).toBe('2');
   });
 
   it('Mi equipo solo aparece para la jefatura de área', async () => {
@@ -137,7 +146,7 @@ describe('ShellComponent', () => {
     // El inglés se descarga al elegir EN (no va en el bundle inicial).
     await TestBed.inject(I18nService).loadEnglish();
     fixture.detectChanges();
-    expect(navLabels(el)).toEqual(['Logbook', 'Tickets', 'Shifts & Checklist', 'Escalation', 'Map', 'Directory', 'Reports', 'Administration']);
+    expect(navLabels(el)).toEqual(['Logbook', 'Tickets', 'Shifts & Checklist', 'Escalation', 'Map', 'Directory', 'Inventory', 'Reports', 'Administration']);
     expect(document.documentElement.lang).toBe('en');
   });
 

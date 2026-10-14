@@ -55,6 +55,15 @@ func (q *Queries) ClaimTicketImages(ctx context.Context, arg ClaimTicketImagesPa
 	return result.RowsAffected(), nil
 }
 
+const clearTicketResolvers = `-- name: ClearTicketResolvers :exec
+DELETE FROM ticket_resolvers WHERE ticket_id = $1
+`
+
+func (q *Queries) ClearTicketResolvers(ctx context.Context, ticketID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, clearTicketResolvers, ticketID)
+	return err
+}
+
 const copyTicketResolvers = `-- name: CopyTicketResolvers :exec
 INSERT INTO ticket_resolvers (ticket_id, user_id, added_by, added_at)
 SELECT $1, r.user_id, r.added_by, r.added_at FROM ticket_resolvers r WHERE r.ticket_id = $2
@@ -124,6 +133,9 @@ WHERE ($1::ticket_type IS NULL OR t.ticket_type = $1::ticket_type)
   AND ($5::uuid IS NULL OR t.client_id = $5::uuid)
   AND ($6::text IS NULL OR t.ticket_number ILIKE '%' || $6::text || '%' OR t.title ILIKE '%' || $6::text || '%')
   AND (NOT $7::bool OR t.status NOT IN ('resolved', 'closed', 'cancelled'))
+  AND ($8::uuid[] IS NULL OR t.area_id = ANY($8::uuid[]) OR t.requested_area_id = ANY($8::uuid[]))
+  AND ($9::uuid[] IS NULL OR t.area_id = ANY($9::uuid[]))
+  AND ($10::uuid[] IS NULL OR (t.requested_area_id = ANY($10::uuid[]) AND NOT t.area_id = ANY($10::uuid[])))
 `
 
 type CountTicketsViewParams struct {
@@ -134,6 +146,9 @@ type CountTicketsViewParams struct {
 	ClientID       pgtype.UUID      `json:"client_id"`
 	Q              pgtype.Text      `json:"q"`
 	OpenOnly       bool             `json:"open_only"`
+	VisibleAreas   []uuid.UUID      `json:"visible_areas"`
+	QueueAreas     []uuid.UUID      `json:"queue_areas"`
+	AskedAreas     []uuid.UUID      `json:"asked_areas"`
 }
 
 func (q *Queries) CountTicketsView(ctx context.Context, arg CountTicketsViewParams) (int64, error) {
@@ -145,6 +160,9 @@ func (q *Queries) CountTicketsView(ctx context.Context, arg CountTicketsViewPara
 		arg.ClientID,
 		arg.Q,
 		arg.OpenOnly,
+		arg.VisibleAreas,
+		arg.QueueAreas,
+		arg.AskedAreas,
 	)
 	var count int64
 	err := row.Scan(&count)
@@ -152,10 +170,11 @@ func (q *Queries) CountTicketsView(ctx context.Context, arg CountTicketsViewPara
 }
 
 const createTicket = `-- name: CreateTicket :one
-INSERT INTO tickets (ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, public_tracking_token, created_by, affects_client, territorial_unit_id)
+INSERT INTO tickets (ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, public_tracking_token, created_by, affects_client, territorial_unit_id, area_id, requested_area_id)
 VALUES ($1, $2, $3, $4, $15, $16, $5, $17, 'new', $6, $7, $8, $9, $10, $11, $12, $13, $14, $18,
-  COALESCE((SELECT a.territorial_unit_id FROM assets a WHERE a.id = $15::uuid), $19::uuid))
-RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id
+  COALESCE((SELECT a.territorial_unit_id FROM assets a WHERE a.id = $15::uuid), $19::uuid),
+  $20, $21)
+RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id
 `
 
 type CreateTicketParams struct {
@@ -178,6 +197,8 @@ type CreateTicketParams struct {
 	AssignedUserID      pgtype.UUID        `json:"assigned_user_id"`
 	AffectsClient       bool               `json:"affects_client"`
 	TerritorialUnitID   pgtype.UUID        `json:"territorial_unit_id"`
+	AreaID              uuid.UUID          `json:"area_id"`
+	RequestedAreaID     uuid.UUID          `json:"requested_area_id"`
 }
 
 // Con activo, el lugar es la localidad del activo (000038).
@@ -202,6 +223,8 @@ func (q *Queries) CreateTicket(ctx context.Context, arg CreateTicketParams) (Tic
 		arg.AssignedUserID,
 		arg.AffectsClient,
 		arg.TerritorialUnitID,
+		arg.AreaID,
+		arg.RequestedAreaID,
 	)
 	var i Ticket
 	err := row.Scan(
@@ -245,6 +268,8 @@ func (q *Queries) CreateTicket(ctx context.Context, arg CreateTicketParams) (Tic
 		&i.SlaResolutionWarnNotifiedAt,
 		&i.SlaResolutionBreachNotifiedAt,
 		&i.TerritorialUnitID,
+		&i.AreaID,
+		&i.RequestedAreaID,
 	)
 	return i, err
 }
@@ -405,8 +430,24 @@ func (q *Queries) DeleteTicket(ctx context.Context, id uuid.UUID) (string, error
 	return ticket_number, err
 }
 
+const deriveTicket = `-- name: DeriveTicket :exec
+UPDATE tickets SET area_id = $2, status = 'new', assigned_team_id = NULL, assigned_user_id = NULL, updated_at = now()
+WHERE id = $1
+`
+
+type DeriveTicketParams struct {
+	ID     uuid.UUID `json:"id"`
+	AreaID uuid.UUID `json:"area_id"`
+}
+
+// Derivar a otra área: entra a esa cola como nuevo, sin equipo ni responsable.
+func (q *Queries) DeriveTicket(ctx context.Context, arg DeriveTicketParams) error {
+	_, err := q.db.Exec(ctx, deriveTicket, arg.ID, arg.AreaID)
+	return err
+}
+
 const getPublicTicket = `-- name: GetPublicTicket :one
-SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id FROM tickets WHERE public_tracking_token = $1 AND public_tracking_enabled = true
+SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id FROM tickets WHERE public_tracking_token = $1 AND public_tracking_enabled = true
 `
 
 func (q *Queries) GetPublicTicket(ctx context.Context, publicTrackingToken pgtype.Text) (Ticket, error) {
@@ -453,12 +494,14 @@ func (q *Queries) GetPublicTicket(ctx context.Context, publicTrackingToken pgtyp
 		&i.SlaResolutionWarnNotifiedAt,
 		&i.SlaResolutionBreachNotifiedAt,
 		&i.TerritorialUnitID,
+		&i.AreaID,
+		&i.RequestedAreaID,
 	)
 	return i, err
 }
 
 const getTicket = `-- name: GetTicket :one
-SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id FROM tickets WHERE id = $1
+SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id FROM tickets WHERE id = $1
 `
 
 func (q *Queries) GetTicket(ctx context.Context, id uuid.UUID) (Ticket, error) {
@@ -505,12 +548,31 @@ func (q *Queries) GetTicket(ctx context.Context, id uuid.UUID) (Ticket, error) {
 		&i.SlaResolutionWarnNotifiedAt,
 		&i.SlaResolutionBreachNotifiedAt,
 		&i.TerritorialUnitID,
+		&i.AreaID,
+		&i.RequestedAreaID,
 	)
 	return i, err
 }
 
+const getTicketAreas = `-- name: GetTicketAreas :one
+SELECT area_id, requested_area_id FROM tickets WHERE id = $1
+`
+
+type GetTicketAreasRow struct {
+	AreaID          uuid.UUID `json:"area_id"`
+	RequestedAreaID uuid.UUID `json:"requested_area_id"`
+}
+
+// Tickets por área (000039): de qué cola es y qué área lo pidió.
+func (q *Queries) GetTicketAreas(ctx context.Context, id uuid.UUID) (GetTicketAreasRow, error) {
+	row := q.db.QueryRow(ctx, getTicketAreas, id)
+	var i GetTicketAreasRow
+	err := row.Scan(&i.AreaID, &i.RequestedAreaID)
+	return i, err
+}
+
 const getTicketByNumber = `-- name: GetTicketByNumber :one
-SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id FROM tickets WHERE ticket_number = $1
+SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id FROM tickets WHERE ticket_number = $1
 `
 
 func (q *Queries) GetTicketByNumber(ctx context.Context, ticketNumber string) (Ticket, error) {
@@ -557,12 +619,14 @@ func (q *Queries) GetTicketByNumber(ctx context.Context, ticketNumber string) (T
 		&i.SlaResolutionWarnNotifiedAt,
 		&i.SlaResolutionBreachNotifiedAt,
 		&i.TerritorialUnitID,
+		&i.AreaID,
+		&i.RequestedAreaID,
 	)
 	return i, err
 }
 
 const getTicketByNumberForMerge = `-- name: GetTicketByNumberForMerge :one
-SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id FROM tickets WHERE ticket_number = $1
+SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id FROM tickets WHERE ticket_number = $1
 `
 
 func (q *Queries) GetTicketByNumberForMerge(ctx context.Context, ticketNumber string) (Ticket, error) {
@@ -609,6 +673,8 @@ func (q *Queries) GetTicketByNumberForMerge(ctx context.Context, ticketNumber st
 		&i.SlaResolutionWarnNotifiedAt,
 		&i.SlaResolutionBreachNotifiedAt,
 		&i.TerritorialUnitID,
+		&i.AreaID,
+		&i.RequestedAreaID,
 	)
 	return i, err
 }
@@ -690,26 +756,36 @@ func (q *Queries) GetTicketTask(ctx context.Context, id uuid.UUID) (TicketTask, 
 }
 
 const getTicketView = `-- name: GetTicketView :one
-SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at, t.parent_id, t.merged_into_id, t.affects_client, t.notify_to, t.notify_cc, t.sla_response_breach_notified_at, t.sla_resolution_warn_notified_at, t.sla_resolution_breach_notified_at, t.territorial_unit_id, o.name AS client_name, tm.name AS team_name, u.username AS assignee_username,
-  pl.name AS place_name, plp.name AS place_parent_name, pa.name AS asset_name
+SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at, t.parent_id, t.merged_into_id, t.affects_client, t.notify_to, t.notify_cc, t.sla_response_breach_notified_at, t.sla_resolution_warn_notified_at, t.sla_resolution_breach_notified_at, t.territorial_unit_id, t.area_id, t.requested_area_id, o.name AS client_name, tm.name AS team_name, u.username AS assignee_username,
+  COALESCE(NULLIF(cu.full_name, ''), cu.username, '')::text AS created_by_name,
+  pl.name AS place_name, plp.name AS place_parent_name, pa.name AS asset_name,
+  ar.code AS area_code, ar.name AS area_name, rq.code AS requested_area_code, rq.name AS requested_area_name
 FROM tickets t
 JOIN organizations o ON o.id = t.client_id
+JOIN areas ar ON ar.id = t.area_id
+JOIN areas rq ON rq.id = t.requested_area_id
 LEFT JOIN teams tm ON tm.id = t.assigned_team_id
 LEFT JOIN users u ON u.id = t.assigned_user_id
 LEFT JOIN territorial_units pl ON pl.id = t.territorial_unit_id
 LEFT JOIN territorial_units plp ON plp.id = pl.parent_id
 LEFT JOIN assets pa ON pa.id = t.asset_id
+LEFT JOIN users cu ON cu.id = t.created_by
 WHERE t.id = $1
 `
 
 type GetTicketViewRow struct {
-	Ticket           Ticket      `json:"ticket"`
-	ClientName       string      `json:"client_name"`
-	TeamName         pgtype.Text `json:"team_name"`
-	AssigneeUsername pgtype.Text `json:"assignee_username"`
-	PlaceName        pgtype.Text `json:"place_name"`
-	PlaceParentName  pgtype.Text `json:"place_parent_name"`
-	AssetName        pgtype.Text `json:"asset_name"`
+	Ticket            Ticket      `json:"ticket"`
+	ClientName        string      `json:"client_name"`
+	TeamName          pgtype.Text `json:"team_name"`
+	AssigneeUsername  pgtype.Text `json:"assignee_username"`
+	CreatedByName     string      `json:"created_by_name"`
+	PlaceName         pgtype.Text `json:"place_name"`
+	PlaceParentName   pgtype.Text `json:"place_parent_name"`
+	AssetName         pgtype.Text `json:"asset_name"`
+	AreaCode          string      `json:"area_code"`
+	AreaName          string      `json:"area_name"`
+	RequestedAreaCode string      `json:"requested_area_code"`
+	RequestedAreaName string      `json:"requested_area_name"`
 }
 
 func (q *Queries) GetTicketView(ctx context.Context, id uuid.UUID) (GetTicketViewRow, error) {
@@ -756,12 +832,19 @@ func (q *Queries) GetTicketView(ctx context.Context, id uuid.UUID) (GetTicketVie
 		&i.Ticket.SlaResolutionWarnNotifiedAt,
 		&i.Ticket.SlaResolutionBreachNotifiedAt,
 		&i.Ticket.TerritorialUnitID,
+		&i.Ticket.AreaID,
+		&i.Ticket.RequestedAreaID,
 		&i.ClientName,
 		&i.TeamName,
 		&i.AssigneeUsername,
+		&i.CreatedByName,
 		&i.PlaceName,
 		&i.PlaceParentName,
 		&i.AssetName,
+		&i.AreaCode,
+		&i.AreaName,
+		&i.RequestedAreaCode,
+		&i.RequestedAreaName,
 	)
 	return i, err
 }
@@ -803,7 +886,7 @@ func (q *Queries) LinkEntryToTicket(ctx context.Context, arg LinkEntryToTicketPa
 }
 
 const listOpenChildTickets = `-- name: ListOpenChildTickets :many
-SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id FROM tickets WHERE parent_id = $1 AND status NOT IN ('resolved', 'closed', 'cancelled') ORDER BY created_at
+SELECT id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id FROM tickets WHERE parent_id = $1 AND status NOT IN ('resolved', 'closed', 'cancelled') ORDER BY created_at
 `
 
 func (q *Queries) ListOpenChildTickets(ctx context.Context, parentID pgtype.UUID) ([]Ticket, error) {
@@ -856,6 +939,8 @@ func (q *Queries) ListOpenChildTickets(ctx context.Context, parentID pgtype.UUID
 			&i.SlaResolutionWarnNotifiedAt,
 			&i.SlaResolutionBreachNotifiedAt,
 			&i.TerritorialUnitID,
+			&i.AreaID,
+			&i.RequestedAreaID,
 		); err != nil {
 			return nil, err
 		}
@@ -1258,7 +1343,7 @@ func (q *Queries) ListTicketTasksWithUser(ctx context.Context, ticketID uuid.UUI
 }
 
 const listTickets = `-- name: ListTickets :many
-SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at, t.parent_id, t.merged_into_id, t.affects_client, t.notify_to, t.notify_cc, t.sla_response_breach_notified_at, t.sla_resolution_warn_notified_at, t.sla_resolution_breach_notified_at, t.territorial_unit_id
+SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at, t.parent_id, t.merged_into_id, t.affects_client, t.notify_to, t.notify_cc, t.sla_response_breach_notified_at, t.sla_resolution_warn_notified_at, t.sla_resolution_breach_notified_at, t.territorial_unit_id, t.area_id, t.requested_area_id
 FROM tickets t
 WHERE ($1::ticket_type IS NULL OR t.ticket_type = $1::ticket_type)
   AND ($2::entry_scope IS NULL OR t.scope = $2::entry_scope)
@@ -1340,6 +1425,8 @@ func (q *Queries) ListTickets(ctx context.Context, arg ListTicketsParams) ([]Tic
 			&i.SlaResolutionWarnNotifiedAt,
 			&i.SlaResolutionBreachNotifiedAt,
 			&i.TerritorialUnitID,
+			&i.AreaID,
+			&i.RequestedAreaID,
 		); err != nil {
 			return nil, err
 		}
@@ -1352,12 +1439,15 @@ func (q *Queries) ListTickets(ctx context.Context, arg ListTicketsParams) ([]Tic
 }
 
 const listTicketsView = `-- name: ListTicketsView :many
-SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at, t.parent_id, t.merged_into_id, t.affects_client, t.notify_to, t.notify_cc, t.sla_response_breach_notified_at, t.sla_resolution_warn_notified_at, t.sla_resolution_breach_notified_at, t.territorial_unit_id, o.name AS client_name, tm.name AS team_name, u.username AS assignee_username,
+SELECT t.id, t.ticket_number, t.ticket_type, t.scope, t.client_id, t.asset_id, t.service_id, t.assigned_team_id, t.assigned_user_id, t.assigned_contact_id, t.status, t.impact, t.urgency, t.priority, t.title, t.description, t.sla_response_due_at, t.sla_resolution_due_at, t.sla_on_hold_since, t.sla_paused_seconds, t.first_responded_at, t.resolved_at, t.closed_at, t.reopened_count, t.reopened_at, t.public_tracking_token, t.public_tracking_enabled, t.public_tracking_pin, t.created_by, t.created_at, t.updated_at, t.parent_id, t.merged_into_id, t.affects_client, t.notify_to, t.notify_cc, t.sla_response_breach_notified_at, t.sla_resolution_warn_notified_at, t.sla_resolution_breach_notified_at, t.territorial_unit_id, t.area_id, t.requested_area_id, o.name AS client_name, tm.name AS team_name, u.username AS assignee_username,
   p.ticket_number AS parent_number, m.ticket_number AS merged_into_number,
   (SELECT count(*) FROM tickets c WHERE c.parent_id = t.id)::int AS child_count,
-  pl.name AS place_name, plp.name AS place_parent_name, pa.name AS asset_name
+  pl.name AS place_name, plp.name AS place_parent_name, pa.name AS asset_name,
+  ar.code AS area_code, ar.name AS area_name, rq.code AS requested_area_code, rq.name AS requested_area_name
 FROM tickets t
 JOIN organizations o ON o.id = t.client_id
+JOIN areas ar ON ar.id = t.area_id
+JOIN areas rq ON rq.id = t.requested_area_id
 LEFT JOIN teams tm ON tm.id = t.assigned_team_id
 LEFT JOIN users u ON u.id = t.assigned_user_id
 LEFT JOIN territorial_units pl ON pl.id = t.territorial_unit_id
@@ -1372,8 +1462,11 @@ WHERE ($1::ticket_type IS NULL OR t.ticket_type = $1::ticket_type)
   AND ($5::uuid IS NULL OR t.client_id = $5::uuid)
   AND ($6::text IS NULL OR t.ticket_number ILIKE '%' || $6::text || '%' OR t.title ILIKE '%' || $6::text || '%')
   AND (NOT $7::bool OR t.status NOT IN ('resolved', 'closed', 'cancelled'))
+  AND ($8::uuid[] IS NULL OR t.area_id = ANY($8::uuid[]) OR t.requested_area_id = ANY($8::uuid[]))
+  AND ($9::uuid[] IS NULL OR t.area_id = ANY($9::uuid[]))
+  AND ($10::uuid[] IS NULL OR (t.requested_area_id = ANY($10::uuid[]) AND NOT t.area_id = ANY($10::uuid[])))
 ORDER BY (t.status IN ('resolved', 'closed', 'cancelled')), t.priority, t.updated_at DESC
-LIMIT $9 OFFSET $8
+LIMIT $12 OFFSET $11
 `
 
 type ListTicketsViewParams struct {
@@ -1384,21 +1477,28 @@ type ListTicketsViewParams struct {
 	ClientID       pgtype.UUID      `json:"client_id"`
 	Q              pgtype.Text      `json:"q"`
 	OpenOnly       bool             `json:"open_only"`
+	VisibleAreas   []uuid.UUID      `json:"visible_areas"`
+	QueueAreas     []uuid.UUID      `json:"queue_areas"`
+	AskedAreas     []uuid.UUID      `json:"asked_areas"`
 	PageOffset     int32            `json:"page_offset"`
 	PageSize       int32            `json:"page_size"`
 }
 
 type ListTicketsViewRow struct {
-	Ticket           Ticket      `json:"ticket"`
-	ClientName       string      `json:"client_name"`
-	TeamName         pgtype.Text `json:"team_name"`
-	AssigneeUsername pgtype.Text `json:"assignee_username"`
-	ParentNumber     pgtype.Text `json:"parent_number"`
-	MergedIntoNumber pgtype.Text `json:"merged_into_number"`
-	ChildCount       int32       `json:"child_count"`
-	PlaceName        pgtype.Text `json:"place_name"`
-	PlaceParentName  pgtype.Text `json:"place_parent_name"`
-	AssetName        pgtype.Text `json:"asset_name"`
+	Ticket            Ticket      `json:"ticket"`
+	ClientName        string      `json:"client_name"`
+	TeamName          pgtype.Text `json:"team_name"`
+	AssigneeUsername  pgtype.Text `json:"assignee_username"`
+	ParentNumber      pgtype.Text `json:"parent_number"`
+	MergedIntoNumber  pgtype.Text `json:"merged_into_number"`
+	ChildCount        int32       `json:"child_count"`
+	PlaceName         pgtype.Text `json:"place_name"`
+	PlaceParentName   pgtype.Text `json:"place_parent_name"`
+	AssetName         pgtype.Text `json:"asset_name"`
+	AreaCode          string      `json:"area_code"`
+	AreaName          string      `json:"area_name"`
+	RequestedAreaCode string      `json:"requested_area_code"`
+	RequestedAreaName string      `json:"requested_area_name"`
 }
 
 // Vista de la cola (Fase 10, pantalla aprobada): nombres ya resueltos para no
@@ -1412,6 +1512,9 @@ func (q *Queries) ListTicketsView(ctx context.Context, arg ListTicketsViewParams
 		arg.ClientID,
 		arg.Q,
 		arg.OpenOnly,
+		arg.VisibleAreas,
+		arg.QueueAreas,
+		arg.AskedAreas,
 		arg.PageOffset,
 		arg.PageSize,
 	)
@@ -1463,6 +1566,8 @@ func (q *Queries) ListTicketsView(ctx context.Context, arg ListTicketsViewParams
 			&i.Ticket.SlaResolutionWarnNotifiedAt,
 			&i.Ticket.SlaResolutionBreachNotifiedAt,
 			&i.Ticket.TerritorialUnitID,
+			&i.Ticket.AreaID,
+			&i.Ticket.RequestedAreaID,
 			&i.ClientName,
 			&i.TeamName,
 			&i.AssigneeUsername,
@@ -1472,6 +1577,10 @@ func (q *Queries) ListTicketsView(ctx context.Context, arg ListTicketsViewParams
 			&i.PlaceName,
 			&i.PlaceParentName,
 			&i.AssetName,
+			&i.AreaCode,
+			&i.AreaName,
+			&i.RequestedAreaCode,
+			&i.RequestedAreaName,
 		); err != nil {
 			return nil, err
 		}
@@ -1649,7 +1758,7 @@ SET client_id = $1,
     public_tracking_pin = CASE WHEN public_tracking_pin IS NULL THEN NULL ELSE $3 END,
     updated_at = now()
 WHERE tickets.id = $4
-RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id
+RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id
 `
 
 type SetTicketClientParams struct {
@@ -1711,6 +1820,8 @@ func (q *Queries) SetTicketClient(ctx context.Context, arg SetTicketClientParams
 		&i.SlaResolutionWarnNotifiedAt,
 		&i.SlaResolutionBreachNotifiedAt,
 		&i.TerritorialUnitID,
+		&i.AreaID,
+		&i.RequestedAreaID,
 	)
 	return i, err
 }
@@ -1748,7 +1859,7 @@ func (q *Queries) SetTicketPlace(ctx context.Context, arg SetTicketPlaceParams) 
 }
 
 const setTicketPublicPin = `-- name: SetTicketPublicPin :one
-UPDATE tickets SET public_tracking_pin = $2, updated_at = now() WHERE id = $1 RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id
+UPDATE tickets SET public_tracking_pin = $2, updated_at = now() WHERE id = $1 RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id
 `
 
 type SetTicketPublicPinParams struct {
@@ -1800,6 +1911,8 @@ func (q *Queries) SetTicketPublicPin(ctx context.Context, arg SetTicketPublicPin
 		&i.SlaResolutionWarnNotifiedAt,
 		&i.SlaResolutionBreachNotifiedAt,
 		&i.TerritorialUnitID,
+		&i.AreaID,
+		&i.RequestedAreaID,
 	)
 	return i, err
 }
@@ -1823,11 +1936,13 @@ SELECT
   count(*) FILTER (WHERE status = 'pending_vendor')::bigint AS paused_count,
   count(*) FILTER (WHERE resolved_at >= $2::timestamptz)::bigint AS resolved_today_count
 FROM tickets
+WHERE $3::uuid[] IS NULL OR area_id = ANY($3::uuid[]) OR requested_area_id = ANY($3::uuid[])
 `
 
 type TicketQueueSummaryParams struct {
 	Now           pgtype.Timestamptz `json:"now"`
 	ResolvedSince pgtype.Timestamptz `json:"resolved_since"`
+	VisibleAreas  []uuid.UUID        `json:"visible_areas"`
 }
 
 type TicketQueueSummaryRow struct {
@@ -1840,7 +1955,7 @@ type TicketQueueSummaryRow struct {
 // Resumen de la cola para la cabecera. "Vencido" = abierto, no en pausa y
 // pasado el vencimiento real (pactado + pausas acumuladas), igual que tickets.ResolutionClock.
 func (q *Queries) TicketQueueSummary(ctx context.Context, arg TicketQueueSummaryParams) (TicketQueueSummaryRow, error) {
-	row := q.db.QueryRow(ctx, ticketQueueSummary, arg.Now, arg.ResolvedSince)
+	row := q.db.QueryRow(ctx, ticketQueueSummary, arg.Now, arg.ResolvedSince, arg.VisibleAreas)
 	var i TicketQueueSummaryRow
 	err := row.Scan(
 		&i.OpenCount,
@@ -1869,7 +1984,7 @@ UPDATE tickets SET
   reopened_at = $15,
   updated_at = now()
 WHERE id = $1
-RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id
+RETURNING id, ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, assigned_contact_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, sla_on_hold_since, sla_paused_seconds, first_responded_at, resolved_at, closed_at, reopened_count, reopened_at, public_tracking_token, public_tracking_enabled, public_tracking_pin, created_by, created_at, updated_at, parent_id, merged_into_id, affects_client, notify_to, notify_cc, sla_response_breach_notified_at, sla_resolution_warn_notified_at, sla_resolution_breach_notified_at, territorial_unit_id, area_id, requested_area_id
 `
 
 type UpdateTicketParams struct {
@@ -1950,6 +2065,8 @@ func (q *Queries) UpdateTicket(ctx context.Context, arg UpdateTicketParams) (Tic
 		&i.SlaResolutionWarnNotifiedAt,
 		&i.SlaResolutionBreachNotifiedAt,
 		&i.TerritorialUnitID,
+		&i.AreaID,
+		&i.RequestedAreaID,
 	)
 	return i, err
 }

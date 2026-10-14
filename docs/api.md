@@ -487,6 +487,29 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `GET` | `/api/raci-assignments` | Sesión |
 | `POST` | `/api/raci-assignments` | Admin |
 
+### Inventario
+
+Quién: ve un equipo quien es del área dueña o de un área responsable (admin, perfil Gestión y quien no tiene áreas ven todos); lo crea y edita quien es de esas áreas o el admin; lo da de baja o lo borra el admin o la jefatura del área dueña, y los demás lo piden.
+
+| Método | Ruta | Acceso |
+| --- | --- | --- |
+| `GET` | `/api/inventory` | Sesión — `?scope=mine\|all&kind=&q=&inactive=true` |
+| `GET` | `/api/inventory/meta` | Sesión — tipos con sus campos, tipos de responsabilidad, áreas y lo que el usuario puede hacer |
+| `POST` | `/api/inventory` | Sesión (áreas del equipo o admin) |
+| `GET` | `/api/inventory/{id}` | Sesión — ficha con IP, responsables, historial, tickets y solicitud pendiente |
+| `PUT` | `/api/inventory/{id}` | Áreas del equipo o admin — lo que cambió queda en el historial |
+| `DELETE` | `/api/inventory/{id}` | Admin o jefatura del área dueña — `409` si tiene registros en bitácora o escalamiento |
+| `POST` | `/api/inventory/{id}/events` | Áreas del equipo o admin — registrar trabajo |
+| `POST` | `/api/inventory/{id}/active` | Admin o jefatura del área dueña — `{active, reason}` |
+| `POST` | `/api/inventory/{id}/requests` | Áreas del equipo — `{action: deactivate\|delete, reason}`; evento en vivo `inventory.request` |
+| `GET` | `/api/inventory/requests` | Sesión — las pendientes que decide el usuario |
+| `POST` | `/api/inventory/requests/{id}/decide` | Admin o jefatura del área dueña — `{approve, note}` |
+| `POST` | `/api/inventory/import` | Sesión — `?kind=&dryRun=true`, cuerpo CSV (hasta 5 MB; no se guarda) |
+| `GET` | `/api/inventory/import/template` | Sesión — `?kind=` |
+| `GET` | `/api/inventory/export` | Sesión — `?kind=` |
+| `PUT` | `/api/inventory/kinds/{code}` | Admin — tipo y sus campos |
+| `PUT` | `/api/inventory/responsibility-types/{code}` | Admin |
+
 ### Territorio (NOC)
 
 | Método | Ruta | Acceso |
@@ -521,6 +544,8 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `POST` | `/api/tickets/merge` | Sesión · Ticketera encendida |
 | `PUT` | `/api/tickets/{id}/parent` | Sesión · Ticketera encendida |
 | `PUT` | `/api/tickets/{id}/client` | Permiso `tickets:change_client` (admin siempre) · Ticketera encendida |
+| `GET` | `/api/tickets/scope` | Sesión · Ticketera encendida — colas del usuario: `{all, myAreas, areas, defaultArea}` |
+| `PUT` | `/api/tickets/{id}/area` | Quien trabaja el ticket · Ticketera encendida — derivar: `{area, reason}`; entra como nuevo, sin equipo ni resolutores |
 | `PUT` | `/api/tickets/{id}/place` | Sesión · Ticketera encendida — lugar del ticket: `{assetId}` (la localidad sale del activo), `{territorialUnitId}` o `{}` para quitarlo; queda en la actividad |
 | `POST` | `/api/tickets/{id}/resolvers` | Sesión · Ticketera encendida |
 | `POST` | `/api/tickets/{id}/images` | Sesión · Ticketera encendida |

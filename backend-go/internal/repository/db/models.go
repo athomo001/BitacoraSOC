@@ -1314,21 +1314,83 @@ type Area struct {
 }
 
 type Asset struct {
-	ID                uuid.UUID   `json:"id"`
-	Type              AssetType   `json:"type"`
-	Name              string      `json:"name"`
-	Code              string      `json:"code"`
-	IpAddress         *netip.Addr `json:"ip_address"`
-	Metadata          []byte      `json:"metadata"`
-	Address           pgtype.Text `json:"address"`
-	Latitude          *float64    `json:"latitude"`
-	Longitude         *float64    `json:"longitude"`
-	TerritorialUnitID uuid.UUID   `json:"territorial_unit_id"`
-	ClientID          pgtype.UUID `json:"client_id"`
-	ContractorID      pgtype.UUID `json:"contractor_id"`
-	LogSourceID       pgtype.UUID `json:"log_source_id"`
-	ParentAssetID     pgtype.UUID `json:"parent_asset_id"`
-	Active            bool        `json:"active"`
+	ID                uuid.UUID          `json:"id"`
+	Type              AssetType          `json:"type"`
+	Name              string             `json:"name"`
+	Code              string             `json:"code"`
+	IpAddress         *netip.Addr        `json:"ip_address"`
+	Metadata          []byte             `json:"metadata"`
+	Address           pgtype.Text        `json:"address"`
+	Latitude          *float64           `json:"latitude"`
+	Longitude         *float64           `json:"longitude"`
+	TerritorialUnitID pgtype.UUID        `json:"territorial_unit_id"`
+	ClientID          pgtype.UUID        `json:"client_id"`
+	ContractorID      pgtype.UUID        `json:"contractor_id"`
+	LogSourceID       pgtype.UUID        `json:"log_source_id"`
+	ParentAssetID     pgtype.UUID        `json:"parent_asset_id"`
+	Active            bool               `json:"active"`
+	AreaID            uuid.UUID          `json:"area_id"`
+	KindCode          pgtype.Text        `json:"kind_code"`
+	Model             pgtype.Text        `json:"model"`
+	Serial            pgtype.Text        `json:"serial"`
+	Rack              pgtype.Text        `json:"rack"`
+	RackPosition      pgtype.Text        `json:"rack_position"`
+	Attributes        []byte             `json:"attributes"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
+type AssetEvent struct {
+	ID          uuid.UUID          `json:"id"`
+	AssetID     uuid.UUID          `json:"asset_id"`
+	Kind        string             `json:"kind"`
+	Description string             `json:"description"`
+	HappenedAt  pgtype.Timestamptz `json:"happened_at"`
+	UserID      pgtype.UUID        `json:"user_id"`
+	TicketID    pgtype.UUID        `json:"ticket_id"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
+type AssetIp struct {
+	ID        uuid.UUID   `json:"id"`
+	AssetID   uuid.UUID   `json:"asset_id"`
+	Kind      string      `json:"kind"`
+	Address   netip.Addr  `json:"address"`
+	Note      pgtype.Text `json:"note"`
+	SortOrder int32       `json:"sort_order"`
+}
+
+type AssetKind struct {
+	Code      string    `json:"code"`
+	Name      string    `json:"name"`
+	Icon      string    `json:"icon"`
+	BaseType  AssetType `json:"base_type"`
+	Fields    []byte    `json:"fields"`
+	SortOrder int32     `json:"sort_order"`
+	Active    bool      `json:"active"`
+}
+
+type AssetRequest struct {
+	ID           uuid.UUID          `json:"id"`
+	AssetID      uuid.UUID          `json:"asset_id"`
+	Action       string             `json:"action"`
+	Reason       string             `json:"reason"`
+	RequestedBy  pgtype.UUID        `json:"requested_by"`
+	Status       string             `json:"status"`
+	DecidedBy    pgtype.UUID        `json:"decided_by"`
+	DecidedAt    pgtype.Timestamptz `json:"decided_at"`
+	DecisionNote pgtype.Text        `json:"decision_note"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
+type AssetResponsible struct {
+	ID             uuid.UUID   `json:"id"`
+	AssetID        uuid.UUID   `json:"asset_id"`
+	TypeCode       string      `json:"type_code"`
+	AreaID         pgtype.UUID `json:"area_id"`
+	UserID         pgtype.UUID `json:"user_id"`
+	OrganizationID pgtype.UUID `json:"organization_id"`
+	SortOrder      int32       `json:"sort_order"`
 }
 
 type AuditLog struct {
@@ -1811,6 +1873,13 @@ type ReportOperationType struct {
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
+type ResponsibilityType struct {
+	Code      string `json:"code"`
+	Name      string `json:"name"`
+	SortOrder int32  `json:"sort_order"`
+	Active    bool   `json:"active"`
+}
+
 type RotationCycle struct {
 	ID             uuid.UUID   `json:"id"`
 	TeamID         uuid.UUID   `json:"team_id"`
@@ -2067,6 +2136,8 @@ type Ticket struct {
 	SlaResolutionWarnNotifiedAt   pgtype.Timestamptz `json:"sla_resolution_warn_notified_at"`
 	SlaResolutionBreachNotifiedAt pgtype.Timestamptz `json:"sla_resolution_breach_notified_at"`
 	TerritorialUnitID             pgtype.UUID        `json:"territorial_unit_id"`
+	AreaID                        uuid.UUID          `json:"area_id"`
+	RequestedAreaID               uuid.UUID          `json:"requested_area_id"`
 }
 
 type TicketComment struct {

@@ -1,0 +1,204 @@
+<div class="iv">
+  <div class="iv__toolbar">
+    <h1 class="iv__title"><mat-icon>dns</mat-icon>{{ i18n.t('nav.inventory') }}</h1>
+    <span class="adm-muted">{{ i18n.t('inv.subtitle') }}</span>
+    <span class="adm-push iv__actions">
+      @if (api.pending() > 0 || meta()?.admin) {
+        <button type="button" class="adm-btn" (click)="openRequests()"><mat-icon>inbox</mat-icon>{{ i18n.t('inv.requests') }}
+          @if (api.pending() > 0) { <span class="pill tone-warn mono">{{ api.pending() }}</span> }</button>
+      }
+      @if (meta()?.canCreate) {
+        <button type="button" class="adm-btn" (click)="panel.set('csv')"><mat-icon>upload_file</mat-icon>{{ i18n.t('inv.csv') }}</button>
+        <button type="button" class="adm-btn adm-btn--primary" (click)="openNew()"><mat-icon>add</mat-icon>{{ i18n.t('inv.new') }}</button>
+      }
+    </span>
+  </div>
+
+  @if (error(); as e) { <p class="adm-error iv__error" role="alert">{{ e }}</p> }
+
+  <div class="iv__grid">
+    <section class="adm-card iv__listcard">
+      <div class="iv__filters">
+        @if (meta()?.viewAll && meta()?.myAreas?.length) {
+          <button type="button" class="seg" [attr.aria-pressed]="scope() === 'mine'" (click)="setScope('mine')">{{ i18n.t('inv.scope.mine') }}</button>
+          <button type="button" class="seg" [attr.aria-pressed]="scope() === 'all'" (click)="setScope('all')">{{ i18n.t('inv.scope.all') }}</button>
+        }
+        @for (k of kindsInList(); track k.code) {
+          <button type="button" class="seg" [attr.aria-pressed]="kindFilter() === k.code" (click)="setKind(k.code)"><mat-icon>{{ k.icon }}</mat-icon>{{ k.name }}</button>
+        }
+        <label class="iv__search adm-push">
+          <mat-icon>search</mat-icon>
+          <input #q type="search" name="invSearch" [placeholder]="i18n.t('inv.search')" [attr.aria-label]="i18n.t('inv.search')" (change)="search(q.value)" />
+        </label>
+        <label class="iv__check"><input type="checkbox" name="invInactive" [checked]="showInactive()" (change)="toggleInactive()" />{{ i18n.t('inv.inactive') }}</label>
+      </div>
+      <div class="iv__row iv__row--head">
+        <span>{{ i18n.t('inv.col.asset') }}</span><span>{{ i18n.t('inv.col.kind') }}</span><span>{{ i18n.t('inv.col.system') }}</span><span>{{ i18n.t('inv.col.ip') }}</span><span>{{ i18n.t('inv.col.place') }}</span>
+      </div>
+      @for (r of visibleRows(); track r.id) {
+        <button type="button" class="iv__row" [attr.aria-current]="r.id === selectedId()" [class.iv__row--off]="!r.active" (click)="select(r.id)">
+          <span class="iv__cell"><b>{{ r.name }}</b><span class="iv__sub mono">{{ r.serial || r.code }}</span></span>
+          <span><span class="pill tone-neutral"><mat-icon>{{ kindIcon(r.kind) }}</mat-icon>{{ kindName(r.kind) }}</span></span>
+          <span class="iv__cell">{{ system(r) }}</span>
+          <span class="iv__cell mono">{{ r.firstIp || '—' }}@if (r.ipCount > 1) { <span class="iv__sub">{{ i18n.tf('inv.moreIps', r.ipCount - 1) }}</span> }</span>
+          <span class="iv__cell">{{ r.placeName ?? '—' }}<span class="iv__sub">{{ r.areaName }}</span></span>
+        </button>
+      } @empty {
+        @if (loaded()) { <p class="adm-empty">{{ i18n.t('inv.empty') }}</p> }
+      }
+    </section>
+
+    <section class="adm-card iv__panel">
+      @switch (panel()) {
+        @case ('new') {
+          @if (meta(); as m) { <app-asset-form [meta]="m" (saved)="onSaved($event)" (cancelled)="panel.set('detail')" /> }
+        }
+        @case ('edit') {
+          @if (meta(); as m) { <app-asset-form [meta]="m" [asset]="asset()" (saved)="onSaved($event)" (cancelled)="panel.set('detail')" /> }
+        }
+        @case ('csv') {
+          @if (meta(); as m) { <app-asset-csv [meta]="m" (loaded)="load()" (closed)="panel.set('detail')" /> }
+        }
+        @case ('requests') {
+          <div class="adm-card__head">
+            <h2 class="adm-card__title"><mat-icon>inbox</mat-icon>{{ i18n.t('inv.req.title') }}</h2>
+            <button type="button" class="adm-icon-btn adm-push" [attr.aria-label]="i18n.t('inv.cancel')" (click)="panel.set('detail')"><mat-icon>close</mat-icon></button>
+          </div>
+          <div class="adm-card__body iv__reqs">
+            @for (r of requests(); track r.id) {
+              <div class="iv__req">
+                <b>{{ r.assetName }} <span class="mono adm-secondary">{{ r.assetCode }}</span></b>
+                <span>{{ i18n.tf('inv.req.by', r.requestedByName) }} <b>{{ actionLabel(r.action) }}</b>: {{ r.reason }}</span>
+                <span class="adm-small adm-secondary">{{ r.areaName }} · {{ r.createdAt | date: 'dd/MM HH:mm' }}</span>
+                <input class="adm-input" name="decisionNote" [placeholder]="i18n.t('inv.req.note')" [value]="decisionNote()" (input)="decisionNote.set($any($event.target).value)" />
+                <span class="iv__actions">
+                  <button type="button" class="adm-btn" [disabled]="busy()" (click)="decide(r, false)">{{ i18n.t('inv.req.reject') }}</button>
+                  <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy()" (click)="decide(r, true)"><mat-icon>check</mat-icon>{{ i18n.t('inv.req.approve') }}</button>
+                </span>
+              </div>
+            } @empty {
+              <p class="adm-empty">{{ i18n.t('inv.req.empty') }}</p>
+            }
+          </div>
+        }
+        @default {
+          @if (asset(); as a) {
+            <div class="adm-card__head iv__fhead">
+              <h2 class="adm-card__title"><mat-icon>{{ kindIcon(a.kind) }}</mat-icon>{{ a.name }}</h2>
+              <span class="pill tone-neutral">{{ kindName(a.kind) }}</span>
+              <span class="pill tone-neutral">{{ a.areaName }}</span>
+              @if (!a.active) { <span class="pill tone-bad">{{ i18n.t('inv.inactiveBadge') }}</span> }
+              <span class="adm-push iv__actions">
+                @if (a.canEdit) { <button type="button" class="adm-btn" (click)="panel.set('edit')"><mat-icon>edit</mat-icon>{{ i18n.t('inv.edit') }}</button> }
+                @if (a.canDecide) {
+                  @if (a.active) { <button type="button" class="adm-btn" [disabled]="busy()" (click)="setActive(false)"><mat-icon>block</mat-icon>{{ i18n.t('inv.deactivate') }}</button> }
+                  @else { <button type="button" class="adm-btn" [disabled]="busy()" (click)="setActive(true)"><mat-icon>restart_alt</mat-icon>{{ i18n.t('inv.reactivate') }}</button> }
+                  <button type="button" class="adm-btn" [disabled]="busy()" (click)="confirmDelete.set(true)"><mat-icon>delete</mat-icon>{{ i18n.t('inv.delete') }}</button>
+                } @else if (a.canEdit && !a.pendingRequest) {
+                  @if (a.active) { <button type="button" class="adm-btn" (click)="asking.set('deactivate')">{{ i18n.t('inv.askDeactivate') }}</button> }
+                  <button type="button" class="adm-btn" (click)="asking.set('delete')">{{ i18n.t('inv.askDelete') }}</button>
+                }
+              </span>
+            </div>
+            @if (confirmDelete()) {
+              <div class="iv__confirm" role="group">
+                <span>{{ i18n.tf('inv.deleteConfirm', a.name) }}</span>
+                <span class="iv__actions"><button type="button" class="adm-btn" (click)="confirmDelete.set(false)">{{ i18n.t('inv.keep') }}</button>
+                  <button type="button" class="adm-btn adm-btn--danger" [disabled]="busy()" (click)="remove()"><mat-icon>delete_forever</mat-icon>{{ i18n.t('inv.deleteDo') }}</button></span>
+              </div>
+            }
+            @if (asking(); as act) {
+              <div class="iv__confirm">
+                <label class="adm-label" for="askReason">{{ i18n.t('inv.askReason') }}</label>
+                <textarea id="askReason" class="adm-input" name="askReason" rows="2" maxlength="500" [value]="askReason()" (input)="askReason.set($any($event.target).value)"></textarea>
+                <span class="adm-hint">{{ i18n.t('inv.askHint') }}</span>
+                <span class="iv__actions"><button type="button" class="adm-btn" (click)="asking.set(null)">{{ i18n.t('inv.cancel') }}</button>
+                  <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy() || !askReason().trim()" (click)="sendRequest()">{{ i18n.t('inv.askSend') }} ({{ actionLabel(act) }})</button></span>
+              </div>
+            }
+            @if (a.pendingRequest; as p) {
+              <p class="iv__pending"><mat-icon>hourglass_top</mat-icon>{{ i18n.tf('inv.pendingRequest', actionLabel(p.action)) }} · {{ p.requestedByName }}: {{ p.reason }}</p>
+            }
+
+            <div class="iv__sections">
+              @if (fields().length) {
+                <span class="adm-label">{{ i18n.tf('inv.sec.fields', kindName(a.kind).toLowerCase()) }}</span>
+                <dl class="iv__facts">
+                  @for (f of fields(); track f.key) { <dt>{{ f.label }}</dt><dd>{{ a.attributes[f.key] }}</dd> }
+                </dl>
+              }
+              <span class="adm-label">{{ i18n.t('inv.sec.ips') }}</span>
+              <dl class="iv__facts">
+                @for (ip of a.ips; track $index) { <dt>{{ i18n.t(ipLabel(ip.kind)) }}</dt><dd><span class="mono">{{ ip.address }}</span>@if (ip.note) { <span class="adm-secondary"> · {{ ip.note }}</span> }</dd> }
+                @empty { <dd class="adm-secondary">{{ i18n.t('inv.noIps') }}</dd> }
+              </dl>
+              <span class="adm-label">{{ i18n.t('inv.sec.responsibles') }}</span>
+              <dl class="iv__facts">
+                @for (r of a.responsibles; track $index) {
+                  <dt>{{ r.typeName }}</dt>
+                  <dd><mat-icon class="iv__who">{{ r.area ? 'groups' : r.organizationId ? 'business' : 'person' }}</mat-icon>{{ r.areaName || r.organizationName || r.userName }}</dd>
+                } @empty { <dd class="adm-secondary">{{ i18n.t('inv.noResponsibles') }}</dd> }
+              </dl>
+              <span class="adm-label">{{ i18n.t('inv.sec.ident') }}</span>
+              <dl class="iv__facts">
+                <dt>{{ i18n.t('inv.f.code') }}</dt><dd class="mono">{{ a.code }}</dd>
+                @if (a.model) { <dt>{{ i18n.t('inv.f.model') }}</dt><dd>{{ a.model }}</dd> }
+                @if (a.serial) { <dt>{{ i18n.t('inv.f.serial') }}</dt><dd class="mono">{{ a.serial }}</dd> }
+                @if (a.clientName) { <dt>{{ i18n.t('inv.f.client') }}</dt><dd>{{ a.clientName }}</dd> }
+                @if (a.placeName) { <dt>{{ i18n.t('inv.f.place') }}</dt><dd>{{ a.placeName }}</dd> }
+                @if (a.rack || a.rackPosition) { <dt>{{ i18n.t('inv.f.rack') }}</dt><dd>{{ a.rack }}@if (a.rackPosition) { · {{ a.rackPosition }} }</dd> }
+              </dl>
+              @if (extraList().length) {
+                <span class="adm-label">{{ i18n.t('inv.sec.extra') }}</span>
+                <dl class="iv__facts">@for (e of extraList(); track e[0]) { <dt>{{ e[0] }}</dt><dd>{{ e[1] }}</dd> }</dl>
+              }
+            </div>
+
+            <div class="iv__tabs" role="tablist">
+              <button type="button" role="tab" class="iv__tab" [attr.aria-selected]="tab() === 'history'" (click)="tab.set('history')">{{ i18n.t('inv.tab.history') }} <span class="mono">{{ a.events.length }}</span></button>
+              <button type="button" role="tab" class="iv__tab" [attr.aria-selected]="tab() === 'tickets'" (click)="tab.set('tickets')">{{ i18n.t('inv.tab.tickets') }} <span class="mono">{{ a.tickets.length }}</span></button>
+              @if (tab() === 'history' && a.canEdit && !working()) {
+                <button type="button" class="adm-btn adm-push" (click)="working.set(true)"><mat-icon>add</mat-icon>{{ i18n.t('inv.work') }}</button>
+              }
+            </div>
+            @if (tab() === 'history') {
+              @if (working()) {
+                <div class="iv__confirm">
+                  <label class="adm-label" for="workText">{{ i18n.t('inv.work.text') }}</label>
+                  <textarea id="workText" class="adm-input" name="workText" rows="2" maxlength="2000" [value]="workText()" (input)="workText.set($any($event.target).value)"></textarea>
+                  <label class="adm-label" for="workDate">{{ i18n.t('inv.work.date') }}</label>
+                  <input id="workDate" class="adm-input iv__date" type="date" name="workDate" [value]="workDate()" (input)="workDate.set($any($event.target).value)" />
+                  <span class="iv__actions"><button type="button" class="adm-btn" (click)="working.set(false)">{{ i18n.t('inv.cancel') }}</button>
+                    <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy() || !workText().trim()" (click)="addWork()">{{ i18n.t('inv.work.save') }}</button></span>
+                </div>
+              }
+              <ol class="iv__timeline">
+                @for (e of a.events; track e.id) {
+                  <li class="iv__ev">
+                    <span class="iv__dot"><mat-icon>{{ eventIcon[e.kind] }}</mat-icon></span>
+                    <span class="iv__evtext">
+                      <span>{{ e.description }}</span>
+                      <span class="adm-small adm-secondary"><span class="mono">{{ e.happenedAt | date: 'yyyy-MM-dd' }}</span>@if (e.userName) { · {{ e.userName }} } · {{ i18n.t(eventLabel(e.kind)) }}
+                        @if (e.ticketNumber) { · <a class="mono" routerLink="/tickets" [queryParams]="{ id: e.ticketId }">{{ e.ticketNumber }}</a> }</span>
+                    </span>
+                  </li>
+                }
+              </ol>
+            } @else {
+              <ol class="iv__timeline">
+                @for (t of a.tickets; track t.id) {
+                  <li class="iv__ev">
+                    <span class="iv__dot"><mat-icon>confirmation_number</mat-icon></span>
+                    <span class="iv__evtext"><a class="mono" routerLink="/tickets" [queryParams]="{ id: t.id }">{{ t.ticketNumber }}</a> {{ t.title }}</span>
+                  </li>
+                } @empty { <p class="adm-empty">{{ i18n.t('inv.noTickets') }}</p> }
+              </ol>
+            }
+          } @else {
+            <p class="adm-empty"><mat-icon>touch_app</mat-icon> {{ i18n.t('inv.pick') }}</p>
+          }
+        }
+      }
+    </section>
+  </div>
+</div>

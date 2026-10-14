@@ -150,6 +150,8 @@ export const EN: Record<CoreKey, string> = {
   'nav.reports': 'Reports',
   'nav.team': 'My team',
   'nav.map': 'Map',
+  'nav.inventory': 'Inventory',
+  'shell.pending': 'Pending requests',
   'rpt.f.chooseClient': 'Choose the client…',
   'rpt.f.additional': 'Additional information',
   'rpt.col.client': 'Client',

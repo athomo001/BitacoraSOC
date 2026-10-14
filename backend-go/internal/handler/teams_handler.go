@@ -101,8 +101,10 @@ type teamDTO struct {
 	OrganizationID   *uuid.UUID `json:"organizationId,omitempty"`
 	OrganizationName *string    `json:"organizationName,omitempty"`
 	TeamGroupID      *uuid.UUID `json:"teamGroupId,omitempty"`
-	Active           bool       `json:"active"`
-	MemberCount      *int32     `json:"memberCount,omitempty"`
+	// AreaID: el área dueña (guardias, 000035); la Ticketera ofrece los equipos del área del ticket.
+	AreaID      *uuid.UUID `json:"areaId,omitempty"`
+	Active      bool       `json:"active"`
+	MemberCount *int32     `json:"memberCount,omitempty"`
 	// Solo en la lista: si su organización está activa y qué lo usa (para
 	// avisar antes de borrar).
 	OrganizationActive *bool         `json:"organizationActive,omitempty"`
@@ -114,7 +116,7 @@ type teamDTO struct {
 
 func toTeamDTO(t db.Team) teamDTO {
 	return teamDTO{ID: t.ID, Name: t.Name, Slug: t.Slug, Kind: t.Kind, Audience: string(t.Audience),
-		OrganizationID: uuidPtr(t.OrganizationID), TeamGroupID: uuidPtr(t.TeamGroupID), Active: t.Active}
+		OrganizationID: uuidPtr(t.OrganizationID), TeamGroupID: uuidPtr(t.TeamGroupID), AreaID: uuidPtr(t.AreaID), Active: t.Active}
 }
 
 func (h *TeamsHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -140,7 +142,7 @@ func (h *TeamsHandler) List(w http.ResponseWriter, r *http.Request) {
 	for _, t := range teams {
 		dto := teamDTO{ID: t.ID, Name: t.Name, Slug: t.Slug, Kind: t.Kind, Audience: string(t.Audience),
 			OrganizationID: uuidPtr(t.OrganizationID), OrganizationName: textPtr(t.OrganizationName),
-			TeamGroupID: uuidPtr(t.TeamGroupID), Active: t.Active}
+			TeamGroupID: uuidPtr(t.TeamGroupID), AreaID: uuidPtr(t.AreaID), Active: t.Active}
 		count := t.MemberCount
 		dto.MemberCount = &count
 		orgActive := t.OrganizationActive
@@ -485,7 +487,7 @@ type assetDTO struct {
 	Latitude          *float64        `json:"latitude,omitempty"`
 	Longitude         *float64        `json:"longitude,omitempty"`
 	Metadata          json.RawMessage `json:"metadata"`
-	TerritorialUnitID uuid.UUID       `json:"territorialUnitId"`
+	TerritorialUnitID *uuid.UUID      `json:"territorialUnitId,omitempty"`
 	ClientID          *uuid.UUID      `json:"clientId,omitempty"`
 	ContractorID      *uuid.UUID      `json:"contractorId,omitempty"`
 	LogSourceID       *uuid.UUID      `json:"logSourceId,omitempty"`
@@ -495,7 +497,7 @@ type assetDTO struct {
 
 func toAssetDTO(a db.GetAssetRow) assetDTO {
 	dto := assetDTO{ID: a.ID, Type: string(a.Type), Name: a.Name, Code: a.Code, Address: textPtr(a.Address),
-		Latitude: a.Latitude, Longitude: a.Longitude, Metadata: a.Metadata, TerritorialUnitID: a.TerritorialUnitID,
+		Latitude: a.Latitude, Longitude: a.Longitude, Metadata: a.Metadata, TerritorialUnitID: uuidPtr(a.TerritorialUnitID),
 		ClientID: uuidPtr(a.ClientID), ContractorID: uuidPtr(a.ContractorID), LogSourceID: uuidPtr(a.LogSourceID),
 		ParentAssetID: uuidPtr(a.ParentAssetID), Active: a.Active}
 	if a.IpAddress != "" {
@@ -613,7 +615,7 @@ func (h *TeamsHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 	id, err := h.Queries.CreateAsset(ctx, db.CreateAssetParams{
 		Type: db.AssetType(*req.Type), Name: strings.TrimSpace(*req.Name), Code: strings.TrimSpace(*req.Code), IpAddress: ip,
 		Metadata: metadata, Address: nonEmptyText(req.Address), Latitude: req.Latitude, Longitude: req.Longitude,
-		TerritorialUnitID: *req.TerritorialUnitID, ClientID: optionalUUID(req.ClientID), ContractorID: optionalUUID(req.ContractorID),
+		TerritorialUnitID: pgtype.UUID{Bytes: *req.TerritorialUnitID, Valid: true}, ClientID: optionalUUID(req.ClientID), ContractorID: optionalUUID(req.ContractorID),
 		LogSourceID: optionalUUID(req.LogSourceID), ParentAssetID: optionalUUID(req.ParentAssetID),
 	})
 	if isUniqueViolation(err) {

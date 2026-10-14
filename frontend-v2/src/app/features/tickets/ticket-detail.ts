@@ -9,7 +9,7 @@ import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
 import { MarkdownComponent } from '../../shared/markdown/markdown';
 import { appendSnippet, openMarkdownHelp } from '../../shared/markdown/markdown-help-dialog';
-import { SlaClock, Ticket, TicketDetail, TicketImage, TicketPerson, TicketStatus, TicketsService } from '../../core/tickets/tickets.service';
+import { SlaClock, Ticket, TicketArea, TicketDetail, TicketImage, TicketPerson, TicketStatus, TicketsService } from '../../core/tickets/tickets.service';
 import { AuthImgDirective } from '../../shared/ui/auth-img';
 import { downloadFile } from '../../core/download';
 import { HttpClient } from '@angular/common/http';
@@ -87,6 +87,17 @@ export class TicketDetailComponent {
   /** Lugar (#24): el buscador abierto en el panel. */
   protected readonly editingPlace = signal(false);
   protected readonly placeLabel = placeLabel;
+  /** Derivar a otra área (9.1). */
+  protected readonly deriving = signal(false);
+  protected readonly deriveTo = signal<string | null>(null);
+  protected readonly deriveReason = signal('');
+  private readonly ticketAreas = signal<TicketArea[]>([]);
+  protected readonly deriveAreas = computed(() => this.ticketAreas().filter((a) => a.resolves && a.code !== this.detail()?.ticket.areaCode));
+  /** Los equipos del área del ticket, y los que no tienen área. */
+  protected readonly areaTeams = computed(() => {
+    const area = this.detail()?.ticket.areaId;
+    return this.teams().filter((tm) => !tm.areaId || tm.areaId === area);
+  });
   protected readonly teams = signal<TeamSummary[]>([]);
   protected readonly people = signal<TicketPerson[]>([]);
   /** Quienes todavía no están entre los resolutores. */
@@ -154,6 +165,30 @@ export class TicketDetailComponent {
     } catch {
       // Sin listas no se puede cambiar el equipo ni sumar gente; el resto funciona.
     }
+  }
+
+  protected isOpen(t: Ticket): boolean {
+    return t.status !== 'resolved' && t.status !== 'closed' && t.status !== 'cancelled';
+  }
+
+  protected async openDerive(): Promise<void> {
+    this.deriveTo.set(null);
+    this.deriveReason.set('');
+    this.deriving.set(true);
+    try {
+      this.ticketAreas.set((await this.api.scope()).areas);
+    } catch (error) {
+      this.error.set(problemDetail(error, this.i18n.t('tickets.error.action')));
+    }
+  }
+
+  protected async derive(): Promise<void> {
+    const t = this.detail()?.ticket;
+    const to = this.deriveTo();
+    const reason = this.deriveReason().trim();
+    if (!t || !to || !reason) return;
+    this.deriving.set(false);
+    await this.run(() => this.api.derive(t.id, to, reason));
   }
 
   protected async setTeam(teamId: string): Promise<void> {

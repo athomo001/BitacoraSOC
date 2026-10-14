@@ -184,7 +184,8 @@ export interface Asset {
   name: string;
   code: string;
   ipAddress?: string;
-  territorialUnitId: string;
+  /** Opcional desde el Inventario (9.2): un notebook no siempre tiene localidad. */
+  territorialUnitId?: string;
 }
 
 /** Persona (o pool) de un llamado con personas propias. */

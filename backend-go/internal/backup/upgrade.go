@@ -27,6 +27,28 @@ func upgradeTables(tables map[string]json.RawMessage) {
 	fillAreaProfiles(tables)
 	fillGuardAreas(tables)
 	fillModuleFlags(tables)
+	fillTicketAreas(tables)
+}
+
+// fillTicketAreas: los respaldos de antes de 000039 traen los tickets sin
+// área; van a la cola del SOC, o a la del NOC si eran de alcance NOC, como
+// hizo la migración.
+func fillTicketAreas(tables map[string]json.RawMessage) {
+	var tickets []map[string]any
+	if err := json.Unmarshal(tables["tickets"], &tickets); err != nil || len(tickets) == 0 {
+		return
+	}
+	if _, ok := tickets[0]["area_id"]; ok {
+		return
+	}
+	for _, t := range tickets {
+		area := areaSOCID
+		if t["scope"] == "noc" {
+			area = areaNOCID
+		}
+		t["area_id"], t["requested_area_id"] = area, area
+	}
+	tables["tickets"], _ = json.Marshal(tickets)
 }
 
 // fillModuleFlags: los respaldos de entre 000033 y 000036 no traen los

@@ -51,7 +51,7 @@ type CreateAssetParams struct {
 	Address           pgtype.Text `json:"address"`
 	Latitude          *float64    `json:"latitude"`
 	Longitude         *float64    `json:"longitude"`
-	TerritorialUnitID uuid.UUID   `json:"territorial_unit_id"`
+	TerritorialUnitID pgtype.UUID `json:"territorial_unit_id"`
 	ClientID          pgtype.UUID `json:"client_id"`
 	ContractorID      pgtype.UUID `json:"contractor_id"`
 	LogSourceID       pgtype.UUID `json:"log_source_id"`
@@ -96,7 +96,7 @@ type GetAssetRow struct {
 	Address           pgtype.Text `json:"address"`
 	Latitude          *float64    `json:"latitude"`
 	Longitude         *float64    `json:"longitude"`
-	TerritorialUnitID uuid.UUID   `json:"territorial_unit_id"`
+	TerritorialUnitID pgtype.UUID `json:"territorial_unit_id"`
 	ClientID          pgtype.UUID `json:"client_id"`
 	ContractorID      pgtype.UUID `json:"contractor_id"`
 	LogSourceID       pgtype.UUID `json:"log_source_id"`
@@ -157,7 +157,7 @@ type ListAssetsRow struct {
 	Address           pgtype.Text `json:"address"`
 	Latitude          *float64    `json:"latitude"`
 	Longitude         *float64    `json:"longitude"`
-	TerritorialUnitID uuid.UUID   `json:"territorial_unit_id"`
+	TerritorialUnitID pgtype.UUID `json:"territorial_unit_id"`
 	ClientID          pgtype.UUID `json:"client_id"`
 	ContractorID      pgtype.UUID `json:"contractor_id"`
 	LogSourceID       pgtype.UUID `json:"log_source_id"`

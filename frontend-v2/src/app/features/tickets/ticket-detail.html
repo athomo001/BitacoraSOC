@@ -9,28 +9,58 @@
     <h2 class="td__title">{{ t.title }}</h2>
     <dl class="td__facts">
       <dt>{{ i18n.t('tickets.detail.client') }}</dt><dd>{{ t.clientName }}</dd>
+      <!-- Tickets por área (9.1): la cola, quién lo pidió y derivar. -->
+      <dt>{{ i18n.t('tickets.area') }}</dt>
+      <dd class="td__people">
+        <span class="pill tone-neutral">{{ t.areaName }}</span>
+        @if (t.canWork && !t.mergedIntoId && isOpen(t)) {
+          <button type="button" class="adm-btn" [disabled]="busy()" (click)="openDerive()"><mat-icon>alt_route</mat-icon>{{ i18n.t('tickets.derive') }}</button>
+        }
+      </dd>
+      @if (deriving()) {
+        <dt></dt>
+        <dd style="display: flex; flex-direction: column; gap: 6px;">
+          <span class="adm-label">{{ i18n.t('tickets.derive.to') }}</span>
+          <span class="td__people">
+            @for (a of deriveAreas(); track a.code) {
+              <button type="button" class="seg" [attr.aria-pressed]="deriveTo() === a.code" (click)="deriveTo.set(a.code)">{{ a.name }}</button>
+            }
+          </span>
+          <label class="adm-label" for="deriveReason">{{ i18n.t('tickets.derive.reason') }}</label>
+          <textarea id="deriveReason" class="td__input" name="deriveReason" rows="2" maxlength="500" [value]="deriveReason()" (input)="deriveReason.set($any($event.target).value)"></textarea>
+          <span class="td__muted">{{ i18n.t('tickets.derive.hint') }}</span>
+          <span class="td__people">
+            <button type="button" class="adm-btn" (click)="deriving.set(false)">{{ i18n.t('tickets.derive.cancel') }}</button>
+            <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy() || !deriveTo() || !deriveReason().trim()" (click)="derive()"><mat-icon>alt_route</mat-icon>{{ i18n.t('tickets.derive.do') }}</button>
+          </span>
+        </dd>
+      }
+      <dt>{{ i18n.t('tickets.requestedBy') }}</dt>
+      <dd>{{ t.requestedAreaName }}@if (t.createdByName) { · {{ t.createdByName }} }</dd>
       <dt>{{ i18n.t('tickets.detail.team') }}</dt>
       <dd>
+        @if (!t.canWork) { {{ t.teamName ?? '—' }} } @else {
         <select class="td__inline-select" name="ticketTeam" [attr.aria-label]="i18n.t('tickets.detail.team')" [disabled]="busy()" [ngModel]="t.assignedTeamId ?? ''" (ngModelChange)="setTeam($event)">
           <option value="" disabled>{{ i18n.t('tickets.detail.noTeam') }}</option>
-          @for (tm of teams(); track tm.id) { <option [value]="tm.id">{{ tm.name }}</option> }
+          @for (tm of areaTeams(); track tm.id) { <option [value]="tm.id">{{ tm.name }}</option> }
           @if (t.assignedTeamId && !hasTeam(t.assignedTeamId)) { <option [value]="t.assignedTeamId">{{ t.teamName }}</option> }
         </select>
+        }
       </dd>
       @if (modules.escNoc()) {
         <dt>{{ i18n.t('tickets.place') }}</dt>
         <dd class="td__people">
           @if (t.place; as p) {
             <span>{{ placeLabel(p) }}</span>
-            @if (!t.mergedIntoId) {
+            @if (!t.mergedIntoId && t.canWork) {
               <button type="button" class="adm-icon-btn" [disabled]="busy()" [attr.aria-label]="i18n.t('tickets.place.change')" (click)="editingPlace.set(!editingPlace())"><mat-icon>edit</mat-icon></button>
             }
-            @if (modules.noc()) {
+            @if (modules.noc() && p.territorialUnitId) {
               <a class="adm-btn" routerLink="/map" [queryParams]="{ unitId: p.territorialUnitId }"><mat-icon>map</mat-icon>{{ i18n.t('tickets.place.onMap') }}</a>
             }
           } @else {
             <span class="td__muted">{{ i18n.t('tickets.place.empty') }}</span>
-            @if (!t.mergedIntoId) {
+            @if (!t.mergedIntoId && t.canWork) {
               <button type="button" class="adm-btn" [disabled]="busy()" (click)="editingPlace.set(!editingPlace())"><mat-icon>add</mat-icon>{{ i18n.t('tickets.place.choose') }}</button>
             }
           }
@@ -50,12 +80,14 @@
       <dd class="td__people">
         @for (p of d.resolvers; track p.userId) {
           <span class="td__person">{{ personName(p) }}
+            @if (t.canWork) {
             <button type="button" class="td__person-x" [disabled]="busy()" [attr.aria-label]="i18n.tf('tickets.detail.removeResolver', personName(p))" (click)="removeResolver(p.userId)"><mat-icon>close</mat-icon></button>
+            }
           </span>
         } @empty {
           <span class="td__muted">{{ i18n.t('tickets.detail.unassigned') }}</span>
         }
-        @if (addable().length) {
+        @if (t.canWork && addable().length) {
           <select class="td__inline-select" name="addResolver" [attr.aria-label]="i18n.t('tickets.detail.addResolver')" [disabled]="busy()" [ngModel]="''" (ngModelChange)="addResolver($event)">
             <option value="" disabled>+ {{ i18n.t('tickets.detail.addResolver') }}</option>
             @for (p of addable(); track p.userId) { <option [value]="p.userId">{{ personName(p) }}</option> }
@@ -66,7 +98,9 @@
     </dl>
   </header>
 
-  <app-ticket-relations [detail]="d" (reload)="reloadAll()" (open)="navigate.emit($event)" />
+  @if (t.canWork) {
+    <app-ticket-relations [detail]="d" (reload)="reloadAll()" (open)="navigate.emit($event)" />
+  }
 
   <section class="td__block td__sla" [attr.aria-label]="i18n.t('tickets.detail.sla')">
     <div class="td__row">
@@ -99,12 +133,15 @@
       }
     </div>
     <div class="td__actions">
-      @for (a of actions(); track a.to) {
+      @if (!t.canWork) {
+        <span class="td__muted"><mat-icon>visibility</mat-icon> {{ i18n.tf('tickets.viewOnly', t.areaName) }}</span>
+      }
+      @for (a of t.canWork ? actions() : []; track a.to) {
         <button type="button" class="td__btn" [class.td__btn--primary]="a.primary" [disabled]="busy()" (click)="transition(a.to)">
           <mat-icon>{{ a.icon }}</mat-icon>{{ i18n.t(a.key) }}
         </button>
       } @empty {
-        <span class="td__muted">{{ i18n.t('tickets.detail.noActions') }}</span>
+        @if (t.canWork) { <span class="td__muted">{{ i18n.t('tickets.detail.noActions') }}</span> }
       }
       @if (canDelete()) {
         @if (confirmDelete()) {
@@ -169,6 +206,7 @@
         </div>
       }
       @case ('tasks') {
+        @if (t.canWork) {
         <div class="td__task-form">
           <input class="td__input" [(ngModel)]="taskContent" [placeholder]="i18n.t('tickets.tasks.placeholder')" [attr.aria-label]="i18n.t('tickets.tasks.placeholder')" />
           <div class="td__task-row">
@@ -178,6 +216,7 @@
             <button type="button" class="td__btn td__btn--primary td__push" [disabled]="busy() || !taskContent.trim()" (click)="addTask()"><mat-icon>timer</mat-icon>{{ i18n.t('tickets.tasks.add') }}</button>
           </div>
         </div>
+        }
         @for (k of d.tasks; track k.id) {
           <div class="td__task">
             <span class="mono td__task-time">{{ duration(k.timeSpentSeconds) }}</span>

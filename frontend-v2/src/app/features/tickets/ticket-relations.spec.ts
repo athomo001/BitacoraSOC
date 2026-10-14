@@ -12,7 +12,8 @@ function ticket(overrides: Partial<Ticket>): Ticket {
     id: 't50', ticketNumber: 'TKT-2026-00050', ticketType: 'incident', scope: 'noc', clientId: 'c-int', clientName: 'Interno · NOC',
     teamName: null, assigneeUsername: null, status: 'in_progress', impact: 'high', urgency: 'high', priority: 'p1_critical',
     title: 'Caída fibra troncal Sur', description: 'x', slaPausedSeconds: 0, reopenedCount: 0, onHoldSince: null,
-    sla: {}, allowedTransitions: ['pending_vendor', 'resolved'], createdAt: '2026-10-07T04:58:00Z', updatedAt: '', childCount: 0, ...overrides,
+    sla: {}, allowedTransitions: ['pending_vendor', 'resolved'], createdAt: '2026-10-07T04:58:00Z', updatedAt: '', childCount: 0,
+    areaId: 'a-soc', areaCode: 'soc', areaName: 'SOC', requestedAreaId: 'a-soc', requestedAreaCode: 'soc', requestedAreaName: 'SOC', canWork: true, ...overrides,
   };
 }
 
@@ -46,6 +47,9 @@ describe('Ticketera: unir, padre/hijo y cambiar cliente (canvas aprobado 2026-10
     perms._caps.set({ moduleScope: 'both', capabilities: caps });
     const fixture = TestBed.createComponent(TicketsComponent);
     fixture.detectChanges();
+    // Tickets por área (9.1): primero las colas del usuario.
+    httpMock.match('/api/tickets/scope').forEach((r) => r.flush({ data: { all: true, myAreas: [], areas: [{ id: 'a-soc', code: 'soc', name: 'SOC', resolves: true }], defaultArea: 'soc' } }));
+    await settle();
     httpMock.expectOne((r) => r.url === '/api/tickets').flush({ data: { items: list, total: list.length, summary: { open: 1, breached: 0, paused: 0, resolvedToday: 0 } } });
     await settle();
     fixture.detectChanges();

@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/middleware"
@@ -23,19 +24,21 @@ type setTicketPlaceRequest struct {
 
 // placeLabel: "Calama · RT-CAL-06", "Calama" o "Sin lugar", para la actividad del ticket.
 func (h *TicketsHandler) placeLabel(ctx context.Context, unit, asset pgtype.UUID) string {
-	if !unit.Valid {
-		return "Sin lugar"
-	}
-	label := "?"
-	if u, err := h.Queries.GetTerritorialUnit(ctx, uuid.UUID(unit.Bytes)); err == nil {
-		label = u.Name
+	parts := []string{}
+	if unit.Valid {
+		if u, err := h.Queries.GetTerritorialUnit(ctx, uuid.UUID(unit.Bytes)); err == nil {
+			parts = append(parts, u.Name)
+		}
 	}
 	if asset.Valid {
 		if a, err := h.Queries.GetAsset(ctx, uuid.UUID(asset.Bytes)); err == nil {
-			label += " · " + a.Name
+			parts = append(parts, a.Name)
 		}
 	}
-	return label
+	if len(parts) == 0 {
+		return "Sin lugar"
+	}
+	return strings.Join(parts, " · ")
 }
 
 // SetPlace es PUT /api/tickets/{id}/place: {assetId} o {territorialUnitId}; los dos vacíos quitan el lugar.
@@ -68,8 +71,8 @@ func (h *TicketsHandler) SetPlace(w http.ResponseWriter, r *http.Request) {
 			problemdetails.Write(w, r, 404, "not-found", "el activo no existe")
 			return
 		}
-		asset = pgtype.UUID{Bytes: a.ID, Valid: true}
-		unit = pgtype.UUID{Bytes: a.TerritorialUnitID, Valid: true}
+		// Un equipo sin localidad (000040) es lugar igual; solo no sale en el Mapa.
+		asset, unit = pgtype.UUID{Bytes: a.ID, Valid: true}, a.TerritorialUnitID
 	case req.TerritorialUnitID != nil:
 		if _, err := h.Queries.GetTerritorialUnit(ctx, *req.TerritorialUnitID); err != nil {
 			problemdetails.Write(w, r, 404, "not-found", "la localidad no existe")

@@ -48,10 +48,18 @@ type ticketViewDTO struct {
 	ChildCount       int32   `json:"childCount"`
 	// Place: el lugar del ticket (000038), con nombres para no mostrar UUID.
 	Place *ticketPlaceDTO `json:"place,omitempty"`
+	// Tickets por área (000039): la cola, quién lo pidió y si el usuario lo trabaja.
+	AreaCode          string  `json:"areaCode"`
+	AreaName          string  `json:"areaName"`
+	RequestedAreaCode string  `json:"requestedAreaCode"`
+	RequestedAreaName string  `json:"requestedAreaName"`
+	CreatedByName     *string `json:"createdByName,omitempty"`
+	CanWork           bool    `json:"canWork"`
 }
 
 type ticketPlaceDTO struct {
-	TerritorialUnitID uuid.UUID  `json:"territorialUnitId"`
+	// Sin localidad cuando el lugar es un equipo que no la tiene (000040).
+	TerritorialUnitID *uuid.UUID `json:"territorialUnitId,omitempty"`
 	Name              string     `json:"name"`
 	ParentName        *string    `json:"parentName,omitempty"`
 	AssetID           *uuid.UUID `json:"assetId,omitempty"`
@@ -60,10 +68,10 @@ type ticketPlaceDTO struct {
 
 // ticketPlace arma el lugar con los nombres que trae la vista (nil = sin lugar).
 func ticketPlace(t db.Ticket, name, parentName, assetName pgtype.Text) *ticketPlaceDTO {
-	if !t.TerritorialUnitID.Valid || !name.Valid {
+	if !t.AssetID.Valid && (!t.TerritorialUnitID.Valid || !name.Valid) {
 		return nil
 	}
-	p := &ticketPlaceDTO{TerritorialUnitID: uuid.UUID(t.TerritorialUnitID.Bytes), Name: name.String, ParentName: textPtr(parentName)}
+	p := &ticketPlaceDTO{TerritorialUnitID: uuidPtr(t.TerritorialUnitID), Name: name.String, ParentName: textPtr(parentName)}
 	if t.AssetID.Valid && assetName.Valid {
 		p.AssetID, p.AssetName = uuidPtr(t.AssetID), textPtr(assetName)
 	}
@@ -234,12 +242,28 @@ func (h *TicketsHandler) List(w http.ResponseWriter, r *http.Request) {
 	if size > maxTicketsPageSize {
 		size = maxTicketsPageSize
 	}
+	ctx := r.Context()
+	scope, err := loadTicketScope(ctx, h.Queries)
+	if err != nil {
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudieron leer tus áreas")
+		return
+	}
 	params := db.ListTicketsViewParams{
 		TicketType: db.NullTicketType{TicketType: db.TicketType(q.Get("ticketType")), Valid: q.Get("ticketType") != ""},
 		Scope:      db.NullEntryScope{EntryScope: db.EntryScope(q.Get("scope")), Valid: q.Get("scope") != ""},
 		Status:     db.NullTicketStatus{TicketStatus: db.TicketStatus(q.Get("status")), Valid: q.Get("status") != ""},
 		Q:          queryText(q.Get("q")), OpenOnly: q.Get("openOnly") == "true",
 		PageSize: int32(size), PageOffset: int32((page - 1) * size),
+		VisibleAreas: scope.visible(),
+	}
+	// ?queue=mine (la cola de mis áreas) | asked (lo que mis áreas pidieron a otras) | all.
+	if own := scope.list(); len(own) > 0 {
+		switch q.Get("queue") {
+		case "mine":
+			params.QueueAreas = own
+		case "asked":
+			params.AskedAreas = own
+		}
 	}
 	if v, err := uuid.Parse(q.Get("teamId")); err == nil {
 		params.AssignedTeamID = pgtype.UUID{Bytes: v, Valid: true}
@@ -247,19 +271,18 @@ func (h *TicketsHandler) List(w http.ResponseWriter, r *http.Request) {
 	if v, err := uuid.Parse(q.Get("clientId")); err == nil {
 		params.ClientID = pgtype.UUID{Bytes: v, Valid: true}
 	}
-	ctx := r.Context()
 	rows, err := h.Queries.ListTicketsView(ctx, params)
 	if err != nil {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudieron listar los tickets")
 		return
 	}
-	total, err := h.Queries.CountTicketsView(ctx, db.CountTicketsViewParams{TicketType: params.TicketType, Scope: params.Scope, Status: params.Status, AssignedTeamID: params.AssignedTeamID, ClientID: params.ClientID, Q: params.Q, OpenOnly: params.OpenOnly})
+	total, err := h.Queries.CountTicketsView(ctx, db.CountTicketsViewParams{TicketType: params.TicketType, Scope: params.Scope, Status: params.Status, AssignedTeamID: params.AssignedTeamID, ClientID: params.ClientID, Q: params.Q, OpenOnly: params.OpenOnly, VisibleAreas: params.VisibleAreas, QueueAreas: params.QueueAreas, AskedAreas: params.AskedAreas})
 	if err != nil {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo contar los tickets")
 		return
 	}
 	now := h.now()
-	summary, err := h.Queries.TicketQueueSummary(ctx, db.TicketQueueSummaryParams{Now: pgtype.Timestamptz{Time: now, Valid: true}, ResolvedSince: pgtype.Timestamptz{Time: startOfDay(now), Valid: true}})
+	summary, err := h.Queries.TicketQueueSummary(ctx, db.TicketQueueSummaryParams{Now: pgtype.Timestamptz{Time: now, Valid: true}, ResolvedSince: pgtype.Timestamptz{Time: startOfDay(now), Valid: true}, VisibleAreas: scope.visible()})
 	if err != nil {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo resumir la cola")
 		return
@@ -270,6 +293,8 @@ func (h *TicketsHandler) List(w http.ResponseWriter, r *http.Request) {
 		v := toTicketView(row.Ticket, row.ClientName, row.TeamName, row.AssigneeUsername, now, atRisk)
 		v.ParentNumber, v.MergedIntoNumber, v.ChildCount = textPtr(row.ParentNumber), textPtr(row.MergedIntoNumber), row.ChildCount
 		v.Place = ticketPlace(row.Ticket, row.PlaceName, row.PlaceParentName, row.AssetName)
+		v.AreaCode, v.AreaName, v.RequestedAreaCode, v.RequestedAreaName = row.AreaCode, row.AreaName, row.RequestedAreaCode, row.RequestedAreaName
+		v.CanWork = scope.canWork(row.Ticket.AreaID)
 		items = append(items, v)
 	}
 	writeData(w, 200, map[string]any{
@@ -316,6 +341,13 @@ func (h *TicketsHandler) loadDetail(r *http.Request, id uuid.UUID) (ticketDetail
 		Resolvers: make([]ticketResolverDTO, 0, len(resolvers)),
 	}
 	d.Ticket.Place = ticketPlace(row.Ticket, row.PlaceName, row.PlaceParentName, row.AssetName)
+	d.Ticket.AreaCode, d.Ticket.AreaName, d.Ticket.RequestedAreaCode, d.Ticket.RequestedAreaName = row.AreaCode, row.AreaName, row.RequestedAreaCode, row.RequestedAreaName
+	if row.CreatedByName != "" {
+		d.Ticket.CreatedByName = &row.CreatedByName
+	}
+	if scope, err := loadTicketScope(ctx, h.Queries); err == nil {
+		d.Ticket.CanWork = scope.canWork(row.Ticket.AreaID)
+	}
 	for _, rv := range resolvers {
 		d.Resolvers = append(d.Resolvers, ticketResolverDTO{UserID: rv.UserID, Username: rv.Username, FullName: textPtr(rv.FullName)})
 	}
@@ -490,6 +522,8 @@ func (h *TicketsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	}
 	v := toTicketView(row.Ticket, row.ClientName, row.TeamName, row.AssigneeUsername, now, h.atRiskPercent(ctx))
 	v.Place = ticketPlace(row.Ticket, row.PlaceName, row.PlaceParentName, row.AssetName)
+	v.AreaCode, v.AreaName, v.RequestedAreaCode, v.RequestedAreaName = row.AreaCode, row.AreaName, row.RequestedAreaCode, row.RequestedAreaName
+	v.CanWork = true // llegó hasta acá: requireTicketAccess ya lo dejó trabajar
 	writeData(w, 200, v)
 }
 

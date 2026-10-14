@@ -13,6 +13,13 @@
     <button type="button" class="tk__new" (click)="openNew()"><mat-icon>add</mat-icon>{{ i18n.t('tickets.new') }}</button>
   </header>
 
+  @if (queues().length > 1) {
+    <div class="tk__filters" role="tablist" [attr.aria-label]="i18n.t('tickets.col.area')">
+      @for (qu of queues(); track qu.key) {
+        <button type="button" role="tab" class="seg" [attr.aria-pressed]="queue() === qu.key" [attr.aria-selected]="queue() === qu.key" (click)="setQueue(qu.key)"><mat-icon class="tk__queue-icon">{{ qu.icon }}</mat-icon>{{ qu.label }}</button>
+      }
+    </div>
+  }
   <div class="tk__filters">
     <button type="button" class="seg" [attr.aria-pressed]="typeFilter() === null" (click)="setType(null)">{{ i18n.t('tickets.filter.all') }}</button>
     <button type="button" class="seg" [attr.aria-pressed]="typeFilter() === 'incident'" (click)="setType('incident')">{{ i18n.t('tickets.filter.incidents') }}</button>
@@ -49,6 +56,8 @@
             <span class="tk__cell-title">
               <span class="tk__ticket-title">{{ t.title }}</span>
               <span class="tk__ticket-sub">{{ i18n.t(typeKey(t)) }} · {{ t.clientName }} · {{ t.teamName ?? '—' }}@if (t.place) { · {{ t.place.name }} }
+                @if (queue() !== 'mine' && t.areaName) { · <strong>{{ t.areaName }}</strong> }
+                @if (t.requestedAreaCode && t.requestedAreaCode !== t.areaCode) { · {{ i18n.tf('tickets.askedBy', t.requestedAreaName) }} }
                 @if (t.childCount) { · <strong class="tk__rel">{{ i18n.tf('tkrel.childCount', t.childCount) }}</strong> }
                 @if (t.mergedIntoNumber) { · <strong class="tk__rel">{{ i18n.tf('tkrel.mergedShort', t.mergedIntoNumber) }}</strong> }
               </span>

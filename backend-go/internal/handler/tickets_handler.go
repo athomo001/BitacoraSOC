@@ -57,6 +57,10 @@ func (h *TicketsHandler) RequireEnabled(w http.ResponseWriter, r *http.Request, 
 		problemdetails.Write(w, r, http.StatusForbidden, "module-disabled", "la ticketera nativa está desactivada")
 		return
 	}
+	// Tickets por área (9.1): un ticket de otra área no se ve ni se trabaja.
+	if !h.requireTicketAccess(w, r) {
+		return
+	}
 	next.ServeHTTP(w, r)
 }
 
@@ -68,6 +72,8 @@ type ticketDTO struct {
 	ClientID            uuid.UUID  `json:"clientId"`
 	AssetID             *uuid.UUID `json:"assetId,omitempty"`
 	TerritorialUnitID   *uuid.UUID `json:"territorialUnitId,omitempty"`
+	AreaID              uuid.UUID  `json:"areaId"`
+	RequestedAreaID     uuid.UUID  `json:"requestedAreaId"`
 	ServiceID           *uuid.UUID `json:"serviceId,omitempty"`
 	AssignedTeamID      *uuid.UUID `json:"assignedTeamId,omitempty"`
 	AssignedUserID      *uuid.UUID `json:"assignedUserId,omitempty"`
@@ -101,6 +107,7 @@ func toTicketDTO(t db.Ticket, exposeToken bool) ticketDTO {
 	}
 	d.ParentID, d.MergedIntoID, d.CreatedByID = uuidPtr(t.ParentID), uuidPtr(t.MergedIntoID), uuidPtr(t.CreatedBy)
 	d.TerritorialUnitID = uuidPtr(t.TerritorialUnitID)
+	d.AreaID, d.RequestedAreaID = t.AreaID, t.RequestedAreaID
 	if exposeToken && t.PublicTrackingToken.Valid {
 		v := t.PublicTrackingToken.String
 		d.PublicTrackingToken = &v
@@ -128,6 +135,8 @@ type createTicketRequest struct {
 	Urgency           string     `json:"urgency"`
 	Title             string     `json:"title"`
 	Description       string     `json:"description"`
+	// Area: código del área que lo resuelve (vacío = la del usuario, 9.1).
+	Area string `json:"area"`
 	// ParentID: crear el ticket ya como hijo de otro ("Crear hijo").
 	ParentID *uuid.UUID `json:"parentId"`
 	// AffectsClient: nil = según la regla de Administración → Ticketera.

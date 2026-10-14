@@ -443,9 +443,9 @@ SELECT a.id, a.name, a.territorial_unit_id FROM assets a WHERE a.id = $1 AND a.a
 `
 
 type GetAssetForResolveRow struct {
-	ID                uuid.UUID `json:"id"`
-	Name              string    `json:"name"`
-	TerritorialUnitID uuid.UUID `json:"territorial_unit_id"`
+	ID                uuid.UUID   `json:"id"`
+	Name              string      `json:"name"`
+	TerritorialUnitID pgtype.UUID `json:"territorial_unit_id"`
 }
 
 func (q *Queries) GetAssetForResolve(ctx context.Context, id uuid.UUID) (GetAssetForResolveRow, error) {

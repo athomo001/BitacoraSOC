@@ -16,6 +16,7 @@ function normalize(text: string): string {
 
 /** "Calama · RT-CAL-06" o "Calama". */
 export function placeLabel(p: TicketPlace): string {
+  if (!p.name) return p.assetName ?? '';
   return p.assetName ? `${p.name} · ${p.assetName}` : p.name;
 }
 
@@ -116,10 +117,10 @@ export class PlacePickerComponent implements OnInit {
   }
 
   protected pickAsset(a: Asset): void {
-    const unit = this.byId().get(a.territorialUnitId);
+    const unit = a.territorialUnitId ? this.byId().get(a.territorialUnitId) : undefined;
     this.picked.emit({
       assetId: a.id,
-      place: { territorialUnitId: a.territorialUnitId, name: unit?.name ?? '', parentName: this.parentName(unit?.parentId ?? null) || undefined, assetId: a.id, assetName: a.name },
+      place: { territorialUnitId: a.territorialUnitId || undefined, name: unit?.name ?? '', parentName: this.parentName(unit?.parentId ?? null) || undefined, assetId: a.id, assetName: a.name },
     });
   }
 

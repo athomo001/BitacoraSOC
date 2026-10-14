@@ -164,6 +164,17 @@ Si una localidad tiene varias cosas, el punto toma el color más grave y la list
 
 ---
 
+## Inventario
+
+Los equipos de tu área (dueña o responsable): servidores, computadores, equipos de red, enlaces, sitios… El admin y el perfil Gestión ven todos («Todas»).
+
+- **Ficha:** los datos de su tipo (un servidor: SO, versión, CPU, RAM, disco; un equipo de red: sistema, versión, puertos, PoE, rol, stack, VLAN de gestión), **varias IP** con su tipo (Red, Balanceo VIP, Administración iLO/iDRAC u Otra), **responsables** (un área, una persona o una organización externa, con de qué se encarga: por ejemplo TI configura, Infra el hardware, Datahouse la energía y la conectividad), marca y modelo, serie, cliente, localidad (opcional), rack y posición, y «otros datos» libres.
+- **Historial:** queda solo cada cambio de ficha («SO: 20.04 → 24.04»), cada **Registrar trabajo** y cada ticket resuelto cuyo lugar es el equipo. La pestaña **Tickets** muestra los tickets que lo tuvieron como lugar.
+- **Dar de baja o borrar:** lo hace el admin o la jefatura del área dueña. Los demás usan **Pedir baja** o **Pedir borrado** con un motivo; a quien decide le aparece el número en el menú (Inventario) y acepta o rechaza en **Solicitudes**. Un equipo con registros en la bitácora o en escalamiento no se borra: se da de baja.
+- **Cargar CSV:** se elige el tipo, se baja la plantilla, se llena en Excel y se sube. Antes de guardar se ve fila por fila qué pasará; cada equipo se busca por su código (se actualiza si existe, se crea si no) y las filas con error no entran. En una celda van varios valores separados por «;»: `ips` = `Red=10.10.4.21; VIP=10.10.4.20; iLO=10.10.99.21`, `responsables` = `Configuración y sistema=área:TI; Energía y conectividad=org:Datahouse`. El archivo no se guarda. **Exportar lo que hay** baja el inventario en el mismo formato.
+
+---
+
 ## Directorio
 
 Contactos **internos** (sincronizados desde los usuarios de la app) y **externos** (contratas, clientes, proveedores). Cada contacto tiene sus canales: llamada, WhatsApp, SMS, correo u otro.
@@ -198,6 +209,14 @@ Informes por correo para clientes, con dos modos:
 
 Tickets ITIL de **incidente** o **requerimiento**. Solo aparece si el módulo Ticketera está encendido.
 
+**Colas por área:** arriba eliges qué mirar.
+
+- **Cola de mi área:** lo que resuelve tu área; lo trabajas.
+- **Pedidos por mi área:** lo que tu área le pidió a otras. Ves el avance y comentas, pero lo trabaja la otra área.
+- **Todas las áreas:** solo el administrador y el perfil Gestión (CSM).
+
+Quien todavía no tiene grupos ni áreas ve todos los tickets, como antes.
+
 | Concepto | Cómo funciona |
 | --- | --- |
 | **Prioridad** | Sale de impacto × urgencia (P1 crítica a P4 baja). |
@@ -206,6 +225,7 @@ Tickets ITIL de **incidente** o **requerimiento**. Solo aparece si el módulo Ti
 | **Asignación** | Equipo y resolutores. Cualquier analista puede tomar o asignar. |
 | **Tareas** | Lista de pasos dentro del ticket, con tiempo. |
 | **Comentarios** | Internos o públicos, en Markdown, con imágenes. |
+| **Área** | Cada ticket está en la **cola de un área** (la que lo resuelve) y recuerda el **área que lo pidió**. Al crearlo parte en tu área; si eliges otra, le estás pidiendo algo a esa área. **Derivar a otra área** pide un motivo, queda en la actividad y el ticket entra a esa cola como Nuevo, sin equipo ni resolutores (el SLA sigue). |
 | **Lugar** | Opcional, con el módulo NOC: una localidad del Territorio o un activo (con un activo, la localidad sale sola). Se elige al crear el ticket o en su panel; aparece en la lista y en el Mapa (capa *Tickets abiertos*). El cliente no lo ve en el seguimiento público. |
 
 **Relaciones entre tickets:**
@@ -267,6 +287,7 @@ Solo para administradores. El menú se agrupa así:
 | | **Reportes de turno** | Formato y estado de los reportes de cierre. |
 | Catálogos | **Organizaciones y servicios** | Clientes, tipos, servicios y fuentes de log. |
 | | **Territorio** (NOC) | Regiones, zonas y sitios, con importación CSV y activar o desactivar en lote. Para el Mapa: el **fondo** (OpenStreetMap público, servidor propio o sin fondo) y **Sin ubicación**, donde se ubica con un clic en el mapa cada localidad que no tiene coordenadas. |
+| | **Inventario** | Tipos de equipo y sus campos (texto, número, lista o fecha), y la lista de tipos de responsabilidad. Quitar un campo no borra lo cargado. |
 | | **Equipos** | Equipos, contratas, guardias, integrantes y cobertura territorial, con acciones en lote (detalle abajo). |
 | Sistema | **Marca** | Nombre, logo, favicon y fuente. |
 | | **Módulos** y **Funcionalidades** | Qué partes del sistema están encendidas (SOC, NOC y la Ticketera se encienden y apagan en Módulos). |

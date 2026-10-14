@@ -19,11 +19,15 @@
           class="shell__nav-item"
           [routerLink]="['/', item.path]"
           routerLinkActive="shell__nav-item--active"
-          [attr.title]="i18n.t(item.labelKey) + ' (Alt+' + item.shortcutDigit + ')'"
+          [attr.title]="i18n.t(item.labelKey) + (item.shortcutDigit ? ' (Alt+' + item.shortcutDigit + ')' : '')"
         >
           <mat-icon class="shell__nav-icon">{{ item.icon }}</mat-icon>
           <span class="shell__nav-label">{{ i18n.t(item.labelKey) }}</span>
-          <span class="shell__shortcut mono">Alt+{{ item.shortcutDigit }}</span>
+          @if (item.path === 'inventory' && inventory.pending() > 0) {
+            <span class="pill tone-warn mono" [attr.aria-label]="i18n.t('shell.pending')">{{ inventory.pending() }}</span>
+          } @else if (item.shortcutDigit) {
+            <span class="shell__shortcut mono">Alt+{{ item.shortcutDigit }}</span>
+          }
         </a>
       }
     </div>

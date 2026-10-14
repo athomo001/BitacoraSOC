@@ -266,7 +266,10 @@ func (h *EscalationHandler) resolve(ctx context.Context, s scope) (*resolutionDT
 			if err != nil {
 				return nil, err
 			}
-			unitID = asset.TerritorialUnitID
+			// Un equipo sin localidad (000040) solo escala por su propia política.
+			if asset.TerritorialUnitID.Valid {
+				unitID = uuid.UUID(asset.TerritorialUnitID.Bytes)
+			}
 			if pid, err := h.Queries.FindPolicyByAsset(ctx, pgtype.UUID{Bytes: asset.ID, Valid: true}); err == nil {
 				assetPolicy = &pid
 			} else if !errors.Is(err, pgx.ErrNoRows) {

@@ -10,6 +10,7 @@ import type { TerritoryKey } from './packs/territory';
 import type { TicketsKey } from './packs/tickets';
 import type { TeamKey } from './packs/team';
 import type { MapKey } from './packs/map';
+import type { InventoryKey } from './packs/inventory';
 
 const ES = {
   'nav.entries': 'Bitácora',
@@ -160,6 +161,8 @@ const ES = {
   'nav.reports': 'Reportes',
   'nav.team': 'Mi equipo',
   'nav.map': 'Mapa',
+  'nav.inventory': 'Inventario',
+  'shell.pending': 'Solicitudes pendientes',
   'rpt.f.chooseClient': 'Elige el cliente…',
   'rpt.f.additional': 'Información adicional',
   'rpt.col.client': 'Cliente',
@@ -224,7 +227,8 @@ export type MessageKey =
   | TerritoryKey
   | TicketsKey
   | TeamKey
-  | MapKey;
+  | MapKey
+  | InventoryKey;
 
 /**
  * El inglés va en messages-en.ts y se descarga solo al cambiar a EN: así no

@@ -279,6 +279,43 @@ func (q *Queries) ListLevelsWithUsage(ctx context.Context) ([]ListLevelsWithUsag
 	return items, nil
 }
 
+const listTicketAreas = `-- name: ListTicketAreas :many
+SELECT id, code, name, default_profile FROM areas WHERE active ORDER BY sort_order, name
+`
+
+type ListTicketAreasRow struct {
+	ID             uuid.UUID `json:"id"`
+	Code           string    `json:"code"`
+	Name           string    `json:"name"`
+	DefaultProfile string    `json:"default_profile"`
+}
+
+// Las áreas activas, en orden, con su perfil (las de Gestión piden, no resuelven).
+func (q *Queries) ListTicketAreas(ctx context.Context) ([]ListTicketAreasRow, error) {
+	rows, err := q.db.Query(ctx, listTicketAreas)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTicketAreasRow
+	for rows.Next() {
+		var i ListTicketAreasRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Code,
+			&i.Name,
+			&i.DefaultProfile,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUserAreaCodes = `-- name: ListUserAreaCodes :many
 SELECT DISTINCT a.code
 FROM user_permission_groups upg
@@ -361,6 +398,40 @@ func (q *Queries) ListUserProfiles(ctx context.Context, userID uuid.UUID) ([]str
 			return nil, err
 		}
 		items = append(items, profile)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUserTicketGroups = `-- name: ListUserTicketGroups :many
+SELECT pg.profile, pa.area_id
+FROM user_permission_groups upg
+JOIN permission_groups pg ON pg.id = upg.permission_group_id AND pg.active
+LEFT JOIN permission_group_areas pa ON pa.permission_group_id = pg.id
+WHERE upg.user_id = $1
+`
+
+type ListUserTicketGroupsRow struct {
+	Profile string      `json:"profile"`
+	AreaID  pgtype.UUID `json:"area_id"`
+}
+
+// Tickets por área (9.1): las áreas y perfiles de los grupos activos de un usuario.
+func (q *Queries) ListUserTicketGroups(ctx context.Context, userID uuid.UUID) ([]ListUserTicketGroupsRow, error) {
+	rows, err := q.db.Query(ctx, listUserTicketGroups, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUserTicketGroupsRow
+	for rows.Next() {
+		var i ListUserTicketGroupsRow
+		if err := rows.Scan(&i.Profile, &i.AreaID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

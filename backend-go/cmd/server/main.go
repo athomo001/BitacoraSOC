@@ -154,6 +154,7 @@ func run(logger *slog.Logger) error {
 	systemFeaturesHandler := &handler.SystemFeaturesHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
 	territorialUnitsHandler := &handler.TerritorialUnitsHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
 	mapHandler := &handler.MapHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
+	inventoryHandler := &handler.InventoryHandler{Pool: pool, Queries: queries, AuditLog: auditLog, Hub: hub}
 	organizationsHandler := &handler.OrganizationsHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
 	directoryHandler := &handler.DirectoryHandler{Pool: pool, Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
 	smtpConfigHandler := &handler.SMTPConfigHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
@@ -386,6 +387,23 @@ func run(logger *slog.Logger) error {
 	mux.Handle("GET /api/map/units/{id}", nocAuthed(mapHandler.Unit))
 	mux.Handle("GET /api/config/map-tiles", nocAuthed(mapHandler.GetTiles))
 	mux.Handle("PUT /api/config/map-tiles", nocAdmin(mapHandler.PutTiles))
+	// Inventario (spec/16 §4.2, 9.2): por área; el handler decide quién ve, edita y da de baja.
+	mux.Handle("GET /api/inventory", authed(inventoryHandler.List))
+	mux.Handle("GET /api/inventory/meta", authed(inventoryHandler.Meta))
+	mux.Handle("GET /api/inventory/requests", authed(inventoryHandler.Requests))
+	mux.Handle("POST /api/inventory/requests/{id}/decide", authed(inventoryHandler.Decide))
+	mux.Handle("GET /api/inventory/import/template", authed(inventoryHandler.Template))
+	mux.Handle("POST /api/inventory/import", authed(inventoryHandler.Import))
+	mux.Handle("GET /api/inventory/export", authed(inventoryHandler.Export))
+	mux.Handle("PUT /api/inventory/kinds/{code}", admin(inventoryHandler.PutKind))
+	mux.Handle("PUT /api/inventory/responsibility-types/{code}", admin(inventoryHandler.PutResponsibilityType))
+	mux.Handle("POST /api/inventory", authed(inventoryHandler.Create))
+	mux.Handle("GET /api/inventory/{id}", authed(inventoryHandler.Get))
+	mux.Handle("PUT /api/inventory/{id}", authed(inventoryHandler.Update))
+	mux.Handle("DELETE /api/inventory/{id}", authed(inventoryHandler.Delete))
+	mux.Handle("POST /api/inventory/{id}/events", authed(inventoryHandler.AddEvent))
+	mux.Handle("POST /api/inventory/{id}/active", authed(inventoryHandler.SetActive))
+	mux.Handle("POST /api/inventory/{id}/requests", authed(inventoryHandler.Request))
 
 	// Organizaciones y catálogo de tecnologías (Fase 6) — núcleo compartido SOC/NOC.
 	mux.Handle("GET /api/organizations", authed(organizationsHandler.List))
@@ -590,6 +608,7 @@ func run(logger *slog.Logger) error {
 	mux.Handle("GET /api/tickets", ticketAuthed(ticketsHandler.List))
 	mux.Handle("POST /api/tickets", ticketAuthed(ticketsHandler.Create))
 	mux.Handle("GET /api/tickets/assignees", ticketAuthed(ticketsHandler.Assignees))
+	mux.Handle("GET /api/tickets/scope", ticketAuthed(ticketsHandler.Scope))
 	mux.Handle("GET /api/tickets/{id}", ticketAuthed(ticketsHandler.Get))
 	mux.Handle("PATCH /api/tickets/{id}", ticketAuthed(ticketsHandler.Patch))
 	mux.Handle("DELETE /api/tickets/{id}", ticketAdmin(ticketsHandler.Delete))
@@ -597,6 +616,7 @@ func run(logger *slog.Logger) error {
 	mux.Handle("PUT /api/tickets/{id}/parent", ticketAuthed(ticketsHandler.SetParent))
 	mux.Handle("PUT /api/tickets/{id}/client", ticketCapability(capTicketsChangeClient, ticketsHandler.ChangeClient))
 	mux.Handle("PUT /api/tickets/{id}/place", ticketAuthed(ticketsHandler.SetPlace))
+	mux.Handle("PUT /api/tickets/{id}/area", ticketAuthed(ticketsHandler.Derive))
 	mux.Handle("POST /api/tickets/{id}/resolvers", ticketAuthed(ticketsHandler.AddResolver))
 	mux.Handle("POST /api/tickets/{id}/images", ticketAuthed(ticketsHandler.UploadImage))
 	mux.Handle("GET /api/tickets/{id}/images/{imageId}", ticketAuthed(ticketsHandler.ServeImage))

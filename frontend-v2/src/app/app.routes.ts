@@ -68,6 +68,11 @@ export const routes: Routes = [
         canActivate: [nocGuard],
         loadComponent: () => import('./features/map/map').then((module) => module.MapComponent),
       },
+      // Inventario (9.2): equipos por área.
+      {
+        path: 'inventory',
+        loadComponent: () => import('./features/inventory/inventory').then((module) => module.InventoryComponent),
+      },
       {
         path: 'reports',
         loadComponent: () => import('./features/reports/reports').then((module) => module.ReportsComponent),

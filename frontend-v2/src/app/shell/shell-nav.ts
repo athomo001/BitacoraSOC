@@ -14,8 +14,8 @@ export interface ShellNavItem {
   path: string;
   labelKey: MessageKey;
   icon: string;
-  /** Alt+<dígito>, ver ShellComponent.onKeydown */
-  shortcutDigit: '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9';
+  /** Alt+<dígito>, ver ShellComponent.onKeydown (ya no quedan dígitos libres: los nuevos van sin atajo). */
+  shortcutDigit?: '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9';
   /** Código de `system_features` que debe estar activo para mostrar la sección. */
   requiresFeature?: string;
   /** Necesita SOC o NOC encendido: con solo la Ticketera no aparece (pedido del dueño). */
@@ -40,6 +40,8 @@ export const SHELL_NAV_ITEMS: readonly ShellNavItem[] = [
   // Mapa (#24): localidades y sectores a revisar. Es del módulo NOC (territorio).
   { path: 'map', labelKey: 'nav.map', icon: 'map', shortcutDigit: '0', requiresNoc: true, requiresOperational: true },
   { path: 'directory', labelKey: 'nav.directory', icon: 'contacts', shortcutDigit: '4' },
+  // Inventario (spec/16 §4.2, 9.2): equipos por área; el servidor decide qué ve cada uno.
+  { path: 'inventory', labelKey: 'nav.inventory', icon: 'dns', requiresAreaOps: true },
   // Reportes (comentario del dueño #10): informes y boletines por correo. Es del núcleo:
   // SOC (incidentes de seguridad) y NOC (caída de un enlace) le avisan igual al cliente.
   { path: 'reports', labelKey: 'nav.reports', icon: 'outgoing_mail', shortcutDigit: '8', requiresOperational: true },

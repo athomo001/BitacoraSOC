@@ -17,6 +17,7 @@ WITH open_incidents AS (
          (array_agg(t.ticket_number || ' · ' || t.title ORDER BY t.created_at DESC))[1]::text AS last_title
   FROM tickets t
   WHERE t.territorial_unit_id IS NOT NULL AND t.merged_into_id IS NULL
+    AND (sqlc.narg('visible_areas')::uuid[] IS NULL OR t.area_id = ANY(sqlc.narg('visible_areas')::uuid[]) OR t.requested_area_id = ANY(sqlc.narg('visible_areas')::uuid[]))
     AND t.status NOT IN ('resolved', 'closed', 'cancelled')
   GROUP BY 1
 ), active_windows AS (
@@ -81,6 +82,7 @@ SELECT t.id, t.ticket_number, t.title, t.priority, t.status, a.name AS asset_nam
 FROM tickets t
 LEFT JOIN assets a ON a.id = t.asset_id
 WHERE t.territorial_unit_id = sqlc.arg('unit_id')::uuid AND t.merged_into_id IS NULL
+  AND (sqlc.narg('visible_areas')::uuid[] IS NULL OR t.area_id = ANY(sqlc.narg('visible_areas')::uuid[]) OR t.requested_area_id = ANY(sqlc.narg('visible_areas')::uuid[]))
   AND t.status NOT IN ('resolved', 'closed', 'cancelled')
 ORDER BY t.priority, t.created_at DESC
 LIMIT 50;

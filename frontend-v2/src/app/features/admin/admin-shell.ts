@@ -8,6 +8,7 @@ import { SetupService } from '../../core/setup/setup.service';
 import { AdminModulesComponent } from './admin-modules';
 import { AdminFeaturesComponent } from './admin-features';
 import { AdminTerritoryComponent } from './admin-territory';
+import { AdminInventoryComponent } from './admin-inventory';
 import { AdminOrganizationsComponent } from './admin-organizations';
 import { AdminTeamsComponent } from './admin-teams';
 import { AdminEscalationComponent } from './admin-escalation';
@@ -27,7 +28,7 @@ import { SystemFeaturesService } from '../../core/system-features/system-feature
 import '../../core/i18n/packs/admin';
 export type AdminSection =
   | 'access' | 'areas' | 'shifts' | 'checklist' | 'escalation' | 'tickets' | 'clientAlerts' | 'smtp' | 'reports'
-  | 'organizations' | 'territory' | 'teams'
+  | 'organizations' | 'territory' | 'inventory' | 'teams'
   | 'modules' | 'brand' | 'features' | 'backups' | 'audit' | 'complements';
 
 interface NavItem {
@@ -69,6 +70,7 @@ const NAV: readonly { labelKey: MessageKey; items: readonly NavItem[] }[] = [
     items: [
       { id: 'organizations', icon: 'business', labelKey: 'admin.nav.organizations' },
       { id: 'territory', icon: 'map', labelKey: 'admin.nav.territory', requiresModule: 'noc' },
+      { id: 'inventory', icon: 'dns', labelKey: 'admin.nav.inventory' },
       { id: 'teams', icon: 'groups', labelKey: 'admin.nav.teams' },
     ],
   },
@@ -111,7 +113,7 @@ function normalize(text: string): string {
   selector: 'app-admin-shell',
   standalone: true,
   imports: [
-    MatIconModule, AdminModulesComponent, AdminBrandComponent, AdminFeaturesComponent, AdminTerritoryComponent, AdminOrganizationsComponent, AdminTeamsComponent,
+    MatIconModule, AdminModulesComponent, AdminBrandComponent, AdminFeaturesComponent, AdminTerritoryComponent, AdminInventoryComponent, AdminOrganizationsComponent, AdminTeamsComponent,
     AdminEscalationComponent, AdminShiftsComponent, AdminSmtpComponent, AdminReportsComponent, AdminBackupsComponent, AdminAuditComponent,
     AdminAccessComponent, AdminChecklistComponent, AdminComplementsComponent, AdminClientAlertsComponent, AdminTicketsComponent, AdminAreasComponent,
   ],
@@ -159,6 +161,7 @@ function normalize(text: string): string {
           @case ('reports') { <app-admin-reports /> }
           @case ('organizations') { <app-admin-organizations /> }
           @case ('territory') { <app-admin-territory /> }
+          @case ('inventory') { <app-admin-inventory /> }
           @case ('teams') { <app-admin-teams /> }
           @case ('brand') { <app-admin-brand /> }
           @case ('modules') { <app-admin-modules /> }

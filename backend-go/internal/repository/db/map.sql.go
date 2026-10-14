@@ -27,6 +27,7 @@ WITH open_incidents AS (
          (array_agg(t.ticket_number || ' · ' || t.title ORDER BY t.created_at DESC))[1]::text AS last_title
   FROM tickets t
   WHERE t.territorial_unit_id IS NOT NULL AND t.merged_into_id IS NULL
+    AND ($1::uuid[] IS NULL OR t.area_id = ANY($1::uuid[]) OR t.requested_area_id = ANY($1::uuid[]))
     AND t.status NOT IN ('resolved', 'closed', 'cancelled')
   GROUP BY 1
 ), active_windows AS (
@@ -76,8 +77,8 @@ type ListMapPointsRow struct {
 // ella. Un incidente o una ventana sobre un activo cuenta para la localidad
 // del activo; un ticket, por su lugar (000038). El país solo aparece si
 // tiene algo abierto.
-func (q *Queries) ListMapPoints(ctx context.Context) ([]ListMapPointsRow, error) {
-	rows, err := q.db.Query(ctx, listMapPoints)
+func (q *Queries) ListMapPoints(ctx context.Context, visibleAreas []uuid.UUID) ([]ListMapPointsRow, error) {
+	rows, err := q.db.Query(ctx, listMapPoints, visibleAreas)
 	if err != nil {
 		return nil, err
 	}
@@ -196,10 +197,16 @@ SELECT t.id, t.ticket_number, t.title, t.priority, t.status, a.name AS asset_nam
 FROM tickets t
 LEFT JOIN assets a ON a.id = t.asset_id
 WHERE t.territorial_unit_id = $1::uuid AND t.merged_into_id IS NULL
+  AND ($2::uuid[] IS NULL OR t.area_id = ANY($2::uuid[]) OR t.requested_area_id = ANY($2::uuid[]))
   AND t.status NOT IN ('resolved', 'closed', 'cancelled')
 ORDER BY t.priority, t.created_at DESC
 LIMIT 50
 `
+
+type ListMapUnitTicketsParams struct {
+	UnitID       uuid.UUID   `json:"unit_id"`
+	VisibleAreas []uuid.UUID `json:"visible_areas"`
+}
 
 type ListMapUnitTicketsRow struct {
 	ID           uuid.UUID    `json:"id"`
@@ -211,8 +218,8 @@ type ListMapUnitTicketsRow struct {
 }
 
 // Tickets abiertos con lugar en la localidad (000038), los más urgentes primero.
-func (q *Queries) ListMapUnitTickets(ctx context.Context, unitID uuid.UUID) ([]ListMapUnitTicketsRow, error) {
-	rows, err := q.db.Query(ctx, listMapUnitTickets, unitID)
+func (q *Queries) ListMapUnitTickets(ctx context.Context, arg ListMapUnitTicketsParams) ([]ListMapUnitTicketsRow, error) {
+	rows, err := q.db.Query(ctx, listMapUnitTickets, arg.UnitID, arg.VisibleAreas)
 	if err != nil {
 		return nil, err
 	}

@@ -14,6 +14,9 @@ import (
 type Querier interface {
 	AckClientAlert(ctx context.Context, arg AckClientAlertParams) error
 	AcknowledgeShiftClosure(ctx context.Context, arg AcknowledgeShiftClosureParams) (ShiftClosure, error)
+	AddAssetEvent(ctx context.Context, arg AddAssetEventParams) error
+	AddAssetIP(ctx context.Context, arg AddAssetIPParams) error
+	AddAssetResponsible(ctx context.Context, arg AddAssetResponsibleParams) error
 	AddEscalationIncidentNote(ctx context.Context, arg AddEscalationIncidentNoteParams) (EscalationIncidentNote, error)
 	AddEscalationPoolMember(ctx context.Context, arg AddEscalationPoolMemberParams) error
 	AddGroupAreasByCode(ctx context.Context, arg AddGroupAreasByCodeParams) (int64, error)
@@ -42,6 +45,8 @@ type Querier interface {
 	ClaimShiftReminderSend(ctx context.Context, arg ClaimShiftReminderSendParams) (int64, error)
 	// El comentario reclama las imágenes que subió su autor en ese ticket.
 	ClaimTicketImages(ctx context.Context, arg ClaimTicketImagesParams) (int64, error)
+	ClearAssetIPs(ctx context.Context, assetID uuid.UUID) error
+	ClearAssetResponsibles(ctx context.Context, assetID uuid.UUID) error
 	ClearEscalationPoolMembers(ctx context.Context, poolID uuid.UUID) error
 	ClearGroupAreas(ctx context.Context, permissionGroupID uuid.UUID) error
 	ClearPasswordResetToken(ctx context.Context, id uuid.UUID) error
@@ -51,6 +56,7 @@ type Querier interface {
 	ClearPreferredUserChannel(ctx context.Context, userID pgtype.UUID) error
 	ClearTeamMembers(ctx context.Context, teamID uuid.UUID) error
 	ClearTemplateFromShifts(ctx context.Context, checklistTemplateStartID pgtype.UUID) error
+	ClearTicketResolvers(ctx context.Context, ticketID uuid.UUID) error
 	CloseEscalationIncident(ctx context.Context, arg CloseEscalationIncidentParams) (int64, error)
 	// Qué módulos quedan encendidos lo guarda SetModuleFlags.
 	CompleteSetup(ctx context.Context) (AppConfig, error)
@@ -77,6 +83,7 @@ type Querier interface {
 	CountUsers(ctx context.Context) (int64, error)
 	CreateArea(ctx context.Context, arg CreateAreaParams) (Area, error)
 	CreateAsset(ctx context.Context, arg CreateAssetParams) (uuid.UUID, error)
+	CreateAssetRequest(ctx context.Context, arg CreateAssetRequestParams) (uuid.UUID, error)
 	CreateBackupRun(ctx context.Context, arg CreateBackupRunParams) (BackupRun, error)
 	CreateBackupRunWithSource(ctx context.Context, arg CreateBackupRunWithSourceParams) (BackupRun, error)
 	CreateChecklistEntry(ctx context.Context, arg CreateChecklistEntryParams) (Entry, error)
@@ -102,6 +109,7 @@ type Querier interface {
 	CreateGuardSlot(ctx context.Context, arg CreateGuardSlotParams) (RotationSlot, error)
 	// Una guardia nueva (9e): el equipo "oncall" con su área dueña.
 	CreateGuardTeam(ctx context.Context, arg CreateGuardTeamParams) (uuid.UUID, error)
+	CreateInventoryAsset(ctx context.Context, arg CreateInventoryAssetParams) (uuid.UUID, error)
 	CreateLevel(ctx context.Context, arg CreateLevelParams) (Level, error)
 	CreateLogSource(ctx context.Context, arg CreateLogSourceParams) (CatalogLogSource, error)
 	CreateMaintenanceWindow(ctx context.Context, arg CreateMaintenanceWindowParams) (MaintenanceWindow, error)
@@ -156,6 +164,8 @@ type Querier interface {
 	// usuario que alguna vez hizo algo auditado rompería esa FK. Mismo patrón
 	// `active` que ya usa el resto del esquema (organizations, teams, etc.).
 	DeactivateUser(ctx context.Context, id uuid.UUID) error
+	DecideAssetRequest(ctx context.Context, arg DecideAssetRequestParams) error
+	DeleteAsset(ctx context.Context, id uuid.UUID) error
 	DeleteAssetPolicies(ctx context.Context, assetID pgtype.UUID) error
 	DeleteAssetRaci(ctx context.Context, assetID pgtype.UUID) error
 	DeleteAssetWithoutHistory(ctx context.Context, arg DeleteAssetWithoutHistoryParams) (int64, error)
@@ -215,6 +225,8 @@ type Querier interface {
 	// POST /api/auth/logout — revoca un JTI puntual sin afectar otras sesiones
 	// del mismo usuario.
 	DenylistToken(ctx context.Context, arg DenylistTokenParams) error
+	// Derivar a otra área: entra a esa cola como nuevo, sin equipo ni responsable.
+	DeriveTicket(ctx context.Context, arg DeriveTicketParams) error
 	DisableMFA(ctx context.Context, id uuid.UUID) error
 	EnableMFA(ctx context.Context, id uuid.UUID) error
 	// app_config es singleton pero no viene precargado por la migración inicial
@@ -252,6 +264,9 @@ type Querier interface {
 	GetAppConfig(ctx context.Context) (AppConfig, error)
 	GetAsset(ctx context.Context, id uuid.UUID) (GetAssetRow, error)
 	GetAssetForResolve(ctx context.Context, id uuid.UUID) (GetAssetForResolveRow, error)
+	GetAssetIDByCode(ctx context.Context, code string) (uuid.UUID, error)
+	GetAssetKind(ctx context.Context, code string) (AssetKind, error)
+	GetAssetRequest(ctx context.Context, id uuid.UUID) (AssetRequest, error)
 	GetAttachment(ctx context.Context, id uuid.UUID) (EntryAttachment, error)
 	GetBackupConfig(ctx context.Context) (BackupConfig, error)
 	GetBackupRun(ctx context.Context, id uuid.UUID) (BackupRun, error)
@@ -276,6 +291,7 @@ type Querier interface {
 	GetEscalationPool(ctx context.Context, id uuid.UUID) (EscalationPool, error)
 	GetGuardCycle(ctx context.Context, id uuid.UUID) (GetGuardCycleRow, error)
 	GetGuardSlot(ctx context.Context, id uuid.UUID) (RotationSlot, error)
+	GetInventoryAsset(ctx context.Context, id uuid.UUID) (GetInventoryAssetRow, error)
 	GetLatestShiftCheck(ctx context.Context, workShiftID uuid.UUID) (ShiftCheck, error)
 	GetLatestShiftClosure(ctx context.Context) (ShiftClosure, error)
 	// Checklist de inicio más reciente del mismo turno dentro de la ventana
@@ -324,6 +340,8 @@ type Querier interface {
 	// descendientes con el path viejo — ver RebaseTerritorialSubtree.
 	GetTerritorialUnitPathByCodeForUpdate(ctx context.Context, code string) (string, error)
 	GetTicket(ctx context.Context, id uuid.UUID) (Ticket, error)
+	// Tickets por área (000039): de qué cola es y qué área lo pidió.
+	GetTicketAreas(ctx context.Context, id uuid.UUID) (GetTicketAreasRow, error)
 	GetTicketByNumber(ctx context.Context, ticketNumber string) (Ticket, error)
 	GetTicketByNumberForMerge(ctx context.Context, ticketNumber string) (Ticket, error)
 	GetTicketImage(ctx context.Context, arg GetTicketImageParams) (GetTicketImageRow, error)
@@ -392,6 +410,15 @@ type Querier interface {
 	ListAreas(ctx context.Context) ([]Area, error)
 	// ===== Administración → Áreas y niveles (spec/16, 9b) =====
 	ListAreasWithUsage(ctx context.Context) ([]ListAreasWithUsageRow, error)
+	ListAssetEvents(ctx context.Context, assetID uuid.UUID) ([]ListAssetEventsRow, error)
+	ListAssetIPs(ctx context.Context, assetID uuid.UUID) ([]ListAssetIPsRow, error)
+	// Inventario (spec/16 §4.2, 9.2, 000040).
+	ListAssetKinds(ctx context.Context) ([]AssetKind, error)
+	// Las áreas que trabajan un equipo: la dueña y las responsables.
+	ListAssetResponsibleAreas(ctx context.Context, assetID uuid.UUID) ([]uuid.UUID, error)
+	ListAssetResponsibles(ctx context.Context, assetID uuid.UUID) ([]ListAssetResponsiblesRow, error)
+	// Los tickets que tuvieron este equipo como lugar.
+	ListAssetTickets(ctx context.Context, assetID uuid.UUID) ([]ListAssetTicketsRow, error)
 	// ip_address es INET: se lee y escribe como texto (::text / ::inet) para que
 	// el tipo Go sea string y Postgres valide el formato (IPv4/IPv6) al insertar.
 	ListAssets(ctx context.Context, arg ListAssetsParams) ([]ListAssetsRow, error)
@@ -484,6 +511,8 @@ type Querier interface {
 	// (sendEscalationScheduleInternal del legacy).
 	ListGuardSlotsForRange(ctx context.Context, arg ListGuardSlotsForRangeParams) ([]ListGuardSlotsForRangeRow, error)
 	ListHandoverOnCall(ctx context.Context, arg ListHandoverOnCallParams) ([]ListHandoverOnCallRow, error)
+	// La lista: los equipos de las áreas dadas (dueña o responsable); nil = todos.
+	ListInventory(ctx context.Context, arg ListInventoryParams) ([]ListInventoryRow, error)
 	// Mi equipo: la jefatura de área (spec/16 §3.5, 9d). Un grupo con la
 	// capacidad area:lead es jefe de las áreas de ese grupo.
 	ListLeadAreas(ctx context.Context, userID uuid.UUID) ([]ListLeadAreasRow, error)
@@ -496,13 +525,13 @@ type Querier interface {
 	// ella. Un incidente o una ventana sobre un activo cuenta para la localidad
 	// del activo; un ticket, por su lugar (000038). El país solo aparece si
 	// tiene algo abierto.
-	ListMapPoints(ctx context.Context) ([]ListMapPointsRow, error)
+	ListMapPoints(ctx context.Context, visibleAreas []uuid.UUID) ([]ListMapPointsRow, error)
 	// Incidentes abiertos de una localidad, directos o sobre sus activos.
 	ListMapUnitIncidents(ctx context.Context, unitID uuid.UUID) ([]ListMapUnitIncidentsRow, error)
 	// Equipos que cubren la localidad: los de ella o de un nivel de arriba.
 	ListMapUnitTeams(ctx context.Context, unitID uuid.UUID) ([]ListMapUnitTeamsRow, error)
 	// Tickets abiertos con lugar en la localidad (000038), los más urgentes primero.
-	ListMapUnitTickets(ctx context.Context, unitID uuid.UUID) ([]ListMapUnitTicketsRow, error)
+	ListMapUnitTickets(ctx context.Context, arg ListMapUnitTicketsParams) ([]ListMapUnitTicketsRow, error)
 	// Ventanas de mantenimiento activas ahora en una localidad o sus activos.
 	ListMapUnitWindows(ctx context.Context, unitID uuid.UUID) ([]ListMapUnitWindowsRow, error)
 	// Miembros activos de los equipos a resolver, con lo que la tarjeta necesita
@@ -522,6 +551,8 @@ type Querier interface {
 	ListOrganizationTypes(ctx context.Context) ([]ListOrganizationTypesRow, error)
 	// clients_only: los de tipos que cuentan como cliente (Cliente, Mandante…).
 	ListOrganizations(ctx context.Context, arg ListOrganizationsParams) ([]ListOrganizationsRow, error)
+	// Solicitudes pendientes de los equipos de las áreas dadas (nil = todas, para el admin).
+	ListPendingAssetRequests(ctx context.Context, areas []uuid.UUID) ([]ListPendingAssetRequestsRow, error)
 	ListPendingShiftClosures(ctx context.Context) ([]ShiftClosure, error)
 	ListPermissionGroups(ctx context.Context, active pgtype.Bool) ([]PermissionGroup, error)
 	ListPersonOpenTickets(ctx context.Context, arg ListPersonOpenTicketsParams) ([]ListPersonOpenTicketsRow, error)
@@ -547,6 +578,7 @@ type Querier interface {
 	ListReportHistory(ctx context.Context, arg ListReportHistoryParams) ([]ListReportHistoryRow, error)
 	// ===== Tipos de operación del informe de incidente =====
 	ListReportOperationTypes(ctx context.Context) ([]ReportOperationType, error)
+	ListResponsibilityTypes(ctx context.Context) ([]ResponsibilityType, error)
 	// Fase 8 del roadmap (spec/02-alcance-y-roadmap.md): motor de rotación
 	// unificado (rotation_cycles/rotation_slots/rotation_overrides) y work_shifts.
 	// GET /api/rotation-slots, POST /api/rotation-slots y PATCH
@@ -587,6 +619,8 @@ type Querier interface {
 	// frontend lo indenta por nlevel sin reconstruir nada). child_count deja al
 	// frontend saber si un nodo es expandible sin pedir otro nivel a ciegas.
 	ListTerritorialUnits(ctx context.Context, arg ListTerritorialUnitsParams) ([]ListTerritorialUnitsRow, error)
+	// Las áreas activas, en orden, con su perfil (las de Gestión piden, no resuelven).
+	ListTicketAreas(ctx context.Context) ([]ListTicketAreasRow, error)
 	// Personas a las que se puede sumar como resolutor (usuarios activos que
 	// operan: admin y analistas).
 	ListTicketAssignees(ctx context.Context) ([]ListTicketAssigneesRow, error)
@@ -628,6 +662,8 @@ type Querier interface {
 	ListUserModuleAreaCodes(ctx context.Context, userID uuid.UUID) ([]string, error)
 	ListUserPermissionGroups(ctx context.Context, userID uuid.UUID) ([]PermissionGroup, error)
 	ListUserProfiles(ctx context.Context, userID uuid.UUID) ([]string, error)
+	// Tickets por área (9.1): las áreas y perfiles de los grupos activos de un usuario.
+	ListUserTicketGroups(ctx context.Context, userID uuid.UUID) ([]ListUserTicketGroupsRow, error)
 	// ?role=&active= son opcionales (04-contratos-api.md) — sqlc.narg + el
 	// patrón "columna = $n OR $n IS NULL" evita escribir dos queries a mano.
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
@@ -682,6 +718,7 @@ type Querier interface {
 	PatchNotificationSchedule(ctx context.Context, arg PatchNotificationScheduleParams) (WorkShiftNotificationSchedule, error)
 	// HU-5: pausar sin borrar la fila (conserva el historial del rol).
 	PatchRotationSlotPause(ctx context.Context, arg PatchRotationSlotPauseParams) (RotationSlot, error)
+	PendingAssetRequestExists(ctx context.Context, assetID uuid.UUID) (bool, error)
 	// Prueba mínima de conectividad real a Postgres para /api/health/ready
 	// (más que un simple pgxpool.Ping(): confirma que el pool puede ejecutar SQL
 	// de verdad contra la base, no solo abrir el socket TCP).
@@ -726,6 +763,7 @@ type Querier interface {
 	ResetTicketResolutionSLANotified(ctx context.Context, id uuid.UUID) error
 	RetryTicketMail(ctx context.Context, arg RetryTicketMailParams) (int64, error)
 	RotatePublicShareLink(ctx context.Context, arg RotatePublicShareLinkParams) (PublicShareLink, error)
+	SetAssetActive(ctx context.Context, arg SetAssetActiveParams) error
 	SetBrandingFavicon(ctx context.Context, arg SetBrandingFaviconParams) error
 	SetBrandingFont(ctx context.Context, arg SetBrandingFontParams) error
 	SetBrandingLogo(ctx context.Context, arg SetBrandingLogoParams) error
@@ -804,6 +842,7 @@ type Querier interface {
 	UpdateEscalationPool(ctx context.Context, arg UpdateEscalationPoolParams) (EscalationPool, error)
 	UpdateGuardCycle(ctx context.Context, arg UpdateGuardCycleParams) (RotationCycle, error)
 	UpdateGuardSlot(ctx context.Context, arg UpdateGuardSlotParams) (RotationSlot, error)
+	UpdateInventoryAsset(ctx context.Context, arg UpdateInventoryAssetParams) error
 	UpdateLogSource(ctx context.Context, arg UpdateLogSourceParams) (CatalogLogSource, error)
 	UpdateMyProfile(ctx context.Context, arg UpdateMyProfileParams) (User, error)
 	UpdateOrganization(ctx context.Context, arg UpdateOrganizationParams) (Organization, error)
@@ -834,6 +873,8 @@ type Querier interface {
 	// reporte de cierre y activo. Lo que no se manda queda como estaba.
 	UpdateWorkShift(ctx context.Context, arg UpdateWorkShiftParams) (WorkShift, error)
 	UpsertAdminNotes(ctx context.Context, arg UpsertAdminNotesParams) (AdminNote, error)
+	// Administración → Inventario: tipos y sus campos.
+	UpsertAssetKind(ctx context.Context, arg UpsertAssetKindParams) (AssetKind, error)
 	// Un POST sobre el mismo (userId, assignedDate) corrige la condición en vez
 	// de fallar con 409 — mismo criterio "upsert" que UpsertTeamCoverage
 	// (teams.sql) de la Fase 6, más amigable para el admin que corrige un día.
@@ -849,6 +890,7 @@ type Querier interface {
 	// resetear en vez de incrementar (ver internal/service/ratelimit).
 	UpsertLoginAttempt(ctx context.Context, ipAddress string) (LoginRateLimit, error)
 	UpsertPersonalNotes(ctx context.Context, arg UpsertPersonalNotesParams) (PersonalNote, error)
+	UpsertResponsibilityType(ctx context.Context, arg UpsertResponsibilityTypeParams) (ResponsibilityType, error)
 	// Guardar no borra el resultado de la última prueba: sigue siendo cierto
 	// para la configuración con la que se hizo hasta que se pruebe de nuevo.
 	UpsertSMTPConfig(ctx context.Context, arg UpsertSMTPConfigParams) error

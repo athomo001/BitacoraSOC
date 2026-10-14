@@ -51,8 +51,8 @@ type domain struct {
 var domains = []domain{
 	{"Usuarios, acceso y permisos", "Cuentas, sesiones revocadas, llaves de API y los grupos de permisos que acotan qué módulos y capacidades tiene cada usuario.",
 		[]string{"users", "login_rate_limits", "token_denylist", "api_keys", "permission_groups", "permission_group_areas", "areas", "levels", "user_permission_groups"}},
-	{"Territorio, organizaciones y activos", "Árbol territorial genérico (país → región → zona → sitio), organizaciones con tipos configurables, sus servicios y los activos.",
-		[]string{"territorial_units", "organization_types", "organizations", "services", "catalog_log_sources", "assets"}},
+	{"Territorio, organizaciones y activos", "Árbol territorial genérico (país → región → zona → sitio), organizaciones con tipos configurables, sus servicios y los activos (el Inventario: tipos con sus campos, IP, responsables, historial y solicitudes de baja).",
+		[]string{"territorial_units", "organization_types", "organizations", "services", "catalog_log_sources", "assets", "asset_kinds", "responsibility_types", "asset_ips", "asset_responsibles", "asset_events", "asset_requests"}},
 	{"Directorio de contactos", "Personas externas e internas a las que se avisa, con sus canales.",
 		[]string{"contacts", "contact_channels"}},
 	{"Ticketera", "Tickets con SLA, comentarios, tareas con tiempo, resolutores, imágenes, padre/hijo y unidos.",

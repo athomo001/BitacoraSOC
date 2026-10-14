@@ -2,7 +2,7 @@
 
 > Generado por `backend-go/cmd/er-docs` desde `backend-go/sql/schema/0001_init_schema.sql`, el esquema que usa sqlc, con todas las migraciones aplicadas. **No se edita a mano**: si cambia el esquema, se regenera con `go run ./cmd/er-docs` desde `backend-go/`.
 
-78 tablas en PostgreSQL, agrupadas en 13 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
+84 tablas en PostgreSQL, agrupadas en 13 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
 
 - Cada entidad muestra todas sus columnas salvo `created_at` y `updated_at`. `PK` clave primaria, `FK` referencia a otra tabla, `UK` valor único.
 - Las tablas de otros dominios aparecen como cajas sin columnas: son la misma tabla, dibujada donde se une.
@@ -14,7 +14,7 @@ Correspondencia con el legacy (MongoDB): [modelo-er-legacy-2.0.md](modelo-er-leg
 ## Índice
 
 1. [Usuarios, acceso y permisos](#1-usuarios-acceso-y-permisos) — 9 tablas
-2. [Territorio, organizaciones y activos](#2-territorio-organizaciones-y-activos) — 6 tablas
+2. [Territorio, organizaciones y activos](#2-territorio-organizaciones-y-activos) — 12 tablas
 3. [Directorio de contactos](#3-directorio-de-contactos) — 2 tablas
 4. [Ticketera](#4-ticketera) — 7 tablas
 5. [Equipos y escalamiento](#5-equipos-y-escalamiento) — 13 tablas
@@ -127,7 +127,7 @@ erDiagram
 
 ## 2. Territorio, organizaciones y activos
 
-Árbol territorial genérico (país → región → zona → sitio), organizaciones con tipos configurables, sus servicios y los activos.
+Árbol territorial genérico (país → región → zona → sitio), organizaciones con tipos configurables, sus servicios y los activos (el Inventario: tipos con sus campos, IP, responsables, historial y solicitudes de baja).
 
 ```mermaid
 erDiagram
@@ -191,17 +191,88 @@ erDiagram
         uuid log_source_id FK
         uuid parent_asset_id FK
         boolean active
+        uuid area_id FK
+        text kind_code FK
+        text model
+        text serial
+        text rack
+        text rack_position
+        jsonb attributes
+    }
+    ASSET_KINDS {
+        text code PK
+        text name
+        text icon
+        asset_type base_type
+        jsonb fields
+        int sort_order
+        boolean active
+    }
+    RESPONSIBILITY_TYPES {
+        text code PK
+        text name
+        int sort_order
+        boolean active
+    }
+    ASSET_IPS {
+        uuid id PK
+        uuid asset_id FK
+        text kind
+        inet address
+        text note
+        int sort_order
+    }
+    ASSET_RESPONSIBLES {
+        uuid id PK
+        uuid asset_id FK
+        text type_code FK
+        uuid area_id FK
+        uuid user_id FK
+        uuid organization_id FK
+        int sort_order
+    }
+    ASSET_EVENTS {
+        uuid id PK
+        uuid asset_id FK
+        text kind
+        text description
+        timestamptz happened_at
+        uuid user_id FK
+        uuid ticket_id FK
+    }
+    ASSET_REQUESTS {
+        uuid id PK
+        uuid asset_id FK
+        text action
+        text reason
+        uuid requested_by FK
+        text status
+        uuid decided_by FK
+        timestamptz decided_at
+        text decision_note
     }
 
+    AREAS |o--o{ ASSET_RESPONSIBLES : "area_id"
+    AREAS ||--o{ ASSETS : "area_id"
     ASSETS |o--o{ ASSETS : "parent_asset_id"
+    ASSETS ||--o{ ASSET_EVENTS : "asset_id"
+    ASSETS ||--o{ ASSET_IPS : "asset_id"
+    ASSETS ||--o{ ASSET_REQUESTS : "asset_id"
+    ASSETS ||--o{ ASSET_RESPONSIBLES : "asset_id"
+    ASSET_KINDS |o--o{ ASSETS : "kind_code"
     CATALOG_LOG_SOURCES |o--o{ ASSETS : "log_source_id"
     ORGANIZATIONS |o--o{ ASSETS : "client_id"
     ORGANIZATIONS |o--o{ ASSETS : "contractor_id"
+    ORGANIZATIONS |o--o{ ASSET_RESPONSIBLES : "organization_id"
     ORGANIZATIONS |o--o{ ORGANIZATIONS : "via_organization_id"
     ORGANIZATIONS ||--o{ SERVICES : "organization_id"
     ORGANIZATION_TYPES ||--o{ ORGANIZATIONS : "type"
+    RESPONSIBILITY_TYPES ||--o{ ASSET_RESPONSIBLES : "type_code"
+    TERRITORIAL_UNITS |o--o{ ASSETS : "territorial_unit_id"
     TERRITORIAL_UNITS |o--o{ TERRITORIAL_UNITS : "parent_id"
-    TERRITORIAL_UNITS ||--o{ ASSETS : "territorial_unit_id"
+    TICKETS |o--o{ ASSET_EVENTS : "ticket_id"
+    USERS |o--o{ ASSET_EVENTS : "user_id"
+    USERS |o--o{ ASSET_RESPONSIBLES : "user_id"
 ```
 
 ---
@@ -291,6 +362,8 @@ erDiagram
         timestamptz sla_resolution_warn_notified_at
         timestamptz sla_resolution_breach_notified_at
         uuid territorial_unit_id FK
+        uuid area_id FK
+        uuid requested_area_id FK
     }
     TICKET_COMMENTS {
         uuid id PK
@@ -382,6 +455,8 @@ erDiagram
         uuid created_by FK
     }
 
+    AREAS ||--o{ TICKETS : "area_id"
+    AREAS ||--o{ TICKETS : "requested_area_id"
     ASSETS |o--o{ TICKETS : "asset_id"
     CONTACTS |o--o{ TICKETS : "assigned_contact_id"
     ORGANIZATIONS ||--o{ TICKETS : "client_id"

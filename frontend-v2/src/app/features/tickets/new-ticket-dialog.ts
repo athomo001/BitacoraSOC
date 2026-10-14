@@ -7,7 +7,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
 import { Organization, OrganizationsService, TeamSummary } from '../../core/organizations/organizations.service';
-import { Impact, TicketPlace, TicketType, TicketsService, Urgency } from '../../core/tickets/tickets.service';
+import { Impact, TicketPlace, TicketScope, TicketType, TicketsService, Urgency } from '../../core/tickets/tickets.service';
 import { PRIORITY_SHORT, PRIORITY_TONE, priorityOf, resolverTeams } from '../../core/tickets/ticket-view';
 import { ModuleAccessService } from '../../core/auth/module-access.service';
 import { MatIconModule } from '@angular/material/icon';
@@ -44,6 +44,18 @@ export interface NewChildData {
           <button type="button" class="seg" [attr.aria-pressed]="type() === 'service_request'" (click)="type.set('service_request')">{{ i18n.t('tickets.type.service_request') }}</button>
           <span class="nt__hint">{{ i18n.t(type() === 'incident' ? 'tickets.newDialog.hintIncident' : 'tickets.newDialog.hintRequest') }}</span>
         </div>
+        <!-- Tickets por área (9.1): parte en la del usuario; otra = pedirle algo a esa área. -->
+        @if (resolving().length > 1) {
+          <div class="field">
+            <span>{{ i18n.t('tickets.area.resolves') }}</span>
+            <div class="nt__row">
+              @for (a of resolving(); track a.code) {
+                <button type="button" class="seg" [attr.aria-pressed]="area() === a.code" (click)="setArea(a.code)">{{ a.name }}@if (isMine(a.code)) { {{ i18n.t('tickets.area.mine') }} }</button>
+              }
+            </div>
+            @if (areaHint(); as h) { <span class="nt__hint">{{ h }}</span> }
+          </div>
+        }
         <div class="field-grid">
           <label class="field">
             <span>{{ i18n.t('tickets.newDialog.client') }}</span>
@@ -56,7 +68,7 @@ export interface NewChildData {
             <span>{{ i18n.t('tickets.newDialog.team') }}</span>
             <select name="teamId" [(ngModel)]="teamId">
               <option value="">{{ i18n.t('tickets.newDialog.teamLater') }}</option>
-              @for (tm of teams(); track tm.id) { <option [value]="tm.id">{{ tm.name }}</option> }
+              @for (tm of areaTeams(); track tm.id) { <option [value]="tm.id">{{ tm.name }}</option> }
             </select>
           </label>
           <label class="field">
@@ -227,6 +239,28 @@ export class NewTicketDialogComponent implements OnInit {
   protected description = '';
   protected readonly place = signal<{ territorialUnitId?: string; assetId?: string; place: TicketPlace } | null>(null);
   protected readonly label = placeLabel;
+  protected readonly areaScope = signal<TicketScope | null>(null);
+  protected readonly area = signal('');
+  /** Las áreas que reciben tickets. */
+  protected readonly resolving = computed(() => (this.areaScope()?.areas ?? []).filter((a) => a.resolves));
+  protected readonly areaTeams = computed(() => {
+    const id = this.resolving().find((a) => a.code === this.area())?.id;
+    return this.teams().filter((tm) => !tm.areaId || !id || tm.areaId === id);
+  });
+  protected readonly areaHint = computed(() => {
+    const a = this.resolving().find((x) => x.code === this.area());
+    if (!a || !this.areaScope()?.myAreas.length) return null;
+    return this.isMine(a.code) ? this.i18n.t('tickets.area.hintMine') : this.i18n.tf('tickets.area.hintOther', a.name);
+  });
+
+  protected isMine(code: string): boolean {
+    return !!this.areaScope()?.myAreas.some((a) => a.code === code);
+  }
+
+  protected setArea(code: string): void {
+    this.area.set(code);
+    if (this.teamId && !this.areaTeams().some((tm) => tm.id === this.teamId)) this.teamId = '';
+  }
 
   protected readonly priority = computed(() => priorityOf(this.impact(), this.urgency()));
   protected readonly priorityKey = computed(() => `tickets.priority.${this.priority()}` as MessageKey);
@@ -240,6 +274,14 @@ export class NewTicketDialogComponent implements OnInit {
       this.teams.set(resolverTeams(teams));
     } catch (error) {
       this.error.set(problemDetail(error, this.i18n.t('tickets.error.load')));
+    }
+    // Áreas (9.1): sin ellas el ticket queda en la del usuario (lo decide el servidor).
+    try {
+      const scope = await this.api.scope();
+      this.areaScope.set(scope);
+      this.area.set(scope.defaultArea);
+    } catch {
+      this.areaScope.set(null);
     }
   }
 
@@ -265,6 +307,7 @@ export class NewTicketDialogComponent implements OnInit {
         impact: this.impact(), urgency: this.urgency(), title: this.title.trim(), description: this.description.trim(),
         parentId: this.parent?.parentId,
         territorialUnitId: this.place()?.territorialUnitId, assetId: this.place()?.assetId,
+        area: this.area() || undefined,
       });
       this.dialogRef.close(created.id);
     } catch (error) {

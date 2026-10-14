@@ -53,10 +53,30 @@ export interface Ticket {
   childCount: number;
   /** Lugar del ticket (#24): localidad y, si se eligió, el activo. */
   place?: TicketPlace;
+  /** Tickets por área (9.1): la cola que lo resuelve y el área que lo pidió. */
+  areaId: string;
+  areaCode: string;
+  areaName: string;
+  requestedAreaId: string;
+  requestedAreaCode: string;
+  requestedAreaName: string;
+  /** Solo en el detalle: quién lo creó. */
+  createdByName?: string;
+  /** false: lo pidió el área del usuario; lo ve y comenta, lo trabaja otra área. */
+  canWork: boolean;
 }
 
+export interface TicketArea { id: string; code: string; name: string; resolves: boolean; }
+
+/** Las colas del usuario: sus áreas, todas las que reciben tickets y si ve todas (admin o Gestión). */
+export interface TicketScope { all: boolean; myAreas: TicketArea[]; areas: TicketArea[]; defaultArea: string; }
+
+/** mine: la cola de mis áreas · asked: lo que mis áreas pidieron a otras · all: todas. */
+export type TicketQueue = 'mine' | 'asked' | 'all';
+
 export interface TicketPlace {
-  territorialUnitId: string;
+  /** Sin localidad cuando el lugar es un equipo que no la tiene. */
+  territorialUnitId?: string;
   name: string;
   parentName?: string;
   assetId?: string;
@@ -111,7 +131,7 @@ export interface PublicTicket {
   mergedInto?: string;
 }
 
-export interface TicketFilters { ticketType?: TicketType; openOnly?: boolean; q?: string; }
+export interface TicketFilters { ticketType?: TicketType; openOnly?: boolean; q?: string; queue?: TicketQueue; }
 
 export interface NewTicket {
   ticketType: TicketType;
@@ -119,6 +139,8 @@ export interface NewTicket {
   clientId: string;
   /** Opcional: el equipo resolutor se puede elegir después. */
   teamId?: string;
+  /** Código del área que lo resuelve (vacío = la del usuario). */
+  area?: string;
   impact: Impact;
   urgency: Urgency;
   title: string;
@@ -196,6 +218,7 @@ export class TicketsService {
     if (filters.ticketType) params['ticketType'] = filters.ticketType;
     if (filters.openOnly) params['openOnly'] = 'true';
     if (filters.q?.trim()) params['q'] = filters.q.trim();
+    if (filters.queue) params['queue'] = filters.queue;
     return (await firstValueFrom(this.http.get<ApiEnvelope<TicketList>>('/api/tickets', { params }))).data;
   }
 
@@ -259,6 +282,22 @@ export class TicketsService {
   /** Corrige el cliente (admin o permiso tickets:change_client); renueva enlace público y PIN. */
   async changeClient(id: string, clientId: string, reason: string): Promise<TicketDetail> {
     return (await firstValueFrom(this.http.put<ApiEnvelope<TicketDetail>>(`/api/tickets/${id}/client`, { clientId, reason }))).data;
+  }
+
+  private scopeCache: Promise<TicketScope> | null = null;
+
+  /** Áreas del usuario y a cuáles puede pedir (se pide una vez por sesión de pantalla). */
+  scope(): Promise<TicketScope> {
+    this.scopeCache ??= firstValueFrom(this.http.get<ApiEnvelope<TicketScope>>('/api/tickets/scope')).then((r) => r.data).catch((e) => {
+      this.scopeCache = null;
+      throw e;
+    });
+    return this.scopeCache;
+  }
+
+  /** Deriva el ticket a la cola de otra área (motivo obligatorio). */
+  async derive(id: string, area: string, reason: string): Promise<TicketDetail> {
+    return (await firstValueFrom(this.http.put<ApiEnvelope<TicketDetail>>(`/api/tickets/${id}/area`, { area, reason }))).data;
   }
 
   /** Lugar del ticket: un activo (y su localidad), una localidad, o null para quitarlo. */

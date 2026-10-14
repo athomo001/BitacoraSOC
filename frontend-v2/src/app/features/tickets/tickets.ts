@@ -6,7 +6,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
 import { SseService } from '../../core/sse/sse.service';
-import { QueueSummary, SlaClock, Ticket, TicketFilters, TicketType, TicketsService } from '../../core/tickets/tickets.service';
+import { QueueSummary, SlaClock, Ticket, TicketFilters, TicketQueue, TicketScope, TicketType, TicketsService } from '../../core/tickets/tickets.service';
 import { CLOCK_TONE, PRIORITY_SHORT, PRIORITY_TONE, STATUS_TONE, clockText } from '../../core/tickets/ticket-view';
 import { TicketDetailComponent } from './ticket-detail';
 
@@ -40,6 +40,23 @@ export class TicketsComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly typeFilter = signal<TicketType | null>(null);
   protected readonly openOnly = signal(false);
+  /** Tickets por área (9.1): qué cola se mira y las áreas del usuario. */
+  protected readonly scope = signal<TicketScope | null>(null);
+  protected readonly queue = signal<TicketQueue | null>(null);
+  protected readonly queues = computed(() => {
+    const s = this.scope();
+    if (!s) return [];
+    const out: { key: TicketQueue; icon: string; label: string }[] = [];
+    const resolving = s.myAreas.filter((a) => a.resolves);
+    if (resolving.length) {
+      out.push({ key: 'mine', icon: 'inbox', label: resolving.length === 1 ? this.i18n.tf('tickets.queue.mine', resolving[0].name) : this.i18n.t('tickets.queue.mineMany') });
+    }
+    if (s.myAreas.length) {
+      out.push({ key: 'asked', icon: 'outbox', label: resolving.length ? this.i18n.t('tickets.queue.askedMine') : this.i18n.tf('tickets.queue.asked', s.myAreas[0].name) });
+    }
+    if (s.all) out.push({ key: 'all', icon: 'select_all', label: this.i18n.t('tickets.queue.all') });
+    return out;
+  });
   protected query = '';
 
   /** Los hijos van justo debajo de su padre cuando los dos están en la página. */
@@ -73,12 +90,25 @@ export class TicketsComponent implements OnInit {
       if (eventType.startsWith('ticket.')) void this.load();
     });
     this.destroyRef.onDestroy(stop);
+    try {
+      this.scope.set(await this.api.scope());
+      // Llegando por un enlace se mira todo lo visible, para encontrar ese ticket.
+      this.queue.set(fromLink ? 'all' : (this.queues()[0]?.key ?? null));
+    } catch {
+      // Sin áreas conocidas se ve lo que el servidor deje ver.
+    }
     await this.load();
+  }
+
+  protected setQueue(queue: TicketQueue): void {
+    this.queue.set(queue);
+    this.selectedId.set(null);
+    void this.load();
   }
 
   protected async load(): Promise<void> {
     this.error.set(null);
-    const filters: TicketFilters = { ticketType: this.typeFilter() ?? undefined, openOnly: this.openOnly(), q: this.query };
+    const filters: TicketFilters = { ticketType: this.typeFilter() ?? undefined, openOnly: this.openOnly(), q: this.query, queue: this.queue() ?? undefined };
     try {
       const result = await this.api.list(filters);
       this.tickets.set(result.items);

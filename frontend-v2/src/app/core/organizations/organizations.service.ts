@@ -88,6 +88,8 @@ export interface LogSource {
 
 export interface TeamSummary {
   id: string;
+  /** Área dueña (guardias); sin área, sirve a cualquiera. */
+  areaId?: string;
   name: string;
   slug: string;
   kind: string;

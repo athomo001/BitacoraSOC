@@ -4,6 +4,25 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] Inventario (spec/16 §4.2, 9.2) - 2026-10-14
+
+- Diseño aprobado por el dueño el 2026-10-14. Decisiones: localidad opcional; crean y editan el área dueña, las áreas responsables y el admin; dar de baja y borrar solo el admin y la jefatura del área dueña, y los demás lo piden; tipos de responsabilidad en una lista que el admin amplía; carga masiva por CSV sin guardar el archivo.
+- **Inventario** (menú nuevo): lista por área (dueña o responsable) con filtros por tipo y búsqueda por nombre, código, IP o serie. Ficha con los **campos de su tipo**, **varias IP** con su tipo (Red, VIP, iLO/iDRAC, Otra), **responsables** (área, persona u organización externa), identificación, ubicación y otros datos.
+- **Historial** automático: cambios de ficha, trabajos registrados, tickets resueltos con el equipo como lugar y cargas masivas. Pestaña Tickets.
+- **Bajas:** admin o jefatura del área dueña dan de baja, reactivan o borran (no se borra un equipo con registros en bitácora o escalamiento). Los demás envían una solicitud con motivo; quien decide ve el número en el menú, en vivo, y acepta o rechaza.
+- **Carga masiva por CSV:** plantilla por tipo, revisión fila por fila, alta o actualización por código, exportación en el mismo formato. El archivo se procesa en memoria y no se guarda.
+- **Administración → Inventario:** tipos de equipo con sus campos (texto, número, lista, fecha) y tipos de responsabilidad.
+- Un equipo sin localidad también puede ser el lugar de un ticket (no sale en el Mapa).
+- Migración 000040 (`asset_kinds`, `responsibility_types`, `asset_ips`, `asset_responsibles`, `asset_events`, `asset_requests`; `assets.area_id`, tipo, modelo, serie, rack, posición y campos; la localidad pasa a ser opcional). Los activos de hoy pasan al área NOC, con su IP como «Red». Rutas nuevas `/api/inventory/*` (spec/04).
+
+## [Rewrite] Tickets por área (spec/16 §4.1, 9.1) - 2026-10-14
+
+- Diseño aprobado por el dueño el 2026-10-14. Decisiones: el área es un campo propio del ticket (no sale del equipo); al derivar, el ticket vuelve a Nuevo sin equipo ni resolutores; un Operativo SOC/NOC ve su cola y lo que su área pidió (ya no todos los tickets).
+- **Ticketera**: pestañas **Cola de mi área**, **Pedidos por mi área** y **Todas las áreas** (admin y perfil Gestión). La lista muestra el área y «pedido por». Al crear se elige el **área que lo resuelve** (parte en la propia) y el equipo se ofrece entre los de esa área.
+- **Panel**: filas **Área** (con **Derivar a otra área…**, motivo obligatorio, queda en la actividad) y **Pedido por**. Lo que pidió tu área se ve y se comenta, pero no se trabaja: sin cambiar estado, equipo, resolutores, lugar, tareas ni relaciones.
+- El servidor hace cumplir lo mismo: un ticket de otra área responde 404, y uno que pidió tu área responde 403 a todo lo que no sea verlo o comentarlo. El Mapa cuenta solo los tickets visibles.
+- Migración 000039 (`tickets.area_id`, `tickets.requested_area_id`): los tickets de hoy van a la cola del SOC, los de alcance NOC a la del NOC. Los respaldos anteriores se completan igual al restaurar. Rutas nuevas `GET /api/tickets/scope`, `PUT /api/tickets/{id}/area`; `GET /api/tickets?queue=mine|asked|all`; `POST /api/tickets` acepta `area`.
+
 ## [Rewrite] Lugar del ticket y tickets en el Mapa (#24, 7b) - 2026-10-14
 
 - Diseño aprobado por el dueño el 2026-10-14. Decisiones: el lugar es una localidad **o** un activo; los tickets van en el Mapa con capa y color propios (azul). Por defecto: siempre opcional y no se muestra en el seguimiento público.

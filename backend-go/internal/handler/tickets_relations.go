@@ -48,6 +48,10 @@ func ticketNote(ctx context.Context, q *db.Queries, ticketID uuid.UUID, user mid
 // cambio principal ya quedó guardado.
 func (h *TicketsHandler) afterStatusChange(ctx context.Context, old db.Ticket, to tickets.Status, alsoChildren bool, actor middleware.AuthenticatedUser, now time.Time) {
 	from := tickets.Status(old.Status)
+	// Inventario (9.2): el trabajo queda en el historial del equipo del ticket.
+	if to == tickets.Resolved {
+		recordTicketResolved(ctx, h.Queries, old)
+	}
 	if old.ParentID.Valid {
 		_ = ticketNote(ctx, h.Queries, uuid.UUID(old.ParentID.Bytes), actor,
 			fmt.Sprintf("%s pasó a %s.", old.TicketNumber, ticketStatusLabel[to]), false, "child:"+old.TicketNumber)
@@ -79,6 +83,9 @@ func (h *TicketsHandler) afterStatusChange(ctx context.Context, old db.Ticket, t
 			continue
 		}
 		_ = ticketNote(ctx, h.Queries, c.ID, actor, note, false, origin)
+		if target == tickets.Resolved {
+			recordTicketResolved(ctx, h.Queries, c)
+		}
 		h.afterStatusMail(ctx, c.ID, cs, target, actor.ID)
 		h.notifyChanged(ctx, c.ID)
 	}
@@ -135,6 +142,11 @@ func (h *TicketsHandler) Merge(w http.ResponseWriter, r *http.Request) {
 	main, err1 := h.Queries.GetTicket(ctx, req.MainID)
 	other, err2 := h.Queries.GetTicket(ctx, req.OtherID)
 	if err1 != nil || err2 != nil {
+		problemdetails.Write(w, r, 404, "not-found", "ticket no encontrado")
+		return
+	}
+	// Tickets por área (9.1): los dos tienen que ser de un área que el usuario trabaja.
+	if scope, err := loadTicketScope(ctx, h.Queries); err != nil || !scope.canWork(main.AreaID) || !scope.canWork(other.AreaID) {
 		problemdetails.Write(w, r, 404, "not-found", "ticket no encontrado")
 		return
 	}

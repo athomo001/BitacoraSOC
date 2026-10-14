@@ -50,7 +50,13 @@ func (h *MapHandler) ticketsOn(ctx context.Context) bool {
 // Points es GET /api/map/points: solo lo que el mapa pinta, sin paginar
 // (un país entero son unos cientos de filas livianas).
 func (h *MapHandler) Points(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.Queries.ListMapPoints(r.Context())
+	scope, err := loadTicketScope(r.Context(), h.Queries)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer el mapa")
+		return
+	}
+	// Solo los tickets que la persona ve en la Ticketera (9.1).
+	rows, err := h.Queries.ListMapPoints(r.Context(), scope.visible())
 	withTickets := h.ticketsOn(r.Context())
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer el mapa")
@@ -151,7 +157,7 @@ func (h *MapHandler) Unit(w http.ResponseWriter, r *http.Request) {
 	}
 	out := mapUnitDTO{Incidents: []mapIncidentDTO{}, Windows: []mapWindowDTO{}, Teams: []mapTeamDTO{}, Tickets: []mapTicketDTO{}}
 	if h.ticketsOn(ctx) {
-		rows, err := h.Queries.ListMapUnitTickets(ctx, id)
+		rows, err := h.Queries.ListMapUnitTickets(ctx, db.ListMapUnitTicketsParams{UnitID: id, VisibleAreas: ticketScopeVisible(ctx, h.Queries)})
 		if err != nil {
 			problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer los tickets")
 			return
@@ -240,4 +246,13 @@ func (h *MapHandler) PutTiles(w http.ResponseWriter, r *http.Request) {
 	h.AuditLog.Log(ctx, "config.map_tiles.update", audit.LevelInfo, audit.Success(), map[string]any{"mode": req.Mode, "url": req.URL})
 	publishSync(ctx, h.Hub, "config.map_tiles.updated", req)
 	writeData(w, http.StatusOK, req)
+}
+
+// ticketScopeVisible: las áreas cuyos tickets ve el usuario (nil = todas; ante un error, ninguna).
+func ticketScopeVisible(ctx context.Context, q *db.Queries) []uuid.UUID {
+	scope, err := loadTicketScope(ctx, q)
+	if err != nil {
+		return []uuid.UUID{}
+	}
+	return scope.visible()
 }

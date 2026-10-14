@@ -109,6 +109,7 @@ Todo esto está en **Administración** (solo administradores) y queda registrado
 | **Reportes de turno** | Formato y estado de los reportes de cierre enviados. |
 | **Organizaciones y servicios** | Clientes, tipos de organización, servicios y fuentes de log. |
 | **Territorio** (NOC) | Regiones, zonas y sitios; importación y activación masiva. Fondo del **Mapa**: OpenStreetMap público (necesita internet; su política solo permite uso bajo), un servidor de mosaicos propio (dirección con `{z}`, `{x}` e `{y}`) o sin fondo (silueta de los países, funciona sin internet). |
+| **Inventario** | Tipos de equipo con sus campos y los tipos de responsabilidad (Configuración y sistema, Hardware, Energía y conectividad, Usuario, Mantención en terreno, y los que se agreguen). |
 | **Equipos** | Equipos internos, contratas, guardias e integrantes; cobertura territorial (NOC). |
 | **Marca** | Nombre, logo, favicon y fuente. |
 | **Módulos** | SOC, NOC y Ticketera. |

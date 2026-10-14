@@ -27,9 +27,10 @@ SELECT * FROM tickets WHERE ticket_number = $1;
 
 -- name: CreateTicket :one
 -- Con activo, el lugar es la localidad del activo (000038).
-INSERT INTO tickets (ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, public_tracking_token, created_by, affects_client, territorial_unit_id)
+INSERT INTO tickets (ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, public_tracking_token, created_by, affects_client, territorial_unit_id, area_id, requested_area_id)
 VALUES ($1, $2, $3, $4, sqlc.narg('asset_id'), sqlc.narg('service_id'), $5, sqlc.narg('assigned_user_id'), 'new', $6, $7, $8, $9, $10, $11, $12, $13, $14, sqlc.arg('affects_client'),
-  COALESCE((SELECT a.territorial_unit_id FROM assets a WHERE a.id = sqlc.narg('asset_id')::uuid), sqlc.narg('territorial_unit_id')::uuid))
+  COALESCE((SELECT a.territorial_unit_id FROM assets a WHERE a.id = sqlc.narg('asset_id')::uuid), sqlc.narg('territorial_unit_id')::uuid),
+  sqlc.arg('area_id'), sqlc.arg('requested_area_id'))
 RETURNING *;
 
 -- name: UpdateTicket :one
@@ -93,9 +94,12 @@ SELECT * FROM entries WHERE ticket_id = $1 ORDER BY created_at ASC;
 SELECT sqlc.embed(t), o.name AS client_name, tm.name AS team_name, u.username AS assignee_username,
   p.ticket_number AS parent_number, m.ticket_number AS merged_into_number,
   (SELECT count(*) FROM tickets c WHERE c.parent_id = t.id)::int AS child_count,
-  pl.name AS place_name, plp.name AS place_parent_name, pa.name AS asset_name
+  pl.name AS place_name, plp.name AS place_parent_name, pa.name AS asset_name,
+  ar.code AS area_code, ar.name AS area_name, rq.code AS requested_area_code, rq.name AS requested_area_name
 FROM tickets t
 JOIN organizations o ON o.id = t.client_id
+JOIN areas ar ON ar.id = t.area_id
+JOIN areas rq ON rq.id = t.requested_area_id
 LEFT JOIN teams tm ON tm.id = t.assigned_team_id
 LEFT JOIN users u ON u.id = t.assigned_user_id
 LEFT JOIN territorial_units pl ON pl.id = t.territorial_unit_id
@@ -110,6 +114,9 @@ WHERE (sqlc.narg('ticket_type')::ticket_type IS NULL OR t.ticket_type = sqlc.nar
   AND (sqlc.narg('client_id')::uuid IS NULL OR t.client_id = sqlc.narg('client_id')::uuid)
   AND (sqlc.narg('q')::text IS NULL OR t.ticket_number ILIKE '%' || sqlc.narg('q')::text || '%' OR t.title ILIKE '%' || sqlc.narg('q')::text || '%')
   AND (NOT sqlc.arg('open_only')::bool OR t.status NOT IN ('resolved', 'closed', 'cancelled'))
+  AND (sqlc.narg('visible_areas')::uuid[] IS NULL OR t.area_id = ANY(sqlc.narg('visible_areas')::uuid[]) OR t.requested_area_id = ANY(sqlc.narg('visible_areas')::uuid[]))
+  AND (sqlc.narg('queue_areas')::uuid[] IS NULL OR t.area_id = ANY(sqlc.narg('queue_areas')::uuid[]))
+  AND (sqlc.narg('asked_areas')::uuid[] IS NULL OR (t.requested_area_id = ANY(sqlc.narg('asked_areas')::uuid[]) AND NOT t.area_id = ANY(sqlc.narg('asked_areas')::uuid[])))
 ORDER BY (t.status IN ('resolved', 'closed', 'cancelled')), t.priority, t.updated_at DESC
 LIMIT sqlc.arg('page_size') OFFSET sqlc.arg('page_offset');
 
@@ -121,7 +128,10 @@ WHERE (sqlc.narg('ticket_type')::ticket_type IS NULL OR t.ticket_type = sqlc.nar
   AND (sqlc.narg('assigned_team_id')::uuid IS NULL OR t.assigned_team_id = sqlc.narg('assigned_team_id')::uuid)
   AND (sqlc.narg('client_id')::uuid IS NULL OR t.client_id = sqlc.narg('client_id')::uuid)
   AND (sqlc.narg('q')::text IS NULL OR t.ticket_number ILIKE '%' || sqlc.narg('q')::text || '%' OR t.title ILIKE '%' || sqlc.narg('q')::text || '%')
-  AND (NOT sqlc.arg('open_only')::bool OR t.status NOT IN ('resolved', 'closed', 'cancelled'));
+  AND (NOT sqlc.arg('open_only')::bool OR t.status NOT IN ('resolved', 'closed', 'cancelled'))
+  AND (sqlc.narg('visible_areas')::uuid[] IS NULL OR t.area_id = ANY(sqlc.narg('visible_areas')::uuid[]) OR t.requested_area_id = ANY(sqlc.narg('visible_areas')::uuid[]))
+  AND (sqlc.narg('queue_areas')::uuid[] IS NULL OR t.area_id = ANY(sqlc.narg('queue_areas')::uuid[]))
+  AND (sqlc.narg('asked_areas')::uuid[] IS NULL OR (t.requested_area_id = ANY(sqlc.narg('asked_areas')::uuid[]) AND NOT t.area_id = ANY(sqlc.narg('asked_areas')::uuid[])));
 
 -- name: TicketQueueSummary :one
 -- Resumen de la cola para la cabecera. "Vencido" = abierto, no en pausa y
@@ -132,18 +142,24 @@ SELECT
                    AND sla_resolution_due_at + make_interval(secs => sla_paused_seconds) < sqlc.arg('now')::timestamptz)::bigint AS breached_count,
   count(*) FILTER (WHERE status = 'pending_vendor')::bigint AS paused_count,
   count(*) FILTER (WHERE resolved_at >= sqlc.arg('resolved_since')::timestamptz)::bigint AS resolved_today_count
-FROM tickets;
+FROM tickets
+WHERE sqlc.narg('visible_areas')::uuid[] IS NULL OR area_id = ANY(sqlc.narg('visible_areas')::uuid[]) OR requested_area_id = ANY(sqlc.narg('visible_areas')::uuid[]);
 
 -- name: GetTicketView :one
 SELECT sqlc.embed(t), o.name AS client_name, tm.name AS team_name, u.username AS assignee_username,
-  pl.name AS place_name, plp.name AS place_parent_name, pa.name AS asset_name
+  COALESCE(NULLIF(cu.full_name, ''), cu.username, '')::text AS created_by_name,
+  pl.name AS place_name, plp.name AS place_parent_name, pa.name AS asset_name,
+  ar.code AS area_code, ar.name AS area_name, rq.code AS requested_area_code, rq.name AS requested_area_name
 FROM tickets t
 JOIN organizations o ON o.id = t.client_id
+JOIN areas ar ON ar.id = t.area_id
+JOIN areas rq ON rq.id = t.requested_area_id
 LEFT JOIN teams tm ON tm.id = t.assigned_team_id
 LEFT JOIN users u ON u.id = t.assigned_user_id
 LEFT JOIN territorial_units pl ON pl.id = t.territorial_unit_id
 LEFT JOIN territorial_units plp ON plp.id = pl.parent_id
 LEFT JOIN assets pa ON pa.id = t.asset_id
+LEFT JOIN users cu ON cu.id = t.created_by
 WHERE t.id = $1;
 
 -- name: ListTicketTasksWithUser :many
@@ -296,3 +312,15 @@ RETURNING *;
 -- name: SetTicketPlace :exec
 -- Lugar del ticket (000038): activo opcional y su localidad.
 UPDATE tickets SET asset_id = sqlc.narg('asset_id'), territorial_unit_id = sqlc.narg('territorial_unit_id'), updated_at = now() WHERE id = $1;
+
+-- name: GetTicketAreas :one
+-- Tickets por área (000039): de qué cola es y qué área lo pidió.
+SELECT area_id, requested_area_id FROM tickets WHERE id = $1;
+
+-- name: DeriveTicket :exec
+-- Derivar a otra área: entra a esa cola como nuevo, sin equipo ni responsable.
+UPDATE tickets SET area_id = sqlc.arg('area_id'), status = 'new', assigned_team_id = NULL, assigned_user_id = NULL, updated_at = now()
+WHERE id = $1;
+
+-- name: ClearTicketResolvers :exec
+DELETE FROM ticket_resolvers WHERE ticket_id = $1;
