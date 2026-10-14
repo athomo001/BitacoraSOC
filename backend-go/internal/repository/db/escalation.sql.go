@@ -244,17 +244,23 @@ func (q *Queries) CreateMaintenanceWindow(ctx context.Context, arg CreateMainten
 }
 
 const createPolicy = `-- name: CreatePolicy :one
-INSERT INTO escalation_policies (service_id, asset_id, territorial_unit_id) VALUES ($1, $2, $3) RETURNING id, service_id, asset_id, territorial_unit_id, active, reminder
+INSERT INTO escalation_policies (service_id, asset_id, territorial_unit_id, area_id) VALUES ($1, $2, $3, $4) RETURNING id, service_id, asset_id, territorial_unit_id, active, reminder, area_id
 `
 
 type CreatePolicyParams struct {
 	ServiceID         pgtype.UUID `json:"service_id"`
 	AssetID           pgtype.UUID `json:"asset_id"`
 	TerritorialUnitID pgtype.UUID `json:"territorial_unit_id"`
+	AreaID            uuid.UUID   `json:"area_id"`
 }
 
 func (q *Queries) CreatePolicy(ctx context.Context, arg CreatePolicyParams) (EscalationPolicy, error) {
-	row := q.db.QueryRow(ctx, createPolicy, arg.ServiceID, arg.AssetID, arg.TerritorialUnitID)
+	row := q.db.QueryRow(ctx, createPolicy,
+		arg.ServiceID,
+		arg.AssetID,
+		arg.TerritorialUnitID,
+		arg.AreaID,
+	)
 	var i EscalationPolicy
 	err := row.Scan(
 		&i.ID,
@@ -263,6 +269,7 @@ func (q *Queries) CreatePolicy(ctx context.Context, arg CreatePolicyParams) (Esc
 		&i.TerritorialUnitID,
 		&i.Active,
 		&i.Reminder,
+		&i.AreaID,
 	)
 	return i, err
 }
@@ -513,7 +520,7 @@ func (q *Queries) GetEscalationPool(ctx context.Context, id uuid.UUID) (Escalati
 }
 
 const getPolicy = `-- name: GetPolicy :one
-SELECT id, service_id, asset_id, territorial_unit_id, active, reminder FROM escalation_policies WHERE id = $1
+SELECT id, service_id, asset_id, territorial_unit_id, active, reminder, area_id FROM escalation_policies WHERE id = $1
 `
 
 func (q *Queries) GetPolicy(ctx context.Context, id uuid.UUID) (EscalationPolicy, error) {
@@ -526,6 +533,7 @@ func (q *Queries) GetPolicy(ctx context.Context, id uuid.UUID) (EscalationPolicy
 		&i.TerritorialUnitID,
 		&i.Active,
 		&i.Reminder,
+		&i.AreaID,
 	)
 	return i, err
 }
@@ -1137,7 +1145,7 @@ func (q *Queries) ListMembersForTeams(ctx context.Context, teamIds []uuid.UUID) 
 
 const listPolicies = `-- name: ListPolicies :many
 
-SELECT id, service_id, asset_id, territorial_unit_id, active, reminder FROM escalation_policies
+SELECT id, service_id, asset_id, territorial_unit_id, active, reminder, area_id FROM escalation_policies
 WHERE ($1::uuid IS NULL OR service_id = $1)
   AND ($2::uuid IS NULL OR asset_id = $2)
   AND ($3::uuid IS NULL OR territorial_unit_id = $3)
@@ -1167,6 +1175,7 @@ func (q *Queries) ListPolicies(ctx context.Context, arg ListPoliciesParams) ([]E
 			&i.TerritorialUnitID,
 			&i.Active,
 			&i.Reminder,
+			&i.AreaID,
 		); err != nil {
 			return nil, err
 		}
@@ -1732,6 +1741,31 @@ func (q *Queries) SetEscalationIncidentEntry(ctx context.Context, arg SetEscalat
 	return err
 }
 
+const setPolicyArea = `-- name: SetPolicyArea :one
+UPDATE escalation_policies SET area_id = $1 WHERE id = $2 RETURNING id, service_id, asset_id, territorial_unit_id, active, reminder, area_id
+`
+
+type SetPolicyAreaParams struct {
+	AreaID uuid.UUID `json:"area_id"`
+	ID     uuid.UUID `json:"id"`
+}
+
+// El área dueña de la política (9e): esa área la ve y su jefatura la edita.
+func (q *Queries) SetPolicyArea(ctx context.Context, arg SetPolicyAreaParams) (EscalationPolicy, error) {
+	row := q.db.QueryRow(ctx, setPolicyArea, arg.AreaID, arg.ID)
+	var i EscalationPolicy
+	err := row.Scan(
+		&i.ID,
+		&i.ServiceID,
+		&i.AssetID,
+		&i.TerritorialUnitID,
+		&i.Active,
+		&i.Reminder,
+		&i.AreaID,
+	)
+	return i, err
+}
+
 const shiftPolicySteps = `-- name: ShiftPolicySteps :exec
 UPDATE escalation_steps SET step_order = step_order + 100000 WHERE policy_id = $1
 `
@@ -1778,7 +1812,7 @@ func (q *Queries) UpdateEscalationPool(ctx context.Context, arg UpdateEscalation
 }
 
 const updatePolicyReminder = `-- name: UpdatePolicyReminder :one
-UPDATE escalation_policies SET reminder = $1 WHERE id = $2 RETURNING id, service_id, asset_id, territorial_unit_id, active, reminder
+UPDATE escalation_policies SET reminder = $1 WHERE id = $2 RETURNING id, service_id, asset_id, territorial_unit_id, active, reminder, area_id
 `
 
 type UpdatePolicyReminderParams struct {
@@ -1796,6 +1830,7 @@ func (q *Queries) UpdatePolicyReminder(ctx context.Context, arg UpdatePolicyRemi
 		&i.TerritorialUnitID,
 		&i.Active,
 		&i.Reminder,
+		&i.AreaID,
 	)
 	return i, err
 }

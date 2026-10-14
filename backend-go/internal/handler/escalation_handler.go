@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -18,7 +19,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // EscalationHandler es el motor de escalación unificado SOC/NOC de la Fase 7
@@ -29,7 +29,7 @@ import (
 // "no es una central telefónica").
 type EscalationHandler struct {
 	// DB: transacciones (lista de personas de un pool).
-	DB       *pgxpool.Pool
+	DB       txBeginner
 	Queries  *db.Queries
 	Crypto   *crypto.Box
 	AuditLog *audit.Logger
@@ -107,11 +107,22 @@ func (h *EscalationHandler) checkModule(w http.ResponseWriter, r *http.Request, 
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer el alcance del usuario")
 		return false
 	}
-	if !modules.EffectiveScope(flags, scopes).Includes(m) {
-		problemdetails.Write(w, r, http.StatusForbidden, "module-not-in-scope", "tu grupo de permisos no incluye el módulo "+string(m))
+	if modules.EffectiveScope(flags, scopes).Includes(m) {
+		return true
+	}
+	// 9e: quien está en un área propia (TI, Infra…) usa el escalamiento de
+	// su área aunque no sea Operativo de SOC/NOC; qué políticas ve y edita lo
+	// decide el área dueña de cada una.
+	areas, err := h.Queries.ListUserAreaCodes(ctx, user.ID)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer el alcance del usuario")
 		return false
 	}
-	return true
+	if slices.ContainsFunc(areas, func(c string) bool { return c != string(modules.SOC) && c != string(modules.NOC) }) {
+		return true
+	}
+	problemdetails.Write(w, r, http.StatusForbidden, "module-not-in-scope", "tu grupo de permisos no incluye el módulo "+string(m))
+	return false
 }
 
 // ===== DTOs de resolución (forma de spec/04: la misma para SOC y NOC, HU-2) =====
@@ -539,6 +550,18 @@ func (h *EscalationHandler) Resolve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res, err := h.resolve(r.Context(), s)
+	if err == nil && res.PolicyID != nil {
+		// 9e: la política es de un área que el usuario no ve → como si no hubiera.
+		if p, perr := h.Queries.GetPolicy(r.Context(), *res.PolicyID); perr == nil {
+			acc, ok := mustLoadAreaAccess(w, r, h.Queries)
+			if !ok {
+				return
+			}
+			if !acc.canView(acc.codeOf[p.AreaID]) {
+				err = errNoPolicy
+			}
+		}
+	}
 	if err != nil {
 		h.writeResolveError(w, r, err)
 		return
@@ -1041,6 +1064,10 @@ type policyDTO struct {
 	Active            bool            `json:"active"`
 	Steps             []policyStepDTO `json:"steps"`
 	Reminder          *string         `json:"reminder,omitempty"`
+	// Area: el área dueña (9e); Editable: el usuario la puede cambiar
+	// (jefatura de esa área o admin).
+	Area     string `json:"area"`
+	Editable bool   `json:"editable"`
 }
 
 func (h *EscalationHandler) ListPolicies(w http.ResponseWriter, r *http.Request) {
@@ -1049,10 +1076,23 @@ func (h *EscalationHandler) ListPolicies(w http.ResponseWriter, r *http.Request)
 		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-parameter", err.Error())
 		return
 	}
-	rows, err := h.Queries.ListPolicies(r.Context(), db.ListPoliciesParams{ServiceID: optionalUUID(s.ServiceID), AssetID: optionalUUID(s.AssetID), TerritorialUnitID: optionalUUID(s.TerritorialUnitID)})
+	all, err := h.Queries.ListPolicies(r.Context(), db.ListPoliciesParams{ServiceID: optionalUUID(s.ServiceID), AssetID: optionalUUID(s.AssetID), TerritorialUnitID: optionalUUID(s.TerritorialUnitID)})
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron listar las políticas")
 		return
+	}
+	acc, ok := mustLoadAreaAccess(w, r, h.Queries)
+	if !ok {
+		return
+	}
+	// Cada área ve sus políticas (9e); ?area= acota a una.
+	onlyArea := r.URL.Query().Get("area")
+	rows := all[:0]
+	for _, p := range all {
+		code := acc.codeOf[p.AreaID]
+		if acc.canView(code) && (onlyArea == "" || onlyArea == code) {
+			rows = append(rows, p)
+		}
 	}
 	dtos, err := h.policiesWithSteps(r.Context(), rows)
 	if err != nil {
@@ -1064,15 +1104,35 @@ func (h *EscalationHandler) ListPolicies(w http.ResponseWriter, r *http.Request)
 
 func (h *EscalationHandler) CreatePolicy(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	var req scope
-	if err := decodeJSON(w, r, &req); err != nil || req.count() != 1 {
+	var body struct {
+		scope
+		// Area: el área dueña (9e); sin ella, SOC.
+		Area string `json:"area"`
+	}
+	if err := decodeJSON(w, r, &body); err != nil || body.count() != 1 {
 		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-scope", "indica exactamente uno: serviceId, assetId o territorialUnitId")
 		return
 	}
+	req := body.scope
 	if !h.checkModule(w, r, req) {
 		return
 	}
-	p, err := h.Queries.CreatePolicy(ctx, db.CreatePolicyParams{ServiceID: optionalUUID(req.ServiceID), AssetID: optionalUUID(req.AssetID), TerritorialUnitID: optionalUUID(req.TerritorialUnitID)})
+	acc, ok := mustLoadAreaAccess(w, r, h.Queries)
+	if !ok {
+		return
+	}
+	if body.Area == "" {
+		body.Area = "soc"
+	}
+	areaID, found := acc.idOf(body.Area)
+	if !found {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "área inválida")
+		return
+	}
+	if !requireManage(w, r, acc, body.Area) {
+		return
+	}
+	p, err := h.Queries.CreatePolicy(ctx, db.CreatePolicyParams{ServiceID: optionalUUID(req.ServiceID), AssetID: optionalUUID(req.AssetID), TerritorialUnitID: optionalUUID(req.TerritorialUnitID), AreaID: areaID})
 	if isUniqueViolation(err) {
 		problemdetails.Write(w, r, http.StatusConflict, "policy-exists", "ya existe una política para ese servicio/activo/unidad")
 		return
@@ -1094,6 +1154,9 @@ func (h *EscalationHandler) DeletePolicy(w http.ResponseWriter, r *http.Request)
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "id inválido")
+		return
+	}
+	if !h.managePolicy(w, r, id) {
 		return
 	}
 	n, err := h.Queries.DeletePolicy(r.Context(), id)

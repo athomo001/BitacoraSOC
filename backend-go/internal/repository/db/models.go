@@ -1635,6 +1635,7 @@ type EscalationPolicy struct {
 	TerritorialUnitID pgtype.UUID `json:"territorial_unit_id"`
 	Active            bool        `json:"active"`
 	Reminder          pgtype.Text `json:"reminder"`
+	AreaID            uuid.UUID   `json:"area_id"`
 }
 
 type EscalationPool struct {
@@ -1979,6 +1980,7 @@ type Team struct {
 	Audience         TeamAudience `json:"audience"`
 	Active           bool         `json:"active"`
 	DeactivatedByOrg bool         `json:"deactivated_by_org"`
+	AreaID           pgtype.UUID  `json:"area_id"`
 }
 
 type TeamCoverage struct {

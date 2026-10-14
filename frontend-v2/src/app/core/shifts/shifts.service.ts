@@ -222,10 +222,12 @@ export class ShiftsService {
 
   // ===== Matriz y asignaciones de dotación (HU-4b) =====
 
-  async matrix(from?: string, to?: string): Promise<Matrix> {
+  /** area: solo la gente de esa área (Turnos de TI o Infra, 9e). */
+  async matrix(from?: string, to?: string, area?: string | null): Promise<Matrix> {
     const params: Record<string, string> = {};
     if (from) params['from'] = from;
     if (to) params['to'] = to;
+    if (area) params['area'] = area;
     return (await firstValueFrom(this.http.get<ApiEnvelope<Matrix>>('/api/work-shifts/matrix', { params }))).data;
   }
 

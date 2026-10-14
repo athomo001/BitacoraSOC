@@ -425,6 +425,7 @@ erDiagram
         team_audience audience
         boolean active
         boolean deactivated_by_org
+        uuid area_id FK
     }
     TEAM_MEMBERS {
         uuid id PK
@@ -449,6 +450,7 @@ erDiagram
         uuid territorial_unit_id FK
         boolean active
         text reminder
+        uuid area_id FK
     }
     ESCALATION_STEPS {
         uuid id PK
@@ -529,6 +531,8 @@ erDiagram
         boolean active
     }
 
+    AREAS |o--o{ TEAMS : "area_id"
+    AREAS ||--o{ ESCALATION_POLICIES : "area_id"
     ASSETS |o--o{ ESCALATION_INCIDENTS : "asset_id"
     ASSETS |o--o{ ESCALATION_POLICIES : "asset_id"
     ASSETS |o--o{ MAINTENANCE_WINDOWS : "asset_id"

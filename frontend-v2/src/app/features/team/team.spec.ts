@@ -114,4 +114,30 @@ describe('TeamComponent (Mi equipo, jefatura de área, spec/16 9d)', () => {
     expect(el.textContent).toContain('Abc23456789xyz');
     expect(el.textContent).toContain('no se vuelve a mostrar');
   });
+
+  it('la pestaña Guardias trae solo las guardias del área', async () => {
+    const { fixture, el } = await render();
+    button(el, 'Guardias').click();
+    fixture.detectChanges();
+    await settle();
+    const guards = http.match((r) => r.url === '/api/guards');
+    expect(guards.length).toBeGreaterThan(0);
+    expect(guards.every((r) => r.request.params.get('area') === 'infra')).toBe(true);
+    expect(el.querySelector('app-team-guards')).toBeTruthy();
+  });
+
+  it('la pestaña Escalamiento trae solo las políticas del área', async () => {
+    const { fixture, el } = await render();
+    button(el, 'Escalamiento').click();
+    fixture.detectChanges();
+    await settle();
+    // Antes de las políticas, la pantalla lee la instalación y los permisos.
+    for (const r of http.match((r) => r.url === '/api/setup/status')) r.flush({ data: { setupCompleted: true, socEnabled: true, nocEnabled: false } });
+    for (const r of http.match((r) => r.url === '/api/users/me')) r.flush({ data: { id: 'me', username: 'jefe', role: 'user' } });
+    for (const r of http.match((r) => r.url === '/api/users/me/capabilities')) r.flush({ data: { moduleScope: 'none', capabilities: ['area:lead'], areas: ['infra'] } });
+    await settle();
+    const policies = http.match((r) => r.url === '/api/escalation/policies');
+    expect(policies.length).toBe(1);
+    expect(policies[0].request.params.get('area')).toBe('infra');
+  });
 });

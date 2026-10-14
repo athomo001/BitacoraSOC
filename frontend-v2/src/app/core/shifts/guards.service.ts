@@ -19,6 +19,9 @@ export interface Guard {
   workShiftName?: string;
   timezone: string;
   members: GuardMember[];
+  /** Área dueña (9e): la ve quien está en el área; la edita su jefatura. */
+  area: string;
+  areaName: string;
 }
 
 export interface GuardMember { teamMemberId: string; name: string; userId?: string; }
@@ -57,6 +60,8 @@ export interface GuardTimeline {
   overrides: GuardOverride[];
   absences: Absence[];
   workShifts: { id: string; name: string; startTime: string }[];
+  /** Áreas cuyas guardias puede editar el usuario (jefatura o admin). */
+  editableAreas: string[];
 }
 
 export interface GuardImportResult { guards: number; dotacionDays: number; errors: { row: number; message: string }[]; }
@@ -66,8 +71,10 @@ export interface GuardImportResult { guards: number; dotacionDays: number; error
 export class GuardsService {
   private readonly http = inject(HttpClient);
 
-  async timeline(from: Date, to: Date): Promise<GuardTimeline> {
-    const params = { from: from.toISOString(), to: to.toISOString() };
+  /** area: solo las guardias de esa área (Mi equipo, Turnos de TI/Infra). */
+  async timeline(from: Date, to: Date, area?: string | null): Promise<GuardTimeline> {
+    const params: Record<string, string> = { from: from.toISOString(), to: to.toISOString() };
+    if (area) params['area'] = area;
     return (await firstValueFrom(this.http.get<ApiEnvelope<GuardTimeline>>('/api/guards', { params }))).data;
   }
 
@@ -91,6 +98,19 @@ export class GuardsService {
   /** "Reemplazo por unos días": no toca la guardia (rotation_overrides). */
   async addOverride(cycleId: string, originalTeamMemberId: string, replacementTeamMemberId: string, startsAt: Date, endsAt: Date, reason: string): Promise<void> {
     await firstValueFrom(this.http.post('/api/rotation-overrides', { cycleId, originalTeamMemberId, replacementTeamMemberId, startDate: startsAt.toISOString(), endDate: endsAt.toISOString(), reason }));
+  }
+
+  /** Guardia nueva de un área (jefatura o admin, 9e). */
+  async createGuard(area: string, name: string, changeDay: number, mustBeCovered: boolean): Promise<void> {
+    await firstValueFrom(this.http.post('/api/guards', { area, name, changeDay, mustBeCovered }));
+  }
+
+  async addMember(cycleId: string, userId: string): Promise<void> {
+    await firstValueFrom(this.http.post(`/api/guards/${cycleId}/members`, { userId }));
+  }
+
+  async removeMember(cycleId: string, teamMemberId: string): Promise<void> {
+    await firstValueFrom(this.http.delete(`/api/guards/${cycleId}/members/${teamMemberId}`));
   }
 
   /** Carga masiva con el CSV del legacy (condicion,usuario,fechaInicio,horaInicio,fechaFin,horaFin). */

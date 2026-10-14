@@ -240,6 +240,35 @@ func (q *Queries) ListAreaPeopleGroups(ctx context.Context, areaID uuid.UUID) ([
 	return items, nil
 }
 
+const listAreaUserIDs = `-- name: ListAreaUserIDs :many
+SELECT DISTINCT upg.user_id
+FROM user_permission_groups upg
+JOIN permission_groups pg ON pg.id = upg.permission_group_id AND pg.active
+JOIN permission_group_areas pa ON pa.permission_group_id = pg.id
+JOIN areas a ON a.id = pa.area_id AND a.code = $1
+`
+
+// Las personas de un área (Dotación por área, 9e).
+func (q *Queries) ListAreaUserIDs(ctx context.Context, code string) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listAreaUserIDs, code)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var user_id uuid.UUID
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listLeadAreas = `-- name: ListLeadAreas :many
 
 SELECT DISTINCT a.id, a.code, a.name

@@ -44,6 +44,10 @@ type policyStepDTO struct {
 }
 
 func (h *EscalationHandler) policiesWithSteps(ctx context.Context, policies []db.EscalationPolicy) ([]policyDTO, error) {
+	acc, err := loadAreaAccess(ctx, h.Queries)
+	if err != nil {
+		return nil, err
+	}
 	ids := make([]uuid.UUID, 0, len(policies))
 	for _, p := range policies {
 		ids = append(ids, p.ID)
@@ -101,7 +105,8 @@ func (h *EscalationHandler) policiesWithSteps(ctx context.Context, policies []db
 	}
 	dtos := make([]policyDTO, 0, len(policies))
 	for _, p := range policies {
-		d := policyDTO{ID: p.ID, ServiceID: uuidPtr(p.ServiceID), AssetID: uuidPtr(p.AssetID), TerritorialUnitID: uuidPtr(p.TerritorialUnitID), Active: p.Active, Steps: steps[p.ID], Reminder: textPtr(p.Reminder)}
+		d := policyDTO{ID: p.ID, ServiceID: uuidPtr(p.ServiceID), AssetID: uuidPtr(p.AssetID), TerritorialUnitID: uuidPtr(p.TerritorialUnitID), Active: p.Active, Steps: steps[p.ID], Reminder: textPtr(p.Reminder),
+			Area: acc.codeOf[p.AreaID], Editable: acc.canManage(acc.codeOf[p.AreaID])}
 		if d.Steps == nil {
 			d.Steps = []policyStepDTO{}
 		}
@@ -220,11 +225,25 @@ func (h *EscalationHandler) policyFromPath(w http.ResponseWriter, r *http.Reques
 		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "id inválido")
 		return uuid.Nil, false
 	}
-	if _, err := h.Queries.GetPolicy(r.Context(), id); err != nil {
-		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "política no encontrada")
+	if !h.managePolicy(w, r, id) {
 		return uuid.Nil, false
 	}
 	return id, true
+}
+
+// managePolicy: la política existe y el usuario edita su área (jefatura o
+// admin, 9e). Escribe el 404 o el 403.
+func (h *EscalationHandler) managePolicy(w http.ResponseWriter, r *http.Request, id uuid.UUID) bool {
+	p, err := h.Queries.GetPolicy(r.Context(), id)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "política no encontrada")
+		return false
+	}
+	acc, ok := mustLoadAreaAccess(w, r, h.Queries)
+	if !ok {
+		return false
+	}
+	return requireManage(w, r, acc, acc.codeOf[p.AreaID])
 }
 
 // writePolicy responde la política completa (con sus llamados ya renumerados).

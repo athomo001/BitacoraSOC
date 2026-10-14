@@ -219,6 +219,9 @@ export interface Policy extends EscalationScope {
   active: boolean;
   steps: PolicyStep[];
   reminder?: string;
+  /** Área dueña (9e): esa área la ve; su jefatura y el admin la editan. */
+  area: string;
+  editable: boolean;
 }
 
 export interface MaintenanceWindow extends EscalationScope {
@@ -374,12 +377,19 @@ export class EscalationService {
     return (await firstValueFrom(this.http.get<ApiEnvelope<Asset[]>>('/api/assets'))).data;
   }
 
-  async listPolicies(): Promise<Policy[]> {
-    return (await firstValueFrom(this.http.get<ApiEnvelope<Policy[]>>('/api/escalation/policies'))).data;
+  /** area: solo las de esa área (Mi equipo). El servidor ya filtra por las áreas del usuario. */
+  async listPolicies(area?: string | null): Promise<Policy[]> {
+    const params: Record<string, string> = area ? { area } : {};
+    return (await firstValueFrom(this.http.get<ApiEnvelope<Policy[]>>('/api/escalation/policies', { params }))).data;
   }
 
-  async createPolicy(scope: EscalationScope): Promise<Policy> {
-    return (await firstValueFrom(this.http.post<ApiEnvelope<Policy>>('/api/escalation/policies', scope))).data;
+  async createPolicy(scope: EscalationScope, area?: string | null): Promise<Policy> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<Policy>>('/api/escalation/policies', { ...scope, ...(area ? { area } : {}) }))).data;
+  }
+
+  /** Cambia el área dueña de una política (admin, o jefatura entre sus áreas). */
+  async setPolicyArea(id: string, area: string): Promise<void> {
+    await firstValueFrom(this.http.patch(`/api/escalation/policies/${id}`, { area }));
   }
 
   async deletePolicy(id: string): Promise<void> {

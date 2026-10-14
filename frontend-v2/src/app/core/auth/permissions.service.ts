@@ -6,6 +6,8 @@ import { ApiEnvelope, AuthUser } from './auth.models';
 interface Capabilities {
   moduleScope: 'none' | 'soc' | 'noc' | 'both';
   capabilities: string[];
+  /** Todas las áreas de sus grupos (cualquier perfil). */
+  areas?: string[];
 }
 
 /**
@@ -28,6 +30,15 @@ export class PermissionsService {
   /** Alcance SOC/NOC efectivo que calcula el backend (ya descuenta los módulos apagados). */
   readonly moduleScope = computed(() => this._caps()?.moduleScope ?? null);
   readonly can = (capability: string) => computed(() => this.isAdmin() || !!this._caps()?.capabilities.includes(capability));
+  /**
+   * Perfil Operativo de SOC/NOC: Bitácora, Checklist y Reportes. Mientras no
+   * se conocen los permisos se asume que sí (el backend igual decide).
+   */
+  readonly operational = computed(() => this.isAdmin() || !this._caps() || this._caps()!.moduleScope !== 'none');
+  /** Áreas propias que no son SOC ni NOC (TI, Infraestructura…). */
+  readonly ownAreas = computed(() => (this._caps()?.areas ?? []).filter((a) => a !== 'soc' && a !== 'noc'));
+  /** Turnos y Escalamiento: Operativo, o gente de un área propia (9e). */
+  readonly areaOps = computed(() => this.operational() || this.ownAreas().length > 0);
   readonly canWriteDirectory = this.can('directory:write');
   readonly canDeleteDirectory = this.can('directory:delete');
 

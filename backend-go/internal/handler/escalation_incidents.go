@@ -271,6 +271,8 @@ func (h *EscalationHandler) AddIncidentNote(w http.ResponseWriter, r *http.Reque
 
 type patchPolicyRequest struct {
 	Reminder *string `json:"reminder"`
+	// Area: cambia el área dueña (9e). La jefatura solo la pasa entre sus áreas.
+	Area *string `json:"area"`
 }
 
 // PatchPolicy es PATCH /api/escalation/policies/{id}: el Recordatorio del
@@ -283,9 +285,35 @@ func (h *EscalationHandler) PatchPolicy(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	var req patchPolicyRequest
-	if err := decodeJSON(w, r, &req); err != nil || req.Reminder == nil {
-		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "indica reminder (vacío lo quita)")
+	if err := decodeJSON(w, r, &req); err != nil || (req.Reminder == nil && req.Area == nil) {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "indica reminder (vacío lo quita) o area")
 		return
+	}
+	if !h.managePolicy(w, r, id) {
+		return
+	}
+	if req.Area != nil {
+		acc, ok := mustLoadAreaAccess(w, r, h.Queries)
+		if !ok {
+			return
+		}
+		areaID, found := acc.idOf(*req.Area)
+		if !found {
+			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "área inválida")
+			return
+		}
+		if !requireManage(w, r, acc, *req.Area) {
+			return
+		}
+		if _, err := h.Queries.SetPolicyArea(ctx, db.SetPolicyAreaParams{AreaID: areaID, ID: id}); err != nil {
+			problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo cambiar el área")
+			return
+		}
+		h.AuditLog.Log(ctx, "escalation.policy.area", audit.LevelInfo, audit.Success(), map[string]any{"policyId": id.String(), "area": *req.Area})
+		if req.Reminder == nil {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 	}
 	reminder := strings.TrimSpace(*req.Reminder)
 	if len([]rune(reminder)) > 500 {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -18,7 +19,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/text/unicode/norm"
 )
 
@@ -28,7 +28,7 @@ import (
 // generar rotación y la carga masiva por CSV con el mismo formato del legacy.
 
 type GuardsHandler struct {
-	Pool     *pgxpool.Pool
+	Pool     txBeginner
 	Queries  *db.Queries
 	AuditLog *audit.Logger
 	Now      func() time.Time
@@ -54,9 +54,12 @@ type guardMemberDTO struct {
 }
 
 type guardDTO struct {
-	CycleID       uuid.UUID        `json:"cycleId"`
-	TeamID        uuid.UUID        `json:"teamId"`
-	Label         string           `json:"label"`
+	CycleID uuid.UUID `json:"cycleId"`
+	TeamID  uuid.UUID `json:"teamId"`
+	Label   string    `json:"label"`
+	// Area: el área dueña (9e). La ven quienes están en el área; la edita su jefatura.
+	Area          string           `json:"area"`
+	AreaName      string           `json:"areaName"`
 	MustBeCovered bool             `json:"mustBeCovered"`
 	ChangeDay     int32            `json:"changeDay"`
 	ChangeTime    string           `json:"changeTime"`
@@ -144,10 +147,25 @@ func (h *GuardsHandler) Timeline(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 400, "invalid-parameter", fmt.Sprintf("el periodo debe ser de hasta %d días", maxGuardRangeDays))
 		return
 	}
-	cycles, err := h.Queries.ListGuardCycles(ctx)
+	acc, ok := mustLoadAreaAccess(w, r, h.Queries)
+	if !ok {
+		return
+	}
+	onlyArea := r.URL.Query().Get("area")
+	all, err := h.Queries.ListGuardCycles(ctx)
 	if err != nil {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudieron leer las guardias")
 		return
+	}
+	// Cada área ve sus guardias (9e); el admin, todas. ?area= acota a una.
+	cycles := all[:0]
+	visible := map[uuid.UUID]bool{}
+	for _, c := range all {
+		code := acc.code(c.AreaID)
+		if acc.canView(code) && (onlyArea == "" || onlyArea == code) {
+			cycles = append(cycles, c)
+			visible[c.ID] = true
+		}
 	}
 	members, err := h.Queries.ListGuardMembers(ctx)
 	if err != nil {
@@ -166,6 +184,7 @@ func (h *GuardsHandler) Timeline(w http.ResponseWriter, r *http.Request) {
 		}
 		guards = append(guards, guardDTO{
 			CycleID: c.ID, TeamID: c.TeamID, Label: guardLabel(c.TeamName), MustBeCovered: c.MustBeCovered,
+			Area: acc.code(c.AreaID), AreaName: acc.nameOf[acc.code(c.AreaID)],
 			ChangeDay: c.StartDayOfWeek, ChangeTime: pgTimeString(c.ChangeTime), Timezone: c.Timezone, Members: ms,
 		})
 		if c.WorkShiftID != uuid.Nil {
@@ -181,6 +200,9 @@ func (h *GuardsHandler) Timeline(w http.ResponseWriter, r *http.Request) {
 	}
 	slots := make([]guardSlotDTO, 0, len(slotRows))
 	for _, s := range slotRows {
+		if !visible[s.CycleID] {
+			continue
+		}
 		slots = append(slots, guardSlotDTO{ID: s.ID, CycleID: s.CycleID, TeamMemberID: s.TeamMemberID, Name: s.DisplayName, UserID: uuidPtr(s.UserID), StartsAt: s.StartsAt.Time, EndsAt: s.EndsAt.Time, Paused: s.IsPaused})
 	}
 	ovRows, err := h.Queries.ListGuardOverridesBetween(ctx, db.ListGuardOverridesBetweenParams{FromAt: tsFrom, ToAt: tsTo})
@@ -190,6 +212,9 @@ func (h *GuardsHandler) Timeline(w http.ResponseWriter, r *http.Request) {
 	}
 	overrides := make([]guardOverrideDTO, 0, len(ovRows))
 	for _, o := range ovRows {
+		if !visible[o.CycleID] {
+			continue
+		}
 		overrides = append(overrides, guardOverrideDTO{ID: o.ID, CycleID: o.CycleID, OriginalTeamMemberID: uuidPtr(o.OriginalTeamMemberID), ReplacementTeamMemberID: o.ReplacementTeamMemberID, Name: o.ReplacementName, StartsAt: o.StartDate.Time, EndsAt: o.EndDate.Time, Reason: o.Reason})
 	}
 	absRows, err := h.Queries.ListAbsencesBetween(ctx, db.ListAbsencesBetweenParams{FromDate: pgtype.Date{Time: from, Valid: true}, ToDate: pgtype.Date{Time: to, Valid: true}})
@@ -209,6 +234,8 @@ func (h *GuardsHandler) Timeline(w http.ResponseWriter, r *http.Request) {
 	writeData(w, 200, map[string]any{
 		"from": from, "to": to, "now": now, "guards": guards, "slots": slots, "overrides": overrides,
 		"absences": mergeAbsences(absRows), "workShifts": shiftRefs,
+		// Las áreas cuyas guardias puede editar (jefatura o admin).
+		"editableAreas": acc.manageable(),
 	})
 }
 
@@ -254,6 +281,9 @@ func (h *GuardsHandler) memberOfCycle(ctx context.Context, q *db.Queries, cycleI
 	c, err := q.GetGuardCycle(ctx, cycleID)
 	if err != nil {
 		return c, "la guardia no existe"
+	}
+	if msg := h.manageCycleMsg(ctx, c); msg != "" {
+		return c, msg
 	}
 	if _, err := q.GetTeamMemberForTeam(ctx, db.GetTeamMemberForTeamParams{ID: memberID, TeamID: c.TeamID}); err != nil {
 		return c, "esa persona no es integrante de la guardia (agrégala en Administración → Equipos)"
@@ -337,6 +367,17 @@ func (h *GuardsHandler) DeleteSlot(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		problemdetails.Write(w, r, 404, "not-found", "guardia no encontrada")
 		return
+	}
+	if old, err := h.Queries.GetGuardSlot(ctx, id); err == nil {
+		c, err := h.Queries.GetGuardCycle(ctx, old.CycleID)
+		if err != nil {
+			problemdetails.Write(w, r, 500, "internal-error", "no se pudo leer la guardia")
+			return
+		}
+		if msg := h.manageCycleMsg(ctx, c); msg != "" {
+			problemdetails.Write(w, r, http.StatusForbidden, "area-not-managed", msg)
+			return
+		}
 	}
 	n, err := h.Queries.DeleteGuardSlot(ctx, id)
 	if err != nil {
@@ -428,6 +469,10 @@ func (h *GuardsHandler) UpdateGuard(w http.ResponseWriter, r *http.Request) {
 	cycle, err := h.Queries.GetGuardCycle(ctx, id)
 	if err != nil {
 		problemdetails.Write(w, r, 404, "not-found", "guardia no encontrada")
+		return
+	}
+	if msg := h.manageCycleMsg(ctx, cycle); msg != "" {
+		problemdetails.Write(w, r, http.StatusForbidden, "area-not-managed", msg)
 		return
 	}
 	tx, err := h.Pool.Begin(ctx)
@@ -689,4 +734,192 @@ func (h *GuardsHandler) Import(w http.ResponseWriter, r *http.Request) {
 	sort.Slice(errs, func(i, j int) bool { return errs[i].Row < errs[j].Row })
 	h.AuditLog.Log(ctx, "guard.import", audit.LevelInfo, audit.Success(), map[string]any{"guards": created, "dotacionDays": days, "errors": len(errs), "by": actor.Username})
 	writeData(w, 200, map[string]any{"guards": created, "dotacionDays": days, "errors": errs})
+}
+
+// ===== Guardias por área (9e) =====
+
+const notManagedMsg = "solo la jefatura de esa área o un administrador puede cambiar esta guardia"
+
+// manageCycleMsg: "" si el usuario edita el área de la guardia.
+func (h *GuardsHandler) manageCycleMsg(ctx context.Context, c db.GetGuardCycleRow) string {
+	acc, err := loadAreaAccess(ctx, h.Queries)
+	if err != nil {
+		return "no se pudieron leer tus áreas"
+	}
+	if !acc.canManage(acc.code(c.AreaID)) {
+		return notManagedMsg
+	}
+	return ""
+}
+
+type createGuardRequest struct {
+	Area          string `json:"area"`
+	Name          string `json:"name"`
+	ChangeDay     *int32 `json:"changeDay"`
+	MustBeCovered bool   `json:"mustBeCovered"`
+}
+
+// CreateGuard es POST /api/guards (jefatura del área o admin): una guardia
+// nueva («Guardia Infra»), semanal, con su área dueña.
+func (h *GuardsHandler) CreateGuard(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	var req createGuardRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		problemdetails.Write(w, r, 400, "invalid-payload", "cuerpo inválido")
+		return
+	}
+	name := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(req.Name), "Guardia "))
+	if name == "" || len([]rune(name)) > 40 {
+		problemdetails.Write(w, r, 400, "invalid-payload", "el nombre es obligatorio (hasta 40 caracteres)")
+		return
+	}
+	day := int32(1)
+	if req.ChangeDay != nil {
+		day = *req.ChangeDay
+	}
+	if day < 0 || day > 6 {
+		problemdetails.Write(w, r, 400, "invalid-payload", "día de cambio inválido (0 = domingo … 6 = sábado)")
+		return
+	}
+	acc, ok := mustLoadAreaAccess(w, r, h.Queries)
+	if !ok {
+		return
+	}
+	var areaID uuid.UUID
+	for id, code := range acc.codeOf {
+		if code == req.Area {
+			areaID = id
+		}
+	}
+	if areaID == uuid.Nil {
+		problemdetails.Write(w, r, 400, "invalid-payload", "área inválida")
+		return
+	}
+	if !requireManage(w, r, acc, req.Area) {
+		return
+	}
+	team := "Guardia " + name
+	tx, err := h.Pool.Begin(ctx)
+	if err != nil {
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudo crear la guardia")
+		return
+	}
+	defer tx.Rollback(ctx)
+	q := h.Queries.WithTx(tx)
+	slug := slugCode(team)
+	for i := 2; ; i++ {
+		taken, err := q.GuardSlugTaken(ctx, slug)
+		if err != nil {
+			problemdetails.Write(w, r, 500, "internal-error", "no se pudo crear la guardia")
+			return
+		}
+		if !taken {
+			break
+		}
+		slug = fmt.Sprintf("%s_%d", slugCode(team), i)
+	}
+	teamID, err := q.CreateGuardTeam(ctx, db.CreateGuardTeamParams{Name: team, Slug: slug, AreaID: pgtype.UUID{Bytes: areaID, Valid: true}})
+	if err != nil {
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudo crear la guardia")
+		return
+	}
+	cycleID, err := q.CreateGuardCycle(ctx, db.CreateGuardCycleParams{TeamID: teamID, StartDayOfWeek: day, MustBeCovered: req.MustBeCovered})
+	if err != nil {
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudo crear la guardia")
+		return
+	}
+	if err := tx.Commit(ctx); err != nil {
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudo crear la guardia")
+		return
+	}
+	h.AuditLog.Log(ctx, "guard.created", audit.LevelInfo, audit.Success(), map[string]any{"guard": team, "area": req.Area, "cycleId": cycleID.String()})
+	writeData(w, http.StatusCreated, map[string]any{"cycleId": cycleID, "teamId": teamID, "label": name})
+}
+
+type guardMemberRequest struct {
+	UserID uuid.UUID `json:"userId"`
+}
+
+// AddMember es POST /api/guards/{cycleId}/members: suma a una persona a la
+// guardia. La jefatura solo suma a gente de su área.
+func (h *GuardsHandler) AddMember(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	cycleID, err := uuid.Parse(r.PathValue("cycleId"))
+	if err != nil {
+		problemdetails.Write(w, r, 404, "not-found", "guardia no encontrada")
+		return
+	}
+	var req guardMemberRequest
+	if err := decodeJSON(w, r, &req); err != nil || req.UserID == uuid.Nil {
+		problemdetails.Write(w, r, 400, "invalid-payload", "indica la persona")
+		return
+	}
+	cycle, err := h.Queries.GetGuardCycle(ctx, cycleID)
+	if err != nil {
+		problemdetails.Write(w, r, 404, "not-found", "guardia no encontrada")
+		return
+	}
+	acc, ok := mustLoadAreaAccess(w, r, h.Queries)
+	if !ok {
+		return
+	}
+	area := acc.code(cycle.AreaID)
+	if !requireManage(w, r, acc, area) {
+		return
+	}
+	if !acc.all {
+		groups, err := h.Queries.ListUserGroupsWithAreas(ctx, req.UserID)
+		if err != nil {
+			problemdetails.Write(w, r, 500, "internal-error", "no se pudieron leer sus grupos")
+			return
+		}
+		if !slices.ContainsFunc(groups, func(g db.ListUserGroupsWithAreasRow) bool { return slices.Contains(g.AreaCodes, area) }) {
+			problemdetails.Write(w, r, 400, "invalid-payload", "esa persona no es de tu área")
+			return
+		}
+	}
+	member, err := h.Queries.FindTeamMemberByUser(ctx, db.FindTeamMemberByUserParams{TeamID: cycle.TeamID, UserID: pgtype.UUID{Bytes: req.UserID, Valid: true}})
+	if err == nil {
+		err = h.Queries.ReactivateGuardMember(ctx, member)
+	} else if errors.Is(err, pgx.ErrNoRows) {
+		member, err = h.Queries.AddGuardMember(ctx, db.AddGuardMemberParams{TeamID: cycle.TeamID, UserID: pgtype.UUID{Bytes: req.UserID, Valid: true}})
+	}
+	if err != nil {
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudo sumar a la persona")
+		return
+	}
+	h.AuditLog.Log(ctx, "guard.member.added", audit.LevelInfo, audit.Success(), map[string]any{"guard": cycle.TeamName, "userId": req.UserID.String()})
+	writeData(w, http.StatusCreated, map[string]any{"teamMemberId": member})
+}
+
+// RemoveMember es DELETE /api/guards/{cycleId}/members/{memberId}: la saca
+// de la guardia (sus guardias pasadas quedan).
+func (h *GuardsHandler) RemoveMember(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	cycleID, err1 := uuid.Parse(r.PathValue("cycleId"))
+	memberID, err2 := uuid.Parse(r.PathValue("memberId"))
+	if err1 != nil || err2 != nil {
+		problemdetails.Write(w, r, 404, "not-found", "guardia no encontrada")
+		return
+	}
+	cycle, err := h.Queries.GetGuardCycle(ctx, cycleID)
+	if err != nil {
+		problemdetails.Write(w, r, 404, "not-found", "guardia no encontrada")
+		return
+	}
+	if msg := h.manageCycleMsg(ctx, cycle); msg != "" {
+		problemdetails.Write(w, r, http.StatusForbidden, "area-not-managed", msg)
+		return
+	}
+	n, err := h.Queries.DeactivateGuardMember(ctx, db.DeactivateGuardMemberParams{ID: memberID, TeamID: cycle.TeamID})
+	if err != nil {
+		problemdetails.Write(w, r, 500, "internal-error", "no se pudo sacar a la persona")
+		return
+	}
+	if n == 0 {
+		problemdetails.Write(w, r, 404, "not-found", "esa persona no está en la guardia")
+		return
+	}
+	h.AuditLog.Log(ctx, "guard.member.removed", audit.LevelInfo, audit.Success(), map[string]any{"guard": cycle.TeamName, "teamMemberId": memberID.String()})
+	w.WriteHeader(http.StatusNoContent)
 }

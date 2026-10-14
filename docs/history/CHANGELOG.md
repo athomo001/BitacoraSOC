@@ -4,6 +4,14 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] Guardias y escalamiento por área (spec/16, etapa 9e) - 2026-10-14
+
+- Diseño aprobado por el dueño en el canvas (v38, "Guardias y escalamiento por área").
+- Migración 000035: cada guardia y cada política de escalamiento tiene **área dueña**. «Guardia N2» y «Guardia N1_NO_HABIL» quedan en SOC; «Guardia TI» pasa al área TI (se crea si falta); las políticas existentes, en SOC. El ETL y los respaldos anteriores siguen la misma regla.
+- Cada área ve sus guardias y políticas; su **jefatura las edita** desde **Mi equipo**, con pestañas nuevas Guardias (guardias, integrantes, guardia nueva y la línea de tiempo) y Escalamiento (políticas y llamados). El admin ve todas y cambia el área dueña en Administración → Escalamiento.
+- La gente de TI o Infraestructura ve **Turnos** (Guardias en solo lectura y Dotación de su área) y **Escalamiento** (solo sus políticas). El menú ahora respeta el perfil: Bitácora y Reportes solo para el perfil Operativo.
+- Rutas nuevas `POST /api/guards`, `POST/DELETE /api/guards/{cycleId}/members`; `?area=` en guardias, políticas y Dotación (spec/04).
+
 ## [Rewrite] Usuarios por área y nivel: los grupos se arman solos - 2026-10-13
 
 - Pedido del dueño («me complico»); diseño aprobado en el canvas (v36, "Usuarios por área y nivel").

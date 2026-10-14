@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, signal } from '@angular/core';
+import { Area, AreasService } from '../../core/areas/areas.service';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import {
@@ -46,6 +47,7 @@ type ScopeKind = 'asset' | 'unit' | 'service';
     .ea__confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
     .ea__reminder { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); }
     .ea__reminder .adm-field { flex: 1 1 260px; }
+    .ea__owner { display: flex; flex-wrap: wrap; gap: 6px; }
   `,
 })
 export class AdminEscalationComponent implements OnInit {
@@ -55,8 +57,29 @@ export class AdminEscalationComponent implements OnInit {
   private readonly territory = inject(TerritoryService);
   private readonly modules = inject(ModuleAccessService);
 
-  protected readonly socEnabled = this.modules.soc;
-  protected readonly nocEnabled = this.modules.noc;
+  protected readonly socEnabled = this.modules.escSoc;
+  protected readonly nocEnabled = this.modules.escNoc;
+  private readonly areasApi = inject(AreasService);
+
+  /**
+   * area: solo las políticas de esa área y las nuevas nacen ahí (Mi equipo de
+   * la jefatura, 9e). Sin área es Administración: todas, con su área dueña.
+   */
+  readonly area = input<string | null>(null);
+  protected readonly areaList = signal<Area[]>([]);
+  protected areaName(code: string): string {
+    return this.areaList().find((a) => a.code === code)?.name ?? code.toUpperCase();
+  }
+  /** Área dueña de las nuevas políticas en Administración. */
+  protected readonly newArea = signal('soc');
+
+  protected async setArea(p: Policy, area: string): Promise<void> {
+    if (area === p.area) return;
+    await this.run(async () => {
+      await this.api.setPolicyArea(p.id, area);
+      this.policies.update((list) => list.map((x) => (x.id === p.id ? { ...x, area } : x)));
+    });
+  }
   protected readonly error = signal<string | null>(null);
   protected readonly busy = signal(false);
   protected readonly confirmDelete = signal(false);
@@ -92,6 +115,7 @@ export class AdminEscalationComponent implements OnInit {
     await this.run(async () => {
       await Promise.all([
         this.refreshPolicies(),
+        this.area() ? null : this.areasApi.areas().then((a) => this.areaList.set(a.filter((x) => x.active))),
         this.orgs.listTeams().then((t) => this.teams.set(t.filter((x) => x.active))),
         this.api.listPools().then((p) => this.pools.set(p)),
         this.nocEnabled() ? this.api.listAssets().then((a) => this.assets.set(a)) : null,
@@ -173,7 +197,7 @@ export class AdminEscalationComponent implements OnInit {
 
   protected async createPolicy(): Promise<void> {
     await this.run(async () => {
-      const p = await this.api.createPolicy(this.scopeOf(this.policyKind(), this.policyTarget()));
+      const p = await this.api.createPolicy(this.scopeOf(this.policyKind(), this.policyTarget()), this.area() ?? this.newArea());
       this.policyTarget.set('');
       await this.refreshPolicies();
       this.selectedId.set(p.id);
@@ -199,7 +223,7 @@ export class AdminEscalationComponent implements OnInit {
   }
 
   private async refreshPolicies(): Promise<void> {
-    this.policies.set(await this.api.listPolicies());
+    this.policies.set(await this.api.listPolicies(this.area()));
   }
 
   private async refreshServices(): Promise<void> {

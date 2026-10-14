@@ -328,6 +328,13 @@ func (h *RotationHandler) CreateOverride(w http.ResponseWriter, r *http.Request)
 		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "endDate debe ser posterior a startDate")
 		return
 	}
+	// 9e: solo la jefatura del área de la guardia (o el admin) pone reemplazos.
+	if cycle, err := h.Queries.GetGuardCycle(r.Context(), req.CycleID); err == nil {
+		acc, ok := mustLoadAreaAccess(w, r, h.Queries)
+		if !ok || !requireManage(w, r, acc, acc.code(cycle.AreaID)) {
+			return
+		}
+	}
 	user, _ := middleware.UserFromContext(r.Context())
 	override, err := h.Queries.CreateRotationOverride(r.Context(), db.CreateRotationOverrideParams{
 		CycleID: req.CycleID, OriginalTeamMemberID: optionalUUID(req.OriginalTeamMemberID),

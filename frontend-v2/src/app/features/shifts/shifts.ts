@@ -7,6 +7,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { MyShiftComponent } from './my-shift';
 import { ShiftHistoryComponent } from './shift-history';
+import { AdminGuardsComponent } from '../admin/admin-guards';
 import {
   CONDITION_COLOR_VAR,
   Matrix,
@@ -16,7 +17,7 @@ import {
 } from '../../core/shifts/shifts.service';
 
 import '../../core/i18n/packs/shifts';
-type ShiftsTab = 'mine' | 'history' | 'dotacion';
+type ShiftsTab = 'mine' | 'history' | 'dotacion' | 'guards';
 
 const ALL_CONDITIONS: TeleworkCondition[] = ['office', 'telework', 'guardia', 'training', 'medical_appointment', 'vacation', 'medical_leave'];
 
@@ -49,7 +50,7 @@ function mondayOf(d: Date): Date {
 @Component({
   selector: 'app-shifts',
   standalone: true,
-  imports: [FormsModule, ButtonComponent, MyShiftComponent, ShiftHistoryComponent],
+  imports: [FormsModule, ButtonComponent, MyShiftComponent, ShiftHistoryComponent, AdminGuardsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './shifts.html',
   styleUrl: './shifts.css',
@@ -63,6 +64,13 @@ export class ShiftsComponent implements OnInit {
   protected readonly perms = inject(PermissionsService);
 
   protected readonly tab = signal<ShiftsTab>('mine');
+  /**
+   * La gente de un área propia (TI, Infra) que no es Operativa ve sus
+   * guardias (solo mirar) y la Dotación de su área (9e); Mi turno e
+   * Historial son del checklist de SOC/NOC.
+   */
+  protected readonly areaView = computed(() => !this.perms.operational() && this.perms.ownAreas().length > 0);
+  protected readonly area = signal<string | null>(null);
   protected readonly weekStart = signal(mondayOf(new Date()));
   protected readonly matrix = signal<Matrix | null>(null);
   protected readonly loading = signal(false);
@@ -93,6 +101,15 @@ export class ShiftsComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.perms.load();
+    if (this.areaView()) {
+      this.area.set(this.perms.ownAreas()[0]);
+      this.tab.set('guards');
+    }
+    await this.loadMatrix();
+  }
+
+  protected async pickArea(code: string): Promise<void> {
+    this.area.set(code);
     await this.loadMatrix();
   }
 
@@ -102,7 +119,7 @@ export class ShiftsComponent implements OnInit {
     try {
       const from = isoDate(this.weekStart());
       const to = isoDate(new Date(this.weekStart().getTime() + 6 * 86_400_000));
-      this.matrix.set(await this.api.matrix(from, to));
+      this.matrix.set(await this.api.matrix(from, to, this.areaView() ? this.area() : null));
     } catch (error) {
       this.error.set(problemDetail(error, this.i18n.t('staff.loadError')));
     } finally {

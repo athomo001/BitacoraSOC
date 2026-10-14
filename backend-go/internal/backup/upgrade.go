@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -24,6 +25,45 @@ func upgradeTables(tables map[string]json.RawMessage) {
 		buildAreas(tables)
 	}
 	fillAreaProfiles(tables)
+	fillGuardAreas(tables)
+}
+
+// fillGuardAreas: los respaldos de antes de 000035 traen las guardias sin
+// área dueña (y la base ya no las acepta así). Misma regla que la migración:
+// la Guardia TI al área TI (se agrega si falta), las demás a SOC. Las
+// políticas sin área toman SOC por el valor por defecto de la columna.
+func fillGuardAreas(tables map[string]json.RawMessage) {
+	var teams []map[string]any
+	if err := json.Unmarshal(tables["teams"], &teams); err != nil {
+		return
+	}
+	var areas []map[string]any
+	_ = json.Unmarshal(tables["areas"], &areas)
+	tiID := ""
+	for _, a := range areas {
+		if a["code"] == "ti" {
+			tiID, _ = a["id"].(string)
+		}
+	}
+	changed := false
+	for _, t := range teams {
+		if t["kind"] != "oncall" || t["area_id"] != nil {
+			continue
+		}
+		t["area_id"] = areaSOCID
+		if t["name"] == "Guardia TI" {
+			if tiID == "" {
+				tiID = uuid.NewString()
+				areas = append(areas, map[string]any{"id": tiID, "code": "ti", "name": "TI", "active": true, "is_system": false, "sort_order": 30, "default_profile": "resolutor"})
+				tables["areas"], _ = json.Marshal(areas)
+			}
+			t["area_id"] = tiID
+		}
+		changed = true
+	}
+	if changed {
+		tables["teams"], _ = json.Marshal(teams)
+	}
 }
 
 // fillAreaProfiles: los respaldos de antes de 000034 no traen el perfil de

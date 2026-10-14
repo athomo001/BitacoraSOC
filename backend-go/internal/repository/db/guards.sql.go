@@ -29,6 +29,25 @@ func (q *Queries) AddGuardMember(ctx context.Context, arg AddGuardMemberParams) 
 	return id, err
 }
 
+const createGuardCycle = `-- name: CreateGuardCycle :one
+INSERT INTO rotation_cycles (team_id, start_day_of_week, start_time_utc, duration_days, timezone, must_be_covered)
+VALUES ($1, $2, '12:00', 7, 'America/Santiago', $3)
+RETURNING id
+`
+
+type CreateGuardCycleParams struct {
+	TeamID         uuid.UUID `json:"team_id"`
+	StartDayOfWeek int32     `json:"start_day_of_week"`
+	MustBeCovered  bool      `json:"must_be_covered"`
+}
+
+func (q *Queries) CreateGuardCycle(ctx context.Context, arg CreateGuardCycleParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, createGuardCycle, arg.TeamID, arg.StartDayOfWeek, arg.MustBeCovered)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const createGuardSlot = `-- name: CreateGuardSlot :one
 INSERT INTO rotation_slots (cycle_id, team_member_id, starts_at, ends_at, week_start_date, week_end_date)
 SELECT c.id, $1, $2::timestamptz, $3::timestamptz,
@@ -65,6 +84,42 @@ func (q *Queries) CreateGuardSlot(ctx context.Context, arg CreateGuardSlotParams
 		&i.EndsAt,
 	)
 	return i, err
+}
+
+const createGuardTeam = `-- name: CreateGuardTeam :one
+INSERT INTO teams (name, slug, kind, audience, area_id) VALUES ($1, $2, 'oncall', 'internal', $3)
+RETURNING id
+`
+
+type CreateGuardTeamParams struct {
+	Name   string      `json:"name"`
+	Slug   string      `json:"slug"`
+	AreaID pgtype.UUID `json:"area_id"`
+}
+
+// Una guardia nueva (9e): el equipo "oncall" con su área dueña.
+func (q *Queries) CreateGuardTeam(ctx context.Context, arg CreateGuardTeamParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, createGuardTeam, arg.Name, arg.Slug, arg.AreaID)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const deactivateGuardMember = `-- name: DeactivateGuardMember :execrows
+UPDATE team_members SET active = false WHERE id = $1 AND team_id = $2
+`
+
+type DeactivateGuardMemberParams struct {
+	ID     uuid.UUID `json:"id"`
+	TeamID uuid.UUID `json:"team_id"`
+}
+
+func (q *Queries) DeactivateGuardMember(ctx context.Context, arg DeactivateGuardMemberParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deactivateGuardMember, arg.ID, arg.TeamID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const deleteGuardSlot = `-- name: DeleteGuardSlot :execrows
@@ -115,7 +170,8 @@ func (q *Queries) FindUserForGuardImport(ctx context.Context, q_ string) (FindUs
 }
 
 const getGuardCycle = `-- name: GetGuardCycle :one
-SELECT c.id, c.team_id, c.start_day_of_week, c.start_time_utc, c.duration_days, c.timezone, c.active, c.must_be_covered, t.name AS team_name FROM rotation_cycles c JOIN teams t ON t.id = c.team_id WHERE c.id = $1
+SELECT c.id, c.team_id, c.start_day_of_week, c.start_time_utc, c.duration_days, c.timezone, c.active, c.must_be_covered, t.name AS team_name, COALESCE(t.area_id, '00000000-0000-0000-0000-000000000000'::uuid) AS area_id
+FROM rotation_cycles c JOIN teams t ON t.id = c.team_id WHERE c.id = $1
 `
 
 type GetGuardCycleRow struct {
@@ -128,6 +184,7 @@ type GetGuardCycleRow struct {
 	Active         bool        `json:"active"`
 	MustBeCovered  bool        `json:"must_be_covered"`
 	TeamName       string      `json:"team_name"`
+	AreaID         pgtype.UUID `json:"area_id"`
 }
 
 func (q *Queries) GetGuardCycle(ctx context.Context, id uuid.UUID) (GetGuardCycleRow, error) {
@@ -143,6 +200,7 @@ func (q *Queries) GetGuardCycle(ctx context.Context, id uuid.UUID) (GetGuardCycl
 		&i.Active,
 		&i.MustBeCovered,
 		&i.TeamName,
+		&i.AreaID,
 	)
 	return i, err
 }
@@ -182,6 +240,17 @@ func (q *Queries) GetTeamMemberForTeam(ctx context.Context, arg GetTeamMemberFor
 	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err
+}
+
+const guardSlugTaken = `-- name: GuardSlugTaken :one
+SELECT EXISTS (SELECT 1 FROM teams WHERE slug = $1)
+`
+
+func (q *Queries) GuardSlugTaken(ctx context.Context, slug string) (bool, error) {
+	row := q.db.QueryRow(ctx, guardSlugTaken, slug)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const linkWorkShiftToCycle = `-- name: LinkWorkShiftToCycle :exec
@@ -241,6 +310,7 @@ func (q *Queries) ListAbsencesBetween(ctx context.Context, arg ListAbsencesBetwe
 const listGuardCycles = `-- name: ListGuardCycles :many
 
 SELECT c.id, c.team_id, t.name AS team_name, c.start_day_of_week, c.timezone, c.must_be_covered, c.duration_days,
+  COALESCE(t.area_id, '00000000-0000-0000-0000-000000000000'::uuid) AS area_id,
   COALESCE(ws.id, '00000000-0000-0000-0000-000000000000'::uuid) AS work_shift_id, COALESCE(ws.name, '')::text AS work_shift_name,
   COALESCE(ws.start_time, time '09:00') AS change_time
 FROM rotation_cycles c
@@ -261,6 +331,7 @@ type ListGuardCyclesRow struct {
 	Timezone       string      `json:"timezone"`
 	MustBeCovered  bool        `json:"must_be_covered"`
 	DurationDays   int32       `json:"duration_days"`
+	AreaID         pgtype.UUID `json:"area_id"`
 	WorkShiftID    uuid.UUID   `json:"work_shift_id"`
 	WorkShiftName  string      `json:"work_shift_name"`
 	ChangeTime     pgtype.Time `json:"change_time"`
@@ -288,6 +359,7 @@ func (q *Queries) ListGuardCycles(ctx context.Context) ([]ListGuardCyclesRow, er
 			&i.Timezone,
 			&i.MustBeCovered,
 			&i.DurationDays,
+			&i.AreaID,
 			&i.WorkShiftID,
 			&i.WorkShiftName,
 			&i.ChangeTime,
@@ -459,6 +531,15 @@ func (q *Queries) ListGuardSlotsBetween(ctx context.Context, arg ListGuardSlotsB
 		return nil, err
 	}
 	return items, nil
+}
+
+const reactivateGuardMember = `-- name: ReactivateGuardMember :exec
+UPDATE team_members SET active = true WHERE id = $1
+`
+
+func (q *Queries) ReactivateGuardMember(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, reactivateGuardMember, id)
+	return err
 }
 
 const unlinkWorkShiftsFromCycle = `-- name: UnlinkWorkShiftsFromCycle :exec

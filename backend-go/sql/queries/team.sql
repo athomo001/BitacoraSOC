@@ -88,3 +88,11 @@ WHERE t.status NOT IN ('resolved', 'closed', 'cancelled')
 ORDER BY t.sla_resolution_due_at NULLS LAST
 LIMIT 20;
 
+
+-- name: ListAreaUserIDs :many
+-- Las personas de un área (Dotación por área, 9e).
+SELECT DISTINCT upg.user_id
+FROM user_permission_groups upg
+JOIN permission_groups pg ON pg.id = upg.permission_group_id AND pg.active
+JOIN permission_group_areas pa ON pa.permission_group_id = pg.id
+JOIN areas a ON a.id = pa.area_id AND a.code = $1;

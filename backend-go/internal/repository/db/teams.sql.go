@@ -54,7 +54,7 @@ func (q *Queries) AddTeamMember(ctx context.Context, arg AddTeamMemberParams) (T
 
 const createTeam = `-- name: CreateTeam :one
 INSERT INTO teams (name, slug, kind, organization_id, team_group_id, audience)
-VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, organization_id, team_group_id, name, slug, kind, audience, active, deactivated_by_org
+VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, organization_id, team_group_id, name, slug, kind, audience, active, deactivated_by_org, area_id
 `
 
 type CreateTeamParams struct {
@@ -86,6 +86,7 @@ func (q *Queries) CreateTeam(ctx context.Context, arg CreateTeamParams) (Team, e
 		&i.Audience,
 		&i.Active,
 		&i.DeactivatedByOrg,
+		&i.AreaID,
 	)
 	return i, err
 }
@@ -201,7 +202,7 @@ func (q *Queries) DeleteTeams(ctx context.Context, ids []uuid.UUID) (int64, erro
 }
 
 const getTeam = `-- name: GetTeam :one
-SELECT id, organization_id, team_group_id, name, slug, kind, audience, active, deactivated_by_org FROM teams WHERE id = $1
+SELECT id, organization_id, team_group_id, name, slug, kind, audience, active, deactivated_by_org, area_id FROM teams WHERE id = $1
 `
 
 func (q *Queries) GetTeam(ctx context.Context, id uuid.UUID) (Team, error) {
@@ -217,6 +218,7 @@ func (q *Queries) GetTeam(ctx context.Context, id uuid.UUID) (Team, error) {
 		&i.Audience,
 		&i.Active,
 		&i.DeactivatedByOrg,
+		&i.AreaID,
 	)
 	return i, err
 }
@@ -359,7 +361,7 @@ func (q *Queries) ListTeamMembers(ctx context.Context, teamID uuid.UUID) ([]List
 }
 
 const listTeams = `-- name: ListTeams :many
-SELECT t.id, t.organization_id, t.team_group_id, t.name, t.slug, t.kind, t.audience, t.active, t.deactivated_by_org, o.name AS organization_name, COALESCE(o.active, true) AS organization_active,
+SELECT t.id, t.organization_id, t.team_group_id, t.name, t.slug, t.kind, t.audience, t.active, t.deactivated_by_org, t.area_id, o.name AS organization_name, COALESCE(o.active, true) AS organization_active,
   (SELECT count(*) FROM team_members m WHERE m.team_id = t.id AND m.active)::int AS member_count,
   COALESCE((SELECT string_agg(COALESCE(sv.name || ' · ' || so.name, sv.name, a.name, u.name, 'política') || ' #' || st.step_order, ', ' ORDER BY st.step_order)
     FROM escalation_steps st JOIN escalation_policies p ON p.id = st.policy_id
@@ -397,6 +399,7 @@ type ListTeamsRow struct {
 	Audience           TeamAudience `json:"audience"`
 	Active             bool         `json:"active"`
 	DeactivatedByOrg   bool         `json:"deactivated_by_org"`
+	AreaID             pgtype.UUID  `json:"area_id"`
 	OrganizationName   pgtype.Text  `json:"organization_name"`
 	OrganizationActive bool         `json:"organization_active"`
 	MemberCount        int32        `json:"member_count"`
@@ -434,6 +437,7 @@ func (q *Queries) ListTeams(ctx context.Context, arg ListTeamsParams) ([]ListTea
 			&i.Audience,
 			&i.Active,
 			&i.DeactivatedByOrg,
+			&i.AreaID,
 			&i.OrganizationName,
 			&i.OrganizationActive,
 			&i.MemberCount,
@@ -543,7 +547,7 @@ UPDATE teams SET
   audience = COALESCE($6, audience),
   active = COALESCE($7, active)
 WHERE id = $1
-RETURNING id, organization_id, team_group_id, name, slug, kind, audience, active, deactivated_by_org
+RETURNING id, organization_id, team_group_id, name, slug, kind, audience, active, deactivated_by_org, area_id
 `
 
 type UpdateTeamParams struct {
@@ -577,6 +581,7 @@ func (q *Queries) UpdateTeam(ctx context.Context, arg UpdateTeamParams) (Team, e
 		&i.Audience,
 		&i.Active,
 		&i.DeactivatedByOrg,
+		&i.AreaID,
 	)
 	return i, err
 }

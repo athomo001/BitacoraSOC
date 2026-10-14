@@ -244,16 +244,22 @@ func run(logger *slog.Logger) error {
 	nocAdmin := func(h http.HandlerFunc) http.Handler {
 		return authMW.RequireAuth(apiRateLimit(middleware.RequireNotForcedPasswordChange(middleware.RequireModule(moduleAccess, modules.NOC)(middleware.RequireRole("admin")(h)))))
 	}
-	socAuthed := func(h http.HandlerFunc) http.Handler {
-		return authMW.RequireAuth(apiRateLimit(middleware.RequireNotForcedPasswordChange(middleware.RequireModule(moduleAccess, modules.SOC)(h))))
-	}
 	socAdmin := func(h http.HandlerFunc) http.Handler {
 		return authMW.RequireAuth(apiRateLimit(middleware.RequireNotForcedPasswordChange(middleware.RequireModule(moduleAccess, modules.SOC)(middleware.RequireRole("admin")(h)))))
+	}
+	// Lecturas de catálogo que también usa la gente de un área propia (9e).
+	socOrArea := func(h http.HandlerFunc) http.Handler {
+		return authMW.RequireAuth(apiRateLimit(middleware.RequireNotForcedPasswordChange(middleware.RequireModuleOrOwnArea(moduleAccess, moduleAccess, modules.SOC)(h))))
+	}
+	nocOrArea := func(h http.HandlerFunc) http.Handler {
+		return authMW.RequireAuth(apiRateLimit(middleware.RequireNotForcedPasswordChange(middleware.RequireModuleOrOwnArea(moduleAccess, moduleAccess, modules.NOC)(h))))
 	}
 	// Permiso por capacidad de permission_groups (HU-PERM-1); admin pasa siempre.
 	withCapability := func(capability string, h http.HandlerFunc) http.Handler {
 		return authMW.RequireAuth(apiRateLimit(middleware.RequireNotForcedPasswordChange(middleware.RequireCapability(moduleAccess, capability)(h))))
 	}
+	// 9e: jefatura de área o admin; el handler verifica que el área sea suya.
+	areaLead := func(h http.HandlerFunc) http.Handler { return withCapability(handler.CapAreaLead, h) }
 	ticketCapability := func(capability string, h http.HandlerFunc) http.Handler {
 		return withCapability(capability, func(w http.ResponseWriter, r *http.Request) {
 			ticketsHandler.RequireEnabled(w, r, h)
@@ -365,7 +371,7 @@ func run(logger *slog.Logger) error {
 	// las unidades sí.
 	mux.Handle("GET /api/config/territorial-labels", authed(configHandler.GetTerritorialLabels))
 	mux.Handle("PATCH /api/config/territorial-labels", admin(configHandler.PatchTerritorialLabels))
-	mux.Handle("GET /api/territorial-units", nocAuthed(territorialUnitsHandler.List))
+	mux.Handle("GET /api/territorial-units", nocOrArea(territorialUnitsHandler.List))
 	mux.Handle("POST /api/territorial-units", nocAdmin(territorialUnitsHandler.Create))
 	mux.Handle("PATCH /api/territorial-units/{id}", nocAdmin(territorialUnitsHandler.Patch))
 	mux.Handle("POST /api/territorial-units/import", nocAdmin(territorialUnitsHandler.Import))
@@ -416,7 +422,7 @@ func run(logger *slog.Logger) error {
 	mux.Handle("GET /api/teams/{id}/coverage", nocAuthed(teamsHandler.ListCoverage))
 	mux.Handle("POST /api/teams/{id}/coverage", nocAdmin(teamsHandler.AddCoverage))
 	mux.Handle("DELETE /api/teams/{id}/coverage/{territorialUnitId}", nocAdmin(teamsHandler.RemoveCoverage))
-	mux.Handle("GET /api/assets", nocAuthed(teamsHandler.ListAssets))
+	mux.Handle("GET /api/assets", nocOrArea(teamsHandler.ListAssets))
 	mux.Handle("POST /api/assets", nocAdmin(teamsHandler.CreateAsset))
 	mux.Handle("PATCH /api/assets/{id}", nocAdmin(teamsHandler.PatchAsset))
 
@@ -428,16 +434,16 @@ func run(logger *slog.Logger) error {
 	// Motor de escalación (Fase 7). resolve/actions/notify/policies aplican el
 	// gate de módulo según el scope del request (serviceId = SOC, assetId /
 	// territorialUnitId = NOC), dentro del handler.
-	mux.Handle("GET /api/services", socAuthed(escalationHandler.ListServices))
+	mux.Handle("GET /api/services", socOrArea(escalationHandler.ListServices))
 	mux.Handle("POST /api/services", socAdmin(escalationHandler.CreateService))
 	mux.Handle("GET /api/escalation/resolve", authed(escalationHandler.Resolve))
 	mux.Handle("POST /api/escalation/actions", authed(escalationHandler.RecordAction))
 	mux.Handle("GET /api/escalation/actions", authed(escalationHandler.ListActions))
 	mux.Handle("POST /api/escalation/notify", authed(escalationHandler.Notify))
 	mux.Handle("GET /api/escalation/policies", authed(escalationHandler.ListPolicies))
-	mux.Handle("POST /api/escalation/policies", admin(escalationHandler.CreatePolicy))
-	mux.Handle("DELETE /api/escalation/policies/{id}", admin(escalationHandler.DeletePolicy))
-	mux.Handle("PATCH /api/escalation/policies/{id}", admin(escalationHandler.PatchPolicy))
+	mux.Handle("POST /api/escalation/policies", areaLead(escalationHandler.CreatePolicy))
+	mux.Handle("DELETE /api/escalation/policies/{id}", areaLead(escalationHandler.DeletePolicy))
+	mux.Handle("PATCH /api/escalation/policies/{id}", areaLead(escalationHandler.PatchPolicy))
 	mux.Handle("GET /api/escalation/incidents", authed(escalationHandler.ListIncidents))
 	mux.Handle("POST /api/escalation/incidents", authed(escalationHandler.CreateIncident))
 	mux.Handle("PATCH /api/escalation/incidents/{id}", authed(escalationHandler.PatchIncident))
@@ -449,10 +455,10 @@ func run(logger *slog.Logger) error {
 	mux.Handle("DELETE /api/escalation/pools/{id}", admin(escalationHandler.DeletePool))
 	mux.Handle("GET /api/escalation/pools/{id}/members", authed(escalationHandler.ListPoolMembers))
 	mux.Handle("PUT /api/escalation/pools/{id}/members", admin(escalationHandler.PutPoolMembers))
-	mux.Handle("POST /api/escalation/policies/{id}/steps", admin(escalationHandler.AddStep))
-	mux.Handle("DELETE /api/escalation/policies/{id}/steps/{stepOrder}", admin(escalationHandler.DeleteStep))
-	mux.Handle("PUT /api/escalation/policies/{id}/steps/{stepId}", admin(escalationHandler.UpdateStep))
-	mux.Handle("POST /api/escalation/policies/{id}/steps/reorder", admin(escalationHandler.ReorderSteps))
+	mux.Handle("POST /api/escalation/policies/{id}/steps", areaLead(escalationHandler.AddStep))
+	mux.Handle("DELETE /api/escalation/policies/{id}/steps/{stepOrder}", areaLead(escalationHandler.DeleteStep))
+	mux.Handle("PUT /api/escalation/policies/{id}/steps/{stepId}", areaLead(escalationHandler.UpdateStep))
+	mux.Handle("POST /api/escalation/policies/{id}/steps/reorder", areaLead(escalationHandler.ReorderSteps))
 	mux.Handle("GET /api/maintenance-windows", authed(escalationHandler.ListWindows))
 	// Las mantenciones también las programa el analista (comentario del dueño #16).
 	mux.Handle("POST /api/maintenance-windows", operator(escalationHandler.CreateWindow))
@@ -470,15 +476,18 @@ func run(logger *slog.Logger) error {
 	mux.Handle("GET /api/rotation-slots", authed(rotationHandler.ListSlots))
 	mux.Handle("POST /api/rotation-slots", admin(rotationHandler.CreateSlot))
 	mux.Handle("PATCH /api/rotation-slots/{id}", admin(rotationHandler.PatchSlot))
-	mux.Handle("POST /api/rotation-overrides", admin(rotationHandler.CreateOverride))
+	mux.Handle("POST /api/rotation-overrides", areaLead(rotationHandler.CreateOverride))
 	// Guardias en línea de tiempo (canvas "Turnos: guardias", 2026-10-07).
 	guardsHandler := &handler.GuardsHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
 	mux.Handle("GET /api/guards", authed(guardsHandler.Timeline))
-	mux.Handle("PATCH /api/guards/{cycleId}", admin(guardsHandler.UpdateGuard))
-	mux.Handle("POST /api/guards/slots", admin(guardsHandler.CreateSlot))
-	mux.Handle("PUT /api/guards/slots/{id}", admin(guardsHandler.UpdateSlot))
-	mux.Handle("DELETE /api/guards/slots/{id}", admin(guardsHandler.DeleteSlot))
-	mux.Handle("POST /api/guards/rotation", admin(guardsHandler.GenerateRotation))
+	mux.Handle("PATCH /api/guards/{cycleId}", areaLead(guardsHandler.UpdateGuard))
+	mux.Handle("POST /api/guards/slots", areaLead(guardsHandler.CreateSlot))
+	mux.Handle("PUT /api/guards/slots/{id}", areaLead(guardsHandler.UpdateSlot))
+	mux.Handle("DELETE /api/guards/slots/{id}", areaLead(guardsHandler.DeleteSlot))
+	mux.Handle("POST /api/guards/rotation", areaLead(guardsHandler.GenerateRotation))
+	mux.Handle("POST /api/guards", areaLead(guardsHandler.CreateGuard))
+	mux.Handle("POST /api/guards/{cycleId}/members", areaLead(guardsHandler.AddMember))
+	mux.Handle("DELETE /api/guards/{cycleId}/members/{memberId}", areaLead(guardsHandler.RemoveMember))
 	mux.Handle("GET /api/guards/import/template", admin(guardsHandler.Template))
 	mux.Handle("POST /api/guards/import", admin(guardsHandler.Import))
 	mux.Handle("GET /api/work-shifts", authed(rotationHandler.ListWorkShifts))

@@ -63,3 +63,21 @@ func TestUpgradeTablesFillsAreaProfiles(t *testing.T) {
 		}
 	}
 }
+
+func TestUpgradeTablesFillsGuardAreas(t *testing.T) {
+	tables := map[string]json.RawMessage{
+		"areas": json.RawMessage(`[{"id":"` + areaSOCID + `","code":"soc","default_profile":"operativo"}]`),
+		"teams": json.RawMessage(`[{"name":"Guardia N2","kind":"oncall"},{"name":"Guardia TI","kind":"oncall"},{"name":"Mundo","kind":"escalation"}]`),
+	}
+	upgradeTables(tables)
+	var teams []map[string]any
+	_ = json.Unmarshal(tables["teams"], &teams)
+	var areas []map[string]any
+	_ = json.Unmarshal(tables["areas"], &areas)
+	if len(areas) != 2 || areas[1]["code"] != "ti" {
+		t.Fatalf("se agrega el área TI: %v", areas)
+	}
+	if teams[0]["area_id"] != areaSOCID || teams[1]["area_id"] != areas[1]["id"] || teams[2]["area_id"] != nil {
+		t.Fatalf("áreas de las guardias: %v", teams)
+	}
+}

@@ -98,7 +98,10 @@ type Querier interface {
 	CreateEntryComment(ctx context.Context, arg CreateEntryCommentParams) (EntryComment, error)
 	CreateEscalationIncident(ctx context.Context, arg CreateEscalationIncidentParams) (EscalationIncident, error)
 	CreateEscalationPool(ctx context.Context, arg CreateEscalationPoolParams) (EscalationPool, error)
+	CreateGuardCycle(ctx context.Context, arg CreateGuardCycleParams) (uuid.UUID, error)
 	CreateGuardSlot(ctx context.Context, arg CreateGuardSlotParams) (RotationSlot, error)
+	// Una guardia nueva (9e): el equipo "oncall" con su área dueña.
+	CreateGuardTeam(ctx context.Context, arg CreateGuardTeamParams) (uuid.UUID, error)
 	CreateLevel(ctx context.Context, arg CreateLevelParams) (Level, error)
 	CreateLogSource(ctx context.Context, arg CreateLogSourceParams) (CatalogLogSource, error)
 	CreateMaintenanceWindow(ctx context.Context, arg CreateMaintenanceWindowParams) (MaintenanceWindow, error)
@@ -142,6 +145,7 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateUserChannel(ctx context.Context, arg CreateUserChannelParams) (ContactChannel, error)
 	CreateWorkShift(ctx context.Context, arg CreateWorkShiftParams) (WorkShift, error)
+	DeactivateGuardMember(ctx context.Context, arg DeactivateGuardMemberParams) (int64, error)
 	DeactivateLeftoverMemberships(ctx context.Context, duplicateID pgtype.UUID) error
 	DeactivateMaintenanceWindow(ctx context.Context, id uuid.UUID) (int64, error)
 	DeactivateOrganizationTeams(ctx context.Context, organizationID pgtype.UUID) (int64, error)
@@ -339,6 +343,7 @@ type Querier interface {
 	// Turno al que pertenece un check: define la ventana real del cierre (no 8h fijas) y los destinatarios del reporte.
 	GetWorkShiftForCheck(ctx context.Context, id uuid.UUID) (WorkShift, error)
 	GroupCodeTaken(ctx context.Context, code string) (bool, error)
+	GuardSlugTaken(ctx context.Context, slug string) (bool, error)
 	HasClientAlertAck(ctx context.Context, arg HasClientAlertAckParams) (bool, error)
 	// ===== Intentos (inmutables, ver migración 000004) =====
 	InsertActionLog(ctx context.Context, arg InsertActionLogParams) (EscalationActionLog, error)
@@ -376,6 +381,8 @@ type Querier interface {
 	// TicketQueueSummary): los asignados y en los que es resolutor.
 	ListAreaPeople(ctx context.Context, arg ListAreaPeopleParams) ([]ListAreaPeopleRow, error)
 	ListAreaPeopleGroups(ctx context.Context, areaID uuid.UUID) ([]ListAreaPeopleGroupsRow, error)
+	// Las personas de un área (Dotación por área, 9e).
+	ListAreaUserIDs(ctx context.Context, code string) ([]uuid.UUID, error)
 	// Áreas y niveles (000033, spec/16 §3).
 	ListAreas(ctx context.Context) ([]Area, error)
 	// ===== Administración → Áreas y niveles (spec/16, 9b) =====
@@ -664,6 +671,7 @@ type Querier interface {
 	// Housekeeping: una vez que un JTI expiró de verdad, ya no hace falta
 	// consultarlo (el JWT tampoco pasaría Verify() por expiración propia).
 	PurgeExpiredDenylistedTokens(ctx context.Context) error
+	ReactivateGuardMember(ctx context.Context, id uuid.UUID) error
 	ReactivateOrganizationTeams(ctx context.Context, organizationID pgtype.UUID) (int64, error)
 	// Reubica los descendientes de un nodo cuyo path cambió (reimport que lo
 	// movió de padre) — incluidos los sitios agregados a mano que el dataset
@@ -717,6 +725,8 @@ type Querier interface {
 	SetMustChangePassword(ctx context.Context, arg SetMustChangePasswordParams) error
 	SetPasswordMinLength(ctx context.Context, passwordMinLength int16) (int16, error)
 	SetPasswordResetToken(ctx context.Context, arg SetPasswordResetTokenParams) error
+	// El área dueña de la política (9e): esa área la ve y su jefatura la edita.
+	SetPolicyArea(ctx context.Context, arg SetPolicyAreaParams) (EscalationPolicy, error)
 	SetPublicShareLinkActive(ctx context.Context, arg SetPublicShareLinkActiveParams) (PublicShareLink, error)
 	// Activar o desactivar a mano anula lo que hizo la organización.
 	SetTeamsActive(ctx context.Context, arg SetTeamsActiveParams) (int64, error)

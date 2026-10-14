@@ -58,3 +58,39 @@ func RequireModule(access ModuleAccess, module modules.Module) func(http.Handler
 		})
 	}
 }
+
+// AreaLister lee todas las áreas del usuario (cualquier perfil).
+type AreaLister interface {
+	UserAreaCodes(ctx context.Context, userID uuid.UUID) ([]string, error)
+}
+
+// RequireModuleOrOwnArea es RequireModule para las lecturas que también usa
+// la gente de un área propia (TI, Infraestructura…) para su escalamiento
+// (9e, spec/16 §3.6): el módulo tiene que estar encendido en la instalación
+// y el usuario, o tenerlo en su alcance Operativo, o estar en un área que
+// no sea SOC ni NOC.
+func RequireModuleOrOwnArea(access ModuleAccess, areas AreaLister, module modules.Module) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		strict := RequireModule(access, module)(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			user, ok := UserFromContext(r.Context())
+			if ok && user.Role != "admin" {
+				flags, err := access.InstanceFlags(r.Context())
+				if err == nil && flags.Enabled(module) {
+					codes, err := areas.UserAreaCodes(r.Context(), user.ID)
+					if err != nil {
+						problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer el alcance del usuario")
+						return
+					}
+					for _, c := range codes {
+						if c != string(modules.SOC) && c != string(modules.NOC) {
+							next.ServeHTTP(w, r)
+							return
+						}
+					}
+				}
+			}
+			strict.ServeHTTP(w, r)
+		})
+	}
+}

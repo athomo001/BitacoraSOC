@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
@@ -88,6 +88,20 @@ export class AdminGuardsComponent implements OnInit {
   private readonly api = inject(GuardsService);
   private readonly shiftsApi = inject(ShiftsService);
   private readonly http = inject(HttpClient);
+
+  /**
+   * area: solo las guardias de esa área (9e: Mi equipo de la jefatura o
+   * Turnos de TI/Infra). Sin área es Administración: todas, más la carga por
+   * CSV y las condiciones de Dotación.
+   */
+  readonly area = input<string | null>(null);
+  /** Solo mirar: sin botones ni paneles de edición (Turnos de la gente del área). */
+  readonly readonly = input(false);
+  protected readonly canEdit = computed(() => {
+    if (this.readonly()) return false;
+    const area = this.area();
+    return !area || (this.view()?.editableAreas ?? []).includes(area);
+  });
 
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -665,6 +679,9 @@ export class AdminGuardsComponent implements OnInit {
   }
 
   private setPanel(panel: Panel): void {
+    if (!this.canEdit()) return;
+    // Las condiciones de Dotación son de Administración (no del Mi equipo de un área).
+    if (panel.kind === 'condition' && this.area()) return;
     this.confirmDelete.set(false);
     this.overrideOpen.set(false);
     this.panel.set(panel);
@@ -672,14 +689,19 @@ export class AdminGuardsComponent implements OnInit {
 
   /** Margen de un mes a cada lado: para ver quién venía antes y avisar huecos. */
   private async loadView(): Promise<void> {
-    this.view.set(await this.api.timeline(new Date(this.start() - 31 * DAY), new Date(this.end() + 31 * DAY)));
+    this.view.set(await this.api.timeline(new Date(this.start() - 31 * DAY), new Date(this.end() + 31 * DAY), this.area()));
+  }
+
+  /** Recarga desde fuera (Mi equipo, al crear una guardia o cambiar integrantes). */
+  async reload(): Promise<void> {
+    await this.run(() => this.load());
   }
 
   private async load(): Promise<void> {
     const now = Date.now();
     const [view, upcoming] = await Promise.all([
-      this.api.timeline(new Date(this.start() - 31 * DAY), new Date(this.end() + 31 * DAY)),
-      this.api.timeline(new Date(now - 31 * DAY), new Date(now + 35 * DAY)),
+      this.api.timeline(new Date(this.start() - 31 * DAY), new Date(this.end() + 31 * DAY), this.area()),
+      this.api.timeline(new Date(now - 31 * DAY), new Date(now + 35 * DAY), this.area()),
     ]);
     this.view.set(view);
     this.upcoming.set(upcoming);

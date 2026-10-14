@@ -40,12 +40,12 @@ describe('ShellComponent', () => {
     delete document.documentElement.dataset['font'];
   });
 
-  async function render(features: { code: string; isEnabled: boolean }[], capabilities: string[] = []) {
+  async function render(features: { code: string; isEnabled: boolean }[], capabilities: string[] = [], scope: { moduleScope?: string; areas?: string[] } = {}) {
     const fixture = TestBed.createComponent(ShellComponent);
     fixture.detectChanges();
     // El usuario lo piden la sesión y los permisos (capacidades de grupo).
     for (const req of httpMock.match('/api/users/me')) req.flush({ data: { id: '1', username: 'ana.rojas', fullName: 'Ana Rojas', email: 'ana@x.cl', role: 'user' } });
-    httpMock.expectOne('/api/users/me/capabilities').flush({ data: { moduleScope: 'both', capabilities } });
+    httpMock.expectOne('/api/users/me/capabilities').flush({ data: { moduleScope: scope.moduleScope ?? 'both', capabilities, areas: scope.areas ?? ['soc'] } });
     httpMock.expectOne('/api/system-features').flush({ data: features });
     await fixture.whenStable();
     fixture.detectChanges();
@@ -61,6 +61,15 @@ describe('ShellComponent', () => {
   it('muestra las 6 secciones del núcleo y oculta la ticketera si está apagada', async () => {
     const { el } = await render([{ code: 'native_tickets', isEnabled: false }]);
     expect(navLabels(el)).toEqual(['Bitácora', 'Turnos y Checklist', 'Escalamiento', 'Directorio', 'Reportes', 'Administración']);
+  });
+
+  it('alguien de Infra (no Operativo) ve Turnos y Escalamiento, no Bitácora ni Reportes', async () => {
+    const { el } = await render([], [], { moduleScope: 'none', areas: ['infraestructura'] });
+    const labels = navLabels(el);
+    expect(labels).toContain('Turnos y Checklist');
+    expect(labels).toContain('Escalamiento');
+    expect(labels).not.toContain('Bitácora');
+    expect(labels).not.toContain('Reportes');
   });
 
   it('Mi equipo solo aparece para la jefatura de área', async () => {

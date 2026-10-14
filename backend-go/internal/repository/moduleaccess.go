@@ -37,6 +37,11 @@ func (s *ModuleAccess) UserModuleAreaCodes(ctx context.Context, userID uuid.UUID
 	return s.Queries.ListUserModuleAreaCodes(ctx, userID)
 }
 
+// UserAreaCodes: todas las áreas del usuario (cualquier perfil), 9e.
+func (s *ModuleAccess) UserAreaCodes(ctx context.Context, userID uuid.UUID) ([]string, error) {
+	return s.Queries.ListUserAreaCodes(ctx, userID)
+}
+
 func (s *ModuleAccess) UserCapabilities(ctx context.Context, userID uuid.UUID) ([]string, error) {
 	groups, err := s.Queries.ListUserPermissionGroups(ctx, userID)
 	if err != nil {

@@ -2,10 +2,21 @@
   <header class="shifts__head">
     <h1 class="shifts__title">{{ i18n.t('nav.shifts') }}</h1>
     <div class="shifts__tabs" role="tablist">
-      <button type="button" role="tab" class="shifts__tab" [class.shifts__tab--active]="tab() === 'mine'" [attr.aria-selected]="tab() === 'mine'" (click)="tab.set('mine')">{{ i18n.t('shift.tab.mine') }}</button>
-      <button type="button" role="tab" class="shifts__tab" [class.shifts__tab--active]="tab() === 'history'" [attr.aria-selected]="tab() === 'history'" (click)="tab.set('history')">{{ i18n.t('shift.tab.history') }}</button>
+      @if (areaView()) {
+        <button type="button" role="tab" class="shifts__tab" [class.shifts__tab--active]="tab() === 'guards'" [attr.aria-selected]="tab() === 'guards'" (click)="tab.set('guards')">{{ i18n.t('shift.tab.guards') }}</button>
+      } @else {
+        <button type="button" role="tab" class="shifts__tab" [class.shifts__tab--active]="tab() === 'mine'" [attr.aria-selected]="tab() === 'mine'" (click)="tab.set('mine')">{{ i18n.t('shift.tab.mine') }}</button>
+        <button type="button" role="tab" class="shifts__tab" [class.shifts__tab--active]="tab() === 'history'" [attr.aria-selected]="tab() === 'history'" (click)="tab.set('history')">{{ i18n.t('shift.tab.history') }}</button>
+      }
       <button type="button" role="tab" class="shifts__tab" [class.shifts__tab--active]="tab() === 'dotacion'" [attr.aria-selected]="tab() === 'dotacion'" (click)="tab.set('dotacion')">{{ i18n.t('shift.tab.staffing') }}</button>
     </div>
+    @if (areaView() && perms.ownAreas().length > 1) {
+      <div class="shifts__areas" role="group" [attr.aria-label]="i18n.t('shift.area')">
+        @for (a of perms.ownAreas(); track a) {
+          <button type="button" class="seg" [attr.aria-pressed]="area() === a" (click)="pickArea(a)">{{ a }}</button>
+        }
+      </div>
+    }
   </header>
 
   <div class="shifts__body">
@@ -89,6 +100,11 @@
     }
     @case ('mine') {
       <app-my-shift (viewHistory)="tab.set('history')" />
+    }
+    @case ('guards') {
+      @if (area(); as a) {
+        @for (x of [a]; track x) { <app-admin-guards [area]="x" [readonly]="true" /> }
+      }
     }
     @case ('history') {
       <app-shift-history />

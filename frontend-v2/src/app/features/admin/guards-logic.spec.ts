@@ -8,6 +8,8 @@ const guard = (over: Partial<Guard> = {}): Guard => ({
   cycleId: 'c2',
   teamId: 't2',
   label: 'N2',
+  area: 'soc',
+  areaName: 'SOC',
   mustBeCovered: true,
   changeDay: 1,
   changeTime: '09:00',

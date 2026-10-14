@@ -19,6 +19,13 @@ export class ModuleAccessService {
 
   readonly soc = computed(() => this.allows('soc'));
   readonly noc = computed(() => this.allows('noc'));
+  /**
+   * Escalamiento por servicio (SOC) o por activo/zona (NOC): también para la
+   * gente de un área propia (TI, Infra), que escala por los mismos destinos
+   * con sus políticas (9e). Lo que ve de cada política lo decide su área.
+   */
+  readonly escSoc = computed(() => this.allows('soc') || (this.enabled('soc') && this.perms.ownAreas().length > 0));
+  readonly escNoc = computed(() => this.allows('noc') || (this.enabled('noc') && this.perms.ownAreas().length > 0));
 
   /** Estado de la instalación y permisos del usuario; ambos se cachean. */
   async load(): Promise<void> {
@@ -27,6 +34,11 @@ export class ModuleAccessService {
 
   has(module: DomainModule): boolean {
     return module === 'soc' ? this.soc() : this.noc();
+  }
+
+  private enabled(module: DomainModule): boolean {
+    const status = this.setup.status();
+    return !!(module === 'soc' ? status?.socEnabled : status?.nocEnabled);
   }
 
   private allows(module: DomainModule): boolean {

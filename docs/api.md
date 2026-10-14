@@ -380,11 +380,14 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | Método | Ruta | Acceso |
 | --- | --- | --- |
 | `GET` | `/api/guards` | Sesión |
-| `PATCH` | `/api/guards/{cycleId}` | Admin |
-| `POST` | `/api/guards/slots` | Admin |
-| `PUT` | `/api/guards/slots/{id}` | Admin |
-| `DELETE` | `/api/guards/slots/{id}` | Admin |
-| `POST` | `/api/guards/rotation` | Admin |
+| `PATCH` | `/api/guards/{cycleId}` | Jefatura del área o admin |
+| `POST` | `/api/guards/slots` | Jefatura del área o admin |
+| `PUT` | `/api/guards/slots/{id}` | Jefatura del área o admin |
+| `DELETE` | `/api/guards/slots/{id}` | Jefatura del área o admin |
+| `POST` | `/api/guards/rotation` | Jefatura del área o admin |
+| `POST` | `/api/guards` | Jefatura del área o admin |
+| `POST` | `/api/guards/{cycleId}/members` | Jefatura del área o admin |
+| `DELETE` | `/api/guards/{cycleId}/members/{memberId}` | Jefatura del área o admin |
 | `GET` | `/api/guards/import/template` | Admin |
 | `POST` | `/api/guards/import` | Admin |
 
@@ -398,7 +401,7 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `GET` | `/api/rotation-slots` | Sesión |
 | `POST` | `/api/rotation-slots` | Admin |
 | `PATCH` | `/api/rotation-slots/{id}` | Admin |
-| `POST` | `/api/rotation-overrides` | Admin |
+| `POST` | `/api/rotation-overrides` | Jefatura del área o admin |
 
 ### Escalamiento
 
@@ -409,9 +412,9 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `GET` | `/api/escalation/actions` | Sesión |
 | `POST` | `/api/escalation/notify` | Sesión |
 | `GET` | `/api/escalation/policies` | Sesión |
-| `POST` | `/api/escalation/policies` | Admin |
-| `DELETE` | `/api/escalation/policies/{id}` | Admin |
-| `PATCH` | `/api/escalation/policies/{id}` | Admin |
+| `POST` | `/api/escalation/policies` | Jefatura del área o admin |
+| `DELETE` | `/api/escalation/policies/{id}` | Jefatura del área o admin |
+| `PATCH` | `/api/escalation/policies/{id}` | Jefatura del área o admin |
 | `GET` | `/api/escalation/incidents` | Sesión |
 | `POST` | `/api/escalation/incidents` | Sesión |
 | `PATCH` | `/api/escalation/incidents/{id}` | Sesión |
@@ -423,10 +426,10 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `DELETE` | `/api/escalation/pools/{id}` | Admin |
 | `GET` | `/api/escalation/pools/{id}/members` | Sesión |
 | `PUT` | `/api/escalation/pools/{id}/members` | Admin |
-| `POST` | `/api/escalation/policies/{id}/steps` | Admin |
-| `DELETE` | `/api/escalation/policies/{id}/steps/{stepOrder}` | Admin |
-| `PUT` | `/api/escalation/policies/{id}/steps/{stepId}` | Admin |
-| `POST` | `/api/escalation/policies/{id}/steps/reorder` | Admin |
+| `POST` | `/api/escalation/policies/{id}/steps` | Jefatura del área o admin |
+| `DELETE` | `/api/escalation/policies/{id}/steps/{stepOrder}` | Jefatura del área o admin |
+| `PUT` | `/api/escalation/policies/{id}/steps/{stepId}` | Jefatura del área o admin |
+| `POST` | `/api/escalation/policies/{id}/steps/reorder` | Jefatura del área o admin |
 
 ### Directorio
 
@@ -460,7 +463,7 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `GET` | `/api/log-sources` | Sesión |
 | `POST` | `/api/log-sources` | Admin |
 | `PATCH` | `/api/log-sources/{id}` | Admin |
-| `GET` | `/api/services` | Sesión · módulo SOC |
+| `GET` | `/api/services` | Sesión · módulo SOC, o persona de un área propia |
 | `POST` | `/api/services` | Admin · módulo SOC |
 
 ### Equipos
@@ -486,13 +489,13 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 
 | Método | Ruta | Acceso |
 | --- | --- | --- |
-| `GET` | `/api/territorial-units` | Sesión · módulo NOC |
+| `GET` | `/api/territorial-units` | Sesión · módulo NOC, o persona de un área propia |
 | `POST` | `/api/territorial-units` | Admin · módulo NOC |
 | `PATCH` | `/api/territorial-units/{id}` | Admin · módulo NOC |
 | `POST` | `/api/territorial-units/import` | Admin · módulo NOC |
 | `POST` | `/api/territorial-units/bulk-active` | Admin · módulo NOC |
 | `GET` | `/api/territorial-units/import/template` | Sesión · módulo NOC |
-| `GET` | `/api/assets` | Sesión · módulo NOC |
+| `GET` | `/api/assets` | Sesión · módulo NOC, o persona de un área propia |
 | `POST` | `/api/assets` | Admin · módulo NOC |
 | `PATCH` | `/api/assets/{id}` | Admin · módulo NOC |
 | `GET` | `/api/maintenance-windows` | Sesión |

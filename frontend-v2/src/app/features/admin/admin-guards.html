@@ -13,9 +13,13 @@
           <button type="button" class="seg" [attr.aria-pressed]="spanDays() === 14" (click)="zoom(14)">{{ i18n.t('guards.len.twoWeeks') }}</button>
           <button type="button" class="seg" [attr.aria-pressed]="spanDays() === 28" (click)="zoom(28)">{{ i18n.t('guards.fourWeeks') }}</button>
         </span>
-        <button type="button" class="adm-btn" (click)="openImport()"><mat-icon>upload_file</mat-icon>{{ i18n.t('guards.import') }}</button>
-        <button type="button" class="adm-btn" [disabled]="!guards().length" (click)="openRotation()"><mat-icon>autorenew</mat-icon>{{ i18n.t('guards.rotate') }}</button>
-        <button type="button" class="adm-btn adm-btn--primary" (click)="guards().length ? openNew() : openCondition()"><mat-icon>add</mat-icon>{{ i18n.t('guards.new') }}</button>
+        @if (canEdit()) {
+          @if (!area()) { <button type="button" class="adm-btn" (click)="openImport()"><mat-icon>upload_file</mat-icon>{{ i18n.t('guards.import') }}</button> }
+          <button type="button" class="adm-btn" [disabled]="!guards().length" (click)="openRotation()"><mat-icon>autorenew</mat-icon>{{ i18n.t('guards.rotate') }}</button>
+          @if (guards().length || !area()) {
+            <button type="button" class="adm-btn adm-btn--primary" (click)="guards().length ? openNew() : openCondition()"><mat-icon>add</mat-icon>{{ i18n.t('guards.new') }}</button>
+          }
+        }
       </span>
     </header>
 
@@ -142,7 +146,7 @@
             @for (g of guards(); track g.cycleId) {
               <button type="button" class="seg" [attr.aria-pressed]="d.cycleId === g.cycleId" [disabled]="!!d.id && d.cycleId !== g.cycleId" (click)="pickGuard(g.cycleId)">{{ g.label }}</button>
             }
-            @if (!d.id) {
+            @if (!d.id && !area()) {
               <span class="gd__sep" aria-hidden="true"></span>
               @for (m of markable; track m.value) {
                 @if (m.value !== 'office') {

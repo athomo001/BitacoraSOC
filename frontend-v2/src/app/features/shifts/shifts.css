@@ -297,3 +297,9 @@
   color: color-mix(in srgb, var(--c) 80%, var(--text-primary));
   text-shadow: none;
 }
+
+.shifts__areas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}

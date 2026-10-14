@@ -65,3 +65,32 @@ func TestRequireModule_UserInScopePasses(t *testing.T) {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
 }
+
+type fakeAreas []string
+
+func (f fakeAreas) UserAreaCodes(context.Context, uuid.UUID) ([]string, error) { return f, nil }
+
+func TestRequireModuleOrOwnArea(t *testing.T) {
+	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	user := AuthenticatedUser{ID: uuid.New(), Role: "user"}
+	cases := []struct {
+		name  string
+		flags modules.Flags
+		areas fakeAreas
+		want  int
+	}{
+		{"gente de Infra pasa", modules.Flags{NOC: true}, fakeAreas{"infraestructura"}, http.StatusOK},
+		{"solo SOC sin alcance NOC no pasa", modules.Flags{NOC: true}, fakeAreas{"soc"}, http.StatusForbidden},
+		{"módulo apagado no pasa ni con área propia", modules.Flags{SOC: true}, fakeAreas{"infraestructura"}, http.StatusForbidden},
+	}
+	for _, c := range cases {
+		h := RequireModuleOrOwnArea(fakeModuleAccess{flags: c.flags}, c.areas, modules.NOC)(ok)
+		req := httptest.NewRequest(http.MethodGet, "/api/assets", nil)
+		req = req.WithContext(WithUser(req.Context(), user))
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != c.want {
+			t.Errorf("%s: status %d, want %d", c.name, rec.Code, c.want)
+		}
+	}
+}

@@ -14,11 +14,11 @@ function timeline(now: number): GuardTimeline {
     now: iso(now),
     guards: [
       {
-        cycleId: 'c2', teamId: 't2', label: 'N2', mustBeCovered: true, changeDay: 1, changeTime: '09:00', timezone: 'America/Santiago',
+        cycleId: 'c2', teamId: 't2', label: 'N2', mustBeCovered: true, changeDay: 1, changeTime: '09:00', timezone: 'America/Santiago', area: 'soc', areaName: 'SOC',
         members: [{ teamMemberId: 'm1', name: 'Ana Rojas', userId: 'u1' }, { teamMemberId: 'm2', name: 'Beto Soto', userId: 'u2' }],
       },
       {
-        cycleId: 'c4', teamId: 't4', label: 'TI', mustBeCovered: false, changeDay: 1, changeTime: '09:00', timezone: 'America/Santiago',
+        cycleId: 'c4', teamId: 't4', label: 'TI', mustBeCovered: false, changeDay: 1, changeTime: '09:00', timezone: 'America/Santiago', area: 'ti', areaName: 'TI',
         members: [{ teamMemberId: 'm5', name: 'Pablo E', userId: 'u5' }],
       },
     ],
@@ -29,6 +29,7 @@ function timeline(now: number): GuardTimeline {
     overrides: [],
     absences: [],
     workShifts: [{ id: 'w1', name: 'Turno Día', startTime: '08:00' }],
+    editableAreas: ['soc', 'ti'],
   };
 }
 
@@ -152,5 +153,23 @@ describe('AdminGuardsComponent (línea de tiempo de guardias)', () => {
     const req = httpMock.expectOne('/api/work-shifts/assignments');
     expect(req.request.body).toEqual({ userId: 'u1', assignedDate: '2026-10-14', condition: 'medical_leave', untilDate: '2026-10-20' });
     req.flush({ data: {} });
+  });
+
+  it('solo mirar (Turnos de un área): sin botones de edición, y pide solo esa área', async () => {
+    const fixture = TestBed.createComponent(AdminGuardsComponent);
+    fixture.componentRef.setInput('area', 'ti');
+    fixture.componentRef.setInput('readonly', true);
+    fixture.detectChanges();
+    const reqs = httpMock.match((r) => r.url === '/api/guards');
+    expect(reqs.every((r) => r.request.params.get('area') === 'ti')).toBe(true);
+    reqs.forEach((r: TestRequest) => r.flush({ data: timeline(Date.now()) }));
+    await tick();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const labels = [...el.querySelectorAll('.gd__tools button')].map((b) => b.textContent?.trim() ?? '');
+    expect(labels.some((l) => l.includes('Nueva asignación') || l.includes('Importar'))).toBe(false);
+    (el.querySelector('.gd__issue button') as HTMLButtonElement | null)?.click();
+    fixture.detectChanges();
+    expect(el.querySelector('.gd--panel')).toBeNull();
   });
 });

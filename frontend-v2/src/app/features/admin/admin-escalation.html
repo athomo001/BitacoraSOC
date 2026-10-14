@@ -1,9 +1,11 @@
-<header class="adm-head">
-  <div>
-    <h2 class="adm-title">{{ i18n.t('admin.nav.escalation') }}</h2>
-    <p class="adm-muted">{{ i18n.t('escAdmin.subtitle') }}</p>
-  </div>
-</header>
+@if (!area()) {
+  <header class="adm-head">
+    <div>
+      <h2 class="adm-title">{{ i18n.t('admin.nav.escalation') }}</h2>
+      <p class="adm-muted">{{ i18n.t('escAdmin.subtitle') }}</p>
+    </div>
+  </header>
+}
 
 @if (error(); as e) { <p class="adm-error" role="alert">{{ e }}</p> }
 
@@ -27,6 +29,14 @@
           @for (o of targetOptions(); track o.id) { <option [value]="o.id">{{ o.label }}</option> }
         </select>
       </label>
+      @if (!area() && areaList().length > 1) {
+        <label class="adm-field adm-field--narrow">
+          <span class="adm-label">{{ i18n.t('escAdmin.ownerArea') }}</span>
+          <select class="adm-input" name="newArea" [ngModel]="newArea()" (ngModelChange)="newArea.set($event)">
+            @for (a of areaList(); track a.code) { <option [value]="a.code">{{ a.name }}</option> }
+          </select>
+        </label>
+      }
       <button type="submit" class="adm-btn adm-btn--primary" [disabled]="busy() || !policyTarget()"><mat-icon>add</mat-icon>{{ i18n.t('escAdmin.createPolicy') }}</button>
     </form>
     <div class="adm-table-wrap">
@@ -37,6 +47,7 @@
             <tr class="adm-row-click" [class.adm-row--active]="selectedId() === p.id" tabindex="0" (click)="select(p)" (keydown.enter)="select(p)">
               <td>
                 <span class="pill tone-neutral">{{ i18n.t(kindKey(kindOf(p))) }}</span>
+                @if (!area()) { <span class="pill tone-accent">{{ areaName(p.area) }}</span> }
                 <strong class="adm-block ea__name">{{ targetName(p) }}</strong>
               </td>
               <td class="adm-small adm-secondary">{{ stepsSummary(p) }}</td>
@@ -62,6 +73,19 @@
           <button type="button" class="adm-btn adm-btn--danger adm-push" (click)="confirmDelete.set(true)"><mat-icon>delete_outline</mat-icon>{{ i18n.t('escAdmin.deletePolicy') }}</button>
         }
       </div>
+      @if (!area() && areaList().length > 1) {
+        <div class="ea__reminder">
+          <div class="adm-field">
+            <span class="adm-label">{{ i18n.t('escAdmin.ownerArea') }}</span>
+            <span class="ea__owner" role="group" [attr.aria-label]="i18n.t('escAdmin.ownerArea')">
+              @for (a of areaList(); track a.code) {
+                <button type="button" class="seg" [attr.aria-pressed]="p.area === a.code" [disabled]="busy()" (click)="setArea(p, a.code)">{{ a.name }}</button>
+              }
+            </span>
+            <span class="adm-small adm-muted">{{ i18n.t('escAdmin.ownerHint') }}</span>
+          </div>
+        </div>
+      }
       <form class="ea__reminder" (ngSubmit)="saveReminder(p)">
         <label class="adm-field">
           <span class="adm-label">{{ i18n.t('escAdmin.reminder') }}</span>
@@ -76,7 +100,7 @@
   </section>
 </div>
 
-@if (socEnabled()) {
+@if (socEnabled() && !area()) {
   <section class="adm-card">
     <div class="adm-card__head">
       <h3 class="adm-card__title"><mat-icon>security</mat-icon>{{ i18n.t('escAdmin.services') }} <span class="mono adm-secondary">{{ services().length }}</span></h3>
@@ -108,6 +132,7 @@
   </section>
 }
 
-<app-admin-escalation-pools />
-
-<app-maintenance-windows />
+@if (!area()) {
+  <app-admin-escalation-pools />
+  <app-maintenance-windows />
+}

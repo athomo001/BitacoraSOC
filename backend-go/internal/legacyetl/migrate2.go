@@ -46,6 +46,24 @@ func (m *Migrator) createTeam(ctx context.Context, id uuid.UUID, org *uuid.UUID,
 	return err
 }
 
+// createGuardTeam crea el equipo de la guardia con su área dueña (000035,
+// decisión del dueño): la Guardia TI es del área TI (se crea si falta); las
+// demás, de SOC.
+func (m *Migrator) createGuardTeam(ctx context.Context, team uuid.UUID, code string) error {
+	area := "soc"
+	if code == "TI" {
+		area = "ti"
+		if _, err := m.tx.Exec(ctx, `INSERT INTO areas (code, name, sort_order, default_profile)
+			VALUES ('ti', 'TI', (SELECT COALESCE(max(sort_order), 0) + 10 FROM areas), 'resolutor') ON CONFLICT (code) DO NOTHING`); err != nil {
+			return err
+		}
+	}
+	name := "Guardia " + code
+	_, err := m.tx.Exec(ctx, `INSERT INTO teams (id, name, slug, kind, audience, active, area_id)
+		VALUES ($1, $2, $3, 'oncall', 'internal', true, (SELECT id FROM areas WHERE code = $4))`, team, name, m.teamSlug(name), area)
+	return err
+}
+
 func (m *Migrator) addMember(ctx context.Context, team uuid.UUID, contact, user *uuid.UUID, recipient, role string, priority int) (uuid.UUID, error) {
 	id := uuid.New()
 	_, err := m.tx.Exec(ctx, `INSERT INTO team_members (id, team_id, user_id, contact_id, recipient_type, role_in_team, priority, active) VALUES ($1,$2,$3,$4,$5,$6,$7,true)`,
@@ -362,7 +380,7 @@ func (m *Migrator) migrateShiftAssignments(ctx context.Context) error {
 		g, ok := guards[code]
 		if !ok {
 			team := ID("teams", "oncall:"+code)
-			if err := m.createTeam(ctx, team, nil, "Guardia "+code, "oncall", "internal"); err != nil {
+			if err := m.createGuardTeam(ctx, team, code); err != nil {
 				return err
 			}
 			cycle := ID("rotation_cycles", code)

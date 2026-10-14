@@ -5,7 +5,7 @@ import { EscalationStepsComponent } from './escalation-steps';
 import { Policy } from '../../core/escalation/escalation.service';
 
 const policy = (): Policy => ({
-  id: 'p1', serviceId: 's1', active: true,
+  id: 'p1', serviceId: 's1', active: true, area: 'soc', editable: true,
   steps: [
     { id: 'st1', stepOrder: 1, title: '1er llamado', teamId: 'g1', teamName: '', ownPeople: true, mode: 'unique', waitBeforeEscalateMinutes: 10,
       members: [{ id: 'm1', kind: 'contact', refId: 'c1', name: 'Juan Pérez', channels: ['call', 'whatsapp'] }] },

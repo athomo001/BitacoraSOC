@@ -6,6 +6,7 @@
 -- La hora de cambio sale del turno de trabajo enlazado a la guardia
 -- (Administración → Turnos → Turnos de trabajo); sin turno enlazado, 09:00.
 SELECT c.id, c.team_id, t.name AS team_name, c.start_day_of_week, c.timezone, c.must_be_covered, c.duration_days,
+  COALESCE(t.area_id, '00000000-0000-0000-0000-000000000000'::uuid) AS area_id,
   COALESCE(ws.id, '00000000-0000-0000-0000-000000000000'::uuid) AS work_shift_id, COALESCE(ws.name, '')::text AS work_shift_name,
   COALESCE(ws.start_time, time '09:00') AS change_time
 FROM rotation_cycles c
@@ -18,7 +19,27 @@ WHERE t.kind = 'oncall' AND c.active AND t.active
 ORDER BY t.name;
 
 -- name: GetGuardCycle :one
-SELECT c.*, t.name AS team_name FROM rotation_cycles c JOIN teams t ON t.id = c.team_id WHERE c.id = $1;
+SELECT c.*, t.name AS team_name, COALESCE(t.area_id, '00000000-0000-0000-0000-000000000000'::uuid) AS area_id
+FROM rotation_cycles c JOIN teams t ON t.id = c.team_id WHERE c.id = $1;
+
+-- name: CreateGuardTeam :one
+-- Una guardia nueva (9e): el equipo "oncall" con su área dueña.
+INSERT INTO teams (name, slug, kind, audience, area_id) VALUES (sqlc.arg('name'), sqlc.arg('slug'), 'oncall', 'internal', sqlc.arg('area_id'))
+RETURNING id;
+
+-- name: CreateGuardCycle :one
+INSERT INTO rotation_cycles (team_id, start_day_of_week, start_time_utc, duration_days, timezone, must_be_covered)
+VALUES (sqlc.arg('team_id'), sqlc.arg('start_day_of_week'), '12:00', 7, 'America/Santiago', sqlc.arg('must_be_covered'))
+RETURNING id;
+
+-- name: DeactivateGuardMember :execrows
+UPDATE team_members SET active = false WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id');
+
+-- name: ReactivateGuardMember :exec
+UPDATE team_members SET active = true WHERE id = $1;
+
+-- name: GuardSlugTaken :one
+SELECT EXISTS (SELECT 1 FROM teams WHERE slug = $1);
 
 -- name: ListGuardMembers :many
 SELECT m.id, m.team_id, m.user_id, m.contact_id,

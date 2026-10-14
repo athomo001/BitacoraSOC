@@ -31,7 +31,11 @@ ORDER BY id;
 SELECT * FROM escalation_policies WHERE id = $1;
 
 -- name: CreatePolicy :one
-INSERT INTO escalation_policies (service_id, asset_id, territorial_unit_id) VALUES ($1, $2, $3) RETURNING *;
+INSERT INTO escalation_policies (service_id, asset_id, territorial_unit_id, area_id) VALUES ($1, $2, $3, sqlc.arg('area_id')) RETURNING *;
+
+-- name: SetPolicyArea :one
+-- El área dueña de la política (9e): esa área la ve y su jefatura la edita.
+UPDATE escalation_policies SET area_id = sqlc.arg('area_id') WHERE id = sqlc.arg('id') RETURNING *;
 
 -- name: DeletePolicy :execrows
 DELETE FROM escalation_policies WHERE id = $1;

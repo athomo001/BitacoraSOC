@@ -99,4 +99,24 @@ describe('ShiftsComponent (Dotación)', () => {
     await tick();
     httpMock.expectOne((r) => r.url === '/api/work-shifts/matrix').flush({ data: MATRIX });
   });
+
+  it('alguien de un área propia ve Guardias (solo mirar) y la Dotación de su área', async () => {
+    const fixture = TestBed.createComponent(ShiftsComponent);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/users/me').flush({ data: { ...ADMIN_USER, role: 'user' } });
+    httpMock.expectOne('/api/users/me/capabilities').flush({ data: { moduleScope: 'none', capabilities: [], areas: ['infraestructura'] } });
+    await tick();
+    const req = httpMock.expectOne((r) => r.url === '/api/work-shifts/matrix');
+    expect(req.request.params.get('area')).toBe('infraestructura');
+    req.flush({ data: MATRIX });
+    await tick();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const tabs = [...el.querySelectorAll('[role="tab"]')].map((t) => t.textContent?.trim());
+    expect(tabs).toEqual(['Guardias', 'Dotación (TV)']);
+    expect(el.querySelector('app-admin-guards')).toBeTruthy();
+    const guards = httpMock.match((r) => r.url === '/api/guards');
+    expect(guards.length).toBeGreaterThan(0);
+    expect(guards.every((r) => r.request.params.get('area') === 'infraestructura')).toBe(true);
+  });
 });

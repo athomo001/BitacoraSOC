@@ -109,8 +109,8 @@ export class EscalationComponent implements OnInit {
   private readonly ticketsApi = inject(TicketsService);
   private readonly route = inject(ActivatedRoute);
 
-  protected readonly socEnabled = this.modules.soc;
-  protected readonly nocEnabled = this.modules.noc;
+  protected readonly socEnabled = this.modules.escSoc;
+  protected readonly nocEnabled = this.modules.escNoc;
   protected readonly ticketsEnabled = computed(() => this.features.isEnabled('native_tickets'));
 
   protected readonly scopeKind = signal<ScopeKind>('asset');

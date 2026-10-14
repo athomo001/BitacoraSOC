@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
@@ -6,6 +6,9 @@ import { TeamArea, TeamCondition, TeamPerson, TeamService, TeamTicket, TeamView 
 import { problemDetail } from '../../core/http-error';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
+import { AdminGuardsComponent } from '../admin/admin-guards';
+import { AdminEscalationComponent } from '../admin/admin-escalation';
+import { TeamGuardsComponent } from './team-guards';
 
 import '../../core/i18n/packs/team';
 
@@ -29,7 +32,7 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
 @Component({
   selector: 'app-team',
   standalone: true,
-  imports: [FormsModule, RouterLink, MatIconModule],
+  imports: [FormsModule, RouterLink, MatIconModule, AdminGuardsComponent, AdminEscalationComponent, TeamGuardsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="tm__head">
@@ -48,9 +51,27 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
     </header>
     @if (error(); as e) { <p class="adm-error" role="alert">{{ e }}</p> }
 
+    @if (view(); as v) {
+      <div class="tm__tabs" role="tablist">
+        <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'people'" [attr.aria-selected]="tab() === 'people'" (click)="tab.set('people')"><mat-icon>badge</mat-icon>{{ i18n.t('team.tab.people') }}</button>
+        <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'guards'" [attr.aria-selected]="tab() === 'guards'" (click)="tab.set('guards')"><mat-icon>shield</mat-icon>{{ i18n.t('team.tab.guards') }}</button>
+        <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'escalation'" [attr.aria-selected]="tab() === 'escalation'" (click)="tab.set('escalation')"><mat-icon>call_split</mat-icon>{{ i18n.t('team.tab.escalation') }}</button>
+      </div>
+      <!-- Cada área monta sus propias guardias y políticas (el @for las recrea al cambiar de área). -->
+      @if (tab() === 'guards') {
+        @for (code of [v.area.code]; track code) {
+          <app-team-guards [area]="code" [areaName]="v.area.name" [people]="v.people" (changed)="guardsTimeline()?.reload()" />
+          <app-admin-guards [area]="code" />
+        }
+      }
+      @if (tab() === 'escalation') {
+        @for (code of [v.area.code]; track code) { <app-admin-escalation [area]="code" /> }
+      }
+    }
+
     @if (loaded() && !areas().length) {
       <p class="adm-empty">{{ i18n.t('team.noAreas') }}</p>
-    } @else if (view(); as v) {
+    } @else if (tab() === 'people' && view(); as v) {
       <div class="tm__stats">
         <div class="adm-card tm__stat"><span class="adm-label">{{ i18n.t('team.stat.people') }}</span><strong class="mono">{{ v.stats.people }}</strong><span class="adm-small adm-muted">{{ i18n.t('team.stat.peopleHint') }}</span></div>
         <div class="adm-card tm__stat"><span class="adm-label">{{ i18n.t('team.stat.tickets') }}</span><strong class="mono">{{ v.stats.tickets }}</strong><span class="adm-small adm-muted">{{ i18n.t('team.stat.ticketsHint') }}</span></div>
@@ -208,6 +229,8 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
     .tm__title { margin: 0; font-size: 18px; font-weight: 600; }
     .tm__lead { margin: 2px 0 0; }
     .tm__areas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: auto; }
+    .tm__tabs { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--border-subtle); }
+    .tm__tabs mat-icon { width: 14px; height: 14px; font-size: 14px; vertical-align: -2px; margin-right: 4px; }
     .tm__stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
     .tm__stat { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; }
     .tm__stat strong { font-size: 22px; }
@@ -239,6 +262,8 @@ export class TeamComponent implements OnInit {
   protected readonly i18n = inject(I18nService);
   private readonly api = inject(TeamService);
 
+  protected readonly tab = signal<'people' | 'guards' | 'escalation'>('people');
+  protected readonly guardsTimeline = viewChild(AdminGuardsComponent);
   protected readonly areas = signal<TeamArea[]>([]);
   protected readonly area = signal('');
   protected readonly view = signal<TeamView | null>(null);

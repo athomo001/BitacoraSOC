@@ -1727,3 +1727,18 @@ ALTER TABLE areas
   ADD COLUMN default_profile TEXT NOT NULL DEFAULT 'resolutor'
   CHECK (default_profile IN ('operativo', 'resolutor', 'gestion'));
 UPDATE areas SET default_profile = 'operativo' WHERE code IN ('soc', 'noc');
+
+-- 000035: área dueña de cada guardia y de cada política de escalamiento (9e).
+INSERT INTO areas (code, name, sort_order, default_profile)
+SELECT 'ti', 'TI', (SELECT COALESCE(max(sort_order), 0) + 10 FROM areas), 'resolutor'
+WHERE EXISTS (SELECT 1 FROM teams WHERE kind = 'oncall' AND name = 'Guardia TI')
+ON CONFLICT (code) DO NOTHING;
+
+ALTER TABLE teams ADD COLUMN area_id UUID REFERENCES areas(id) ON DELETE RESTRICT;
+UPDATE teams SET area_id = 'a0000000-0000-4000-8000-000000000001' WHERE kind = 'oncall';
+UPDATE teams SET area_id = (SELECT id FROM areas WHERE code = 'ti') WHERE kind = 'oncall' AND name = 'Guardia TI';
+ALTER TABLE teams ADD CONSTRAINT chk_oncall_team_area CHECK (kind <> 'oncall' OR area_id IS NOT NULL);
+
+ALTER TABLE escalation_policies
+  ADD COLUMN area_id UUID NOT NULL DEFAULT 'a0000000-0000-4000-8000-000000000001' REFERENCES areas(id) ON DELETE RESTRICT;
+CREATE INDEX idx_escalation_policies_area ON escalation_policies(area_id);

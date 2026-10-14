@@ -228,6 +228,10 @@ Solo para la **jefatura de área**: quien tiene un grupo con la capacidad *Jefat
 - Al elegir a una persona: su semana, sus tickets (se abren con un clic), cambiarle el grupo y darla de baja o reactivarla.
 - **Agregar persona:** nombre, usuario, correo y un grupo del área. La app genera una contraseña temporal que se muestra **una sola vez**: entrégasela tú. La persona la cambia al primer ingreso.
 - La jefatura solo asigna grupos de sus áreas, nunca da permisos de administrador y no toca a administradores ni a quien tiene grupos de otras áreas. Todo queda en Auditoría.
+- **Guardias** (pestaña): las guardias del área, quién está en cada una (sumar o sacar personas del área) y «Nueva guardia». Abajo, la misma línea de tiempo de Administración para asignar fechas, generar la rotación y poner reemplazos.
+- **Escalamiento** (pestaña): las políticas del área, con sus llamados y el recordatorio. Las nuevas nacen en el área.
+
+Cada guardia y cada política tiene un **área dueña**: la gente del área la ve (en Turnos y Escalamiento) y su jefatura la edita. La gente de TI o Infraestructura ve en Turnos las pestañas Guardias (solo mirar) y Dotación de su área.
 
 ---
 

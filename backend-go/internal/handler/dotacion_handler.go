@@ -258,6 +258,25 @@ func (h *DotacionHandler) Matrix(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo construir la matriz de dotación")
 		return
 	}
+	// ?area=: solo la gente de esa área (Turnos de TI o Infra, 9e).
+	if code := r.URL.Query().Get("area"); code != "" {
+		ids, err := h.Queries.ListAreaUserIDs(r.Context(), code)
+		if err != nil {
+			problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer el área")
+			return
+		}
+		in := map[string]bool{}
+		for _, id := range ids {
+			in[id.String()] = true
+		}
+		rows := matrix.Rows[:0]
+		for _, row := range matrix.Rows {
+			if in[row.UserID] {
+				rows = append(rows, row)
+			}
+		}
+		matrix.Rows = rows
+	}
 	writeData(w, http.StatusOK, matrix)
 }
 
