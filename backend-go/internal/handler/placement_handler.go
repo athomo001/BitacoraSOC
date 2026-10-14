@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/auth"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/middleware"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
@@ -386,3 +388,143 @@ func (h *PlacementHandler) Put(w http.ResponseWriter, r *http.Request) {
 	})
 	writeData(w, http.StatusOK, placement)
 }
+
+// ===== Ficha del área (Áreas y niveles → un área → Personas, 2026-10-14) =====
+
+type areaPersonDTO struct {
+	ID       uuid.UUID `json:"id"`
+	Username string    `json:"username"`
+	FullName string    `json:"fullName"`
+	Email    string    `json:"email"`
+	Active   bool      `json:"active"`
+	// LevelID: "" = en el área sin nivel.
+	LevelID string   `json:"levelId"`
+	Lead    bool     `json:"lead"`
+	Extras  []string `json:"extras"`
+}
+
+// AreaPeople es GET /api/areas/{code}/people: la gente del área con su
+// nivel, si es jefatura y sus permisos extra.
+func (h *PlacementHandler) AreaPeople(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	code := r.PathValue("code")
+	areas, _, err := h.catalog(ctx)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer las áreas")
+		return
+	}
+	if _, ok := areas[code]; !ok {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "área no encontrada o apagada")
+		return
+	}
+	ids, err := h.Queries.ListAreaUserIDs(ctx, code)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer la gente del área")
+		return
+	}
+	out := make([]areaPersonDTO, 0, len(ids))
+	for _, id := range ids {
+		u, err := h.Queries.GetUserByID(ctx, id)
+		if err != nil {
+			continue
+		}
+		rows, err := h.Queries.ListUserGroupShapes(ctx, id)
+		if err != nil {
+			problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer sus grupos")
+			return
+		}
+		p := derivePlacement(shapesOf(rows), activeSet(areas))
+		person := areaPersonDTO{ID: u.ID, Username: u.Username, FullName: u.FullName.String, Email: u.Email, Active: u.Active, Extras: p.Extras}
+		for _, a := range p.Areas {
+			if a.Code == code {
+				person.LevelID, person.Lead = a.LevelID, a.Lead
+			}
+		}
+		out = append(out, person)
+	}
+	slices.SortFunc(out, func(a, b areaPersonDTO) int {
+		return strings.Compare(strings.ToLower(cmp.Or(a.FullName, a.Username)), strings.ToLower(cmp.Or(b.FullName, b.Username)))
+	})
+	writeData(w, http.StatusOK, out)
+}
+
+type newAreaPersonRequest struct {
+	FullName string `json:"fullName"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	LevelID  string `json:"levelId"`
+}
+
+// CreateAreaPerson es POST /api/areas/{code}/people: una persona nueva,
+// ya ubicada en el área con su nivel. Rol usuario y contraseña temporal,
+// que se muestra una vez.
+func (h *PlacementHandler) CreateAreaPerson(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	code := r.PathValue("code")
+	var req newAreaPersonRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "cuerpo de la request inválido")
+		return
+	}
+	req.FullName = strings.TrimSpace(req.FullName)
+	req.Username = strings.ToLower(strings.TrimSpace(req.Username))
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	if req.FullName == "" || !teamUsername.MatchString(req.Username) || !strings.Contains(req.Email, "@") {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "nombre, usuario (3 a 40 letras minúsculas, números, punto o guion) y correo son obligatorios")
+		return
+	}
+	areas, levels, err := h.catalog(ctx)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer las áreas")
+		return
+	}
+	if _, ok := areas[code]; !ok {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "área no encontrada o apagada")
+		return
+	}
+	if _, ok := levels[req.LevelID]; req.LevelID != "" && !ok {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "nivel inválido")
+		return
+	}
+	password, err := tempPassword()
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo generar la contraseña")
+		return
+	}
+	hash, err := auth.HashPassword(password)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo procesar la contraseña")
+		return
+	}
+	actor, _ := middleware.UserFromContext(ctx)
+	var created db.User
+	err = pgx.BeginFunc(ctx, h.Pool, func(tx pgx.Tx) error {
+		q := h.Queries.WithTx(tx)
+		u, err := q.CreateTeamUser(ctx, db.CreateTeamUserParams{
+			Username: req.Username, Email: req.Email, FullName: pgtype.Text{String: req.FullName, Valid: true}, PasswordHash: hash,
+		})
+		if err != nil {
+			return errDuplicateUser
+		}
+		created = u
+		groupID, err := ensureShapedGroup(ctx, q, shapeSpec{Area: code, Level: req.LevelID, Caps: []string{}}, areas, levels)
+		if err != nil {
+			return err
+		}
+		return q.AddUserPermissionGroup(ctx, db.AddUserPermissionGroupParams{
+			UserID: u.ID, PermissionGroupID: groupID, AssignedBy: pgtype.UUID{Bytes: actor.ID, Valid: actor.ID != uuid.Nil},
+		})
+	})
+	if errors.Is(err, errDuplicateUser) {
+		problemdetails.Write(w, r, http.StatusConflict, "duplicate-user", "ya existe alguien con ese usuario o correo")
+		return
+	}
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo agregar a la persona")
+		return
+	}
+	h.AuditLog.Log(ctx, "area.person.create", audit.LevelInfo, audit.Success(), map[string]any{"area": code, "userId": created.ID.String(), "username": created.Username})
+	writeData(w, http.StatusCreated, map[string]any{"id": created.ID, "username": created.Username, "tempPassword": password})
+}
+
+var errDuplicateUser = errors.New("usuario repetido")

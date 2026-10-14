@@ -149,6 +149,7 @@ export const EN: Record<CoreKey, string> = {
   'esc.pool': 'Pool',
   'nav.reports': 'Reports',
   'nav.team': 'My team',
+  'nav.map': 'Map',
   'rpt.f.chooseClient': 'Choose the client…',
   'rpt.f.additional': 'Additional information',
   'rpt.col.client': 'Client',

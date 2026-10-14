@@ -15,6 +15,18 @@ export interface Area {
   groupCount: number;
 }
 
+/** Una persona de un área (ficha del área): su nivel, si es jefe y sus permisos extra. */
+export interface AreaPerson {
+  id: string;
+  username: string;
+  fullName: string;
+  email: string;
+  active: boolean;
+  levelId: string;
+  lead: boolean;
+  extras: string[];
+}
+
 /** Dónde está una persona: área + nivel ('' = sin nivel) + jefatura, y permisos extra. */
 export interface Placement {
   areas: { code: string; levelId: string; lead: boolean }[];
@@ -66,6 +78,16 @@ export class AreasService {
 
   async orderLevels(ids: string[]): Promise<void> {
     await firstValueFrom(this.http.put('/api/levels/order', { ids }));
+  }
+
+  /** Ficha del área: la gente del área. */
+  async areaPeople(code: string): Promise<AreaPerson[]> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<AreaPerson[]>>(`/api/areas/${encodeURIComponent(code)}/people`))).data;
+  }
+
+  /** Persona nueva directo al área, con su nivel; la contraseña temporal se muestra una vez. */
+  async createAreaPerson(code: string, person: { fullName: string; username: string; email: string; levelId: string }): Promise<{ id: string; username: string; tempPassword: string }> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<{ id: string; username: string; tempPassword: string }>>(`/api/areas/${encodeURIComponent(code)}/people`, person))).data;
   }
 
   /** Usuarios por área y nivel: los grupos se arman solos en el servidor. */

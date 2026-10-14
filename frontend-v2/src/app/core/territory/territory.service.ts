@@ -92,6 +92,14 @@ export class TerritoryService {
     return response.data.changed;
   }
 
+  /** Ubica una localidad en el Mapa (Administración → Territorio → Sin ubicación). */
+  async setCoordinates(id: string, latitude: number, longitude: number): Promise<TerritorialUnit> {
+    const response = await firstValueFrom(
+      this.http.patch<ApiEnvelope<TerritorialUnit>>(`/api/territorial-units/${id}`, { latitude, longitude }),
+    );
+    return response.data;
+  }
+
   async setActive(id: string, active: boolean): Promise<TerritorialUnit> {
     const response = await firstValueFrom(
       this.http.patch<ApiEnvelope<TerritorialUnit>>(`/api/territorial-units/${id}`, { active }),

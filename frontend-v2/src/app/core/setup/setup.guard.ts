@@ -44,3 +44,15 @@ export const socOrNocGuard: CanActivateFn = async () => {
     return true;
   }
 };
+
+/** Pantallas del módulo NOC (el Mapa): sin NOC, la app abre en la Bitácora. */
+export const nocGuard: CanActivateFn = async () => {
+  const setup = inject(SetupService);
+  const router = inject(Router);
+  try {
+    const status = await setup.loadStatus();
+    return status.nocEnabled || router.parseUrl('/');
+  } catch {
+    return true;
+  }
+};

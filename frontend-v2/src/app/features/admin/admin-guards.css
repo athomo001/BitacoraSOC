@@ -447,4 +447,9 @@ mat-icon {
 }
 
 /* Separa las guardias de las condiciones de Dotación en el selector. */
-.gd__sep { width: 1px; align-self: stretch; margin: 0 4px; background: var(--border-subtle); }
+.gd__sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 0 4px;
+  background: var(--border-subtle);
+}

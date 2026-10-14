@@ -67,6 +67,7 @@ type ticketDTO struct {
 	Scope               string     `json:"scope"`
 	ClientID            uuid.UUID  `json:"clientId"`
 	AssetID             *uuid.UUID `json:"assetId,omitempty"`
+	TerritorialUnitID   *uuid.UUID `json:"territorialUnitId,omitempty"`
 	ServiceID           *uuid.UUID `json:"serviceId,omitempty"`
 	AssignedTeamID      *uuid.UUID `json:"assignedTeamId,omitempty"`
 	AssignedUserID      *uuid.UUID `json:"assignedUserId,omitempty"`
@@ -99,6 +100,7 @@ func toTicketDTO(t db.Ticket, exposeToken bool) ticketDTO {
 		d.SLAResolutionDueAt = &v
 	}
 	d.ParentID, d.MergedIntoID, d.CreatedByID = uuidPtr(t.ParentID), uuidPtr(t.MergedIntoID), uuidPtr(t.CreatedBy)
+	d.TerritorialUnitID = uuidPtr(t.TerritorialUnitID)
 	if exposeToken && t.PublicTrackingToken.Valid {
 		v := t.PublicTrackingToken.String
 		d.PublicTrackingToken = &v
@@ -113,17 +115,19 @@ func toTicketDTO(t db.Ticket, exposeToken bool) ticketDTO {
 }
 
 type createTicketRequest struct {
-	TicketType     string     `json:"ticketType"`
-	Scope          string     `json:"scope"`
-	ClientID       uuid.UUID  `json:"clientId"`
-	AssetID        *uuid.UUID `json:"assetId"`
-	ServiceID      *uuid.UUID `json:"serviceId"`
-	TeamID         uuid.UUID  `json:"teamId"`
-	AssignedUserID *uuid.UUID `json:"assignedUserId"`
-	Impact         string     `json:"impact"`
-	Urgency        string     `json:"urgency"`
-	Title          string     `json:"title"`
-	Description    string     `json:"description"`
+	TicketType string     `json:"ticketType"`
+	Scope      string     `json:"scope"`
+	ClientID   uuid.UUID  `json:"clientId"`
+	AssetID    *uuid.UUID `json:"assetId"`
+	ServiceID  *uuid.UUID `json:"serviceId"`
+	// TerritorialUnitID: el lugar (000038); con assetId manda la localidad del activo.
+	TerritorialUnitID *uuid.UUID `json:"territorialUnitId"`
+	TeamID            uuid.UUID  `json:"teamId"`
+	AssignedUserID    *uuid.UUID `json:"assignedUserId"`
+	Impact            string     `json:"impact"`
+	Urgency           string     `json:"urgency"`
+	Title             string     `json:"title"`
+	Description       string     `json:"description"`
 	// ParentID: crear el ticket ya como hijo de otro ("Crear hijo").
 	ParentID *uuid.UUID `json:"parentId"`
 	// AffectsClient: nil = según la regla de Administración → Ticketera.

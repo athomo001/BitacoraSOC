@@ -15,11 +15,13 @@ export interface ShellNavItem {
   labelKey: MessageKey;
   icon: string;
   /** Alt+<dígito>, ver ShellComponent.onKeydown */
-  shortcutDigit: '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9';
+  shortcutDigit: '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9';
   /** Código de `system_features` que debe estar activo para mostrar la sección. */
   requiresFeature?: string;
   /** Necesita SOC o NOC encendido: con solo la Ticketera no aparece (pedido del dueño). */
   requiresSocOrNoc?: boolean;
+  /** Necesita el módulo NOC encendido (territorio, activos). */
+  requiresNoc?: boolean;
   /** Además, que el usuario vea al menos un complemento (si no, no hay nada que abrir). */
   requiresComplements?: boolean;
   /** Capacidad de grupo que debe tener el usuario (el admin la tiene siempre). */
@@ -35,6 +37,8 @@ export const SHELL_NAV_ITEMS: readonly ShellNavItem[] = [
   { path: 'tickets', labelKey: 'nav.tickets', icon: 'confirmation_number', shortcutDigit: '6', requiresFeature: 'native_tickets' },
   { path: 'shifts', labelKey: 'nav.shifts', icon: 'schedule', shortcutDigit: '2', requiresSocOrNoc: true, requiresAreaOps: true },
   { path: 'escalation', labelKey: 'nav.escalation', icon: 'phone_in_talk', shortcutDigit: '3', requiresSocOrNoc: true, requiresAreaOps: true },
+  // Mapa (#24): localidades y sectores a revisar. Es del módulo NOC (territorio).
+  { path: 'map', labelKey: 'nav.map', icon: 'map', shortcutDigit: '0', requiresNoc: true, requiresOperational: true },
   { path: 'directory', labelKey: 'nav.directory', icon: 'contacts', shortcutDigit: '4' },
   // Reportes (comentario del dueño #10): informes y boletines por correo. Es del núcleo:
   // SOC (incidentes de seguridad) y NOC (caída de un enlace) le avisan igual al cliente.

@@ -7,9 +7,11 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
 import { Organization, OrganizationsService, TeamSummary } from '../../core/organizations/organizations.service';
-import { Impact, TicketType, TicketsService, Urgency } from '../../core/tickets/tickets.service';
+import { Impact, TicketPlace, TicketType, TicketsService, Urgency } from '../../core/tickets/tickets.service';
 import { PRIORITY_SHORT, PRIORITY_TONE, priorityOf, resolverTeams } from '../../core/tickets/ticket-view';
 import { ModuleAccessService } from '../../core/auth/module-access.service';
+import { MatIconModule } from '@angular/material/icon';
+import { PlacePickerComponent, placeLabel } from './place-picker';
 
 import '../../core/i18n/packs/tickets';
 const IMPACTS: readonly Impact[] = ['low', 'medium', 'high'];
@@ -31,7 +33,7 @@ export interface NewChildData {
 @Component({
   selector: 'app-new-ticket-dialog',
   standalone: true,
-  imports: [FormsModule, ModalComponent, ButtonComponent],
+  imports: [FormsModule, ModalComponent, ButtonComponent, MatIconModule, PlacePickerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <app-modal>
@@ -66,6 +68,21 @@ export interface NewChildData {
             </select>
           </label>
         </div>
+        <!-- Lugar (#24): localidad o activo; con NOC o un área propia que escala por zona. -->
+        @if (modules.escNoc()) {
+          <div class="field">
+            <span>{{ i18n.t('tickets.place') }} <span class="nt__hint">{{ i18n.t('tickets.place.optional') }}</span></span>
+            @if (place(); as p) {
+              <span class="nt__place">
+                <mat-icon>{{ p.place.assetId ? 'router' : 'place' }}</mat-icon>{{ label(p.place) }}
+                <button type="button" class="adm-icon-btn" [attr.aria-label]="i18n.t('tickets.place.remove')" (click)="place.set(null)"><mat-icon>close</mat-icon></button>
+              </span>
+            } @else {
+              <app-place-picker (picked)="place.set($event)" />
+            }
+            <span class="nt__hint">{{ i18n.t('tickets.place.hint') }}</span>
+          </div>
+        }
         <label class="field">
           <span>{{ i18n.t('tickets.newDialog.ticketTitle') }}</span>
           <input name="title" [(ngModel)]="title" required maxlength="200" />
@@ -106,6 +123,25 @@ export interface NewChildData {
     </app-modal>
   `,
   styles: `
+    .nt__place {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 4px 4px 9px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: var(--bg-app);
+    }
+
+    .nt__place mat-icon {
+      width: 16px;
+      height: 16px;
+      font-size: 16px;
+      color: var(--accent);
+    }
+
+    .nt__place .adm-icon-btn { margin-left: auto; }
+
     .nt {
       display: flex;
       flex-direction: column;
@@ -189,6 +225,8 @@ export class NewTicketDialogComponent implements OnInit {
   protected scope: 'soc' | 'noc' | 'general' = 'general';
   protected title = '';
   protected description = '';
+  protected readonly place = signal<{ territorialUnitId?: string; assetId?: string; place: TicketPlace } | null>(null);
+  protected readonly label = placeLabel;
 
   protected readonly priority = computed(() => priorityOf(this.impact(), this.urgency()));
   protected readonly priorityKey = computed(() => `tickets.priority.${this.priority()}` as MessageKey);
@@ -226,6 +264,7 @@ export class NewTicketDialogComponent implements OnInit {
         ticketType: this.type(), scope: this.scope, clientId: this.clientId, teamId: this.teamId || undefined,
         impact: this.impact(), urgency: this.urgency(), title: this.title.trim(), description: this.description.trim(),
         parentId: this.parent?.parentId,
+        territorialUnitId: this.place()?.territorialUnitId, assetId: this.place()?.assetId,
       });
       this.dialogRef.close(created.id);
     } catch (error) {

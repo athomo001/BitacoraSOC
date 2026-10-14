@@ -14,10 +14,10 @@ UPDATE app_config SET
   setup_completed_at = now(),
   updated_at = now()
 WHERE id = true
-RETURNING id, shift_check_cooldown_minutes, alert_nok_enabled, alert_nok_role_target, audit_ttl_days, backup_retention_days, territorial_kind_labels, setup_completed_at, updated_at, birthday_emails_enabled, birthday_emails_time, birthday_emails_cc, birthday_emails_last_date, password_min_length
+RETURNING id, shift_check_cooldown_minutes, alert_nok_enabled, alert_nok_role_target, audit_ttl_days, backup_retention_days, territorial_kind_labels, setup_completed_at, updated_at, birthday_emails_enabled, birthday_emails_time, birthday_emails_cc, birthday_emails_last_date, password_min_length, soc_module_enabled, noc_module_enabled, map_tiles_mode, map_tiles_url
 `
 
-// Qué áreas quedan activas lo guarda SetAreaActiveByCode (000033).
+// Qué módulos quedan encendidos lo guarda SetModuleFlags.
 func (q *Queries) CompleteSetup(ctx context.Context) (AppConfig, error) {
 	row := q.db.QueryRow(ctx, completeSetup)
 	var i AppConfig
@@ -36,6 +36,10 @@ func (q *Queries) CompleteSetup(ctx context.Context) (AppConfig, error) {
 		&i.BirthdayEmailsCc,
 		&i.BirthdayEmailsLastDate,
 		&i.PasswordMinLength,
+		&i.SocModuleEnabled,
+		&i.NocModuleEnabled,
+		&i.MapTilesMode,
+		&i.MapTilesUrl,
 	)
 	return i, err
 }
@@ -54,7 +58,7 @@ func (q *Queries) EnsureAppConfigRow(ctx context.Context) error {
 }
 
 const getAppConfig = `-- name: GetAppConfig :one
-SELECT id, shift_check_cooldown_minutes, alert_nok_enabled, alert_nok_role_target, audit_ttl_days, backup_retention_days, territorial_kind_labels, setup_completed_at, updated_at, birthday_emails_enabled, birthday_emails_time, birthday_emails_cc, birthday_emails_last_date, password_min_length FROM app_config WHERE id = true
+SELECT id, shift_check_cooldown_minutes, alert_nok_enabled, alert_nok_role_target, audit_ttl_days, backup_retention_days, territorial_kind_labels, setup_completed_at, updated_at, birthday_emails_enabled, birthday_emails_time, birthday_emails_cc, birthday_emails_last_date, password_min_length, soc_module_enabled, noc_module_enabled, map_tiles_mode, map_tiles_url FROM app_config WHERE id = true
 `
 
 func (q *Queries) GetAppConfig(ctx context.Context) (AppConfig, error) {
@@ -75,7 +79,45 @@ func (q *Queries) GetAppConfig(ctx context.Context) (AppConfig, error) {
 		&i.BirthdayEmailsCc,
 		&i.BirthdayEmailsLastDate,
 		&i.PasswordMinLength,
+		&i.SocModuleEnabled,
+		&i.NocModuleEnabled,
+		&i.MapTilesMode,
+		&i.MapTilesUrl,
 	)
+	return i, err
+}
+
+const getMapTiles = `-- name: GetMapTiles :one
+SELECT map_tiles_mode, map_tiles_url FROM app_config WHERE id = true
+`
+
+type GetMapTilesRow struct {
+	MapTilesMode string `json:"map_tiles_mode"`
+	MapTilesUrl  string `json:"map_tiles_url"`
+}
+
+// Fondo del Mapa (000037).
+func (q *Queries) GetMapTiles(ctx context.Context) (GetMapTilesRow, error) {
+	row := q.db.QueryRow(ctx, getMapTiles)
+	var i GetMapTilesRow
+	err := row.Scan(&i.MapTilesMode, &i.MapTilesUrl)
+	return i, err
+}
+
+const getModuleFlags = `-- name: GetModuleFlags :one
+SELECT soc_module_enabled, noc_module_enabled FROM app_config WHERE id = true
+`
+
+type GetModuleFlagsRow struct {
+	SocModuleEnabled bool `json:"soc_module_enabled"`
+	NocModuleEnabled bool `json:"noc_module_enabled"`
+}
+
+// Los módulos SOC y NOC de la instalación (000036). Distintos de las áreas.
+func (q *Queries) GetModuleFlags(ctx context.Context) (GetModuleFlagsRow, error) {
+	row := q.db.QueryRow(ctx, getModuleFlags)
+	var i GetModuleFlagsRow
+	err := row.Scan(&i.SocModuleEnabled, &i.NocModuleEnabled)
 	return i, err
 }
 
@@ -94,4 +136,32 @@ func (q *Queries) MergeTerritorialLabels(ctx context.Context, labels []byte) ([]
 	var territorial_kind_labels []byte
 	err := row.Scan(&territorial_kind_labels)
 	return territorial_kind_labels, err
+}
+
+const setMapTiles = `-- name: SetMapTiles :exec
+UPDATE app_config SET map_tiles_mode = $1, map_tiles_url = $2, updated_at = now() WHERE id = true
+`
+
+type SetMapTilesParams struct {
+	Mode string `json:"mode"`
+	Url  string `json:"url"`
+}
+
+func (q *Queries) SetMapTiles(ctx context.Context, arg SetMapTilesParams) error {
+	_, err := q.db.Exec(ctx, setMapTiles, arg.Mode, arg.Url)
+	return err
+}
+
+const setModuleFlags = `-- name: SetModuleFlags :exec
+UPDATE app_config SET soc_module_enabled = $1, noc_module_enabled = $2, updated_at = now() WHERE id = true
+`
+
+type SetModuleFlagsParams struct {
+	Soc bool `json:"soc"`
+	Noc bool `json:"noc"`
+}
+
+func (q *Queries) SetModuleFlags(ctx context.Context, arg SetModuleFlagsParams) error {
+	_, err := q.db.Exec(ctx, setModuleFlags, arg.Soc, arg.Noc)
+	return err
 }

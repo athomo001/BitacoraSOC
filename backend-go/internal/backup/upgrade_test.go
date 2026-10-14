@@ -81,3 +81,16 @@ func TestUpgradeTablesFillsGuardAreas(t *testing.T) {
 		t.Fatalf("áreas de las guardias: %v", teams)
 	}
 }
+
+func TestUpgradeTablesFillsModuleFlags(t *testing.T) {
+	tables := map[string]json.RawMessage{
+		"app_config": json.RawMessage(`[{"id":true}]`),
+		"areas":      json.RawMessage(`[{"code":"soc","active":true,"default_profile":"operativo"},{"code":"noc","active":false,"default_profile":"operativo"}]`),
+	}
+	upgradeTables(tables)
+	var config []map[string]any
+	_ = json.Unmarshal(tables["app_config"], &config)
+	if config[0]["soc_module_enabled"] != true || config[0]["noc_module_enabled"] != false {
+		t.Fatalf("los módulos salen de las áreas del respaldo: %v", config)
+	}
+}

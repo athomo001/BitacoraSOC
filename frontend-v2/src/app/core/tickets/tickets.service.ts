@@ -51,6 +51,16 @@ export interface Ticket {
   mergedIntoId?: string;
   mergedIntoNumber?: string;
   childCount: number;
+  /** Lugar del ticket (#24): localidad y, si se eligió, el activo. */
+  place?: TicketPlace;
+}
+
+export interface TicketPlace {
+  territorialUnitId: string;
+  name: string;
+  parentName?: string;
+  assetId?: string;
+  assetName?: string;
 }
 
 export interface TicketImage { id: string; fileName: string; sizeBytes: number; createdAt: string; }
@@ -115,6 +125,9 @@ export interface NewTicket {
   description: string;
   /** "Crear hijo": el ticket nace como hijo de este. */
   parentId?: string;
+  /** Lugar: con assetId, la localidad es la del activo. */
+  territorialUnitId?: string;
+  assetId?: string;
 }
 
 /** Plazos de SLA en minutos (Administración → Ticketera). */
@@ -246,6 +259,11 @@ export class TicketsService {
   /** Corrige el cliente (admin o permiso tickets:change_client); renueva enlace público y PIN. */
   async changeClient(id: string, clientId: string, reason: string): Promise<TicketDetail> {
     return (await firstValueFrom(this.http.put<ApiEnvelope<TicketDetail>>(`/api/tickets/${id}/client`, { clientId, reason }))).data;
+  }
+
+  /** Lugar del ticket: un activo (y su localidad), una localidad, o null para quitarlo. */
+  async setPlace(id: string, place: { territorialUnitId?: string; assetId?: string } | null): Promise<TicketDetail> {
+    return (await firstValueFrom(this.http.put<ApiEnvelope<TicketDetail>>(`/api/tickets/${id}/place`, place ?? {}))).data;
   }
 
   /** Sube una imagen; queda pendiente hasta que el comentario la incluye en imageIds. */

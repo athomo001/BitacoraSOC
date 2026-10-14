@@ -149,7 +149,7 @@ function normalize(text: string): string {
       <main class="adm__body">
         @switch (active()) {
           @case ('access') { <app-admin-access (goToAreas)="go('areas')" /> }
-          @case ('areas') { <app-admin-areas (goToAccess)="go('access')" /> }
+          @case ('areas') { <app-admin-areas /> }
           @case ('shifts') { <app-admin-shifts /> }
           @case ('checklist') { <app-admin-checklist /> }
           @case ('escalation') { <app-admin-escalation /> }
@@ -161,7 +161,7 @@ function normalize(text: string): string {
           @case ('territory') { <app-admin-territory /> }
           @case ('teams') { <app-admin-teams /> }
           @case ('brand') { <app-admin-brand /> }
-          @case ('modules') { <app-admin-modules (goToAreas)="go('areas')" /> }
+          @case ('modules') { <app-admin-modules /> }
           @case ('features') { <app-admin-features /> }
           @case ('backups') { <app-admin-backups (goToFeatures)="go('features')" /> }
           @case ('audit') { <app-admin-audit /> }

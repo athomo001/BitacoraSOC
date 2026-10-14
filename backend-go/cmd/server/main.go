@@ -153,6 +153,7 @@ func run(logger *slog.Logger) error {
 	configHandler := &handler.ConfigHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
 	systemFeaturesHandler := &handler.SystemFeaturesHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
 	territorialUnitsHandler := &handler.TerritorialUnitsHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
+	mapHandler := &handler.MapHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
 	organizationsHandler := &handler.OrganizationsHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
 	directoryHandler := &handler.DirectoryHandler{Pool: pool, Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
 	smtpConfigHandler := &handler.SMTPConfigHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
@@ -317,12 +318,15 @@ func run(logger *slog.Logger) error {
 	placementHandler := &handler.PlacementHandler{Queries: queries, Pool: pool, AuditLog: auditLog}
 	mux.Handle("GET /api/users/{id}/placement", admin(placementHandler.Get))
 	mux.Handle("PUT /api/users/{id}/placement", admin(placementHandler.Put))
+	// Ficha del área: la gente de un área (Áreas y niveles → un área → Personas).
+	mux.Handle("GET /api/areas/{code}/people", admin(placementHandler.AreaPeople))
+	mux.Handle("POST /api/areas/{code}/people", admin(placementHandler.CreateAreaPerson))
 
 	// Grupos de permisos
 	mux.Handle("GET /api/permission-groups", authed(permissionGroupsHandler.List))
 	mux.Handle("POST /api/permission-groups", admin(permissionGroupsHandler.Create))
 	// Administración → Áreas y niveles (spec/16, 9b).
-	areasHandler := &handler.AreasHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
+	areasHandler := &handler.AreasHandler{Queries: queries, AuditLog: auditLog}
 	mux.Handle("GET /api/areas", admin(areasHandler.List))
 	mux.Handle("POST /api/areas", admin(areasHandler.Create))
 	mux.Handle("PATCH /api/areas/{code}", admin(areasHandler.Patch))
@@ -377,6 +381,11 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/territorial-units/import", nocAdmin(territorialUnitsHandler.Import))
 	mux.Handle("POST /api/territorial-units/bulk-active", nocAdmin(territorialUnitsHandler.BulkActive))
 	mux.Handle("GET /api/territorial-units/import/template", nocAuthed(territorialUnitsHandler.ImportTemplate))
+	// Mapa (#24): localidades y sectores a revisar; el fondo lo elige el admin.
+	mux.Handle("GET /api/map/points", nocAuthed(mapHandler.Points))
+	mux.Handle("GET /api/map/units/{id}", nocAuthed(mapHandler.Unit))
+	mux.Handle("GET /api/config/map-tiles", nocAuthed(mapHandler.GetTiles))
+	mux.Handle("PUT /api/config/map-tiles", nocAdmin(mapHandler.PutTiles))
 
 	// Organizaciones y catálogo de tecnologías (Fase 6) — núcleo compartido SOC/NOC.
 	mux.Handle("GET /api/organizations", authed(organizationsHandler.List))
@@ -587,6 +596,7 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/tickets/merge", ticketAuthed(ticketsHandler.Merge))
 	mux.Handle("PUT /api/tickets/{id}/parent", ticketAuthed(ticketsHandler.SetParent))
 	mux.Handle("PUT /api/tickets/{id}/client", ticketCapability(capTicketsChangeClient, ticketsHandler.ChangeClient))
+	mux.Handle("PUT /api/tickets/{id}/place", ticketAuthed(ticketsHandler.SetPlace))
 	mux.Handle("POST /api/tickets/{id}/resolvers", ticketAuthed(ticketsHandler.AddResolver))
 	mux.Handle("POST /api/tickets/{id}/images", ticketAuthed(ticketsHandler.UploadImage))
 	mux.Handle("GET /api/tickets/{id}/images/{imageId}", ticketAuthed(ticketsHandler.ServeImage))

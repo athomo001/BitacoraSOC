@@ -26,6 +26,30 @@ func upgradeTables(tables map[string]json.RawMessage) {
 	}
 	fillAreaProfiles(tables)
 	fillGuardAreas(tables)
+	fillModuleFlags(tables)
+}
+
+// fillModuleFlags: los respaldos de entre 000033 y 000036 no traen los
+// módulos en app_config (vivían en el active de las áreas SOC y NOC).
+func fillModuleFlags(tables map[string]json.RawMessage) {
+	var config []map[string]any
+	if err := json.Unmarshal(tables["app_config"], &config); err != nil || len(config) == 0 {
+		return
+	}
+	if _, ok := config[0]["soc_module_enabled"]; ok {
+		return
+	}
+	var areas []map[string]any
+	_ = json.Unmarshal(tables["areas"], &areas)
+	for _, a := range areas {
+		switch a["code"] {
+		case "soc":
+			config[0]["soc_module_enabled"] = a["active"] == true
+		case "noc":
+			config[0]["noc_module_enabled"] = a["active"] == true
+		}
+	}
+	tables["app_config"], _ = json.Marshal(config)
 }
 
 // fillGuardAreas: los respaldos de antes de 000035 traen las guardias sin

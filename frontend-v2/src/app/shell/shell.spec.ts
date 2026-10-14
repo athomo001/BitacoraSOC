@@ -58,9 +58,9 @@ describe('ShellComponent', () => {
     return [...el.querySelectorAll('.shell__nav-label')].map((n) => n.textContent?.trim() ?? '');
   }
 
-  it('muestra las 6 secciones del núcleo y oculta la ticketera si está apagada', async () => {
+  it('muestra las secciones del núcleo, el Mapa con NOC, y oculta la ticketera si está apagada', async () => {
     const { el } = await render([{ code: 'native_tickets', isEnabled: false }]);
-    expect(navLabels(el)).toEqual(['Bitácora', 'Turnos y Checklist', 'Escalamiento', 'Directorio', 'Reportes', 'Administración']);
+    expect(navLabels(el)).toEqual(['Bitácora', 'Turnos y Checklist', 'Escalamiento', 'Mapa', 'Directorio', 'Reportes', 'Administración']);
   });
 
   it('alguien de Infra (no Operativo) ve Turnos y Escalamiento, no Bitácora ni Reportes', async () => {
@@ -70,6 +70,14 @@ describe('ShellComponent', () => {
     expect(labels).toContain('Escalamiento');
     expect(labels).not.toContain('Bitácora');
     expect(labels).not.toContain('Reportes');
+  });
+
+  it('sin el módulo NOC no aparece el Mapa', async () => {
+    const { fixture, el } = await render([]);
+    sseCallback?.('config.modules.updated', { socEnabled: true, nocEnabled: false });
+    fixture.detectChanges();
+    expect(navLabels(el)).not.toContain('Mapa');
+    expect(navLabels(el)).toContain('Escalamiento');
   });
 
   it('Mi equipo solo aparece para la jefatura de área', async () => {
@@ -129,7 +137,7 @@ describe('ShellComponent', () => {
     // El inglés se descarga al elegir EN (no va en el bundle inicial).
     await TestBed.inject(I18nService).loadEnglish();
     fixture.detectChanges();
-    expect(navLabels(el)).toEqual(['Logbook', 'Tickets', 'Shifts & Checklist', 'Escalation', 'Directory', 'Reports', 'Administration']);
+    expect(navLabels(el)).toEqual(['Logbook', 'Tickets', 'Shifts & Checklist', 'Escalation', 'Map', 'Directory', 'Reports', 'Administration']);
     expect(document.documentElement.lang).toBe('en');
   });
 

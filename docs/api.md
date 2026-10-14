@@ -222,6 +222,8 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `GET` | `/api/areas` | Admin |
 | `POST` | `/api/areas` | Admin |
 | `PATCH` | `/api/areas/{code}` | Admin |
+| `GET` | `/api/areas/{code}/people` | Admin |
+| `POST` | `/api/areas/{code}/people` | Admin |
 | `GET` | `/api/levels` | Admin |
 | `POST` | `/api/levels` | Admin |
 | `PUT` | `/api/levels/order` | Admin |
@@ -495,6 +497,10 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `POST` | `/api/territorial-units/import` | Admin · módulo NOC |
 | `POST` | `/api/territorial-units/bulk-active` | Admin · módulo NOC |
 | `GET` | `/api/territorial-units/import/template` | Sesión · módulo NOC |
+| `GET` | `/api/map/points` | Sesión · módulo NOC — localidades con coordenadas, incidentes abiertos, mantenimiento activo y tickets abiertos con lugar (estos solo con la Ticketera encendida) |
+| `GET` | `/api/map/units/{id}` | Sesión · módulo NOC — incidentes abiertos, mantenimientos activos, tickets abiertos y equipos que cubren la localidad (sin contactos) |
+| `GET` | `/api/config/map-tiles` | Sesión · módulo NOC — fondo del Mapa: `{mode: osm\|custom\|none, url}` |
+| `PUT` | `/api/config/map-tiles` | Admin · módulo NOC — `url` obligatoria con `custom` (http/https con `{z}`, `{x}` e `{y}`) |
 | `GET` | `/api/assets` | Sesión · módulo NOC, o persona de un área propia |
 | `POST` | `/api/assets` | Admin · módulo NOC |
 | `PATCH` | `/api/assets/{id}` | Admin · módulo NOC |
@@ -515,6 +521,7 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `POST` | `/api/tickets/merge` | Sesión · Ticketera encendida |
 | `PUT` | `/api/tickets/{id}/parent` | Sesión · Ticketera encendida |
 | `PUT` | `/api/tickets/{id}/client` | Permiso `tickets:change_client` (admin siempre) · Ticketera encendida |
+| `PUT` | `/api/tickets/{id}/place` | Sesión · Ticketera encendida — lugar del ticket: `{assetId}` (la localidad sale del activo), `{territorialUnitId}` o `{}` para quitarlo; queda en la actividad |
 | `POST` | `/api/tickets/{id}/resolvers` | Sesión · Ticketera encendida |
 | `POST` | `/api/tickets/{id}/images` | Sesión · Ticketera encendida |
 | `GET` | `/api/tickets/{id}/images/{imageId}` | Sesión · Ticketera encendida |

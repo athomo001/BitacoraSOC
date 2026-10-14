@@ -9,7 +9,7 @@ SELECT * FROM app_config WHERE id = true;
 INSERT INTO app_config (id) VALUES (true) ON CONFLICT (id) DO NOTHING;
 
 -- name: CompleteSetup :one
--- Qué áreas quedan activas lo guarda SetAreaActiveByCode (000033).
+-- Qué módulos quedan encendidos lo guarda SetModuleFlags.
 UPDATE app_config SET
   setup_completed_at = now(),
   updated_at = now()
@@ -24,3 +24,17 @@ UPDATE app_config SET
   updated_at = now()
 WHERE id = true
 RETURNING territorial_kind_labels;
+
+-- name: GetModuleFlags :one
+-- Los módulos SOC y NOC de la instalación (000036). Distintos de las áreas.
+SELECT soc_module_enabled, noc_module_enabled FROM app_config WHERE id = true;
+
+-- name: SetModuleFlags :exec
+UPDATE app_config SET soc_module_enabled = sqlc.arg('soc'), noc_module_enabled = sqlc.arg('noc'), updated_at = now() WHERE id = true;
+
+-- name: GetMapTiles :one
+-- Fondo del Mapa (000037).
+SELECT map_tiles_mode, map_tiles_url FROM app_config WHERE id = true;
+
+-- name: SetMapTiles :exec
+UPDATE app_config SET map_tiles_mode = sqlc.arg('mode'), map_tiles_url = sqlc.arg('url'), updated_at = now() WHERE id = true;

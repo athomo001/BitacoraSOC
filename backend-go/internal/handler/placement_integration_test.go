@@ -45,6 +45,10 @@ func TestPlacement_GruposQueSeArmanSolos(t *testing.T) {
 	defer tx.Rollback(ctx) //nolint:errcheck // la transacción se deshace siempre
 	q := db.New(tx)
 	nonce := fmt.Sprintf("%d", time.Now().UnixNano())
+	// La prueba no depende de cómo esté la base: módulo y área SOC encendidos.
+	if _, err := tx.Exec(ctx, `UPDATE app_config SET soc_module_enabled = true; UPDATE areas SET active = true WHERE code = 'soc'`); err != nil {
+		t.Fatal(err)
+	}
 	code := "infra_" + nonce
 	name := "Infra " + nonce
 	if _, err := tx.Exec(ctx, `INSERT INTO areas (code, name) VALUES ($1, $2)`, code, name); err != nil {
@@ -125,5 +129,32 @@ func TestPlacement_GruposQueSeArmanSolos(t *testing.T) {
 	}
 	if !slices.Contains(rec.events, "user.placement.update") {
 		t.Fatalf("auditoría: %v", rec.events)
+	}
+
+	// Ficha del área: la gente con su nivel, y una persona nueva directo al área.
+	r := httptest.NewRequest("GET", "/", nil).WithContext(asAdmin)
+	r.SetPathValue("code", code)
+	w := httptest.NewRecorder()
+	h.AreaPeople(w, r)
+	var people struct{ Data []areaPersonDTO }
+	if err := json.Unmarshal(w.Body.Bytes(), &people); err != nil || w.Code != http.StatusOK || len(people.Data) != 1 || people.Data[0].ID != user || people.Data[0].LevelID != n1.String() {
+		t.Fatalf("gente del área: %d %s", w.Code, w.Body)
+	}
+	var buf bytes.Buffer
+	_ = json.NewEncoder(&buf).Encode(map[string]any{"fullName": "Rocío Fuentes", "username": "rf" + nonce, "email": "rf" + nonce + "@test.local", "levelId": n2.String()})
+	r = httptest.NewRequest("POST", "/", &buf).WithContext(asAdmin)
+	r.SetPathValue("code", code)
+	w = httptest.NewRecorder()
+	h.CreateAreaPerson(w, r)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("persona nueva en el área: %d %s", w.Code, w.Body)
+	}
+	r = httptest.NewRequest("GET", "/", nil).WithContext(asAdmin)
+	r.SetPathValue("code", code)
+	w = httptest.NewRecorder()
+	h.AreaPeople(w, r)
+	_ = json.Unmarshal(w.Body.Bytes(), &people)
+	if len(people.Data) != 2 {
+		t.Fatalf("la persona nueva aparece en el área: %s", w.Body)
 	}
 }

@@ -22,7 +22,7 @@ type ModuleAccess interface {
 // visual", aplica incluso a admin — un módulo apagado está apagado para
 // todos) o si el usuario no-admin no lo tiene en el alcance de sus
 // permission_groups (HU-PERM-2). Debe montarse después de RequireAuth.
-// Lee las áreas en cada request a propósito: PATCH /api/config/modules
+// Lee los módulos en cada request a propósito: PATCH /api/config/modules
 // tiene que surtir efecto en la request siguiente, sin caché que invalidar.
 func RequireModule(access ModuleAccess, module modules.Module) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

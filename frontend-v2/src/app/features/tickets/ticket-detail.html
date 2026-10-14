@@ -17,6 +17,35 @@
           @if (t.assignedTeamId && !hasTeam(t.assignedTeamId)) { <option [value]="t.assignedTeamId">{{ t.teamName }}</option> }
         </select>
       </dd>
+      @if (modules.escNoc()) {
+        <dt>{{ i18n.t('tickets.place') }}</dt>
+        <dd class="td__people">
+          @if (t.place; as p) {
+            <span>{{ placeLabel(p) }}</span>
+            @if (!t.mergedIntoId) {
+              <button type="button" class="adm-icon-btn" [disabled]="busy()" [attr.aria-label]="i18n.t('tickets.place.change')" (click)="editingPlace.set(!editingPlace())"><mat-icon>edit</mat-icon></button>
+            }
+            @if (modules.noc()) {
+              <a class="adm-btn" routerLink="/map" [queryParams]="{ unitId: p.territorialUnitId }"><mat-icon>map</mat-icon>{{ i18n.t('tickets.place.onMap') }}</a>
+            }
+          } @else {
+            <span class="td__muted">{{ i18n.t('tickets.place.empty') }}</span>
+            @if (!t.mergedIntoId) {
+              <button type="button" class="adm-btn" [disabled]="busy()" (click)="editingPlace.set(!editingPlace())"><mat-icon>add</mat-icon>{{ i18n.t('tickets.place.choose') }}</button>
+            }
+          }
+        </dd>
+        @if (editingPlace()) {
+          <dt></dt>
+          <dd class="td__people">
+            <app-place-picker (picked)="setPlace($event)" />
+            <button type="button" class="adm-btn" (click)="editingPlace.set(false)">{{ i18n.t('tickets.place.cancel') }}</button>
+            @if (t.place) {
+              <button type="button" class="adm-btn" [disabled]="busy()" (click)="setPlace(null)">{{ i18n.t('tickets.place.remove') }}</button>
+            }
+          </dd>
+        }
+      }
       <dt>{{ i18n.t('tickets.detail.resolvers') }}</dt>
       <dd class="td__people">
         @for (p of d.resolvers; track p.userId) {

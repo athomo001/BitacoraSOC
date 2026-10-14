@@ -26,8 +26,10 @@ SELECT * FROM tickets WHERE id = $1;
 SELECT * FROM tickets WHERE ticket_number = $1;
 
 -- name: CreateTicket :one
-INSERT INTO tickets (ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, public_tracking_token, created_by, affects_client)
-VALUES ($1, $2, $3, $4, sqlc.narg('asset_id'), sqlc.narg('service_id'), $5, sqlc.narg('assigned_user_id'), 'new', $6, $7, $8, $9, $10, $11, $12, $13, $14, sqlc.arg('affects_client'))
+-- Con activo, el lugar es la localidad del activo (000038).
+INSERT INTO tickets (ticket_number, ticket_type, scope, client_id, asset_id, service_id, assigned_team_id, assigned_user_id, status, impact, urgency, priority, title, description, sla_response_due_at, sla_resolution_due_at, public_tracking_token, created_by, affects_client, territorial_unit_id)
+VALUES ($1, $2, $3, $4, sqlc.narg('asset_id'), sqlc.narg('service_id'), $5, sqlc.narg('assigned_user_id'), 'new', $6, $7, $8, $9, $10, $11, $12, $13, $14, sqlc.arg('affects_client'),
+  COALESCE((SELECT a.territorial_unit_id FROM assets a WHERE a.id = sqlc.narg('asset_id')::uuid), sqlc.narg('territorial_unit_id')::uuid))
 RETURNING *;
 
 -- name: UpdateTicket :one
@@ -90,11 +92,15 @@ SELECT * FROM entries WHERE ticket_id = $1 ORDER BY created_at ASC;
 -- mostrar UUID, abiertos primero y por prioridad, luego lo más reciente.
 SELECT sqlc.embed(t), o.name AS client_name, tm.name AS team_name, u.username AS assignee_username,
   p.ticket_number AS parent_number, m.ticket_number AS merged_into_number,
-  (SELECT count(*) FROM tickets c WHERE c.parent_id = t.id)::int AS child_count
+  (SELECT count(*) FROM tickets c WHERE c.parent_id = t.id)::int AS child_count,
+  pl.name AS place_name, plp.name AS place_parent_name, pa.name AS asset_name
 FROM tickets t
 JOIN organizations o ON o.id = t.client_id
 LEFT JOIN teams tm ON tm.id = t.assigned_team_id
 LEFT JOIN users u ON u.id = t.assigned_user_id
+LEFT JOIN territorial_units pl ON pl.id = t.territorial_unit_id
+LEFT JOIN territorial_units plp ON plp.id = pl.parent_id
+LEFT JOIN assets pa ON pa.id = t.asset_id
 LEFT JOIN tickets p ON p.id = t.parent_id
 LEFT JOIN tickets m ON m.id = t.merged_into_id
 WHERE (sqlc.narg('ticket_type')::ticket_type IS NULL OR t.ticket_type = sqlc.narg('ticket_type')::ticket_type)
@@ -129,11 +135,15 @@ SELECT
 FROM tickets;
 
 -- name: GetTicketView :one
-SELECT sqlc.embed(t), o.name AS client_name, tm.name AS team_name, u.username AS assignee_username
+SELECT sqlc.embed(t), o.name AS client_name, tm.name AS team_name, u.username AS assignee_username,
+  pl.name AS place_name, plp.name AS place_parent_name, pa.name AS asset_name
 FROM tickets t
 JOIN organizations o ON o.id = t.client_id
 LEFT JOIN teams tm ON tm.id = t.assigned_team_id
 LEFT JOIN users u ON u.id = t.assigned_user_id
+LEFT JOIN territorial_units pl ON pl.id = t.territorial_unit_id
+LEFT JOIN territorial_units plp ON plp.id = pl.parent_id
+LEFT JOIN assets pa ON pa.id = t.asset_id
 WHERE t.id = $1;
 
 -- name: ListTicketTasksWithUser :many
@@ -282,3 +292,7 @@ SET client_id = sqlc.arg('client_id'),
     updated_at = now()
 WHERE tickets.id = sqlc.arg('id')
 RETURNING *;
+
+-- name: SetTicketPlace :exec
+-- Lugar del ticket (000038): activo opcional y su localidad.
+UPDATE tickets SET asset_id = sqlc.narg('asset_id'), territorial_unit_id = sqlc.narg('territorial_unit_id'), updated_at = now() WHERE id = $1;

@@ -90,7 +90,7 @@ func (h *SystemFeaturesHandler) Patch(w http.ResponseWriter, r *http.Request) {
 
 	// La Ticketera es un módulo más: no se apaga si SOC y NOC ya están apagados.
 	if code == ticketsFeature && !*req.IsEnabled {
-		if flags, err := repository.AreaFlags(ctx, h.Queries); err == nil && !flags.SOC && !flags.NOC {
+		if flags, err := repository.ModuleFlags(ctx, h.Queries); err == nil && !flags.SOC && !flags.NOC {
 			problemdetails.Write(w, r, http.StatusBadRequest, "no-module-selected", noModuleMessage)
 			return
 		}

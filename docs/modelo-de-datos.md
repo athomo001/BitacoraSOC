@@ -290,6 +290,7 @@ erDiagram
         timestamptz sla_response_breach_notified_at
         timestamptz sla_resolution_warn_notified_at
         timestamptz sla_resolution_breach_notified_at
+        uuid territorial_unit_id FK
     }
     TICKET_COMMENTS {
         uuid id PK
@@ -386,6 +387,7 @@ erDiagram
     ORGANIZATIONS ||--o{ TICKETS : "client_id"
     SERVICES |o--o{ TICKETS : "service_id"
     TEAMS |o--o{ TICKETS : "assigned_team_id"
+    TERRITORIAL_UNITS |o--o{ TICKETS : "territorial_unit_id"
     TICKETS |o--o{ TICKETS : "merged_into_id"
     TICKETS |o--o{ TICKETS : "parent_id"
     TICKETS ||--o{ TICKET_COMMENTS : "ticket_id"
@@ -1006,6 +1008,10 @@ erDiagram
         text birthday_emails_cc
         date birthday_emails_last_date
         smallint password_min_length
+        boolean soc_module_enabled
+        boolean noc_module_enabled
+        text map_tiles_mode
+        text map_tiles_url
     }
     SMTP_CONFIG {
         boolean id PK

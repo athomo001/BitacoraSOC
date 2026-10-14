@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { SetupService } from '../../core/setup/setup.service';
 import { SystemFeaturesService } from '../../core/system-features/system-features.service';
@@ -26,11 +26,11 @@ const MODULES: readonly ModuleRow[] = [
 const TICKETS_FEATURE = 'native_tickets';
 
 /**
- * Los módulos de la instalación (HU-0b): SOC, NOC y la Ticketera. SOC y NOC
- * son áreas desde spec/16 (9b, aprobado por el dueño 2026-10-13): se
- * encienden en Administración → Áreas y niveles, y acá se ve su estado. La
- * Ticketera se enciende acá. Apagar un módulo nunca borra datos: solo lo saca
- * de menús y bloquea su API hasta reactivarlo.
+ * Los módulos de la instalación (HU-0b): SOC, NOC y la Ticketera, todos con
+ * su interruptor acá (pedido del dueño 2026-10-14: "se activa o se desactiva
+ * todo de ahí"). Un módulo son funciones; el área SOC o NOC de Áreas y
+ * niveles es la gente, y no los enciende ni apaga. Apagar un módulo nunca
+ * borra datos: solo lo saca de menús y bloquea su API hasta reactivarlo.
  */
 @Component({
   selector: 'app-admin-modules',
@@ -48,29 +48,17 @@ const TICKETS_FEATURE = 'native_tickets';
     <section class="adm-card">
       <div class="adm-card__body">
         @for (m of modules; track m.id) {
-          @if (m.id === 'tickets') {
-            <label class="adm-switch-row">
-              <span class="switch">
-                <input class="switch__input" type="checkbox" role="switch" [checked]="draft()[m.id]" (change)="toggle(m.id)" />
-                <span class="switch__track" aria-hidden="true"></span>
-              </span>
-              <span class="mod__text">
-                <span class="adm-strong">{{ i18n.t(m.nameKey) }}</span>
-                <span class="pill" [class]="draft()[m.id] ? 'tone-ok' : 'tone-neutral'">{{ i18n.t(draft()[m.id] ? 'modules.on' : 'modules.off') }}</span>
-                <span class="adm-hint adm-block">{{ i18n.t(m.descKey) }}</span>
-              </span>
-            </label>
-          } @else {
-            <div class="adm-switch-row">
-              <mat-icon class="mod__area-icon">hub</mat-icon>
-              <span class="mod__text">
-                <span class="adm-strong">{{ i18n.t(m.nameKey) }}</span>
-                <span class="pill" [class]="draft()[m.id] ? 'tone-ok' : 'tone-neutral'">{{ i18n.t(draft()[m.id] ? 'modules.on' : 'modules.off') }}</span>
-                <span class="adm-hint adm-block">{{ i18n.t(m.descKey) }}</span>
-              </span>
-              <button type="button" class="adm-btn adm-push" (click)="goToAreas.emit()"><mat-icon>hub</mat-icon>{{ i18n.t('modules.inAreas') }}</button>
-            </div>
-          }
+          <label class="adm-switch-row">
+            <span class="switch">
+              <input class="switch__input" type="checkbox" role="switch" [checked]="draft()[m.id]" (change)="toggle(m.id)" />
+              <span class="switch__track" aria-hidden="true"></span>
+            </span>
+            <span class="mod__text">
+              <span class="adm-strong">{{ i18n.t(m.nameKey) }}</span>
+              <span class="pill" [class]="draft()[m.id] ? 'tone-ok' : 'tone-neutral'">{{ i18n.t(draft()[m.id] ? 'modules.on' : 'modules.off') }}</span>
+              <span class="adm-hint adm-block">{{ i18n.t(m.descKey) }}</span>
+            </span>
+          </label>
         }
       </div>
       <p class="adm-card__note"><mat-icon class="mod__note-icon">info_outline</mat-icon>{{ i18n.t('modules.note') }}</p>
@@ -102,15 +90,12 @@ const TICKETS_FEATURE = 'native_tickets';
     .mod__text .adm-hint { flex-basis: 100%; }
     .adm-card__note { display: flex; align-items: flex-start; gap: 6px; border-top: 1px solid var(--border-subtle); }
     .mod__note-icon { flex: none; width: 14px; height: 14px; font-size: 14px; }
-    .mod__area-icon { flex: none; width: 34px; color: var(--text-muted); }
   `,
 })
 export class AdminModulesComponent implements OnInit {
   protected readonly i18n = inject(I18nService);
   private readonly setup = inject(SetupService);
   private readonly features = inject(SystemFeaturesService);
-  /** SOC y NOC se encienden en Áreas y niveles. */
-  readonly goToAreas = output<void>();
 
   protected readonly modules = MODULES;
   protected readonly saved = signal<Flags>({ soc: false, noc: false, tickets: false });
@@ -150,17 +135,14 @@ export class AdminModulesComponent implements OnInit {
     this.error.set(null);
     const before = this.saved();
     try {
-      // Actualiza el estado cacheado: los menús aparecen o se van al instante.
       // Lo que se enciende va primero, así nunca quedan los tres apagados a
       // mitad del guardado (el servidor lo rechazaría).
       let tickets = before.tickets;
-      if (d.tickets && !before.tickets) {
-        tickets = (await this.features.setEnabled(TICKETS_FEATURE, true)).isEnabled;
-      }
-      const flags = { socEnabled: before.soc, nocEnabled: before.noc };
-      if (!d.tickets && before.tickets) {
-        tickets = (await this.features.setEnabled(TICKETS_FEATURE, false)).isEnabled;
-      }
+      if (d.tickets && !before.tickets) tickets = (await this.features.setEnabled(TICKETS_FEATURE, true)).isEnabled;
+      // SOC y NOC van juntos; updateModules deja los menús al día al instante.
+      let flags = { socEnabled: before.soc, nocEnabled: before.noc };
+      if (d.soc !== before.soc || d.noc !== before.noc) flags = await this.setup.updateModules({ socEnabled: d.soc, nocEnabled: d.noc });
+      if (!d.tickets && before.tickets) tickets = (await this.features.setEnabled(TICKETS_FEATURE, false)).isEnabled;
       this.apply({ soc: flags.socEnabled, noc: flags.nocEnabled, tickets });
       this.notice.set(this.i18n.t('admin.saved'));
     } catch (error) {

@@ -1296,6 +1296,10 @@ type AppConfig struct {
 	BirthdayEmailsCc          string             `json:"birthday_emails_cc"`
 	BirthdayEmailsLastDate    pgtype.Date        `json:"birthday_emails_last_date"`
 	PasswordMinLength         int16              `json:"password_min_length"`
+	SocModuleEnabled          bool               `json:"soc_module_enabled"`
+	NocModuleEnabled          bool               `json:"noc_module_enabled"`
+	MapTilesMode              string             `json:"map_tiles_mode"`
+	MapTilesUrl               string             `json:"map_tiles_url"`
 }
 
 type Area struct {
@@ -2062,6 +2066,7 @@ type Ticket struct {
 	SlaResponseBreachNotifiedAt   pgtype.Timestamptz `json:"sla_response_breach_notified_at"`
 	SlaResolutionWarnNotifiedAt   pgtype.Timestamptz `json:"sla_resolution_warn_notified_at"`
 	SlaResolutionBreachNotifiedAt pgtype.Timestamptz `json:"sla_resolution_breach_notified_at"`
+	TerritorialUnitID             pgtype.UUID        `json:"territorial_unit_id"`
 }
 
 type TicketComment struct {

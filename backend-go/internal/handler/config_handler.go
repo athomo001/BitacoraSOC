@@ -56,7 +56,8 @@ type patchModulesRequest struct {
 
 // PatchModules activa/desactiva SOC/NOC post-bootstrap. Puramente de
 // acceso: nunca borra ni migra datos del módulo apagado (HU-0b) — solo
-// cambia el `active` de las áreas SOC y NOC, que RequireModule lee en cada request.
+// cambia los módulos de app_config (000036), que RequireModule lee en cada
+// request. Las áreas SOC y NOC (la gente) no se tocan.
 func (h *ConfigHandler) PatchModules(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var req patchModulesRequest
@@ -64,7 +65,7 @@ func (h *ConfigHandler) PatchModules(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "cuerpo de la request inválido")
 		return
 	}
-	before, err := repository.AreaFlags(ctx, h.Queries)
+	before, err := repository.ModuleFlags(ctx, h.Queries)
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer la configuración")
 		return
@@ -82,7 +83,7 @@ func (h *ConfigHandler) PatchModules(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := setModuleAreas(ctx, h.Queries, soc, noc); err != nil {
+	if err := setModuleFlags(ctx, h.Queries, soc, noc); err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo actualizar los módulos")
 		return
 	}

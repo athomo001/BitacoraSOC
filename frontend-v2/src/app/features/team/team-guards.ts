@@ -2,12 +2,14 @@ import { ChangeDetectionStrategy, Component, OnInit, inject, input, output, sign
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { Guard, GuardsService } from '../../core/shifts/guards.service';
-import { TeamPerson } from '../../core/team/team.service';
 import { problemDetail } from '../../core/http-error';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 
 import '../../core/i18n/packs/team';
+
+/** Quien se puede sumar a una guardia (de Mi equipo o de la ficha del área). */
+export interface GuardCandidate { id: string; username: string; fullName: string; active: boolean; }
 
 /**
  * Mi equipo → Guardias (9e, canvas "Guardias y escalamiento por área",
@@ -84,8 +86,8 @@ export class TeamGuardsComponent implements OnInit {
 
   readonly area = input.required<string>();
   readonly areaName = input.required<string>();
-  /** La gente del área (de Mi equipo), para sumarla a una guardia. */
-  readonly people = input.required<TeamPerson[]>();
+  /** La gente del área, para sumarla a una guardia. */
+  readonly people = input.required<GuardCandidate[]>();
   /** Cambió una guardia o sus integrantes: la línea de tiempo de abajo se recarga. */
   readonly changed = output<void>();
 
@@ -107,7 +109,7 @@ export class TeamGuardsComponent implements OnInit {
     return `team.g.day.${d}` as MessageKey;
   }
 
-  protected candidates(g: Guard): TeamPerson[] {
+  protected candidates(g: Guard): GuardCandidate[] {
     const inGuard = new Set(g.members.map((m) => m.userId));
     return this.people().filter((p) => p.active && !inGuard.has(p.id));
   }

@@ -15,15 +15,10 @@ const (
 	NOC Module = "noc"
 )
 
-// Flags es el estado de la instancia: si las áreas SOC y NOC están activas.
+// Flags es el estado de la instancia: si los módulos SOC y NOC están encendidos.
 type Flags struct {
 	SOC bool
 	NOC bool
-}
-
-// FlagsFromAreas arma Flags a partir de las áreas activas, por código.
-func FlagsFromAreas(active map[string]bool) Flags {
-	return Flags{SOC: active[string(SOC)], NOC: active[string(NOC)]}
 }
 
 // Enabled dice si el módulo está activo a nivel de instancia.

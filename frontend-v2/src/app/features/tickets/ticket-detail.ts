@@ -18,6 +18,9 @@ import { resolverTeams } from '../../core/tickets/ticket-view';
 import { CLOCK_TONE, PRIORITY_SHORT, PRIORITY_TONE, STATUS_TONE, clockText, formatDuration, publicTrackingUrl, transitionAction } from '../../core/tickets/ticket-view';
 import { TicketRelationsComponent } from './ticket-relations';
 import { TicketMailComponent } from './ticket-mail';
+import { RouterLink } from '@angular/router';
+import { ModuleAccessService } from '../../core/auth/module-access.service';
+import { PlacePickerComponent, placeLabel } from './place-picker';
 
 import '../../core/i18n/packs/tickets';
 type Tab = 'activity' | 'images' | 'tasks' | 'entries';
@@ -51,7 +54,7 @@ const TASK_PRESETS = [15, 30, 60] as const;
 @Component({
   selector: 'app-ticket-detail',
   standalone: true,
-  imports: [DatePipe, FormsModule, MatIconModule, MarkdownComponent, AuthImgDirective, TicketRelationsComponent, TicketMailComponent],
+  imports: [DatePipe, FormsModule, MatIconModule, MarkdownComponent, AuthImgDirective, TicketRelationsComponent, TicketMailComponent, RouterLink, PlacePickerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './ticket-detail.html',
   styleUrl: './ticket-detail.css',
@@ -80,6 +83,10 @@ export class TicketDetailComponent {
   protected readonly canDelete = this.perms.isAdmin;
   protected readonly confirmDelete = signal(false);
   private readonly orgs = inject(OrganizationsService);
+  protected readonly modules = inject(ModuleAccessService);
+  /** Lugar (#24): el buscador abierto en el panel. */
+  protected readonly editingPlace = signal(false);
+  protected readonly placeLabel = placeLabel;
   protected readonly teams = signal<TeamSummary[]>([]);
   protected readonly people = signal<TicketPerson[]>([]);
   /** Quienes todavía no están entre los resolutores. */
@@ -153,6 +160,14 @@ export class TicketDetailComponent {
     const t = this.detail()?.ticket;
     if (!t || !teamId || teamId === t.assignedTeamId) return;
     await this.run(() => this.api.setTeam(t.id, teamId));
+  }
+
+  /** Un activo (con su localidad), una localidad, o null para quitar el lugar. */
+  protected async setPlace(place: { territorialUnitId?: string; assetId?: string } | null): Promise<void> {
+    const t = this.detail()?.ticket;
+    if (!t) return;
+    this.editingPlace.set(false);
+    await this.run(() => this.api.setPlace(t.id, place && { territorialUnitId: place.territorialUnitId, assetId: place.assetId }));
   }
 
   protected async addResolver(userId: string): Promise<void> {

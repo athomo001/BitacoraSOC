@@ -46,6 +46,28 @@ type ticketViewDTO struct {
 	ParentNumber     *string `json:"parentNumber,omitempty"`
 	MergedIntoNumber *string `json:"mergedIntoNumber,omitempty"`
 	ChildCount       int32   `json:"childCount"`
+	// Place: el lugar del ticket (000038), con nombres para no mostrar UUID.
+	Place *ticketPlaceDTO `json:"place,omitempty"`
+}
+
+type ticketPlaceDTO struct {
+	TerritorialUnitID uuid.UUID  `json:"territorialUnitId"`
+	Name              string     `json:"name"`
+	ParentName        *string    `json:"parentName,omitempty"`
+	AssetID           *uuid.UUID `json:"assetId,omitempty"`
+	AssetName         *string    `json:"assetName,omitempty"`
+}
+
+// ticketPlace arma el lugar con los nombres que trae la vista (nil = sin lugar).
+func ticketPlace(t db.Ticket, name, parentName, assetName pgtype.Text) *ticketPlaceDTO {
+	if !t.TerritorialUnitID.Valid || !name.Valid {
+		return nil
+	}
+	p := &ticketPlaceDTO{TerritorialUnitID: uuid.UUID(t.TerritorialUnitID.Bytes), Name: name.String, ParentName: textPtr(parentName)}
+	if t.AssetID.Valid && assetName.Valid {
+		p.AssetID, p.AssetName = uuidPtr(t.AssetID), textPtr(assetName)
+	}
+	return p
 }
 
 // atRiskPercent: el umbral "en riesgo" de Administración → Ticketera.
@@ -247,6 +269,7 @@ func (h *TicketsHandler) List(w http.ResponseWriter, r *http.Request) {
 	for _, row := range rows {
 		v := toTicketView(row.Ticket, row.ClientName, row.TeamName, row.AssigneeUsername, now, atRisk)
 		v.ParentNumber, v.MergedIntoNumber, v.ChildCount = textPtr(row.ParentNumber), textPtr(row.MergedIntoNumber), row.ChildCount
+		v.Place = ticketPlace(row.Ticket, row.PlaceName, row.PlaceParentName, row.AssetName)
 		items = append(items, v)
 	}
 	writeData(w, 200, map[string]any{
@@ -292,6 +315,7 @@ func (h *TicketsHandler) loadDetail(r *http.Request, id uuid.UUID) (ticketDetail
 		Entries: make([]ticketEntryDTO, 0, len(entryRows)), TotalTimeSpentSeconds: total,
 		Resolvers: make([]ticketResolverDTO, 0, len(resolvers)),
 	}
+	d.Ticket.Place = ticketPlace(row.Ticket, row.PlaceName, row.PlaceParentName, row.AssetName)
 	for _, rv := range resolvers {
 		d.Resolvers = append(d.Resolvers, ticketResolverDTO{UserID: rv.UserID, Username: rv.Username, FullName: textPtr(rv.FullName)})
 	}
@@ -464,7 +488,9 @@ func (h *TicketsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, 500, "internal-error", "no se pudo recargar el ticket")
 		return
 	}
-	writeData(w, 200, toTicketView(row.Ticket, row.ClientName, row.TeamName, row.AssigneeUsername, now, h.atRiskPercent(ctx)))
+	v := toTicketView(row.Ticket, row.ClientName, row.TeamName, row.AssigneeUsername, now, h.atRiskPercent(ctx))
+	v.Place = ticketPlace(row.Ticket, row.PlaceName, row.PlaceParentName, row.AssetName)
+	writeData(w, 200, v)
 }
 
 // baseTicketUpdate copia lo que UpdateTicket no debe perder (fechas y contadores).

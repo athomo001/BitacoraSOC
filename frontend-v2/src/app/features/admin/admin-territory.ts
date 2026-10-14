@@ -8,6 +8,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { problemDetail } from '../../core/http-error';
 import { TerritorialLabelsFormComponent } from '../territory/territorial-labels-form';
 import { TerritoryImportComponent } from '../territory/territory-import';
+import { AdminTerritoryMapComponent } from './admin-territory-map';
 
 import '../../core/i18n/packs/admin';
 type TerritoryRow = TerritorialUnit & Record<string, unknown>;
@@ -33,7 +34,7 @@ function isUnder(row: TerritorialUnit, path: string): boolean {
 @Component({
   selector: 'app-admin-territory',
   standalone: true,
-  imports: [MatIconModule, DenseTableComponent, TerritorialLabelsFormComponent, TerritoryImportComponent],
+  imports: [MatIconModule, DenseTableComponent, TerritorialLabelsFormComponent, TerritoryImportComponent, AdminTerritoryMapComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <!-- Sin NOC esta sección ni aparece en el menú (admin-shell); si se llega igual, no muestra nada. -->
@@ -62,6 +63,9 @@ function isUnder(row: TerritorialUnit, path: string): boolean {
           </div>
         </section>
       </div>
+
+      <!-- Mapa (#24): fondo y localidades sin ubicación. -->
+      <app-admin-territory-map [units]="rows()" (placed)="onPlaced($event)" />
 
       <section class="adm-card">
         <div class="adm-card__head">
@@ -296,6 +300,11 @@ export class AdminTerritoryComponent implements OnInit {
     if (this.nocEnabled()) {
       await this.reload();
     }
+  }
+
+  /** Una localidad ubicada en el mapa: se actualiza su fila sin recargar el árbol. */
+  protected onPlaced(unit: TerritorialUnit): void {
+    this.rows.update((rows) => rows.map((r) => (r.id === unit.id ? { ...r, latitude: unit.latitude, longitude: unit.longitude } : r)));
   }
 
   protected async reload(): Promise<void> {

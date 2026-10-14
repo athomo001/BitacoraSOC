@@ -3,9 +3,6 @@
 -- name: ListAreas :many
 SELECT * FROM areas ORDER BY sort_order, name;
 
--- name: SetAreaActiveByCode :one
-UPDATE areas SET active = sqlc.arg('active') WHERE code = sqlc.arg('code') RETURNING *;
-
 -- name: ListLevels :many
 SELECT * FROM levels ORDER BY rank, name;
 

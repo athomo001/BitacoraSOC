@@ -63,8 +63,11 @@ export class ShellComponent implements OnInit {
     const wasOn = new Map<string, boolean>();
     effect(() => {
       for (const item of SHELL_NAV_ITEMS) {
-        if (!item.requiresFeature && !item.requiresSocOrNoc) continue;
-        const on = (!item.requiresFeature || this.features.isEnabled(item.requiresFeature)) && (!item.requiresSocOrNoc || this.socOrNoc());
+        if (!item.requiresFeature && !item.requiresSocOrNoc && !item.requiresNoc) continue;
+        const on =
+          (!item.requiresFeature || this.features.isEnabled(item.requiresFeature)) &&
+          (!item.requiresSocOrNoc || this.socOrNoc()) &&
+          (!item.requiresNoc || this.noc());
         const leaving = wasOn.get(item.path) === true && !on;
         wasOn.set(item.path, on);
         if (leaving && this.router.url.split('?')[0].startsWith('/' + item.path)) void this.router.navigateByUrl('/entries');
@@ -78,6 +81,7 @@ export class ShellComponent implements OnInit {
       (item) =>
         (!item.requiresFeature || this.features.isEnabled(item.requiresFeature)) &&
         (!item.requiresSocOrNoc || this.socOrNoc()) &&
+        (!item.requiresNoc || this.noc()) &&
         (!item.requiresComplements || this.complements.available().length > 0) &&
         (!item.requiresCapability || this.perms.can(item.requiresCapability)()) &&
         (!item.requiresOperational || this.perms.operational()) &&
@@ -88,6 +92,11 @@ export class ShellComponent implements OnInit {
   private readonly socOrNoc = computed(() => {
     const status = this.setup.status();
     return !status || status.socEnabled || status.nocEnabled;
+  });
+  /** Módulo NOC encendido (sin estado todavía, se asume que sí). */
+  private readonly noc = computed(() => {
+    const status = this.setup.status();
+    return !status || status.nocEnabled;
   });
   protected readonly nextTheme = computed(() => NEXT_THEME[this.prefs.theme()]);
   protected readonly displayName = computed(() => {

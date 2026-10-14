@@ -8,6 +8,12 @@
 
 ODbL aplica a la base de datos en sí, no al código de BitacoraSOC que la consume (ver `spec/03b-guia-import-territorial.md` sección 2). La misma atribución se muestra en la pantalla de Administración → Territorio.
 
+## Mapa
+
+- **Leaflet 1.9.4** (BSD 2-Clause) — <https://leafletjs.com>.
+- Mosaicos de **OpenStreetMap** (cuando el fondo es "OpenStreetMap público"): datos © colaboradores de OpenStreetMap, ODbL; el mapa muestra la atribución.
+- `frontend-v2/public/map/countries-110m.json`: siluetas de los países de **Natural Earth** 1:110m (dominio público), convertidas desde el paquete `world-atlas` 2.0.2 (ISC).
+
 ## Fuentes tipográficas
 
 Geist Sans, JetBrains Mono, VT323, Orbitron y OpenDyslexic: SIL Open Font License 1.1. Material Icons: Apache 2.0. Las licencias completas viajan junto a los archivos en `frontend-v2/public/fonts/`.

@@ -9,6 +9,7 @@ import type { ShiftsKey } from './packs/shifts';
 import type { TerritoryKey } from './packs/territory';
 import type { TicketsKey } from './packs/tickets';
 import type { TeamKey } from './packs/team';
+import type { MapKey } from './packs/map';
 
 const ES = {
   'nav.entries': 'Bitácora',
@@ -158,6 +159,7 @@ const ES = {
   'esc.pool': 'Pool',
   'nav.reports': 'Reportes',
   'nav.team': 'Mi equipo',
+  'nav.map': 'Mapa',
   'rpt.f.chooseClient': 'Elige el cliente…',
   'rpt.f.additional': 'Información adicional',
   'rpt.col.client': 'Cliente',
@@ -221,7 +223,8 @@ export type MessageKey =
   | ShiftsKey
   | TerritoryKey
   | TicketsKey
-  | TeamKey;
+  | TeamKey
+  | MapKey;
 
 /**
  * El inglés va en messages-en.ts y se descarga solo al cambiar a EN: así no

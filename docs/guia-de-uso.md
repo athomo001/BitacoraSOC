@@ -150,6 +150,20 @@ Ver a quién llamar queda registrado en la Auditoría.
 
 ---
 
+## Mapa
+
+Solo con el módulo NOC y para el perfil Operativo. Muestra las localidades del Territorio que tienen coordenadas y, a la derecha, los **sectores a revisar**:
+
+- **Rojo:** la localidad (o un activo de ella) tiene un incidente de escalamiento abierto.
+- **Ámbar:** tiene una ventana de mantenimiento activa en este momento.
+- **Azul:** tiene tickets abiertos con ese lugar (solo con la Ticketera encendida).
+
+Si una localidad tiene varias cosas, el punto toma el color más grave y la lista las muestra todas («1 incidente · 2 tickets»).
+
+«A revisar» deja solo esas; «Todas» muestra también las que están sin novedad, en gris. Los botones *Incidentes abiertos*, *Mantenimiento* y *Tickets abiertos* encienden o apagan cada color. Al elegir un sector (en la lista o en el mapa) se ve qué equipos lo cubren, sus incidentes, mantenimientos y tickets (un clic abre el ticket), y **Ver escalamiento** abre Escalamiento con esa localidad elegida. El mapa se actualiza solo cada minuto mientras está a la vista.
+
+---
+
 ## Directorio
 
 Contactos **internos** (sincronizados desde los usuarios de la app) y **externos** (contratas, clientes, proveedores). Cada contacto tiene sus canales: llamada, WhatsApp, SMS, correo u otro.
@@ -192,6 +206,7 @@ Tickets ITIL de **incidente** o **requerimiento**. Solo aparece si el módulo Ti
 | **Asignación** | Equipo y resolutores. Cualquier analista puede tomar o asignar. |
 | **Tareas** | Lista de pasos dentro del ticket, con tiempo. |
 | **Comentarios** | Internos o públicos, en Markdown, con imágenes. |
+| **Lugar** | Opcional, con el módulo NOC: una localidad del Territorio o un activo (con un activo, la localidad sale sola). Se elige al crear el ticket o en su panel; aparece en la lista y en el Mapa (capa *Tickets abiertos*). El cliente no lo ve en el seguimiento público. |
 
 **Relaciones entre tickets:**
 
@@ -242,7 +257,7 @@ Solo para administradores. El menú se agrupa así:
 | Grupo | Sección | Lo esencial |
 | --- | --- | --- |
 | Personas | **Usuarios y grupos** | Usuarios y roles; en el panel de cada persona, su **nivel en cada área** («—» = fuera; puede estar en varias), **Jefe** por área y permisos extra: los grupos se arman solos. También cargos, largo mínimo de contraseña (6 por defecto) y correos de cumpleaños. La pestaña Grupos queda para casos raros. |
-| | **Áreas y niveles** | Las áreas (SOC, NOC y las que se creen: TI, Infraestructura, CSM…), el perfil de cada una (SOC y NOC Operativo; las demás Resolutor) y los niveles N1, N2, N3. SOC y NOC se encienden acá. |
+| | **Áreas y niveles** | Todo lo de la **gente** de cada área. A la izquierda las áreas (y «Nueva área», «Niveles»); al elegir una se abre su ficha: **Personas** (nivel, Jefe, permisos extra; agregar a alguien que ya existe o a una persona nueva; sacar del área), **Guardias** y **Escalamiento** del área, más su perfil y si está activa. Un área es gente: apagarla no apaga funciones (eso es Módulos). |
 | Operación | **Turnos** | Guardias, turnos de trabajo, dotación programada y recordatorios (detalle abajo). |
 | | **Checklist** | Plantillas de inicio y cierre, servicios y alertas de ítems en rojo. |
 | | **Escalamiento** | Políticas por servicio, activo o zona, con sus llamados en orden (detalle abajo). |
@@ -251,10 +266,10 @@ Solo para administradores. El menú se agrupa así:
 | | **Correo** | SMTP y remitente, con plantillas para los proveedores comunes y correo de prueba. |
 | | **Reportes de turno** | Formato y estado de los reportes de cierre. |
 | Catálogos | **Organizaciones y servicios** | Clientes, tipos, servicios y fuentes de log. |
-| | **Territorio** (NOC) | Regiones, zonas y sitios, con importación CSV y activar o desactivar en lote. |
+| | **Territorio** (NOC) | Regiones, zonas y sitios, con importación CSV y activar o desactivar en lote. Para el Mapa: el **fondo** (OpenStreetMap público, servidor propio o sin fondo) y **Sin ubicación**, donde se ubica con un clic en el mapa cada localidad que no tiene coordenadas. |
 | | **Equipos** | Equipos, contratas, guardias, integrantes y cobertura territorial, con acciones en lote (detalle abajo). |
 | Sistema | **Marca** | Nombre, logo, favicon y fuente. |
-| | **Módulos** y **Funcionalidades** | Qué partes del sistema están encendidas (la Ticketera se enciende en Módulos; SOC y NOC, en Áreas y niveles). |
+| | **Módulos** y **Funcionalidades** | Qué partes del sistema están encendidas (SOC, NOC y la Ticketera se encienden y apagan en Módulos). |
 | | **Respaldos** | Copias, restauración y exportación (ver [operacion.md](operacion.md)). |
 | | **Auditoría** | Quién hizo qué y cuándo, con filtros y exportación. |
 | | **Complementos** | Subir y publicar mini-aplicaciones. |
@@ -314,7 +329,7 @@ La pantalla para organizar las guardias (N2, TI, N1 No hábil…) y marcar condi
 
 ## Atajos y accesibilidad
 
-- **Atajos de navegación:** `Alt+1` Bitácora · `Alt+2` Turnos · `Alt+3` Escalamiento · `Alt+4` Directorio · `Alt+5` Administración · `Alt+8` Reportes · `Alt+9` Mi equipo (jefatura). Están indicados junto a cada ítem del menú.
+- **Atajos de navegación:** `Alt+1` Bitácora · `Alt+2` Turnos · `Alt+3` Escalamiento · `Alt+4` Directorio · `Alt+5` Administración · `Alt+8` Reportes · `Alt+9` Mi equipo (jefatura) · `Alt+0` Mapa (NOC). Están indicados junto a cada ítem del menú.
 - **Buscador de Administración:** `Ctrl+K`.
 - **Idioma:** botones ES / EN abajo a la izquierda.
 - **Tema y fuente para dislexia (OpenDyslexic):** íconos abajo a la izquierda o en *Mi perfil → Preferencias*.

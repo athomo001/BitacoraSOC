@@ -243,9 +243,14 @@
 }
 
 .shifts__calendar-bar--clickable { cursor: pointer; }
+
 .shifts__calendar-bar--clickable:hover,
 .shifts__calendar-bar--clickable:focus-visible { filter: brightness(1.15); }
-.shifts__calendar-bar--editing { outline: 2px solid var(--border-active); outline-offset: 1px; }
+
+.shifts__calendar-bar--editing {
+  outline: 2px solid var(--border-active);
+  outline-offset: 1px;
+}
 
 /* Edición de un día: franja bajo la fila de la persona, a todo el ancho. */
 .shifts__edit {

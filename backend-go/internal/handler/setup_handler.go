@@ -44,7 +44,7 @@ func (h *SetupHandler) Status(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer la configuración")
 		return
 	}
-	flags, err := repository.AreaFlags(ctx, h.Queries)
+	flags, err := repository.ModuleFlags(ctx, h.Queries)
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer la configuración")
 		return
@@ -127,7 +127,7 @@ func (h *SetupHandler) runBootstrap(ctx context.Context, req bootstrapRequest) (
 			return db.User{}, &bootstrapError{http.StatusInternalServerError, "internal-error", "no se pudo encender la Ticketera"}
 		}
 	}
-	if err := setModuleAreas(ctx, h.Queries, req.SocEnabled, req.NocEnabled); err != nil {
+	if err := setModuleFlags(ctx, h.Queries, req.SocEnabled, req.NocEnabled); err != nil {
 		return db.User{}, &bootstrapError{http.StatusInternalServerError, "internal-error", "no se pudieron activar los módulos"}
 	}
 	if _, err := h.Queries.CompleteSetup(ctx); err != nil {

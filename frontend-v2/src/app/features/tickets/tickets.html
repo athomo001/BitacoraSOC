@@ -48,7 +48,7 @@
             <span class="pill mono tk__prio" [class]="'tone-' + priorityTone[t.priority]">{{ priorityShort[t.priority] }}</span>
             <span class="tk__cell-title">
               <span class="tk__ticket-title">{{ t.title }}</span>
-              <span class="tk__ticket-sub">{{ i18n.t(typeKey(t)) }} · {{ t.clientName }} · {{ t.teamName ?? '—' }}
+              <span class="tk__ticket-sub">{{ i18n.t(typeKey(t)) }} · {{ t.clientName }} · {{ t.teamName ?? '—' }}@if (t.place) { · {{ t.place.name }} }
                 @if (t.childCount) { · <strong class="tk__rel">{{ i18n.tf('tkrel.childCount', t.childCount) }}</strong> }
                 @if (t.mergedIntoNumber) { · <strong class="tk__rel">{{ i18n.tf('tkrel.mergedShort', t.mergedIntoNumber) }}</strong> }
               </span>

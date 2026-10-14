@@ -28,18 +28,20 @@ import (
 // newTicket son los datos de negocio de un ticket nuevo; número, token
 // público y vencimientos de SLA los calcula createTicketTx.
 type newTicket struct {
-	Type           string
-	Scope          db.EntryScope
-	ClientID       uuid.UUID
-	TeamID         uuid.UUID
-	ServiceID      pgtype.UUID
-	AssetID        pgtype.UUID
-	AssignedUserID pgtype.UUID
-	Title          string
-	Description    string
-	Impact         string
-	Urgency        string
-	ActorID        uuid.UUID
+	Type      string
+	Scope     db.EntryScope
+	ClientID  uuid.UUID
+	TeamID    uuid.UUID
+	ServiceID pgtype.UUID
+	AssetID   pgtype.UUID
+	// TerritorialUnitID: el lugar; con activo se usa la localidad del activo.
+	TerritorialUnitID pgtype.UUID
+	AssignedUserID    pgtype.UUID
+	Title             string
+	Description       string
+	Impact            string
+	Urgency           string
+	ActorID           uuid.UUID
 	// AffectsClient: nil = según la regla de Administración → Ticketera.
 	AffectsClient *bool
 }
@@ -93,7 +95,7 @@ func (h *TicketsHandler) createTicketTx(ctx context.Context, tx pgx.Tx, n newTic
 	return q.CreateTicket(ctx, db.CreateTicketParams{
 		TicketNumber: fmt.Sprintf("TKT-%04d-%05d", now.Year(), sequence), TicketType: db.TicketType(n.Type), Scope: n.Scope,
 		ClientID: n.ClientID, AssignedTeamID: pgtype.UUID{Bytes: n.TeamID, Valid: n.TeamID != uuid.Nil}, AssignedUserID: n.AssignedUserID,
-		ServiceID: n.ServiceID, AssetID: n.AssetID,
+		ServiceID: n.ServiceID, AssetID: n.AssetID, TerritorialUnitID: n.TerritorialUnitID,
 		Impact: db.ItilImpact(n.Impact), Urgency: db.ItilUrgency(n.Urgency), Priority: priority,
 		Title: n.Title, Description: n.Description,
 		SlaResponseDueAt:    pgtype.Timestamptz{Time: now.Add(response), Valid: true},
@@ -256,7 +258,7 @@ func (h *TicketsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(ctx)
 	ticket, err := h.createTicketTx(ctx, tx, newTicket{
 		Type: req.TicketType, Scope: scope, ClientID: req.ClientID, TeamID: req.TeamID,
-		ServiceID: optionalUUID(req.ServiceID), AssetID: optionalUUID(req.AssetID), AssignedUserID: optionalUUID(req.AssignedUserID),
+		ServiceID: optionalUUID(req.ServiceID), AssetID: optionalUUID(req.AssetID), TerritorialUnitID: optionalUUID(req.TerritorialUnitID), AssignedUserID: optionalUUID(req.AssignedUserID),
 		Title: strings.TrimSpace(req.Title), Description: strings.TrimSpace(req.Description),
 		Impact: req.Impact, Urgency: req.Urgency, ActorID: actor.ID, AffectsClient: req.AffectsClient,
 	}, h.now())

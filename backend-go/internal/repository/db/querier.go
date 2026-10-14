@@ -52,7 +52,7 @@ type Querier interface {
 	ClearTeamMembers(ctx context.Context, teamID uuid.UUID) error
 	ClearTemplateFromShifts(ctx context.Context, checklistTemplateStartID pgtype.UUID) error
 	CloseEscalationIncident(ctx context.Context, arg CloseEscalationIncidentParams) (int64, error)
-	// Qué áreas quedan activas lo guarda SetAreaActiveByCode (000033).
+	// Qué módulos quedan encendidos lo guarda SetModuleFlags.
 	CompleteSetup(ctx context.Context) (AppConfig, error)
 	CopyTicketResolvers(ctx context.Context, arg CopyTicketResolversParams) error
 	CountActiveWorkShiftMembers(ctx context.Context, workShiftID uuid.UUID) (int32, error)
@@ -136,6 +136,7 @@ type Querier interface {
 	CreateTeamGroup(ctx context.Context, arg CreateTeamGroupParams) (TeamGroup, error)
 	CreateTeamUser(ctx context.Context, arg CreateTeamUserParams) (User, error)
 	CreateTerritorialUnit(ctx context.Context, arg CreateTerritorialUnitParams) (TerritorialUnit, error)
+	// Con activo, el lugar es la localidad del activo (000038).
 	CreateTicket(ctx context.Context, arg CreateTicketParams) (Ticket, error)
 	CreateTicketComment(ctx context.Context, arg CreateTicketCommentParams) (TicketComment, error)
 	CreateTicketImage(ctx context.Context, arg CreateTicketImageParams) (CreateTicketImageRow, error)
@@ -281,6 +282,10 @@ type Querier interface {
 	// (loadShiftReportData del legacy).
 	GetLatestStartCheckInWindow(ctx context.Context, arg GetLatestStartCheckInWindowParams) (GetLatestStartCheckInWindowRow, error)
 	GetLoginRateLimit(ctx context.Context, ipAddress string) (LoginRateLimit, error)
+	// Fondo del Mapa (000037).
+	GetMapTiles(ctx context.Context) (GetMapTilesRow, error)
+	// Los módulos SOC y NOC de la instalación (000036). Distintos de las áreas.
+	GetModuleFlags(ctx context.Context) (GetModuleFlagsRow, error)
 	GetNotificationSchedule(ctx context.Context, id uuid.UUID) (WorkShiftNotificationSchedule, error)
 	GetOrganization(ctx context.Context, id uuid.UUID) (Organization, error)
 	GetOrganizationType(ctx context.Context, code string) (OrganizationType, error)
@@ -487,6 +492,19 @@ type Querier interface {
 	ListLogSources(ctx context.Context, arg ListLogSourcesParams) ([]CatalogLogSource, error)
 	// ===== Ventanas de mantenimiento =====
 	ListMaintenanceWindows(ctx context.Context, arg ListMaintenanceWindowsParams) ([]MaintenanceWindow, error)
+	// Mapa (#24): cada localidad con coordenadas y lo que hay que revisar en
+	// ella. Un incidente o una ventana sobre un activo cuenta para la localidad
+	// del activo; un ticket, por su lugar (000038). El país solo aparece si
+	// tiene algo abierto.
+	ListMapPoints(ctx context.Context) ([]ListMapPointsRow, error)
+	// Incidentes abiertos de una localidad, directos o sobre sus activos.
+	ListMapUnitIncidents(ctx context.Context, unitID uuid.UUID) ([]ListMapUnitIncidentsRow, error)
+	// Equipos que cubren la localidad: los de ella o de un nivel de arriba.
+	ListMapUnitTeams(ctx context.Context, unitID uuid.UUID) ([]ListMapUnitTeamsRow, error)
+	// Tickets abiertos con lugar en la localidad (000038), los más urgentes primero.
+	ListMapUnitTickets(ctx context.Context, unitID uuid.UUID) ([]ListMapUnitTicketsRow, error)
+	// Ventanas de mantenimiento activas ahora en una localidad o sus activos.
+	ListMapUnitWindows(ctx context.Context, unitID uuid.UUID) ([]ListMapUnitWindowsRow, error)
 	// Miembros activos de los equipos a resolver, con lo que la tarjeta necesita
 	// mostrar: nombre, especialidad (solo contactos), rol y prioridad.
 	ListMembersForTeams(ctx context.Context, teamIds []uuid.UUID) ([]ListMembersForTeamsRow, error)
@@ -708,7 +726,6 @@ type Querier interface {
 	ResetTicketResolutionSLANotified(ctx context.Context, id uuid.UUID) error
 	RetryTicketMail(ctx context.Context, arg RetryTicketMailParams) (int64, error)
 	RotatePublicShareLink(ctx context.Context, arg RotatePublicShareLinkParams) (PublicShareLink, error)
-	SetAreaActiveByCode(ctx context.Context, arg SetAreaActiveByCodeParams) (Area, error)
 	SetBrandingFavicon(ctx context.Context, arg SetBrandingFaviconParams) error
 	SetBrandingFont(ctx context.Context, arg SetBrandingFontParams) error
 	SetBrandingLogo(ctx context.Context, arg SetBrandingLogoParams) error
@@ -722,6 +739,8 @@ type Querier interface {
 	SetEscalationIncidentEntry(ctx context.Context, arg SetEscalationIncidentEntryParams) error
 	SetLevelRank(ctx context.Context, arg SetLevelRankParams) (int64, error)
 	SetMFASecret(ctx context.Context, arg SetMFASecretParams) error
+	SetMapTiles(ctx context.Context, arg SetMapTilesParams) error
+	SetModuleFlags(ctx context.Context, arg SetModuleFlagsParams) error
 	SetMustChangePassword(ctx context.Context, arg SetMustChangePasswordParams) error
 	SetPasswordMinLength(ctx context.Context, passwordMinLength int16) (int16, error)
 	SetPasswordResetToken(ctx context.Context, arg SetPasswordResetTokenParams) error
@@ -742,6 +761,8 @@ type Querier interface {
 	SetTicketMailRecipients(ctx context.Context, arg SetTicketMailRecipientsParams) (Ticket, error)
 	// ===== Unir tickets y padre/hijo (000028) =====
 	SetTicketParent(ctx context.Context, arg SetTicketParentParams) error
+	// Lugar del ticket (000038): activo opcional y su localidad.
+	SetTicketPlace(ctx context.Context, arg SetTicketPlaceParams) error
 	SetTicketPublicPin(ctx context.Context, arg SetTicketPublicPinParams) (Ticket, error)
 	SetUserActive(ctx context.Context, arg SetUserActiveParams) (User, error)
 	// Renumerar en dos pasadas por la restricción única (policy_id, step_order).

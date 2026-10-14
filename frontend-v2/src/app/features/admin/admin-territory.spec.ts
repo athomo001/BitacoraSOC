@@ -1,7 +1,15 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
+import { Component, input } from '@angular/core';
 import { AdminTerritoryComponent } from './admin-territory';
+import { AdminTerritoryMapComponent } from './admin-territory-map';
+
+/** La parte del mapa tiene su propia prueba; acá solo se prueba el árbol. */
+@Component({ selector: 'app-admin-territory-map', standalone: true, template: '' })
+class MapStubComponent {
+  readonly units = input<unknown[]>([]);
+}
 
 const unit = (id: string, name: string, path: string, parentId: string | null, childCount = 0) => {
   const code = path.split('.').pop()!;
@@ -15,6 +23,7 @@ describe('AdminTerritoryComponent (activar/desactivar masivo, pedido del dueño 
 
   beforeEach(() => {
     TestBed.configureTestingModule({ imports: [AdminTerritoryComponent], providers: [provideHttpClient(), provideHttpClientTesting()] });
+    TestBed.overrideComponent(AdminTerritoryComponent, { remove: { imports: [AdminTerritoryMapComponent] }, add: { imports: [MapStubComponent] } });
     httpMock = TestBed.inject(HttpTestingController);
   });
 

@@ -390,31 +390,6 @@ func (q *Queries) RenameLevel(ctx context.Context, arg RenameLevelParams) (Level
 	return i, err
 }
 
-const setAreaActiveByCode = `-- name: SetAreaActiveByCode :one
-UPDATE areas SET active = $1 WHERE code = $2 RETURNING id, code, name, active, is_system, sort_order, created_at, default_profile
-`
-
-type SetAreaActiveByCodeParams struct {
-	Active bool   `json:"active"`
-	Code   string `json:"code"`
-}
-
-func (q *Queries) SetAreaActiveByCode(ctx context.Context, arg SetAreaActiveByCodeParams) (Area, error) {
-	row := q.db.QueryRow(ctx, setAreaActiveByCode, arg.Active, arg.Code)
-	var i Area
-	err := row.Scan(
-		&i.ID,
-		&i.Code,
-		&i.Name,
-		&i.Active,
-		&i.IsSystem,
-		&i.SortOrder,
-		&i.CreatedAt,
-		&i.DefaultProfile,
-	)
-	return i, err
-}
-
 const setLevelRank = `-- name: SetLevelRank :execrows
 UPDATE levels SET rank = $1 WHERE id = $2
 `

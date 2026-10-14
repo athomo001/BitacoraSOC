@@ -122,30 +122,24 @@ describe('Administración re-vestida', () => {
     http.expectNone('/api/config/modules');
   });
 
-  it('Módulos: la Ticketera se enciende acá; SOC y NOC llevan a Áreas y niveles', async () => {
+  it('Módulos: SOC y NOC se apagan acá, sin tocar las áreas (la gente)', async () => {
     const fixture = TestBed.createComponent(AdminModulesComponent);
-    let wentToAreas = false;
-    fixture.componentInstance.goToAreas.subscribe(() => (wentToAreas = true));
     fixture.detectChanges();
-    http.expectOne('/api/setup/status').flush({ data: { setupCompleted: true, socEnabled: true, nocEnabled: false } });
+    http.expectOne('/api/setup/status').flush({ data: { setupCompleted: true, socEnabled: true, nocEnabled: true } });
     http.expectOne('/api/system-features').flush({
       data: [{ code: 'native_tickets', name: 'x', isEnabled: false, configPayload: {}, updatedAt: '' }],
     });
     await settle();
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
-    // Solo la Ticketera tiene interruptor.
     const switches = [...el.querySelectorAll<HTMLInputElement>('.adm-switch-row input[role="switch"]')];
-    expect(switches.length).toBe(1);
-    ([...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.includes('Se enciende en Áreas y niveles'))!).click();
-    expect(wentToAreas).toBe(true);
-
-    switches[0].dispatchEvent(new Event('change'));
+    expect(switches.length).toBe(3);
+    switches[1].dispatchEvent(new Event('change')); // NOC
     fixture.detectChanges();
     (el.querySelector('.adm-btn--primary') as HTMLButtonElement).click();
-    http.expectOne((r) => r.method === 'PATCH' && r.url === '/api/system-features/native_tickets')
-      .flush({ data: { code: 'native_tickets', name: 'x', isEnabled: true, configPayload: {}, updatedAt: '' } });
-    await settle();
-    http.expectNone('/api/config/modules');
+    const req = http.expectOne((r) => r.method === 'PATCH' && r.url === '/api/config/modules');
+    expect(req.request.body).toEqual({ socEnabled: true, nocEnabled: false });
+    req.flush({ data: { socEnabled: true, nocEnabled: false } });
+    http.expectNone((r) => r.url.startsWith('/api/areas'));
   });
 });

@@ -8,34 +8,30 @@ import (
 	"unicode"
 
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
-	"github.com/athomo001/BitacoraSOC/backend-go/internal/modules"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
-	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/text/unicode/norm"
 )
 
-// setModuleAreas enciende o apaga las áreas SOC y NOC (los antiguos
-// app_config.soc/noc_module_enabled, 000033).
-func setModuleAreas(ctx context.Context, q *db.Queries, soc, noc bool) error {
-	if _, err := q.SetAreaActiveByCode(ctx, db.SetAreaActiveByCodeParams{Code: string(modules.SOC), Active: soc}); err != nil {
+// setModuleFlags enciende o apaga los módulos SOC y NOC (000036). No toca
+// las áreas: el área es la gente, el módulo son las funciones.
+func setModuleFlags(ctx context.Context, q *db.Queries, soc, noc bool) error {
+	if err := q.EnsureAppConfigRow(ctx); err != nil {
 		return err
 	}
-	_, err := q.SetAreaActiveByCode(ctx, db.SetAreaActiveByCodeParams{Code: string(modules.NOC), Active: noc})
-	return err
+	return q.SetModuleFlags(ctx, db.SetModuleFlagsParams{Soc: soc, Noc: noc})
 }
 
 // AreasHandler es Administración → Áreas y niveles (spec/16 §3, 9b,
 // diseño aprobado por el dueño 2026-10-13): crear, renombrar y apagar
-// áreas, y crear, renombrar y ordenar niveles. SOC y NOC se encienden acá
-// (antes en Módulos), con la misma regla: al menos uno de SOC, NOC o la
-// Ticketera queda activo.
+// áreas, y crear, renombrar y ordenar niveles. Un área es gente (personal,
+// jefaturas, permisos); apagarla no apaga funciones: los módulos SOC y NOC
+// se encienden en Módulos (000036, dueño 2026-10-14).
 type AreasHandler struct {
 	Queries  *db.Queries
 	AuditLog *audit.Logger
-	Hub      eventPublisher
 }
 
 type areaDTO struct {
@@ -144,25 +140,8 @@ func (h *AreasHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		}
 		p.DefaultProfile = pgtype.Text{String: *req.Profile, Valid: true}
 	}
-	moduleArea := code == string(modules.SOC) || code == string(modules.NOC)
 	if req.Active != nil {
 		p.Active = pgtype.Bool{Bool: *req.Active, Valid: true}
-		// Basta con uno: SOC, NOC o la Ticketera sola (misma regla que antes en Módulos).
-		if moduleArea && !*req.Active {
-			flags, err := repository.AreaFlags(ctx, h.Queries)
-			if err != nil {
-				problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer las áreas")
-				return
-			}
-			other := flags.NOC
-			if code == string(modules.NOC) {
-				other = flags.SOC
-			}
-			if !other && !featureEnabled(ctx, h.Queries, ticketsFeature) {
-				problemdetails.Write(w, r, http.StatusBadRequest, "no-module-selected", noModuleMessage)
-				return
-			}
-		}
 	}
 	a, err := h.Queries.UpdateArea(ctx, p)
 	if err != nil {
@@ -170,12 +149,6 @@ func (h *AreasHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.AuditLog.Log(ctx, "area.update", audit.LevelInfo, audit.Success(), map[string]any{"code": a.Code, "active": a.Active, "renamed": req.Name != nil, "profile": a.DefaultProfile})
-	if moduleArea && req.Active != nil {
-		// Los menús (Bitácora, Turnos, Escalamiento) se recalculan al instante.
-		if flags, err := repository.AreaFlags(ctx, h.Queries); err == nil {
-			publishSync(ctx, h.Hub, "config.modules.updated", modulesResponse{SocEnabled: flags.SOC, NocEnabled: flags.NOC})
-		}
-	}
 	writeData(w, http.StatusOK, areaDTO{ID: a.ID, Code: a.Code, Name: a.Name, Active: a.Active, System: a.IsSystem, Profile: a.DefaultProfile})
 }
 

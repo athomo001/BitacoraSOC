@@ -5,6 +5,9 @@ import { TicketsComponent } from './tickets';
 import { SseService } from '../../core/sse/sse.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { Ticket, TicketDetail } from '../../core/tickets/tickets.service';
+import { SetupService } from '../../core/setup/setup.service';
+import { PermissionsService } from '../../core/auth/permissions.service';
+import { provideRouter } from '@angular/router';
 
 const clock = (state: string, percent: number, remainingSeconds: number) => ({ state, percent, remainingSeconds, elapsedSeconds: 0, dueAt: '2026-09-27T07:15:00Z' });
 
@@ -37,7 +40,7 @@ describe('TicketsComponent', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [TicketsComponent],
-      providers: [provideHttpClient(), provideHttpClientTesting(), { provide: SseService, useValue: { connect: () => () => undefined } }],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([]), { provide: SseService, useValue: { connect: () => () => undefined } }],
     });
     httpMock = TestBed.inject(HttpTestingController);
   });
@@ -84,6 +87,42 @@ describe('TicketsComponent', () => {
     httpMock.expectOne('/api/tickets/t1').flush({ data: detail(ticket({ status: 'assigned' })) });
     await settle();
     httpMock.match((r) => r.url === '/api/tickets').forEach((r) => r.flush({ data: LIST }));
+  });
+
+  it('lugar (#24): con NOC se ve en la lista y el panel, y se elige con el buscador', async () => {
+    const perms = TestBed.inject(PermissionsService) as unknown as { _user: { set(u: unknown): void } };
+    perms._user.set({ id: 'u-ana', username: 'ana', role: 'admin' });
+    TestBed.inject(SetupService).applyModules({ socEnabled: false, nocEnabled: true });
+    LIST.items[1] = { ...LIST.items[1], place: { territorialUnitId: 'z1', name: 'Calama', parentName: 'Antofagasta', assetId: 'a1', assetName: 'RT-CAL-06' } };
+    const { fixture, el } = await render();
+    expect(el.querySelectorAll('.tk__row:not(.tk__row--head)')[1].textContent).toContain('· Calama');
+    const dd = [...el.querySelectorAll('.td__facts dt')].find((d) => d.textContent?.trim() === 'Lugar')!.nextElementSibling!;
+    expect(dd.textContent).toContain('Sin lugar');
+
+    [...dd.querySelectorAll('button')].find((b) => b.textContent?.includes('Elegir lugar'))!.click();
+    fixture.detectChanges();
+    httpMock.expectOne((r) => r.url === '/api/territorial-units').flush({
+      data: [{ id: 'r1', parentId: null, kind: 'region', name: 'Antofagasta', code: 'r1', path: 'r1', depth: 0, active: true }, { id: 'z1', parentId: 'r1', kind: 'zone', name: 'Calama', code: 'z1', path: 'r1.z1', depth: 1, active: true }],
+      meta: { page: 1, pageSize: 5000, total: 2 },
+    });
+    httpMock.expectOne('/api/assets').flush({ data: [{ id: 'a1', type: 'device', name: 'RT-CAL-06', code: 'rt', territorialUnitId: 'z1' }] });
+    await settle();
+    const search = el.querySelector('input[name="placeSearch"]') as HTMLInputElement;
+    search.value = 'cal';
+    search.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    const options = [...el.querySelectorAll<HTMLButtonElement>('.pp__opt')];
+    expect(options.map((o) => o.textContent?.trim())).toEqual(['placeCalamaAntofagasta', 'routerRT-CAL-06Calama']);
+    options[1].click();
+    const req = httpMock.expectOne({ method: 'PUT', url: '/api/tickets/t1/place' });
+    expect(req.request.body).toEqual({ territorialUnitId: undefined, assetId: 'a1' });
+    req.flush({ data: detail(LIST.items[0]) });
+    await settle();
+    httpMock.match('/api/tickets/t1').forEach((r) => r.flush({ data: detail(ticket({ place: { territorialUnitId: 'z1', name: 'Calama', assetId: 'a1', assetName: 'RT-CAL-06' } })) }));
+    await settle();
+    fixture.detectChanges();
+    expect(dd.textContent).toContain('Calama · RT-CAL-06');
+    delete LIST.items[1].place;
   });
 
   it('un comentario es interno salvo que se marque visible al cliente', async () => {

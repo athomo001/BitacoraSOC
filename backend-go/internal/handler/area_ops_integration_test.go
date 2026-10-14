@@ -45,6 +45,10 @@ func TestAreaOps_GuardiasYEscalamientoPorArea(t *testing.T) {
 	defer tx.Rollback(ctx) //nolint:errcheck // la transacción se deshace siempre
 	q := db.New(tx)
 	nonce := fmt.Sprintf("%d", time.Now().UnixNano())
+	// La prueba no depende de cómo esté la base: módulo y área SOC encendidos.
+	if _, err := tx.Exec(ctx, `UPDATE app_config SET soc_module_enabled = true; UPDATE areas SET active = true WHERE code = 'soc'`); err != nil {
+		t.Fatal(err)
+	}
 	id := func(sql string, args ...any) uuid.UUID {
 		t.Helper()
 		var out uuid.UUID
@@ -160,5 +164,15 @@ func TestAreaOps_GuardiasYEscalamientoPorArea(t *testing.T) {
 	socPolicy := id(`SELECT id FROM escalation_policies WHERE area_id = 'a0000000-0000-4000-8000-000000000001' AND id <> $1 LIMIT 1`, pols.Data[0].ID)
 	if w := call(as(lead), eh.DeletePolicy, nil, map[string]string{"id": socPolicy.String()}, ""); w.Code != http.StatusForbidden {
 		t.Fatalf("no borra políticas de SOC: %d %s", w.Code, w.Body)
+	}
+
+	// El área es gente, el módulo son funciones: apagar el área SOC no apaga el módulo.
+	ah := &AreasHandler{Queries: q, AuditLog: logger}
+	admin := middleware.WithUser(ctx, middleware.AuthenticatedUser{ID: lead, Username: "admin", Role: "admin"})
+	if w := call(admin, ah.Patch, map[string]any{"active": false}, map[string]string{"code": "soc"}, ""); w.Code != http.StatusOK {
+		t.Fatalf("apagar el área SOC: %d %s", w.Code, w.Body)
+	}
+	if flags, err := repository.ModuleFlags(ctx, q); err != nil || !flags.SOC {
+		t.Fatalf("el módulo SOC sigue encendido: %+v %v", flags, err)
 	}
 }

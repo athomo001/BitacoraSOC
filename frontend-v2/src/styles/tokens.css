@@ -40,6 +40,11 @@
   --accent-contrast: #0d1117;
   --accent-soft: #132b47;
 
+  /* Mapa (#24): mar, tierra y fronteras del fondo sin mosaicos */
+  --map-sea: #090d13;
+  --map-land: #151a21;
+  --map-border: #3b4450;
+
   color-scheme: dark;
 }
 
@@ -87,6 +92,9 @@
   --accent: #0969da;
   --accent-contrast: #fff;
   --accent-soft: #ddf4ff;
+  --map-sea: #d6e2ec;
+  --map-land: #eef2f5;
+  --map-border: #aab7c3;
 
   color-scheme: light;
 }
@@ -113,6 +121,9 @@
   --accent: #d6428f;
   --accent-contrast: #fff;
   --accent-soft: #fbe0ee;
+  --map-sea: #f5e1eb;
+  --map-land: #fcf4f8;
+  --map-border: #dcb6c9;
 
   color-scheme: light;
 }

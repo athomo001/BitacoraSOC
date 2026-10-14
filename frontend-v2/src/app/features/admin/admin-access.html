@@ -98,16 +98,21 @@
               @for (a of activeAreas(); track a.code) {
                 @let row = placeRow(a.code);
                 <div class="aa-place" [class.aa-place--in]="row">
-                  <span class="aa-place__area"><strong>{{ a.name }}</strong><span class="aa__muted">{{ i18n.t(profileKey(a.profile)) }}</span></span>
-                  <span class="aa__seg-row">
-                    <button type="button" class="seg" [attr.aria-pressed]="!row" [attr.aria-label]="a.name + ': ' + i18n.t('access.place.out')" (click)="setPlaceLevel(a.code, null)">—</button>
-                    @for (l of levelList(); track l.id) {
-                      <button type="button" class="seg" [attr.aria-pressed]="row?.levelId === l.id" [attr.aria-label]="a.name + ' ' + l.name" (click)="setPlaceLevel(a.code, l.id)">{{ l.name }}</button>
+                  <div class="aa-place__top">
+                    <strong>{{ a.name }}</strong>
+                    <span class="aa__muted aa-place__profile">{{ i18n.t(profileKey(a.profile)) }}</span>
+                    @if (row) {
+                      <label class="aa-place__lead">
+                        <input type="checkbox" [checked]="row.lead" (change)="togglePlaceLead(a.code)" />{{ i18n.t('access.place.lead') }}
+                      </label>
                     }
-                  </span>
-                  <button type="button" class="seg aa-place__lead" [attr.aria-pressed]="!!row?.lead" [disabled]="!row" (click)="togglePlaceLead(a.code)">
-                    <mat-icon>{{ row?.lead ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>{{ i18n.t('access.place.lead') }}
-                  </button>
+                  </div>
+                  <div class="aa-levels" role="group" [attr.aria-label]="a.name">
+                    <button type="button" [attr.aria-pressed]="!row" [attr.aria-label]="a.name + ': ' + i18n.t('access.place.out')" (click)="setPlaceLevel(a.code, null)">{{ i18n.t('access.place.outShort') }}</button>
+                    @for (l of levelList(); track l.id) {
+                      <button type="button" [attr.aria-pressed]="row?.levelId === l.id" [attr.aria-label]="a.name + ' ' + l.name" (click)="setPlaceLevel(a.code, l.id)">{{ l.name }}</button>
+                    }
+                  </div>
                 </div>
               }
               <span class="aa__muted">{{ i18n.t('access.place.hint') }}</span>

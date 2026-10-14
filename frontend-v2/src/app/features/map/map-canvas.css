@@ -1,0 +1,149 @@
+/*
+ * Lo mínimo de leaflet.css que usa el Mapa (#24): paneles, controles de zoom,
+ * atribución y etiquetas, con los colores del tema. Sin los íconos de
+ * marcadores ni el control de capas: los puntos se dibujan en un lienzo.
+ * Va sin encapsulación (Leaflet crea sus propios nodos) y todo bajo .map-canvas.
+ */
+.map-canvas {
+  display: block;
+  position: relative;
+  min-height: 0;
+}
+
+.map-canvas .leaflet-container {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--map-sea);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  outline-offset: 1px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.map-canvas .leaflet-pane,
+.map-canvas .leaflet-tile,
+.map-canvas .leaflet-tile-container,
+.map-canvas .leaflet-pane > svg,
+.map-canvas .leaflet-pane > canvas,
+.map-canvas .leaflet-zoom-box,
+.map-canvas .leaflet-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.map-canvas .leaflet-tile {
+  user-select: none;
+  max-width: none;
+  max-height: none;
+  width: auto;
+  padding: 0;
+  visibility: hidden;
+}
+
+.map-canvas .leaflet-tile-loaded { visibility: inherit; }
+.map-canvas .leaflet-container.leaflet-touch-drag.leaflet-touch-zoom { touch-action: none; }
+.map-canvas .leaflet-pane { z-index: 400; }
+.map-canvas .leaflet-tile-pane { z-index: 200; }
+.map-canvas .leaflet-overlay-pane { z-index: 400; }
+.map-canvas .leaflet-tooltip-pane { z-index: 650; }
+.map-canvas .leaflet-map-pane canvas { z-index: 100; }
+.map-canvas .leaflet-zoom-animated { transform-origin: 0 0; }
+.map-canvas .leaflet-zoom-anim .leaflet-zoom-animated { transition: transform 0.25s cubic-bezier(0, 0, 0.25, 1); }
+.map-canvas .leaflet-zoom-anim .leaflet-zoom-hide { visibility: hidden; }
+.map-canvas .leaflet-interactive { cursor: pointer; }
+.map-canvas .leaflet-grab { cursor: grab; }
+.map-canvas .leaflet-dragging .leaflet-grab { cursor: grabbing; }
+
+.map-canvas .leaflet-crosshair,
+.map-canvas .leaflet-crosshair .leaflet-interactive,
+.map-canvas.map-canvas--crosshair .leaflet-container { cursor: crosshair; }
+
+.map-canvas .leaflet-top,
+.map-canvas .leaflet-bottom {
+  position: absolute;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.map-canvas .leaflet-top { top: 0; }
+.map-canvas .leaflet-bottom { bottom: 0; }
+.map-canvas .leaflet-left { left: 0; }
+.map-canvas .leaflet-right { right: 0; }
+
+.map-canvas .leaflet-control {
+  position: relative;
+  z-index: 800;
+  float: left;
+  clear: both;
+  pointer-events: auto;
+  cursor: auto;
+}
+
+.map-canvas .leaflet-right .leaflet-control {
+  float: right;
+  margin-right: 10px;
+}
+
+.map-canvas .leaflet-left .leaflet-control { margin-left: 10px; }
+.map-canvas .leaflet-top .leaflet-control { margin-top: 10px; }
+.map-canvas .leaflet-bottom .leaflet-control { margin-bottom: 10px; }
+
+/* La atribución va pegada a la esquina (después de los márgenes de .leaflet-control). */
+.map-canvas .leaflet-bottom .leaflet-control-attribution {
+  margin: 0;
+  padding: 1px 6px;
+  font-size: 10.5px;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  border-top-left-radius: var(--radius-sm);
+}
+
+.map-canvas .leaflet-control-attribution a { color: var(--accent); }
+
+.map-canvas .leaflet-bar {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.map-canvas .leaflet-bar a {
+  display: block;
+  width: 28px;
+  height: 28px;
+  text-align: center;
+  text-decoration: none;
+  font: 600 16px/28px var(--font-mono);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.map-canvas .leaflet-bar a:last-child { border-bottom: none; }
+
+.map-canvas .leaflet-bar a:hover,
+.map-canvas .leaflet-bar a:focus-visible { background: var(--bg-surface-hover); }
+
+.map-canvas .leaflet-bar a.leaflet-disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.map-canvas .leaflet-tooltip {
+  position: absolute;
+  padding: 3px 7px;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-canvas .leaflet-zoom-anim .leaflet-zoom-animated { transition: none; }
+}

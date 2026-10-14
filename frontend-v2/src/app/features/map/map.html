@@ -1,0 +1,139 @@
+<div class="mp">
+  <div class="mp__toolbar">
+    <h1 class="mp__title"><mat-icon>map</mat-icon>{{ i18n.t('nav.map') }}</h1>
+    <span class="adm-muted">{{ i18n.t('map.subtitle') }}</span>
+  </div>
+
+  @if (error(); as e) { <p class="adm-error mp__error" role="alert">{{ e }}</p> }
+
+  <div class="mp__grid">
+    <section class="mp__mapcard">
+      <div class="mp__bar">
+        <button type="button" class="seg" [attr.aria-pressed]="!showAll()" (click)="showAll.set(false)">{{ i18n.t('map.filter.review') }}</button>
+        <button type="button" class="seg" [attr.aria-pressed]="showAll()" (click)="showAll.set(true)">{{ i18n.t('map.filter.all') }}</button>
+        <span class="mp__sep" aria-hidden="true"></span>
+        <button type="button" class="seg" [attr.aria-pressed]="showIncidents()" (click)="showIncidents.set(!showIncidents())">
+          <mat-icon class="mp__bad">error</mat-icon>{{ i18n.t('map.layer.incidents') }}
+        </button>
+        <button type="button" class="seg" [attr.aria-pressed]="showMaintenance()" (click)="showMaintenance.set(!showMaintenance())">
+          <mat-icon class="mp__warn">engineering</mat-icon>{{ i18n.t('map.layer.maintenance') }}
+        </button>
+        @if (ticketsOn()) {
+          <button type="button" class="seg" [attr.aria-pressed]="showTickets()" (click)="showTickets.set(!showTickets())">
+            <mat-icon class="mp__tk">confirmation_number</mat-icon>{{ i18n.t('map.layer.tickets') }}
+          </button>
+        }
+        <span class="mono adm-small adm-secondary adm-push">{{ i18n.tf('map.count', shownCount()) }}</span>
+      </div>
+      <app-map-canvas class="mp__map" [tiles]="tiles()" [label]="i18n.t('nav.map')" (ready)="onReady($event)" />
+      <div class="mp__legend">
+        <span><i class="mp__dot mp__dot--bad"></i>{{ i18n.t('map.legend.incident') }}</span>
+        <span><i class="mp__dot mp__dot--warn"></i>{{ i18n.t('map.legend.maintenance') }}</span>
+        @if (ticketsOn()) { <span><i class="mp__dot mp__dot--tk"></i>{{ i18n.t('map.legend.ticket') }}</span> }
+        <span><i class="mp__dot"></i>{{ i18n.t('map.legend.quiet') }}</span>
+      </div>
+    </section>
+
+    <aside class="mp__side">
+      <section class="adm-card">
+        <div class="adm-card__head">
+          <h2 class="adm-card__title"><mat-icon class="mp__bad">crisis_alert</mat-icon>{{ i18n.t('map.review') }}</h2>
+          <span class="pill mono" [class.tone-bad]="review().length > 0">{{ review().length }}</span>
+        </div>
+        @for (p of review(); track p.id) {
+          <button type="button" class="mp__row" [attr.aria-current]="p.id === selectedId()" (click)="select(p, true)">
+            <span class="mp__bar-tone" [class.mp__bar-tone--warn]="tone(p) === 'warn'" [class.mp__bar-tone--tk]="tone(p) === 'ticket'"></span>
+            <span class="mp__row-text">
+              <span class="mp__row-name">{{ p.name }}</span>
+              @if (p.parentName) { <span class="mp__row-sub">{{ p.parentName }}</span> }
+              <span class="mp__row-what">{{ what(p) }}</span>
+            </span>
+            <span class="mp__marks">
+              @for (m of marks(p); track m.tone) { <span class="pill" [class]="'tone-' + pillTone(m.tone)">{{ m.text }}</span> }
+            </span>
+          </button>
+        } @empty {
+          @if (loaded()) {
+            <p class="mp__empty"><mat-icon class="mp__ok">check_circle</mat-icon>{{ i18n.t('map.nothing') }}</p>
+          }
+        }
+      </section>
+
+      <section class="adm-card">
+        @if (selected(); as p) {
+          <div class="adm-card__head">
+            <h2 class="adm-card__title"><mat-icon>place</mat-icon>{{ p.name }}</h2>
+            @for (m of marks(p); track m.tone) { <span class="pill" [class]="'tone-' + pillTone(m.tone)">{{ m.text }}</span> }
+            <button type="button" class="adm-icon-btn adm-push" [attr.aria-label]="i18n.t('map.close')" (click)="clearSelection()"><mat-icon>close</mat-icon></button>
+          </div>
+          <div class="adm-card__body mp__detail">
+            <dl class="mp__kv">
+              <dt>{{ i18n.t('map.territory') }}</dt>
+              <dd>{{ p.parentName ? p.parentName + ' › ' : '' }}{{ p.name }}</dd>
+              <dt>{{ i18n.t('map.coords') }}</dt>
+              <dd class="mono">{{ p.latitude.toFixed(4) }}, {{ p.longitude.toFixed(4) }}</dd>
+              <dt>{{ i18n.t('map.covers') }}</dt>
+              <dd>
+                @if (detail(); as d) {
+                  @for (t of d.teams; track t.id) {
+                    <span class="mp__team">{{ t.name }}@if (t.coveredVia !== p.name) { <span class="adm-secondary"> · {{ i18n.tf('map.via', t.coveredVia) }}</span> }</span>
+                  } @empty { <span class="adm-secondary">{{ i18n.t('map.noTeam') }}</span> }
+                } @else { <span class="adm-secondary">…</span> }
+              </dd>
+            </dl>
+            @if (detail(); as d) {
+              @if (d.incidents.length) {
+                <div class="mp__list">
+                  <span class="adm-label">{{ i18n.t('map.openIncidents') }}</span>
+                  @for (i of d.incidents; track i.id) {
+                    <div class="mp__item">
+                      <b>{{ i.title }}</b>
+                      <span class="adm-small adm-secondary">
+                        @if (i.glpiTicket) { <span class="mono">{{ i.glpiTicket }}</span> · }
+                        {{ i18n.tf('map.openedAt', when(i.openedAt)) }}
+                        @if (i.assetName) { · {{ i.assetName }} }
+                      </span>
+                    </div>
+                  }
+                </div>
+              }
+              @if (d.tickets.length) {
+                <div class="mp__list">
+                  <span class="adm-label">{{ i18n.t('map.openTickets') }}</span>
+                  @for (tk of d.tickets; track tk.id) {
+                    <a class="mp__item mp__ticket" routerLink="/tickets" [queryParams]="{ id: tk.id }">
+                      <span class="mono mp__tk">{{ tk.ticketNumber }}</span>
+                      <span class="mp__ticket-title">{{ tk.title }}@if (tk.assetName) { <span class="adm-secondary"> · {{ tk.assetName }}</span> }</span>
+                      <span class="pill mono" [class]="'tone-' + priorityTone[tk.priority]">{{ priorityShort[tk.priority] }}</span>
+                    </a>
+                  }
+                </div>
+              }
+              @if (d.windows.length) {
+                <div class="mp__list">
+                  <span class="adm-label">{{ i18n.t('map.activeMaintenance') }}</span>
+                  @for (w of d.windows; track w.id) {
+                    <div class="mp__item">
+                      <b>{{ w.title }}</b>
+                      <span class="adm-small adm-secondary">
+                        {{ i18n.tf('map.until', when(w.endsAt)) }}
+                        @if (w.assetName) { · {{ w.assetName }} }
+                        @if (w.suppressNotifications) { · {{ i18n.t('map.paused') }} }
+                      </span>
+                    </div>
+                  }
+                </div>
+              }
+            }
+            <a class="adm-btn adm-btn--primary mp__go" routerLink="/escalation" [queryParams]="{ territorialUnitId: p.id }">
+              <mat-icon>phone_in_talk</mat-icon>{{ i18n.t('map.openEscalation') }}
+            </a>
+          </div>
+        } @else {
+          <div class="adm-card__head"><h2 class="adm-card__title"><mat-icon>place</mat-icon>{{ i18n.t('map.unit') }}</h2></div>
+          <p class="mp__empty"><mat-icon>touch_app</mat-icon>{{ i18n.t('map.pick') }}</p>
+        }
+      </section>
+    </aside>
+  </div>
+</div>

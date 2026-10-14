@@ -1310,6 +1310,9 @@ func (m *Migrator) migrateAppConfig(ctx context.Context) error {
 	if _, err := m.tx.Exec(ctx, `UPDATE areas SET active = true WHERE code = 'soc'`); err != nil {
 		return err
 	}
+	if _, err := m.tx.Exec(ctx, `UPDATE app_config SET soc_module_enabled = true`); err != nil {
+		return err
+	}
 	if _, err := m.tx.Exec(ctx, `UPDATE app_config SET setup_completed_at = COALESCE(setup_completed_at, now())`); err != nil {
 		return err
 	}

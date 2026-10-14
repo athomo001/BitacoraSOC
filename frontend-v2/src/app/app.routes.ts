@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
 import { ShellComponent } from './shell/shell';
 import { authGuard } from './core/auth/auth.guard';
-import { socOrNocGuard } from './core/setup/setup.guard';
+import { nocGuard, socOrNocGuard } from './core/setup/setup.guard';
 import { setupCompletedGuard, setupPendingGuard } from './core/setup/setup.guard';
 
 /**
@@ -61,6 +61,12 @@ export const routes: Routes = [
         canActivate: [socOrNocGuard],
         loadComponent: () =>
           import('./features/escalation/escalation').then((module) => module.EscalationComponent),
+      },
+      // Mapa (#24): localidades y sectores a revisar (módulo NOC).
+      {
+        path: 'map',
+        canActivate: [nocGuard],
+        loadComponent: () => import('./features/map/map').then((module) => module.MapComponent),
       },
       {
         path: 'reports',

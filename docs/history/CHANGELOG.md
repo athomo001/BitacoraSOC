@@ -4,6 +4,37 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] Lugar del ticket y tickets en el Mapa (#24, 7b) - 2026-10-14
+
+- Diseño aprobado por el dueño el 2026-10-14. Decisiones: el lugar es una localidad **o** un activo; los tickets van en el Mapa con capa y color propios (azul). Por defecto: siempre opcional y no se muestra en el seguimiento público.
+- **Ticketera**: campo **Lugar** al crear el ticket y fila **Lugar** en su panel (cambiar, quitar, «Ver en el mapa»), con un buscador de localidades y activos; con un activo, la localidad sale del activo. El cambio queda en la actividad. La lista muestra la localidad.
+- **Mapa**: capa **Tickets abiertos** (azul) con la Ticketera encendida; manda el color más grave (incidente, mantenimiento, ticket) y la lista muestra todo. El detalle lista los tickets y abre cada uno.
+- Migración 000038 (`tickets.territorial_unit_id`; los tickets con activo toman su localidad). Ruta nueva `PUT /api/tickets/{id}/place`; `POST /api/tickets` acepta `territorialUnitId`.
+
+## [Rewrite] Mapa con OpenStreetMap (#24) - 2026-10-14
+
+- Diseño aprobado por el dueño el 2026-10-14. Decisiones: entrada propia del menú (módulo NOC, perfil Operativo, `Alt+0`); «a revisar» = incidentes de escalamiento abiertos + ventanas de mantenimiento activas; la capa de activos queda para después.
+- **Mapa**: las localidades del Territorio con coordenadas; en rojo las que tienen un incidente abierto (directo o sobre uno de sus activos), en ámbar las que están en mantenimiento. A la derecha, los sectores a revisar y el detalle de la elegida (equipos que la cubren, incidentes, mantenimientos y «Ver escalamiento»). Se actualiza cada 60 s solo con la pestaña a la vista.
+- Lo liviano: **Leaflet 1.9.4** (~37 kB comprimido) se descarga solo al abrir un mapa; los puntos se dibujan en un único lienzo; sin PostGIS.
+- **Administración → Territorio**: fondo del mapa (OpenStreetMap público, servidor propio o sin fondo con la silueta de los países) y «Sin ubicación», para ubicar con un clic las localidades sin coordenadas.
+- Migración 000037 (`app_config.map_tiles_mode`, `map_tiles_url`). Rutas nuevas `GET /api/map/points`, `GET /api/map/units/{id}`, `GET/PUT /api/config/map-tiles`.
+
+## [Rewrite] Áreas y niveles: la ficha de cada área - 2026-10-14
+
+- Diseño aprobado por el dueño en el canvas (v39, "Ficha del área"): todo lo de la gente de un área en un solo lugar.
+- **Administración → Áreas y niveles**: lista de áreas a la izquierda; cada una abre su ficha con **Personas** (nivel, Jefe y permisos extra, que se guardan al tocar; agregar a alguien existente o a una persona nueva con contraseña temporal; sacar del área), **Guardias** y **Escalamiento** del área, más su perfil y el interruptor de área activa. «Niveles» abre la lista de niveles.
+- Rutas nuevas `GET/POST /api/areas/{code}/people` (spec/04).
+
+## [Rewrite] Módulo y área son cosas distintas - 2026-10-14
+
+- Pedido del dueño: el **módulo** SOC/NOC son las funciones (bitácora SOC, servicios, activos, territorio, escalamiento por servicio o zona) y se enciende en **Módulos**; el **área** SOC/NOC es la gente (personal, jefaturas, permisos) y se administra en **Áreas y niveles**. Apagar el área ya no apaga funciones, ni al revés.
+- Migración 000036: los módulos vuelven a `app_config.soc_module_enabled` / `noc_module_enabled`, partiendo del estado que tenían. El ETL enciende el módulo SOC; los respaldos de entre 000033 y 000036 se actualizan al restaurar.
+
+## [Rewrite] Módulos vuelve a encender SOC y NOC; panel por área más compacto - 2026-10-14
+
+- Pedido del dueño: **SOC, NOC y la Ticketera se encienden y apagan en Administración → Módulos**, los tres con su interruptor (deshace el traslado de 9b a Áreas y niveles). El interruptor de SOC/NOC es el mismo `active` de su área; se mantiene la regla de que al menos uno quede encendido.
+- Usuarios y grupos → panel de la persona: cada área en dos líneas (nombre, perfil y «Jefe»; debajo los niveles en una barra Fuera · N1 · N2 · N3).
+
 ## [Rewrite] Guardias y escalamiento por área (spec/16, etapa 9e) - 2026-10-14
 
 - Diseño aprobado por el dueño en el canvas (v38, "Guardias y escalamiento por área").

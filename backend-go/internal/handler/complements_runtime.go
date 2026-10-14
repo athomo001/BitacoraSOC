@@ -114,7 +114,7 @@ func requireCollection(w http.ResponseWriter, c db.Complement, collection string
 func (a *RuntimeAPI) Context(w http.ResponseWriter, r *http.Request, c db.Complement) {
 	q := a.Complements.Queries
 	out := map[string]any{"version": "v1", "appVersion": a.AppVersion, "requestId": r.Header.Get("X-Request-Id"), "shift": nil}
-	if flags, err := repository.AreaFlags(r.Context(), q); err == nil {
+	if flags, err := repository.ModuleFlags(r.Context(), q); err == nil {
 		out["modules"] = map[string]bool{"soc": flags.SOC, "noc": flags.NOC}
 	}
 	shifts, _ := q.ListWorkShifts(r.Context(), pgtype.Bool{Bool: true, Valid: true})

@@ -166,9 +166,9 @@ func (h *PermissionGroupsHandler) Create(w http.ResponseWriter, r *http.Request)
 }
 
 type patchPermissionGroupRequest struct {
-	Name         *string   `json:"name"`
-	Areas        *[]string `json:"areas"`
-	Profile      *string   `json:"profile"`
+	Name    *string   `json:"name"`
+	Areas   *[]string `json:"areas"`
+	Profile *string   `json:"profile"`
 	// LevelID: presente (aunque sea null) cambia el nivel; null lo quita.
 	LevelID      *uuid.UUID `json:"levelId"`
 	SetLevel     bool       `json:"setLevel"`
@@ -337,7 +337,7 @@ func (h *PermissionGroupsHandler) MyCapabilities(w http.ResponseWriter, r *http.
 		return
 	}
 
-	instance, _ := repository.AreaFlags(ctx, h.Queries)
+	instance, _ := repository.ModuleFlags(ctx, h.Queries)
 	areas, err := h.Queries.ListUserAreaCodes(ctx, authUser.ID)
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer las capacidades")

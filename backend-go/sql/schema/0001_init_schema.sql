@@ -1742,3 +1742,20 @@ ALTER TABLE teams ADD CONSTRAINT chk_oncall_team_area CHECK (kind <> 'oncall' OR
 ALTER TABLE escalation_policies
   ADD COLUMN area_id UUID NOT NULL DEFAULT 'a0000000-0000-4000-8000-000000000001' REFERENCES areas(id) ON DELETE RESTRICT;
 CREATE INDEX idx_escalation_policies_area ON escalation_policies(area_id);
+
+-- 000036: los módulos SOC/NOC (funciones) vuelven a app_config, separados de las áreas (gente).
+ALTER TABLE app_config
+  ADD COLUMN soc_module_enabled BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN noc_module_enabled BOOLEAN NOT NULL DEFAULT false;
+UPDATE app_config SET
+  soc_module_enabled = COALESCE((SELECT active FROM areas WHERE code = 'soc'), false),
+  noc_module_enabled = COALESCE((SELECT active FROM areas WHERE code = 'noc'), false);
+
+-- 000037: de dónde salen los mosaicos del fondo del Mapa (#24).
+ALTER TABLE app_config
+  ADD COLUMN map_tiles_mode TEXT NOT NULL DEFAULT 'osm' CHECK (map_tiles_mode IN ('osm', 'custom', 'none')),
+  ADD COLUMN map_tiles_url TEXT NOT NULL DEFAULT '';
+
+-- 000038: lugar del ticket (localidad; con activo, la del activo).
+ALTER TABLE tickets ADD COLUMN territorial_unit_id UUID REFERENCES territorial_units(id) ON DELETE SET NULL;
+CREATE INDEX idx_tickets_territorial_unit ON tickets(territorial_unit_id) WHERE territorial_unit_id IS NOT NULL;

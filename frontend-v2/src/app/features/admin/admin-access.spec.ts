@@ -58,7 +58,7 @@ describe('AdminAccessComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
-    const seg = (label: string) => el.querySelector<HTMLButtonElement>(`.aa-place .seg[aria-label="${label}"]`)!;
+    const seg = (label: string) => el.querySelector<HTMLButtonElement>(`.aa-levels button[aria-label="${label}"]`)!;
     const save = () => [...el.querySelectorAll<HTMLButtonElement>('.aa-place__actions .aa-btn--primary')][0];
     expect(seg('SOC N1').getAttribute('aria-pressed')).toBe('true');
     expect(save().disabled).toBe(true);
@@ -66,8 +66,7 @@ describe('AdminAccessComponent', () => {
     seg('SOC N2').click();
     seg('Infraestructura N1').click();
     fixture.detectChanges();
-    const leads = el.querySelectorAll<HTMLButtonElement>('.aa-place__lead');
-    leads[2].click(); // Jefe de Infraestructura
+    el.querySelectorAll('.aa-place')[2].querySelector<HTMLInputElement>('.aa-place__lead input')!.click(); // Jefe de Infraestructura
     fixture.detectChanges();
     expect(el.querySelector('.aa-shape__preview')?.textContent).toContain('Mi equipo');
     expect(save().disabled).toBe(false);
@@ -93,10 +92,9 @@ describe('AdminAccessComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
-    el.querySelector<HTMLButtonElement>('.aa-place .seg[aria-label="Infraestructura: fuera del área"]')!.click();
+    el.querySelector<HTMLButtonElement>('.aa-levels button[aria-label="Infraestructura: fuera del área"]')!.click();
     fixture.detectChanges();
-    const leads = el.querySelectorAll<HTMLButtonElement>('.aa-place__lead');
-    expect(leads[2].disabled).toBe(true);
+    expect(el.querySelectorAll('.aa-place')[2].querySelector('.aa-place__lead')).toBeNull();
     expect(el.querySelector('.aa-shape__preview')?.textContent).not.toContain('Mi equipo');
   });
 
