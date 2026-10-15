@@ -493,7 +493,7 @@ Quién: ve un equipo quien es del área dueña o de un área responsable (admin,
 
 | Método | Ruta | Acceso |
 | --- | --- | --- |
-| `GET` | `/api/inventory` | Sesión — `?scope=mine\|all&kind=&q=&inactive=true` |
+| `GET` | `/api/inventory` | Sesión — `?scope=mine\|all&kind=&q=&inactive=true&source=glpi` |
 | `GET` | `/api/inventory/meta` | Sesión — tipos con sus campos, tipos de responsabilidad, áreas y lo que el usuario puede hacer |
 | `POST` | `/api/inventory` | Sesión (áreas del equipo o admin) |
 | `GET` | `/api/inventory/{id}` | Sesión — ficha con IP, responsables, historial, tickets y solicitud pendiente |
@@ -509,6 +509,21 @@ Quién: ve un equipo quien es del área dueña o de un área responsable (admin,
 | `GET` | `/api/inventory/export` | Sesión — `?kind=` |
 | `PUT` | `/api/inventory/kinds/{code}` | Admin — tipo y sus campos |
 | `PUT` | `/api/inventory/responsibility-types/{code}` | Admin |
+
+### GLPI
+
+Importación de equipos desde GLPI (spec/16 §5.1, 9.6). Solo admin y solo con `glpi_sync` encendida (si no, `403 module-disabled`). Usa la API clásica de GLPI (`apirest.php`) y solo lee. La ficha de un equipo importado trae `glpi: {itemtype, id, url}`.
+
+| Método | Ruta | Notas |
+| --- | --- | --- |
+| `GET` | `/api/glpi/config` | Conexión, reglas e importación automática; los tokens nunca vuelven (`hasAppToken`, `hasUserToken`) |
+| `PUT` | `/api/glpi/config` | `{url, appToken?, userToken?, verifyTls, timeoutSeconds, importComputers, importNetwork, areaId, computerTypes, entities, autoMode: off\|night\|6h}`; un token vacío conserva el guardado |
+| `POST` | `/api/glpi/test` | Prueba la conexión guardada; si falla, `explanation: {error, cause, next, raw}` |
+| `GET` | `/api/glpi/catalog` | Entidades y tipos de computador de GLPI; `502 glpi-unreachable` si no conecta |
+| `POST` | `/api/glpi/preview` | Lee GLPI y devuelve qué se crea, cambia, reactiva, da de baja o salta; no guarda nada |
+| `POST` | `/api/glpi/import` | Vuelve a leer y aplica; `409 glpi-busy` si ya hay una en curso |
+| `POST` | `/api/glpi/link` | `{assetId, itemtype, glpiId}`: un equipo de la app (misma serie) pasa a venir de GLPI |
+| `GET` | `/api/glpi/runs` | Las últimas 20 importaciones |
 
 ### Agenda
 
@@ -561,7 +576,7 @@ La campana de cada persona y sus preferencias. El evento en vivo `notifications.
 | `GET` | `/api/notices/{id}/recipients` | Quien lo envió o admin |
 | `POST` | `/api/notices/{id}/remind` | Quien lo envió o admin — correo a quienes faltan |
 
-Tipos de notificación: `agenda.assigned`, `agenda.warn`, `agenda.due`, `agenda.late`, `agenda.handover`, `agenda.absence`, `ticket.assigned`, `ticket.derived`, `ticket.comment`, `inventory.request`, `window`, `notice`.
+Tipos de notificación: `agenda.assigned`, `agenda.warn`, `agenda.due`, `agenda.late`, `agenda.handover`, `agenda.absence`, `ticket.assigned`, `ticket.derived`, `ticket.comment`, `inventory.request`, `glpi.import`, `window`, `notice`.
 
 ### Territorio (NOC)
 

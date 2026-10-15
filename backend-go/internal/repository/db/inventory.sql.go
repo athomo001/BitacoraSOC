@@ -261,7 +261,8 @@ func (q *Queries) GetAssetRequest(ctx context.Context, id uuid.UUID) (AssetReque
 const getInventoryAsset = `-- name: GetInventoryAsset :one
 SELECT a.id, a.name, a.code, a.kind_code, a.type, a.area_id, ar.name AS area_name, ar.code AS area_code,
   a.serial, a.model, a.rack, a.rack_position, a.attributes, a.metadata, a.active,
-  a.territorial_unit_id, tu.name AS place_name, a.client_id, o.name AS client_name, a.created_at, a.updated_at
+  a.territorial_unit_id, tu.name AS place_name, a.client_id, o.name AS client_name, a.created_at, a.updated_at,
+  a.glpi_itemtype, a.glpi_id
 FROM assets a
 JOIN areas ar ON ar.id = a.area_id
 LEFT JOIN territorial_units tu ON tu.id = a.territorial_unit_id
@@ -291,6 +292,8 @@ type GetInventoryAssetRow struct {
 	ClientName        pgtype.Text        `json:"client_name"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	GlpiItemtype      pgtype.Text        `json:"glpi_itemtype"`
+	GlpiID            pgtype.Int4        `json:"glpi_id"`
 }
 
 func (q *Queries) GetInventoryAsset(ctx context.Context, id uuid.UUID) (GetInventoryAssetRow, error) {
@@ -318,6 +321,8 @@ func (q *Queries) GetInventoryAsset(ctx context.Context, id uuid.UUID) (GetInven
 		&i.ClientName,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.GlpiItemtype,
+		&i.GlpiID,
 	)
 	return i, err
 }
@@ -572,7 +577,7 @@ func (q *Queries) ListAssetTickets(ctx context.Context, assetID uuid.UUID) ([]Li
 
 const listInventory = `-- name: ListInventory :many
 SELECT a.id, a.name, a.code, a.kind_code, a.type, a.area_id, ar.name AS area_name, a.serial, a.model,
-  a.attributes, a.active, tu.name AS place_name,
+  a.attributes, a.active, tu.name AS place_name, a.glpi_id,
   COALESCE((SELECT host(i.address) FROM asset_ips i WHERE i.asset_id = a.id ORDER BY i.sort_order LIMIT 1), '')::text AS first_ip,
   (SELECT count(*) FROM asset_ips i WHERE i.asset_id = a.id)::int AS ip_count
 FROM assets a
@@ -582,10 +587,11 @@ WHERE ($1::uuid[] IS NULL OR a.area_id = ANY($1::uuid[])
        OR EXISTS (SELECT 1 FROM asset_responsibles r WHERE r.asset_id = a.id AND r.area_id = ANY($1::uuid[])))
   AND ($2::text IS NULL OR a.kind_code = $2::text)
   AND ($3::bool OR a.active)
-  AND ($4::text IS NULL
-       OR a.name ILIKE '%' || $4::text || '%' OR a.code ILIKE '%' || $4::text || '%'
-       OR a.serial ILIKE '%' || $4::text || '%'
-       OR EXISTS (SELECT 1 FROM asset_ips i WHERE i.asset_id = a.id AND host(i.address) LIKE $4::text || '%'))
+  AND (NOT $4::bool OR a.glpi_id IS NOT NULL)
+  AND ($5::text IS NULL
+       OR a.name ILIKE '%' || $5::text || '%' OR a.code ILIKE '%' || $5::text || '%'
+       OR a.serial ILIKE '%' || $5::text || '%'
+       OR EXISTS (SELECT 1 FROM asset_ips i WHERE i.asset_id = a.id AND host(i.address) LIKE $5::text || '%'))
 ORDER BY a.active DESC, a.name
 LIMIT 1000
 `
@@ -594,6 +600,7 @@ type ListInventoryParams struct {
 	Areas           []uuid.UUID `json:"areas"`
 	Kind            pgtype.Text `json:"kind"`
 	IncludeInactive bool        `json:"include_inactive"`
+	OnlyGlpi        bool        `json:"only_glpi"`
 	Q               pgtype.Text `json:"q"`
 }
 
@@ -610,6 +617,7 @@ type ListInventoryRow struct {
 	Attributes []byte      `json:"attributes"`
 	Active     bool        `json:"active"`
 	PlaceName  pgtype.Text `json:"place_name"`
+	GlpiID     pgtype.Int4 `json:"glpi_id"`
 	FirstIp    string      `json:"first_ip"`
 	IpCount    int32       `json:"ip_count"`
 }
@@ -620,6 +628,7 @@ func (q *Queries) ListInventory(ctx context.Context, arg ListInventoryParams) ([
 		arg.Areas,
 		arg.Kind,
 		arg.IncludeInactive,
+		arg.OnlyGlpi,
 		arg.Q,
 	)
 	if err != nil {
@@ -642,6 +651,7 @@ func (q *Queries) ListInventory(ctx context.Context, arg ListInventoryParams) ([
 			&i.Attributes,
 			&i.Active,
 			&i.PlaceName,
+			&i.GlpiID,
 			&i.FirstIp,
 			&i.IpCount,
 		); err != nil {

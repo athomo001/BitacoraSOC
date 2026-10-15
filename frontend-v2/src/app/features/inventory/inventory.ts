@@ -7,6 +7,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
 import { SseService } from '../../core/sse/sse.service';
+import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 import { AssetFormComponent } from './asset-form';
 import { AssetCsvComponent } from './asset-csv';
 
@@ -14,8 +15,11 @@ import '../../core/i18n/packs/inventory';
 
 type Panel = 'detail' | 'new' | 'edit' | 'csv' | 'requests';
 
+/** Campos que trae GLPI (9.6): en un equipo importado, cada importación los actualiza. */
+const GLPI_ATTRIBUTES = new Set(['os', 'os_version', 'cpu', 'ram_gb', 'disk', 'equipment']);
+
 const EVENT_ICON: Record<AssetEvent['kind'], string> = {
-  created: 'add_circle', edited: 'edit', work: 'build', ticket: 'confirmation_number', import: 'upload_file', deactivated: 'block', reactivated: 'restart_alt',
+  created: 'add_circle', edited: 'edit', work: 'build', ticket: 'confirmation_number', import: 'upload_file', glpi: 'cloud_download', deactivated: 'block', reactivated: 'restart_alt',
 };
 
 /**
@@ -37,12 +41,16 @@ export class InventoryComponent implements OnInit {
   protected readonly api = inject(InventoryService);
   private readonly sse = inject(SseService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly features = inject(SystemFeaturesService);
+  /** «De GLPI» solo existe con la importación desde GLPI prendida. */
+  protected readonly glpiOn = computed(() => this.features.isEnabled('glpi_sync'));
 
   protected readonly meta = signal<InventoryMeta | null>(null);
   protected readonly rows = signal<InventoryRow[]>([]);
   protected readonly scope = signal<'mine' | 'all'>('mine');
   protected readonly kindFilter = signal<string | null>(null);
   protected readonly showInactive = signal(false);
+  protected readonly glpiOnly = signal(false);
   protected query = '';
   protected readonly selectedId = signal<string | null>(null);
   protected readonly asset = signal<InventoryAsset | null>(null);
@@ -93,7 +101,7 @@ export class InventoryComponent implements OnInit {
 
   protected async load(): Promise<void> {
     try {
-      this.rows.set(await this.api.list({ scope: this.scope(), q: this.query, inactive: this.showInactive() }));
+      this.rows.set(await this.api.list({ scope: this.scope(), q: this.query, inactive: this.showInactive(), glpi: this.glpiOnly() }));
       this.error.set(null);
       const sel = this.selectedId();
       if (!sel || !this.rows().some((r) => r.id === sel)) {
@@ -115,6 +123,16 @@ export class InventoryComponent implements OnInit {
 
   protected setKind(code: string): void {
     this.kindFilter.set(this.kindFilter() === code ? null : code);
+  }
+
+  protected toggleGlpi(): void {
+    this.glpiOnly.update((v) => !v);
+    void this.load();
+  }
+
+  /** El dato lo trae GLPI: se marca con la nube en la ficha. */
+  protected fromGlpi(field: string): boolean {
+    return !!this.asset()?.glpi && GLPI_ATTRIBUTES.has(field);
   }
 
   protected toggleInactive(): void {

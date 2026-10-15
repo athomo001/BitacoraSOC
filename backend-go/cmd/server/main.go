@@ -165,6 +165,8 @@ func run(logger *slog.Logger) error {
 	organizationsHandler := &handler.OrganizationsHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
 	directoryHandler := &handler.DirectoryHandler{Pool: pool, Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
 	smtpConfigHandler := &handler.SMTPConfigHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
+	// Importación de equipos desde GLPI (spec/16 §5.1, 9.6), detrás de glpi_sync.
+	glpiHandler := &handler.GlpiHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, Notify: notifier, Inventory: inventoryHandler}
 	escalationHandler := &handler.EscalationHandler{DB: pool, Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, Modules: &repository.ModuleAccess{Queries: queries}}
 	teamsHandler := &handler.TeamsHandler{Pool: pool, Queries: queries, AuditLog: auditLog, NOCEnabled: func(r *http.Request) bool {
 		flags, err := (&repository.ModuleAccess{Queries: queries}).InstanceFlags(r.Context())
@@ -411,6 +413,14 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/inventory/{id}/events", authed(inventoryHandler.AddEvent))
 	mux.Handle("POST /api/inventory/{id}/active", authed(inventoryHandler.SetActive))
 	mux.Handle("POST /api/inventory/{id}/requests", authed(inventoryHandler.Request))
+	mux.Handle("GET /api/glpi/config", admin(glpiHandler.RequireEnabled(glpiHandler.GetConfig)))
+	mux.Handle("PUT /api/glpi/config", admin(glpiHandler.RequireEnabled(glpiHandler.PutConfig)))
+	mux.Handle("POST /api/glpi/test", admin(glpiHandler.RequireEnabled(glpiHandler.Test)))
+	mux.Handle("GET /api/glpi/catalog", admin(glpiHandler.RequireEnabled(glpiHandler.Catalog)))
+	mux.Handle("POST /api/glpi/preview", admin(glpiHandler.RequireEnabled(glpiHandler.Preview)))
+	mux.Handle("POST /api/glpi/import", admin(glpiHandler.RequireEnabled(glpiHandler.Import)))
+	mux.Handle("POST /api/glpi/link", admin(glpiHandler.RequireEnabled(glpiHandler.Link)))
+	mux.Handle("GET /api/glpi/runs", admin(glpiHandler.RequireEnabled(glpiHandler.Runs)))
 	// Agenda (spec/16 §4.3, 9.3): tareas y recurrentes en días hábiles. Todos
 	// los perfiles; el handler decide qué ve y a quién asigna cada uno.
 	mux.Handle("GET /api/agenda/meta", authed(agendaHandler.Meta))
@@ -775,6 +785,8 @@ func run(logger *slog.Logger) error {
 	go scheduler.Run(ctx, time.Minute, notifier.Windows)
 	go scheduler.Run(ctx, time.Minute, notificationsHandler.PublishDue)
 	go scheduler.Run(ctx, time.Hour, notifier.Purge)
+	// GLPI: la importación automática (cada noche a las 02:00 o cada 6 horas).
+	go scheduler.Run(ctx, time.Minute, glpiHandler.AutoTick)
 	// Correos de cumpleaños (comentario del dueño #21): una vez al día, desde la hora configurada.
 	birthdaysHandler := &handler.BirthdaysHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
 	mux.Handle("GET /api/config/birthday-emails", admin(birthdaysHandler.GetConfig))

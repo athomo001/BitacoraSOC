@@ -4,6 +4,18 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] Importación de equipos desde GLPI (spec/16 §5.1, 9.6) - 2026-10-15
+
+- Diseño aprobado por el dueño el 2026-10-15. Decisiones: se traen computadores y equipos de red; importación manual con revisión y automática opcional; GLPI manda en sus campos; lo borrado o en la papelera de GLPI queda dado de baja, nunca se borra; un equipo de la app con la misma serie se salta y se puede vincular; si un equipo vuelve a GLPI se reactiva; la automática corre a las 02:00 o cada 6 horas; seguro contra bajas masivas del 10 %.
+- **Administración → GLPI** (aparece con «Sincronización con GLPI» encendida en Funcionalidades): conexión con la **API clásica** de GLPI (`apirest.php`, App-Token + User-Token cifrados, como el legacy; la API v2 de GLPI 11 pide guardar usuario y contraseña) y **Probar conexión**, que si falla explica el error, la causa probable y el siguiente paso; tipo de computador de GLPI → tipo de equipo, área dueña de lo importado y entidad de GLPI → cliente o «No importar»; importación automática.
+- **Revisar ahora → Importar:** muestra qué se crea, qué cambia (antes → después), qué se reactiva, qué se da de baja y qué se salta, y recién al importar guarda. Cada equipo guarda su ID de GLPI: al reimportar se actualiza, nunca se duplica.
+- **GLPI manda en sus campos** cuando trae el dato: nombre, serie, marca y modelo, SO y versión, CPU, RAM, disco, IP de red, cliente (por entidad) y localidad (por ubicación, mismo nombre). Área, responsables, rack, otros datos e historial son de la Bitácora. Lo creado en la app nunca se toca.
+- **Seguro:** una lectura que falla a medias no aplica nada; si no se puede leer un componente (por permisos), se importa sin ese dato. Si en una corrida desaparece más del 10 % de lo importado, la automática no da de baja y avisa en la campana a los administradores (aviso nuevo `glpi.import`, una vez al día).
+- **Inventario:** los equipos importados muestran «GLPI #id», filtro **De GLPI**, aviso en la ficha con enlace «Abrir en GLPI», una nube en los datos que actualiza GLPI y los cambios en el historial como «GLPI».
+- La administración abre una sección desde la URL (`/admin?section=glpi`), para el enlace del aviso.
+- Migración 000043 (`glpi_config`, `glpi_import_runs`; `assets` con `glpi_itemtype`, `glpi_id` y `glpi_removed_at`; el historial admite `glpi`). Paquete `internal/glpi` y un GLPI falso para las pruebas (`internal/glpi/glpitest`). Rutas nuevas `/api/glpi/*` (spec/04, docs/api.md).
+- Sigue en el backlog: tickets con GLPI (traer y enviar), impresoras, teléfonos y periféricos, y los webhooks de GLPI 11.
+
 ## [Rewrite] Notificaciones y ventanas de mantenimiento ampliadas (spec/16 §4.5–4.6, 9.5) - 2026-10-15
 
 - Diseño aprobado por el dueño el 2026-10-15. Decisiones: resumen diario a las 08:00 de los días hábiles; formato del correo: la plantilla de lista de Dotación del legacy, sin diseñar uno nuevo; no se apagan los atrasos ni los avisos con acuse; las jefaturas envían avisos con acuse sin pedir el permiso; la campana guarda 90 días; los tres avisos de tickets están y cada persona los apaga; la ventana desde una tarea, solo para tareas de una vez.

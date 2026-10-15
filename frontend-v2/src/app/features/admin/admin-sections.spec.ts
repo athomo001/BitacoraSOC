@@ -81,7 +81,7 @@ describe('Administración re-vestida', () => {
       data: [
         { code: 'native_tickets', name: 'x', isEnabled: false, configPayload: {}, updatedAt: '' },
         { code: 'allow_purge', name: 'x', isEnabled: false, configPayload: {}, updatedAt: '' },
-        { code: 'glpi_sync', name: 'x', isEnabled: false, configPayload: {}, updatedAt: '' },
+        { code: 'zabbix_inbound', name: 'x', isEnabled: false, configPayload: {}, updatedAt: '' },
       ],
     });
     await settle();

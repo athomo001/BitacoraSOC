@@ -2,7 +2,7 @@
 
 > Generado por `backend-go/cmd/er-docs` desde `backend-go/sql/schema/0001_init_schema.sql`, el esquema que usa sqlc, con todas las migraciones aplicadas. **No se edita a mano**: si cambia el esquema, se regenera con `go run ./cmd/er-docs` desde `backend-go/`.
 
-94 tablas en PostgreSQL, agrupadas en 15 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
+96 tablas en PostgreSQL, agrupadas en 15 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
 
 - Cada entidad muestra todas sus columnas salvo `created_at` y `updated_at`. `PK` clave primaria, `FK` referencia a otra tabla, `UK` valor único.
 - Las tablas de otros dominios aparecen como cajas sin columnas: son la misma tabla, dibujada donde se une.
@@ -14,7 +14,7 @@ Correspondencia con el legacy (MongoDB): [modelo-er-legacy-2.0.md](modelo-er-leg
 ## Índice
 
 1. [Usuarios, acceso y permisos](#1-usuarios-acceso-y-permisos) — 9 tablas
-2. [Territorio, organizaciones y activos](#2-territorio-organizaciones-y-activos) — 12 tablas
+2. [Territorio, organizaciones y activos](#2-territorio-organizaciones-y-activos) — 14 tablas
 3. [Directorio de contactos](#3-directorio-de-contactos) — 2 tablas
 4. [Ticketera](#4-ticketera) — 7 tablas
 5. [Equipos y escalamiento](#5-equipos-y-escalamiento) — 13 tablas
@@ -129,7 +129,7 @@ erDiagram
 
 ## 2. Territorio, organizaciones y activos
 
-Árbol territorial genérico (país → región → zona → sitio), organizaciones con tipos configurables, sus servicios y los activos (el Inventario: tipos con sus campos, IP, responsables, historial y solicitudes de baja).
+Árbol territorial genérico (país → región → zona → sitio), organizaciones con tipos configurables, sus servicios y los activos (el Inventario: tipos con sus campos, IP, responsables, historial y solicitudes de baja), más la importación desde GLPI (conexión, reglas y cada corrida).
 
 ```mermaid
 erDiagram
@@ -200,6 +200,9 @@ erDiagram
         text rack
         text rack_position
         jsonb attributes
+        text glpi_itemtype
+        int glpi_id
+        timestamptz glpi_removed_at
     }
     ASSET_KINDS {
         text code PK
@@ -253,8 +256,44 @@ erDiagram
         timestamptz decided_at
         text decision_note
     }
+    GLPI_CONFIG {
+        boolean id PK
+        text api_url
+        text app_token_encrypted
+        text user_token_encrypted
+        boolean verify_tls
+        int timeout_seconds
+        boolean import_computers
+        boolean import_network
+        uuid area_id FK
+        jsonb computer_types
+        jsonb entities
+        text auto_mode
+        timestamptz last_auto_at
+        date last_failure_notified_on
+        timestamptz last_test_at
+        boolean last_test_ok
+        jsonb last_test
+    }
+    GLPI_IMPORT_RUNS {
+        uuid id PK
+        text trigger
+        uuid user_id FK
+        timestamptz started_at
+        timestamptz finished_at
+        boolean ok
+        int created
+        int updated
+        int deactivated
+        int reactivated
+        int skipped
+        int unchanged
+        int held_back
+        text message
+    }
 
     AREAS |o--o{ ASSET_RESPONSIBLES : "area_id"
+    AREAS |o--o{ GLPI_CONFIG : "area_id"
     AREAS ||--o{ ASSETS : "area_id"
     ASSETS |o--o{ ASSETS : "parent_asset_id"
     ASSETS ||--o{ ASSET_EVENTS : "asset_id"
@@ -275,6 +314,7 @@ erDiagram
     TICKETS |o--o{ ASSET_EVENTS : "ticket_id"
     USERS |o--o{ ASSET_EVENTS : "user_id"
     USERS |o--o{ ASSET_RESPONSIBLES : "user_id"
+    USERS |o--o{ GLPI_IMPORT_RUNS : "user_id"
 ```
 
 ---

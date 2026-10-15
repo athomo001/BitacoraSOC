@@ -1395,6 +1395,9 @@ type Asset struct {
 	Attributes        []byte             `json:"attributes"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	GlpiItemtype      pgtype.Text        `json:"glpi_itemtype"`
+	GlpiID            pgtype.Int4        `json:"glpi_id"`
+	GlpiRemovedAt     pgtype.Timestamptz `json:"glpi_removed_at"`
 }
 
 type AssetEvent struct {
@@ -1785,6 +1788,44 @@ type EscalationStep struct {
 	Mode                      EscalationMode `json:"mode"`
 	WaitBeforeEscalateMinutes int32          `json:"wait_before_escalate_minutes"`
 	Title                     pgtype.Text    `json:"title"`
+}
+
+type GlpiConfig struct {
+	ID                    bool               `json:"id"`
+	ApiUrl                string             `json:"api_url"`
+	AppTokenEncrypted     pgtype.Text        `json:"app_token_encrypted"`
+	UserTokenEncrypted    pgtype.Text        `json:"user_token_encrypted"`
+	VerifyTls             bool               `json:"verify_tls"`
+	TimeoutSeconds        int32              `json:"timeout_seconds"`
+	ImportComputers       bool               `json:"import_computers"`
+	ImportNetwork         bool               `json:"import_network"`
+	AreaID                pgtype.UUID        `json:"area_id"`
+	ComputerTypes         []byte             `json:"computer_types"`
+	Entities              []byte             `json:"entities"`
+	AutoMode              string             `json:"auto_mode"`
+	LastAutoAt            pgtype.Timestamptz `json:"last_auto_at"`
+	LastFailureNotifiedOn pgtype.Date        `json:"last_failure_notified_on"`
+	LastTestAt            pgtype.Timestamptz `json:"last_test_at"`
+	LastTestOk            pgtype.Bool        `json:"last_test_ok"`
+	LastTest              []byte             `json:"last_test"`
+	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
+}
+
+type GlpiImportRun struct {
+	ID          uuid.UUID          `json:"id"`
+	Trigger     string             `json:"trigger"`
+	UserID      pgtype.UUID        `json:"user_id"`
+	StartedAt   pgtype.Timestamptz `json:"started_at"`
+	FinishedAt  pgtype.Timestamptz `json:"finished_at"`
+	Ok          bool               `json:"ok"`
+	Created     int32              `json:"created"`
+	Updated     int32              `json:"updated"`
+	Deactivated int32              `json:"deactivated"`
+	Reactivated int32              `json:"reactivated"`
+	Skipped     int32              `json:"skipped"`
+	Unchanged   int32              `json:"unchanged"`
+	HeldBack    int32              `json:"held_back"`
+	Message     string             `json:"message"`
 }
 
 type Holiday struct {

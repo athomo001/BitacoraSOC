@@ -11,7 +11,7 @@ import '../core/i18n/packs/notifications';
 const KIND_ICON: Record<string, string> = {
   'agenda.assigned': 'assignment_ind', 'agenda.warn': 'event', 'agenda.due': 'event', 'agenda.late': 'priority_high',
   'agenda.handover': 'swap_horiz', 'agenda.absence': 'person_off', 'ticket.assigned': 'confirmation_number',
-  'ticket.derived': 'call_split', 'ticket.comment': 'chat', 'inventory.request': 'inbox', window: 'engineering', notice: 'campaign',
+  'ticket.derived': 'call_split', 'ticket.comment': 'chat', 'inventory.request': 'inbox', 'glpi.import': 'cloud_off', window: 'engineering', notice: 'campaign',
 };
 const KIND_TONE: Record<string, string> = {
   'agenda.late': 'tone-bad', 'agenda.due': 'tone-warn', 'agenda.warn': 'tone-warn', window: 'tone-warn', notice: 'tone-system',

@@ -1,0 +1,223 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+mat-icon {
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+}
+
+.gl__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.gl__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gl__self-start {
+  align-self: flex-start;
+}
+
+.gl__check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 9px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.gl__check input {
+  margin-top: 2px;
+}
+
+.gl__map {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.gl__from {
+  overflow-wrap: anywhere;
+  padding: 6px 9px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+  font-size: 12.5px;
+}
+
+.gl__arrow {
+  color: var(--text-muted);
+}
+
+.gl__line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.gl__end {
+  justify-content: flex-end;
+}
+
+.gl__segs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gl__result {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+}
+
+.gl__result--ok {
+  background: var(--status-ok-bg);
+}
+
+.gl__result--bad {
+  background: var(--status-critical-bg);
+}
+
+.gl__result-head {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-weight: 700;
+}
+
+.gl__result--ok .gl__result-head {
+  color: var(--status-ok);
+}
+
+.gl__result--bad .gl__result-head {
+  color: var(--status-critical);
+}
+
+.gl__dl {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 4px 10px;
+  margin: 0;
+}
+
+.gl__dl dt {
+  color: var(--text-secondary);
+}
+
+.gl__dl dd {
+  min-width: 0;
+  margin: 0;
+}
+
+.gl__raw {
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+
+.gl__warn {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: var(--status-warning-bg);
+  font-size: 12px;
+}
+
+.gl__warn mat-icon {
+  color: var(--status-warning);
+}
+
+.gl__tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.gl__tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 2px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.gl__tile[aria-pressed="true"] {
+  border-color: var(--accent);
+}
+
+.gl__n {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.gl__t {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.gl__change {
+  font-size: 12px;
+}
+
+.gl__mini {
+  margin-top: 4px;
+  padding: 2px 8px;
+}
+
+.gl__run {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 12px;
+}
+
+.gl__run:last-child {
+  border-bottom: none;
+}
+
+.gl__run > mat-icon {
+  color: var(--text-muted);
+}
+
+.gl__run-text {
+  min-width: 0;
+}
+
+@media (width <= 1100px) {
+  .gl__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

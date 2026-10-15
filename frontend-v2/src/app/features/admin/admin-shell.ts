@@ -1,6 +1,8 @@
 import { AdminBrandComponent } from './admin-brand';
 import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
+import { ActivatedRoute } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { DomainModule, ModuleAccessService } from '../../core/auth/module-access.service';
@@ -25,13 +27,14 @@ import { AdminComplementsComponent } from './admin-complements';
 import { AdminClientAlertsComponent } from './admin-client-alerts';
 import { AdminTicketsComponent } from './admin-tickets';
 import { AdminAreasComponent } from './admin-areas';
+import { AdminGlpiComponent } from './admin-glpi';
 import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 
 import '../../core/i18n/packs/admin';
 export type AdminSection =
   | 'access' | 'areas' | 'shifts' | 'checklist' | 'escalation' | 'tickets' | 'clientAlerts' | 'smtp' | 'reports'
   | 'agenda' | 'notifications' | 'organizations' | 'territory' | 'inventory' | 'teams'
-  | 'modules' | 'brand' | 'features' | 'backups' | 'audit' | 'complements';
+  | 'modules' | 'brand' | 'features' | 'glpi' | 'backups' | 'audit' | 'complements';
 
 interface NavItem {
   id: AdminSection;
@@ -84,6 +87,7 @@ const NAV: readonly { labelKey: MessageKey; items: readonly NavItem[] }[] = [
       { id: 'brand', icon: 'palette', labelKey: 'admin.nav.brand' },
       { id: 'modules', icon: 'apps', labelKey: 'admin.nav.modules' },
       { id: 'features', icon: 'toggle_on', labelKey: 'admin.nav.features' },
+      { id: 'glpi', icon: 'cloud_download', labelKey: 'admin.nav.glpi', requiresFeature: 'glpi_sync' },
       { id: 'backups', icon: 'backup', labelKey: 'admin.nav.backups' },
       { id: 'audit', icon: 'policy', labelKey: 'admin.nav.audit' },
       { id: 'complements', icon: 'extension', labelKey: 'admin.nav.complements', requiresFeature: 'complements' },
@@ -119,7 +123,7 @@ function normalize(text: string): string {
   imports: [
     MatIconModule, AdminModulesComponent, AdminBrandComponent, AdminFeaturesComponent, AdminTerritoryComponent, AdminInventoryComponent, AdminOrganizationsComponent, AdminTeamsComponent,
     AdminEscalationComponent, AdminShiftsComponent, AdminSmtpComponent, AdminReportsComponent, AdminBackupsComponent, AdminAuditComponent,
-    AdminAccessComponent, AdminChecklistComponent, AdminComplementsComponent, AdminClientAlertsComponent, AdminTicketsComponent, AdminAreasComponent, AdminAgendaComponent, AdminNotificationsComponent,
+    AdminAccessComponent, AdminChecklistComponent, AdminComplementsComponent, AdminClientAlertsComponent, AdminTicketsComponent, AdminAreasComponent, AdminAgendaComponent, AdminNotificationsComponent, AdminGlpiComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKeydown($event)' },
@@ -172,6 +176,7 @@ function normalize(text: string): string {
           @case ('brand') { <app-admin-brand /> }
           @case ('modules') { <app-admin-modules /> }
           @case ('features') { <app-admin-features /> }
+          @case ('glpi') { <app-admin-glpi /> }
           @case ('backups') { <app-admin-backups (goToFeatures)="go('features')" /> }
           @case ('audit') { <app-admin-audit /> }
           @case ('complements') { <app-admin-complements /> }
@@ -249,6 +254,11 @@ export class AdminShellComponent {
 
   constructor() {
     void this.modules.load().finally(() => this.modulesLoaded.set(true));
+    // Un aviso de la campana abre una sección: /admin?section=glpi.
+    inject(ActivatedRoute, { optional: true })?.queryParamMap.pipe(takeUntilDestroyed()).subscribe((params) => {
+      const section = params.get('section') as AdminSection | null;
+      if (section && NAV.some((group) => group.items.some((item) => item.id === section))) this.go(section);
+    });
   }
 
   /** El buscador filtra por nombre de sección o de grupo, sin tildes. */

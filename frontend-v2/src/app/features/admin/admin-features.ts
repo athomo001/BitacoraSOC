@@ -15,7 +15,7 @@ const KNOWN: Record<string, { name: MessageKey; desc: MessageKey; available: boo
   allow_purge: { name: 'features.allow_purge.name', desc: 'features.allow_purge.desc', available: true },
   complements: { name: 'features.complements.name', desc: 'features.complements.desc', available: true },
   zabbix_inbound: { name: 'features.zabbix_inbound.name', desc: 'features.zabbix_inbound.desc', available: false },
-  glpi_sync: { name: 'features.glpi_sync.name', desc: 'features.glpi_sync.desc', available: false },
+  glpi_sync: { name: 'features.glpi_sync.name', desc: 'features.glpi_sync.desc', available: true },
 };
 
 /** Funcionalidades que se administran en Módulos y no se repiten acá. */

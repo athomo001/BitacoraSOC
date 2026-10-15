@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/glpi"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/middleware"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/problemdetails"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/repository/db"
@@ -317,6 +318,8 @@ type inventoryRowDTO struct {
 	PlaceName  *string           `json:"placeName,omitempty"`
 	FirstIP    string            `json:"firstIp"`
 	IPCount    int32             `json:"ipCount"`
+	// GlpiID: el equipo viene de GLPI (9.6).
+	GlpiID *int32 `json:"glpiId,omitempty"`
 }
 
 func attrs(raw []byte) map[string]string {
@@ -346,7 +349,8 @@ func (h *InventoryHandler) List(w http.ResponseWriter, r *http.Request) {
 			areas = nil // sin áreas propias (admin): «mi área» es todo
 		}
 	}
-	params := db.ListInventoryParams{Areas: areas, Kind: queryText(q.Get("kind")), Q: queryText(strings.TrimSpace(q.Get("q"))), IncludeInactive: q.Get("inactive") == "true"}
+	params := db.ListInventoryParams{Areas: areas, Kind: queryText(q.Get("kind")), Q: queryText(strings.TrimSpace(q.Get("q"))), IncludeInactive: q.Get("inactive") == "true",
+		OnlyGlpi: q.Get("source") == "glpi"}
 	if !acc.viewAll && len(areas) == 0 {
 		writeData(w, http.StatusOK, []inventoryRowDTO{})
 		return
@@ -359,7 +363,7 @@ func (h *InventoryHandler) List(w http.ResponseWriter, r *http.Request) {
 	out := make([]inventoryRowDTO, 0, len(rows))
 	for _, a := range rows {
 		out = append(out, inventoryRowDTO{ID: a.ID, Name: a.Name, Code: a.Code, Kind: kindOf(a.KindCode, a.Type), AreaID: a.AreaID, AreaName: a.AreaName,
-			Serial: textPtr(a.Serial), Model: textPtr(a.Model), Attributes: attrs(a.Attributes), Active: a.Active, PlaceName: textPtr(a.PlaceName), FirstIP: a.FirstIp, IPCount: a.IpCount})
+			Serial: textPtr(a.Serial), Model: textPtr(a.Model), Attributes: attrs(a.Attributes), Active: a.Active, PlaceName: textPtr(a.PlaceName), FirstIP: a.FirstIp, IPCount: a.IpCount, GlpiID: int4Ptr(a.GlpiID)})
 	}
 	writeData(w, http.StatusOK, out)
 }
@@ -437,6 +441,14 @@ type inventoryDetailDTO struct {
 	PendingRequest    *assetRequestDTO      `json:"pendingRequest,omitempty"`
 	CanEdit           bool                  `json:"canEdit"`
 	CanDecide         bool                  `json:"canDecide"`
+	// Glpi: de qué ítem de GLPI viene (9.6); sus campos los actualiza GLPI.
+	Glpi *assetGlpiDTO `json:"glpi,omitempty"`
+}
+
+type assetGlpiDTO struct {
+	Itemtype string `json:"itemtype"`
+	ID       int32  `json:"id"`
+	URL      string `json:"url,omitempty"`
 }
 
 // loadAssetFor lee el equipo y corta con 404 si el usuario no lo ve.
@@ -474,6 +486,12 @@ func (h *InventoryHandler) detail(ctx context.Context, a db.GetInventoryAssetRow
 		Attributes: attrs(a.Attributes), Extra: attrs(a.Metadata), Active: a.Active,
 		IPs: []assetIPDTO{}, Responsibles: []assetResponsibleDTO{}, Events: []assetEventDTO{}, Tickets: []assetTicketDTO{},
 		CanEdit: acc.canEdit(areas), CanDecide: acc.canDecide(a.AreaID)}
+	if a.GlpiID.Valid {
+		d.Glpi = &assetGlpiDTO{Itemtype: a.GlpiItemtype.String, ID: a.GlpiID.Int32}
+		if cfg, err := h.Queries.GetGlpiConfig(ctx); err == nil {
+			d.Glpi.URL = glpi.WebURL(cfg.ApiUrl, a.GlpiItemtype.String, int(a.GlpiID.Int32))
+		}
+	}
 	ips, err := h.Queries.ListAssetIPs(ctx, a.ID)
 	if err != nil {
 		return d, err

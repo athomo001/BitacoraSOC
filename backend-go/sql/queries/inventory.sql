@@ -26,7 +26,7 @@ RETURNING *;
 -- name: ListInventory :many
 -- La lista: los equipos de las áreas dadas (dueña o responsable); nil = todos.
 SELECT a.id, a.name, a.code, a.kind_code, a.type, a.area_id, ar.name AS area_name, a.serial, a.model,
-  a.attributes, a.active, tu.name AS place_name,
+  a.attributes, a.active, tu.name AS place_name, a.glpi_id,
   COALESCE((SELECT host(i.address) FROM asset_ips i WHERE i.asset_id = a.id ORDER BY i.sort_order LIMIT 1), '')::text AS first_ip,
   (SELECT count(*) FROM asset_ips i WHERE i.asset_id = a.id)::int AS ip_count
 FROM assets a
@@ -36,6 +36,7 @@ WHERE (sqlc.narg('areas')::uuid[] IS NULL OR a.area_id = ANY(sqlc.narg('areas'):
        OR EXISTS (SELECT 1 FROM asset_responsibles r WHERE r.asset_id = a.id AND r.area_id = ANY(sqlc.narg('areas')::uuid[])))
   AND (sqlc.narg('kind')::text IS NULL OR a.kind_code = sqlc.narg('kind')::text)
   AND (sqlc.arg('include_inactive')::bool OR a.active)
+  AND (NOT sqlc.arg('only_glpi')::bool OR a.glpi_id IS NOT NULL)
   AND (sqlc.narg('q')::text IS NULL
        OR a.name ILIKE '%' || sqlc.narg('q')::text || '%' OR a.code ILIKE '%' || sqlc.narg('q')::text || '%'
        OR a.serial ILIKE '%' || sqlc.narg('q')::text || '%'
@@ -46,7 +47,8 @@ LIMIT 1000;
 -- name: GetInventoryAsset :one
 SELECT a.id, a.name, a.code, a.kind_code, a.type, a.area_id, ar.name AS area_name, ar.code AS area_code,
   a.serial, a.model, a.rack, a.rack_position, a.attributes, a.metadata, a.active,
-  a.territorial_unit_id, tu.name AS place_name, a.client_id, o.name AS client_name, a.created_at, a.updated_at
+  a.territorial_unit_id, tu.name AS place_name, a.client_id, o.name AS client_name, a.created_at, a.updated_at,
+  a.glpi_itemtype, a.glpi_id
 FROM assets a
 JOIN areas ar ON ar.id = a.area_id
 LEFT JOIN territorial_units tu ON tu.id = a.territorial_unit_id

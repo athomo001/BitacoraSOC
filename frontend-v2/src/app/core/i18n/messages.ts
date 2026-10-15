@@ -13,6 +13,7 @@ import type { MapKey } from './packs/map';
 import type { InventoryKey } from './packs/inventory';
 import type { AgendaKey } from './packs/agenda';
 import type { NotificationsKey } from './packs/notifications';
+import type { GlpiKey } from './packs/glpi';
 
 const ES = {
   'nav.entries': 'Bitácora',
@@ -236,7 +237,8 @@ export type MessageKey =
   | MapKey
   | InventoryKey
   | AgendaKey
-  | NotificationsKey;
+  | NotificationsKey
+  | GlpiKey;
 
 /**
  * El inglés va en messages-en.ts y se descarga solo al cambiar a EN: así no

@@ -62,6 +62,19 @@ describe('Inventario (9.2)', () => {
 
   const button = (el: HTMLElement, text: string) => [...el.querySelectorAll('button')].find((b) => b.textContent?.includes(text)) as HTMLButtonElement;
 
+  it('un equipo de GLPI: aviso con enlace, nube en lo que trae GLPI y no en lo de la Bitácora', async () => {
+    const { el } = await render(asset({
+      glpi: { itemtype: 'Computer', id: 1042, url: 'https://glpi.netics.cl/front/computer.form.php?id=1042' }, rack: 'DC1-R06',
+      events: [{ id: 'e2', kind: 'glpi', description: 'RAM (GB): 64 → 128', happenedAt: '2026-10-15T05:00:00Z' }],
+    }));
+    const panel = el.querySelector('.iv__panel')!;
+    expect(panel.querySelector('.iv__glpibar')!.textContent).toContain('GLPI #1042');
+    expect(panel.querySelector<HTMLAnchorElement>('.iv__glpibar a')!.href).toContain('computer.form.php?id=1042');
+    // SO, versión y RAM, más las 2 IP de red: 5 nubes. VIP, iLO y rack son de la Bitácora.
+    expect(panel.querySelectorAll('.iv__cloud').length).toBe(5);
+    expect(panel.textContent).toContain('cloud_download');
+  });
+
   it('lista y ficha: campos del tipo, varias IP, responsables e historial', async () => {
     const { el } = await render();
     const row = el.querySelector('.iv__row[aria-current="true"]')!;

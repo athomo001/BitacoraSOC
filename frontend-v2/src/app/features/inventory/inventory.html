@@ -26,6 +26,9 @@
         @for (k of kindsInList(); track k.code) {
           <button type="button" class="seg" [attr.aria-pressed]="kindFilter() === k.code" (click)="setKind(k.code)"><mat-icon>{{ k.icon }}</mat-icon>{{ k.name }}</button>
         }
+        @if (glpiOn()) {
+          <button type="button" class="seg" [attr.aria-pressed]="glpiOnly()" (click)="toggleGlpi()"><mat-icon>cloud_download</mat-icon>{{ i18n.t('inv.glpi.only') }}</button>
+        }
         <label class="iv__search adm-push">
           <mat-icon>search</mat-icon>
           <input #q type="search" name="invSearch" [placeholder]="i18n.t('inv.search')" [attr.aria-label]="i18n.t('inv.search')" (change)="search(q.value)" />
@@ -37,7 +40,7 @@
       </div>
       @for (r of visibleRows(); track r.id) {
         <button type="button" class="iv__row" [attr.aria-current]="r.id === selectedId()" [class.iv__row--off]="!r.active" (click)="select(r.id)">
-          <span class="iv__cell"><b>{{ r.name }}</b><span class="iv__sub mono">{{ r.serial || r.code }}</span></span>
+          <span class="iv__cell"><b>{{ r.name }}</b><span class="iv__sub mono">{{ r.serial || r.code }}@if (r.glpiId) { · <span class="iv__glpi">GLPI #{{ r.glpiId }}</span> }</span></span>
           <span><span class="pill tone-neutral"><mat-icon>{{ kindIcon(r.kind) }}</mat-icon>{{ kindName(r.kind) }}</span></span>
           <span class="iv__cell">{{ system(r) }}</span>
           <span class="iv__cell mono">{{ r.firstIp || '—' }}@if (r.ipCount > 1) { <span class="iv__sub">{{ i18n.tf('inv.moreIps', r.ipCount - 1) }}</span> }</span>
@@ -116,6 +119,12 @@
                   <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy() || !askReason().trim()" (click)="sendRequest()">{{ i18n.t('inv.askSend') }} ({{ actionLabel(act) }})</button></span>
               </div>
             }
+            @if (a.glpi; as g) {
+              <p class="iv__glpibar"><mat-icon>cloud_download</mat-icon>
+                <span>{{ i18n.tf('inv.glpi.banner', g.id) }}
+                  @if (g.url) { <a [href]="g.url" target="_blank" rel="noopener">{{ i18n.t('inv.glpi.open') }}</a> }</span>
+              </p>
+            }
             @if (a.pendingRequest; as p) {
               <p class="iv__pending"><mat-icon>hourglass_top</mat-icon>{{ i18n.tf('inv.pendingRequest', actionLabel(p.action)) }} · {{ p.requestedByName }}: {{ p.reason }}</p>
             }
@@ -124,12 +133,12 @@
               @if (fields().length) {
                 <span class="adm-label">{{ i18n.tf('inv.sec.fields', kindName(a.kind).toLowerCase()) }}</span>
                 <dl class="iv__facts">
-                  @for (f of fields(); track f.key) { <dt>{{ f.label }}</dt><dd>{{ a.attributes[f.key] }}</dd> }
+                  @for (f of fields(); track f.key) { <dt>{{ f.label }}</dt><dd>{{ a.attributes[f.key] }}@if (fromGlpi(f.key)) { <mat-icon class="iv__cloud" [attr.title]="i18n.t('inv.glpi.field')">cloud</mat-icon> }</dd> }
                 </dl>
               }
               <span class="adm-label">{{ i18n.t('inv.sec.ips') }}</span>
               <dl class="iv__facts">
-                @for (ip of a.ips; track $index) { <dt>{{ i18n.t(ipLabel(ip.kind)) }}</dt><dd><span class="mono">{{ ip.address }}</span>@if (ip.note) { <span class="adm-secondary"> · {{ ip.note }}</span> }</dd> }
+                @for (ip of a.ips; track $index) { <dt>{{ i18n.t(ipLabel(ip.kind)) }}</dt><dd><span class="mono">{{ ip.address }}</span>@if (ip.note) { <span class="adm-secondary"> · {{ ip.note }}</span> }@if (a.glpi && ip.kind === 'network') { <mat-icon class="iv__cloud" [attr.title]="i18n.t('inv.glpi.field')">cloud</mat-icon> }</dd> }
                 @empty { <dd class="adm-secondary">{{ i18n.t('inv.noIps') }}</dd> }
               </dl>
               <span class="adm-label">{{ i18n.t('inv.sec.responsibles') }}</span>
@@ -142,10 +151,10 @@
               <span class="adm-label">{{ i18n.t('inv.sec.ident') }}</span>
               <dl class="iv__facts">
                 <dt>{{ i18n.t('inv.f.code') }}</dt><dd class="mono">{{ a.code }}</dd>
-                @if (a.model) { <dt>{{ i18n.t('inv.f.model') }}</dt><dd>{{ a.model }}</dd> }
-                @if (a.serial) { <dt>{{ i18n.t('inv.f.serial') }}</dt><dd class="mono">{{ a.serial }}</dd> }
-                @if (a.clientName) { <dt>{{ i18n.t('inv.f.client') }}</dt><dd>{{ a.clientName }}</dd> }
-                @if (a.placeName) { <dt>{{ i18n.t('inv.f.place') }}</dt><dd>{{ a.placeName }}</dd> }
+                @if (a.model) { <dt>{{ i18n.t('inv.f.model') }}</dt><dd>{{ a.model }}@if (a.glpi) { <mat-icon class="iv__cloud" [attr.title]="i18n.t('inv.glpi.field')">cloud</mat-icon> }</dd> }
+                @if (a.serial) { <dt>{{ i18n.t('inv.f.serial') }}</dt><dd><span class="mono">{{ a.serial }}</span>@if (a.glpi) { <mat-icon class="iv__cloud" [attr.title]="i18n.t('inv.glpi.field')">cloud</mat-icon> }</dd> }
+                @if (a.clientName) { <dt>{{ i18n.t('inv.f.client') }}</dt><dd>{{ a.clientName }}@if (a.glpi) { <mat-icon class="iv__cloud" [attr.title]="i18n.t('inv.glpi.field')">cloud</mat-icon> }</dd> }
+                @if (a.placeName) { <dt>{{ i18n.t('inv.f.place') }}</dt><dd>{{ a.placeName }}@if (a.glpi) { <mat-icon class="iv__cloud" [attr.title]="i18n.t('inv.glpi.field')">cloud</mat-icon> }</dd> }
                 @if (a.rack || a.rackPosition) { <dt>{{ i18n.t('inv.f.rack') }}</dt><dd>{{ a.rack }}@if (a.rackPosition) { · {{ a.rackPosition }} }</dd> }
               </dl>
               @if (extraList().length) {

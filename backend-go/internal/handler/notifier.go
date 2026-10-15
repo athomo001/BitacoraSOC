@@ -28,6 +28,7 @@ const (
 	NotifTicketDerived  = "ticket.derived"
 	NotifTicketComment  = "ticket.comment"
 	NotifInventoryReq   = "inventory.request"
+	NotifGlpiImport     = "glpi.import"
 	NotifWindow         = "window"
 	NotifNotice         = "notice"
 )
@@ -54,6 +55,8 @@ var notifKinds = []notifKind{
 	{NotifTicketDerived, false, false, false, true},
 	{NotifTicketComment, false, false, false, true},
 	{NotifInventoryReq, true, false, false, true},
+	// Importación automática desde GLPI que falló o retuvo bajas (solo admin).
+	{NotifGlpiImport, true, false, false, true},
 	{NotifWindow, false, false, false, true},
 	// El aviso con acuse se muestra como ventana: no tiene emergente ni correo propio.
 	{NotifNotice, false, false, false, false},

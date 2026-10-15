@@ -28,6 +28,7 @@ type Querier interface {
 	AppendWaitingComment(ctx context.Context, arg AppendWaitingCommentParams) (int64, error)
 	// Solo si ya no tiene servicios, equipos ni activos; el código queda libre.
 	ArchiveOrganization(ctx context.Context, id uuid.UUID) (int64, error)
+	AssetCodeTaken(ctx context.Context, code string) (bool, error)
 	// 409 de spec/04-contratos-api.md: la IP de un activo es su identidad operativa.
 	AssetIPTaken(ctx context.Context, arg AssetIPTakenParams) (bool, error)
 	AssignShiftEndTemplate(ctx context.Context, arg AssignShiftEndTemplateParams) error
@@ -116,6 +117,7 @@ type Querier interface {
 	CreateEntryComment(ctx context.Context, arg CreateEntryCommentParams) (EntryComment, error)
 	CreateEscalationIncident(ctx context.Context, arg CreateEscalationIncidentParams) (EscalationIncident, error)
 	CreateEscalationPool(ctx context.Context, arg CreateEscalationPoolParams) (EscalationPool, error)
+	CreateGlpiRun(ctx context.Context, arg CreateGlpiRunParams) (uuid.UUID, error)
 	CreateGuardCycle(ctx context.Context, arg CreateGuardCycleParams) (uuid.UUID, error)
 	CreateGuardSlot(ctx context.Context, arg CreateGuardSlotParams) (RotationSlot, error)
 	// Una guardia nueva (9e): el equipo "oncall" con su área dueña.
@@ -270,6 +272,7 @@ type Querier interface {
 	FindTeamMemberByUser(ctx context.Context, arg FindTeamMemberByUserParams) (uuid.UUID, error)
 	// usuario del CSV del legacy: username, correo o nombre completo.
 	FindUserForGuardImport(ctx context.Context, q_ string) (FindUserForGuardImportRow, error)
+	FinishGlpiRun(ctx context.Context, arg FinishGlpiRunParams) error
 	// POST /api/users/force-reset-all — usuarios internos = no invitados
 	// (is_guest=false), activos. Devuelve los afectados para poder notificarlos
 	// por correo sin una segunda consulta.
@@ -312,6 +315,8 @@ type Querier interface {
 	GetEntry(ctx context.Context, id uuid.UUID) (GetEntryRow, error)
 	GetEscalationIncident(ctx context.Context, id uuid.UUID) (GetEscalationIncidentRow, error)
 	GetEscalationPool(ctx context.Context, id uuid.UUID) (EscalationPool, error)
+	// Importación desde GLPI (spec/16 §5.1, 9.6, 000043).
+	GetGlpiConfig(ctx context.Context) (GlpiConfig, error)
 	GetGuardCycle(ctx context.Context, id uuid.UUID) (GetGuardCycleRow, error)
 	GetGuardSlot(ctx context.Context, id uuid.UUID) (RotationSlot, error)
 	GetInventoryAsset(ctx context.Context, id uuid.UUID) (GetInventoryAssetRow, error)
@@ -472,6 +477,8 @@ type Querier interface {
 	// ip_address es INET: se lee y escribe como texto (::text / ::inet) para que
 	// el tipo Go sea string y Postgres valide el formato (IPv4/IPv6) al insertar.
 	ListAssets(ctx context.Context, arg ListAssetsParams) ([]ListAssetsRow, error)
+	// Equipos creados en la app (sin vínculo con GLPI) con alguna de estas series.
+	ListAssetsBySerial(ctx context.Context, serials []string) ([]ListAssetsBySerialRow, error)
 	// Fase 8 del roadmap: matriz semanal de dotación/teletrabajo
 	// (work_shift_assignments), enlace público de solo lectura para TV
 	// (public_share_links) y notificación periódica a RRHH
@@ -546,6 +553,9 @@ type Querier interface {
 	ListEscalationPools(ctx context.Context) ([]ListEscalationPoolsRow, error)
 	// Copias automáticas fuera de la retención: el planificador las borra (archivo y fila).
 	ListExpiredAutoBackups(ctx context.Context, startedAt pgtype.Timestamptz) ([]BackupRun, error)
+	// Los equipos que vienen de GLPI (activos o no).
+	ListGlpiLinkedAssets(ctx context.Context) ([]ListGlpiLinkedAssetsRow, error)
+	ListGlpiRuns(ctx context.Context) ([]ListGlpiRunsRow, error)
 	// Las áreas de varios grupos de una vez (para listarlos sin N consultas).
 	ListGroupAreaCodes(ctx context.Context, groupIds []uuid.UUID) ([]ListGroupAreaCodesRow, error)
 	// Guardias en línea de tiempo (000029, canvas "Turnos: guardias"): los
@@ -758,6 +768,8 @@ type Querier interface {
 	// Al eliminar un ticket (comentario del dueño #20) la entrada de la
 	// bitácora se queda: un comentario de sistema deja constancia del ticket.
 	MarkEntriesOfDeletedTicket(ctx context.Context, arg MarkEntriesOfDeletedTicketParams) error
+	MarkGlpiAutoRun(ctx context.Context, at pgtype.Timestamptz) error
+	MarkGlpiFailureNotified(ctx context.Context, day pgtype.Date) error
 	MarkNoticePublished(ctx context.Context, id uuid.UUID) error
 	MarkNoticeRead(ctx context.Context, arg MarkNoticeReadParams) (int64, error)
 	MarkNoticeReminded(ctx context.Context, noticeID uuid.UUID) error
@@ -814,6 +826,7 @@ type Querier interface {
 	// movió de padre) — incluidos los sitios agregados a mano que el dataset
 	// no conoce y por lo tanto no vuelve a upsertear.
 	RebaseTerritorialSubtree(ctx context.Context, arg RebaseTerritorialSubtreeParams) error
+	RecordGlpiTest(ctx context.Context, arg RecordGlpiTestParams) error
 	RecordSMTPTest(ctx context.Context, arg RecordSMTPTestParams) error
 	RegisterFailedLogin(ctx context.Context, id uuid.UUID) (int32, error)
 	// Re-hash oportunista en login (spec/07-backend-arquitectura-go.md sección
@@ -848,6 +861,9 @@ type Querier interface {
 	RotatePublicShareLink(ctx context.Context, arg RotatePublicShareLinkParams) (PublicShareLink, error)
 	SetAgendaTaskActive(ctx context.Context, arg SetAgendaTaskActiveParams) (int64, error)
 	SetAssetActive(ctx context.Context, arg SetAssetActiveParams) error
+	SetAssetGlpiLink(ctx context.Context, arg SetAssetGlpiLinkParams) error
+	// removed=true: dado de baja porque desapareció de GLPI; false: volvió.
+	SetAssetGlpiRemoved(ctx context.Context, arg SetAssetGlpiRemovedParams) error
 	SetBrandingFavicon(ctx context.Context, arg SetBrandingFaviconParams) error
 	SetBrandingFont(ctx context.Context, arg SetBrandingFontParams) error
 	SetBrandingLogo(ctx context.Context, arg SetBrandingLogoParams) error
@@ -930,6 +946,7 @@ type Querier interface {
 	UpdateContact(ctx context.Context, arg UpdateContactParams) (int64, error)
 	UpdateEntryTicket(ctx context.Context, arg UpdateEntryTicketParams) (Entry, error)
 	UpdateEscalationPool(ctx context.Context, arg UpdateEscalationPoolParams) (EscalationPool, error)
+	UpdateGlpiConfig(ctx context.Context, arg UpdateGlpiConfigParams) error
 	UpdateGroupedNotification(ctx context.Context, arg UpdateGroupedNotificationParams) error
 	UpdateGuardCycle(ctx context.Context, arg UpdateGuardCycleParams) (RotationCycle, error)
 	UpdateGuardSlot(ctx context.Context, arg UpdateGuardSlotParams) (RotationSlot, error)

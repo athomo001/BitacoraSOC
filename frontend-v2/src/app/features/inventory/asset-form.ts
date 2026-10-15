@@ -31,6 +31,7 @@ type WhoKind = 'area' | 'person' | 'org';
       </div>
 
       <div class="af__body">
+        @if (asset()?.glpi) { <p class="adm-hint af__glpi"><mat-icon>cloud_download</mat-icon>{{ i18n.t('inv.glpi.formHint') }}</p> }
         <div class="adm-field">
           <span class="adm-label">{{ i18n.t('inv.f.kind') }}</span>
           <div class="af__kinds">
@@ -155,6 +156,8 @@ type WhoKind = 'area' | 'person' | 'org';
     .af__head { padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); }
     .af__body { display: flex; flex-direction: column; gap: 10px; padding: 12px 16px 16px; }
     .af__sec { margin-top: 6px; }
+    .af__glpi { display: flex; gap: 6px; align-items: flex-start; margin: 0; }
+    .af__glpi mat-icon { flex: none; width: 15px; height: 15px; font-size: 15px; color: var(--status-carrier); }
     .af__kinds { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
     .af__kind { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; border: 2px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-app); color: var(--text-primary); font: inherit; font-size: 11.5px; cursor: pointer; }
     .af__kind mat-icon { width: 20px; height: 20px; font-size: 20px; color: var(--text-secondary); }

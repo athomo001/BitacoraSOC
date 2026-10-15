@@ -116,6 +116,7 @@ Todo esto está en **Administración** (solo administradores) y queda registrado
 | **Marca** | Nombre, logo, favicon y fuente. |
 | **Módulos** | SOC, NOC y Ticketera. |
 | **Funcionalidades** | Interruptores de funciones opcionales (sección 4). |
+| **GLPI** | Solo con `glpi_sync` encendida. Conexión (URL de `apirest.php`, App-Token, User-Token, validar TLS, tiempo de espera) y prueba; qué se trae (computadores, equipos de red), tipo de computador → tipo de equipo, área dueña, entidad → cliente o «No importar»; importación automática (apagada, cada noche a las 02:00 o cada 6 horas); «Revisar ahora» → «Importar» y el historial de importaciones. |
 | **Respaldos** | Copias manuales y automáticas, destino, retención, restauración, exportación delta y purga. |
 | **Auditoría** | Consulta y exportación del registro de eventos. |
 | **Complementos** | Subir, publicar y administrar mini-aplicaciones. |
@@ -144,4 +145,6 @@ SOC y NOC son **áreas**: se encienden en *Administración → Áreas y niveles*
 | `complements` | Complementos | Mini-aplicaciones embebidas. Apagada corta el menú, la administración y su API. |
 | `allow_purge` | Permitir purga | Muestra "Purgar base de datos" en Respaldos. **Solo para ambientes de prueba.** |
 | `zabbix_inbound` | Ingesta de alertas Zabbix | Reservada para después del corte. |
-| `glpi_sync` | Sincronización con GLPI | Reservada para después del corte. |
+| `glpi_sync` | Sincronización con GLPI | Importa computadores y equipos de red desde GLPI al Inventario (*Administración → GLPI*). Solo lee de GLPI. |
+
+**Preparar GLPI** (una vez): en GLPI, *Configuración → General → API*, prender «API REST» e «Inicio de sesión con token externo» y crear un cliente de API con la IP del servidor de la Bitácora (de ahí sale el App-Token). Crear un usuario de solo lectura con un perfil que vea Computadores y Equipos de red en todas las entidades (recursivo); su token sale de *Preferencias → Claves de acceso remoto*. Los tokens se guardan cifrados con la llave de la instalación.

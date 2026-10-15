@@ -47,6 +47,8 @@ export interface InventoryRow {
   placeName?: string;
   firstIp: string;
   ipCount: number;
+  /** Viene de GLPI (9.6). */
+  glpiId?: number;
 }
 
 export type IpKind = 'network' | 'vip' | 'management' | 'other';
@@ -66,7 +68,7 @@ export interface AssetResponsible {
 
 export interface AssetEvent {
   id: string;
-  kind: 'created' | 'edited' | 'work' | 'ticket' | 'import' | 'deactivated' | 'reactivated';
+  kind: 'created' | 'edited' | 'work' | 'ticket' | 'import' | 'glpi' | 'deactivated' | 'reactivated';
   description: string;
   happenedAt: string;
   userName?: string;
@@ -111,6 +113,8 @@ export interface InventoryAsset {
   pendingRequest?: AssetRequest;
   canEdit: boolean;
   canDecide: boolean;
+  /** De qué ítem de GLPI viene: sus campos los actualiza cada importación. */
+  glpi?: { itemtype: 'Computer' | 'NetworkEquipment'; id: number; url?: string };
 }
 
 /** Lo que se manda al crear o editar. */
@@ -154,12 +158,13 @@ export class InventoryService {
     return (await firstValueFrom(this.http.get<ApiEnvelope<InventoryMeta>>('/api/inventory/meta'))).data;
   }
 
-  async list(filters: { scope?: 'mine' | 'all'; kind?: string; q?: string; inactive?: boolean } = {}): Promise<InventoryRow[]> {
+  async list(filters: { scope?: 'mine' | 'all'; kind?: string; q?: string; inactive?: boolean; glpi?: boolean } = {}): Promise<InventoryRow[]> {
     let params = new HttpParams();
     if (filters.scope) params = params.set('scope', filters.scope);
     if (filters.kind) params = params.set('kind', filters.kind);
     if (filters.q?.trim()) params = params.set('q', filters.q.trim());
     if (filters.inactive) params = params.set('inactive', 'true');
+    if (filters.glpi) params = params.set('source', 'glpi');
     return (await firstValueFrom(this.http.get<ApiEnvelope<InventoryRow[]>>('/api/inventory', { params }))).data;
   }
 
