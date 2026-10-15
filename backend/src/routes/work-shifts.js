@@ -469,6 +469,12 @@ router.delete('/:id',
         return res.status(404).json({ error: 'Turno no encontrado' });
       }
 
+      // Desactivar vinculaciones operativas del turno eliminado (evita workShiftId null tras populate)
+      await WorkShiftAssignment.updateMany(
+        { workShiftId: shift._id, active: true },
+        { $set: { active: false } }
+      );
+
       logger.info('Work shift deleted:', { shiftId: shift._id, code: shift.code });
 
       // Auditar eliminación de turno

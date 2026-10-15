@@ -2,6 +2,16 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.11.4] - 2026-10-15
+
+### La pestaña Turnos de la Consola Administrativa dejaba de cargar tras eliminar un usuario o un turno (`/main/admin/work-shifts`)
+
+- **Bugfix (Frontend) — "Error al cargar datos operativos" y la vista de Turnos vacía**: cuando una vinculación operativa (`WorkShiftAssignment`) seguía activa apuntando a un usuario eliminado, el `populate` del backend devolvía `userId: null`. `rebuildOperationalRows()` y `getUserName()` (`work-shifts-admin.component.ts`) distinguían "poblado vs. ID" con `typeof x === 'object'`, que en JavaScript también es verdadero para `null`, y al leer `null._id` abortaban la carga completa de la pestaña (resumen semanal, turnos próximos y gestión de asignaciones quedaban vacíos, y la consola se llenaba de errores porque `getUserName()` se evalúa desde el template). Ahora ambas funciones toleran referencias nulas: la vinculación huérfana se muestra como **"Usuario eliminado"** en Vinculaciones Operativas, donde puede desvincularse con el botón existente.
+- **Bugfix (Backend) — Eliminar un usuario o un turno dejaba sus vinculaciones operativas activas**: `DELETE /api/users/:id` y `DELETE /api/work-shifts/:id` borraban el documento sin tocar `WorkShiftAssignment`, lo que originaba el problema anterior. Además, en el recordatorio de inicio de turno (`shiftReminderScheduler.js`) esas vinculaciones huérfanas seguían contando como activas: el turno no tenía destinatarios válidos y tampoco se usaba el fallback legacy (`assignedUserIds`), por lo que **el recordatorio podía no enviarse a nadie**. Ahora ambas eliminaciones desactivan (`active: false`) las vinculaciones asociadas, y la auditoría `admin.users.delete` registra cuántas se desactivaron (`deactivatedWorkShiftAssignments`).
+  - Las vinculaciones huérfanas creadas antes de esta versión no se corrigen solas: deben desvincularse una vez desde Vinculaciones Operativas (aparecen como "Usuario eliminado").
+
+---
+
 ## [v1.11.3] - 2026-08-31
 
 ### Enlace público de solo lectura para "Personal en Teletrabajo y Apoyo" (`/main/escalation/view`)
