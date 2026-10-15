@@ -458,8 +458,11 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
       .filter(asg => asg.active !== false && asg.workShiftId)
       .map(asg => {
         const shiftId = typeof asg.workShiftId === 'object' ? asg.workShiftId._id : asg.workShiftId;
-        const userId = typeof asg.userId === 'object' ? asg.userId._id : asg.userId;
-        const analystName = typeof asg.userId === 'object' ? asg.userId.fullName : this.getLoadedUserName(userId);
+        // userId puede venir null si el usuario fue eliminado (populate sin match)
+        const userId = asg.userId && typeof asg.userId === 'object' ? asg.userId._id : asg.userId;
+        const analystName = !asg.userId
+          ? 'Usuario eliminado'
+          : typeof asg.userId === 'object' ? asg.userId.fullName : this.getLoadedUserName(userId);
         const shiftData = typeof asg.workShiftId === 'object' ? asg.workShiftId : this.shifts.find(s => s._id === shiftId);
 
         return {
@@ -2871,7 +2874,7 @@ export class WorkShiftsAdminComponent implements OnInit, OnDestroy {
 
   getUserName(shift: WorkShift): string {
     const assignedIds = this.assignments
-      .filter(a => a.active !== false && (typeof a.workShiftId === 'object' ? a.workShiftId._id === shift._id : a.workShiftId === shift._id))
+      .filter(a => a.active !== false && a.userId && (typeof a.workShiftId === 'object' ? a.workShiftId?._id === shift._id : a.workShiftId === shift._id))
       .map(a => typeof a.userId === 'object' ? a.userId._id : a.userId);
 
     if (assignedIds.length === 0) {

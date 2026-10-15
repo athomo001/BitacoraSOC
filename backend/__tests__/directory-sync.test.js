@@ -23,12 +23,12 @@ describe('directory-sync cleanup helpers', () => {
     DirectoryContact.deleteMany.mockResolvedValue({ deletedCount: 1 });
 
     const deletedCount = await removeDirectoryContactsForUser({
-      email: '  Areyes@Netics.CL '
+      email: '  Areyes@Ejemplo.CL '
     });
 
     expect(DirectoryContact.deleteMany).toHaveBeenCalledWith({
       source: 'User',
-      emailHash: 'hash:areyes@netics.cl'
+      emailHash: 'hash:areyes@ejemplo.cl'
     });
     expect(deletedCount).toBe(1);
   });
@@ -39,7 +39,7 @@ describe('directory-sync cleanup helpers', () => {
 
     const deletedCount = await purgeStaleUserDirectoryContacts([
       { email: 'analista1@soc.local' },
-      { email: '  areyes@netics.cl ' }
+      { email: '  areyes@ejemplo.cl ' }
     ]);
 
     expect(DirectoryContact.deleteMany).toHaveBeenCalledWith({
@@ -47,7 +47,7 @@ describe('directory-sync cleanup helpers', () => {
       $or: [
         { emailHash: { $exists: false } },
         { emailHash: '' },
-        { emailHash: { $nin: ['hash:analista1@soc.local', 'hash:areyes@netics.cl'] } }
+        { emailHash: { $nin: ['hash:analista1@soc.local', 'hash:areyes@ejemplo.cl'] } }
       ]
     });
     expect(deletedCount).toBe(2);

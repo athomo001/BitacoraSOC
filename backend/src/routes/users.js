@@ -12,6 +12,7 @@ const router = express.Router();
 const { body } = require('express-validator');
 const User = require('../models/User');
 const AppConfig = require('../models/AppConfig');
+const WorkShiftAssignment = require('../models/WorkShiftAssignment');
 const { authenticate, authorize } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const { audit } = require('../utils/audit');
@@ -774,6 +775,13 @@ router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
     await removeDirectoryContactsForUser(user);
     await removeContactFromEscalationFlows({ name: user.fullName, phone: user.phone });
 
+    // Desactivar vinculaciones operativas: si quedan activas, el populate devuelve userId null
+    // y rompe la vista de Turnos y el cálculo de destinatarios de recordatorios.
+    const deactivatedAssignments = await WorkShiftAssignment.updateMany(
+      { userId: user._id, active: true },
+      { $set: { active: false } }
+    );
+
     await audit(req, {
       event: 'admin.users.delete',
       level: 'warn',
@@ -782,7 +790,8 @@ router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
         targetUserId: user._id,
         targetUsername: user.username,
         targetRole: user.role,
-        targetEmail: user.email
+        targetEmail: user.email,
+        deactivatedWorkShiftAssignments: deactivatedAssignments.modifiedCount
       }
     });
 

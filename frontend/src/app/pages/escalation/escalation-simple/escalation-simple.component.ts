@@ -28,6 +28,7 @@ import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angula
 import { EscalationService, TeleworkPublicLink } from '../../../services/escalation.service';
 import { CatalogService } from '../../../services/catalog.service';
 import { AuthService } from '../../../services/auth.service';
+import { ConfigService } from '../../../services/config.service';
 import { CatalogLogSource } from '../../../models/catalog.model';
 import { ClientAlertRule, EscalationFlowConfig } from '../../../models/escalation.model';
 import { EscalationFlowPreviewComponent } from '../shared/escalation-flow-preview.component';
@@ -158,6 +159,8 @@ export class EscalationSimpleComponent implements OnInit {
   publicLink: TeleworkPublicLink | null = null;
   loadingPublicLink = false;
   generatingPublicLink = false;
+  /** Nombre de la marca (Administración → Marca) para la cabecera impresa. */
+  brandName = 'Bitácora SOC';
 
   constructor(
     private escalationService: EscalationService,
@@ -165,7 +168,8 @@ export class EscalationSimpleComponent implements OnInit {
     private snackBar: MatSnackBar,
     private cdr: ChangeDetectorRef,
     private fb: FormBuilder,
-    private authService: AuthService
+    private authService: AuthService,
+    private configService: ConfigService
   ) {
     this.maintenanceForm = this.fb.group({
       clientId: [null],
@@ -181,6 +185,16 @@ export class EscalationSimpleComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.configService.getLogo().subscribe({
+      next: (cfg) => {
+        const title = (cfg?.appTitle || '').trim();
+        if (title) {
+          this.brandName = title;
+          this.cdr.markForCheck();
+        }
+      },
+      error: () => undefined
+    });
     this.setCurrentWeek();
     this.loadEscalationView();
     this.loadRaciClients();
@@ -1054,7 +1068,7 @@ export class EscalationSimpleComponent implements OnInit {
     const headerHtml = `
       <div class="print-only-header">
         <div class="print-header-top">
-          <span class="print-brand">CDC Netics · Control Interno</span>
+          <span class="print-brand">${this.escapeHtml(this.brandName)} · Control Interno</span>
           <span class="print-date">Generado el ${this.escapeHtml(this.getTodayDateFormatted())}</span>
         </div>
         <h1>Personal Fuera de la Oficina y Apoyo</h1>
@@ -1072,7 +1086,7 @@ export class EscalationSimpleComponent implements OnInit {
     const styles = `
       <html>
         <head>
-          <title>Personal Fuera de la Oficina y Apoyo - CDC Netics</title>
+          <title>Personal Fuera de la Oficina y Apoyo - ${this.escapeHtml(this.brandName)}</title>
           <link rel="preconnect" href="https://fonts.gstatic.com">
           <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
           <style>

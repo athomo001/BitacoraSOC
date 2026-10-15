@@ -2,6 +2,16 @@
 
 Registro de cambios relevantes del proyecto.
 
+## [v1.11.4] - 2026-10-15
+
+### La pestaña Turnos de la Consola Administrativa dejaba de cargar tras eliminar un usuario o un turno (`/main/admin/work-shifts`)
+
+- **Bugfix (Frontend) — "Error al cargar datos operativos" y la vista de Turnos vacía**: cuando una vinculación operativa (`WorkShiftAssignment`) seguía activa apuntando a un usuario eliminado, el `populate` del backend devolvía `userId: null`. `rebuildOperationalRows()` y `getUserName()` (`work-shifts-admin.component.ts`) distinguían "poblado vs. ID" con `typeof x === 'object'`, que en JavaScript también es verdadero para `null`, y al leer `null._id` abortaban la carga completa de la pestaña (resumen semanal, turnos próximos y gestión de asignaciones quedaban vacíos, y la consola se llenaba de errores porque `getUserName()` se evalúa desde el template). Ahora ambas funciones toleran referencias nulas: la vinculación huérfana se muestra como **"Usuario eliminado"** en Vinculaciones Operativas, donde puede desvincularse con el botón existente.
+- **Bugfix (Backend) — Eliminar un usuario o un turno dejaba sus vinculaciones operativas activas**: `DELETE /api/users/:id` y `DELETE /api/work-shifts/:id` borraban el documento sin tocar `WorkShiftAssignment`, lo que originaba el problema anterior. Además, en el recordatorio de inicio de turno (`shiftReminderScheduler.js`) esas vinculaciones huérfanas seguían contando como activas: el turno no tenía destinatarios válidos y tampoco se usaba el fallback legacy (`assignedUserIds`), por lo que **el recordatorio podía no enviarse a nadie**. Ahora ambas eliminaciones desactivan (`active: false`) las vinculaciones asociadas, y la auditoría `admin.users.delete` registra cuántas se desactivaron (`deactivatedWorkShiftAssignments`).
+  - Las vinculaciones huérfanas creadas antes de esta versión no se corrigen solas: deben desvincularse una vez desde Vinculaciones Operativas (aparecen como "Usuario eliminado").
+
+---
+
 ## [v1.11.3] - 2026-08-31
 
 ### Enlace público de solo lectura para "Personal en Teletrabajo y Apoyo" (`/main/escalation/view`)
@@ -307,7 +317,7 @@ Registro de cambios relevantes del proyecto.
 - **Auditoría de Consumo de API**:
   - Registro no bloqueante de logs de acceso en tiempo real (IP, método, endpoint, estado HTTP, fecha, clave consumida) con paginación interactiva en el panel del SOC.
 - **API Externa de Incidentes y SMTP**:
-  - Exposición de `/api/v1/templates/render` para procesamiento de plantillas MJML con soporte opcional para envío automático de alertas por correo mediante el SMTP del SOC pasándole `"sendEmail": true`. Se inyecta automáticamente el logo de Netics (`Sharp-processed`) y se autocompletan los campos de incidentes (ofensa, ticket, criticidad) provistos en el JSON.
+  - Exposición de `/api/v1/templates/render` para procesamiento de plantillas MJML con soporte opcional para envío automático de alertas por correo mediante el SMTP del SOC pasándole `"sendEmail": true`. Se inyecta automáticamente el logo de la marca (`Sharp-processed`) y se autocompletan los campos de incidentes (ofensa, ticket, criticidad) provistos en el JSON.
 - **Visualización de Logs de Auditoría Extendida**:
   - Diálogo detallado `AuditLogDetailDialogComponent` para leer logs extensos y metadatos JSON completos sin truncado.
   - Botón interactivo de expansión rápida en hover de la celda de detalle del log.
@@ -470,7 +480,7 @@ Registro de cambios relevantes del proyecto.
 
 - **Lógica de Sincronización Mejorada**: Se actualizó la función `syncUserAsDirectoryInternal()` en la ruta de usuarios para:
   - Obtener el `defaultLogSourceId` configurado en AppConfig (cliente/LogSource por defecto asignado en `/main/logo`).
-  - Buscar el CatalogLogSource correspondiente y extraer su nombre (ej: "Netics", "AIEP", "BeyondTrust").
+  - Buscar el CatalogLogSource correspondiente y extraer su nombre (ej: "AIEP", "BeyondTrust").
   - Incluir automáticamente ese nombre como la empresa en la sincronización al DirectoryContact.
   - Esto sincroniza la información del cliente interno ya configurado en `/main/admin/catalogs` sin requerir campo adicional.
 - **Integración Transparente**: Aprovecha la jerarquía existente:
@@ -807,7 +817,7 @@ Registro de cambios relevantes del proyecto.
 - **Unificación de Entornos (`.env`):** Se eliminó la duplicidad de configuración entre la raíz y el backend. `backend/src/server.js` fue refactorizado para resolver automáticamente el archivo `.env` de la raíz del proyecto, permitiendo que un único archivo actúe como fuente de verdad absoluta tanto para la orquestación Docker como para la ejecución local de Node.js.
 - **Depuración de Scripts Heredados (Clean-up):**
   - Se eliminaron fragmentos obsoletos de inicialización de BD (`seed-escalation-example.js`, `seed-services.js`, `seed-shift-roles.js`, `seed-work-shifts.js`) para consolidar la estrategia en el sembrado oficial (`seed.js` y `seed-admin.js`).
-  - Se borraron scripts manuales de único uso que generaban ruido operativo (`add-netics.js`, `create-users.js`, `shift-dates.js`, `import-sanitized.js`).
+  - Se borraron scripts manuales de único uso que generaban ruido operativo (un script de alta de cliente, `create-users.js`, `shift-dates.js`, `import-sanitized.js`).
   - Se removieron los scripts de migración `mongo8-migration` (y su documentación en `02_DESPLIEGUE_Y_CONFIG.md`), al considerarse un procedimiento puntual ya ejecutado y superado por la arquitectura nativa en Mongo 8.
 - **Resiliencia de Easter Eggs:** Se restituyó y validó la dependencia funcional de `scripts/Bender.png` para los triggers de UI basados en el hashtag `#bender`.
 
