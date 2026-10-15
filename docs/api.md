@@ -510,6 +510,59 @@ Quién: ve un equipo quien es del área dueña o de un área responsable (admin,
 | `PUT` | `/api/inventory/kinds/{code}` | Admin — tipo y sus campos |
 | `PUT` | `/api/inventory/responsibility-types/{code}` | Admin |
 
+### Agenda
+
+Quién: ve las tareas de sus áreas, las que creó y las que le asignaron (admin y perfil Gestión, todas). Asigna a sí mismo y a los niveles de abajo de su área; la jefatura, a todo su área; Gestión y las jefaturas, también a otras áreas. Una ocurrencia de un nivel la toma cualquiera de ese nivel; la de una guardia, quien esté de guardia. Omite el responsable o quien la asignó. Cada cambio publica el evento en vivo `agenda.changed`.
+
+| Método | Ruta | Acceso |
+| --- | --- | --- |
+| `GET` | `/api/agenda/meta` | Sesión — hoy, horario hábil, feriados cercanos y, por área, a qué niveles, personas y guardias puede asignar (`allowed`) |
+| `GET` | `/api/agenda/mine` | Sesión — pendientes propias, de sus niveles y de su guardia (con las atrasadas) y lo cerrado hoy |
+| `GET` | `/api/agenda/calendar` | Sesión — `?from=&to=` (hasta 62 días) `&area=&client=&user=`; lo que queda más allá de lo generado viene con `projected: true` |
+| `GET` | `/api/agenda/managed` | Sesión — `?scope=mine\|area`: tareas con próxima ocurrencia, historial y estado, más indicadores de 90 días |
+| `GET` | `/api/agenda/handover` | Sesión — para el cierre de turno: tareas propias abiertas que vencen hasta el siguiente día hábil y quienes entran en el próximo turno |
+| `POST` | `/api/agenda/preview` | Sesión — una recurrencia → sus próximas 6 fechas (`movedFrom` y el feriado si se corrió) |
+| `POST` | `/api/agenda/tasks` | Sesión — `{name, description, areaId, clientId, assigneeKind: person\|level\|guard, assigneeId, recurrence, warnDays, steps, docUrl, reportKind}`; `403` si asigna hacia arriba |
+| `GET` | `/api/agenda/tasks/{id}` | Sesión |
+| `PUT` | `/api/agenda/tasks/{id}` | Quien la creó, jefatura del área o admin — rehace las pendientes que nadie empezó |
+| `DELETE` | `/api/agenda/tasks/{id}` | Quien la creó, jefatura del área o admin — la da de baja (queda el historial) |
+| `POST` | `/api/agenda/occurrences/{id}/take` | Quien es del nivel ofrecido o está de guardia |
+| `POST` | `/api/agenda/occurrences/{id}/release` | Quien la tiene — vuelve al nivel |
+| `POST` | `/api/agenda/occurrences/{id}/handover` | Quien la tiene — `{userId}` (alguien del área) |
+| `PUT` | `/api/agenda/occurrences/{id}/steps` | Quien la tiene o se le ofrece — `{steps: [índices]}` |
+| `POST` | `/api/agenda/occurrences/{id}/done` | Quien la tiene o se le ofrece — `{note, link}` |
+| `POST` | `/api/agenda/occurrences/{id}/skip` | Responsable o quien la asignó — `{reason}` obligatorio |
+| `POST` | `/api/agenda/occurrences/{id}/reopen` | Quien la cerró, la tiene o la asignó |
+| `GET` | `/api/agenda/settings` | Admin — horario, feriados de `?year=` y años que se pueden importar |
+| `PUT` | `/api/agenda/settings` | Admin — `{workDays: [0-6], dayStart, dayEnd}` |
+| `PUT` | `/api/agenda/holidays` | Admin — `{date, name}` |
+| `DELETE` | `/api/agenda/holidays/{date}` | Admin |
+| `POST` | `/api/agenda/holidays/import` | Admin — `{year}` desde la lista incluida en la app; no pisa los cargados a mano |
+
+Enviar un informe de Reportes (`POST /api/reports/{kind}/send`) a un cliente cierra la ocurrencia pendiente de las tareas ligadas a ese informe y cliente que vence dentro de 7 días. `POST /api/agenda/tasks` acepta también `window: {start, end, suppress}` (solo tareas de una vez) para crear la ventana de mantenimiento con la misma fecha; si la tarea cambia de fecha, la ventana se mueve con ella.
+
+### Notificaciones y avisos con acuse
+
+La campana de cada persona y sus preferencias. El evento en vivo `notifications.changed` (y `notices.published`) lleva solo `{users: [...]}`: cada cliente pide lo suyo.
+
+| Método | Ruta | Acceso |
+| --- | --- | --- |
+| `GET` | `/api/notifications` | Sesión — `?filter=unread\|all`: `{items, unread}` |
+| `POST` | `/api/notifications/read` | Sesión — `{ids: [...]}`; vacío = todas |
+| `GET` | `/api/notifications/prefs` | Sesión — por tipo: emergente y correo (con lo que fija el admin), resumen diario y navegador |
+| `PUT` | `/api/notifications/prefs` | Sesión — `{kinds: {tipo: {toast, email}}, digest, browser}` |
+| `GET` | `/api/notifications/settings` | Admin |
+| `PUT` | `/api/notifications/settings` | Admin — `{digestTime, lockedKinds, groupMinutes, retentionDays}`; `notice` siempre queda fijo |
+| `GET` | `/api/notices/meta` | Sesión — `{canSend}` |
+| `GET` | `/api/notices/pending` | Sesión — los avisos con acuse sin leer, el más antiguo primero |
+| `POST` | `/api/notices/{id}/read` | Sesión — «Leído» (queda en Auditoría) |
+| `POST` | `/api/notices` | Admin, jefatura de área o permiso `notices:send` — `{title, body, audience: {kind: people\|level\|area\|all, userIds, areaIds, levelIds}, publishAt, expiresAt}` |
+| `GET` | `/api/notices/sent` | Los mismos — con `total` y `read` |
+| `GET` | `/api/notices/{id}/recipients` | Quien lo envió o admin |
+| `POST` | `/api/notices/{id}/remind` | Quien lo envió o admin — correo a quienes faltan |
+
+Tipos de notificación: `agenda.assigned`, `agenda.warn`, `agenda.due`, `agenda.late`, `agenda.handover`, `agenda.absence`, `ticket.assigned`, `ticket.derived`, `ticket.comment`, `inventory.request`, `window`, `notice`.
+
 ### Territorio (NOC)
 
 | Método | Ruta | Acceso |
@@ -528,6 +581,8 @@ Quién: ve un equipo quien es del área dueña o de un área responsable (admin,
 | `POST` | `/api/assets` | Admin · módulo NOC |
 | `PATCH` | `/api/assets/{id}` | Admin · módulo NOC |
 | `GET` | `/api/maintenance-windows` | Sesión |
+| `GET` | `/api/maintenance-windows/overview` | Sesión — `?from=&to=` (RFC3339): ventanas activas con el nombre de a qué aplican |
+| `POST` | `/api/maintenance-windows/{id}/close` | Admin o analista — cierra antes de tiempo una ventana en curso |
 | `POST` | `/api/maintenance-windows` | Admin o analista |
 | `DELETE` | `/api/maintenance-windows/{id}` | Admin o analista |
 

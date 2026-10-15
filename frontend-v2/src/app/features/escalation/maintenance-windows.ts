@@ -2,7 +2,9 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, si
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
-import { Asset, EscalationScope, EscalationService, MaintenanceWindow, SocService } from '../../core/escalation/escalation.service';
+import { Asset, EscalationService, MaintenanceWindow, SocService, WindowTarget } from '../../core/escalation/escalation.service';
+import { Organization, OrganizationsService, TeamSummary } from '../../core/organizations/organizations.service';
+import { AgendaService } from '../../core/agenda/agenda.service';
 import { TerritoryService } from '../../core/territory/territory.service';
 import { TerritorialUnit } from '../../core/territory/territory.models';
 import { ModuleAccessService } from '../../core/auth/module-access.service';
@@ -11,13 +13,15 @@ import { MessageKey } from '../../core/i18n/messages';
 import { problemDetail } from '../../core/http-error';
 
 import '../../core/i18n/packs/escalation';
-type ScopeKind = 'asset' | 'unit' | 'service';
+type ScopeKind = 'asset' | 'unit' | 'service' | 'client' | 'area' | 'team';
 
 /**
  * Ventanas de mantenimiento: programar y cerrar. La usan Administración →
  * Escalamiento y la pantalla de Escalamiento, porque también las crea el
  * analista (comentario del dueño #16), no solo el admin. Solo ofrece los
- * destinos de los módulos encendidos.
+ * destinos de los módulos encendidos. Desde la 9.5 también aplican a un
+ * cliente, un área o un equipo de la app; la que está en curso se cierra
+ * antes de tiempo («Cerrar ahora», queda registrado) y la programada se cancela.
  */
 @Component({
   selector: 'app-maintenance-windows',
@@ -67,15 +71,17 @@ type ScopeKind = 'asset' | 'unit' | 'service';
           <tbody>
             @for (w of windows(); track w.id) {
               <tr [class.mw__inactive]="!w.active">
-                <td><strong>{{ w.title }}</strong></td>
+                <td><strong>{{ w.title }}</strong>@if (w.agendaTaskId) { <span class="adm-small adm-secondary"> · {{ i18n.t('escAdmin.fromTask') }}</span> }</td>
                 <td>{{ i18n.t(kindKey(kindOf(w))) }}: {{ targetName(w) }}</td>
                 <td class="mono adm-small">{{ w.startsAt | date: 'dd/MM/yy HH:mm' }} → {{ w.endsAt | date: 'dd/MM/yy HH:mm' }}</td>
                 <td><span class="pill" [class]="w.suppressNotifications ? 'tone-warn' : 'tone-neutral'">{{ i18n.t(w.suppressNotifications ? 'escAdmin.suppressed' : 'escAdmin.informative') }}</span></td>
                 <td class="adm-num">
-                  @if (w.active) {
-                    <button type="button" class="adm-btn" [disabled]="busy()" (click)="close(w)">{{ i18n.t('escAdmin.close') }}</button>
-                  } @else {
-                    <span class="pill tone-neutral">{{ i18n.t('escAdmin.closed') }}</span>
+                  @switch (stateOf(w)) {
+                    @case ('running') { <button type="button" class="adm-btn" [disabled]="busy()" (click)="closeNow(w)">{{ i18n.t('escAdmin.closeNow') }}</button> }
+                    @case ('upcoming') { <button type="button" class="adm-btn" [disabled]="busy()" (click)="close(w)">{{ i18n.t('escAdmin.cancelWindow') }}</button> }
+                    @case ('closedEarly') { <span class="pill tone-neutral">{{ i18n.tf('escAdmin.closedEarly', (w.closedAt | date: 'dd/MM HH:mm') ?? '') }}</span> }
+                    @case ('ended') { <span class="pill tone-neutral">{{ i18n.t('escAdmin.ended') }}</span> }
+                    @default { <span class="pill tone-neutral">{{ i18n.t('escAdmin.cancelled') }}</span> }
                   }
                 </td>
               </tr>
@@ -104,11 +110,16 @@ export class MaintenanceWindowsComponent implements OnInit {
   private readonly api = inject(EscalationService);
   private readonly territory = inject(TerritoryService);
   private readonly modules = inject(ModuleAccessService);
+  private readonly orgs = inject(OrganizationsService);
+  private readonly agenda = inject(AgendaService);
 
   protected readonly windows = signal<MaintenanceWindow[]>([]);
   private readonly services = signal<SocService[]>([]);
   private readonly assets = signal<Asset[]>([]);
   private readonly units = signal<TerritorialUnit[]>([]);
+  private readonly clients = signal<Organization[]>([]);
+  private readonly areas = signal<{ id: string; name: string }[]>([]);
+  private readonly teams = signal<TeamSummary[]>([]);
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
 
@@ -122,6 +133,7 @@ export class MaintenanceWindowsComponent implements OnInit {
   protected readonly kinds = computed<ScopeKind[]>(() => [
     ...(this.modules.noc() ? (['asset', 'unit'] as const) : []),
     ...(this.modules.soc() ? (['service'] as const) : []),
+    'client', 'area', 'team',
   ]);
   protected readonly options = computed(() => {
     switch (this.kind()) {
@@ -129,6 +141,12 @@ export class MaintenanceWindowsComponent implements OnInit {
         return this.assets().map((a) => ({ id: a.id, label: `${a.name} (${a.code})` }));
       case 'unit':
         return this.units().filter((u) => u.active).map((u) => ({ id: u.id, label: `${'— '.repeat(u.depth)}${u.name}` }));
+      case 'client':
+        return this.clients().map((c) => ({ id: c.id, label: c.name }));
+      case 'area':
+        return this.areas().map((a) => ({ id: a.id, label: a.name }));
+      case 'team':
+        return this.teams().map((t) => ({ id: t.id, label: t.name }));
       default:
         return this.services()
           .map((s) => ({ id: s.id, label: serviceLabel(s) }))
@@ -145,6 +163,9 @@ export class MaintenanceWindowsComponent implements OnInit {
         this.modules.soc() ? this.api.listServices().then((s) => this.services.set(s)) : null,
         this.modules.noc() ? this.api.listAssets().then((a) => this.assets.set(a)) : null,
         this.modules.noc() ? this.territory.list(1, 5000).then((r) => this.units.set(r.units)) : null,
+        this.orgs.list({ clients: true, active: true }).then((c) => this.clients.set(c), () => this.clients.set([])),
+        this.agenda.meta().then((m) => this.areas.set(m.areas), () => this.areas.set([])),
+        this.orgs.listTeams().then((t) => this.teams.set(t.filter((x) => x.kind !== 'step')), () => this.teams.set([])),
       ]),
     );
     const preset = this.presetServiceId();
@@ -154,17 +175,32 @@ export class MaintenanceWindowsComponent implements OnInit {
     }
   }
 
-  protected kindOf(s: EscalationScope): ScopeKind {
+  protected kindOf(s: WindowTarget): ScopeKind {
     if (s.assetId) return 'asset';
     if (s.territorialUnitId) return 'unit';
+    if (s.organizationId) return 'client';
+    if (s.areaId) return 'area';
+    if (s.teamId) return 'team';
     return 'service';
+  }
+
+  /** En curso, programada, cerrada antes de tiempo, terminada o cancelada. */
+  protected stateOf(w: MaintenanceWindow): 'running' | 'upcoming' | 'closedEarly' | 'ended' | 'cancelled' {
+    const now = Date.now();
+    if (!w.active) return 'cancelled';
+    if (w.closedAt) return 'closedEarly';
+    if (new Date(w.endsAt).getTime() <= now) return 'ended';
+    return new Date(w.startsAt).getTime() <= now ? 'running' : 'upcoming';
   }
 
   protected kindKey(kind: ScopeKind): MessageKey {
     return `escAdmin.kind.${kind}` as MessageKey;
   }
 
-  protected targetName(s: EscalationScope): string {
+  protected targetName(s: WindowTarget): string {
+    if (s.organizationId) return this.clients().find((x) => x.id === s.organizationId)?.name ?? s.organizationId;
+    if (s.areaId) return this.areas().find((x) => x.id === s.areaId)?.name ?? s.areaId;
+    if (s.teamId) return this.teams().find((x) => x.id === s.teamId)?.name ?? s.teamId;
     if (s.assetId) return this.assets().find((x) => x.id === s.assetId)?.name ?? s.assetId;
     if (s.territorialUnitId) {
       const u = this.units().find((x) => x.id === s.territorialUnitId);
@@ -176,7 +212,10 @@ export class MaintenanceWindowsComponent implements OnInit {
 
   protected async create(): Promise<void> {
     const id = this.target();
-    const scope: EscalationScope = this.kind() === 'asset' ? { assetId: id } : this.kind() === 'unit' ? { territorialUnitId: id } : { serviceId: id };
+    const scope: WindowTarget = {
+      asset: { assetId: id }, unit: { territorialUnitId: id }, service: { serviceId: id },
+      client: { organizationId: id }, area: { areaId: id }, team: { teamId: id },
+    }[this.kind()];
     await this.run(async () => {
       await this.api.createWindow({
         ...scope,
@@ -187,6 +226,13 @@ export class MaintenanceWindowsComponent implements OnInit {
         suppressNotifications: this.suppress(),
       });
       this.title.set('');
+      await this.refresh();
+    });
+  }
+
+  protected async closeNow(w: MaintenanceWindow): Promise<void> {
+    await this.run(async () => {
+      await this.api.closeWindowNow(w.id);
       await this.refresh();
     });
   }

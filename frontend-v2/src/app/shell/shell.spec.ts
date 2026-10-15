@@ -60,7 +60,7 @@ describe('ShellComponent', () => {
 
   it('muestra las secciones del núcleo, el Mapa con NOC, y oculta la ticketera si está apagada', async () => {
     const { el } = await render([{ code: 'native_tickets', isEnabled: false }]);
-    expect(navLabels(el)).toEqual(['Bitácora', 'Turnos y Checklist', 'Escalamiento', 'Mapa', 'Directorio', 'Inventario', 'Reportes', 'Administración']);
+    expect(navLabels(el)).toEqual(['Bitácora', 'Turnos y Checklist', 'Escalamiento', 'Mapa', 'Directorio', 'Inventario', 'Agenda', 'Reportes', 'Administración']);
   });
 
   it('alguien de Infra (no Operativo) ve Turnos y Escalamiento, no Bitácora ni Reportes', async () => {
@@ -146,7 +146,7 @@ describe('ShellComponent', () => {
     // El inglés se descarga al elegir EN (no va en el bundle inicial).
     await TestBed.inject(I18nService).loadEnglish();
     fixture.detectChanges();
-    expect(navLabels(el)).toEqual(['Logbook', 'Tickets', 'Shifts & Checklist', 'Escalation', 'Map', 'Directory', 'Inventory', 'Reports', 'Administration']);
+    expect(navLabels(el)).toEqual(['Logbook', 'Tickets', 'Shifts & Checklist', 'Escalation', 'Map', 'Directory', 'Inventory', 'Agenda', 'Reports', 'Administration']);
     expect(document.documentElement.lang).toBe('en');
   });
 

@@ -884,7 +884,7 @@ func (h *EscalationHandler) Notify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	window, err := h.activeWindow(ctx, req.scope, res.unitPath)
+	window, err := h.activeWindow(ctx, req.scope, res)
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron revisar las ventanas de mantenimiento")
 		return
@@ -958,10 +958,24 @@ func (h *EscalationHandler) Notify(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, resp)
 }
 
-func (h *EscalationHandler) activeWindow(ctx context.Context, s scope, unitPath []uuid.UUID) (*escalation.Window, error) {
-	rows, err := h.Queries.ListWindowsForScope(ctx, db.ListWindowsForScopeParams{
-		ServiceID: optionalUUID(s.ServiceID), AssetID: optionalUUID(s.AssetID), UnitIds: append([]uuid.UUID{}, unitPath...),
-	})
+// activeWindow: la ventana que aplica ahora. Desde 000042 cuentan también
+// las del cliente, del área de la política (o del activo) y de los equipos
+// de los llamados (spec/16 §4.6).
+func (h *EscalationHandler) activeWindow(ctx context.Context, s scope, res *resolutionDTO) (*escalation.Window, error) {
+	params := db.ListWindowsForScopeParams{
+		ServiceID: optionalUUID(s.ServiceID), AssetID: optionalUUID(s.AssetID), UnitIds: append([]uuid.UUID{}, res.unitPath...), TeamIds: []uuid.UUID{},
+	}
+	if res.PolicyID != nil {
+		if p, err := h.Queries.GetPolicy(ctx, *res.PolicyID); err == nil {
+			params.PolicyAreaID = pgUUIDOf(p.AreaID)
+		}
+	}
+	for _, st := range res.steps {
+		if st.TeamID != uuid.Nil {
+			params.TeamIds = append(params.TeamIds, st.TeamID)
+		}
+	}
+	rows, err := h.Queries.ListWindowsForScope(ctx, params)
 	if err != nil {
 		return nil, err
 	}
@@ -1186,6 +1200,11 @@ type windowDTO struct {
 	ServiceID             *uuid.UUID `json:"serviceId,omitempty"`
 	AssetID               *uuid.UUID `json:"assetId,omitempty"`
 	TerritorialUnitID     *uuid.UUID `json:"territorialUnitId,omitempty"`
+	OrganizationID        *uuid.UUID `json:"organizationId,omitempty"`
+	AreaID                *uuid.UUID `json:"areaId,omitempty"`
+	TeamID                *uuid.UUID `json:"teamId,omitempty"`
+	AgendaTaskID          *uuid.UUID `json:"agendaTaskId,omitempty"`
+	ClosedAt              *time.Time `json:"closedAt,omitempty"`
 	Title                 string     `json:"title"`
 	Notes                 *string    `json:"notes,omitempty"`
 	StartsAt              time.Time  `json:"startsAt"`
@@ -1196,6 +1215,7 @@ type windowDTO struct {
 
 func toWindowDTO(m db.MaintenanceWindow) windowDTO {
 	return windowDTO{ID: m.ID, ServiceID: uuidPtr(m.ServiceID), AssetID: uuidPtr(m.AssetID), TerritorialUnitID: uuidPtr(m.TerritorialUnitID),
+		OrganizationID: uuidPtr(m.OrganizationID), AreaID: uuidPtr(m.AreaID), TeamID: uuidPtr(m.TeamID), AgendaTaskID: uuidPtr(m.AgendaTaskID), ClosedAt: timestamptzPtr(m.ClosedAt),
 		Title: m.Title, Notes: textPtr(m.Notes), StartsAt: m.StartsAt.Time, EndsAt: m.EndsAt.Time, SuppressNotifications: m.SuppressNotifications, Active: m.Active}
 }
 
@@ -1207,6 +1227,8 @@ func (h *EscalationHandler) ListWindows(w http.ResponseWriter, r *http.Request) 
 	}
 	rows, err := h.Queries.ListMaintenanceWindows(r.Context(), db.ListMaintenanceWindowsParams{
 		ServiceID: optionalUUID(s.ServiceID), AssetID: optionalUUID(s.AssetID), TerritorialUnitID: optionalUUID(s.TerritorialUnitID),
+		OrganizationID: queryUUIDOrNull(r.URL.Query().Get("organizationId")), AreaID: queryUUIDOrNull(r.URL.Query().Get("areaId")),
+		TeamID:      queryUUIDOrNull(r.URL.Query().Get("teamId")),
 		OnlyCurrent: pgtype.Bool{Bool: r.URL.Query().Get("active") == "true", Valid: true},
 	})
 	if err != nil {
@@ -1222,19 +1244,33 @@ func (h *EscalationHandler) ListWindows(w http.ResponseWriter, r *http.Request) 
 
 type createWindowRequest struct {
 	scope
-	Title                 string    `json:"title"`
-	Notes                 *string   `json:"notes"`
-	StartsAt              time.Time `json:"startsAt"`
-	EndsAt                time.Time `json:"endsAt"`
-	SuppressNotifications bool      `json:"suppressNotifications"`
-	Priority              *int32    `json:"priority"`
+	// Desde 000042: un cliente, un área o un equipo de la app (spec/16 §4.6).
+	OrganizationID        *uuid.UUID `json:"organizationId"`
+	AreaID                *uuid.UUID `json:"areaId"`
+	TeamID                *uuid.UUID `json:"teamId"`
+	Title                 string     `json:"title"`
+	Notes                 *string    `json:"notes"`
+	StartsAt              time.Time  `json:"startsAt"`
+	EndsAt                time.Time  `json:"endsAt"`
+	SuppressNotifications bool       `json:"suppressNotifications"`
+	Priority              *int32     `json:"priority"`
 }
 
 func (h *EscalationHandler) CreateWindow(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var req createWindowRequest
-	if err := decodeJSON(w, r, &req); err != nil || req.scope.count() != 1 || strings.TrimSpace(req.Title) == "" {
-		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "indica exactamente un scope, title, startsAt y endsAt (RFC3339)")
+	if err := decodeJSON(w, r, &req); err != nil || strings.TrimSpace(req.Title) == "" {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "indica a qué aplica, title, startsAt y endsAt (RFC3339)")
+		return
+	}
+	targets := req.scope.count()
+	for _, p := range []*uuid.UUID{req.OrganizationID, req.AreaID, req.TeamID} {
+		if p != nil {
+			targets++
+		}
+	}
+	if targets != 1 {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "la ventana aplica a exactamente uno: servicio, activo, zona, cliente, área o equipo")
 		return
 	}
 	if !req.EndsAt.After(req.StartsAt) {
@@ -1248,6 +1284,7 @@ func (h *EscalationHandler) CreateWindow(w http.ResponseWriter, r *http.Request)
 	actor, _ := middleware.UserFromContext(ctx)
 	m, err := h.Queries.CreateMaintenanceWindow(ctx, db.CreateMaintenanceWindowParams{
 		ServiceID: optionalUUID(req.ServiceID), AssetID: optionalUUID(req.AssetID), TerritorialUnitID: optionalUUID(req.TerritorialUnitID),
+		OrganizationID: optionalUUID(req.OrganizationID), AreaID: optionalUUID(req.AreaID), TeamID: optionalUUID(req.TeamID),
 		Title: strings.TrimSpace(req.Title), Notes: nonEmptyText(req.Notes), StartsAt: pgtype.Timestamptz{Time: req.StartsAt, Valid: true},
 		EndsAt: pgtype.Timestamptz{Time: req.EndsAt, Valid: true}, SuppressNotifications: req.SuppressNotifications, Priority: priority, CreatedBy: actor.ID,
 	})
@@ -1280,6 +1317,66 @@ func (h *EscalationHandler) DeleteWindow(w http.ResponseWriter, r *http.Request)
 	}
 	h.AuditLog.Log(r.Context(), "maintenance_window.delete", audit.LevelInfo, audit.Success(), map[string]any{"windowId": id.String()})
 	writeNoContent(w)
+}
+
+// CloseWindow cierra una ventana en curso antes de tiempo: termina ahora y
+// queda quién la cerró (spec/16 §4.6). Cualquiera puede.
+func (h *EscalationHandler) CloseWindow(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "id inválido")
+		return
+	}
+	ctx := r.Context()
+	actor, _ := middleware.UserFromContext(ctx)
+	m, err := h.Queries.CloseMaintenanceWindow(ctx, db.CloseMaintenanceWindowParams{ID: id, ClosedBy: pgUUIDOf(actor.ID)})
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusConflict, "not-running", "la ventana no está en curso")
+		return
+	}
+	h.AuditLog.Log(ctx, "maintenance_window.close", audit.LevelInfo, audit.Success(), map[string]any{"windowId": id.String(), "title": m.Title})
+	writeData(w, http.StatusOK, toWindowDTO(m))
+}
+
+// windowOverviewDTO: una ventana con el nombre de a qué aplica (pantalla de
+// ventanas y calendario de la Agenda).
+type windowOverviewDTO struct {
+	ID           uuid.UUID  `json:"id"`
+	Title        string     `json:"title"`
+	StartsAt     time.Time  `json:"startsAt"`
+	EndsAt       time.Time  `json:"endsAt"`
+	Suppress     bool       `json:"suppressNotifications"`
+	TargetName   string     `json:"targetName"`
+	AgendaTaskID *uuid.UUID `json:"agendaTaskId,omitempty"`
+	AreaID       *uuid.UUID `json:"areaId,omitempty"`
+}
+
+// Overview: las ventanas activas que tocan [from, to] (RFC3339; por defecto
+// desde ayer hasta 60 días adelante).
+func (h *EscalationHandler) Overview(w http.ResponseWriter, r *http.Request) {
+	from, to := time.Now().Add(-24*time.Hour), time.Now().AddDate(0, 0, 60)
+	if v, err := time.Parse(time.RFC3339, r.URL.Query().Get("from")); err == nil {
+		from = v
+	}
+	if v, err := time.Parse(time.RFC3339, r.URL.Query().Get("to")); err == nil {
+		to = v
+	}
+	rows, err := h.Queries.ListWindowsBetween(r.Context(), db.ListWindowsBetweenParams{FromAt: pgTime(from), ToAt: pgTime(to)})
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron listar las ventanas")
+		return
+	}
+	out := make([]windowOverviewDTO, 0, len(rows))
+	for _, m := range rows {
+		d := windowOverviewDTO{ID: m.ID, Title: m.Title, StartsAt: m.StartsAt.Time, EndsAt: m.EndsAt.Time, Suppress: m.SuppressNotifications,
+			TargetName: m.TargetName, AgendaTaskID: uuidPtr(m.AgendaTaskID)}
+		if m.AreaID != uuid.Nil {
+			a := m.AreaID
+			d.AreaID = &a
+		}
+		out = append(out, d)
+	}
+	writeData(w, http.StatusOK, out)
 }
 
 // ===== RACI (solo dato en esta fase; la UI completa es Backlog Post-Corte) =====

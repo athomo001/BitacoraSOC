@@ -11,6 +11,8 @@ import { SHIFT_REPORT_TAG, ShiftReportMode, buildShiftReport, parsePending, sani
 import { WorkShift } from '../../core/shifts/shifts.service';
 import { MarkdownComponent } from '../../shared/markdown/markdown';
 import { appendSnippet, openMarkdownHelp } from '../../shared/markdown/markdown-help-dialog';
+import { AgendaHandoverComponent } from '../agenda/agenda-handover';
+import { AgendaTodayComponent } from '../agenda/agenda-today';
 
 import '../../core/i18n/packs/shifts';
 export interface ShiftReportData {
@@ -50,7 +52,7 @@ interface Draft {
 @Component({
   selector: 'app-shift-report-dialog',
   standalone: true,
-  imports: [FormsModule, DatePipe, MatIconModule, MarkdownComponent],
+  imports: [FormsModule, DatePipe, MatIconModule, MarkdownComponent, AgendaHandoverComponent, AgendaTodayComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './shift-report-dialog.html',
   styleUrl: './shift-report-dialog.css',

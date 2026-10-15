@@ -68,6 +68,16 @@ export const routes: Routes = [
         canActivate: [nocGuard],
         loadComponent: () => import('./features/map/map').then((module) => module.MapComponent),
       },
+      // Avisos con acuse (9.5): se abren desde la campana; la pantalla revisa el permiso.
+      {
+        path: 'notices',
+        loadComponent: () => import('./features/notices/notices').then((module) => module.NoticesComponent),
+      },
+      // Agenda (9.3): tareas y recurrentes en días hábiles, para todos los perfiles.
+      {
+        path: 'agenda',
+        loadComponent: () => import('./features/agenda/agenda').then((module) => module.AgendaComponent),
+      },
       // Inventario (9.2): equipos por área.
       {
         path: 'inventory',

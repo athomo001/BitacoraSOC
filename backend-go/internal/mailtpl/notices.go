@@ -65,3 +65,33 @@ func ForcedPasswordChange(appTitle, recipientName string) Mail {
         `, escapeBulletin(name), escapeBulletin(systemName), escapeBulletin(teamName))
 	return Mail{Subject: subject, HTML: html, Text: text}
 }
+
+// NoticeReminder recuerda un aviso con acuse que la persona todavía no leyó
+// (spec/16 §4.5.1). Mismo formato que ForcedPasswordChange del legacy, el
+// aviso más parecido: el legacy no tenía avisos con acuse.
+func NoticeReminder(appTitle, noticeTitle string) Mail {
+	systemName := AppTitleForText(strings.TrimSpace(appTitle))
+	subject := "Aviso pendiente de lectura: " + noticeTitle
+	text := strings.Join([]string{
+		"Hola,",
+		"",
+		"Tienes un aviso pendiente de lectura en " + systemName + ": «" + noticeTitle + "».",
+		"Al entrar a la aplicación se mostrará para que lo confirmes con «Leído».",
+		"",
+		"Saludos,",
+		systemName,
+	}, "\n")
+	html := fmt.Sprintf(`
+          <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; color: #1f2937;">
+            <h2 style="margin: 0 0 12px; color: #b91c1c;">Aviso pendiente de lectura</h2>
+            <p>Hola,</p>
+            <p>
+              Tienes un aviso pendiente de lectura en <strong>%s</strong>: <strong>%s</strong>.
+              Al entrar a la aplicación se mostrará para que lo confirmes con «Leído».
+            </p>
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
+            <p style="font-size: 12px; color: #6b7280; margin: 0;">Mensaje automático de %s.</p>
+          </div>
+        `, escapeBulletin(systemName), escapeBulletin(noticeTitle), escapeBulletin(systemName))
+	return Mail{Subject: subject, HTML: html, Text: text}
+}

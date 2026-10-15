@@ -37,6 +37,7 @@
         <app-user-avatar [name]="displayName()" [src]="auth.user()?.avatarUrl" />
         <span class="shell__profile-name">{{ displayName() }}</span>
       </button>
+      <app-notifications-bell (openPrefs)="openProfile('notif')" />
       <button type="button" class="shell__icon-btn" [attr.aria-label]="i18n.t('shell.logout')" [attr.title]="i18n.t('shell.logout')" (click)="logout()">
         <mat-icon>logout</mat-icon>
       </button>
@@ -68,3 +69,5 @@
     <router-outlet />
   </main>
 </div>
+<app-notification-toasts />
+<app-notice-modal />

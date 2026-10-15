@@ -2,7 +2,7 @@
 
 > Generado por `backend-go/cmd/er-docs` desde `backend-go/sql/schema/0001_init_schema.sql`, el esquema que usa sqlc, con todas las migraciones aplicadas. **No se edita a mano**: si cambia el esquema, se regenera con `go run ./cmd/er-docs` desde `backend-go/`.
 
-84 tablas en PostgreSQL, agrupadas en 13 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
+94 tablas en PostgreSQL, agrupadas en 15 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
 
 - Cada entidad muestra todas sus columnas salvo `created_at` y `updated_at`. `PK` clave primaria, `FK` referencia a otra tabla, `UK` valor único.
 - Las tablas de otros dominios aparecen como cajas sin columnas: son la misma tabla, dibujada donde se une.
@@ -19,13 +19,15 @@ Correspondencia con el legacy (MongoDB): [modelo-er-legacy-2.0.md](modelo-er-leg
 4. [Ticketera](#4-ticketera) — 7 tablas
 5. [Equipos y escalamiento](#5-equipos-y-escalamiento) — 13 tablas
 6. [Turnos, guardias y dotación](#6-turnos-guardias-y-dotación) — 11 tablas
-7. [Checklists](#7-checklists) — 4 tablas
-8. [Bitácora](#8-bitácora) — 5 tablas
-9. [Reportes y avisos por cliente](#9-reportes-y-avisos-por-cliente) — 5 tablas
-10. [Auditoría, notas y alertas de sala](#10-auditoría-notas-y-alertas-de-sala) — 4 tablas
-11. [Configuración y respaldos](#11-configuración-y-respaldos) — 6 tablas
-12. [Complementos](#12-complementos) — 4 tablas
-13. [Ingesta de alertas (después del corte)](#13-ingesta-de-alertas-después-del-corte) — 2 tablas
+7. [Agenda](#7-agenda) — 4 tablas
+8. [Notificaciones y avisos con acuse](#8-notificaciones-y-avisos-con-acuse) — 6 tablas
+9. [Checklists](#9-checklists) — 4 tablas
+10. [Bitácora](#10-bitácora) — 5 tablas
+11. [Reportes y avisos por cliente](#11-reportes-y-avisos-por-cliente) — 5 tablas
+12. [Auditoría, notas y alertas de sala](#12-auditoría-notas-y-alertas-de-sala) — 4 tablas
+13. [Configuración y respaldos](#13-configuración-y-respaldos) — 6 tablas
+14. [Complementos](#14-complementos) — 4 tablas
+15. [Ingesta de alertas (después del corte)](#15-ingesta-de-alertas-después-del-corte) — 2 tablas
 
 ---
 
@@ -596,6 +598,14 @@ erDiagram
         int priority
         uuid created_by FK
         boolean active
+        uuid organization_id FK
+        uuid area_id FK
+        uuid team_id FK
+        uuid agenda_task_id FK
+        timestamptz closed_at
+        uuid closed_by FK
+        boolean notified_start
+        boolean notified_end
     }
     RACI_ASSIGNMENTS {
         uuid id PK
@@ -608,6 +618,8 @@ erDiagram
         boolean active
     }
 
+    AGENDA_TASKS |o--o{ MAINTENANCE_WINDOWS : "agenda_task_id"
+    AREAS |o--o{ MAINTENANCE_WINDOWS : "area_id"
     AREAS |o--o{ TEAMS : "area_id"
     AREAS ||--o{ ESCALATION_POLICIES : "area_id"
     ASSETS |o--o{ ESCALATION_INCIDENTS : "asset_id"
@@ -626,6 +638,7 @@ erDiagram
     ESCALATION_POOLS |o--o{ TEAM_MEMBERS : "pool_id"
     ESCALATION_POOLS ||--o{ ESCALATION_POOL_MEMBERS : "pool_id"
     ORGANIZATIONS |o--o{ ESCALATION_POOLS : "organization_id"
+    ORGANIZATIONS |o--o{ MAINTENANCE_WINDOWS : "organization_id"
     ORGANIZATIONS |o--o{ RACI_ASSIGNMENTS : "client_id"
     ORGANIZATIONS |o--o{ TEAMS : "organization_id"
     ORGANIZATIONS |o--o{ TEAM_GROUPS : "client_id"
@@ -633,6 +646,7 @@ erDiagram
     SERVICES |o--o{ ESCALATION_POLICIES : "service_id"
     SERVICES |o--o{ MAINTENANCE_WINDOWS : "service_id"
     SERVICES |o--o{ RACI_ASSIGNMENTS : "service_id"
+    TEAMS |o--o{ MAINTENANCE_WINDOWS : "team_id"
     TEAMS ||--o{ ESCALATION_STEPS : "team_id"
     TEAMS ||--o{ RACI_ASSIGNMENTS : "team_id"
     TEAMS ||--o{ TEAM_COVERAGE : "team_id"
@@ -806,7 +820,140 @@ erDiagram
 
 ---
 
-## 7. Checklists
+## 7. Agenda
+
+Tareas programadas (una vez o recurrentes en días hábiles) con su responsable (persona, nivel o guardia), cada ocurrencia con su estado, y el calendario hábil: horario de la Agenda y feriados.
+
+```mermaid
+erDiagram
+    AGENDA_TASKS {
+        uuid id PK
+        text name
+        text description
+        uuid area_id FK
+        uuid organization_id FK
+        text assignee_kind
+        uuid assignee_user_id FK
+        uuid assignee_level_id FK
+        uuid assignee_team_id FK
+        jsonb recurrence
+        int[] warn_days
+        text[] steps
+        text doc_url
+        text report_kind
+        boolean active
+        uuid created_by FK
+    }
+    AGENDA_OCCURRENCES {
+        uuid id PK
+        uuid task_id FK
+        date due_date
+        date moved_from
+        text status
+        uuid user_id FK
+        uuid offered_level_id FK
+        uuid absent_user_id FK
+        int[] steps_done
+        text note
+        text link
+        text skip_reason
+        uuid closed_by FK
+        timestamptz closed_at
+        uuid report_history_id FK
+    }
+    AGENDA_SETTINGS {
+        boolean id PK
+        int[] work_days
+        time day_start
+        time day_end
+        text timezone
+        text holiday_country
+    }
+    HOLIDAYS {
+        date day PK
+        text name
+        text source
+    }
+
+    AGENDA_TASKS ||--o{ AGENDA_OCCURRENCES : "task_id"
+    AREAS ||--o{ AGENDA_TASKS : "area_id"
+    LEVELS |o--o{ AGENDA_OCCURRENCES : "offered_level_id"
+    LEVELS |o--o{ AGENDA_TASKS : "assignee_level_id"
+    ORGANIZATIONS |o--o{ AGENDA_TASKS : "organization_id"
+    REPORT_HISTORY |o--o{ AGENDA_OCCURRENCES : "report_history_id"
+    TEAMS |o--o{ AGENDA_TASKS : "assignee_team_id"
+    USERS |o--o{ AGENDA_OCCURRENCES : "absent_user_id"
+    USERS |o--o{ AGENDA_OCCURRENCES : "user_id"
+    USERS |o--o{ AGENDA_TASKS : "assignee_user_id"
+```
+
+---
+
+## 8. Notificaciones y avisos con acuse
+
+La campana de cada persona, sus preferencias, lo que fija el admin, los avisos de la Agenda ya enviados y los avisos con acuse de lectura con quién los leyó.
+
+```mermaid
+erDiagram
+    NOTIFICATIONS {
+        uuid id PK
+        uuid user_id FK
+        text kind
+        text title
+        text body
+        text link
+        text group_key
+        int count
+        boolean toast
+        boolean browser
+        timestamptz read_at
+    }
+    NOTIFICATION_PREFS {
+        uuid user_id PK, FK
+        jsonb prefs
+        boolean digest
+        boolean browser
+    }
+    NOTIFICATION_SETTINGS {
+        boolean id PK
+        time digest_time
+        text[] locked_kinds
+        int group_minutes
+        int retention_days
+        date last_digest_day
+    }
+    AGENDA_OCCURRENCE_ALERTS {
+        uuid occurrence_id PK, FK
+        text alert PK
+        timestamptz sent_at
+    }
+    NOTICES {
+        uuid id PK
+        text title
+        text body
+        jsonb audience
+        timestamptz publish_at
+        timestamptz expires_at
+        boolean published
+        uuid created_by FK
+    }
+    NOTICE_RECIPIENTS {
+        uuid notice_id PK, FK
+        uuid user_id PK, FK
+        timestamptz read_at
+        timestamptz reminded_at
+    }
+
+    AGENDA_OCCURRENCES ||--o{ AGENDA_OCCURRENCE_ALERTS : "occurrence_id"
+    NOTICES ||--o{ NOTICE_RECIPIENTS : "notice_id"
+    USERS ||--o{ NOTICE_RECIPIENTS : "user_id"
+    USERS ||--o{ NOTIFICATIONS : "user_id"
+    USERS ||--o| NOTIFICATION_PREFS : "user_id"
+```
+
+---
+
+## 9. Checklists
 
 Plantillas de checklist de inicio y cierre de turno y sus ejecuciones.
 
@@ -858,7 +1005,7 @@ erDiagram
 
 ---
 
-## 8. Bitácora
+## 10. Bitácora
 
 Entradas, comentarios, adjuntos, borradores y eventos del sistema.
 
@@ -928,7 +1075,7 @@ erDiagram
 
 ---
 
-## 9. Reportes y avisos por cliente
+## 11. Reportes y avisos por cliente
 
 Historial de reportes enviados, tipos de operación, eventos del informe y las reglas de aviso por cliente con su acuse.
 
@@ -999,7 +1146,7 @@ erDiagram
 
 ---
 
-## 10. Auditoría, notas y alertas de sala
+## 12. Auditoría, notas y alertas de sala
 
 Registro de auditoría (solo se agrega), notas del admin y personales, y alertas programadas en pantalla.
 
@@ -1063,7 +1210,7 @@ erDiagram
 
 ---
 
-## 11. Configuración y respaldos
+## 13. Configuración y respaldos
 
 Configuración única de la instalación, correo, marca, funcionalidades activables y respaldos.
 
@@ -1166,7 +1313,7 @@ erDiagram
 
 ---
 
-## 12. Complementos
+## 14. Complementos
 
 Complementos instalados, sus archivos y su almacenamiento.
 
@@ -1228,7 +1375,7 @@ erDiagram
 
 ---
 
-## 13. Ingesta de alertas (después del corte)
+## 15. Ingesta de alertas (después del corte)
 
 Tablas creadas para la ingesta de alertas del backlog posterior al corte; todavía sin uso.
 

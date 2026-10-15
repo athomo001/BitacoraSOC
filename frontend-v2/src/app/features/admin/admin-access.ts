@@ -66,6 +66,7 @@ export const CAPABILITIES: readonly { code: string; labelKey: MessageKey }[] = [
   { code: 'directory:write', labelKey: 'access.cap.directoryWrite' },
   { code: 'directory:delete', labelKey: 'access.cap.directoryDelete' },
   { code: 'tickets:change_client', labelKey: 'access.cap.ticketsChangeClient' },
+  { code: 'notices:send', labelKey: 'access.cap.noticesSend' },
   { code: 'area:lead', labelKey: 'access.cap.areaLead' },
 ];
 

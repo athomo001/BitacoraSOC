@@ -225,7 +225,14 @@ export interface Policy extends EscalationScope {
   editable: boolean;
 }
 
-export interface MaintenanceWindow extends EscalationScope {
+/** Además de servicio, activo o zona: un cliente, un área o un equipo de la app (9.5). */
+export interface WindowTarget extends EscalationScope {
+  organizationId?: string;
+  areaId?: string;
+  teamId?: string;
+}
+
+export interface MaintenanceWindow extends WindowTarget {
   id: string;
   title: string;
   notes?: string;
@@ -233,6 +240,8 @@ export interface MaintenanceWindow extends EscalationScope {
   endsAt: string;
   suppressNotifications: boolean;
   active: boolean;
+  agendaTaskId?: string;
+  closedAt?: string;
 }
 
 export interface ShiftReportDelivery {
@@ -420,12 +429,18 @@ export class EscalationService {
     return (await firstValueFrom(this.http.get<ApiEnvelope<MaintenanceWindow[]>>('/api/maintenance-windows', { params }))).data;
   }
 
-  async createWindow(window: EscalationScope & { title: string; notes?: string; startsAt: string; endsAt: string; suppressNotifications: boolean }): Promise<MaintenanceWindow> {
+  async createWindow(window: WindowTarget & { title: string; notes?: string; startsAt: string; endsAt: string; suppressNotifications: boolean }): Promise<MaintenanceWindow> {
     return (await firstValueFrom(this.http.post<ApiEnvelope<MaintenanceWindow>>('/api/maintenance-windows', window))).data;
   }
 
+  /** Cancela una ventana (deja de aplicar). */
   async closeWindow(id: string): Promise<void> {
     await firstValueFrom(this.http.delete(`/api/maintenance-windows/${id}`));
+  }
+
+  /** Cierra antes de tiempo una ventana en curso: termina ahora y queda quién la cerró. */
+  async closeWindowNow(id: string): Promise<MaintenanceWindow> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<MaintenanceWindow>>(`/api/maintenance-windows/${id}/close`, {}))).data;
   }
 
   /** null = todavía no se configuró el SMTP. */

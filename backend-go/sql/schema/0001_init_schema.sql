@@ -1877,3 +1877,201 @@ CREATE TABLE asset_requests (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_asset_requests_pending ON asset_requests(asset_id) WHERE status = 'pending';
+
+-- 000041: Agenda (spec/16 §4.3, 9.3, diseño aprobado por el dueño 2026-10-14): un
+-- solo motor para todo lo que "hay que hacer para una fecha" (informes de
+-- N2/N3, trabajos recurrentes de Infra, acciones del CSM, pendientes sueltos).
+--
+-- Horario hábil de la Agenda: solo ordena vencimientos y avisos. No es el
+-- horario de la oficina ni toca Turnos, guardias o escalamiento (24/7).
+CREATE TABLE agenda_settings (
+  id BOOLEAN PRIMARY KEY DEFAULT true CHECK (id),
+  -- 0 = domingo … 6 = sábado.
+  work_days INT[] NOT NULL DEFAULT '{1,2,3,4,5}' CHECK (work_days <@ ARRAY[0,1,2,3,4,5,6]),
+  day_start TIME NOT NULL DEFAULT '08:00',
+  day_end TIME NOT NULL DEFAULT '20:00' CHECK (day_end > day_start),
+  timezone TEXT NOT NULL DEFAULT 'America/Santiago',
+  -- País de la lista de feriados incluida en la app (internal/agenda/holidays).
+  holiday_country TEXT NOT NULL DEFAULT 'CL',
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO agenda_settings DEFAULT VALUES;
+
+-- Feriados (los configura el admin; se importan por año desde la lista
+-- incluida y los regionales se agregan a mano).
+CREATE TABLE holidays (
+  day DATE PRIMARY KEY,
+  name TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 120),
+  source TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'import')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- La tarea programada (plantilla). Responsable: una persona, un nivel del
+-- área («N1 de Infra») o quien esté de guardia en una guardia del área.
+CREATE TABLE agenda_tasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 200),
+  description TEXT NOT NULL DEFAULT '' CHECK (length(description) <= 5000),
+  area_id UUID NOT NULL REFERENCES areas(id) ON DELETE RESTRICT,
+  organization_id UUID REFERENCES organizations(id) ON DELETE SET NULL,
+  assignee_kind TEXT NOT NULL CHECK (assignee_kind IN ('person', 'level', 'guard')),
+  assignee_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  assignee_level_id UUID REFERENCES levels(id) ON DELETE RESTRICT,
+  assignee_team_id UUID REFERENCES teams(id) ON DELETE RESTRICT,
+  -- {kind: once|days|weekly|bizN|lastBiz|fixed, …} (internal/agenda.Recurrence).
+  recurrence JSONB NOT NULL,
+  -- Avisos: días hábiles antes del vencimiento (0 = el mismo día). Los envía
+  -- el centro de notificaciones (9.5); el atraso se avisa siempre.
+  warn_days INT[] NOT NULL DEFAULT '{0}',
+  steps TEXT[] NOT NULL DEFAULT '{}',
+  doc_url TEXT CHECK (doc_url IS NULL OR length(doc_url) <= 500),
+  -- Se cierra sola al enviar este informe de Reportes al cliente de la tarea.
+  report_kind TEXT CHECK (report_kind IN ('incident', 'bulletin')),
+  active BOOLEAN NOT NULL DEFAULT true,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT chk_agenda_task_assignee CHECK (
+    (assignee_kind = 'person' AND assignee_user_id IS NOT NULL) OR
+    (assignee_kind = 'level' AND assignee_level_id IS NOT NULL) OR
+    (assignee_kind = 'guard' AND assignee_team_id IS NOT NULL))
+);
+CREATE INDEX idx_agenda_tasks_area ON agenda_tasks(area_id) WHERE active;
+CREATE INDEX idx_agenda_tasks_creator ON agenda_tasks(created_by);
+
+-- Cada vez que toca: pendiente, hecha u omitida (con motivo). Atrasada es
+-- una pendiente con el vencimiento pasado (se calcula, no se guarda).
+-- user_id es quién la tiene; sin nadie, la ve el nivel ofrecido del área
+-- (offered_level_id) o la guardia. absent_user_id: la tenía alguien que
+-- quedó ausente en Dotación y volvió a su nivel.
+CREATE TABLE agenda_occurrences (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id UUID NOT NULL REFERENCES agenda_tasks(id) ON DELETE CASCADE,
+  due_date DATE NOT NULL,
+  moved_from DATE,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'done', 'skipped')),
+  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  offered_level_id UUID REFERENCES levels(id) ON DELETE SET NULL,
+  absent_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  steps_done INT[] NOT NULL DEFAULT '{}',
+  note TEXT CHECK (note IS NULL OR length(note) <= 5000),
+  link TEXT CHECK (link IS NULL OR length(link) <= 500),
+  skip_reason TEXT CHECK (skip_reason IS NULL OR length(skip_reason) <= 500),
+  closed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  closed_at TIMESTAMPTZ,
+  report_history_id UUID REFERENCES report_history(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (task_id, due_date)
+);
+CREATE INDEX idx_agenda_occurrences_pending ON agenda_occurrences(due_date) WHERE status = 'pending';
+CREATE INDEX idx_agenda_occurrences_user ON agenda_occurrences(user_id) WHERE status = 'pending';
+
+-- 000042: Notificaciones (spec/16 §4.5, 9.5, diseño aprobado por el dueño 2026-10-15)
+-- y ventanas de mantenimiento ampliadas (§4.6).
+--
+-- La campana: el registro de todo lo que se le avisó a cada persona. Lo que
+-- además sale como aviso emergente o del navegador se decide al crearlo,
+-- según sus preferencias. Los avisos iguales se agrupan (count).
+CREATE TABLE notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  -- agenda.assigned | agenda.warn | agenda.due | agenda.late | agenda.handover | agenda.absence
+  -- ticket.assigned | ticket.derived | ticket.comment | inventory.request | window | notice
+  kind TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL DEFAULT '',
+  -- Ruta de la app a la que lleva ("/agenda", "/tickets?id=…").
+  link TEXT NOT NULL DEFAULT '',
+  group_key TEXT,
+  count INT NOT NULL DEFAULT 1,
+  toast BOOLEAN NOT NULL DEFAULT false,
+  browser BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  read_at TIMESTAMPTZ
+);
+CREATE INDEX idx_notifications_user ON notifications(user_id, updated_at DESC);
+CREATE INDEX idx_notifications_unread ON notifications(user_id, group_key) WHERE read_at IS NULL;
+
+-- Lo que fija el admin (decisiones del dueño 2026-10-15): resumen diario a
+-- las 08:00 de los días hábiles de la Agenda, los atrasos y los avisos con
+-- acuse no se apagan, la campana guarda 90 días.
+CREATE TABLE notification_settings (
+  id BOOLEAN PRIMARY KEY DEFAULT true CHECK (id),
+  digest_time TIME NOT NULL DEFAULT '08:00',
+  locked_kinds TEXT[] NOT NULL DEFAULT '{agenda.late,notice}',
+  group_minutes INT NOT NULL DEFAULT 15 CHECK (group_minutes BETWEEN 0 AND 240),
+  retention_days INT NOT NULL DEFAULT 90 CHECK (retention_days BETWEEN 7 AND 730),
+  last_digest_day DATE,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO notification_settings DEFAULT VALUES;
+
+-- Lo que elige cada persona: {kind: {toast, email, browser}}; lo que no
+-- está usa el valor por defecto de la app.
+CREATE TABLE notification_prefs (
+  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  prefs JSONB NOT NULL DEFAULT '{}'::jsonb,
+  digest BOOLEAN NOT NULL DEFAULT true,
+  browser BOOLEAN NOT NULL DEFAULT false,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Avisos de la Agenda ya enviados por ocurrencia ("warn2", "due", "late"):
+-- no se repiten.
+CREATE TABLE agenda_occurrence_alerts (
+  occurrence_id UUID NOT NULL REFERENCES agenda_occurrences(id) ON DELETE CASCADE,
+  alert TEXT NOT NULL,
+  sent_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (occurrence_id, alert)
+);
+
+-- Aviso con acuse de lectura (§4.5.1): ventana que solo se cierra con
+-- «Leído». audience: {kind: people|level|area|all, ids: [...], areaId}.
+CREATE TABLE notices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL CHECK (length(trim(title)) BETWEEN 1 AND 200),
+  body TEXT NOT NULL CHECK (length(body) <= 10000),
+  audience JSONB NOT NULL,
+  publish_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ,
+  published BOOLEAN NOT NULL DEFAULT false,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT chk_notice_expires CHECK (expires_at IS NULL OR expires_at > publish_at)
+);
+CREATE INDEX idx_notices_publish ON notices(publish_at) WHERE NOT published;
+
+CREATE TABLE notice_recipients (
+  notice_id UUID NOT NULL REFERENCES notices(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  read_at TIMESTAMPTZ,
+  reminded_at TIMESTAMPTZ,
+  PRIMARY KEY (notice_id, user_id)
+);
+CREATE INDEX idx_notice_recipients_pending ON notice_recipients(user_id) WHERE read_at IS NULL;
+
+-- Ventanas de mantenimiento ampliadas (§4.6): además de servicio, activo o
+-- zona, un cliente (todos sus servicios), un área o un equipo de la app.
+-- Cerrar antes de tiempo queda registrado. agenda_task_id: la ventana se
+-- creó desde una tarea de la Agenda y se mueve con ella.
+ALTER TABLE maintenance_windows
+  ADD COLUMN organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+  ADD COLUMN area_id UUID REFERENCES areas(id) ON DELETE CASCADE,
+  ADD COLUMN team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
+  ADD COLUMN agenda_task_id UUID REFERENCES agenda_tasks(id) ON DELETE SET NULL,
+  ADD COLUMN closed_at TIMESTAMPTZ,
+  ADD COLUMN closed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  ADD COLUMN notified_start BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN notified_end BOOLEAN NOT NULL DEFAULT false,
+  DROP CONSTRAINT chk_maintenance_window_one_scope,
+  ADD CONSTRAINT chk_maintenance_window_one_scope CHECK (
+    (service_id IS NOT NULL)::int + (asset_id IS NOT NULL)::int + (territorial_unit_id IS NOT NULL)::int +
+    (organization_id IS NOT NULL)::int + (area_id IS NOT NULL)::int + (team_id IS NOT NULL)::int = 1
+  );
+-- Las que ya pasaron no se avisan al aplicar la migración.
+UPDATE maintenance_windows SET notified_start = starts_at <= now(), notified_end = ends_at <= now();
+CREATE INDEX idx_maintenance_windows_org ON maintenance_windows(organization_id, starts_at, ends_at) WHERE active;
+CREATE INDEX idx_maintenance_windows_area ON maintenance_windows(area_id, starts_at, ends_at) WHERE active;
+CREATE INDEX idx_maintenance_windows_team ON maintenance_windows(team_id, starts_at, ends_at) WHERE active;

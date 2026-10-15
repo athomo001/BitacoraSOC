@@ -42,6 +42,7 @@
           }
         </section>
       }
+      @if (isInicio()) { <app-agenda-today /> }
 
       <div class="sr__metric-row">
         <label class="sr__field sr__metric">
@@ -80,6 +81,7 @@
           <textarea class="mono" rows="3" name="pending" placeholder="- [ ] …" [ngModel]="draft().pending" (ngModelChange)="edit({ pending: $event })"></textarea>
           <span class="sr__hint">{{ i18n.t('shiftReport.pendingHint') }}</span>
         </label>
+        <app-agenda-handover />
         <div class="sr__closing">
           <span class="sr__check">
             @if (canClose()) {

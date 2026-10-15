@@ -195,14 +195,19 @@ func (q *Queries) CreateEscalationPool(ctx context.Context, arg CreateEscalation
 }
 
 const createMaintenanceWindow = `-- name: CreateMaintenanceWindow :one
-INSERT INTO maintenance_windows (service_id, asset_id, territorial_unit_id, title, notes, starts_at, ends_at, suppress_notifications, priority, created_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, service_id, asset_id, territorial_unit_id, title, notes, starts_at, ends_at, suppress_notifications, priority, created_by, active
+INSERT INTO maintenance_windows (service_id, asset_id, territorial_unit_id, organization_id, area_id, team_id, agenda_task_id,
+  title, notes, starts_at, ends_at, suppress_notifications, priority, created_by, notified_start)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $10 <= now()) RETURNING id, service_id, asset_id, territorial_unit_id, title, notes, starts_at, ends_at, suppress_notifications, priority, created_by, active, organization_id, area_id, team_id, agenda_task_id, closed_at, closed_by, notified_start, notified_end
 `
 
 type CreateMaintenanceWindowParams struct {
 	ServiceID             pgtype.UUID        `json:"service_id"`
 	AssetID               pgtype.UUID        `json:"asset_id"`
 	TerritorialUnitID     pgtype.UUID        `json:"territorial_unit_id"`
+	OrganizationID        pgtype.UUID        `json:"organization_id"`
+	AreaID                pgtype.UUID        `json:"area_id"`
+	TeamID                pgtype.UUID        `json:"team_id"`
+	AgendaTaskID          pgtype.UUID        `json:"agenda_task_id"`
 	Title                 string             `json:"title"`
 	Notes                 pgtype.Text        `json:"notes"`
 	StartsAt              pgtype.Timestamptz `json:"starts_at"`
@@ -217,6 +222,10 @@ func (q *Queries) CreateMaintenanceWindow(ctx context.Context, arg CreateMainten
 		arg.ServiceID,
 		arg.AssetID,
 		arg.TerritorialUnitID,
+		arg.OrganizationID,
+		arg.AreaID,
+		arg.TeamID,
+		arg.AgendaTaskID,
 		arg.Title,
 		arg.Notes,
 		arg.StartsAt,
@@ -239,6 +248,14 @@ func (q *Queries) CreateMaintenanceWindow(ctx context.Context, arg CreateMainten
 		&i.Priority,
 		&i.CreatedBy,
 		&i.Active,
+		&i.OrganizationID,
+		&i.AreaID,
+		&i.TeamID,
+		&i.AgendaTaskID,
+		&i.ClosedAt,
+		&i.ClosedBy,
+		&i.NotifiedStart,
+		&i.NotifiedEnd,
 	)
 	return i, err
 }
@@ -1028,11 +1045,14 @@ func (q *Queries) ListEscalationPools(ctx context.Context) ([]ListEscalationPool
 
 const listMaintenanceWindows = `-- name: ListMaintenanceWindows :many
 
-SELECT id, service_id, asset_id, territorial_unit_id, title, notes, starts_at, ends_at, suppress_notifications, priority, created_by, active FROM maintenance_windows
+SELECT id, service_id, asset_id, territorial_unit_id, title, notes, starts_at, ends_at, suppress_notifications, priority, created_by, active, organization_id, area_id, team_id, agenda_task_id, closed_at, closed_by, notified_start, notified_end FROM maintenance_windows
 WHERE ($1::uuid IS NULL OR service_id = $1)
   AND ($2::uuid IS NULL OR asset_id = $2)
   AND ($3::uuid IS NULL OR territorial_unit_id = $3)
-  AND ($4::boolean IS NOT TRUE OR (active AND now() >= starts_at AND now() < ends_at))
+  AND ($4::uuid IS NULL OR organization_id = $4)
+  AND ($5::uuid IS NULL OR area_id = $5)
+  AND ($6::uuid IS NULL OR team_id = $6)
+  AND ($7::boolean IS NOT TRUE OR (active AND now() >= starts_at AND now() < ends_at))
 ORDER BY starts_at DESC
 `
 
@@ -1040,6 +1060,9 @@ type ListMaintenanceWindowsParams struct {
 	ServiceID         pgtype.UUID `json:"service_id"`
 	AssetID           pgtype.UUID `json:"asset_id"`
 	TerritorialUnitID pgtype.UUID `json:"territorial_unit_id"`
+	OrganizationID    pgtype.UUID `json:"organization_id"`
+	AreaID            pgtype.UUID `json:"area_id"`
+	TeamID            pgtype.UUID `json:"team_id"`
 	OnlyCurrent       pgtype.Bool `json:"only_current"`
 }
 
@@ -1049,6 +1072,9 @@ func (q *Queries) ListMaintenanceWindows(ctx context.Context, arg ListMaintenanc
 		arg.ServiceID,
 		arg.AssetID,
 		arg.TerritorialUnitID,
+		arg.OrganizationID,
+		arg.AreaID,
+		arg.TeamID,
 		arg.OnlyCurrent,
 	)
 	if err != nil {
@@ -1071,6 +1097,14 @@ func (q *Queries) ListMaintenanceWindows(ctx context.Context, arg ListMaintenanc
 			&i.Priority,
 			&i.CreatedBy,
 			&i.Active,
+			&i.OrganizationID,
+			&i.AreaID,
+			&i.TeamID,
+			&i.AgendaTaskID,
+			&i.ClosedAt,
+			&i.ClosedBy,
+			&i.NotifiedStart,
+			&i.NotifiedEnd,
 		); err != nil {
 			return nil, err
 		}
@@ -1635,24 +1669,39 @@ func (q *Queries) ListUnitAncestors(ctx context.Context, id uuid.UUID) ([]ListUn
 }
 
 const listWindowsForScope = `-- name: ListWindowsForScope :many
-SELECT id, service_id, asset_id, territorial_unit_id, title, notes, starts_at, ends_at, suppress_notifications, priority, created_by, active FROM maintenance_windows
-WHERE active AND ends_at > now()
-  AND (service_id = $1
-       OR asset_id = $2
-       OR territorial_unit_id = ANY($3::uuid[]))
+SELECT mw.id, mw.service_id, mw.asset_id, mw.territorial_unit_id, mw.title, mw.notes, mw.starts_at, mw.ends_at, mw.suppress_notifications, mw.priority, mw.created_by, mw.active, mw.organization_id, mw.area_id, mw.team_id, mw.agenda_task_id, mw.closed_at, mw.closed_by, mw.notified_start, mw.notified_end FROM maintenance_windows mw
+WHERE mw.active AND mw.ends_at > now()
+  AND (mw.service_id = $1
+       OR mw.asset_id = $2
+       OR mw.territorial_unit_id = ANY($3::uuid[])
+       OR mw.organization_id = (SELECT sv.organization_id FROM services sv WHERE sv.id = $1)
+       OR mw.organization_id = (SELECT ac.client_id FROM assets ac WHERE ac.id = $2)
+       OR mw.area_id = $4
+       OR mw.area_id = (SELECT aa.area_id FROM assets aa WHERE aa.id = $2)
+       OR mw.team_id = ANY($5::uuid[]))
 `
 
 type ListWindowsForScopeParams struct {
-	ServiceID pgtype.UUID `json:"service_id"`
-	AssetID   pgtype.UUID `json:"asset_id"`
-	UnitIds   []uuid.UUID `json:"unit_ids"`
+	ServiceID    pgtype.UUID `json:"service_id"`
+	AssetID      pgtype.UUID `json:"asset_id"`
+	UnitIds      []uuid.UUID `json:"unit_ids"`
+	PolicyAreaID pgtype.UUID `json:"policy_area_id"`
+	TeamIds      []uuid.UUID `json:"team_ids"`
 }
 
 // Candidatas para notify: ventanas activas del servicio, del activo, o de
 // cualquier unidad del camino territorial (un mantenimiento sobre toda la
-// zona Calama también cubre a sus routers).
+// zona Calama también cubre a sus routers). Desde 000042 también las del
+// cliente (el del servicio o del activo), del área (la de la política o del
+// activo) y de los equipos que se avisan.
 func (q *Queries) ListWindowsForScope(ctx context.Context, arg ListWindowsForScopeParams) ([]MaintenanceWindow, error) {
-	rows, err := q.db.Query(ctx, listWindowsForScope, arg.ServiceID, arg.AssetID, arg.UnitIds)
+	rows, err := q.db.Query(ctx, listWindowsForScope,
+		arg.ServiceID,
+		arg.AssetID,
+		arg.UnitIds,
+		arg.PolicyAreaID,
+		arg.TeamIds,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -1673,6 +1722,14 @@ func (q *Queries) ListWindowsForScope(ctx context.Context, arg ListWindowsForSco
 			&i.Priority,
 			&i.CreatedBy,
 			&i.Active,
+			&i.OrganizationID,
+			&i.AreaID,
+			&i.TeamID,
+			&i.AgendaTaskID,
+			&i.ClosedAt,
+			&i.ClosedBy,
+			&i.NotifiedStart,
+			&i.NotifiedEnd,
 		); err != nil {
 			return nil, err
 		}

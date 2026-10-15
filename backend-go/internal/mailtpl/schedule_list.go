@@ -141,6 +141,7 @@ func RenderScheduleList(o ScheduleListOptions) (string, error) {
 		"PeriodLabel": e(o.PeriodLabel),
 		"Rows":        strings.TrimRight(rows.String(), " \n"), // mj-table recorta el final
 		"Year":        o.Year,
+		"H1":          "ANALISTA", "H2": "INICIO", "H3": "FIN", "H4": "CARGO", "H5": "ESTADO",
 	})
 	return buf.String(), err
 }

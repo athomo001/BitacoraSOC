@@ -14,6 +14,10 @@ import { ComplementsService } from '../core/complements/complements.service';
 import { SetupService } from '../core/setup/setup.service';
 import { PermissionsService } from '../core/auth/permissions.service';
 import { InventoryService } from '../core/inventory/inventory.service';
+import { NotificationsService } from '../core/notifications/notifications.service';
+import { NotificationsBellComponent } from './notifications-bell';
+import { NotificationToastsComponent } from './notification-toasts';
+import { NoticeModalComponent } from './notice-modal';
 
 /** Ícono y etiqueta del botón de tema: muestran el tema SIGUIENTE (igual que el diseño). */
 const NEXT_THEME: Record<Theme, { icon: string; labelKey: MessageKey }> = {
@@ -33,7 +37,7 @@ const NEXT_THEME: Record<Theme, { icon: string; labelKey: MessageKey }> = {
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, MatIconModule, UserAvatarComponent],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, MatIconModule, UserAvatarComponent, NotificationsBellComponent, NotificationToastsComponent, NoticeModalComponent],
   templateUrl: './shell.html',
   styleUrl: './shell.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -52,6 +56,7 @@ export class ShellComponent implements OnInit {
   private readonly perms = inject(PermissionsService);
   /** Solicitudes de baja de equipos que espera el usuario (admin o jefatura): número en el menú. */
   protected readonly inventory = inject(InventoryService);
+  private readonly notifications = inject(NotificationsService);
 
   constructor() {
     // Encender o apagar "Complementos" (aquí o desde otro admin) recarga la
@@ -122,9 +127,13 @@ export class ShellComponent implements OnInit {
       if (eventType === 'inventory.request') void this.inventory.refreshPending();
       // Marca cambiada por un admin: barra, pestaña y fuente sin F5.
       if (eventType === 'config.branding.updated' && data && typeof data === 'object' && 'appTitle' in data) this.branding.apply(data as Branding);
+      // Campana y avisos con acuse (9.5): solo los eventos que nombran al usuario.
+      this.notifications.onEvent(eventType, data);
     });
     this.destroyRef.onDestroy(stop);
     await Promise.all([this.loadUser(), this.loadFeatures()]);
+    const me = this.auth.user()?.id;
+    if (me) void this.notifications.start(me);
   }
 
   /** Tras un F5 solo sobrevive el token: el usuario (nombre, avatar) se vuelve a pedir. */
@@ -150,12 +159,12 @@ export class ShellComponent implements OnInit {
    * (~150 kB); si se importara arriba, iría en el bundle inicial de toda la
    * app solo por algo que se abre de vez en cuando.
    */
-  protected async openProfile(): Promise<void> {
+  protected async openProfile(tab?: 'notif'): Promise<void> {
     const [{ Dialog }, { ProfileDialogComponent }] = await Promise.all([
       import('@angular/cdk/dialog'),
       import('./profile-dialog'),
     ]);
-    this.injector.get(Dialog).open(ProfileDialogComponent, { ariaLabel: this.i18n.t('profile.title') });
+    this.injector.get(Dialog).open(ProfileDialogComponent, { ariaLabel: this.i18n.t('profile.title'), data: { tab } });
   }
 
   // Atajos de teclado globales — spec/06-frontend-arquitectura-y-ui.md sección 3.

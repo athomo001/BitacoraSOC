@@ -9,6 +9,8 @@ import { AdminModulesComponent } from './admin-modules';
 import { AdminFeaturesComponent } from './admin-features';
 import { AdminTerritoryComponent } from './admin-territory';
 import { AdminInventoryComponent } from './admin-inventory';
+import { AdminAgendaComponent } from './admin-agenda';
+import { AdminNotificationsComponent } from './admin-notifications';
 import { AdminOrganizationsComponent } from './admin-organizations';
 import { AdminTeamsComponent } from './admin-teams';
 import { AdminEscalationComponent } from './admin-escalation';
@@ -28,7 +30,7 @@ import { SystemFeaturesService } from '../../core/system-features/system-feature
 import '../../core/i18n/packs/admin';
 export type AdminSection =
   | 'access' | 'areas' | 'shifts' | 'checklist' | 'escalation' | 'tickets' | 'clientAlerts' | 'smtp' | 'reports'
-  | 'organizations' | 'territory' | 'inventory' | 'teams'
+  | 'agenda' | 'notifications' | 'organizations' | 'territory' | 'inventory' | 'teams'
   | 'modules' | 'brand' | 'features' | 'backups' | 'audit' | 'complements';
 
 interface NavItem {
@@ -63,6 +65,8 @@ const NAV: readonly { labelKey: MessageKey; items: readonly NavItem[] }[] = [
       { id: 'clientAlerts', icon: 'campaign', labelKey: 'admin.nav.clientAlerts' },
       { id: 'smtp', icon: 'mail', labelKey: 'admin.nav.smtp' },
       { id: 'reports', icon: 'summarize', labelKey: 'admin.nav.reports', requiresSocOrNoc: true },
+      { id: 'agenda', icon: 'event_note', labelKey: 'admin.nav.agenda' },
+      { id: 'notifications', icon: 'notifications', labelKey: 'admin.nav.notifications' },
     ],
   },
   {
@@ -115,7 +119,7 @@ function normalize(text: string): string {
   imports: [
     MatIconModule, AdminModulesComponent, AdminBrandComponent, AdminFeaturesComponent, AdminTerritoryComponent, AdminInventoryComponent, AdminOrganizationsComponent, AdminTeamsComponent,
     AdminEscalationComponent, AdminShiftsComponent, AdminSmtpComponent, AdminReportsComponent, AdminBackupsComponent, AdminAuditComponent,
-    AdminAccessComponent, AdminChecklistComponent, AdminComplementsComponent, AdminClientAlertsComponent, AdminTicketsComponent, AdminAreasComponent,
+    AdminAccessComponent, AdminChecklistComponent, AdminComplementsComponent, AdminClientAlertsComponent, AdminTicketsComponent, AdminAreasComponent, AdminAgendaComponent, AdminNotificationsComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKeydown($event)' },
@@ -159,6 +163,8 @@ function normalize(text: string): string {
           @case ('clientAlerts') { <app-admin-client-alerts /> }
           @case ('smtp') { <app-admin-smtp /> }
           @case ('reports') { <app-admin-reports /> }
+          @case ('agenda') { <app-admin-agenda /> }
+          @case ('notifications') { <app-admin-notifications /> }
           @case ('organizations') { <app-admin-organizations /> }
           @case ('territory') { <app-admin-territory /> }
           @case ('inventory') { <app-admin-inventory /> }

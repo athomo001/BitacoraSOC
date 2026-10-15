@@ -148,6 +148,8 @@ flowchart TD
 
 Ver a quién llamar queda registrado en la Auditoría.
 
+**Ventanas de mantenimiento:** cualquier analista las programa y las cierra. Aplican a un servicio, un activo, una zona, un **cliente** (todos sus servicios), un **área** o un **equipo** de la app; con «suprimir» el escalamiento anota sin enviar el aviso. Una ventana en curso se cierra antes de tiempo con **Cerrar ahora** (queda registrado quién y cuándo); una programada se **cancela**. Se ven también en el calendario de la Agenda.
+
 ---
 
 ## Mapa
@@ -172,6 +174,41 @@ Los equipos de tu área (dueña o responsable): servidores, computadores, equipo
 - **Historial:** queda solo cada cambio de ficha («SO: 20.04 → 24.04»), cada **Registrar trabajo** y cada ticket resuelto cuyo lugar es el equipo. La pestaña **Tickets** muestra los tickets que lo tuvieron como lugar.
 - **Dar de baja o borrar:** lo hace el admin o la jefatura del área dueña. Los demás usan **Pedir baja** o **Pedir borrado** con un motivo; a quien decide le aparece el número en el menú (Inventario) y acepta o rechaza en **Solicitudes**. Un equipo con registros en la bitácora o en escalamiento no se borra: se da de baja.
 - **Cargar CSV:** se elige el tipo, se baja la plantilla, se llena en Excel y se sube. Antes de guardar se ve fila por fila qué pasará; cada equipo se busca por su código (se actualiza si existe, se crea si no) y las filas con error no entran. En una celda van varios valores separados por «;»: `ips` = `Red=10.10.4.21; VIP=10.10.4.20; iLO=10.10.99.21`, `responsables` = `Configuración y sistema=área:TI; Energía y conectividad=org:Datahouse`. El archivo no se guarda. **Exportar lo que hay** baja el inventario en el mismo formato.
+
+---
+
+## Agenda
+
+Todo lo que hay que hacer para una fecha: el informe mensual de un cliente, el respaldo de los switches el último día hábil, la acción que pide un CSM o un pendiente propio. La ven todos los perfiles.
+
+- **Mis pendientes:** lo tuyo, lo de tu nivel («N1 de Infra») y lo de tu guardia cuando estás de guardia, ordenado por vencimiento: atrasadas, hoy, próximos 3 días hábiles, más adelante y lo que cerraste hoy. Lo que va a un nivel aparece **sin tomar**: el primero que aprieta **Tomar** se queda con ella.
+- **Detalle:** cuándo vence (a las 20:00 del día), quién la tiene, cuándo se repite y quién la asignó. Los **pasos** se marcan como un checklist. **Marcar hecha** pide una nota y un enlace opcionales; **Omitir** pide un motivo (lo pueden hacer el responsable o quien la asignó); también **Traspasar** a alguien del área, **Devolver al nivel** y **Reabrir**.
+- **Calendario:** mes y semana, con fines de semana y feriados sombreados, por área, cliente o solo las tuyas.
+- **Gestión:** lo que asignaste y cómo va (a tiempo, en riesgo, atrasada), con las últimas veces de cada tarea recurrente e indicadores de 90 días. La jefatura ve además todo su área.
+- **Nueva tarea:** quién la hace (una persona, un nivel o quien esté de guardia) y cuándo: una vez, cada N días, semanal, el día hábil N del mes, el último día hábil o un día fijo que se adelanta o posterga si no es hábil. Abajo se ven las próximas fechas, con las que se corrieron por un feriado. Puedes asignarte a ti y a los niveles de abajo de tu área; **hacia arriba no** (se pide con un ticket). La jefatura asigna a todo su área, y Gestión (CSM) y las jefaturas también a otras áreas.
+- **Se cierra sola:** una tarea con cliente puede quedar ligada a un informe de Reportes; al enviárselo a ese cliente, queda hecha.
+- **Ausencias:** si quien tiene una tarea está de vacaciones o con licencia en Dotación ese día, vuelve a su nivel.
+- **Cierre de turno:** el popup de cierre muestra tus tareas abiertas que vencen hasta el siguiente día hábil, para quedártelas, pasarlas a quien entra o devolverlas al nivel.
+- Si el cliente de una tarea se desactiva, sus tareas recurrentes se pausan hasta reactivarlo.
+- **Ventana de mantenimiento desde una tarea:** en una tarea de una vez se puede marcar «Crear ventana de mantenimiento» con hora de inicio y fin. Aplica al cliente de la tarea (o a su área) y se mueve con la tarea si cambia de fecha. Las ventanas se ven en el calendario.
+
+---
+
+## Notificaciones
+
+Lo mismo nunca llega por todos los canales a la vez.
+
+- **Campana**, junto a tu nombre en la barra lateral: el registro de todo, con el número de no leídas en vivo. Cada aviso lleva a lo suyo (la tarea, el ticket). Los avisos iguales se agrupan («3 tareas vencen hoy»). «Marcar todas leídas» la deja en cero. Guarda 90 días.
+- **Aviso emergente**, abajo a la derecha, con la app abierta: «Ver» lleva a lo suyo y «Más tarde» lo deja en la campana. Se va solo y nunca bloquea.
+- **Inicio de turno**: el popup muestra «Hoy vencen 3 tareas y tienes 1 atrasada».
+- **Correo**: el **resumen diario** a las 08:00 de los días hábiles, solo si tienes algo, y al instante solo los atrasos (y los avisos antes del vencimiento, si lo dejas así).
+- **Notificaciones del navegador** (opcional): sirven con la app en otra pestaña; el navegador pide permiso.
+
+Qué avisa: en la **Agenda**, que te asignaron una tarea (a ti, a tu nivel o a tu guardia), los avisos antes del vencimiento, «vence hoy», el atraso (solo al responsable), un traspaso, y a la jefatura cuando una ausencia devuelve una tarea al nivel. En **Tickets**, que te asignaron uno o te sumaron como resolutor, que derivaron uno a tu área y que comentaron uno tuyo. En **Inventario**, una solicitud de baja que decides. Y cuando empieza o termina una **ventana de mantenimiento** de tu área.
+
+**Mis preferencias:** en Mi perfil → Notificaciones (o con el ícono de ajustes de la campana) eliges, por tipo, si te llega como aviso emergente y por correo, el resumen diario y las notificaciones del navegador. Lo que tiene candado lo fijó el admin y no se apaga.
+
+**Avisos con acuse:** lo importante sale en una ventana al centro que solo se cierra con **Leído**; lo que estabas escribiendo sigue ahí. Si hay varios, salen uno tras otro. Quedan en la campana para volver a leerlos. Los envían el admin, la jefatura de área y quien tenga el permiso «Enviar avisos con acuse», desde la campana → **Avisos con acuse**: título, texto (markdown), a quién (personas, un nivel de un área, áreas enteras o todos), ahora o programado, y opcionalmente cuándo deja de aparecer. Ahí mismo se ve el avance («12 de 15 leyeron»), quién falta, y se les puede recordar por correo.
 
 ---
 
@@ -285,6 +322,8 @@ Solo para administradores. El menú se agrupa así:
 | | **Avisos por cliente** | Avisos que aparecen al trabajar con un cliente y el catálogo de eventos de los informes. |
 | | **Correo** | SMTP y remitente, con plantillas para los proveedores comunes y correo de prueba. |
 | | **Reportes de turno** | Formato y estado de los reportes de cierre. |
+| | **Notificaciones** | La hora del resumen diario, lo que nadie puede apagar (por defecto los atrasos y los avisos con acuse), cada cuántos minutos se agrupan los avisos iguales y cuántos días guarda la campana. |
+| | **Agenda** | Horario hábil con que la Agenda calcula vencimientos y avisos (por defecto lunes a viernes de 08:00 a 20:00; no cambia turnos ni guardias) y los feriados por año: se importan los de Chile incluidos en la app y se agregan o quitan a mano. |
 | Catálogos | **Organizaciones y servicios** | Clientes, tipos, servicios y fuentes de log. |
 | | **Territorio** (NOC) | Regiones, zonas y sitios, con importación CSV y activar o desactivar en lote. Para el Mapa: el **fondo** (OpenStreetMap público, servidor propio o sin fondo) y **Sin ubicación**, donde se ubica con un clic en el mapa cada localidad que no tiene coordenadas. |
 | | **Inventario** | Tipos de equipo y sus campos (texto, número, lista o fecha), y la lista de tipos de responsabilidad. Quitar un campo no borra lo cargado. |

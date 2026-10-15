@@ -11,6 +11,8 @@ import type { TicketsKey } from './packs/tickets';
 import type { TeamKey } from './packs/team';
 import type { MapKey } from './packs/map';
 import type { InventoryKey } from './packs/inventory';
+import type { AgendaKey } from './packs/agenda';
+import type { NotificationsKey } from './packs/notifications';
 
 const ES = {
   'nav.entries': 'Bitácora',
@@ -130,6 +132,9 @@ const ES = {
   'escAdmin.kind.asset': 'Activo',
   'escAdmin.kind.unit': 'Zona',
   'escAdmin.kind.service': 'Servicio',
+  'escAdmin.kind.client': 'Cliente',
+  'escAdmin.kind.area': 'Área',
+  'escAdmin.kind.team': 'Equipo de la app',
   'escAdmin.mode.unique': 'Solo el principal',
   'escAdmin.mode.sequential': 'Uno tras otro',
   'escAdmin.mode.pool': 'Todos a la vez',
@@ -162,6 +167,7 @@ const ES = {
   'nav.team': 'Mi equipo',
   'nav.map': 'Mapa',
   'nav.inventory': 'Inventario',
+  'nav.agenda': 'Agenda',
   'shell.pending': 'Solicitudes pendientes',
   'rpt.f.chooseClient': 'Elige el cliente…',
   'rpt.f.additional': 'Información adicional',
@@ -228,7 +234,9 @@ export type MessageKey =
   | TicketsKey
   | TeamKey
   | MapKey
-  | InventoryKey;
+  | InventoryKey
+  | AgendaKey
+  | NotificationsKey;
 
 /**
  * El inglés va en messages-en.ts y se descarga solo al cambiar a EN: así no

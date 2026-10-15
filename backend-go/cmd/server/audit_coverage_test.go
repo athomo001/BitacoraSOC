@@ -18,6 +18,7 @@ var auditExempt = map[string]string{
 	"DELETE /api/drafts/{id}":          "descarta un borrador propio del autoguardado; nunca fue un dato de negocio",
 	"PUT /api/notes/personal":          "libreta privada con autoguardado cada 3 s (el legacy tampoco la auditaba)",
 	"POST /api/reports/{kind}/preview": "solo arma la vista previa del correo, no envía ni guarda nada (el envío sí se audita)",
+	"POST /api/agenda/preview":         "solo calcula las próximas fechas de una recurrencia, no guarda nada (crear la tarea sí se audita)",
 }
 
 // TestEveryWriteRouteAudits recorre las rutas POST/PUT/PATCH/DELETE que

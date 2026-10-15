@@ -314,6 +314,7 @@ func (h *TicketsHandler) Derive(w http.ResponseWriter, r *http.Request) {
 	h.AuditLog.Log(ctx, "ticket.derived", audit.LevelInfo, audit.Success(), map[string]any{
 		"ticketId": id.String(), "fromAreaId": old.AreaID.String(), "toArea": to.Code, "reason": reason,
 	})
+	h.notifyDerived(ctx, id, to.ID, to.Name, reason, user.ID)
 	h.notifyChanged(ctx, id)
 	d, err := h.loadDetail(r, id)
 	if err != nil {

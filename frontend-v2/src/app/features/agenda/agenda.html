@@ -1,0 +1,247 @@
+<div class="ag">
+  <div class="ag__toolbar">
+    <h1 class="ag__title"><mat-icon>event_note</mat-icon>{{ i18n.t('nav.agenda') }}</h1>
+    <span class="adm-muted">{{ i18n.t('ag.subtitle') }}</span>
+    <span class="adm-push ag__tabs" role="tablist">
+      <button type="button" role="tab" class="seg" [attr.aria-selected]="tab() === 'mine'" [attr.aria-pressed]="tab() === 'mine'" (click)="setTab('mine')"><mat-icon>checklist</mat-icon>{{ i18n.t('ag.tab.mine') }}</button>
+      <button type="button" role="tab" class="seg" [attr.aria-selected]="tab() === 'calendar'" [attr.aria-pressed]="tab() === 'calendar'" (click)="setTab('calendar')"><mat-icon>calendar_month</mat-icon>{{ i18n.t('ag.tab.calendar') }}</button>
+      <button type="button" role="tab" class="seg" [attr.aria-selected]="tab() === 'managed'" [attr.aria-pressed]="tab() === 'managed'" (click)="setTab('managed')"><mat-icon>monitoring</mat-icon>{{ i18n.t('ag.tab.managed') }}</button>
+      @if (meta()) {
+        <button type="button" class="adm-btn adm-btn--primary" (click)="openNew()"><mat-icon>add</mat-icon>{{ i18n.t('ag.new') }}</button>
+      }
+    </span>
+  </div>
+
+  @if (error(); as e) { <p class="adm-error ag__error" role="alert">{{ e }}</p> }
+
+  <div class="ag__grid" [class.ag__grid--wide]="tab() !== 'mine' && !selected() && !form()">
+    <section class="adm-card ag__main">
+      @switch (tab()) {
+        @case ('mine') {
+          <div class="ag__bar">
+            @if (lateCount()) { <span class="pill tone-bad">{{ i18n.tf('ag.count.late', lateCount()) }}</span> }
+            @if (todayCount()) { <span class="pill tone-warn">{{ i18n.tf('ag.count.today', todayCount()) }}</span> }
+            <span class="adm-hint">{{ i18n.t('ag.mineHint') }}</span>
+          </div>
+          @for (g of grouped(); track g.id) {
+            <div class="ag__grp"><span class="adm-label">{{ i18n.t(g.key) }}</span><span class="pill {{ g.tone }} mono">{{ g.items.length }}</span></div>
+            @for (o of g.items; track o.id) {
+              <button type="button" class="ag__row" [attr.aria-current]="selected()?.id === o.id" (click)="select(o)">
+                <span class="ag__stripe {{ g.id === 'late' ? 'tone-bad' : g.id === 'done' ? 'tone-ok' : areaTone(o.task.areaId) }}"></span>
+                <span class="ag__cell">
+                  <span class="ag__name">
+                    @if (o.status === 'done') { <mat-icon class="ag__ok">task_alt</mat-icon> }
+                    @if (o.status === 'skipped') { <mat-icon class="adm-secondary">redo</mat-icon> }
+                    {{ o.task.name }}
+                    @if (o.task.clientName) { <span class="pill tone-info">{{ o.task.clientName }}</span> }
+                    @if (!o.holderId && o.status === 'pending') { <span class="pill tone-neutral">{{ i18n.t('ag.untaken') }}</span> }
+                  </span>
+                  <span class="ag__sub">
+                    <mat-icon>{{ whoIcon(o) }}</mat-icon>{{ holder(o) }}
+                    @if (o.task.recurrence.kind !== 'once') { · <mat-icon>repeat</mat-icon> }
+                    @if (o.task.steps.length) { · {{ o.stepsDone.length }}/{{ o.task.steps.length }} {{ i18n.t('ag.stepsWord') }} }
+                  </span>
+                </span>
+                <span class="ag__due">
+                  <b>{{ day(o.dueDate) }}</b>
+                  <span [class.ag__late]="o.late">{{ o.status === 'pending' ? due(o) : i18n.t(o.status === 'done' ? 'ag.status.done' : 'ag.status.skipped') }}</span>
+                </span>
+              </button>
+            }
+          } @empty {
+            @if (loaded()) { <p class="adm-empty">{{ i18n.t('ag.empty.mine') }}</p> }
+          }
+        }
+
+        @case ('calendar') {
+          <div class="ag__bar">
+            <span class="ag__stepper">
+              <button type="button" class="adm-icon-btn" [attr.aria-label]="i18n.t('ag.cal.prev')" (click)="moveCal(-1)"><mat-icon>chevron_left</mat-icon></button>
+              <b class="ag__caltitle">{{ calTitle() }}</b>
+              <button type="button" class="adm-icon-btn" [attr.aria-label]="i18n.t('ag.cal.next')" (click)="moveCal(1)"><mat-icon>chevron_right</mat-icon></button>
+            </span>
+            <button type="button" class="adm-btn" (click)="moveCal(0)">{{ i18n.t('ag.cal.today') }}</button>
+            <button type="button" class="seg" [attr.aria-pressed]="calMode() === 'month'" (click)="setCalMode('month')">{{ i18n.t('ag.cal.month') }}</button>
+            <button type="button" class="seg" [attr.aria-pressed]="calMode() === 'week'" (click)="setCalMode('week')">{{ i18n.t('ag.cal.week') }}</button>
+            <span class="ag__sep"></span>
+            @if (calAreas().length > 1) {
+              <button type="button" class="seg" [attr.aria-pressed]="calArea() === ''" (click)="setCalArea('')">{{ i18n.t('ag.cal.allAreas') }}</button>
+              @for (a of calAreas(); track a.id) {
+                <button type="button" class="seg" [attr.aria-pressed]="calArea() === a.id" (click)="setCalArea(a.id)">{{ a.name }}</button>
+              }
+            }
+            <button type="button" class="seg" [attr.aria-pressed]="calOnlyMine()" (click)="toggleOnlyMine()"><mat-icon>person</mat-icon>{{ i18n.t('ag.cal.onlyMine') }}</button>
+            @if (clients().length) {
+              <select class="adm-input ag__client" name="calClient" [attr.aria-label]="i18n.t('ag.form.client')" (change)="setCalClient(val($event))">
+                <option value="" [selected]="calClient() === ''">{{ i18n.t('ag.cal.allClients') }}</option>
+                @for (c of clients(); track c.id) { <option [value]="c.id" [selected]="calClient() === c.id">{{ c.name }}</option> }
+              </select>
+            }
+          </div>
+          <div class="ag__cal" [class.ag__cal--week]="calMode() === 'week'">
+            @for (d of dowHeader(); track $index) { <div class="ag__dow">{{ d }}</div> }
+            @for (c of cells(); track c.iso) {
+              <div class="ag__day" [class.ag__day--off]="c.off" [class.ag__day--out]="c.out" [class.ag__day--today]="c.today">
+                <span class="ag__n">{{ c.day }}</span>
+                @if (c.holiday) { <span class="ag__hol">{{ c.holiday }}</span> }
+                @for (w of c.windows; track w.id) {
+                  <span class="ag__win" [title]="i18n.t('ag.cal.window') + ': ' + w.title + ' · ' + w.targetName"><mat-icon class="ag__win-ic">engineering</mat-icon>{{ w.title }}</span>
+                }
+                @for (o of (calMode() === 'week' ? c.items : c.items.slice(0, 3)); track o.task.id + o.dueDate) {
+                  <button type="button" class="ag__chip {{ o.late ? 'tone-bad' : areaTone(o.task.areaId) }}" [class.ag__chip--closed]="o.status !== 'pending'"
+                    [class.ag__chip--projected]="o.projected" [attr.aria-current]="selected()?.id === o.id && !o.projected"
+                    [title]="o.task.name + ' · ' + holder(o)" (click)="select(o)">{{ o.task.name }}</button>
+                }
+                @if (calMode() === 'month' && c.items.length > 3) { <span class="adm-hint">{{ i18n.tf('ag.cal.more', c.items.length - 3) }}</span> }
+              </div>
+            }
+          </div>
+          <div class="ag__legend">
+            @for (a of calAreas(); track a.id) { <span><i class="{{ areaTone(a.id) }}"></i>{{ a.name }}</span> }
+            <span><i class="tone-bad"></i>{{ i18n.t('ag.cal.late') }}</span>
+            <span><i class="ag__legend-win"></i>{{ i18n.t('ag.cal.window') }}</span>
+            <span><i class="ag__legend-off"></i>{{ i18n.t('ag.cal.offday') }}</span>
+          </div>
+        }
+
+        @case ('managed') {
+          @if (meta(); as m) { <app-agenda-managed [meta]="m" [refresh]="refreshTick()" (edit)="editTask($event)" /> }
+        }
+      }
+    </section>
+
+    @if (form(); as f) {
+      <section class="adm-card ag__panel">
+        @if (meta(); as m) {
+          <app-agenda-task-form [meta]="m" [task]="f.task" (saved)="onSaved()" (cancelled)="closeForm()" (removed)="onSaved()" />
+        }
+      </section>
+    } @else if (selected(); as o) {
+      <section class="adm-card ag__panel">
+        <div class="adm-card__head ag__dhead">
+          <h2 class="adm-card__title">{{ o.task.name }}</h2>
+          @if (o.task.clientName) { <span class="pill tone-info">{{ o.task.clientName }}</span> }
+          <span class="pill tone-neutral">{{ o.task.areaName }}</span>
+          @if (o.status === 'done') { <span class="pill tone-ok adm-push">{{ i18n.t('ag.status.done') }}</span> }
+          @else if (o.status === 'skipped') { <span class="pill tone-neutral adm-push">{{ i18n.t('ag.status.skipped') }}</span> }
+          @else if (o.late) { <span class="pill tone-bad adm-push">{{ i18n.t('ag.status.late') }}</span> }
+          @if (tab() !== 'mine') {
+            <button type="button" class="adm-icon-btn" [class.adm-push]="o.status === 'pending' && !o.late" [attr.aria-label]="i18n.t('ag.close')" (click)="selected.set(null)"><mat-icon>close</mat-icon></button>
+          }
+        </div>
+        @if (o.absentName && o.status === 'pending') { <p class="ag__note ag__note--warn">{{ i18n.tf('ag.absent', o.absentName) }}</p> }
+        <dl class="ag__facts">
+          <dt>{{ i18n.t('ag.f.due') }}</dt>
+          <dd><b>{{ day(o.dueDate, true) }} · {{ meta()?.dayEnd }}</b>
+            @if (o.status === 'pending') { <span class="adm-hint" [class.ag__late]="o.late">{{ due(o) }}</span> }
+            @if (o.movedFrom) { <span class="adm-hint">{{ i18n.tf('ag.f.moved', day(o.movedFrom)) }}</span> }</dd>
+          <dt>{{ i18n.t('ag.f.holder') }}</dt>
+          <dd><mat-icon>{{ whoIcon(o) }}</mat-icon>{{ holder(o) }}
+            @if (!o.holderId && o.status === 'pending') { <span class="pill tone-neutral">{{ i18n.t('ag.untaken') }}</span> }</dd>
+          <dt>{{ i18n.t('ag.f.repeat') }}</dt><dd>{{ recText(o) }}</dd>
+          <dt>{{ i18n.t('ag.f.by') }}</dt><dd>{{ o.task.createdBy === meta()?.me ? i18n.t('ag.you') : o.task.createdByName }}</dd>
+          @if (o.task.reportKind) {
+            <dt>{{ i18n.t('ag.f.report') }}</dt><dd><mat-icon>description</mat-icon>{{ i18n.t(o.task.reportKind === 'incident' ? 'ag.report.incident' : 'ag.report.bulletin') }}</dd>
+          }
+          @if (o.task.docUrl) {
+            <dt>{{ i18n.t('ag.f.doc') }}</dt><dd><a class="mono ag__link" [href]="o.task.docUrl" target="_blank" rel="noopener noreferrer">{{ o.task.docUrl }}</a></dd>
+          }
+        </dl>
+        @if (o.task.description) { <p class="ag__desc">{{ o.task.description }}</p> }
+
+        @if (o.task.steps.length) {
+          <div class="ag__grp"><span class="adm-label">{{ i18n.t('ag.stepsTitle') }}</span><span class="adm-hint">{{ o.stepsDone.length }}/{{ o.task.steps.length }}</span></div>
+          <div class="ag__steps">
+            @for (s of o.task.steps; track $index) {
+              <button type="button" class="ag__step" [attr.aria-pressed]="o.stepsDone.includes($index)" [disabled]="busy() || !o.canAct || o.status !== 'pending'" (click)="toggleStep(o, $index)">
+                <mat-icon>{{ o.stepsDone.includes($index) ? 'check_box' : 'check_box_outline_blank' }}</mat-icon><span>{{ s }}</span>
+              </button>
+            }
+          </div>
+        }
+
+        @if (o.status !== 'pending') {
+          <div class="ag__box">
+            @if (o.byReport) { <span>{{ i18n.t('ag.byReport') }}</span> }
+            @if (o.note) { <span>{{ o.note }}</span> }
+            @if (o.skipReason) { <span>{{ o.skipReason }}</span> }
+            @if (o.link) { <a class="mono ag__link" [href]="o.link.startsWith('http') ? o.link : null" target="_blank" rel="noopener noreferrer">{{ o.link }}</a> }
+            <span class="adm-hint">{{ i18n.tf('ag.closedBy', o.closedByName || '—') }}</span>
+            @if (o.canReopen) { <span><button type="button" class="adm-btn" [disabled]="busy()" (click)="reopen(o)"><mat-icon>undo</mat-icon>{{ i18n.t('ag.reopen') }}</button></span> }
+          </div>
+        } @else {
+          @switch (action()) {
+            @case ('done') {
+              <div class="ag__box">
+                <span class="adm-label">{{ i18n.t('ag.done') }}</span>
+                <textarea class="adm-input" name="doneNote" rows="2" maxlength="5000" [placeholder]="i18n.t('ag.doneNote')" [value]="note()" (input)="note.set(val($event))"></textarea>
+                <input class="adm-input" name="doneLink" maxlength="500" [placeholder]="i18n.t('ag.doneLink')" [value]="link()" (input)="link.set(val($event))" />
+                <span class="ag__actions"><button type="button" class="adm-btn" (click)="startAction(null)">{{ i18n.t('ag.cancel') }}</button>
+                  <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy()" (click)="done(o)"><mat-icon>task_alt</mat-icon>{{ i18n.t('ag.save') }}</button></span>
+              </div>
+            }
+            @case ('skip') {
+              <div class="ag__box">
+                <span class="adm-label">{{ i18n.t('ag.skipTitle') }}</span>
+                <span class="ag__actions">
+                  @for (r of skipReasons; track r) {
+                    <button type="button" class="seg" [attr.aria-pressed]="reason() === i18n.t(r)" (click)="reason.set(i18n.t(r))">{{ i18n.t(r) }}</button>
+                  }
+                </span>
+                <input class="adm-input" name="skipReason" maxlength="500" [placeholder]="i18n.t('ag.skip.reason')" [value]="reason()" (input)="reason.set(val($event))" />
+                <span class="adm-hint">{{ i18n.t('ag.skipHint') }}</span>
+                <span class="ag__actions"><button type="button" class="adm-btn" (click)="startAction(null)">{{ i18n.t('ag.cancel') }}</button>
+                  <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy() || !reason().trim()" (click)="skip(o)"><mat-icon>redo</mat-icon>{{ i18n.t('ag.skip') }}</button></span>
+              </div>
+            }
+            @case ('handover') {
+              <div class="ag__box">
+                <label class="adm-field"><span class="adm-label">{{ i18n.t('ag.handoverTo') }}</span>
+                  <select class="adm-input" name="handoverTo" (change)="handoverTo.set(val($event))">
+                    <option value="" [selected]="!handoverTo()">{{ i18n.t('ag.ho.pick') }}</option>
+                    @for (p of handoverPeople(); track p.id) { <option [value]="p.id">{{ p.name }}</option> }
+                  </select></label>
+                <span class="ag__actions"><button type="button" class="adm-btn" (click)="startAction(null)">{{ i18n.t('ag.cancel') }}</button>
+                  <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy() || !handoverTo()" (click)="handover(o)"><mat-icon>swap_horiz</mat-icon>{{ i18n.t('ag.handover') }}</button></span>
+              </div>
+            }
+            @default {
+              @if (o.canTake) {
+                <div class="ag__box">
+                  <span>{{ o.task.assigneeKind === 'guard' && !o.offeredLevel ? i18n.t('ag.guardOffer') : i18n.tf('ag.offered', o.offeredLevel || o.task.assigneeName) }}</span>
+                  <span class="ag__actions">
+                    <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy()" (click)="take(o)"><mat-icon>back_hand</mat-icon>{{ i18n.t('ag.take') }}</button>
+                    <button type="button" class="adm-btn" [disabled]="busy()" (click)="startAction('done')"><mat-icon>task_alt</mat-icon>{{ i18n.t('ag.done') }}</button>
+                  </span>
+                </div>
+              } @else {
+                <div class="ag__actions ag__actions--pad">
+                  @if (o.canAct) {
+                    <button type="button" class="adm-btn adm-btn--primary" (click)="startAction('done')"><mat-icon>task_alt</mat-icon>{{ i18n.t('ag.done') }}</button>
+                  }
+                  @if (o.canSkip) {
+                    <button type="button" class="adm-btn" (click)="startAction('skip')"><mat-icon>redo</mat-icon>{{ i18n.t('ag.skip') }}</button>
+                  }
+                  @if (o.canAct && o.holderId === meta()?.me) {
+                    <button type="button" class="adm-btn" (click)="startAction('handover')"><mat-icon>swap_horiz</mat-icon>{{ i18n.t('ag.handover') }}</button>
+                  }
+                  @if (o.canRelease) {
+                    <button type="button" class="adm-btn" [disabled]="busy()" (click)="release(o)"><mat-icon>undo</mat-icon>{{ i18n.t('ag.release') }}</button>
+                  }
+                </div>
+              }
+            }
+          }
+        }
+        @if (actionError(); as e) { <p class="adm-error ag__pad" role="alert">{{ e }}</p> }
+        @if (o.task.canEdit) {
+          <div class="ag__actions ag__actions--pad ag__actions--end">
+            <button type="button" class="adm-btn" (click)="editTask(o.task.id)"><mat-icon>edit</mat-icon>{{ i18n.t('ag.editTask') }}</button>
+          </div>
+        }
+      </section>
+    } @else if (tab() === 'mine') {
+      <section class="adm-card ag__panel"><p class="adm-empty">{{ i18n.t('ag.pick') }}</p></section>
+    }
+  </div>
+</div>

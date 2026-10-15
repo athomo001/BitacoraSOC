@@ -502,6 +502,7 @@ func (h *TicketsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		_ = h.Queries.AddTicketResolver(ctx, db.AddTicketResolverParams{TicketID: id, UserID: *req.AssignedUserID, AddedBy: pgtype.UUID{Bytes: actor.ID, Valid: actor.ID != uuid.Nil}})
 		if !old.AssignedUserID.Valid || uuid.UUID(old.AssignedUserID.Bytes) != *req.AssignedUserID {
 			h.Mailer.Emit(ctx, mailEmission{Event: ticketmail.TeamAssigned, TicketID: id, ActorID: actor.ID, Targets: []uuid.UUID{*req.AssignedUserID}})
+			h.notifyAssigned(ctx, id, *req.AssignedUserID, actor.ID, false)
 		}
 	}
 	if req.Status != nil && tickets.Status(*req.Status) != from {
@@ -674,6 +675,7 @@ func (h *TicketsHandler) AddResolver(w http.ResponseWriter, r *http.Request) {
 	}
 	h.AuditLog.Log(ctx, "ticket.resolver.add", audit.LevelInfo, audit.Success(), map[string]any{"ticketId": id.String(), "userId": req.UserID.String()})
 	h.Mailer.Emit(ctx, mailEmission{Event: ticketmail.TeamResolverAdded, TicketID: id, ActorID: actor.ID, Targets: []uuid.UUID{req.UserID}})
+	h.notifyAssigned(ctx, id, req.UserID, actor.ID, true)
 	h.notifyChanged(ctx, id)
 	w.WriteHeader(http.StatusNoContent)
 }

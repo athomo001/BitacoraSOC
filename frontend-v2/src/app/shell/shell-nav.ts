@@ -42,6 +42,8 @@ export const SHELL_NAV_ITEMS: readonly ShellNavItem[] = [
   { path: 'directory', labelKey: 'nav.directory', icon: 'contacts', shortcutDigit: '4' },
   // Inventario (spec/16 §4.2, 9.2): equipos por área; el servidor decide qué ve cada uno.
   { path: 'inventory', labelKey: 'nav.inventory', icon: 'dns', requiresAreaOps: true },
+  // Agenda (spec/16 §4.3, 9.3): todos los perfiles (decisión del dueño 2026-10-14).
+  { path: 'agenda', labelKey: 'nav.agenda', icon: 'event_note' },
   // Reportes (comentario del dueño #10): informes y boletines por correo. Es del núcleo:
   // SOC (incidentes de seguridad) y NOC (caída de un enlace) le avisan igual al cliente.
   { path: 'reports', labelKey: 'nav.reports', icon: 'outgoing_mail', shortcutDigit: '8', requiresOperational: true },

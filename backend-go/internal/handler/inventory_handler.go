@@ -36,6 +36,8 @@ type InventoryHandler struct {
 	Queries  *db.Queries
 	AuditLog *audit.Logger
 	Hub      eventPublisher
+	// Notify avisa a quien decide una solicitud de baja (9.5).
+	Notify *Notifier
 }
 
 type invAccess struct {
@@ -1160,6 +1162,13 @@ func (h *InventoryHandler) Request(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.AuditLog.Log(ctx, "inventory.request.create", audit.LevelInfo, audit.Success(), map[string]any{"assetId": a.ID.String(), "action": req.Action})
+	if h.Notify != nil {
+		deciders, _ := h.Queries.ListAreaLeadUserIDs(ctx, a.AreaID)
+		admins, _ := h.Queries.ListAdminUserIDs(ctx)
+		what := map[string]string{"deactivate": "dar de baja", "delete": "borrar"}[req.Action]
+		h.Notify.Send(ctx, append(deciders, admins...), NotifMsg{Kind: NotifInventoryReq, Link: "/inventory", Exclude: u.ID,
+			Title: fmt.Sprintf("%s pide %s %s", h.Notify.userNameOr(ctx, u.ID), what, a.Name), Body: strings.TrimSpace(req.Reason)})
+	}
 	// Aviso en vivo: a quien decide se le actualiza el número de solicitudes.
 	publishSync(ctx, h.Hub, "inventory.request", map[string]string{"assetId": a.ID.String()})
 	h.reload(w, r, a.ID, acc)

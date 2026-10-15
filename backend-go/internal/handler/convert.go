@@ -154,3 +154,12 @@ func timestamptzPtr(t pgtype.Timestamptz) *time.Time {
 	}
 	return &t.Time
 }
+
+// queryUUIDOrNull: un uuid opcional de la query (inválido o vacío = sin filtro).
+func queryUUIDOrNull(raw string) pgtype.UUID {
+	id, err := uuid.Parse(raw)
+	if err != nil {
+		return pgtype.UUID{}
+	}
+	return pgtype.UUID{Bytes: id, Valid: true}
+}

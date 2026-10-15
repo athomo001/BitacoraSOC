@@ -127,6 +127,7 @@ func (h *TicketsHandler) afterCreate(ctx context.Context, t db.Ticket, actorID u
 	h.Mailer.Emit(ctx, mailEmission{Event: ticketmail.TeamCreated, TicketID: t.ID, ActorID: actorID})
 	if t.AssignedUserID.Valid {
 		h.Mailer.Emit(ctx, mailEmission{Event: ticketmail.TeamAssigned, TicketID: t.ID, ActorID: actorID, Targets: []uuid.UUID{uuid.UUID(t.AssignedUserID.Bytes)}})
+		h.notifyAssigned(ctx, t.ID, uuid.UUID(t.AssignedUserID.Bytes), actorID, false)
 	}
 	if t.AffectsClient {
 		h.Mailer.Emit(ctx, mailEmission{Event: ticketmail.ClientOpened, TicketID: t.ID, ActorID: actorID})

@@ -1234,6 +1234,63 @@ type AdminNote struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
+type AgendaOccurrence struct {
+	ID              uuid.UUID          `json:"id"`
+	TaskID          uuid.UUID          `json:"task_id"`
+	DueDate         pgtype.Date        `json:"due_date"`
+	MovedFrom       pgtype.Date        `json:"moved_from"`
+	Status          string             `json:"status"`
+	UserID          pgtype.UUID        `json:"user_id"`
+	OfferedLevelID  pgtype.UUID        `json:"offered_level_id"`
+	AbsentUserID    pgtype.UUID        `json:"absent_user_id"`
+	StepsDone       []int32            `json:"steps_done"`
+	Note            pgtype.Text        `json:"note"`
+	Link            pgtype.Text        `json:"link"`
+	SkipReason      pgtype.Text        `json:"skip_reason"`
+	ClosedBy        pgtype.UUID        `json:"closed_by"`
+	ClosedAt        pgtype.Timestamptz `json:"closed_at"`
+	ReportHistoryID pgtype.UUID        `json:"report_history_id"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
+type AgendaOccurrenceAlert struct {
+	OccurrenceID uuid.UUID          `json:"occurrence_id"`
+	Alert        string             `json:"alert"`
+	SentAt       pgtype.Timestamptz `json:"sent_at"`
+}
+
+type AgendaSetting struct {
+	ID             bool               `json:"id"`
+	WorkDays       []int32            `json:"work_days"`
+	DayStart       pgtype.Time        `json:"day_start"`
+	DayEnd         pgtype.Time        `json:"day_end"`
+	Timezone       string             `json:"timezone"`
+	HolidayCountry string             `json:"holiday_country"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type AgendaTask struct {
+	ID              uuid.UUID          `json:"id"`
+	Name            string             `json:"name"`
+	Description     string             `json:"description"`
+	AreaID          uuid.UUID          `json:"area_id"`
+	OrganizationID  pgtype.UUID        `json:"organization_id"`
+	AssigneeKind    string             `json:"assignee_kind"`
+	AssigneeUserID  pgtype.UUID        `json:"assignee_user_id"`
+	AssigneeLevelID pgtype.UUID        `json:"assignee_level_id"`
+	AssigneeTeamID  pgtype.UUID        `json:"assignee_team_id"`
+	Recurrence      []byte             `json:"recurrence"`
+	WarnDays        []int32            `json:"warn_days"`
+	Steps           []string           `json:"steps"`
+	DocUrl          pgtype.Text        `json:"doc_url"`
+	ReportKind      pgtype.Text        `json:"report_kind"`
+	Active          bool               `json:"active"`
+	CreatedBy       pgtype.UUID        `json:"created_by"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
 type AlertIngestionRule struct {
 	ID               uuid.UUID          `json:"id"`
 	SourceType       string             `json:"source_type"`
@@ -1730,6 +1787,13 @@ type EscalationStep struct {
 	Title                     pgtype.Text    `json:"title"`
 }
 
+type Holiday struct {
+	Day       pgtype.Date        `json:"day"`
+	Name      string             `json:"name"`
+	Source    string             `json:"source"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
 type Level struct {
 	ID     uuid.UUID `json:"id"`
 	Code   string    `json:"code"`
@@ -1757,6 +1821,14 @@ type MaintenanceWindow struct {
 	Priority              int32              `json:"priority"`
 	CreatedBy             uuid.UUID          `json:"created_by"`
 	Active                bool               `json:"active"`
+	OrganizationID        pgtype.UUID        `json:"organization_id"`
+	AreaID                pgtype.UUID        `json:"area_id"`
+	TeamID                pgtype.UUID        `json:"team_id"`
+	AgendaTaskID          pgtype.UUID        `json:"agenda_task_id"`
+	ClosedAt              pgtype.Timestamptz `json:"closed_at"`
+	ClosedBy              pgtype.UUID        `json:"closed_by"`
+	NotifiedStart         bool               `json:"notified_start"`
+	NotifiedEnd           bool               `json:"notified_end"`
 }
 
 type MessageTemplate struct {
@@ -1768,6 +1840,59 @@ type MessageTemplate struct {
 	SuggestedSeverity string             `json:"suggested_severity"`
 	Active            bool               `json:"active"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+}
+
+type Notice struct {
+	ID        uuid.UUID          `json:"id"`
+	Title     string             `json:"title"`
+	Body      string             `json:"body"`
+	Audience  []byte             `json:"audience"`
+	PublishAt pgtype.Timestamptz `json:"publish_at"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+	Published bool               `json:"published"`
+	CreatedBy pgtype.UUID        `json:"created_by"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type NoticeRecipient struct {
+	NoticeID   uuid.UUID          `json:"notice_id"`
+	UserID     uuid.UUID          `json:"user_id"`
+	ReadAt     pgtype.Timestamptz `json:"read_at"`
+	RemindedAt pgtype.Timestamptz `json:"reminded_at"`
+}
+
+type Notification struct {
+	ID        uuid.UUID          `json:"id"`
+	UserID    uuid.UUID          `json:"user_id"`
+	Kind      string             `json:"kind"`
+	Title     string             `json:"title"`
+	Body      string             `json:"body"`
+	Link      string             `json:"link"`
+	GroupKey  pgtype.Text        `json:"group_key"`
+	Count     int32              `json:"count"`
+	Toast     bool               `json:"toast"`
+	Browser   bool               `json:"browser"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	ReadAt    pgtype.Timestamptz `json:"read_at"`
+}
+
+type NotificationPref struct {
+	UserID    uuid.UUID          `json:"user_id"`
+	Prefs     []byte             `json:"prefs"`
+	Digest    bool               `json:"digest"`
+	Browser   bool               `json:"browser"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type NotificationSetting struct {
+	ID            bool               `json:"id"`
+	DigestTime    pgtype.Time        `json:"digest_time"`
+	LockedKinds   []string           `json:"locked_kinds"`
+	GroupMinutes  int32              `json:"group_minutes"`
+	RetentionDays int32              `json:"retention_days"`
+	LastDigestDay pgtype.Date        `json:"last_digest_day"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Organization struct {

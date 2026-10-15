@@ -1,0 +1,158 @@
+/* Agenda → Gestión: indicadores y tabla de tareas con su historial. */
+mat-icon {
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+}
+
+.am__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.am__pad {
+  margin: 10px 14px;
+}
+
+.am__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.am__sub {
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.am__kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.am__kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.am__kpi b {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.am__kpi--ok {
+  color: var(--status-ok);
+}
+
+.am__kpi--bad {
+  color: var(--status-critical);
+}
+
+.am__kpi--warn {
+  color: var(--status-warning);
+}
+
+.am__mrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) 110px 120px 100px;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 9px 14px;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+}
+
+button.am__mrow:not(:disabled) {
+  cursor: pointer;
+}
+
+button.am__mrow:not(:disabled):hover {
+  background: var(--bg-surface-hover);
+}
+
+.am__mrow--head {
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.am__hist {
+  display: flex;
+  gap: 3px;
+}
+
+.am__h {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.am__legend i.am__h--ok,
+.am__h--ok {
+  background: var(--status-ok);
+}
+
+.am__legend i.am__h--late,
+.am__h--late {
+  background: var(--status-warning);
+}
+
+.am__legend i.am__h--skip,
+.am__h--skip {
+  background: var(--border-subtle);
+}
+
+.am__legend i.am__h--open,
+.am__h--open {
+  background: var(--status-critical);
+}
+
+.am__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 8px 14px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.am__legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 5px;
+  border-radius: 3px;
+  background: currentcolor;
+  vertical-align: -1px;
+}
+
+@media (width <= 900px) {
+  .am__kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .am__mrow {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .am__hs {
+    display: none;
+  }
+}

@@ -39,6 +39,7 @@ var extraCapabilities = map[string]string{
 	"directory:write":       "Directorio: escribir",
 	"directory:delete":      "Directorio: borrar",
 	"tickets:change_client": "Tickets: cambiar cliente",
+	CapNoticesSend:          "Enviar avisos con acuse",
 }
 
 type placementArea struct {

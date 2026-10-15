@@ -138,12 +138,16 @@ SELECT * FROM maintenance_windows
 WHERE (sqlc.narg('service_id')::uuid IS NULL OR service_id = sqlc.narg('service_id'))
   AND (sqlc.narg('asset_id')::uuid IS NULL OR asset_id = sqlc.narg('asset_id'))
   AND (sqlc.narg('territorial_unit_id')::uuid IS NULL OR territorial_unit_id = sqlc.narg('territorial_unit_id'))
+  AND (sqlc.narg('organization_id')::uuid IS NULL OR organization_id = sqlc.narg('organization_id'))
+  AND (sqlc.narg('area_id')::uuid IS NULL OR area_id = sqlc.narg('area_id'))
+  AND (sqlc.narg('team_id')::uuid IS NULL OR team_id = sqlc.narg('team_id'))
   AND (sqlc.narg('only_current')::boolean IS NOT TRUE OR (active AND now() >= starts_at AND now() < ends_at))
 ORDER BY starts_at DESC;
 
 -- name: CreateMaintenanceWindow :one
-INSERT INTO maintenance_windows (service_id, asset_id, territorial_unit_id, title, notes, starts_at, ends_at, suppress_notifications, priority, created_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *;
+INSERT INTO maintenance_windows (service_id, asset_id, territorial_unit_id, organization_id, area_id, team_id, agenda_task_id,
+  title, notes, starts_at, ends_at, suppress_notifications, priority, created_by, notified_start)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $10 <= now()) RETURNING *;
 
 -- name: DeactivateMaintenanceWindow :execrows
 UPDATE maintenance_windows SET active = false WHERE id = $1 AND active;
@@ -151,12 +155,19 @@ UPDATE maintenance_windows SET active = false WHERE id = $1 AND active;
 -- name: ListWindowsForScope :many
 -- Candidatas para notify: ventanas activas del servicio, del activo, o de
 -- cualquier unidad del camino territorial (un mantenimiento sobre toda la
--- zona Calama también cubre a sus routers).
-SELECT * FROM maintenance_windows
-WHERE active AND ends_at > now()
-  AND (service_id = sqlc.narg('service_id')
-       OR asset_id = sqlc.narg('asset_id')
-       OR territorial_unit_id = ANY(sqlc.arg('unit_ids')::uuid[]));
+-- zona Calama también cubre a sus routers). Desde 000042 también las del
+-- cliente (el del servicio o del activo), del área (la de la política o del
+-- activo) y de los equipos que se avisan.
+SELECT mw.* FROM maintenance_windows mw
+WHERE mw.active AND mw.ends_at > now()
+  AND (mw.service_id = sqlc.narg('service_id')
+       OR mw.asset_id = sqlc.narg('asset_id')
+       OR mw.territorial_unit_id = ANY(sqlc.arg('unit_ids')::uuid[])
+       OR mw.organization_id = (SELECT sv.organization_id FROM services sv WHERE sv.id = sqlc.narg('service_id'))
+       OR mw.organization_id = (SELECT ac.client_id FROM assets ac WHERE ac.id = sqlc.narg('asset_id'))
+       OR mw.area_id = sqlc.narg('policy_area_id')
+       OR mw.area_id = (SELECT aa.area_id FROM assets aa WHERE aa.id = sqlc.narg('asset_id'))
+       OR mw.team_id = ANY(sqlc.arg('team_ids')::uuid[]));
 
 -- ===== RACI (solo dato en esta fase, sin UI) =====
 

@@ -107,6 +107,8 @@ Todo esto está en **Administración** (solo administradores) y queda registrado
 | **Avisos por cliente** | Alertas que aparecen al trabajar con un cliente y el catálogo de eventos del informe. |
 | **Correo** | Servidor SMTP (con plantillas para Gmail, Microsoft 365 y otros), remitente y correo de prueba. |
 | **Reportes de turno** | Formato y estado de los reportes de cierre enviados. |
+| **Notificaciones** | Hora del resumen diario (08:00, días hábiles de la Agenda), lo que no se apaga, agrupación de avisos iguales y cuántos días guarda la campana. Los correos usan el SMTP de Administración → Correo. |
+| **Agenda** | Horario hábil de la Agenda (días y horas; por defecto lunes a viernes de 08:00 a 20:00) y feriados por año. Los feriados de Chile vienen incluidos en la app (`backend-go/internal/agenda/holidays/`, un archivo JSON por país); para otro año o país se agregan ahí o a mano. |
 | **Organizaciones y servicios** | Clientes, tipos de organización, servicios y fuentes de log. |
 | **Territorio** (NOC) | Regiones, zonas y sitios; importación y activación masiva. Fondo del **Mapa**: OpenStreetMap público (necesita internet; su política solo permite uso bajo), un servidor de mosaicos propio (dirección con `{z}`, `{x}` e `{y}`) o sin fondo (silueta de los países, funciona sin internet). |
 | **Inventario** | Tipos de equipo con sus campos y los tipos de responsabilidad (Configuración y sistema, Hardware, Energía y conectividad, Usuario, Mantención en terreno, y los que se agreguen). |

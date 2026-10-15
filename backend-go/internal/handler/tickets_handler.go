@@ -37,6 +37,8 @@ type TicketsHandler struct {
 	Hub eventPublisher
 	// Mailer: avisos por correo (spec/15); nil = sin avisos (tests).
 	Mailer *TicketMailer
+	// Notify: avisos en la campana (9.5); nil = sin avisos (tests).
+	Notify *Notifier
 }
 
 func (h *TicketsHandler) now() time.Time {
@@ -231,6 +233,7 @@ func (h *TicketsHandler) AddComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.afterComment(ctx, ticket, u.ID, strings.TrimSpace(req.Content), req.IsPublic)
+	h.notifyComment(ctx, ticket, u.ID, strings.TrimSpace(req.Content))
 	copied := h.cascadeComment(ctx, ticket, u, strings.TrimSpace(req.Content), req.IsPublic, req.AlsoChildren)
 	if h.AuditLog != nil {
 		h.AuditLog.Log(ctx, "ticket.comment_added", audit.LevelInfo, audit.Success(), map[string]any{"ticketId": id.String(), "images": len(req.ImageIDs), "copiedToChildren": copied})

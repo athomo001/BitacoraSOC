@@ -38,6 +38,8 @@ type ReportsHandler struct {
 	AuditLog *audit.Logger
 	Sender   func(context.Context) (*mail.Sender, error)
 	Now      func() time.Time
+	// Hub avisa a la Agenda cuando un informe cierra una tarea (opcional).
+	Hub eventPublisher
 }
 
 func (h *ReportsHandler) now() time.Time {
@@ -516,8 +518,14 @@ func (h *ReportsHandler) Send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := map[string]any{"status": status, "batches": len(batches), "failures": failures}
+	var histID pgtype.UUID
 	if histErr == nil {
 		resp["historyId"] = saved.ID
+		histID = pgtype.UUID{Bytes: saved.ID, Valid: true}
+	}
+	// La Agenda: el informe enviado cierra la tarea ligada a él y a este cliente.
+	if req.OrganizationID != nil {
+		agendaCloseByReport(ctx, h.Queries, h.Hub, h.AuditLog, kind, *req.OrganizationID, histID, user.ID, rep.title, h.now())
 	}
 	writeData(w, http.StatusOK, resp)
 }

@@ -1,4 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { DIALOG_DATA } from '@angular/cdk/dialog';
+import { NotificationPrefsComponent } from './notification-prefs';
+import '../core/i18n/packs/notifications';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../core/auth/auth.service';
 import { MfaEnrollment } from '../core/auth/auth.models';
@@ -15,7 +18,7 @@ interface Feedback {
   key: MessageKey;
 }
 
-type Tab = 'data' | 'security' | 'prefs';
+type Tab = 'data' | 'security' | 'prefs' | 'notif';
 
 const ROLE_KEYS: Record<string, MessageKey> = {
   admin: 'access.role.admin',
@@ -41,7 +44,7 @@ const STRENGTH: readonly { label: MessageKey; color: string }[] = [
 @Component({
   selector: 'app-profile-dialog',
   standalone: true,
-  imports: [FormsModule, ModalComponent, ButtonComponent, UserAvatarComponent],
+  imports: [FormsModule, ModalComponent, ButtonComponent, UserAvatarComponent, NotificationPrefsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './profile-dialog.html',
   styleUrl: './profile-dialog.css',
@@ -56,6 +59,7 @@ export class ProfileDialogComponent implements OnInit {
     { id: 'data', icon: 'badge', label: 'profile.tabData' },
     { id: 'security', icon: 'shield', label: 'profile.tabSecurity' },
     { id: 'prefs', icon: 'tune', label: 'profile.tabPrefs' },
+    { id: 'notif', icon: 'notifications', label: 'nt.prefs.title' },
   ];
   protected readonly themes: readonly { id: Theme; icon: string; label: MessageKey }[] = [
     { id: 'dark', icon: 'dark_mode', label: 'profile.themeDark' },
@@ -75,7 +79,7 @@ export class ProfileDialogComponent implements OnInit {
   /** Lo fija el admin (6 por defecto, como el legacy); el servidor también lo exige. */
   protected readonly minPassword = signal(6);
 
-  protected readonly tab = signal<Tab>('data');
+  protected readonly tab = signal<Tab>(inject<{ tab?: Tab } | null>(DIALOG_DATA, { optional: true })?.tab ?? 'data');
   protected readonly loginTheme = signal<LoginTheme>(readLoginTheme());
   protected readonly saving = signal(false);
   protected readonly profileFeedback = signal<Feedback | null>(null);

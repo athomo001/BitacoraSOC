@@ -154,7 +154,14 @@ func run(logger *slog.Logger) error {
 	systemFeaturesHandler := &handler.SystemFeaturesHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
 	territorialUnitsHandler := &handler.TerritorialUnitsHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
 	mapHandler := &handler.MapHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
-	inventoryHandler := &handler.InventoryHandler{Pool: pool, Queries: queries, AuditLog: auditLog, Hub: hub}
+	// Notificaciones (spec/16 §4.5, 9.5): campana, emergente, navegador y correo.
+	notifier := &handler.Notifier{Queries: queries, Hub: hub, AuditLog: auditLog, Sender: func(ctx context.Context) (*mail.Sender, error) {
+		sender, _, err := handler.BuildMailSender(ctx, queries, cryptoBox)
+		return sender, err
+	}}
+	notificationsHandler := &handler.NotificationsHandler{Queries: queries, AuditLog: auditLog, Notify: notifier}
+	inventoryHandler := &handler.InventoryHandler{Pool: pool, Queries: queries, AuditLog: auditLog, Hub: hub, Notify: notifier}
+	agendaHandler := &handler.AgendaHandler{Queries: queries, AuditLog: auditLog, Hub: hub, Notify: notifier}
 	organizationsHandler := &handler.OrganizationsHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
 	directoryHandler := &handler.DirectoryHandler{Pool: pool, Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
 	smtpConfigHandler := &handler.SMTPConfigHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
@@ -199,7 +206,7 @@ func run(logger *slog.Logger) error {
 	// Avisos por correo de la Ticketera (spec/15) y Administración → Ticketera.
 	ticketMailer := &handler.TicketMailer{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, PublicBaseURL: publicBaseURL}
 	ticketSettingsHandler := &handler.TicketSettingsHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
-	ticketsHandler := &handler.TicketsHandler{Pool: pool, Queries: queries, AuditLog: auditLog, PinLimiter: ratelimit.NewAPILimiter(30, 15*time.Minute), Hub: hub, Mailer: ticketMailer}
+	ticketsHandler := &handler.TicketsHandler{Pool: pool, Queries: queries, AuditLog: auditLog, PinLimiter: ratelimit.NewAPILimiter(30, 15*time.Minute), Hub: hub, Mailer: ticketMailer, Notify: notifier}
 	entriesHandler.Tickets = ticketsHandler
 	notesHandler := &handler.NotesHandler{Queries: queries, AuditLog: auditLog}
 	draftsHandler := &handler.DraftsHandler{Queries: queries, AuditLog: auditLog, Hub: hub}
@@ -404,6 +411,48 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/inventory/{id}/events", authed(inventoryHandler.AddEvent))
 	mux.Handle("POST /api/inventory/{id}/active", authed(inventoryHandler.SetActive))
 	mux.Handle("POST /api/inventory/{id}/requests", authed(inventoryHandler.Request))
+	// Agenda (spec/16 §4.3, 9.3): tareas y recurrentes en días hábiles. Todos
+	// los perfiles; el handler decide qué ve y a quién asigna cada uno.
+	mux.Handle("GET /api/agenda/meta", authed(agendaHandler.Meta))
+	mux.Handle("GET /api/agenda/mine", authed(agendaHandler.Mine))
+	mux.Handle("GET /api/agenda/calendar", authed(agendaHandler.Calendar))
+	mux.Handle("GET /api/agenda/managed", authed(agendaHandler.Managed))
+	mux.Handle("GET /api/agenda/handover", authed(agendaHandler.HandoverInfo))
+	mux.Handle("POST /api/agenda/preview", authed(agendaHandler.Preview))
+	mux.Handle("POST /api/agenda/tasks", authed(agendaHandler.CreateTask))
+	mux.Handle("GET /api/agenda/tasks/{id}", authed(agendaHandler.GetTask))
+	mux.Handle("PUT /api/agenda/tasks/{id}", authed(agendaHandler.UpdateTask))
+	mux.Handle("DELETE /api/agenda/tasks/{id}", authed(agendaHandler.DeleteTask))
+	mux.Handle("POST /api/agenda/occurrences/{id}/take", authed(agendaHandler.Take))
+	mux.Handle("POST /api/agenda/occurrences/{id}/release", authed(agendaHandler.Release))
+	mux.Handle("POST /api/agenda/occurrences/{id}/handover", authed(agendaHandler.Handover))
+	mux.Handle("PUT /api/agenda/occurrences/{id}/steps", authed(agendaHandler.Steps))
+	mux.Handle("POST /api/agenda/occurrences/{id}/done", authed(agendaHandler.Done))
+	mux.Handle("POST /api/agenda/occurrences/{id}/skip", authed(agendaHandler.Skip))
+	mux.Handle("POST /api/agenda/occurrences/{id}/reopen", authed(agendaHandler.Reopen))
+	// Notificaciones (spec/16 §4.5, 9.5): la campana, las preferencias de cada
+	// persona y lo que fija el admin.
+	mux.Handle("GET /api/notifications", authed(notificationsHandler.List))
+	mux.Handle("POST /api/notifications/read", authed(notificationsHandler.Read))
+	mux.Handle("GET /api/notifications/prefs", authed(notificationsHandler.GetPrefs))
+	mux.Handle("PUT /api/notifications/prefs", authed(notificationsHandler.PutPrefs))
+	mux.Handle("GET /api/notifications/settings", admin(notificationsHandler.Settings))
+	mux.Handle("PUT /api/notifications/settings", admin(notificationsHandler.PutSettings))
+	// Avisos con acuse de lectura (§4.5.1): los envía el admin, la jefatura o
+	// quien tiene el permiso notices:send; el handler lo revisa.
+	mux.Handle("GET /api/notices/meta", authed(notificationsHandler.NoticesMeta))
+	mux.Handle("GET /api/notices/pending", authed(notificationsHandler.Pending))
+	mux.Handle("POST /api/notices/{id}/read", authed(notificationsHandler.ReadNotice))
+	mux.Handle("POST /api/notices", authed(notificationsHandler.CreateNotice))
+	mux.Handle("GET /api/notices/sent", authed(notificationsHandler.Sent))
+	mux.Handle("GET /api/notices/{id}/recipients", authed(notificationsHandler.Recipients))
+	mux.Handle("POST /api/notices/{id}/remind", authed(notificationsHandler.Remind))
+	// Administración → Agenda: horario hábil y feriados.
+	mux.Handle("GET /api/agenda/settings", admin(agendaHandler.Settings))
+	mux.Handle("PUT /api/agenda/settings", admin(agendaHandler.PutSettings))
+	mux.Handle("PUT /api/agenda/holidays", admin(agendaHandler.PutHoliday))
+	mux.Handle("DELETE /api/agenda/holidays/{date}", admin(agendaHandler.DeleteHoliday))
+	mux.Handle("POST /api/agenda/holidays/import", admin(agendaHandler.ImportHolidays))
 
 	// Organizaciones y catálogo de tecnologías (Fase 6) — núcleo compartido SOC/NOC.
 	mux.Handle("GET /api/organizations", authed(organizationsHandler.List))
@@ -487,6 +536,8 @@ func run(logger *slog.Logger) error {
 	mux.Handle("PUT /api/escalation/policies/{id}/steps/{stepId}", areaLead(escalationHandler.UpdateStep))
 	mux.Handle("POST /api/escalation/policies/{id}/steps/reorder", areaLead(escalationHandler.ReorderSteps))
 	mux.Handle("GET /api/maintenance-windows", authed(escalationHandler.ListWindows))
+	mux.Handle("GET /api/maintenance-windows/overview", authed(escalationHandler.Overview))
+	mux.Handle("POST /api/maintenance-windows/{id}/close", operator(escalationHandler.CloseWindow))
 	// Las mantenciones también las programa el analista (comentario del dueño #16).
 	mux.Handle("POST /api/maintenance-windows", operator(escalationHandler.CreateWindow))
 	mux.Handle("DELETE /api/maintenance-windows/{id}", operator(escalationHandler.DeleteWindow))
@@ -678,7 +729,7 @@ func run(logger *slog.Logger) error {
 	}}
 	mux.Handle("GET /api/reports/shift/recent", admin(checklistsHandler.RecentReports))
 	// Reportes (comentario del dueño #10) y Avisos por cliente.
-	reportsHandler := &handler.ReportsHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, Sender: func(ctx context.Context) (*mail.Sender, error) {
+	reportsHandler := &handler.ReportsHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, Hub: hub, Sender: func(ctx context.Context) (*mail.Sender, error) {
 		sender, _, err := handler.BuildMailSender(ctx, queries, cryptoBox)
 		return sender, err
 	}}
@@ -715,6 +766,15 @@ func run(logger *slog.Logger) error {
 	go scheduler.Run(ctx, time.Minute, reportDispatcher.DispatchPending)
 	// Recordatorios de turno: revisa cada minuto cuáles tocan (un envío por bloque u hora).
 	go scheduler.Run(ctx, time.Minute, shiftRemindersHandler.DispatchDue)
+	// Agenda: genera las ocurrencias que faltan y aplica las ausencias de Dotación.
+	go scheduler.Run(ctx, 10*time.Minute, agendaHandler.Generate)
+	// Notificaciones: avisos de la Agenda, resumen diario, ventanas que
+	// empiezan o terminan, avisos con acuse programados y limpieza de la campana.
+	go scheduler.Run(ctx, 5*time.Minute, agendaHandler.Alerts)
+	go scheduler.Run(ctx, time.Minute, agendaHandler.Digest)
+	go scheduler.Run(ctx, time.Minute, notifier.Windows)
+	go scheduler.Run(ctx, time.Minute, notificationsHandler.PublishDue)
+	go scheduler.Run(ctx, time.Hour, notifier.Purge)
 	// Correos de cumpleaños (comentario del dueño #21): una vez al día, desde la hora configurada.
 	birthdaysHandler := &handler.BirthdaysHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
 	mux.Handle("GET /api/config/birthday-emails", admin(birthdaysHandler.GetConfig))

@@ -183,6 +183,9 @@
           </section>
         </div>
       }
+      @case ('notif') {
+        <div class="pf__panel" role="tabpanel"><app-notification-prefs /></div>
+      }
       @case ('prefs') {
         <div class="pf__panel pf__prefs" role="tabpanel">
           <div class="pf__grid pf__grid--3">
