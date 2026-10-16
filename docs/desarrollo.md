@@ -69,6 +69,7 @@ Pruebas de Go que **protegen convenciones** (fallan si se rompe la regla):
 | --- | --- |
 | `audit_coverage_test` | Toda ruta que escribe (POST, PUT, PATCH, DELETE) llama a `AuditLog.Log`. |
 | `routes_test` | Toda capacidad `cap…` usada en `main.go` está en `KnownCapabilities` (para que aparezca en la pantalla de permisos). |
+| `api_docs_test` | Toda ruta de `main.go` tiene su fila en [api.md](api.md), y toda fila de api.md existe en `main.go`. |
 
 Las pruebas de frontend usan Vitest con `HttpTestingController`: se simulan las respuestas del servidor sin levantar nada.
 
@@ -122,7 +123,7 @@ migrate create -ext sql -dir sql/migrations -seq nombre_corto
    ```
 
 5. Si usa una capacidad nueva, agrégala a `KnownCapabilities`.
-6. Actualiza [api.md](api.md). La tabla de rutas sale de `main.go`, así que basta con regenerarla.
+6. Agrega su fila en [api.md](api.md) (`| MÉTODO | ruta | acceso — qué hace |`), en la sección que corresponda. Se escribe a mano; `api_docs_test` falla si falta.
 
 ### Agregar una pantalla o sección
 

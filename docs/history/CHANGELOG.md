@@ -4,6 +4,12 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] Documentación al día - 2026-10-16
+
+- Revisión de la documentación: faltaban 8 rutas en `docs/api.md` (configuración de la Ticketera, avisos por correo de un ticket, muestras de correo); agregadas. Nueva prueba `api_docs_test`: compara las rutas de `main.go` con `api.md` en los dos sentidos y hace fallar el CI si alguna queda sin documentar.
+- `docs/desarrollo.md` decía que la tabla de rutas «se regenera desde `main.go`», pero no hay generador: se escribe a mano. Corregido, y la prueba nueva está en la lista de pruebas que protegen convenciones.
+- `docs/modelo-er-legacy-2.0.md`: agregado lo que el ETL trae desde hoy (avisos de checklist no realizado y de guardia sin cubrir, las guardias que revisaba y el orden de los turnos).
+
 ## [Rewrite] «Escalamiento» en toda la app - 2026-10-16
 
 - Decisión del dueño: se dice **escalamiento** (está en el diccionario de la RAE; «escalación» es un calco del inglés). Cambiados los textos de pantalla, los mensajes de error, los pasos del ETL, el reporte del shadow-diff, `docs/operacion.md` y los comentarios. Se mantiene el correo «Recordatorio de escalación interna», que es la plantilla del legacy tal cual.

@@ -253,6 +253,11 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `GET` | `/api/config/smtp` | Admin |
 | `PUT` | `/api/config/smtp` | Admin |
 | `POST` | `/api/config/smtp/test-send` | Admin |
+| `GET` | `/api/config/smtp/samples` | Admin — los correos de muestra que se pueden enviar (todos los tipos, con datos de ejemplo) y los que no se pudieron armar, con el motivo |
+| `POST` | `/api/config/smtp/samples/{n}` | Admin — `{to: [...]}`; manda la muestra `n` (desde 1). La pantalla los manda de a uno, con una pausa |
+| `GET` | `/api/config/tickets` | Admin · Ticketera — plazos de SLA por prioridad, umbral «en riesgo», firma ante el cliente y avisos por correo |
+| `PUT` | `/api/config/tickets` | Admin · Ticketera |
+| `POST` | `/api/config/tickets/mail-test` | Admin · Ticketera — los tres modelos de aviso (respaldo, responsable, cliente) con datos de ejemplo, solo al propio admin |
 | `GET` | `/api/config/checklist` | Admin |
 | `PUT` | `/api/config/checklist` | Admin |
 | `GET` | `/api/config/birthday-emails` | Admin |
@@ -596,7 +601,7 @@ Detrás de la funcionalidad `calendar_feed` (Administración → Funcionalidades
 | `POST` | `/api/users/me/calendar` | Sesión — crea el enlace o genera uno nuevo (el anterior deja de funcionar) |
 | `PUT` | `/api/users/me/calendar` | Sesión — `{includeWindows}` |
 | `DELETE` | `/api/users/me/calendar` | Sesión — el enlace deja de responder |
-| `GET` | `/cal/{token}.ics` | Público, el token es la llave — suscripción ICS de solo lectura: los vencimientos a nombre de la persona (30 días atrás y 92 adelante) como eventos de todo el día «disponibles» y, si lo pidió, las ventanas de mantenimiento de sus áreas |
+| `GET` | `/cal/{file}` | Público (`{token}.ics`), el token es la llave — suscripción ICS de solo lectura: los vencimientos a nombre de la persona (30 días atrás y 92 adelante) como eventos de todo el día «disponibles» y, si lo pidió, las ventanas de mantenimiento de sus áreas |
 
 ### Notificaciones y avisos con acuse
 
@@ -675,6 +680,9 @@ Tipos de notificación: `agenda.assigned`, `agenda.warn`, `agenda.due`, `agenda.
 | `POST` | `/api/tickets/{id}/tasks` | Sesión · Ticketera encendida |
 | `PATCH` | `/api/tickets/{id}/tasks/{taskId}` | Sesión · Ticketera encendida |
 | `POST` | `/api/tickets/{id}/public-pin` | Sesión · Ticketera encendida |
+| `GET` | `/api/tickets/{id}/mails` | Sesión · Ticketera encendida — los avisos por correo del ticket (a quién, asunto, estado, intentos, error) |
+| `PUT` | `/api/tickets/{id}/notify` | Sesión · Ticketera encendida — «Afecta al cliente» y «Avisar a»; marcar «Afecta al cliente» en un ticket abierto manda «Ticket abierto» |
+| `POST` | `/api/tickets/{id}/mails/{mailId}/retry` | Sesión · Ticketera encendida — vuelve a intentar un aviso que falló |
 
 ### Enlaces públicos
 

@@ -101,13 +101,13 @@ Tablas de configuración (fila única): `app_config`, `app_branding`, `smtp_conf
 | `externalPersons` | 1 | `contacts` (ámbito interno) | Personal externo de guardia. |
 | `clientEscalationRules` | 6 | `escalation_pools`, `escalation_pool_members`, `escalation_steps`, `client_alert_rules`, `maintenance_windows` | Según el tipo de regla: flujos de llamada → llamados de la política, cada uno con su título del legacy ("1er llamado"…) y sus personas en un grupo del paso (`kind = 'step'`); los pasos `pool` del legacy pasan a pools con nombre; `special_alert` → avisos por cliente; mantenciones → ventanas por servicio. Las personas del flujo que no estaban en el directorio se crean como contactos. |
 | `raciEntries` | 12 | `raci_assignments` | Una fila por persona y letra R/A/C/I. |
-| `workShifts` | 2 | `work_shifts` | Horario, zona y reporte de cierre (destinatarios, asunto, qué incluye). |
+| `workShifts` | 2 | `work_shifts` | Horario, zona, reporte de cierre (destinatarios, asunto, qué incluye) y el orden en que se ven (`order` → `sort_order`). |
 | `workShiftAssignments` | 2 | `work_shift_members` | Personas del turno y sus días: reciben los recordatorios de turno, como en el legacy. |
 | `checklistTemplates` | 2 | `checklist_templates`, `checklist_items`, `work_shifts.checklist_template_*_id` | Ítems anidados → filas con `parent_item_id`. La asignación a turno (inicio/cierre) va en el turno. |
 | `checks` | 339 | `shift_checks`, `shift_check_services` | 4.976 servicios. Cada servicio se enlaza con su ítem de plantilla cuando existe. El turno faltante (215 checks viejos) se deduce por la hora; las plantillas ya borradas se recrean inactivas con su nombre. |
 | `entries` | 966 | `entries` | Tipo, ámbito (SOC/NOC), etiquetas y cliente (por servicio). |
 | `adminNotes`, `personalNotes` | 1, 10 | `admin_notes`, `personal_notes` | Se descarta la nota de un usuario que ya no existe. |
-| `shiftAssignments` | 330 | `work_shift_assignments`, `teams`, `team_members`, `rotation_cycles`, `rotation_slots` | Condiciones del día (teletrabajo, charla/capacitación OL, vacaciones, licencia…) → un registro por día. Guardias (N2, N1 inhábil, TI) → un equipo "Guardia X" con su ciclo semanal; cada guardia es un tramo con la **fecha y hora exactas** del legacy (`starts_at`/`ends_at`). N2 y N1 inhábil quedan como guardias que siempre deben estar cubiertas (`must_be_covered`). |
+| `shiftAssignments` | 330 | `work_shift_assignments`, `teams`, `team_members`, `rotation_cycles`, `rotation_slots` | Condiciones del día (teletrabajo, charla/capacitación OL, vacaciones, licencia…) → un registro por día. Guardias (N2, N1 inhábil, TI) → un equipo "Guardia X" con su ciclo semanal; cada guardia es un tramo con la **fecha y hora exactas** del legacy (`starts_at`/`ends_at`). N2 y N1 inhábil quedan como guardias que siempre deben estar cubiertas (`must_be_covered`). Las guardias que revisaba el recordatorio de guardia sin cubrir (N2, TI y N1 no hábil) quedan con `rotation_cycles.remind_uncovered`. |
 | `shiftReminders` | 1 | `shift_reminders` | |
 | `shiftNotificationSchedules` | 2 | `work_shift_notification_schedules` | Formato (lista/calendario) y condiciones a notificar con los códigos del legacy. |
 | `smtpConfigs` | 1 | `smtp_config` | La contraseña se re-cifra con la llave 2.0. |
@@ -115,7 +115,7 @@ Tablas de configuración (fila única): `app_config`, `app_branding`, `smtp_conf
 | `reportHistories` | 500 | `report_history` | Estado "importado": se ven pero no se pueden usar como base (el legacy no guardaba el formulario). |
 | `catalogOperationTypes` | 2 | `report_operation_types` | Con su texto de "Información adicional". |
 | `catalogEvents` | 1863 | `report_events` | Con su texto de "Motivo"; 5 repetidos se cargan una vez (desde 2026-10-07). |
-| `appConfigs` | 1 | `app_config`, `app_branding`, `checklist_templates` | Marca (nombre, logo de `uploads/logos`, favicon, paleta, tema del login); alerta NOK por cargo → copiada a cada plantilla; correos de cumpleaños; cooldown de checklist. Enciende SOC y marca el setup como hecho. |
+| `appConfigs` | 1 | `app_config`, `app_branding`, `checklist_templates` | Marca (nombre, logo de `uploads/logos`, favicon, paleta, tema del login); alerta NOK por cargo → copiada a cada plantilla; correos de cumpleaños; cooldown de checklist; aviso de checklist no realizado (`checklistAlert*` → `app_config.checklist_missing_*`) y recordatorio de guardia sin cubrir (`escalationReminder*` → `app_config.guard_reminder_*`). Enciende SOC y marca el setup como hecho. |
 | `auditLogs` | 21.786 | `audit_log` | Carga masiva; la tabla es solo de inserción. |
 
 ### Diagrama de la correspondencia
