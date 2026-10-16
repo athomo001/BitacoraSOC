@@ -220,6 +220,11 @@ export class ShiftsService {
     return (await firstValueFrom(this.http.patch<ApiEnvelope<WorkShift>>(`/api/work-shifts/${id}`, patch))).data;
   }
 
+  /** El orden en que se ven los turnos en todas las pantallas (como el legacy). */
+  async reorderWorkShifts(ids: string[]): Promise<WorkShift[]> {
+    return (await firstValueFrom(this.http.put<ApiEnvelope<WorkShift[]>>('/api/work-shifts/reorder', { ids }))).data;
+  }
+
   // ===== Matriz y asignaciones de dotación (HU-4b) =====
 
   /** area: solo la gente de esa área (Turnos de TI o Infra, 9e). */

@@ -5,6 +5,7 @@ import { AffectsRule, SlaPair, TicketSettings, TicketsService } from '../../core
 import { problemDetail } from '../../core/http-error';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
+import { AdminTicketSeriesComponent } from './admin-ticket-series';
 
 import '../../core/i18n/packs/admin';
 import '../../core/i18n/packs/tickets';
@@ -50,7 +51,7 @@ function hours(minutes: number): number {
 @Component({
   selector: 'app-admin-tickets',
   standalone: true,
-  imports: [FormsModule, MatIconModule],
+  imports: [FormsModule, MatIconModule, AdminTicketSeriesComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-tickets.html',
   styles: `
@@ -91,7 +92,7 @@ export class AdminTicketsComponent implements OnInit {
   protected readonly affectsOptions = AFFECTS;
   protected readonly hours = hours;
 
-  protected readonly tab = signal<'general' | 'mail'>('general');
+  protected readonly tab = signal<'general' | 'mail' | 'numbering'>('general');
   private readonly saved = signal<TicketSettings | null>(null);
   protected readonly draft = signal<TicketSettings | null>(null);
   protected readonly newBackup = signal('');

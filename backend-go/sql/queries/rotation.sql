@@ -66,6 +66,21 @@ ORDER BY start_date DESC;
 INSERT INTO rotation_overrides (cycle_id, original_team_member_id, replacement_team_member_id, start_date, end_date, reason, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
 
+-- name: GetRotationOverride :one
+SELECT * FROM rotation_overrides WHERE id = $1;
+
+-- name: UpdateRotationOverride :one
+-- El reemplazante tiene que ser de la misma guardia (como al crearlo).
+UPDATE rotation_overrides o SET replacement_team_member_id = sqlc.arg('replacement_team_member_id')::uuid,
+  start_date = sqlc.arg('start_date')::timestamptz, end_date = sqlc.arg('end_date')::timestamptz, reason = sqlc.arg('reason')::text
+WHERE o.id = sqlc.arg('id')::uuid
+  AND EXISTS (SELECT 1 FROM team_members m JOIN rotation_cycles c ON c.team_id = m.team_id
+              WHERE m.id = sqlc.arg('replacement_team_member_id')::uuid AND c.id = o.cycle_id)
+RETURNING *;
+
+-- name: DeleteRotationOverride :execrows
+DELETE FROM rotation_overrides WHERE id = $1;
+
 -- name: GetTeamMemberDisplay :one
 SELECT m.id, m.team_id, m.user_id, m.contact_id, COALESCE(u.username, c.name, '')::text AS display_name
 FROM team_members m
@@ -76,13 +91,20 @@ WHERE m.id = $1;
 -- name: ListWorkShifts :many
 SELECT * FROM work_shifts
 WHERE (sqlc.narg('active')::boolean IS NULL OR active = sqlc.narg('active'))
-ORDER BY name;
+ORDER BY sort_order, start_time, name;
 
 -- name: CreateWorkShift :one
+-- Un turno nuevo queda al final del orden.
 INSERT INTO work_shifts (
   rotation_cycle_id, name, start_time, end_time, timezone, shift_type,
-  checklist_template_start_id, checklist_template_end_id, email_recipients
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *;
+  checklist_template_start_id, checklist_template_end_id, email_recipients, sort_order
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, (SELECT COALESCE(max(sort_order), 0) + 1 FROM work_shifts)) RETURNING *;
+
+-- name: ReorderWorkShifts :execrows
+-- El orden es la posición en la lista (legacy PUT /api/work-shifts/reorder).
+UPDATE work_shifts w SET sort_order = o.n::int
+FROM unnest(sqlc.arg('ids')::uuid[]) WITH ORDINALITY AS o(id, n)
+WHERE w.id = o.id;
 
 -- name: UpdateWorkShift :one
 -- Administración → Turnos: editar nombre, horario, zona, destinatarios del

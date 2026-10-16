@@ -145,6 +145,12 @@ func (h *MailSamplesHandler) samples(ctx context.Context, now time.Time, extras 
 		mailtpl.ChecklistNok(appTitle, "ana.rojas", "Turno A", "inicio", []string{"N2"},
 			[]mailtpl.NokService{{Title: "Firewall perimetral", Observation: "Latencia alta en la VPN de respaldo."}}, now)), nil)
 
+	add(simpleSample("Checklist no realizado", "checklist-no-realizado", "A la hora configurada (09:30) si nadie hizo el checklist de inicio ese día: a quien está de guardia N1 no hábil y a los N2 (Administración → Turnos → Avisos).",
+		mailtpl.ChecklistMissing(appTitle, "09:30", now)), nil)
+	monday := targetWeek(now, 7)
+	add(simpleSample("Guardia sin cubrir", "guardia-sin-cubrir", "Desde las 09:00, si la semana que empieza en 7 días tiene una guardia marcada sin nadie: a los N2 (Administración → Turnos → Avisos).",
+		mailtpl.GuardUncovered(appTitle, []string{"N2"}, monday, monday.AddDate(0, 0, 6), int(monday.Sub(now).Hours()/24)+1, []string{"N2"}, now)), nil)
+
 	add(simpleSample("Recordatorio de turno", "recordatorio-turno", "Administración → Turnos → Recordatorios, a la hora configurada.",
 		mailtpl.ShiftReminder(appTitle, "Recordatorio: revisión de las 14:00",
 			"Recordatorio de la revisión de mitad de turno:\n\n- Revisar la consola del SIEM\n- Confirmar los respaldos de la noche\n- Actualizar la bitácora")), nil)

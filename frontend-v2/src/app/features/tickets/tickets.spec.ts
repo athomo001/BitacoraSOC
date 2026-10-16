@@ -73,6 +73,67 @@ describe('TicketsComponent', () => {
     expect(rows[1].querySelector('.tk__sla')?.classList).toContain('text-bad');
   });
 
+  it('la nota de una entrada vinculada y la pestaña Bitácora llevan a la entrada', async () => {
+    const fixture = TestBed.createComponent(TicketsComponent);
+    fixture.detectChanges();
+    httpMock.match('/api/tickets/scope').forEach((r) => r.flush({ data: { all: true, myAreas: [], areas: [{ id: 'a-soc', code: 'soc', name: 'SOC', resolves: true }], defaultArea: 'soc' } }));
+    await settle();
+    httpMock.expectOne((r) => r.url === '/api/tickets').flush({ data: LIST });
+    await settle();
+    fixture.detectChanges();
+    const entryId = '341efad1-32c4-4fb8-8600-25a8fc83efe9';
+    httpMock.expectOne('/api/tickets/t1').flush({
+      data: {
+        ...detail(LIST.items[0]),
+        comments: [{ id: 'c1', authorName: 'despinoza', content: `Entrada de bitácora vinculada: ${entryId}`, isPublic: false, createdAt: new Date().toISOString(), images: [], origin: '' }],
+        entries: [{ id: entryId, content: 'se murió alguien', authorUsername: 'despinoza', createdAt: new Date().toISOString() }],
+      },
+    });
+    await settle();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const note = el.querySelector('.td__entry-ref') as HTMLElement;
+    expect(note.textContent).toContain('Se vinculó una entrada de la bitácora.');
+    expect(note.textContent).not.toContain(entryId);
+    // «Ver la entrada» la abre en un popup, sin salir del ticket.
+    (note.querySelector('button') as HTMLButtonElement).click();
+    await settle();
+    httpMock.expectOne(`/api/entries/${entryId}`).flush({
+      data: { id: entryId, authorUsername: 'despinoza', entryType: 'incidente', scope: 'general', content: 'se murió alguien', tags: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), comments: [{ id: 'k1', entryId, authorUsername: 'despinoza', comment: 'al final no se murió', isSystemGenerated: false, createdAt: new Date().toISOString() }] },
+    });
+    await settle();
+    fixture.detectChanges();
+    const popup = document.querySelector('app-entry-preview-dialog') as HTMLElement;
+    expect(popup.textContent).toContain('se murió alguien');
+    expect(popup.textContent).toContain('al final no se murió');
+    expect(popup.querySelector('a')?.getAttribute('href')).toBe(`/entries?entry=${entryId}`);
+    (popup.querySelector('.ep__foot .adm-btn--primary') as HTMLButtonElement).click();
+    await settle();
+    // La pestaña Bitácora abre el mismo popup.
+    ([...el.querySelectorAll('.td__tab')].find((b) => b.textContent?.includes('Bitácora')) as HTMLButtonElement).click();
+    fixture.detectChanges();
+    (el.querySelector('button.td__entry') as HTMLButtonElement).click();
+    await settle();
+    httpMock.expectOne(`/api/entries/${entryId}`);
+  });
+
+  it('clic en el número lo copia sin abrir otro ticket, y dice «Copiado»', async () => {
+    const { fixture, el } = await render();
+    const written: string[] = [];
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (t: string) => void written.push(t) } });
+    const second = el.querySelectorAll('.tk__row:not(.tk__row--head)')[1];
+    (second.querySelector('.tk__copy') as HTMLElement).click();
+    await settle();
+    fixture.detectChanges();
+    expect(written).toEqual(['TKT-2026-00040']);
+    expect(second.querySelector('.tk__copy')?.textContent).toContain('Copiado');
+    // No abrió el segundo ticket: sigue el primero en el panel.
+    httpMock.expectNone('/api/tickets/t2');
+    (el.querySelector('.td__copy') as HTMLButtonElement).click();
+    await settle();
+    expect(written).toEqual(['TKT-2026-00040', 'TKT-2026-00042']);
+  });
+
   it('selecciona el primero y muestra solo las transiciones válidas', async () => {
     const { el } = await render();
     const buttons = [...el.querySelectorAll('.td__actions button')].map((b) => b.textContent?.trim());

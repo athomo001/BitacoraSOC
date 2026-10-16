@@ -44,10 +44,14 @@
   </div>
 
   <div class="aud__cats" role="group" [attr.aria-label]="i18n.t('audit.categories')">
-    <button type="button" class="seg" [attr.aria-pressed]="category() === 'all'" (click)="setFilter(category, 'all')">{{ i18n.t('audit.cat.all') }}</button>
+    <button type="button" class="seg" [attr.aria-pressed]="category() === 'all'" (click)="setCategory('all')">{{ i18n.t('audit.cat.all') }}</button>
     @for (c of categories; track c.id) {
-      <button type="button" class="seg" [attr.aria-pressed]="category() === c.id" (click)="setFilter(category, c.id)">{{ i18n.t(c.labelKey) }}</button>
+      <button type="button" class="seg" [attr.aria-pressed]="category() === c.id" (click)="setCategory(c.id)">{{ i18n.t(c.labelKey) }}</button>
     }
+    <select class="aud__event-pick mono" name="auditEvent" [attr.aria-label]="i18n.t('audit.event')" [value]="eventName()" (change)="setFilter(eventName, $any($event.target).value)">
+      <option value="">{{ i18n.t('audit.allEvents') }}</option>
+      @for (e of eventNames(); track e.event) { <option [value]="e.event" [selected]="e.event === eventName()">{{ e.event }} ({{ e.total }})</option> }
+    </select>
     @if (filtered()) {
       <button type="button" class="aud__clear" (click)="clear(); search.value = ''">{{ i18n.t('audit.clear') }}</button>
     }

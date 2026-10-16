@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/audit"
@@ -44,6 +45,15 @@ type areaDTO struct {
 	// persona en esta área (SOC/NOC Operativo; las demás, Resolutor).
 	Profile    string `json:"profile"`
 	GroupCount int32  `json:"groupCount"`
+	// TicketSeries: cómo numera los tickets que pide (solo vista; se
+	// configura en Administración → Ticketera).
+	TicketSeries *areaTicketSeriesDTO `json:"ticketSeries,omitempty"`
+}
+
+type areaTicketSeriesDTO struct {
+	Name    string `json:"name"`
+	Preview string `json:"preview"`
+	General bool   `json:"general"`
 }
 
 type levelDTO struct {
@@ -81,9 +91,16 @@ func (h *AreasHandler) List(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer las áreas")
 		return
 	}
+	series, general := areaSeriesExamples(r.Context(), h.Queries, time.Now())
 	out := make([]areaDTO, 0, len(rows))
 	for _, a := range rows {
-		out = append(out, areaDTO{ID: a.ID, Code: a.Code, Name: a.Name, Active: a.Active, System: a.IsSystem, Profile: a.DefaultProfile, GroupCount: a.GroupCount})
+		dto := areaDTO{ID: a.ID, Code: a.Code, Name: a.Name, Active: a.Active, System: a.IsSystem, Profile: a.DefaultProfile, GroupCount: a.GroupCount}
+		if s, ok := series[a.TicketSeriesID.Bytes]; ok && a.TicketSeriesID.Valid {
+			dto.TicketSeries = &areaTicketSeriesDTO{Name: s.Name, Preview: s.Preview, General: s.IsDefault}
+		} else if general != nil {
+			dto.TicketSeries = &areaTicketSeriesDTO{Name: general.Name, Preview: general.Preview, General: true}
+		}
+		out = append(out, dto)
 	}
 	writeData(w, http.StatusOK, out)
 }

@@ -639,3 +639,40 @@ func (h *RotationHandler) PatchWorkShift(w http.ResponseWriter, r *http.Request)
 	})
 	writeData(w, http.StatusOK, toWorkShiftDTO(shift))
 }
+
+// ReorderWorkShifts: PUT /api/work-shifts/reorder {ids: [...]} — el orden en
+// que se ven los turnos en todas las pantallas (paridad con el legacy).
+func (h *RotationHandler) ReorderWorkShifts(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		IDs []uuid.UUID `json:"ids"`
+	}
+	if err := decodeJSON(w, r, &req); err != nil || len(req.IDs) == 0 {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "manda los turnos en el orden nuevo")
+		return
+	}
+	seen := map[uuid.UUID]bool{}
+	for _, id := range req.IDs {
+		if seen[id] {
+			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "un turno viene repetido")
+			return
+		}
+		seen[id] = true
+	}
+	ctx := r.Context()
+	n, err := h.Queries.ReorderWorkShifts(ctx, req.IDs)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo guardar el orden")
+		return
+	}
+	h.AuditLog.Log(ctx, "work_shift.reordered", audit.LevelInfo, audit.Success(), map[string]any{"count": n})
+	shifts, err := h.Queries.ListWorkShifts(ctx, pgtype.Bool{})
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer los turnos")
+		return
+	}
+	out := make([]workShiftDTO, 0, len(shifts))
+	for _, s := range shifts {
+		out = append(out, toWorkShiftDTO(s))
+	}
+	writeData(w, http.StatusOK, out)
+}

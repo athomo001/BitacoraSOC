@@ -44,7 +44,7 @@ function mondayOf(d: Date): Date {
  *
  * La configuración de fondo (ciclos de rotación, turnos, notificaciones
  * periódicas) vive en Administración → Turnos, no acá — mismo criterio que
- * Escalación (la operación del día a día vs. las políticas se configuran en
+ * Escalamiento (la operación del día a día vs. las políticas se configuran en
  * Administración → Escalamiento).
  */
 @Component({

@@ -208,6 +208,7 @@ func run(logger *slog.Logger) error {
 	// Avisos por correo de la Ticketera (spec/15) y Administración → Ticketera.
 	ticketMailer := &handler.TicketMailer{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, PublicBaseURL: publicBaseURL}
 	ticketSettingsHandler := &handler.TicketSettingsHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
+	ticketSeriesHandler := &handler.TicketSeriesHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
 	ticketsHandler := &handler.TicketsHandler{Pool: pool, Queries: queries, AuditLog: auditLog, PinLimiter: ratelimit.NewAPILimiter(30, 15*time.Minute), Hub: hub, Mailer: ticketMailer, Notify: notifier}
 	entriesHandler.Tickets = ticketsHandler
 	notesHandler := &handler.NotesHandler{Queries: queries, AuditLog: auditLog}
@@ -363,6 +364,7 @@ func run(logger *slog.Logger) error {
 	// Auditoría
 	mux.Handle("GET /api/audit-logs", adminOrAuditor(auditLogHandler.List))
 	mux.Handle("GET /api/audit-logs/export", adminOrAuditor(auditLogHandler.Export))
+	mux.Handle("GET /api/audit-logs/events", adminOrAuditor(auditLogHandler.Events))
 	mux.Handle("GET /api/backups/history", admin(backupsHandler.History))
 	mux.Handle("POST /api/backups/create", admin(backupsHandler.Create))
 	mux.Handle("POST /api/backups/export-delta", authed(backupsHandler.ExportDelta))
@@ -485,11 +487,13 @@ func run(logger *slog.Logger) error {
 	mux.Handle("GET /api/log-sources", authed(organizationsHandler.ListLogSources))
 	mux.Handle("POST /api/log-sources", admin(organizationsHandler.CreateLogSource))
 	mux.Handle("PATCH /api/log-sources/{id}", admin(organizationsHandler.PatchLogSource))
+	mux.Handle("DELETE /api/log-sources/{id}", admin(organizationsHandler.DeleteLogSource))
 
 	// Directorio Global (Fase 6, HU-DIR-1/2): leer = cualquier sesión;
 	// escribir = capacidad directory:write; borrar = directory:delete.
 	mux.Handle("GET /api/directory", authed(directoryHandler.List))
 	mux.Handle("GET /api/directory/search", authed(directoryHandler.Search))
+	mux.Handle("GET /api/directory/export", withCapability(capDirectoryWrite, directoryHandler.Export))
 	mux.Handle("GET /api/directory/{id}", authed(directoryHandler.Get))
 	mux.Handle("POST /api/directory", withCapability(capDirectoryWrite, directoryHandler.Create))
 	mux.Handle("PUT /api/directory/{id}", withCapability(capDirectoryWrite, directoryHandler.Update))
@@ -525,7 +529,7 @@ func run(logger *slog.Logger) error {
 	mux.Handle("PUT /api/config/smtp", admin(smtpConfigHandler.Put))
 	mux.Handle("POST /api/config/smtp/test-send", admin(smtpConfigHandler.TestSend))
 
-	// Motor de escalación (Fase 7). resolve/actions/notify/policies aplican el
+	// Motor de escalamiento (Fase 7). resolve/actions/notify/policies aplican el
 	// gate de módulo según el scope del request (serviceId = SOC, assetId /
 	// territorialUnitId = NOC), dentro del handler.
 	mux.Handle("GET /api/services", socOrArea(escalationHandler.ListServices))
@@ -580,6 +584,8 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/rotation-slots", admin(rotationHandler.CreateSlot))
 	mux.Handle("PATCH /api/rotation-slots/{id}", admin(rotationHandler.PatchSlot))
 	mux.Handle("POST /api/rotation-overrides", areaLead(rotationHandler.CreateOverride))
+	mux.Handle("PUT /api/rotation-overrides/{id}", areaLead(rotationHandler.UpdateOverride))
+	mux.Handle("DELETE /api/rotation-overrides/{id}", areaLead(rotationHandler.DeleteOverride))
 	// Guardias en línea de tiempo (canvas "Turnos: guardias", 2026-10-07).
 	guardsHandler := &handler.GuardsHandler{Pool: pool, Queries: queries, AuditLog: auditLog}
 	mux.Handle("GET /api/guards", authed(guardsHandler.Timeline))
@@ -601,6 +607,7 @@ func run(logger *slog.Logger) error {
 	mux.Handle("DELETE /api/work-shifts/{id}/members/{userId}", admin(workShiftMembersHandler.Delete))
 	mux.Handle("POST /api/work-shifts", admin(rotationHandler.CreateWorkShift))
 	mux.Handle("PATCH /api/work-shifts/{id}", admin(rotationHandler.PatchWorkShift))
+	mux.Handle("PUT /api/work-shifts/reorder", admin(rotationHandler.ReorderWorkShifts))
 
 	// Checklists y cierre de turno (Fase 11).
 	mux.Handle("GET /api/checklist-templates/active", authed(checklistsHandler.ActiveTemplates))
@@ -616,6 +623,7 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/shift-checks/close", authed(checklistsHandler.Close))
 	mux.Handle("GET /api/shift-checks/handover", authed(checklistsHandler.Handover))
 	mux.Handle("GET /api/shift-checks/stats", authed(checklistsHandler.ShiftStats))
+	mux.Handle("DELETE /api/shift-checks/{id}", admin(checklistsHandler.DeleteCheck))
 	mux.Handle("POST /api/shift-checks/closures/{id}/acknowledge", authed(checklistsHandler.Acknowledge))
 
 	// Dotación, teletrabajo y pantalla TV (Fase 8, HU-4b/HU-5b) — núcleo
@@ -679,12 +687,19 @@ func run(logger *slog.Logger) error {
 	mux.Handle("GET /api/entries", authed(entriesHandler.List))
 	mux.Handle("POST /api/entries", authed(entriesHandler.Create))
 	mux.Handle("GET /api/entries/export", authed(entriesHandler.Export))
+	mux.Handle("GET /api/entries/authors", authed(entriesHandler.Authors))
+	// Etiquetas (paridad con el legacy): sugerencias para todos; uso, renombrar y borrar, el admin.
+	mux.Handle("GET /api/entries/tags", authed(entriesHandler.SuggestTags))
+	mux.Handle("GET /api/admin/entry-tags", admin(entriesHandler.TagStats))
+	mux.Handle("POST /api/admin/entry-tags/rename", admin(entriesHandler.RenameTag))
+	mux.Handle("POST /api/admin/entry-tags/delete", admin(entriesHandler.DeleteTag))
 	mux.Handle("POST /api/entries/upload-image", authed(entriesHandler.UploadImage))
 	mux.Handle("PATCH /api/entries/bulk", admin(entriesHandler.BulkPatch))
 	mux.Handle("GET /api/entries/{id}", authed(entriesHandler.Get))
 	mux.Handle("PATCH /api/entries/{id}", authed(entriesHandler.Patch))
 	mux.Handle("DELETE /api/entries/{id}", authed(entriesHandler.Delete))
 	mux.Handle("POST /api/entries/{id}/comments", authed(entriesHandler.AddComment))
+	mux.Handle("PUT /api/entries/{id}/glpi-ticket", authed(entriesHandler.SetGlpiTicket))
 	mux.Handle("GET /api/attachments/{id}", authed(entriesHandler.ServeAttachment))
 
 	// Ticketera nativa ITIL (Fase 10). El feature gate se evalúa por request:
@@ -711,6 +726,7 @@ func run(logger *slog.Logger) error {
 	mux.Handle("POST /api/tickets/{id}/tasks", ticketAuthed(ticketsHandler.AddTask))
 	mux.Handle("PATCH /api/tickets/{id}/tasks/{taskId}", ticketAuthed(ticketsHandler.PatchTask))
 	mux.Handle("POST /api/entries/{id}/ticket-link", ticketAuthed(ticketsHandler.LinkEntry))
+	mux.Handle("DELETE /api/entries/{id}/ticket-link", ticketAuthed(ticketsHandler.UnlinkEntry))
 	mux.Handle("POST /api/entries/{id}/convert-to-ticket", ticketAuthed(ticketsHandler.ConvertEntry))
 	mux.Handle("POST /api/entries/{id}/resolve", ticketAuthed(ticketsHandler.ResolveEntry))
 	mux.Handle("POST /api/tickets/{id}/public-pin", ticketAuthed(ticketsHandler.RegeneratePublicPin))
@@ -720,6 +736,11 @@ func run(logger *slog.Logger) error {
 	mux.Handle("GET /api/config/tickets", ticketAdmin(ticketSettingsHandler.GetConfig))
 	mux.Handle("PUT /api/config/tickets", ticketAdmin(ticketSettingsHandler.UpdateConfig))
 	mux.Handle("POST /api/config/tickets/mail-test", ticketAdmin(ticketSettingsHandler.SendTest))
+	mux.Handle("GET /api/config/ticket-series", ticketAdmin(ticketSeriesHandler.List))
+	mux.Handle("POST /api/config/ticket-series", ticketAdmin(ticketSeriesHandler.Create))
+	mux.Handle("PUT /api/config/ticket-series/areas", ticketAdmin(ticketSeriesHandler.Assign))
+	mux.Handle("PUT /api/config/ticket-series/{id}", ticketAdmin(ticketSeriesHandler.Update))
+	mux.Handle("DELETE /api/config/ticket-series/{id}", ticketAdmin(ticketSeriesHandler.Delete))
 	// Datos del seguimiento público. La URL que recibe el cliente es
 	// /p/tickets/{token}, pero esa la sirve la SPA (catch-all de abajo): si el
 	// JSON viviera en la misma ruta, el navegador mostraría JSON crudo y la
@@ -786,6 +807,7 @@ func run(logger *slog.Logger) error {
 	mux.Handle("GET /api/report-events", authed(reportsHandler.SuggestReportEvents))
 	mux.Handle("GET /api/report-events/all", admin(reportsHandler.ListReportEvents))
 	mux.Handle("POST /api/report-events", admin(reportsHandler.CreateReportEvent))
+	mux.Handle("POST /api/report-events/import", admin(reportsHandler.ImportReportEvents))
 	mux.Handle("PUT /api/report-events/{id}", admin(reportsHandler.UpdateReportEvent))
 	mux.Handle("DELETE /api/report-events/{id}", admin(reportsHandler.DeleteReportEvent))
 	mux.Handle("POST /api/reports/shift/dispatch", admin(func(w http.ResponseWriter, r *http.Request) {
@@ -821,6 +843,13 @@ func run(logger *slog.Logger) error {
 	mux.Handle("PUT /api/config/birthday-emails", admin(birthdaysHandler.UpdateConfig))
 	mux.Handle("POST /api/config/birthday-emails/test", admin(birthdaysHandler.SendTest))
 	mux.Handle("GET /api/config/birthday-emails/image", public(birthdaysHandler.Image))
+	mux.Handle("PUT /api/config/birthday-emails/image", admin(birthdaysHandler.PutImage))
+	mux.Handle("DELETE /api/config/birthday-emails/image", admin(birthdaysHandler.DeleteImage))
+	// Avisos del legacy: checklist no realizado y guardia sin cubrir (revisión de paridad 2026-10-16).
+	shiftAlertsHandler := &handler.ShiftAlertsHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog}
+	mux.Handle("GET /api/config/shift-alerts", admin(shiftAlertsHandler.GetConfig))
+	mux.Handle("PUT /api/config/shift-alerts", admin(shiftAlertsHandler.UpdateConfig))
+	go scheduler.Run(ctx, 5*time.Minute, shiftAlertsHandler.Tick)
 	go scheduler.Run(ctx, time.Minute, birthdaysHandler.DispatchDue)
 	// Muestras de todos los correos (pendiente 4: revisarlos en Outlook y Gmail).
 	mailSamplesHandler := &handler.MailSamplesHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, PublicBaseURL: publicBaseURL, Reports: reportsHandler, Dotacion: dotacionHandler, Birthdays: birthdaysHandler}

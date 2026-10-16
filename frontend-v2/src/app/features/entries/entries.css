@@ -270,6 +270,26 @@ mat-icon {
   width: 200px;
 }
 
+.en__tagbox {
+  position: relative;
+}
+
+.en__tagsug {
+  position: absolute;
+  z-index: 5;
+  bottom: calc(100% + 4px);
+  left: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: max-content;
+  max-width: 360px;
+  padding: 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
 .en__ticket-no {
   width: 160px;
 }
@@ -414,4 +434,45 @@ mat-icon {
   :host {
     height: auto;
   }
+}
+
+.en__links {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.en__link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.en__link-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.en__link-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.en__link-form .adm-input {
+  flex: 1;
+  min-width: 140px;
+}
+
+.en__link-add {
+  align-self: flex-start;
+}
+
+.en__link-kind {
+  display: inline-flex;
+  gap: 4px;
 }

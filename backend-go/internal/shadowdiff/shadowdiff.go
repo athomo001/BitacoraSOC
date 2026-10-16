@@ -1,6 +1,6 @@
-// Package shadowdiff compara la escalación del legacy contra la resolución
+// Package shadowdiff compara el escalamiento del legacy contra la resolución
 // del motor nuevo sobre los mismos casos (Fase 7 tarea 8: prototipo del
-// "shadow-diff real de escalación" que exige el checklist de paridad de la
+// "shadow-diff real de escalamiento" que exige el checklist de paridad de la
 // Fase 14 antes del corte). El legacy guarda el flujo en
 // CatalogLogSource.escalationFlow: pasos `unique` (un contacto con nombre y
 // teléfono) o `pool` (una lista de contactos). El nuevo devuelve pasos con
@@ -218,7 +218,7 @@ type Report struct {
 func (r Report) Markdown() string {
 	var b strings.Builder
 	ok, diff, failed := 0, 0, 0
-	b.WriteString("# Shadow-diff de escalación (legacy vs Bitácora Ops)\n\n")
+	b.WriteString("# Shadow-diff de escalamiento (legacy vs Bitácora Ops)\n\n")
 	b.WriteString("| Caso | Resultado |\n| --- | --- |\n")
 	for _, c := range r.Cases {
 		switch {

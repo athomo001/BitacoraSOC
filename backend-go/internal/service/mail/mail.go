@@ -1,6 +1,6 @@
 // Package mail envía correo real vía SMTP (Fase 2 del roadmap: "SMTP básico,
 // envío de prueba" — spec/02-alcance-y-roadmap.md). Base para Auth (Fase 4,
-// forgot-password) y Escalación (Fase 7, POST /api/escalation/notify).
+// forgot-password) y Escalamiento (Fase 7, POST /api/escalation/notify).
 package mail
 
 import (
@@ -48,7 +48,7 @@ func (s *Sender) Send(to, subject, body string) error {
 }
 
 // SendMany despacha un solo correo con varios destinatarios en To y Cc
-// (miembros recipient_type=to/cc de un equipo de escalación).
+// (miembros recipient_type=to/cc de un equipo de escalamiento).
 func (s *Sender) SendMany(to, cc []string, subject, body string) error {
 	to, cc = nonEmpty(to), nonEmpty(cc)
 	if len(to) == 0 {

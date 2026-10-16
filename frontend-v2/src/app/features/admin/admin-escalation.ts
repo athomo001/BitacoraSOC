@@ -25,7 +25,7 @@ import '../../core/i18n/packs/admin';
 type ScopeKind = 'asset' | 'unit' | 'service';
 
 /**
- * Administración del motor de escalación (Fase 7), re-vestido con los
+ * Administración del motor de escalamiento (Fase 7), re-vestido con los
  * componentes del artboard "Administración": políticas a la izquierda y los
  * pasos de la elegida a la derecha, servicios SOC y ventanas de
  * mantenimiento. Portado en espíritu de "Flujo" y "Mantenimientos" del

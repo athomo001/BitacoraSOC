@@ -360,3 +360,14 @@ mat-icon {
     border-bottom: 1px solid var(--border-subtle);
   }
 }
+
+.aud__event-pick {
+  max-width: 280px;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-size: 12px;
+}

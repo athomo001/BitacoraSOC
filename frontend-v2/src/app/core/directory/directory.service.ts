@@ -1,7 +1,8 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { ApiEnvelope } from '../auth/auth.models';
+import { downloadFile } from '../download';
 import { PageMeta } from '../territory/territory.models';
 
 export type ChannelType = 'call' | 'whatsapp' | 'sms' | 'email' | 'other';
@@ -71,6 +72,15 @@ export class DirectoryService {
     }
     const res = await firstValueFrom(this.http.get<ApiEnvelope<DirectoryContact[]>>('/api/directory', { params }));
     return { contacts: res.data, meta: res.meta as PageMeta };
+  }
+
+  /** CSV con lo filtrado y las columnas de la plantilla de importación (vuelve a entrar tal cual). */
+  exportCsv(filters: DirectoryFilters): Promise<void> {
+    let params = new HttpParams();
+    for (const [key, value] of Object.entries(filters)) {
+      if (value !== undefined && value !== '' && value !== null) params = params.set(key, String(value));
+    }
+    return downloadFile(this.http, '/api/directory/export', 'contactos.csv', params);
   }
 
   async search(q: string): Promise<DirectoryContact[]> {

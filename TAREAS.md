@@ -6,7 +6,7 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 
 - [x] Núcleo 2.0 completo (fases 1 a 13)
 - [ ] Áreas TI, Infra y CSM (9.1 a 9.7 hechas; falta la Gestión CSM)
-- [ ] Gestión CSM y segunda etapa de áreas
+- [ ] Gestión CSM (la segunda etapa de áreas ya está hecha)
 - [ ] Wiki y orquestador
 - [ ] Ensayo de paridad 2
 - [ ] Corte a producción y fin del rollback
@@ -27,8 +27,20 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [ ] Decidir las 6 preguntas de la Gestión CSM — Dueño
 - [ ] Comunicaciones internas del CSM y la tarea «avisar al cliente» (espera a la 9.4)
 
+### Paridad con el legacy (revisión y decisiones del dueño, 2026-10-16)
+- [x] Correo «no se hizo el checklist de inicio»: igual al legacy (09:30, a la guardia N1 no hábil y a los N2)
+- [x] Recordatorio de semana de guardia sin cubrir: igual al legacy (7 días antes, a los N2)
+- [x] Login: corregir el texto «Analistas/Admin 4h | Invitados 2h» (sin invitados; la sesión dura 8 h)
+- [x] Bitácora: filtrar por autor y por cliente, y «Mías», en la barra de filtros actual
+- [x] Etiquetas: sugerencias al escribir para todos; renombrar, borrar y ver uso solo el admin
+- [x] Borrar un checklist del historial: solo el admin, con motivo y en Auditoría
+- [x] Auditoría: filtro por tipo de evento (el resumen va con los reportes avanzados)
+- [x] Reemplazos de guardia: verlos, editarlos y borrarlos
+- [x] Exportar contactos a CSV; reordenar turnos; importar eventos del catálogo; borrar fuentes de log
+- Decidido: las cuentas de invitado no vuelven.
+
 ### Integraciones
-- [ ] Wiki: responder sus 2 preguntas abiertas — Dueño
+- [ ] Wiki: nada por ahora; se retoma cuando exista Kudawiki (decisión del dueño 2026-10-16)
 - [ ] Documentación externa (wiki) en la app: buscador, ayuda en pantalla y sugerencias por contexto
 - [ ] Orquestador: barra para saltar entre sistemas, como complemento fuera del núcleo
 

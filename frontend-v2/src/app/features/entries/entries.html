@@ -28,6 +28,7 @@
         <mat-icon>search</mat-icon>
         <input type="search" [placeholder]="i18n.t('entries.search')" [attr.aria-label]="i18n.t('entries.search')" [ngModel]="filterQ()" (ngModelChange)="filterQ.set($event)" (keyup.enter)="load()" />
       </label>
+      <button type="button" class="seg" [attr.aria-pressed]="filterAuthor() === 'me'" (click)="toggleMine()"><mat-icon>person</mat-icon>{{ i18n.t('entries.mine') }}</button>
       <button type="button" class="adm-btn" [attr.aria-expanded]="moreFilters()" (click)="moreFilters.set(!moreFilters())"><mat-icon>tune</mat-icon>{{ i18n.t('entries.moreFilters') }}</button>
       <span class="en__count mono en__push">{{ i18n.tf('entries.count', total()) }}</span>
       <button type="button" class="adm-btn" [attr.aria-pressed]="panel() === 'notes'" (click)="toggleNotes()"><mat-icon>sticky_note_2</mat-icon>{{ i18n.t('entries.notes') }}</button>
@@ -36,7 +37,19 @@
 
     @if (moreFilters()) {
       <div class="en__filters">
-        <label class="adm-field"><span class="adm-label">{{ i18n.t('entries.tag') }}</span><input class="adm-input" placeholder="otdr" [ngModel]="filterTag()" (ngModelChange)="filterTag.set($event)" (keyup.enter)="load()" /></label>
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('entries.author') }}</span>
+          <select class="adm-input" name="filterAuthor" [ngModel]="filterAuthor()" (ngModelChange)="filterAuthor.set($event)">
+            <option value="">{{ i18n.t('entries.anyone') }}</option>
+            <option value="me">{{ i18n.t('entries.me') }}</option>
+            @for (a of authors(); track a.id) { <option [value]="a.id">{{ a.name }}</option> }
+          </select></label>
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('entries.col.client') }}</span>
+          <select class="adm-input" name="filterClient" [ngModel]="filterClient()" (ngModelChange)="filterClient.set($event)">
+            <option value="">{{ i18n.t('entries.anyClient') }}</option>
+            @for (c of filterClients(); track c.id) { <option [value]="c.id">{{ c.name }}</option> }
+          </select></label>
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('entries.tag') }}</span><input class="adm-input" name="filterTag" placeholder="otdr" list="entriesTagList" autocomplete="off" [ngModel]="filterTag()" (ngModelChange)="onTagsInput($event, 'filter')" (keyup.enter)="load()" />
+          <datalist id="entriesTagList">@for (s of filterTagSuggestions(); track s.tag) { <option [value]="s.tag"></option> }</datalist></label>
         <label class="adm-field"><span class="adm-label">{{ i18n.t('audit.range.from') }}</span><input class="adm-input" type="date" [ngModel]="filterFrom()" (ngModelChange)="filterFrom.set($event)" /></label>
         <label class="adm-field"><span class="adm-label">{{ i18n.t('audit.range.to') }}</span><input class="adm-input" type="date" [ngModel]="filterTo()" (ngModelChange)="filterTo.set($event)" /></label>
         <button type="button" class="adm-btn adm-btn--primary" (click)="load()"><mat-icon>search</mat-icon>{{ i18n.t('entries.apply') }}</button>
@@ -134,7 +147,16 @@
       }
 
       <div class="en__crow">
-        <input class="adm-input en__tags" name="tags" [placeholder]="i18n.t('entries.tagsPlaceholder')" [attr.aria-label]="i18n.t('entries.tag')" [ngModel]="draft().tags" (ngModelChange)="updateDraft({ tags: $event })" />
+        <span class="en__tagbox">
+          <input class="adm-input en__tags" name="tags" autocomplete="off" [placeholder]="i18n.t('entries.tagsPlaceholder')" [attr.aria-label]="i18n.t('entries.tag')" [ngModel]="draft().tags" (ngModelChange)="onTagsInput($event, 'draft')" (blur)="tagSuggestions.set([])" />
+          @if (tagSuggestions().length) {
+            <span class="en__tagsug" role="listbox" [attr.aria-label]="i18n.t('entries.tagSuggestions')">
+              @for (s of tagSuggestions(); track s.tag) {
+                <button type="button" class="seg" role="option" (mousedown)="$event.preventDefault(); pickTag(s.tag)">{{ s.tag }} <span class="mono adm-muted">{{ s.uses }}</span></button>
+              }
+            </span>
+          }
+        </span>
         @if (ticketsEnabled()) {
           <label class="en__check">
             <input type="checkbox" name="createTicket" [ngModel]="draft().createTicket" (ngModelChange)="updateDraft({ createTicket: $event })" />
@@ -145,6 +167,7 @@
           }
         }
         <button type="button" class="adm-btn" [title]="i18n.t('entries.defangHint')" [disabled]="!draft().content.trim()" (click)="defangDraft()"><mat-icon>shield</mat-icon>{{ i18n.t('entries.defang') }}</button>
+        @if (defangInfo(); as d) { <span class="adm-small adm-secondary" role="status">{{ d }}</span> }
         <button type="button" class="adm-btn" [title]="i18n.t('mdHelp.openHint')" (click)="openFormat()"><mat-icon>text_format</mat-icon>{{ i18n.t('mdHelp.open') }}</button>
         @if (composeImage(); as img) {
           <span class="en__img"><img [src]="img.previewUrl" [alt]="i18n.t('entries.evidence')" /><button type="button" class="adm-icon-btn" [attr.aria-label]="i18n.t('teams.remove')" (click)="removeImage()"><mat-icon>close</mat-icon></button></span>
@@ -177,6 +200,46 @@
           @if (entry.tags.length) {
             <p class="en__tags-row">@for (tag of entry.tags; track tag) { <span class="pill tone-neutral">{{ tag }}</span> }</p>
           }
+
+          <span class="adm-label">{{ i18n.t('entries.ticketLinks') }}</span>
+          <div class="en__links">
+            @if (entry.ticket; as t) {
+              <span class="en__link">
+                <mat-icon>confirmation_number</mat-icon>
+                <a class="mono" routerLink="/tickets" [queryParams]="{ id: t.id }" [title]="t.title">{{ t.number }}</a>
+                <span class="adm-small adm-secondary en__link-title">{{ t.title }}</span>
+                @if (ticketsEnabled()) {
+                  <button type="button" class="adm-icon-btn" [disabled]="linkBusy()" [title]="i18n.t('entries.unlink')" [attr.aria-label]="i18n.t('entries.unlink') + ' ' + t.number" (click)="unlink('internal')"><mat-icon>link_off</mat-icon></button>
+                }
+              </span>
+            }
+            @if (entry.glpiTicketId; as g) {
+              <span class="en__link">
+                <mat-icon>open_in_new</mat-icon>
+                @if (entry.glpiTicketUrl) {
+                  <a class="mono" [href]="entry.glpiTicketUrl" target="_blank" rel="noopener noreferrer">GLPI #{{ g }}</a>
+                } @else {
+                  <span class="mono">GLPI #{{ g }}</span>
+                }
+                <button type="button" class="adm-icon-btn" [disabled]="linkBusy()" [title]="i18n.t('entries.unlink')" [attr.aria-label]="i18n.t('entries.unlink') + ' GLPI ' + g" (click)="unlink('glpi')"><mat-icon>link_off</mat-icon></button>
+              </span>
+            }
+            @if (linkOpen()) {
+              <div class="en__link-form">
+                <span class="en__link-kind" role="group" [attr.aria-label]="i18n.t('entries.ticketKind')">
+                  @if (ticketsEnabled()) {
+                    <button type="button" class="seg" [attr.aria-pressed]="linkKind() === 'internal'" (click)="linkKind.set('internal')">{{ i18n.t('entries.ticketInternal') }}</button>
+                  }
+                  <button type="button" class="seg" [attr.aria-pressed]="linkKind() === 'glpi'" (click)="linkKind.set('glpi')">GLPI</button>
+                </span>
+                <input class="adm-input mono" name="linkNumber" [placeholder]="linkKind() === 'glpi' ? '12345' : 'TKT-2026-00042'" [attr.aria-label]="i18n.t('entries.ticketNumber')" [ngModel]="linkNumber()" (ngModelChange)="linkNumber.set($event)" (keyup.enter)="saveLink()" />
+                <button type="button" class="adm-btn" (click)="linkOpen.set(false)">{{ i18n.t('adminChecklist.cancel') }}</button>
+                <button type="button" class="adm-btn adm-btn--primary" [disabled]="linkBusy() || !linkNumber().trim()" (click)="saveLink()">{{ i18n.t('entries.link') }}</button>
+              </div>
+            } @else if (!entry.ticket || !entry.glpiTicketId) {
+              <button type="button" class="adm-btn en__link-add" (click)="openLink()"><mat-icon>add_link</mat-icon>{{ i18n.t('entries.linkTicketBtn') }}</button>
+            }
+          </div>
 
           <span class="adm-label">{{ i18n.t('entries.followUps') }}</span>
           <ul class="en__comments">

@@ -46,6 +46,11 @@ export interface EntryComment {
 
 export interface EntryDetail extends Entry {
   comments: EntryComment[];
+  /** Ticket interno enlazado. */
+  ticket?: { id: string; number: string; title: string };
+  /** Ticket de GLPI enlazado y, si GLPI está configurado, el enlace a su ficha. */
+  glpiTicketId?: string;
+  glpiTicketUrl?: string;
 }
 
 export interface EntryFilters {
@@ -55,9 +60,17 @@ export interface EntryFilters {
   from?: string;
   to?: string;
   q?: string;
+  /** Autor: un id o «me» (Mías). */
+  author?: string;
+  /** Cliente: por el servicio o el activo de la entrada (o la etiqueta cliente:X del legacy). */
+  client?: string;
   page?: number;
   pageSize?: number;
 }
+
+export interface EntryAuthor { id: string; name: string; username: string; }
+export interface TagSuggestion { tag: string; uses: number; }
+export interface TagStat { tag: string; uses: number; lastUsed: string; }
 
 function filterParams(f: EntryFilters): Record<string, string> {
   const params: Record<string, string> = {};
@@ -67,6 +80,8 @@ function filterParams(f: EntryFilters): Record<string, string> {
   if (f.from) params['from'] = f.from;
   if (f.to) params['to'] = f.to;
   if (f.q) params['q'] = f.q;
+  if (f.author) params['author'] = f.author;
+  if (f.client) params['client'] = f.client;
   if (f.page) params['page'] = String(f.page);
   if (f.pageSize) params['pageSize'] = String(f.pageSize);
   return params;
@@ -85,6 +100,29 @@ export class EntriesService {
 
   async list(filters: EntryFilters = {}): Promise<{ items: Entry[]; total: number }> {
     return (await firstValueFrom(this.http.get<ApiEnvelope<{ items: Entry[]; total: number }>>('/api/entries', { params: filterParams(filters) }))).data;
+  }
+
+  /** Quienes escribieron en la Bitácora (filtro por autor). */
+  async authors(): Promise<EntryAuthor[]> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<EntryAuthor[]>>('/api/entries/authors'))).data;
+  }
+
+  /** Etiquetas que empiezan con lo escrito, las más usadas primero (hasta 10). */
+  async suggestTags(q: string): Promise<TagSuggestion[]> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<TagSuggestion[]>>('/api/entries/tags', { params: { q } }))).data;
+  }
+
+  /** Administración → Etiquetas (admin). */
+  async tagStats(): Promise<TagStat[]> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<TagStat[]>>('/api/admin/entry-tags'))).data;
+  }
+
+  async renameTag(from: string, to: string): Promise<number> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<{ entries: number }>>('/api/admin/entry-tags/rename', { from, to }))).data.entries;
+  }
+
+  async deleteTag(tag: string): Promise<number> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<{ entries: number }>>('/api/admin/entry-tags/delete', { tag }))).data.entries;
   }
 
   async get(id: string): Promise<EntryDetail> {
@@ -113,6 +151,20 @@ export class EntriesService {
 
   async bulkPatch(entryIds: string[], patch: { scope?: EntryScope; tags?: string[] }): Promise<{ updatedCount: number }> {
     return (await firstValueFrom(this.http.patch<ApiEnvelope<{ updatedCount: number }>>('/api/entries/bulk', { entryIds, ...patch }))).data;
+  }
+
+  /** Enlaza la entrada a un ticket interno por su número (TKT-…). */
+  async linkTicket(entryId: string, ticketNumber: string): Promise<void> {
+    await firstValueFrom(this.http.post(`/api/entries/${entryId}/ticket-link`, { ticketNumber }));
+  }
+
+  async unlinkTicket(entryId: string): Promise<void> {
+    await firstValueFrom(this.http.delete(`/api/entries/${entryId}/ticket-link`));
+  }
+
+  /** Número de ticket de GLPI; vacío lo quita. Devuelve el detalle actualizado. */
+  async setGlpiTicket(entryId: string, glpiTicketId: string): Promise<EntryDetail> {
+    return (await firstValueFrom(this.http.put<ApiEnvelope<EntryDetail>>(`/api/entries/${entryId}/glpi-ticket`, { glpiTicketId }))).data;
   }
 
   async addComment(entryId: string, comment: string): Promise<EntryComment> {

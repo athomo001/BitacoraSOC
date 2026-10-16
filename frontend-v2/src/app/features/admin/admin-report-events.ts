@@ -30,9 +30,19 @@ const PAGE_SIZE = 50;
           <mat-icon>search</mat-icon>
           <input type="search" name="revSearch" [placeholder]="i18n.t('rev.search')" [attr.aria-label]="i18n.t('rev.search')" [ngModel]="query()" (ngModelChange)="onSearch($event)" />
         </label>
+        <label class="adm-btn rev__file" [title]="i18n.t('rev.importHint')">
+          <mat-icon>upload_file</mat-icon>{{ i18n.t('rev.import') }}
+          <input type="file" name="revImport" accept=".csv,.json,text/csv,application/json" [disabled]="saving()" (change)="importFile($event)" />
+        </label>
         <button type="button" class="adm-btn" (click)="edit(null)"><mat-icon>add</mat-icon>{{ i18n.t('rev.new') }}</button>
       </div>
       <p class="adm-card__note">{{ i18n.t('rev.hint') }}</p>
+      @if (imported(); as r) {
+        <div class="adm-card__note rev__result" role="status">
+          {{ fill('rev.importDone', { c: r.created, s: r.skipped }) }}
+          @for (e of r.errors.slice(0, 10); track e.line) { <div class="adm-small adm-secondary">{{ fill('rev.importRowError', { l: e.line, r: e.reason }) }}</div> }
+        </div>
+      }
       @if (error(); as e) { <p class="adm-error rev__msg" role="alert">{{ e }}</p> }
       <div class="adm-table-wrap">
         <table class="adm-table rev__table">
@@ -94,6 +104,9 @@ const PAGE_SIZE = 50;
     .rev__motivo { max-width: 420px; color: var(--text-secondary); white-space: pre-line; }
     .rev__muted td { opacity: 0.55; }
     .rev__actions { display: flex; flex-wrap: wrap; gap: 6px; }
+    .rev__file { position: relative; cursor: pointer; }
+    .rev__file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .rev__result { color: var(--text-primary); }
   `,
 })
 export class AdminReportEventsComponent implements OnInit {
@@ -110,7 +123,24 @@ export class AdminReportEventsComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly pages = computed(() => Math.max(1, Math.ceil(this.total() / PAGE_SIZE)));
 
+  protected readonly imported = signal<{ created: number; skipped: number; errors: { line: number; reason: string }[] } | null>(null);
+
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+  protected fill(key: 'rev.importDone' | 'rev.importRowError', values: Record<string, string | number>): string {
+    return Object.entries(values).reduce((text, [k, v]) => text.replace(`{${k}}`, String(v)), this.i18n.t(key));
+  }
+
+  protected async importFile(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    this.imported.set(null);
+    await this.run(async () => {
+      this.imported.set(await this.reports.importEvents(file));
+    });
+    input.value = '';
+  }
 
   async ngOnInit(): Promise<void> {
     await this.load();

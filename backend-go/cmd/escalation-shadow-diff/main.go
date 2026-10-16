@@ -1,4 +1,4 @@
-// escalation-shadow-diff compara la escalación del legacy con la del motor
+// escalation-shadow-diff compara el escalamiento del legacy con el del motor
 // nuevo (Fase 7 tarea 8, prototipo del shadow-diff que la Fase 14 debe pasar
 // sin discrepancias no explicadas antes del corte).
 //

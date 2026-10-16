@@ -21,8 +21,8 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// EscalationHandler es el motor de escalación unificado SOC/NOC de la Fase 7
-// (spec/04-contratos-api.md "Escalación NOC/SOC", docs/adr/0004): resolver a
+// EscalationHandler es el motor de escalamiento unificado SOC/NOC de la Fase 7
+// (spec/04-contratos-api.md "Escalamiento NOC/SOC", docs/adr/0004): resolver a
 // quién avisar, registrar cada intento de contacto (inmutable) y despachar el
 // aviso por correo. La app nunca llama por teléfono: el operador llama desde
 // su teléfono y la app solo registra el resultado (ver memoria del proyecto:
@@ -237,7 +237,7 @@ func normalizeDigits(v string) string {
 	return b.String()
 }
 
-var errNoPolicy = errors.New("no hay política de escalación ni cobertura aplicable")
+var errNoPolicy = errors.New("no hay política de escalamiento ni cobertura aplicable")
 
 // resolve implementa GET /api/escalation/resolve y es la base de notify y
 // actions: misma resolución en los tres (un solo motor, docs/adr/0004).
@@ -534,11 +534,11 @@ func (h *EscalationHandler) writeResolveError(w http.ResponseWriter, r *http.Req
 	switch {
 	case errors.Is(err, errNoPolicy):
 		problemdetails.Write(w, r, http.StatusNotFound, "no-escalation-policy",
-			"no hay política de escalación ni equipo con cobertura para este caso — configúrala en Administración → Escalamiento")
+			"no hay política de escalamiento ni equipo con cobertura para este caso — configúrala en Administración → Escalamiento")
 	case errors.Is(err, errNotFoundScope):
 		problemdetails.Write(w, r, http.StatusNotFound, "not-found", err.Error())
 	default:
-		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo resolver la escalación")
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo resolver el escalamiento")
 	}
 }
 
@@ -646,7 +646,7 @@ func (h *EscalationHandler) RecordAction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if req.PolicyID != nil && (res.PolicyID == nil || *res.PolicyID != *req.PolicyID) {
-		problemdetails.Write(w, r, http.StatusConflict, "stale-resolution", "la política de escalación cambió desde que resolviste; vuelve a resolver")
+		problemdetails.Write(w, r, http.StatusConflict, "stale-resolution", "la política de escalamiento cambió desde que resolviste; vuelve a resolver")
 		return
 	}
 	var step *escalation.Step
@@ -656,7 +656,7 @@ func (h *EscalationHandler) RecordAction(w http.ResponseWriter, r *http.Request)
 		}
 	}
 	if step == nil {
-		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-step", "ese paso no existe en la escalación resuelta")
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-step", "ese paso no existe en el escalamiento resuelto")
 		return
 	}
 
@@ -880,7 +880,7 @@ func (h *EscalationHandler) Notify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(res.Steps) == 0 {
-		problemdetails.Write(w, r, http.StatusNotFound, "no-escalation-policy", "la política de escalación no tiene pasos configurados")
+		problemdetails.Write(w, r, http.StatusNotFound, "no-escalation-policy", "la política de escalamiento no tiene pasos configurados")
 		return
 	}
 
@@ -899,7 +899,7 @@ func (h *EscalationHandler) Notify(w http.ResponseWriter, r *http.Request) {
 
 	idx, ok := notifyStepIndex(res.Steps, req.StepOrder)
 	if !ok {
-		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "ese paso no existe en la política de escalación")
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-payload", "ese paso no existe en la política de escalamiento")
 		return
 	}
 	first := res.steps[idx]

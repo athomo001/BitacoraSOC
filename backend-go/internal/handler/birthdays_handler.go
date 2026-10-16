@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -53,24 +54,36 @@ type birthdayConfigDTO struct {
 	Time         string `json:"time"`
 	Cc           string `json:"cc"`
 	LastSentDate string `json:"lastSentDate,omitempty"`
+	// CustomImage: hay una imagen propia (si no, la incluida en la app).
+	// ImageVersion cambia con cada cambio de imagen (para el ?v= de la miniatura).
+	CustomImage  bool   `json:"customImage"`
+	ImageVersion string `json:"imageVersion,omitempty"`
 }
 
-func toBirthdayConfigDTO(enabled bool, at, cc string, last pgtype.Date) birthdayConfigDTO {
-	dto := birthdayConfigDTO{Enabled: enabled, Time: at, Cc: cc}
-	if last.Valid {
-		dto.LastSentDate = last.Time.Format("2006-01-02")
+func toBirthdayConfigDTO(c db.GetBirthdayConfigRow) birthdayConfigDTO {
+	dto := birthdayConfigDTO{Enabled: c.BirthdayEmailsEnabled, Time: c.BirthdayEmailsTime, Cc: c.BirthdayEmailsCc, CustomImage: c.HasCustomImage}
+	if c.BirthdayEmailsLastDate.Valid {
+		dto.LastSentDate = c.BirthdayEmailsLastDate.Time.Format("2006-01-02")
+	}
+	if c.BirthdayImageUpdatedAt.Valid {
+		dto.ImageVersion = strconv.FormatInt(c.BirthdayImageUpdatedAt.Time.Unix(), 36)
 	}
 	return dto
 }
 
-// GetConfig es GET /api/config/birthday-emails (admin).
-func (h *BirthdaysHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
+// writeConfig responde la configuración tal como quedó.
+func (h *BirthdaysHandler) writeConfig(w http.ResponseWriter, r *http.Request) {
 	c, err := h.Queries.GetBirthdayConfig(r.Context())
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo leer la configuración")
 		return
 	}
-	writeData(w, http.StatusOK, toBirthdayConfigDTO(c.BirthdayEmailsEnabled, c.BirthdayEmailsTime, c.BirthdayEmailsCc, c.BirthdayEmailsLastDate))
+	writeData(w, http.StatusOK, toBirthdayConfigDTO(c))
+}
+
+// GetConfig es GET /api/config/birthday-emails (admin).
+func (h *BirthdaysHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
+	h.writeConfig(w, r)
 }
 
 // UpdateConfig es PUT /api/config/birthday-emails (admin).
@@ -99,13 +112,23 @@ func (h *BirthdaysHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) 
 	h.AuditLog.Log(ctx, "config.birthday_emails.update", audit.LevelInfo, audit.Success(), map[string]any{
 		"enabled": c.BirthdayEmailsEnabled, "time": c.BirthdayEmailsTime, "hasCc": c.BirthdayEmailsCc != "",
 	})
-	writeData(w, http.StatusOK, toBirthdayConfigDTO(c.BirthdayEmailsEnabled, c.BirthdayEmailsTime, c.BirthdayEmailsCc, c.BirthdayEmailsLastDate))
+	h.writeConfig(w, r)
+}
+
+// birthdayPicture es la imagen del correo: la propia si la subieron, si no la
+// incluida en la app.
+func (h *BirthdaysHandler) birthdayPicture(ctx context.Context) ([]byte, string) {
+	if img, err := h.Queries.GetBirthdayImage(ctx); err == nil && len(img.BirthdayImage) > 0 && img.BirthdayImageType.Valid {
+		return img.BirthdayImage, img.BirthdayImageType.String
+	}
+	return mailtpl.BirthdayImage, "image/jpeg"
 }
 
 // birthdayMail arma el correo con el logo de Marca y la ilustración en línea.
 func (h *BirthdaysHandler) birthdayMail(ctx context.Context, userName string) (mailtpl.Mail, []mail.Inline) {
 	brand := branding.Load(ctx, h.Queries, true)
-	inline := []mail.Inline{{CID: mailtpl.BirthdayImageCID, Name: "birthday_kawaii.jpg", ContentType: "image/jpeg", Data: mailtpl.BirthdayImage}}
+	picture, pictureType := h.birthdayPicture(ctx)
+	inline := []mail.Inline{{CID: mailtpl.BirthdayImageCID, Name: "cumpleanos" + logoExtension(pictureType), ContentType: pictureType, Data: picture}}
 	logoSrc := ""
 	if len(brand.Logo) > 0 {
 		logoSrc = "cid:" + mailtpl.BirthdayLogoCID
@@ -186,8 +209,50 @@ func (h *BirthdaysHandler) DispatchDue(ctx context.Context) error {
 
 // Image es GET /api/config/birthday-emails/image (pública): la ilustración
 // del correo, para la miniatura de Administración (un <img> no manda el token).
+// El ?v= de la miniatura cambia con cada imagen nueva.
 func (h *BirthdaysHandler) Image(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "image/jpeg")
-	w.Header().Set("Cache-Control", "public, max-age=86400")
-	_, _ = w.Write(mailtpl.BirthdayImage)
+	picture, pictureType := h.birthdayPicture(r.Context())
+	serveAsset(w, r, picture, pictureType)
+}
+
+// birthdayPictureMaxSide: el correo la muestra a 380 px; el doble se ve
+// nítida en pantallas de alta densidad.
+const birthdayPictureMaxSide = 760
+
+// birthdayImageAllowed: lo que se ve en los clientes de correo (sin SVG ni ICO).
+func birthdayImageAllowed(raw []byte, _ string) (string, bool) {
+	switch mime := http.DetectContentType(raw); mime {
+	case "image/png", "image/jpeg", "image/webp", "image/gif":
+		return mime, true
+	}
+	return "", false
+}
+
+// PutImage es PUT /api/config/birthday-emails/image (admin, multipart "file"):
+// una imagen propia para el correo (pedido del dueño 2026-10-16).
+func (h *BirthdaysHandler) PutImage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	raw, mime, _, ok := readBrandFile(w, r, maxBrandFile, birthdayImageAllowed)
+	if !ok {
+		return
+	}
+	raw, mime = branding.EmailPicture(raw, mime, birthdayPictureMaxSide)
+	if err := h.Queries.SetBirthdayImage(ctx, db.SetBirthdayImageParams{Image: raw, ImageType: pgtype.Text{String: mime, Valid: true}}); err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo guardar la imagen")
+		return
+	}
+	h.AuditLog.Log(ctx, "config.birthday_emails.image.set", audit.LevelInfo, audit.Success(), map[string]any{"type": mime, "bytes": len(raw)})
+	h.writeConfig(w, r)
+}
+
+// DeleteImage es DELETE /api/config/birthday-emails/image (admin): vuelve a
+// la imagen incluida en la app.
+func (h *BirthdaysHandler) DeleteImage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := h.Queries.SetBirthdayImage(ctx, db.SetBirthdayImageParams{}); err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo quitar la imagen")
+		return
+	}
+	h.AuditLog.Log(ctx, "config.birthday_emails.image.removed", audit.LevelInfo, audit.Success(), nil)
+	h.writeConfig(w, r)
 }

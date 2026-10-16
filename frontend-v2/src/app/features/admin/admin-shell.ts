@@ -28,13 +28,14 @@ import { AdminClientAlertsComponent } from './admin-client-alerts';
 import { AdminTicketsComponent } from './admin-tickets';
 import { AdminAreasComponent } from './admin-areas';
 import { AdminGlpiComponent } from './admin-glpi';
+import { AdminEntryTagsComponent } from './admin-entry-tags';
 import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 
 import '../../core/i18n/packs/admin';
 export type AdminSection =
   | 'access' | 'areas' | 'shifts' | 'checklist' | 'escalation' | 'tickets' | 'clientAlerts' | 'smtp' | 'reports'
   | 'agenda' | 'notifications' | 'organizations' | 'territory' | 'inventory' | 'teams'
-  | 'modules' | 'brand' | 'features' | 'glpi' | 'backups' | 'audit' | 'complements';
+  | 'modules' | 'brand' | 'features' | 'glpi' | 'backups' | 'audit' | 'complements' | 'tags';
 
 interface NavItem {
   id: AdminSection;
@@ -79,6 +80,7 @@ const NAV: readonly { labelKey: MessageKey; items: readonly NavItem[] }[] = [
       { id: 'territory', icon: 'map', labelKey: 'admin.nav.territory', requiresModule: 'noc' },
       { id: 'inventory', icon: 'dns', labelKey: 'admin.nav.inventory' },
       { id: 'teams', icon: 'groups', labelKey: 'admin.nav.teams' },
+      { id: 'tags', icon: 'sell', labelKey: 'admin.nav.tags', requiresSocOrNoc: true },
     ],
   },
   {
@@ -124,6 +126,7 @@ function normalize(text: string): string {
     MatIconModule, AdminModulesComponent, AdminBrandComponent, AdminFeaturesComponent, AdminTerritoryComponent, AdminInventoryComponent, AdminOrganizationsComponent, AdminTeamsComponent,
     AdminEscalationComponent, AdminShiftsComponent, AdminSmtpComponent, AdminReportsComponent, AdminBackupsComponent, AdminAuditComponent,
     AdminAccessComponent, AdminChecklistComponent, AdminComplementsComponent, AdminClientAlertsComponent, AdminTicketsComponent, AdminAreasComponent, AdminAgendaComponent, AdminNotificationsComponent, AdminGlpiComponent,
+    AdminEntryTagsComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKeydown($event)' },
@@ -180,6 +183,7 @@ function normalize(text: string): string {
           @case ('backups') { <app-admin-backups (goToFeatures)="go('features')" /> }
           @case ('audit') { <app-admin-audit /> }
           @case ('complements') { <app-admin-complements /> }
+          @case ('tags') { <app-admin-entry-tags /> }
         }
       </main>
     </div>

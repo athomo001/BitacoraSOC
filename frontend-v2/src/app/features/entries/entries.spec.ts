@@ -63,11 +63,85 @@ describe('EntriesComponent (Bitácora)', () => {
     expect(row.querySelector('.en__summary')?.textContent).not.toContain('##');
   });
 
+  it('desde el detalle se enlaza la entrada a un ticket de GLPI y se puede quitar', async () => {
+    const { fixture, el, button } = await render();
+    (el.querySelector('tr.en-row') as HTMLElement).click();
+    await tick();
+    httpMock.expectOne('/api/entries/e1').flush({ data: { ...ENTRY, comments: [] } });
+    await tick();
+    fixture.detectChanges();
+    button('Enlazar ticket').click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const input = el.querySelector('input[name="linkNumber"]') as HTMLInputElement;
+    input.value = '#4521';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    button('Enlazar').click();
+    await tick();
+    const put = httpMock.expectOne('/api/entries/e1/glpi-ticket');
+    expect(put.request.method).toBe('PUT');
+    expect(put.request.body).toEqual({ glpiTicketId: '#4521' });
+    put.flush({ data: {} });
+    await tick();
+    httpMock.expectOne('/api/entries/e1').flush({ data: { ...ENTRY, comments: [], glpiTicketId: '4521', glpiTicketUrl: 'https://glpi.x.cl/front/ticket.form.php?id=4521' } });
+    await tick();
+    fixture.detectChanges();
+    const link = [...el.querySelectorAll('.en__link a')].find((a) => a.textContent?.includes('GLPI #4521')) as HTMLAnchorElement;
+    expect(link.getAttribute('href')).toBe('https://glpi.x.cl/front/ticket.form.php?id=4521');
+    (el.querySelector('button[aria-label="Quitar enlace GLPI 4521"]') as HTMLButtonElement).click();
+    await tick();
+    const clear = httpMock.expectOne('/api/entries/e1/glpi-ticket');
+    expect(clear.request.body).toEqual({ glpiTicketId: '' });
+    clear.flush({ data: {} });
+    await tick();
+    httpMock.expectOne('/api/entries/e1').flush({ data: { ...ENTRY, comments: [] } });
+  });
+
   it('solo ofrece los ámbitos que aplican: sin SOC no aparece SOC', async () => {
     const { el } = await render({ socEnabled: false, nocEnabled: true });
     const scopes = [...el.querySelectorAll('.en__toolbar .en__segs')[0].querySelectorAll('.seg')].map((b) => b.textContent?.trim());
     expect(scopes.some((s) => s?.endsWith('SOC'))).toBe(false);
     expect(scopes.some((s) => s?.endsWith('NOC'))).toBe(true);
+  });
+
+  it('«Mías», autor y cliente van al servidor; las etiquetas se sugieren al escribir (paridad con el legacy)', async () => {
+    const { fixture, el, button } = await render();
+    httpMock.match('/api/entries/authors').forEach((r) => r.flush({ data: [{ id: 'u2', name: 'Beto', username: 'beto' }] }));
+    httpMock.match((r) => r.url === '/api/organizations').forEach((r) => r.flush({ data: [{ id: 'c1', name: 'Netics', code: 'netics', type: 'client', active: true }] }));
+    await tick();
+    button('Mías').click();
+    await tick();
+    httpMock.expectOne((r) => r.url === '/api/entries' && r.params.get('author') === 'me').flush({ data: { items: [], total: 0 } });
+    await tick();
+    button('Más filtros').click();
+    fixture.detectChanges();
+    const pick = (name: string, value: string) => {
+      const sel = el.querySelector(`select[name="${name}"]`) as HTMLSelectElement;
+      sel.value = value;
+      sel.dispatchEvent(new Event('change'));
+    };
+    pick('filterAuthor', 'u2');
+    pick('filterClient', 'c1');
+    fixture.detectChanges();
+    button('Aplicar').click();
+    await tick();
+    httpMock.expectOne((r) => r.url === '/api/entries' && r.params.get('author') === 'u2' && r.params.get('client') === 'c1').flush({ data: { items: [], total: 0 } });
+    await tick();
+
+    const tags = el.querySelector('input[name="tags"]') as HTMLInputElement;
+    tags.value = 'fibra, ot';
+    tags.dispatchEvent(new Event('input'));
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    httpMock.expectOne((r) => r.url === '/api/entries/tags' && r.params.get('q') === 'ot').flush({ data: [{ tag: 'otdr', uses: 12 }, { tag: 'fibra', uses: 3 }] });
+    await tick();
+    fixture.detectChanges();
+    const sug = [...el.querySelectorAll('.en__tagsug button')];
+    expect(sug.map((b) => b.textContent?.trim())).toEqual(['otdr 12']);
+    sug[0].dispatchEvent(new Event('mousedown'));
+    fixture.detectChanges();
+    await tick();
+    expect((el.querySelector('input[name="tags"]') as HTMLInputElement).value).toBe('fibra, otdr, ');
   });
 
   it('el filtro rápido de tipo pide al clic; el de tag vive en "Más filtros"', async () => {

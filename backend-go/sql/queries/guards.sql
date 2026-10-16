@@ -5,7 +5,7 @@
 -- name: ListGuardCycles :many
 -- La hora de cambio sale del turno de trabajo enlazado a la guardia
 -- (Administración → Turnos → Turnos de trabajo); sin turno enlazado, 09:00.
-SELECT c.id, c.team_id, t.name AS team_name, c.start_day_of_week, c.timezone, c.must_be_covered, c.duration_days,
+SELECT c.id, c.team_id, t.name AS team_name, c.start_day_of_week, c.timezone, c.must_be_covered, c.remind_uncovered, c.duration_days,
   COALESCE(t.area_id, '00000000-0000-0000-0000-000000000000'::uuid) AS area_id,
   COALESCE(ws.id, '00000000-0000-0000-0000-000000000000'::uuid) AS work_shift_id, COALESCE(ws.name, '')::text AS work_shift_name,
   COALESCE(ws.start_time, time '09:00') AS change_time

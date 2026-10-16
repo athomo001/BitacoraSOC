@@ -8,6 +8,7 @@
     <button type="button" class="seg" [attr.aria-pressed]="tab() === 'shifts'" (click)="tab.set('shifts')">{{ i18n.t('shiftsAdmin.tabShifts') }} <span class="mono">{{ workShifts().length }}</span></button>
     <button type="button" class="seg" [attr.aria-pressed]="tab() === 'staffing'" (click)="tab.set('staffing')">{{ i18n.t('shiftsAdmin.tabStaffing') }}</button>
     <button type="button" class="seg" [attr.aria-pressed]="tab() === 'reminders'" (click)="tab.set('reminders')">{{ i18n.t('shiftsAdmin.tabReminders') }}</button>
+    <button type="button" class="seg" [attr.aria-pressed]="tab() === 'alerts'" (click)="tab.set('alerts')">{{ i18n.t('alerts.tab') }}</button>
   </span>
 </header>
 
@@ -27,7 +28,7 @@
   <p class="adm-card__note sa__lead">{{ i18n.t('shiftsAdmin.workShiftsHint') }}</p>
   <div class="adm-table-wrap">
     <table class="adm-table">
-      <thead><tr><th>{{ i18n.t('teams.name') }}</th><th>{{ i18n.t('shiftsAdmin.hours') }}</th><th>{{ i18n.t('shiftsAdmin.timezone') }}</th><th>{{ i18n.t('shiftsAdmin.recipients') }}</th><th>{{ i18n.t('orgs.active') }}</th></tr></thead>
+      <thead><tr><th>{{ i18n.t('teams.name') }}</th><th>{{ i18n.t('shiftsAdmin.hours') }}</th><th>{{ i18n.t('shiftsAdmin.timezone') }}</th><th>{{ i18n.t('shiftsAdmin.recipients') }}</th><th>{{ i18n.t('orgs.active') }}</th><th>{{ i18n.t('shiftsAdmin.order') }}</th></tr></thead>
       <tbody>
         @for (w of workShifts(); track w.id) {
           <tr class="adm-row-click" [class.adm-row--active]="editingShiftId() === w.id" tabindex="0" (click)="editShift(w)" (keydown.enter)="editShift(w)">
@@ -46,6 +47,10 @@
                 <input class="switch__input" type="checkbox" role="switch" [checked]="w.active" [disabled]="busy()" (change)="toggleShift(w)" [attr.aria-label]="w.name" />
                 <span class="switch__track" aria-hidden="true"></span>
               </label>
+            </td>
+            <td class="sa__order" (click)="$event.stopPropagation()">
+              <button type="button" class="adm-icon-btn" [disabled]="busy() || $first" [title]="i18n.t('shiftsAdmin.moveUp')" [attr.aria-label]="i18n.t('shiftsAdmin.moveUp') + ' ' + w.name" (click)="moveShift($index, -1)"><mat-icon>arrow_upward</mat-icon></button>
+              <button type="button" class="adm-icon-btn" [disabled]="busy() || $last" [title]="i18n.t('shiftsAdmin.moveDown')" [attr.aria-label]="i18n.t('shiftsAdmin.moveDown') + ' ' + w.name" (click)="moveShift($index, 1)"><mat-icon>arrow_downward</mat-icon></button>
             </td>
           </tr>
         }
@@ -326,4 +331,8 @@
 
 @if (tab() === 'reminders') {
   <app-admin-shift-reminders />
+}
+
+@if (tab() === 'alerts') {
+  <app-admin-shift-alerts />
 }

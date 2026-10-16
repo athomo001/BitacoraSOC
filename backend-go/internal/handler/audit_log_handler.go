@@ -253,3 +253,23 @@ func (h *AuditLogHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	writeDataMeta(w, http.StatusOK, dtos, map[string]any{"page": page, "pageSize": pageSize, "total": total})
 }
+
+// Events: GET /api/audit-logs/events?event=prefijo,… — los eventos que hay
+// (con cuántas veces) para el filtro por evento exacto, como el legacy.
+func (h *AuditLogHandler) Events(w http.ResponseWriter, r *http.Request) {
+	f, bad := parseAuditFilter(r.URL.Query())
+	if bad != "" {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-query", bad)
+		return
+	}
+	rows, err := h.Queries.ListAuditEventNames(r.Context(), f.Events)
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer los eventos")
+		return
+	}
+	out := make([]map[string]any, 0, len(rows))
+	for _, e := range rows {
+		out = append(out, map[string]any{"event": e.Event, "total": e.Total})
+	}
+	writeData(w, http.StatusOK, out)
+}

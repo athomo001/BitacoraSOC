@@ -47,6 +47,27 @@ describe('AdminBirthdaysComponent (correos de cumpleaños, #21)', () => {
     expect(el.textContent).toContain('Guardado');
   });
 
+  it('cambiar la imagen la sube y la miniatura se refresca; «Volver a la original» la quita', async () => {
+    const { fixture, el } = await render();
+    expect(el.textContent).not.toContain('Volver a la original');
+    const input = el.querySelector('input[name="bdImage"]') as HTMLInputElement;
+    const file = new File(['png'], 'torta.png', { type: 'image/png' });
+    Object.defineProperty(input, 'files', { value: [file] });
+    input.dispatchEvent(new Event('change'));
+    const put = http.expectOne({ method: 'PUT', url: '/api/config/birthday-emails/image' });
+    expect((put.request.body as FormData).get('file')).toBe(file);
+    put.flush({ data: { enabled: false, time: '09:00', cc: '', customImage: true, imageVersion: 'abc' } });
+    await settle();
+    fixture.detectChanges();
+    expect((el.querySelector('img.bd__art') as HTMLImageElement).getAttribute('src')).toBe('/api/config/birthday-emails/image?v=abc');
+    expect(el.textContent).toContain('Imagen guardada');
+    ([...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Volver a la original')) as HTMLButtonElement).click();
+    http.expectOne({ method: 'DELETE', url: '/api/config/birthday-emails/image' }).flush({ data: { enabled: false, time: '09:00', cc: '', customImage: false, imageVersion: 'abd' } });
+    await settle();
+    fixture.detectChanges();
+    expect(el.textContent).not.toContain('Volver a la original');
+  });
+
   it('la prueba se envía al propio admin', async () => {
     const { fixture, el } = await render();
     ([...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Enviarme una prueba')) as HTMLButtonElement).click();

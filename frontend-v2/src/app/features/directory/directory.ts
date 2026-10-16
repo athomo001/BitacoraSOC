@@ -103,14 +103,34 @@ export class DirectoryComponent implements OnInit {
     await this.load(1);
   }
 
+  private filters() {
+    return {
+      q: this.search().trim() || undefined,
+      scope: this.scopeFilter() || undefined,
+      organizationId: this.organizationFilter() || undefined,
+      favorite: this.favoritesOnly() ? true : undefined,
+    };
+  }
+
+  protected readonly exporting = signal(false);
+
+  protected async exportCsv(): Promise<void> {
+    if (this.exporting()) return;
+    this.exporting.set(true);
+    try {
+      await this.directory.exportCsv(this.filters());
+    } catch (error) {
+      this.showError(problemDetail(error, this.i18n.t('dir.exportError')));
+    } finally {
+      this.exporting.set(false);
+    }
+  }
+
   protected async load(page = this.meta().page): Promise<void> {
     this.loading.set(true);
     try {
       const { contacts, meta } = await this.directory.list({
-        q: this.search().trim() || undefined,
-        scope: this.scopeFilter() || undefined,
-        organizationId: this.organizationFilter() || undefined,
-        favorite: this.favoritesOnly() ? true : undefined,
+        ...this.filters(),
         page,
         pageSize: this.pageSize(),
       });

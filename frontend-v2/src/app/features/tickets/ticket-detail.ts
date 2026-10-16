@@ -17,6 +17,8 @@ import { OrganizationsService, TeamSummary } from '../../core/organizations/orga
 import { resolverTeams } from '../../core/tickets/ticket-view';
 import { CLOCK_TONE, PRIORITY_SHORT, PRIORITY_TONE, STATUS_TONE, clockText, formatDuration, publicTrackingUrl, transitionAction } from '../../core/tickets/ticket-view';
 import { TicketRelationsComponent } from './ticket-relations';
+import { Dialog } from '@angular/cdk/dialog';
+import { EntryPreviewDialogComponent, EntryPreviewData } from '../entries/entry-preview-dialog';
 import { TicketMailComponent } from './ticket-mail';
 import { RouterLink } from '@angular/router';
 import { ModuleAccessService } from '../../core/auth/module-access.service';
@@ -74,10 +76,27 @@ export class TicketDetailComponent {
   protected readonly alsoChildren = signal(true);
 
   protected readonly i18n = inject(I18nService);
+
+  /** Clic en el número: lo copia (pedido del dueño) y por un momento dice «Copiado». */
+  protected readonly copiedNumber = signal<string | null>(null);
+  private copiedTimer?: ReturnType<typeof setTimeout>;
+
+  protected async copyNumber(number: string, event: Event): Promise<void> {
+    event.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(number);
+      this.copiedNumber.set(number);
+      clearTimeout(this.copiedTimer);
+      this.copiedTimer = setTimeout(() => this.copiedNumber.set(null), 1500);
+    } catch {
+      this.copiedNumber.set(null);
+    }
+  }
   private readonly api = inject(TicketsService);
   private readonly auth = inject(AuthService);
   private readonly perms = inject(PermissionsService);
   private readonly injector = inject(Injector);
+  private readonly dialog = inject(Dialog);
   private readonly http = inject(HttpClient);
   /** Eliminar un ticket mal creado: solo admin (pedido del dueño: cancelar = borrar). */
   protected readonly canDelete = this.perms.isAdmin;
@@ -318,6 +337,17 @@ export class TicketDetailComponent {
   /** Tras unir, hacer hijo o cambiar cliente: recarga y avisa a la lista. */
   protected async reloadAll(): Promise<void> {
     await this.run(() => Promise.resolve());
+  }
+
+  /** La entrada en un popup, sin salir del ticket (pedido del dueño). */
+  protected openEntry(entryId: string): void {
+    this.dialog.open<void, EntryPreviewData>(EntryPreviewDialogComponent, { data: { entryId }, injector: this.injector });
+  }
+
+  /** La nota que deja enlazar o quitar una entrada de bitácora: se muestra con un enlace a la entrada. */
+  protected entryRef(content: string): { id: string; linked: boolean } | null {
+    const m = /^Entrada de bitácora (vinculada|desvinculada): ([0-9a-f-]{36})$/.exec(content.trim());
+    return m ? { id: m[2], linked: m[1] === 'vinculada' } : null;
   }
 
   /** "↑ Padre" / "↓ TKT-…" / "desde TKT-…": de dónde vino un comentario. */

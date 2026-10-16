@@ -170,21 +170,22 @@ func (q *Queries) FindUserForGuardImport(ctx context.Context, q_ string) (FindUs
 }
 
 const getGuardCycle = `-- name: GetGuardCycle :one
-SELECT c.id, c.team_id, c.start_day_of_week, c.start_time_utc, c.duration_days, c.timezone, c.active, c.must_be_covered, t.name AS team_name, COALESCE(t.area_id, '00000000-0000-0000-0000-000000000000'::uuid) AS area_id
+SELECT c.id, c.team_id, c.start_day_of_week, c.start_time_utc, c.duration_days, c.timezone, c.active, c.must_be_covered, c.remind_uncovered, t.name AS team_name, COALESCE(t.area_id, '00000000-0000-0000-0000-000000000000'::uuid) AS area_id
 FROM rotation_cycles c JOIN teams t ON t.id = c.team_id WHERE c.id = $1
 `
 
 type GetGuardCycleRow struct {
-	ID             uuid.UUID   `json:"id"`
-	TeamID         uuid.UUID   `json:"team_id"`
-	StartDayOfWeek int32       `json:"start_day_of_week"`
-	StartTimeUtc   pgtype.Time `json:"start_time_utc"`
-	DurationDays   int32       `json:"duration_days"`
-	Timezone       string      `json:"timezone"`
-	Active         bool        `json:"active"`
-	MustBeCovered  bool        `json:"must_be_covered"`
-	TeamName       string      `json:"team_name"`
-	AreaID         pgtype.UUID `json:"area_id"`
+	ID              uuid.UUID   `json:"id"`
+	TeamID          uuid.UUID   `json:"team_id"`
+	StartDayOfWeek  int32       `json:"start_day_of_week"`
+	StartTimeUtc    pgtype.Time `json:"start_time_utc"`
+	DurationDays    int32       `json:"duration_days"`
+	Timezone        string      `json:"timezone"`
+	Active          bool        `json:"active"`
+	MustBeCovered   bool        `json:"must_be_covered"`
+	RemindUncovered bool        `json:"remind_uncovered"`
+	TeamName        string      `json:"team_name"`
+	AreaID          pgtype.UUID `json:"area_id"`
 }
 
 func (q *Queries) GetGuardCycle(ctx context.Context, id uuid.UUID) (GetGuardCycleRow, error) {
@@ -199,6 +200,7 @@ func (q *Queries) GetGuardCycle(ctx context.Context, id uuid.UUID) (GetGuardCycl
 		&i.Timezone,
 		&i.Active,
 		&i.MustBeCovered,
+		&i.RemindUncovered,
 		&i.TeamName,
 		&i.AreaID,
 	)
@@ -309,7 +311,7 @@ func (q *Queries) ListAbsencesBetween(ctx context.Context, arg ListAbsencesBetwe
 
 const listGuardCycles = `-- name: ListGuardCycles :many
 
-SELECT c.id, c.team_id, t.name AS team_name, c.start_day_of_week, c.timezone, c.must_be_covered, c.duration_days,
+SELECT c.id, c.team_id, t.name AS team_name, c.start_day_of_week, c.timezone, c.must_be_covered, c.remind_uncovered, c.duration_days,
   COALESCE(t.area_id, '00000000-0000-0000-0000-000000000000'::uuid) AS area_id,
   COALESCE(ws.id, '00000000-0000-0000-0000-000000000000'::uuid) AS work_shift_id, COALESCE(ws.name, '')::text AS work_shift_name,
   COALESCE(ws.start_time, time '09:00') AS change_time
@@ -324,17 +326,18 @@ ORDER BY t.name
 `
 
 type ListGuardCyclesRow struct {
-	ID             uuid.UUID   `json:"id"`
-	TeamID         uuid.UUID   `json:"team_id"`
-	TeamName       string      `json:"team_name"`
-	StartDayOfWeek int32       `json:"start_day_of_week"`
-	Timezone       string      `json:"timezone"`
-	MustBeCovered  bool        `json:"must_be_covered"`
-	DurationDays   int32       `json:"duration_days"`
-	AreaID         pgtype.UUID `json:"area_id"`
-	WorkShiftID    uuid.UUID   `json:"work_shift_id"`
-	WorkShiftName  string      `json:"work_shift_name"`
-	ChangeTime     pgtype.Time `json:"change_time"`
+	ID              uuid.UUID   `json:"id"`
+	TeamID          uuid.UUID   `json:"team_id"`
+	TeamName        string      `json:"team_name"`
+	StartDayOfWeek  int32       `json:"start_day_of_week"`
+	Timezone        string      `json:"timezone"`
+	MustBeCovered   bool        `json:"must_be_covered"`
+	RemindUncovered bool        `json:"remind_uncovered"`
+	DurationDays    int32       `json:"duration_days"`
+	AreaID          pgtype.UUID `json:"area_id"`
+	WorkShiftID     uuid.UUID   `json:"work_shift_id"`
+	WorkShiftName   string      `json:"work_shift_name"`
+	ChangeTime      pgtype.Time `json:"change_time"`
 }
 
 // Guardias en línea de tiempo (000029, canvas "Turnos: guardias"): los
@@ -358,6 +361,7 @@ func (q *Queries) ListGuardCycles(ctx context.Context) ([]ListGuardCyclesRow, er
 			&i.StartDayOfWeek,
 			&i.Timezone,
 			&i.MustBeCovered,
+			&i.RemindUncovered,
 			&i.DurationDays,
 			&i.AreaID,
 			&i.WorkShiftID,
@@ -553,7 +557,7 @@ func (q *Queries) UnlinkWorkShiftsFromCycle(ctx context.Context, rotationCycleID
 
 const updateGuardCycle = `-- name: UpdateGuardCycle :one
 UPDATE rotation_cycles SET must_be_covered = $1, start_day_of_week = $2
-WHERE id = $3 RETURNING id, team_id, start_day_of_week, start_time_utc, duration_days, timezone, active, must_be_covered
+WHERE id = $3 RETURNING id, team_id, start_day_of_week, start_time_utc, duration_days, timezone, active, must_be_covered, remind_uncovered
 `
 
 type UpdateGuardCycleParams struct {
@@ -574,6 +578,7 @@ func (q *Queries) UpdateGuardCycle(ctx context.Context, arg UpdateGuardCyclePara
 		&i.Timezone,
 		&i.Active,
 		&i.MustBeCovered,
+		&i.RemindUncovered,
 	)
 	return i, err
 }

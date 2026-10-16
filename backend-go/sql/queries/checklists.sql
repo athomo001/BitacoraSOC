@@ -206,3 +206,12 @@ LEFT JOIN services sv ON sv.id = e.service_id
 LEFT JOIN organizations o ON o.id = sv.organization_id
 WHERE e.entry_type <> 'checklist' AND e.created_at >= $1 AND e.created_at <= $2
 ORDER BY e.created_at ASC;
+
+-- name: CountClosuresForCheck :one
+-- Un checklist de cierre de un turno ya cerrado no se borra (el cierre lo usa).
+SELECT count(*) FROM shift_closures WHERE closure_check_id = $1;
+
+-- name: DeleteShiftCheck :execrows
+-- Borrado del admin (paridad con el legacy, decisión del dueño 2026-10-16);
+-- sus servicios se van en cascada. La foto completa queda en Auditoría.
+DELETE FROM shift_checks WHERE id = $1;

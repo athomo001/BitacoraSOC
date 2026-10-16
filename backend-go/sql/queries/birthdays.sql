@@ -1,7 +1,17 @@
 -- ===== Correos de cumpleaños (comentario del dueño #21) =====
 
 -- name: GetBirthdayConfig :one
-SELECT birthday_emails_enabled, birthday_emails_time, birthday_emails_cc, birthday_emails_last_date FROM app_config LIMIT 1;
+SELECT birthday_emails_enabled, birthday_emails_time, birthday_emails_cc, birthday_emails_last_date,
+  (birthday_image IS NOT NULL)::boolean AS has_custom_image, birthday_image_updated_at
+FROM app_config LIMIT 1;
+
+-- name: GetBirthdayImage :one
+-- La imagen propia (NULL si se usa la incluida en la app).
+SELECT birthday_image, birthday_image_type FROM app_config LIMIT 1;
+
+-- name: SetBirthdayImage :exec
+-- NULL vuelve a la imagen incluida en la app.
+UPDATE app_config SET birthday_image = sqlc.narg('image'), birthday_image_type = sqlc.narg('image_type'), birthday_image_updated_at = now();
 
 -- name: UpdateBirthdayConfig :one
 -- Cambiar la hora o volver a encenderlo permite enviar de nuevo hoy (como el legacy).

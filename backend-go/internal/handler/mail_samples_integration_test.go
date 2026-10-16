@@ -44,8 +44,8 @@ func TestMailSamples_TodasSeArmanYLleganAMailpit(t *testing.T) {
 	if len(failed) > 0 {
 		t.Fatalf("no se pudieron armar: %+v", failed)
 	}
-	// Los 14 de la Fase 12 más los de la Agenda, el aviso con acuse y el resumen mensual (9.5, 9.7).
-	if len(samples) != 18 {
+	// Los 14 de la Fase 12, los de la Agenda, el aviso con acuse, el resumen mensual y los dos avisos del legacy de turnos.
+	if len(samples) != 20 {
 		t.Fatalf("muestras: %d", len(samples))
 	}
 	// Todos los tipos (docs/correos): cada uno con su archivo, cuándo sale y contenido.

@@ -21,7 +21,7 @@ export interface FlowState {
 export const stepContactKey = (order: number, contactId: string): string => `${order}:${contactId}`;
 
 /**
- * Reconstruye el estado de la tarjeta de escalación a partir de la línea de
+ * Reconstruye el estado de la tarjeta de escalamiento a partir de la línea de
  * tiempo del incidente, con las mismas reglas que escalation.Next del
  * backend: si quien no contestó es de un pool (TI-Mundo…), se sigue con el
  * siguiente del pool; agotado el pool, o en unique/pool con alguien que no es

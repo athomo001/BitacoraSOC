@@ -2,7 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, TestRequest, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
-import { ReportsComponent, defang, salutation } from './reports';
+import { ReportsComponent, salutation } from './reports';
+import { defang } from '../../core/entries/defang';
 
 const ORG = { id: 'o1', name: 'Defensoría Penal', code: 'DPP', type: 'client', active: true };
 const ALERT = {

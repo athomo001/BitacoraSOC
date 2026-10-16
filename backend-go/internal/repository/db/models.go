@@ -1380,6 +1380,19 @@ type AppConfig struct {
 	NocModuleEnabled          bool               `json:"noc_module_enabled"`
 	MapTilesMode              string             `json:"map_tiles_mode"`
 	MapTilesUrl               string             `json:"map_tiles_url"`
+	ChecklistMissingEnabled   bool               `json:"checklist_missing_enabled"`
+	ChecklistMissingTime      string             `json:"checklist_missing_time"`
+	ChecklistMissingTeamID    pgtype.UUID        `json:"checklist_missing_team_id"`
+	ChecklistMissingCargos    []string           `json:"checklist_missing_cargos"`
+	ChecklistMissingLastDate  pgtype.Date        `json:"checklist_missing_last_date"`
+	GuardReminderEnabled      bool               `json:"guard_reminder_enabled"`
+	GuardReminderDaysAhead    int32              `json:"guard_reminder_days_ahead"`
+	GuardReminderCargos       []string           `json:"guard_reminder_cargos"`
+	GuardReminderLastDate     pgtype.Date        `json:"guard_reminder_last_date"`
+	GuardReminderLastWeek     pgtype.Date        `json:"guard_reminder_last_week"`
+	BirthdayImage             []byte             `json:"birthday_image"`
+	BirthdayImageType         pgtype.Text        `json:"birthday_image_type"`
+	BirthdayImageUpdatedAt    pgtype.Timestamptz `json:"birthday_image_updated_at"`
 }
 
 type Area struct {
@@ -1391,6 +1404,7 @@ type Area struct {
 	SortOrder      int32              `json:"sort_order"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	DefaultProfile string             `json:"default_profile"`
+	TicketSeriesID pgtype.UUID        `json:"ticket_series_id"`
 }
 
 type Asset struct {
@@ -2113,14 +2127,15 @@ type ResponsibilityType struct {
 }
 
 type RotationCycle struct {
-	ID             uuid.UUID   `json:"id"`
-	TeamID         uuid.UUID   `json:"team_id"`
-	StartDayOfWeek int32       `json:"start_day_of_week"`
-	StartTimeUtc   pgtype.Time `json:"start_time_utc"`
-	DurationDays   int32       `json:"duration_days"`
-	Timezone       string      `json:"timezone"`
-	Active         bool        `json:"active"`
-	MustBeCovered  bool        `json:"must_be_covered"`
+	ID              uuid.UUID   `json:"id"`
+	TeamID          uuid.UUID   `json:"team_id"`
+	StartDayOfWeek  int32       `json:"start_day_of_week"`
+	StartTimeUtc    pgtype.Time `json:"start_time_utc"`
+	DurationDays    int32       `json:"duration_days"`
+	Timezone        string      `json:"timezone"`
+	Active          bool        `json:"active"`
+	MustBeCovered   bool        `json:"must_be_covered"`
+	RemindUncovered bool        `json:"remind_uncovered"`
 }
 
 type RotationOverride struct {
@@ -2416,6 +2431,17 @@ type TicketMailOutbox struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
+type TicketNumberSeries struct {
+	ID         uuid.UUID          `json:"id"`
+	Name       string             `json:"name"`
+	Prefix     string             `json:"prefix"`
+	YearFormat string             `json:"year_format"`
+	Digits     int32              `json:"digits"`
+	NextNumber int64              `json:"next_number"`
+	IsDefault  bool               `json:"is_default"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
 type TicketResolver struct {
 	TicketID uuid.UUID          `json:"ticket_id"`
 	UserID   uuid.UUID          `json:"user_id"`
@@ -2515,6 +2541,7 @@ type WorkShift struct {
 	EmailIncludeChecklist    bool        `json:"email_include_checklist"`
 	EmailIncludeEntries      bool        `json:"email_include_entries"`
 	EmailSubjectTemplate     string      `json:"email_subject_template"`
+	SortOrder                int32       `json:"sort_order"`
 }
 
 type WorkShiftAssignment struct {

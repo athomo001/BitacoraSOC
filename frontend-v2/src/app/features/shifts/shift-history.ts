@@ -7,6 +7,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { ChecklistsService, ShiftCheck } from '../../core/checklists/checklists.service';
 import { redLeaves } from '../../core/checklists/shift-detect';
 import { ShiftsService, WorkShift } from '../../core/shifts/shifts.service';
+import { PermissionsService } from '../../core/auth/permissions.service';
 
 import '../../core/i18n/packs/shifts';
 const PAGE_SIZE = 50;
@@ -30,6 +31,12 @@ export class ShiftHistoryComponent implements OnInit {
   protected readonly i18n = inject(I18nService);
   private readonly api = inject(ChecklistsService);
   private readonly shiftsApi = inject(ShiftsService);
+  private readonly perms = inject(PermissionsService);
+  /** Borrar un checklist: solo el admin, con motivo (paridad con el legacy). */
+  protected readonly isAdmin = this.perms.isAdmin;
+  protected readonly deleting = signal<string | null>(null);
+  protected readonly reason = signal('');
+  protected readonly busy = signal(false);
 
   protected readonly checks = signal<ShiftCheck[]>([]);
   protected readonly shifts = signal<WorkShift[]>([]);
@@ -49,6 +56,7 @@ export class ShiftHistoryComponent implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
+    void this.perms.load();
     try {
       this.shifts.set(await this.shiftsApi.listWorkShifts());
     } catch {
@@ -78,6 +86,29 @@ export class ShiftHistoryComponent implements OnInit {
       this.error.set(problemDetail(error, this.i18n.t('history.loadError')));
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  protected startDelete(id: string, event: Event): void {
+    event.stopPropagation();
+    this.deleting.set(id);
+    this.reason.set('');
+    this.error.set(null);
+  }
+
+  protected async remove(check: ShiftCheck): Promise<void> {
+    const reason = this.reason().trim();
+    if (!reason || this.busy()) return;
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      await this.api.remove(check.id, reason);
+      this.checks.update((list) => list.filter((c) => c.id !== check.id));
+      this.deleting.set(null);
+    } catch (error) {
+      this.error.set(problemDetail(error, this.i18n.t('history.deleteError')));
+    } finally {
+      this.busy.set(false);
     }
   }
 

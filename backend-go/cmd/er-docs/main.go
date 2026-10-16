@@ -56,7 +56,7 @@ var domains = []domain{
 	{"Directorio de contactos", "Personas externas e internas a las que se avisa, con sus canales.",
 		[]string{"contacts", "contact_channels"}},
 	{"Ticketera", "Tickets con SLA, comentarios, tareas con tiempo, resolutores, imágenes, padre/hijo y unidos.",
-		[]string{"tickets", "ticket_comments", "ticket_tasks", "ticket_resolvers", "ticket_images", "ticket_settings", "ticket_mail_outbox"}},
+		[]string{"tickets", "ticket_comments", "ticket_tasks", "ticket_resolvers", "ticket_images", "ticket_settings", "ticket_mail_outbox", "ticket_number_series"}},
 	{"Equipos y escalamiento", "Equipos, políticas con sus llamados, pools con nombre, incidentes con sus intentos y notas, ventanas de mantenimiento (también las que se repiten, con su serie) y RACI. Un equipo con `kind = 'step'` es el grupo de personas de un solo llamado: no tiene organización, no aparece en Equipos y se borra con su paso.",
 		[]string{"team_groups", "teams", "team_members", "team_coverage", "escalation_policies", "escalation_steps", "escalation_pools", "escalation_pool_members", "escalation_incidents", "escalation_incident_notes", "escalation_action_logs", "maintenance_windows", "maintenance_window_series", "raci_assignments"}},
 	{"Turnos, guardias y dotación", "Turnos de trabajo y sus integrantes, guardias con hora exacta (ciclos, tramos y reemplazos), dotación, recordatorios y cierre de turno.",

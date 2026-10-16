@@ -1,4 +1,4 @@
-// Package escalation contiene las reglas puras del motor de escalación
+// Package escalation contiene las reglas puras del motor de escalamiento
 // unificado SOC/NOC (spec/01-arquitectura.md sección 4, docs/adr/0004,
 // HU-1/1t/1u/1z/2/3/3b): qué política aplica, qué pasos salen de una
 // cobertura territorial, a quién se avisa en cada modo, y a quién se llama
@@ -106,7 +106,7 @@ func Choose(assetPolicy *uuid.UUID, levels []Level) (Choice, bool) {
 	return Choice{}, false
 }
 
-// Step es un paso de escalación ya resuelto.
+// Step es un paso de escalamiento ya resuelto.
 type Step struct {
 	Order       int32
 	TeamID      uuid.UUID

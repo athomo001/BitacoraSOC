@@ -14,7 +14,7 @@ UPDATE app_config SET
   setup_completed_at = now(),
   updated_at = now()
 WHERE id = true
-RETURNING id, shift_check_cooldown_minutes, alert_nok_enabled, alert_nok_role_target, audit_ttl_days, backup_retention_days, territorial_kind_labels, setup_completed_at, updated_at, birthday_emails_enabled, birthday_emails_time, birthday_emails_cc, birthday_emails_last_date, password_min_length, soc_module_enabled, noc_module_enabled, map_tiles_mode, map_tiles_url
+RETURNING id, shift_check_cooldown_minutes, alert_nok_enabled, alert_nok_role_target, audit_ttl_days, backup_retention_days, territorial_kind_labels, setup_completed_at, updated_at, birthday_emails_enabled, birthday_emails_time, birthday_emails_cc, birthday_emails_last_date, password_min_length, soc_module_enabled, noc_module_enabled, map_tiles_mode, map_tiles_url, checklist_missing_enabled, checklist_missing_time, checklist_missing_team_id, checklist_missing_cargos, checklist_missing_last_date, guard_reminder_enabled, guard_reminder_days_ahead, guard_reminder_cargos, guard_reminder_last_date, guard_reminder_last_week, birthday_image, birthday_image_type, birthday_image_updated_at
 `
 
 // Qué módulos quedan encendidos lo guarda SetModuleFlags.
@@ -40,6 +40,19 @@ func (q *Queries) CompleteSetup(ctx context.Context) (AppConfig, error) {
 		&i.NocModuleEnabled,
 		&i.MapTilesMode,
 		&i.MapTilesUrl,
+		&i.ChecklistMissingEnabled,
+		&i.ChecklistMissingTime,
+		&i.ChecklistMissingTeamID,
+		&i.ChecklistMissingCargos,
+		&i.ChecklistMissingLastDate,
+		&i.GuardReminderEnabled,
+		&i.GuardReminderDaysAhead,
+		&i.GuardReminderCargos,
+		&i.GuardReminderLastDate,
+		&i.GuardReminderLastWeek,
+		&i.BirthdayImage,
+		&i.BirthdayImageType,
+		&i.BirthdayImageUpdatedAt,
 	)
 	return i, err
 }
@@ -58,7 +71,7 @@ func (q *Queries) EnsureAppConfigRow(ctx context.Context) error {
 }
 
 const getAppConfig = `-- name: GetAppConfig :one
-SELECT id, shift_check_cooldown_minutes, alert_nok_enabled, alert_nok_role_target, audit_ttl_days, backup_retention_days, territorial_kind_labels, setup_completed_at, updated_at, birthday_emails_enabled, birthday_emails_time, birthday_emails_cc, birthday_emails_last_date, password_min_length, soc_module_enabled, noc_module_enabled, map_tiles_mode, map_tiles_url FROM app_config WHERE id = true
+SELECT id, shift_check_cooldown_minutes, alert_nok_enabled, alert_nok_role_target, audit_ttl_days, backup_retention_days, territorial_kind_labels, setup_completed_at, updated_at, birthday_emails_enabled, birthday_emails_time, birthday_emails_cc, birthday_emails_last_date, password_min_length, soc_module_enabled, noc_module_enabled, map_tiles_mode, map_tiles_url, checklist_missing_enabled, checklist_missing_time, checklist_missing_team_id, checklist_missing_cargos, checklist_missing_last_date, guard_reminder_enabled, guard_reminder_days_ahead, guard_reminder_cargos, guard_reminder_last_date, guard_reminder_last_week, birthday_image, birthday_image_type, birthday_image_updated_at FROM app_config WHERE id = true
 `
 
 func (q *Queries) GetAppConfig(ctx context.Context) (AppConfig, error) {
@@ -83,6 +96,19 @@ func (q *Queries) GetAppConfig(ctx context.Context) (AppConfig, error) {
 		&i.NocModuleEnabled,
 		&i.MapTilesMode,
 		&i.MapTilesUrl,
+		&i.ChecklistMissingEnabled,
+		&i.ChecklistMissingTime,
+		&i.ChecklistMissingTeamID,
+		&i.ChecklistMissingCargos,
+		&i.ChecklistMissingLastDate,
+		&i.GuardReminderEnabled,
+		&i.GuardReminderDaysAhead,
+		&i.GuardReminderCargos,
+		&i.GuardReminderLastDate,
+		&i.GuardReminderLastWeek,
+		&i.BirthdayImage,
+		&i.BirthdayImageType,
+		&i.BirthdayImageUpdatedAt,
 	)
 	return i, err
 }

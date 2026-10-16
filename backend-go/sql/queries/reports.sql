@@ -125,3 +125,7 @@ UPDATE report_events SET name = $2, parent = $3, description = $4, motivo_defaul
 
 -- name: DeleteReportEvent :execrows
 DELETE FROM report_events WHERE id = $1;
+
+-- name: ListReportEventKeys :many
+-- Para no duplicar al importar: nombre + categoría ya existentes.
+SELECT lower(name)::text AS name, lower(parent)::text AS parent FROM report_events;

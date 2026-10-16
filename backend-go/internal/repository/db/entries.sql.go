@@ -43,6 +43,11 @@ WHERE ($1::entry_scope IS NULL OR e.scope = $1)
   AND ($4::timestamptz IS NULL OR e.created_at >= $4)
   AND ($5::timestamptz IS NULL OR e.created_at < $5)
   AND ($6::text IS NULL OR to_tsvector('spanish', e.content) @@ websearch_to_tsquery('spanish', $6))
+  AND ($7::uuid IS NULL OR e.user_id = $7)
+  AND ($8::uuid IS NULL
+       OR EXISTS (SELECT 1 FROM services s WHERE s.id = e.service_id AND s.organization_id = $8)
+       OR EXISTS (SELECT 1 FROM assets a WHERE a.id = e.asset_id AND a.client_id = $8)
+       OR EXISTS (SELECT 1 FROM organizations o, unnest(e.tags) t WHERE o.id = $8 AND lower(t) = lower('cliente:' || o.name)))
 `
 
 type CountEntriesParams struct {
@@ -52,6 +57,8 @@ type CountEntriesParams struct {
 	FromDate  pgtype.Timestamptz `json:"from_date"`
 	ToDate    pgtype.Timestamptz `json:"to_date"`
 	Q         pgtype.Text        `json:"q"`
+	AuthorID  pgtype.UUID        `json:"author_id"`
+	ClientID  pgtype.UUID        `json:"client_id"`
 }
 
 func (q *Queries) CountEntries(ctx context.Context, arg CountEntriesParams) (int64, error) {
@@ -62,6 +69,8 @@ func (q *Queries) CountEntries(ctx context.Context, arg CountEntriesParams) (int
 		arg.FromDate,
 		arg.ToDate,
 		arg.Q,
+		arg.AuthorID,
+		arg.ClientID,
 	)
 	var count int64
 	err := row.Scan(&count)
@@ -240,8 +249,13 @@ WHERE ($1::entry_scope IS NULL OR e.scope = $1)
   AND ($4::timestamptz IS NULL OR e.created_at >= $4)
   AND ($5::timestamptz IS NULL OR e.created_at < $5)
   AND ($6::text IS NULL OR to_tsvector('spanish', e.content) @@ websearch_to_tsquery('spanish', $6))
+  AND ($7::uuid IS NULL OR e.user_id = $7)
+  AND ($8::uuid IS NULL
+       OR EXISTS (SELECT 1 FROM services s WHERE s.id = e.service_id AND s.organization_id = $8)
+       OR EXISTS (SELECT 1 FROM assets a WHERE a.id = e.asset_id AND a.client_id = $8)
+       OR EXISTS (SELECT 1 FROM organizations o, unnest(e.tags) t WHERE o.id = $8 AND lower(t) = lower('cliente:' || o.name)))
 ORDER BY e.created_at DESC
-LIMIT $8 OFFSET $7
+LIMIT $10 OFFSET $9
 `
 
 type ListEntriesParams struct {
@@ -251,6 +265,8 @@ type ListEntriesParams struct {
 	FromDate   pgtype.Timestamptz `json:"from_date"`
 	ToDate     pgtype.Timestamptz `json:"to_date"`
 	Q          pgtype.Text        `json:"q"`
+	AuthorID   pgtype.UUID        `json:"author_id"`
+	ClientID   pgtype.UUID        `json:"client_id"`
 	PageOffset int32              `json:"page_offset"`
 	PageSize   int32              `json:"page_size"`
 }
@@ -278,6 +294,9 @@ type ListEntriesRow struct {
 	AuthorUsername      string             `json:"author_username"`
 }
 
+// Filtros (todos opcionales): ámbito, tipo, etiqueta, fechas, texto, autor y
+// cliente. El cliente sale del servicio o del activo de la entrada, o de la
+// etiqueta cliente:X que dejó el ETL cuando el cliente tenía varios servicios.
 func (q *Queries) ListEntries(ctx context.Context, arg ListEntriesParams) ([]ListEntriesRow, error) {
 	rows, err := q.db.Query(ctx, listEntries,
 		arg.Scope,
@@ -286,6 +305,8 @@ func (q *Queries) ListEntries(ctx context.Context, arg ListEntriesParams) ([]Lis
 		arg.FromDate,
 		arg.ToDate,
 		arg.Q,
+		arg.AuthorID,
+		arg.ClientID,
 		arg.PageOffset,
 		arg.PageSize,
 	)
@@ -337,6 +358,11 @@ WHERE ($1::entry_scope IS NULL OR e.scope = $1)
   AND ($4::timestamptz IS NULL OR e.created_at >= $4)
   AND ($5::timestamptz IS NULL OR e.created_at < $5)
   AND ($6::text IS NULL OR to_tsvector('spanish', e.content) @@ websearch_to_tsquery('spanish', $6))
+  AND ($7::uuid IS NULL OR e.user_id = $7)
+  AND ($8::uuid IS NULL
+       OR EXISTS (SELECT 1 FROM services s WHERE s.id = e.service_id AND s.organization_id = $8)
+       OR EXISTS (SELECT 1 FROM assets a WHERE a.id = e.asset_id AND a.client_id = $8)
+       OR EXISTS (SELECT 1 FROM organizations o, unnest(e.tags) t WHERE o.id = $8 AND lower(t) = lower('cliente:' || o.name)))
 ORDER BY e.created_at DESC
 `
 
@@ -347,6 +373,8 @@ type ListEntriesForExportParams struct {
 	FromDate  pgtype.Timestamptz `json:"from_date"`
 	ToDate    pgtype.Timestamptz `json:"to_date"`
 	Q         pgtype.Text        `json:"q"`
+	AuthorID  pgtype.UUID        `json:"author_id"`
+	ClientID  pgtype.UUID        `json:"client_id"`
 }
 
 type ListEntriesForExportRow struct {
@@ -381,6 +409,8 @@ func (q *Queries) ListEntriesForExport(ctx context.Context, arg ListEntriesForEx
 		arg.FromDate,
 		arg.ToDate,
 		arg.Q,
+		arg.AuthorID,
+		arg.ClientID,
 	)
 	if err != nil {
 		return nil, err
@@ -411,6 +441,40 @@ func (q *Queries) ListEntriesForExport(ctx context.Context, arg ListEntriesForEx
 			&i.OwnerComplementName,
 			&i.AuthorUsername,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEntryAuthors = `-- name: ListEntryAuthors :many
+SELECT u.id, COALESCE(NULLIF(u.full_name, ''), u.username)::text AS name, u.username
+FROM users u
+WHERE EXISTS (SELECT 1 FROM entries e WHERE e.user_id = u.id)
+ORDER BY 2
+`
+
+type ListEntryAuthorsRow struct {
+	ID       uuid.UUID `json:"id"`
+	Name     string    `json:"name"`
+	Username string    `json:"username"`
+}
+
+// Quienes escribieron en la Bitácora (filtro por autor).
+func (q *Queries) ListEntryAuthors(ctx context.Context) ([]ListEntryAuthorsRow, error) {
+	rows, err := q.db.Query(ctx, listEntryAuthors)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListEntryAuthorsRow
+	for rows.Next() {
+		var i ListEntryAuthorsRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.Username); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -474,6 +538,25 @@ func (q *Queries) PatchEntry(ctx context.Context, arg PatchEntryParams) (Entry, 
 		&i.OwnerComplementName,
 	)
 	return i, err
+}
+
+const setEntryGlpiTicket = `-- name: SetEntryGlpiTicket :one
+UPDATE entries SET glpi_ticket_id = $1,
+  glpi_linked_at = CASE WHEN $1::text IS NULL THEN NULL ELSE now() END, updated_at = now()
+WHERE id = $2 RETURNING id
+`
+
+type SetEntryGlpiTicketParams struct {
+	GlpiTicketID pgtype.Text `json:"glpi_ticket_id"`
+	ID           uuid.UUID   `json:"id"`
+}
+
+// Ticket de GLPI de una entrada (NULL lo quita).
+func (q *Queries) SetEntryGlpiTicket(ctx context.Context, arg SetEntryGlpiTicketParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, setEntryGlpiTicket, arg.GlpiTicketID, arg.ID)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const updateEntryTicket = `-- name: UpdateEntryTicket :one

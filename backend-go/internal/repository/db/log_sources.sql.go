@@ -12,6 +12,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countAssetsForLogSource = `-- name: CountAssetsForLogSource :one
+SELECT count(*) FROM assets WHERE log_source_id = $1
+`
+
+func (q *Queries) CountAssetsForLogSource(ctx context.Context, logSourceID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countAssetsForLogSource, logSourceID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createLogSource = `-- name: CreateLogSource :one
 INSERT INTO catalog_log_sources (code, display_name, category, default_parser)
 VALUES ($1, $2, $3, $4) RETURNING id, code, display_name, category, default_parser, active, created_at
@@ -31,6 +42,25 @@ func (q *Queries) CreateLogSource(ctx context.Context, arg CreateLogSourceParams
 		arg.Category,
 		arg.DefaultParser,
 	)
+	var i CatalogLogSource
+	err := row.Scan(
+		&i.ID,
+		&i.Code,
+		&i.DisplayName,
+		&i.Category,
+		&i.DefaultParser,
+		&i.Active,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const deleteLogSource = `-- name: DeleteLogSource :one
+DELETE FROM catalog_log_sources WHERE id = $1 RETURNING id, code, display_name, category, default_parser, active, created_at
+`
+
+func (q *Queries) DeleteLogSource(ctx context.Context, id uuid.UUID) (CatalogLogSource, error) {
+	row := q.db.QueryRow(ctx, deleteLogSource, id)
 	var i CatalogLogSource
 	err := row.Scan(
 		&i.ID,

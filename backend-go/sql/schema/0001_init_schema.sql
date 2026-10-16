@@ -2264,3 +2264,48 @@ ALTER TABLE maintenance_windows
   ADD COLUMN approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
   ADD COLUMN approved_at TIMESTAMPTZ;
 CREATE UNIQUE INDEX uq_maintenance_windows_series_day ON maintenance_windows(series_id, series_day) WHERE series_id IS NOT NULL;
+
+-- 000045: avisos del legacy (checklist no realizado y guardia sin cubrir).
+ALTER TABLE app_config
+  ADD COLUMN checklist_missing_enabled BOOLEAN NOT NULL DEFAULT true,
+  ADD COLUMN checklist_missing_time TEXT NOT NULL DEFAULT '09:30' CHECK (checklist_missing_time ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
+  ADD COLUMN checklist_missing_team_id UUID REFERENCES teams(id) ON DELETE SET NULL,
+  ADD COLUMN checklist_missing_cargos TEXT[] NOT NULL DEFAULT '{N2}',
+  ADD COLUMN checklist_missing_last_date DATE,
+  ADD COLUMN guard_reminder_enabled BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN guard_reminder_days_ahead INT NOT NULL DEFAULT 7 CHECK (guard_reminder_days_ahead BETWEEN 1 AND 60),
+  ADD COLUMN guard_reminder_cargos TEXT[] NOT NULL DEFAULT '{N2}',
+  ADD COLUMN guard_reminder_last_date DATE,
+  ADD COLUMN guard_reminder_last_week DATE;
+
+UPDATE app_config SET checklist_missing_team_id = (
+  SELECT id FROM teams WHERE kind = 'oncall' AND name = 'Guardia N1_NO_HABIL' ORDER BY id LIMIT 1);
+
+-- Qué guardias revisa el recordatorio. Las del legacy (N2, TI y N1 no hábil).
+ALTER TABLE rotation_cycles ADD COLUMN remind_uncovered BOOLEAN NOT NULL DEFAULT false;
+UPDATE rotation_cycles c SET remind_uncovered = true
+FROM teams t
+WHERE t.id = c.team_id AND t.name IN ('Guardia N2', 'Guardia TI', 'Guardia N1_NO_HABIL');
+
+-- 000046: orden de los turnos de trabajo (legacy WorkShift.order).
+ALTER TABLE work_shifts ADD COLUMN sort_order INT NOT NULL DEFAULT 0;
+
+-- 000047: imagen propia del correo de cumpleaños.
+ALTER TABLE app_config
+  ADD COLUMN birthday_image BYTEA,
+  ADD COLUMN birthday_image_type TEXT,
+  ADD COLUMN birthday_image_updated_at TIMESTAMPTZ;
+
+-- 000048: numeración de tickets configurable.
+CREATE TABLE ticket_number_series (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 60),
+  prefix TEXT NOT NULL CHECK (prefix ~ '^[A-Z0-9]{1,10}$'),
+  year_format TEXT NOT NULL DEFAULT 'yyyy' CHECK (year_format IN ('none', 'yyyy', 'yy')),
+  digits INT NOT NULL DEFAULT 5 CHECK (digits BETWEEN 3 AND 10),
+  next_number BIGINT NOT NULL DEFAULT 1 CHECK (next_number >= 1),
+  is_default BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX uq_ticket_number_series_default ON ticket_number_series (is_default) WHERE is_default;
+ALTER TABLE areas ADD COLUMN ticket_series_id UUID REFERENCES ticket_number_series(id) ON DELETE SET NULL;

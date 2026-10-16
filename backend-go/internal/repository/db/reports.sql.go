@@ -587,6 +587,36 @@ func (q *Queries) ListEscalationEmailsForOrganization(ctx context.Context, arg L
 	return items, nil
 }
 
+const listReportEventKeys = `-- name: ListReportEventKeys :many
+SELECT lower(name)::text AS name, lower(parent)::text AS parent FROM report_events
+`
+
+type ListReportEventKeysRow struct {
+	Name   string `json:"name"`
+	Parent string `json:"parent"`
+}
+
+// Para no duplicar al importar: nombre + categoría ya existentes.
+func (q *Queries) ListReportEventKeys(ctx context.Context) ([]ListReportEventKeysRow, error) {
+	rows, err := q.db.Query(ctx, listReportEventKeys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListReportEventKeysRow
+	for rows.Next() {
+		var i ListReportEventKeysRow
+		if err := rows.Scan(&i.Name, &i.Parent); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listReportEvents = `-- name: ListReportEvents :many
 SELECT id, name, parent, description, motivo_default, enabled, created_at, updated_at FROM report_events
 WHERE ($1::text = '' OR name ILIKE '%' || $1::text || '%' OR parent ILIKE '%' || $1::text || '%')

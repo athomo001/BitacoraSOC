@@ -90,6 +90,18 @@ func (q *Queries) ClearTemplateFromShifts(ctx context.Context, checklistTemplate
 	return err
 }
 
+const countClosuresForCheck = `-- name: CountClosuresForCheck :one
+SELECT count(*) FROM shift_closures WHERE closure_check_id = $1
+`
+
+// Un checklist de cierre de un turno ya cerrado no se borra (el cierre lo usa).
+func (q *Queries) CountClosuresForCheck(ctx context.Context, closureCheckID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countClosuresForCheck, closureCheckID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countEntriesInWindow = `-- name: CountEntriesInWindow :one
 SELECT count(*) FROM entries WHERE created_at >= $1 AND created_at < $2
 `
@@ -400,6 +412,20 @@ func (q *Queries) DeleteChecklistTemplate(ctx context.Context, id uuid.UUID) err
 	return err
 }
 
+const deleteShiftCheck = `-- name: DeleteShiftCheck :execrows
+DELETE FROM shift_checks WHERE id = $1
+`
+
+// Borrado del admin (paridad con el legacy, decisión del dueño 2026-10-16);
+// sus servicios se van en cascada. La foto completa queda en Auditoría.
+func (q *Queries) DeleteShiftCheck(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteShiftCheck, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getActiveChecklistTemplate = `-- name: GetActiveChecklistTemplate :one
 SELECT id, name, is_active, alert_nok_enabled, created_at, alert_nok_cargos FROM checklist_templates WHERE id = $1 AND is_active = true
 `
@@ -660,7 +686,7 @@ func (q *Queries) GetShiftClosureByCheck(ctx context.Context, closureCheckID uui
 }
 
 const getWorkShiftByID = `-- name: GetWorkShiftByID :one
-SELECT id, rotation_cycle_id, name, start_time, end_time, timezone, shift_type, checklist_template_start_id, checklist_template_end_id, email_recipients, active, email_include_checklist, email_include_entries, email_subject_template FROM work_shifts WHERE id = $1
+SELECT id, rotation_cycle_id, name, start_time, end_time, timezone, shift_type, checklist_template_start_id, checklist_template_end_id, email_recipients, active, email_include_checklist, email_include_entries, email_subject_template, sort_order FROM work_shifts WHERE id = $1
 `
 
 func (q *Queries) GetWorkShiftByID(ctx context.Context, id uuid.UUID) (WorkShift, error) {
@@ -681,12 +707,13 @@ func (q *Queries) GetWorkShiftByID(ctx context.Context, id uuid.UUID) (WorkShift
 		&i.EmailIncludeChecklist,
 		&i.EmailIncludeEntries,
 		&i.EmailSubjectTemplate,
+		&i.SortOrder,
 	)
 	return i, err
 }
 
 const getWorkShiftForCheck = `-- name: GetWorkShiftForCheck :one
-SELECT ws.id, ws.rotation_cycle_id, ws.name, ws.start_time, ws.end_time, ws.timezone, ws.shift_type, ws.checklist_template_start_id, ws.checklist_template_end_id, ws.email_recipients, ws.active, ws.email_include_checklist, ws.email_include_entries, ws.email_subject_template FROM work_shifts ws JOIN shift_checks sc ON sc.work_shift_id = ws.id WHERE sc.id = $1
+SELECT ws.id, ws.rotation_cycle_id, ws.name, ws.start_time, ws.end_time, ws.timezone, ws.shift_type, ws.checklist_template_start_id, ws.checklist_template_end_id, ws.email_recipients, ws.active, ws.email_include_checklist, ws.email_include_entries, ws.email_subject_template, ws.sort_order FROM work_shifts ws JOIN shift_checks sc ON sc.work_shift_id = ws.id WHERE sc.id = $1
 `
 
 // Turno al que pertenece un check: define la ventana real del cierre (no 8h fijas) y los destinatarios del reporte.
@@ -708,6 +735,7 @@ func (q *Queries) GetWorkShiftForCheck(ctx context.Context, id uuid.UUID) (WorkS
 		&i.EmailIncludeChecklist,
 		&i.EmailIncludeEntries,
 		&i.EmailSubjectTemplate,
+		&i.SortOrder,
 	)
 	return i, err
 }

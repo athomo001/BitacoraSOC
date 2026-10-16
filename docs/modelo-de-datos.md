@@ -2,7 +2,7 @@
 
 > Generado por `backend-go/cmd/er-docs` desde `backend-go/sql/schema/0001_init_schema.sql`, el esquema que usa sqlc, con todas las migraciones aplicadas. **No se edita a mano**: si cambia el esquema, se regenera con `go run ./cmd/er-docs` desde `backend-go/`.
 
-101 tablas en PostgreSQL, agrupadas en 15 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
+102 tablas en PostgreSQL, agrupadas en 15 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
 
 - Cada entidad muestra todas sus columnas salvo `created_at` y `updated_at`. `PK` clave primaria, `FK` referencia a otra tabla, `UK` valor único.
 - Las tablas de otros dominios aparecen como cajas sin columnas: son la misma tabla, dibujada donde se une.
@@ -16,7 +16,7 @@ Correspondencia con el legacy (MongoDB): [modelo-er-legacy-2.0.md](modelo-er-leg
 1. [Usuarios, acceso y permisos](#1-usuarios-acceso-y-permisos) — 9 tablas
 2. [Territorio, organizaciones y activos](#2-territorio-organizaciones-y-activos) — 14 tablas
 3. [Directorio de contactos](#3-directorio-de-contactos) — 2 tablas
-4. [Ticketera](#4-ticketera) — 7 tablas
+4. [Ticketera](#4-ticketera) — 8 tablas
 5. [Equipos y escalamiento](#5-equipos-y-escalamiento) — 14 tablas
 6. [Turnos, guardias y dotación](#6-turnos-guardias-y-dotación) — 11 tablas
 7. [Agenda](#7-agenda) — 8 tablas
@@ -102,6 +102,7 @@ erDiagram
         boolean is_system
         int sort_order
         text default_profile
+        uuid ticket_series_id FK
     }
     LEVELS {
         uuid id PK
@@ -121,6 +122,7 @@ erDiagram
     LEVELS |o--o{ PERMISSION_GROUPS : "level_id"
     PERMISSION_GROUPS ||--o{ PERMISSION_GROUP_AREAS : "permission_group_id"
     PERMISSION_GROUPS ||--o{ USER_PERMISSION_GROUPS : "permission_group_id"
+    TICKET_NUMBER_SERIES |o--o{ AREAS : "ticket_series_id"
     USERS ||--o{ TOKEN_DENYLIST : "user_id"
     USERS ||--o{ USER_PERMISSION_GROUPS : "user_id"
 ```
@@ -496,6 +498,15 @@ erDiagram
         timestamptz sent_at
         uuid created_by FK
     }
+    TICKET_NUMBER_SERIES {
+        uuid id PK
+        text name
+        text prefix
+        text year_format
+        int digits
+        bigint next_number
+        boolean is_default
+    }
 
     AREAS ||--o{ TICKETS : "area_id"
     AREAS ||--o{ TICKETS : "requested_area_id"
@@ -757,6 +768,7 @@ erDiagram
         boolean email_include_checklist
         boolean email_include_entries
         text email_subject_template
+        int sort_order
     }
     WORK_SHIFT_MEMBERS {
         uuid id PK
@@ -799,6 +811,7 @@ erDiagram
         text timezone
         boolean active
         boolean must_be_covered
+        boolean remind_uncovered
     }
     ROTATION_SLOTS {
         uuid id PK
@@ -1342,6 +1355,19 @@ erDiagram
         boolean noc_module_enabled
         text map_tiles_mode
         text map_tiles_url
+        boolean checklist_missing_enabled
+        text checklist_missing_time
+        uuid checklist_missing_team_id FK
+        text[] checklist_missing_cargos
+        date checklist_missing_last_date
+        boolean guard_reminder_enabled
+        int guard_reminder_days_ahead
+        text[] guard_reminder_cargos
+        date guard_reminder_last_date
+        date guard_reminder_last_week
+        bytea birthday_image
+        text birthday_image_type
+        timestamptz birthday_image_updated_at
     }
     SMTP_CONFIG {
         boolean id PK
@@ -1417,6 +1443,8 @@ erDiagram
         text error_message
         text trigger_source
     }
+
+    TEAMS |o--o{ APP_CONFIG : "checklist_missing_team_id"
 ```
 
 ---

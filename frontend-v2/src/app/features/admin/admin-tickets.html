@@ -6,10 +6,13 @@
   <span class="tk__tabs" role="tablist">
     <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'general'" [attr.aria-selected]="tab() === 'general'" (click)="tab.set('general')">{{ i18n.t('tkAdmin.tab.general') }}</button>
     <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'mail'" [attr.aria-selected]="tab() === 'mail'" (click)="tab.set('mail')">{{ i18n.t('tkAdmin.tab.mail') }}</button>
+    <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'numbering'" [attr.aria-selected]="tab() === 'numbering'" (click)="tab.set('numbering')">{{ i18n.t('tkAdmin.tab.numbering') }}</button>
   </span>
 </header>
 
-@if (draft(); as d) {
+@if (tab() === 'numbering') {
+  <app-admin-ticket-series />
+} @else if (draft(); as d) {
   @if (tab() === 'general') {
     <div class="tk__grid">
       <section class="adm-card">

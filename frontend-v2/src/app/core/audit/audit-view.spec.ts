@@ -12,6 +12,11 @@ describe('audit-view', () => {
       'system.ratelimit.reset', 'system_feature.update', 'team.coverage.remove', 'team_group.create', 'territorial_unit.import',
       'ticket.updated', 'user.channel.delete', 'user.permissiongroups.replace', 'users.update', 'work_shift.created',
       'work_shift_assignment.upserted',
+      // Los que llegaron después (9.x y paridad) y los que vienen del legacy.
+      'agenda.task.created', 'notification.digest.sent', 'notice.read', 'calendar_feed.create', 'inventory.asset.create', 'glpi.import',
+      'guard.slot.create', 'shiftcheck.delete', 'client_alert.update', 'mail.send.success', 'smtp.shift-report.sent', 'birthday.sent',
+      'area.create', 'level.update', 'branding.update', 'complement.list.view', 'entries.tag.rename', 'user.reports.overview.view',
+      'admin.users.update', 'admin.backup.create', 'BACKUP_AUTO_SCHEDULED', 'organization_type.create',
     ];
     const other = events.filter((e) => categoryOf(e).id === 'other');
     expect(other).toEqual([]);
@@ -23,6 +28,9 @@ describe('audit-view', () => {
     expect(categoryOf('user.channel.create').id).toBe('directory');
     expect(categoryOf('users.update').id).toBe('admin');
     expect(categoryOf('checklist_template.delete').id).toBe('shifts');
+    expect(categoryOf('admin.backup.create').id).toBe('backups');
+    expect(categoryOf('BACKUP_AUTO_SCHEDULED').id).toBe('backups');
+    expect(categoryOf('user.reports.overview.view').id).toBe('shifts');
     // "ticketera.x" no es del dominio "ticket": el prefijo tiene que terminar en punto.
     expect(categoryOf('ticketera.x').id).toBe('other');
   });

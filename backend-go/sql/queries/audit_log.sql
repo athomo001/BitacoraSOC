@@ -69,3 +69,12 @@ WHERE (sqlc.narg('events')::text[] IS NULL
        OR event ILIKE '%' || sqlc.narg('q') || '%'
        OR reason ILIKE '%' || sqlc.narg('q') || '%')
 ORDER BY "timestamp" DESC;
+
+-- name: ListAuditEventNames :many
+-- Los eventos distintos (con cuántas veces), para filtrar por evento exacto
+-- como el legacy (GET /audit-logs/events). Acota a los prefijos de la categoría.
+SELECT event, count(*)::bigint AS total FROM audit_log
+WHERE (sqlc.narg('events')::text[] IS NULL
+       OR EXISTS (SELECT 1 FROM unnest(sqlc.narg('events')::text[]) AS p(prefix) WHERE event = p.prefix OR starts_with(event, p.prefix || '.')))
+GROUP BY event
+ORDER BY event;

@@ -258,7 +258,16 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `GET` | `/api/config/birthday-emails` | Admin |
 | `PUT` | `/api/config/birthday-emails` | Admin |
 | `POST` | `/api/config/birthday-emails/test` | Admin |
-| `GET` | `/api/config/birthday-emails/image` | Pública |
+| `GET` | `/api/config/birthday-emails/image` | Pública — la imagen del correo (la propia o la incluida) |
+| `PUT` | `/api/config/birthday-emails/image` | Admin — multipart `file` (PNG, JPEG, WebP o GIF, máx. 2 MB); se achica a 760 px |
+| `DELETE` | `/api/config/birthday-emails/image` | Admin — vuelve a la imagen incluida en la app |
+| `GET` | `/api/config/shift-alerts` | Admin — avisos de checklist no realizado y de guardia sin cubrir, con las guardias y cuáles revisa |
+| `GET` | `/api/config/ticket-series` | Admin · Ticketera — `{series[{id, name, prefix, yearFormat: none\|yyyy\|yy, digits, nextNumber, isDefault, preview}], areas[{id, code, name, active, seriesId?}]}` |
+| `POST` | `/api/config/ticket-series` | Admin · Ticketera — `{name, prefix (A-Z0-9, hasta 10), yearFormat, digits 3–10, nextNumber, isDefault}` |
+| `PUT` | `/api/config/ticket-series/{id}` | Admin · Ticketera — lo mismo; `nextNumber` no puede bajar y la general deja de serlo solo marcando otra |
+| `DELETE` | `/api/config/ticket-series/{id}` | Admin · Ticketera — no la general (`409`); sus áreas pasan a la general |
+| `PUT` | `/api/config/ticket-series/areas` | Admin · Ticketera — `{assignments: [{areaId, seriesId\|null}]}` (null = la general) |
+| `PUT` | `/api/config/shift-alerts` | Admin — `{checklistEnabled, checklistTime, checklistTeamId, checklistCargos[], guardEnabled, guardDaysAhead, guardCargos[], remindCycleIds[]}` |
 
 ### Funcionalidades
 
@@ -297,6 +306,11 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `GET` | `/api/entries` | Sesión |
 | `POST` | `/api/entries` | Sesión |
 | `GET` | `/api/entries/export` | Sesión |
+| `GET` | `/api/entries/authors` | Sesión — quienes escribieron en la Bitácora (filtro por autor) |
+| `GET` | `/api/entries/tags` | Sesión — `?q=`: hasta 10 etiquetas que empiezan con lo escrito, las más usadas primero |
+| `GET` | `/api/admin/entry-tags` | Admin — todas las etiquetas con cuántas entradas las usan y el último uso |
+| `POST` | `/api/admin/entry-tags/rename` | Admin — `{from, to}`; si `to` ya existe, se juntan |
+| `POST` | `/api/admin/entry-tags/delete` | Admin — `{tag}`; la quita de todas las entradas |
 | `POST` | `/api/entries/upload-image` | Sesión |
 | `PATCH` | `/api/entries/bulk` | Admin |
 | `GET` | `/api/entries/{id}` | Sesión |
@@ -304,6 +318,8 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `DELETE` | `/api/entries/{id}` | Sesión |
 | `POST` | `/api/entries/{id}/comments` | Sesión |
 | `POST` | `/api/entries/{id}/ticket-link` | Sesión · Ticketera encendida |
+| `DELETE` | `/api/entries/{id}/ticket-link` | Sesión · Ticketera encendida — quita el ticket interno y deja una nota en el ticket |
+| `PUT` | `/api/entries/{id}/glpi-ticket` | Sesión — `{glpiTicketId}` (solo dígitos, acepta `#`); vacío lo quita. Devuelve el detalle |
 | `POST` | `/api/entries/{id}/convert-to-ticket` | Sesión · Ticketera encendida |
 | `POST` | `/api/entries/{id}/resolve` | Sesión · Ticketera encendida |
 
@@ -341,6 +357,7 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `GET` | `/api/shift-checks/handover` | Sesión |
 | `GET` | `/api/shift-checks/stats` | Sesión |
 | `POST` | `/api/shift-checks/closures/{id}/acknowledge` | Sesión |
+| `DELETE` | `/api/shift-checks/{id}` | Admin — `{reason}`; borra un checklist del historial (no el de un cierre: 409) y deja el detalle en Auditoría |
 
 ### Plantillas de checklist
 
@@ -362,6 +379,7 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `DELETE` | `/api/work-shifts/{id}/members/{userId}` | Admin |
 | `POST` | `/api/work-shifts` | Admin |
 | `PATCH` | `/api/work-shifts/{id}` | Admin |
+| `PUT` | `/api/work-shifts/reorder` | Admin — `{ids}` en el orden nuevo; devuelve los turnos ordenados |
 | `GET` | `/api/work-shifts/matrix` | Sesión |
 | `POST` | `/api/work-shifts/assignments` | Admin |
 | `GET` | `/api/work-shifts/notification-schedules` | Admin |
@@ -406,6 +424,8 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `POST` | `/api/rotation-slots` | Admin |
 | `PATCH` | `/api/rotation-slots/{id}` | Admin |
 | `POST` | `/api/rotation-overrides` | Jefatura del área o admin |
+| `PUT` | `/api/rotation-overrides/{id}` | Jefatura del área o admin — `{replacementTeamMemberId, startDate, endDate, reason}` |
+| `DELETE` | `/api/rotation-overrides/{id}` | Jefatura del área o admin |
 
 ### Escalamiento
 
@@ -441,6 +461,7 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | --- | --- | --- |
 | `GET` | `/api/directory` | Sesión |
 | `GET` | `/api/directory/search` | Sesión |
+| `GET` | `/api/directory/export` | Permiso `directory:write` (admin siempre) — CSV con los filtros del listado y las columnas de la plantilla de importación |
 | `GET` | `/api/directory/{id}` | Sesión |
 | `POST` | `/api/directory` | Permiso `directory:write` (admin siempre) |
 | `PUT` | `/api/directory/{id}` | Permiso `directory:write` (admin siempre) |
@@ -467,6 +488,7 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `GET` | `/api/log-sources` | Sesión |
 | `POST` | `/api/log-sources` | Admin |
 | `PATCH` | `/api/log-sources/{id}` | Admin |
+| `DELETE` | `/api/log-sources/{id}` | Admin — 409 si un activo la usa (se desactiva en vez de borrar) |
 | `GET` | `/api/services` | Sesión · módulo SOC, o persona de un área propia |
 | `POST` | `/api/services` | Admin · módulo SOC |
 
@@ -681,6 +703,7 @@ Tipos de notificación: `agenda.assigned`, `agenda.warn`, `agenda.due`, `agenda.
 | `GET` | `/api/report-events` | Sesión |
 | `GET` | `/api/report-events/all` | Admin |
 | `POST` | `/api/report-events` | Admin |
+| `POST` | `/api/report-events/import` | Admin — multipart `file` (.csv o .json); salta los que ya existen (nombre + categoría) |
 | `PUT` | `/api/report-events/{id}` | Admin |
 | `DELETE` | `/api/report-events/{id}` | Admin |
 | `POST` | `/api/reports/shift/dispatch` | Admin |
@@ -721,6 +744,7 @@ Tipos de notificación: `agenda.assigned`, `agenda.warn`, `agenda.due`, `agenda.
 | --- | --- | --- |
 | `GET` | `/api/audit-logs` | Admin o auditor |
 | `GET` | `/api/audit-logs/export` | Admin o auditor |
+| `GET` | `/api/audit-logs/events` | Admin o auditor — eventos distintos con su cantidad (filtro por evento exacto); acepta `event=prefijo,…` |
 
 ### Complementos
 

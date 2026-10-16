@@ -16,3 +16,9 @@ UPDATE catalog_log_sources SET
   active = COALESCE(sqlc.narg('active'), active)
 WHERE id = $1
 RETURNING *;
+
+-- name: CountAssetsForLogSource :one
+SELECT count(*) FROM assets WHERE log_source_id = $1;
+
+-- name: DeleteLogSource :one
+DELETE FROM catalog_log_sources WHERE id = $1 RETURNING *;

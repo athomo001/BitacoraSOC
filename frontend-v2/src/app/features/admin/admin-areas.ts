@@ -100,6 +100,9 @@ type AreaTab = 'people' | 'guards' | 'escalation';
                 </h2>
               }
               <p class="adm-small adm-muted">{{ i18n.t('areas.leads') }} <strong class="ar__leads">{{ leads() || i18n.t('areas.noLeads') }}</strong></p>
+              @if (a.ticketSeries; as ts) {
+                <p class="adm-small adm-muted" [title]="i18n.t('areas.ticketSeriesHint')">{{ i18n.t('areas.ticketSeries') }} <strong class="mono">{{ ts.preview }}</strong> ({{ ts.name }})</p>
+              }
             </div>
             <label class="adm-field ar__profile"><span class="adm-label">{{ i18n.t('areas.col.profile') }}</span>
               <select class="adm-input" [disabled]="busy()" [value]="a.profile" (change)="setProfile(a, $any($event.target).value)">

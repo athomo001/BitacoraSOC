@@ -36,6 +36,22 @@ export class TicketsComponent implements OnInit {
   protected readonly tickets = signal<Ticket[]>([]);
   protected readonly summary = signal<QueueSummary>({ open: 0, breached: 0, paused: 0, resolvedToday: 0 });
   protected readonly selectedId = signal<string | null>(null);
+
+  /** Clic en el número: lo copia (pedido del dueño) y por un momento dice «Copiado». */
+  protected readonly copiedNumber = signal<string | null>(null);
+  private copiedTimer?: ReturnType<typeof setTimeout>;
+
+  protected async copyNumber(number: string, event: Event): Promise<void> {
+    event.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(number);
+      this.copiedNumber.set(number);
+      clearTimeout(this.copiedTimer);
+      this.copiedTimer = setTimeout(() => this.copiedNumber.set(null), 1500);
+    } catch {
+      this.copiedNumber.set(null);
+    }
+  }
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
   protected readonly typeFilter = signal<TicketType | null>(null);

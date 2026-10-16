@@ -67,4 +67,32 @@ describe('ShiftHistoryComponent', () => {
     expect(req.request.params.get('workShiftId')).toBe('ws-1');
     expect(req.request.params.get('page')).toBe('1');
   });
+
+  it('el admin borra un checklist con motivo (paridad con el legacy)', async () => {
+    const fixture = TestBed.createComponent(ShiftHistoryComponent);
+    fixture.detectChanges();
+    httpMock.match('/api/users/me').forEach((r) => r.flush({ data: { id: 'u-admin', username: 'admin', role: 'admin' } }));
+    httpMock.match('/api/users/me/capabilities').forEach((r) => r.flush({ data: { moduleScope: 'both', capabilities: [] } }));
+    httpMock.expectOne((r) => r.url === '/api/work-shifts').flush({ data: [] });
+    await settle();
+    httpMock.expectOne((r) => r.url === '/api/shift-checks').flush({ data: CHECKS });
+    await settle();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const del = el.querySelectorAll<HTMLButtonElement>('button[aria-label="Borrar checklist"]');
+    expect(del.length).toBe(2);
+    del[1].click();
+    fixture.detectChanges();
+    const input = el.querySelector('input[name="deleteReason"]') as HTMLInputElement;
+    input.value = 'Duplicado por error';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    (el.querySelector('.sh__btn--danger') as HTMLButtonElement).click();
+    const req = httpMock.expectOne({ method: 'DELETE', url: '/api/shift-checks/c1' });
+    expect(req.request.body).toEqual({ reason: 'Duplicado por error' });
+    req.flush(null);
+    await settle();
+    fixture.detectChanges();
+    expect(el.querySelectorAll('tr.sh__row').length).toBe(1);
+  });
 });

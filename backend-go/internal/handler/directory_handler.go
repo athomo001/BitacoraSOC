@@ -2,9 +2,11 @@ package handler
 
 import (
 	"context"
+	"encoding/csv"
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -183,46 +185,27 @@ func (h *DirectoryHandler) searchFilter(raw string) (q, emailHash, phoneHash pgt
 func (h *DirectoryHandler) List(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	qs := r.URL.Query()
-	if len([]rune(qs.Get("q"))) > maxDirectoryQueryLength {
-		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-parameter", "q no puede superar 64 caracteres")
+	f, bad := h.parseDirectoryFilter(qs)
+	if bad != "" {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-parameter", bad)
 		return
-	}
-	orgID, err := queryUUID(qs.Get("organizationId"))
-	if err != nil {
-		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-parameter", "organizationId inválido")
-		return
-	}
-	var scope db.NullContactScope
-	if s := qs.Get("scope"); s != "" {
-		if s != "internal" && s != "external" {
-			problemdetails.Write(w, r, http.StatusBadRequest, "invalid-parameter", "scope debe ser internal o external")
-			return
-		}
-		scope = db.NullContactScope{ContactScope: db.ContactScope(s), Valid: true}
 	}
 	page := parsePositiveInt(qs.Get("page"), 1)
 	pageSize := parsePositiveInt(qs.Get("pageSize"), defaultDirectoryPage)
 	if pageSize > maxDirectoryPage {
 		pageSize = maxDirectoryPage
 	}
-	q, emailHash, phoneHash := h.searchFilter(qs.Get("q"))
-	specialty := queryText(qs.Get("specialty"))
-	if specialty.Valid {
-		specialty.String = escapeLike(specialty.String)
-	}
-	active := qs.Get("active") != "false"
+	f.PageSize, f.PageOffset = int32(pageSize), int32((page-1)*pageSize)
+	q := f.Q
 
-	rows, err := h.Queries.ListDirectory(ctx, db.ListDirectoryParams{
-		Active: active, OrganizationID: orgID, Scope: scope, Specialty: specialty, Favorite: queryBool(qs.Get("favorite")),
-		Q: q, QEmailHash: emailHash, QPhoneHash: phoneHash, PageSize: int32(pageSize), PageOffset: int32((page - 1) * pageSize),
-	})
+	rows, err := h.Queries.ListDirectory(ctx, f)
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo listar el directorio")
 		return
 	}
 	total, err := h.Queries.CountDirectory(ctx, db.CountDirectoryParams{
-		Active: active, OrganizationID: orgID, Scope: scope, Specialty: specialty, Favorite: queryBool(qs.Get("favorite")),
-		Q: q, QEmailHash: emailHash, QPhoneHash: phoneHash,
+		Active: f.Active, OrganizationID: f.OrganizationID, Scope: f.Scope, Specialty: f.Specialty, Favorite: f.Favorite,
+		Q: f.Q, QEmailHash: f.QEmailHash, QPhoneHash: f.QPhoneHash,
 	})
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo contar el directorio")
@@ -243,6 +226,97 @@ func (h *DirectoryHandler) List(w http.ResponseWriter, r *http.Request) {
 		"hasQuery": q.Valid, "page": page, "results": len(dtos), "total": total,
 	})
 	writeDataMeta(w, http.StatusOK, dtos, map[string]any{"page": page, "pageSize": pageSize, "total": total})
+}
+
+// parseDirectoryFilter lee los filtros del listado (los mismos del CSV).
+func (h *DirectoryHandler) parseDirectoryFilter(qs url.Values) (db.ListDirectoryParams, string) {
+	if len([]rune(qs.Get("q"))) > maxDirectoryQueryLength {
+		return db.ListDirectoryParams{}, "q no puede superar 64 caracteres"
+	}
+	orgID, err := queryUUID(qs.Get("organizationId"))
+	if err != nil {
+		return db.ListDirectoryParams{}, "organizationId inválido"
+	}
+	var scope db.NullContactScope
+	if s := qs.Get("scope"); s != "" {
+		if s != "internal" && s != "external" {
+			return db.ListDirectoryParams{}, "scope debe ser internal o external"
+		}
+		scope = db.NullContactScope{ContactScope: db.ContactScope(s), Valid: true}
+	}
+	q, emailHash, phoneHash := h.searchFilter(qs.Get("q"))
+	specialty := queryText(qs.Get("specialty"))
+	if specialty.Valid {
+		specialty.String = escapeLike(specialty.String)
+	}
+	return db.ListDirectoryParams{
+		Active: qs.Get("active") != "false", OrganizationID: orgID, Scope: scope, Specialty: specialty, Favorite: queryBool(qs.Get("favorite")),
+		Q: q, QEmailHash: emailHash, QPhoneHash: phoneHash,
+	}, ""
+}
+
+// Export: GET /api/directory/export — el directorio (con los filtros de la
+// pantalla) en CSV con las columnas de la plantilla de importación, así el
+// archivo vuelve a entrar tal cual (legacy: /escalation/admin/contacts/export-csv).
+func (h *DirectoryHandler) Export(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	f, bad := h.parseDirectoryFilter(r.URL.Query())
+	if bad != "" {
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-parameter", bad)
+		return
+	}
+	var all []contactDTO
+	for f.PageSize, f.PageOffset = maxDirectoryPage, 0; ; f.PageOffset += maxDirectoryPage {
+		rows, err := h.Queries.ListDirectory(ctx, f)
+		if err != nil {
+			problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo exportar el directorio")
+			return
+		}
+		crow := make([]contactRow, 0, len(rows))
+		for _, c := range rows {
+			crow = append(crow, fromListRow(c))
+		}
+		dtos, err := h.withChannels(ctx, h.Queries, crow)
+		if err != nil {
+			problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer los canales")
+			return
+		}
+		all = append(all, dtos...)
+		if len(rows) < maxDirectoryPage {
+			break
+		}
+	}
+	// Sacar datos personales en bloque queda auditado (no se guarda lo buscado).
+	h.AuditLog.Log(ctx, "directory.central.export", audit.LevelInfo, audit.Success(), map[string]any{"hasQuery": f.Q.Valid, "rows": len(all)})
+
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="contactos.csv"`)
+	_, _ = w.Write([]byte("\xef\xbb\xbf")) // BOM: Excel abre bien los acentos
+	writer := csv.NewWriter(w)
+	_ = writer.Write([]string{"Nombre", "Correo", "Teléfono", "Empresa", "Cargo", "Especialidad", "Ámbito", "Favorito"})
+	for _, c := range all {
+		scope, fav := "Externo", "no"
+		if c.Scope == "internal" {
+			scope = "Interno"
+		}
+		if c.IsFavorite {
+			fav = "sí"
+		}
+		_ = writer.Write([]string{csvCell(c.Name), csvCell(c.Email), csvCell(c.Phone), csvCell(c.OrganizationName),
+			csvCell(deref(c.Position)), csvCell(deref(c.Specialty)), scope, fav})
+	}
+	writer.Flush()
+}
+
+// csvCell evita que Excel tome un valor como fórmula (=, +, -, @ al inicio).
+func csvCell(v string) string {
+	if strings.Trim(v, "+-0123456789 ()") == "" {
+		return v // un teléfono como "+56 9 1234 5678" queda tal cual
+	}
+	if strings.ContainsRune("=+-@\t\r", rune(v[0])) {
+		return "'" + v
+	}
+	return v
 }
 
 // Search es el typeahead GET /api/directory/search?q= (máx 20, favoritos primero).

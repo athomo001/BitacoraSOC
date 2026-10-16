@@ -13,6 +13,8 @@ export interface Area {
   /** Perfil de los grupos que se arman solos al ubicar a alguien en el área. */
   profile: Profile;
   groupCount: number;
+  /** Cómo numera los tickets que pide (se configura en Administración → Ticketera). */
+  ticketSeries?: { name: string; preview: string; general: boolean };
 }
 
 /** Una persona de un área (ficha del área): su nivel, si es jefe y sus permisos extra. */

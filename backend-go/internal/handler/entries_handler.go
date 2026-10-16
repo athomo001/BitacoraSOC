@@ -120,6 +120,10 @@ type entryCommentDTO struct {
 type entryDetailDTO struct {
 	entryDTO
 	Comments []entryCommentDTO `json:"comments"`
+	// Enlaces a tickets (entry_links.go).
+	Ticket        *entryTicketDTO `json:"ticket,omitempty"`
+	GlpiTicketID  string          `json:"glpiTicketId,omitempty"`
+	GlpiTicketURL string          `json:"glpiTicketUrl,omitempty"`
 }
 
 // ===== Listar =====
@@ -131,6 +135,9 @@ type entryFilters struct {
 	FromDate  pgtype.Timestamptz
 	ToDate    pgtype.Timestamptz
 	Q         pgtype.Text
+	// Autor y cliente (paridad con el legacy, 2026-10-16). author=me: el usuario.
+	AuthorID pgtype.UUID
+	ClientID pgtype.UUID
 }
 
 func parseEntryFilters(r *http.Request) (entryFilters, error) {
@@ -144,6 +151,25 @@ func parseEntryFilters(r *http.Request) (entryFilters, error) {
 	}
 	f.Tag = queryText(q.Get("tag"))
 	f.Q = queryText(q.Get("q"))
+	switch v := q.Get("author"); v {
+	case "":
+	case "me":
+		user, _ := middleware.UserFromContext(r.Context())
+		f.AuthorID = pgUUIDOf(user.ID)
+	default:
+		id, err := uuid.Parse(v)
+		if err != nil {
+			return f, err
+		}
+		f.AuthorID = pgUUIDOf(id)
+	}
+	if v := q.Get("client"); v != "" {
+		id, err := uuid.Parse(v)
+		if err != nil {
+			return f, err
+		}
+		f.ClientID = pgUUIDOf(id)
+	}
 	if v := q.Get("from"); v != "" {
 		t, err := time.Parse("2006-01-02", v)
 		if err != nil {
@@ -164,7 +190,7 @@ func parseEntryFilters(r *http.Request) (entryFilters, error) {
 func (h *EntriesHandler) List(w http.ResponseWriter, r *http.Request) {
 	f, err := parseEntryFilters(r)
 	if err != nil {
-		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-query", "from/to deben tener formato YYYY-MM-DD")
+		problemdetails.Write(w, r, http.StatusBadRequest, "invalid-query", "from/to deben tener formato YYYY-MM-DD; author y client, un id")
 		return
 	}
 	page := parsePositiveInt(r.URL.Query().Get("page"), 1)
@@ -174,7 +200,7 @@ func (h *EntriesHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	rows, err := h.Queries.ListEntries(ctx, db.ListEntriesParams{
-		Scope: f.Scope, EntryType: f.EntryType, Tag: f.Tag, FromDate: f.FromDate, ToDate: f.ToDate, Q: f.Q,
+		Scope: f.Scope, EntryType: f.EntryType, Tag: f.Tag, FromDate: f.FromDate, ToDate: f.ToDate, Q: f.Q, AuthorID: f.AuthorID, ClientID: f.ClientID,
 		PageSize: int32(pageSize), PageOffset: int32((page - 1) * pageSize),
 	})
 	if err != nil {
@@ -182,7 +208,7 @@ func (h *EntriesHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	total, err := h.Queries.CountEntries(ctx, db.CountEntriesParams{
-		Scope: f.Scope, EntryType: f.EntryType, Tag: f.Tag, FromDate: f.FromDate, ToDate: f.ToDate, Q: f.Q,
+		Scope: f.Scope, EntryType: f.EntryType, Tag: f.Tag, FromDate: f.FromDate, ToDate: f.ToDate, Q: f.Q, AuthorID: f.AuthorID, ClientID: f.ClientID,
 	})
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron contar las entradas")
@@ -259,7 +285,9 @@ func (h *EntriesHandler) Get(w http.ResponseWriter, r *http.Request) {
 		ServiceID: row.ServiceID, AssetID: row.AssetID, ImageUrl: row.ImageUrl, ImageHash: row.ImageHash,
 		ImageSizeBytes: row.ImageSizeBytes, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 	}
-	writeData(w, http.StatusOK, entryDetailDTO{entryDTO: toEntryDTO(entry, row.AuthorUsername), Comments: comments})
+	dto := entryDetailDTO{entryDTO: toEntryDTO(entry, row.AuthorUsername), Comments: comments}
+	h.entryLinks(ctx, &dto, row.TicketID, row.GlpiTicketID)
+	writeData(w, http.StatusOK, dto)
 }
 
 // ===== Editar =====
@@ -394,7 +422,7 @@ func (h *EntriesHandler) Export(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	rows, err := h.Queries.ListEntriesForExport(ctx, db.ListEntriesForExportParams{
-		Scope: f.Scope, EntryType: f.EntryType, Tag: f.Tag, FromDate: f.FromDate, ToDate: f.ToDate, Q: f.Q,
+		Scope: f.Scope, EntryType: f.EntryType, Tag: f.Tag, FromDate: f.FromDate, ToDate: f.ToDate, Q: f.Q, AuthorID: f.AuthorID, ClientID: f.ClientID,
 	})
 	if err != nil {
 		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo exportar")
@@ -563,4 +591,19 @@ func readImageUpload(w http.ResponseWriter, r *http.Request) (uploadedImage, boo
 		name = "imagen"
 	}
 	return uploadedImage{data: raw, mime: mimeType, hash: hex.EncodeToString(sum[:]), name: name}, true
+}
+
+// Authors: GET /api/entries/authors — quienes escribieron en la Bitácora
+// (filtro por autor).
+func (h *EntriesHandler) Authors(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.Queries.ListEntryAuthors(r.Context())
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudieron leer los autores")
+		return
+	}
+	out := make([]map[string]any, 0, len(rows))
+	for _, a := range rows {
+		out = append(out, map[string]any{"id": a.ID, "name": a.Name, "username": a.Username})
+	}
+	writeData(w, http.StatusOK, out)
 }

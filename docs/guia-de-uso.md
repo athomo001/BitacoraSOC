@@ -88,10 +88,11 @@ Es el registro del turno. Cada **entrada** tiene un tipo, un texto en Markdown y
 
 **Qué se puede hacer con las entradas:**
 
-- **Buscar y filtrar** por texto, tipo, alcance, cliente, autor, fechas y si tiene imagen.
+- **Buscar y filtrar** por texto, tipo y alcance; **Mías** muestra solo las tuyas; en **Más filtros**, autor, cliente, etiqueta y fechas. El cliente sale del servicio o del activo de la entrada (las que vienen del legacy con un cliente de varios servicios, de su etiqueta `cliente:…`).
+- **Etiquetas**: al escribir, se sugieren las que ya existen, las más usadas primero. El administrador las renombra (si el nombre nuevo ya existe, se juntan) o las borra en **Administración → Etiquetas**.
 - **Seguimiento**: comentarios sobre la entrada.
-- **Crear ticket** o **vincular a un ticket** existente.
-- **Neutralizar** (*defang*) URLs e IPs: `https` pasa a `hxxps` y `1.2.3.4` a `1[.]2[.]3[.]4`, para que nadie las abra por error.
+- **Crear ticket** o **vincular a un ticket** existente al escribir. En el detalle de una entrada ya guardada, **Enlazar ticket** la une a un ticket **interno** (con la Ticketera encendida) o de **GLPI** por su número; se ve ahí mismo (el de GLPI abre su ficha si GLPI está configurado) y se quita con el ícono de enlace roto.
+- **Neutralizar** (*defang*) enlaces, dominios, correos e IPs: `https` pasa a `hxxps`, `www.malo.com` a `www[.]malo[.]com` y `1.2.3.4` a `1[.]2[.]3[.]4`, para que nadie los abra por error. Los nombres de archivo (`hola.zip`, `reporte.pdf`) no se tocan. Al lado del botón dice cuántos neutralizó. En Reportes, el mismo botón revisa todos los campos de texto del informe.
 - **Exportar a CSV** (cualquier usuario) y acciones en lote (solo administrador).
 - **Borradores**: lo que escribes se guarda solo y se sincroniza entre pestañas.
 
@@ -116,7 +117,7 @@ Tiene tres pestañas.
 
 ### Historial
 
-Checklists anteriores con fecha, turno, analista y resultado. Se pueden filtrar los que tuvieron servicios en rojo y descargar en PDF.
+Checklists anteriores con fecha, turno, analista y resultado. Se pueden filtrar los que tuvieron servicios en rojo y descargar en PDF. El administrador puede **borrar** un checklist (por ejemplo, uno duplicado) escribiendo el motivo; queda en Auditoría con todo su contenido. El checklist con que se cerró un turno no se borra.
 
 ### Dotación (TV)
 
@@ -225,7 +226,7 @@ Contactos **internos** (sincronizados desde los usuarios de la app) y **externos
 
 - Buscar, filtrar por organización y marcar **favoritos**.
 - Clic en un teléfono o correo para **copiarlo**.
-- **Agregar, editar e importar CSV**: requiere el permiso de escritura del Directorio. **Borrar** requiere el permiso de borrado. **Consolidar duplicados** es solo del administrador.
+- **Agregar, editar, importar y exportar CSV**: requiere el permiso de escritura del Directorio. **Exportar CSV** descarga lo filtrado con las columnas de la plantilla, así se puede corregir en Excel y volver a importar; queda en Auditoría. **Borrar** requiere el permiso de borrado. **Consolidar duplicados** es solo del administrador.
 - Los contactos sincronizados desde un usuario se editan desde la cuenta de ese usuario.
 
 Consultar el Directorio queda registrado en la Auditoría. No se guarda lo buscado, porque puede ser un teléfono o un correo.
@@ -252,6 +253,10 @@ Informes por correo para clientes, con dos modos:
 ## Ticketera
 
 Tickets ITIL de **incidente** o **requerimiento**. Solo aparece si el módulo Ticketera está encendido.
+
+Un clic en el **número** del ticket (en la lista o arriba del detalle) lo copia; por un momento dice «Copiado».
+
+Las entradas de la Bitácora vinculadas al ticket (pestaña **Bitácora**, o «Ver la entrada» en la actividad) se abren en un popup sin salir del ticket; desde ahí, **Abrir en la Bitácora** lleva a la entrada.
 
 **Colas por área:** arriba eliges qué mirar.
 
@@ -321,18 +326,18 @@ Solo para administradores. El menú se agrupa así:
 
 | Grupo | Sección | Lo esencial |
 | --- | --- | --- |
-| Personas | **Usuarios y grupos** | Usuarios y roles; en el panel de cada persona, su **nivel en cada área** («—» = fuera; puede estar en varias), **Jefe** por área y permisos extra: los grupos se arman solos. También cargos, largo mínimo de contraseña (6 por defecto) y correos de cumpleaños. La pestaña Grupos queda para casos raros. |
+| Personas | **Usuarios y grupos** | Usuarios y roles; en el panel de cada persona, su **nivel en cada área** («—» = fuera; puede estar en varias), **Jefe** por área y permisos extra: los grupos se arman solos. También cargos, largo mínimo de contraseña (6 por defecto) y correos de cumpleaños (con **Cambiar imagen** se usa una imagen propia en el correo; **Volver a la original** deja la de la app). La pestaña Grupos queda para casos raros. |
 | | **Áreas y niveles** | Todo lo de la **gente** de cada área. A la izquierda las áreas (y «Nueva área», «Niveles»); al elegir una se abre su ficha: **Personas** (nivel, Jefe, permisos extra; agregar a alguien que ya existe o a una persona nueva; sacar del área), **Guardias** y **Escalamiento** del área, más su perfil y si está activa. Un área es gente: apagarla no apaga funciones (eso es Módulos). |
-| Operación | **Turnos** | Guardias, turnos de trabajo, dotación programada y recordatorios (detalle abajo). |
+| Operación | **Turnos** | Guardias, turnos de trabajo (con flechas para cambiar el orden en que se ven en todas las pantallas), dotación programada, recordatorios y avisos (detalle abajo). |
 | | **Checklist** | Plantillas de inicio y cierre, servicios y alertas de ítems en rojo. |
 | | **Escalamiento** | Políticas por servicio, activo o zona, con sus llamados en orden (detalle abajo). |
-| | **Ticketera** | Plazos de SLA por prioridad, umbral "en riesgo", firma ante el cliente y avisos por correo (solo con la Ticketera encendida). |
-| | **Avisos por cliente** | Avisos que aparecen al trabajar con un cliente y el catálogo de eventos de los informes. |
+| | **Ticketera** | Plazos de SLA por prioridad, umbral "en riesgo", firma ante el cliente, avisos por correo y **Numeración** (solo con la Ticketera encendida). En Numeración se arma cómo se ve el número: prefijo, con año (2026), año corto (26) o sin año, cuántos dígitos y desde qué número sigue (solo puede subir), con una vista previa. Hay una **general** y se pueden crear otras; abajo se elige cuál usa cada área (varias pueden compartir una). Numera el **área que pide** el ticket, el correlativo nunca vuelve a 1 y los tickets que ya existen conservan su número. En **Áreas y niveles**, la ficha de cada área muestra su numeración (solo vista). |
+| | **Avisos por cliente** | Avisos que aparecen al trabajar con un cliente y el catálogo de eventos de los informes, que también se **importa** desde un .csv (columnas nombre, categoria, motivo) o .json; lo que ya existe se salta. |
 | | **Correo** | SMTP y remitente, con plantillas para los proveedores comunes y correo de prueba. |
 | | **Reportes de turno** | Formato y estado de los reportes de cierre. |
 | | **Notificaciones** | La hora del resumen diario, lo que nadie puede apagar (por defecto los atrasos y los avisos con acuse), cada cuántos minutos se agrupan los avisos iguales y cuántos días guarda la campana. |
 | | **Agenda** | Horario hábil con que la Agenda calcula vencimientos y avisos (por defecto lunes a viernes de 08:00 a 20:00; no cambia turnos ni guardias) y los feriados por año: se importan los de Chile incluidos en la app y se agregan o quitan a mano. |
-| Catálogos | **Organizaciones y servicios** | Clientes, tipos, servicios y fuentes de log. |
+| Catálogos | **Organizaciones y servicios** | Clientes, tipos, servicios y fuentes de log. Una fuente de log se puede borrar si ningún equipo del inventario la usa; si no, se desactiva. |
 | | **Territorio** (NOC) | Regiones, zonas y sitios, con importación CSV y activar o desactivar en lote. Para el Mapa: el **fondo** (OpenStreetMap público, servidor propio o sin fondo) y **Sin ubicación**, donde se ubica con un clic en el mapa cada localidad que no tiene coordenadas. |
 | | **Inventario** | Tipos de equipo y sus campos (texto, número, lista o fecha), y la lista de tipos de responsabilidad. Quitar un campo no borra lo cargado. |
 | | **Equipos** | Equipos, contratas, guardias, integrantes y cobertura territorial, con acciones en lote (detalle abajo). |
@@ -340,7 +345,7 @@ Solo para administradores. El menú se agrupa así:
 | | **Módulos** y **Funcionalidades** | Qué partes del sistema están encendidas (SOC, NOC y la Ticketera se encienden y apagan en Módulos). |
 | | **GLPI** | Con «Sincronización con GLPI» encendida: la conexión con GLPI y su prueba (si falla, dice la causa probable y qué hacer), qué se trae y cómo se reparte (tipo, área dueña, entidad → cliente), la importación automática y **Revisar ahora**, que muestra qué se crea, qué cambia (antes → después), qué se da de baja y qué se salta antes de **Importar**. Un equipo que ya existe en la app con la misma serie se salta; **Vincular** hace que desde ahí lo actualice GLPI. Si la automática falla, o si de una vez desaparece más del 10 % de lo importado (no lo da de baja), avisa en la campana a los administradores. |
 | | **Respaldos** | Copias, restauración y exportación (ver [operacion.md](operacion.md)). |
-| | **Auditoría** | Quién hizo qué y cuándo, con filtros y exportación. |
+| | **Auditoría** | Quién hizo qué y cuándo, con filtros por categoría y por evento exacto, y exportación. |
 | | **Complementos** | Subir y publicar mini-aplicaciones. |
 
 ### Escalamiento → llamados de una política
@@ -382,7 +387,7 @@ La pantalla para organizar las guardias (N2, TI, N1 No hábil…) y marcar condi
   - tiene una ausencia en Dotación,
   - quedan dos personas a la vez,
   - queda un hueco antes o después.
-- **Reemplazo por unos días:** pone a otra persona en un tramo sin cambiar la guardia.
+- **Reemplazo por unos días:** pone a otra persona en un tramo sin cambiar la guardia. Un clic en un reemplazo (barra rayada) lo abre para cambiar quién reemplaza, las fechas o el motivo, o para borrarlo.
 - **Generar rotación:** marcas a las personas, las ordenas y eliges desde cuándo, cuánto dura cada una y cuántas crear. La vista previa avisa de ausencias y cruces.
 - **Configurar** (ícono junto a cada guardia):
   - si debe estar siempre cubierta,
@@ -393,6 +398,14 @@ La pantalla para organizar las guardias (N2, TI, N1 No hábil…) y marcar condi
   - Teletrabajo, vacaciones, trámite médico y licencia van a Dotación.
   - Informa los errores fila por fila.
 - **Próximos relevos** y **Revisión** de las próximas 4 semanas: cada problema viene con un botón para resolverlo.
+
+### Turnos → Avisos
+
+Dos correos que también mandaba el legacy:
+
+- **Checklist no realizado:** si a la hora elegida (09:30) nadie hizo el checklist de inicio del día, avisa a quien esté de guardia en la guardia elegida (N1 no hábil) y a las personas con los cargos elegidos (N2). Uno al día como máximo.
+- **Guardia sin cubrir:** desde las 09:00 revisa la semana que empieza en los días elegidos (7). Si alguna de las guardias marcadas tiene un hueco, avisa a las personas con los cargos elegidos (N2). Una vez por semana revisada. Viene apagado, como en el legacy.
+- Los cargos son los de cada persona (Usuarios y grupos). El último envío se ve debajo de cada aviso y cada envío queda en Auditoría.
 
 ---
 

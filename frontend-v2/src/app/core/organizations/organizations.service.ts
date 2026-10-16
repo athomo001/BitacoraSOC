@@ -188,6 +188,11 @@ export class OrganizationsService {
     return (await firstValueFrom(this.http.get<ApiEnvelope<LogSource[]>>('/api/log-sources'))).data;
   }
 
+  /** Borra una fuente de log; si la usa un activo responde 409 (se desactiva en vez de borrar). */
+  async deleteLogSource(id: string): Promise<void> {
+    await firstValueFrom(this.http.delete(`/api/log-sources/${id}`));
+  }
+
   async patchLogSource(id: string, patch: { displayName?: string; category?: string; active?: boolean }): Promise<LogSource> {
     return (await firstValueFrom(this.http.patch<ApiEnvelope<LogSource>>(`/api/log-sources/${id}`, patch))).data;
   }

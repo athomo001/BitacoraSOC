@@ -3,7 +3,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { ApiEnvelope } from '../auth/auth.models';
 
-/** Exactamente uno de los tres (spec/04-contratos-api.md, escalación). */
+/** Exactamente uno de los tres (spec/04-contratos-api.md, escalamiento). */
 export interface EscalationScope {
   serviceId?: string;
   assetId?: string;
@@ -324,7 +324,7 @@ function scopeParams(scope: EscalationScope): Record<string, string> {
   return params;
 }
 
-/** Motor de escalación, ventanas de mantenimiento y SMTP (Fase 7). */
+/** Motor de escalamiento, ventanas de mantenimiento y SMTP (Fase 7). */
 @Injectable({ providedIn: 'root' })
 export class EscalationService {
   private readonly http = inject(HttpClient);

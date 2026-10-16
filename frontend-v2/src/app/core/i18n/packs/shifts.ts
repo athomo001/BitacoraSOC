@@ -162,6 +162,11 @@ const ES = {
   'staff.cond.guardia': 'Guardia',
   'staff.cond.telework': 'Teletrabajo',
   'staff.cond.office': 'En Oficina',
+  'history.delete': 'Borrar checklist',
+  'history.deleteReason': 'Motivo',
+  'history.deleteHint': 'Se borra del historial y queda en Auditoría con todos sus servicios y el motivo.',
+  'history.cancel': 'Cancelar',
+  'history.deleteError': 'No se pudo borrar el checklist',
 };
 
 export type ShiftsKey = keyof typeof ES;
@@ -327,6 +332,11 @@ const EN: Record<ShiftsKey, string> = {
   'staff.cond.guardia': 'On call',
   'staff.cond.telework': 'Remote work',
   'staff.cond.office': 'At the office',
+  'history.delete': 'Delete checklist',
+  'history.deleteReason': 'Reason',
+  'history.deleteHint': 'It is removed from the history and kept in the Audit log with all its services and the reason.',
+  'history.cancel': 'Cancel',
+  'history.deleteError': 'The checklist could not be deleted',
 };
 
 registerTexts(ES, EN);

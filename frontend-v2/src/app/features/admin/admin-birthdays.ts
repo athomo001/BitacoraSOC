@@ -13,12 +13,15 @@ interface BirthdayConfig {
   time: string;
   cc: string;
   lastSentDate?: string;
+  customImage?: boolean;
+  imageVersion?: string;
 }
 
 /**
  * Correos de cumpleaños (comentario del dueño #21; en el legacy, en la
  * pantalla de Usuarios): encender, hora de envío y correo del área en copia.
- * El correo es el del legacy con la ilustración de los hámsters.
+ * El correo es el del legacy con la ilustración de los hámsters, o con una
+ * imagen propia que sube el admin (pedido del dueño 2026-10-16).
  */
 @Component({
   selector: 'app-admin-birthdays',
@@ -29,7 +32,16 @@ interface BirthdayConfig {
     <section class="adm-card">
       <div class="adm-card__head"><h3 class="adm-card__title"><mat-icon>cake</mat-icon>{{ i18n.t('bday.title') }}</h3></div>
       <div class="adm-card__body bd">
-        <img class="bd__art" src="/api/config/birthday-emails/image" alt="" aria-hidden="true" />
+        <div class="bd__pic">
+          <img class="bd__art" [src]="imageUrl()" [alt]="i18n.t('bday.image')" />
+          <label class="adm-btn bd__file" [class.bd__file--off]="busy()">
+            <mat-icon>image</mat-icon>{{ i18n.t('bday.imageChange') }}
+            <input type="file" name="bdImage" accept="image/png,image/jpeg,image/webp,image/gif" [disabled]="busy()" (change)="uploadImage($event)" />
+          </label>
+          @if (customImage()) {
+            <button type="button" class="adm-btn bd__reset" [disabled]="busy()" (click)="resetImage()"><mat-icon>undo</mat-icon>{{ i18n.t('bday.imageReset') }}</button>
+          }
+        </div>
         <div class="bd__form">
           <label class="switch">
             <input class="switch__input" type="checkbox" role="switch" name="bdEnabled" [ngModel]="draft().enabled" (ngModelChange)="patch({ enabled: $event })" />
@@ -67,7 +79,12 @@ interface BirthdayConfig {
   styles: `
     mat-icon { width: 16px; height: 16px; font-size: 16px; }
     .bd { display: flex; flex-direction: row; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
-    .bd__art { width: 96px; height: 96px; border-radius: var(--radius-md); object-fit: cover; flex-shrink: 0; }
+    .bd__pic { display: flex; flex-direction: column; align-items: stretch; gap: 6px; width: 132px; flex-shrink: 0; }
+    .bd__art { width: 132px; height: 132px; border-radius: var(--radius-md); object-fit: cover; }
+    .bd__file { position: relative; justify-content: center; cursor: pointer; }
+    .bd__file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .bd__file--off { opacity: 0.6; pointer-events: none; }
+    .bd__reset { justify-content: center; }
     .bd__form { flex: 1; min-width: 240px; display: flex; flex-direction: column; gap: 10px; }
   `,
 })
@@ -80,6 +97,9 @@ export class AdminBirthdaysComponent implements OnInit {
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+  protected readonly customImage = signal(false);
+  private readonly imageVersion = signal('');
+  protected readonly imageUrl = computed(() => '/api/config/birthday-emails/image' + (this.imageVersion() ? `?v=${this.imageVersion()}` : ''));
   protected readonly dirty = computed(() => {
     const a = this.draft();
     const b = this.saved();
@@ -116,6 +136,32 @@ export class AdminBirthdaysComponent implements OnInit {
     });
   }
 
+  /** Imagen propia para el correo: se achica sola al subirla. */
+  protected async uploadImage(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    const body = new FormData();
+    body.append('file', file);
+    await this.run(async () => {
+      this.applyImage((await firstValueFrom(this.http.put<ApiEnvelope<BirthdayConfig>>('/api/config/birthday-emails/image', body))).data);
+      return this.i18n.t('bday.imageSaved');
+    });
+    input.value = '';
+  }
+
+  protected async resetImage(): Promise<void> {
+    await this.run(async () => {
+      this.applyImage((await firstValueFrom(this.http.delete<ApiEnvelope<BirthdayConfig>>('/api/config/birthday-emails/image'))).data);
+      return this.i18n.t('bday.imageResetDone');
+    });
+  }
+
+  private applyImage(c: BirthdayConfig): void {
+    this.customImage.set(!!c.customImage);
+    this.imageVersion.set(c.imageVersion ?? '');
+  }
+
   private async run(action: () => Promise<string>): Promise<void> {
     this.busy.set(true);
     this.error.set(null);
@@ -130,6 +176,7 @@ export class AdminBirthdaysComponent implements OnInit {
   }
 
   private apply(c: BirthdayConfig): void {
+    this.applyImage(c);
     const clean = { enabled: c.enabled, time: c.time || '09:00', cc: c.cc ?? '' };
     this.saved.set(clean);
     this.draft.set({ ...clean });

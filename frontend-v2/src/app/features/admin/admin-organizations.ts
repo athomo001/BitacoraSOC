@@ -204,7 +204,7 @@ const DEFAULT_NAMES: Record<string, string> = { client: 'Cliente', mandante: 'Ma
       </form>
       <div class="adm-table-wrap">
         <table class="adm-table">
-          <thead><tr><th>{{ i18n.t('orgs.name') }}</th><th>{{ i18n.t('orgs.code') }}</th><th>{{ i18n.t('orgs.category') }}</th><th>{{ i18n.t('orgs.active') }}</th></tr></thead>
+          <thead><tr><th>{{ i18n.t('orgs.name') }}</th><th>{{ i18n.t('orgs.code') }}</th><th>{{ i18n.t('orgs.category') }}</th><th>{{ i18n.t('orgs.active') }}</th><th></th></tr></thead>
           <tbody>
             @for (src of sources(); track src.id) {
               <tr [class.org__inactive]="!src.active">
@@ -216,6 +216,14 @@ const DEFAULT_NAMES: Record<string, string> = { client: 'Cliente', mandante: 'Ma
                     <input class="switch__input" type="checkbox" role="switch" [checked]="src.active" [disabled]="busy()" (change)="toggleSource(src)" [attr.aria-label]="src.displayName" />
                     <span class="switch__track" aria-hidden="true"></span>
                   </label>
+                </td>
+                <td class="org__del">
+                  @if (deletingSource() === src.id) {
+                    <button type="button" class="adm-btn adm-btn--danger" [disabled]="busy()" (click)="deleteSource(src)">{{ i18n.t('orgs.sourceDeleteSure') }}</button>
+                    <button type="button" class="adm-btn" (click)="deletingSource.set(null)">{{ i18n.t('orgs.cancel') }}</button>
+                  } @else {
+                    <button type="button" class="adm-icon-btn adm-icon-btn--danger" [disabled]="busy()" [title]="i18n.t('orgs.sourceDelete')" [attr.aria-label]="i18n.t('orgs.sourceDelete') + ' ' + src.displayName" (click)="deletingSource.set(src.id)"><mat-icon>delete</mat-icon></button>
+                  }
                 </td>
               </tr>
             }
@@ -229,6 +237,7 @@ const DEFAULT_NAMES: Record<string, string> = { client: 'Cliente', mandante: 'Ma
     :host { display: flex; flex-direction: column; gap: 16px; }
     mat-icon { width: 16px; height: 16px; font-size: 16px; }
     .org__segs { display: flex; flex-wrap: wrap; gap: 4px; }
+    .org__del { white-space: nowrap; text-align: right; }
     .org__add { padding: 12px 14px; border-bottom: 1px solid var(--border-subtle); }
     .org__inactive td { color: var(--text-muted); }
     .org__note { border-top: 1px solid var(--border-subtle); }
@@ -425,6 +434,12 @@ export class AdminOrganizationsComponent implements OnInit {
 
   protected async toggleOrg(org: Organization): Promise<void> {
     await this.run(() => this.api.patch(org.id, { active: !org.active }), () => undefined);
+  }
+
+  protected readonly deletingSource = signal<string | null>(null);
+
+  protected async deleteSource(src: LogSource): Promise<void> {
+    await this.run(() => this.api.deleteLogSource(src.id), () => this.deletingSource.set(null));
   }
 
   protected async toggleSource(src: LogSource): Promise<void> {

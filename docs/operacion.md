@@ -20,7 +20,7 @@ Todo se maneja en **Administración → Respaldos** y queda en la Auditoría.
 | Tipo | Qué contiene | Para qué |
 | --- | --- | --- |
 | **Completa** | Toda la base: datos y configuración. | Recuperarse de un desastre o mover la instalación entera. |
-| **Delta operativo** | Solo lo del período elegido: bitácora, tickets, checklists, cierres y escalaciones. Sin configuración. | Llevar la operación de un servidor a otro (por ejemplo, de un nodo de contingencia al principal). |
+| **Delta operativo** | Solo lo del período elegido: bitácora, tickets, checklists, cierres y escalamientos. Sin configuración. | Llevar la operación de un servidor a otro (por ejemplo, de un nodo de contingencia al principal). |
 | **Exportación** | ZIP de bitácora, checklists, tickets o todo, en formato legible. | Entregar datos a alguien o archivarlos. No sirve para restaurar. |
 
 Las copias completas y delta se guardan **comprimidas (zstd) y cifradas**:

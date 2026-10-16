@@ -30,7 +30,7 @@ type Health = 'none' | 'untested' | 'ok' | 'failed';
 
 /**
  * Correo saliente (Administración → Operación → Correo), re-vestido con los
- * componentes del diseño aprobado. Por aquí salen los avisos de escalación,
+ * componentes del diseño aprobado. Por aquí salen los avisos de escalamiento,
  * los reportes de turno, las alertas NOK y la recuperación de contraseña.
  * La contraseña se guarda cifrada y nunca vuelve al navegador: dejarla vacía
  * conserva la guardada. La prueba usa lo guardado, por eso pide guardar antes.

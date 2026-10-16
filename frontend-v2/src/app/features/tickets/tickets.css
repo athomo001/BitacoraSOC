@@ -273,3 +273,16 @@
   color: var(--status-system);
   font-weight: 600;
 }
+
+.tk__copy {
+  cursor: copy;
+}
+
+.tk__copy:hover {
+  color: var(--accent);
+  text-decoration: underline dotted;
+}
+
+.tk__copied {
+  color: var(--status-ok);
+}

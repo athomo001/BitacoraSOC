@@ -16,7 +16,7 @@ import (
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/directory"
 )
 
-// Iteración 2 (spec/13 §3): escalación, RACI, guardias y dotación,
+// Iteración 2 (spec/13 §3): escalamiento, RACI, guardias y dotación,
 // complementos publicados y reglas de alerta del cliente.
 
 func (m *Migrator) teamSlug(name string) string {
@@ -71,7 +71,7 @@ func (m *Migrator) addMember(ctx context.Context, team uuid.UUID, contact, user 
 	return id, err
 }
 
-// ===== escalación por servicio =====
+// ===== escalamiento por servicio =====
 
 func (m *Migrator) migrateEscalation(ctx context.Context) error {
 	var contacts []legacyContact
@@ -86,7 +86,7 @@ func (m *Migrator) migrateEscalation(ctx context.Context) error {
 			serviceName[id] = strings.TrimSpace(s.Name)
 		}
 	}
-	step := newStep("escalación por servicio", len(contacts))
+	step := newStep("escalamiento por servicio", len(contacts))
 	m.rep.Steps = append(m.rep.Steps, step)
 
 	type member struct {
@@ -221,7 +221,7 @@ func (m *Migrator) migrateEscalation(ctx context.Context) error {
 			}
 		}
 	}
-	step.note("%d políticas de escalación: su llamado 1 avisa por correo a todos los PARA con los CC en copia", policies)
+	step.note("%d políticas de escalamiento: su llamado 1 avisa por correo a todos los PARA con los CC en copia", policies)
 	if n := len(preventive) + len(preventiveByOrg); n > 0 {
 		step.note("%d equipos de avisos preventivos (sin política: se usan desde Equipos)", n)
 	}
@@ -387,9 +387,18 @@ func (m *Migrator) migrateShiftAssignments(ctx context.Context) error {
 			// Semana de lunes a lunes; cada guardia trae su hora exacta (000029).
 			// N1 y N2 nunca pueden quedar sin nadie (decisión del dueño 2026-10-07).
 			mustCover := code == "N2" || code == "N1_NO_HABIL"
-			if _, err := m.tx.Exec(ctx, `INSERT INTO rotation_cycles (id, team_id, start_day_of_week, start_time_utc, duration_days, timezone, active, must_be_covered)
-				VALUES ($1,$2,1,'12:00',7,'America/Santiago',true,$3)`, cycle, team, mustCover); err != nil {
+			// El recordatorio de guardia sin cubrir del legacy revisaba N2, TI y N1_NO_HABIL (000045).
+			remind := mustCover || code == "TI"
+			if _, err := m.tx.Exec(ctx, `INSERT INTO rotation_cycles (id, team_id, start_day_of_week, start_time_utc, duration_days, timezone, active, must_be_covered, remind_uncovered)
+				VALUES ($1,$2,1,'12:00',7,'America/Santiago',true,$3,$4)`, cycle, team, mustCover, remind); err != nil {
 				return err
+			}
+			// El aviso de checklist no realizado va a quien esté de guardia N1 no hábil.
+			if code == "N1_NO_HABIL" {
+				if _, err := m.tx.Exec(ctx, `INSERT INTO app_config (id, checklist_missing_team_id) VALUES (true, $1)
+					ON CONFLICT (id) DO UPDATE SET checklist_missing_team_id = EXCLUDED.checklist_missing_team_id`, team); err != nil {
+					return err
+				}
 			}
 			g = &guard{cycle: cycle, members: map[string]uuid.UUID{}}
 			guards[code] = g

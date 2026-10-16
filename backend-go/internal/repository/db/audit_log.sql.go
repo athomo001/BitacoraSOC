@@ -115,6 +115,41 @@ func (q *Queries) InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) 
 	return err
 }
 
+const listAuditEventNames = `-- name: ListAuditEventNames :many
+SELECT event, count(*)::bigint AS total FROM audit_log
+WHERE ($1::text[] IS NULL
+       OR EXISTS (SELECT 1 FROM unnest($1::text[]) AS p(prefix) WHERE event = p.prefix OR starts_with(event, p.prefix || '.')))
+GROUP BY event
+ORDER BY event
+`
+
+type ListAuditEventNamesRow struct {
+	Event string `json:"event"`
+	Total int64  `json:"total"`
+}
+
+// Los eventos distintos (con cuántas veces), para filtrar por evento exacto
+// como el legacy (GET /audit-logs/events). Acota a los prefijos de la categoría.
+func (q *Queries) ListAuditEventNames(ctx context.Context, events []string) ([]ListAuditEventNamesRow, error) {
+	rows, err := q.db.Query(ctx, listAuditEventNames, events)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAuditEventNamesRow
+	for rows.Next() {
+		var i ListAuditEventNamesRow
+		if err := rows.Scan(&i.Event, &i.Total); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAuditLogs = `-- name: ListAuditLogs :many
 
 SELECT id, timestamp, event, level, actor_user_id, actor_username, actor_role, request_id, request_ip, request_path, request_method, user_agent, device_fingerprint, ip_changed, previous_ip, success, reason, source, source_id, metadata FROM audit_log

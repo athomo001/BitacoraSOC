@@ -21,6 +21,9 @@
           <button type="button" class="adm-btn" [disabled]="merging()" (click)="confirmMerge.set(true)"><mat-icon>merge_type</mat-icon>{{ i18n.t(merging() ? 'dir.merging' : 'dir.merge') }}</button>
         }
         <button type="button" class="adm-btn" [attr.aria-expanded]="showImport()" [disabled]="!perms.canWriteDirectory()" (click)="showImport.set(!showImport())"><mat-icon>upload_file</mat-icon>{{ i18n.t('dir.import') }}</button>
+        @if (perms.canWriteDirectory()) {
+          <button type="button" class="adm-btn" [disabled]="exporting()" [title]="i18n.t('dir.exportHint')" (click)="exportCsv()"><mat-icon>download</mat-icon>{{ i18n.t('dir.export') }}</button>
+        }
         <button type="button" class="adm-icon-btn" [title]="i18n.t('dir.refresh')" [attr.aria-label]="i18n.t('dir.refresh')" [disabled]="loading()" (click)="load()"><mat-icon>refresh</mat-icon></button>
         <button type="button" class="adm-btn adm-btn--primary" [disabled]="!perms.canWriteDirectory()" (click)="startCreate()"><mat-icon>person_add</mat-icon>{{ i18n.t('dir.add') }}</button>
       </span>

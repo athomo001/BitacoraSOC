@@ -17,7 +17,7 @@ const act = (stepOrder: number, id: string, result: ActionLog['result']): Action
 const STEPS = [step(1, 'sequential', ['juan', 'pedro']), step(2, 'unique', ['carlos'], 15), step(3, 'pool', ['marta', 'ana'])];
 const SINCE = '2026-09-23T09:59:00Z';
 
-describe('flowState (tarjeta de escalación)', () => {
+describe('flowState (tarjeta de escalamiento)', () => {
   beforeEach(() => (seq = 0));
 
   it('sin intentos: el paso 1 está en curso y toca llamar al primero', () => {

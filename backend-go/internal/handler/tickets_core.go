@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -69,17 +68,11 @@ func ticketTitleFromContent(content string) string {
 	return strings.TrimSpace(string(runes[:ticketTitleMaxRunes-1])) + "…"
 }
 
-// createTicketTx asigna el correlativo TKT-YYYY-NNNNN bajo un advisory lock
-// por año (dos altas simultáneas nunca repiten número) y crea el ticket
-// dentro de la transacción del llamador.
+// createTicketTx asigna el número con la numeración del área que pide el
+// ticket (o la general; Administración → Ticketera) y crea el ticket dentro
+// de la transacción del llamador. La numeración queda bloqueada hasta el fin
+// de la transacción: dos altas simultáneas nunca repiten número.
 func (h *TicketsHandler) createTicketTx(ctx context.Context, tx pgx.Tx, n newTicket, now time.Time) (db.Ticket, error) {
-	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1))", strconv.Itoa(now.Year())); err != nil {
-		return db.Ticket{}, err
-	}
-	var sequence int
-	if err := tx.QueryRow(ctx, "SELECT COALESCE(MAX(CAST(right(ticket_number, 5) AS integer)), 0) + 1 FROM tickets WHERE ticket_number LIKE $1", fmt.Sprintf("TKT-%04d-%%", now.Year())).Scan(&sequence); err != nil {
-		return db.Ticket{}, err
-	}
 	token, err := randomToken()
 	if err != nil {
 		return db.Ticket{}, err
@@ -95,6 +88,10 @@ func (h *TicketsHandler) createTicketTx(ctx context.Context, tx pgx.Tx, n newTic
 		n.RequestedAreaID = n.AreaID
 	}
 	q := h.Queries.WithTx(tx)
+	number, err := nextTicketNumber(ctx, q, n.RequestedAreaID, now)
+	if err != nil {
+		return db.Ticket{}, err
+	}
 	// Plazos de SLA y "Afecta al cliente": Administración → Ticketera.
 	settings, err := q.GetTicketSettings(ctx)
 	if err != nil {
@@ -107,7 +104,7 @@ func (h *TicketsHandler) createTicketTx(ctx context.Context, tx pgx.Tx, n newTic
 		affects = *n.AffectsClient
 	}
 	return q.CreateTicket(ctx, db.CreateTicketParams{
-		TicketNumber: fmt.Sprintf("TKT-%04d-%05d", now.Year(), sequence), TicketType: db.TicketType(n.Type), Scope: n.Scope,
+		TicketNumber: number, TicketType: db.TicketType(n.Type), Scope: n.Scope,
 		ClientID: n.ClientID, AssignedTeamID: pgtype.UUID{Bytes: n.TeamID, Valid: n.TeamID != uuid.Nil}, AssignedUserID: n.AssignedUserID,
 		ServiceID: n.ServiceID, AssetID: n.AssetID, TerritorialUnitID: n.TerritorialUnitID,
 		AreaID: n.AreaID, RequestedAreaID: n.RequestedAreaID,
@@ -315,4 +312,26 @@ func (h *TicketsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		h.notifyChanged(ctx, parent.ID)
 	}
 	writeData(w, http.StatusCreated, toTicketDTO(ticket, true))
+}
+
+// nextTicketNumber toma el próximo número de la numeración del área (o la
+// general) y la deja avanzada. Si ese número ya existe (dos numeraciones con
+// el mismo prefijo, o un respaldo restaurado) sigue con el siguiente.
+func nextTicketNumber(ctx context.Context, q *db.Queries, areaID uuid.UUID, now time.Time) (string, error) {
+	series, err := q.LockTicketSeriesForArea(ctx, pgtype.UUID{Bytes: areaID, Valid: areaID != uuid.Nil})
+	if err != nil {
+		return "", fmt.Errorf("numeración de tickets: %w", err)
+	}
+	n := series.NextNumber
+	for {
+		number := tickets.FormatNumber(series.Prefix, series.YearFormat, int(series.Digits), n, now)
+		taken, err := q.TicketNumberTaken(ctx, number)
+		if err != nil {
+			return "", err
+		}
+		n++
+		if !taken {
+			return number, q.SetTicketSeriesNext(ctx, db.SetTicketSeriesNextParams{ID: series.ID, NextNumber: n})
+		}
+	}
 }

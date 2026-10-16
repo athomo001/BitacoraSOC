@@ -14,7 +14,7 @@ import (
 
 const createRotationCycle = `-- name: CreateRotationCycle :one
 INSERT INTO rotation_cycles (team_id, start_day_of_week, start_time_utc, duration_days, timezone)
-VALUES ($1, $2, $3, $4, $5) RETURNING id, team_id, start_day_of_week, start_time_utc, duration_days, timezone, active, must_be_covered
+VALUES ($1, $2, $3, $4, $5) RETURNING id, team_id, start_day_of_week, start_time_utc, duration_days, timezone, active, must_be_covered, remind_uncovered
 `
 
 type CreateRotationCycleParams struct {
@@ -43,6 +43,7 @@ func (q *Queries) CreateRotationCycle(ctx context.Context, arg CreateRotationCyc
 		&i.Timezone,
 		&i.Active,
 		&i.MustBeCovered,
+		&i.RemindUncovered,
 	)
 	return i, err
 }
@@ -130,8 +131,8 @@ func (q *Queries) CreateRotationSlot(ctx context.Context, arg CreateRotationSlot
 const createWorkShift = `-- name: CreateWorkShift :one
 INSERT INTO work_shifts (
   rotation_cycle_id, name, start_time, end_time, timezone, shift_type,
-  checklist_template_start_id, checklist_template_end_id, email_recipients
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, rotation_cycle_id, name, start_time, end_time, timezone, shift_type, checklist_template_start_id, checklist_template_end_id, email_recipients, active, email_include_checklist, email_include_entries, email_subject_template
+  checklist_template_start_id, checklist_template_end_id, email_recipients, sort_order
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, (SELECT COALESCE(max(sort_order), 0) + 1 FROM work_shifts)) RETURNING id, rotation_cycle_id, name, start_time, end_time, timezone, shift_type, checklist_template_start_id, checklist_template_end_id, email_recipients, active, email_include_checklist, email_include_entries, email_subject_template, sort_order
 `
 
 type CreateWorkShiftParams struct {
@@ -146,6 +147,7 @@ type CreateWorkShiftParams struct {
 	EmailRecipients          []string    `json:"email_recipients"`
 }
 
+// Un turno nuevo queda al final del orden.
 func (q *Queries) CreateWorkShift(ctx context.Context, arg CreateWorkShiftParams) (WorkShift, error) {
 	row := q.db.QueryRow(ctx, createWorkShift,
 		arg.RotationCycleID,
@@ -174,12 +176,25 @@ func (q *Queries) CreateWorkShift(ctx context.Context, arg CreateWorkShiftParams
 		&i.EmailIncludeChecklist,
 		&i.EmailIncludeEntries,
 		&i.EmailSubjectTemplate,
+		&i.SortOrder,
 	)
 	return i, err
 }
 
+const deleteRotationOverride = `-- name: DeleteRotationOverride :execrows
+DELETE FROM rotation_overrides WHERE id = $1
+`
+
+func (q *Queries) DeleteRotationOverride(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteRotationOverride, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getRotationCycle = `-- name: GetRotationCycle :one
-SELECT id, team_id, start_day_of_week, start_time_utc, duration_days, timezone, active, must_be_covered FROM rotation_cycles WHERE id = $1
+SELECT id, team_id, start_day_of_week, start_time_utc, duration_days, timezone, active, must_be_covered, remind_uncovered FROM rotation_cycles WHERE id = $1
 `
 
 func (q *Queries) GetRotationCycle(ctx context.Context, id uuid.UUID) (RotationCycle, error) {
@@ -194,6 +209,28 @@ func (q *Queries) GetRotationCycle(ctx context.Context, id uuid.UUID) (RotationC
 		&i.Timezone,
 		&i.Active,
 		&i.MustBeCovered,
+		&i.RemindUncovered,
+	)
+	return i, err
+}
+
+const getRotationOverride = `-- name: GetRotationOverride :one
+SELECT id, cycle_id, original_team_member_id, replacement_team_member_id, start_date, end_date, reason, created_by, created_at FROM rotation_overrides WHERE id = $1
+`
+
+func (q *Queries) GetRotationOverride(ctx context.Context, id uuid.UUID) (RotationOverride, error) {
+	row := q.db.QueryRow(ctx, getRotationOverride, id)
+	var i RotationOverride
+	err := row.Scan(
+		&i.ID,
+		&i.CycleID,
+		&i.OriginalTeamMemberID,
+		&i.ReplacementTeamMemberID,
+		&i.StartDate,
+		&i.EndDate,
+		&i.Reason,
+		&i.CreatedBy,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -337,7 +374,7 @@ func (q *Queries) ListCurrentRotationSlots(ctx context.Context, arg ListCurrentR
 
 const listRotationCyclesByTeam = `-- name: ListRotationCyclesByTeam :many
 
-SELECT id, team_id, start_day_of_week, start_time_utc, duration_days, timezone, active, must_be_covered FROM rotation_cycles
+SELECT id, team_id, start_day_of_week, start_time_utc, duration_days, timezone, active, must_be_covered, remind_uncovered FROM rotation_cycles
 WHERE ($1::uuid IS NULL OR team_id = $1)
 ORDER BY team_id
 `
@@ -366,6 +403,7 @@ func (q *Queries) ListRotationCyclesByTeam(ctx context.Context, teamID pgtype.UU
 			&i.Timezone,
 			&i.Active,
 			&i.MustBeCovered,
+			&i.RemindUncovered,
 		); err != nil {
 			return nil, err
 		}
@@ -432,9 +470,9 @@ func (q *Queries) ListRotationSlotsByCycle(ctx context.Context, cycleID uuid.UUI
 }
 
 const listWorkShifts = `-- name: ListWorkShifts :many
-SELECT id, rotation_cycle_id, name, start_time, end_time, timezone, shift_type, checklist_template_start_id, checklist_template_end_id, email_recipients, active, email_include_checklist, email_include_entries, email_subject_template FROM work_shifts
+SELECT id, rotation_cycle_id, name, start_time, end_time, timezone, shift_type, checklist_template_start_id, checklist_template_end_id, email_recipients, active, email_include_checklist, email_include_entries, email_subject_template, sort_order FROM work_shifts
 WHERE ($1::boolean IS NULL OR active = $1)
-ORDER BY name
+ORDER BY sort_order, start_time, name
 `
 
 func (q *Queries) ListWorkShifts(ctx context.Context, active pgtype.Bool) ([]WorkShift, error) {
@@ -461,6 +499,7 @@ func (q *Queries) ListWorkShifts(ctx context.Context, active pgtype.Bool) ([]Wor
 			&i.EmailIncludeChecklist,
 			&i.EmailIncludeEntries,
 			&i.EmailSubjectTemplate,
+			&i.SortOrder,
 		); err != nil {
 			return nil, err
 		}
@@ -500,6 +539,62 @@ func (q *Queries) PatchRotationSlotPause(ctx context.Context, arg PatchRotationS
 	return i, err
 }
 
+const reorderWorkShifts = `-- name: ReorderWorkShifts :execrows
+UPDATE work_shifts w SET sort_order = o.n::int
+FROM unnest($1::uuid[]) WITH ORDINALITY AS o(id, n)
+WHERE w.id = o.id
+`
+
+// El orden es la posición en la lista (legacy PUT /api/work-shifts/reorder).
+func (q *Queries) ReorderWorkShifts(ctx context.Context, ids []uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, reorderWorkShifts, ids)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateRotationOverride = `-- name: UpdateRotationOverride :one
+UPDATE rotation_overrides o SET replacement_team_member_id = $1::uuid,
+  start_date = $2::timestamptz, end_date = $3::timestamptz, reason = $4::text
+WHERE o.id = $5::uuid
+  AND EXISTS (SELECT 1 FROM team_members m JOIN rotation_cycles c ON c.team_id = m.team_id
+              WHERE m.id = $1::uuid AND c.id = o.cycle_id)
+RETURNING id, cycle_id, original_team_member_id, replacement_team_member_id, start_date, end_date, reason, created_by, created_at
+`
+
+type UpdateRotationOverrideParams struct {
+	ReplacementTeamMemberID uuid.UUID          `json:"replacement_team_member_id"`
+	StartDate               pgtype.Timestamptz `json:"start_date"`
+	EndDate                 pgtype.Timestamptz `json:"end_date"`
+	Reason                  string             `json:"reason"`
+	ID                      uuid.UUID          `json:"id"`
+}
+
+// El reemplazante tiene que ser de la misma guardia (como al crearlo).
+func (q *Queries) UpdateRotationOverride(ctx context.Context, arg UpdateRotationOverrideParams) (RotationOverride, error) {
+	row := q.db.QueryRow(ctx, updateRotationOverride,
+		arg.ReplacementTeamMemberID,
+		arg.StartDate,
+		arg.EndDate,
+		arg.Reason,
+		arg.ID,
+	)
+	var i RotationOverride
+	err := row.Scan(
+		&i.ID,
+		&i.CycleID,
+		&i.OriginalTeamMemberID,
+		&i.ReplacementTeamMemberID,
+		&i.StartDate,
+		&i.EndDate,
+		&i.Reason,
+		&i.CreatedBy,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const updateWorkShift = `-- name: UpdateWorkShift :one
 UPDATE work_shifts SET
   name = COALESCE($1, name),
@@ -512,7 +607,7 @@ UPDATE work_shifts SET
   email_include_entries = COALESCE($8, email_include_entries),
   email_subject_template = COALESCE($9, email_subject_template)
 WHERE id = $10
-RETURNING id, rotation_cycle_id, name, start_time, end_time, timezone, shift_type, checklist_template_start_id, checklist_template_end_id, email_recipients, active, email_include_checklist, email_include_entries, email_subject_template
+RETURNING id, rotation_cycle_id, name, start_time, end_time, timezone, shift_type, checklist_template_start_id, checklist_template_end_id, email_recipients, active, email_include_checklist, email_include_entries, email_subject_template, sort_order
 `
 
 type UpdateWorkShiftParams struct {
@@ -559,6 +654,7 @@ func (q *Queries) UpdateWorkShift(ctx context.Context, arg UpdateWorkShiftParams
 		&i.EmailIncludeChecklist,
 		&i.EmailIncludeEntries,
 		&i.EmailSubjectTemplate,
+		&i.SortOrder,
 	)
 	return i, err
 }

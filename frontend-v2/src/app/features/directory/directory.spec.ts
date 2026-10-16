@@ -47,6 +47,7 @@ describe('DirectoryComponent (re-vestido, portado del legacy)', () => {
     const edit = el.querySelector('button[aria-label="Editar"]') as HTMLButtonElement;
     expect(edit.disabled).toBe(true);
     expect(el.textContent).not.toContain('Consolidar duplicados');
+    expect(el.textContent).not.toContain('Exportar CSV');
   });
 
   it('con directory:write puede editar pero no eliminar sin directory:delete', async () => {
@@ -65,6 +66,21 @@ describe('DirectoryComponent (re-vestido, portado del legacy)', () => {
     expect(el.textContent).toContain('+56912345678');
     expect(el.querySelector('button[aria-label="Quitar de favoritos"]')?.getAttribute('aria-pressed')).toBe('true');
     expect(el.textContent).toContain('1-1 de 1');
+  });
+
+  it('exportar CSV solo con directory:write y con los filtros de la pantalla', async () => {
+    const { el, fixture } = await render('user', ['directory:write']);
+    const fav = [...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Favoritos')) as HTMLButtonElement;
+    fav.click();
+    await tick();
+    httpMock.match((r) => r.url === '/api/directory').forEach((r) => r.flush({ data: [], meta: { page: 1, pageSize: 50, total: 0 } }));
+    fixture.detectChanges();
+    const exp = [...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Exportar CSV')) as HTMLButtonElement;
+    exp.click();
+    const req = httpMock.expectOne((r) => r.url === '/api/directory/export');
+    expect(req.request.params.get('favorite')).toBe('true');
+    expect(req.request.params.has('page')).toBe(false);
+    req.flush(new Blob(['Nombre\n']));
   });
 
   it('la búsqueda viaja al backend (no filtra en el navegador como el legacy)', async () => {

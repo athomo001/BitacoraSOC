@@ -218,6 +218,10 @@ mat-icon {
   line-height: 18px;
 }
 
+.gd__bar--swap-edit {
+  cursor: pointer;
+}
+
 .gd__bar--sel {
   outline: 2px solid var(--text-primary);
   outline-offset: 1px;

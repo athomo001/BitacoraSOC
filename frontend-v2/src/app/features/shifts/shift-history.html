@@ -27,6 +27,7 @@
           <th>{{ i18n.t('history.col.shift') }}</th>
           <th>{{ i18n.t('history.col.analyst') }}</th>
           <th>{{ i18n.t('history.col.result') }}</th>
+          @if (isAdmin()) { <th class="no-print"></th> }
         </tr>
       </thead>
       <tbody>
@@ -38,10 +39,26 @@
             <td>{{ shiftName(check.workShiftId) }}</td>
             <td>{{ check.username }}</td>
             <td><span class="pill" [class.tone-bad]="reds.length > 0" [class.tone-ok]="reds.length === 0">{{ reds.length > 0 ? i18n.tf('check.red', reds.length) : i18n.t('history.allGreen') }}</span></td>
+            @if (isAdmin()) {
+              <td class="no-print sh__act"><button type="button" class="sh__icon-btn" [attr.aria-label]="i18n.t('history.delete')" [title]="i18n.t('history.delete')" (click)="startDelete(check.id, $event)"><mat-icon>delete</mat-icon></button></td>
+            }
           </tr>
+          @if (deleting() === check.id) {
+            <tr class="sh__detail no-print">
+              <td [attr.colspan]="isAdmin() ? 6 : 5">
+                <div class="sh__delete">
+                  <label class="sh__reason"><span>{{ i18n.t('history.deleteReason') }}</span>
+                    <input class="adm-input" name="deleteReason" maxlength="500" [ngModel]="reason()" (ngModelChange)="reason.set($event)" (keydown.enter)="remove(check)" /></label>
+                  <span class="sh__hint">{{ i18n.t('history.deleteHint') }}</span>
+                  <button type="button" class="sh__btn" (click)="deleting.set(null)">{{ i18n.t('history.cancel') }}</button>
+                  <button type="button" class="sh__btn sh__btn--danger" [disabled]="busy() || !reason().trim()" (click)="remove(check)"><mat-icon>delete</mat-icon>{{ i18n.t('history.delete') }}</button>
+                </div>
+              </td>
+            </tr>
+          }
           @if (reds.length > 0 && expanded() === check.id) {
             <tr class="sh__detail">
-              <td colspan="5">
+              <td [attr.colspan]="isAdmin() ? 6 : 5">
                 <ul>
                   @for (service of reds; track service.id) {
                     <li><strong class="text-bad">{{ service.serviceTitle }}</strong> — {{ service.observation }}</li>
@@ -52,7 +69,7 @@
           }
         } @empty {
           @if (!loading()) {
-            <tr><td colspan="5" class="sh__empty">{{ i18n.t('history.empty') }}</td></tr>
+            <tr><td [attr.colspan]="isAdmin() ? 6 : 5" class="sh__empty">{{ i18n.t('history.empty') }}</td></tr>
           }
         }
       </tbody>

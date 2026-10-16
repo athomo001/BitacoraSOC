@@ -27,7 +27,11 @@ describe('AdminAuditComponent', () => {
     http = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    // La lista de eventos del filtro sigue a la categoría.
+    http.match((r) => r.url === '/api/audit-logs/events').forEach((r) => r.flush({ data: [] }));
+    http.verify();
+  });
 
   const isList = (r: HttpRequest<unknown>) => r.url === '/api/audit-logs';
 
@@ -117,5 +121,22 @@ describe('AdminAuditComponent', () => {
     http.expectNone(isList);
     await settle(320);
     expect((await answer(fixture, [])).params.get('q')).toBe('181.43');
+  });
+
+  it('el evento exacto filtra solo ese evento (como el legacy)', async () => {
+    const { fixture, el } = await render();
+    const events = http.match((r) => r.url === '/api/audit-logs/events');
+    events.forEach((r) => r.flush({ data: [{ event: 'auth.login.fail', total: 12 }, { event: 'auth.login.success', total: 300 }] }));
+    await settle();
+    fixture.detectChanges();
+    const select = el.querySelector('select[name="auditEvent"]') as HTMLSelectElement;
+    expect([...select.options].map((o) => o.textContent?.trim())).toContain('auth.login.fail (12)');
+    select.value = 'auth.login.fail';
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    const req = http.expectOne((r) => r.url === '/api/audit-logs');
+    expect(req.request.params.get('event')).toBe('auth.login.fail');
+    req.flush({ data: [], meta: { total: 0 } });
+    await settle();
   });
 });

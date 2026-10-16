@@ -6,6 +6,7 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Dialog } from '@angular/cdk/dialog';
 import { firstValueFrom } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
+import { defangWithCount } from '../../core/entries/defang';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { PermissionsService } from '../../core/auth/permissions.service';
@@ -74,18 +75,6 @@ export const emptyBulletin = (): BulletinFields => ({
   recomendacion: '',
   referencias: '',
 });
-
-/**
- * Defang de IoCs (canvas v18): http→hxxp y el punto de IPs y dominios como
- * [.], para que nadie haga clic por error en el correo del cliente. Lo ya
- * defangeado no cambia.
- */
-export function defang(text: string): string {
-  return text
-    .replace(/\bhttp(s?):\/\//gi, (_m, s: string) => `hxxp${s}://`)
-    .replace(/\b(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\b/g, '$1[.]$2[.]$3[.]$4')
-    .replace(/\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b/gi, (m) => m.replace(/\./g, '[.]'));
-}
 
 /** Saludo según la hora (va en español: los correos salen en el formato del área). */
 export function salutation(hour: number): string {
@@ -476,17 +465,26 @@ export class ReportsComponent implements OnInit {
     }
   }
 
+  /** Todos los campos de texto del informe (fecha, criticidad y CVE no llevan IoCs). */
   protected defangIocs(): void {
+    let count = 0;
+    const clean = <T extends object>(fields: T, keys: (keyof T)[]): T => {
+      const out = { ...fields };
+      for (const k of keys) {
+        const r = defangWithCount(String(out[k] ?? ''));
+        count += r.count;
+        (out as Record<keyof T, unknown>)[k] = r.text;
+      }
+      return out;
+    };
     if (this.mode() === 'incident') {
-      this.incident.update((f) => ({
-        ...f,
-        origenConexion: defang(f.origenConexion),
-        destino: defang(f.destino),
-        evidenciaTexto: defang(f.evidenciaTexto),
-      }));
+      this.incident.update((f) =>
+        clean(f, ['ofensa', 'nombreEvento', 'motivoEvento', 'observaciones', 'recomendacion', 'informacionAdicional', 'origenConexion', 'destino', 'reputacionOrigen', 'evidenciaTexto']),
+      );
     } else {
-      this.bulletin.update((f) => ({ ...f, referencias: defang(f.referencias) }));
+      this.bulletin.update((f) => clean(f, ['tituloBoletin', 'productosAfectados', 'impacto', 'recomendacion', 'referencias']));
     }
+    this.notice.set({ kind: 'ok', text: count ? this.i18n.tf('rpt.defangDone', count) : this.i18n.t('rpt.defangNone') });
   }
 
   protected clearForm(): void {

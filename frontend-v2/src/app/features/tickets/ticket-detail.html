@@ -2,7 +2,7 @@
   @let t = d.ticket;
   <header class="td__head">
     <div class="td__ids">
-      <span class="mono td__number">{{ t.ticketNumber }}</span>
+      <button type="button" class="mono td__number td__copy" [title]="i18n.t('tickets.copyNumber')" (click)="copyNumber(t.ticketNumber, $event)">@if (copiedNumber() === t.ticketNumber) {<span class="td__copied" role="status">{{ i18n.t('tickets.copied') }}</span>} @else {<span>{{ t.ticketNumber }}</span>}</button>
       <span class="pill mono" [class]="'tone-' + priorityTone[t.priority]">{{ priorityShort[t.priority] }}</span>
       <span class="pill">{{ i18n.t(typeKey(t)) }} · {{ t.scope.toUpperCase() }}</span>
     </div>
@@ -176,7 +176,9 @@
                 <mat-icon>{{ c.isPublic ? 'visibility' : 'lock' }}</mat-icon>{{ i18n.t(c.isPublic ? 'tickets.activity.public' : 'tickets.activity.internal') }}
               </span>
             </div>
-            @if (c.content) { <app-markdown [content]="c.content" /> }
+            @if (entryRef(c.content); as ref) {
+              <p class="td__entry-ref">{{ i18n.t(ref.linked ? 'tickets.entryLinked' : 'tickets.entryUnlinked') }} <button type="button" class="td__linkbtn" (click)="openEntry(ref.id)">{{ i18n.t('tickets.openEntry') }}</button></p>
+            } @else if (c.content) { <app-markdown [content]="c.content" /> }
             @if (c.images.length) {
               <div class="td__thumbs">
                 @for (img of c.images; track img.id) {
@@ -228,11 +230,11 @@
       }
       @case ('entries') {
         @for (e of d.entries; track e.id) {
-          <div class="td__entry">
+          <button type="button" class="td__entry" [title]="i18n.t('tickets.openEntry')" (click)="openEntry(e.id)">
             <span class="mono td__muted">{{ e.createdAt | date: 'dd/MM HH:mm' }}</span>
             <span class="td__entry-text">{{ e.content }}</span>
             <span class="td__muted">{{ e.authorUsername }}</span>
-          </div>
+          </button>
         } @empty {
           <p class="td__muted">{{ i18n.t('tickets.entries.empty') }}</p>
         }

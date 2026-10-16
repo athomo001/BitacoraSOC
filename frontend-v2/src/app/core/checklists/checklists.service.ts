@@ -58,6 +58,10 @@ export class ChecklistsService {
     if (params.page) query['page'] = String(params.page);
     return (await firstValueFrom(this.http.get<ApiEnvelope<ShiftCheck[]>>('/api/shift-checks', { params: query }))).data;
   }
+  /** Borra un checklist del historial (admin, con motivo; queda en Auditoría). */
+  async remove(id: string, reason: string): Promise<void> {
+    await firstValueFrom(this.http.delete(`/api/shift-checks/${id}`, { body: { reason } }));
+  }
   async close(payload: { closureCheckId: string; observations?: string; pendingForNextShift?: string; notifyEmail: boolean; syncGlpi: boolean }): Promise<ShiftClosure> {
     return (await firstValueFrom(this.http.post<ApiEnvelope<ShiftClosure>>('/api/shift-checks/close', payload))).data;
   }

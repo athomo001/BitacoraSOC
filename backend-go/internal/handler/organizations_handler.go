@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -424,3 +425,36 @@ func (h *OrganizationsHandler) PatchLogSource(w http.ResponseWriter, r *http.Req
 // organización sin nada asociado: con servicios, contactos, tickets, equipos
 // o activos responde 409 con el detalle, para desactivarla o mover esos datos
 // antes (los contactos caerían en cascada y el resto quedaría huérfano).
+
+// DeleteLogSource: DELETE /api/log-sources/{id} — borrar una fuente de log
+// (paridad con el legacy). Si un activo la usa, no se borra: se desactiva.
+func (h *OrganizationsHandler) DeleteLogSource(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "fuente no encontrada")
+		return
+	}
+	used, err := h.Queries.CountAssetsForLogSource(ctx, pgtype.UUID{Bytes: id, Valid: true})
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo revisar la fuente")
+		return
+	}
+	if used > 0 {
+		problemdetails.Write(w, r, http.StatusConflict, "log-source-in-use",
+			fmt.Sprintf("la usan %d activo(s) del inventario: desactívala en vez de borrarla", used))
+		return
+	}
+	src, err := h.Queries.DeleteLogSource(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "fuente no encontrada")
+		return
+	}
+	if err != nil {
+		problemdetails.Write(w, r, http.StatusInternalServerError, "internal-error", "no se pudo borrar la fuente")
+		return
+	}
+	h.AuditLog.Log(ctx, "log_source.delete", audit.LevelWarn, audit.Success(), map[string]any{
+		"logSourceId": id.String(), "code": src.Code, "displayName": src.DisplayName})
+	writeNoContent(w)
+}

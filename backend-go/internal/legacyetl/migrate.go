@@ -63,7 +63,7 @@ type Migrator struct {
 	services    map[string]uuid.UUID
 	shifts      map[string]uuid.UUID
 	contactMail map[string]uuid.UUID // organización|correo normalizado → contacto
-	// escalationContacts: contacto de escalación del legacy → contacto 2.0
+	// escalationContacts: contacto de escalamiento del legacy → contacto 2.0
 	// (propio o el del directorio con el que se unió), para la iteración 2.
 	escalationContacts map[string]uuid.UUID
 	teamSlugs          map[string]bool
@@ -98,7 +98,7 @@ func Run(ctx context.Context, pool *pgxpool.Pool, backup *Backup, legacy LegacyK
 		{"organizaciones", m.migrateOrganizations},
 		{"servicios", m.migrateServices},
 		{"contactos del directorio", m.migrateDirectoryContacts},
-		{"contactos de escalación", m.migrateEscalationContacts},
+		{"contactos de escalamiento", m.migrateEscalationContacts},
 		{"personal externo", m.migrateExternalPersons},
 		{"turnos", m.migrateWorkShifts},
 		{"personas del turno", m.migrateWorkShiftMembers},
@@ -109,7 +109,7 @@ func Run(ctx context.Context, pool *pgxpool.Pool, backup *Backup, legacy LegacyK
 		{"correo (SMTP)", m.migrateSMTP},
 		{"recordatorios de turno", m.migrateShiftReminders},
 		{"avisos de dotación", m.migrateNotificationSchedules},
-		{"escalación por servicio", m.migrateEscalation},
+		{"escalamiento por servicio", m.migrateEscalation},
 		{"flujos de llamadas", m.migrateCallFlows},
 		{"RACI", m.migrateRaci},
 		{"guardias y dotación", m.migrateShiftAssignments},
@@ -712,7 +712,7 @@ func (m *Migrator) migrateEscalationContacts(ctx context.Context) error {
 	for _, s := range services {
 		serviceName[s.ID] = s.Name
 	}
-	step := newStep("contactos de escalación", len(rows))
+	step := newStep("contactos de escalamiento", len(rows))
 	m.rep.Steps = append(m.rep.Steps, step)
 	now := time.Now()
 	for _, c := range rows {
@@ -727,7 +727,7 @@ func (m *Migrator) migrateEscalationContacts(ctx context.Context) error {
 		}
 		email := m.decrypt(step, "correo", c.Email)
 		// Para armar equipos y políticas en la iteración 2 (spec/13 §3).
-		parts := []string{"Escalación legacy"}
+		parts := []string{"Escalamiento legacy"}
 		if c.Role != "" {
 			parts = append(parts, "rol "+c.Role)
 		}
@@ -744,12 +744,12 @@ func (m *Migrator) migrateEscalationContacts(ctx context.Context) error {
 		if e := directory.NormalizeEmail(email); e != "" {
 			if existing, dup := m.contactMail[org.String()+"|"+e]; dup {
 				// Ya está en el directorio: no se duplica, pero conserva su rol
-				// de escalación y su servicio en las notas.
+				// de escalamiento y su servicio en las notas.
 				if _, err := m.tx.Exec(ctx, `UPDATE contacts SET notes = concat_ws(E'\n', notes, $2::text) WHERE id = $1`, existing, notes); err != nil {
 					return err
 				}
 				m.escalationContacts[c.ID] = existing
-				step.skip("ya estaba en el directorio (unido; su rol de escalación queda en las notas)")
+				step.skip("ya estaba en el directorio (unido; su rol de escalamiento queda en las notas)")
 				continue
 			}
 		}
@@ -812,6 +812,7 @@ func (m *Migrator) migrateWorkShifts(ctx context.Context) error {
 		Timezone          string `json:"timezone"`
 		Type              string `json:"type"`
 		Active            bool   `json:"active"`
+		Order             int    `json:"order"`
 		EmailReportConfig struct {
 			Recipients       []string `json:"recipients"`
 			IncludeChecklist *bool    `json:"includeChecklist"`
@@ -851,9 +852,9 @@ func (m *Migrator) migrateWorkShifts(ctx context.Context) error {
 		}
 		id := ID("workShifts", w.ID)
 		if _, err := m.tx.Exec(ctx, `INSERT INTO work_shifts (id, name, start_time, end_time, timezone, shift_type, email_recipients, active,
-			email_include_checklist, email_include_entries, email_subject_template)
-			VALUES ($1,$2,$3::time,$4::time,$5,$6,$7,$8,$9,$10,$11)`, id, strings.TrimSpace(w.Name), w.StartTime, w.EndTime, tz, shiftType, recipients, w.Active,
-			cfg.IncludeChecklist == nil || *cfg.IncludeChecklist, cfg.IncludeEntries == nil || *cfg.IncludeEntries, subject); err != nil {
+			email_include_checklist, email_include_entries, email_subject_template, sort_order)
+			VALUES ($1,$2,$3::time,$4::time,$5,$6,$7,$8,$9,$10,$11,$12)`, id, strings.TrimSpace(w.Name), w.StartTime, w.EndTime, tz, shiftType, recipients, w.Active,
+			cfg.IncludeChecklist == nil || *cfg.IncludeChecklist, cfg.IncludeEntries == nil || *cfg.IncludeEntries, subject, w.Order); err != nil {
 			return err
 		}
 		m.shifts[w.ID] = id
@@ -1296,6 +1297,12 @@ func (m *Migrator) migrateAppConfig(ctx context.Context) error {
 		BirthdayEmailsEnabled   *bool  `json:"birthdayEmailsEnabled"`
 		BirthdayEmailsTime      string `json:"birthdayEmailsTime"`
 		BirthdayEmailsCcAddress string `json:"birthdayEmailsCcAddress"`
+		// Avisos de checklist no realizado y de guardia sin cubrir (000045).
+		ChecklistAlertEnabled         *bool    `json:"checklistAlertEnabled"`
+		ChecklistAlertTime            string   `json:"checklistAlertTime"`
+		EscalationReminderEnabled     *bool    `json:"escalationReminderEnabled"`
+		EscalationReminderCargoLabels []string `json:"escalationReminderCargoLabels"`
+		EscalationReminderDaysAhead   *int     `json:"escalationReminderDaysAhead"`
 	}
 	if err := m.ex.Decode("appConfigs", &rows); err != nil {
 		return err
@@ -1340,6 +1347,37 @@ func (m *Migrator) migrateAppConfig(ctx context.Context) error {
 			}
 			if *c.AlertNokEnabled {
 				step.note("alerta NOK del checklist a los cargos %s en %d plantillas", strings.Join(targets, ", "), tag.RowsAffected())
+			}
+		}
+		if c.ChecklistAlertEnabled != nil {
+			at := strings.TrimSpace(c.ChecklistAlertTime)
+			if !birthdayTime.MatchString(at) {
+				at = "09:30"
+			}
+			if _, err := m.tx.Exec(ctx, `UPDATE app_config SET checklist_missing_enabled = $1, checklist_missing_time = $2`, *c.ChecklistAlertEnabled, at); err != nil {
+				return err
+			}
+		}
+		if c.EscalationReminderEnabled != nil {
+			days := 7
+			if c.EscalationReminderDaysAhead != nil && *c.EscalationReminderDaysAhead >= 1 && *c.EscalationReminderDaysAhead <= 60 {
+				days = *c.EscalationReminderDaysAhead
+			}
+			cargos := []string{}
+			for _, x := range c.EscalationReminderCargoLabels {
+				if x = strings.ToUpper(strings.TrimSpace(x)); x != "" {
+					cargos = append(cargos, x)
+				}
+			}
+			if len(cargos) == 0 {
+				cargos = []string{"N2"}
+			}
+			if _, err := m.tx.Exec(ctx, `UPDATE app_config SET guard_reminder_enabled = $1, guard_reminder_days_ahead = $2, guard_reminder_cargos = $3`,
+				*c.EscalationReminderEnabled, days, cargos); err != nil {
+				return err
+			}
+			if *c.EscalationReminderEnabled {
+				step.note("recordatorio de guardia sin cubrir encendido (%d días antes, a %s)", days, strings.Join(cargos, ", "))
 			}
 		}
 		if c.BirthdayEmailsEnabled != nil {

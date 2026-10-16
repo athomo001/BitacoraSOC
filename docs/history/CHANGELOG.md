@@ -4,6 +4,56 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] «Escalamiento» en toda la app - 2026-10-16
+
+- Decisión del dueño: se dice **escalamiento** (está en el diccionario de la RAE; «escalación» es un calco del inglés). Cambiados los textos de pantalla, los mensajes de error, los pasos del ETL, el reporte del shadow-diff, `docs/operacion.md` y los comentarios. Se mantiene el correo «Recordatorio de escalación interna», que es la plantilla del legacy tal cual.
+
+## [Rewrite] Numeración de tickets configurable y entrada vinculada visible - 2026-10-16
+
+- Pedido del dueño: que el número no sea siempre `TKT-AAAA-NNNNN`. **Administración → Ticketera → Numeración**: prefijo, año (2026, 26 o sin año), dígitos (3 a 10) y próximo número (solo sube), con vista previa. Una **general** y otras que se asignan a las áreas; varias áreas pueden compartir una. Decisiones del dueño: numera el **área que pide** el ticket y el correlativo **nunca vuelve a 1**. Los tickets existentes conservan su número; la general sigue desde el último usado. Si un número ya existe (dos numeraciones con el mismo prefijo, un respaldo restaurado) salta al siguiente. En **Áreas y niveles** la ficha del área muestra su numeración (solo vista).
+- Migración 000048 (`ticket_number_series`, `areas.ticket_series_id`); rutas `/api/config/ticket-series*`; `GET /api/areas` trae `ticketSeries`.
+- **Entrada vinculada a un ticket:** la nota «Entrada de bitácora vinculada: <código>» ahora dice «Se vinculó una entrada de la bitácora» con **Ver la entrada**, que la abre en un popup sin salir del ticket (texto, imagen, etiquetas y seguimiento; «Abrir en la Bitácora» si hace falta trabajarla). La pestaña **Bitácora** del ticket abre el mismo popup.
+
+## [Rewrite] Copiar el número de un ticket con un clic - 2026-10-16
+
+- Pedido del dueño: en la Ticketera, un clic en el número (lista o encabezado del detalle) lo copia y muestra «Copiado» un momento, sin abrir el ticket.
+
+## [Rewrite] Defang que sirve y entradas enlazadas a tickets - 2026-10-16
+
+- **Defang IoCs** (reporte del dueño: «no sirve»): sin `http` no hacía nada (`www.algo.com` quedaba igual), y Bitácora y Reportes tenían dos versiones distintas. Ahora es una sola: `http/https/ftp`, dominios sueltos (por su terminación: `.com`, `.cl`, `.ru`…), correos e IPs con puerto. Los nombres de archivo no se tocan (`hola.zip`, `README.md`, `malware.exe`); las terminaciones que también son archivos (`.zip`, `.md`, `.py`…) solo cuentan con `www.` delante o dentro de un enlace. Dice cuántos indicadores neutralizó. En Reportes revisa todos los campos de texto, no solo origen, destino y evidencia.
+- **Enlazar una entrada a un ticket desde su detalle** (pedido del dueño): sección **Ticket** con el interno (abre el ticket) y el de GLPI (abre su ficha si GLPI está configurado), **Enlazar ticket** (Interno o GLPI, por número) y quitar el enlace. Rutas `PUT /api/entries/{id}/glpi-ticket` y `DELETE /api/entries/{id}/ticket-link`; el detalle de la entrada trae `ticket`, `glpiTicketId` y `glpiTicketUrl`.
+
+## [Rewrite] Imagen propia en el correo de cumpleaños - 2026-10-16
+
+- Pedido del dueño: poder cambiar la ilustración del correo. En **Correos de cumpleaños**, **Cambiar imagen** sube una propia (PNG, JPEG, WebP o GIF, hasta 2 MB) y **Volver a la original** deja la de los hámsters. Se achica sola a 760 px; un GIF se deja igual para no perder la animación. La prueba y los envíos usan la que esté puesta. Queda en Auditoría.
+- Migración 000047 (`app_config.birthday_image*`); rutas `PUT/DELETE /api/config/birthday-emails/image`.
+
+## [Rewrite] Paridad con el legacy: arreglos chicos - 2026-10-16
+
+- Decisiones del dueño 2026-10-16 (revisión de paridad con el legacy).
+- **Borrar un checklist del historial:** solo el admin, con motivo; queda en Auditoría con todos sus servicios (`shiftcheck.delete`). El checklist de un cierre de turno no se borra. `DELETE /api/shift-checks/{id}`.
+- **Auditoría:** junto a las categorías, un selector con los eventos que hay (con su cantidad) para filtrar por evento exacto, como el legacy. Categorías nuevas: Agenda y avisos, Inventario y Correo; los eventos de respaldo del legacy caen en Respaldos. `GET /api/audit-logs/events`.
+- **Reemplazos de guardia:** un clic en un reemplazo de la línea de tiempo lo abre para cambiar quién reemplaza, las fechas y el motivo, o para borrarlo. Mismo permiso que crearlo. `PUT/DELETE /api/rotation-overrides/{id}`.
+- **Directorio → Exportar CSV:** lo filtrado, con las columnas de la plantilla de importación (vuelve a entrar tal cual). Queda en Auditoría. `GET /api/directory/export`.
+- **Turnos de trabajo:** flechas para cambiar el orden, que se usa en todas las pantallas. El ETL trae el orden del legacy. Migración 000046; `PUT /api/work-shifts/reorder`.
+- **Eventos del catálogo:** importar desde un .csv o .json (lo que ya existe se salta). `POST /api/report-events/import`.
+- **Fuentes de log:** se pueden borrar; si un activo la usa, se pide desactivarla. `DELETE /api/log-sources/{id}`.
+
+## [Rewrite] Paridad con el legacy: filtros y etiquetas de la Bitácora - 2026-10-16
+
+- Decisiones del dueño 2026-10-16: en la barra de filtros actual; sugerencias para todos y la administración de etiquetas solo para el admin.
+- **Filtros:** «Mías» en la barra; en «Más filtros», autor y cliente. El cliente sale del servicio o del activo de la entrada, y en las entradas del legacy con un cliente de varios servicios, de su etiqueta `cliente:X`. La exportación a CSV respeta los mismos filtros.
+- **Etiquetas:** al escribir se sugieren las que ya existen (sin distinguir mayúsculas, las más usadas primero), también en el filtro. **Administración → Etiquetas** (con SOC o NOC) muestra cada una con su uso y último uso, y el admin la renombra (si el nombre nuevo existe, se juntan; sirve para unir «SIEM» y «siem») o la borra de todas las entradas. Queda en Auditoría.
+- Rutas nuevas `/api/entries/authors`, `/api/entries/tags` y `/api/admin/entry-tags*`; `GET /api/entries` acepta `author` y `client`.
+
+## [Rewrite] Paridad con el legacy: avisos de turnos - 2026-10-16
+
+- Revisión de paridad con el legacy (2026-10-16): faltaban dos correos. Decisiones del dueño: «igual al legacy».
+- **Checklist no realizado:** a las 09:30 (configurable), si nadie hizo el checklist de inicio del día, un correo a quien está de guardia N1 no hábil y a los N2. Uno al día como máximo. Mismo HTML del legacy.
+- **Guardia sin cubrir:** desde las 09:00, si la semana que empieza en 7 días (configurable) tiene una de las guardias marcadas (N2, TI y N1 no hábil, como el legacy) con un hueco, un correo a los N2 que además nombra las guardias. Una vez por semana revisada. Apagado por defecto, como el legacy.
+- Se configuran en **Administración → Turnos → Avisos**. El ETL trae los ajustes del legacy (`checklistAlert*`, `escalationReminder*`) y marca las guardias que revisaba. Migración 000045; rutas `GET/PUT /api/config/shift-alerts`. Los dos correos están en la muestra de Administración y en `docs/correos/`.
+- Login: el texto «Expiración: Analistas/Admin 4h | Invitados 2h» ahora dice «La sesión dura 8 horas» (no hay cuentas de invitado: decisión del dueño, no vuelven).
+
 ## [Rewrite] Carpeta de correos para soporte - 2026-10-16
 
 - Pedido del dueño: cada tipo de correo en su propio archivo, para que soporte los revise sin buscar en el código. **`docs/correos/`** tiene un `.html` por correo (34: los de la Fase 12, todas las variantes de la Ticketera, los de la Agenda, el aviso con acuse, el resumen mensual y el aviso de escalamiento), cada uno con un comentario de qué correo es, su asunto y cuándo sale, y un `README.md` con la lista.

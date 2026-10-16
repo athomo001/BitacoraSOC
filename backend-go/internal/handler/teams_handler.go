@@ -18,7 +18,7 @@ import (
 )
 
 // TeamsHandler cubre /api/team-groups, /api/teams/*, /api/assets (módulo NOC)
-// — spec/04-contratos-api.md sección "Escalación NOC/SOC", Fase 6 tareas 2 y
+// — spec/04-contratos-api.md sección "Escalamiento NOC/SOC", Fase 6 tareas 2 y
 // 4. Un equipo es la unidad a la que escala el motor de la Fase 7: un team
 // de 1 persona es el caso SOC clásico, uno de N con team_coverage es una
 // cuadrilla NOC (spec/01-arquitectura.md sección 4).

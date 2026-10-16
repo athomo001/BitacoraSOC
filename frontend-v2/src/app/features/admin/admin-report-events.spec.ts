@@ -37,6 +37,25 @@ describe('AdminReportEventsComponent (catalogEvents del legacy)', () => {
     expect(el.querySelectorAll('tbody tr').length).toBe(1);
   });
 
+  it('importar un archivo lo sube y muestra cuántos entraron y qué filas fallaron', async () => {
+    const { fixture, el } = await render();
+    const input = el.querySelector('input[name="revImport"]') as HTMLInputElement;
+    const file = new File(['nombre,categoria\nNuevo,Correo\n'], 'eventos.csv', { type: 'text/csv' });
+    Object.defineProperty(input, 'files', { value: [file] });
+    input.dispatchEvent(new Event('change'));
+    await tick();
+    const req = httpMock.expectOne('/api/report-events/import');
+    expect(req.request.method).toBe('POST');
+    expect((req.request.body as FormData).get('file')).toBe(file);
+    req.flush({ data: { created: 1, skipped: 3, errors: [{ line: 4, reason: 'el nombre no puede quedar vacío' }] } });
+    await tick();
+    httpMock.expectOne((r) => r.url === '/api/report-events/all').flush({ data: [], meta: { total: 0 } });
+    await tick();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('1 evento(s) nuevo(s), 3 ya estaban.');
+    expect(el.textContent).toContain('Línea 4: el nombre no puede quedar vacío');
+  });
+
   it('desactivar un evento lo guarda con enabled=false', async () => {
     const { el } = await render();
     (el.querySelector('tbody tr input[role="switch"]') as HTMLInputElement).click();

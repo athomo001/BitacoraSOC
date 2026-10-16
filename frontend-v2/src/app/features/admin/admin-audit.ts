@@ -39,6 +39,9 @@ export class AdminAuditComponent {
   protected readonly timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   protected readonly category = signal<string>('all');
+  /** Evento exacto dentro de la categoría (como el legacy); '' = todos. */
+  protected readonly eventName = signal('');
+  protected readonly eventNames = signal<{ event: string; total: number }[]>([]);
   protected readonly level = signal<AuditLevel | ''>('');
   protected readonly result = signal<'ok' | 'fail' | ''>('');
   protected readonly range = signal<AuditRange>('7d');
@@ -61,7 +64,7 @@ export class AdminAuditComponent {
   protected readonly filter = computed<AuditFilter>(() => {
     const category = AUDIT_CATEGORIES.find((c) => c.id === this.category());
     return {
-      events: category?.prefixes,
+      events: this.eventName() ? [this.eventName()] : category?.prefixes,
       level: this.level() || undefined,
       result: this.result() || undefined,
       q: this.query(),
@@ -71,7 +74,7 @@ export class AdminAuditComponent {
 
   /** Algún filtro distinto del estado inicial (el rango de 7 días es el punto de partida, no un filtro). */
   protected readonly filtered = computed(
-    () => this.category() !== 'all' || !!this.level() || !!this.result() || !!this.query().trim() || this.range() !== '7d',
+    () => this.category() !== 'all' || !!this.eventName() || !!this.level() || !!this.result() || !!this.query().trim() || this.range() !== '7d',
   );
 
   protected readonly pages = computed(() => Math.max(1, Math.ceil(this.total() / this.pageSize())));
@@ -100,6 +103,16 @@ export class AdminAuditComponent {
       untracked(() => void this.load(filter, page, pageSize));
     });
     inject(DestroyRef).onDestroy(() => clearTimeout(this.searchTimer));
+    // La lista de eventos sigue a la categoría.
+    effect(() => {
+      const category = AUDIT_CATEGORIES.find((c) => c.id === this.category());
+      untracked(() => void this.api.events(category?.prefixes).then((list) => this.eventNames.set(list), () => this.eventNames.set([])));
+    });
+  }
+
+  protected setCategory(id: string): void {
+    this.eventName.set('');
+    this.setFilter(this.category, id);
   }
 
   /** Cambiar un filtro siempre vuelve a la primera página. */
@@ -117,6 +130,7 @@ export class AdminAuditComponent {
   protected clear(): void {
     clearTimeout(this.searchTimer);
     this.category.set('all');
+    this.eventName.set('');
     this.level.set('');
     this.result.set('');
     this.range.set('7d');

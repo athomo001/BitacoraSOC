@@ -63,6 +63,13 @@ export class AuditService {
     return { items: response.data, total: meta?.total ?? response.data.length };
   }
 
+  /** Los eventos que hay (con cuántas veces) dentro de esos prefijos: el filtro por evento exacto. */
+  async events(prefixes?: readonly string[]): Promise<{ event: string; total: number }[]> {
+    let params = new HttpParams();
+    if (prefixes?.length) params = params.set('event', prefixes.join(','));
+    return (await firstValueFrom(this.http.get<ApiEnvelope<{ event: string; total: number }[]>>('/api/audit-logs/events', { params }))).data;
+  }
+
   /** Descarga autenticada del CSV con exactamente lo filtrado (un <a href> directo respondía 401). */
   exportCsv(filter: AuditFilter): Promise<void> {
     return downloadFile(this.http, '/api/audit-logs/export', 'auditoria.csv', toParams(filter));

@@ -221,6 +221,13 @@ export class ReportsService {
     await firstValueFrom(this.http.delete(`/api/report-events/${id}`));
   }
 
+  /** Importa eventos desde un .csv o .json (lo que ya existe se salta). */
+  async importEvents(file: File): Promise<{ created: number; skipped: number; errors: { line: number; reason: string }[] }> {
+    const body = new FormData();
+    body.append('file', file);
+    return (await firstValueFrom(this.http.post<ApiEnvelope<{ created: number; skipped: number; errors: { line: number; reason: string }[] }>>('/api/report-events/import', body))).data;
+  }
+
   async listAlerts(): Promise<ClientAlertRule[]> {
     return (await firstValueFrom(this.http.get<ApiEnvelope<ClientAlertRule[]>>('/api/client-alerts'))).data;
   }

@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, O
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MarkdownComponent } from '../../shared/markdown/markdown';
 import { AuthImgDirective } from '../../shared/ui/auth-img';
 import { PermissionsService } from '../../core/auth/permissions.service';
@@ -18,8 +18,8 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { Asset, EscalationService, SocService } from '../../core/escalation/escalation.service';
 import { Organization, OrganizationsService, TeamSummary } from '../../core/organizations/organizations.service';
-import { defang } from '../../core/entries/defang';
-import { Entry, EntryComment, EntryDetail, EntryFilters, EntryScope, EntryType, EntriesService } from '../../core/entries/entries.service';
+import { defangWithCount } from '../../core/entries/defang';
+import { Entry, EntryAuthor, EntryComment, EntryDetail, EntryFilters, EntryScope, EntryType, EntriesService, TagSuggestion } from '../../core/entries/entries.service';
 
 import '../../core/i18n/packs/entries';
 interface ComposeDraft {
@@ -61,7 +61,7 @@ function summaryOf(content: string): string {
 @Component({
   selector: 'app-entries',
   standalone: true,
-  imports: [FormsModule, DatePipe, MatIconModule, MarkdownComponent, AuthImgDirective],
+  imports: [FormsModule, DatePipe, MatIconModule, MarkdownComponent, AuthImgDirective, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKeydown($event)' },
   templateUrl: './entries.html',
@@ -102,6 +102,15 @@ export class EntriesComponent implements OnInit {
   protected readonly filterQ = signal('');
   protected readonly filterFrom = signal('');
   protected readonly filterTo = signal('');
+  /** Autor: '' todos, 'me' (Mías) o un id. Cliente: '' todos o un id (paridad con el legacy). */
+  protected readonly filterAuthor = signal('');
+  protected readonly filterClient = signal('');
+  protected readonly authors = signal<EntryAuthor[]>([]);
+  protected readonly filterClients = signal<Organization[]>([]);
+  /** Sugerencias de etiquetas al escribir (las que ya existen). */
+  protected readonly tagSuggestions = signal<TagSuggestion[]>([]);
+  protected readonly filterTagSuggestions = signal<TagSuggestion[]>([]);
+  private tagTimer: ReturnType<typeof setTimeout> | null = null;
   protected readonly moreFilters = signal(false);
 
   protected readonly entries = signal<Entry[]>([]);
@@ -154,6 +163,9 @@ export class EntriesComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     await Promise.all([this.perms.load(), this.modules.load()]);
     await this.load();
+    this.destroyRef.onDestroy(() => { if (this.tagTimer) clearTimeout(this.tagTimer); });
+    void this.api.authors().then((a) => this.authors.set(a), () => this.authors.set([]));
+    void this.orgs.list({ clients: true }).then((c) => this.filterClients.set(c), () => this.filterClients.set([]));
     // /entries?entry=<id>: abre esa entrada (p. ej. desde un incidente de escalamiento).
     const linked = this.route?.snapshot.queryParamMap.get('entry');
     if (linked) await this.select({ id: linked } as Entry);
@@ -222,7 +234,46 @@ export class EntriesComponent implements OnInit {
       q: this.filterQ().trim() || undefined,
       from: this.filterFrom() || undefined,
       to: this.filterTo() || undefined,
+      author: this.filterAuthor() || undefined,
+      client: this.filterClient() || undefined,
     };
+  }
+
+  /** «Mías»: las entradas que escribí yo. */
+  protected toggleMine(): void {
+    this.quickFilter(this.filterAuthor, this.filterAuthor() === 'me' ? '' : 'me');
+  }
+
+  /** La etiqueta que se está escribiendo (lo que va después de la última coma). */
+  private tagFragment(value: string): string {
+    return value.split(',').pop()?.trim() ?? '';
+  }
+
+  /** Al escribir etiquetas, sugiere las que ya existen (como el legacy). */
+  protected onTagsInput(value: string, target: 'draft' | 'filter'): void {
+    if (target === 'draft') this.updateDraft({ tags: value });
+    else this.filterTag.set(value);
+    if (this.tagTimer) clearTimeout(this.tagTimer);
+    const fragment = target === 'draft' ? this.tagFragment(value) : value.trim();
+    const set = target === 'draft' ? this.tagSuggestions : this.filterTagSuggestions;
+    if (!fragment) {
+      set.set([]);
+      return;
+    }
+    this.tagTimer = setTimeout(() => {
+      void this.api.suggestTags(fragment).then((list) => {
+        const used = new Set(target === 'draft' ? this.draft().tags.split(',').map((t) => t.trim()) : []);
+        set.set(list.filter((s) => !used.has(s.tag)));
+      }, () => set.set([]));
+    }, 200);
+  }
+
+  /** Reemplaza la etiqueta a medio escribir por la sugerida. */
+  protected pickTag(tag: string): void {
+    const parts = this.draft().tags.split(',').map((t) => t.trim());
+    parts[parts.length - 1] = tag;
+    this.updateDraft({ tags: parts.filter(Boolean).join(', ') + ', ' });
+    this.tagSuggestions.set([]);
   }
 
   protected async load(): Promise<void> {
@@ -252,11 +303,13 @@ export class EntriesComponent implements OnInit {
     this.filterQ.set('');
     this.filterFrom.set('');
     this.filterTo.set('');
+    this.filterAuthor.set('');
+    this.filterClient.set('');
     void this.load();
   }
 
   protected hasFilters(): boolean {
-    return !!(this.filterScope() || this.filterType() || this.filterTag() || this.filterQ() || this.filterFrom() || this.filterTo());
+    return !!(this.filterScope() || this.filterType() || this.filterTag() || this.filterQ() || this.filterFrom() || this.filterTo() || this.filterAuthor() || this.filterClient());
   }
 
   protected summary(entry: Entry): string {
@@ -284,6 +337,7 @@ export class EntriesComponent implements OnInit {
 
   protected async select(entry: Entry): Promise<void> {
     this.error.set(null);
+    this.linkOpen.set(false);
     this.confirmDelete.set(false);
     try {
       this.selected.set(await this.api.get(entry.id));
@@ -294,6 +348,7 @@ export class EntriesComponent implements OnInit {
   }
 
   protected closePanel(): void {
+    this.linkOpen.set(false);
     this.panel.set('none');
     this.selected.set(null);
     this.newComment.set('');
@@ -322,6 +377,54 @@ export class EntriesComponent implements OnInit {
     }
   }
 
+  // ===== Ticket enlazado (interno o GLPI) =====
+
+  protected readonly linkOpen = signal(false);
+  protected readonly linkKind = signal<'internal' | 'glpi'>('internal');
+  protected readonly linkNumber = signal('');
+  protected readonly linkBusy = signal(false);
+
+  protected openLink(): void {
+    this.linkKind.set(this.ticketsEnabled() ? 'internal' : 'glpi');
+    this.linkNumber.set('');
+    this.linkOpen.set(true);
+  }
+
+  protected async saveLink(): Promise<void> {
+    const entry = this.selected();
+    const number = this.linkNumber().trim();
+    if (!entry || !number || this.linkBusy()) return;
+    await this.linkAction(async () => {
+      if (this.linkKind() === 'glpi') await this.api.setGlpiTicket(entry.id, number);
+      else await this.api.linkTicket(entry.id, number);
+      this.linkOpen.set(false);
+    });
+  }
+
+  protected async unlink(kind: 'internal' | 'glpi'): Promise<void> {
+    const entry = this.selected();
+    if (!entry) return;
+    await this.linkAction(async () => {
+      if (kind === 'glpi') await this.api.setGlpiTicket(entry.id, '');
+      else await this.api.unlinkTicket(entry.id);
+    });
+  }
+
+  private async linkAction(action: () => Promise<void>): Promise<void> {
+    const entry = this.selected();
+    if (!entry) return;
+    this.linkBusy.set(true);
+    this.error.set(null);
+    try {
+      await action();
+      this.selected.set(await this.api.get(entry.id));
+    } catch (error) {
+      this.error.set(problemDetail(error, this.i18n.t('entries.linkError')));
+    } finally {
+      this.linkBusy.set(false);
+    }
+  }
+
   protected async addComment(): Promise<void> {
     const entry = this.selected();
     const comment = this.newComment().trim();
@@ -337,7 +440,11 @@ export class EntriesComponent implements OnInit {
 
   // ===== Redactor =====
 
+  /** Cuántos indicadores neutralizó el último «Defang IoCs» (se borra al seguir escribiendo). */
+  protected readonly defangInfo = signal<string | null>(null);
+
   protected updateDraft(patch: Partial<ComposeDraft>): void {
+    if ('content' in patch) this.defangInfo.set(null);
     this.draft.update((d) => {
       const next = { ...d, ...patch };
       // Cambiar de ámbito puede dejar un cliente/activo que ya no corresponde.
@@ -357,7 +464,9 @@ export class EntriesComponent implements OnInit {
   }
 
   protected defangDraft(): void {
-    this.updateDraft({ content: defang(this.draft().content) });
+    const { text, count } = defangWithCount(this.draft().content);
+    this.updateDraft({ content: text });
+    this.defangInfo.set(count ? this.i18n.tf('entries.defangDone', count) : this.i18n.t('entries.defangNone'));
   }
 
   /** Crear ticket pide equipo y, si no hay un servicio elegido, el cliente. */

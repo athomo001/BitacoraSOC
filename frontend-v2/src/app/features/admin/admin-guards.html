@@ -77,7 +77,11 @@
                   <button type="button" class="gd__gap" [style.left.%]="g.left" [style.width.%]="g.width" [title]="g.title" (click)="openNew(r.guard.cycleId, g.from, g.to)">⚠ {{ g.label }}</button>
                 }
                 @for (s of r.swapBars; track s.id) {
-                  <span class="gd__bar gd__bar--swap" [style.left.%]="s.left" [style.width.%]="s.width" [style.top.px]="s.top" [style.height.px]="s.h" [title]="s.title">{{ s.label }}</span>
+                  @if (canEdit()) {
+                    <button type="button" class="gd__bar gd__bar--swap gd__bar--swap-edit" [class.gd__bar--sel]="s.selected" [style.left.%]="s.left" [style.width.%]="s.width" [style.top.px]="s.top" [style.height.px]="s.h" [title]="s.title" (click)="editOverride(s.override)">{{ s.label }}</button>
+                  } @else {
+                    <span class="gd__bar gd__bar--swap" [style.left.%]="s.left" [style.width.%]="s.width" [style.top.px]="s.top" [style.height.px]="s.h" [title]="s.title">{{ s.label }}</span>
+                  }
                 }
                 @for (b of r.bars; track b.id) {
                   <button type="button" class="gd__bar" [class]="'gd__bar gd__bar--' + b.state" [class.gd__bar--sel]="b.selected" [style.left.%]="b.left" [style.width.%]="b.width" [style.top.px]="b.top" [style.height.px]="b.h" [title]="b.title" (click)="edit(b.slot)">{{ b.label }}</button>
@@ -129,6 +133,7 @@
       <strong>
         @switch (p.kind) {
           @case ('slot') { {{ i18n.t(draft()?.id ? 'guards.edit' : 'guards.new') }} }
+          @case ('override') { {{ i18n.t('guards.override') }} · {{ guardOf(p.cycleId)?.label }} }
           @case ('rotation') { {{ i18n.t('guards.rotate') }} }
           @case ('config') { {{ i18n.t('guards.config.title') }} · {{ guardOf(p.cycleId)?.label }} }
           @case ('import') { {{ i18n.t('guards.import') }} }
@@ -266,6 +271,25 @@
         </div>
       }
 
+      @if (swap(); as s) {
+        <span class="adm-hint">{{ i18n.t('guards.overrideHint') }}</span>
+        @if (s.originalId) {
+          <div class="adm-field"><span class="adm-label">{{ i18n.t('guards.overrideFor') }}</span><span>{{ memberName(s.cycleId, s.originalId) }}</span></div>
+        }
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('guards.replacement') }}</span>
+          <select class="adm-input" name="swapMember" [ngModel]="s.memberId" (ngModelChange)="patchSwap({ memberId: $event })">
+            @for (m of guardOf(s.cycleId)?.members ?? []; track m.teamMemberId) {
+              @if (m.teamMemberId !== s.originalId) { <option [value]="m.teamMemberId">{{ m.name }}</option> }
+            }
+          </select>
+        </label>
+        <div class="gd__two">
+          <label class="adm-field"><span class="adm-label">{{ i18n.t('guards.from') }}</span><input class="adm-input mono" type="datetime-local" name="swapFrom" [ngModel]="s.from" (ngModelChange)="patchSwap({ from: $event })" /></label>
+          <label class="adm-field"><span class="adm-label">{{ i18n.t('guards.to') }}</span><input class="adm-input mono" type="datetime-local" name="swapTo" [ngModel]="s.to" (ngModelChange)="patchSwap({ to: $event })" /></label>
+        </div>
+        <label class="adm-field"><span class="adm-label">{{ i18n.t('guards.reason') }}</span><input class="adm-input" name="swapReason" maxlength="500" [ngModel]="s.reason" (ngModelChange)="patchSwap({ reason: $event })" /></label>
+      }
+
       @if (config(); as c) {
         <label class="adm-switch-row">
           <span class="switch">
@@ -340,6 +364,11 @@
           }
           <button type="button" class="adm-btn adm-push" (click)="closePanel()">{{ i18n.t('guards.cancel') }}</button>
           <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy() || !canSave()" (click)="saveSlot()">{{ i18n.t(draft()?.id ? 'guards.saveChanges' : 'guards.create') }}</button>
+        }
+        @case ('override') {
+          <button type="button" class="adm-btn adm-btn--danger" [disabled]="busy()" (click)="deleteSwap()">{{ i18n.t(confirmDelete() ? 'guards.deleteSure' : 'guards.delete') }}</button>
+          <button type="button" class="adm-btn adm-push" (click)="closePanel()">{{ i18n.t('guards.cancel') }}</button>
+          <button type="button" class="adm-btn adm-btn--primary" [disabled]="busy() || !canSaveSwap()" (click)="saveSwap()">{{ i18n.t('guards.saveChanges') }}</button>
         }
         @case ('rotation') {
           <button type="button" class="adm-btn adm-push" (click)="closePanel()">{{ i18n.t('guards.cancel') }}</button>

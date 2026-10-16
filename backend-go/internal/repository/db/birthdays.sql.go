@@ -14,14 +14,18 @@ import (
 
 const getBirthdayConfig = `-- name: GetBirthdayConfig :one
 
-SELECT birthday_emails_enabled, birthday_emails_time, birthday_emails_cc, birthday_emails_last_date FROM app_config LIMIT 1
+SELECT birthday_emails_enabled, birthday_emails_time, birthday_emails_cc, birthday_emails_last_date,
+  (birthday_image IS NOT NULL)::boolean AS has_custom_image, birthday_image_updated_at
+FROM app_config LIMIT 1
 `
 
 type GetBirthdayConfigRow struct {
-	BirthdayEmailsEnabled  bool        `json:"birthday_emails_enabled"`
-	BirthdayEmailsTime     string      `json:"birthday_emails_time"`
-	BirthdayEmailsCc       string      `json:"birthday_emails_cc"`
-	BirthdayEmailsLastDate pgtype.Date `json:"birthday_emails_last_date"`
+	BirthdayEmailsEnabled  bool               `json:"birthday_emails_enabled"`
+	BirthdayEmailsTime     string             `json:"birthday_emails_time"`
+	BirthdayEmailsCc       string             `json:"birthday_emails_cc"`
+	BirthdayEmailsLastDate pgtype.Date        `json:"birthday_emails_last_date"`
+	HasCustomImage         bool               `json:"has_custom_image"`
+	BirthdayImageUpdatedAt pgtype.Timestamptz `json:"birthday_image_updated_at"`
 }
 
 // ===== Correos de cumpleaños (comentario del dueño #21) =====
@@ -33,7 +37,26 @@ func (q *Queries) GetBirthdayConfig(ctx context.Context) (GetBirthdayConfigRow, 
 		&i.BirthdayEmailsTime,
 		&i.BirthdayEmailsCc,
 		&i.BirthdayEmailsLastDate,
+		&i.HasCustomImage,
+		&i.BirthdayImageUpdatedAt,
 	)
+	return i, err
+}
+
+const getBirthdayImage = `-- name: GetBirthdayImage :one
+SELECT birthday_image, birthday_image_type FROM app_config LIMIT 1
+`
+
+type GetBirthdayImageRow struct {
+	BirthdayImage     []byte      `json:"birthday_image"`
+	BirthdayImageType pgtype.Text `json:"birthday_image_type"`
+}
+
+// La imagen propia (NULL si se usa la incluida en la app).
+func (q *Queries) GetBirthdayImage(ctx context.Context) (GetBirthdayImageRow, error) {
+	row := q.db.QueryRow(ctx, getBirthdayImage)
+	var i GetBirthdayImageRow
+	err := row.Scan(&i.BirthdayImage, &i.BirthdayImageType)
 	return i, err
 }
 
@@ -89,6 +112,21 @@ UPDATE app_config SET birthday_emails_last_date = $1::date
 
 func (q *Queries) MarkBirthdayEmailsSent(ctx context.Context, day pgtype.Date) error {
 	_, err := q.db.Exec(ctx, markBirthdayEmailsSent, day)
+	return err
+}
+
+const setBirthdayImage = `-- name: SetBirthdayImage :exec
+UPDATE app_config SET birthday_image = $1, birthday_image_type = $2, birthday_image_updated_at = now()
+`
+
+type SetBirthdayImageParams struct {
+	Image     []byte      `json:"image"`
+	ImageType pgtype.Text `json:"image_type"`
+}
+
+// NULL vuelve a la imagen incluida en la app.
+func (q *Queries) SetBirthdayImage(ctx context.Context, arg SetBirthdayImageParams) error {
+	_, err := q.db.Exec(ctx, setBirthdayImage, arg.Image, arg.ImageType)
 	return err
 }
 

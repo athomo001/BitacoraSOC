@@ -5,7 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
 import { ApiEnvelope } from '../../core/auth/auth.models';
 import { ShiftsService, TeleworkCondition } from '../../core/shifts/shifts.service';
-import { Absence, Guard, GuardImportResult, GuardSlot, GuardTimeline, GuardsService } from '../../core/shifts/guards.service';
+import { Absence, Guard, GuardImportResult, GuardOverride, GuardSlot, GuardTimeline, GuardsService } from '../../core/shifts/guards.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
 import { PreferencesService } from '../../core/preferences/preferences.service';
@@ -14,9 +14,10 @@ import { Check, DAY, DAYS_EN, DAYS_ES, Draft, absenceInterval, checks, fmt, from
 
 import '../../core/i18n/packs/admin';
 
-/** Panel lateral: una guardia, la rotación, la configuración de una guardia, el CSV o una condición de Dotación. */
+/** Panel lateral: una guardia, un reemplazo, la rotación, la configuración de una guardia, el CSV o una condición de Dotación. */
 type Panel =
   | { kind: 'slot'; draft: Draft }
+  | { kind: 'override'; id: string; cycleId: string; originalId: string; memberId: string; from: string; to: string; reason: string }
   | { kind: 'rotation'; cycleId: string; order: string[]; from: number; daysEach: number; count: number }
   | { kind: 'config'; cycleId: string; mustBeCovered: boolean; changeDay: number; workShiftId: string }
   | { kind: 'import' }
@@ -213,6 +214,8 @@ export class AdminGuardsComponent implements OnInit {
       }));
       const swapBars = swaps.map((s, i) => ({
         id: s.o.id,
+        override: s.o,
+        selected: selected?.kind === 'override' && selected.id === s.o.id,
         label: `↺ ${s.o.name}`,
         title: `${this.i18n.t('guards.override')}: ${s.o.name} · ${this.f(s.from)} → ${this.f(s.to)}${s.o.reason ? ` · ${s.o.reason}` : ''}`,
         left: this.pct(s.from),
@@ -445,6 +448,66 @@ export class AdminGuardsComponent implements OnInit {
       this.overrideOpen.set(false);
       await this.load();
     }, this.i18n.t('guards.overrideSaved'));
+  }
+
+  // ===== Panel: un reemplazo ya hecho (ver, editar, borrar; paridad con el legacy) =====
+
+  protected readonly swap = computed(() => {
+    const p = this.panel();
+    return p?.kind === 'override' ? p : null;
+  });
+
+  protected editOverride(o: GuardOverride): void {
+    this.setPanel({
+      kind: 'override',
+      id: o.id,
+      cycleId: o.cycleId,
+      originalId: o.originalTeamMemberId ?? '',
+      memberId: o.replacementTeamMemberId,
+      from: toLocalInput(Date.parse(o.startsAt)),
+      to: toLocalInput(Date.parse(o.endsAt)),
+      reason: o.reason,
+    });
+  }
+
+  protected memberName(cycleId: string, teamMemberId: string): string {
+    return this.guardOf(cycleId)?.members.find((m) => m.teamMemberId === teamMemberId)?.name ?? '—';
+  }
+
+  protected patchSwap(patch: Partial<Extract<Panel, { kind: 'override' }>>): void {
+    const s = this.swap();
+    if (s) this.panel.set({ ...s, ...patch });
+  }
+
+  protected readonly canSaveSwap = computed(() => {
+    const s = this.swap();
+    if (!s || !s.memberId || !s.reason.trim()) return false;
+    const from = fromLocalInput(s.from);
+    return !!from && fromLocalInput(s.to) > from;
+  });
+
+  protected async saveSwap(): Promise<void> {
+    const s = this.swap();
+    if (!s || !this.canSaveSwap()) return;
+    await this.run(async () => {
+      await this.api.updateOverride(s.id, s.memberId, new Date(fromLocalInput(s.from)), new Date(fromLocalInput(s.to)), s.reason.trim());
+      this.panel.set(null);
+      await this.load();
+    }, this.i18n.t('guards.overrideSaved'));
+  }
+
+  protected async deleteSwap(): Promise<void> {
+    const s = this.swap();
+    if (!s) return;
+    if (!this.confirmDelete()) {
+      this.confirmDelete.set(true);
+      return;
+    }
+    await this.run(async () => {
+      await this.api.deleteOverride(s.id);
+      this.panel.set(null);
+      await this.load();
+    }, this.i18n.t('guards.overrideDeleted'));
   }
 
   // ===== Panel: rotación =====

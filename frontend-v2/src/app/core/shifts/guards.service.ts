@@ -95,6 +95,14 @@ export class GuardsService {
     await firstValueFrom(this.http.patch(`/api/guards/${cycleId}`, patch));
   }
 
+  async updateOverride(id: string, replacementTeamMemberId: string, startsAt: Date, endsAt: Date, reason: string): Promise<void> {
+    await firstValueFrom(this.http.put(`/api/rotation-overrides/${id}`, { replacementTeamMemberId, startDate: startsAt.toISOString(), endDate: endsAt.toISOString(), reason }));
+  }
+
+  async deleteOverride(id: string): Promise<void> {
+    await firstValueFrom(this.http.delete(`/api/rotation-overrides/${id}`));
+  }
+
   /** "Reemplazo por unos días": no toca la guardia (rotation_overrides). */
   async addOverride(cycleId: string, originalTeamMemberId: string, replacementTeamMemberId: string, startsAt: Date, endsAt: Date, reason: string): Promise<void> {
     await firstValueFrom(this.http.post('/api/rotation-overrides', { cycleId, originalTeamMemberId, replacementTeamMemberId, startDate: startsAt.toISOString(), endDate: endsAt.toISOString(), reason }));

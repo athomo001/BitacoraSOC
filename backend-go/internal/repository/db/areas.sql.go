@@ -43,7 +43,7 @@ func (q *Queries) ClearGroupAreas(ctx context.Context, permissionGroupID uuid.UU
 const createArea = `-- name: CreateArea :one
 INSERT INTO areas (code, name, sort_order)
 VALUES ($1, $2, (SELECT COALESCE(max(sort_order), 0) + 10 FROM areas))
-RETURNING id, code, name, active, is_system, sort_order, created_at, default_profile
+RETURNING id, code, name, active, is_system, sort_order, created_at, default_profile, ticket_series_id
 `
 
 type CreateAreaParams struct {
@@ -63,6 +63,7 @@ func (q *Queries) CreateArea(ctx context.Context, arg CreateAreaParams) (Area, e
 		&i.SortOrder,
 		&i.CreatedAt,
 		&i.DefaultProfile,
+		&i.TicketSeriesID,
 	)
 	return i, err
 }
@@ -93,7 +94,7 @@ func (q *Queries) CreateLevel(ctx context.Context, arg CreateLevelParams) (Level
 
 const listAreas = `-- name: ListAreas :many
 
-SELECT id, code, name, active, is_system, sort_order, created_at, default_profile FROM areas ORDER BY sort_order, name
+SELECT id, code, name, active, is_system, sort_order, created_at, default_profile, ticket_series_id FROM areas ORDER BY sort_order, name
 `
 
 // Áreas y niveles (000033, spec/16 §3).
@@ -115,6 +116,7 @@ func (q *Queries) ListAreas(ctx context.Context) ([]Area, error) {
 			&i.SortOrder,
 			&i.CreatedAt,
 			&i.DefaultProfile,
+			&i.TicketSeriesID,
 		); err != nil {
 			return nil, err
 		}
@@ -128,7 +130,7 @@ func (q *Queries) ListAreas(ctx context.Context) ([]Area, error) {
 
 const listAreasWithUsage = `-- name: ListAreasWithUsage :many
 
-SELECT a.id, a.code, a.name, a.active, a.is_system, a.sort_order, a.created_at, a.default_profile, (SELECT count(*) FROM permission_group_areas pa WHERE pa.area_id = a.id)::int AS group_count
+SELECT a.id, a.code, a.name, a.active, a.is_system, a.sort_order, a.created_at, a.default_profile, a.ticket_series_id, (SELECT count(*) FROM permission_group_areas pa WHERE pa.area_id = a.id)::int AS group_count
 FROM areas a ORDER BY a.sort_order, a.name
 `
 
@@ -141,6 +143,7 @@ type ListAreasWithUsageRow struct {
 	SortOrder      int32              `json:"sort_order"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	DefaultProfile string             `json:"default_profile"`
+	TicketSeriesID pgtype.UUID        `json:"ticket_series_id"`
 	GroupCount     int32              `json:"group_count"`
 }
 
@@ -163,6 +166,7 @@ func (q *Queries) ListAreasWithUsage(ctx context.Context) ([]ListAreasWithUsageR
 			&i.SortOrder,
 			&i.CreatedAt,
 			&i.DefaultProfile,
+			&i.TicketSeriesID,
 			&i.GroupCount,
 		); err != nil {
 			return nil, err
@@ -484,7 +488,7 @@ UPDATE areas SET
   active = COALESCE($2, active),
   default_profile = COALESCE($3, default_profile)
 WHERE code = $4
-RETURNING id, code, name, active, is_system, sort_order, created_at, default_profile
+RETURNING id, code, name, active, is_system, sort_order, created_at, default_profile, ticket_series_id
 `
 
 type UpdateAreaParams struct {
@@ -511,6 +515,7 @@ func (q *Queries) UpdateArea(ctx context.Context, arg UpdateAreaParams) (Area, e
 		&i.SortOrder,
 		&i.CreatedAt,
 		&i.DefaultProfile,
+		&i.TicketSeriesID,
 	)
 	return i, err
 }

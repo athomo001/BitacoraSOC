@@ -20,6 +20,7 @@ import { problemDetail } from '../../core/http-error';
 import { AdminShiftRemindersComponent } from './admin-shift-reminders';
 import { AdminShiftMembersComponent } from './admin-shift-members';
 import { AdminGuardsComponent } from './admin-guards';
+import { AdminShiftAlertsComponent } from './admin-shift-alerts';
 
 import '../../core/i18n/packs/admin';
 function splitList(raw: string): string[] {
@@ -61,13 +62,14 @@ const DEFAULT_REPORT_SUBJECT = 'Reporte SOC [fecha] [turno]';
 @Component({
   selector: 'app-admin-shifts',
   standalone: true,
-  imports: [DatePipe, FormsModule, MatIconModule, AdminShiftRemindersComponent, AdminShiftMembersComponent, AdminGuardsComponent],
+  imports: [DatePipe, FormsModule, MatIconModule, AdminShiftRemindersComponent, AdminShiftMembersComponent, AdminGuardsComponent, AdminShiftAlertsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-shifts.html',
   styles: `
     :host { display: flex; flex-direction: column; gap: 16px; }
     mat-icon { width: 16px; height: 16px; font-size: 16px; }
     .sa__lead { padding-bottom: 0; }
+    .sa__order { white-space: nowrap; }
     .sa__form { border-top: 1px solid var(--border-subtle); }
     .sa__chips { display: flex; flex-wrap: wrap; gap: 6px; }
     .sa__on, .sa__on:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
@@ -99,7 +101,7 @@ export class AdminShiftsComponent implements OnInit {
     });
   });
 
-  protected readonly tab = signal<'guards' | 'shifts' | 'staffing' | 'reminders'>('guards');
+  protected readonly tab = signal<'guards' | 'shifts' | 'staffing' | 'reminders' | 'alerts'>('guards');
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
@@ -220,6 +222,17 @@ export class AdminShiftsComponent implements OnInit {
     await this.run(async () => {
       await this.api.patchWorkShift(shift.id, { active: !shift.active });
       this.workShifts.set(await this.api.listWorkShifts());
+    });
+  }
+
+  protected async moveShift(index: number, delta: -1 | 1): Promise<void> {
+    const list = [...this.workShifts()];
+    const to = index + delta;
+    if (to < 0 || to >= list.length) return;
+    [list[index], list[to]] = [list[to], list[index]];
+    this.workShifts.set(list);
+    await this.run(async () => {
+      this.workShifts.set(await this.api.reorderWorkShifts(list.map((w) => w.id)));
     });
   }
 
