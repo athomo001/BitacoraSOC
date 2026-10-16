@@ -103,6 +103,13 @@ migrate create -ext sql -dir sql/migrations -seq nombre_corto
 
 > Si una columna es ambigua entre tablas (`id`), califícala (`tickets.id`). En `LEFT JOIN`, envuelve con `COALESCE` las columnas que `sqlc` debe tratar como no nulas.
 
+### Agregar o cambiar un correo
+
+1. Los correos se arman en `internal/mailtpl/` (los de la Ticketera, en `internal/ticketmail/`). Los que vienen del legacy usan sus plantillas tal cual; un correo nuevo reusa una de ellas, no se diseña uno nuevo.
+2. Súmalo al catálogo de `internal/handler/mail_samples.go`, con su nombre de archivo (`Slug`) y cuándo sale (`When`). `Extra: true` lo deja solo en la carpeta de correos y fuera de Administración → Correo → «Muestras de todos los correos».
+3. Regenera la carpeta de correos: `go run ./cmd/mail-previews -database-url "postgres://…"` (escribe un archivo por correo en `docs/correos/`, las imágenes en `docs/correos/img/` y la lista en `docs/correos/README.md`).
+4. El logo sale siempre de la marca (`branding.Load` al enviar), nunca de un archivo fijo: así un cambio de logo llega a todos los correos.
+
 ### Agregar una ruta de API
 
 1. Crea o extiende un handler en `internal/handler/` (struct con `Queries`, `AuditLog`, etc.).

@@ -42,13 +42,15 @@ Además del rol, cada usuario pertenece a **grupos de permisos**. Los grupos def
 - La sesión dura **8 horas**.
 - Tras **5 intentos fallidos** desde la misma red, el login se bloquea 15 minutos.
 
-**Mi perfil** (menú de tu nombre, abajo a la izquierda) tiene tres pestañas:
+**Mi perfil** (menú de tu nombre, abajo a la izquierda) tiene estas pestañas:
 
 | Pestaña | Qué hay |
 | --- | --- |
 | **Datos** | Nombre, correo, cargo y último ingreso. |
 | **Seguridad** | Cambiar contraseña (con medidor de fortaleza) y activar o desactivar MFA con un código QR. |
 | **Preferencias** | Idioma (ES/EN), tema (claro, oscuro, rosa) y fuente para dislexia. |
+| **Notificaciones** | Qué te llega como aviso emergente o por correo, el resumen diario y las notificaciones del navegador. |
+| **Calendario** | Tu enlace para ver tus vencimientos de la Agenda en Outlook o Google Calendar (solo lectura), con los pasos para agregarlo. Es personal: «Generar uno nuevo» deja inútil el anterior. Aparece cuando el admin prende «Calendario en Outlook» en Funcionalidades. |
 
 ---
 
@@ -148,7 +150,7 @@ flowchart TD
 
 Ver a quién llamar queda registrado en la Auditoría.
 
-**Ventanas de mantenimiento:** cualquier analista las programa y las cierra. Aplican a un servicio, un activo, una zona, un **cliente** (todos sus servicios), un **área** o un **equipo** de la app; con «suprimir» el escalamiento anota sin enviar el aviso. Una ventana en curso se cierra antes de tiempo con **Cerrar ahora** (queda registrado quién y cuándo); una programada se **cancela**. Se ven también en el calendario de la Agenda.
+**Ventanas de mantenimiento:** cualquier analista las programa y las cierra. Aplican a un servicio, un activo, una zona, un **cliente** (todos sus servicios), un **área** o un **equipo** de la app; con «suprimir» el escalamiento anota sin enviar el aviso. Una ventana en curso se cierra antes de tiempo con **Cerrar ahora** (queda registrado quién y cuándo); una programada se **cancela**. Se ven también en el calendario de la Agenda. Con **Se repite** una ventana vuelve cada semana (días y horario; si termina antes de empezar, pasa la medianoche) o cada mes (un día fijo o «el tercer domingo»), con fecha de inicio y de término opcional; abajo se ven las próximas. En **Ventanas que se repiten** cada una se puede **saltar esta vez**. La que cae en **feriado no se aplica**; si es urgente, la jefatura o el admin pulsa **Aplicar igual** y queda quién la aplicó.
 
 ---
 
@@ -192,6 +194,10 @@ Todo lo que hay que hacer para una fecha: el informe mensual de un cliente, el r
 - **Cierre de turno:** el popup de cierre muestra tus tareas abiertas que vencen hasta el siguiente día hábil, para quedártelas, pasarlas a quien entra o devolverlas al nivel.
 - Si el cliente de una tarea se desactiva, sus tareas recurrentes se pausan hasta reactivarlo.
 - **Ventana de mantenimiento desde una tarea:** en una tarea de una vez se puede marcar «Crear ventana de mantenimiento» con hora de inicio y fin. Aplica al cliente de la tarea (o a su área) y se mueve con la tarea si cambia de fecha. Las ventanas se ven en el calendario.
+- **Flujos** (pestaña): tareas de varias áreas en orden, por ejemplo Infra instala el rack → TI configura la red → CSM avisa al cliente. **Flujo nuevo** pide el nombre, el cliente, cuándo empieza (una vez o cada cierto tiempo) y los pasos, cada uno con su área, quién lo hace y cómo empieza:
+  - **Al terminar el anterior:** espera, y cuando el anterior se marca hecho (u omitido) vence en los días hábiles que pusiste. Si el anterior se atrasa, este se corre. A su responsable le llega el aviso en ese momento.
+  - **En paralelo:** vence en esos días hábiles desde que empieza el flujo, aunque el anterior no haya terminado.
+  Cada paso se hace desde Mis pendientes de su responsable, como cualquier tarea; lo que espera aparece en **En espera**, con a qué espera. En la pestaña se ve cada flujo con sus pasos unidos por flechas (punteada si va en paralelo), en qué paso va y si está a tiempo. Arma flujos con otras áreas quien puede asignarles tareas (jefaturas, Gestión y admin); lo edita quien lo creó.
 
 ---
 
@@ -303,6 +309,7 @@ Solo para la **jefatura de área**: quien tiene un grupo con la capacidad *Jefat
 - La jefatura solo asigna grupos de sus áreas, nunca da permisos de administrador y no toca a administradores ni a quien tiene grupos de otras áreas. Todo queda en Auditoría.
 - **Guardias** (pestaña): las guardias del área, quién está en cada una (sumar o sacar personas del área) y «Nueva guardia». Abajo, la misma línea de tiempo de Administración para asignar fechas, generar la rotación y poner reemplazos.
 - **Escalamiento** (pestaña): las políticas del área, con sus llamados y el recordatorio. Las nuevas nacen en el área.
+- **Resumen mensual** (pestaña): por persona y total del área, las tareas a tiempo, los atrasos que quedaron abiertos, las omitidas, los tickets resueltos dentro del SLA y los días ausente, con la diferencia contra el mes anterior. Abre en el mes pasado; con las flechas se ven hasta 12 meses atrás. El primer día hábil del mes siguiente el mes se **congela**: lo enviado ya no cambia aunque alguien reabra una tarea vieja. No llega solo: **Enviar por correo** a quien elijas (correos de la empresa) o **Descargar PDF**.
 
 Cada guardia y cada política tiene un **área dueña**: la gente del área la ve (en Turnos y Escalamiento) y su jefatura la edita. La gente de TI o Infraestructura ve en Turnos las pestañas Guardias (solo mirar) y Dotación de su área.
 

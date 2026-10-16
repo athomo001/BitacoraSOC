@@ -197,7 +197,7 @@ func (q *Queries) CreateEscalationPool(ctx context.Context, arg CreateEscalation
 const createMaintenanceWindow = `-- name: CreateMaintenanceWindow :one
 INSERT INTO maintenance_windows (service_id, asset_id, territorial_unit_id, organization_id, area_id, team_id, agenda_task_id,
   title, notes, starts_at, ends_at, suppress_notifications, priority, created_by, notified_start)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $10 <= now()) RETURNING id, service_id, asset_id, territorial_unit_id, title, notes, starts_at, ends_at, suppress_notifications, priority, created_by, active, organization_id, area_id, team_id, agenda_task_id, closed_at, closed_by, notified_start, notified_end
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $10 <= now()) RETURNING id, service_id, asset_id, territorial_unit_id, title, notes, starts_at, ends_at, suppress_notifications, priority, created_by, active, organization_id, area_id, team_id, agenda_task_id, closed_at, closed_by, notified_start, notified_end, series_id, series_day, holiday_name, approved_by, approved_at
 `
 
 type CreateMaintenanceWindowParams struct {
@@ -256,6 +256,11 @@ func (q *Queries) CreateMaintenanceWindow(ctx context.Context, arg CreateMainten
 		&i.ClosedBy,
 		&i.NotifiedStart,
 		&i.NotifiedEnd,
+		&i.SeriesID,
+		&i.SeriesDay,
+		&i.HolidayName,
+		&i.ApprovedBy,
+		&i.ApprovedAt,
 	)
 	return i, err
 }
@@ -1045,7 +1050,7 @@ func (q *Queries) ListEscalationPools(ctx context.Context) ([]ListEscalationPool
 
 const listMaintenanceWindows = `-- name: ListMaintenanceWindows :many
 
-SELECT id, service_id, asset_id, territorial_unit_id, title, notes, starts_at, ends_at, suppress_notifications, priority, created_by, active, organization_id, area_id, team_id, agenda_task_id, closed_at, closed_by, notified_start, notified_end FROM maintenance_windows
+SELECT id, service_id, asset_id, territorial_unit_id, title, notes, starts_at, ends_at, suppress_notifications, priority, created_by, active, organization_id, area_id, team_id, agenda_task_id, closed_at, closed_by, notified_start, notified_end, series_id, series_day, holiday_name, approved_by, approved_at FROM maintenance_windows
 WHERE ($1::uuid IS NULL OR service_id = $1)
   AND ($2::uuid IS NULL OR asset_id = $2)
   AND ($3::uuid IS NULL OR territorial_unit_id = $3)
@@ -1105,6 +1110,11 @@ func (q *Queries) ListMaintenanceWindows(ctx context.Context, arg ListMaintenanc
 			&i.ClosedBy,
 			&i.NotifiedStart,
 			&i.NotifiedEnd,
+			&i.SeriesID,
+			&i.SeriesDay,
+			&i.HolidayName,
+			&i.ApprovedBy,
+			&i.ApprovedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1669,7 +1679,7 @@ func (q *Queries) ListUnitAncestors(ctx context.Context, id uuid.UUID) ([]ListUn
 }
 
 const listWindowsForScope = `-- name: ListWindowsForScope :many
-SELECT mw.id, mw.service_id, mw.asset_id, mw.territorial_unit_id, mw.title, mw.notes, mw.starts_at, mw.ends_at, mw.suppress_notifications, mw.priority, mw.created_by, mw.active, mw.organization_id, mw.area_id, mw.team_id, mw.agenda_task_id, mw.closed_at, mw.closed_by, mw.notified_start, mw.notified_end FROM maintenance_windows mw
+SELECT mw.id, mw.service_id, mw.asset_id, mw.territorial_unit_id, mw.title, mw.notes, mw.starts_at, mw.ends_at, mw.suppress_notifications, mw.priority, mw.created_by, mw.active, mw.organization_id, mw.area_id, mw.team_id, mw.agenda_task_id, mw.closed_at, mw.closed_by, mw.notified_start, mw.notified_end, mw.series_id, mw.series_day, mw.holiday_name, mw.approved_by, mw.approved_at FROM maintenance_windows mw
 WHERE mw.active AND mw.ends_at > now()
   AND (mw.service_id = $1
        OR mw.asset_id = $2
@@ -1730,6 +1740,11 @@ func (q *Queries) ListWindowsForScope(ctx context.Context, arg ListWindowsForSco
 			&i.ClosedBy,
 			&i.NotifiedStart,
 			&i.NotifiedEnd,
+			&i.SeriesID,
+			&i.SeriesDay,
+			&i.HolidayName,
+			&i.ApprovedBy,
+			&i.ApprovedAt,
 		); err != nil {
 			return nil, err
 		}

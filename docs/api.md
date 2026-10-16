@@ -239,6 +239,8 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `POST` | `/api/team/people` | Capacidad `area:lead` |
 | `PUT` | `/api/team/people/{id}/group` | Capacidad `area:lead` |
 | `PATCH` | `/api/team/people/{id}` | Capacidad `area:lead` |
+| `GET` | `/api/team/monthly?area=&month=YYYY-MM` | Capacidad `area:lead` — resumen mensual del área: por persona y total (tareas, a tiempo, hechas tarde, atrasos abiertos, omitidas, tickets resueltos, dentro del SLA, días ausente), `frozen` y los porcentajes del mes anterior |
+| `POST` | `/api/team/monthly/send` | Capacidad `area:lead` — `{area, month, to: [correos]}` (1 a 30, dominios válidos de Reportes) |
 
 ### Configuración
 
@@ -553,8 +555,26 @@ Quién: ve las tareas de sus áreas, las que creó y las que le asignaron (admin
 | `PUT` | `/api/agenda/holidays` | Admin — `{date, name}` |
 | `DELETE` | `/api/agenda/holidays/{date}` | Admin |
 | `POST` | `/api/agenda/holidays/import` | Admin — `{year}` desde la lista incluida en la app; no pisa los cargados a mano |
+| `GET` | `/api/agenda/flows` | Sesión — los flujos que ve (los que creó, los de sus áreas; admin y Gestión, todos) con sus pasos y la vuelta en curso (`run.steps[]` con `status: pending\|done\|skipped\|waiting`) |
+| `POST` | `/api/agenda/flows` | Sesión — `{name, clientId, recurrence, steps: [{name, description, areaId, assigneeKind, assigneeId, after, days, steps, docUrl, warnDays}]}` (2 a 20 pasos); cada paso con las mismas reglas de asignación de una tarea (`403` si no puede) |
+| `PUT` | `/api/agenda/flows/{id}` | Quien lo creó o admin — las vueltas en curso siguen; las que no empezaron y nadie tocó se rehacen |
+| `DELETE` | `/api/agenda/flows/{id}` | Quien lo creó o admin — queda el historial |
+
+**Flujos entre áreas (9.7):** cada paso es una tarea con `flowId` (se edita desde el flujo: `PUT /api/agenda/tasks/{id}` de un paso responde `409 flow-step`). Un paso con `after: true` nace en `waiting` y, cuando el anterior se cierra (hecho u omitido), vence `days` días hábiles después y se le avisa a su responsable; uno con `after: false` vence `days` días hábiles desde el inicio de la vuelta. En Mis pendientes, lo que espera viene con `flow.waitingFor`.
 
 Enviar un informe de Reportes (`POST /api/reports/{kind}/send`) a un cliente cierra la ocurrencia pendiente de las tareas ligadas a ese informe y cliente que vence dentro de 7 días. `POST /api/agenda/tasks` acepta también `window: {start, end, suppress}` (solo tareas de una vez) para crear la ventana de mantenimiento con la misma fecha; si la tarea cambia de fecha, la ventana se mueve con ella.
+
+### Calendario en Outlook
+
+Detrás de la funcionalidad `calendar_feed` (Administración → Funcionalidades); apagada, las rutas responden `403 module-disabled` y el enlace `404`.
+
+| Método | Ruta | Quién y qué |
+| --- | --- | --- |
+| `GET` | `/api/users/me/calendar` | Sesión — `{url, includeWindows, createdAt, lastReadAt}` o `null` si no tiene enlace |
+| `POST` | `/api/users/me/calendar` | Sesión — crea el enlace o genera uno nuevo (el anterior deja de funcionar) |
+| `PUT` | `/api/users/me/calendar` | Sesión — `{includeWindows}` |
+| `DELETE` | `/api/users/me/calendar` | Sesión — el enlace deja de responder |
+| `GET` | `/cal/{token}.ics` | Público, el token es la llave — suscripción ICS de solo lectura: los vencimientos a nombre de la persona (30 días atrás y 92 adelante) como eventos de todo el día «disponibles» y, si lo pidió, las ventanas de mantenimiento de sus áreas |
 
 ### Notificaciones y avisos con acuse
 
@@ -600,6 +620,12 @@ Tipos de notificación: `agenda.assigned`, `agenda.warn`, `agenda.due`, `agenda.
 | `POST` | `/api/maintenance-windows/{id}/close` | Admin o analista — cierra antes de tiempo una ventana en curso |
 | `POST` | `/api/maintenance-windows` | Admin o analista |
 | `DELETE` | `/api/maintenance-windows/{id}` | Admin o analista |
+| `GET` | `/api/maintenance-windows/series` | Sesión — ventanas que se repiten con sus próximas (también las saltadas y las de feriado) y `canApproveHoliday` |
+| `POST` | `/api/maintenance-windows/series/preview` | Sesión — `{rule, validFrom}` → las próximas 6, con el feriado si cae en uno |
+| `POST` | `/api/maintenance-windows/series` | Admin o analista — a qué aplica (uno) + `{title, notes, suppressNotifications, rule: {kind: weekly\|monthly, weekdays, day \| nth + weekday, start, end}, validFrom, validTo}` |
+| `PUT` | `/api/maintenance-windows/series/{id}` | Admin o analista — cambia la regla; las que no empezaron se rehacen (las aprobadas en feriado se mantienen) |
+| `DELETE` | `/api/maintenance-windows/series/{id}` | Admin o analista — termina la serie y borra las que no empezaron |
+| `POST` | `/api/maintenance-windows/series-windows/{id}/{action}` | `skip` / `apply`: admin o analista (saltar una vez o volver a aplicarla). `approve` / `unapprove` (la que cae en feriado): la jefatura (del área de la ventana, o cualquiera si no es de un área) o el admin |
 
 ### Ticketera
 

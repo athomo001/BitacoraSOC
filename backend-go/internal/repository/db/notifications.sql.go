@@ -29,7 +29,7 @@ func (q *Queries) ClaimDigestDay(ctx context.Context, day pgtype.Date) (int64, e
 const closeMaintenanceWindow = `-- name: CloseMaintenanceWindow :one
 UPDATE maintenance_windows SET ends_at = now(), closed_at = now(), closed_by = $2, notified_end = false
 WHERE id = $1 AND active AND starts_at <= now() AND ends_at > now()
-RETURNING id, service_id, asset_id, territorial_unit_id, title, notes, starts_at, ends_at, suppress_notifications, priority, created_by, active, organization_id, area_id, team_id, agenda_task_id, closed_at, closed_by, notified_start, notified_end
+RETURNING id, service_id, asset_id, territorial_unit_id, title, notes, starts_at, ends_at, suppress_notifications, priority, created_by, active, organization_id, area_id, team_id, agenda_task_id, closed_at, closed_by, notified_start, notified_end, series_id, series_day, holiday_name, approved_by, approved_at
 `
 
 type CloseMaintenanceWindowParams struct {
@@ -62,6 +62,11 @@ func (q *Queries) CloseMaintenanceWindow(ctx context.Context, arg CloseMaintenan
 		&i.ClosedBy,
 		&i.NotifiedStart,
 		&i.NotifiedEnd,
+		&i.SeriesID,
+		&i.SeriesDay,
+		&i.HolidayName,
+		&i.ApprovedBy,
+		&i.ApprovedAt,
 	)
 	return i, err
 }

@@ -12,6 +12,7 @@
 | Integrarme por API | [API](api.md) |
 | Programar en el proyecto | [Desarrollo](desarrollo.md) |
 | Ver las tablas y cómo se relacionan | [Modelo de datos](modelo-de-datos.md) |
+| Ver cómo se ve cada correo que envía la app y cuándo sale | [Correos](correos/README.md) |
 | Migrar los datos del sistema anterior | [Migración desde el legacy](migracion-legacy.md) |
 | Saber a qué tabla va cada colección del legacy | [Modelo legacy ↔ 2.0](modelo-er-legacy-2.0.md) |
 | Saber por qué se decidió algo | [Decisiones (ADR)](#decisiones-de-arquitectura) |

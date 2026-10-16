@@ -57,6 +57,41 @@ export interface NewTeamPerson {
 }
 
 /** Mi equipo: la jefatura de área (spec/16 §3.5, 9d). */
+/** Una persona (o el total) del resumen mensual (9.7). */
+export interface MonthlyPerson {
+  id: string;
+  name: string;
+  level: string;
+  tasks: number;
+  onTime: number;
+  doneLate: number;
+  openLate: number;
+  skipped: number;
+  tickets: number;
+  ticketsSla: number;
+  absentDays: number;
+}
+
+export interface MonthlySummary {
+  month: string;
+  areaCode: string;
+  areaName: string;
+  bizDays: number;
+  people: MonthlyPerson[];
+  total: MonthlyPerson;
+  computedAt: string;
+}
+
+export interface MonthlyView {
+  summary: MonthlySummary;
+  /** El mes ya se congeló (foto del primer día hábil del mes siguiente). */
+  frozen: boolean;
+  /** -1 = sin datos. */
+  onTimePct: number;
+  slaPct: number;
+  previous: { onTimePct: number; slaPct: number };
+}
+
 @Injectable({ providedIn: 'root' })
 export class TeamService {
   private readonly http = inject(HttpClient);
@@ -80,6 +115,15 @@ export class TeamService {
 
   async setGroup(area: string, personId: string, groupId: string): Promise<void> {
     await firstValueFrom(this.http.put(`/api/team/people/${personId}/group`, { area, groupId }));
+  }
+
+  /** Resumen mensual del área (month = YYYY-MM). */
+  async monthly(area: string, month: string): Promise<MonthlyView> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<MonthlyView>>('/api/team/monthly', { params: { area, month } }))).data;
+  }
+
+  async sendMonthly(area: string, month: string, to: string[]): Promise<void> {
+    await firstValueFrom(this.http.post('/api/team/monthly/send', { area, month, to }));
   }
 
   async setActive(area: string, personId: string, active: boolean): Promise<void> {

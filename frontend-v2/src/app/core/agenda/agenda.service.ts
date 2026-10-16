@@ -40,6 +40,18 @@ export interface AgendaTask {
   createdBy?: string;
   createdByName: string;
   canEdit: boolean;
+  /** Es un paso de un flujo (9.7): se edita desde el flujo. */
+  flowId?: string;
+}
+
+/** El paso de un flujo en una ocurrencia y, si espera, a qué paso espera (9.7). */
+export interface AgendaOccurrenceFlow {
+  id: string;
+  name: string;
+  position: number;
+  total: number;
+  waitingFor?: string;
+  waitingArea?: string;
 }
 
 export interface AgendaOccurrence {
@@ -48,7 +60,8 @@ export interface AgendaOccurrence {
   dueDate: string;
   dueAt: string;
   movedFrom?: string;
-  status: 'pending' | 'done' | 'skipped';
+  /** waiting: paso de un flujo que espera que termine el anterior. */
+  status: 'pending' | 'done' | 'skipped' | 'waiting';
   late: boolean;
   /** Días hábiles desde hoy hasta el vencimiento (negativo si ya pasó). */
   bizDays: number;
@@ -72,6 +85,7 @@ export interface AgendaOccurrence {
   canSkip: boolean;
   canRelease: boolean;
   canReopen: boolean;
+  flow?: AgendaOccurrenceFlow;
 }
 
 export interface AgendaAssignee { id: string; name: string; rank?: number; allowed: boolean; }
@@ -137,6 +151,58 @@ export interface AgendaTaskInput {
 
 export interface PreviewDate { date: string; movedFrom?: string; reason?: string; }
 
+/** Un paso de un flujo entre áreas (9.7). after: espera que termine el anterior. */
+export interface AgendaFlowStep {
+  taskId?: string;
+  position?: number;
+  name: string;
+  description: string;
+  areaId: string;
+  areaName?: string;
+  assigneeKind: AssigneeKind;
+  assigneeId: string;
+  assigneeName?: string;
+  /** true: empieza al terminar el anterior (days hábiles desde ahí); false: en paralelo (days desde el inicio). */
+  after: boolean;
+  days: number;
+  steps: string[];
+  docUrl?: string;
+  warnDays: number[];
+}
+
+export interface AgendaFlowRunStep {
+  taskId: string;
+  occurrenceId: string;
+  status: 'pending' | 'done' | 'skipped' | 'waiting';
+  dueDate: string;
+  late: boolean;
+  holderName?: string;
+  offeredLevel?: string;
+  closedAt?: string;
+}
+
+export interface AgendaFlow {
+  id: string;
+  name: string;
+  clientId?: string;
+  clientName?: string;
+  paused: boolean;
+  recurrence: Recurrence;
+  createdByName: string;
+  canEdit: boolean;
+  steps: AgendaFlowStep[];
+  /** La vuelta que se muestra: la abierta que ya empezó, si no la próxima, si no la última. */
+  run?: { id: string; startDate: string; done: number; steps: AgendaFlowRunStep[] };
+  state: 'ok' | 'late' | 'done' | 'waiting' | 'paused';
+}
+
+export interface AgendaFlowInput {
+  name: string;
+  clientId?: string | null;
+  recurrence: Recurrence;
+  steps: AgendaFlowStep[];
+}
+
 export interface AgendaPerson { id: string; name: string; shift?: string; }
 export interface AgendaHandover { items: AgendaOccurrence[]; entering: AgendaPerson[]; }
 
@@ -198,6 +264,14 @@ export class AgendaService {
   createTask(input: AgendaTaskInput): Promise<AgendaTask> { return this.send('POST', '/api/agenda/tasks', input); }
   updateTask(id: string, input: AgendaTaskInput): Promise<AgendaTask> { return this.send('PUT', `/api/agenda/tasks/${id}`, input); }
   async deleteTask(id: string): Promise<void> { await firstValueFrom(this.http.delete(`/api/agenda/tasks/${id}`)); }
+
+  /** Flujos entre áreas (9.7). */
+  flows(): Promise<AgendaFlow[]> { return this.get('/api/agenda/flows'); }
+  createFlow(input: AgendaFlowInput): Promise<{ id: string }> { return this.send('POST', '/api/agenda/flows', input); }
+  async updateFlow(id: string, input: AgendaFlowInput): Promise<void> {
+    await firstValueFrom(this.http.put(`/api/agenda/flows/${id}`, input));
+  }
+  async deleteFlow(id: string): Promise<void> { await firstValueFrom(this.http.delete(`/api/agenda/flows/${id}`)); }
 
   private occ(id: string, action: string, body: unknown = {}, method: 'POST' | 'PUT' = 'POST'): Promise<AgendaOccurrence> {
     return this.send(method, `/api/agenda/occurrences/${id}/${action}`, body);

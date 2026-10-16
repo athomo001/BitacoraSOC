@@ -37,6 +37,10 @@ type TeamHandler struct {
 		Begin(ctx context.Context) (pgx.Tx, error)
 	}
 	AuditLog *audit.Logger
+	// Resumen mensual (9.7): el correo (Notify) con los destinatarios válidos de Reportes.
+	Notify  *Notifier
+	Reports *ReportsHandler
+	Now     func() time.Time
 }
 
 type teamAreaDTO struct {

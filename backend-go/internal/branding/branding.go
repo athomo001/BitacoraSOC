@@ -40,9 +40,11 @@ func Load(ctx context.Context, q *db.Queries, withLogo bool) Brand {
 		b.BulletinColor = row.BulletinColor
 	}
 	b.FaviconURL = row.FaviconUrl.String
+	// El logo es para los correos: va achicado (EmailLogo). La app lo sirve
+	// aparte, con el archivo original.
 	if withLogo && row.HasLogo {
 		if logo, err := q.GetBrandingLogo(ctx); err == nil {
-			b.Logo, b.LogoType = logo.Logo, logo.LogoType.String
+			b.Logo, b.LogoType = EmailLogo(logo.Logo, logo.LogoType.String)
 		}
 	}
 	return b

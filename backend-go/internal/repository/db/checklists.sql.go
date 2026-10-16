@@ -1203,7 +1203,7 @@ func (q *Queries) ListShiftChecks(ctx context.Context, arg ListShiftChecksParams
 }
 
 const listUpcomingMaintenanceWindows = `-- name: ListUpcomingMaintenanceWindows :many
-SELECT id, service_id, asset_id, territorial_unit_id, title, notes, starts_at, ends_at, suppress_notifications, priority, created_by, active, organization_id, area_id, team_id, agenda_task_id, closed_at, closed_by, notified_start, notified_end FROM maintenance_windows
+SELECT id, service_id, asset_id, territorial_unit_id, title, notes, starts_at, ends_at, suppress_notifications, priority, created_by, active, organization_id, area_id, team_id, agenda_task_id, closed_at, closed_by, notified_start, notified_end, series_id, series_day, holiday_name, approved_by, approved_at FROM maintenance_windows
 WHERE active = true AND ends_at > $1 AND starts_at <= $2
 ORDER BY starts_at ASC
 `
@@ -1243,6 +1243,11 @@ func (q *Queries) ListUpcomingMaintenanceWindows(ctx context.Context, arg ListUp
 			&i.ClosedBy,
 			&i.NotifiedStart,
 			&i.NotifiedEnd,
+			&i.SeriesID,
+			&i.SeriesDay,
+			&i.HolidayName,
+			&i.ApprovedBy,
+			&i.ApprovedAt,
 		); err != nil {
 			return nil, err
 		}

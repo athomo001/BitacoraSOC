@@ -92,6 +92,26 @@ describe('Agenda (9.3)', () => {
     expect(button(el, 'Marcar hecha')).toBeDefined();
   });
 
+  it('un paso de un flujo que espera al anterior va en «En espera», sin fecha ni acciones (9.7)', async () => {
+    const waiting = occ({
+      id: 'ow', status: 'waiting', holderId: 'me', holderName: 'Camila', canTake: false, canAct: false, canSkip: false,
+      task: task({ id: 'tw', name: 'Configurar red', flowId: 'f1', steps: [] }),
+      flow: { id: 'f1', name: 'Habilitar sucursal', position: 1, total: 4, waitingFor: 'Instalar rack', waitingArea: 'Infraestructura' },
+    });
+    const { fixture, el } = await render([occ(), waiting]);
+    const groups = [...el.querySelectorAll('.ag__main .ag__grp')].map((g) => g.textContent?.trim());
+    expect(groups[groups.length - 1]).toContain('En espera');
+    const row = el.querySelectorAll('.ag__row')[1] as HTMLElement;
+    expect(row.textContent).toContain('Espera a: Instalar rack (Infraestructura)');
+    row.click();
+    fixture.detectChanges();
+    const panel = el.querySelector('.ag__panel')!.textContent!;
+    expect(panel).toContain('Empieza cuando termine «Instalar rack (Infraestructura)»');
+    expect(panel).toContain('Paso 2 de 4 · Habilitar sucursal');
+    expect(button(el, 'Marcar hecha')).toBeUndefined();
+    expect(button(el, 'Editar')).toBeUndefined();
+  });
+
   it('marcar hecha con nota y omitir con motivo', async () => {
     const mine = occ({ holderId: 'me', holderName: 'Camila', canTake: false });
     const { fixture, el } = await render([mine]);

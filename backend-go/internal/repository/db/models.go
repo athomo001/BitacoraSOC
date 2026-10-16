@@ -1234,6 +1234,24 @@ type AdminNote struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
+type AgendaFlow struct {
+	ID             uuid.UUID          `json:"id"`
+	Name           string             `json:"name"`
+	OrganizationID pgtype.UUID        `json:"organization_id"`
+	Recurrence     []byte             `json:"recurrence"`
+	Active         bool               `json:"active"`
+	CreatedBy      pgtype.UUID        `json:"created_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type AgendaFlowRun struct {
+	ID        uuid.UUID          `json:"id"`
+	FlowID    uuid.UUID          `json:"flow_id"`
+	StartDate pgtype.Date        `json:"start_date"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
 type AgendaOccurrence struct {
 	ID              uuid.UUID          `json:"id"`
 	TaskID          uuid.UUID          `json:"task_id"`
@@ -1252,6 +1270,7 @@ type AgendaOccurrence struct {
 	ReportHistoryID pgtype.UUID        `json:"report_history_id"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	FlowRunID       pgtype.UUID        `json:"flow_run_id"`
 }
 
 type AgendaOccurrenceAlert struct {
@@ -1289,6 +1308,10 @@ type AgendaTask struct {
 	CreatedBy       pgtype.UUID        `json:"created_by"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	FlowID          pgtype.UUID        `json:"flow_id"`
+	FlowPosition    pgtype.Int4        `json:"flow_position"`
+	FlowAfter       bool               `json:"flow_after"`
+	FlowDays        int32              `json:"flow_days"`
 }
 
 type AlertIngestionRule struct {
@@ -1511,6 +1534,15 @@ type BackupRun struct {
 	TriggeredBy          pgtype.UUID        `json:"triggered_by"`
 	ErrorMessage         pgtype.Text        `json:"error_message"`
 	TriggerSource        string             `json:"trigger_source"`
+}
+
+type CalendarFeed struct {
+	UserID         uuid.UUID          `json:"user_id"`
+	TokenHash      string             `json:"token_hash"`
+	TokenEncrypted string             `json:"token_encrypted"`
+	IncludeWindows bool               `json:"include_windows"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	LastReadAt     pgtype.Timestamptz `json:"last_read_at"`
 }
 
 type CatalogLogSource struct {
@@ -1870,6 +1902,33 @@ type MaintenanceWindow struct {
 	ClosedBy              pgtype.UUID        `json:"closed_by"`
 	NotifiedStart         bool               `json:"notified_start"`
 	NotifiedEnd           bool               `json:"notified_end"`
+	SeriesID              pgtype.UUID        `json:"series_id"`
+	SeriesDay             pgtype.Date        `json:"series_day"`
+	HolidayName           pgtype.Text        `json:"holiday_name"`
+	ApprovedBy            pgtype.UUID        `json:"approved_by"`
+	ApprovedAt            pgtype.Timestamptz `json:"approved_at"`
+}
+
+type MaintenanceWindowSeries struct {
+	ID                    uuid.UUID          `json:"id"`
+	ServiceID             pgtype.UUID        `json:"service_id"`
+	AssetID               pgtype.UUID        `json:"asset_id"`
+	TerritorialUnitID     pgtype.UUID        `json:"territorial_unit_id"`
+	OrganizationID        pgtype.UUID        `json:"organization_id"`
+	AreaID                pgtype.UUID        `json:"area_id"`
+	TeamID                pgtype.UUID        `json:"team_id"`
+	Title                 string             `json:"title"`
+	Notes                 pgtype.Text        `json:"notes"`
+	SuppressNotifications bool               `json:"suppress_notifications"`
+	Priority              int32              `json:"priority"`
+	Rule                  []byte             `json:"rule"`
+	ValidFrom             pgtype.Date        `json:"valid_from"`
+	ValidTo               pgtype.Date        `json:"valid_to"`
+	Timezone              string             `json:"timezone"`
+	Active                bool               `json:"active"`
+	CreatedBy             uuid.UUID          `json:"created_by"`
+	CreatedAt             pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
 }
 
 type MessageTemplate struct {
@@ -1881,6 +1940,13 @@ type MessageTemplate struct {
 	SuggestedSeverity string             `json:"suggested_severity"`
 	Active            bool               `json:"active"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+}
+
+type MonthlySummary struct {
+	AreaID   uuid.UUID          `json:"area_id"`
+	Month    pgtype.Date        `json:"month"`
+	Data     []byte             `json:"data"`
+	FrozenAt pgtype.Timestamptz `json:"frozen_at"`
 }
 
 type Notice struct {

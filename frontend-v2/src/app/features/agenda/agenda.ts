@@ -9,11 +9,12 @@ import { SseService } from '../../core/sse/sse.service';
 import { problemDetail } from '../../core/http-error';
 import { AgendaTaskFormComponent } from './task-form';
 import { AgendaManagedComponent } from './agenda-managed';
+import { AgendaFlowsComponent } from './agenda-flows';
 import {
   AgendaBucket, addDays, bucketOf, dueText, fmtDay, isoDay, monthLabel, parseDay, recurrenceText, weekdayNames,
 } from './agenda-format';
 
-type Tab = 'mine' | 'calendar' | 'managed';
+type Tab = 'mine' | 'calendar' | 'managed' | 'flows';
 type Action = 'done' | 'skip' | 'handover' | null;
 
 const BUCKETS: { id: AgendaBucket; key: MessageKey; tone: string }[] = [
@@ -21,6 +22,7 @@ const BUCKETS: { id: AgendaBucket; key: MessageKey; tone: string }[] = [
   { id: 'today', key: 'ag.grp.today', tone: 'tone-warn' },
   { id: 'soon', key: 'ag.grp.soon', tone: 'tone-system' },
   { id: 'later', key: 'ag.grp.later', tone: 'tone-neutral' },
+  { id: 'waiting', key: 'ag.grp.waiting', tone: 'tone-neutral' },
   { id: 'done', key: 'ag.grp.done', tone: 'tone-ok' },
 ];
 /** Color de cada área en el calendario (en el orden de las áreas). */
@@ -38,7 +40,7 @@ interface CalCell { iso: string; day: number; off: boolean; out: boolean; today:
 @Component({
   selector: 'app-agenda',
   standalone: true,
-  imports: [MatIconModule, AgendaTaskFormComponent, AgendaManagedComponent],
+  imports: [MatIconModule, AgendaTaskFormComponent, AgendaManagedComponent, AgendaFlowsComponent],
   templateUrl: './agenda.html',
   styleUrl: './agenda.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -211,6 +213,20 @@ export class AgendaComponent implements OnInit {
 
   protected due(o: AgendaOccurrence): string {
     return dueText(o, this.i18n, this.meta()?.dayEnd ?? '20:00');
+  }
+
+  /** «Espera a: Instalar rack (Infraestructura)». */
+  protected waitingFor(o: AgendaOccurrence): string {
+    const f = o.flow;
+    if (!f?.waitingFor) return '';
+    return f.waitingArea ? `${f.waitingFor} (${f.waitingArea})` : f.waitingFor;
+  }
+
+  /** «Paso 2 de 4 · Habilitar sucursal». */
+  protected flowLine(o: AgendaOccurrence): string {
+    const f = o.flow;
+    if (!f) return '';
+    return `${this.i18n.tf('ag.flowStep', `${f.position + 1} ${this.i18n.t('ag.of')} ${f.total}`)} · ${f.name}`;
   }
 
   protected holder(o: AgendaOccurrence): string {

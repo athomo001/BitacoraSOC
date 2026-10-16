@@ -345,13 +345,16 @@ func run(logger *slog.Logger) error {
 	mux.Handle("PUT /api/levels/order", admin(areasHandler.OrderLevels))
 	mux.Handle("PATCH /api/levels/{id}", admin(areasHandler.RenameLevel))
 	// Mi equipo: jefatura de área (spec/16 §3.5, 9d).
-	teamHandler := &handler.TeamHandler{Queries: queries, Pool: pool, AuditLog: auditLog}
+	teamHandler := &handler.TeamHandler{Queries: queries, Pool: pool, AuditLog: auditLog, Notify: notifier}
 	mux.Handle("GET /api/team/areas", withCapability(handler.CapAreaLead, teamHandler.Areas))
 	mux.Handle("GET /api/team", withCapability(handler.CapAreaLead, teamHandler.Get))
 	mux.Handle("GET /api/team/people/{id}/tickets", withCapability(handler.CapAreaLead, teamHandler.PersonTickets))
 	mux.Handle("POST /api/team/people", withCapability(handler.CapAreaLead, teamHandler.CreatePerson))
 	mux.Handle("PUT /api/team/people/{id}/group", withCapability(handler.CapAreaLead, teamHandler.SetGroup))
 	mux.Handle("PATCH /api/team/people/{id}", withCapability(handler.CapAreaLead, teamHandler.SetActive))
+	// Resumen mensual (spec/16 §6.1, 9.7): se revisa en la app; la jefatura lo envía o lo descarga.
+	mux.Handle("GET /api/team/monthly", withCapability(handler.CapAreaLead, teamHandler.Monthly))
+	mux.Handle("POST /api/team/monthly/send", withCapability(handler.CapAreaLead, teamHandler.SendMonthly))
 	mux.Handle("PATCH /api/permission-groups/{id}", admin(permissionGroupsHandler.Patch))
 
 	// Válvula de emergencia — secreto compartido, no JWT (ver handler).
@@ -433,6 +436,11 @@ func run(logger *slog.Logger) error {
 	mux.Handle("GET /api/agenda/tasks/{id}", authed(agendaHandler.GetTask))
 	mux.Handle("PUT /api/agenda/tasks/{id}", authed(agendaHandler.UpdateTask))
 	mux.Handle("DELETE /api/agenda/tasks/{id}", authed(agendaHandler.DeleteTask))
+	// Flujos entre áreas (spec/16 §6.1, 9.7): pasos en orden, cada uno de un área.
+	mux.Handle("GET /api/agenda/flows", authed(agendaHandler.Flows))
+	mux.Handle("POST /api/agenda/flows", authed(agendaHandler.CreateFlow))
+	mux.Handle("PUT /api/agenda/flows/{id}", authed(agendaHandler.UpdateFlow))
+	mux.Handle("DELETE /api/agenda/flows/{id}", authed(agendaHandler.DeleteFlow))
 	mux.Handle("POST /api/agenda/occurrences/{id}/take", authed(agendaHandler.Take))
 	mux.Handle("POST /api/agenda/occurrences/{id}/release", authed(agendaHandler.Release))
 	mux.Handle("POST /api/agenda/occurrences/{id}/handover", authed(agendaHandler.Handover))
@@ -551,6 +559,13 @@ func run(logger *slog.Logger) error {
 	// Las mantenciones también las programa el analista (comentario del dueño #16).
 	mux.Handle("POST /api/maintenance-windows", operator(escalationHandler.CreateWindow))
 	mux.Handle("DELETE /api/maintenance-windows/{id}", operator(escalationHandler.DeleteWindow))
+	// Ventanas que se repiten (spec/16 §6.1, 9.7). En feriado las aplica la jefatura o el admin (lo revisa el handler).
+	mux.Handle("GET /api/maintenance-windows/series", authed(escalationHandler.ListSeries))
+	mux.Handle("POST /api/maintenance-windows/series/preview", authed(escalationHandler.PreviewSeries))
+	mux.Handle("POST /api/maintenance-windows/series", operator(escalationHandler.CreateSeries))
+	mux.Handle("PUT /api/maintenance-windows/series/{id}", operator(escalationHandler.UpdateSeries))
+	mux.Handle("DELETE /api/maintenance-windows/series/{id}", operator(escalationHandler.DeleteSeries))
+	mux.Handle("POST /api/maintenance-windows/series-windows/{id}/{action}", operator(escalationHandler.SetSeriesWindow))
 	mux.Handle("GET /api/raci-assignments", authed(escalationHandler.ListRaci))
 	mux.Handle("POST /api/raci-assignments", admin(escalationHandler.CreateRaci))
 
@@ -650,6 +665,14 @@ func run(logger *slog.Logger) error {
 	// Página pública sin login para la TV de sala (HU-4b) — primer endpoint
 	// HTML del backend, fuera del envoltorio {data} y sin auth a propósito.
 	mux.HandleFunc("GET /p/telework/{token}", dotacionHandler.PublicTeleworkPage)
+	// Calendario en Outlook (spec/16 §6.1, 9.7): el enlace propio de cada
+	// persona (Perfil) y la suscripción ICS pública (el token es la llave).
+	calendarFeedHandler := &handler.CalendarFeedHandler{Queries: queries, Crypto: cryptoBox, AuditLog: auditLog, PublicBaseURL: publicBaseURL}
+	mux.Handle("GET /api/users/me/calendar", authed(calendarFeedHandler.Mine))
+	mux.Handle("POST /api/users/me/calendar", authed(calendarFeedHandler.Create))
+	mux.Handle("PUT /api/users/me/calendar", authed(calendarFeedHandler.Update))
+	mux.Handle("DELETE /api/users/me/calendar", authed(calendarFeedHandler.Delete))
+	mux.HandleFunc("GET /cal/{file}", calendarFeedHandler.Feed)
 
 	// Bitácora (Fase 9, HU-7 y siguientes) — núcleo siempre activo, sin gate
 	// SOC/NOC (`scope` es un dato, no un permiso).
@@ -743,6 +766,7 @@ func run(logger *slog.Logger) error {
 		sender, _, err := handler.BuildMailSender(ctx, queries, cryptoBox)
 		return sender, err
 	}}
+	teamHandler.Reports = reportsHandler // el resumen mensual usa sus destinatarios válidos
 	mux.Handle("POST /api/reports/{kind}/preview", authed(reportsHandler.Preview))
 	mux.Handle("POST /api/reports/{kind}/send", operator(reportsHandler.Send))
 	mux.Handle("GET /api/reports/recipients", authed(reportsHandler.Recipients))
@@ -783,6 +807,10 @@ func run(logger *slog.Logger) error {
 	go scheduler.Run(ctx, 5*time.Minute, agendaHandler.Alerts)
 	go scheduler.Run(ctx, time.Minute, agendaHandler.Digest)
 	go scheduler.Run(ctx, time.Minute, notifier.Windows)
+	// Ventanas que se repiten: crea las de los próximos 60 días.
+	go scheduler.Run(ctx, time.Hour, escalationHandler.GenerateSeries)
+	// Resumen mensual: congela el mes anterior el primer día hábil.
+	go scheduler.Run(ctx, time.Hour, teamHandler.FreezeMonthly)
 	go scheduler.Run(ctx, time.Minute, notificationsHandler.PublishDue)
 	go scheduler.Run(ctx, time.Hour, notifier.Purge)
 	// GLPI: la importación automática (cada noche a las 02:00 o cada 6 horas).

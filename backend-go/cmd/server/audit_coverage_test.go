@@ -14,12 +14,13 @@ import (
 // Rutas de escritura que no auditan a propósito. Agregar una acá exige
 // explicar por qué; lo normal es llamar a AuditLog.Log (spec/07 §6.1).
 var auditExempt = map[string]string{
-	"POST /api/drafts/sync":            "autoguardado de borradores cada pocos segundos; la entrada que resulta sí se audita al crearse",
-	"DELETE /api/drafts/{id}":          "descarta un borrador propio del autoguardado; nunca fue un dato de negocio",
-	"PUT /api/notes/personal":          "libreta privada con autoguardado cada 3 s (el legacy tampoco la auditaba)",
-	"POST /api/reports/{kind}/preview": "solo arma la vista previa del correo, no envía ni guarda nada (el envío sí se audita)",
-	"POST /api/agenda/preview":         "solo calcula las próximas fechas de una recurrencia, no guarda nada (crear la tarea sí se audita)",
-	"POST /api/glpi/preview":           "solo lee GLPI y muestra qué cambiaría, no guarda nada (la importación sí se audita)",
+	"POST /api/drafts/sync":                        "autoguardado de borradores cada pocos segundos; la entrada que resulta sí se audita al crearse",
+	"DELETE /api/drafts/{id}":                      "descarta un borrador propio del autoguardado; nunca fue un dato de negocio",
+	"PUT /api/notes/personal":                      "libreta privada con autoguardado cada 3 s (el legacy tampoco la auditaba)",
+	"POST /api/reports/{kind}/preview":             "solo arma la vista previa del correo, no envía ni guarda nada (el envío sí se audita)",
+	"POST /api/agenda/preview":                     "solo calcula las próximas fechas de una recurrencia, no guarda nada (crear la tarea sí se audita)",
+	"POST /api/glpi/preview":                       "solo lee GLPI y muestra qué cambiaría, no guarda nada (la importación sí se audita)",
+	"POST /api/maintenance-windows/series/preview": "solo calcula las próximas fechas de una ventana que se repite, no guarda nada (crearla sí se audita)",
 }
 
 // TestEveryWriteRouteAudits recorre las rutas POST/PUT/PATCH/DELETE que

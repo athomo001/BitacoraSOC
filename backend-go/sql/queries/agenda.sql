@@ -75,7 +75,8 @@ SELECT t.id, t.name, t.description, t.area_id, a.name AS area_name, t.organizati
   t.assignee_level_id, COALESCE(l.name, '')::text AS assignee_level_name, COALESCE(l.rank, 0)::int AS assignee_level_rank,
   t.assignee_team_id, COALESCE(tm.name, '')::text AS assignee_team_name,
   t.recurrence, t.warn_days, t.steps, t.doc_url, t.report_kind, t.active,
-  t.created_by, COALESCE(NULLIF(c.full_name, ''), c.username, '')::text AS created_by_name, t.created_at
+  t.created_by, COALESCE(NULLIF(c.full_name, ''), c.username, '')::text AS created_by_name, t.created_at,
+  t.flow_id, t.flow_position, t.flow_after, t.flow_days
 FROM agenda_tasks t
 JOIN areas a ON a.id = t.area_id
 LEFT JOIN organizations o ON o.id = t.organization_id
@@ -89,28 +90,30 @@ ORDER BY t.name;
 -- name: InsertAgendaOccurrence :execrows
 INSERT INTO agenda_occurrences (task_id, due_date, moved_from, user_id, offered_level_id)
 VALUES ($1, $2, $3, $4, $5)
-ON CONFLICT (task_id, due_date) DO NOTHING;
+ON CONFLICT (task_id, due_date) WHERE flow_run_id IS NULL DO NOTHING;
 
 -- name: DeleteFutureUntouchedOccurrences :execrows
 -- Al cambiar la recurrencia o el responsable, las pendientes desde hoy que
 -- nadie empezó se rehacen con la regla nueva. keep_taken: al cambiar
 -- feriados u horario se respetan las que alguien ya tomó o le traspasaron.
+-- Las de un flujo (9.7) no se rehacen: nacen con su vuelta.
 DELETE FROM agenda_occurrences o
 USING agenda_tasks t
-WHERE t.id = o.task_id AND o.task_id = sqlc.arg('task_id') AND o.status = 'pending'
+WHERE t.id = o.task_id AND o.task_id = sqlc.arg('task_id') AND o.status = 'pending' AND o.flow_run_id IS NULL
   AND o.due_date >= sqlc.arg('from_day')::date AND cardinality(o.steps_done) = 0
   AND (NOT sqlc.arg('keep_taken')::bool
        OR (o.absent_user_id IS NULL AND (o.user_id IS NULL OR o.user_id IS NOT DISTINCT FROM t.assignee_user_id)));
 
 -- name: ListAgendaOccurrences :many
--- Las ocurrencias de un rango (las pendientes atrasadas siempre, aunque sean
--- anteriores), con quién la tiene y el nivel al que se ofrece.
+-- Las ocurrencias de un rango (las pendientes atrasadas y los pasos de un
+-- flujo en espera siempre, aunque sean anteriores), con quién la tiene y el
+-- nivel al que se ofrece.
 SELECT o.id, o.task_id, o.due_date, o.moved_from, o.status, o.user_id,
   COALESCE(NULLIF(u.full_name, ''), u.username, '')::text AS user_name,
   o.offered_level_id, COALESCE(l.name, '')::text AS offered_level_name, COALESCE(l.rank, 0)::int AS offered_level_rank,
   o.absent_user_id, COALESCE(NULLIF(ab.full_name, ''), ab.username, '')::text AS absent_user_name,
   o.steps_done, o.note, o.link, o.skip_reason, o.closed_by, COALESCE(NULLIF(cb.full_name, ''), cb.username, '')::text AS closed_by_name,
-  o.closed_at, o.report_history_id
+  o.closed_at, o.report_history_id, o.flow_run_id
 FROM agenda_occurrences o
 JOIN agenda_tasks t ON t.id = o.task_id
 LEFT JOIN users u ON u.id = o.user_id
@@ -118,11 +121,11 @@ LEFT JOIN levels l ON l.id = o.offered_level_id
 LEFT JOIN users ab ON ab.id = o.absent_user_id
 LEFT JOIN users cb ON cb.id = o.closed_by
 WHERE (o.due_date BETWEEN sqlc.arg('from_day')::date AND sqlc.arg('to_day')::date)
-   OR (o.status = 'pending' AND o.due_date < sqlc.arg('from_day')::date AND sqlc.arg('with_late')::bool)
+   OR (o.status IN ('pending', 'waiting') AND o.due_date < sqlc.arg('from_day')::date AND sqlc.arg('with_late')::bool)
 ORDER BY o.due_date, t.name;
 
 -- name: GetAgendaOccurrence :one
-SELECT o.id, o.task_id, o.due_date, o.status, o.user_id, o.offered_level_id, o.steps_done
+SELECT o.id, o.task_id, o.due_date, o.status, o.user_id, o.offered_level_id, o.steps_done, o.flow_run_id
 FROM agenda_occurrences o WHERE o.id = $1;
 
 -- name: SetOccurrenceHolder :exec

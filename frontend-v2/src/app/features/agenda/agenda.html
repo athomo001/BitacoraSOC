@@ -6,6 +6,7 @@
       <button type="button" role="tab" class="seg" [attr.aria-selected]="tab() === 'mine'" [attr.aria-pressed]="tab() === 'mine'" (click)="setTab('mine')"><mat-icon>checklist</mat-icon>{{ i18n.t('ag.tab.mine') }}</button>
       <button type="button" role="tab" class="seg" [attr.aria-selected]="tab() === 'calendar'" [attr.aria-pressed]="tab() === 'calendar'" (click)="setTab('calendar')"><mat-icon>calendar_month</mat-icon>{{ i18n.t('ag.tab.calendar') }}</button>
       <button type="button" role="tab" class="seg" [attr.aria-selected]="tab() === 'managed'" [attr.aria-pressed]="tab() === 'managed'" (click)="setTab('managed')"><mat-icon>monitoring</mat-icon>{{ i18n.t('ag.tab.managed') }}</button>
+      <button type="button" role="tab" class="seg" [attr.aria-selected]="tab() === 'flows'" [attr.aria-pressed]="tab() === 'flows'" (click)="setTab('flows')"><mat-icon>account_tree</mat-icon>{{ i18n.t('ag.tab.flows') }}</button>
       @if (meta()) {
         <button type="button" class="adm-btn adm-btn--primary" (click)="openNew()"><mat-icon>add</mat-icon>{{ i18n.t('ag.new') }}</button>
       }
@@ -37,14 +38,20 @@
                     @if (!o.holderId && o.status === 'pending') { <span class="pill tone-neutral">{{ i18n.t('ag.untaken') }}</span> }
                   </span>
                   <span class="ag__sub">
+                    @if (o.status === 'waiting') { <mat-icon>hourglass_top</mat-icon>{{ i18n.tf('ag.waitingFor', waitingFor(o)) }} · }
+                    @else if (o.flow) { <mat-icon>account_tree</mat-icon>{{ flowLine(o) }} · }
                     <mat-icon>{{ whoIcon(o) }}</mat-icon>{{ holder(o) }}
                     @if (o.task.recurrence.kind !== 'once') { · <mat-icon>repeat</mat-icon> }
                     @if (o.task.steps.length) { · {{ o.stepsDone.length }}/{{ o.task.steps.length }} {{ i18n.t('ag.stepsWord') }} }
                   </span>
                 </span>
                 <span class="ag__due">
-                  <b>{{ day(o.dueDate) }}</b>
-                  <span [class.ag__late]="o.late">{{ o.status === 'pending' ? due(o) : i18n.t(o.status === 'done' ? 'ag.status.done' : 'ag.status.skipped') }}</span>
+                  @if (o.status === 'waiting') {
+                    <b>—</b><span>{{ i18n.t('ag.waiting') }}</span>
+                  } @else {
+                    <b>{{ day(o.dueDate) }}</b>
+                    <span [class.ag__late]="o.late">{{ o.status === 'pending' ? due(o) : i18n.t(o.status === 'done' ? 'ag.status.done' : 'ag.status.skipped') }}</span>
+                  }
                 </span>
               </button>
             }
@@ -107,6 +114,10 @@
         @case ('managed') {
           @if (meta(); as m) { <app-agenda-managed [meta]="m" [refresh]="refreshTick()" (edit)="editTask($event)" /> }
         }
+
+        @case ('flows') {
+          @if (meta(); as m) { <app-agenda-flows [meta]="m" [refresh]="refreshTick()" /> }
+        }
       }
     </section>
 
@@ -130,15 +141,19 @@
           }
         </div>
         @if (o.absentName && o.status === 'pending') { <p class="ag__note ag__note--warn">{{ i18n.tf('ag.absent', o.absentName) }}</p> }
+        @if (o.status === 'waiting') { <p class="ag__note">{{ i18n.tf('ag.waitingNote', waitingFor(o)) }}</p> }
         <dl class="ag__facts">
+          @if (o.flow) { <dt>{{ i18n.t('ag.f.flow') }}</dt><dd><mat-icon>account_tree</mat-icon>{{ flowLine(o) }}</dd> }
+          @if (o.status !== 'waiting') {
           <dt>{{ i18n.t('ag.f.due') }}</dt>
           <dd><b>{{ day(o.dueDate, true) }} · {{ meta()?.dayEnd }}</b>
             @if (o.status === 'pending') { <span class="adm-hint" [class.ag__late]="o.late">{{ due(o) }}</span> }
             @if (o.movedFrom) { <span class="adm-hint">{{ i18n.tf('ag.f.moved', day(o.movedFrom)) }}</span> }</dd>
+          }
           <dt>{{ i18n.t('ag.f.holder') }}</dt>
           <dd><mat-icon>{{ whoIcon(o) }}</mat-icon>{{ holder(o) }}
             @if (!o.holderId && o.status === 'pending') { <span class="pill tone-neutral">{{ i18n.t('ag.untaken') }}</span> }</dd>
-          <dt>{{ i18n.t('ag.f.repeat') }}</dt><dd>{{ recText(o) }}</dd>
+          @if (!o.flow) { <dt>{{ i18n.t('ag.f.repeat') }}</dt><dd>{{ recText(o) }}</dd> }
           <dt>{{ i18n.t('ag.f.by') }}</dt><dd>{{ o.task.createdBy === meta()?.me ? i18n.t('ag.you') : o.task.createdByName }}</dd>
           @if (o.task.reportKind) {
             <dt>{{ i18n.t('ag.f.report') }}</dt><dd><mat-icon>description</mat-icon>{{ i18n.t(o.task.reportKind === 'incident' ? 'ag.report.incident' : 'ag.report.bulletin') }}</dd>
@@ -160,7 +175,8 @@
           </div>
         }
 
-        @if (o.status !== 'pending') {
+        @if (o.status === 'waiting') {
+        } @else if (o.status !== 'pending') {
           <div class="ag__box">
             @if (o.byReport) { <span>{{ i18n.t('ag.byReport') }}</span> }
             @if (o.note) { <span>{{ o.note }}</span> }

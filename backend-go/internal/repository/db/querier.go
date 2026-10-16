@@ -92,6 +92,10 @@ type Querier interface {
 	CountTicketsView(ctx context.Context, arg CountTicketsViewParams) (int64, error)
 	CountUnreadNotifications(ctx context.Context, userID uuid.UUID) (int32, error)
 	CountUsers(ctx context.Context) (int64, error)
+	// Flujos entre áreas (spec/16 §6.1, 9.7, 000044): una tarea de la Agenda con
+	// pasos en orden, cada uno de un área. Cada paso es una agenda_task.
+	CreateAgendaFlow(ctx context.Context, arg CreateAgendaFlowParams) (uuid.UUID, error)
+	CreateAgendaFlowStep(ctx context.Context, arg CreateAgendaFlowStepParams) (uuid.UUID, error)
 	CreateAgendaTask(ctx context.Context, arg CreateAgendaTaskParams) (uuid.UUID, error)
 	CreateArea(ctx context.Context, arg CreateAreaParams) (Area, error)
 	CreateAsset(ctx context.Context, arg CreateAssetParams) (uuid.UUID, error)
@@ -168,7 +172,12 @@ type Querier interface {
 	CreateTicketTask(ctx context.Context, arg CreateTicketTaskParams) (TicketTask, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateUserChannel(ctx context.Context, arg CreateUserChannelParams) (ContactChannel, error)
+	// Ventanas de mantenimiento que se repiten (spec/16 §6.1, 9.7, 000044).
+	CreateWindowSeries(ctx context.Context, arg CreateWindowSeriesParams) (MaintenanceWindowSeries, error)
 	CreateWorkShift(ctx context.Context, arg CreateWorkShiftParams) (WorkShift, error)
+	DeactivateFlowSteps(ctx context.Context, flowID pgtype.UUID) (int64, error)
+	// Al quitar pasos del final de un flujo (quedan con su historial).
+	DeactivateFlowStepsFrom(ctx context.Context, arg DeactivateFlowStepsFromParams) (int64, error)
 	DeactivateGuardMember(ctx context.Context, arg DeactivateGuardMemberParams) (int64, error)
 	DeactivateLeftoverMemberships(ctx context.Context, duplicateID pgtype.UUID) error
 	DeactivateMaintenanceWindow(ctx context.Context, id uuid.UUID) (int64, error)
@@ -179,12 +188,14 @@ type Querier interface {
 	// usuario que alguna vez hizo algo auditado rompería esa FK. Mismo patrón
 	// `active` que ya usa el resto del esquema (organizations, teams, etc.).
 	DeactivateUser(ctx context.Context, id uuid.UUID) error
+	DeactivateWindowSeries(ctx context.Context, id uuid.UUID) (int64, error)
 	DecideAssetRequest(ctx context.Context, arg DecideAssetRequestParams) error
 	DeleteAsset(ctx context.Context, id uuid.UUID) error
 	DeleteAssetPolicies(ctx context.Context, assetID pgtype.UUID) error
 	DeleteAssetRaci(ctx context.Context, assetID pgtype.UUID) error
 	DeleteAssetWithoutHistory(ctx context.Context, arg DeleteAssetWithoutHistoryParams) (int64, error)
 	DeleteBackupRun(ctx context.Context, id uuid.UUID) (BackupRun, error)
+	DeleteCalendarFeed(ctx context.Context, userID uuid.UUID) (int64, error)
 	// Un solo DELETE para padres e hijos: la FK de parent_item_id se revisa al
 	// final de la sentencia. El historial conserva el nombre (service_title) y
 	// su checklist_item_id queda en NULL (ON DELETE SET NULL).
@@ -202,10 +213,15 @@ type Querier interface {
 	DeleteEntry(ctx context.Context, id uuid.UUID) (Entry, error)
 	DeleteEscalationPool(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteExpiredComplementUploads(ctx context.Context) (int64, error)
+	// Al cambiar o borrar la serie: las que no empezaron (y nadie aprobó en feriado) se rehacen.
+	DeleteFutureSeriesWindows(ctx context.Context, seriesID pgtype.UUID) (int64, error)
 	// Al cambiar la recurrencia o el responsable, las pendientes desde hoy que
 	// nadie empezó se rehacen con la regla nueva. keep_taken: al cambiar
 	// feriados u horario se respetan las que alguien ya tomó o le traspasaron.
+	// Las de un flujo (9.7) no se rehacen: nacen con su vuelta.
 	DeleteFutureUntouchedOccurrences(ctx context.Context, arg DeleteFutureUntouchedOccurrencesParams) (int64, error)
+	// Al editar un flujo, las vueltas que todavía no empiezan y nadie tocó se rehacen.
+	DeleteFutureUntouchedRuns(ctx context.Context, arg DeleteFutureUntouchedRunsParams) (int64, error)
 	DeleteGuardSlot(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteHoliday(ctx context.Context, day pgtype.Date) (int64, error)
 	DeleteOrganizationGroups(ctx context.Context, clientID pgtype.UUID) error
@@ -304,6 +320,10 @@ type Querier interface {
 	GetBrandingFavicon(ctx context.Context) (GetBrandingFaviconRow, error)
 	GetBrandingFont(ctx context.Context) (GetBrandingFontRow, error)
 	GetBrandingLogo(ctx context.Context) (GetBrandingLogoRow, error)
+	// Calendario en Outlook (spec/16 §6.1, 9.7, 000044): suscripción ICS propia.
+	GetCalendarFeed(ctx context.Context, userID uuid.UUID) (GetCalendarFeedRow, error)
+	// Solo responde mientras la persona siga activa.
+	GetCalendarFeedByToken(ctx context.Context, tokenHash string) (GetCalendarFeedByTokenRow, error)
 	GetChecklistCooldown(ctx context.Context) (int32, error)
 	GetChecklistTemplate(ctx context.Context, id uuid.UUID) (ChecklistTemplate, error)
 	GetClientAlertRule(ctx context.Context, id uuid.UUID) (ClientAlertRule, error)
@@ -330,6 +350,8 @@ type Querier interface {
 	GetMapTiles(ctx context.Context) (GetMapTilesRow, error)
 	// Los módulos SOC y NOC de la instalación (000036). Distintos de las áreas.
 	GetModuleFlags(ctx context.Context) (GetModuleFlagsRow, error)
+	// Resumen mensual de la jefatura (spec/16 §6.1, 9.7, 000044).
+	GetMonthlySummary(ctx context.Context, arg GetMonthlySummaryParams) (GetMonthlySummaryRow, error)
 	GetNotice(ctx context.Context, id uuid.UUID) (GetNoticeRow, error)
 	GetNotificationPrefs(ctx context.Context, userID uuid.UUID) (GetNotificationPrefsRow, error)
 	GetNotificationSchedule(ctx context.Context, id uuid.UUID) (WorkShiftNotificationSchedule, error)
@@ -352,6 +374,7 @@ type Querier interface {
 	// a lo sumo una fila. sqlc.narg permite pgx.ErrNoRows cuando aún no se
 	// configuró SMTP (setup inicial no completado).
 	GetSMTPConfig(ctx context.Context) (GetSMTPConfigRow, error)
+	GetSeriesWindow(ctx context.Context, id uuid.UUID) (MaintenanceWindow, error)
 	GetService(ctx context.Context, id uuid.UUID) (Service, error)
 	GetServiceOrganizationID(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	GetShiftCheck(ctx context.Context, id uuid.UUID) (ShiftCheck, error)
@@ -404,15 +427,21 @@ type Querier interface {
 	// ===== Intentos (inmutables, ver migración 000004) =====
 	InsertActionLog(ctx context.Context, arg InsertActionLogParams) (EscalationActionLog, error)
 	InsertAgendaAlert(ctx context.Context, arg InsertAgendaAlertParams) (int64, error)
+	// Una vuelta del flujo por fecha de inicio. Sin fila: ya existía.
+	InsertAgendaFlowRun(ctx context.Context, arg InsertAgendaFlowRunParams) (uuid.UUID, error)
 	InsertAgendaOccurrence(ctx context.Context, arg InsertAgendaOccurrenceParams) (int64, error)
 	InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) error
 	InsertChecklistItem(ctx context.Context, arg InsertChecklistItemParams) error
 	InsertComplementFile(ctx context.Context, arg InsertComplementFileParams) error
+	InsertFlowOccurrence(ctx context.Context, arg InsertFlowOccurrenceParams) (int64, error)
+	InsertMonthlySummary(ctx context.Context, arg InsertMonthlySummaryParams) error
 	InsertNoticeRecipient(ctx context.Context, arg InsertNoticeRecipientParams) (int64, error)
 	// Notificaciones (spec/16 §4.5, 9.5, 000042).
 	InsertNotification(ctx context.Context, arg InsertNotificationParams) (uuid.UUID, error)
 	// ===== Reportes (comentario del dueño #10) =====
 	InsertReportHistory(ctx context.Context, arg InsertReportHistoryParams) (InsertReportHistoryRow, error)
+	// Una ventana de la serie por día. En feriado se crea inactiva (holiday_name).
+	InsertSeriesWindow(ctx context.Context, arg InsertSeriesWindowParams) (int64, error)
 	// Hub SSE genérico (Fase 2 del roadmap) — toda publicación pasa por acá para
 	// que GET /api/stream/events pueda reponer eventos perdidos vía Last-Event-ID
 	// (ver spec/09-alta-disponibilidad-2-nodos.md sección 3.2/9.3).
@@ -439,10 +468,13 @@ type Querier interface {
 	ListActiveUserEmailsByCargo(ctx context.Context, cargos []string) ([]string, error)
 	ListActiveUserIDs(ctx context.Context) ([]uuid.UUID, error)
 	ListAdminUserIDs(ctx context.Context) ([]uuid.UUID, error)
+	// paused: su cliente está desactivado (como las tareas).
+	ListAgendaFlows(ctx context.Context, includeInactive bool) ([]ListAgendaFlowsRow, error)
 	// Las guardias (equipos de guardia) activas con su área.
 	ListAgendaGuards(ctx context.Context) ([]ListAgendaGuardsRow, error)
-	// Las ocurrencias de un rango (las pendientes atrasadas siempre, aunque sean
-	// anteriores), con quién la tiene y el nivel al que se ofrece.
+	// Las ocurrencias de un rango (las pendientes atrasadas y los pasos de un
+	// flujo en espera siempre, aunque sean anteriores), con quién la tiene y el
+	// nivel al que se ofrece.
 	ListAgendaOccurrences(ctx context.Context, arg ListAgendaOccurrencesParams) ([]ListAgendaOccurrencesRow, error)
 	// Las tareas con los nombres que muestra la pantalla. paused: su cliente
 	// está desactivado (las recurrentes se pausan y vuelven al reactivarlo).
@@ -553,6 +585,12 @@ type Querier interface {
 	ListEscalationPools(ctx context.Context) ([]ListEscalationPoolsRow, error)
 	// Copias automáticas fuera de la retención: el planificador las borra (archivo y fila).
 	ListExpiredAutoBackups(ctx context.Context, startedAt pgtype.Timestamptz) ([]BackupRun, error)
+	// Lo que está a nombre de la persona (decisión del dueño 2026-10-15: lo
+	// ofrecido a su nivel que nadie tomó no va).
+	ListFeedOccurrences(ctx context.Context, arg ListFeedOccurrencesParams) ([]ListFeedOccurrencesRow, error)
+	ListFlowRunOccurrences(ctx context.Context, runIds []uuid.UUID) ([]ListFlowRunOccurrencesRow, error)
+	// Las vueltas que empiezan desde una fecha, más las que siguen abiertas.
+	ListFlowRuns(ctx context.Context, fromDay pgtype.Date) ([]ListFlowRunsRow, error)
 	// Los equipos que vienen de GLPI (activos o no).
 	ListGlpiLinkedAssets(ctx context.Context) ([]ListGlpiLinkedAssetsRow, error)
 	ListGlpiRuns(ctx context.Context) ([]ListGlpiRunsRow, error)
@@ -599,6 +637,14 @@ type Querier interface {
 	// Miembros activos de los equipos a resolver, con lo que la tarjeta necesita
 	// mostrar: nombre, especialidad (solo contactos), rol y prioridad.
 	ListMembersForTeams(ctx context.Context, teamIds []uuid.UUID) ([]ListMembersForTeamsRow, error)
+	// Días de vacaciones o licencia de cada persona en el mes (Dotación).
+	ListMonthAbsenceDays(ctx context.Context, arg ListMonthAbsenceDaysParams) ([]ListMonthAbsenceDaysRow, error)
+	// Las ocurrencias de las tareas del área que vencen en el mes: a quién
+	// cuentan (quien la tiene o quien la cerró), cómo terminaron y cuándo.
+	ListMonthOccurrences(ctx context.Context, arg ListMonthOccurrencesParams) ([]ListMonthOccurrencesRow, error)
+	// Los tickets del área resueltos en el mes, con su vencimiento real de SLA
+	// (con las pausas). Cuentan para quien estaba asignado.
+	ListMonthResolvedTickets(ctx context.Context, arg ListMonthResolvedTicketsParams) ([]ListMonthResolvedTicketsRow, error)
 	ListNoticeRecipients(ctx context.Context, noticeID uuid.UUID) ([]ListNoticeRecipientsRow, error)
 	ListNotificationPrefs(ctx context.Context, ids []uuid.UUID) ([]ListNotificationPrefsRow, error)
 	// ===== Notificación periódica de dotación (HU-5b) =====
@@ -658,6 +704,8 @@ type Querier interface {
 	ListRotationCyclesByTeam(ctx context.Context, teamID pgtype.UUID) ([]RotationCycle, error)
 	ListRotationSlotsByCycle(ctx context.Context, cycleID uuid.UUID) ([]ListRotationSlotsByCycleRow, error)
 	ListSentNotices(ctx context.Context, arg ListSentNoticesParams) ([]ListSentNoticesRow, error)
+	// Las próximas ventanas de las series, también las saltadas y las de feriado.
+	ListSeriesWindows(ctx context.Context, seriesIds []uuid.UUID) ([]ListSeriesWindowsRow, error)
 	// ===== Servicios (módulo SOC) =====
 	ListServices(ctx context.Context, arg ListServicesParams) ([]ListServicesRow, error)
 	ListShiftCheckServices(ctx context.Context, shiftCheckID uuid.UUID) ([]ShiftCheckService, error)
@@ -744,6 +792,8 @@ type Querier interface {
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	// Activos o en mantenimiento; la visibilidad por rol y grupo se filtra en Go.
 	ListVisibleComplementCandidates(ctx context.Context) ([]Complement, error)
+	// Las series activas con el nombre de a qué aplican.
+	ListWindowSeries(ctx context.Context) ([]ListWindowSeriesRow, error)
 	// Para el calendario de la Agenda: las ventanas activas que tocan el rango.
 	ListWindowsBetween(ctx context.Context, arg ListWindowsBetweenParams) ([]ListWindowsBetweenRow, error)
 	// Candidatas para notify: ventanas activas del servicio, del activo, o de
@@ -833,6 +883,8 @@ type Querier interface {
 	// 6.5) — a diferencia de UpdateUserPassword, NO toca must_change_password:
 	// esto es transparente para el usuario, no un cambio de contraseña real.
 	RehashPassword(ctx context.Context, arg RehashPasswordParams) error
+	// El paso que esperaba al anterior empieza: recibe su vencimiento.
+	ReleaseFlowStep(ctx context.Context, arg ReleaseFlowStepParams) (int64, error)
 	// Antes de archivar: los equipos dejan sus grupos, quien la tenía como
 	// mandante queda sin mandante, y sus grupos y RACI se eliminan.
 	ReleaseOrganizationGroups(ctx context.Context, clientID pgtype.UUID) error
@@ -859,6 +911,7 @@ type Querier interface {
 	ResetTicketResolutionSLANotified(ctx context.Context, id uuid.UUID) error
 	RetryTicketMail(ctx context.Context, arg RetryTicketMailParams) (int64, error)
 	RotatePublicShareLink(ctx context.Context, arg RotatePublicShareLinkParams) (PublicShareLink, error)
+	SetAgendaFlowActive(ctx context.Context, arg SetAgendaFlowActiveParams) (int64, error)
 	SetAgendaTaskActive(ctx context.Context, arg SetAgendaTaskActiveParams) (int64, error)
 	SetAssetActive(ctx context.Context, arg SetAssetActiveParams) error
 	SetAssetGlpiLink(ctx context.Context, arg SetAssetGlpiLinkParams) error
@@ -867,6 +920,7 @@ type Querier interface {
 	SetBrandingFavicon(ctx context.Context, arg SetBrandingFaviconParams) error
 	SetBrandingFont(ctx context.Context, arg SetBrandingFontParams) error
 	SetBrandingLogo(ctx context.Context, arg SetBrandingLogoParams) error
+	SetCalendarFeedWindows(ctx context.Context, arg SetCalendarFeedWindowsParams) (int64, error)
 	SetChecklistCooldown(ctx context.Context, shiftCheckCooldownMinutes int32) (int32, error)
 	SetComplementArtifact(ctx context.Context, arg SetComplementArtifactParams) error
 	SetComplementToken(ctx context.Context, arg SetComplementTokenParams) error
@@ -887,6 +941,8 @@ type Querier interface {
 	// El área dueña de la política (9e): esa área la ve y su jefatura la edita.
 	SetPolicyArea(ctx context.Context, arg SetPolicyAreaParams) (EscalationPolicy, error)
 	SetPublicShareLinkActive(ctx context.Context, arg SetPublicShareLinkActiveParams) (PublicShareLink, error)
+	// Saltar o volver a aplicar una vez; aplicar igual en feriado (queda quién) o quitarlo.
+	SetSeriesWindowState(ctx context.Context, arg SetSeriesWindowStateParams) (MaintenanceWindow, error)
 	// Activar o desactivar a mano anula lo que hizo la organización.
 	SetTeamsActive(ctx context.Context, arg SetTeamsActiveParams) (int64, error)
 	// POST /api/territorial-units/bulk-active — activar o desactivar varias de
@@ -921,6 +977,7 @@ type Querier interface {
 	// Resumen de la cola para la cabecera. "Vencido" = abierto, no en pausa y
 	// pasado el vencimiento real (pactado + pausas acumuladas), igual que tickets.ResolutionClock.
 	TicketQueueSummary(ctx context.Context, arg TicketQueueSummaryParams) (TicketQueueSummaryRow, error)
+	TouchCalendarFeed(ctx context.Context, userID uuid.UUID) error
 	TouchLastLogin(ctx context.Context, id uuid.UUID) error
 	TouchPublicShareAccess(ctx context.Context, id uuid.UUID) error
 	// Borrado en cascada (decisión del dueño 2026-10-07): todo lo que cuelga del
@@ -928,6 +985,8 @@ type Querier interface {
 	// equipo asignado. Se ejecutan en este orden dentro de una transacción.
 	UnassignTeamTickets(ctx context.Context, ids []uuid.UUID) (int64, error)
 	UnlinkWorkShiftsFromCycle(ctx context.Context, rotationCycleID pgtype.UUID) error
+	UpdateAgendaFlow(ctx context.Context, arg UpdateAgendaFlowParams) error
+	UpdateAgendaFlowStep(ctx context.Context, arg UpdateAgendaFlowStepParams) error
 	UpdateAgendaSettings(ctx context.Context, arg UpdateAgendaSettingsParams) error
 	UpdateAgendaTask(ctx context.Context, arg UpdateAgendaTaskParams) error
 	UpdateArea(ctx context.Context, arg UpdateAreaParams) (Area, error)
@@ -978,6 +1037,7 @@ type Querier interface {
 	// Limpia must_change_password al completar el cambio (04-contratos-api.md:
 	// "Limpia el flag al completar").
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
+	UpdateWindowSeries(ctx context.Context, arg UpdateWindowSeriesParams) (MaintenanceWindowSeries, error)
 	// Administración → Turnos: editar nombre, horario, zona, destinatarios del
 	// reporte de cierre y activo. Lo que no se manda queda como estaba.
 	UpdateWorkShift(ctx context.Context, arg UpdateWorkShiftParams) (WorkShift, error)
@@ -988,6 +1048,8 @@ type Querier interface {
 	// de fallar con 409 — mismo criterio "upsert" que UpsertTeamCoverage
 	// (teams.sql) de la Fase 6, más amigable para el admin que corrige un día.
 	UpsertAssignment(ctx context.Context, arg UpsertAssignmentParams) (WorkShiftAssignment, error)
+	// Generar uno nuevo deja inútil el anterior.
+	UpsertCalendarFeed(ctx context.Context, arg UpsertCalendarFeedParams) error
 	UpsertComplementStorage(ctx context.Context, arg UpsertComplementStorageParams) (ComplementStorage, error)
 	UpsertDotacionDay(ctx context.Context, arg UpsertDotacionDayParams) error
 	// Borradores (Autosave, HU-7d): generaliza personal_notes a cualquier

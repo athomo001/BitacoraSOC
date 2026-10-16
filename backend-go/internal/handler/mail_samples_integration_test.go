@@ -40,12 +40,28 @@ func TestMailSamples_TodasSeArmanYLleganAMailpit(t *testing.T) {
 	q := db.New(tx)
 	h := &MailSamplesHandler{Queries: q, PublicBaseURL: "https://bitacora.test",
 		Reports: &ReportsHandler{Queries: q}, Dotacion: &DotacionHandler{Queries: q}, Birthdays: &BirthdaysHandler{Queries: q}}
-	samples, failed := h.samples(ctx)
+	samples, failed := h.samples(ctx, time.Now(), false)
 	if len(failed) > 0 {
 		t.Fatalf("no se pudieron armar: %+v", failed)
 	}
-	if len(samples) != 14 {
+	// Los 14 de la Fase 12 más los de la Agenda, el aviso con acuse y el resumen mensual (9.5, 9.7).
+	if len(samples) != 18 {
 		t.Fatalf("muestras: %d", len(samples))
+	}
+	// Todos los tipos (docs/correos): cada uno con su archivo, cuándo sale y contenido.
+	previews, errs := h.Previews(ctx, time.Now())
+	if len(errs) > 0 {
+		t.Fatalf("vistas que no se pudieron armar: %v", errs)
+	}
+	slugs := map[string]bool{}
+	for _, p := range previews {
+		if p.Slug == "" || slugs[p.Slug] || p.When == "" || p.HTML == "" || p.Subject == "" {
+			t.Errorf("vista incompleta o repetida: %+v", p.Name)
+		}
+		slugs[p.Slug] = true
+	}
+	if len(previews) < 34 {
+		t.Fatalf("vistas: %d", len(previews))
 	}
 	sender, _, err := buildMailSender(ctx, q, nil)
 	if err != nil {

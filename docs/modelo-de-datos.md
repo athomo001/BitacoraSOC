@@ -2,7 +2,7 @@
 
 > Generado por `backend-go/cmd/er-docs` desde `backend-go/sql/schema/0001_init_schema.sql`, el esquema que usa sqlc, con todas las migraciones aplicadas. **No se edita a mano**: si cambia el esquema, se regenera con `go run ./cmd/er-docs` desde `backend-go/`.
 
-96 tablas en PostgreSQL, agrupadas en 15 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
+101 tablas en PostgreSQL, agrupadas en 15 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
 
 - Cada entidad muestra todas sus columnas salvo `created_at` y `updated_at`. `PK` clave primaria, `FK` referencia a otra tabla, `UK` valor único.
 - Las tablas de otros dominios aparecen como cajas sin columnas: son la misma tabla, dibujada donde se une.
@@ -17,9 +17,9 @@ Correspondencia con el legacy (MongoDB): [modelo-er-legacy-2.0.md](modelo-er-leg
 2. [Territorio, organizaciones y activos](#2-territorio-organizaciones-y-activos) — 14 tablas
 3. [Directorio de contactos](#3-directorio-de-contactos) — 2 tablas
 4. [Ticketera](#4-ticketera) — 7 tablas
-5. [Equipos y escalamiento](#5-equipos-y-escalamiento) — 13 tablas
+5. [Equipos y escalamiento](#5-equipos-y-escalamiento) — 14 tablas
 6. [Turnos, guardias y dotación](#6-turnos-guardias-y-dotación) — 11 tablas
-7. [Agenda](#7-agenda) — 4 tablas
+7. [Agenda](#7-agenda) — 8 tablas
 8. [Notificaciones y avisos con acuse](#8-notificaciones-y-avisos-con-acuse) — 6 tablas
 9. [Checklists](#9-checklists) — 4 tablas
 10. [Bitácora](#10-bitácora) — 5 tablas
@@ -523,7 +523,7 @@ erDiagram
 
 ## 5. Equipos y escalamiento
 
-Equipos, políticas con sus llamados, pools con nombre, incidentes con sus intentos y notas, ventanas de mantenimiento y RACI. Un equipo con `kind = 'step'` es el grupo de personas de un solo llamado: no tiene organización, no aparece en Equipos y se borra con su paso.
+Equipos, políticas con sus llamados, pools con nombre, incidentes con sus intentos y notas, ventanas de mantenimiento (también las que se repiten, con su serie) y RACI. Un equipo con `kind = 'step'` es el grupo de personas de un solo llamado: no tiene organización, no aparece en Equipos y se borra con su paso.
 
 ```mermaid
 erDiagram
@@ -646,6 +646,30 @@ erDiagram
         uuid closed_by FK
         boolean notified_start
         boolean notified_end
+        uuid series_id FK
+        date series_day
+        text holiday_name
+        uuid approved_by FK
+        timestamptz approved_at
+    }
+    MAINTENANCE_WINDOW_SERIES {
+        uuid id PK
+        uuid service_id FK
+        uuid asset_id FK
+        uuid territorial_unit_id FK
+        uuid organization_id FK
+        uuid area_id FK
+        uuid team_id FK
+        text title
+        text notes
+        boolean suppress_notifications
+        int priority
+        jsonb rule
+        date valid_from
+        date valid_to
+        text timezone
+        boolean active
+        uuid created_by FK
     }
     RACI_ASSIGNMENTS {
         uuid id PK
@@ -660,11 +684,13 @@ erDiagram
 
     AGENDA_TASKS |o--o{ MAINTENANCE_WINDOWS : "agenda_task_id"
     AREAS |o--o{ MAINTENANCE_WINDOWS : "area_id"
+    AREAS |o--o{ MAINTENANCE_WINDOW_SERIES : "area_id"
     AREAS |o--o{ TEAMS : "area_id"
     AREAS ||--o{ ESCALATION_POLICIES : "area_id"
     ASSETS |o--o{ ESCALATION_INCIDENTS : "asset_id"
     ASSETS |o--o{ ESCALATION_POLICIES : "asset_id"
     ASSETS |o--o{ MAINTENANCE_WINDOWS : "asset_id"
+    ASSETS |o--o{ MAINTENANCE_WINDOW_SERIES : "asset_id"
     ASSETS |o--o{ RACI_ASSIGNMENTS : "asset_id"
     CONTACTS |o--o{ ESCALATION_ACTION_LOGS : "contact_id"
     CONTACTS |o--o{ ESCALATION_POOL_MEMBERS : "contact_id"
@@ -677,16 +703,20 @@ erDiagram
     ESCALATION_POLICIES ||--o{ ESCALATION_STEPS : "policy_id"
     ESCALATION_POOLS |o--o{ TEAM_MEMBERS : "pool_id"
     ESCALATION_POOLS ||--o{ ESCALATION_POOL_MEMBERS : "pool_id"
+    MAINTENANCE_WINDOW_SERIES |o--o{ MAINTENANCE_WINDOWS : "series_id"
     ORGANIZATIONS |o--o{ ESCALATION_POOLS : "organization_id"
     ORGANIZATIONS |o--o{ MAINTENANCE_WINDOWS : "organization_id"
+    ORGANIZATIONS |o--o{ MAINTENANCE_WINDOW_SERIES : "organization_id"
     ORGANIZATIONS |o--o{ RACI_ASSIGNMENTS : "client_id"
     ORGANIZATIONS |o--o{ TEAMS : "organization_id"
     ORGANIZATIONS |o--o{ TEAM_GROUPS : "client_id"
     SERVICES |o--o{ ESCALATION_INCIDENTS : "service_id"
     SERVICES |o--o{ ESCALATION_POLICIES : "service_id"
     SERVICES |o--o{ MAINTENANCE_WINDOWS : "service_id"
+    SERVICES |o--o{ MAINTENANCE_WINDOW_SERIES : "service_id"
     SERVICES |o--o{ RACI_ASSIGNMENTS : "service_id"
     TEAMS |o--o{ MAINTENANCE_WINDOWS : "team_id"
+    TEAMS |o--o{ MAINTENANCE_WINDOW_SERIES : "team_id"
     TEAMS ||--o{ ESCALATION_STEPS : "team_id"
     TEAMS ||--o{ RACI_ASSIGNMENTS : "team_id"
     TEAMS ||--o{ TEAM_COVERAGE : "team_id"
@@ -695,6 +725,7 @@ erDiagram
     TERRITORIAL_UNITS |o--o{ ESCALATION_INCIDENTS : "territorial_unit_id"
     TERRITORIAL_UNITS |o--o{ ESCALATION_POLICIES : "territorial_unit_id"
     TERRITORIAL_UNITS |o--o{ MAINTENANCE_WINDOWS : "territorial_unit_id"
+    TERRITORIAL_UNITS |o--o{ MAINTENANCE_WINDOW_SERIES : "territorial_unit_id"
     TERRITORIAL_UNITS ||--o{ TEAM_COVERAGE : "territorial_unit_id"
     TICKETS |o--o{ ESCALATION_INCIDENTS : "ticket_id"
     USERS |o--o{ ESCALATION_POOL_MEMBERS : "user_id"
@@ -862,7 +893,7 @@ erDiagram
 
 ## 7. Agenda
 
-Tareas programadas (una vez o recurrentes en días hábiles) con su responsable (persona, nivel o guardia), cada ocurrencia con su estado, y el calendario hábil: horario de la Agenda y feriados.
+Tareas programadas (una vez o recurrentes en días hábiles) con su responsable (persona, nivel o guardia), cada ocurrencia con su estado, y el calendario hábil: horario de la Agenda y feriados. Un flujo une tareas de varias áreas en orden (cada paso es una tarea con `flow_id`); cada vuelta del flujo tiene una ocurrencia por paso. También el enlace propio de cada persona para ver su Agenda en Outlook y la foto del resumen mensual de cada área.
 
 ```mermaid
 erDiagram
@@ -883,6 +914,10 @@ erDiagram
         text report_kind
         boolean active
         uuid created_by FK
+        uuid flow_id FK
+        int flow_position
+        boolean flow_after
+        int flow_days
     }
     AGENDA_OCCURRENCES {
         uuid id PK
@@ -900,6 +935,7 @@ erDiagram
         uuid closed_by FK
         timestamptz closed_at
         uuid report_history_id FK
+        uuid flow_run_id FK
     }
     AGENDA_SETTINGS {
         boolean id PK
@@ -914,17 +950,49 @@ erDiagram
         text name
         text source
     }
+    AGENDA_FLOWS {
+        uuid id PK
+        text name
+        uuid organization_id FK
+        jsonb recurrence
+        boolean active
+        uuid created_by FK
+    }
+    AGENDA_FLOW_RUNS {
+        uuid id PK
+        uuid flow_id FK
+        date start_date
+    }
+    CALENDAR_FEEDS {
+        uuid user_id PK, FK
+        text token_hash UK
+        text token_encrypted
+        boolean include_windows
+        timestamptz last_read_at
+    }
+    MONTHLY_SUMMARIES {
+        uuid area_id PK, FK
+        date month PK
+        jsonb data
+        timestamptz frozen_at
+    }
 
+    AGENDA_FLOWS |o--o{ AGENDA_TASKS : "flow_id"
+    AGENDA_FLOWS ||--o{ AGENDA_FLOW_RUNS : "flow_id"
+    AGENDA_FLOW_RUNS |o--o{ AGENDA_OCCURRENCES : "flow_run_id"
     AGENDA_TASKS ||--o{ AGENDA_OCCURRENCES : "task_id"
     AREAS ||--o{ AGENDA_TASKS : "area_id"
+    AREAS ||--o{ MONTHLY_SUMMARIES : "area_id"
     LEVELS |o--o{ AGENDA_OCCURRENCES : "offered_level_id"
     LEVELS |o--o{ AGENDA_TASKS : "assignee_level_id"
+    ORGANIZATIONS |o--o{ AGENDA_FLOWS : "organization_id"
     ORGANIZATIONS |o--o{ AGENDA_TASKS : "organization_id"
     REPORT_HISTORY |o--o{ AGENDA_OCCURRENCES : "report_history_id"
     TEAMS |o--o{ AGENDA_TASKS : "assignee_team_id"
     USERS |o--o{ AGENDA_OCCURRENCES : "absent_user_id"
     USERS |o--o{ AGENDA_OCCURRENCES : "user_id"
     USERS |o--o{ AGENDA_TASKS : "assignee_user_id"
+    USERS ||--o| CALENDAR_FEEDS : "user_id"
 ```
 
 ---

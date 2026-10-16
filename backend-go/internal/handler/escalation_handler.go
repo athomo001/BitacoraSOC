@@ -1211,12 +1211,16 @@ type windowDTO struct {
 	EndsAt                time.Time  `json:"endsAt"`
 	SuppressNotifications bool       `json:"suppressNotifications"`
 	Active                bool       `json:"active"`
+	// Ventanas que se repiten (9.7): la serie y, si cae en feriado, cuál.
+	SeriesID    *uuid.UUID `json:"seriesId,omitempty"`
+	HolidayName *string    `json:"holidayName,omitempty"`
 }
 
 func toWindowDTO(m db.MaintenanceWindow) windowDTO {
 	return windowDTO{ID: m.ID, ServiceID: uuidPtr(m.ServiceID), AssetID: uuidPtr(m.AssetID), TerritorialUnitID: uuidPtr(m.TerritorialUnitID),
 		OrganizationID: uuidPtr(m.OrganizationID), AreaID: uuidPtr(m.AreaID), TeamID: uuidPtr(m.TeamID), AgendaTaskID: uuidPtr(m.AgendaTaskID), ClosedAt: timestamptzPtr(m.ClosedAt),
-		Title: m.Title, Notes: textPtr(m.Notes), StartsAt: m.StartsAt.Time, EndsAt: m.EndsAt.Time, SuppressNotifications: m.SuppressNotifications, Active: m.Active}
+		Title: m.Title, Notes: textPtr(m.Notes), StartsAt: m.StartsAt.Time, EndsAt: m.EndsAt.Time, SuppressNotifications: m.SuppressNotifications, Active: m.Active,
+		SeriesID: uuidPtr(m.SeriesID), HolidayName: textPtr(m.HolidayName)}
 }
 
 func (h *EscalationHandler) ListWindows(w http.ResponseWriter, r *http.Request) {

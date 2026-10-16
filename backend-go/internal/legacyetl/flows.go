@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/athomo001/BitacoraSOC/backend-go/internal/agenda"
 	"github.com/athomo001/BitacoraSOC/backend-go/internal/directory"
 )
 
@@ -286,9 +287,33 @@ func (m *Migrator) migrateClientRules(ctx context.Context) error {
 			step.Loaded++
 			continue
 		}
+		// Con horario (p. ej. «entre 02:00 y 04:00 los domingos») es una
+		// ventana que se repite (9.7, decisión del dueño 2026-10-15).
+		if rules, bad := legacyWindowRules(r.TimeWindows); len(rules) > 0 || bad != "" {
+			if bad != "" {
+				step.skip("mantención con un horario que la 2.0 no repite (" + bad + "); recrearla a mano")
+				step.note("horario %s, no migrada: %s", bad, name)
+				continue
+			}
+			org, ok := uuid.UUID{}, false
+			if r.ClientID != nil {
+				org, ok = m.clientOrgs[*r.ClientID]
+			}
+			if !ok {
+				step.skip("mantención sin cliente (la 2.0 exige servicio, activo o zona)")
+				step.note("sin cliente, no migrada: %s", name)
+				continue
+			}
+			if err := m.insertWindowSeries(ctx, org, r, rules, from, okFrom, to, okTo); err != nil {
+				return err
+			}
+			step.note("se repite: %s", name)
+			step.Loaded++
+			continue
+		}
 		if !okFrom || !okTo || !to.After(from) {
-			step.skip("regla recurrente: la 2.0 aún no tiene recurrencia (post-corte); recrearla como ventana si hace falta")
-			step.note("recurrente, no migrada: %s", name)
+			step.skip("regla sin fechas ni horario: recrearla como ventana si hace falta")
+			step.note("sin fechas, no migrada: %s", name)
 			continue
 		}
 		org, ok := uuid.UUID{}, false
@@ -327,6 +352,98 @@ func (m *Migrator) migrateClientRules(ctx context.Context) error {
 	}
 	if windows > 0 {
 		step.note("%d ventanas de mantenimiento (una por servicio del cliente)", windows)
+	}
+	return nil
+}
+
+// legacyTimeWindow es un timeWindows del legacy (ClientEscalationRule).
+type legacyTimeWindow struct {
+	Mode        string `json:"mode"`
+	StartTime   string `json:"startTime"`
+	EndTime     string `json:"endTime"`
+	DaysOfWeek  []int  `json:"daysOfWeek"`
+	HolidayOnly bool   `json:"holidayOnly"`
+}
+
+// legacyWindowRules traduce los horarios de una mantención del legacy a
+// reglas semanales de la 2.0. «always» sin días es la ventana continua de
+// siempre (sin reglas). «between_hours» y «always» con días se repiten; el
+// resto de los modos (fuera de horario, solo feriados…) devuelve bad.
+func legacyWindowRules(raw []json.RawMessage) (rules []agenda.WindowRule, bad string) {
+	for _, item := range raw {
+		var w legacyTimeWindow
+		if json.Unmarshal(item, &w) != nil {
+			continue
+		}
+		if w.Mode == "" {
+			w.Mode = "always"
+		}
+		days := w.DaysOfWeek
+		if len(days) == 0 {
+			days = []int{0, 1, 2, 3, 4, 5, 6}
+		}
+		var rule agenda.WindowRule
+		switch {
+		case w.HolidayOnly:
+			return nil, "solo feriados"
+		case w.Mode == "always" && len(w.DaysOfWeek) == 0:
+			continue
+		case w.Mode == "always":
+			rule = agenda.WindowRule{Kind: agenda.WindowWeekly, Weekdays: days, Start: "00:00", End: "23:59"}
+		case w.Mode == "between_hours":
+			rule = agenda.WindowRule{Kind: agenda.WindowWeekly, Weekdays: days, Start: w.StartTime, End: w.EndTime}
+		default:
+			return nil, w.Mode
+		}
+		if rule.Validate() != nil {
+			return nil, w.Mode + " " + w.StartTime + "-" + w.EndTime
+		}
+		rules = append(rules, rule)
+	}
+	return rules, ""
+}
+
+// insertWindowSeries crea una serie por horario, sobre el cliente, con la
+// vigencia de la regla. Las ventanas las genera el servidor al arrancar.
+func (m *Migrator) insertWindowSeries(ctx context.Context, org uuid.UUID, r legacyClientRule, rules []agenda.WindowRule, from time.Time, okFrom bool, to time.Time, okTo bool) error {
+	tz := strings.TrimSpace(r.Timezone)
+	if tz == "" {
+		tz = "America/Santiago"
+	}
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		loc, tz = time.UTC, "UTC"
+	}
+	validFrom := agenda.Day(time.Now(), loc)
+	if okFrom {
+		validFrom = agenda.Day(from, loc)
+	}
+	var validTo *time.Time
+	if okTo {
+		d := agenda.Day(to, loc)
+		if d.Before(validFrom) {
+			d = validFrom
+		}
+		validTo = &d
+	}
+	title := strings.TrimSpace(r.MaintenanceTitle)
+	if title == "" {
+		title = strings.TrimSpace(r.Name)
+	}
+	if title == "" {
+		title = "Mantención programada"
+	}
+	priority := r.Priority
+	if priority <= 0 {
+		priority = 100
+	}
+	for _, rule := range rules {
+		raw, _ := json.Marshal(rule)
+		if _, err := m.tx.Exec(ctx, `INSERT INTO maintenance_window_series (organization_id, title, notes, suppress_notifications, priority, rule,
+			valid_from, valid_to, timezone, active, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+			org, truncate(title, 200), nz(r.AlertMessage), r.Blocking, priority, raw, validFrom, validTo, tz, r.Enabled, m.firstAdmin); err != nil {
+			return err
+		}
 	}
 	return nil
 }

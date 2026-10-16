@@ -312,8 +312,8 @@ func (h *AgendaHandler) generate(ctx context.Context, force bool) error {
 		return err
 	}
 	for _, t := range tasks {
-		if t.Paused {
-			continue
+		if t.Paused || t.FlowID.Valid {
+			continue // los pasos de un flujo nacen con cada vuelta (generateFlows)
 		}
 		var rec agenda.Recurrence
 		if json.Unmarshal(t.Recurrence, &rec) != nil {
@@ -334,6 +334,9 @@ func (h *AgendaHandler) generate(ctx context.Context, force bool) error {
 				return err
 			}
 		}
+	}
+	if err := h.generateFlows(ctx, ac, today, to, tasks); err != nil {
+		return err
 	}
 	if err := h.applyAbsences(ctx, ac, today, tasks); err != nil {
 		return err
@@ -423,6 +426,8 @@ type agendaTaskDTO struct {
 	CreatedBy     *uuid.UUID        `json:"createdBy,omitempty"`
 	CreatedByName string            `json:"createdByName"`
 	CanEdit       bool              `json:"canEdit"`
+	// FlowID: es un paso de un flujo (9.7); se edita desde el flujo.
+	FlowID *uuid.UUID `json:"flowId,omitempty"`
 }
 
 func toAgendaTaskDTO(t db.ListAgendaTasksRow, u agendaUser) agendaTaskDTO {
@@ -432,7 +437,7 @@ func toAgendaTaskDTO(t db.ListAgendaTasksRow, u agendaUser) agendaTaskDTO {
 		ClientID: uuidPtr(t.OrganizationID), ClientName: t.OrganizationName, Paused: t.Paused, AssigneeKind: t.AssigneeKind,
 		Recurrence: rec, WarnDays: nonNilInts(t.WarnDays), Steps: nonNilStrings(t.Steps), DocURL: textPtr(t.DocUrl),
 		ReportKind: textPtr(t.ReportKind), Active: t.Active, CreatedBy: uuidPtr(t.CreatedBy), CreatedByName: t.CreatedByName,
-		CanEdit: u.canEditTask(t)}
+		CanEdit: u.canEditTask(t) && !t.FlowID.Valid, FlowID: uuidPtr(t.FlowID)}
 	switch t.AssigneeKind {
 	case "person":
 		d.AssigneeID, d.AssigneeName = uuidPtr(t.AssigneeUserID), t.AssigneeUserName
@@ -479,6 +484,17 @@ type agendaOccDTO struct {
 	CanSkip      bool          `json:"canSkip"`
 	CanRelease   bool          `json:"canRelease"`
 	CanReopen    bool          `json:"canReopen"`
+	// Flow: el paso de un flujo (9.7) y, si espera, a qué paso espera.
+	Flow *agendaOccFlowDTO `json:"flow,omitempty"`
+}
+
+type agendaOccFlowDTO struct {
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	Position    int32     `json:"position"`
+	Total       int       `json:"total"`
+	WaitingFor  string    `json:"waitingFor,omitempty"`
+	WaitingArea string    `json:"waitingArea,omitempty"`
 }
 
 // agendaView reúne lo que hace falta para armar las ocurrencias de un usuario.
@@ -489,6 +505,7 @@ type agendaView struct {
 	today   time.Time
 	tasks   map[uuid.UUID]db.ListAgendaTasksRow
 	onGuard map[uuid.UUID]bool // guardias en las que el usuario está de guardia ahora
+	flows   map[uuid.UUID]flowInfo
 }
 
 func (h *AgendaHandler) loadView(ctx context.Context, from, to time.Time) (agendaView, error) {
@@ -504,6 +521,9 @@ func (h *AgendaHandler) loadView(ctx context.Context, from, to time.Time) (agend
 	}
 	tasks, err := h.Queries.ListAgendaTasks(ctx, true)
 	if err != nil {
+		return v, err
+	}
+	if v.flows, err = h.loadFlows(ctx, tasks); err != nil {
 		return v, err
 	}
 	guardTeams := map[uuid.UUID]bool{}
@@ -566,6 +586,15 @@ func (v agendaView) occDTO(o db.ListAgendaOccurrencesRow, t db.ListAgendaTasksRo
 	}
 	d.BizDays = v.ac.cal.BusinessDaysBetween(v.today, due)
 	d.Late = o.Status == "pending" && v.now.After(d.DueAt)
+	if t.FlowID.Valid && o.FlowRunID.Valid {
+		f := v.flows[uuid.UUID(t.FlowID.Bytes)]
+		d.Flow = &agendaOccFlowDTO{ID: f.flow.ID, Name: f.flow.Name, Position: t.FlowPosition.Int32, Total: len(f.steps)}
+		if o.Status == "waiting" {
+			if prev, ok := f.stepAt(t.FlowPosition.Int32 - 1); ok {
+				d.Flow.WaitingFor, d.Flow.WaitingArea = prev.Name, prev.AreaName
+			}
+		}
+	}
 	if d.ClosedAt != nil {
 		d.OnTime = o.Status == "done" && !d.ClosedAt.After(d.DueAt)
 	}
@@ -578,7 +607,7 @@ func (v agendaView) occDTO(o db.ListAgendaOccurrencesRow, t db.ListAgendaTasksRo
 		d.CanAct = holder || elig || v.u.admin
 		d.CanSkip = d.CanAct || creator
 		d.CanRelease = holder && (t.AssigneeKind != "person" || o.AbsentUserID.Valid || len(v.u.levels[t.AreaID]) > 0)
-	} else {
+	} else if o.Status != "waiting" {
 		d.CanReopen = uuidEq(o.ClosedBy, v.u.id) || holder || creator || v.u.admin
 	}
 	return d
@@ -644,7 +673,10 @@ func (h *AgendaHandler) Mine(w http.ResponseWriter, r *http.Request) {
 		}
 		d := v.occDTO(o, t)
 		closedToday := d.ClosedAt != nil && agenda.Day(*d.ClosedAt, v.ac.loc).Equal(v.today) && (uuidEq(o.ClosedBy, v.u.id) || uuidEq(o.UserID, v.u.id))
-		if (o.Status == "pending" && d.Mine) || closedToday {
+		// Lo que espera a un paso anterior se ve aparte, sin contar como atraso
+		// (solo de las vueltas que ya empezaron).
+		waiting := o.Status == "waiting" && (d.Mine || uuidEq(o.UserID, v.u.id)) && !o.DueDate.Time.After(v.today)
+		if (o.Status == "pending" && d.Mine) || closedToday || waiting {
 			out = append(out, d)
 		}
 	}
@@ -677,7 +709,7 @@ func (h *AgendaHandler) Calendar(w http.ResponseWriter, r *http.Request) {
 	have := map[string]bool{}
 	for _, o := range occs {
 		t, ok := v.tasks[o.TaskID]
-		if !ok || !t.Active || !v.u.canSeeTask(t) {
+		if !ok || !t.Active || !v.u.canSeeTask(t) || o.Status == "waiting" {
 			continue
 		}
 		have[o.TaskID.String()+agenda.FormatDate(o.DueDate.Time)] = true
@@ -689,7 +721,7 @@ func (h *AgendaHandler) Calendar(w http.ResponseWriter, r *http.Request) {
 	horizon := v.today.AddDate(0, 0, agendaHorizon)
 	if to.After(horizon) {
 		for _, t := range v.tasks {
-			if !t.Active || t.Paused || !v.u.canSeeTask(t) {
+			if !t.Active || t.Paused || t.FlowID.Valid || !v.u.canSeeTask(t) {
 				continue
 			}
 			var rec agenda.Recurrence
@@ -785,7 +817,7 @@ func (h *AgendaHandler) Managed(w http.ResponseWriter, r *http.Request) {
 	byTask := map[uuid.UUID][]agendaOccDTO{}
 	for _, o := range occs {
 		t, ok := v.tasks[o.TaskID]
-		if ok && include(t) {
+		if ok && include(t) && o.Status != "waiting" {
 			byTask[t.ID] = append(byTask[t.ID], v.occDTO(o, t))
 		}
 	}
@@ -838,6 +870,9 @@ func (h *AgendaHandler) Managed(w http.ResponseWriter, r *http.Request) {
 		} else if n := row.Next; n != nil && row.State == "ok" && n.BizDays <= 1 && agendaAtRisk(*n) {
 			row.State = "risk"
 			kpi.atRisk++
+		}
+		if t.FlowID.Valid {
+			continue // los pasos de un flujo se ven en Flujos; cuentan en los indicadores
 		}
 		rows = append(rows, row)
 	}
@@ -1098,6 +1133,10 @@ func (h *AgendaHandler) taskFor(w http.ResponseWriter, r *http.Request, u agenda
 	}
 	if !ok || !u.canSeeTask(t) {
 		problemdetails.Write(w, r, http.StatusNotFound, "not-found", "tarea no encontrada")
+		return t, false
+	}
+	if edit && t.FlowID.Valid {
+		problemdetails.Write(w, r, http.StatusConflict, "flow-step", "es un paso de un flujo: se edita desde el flujo")
 		return t, false
 	}
 	if edit && !u.canEditTask(t) {
@@ -1430,6 +1469,7 @@ func (h *AgendaHandler) Done(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusConflict, "already-closed", "ya estaba cerrada")
 		return
 	}
+	h.advanceFlow(r.Context(), o.ID, v.u.id)
 	h.afterOcc(w, r, "agenda.occurrence.done", o.ID, map[string]any{"late": d.Late})
 }
 
@@ -1459,6 +1499,8 @@ func (h *AgendaHandler) Skip(w http.ResponseWriter, r *http.Request) {
 		problemdetails.Write(w, r, http.StatusConflict, "already-closed", "ya estaba cerrada")
 		return
 	}
+	// Omitido con motivo, el paso siguiente arranca igual (decisión del dueño).
+	h.advanceFlow(r.Context(), o.ID, v.u.id)
 	h.afterOcc(w, r, "agenda.occurrence.skipped", o.ID, map[string]any{"reason": req.Reason})
 }
 

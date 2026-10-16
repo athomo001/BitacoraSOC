@@ -9,6 +9,7 @@ import { MessageKey } from '../../core/i18n/messages';
 import { AdminGuardsComponent } from '../admin/admin-guards';
 import { AdminEscalationComponent } from '../admin/admin-escalation';
 import { TeamGuardsComponent } from './team-guards';
+import { TeamMonthlyComponent } from './team-monthly';
 
 import '../../core/i18n/packs/team';
 
@@ -32,10 +33,10 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
 @Component({
   selector: 'app-team',
   standalone: true,
-  imports: [FormsModule, RouterLink, MatIconModule, AdminGuardsComponent, AdminEscalationComponent, TeamGuardsComponent],
+  imports: [FormsModule, RouterLink, MatIconModule, AdminGuardsComponent, AdminEscalationComponent, TeamGuardsComponent, TeamMonthlyComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <header class="tm__head">
+    <header class="tm__head no-print">
       <div>
         <h1 class="tm__title">{{ i18n.t('nav.team') }}</h1>
         <p class="adm-muted tm__lead">{{ i18n.t('team.lead') }}</p>
@@ -52,10 +53,11 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
     @if (error(); as e) { <p class="adm-error" role="alert">{{ e }}</p> }
 
     @if (view(); as v) {
-      <div class="tm__tabs" role="tablist">
+      <div class="tm__tabs no-print" role="tablist">
         <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'people'" [attr.aria-selected]="tab() === 'people'" (click)="tab.set('people')"><mat-icon>badge</mat-icon>{{ i18n.t('team.tab.people') }}</button>
         <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'guards'" [attr.aria-selected]="tab() === 'guards'" (click)="tab.set('guards')"><mat-icon>shield</mat-icon>{{ i18n.t('team.tab.guards') }}</button>
         <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'escalation'" [attr.aria-selected]="tab() === 'escalation'" (click)="tab.set('escalation')"><mat-icon>call_split</mat-icon>{{ i18n.t('team.tab.escalation') }}</button>
+        <button type="button" role="tab" class="seg" [attr.aria-pressed]="tab() === 'monthly'" [attr.aria-selected]="tab() === 'monthly'" (click)="tab.set('monthly')"><mat-icon>insights</mat-icon>{{ i18n.t('team.tab.monthly') }}</button>
       </div>
       <!-- Cada área monta sus propias guardias y políticas (el @for las recrea al cambiar de área). -->
       @if (tab() === 'guards') {
@@ -66,6 +68,9 @@ const CONDITION_STYLE: Record<TeamCondition, { icon: string; tone: string }> = {
       }
       @if (tab() === 'escalation') {
         @for (code of [v.area.code]; track code) { <app-admin-escalation [area]="code" /> }
+      }
+      @if (tab() === 'monthly') {
+        <app-team-monthly [area]="v.area.code" [areaName]="v.area.name" />
       }
     }
 
@@ -262,7 +267,7 @@ export class TeamComponent implements OnInit {
   protected readonly i18n = inject(I18nService);
   private readonly api = inject(TeamService);
 
-  protected readonly tab = signal<'people' | 'guards' | 'escalation'>('people');
+  protected readonly tab = signal<'people' | 'guards' | 'escalation' | 'monthly'>('people');
   protected readonly guardsTimeline = viewChild(AdminGuardsComponent);
   protected readonly areas = signal<TeamArea[]>([]);
   protected readonly area = signal('');

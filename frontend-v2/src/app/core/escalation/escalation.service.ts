@@ -242,7 +242,55 @@ export interface MaintenanceWindow extends WindowTarget {
   active: boolean;
   agendaTaskId?: string;
   closedAt?: string;
+  /** Ventana de una serie que se repite (9.7); si cae en feriado, cuál. */
+  seriesId?: string;
+  holidayName?: string;
 }
+
+/** Regla de una ventana que se repite: cada semana o cada mes (9.7). */
+export interface WindowRule {
+  kind: 'weekly' | 'monthly';
+  weekdays?: number[];
+  /** Día fijo del mes (1–31). */
+  day?: number;
+  /** «El tercer domingo»: nth 1–4 (5 = el último) + weekday 0–6. */
+  nth?: number;
+  weekday: number;
+  start: string;
+  end: string;
+}
+
+export interface SeriesWindow {
+  id: string;
+  day: string;
+  startsAt: string;
+  endsAt: string;
+  active: boolean;
+  holidayName?: string;
+  approvedByName?: string;
+  approvedAt?: string;
+}
+
+export interface WindowSeries extends WindowTarget {
+  id: string;
+  targetName: string;
+  title: string;
+  notes?: string;
+  suppressNotifications: boolean;
+  rule: WindowRule;
+  validFrom: string;
+  validTo?: string;
+  next: SeriesWindow[];
+}
+
+export interface SeriesPreviewItem {
+  day: string;
+  startsAt: string;
+  endsAt: string;
+  holiday?: string;
+}
+
+export type SeriesWindowAction = 'skip' | 'apply' | 'approve' | 'unapprove';
 
 export interface ShiftReportDelivery {
   id: string;
@@ -441,6 +489,28 @@ export class EscalationService {
   /** Cierra antes de tiempo una ventana en curso: termina ahora y queda quién la cerró. */
   async closeWindowNow(id: string): Promise<MaintenanceWindow> {
     return (await firstValueFrom(this.http.post<ApiEnvelope<MaintenanceWindow>>(`/api/maintenance-windows/${id}/close`, {}))).data;
+  }
+
+  /** Ventanas que se repiten (9.7), con sus próximas y si el usuario aplica las de feriado. */
+  async listSeries(): Promise<{ series: WindowSeries[]; canApproveHoliday: boolean }> {
+    return (await firstValueFrom(this.http.get<ApiEnvelope<{ series: WindowSeries[]; canApproveHoliday: boolean }>>('/api/maintenance-windows/series'))).data;
+  }
+
+  async previewSeries(rule: WindowRule, validFrom: string): Promise<SeriesPreviewItem[]> {
+    return (await firstValueFrom(this.http.post<ApiEnvelope<SeriesPreviewItem[]>>('/api/maintenance-windows/series/preview', { rule, validFrom }))).data;
+  }
+
+  async createSeries(series: WindowTarget & { title: string; suppressNotifications: boolean; rule: WindowRule; validFrom: string; validTo?: string }): Promise<void> {
+    await firstValueFrom(this.http.post('/api/maintenance-windows/series', series));
+  }
+
+  async deleteSeries(id: string): Promise<void> {
+    await firstValueFrom(this.http.delete(`/api/maintenance-windows/series/${id}`));
+  }
+
+  /** Saltar una vez o volver a aplicarla; en feriado, aplicarla igual (jefatura o admin) o quitarlo. */
+  async setSeriesWindow(id: string, action: SeriesWindowAction): Promise<void> {
+    await firstValueFrom(this.http.post(`/api/maintenance-windows/series-windows/${id}/${action}`, {}));
   }
 
   /** null = todavía no se configuró el SMTP. */

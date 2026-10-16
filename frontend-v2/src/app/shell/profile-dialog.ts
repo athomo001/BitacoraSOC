@@ -1,6 +1,8 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DIALOG_DATA } from '@angular/cdk/dialog';
 import { NotificationPrefsComponent } from './notification-prefs';
+import { CalendarFeedComponent } from './calendar-feed';
+import { CalendarFeed, CalendarFeedService } from '../core/calendar/calendar-feed.service';
 import '../core/i18n/packs/notifications';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../core/auth/auth.service';
@@ -18,7 +20,7 @@ interface Feedback {
   key: MessageKey;
 }
 
-type Tab = 'data' | 'security' | 'prefs' | 'notif';
+type Tab = 'data' | 'security' | 'prefs' | 'notif' | 'calendar';
 
 const ROLE_KEYS: Record<string, MessageKey> = {
   admin: 'access.role.admin',
@@ -44,7 +46,7 @@ const STRENGTH: readonly { label: MessageKey; color: string }[] = [
 @Component({
   selector: 'app-profile-dialog',
   standalone: true,
-  imports: [FormsModule, ModalComponent, ButtonComponent, UserAvatarComponent, NotificationPrefsComponent],
+  imports: [FormsModule, ModalComponent, ButtonComponent, UserAvatarComponent, NotificationPrefsComponent, CalendarFeedComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './profile-dialog.html',
   styleUrl: './profile-dialog.css',
@@ -53,14 +55,19 @@ export class ProfileDialogComponent implements OnInit {
   protected readonly i18n = inject(I18nService);
   protected readonly prefs = inject(PreferencesService);
   private readonly auth = inject(AuthService);
+  private readonly calendarApi = inject(CalendarFeedService);
   protected readonly user = this.auth.user;
 
-  protected readonly tabs: readonly { id: Tab; icon: string; label: MessageKey }[] = [
+  /** Calendario en Outlook (9.7): la pestaña aparece solo con la funcionalidad prendida. */
+  protected readonly calendarAvailable = signal(false);
+  protected readonly calendarFeed = signal<CalendarFeed | null>(null);
+  protected readonly tabs = computed<readonly { id: Tab; icon: string; label: MessageKey }[]>(() => [
     { id: 'data', icon: 'badge', label: 'profile.tabData' },
     { id: 'security', icon: 'shield', label: 'profile.tabSecurity' },
     { id: 'prefs', icon: 'tune', label: 'profile.tabPrefs' },
     { id: 'notif', icon: 'notifications', label: 'nt.prefs.title' },
-  ];
+    ...(this.calendarAvailable() ? [{ id: 'calendar' as const, icon: 'event_available', label: 'nt.cal.tab' as MessageKey }] : []),
+  ]);
   protected readonly themes: readonly { id: Theme; icon: string; label: MessageKey }[] = [
     { id: 'dark', icon: 'dark_mode', label: 'profile.themeDark' },
     { id: 'light', icon: 'light_mode', label: 'profile.themeLight' },
@@ -128,6 +135,10 @@ export class ProfileDialogComponent implements OnInit {
   protected readonly groupedSecret = computed(() => (this.enrollment()?.secret ?? '').replace(/(.{4})(?=.)/g, '$1 '));
 
   async ngOnInit(): Promise<void> {
+    void this.calendarApi.mine().then(
+      (s) => { this.calendarFeed.set(s.feed); this.calendarAvailable.set(s.available); },
+      () => this.calendarAvailable.set(false),
+    );
     try {
       this.minPassword.set(await this.auth.passwordMinLength());
     } catch {

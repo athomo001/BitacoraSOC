@@ -29,7 +29,7 @@
     </div>
 
     <div class="pf__tabs" role="tablist">
-      @for (t of tabs; track t.id) {
+      @for (t of tabs(); track t.id) {
         <button
           type="button"
           role="tab"
@@ -185,6 +185,9 @@
       }
       @case ('notif') {
         <div class="pf__panel" role="tabpanel"><app-notification-prefs /></div>
+      }
+      @case ('calendar') {
+        <div class="pf__panel" role="tabpanel"><app-calendar-feed [initial]="calendarFeed()" /></div>
       }
       @case ('prefs') {
         <div class="pf__panel pf__prefs" role="tabpanel">

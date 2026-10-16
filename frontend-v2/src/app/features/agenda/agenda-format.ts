@@ -63,9 +63,10 @@ export function dueText(o: AgendaOccurrence, i18n: I18nService, dayEnd: string):
   return o.bizDays === 1 ? i18n.t('ag.due.in1') : i18n.tf('ag.due.inDays', o.bizDays);
 }
 
-/** Grupo de «Mis pendientes». */
-export type AgendaBucket = 'late' | 'today' | 'soon' | 'later' | 'done';
+/** Grupo de «Mis pendientes». waiting: paso de un flujo que espera al anterior (9.7). */
+export type AgendaBucket = 'late' | 'today' | 'soon' | 'later' | 'waiting' | 'done';
 export function bucketOf(o: AgendaOccurrence): AgendaBucket {
+  if (o.status === 'waiting') return 'waiting';
   if (o.status !== 'pending') return 'done';
   if (o.late) return 'late';
   if (o.bizDays <= 0) return 'today';

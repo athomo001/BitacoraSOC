@@ -153,7 +153,7 @@ func (q *Queries) CreateAgendaTask(ctx context.Context, arg CreateAgendaTaskPara
 const deleteFutureUntouchedOccurrences = `-- name: DeleteFutureUntouchedOccurrences :execrows
 DELETE FROM agenda_occurrences o
 USING agenda_tasks t
-WHERE t.id = o.task_id AND o.task_id = $1 AND o.status = 'pending'
+WHERE t.id = o.task_id AND o.task_id = $1 AND o.status = 'pending' AND o.flow_run_id IS NULL
   AND o.due_date >= $2::date AND cardinality(o.steps_done) = 0
   AND (NOT $3::bool
        OR (o.absent_user_id IS NULL AND (o.user_id IS NULL OR o.user_id IS NOT DISTINCT FROM t.assignee_user_id)))
@@ -168,6 +168,7 @@ type DeleteFutureUntouchedOccurrencesParams struct {
 // Al cambiar la recurrencia o el responsable, las pendientes desde hoy que
 // nadie empezó se rehacen con la regla nueva. keep_taken: al cambiar
 // feriados u horario se respetan las que alguien ya tomó o le traspasaron.
+// Las de un flujo (9.7) no se rehacen: nacen con su vuelta.
 func (q *Queries) DeleteFutureUntouchedOccurrences(ctx context.Context, arg DeleteFutureUntouchedOccurrencesParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteFutureUntouchedOccurrences, arg.TaskID, arg.FromDay, arg.KeepTaken)
 	if err != nil {
@@ -189,7 +190,7 @@ func (q *Queries) DeleteHoliday(ctx context.Context, day pgtype.Date) (int64, er
 }
 
 const getAgendaOccurrence = `-- name: GetAgendaOccurrence :one
-SELECT o.id, o.task_id, o.due_date, o.status, o.user_id, o.offered_level_id, o.steps_done
+SELECT o.id, o.task_id, o.due_date, o.status, o.user_id, o.offered_level_id, o.steps_done, o.flow_run_id
 FROM agenda_occurrences o WHERE o.id = $1
 `
 
@@ -201,6 +202,7 @@ type GetAgendaOccurrenceRow struct {
 	UserID         pgtype.UUID `json:"user_id"`
 	OfferedLevelID pgtype.UUID `json:"offered_level_id"`
 	StepsDone      []int32     `json:"steps_done"`
+	FlowRunID      pgtype.UUID `json:"flow_run_id"`
 }
 
 func (q *Queries) GetAgendaOccurrence(ctx context.Context, id uuid.UUID) (GetAgendaOccurrenceRow, error) {
@@ -214,6 +216,7 @@ func (q *Queries) GetAgendaOccurrence(ctx context.Context, id uuid.UUID) (GetAge
 		&i.UserID,
 		&i.OfferedLevelID,
 		&i.StepsDone,
+		&i.FlowRunID,
 	)
 	return i, err
 }
@@ -268,7 +271,7 @@ func (q *Queries) ImportHoliday(ctx context.Context, arg ImportHolidayParams) (i
 const insertAgendaOccurrence = `-- name: InsertAgendaOccurrence :execrows
 INSERT INTO agenda_occurrences (task_id, due_date, moved_from, user_id, offered_level_id)
 VALUES ($1, $2, $3, $4, $5)
-ON CONFLICT (task_id, due_date) DO NOTHING
+ON CONFLICT (task_id, due_date) WHERE flow_run_id IS NULL DO NOTHING
 `
 
 type InsertAgendaOccurrenceParams struct {
@@ -367,7 +370,7 @@ SELECT o.id, o.task_id, o.due_date, o.moved_from, o.status, o.user_id,
   o.offered_level_id, COALESCE(l.name, '')::text AS offered_level_name, COALESCE(l.rank, 0)::int AS offered_level_rank,
   o.absent_user_id, COALESCE(NULLIF(ab.full_name, ''), ab.username, '')::text AS absent_user_name,
   o.steps_done, o.note, o.link, o.skip_reason, o.closed_by, COALESCE(NULLIF(cb.full_name, ''), cb.username, '')::text AS closed_by_name,
-  o.closed_at, o.report_history_id
+  o.closed_at, o.report_history_id, o.flow_run_id
 FROM agenda_occurrences o
 JOIN agenda_tasks t ON t.id = o.task_id
 LEFT JOIN users u ON u.id = o.user_id
@@ -375,7 +378,7 @@ LEFT JOIN levels l ON l.id = o.offered_level_id
 LEFT JOIN users ab ON ab.id = o.absent_user_id
 LEFT JOIN users cb ON cb.id = o.closed_by
 WHERE (o.due_date BETWEEN $1::date AND $2::date)
-   OR (o.status = 'pending' AND o.due_date < $1::date AND $3::bool)
+   OR (o.status IN ('pending', 'waiting') AND o.due_date < $1::date AND $3::bool)
 ORDER BY o.due_date, t.name
 `
 
@@ -406,10 +409,12 @@ type ListAgendaOccurrencesRow struct {
 	ClosedByName     string             `json:"closed_by_name"`
 	ClosedAt         pgtype.Timestamptz `json:"closed_at"`
 	ReportHistoryID  pgtype.UUID        `json:"report_history_id"`
+	FlowRunID        pgtype.UUID        `json:"flow_run_id"`
 }
 
-// Las ocurrencias de un rango (las pendientes atrasadas siempre, aunque sean
-// anteriores), con quién la tiene y el nivel al que se ofrece.
+// Las ocurrencias de un rango (las pendientes atrasadas y los pasos de un
+// flujo en espera siempre, aunque sean anteriores), con quién la tiene y el
+// nivel al que se ofrece.
 func (q *Queries) ListAgendaOccurrences(ctx context.Context, arg ListAgendaOccurrencesParams) ([]ListAgendaOccurrencesRow, error) {
 	rows, err := q.db.Query(ctx, listAgendaOccurrences, arg.FromDay, arg.ToDay, arg.WithLate)
 	if err != nil {
@@ -440,6 +445,7 @@ func (q *Queries) ListAgendaOccurrences(ctx context.Context, arg ListAgendaOccur
 			&i.ClosedByName,
 			&i.ClosedAt,
 			&i.ReportHistoryID,
+			&i.FlowRunID,
 		); err != nil {
 			return nil, err
 		}
@@ -458,7 +464,8 @@ SELECT t.id, t.name, t.description, t.area_id, a.name AS area_name, t.organizati
   t.assignee_level_id, COALESCE(l.name, '')::text AS assignee_level_name, COALESCE(l.rank, 0)::int AS assignee_level_rank,
   t.assignee_team_id, COALESCE(tm.name, '')::text AS assignee_team_name,
   t.recurrence, t.warn_days, t.steps, t.doc_url, t.report_kind, t.active,
-  t.created_by, COALESCE(NULLIF(c.full_name, ''), c.username, '')::text AS created_by_name, t.created_at
+  t.created_by, COALESCE(NULLIF(c.full_name, ''), c.username, '')::text AS created_by_name, t.created_at,
+  t.flow_id, t.flow_position, t.flow_after, t.flow_days
 FROM agenda_tasks t
 JOIN areas a ON a.id = t.area_id
 LEFT JOIN organizations o ON o.id = t.organization_id
@@ -496,6 +503,10 @@ type ListAgendaTasksRow struct {
 	CreatedBy         pgtype.UUID        `json:"created_by"`
 	CreatedByName     string             `json:"created_by_name"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	FlowID            pgtype.UUID        `json:"flow_id"`
+	FlowPosition      pgtype.Int4        `json:"flow_position"`
+	FlowAfter         bool               `json:"flow_after"`
+	FlowDays          int32              `json:"flow_days"`
 }
 
 // Las tareas con los nombres que muestra la pantalla. paused: su cliente
@@ -535,6 +546,10 @@ func (q *Queries) ListAgendaTasks(ctx context.Context, includeInactive bool) ([]
 			&i.CreatedBy,
 			&i.CreatedByName,
 			&i.CreatedAt,
+			&i.FlowID,
+			&i.FlowPosition,
+			&i.FlowAfter,
+			&i.FlowDays,
 		); err != nil {
 			return nil, err
 		}
