@@ -6,6 +6,7 @@ describe('PreferencesService', () => {
     localStorage.clear();
     delete document.documentElement.dataset['theme'];
     delete document.documentElement.dataset['font'];
+    document.getElementById('theme-pink')?.remove();
   });
 
   function create(): PreferencesService {
@@ -34,6 +35,20 @@ describe('PreferencesService', () => {
   it('ignora un tema guardado que ya no existe', () => {
     localStorage.setItem('bitacora.theme', 'neon');
     expect(create().theme()).toBe('dark');
+  });
+
+  it('carga la hoja del efecto pixel solo con el tema Rosa, y una sola vez', () => {
+    const prefs = create();
+    expect(document.getElementById('theme-pink')).toBeNull();
+    prefs.theme.set('pink');
+    TestBed.tick();
+    prefs.theme.set('dark');
+    TestBed.tick();
+    prefs.theme.set('pink');
+    TestBed.tick();
+    const sheets = document.querySelectorAll('link#theme-pink');
+    expect(sheets.length).toBe(1);
+    expect(sheets[0].getAttribute('href')).toBe('theme-pink.css');
   });
 
   it('persiste los cambios', () => {

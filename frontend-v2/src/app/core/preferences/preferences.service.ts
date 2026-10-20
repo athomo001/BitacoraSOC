@@ -6,6 +6,8 @@ export type Language = 'es' | 'en';
 
 const THEMES: readonly Theme[] = ['dark', 'light', 'pink'];
 const KEYS = { theme: 'bitacora.theme', language: 'bitacora.language', dyslexia: 'bitacora.dyslexiaFont' } as const;
+/** Efecto 8-bit del tema Rosa (styles/theme-pixel.css, angular.json inject: false). */
+const PINK_SHEET = { id: 'theme-pink', href: 'theme-pink.css' } as const;
 
 /**
  * Preferencias visuales por operador (tema, idioma, fuente para dislexia) —
@@ -18,7 +20,8 @@ const KEYS = { theme: 'bitacora.theme', language: 'bitacora.language', dyslexia:
  */
 @Injectable({ providedIn: 'root' })
 export class PreferencesService {
-  private readonly root = inject(DOCUMENT).documentElement;
+  private readonly document = inject(DOCUMENT);
+  private readonly root = this.document.documentElement;
 
   readonly theme = signal<Theme>(readTheme());
   readonly language = signal<Language>(read(KEYS.language) === 'en' ? 'en' : 'es');
@@ -28,6 +31,7 @@ export class PreferencesService {
     effect(() => {
       const theme = this.theme();
       this.root.dataset['theme'] = theme;
+      if (theme === 'pink') this.loadPinkSheet();
       write(KEYS.theme, theme);
     });
     effect(() => {
@@ -50,6 +54,21 @@ export class PreferencesService {
 
   toggleDyslexiaFont(): void {
     this.dyslexiaFont.update((on) => !on);
+  }
+
+  /**
+   * La hoja del efecto pixel va aparte para que quien usa Oscuro o Claro no la
+   * descargue (y el bundle inicial quede bajo el presupuesto). Sus reglas
+   * cuelgan de [data-theme="pink"], así que al cambiar de tema se queda
+   * puesta sin afectar.
+   */
+  private loadPinkSheet(): void {
+    if (this.document.getElementById(PINK_SHEET.id)) return;
+    const link = this.document.createElement('link');
+    link.id = PINK_SHEET.id;
+    link.rel = 'stylesheet';
+    link.href = PINK_SHEET.href;
+    this.document.head.appendChild(link);
   }
 }
 

@@ -1,0 +1,202 @@
+/*
+ * Tema Rosa: efecto 8-bit sutil (diseño aprobado por el dueño el 2026-10-19,
+ * https://claude.ai/artifact/Y7xkYZWXpVWNE7dv6hENfc). Decisiones del dueño:
+ * reemplaza al rosado anterior, la fuente pixelada no va en los nombres del
+ * menú y el fondo lleva cuadriculado.
+ *
+ * Todo cuelga de :root[data-theme="pink"]: Oscuro y Claro no cambian. Esa
+ * raíz (0,2,0) más la clase le gana a los estilos encapsulados de cada
+ * componente (.x[_ngcontent], 0,2,0) sin !important. Los colores salen de los
+ * tokens del tema con color-mix: aquí no hay hex (color-no-hex) y la paleta
+ * de tokens.css sigue igual en los tres temas.
+ *
+ * El texto que se lee (registros, tickets, formularios, menú) sigue en Geist y
+ * los datos en JetBrains Mono; la fuente pixelada va solo en títulos,
+ * encabezados de tabla, el nombre de la app y los atajos Alt+N. Con la fuente
+ * para dislexia, los títulos vuelven a OpenDyslexic.
+ */
+:root[data-theme="pink"] {
+  --font-pixel: "Pixelify Sans", var(--font-ui);
+  --px-line: color-mix(in srgb, var(--status-system) 40%, var(--bg-surface));
+  --px-shadow: color-mix(in srgb, var(--accent) 26%, var(--bg-surface));
+  --px-depth: color-mix(in srgb, var(--status-system) 16%, var(--bg-surface));
+  --px-deep: color-mix(in srgb, var(--accent) 72%, black);
+  --px-check: color-mix(in srgb, var(--accent) 4%, var(--bg-app));
+  --px-frame: 0 -2px 0 var(--px-line), 0 2px 0 var(--px-line), -2px 0 0 var(--px-line), 2px 0 0 var(--px-line);
+  --px-frame-deep: 0 -2px 0 var(--px-deep), 0 2px 0 var(--px-deep), -2px 0 0 var(--px-deep), 2px 0 0 var(--px-deep);
+  --px-heart: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 6' shape-rendering='crispEdges'%3E%3Cpath d='M1 0h2v1H1zM4 0h2v1H4zM0 1h7v2H0zM1 3h5v1H1zM2 4h3v1H2zM3 5h1v1H3z'/%3E%3C/svg%3E");
+
+  /* Esquinas cuadradas: casi todo el radio de la app sale de estos tokens. */
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-pill: 0;
+
+  scrollbar-color: var(--px-line) transparent;
+}
+
+:root[data-theme="pink"][data-font="dyslexic"] {
+  --font-pixel: var(--font-ui);
+}
+
+:root[data-theme="pink"] ::selection {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+:root[data-theme="pink"] :focus-visible {
+  outline: 2px dashed var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------- Shell ---------- */
+:root[data-theme="pink"] .shell__workspace {
+  background-color: var(--bg-app);
+  background-image: repeating-conic-gradient(var(--px-check) 0 25%, transparent 0 50%);
+  background-size: 24px 24px;
+}
+
+:root[data-theme="pink"] .shell__sidebar {
+  border-right: 2px solid var(--px-line);
+}
+
+:root[data-theme="pink"] .shell__brand {
+  border-bottom: 2px solid var(--px-line);
+}
+
+:root[data-theme="pink"] .shell__user,
+:root[data-theme="pink"] .shell__prefs {
+  border-top: 2px solid var(--px-line);
+}
+
+:root[data-theme="pink"] .shell__brand-name {
+  color: var(--status-system);
+  font-family: var(--font-pixel);
+  font-size: 17px;
+  text-shadow: 1px 1px 0 var(--px-shadow);
+}
+
+:root[data-theme="pink"] .shell__logo:not(.shell__logo--img) {
+  box-shadow: 2px 2px 0 var(--px-shadow);
+  font-family: var(--font-pixel);
+  font-size: 15px;
+}
+
+/* Ítem activo: marco pixel y un corazón como cursor de menú de juego. */
+:root[data-theme="pink"] .shell__nav-item--active {
+  position: relative;
+  padding-left: 22px;
+  box-shadow: 0 -2px 0 var(--accent), 0 2px 0 var(--accent), -2px 0 0 var(--accent), 2px 0 0 var(--accent);
+}
+
+:root[data-theme="pink"] .shell__nav-item--active::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 7px;
+  width: 9px;
+  height: 8px;
+  background: var(--accent);
+  mask: var(--px-heart) center / contain no-repeat;
+  transform: translateY(-50%);
+}
+
+:root[data-theme="pink"] .shell__shortcut {
+  font-family: var(--font-pixel);
+  font-size: 12px;
+}
+
+/* ---------- Títulos (no el markdown que escribe la gente) ---------- */
+:root[data-theme="pink"] :is(.shell__workspace, .cdk-overlay-container) :is(h1, h2, h3):not(.app-markdown *) {
+  color: var(--status-system);
+  font-family: var(--font-pixel);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+:root[data-theme="pink"] .shell__workspace h1:not(.app-markdown *) {
+  text-shadow: 2px 2px 0 var(--px-shadow);
+}
+
+/* ---------- Tarjetas, tablas y diálogos: borde de 2 px escalonado y sombra dura ---------- */
+:root[data-theme="pink"] :is(
+  .adm-card, .panel, .app-table, .app-modal, .nm__box,
+  .ms-card, .aa-card, .aud-card, .ac-card, .sm-card, .bk__card, .bk__panel,
+  .gd, .incidents, .mp__mapcard, .sh__stat, .sh__table-wrap, .sr, .od, .mh
+) {
+  border-color: transparent;
+  border-radius: 0;
+  box-shadow: var(--px-frame), 4px 4px 0 var(--px-shadow);
+}
+
+:root[data-theme="pink"] .nt__card {
+  border-color: transparent;
+  border-left-color: var(--accent);
+  border-radius: 0;
+  box-shadow: var(--px-frame), 4px 4px 0 var(--status-ok-bg);
+}
+
+/* Barra de título lila, como las ventanas de las imágenes. */
+:root[data-theme="pink"] :is(.adm-card__head, .app-modal__header, .nm__head) {
+  border-bottom: 2px solid var(--px-line);
+  background: var(--status-system-bg);
+}
+
+:root[data-theme="pink"] :is(.adm-card__title, .app-modal__header) {
+  color: var(--status-system);
+  font-family: var(--font-pixel);
+  font-size: 14px;
+}
+
+:root[data-theme="pink"] :is(.shell__workspace th, .app-table__header) {
+  border-bottom: 2px solid var(--px-line);
+  background: var(--bg-surface-hover);
+  color: var(--text-secondary);
+  font-family: var(--font-pixel);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+:root[data-theme="pink"] .shell__workspace td {
+  border-bottom-style: dashed;
+}
+
+/* ---------- Botones con relieve ---------- */
+:root[data-theme="pink"] :is(.adm-btn, .bk__btn, .aa-btn, .td__btn, .ac-btn, .ms-btn, .sr__btn, .cf__btn, .sm-btn, .sh__btn) {
+  border-color: transparent;
+  border-radius: 0;
+  box-shadow: var(--px-frame), inset 0 -3px 0 var(--px-depth);
+}
+
+:root[data-theme="pink"] :is(.adm-btn--primary, .bk__btn--primary, .aa-btn--primary, .td__btn--primary, .sr__btn--primary, .sm-btn--primary) {
+  border-color: transparent;
+  box-shadow: var(--px-frame-deep), inset 0 -3px 0 var(--px-deep);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-theme="pink"] :is(.adm-btn, .bk__btn, .aa-btn, .td__btn, .ac-btn, .ms-btn, .sr__btn, .cf__btn, .sm-btn, .sh__btn):active:not(:disabled) {
+    transform: translateY(1px);
+  }
+}
+
+/* ---------- Campos ---------- */
+:root[data-theme="pink"] :is(.adm-input, .field input, .field select, .field textarea) {
+  border-width: 2px;
+  border-color: var(--px-line);
+}
+
+/* ---------- Píldoras escalonadas y progreso por bloques ---------- */
+:root[data-theme="pink"] .pill {
+  clip-path: polygon(2px 0, calc(100% - 2px) 0, 100% 2px, 100% calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 0 calc(100% - 2px), 0 2px);
+}
+
+:root[data-theme="pink"] .meter {
+  height: 8px;
+  mask: repeating-linear-gradient(90deg, black 0 6px, transparent 6px 8px);
+}
+
+/* Fondo de los diálogos con un tinte ciruela en vez de negro. */
+:root[data-theme="pink"] .cdk-overlay-dark-backdrop {
+  background: color-mix(in srgb, var(--text-primary) 38%, transparent);
+}

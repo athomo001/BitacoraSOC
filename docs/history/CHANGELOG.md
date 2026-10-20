@@ -4,6 +4,17 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] Tema Rosa con efecto 8-bit - 2026-10-19
+
+- Pedido del dueño: el tema rosado cambia a una paleta pastel con un efecto 8-bit sutil, inspirado en imágenes de pixel art que él mandó. Diseño aprobado: <https://claude.ai/artifact/Y7xkYZWXpVWNE7dv6hENfc>. Decisiones del dueño: se sigue llamando **Rosa**, **reemplaza** al rosado anterior, la fuente pixelada **no** va en los nombres del menú y el fondo lleva cuadriculado. Oscuro, Claro y los temas del login no cambian.
+- **Paleta** (`tokens.css`): crema, lila, frambuesa, menta, celeste y mantequilla, con texto ciruela. El contraste sube: el acento pasa de 4,2:1 a 7,5:1 y los estados quedan cerca de 7:1.
+- **Efecto** (`styles/theme-pixel.css`, todo bajo `[data-theme="pink"]`):
+  - **Pixelify Sans** en el nombre de la app, los títulos de página, de tarjeta y de diálogo, los encabezados de tabla y los atajos `Alt+N`. El texto de lectura sigue en Geist y los datos en JetBrains Mono. Con la fuente para dislexia, los títulos vuelven a OpenDyslexic. Los títulos que vienen dentro del markdown de un registro no cambian.
+  - Bordes de 2 px con esquinas escalonadas y sombra dura en tarjetas, tablas y diálogos, y barra de título lila.
+  - Botones con relieve, píldoras escalonadas, barras de progreso por bloques, corazón en el ítem activo del menú, fondo cuadriculado y foco punteado.
+- **Carga**: la hoja del efecto se publica aparte (`theme-pink.css`, `inject: false`) y se agrega la primera vez que se elige Rosa, así que quien usa Oscuro o Claro no la descarga y el bundle inicial queda bajo los 500 kB.
+- Pixelify Sans se auto-hospeda (`public/fonts`, licencia OFL), igual que Geist.
+
 ## [Rewrite] Documentación al día - 2026-10-16
 
 - Revisión de la documentación: faltaban 8 rutas en `docs/api.md` (configuración de la Ticketera, avisos por correo de un ticket, muestras de correo); agregadas. Nueva prueba `api_docs_test`: compara las rutas de `main.go` con `api.md` en los dos sentidos y hace fallar el CI si alguna queda sin documentar.

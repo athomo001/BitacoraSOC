@@ -99,31 +99,35 @@
   color-scheme: light;
 }
 
+/* Rosa (2026-10-19, diseño aprobado por el dueño): paleta pastel 8-bit —
+   crema, lila, frambuesa, menta, celeste y mantequilla, texto ciruela.
+   Contraste ≈ 7:1 en texto secundario, estados y acento. El efecto pixel
+   (bordes, fuente, barras de título) vive en styles/theme-pixel.css. */
 [data-theme="pink"] {
-  --bg-app: #fdf0f6;
-  --bg-surface: #fff;
-  --bg-surface-hover: #fbe4ee;
-  --border-subtle: #f3d1e3;
-  --border-active: #d6428f;
-  --text-primary: #3d1f2e;
-  --text-secondary: #7a5468;
-  --text-muted: #9c7d8d;
-  --status-ok: #1a7f37;
-  --status-ok-bg: #dafbe1;
-  --status-warning: #9a6700;
-  --status-warning-bg: #fff8c5;
-  --status-critical: #cf222e;
-  --status-critical-bg: #ffebe9;
-  --status-carrier: #0969da;
-  --status-carrier-bg: #ddf4ff;
-  --status-system: #8957e5;
-  --status-system-bg: #fbefff;
-  --accent: #d6428f;
+  --bg-app: #fcf1f7;
+  --bg-surface: #fffafd;
+  --bg-surface-hover: #f5e6f7;
+  --border-subtle: #e2cdea;
+  --border-active: #9c1b5e;
+  --text-primary: #3a1f52;
+  --text-secondary: #5e3f7d;
+  --text-muted: #7a5f96;
+  --status-ok: #0f5a37;
+  --status-ok-bg: #d5f2e6;
+  --status-warning: #6b4300;
+  --status-warning-bg: #fff0c2;
+  --status-critical: #9a1028;
+  --status-critical-bg: #ffe1e7;
+  --status-carrier: #1a4c9e;
+  --status-carrier-bg: #dcebff;
+  --status-system: #5c2ca6;
+  --status-system-bg: #ece2ff;
+  --accent: #9c1b5e;
   --accent-contrast: #fff;
-  --accent-soft: #fbe0ee;
-  --map-sea: #f5e1eb;
-  --map-land: #fcf4f8;
-  --map-border: #dcb6c9;
+  --accent-soft: #fbdcec;
+  --map-sea: #ece2f6;
+  --map-land: #fffafd;
+  --map-border: #cdb5e3;
 
   color-scheme: light;
 }

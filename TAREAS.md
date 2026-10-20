@@ -19,12 +19,15 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [ ] Probar la importación desde GLPI contra el GLPI real (9.6) — Dueño
 - [ ] Revisión humana del shadow-diff del escalamiento — Equipo SOC
 - [ ] Revisar en la app la segunda etapa (9.7): flujos, calendario en Outlook, resumen mensual y ventanas que se repiten — Dueño
-- [ ] Gestión CSM (9.4): en pausa mientras el CSM valida si le sirve — CSM
+- [x] Gestión CSM (9.4): el CSM validó el diseño y mandó feedback (2026-10-19); spec ajustado en `16` §4.4 — CSM
+- [x] Gestión CSM (9.4): diseño rehecho con el feedback del CSM (2026-10-19)
+- [ ] Tema Rosa con efecto 8-bit (construido el 2026-10-19, ver CHANGELOG): revisarlo en la app — Dueño
+- [ ] Gestión CSM (9.4): en pausa; el diseño rehecho (<https://claude.ai/artifact/MkPD5Eipnsgiy95BPQudob>) se envió a la CSM el 2026-10-19 y se implementa si lo aprueba — CSM
 
 ## Por hacer
 
 ### Áreas
-- [ ] Decidir las 6 preguntas de la Gestión CSM — Dueño
+- [ ] Decidir las 7 preguntas de la Gestión CSM (`16` §4.4.10; incluye quién crea las metas por persona y quién confirma una certificación para el bono) — Dueño
 - [ ] Comunicaciones internas del CSM y la tarea «avisar al cliente» (espera a la 9.4)
 
 ### Paridad con el legacy (revisión y decisiones del dueño, 2026-10-16)

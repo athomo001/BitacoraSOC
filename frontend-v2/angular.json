@@ -28,6 +28,7 @@
             "styles": [
               "src/material-theme.scss",
               "src/styles.css",
+              { "input": "src/styles/theme-pixel.css", "bundleName": "theme-pink", "inject": false },
               { "input": "src/app/features/login/_login-infoflow.scss", "bundleName": "login-infoflow", "inject": false },
               { "input": "src/app/features/login/_login-modern.scss", "bundleName": "login-modern", "inject": false },
               { "input": "src/app/features/login/_login-surrealism.scss", "bundleName": "login-surrealism", "inject": false },
