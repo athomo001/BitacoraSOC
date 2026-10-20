@@ -570,8 +570,12 @@ func run(logger *slog.Logger) error {
 	mux.Handle("PUT /api/maintenance-windows/series/{id}", operator(escalationHandler.UpdateSeries))
 	mux.Handle("DELETE /api/maintenance-windows/series/{id}", operator(escalationHandler.DeleteSeries))
 	mux.Handle("POST /api/maintenance-windows/series-windows/{id}/{action}", operator(escalationHandler.SetSeriesWindow))
-	mux.Handle("GET /api/raci-assignments", authed(escalationHandler.ListRaci))
-	mux.Handle("POST /api/raci-assignments", admin(escalationHandler.CreateRaci))
+	// RACI por cliente (paridad con el legacy; pendiente 10 → falta para el corte).
+	mux.Handle("GET /api/raci", authed(escalationHandler.ListRaci))
+	mux.Handle("POST /api/raci", admin(escalationHandler.CreateRaci))
+	mux.Handle("PUT /api/raci/{id}", admin(escalationHandler.UpdateRaci))
+	mux.Handle("DELETE /api/raci/{id}", admin(escalationHandler.DeleteRaci))
+	mux.Handle("POST /api/raci/people", admin(escalationHandler.RaciPerson))
 
 	// Turnos y rotación de guardia (Fase 8, HU-4/HU-5) — núcleo siempre
 	// activo, sin gate SOC/NOC. GET/POST/PATCH de rotation-slots no estaban

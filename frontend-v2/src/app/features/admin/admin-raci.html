@@ -1,0 +1,123 @@
+<div class="adm-block">
+  <div class="adm-head">
+    <div>
+      <h2 class="adm-title">{{ i18n.t('raci.title') }}</h2>
+      <p class="adm-muted">{{ i18n.t('raci.admin.hint') }}</p>
+    </div>
+    <button type="button" class="adm-btn adm-btn--primary adm-push" (click)="startNew()"><mat-icon>add</mat-icon>{{ i18n.t('raci.admin.new') }}</button>
+  </div>
+
+  @if (error(); as e) { <p class="adm-error" role="alert">{{ e }}</p> }
+  @if (flash(); as f) { <p class="adm-muted" role="status">{{ f }}</p> }
+
+  @if (draft(); as d) {
+    <section class="adm-card">
+      <header class="adm-card__head"><h3 class="adm-card__title"><mat-icon>assignment_ind</mat-icon>{{ i18n.t(d.id ? 'raci.form.editTitle' : 'raci.form.newTitle') }}</h3></header>
+      <div class="adm-card__body ra__form">
+        <div class="ra__grid">
+          <label class="adm-field">
+            <span class="adm-label">{{ i18n.t('raci.client') }}</span>
+            <select class="adm-input" name="raciClientForm" [ngModel]="d.clientId" (ngModelChange)="patch({ clientId: $event })">
+              @for (c of clients(); track c.id) { <option [value]="c.id">{{ c.name }}</option> }
+            </select>
+          </label>
+          <label class="adm-field">
+            <span class="adm-label">{{ i18n.t('raci.form.topic') }}</span>
+            <input class="adm-input" name="raciTopic" list="raci-topics" [placeholder]="i18n.t('raci.form.topicPlaceholder')" [ngModel]="d.topic" (ngModelChange)="patch({ topic: $event })" />
+            <datalist id="raci-topics">@for (t of topics(); track t) { <option [value]="t"></option> }</datalist>
+          </label>
+          <label class="adm-field ra__wide">
+            <span class="adm-label">{{ i18n.t('raci.form.activity') }}</span>
+            <input class="adm-input" name="raciActivity" [placeholder]="i18n.t('raci.form.activityPlaceholder')" [ngModel]="d.activity" (ngModelChange)="patch({ activity: $event })" />
+          </label>
+          <label class="adm-field ra__wide">
+            <span class="adm-label">{{ i18n.t('raci.form.notes') }}</span>
+            <textarea class="adm-input" name="raciNotes" rows="2" [placeholder]="i18n.t('raci.form.notesPlaceholder')" [ngModel]="d.notes" (ngModelChange)="patch({ notes: $event })"></textarea>
+          </label>
+        </div>
+
+        @for (role of roles; track role) {
+          <div class="ra__role">
+            <div class="ra__role-head">
+              <span class="ra__letter">{{ letter(role) }}</span>
+              <strong>{{ i18n.t(roleKey(role)) }}</strong>
+              <span class="adm-muted">{{ i18n.t(hintKey(role)) }}</span>
+            </div>
+            <div class="ra__chips">
+              @for (p of d.letters[role]; track p.id) {
+                <span class="pill tone-neutral ra__chip">{{ p.name }}
+                  <button type="button" class="ra__x" [attr.aria-label]="i18n.tf('raci.form.remove', p.name)" (click)="removeFrom(role, p.id)"><mat-icon>close</mat-icon></button>
+                </span>
+              }
+              @if (picking() !== role) {
+                <button type="button" class="adm-btn" [attr.data-add]="role" (click)="openPicker(role)"><mat-icon>person_add</mat-icon>{{ i18n.t('raci.form.add') }}</button>
+              }
+            </div>
+            @if (picking() === role) {
+              <div class="ra__picker">
+                <input class="adm-input" name="raciWho" [placeholder]="i18n.t('raci.form.searchWho')" [attr.aria-label]="i18n.t('raci.form.searchWho')" [ngModel]="who()" (ngModelChange)="onWho($event)" />
+                @if (teamMatches().length) {
+                  <span class="adm-label">{{ i18n.t('raci.form.teams') }}</span>
+                  @for (t of teamMatches(); track t.id) {
+                    <button type="button" class="ra__opt" (click)="add({ id: t.id, name: t.name })"><mat-icon>groups</mat-icon>{{ t.name }}</button>
+                  }
+                }
+                @if (contacts().length) {
+                  <span class="adm-label">{{ i18n.t('raci.form.contacts') }}</span>
+                  @for (c of contacts(); track c.id) {
+                    <button type="button" class="ra__opt" (click)="addContact(c)"><mat-icon>person</mat-icon>{{ c.name }} <span class="adm-muted">{{ c.organizationName }}</span></button>
+                  }
+                }
+                @if (who().trim().length >= 2 && !teamMatches().length && !contacts().length) {
+                  <p class="adm-hint">{{ i18n.t('raci.form.noMatch') }}</p>
+                }
+                <div class="ra__new">
+                  <span class="adm-label">{{ i18n.t('raci.form.newPerson') }}</span>
+                  <input class="adm-input" name="raciPersonName" [placeholder]="i18n.t('raci.form.personName')" [attr.aria-label]="i18n.t('raci.form.personName')" [ngModel]="person().name" (ngModelChange)="person.set({ name: $event, email: person().email, phone: person().phone })" />
+                  <input class="adm-input" name="raciPersonEmail" type="email" [placeholder]="i18n.t('raci.form.personEmail')" [attr.aria-label]="i18n.t('raci.form.personEmail')" [ngModel]="person().email" (ngModelChange)="person.set({ name: person().name, email: $event, phone: person().phone })" />
+                  <input class="adm-input" name="raciPersonPhone" [placeholder]="i18n.t('raci.form.personPhone')" [attr.aria-label]="i18n.t('raci.form.personPhone')" [ngModel]="person().phone" (ngModelChange)="person.set({ name: person().name, email: person().email, phone: $event })" />
+                  <button type="button" class="adm-btn" [disabled]="!person().name.trim()" (click)="createPerson()">{{ i18n.t('raci.form.createPerson') }}</button>
+                  <span class="adm-hint">{{ i18n.t('raci.form.newPersonHint') }}</span>
+                </div>
+                <button type="button" class="adm-btn ra__close" (click)="closePicker()">{{ i18n.t('raci.form.cancel') }}</button>
+              </div>
+            }
+          </div>
+        }
+
+        @for (p of problems(); track p) { <p class="adm-hint ra__problem">{{ i18n.t(p) }}</p> }
+        <div class="adm-row">
+          <button type="button" class="adm-btn adm-btn--primary" [disabled]="saving() || problems().length > 0 || !d.activity.trim()" (click)="save()"><mat-icon>save</mat-icon>{{ i18n.t('raci.form.save') }}</button>
+          <button type="button" class="adm-btn" (click)="draft.set(null)">{{ i18n.t('raci.form.cancel') }}</button>
+        </div>
+      </div>
+    </section>
+  }
+
+  @if (confirming(); as c) {
+    <section class="adm-card ra__confirm" role="alertdialog" aria-modal="false">
+      <p>{{ i18n.tf('raci.admin.confirmDelete', c.activity) }}</p>
+      <div class="adm-row">
+        <button type="button" class="adm-btn adm-btn--danger" (click)="confirmRemove()"><mat-icon>delete</mat-icon>{{ i18n.t('raci.admin.delete') }}</button>
+        <button type="button" class="adm-btn" (click)="confirming.set(null)">{{ i18n.t('raci.form.cancel') }}</button>
+      </div>
+    </section>
+  }
+
+  <section class="adm-card">
+    <div class="adm-card__head">
+      <select class="adm-input ra__filter" name="raciFilter" [attr.aria-label]="i18n.t('raci.client')" [ngModel]="filterClient()" (ngModelChange)="filterClient.set($event)">
+        <option value="">{{ i18n.t('raci.admin.all') }}</option>
+        @for (c of withRaci(); track c.id) { <option [value]="c.id">{{ c.name }}</option> }
+      </select>
+      <input class="adm-input ra__search" name="raciSearch" type="search" [placeholder]="i18n.t('raci.admin.search')" [attr.aria-label]="i18n.t('raci.admin.search')" [ngModel]="search()" (ngModelChange)="search.set($event)" />
+    </div>
+    <div class="adm-card__body">
+      @if (shown().length) {
+        <app-raci-table [activities]="shown()" [editable]="true" [showClient]="!filterClient()" (edit)="startEdit($event)" (remove)="confirming.set($event)" />
+      } @else {
+        <p class="adm-empty">{{ i18n.t(filterClient() ? 'raci.empty' : 'raci.noClients') }}</p>
+      }
+    </div>
+  </section>
+</div>

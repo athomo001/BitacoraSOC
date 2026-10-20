@@ -13,6 +13,7 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 
 ## En curso
 
+- [ ] Revisar en la app el RACI por cliente (Escalamiento → RACI y Administración → Matriz RACI; antes correr `migrate … up` para la 000049) — Dueño
 - [ ] Revisar en la app el Mapa y el lugar del ticket (#24 y 7b) — Dueño
 - [ ] Revisar en la app colas por área, Inventario y Agenda (9.1, 9.2, 9.3) — Dueño
 - [ ] Revisar en la app las Notificaciones (9.5) — Dueño
@@ -48,11 +49,15 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [ ] Orquestador: barra para saltar entre sistemas, como complemento fuera del núcleo
 
 ### Backlog
-- [ ] GLPI en ambos sentidos (tickets)
-- [ ] SSO
-- [ ] RACI completo y enlaces públicos avanzados
-- [ ] Reportes avanzados y pedidos especiales
-- [ ] Carga CSV masiva y logs a SIEM/SOAR
+- [x] 10a RACI por cliente (hecho el 2026-10-20; ver «En curso»)
+- [ ] 10b Logs a SIEM/SOAR y API externa — falta saber a qué SIEM
+- [ ] 10c SSO con Microsoft 365 — un admin del tenant registra la app en Entra ID
+- [ ] 10d GLPI en ambos sentidos (tickets) — en pausa (2026-10-20); para retomar: aprobar el diseño <https://claude.ai/artifact/6Dt6kJj7pWf3QPE5ZuxaVi> y responder las 3 preguntas de `spec/18` §5 — Dueño
+- [ ] 10e Pedidos especiales — validar el concepto con el dueño
+- [ ] 10f Reportes avanzados — elegir qué parte primero
+- [ ] 10g Carga CSV masiva — definir de qué más
+- [ ] 10h Enlaces públicos avanzados — definir qué falta
+- [ ] 10i Complementos con build — solo si hay un complemento real que lo necesite
 
 ### Corte
 - [ ] Ensayo de paridad 2 con un respaldo de producción nuevo
@@ -85,3 +90,4 @@ Lo hecho, lo que está en revisión y lo que falta hasta el corte. Marca con `[x
 - [x] Importación de equipos desde GLPI (9.6)
 - [x] Segunda etapa de áreas (9.7): flujos entre áreas, calendario en Outlook, resumen mensual y ventanas que se repiten
 - [x] Documentación: instalación, operación, API, modelo de datos y guía de uso
+- [x] RACI por cliente como el legacy, con las notas que el ETL perdía (2026-10-20)

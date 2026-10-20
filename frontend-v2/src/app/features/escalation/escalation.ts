@@ -28,6 +28,9 @@ import { OrganizationsService } from '../../core/organizations/organizations.ser
 import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 import { Ticket, TicketsService } from '../../core/tickets/tickets.service';
 import { MaintenanceWindowsComponent } from './maintenance-windows';
+import { RaciPanelComponent } from './raci-panel';
+
+import '../../core/i18n/packs/raci';
 import { problemDetail } from '../../core/http-error';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageKey } from '../../core/i18n/messages';
@@ -92,7 +95,7 @@ const CHANNEL_ICON: Record<ChannelType, string> = { call: 'call', sms: 'sms', wh
 @Component({
   selector: 'app-escalation',
   standalone: true,
-  imports: [FormsModule, DatePipe, MatIconModule, RouterLink, MaintenanceWindowsComponent],
+  imports: [FormsModule, DatePipe, MatIconModule, RouterLink, MaintenanceWindowsComponent, RaciPanelComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './escalation.html',
   styleUrl: './escalation.css',
@@ -116,6 +119,8 @@ export class EscalationComponent implements OnInit {
   protected readonly scopeKind = signal<ScopeKind>('asset');
   protected readonly filter = signal('');
   protected readonly showMaintenance = signal(false);
+  /** Matriz RACI del cliente (paridad con el legacy). */
+  protected readonly showRaci = signal(false);
   protected readonly selectedId = signal('');
   private readonly assets = signal<Asset[]>([]);
   private readonly units = signal<TerritorialUnit[]>([]);
@@ -198,6 +203,12 @@ export class EscalationComponent implements OnInit {
 
   protected readonly pickOpen = signal(false);
   protected readonly pickActive = signal(0);
+
+  /** El RACI parte con el cliente del servicio que se está mirando. */
+  protected readonly raciClientId = computed(() => {
+    if (this.scopeKind() !== 'service') return null;
+    return this.services().find((x) => x.id === this.selectedId())?.organizationId ?? null;
+  });
 
   /** Lo que se destaca arriba: servicio y cliente (o activo / zona en NOC). */
   protected readonly target = computed(() => {

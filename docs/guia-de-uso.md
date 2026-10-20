@@ -151,6 +151,8 @@ flowchart TD
 
 Ver a quién llamar queda registrado en la Auditoría.
 
+**Matriz RACI:** el botón **RACI** muestra, por cliente, quién es **responsable** (R), quién **aprueba** (A), a quién se **consulta** (C) y a quién se **informa** (I) en cada actividad, agrupadas por tópico, con las **notas** (por ejemplo, a qué canal avisar después de cierta hora). Parte con el cliente del servicio que estás mirando. Un clic en un correo lo copia y el teléfono se puede marcar. La matriz la edita el admin en Administración → Matriz RACI.
+
 **Ventanas de mantenimiento:** cualquier analista las programa y las cierra. Aplican a un servicio, un activo, una zona, un **cliente** (todos sus servicios), un **área** o un **equipo** de la app; con «suprimir» el escalamiento anota sin enviar el aviso. Una ventana en curso se cierra antes de tiempo con **Cerrar ahora** (queda registrado quién y cuándo); una programada se **cancela**. Se ven también en el calendario de la Agenda. Con **Se repite** una ventana vuelve cada semana (días y horario; si termina antes de empezar, pasa la medianoche) o cada mes (un día fijo o «el tercer domingo»), con fecha de inicio y de término opcional; abajo se ven las próximas. En **Ventanas que se repiten** cada una se puede **saltar esta vez**. La que cae en **feriado no se aplica**; si es urgente, la jefatura o el admin pulsa **Aplicar igual** y queda quién la aplicó.
 
 ---
@@ -331,6 +333,7 @@ Solo para administradores. El menú se agrupa así:
 | Operación | **Turnos** | Guardias, turnos de trabajo (con flechas para cambiar el orden en que se ven en todas las pantallas), dotación programada, recordatorios y avisos (detalle abajo). |
 | | **Checklist** | Plantillas de inicio y cierre, servicios y alertas de ítems en rojo. |
 | | **Escalamiento** | Políticas por servicio, activo o zona, con sus llamados en orden (detalle abajo). |
+| | **Matriz RACI** | Por cliente, cada actividad con su tópico, sus notas y las cuatro letras: un solo **aprobador** (A), al menos un **responsable** (R) y los **consultados** e **informados** que hagan falta. Cada letra puede ser una guardia o lista que ya existe, una persona del directorio o una persona nueva (queda en el directorio del cliente). Los analistas la ven en Escalamiento. |
 | | **Ticketera** | Plazos de SLA por prioridad, umbral "en riesgo", firma ante el cliente, avisos por correo y **Numeración** (solo con la Ticketera encendida). En Numeración se arma cómo se ve el número: prefijo, con año (2026), año corto (26) o sin año, cuántos dígitos y desde qué número sigue (solo puede subir), con una vista previa. Hay una **general** y se pueden crear otras; abajo se elige cuál usa cada área (varias pueden compartir una). Numera el **área que pide** el ticket, el correlativo nunca vuelve a 1 y los tickets que ya existen conservan su número. En **Áreas y niveles**, la ficha de cada área muestra su numeración (solo vista). |
 | | **Avisos por cliente** | Avisos que aparecen al trabajar con un cliente y el catálogo de eventos de los informes, que también se **importa** desde un .csv (columnas nombre, categoria, motivo) o .json; lo que ya existe se salta. |
 | | **Correo** | SMTP y remitente, con plantillas para los proveedores comunes y correo de prueba. |

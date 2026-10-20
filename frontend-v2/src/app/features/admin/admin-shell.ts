@@ -29,11 +29,13 @@ import { AdminTicketsComponent } from './admin-tickets';
 import { AdminAreasComponent } from './admin-areas';
 import { AdminGlpiComponent } from './admin-glpi';
 import { AdminEntryTagsComponent } from './admin-entry-tags';
+import { AdminRaciComponent } from './admin-raci';
 import { SystemFeaturesService } from '../../core/system-features/system-features.service';
 
 import '../../core/i18n/packs/admin';
+import '../../core/i18n/packs/raci';
 export type AdminSection =
-  | 'access' | 'areas' | 'shifts' | 'checklist' | 'escalation' | 'tickets' | 'clientAlerts' | 'smtp' | 'reports'
+  | 'access' | 'areas' | 'shifts' | 'checklist' | 'escalation' | 'raci' | 'tickets' | 'clientAlerts' | 'smtp' | 'reports'
   | 'agenda' | 'notifications' | 'organizations' | 'territory' | 'inventory' | 'teams'
   | 'modules' | 'brand' | 'features' | 'glpi' | 'backups' | 'audit' | 'complements' | 'tags';
 
@@ -65,6 +67,7 @@ const NAV: readonly { labelKey: MessageKey; items: readonly NavItem[] }[] = [
       { id: 'shifts', icon: 'schedule', labelKey: 'admin.nav.shifts', requiresSocOrNoc: true },
       { id: 'checklist', icon: 'checklist', labelKey: 'admin.nav.checklist', requiresSocOrNoc: true },
       { id: 'escalation', icon: 'call_split', labelKey: 'admin.nav.escalation', requiresSocOrNoc: true },
+      { id: 'raci', icon: 'assignment_ind', labelKey: 'raci.title', requiresSocOrNoc: true },
       { id: 'tickets', icon: 'confirmation_number', labelKey: 'admin.nav.tickets', requiresFeature: 'native_tickets' },
       { id: 'clientAlerts', icon: 'campaign', labelKey: 'admin.nav.clientAlerts' },
       { id: 'smtp', icon: 'mail', labelKey: 'admin.nav.smtp' },
@@ -126,7 +129,7 @@ function normalize(text: string): string {
     MatIconModule, AdminModulesComponent, AdminBrandComponent, AdminFeaturesComponent, AdminTerritoryComponent, AdminInventoryComponent, AdminOrganizationsComponent, AdminTeamsComponent,
     AdminEscalationComponent, AdminShiftsComponent, AdminSmtpComponent, AdminReportsComponent, AdminBackupsComponent, AdminAuditComponent,
     AdminAccessComponent, AdminChecklistComponent, AdminComplementsComponent, AdminClientAlertsComponent, AdminTicketsComponent, AdminAreasComponent, AdminAgendaComponent, AdminNotificationsComponent, AdminGlpiComponent,
-    AdminEntryTagsComponent,
+    AdminEntryTagsComponent, AdminRaciComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKeydown($event)' },
@@ -166,6 +169,7 @@ function normalize(text: string): string {
           @case ('shifts') { <app-admin-shifts /> }
           @case ('checklist') { <app-admin-checklist /> }
           @case ('escalation') { <app-admin-escalation /> }
+          @case ('raci') { <app-admin-raci /> }
           @case ('tickets') { <app-admin-tickets /> }
           @case ('clientAlerts') { <app-admin-client-alerts /> }
           @case ('smtp') { <app-admin-smtp /> }

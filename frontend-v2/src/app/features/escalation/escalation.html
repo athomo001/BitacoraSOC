@@ -13,10 +13,16 @@
     <button type="button" class="adm-btn esc__push" [attr.aria-expanded]="showMaintenance()" (click)="showMaintenance.set(!showMaintenance())">
       <mat-icon>engineering</mat-icon>{{ i18n.t('esc.maintenance') }}
     </button>
+    <button type="button" class="adm-btn" [attr.aria-expanded]="showRaci()" [attr.title]="i18n.t('raci.title')" (click)="showRaci.set(!showRaci())">
+      <mat-icon>assignment_ind</mat-icon>{{ i18n.t('raci.open') }}
+    </button>
   </div>
 
   @if (showMaintenance()) {
     <app-maintenance-windows class="esc__maint" [presetServiceId]="scopeKind() === 'service' ? selectedId() : null" />
+  }
+  @if (showRaci()) {
+    <app-raci-panel class="esc__maint" [presetClientId]="raciClientId()" />
   }
 
   <!-- Servicio y cliente destacados (canvas v26) -->

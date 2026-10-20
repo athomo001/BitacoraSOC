@@ -14,6 +14,7 @@ import type { InventoryKey } from './packs/inventory';
 import type { AgendaKey } from './packs/agenda';
 import type { NotificationsKey } from './packs/notifications';
 import type { GlpiKey } from './packs/glpi';
+import type { RaciKey } from './packs/raci';
 
 const ES = {
   'nav.entries': 'Bitácora',
@@ -241,7 +242,8 @@ export type MessageKey =
   | InventoryKey
   | AgendaKey
   | NotificationsKey
-  | GlpiKey;
+  | GlpiKey
+  | RaciKey;
 
 /**
  * El inglés va en messages-en.ts y se descarga solo al cambiar a EN: así no

@@ -22,6 +22,7 @@ type Querier interface {
 	AddGroupAreasByCode(ctx context.Context, arg AddGroupAreasByCodeParams) (int64, error)
 	AddGuardMember(ctx context.Context, arg AddGuardMemberParams) (uuid.UUID, error)
 	AddPolicyStep(ctx context.Context, arg AddPolicyStepParams) (EscalationStep, error)
+	AddRaciLetter(ctx context.Context, arg AddRaciLetterParams) error
 	AddTeamMember(ctx context.Context, arg AddTeamMemberParams) (TeamMember, error)
 	AddTicketResolver(ctx context.Context, arg AddTicketResolverParams) error
 	AddUserPermissionGroup(ctx context.Context, arg AddUserPermissionGroupParams) error
@@ -62,6 +63,7 @@ type Querier interface {
 	// marcar uno nuevo desmarca el anterior.
 	ClearPreferredContactChannel(ctx context.Context, contactID pgtype.UUID) error
 	ClearPreferredUserChannel(ctx context.Context, userID pgtype.UUID) error
+	ClearRaciLetters(ctx context.Context, activityID uuid.UUID) error
 	ClearTeamMembers(ctx context.Context, teamID uuid.UUID) error
 	ClearTemplateFromShifts(ctx context.Context, checklistTemplateStartID pgtype.UUID) error
 	ClearTicketResolvers(ctx context.Context, ticketID uuid.UUID) error
@@ -154,7 +156,7 @@ type Querier interface {
 	CreatePermissionGroup(ctx context.Context, arg CreatePermissionGroupParams) (PermissionGroup, error)
 	CreatePolicy(ctx context.Context, arg CreatePolicyParams) (EscalationPolicy, error)
 	CreatePublicShareLink(ctx context.Context, arg CreatePublicShareLinkParams) (PublicShareLink, error)
-	CreateRaciAssignment(ctx context.Context, arg CreateRaciAssignmentParams) (RaciAssignment, error)
+	CreateRaciActivity(ctx context.Context, arg CreateRaciActivityParams) (uuid.UUID, error)
 	CreateReportEvent(ctx context.Context, arg CreateReportEventParams) (ReportEvent, error)
 	CreateReportOperationType(ctx context.Context, arg CreateReportOperationTypeParams) (ReportOperationType, error)
 	CreateRotationCycle(ctx context.Context, arg CreateRotationCycleParams) (RotationCycle, error)
@@ -204,7 +206,6 @@ type Querier interface {
 	DecideAssetRequest(ctx context.Context, arg DecideAssetRequestParams) error
 	DeleteAsset(ctx context.Context, id uuid.UUID) error
 	DeleteAssetPolicies(ctx context.Context, assetID pgtype.UUID) error
-	DeleteAssetRaci(ctx context.Context, assetID pgtype.UUID) error
 	DeleteAssetWithoutHistory(ctx context.Context, arg DeleteAssetWithoutHistoryParams) (int64, error)
 	DeleteBackupRun(ctx context.Context, id uuid.UUID) (BackupRun, error)
 	DeleteCalendarFeed(ctx context.Context, userID uuid.UUID) (int64, error)
@@ -239,20 +240,20 @@ type Querier interface {
 	DeleteHoliday(ctx context.Context, day pgtype.Date) (int64, error)
 	DeleteLogSource(ctx context.Context, id uuid.UUID) (CatalogLogSource, error)
 	DeleteOrganizationGroups(ctx context.Context, clientID pgtype.UUID) error
-	DeleteOrganizationRaci(ctx context.Context, clientID pgtype.UUID) error
+	DeleteOrganizationRaci(ctx context.Context, clientID uuid.UUID) error
 	DeleteOrganizationType(ctx context.Context, code string) (int64, error)
 	DeletePendingTicketImage(ctx context.Context, arg DeletePendingTicketImageParams) (int64, error)
 	DeletePolicy(ctx context.Context, id uuid.UUID) (int64, error)
 	DeletePolicyStep(ctx context.Context, arg DeletePolicyStepParams) (int64, error)
+	DeleteRaciActivity(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteRaciOfTeams(ctx context.Context, ids []uuid.UUID) (int64, error)
 	DeleteReportEvent(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteReportHistory(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteReportOperationType(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteRotationOverride(ctx context.Context, id uuid.UUID) (int64, error)
+	// Antes de borrar un servicio sin historial: sus políticas de escalamiento
+	// (los pasos caen con la política).
 	DeleteServicePolicies(ctx context.Context, serviceID pgtype.UUID) error
-	// Antes de borrar un servicio sin historial: su RACI y sus políticas de
-	// escalamiento (los pasos caen con la política).
-	DeleteServiceRaci(ctx context.Context, serviceID pgtype.UUID) error
 	DeleteServiceWithoutHistory(ctx context.Context, arg DeleteServiceWithoutHistoryParams) (int64, error)
 	// Borrado del admin (paridad con el legacy, decisión del dueño 2026-10-16);
 	// sus servicios se van en cascada. La foto completa queda en Auditoría.
@@ -302,6 +303,9 @@ type Querier interface {
 	FindPolicyByAsset(ctx context.Context, assetID pgtype.UUID) (uuid.UUID, error)
 	// ===== Resolución =====
 	FindPolicyByService(ctx context.Context, serviceID pgtype.UUID) (uuid.UUID, error)
+	// El equipo «raci» de una sola persona (lo crean el editor o el ETL): se
+	// reutiliza para no repetir un equipo por cada actividad.
+	FindRaciTeamForContact(ctx context.Context, contactID pgtype.UUID) (FindRaciTeamForContactRow, error)
 	// Un grupo activo con exactamente esa forma: un área (o ninguna), ese nivel
 	// (o ninguno) y esas capacidades. El más antiguo, si hubiera varios.
 	FindShapedGroup(ctx context.Context, arg FindShapedGroupParams) (uuid.UUID, error)
@@ -720,8 +724,11 @@ type Querier interface {
 	// orden del pool, con el rol y la prioridad del integrante del nivel.
 	ListPoolMembersForTeams(ctx context.Context, teamIds []uuid.UUID) ([]ListPoolMembersForTeamsRow, error)
 	ListPublicTicketComments(ctx context.Context, ticketID uuid.UUID) ([]TicketComment, error)
-	// ===== RACI (solo dato en esta fase, sin UI) =====
-	ListRaciAssignments(ctx context.Context, arg ListRaciAssignmentsParams) ([]ListRaciAssignmentsRow, error)
+	// ===== RACI por cliente (paridad con el legacy: Escalamiento → Matriz RACI) =====
+	// Actividades de un cliente (o de todos), con el nombre del cliente.
+	ListRaciActivities(ctx context.Context, clientID pgtype.UUID) ([]ListRaciActivitiesRow, error)
+	// Las letras R/A/C/I de varias actividades, con su equipo.
+	ListRaciLetters(ctx context.Context, activityIds []uuid.UUID) ([]ListRaciLettersRow, error)
 	ListRecentAuditForComplement(ctx context.Context, limit int32) ([]ListRecentAuditForComplementRow, error)
 	// Runtime API query-general?collection=entries: lo más reciente, sin adjuntos.
 	ListRecentEntriesForComplement(ctx context.Context, limit int32) ([]ListRecentEntriesForComplementRow, error)
@@ -1082,6 +1089,7 @@ type Querier interface {
 	UpdatePermissionGroup(ctx context.Context, arg UpdatePermissionGroupParams) (PermissionGroup, error)
 	UpdatePolicyReminder(ctx context.Context, arg UpdatePolicyReminderParams) (EscalationPolicy, error)
 	UpdatePolicyStep(ctx context.Context, arg UpdatePolicyStepParams) (EscalationStep, error)
+	UpdateRaciActivity(ctx context.Context, arg UpdateRaciActivityParams) (int64, error)
 	UpdateReportEvent(ctx context.Context, arg UpdateReportEventParams) (ReportEvent, error)
 	UpdateReportOperationType(ctx context.Context, arg UpdateReportOperationTypeParams) (ReportOperationType, error)
 	// El reemplazante tiene que ser de la misma guardia (como al crearlo).

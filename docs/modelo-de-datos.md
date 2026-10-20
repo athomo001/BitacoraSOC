@@ -2,7 +2,7 @@
 
 > Generado por `backend-go/cmd/er-docs` desde `backend-go/sql/schema/0001_init_schema.sql`, el esquema que usa sqlc, con todas las migraciones aplicadas. **No se edita a mano**: si cambia el esquema, se regenera con `go run ./cmd/er-docs` desde `backend-go/`.
 
-102 tablas en PostgreSQL, agrupadas en 15 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
+103 tablas en PostgreSQL, agrupadas en 15 dominios. Notación pata de gallo: `||` uno, `|o` / `o|` cero o uno, `o{` cero o muchos. La etiqueta de cada línea es la columna que hace la referencia.
 
 - Cada entidad muestra todas sus columnas salvo `created_at` y `updated_at`. `PK` clave primaria, `FK` referencia a otra tabla, `UK` valor único.
 - Las tablas de otros dominios aparecen como cajas sin columnas: son la misma tabla, dibujada donde se une.
@@ -17,7 +17,7 @@ Correspondencia con el legacy (MongoDB): [modelo-er-legacy-2.0.md](modelo-er-leg
 2. [Territorio, organizaciones y activos](#2-territorio-organizaciones-y-activos) — 14 tablas
 3. [Directorio de contactos](#3-directorio-de-contactos) — 2 tablas
 4. [Ticketera](#4-ticketera) — 8 tablas
-5. [Equipos y escalamiento](#5-equipos-y-escalamiento) — 14 tablas
+5. [Equipos y escalamiento](#5-equipos-y-escalamiento) — 15 tablas
 6. [Turnos, guardias y dotación](#6-turnos-guardias-y-dotación) — 11 tablas
 7. [Agenda](#7-agenda) — 8 tablas
 8. [Notificaciones y avisos con acuse](#8-notificaciones-y-avisos-con-acuse) — 6 tablas
@@ -682,15 +682,19 @@ erDiagram
         boolean active
         uuid created_by FK
     }
-    RACI_ASSIGNMENTS {
+    RACI_ACTIVITIES {
         uuid id PK
         uuid client_id FK
-        uuid service_id FK
-        uuid asset_id FK
         text topic
+        text activity
+        text notes
+        boolean active
+    }
+    RACI_ASSIGNMENTS {
+        uuid id PK
         raci_role role
         uuid team_id FK
-        boolean active
+        uuid activity_id FK
     }
 
     AGENDA_TASKS |o--o{ MAINTENANCE_WINDOWS : "agenda_task_id"
@@ -702,7 +706,6 @@ erDiagram
     ASSETS |o--o{ ESCALATION_POLICIES : "asset_id"
     ASSETS |o--o{ MAINTENANCE_WINDOWS : "asset_id"
     ASSETS |o--o{ MAINTENANCE_WINDOW_SERIES : "asset_id"
-    ASSETS |o--o{ RACI_ASSIGNMENTS : "asset_id"
     CONTACTS |o--o{ ESCALATION_ACTION_LOGS : "contact_id"
     CONTACTS |o--o{ ESCALATION_POOL_MEMBERS : "contact_id"
     CONTACTS |o--o{ TEAM_MEMBERS : "contact_id"
@@ -718,14 +721,14 @@ erDiagram
     ORGANIZATIONS |o--o{ ESCALATION_POOLS : "organization_id"
     ORGANIZATIONS |o--o{ MAINTENANCE_WINDOWS : "organization_id"
     ORGANIZATIONS |o--o{ MAINTENANCE_WINDOW_SERIES : "organization_id"
-    ORGANIZATIONS |o--o{ RACI_ASSIGNMENTS : "client_id"
     ORGANIZATIONS |o--o{ TEAMS : "organization_id"
     ORGANIZATIONS |o--o{ TEAM_GROUPS : "client_id"
+    ORGANIZATIONS ||--o{ RACI_ACTIVITIES : "client_id"
+    RACI_ACTIVITIES ||--o{ RACI_ASSIGNMENTS : "activity_id"
     SERVICES |o--o{ ESCALATION_INCIDENTS : "service_id"
     SERVICES |o--o{ ESCALATION_POLICIES : "service_id"
     SERVICES |o--o{ MAINTENANCE_WINDOWS : "service_id"
     SERVICES |o--o{ MAINTENANCE_WINDOW_SERIES : "service_id"
-    SERVICES |o--o{ RACI_ASSIGNMENTS : "service_id"
     TEAMS |o--o{ MAINTENANCE_WINDOWS : "team_id"
     TEAMS |o--o{ MAINTENANCE_WINDOW_SERIES : "team_id"
     TEAMS ||--o{ ESCALATION_STEPS : "team_id"

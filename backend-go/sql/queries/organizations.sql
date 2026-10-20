@@ -100,12 +100,9 @@ UPDATE services SET organization_id = sqlc.arg('to_org') WHERE id = sqlc.arg('id
 -- name: RenameService :execrows
 UPDATE services SET name = sqlc.arg('name') WHERE id = sqlc.arg('id') AND organization_id = sqlc.arg('org');
 
--- name: DeleteServiceRaci :exec
--- Antes de borrar un servicio sin historial: su RACI y sus políticas de
--- escalamiento (los pasos caen con la política).
-DELETE FROM raci_assignments WHERE service_id = $1;
-
 -- name: DeleteServicePolicies :exec
+-- Antes de borrar un servicio sin historial: sus políticas de escalamiento
+-- (los pasos caen con la política).
 DELETE FROM escalation_policies WHERE service_id = $1;
 
 -- name: DeleteServiceWithoutHistory :execrows
@@ -142,9 +139,6 @@ WHERE id = sqlc.arg('id') AND (client_id = sqlc.arg('from_org') OR contractor_id
 -- name: RenameAsset :execrows
 UPDATE assets SET name = sqlc.arg('name') WHERE id = sqlc.arg('id') AND (client_id = sqlc.arg('org') OR contractor_id = sqlc.arg('org'));
 
--- name: DeleteAssetRaci :exec
-DELETE FROM raci_assignments WHERE asset_id = $1;
-
 -- name: DeleteAssetPolicies :exec
 DELETE FROM escalation_policies WHERE asset_id = $1;
 
@@ -167,7 +161,7 @@ UPDATE teams SET team_group_id = NULL WHERE team_group_id IN (SELECT g.id FROM t
 UPDATE organizations SET via_organization_id = NULL WHERE via_organization_id = $1;
 
 -- name: DeleteOrganizationRaci :exec
-DELETE FROM raci_assignments WHERE client_id = $1;
+DELETE FROM raci_activities WHERE client_id = sqlc.arg('client_id')::uuid;
 
 -- name: DeleteOrganizationGroups :exec
 DELETE FROM team_groups WHERE client_id = $1;

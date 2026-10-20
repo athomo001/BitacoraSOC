@@ -513,8 +513,18 @@ Generada desde `backend-go/cmd/server/main.go`, donde se registran las rutas. La
 | `GET` | `/api/teams/{id}/coverage` | Sesión · módulo NOC |
 | `POST` | `/api/teams/{id}/coverage` | Admin · módulo NOC |
 | `DELETE` | `/api/teams/{id}/coverage/{territorialUnitId}` | Admin · módulo NOC |
-| `GET` | `/api/raci-assignments` | Sesión |
-| `POST` | `/api/raci-assignments` | Admin |
+
+### RACI por cliente
+
+Matriz de responsabilidades del legacy (Escalamiento → Matriz RACI). Cada actividad (tópico, actividad, notas) tiene sus letras: `responsible` (R, una o más), `accountable` (A, exactamente una), `consulted` y `informed` (C e I, opcionales). Cada letra apunta a un equipo: una persona (equipo `raci` de un contacto del directorio), una lista o una guardia. `GET` trae por equipo sus integrantes con los canales descifrados (`channelType`, `value`, `href`).
+
+| Método | Ruta | Acceso |
+| --- | --- | --- |
+| `GET` | `/api/raci` | Sesión (`?clientId=` filtra por cliente) |
+| `POST` | `/api/raci` | Admin |
+| `PUT` | `/api/raci/{id}` | Admin (reemplaza la actividad y sus letras) |
+| `DELETE` | `/api/raci/{id}` | Admin |
+| `POST` | `/api/raci/people` | Admin (`{contactId}` → el equipo `raci` de esa persona; lo crea si no existe) |
 
 ### Inventario
 

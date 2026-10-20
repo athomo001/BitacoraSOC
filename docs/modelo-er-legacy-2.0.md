@@ -64,7 +64,8 @@ erDiagram
     teams ||--o{ team_members : "integrantes"
     escalation_pools |o--o{ team_members : "pool en un llamado"
     escalation_pools ||--o{ escalation_pool_members : "integrantes"
-    services ||--o{ raci_assignments : "RACI"
+    organizations ||--o{ raci_activities : "RACI"
+    raci_activities ||--o{ raci_assignments : "letras R/A/C/I"
     services ||--o{ maintenance_windows : "mantención"
     organizations ||--o{ client_alert_rules : "avisos"
     work_shifts ||--o{ work_shift_members : "personas"
@@ -100,7 +101,7 @@ Tablas de configuración (fila única): `app_config`, `app_branding`, `smtp_conf
 | `contacts` | 58 | `contacts`, `contact_channels`, `teams`, `team_members`, `escalation_policies`, `escalation_steps` | Cada servicio con contactos PARA/CC pasa a una política cuyo primer llamado es **"Aviso por correo (PARA y CC)"**, en modo pool. Las personas de ese llamado forman un grupo propio del paso (`teams.kind = 'step'`, sin organización): no aparece en Equipos y se borra con el paso. Los avisos preventivos sí quedan como equipos de la organización. |
 | `externalPersons` | 1 | `contacts` (ámbito interno) | Personal externo de guardia. |
 | `clientEscalationRules` | 6 | `escalation_pools`, `escalation_pool_members`, `escalation_steps`, `client_alert_rules`, `maintenance_windows` | Según el tipo de regla: flujos de llamada → llamados de la política, cada uno con su título del legacy ("1er llamado"…) y sus personas en un grupo del paso (`kind = 'step'`); los pasos `pool` del legacy pasan a pools con nombre; `special_alert` → avisos por cliente; mantenciones → ventanas por servicio. Las personas del flujo que no estaban en el directorio se crean como contactos. |
-| `raciEntries` | 12 | `raci_assignments` | Una fila por persona y letra R/A/C/I. |
+| `raciEntries` | 12 | `raci_activities` + `raci_assignments` | Una actividad por fila (tópico, actividad y notas tal cual) y una letra R/A/C/I por persona; cada persona es un contacto del directorio con su equipo «raci». |
 | `workShifts` | 2 | `work_shifts` | Horario, zona, reporte de cierre (destinatarios, asunto, qué incluye) y el orden en que se ven (`order` → `sort_order`). |
 | `workShiftAssignments` | 2 | `work_shift_members` | Personas del turno y sus días: reciben los recordatorios de turno, como en el legacy. |
 | `checklistTemplates` | 2 | `checklist_templates`, `checklist_items`, `work_shifts.checklist_template_*_id` | Ítems anidados → filas con `parent_item_id`. La asignación a turno (inicio/cierre) va en el turno. |

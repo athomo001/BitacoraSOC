@@ -169,18 +169,47 @@ WHERE mw.active AND mw.ends_at > now()
        OR mw.area_id = (SELECT aa.area_id FROM assets aa WHERE aa.id = sqlc.narg('asset_id'))
        OR mw.team_id = ANY(sqlc.arg('team_ids')::uuid[]));
 
--- ===== RACI (solo dato en esta fase, sin UI) =====
+-- ===== RACI por cliente (paridad con el legacy: Escalamiento → Matriz RACI) =====
 
--- name: ListRaciAssignments :many
-SELECT r.*, t.name AS team_name FROM raci_assignments r JOIN teams t ON t.id = r.team_id
-WHERE r.active
-  AND (sqlc.narg('client_id')::uuid IS NULL OR r.client_id = sqlc.narg('client_id'))
-  AND (sqlc.narg('service_id')::uuid IS NULL OR r.service_id = sqlc.narg('service_id'))
-ORDER BY r.topic, r.role;
+-- name: ListRaciActivities :many
+-- Actividades de un cliente (o de todos), con el nombre del cliente.
+SELECT a.id, a.client_id, a.topic, a.activity, a.notes, o.name AS client_name
+FROM raci_activities a JOIN organizations o ON o.id = a.client_id
+WHERE a.active AND (sqlc.narg('client_id')::uuid IS NULL OR a.client_id = sqlc.narg('client_id'))
+ORDER BY o.name, a.topic, a.activity;
 
--- name: CreateRaciAssignment :one
-INSERT INTO raci_assignments (client_id, service_id, asset_id, topic, role, team_id)
-VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
+-- name: ListRaciLetters :many
+-- Las letras R/A/C/I de varias actividades, con su equipo.
+SELECT ra.activity_id, ra.role, t.id AS team_id, t.name AS team_name, t.kind AS team_kind
+FROM raci_assignments ra JOIN teams t ON t.id = ra.team_id
+WHERE ra.activity_id = ANY(sqlc.arg('activity_ids')::uuid[])
+ORDER BY ra.activity_id, ra.role, t.name;
+
+-- name: CreateRaciActivity :one
+INSERT INTO raci_activities (client_id, topic, activity, notes) VALUES ($1, $2, $3, $4) RETURNING id;
+
+-- name: UpdateRaciActivity :execrows
+UPDATE raci_activities SET client_id = $2, topic = $3, activity = $4, notes = $5, updated_at = now()
+WHERE id = $1 AND active;
+
+-- name: DeleteRaciActivity :execrows
+DELETE FROM raci_activities WHERE id = $1;
+
+-- name: ClearRaciLetters :exec
+DELETE FROM raci_assignments WHERE activity_id = $1;
+
+-- name: AddRaciLetter :exec
+INSERT INTO raci_assignments (activity_id, role, team_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING;
+
+-- name: FindRaciTeamForContact :one
+-- El equipo «raci» de una sola persona (lo crean el editor o el ETL): se
+-- reutiliza para no repetir un equipo por cada actividad.
+SELECT t.id, t.name FROM teams t
+JOIN team_members m ON m.team_id = t.id AND m.active
+WHERE t.kind = 'raci' AND t.active AND m.contact_id = $1
+  AND (SELECT count(*) FROM team_members x WHERE x.team_id = t.id AND x.active) = 1
+ORDER BY t.name
+LIMIT 1;
 
 -- ===== Rediseño de escalamiento (#17, canvas v26) =====
 

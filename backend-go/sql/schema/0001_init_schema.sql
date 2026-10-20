@@ -2309,3 +2309,26 @@ CREATE TABLE ticket_number_series (
 );
 CREATE UNIQUE INDEX uq_ticket_number_series_default ON ticket_number_series (is_default) WHERE is_default;
 ALTER TABLE areas ADD COLUMN ticket_series_id UUID REFERENCES ticket_number_series(id) ON DELETE SET NULL;
+
+-- 000049: RACI por cliente con actividades (tópico, actividad, notas); cada
+-- letra R/A/C/I cuelga de la actividad y apunta a un equipo.
+CREATE TABLE raci_activities (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  topic TEXT NOT NULL DEFAULT '' CHECK (length(topic) <= 180),
+  activity TEXT NOT NULL CHECK (length(trim(activity)) BETWEEN 1 AND 300),
+  notes TEXT NOT NULL DEFAULT '' CHECK (length(notes) <= 2000),
+  active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE raci_assignments
+  ADD COLUMN activity_id UUID NOT NULL REFERENCES raci_activities(id) ON DELETE CASCADE,
+  DROP COLUMN client_id,
+  DROP COLUMN service_id,
+  DROP COLUMN asset_id,
+  DROP COLUMN topic,
+  DROP COLUMN active;
+ALTER TABLE raci_assignments ADD CONSTRAINT uq_raci_assignment UNIQUE (activity_id, role, team_id);
+CREATE INDEX idx_raci_activities_client ON raci_activities(client_id) WHERE active;
+CREATE INDEX idx_raci_assignments_team ON raci_assignments(team_id);

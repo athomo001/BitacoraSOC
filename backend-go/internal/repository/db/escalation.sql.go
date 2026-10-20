@@ -93,12 +93,36 @@ func (q *Queries) AddPolicyStep(ctx context.Context, arg AddPolicyStepParams) (E
 	return i, err
 }
 
+const addRaciLetter = `-- name: AddRaciLetter :exec
+INSERT INTO raci_assignments (activity_id, role, team_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING
+`
+
+type AddRaciLetterParams struct {
+	ActivityID uuid.UUID `json:"activity_id"`
+	Role       RaciRole  `json:"role"`
+	TeamID     uuid.UUID `json:"team_id"`
+}
+
+func (q *Queries) AddRaciLetter(ctx context.Context, arg AddRaciLetterParams) error {
+	_, err := q.db.Exec(ctx, addRaciLetter, arg.ActivityID, arg.Role, arg.TeamID)
+	return err
+}
+
 const clearEscalationPoolMembers = `-- name: ClearEscalationPoolMembers :exec
 DELETE FROM escalation_pool_members WHERE pool_id = $1
 `
 
 func (q *Queries) ClearEscalationPoolMembers(ctx context.Context, poolID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, clearEscalationPoolMembers, poolID)
+	return err
+}
+
+const clearRaciLetters = `-- name: ClearRaciLetters :exec
+DELETE FROM raci_assignments WHERE activity_id = $1
+`
+
+func (q *Queries) ClearRaciLetters(ctx context.Context, activityID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, clearRaciLetters, activityID)
 	return err
 }
 
@@ -296,41 +320,27 @@ func (q *Queries) CreatePolicy(ctx context.Context, arg CreatePolicyParams) (Esc
 	return i, err
 }
 
-const createRaciAssignment = `-- name: CreateRaciAssignment :one
-INSERT INTO raci_assignments (client_id, service_id, asset_id, topic, role, team_id)
-VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, client_id, service_id, asset_id, topic, role, team_id, active
+const createRaciActivity = `-- name: CreateRaciActivity :one
+INSERT INTO raci_activities (client_id, topic, activity, notes) VALUES ($1, $2, $3, $4) RETURNING id
 `
 
-type CreateRaciAssignmentParams struct {
-	ClientID  pgtype.UUID `json:"client_id"`
-	ServiceID pgtype.UUID `json:"service_id"`
-	AssetID   pgtype.UUID `json:"asset_id"`
-	Topic     string      `json:"topic"`
-	Role      RaciRole    `json:"role"`
-	TeamID    uuid.UUID   `json:"team_id"`
+type CreateRaciActivityParams struct {
+	ClientID uuid.UUID `json:"client_id"`
+	Topic    string    `json:"topic"`
+	Activity string    `json:"activity"`
+	Notes    string    `json:"notes"`
 }
 
-func (q *Queries) CreateRaciAssignment(ctx context.Context, arg CreateRaciAssignmentParams) (RaciAssignment, error) {
-	row := q.db.QueryRow(ctx, createRaciAssignment,
+func (q *Queries) CreateRaciActivity(ctx context.Context, arg CreateRaciActivityParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, createRaciActivity,
 		arg.ClientID,
-		arg.ServiceID,
-		arg.AssetID,
 		arg.Topic,
-		arg.Role,
-		arg.TeamID,
+		arg.Activity,
+		arg.Notes,
 	)
-	var i RaciAssignment
-	err := row.Scan(
-		&i.ID,
-		&i.ClientID,
-		&i.ServiceID,
-		&i.AssetID,
-		&i.Topic,
-		&i.Role,
-		&i.TeamID,
-		&i.Active,
-	)
-	return i, err
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const createService = `-- name: CreateService :one
@@ -426,6 +436,18 @@ func (q *Queries) DeletePolicyStep(ctx context.Context, arg DeletePolicyStepPara
 	return result.RowsAffected(), nil
 }
 
+const deleteRaciActivity = `-- name: DeleteRaciActivity :execrows
+DELETE FROM raci_activities WHERE id = $1
+`
+
+func (q *Queries) DeleteRaciActivity(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteRaciActivity, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteStepTeam = `-- name: DeleteStepTeam :exec
 DELETE FROM teams WHERE id = $1 AND kind = 'step'
 `
@@ -458,6 +480,29 @@ func (q *Queries) FindPolicyByService(ctx context.Context, serviceID pgtype.UUID
 	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err
+}
+
+const findRaciTeamForContact = `-- name: FindRaciTeamForContact :one
+SELECT t.id, t.name FROM teams t
+JOIN team_members m ON m.team_id = t.id AND m.active
+WHERE t.kind = 'raci' AND t.active AND m.contact_id = $1
+  AND (SELECT count(*) FROM team_members x WHERE x.team_id = t.id AND x.active) = 1
+ORDER BY t.name
+LIMIT 1
+`
+
+type FindRaciTeamForContactRow struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+}
+
+// El equipo «raci» de una sola persona (lo crean el editor o el ETL): se
+// reutiliza para no repetir un equipo por cada actividad.
+func (q *Queries) FindRaciTeamForContact(ctx context.Context, contactID pgtype.UUID) (FindRaciTeamForContactRow, error) {
+	row := q.db.QueryRow(ctx, findRaciTeamForContact, contactID)
+	var i FindRaciTeamForContactRow
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
 }
 
 const getAssetForResolve = `-- name: GetAssetForResolve :one
@@ -1387,52 +1432,83 @@ func (q *Queries) ListPoolMembersForTeams(ctx context.Context, teamIds []uuid.UU
 	return items, nil
 }
 
-const listRaciAssignments = `-- name: ListRaciAssignments :many
+const listRaciActivities = `-- name: ListRaciActivities :many
 
-SELECT r.id, r.client_id, r.service_id, r.asset_id, r.topic, r.role, r.team_id, r.active, t.name AS team_name FROM raci_assignments r JOIN teams t ON t.id = r.team_id
-WHERE r.active
-  AND ($1::uuid IS NULL OR r.client_id = $1)
-  AND ($2::uuid IS NULL OR r.service_id = $2)
-ORDER BY r.topic, r.role
+SELECT a.id, a.client_id, a.topic, a.activity, a.notes, o.name AS client_name
+FROM raci_activities a JOIN organizations o ON o.id = a.client_id
+WHERE a.active AND ($1::uuid IS NULL OR a.client_id = $1)
+ORDER BY o.name, a.topic, a.activity
 `
 
-type ListRaciAssignmentsParams struct {
-	ClientID  pgtype.UUID `json:"client_id"`
-	ServiceID pgtype.UUID `json:"service_id"`
+type ListRaciActivitiesRow struct {
+	ID         uuid.UUID `json:"id"`
+	ClientID   uuid.UUID `json:"client_id"`
+	Topic      string    `json:"topic"`
+	Activity   string    `json:"activity"`
+	Notes      string    `json:"notes"`
+	ClientName string    `json:"client_name"`
 }
 
-type ListRaciAssignmentsRow struct {
-	ID        uuid.UUID   `json:"id"`
-	ClientID  pgtype.UUID `json:"client_id"`
-	ServiceID pgtype.UUID `json:"service_id"`
-	AssetID   pgtype.UUID `json:"asset_id"`
-	Topic     string      `json:"topic"`
-	Role      RaciRole    `json:"role"`
-	TeamID    uuid.UUID   `json:"team_id"`
-	Active    bool        `json:"active"`
-	TeamName  string      `json:"team_name"`
-}
-
-// ===== RACI (solo dato en esta fase, sin UI) =====
-func (q *Queries) ListRaciAssignments(ctx context.Context, arg ListRaciAssignmentsParams) ([]ListRaciAssignmentsRow, error) {
-	rows, err := q.db.Query(ctx, listRaciAssignments, arg.ClientID, arg.ServiceID)
+// ===== RACI por cliente (paridad con el legacy: Escalamiento → Matriz RACI) =====
+// Actividades de un cliente (o de todos), con el nombre del cliente.
+func (q *Queries) ListRaciActivities(ctx context.Context, clientID pgtype.UUID) ([]ListRaciActivitiesRow, error) {
+	rows, err := q.db.Query(ctx, listRaciActivities, clientID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListRaciAssignmentsRow
+	var items []ListRaciActivitiesRow
 	for rows.Next() {
-		var i ListRaciAssignmentsRow
+		var i ListRaciActivitiesRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ClientID,
-			&i.ServiceID,
-			&i.AssetID,
 			&i.Topic,
+			&i.Activity,
+			&i.Notes,
+			&i.ClientName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRaciLetters = `-- name: ListRaciLetters :many
+SELECT ra.activity_id, ra.role, t.id AS team_id, t.name AS team_name, t.kind AS team_kind
+FROM raci_assignments ra JOIN teams t ON t.id = ra.team_id
+WHERE ra.activity_id = ANY($1::uuid[])
+ORDER BY ra.activity_id, ra.role, t.name
+`
+
+type ListRaciLettersRow struct {
+	ActivityID uuid.UUID `json:"activity_id"`
+	Role       RaciRole  `json:"role"`
+	TeamID     uuid.UUID `json:"team_id"`
+	TeamName   string    `json:"team_name"`
+	TeamKind   string    `json:"team_kind"`
+}
+
+// Las letras R/A/C/I de varias actividades, con su equipo.
+func (q *Queries) ListRaciLetters(ctx context.Context, activityIds []uuid.UUID) ([]ListRaciLettersRow, error) {
+	rows, err := q.db.Query(ctx, listRaciLetters, activityIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListRaciLettersRow
+	for rows.Next() {
+		var i ListRaciLettersRow
+		if err := rows.Scan(
+			&i.ActivityID,
 			&i.Role,
 			&i.TeamID,
-			&i.Active,
 			&i.TeamName,
+			&i.TeamKind,
 		); err != nil {
 			return nil, err
 		}
@@ -1940,6 +2016,33 @@ func (q *Queries) UpdatePolicyStep(ctx context.Context, arg UpdatePolicyStepPara
 		&i.Title,
 	)
 	return i, err
+}
+
+const updateRaciActivity = `-- name: UpdateRaciActivity :execrows
+UPDATE raci_activities SET client_id = $2, topic = $3, activity = $4, notes = $5, updated_at = now()
+WHERE id = $1 AND active
+`
+
+type UpdateRaciActivityParams struct {
+	ID       uuid.UUID `json:"id"`
+	ClientID uuid.UUID `json:"client_id"`
+	Topic    string    `json:"topic"`
+	Activity string    `json:"activity"`
+	Notes    string    `json:"notes"`
+}
+
+func (q *Queries) UpdateRaciActivity(ctx context.Context, arg UpdateRaciActivityParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateRaciActivity,
+		arg.ID,
+		arg.ClientID,
+		arg.Topic,
+		arg.Activity,
+		arg.Notes,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateService = `-- name: UpdateService :one

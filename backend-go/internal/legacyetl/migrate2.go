@@ -242,6 +242,7 @@ func (m *Migrator) migrateRaci(ctx context.Context) error {
 		ClientID    string `json:"clientId"`
 		Topic       string `json:"topic"`
 		Activity    string `json:"activity"`
+		Notes       string `json:"notes"`
 		Active      bool   `json:"active"`
 		Responsible person `json:"responsible"`
 		Accountable person `json:"accountable"`
@@ -262,13 +263,21 @@ func (m *Migrator) migrateRaci(ctx context.Context) error {
 			step.skip("su cliente no viene en la exportación")
 			continue
 		}
-		topic := strings.TrimSpace(r.Topic)
-		if a := strings.TrimSpace(r.Activity); a != "" {
-			topic += " — " + a
+		// Tópico, actividad y notas van tal cual (000049). Sin actividad, el
+		// tópico hace de actividad.
+		topic := directory.Sanitize(r.Topic, 180)
+		activityName := directory.Sanitize(r.Activity, 300)
+		if activityName == "" {
+			topic, activityName = "", topic
 		}
-		if topic == "" {
-			step.skip("sin tema")
+		if activityName == "" {
+			step.skip("sin actividad ni tópico")
 			continue
+		}
+		activity := ID("raciActivities", r.ID)
+		if _, err := m.tx.Exec(ctx, `INSERT INTO raci_activities (id, client_id, topic, activity, notes, active) VALUES ($1,$2,$3,$4,$5,$6)`,
+			activity, org, topic, activityName, strings.TrimSpace(r.Notes), r.Active); err != nil {
+			return err
 		}
 		for _, role := range []struct {
 			name string
@@ -302,8 +311,8 @@ func (m *Migrator) migrateRaci(ctx context.Context) error {
 				}
 				teamByPerson[key] = team
 			}
-			if _, err := m.tx.Exec(ctx, `INSERT INTO raci_assignments (id, client_id, topic, role, team_id, active) VALUES ($1,$2,$3,$4,$5,$6)`,
-				uuid.New(), org, topic, role.name, team, r.Active); err != nil {
+			if _, err := m.tx.Exec(ctx, `INSERT INTO raci_assignments (id, activity_id, role, team_id) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+				uuid.New(), activity, role.name, team); err != nil {
 				return err
 			}
 			assignments++

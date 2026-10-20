@@ -108,15 +108,6 @@ func (q *Queries) DeleteAssetPolicies(ctx context.Context, assetID pgtype.UUID) 
 	return err
 }
 
-const deleteAssetRaci = `-- name: DeleteAssetRaci :exec
-DELETE FROM raci_assignments WHERE asset_id = $1
-`
-
-func (q *Queries) DeleteAssetRaci(ctx context.Context, assetID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, deleteAssetRaci, assetID)
-	return err
-}
-
 const deleteAssetWithoutHistory = `-- name: DeleteAssetWithoutHistory :execrows
 DELETE FROM assets a WHERE a.id = $1 AND (a.client_id = $2 OR a.contractor_id = $2)
   AND NOT EXISTS (SELECT 1 FROM entries e WHERE e.asset_id = a.id)
@@ -148,10 +139,10 @@ func (q *Queries) DeleteOrganizationGroups(ctx context.Context, clientID pgtype.
 }
 
 const deleteOrganizationRaci = `-- name: DeleteOrganizationRaci :exec
-DELETE FROM raci_assignments WHERE client_id = $1
+DELETE FROM raci_activities WHERE client_id = $1::uuid
 `
 
-func (q *Queries) DeleteOrganizationRaci(ctx context.Context, clientID pgtype.UUID) error {
+func (q *Queries) DeleteOrganizationRaci(ctx context.Context, clientID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteOrganizationRaci, clientID)
 	return err
 }
@@ -172,19 +163,10 @@ const deleteServicePolicies = `-- name: DeleteServicePolicies :exec
 DELETE FROM escalation_policies WHERE service_id = $1
 `
 
+// Antes de borrar un servicio sin historial: sus políticas de escalamiento
+// (los pasos caen con la política).
 func (q *Queries) DeleteServicePolicies(ctx context.Context, serviceID pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, deleteServicePolicies, serviceID)
-	return err
-}
-
-const deleteServiceRaci = `-- name: DeleteServiceRaci :exec
-DELETE FROM raci_assignments WHERE service_id = $1
-`
-
-// Antes de borrar un servicio sin historial: su RACI y sus políticas de
-// escalamiento (los pasos caen con la política).
-func (q *Queries) DeleteServiceRaci(ctx context.Context, serviceID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, deleteServiceRaci, serviceID)
 	return err
 }
 

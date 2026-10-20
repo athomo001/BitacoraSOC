@@ -4,6 +4,16 @@ Registro de cambios relevantes del proyecto.
 
 > Las entradas `[Rewrite]` registran avance de la reescritura Go/Angular especificada en `spec/` (ver `spec/02-alcance-y-roadmap.md`), fase por fase. No llevan número de versión de `package.json` porque documentan spec/decisiones/código de un sistema todavía no desplegado — el sistema en producción sigue siendo el de las entradas versionadas de abajo hasta el corte (Fase 14).
 
+## [Rewrite] RACI por cliente, como el legacy - 2026-10-20
+
+- Estaba en el backlog post-corte, pero el legacy lo usa: en producción hay **12 actividades RACI** y **8 tienen una nota operativa** («Después de 17 horas el aviso es por canal de grupo de WhatsApp»). La 2.0 tenía el dato, pero ninguna pantalla lo mostraba. Decisión del dueño: falta para el corte.
+- **Escalamiento → RACI** (analistas): botón junto a Mantenimientos. Por cliente, cada actividad agrupada por tópico con su responsable (R), aprobador (A), consultados (C), informados (I) y notas. Parte con el cliente del servicio que se está mirando. Un clic en un correo lo copia; el teléfono se puede marcar.
+- **Administración → Matriz RACI** (admin): crear, editar y eliminar actividades. Validación: un solo aprobador y al menos un responsable. Cada letra puede ser una guardia o lista que ya existe, una persona del directorio o una persona nueva, que se crea en el directorio del cliente.
+- **Modelo** (migración 000049): la actividad tiene su tabla (`raci_activities`: cliente, tópico, actividad, notas) y las letras cuelgan de ella. Antes cada letra guardaba «tópico — actividad» suelto; la migración lo separa, deja una sola letra repetida y descarta las que no tenían cliente (no había pantalla que las creara). Se probó sobre una copia de la base de desarrollo (12 actividades, 47 letras) y hacia atrás.
+- **ETL corregido**: antes perdía las notas y juntaba tópico y actividad. Ahora los pasa tal cual. Probado con el respaldo de producción: 12 de 12 actividades, las 8 notas y las 47 letras.
+- Rutas nuevas `GET/POST /api/raci`, `PUT/DELETE /api/raci/{id}` y `POST /api/raci/people`; se quitan `/api/raci-assignments` (sin uso). Auditoría: `raci.create`, `raci.update`, `raci.delete`, `raci.person`.
+- `docs/operacion.md` decía que la última migración era la 000042; corregido a la 000049.
+
 ## [Rewrite] Tema Rosa con efecto 8-bit - 2026-10-19
 
 - Pedido del dueño: el tema rosado cambia a una paleta pastel con un efecto 8-bit sutil, inspirado en imágenes de pixel art que él mandó. Diseño aprobado: <https://claude.ai/artifact/Y7xkYZWXpVWNE7dv6hENfc>. Decisiones del dueño: se sigue llamando **Rosa**, **reemplaza** al rosado anterior, la fuente pixelada **no** va en los nombres del menú y el fondo lleva cuadriculado. Oscuro, Claro y los temas del login no cambian.

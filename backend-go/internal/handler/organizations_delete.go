@@ -255,10 +255,13 @@ func (h *OrganizationsHandler) applyOrgDelete(ctx context.Context, q *db.Queries
 		}
 		counts["moveTo"] = len(dep.Services) + len(dep.Teams) + len(dep.Assets)
 	}
-	for _, step := range []func(context.Context, pgtype.UUID) error{q.ReleaseOrganizationGroups, q.ReleaseOrganizationVia, q.DeleteOrganizationRaci, q.DeleteOrganizationGroups} {
+	for _, step := range []func(context.Context, pgtype.UUID) error{q.ReleaseOrganizationGroups, q.ReleaseOrganizationVia, q.DeleteOrganizationGroups} {
 		if err := step(ctx, org); err != nil {
 			return nil, err
 		}
+	}
+	if err := q.DeleteOrganizationRaci(ctx, id); err != nil {
+		return nil, err
 	}
 	n, err := q.ArchiveOrganization(ctx, id)
 	if err != nil {
@@ -320,9 +323,6 @@ func (h *OrganizationsHandler) applyOrgAction(ctx context.Context, q *db.Queries
 		}
 		return n, err
 	case "service.delete":
-		if err := q.DeleteServiceRaci(ctx, pgtype.UUID{Bytes: a.ID, Valid: true}); err != nil {
-			return 0, err
-		}
 		if err := q.DeleteServicePolicies(ctx, pgtype.UUID{Bytes: a.ID, Valid: true}); err != nil {
 			return 0, err
 		}
@@ -354,9 +354,6 @@ func (h *OrganizationsHandler) applyOrgAction(ctx context.Context, q *db.Queries
 	case "asset.rename":
 		return q.RenameAsset(ctx, db.RenameAssetParams{Name: name, ID: a.ID, Org: org})
 	case "asset.delete":
-		if err := q.DeleteAssetRaci(ctx, pgtype.UUID{Bytes: a.ID, Valid: true}); err != nil {
-			return 0, err
-		}
 		if err := q.DeleteAssetPolicies(ctx, pgtype.UUID{Bytes: a.ID, Valid: true}); err != nil {
 			return 0, err
 		}

@@ -2070,15 +2070,22 @@ type PublicShareLink struct {
 	LastAccessedAt pgtype.Timestamptz `json:"last_accessed_at"`
 }
 
+type RaciActivity struct {
+	ID        uuid.UUID          `json:"id"`
+	ClientID  uuid.UUID          `json:"client_id"`
+	Topic     string             `json:"topic"`
+	Activity  string             `json:"activity"`
+	Notes     string             `json:"notes"`
+	Active    bool               `json:"active"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 type RaciAssignment struct {
-	ID        uuid.UUID   `json:"id"`
-	ClientID  pgtype.UUID `json:"client_id"`
-	ServiceID pgtype.UUID `json:"service_id"`
-	AssetID   pgtype.UUID `json:"asset_id"`
-	Topic     string      `json:"topic"`
-	Role      RaciRole    `json:"role"`
-	TeamID    uuid.UUID   `json:"team_id"`
-	Active    bool        `json:"active"`
+	ID         uuid.UUID `json:"id"`
+	Role       RaciRole  `json:"role"`
+	TeamID     uuid.UUID `json:"team_id"`
+	ActivityID uuid.UUID `json:"activity_id"`
 }
 
 type ReportEvent struct {

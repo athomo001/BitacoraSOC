@@ -1,0 +1,112 @@
+/* Matriz RACI: tópico como fila de grupo, letras con su persona y canales. */
+mat-icon {
+  width: 14px;
+  height: 14px;
+  font-size: 14px;
+}
+
+.rt__table th,
+.rt__table td {
+  vertical-align: top;
+}
+
+.rt__letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.rt__group th {
+  padding-top: 14px;
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+  font-size: 12px;
+  text-transform: none;
+}
+
+.rt__activity {
+  min-width: 160px;
+  font-weight: 600;
+}
+
+.rt__activity .adm-muted {
+  display: block;
+  font-weight: 400;
+}
+
+.rt__cell {
+  min-width: 150px;
+}
+
+.rt__who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+}
+
+.rt__who + .rt__who {
+  margin-top: 8px;
+}
+
+.rt__member {
+  color: var(--text-secondary);
+  font-size: 11.5px;
+}
+
+.rt__chan {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 11px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.rt__chan:hover {
+  text-decoration: underline;
+}
+
+.rt__notes {
+  min-width: 180px;
+}
+
+.rt__note {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  color: var(--text-primary);
+}
+
+.rt__note mat-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--status-warning);
+}
+
+.rt__actions {
+  white-space: nowrap;
+}
+
+.rt__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
